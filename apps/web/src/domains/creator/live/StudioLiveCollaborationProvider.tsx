@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { useStudioLiveAutoReconnect } from "./use-studio-live-auto-reconnect";
+import { studioAutomergeOfflineBranchEnabled } from "../offline-branch/studio-offline-branch-feature";
 
 import { readOrCreateStudioLiveClientInstanceId } from "./studio-live-client-identity";
 import {
@@ -26,6 +27,7 @@ import {
 } from "./studio-live-sync-safety";
 
 import type { StudioCrdtDocument } from "./studio-crdt-document";
+import type { StudioOfflineBranchRuntime } from "../offline-branch/studio-offline-branch-runtime";
 import type { StudioCrdtRecoveryVaultEntry } from "./studio-crdt-recovery-vault";
 import type {
   StudioCrdtAuthoritativeAckBarrierResult,
@@ -51,6 +53,7 @@ export type StudioCrdtAuthoritativeSaveBarrier = (
 ) => Promise<StudioCrdtAuthoritativeAckBarrierResult>;
 
 export interface StudioCrdtSceneGraphRuntime {
+  offlineBranch?: StudioOfflineBranchRuntime | null;
   flushAndWaitForDelivery: (timeoutMs?: number) => Promise<void>;
   flushAndWaitForDraftProtection: (
     timeoutMs?: number
@@ -476,6 +479,8 @@ export function StudioLiveCollaborationProvider({
       };
       let crdtDocument: StudioCrdtDocument | null = null;
       let crdtBinding: StudioCrdtRoomBinding | null = null;
+      let offlineBranchRuntime: StudioOfflineBranchRuntime | null = null;
+      let offlineBranchPeerSync: { announce(): void; close(): void } | null = null;
       let crdtDurabilityWarning: string | null = null;
       const exposeReadyRoom = (nextError?: string | null) => {
         if (crdtDurabilityWarning) {
@@ -491,6 +496,7 @@ export function StudioLiveCollaborationProvider({
         if (event.type === "presence") {
           observedPeerCount = event.peers.length;
           setPeers(event.peers);
+          offlineBranchPeerSync?.announce();
           if (nextRoom.ready) exposeReadyRoom();
           return;
         }
@@ -629,6 +635,32 @@ export function StudioLiveCollaborationProvider({
             outboxScope,
             onStatus: (status) => {
               if (cancelled) return;
+              const hasCanonicalAuthority =
+                status.state === "ready"
+                && nextRoom.ready
+                && (
+                  nextRoom.mode !== "server"
+                  || nextRoom.crdtFanout === "authoritative"
+                );
+              offlineBranchRuntime?.setCanonicalAuthority(hasCanonicalAuthority);
+              if (
+                hasCanonicalAuthority
+                && offlineBranchRuntime
+                && crdtDocument
+                && crdtBinding
+              ) {
+                void offlineBranchRuntime.promotePending(
+                  crdtDocument,
+                  () => crdtBinding!.flushAndWaitForDraftProtection(),
+                ).catch((promotionCause) => {
+                  if (!cancelled) {
+                    setError(messageFrom(
+                      promotionCause,
+                      "오프라인 변경을 서버 정본에 합치지 못했습니다.",
+                    ));
+                  }
+                });
+              }
               // Transport revocation rejects pending CRDT operations before or after its status
               // event depending on scheduling. The synchronously latched boundary makes both
               // orders converge on the same user-visible terminal state.
@@ -704,6 +736,50 @@ export function StudioLiveCollaborationProvider({
             setOperationSyncReady(false);
             return;
           }
+          if (participantCanEdit && studioAutomergeOfflineBranchEnabled()) {
+            try {
+              const offlineModule = await import(
+                "../offline-branch/studio-offline-branch-runtime"
+              );
+                const offlineScope = outboxScope?.trim()
+                  || `local-${nextRoom.participant.sessionId}`;
+                offlineBranchRuntime = await offlineModule.StudioOfflineBranchRuntime.create({
+                  workId: nextRoom.workId,
+                  scope: offlineScope,
+                  actorId: offlineScope,
+                  canonicalAuthority:
+                    nextRoom.ready
+                    && (
+                      nextRoom.mode !== "server"
+                      || nextRoom.crdtFanout === "authoritative"
+                    ),
+                  onError: (message) => {
+                    if (!cancelled) setError(message);
+                  },
+                });
+                const peerModule = await import(
+                  "../offline-branch/studio-offline-branch-p2p"
+                );
+                offlineBranchPeerSync = peerModule.connectStudioOfflineBranchPeerSync({
+                  runtime: offlineBranchRuntime,
+                  room: nextRoom,
+                  workId: nextRoom.workId,
+                  scope: offlineScope,
+                  onError: (message) => {
+                    if (!cancelled) setError(message);
+                  },
+                });
+            } catch (offlineCause) {
+              setError(messageFrom(
+                offlineCause,
+                "오프라인 변경 보관함을 준비하지 못했습니다. 온라인 공동 편집은 계속 사용할 수 있습니다.",
+              ));
+              offlineBranchPeerSync?.close();
+              offlineBranchPeerSync = null;
+              await offlineBranchRuntime?.close().catch(() => undefined);
+              offlineBranchRuntime = null;
+            }
+          }
           const readyBinding = crdtBinding;
           onAuthoritativeSaveBarrierChange?.((timeoutMs) =>
             readyBinding.flushAndWaitForAuthoritativeAck(timeoutMs)
@@ -711,6 +787,7 @@ export function StudioLiveCollaborationProvider({
           onCrdtDocumentChange?.(
             crdtDocument,
             {
+              offlineBranch: offlineBranchRuntime,
               flushAndWaitForDelivery: async (timeoutMs) => {
                 if (cancelled || crdtBinding !== readyBinding) throw new Error("공동 편집 원고가 변경되었습니다.");
                 await readyBinding.flushAndWaitForDelivery(timeoutMs);
@@ -757,6 +834,11 @@ export function StudioLiveCollaborationProvider({
           onAuthoritativeSaveBarrierChange?.(null);
           failedBinding?.close();
           failedDocument?.destroy();
+          offlineBranchPeerSync?.close();
+          offlineBranchPeerSync = null;
+          const failedOfflineBranch = offlineBranchRuntime;
+          offlineBranchRuntime = null;
+          await failedOfflineBranch?.close().catch(() => undefined);
           stopVisibilityListener();
           stopRoomSubscription();
           closeRoom();
@@ -776,8 +858,13 @@ export function StudioLiveCollaborationProvider({
         stopRoomSubscription();
         const closingBinding = crdtBinding;
         const closingDocument = crdtDocument;
+        const closingOfflineBranch = offlineBranchRuntime;
         crdtBinding = null;
         crdtDocument = null;
+        offlineBranchPeerSync?.close();
+        offlineBranchPeerSync = null;
+        offlineBranchRuntime = null;
+        void closingOfflineBranch?.close().catch(() => undefined);
         if (closingBinding && closingDocument) {
           void closingBinding.closeGracefully()
             .finally(() => {

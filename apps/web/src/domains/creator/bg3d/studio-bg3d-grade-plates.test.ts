@@ -21,17 +21,28 @@ function pixelsDiffer(a: Uint8ClampedArray, b: Uint8ClampedArray): boolean {
 
 describe("background 3D plates and offered commands", () => {
   it("captures a line plate and a fill plate that follow the camera, light, and props", () => {
-    const scene = createStudio3dHistory().scene;
-    const first = captureStudio3dPlates(scene, 160, 90);
+    let history = createStudio3dHistory();
+    const first = captureStudio3dPlates(history.scene, 160, 90);
     expect(first.width).toBe(160);
     expect(first.height).toBe(90);
     const fill = plateCoverage(first.fill, first.width, first.height);
     expect(fill.width / first.width).toBeGreaterThanOrEqual(0.8);
     expect(fill.height / first.height).toBeGreaterThanOrEqual(0.8);
     expect(linePlateIsStroke(first.line)).toBe(true);
-    const movedCamera = captureStudio3dPlates({ ...scene, camera: { yaw: 1.1, pitch: -0.2, fov: 55 } }, 160, 90);
-    const movedLight = captureStudio3dPlates({ ...scene, light: { azimuth: 0.1, elevation: 0.2, intensity: 0.35 } }, 160, 90);
-    const movedProp = captureStudio3dPlates({ ...scene, props: [{ id: "desk", x: -0.45, y: 0.2, z: 0.1 }] }, 160, 90);
+
+    history = applyStudio3dCommand(history, { id: "set-camera", yaw: 1.1, pitch: -0.2, fov: 55 });
+    const movedCamera = captureStudio3dPlates(history.scene, 160, 90);
+    history = applyStudio3dCommand(createStudio3dHistory(), { id: "set-light", azimuth: 0.1, elevation: 0.2, intensity: 0.35 });
+    const movedLight = captureStudio3dPlates(history.scene, 160, 90);
+    history = applyStudio3dCommand(createStudio3dHistory(), {
+      id: "place-prop",
+      propId: "desk",
+      x: -0.45,
+      y: 0.2,
+      z: 0.1,
+    });
+    const movedProp = captureStudio3dPlates(history.scene, 160, 90);
+
     expect(pixelsDiffer(first.fill, movedCamera.fill) || pixelsDiffer(first.line, movedCamera.line)).toBe(true);
     expect(pixelsDiffer(first.fill, movedLight.fill)).toBe(true);
     expect(pixelsDiffer(first.fill, movedProp.fill) || pixelsDiffer(first.line, movedProp.line)).toBe(true);
