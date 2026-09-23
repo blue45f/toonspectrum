@@ -140,6 +140,8 @@ export type StudioLayerNavigatorNode =
       key: string;
       group: LayerGroup;
       entries: readonly StudioLayerNavigatorResult[];
+      /** Optional DOM window. Group semantics and counts always use `entries`; rows render this prefix. */
+      renderedEntries?: readonly StudioLayerNavigatorResult[];
       segmentIndex: number;
       empty: boolean;
       expanded: boolean;
