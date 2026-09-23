@@ -237,6 +237,11 @@ const OCCT_NPM_INTEGRITY =
 const OCCT_WASM_SHA256 =
   "6cc2f3fa1611d32ad7563f7092aa1bf58741124302630cef7d21561ecd7b7284";
 
+const REMOTION_PACKAGE_VERSION = "4.0.514";
+const REMOTION_LICENSE_EXPRESSION = "Remotion License";
+const REMOTION_LICENSE_SHA256 =
+  "9830440ed5c55fbbbc0afcf58f292dc1c1522e9e691264a78733f1e11b2841b9";
+
 const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "0BSD",
   "(MIT AND Zlib)",
@@ -253,11 +258,28 @@ const REVIEWED_LICENSE_EXPRESSIONS = new Set([
   "MIT OR Apache-2.0",
   "MPL-2.0",
   "Public Domain",
+  REMOTION_LICENSE_EXPRESSION,
   "SGI-B-2.0",
   "Unlicense",
 ]);
 
 const REVIEWED_RESTRICTED_PRODUCTION_DEPENDENCIES = Object.freeze({
+  "@remotion/player": Object.freeze({
+    version: REMOTION_PACKAGE_VERSION,
+    license: REMOTION_LICENSE_EXPRESSION,
+    detectedLicenses: Object.freeze([
+      "SEE LICENSE IN LICENSE.md",
+      "Unknown",
+    ]),
+  }),
+  remotion: Object.freeze({
+    version: REMOTION_PACKAGE_VERSION,
+    license: REMOTION_LICENSE_EXPRESSION,
+    detectedLicenses: Object.freeze([
+      "SEE LICENSE IN LICENSE.md",
+      "Unknown",
+    ]),
+  }),
   mixbox: Object.freeze({
     version: "2.0.0",
     license: "CC-BY-NC-4.0",
@@ -270,7 +292,11 @@ function validateReviewedRestrictedProductionDependency(
   license,
 ) {
   const policy = REVIEWED_RESTRICTED_PRODUCTION_DEPENDENCIES[name];
-  if (!policy && license !== "CC-BY-NC-4.0") return;
+  if (
+    !policy
+    && license !== "CC-BY-NC-4.0"
+    && license !== REMOTION_LICENSE_EXPRESSION
+  ) return;
   if (
     !policy
     || policy.license !== license
@@ -283,11 +309,27 @@ function validateReviewedRestrictedProductionDependency(
   }
 }
 
+function resolveReviewedLicenseExpression(name, versions, detectedLicense) {
+  const policy = REVIEWED_RESTRICTED_PRODUCTION_DEPENDENCIES[name];
+  if (!policy?.detectedLicenses) return detectedLicense;
+  if (
+    versions.length !== 1
+    || versions[0] !== policy.version
+    || !policy.detectedLicenses.includes(detectedLicense)
+  ) {
+    throw new Error(
+      `Reviewed license metadata changed: ${name}@${versions.join(",") || "(missing)"} — ${detectedLicense || "(missing)"}`,
+    );
+  }
+  return policy.license;
+}
+
 const REVIEWED_LICENSE_FILE_DIGESTS = new Map([
   [
     "422fa324bf754acb2f48918039858f39bc31cc1a710b492906889f9363d6b09e",
     "MIT",
   ],
+  [REMOTION_LICENSE_SHA256, REMOTION_LICENSE_EXPRESSION],
 ]);
 
 const HYBRID_PROVIDER_DEPENDENCIES = Object.freeze({
@@ -1434,11 +1476,16 @@ export function readFilesystemLicenseInventory() { // NOSONAR javascript:S3776
     }
 
     if (!packageJson.private) {
-      const license =
+      const detectedLicense =
         normalizeLicenseExpression(
           packageJson.license ?? packageJson.licenses,
         )
         || inferLicenseExpressionFromFiles(packagePath);
+      const license = resolveReviewedLicenseExpression(
+        packageJson.name,
+        [packageJson.version],
+        detectedLicense,
+      );
       if (!REVIEWED_LICENSE_EXPRESSIONS.has(license)) {
         throw new Error(
           `Unreviewed production license expression: ${license || "(missing)"} (${packageJson.name}@${packageJson.version})`,
@@ -1561,12 +1608,7 @@ function collectMplFallback() {
 export function parsePnpmLicenseInventory(raw) { // NOSONAR javascript:S3776
   const grouped = JSON.parse(raw);
   const entries = [];
-  for (const [licenseExpression, packages] of Object.entries(grouped)) {
-    if (!REVIEWED_LICENSE_EXPRESSIONS.has(licenseExpression)) {
-      throw new Error(
-        `Unreviewed production license expression: ${licenseExpression}`,
-      );
-    }
+  for (const [detectedLicense, packages] of Object.entries(grouped)) {
     for (const packageRecord of packages) {
       const versions = Array.isArray(packageRecord.versions)
         ? [...packageRecord.versions].map(String).sort()
@@ -1584,16 +1626,26 @@ export function parsePnpmLicenseInventory(raw) { // NOSONAR javascript:S3776
           `Malformed pnpm license inventory entry for ${String(packageRecord.name)}`,
         );
       }
+      const license = resolveReviewedLicenseExpression(
+        packageRecord.name,
+        versions,
+        detectedLicense,
+      );
+      if (!REVIEWED_LICENSE_EXPRESSIONS.has(license)) {
+        throw new Error(
+          `Unreviewed production license expression: ${license || "(missing)"} (${packageRecord.name}@${versions.join(",")})`,
+        );
+      }
       validateReviewedRestrictedProductionDependency(
         packageRecord.name,
         versions,
-        licenseExpression,
+        license,
       );
       entries.push({
         name: packageRecord.name,
         versions,
         paths,
-        license: licenseExpression,
+        license,
         author:
           typeof packageRecord.author === "string" ? packageRecord.author : "",
         homepage:
@@ -1670,6 +1722,52 @@ function validateDirectDependencies(packageJson, inventory) {
     );
     if (!resolved) {
       throw new Error(`${name}@${version} is absent from the resolved graph.`);
+    }
+  }
+}
+
+function validateRemotionReleaseBoundary(inventory) {
+  const expectedPackages = ["@remotion/player", "remotion"];
+  for (const name of expectedPackages) {
+    const entry = inventory.find((candidate) => candidate.name === name);
+    if (
+      !entry
+      || entry.license !== REMOTION_LICENSE_EXPRESSION
+      || entry.versions.length !== 1
+      || entry.versions[0] !== REMOTION_PACKAGE_VERSION
+    ) {
+      throw new Error(
+        `Remotion release boundary changed: ${name}@${entry?.versions.join(",") || "(missing)"} — ${entry?.license || "(missing)"}`,
+      );
+    }
+    for (const packagePath of entry.paths) {
+      const metadata = readJson(join(packagePath, "package.json"));
+      const detectedLicense = normalizeLicenseExpression(
+        metadata.license ?? metadata.licenses,
+      );
+      const policy = REVIEWED_RESTRICTED_PRODUCTION_DEPENDENCIES[name];
+      if (
+        metadata.name !== name
+        || metadata.version !== REMOTION_PACKAGE_VERSION
+        || !policy.detectedLicenses.includes(detectedLicense)
+      ) {
+        throw new Error(`Installed Remotion metadata changed: ${name}`);
+      }
+      const licenseFiles = findRootLicenseFiles(packagePath);
+      const reviewedLicense = licenseFiles.find((file) =>
+        basename(file).toLowerCase() === "license.md"
+      );
+      if (!reviewedLicense) {
+        throw new Error(`Remotion license file is missing: ${name}`);
+      }
+      const digest = sha256(
+        normalizeNoticeText(readFileSync(reviewedLicense, "utf8")),
+      );
+      if (digest !== REMOTION_LICENSE_SHA256) {
+        throw new Error(
+          `Remotion license text changed: ${name} — ${digest}`,
+        );
+      }
     }
   }
 }
@@ -1818,6 +1916,8 @@ function validateRepositoryPolicy() {
     "mixbox@2.0.0",
     "CC BY-NC 4.0",
     "third_party/mixbox/README.md",
+    "acknowledgeRemotionLicense",
+    REMOTION_LICENSE_SHA256,
     "https://github.com/processing/p5.js",
     "https://github.com/brendankenny/libtess.js",
     "https://github.com/reearth/hokusai/tree/f7e998173c0e7427b95afe0b6947e3103da60f00",
@@ -2166,6 +2266,7 @@ export function main(argumentsList = process.argv.slice(2)) { // NOSONAR javascr
   verifyCheckedInHokusaiArtifacts();
   const engineNotices = validateShippedEngineNotices();
   validateDirectDependencies(packageJson, inventory);
+  validateRemotionReleaseBoundary(inventory);
   validateRepositoryPolicy();
   validateOpenCascadeReleaseBoundary();
   const { documents, missing } = collectLicenseDocuments(

@@ -133,6 +133,9 @@ importers:
       '@react-three/fiber':
         specifier: 9.6.1
         version: 9.6.1(patch_hash=68f1cb873dce662afa8148b10c5896d9e74acdcf70313881d944c1588be4c222)(@types/react@19.2.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(three@0.184.0)
+      '@remotion/player':
+        specifier: 4.0.514
+        version: 4.0.514(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@resvg/resvg-wasm':
         specifier: 2.6.2
         version: 2.6.2
@@ -154,6 +157,9 @@ importers:
       '@toonspectrum/play-core':
         specifier: workspace:*
         version: link:packages/play-core
+      '@toonspectrum/product-tour-film':
+        specifier: workspace:*
+        version: link:packages/product-tour-film
       '@toonspectrum/studio-brush-platform':
         specifier: workspace:*
         version: link:packages/studio-brush-platform
@@ -307,6 +313,9 @@ importers:
       recast-navigation:
         specifier: 0.43.1
         version: 0.43.1
+      remotion:
+        specifier: 4.0.514
+        version: 4.0.514(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       rhino3dm:
         specifier: 8.32.1
         version: 8.32.1
@@ -670,6 +679,15 @@ importers:
         version: 1.8.6
 
   packages/play-core: {}
+
+  packages/product-tour-film:
+    dependencies:
+      react:
+        specifier: ^19.2.0
+        version: 19.2.7
+      remotion:
+        specifier: 4.0.514
+        version: 4.0.514(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
 
   packages/studio-brush-platform:
     dependencies:
@@ -3020,6 +3038,12 @@ packages:
     engines: {node: '>= 18.19.0'}
     peerDependencies:
       '@redis/client': ^5.12.1
+
+  '@remotion/player@4.0.514':
+    resolution: {integrity: sha512-0SAHgXsoW9e4q3iYT08qokcuqtG4Nu3pZQO08WwBxwY0g/xHBKm6rFUSB6ePiy2DtTbQcTKhZl3KcE0mzvoX3A==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@resvg/resvg-wasm@2.6.2':
     resolution: {integrity: sha512-FqALmHI8D4o6lk/LRWDnhw95z5eO+eAa6ORjVg09YRR7BkcM6oPHU9uyC0gtQG5vpFLvgpeU4+zEAz2H8APHNw==}
@@ -6735,6 +6759,12 @@ packages:
     resolution: {integrity: sha512-dYqgNSZbDwkaJ2ceRd9ojCGjBq+mOm9LmtXnAnEGyHhN/5R7iDW2TRw3h+o/jCFxus3P2LfWIIiwowAjANm7IA==}
     engines: {node: '>= 0.4'}
 
+  remotion@4.0.514:
+    resolution: {integrity: sha512-uhfvNqzs0v0Sg6+lI2bGpWHZd7fEmMpfJC6r4jR+EZXIPpWwH3VldEeO9BeoSrAEVsrt8l7TKwXxy6/duDO/9g==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
     engines: {node: '>=0.10.0'}
@@ -9999,6 +10029,12 @@ snapshots:
   '@redis/time-series@5.12.1(@redis/client@5.12.1)':
     dependencies:
       '@redis/client': 5.12.1
+
+  '@remotion/player@4.0.514(react-dom@19.2.7(react@19.2.7))(react@19.2.7)':
+    dependencies:
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
+      remotion: 4.0.514(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
 
   '@resvg/resvg-wasm@2.6.2': {}
 
@@ -13891,6 +13927,11 @@ snapshots:
       get-proto: 1.0.1
       gopd: 1.2.0
       set-function-name: 2.0.2
+
+  remotion@4.0.514(react-dom@19.2.7(react@19.2.7))(react@19.2.7):
+    dependencies:
+      react: 19.2.7
+      react-dom: 19.2.7(react@19.2.7)
 
   require-directory@2.1.1: {}
 
