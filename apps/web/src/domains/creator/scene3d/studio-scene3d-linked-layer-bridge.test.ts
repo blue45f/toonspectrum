@@ -4,6 +4,7 @@ import { createStudioLinked3dRenderPageFixture } from "../studio-linked-3d-rende
 import type { El } from "../studio-element-model";
 import {
   projectStudioScene3dLinkedLayerEdit,
+  resolveCanonicalStudioBg3dSceneForBundle,
   resolveStudioScene3dLinkedLayerRoundTrip,
 } from "./studio-scene3d-linked-layer-bridge";
 
@@ -84,4 +85,35 @@ describe("Studio Scene3D linked layer bridge", () => {
     });
     expect(result).toMatchObject({ ok: false, code: "page-cross-reference-invalid" });
   });
+
+  it("fails closed when linked layer BG3D scenes disagree", () => {
+    const page = createStudioLinked3dRenderPageFixture("page-scene-diverge");
+    const element = page.elements[0] as Extract<El, { type: "image" }> | undefined;
+    if (!element?.bg3dLtBundleId || !element.bg3dScene) {
+      throw new Error("Linked 3D fixture is incomplete.");
+    }
+    const twin = {
+      ...element,
+      id: `${element.id}-twin`,
+      bg3dScene: {
+        ...element.bg3dScene,
+        camera: {
+          ...element.bg3dScene.camera,
+          fovDegrees: (element.bg3dScene.camera.fovDegrees ?? 50) + 7,
+        },
+      },
+    };
+    expect(resolveCanonicalStudioBg3dSceneForBundle([element], element.bg3dLtBundleId)).toMatchObject({
+      ok: true,
+    });
+    expect(resolveCanonicalStudioBg3dSceneForBundle([element, twin], element.bg3dLtBundleId)).toEqual({
+      ok: false,
+      reason: "diverged",
+    });
+    expect(resolveCanonicalStudioBg3dSceneForBundle([], element.bg3dLtBundleId)).toEqual({
+      ok: false,
+      reason: "missing",
+    });
+  });
+
 });

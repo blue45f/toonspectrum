@@ -61,21 +61,29 @@ function failure(
 ): StudioScene3dLinkedLayerBridgeFailure {
   return Object.freeze({ ok: false as const, code, message });
 }
-function canonicalSceneForBundle(
+export type StudioScene3dCanonicalSceneLookup =
+  | { readonly ok: true; readonly scene: StudioBg3dSceneDocument }
+  | { readonly ok: false; readonly reason: "missing" | "diverged" };
+
+export function resolveCanonicalStudioBg3dSceneForBundle(
   elements: readonly StudioLinked3dRenderElementLike[],
   bundleId: string,
-): StudioBg3dSceneDocument | null {
+): StudioScene3dCanonicalSceneLookup {
   const scenes = elements
     .filter((element) =>
       element.type === "image"
       && element.bg3dLtBundleId === bundleId
       && element.bg3dScene !== undefined)
     .map((element) => element.bg3dScene!);
-  if (scenes.length === 0) return null;
+  if (scenes.length === 0) return { ok: false, reason: "missing" };
   const serialized = scenes.map(serializeStudioBg3dSceneDocument);
   const first = serialized[0];
-  if (!first || serialized.some((candidate) => candidate !== first)) return null;
-  return scenes[0] ?? null;
+  if (!first || serialized.some((candidate) => candidate !== first)) {
+    return { ok: false, reason: "diverged" };
+  }
+  const scene = scenes[0];
+  if (!scene) return { ok: false, reason: "missing" };
+  return { ok: true, scene };
 }
 
 export function resolveStudioScene3dLinkedLayerRoundTrip(input: {
@@ -108,13 +116,20 @@ export function resolveStudioScene3dLinkedLayerRoundTrip(input: {
       "Canvas 레이어·3D Stage·pass receipt 교차참조가 일치하지 않습니다.",
     );
   }
-  const scene = canonicalSceneForBundle(input.elements, input.bundleId);
-  if (!scene) {
+  const sceneLookup = resolveCanonicalStudioBg3dSceneForBundle(input.elements, input.bundleId);
+  if (!sceneLookup.ok) {
+    if (sceneLookup.reason === "diverged") {
+      return failure(
+        "scene-revision-diverged",
+        "연결된 레이어들의 BG3D SceneDocument가 서로 달라 canonical 장면을 고를 수 없습니다.",
+      );
+    }
     return failure(
       "missing-canonical-scene",
       "연결된 레이어에서 하나의 canonical BG3D SceneDocument를 복원하지 못했습니다.",
     );
   }
+  const scene = sceneLookup.scene;
   if (scene.activeShotId !== link.shotId) {
     return failure(
       "shot-mismatch",

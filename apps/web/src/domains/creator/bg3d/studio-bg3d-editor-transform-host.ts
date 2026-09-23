@@ -5,7 +5,8 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
-import { applyStudio3dCommand, captureStudio3dPlates, createStudio3dHistory } from "./studio-bg3d-grade-plates";
+import { ensureStudio3dGradeHistory, pushStudio3dGradeCommand } from "./studio-bg3d-grade-history-bridge";
+import { captureStudio3dPlatesFromSource } from "./studio-bg3d-grade-plates-production";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { readStudioBg3dSelectionBounds } from "./studio-bg3d-camera-selection";
 import { hasStudioBg3dSelectedAncestor } from "./studio-bg3d-template-instance";
@@ -911,14 +912,17 @@ export function attachStudioBg3dEditorTransformHost(h) {
     ) || 1;
     const yaw = Math.atan2(position[0] - target[0], position[2] - target[2]);
     const pitch = Math.asin(Math.max(-1, Math.min(1, (position[1] - target[1]) / radius)));
-    const graded = applyStudio3dCommand(createStudio3dHistory(beforeDocument), {
+    if (!h.gradeHistoryRef) h.gradeHistoryRef = { current: null };
+    const grade = ensureStudio3dGradeHistory(h.gradeHistoryRef.current, beforeDocument);
+    const graded = pushStudio3dGradeCommand(grade, {
       id: "set-camera",
       yaw,
       pitch,
       fov: nextDocument.camera.fovDegrees,
     });
+    h.gradeHistoryRef.current = graded;
     // Keep the production camera write (lens/up/near) but share the offered command path + plates.
-    captureStudio3dPlates(graded.scene, 48, 27);
+    captureStudio3dPlatesFromSource(graded.scene, 48, 27);
     commitImmediateHistoryTransition(
       primitives,
       customModels,
