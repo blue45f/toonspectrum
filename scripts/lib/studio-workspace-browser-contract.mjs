@@ -27,16 +27,10 @@ export async function assertStudioWorkspaceHome(page) {
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(home.locator(".workspace-list-view")).toBeVisible();
   await expect(selection).toHaveValue(selectedProject);
-  await viewButtons.nth(1).click();
-  const canvas = home.locator('[data-studio-phaser-runtime] canvas');
-  await expect(home.locator('[data-studio-engine-status="ready"]')).toHaveCount(1, { timeout: 45000 });
-  await expect(canvas).toBeVisible();
-  await expect.poll(async () => (await canvas.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(320);
-  await expect.poll(async () => (await canvas.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(280);
-  await expect(home.locator(".workspace-world")).toHaveCount(0);
-  await expect(selection).toHaveValue(selectedProject);
   const workTrigger = home.locator(".workspace-work-shortcut");
-  const trigger = await workTrigger.isVisible() ? workTrigger : home.getByRole("button", { name: /^(검수·작업함|Reviews & inbox)$/u });
+  const trigger = await workTrigger.isVisible()
+    ? workTrigger
+    : home.getByRole("button", { name: /^(도구와 공간 메뉴|Tools and space menu)$/u });
   await trigger.click();
   const panel = home.locator("dialog[open]");
   await expect(panel).toBeVisible();
@@ -44,6 +38,22 @@ export async function assertStudioWorkspaceHome(page) {
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
   await expect(trigger).toBeFocused();
+  await expect(home.locator(".workspace-statusbar")).toBeVisible();
+
+  // Spatial Campus now requires an explicit character choice and entry action.
+  // The flagship contract validates that consent boundary; renderer readiness is
+  // covered by the dedicated virtual-studio runtime suites after the user enters.
+  await viewButtons.nth(1).click();
+  const lobby = home.locator('[data-route-ready="studio-virtual-entry"]');
+  await expect(lobby).toBeVisible({ timeout: 30000 });
+  await expect(lobby.getByRole("heading", {
+    name: /^(입장할 캐릭터를 선택하세요|Choose your character before entering)$/u,
+  })).toBeVisible();
+  await expect(lobby.getByRole("group", { name: /^(내 캐릭터|My character)$/u })).toBeVisible();
+  const enter = lobby.getByRole("button", { name: /^(선택하고 입장|Choose and enter)$/u });
+  await expect(enter).toBeVisible();
+  await expect.poll(async () => (await enter.boundingBox())?.height ?? 0,
+    { message: "The explicit spatial entry action must retain a 44px target" }).toBeGreaterThanOrEqual(44);
+  await expect(home.locator('[data-studio-engine-status="ready"]')).toHaveCount(0);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Workspace must not overflow horizontally");
-  await expect(home.locator(".workspace-statusbar, .workspace-live-status")).toBeVisible();
 }
