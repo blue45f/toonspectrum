@@ -1892,12 +1892,27 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
             },
           }, usedClip)
         : null;
+      let before: Buffer;
       if (eraseBaseline) {
         await selectDesktopBrush(page, preset, expectedSelection);
+        // Selecting a destructive preset may synchronously flush the retained paint backdrop.
+        // Capture the comparison baseline after that boundary instead of reusing the earlier
+        // frame, which can still contain the same paint once in committed ink and once in the
+        // retiring live overlay. Undo should be compared with the surface the eraser actually saw.
+        before = await captureStableEvidence(page, usedClip);
+        const preparedBaselineDiff = await compareScreenshotPixels(
+          page,
+          eraseBaseline.empty,
+          before,
+        );
+        invariant(
+          hasMeaningfulPixelChange(preparedBaselineDiff),
+          `${preset.id}: selecting the eraser removed its prepared paint baseline`,
+        );
+      } else {
+        before = await captureStableEvidence(page, usedClip);
       }
       const emptyBefore = eraseBaseline?.empty ?? null;
-      const before = eraseBaseline?.painted
-        ?? await captureStableEvidence(page, usedClip);
       const shortOperationRoute: VerifierStrokeRoute = operation === "erase"
         ? {
             start: {

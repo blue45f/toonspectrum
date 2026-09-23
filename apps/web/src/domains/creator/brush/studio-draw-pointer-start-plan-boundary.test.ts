@@ -154,6 +154,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
       "screenPoint: clientPoint",
     ]);
 
+    expect(onStageDown).toContain(
+      'strokeDrawMode === "pen" || strokeDrawMode === "shape" || strokeDrawMode === "eraser"',
+    );
     expectTokenOrder(onStageDown, [
       "if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit(undefined, leaseIntent)) return",
       "beginStudioStrokePointerSession(pointerSample, penButtonPolicy)",

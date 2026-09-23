@@ -25401,8 +25401,13 @@ function clearSelectionForEdit() {
     select: (id) => { setSelectedId(id); setMarqueeIds([]); },
     closeMenu: () => setMenu(null), setError,
     onApplied: (stroke) => {
-      activatePrimaryCanvasTool("select");
-      setNodeEditTool("move", stroke.id);
+      // Correction confirmation and the first control-point gesture can occur back-to-back. Flush
+      // selection plus node-edit ownership before the dialog yields focus so that an immediate
+      // pointerdown cannot fall through to the blank-canvas selection clearer.
+      flushSync(() => {
+        activatePrimaryCanvasTool("select");
+        setNodeEditTool("move", stroke.id);
+      });
       announceDrawingShortcut(stroke.smartShape ? "도형을 확정했어요. 캔버스의 점을 끌어 편집하세요." : "원래 자유선을 복원했어요.");
     },
   });
