@@ -64,6 +64,11 @@ const BetaOpenEventGate = lazy(() =>
     default: mod.BetaOpenEventGate,
   })),
 );
+const StudioBetaNoticeGate = lazy(() =>
+  import("@/domains/creator/StudioBetaNoticeGate").then((mod) => ({
+    default: mod.StudioBetaNoticeGate,
+  })),
+);
 
 const HAS_DESKCLOUD_MOUNTS = Boolean(
   import.meta.env.VITE_SURVEYDESK_URL ||
@@ -267,6 +272,11 @@ function AppRuntime() {
       <Suspense fallback={null}>
         <SiteBackgroundMusicPlayer suspended={isolatedChrome} />
       </Suspense>
+      {isStudioRoutePathname(pathname) ? (
+        <Suspense fallback={null}>
+          <StudioBetaNoticeGate pathname={pathname} />
+        </Suspense>
+      ) : null}
       <AppShell
         header={isolatedChrome ? null : <SiteHeader />}
         footer={isolatedChrome ? null : <DeferredFooter immediate={publicExperience} />}
