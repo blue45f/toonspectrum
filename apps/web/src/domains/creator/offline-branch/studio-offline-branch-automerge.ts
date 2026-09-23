@@ -1,4 +1,5 @@
-import * as Automerge from "@automerge/automerge";
+import * as Automerge from "@automerge/automerge/slim";
+import * as automergeWasmBase64Module from "@automerge/automerge/automerge.wasm.base64";
 
 import {
   STUDIO_OFFLINE_BRANCH_LIMITS,
@@ -12,6 +13,38 @@ import {
   type StudioOfflineBranchReceipt,
   type StudioOfflineBranchSnapshot,
 } from "./studio-offline-branch-contract";
+
+type EncodedAutomergeWasmSource = string | (() => string);
+
+function resolveAutomergeWasmBase64(): string {
+  const moduleRecord = automergeWasmBase64Module as unknown as {
+    readonly automergeWasmBase64?: EncodedAutomergeWasmSource;
+    readonly init?: EncodedAutomergeWasmSource;
+    readonly default?: EncodedAutomergeWasmSource;
+  };
+  const source = moduleRecord.automergeWasmBase64
+    ?? moduleRecord.init
+    ?? moduleRecord.default;
+  const encoded = typeof source === "function" ? source() : source;
+  if (typeof encoded !== "string" || encoded.length === 0) {
+    throw new Error("Automerge WASM base64 source is unavailable");
+  }
+  return encoded;
+}
+
+let automergeInitialization: Promise<void> | null = null;
+
+export function initializeStudioOfflineBranchAutomerge(): Promise<void> {
+  if (Automerge.isWasmInitialized()) return Promise.resolve();
+  if (!automergeInitialization) {
+    automergeInitialization = Automerge.initializeBase64Wasm(resolveAutomergeWasmBase64())
+      .catch((cause: unknown) => {
+        automergeInitialization = null;
+        throw cause;
+      });
+  }
+  return automergeInitialization;
+}
 
 export interface CreateStudioOfflineBranchInput {
   readonly id: string;
