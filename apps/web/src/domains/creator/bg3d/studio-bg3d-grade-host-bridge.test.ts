@@ -40,4 +40,18 @@ describe("bg3d grade host bridge contracts", () => {
     // The host must persist next.scene (not a separately merged discard).
     expect(serializeStudio3dScene(next.scene)).toBe(after);
   });
+
+  it("remove-prop clears the prop from the serialized document the host must persist", () => {
+    const placed = applyStudio3dCommand(createStudio3dHistory(), {
+      id: "place-prop",
+      propId: "crate",
+      x: 0.25,
+      y: 0,
+      z: -0.5,
+    });
+    expect(placed.scene.nodes.some((node) => node.id === "crate")).toBe(true);
+    const removed = applyStudio3dCommand(placed, { id: "remove-prop", propId: "crate" });
+    expect(removed.scene.nodes.some((node) => node.id === "crate")).toBe(false);
+    expect(serializeStudio3dScene(removed.scene)).not.toBe(serializeStudio3dScene(placed.scene));
+  });
 });

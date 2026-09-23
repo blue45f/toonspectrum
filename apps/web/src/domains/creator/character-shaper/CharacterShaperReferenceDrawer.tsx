@@ -24,6 +24,7 @@ import { StudioVrmPhotoPoseScanner } from "../vrm/StudioVrmPhotoPoseScanner";
 import { studioVrmAvatarReferenceCatalogueDiagnosticMessage } from "../vrm/useStudioVrmAvatarReferenceCatalogue";
 
 import { extractCharacterReferencePalette } from "./character-shaper-palette-extract";
+import { shouldSyncGradePoseAfterPhotoApply } from "./character-shaper-grade-photo-sync";
 
 import type { CharacterReferencePalette } from "./character-shaper-palette-extract";
 import type { CharacterShaperReferenceDrawerProps } from "./character-shaper-ui-contract";
@@ -488,8 +489,12 @@ export function CharacterShaperReferenceDrawer({
       disabled={!h.vrm || binding.busyReason !== null}
       handoff={photoHandoff}
       onApply={(payload: StudioVrmPhotoPoseApplyPayload) => {
-        if (gradeImage) binding.applyGradePoseFromImage?.(gradeImage, "photo");
-        return Boolean(h.handlePhotoPoseApply?.(payload));
+        const applied = Boolean(h.handlePhotoPoseApply?.(payload));
+        // Grade twin must follow the host bone write — never advance on a rejected apply.
+        if (shouldSyncGradePoseAfterPhotoApply(applied) && gradeImage) {
+          binding.applyGradePoseFromImage?.(gradeImage, "photo");
+        }
+        return applied;
       }}
     />
   );

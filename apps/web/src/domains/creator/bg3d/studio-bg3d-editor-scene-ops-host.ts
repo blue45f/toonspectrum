@@ -586,15 +586,23 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
   const removeSceneEntities = (ids: ReadonlySet<string>): boolean => {
     if (!isStudioBg3dSceneEditReady(h)) return false;
     if (ids.size === 0) return false;
+    const live = physicsRuntimeSourceRef.current;
     const plan = planStudioBg3dSceneEntityRemoval({
-      snapshot: physicsRuntimeSourceRef.current,
+      snapshot: live,
       entityIds: ids,
     });
     if (!plan.ok) {
       setError("부모를 삭제해도 자식의 월드 변환을 보존할 수 없어 삭제를 취소했습니다.");
       return false;
     }
+    // Capture the pre-removal document so offered remove-prop commands stay on the same
+    // grade path as place-prop (sidebar advertises both; plates must react to delete too).
+    let graded = createStudio3dHistory(live.document ?? sceneBaseDocument);
+    for (const propId of ids) {
+      graded = applyStudio3dCommand(graded, { id: "remove-prop", propId });
+    }
     commitSceneEntityRemoval(plan);
+    captureStudio3dPlates(graded.scene, 48, 27);
     setError(null);
     return true;
   };
