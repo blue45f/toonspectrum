@@ -9,6 +9,10 @@ on:
       - 'scripts/lib/studio-crdt-bundle-boundary*'
       - 'scripts/lib/repo-paths.mjs'
       - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'scripts/verify-studio-menus.mts'
+      - 'scripts/verify-studio-menus-ci.mjs'
+      - 'apps/web/src/domains/creator/StudioBetaNoticeGate.tsx'
+      - 'apps/web/src/domains/creator/studio-beta-notice-storage.ts'
       - 'vite.config.ts'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -29,6 +33,10 @@ on:
       - 'scripts/lib/studio-crdt-bundle-boundary*'
       - 'scripts/lib/repo-paths.mjs'
       - 'scripts/integration-test-runner-ci-policy.test.mjs'
+      - 'scripts/verify-studio-menus.mts'
+      - 'scripts/verify-studio-menus-ci.mjs'
+      - 'apps/web/src/domains/creator/StudioBetaNoticeGate.tsx'
+      - 'apps/web/src/domains/creator/studio-beta-notice-storage.ts'
       - 'vite.config.ts'
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -111,4 +119,4 @@ jobs:
       - name: Install Chromium system dependencies
         run: pnpm exec playwright install-deps chromium
       - name: Inspect actual production browser
-        run: pnpm run verify:studio-menus
+        run: pnpm exec tsx scripts/verify-studio-menus-ci.mjs
