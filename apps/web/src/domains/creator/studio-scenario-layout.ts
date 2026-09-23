@@ -152,6 +152,8 @@ export interface ScenarioPreviewItem extends ScenarioPanelSeed {
   selectedImageCandidateId?: string;
   approvedImageCandidateId?: string;
   preferredVariantCount?: ScenarioImageVariantCount;
+  preferredQualityProfile?: ScenarioImageQualityProfile;
+  preferredVariationStrategy?: ScenarioImageVariationStrategy;
   qualityReport?: ScenarioImageQualityReport;
   layerManifest?: ScenarioImageLayerManifest;
   approvalRevision?: number;

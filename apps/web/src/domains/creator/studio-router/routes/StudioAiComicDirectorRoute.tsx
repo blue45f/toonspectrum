@@ -17,6 +17,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { requestStudioAiComicComposerOpen } from "../../ai/studio-ai-comic-composer-intent";
 import { StudioToonAutomationWorkspace } from "../../ai/StudioToonAutomationWorkspace";
 import { createStudioAiComicDirectorApiClient } from "../../ai/studio-ai-comic-director-api";
+import { createStudioToonProductionHandoff } from "../../ai/studio-toon-production-board";
+import type { StudioScenarioImageGenerationRequest } from "../../ai/studio-scenario-candidate-workflow";
 import {
   createStudioAiComicDirectorSession,
   loadStudioAiComicDirectorSession,
@@ -289,30 +291,47 @@ export function StudioAiComicDirectorRoute({
     }
   };
 
-  const continueInEditor = () => {
-    requestStudioAiComicComposerOpen({
-      version: 1,
-      source: "episode-production-director",
-      episodeTitle: session.title,
+  const openScenesInEditor = (request?: StudioScenarioImageGenerationRequest) => {
+    requestStudioAiComicComposerOpen(createStudioToonProductionHandoff({
+      title: session.title,
       storyText: session.storyText,
       characterDescription: session.characterDescription,
-      variants: 2,
-      modeLabel: "AI 코믹 디렉터 제작용",
-      totalCuts: session.scenes.length,
-      projectedOutputCount: session.scenes.length * 2,
-      generationWorkUnits: session.scenes.length * 2,
-      scenes: session.scenes.map((scene, index) => ({
-        sourceSceneNumber: index + 1,
-        sourceCutNumber: index + 1,
-        beatType: scene.beatType,
-        summary: scene.summary,
-        imagePrompt: scene.imagePrompt,
-        dialogue: scene.dialogue,
-        continuity: scene.continuity,
-      })),
-    });
+      scenes: session.scenes,
+      request,
+    }));
     navigate(resolution.editorHref);
   };
+
+  const continueInEditor = () => openScenesInEditor();
+
+  const changeAutomationScene = (
+    index: number,
+    patch: Partial<StudioAiComicDirectorSessionDocument["scenes"][number]>,
+  ) => {
+    const current = session.scenes[index];
+    if (!current) return;
+    const generationInputChanged =
+      (typeof patch.imagePrompt === "string" && patch.imagePrompt !== current.imagePrompt)
+      || ("continuity" in patch && patch.continuity !== current.continuity)
+      || (typeof patch.aspect === "string" && patch.aspect !== current.aspect);
+    patchSession({
+      scenes: session.scenes.map((scene, sceneIndex) =>
+        sceneIndex === index
+          ? {
+              ...scene,
+              ...patch,
+              ...(generationInputChanged
+                ? { imageDataUrl: undefined, imageError: undefined, imageProvenance: undefined }
+                : {}),
+            }
+          : scene,
+      ),
+    });
+  };
+
+  const replaceAutomationScenes = (
+    scenes: readonly StudioAiComicDirectorSessionDocument["scenes"][number][],
+  ) => patchSession({ scenes: [...scenes] });
 
   const candidateDigest = studioAiComicDirectorCandidateDigest(session.scenes);
   const activeApproval =
@@ -438,11 +457,16 @@ export function StudioAiComicDirectorRoute({
             title={session.title}
             storyText={session.storyText}
             sceneCount={session.scenes.length}
+            scenes={session.scenes}
             visualBibleEntryCount={session.visualBible.entries.length}
             document={session.automation}
             onChange={(automation) => patchSession({ automation })}
+            onChangeScene={changeAutomationScene}
+            onReplaceScenes={replaceAutomationScenes}
+            onGenerateScenes={openScenesInEditor}
             onOpenDirector={() => setAutomationView(false)}
             onOpenSurface={openStudioSurface}
+            onOpenUsage={() => navigate("/membership")}
             disabled={syncState === "loading"}
           />
         ) : (

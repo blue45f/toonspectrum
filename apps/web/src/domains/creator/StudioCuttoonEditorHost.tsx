@@ -19213,6 +19213,12 @@ const puppetWarpArmed =
       items: panels.map((panel) => ({
         ...panel,
         preferredVariantCount: handoff.variants,
+        ...(handoff.qualityProfile
+          ? { preferredQualityProfile: handoff.qualityProfile }
+          : {}),
+        ...(handoff.variationStrategy
+          ? { preferredVariationStrategy: handoff.variationStrategy }
+          : {}),
       })),
       nextCanvasH,
       characterDescription: handoff.characterDescription,
@@ -19257,6 +19263,12 @@ const puppetWarpArmed =
           : {}),
         ...(items[index]?.preferredVariantCount
           ? { preferredVariantCount: items[index].preferredVariantCount }
+          : {}),
+        ...(items[index]?.preferredQualityProfile
+          ? { preferredQualityProfile: items[index].preferredQualityProfile }
+          : {}),
+        ...(items[index]?.preferredVariationStrategy
+          ? { preferredVariationStrategy: items[index].preferredVariationStrategy }
           : {}),
       })),
     };
