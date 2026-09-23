@@ -52,6 +52,12 @@ import {
 } from "./studio-virtual-space-character-skins";
 import { STUDIO_NPC_CAST, studioNpcCastSkinByKey } from "./studio-virtual-space-npc-cast";
 import {
+  DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
+  studioVirtualArtStyle,
+  type StudioVirtualArtStyleKey,
+} from "./studio-virtual-space-art-style";
+import { drawStudioModularCampus } from "./studio-virtual-space-modular-campus";
+import {
   StudioCharacterAssetResidency,
   studioCharacterFrameGeometry,
   studioCharacterActionTextureKey,
@@ -109,6 +115,7 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly renderer?: "auto" | "webgl" | "canvas";
   readonly debugWorld?: boolean;
   readonly atmosphere?: StudioNpcAtmosphere;
+  readonly artStyle?: StudioVirtualArtStyleKey;
   readonly selfPose?: { readonly state: "sit"; readonly facing: StudioVirtualSpaceFacing };
   readonly waveActorIds?: readonly string[];
   /** Membership/lease authority belongs to the caller. Anchor attaches the rendered hips only. */
@@ -208,6 +215,7 @@ export function StudioVirtualSpacePhaserCanvas({
   renderer = "auto",
   debugWorld = false,
   atmosphere = "balanced",
+  artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
   selfPose,
   waveActorIds = [],
   seatedActors = [],
@@ -282,6 +290,8 @@ export function StudioVirtualSpacePhaserCanvas({
     const parent = hostRef.current;
     if (!parent) return undefined;
 
+    parent.dataset.artStyle = artStyle;
+    const artProfile = studioVirtualArtStyle(artStyle);
     const mount = document.createElement("div");
     mount.className = "studio-vspace-engine-mount";
     parent.append(mount);
@@ -662,6 +672,10 @@ export function StudioVirtualSpacePhaserCanvas({
           .setOrigin(0)
           .setDisplaySize(backgroundRect.width, backgroundRect.height)
           .setDepth(-1_000);
+
+        const modularCampus = drawStudioModularCampus(this, manifest, artStyle);
+        parent.dataset.worldPresentation = modularCampus.length > 0 ? "modular-campus" : "illustrated";
+        cleanup.push(() => modularCampus.forEach((item) => item.destroy()));
 
         for (const layer of manifest.occlusionLayers ?? []) {
           const maskGraphics = this.add.graphics().fillStyle(0xffffff).fillPoints([...layer.polygon], true).setVisible(false);
@@ -1443,9 +1457,9 @@ export function StudioVirtualSpacePhaserCanvas({
         loader: { timeout: 15000, maxParallelDownloads: 6 },
         transparent: false,
         backgroundColor: "#17181b",
-        antialias: true,
-        roundPixels: false,
-        pixelArt: false,
+        antialias: !artProfile.pixelated,
+        roundPixels: artProfile.pixelated,
+        pixelArt: artProfile.pixelated,
         scale: {
           mode: Phaser.Scale.NONE,
           width: viewport.width,
@@ -1490,7 +1504,7 @@ export function StudioVirtualSpacePhaserCanvas({
       game?.destroy(true);
       mount.remove();
     };
-  }, [attempt, bridge, debugWorld, manifest, renderer, worldAssetUrls]);
+  }, [artStyle, attempt, bridge, debugWorld, manifest, renderer, worldAssetUrls]);
 
   return (
     <div
@@ -1499,6 +1513,7 @@ export function StudioVirtualSpacePhaserCanvas({
       data-studio-phaser-runtime="true"
       data-studio-engine-status={failure ? "error" : ready ? "ready" : "loading"}
       data-world-id={manifest.id}
+      data-art-style={artStyle}
     >
       {failure ? (
         <div className="studio-vspace-engine-message" role="alert">

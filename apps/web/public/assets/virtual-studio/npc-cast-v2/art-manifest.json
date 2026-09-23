@@ -1,0 +1,346 @@
+{
+  "version": 2,
+  "generatedAt": "2026-09-23",
+  "playerSpriteReuse": false,
+  "derivedFromSelectableStyle": true,
+  "technique": "selectable webtoon-chibi source grammar with independent NPC bytes, role tint, outline and accessories",
+  "roles": {
+    "concierge": {
+      "basePlayableStyle": "silver",
+      "accent": "#33beb8",
+      "accessory": "headset"
+    },
+    "editor": {
+      "basePlayableStyle": "dark",
+      "accent": "#eda745",
+      "accessory": "glasses"
+    },
+    "atelier": {
+      "basePlayableStyle": "pink",
+      "accent": "#ef6a96",
+      "accessory": "beret"
+    },
+    "archivist": {
+      "basePlayableStyle": "purple",
+      "accent": "#8b6fe4",
+      "accessory": "pin"
+    }
+  },
+  "files": [
+    {
+      "file": "npc-archivist-direction-down.png",
+      "sha256": "bde260a8746aa231b98de9335d925f3d887efa6979a4be7516093403ae5492da",
+      "bytes": 159714,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-archivist-direction-left.png",
+      "sha256": "dbdc7a29c09c4ff3f11835b99144845e93d09dad1819ec1de92673f214a53f45",
+      "bytes": 147276,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-archivist-direction-right.png",
+      "sha256": "f805ae7e1603836a19ef429c7292c6b41c552e622ceb763e1976ec07ef0a2971",
+      "bytes": 135593,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-archivist-direction-up.png",
+      "sha256": "ade6d711a8b4eddfe4885b0661afa54744edc4d15382d37cd5c18cc844130e99",
+      "bytes": 129536,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-archivist-walk-down.png",
+      "sha256": "203d030749a46a766dbc6566e153477d90b787d6ed8c803b53c3a7eea4bbb655",
+      "bytes": 1100166,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-archivist-walk-left.png",
+      "sha256": "7c95b50c6ee1928349c6f9cdcb60d30470309e1c889624e6ded147c89f4fe701",
+      "bytes": 1153470,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-archivist-walk-right.png",
+      "sha256": "3a03e74b3d41bfed7d42a5790509bccc9305fa329efa8fde8a1dbd6c95004162",
+      "bytes": 1066241,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-archivist-walk-up.png",
+      "sha256": "58f7a71e36d1057ae6cd9fd1bdda21552bd803bbb9d5aa6e957cc6660e81a1a5",
+      "bytes": 821472,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-atelier-direction-down.png",
+      "sha256": "fbffe5db21699f58c02fd100713ef8a9cdfdd85354ebd06e96142b757ed64584",
+      "bytes": 137230,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-atelier-direction-left.png",
+      "sha256": "07026e099de8a4d03b89b5ead4503ee5661596afc5dd03affcd53c622db41907",
+      "bytes": 135469,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-atelier-direction-right.png",
+      "sha256": "06d9ace600783e8e38f2bdd0f8cbe8cf39efc7db92eddab812651c5fbed855cd",
+      "bytes": 137060,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-atelier-direction-up.png",
+      "sha256": "d5b3ac930932b8cf5804432c453fea01a93d2201cd1ad95ee475f87e799cb0d7",
+      "bytes": 122628,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-atelier-state-draw.png",
+      "sha256": "4e182b78be9295f1dbba98763b1102f4363317c77925318682ed6ffba528d2bf",
+      "bytes": 136019,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-atelier-state-review.png",
+      "sha256": "8811bccdc90b9b3ac002efa507c3de3ba5f7369a3ba79b3356350f201bdd2451",
+      "bytes": 131763,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-atelier-walk-down.png",
+      "sha256": "8797f342eda93d7dea91d217086de406256c64edb30420b8f0ca2fe82d6db1e8",
+      "bytes": 869773,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-atelier-walk-left.png",
+      "sha256": "55274888b89eb6b0320bd0a1505b1475828bd36b0b4807b4ad27f18cd4348f70",
+      "bytes": 1014390,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-atelier-walk-right.png",
+      "sha256": "a7a8343eb4fd26064e52cab684c1fd68cafa4bbf57c9119e83623c98784f4a30",
+      "bytes": 936540,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-atelier-walk-up.png",
+      "sha256": "949acc21082bd3be40481550621c156df5b2e60a6a5bfc06d77f46385afe9284",
+      "bytes": 731897,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-concierge-direction-down.png",
+      "sha256": "29b9e178e91a5c930d436ddc04d527e34704987875b91e03bcd31fa891f26b63",
+      "bytes": 141070,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-concierge-direction-left.png",
+      "sha256": "383f5ed61fc8867a4fb4cad98d6be201a9324702c36933b21ea1eadd8a6e5c52",
+      "bytes": 125428,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-concierge-direction-right.png",
+      "sha256": "04fbb8d31534db364e7fe2ae36aa4cbcce67cac57b3fe4aaec9a175cb48dfce8",
+      "bytes": 121282,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-concierge-direction-up.png",
+      "sha256": "570fce1f5fe4b7e24e371ced6c232e249e6c3e5b7af046416e3cf6b7c4f53e70",
+      "bytes": 127887,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-concierge-walk-down.png",
+      "sha256": "b745bf866c2410f7065e73b9c1fa70d4ddb616e7ce4a1eaabbe5ab4395ea4b54",
+      "bytes": 940928,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-concierge-walk-left.png",
+      "sha256": "0fada4ba2df22e9d09ecc3e4ba4af19f3caabad5e6375b03dc7ca78d2a4b23e0",
+      "bytes": 1010553,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-concierge-walk-right.png",
+      "sha256": "a6aad34f93e1e1d7ac816b87b3585b134f0f77d7bdb5157fd5a83a6a68c2388a",
+      "bytes": 988109,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-concierge-walk-up.png",
+      "sha256": "29218e15a5ab51eafdfb7ca6c00f7060a90d6a331d69a54df4bd8ba34bd2b1c6",
+      "bytes": 763254,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-editor-direction-down.png",
+      "sha256": "aaffd517e2ed18b45aec4d714d0f16ed324caa19619b22fd39673ebd4ea2b3d9",
+      "bytes": 137190,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-editor-direction-left.png",
+      "sha256": "a1fa26d9071a02f81c9da472dc1acf8af4a89ab9016d9a31a9b7164fd66caa96",
+      "bytes": 133734,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-editor-direction-right.png",
+      "sha256": "909cbd4e0c61e753fd0dcf1c9d2b98f24620ab3b5d6093305a1103bf98288b03",
+      "bytes": 129509,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-editor-direction-up.png",
+      "sha256": "210cd45ceee3001911b36f4d1cff45504f7772743f2f70896564091217028bd7",
+      "bytes": 133760,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-editor-state-review.png",
+      "sha256": "7d09fa55b963085c1d5455e92d44f7f528b470d3a5ce7107c0eb49930407a194",
+      "bytes": 136151,
+      "size": [
+        384,
+        512
+      ]
+    },
+    {
+      "file": "npc-editor-walk-down.png",
+      "sha256": "0a236be0d39daa3d2f580190490603dc5643c3df964c8a3f1246ba0d38ec8ea0",
+      "bytes": 1052166,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-editor-walk-left.png",
+      "sha256": "3c4d5d6c422ccf44bd077aa8a581b82ada91d177e1a80c1366aafade48668ac0",
+      "bytes": 1007697,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-editor-walk-right.png",
+      "sha256": "1138823d709ca7c87753bcbb519660be27588f2382c71b5d2d6fce70194ca59d",
+      "bytes": 1050031,
+      "size": [
+        1122,
+        1402
+      ]
+    },
+    {
+      "file": "npc-editor-walk-up.png",
+      "sha256": "2273991b510827c8d79a1fce4a467c97bdafa76b55736bcf595536cc561326e3",
+      "bytes": 877354,
+      "size": [
+        1122,
+        1402
+      ]
+    }
+  ]
+}

@@ -6,24 +6,34 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { cn } from "@/shared/lib/utils";
 
+import {
+  DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
+  STUDIO_VIRTUAL_ART_STYLES,
+  type StudioVirtualArtStyleKey,
+} from "./studio-virtual-space-art-style";
 import { STUDIO_CHARACTER_SKINS } from "./studio-virtual-space-character-skins";
 import { STUDIO_VIRTUAL_SPACE_AUTO_AVATAR } from "./studio-virtual-space-model";
 
 export function StudioVirtualSpaceEntryLobby({
   avatarIndex,
+  artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
   returning,
   projectName,
   onAvatarIndex,
+  onArtStyle,
   onEnter,
 }: {
   readonly avatarIndex: number;
+  readonly artStyle?: StudioVirtualArtStyleKey;
   readonly returning: boolean;
   readonly projectName: string;
   readonly onAvatarIndex: (avatarIndex: number) => void;
+  readonly onArtStyle?: (artStyle: StudioVirtualArtStyleKey) => void;
   readonly onEnter: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceEntryLobby");
-  return <div className="studio-vspace-entry" data-route-ready="studio-virtual-entry">
+  const previewCharacter = STUDIO_CHARACTER_SKINS[0]!;
+  return <div className="studio-vspace-entry" data-route-ready="studio-virtual-entry" data-art-style={artStyle}>
     <Container size="wide" className="studio-vspace-entry-container">
       <section className="studio-vspace-entry-card" aria-labelledby="studio-vspace-entry-title">
         <div className="studio-vspace-entry-copy">
@@ -67,6 +77,31 @@ export function StudioVirtualSpaceEntryLobby({
           </button>)}
         </fieldset>
 
+        <fieldset className="studio-vspace-entry-art-styles">
+          <legend>{bt("아트 스타일", "Art direction")}</legend>
+          <p>{bt(
+            "캐릭터와 공간은 그대로 유지하면서 전체 작화 톤을 바꿉니다. 언제든 공간 안에서 다시 변경할 수 있어요.",
+            "Keep the same character and layout while changing the full art direction. You can switch again inside the space.",
+          )}</p>
+          <div>
+            {STUDIO_VIRTUAL_ART_STYLES.map((style) => <button
+              key={style.key}
+              type="button"
+              data-art-style={style.key}
+              aria-pressed={artStyle === style.key}
+              className={cn("studio-vspace-entry-art-style", artStyle === style.key && "is-selected")}
+              onClick={() => onArtStyle?.(style.key)}
+            >
+              <span className="studio-vspace-entry-art-style-preview" aria-hidden>
+                <img src={previewCharacter.directional.down} alt="" draggable={false} />
+                <i />
+              </span>
+              <strong>{bt(style.labelKo, style.labelEn)}</strong>
+              <small>{bt(style.descriptionKo, style.descriptionEn)}</small>
+            </button>)}
+          </div>
+        </fieldset>
+
         <div className="studio-vspace-entry-actions">
           <Link href="/studio" className={buttonClass({ variant: "outline" })}>{bt("작업 목록으로", "Back to work list")}</Link>
           <button type="button" className={buttonClass()} onClick={onEnter}>
@@ -74,8 +109,8 @@ export function StudioVirtualSpaceEntryLobby({
           </button>
         </div>
         <p className="studio-vspace-entry-note">{bt(
-          "선택은 이 브라우저에 저장되며, 공간 안에서 언제든 변경할 수 있습니다.",
-          "The choice is saved in this browser and can be changed inside the space.",
+          "캐릭터와 아트 스타일 선택은 이 브라우저에 저장됩니다.",
+          "Character and art-style choices are saved in this browser.",
         )}</p>
       </section>
     </Container>
