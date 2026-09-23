@@ -79,6 +79,46 @@ describe("AuthModal focus return", () => {
     ).toContain("size-11");
   });
 
+  it("does not expose the full-screen backdrop to the global tooltip layer", () => {
+    render(<InitiallyOpenAuthModal />);
+
+    expect(
+      document.querySelector('[data-auth-overlay="true"] > button')?.getAttribute(
+        "data-app-tooltip-exclude",
+      ),
+    ).toBe("true");
+  });
+
+  it("locks only background branches and restores them after close", async () => {
+    const { container } = render(<InitiallyOpenAuthModal />);
+    const dialog = screen.getByRole("dialog", { name: "다시 만나 반가워요" });
+
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    expect(container.hasAttribute("inert")).toBe(true);
+    expect(container.getAttribute("aria-hidden")).toBe("true");
+    expect(dialog.hasAttribute("inert")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "로그인 창 닫기" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.body.style.overflow).toBe("");
+    expect(document.documentElement.style.overflow).toBe("");
+    expect(container.hasAttribute("inert")).toBe(false);
+    expect(container.hasAttribute("aria-hidden")).toBe(false);
+  });
+
+  it("lets people reveal and hide the password without replacing the field", () => {
+    render(<InitiallyOpenAuthModal />);
+    const password = screen.getByLabelText<HTMLInputElement>("비밀번호");
+
+    expect(password.type).toBe("password");
+    fireEvent.click(screen.getByRole("button", { name: "비밀번호 표시" }));
+    expect(password.type).toBe("text");
+    fireEvent.click(screen.getByRole("button", { name: "비밀번호 숨기기" }));
+    expect(password.type).toBe("password");
+  });
+
   it("Google 로그인 실패를 모달에서 한 번만 알린다", async () => {
     const error = "Google 로그인을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.";
     let credentialCallback: ((response: { credential?: string }) => void) | null = null;

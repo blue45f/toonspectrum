@@ -367,7 +367,7 @@ export function ToonSpectrumMark({ className }: { className?: string }) {
       )}
       aria-hidden
     >
-      <img src={resolveAssetUrl("/icon-192.png")} alt="" className="size-full object-cover" decoding="async" />
+      <img src={resolveAssetUrl("/brand/spectrum-ribbon-v2/icon-192.png")} alt="" className="size-full object-cover" decoding="async" />
     </span>
   );
 }
