@@ -1,140 +1,24 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Footprints, Pause, ArrowUpRight } from "lucide-react";
-import { useSession } from "@/compat/auth-session-store";
-import { CampusSceneBoundary } from "@/shared/components/spatial-campus/CampusSceneBoundary";
-import { CampusSceneRecovery } from "@/shared/components/spatial-campus/CampusSceneRecovery";
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { ArrowUpRight } from "lucide-react";
 import { useI18n } from "@/shared/lib/i18n";
 import type { CampusDistrict } from "@/shared/lib/spatial-campus/campus-model";
 import { useCampus } from "@/shared/components/spatial-campus/campus-context";
 import type { CampusObject } from "@/shared/lib/spatial-campus/campus-objects";
-import { StudioVirtualSpaceEngineBridge } from "@/domains/creator/virtual-space/studio-virtual-space-engine-bridge";
-import { studioVirtualSpaceState } from "@/domains/creator/virtual-space/studio-virtual-space-model";
-import type { StudioVirtualSpaceSnapshot } from "@/domains/creator/virtual-space/studio-virtual-space-presence";
-import { campusPositionMemory } from "./campus-position-memory";
-import { campusObjectInteractionIndex, campusWorld } from "./campus-world";
-
-const PhaserCanvas = lazy(() => import("@/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas").then((module) => ({ default: module.StudioVirtualSpacePhaserCanvas })));
-const noOperation = () => undefined;
-const MAX_WALK_OBJECTS = 3;
-const EMPTY_CAMPUS_OBJECTS: readonly CampusObject[] = Object.freeze([]);
-
-function sameCampusObjects(left: readonly CampusObject[], right: readonly CampusObject[]): boolean {
-  if (left.length !== right.length) return false;
-  return left.every((item, index) => {
-    const candidate = right[index];
-    return Boolean(candidate)
-      && item.id === candidate.id
-      && item.title === candidate.title
-      && item.href === candidate.href
-      && item.kind === candidate.kind
-      && item.exposure === candidate.exposure
-      && item.thumbnail === candidate.thumbnail;
-  });
-}
 
 export function CampusRoom({ district, objects }: { readonly district: CampusDistrict; readonly objects: readonly CampusObject[] }) {
   const locale = useI18n((state) => state.lang.startsWith("ko") ? "ko" : "en");
-  const session = useSession();
-  const ownerScope = session.data?.user.id ?? "local";
   const campus = useCampus();
   const location = useLocation();
-  const navigate = useNavigate();
-  const spawnPoint = useMemo(() => campusWorld(district).spawns[0]!.point, [district]);
-  const initialPoint = useMemo(
-    () => campusPositionMemory.read(ownerScope, district.id) ?? spawnPoint,
-    [district.id, ownerScope, spawnPoint],
-  );
-  const [sceneProjection, setSceneProjection] = useState<{
-    readonly districtId: string;
-    readonly objects: readonly CampusObject[];
-  }>(() => ({
-    districtId: district.id,
-    objects: objects.slice(0, MAX_WALK_OBJECTS),
-  }));
-  const sceneObjects = useMemo(
-    () => sceneProjection.districtId === district.id ? sceneProjection.objects : EMPTY_CAMPUS_OBJECTS,
-    [district.id, sceneProjection],
-  );
-  const manifest = useMemo(() => campusWorld(district, sceneObjects), [district, sceneObjects]);
-  const bridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
-  const [walking, setWalking] = useState(false);
-  const [visible, setVisible] = useState(true);
   const [imageFailed, setImageFailed] = useState(false);
-  const host = useRef<HTMLDivElement>(null);
-  const point = useRef(initialPoint);
-  const [snapshot, setSnapshot] = useState<StudioVirtualSpaceSnapshot>(() => ({
-    self: studioVirtualSpaceState(initialPoint), peers: [], nearbyPeers: [], selfReaction: null, peerReactions: [], direct: false,
-  }));
-  useEffect(() => {
-    const nextObjects = objects.slice(0, MAX_WALK_OBJECTS);
-    if (sceneProjection.districtId === district.id && sameCampusObjects(sceneProjection.objects, nextObjects)) return;
-    if (sceneProjection.districtId === district.id) {
-      setSnapshot((current) => ({ ...current, self: studioVirtualSpaceState(point.current) }));
-    }
-    setSceneProjection({ districtId: district.id, objects: nextObjects });
-  }, [district.id, objects, sceneProjection]);
-  useEffect(() => {
-    const restoredPoint = campusPositionMemory.read(ownerScope, district.id) ?? spawnPoint;
-    point.current = restoredPoint;
-    setSnapshot((current) => ({ ...current, self: studioVirtualSpaceState(restoredPoint) }));
-    setWalking(false);
-    setImageFailed(false);
-    return () => {
-      campusPositionMemory.write(ownerScope, district.id, point.current);
-      bridge.clearMovement();
-    };
-  }, [bridge, district.id, ownerScope, spawnPoint]);
-  useEffect(() => {
-    let intersects = true;
-    const update = () => {
-      setSnapshot((current) => ({ ...current, self: studioVirtualSpaceState(point.current) }));
-      setVisible(intersects && !document.hidden);
-    };
-    const observer = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver(([entry]) => {
-      intersects = Boolean(entry?.isIntersecting); update();
-    });
-    if (host.current) observer?.observe(host.current);
-    document.addEventListener("visibilitychange", update);
-    update();
-    return () => { observer?.disconnect(); document.removeEventListener("visibilitychange", update); };
-  }, []);
-  const artwork = !imageFailed ? <img src={district.artworkUrl} alt="" width={manifest.width} height={manifest.height}
-    onError={() => setImageFailed(true)} decoding="async" /> : <p role="status">{locale === "ko" ? "그림 없이도 아래 기능을 사용할 수 있어요." : "All actions remain available without the artwork."}</p>;
+
   return <section className="campus-room" aria-label={district.label[locale]} data-campus-room={district.id}>
     <header><h2>{district.label[locale]}</h2><p>{district.description[locale]}</p></header>
-    <div className="campus-room-art" ref={host}>
-      {walking && visible ? <CampusSceneBoundary resetKey={district.id} fallback={<CampusSceneRecovery />}><Suspense fallback={artwork}>
-        <PhaserCanvas manifest={manifest} snapshot={snapshot} bridge={bridge} atmosphere="focus"
-          onLocalState={(state) => {
-            point.current = state.point;
-            campusPositionMemory.write(ownerScope, district.id, state.point);
-            // Local-only renderer diagnostics: no identity, domain input, peers or network writes.
-            if (host.current) {
-              host.current.dataset.campusWalkX = state.point.x.toFixed(3);
-              host.current.dataset.campusWalkY = state.point.y.toFixed(3);
-            }
-          }} onPeerSelect={noOperation} onCancelFollow={noOperation}
-          onInteract={(interaction) => {
-            const interactionId = interaction?.id;
-            if (!interactionId) return;
-            const target = district.destinations.find((item) => item.id === interactionId);
-            if (target) {
-              navigate(target.href);
-              return;
-            }
-            const objectIndex = campusObjectInteractionIndex(interactionId);
-            const object = objectIndex === null ? null : sceneObjects[objectIndex];
-            if (object) navigate(object.href);
-          }} />
-      </Suspense></CampusSceneBoundary> : artwork}
-    </div>
-    <div className="campus-room-action-row">
-      <button type="button" className="campus-control" aria-pressed={walking} onClick={() => { setSnapshot((current) => ({ ...current, self: studioVirtualSpaceState(point.current) })); setWalking((value) => !value); }}>
-        {walking ? <Pause size={16} aria-hidden="true" /> : <Footprints size={16} aria-hidden="true" />}
-        {locale === "ko" ? (walking ? "걷기 멈추기" : "공용 아틀리에 걷기") : (walking ? "Stop walking" : "Walk the shared atelier")}
-      </button>
-      <small>{locale === "ko" ? "아래 기능은 바로 열 수 있어요." : "Open any action directly below."}</small>
+    <div className="campus-room-art">
+      {!imageFailed ? <img src={district.artworkUrl} alt="" width={640} height={640}
+        onError={() => setImageFailed(true)} decoding="async" /> : <p role="status">
+        {locale === "ko" ? "그림 없이도 아래 기능을 사용할 수 있어요." : "All actions remain available without the artwork."}
+      </p>}
     </div>
     <nav className="campus-room-destinations" aria-label={locale === "ko" ? "이 공간의 기능" : "Actions in this place"}>
       {district.destinations.map((destination) => <Link key={destination.id} to={destination.href}
