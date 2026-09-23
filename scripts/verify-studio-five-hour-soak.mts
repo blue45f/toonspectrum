@@ -344,6 +344,15 @@ async function ensurePenReady(page: Page): Promise<boolean> {
     .catch(() => false);
 }
 
+async function waitForPenReady(page: Page, timeoutMs = 30_000): Promise<boolean> {
+  const deadline = Date.now() + Math.max(1_000, timeoutMs);
+  do {
+    if (await ensurePenReady(page)) return true;
+    await page.waitForTimeout(250);
+  } while (Date.now() < deadline);
+  return false;
+}
+
 async function drawEvidenceStroke(
   page: Page,
   cdp: CDPSession | null,
@@ -500,6 +509,9 @@ try {
   await page.goto(`${preview.origin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 90_000 });
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 90_000 });
   await page.waitForTimeout(3_000);
+  if (!(await waitForPenReady(page))) {
+    throw new Error("Studio pen tool did not become ready during the bounded preflight window.");
+  }
 
   log(`${PROFILE_ID} · ${MINUTES} min · input=${inputMode} · webgpu=${WEBGPU ? "on" : "off"} · ${preview.origin}`);
 

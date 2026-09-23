@@ -434,7 +434,7 @@ export function StudioLayerNavigatorTree({
                 aria-label={`${node.group.name} 그룹 레이어`}
                 className="flex flex-col gap-0.5 border-t border-line/45 p-1 pl-3"
               >
-                {node.entries.map((entry) =>
+                {(node.renderedEntries ?? node.entries).map((entry) =>
                   renderItemRow(entry, `${node.key}:item:${entry.item.id}`, 2)
                 )}
               </ul>
