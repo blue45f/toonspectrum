@@ -159,6 +159,39 @@ export interface ScenarioPreviewItem extends ScenarioPanelSeed {
   approvalRevision?: number;
 }
 
+export type ScenarioGenerationPreferences = Pick<
+  ScenarioPreviewItem,
+  "preferredVariantCount" | "preferredQualityProfile" | "preferredVariationStrategy"
+>;
+
+type ScenarioGenerationPreferenceInput = {
+  readonly preferredVariantCount?: ScenarioImageVariantCount | undefined;
+  readonly preferredQualityProfile?: ScenarioImageQualityProfile | undefined;
+  readonly preferredVariationStrategy?: ScenarioImageVariationStrategy | undefined;
+};
+
+export function scenarioGenerationPreferences(
+  source: ScenarioGenerationPreferenceInput,
+): ScenarioGenerationPreferences {
+  return {
+    ...(source.preferredVariantCount ? { preferredVariantCount: source.preferredVariantCount } : {}),
+    ...(source.preferredQualityProfile ? { preferredQualityProfile: source.preferredQualityProfile } : {}),
+    ...(source.preferredVariationStrategy ? { preferredVariationStrategy: source.preferredVariationStrategy } : {}),
+  };
+}
+
+export function scenarioGenerationPreferencesFromHandoff(source: {
+  readonly variants: ScenarioImageVariantCount;
+  readonly qualityProfile?: ScenarioImageQualityProfile | undefined;
+  readonly variationStrategy?: ScenarioImageVariationStrategy | undefined;
+}): ScenarioGenerationPreferences {
+  return scenarioGenerationPreferences({
+    preferredVariantCount: source.variants,
+    preferredQualityProfile: source.qualityProfile,
+    preferredVariationStrategy: source.variationStrategy,
+  });
+}
+
 export interface ScenarioLayoutResult {
   panels: ScenarioPanelSeed[];
   /** 마지막 패널 하단 + 여백까지 반영한 페이지 캔버스 높이(기존 canvasH보다 작아지지 않는다). */

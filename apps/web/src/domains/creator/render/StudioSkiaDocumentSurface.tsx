@@ -87,11 +87,27 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
         ownedDocumentIds: receiptOwnedDocumentIds.current,
       });
     };
-    if (!enabled || !visible || receipt.current !== sceneRevision) {
+    const transformSnapshot = latest.current.liveTransformDraftStore?.getSnapshot() ?? null;
+    const pendingGpuTransformHandoff =
+      transformSnapshot !== null
+      && transformSnapshot.scope === latest.current.liveTransformDraftScope
+      && transformSnapshot.phase === "handoff"
+      && receipt.current !== null
+      && sourceHiddenReceipt.current === receipt.current;
+    if (!enabled || !visible) {
       sourceHiddenReceipt.current = null;
       visiblePresentationReceipt.current = null;
       clearRetainedCameraTranslation(current);
       current.style.visibility = "hidden";
+      return;
+    }
+    if (receipt.current !== sceneRevision) {
+      if (!pendingGpuTransformHandoff) {
+        sourceHiddenReceipt.current = null;
+        visiblePresentationReceipt.current = null;
+        clearRetainedCameraTranslation(current);
+        current.style.visibility = "hidden";
+      }
       return;
     }
     if (current.style.visibility === "visible") {
@@ -121,6 +137,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       receipt.current = null;
       receiptOwnedDocumentIds.current = [];
       visiblePresentationReceipt.current = null;
+      clearRetainedCameraTranslation(current);
       current.style.visibility = "hidden";
       report("unavailable", sceneRevision, [], cause instanceof Error ? cause.message : String(cause));
     });
@@ -152,10 +169,23 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       const state = latest.current; const request = ++revision.current;
       canvas.dataset.studioSkiaRequest = String(request);
       canvas.dataset.studioSkiaPhase = "rendering";
-      const continuing = cameraOnly && receipt.current === state.sceneRevision && sourceHiddenReceipt.current === state.sceneRevision && state.visible;
+      const transformSnapshot = state.liveTransformDraftStore?.getSnapshot() ?? null;
+      const transformHandoffContinuing =
+        transformSnapshot !== null
+        && transformSnapshot.scope === state.liveTransformDraftScope
+        && transformSnapshot.phase === "handoff"
+        && receipt.current !== null
+        && sourceHiddenReceipt.current === receipt.current
+        && state.visible;
+      const continuing = transformHandoffContinuing || (
+        cameraOnly
+        && receipt.current === state.sceneRevision
+        && sourceHiddenReceipt.current === state.sceneRevision
+        && state.visible
+      );
       const transformProjection = projectStudioSkiaLiveTransformElements(
         state.elements,
-        state.liveTransformDraftStore?.getSnapshot() ?? null,
+        transformSnapshot,
         state.liveTransformDraftScope ?? "",
       );
       const projectionToken = transformProjection.token;
@@ -240,7 +270,9 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
           canvas.dataset.studioSkiaPictureBytes = String(result.stats.pictureBytes);
           canvas.dataset.studioSkiaReadbacks = "0";
           if (continuing && latest.current.visible) canvas.style.visibility = "visible";
-          else report("active", state.sceneRevision, plan.ownedDocumentIds);
+          if (!continuing || transformHandoffContinuing) {
+            report("active", state.sceneRevision, plan.ownedDocumentIds);
+          }
         } else if (result.status === "unsupported") {
           receipt.current = null;
           receiptOwnedDocumentIds.current = [];
@@ -302,9 +334,10 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
         liveTransformProjectionToken = next.token;
         return;
       }
-      // Projection ownership changes document pixels, so they must re-enter the guarded document
-      // handoff rather than borrowing the retained camera-only continuation path.
-      submit();
+      // The exact transform lane already owns the moving source. Keep the source-hidden GPU
+      // receipt visible while submitting only the ownership transition; the projection token
+      // prevents a superseded camera frame from replacing newer document pixels.
+      submit(true);
     };
     const unsubscribeLiveTransform = liveTransformDraftStore?.subscribe(
       syncLiveTransformProjection,
@@ -348,17 +381,37 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     liveTransformDraftStore,
   ]);
   useLayoutEffect(() => {
-    if (canvasRef.current) {
-      clearRetainedCameraTranslation(canvasRef.current);
-      canvasRef.current.style.visibility = "hidden";
+    const state = latest.current;
+    const snapshot = state.liveTransformDraftStore?.getSnapshot() ?? null;
+    const keepVisibleForHandoff =
+      snapshot !== null
+      && snapshot.scope === state.liveTransformDraftScope
+      && snapshot.phase === "handoff"
+      && receipt.current !== null
+      && sourceHiddenReceipt.current === receipt.current
+      && state.visible;
+    const current = canvasRef.current;
+    if (current && !keepVisibleForHandoff) {
+      clearRetainedCameraTranslation(current);
+      current.style.visibility = "hidden";
     }
     submitted.current?.();
   }, [sceneRevision, width, height, documentWidth, documentHeight, dpr, elements, frameTheme]);
   useLayoutEffect(() => {
     if (cameraSource) return;
-    if (canvasRef.current) {
-      clearRetainedCameraTranslation(canvasRef.current);
-      canvasRef.current.style.visibility = "hidden";
+    const state = latest.current;
+    const snapshot = state.liveTransformDraftStore?.getSnapshot() ?? null;
+    const keepVisibleForHandoff =
+      snapshot !== null
+      && snapshot.scope === state.liveTransformDraftScope
+      && snapshot.phase === "handoff"
+      && receipt.current !== null
+      && sourceHiddenReceipt.current === receipt.current
+      && state.visible;
+    const current = canvasRef.current;
+    if (current && !keepVisibleForHandoff) {
+      clearRetainedCameraTranslation(current);
+      current.style.visibility = "hidden";
     }
     submitted.current?.();
   }, [cameraSource, documentTransform]);

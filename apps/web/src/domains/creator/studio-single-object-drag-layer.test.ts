@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readStudioCanvasViewportStack } from "./canvas/read-studio-canvas-viewport-stack";
 import { studioKonvaRuntime } from "./render/studio-konva-runtime";
 import {
+  findStudioDrawWrapperNode,
   mirrorStudioDrawElementTranslation,
   STUDIO_LIVE_TRANSFORM_PREVIEW_ACTIVE_ATTR,
 } from "./studio-selection-chrome-mirror";
@@ -416,6 +417,49 @@ describe("single-draw transform gesture Layer lift", () => {
     transformer.nodes([proxy]);
     return { wrapper, proxy, transformer };
   }
+
+  it("uses the GPU hit-only proxy as the exact transform source while paint is unmounted", () => {
+    const hitProxy = new studioKonvaRuntime.Shape({
+      name: "skia-document-hit-proxy",
+      sceneFunc: () => undefined,
+      hitFunc: () => undefined,
+    });
+    hitProxy.setAttr("studioElementId", "stroke-1");
+    scene.mainLayer.add(hitProxy);
+    const proxy = new studioKonvaRuntime.Rect({ x: 10, y: 20, width: 100, height: 50 });
+    scene.mainLayer.add(proxy);
+    const transformer = new studioKonvaRuntime.Transformer();
+    scene.mainLayer.add(transformer);
+    transformer.nodes([proxy]);
+
+    expect(findStudioDrawWrapperNode(scene.stage, "stroke-1")).toBe(hitProxy);
+    const chromeSession = beginStudioSingleDrawTransformChromeLayer({
+      elementId: "stroke-1",
+      wrapper: hitProxy,
+      proxy,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+    expect(chromeSession).not.toBeNull();
+    expect(hitProxy.getLayer()).toBe(scene.mainLayer);
+    expect(proxy.getLayer()).toBe(scene.dragLayer);
+    expect(transformer.getLayer()).toBe(scene.dragLayer);
+
+    const sourceSession = beginStudioSingleDrawTransformSourceLayer({
+      elementId: "stroke-1",
+      wrapper: hitProxy,
+      transformer,
+      dragLayer: scene.dragLayer,
+    });
+    expect(sourceSession).not.toBeNull();
+    expect(hitProxy.getLayer()).toBe(scene.dragLayer);
+
+    expect(restoreStudioSingleObjectDragLayer(sourceSession)).toBe(true);
+    expect(hitProxy.getLayer()).toBe(scene.mainLayer);
+    expect(restoreStudioSingleObjectDragLayer(chromeSession)).toBe(true);
+    expect(proxy.getLayer()).toBe(scene.mainLayer);
+    expect(transformer.getLayer()).toBe(scene.mainLayer);
+  });
 
   it("keeps the source in the document Layer until an admitted frame claims it", () => {
     const { wrapper, proxy, transformer } = addTransformScene();

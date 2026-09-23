@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { layoutScenarioPanels, scenarioPanelAspect, type ScenarioFrameRect } from "./studio-scenario-layout";
+import {
+  layoutScenarioPanels,
+  scenarioGenerationPreferences,
+  scenarioGenerationPreferencesFromHandoff,
+  scenarioPanelAspect,
+  type ScenarioFrameRect,
+} from "./studio-scenario-layout";
 
 const CANVAS_W = 720;
 
@@ -16,6 +22,31 @@ describe("scenarioPanelAspect", () => {
   });
   it("does not throw/NaN on a zero-height rect (defensive fallback to square)", () => {
     expect(scenarioPanelAspect(500, 0)).toBe("square");
+  });
+});
+
+describe("scenario generation preferences", () => {
+  it("keeps only defined generation preferences", () => {
+    expect(scenarioGenerationPreferences({
+      preferredVariantCount: 4,
+      preferredQualityProfile: undefined,
+      preferredVariationStrategy: "coverage",
+    })).toEqual({
+      preferredVariantCount: 4,
+      preferredVariationStrategy: "coverage",
+    });
+  });
+
+  it("maps composer handoff preference names without changing their values", () => {
+    expect(scenarioGenerationPreferencesFromHandoff({
+      variants: 2,
+      qualityProfile: "final",
+      variationStrategy: "directorial",
+    })).toEqual({
+      preferredVariantCount: 2,
+      preferredQualityProfile: "final",
+      preferredVariationStrategy: "directorial",
+    });
   });
 });
 

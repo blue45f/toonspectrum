@@ -59,12 +59,14 @@ try {
   const selectRail = page.locator('[data-studio-rail-tool-id="select"]');
   if (await selectRail.isVisible()) await selectRail.click(); else await viewTool('select');
   await page.mouse.click(bounds.x + bounds.width * 0.4, bounds.y + 165);
-  await expect(host).toHaveAttribute('data-studio-konva-document-shadow', 'mounted');
-  await expect(page.locator('[data-studio-document-renderer="compatibility"]')).toBeVisible();
+  await expect(page.locator('[data-studio-selection-badge="true"]')).toBeVisible();
+  await gpuReady(3);
+  await expect(host).toHaveAttribute('data-studio-konva-document-shadow', 'unmounted');
+  await expect(page.locator('[data-studio-document-renderer="skia-canvaskit-document-webgl2"]')).toBeVisible();
+  report.checks.push('A single exact ink selection keeps Skia ownership; the hit-only proxy selects it without remounting the Konva paint tree');
   await page.mouse.click(bounds.x + 45, bounds.y + 45);
   await gpuReady(3);
   await expect(host).toHaveAttribute('data-studio-konva-document-shadow', 'unmounted');
-  report.checks.push('GPU-owned documents unmount the Konva paint tree; the lightweight hit proxy restores compatibility editing on selection');
   await viewTool('zoom');
   await page.getByRole('button', { name: '캔버스 실제 픽셀 100%', exact: true }).click();
   await gpuReady(3);

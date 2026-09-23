@@ -159,7 +159,7 @@ export function StudioCanvasViewportStageHost({
     setTool,
   } = stableHandlers;
   const {
-    frameGraphOwnsDocumentPixels,
+    frameGraphOwnsDocumentPixels: settledFrameGraphOwnsDocumentPixels,
     paperGrainOpacity,
     paperGrainPatternImage,
     stageViewClip,
@@ -202,6 +202,16 @@ export function StudioCanvasViewportStageHost({
     },
     () => null,
   );
+  const liveTransformHandoffOwnsGpu =
+    liveTransformHandoffRevision !== null
+    && live.velloDocumentSurfaceEnabled
+    && velloHubAuthority.visibleCanvasCount === 1
+    && (
+      velloHubAuthority.status === "active"
+      || velloHubAuthority.status === "unavailable"
+    );
+  const frameGraphOwnsDocumentPixels =
+    settledFrameGraphOwnsDocumentPixels || liveTransformHandoffOwnsGpu;
 
   // Pointer-up retains the exact terminal draft until this authoritative render is committed.
   // useLayoutEffect releases the hidden source before paint, preventing both source flash and a
