@@ -22,7 +22,6 @@ import {
   normalizeStudioAdjustmentFilterOperations,
   studioAdjustmentOperationToFilterFields,
 } from "../studio-adjustment-stack";
-import type { El } from "../studio-element-model";
 import { normalizeOutline, outlineCachePad } from "../studio-outline";
 import {
   hasActiveImageFilters,
@@ -38,13 +37,16 @@ import {
 import type { StudioImageDataLike } from "../studio-filters";
 import { studioSkiaBrowserImageSourcePool } from "./studio-skia-browser-image-source-pool";
 import { applyStudioSkiaRoundedCornerAlphaToPixels } from "./studio-skia-rounded-corner-raster";
+import type { StudioSkiaSpecialistRasterElement } from "./studio-skia-specialist-raster-contract";
+
+export {
+  requiresStudioSkiaSpecialistRaster,
+  STUDIO_SKIA_SPECIALIST_RASTER_ANIMATION_INTERVAL_MS,
+} from "./studio-skia-specialist-raster-contract";
+export type { StudioSkiaSpecialistRasterElement } from "./studio-skia-specialist-raster-contract";
 
 export const STUDIO_SKIA_SPECIALIST_RASTER_MAX_PIXELS = 64 * 1024 * 1024;
 export const STUDIO_SKIA_SPECIALIST_RASTER_MAX_BYTES = 256 * 1024 * 1024;
-export const STUDIO_SKIA_SPECIALIST_RASTER_ANIMATION_INTERVAL_MS = 80;
-
-export type StudioSkiaSpecialistRasterElement =
-  Extract<El, { type: "image" }> & ImageFilterFields;
 
 export interface StudioSkiaSpecialistRasterPlan {
   readonly key: string;
@@ -209,18 +211,6 @@ export function resolveStudioSkiaSpecialistRasterPadding(
     );
   }
   return padding;
-}
-
-export function requiresStudioSkiaSpecialistRaster(
-  element: El,
-): element is StudioSkiaSpecialistRasterElement {
-  return element.type === "image" && (
-    hasActiveImageFilters(element)
-    || shouldApplyFilterMask(element)
-    || shouldApplyLayerMask(element)
-    || element.isAnimatedGif === true
-    || (element.frames?.length ?? 0) > 1
-  );
 }
 
 export function planStudioSkiaSpecialistRaster(

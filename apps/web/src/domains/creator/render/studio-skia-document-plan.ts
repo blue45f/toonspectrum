@@ -10,7 +10,7 @@ import { skewDegToKonva } from "../studio-skew";
 import { isStudioStandardBlendMode } from "../studio-standard-blend";
 import { hasActiveImageFilters } from "./studio-konva-filter-fields";
 import { resolveStudioSkiaDocumentFontSource } from "./studio-skia-document-font-contract";
-import { requiresStudioSkiaSpecialistRaster } from "./studio-skia-specialist-raster";
+import { requiresStudioSkiaSpecialistRaster } from "./studio-skia-specialist-raster-contract";
 import type { StudioSkiaPreparedImageProjection } from "./studio-skia-specialist-document-projection";
 import { isStudioVelloDocumentVectorElement, lowerStudioElementsToRenderScene, parseSupportedCssColorToIR } from "./studio-document-scene-lower";
 

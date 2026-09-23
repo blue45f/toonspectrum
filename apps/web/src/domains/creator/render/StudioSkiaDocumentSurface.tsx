@@ -9,15 +9,11 @@ import type { StudioSkiaDocumentPresentationCandidate } from "../studio-skia-com
 import type { StudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import { createStudioSkiaDocumentProjector } from "./studio-skia-document-plan";
 import { projectStudioSkiaLiveTransformElements } from "./studio-skia-live-transform-projection";
-import {
-  createStudioSkiaSpecialistDocumentProjectionCache,
-  prepareStudioSkiaSpecialistDocumentProjection,
-  type StudioSkiaSpecialistDocumentProjection,
-} from "./studio-skia-specialist-document-projection";
+import type { StudioSkiaSpecialistDocumentProjection } from "./studio-skia-specialist-document-projection";
 import {
   requiresStudioSkiaSpecialistRaster,
   STUDIO_SKIA_SPECIALIST_RASTER_ANIMATION_INTERVAL_MS,
-} from "./studio-skia-specialist-raster";
+} from "./studio-skia-specialist-raster-contract";
 import type { StudioSkiaSpecialistRasterCache } from "./studio-skia-specialist-raster-cache";
 import type { StudioRenderSurfaceAuthority, StudioRenderSurfaceProps } from "./StudioRenderSurface";
 
@@ -108,11 +104,6 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
   useLayoutEffect(() => {
     const preparationGeneration = ++specialistPreparationGeneration.current;
     const controller = new AbortController();
-    let cache = specialistCacheRef.current;
-    if (!cache || cache.snapshot().disposed) {
-      cache = createStudioSkiaSpecialistDocumentProjectionCache();
-      specialistCacheRef.current = cache;
-    }
     const previous = specialistStateRef.current.projection;
     const hasCandidates = elements.some(requiresStudioSkiaSpecialistRaster);
     specialistStateRef.current = {
@@ -133,11 +124,23 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
       };
       return () => controller.abort();
     }
-    void prepareStudioSkiaSpecialistDocumentProjection(elements, {
-      cache,
-      liveFrameRevision,
-      signal: controller.signal,
+    void import("./studio-skia-specialist-document-projection").then((module) => {
+      if (
+        controller.signal.aborted
+        || preparationGeneration !== specialistPreparationGeneration.current
+      ) return null;
+      let cache = specialistCacheRef.current;
+      if (!cache || cache.snapshot().disposed) {
+        cache = module.createStudioSkiaSpecialistDocumentProjectionCache();
+        specialistCacheRef.current = cache;
+      }
+      return module.prepareStudioSkiaSpecialistDocumentProjection(elements, {
+        cache,
+        liveFrameRevision,
+        signal: controller.signal,
+      });
     }).then((projection) => {
+      if (!projection) return;
       if (
         controller.signal.aborted
         || preparationGeneration !== specialistPreparationGeneration.current

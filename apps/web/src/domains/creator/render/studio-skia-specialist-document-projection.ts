@@ -5,9 +5,9 @@ import {
 } from "./studio-skia-specialist-raster-cache";
 import {
   planStudioSkiaSpecialistRaster,
-  requiresStudioSkiaSpecialistRaster,
   type StudioSkiaSpecialistRasterLease,
 } from "./studio-skia-specialist-raster";
+import { requiresStudioSkiaSpecialistRaster } from "./studio-skia-specialist-raster-contract";
 
 export interface StudioSkiaPreparedImageProjection {
   readonly key: string;
