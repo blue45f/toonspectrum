@@ -19,6 +19,7 @@ const run = (command, args) => {
 };
 
 run(process.execPath, ["generate-product-tour-narration.mjs", "--check"]);
+run(process.execPath, ["generate-product-tour-runtime-audio.mjs"]);
 try {
   run(executable, [
     "render",
@@ -52,4 +53,5 @@ try {
   rmSync(visualPath, { force: true });
 }
 
+run(process.execPath, ["generate-product-tour-runtime-audio.mjs", "--check"]);
 run(process.execPath, ["mix-product-tour-audio.mjs", "--check"]);

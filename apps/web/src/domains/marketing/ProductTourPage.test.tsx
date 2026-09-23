@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { PRODUCT_TOUR_RUNTIME_AUDIO } from "./product-tour-audio.generated";
 import { PRODUCT_TOUR } from "./product-tour-content";
 
 const PUBLIC_BRAND = "apps/web/public/brand";
@@ -11,6 +12,9 @@ const PLAYER_SOURCE = "apps/web/src/domains/marketing/ProductTourPlayer.tsx";
 const ROUTE_SOURCE = "apps/web/src/app/routes/groups/marketing.routes.tsx";
 const HOME_SOURCE = "apps/web/src/domains/marketing/CreatorHomeExperience.tsx";
 const REMOTION_SOURCE = "media/brand-film/src/ProductTourFilm.tsx";
+const SHARED_REMOTION_SOURCE = "packages/product-tour-film/src/ProductTourFilm.tsx";
+const FALLBACK_PLAYER_SOURCE = "apps/web/src/domains/marketing/ProductTourMp4Player.tsx";
+const RUNTIME_AUDIO_MANIFEST = `${PUBLIC_BRAND}/product-tour/product-tour-audio.json`;
 const REMOTION_ROOT = "media/brand-film/src/index.tsx";
 
 describe("long-form product tour contracts", () => {
@@ -39,20 +43,26 @@ describe("long-form product tour contracts", () => {
     expect(pageSource).toContain('duration: "PT8M24S"');
     expect(pageSource).toContain("product-tour-page__journey-grid");
     expect(pageSource).toContain("<CreatorFeatureReels showFilm={false} embedded />");
-    expect(playerSource).toContain("mounted ? (");
-    expect(playerSource).toContain('preload="metadata"');
-    expect(playerSource).toContain('srcLang="ko"');
-    expect(playerSource).toContain('srcLang="en"');
-    expect(playerSource).toContain("PRODUCT_TOUR_STALL_TIMEOUT_MS");
-    expect(playerSource).toContain("recoverPlayback");
-    expect(playerSource).toContain("suspendBgmForContext");
+    const fallbackSource = readFileSync(FALLBACK_PLAYER_SOURCE, "utf8");
+    expect(playerSource).toContain("component={ProductTourRemotionComposition}");
+    expect(playerSource).toContain("initiallyMuted={false}");
+    expect(playerSource).toContain("numberOfSharedAudioTags={2}");
+    expect(playerSource).toContain("enableSound");
+    expect(playerSource).toContain("ProductTourMp4Player");
+    expect(fallbackSource).toContain('preload="metadata"');
+    expect(fallbackSource).toContain('srcLang="ko"');
+    expect(fallbackSource).toContain('srcLang="en"');
+    expect(fallbackSource).toContain("PRODUCT_TOUR_STALL_TIMEOUT_MS");
+    expect(fallbackSource).toContain("recoverPlayback");
     expect(playerSource).toContain("PRODUCT_TOUR.chapters.map");
   });
 
-  it("registers the Remotion composition at the same duration", () => {
-    const filmSource = readFileSync(REMOTION_SOURCE, "utf8");
+  it("shares one reviewed Remotion composition between rendering and runtime playback", () => {
+    const bridgeSource = readFileSync(REMOTION_SOURCE, "utf8");
+    const filmSource = readFileSync(SHARED_REMOTION_SOURCE, "utf8");
     const rootSource = readFileSync(REMOTION_ROOT, "utf8");
 
+    expect(bridgeSource).toContain("@toonspectrum/product-tour-film");
     expect(filmSource).toContain("PRODUCT_TOUR_DURATION_SECONDS = 504");
     expect(filmSource).toContain("PRODUCT_TOUR_FPS = 30");
     expect(rootSource).toContain('id="ToonStudioProductTour"');
@@ -76,6 +86,23 @@ describe("long-form product tour contracts", () => {
     ]) {
       expect(existsSync(`${PUBLIC_BRAND}/${asset}`), asset).toBe(true);
     }
+  });
+
+  it("ships versioned Remotion runtime narration, BGM and shared cue data", () => {
+    const manifest = JSON.parse(readFileSync(RUNTIME_AUDIO_MANIFEST, "utf8")) as typeof PRODUCT_TOUR_RUNTIME_AUDIO;
+    const narration = readFileSync(`${PUBLIC_BRAND}/product-tour/toonstudio-product-tour-narration.ko.m4a`);
+    const bgm = readFileSync(`${PUBLIC_BRAND}/product-tour/toonstudio-product-tour-bgm.m4a`);
+
+    expect(manifest).toEqual(PRODUCT_TOUR_RUNTIME_AUDIO);
+    expect(manifest.version).toBe(1);
+    expect(manifest.duration).toBe(504);
+    expect(manifest.cues).toHaveLength(27);
+    expect(manifest.narration.src).toMatch(/\?v=[a-f0-9]{16}$/u);
+    expect(manifest.bgm.src).toMatch(/\?v=[a-f0-9]{16}$/u);
+    expect(manifest.narration.bytes).toBe(narration.byteLength);
+    expect(manifest.bgm.bytes).toBe(bgm.byteLength);
+    expect(createHash("sha256").update(narration).digest("hex")).toBe(manifest.narration.sha256);
+    expect(createHash("sha256").update(bgm).digest("hex")).toBe(manifest.bgm.sha256);
   });
 
   it("ships a versioned narrated mix with original BGM and synchronized captions", () => {
