@@ -39,16 +39,21 @@ describe("StudioPage authoritative mutation-lock integration boundary", () => {
     );
   });
 
-  it("keeps gestures fail-closed until server lease warmup succeeds", () => {
+  it("keeps authoritative gestures fail-closed while cooperative rooms arbitrate synchronously", () => {
     const begin = sourceBetween(
       "const begin = (",
       "const end = (): void => {",
     );
 
-    expect(begin).toContain('if (room.mode !== "server")');
+    expect(pageSource).toContain(
+      'room.mode !== "server" || room.canvasLockPolicy === "cooperative"',
+    );
+    expect(begin).toContain("if (usesSynchronousLocks(room))");
+    expect(begin).toContain("const newlyClaimed: string[] = []");
+    expect(begin).toContain("releaseStudioLiveMutationLocks(room, newlyClaimed)");
     expect(begin).toContain("selfHoldsStudioLiveLock(locks, resource, room.participant.sessionId)");
     expect(begin).toContain("void beginAsync(elementIds, intent)");
-    expect(begin.trimEnd().endsWith("return false;\n  };" )).toBe(true);
+    expect(begin.trimEnd().endsWith("return false;\n  };")).toBe(true);
     expect(begin).toContain("const key = JSON.stringify(resources)");
     expect(begin).toContain("return true;");
   });

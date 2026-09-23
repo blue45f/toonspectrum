@@ -67,6 +67,7 @@ export const STATIC_TITLES: Record<string, string> = {
   "/support": "route.support",
   "/create": "route.create",
   "/showcase": "route.create",
+  "/showcase/reviews": "route.create",
   "/studio": "route.studio",
   "/shaper": "route.shaper",
   "/me": "route.me",
@@ -90,6 +91,7 @@ export function resolveRouteTitle(pathname: string, t: Translator, productLocale
   if (canonicalPath.startsWith("/pencafe/")) return `${decodePathSegment(canonicalPath.slice(9))} ${t("route.pencafeSuffix")}`;
   if (canonicalPath.startsWith("/community/")) return t("route.community");
   if (canonicalPath.startsWith("/market/resource/")) return t("route.market");
+  if (canonicalPath.startsWith("/showcase/reviews/")) return t("route.create");
   if (canonicalPath.startsWith("/admin/")) return t("route.admin");
   if (canonicalPath === "/me" || canonicalPath.startsWith("/me/")) return t("route.me");
   if (isStudioRoutePathname(canonicalPath)) return t("route.studio");

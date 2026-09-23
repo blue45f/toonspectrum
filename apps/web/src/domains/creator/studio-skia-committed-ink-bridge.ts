@@ -128,13 +128,14 @@ export function decideStudioSkiaCommittedInkDraw(
     return { status: "receipted" };
   }
 
-  const authorityMatches = matchesRequestRevision(
-    authority?.revision ?? null,
-    request,
-  );
-  if (authorityMatches) {
-    if (authority?.status === "active") return { status: "hold" };
-    if (authority?.status === "starting") {
+  if (authority) {
+    const authorityMatches = matchesRequestRevision(
+      authority.revision,
+      request,
+    );
+    if (!authorityMatches) return { status: "fallback" };
+    if (authority.status === "active") return { status: "hold" };
+    if (authority.status === "starting") {
       if (deferAttempt < maxDeferAttempts) {
         return { status: "wait", nextDeferAttempt: deferAttempt + 1 };
       }

@@ -8,7 +8,10 @@ import type { CanvasKit } from "canvaskit-wasm";
 function harness() {
   const pictures: Array<{ delete: ReturnType<typeof vi.fn>; approximateBytesUsed(): number }> = [];
   const output = { clear: vi.fn(), save: vi.fn(), restore: vi.fn(), scale: vi.fn(), translate: vi.fn(), rotate: vi.fn(), clipRect: vi.fn(), drawPicture: vi.fn(), drawImage: vi.fn() };
-  const surface = { getCanvas: () => output, flush: vi.fn(), delete: vi.fn(), makeImageSnapshot: () => ({ delete: vi.fn() }) };
+  const surface = { getCanvas: () => output, flush: vi.fn(), delete: vi.fn(), makeImageSnapshot: () => ({
+    delete: vi.fn(),
+    encodeToBytes: vi.fn(() => Uint8Array.of(0x89, 0x50, 0x4e, 0x47)),
+  }) };
   const context = { setResourceCacheLimitBytes: vi.fn(), getResourceCacheUsageBytes: () => 512, delete: vi.fn() };
   const recorders: Array<{ delete: ReturnType<typeof vi.fn> }> = [];
   class PictureRecorder {
@@ -21,7 +24,7 @@ function harness() {
     }
   }
   const ck = { PictureRecorder, GetWebGLContext: vi.fn(() => 1), MakeWebGLContext: vi.fn(() => context),
-    MakeOnScreenGLSurface: vi.fn(() => surface), deleteContext: vi.fn(), setCurrentContext: vi.fn(() => true), ColorSpace: { SRGB: {} }, ClipOp: { Intersect: 1 }, TRANSPARENT: new Float32Array(4),
+    MakeOnScreenGLSurface: vi.fn(() => surface), deleteContext: vi.fn(), setCurrentContext: vi.fn(() => true), ColorSpace: { SRGB: {} }, ClipOp: { Intersect: 1 }, ImageFormat: { PNG: 1 }, TRANSPARENT: new Float32Array(4),
   } as unknown as CanvasKit;
   const canvas = document.createElement("canvas");
   const frame: SkiaDocumentFrame = { revision: {}, width: 200, height: 200, dpr: 1, documentWidth: 1000, documentHeight: 1000,
@@ -44,6 +47,18 @@ describe("persistent CanvasKit document renderer", () => {
     expect(h.recorders.every((recorder) => recorder.delete.mock.calls.length === 1)).toBe(true);
     expect(h.context.delete).toHaveBeenCalledOnce();
     expect(h.ck.deleteContext).toHaveBeenCalledOnce();
+  });
+
+  it("snapshots only the exact currently presented revision", async () => {
+    const h = harness();
+    const renderer = createSkiaDocumentRenderer(h.canvas, { loadCanvasKit: async () => h.ck });
+    expect(renderer.snapshotPng(h.frame.revision)).toBeNull();
+    const receipt = await renderer.present(h.frame);
+    expect(receipt).toMatchObject({ status: "presented", revision: h.frame.revision });
+    expect(renderer.snapshotPng({})).toBeNull();
+    expect(renderer.snapshotPng(h.frame.revision)).toEqual(Uint8Array.of(0x89, 0x50, 0x4e, 0x47));
+    renderer.dispose();
+    expect(renderer.snapshotPng(h.frame.revision)).toBeNull();
   });
   it("coalesces only unpresented frames during async loading and settles every waiter", async () => {
     const h = harness(); let load!: (ck: CanvasKit) => void;
@@ -112,7 +127,7 @@ it("records only the affected composite batch rather than replaying the document
 
 it("bounds retained viewport images and releases GPU resources on repeated camera changes", async () => {
   const h = harness(); const images: Array<{ delete: ReturnType<typeof vi.fn> }> = [];
-  h.surface.makeImageSnapshot = () => { const image = { delete: vi.fn() }; images.push(image); return image; };
+  h.surface.makeImageSnapshot = () => { const image = { delete: vi.fn(), encodeToBytes: vi.fn(() => Uint8Array.of(1, 2, 3)) }; images.push(image); return image; };
   const abandon = vi.fn(); Object.assign(h.context, { releaseResourcesAndAbandonContext: abandon });
   const renderer = createSkiaDocumentRenderer(h.canvas, { loadCanvasKit: async () => h.ck });
   for (let index = 0; index < 40; index++) {
@@ -169,7 +184,7 @@ it("releases retained GPU resources on loss without waiting for the editor to un
   const h = harness();
   const images: Array<{ delete: ReturnType<typeof vi.fn> }> = [];
   h.surface.makeImageSnapshot = () => {
-    const image = { delete: vi.fn() }; images.push(image); return image;
+    const image = { delete: vi.fn(), encodeToBytes: vi.fn(() => Uint8Array.of(1, 2, 3)) }; images.push(image); return image;
   };
   const abandon = vi.fn();
   Object.assign(h.context, { releaseResourcesAndAbandonContext: abandon });

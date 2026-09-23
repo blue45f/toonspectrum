@@ -43,15 +43,17 @@ async function setup(primary = createStudioLiveSignalingServerTransport(), role 
 }
 
 describe("signaling-only drawing lock regression through all runtime wrappers", () => {
-  it("preserves missing lock capability without inventing server authority", async () => {
+  it("uses cooperative locks without inventing server authority", async () => {
     const { room } = await setup();
     expect(room.mode).toBe("server");
-    expect(room.canvasLockPolicy).toBe("append-only");
+    expect(room.canvasLockPolicy).toBe("cooperative");
     expect(room.serverLockSupported).toBe(false);
     expect(room.authoritativeLockCapability).toBeNull();
     await expect(room.claimLockAsync("page:page-1")).resolves.toMatchObject({
-      status: "denied", code: "unsupported_transport",
+      status: "acquired",
+      resource: "page:page-1",
     });
+    expect(room.releaseLock("page:page-1")).toBe(true);
     await expect(room.claimAuthoritativeLockAsync("page:page-1")).resolves.toMatchObject({
       status: "denied", code: "unsupported_authority",
     });
@@ -71,17 +73,34 @@ describe("signaling-only drawing lock regression through all runtime wrappers", 
     expect(errors.mock.calls.every(([message]) => message === null)).toBe(true);
   });
 
-  it.each(["drag", "transform", "text-edit", "page-edit"] as const)("keeps %s blocked without an authority", async (intent) => {
-    const { room, controller } = await setup();
-    const claim = vi.spyOn(room, "claimLockAsync");
-    expect(controller.begin(["existing-element"], intent)).toBe(false);
-    expect(await controller.beginAsync(["existing-element"], intent)).toBe(false);
-    expect(claim).not.toHaveBeenCalled();
+  it.each([
+    { intent: "drag" as const, elementIds: ["existing-element"] },
+    { intent: "transform" as const, elementIds: ["existing-element"] },
+    { intent: "text-edit" as const, elementIds: ["existing-element"] },
+    { intent: "page-edit" as const, elementIds: undefined },
+  ])("allows $intent through a cooperative lock without the old error", async ({ intent, elementIds }) => {
+    const { room, controller, errors } = await setup();
+
+    expect(controller.begin(elementIds, intent)).toBe(true);
+    expect(room.getLocks()).toHaveLength(1);
+    controller.end();
+    expect(room.getLocks()).toEqual([]);
+
+    expect(await controller.beginAsync(elementIds, intent)).toBe(true);
+    expect(room.getLocks()).toHaveLength(1);
+    controller.end();
+    expect(room.getLocks()).toEqual([]);
+    expect(errors).not.toHaveBeenCalledWith(
+      "현재 연결에서는 새 획을 추가할 수 있습니다. 기존 요소 수정은 편집 잠금 서버 연결이 필요합니다.",
+    );
   });
 
-  it("does not treat existing targets, viewers, or a closed connection as additive permission", async () => {
-    const { controller, primary } = await setup();
-    expect(controller.begin(["existing"], "append-stroke")).toBe(false);
+  it("locks existing targets and still blocks viewers or a closed connection", async () => {
+    const { room, controller, primary } = await setup();
+    expect(controller.begin(["existing"], "append-stroke")).toBe(true);
+    expect(room.getLocks()).toHaveLength(1);
+    controller.end();
+
     primary.close();
     expect(controller.begin(undefined, "append-stroke")).toBe(false);
     const viewer = await setup(createStudioLiveSignalingServerTransport(), "viewer");

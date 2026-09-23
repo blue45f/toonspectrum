@@ -49,6 +49,7 @@ import {
 } from "./studio-live-collaboration-protocol";
 import {
   createStudioLocalLiveTransport,
+  type StudioLiveCanvasLockPolicy,
   type StudioLiveTransport,
   type StudioLiveTransportControlEvent,
   type StudioLiveTransportFactory,
@@ -494,7 +495,7 @@ export class StudioLiveRoom {
     return typeof this.transport?.acquireLock === "function";
   }
 
-  get canvasLockPolicy(): "required" | "append-only" {
+  get canvasLockPolicy(): StudioLiveCanvasLockPolicy {
     return this.transport?.canvasLockPolicy ?? "required";
   }
 
@@ -866,7 +867,13 @@ export class StudioLiveRoom {
    */
   claimLock(resource: string): boolean {
     if (!this.ready) return false;
-    if (this.transport?.mode !== "server") return this.claimLocalLock(resource);
+    if (this.usesCooperativeLocks()) {
+      try {
+        return this.claimLocalLock(resource);
+      } catch {
+        return false;
+      }
+    }
     if (this.pendingLockReleases.has(resource)) {
       void this.claimLockAsync(resource);
       return true;
@@ -945,7 +952,7 @@ export class StudioLiveRoom {
         lock: { ...current, owner: copyParticipant(current.owner) },
       });
     }
-    if (this.transport?.mode !== "server") {
+    if (this.usesCooperativeLocks()) {
       if (!this.claimLocalLock(resource, requestId, now)) {
         return Promise.resolve({
           status: "denied",
@@ -973,8 +980,9 @@ export class StudioLiveRoom {
       });
     }
 
-    const acquireLock = this.transport.acquireLock;
-    if (!acquireLock) {
+    const transport = this.transport;
+    const acquireLock = transport?.acquireLock;
+    if (!transport || !acquireLock) {
       return Promise.resolve({
         status: "denied",
         resource,
@@ -1012,7 +1020,7 @@ export class StudioLiveRoom {
     };
     let operation: Promise<StudioLiveLockAcquireResult>;
     try {
-      operation = acquireLock.call(this.transport, request);
+      operation = acquireLock.call(transport, request);
     } catch (error) {
       this.completePendingLockClaim(pending, {
         status: "denied",
@@ -1042,18 +1050,23 @@ export class StudioLiveRoom {
     if (this.pendingLockReleases.has(resource)) return true;
     const current = this.locks.get(resource);
     if (!current || current.owner.sessionId !== this.participant.sessionId) return false;
-    if (this.transport?.mode === "server") {
+    if (!this.usesCooperativeLocks()) {
       void this.releaseLockAsync(resource);
       return true;
     }
     this.locks.delete(resource);
     this.emitLocks();
-    return this.post(
-      "lock:release",
-      { resource, claimId: current.claimId },
-      null,
-      this.now()
-    );
+    try {
+      const envelope = this.buildEnvelope(
+        "lock:release",
+        { resource, claimId: current.claimId },
+        null,
+        this.now(),
+      );
+      return this.sendCooperativeLockEnvelope(envelope);
+    } catch {
+      return false;
+    }
   }
 
   releaseLockAsync(resource: string): Promise<StudioLiveLockReleaseResult> {
@@ -1100,10 +1113,17 @@ export class StudioLiveRoom {
       requestId,
       claimId: current.claimId,
     };
-    if (this.transport?.mode !== "server") {
+    if (this.usesCooperativeLocks()) {
       this.locks.delete(resource);
       this.emitLocks();
-      const sent = this.post("lock:release", { resource, claimId: current.claimId });
+      let sent = false;
+      try {
+        sent = this.sendCooperativeLockEnvelope(
+          this.buildEnvelope("lock:release", { resource, claimId: current.claimId }),
+        );
+      } catch {
+        // Local cleanup already completed; the bounded peer lease is the release fallback.
+      }
       return Promise.resolve({
         status: "released",
         resource,
@@ -1113,8 +1133,9 @@ export class StudioLiveRoom {
       });
     }
 
-    const releaseLock = this.transport.releaseLock;
-    if (!releaseLock) {
+    const transport = this.transport;
+    const releaseLock = transport?.releaseLock;
+    if (!transport || !releaseLock) {
       // Compatibility seam for custom/legacy server transports. Production Socket.IO implements
       // correlated release; this branch preserves older embedders without reintroducing heartbeat.
       const sent = this.post("lock:release", { resource, claimId: current.claimId });
@@ -1165,7 +1186,7 @@ export class StudioLiveRoom {
 
     let operation: Promise<StudioLiveLockReleaseResult>;
     try {
-      operation = releaseLock.call(this.transport, request);
+      operation = releaseLock.call(transport, request);
     } catch (error) {
       this.completePendingLockRelease(pending, {
         status: "denied",
@@ -1706,6 +1727,26 @@ export class StudioLiveRoom {
     }
   }
 
+  private usesCooperativeLocks(): boolean {
+    return this.transport?.mode === "local" || this.canvasLockPolicy === "cooperative";
+  }
+
+  /**
+   * A solo editor must not lose local drawing because no collaboration route exists. Once a peer
+   * is present, however, a cooperative claim succeeds only after the complete room route accepts
+   * the envelope; the P2P overlay itself rejects partial mesh fanout.
+   */
+  private sendCooperativeLockEnvelope(envelope: StudioLiveEnvelope): boolean {
+    let sent = false;
+    try {
+      sent = this.transport?.send(envelope) === true;
+    } catch {
+      // Treat adapter exceptions like a failed route. Solo editing remains local; rooms with peers
+      // fail closed so an exception cannot grant a lock that collaborators never observed.
+    }
+    return sent || this.peers.size === 0;
+  }
+
   private claimLocalLock(resource: string, requestId?: string, requestedAt = this.now()): boolean {
     if (!this.ready) return false;
     this.pruneExpired(requestedAt);
@@ -1720,8 +1761,22 @@ export class StudioLiveRoom {
     };
     const envelope = this.buildEnvelope("lock:claim", payload, null, requestedAt);
     this.applyLockClaim(envelope);
-    if (this.sendEnvelope(envelope)) return true;
+    if (this.sendCooperativeLockEnvelope(envelope)) return true;
 
+    // A mesh send can fail after one peer accepted a brand-new claim. Retract only that new claim:
+    // releasing a failed renewal would incorrectly revoke the still-valid previous lease on peers.
+    if (!previous) {
+      try {
+        this.transport?.send(this.buildEnvelope(
+          "lock:release",
+          { resource, claimId },
+          null,
+          requestedAt,
+        ));
+      } catch {
+        // The original short lease remains the bounded fallback if compensation also cannot be sent.
+      }
+    }
     if (previous) this.locks.set(resource, previous);
     else this.locks.delete(resource);
     this.emitLocks();
@@ -1876,8 +1931,17 @@ export class StudioLiveRoom {
         leaseUntil: now + this.lockLeaseMs,
       };
       const envelope = this.buildEnvelope("lock:claim", payload, null, now);
-      if (this.transport?.mode !== "server") this.applyLockClaim(envelope);
-      this.sendEnvelope(envelope);
+      if (this.usesCooperativeLocks()) {
+        this.applyLockClaim(envelope);
+        if (!this.sendCooperativeLockEnvelope(envelope)) {
+          // Do not keep a local-only extension when collaborators missed the renewal. The previous
+          // bounded lease remains valid everywhere and will expire consistently if the route stays down.
+          this.locks.set(lock.resource, lock);
+          this.emitLocks();
+        }
+      } else {
+        this.sendEnvelope(envelope);
+      }
     }
     this.pruneExpired(now);
   }
@@ -2049,9 +2113,11 @@ export class StudioLiveRoom {
         return;
       }
       case "lock:claim":
+        if (!canEditStudioLiveGesturePreview(envelope.sender)) return;
         this.applyLockClaim(envelope as StudioLiveEnvelope<"lock:claim">);
         return;
       case "lock:release":
+        if (!canEditStudioLiveGesturePreview(envelope.sender)) return;
         this.applyLockRelease(envelope as StudioLiveEnvelope<"lock:release">);
         return;
       case "chat:message": {

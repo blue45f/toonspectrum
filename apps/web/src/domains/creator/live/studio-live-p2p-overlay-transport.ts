@@ -97,6 +97,10 @@ const STUDIO_LIVE_P2P_EPHEMERAL_KINDS = new Set<StudioLiveMessageKind>([
   "chat:message",
   "preview:gesture",
 ]);
+const STUDIO_LIVE_P2P_COOPERATIVE_LOCK_KINDS = new Set<StudioLiveMessageKind>([
+  "lock:claim",
+  "lock:release",
+]);
 
 const STUDIO_LIVE_P2P_STUN_URLS = ["stun:stun.l.google.com:19302"] as const;
 
@@ -106,6 +110,10 @@ export function isStudioLiveP2pMeshShareId(shareId: string): boolean {
 
 export function isStudioLiveP2pEphemeralKind(kind: StudioLiveMessageKind): boolean {
   return STUDIO_LIVE_P2P_EPHEMERAL_KINDS.has(kind);
+}
+
+function isStudioLiveP2pCooperativeLockKind(kind: StudioLiveMessageKind): boolean {
+  return STUDIO_LIVE_P2P_COOPERATIVE_LOCK_KINDS.has(kind);
 }
 
 export interface StudioLiveP2pRtcIceCandidate {
@@ -308,9 +316,10 @@ function decodeStudioLiveP2pInkFrame(data: ArrayBuffer): Record<string, unknown>
 
 /**
  * STUN-only data-channel mesh on top of the room's signaling transport.
- * Cursor, presence heartbeat, chat, and gesture previews hop peer-to-peer once every known peer
- * has an open channel. Join, locks, and ICE signaling stay on the primary transport. CRDT stays
- * on the primary when it can persist updates; otherwise the mesh carries jam Yjs diffs.
+ * Cursor, presence heartbeat, chat, gesture previews, and explicitly cooperative soft locks hop
+ * peer-to-peer once every known peer has an open channel. Join, authoritative locks, and ICE
+ * signaling stay on the primary transport. CRDT stays on the primary when it can persist updates;
+ * otherwise the mesh carries jam Yjs diffs.
  * Authoritative ink actuals retain their server lane. Signaling-only rooms negotiate an ordered,
  * fully reliable RTC lane for exact actual samples; failure remains visible to the publisher.
  */
@@ -435,10 +444,19 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
 
   send(envelope: StudioLiveEnvelope): boolean {
     if (this.closed) return false;
-    if (isStudioLiveP2pEphemeralKind(envelope.kind)) {
+    const cooperativeLock =
+      this.canvasLockPolicy === "cooperative"
+      && isStudioLiveP2pCooperativeLockKind(envelope.kind);
+    if (isStudioLiveP2pEphemeralKind(envelope.kind) || cooperativeLock) {
       const result = this.sendEphemeral(envelope);
       if (result === "sent") return true;
       if (result === "rejected") return false;
+      if (cooperativeLock) {
+        // With known remote members, primary signaling/BroadcastChannel is not a complete room
+        // route. Fail closed rather than granting a lock that only some editors can observe.
+        if (this.knownPeerSessionIds.size > 0) return false;
+        return this.primary.send(envelope);
+      }
       if (
         envelope.kind === "preview:gesture"
         && this.primary.crdtFanout !== "authoritative"
@@ -1320,7 +1338,13 @@ class StudioLiveP2pOverlayTransport implements StudioLiveTransport {
     if (
       !envelope
       || envelope.sender.sessionId !== link.sessionId
-      || !isStudioLiveP2pEphemeralKind(envelope.kind)
+      || (
+        !isStudioLiveP2pEphemeralKind(envelope.kind)
+        && !(
+          this.canvasLockPolicy === "cooperative"
+          && isStudioLiveP2pCooperativeLockKind(envelope.kind)
+        )
+      )
     ) return;
     this.emit({
       ...envelope,

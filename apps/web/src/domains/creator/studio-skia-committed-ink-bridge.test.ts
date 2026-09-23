@@ -120,6 +120,24 @@ describe("Skia committed-ink receipt bridge", () => {
     })).toEqual({ status: "fallback" });
   });
 
+  it("falls back immediately when an explicit authority targets another revision", () => {
+    for (const sceneRevision of [
+      revision(9),
+      { pageId: "page-b", projectGeneration: 8 },
+      null,
+    ]) {
+      expect(decideStudioSkiaCommittedInkDraw({
+        request: request(),
+        authority: projectStudioSkiaCommittedInkAuthority({
+          ...authority("starting"),
+          sceneRevision,
+        }),
+        visibleReceipt: null,
+        deferAttempt: 0,
+      })).toEqual({ status: "fallback" });
+    }
+  });
+
   it("falls back immediately for a matching legacy or unavailable surface", () => {
     for (const status of ["legacy", "unavailable", "disabled", "idle"] as const) {
       expect(decideStudioSkiaCommittedInkDraw({
@@ -222,11 +240,6 @@ describe("Skia committed-ink receipt bridge", () => {
       ...authority("starting"),
       sceneRevision: revision(9),
     });
-    expect(runtime.decide(request())).toEqual({
-      status: "wait",
-      nextDeferAttempt: 1,
-    });
-    runtime.defer("receipt-token", 1);
     expect(runtime.decide(request())).toEqual({ status: "fallback" });
     runtime.clear();
   });

@@ -69,6 +69,7 @@ class FakeHubTransport implements StudioLiveTransport {
 
   send(value: Parameters<StudioLiveTransport["send"]>[0]): boolean {
     if (!this.ready) return false;
+    if (this.hub.sendDecision && !this.hub.sendDecision(this, value)) return false;
     this.hub.publish(this, value);
     return true;
   }
@@ -175,6 +176,9 @@ class FakeTransportHub {
     | ((request: StudioLiveLockReleaseRequest) => Promise<StudioLiveLockReleaseResult>)
     | null = null;
   crdtSyncResponse: StudioCrdtSyncResponse | null = null;
+  sendDecision:
+    | ((sender: FakeHubTransport, value: StudioLiveEnvelope) => boolean)
+    | null = null;
   queued = false;
   private queue: Array<{ sender: FakeHubTransport; value: unknown }> = [];
 
@@ -1095,6 +1099,55 @@ describe("StudioLiveRoom", () => {
     roomB.close();
   });
 
+  it("retracts a partially delivered cooperative claim and restores both rooms", async () => {
+    const test = harness();
+    const roomA = test.room(alice, { randomId: () => "claim-partial" });
+    const roomB = test.room(bob);
+    await roomA.start();
+    await roomB.start();
+    const sender = test.hub.transports[0]!;
+    const before = test.hub.published.length;
+    test.hub.sendDecision = (transport, envelope) => {
+      if (transport !== sender || envelope.kind !== "lock:claim") return true;
+      // Simulate a channel race: one peer receives the frame, but the aggregate send reports false.
+      test.hub.publish(transport, envelope);
+      return false;
+    };
+
+    expect(roomA.claimLock("element:page-1:partial")).toBe(false);
+    expect(roomA.getLocks()).toEqual([]);
+    expect(roomB.getLocks()).toEqual([]);
+    expect(
+      test.hub.published.slice(before).map((envelope) => envelope.kind),
+    ).toEqual(["lock:claim", "lock:release"]);
+
+    roomA.close();
+    roomB.close();
+  });
+
+  it("rolls back a missed cooperative renewal to the shared previous lease", async () => {
+    const test = harness();
+    const roomA = test.room(alice, { randomId: () => "claim-renew" });
+    const roomB = test.room(bob);
+    await roomA.start();
+    await roomB.start();
+    expect(roomA.claimLock("element:page-1:renew")).toBe(true);
+    const initialLeaseUntil = roomA.getLocks()[0]?.leaseUntil;
+    expect(initialLeaseUntil).toBe(test.now() + 500);
+    expect(roomB.getLocks()[0]?.leaseUntil).toBe(initialLeaseUntil);
+
+    const sender = test.hub.transports[0]!;
+    test.hub.sendDecision = (transport, envelope) =>
+      !(transport === sender && envelope.kind === "lock:claim");
+    test.advance(250);
+    test.intervalHandlers[0]!();
+
+    expect(roomA.getLocks()[0]?.leaseUntil).toBe(initialLeaseUntil);
+    expect(roomB.getLocks()[0]?.leaseUntil).toBe(initialLeaseUntil);
+    roomA.close();
+    roomB.close();
+  });
+
   it("converges page and sibling-element claims regardless of each room's delivery order", async () => {
     const test = harness();
     const carol = { sessionId: "session-carol", displayName: "지우 탭", role: "editor" } as const;
@@ -1157,7 +1210,7 @@ describe("StudioLiveRoom", () => {
     secondLayerRoom.close();
   });
 
-  it("returns a denied result instead of throwing when request-id generation fails", async () => {
+  it("contains request-id generation failures in synchronous and async lock paths", async () => {
     const test = harness();
     const room = test.room(alice, {
       randomId: () => {
@@ -1166,6 +1219,8 @@ describe("StudioLiveRoom", () => {
     });
     await room.start();
 
+    expect(() => room.claimLock("page:page-1")).not.toThrow();
+    expect(room.claimLock("page:page-1")).toBe(false);
     await expect(room.claimLockAsync("page:page-1")).resolves.toEqual({
       status: "denied",
       resource: "page:page-1",

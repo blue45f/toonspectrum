@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import * as Automerge from "@automerge/automerge/slim";
+import { beforeAll, describe, expect, it } from "vitest";
 
-import { StudioOfflineBranchAutomergeEngine } from "./studio-offline-branch-automerge";
+import {
+  StudioOfflineBranchAutomergeEngine,
+  initializeStudioOfflineBranchAutomerge,
+} from "./studio-offline-branch-automerge";
 
 import type {
   StudioOfflineBranchOperation,
@@ -54,6 +58,14 @@ function engine(id: string, actorId: string, createdAt: number) {
 }
 
 describe("StudioOfflineBranchAutomergeEngine", () => {
+  beforeAll(async () => {
+    await initializeStudioOfflineBranchAutomerge();
+  });
+
+  it("initializes the worker-safe Automerge WASM entrypoint", () => {
+    expect(Automerge.isWasmInitialized()).toBe(true);
+  });
+
   it("imports independently-created journals without root-map data loss", () => {
     const left = engine("branch-left", "actor-left", 1);
     const right = engine("branch-right", "actor-right", 1);

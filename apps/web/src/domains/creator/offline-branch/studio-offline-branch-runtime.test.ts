@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { StudioCrdtDocument } from "../live/studio-crdt-document";
-import { StudioOfflineBranchAutomergeEngine } from "./studio-offline-branch-automerge";
+import {
+  StudioOfflineBranchAutomergeEngine,
+  initializeStudioOfflineBranchAutomerge,
+} from "./studio-offline-branch-automerge";
 import { StudioOfflineBranchRuntime } from "./studio-offline-branch-runtime";
 
 import type { PageState } from "../studio-page-state";
@@ -17,6 +20,10 @@ import type {
 } from "./studio-offline-branch-contract";
 import type { StudioOfflineBranchStorage } from "./studio-offline-branch-storage";
 import type { StudioOfflineBranchWorkerPort } from "./studio-offline-branch-worker-client";
+
+beforeAll(async () => {
+  await initializeStudioOfflineBranchAutomerge();
+});
 
 function page(groupName = "선화"): PageState {
   return {

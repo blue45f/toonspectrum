@@ -11,7 +11,7 @@ const PUBLIC_PAGES = new Set([
   "/research", "/research/assets", "/research/books", "/research/3d-assets", "/references", "/now", "/opportunities", "/story-lab",
   "/learn", "/learn/recipes", "/learn/glossary", "/learn/studio", "/learn/process", "/learn/careers", "/learn/education", "/learn/resources", "/learn/classroom",
   "/market", "/market/browse", "/market/fit", "/market/compare",
-  "/showcase", "/showcase/challenges", "/showcase/promo", "/create", "/create/challenges", "/create/promo",
+  "/showcase", "/showcase/reviews", "/showcase/challenges", "/showcase/promo", "/create", "/create/challenges", "/create/promo",
   "/community", "/community/cafes", "/community/title", "/community/author", "/community/pencafe", "/reviews",
 ]);
 
@@ -20,6 +20,7 @@ const PUBLIC_DETAIL_ROUTES = [
   /^\/(?:title|author|pencafe)\/[^/]+$/u,
   /^\/market\/resource\/[^/]+$/u,
   /^\/(?:showcase|create)\/(?:series|work)\/[^/]+$/u,
+  /^\/showcase\/reviews\/[^/]+$/u,
   /^\/community\/(?:cafes|post)\/[^/]+$/u,
   /^\/learn\/(?:lessons|paths)\/[^/]+$/u,
 ];

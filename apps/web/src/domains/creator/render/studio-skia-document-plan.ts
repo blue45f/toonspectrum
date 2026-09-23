@@ -10,6 +10,8 @@ import { skewDegToKonva } from "../studio-skew";
 import { isStudioStandardBlendMode } from "../studio-standard-blend";
 import { hasActiveImageFilters } from "./studio-konva-filter-fields";
 import { resolveStudioSkiaDocumentFontSource } from "./studio-skia-document-font-contract";
+import { requiresStudioSkiaSpecialistRaster } from "./studio-skia-specialist-raster-contract";
+import type { StudioSkiaPreparedImageProjection } from "./studio-skia-specialist-document-projection";
 import { isStudioVelloDocumentVectorElement, lowerStudioElementsToRenderScene, parseSupportedCssColorToIR } from "./studio-document-scene-lower";
 
 export interface StudioSkiaDocumentPlan {
@@ -84,7 +86,8 @@ function resolveImageBlendMode(
   if (!value || value === "normal" || value === "source-over") {
     return "source-over";
   }
-  return isStudioStandardBlendMode(value) && value !== "normal" ? value : null;
+  if (!isStudioStandardBlendMode(value)) return null;
+  return value === "normal" ? "source-over" : value;
 }
 
 function resolveImageShadow(
@@ -143,12 +146,49 @@ function isStudioSkiaDocumentImage(element: El): element is ImageEl & El {
     && /^(?:data:image\/(?:png|jpeg);base64,|blob:|https?:\/\/|\/)/iu.test(element.src);
 }
 
+function isStudioSkiaSpecialistDocumentImage(element: El): boolean {
+  if (!requiresStudioSkiaSpecialistRaster(element)
+    || element.filterPageComposite
+    || element.adjustmentLayer
+    || element.clipBelow
+    || element.alphaLocked) return false;
+  const blendMode = resolveImageBlendMode(element.blendMode);
+  const shadow = resolveImageShadow(element);
+  const opacity = element.opacity ?? 1;
+  const cornerRadius = element.cornerRadius ?? 0;
+  const skewX = element.skewX ?? 0;
+  const skewY = element.skewY ?? 0;
+  return blendMode !== null
+    && shadow !== null
+    && [
+      element.x,
+      element.y,
+      element.width,
+      element.height,
+      element.rotation,
+      opacity,
+      cornerRadius,
+      skewX,
+      skewY,
+    ].every(Number.isFinite)
+    && element.width > 0
+    && element.height > 0
+    && opacity >= 0
+    && opacity <= 1
+    && cornerRadius >= 0
+    && Math.abs(skewX) <= 60
+    && Math.abs(skewY) <= 60
+    && element.src.length <= 48 * 1024 * 1024
+    && /^(?:data:image\/(?:png|jpeg|webp|gif);base64,|blob:|https?:\/\/|\/)/iu.test(element.src);
+}
+
 export function isStudioSkiaDocumentElement(element: El): boolean {
   return isStudioSkiaCausalInk(element)
     || isStudioVelloDocumentVectorElement(element)
     || isStudioSkiaDocumentFrame(element)
     || isStudioSkiaDocumentText(element)
-    || isStudioSkiaDocumentImage(element);
+    || isStudioSkiaDocumentImage(element)
+    || isStudioSkiaSpecialistDocumentImage(element);
 }
 
 function framePanel(element: FrameEl & El, theme: StudioSkiaFrameTheme): NonNullable<SkiaDocumentItem["panel"]> {
@@ -165,7 +205,11 @@ function framePanel(element: FrameEl & El, theme: StudioSkiaFrameTheme): NonNull
 }
 
 /** Original dabs/pressure/paint identity are reused, not substituted with an approximate brush. */
-export function compileStudioSkiaDocumentItem(element: El, frameTheme: StudioSkiaFrameTheme = "classic"): SkiaDocumentItem | null {
+export function compileStudioSkiaDocumentItem(
+  element: El,
+  frameTheme: StudioSkiaFrameTheme = "classic",
+  preparedImage?: StudioSkiaPreparedImageProjection,
+): SkiaDocumentItem | null {
   if (isStudioSkiaCausalInk(element)) {
     if (element.points.length < 2 || element.points.length % 2 || !element.points.every(Number.isFinite)) return null;
     const contract = resolveStudioCausalInkDrawContract(element);
@@ -207,6 +251,34 @@ export function compileStudioSkiaDocumentItem(element: El, frameTheme: StudioSki
       },
     };
   }
+  if (isStudioSkiaSpecialistDocumentImage(element)) {
+    if (!preparedImage) return null;
+    const imageElement = element as ImageEl & El;
+    const blendMode = resolveImageBlendMode(imageElement.blendMode);
+    const shadow = resolveImageShadow(imageElement);
+    if (!blendMode || shadow === null) return null;
+    return {
+      id: imageElement.id,
+      revision: { element: imageElement, specialistRasterKey: preparedImage.key },
+      image: {
+        src: preparedImage.src,
+        x: imageElement.x,
+        y: imageElement.y,
+        width: imageElement.width,
+        height: imageElement.height,
+        rotation: imageElement.rotation,
+        opacity: imageElement.opacity ?? 1,
+        flipX: Boolean(imageElement.flipped),
+        flipY: Boolean(imageElement.flippedY),
+        skewX: skewDegToKonva(imageElement.skewX ?? 0),
+        skewY: skewDegToKonva(imageElement.skewY ?? 0),
+        cornerRadius: 0,
+        rasterBounds: preparedImage.rasterBounds,
+        blendMode,
+        ...(shadow ? { shadow } : {}),
+      },
+    };
+  }
   if (isStudioSkiaDocumentImage(element)) {
     const blendMode = resolveImageBlendMode(element.blendMode);
     const shadow = resolveImageShadow(element);
@@ -244,12 +316,22 @@ export function compileStudioSkiaDocumentItem(element: El, frameTheme: StudioSki
 
 /** One cache per editor: unchanged strokes are not replanned after every commit or camera move. */
 export function createStudioSkiaDocumentProjector() {
-  type CachedProjection = { element: El; panel: FrameEl | null; theme: StudioSkiaFrameTheme | null; item: SkiaDocumentItem };
+  type CachedProjection = {
+    element: El;
+    panel: FrameEl | null;
+    theme: StudioSkiaFrameTheme | null;
+    preparedImageKey: string | null;
+    item: SkiaDocumentItem;
+  };
   let compiled = new Map<string, CachedProjection>();
   const inkBudget = 64 * 1024 * 1024;
   return {
     clear() { compiled.clear(); },
-    project(elements: readonly El[], frameTheme: StudioSkiaFrameTheme = "classic"): StudioSkiaDocumentPlan {
+    project(
+      elements: readonly El[],
+      frameTheme: StudioSkiaFrameTheme = "classic",
+      preparedImages: ReadonlyMap<string, StudioSkiaPreparedImageProjection> = new Map(),
+    ): StudioSkiaDocumentPlan {
       const unsupportedFrame = elements.find((element) => element.type === "frame" && !element.hidden && !isStudioSkiaDocumentFrame(element));
       if (unsupportedFrame) {
         return { supported: false, items: [], ownedDocumentIds: [], reason: `unsupported-frame:${unsupportedFrame.id}` };
@@ -265,15 +347,24 @@ export function createStudioSkiaDocumentProjector() {
         ids.add(element.id);
         const panel = element.type === "frame" || element.noClip ? null : resolvePanel(element);
         const theme = element.type === "frame" ? frameTheme : null;
+        const preparedImage = preparedImages.get(element.id);
+        const preparedImageKey = preparedImage?.key ?? null;
         let entry = compiled.get(element.id);
-        if (entry?.element !== element || entry.panel !== panel || entry.theme !== theme) entry = undefined;
+        if (entry?.element !== element
+          || entry.panel !== panel
+          || entry.theme !== theme
+          || entry.preparedImageKey !== preparedImageKey) entry = undefined;
         if (!entry) {
-          const result = compileStudioSkiaDocumentItem(element, frameTheme);
+          const result = compileStudioSkiaDocumentItem(element, frameTheme, preparedImage);
           if (!result) return { supported: false, items: [], ownedDocumentIds: [], reason: `unsupported-element:${element.id}` };
           const item = panel
-            ? { ...result, revision: { element, panel }, clip: { x: panel.x, y: panel.y, width: panel.width, height: panel.height } }
+            ? {
+                ...result,
+                revision: { element, panel, preparedImageKey },
+                clip: { x: panel.x, y: panel.y, width: panel.width, height: panel.height },
+              }
             : result;
-          entry = { element, panel, theme, item };
+          entry = { element, panel, theme, preparedImageKey, item };
         }
         inkBytes += entry.item.ink?.dabs.byteLength ?? 0;
         if (inkBytes > inkBudget) return { supported: false, items: [], ownedDocumentIds: [], reason: "GPU ink projection memory budget exceeded" };

@@ -223,3 +223,53 @@ it.each([
   expect(plan.supported).toBe(false);
   expect(plan.items).toEqual([]);
 });
+
+it("projects an exact prepared specialist raster without moving its transform frame", () => {
+  const image = {
+    id: "filtered-image",
+    type: "image",
+    src: "data:image/png;base64,source",
+    x: 12,
+    y: 34,
+    width: 80,
+    height: 60,
+    rotation: 15,
+    opacity: 0.75,
+    brightness: 0.2,
+    cornerRadius: 12,
+    flipped: true,
+    skewX: 10,
+  } as El;
+  const prepared = {
+    key: "specialist:v1",
+    src: "blob:prepared",
+    capturesLiveFrame: false,
+    rasterBounds: { x: -4, y: -4, width: 88, height: 68 },
+  };
+  expect(compileStudioSkiaDocumentItem(image)).toBeNull();
+  expect(compileStudioSkiaDocumentItem(image, "classic", prepared)?.image).toMatchObject({
+    src: "blob:prepared",
+    x: 12,
+    y: 34,
+    width: 80,
+    height: 60,
+    rotation: 15,
+    opacity: 0.75,
+    flipX: true,
+    cornerRadius: 0,
+    rasterBounds: { x: -4, y: -4, width: 88, height: 68 },
+  });
+
+  const projector = createStudioSkiaDocumentProjector();
+  const first = projector.project([image], "classic", new Map([[image.id, prepared]]));
+  expect(first.supported).toBe(true);
+  expect(first.ownedDocumentIds).toEqual([image.id]);
+  const cached = projector.project([image], "classic", new Map([[image.id, prepared]]));
+  expect(cached.items[0]).toBe(first.items[0]);
+  const changed = projector.project([image], "classic", new Map([[
+    image.id,
+    { ...prepared, key: "specialist:v2", src: "blob:prepared-v2" },
+  ]]));
+  expect(changed.items[0]).not.toBe(first.items[0]);
+  expect(changed.items[0]?.image?.src).toBe("blob:prepared-v2");
+});
