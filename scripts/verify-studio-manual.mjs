@@ -62,9 +62,13 @@ try {
   await page.getByRole("heading", { name: "저장·백업·복구", exact: true }).waitFor();
   await page.waitForFunction(() => {
     const target = document.getElementById("backup");
-    if (!target) return false;
-    const top = target.getBoundingClientRect().top;
-    return top >= 76 && top <= 140;
+    const stickyHeader = document.querySelector(".manual-header");
+    if (!target || !stickyHeader) return false;
+    const targetTop = target.getBoundingClientRect().top;
+    const headerBottom = stickyHeader.getBoundingClientRect().bottom;
+    return targetTop >= headerBottom + 8
+      && targetTop <= headerBottom + 80
+      && targetTop < innerHeight;
   });
   assert.match(await page.title(), /저장·백업·복구/);
   await page.screenshot({ path: `${output}/desktop-article.png` });
