@@ -567,7 +567,7 @@ export function CreateGalleryPage() {
                     aria-pressed={contentType === group}
                     onClick={() => setParam("content", group === "all" ? null : group)}
                     className={cn(
-                      "min-h-9 rounded-full border px-3 text-xs font-medium transition-colors",
+                      "min-h-11 rounded-full border px-3 text-xs font-medium transition-colors",
                       contentType === group
                         ? "border-cool/60 bg-[oklch(0.8_0.11_232/0.12)] text-cool"
                         : "border-line bg-card text-fg-2 hover:bg-raised",
@@ -580,7 +580,7 @@ export function CreateGalleryPage() {
                   value={provenance ?? ""}
                   onChange={(event) => setParam("provenance", event.target.value || null)}
                   aria-label="제작 방식 필터"
-                  className="h-9 rounded-full border border-line bg-card px-3 text-xs text-fg-2"
+                  className="min-h-11 rounded-full border border-line bg-card px-3 text-xs text-fg-2"
                 >
                   <option value="">모든 제작 방식</option>
                   {CREATOR_COMMUNITY_PROVENANCES.map((value) => (
@@ -592,7 +592,7 @@ export function CreateGalleryPage() {
                   aria-pressed={portfolio}
                   onClick={() => setParam("portfolio", portfolio ? null : "1")}
                   className={cn(
-                    "min-h-9 rounded-full border px-3 text-xs font-medium transition-colors",
+                    "min-h-11 rounded-full border px-3 text-xs font-medium transition-colors",
                     portfolio
                       ? "border-accent bg-accent-soft text-accent"
                       : "border-line bg-card text-fg-2 hover:bg-raised",

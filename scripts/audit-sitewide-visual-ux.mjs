@@ -18,9 +18,9 @@ const root = process.env.AUDIT_REPOSITORY || process.cwd();
 const output = process.env.AUDIT_OUTPUT || path.join(root, ".qa/visual-ux/sitewide");
 const base = new URL(process.env.AUDIT_BASE_URL || "http://127.0.0.1:5276");
 const allowedHosts = new Set(["127.0.0.1", "localhost", "toonstudio.cloud", "www.toonstudio.cloud"]);
-const auditWorkerLimit = Math.max(1, Number.parseInt(process.env.AUDIT_WORKERS || "6", 10) || 6);
+const auditWorkerLimit = Math.max(1, Number.parseInt(process.env.AUDIT_WORKERS || "2", 10) || 2);
 const auditSettleMs = Math.max(0, Number.parseInt(process.env.AUDIT_SETTLE_MS || "180", 10) || 180);
-const auditNavigationTimeoutMs = Math.max(1_000, Number.parseInt(process.env.AUDIT_NAVIGATION_TIMEOUT_MS || "45_000", 10) || 45_000);
+const auditNavigationTimeoutMs = Math.max(1_000, Number.parseInt(process.env.AUDIT_NAVIGATION_TIMEOUT_MS || "45000", 10) || 45_000);
 const auditNavigationRetries = Math.max(0, Number.parseInt(process.env.AUDIT_NAVIGATION_RETRIES || "1", 10) || 0);
 const auditStageTimeoutMs = Math.max(0, Number.parseInt(process.env.AUDIT_STAGE_TIMEOUT_MS || "900", 10) || 900);
 const auditSceneTimeoutMs = Math.max(0, Number.parseInt(process.env.AUDIT_SCENE_TIMEOUT_MS || "400", 10) || 400);
@@ -131,11 +131,14 @@ const themes = selectedThemes();
 const viewports = selectedViewports();
 if (viewports.some(([, viewport]) => !viewport)) throw new Error("Unknown AUDIT_VIEWPORT_MODE");
 
-const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
 const results = [];
-try {
-  for (const [viewportName, viewport] of viewports) {
-    for (const theme of themes) {
+for (const [viewportName, viewport] of viewports) {
+  for (const theme of themes) {
+    // Heavy Studio/WebGL routes can retain renderer resources after a context closes.
+    // Recycle Chromium for every theme/viewport cell so later palettes are audited with
+    // the same clean memory conditions as the first one instead of producing false timeouts.
+    const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
+    try {
       const context = await browser.newContext({
         viewport: { width: viewport.width, height: viewport.height },
         locale: "ko-KR",
@@ -530,10 +533,10 @@ try {
         }
       }));
       await context.close();
+    } finally {
+      await browser.close();
     }
   }
-} finally {
-  await browser.close();
 }
 
 const failed = results.filter((result) => result.issues?.length);

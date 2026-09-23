@@ -43,11 +43,12 @@ export function ReviewControls() {
           return (
             <button
               key={t.value}
+              type="button"
               role="tab"
               aria-selected={active}
               onClick={() => setParam("sort", t.value === "recent" ? null : t.value)}
               className={cn(
-                "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-150",
+                "min-h-11 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors duration-150",
                 active ? "bg-accent text-on-accent" : "text-fg-2 hover:text-fg"
               )}
             >
@@ -63,9 +64,10 @@ export function ReviewControls() {
           return (
             <button
               key={r.value}
+              type="button"
               onClick={() => setParam("rating", r.value === "all" ? null : r.value)}
               className={cn(
-                "rounded-full px-3 py-1.5 text-[0.8rem] font-medium transition-colors duration-150",
+                "min-h-11 rounded-full px-3 py-1.5 text-[0.8rem] font-medium transition-colors duration-150",
                 active ? "bg-raised text-fg" : "text-fg-3 hover:text-fg-2"
               )}
             >
@@ -76,9 +78,10 @@ export function ReviewControls() {
       </div>
 
       <button
+        type="button"
         onClick={() => setParam("spoiler", spoilerHidden ? null : "hide")}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.8rem] font-medium transition-colors",
+          "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[0.8rem] font-medium transition-colors",
           spoilerHidden
             ? "border-accent/50 bg-accent-soft text-accent"
             : "border-line bg-panel text-fg-3 hover:text-fg-2"
