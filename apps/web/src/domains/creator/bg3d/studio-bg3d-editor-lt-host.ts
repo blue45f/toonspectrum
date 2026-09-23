@@ -6,15 +6,16 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import {
+  beginStudio3dGradeDocumentGesture,
+  classifyStudio3dLightingGestureCommandId,
+  commitStudio3dGradeDocumentGesture,
   ensureStudio3dGradeHistory,
-  pushStudio3dGradeCommand,
 } from "./studio-bg3d-grade-history-bridge";
 import {
   applyStudio3dLightingSettings,
-  captureStudio3dPlates,
   patchStudio3dSceneBackground,
 } from "./studio-bg3d-grade-plates";
-import { captureStudio3dPlatesFromSource } from "./studio-bg3d-grade-plates-production";
+import { captureStudio3dPlatesFromAdapter } from "./studio-bg3d-grade-plates-production";
 
 export function attachStudioBg3dEditorLtHost(h) {
   const {
@@ -240,7 +241,7 @@ export function attachStudioBg3dEditorLtHost(h) {
     startModelThumbnailCaptureBatch, invalidateModalAssetSession, cancelSurfaceSnap,
     handleViewportReady, resetWebXrPresentationUi, finishWebXrControllerCleanup,
     disposeCurrentWebXrControllerGeneration, disposeWebXrControllerForOpenChange,
-    handleWebXrControllerReady, handleWebXrSessionStateChange, historyRef, historyIndexRef,
+    handleWebXrControllerReady, handleWebXrSessionStateChange, historyRef, historyIndexRef, historyCommandTimelineRef,
     deviceQuality, hasCloneFailure, hasPendingClone, hasPendingSharedCharacter,
     hasUnavailableSharedCharacter, physicsInteractionLocked, insertBlocked,
     magicLayerSelectedPrimitive, magicLayerLensShift, magicLayerUnavailableReason,
@@ -552,80 +553,108 @@ export function attachStudioBg3dEditorLtHost(h) {
     setError(null);
   }
   h.updateLtExportAspectRatio = updateLtExportAspectRatio;
-  function updateBackgroundSettings(patch: Partial<StudioBg3dBackgroundSettings>) {
-    setSceneBaseDocument((current) => {
-      if (!h.gradeHistoryRef) h.gradeHistoryRef = { current: null };
-      const grade = ensureStudio3dGradeHistory(h.gradeHistoryRef.current, current);
-      const history = pushStudio3dGradeCommand(grade, {
-        id: "set-background",
-        mode: patch.mode,
-        color: patch.color,
-        skyPresetId: patch.skyPresetId,
-      });
-      // Keep any fog/panorama fields from the panel patch on the same document identity.
-      const merged = patchStudio3dSceneBackground(history.scene, patch);
-      const withExtras = {
-        ...merged,
-        background: { ...merged.background, ...patch },
-      };
-      h.gradeHistoryRef.current = { ...history, scene: withExtras };
-      captureStudio3dPlatesFromSource(withExtras, 48, 27);
-      return canonicalSceneDocument(withExtras) ?? current;
+  if (!h.gradeHistoryRef) h.gradeHistoryRef = { current: null };
+  if (!h.ltGradeDocumentGestureRef) h.ltGradeDocumentGestureRef = { current: null };
+  if (!h.ltGradeDocumentGestureTimerRef) h.ltGradeDocumentGestureTimerRef = { current: null };
+  if (!h.ltGradeDocumentLatestRef) h.ltGradeDocumentLatestRef = { current: null };
+  const gradeHistoryRef = h.gradeHistoryRef;
+  const ltGradeDocumentGestureRef = h.ltGradeDocumentGestureRef;
+  const ltGradeDocumentGestureTimerRef = h.ltGradeDocumentGestureTimerRef;
+  const ltGradeDocumentLatestRef = h.ltGradeDocumentLatestRef;
+  const ltCommandHistoryRefs = {
+    historyRef,
+    historyIndexRef,
+    historyCommandTimelineRef,
+  };
+  function scheduleStudio3dPlateCapture(scene) {
+    void captureStudio3dPlatesFromAdapter(
+      scene,
+      48,
+      27,
+      captureRef?.current?.adapter ?? null,
+    );
+  }
+  function clearLtGradeDocumentGestureTimer() {
+    if (ltGradeDocumentGestureTimerRef.current !== null) {
+      clearTimeout(ltGradeDocumentGestureTimerRef.current);
+      ltGradeDocumentGestureTimerRef.current = null;
+    }
+  }
+  function finishLtDocumentGesture() {
+    clearLtGradeDocumentGestureTimer();
+    const gesture = ltGradeDocumentGestureRef.current;
+    const afterDocument = ltGradeDocumentLatestRef.current ?? sceneBaseDocument;
+    ltGradeDocumentGestureRef.current = null;
+    ltGradeDocumentLatestRef.current = null;
+    if (!gesture) return;
+    const committed = commitStudio3dGradeDocumentGesture({
+      gesture,
+      refs: ltCommandHistoryRefs,
+      primitives,
+      customModels,
+      afterDocument,
+      source: "inspector",
     });
+    if (!committed) return;
+    gradeHistoryRef.current = committed.grade;
+    setCanUndo(committed.receipt.canUndo);
+    setCanRedo(committed.receipt.canRedo);
+    scheduleStudio3dPlateCapture(committed.grade.scene);
+  }
+  h.finishLtDocumentGesture = finishLtDocumentGesture;
+  function armLtGradeDocumentGestureSafetyTimer() {
+    clearLtGradeDocumentGestureTimer();
+    // Pointer cancel / lost blur must not leave a preview outside history forever.
+    ltGradeDocumentGestureTimerRef.current = setTimeout(finishLtDocumentGesture, 800);
+  }
+  function updateBackgroundSettings(patch: Partial<StudioBg3dBackgroundSettings>) {
+    const current = ltGradeDocumentLatestRef.current ?? sceneBaseDocument;
+    const withExtrasCandidate = {
+      ...patchStudio3dSceneBackground(current, patch),
+      background: { ...current.background, ...patch },
+    };
+    const next = canonicalSceneDocument(withExtrasCandidate);
+    if (!next || next === current) {
+      setError(null);
+      return;
+    }
+    ltGradeDocumentGestureRef.current = beginStudio3dGradeDocumentGesture(
+      ltGradeDocumentGestureRef.current,
+      {
+        grade: gradeHistoryRef.current,
+        beforeDocument: current,
+        primaryCommandId: "set-background",
+      },
+    );
+    ltGradeDocumentLatestRef.current = next;
+    armLtGradeDocumentGestureSafetyTimer();
+    setSceneBaseDocument(next);
+    scheduleStudio3dPlateCapture(next);
     setError(null);
   }
   h.updateBackgroundSettings = updateBackgroundSettings;
   function updateLightingSettings(patch: Partial<StudioBg3dLightingSettings>) {
     if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
-    setSceneBaseDocument((current) => {
-      const merged = applyStudio3dLightingSettings(current, patch);
-      const keyIntensityChanged =
-        Number.isFinite(merged.lighting.key.intensity) &&
-        merged.lighting.key.intensity !== current.lighting.key.intensity;
-      const keyDirectionChanged =
-        merged.lighting.key.direction[0] !== current.lighting.key.direction[0] ||
-        merged.lighting.key.direction[1] !== current.lighting.key.direction[1] ||
-        merged.lighting.key.direction[2] !== current.lighting.key.direction[2];
-      const fillIntensityChanged =
-        Number.isFinite(merged.lighting.fill.intensity) &&
-        merged.lighting.fill.intensity !== current.lighting.fill.intensity;
-      const fillDirectionChanged =
-        merged.lighting.fill.direction[0] !== current.lighting.fill.direction[0] ||
-        merged.lighting.fill.direction[1] !== current.lighting.fill.direction[1] ||
-        merged.lighting.fill.direction[2] !== current.lighting.fill.direction[2];
-
-      let next = merged;
-      if (!h.gradeHistoryRef) h.gradeHistoryRef = { current: null };
-      const grade = ensureStudio3dGradeHistory(h.gradeHistoryRef.current, current);
-      if (keyIntensityChanged || keyDirectionChanged) {
-        const history = pushStudio3dGradeCommand(grade, {
-          id: "set-light",
-          azimuth: Math.atan2(merged.lighting.key.direction[0], merged.lighting.key.direction[2]),
-          elevation: Math.asin(Math.max(-1, Math.min(1, merged.lighting.key.direction[1]))),
-          intensity: merged.lighting.key.intensity,
-        });
-        // Preserve fill (and other lighting fields) from the panel patch on the command result.
-        next = applyStudio3dLightingSettings(history.scene, {
-          ...patch,
-          key: merged.lighting.key,
-        });
-        h.gradeHistoryRef.current = { ...history, scene: next };
-      } else if (fillIntensityChanged || fillDirectionChanged) {
-        const history = pushStudio3dGradeCommand(grade, {
-          id: "set-fill-light",
-          azimuth: Math.atan2(merged.lighting.fill.direction[0], merged.lighting.fill.direction[2]),
-          elevation: Math.asin(Math.max(-1, Math.min(1, merged.lighting.fill.direction[1]))),
-          intensity: merged.lighting.fill.intensity,
-        });
-        next = applyStudio3dLightingSettings(history.scene, {
-          ...patch,
-          fill: merged.lighting.fill,
-        });
-        h.gradeHistoryRef.current = { ...history, scene: next };
-      }
-      captureStudio3dPlatesFromSource(next, 48, 27);
-      return canonicalSceneDocument(next) ?? current;
-    });
+    const current = ltGradeDocumentLatestRef.current ?? sceneBaseDocument;
+    const merged = applyStudio3dLightingSettings(current, patch);
+    const next = canonicalSceneDocument(merged);
+    if (!next || next === current) {
+      setError(null);
+      return;
+    }
+    const primaryCommandId = classifyStudio3dLightingGestureCommandId(current, next);
+    ltGradeDocumentGestureRef.current = beginStudio3dGradeDocumentGesture(
+      ltGradeDocumentGestureRef.current,
+      {
+        grade: gradeHistoryRef.current,
+        beforeDocument: current,
+        primaryCommandId,
+      },
+    );
+    ltGradeDocumentLatestRef.current = next;
+    armLtGradeDocumentGestureSafetyTimer();
+    setSceneBaseDocument(next);
+    scheduleStudio3dPlateCapture(next);
     setError(null);
   }
   h.updateLightingSettings = updateLightingSettings;

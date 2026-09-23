@@ -37,6 +37,8 @@ export interface StudioBg3dLightingStudioProps {
   readonly disabled?: boolean;
   readonly onUpdateLighting: (patch: Partial<StudioBg3dLightingSettings>) => void;
   readonly onUpdateExposure: (value: number) => void;
+  /** Commit coalesced light history at pointer-up / discrete edit boundaries. */
+  readonly onCommitLightingHistory?: () => void;
 }
 
 function clamp(value: number, minimum: number, maximum: number, fallback: number): number {
@@ -54,12 +56,14 @@ function StudioBg3dLightColorField({
   value,
   disabled = false,
   onChange,
+  onCommit,
 }: {
   readonly id: string;
   readonly label: string;
   readonly value: string;
   readonly disabled?: boolean;
   readonly onChange: (value: string) => void;
+  readonly onCommit?: () => void;
 }) {
   const color = safeColor(value);
   return (
@@ -81,6 +85,8 @@ function StudioBg3dLightColorField({
           value={color}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onCommit}
+          onPointerUp={onCommit}
           className="size-11 shrink-0 cursor-pointer rounded-lg border border-line bg-transparent p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 sm:size-9 pointer-coarse:size-11"
         />
       </span>
@@ -95,6 +101,7 @@ function StudioBg3dDirectionalLightEditor({
   light,
   disabled = false,
   onUpdate,
+  onCommitHistory,
 }: {
   readonly idPrefix: string;
   readonly label: string;
@@ -102,6 +109,7 @@ function StudioBg3dDirectionalLightEditor({
   readonly light: StudioBg3dDirectionalLightSettings;
   readonly disabled?: boolean;
   readonly onUpdate: (patch: Partial<StudioBg3dDirectionalLightSettings>) => void;
+  readonly onCommitHistory?: () => void;
 }) {
   const angles = studioBg3dLightDirectionToAngles(light.direction);
   const updateDirection = (patch: Partial<StudioBg3dLightAngles>) => {
@@ -138,6 +146,7 @@ function StudioBg3dDirectionalLightEditor({
         value={light.color}
         disabled={disabled}
         onChange={(color) => onUpdate({ color })}
+        onCommit={onCommitHistory}
       />
       <LtRangeControl
         id={`${idPrefix}-intensity`}
@@ -149,6 +158,7 @@ function StudioBg3dDirectionalLightEditor({
         valueText={light.intensity.toFixed(2)}
         disabled={disabled}
         onChange={(intensity) => onUpdate({ intensity })}
+        onChangeEnd={onCommitHistory}
       />
       <LtRangeControl
         id={`${idPrefix}-azimuth`}
@@ -160,6 +170,7 @@ function StudioBg3dDirectionalLightEditor({
         valueText={`${Math.round(angles.azimuthDeg)}°`}
         disabled={disabled}
         onChange={(azimuthDeg) => updateDirection({ azimuthDeg })}
+        onChangeEnd={onCommitHistory}
       />
       <LtRangeControl
         id={`${idPrefix}-elevation`}
@@ -171,12 +182,16 @@ function StudioBg3dDirectionalLightEditor({
         valueText={`${Math.round(angles.elevationDeg)}°`}
         disabled={disabled}
         onChange={(elevationDeg) => updateDirection({ elevationDeg })}
+        onChangeEnd={onCommitHistory}
       />
       <LtToggleRow
         label={`${label} 그림자`}
         checked={light.castsShadow}
         disabled={disabled}
-        onChange={(castsShadow) => onUpdate({ castsShadow })}
+        onChange={(castsShadow) => {
+          onUpdate({ castsShadow });
+          onCommitHistory?.();
+        }}
       />
     </section>
   );
@@ -188,6 +203,7 @@ export function StudioBg3dLightingStudio({
   disabled = false,
   onUpdateLighting,
   onUpdateExposure,
+  onCommitLightingHistory,
 }: StudioBg3dLightingStudioProps) {
   const id = useId().replaceAll(":", "");
   const panelId = `${id}-bg3d-lighting-studio`;
@@ -262,6 +278,7 @@ export function StudioBg3dLightingStudio({
                 onClick={() => {
                   onUpdateLighting(preset.lighting);
                   onUpdateExposure(preset.exposure);
+                  onCommitLightingHistory?.();
                 }}
               >
                 <span className="flex min-w-0 items-center justify-between gap-1.5">
@@ -291,6 +308,7 @@ export function StudioBg3dLightingStudio({
             value={lighting.ambientColor}
             disabled={disabled}
             onChange={(ambientColor) => onUpdateLighting({ ambientColor })}
+            onCommit={onCommitLightingHistory}
           />
           <LtRangeControl
             id={`${panelId}-ambient-intensity`}
@@ -302,6 +320,7 @@ export function StudioBg3dLightingStudio({
             valueText={lighting.ambientIntensity.toFixed(2)}
             disabled={disabled}
             onChange={(ambientIntensity) => onUpdateLighting({ ambientIntensity })}
+            onChangeEnd={onCommitLightingHistory}
           />
         </section>
 
@@ -312,6 +331,7 @@ export function StudioBg3dLightingStudio({
           light={lighting.key}
           disabled={disabled}
           onUpdate={(patch) => updateDirectionalLight("key", patch)}
+          onCommitHistory={onCommitLightingHistory}
         />
         <StudioBg3dDirectionalLightEditor
           idPrefix={`${panelId}-fill`}
@@ -320,6 +340,7 @@ export function StudioBg3dLightingStudio({
           light={lighting.fill}
           disabled={disabled}
           onUpdate={(patch) => updateDirectionalLight("fill", patch)}
+          onCommitHistory={onCommitLightingHistory}
         />
 
         <section aria-labelledby={`${panelId}-render-title`} className="border-t border-line/70 pt-3">

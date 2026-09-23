@@ -4,11 +4,18 @@ import { DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT } from "./studio-bg3d-scene-document
 import { createStudioBg3dHistorySnapshot } from "./studio-bg3d-editor-derivations";
 import {
   applyAndCommitStudio3dGradeCommand,
+  beginStudio3dGradeDocumentGesture,
+  classifyStudio3dLightingGestureCommandId,
   commitGradeRoutedHistoryTransition,
+  commitStudio3dGradeDocumentGesture,
   ensureStudio3dGradeHistory,
   stepUnifiedStudio3dHistory,
 } from "./studio-bg3d-grade-history-bridge";
-import { createStudio3dHistory, serializeStudio3dScene } from "./studio-bg3d-grade-plates";
+import {
+  applyStudio3dLightingSettings,
+  createStudio3dHistory,
+  serializeStudio3dScene,
+} from "./studio-bg3d-grade-plates";
 import {
   resetStudioBg3dCommandHistory,
   type StudioBg3dHistoryCommandRefs,
@@ -130,5 +137,61 @@ describe("studio-bg3d-grade-history-bridge", () => {
     expect(stepped.via).toBe("grade-only");
     expect(stepped.grade.past).toHaveLength(0);
     expect(stepped.grade.future).toHaveLength(1);
+  });
+});
+
+describe("studio-bg3d-grade-history-bridge document gestures", () => {
+  it("coalesces continuous light previews into one dual-write at commit", () => {
+    const state = refs();
+    const start = createStudio3dHistory();
+    resetStudioBg3dCommandHistory(state, snap(start.scene));
+
+    const gesture = beginStudio3dGradeDocumentGesture(null, {
+      grade: start,
+      beforeDocument: start.scene,
+      primaryCommandId: "set-light",
+    });
+    // Intermediate preview documents are ignored until commit.
+    const mid = applyStudio3dLightingSettings(start.scene, {
+      key: { ...start.scene.lighting.key, intensity: 0.9 },
+    });
+    const end = applyStudio3dLightingSettings(mid, {
+      key: { ...mid.lighting.key, intensity: 1.75 },
+    });
+    const stillOpen = beginStudio3dGradeDocumentGesture(gesture, {
+      grade: start,
+      beforeDocument: mid,
+      primaryCommandId: "set-fill-light",
+    });
+    expect(stillOpen).toBe(gesture);
+    expect(stillOpen.primaryCommandId).toBe("set-light");
+
+    const committed = commitStudio3dGradeDocumentGesture({
+      gesture,
+      refs: state,
+      primitives: [],
+      customModels: [],
+      afterDocument: end,
+    });
+    expect(committed).not.toBeNull();
+    expect(committed!.grade.past).toHaveLength(1);
+    expect(committed!.grade.scene.lighting.key.intensity).toBeCloseTo(1.75);
+    expect(committed!.receipt.canUndo).toBe(true);
+
+    const undone = stepUnifiedStudio3dHistory(state, committed!.grade, "undo");
+    expect(undone.via).toBe("adapter");
+    expect(undone.grade.scene.lighting.key.intensity).toBeCloseTo(start.scene.lighting.key.intensity);
+  });
+
+  it("classifies key vs fill lighting gestures", () => {
+    const base = DEFAULT_STUDIO_BG3D_SCENE_DOCUMENT;
+    const keyNext = applyStudio3dLightingSettings(base, {
+      key: { ...base.lighting.key, intensity: 2 },
+    });
+    expect(classifyStudio3dLightingGestureCommandId(base, keyNext)).toBe("set-light");
+    const fillNext = applyStudio3dLightingSettings(base, {
+      fill: { ...base.lighting.fill, intensity: 0.2 },
+    });
+    expect(classifyStudio3dLightingGestureCommandId(base, fillNext)).toBe("set-fill-light");
   });
 });

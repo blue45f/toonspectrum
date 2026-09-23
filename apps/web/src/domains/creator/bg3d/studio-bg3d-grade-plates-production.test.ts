@@ -88,3 +88,22 @@ describe("studio-bg3d-grade-plates-production", () => {
     expect(missing.fill).toEqual(captureStudio3dPlates(scene, width, height).fill);
   });
 });
+
+describe("studio-bg3d-grade-plates-production host wiring", () => {
+  it("routes LT/scene-ops/transform plate captures through the live adapter hook", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { resolve, dirname } = await import("node:path");
+    const { fileURLToPath } = await import("node:url");
+    const dir = dirname(fileURLToPath(import.meta.url));
+    for (const file of [
+      "studio-bg3d-editor-lt-host.ts",
+      "studio-bg3d-editor-scene-ops-host.ts",
+      "studio-bg3d-editor-transform-host.ts",
+    ]) {
+      const source = readFileSync(resolve(dir, file), "utf8");
+      expect(source).toContain("captureStudio3dPlatesFromAdapter");
+      expect(source).toContain("captureRef?.current?.adapter");
+      expect(source).not.toContain("captureStudio3dPlatesFromSource(");
+    }
+  });
+});

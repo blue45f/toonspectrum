@@ -6,7 +6,7 @@
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
 import { ensureStudio3dGradeHistory, pushStudio3dGradeCommand } from "./studio-bg3d-grade-history-bridge";
-import { captureStudio3dPlatesFromSource } from "./studio-bg3d-grade-plates-production";
+import { captureStudio3dPlatesFromAdapter } from "./studio-bg3d-grade-plates-production";
 import { isStudioBg3dSceneEditReady } from "./studio-bg3d-scene-edit-readiness";
 import { readStudioBg3dSelectionBounds } from "./studio-bg3d-camera-selection";
 import { hasStudioBg3dSelectedAncestor } from "./studio-bg3d-template-instance";
@@ -922,7 +922,7 @@ export function attachStudioBg3dEditorTransformHost(h) {
     });
     h.gradeHistoryRef.current = graded;
     // Keep the production camera write (lens/up/near) but share the offered command path + plates.
-    captureStudio3dPlatesFromSource(graded.scene, 48, 27);
+    void captureStudio3dPlatesFromAdapter(graded.scene, 48, 27, captureRef?.current?.adapter ?? null);
     commitImmediateHistoryTransition(
       primitives,
       customModels,
