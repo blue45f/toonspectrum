@@ -350,6 +350,11 @@ for (const [viewportName, viewport] of viewports) {
                 )))
                 .filter((element) => !element.closest(
                   '[aria-hidden="true"],.sr-only,script,style,noscript,template,svg,canvas,[hidden]',
+                ))
+                // Studio skip links are deliberately visually hidden until keyboard focus.
+                // Keep them in the accessibility tree without reporting them as unreadable text.
+                .filter((element) => !element.matches(
+                  '[data-studio-skip-link="true"]:not(:focus-visible)',
                 ));
               const effectiveOpacity = (element) => {
                 let opacity = 1;

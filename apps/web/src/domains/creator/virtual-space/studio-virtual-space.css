@@ -531,7 +531,7 @@
 .studio-vspace-entry-avatar:hover{transform:translateY(-3px);border-color:rgb(188 170 255/.52);background:rgb(188 170 255/.09)}
 .studio-vspace-entry-avatar.is-selected{border-color:#bcaaff;background:rgb(140 105 255/.16);box-shadow:0 0 0 3px rgb(188 170 255/.12),0 14px 32px rgb(0 0 0/.22)}
 .studio-vspace-entry-avatar:focus-visible{outline:3px solid #d5c8ff;outline-offset:3px}
-.studio-vspace-entry-avatar strong{font-size:.78rem}.studio-vspace-entry-avatar>span:last-of-type{color:#aaa9b8;font-size:.6rem;line-height:1.45}
+.studio-vspace-entry-avatar strong{font-size:.78rem}.studio-vspace-entry-avatar>span:last-of-type{color:#aaa9b8;font-size:.6875rem;line-height:1.45}
 .studio-vspace-entry-avatar b{position:absolute;top:.55rem;right:.55rem;display:grid;width:1.35rem;height:1.35rem;place-items:center;border-radius:999px;background:#bcaaff;color:#211735;font-size:.7rem}
 .studio-vspace-entry-avatar-preview{display:grid;width:100%;min-height:8rem;place-items:end center;overflow:hidden;border-radius:.85rem;background:radial-gradient(circle at 50% 35%,rgb(179 155 255/.17),rgb(9 15 24/.38) 72%)}
 .studio-vspace-entry-avatar-preview img{width:min(100%,7rem);height:8.3rem;object-fit:contain;object-position:bottom;filter:drop-shadow(0 10px 9px rgb(0 0 0/.38))}
