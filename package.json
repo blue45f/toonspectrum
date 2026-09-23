@@ -238,7 +238,8 @@
     "verify:studio-3d-tiled:browser": "node scripts/verify-studio-scene3d-tiled-output.mjs",
     "verify:workspace-package-links": "node scripts/verify-workspace-package-links.mjs",
     "test:workspace-package-links": "node --test scripts/verify-workspace-package-links.test.mjs",
-    "verify:studio-work-session-workflows": "tsx --tsconfig apps/api/tsconfig.json apps/api/tools/verify-studio-session-workflows.mts"
+    "verify:studio-work-session-workflows": "tsx --tsconfig apps/api/tsconfig.json apps/api/tools/verify-studio-session-workflows.mts",
+    "verify:studio-thorvg-browser": "THORVG_BROWSER_PROBE=1 vitest run packages/studio-engine-thorvg/src/browser-probe.test.ts --pool=threads --maxWorkers=1"
   },
   "dependencies": {
     "@automerge/automerge": "3.5.0",
@@ -278,6 +279,7 @@
     "@toonspectrum/studio-command-registry": "workspace:*",
     "@toonspectrum/studio-engine-registry": "workspace:*",
     "@toonspectrum/studio-engine-skia": "workspace:*",
+    "@toonspectrum/studio-engine-thorvg": "workspace:*",
     "@toonspectrum/studio-engine-vello": "workspace:*",
     "@toonspectrum/studio-format-gateway": "workspace:*",
     "@toonspectrum/studio-project-model": "workspace:*",

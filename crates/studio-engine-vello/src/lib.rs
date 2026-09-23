@@ -9,6 +9,8 @@ pub mod geometry;
 pub mod gpu_scene;
 #[cfg(all(target_arch = "wasm32", feature = "gpu"))]
 pub mod gpu_web;
+#[cfg(feature = "hybrid")]
+pub mod hybrid_scene;
 #[cfg(feature = "lottie")]
 pub mod lottie;
 pub mod render;
@@ -38,8 +40,8 @@ pub fn render_scene_json(scene_json: &str) -> Result<Vec<u8>, JsError> {
 /// Fits a flat x,y polyline into editable cubic PathIR JSON (Kurbo E05 lane).
 #[wasm_bindgen]
 pub fn fit_polyline_json(points: &[f64], closed: bool, accuracy: f64) -> Result<String, JsError> {
-    let path = fit_polyline(points, closed, accuracy)
-        .map_err(|error| JsError::new(&error.to_string()))?;
+    let path =
+        fit_polyline(points, closed, accuracy).map_err(|error| JsError::new(&error.to_string()))?;
     Ok(bez_path_to_path_ir_json(&path))
 }
 

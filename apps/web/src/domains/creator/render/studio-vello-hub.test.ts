@@ -228,7 +228,7 @@ describe("VelloHub product capability and SceneIR island", () => {
   it("enables only the bounded product island by default and supports an emergency kill", () => {
     expect(resolveStudioVelloHubProductCapability({ globalObject: {} })).toEqual({
       enabled: true,
-      capabilityId: "studio-vello-hub-document-hybrid-v13",
+      capabilityId: "studio-vello-hub-document-hybrid-v14",
       scope: "document-vector-hybrid",
       reason: "product-default",
     });
@@ -246,10 +246,10 @@ describe("VelloHub product capability and SceneIR island", () => {
     });
   });
 
-  it("keeps Hybrid/Sparse GPU explicitly unavailable and uses the compositor Hybrid lane", () => {
+  it("admits the real bounded Hybrid/Sparse GPU provider", () => {
     expect(STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE).toMatchObject({
-      eligible: false,
-      status: "unavailable-upstream-api",
+      eligible: true,
+      status: "adopted-bounded-provider",
     });
     expect(STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE.reason).toContain(
       "vello_hybrid 0.2",

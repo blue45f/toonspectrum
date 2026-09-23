@@ -147,7 +147,8 @@ renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 �
 | `pixi.js` | 별도 투명 surface의 GPU scene graph, z-order, 선택·hover·custom hit-area와 transform overlay |
 | `konva` + `react-konva` | 오브젝트·텍스트·말풍선의 선택/변형/히트테스트 overlay — 문서나 브러시 픽셀 권위는 맡지 않음 |
 | `paper` + `polygon-clipping` | Bézier 교차·스무딩·단순화·부울·경로 기하 계산(화면 renderer가 아닌 동적 격리 vector geometry provider) |
-| Vello 0.9.0 격리 PoC | 공식 MMark를 Chrome WebGPU/Metal에서 실측한 차세대 벡터 후보. 1600×1600·10k 경로는 p95 13.6ms였지만 50k 경로는 p95 59.6ms였고 upstream alpha·교차 브라우저·device-loss·canonical parity 게이트가 남아 제품 권위 없이 연구 후보로 유지 |
+| Vello 0.10 Classic + `vello_hybrid` 0.2 | 같은 StudioGpuFabric `GPUDevice`를 채택하는 명시 선택형 벡터 provider. Classic과 실제 sparse-strip Hybrid는 별도 backend이며, 지원하지 않는 text·mask·filter 조합은 GPU 제출 전에 fail-closed되고 다른 엔진으로 자동 재시도하지 않음 |
+| `@thorvg/webcanvas` 1.1.2 | Vello strict SVG subset 밖의 안전한 filter·mask·text 및 Lottie를 위한 lazy 전문 provider. SVG/Lottie 보안·크기 감사를 먼저 통과하고 WebGPU/WebGL/software 중 하나를 작업 전에 고정하며, 문서 권위나 자동 폴백을 갖지 않음 |
 | `perfect-freehand` | 필압을 가진 centerline을 연속 잉크 outline으로 변환하는 실시간 geometry provider — 합성·질감·히스토리는 맡지 않음 |
 | `lazy-brush` | 정밀 모드에서만 선택하는 입력 leash/손떨림 보정 — 기본 펜 입력에는 지연을 추가하지 않으며 예측 포인트가 상태를 오염시키지 않음 |
 | `roughjs` | 문서에 저장한 seed로 결정적으로 재생하는 손그림 도형 renderer — 자유곡선 브러시 권위는 맡지 않음 |
@@ -176,8 +177,9 @@ renderer-neutral canonical 모델을 권위로 두고, 아래 엔진을 교체 �
 | Studio procedural media-surface oracle + Worker | 독점 종이 스캔 없이 seeded relief·fiber·weave·pore를 생성하고 height·absorbency·grain·flow를 전역 좌표로 평가해 full-frame과 tile+halo 결과를 동일하게 유지하며 전용 Worker에서 typed-array transfer·취소·복구 |
 
 새 후보는 라이선스·공급망, lazy/Worker 격리, 취소·예산·복구 receipt, 실제 브라우저 품질 게이트를
-통과한 뒤 같은 provider 계약 아래 승격합니다. Vello처럼 유망하지만 웹 지원이 alpha인 엔진은
-제품 권위를 주지 않고 실험실에서 비교하며, 실측 근거와 한계는
+통과한 뒤 같은 provider 계약 아래 승격합니다. Vello와 ThorVG도 검증된 bounded island만 제품에
+연결하며, 지원 범위를 벗어나거나 선택한 backend가 실패하면 다른 엔진으로 자동 전환하지 않습니다.
+과거 Vello PoC 실측과 한계는
 [`studio-vello-observed-poc.ts`](apps/web/src/domains/creator/render/studio-vello-observed-poc.ts)에 고정합니다.
 더 나은 결과가 모든 hard gate에서 확인되면 기존 provider를 교체합니다.
 Signature Pad·Atrament·Croquis는 필기 품질 비교용 benchmark oracle일 뿐 런타임 의존성이 아니며,

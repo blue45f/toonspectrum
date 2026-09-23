@@ -1,0 +1,5 @@
+ThorVG WebCanvas 1.1.2
+Copyright (c) the ThorVG authors
+Licensed under the MIT License.
+Source: https://github.com/thorvg/thorvg.web
+The vendored wasm/thorvg.wasm is copied byte-for-byte from @thorvg/webcanvas@1.1.2.

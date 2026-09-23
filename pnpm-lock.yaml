@@ -172,6 +172,9 @@ importers:
       '@toonspectrum/studio-engine-skia':
         specifier: workspace:*
         version: link:packages/studio-engine-skia
+      '@toonspectrum/studio-engine-thorvg':
+        specifier: workspace:*
+        version: link:packages/studio-engine-thorvg
       '@toonspectrum/studio-engine-vello':
         specifier: workspace:*
         version: link:packages/studio-engine-vello
@@ -723,6 +726,16 @@ importers:
       canvaskit-wasm:
         specifier: 0.41.1
         version: 0.41.1
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+
+  packages/studio-engine-thorvg:
+    dependencies:
+      '@thorvg/webcanvas':
+        specifier: 1.1.2
+        version: 1.1.2
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -3374,6 +3387,9 @@ packages:
 
   '@textlint/types@15.8.0':
     resolution: {integrity: sha512-Anhc6y5736YIsvqae0U6k0YmB2M/QVHkEeOv2aydAn/WIkdI69dCOiDbe3/+RagS3qstFTSFWJzNRA2lUjv19w==}
+
+  '@thorvg/webcanvas@1.1.2':
+    resolution: {integrity: sha512-Vw9UJMNMJ1b2F4hA8zBY3Q0xgfF/9n5pXQbpJfj6a4K3caqJN4lp6T5JmCxG+fACe5kn+BR/xMl5ejlYOgZG2Q==}
 
   '@tokenizer/inflate@0.4.1':
     resolution: {integrity: sha512-2mAv+8pkG6GIZiF1kNg1jAjh27IDxEPKwdGul3snfztFerfPGI1LjDezZp3i7BElXompqEtPmoPx6c2wgtWsOA==}
@@ -10322,6 +10338,8 @@ snapshots:
   '@textlint/types@15.8.0':
     dependencies:
       '@textlint/ast-node-types': 15.8.0
+
+  '@thorvg/webcanvas@1.1.2': {}
 
   '@tokenizer/inflate@0.4.1':
     dependencies:

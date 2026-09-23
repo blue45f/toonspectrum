@@ -89,13 +89,13 @@ describe("vello-gpu-browser descriptor declares the lottie capability", () => {
     expect(velloGpuBrowserProviderDescriptor.capabilities).toContain(
       "render.gpu.webgpu",
     );
-    expect(velloGpuBrowserProviderDescriptor.version).toContain("velato 0.11.0");
+    expect(velloGpuBrowserProviderDescriptor.version).toContain("velato 0.12.0");
   });
 
   it("spells out the velato subset as a limitation (registry-auditable)", () => {
     expect(
       velloGpuBrowserProviderDescriptor.limitations.some((limitation) =>
-        limitation.includes("velato 0.11"),
+        limitation.includes("velato 0.12"),
       ),
     ).toBe(true);
   });

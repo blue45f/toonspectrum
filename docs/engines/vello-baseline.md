@@ -1,4 +1,4 @@
-# Vello Baseline Pin (V12 §4.1)
+# Vello Baseline Pin (V14 current / V12 history)
 
 - 요구 근거: `docs/architecture/ToonStudio_Codex_Vello차세대엔진_공격적활용_기존Studio전면교체_V12_2026-08-08.md` §4.1
   — "정확한 commit, Cargo.lock, source URL, license를 `docs/engines/vello-baseline.md`에 기록한다."
@@ -6,6 +6,36 @@
   직접 의존 선언은 `crates/studio-engine-vello/Cargo.toml`.
 - 라이선스는 로컬 crates.io 레지스트리 캐시의 각 크레이트 `Cargo.toml` `license` 필드 실측값이며,
   `docs/architecture/ToonStudio_V12_차세대엔진_승격게이트_매트릭스.csv`(이하 V12 매트릭스)의 라이선스 열과 대조했다.
+
+
+## 0. 현재 제품 핀과 경계 (2026-09-24)
+
+현재 `Cargo.lock` 기준 제품 핀은 Vello Classic **0.10.0**, upstream
+`vello_hybrid` **0.2.0**, `vello_cpu` **0.2.0**, `vello_svg` **0.11.0**,
+Velato **0.12.0**, usvg **0.48.1**, wgpu/naga **29.0.4**다. `kurbo 0.13.1`,
+`peniko 0.6.1`, Parley **0.11.0**과 vendored `wgpu-toon` 단일-device 패치는 유지한다.
+Skrifa는 **0.43.2 / 0.44.0**, HarfRust는 **0.10.0 / 0.12.0**이 잠긴다.
+
+브라우저 GPU 산출물은 다음으로 재현한다.
+
+```bash
+cd crates/studio-engine-vello
+wasm-pack build --target web --release --out-dir pkg-gpu -- \
+  --features hybrid,lottie,svg
+```
+
+- Classic과 Hybrid는 서로 독립된 명시 선택 provider다. Hybrid 실패 뒤 Classic/CPU를 호출하지 않는다.
+- Hybrid의 현재 제품 encoder는 bounded SceneIR path/fill/stroke/gradient/group/clip/blend만 받는다.
+  paragraph text, mask, filter는 GPU 제출 전에 capability error로 닫는다.
+- 두 GPU backend 모두 `StudioGpuFabric`가 소유한 동일 `GPUDevice`를 채택하며 결과는
+  `GPUTexture`로 반환한다. 제품 hot path CPU readback은 없다.
+- strict Vello SVG subset 밖의 안전한 filter/mask/text/Lottie는 사전 선택된 ThorVG 전문
+  provider가 맡을 수 있지만, ThorVG 역시 문서 권위나 실패 후 대체 엔진이 아니다.
+- `THIRD_PARTY_INVENTORY.json`은 CPU 85개, GPU 137개 외부 Rust crate와 exact license
+  bundle을 고정하고 `scripts/generate-third-party-notices.mjs --check`가 이를 검증한다.
+
+아래 V12 표와 벤치마크는 **2026-08-08 당시의 역사적 기준선**이다. 현재 버전·배포 경계는
+위 절과 `Cargo.toml`/`Cargo.lock`/renderer role ledger가 우선한다.
 
 ## 1. 핀 표 (Cargo.lock 실측, 2026-08-08)
 

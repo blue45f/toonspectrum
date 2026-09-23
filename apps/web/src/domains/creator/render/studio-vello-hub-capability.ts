@@ -1,5 +1,5 @@
 export const STUDIO_VELLO_HUB_PRODUCT_CAPABILITY = Object.freeze({
-  id: "studio-vello-hub-document-hybrid-v13",
+  id: "studio-vello-hub-document-hybrid-v14",
   enabledByDefault: true,
   scope: "document-vector-hybrid",
   primarySurfaceOwnership: "frame-graph-compositor",
@@ -20,23 +20,24 @@ export const STUDIO_VELLO_HUB_PRODUCT_CAPABILITY = Object.freeze({
 
 export const STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE = Object.freeze({
   id: "vello-hybrid-sparse-gpu",
-  status: "unavailable-upstream-api" as const,
-  eligible: false,
+  status: "adopted-bounded-provider" as const,
+  eligible: true,
   reason:
-    "Upstream vello_hybrid 0.2 sparse-strip GPU is not adopted in the pinned "
-    + "vello 0.9 Classic browser artifact. Product Hybrid is the FrameGraph compositor.",
+    "Upstream vello_hybrid 0.2 is compiled into the browser WASM artifact, adopts the exact "
+    + "StudioGpuFabric GPUDevice and renders the preflighted SceneIR subset without CPU readback.",
   promotionCondition:
-    "Adopt vello_hybrid 0.2 on a wgpu-aligned toon-vello track and pass the "
-    + "same SceneIR visual gate, device-loss and product-island tests.",
+    "Keep the bounded feature preflight, Classic/CPU parity corpus, device-loss isolation and "
+    + "real-browser soak gates green before widening text, mask or filter support.",
 });
 
 export const STUDIO_VELLO_HYBRID_COMPOSITOR = Object.freeze({
   id: "vello-hybrid-wgpu",
-  status: "production-compositor" as const,
+  status: "production-sparse-strip-provider" as const,
   eligible: true,
   reason:
-    "V13 Hybrid is Classic path-heavy islands plus external-texture / image "
-    + "binding inside StudioFrameGraphCompositor on the single fabric GPUDevice.",
+    "V14 Hybrid is the real upstream sparse-strip renderer on the single fabric GPUDevice. "
+    + "Unsupported text, mask and filter nodes fail during preflight instead of panicking or "
+    + "switching to Classic after a render attempt.",
 });
 
 export interface StudioVelloHubCapabilityDecision {

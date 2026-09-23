@@ -18,8 +18,16 @@ import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const PKG_DIR = join(ROOT, "crates", "studio-engine-vello", "pkg");
 // V12 lane 2 (ADR-0011): separate GPU artifact built with
-// `wasm-pack build --target web --release --out-dir pkg-gpu -- --features gpu`.
+// `wasm-pack build --target web --release --out-dir pkg-gpu -- --features hybrid,lottie,svg`.
 const PKG_GPU_DIR = join(ROOT, "crates", "studio-engine-vello", "pkg-gpu");
+// V14 E13: bounded ThorVG WebCanvas specialist provider. The vendored WASM
+// is copied byte-for-byte from @thorvg/webcanvas@1.1.2 and hash-pinned.
+const THORVG_WASM_DIR = join(
+  ROOT,
+  "packages",
+  "studio-engine-thorvg",
+  "wasm",
+);
 // V12 lane 11 (ADR-0011): pinned libmypaint v1.6.1 emcc build (MyPaint
 // reference parity lane) — artifacts + bridge sources are hash-pinned.
 const LIBMYPAINT_DIR = join(
@@ -81,8 +89,13 @@ verifyPkgIntegrity(
 verifyPkgIntegrity(
   PKG_GPU_DIR,
   "pkg-gpu",
-  "rebuild via `wasm-pack build --target web --release --out-dir pkg-gpu -- --features gpu` " +
+  "rebuild via `wasm-pack build --target web --release --out-dir pkg-gpu -- --features hybrid,lottie,svg` " +
     "(then re-apply the eslint-disable banner per docs/engines/vello-baseline.md §2) and refresh INTEGRITY.sha256",
+);
+verifyPkgIntegrity(
+  THORVG_WASM_DIR,
+  "thorvg-webcanvas",
+  "copy thorvg.wasm from @thorvg/webcanvas@1.1.2 and refresh INTEGRITY.sha256",
 );
 verifyPkgIntegrity(
   INK_MODELER_DIR,
@@ -108,6 +121,7 @@ const STUDIO_ENGINE_PACKAGES = [
   "@toonspectrum/studio-engine-registry",
   "@toonspectrum/studio-command-registry",
   "@toonspectrum/studio-engine-skia",
+  "@toonspectrum/studio-engine-thorvg",
   "@toonspectrum/studio-engine-vello",
   "@toonspectrum/studio-brush-platform",
   "@toonspectrum/studio-format-gateway",

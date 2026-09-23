@@ -1,0 +1,37 @@
+{
+  "name": "@toonspectrum/studio-engine-thorvg",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fail-closed ThorVG WebCanvas provider for bounded SVG and Lottie specialist islands.",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./audit": {
+      "types": "./src/audit.ts",
+      "import": "./src/audit.ts",
+      "default": "./src/audit.ts"
+    },
+    "./runtime": {
+      "types": "./src/runtime.ts",
+      "import": "./src/runtime.ts",
+      "default": "./src/runtime.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@thorvg/webcanvas": "1.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2"
+  }
+}

@@ -1,7 +1,7 @@
 //! Velato Lottie -> vello `Scene` lowering (ADR-0011 Velato lane, V12 게이트).
 //!
-//! Parses a Lottie (bodymovin) JSON document with velato 0.11 and lowers the
-//! requested frame into a vello 0.9 `Scene`, which then reuses the existing
+//! Parses a Lottie (bodymovin) JSON document with velato 0.12 and lowers the
+//! requested frame into a vello 0.10 `Scene`, which then reuses the existing
 //! GPU render path (`gpu_web::render_encoded_scene_gpu` in wasm, the raw
 //! harness in `tests/lottie_parity.rs` natively).
 //!
@@ -10,7 +10,7 @@
 //! Lottie constructs and out-of-range frames all reject loudly so the TS
 //! wrapper can surface a typed error instead of a silent blank frame.
 //!
-//! Panic quarantine: velato 0.11's importer (`Composition::from_slice`)
+//! Panic quarantine: velato 0.12's importer (`Composition::from_slice`)
 //! contains `todo!()`/`unimplemented!()` sites that would abort the wasm on
 //! - a layer transform with a missing or split rotation (`ks.r`),
 //! - a shape transform (`tr`) with split position or split rotation,
@@ -19,12 +19,14 @@
 //! [`validate_supported`] walks the parsed schema first and converts each of
 //! those into an explicit `lottie-unsupported` error before the importer can
 //! reach its panic paths (importer internals verified against the velato
-//! 0.11.0 sources, `src/import/converters.rs`).
+//! 0.12.0 sources, `src/import/converters.rs`).
 //!
 //! Module resolution note: like `gpu_scene.rs`, this file is compiled inside
 //! the library behind the `lottie` feature *and* included via `#[path]` by the
 //! native harness `tests/lottie_parity.rs` (dev-dependencies provide velato +
 //! vello there), so it must only reference external crates.
+
+use std::collections::HashMap;
 
 use velato::schema::animation::animation::Animation;
 use velato::schema::assets::AnyAsset;
@@ -52,11 +54,11 @@ fn layer_transform_issue(transform: &Transform, context: &str) -> Option<String>
     match &transform.rotation {
         Some(AnyTransformR::Rotation(_)) => None,
         Some(AnyTransformR::SplitRotation { .. }) => Some(format!(
-            "{context}: split rotation (r.x/r.y/r.z) is unsupported by velato 0.11"
+            "{context}: split rotation (r.x/r.y/r.z) is unsupported by velato 0.12"
         )),
         None => Some(format!(
             "{context}: layer transform requires a scalar rotation 'ks.r' \
-             (velato 0.11 cannot lower a missing rotation)"
+             (velato 0.12 cannot lower a missing rotation)"
         )),
     }
 }
@@ -64,10 +66,10 @@ fn layer_transform_issue(transform: &Transform, context: &str) -> Option<String>
 fn blend_issue(blend: Option<&BlendMode>, context: &str) -> Option<String> {
     match blend {
         Some(BlendMode::Add) => Some(format!(
-            "{context}: blend mode Add (bm:16) is unsupported by velato 0.11"
+            "{context}: blend mode Add (bm:16) is unsupported by velato 0.12"
         )),
         Some(BlendMode::HardMix) => Some(format!(
-            "{context}: blend mode HardMix (bm:17) is unsupported by velato 0.11"
+            "{context}: blend mode HardMix (bm:17) is unsupported by velato 0.12"
         )),
         _ => None,
     }
@@ -77,8 +79,7 @@ fn walk_shapes(shapes: &[AnyShape], context: &str, issues: &mut Vec<String>) {
     for shape in shapes {
         match shape {
             AnyShape::Group(group) => {
-                if let Some(issue) =
-                    blend_issue(group.graphic_element.blend_mode.as_ref(), context)
+                if let Some(issue) = blend_issue(group.graphic_element.blend_mode.as_ref(), context)
                 {
                     issues.push(issue);
                 }
@@ -91,7 +92,7 @@ fn walk_shapes(shapes: &[AnyShape], context: &str, issues: &mut Vec<String>) {
                     AnyTransformP::SplitPosition(_)
                 ) {
                     issues.push(format!(
-                        "{context}: shape transform split position is unsupported by velato 0.11"
+                        "{context}: shape transform split position is unsupported by velato 0.12"
                     ));
                 }
                 if matches!(
@@ -99,21 +100,23 @@ fn walk_shapes(shapes: &[AnyShape], context: &str, issues: &mut Vec<String>) {
                     Some(AnyTransformR::SplitRotation { .. })
                 ) {
                     issues.push(format!(
-                        "{context}: shape transform split rotation is unsupported by velato 0.11"
+                        "{context}: shape transform split rotation is unsupported by velato 0.12"
                     ));
                 }
             }
             AnyShape::Fill(fill) => {
-                if let Some(issue) =
-                    blend_issue(fill.shape_style.graphic_element.blend_mode.as_ref(), context)
-                {
+                if let Some(issue) = blend_issue(
+                    fill.shape_style.graphic_element.blend_mode.as_ref(),
+                    context,
+                ) {
                     issues.push(issue);
                 }
             }
             AnyShape::Stroke(stroke) => {
-                if let Some(issue) =
-                    blend_issue(stroke.shape_style.graphic_element.blend_mode.as_ref(), context)
-                {
+                if let Some(issue) = blend_issue(
+                    stroke.shape_style.graphic_element.blend_mode.as_ref(),
+                    context,
+                ) {
                     issues.push(issue);
                 }
             }
@@ -149,9 +152,7 @@ fn validate_supported(animation: &Animation) -> Result<(), String> {
     if let Some(assets) = &animation.assets {
         for asset in assets {
             if let AnyAsset::Image(_) = asset {
-                issues.push(
-                    "embedded image assets are unsupported by velato 0.11".to_string(),
-                );
+                issues.push("embedded image assets are unsupported by velato 0.12".to_string());
             }
         }
         for asset in assets {
@@ -230,5 +231,5 @@ pub fn compose_frame_scene(
         f64::from(height) / composition.height as f64,
     );
     let mut renderer = velato::Renderer::new();
-    Ok(renderer.render_to_vello_scene(composition, frame, transform, 1.0))
+    Ok(renderer.render_to_vello_scene(composition, &HashMap::new(), frame, transform, 1.0))
 }
