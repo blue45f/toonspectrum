@@ -2,8 +2,11 @@ import { createSkiaDocumentRenderer, type SkiaDocumentFrame } from "@toonspectru
 
 import { drawLiveFreehandDraftToContext } from "../../src/domains/creator/brush/studio-draw-rendering";
 import { createStudioSkiaDocumentProjector } from "../../src/domains/creator/render/studio-skia-document-plan";
+import { projectStudioSkiaLiveTransformElements } from "../../src/domains/creator/render/studio-skia-live-transform-projection";
+import { createStudioLiveTransformDraftStore } from "../../src/domains/creator/studio-live-transform-draft-store";
 
 import type { DrawEl, El } from "../../src/domains/creator/studio-element-model";
+import type { StudioLiveTransformDraftClaim } from "../../src/domains/creator/studio-live-transform-draft-store";
 import type Konva from "konva";
 
 let gpu = document.querySelector<HTMLCanvasElement>("#gpu")!;
@@ -11,6 +14,11 @@ const reference = document.querySelector<HTMLCanvasElement>("#reference")!;
 let engine = createSkiaDocumentRenderer(gpu);
 let viewport = { width: 640, height: 480, dpr: 1 };
 const projector = createStudioSkiaDocumentProjector();
+const transformStore = createStudioLiveTransformDraftStore();
+const transformScope = "page:skia-browser-harness";
+let transformClaim: StudioLiveTransformDraftClaim | null = null;
+let transformTerminal: DrawEl | null = null;
+let transformProjectionToken = "base";
 let strokes: El[] = [];
 let panel: El | null = null;
 let rasterElement: El | null = null;
@@ -85,8 +93,26 @@ async function present() {
   document.querySelector("#result")!.textContent = JSON.stringify(result);
   return result;
 }
+function releaseTransformFixture() {
+  transformClaim?.release();
+  transformClaim = null;
+  transformTerminal = null;
+  transformProjectionToken = "base";
+  transformStore.releaseScope(transformScope);
+}
+function transformProjection() {
+  const projection = projectStudioSkiaLiveTransformElements(
+    projectedElements(),
+    transformStore.getSnapshot(),
+    transformScope,
+  );
+  const plan = projector.project(projection.elements);
+  if (!plan.supported) throw new Error(plan.reason ?? "Unsupported transform fixture");
+  return { projection, plan };
+}
 const api = {
   async load(count: number, brush = "pen") {
+    releaseTransformFixture();
     panel = null; rasterElement = null; rasterImage = null;
     strokes = Array.from({ length: count }, (_, index) => ({ ...pen(index), brush } as El));
     const plan = projector.project(strokes);
@@ -129,6 +155,57 @@ const api = {
     strokes = [...strokes, pen(strokes.length)]; items = projector.project(projectedElements()).items;
     return present();
   },
+  async beginTransform() {
+    releaseTransformFixture();
+    const source = strokes[0];
+    if (source?.type !== "draw") throw new Error("Transform fixture requires a draw source");
+    transformClaim = transformStore.claim(transformScope, [source.id]);
+    if (!transformClaim) throw new Error("Transform fixture claim failed");
+    transformTerminal = { ...source, points: source.points.map((value, index) => value + (index % 2 ? 18 : 32)) };
+    transformClaim.present([{ element: transformTerminal, clip: null }]);
+    const { projection, plan } = transformProjection();
+    transformProjectionToken = projection.token;
+    items = plan.items;
+    const result = await present();
+    return { result, token: projection.token, sourceId: source.id };
+  },
+  moveTransform(delta = 8) {
+    if (!transformClaim || !transformTerminal) throw new Error("Transform fixture is not active");
+    transformTerminal = {
+      ...transformTerminal,
+      points: transformTerminal.points.map((value, index) => value + (index % 2 ? delta / 2 : delta)),
+    };
+    transformClaim.present([{ element: transformTerminal, clip: null }]);
+    const projection = projectStudioSkiaLiveTransformElements(
+      projectedElements(),
+      transformStore.getSnapshot(),
+      transformScope,
+    );
+    const submitted = projection.token !== transformProjectionToken;
+    if (submitted) {
+      const plan = projector.project(projection.elements);
+      if (!plan.supported) throw new Error(plan.reason ?? "Unsupported transform fixture");
+      items = plan.items;
+      transformProjectionToken = projection.token;
+    }
+    return { token: projection.token, submitted, revision: transformStore.getSnapshot()?.revision ?? null };
+  },
+  async handoffTransform() {
+    if (!transformClaim || !transformTerminal) throw new Error("Transform fixture is not active");
+    const claim = transformClaim;
+    const terminal = transformTerminal;
+    if (!claim.handoff([terminal], () => undefined)) throw new Error("Transform fixture handoff failed");
+    strokes = strokes.map((element) => element.id === terminal.id ? terminal : element);
+    const { projection, plan } = transformProjection();
+    if (projection.token !== "base") throw new Error("Authoritative transform did not restore the base projection");
+    items = plan.items;
+    transformProjectionToken = projection.token;
+    const result = await present();
+    const acknowledged = transformStore.acknowledgeAuthoritative(transformScope, strokes);
+    transformClaim = null;
+    transformTerminal = null;
+    return { result, token: projection.token, acknowledged };
+  },
   async erase() {
     const eraser = { ...pen(strokes.length), id: `eraser-${strokes.length}`, mode: "eraser", brush: "eraser", paintModel: undefined,
       points: [35, 38, 300, 38], pressures: [0.5, 0.5], strokeWidth: 15, opacity: 0.65 } as El;
@@ -159,7 +236,7 @@ const api = {
     } finally { renderer.dispose(); other.remove(); }
   },
 
-  destroy() { engine.dispose(); projector.clear(); },
+  destroy() { releaseTransformFixture(); engine.dispose(); projector.clear(); },
   pixels() { return { gpu: gpu.toDataURL(), reference: reference.toDataURL() }; },
 };
 declare global { interface Window { skiaEngineQA: typeof api } }
