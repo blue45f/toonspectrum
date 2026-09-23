@@ -5,7 +5,13 @@
 // 컴파일러가 h 참조 동일성만 보고 JSX/계산을 캐시하면 첫 렌더에서 UI 가 영구 동결된다
 // (탭 전환 등 커밋된 상태 변경이 화면에 반영되지 않음).
 import * as R from "./studio-bg3d-editor-runtime-bindings";
-import { applyStudio3dCommand, applyStudio3dLightingSettings, captureStudio3dPlates, createStudio3dHistory } from "./studio-bg3d-grade-plates";
+import {
+  applyStudio3dCommand,
+  applyStudio3dLightingSettings,
+  captureStudio3dPlates,
+  createStudio3dHistory,
+  patchStudio3dSceneBackground,
+} from "./studio-bg3d-grade-plates";
 
 export function attachStudioBg3dEditorLtHost(h) {
   const {
@@ -545,11 +551,20 @@ export function attachStudioBg3dEditorLtHost(h) {
   h.updateLtExportAspectRatio = updateLtExportAspectRatio;
   function updateBackgroundSettings(patch: Partial<StudioBg3dBackgroundSettings>) {
     setSceneBaseDocument((current) => {
-      const candidate: StudioBg3dSceneDocument = {
-        ...current,
-        background: { ...current.background, ...patch },
+      const history = applyStudio3dCommand(createStudio3dHistory(current), {
+        id: "set-background",
+        mode: patch.mode,
+        color: patch.color,
+        skyPresetId: patch.skyPresetId,
+      });
+      // Keep any fog/panorama fields from the panel patch on the same document identity.
+      const merged = patchStudio3dSceneBackground(history.scene, patch);
+      const withExtras = {
+        ...merged,
+        background: { ...merged.background, ...patch },
       };
-      return canonicalSceneDocument(candidate) ?? current;
+      captureStudio3dPlates(withExtras, 48, 27);
+      return canonicalSceneDocument(withExtras) ?? current;
     });
     setError(null);
   }
@@ -557,18 +572,48 @@ export function attachStudioBg3dEditorLtHost(h) {
   function updateLightingSettings(patch: Partial<StudioBg3dLightingSettings>) {
     if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
     setSceneBaseDocument((current) => {
-      const next = applyStudio3dLightingSettings(current, patch);
-      // Offered set-light command shares this document; keep a plate snapshot on the production path.
-      const intensity = next.lighting.key.intensity;
-      if (Number.isFinite(intensity) && intensity !== current.lighting.key.intensity) {
-        applyStudio3dCommand(createStudio3dHistory(current), {
+      const merged = applyStudio3dLightingSettings(current, patch);
+      const keyIntensityChanged =
+        Number.isFinite(merged.lighting.key.intensity) &&
+        merged.lighting.key.intensity !== current.lighting.key.intensity;
+      const keyDirectionChanged =
+        merged.lighting.key.direction[0] !== current.lighting.key.direction[0] ||
+        merged.lighting.key.direction[1] !== current.lighting.key.direction[1] ||
+        merged.lighting.key.direction[2] !== current.lighting.key.direction[2];
+      const fillIntensityChanged =
+        Number.isFinite(merged.lighting.fill.intensity) &&
+        merged.lighting.fill.intensity !== current.lighting.fill.intensity;
+      const fillDirectionChanged =
+        merged.lighting.fill.direction[0] !== current.lighting.fill.direction[0] ||
+        merged.lighting.fill.direction[1] !== current.lighting.fill.direction[1] ||
+        merged.lighting.fill.direction[2] !== current.lighting.fill.direction[2];
+
+      let next = merged;
+      if (keyIntensityChanged || keyDirectionChanged) {
+        const history = applyStudio3dCommand(createStudio3dHistory(current), {
           id: "set-light",
-          azimuth: Math.atan2(next.lighting.key.direction[0], next.lighting.key.direction[2]),
-          elevation: Math.asin(Math.max(-1, Math.min(1, next.lighting.key.direction[1]))),
-          intensity,
+          azimuth: Math.atan2(merged.lighting.key.direction[0], merged.lighting.key.direction[2]),
+          elevation: Math.asin(Math.max(-1, Math.min(1, merged.lighting.key.direction[1]))),
+          intensity: merged.lighting.key.intensity,
         });
-        captureStudio3dPlates(next, 48, 27);
+        // Preserve fill (and other lighting fields) from the panel patch on the command result.
+        next = applyStudio3dLightingSettings(history.scene, {
+          ...patch,
+          key: merged.lighting.key,
+        });
+      } else if (fillIntensityChanged || fillDirectionChanged) {
+        const history = applyStudio3dCommand(createStudio3dHistory(current), {
+          id: "set-fill-light",
+          azimuth: Math.atan2(merged.lighting.fill.direction[0], merged.lighting.fill.direction[2]),
+          elevation: Math.asin(Math.max(-1, Math.min(1, merged.lighting.fill.direction[1]))),
+          intensity: merged.lighting.fill.intensity,
+        });
+        next = applyStudio3dLightingSettings(history.scene, {
+          ...patch,
+          fill: merged.lighting.fill,
+        });
       }
+      captureStudio3dPlates(next, 48, 27);
       return canonicalSceneDocument(next) ?? current;
     });
     setError(null);

@@ -5,9 +5,11 @@ import {
   SHAPER_PRODUCTION_CHARACTER_ID,
   SHAPER_REST_UPPER_ARM,
   applyShaperPose,
+  applyShaperPosePreset,
   applyShaperPresetSuggestion,
   captureShaperCharacter,
   createShaperCharacter,
+  mirrorShaperPose,
   opaqueMeanAbsoluteError,
   parseShaperCharacter,
   placeShaperDrawing,
@@ -165,4 +167,27 @@ describe("Shaper-grade character session", () => {
     expect(bald.layers.some((layer) => layer.name === "밑색-헤어")).toBe(false);
     expect(bald.omissions.some((omission) => omission.name === "밑색-헤어" && omission.reason.length > 0)).toBe(true);
   });
+
+
+  it("maps known pose-preset ids to deterministic arm angles and mirrors left/right", () => {
+    const start = createShaperCharacter();
+    const standing = applyShaperPosePreset(start, "unknown-preset-xyz");
+    expect(standing.pose.leftUpperArm).toBeCloseTo(SHAPER_REST_UPPER_ARM, 5);
+    expect(standing.pose.rightUpperArm).toBeCloseTo(SHAPER_REST_UPPER_ARM, 5);
+
+    const idle = applyShaperPosePreset(start, "ni_calm_front");
+    const wave = applyShaperPosePreset(start, "pose:xp_wave_greeting");
+    const fist = applyShaperPosePreset(start, "xp_fist_up");
+    expect(idle.pose).not.toEqual(wave.pose);
+    expect(wave.pose.rightUpperArm).toBeLessThan(idle.pose.rightUpperArm);
+    expect(fist.pose.rightUpperArm).toBeLessThan(SHAPER_REST_UPPER_ARM);
+    expect(applyShaperPosePreset(start, "xp_wave_greeting").pose).toEqual(wave.pose);
+
+    const asymmetric = applyShaperPose(start, { leftUpperArm: 0.4, rightUpperArm: 2.1 });
+    const mirrored = mirrorShaperPose(asymmetric);
+    expect(mirrored.pose.leftUpperArm).toBeCloseTo(2.1, 5);
+    expect(mirrored.pose.rightUpperArm).toBeCloseTo(0.4, 5);
+    expect(mirrorShaperPose(mirrored).pose).toEqual(asymmetric.pose);
+  });
+
 });

@@ -729,7 +729,15 @@ export function CharacterShaperInspector({ h, binding, slot, hoveredEntryId, onC
     return (
       <Section title="포즈 다듬기" hint="좌우 반전, 초기화, 몸 방향, 그리고 현재 포즈 저장.">
         <div className="grid grid-cols-2 gap-1.5">
-          <button type="button" className={ROW_BUTTON} disabled={locked} onClick={() => h.handleMirrorPose("all")}>
+          <button
+            type="button"
+            className={ROW_BUTTON}
+            disabled={locked}
+            onClick={() => {
+              if (binding.mirrorGradePose) binding.mirrorGradePose();
+              else h.handleMirrorPose("all");
+            }}
+          >
             좌우 반전
           </button>
           <button type="button" className={ROW_BUTTON} disabled={locked} onClick={() => h.handleResetActivePose()}>

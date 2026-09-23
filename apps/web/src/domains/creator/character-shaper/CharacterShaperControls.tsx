@@ -511,3 +511,30 @@ export function CharacterChipGroup({ label, options, value, onSelect, disabled =
     </div>
   );
 }
+
+
+/** Pose mirror action shared by inspector / reference drawer wiring. */
+export function CharacterMirrorPoseToggle({
+  disabled,
+  onMirror,
+  label = "포즈 좌우 반전",
+}: {
+  readonly disabled?: boolean;
+  readonly onMirror: () => void;
+  readonly label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onMirror}
+      className={cn(
+        "inline-flex min-h-11 items-center justify-center rounded-xl border border-line bg-card px-3 text-[0.72rem] font-semibold text-fg-2",
+        "transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none",
+        STUDIO_FOCUS_RING,
+      )}
+    >
+      {label}
+    </button>
+  );
+}
