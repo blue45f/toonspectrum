@@ -247,7 +247,7 @@ export function MarketplaceAuthoringInstallAction({
           type="button"
           disabled={busy}
           onClick={() => void open()}
-          className="min-h-11 shrink-0 rounded-lg bg-accent px-4 text-xs font-bold text-accent-fg disabled:cursor-wait disabled:opacity-60"
+          className="min-h-11 shrink-0 rounded-lg bg-accent px-4 text-xs font-bold text-on-accent disabled:cursor-wait disabled:opacity-60"
         >
           {busy ? "준비 중" : targetLabel}
         </button>

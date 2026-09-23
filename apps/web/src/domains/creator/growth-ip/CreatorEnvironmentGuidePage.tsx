@@ -32,8 +32,9 @@ import {
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("CreatorEnvironmentGuidePage", ko, en);
 const CARD = "rounded-2xl border border-line bg-card p-4 sm:p-5";
-const BUTTON = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-sm font-bold text-fg-2 transition-colors hover:bg-raised hover:text-fg disabled:cursor-not-allowed disabled:opacity-50";
-const PRIMARY = `${BUTTON} border-accent/40 bg-accent text-on-accent hover:bg-accent hover:opacity-90`;
+const BUTTON_BASE = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+const BUTTON = `${BUTTON_BASE} border-line bg-card text-fg-2 hover:bg-raised hover:text-fg`;
+const PRIMARY = `${BUTTON_BASE} border-accent/40 bg-accent text-on-accent hover:bg-accent-2`;
 
 type Capability = {
   readonly id: string;

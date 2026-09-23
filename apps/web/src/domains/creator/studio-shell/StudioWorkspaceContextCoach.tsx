@@ -89,7 +89,7 @@ export function StudioWorkspaceContextCoach({ surface }: { readonly surface: Coa
         <motion.aside
           className="studio-context-coach"
           aria-label={content.title}
-          initial={reducedMotion ? false : { opacity: 0, y: -10, scale: .985 }}
+          initial={reducedMotion ? false : { y: -10, scale: .985 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={reducedMotion ? undefined : { opacity: 0, y: -8, scale: .985 }}
           transition={{ duration: .28, ease: [0.16, 1, 0.3, 1] }}

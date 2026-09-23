@@ -104,7 +104,7 @@ export function StudioBg3dTextExtruderPanel({
                 onClick={() => setSelectedStyle(style.id as SfxStyleKind)}
                 className={`rounded border p-1 text-center text-[0.62rem] font-semibold transition-all ${
                   selectedStyle === style.id
-                    ? "border-accent bg-accent text-accent-fg"
+                    ? "border-accent bg-accent text-on-accent"
                     : "border-line bg-card text-fg-2 hover:bg-raised"
                 }`}
               >
@@ -195,7 +195,7 @@ export function StudioBg3dTextExtruderPanel({
         type="button"
         disabled={disabled || !inputText.trim()}
         onClick={handleGenerate}
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90 disabled:opacity-50"
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-on-accent shadow-sm transition-all hover:bg-accent/90 disabled:opacity-50"
       >
         <Sparkles className="size-3.5" />
         <span>3D 텍스트 / 효과음 씬에 추가</span>

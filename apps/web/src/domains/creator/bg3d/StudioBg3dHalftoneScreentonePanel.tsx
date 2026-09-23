@@ -162,7 +162,7 @@ export function StudioBg3dHalftoneScreentonePanel({
       <button
         type="button"
         onClick={() => onApplyScreentoneConfig?.(config)}
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-on-accent shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
         <span>3D 장면에 스크린톤 셰이더 적용</span>

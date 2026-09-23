@@ -191,7 +191,7 @@ export function NowFlowArchive({
                     active ? "border-accent bg-accent-soft" : "border-line bg-panel hover:border-accent/45",
                   )}
                 >
-                  <span className="absolute -right-1 -top-3 font-display text-6xl font-black tabular-nums text-fg/5" aria-hidden="true">
+                  <span className="absolute -right-1 -top-3 font-display text-6xl font-black tabular-nums text-fg-3" aria-hidden="true">
                     {String(day.index + 1).padStart(2, "0")}
                   </span>
                   <span className="relative flex items-center justify-between gap-2 text-xs font-bold text-fg-3">

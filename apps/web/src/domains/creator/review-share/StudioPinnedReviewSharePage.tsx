@@ -166,24 +166,24 @@ export function StudioPinnedReviewSharePage() {
   };
 
   if (loading && !view) {
-    return <main className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
+    return <div className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
       <p className="flex items-center gap-3 rounded-2xl border border-line bg-card px-5 py-4 text-sm font-semibold" role="status">
         <LoaderCircle className="size-5 animate-spin text-accent" aria-hidden="true" /> 고정 검수본을 확인하는 중…
       </p>
-    </main>;
+    </div>;
   }
 
   if (!view) {
-    return <main className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
+    return <div className="flex min-h-dvh items-center justify-center bg-canvas p-6 text-fg">
       <section className="w-full max-w-lg rounded-3xl border border-bad/35 bg-card p-7 text-center" role="alert">
         <AlertTriangle className="mx-auto size-10 text-bad" aria-hidden="true" />
         <h1 className="mt-4 text-xl font-black">고정 검수본을 열 수 없습니다</h1>
         <p className="mt-2 text-sm leading-6 text-fg-2">{error ?? "링크가 만료되었거나 접근 권한이 철회되었습니다."}</p>
       </section>
-    </main>;
+    </div>;
   }
 
-  return <main className="min-h-dvh bg-canvas text-fg">
+  return <div className="min-h-dvh bg-canvas text-fg">
     <header className="border-b border-line bg-card">
       <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -256,5 +256,5 @@ export function StudioPinnedReviewSharePage() {
         {error ? <p className="rounded-xl border border-bad/35 bg-bad/10 p-3 text-sm" role="alert">{error}</p> : null}
       </aside>
     </div>
-  </main>;
+  </div>;
 }

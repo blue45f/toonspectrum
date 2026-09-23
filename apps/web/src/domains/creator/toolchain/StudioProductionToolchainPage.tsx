@@ -91,9 +91,9 @@ function ToolStatusBadge({ state }: { readonly state: string }) {
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.67rem] font-bold ${
       ready
-        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+        ? "border border-good/40 bg-good/15 text-fg"
         : connector
-          ? "bg-blue-500/15 text-blue-700 dark:text-blue-300"
+          ? "border border-cool/40 bg-cool/15 text-fg"
           : "bg-raised text-fg-3"
     }`}>
       {ready ? <CheckCircle2 size={12} aria-hidden="true" /> : <CircleSlash2 size={12} aria-hidden="true" />}

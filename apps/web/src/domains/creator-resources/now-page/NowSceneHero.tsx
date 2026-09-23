@@ -123,7 +123,7 @@ export function NowSceneHero({
           <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-accent">
             <Sparkles size={15} aria-hidden="true" />
             {selectedOffset === 0 ? "TODAY’S SPARK" : "SPARK ARCHIVE"} · {day.label}
-            <span className="rounded-full border border-good/30 bg-good/10 px-2 py-1 text-[0.68rem] font-bold text-good">
+            <span className="rounded-full border border-good/40 bg-good/15 px-2 py-1 text-[0.68rem] font-bold text-fg">
               HUMAN-CURATED · ORIGINAL
             </span>
           </div>

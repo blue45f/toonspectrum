@@ -178,7 +178,7 @@ export function PersonalInferencePage() {
               <Icon size={20} className="text-accent" />
               <strong className="mt-3 block text-fg">{item.title}</strong>
               <span className="mt-1 block text-xs leading-5 text-fg-3">{item.description}</span>
-              <small className={ready ? "mt-3 block text-good" : "mt-3 block text-warn"}>{ready ? capabilities?.engines[item.id]?.model : "클라우드 모델 준비 필요"}</small>
+              <small className={ready ? "mt-3 block text-good" : "mt-3 block font-semibold text-fg-2"}>{ready ? capabilities?.engines[item.id]?.model : "클라우드 모델 준비 필요"}</small>
             </button>
           );
         })}

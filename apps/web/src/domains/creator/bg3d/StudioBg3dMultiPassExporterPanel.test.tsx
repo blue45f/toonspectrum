@@ -52,7 +52,7 @@ describe("StudioBg3dMultiPassExporterPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: /08_법선 벡터/ }));
 
     expect(screen.getByText("사용자 설정")).toBeDefined();
-    expect(completePreset.className).not.toContain("bg-accent text-accent-fg");
+    expect(completePreset.className).not.toContain("bg-accent text-on-accent");
     expect(screen.getByRole("button", { name: /08_법선 벡터/ }).getAttribute("aria-pressed")).toBe("true");
   });
 

@@ -283,7 +283,7 @@ export function WebtoonWorkflowPage() {
               >
                 <article className="grid gap-6 lg:grid-cols-[8rem_minmax(0,1fr)_18rem] lg:gap-10">
                   <div className="flex items-start gap-4 lg:block">
-                    <span className="font-display text-4xl font-bold tracking-[-0.06em] text-fg-3/35">
+                    <span className="font-display text-4xl font-bold tracking-[-0.06em] text-fg-3">
                       {String(index + 1).padStart(2, "0")}
                     </span>
                     <span className="grid size-11 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent lg:mt-5">

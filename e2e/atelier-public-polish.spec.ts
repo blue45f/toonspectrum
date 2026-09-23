@@ -13,64 +13,41 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const width of [390, 1440]) {
-  test(`${width}px atelier tabs, layers, camera and routes work`, async ({ page }, info) => {
+  test(`${width}px community route keeps the spatial campus and real destinations usable`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto("/community");
-    const demo = page.getByTestId("atelier-workbench");
-    await demo.scrollIntoViewIfNeeded();
-    await expect(demo).toHaveCount(1);
-    await demo.getByRole("tab", { name: "선의 감각" }).focus();
-    await page.keyboard.press("ArrowRight");
-    await expect(demo.getByRole("tab", { name: "색과 레이어" })).toBeFocused();
-    await demo.getByRole("button", { name: "채색", exact: true }).click();
-    await expect(demo.locator("[data-color]")).toHaveAttribute("data-color", "false");
-    await demo.getByRole("tab", { name: "컷과 이야기" }).click();
-    await demo.getByRole("button", { name: "세로 흐름" }).click();
-    await expect(demo.locator("[data-vertical]")).toHaveAttribute("data-vertical", "true");
-    await demo.getByRole("tab", { name: "움직이는 컷" }).click();
-    const slider = demo.getByRole("slider", { name: /카메라 위치/ });
-    await slider.focus();
-    await page.keyboard.press("End");
-    await expect(slider).toHaveValue("100");
-    await expect(demo).toHaveAttribute("data-manual-camera", "true");
-    await expect(demo).toHaveAttribute("data-running", "false");
-    await expect(demo.getByRole("link", { name: "홍보 영상 만들기" })).toHaveAttribute("href", "/create/promo");
+    const room = page.getByRole("region", { name: "전시관·창작자 카페" });
+    await expect(room).toBeVisible();
+    await expect(page.getByTestId("atelier-workbench")).toHaveCount(0);
+    await room.getByRole("link", { name: "작품 전시", exact: true }).click();
+    await expect(page).toHaveURL(/\/showcase$/u);
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
-    await demo.screenshot({ path: info.outputPath(`atelier-${width}.png`) });
-    await demo.getByRole("tab", { name: "창작 재료" }).click();
-    await demo.getByRole("link", { name: "리소스 찾아보기" }).click();
-    await expect(page).toHaveURL(/\/market\/browse$/u);
-    await expect(page.getByTestId("atelier-workbench")).toHaveAttribute("data-scene", "materials");
     expect(errors).toEqual([]);
   });
 }
 
-test("motion actually pauses, resumes, and obeys the system preference", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.goto("/community");
-  const demo = page.getByTestId("atelier-workbench");
-  await demo.scrollIntoViewIfNeeded();
-  await expect(demo).toHaveAttribute("data-running", "true");
-  const art = demo.locator(".atelier-workbench__art");
-  await expect(art).toHaveCSS("animation-play-state", "running");
-  await demo.getByRole("button", { name: "모션 일시정지" }).click();
-  await expect(art).toHaveCSS("animation-play-state", "paused");
-  await demo.getByRole("button", { name: "모션 일시정지" }).click();
-  await expect(art).toHaveCSS("animation-play-state", "running");
+test("campus view modes remain keyboard-operable with reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(demo).toHaveAttribute("data-running", "false");
-  await expect(art).toHaveCSS("animation-name", "none");
+  await page.goto("/community");
+  const modes = page.getByRole("group", { name: "보기 방식" });
+  const work = modes.getByRole("button", { name: "업무", exact: true });
+  await work.click();
+  await expect(work).toHaveAttribute("aria-pressed", "true");
+  const space = modes.getByRole("button", { name: "공간", exact: true });
+  await space.click();
+  await expect(space).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("atelier-workbench")).toHaveCount(0);
 });
 
-test("image failure leaves explanation and onward actions usable", async ({ page }) => {
+test("retired atelier artwork failures cannot block the current research workspace", async ({ page }) => {
   await page.route("**/brand/atelier-*.webp", (route) => route.abort());
   await page.goto("/research");
-  const demo = page.getByTestId("atelier-workbench");
-  await demo.scrollIntoViewIfNeeded();
-  await expect(demo.getByText(/이미지 없이도/)).toBeVisible();
-  await expect(demo.getByRole("link", { name: "레이어로 작업하기" })).toHaveAttribute("href", "/studio");
+  await expect(page.getByRole("region", { name: "이야기 도서관" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+  await expect(page.getByTestId("atelier-workbench")).toHaveCount(0);
 });
 
 test("sensitive routes remain free of interactive promotional chapters", async ({ page }) => {

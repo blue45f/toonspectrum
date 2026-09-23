@@ -1,5 +1,6 @@
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 import { STUDIO_EXACT_RESUME_RESTORED_EVENT, studioExactResumeStorageKey } from "../apps/web/src/domains/creator/studio-exact-resume-context";
+import { CREATOR_EXPERIENCE_STORAGE_KEY } from "../apps/web/src/shared/lib/creator-experience-mode";
 import { readDurableStudioAutosaveDocument } from "../scripts/lib/studio-verify-durable-autosave.mjs";
 import { assertStudioWorkspaceHome } from "../scripts/lib/studio-workspace-browser-contract.mjs";
 
@@ -16,11 +17,17 @@ function themeEnvelope() {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(({ language, themeKey, theme }) => {
+  await page.addInitScript(({ language, themeKey, theme, creatorExperienceKey }) => {
     localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: language }, version: 0 }));
     localStorage.setItem(themeKey, theme);
+    localStorage.setItem(creatorExperienceKey, JSON.stringify({ mode: "classic" }));
     sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
-  }, { language: "ko", themeKey: THEME_STORAGE_KEY, theme: themeEnvelope() });
+  }, {
+    language: "ko",
+    themeKey: THEME_STORAGE_KEY,
+    theme: themeEnvelope(),
+    creatorExperienceKey: CREATOR_EXPERIENCE_STORAGE_KEY,
+  });
 
   await page.route("**/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -35,7 +42,7 @@ test.beforeEach(async ({ page }) => {
 for (const width of [320, 390, 820, 1440]) {
   test(`studio-first home keeps real navigation and accessible controls at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 1000 });
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/home", { waitUntil: "domcontentloaded" });
     await assertStudioWorkspaceHome(page);
     await capturePageEvidence(page, testInfo, `studio-workspace-${width}`);
   });
@@ -86,7 +93,7 @@ for (const width of [320, 390, 820, 1440]) {
 }
 
 test("task-first search opens the global command palette without losing the query", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/home");
   await page.getByRole("button", { name: "작품·도구·메뉴 검색", exact: true }).click();
   const search = page.getByPlaceholder(/작품 제목, 작가, 기능 명령/u);
   await expect(search).toBeVisible();
@@ -255,7 +262,7 @@ test("recent work reopens the exact Studio document and restores its viewport", 
   expect(storedCheckpoint?.pageId).toBeTruthy();
   expect(storedCheckpoint?.zoom ?? 0).toBeGreaterThan(1);
 
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/home", { waitUntil: "domcontentloaded" });
   const recent = page.locator('a[data-workspace-resume="true"], a[data-space-exact-resume="true"]').first();
   await expect(recent).toBeVisible();
   await expect(recent).toContainText(/원고 이어하기|이어서 작업/u);

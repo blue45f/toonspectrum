@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("mobile engineering hub leads to twenty-five evidence-backed chapters", async ({ page }) => {
+test("mobile engineering hub leads to all thirty evidence-backed chapters", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/about/technology");
 
@@ -29,7 +29,7 @@ test("mobile engineering hub leads to twenty-five evidence-backed chapters", asy
 
   await page.getByRole("link", { name: "전체 제작 과정 보기" }).click();
   await expect(page).toHaveURL(/\/about\/technology\/story$/u);
-  await expect(page.locator("article[id]")).toHaveCount(25);
+  await expect(page.locator("article[id]")).toHaveCount(30);
 
   const firstDetails = page.locator("article[id] details").first();
   await firstDetails.locator("summary").click();

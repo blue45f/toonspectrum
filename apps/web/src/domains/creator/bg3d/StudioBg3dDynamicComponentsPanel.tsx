@@ -86,7 +86,7 @@ export function StudioBg3dDynamicComponentsPanel({
             onClick={handleToggle}
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-all ${
               componentState.isOpen
-                ? "bg-accent text-accent-fg shadow-sm"
+                ? "bg-accent text-on-accent shadow-sm"
                 : "border border-line bg-raised text-fg-2 hover:text-fg"
             }`}
           >
@@ -129,7 +129,7 @@ export function StudioBg3dDynamicComponentsPanel({
       <button
         type="button"
         onClick={() => onApplyComponentTransform?.(componentState)}
-        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-accent-fg shadow-sm transition-all hover:bg-accent/90"
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-[0.72rem] font-bold text-on-accent shadow-sm transition-all hover:bg-accent/90"
       >
         <Sparkles className="size-3.5" />
         <span>3D 장면에 인터랙션 상태 적용</span>

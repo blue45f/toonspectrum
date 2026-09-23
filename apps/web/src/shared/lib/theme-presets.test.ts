@@ -86,6 +86,27 @@ describe("palette text contrast", () => {
       expect(new Color(tokens["on-accent"]).contrast(new Color(tokens[accent]), "WCAG21"), `${id}: button ${accent}`).toBeGreaterThanOrEqual(4.5);
     }
   });
+  it.each(THEME_PRESETS)("$id semantic error text remains legible on tinted surfaces", ({ id }) => {
+    const block = css.split(`[data-appearance-preview="${id}"] {`)[1]?.split("}")[0] ?? "";
+    const tokens = Object.fromEntries([...block.matchAll(/--color-([\w-]+):\s*([^;]+);/gu)].map((match) => [match[1], match[2]]));
+    const error = new Color(tokens.bad);
+    for (const surface of ["canvas", "panel", "card", "raised"]) {
+      const base = new Color(tokens[surface]);
+      const tinted = base.mix(error, 0.1, { space: "srgb" });
+      expect(error.contrast(tinted, "WCAG21"), `${id}: bad/${surface}+bad-10`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+  it.each(THEME_PRESETS)("$id warning text remains legible on accent-tinted surfaces", ({ id }) => {
+    const block = css.split(`[data-appearance-preview="${id}"] {`)[1]?.split("}")[0] ?? "";
+    const tokens = Object.fromEntries([...block.matchAll(/--color-([\w-]+):\s*([^;]+);/gu)].map((match) => [match[1], match[2]]));
+    const warning = new Color(tokens.warn);
+    const accent = new Color(tokens.accent);
+    const accentAlpha = new Color(tokens["accent-soft"]).alpha;
+    for (const surface of ["canvas", "panel", "card", "raised"]) {
+      const tinted = new Color(tokens[surface]).mix(accent, accentAlpha, { space: "srgb" });
+      expect(warning.contrast(tinted, "WCAG21"), `${id}: warn/${surface}+accent-soft`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
   it.each(THEME_PRESETS)("$id essential control boundaries meet 3:1", ({ id }) => {
     const block = css.split(`[data-appearance-preview="${id}"] {`)[1]?.split("}")[0] ?? "";
     const tokens = Object.fromEntries([...block.matchAll(/--color-([\w-]+):\s*([^;]+);/gu)].map((match) => [match[1], match[2]]));

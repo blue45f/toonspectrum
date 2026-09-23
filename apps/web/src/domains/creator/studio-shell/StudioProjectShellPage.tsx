@@ -365,7 +365,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
             </Link>
             <Link
               href={`/studio/p/${encodeURIComponent(displayProjectId)}/space`}
-              className={buttonClass({ size: "lg", variant: "quiet", className: "gap-2" })}
+              className={buttonClass({ size: "lg", variant: "quiet", className: "gap-2 text-fg" })}
               data-studio-enter-virtual-space="true"
             >
               <Users size={17} aria-hidden="true" />
