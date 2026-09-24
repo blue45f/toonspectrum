@@ -31,6 +31,15 @@ describe("StudioPublishResultReceipt", () => {
               contentChecksum: "a".repeat(64),
               disclosure: "브라우저 편집기에서 제작",
             },
+            community: {
+              kind: "illustration",
+              provenance: "agent_assisted",
+              portfolio: false,
+              downloadAllowed: false,
+              trainingAllowed: false,
+              attributionText: "AI 에이전트 드로잉 · 소유자 최종 검수",
+              altText: "별빛 왕관을 쓴 판타지 소녀",
+            },
             rights: {
               comments: "open",
               allowRemix: true,

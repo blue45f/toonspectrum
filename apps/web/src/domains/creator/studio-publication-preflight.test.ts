@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { createDefaultCreatorCommunityMetadata } from "@/shared/lib/creator-community-publication-contract";
 import { createDefaultCreatorPublicationDirective } from "@/shared/lib/creator-publication-contract";
 
 import {
@@ -32,6 +33,10 @@ function validInput() {
       { id: "page-2", name: "2.webp", width: 720, height: 1280 },
     ],
     directive: directive(),
+    community: {
+      ...createDefaultCreatorCommunityMetadata("upload"),
+      altText: "두 명의 친구가 오늘 있었던 일을 이야기하는 웹툰 장면",
+    },
     now,
   };
 }
@@ -144,6 +149,51 @@ describe("validateStudioPublicationPreflight", () => {
         "CANONICAL_SLUG_MISSING",
       ]),
     );
+  });
+
+  it("blocks public publication until alternative text is provided", () => {
+    const result = validateStudioPublicationPreflight({
+      ...validInput(),
+      community: createDefaultCreatorCommunityMetadata("upload"),
+    });
+
+    expect(result.canPublish).toBe(false);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "ALT_TEXT_REQUIRED",
+        path: "community.altText",
+      }),
+    ]));
+  });
+
+  it("requires an explicit disclosure for agent-assisted public work", () => {
+    const result = validateStudioPublicationPreflight({
+      ...validInput(),
+      community: {
+        ...createDefaultCreatorCommunityMetadata("upload"),
+        provenance: "agent_assisted",
+        altText: "보석 왕관을 쓴 판타지 소녀",
+      },
+    });
+
+    expect(result.canPublish).toBe(false);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        code: "ASSISTANCE_DISCLOSURE_REQUIRED",
+        path: "community.attributionText",
+      }),
+    ]));
+  });
+
+  it("keeps missing accessibility metadata as a warning for private drafts", () => {
+    const result = validateStudioPublicationPreflight({
+      ...validInput(),
+      community: createDefaultCreatorCommunityMetadata("upload"),
+      directive: directive({ visibility: "private" }),
+    });
+
+    expect(result.errors.map((issue) => issue.code)).not.toContain("ALT_TEXT_REQUIRED");
+    expect(result.warnings.map((issue) => issue.code)).toContain("ALT_TEXT_REQUIRED");
   });
 
   it("blocks a private scheduled challenge publication", () => {
