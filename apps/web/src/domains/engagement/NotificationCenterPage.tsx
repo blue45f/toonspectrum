@@ -14,7 +14,6 @@ import { useMemo, useState } from "react";
 
 import type { EngagementNotificationCategory } from "./engagement-model";
 import { activeEngagementNotifications, useEngagement } from "./engagement-store";
-import { useEngagementNotificationSync } from "./use-engagement-notification-sync";
 import { useNotificationClock } from "./use-notification-clock";
 
 import Link from "@/compat/router-link";
@@ -53,7 +52,6 @@ function formatTime(value: string): string {
 export function NotificationCenterPage() {
   useDocumentTitle("알림 센터");
   useMetaRobots(NOINDEX_PRIVATE_ROBOTS);
-  useEngagementNotificationSync();
   const notifications = useEngagement((state) => state.notifications);
   const markNotificationRead = useEngagement((state) => state.markNotificationRead);
   const markAllNotificationsRead = useEngagement((state) => state.markAllNotificationsRead);

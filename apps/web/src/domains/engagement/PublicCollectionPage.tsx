@@ -62,6 +62,7 @@ export function PublicCollectionPage() {
     const controller = new AbortController();
     setLoading(true);
     setLoadError(false);
+    setTitles([]);
     void fetchSharedTitles(snapshot.titleIds, controller.signal)
       .then(setTitles)
       .catch((cause: unknown) => {
