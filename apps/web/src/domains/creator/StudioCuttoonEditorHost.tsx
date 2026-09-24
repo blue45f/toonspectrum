@@ -24301,9 +24301,7 @@ const puppetWarpArmed =
       return;
     }
     await runStudioPageSavePipeline(status, {
-      studioAuthUserId, workId, remixId,
-      sourceProjectId: studioRoute.projectId, sourceDocumentId: studioRoute.documentId,
-      loggedIn, autosaveKey,
+      studioAuthUserId, workId, remixId, sourceProjectId: studioRoute.projectId, sourceDocumentId: studioRoute.documentId, loggedIn, autosaveKey,
       linkedTitleId, linkedSeriesId, linkedChallengeId, location,
       navigate: studioReviewCaptureSaveNavigation(navigate, workId, options?.preserveEditor),
       currentStudioDocumentScopeRef, editorMountedRef,
