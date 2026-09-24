@@ -42,6 +42,7 @@ interface StudioViewInspectorHudProps {
   readonly selectionCount: number;
   readonly viewDisabledReason?: string | null;
   readonly onZoomToSelection: () => void;
+  readonly onFitCanvasToViewport: () => void;
   readonly onFitCanvasToWidth: () => void;
   readonly onActualPixels: () => void;
   readonly onResetView: () => void;
@@ -310,6 +311,7 @@ export function StudioViewInspectorHud({
   selectionCount,
   viewDisabledReason,
   onZoomToSelection,
+  onFitCanvasToViewport,
   onFitCanvasToWidth,
   onActualPixels,
   onResetView,
@@ -428,6 +430,13 @@ export function StudioViewInspectorHud({
               disabled={selectionCount === 0 || viewBusy}
               disabledReason={selectionDisabledReason}
               onClick={onZoomToSelection}
+            />
+            <ViewActionButton
+              icon={Scan}
+              label="화면에 전체 맞춤"
+              disabled={viewBusy}
+              disabledReason={viewDisabledReason}
+              onClick={onFitCanvasToViewport}
             />
             <ViewActionButton
               icon={Maximize2}

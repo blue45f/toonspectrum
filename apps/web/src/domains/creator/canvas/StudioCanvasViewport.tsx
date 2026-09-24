@@ -140,6 +140,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     downloadAutosaveBackup,
     duplicateSelected,
     enterCanvasOnlyMode,
+    fitCanvasToViewport,
     fitCanvasToWidth,
     flipSelected,
     groupSelectedElements,
@@ -364,6 +365,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
           commitPages,
           dismissQuickStart,
           effScale,
+          fitCanvasToViewport,
           fitCanvasToWidth,
           followingStudioSessionId,
           navigate,
@@ -413,6 +415,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
         selectionCount={canvasSelectionEls.length}
         viewDisabledReason={viewBusyReason}
         onZoomToSelection={zoomToSelection}
+        onFitCanvasToViewport={fitCanvasToViewport}
         onFitCanvasToWidth={fitCanvasToWidth}
         onActualPixels={setActualPixelView}
         onResetView={resetView}

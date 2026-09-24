@@ -6,6 +6,7 @@ import {
   clampStudioViewZoomGestureAnchor,
   captureStudioView,
   clampStudioViewZoom,
+  fitStudioViewToViewport,
   fitStudioViewToWidth,
   normalizeStudioViewRotation,
   planStudioViewRestore,
@@ -92,6 +93,16 @@ describe("studio view zoom", () => {
     expect(fitStudioViewToWidth(720, 720, 2.5)).toBe(1);
     expect(fitStudioViewToWidth(1800, 720, 2.5)).toBe(2.5);
     expect(fitStudioViewToWidth(36, 720, 2.5)).toBe(0.1);
+  });
+
+  it("fits the complete portrait canvas without browser zoom and respects rotation", () => {
+    expect(fitStudioViewToViewport(1_200, 800, 1_440, 1_800, 2.5, 0, 24)).toBeCloseTo(752 / 1_800);
+    expect(fitStudioViewToViewport(1_200, 800, 1_440, 1_800, 2.5, 90, 24)).toBeCloseTo(752 / 1_440);
+    expect(fitStudioViewToViewport(4_000, 4_000, 720, 1_080, 2.5, 0, 0)).toBe(2.5);
+  });
+
+  it("keeps extreme long-form documents visible with a bounded positive scale", () => {
+    expect(fitStudioViewToViewport(1_000, 800, 720, 100_000, 2.5, 0, 24)).toBeCloseTo(752 / 100_000);
   });
 
   it("uses the same clamped canvas point for pasteboard zoom preview and settlement", () => {

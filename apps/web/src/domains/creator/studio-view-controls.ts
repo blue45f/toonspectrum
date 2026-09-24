@@ -819,6 +819,36 @@ export function fitStudioViewToWidth(
   return Math.min(safeMaximum, Math.max(0.1, safeViewportWidth / safeCanvasWidth));
 }
 
+/**
+ * Fit the entire transformed document inside the live canvas viewport. Unlike width-fit this uses
+ * both axes, so portrait illustrations and rotated pages never require browser-level zoom to see
+ * their full composition. Padding is reserved in CSS pixels for the pasteboard and focus outline.
+ */
+export function fitStudioViewToViewport(
+  viewportWidth: number,
+  viewportHeight: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  maximumScale: number,
+  canvasRotation: number = 0,
+  padding: number = 24
+): number {
+  const safeCanvasWidth = finitePositive(canvasWidth, 1);
+  const safeCanvasHeight = finitePositive(canvasHeight, 1);
+  const rotation = normalizeStudioViewRotation(canvasRotation);
+  const rotated = rotation === 90 || rotation === 270;
+  const viewWidth = rotated ? safeCanvasHeight : safeCanvasWidth;
+  const viewHeight = rotated ? safeCanvasWidth : safeCanvasHeight;
+  const safePadding = Number.isFinite(padding) ? Math.max(0, padding) : 0;
+  const availableWidth = Math.max(1, finitePositive(viewportWidth, viewWidth) - safePadding * 2);
+  const availableHeight = Math.max(1, finitePositive(viewportHeight, viewHeight) - safePadding * 2);
+  const safeMaximum = finitePositive(maximumScale, 1);
+  return Math.min(
+    safeMaximum,
+    Math.max(0.001, Math.min(availableWidth / viewWidth, availableHeight / viewHeight)),
+  );
+}
+
 export function captureStudioView(input: CaptureStudioViewInput): StudioViewSnapshot {
   const scale = finitePositive(input.scale, 1);
   const zoom = clampStudioViewZoom(input.zoom);

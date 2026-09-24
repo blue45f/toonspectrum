@@ -68,6 +68,10 @@ describe("StudioDraftSaveCenter", () => {
     expect(screen.getByText("서버 초안 revision #7")).not.toBeNull();
     expect(screen.getByText("기기 체크포인트")).not.toBeNull();
     expect(screen.getByText("3개")).not.toBeNull();
+    const lastSave = document.querySelector("[data-studio-last-server-save]");
+    expect(lastSave).not.toBeNull();
+    expect(lastSave?.getAttribute("datetime")).toBe("2026-09-09T03:00:00.000Z");
+    expect(lastSave?.textContent).toContain("서버");
   });
 
   it("delegates manual save, version history and project backup to existing authorities", async () => {

@@ -9,6 +9,7 @@ import { uid } from "../studio-id";
 import { addVanishingPoint, defaultVanishingPointPosition } from "../studio-perspective-guide";
 import {
   captureStudioView,
+  fitStudioViewToViewport,
   fitStudioViewToWidth,
   planStudioViewRestore,
   planStudioViewRotationTransition,
@@ -116,6 +117,25 @@ export function useStudioPageViewControls({
     setZoom(1);
   }
 
+  function fitCanvasToViewport() {
+    if (viewTransformSuppressed || zoomLockedRef.current) return;
+    const wrap = wrapRef.current;
+    const maximumScale = isFullscreen || maximized || mobileImmersive || canvasOnlyMode ? 4 : 2.5;
+    if (wrap) {
+      setScale(fitStudioViewToViewport(
+        wrap.clientWidth,
+        wrap.clientHeight,
+        CANVAS_W,
+        canvasH,
+        maximumScale,
+        canvasRotation,
+      ));
+      wrap.scrollLeft = 0;
+      wrap.scrollTop = 0;
+    }
+    setZoom(1);
+    announceDrawingShortcut("캔버스 전체를 화면에 맞췄습니다");
+  }
   function preserveStudioViewBeforeCapture() {
     if (viewTransformSuppressed || captureSuppressedViewRef.current) return;
     const wrap = wrapRef.current;
@@ -351,6 +371,7 @@ export function useStudioPageViewControls({
   }
 
   return {
+    fitCanvasToViewport,
     fitCanvasToWidth,
     preserveStudioViewBeforeCapture,
     resetView,
