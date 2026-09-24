@@ -108,6 +108,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "creator_work_live_lock_clock",
   "creator_work_production_workspace",
   "creator_work_publication",
+  "creator_work_publication_media",
   "creator_work_raster_asset",
   "creator_work_release",
   "creator_work_release_approval",

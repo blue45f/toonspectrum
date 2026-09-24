@@ -46,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(90);
+  expect(manifest).toHaveLength(91);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0090_studio_review_voice_note");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(90);
+  expect(manifest.at(-1).id).toBe("0091_creator_work_publication_media");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(91);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -894,7 +894,7 @@ test("creator object storage runtime ACL is least-privilege and preserves immuta
     'REVOKE ALL ON TABLE\n  public.creator_asset_storage_object,',
   );
   expect(sql).toContain(
-    'public.creator_work_asset_storage_reference\nFROM PUBLIC;',
+    'public.creator_work_asset_storage_reference,\n  public.creator_work_publication_media\nFROM PUBLIC;',
   );
   expect(sql).toContain(
     'GRANT SELECT\n  ON TABLE public.creator_asset_storage_object',
@@ -914,6 +914,12 @@ test("creator object storage runtime ACL is least-privilege and preserves immuta
   expect(sql).toContain(
     'GRANT UPDATE ("state", "deleteToken", "updatedAt")',
   );
+  expect(sql).toContain(
+    'GRANT SELECT\n  ON TABLE public.creator_work_publication_media',
+  );
+  expect(sql).toContain(
+    'GRANT INSERT (\n  "workId",\n  "slot",\n  "pageIndex",\n  "purpose",\n  "objectDigest",\n  "mediaType",',
+  );
   expect(sql).not.toMatch(/GRANT[^;]*UPDATE\s+ON TABLE/u);
   expect(sql).not.toMatch(/GRANT[^;(]*INSERT\s+ON TABLE/u);
   for (const immutableColumn of [
@@ -927,6 +933,9 @@ test("creator object storage runtime ACL is least-privilege and preserves immuta
     "referenceId",
     "objectDigest",
     "sourceAssetId",
+    "slot",
+    "pageIndex",
+    "mediaType",
   ]) {
     expect(sql).not.toContain(`UPDATE ("${immutableColumn}"`);
   }
@@ -946,6 +955,9 @@ test("creator object-storage grants and verification share one exact SQL contrac
     "deletedAt",
     "objectDigest",
     "sourceAssetId",
+    "slot",
+    "pageIndex",
+    "mediaType",
     "createdBy",
   ]) {
     expect(violation).toContain(`'${requiredColumn}'`);
@@ -1392,6 +1404,7 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "creator_work_comment_like",
     "creator_work_production_workspace",
     "creator_work_publication",
+    "creator_work_publication_media",
     "creator_work_release",
     "creator_work_release_approval",
     "creator_work_report",
@@ -1799,4 +1812,24 @@ test("review voice notes grant only append plus explicit deletion markers", () =
   expect(migration.contents).toContain("review voice note immutable fields changed");
   expect(migration.contents).toContain("REVOKE ALL ON TABLE studio_review_voice_note FROM PUBLIC");
   expect(migration.contents).not.toMatch(/DROP TABLE|TRUNCATE|UPDATE creator_work/iu);
+});
+
+
+test("creator publication media stores immutable object references without inline bytes", () => {
+  const migration = loadMigrationManifest().find(
+    (item) => item.id === "0091_creator_work_publication_media",
+  );
+  expect(migration?.contents).toContain(
+    "CREATE TABLE IF NOT EXISTS public.creator_work_publication_media",
+  );
+  expect(migration?.contents).toContain(
+    'PRIMARY KEY ("workId", slot, "objectDigest")',
+  );
+  expect(migration?.contents).toContain(
+    'FOREIGN KEY (purpose, "objectDigest")',
+  );
+  expect(migration?.contents).toContain(
+    "REVOKE ALL ON TABLE public.creator_work_publication_media FROM PUBLIC",
+  );
+  expect(migration?.contents).not.toMatch(/data:image|base64/iu);
 });

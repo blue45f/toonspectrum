@@ -309,6 +309,7 @@ describe("bootstrap SQL and repository contract", () => {
     );
     expect(sql).toContain("creator_asset_storage_object");
     expect(sql).toContain("creator_work_asset_storage_reference");
+    expect(sql).toContain("creator_work_publication_media");
     expect(sql).toContain("\\gexec");
     expect(sql).not.toContain("GRANT CREATE ON SCHEMA public");
   });
@@ -447,6 +448,7 @@ describe("bootstrap SQL and repository contract", () => {
       "0088_studio_review_delivery",
       "0089_creator_series_spatial_showcase",
       "0090_studio_review_voice_note",
+      "0091_creator_work_publication_media",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
     expect(contract.fingerprintPaths).toEqual(expect.arrayContaining([
