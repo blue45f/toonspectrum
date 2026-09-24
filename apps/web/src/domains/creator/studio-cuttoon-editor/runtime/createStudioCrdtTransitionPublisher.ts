@@ -49,6 +49,7 @@ export function createStudioCrdtTransitionPublisher(
     );
     const mirrorOfflinePendingStroke = stagedOffline === true
       && canMirrorStudioOfflinePendingStrokeTransition(
+        runtime,
         previousPages,
         nextPages,
         offlineRealtimeStrokeIds,
