@@ -41,6 +41,7 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
+import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
@@ -75,10 +76,7 @@ const SECTION_LINKS = [
 export function EngineeringPlaybookPage() {
   useBilingualI18nRevision();
   const locale = useEngineeringLocale();
-  const seminarMinutes = ENGINEERING_SEMINAR_MODULES.reduce(
-    (total, module) => total + module.minutes,
-    0,
-  );
+  const seminarModules = ENGINEERING_SEMINAR_MODULES.length;
 
   useDocumentTitle(
     bi(
@@ -121,9 +119,9 @@ export function EngineeringPlaybookPage() {
                 en: "film cuts",
               },
               {
-                value: seminarMinutes,
-                ko: "분 세미나",
-                en: "seminar minutes",
+                value: seminarModules,
+                ko: "발표 모듈",
+                en: "talk modules",
               },
             ].map((stat) => (
               <div key={stat.ko} className="rounded-2xl border border-line/60 bg-panel/70 p-3">
@@ -136,6 +134,8 @@ export function EngineeringPlaybookPage() {
           </div>
         }
       />
+
+      <ServiceStoryJourney current="playbook" className="mb-5" />
 
       <nav
         aria-label={bi("기술 플레이북 목차", "Engineering playbook sections")}
@@ -197,7 +197,7 @@ export function EngineeringPlaybookPage() {
             href="/about/technology/story"
             className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-card px-4 py-2.5 text-sm font-bold text-fg-2 transition-colors hover:text-accent"
           >
-            {bi("전체 30개 챕터", "All 30 chapters")}
+            {bi("전체 기술 챕터", "All engineering chapters")}
             <ArrowRight size={15} aria-hidden="true" />
           </Link>
         </div>
@@ -308,11 +308,31 @@ export function EngineeringPlaybookPage() {
               <p className="mt-5 rounded-3xl bg-raised/70 p-4 text-sm leading-7 text-fg-2">
                 {bi((group.marketSignal).ko, (group.marketSignal).en)}
               </p>
+              {group.observedPatterns?.length ? (
+                <div className="mt-5 rounded-3xl border border-accent/20 bg-accent-soft/15 p-4">
+                  <p className="text-xs font-black uppercase tracking-[0.1em] text-accent">
+                    {bi("공식 자료에서 확인한 패턴", "Patterns observed in official material")}
+                  </p>
+                  <ul className="mt-3 space-y-2 text-xs leading-6 text-fg-2">
+                    {group.observedPatterns.map((item) => (
+                      <li key={item.ko} className="flex gap-2">
+                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+                        <span>{bi((item).ko, (item).en)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
               <div className="mt-5 grid gap-4 md:grid-cols-3">
                 <CompactList title={bi("배운 점", "Learned")} items={group.learned.map((item) => bi((item).ko, (item).en))} />
                 <CompactList title={bi("적용", "Applied")} items={group.applied.map((item) => bi((item).ko, (item).en))} />
                 <CompactList title={bi("주장하지 않음", "Do not claim")} items={group.doNotClaim.map((item) => bi((item).ko, (item).en))} />
               </div>
+              {group.evidenceNote ? (
+                <p className="mt-5 border-t border-line/70 pt-4 text-[0.7rem] leading-6 text-fg-3">
+                  {bi((group.evidenceNote).ko, (group.evidenceNote).en)}
+                </p>
+              ) : null}
             </article>
           ))}
         </div>
@@ -417,10 +437,13 @@ export function EngineeringPlaybookPage() {
       <section id="seminar" className="scroll-mt-32" aria-labelledby="playbook-seminar-title">
         <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
           <div>
-            <p className="eyebrow text-accent">{seminarMinutes}-MINUTE SEMINAR</p>
+            <p className="eyebrow text-accent">MODULAR STUDY · TALK</p>
             <h2 id="playbook-seminar-title" className="mt-3 max-w-4xl text-balance text-2xl font-black tracking-tight text-fg sm:text-4xl">
-              {bi("설명보다 적용 토론이 남는 스터디·세미나 구성", "A study and seminar structure that ends in application, not explanation")}
+              {bi("필요한 모듈만 골라도 흐름이 이어지는 기술 발표 구성", "A technical talk that stays coherent with only the modules you need")}
             </h2>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2">
+              {bi("표시 시간은 토론과 데모를 포함한 권장 범위일 뿐입니다. 청중과 발표 목적에 맞춰 모듈을 줄이거나 확장하며 정해진 시간을 채우기 위해 내용을 반복하지 않습니다.", "Displayed times are recommendations including discussion and demos. Add or remove modules for the audience and purpose rather than repeating material to fill a fixed duration.")}
+            </p>
           </div>
           <Link
             href="/about/technology/deck"
@@ -438,7 +461,9 @@ export function EngineeringPlaybookPage() {
                 <span className="grid size-11 place-items-center rounded-2xl bg-accent text-sm font-black text-on-accent">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <p className="mt-0 font-display text-lg font-black text-fg md:mt-3">{module.minutes} min</p>
+                <p className="mt-0 font-display text-sm font-black text-fg md:mt-3">
+                  {bi(`권장 ${module.minutes}분`, `~${module.minutes} min`)}
+                </p>
               </div>
               <div>
                 <h3 className="text-lg font-black text-fg">{bi((module.title).ko, (module.title).en)}</h3>

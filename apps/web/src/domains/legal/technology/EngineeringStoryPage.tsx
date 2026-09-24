@@ -32,6 +32,7 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
+import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringStoryPage", ko, en);
@@ -85,6 +86,8 @@ export function EngineeringStoryPage() {
           </div>
         }
       />
+
+      <ServiceStoryJourney current="story" className="mb-8" />
 
       <section aria-labelledby="story-status-legend-title">
         <h2 id="story-status-legend-title" className="sr-only">

@@ -29,7 +29,7 @@ describe("engineering story pages", () => {
       .toBe("location");
     expect(screen.getByRole("link", { name: /제작 스토리|Story/u }).getAttribute("aria-current"))
       .toBe("page");
-    expect(document.querySelectorAll("article[id]")).toHaveLength(30);
+    expect(document.querySelectorAll("article[id]")).toHaveLength(31);
     expect(screen.getByRole("link", { name: /적용 가이드 열기|Open implementation guides/u }).getAttribute("href"))
       .toBe("/about/technology/guides");
   });
@@ -105,8 +105,10 @@ describe("engineering story pages", () => {
 
     expect(screen.getByRole("link", { name: /기술과 신뢰|Technology & trust/u }).getAttribute("aria-current"))
       .toBe("location");
-    expect(screen.getByRole("link", { name: /발표 모드|Deck/u }).getAttribute("aria-current"))
-      .toBe("page");
+    const deckLink = screen
+      .getAllByRole("link", { name: /발표 모드|웹 발표 자료|Deck|Web presentation/u })
+      .find((link) => link.getAttribute("aria-current") === "page");
+    expect(deckLink).toBeTruthy();
 
     const previous = screen.getByRole("button", { name: /이전|Previous/u });
     const next = screen.getByRole("button", { name: /다음|Next/u });
@@ -122,8 +124,8 @@ describe("engineering story pages", () => {
     fireEvent.keyDown(document, { key: "Home" });
     expect(previous.hasAttribute("disabled")).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: /기술 세미나 · 34장|Engineering seminar · 34 slides/u }));
-    for (let step = 0; step < 25; step += 1) fireEvent.keyDown(document, { key: "ArrowRight" });
+    fireEvent.click(screen.getByRole("button", { name: /기술 발표|Engineering talk/u }));
+    for (let step = 0; step < 26; step += 1) fireEvent.keyDown(document, { key: "ArrowRight" });
     expect(
       document.querySelector('[data-engineering-deck-shell] [data-deck-slide] h2')?.textContent,
     ).toMatch(/Worker를 하나의 만능|Workers are task-specific/u);
@@ -136,9 +138,9 @@ describe("engineering story pages", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("heading", { level: 1, name: /영상도 페이지와 같은 사실|film.*same facts/u })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: /서비스 설명, 발표 화면|Service copy, presentation screens/u })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /검토 가능한 렌더 파이프라인|Reviewable render pipeline/u })).toBeTruthy();
-    expect(document.querySelector('[aria-labelledby="storyboard-title"] ol')?.children).toHaveLength(7);
+    expect(document.querySelector('[aria-labelledby="storyboard-title"] ol')?.children).toHaveLength(12);
     unmount();
 
     render(

@@ -22,9 +22,11 @@ export interface EngineeringBenchmarkGroup {
   readonly title: LocalizedText;
   readonly products: readonly string[];
   readonly marketSignal: LocalizedText;
+  readonly observedPatterns?: readonly LocalizedText[];
   readonly learned: readonly LocalizedText[];
   readonly applied: readonly LocalizedText[];
   readonly doNotClaim: readonly LocalizedText[];
+  readonly evidenceNote?: LocalizedText;
 }
 
 export interface EngineeringAiWorkbench {
@@ -296,11 +298,13 @@ export const ENGINEERING_PLAYBOOK_DOSSIERS = [
       { ko: "versioned world manifest와 compiler가 collision, spawn, object action, art provenance를 검증합니다.", en: "A versioned world manifest and compiler validate collision, spawn, object actions and art provenance." },
       { ko: "actor locomotion·animation·NPC·interaction·conversation policy를 Phaser/DOM 밖의 순수 module로 둡니다.", en: "Actor locomotion, animation, NPC, interaction and conversation policy live in pure modules outside Phaser and the DOM." },
       { ko: "프로젝트·멤버십·review·live/huddle는 기존 도메인 API를 adapter로 사용합니다.", en: "Projects, membership, review and live/huddle use existing domain APIs through adapters." },
+      { ko: "Socket.IO admission·signaling, RTCDataChannel 제어와 RTP media를 분리하고 실제 수신자 scope 뒤에서 연결합니다.", en: "Socket.IO admission and signaling, RTCDataChannel control and RTP media stay separate behind actual recipient scope." },
       { ko: "목록·검색·키보드·reduced motion·low-power mode를 공간 화면과 동등한 진입점으로 유지합니다.", en: "List, search, keyboard, reduced-motion and low-power modes remain equivalent entry paths." },
     ],
     achievements: [
       { ko: "공간 page, social panel, world authoring, manifest와 living-world art pipeline을 별도 모듈로 구성했습니다.", en: "Spatial page, social panel, world authoring, manifest and living-world art pipeline are separate modules." },
       { ko: "Gather 2.0, WorkAdventure와 Kumospace의 최신 공식 동작을 기능·privacy·접근성 관점에서 비교했습니다.", en: "Current official Gather 2.0, WorkAdventure and Kumospace behavior was compared across capability, privacy and accessibility." },
+      { ko: "소규모 P2P huddle, 양방향 동의형 화면 공유와 short-lived TURN policy 갱신 경계를 구현했습니다.", en: "Small P2P huddles, two-sided-consent screen sharing and short-lived TURN-policy refresh boundaries are implemented." },
       { ko: "공간 object가 임의 script 대신 allowlisted action registry를 사용하도록 설계했습니다.", en: "Spatial objects use an allowlisted action registry instead of arbitrary scripts." },
     ],
     portability: [
@@ -309,9 +313,10 @@ export const ENGINEERING_PLAYBOOK_DOSSIERS = [
     ],
     limits: [
       { ko: "공간 모드만으로 전체 기능을 사용하게 강제하지 않으며, 화면상의 거리 원을 media privacy 근거로 쓰지 않습니다.", en: "Spatial mode is never mandatory, and on-screen distance is never treated as evidence of media privacy." },
+      { ko: "현재 P2P 경로는 세 명의 원격 peer와 일부 단일 Chromium loopback 증거이므로 WAN·제한 NAT·대규모 broadcast parity를 주장하지 않습니다.", en: "The current P2P path caps remote peers at three and includes some single-Chromium loopback evidence, so it does not claim WAN, restrictive-NAT or large-broadcast parity." },
       { ko: "벤치마크 문서의 target 항목은 source 존재나 시각적 유사성만으로 완료 처리하지 않습니다.", en: "Target benchmark items are not marked complete from source existence or visual similarity alone." },
     ],
-    evidence: ["apps/web/src/domains/creator/virtual-space", "docs/studio/virtual-studio-living-world-design-20260920.md", "docs/studio/virtual-studio-benchmark-20260920.md", "apps/web/public/assets/virtual-studio"],
+    evidence: ["apps/web/src/domains/creator/virtual-space", "apps/web/src/domains/creator/live/huddle/studio-p2p-huddle-controller.ts", "apps/web/src/domains/creator/studio-screen-share.ts", "docs/technology/toonstudio-webrtc-realtime-media-2026-09-25.md"],
   },
   {
     id: "multi-engine-3d-dcc",
@@ -460,6 +465,11 @@ export const ENGINEERING_BENCHMARK_GROUPS = [
       ko: "사용자는 브러시 감각만이 아니라 레이어, 페이지, 파일 호환, 반복 작업과 학습 생태계를 하나의 전문성으로 평가합니다.",
       en: "Users judge professional quality through layers, pages, file interchange, repetitive workflows and learning ecosystems—not brush feel alone.",
     },
+    observedPatterns: [
+      { ko: "Clip Studio Paint는 페이지·소재·3D reference와 desktop 제작 workflow를 하나의 전문 환경으로 연결합니다.", en: "Clip Studio Paint connects pages, materials and 3D reference inside a professional desktop workflow." },
+      { ko: "Krita·Photoshop·Procreate·MediBang은 서로 다른 장치·파일·학습 생태계에 최적화되어 한 제품의 기능 수만으로 비교하기 어렵습니다.", en: "Krita, Photoshop, Procreate and MediBang optimize for different devices, file flows and learning ecosystems, so feature counts alone are misleading." },
+    ],
+    evidenceNote: { ko: "제품 공식 문서와 동일 파일·장치 기반 내부 검증을 구분합니다.", en: "Official product documentation remains separate from our same-file and same-device validation." },
     learned: [
       { ko: "창작 중 방해를 줄이는 패널·shortcut·tool feedback", en: "Panels, shortcuts and tool feedback that reduce interruption" },
       { ko: "브러시 preset·material·page와 project 단위 관리", en: "Brush presets, materials, pages and project-level management" },
@@ -482,6 +492,12 @@ export const ENGINEERING_BENCHMARK_GROUPS = [
       ko: "공동 편집의 가치는 cursor 수보다 room 권위, presence, 공유 link, migration과 복구가 얼마나 예측 가능한지에 달려 있습니다.",
       en: "Collaborative value depends less on cursor count than predictable room authority, presence, share links, migrations and recovery.",
     },
+    observedPatterns: [
+      { ko: "Figma·tldraw·Excalidraw 계열은 공유 가능한 문서 room과 ephemeral presence를 분리하는 패턴을 보여 줍니다.", en: "Figma, tldraw and Excalidraw show the value of separating shareable document rooms from ephemeral presence." },
+      { ko: "Magma는 캔버스 안의 대화·영상·화면 공유를 창작 흐름에 붙이되 일부 미디어 capability를 요금제 경계로 운영합니다.", en: "Magma brings conversation, video and screen sharing into the canvas while placing some media capabilities behind plan boundaries." },
+      { ko: "문서 동기화와 음성·영상 transport는 사용자 경험상 가까워도 내구성·권한·비용 면에서는 별도 시스템입니다.", en: "Document synchronization and audio or video transport may feel adjacent, but differ in durability, authority and cost." },
+    ],
+    evidenceNote: { ko: "공식 기능 문서는 workflow 신호이며 동시 사용자 수·지연·복구 parity의 독립 benchmark는 아닙니다.", en: "Official feature documentation is a workflow signal, not an independent concurrency, latency or recovery benchmark." },
     learned: [
       { ko: "하나의 document room과 명확한 share·permission 경계", en: "One document room with explicit sharing and permission boundaries" },
       { ko: "ephemeral presence와 durable document state 분리", en: "Separation of ephemeral presence and durable document state" },
@@ -504,6 +520,11 @@ export const ENGINEERING_BENCHMARK_GROUPS = [
       ko: "브라우저 협업과 빠른 조립, desktop DCC의 정밀 편집, 전문 자산 시장은 서로 다른 가치 사슬을 만듭니다.",
       en: "Browser collaboration and assembly, precise desktop DCC work and specialist asset marketplaces form different value chains.",
     },
+    observedPatterns: [
+      { ko: "Spline은 브라우저 협업과 빠른 scene 조립, Blender는 topology·rig·render QA, VRoid·MetaHuman은 캐릭터 특화 authoring에 강점이 있습니다.", en: "Spline emphasizes browser collaboration and scene assembly, Blender topology, rigging and render QA, and VRoid or MetaHuman specialized character authoring." },
+      { ko: "SketchUp·ACON3D 같은 도구와 시장은 정밀 모델링과 검증된 소재 유통이 서로 다른 책임임을 보여 줍니다.", en: "Tools and marketplaces such as SketchUp and ACON3D show that precision authoring and validated asset distribution are different responsibilities." },
+    ],
+    evidenceNote: { ko: "파일 왕복, 좌표·재질·skeleton과 권리 provenance를 실제 asset로 검증한 범위만 비교합니다.", en: "Comparisons are limited to real-asset round trips, coordinates, materials, skeletons and rights provenance we actually validate." },
     learned: [
       { ko: "웹 viewport와 authoritative scene data 분리", en: "Separate web viewports from authoritative scene data" },
       { ko: "GLB·VRM 같은 교환 format과 provenance 유지", en: "Preserve GLB and VRM interchange plus provenance" },
@@ -526,6 +547,13 @@ export const ENGINEERING_BENCHMARK_GROUPS = [
       ko: "공간은 사람·방·도구 발견성을 높이지만 대화 동의, 실제 media recipient와 목록 대체 경로가 없으면 장식적이고 배타적인 UI가 됩니다.",
       en: "Space improves discovery of people, rooms and tools, but becomes decorative and exclusionary without conversation consent, real media-recipient disclosure and list alternatives.",
     },
+    observedPatterns: [
+      { ko: "Gather는 근접·private area 공유와 room-wide Spotlight를 구분하고, 모드별 권장 규모를 별도로 안내합니다.", en: "Gather distinguishes proximity or private-area sharing from room-wide Spotlight and publishes separate scale guidance by mode." },
+      { ko: "WorkAdventure는 meeting·silent·restricted·personal·lockable area와 room/world megaphone를 map authoring 계약으로 제공합니다.", en: "WorkAdventure models meeting, silent, restricted, personal and lockable areas plus room or world megaphone as map-authoring contracts." },
+      { ko: "Kumospace는 audio range, room audio, closed room, floor broadcast와 recording 범위를 서로 다른 UX로 노출합니다.", en: "Kumospace exposes audio range, room audio, closed rooms, floor broadcast and recording scope as distinct experiences." },
+      { ko: "세 제품 모두 공간상 거리와 대규모 broadcast를 같은 transport로 취급하지 않으며 수신 범위를 사용자가 이해할 수 있게 표시합니다.", en: "These products do not treat proximity and large broadcast as one transport and make recipient scope legible to users." },
+    ],
+    evidenceNote: { ko: "공식 도움말을 2026-09-25에 재확인했습니다. 이는 제품 기능 신호이며 WAN 품질·암호화·접근성의 독립 검증은 아닙니다.", en: "Official help material was rechecked on 2026-09-25. It is a product signal, not independent proof of WAN quality, encryption or accessibility." },
     learned: [
       { ko: "사람 찾기·목적지 이동·회의 요청을 하나의 흐름으로 연결", en: "Connect people search, navigation and meeting requests" },
       { ko: "시각적 방, 음향 범위, 출입 권한과 media 전송 규칙 분리", en: "Separate visual rooms, audio range, access rights and media-routing rules" },
@@ -548,6 +576,11 @@ export const ENGINEERING_BENCHMARK_GROUPS = [
       ko: "웹 창작 도구는 설치 장벽을 낮추고 template·공유·export를 연결하지만 복잡한 전문 기능은 progressive disclosure가 필요합니다.",
       en: "Web creation lowers installation friction and connects templates, sharing and export, while professional complexity needs progressive disclosure.",
     },
+    observedPatterns: [
+      { ko: "Canva·Adobe Express는 template에서 편집·공유·다운로드까지 첫 성공 경로를 짧게 만들고 고급 기능을 점진적으로 노출합니다.", en: "Canva and Adobe Express shorten the path from templates to edit, share and download while progressively exposing advanced capability." },
+      { ko: "Figma Slides는 협업 문서와 발표를 연결하고, Remotion은 React 데이터와 frame timeline을 재현 가능한 영상 산출물로 바꿉니다.", en: "Figma Slides connects collaborative documents to presentation, while Remotion turns React data and frame timelines into reproducible film artifacts." },
+    ],
+    evidenceNote: { ko: "홍보 영상·발표 화면은 제품 동작과 동일한 source data를 사용하되 실제 사용 성과처럼 표현하지 않습니다.", en: "Promotional films and presentations share product source data but are never presented as measured user outcomes." },
     learned: [
       { ko: "첫 성공까지 짧은 guided entry와 즉시 쓸 수 있는 template", en: "Guided entry and templates that shorten time to first success" },
       { ko: "편집 결과를 share link, download와 presentation으로 재사용", en: "Reuse edited output as share links, downloads and presentations" },

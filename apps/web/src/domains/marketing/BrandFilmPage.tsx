@@ -22,6 +22,7 @@ import {
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
 import { normalizeLocaleCode, useI18n, useT } from "@/shared/lib/i18n";
+import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 
 import "./creator-home.css";
 import "./creator-film.css";
@@ -196,6 +197,11 @@ export function BrandFilmPage() {
           ))}
         </dl>
       </header>
+
+      <ServiceStoryJourney
+        current="brand"
+        className="mx-4 mt-6 sm:mx-6 lg:mx-auto lg:max-w-[94rem]"
+      />
 
       <BrandFilmStoryboard />
 
