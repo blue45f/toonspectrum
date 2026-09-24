@@ -12,6 +12,7 @@ import { useWorkspaceScrollRestoration } from "./useWorkspaceScrollRestoration";
 import "./workspace.css";
 import "./workspace-redesign.css";
 import "./workspace-task-frame.css";
+import "@/shared/components/workspace/workspace-visual-v3.css";
 
 /** Stable child ancestry keeps AppRouter and editor lifetime independent of chrome changes. */
 export function WorkspaceTaskFrame({ route, children, campusMode, campusControls, campusScene }: {

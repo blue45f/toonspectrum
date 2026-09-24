@@ -25,6 +25,7 @@ import { usePathname } from "@/compat/navigation";
 import Link from "@/compat/router-link";
 
 import "./admin-shell.css";
+import "./admin-visual-v2.css";
 
 const SIDEBAR_STORAGE_KEY = "toonspectrum.admin.sidebar.collapsed.v1";
 
@@ -78,6 +79,7 @@ function AdminNavigation({
                   aria-label={collapsed ? t(route.labelKey) : undefined}
                   title={collapsed ? t(route.labelKey) : undefined}
                   onClick={onNavigate}
+                  data-admin-route-entry={route.id}
                   className={cn(
                     "group flex min-h-10 items-center gap-3 rounded-xl border px-3 text-sm font-medium transition-colors",
                     active
@@ -86,15 +88,18 @@ function AdminNavigation({
                     collapsed && "justify-center px-0",
                   )}
                 >
-                  <AdminRouteIcon
-                    icon={route.icon}
-                    className={cn(
-                      "shrink-0",
-                      active
-                        ? "text-accent"
-                        : "text-fg-3 group-hover:text-fg-2",
-                    )}
-                  />
+                  <span className="admin-nav-visual" aria-hidden="true">
+                    <span className="admin-nav-art" />
+                    <AdminRouteIcon
+                      icon={route.icon}
+                      className={cn(
+                        "relative z-[1] shrink-0",
+                        active
+                          ? "text-white"
+                          : "text-fg-2 group-hover:text-white",
+                      )}
+                    />
+                  </span>
                   <span className={cn("truncate", collapsed && "sr-only")}>
                     {t(route.labelKey)}
                   </span>
@@ -170,6 +175,9 @@ export function AdminShell({ actor, userId, children }: AdminShellProps) {
 
   return (
     <div
+      data-admin-shell="true"
+      data-admin-route={route.id}
+      data-admin-group={group?.id ?? "overview"}
       className={cn(
         "grid min-h-[100dvh] bg-canvas text-fg",
         collapsed

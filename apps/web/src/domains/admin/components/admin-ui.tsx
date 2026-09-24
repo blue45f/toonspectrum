@@ -1,4 +1,7 @@
+import { ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
+
+import "../shell/admin-visual-v2.css";
 
 import { cn } from "@/shared/lib/utils";
 
@@ -39,9 +42,16 @@ export function Field({ label, children, full }: { label: string; children: Reac
 
 export function AdminNotice({ title, body }: { title: string; body: string }) {
   return (
-    <section className="rounded-2xl border border-line bg-card p-6">
-      <h2 className="text-lg font-semibold text-fg">{title}</h2>
-      <p className="mt-2 max-w-xl text-sm leading-relaxed text-fg-3">{body}</p>
+    <section data-admin-notice="true" className="rounded-2xl border border-line bg-card p-6">
+      <div className="admin-notice-visual" aria-hidden="true">
+        <span className="admin-notice-emblem"><ShieldCheck size={24} strokeWidth={1.8} /></span>
+        <span>ADMIN OPERATIONS</span>
+      </div>
+      <div className="admin-notice-copy">
+        <p className="admin-notice-kicker">TOONSTUDIO CONTROL CENTER</p>
+        <h2 className="text-lg font-semibold text-fg">{title}</h2>
+        <p className="mt-2 max-w-xl text-sm leading-relaxed text-fg-3">{body}</p>
+      </div>
     </section>
   );
 }
