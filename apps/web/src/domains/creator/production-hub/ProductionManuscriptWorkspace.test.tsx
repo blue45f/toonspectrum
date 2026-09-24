@@ -339,7 +339,7 @@ describe("ProductionManuscriptWorkspace", () => {
     const search = screen.getByRole("searchbox", { name: "원고·공정 검색" });
     await waitFor(() => expect(search).toBe(document.activeElement));
     fireEvent.blur(search);
-    fireEvent.keyDown(window, { key: "2" });
+    fireEvent.keyDown(window, { key: "3" });
     expect(await screen.findByText("VERSION STACK PANEL")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "버전·비교" }).getAttribute("aria-selected")).toBe("true");
   });

@@ -567,6 +567,24 @@ export default defineConfig(({ command, mode }) => ({
   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.
   assetsInclude: ["**/*.wasm"],
   optimizeDeps: {
+    // Browser acceptance needs only the exercised route graph. Disabling discovery there avoids
+    // prebundling every heavyweight 2D/3D engine before the manuscript checks can start.
+    ...(process.env.TOONSPECTRUM_VITE_DISABLE_OPTIMIZE_DEPS === "1"
+      ? {
+          noDiscovery: true,
+          // React's CommonJS compatibility entries still require prebundling; all heavyweight
+          // Studio engines stay outside the acceptance startup graph.
+          include: [
+            "react",
+            "react-dom",
+            "react-dom/client",
+            "react/jsx-runtime",
+            "react/jsx-dev-runtime",
+            // React Router's browser entry pulls in its CommonJS cookie helper.
+            "react-router-dom",
+          ],
+        }
+      : {}),
     // SQLite locates its WASM beside the ESM entry; prebundling loses that asset URL.
     exclude: ["opencascade.js", "@sqlite.org/sqlite-wasm"],
   },

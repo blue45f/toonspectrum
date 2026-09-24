@@ -247,9 +247,12 @@ async function installRoutes(page, actor, clientId) {
 async function openHarness(context, actor, clientId, width) {
   const page = await context.newPage();
   await installRoutes(page, actor, clientId);
-  await page.goto(`${origin.origin}/tools/browser-harnesses/virtual-studio-review-export.html?actor=${actor}`);
+  await page.goto(`${origin.origin}/tools/browser-harnesses/virtual-studio-review-export.html?actor=${actor}`, {
+    waitUntil: "commit",
+    timeout: 90_000,
+  });
   const panel = page.getByRole("region", { name: "공식 전달과 수신 확인", exact: true });
-  await expect(panel).toBeVisible();
+  await expect(panel).toBeVisible({ timeout: 90_000 });
   await expect(page.locator("main")).toHaveAttribute("data-fixture-actor", actor);
   results.push({ kind: "opened", clientId, actor, width });
   return { page, panel };

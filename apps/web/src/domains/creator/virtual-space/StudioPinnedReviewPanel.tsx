@@ -217,7 +217,7 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
     {result?.ok ? <>
       <h3 className="mt-4 font-bold">{result.review.title}</h3>
       <p className="text-xs text-fg-3 break-all">{bt("검수 버전", "Review version")} · {result.subject.revisionId}</p>
-      <details className="mt-2 text-xs"><summary>{bt("버전 식별 정보", "Version identity")}</summary><code className="break-all">{result.subject.rootGraphHash}</code></details>
+      <details className="mt-2 text-xs"><summary className="flex min-h-11 cursor-pointer items-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">{bt("버전 식별 정보", "Version identity")}</summary><code className="break-all">{result.subject.rootGraphHash}</code></details>
       <StudioPinnedReviewPreview key={JSON.stringify(result.subject)} subject={subject ?? result.subject} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }}
         notes={result.review.comments}
         annotation={result.project.access.comment && ["open", "changes-requested"].includes(result.review.status)
