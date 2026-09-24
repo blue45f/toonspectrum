@@ -4,6 +4,7 @@ import {
   isNaturalBrowserSpeechSupported,
   isNaturalSpeechRecordingSupported,
   naturalSpeechVoiceKey,
+  normalizeNaturalSpeechText,
   rankNaturalKoreanVoices,
   speakNaturalBrowserSpeech,
   speakNaturalBrowserSpeechSequence,
@@ -11,6 +12,12 @@ import {
   type NaturalBrowserSpeechSequenceSession,
   type NaturalBrowserSpeechSession,
 } from "../../../shared/lib/natural-browser-speech";
+import {
+  creatorIntelligenceClient,
+  type CreatorIntelligenceStatus,
+  type CreatorIntelligenceVoiceProvider,
+} from "../creator-intelligence/studio-creator-intelligence-client";
+import type { PromoCloudVoiceClipInput } from "./promo-cloud-voice";
 import { downloadPromoBlob } from "./promo-media";
 import { PROMO_VOICE_PRESETS } from "./promo-voice-director";
 import {
@@ -36,6 +43,12 @@ export type PromoVoiceGenerationRequest = {
   durationMs: number;
 };
 
+export type PromoCloudVoiceGenerationRequest = {
+  provider: CreatorIntelligenceVoiceProvider;
+  clips: readonly PromoCloudVoiceClipInput[];
+  durationSec: number;
+};
+
 type PreviewSession = NaturalBrowserSpeechSession | NaturalBrowserSpeechSequenceSession;
 
 const GENDER_LABELS: Record<PromoVoiceGender, string> = {
@@ -50,6 +63,34 @@ const CAPTION_LABELS: Record<PromoVoiceCaptionMode, string> = {
   karaoke: "단어별 하이라이트",
   none: "자막 없음",
 };
+
+const GEMINI_VOICE_OPTIONS = [
+  { id: "Kore", label: "Kore · 단단하고 또렷함" },
+  { id: "Aoede", label: "Aoede · 산뜻하고 자연스러움" },
+  { id: "Leda", label: "Leda · 젊고 밝음" },
+  { id: "Puck", label: "Puck · 경쾌하고 활기참" },
+  { id: "Charon", label: "Charon · 정보 전달형" },
+  { id: "Gacrux", label: "Gacrux · 성숙하고 안정적" },
+  { id: "Achernar", label: "Achernar · 부드러움" },
+  { id: "Sulafat", label: "Sulafat · 따뜻함" },
+] as const;
+
+function cloudLanguage(text: string): "ko" | "ja" | "en" {
+  if (/[가-힣ㄱ-ㅎㅏ-ㅣ]/u.test(text)) return "ko";
+  if (/[ぁ-んァ-ヶ一-龯]/u.test(text)) return "ja";
+  return "en";
+}
+
+function cloudStyle(speaker: PromoVoiceSpeaker): string {
+  const preset = PROMO_VOICE_PRESETS.find((candidate) => candidate.id === speaker.presetId)
+    ?? PROMO_VOICE_PRESETS[0];
+  const gender = speaker.gender === "female"
+    ? "여성적인 음색"
+    : speaker.gender === "male"
+      ? "남성적인 음색"
+      : "중성적인 음색";
+  return `${preset.description}. ${gender}. 자연스럽고 명확하게 말하며 대본에 없는 내용은 읽지 않는다.`;
+}
 
 function createId(prefix: string): string {
   const random = globalThis.crypto?.randomUUID?.()
@@ -66,11 +107,13 @@ export function PromoVoiceDirector({
   disabled,
   onChange,
   onGenerate,
+  onGenerateCloud,
 }: {
   project: PromoProject;
   disabled: boolean;
   onChange: (studio: PromoVoiceStudio) => void;
   onGenerate: (request: PromoVoiceGenerationRequest) => void;
+  onGenerateCloud: (request: PromoCloudVoiceGenerationRequest) => void;
 }) {
   const generatedStudio = useMemo(
     () => createPromoVoiceStudio({ ...project, voiceStudio: undefined }),
@@ -81,9 +124,30 @@ export function PromoVoiceDirector({
   const [allowOnlineVoices, setAllowOnlineVoices] = useState(false);
   const [activePreview, setActivePreview] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [cloudStatus, setCloudStatus] = useState<CreatorIntelligenceStatus | null>(null);
+  const [cloudStatusError, setCloudStatusError] = useState("");
+  const [geminiVoice, setGeminiVoice] = useState("Kore");
   const previewRef = useRef<PreviewSession | null>(null);
   const supported = isNaturalBrowserSpeechSupported();
   const recordingSupported = isNaturalSpeechRecordingSupported();
+
+  useEffect(() => {
+    let active = true;
+    void creatorIntelligenceClient.status()
+      .then((status) => {
+        if (!active) return;
+        setCloudStatus(status);
+        setCloudStatusError("");
+      })
+      .catch(() => {
+        if (!active) return;
+        setCloudStatus(null);
+        setCloudStatusError("클라우드 음성 연결 상태를 확인하지 못했어요.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!supported) return;
@@ -341,7 +405,33 @@ export function PromoVoiceDirector({
     onGenerate({ items: sequence.items, durationMs: sequence.durationMs });
   };
 
+  const generateCloud = (provider: CreatorIntelligenceVoiceProvider) => {
+    stopPreview();
+    setNotice("");
+    const pronunciations = studio.pronunciations.map(({ source, spoken }) => ({ source, spoken }));
+    const clips = sequence.clips.map(({ clip, speaker }): PromoCloudVoiceClipInput => ({
+      id: clip.id,
+      text: normalizeNaturalSpeechText(clip.text, pronunciations),
+      startSec: clip.startSec,
+      durationSec: clip.durationSec,
+      style: cloudStyle(speaker),
+      language: cloudLanguage(clip.text),
+      ...(provider === "gemini" ? { voice: geminiVoice } : {}),
+    }));
+    if (provider === "deepgram" && clips.some((clip) => clip.language !== "en")) {
+      setNotice("현재 연결된 Deepgram Aura 영어 음성은 영문 대사에만 사용해 주세요. 한국어와 일본어는 Gemini 또는 무료 로컬 음성을 사용합니다.");
+      return;
+    }
+    onChange(studio);
+    onGenerateCloud({ provider, clips, durationSec: project.seconds });
+  };
+
   const timelineSeconds = sequence.durationMs / 1_000;
+  const geminiReady = cloudStatus?.voice?.gemini?.status === "ready";
+  const deepgramReady = cloudStatus?.voice?.deepgram?.status === "ready";
+  const hasDeepgramUnsupportedClip = sequence.clips.some(
+    ({ clip }) => cloudLanguage(clip.text) !== "en",
+  );
 
   return (
     <section className="promo-voice-director" aria-labelledby="promo-voice-director-title">
@@ -714,6 +804,74 @@ export function PromoVoiceDirector({
             </button>
           </div>
         ))}
+      </div>
+
+      <div className="promo-cloud-voice">
+        <div className="promo-voice-subhead">
+          <h4>클라우드 AI Voice</h4>
+          <span>가입 무료 할당량·크레딧 활용</span>
+        </div>
+        <p className="promo-muted">
+          Gemini는 한국어 자막·대사에 감정과 톤을 적용하고, Deepgram은 영문 홍보물에
+          빠른 Aura 음성을 사용합니다. 각 대사는 순서대로 한 번만 생성하며 실패해도
+          다른 제공처로 자동 재호출하지 않습니다.
+        </p>
+        <div className="promo-inline-grid promo-cloud-voice-grid">
+          <label htmlFor="promo-gemini-voice">
+            Gemini 음색
+            <select
+              id="promo-gemini-voice"
+              value={geminiVoice}
+              disabled={disabled}
+              onChange={(event) => setGeminiVoice(event.target.value)}
+            >
+              {GEMINI_VOICE_OPTIONS.map((voice) => (
+                <option key={voice.id} value={voice.id}>{voice.label}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="promo-primary"
+            disabled={
+              disabled
+              || !geminiReady
+              || sequence.clips.length === 0
+              || sequence.overrunCount > 0
+              || sequence.overlapCount > 0
+            }
+            onClick={() => generateCloud("gemini")}
+          >
+            Gemini 한국어 AI 음성 만들기
+          </button>
+          <button
+            type="button"
+            disabled={
+              disabled
+              || !deepgramReady
+              || hasDeepgramUnsupportedClip
+              || sequence.clips.length === 0
+              || sequence.overrunCount > 0
+              || sequence.overlapCount > 0
+            }
+            onClick={() => generateCloud("deepgram")}
+          >
+            Deepgram 영문 Aura 음성 만들기
+          </button>
+        </div>
+        <p className="promo-muted">
+          Gemini 무료 티어는 제공자 정책상 입력·출력이 제품 개선에 사용될 수 있어요.
+          공개 전 원고나 민감한 대사는 기기 내 무료 시스템 음성을 사용하세요.
+        </p>
+        <p className="promo-cloud-status" role="status">
+          {cloudStatusError
+            || (!cloudStatus
+              ? "클라우드 음성 연결 상태를 확인하는 중이에요."
+              : `Gemini ${geminiReady ? "연결됨" : "미연결"} · Deepgram ${deepgramReady ? "연결됨" : "미연결"}`)}
+          {hasDeepgramUnsupportedClip
+            ? " · 현재 대사에 비영문이 있어 Deepgram 버튼은 비활성화됩니다."
+            : ""}
+        </p>
       </div>
 
       <div className="promo-button-row promo-voice-actions">

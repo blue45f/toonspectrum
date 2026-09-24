@@ -493,3 +493,15 @@
     max-width: calc(100% - 20px);
   }
 }
+
+.product-tour-player__mix-button:disabled {
+  opacity: .46;
+  cursor: not-allowed;
+}
+
+.product-tour-player__voice-guide-status {
+  margin: 8px 4px 0;
+  color: #b84f2a;
+  font-size: 12px;
+  line-height: 1.6;
+}

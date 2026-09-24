@@ -360,6 +360,16 @@ const envSchema = z.object({
   // 창작 스튜디오 LLM 키(선택 — 미설정 시 해당 기능만 비활성).
   OPENAI_API_KEY: z.string().min(1).optional(),
   GEMINI_API_KEY: z.string().min(1).optional(),
+  CREATOR_INTELLIGENCE_VOICE_ENABLED: z.enum(["true", "false"]).optional(),
+  GEMINI_TTS_API_KEY: z.string().min(1).optional(),
+  GEMINI_TTS_MODEL: z
+    .enum(["gemini-3.8-flash-lite-tts", "gemini-3.8-flash-tts"])
+    .optional(),
+  DEEPGRAM_API_KEY: z.string().min(1).optional(),
+  DEEPGRAM_TTS_MODEL: z
+    .string()
+    .regex(/^aura(?:-2)?-[a-z0-9-]{2,100}$/u, "DEEPGRAM_TTS_MODEL must be an Aura model ID")
+    .optional(),
   CREATOR_IMAGE_AI_ENABLED: z.enum(["true", "false"]).optional(),
   // Text-only shared free pool. Each provider must be explicitly confirmed as
   // billing-disabled/free-tier before it can become configured.
@@ -532,6 +542,8 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "OPENAI_API_KEY",
   "OPENROUTER_API_KEY",
   "GEMINI_API_KEY",
+  "GEMINI_TTS_API_KEY",
+  "DEEPGRAM_API_KEY",
   "STUDIO_AI_FREE_GEMINI_API_KEY",
   "STUDIO_AI_FREE_QWEN_API_KEY",
   "STUDIO_AI_FREE_GROQ_API_KEY",

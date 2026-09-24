@@ -3,6 +3,7 @@ import { Buffer } from "node:buffer";
 export type CreatorIntelligenceProviderStatus = "ready" | "not_configured" | "disabled";
 export type CreatorIntelligenceReferenceProvider = "openverse" | "pexels" | "pixabay";
 export type CreatorIntelligenceTranslationProvider = "deepl" | "libretranslate";
+export type CreatorIntelligenceVoiceProvider = "gemini" | "deepgram";
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 type Env = Record<string, string | undefined>;
@@ -18,9 +19,49 @@ export class CreatorIntelligenceInputError extends Error {}
 
 const MAX_JSON_BYTES = 2 * 1024 * 1024;
 const MAX_AUDIO_BYTES = 4 * 1024 * 1024;
+const MAX_TTS_JSON_BYTES = Math.ceil(MAX_AUDIO_BYTES * 4 / 3) + 128 * 1024;
 const REQUEST_TIMEOUT_MS = 10_000;
+const TTS_REQUEST_TIMEOUT_MS = 45_000;
 const PAGE_SIZE = 12;
 const USER_AGENT = "ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler)";
+
+const GEMINI_TTS_MODELS = new Set([
+  "gemini-3.8-flash-lite-tts",
+  "gemini-3.8-flash-tts",
+]);
+
+const GEMINI_TTS_VOICES = new Set([
+  "Zephyr",
+  "Puck",
+  "Charon",
+  "Kore",
+  "Fenrir",
+  "Leda",
+  "Orus",
+  "Aoede",
+  "Callirrhoe",
+  "Autonoe",
+  "Enceladus",
+  "Iapetus",
+  "Umbriel",
+  "Algieba",
+  "Despina",
+  "Erinome",
+  "Algenib",
+  "Rasalgethi",
+  "Laomedeia",
+  "Achernar",
+  "Alnilam",
+  "Schedar",
+  "Gacrux",
+  "Pulcherrima",
+  "Achird",
+  "Zubenelgenubi",
+  "Vindemiatrix",
+  "Sadachbia",
+  "Sadaltager",
+  "Sulafat",
+]);
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -106,7 +147,7 @@ function configuredEndpoint(raw: string, fallbackPath = ""): URL | null {
   }
 }
 
-async function readJson(response: Response): Promise<unknown> {
+async function readJson(response: Response, maximumBytes = MAX_JSON_BYTES): Promise<unknown> {
   if (!response.ok || response.redirected) {
     await response.body?.cancel().catch(() => undefined);
     throw new Error("upstream_response");
@@ -117,7 +158,7 @@ async function readJson(response: Response): Promise<unknown> {
     throw new Error("upstream_type");
   }
   const length = Number(response.headers.get("content-length"));
-  if (Number.isFinite(length) && length > MAX_JSON_BYTES) {
+  if (Number.isFinite(length) && length > maximumBytes) {
     await response.body?.cancel().catch(() => undefined);
     throw new Error("upstream_size");
   }
@@ -131,7 +172,7 @@ async function readJson(response: Response): Promise<unknown> {
       const chunk = await reader.read();
       if (chunk.done) break;
       total += chunk.value.byteLength;
-      if (total > MAX_JSON_BYTES) throw new Error("upstream_size");
+      if (total > maximumBytes) throw new Error("upstream_size");
       output += decoder.decode(chunk.value, { stream: true });
     }
     output += decoder.decode();
@@ -162,12 +203,21 @@ async function readAudio(response: Response): Promise<string> {
   return Buffer.from(bytes).toString("base64");
 }
 
-function requestInit(init: RequestInit = {}): RequestInit {
+function requestSignal(timeoutMs: number, externalSignal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs);
+  return externalSignal ? AbortSignal.any([externalSignal, timeout]) : timeout;
+}
+
+function requestInit(
+  init: RequestInit = {},
+  timeoutMs = REQUEST_TIMEOUT_MS,
+  externalSignal?: AbortSignal,
+): RequestInit {
   return {
     ...init,
     redirect: "error",
     credentials: "omit",
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: requestSignal(timeoutMs, externalSignal),
     headers: {
       Accept: "application/json",
       "User-Agent": USER_AGENT,
@@ -178,6 +228,89 @@ function requestInit(init: RequestInit = {}): RequestInit {
 
 function status(statusValue: CreatorIntelligenceProviderStatus, reason: string) {
   return { status: statusValue, reason } as const;
+}
+
+function voiceText(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new CreatorIntelligenceInputError("음성으로 읽을 문장 형식이 올바르지 않습니다.");
+  }
+  const normalized = value.trim().replace(/\s+/gu, " ");
+  const hasControl = [...normalized].some((character) => {
+    const code = character.codePointAt(0) ?? 0;
+    return code <= 31 || code === 127;
+  });
+  if (normalized.length < 1 || normalized.length > 1_500 || hasControl) {
+    throw new CreatorIntelligenceInputError("음성으로 읽을 문장은 1~1,500자로 입력하세요.");
+  }
+  return normalized;
+}
+
+function voiceStyle(value: unknown): string {
+  if (value === undefined || value === null || value === "") return "";
+  return cleanQuery(value, "음성 연기 지시", 240);
+}
+
+function geminiTtsModel(env: Env): string {
+  const configured = key(env, "GEMINI_TTS_MODEL") || "gemini-3.8-flash-lite-tts";
+  return GEMINI_TTS_MODELS.has(configured) ? configured : "gemini-3.8-flash-lite-tts";
+}
+
+function geminiTtsVoice(value: unknown): string {
+  const requested = typeof value === "string" ? value.trim() : "";
+  if (!requested) return "Kore";
+  if (!GEMINI_TTS_VOICES.has(requested)) {
+    throw new CreatorIntelligenceInputError("지원하지 않는 Gemini 음성입니다.");
+  }
+  return requested;
+}
+
+function deepgramTtsModel(env: Env): string {
+  const configured = key(env, "DEEPGRAM_TTS_MODEL") || "aura-2-thalia-en";
+  return configured.startsWith("aura-") && configured.length <= 120
+    ? configured
+    : "aura-2-thalia-en";
+}
+
+function normalizedBase64Audio(value: unknown, expectedWave = false): string {
+  if (typeof value !== "string") throw new Error("upstream_schema");
+  const normalized = value.split(/\s+/u).join("");
+  if (
+    normalized.length === 0
+    || normalized.length > Math.ceil(MAX_AUDIO_BYTES * 4 / 3) + 8
+    || normalized.length % 4 !== 0
+    || !/^[A-Za-z0-9+/]+={0,2}$/u.test(normalized)
+  ) {
+    throw new Error("upstream_schema");
+  }
+  const bytes = Buffer.from(normalized, "base64");
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_AUDIO_BYTES) throw new Error("upstream_size");
+  if (expectedWave && (bytes.byteLength < 12 || bytes.subarray(0, 4).toString("ascii") !== "RIFF" || bytes.subarray(8, 12).toString("ascii") !== "WAVE")) {
+    throw new Error("upstream_schema");
+  }
+  return normalized;
+}
+
+function geminiOutputAudio(payload: JsonRecord): { data: unknown; mimeType: string } {
+  const legacy = record(payload.output_audio);
+  if (typeof legacy.data === "string") {
+    return {
+      data: legacy.data,
+      mimeType: text(legacy.mime_type, 80).toLowerCase(),
+    };
+  }
+
+  for (const stepValue of rows(payload.steps)) {
+    const step = record(stepValue);
+    for (const contentValue of rows(step.content)) {
+      const content = record(contentValue);
+      if (content.type !== "audio" || typeof content.data !== "string") continue;
+      return {
+        data: content.data,
+        mimeType: text(content.mime_type, 80).toLowerCase(),
+      };
+    }
+  }
+  throw new Error("upstream_schema");
 }
 
 export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOptions) {
@@ -201,6 +334,14 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
       translation: {
         deepl: key(env, "DEEPL_API_KEY") ? status("ready", "server key configured") : status("not_configured", "DEEPL_API_KEY required"),
         libretranslate: configuredEndpoint(key(env, "LIBRETRANSLATE_BASE_URL")) ? status("ready", "custom endpoint configured") : status("not_configured", "LIBRETRANSLATE_BASE_URL required"),
+      },
+      voice: {
+        gemini: enabled(env, "CREATOR_INTELLIGENCE_VOICE_ENABLED") && key(env, "GEMINI_TTS_API_KEY")
+          ? status("ready", "Gemini Korean and multilingual TTS enabled with server-side credentials")
+          : status("disabled", "voice feature flag and GEMINI_TTS_API_KEY required"),
+        deepgram: enabled(env, "CREATOR_INTELLIGENCE_VOICE_ENABLED") && key(env, "DEEPGRAM_API_KEY")
+          ? status("ready", "Deepgram Aura-2 English TTS enabled; Korean routes stay on Gemini or local speech")
+          : status("disabled", "voice feature flag and DEEPGRAM_API_KEY required"),
       },
       scene: openMeteoReady && geocodeReady
         ? status("ready", "contracted geocoder/weather endpoint configured")
@@ -493,6 +634,108 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
     return { status: "ready", page, items, hasMore: Boolean(payload.next), notice: "Preview/search only. Verify the individual sound license before project inclusion." };
   }
 
+  async function synthesizeVoice(
+    providerRaw: unknown,
+    body: JsonRecord,
+    externalSignal?: AbortSignal,
+  ) {
+    const provider = providerRaw as CreatorIntelligenceVoiceProvider;
+    if (provider !== "gemini" && provider !== "deepgram") {
+      throw new CreatorIntelligenceInputError("지원하지 않는 음성 제공처입니다.");
+    }
+    const env = options.env();
+    if (!enabled(env, "CREATOR_INTELLIGENCE_VOICE_ENABLED")) {
+      return { provider, status: "disabled" } as const;
+    }
+
+    const sourceText = voiceText(body.text);
+    const style = voiceStyle(body.style);
+    const language = text(body.language, 20).toLowerCase();
+    if (language && !/^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/u.test(language)) {
+      throw new CreatorIntelligenceInputError("음성 언어 코드가 올바르지 않습니다.");
+    }
+
+    if (provider === "gemini") {
+      const apiKey = key(env, "GEMINI_TTS_API_KEY");
+      if (!apiKey) return { provider, status: "not_configured" } as const;
+      const model = geminiTtsModel(env);
+      const voice = geminiTtsVoice(body.voice);
+      const annotation: JsonRecord = { type: "speech_metadata" };
+      if (style) annotation.style = style;
+      const response = await options.fetch(
+        "https://generativelanguage.googleapis.com/v1beta/interactions",
+        requestInit({
+          method: "POST",
+          headers: {
+            "x-goog-api-key": apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            input: [{
+              type: "user_input",
+              content: [{
+                type: "text",
+                text: sourceText,
+                annotations: [annotation],
+              }],
+            }],
+            response_format: { type: "audio" },
+            generation_config: { speech_config: [{ voice }] },
+            store: false,
+          }),
+        }, TTS_REQUEST_TIMEOUT_MS, externalSignal),
+      );
+      const payload = record(await readJson(response, MAX_TTS_JSON_BYTES));
+      const outputAudio = geminiOutputAudio(payload);
+      if (outputAudio.mimeType && outputAudio.mimeType !== "audio/wav") {
+        throw new Error("upstream_type");
+      }
+      const audioBase64 = normalizedBase64Audio(outputAudio.data, true);
+      return {
+        status: "ready",
+        provider,
+        model,
+        voice,
+        mimeType: "audio/wav",
+        audioBase64,
+        generatedAt: new Date(now()).toISOString(),
+      } as const;
+    }
+
+    const deepgramEnglish = language === "en" || language.startsWith("en-");
+    if (!deepgramEnglish || /[가-힣ㄱ-ㅎㅏ-ㅣぁ-んァ-ヶ一-龯]/u.test(sourceText)) {
+      throw new CreatorIntelligenceInputError(
+        "현재 연결된 Deepgram Aura 영어 모델은 영문 대사만 지원합니다. 한국어·일본어 등은 Gemini 또는 무료 로컬 음성을 사용하세요.",
+      );
+    }
+    const apiKey = key(env, "DEEPGRAM_API_KEY");
+    if (!apiKey) return { provider, status: "not_configured" } as const;
+    const model = deepgramTtsModel(env);
+    const url = new URL("https://api.deepgram.com/v1/speak");
+    url.searchParams.set("model", model);
+    url.searchParams.set("encoding", "mp3");
+    const response = await options.fetch(url.href, requestInit({
+      method: "POST",
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        "Content-Type": "application/json",
+        Accept: "audio/mpeg",
+      },
+      body: JSON.stringify({ text: sourceText }),
+    }, TTS_REQUEST_TIMEOUT_MS, externalSignal));
+    const audioBase64 = await readAudio(response);
+    return {
+      status: "ready",
+      provider,
+      model,
+      voice: model,
+      mimeType: "audio/mpeg",
+      audioBase64,
+      generatedAt: new Date(now()).toISOString(),
+    } as const;
+  }
+
   async function generateSoundEffect(body: JsonRecord) {
     const env = options.env();
     if (!enabled(env, "CREATOR_INTELLIGENCE_ELEVENLABS_SFX_ENABLED") || !key(env, "ELEVENLABS_API_KEY")) return { status: "disabled" };
@@ -575,6 +818,7 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
     searchAniList,
     sceneReference,
     searchSoundEffects,
+    synthesizeVoice,
     generateSoundEffect,
     createMeshyJob,
     getMeshyJob,

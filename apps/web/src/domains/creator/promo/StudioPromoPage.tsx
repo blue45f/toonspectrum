@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { recordNaturalBrowserSpeechSequence } from "../../../shared/lib/natural-browser-speech";
 import { completeAutomaticFreeText } from "../studio-server-ai-client";
+import { renderPromoCloudVoiceTimeline } from "./promo-cloud-voice";
 import { usePromoDraft } from "./promo-draft";
 import { importPromoAudio, importPromoPanels } from "./promo-import";
 import { createPromoPoster } from "./promo-poster";
@@ -15,7 +16,11 @@ import { emptyPromoProject, localPromoPlan, parsePromoAiPlan, parsePromoProject,
 import { PromoPanelEditor } from "./PromoPanelEditor";
 import { PromoPreflight } from "./PromoPreflight";
 import { PromoPreview } from "./PromoPreview";
-import { PromoVoiceDirector, type PromoVoiceGenerationRequest } from "./PromoVoiceDirector";
+import {
+  PromoVoiceDirector,
+  type PromoCloudVoiceGenerationRequest,
+  type PromoVoiceGenerationRequest,
+} from "./PromoVoiceDirector";
 
 import type { PromoPanel, PromoProject } from "./promo-model";
 
@@ -153,6 +158,39 @@ export function StudioPromoPage() {
       }
     } catch (reason) { failed(reason, controller.signal); } finally { finish(controller); }
   };
+  const generateCloudVoice = async (request: PromoCloudVoiceGenerationRequest) => {
+    const controller = start("voice");
+    if (!controller) return;
+    try {
+      const result = await renderPromoCloudVoiceTimeline(request, {
+        signal: controller.signal,
+        onProgress: (completed, total) => {
+          if (mounted.current) setProgress(total > 0 ? completed / total : 0);
+        },
+      });
+      if (controller.signal.aborted) throw new DOMException("취소했어요.", "AbortError");
+      const file = new File(
+        [result.blob],
+        `toonstudio-${result.provider}-voice.wav`,
+        { type: "audio/wav" },
+      );
+      const voice = await importPromoAudio(file, controller.signal);
+      if (!controller.signal.aborted) {
+        patch({ voiceover: { ...voice, volume: 0.9, startSec: 0 } });
+        const providerLabel = result.provider === "gemini" ? "Gemini" : "Deepgram";
+        const overrun = result.overrunClipIds.length > 0
+          ? ` 배정 구간을 넘은 대사 ${result.overrunClipIds.length}개는 자동으로 잘랐으니 문장을 줄여 다시 생성하는 편이 좋아요.`
+          : "";
+        setMessage(
+          `${providerLabel} AI 음성 ${result.generatedClipCount}개를 자막 타임라인에 맞춰 내레이션 트랙으로 연결했어요.${overrun}`,
+        );
+      }
+    } catch (reason) {
+      failed(reason, controller.signal);
+    } finally {
+      finish(controller);
+    }
+  };
   const uploadForeground = async (id: string, file: File) => {
     const controller = start("import"); if (!controller) return;
     try {
@@ -263,6 +301,7 @@ export function StudioPromoPage() {
               disabled={busy}
               onChange={(voiceStudio) => patch({ voiceStudio })}
               onGenerate={(request) => { void generateFreeVoice(request); }}
+              onGenerateCloud={(request) => { void generateCloudVoice(request); }}
             />
             <PromoMicrophoneRecorder
               disabled={busy}
@@ -305,7 +344,11 @@ export function StudioPromoPage() {
             {phase === "poster" ? <p>썸네일과 콘티를 렌더링하고 있어요.</p> : null}
             {phase === "import" ? <p>파일을 검사하고 불러오는 중이에요.</p> : null}
             {phase === "record" ? <><p>영상 저장 중 · {Math.round(progress * 100)}%</p><progress value={progress} max={1} aria-label="영상 저장 진행률" /></> : null}
-            {phase === "voice" ? <p>시스템 음성을 로컬 오디오 파일로 만들고 있어요. 공유창에서는 현재 탭과 탭 오디오를 선택해 주세요.</p> : null}
+            {phase === "voice" ? (
+              progress > 0
+                ? <><p>클라우드 AI 음성을 자막 타임라인에 맞춰 만드는 중 · {Math.round(progress * 100)}%</p><progress value={progress} max={1} aria-label="AI 음성 생성 진행률" /></>
+                : <p>무료 시스템 음성을 로컬 오디오 파일로 만들고 있어요. 공유창에서는 현재 탭과 탭 오디오를 선택해 주세요.</p>
+            ) : null}
             {!busy ? <p>{message}</p> : <button type="button" onClick={() => operation.current?.abort()}>작업 취소</button>}
           </div>
           {error ? <p className="promo-error" role="alert">{error}</p> : null}

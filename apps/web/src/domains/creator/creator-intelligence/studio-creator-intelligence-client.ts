@@ -2,6 +2,7 @@ import { api } from "@/infrastructure/api";
 
 export type CreatorIntelligenceReferenceProvider = "openverse" | "pexels" | "pixabay";
 export type CreatorIntelligenceTranslationProvider = "deepl" | "libretranslate";
+export type CreatorIntelligenceVoiceProvider = "gemini" | "deepgram";
 export type CreatorIntelligenceProviderState = "ready" | "not_configured" | "disabled";
 
 export interface CreatorIntelligenceProviderStatus {
@@ -13,6 +14,7 @@ export interface CreatorIntelligenceStatus {
   readonly schema: "toonspectrum.creator-intelligence.status.v1";
   readonly references: Readonly<Record<CreatorIntelligenceReferenceProvider, CreatorIntelligenceProviderStatus>>;
   readonly translation: Readonly<Record<CreatorIntelligenceTranslationProvider, CreatorIntelligenceProviderStatus>>;
+  readonly voice: Readonly<Record<CreatorIntelligenceVoiceProvider, CreatorIntelligenceProviderStatus>>;
   readonly scene: CreatorIntelligenceProviderStatus;
   readonly anilist: CreatorIntelligenceProviderStatus;
   readonly freesound: CreatorIntelligenceProviderStatus;
@@ -118,6 +120,16 @@ export interface TranslateResponse {
   readonly detectedSourceLanguage?: string;
 }
 
+export interface VoiceSynthesizeResponse {
+  readonly status: CreatorIntelligenceProviderState;
+  readonly provider: CreatorIntelligenceVoiceProvider;
+  readonly model?: string;
+  readonly voice?: string;
+  readonly mimeType?: "audio/wav" | "audio/mpeg";
+  readonly audioBase64?: string;
+  readonly generatedAt?: string;
+}
+
 export interface SoundGenerateResponse {
   readonly status: CreatorIntelligenceProviderState;
   readonly provider?: "elevenlabs";
@@ -156,6 +168,18 @@ export const creatorIntelligenceClient = {
     api.get<AniListResponse>("/creator-intelligence/anilist", { params: { q: query, type } }),
   soundSearch: (query: string, page = 1) =>
     api.get<SoundSearchResponse>("/creator-intelligence/sfx/search", { params: { q: query, page } }),
+  voiceSynthesize: (input: {
+    readonly provider: CreatorIntelligenceVoiceProvider;
+    readonly text: string;
+    readonly style?: string;
+    readonly voice?: string;
+    readonly language?: string;
+  }, signal?: AbortSignal) =>
+    api.post<VoiceSynthesizeResponse>(
+      "/creator-intelligence/voice/synthesize",
+      input,
+      { signal, timeout: 55_000, retry: 0 },
+    ),
   soundGenerate: (prompt: string, durationSeconds: number, loop: boolean) =>
     api.post<SoundGenerateResponse>("/creator-intelligence/sfx/generate", { prompt, durationSeconds, loop }),
   translate: (input: {
