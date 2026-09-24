@@ -10,6 +10,7 @@ const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
 
 test("Character Platform V3 executes its authoring core inside the browser", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(({
     quickstart,
     mobileHint,
@@ -33,7 +34,11 @@ test("Character Platform V3 executes its authoring core inside the browser", asy
 
   const launcher = page.locator(`${SHAPER} [data-character-quality-trigger="true"]`);
   await expect(launcher).toBeVisible();
-  await launcher.click();
+  // The launcher is portaled into the moving 3D shell. Keyboard activation verifies the accessible
+  // browser path without making the gate depend on a continuously animating pointer hit box.
+  await launcher.focus();
+  await expect(launcher).toBeFocused();
+  await page.keyboard.press("Enter");
 
   const dialog = page.getByRole("dialog", { name: "캐릭터 품질 워크벤치" });
   await expect(dialog).toBeVisible();
