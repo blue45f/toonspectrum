@@ -41,3 +41,12 @@ it("keeps the native cancel path and restores focus without relying on native cl
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(document.activeElement).toBe(trigger);
 });
+
+it("does not keep closed panel content in the document or accessibility tree", () => {
+  render(
+    <WorkspaceContextPanel open={false} title="숨긴 패널" onClose={() => undefined}>
+      <p>숨겨야 하는 대용량 목록</p>
+    </WorkspaceContextPanel>,
+  );
+  expect(screen.queryByText("숨겨야 하는 대용량 목록")).toBeNull();
+});

@@ -23,6 +23,7 @@ import {
   projectCreatorWorkDetailWithRelease,
   projectCreatorWorkListWithReleases,
   promoteDueCreatorCommunityPublications,
+  resolvePublishedCreatorWorkIdBySlug,
 } from "./community-publishing";
 import { creatorWorks, db } from "../../db";
 import {
@@ -354,12 +355,26 @@ async function publicationAwareRemixRelations(
   return { remixFromId, remixFromTitle, remixedChildren };
 }
 
+export async function resolveCreatorWorkReference(
+  reference: string,
+  viewerId?: string,
+): Promise<CreatorWorkDetail | null> {
+  const direct = await rawGetWork(reference, viewerId);
+  if (direct) return direct;
+  try {
+    const workId = await resolvePublishedCreatorWorkIdBySlug(reference);
+    return workId && workId !== reference ? rawGetWork(workId, viewerId) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getWork(
   id: string,
   viewerId?: string,
 ): Promise<CreatorWorkDetail | null> {
   await promoteDueCreatorPublicationsSafely();
-  const work = await rawGetWork(id, viewerId);
+  const work = await resolveCreatorWorkReference(id, viewerId);
   if (!work || work.isOwner) return work;
   if (!isCreatorPublicationDirectlyReadable(work.doc)) return null;
   try {

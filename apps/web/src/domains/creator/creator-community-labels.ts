@@ -18,6 +18,7 @@ export const CREATOR_COMMUNITY_KIND_LABEL: Record<CreatorCommunityContentKind, s
 export const CREATOR_COMMUNITY_PROVENANCE_LABEL: Record<CreatorCommunityProvenance, string> = {
   human: "직접 제작",
   ai_assisted: "AI 보조 사용",
+  agent_assisted: "AI 에이전트 협업",
   ai_generated: "AI 생성 중심",
   mixed: "혼합 제작",
 };

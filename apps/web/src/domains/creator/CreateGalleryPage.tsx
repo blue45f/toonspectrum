@@ -60,6 +60,7 @@ const CONTENT_GROUP_LABEL: Record<CreatorCommunityContentGroup, string> = {
 const PROVENANCE_FILTER_LABEL: Record<CreatorCommunityProvenance, string> = {
   human: "직접 제작",
   ai_assisted: "AI 보조",
+  agent_assisted: "AI 에이전트 협업",
   ai_generated: "AI 생성",
   mixed: "혼합 제작",
 };

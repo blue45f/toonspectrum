@@ -7,6 +7,7 @@ import {
   isCreatorPublicationDirectlyReadable,
   markCreatorPublicationPublished,
   normalizeCreatorPublicationDirective,
+  normalizeCreatorPublicationSlug,
   readCreatorPublicationDirective,
   writeCreatorPublicationDirective,
   type CreatorPublicationVisibility,
@@ -417,6 +418,37 @@ export async function createCreatorWorkRelease(
     return createdId;
   });
   return releaseResponseById(releaseId);
+}
+
+export async function resolvePublishedCreatorWorkIdBySlug(
+  value: unknown,
+): Promise<string | null> {
+  const canonicalSlug = normalizeCreatorPublicationSlug(value);
+  if (!canonicalSlug) return null;
+  const [publication] = await db
+    .select({ workId: creatorWorkPublications.workId })
+    .from(creatorWorkPublications)
+    .where(and(
+      eq(creatorWorkPublications.canonicalSlug, canonicalSlug),
+      eq(creatorWorkPublications.state, "published"),
+      eq(creatorWorkPublications.visibility, "public"),
+    ))
+    .limit(1);
+  if (publication?.workId) return publication.workId;
+
+  // Earlier publisher revisions stored the directive only in creator_work.doc.
+  // Keep those stable public links alive while the immutable publication row is backfilled.
+  const [legacy] = await db
+    .select({ workId: creatorWorks.id })
+    .from(creatorWorks)
+    .where(and(
+      eq(creatorWorks.status, "published"),
+      eq(creatorWorks.hidden, false),
+      sql`coalesce(${creatorWorks.doc}->'publication'->>'canonicalSlug', '') = ${canonicalSlug}`,
+      sql`coalesce(${creatorWorks.doc}->'publication'->>'visibility', 'public') = 'public'`,
+    ))
+    .limit(1);
+  return legacy?.workId ?? null;
 }
 
 export async function listCreatorWorkReleases(

@@ -60,7 +60,7 @@ export function WorkspaceContextPanel({ open, title, onClose, children, initialF
           <X size={20} aria-hidden="true" />
         </button>
       </header>
-      <div className="workspace-inspector-content">{children}</div>
+      <div className="workspace-inspector-content">{open ? children : null}</div>
     </dialog>
   );
 }

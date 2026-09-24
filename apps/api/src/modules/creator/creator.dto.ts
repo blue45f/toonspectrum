@@ -31,7 +31,7 @@ export const CreatorWorkListQuerySchema = z
     challengeId: z.string().trim().min(1).max(160).optional(),
     contentType: z.enum(["all", "illustration", "webtoon", "process"]).optional(),
     portfolio: z.enum(["1", "true"]).optional(),
-    provenance: z.enum(["human", "ai_assisted", "ai_generated", "mixed"]).optional(),
+    provenance: z.enum(["human", "ai_assisted", "agent_assisted", "ai_generated", "mixed"]).optional(),
     bookmarked: z.enum(["1", "true"]).optional(),
   })
   .strict();
@@ -39,6 +39,16 @@ export const CreatorWorkListQuerySchema = z
 export const CreatorWorkParamsSchema = z
   .object({ id: z.string().trim().min(1).max(160) })
   .strict();
+
+const CreatorWorkMediaDigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
+
+export const CreatorWorkCoverMediaParamsSchema = CreatorWorkParamsSchema.extend({
+  digest: CreatorWorkMediaDigestSchema,
+}).strict();
+
+export const CreatorWorkPageMediaParamsSchema = CreatorWorkCoverMediaParamsSchema.extend({
+  pageIndex: z.coerce.number().int().min(0).max(199),
+}).strict();
 
 export const CreatorDirectoryQuerySchema = z
   .object({
@@ -452,6 +462,12 @@ export const ModerateCreatorAssetSchema = z
 
 export class CreatorWorkListQueryDto extends createZodDto(CreatorWorkListQuerySchema) {}
 export class CreatorWorkParamsDto extends createZodDto(CreatorWorkParamsSchema) {}
+export class CreatorWorkCoverMediaParamsDto extends createZodDto(
+  CreatorWorkCoverMediaParamsSchema
+) {}
+export class CreatorWorkPageMediaParamsDto extends createZodDto(
+  CreatorWorkPageMediaParamsSchema
+) {}
 export class CreatorDirectoryQueryDto extends createZodDto(CreatorDirectoryQuerySchema) {}
 export class CreatorExternalPublicationParamsDto extends createZodDto(
   CreatorExternalPublicationParamsSchema

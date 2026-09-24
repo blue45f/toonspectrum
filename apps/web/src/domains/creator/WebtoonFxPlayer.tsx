@@ -481,10 +481,12 @@ export function WebtoonFxPlayer({
   pages,
   fx,
   title,
+  pageAltTexts,
 }: {
   pages: string[];
   fx: WorkFxSettings;
   title: string;
+  pageAltTexts?: readonly string[];
 }) {
   const reduced = usePrefersReducedMotion();
   const ambientPreset = reduced ? undefined : findAmbientPreset(fx.ambient);
@@ -515,7 +517,7 @@ export function WebtoonFxPlayer({
               <RevealPage
                 key={`${page}-${index}`}
                 src={page}
-                alt={`${title} ${index + 1}컷`}
+                alt={pageAltTexts?.[index] ?? `${title} ${index + 1}컷`}
                 reveal={cut.reveal}
                 emphasis={cut.emphasis}
                 seqMarks={cut.seq?.marks ?? []}

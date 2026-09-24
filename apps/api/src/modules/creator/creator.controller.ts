@@ -13,6 +13,8 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  StreamableFile,
 } from "@nestjs/common";
 
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
@@ -30,7 +32,9 @@ import {
   CreatorTeamListQueryDto,
   CreatorTeamMemberParamsDto,
   CreatorTeamWorkParamsDto,
+  CreatorWorkCoverMediaParamsDto,
   CreatorWorkListQueryDto,
+  CreatorWorkPageMediaParamsDto,
   CreatorWorkParamsDto,
   CreatorWorkRevisionListParamsDto,
   CreatorWorkRevisionListQueryDto,
@@ -50,6 +54,8 @@ import {
   UpdateCreatorWorkDto,
 } from "./creator.dto";
 import { CreatorService } from "./creator.service";
+
+import type { Response } from "express";
 
 
 function enforceUserOrError(userId: string | null | undefined) {
@@ -76,6 +82,54 @@ export class CreatorController {
   @Header("Cache-Control", "no-store, max-age=0")
   async getWork(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
     return this.creatorService.getWork(id, userId || undefined);
+  }
+
+  @Get("/creator/works/:id/media/cover/:digest")
+  async getWorkCoverMedia(
+    @Param(new ZodValidationPipe(CreatorWorkCoverMediaParamsDto))
+    params: CreatorWorkCoverMediaParamsDto,
+    @Headers("x-user-id") userId: string | undefined,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    const media = await this.creatorService.getWorkMedia(
+      params.id,
+      { kind: "cover" },
+      params.digest,
+      userId || undefined
+    );
+    response.setHeader("Cache-Control", media.cacheControl);
+    response.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    response.setHeader("ETag", `"${media.sha256}"`);
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    return new StreamableFile(media.bytes, {
+      type: media.mediaType,
+      length: media.byteLength,
+      disposition: "inline",
+    });
+  }
+
+  @Get("/creator/works/:id/media/pages/:pageIndex/:digest")
+  async getWorkPageMedia(
+    @Param(new ZodValidationPipe(CreatorWorkPageMediaParamsDto))
+    params: CreatorWorkPageMediaParamsDto,
+    @Headers("x-user-id") userId: string | undefined,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    const media = await this.creatorService.getWorkMedia(
+      params.id,
+      { kind: "page", pageIndex: params.pageIndex },
+      params.digest,
+      userId || undefined
+    );
+    response.setHeader("Cache-Control", media.cacheControl);
+    response.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    response.setHeader("ETag", `"${media.sha256}"`);
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    return new StreamableFile(media.bytes, {
+      type: media.mediaType,
+      length: media.byteLength,
+      disposition: "inline",
+    });
   }
 
   @Post("/creator/works")

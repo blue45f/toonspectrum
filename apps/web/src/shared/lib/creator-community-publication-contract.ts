@@ -23,6 +23,7 @@ export const CREATOR_COMMUNITY_CONTENT_GROUPS = [
 export const CREATOR_COMMUNITY_PROVENANCES = [
   "human",
   "ai_assisted",
+  "agent_assisted",
   "ai_generated",
   "mixed",
 ] as const;
@@ -369,4 +370,72 @@ export function parseCreatorCommunityProvenance(
   return CREATOR_COMMUNITY_PROVENANCES.includes(value as CreatorCommunityProvenance)
     ? (value as CreatorCommunityProvenance)
     : null;
+}
+
+export const CREATOR_COMMUNITY_METADATA_ISSUE_CODES = [
+  "ALT_TEXT_REQUIRED",
+  "ASSISTANCE_DISCLOSURE_REQUIRED",
+  "RIGHTS_ATTRIBUTION_RECOMMENDED",
+] as const;
+export type CreatorCommunityMetadataIssueCode =
+  (typeof CREATOR_COMMUNITY_METADATA_ISSUE_CODES)[number];
+
+export interface CreatorCommunityMetadataIssue {
+  readonly code: CreatorCommunityMetadataIssueCode;
+  readonly severity: "warning";
+  readonly message: string;
+  readonly path: "altText" | "attributionText";
+}
+
+export function validateCreatorCommunityMetadata(
+  value: unknown,
+  options: { format?: unknown; pageCount?: number } = {},
+): CreatorCommunityMetadataIssue[] {
+  const metadata = normalizeCreatorCommunityMetadata(value, options);
+  const issues: CreatorCommunityMetadataIssue[] = [];
+  if ((options.pageCount ?? 1) > 0 && metadata.altText.length === 0) {
+    issues.push({
+      code: "ALT_TEXT_REQUIRED",
+      severity: "warning",
+      message: "독자가 이미지를 이해할 수 있도록 작품 대체 텍스트를 입력해 주세요.",
+      path: "altText",
+    });
+  }
+  if (
+    metadata.provenance !== "human"
+    && metadata.attributionText.length === 0
+  ) {
+    issues.push({
+      code: "ASSISTANCE_DISCLOSURE_REQUIRED",
+      severity: "warning",
+      message: "AI 또는 에이전트가 참여한 제작 방식과 최종 검수 주체를 공개해 주세요.",
+      path: "attributionText",
+    });
+  }
+  if (
+    (metadata.downloadAllowed || metadata.trainingAllowed)
+    && metadata.attributionText.length === 0
+  ) {
+    issues.push({
+      code: "RIGHTS_ATTRIBUTION_RECOMMENDED",
+      severity: "warning",
+      message: "다운로드·학습 허용 범위와 필요한 출처 표기를 함께 안내해 주세요.",
+      path: "attributionText",
+    });
+  }
+  return issues;
+}
+
+export function creatorCommunityPageAltText(
+  value: unknown,
+  title: string,
+  pageIndex: number,
+  pageCount: number,
+): string {
+  const metadata = normalizeCreatorCommunityMetadata(value);
+  const normalizedTitle = cleanText(title, 160) || "창작 작품";
+  const pageLabel = pageCount > 1 ? ` ${pageIndex + 1}/${pageCount}페이지` : "";
+  return metadata.altText
+    ? `${metadata.altText}${pageLabel}`
+    : `${normalizedTitle}${pageLabel || " 작품 이미지"}`;
 }
