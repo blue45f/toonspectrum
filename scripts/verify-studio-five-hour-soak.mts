@@ -43,6 +43,8 @@ const OUT = process.env.TOONSPECTRUM_SOAK_OUT?.trim()
   || `artifacts/studio-five-hour-soak/${PROFILE_ID}${WEBGPU ? "-webgpu" : ""}`;
 const CYCLE_TARGET_MS = Math.max(5_000, Number(process.env.TOONSPECTRUM_SOAK_CYCLE_MS ?? "30000") || 30_000);
 const INK_MIN_CHANGED_PIXELS = 120;
+const HISTORY_CHURN_INTERVAL = 10;
+const HISTORY_CHURN_REDO_PROBES = 3;
 const CHECKPOINT_MS = 10 * 60_000;
 
 interface HeapSample {
@@ -84,6 +86,8 @@ interface PixelSample {
   readonly tiltYMax: number;
   readonly twistMin: number;
   readonly twistMax: number;
+  readonly layerCountBefore: number | null;
+  readonly layerCountAfter: number | null;
 }
 
 interface SoakFailure {
@@ -338,6 +342,30 @@ async function ensurePenReady(page: Page): Promise<boolean> {
     await page.waitForTimeout(80);
     return await pen.getAttribute("aria-pressed") === "true";
   }
+
+  // A docked brush-library search box can legitimately retain focus after selection. Keyboard
+  // shortcuts intentionally ignore typing surfaces, so using only "b" makes the soak diagnose
+  // focus ownership as a broken pen. Prefer the real rail control and keep the shortcut as a
+  // fallback for compact layouts where the rail item is not mounted.
+  const railPen = page.locator(
+    '[data-studio-rail-tool-id="pen"], [data-studio-current-tool-id="pen"]',
+  ).first();
+  if (await railPen.isVisible({ timeout: 500 }).catch(() => false)) {
+    if (await railPen.getAttribute("aria-pressed") !== "true") {
+      await railPen.click({ timeout: 5_000 }).catch(() => undefined);
+    }
+    await page.waitForTimeout(80);
+    if (await railPen.getAttribute("aria-pressed") !== "true") return false;
+    return page.locator('[data-studio-draw-options="true"]')
+      .waitFor({ state: "visible", timeout: 4_000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }).catch(() => undefined);
   await page.keyboard.press("b");
   return page.locator('[data-studio-draw-options="true"]')
     .waitFor({ state: "visible", timeout: 4_000 })
@@ -370,6 +398,45 @@ async function waitForPenReady(page: Page, timeoutMs = 30_000): Promise<boolean>
   return false;
 }
 
+async function readStudioAvailableLayerCount(page: Page): Promise<number | null> {
+  const raw = await page.locator('[data-studio-layer-available-count]').first()
+    .getAttribute("data-studio-layer-available-count")
+    .catch(() => null);
+  if (raw === null) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+async function exerciseBoundedHistoryChurn(page: Page, strokeCount: number): Promise<number> {
+  const undoCount = Math.max(0, Math.floor(strokeCount));
+  if (undoCount === 0) return 0;
+
+  // The brush-catalog search can remain focused after a docked selection. Undo/redo deliberately
+  // ignores typing surfaces, so clear that UI focus before driving editor-level history commands.
+  await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }).catch(() => undefined);
+
+  // Return the document to the state it had before this block while still exercising both history
+  // directions. The next stroke truncates the redo branch, so the soak stresses long-lived editing
+  // state without mistaking an ever-growing artwork for a runtime memory leak.
+  for (let index = 0; index < undoCount; index += 1) {
+    await page.keyboard.press("Control+z").catch(() => undefined);
+    await page.waitForTimeout(80);
+  }
+  const redoCount = Math.min(HISTORY_CHURN_REDO_PROBES, undoCount);
+  for (let index = 0; index < redoCount; index += 1) {
+    await page.keyboard.press("Control+Shift+z").catch(() => undefined);
+    await page.waitForTimeout(80);
+  }
+  for (let index = 0; index < redoCount; index += 1) {
+    await page.keyboard.press("Control+z").catch(() => undefined);
+    await page.waitForTimeout(80);
+  }
+  return undoCount + redoCount * 2;
+}
+
 async function drawEvidenceStroke(
   page: Page,
   cdp: CDPSession | null,
@@ -390,6 +457,8 @@ async function drawEvidenceStroke(
     twistMin: number;
     twistMax: number;
   };
+  layerCountBefore: number | null;
+  layerCountAfter: number | null;
 }> {
   if (!(await closeBrushSurfaces(page))) {
     throw new Error("brush surfaces stayed open before drawing evidence");
@@ -415,6 +484,7 @@ async function drawEvidenceStroke(
     throw new Error("Studio visible drawing surface is smaller than the pointer acceptance minimum.");
   }
   await page.waitForTimeout(80);
+  const layerCountBefore = await readStudioAvailableLayerCount(page);
   const before = await page.screenshot({ clip: box, animations: "disabled" });
   const points = createStudioPointerStrokePoints(box, cycle, { steps: 28 });
   const pointer = await dispatchStudioPointerStroke({
@@ -425,8 +495,15 @@ async function drawEvidenceStroke(
     stepDelayMs: inputMode === "mouse" ? 0 : 2,
   });
   await page.waitForTimeout(500);
+  const layerCountAfter = await readStudioAvailableLayerCount(page);
   const after = await page.screenshot({ clip: box, animations: "disabled" });
-  return { changed: changedPixels(before, after), shot: after, pointer };
+  return {
+    changed: changedPixels(before, after),
+    shot: after,
+    pointer,
+    layerCountBefore,
+    layerCountAfter,
+  };
 }
 
 async function spawnPreview(): Promise<{ origin: string; child: ReturnType<typeof spawnVitePreview> | null }> {
@@ -464,6 +541,7 @@ const report = {
   strokes: 0,
   brushSwitches: 0,
   historyActions: 0,
+  visuallyCoveredStrokes: 0,
   pixelSamples: [] as PixelSample[],
   heapSamples: [] as HeapSample[],
   gpuEvents: [] as GpuEvent[],
@@ -498,6 +576,7 @@ let heapGrowthFailureRecorded = false;
 let heapSlopeFailureRecorded = false;
 let consecutiveNoInk = 0;
 let consecutivePenBlocked = 0;
+let strokesSinceHistoryChurn = 0;
 let nextCheckpoint = CHECKPOINT_MS;
 let activeBrush: StudioBrushCatalogItem | null = null;
 
@@ -578,12 +657,21 @@ try {
           tiltYMax: evidence.pointer.tiltYMax,
           twistMin: evidence.pointer.twistMin,
           twistMax: evidence.pointer.twistMax,
+          layerCountBefore: evidence.layerCountBefore,
+          layerCountAfter: evidence.layerCountAfter,
         });
-        consecutiveNoInk = evidence.changed >= INK_MIN_CHANGED_PIXELS ? 0 : consecutiveNoInk + 1;
-        if (evidence.changed < INK_MIN_CHANGED_PIXELS) {
+        strokesSinceHistoryChurn += 1;
+        const acceptedByLayer = evidence.layerCountBefore !== null
+          && evidence.layerCountAfter !== null
+          && evidence.layerCountAfter > evidence.layerCountBefore;
+        const visuallyChanged = evidence.changed >= INK_MIN_CHANGED_PIXELS;
+        consecutiveNoInk = visuallyChanged || acceptedByLayer ? 0 : consecutiveNoInk + 1;
+        if (!visuallyChanged && acceptedByLayer) {
+          report.visuallyCoveredStrokes += 1;
+        } else if (!visuallyChanged) {
           report.failures.push({
             atMs: nowMs(startedAt), cycle, kind: "no-ink",
-            detail: `stroke changed ${evidence.changed} px (${consecutiveNoInk} consecutive; min ${INK_MIN_CHANGED_PIXELS})`,
+            detail: `stroke changed ${evidence.changed} px and layer count did not advance (${consecutiveNoInk} consecutive; min ${INK_MIN_CHANGED_PIXELS})`,
           });
           if (evidence.shot.byteLength > 0) {
             writeFileSync(join(OUT, `no-ink-cycle-${cycle}.png`), evidence.shot);
@@ -591,15 +679,9 @@ try {
         }
       }
 
-      if (cycle % 10 === 0) {
-        for (let index = 0; index < 3; index += 1) {
-          await page.keyboard.press("Control+z").catch(() => undefined);
-          await page.waitForTimeout(100);
-          report.historyActions += 1;
-        }
-        await page.keyboard.press("Control+Shift+z").catch(() => undefined);
-        await page.waitForTimeout(150);
-        report.historyActions += 1;
+      if (cycle % HISTORY_CHURN_INTERVAL === 0 && strokesSinceHistoryChurn > 0) {
+        report.historyActions += await exerciseBoundedHistoryChurn(page, strokesSinceHistoryChurn);
+        strokesSinceHistoryChurn = 0;
       }
     } catch (error) {
       report.failures.push({
@@ -706,7 +788,7 @@ const meaningfulFailures = report.failures.filter((failure) => {
 const worstLongTask = Math.max(0, ...report.longTasks.map((entry) => entry.durationMs));
 const initialHeap = report.heapSamples[0]?.usedBytes ?? null;
 const finalHeap = report.heapSamples.at(-1)?.usedBytes ?? null;
-log(`${report.cycles} cycles · ${report.strokes} strokes · ${report.brushSwitches} brush switches · ${report.historyActions} history actions`);
+log(`${report.cycles} cycles · ${report.strokes} strokes · ${report.brushSwitches} brush switches · ${report.historyActions} history actions · ${report.visuallyCoveredStrokes} visually-covered strokes`);
 log(`${report.runtimeErrors.length} runtime errors · ${report.environmentNoise.length} local-preview environment noises · ${report.gpuEvents.length} GPU events · ${report.longTasks.length} long tasks (worst ${Math.round(worstLongTask)} ms)`);
 if (initialHeap !== null && finalHeap !== null) {
   log(`GC heap ${Math.round(initialHeap / 1048576)} MiB → ${Math.round(finalHeap / 1048576)} MiB`);

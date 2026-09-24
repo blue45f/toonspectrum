@@ -51,11 +51,14 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(select).toContain("return closeBrushSurfaces(page)");
   });
 
-  it("uses the real mobile pen authority and keeps the desktop shortcut fallback", () => {
+  it("uses direct pen controls before the desktop shortcut fallback", () => {
     const pen = sliceFunction("ensurePenReady", "drawEvidenceStroke");
     expect(pen).toContain('[data-studio-mobile-editing-dock="true"]');
     expect(pen).toContain('getByRole("button", { name: /^(?:펜|Pen)$/u })');
+    expect(pen).toContain('[data-studio-rail-tool-id="pen"]');
+    expect(pen).toContain('[data-studio-current-tool-id="pen"]');
     expect(pen).toContain('getAttribute("aria-pressed")');
+    expect(pen).toContain("active.blur()");
     expect(pen).toContain('page.keyboard.press("b")');
   });
 
@@ -78,6 +81,24 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(draw).toContain("mode: inputMode");
     expect(draw).toContain("cdp");
     expect(draw).not.toContain("page.mouse.down()");
+  });
+
+  it("uses layer commits to distinguish a covered stroke from missing ink", () => {
+    expect(source).toContain('[data-studio-layer-available-count]');
+    expect(source).toContain("layerCountBefore: evidence.layerCountBefore");
+    expect(source).toContain("layerCountAfter: evidence.layerCountAfter");
+    expect(source).toContain("const acceptedByLayer = evidence.layerCountBefore !== null");
+    expect(source).toContain("evidence.layerCountAfter > evidence.layerCountBefore");
+    expect(source).toContain("report.visuallyCoveredStrokes += 1");
+    expect(source).toContain("else if (!visuallyChanged)");
+  });
+
+  it("keeps document size bounded while repeatedly exercising undo and redo", () => {
+    expect(source).toContain("HISTORY_CHURN_INTERVAL = 10");
+    expect(source).toContain("exerciseBoundedHistoryChurn(page, strokesSinceHistoryChurn)");
+    expect(source).toContain('page.keyboard.press("Control+Shift+z")');
+    expect(source).toContain("return undoCount + redoCount * 2");
+    expect(source).toContain("strokesSinceHistoryChurn = 0");
   });
 
   it("enters the current drawing canvas route before waiting for the editor", () => {
@@ -181,6 +202,19 @@ describe("Studio five-hour soak local-preview runtime noise", () => {
       spawnedPreview: true,
     })).toBe(true);
   });
+
+  it.each(["401 (Unauthorized)", "403 (Forbidden)"])(
+    "classifies local-preview ticket auth rejection %s as environment noise",
+    (status) => {
+      expect(isExpectedLocalPreviewRuntimeNoise({
+        ...ticket502,
+        text: ticket502.text.replace("502 (Bad Gateway)", status),
+      }, {
+        origin: "http://127.0.0.1:4173",
+        spawnedPreview: true,
+      })).toBe(true);
+    },
+  );
 
   it.each([
     ["external origin", ticket502, { origin: "https://studio.example.com", spawnedPreview: true }],
