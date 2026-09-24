@@ -1,16 +1,8 @@
 import {
   ArrowRight,
-  BookOpenText,
-  Brush,
   Clock3,
-  FolderKanban,
-  ImagePlus,
-  MessageCircleMore,
-  PanelsTopLeft,
   Sparkles,
-  UserRoundPen,
   WandSparkles,
-  type LucideIcon,
 } from "lucide-react";
 
 import Link from "@/compat/router-link";
@@ -30,6 +22,7 @@ import type { StudioProjectLibraryManagementController } from "./useStudioProjec
 
 const HERO_ART = "/brand/toonstudio-visual-identity/creator-lobby-hero.webp";
 const AI_DIRECTOR_ART = "/brand/toonstudio-visual-identity/ai-creative-director.webp";
+const ICON_ROOT = "/brand/toonstudio-premium-icons";
 
 const FALLBACK_PROJECT_ART = [
   HERO_ART,
@@ -48,7 +41,7 @@ interface LobbyAction {
   readonly metaKo: string;
   readonly metaEn: string;
   readonly tone: "violet" | "blue" | "pink" | "cyan" | "amber";
-  readonly Icon: LucideIcon;
+  readonly art: string;
 }
 
 const LOBBY_ACTIONS: readonly LobbyAction[] = [
@@ -59,7 +52,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "세로 웹툰",
     metaEn: "Vertical webtoon",
     tone: "violet",
-    Icon: PanelsTopLeft,
+    art: "canvas.webp",
   },
   {
     href: "/story-lab",
@@ -68,7 +61,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "대본·콘티",
     metaEn: "Script & storyboard",
     tone: "blue",
-    Icon: BookOpenText,
+    art: "story.webp",
   },
   {
     href: "/studio/assets/characters/new",
@@ -77,7 +70,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "포즈·표정",
     metaEn: "Pose & expression",
     tone: "pink",
-    Icon: UserRoundPen,
+    art: "character.webp",
   },
   {
     href: "/studio/bg3d",
@@ -86,7 +79,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "2D·3D 장면",
     metaEn: "2D & 3D scene",
     tone: "cyan",
-    Icon: ImagePlus,
+    art: "background.webp",
   },
   {
     href: "/studio/new?kind=illustration&template=illustration-blank",
@@ -95,7 +88,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "바로 그리기",
     metaEn: "Start drawing",
     tone: "amber",
-    Icon: Brush,
+    art: "canvas.webp",
   },
 ] as const;
 
@@ -181,7 +174,7 @@ export function StudioCreatorLobby({
                 className: "studio-creator-hero__primary gap-2",
               })}
             >
-              <WandSparkles size={17} aria-hidden="true" />
+              <img className="studio-creator-hero__button-art" src={`${ICON_ROOT}/create.webp`} alt="" />
               {bi("새 작품 시작", "Start a new work")}
             </Link>
             <Link
@@ -192,7 +185,7 @@ export function StudioCreatorLobby({
                 className: "studio-creator-hero__secondary gap-2",
               })}
             >
-              <FolderKanban size={17} aria-hidden="true" />
+              <img className="studio-creator-hero__button-art" src={`${ICON_ROOT}/projects.webp`} alt="" />
               {bi("작업 가져오기", "Import work")}
             </Link>
             <button
@@ -204,7 +197,7 @@ export function StudioCreatorLobby({
                 className: "studio-creator-hero__secondary gap-2",
               })}
             >
-              <MessageCircleMore size={17} aria-hidden="true" />
+              <img className="studio-creator-hero__button-art" src={`${ICON_ROOT}/ai-director.webp`} alt="" />
               {bi("AI 디렉터에게 말하기", "Ask the AI director")}
             </button>
           </div>
@@ -227,10 +220,10 @@ export function StudioCreatorLobby({
           <span className="studio-creator-hero__caption">INK · LIGHT · STORY</span>
         </div>
         <div className="studio-creator-quick-actions" aria-label={bi("빠른 시작", "Quick start")}>
-          {LOBBY_ACTIONS.map(({ href, labelKo, labelEn, metaKo, metaEn, tone, Icon }) => (
+          {LOBBY_ACTIONS.map(({ href, labelKo, labelEn, metaKo, metaEn, tone, art }) => (
             <Link key={href} href={href} data-tone={tone} className="studio-creator-quick-action">
               <span className="studio-creator-quick-action__icon" aria-hidden="true">
-                <Icon size={20} />
+                <img src={`${ICON_ROOT}/${art}`} alt="" decoding="async" />
               </span>
               <span className="studio-creator-quick-action__copy">
                 <strong>{bi(labelKo, labelEn)}</strong>

@@ -1,8 +1,22 @@
 import { useLocation } from "react-router-dom";
+
 import Link from "@/compat/router-link";
 import { useI18n } from "@/shared/lib/i18n";
+
 import { TOONSTUDIO_PRIMARY_NAVIGATION, siteNavigationText } from "../site-navigation";
-import { workspaceNavigationActiveId, workspaceNavigationContext, workspaceNavigationHref, type WorkspaceNavigationContext } from "./workspace-navigation-model";
+import {
+  workspaceNavigationActiveId,
+  workspaceNavigationContext,
+  workspaceNavigationHref,
+  type WorkspaceNavigationContext,
+} from "./workspace-navigation-model";
+
+const PREMIUM_NAV_ART: Readonly<Record<string, string>> = {
+  "workspace-home": "/brand/toonstudio-premium-icons/home.webp",
+  studio: "/brand/toonstudio-premium-icons/canvas.webp",
+  "workspace-team": "/brand/toonstudio-premium-icons/projects.webp",
+  "workspace-hub": "/brand/toonstudio-premium-icons/community.webp",
+};
 
 export function WorkspaceNavigation({ activeId, studioHref, teamHref, context }: {
   readonly activeId?: string;
@@ -18,17 +32,33 @@ export function WorkspaceNavigation({ activeId, studioHref, teamHref, context }:
     <nav className="workspace-nav" aria-label={locale.startsWith("ko") ? "주 메뉴" : "Main navigation"}>
       {TOONSTUDIO_PRIMARY_NAVIGATION.map((item) => {
         const Icon = item.icon;
-        const href = item.id === "workspace-home" ? studioHref ?? workspaceNavigationHref(item.href, navigationContext)
-          : item.id === "workspace-team" ? teamHref ?? workspaceNavigationHref(item.href, navigationContext)
-          : workspaceNavigationHref(item.href, navigationContext);
-        return <Link key={item.id} href={href} aria-current={selected === item.id ? "page" : undefined}
-          data-navigation-entry={item.id} title={siteNavigationText(item.description, locale)}>
-          <span className="workspace-nav-visual" aria-hidden="true">
-            <span className="workspace-nav-visual-art" />
-            <Icon size={21} strokeWidth={selected === item.id ? 2.35 : 1.9} />
-          </span>
-          <span>{siteNavigationText(item.label, locale)}</span>
-        </Link>;
+        const art = PREMIUM_NAV_ART[item.id];
+        const href = item.id === "workspace-home"
+          ? studioHref ?? workspaceNavigationHref(item.href, navigationContext)
+          : item.id === "workspace-team"
+            ? teamHref ?? workspaceNavigationHref(item.href, navigationContext)
+            : workspaceNavigationHref(item.href, navigationContext);
+
+        return (
+          <Link
+            key={item.id}
+            href={href}
+            aria-current={selected === item.id ? "page" : undefined}
+            data-navigation-entry={item.id}
+            title={siteNavigationText(item.description, locale)}
+          >
+            <span className="workspace-nav-visual" aria-hidden="true">
+              <span className="workspace-nav-visual-art" />
+              {art ? <img src={art} alt="" decoding="async" /> : null}
+              <Icon
+                className="workspace-nav-line-icon"
+                size={18}
+                strokeWidth={selected === item.id ? 2.35 : 1.9}
+              />
+            </span>
+            <span>{siteNavigationText(item.label, locale)}</span>
+          </Link>
+        );
       })}
     </nav>
   );

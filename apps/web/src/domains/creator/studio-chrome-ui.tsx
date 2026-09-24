@@ -1064,16 +1064,18 @@ export function StudioRailToolButton({
       )}
       {...rest}
     >
-      <Icon
-        size={STUDIO_ICON_SIZE.rail}
-        strokeWidth={STUDIO_ICON_STROKE}
-        aria-hidden
-        className={studioChromeIconClass({
-          tone: active ? "accent" : "default",
-          active,
-          disabled,
-        })}
-      />
+      <span className="studio-premium-tool-glyph" aria-hidden="true">
+        <span className="studio-premium-tool-glyph__art" />
+        <Icon
+          size={STUDIO_ICON_SIZE.rail}
+          strokeWidth={STUDIO_ICON_STROKE}
+          className={studioChromeIconClass({
+            tone: active ? "accent" : "default",
+            active,
+            disabled,
+          })}
+        />
+      </span>
       {showLabel ? <span className="min-w-0 flex-1 text-[13px] leading-snug">{localizedLabel}</span> : null}
       {grouped ? (
         <span

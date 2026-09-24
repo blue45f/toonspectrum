@@ -17,6 +17,8 @@ import { StudioCuttoonEditorPanels } from "./StudioCuttoonEditorPanels";
 import { StudioCuttoonEditorSessionDialogs } from "./StudioCuttoonEditorSessionDialogs";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
+import "./studio-cinematic-canvas-v4.css";
+
 const LazyStudioBrushWorkbenchDock = lazy(() => import("../brush/StudioBrushWorkbenchDock").then((module) => ({ default: module.StudioBrushWorkbenchDock })));
 
 const TOOL_RAIL_LAYOUT = { version: 2, xRatio: 0.02, yRatio: 0.1, width: 96, height: 720, dock: "free", positionLocked: false, sizeLocked: false } as const;
@@ -177,6 +179,7 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
         aria-label="편집 작업공간"
         tabIndex={-1}
         data-studio-mobile-canvas-workspace={isMobile ? "true" : undefined}
+        data-studio-cinematic-workspace="v4"
         className={cn(
           // Edge-dock workspace: the mobile dock overlays the scrollport instead of shrinking this
           // flex lane. StudioCanvasViewport owns the matching scroll-safe inset, so the final canvas

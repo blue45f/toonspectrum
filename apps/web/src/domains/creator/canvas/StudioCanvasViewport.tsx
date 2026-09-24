@@ -3,6 +3,7 @@ import { memo, useCallback } from "react";
 import { CANVAS_W } from "../studio-assets";
 import { StudioColorBlindFilterDefs } from "../StudioColorBlindPreview";
 
+import { StudioCinematicCanvasWelcome } from "./StudioCinematicCanvasWelcome";
 import { useStudioCanvasViewportInteraction } from "./studio-canvas-viewport-interaction";
 import { useStudioCanvasViewportLiveSurfaces } from "./studio-canvas-viewport-live-surfaces";
 import { localizeText } from "./studio-canvas-viewport-primitives";
@@ -85,6 +86,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     drawMode,
     drawShape,
     effScale,
+    elements,
     followingStudioSessionId,
     hasAutosave,
     isMobile,
@@ -395,6 +397,16 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
           zoom,
           zoomToSelection,
         })}
+
+        <StudioCinematicCanvasWelcome
+          pageKey={activePage.id}
+          visible={
+            elements.length === 0
+            && !sourceHydrationPending
+            && !workHydrationFailed
+            && !collaborationDocumentUnavailable
+          }
+        />
 
         <StudioCanvasViewportStageHost
           viewport={props}
