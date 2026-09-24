@@ -16,6 +16,7 @@ import {
 import { StudioLiveAdapterCleanupService } from "./studio-live-adapter-cleanup.service";
 import { StudioLiveCleanupNotificationDispatcher } from "./studio-live-cleanup-notification-dispatcher";
 import { StudioLiveInterServerRelayTransport } from "./studio-live-inter-server-relay-transport";
+import { STUDIO_LIVE_ACCESS_RECHECK_MS } from "./studio-live-gateway-constants";
 import { StudioLiveJoinTransitionSequencer } from "./studio-live-join-transition-sequencer";
 import { STUDIO_LIVE_LOCK_LIMIT_PER_WORK } from "./studio-live-lock.repository";
 import { StudioLiveRoomTransitionCoordinator } from "./studio-live-room-transition-coordinator";
@@ -1181,6 +1182,27 @@ describe("studio live protocol", () => {
 });
 
 describe("StudioLiveGateway", () => {
+  it("keeps the distributed lock store asleep until a local participant is active", async () => {
+    vi.useFakeTimers();
+    const lockRepository = new MemoryStudioLiveLockRepository();
+    const purgeExpired = vi.spyOn(lockRepository, "purgeExpired");
+    const harness = createHarness(undefined, undefined, undefined, lockRepository);
+    harness.gateway.afterInit(harness.namespace as unknown as Namespace);
+
+    try {
+      await vi.advanceTimersByTimeAsync(STUDIO_LIVE_ACCESS_RECHECK_MS);
+      expect(purgeExpired).not.toHaveBeenCalled();
+
+      const socket = harness.socket("idle-sweep-editor");
+      await connectAndJoin(harness, socket);
+      await vi.advanceTimersByTimeAsync(STUDIO_LIVE_ACCESS_RECHECK_MS);
+      expect(purgeExpired).toHaveBeenCalledOnce();
+    } finally {
+      harness.gateway.onModuleDestroy();
+      vi.useRealTimers();
+    }
+  });
+
   it("verifies acoustic bindings through actual joined local and remote Gateway authority",async()=>{
     let allowed=true;
     const first=createHarness(),second=createHarness(async(actor,work)=>teamSnapshot(actor,work,{view:allowed}));
