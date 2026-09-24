@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("mobile engineering hub leads to all thirty evidence-backed chapters", async ({ page }) => {
+test("mobile engineering hub leads to all thirty-one evidence-backed chapters", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/about/technology");
 
@@ -29,7 +29,7 @@ test("mobile engineering hub leads to all thirty evidence-backed chapters", asyn
 
   await page.getByRole("link", { name: "전체 제작 과정 보기" }).click();
   await expect(page).toHaveURL(/\/about\/technology\/story$/u);
-  await expect(page.locator("article[id]")).toHaveCount(30);
+  await expect(page.locator("article[id]")).toHaveCount(31);
 
   const firstDetails = page.locator("article[id] details").first();
   await firstDetails.locator("summary").click();
@@ -69,7 +69,7 @@ test("reference search and troubleshooting remain usable on mobile", async ({ pa
   await page.goto("/about/technology/references");
 
   await expect(page.getByRole("heading", { level: 1 })).toContainText("사용한 기술");
-  await expect(page.locator("[data-reference-card]")).toHaveCount(11);
+  await expect(page.locator("[data-reference-card]")).toHaveCount(13);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
 
   const incident = page.locator("#service-worker-update-race");

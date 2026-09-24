@@ -154,6 +154,7 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
     items: [
       destination("/creators", "창작자", "Creators", "창작자와 활동 살펴보기", "Explore creators and their activity"),
       destination("/home", "내 스튜디오", "My studio", "선택 작품의 공간과 목록에서 이어서 작업", "Continue your selected work in spatial or list view"),
+      destination("/onboarding/character", "캐릭터 선택", "Choose character", "서비스와 가상스튜디오에서 사용할 내 캐릭터 선택", "Choose your identity for the service and virtual studio"),
       destination("/team", "팀 작업실", "Team workspace", "작품 멤버와 채용·면접 작업실 연결", "Connect project members, hiring and interviews"),
       destination("/hub", "둘러보기", "Explore hub", "작품·소재·창작자·학습 찾기", "Find works, materials, creators and learning"),
       destination("/about/studio", "스튜디오 소개", "Studio introduction", "기존 제작 가이드와 서비스 기능 살펴보기", "Explore the preserved production guides and features"),

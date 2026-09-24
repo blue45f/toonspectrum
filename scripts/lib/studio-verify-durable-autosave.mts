@@ -186,16 +186,18 @@ async function installBridge(
           }
           if (!found) {
             // The session chunk is loaded lazily with the durable autosave runtime; before
-            // that lands, follow the StudioPage chunk's own import specifier.
-            const studioPageUrl = resourceUrls.find((url) =>
-              /\/assets\/StudioPage-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
+            // that lands, follow either editor entry chunk's own import specifier. Production
+            // bundling may fold StudioPage into the legacy adapter while preserving the same
+            // durable autosave authority.
+            const editorUrl = resourceUrls.find((url) =>
+              /\/assets\/(?:StudioPage|studio-legacy-editor-adapter)-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
             );
-            if (studioPageUrl) {
-              const source = await fetch(studioPageUrl).then((response) => response.text());
+            if (editorUrl) {
+              const source = await fetch(editorUrl).then((response) => response.text());
               const match = source.match(
                 /\.\/studio-autosave-opfs-session-[A-Za-z0-9_-]+\.js/u,
               );
-              if (match) found = new URL(match[0], studioPageUrl).href;
+              if (match) found = new URL(match[0], editorUrl).href;
             }
           }
           bridge.moduleUrl = found;
