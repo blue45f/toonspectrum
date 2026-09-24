@@ -1,4 +1,5 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
+import type { StudioVirtualCharacterCustomization } from "./studio-virtual-space-customization";
 import {
   studioVirtualArtNpcUrl,
   studioVirtualArtPlayerUrl,
@@ -112,8 +113,12 @@ export const STUDIO_CHARACTER_APPEARANCE_REGISTRY: StudioVirtualSpaceAppearanceR
   })),
 });
 
-export function studioCharacterAppearanceForAvatarIndex(index: number, identity?: string): StudioVirtualSpaceAppearance {
-  return createStudioVirtualSpaceAppearance(STUDIO_CHARACTER_APPEARANCE_REGISTRY, index, identity);
+export function studioCharacterAppearanceForAvatarIndex(
+  index: number,
+  identity?: string,
+  customization?: StudioVirtualCharacterCustomization,
+): StudioVirtualSpaceAppearance {
+  return createStudioVirtualSpaceAppearance(STUDIO_CHARACTER_APPEARANCE_REGISTRY, index, identity, customization);
 }
 
 export function resolveStudioCharacterAppearance(

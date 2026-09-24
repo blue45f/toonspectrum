@@ -1,4 +1,5 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import { studioTownLineCanTraverse, studioTownTraversalProfile } from "./studio-virtual-space-town-layout";
 import {
   studioWorldCollisionRects,
   type StudioVirtualSpaceWorldManifest,
@@ -20,7 +21,8 @@ function canOccupyWithColliders(
   point: StudioVirtualSpacePoint,
   radius: number,
 ): boolean {
-  return studioWorldCircleCanOccupy(manifest, colliders, point, radius);
+  return studioWorldCircleCanOccupy(manifest, colliders, point, radius)
+    && studioTownTraversalProfile(manifest, point).allowed;
 }
 
 export function clampStudioWorldPoint(
@@ -54,7 +56,8 @@ function lineWalkable(
   to: StudioVirtualSpacePoint,
   radius: number,
 ): boolean {
-  return studioWorldLineCanOccupy(manifest, colliders, from, to, radius);
+  return studioWorldLineCanOccupy(manifest, colliders, from, to, radius)
+    && studioTownLineCanTraverse(manifest, from, to);
 }
 
 function smoothPath(
@@ -283,7 +286,8 @@ export function findStudioWorldPath(
 
       const key = nodeKey(next.gx, next.gy);
       if (closed.has(key)) continue;
-      const tentative = currentG + Math.hypot(dx, dy);
+      const traversal = studioTownTraversalProfile(manifest, next.point);
+      const tentative = currentG + Math.hypot(dx, dy) * traversal.cost;
       if (tentative >= (gScore.get(key) ?? Number.POSITIVE_INFINITY)) continue;
 
       cameFrom.set(key, currentKey);

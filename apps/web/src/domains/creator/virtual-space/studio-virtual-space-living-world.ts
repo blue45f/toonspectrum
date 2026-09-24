@@ -1,23 +1,31 @@
 import type * as Phaser from "phaser";
 
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import type { StudioVirtualEnvironmentEffect } from "./studio-virtual-space-engine-bridge";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import {
+  STUDIO_TOWN_WATERFALLS,
+  studioTownTraversalProfile,
+} from "./studio-virtual-space-town-layout";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 
-export type StudioVirtualTerrainKind = "grass" | "path" | "stone" | "shallow-water";
+export type StudioVirtualTerrainKind = "grass" | "path" | "stone" | "bridge" | "boardwalk" | "shallow-water";
 
 export interface StudioVirtualTerrainProfile {
   readonly kind: StudioVirtualTerrainKind;
   readonly speedMultiplier: number;
   readonly dragMultiplier: number;
   readonly footprint: "dust" | "leaf" | "ripple" | "spark";
+  readonly walkable: boolean;
 }
 
 const TERRAIN: Readonly<Record<StudioVirtualTerrainKind, StudioVirtualTerrainProfile>> = Object.freeze({
-  grass: { kind: "grass", speedMultiplier: 0.92, dragMultiplier: 1.08, footprint: "leaf" },
-  path: { kind: "path", speedMultiplier: 1, dragMultiplier: 1, footprint: "dust" },
-  stone: { kind: "stone", speedMultiplier: 0.97, dragMultiplier: 1.02, footprint: "dust" },
-  "shallow-water": { kind: "shallow-water", speedMultiplier: 0.62, dragMultiplier: 1.5, footprint: "ripple" },
+  grass: { kind: "grass", speedMultiplier: 0.38, dragMultiplier: 1.8, footprint: "leaf", walkable: false },
+  path: { kind: "path", speedMultiplier: 1, dragMultiplier: 1, footprint: "dust", walkable: true },
+  stone: { kind: "stone", speedMultiplier: 0.97, dragMultiplier: 1.02, footprint: "dust", walkable: true },
+  bridge: { kind: "bridge", speedMultiplier: 0.92, dragMultiplier: 1.08, footprint: "dust", walkable: true },
+  boardwalk: { kind: "boardwalk", speedMultiplier: 0.9, dragMultiplier: 1.1, footprint: "dust", walkable: true },
+  "shallow-water": { kind: "shallow-water", speedMultiplier: 0.62, dragMultiplier: 1.5, footprint: "ripple", walkable: true },
 });
 
 const WATER_PATCHES = Object.freeze([
@@ -29,27 +37,17 @@ function inRect(point: StudioVirtualSpacePoint, rect: { readonly x: number; read
     && point.y >= rect.y && point.y <= rect.y + rect.height;
 }
 
-function distanceToSegment(point: StudioVirtualSpacePoint, from: StudioVirtualSpacePoint, to: StudioVirtualSpacePoint): number {
-  const vx = to.x - from.x;
-  const vy = to.y - from.y;
-  const lengthSquared = vx * vx + vy * vy;
-  if (lengthSquared <= 0.0001) return Math.hypot(point.x - from.x, point.y - from.y);
-  const t = Math.max(0, Math.min(1, ((point.x - from.x) * vx + (point.y - from.y) * vy) / lengthSquared));
-  return Math.hypot(point.x - (from.x + vx * t), point.y - (from.y + vy * t));
-}
-
 export function studioVirtualTerrainAt(
-  manifest: Pick<StudioVirtualSpaceWorldManifest, "rooms">,
+  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "rooms">,
   point: StudioVirtualSpacePoint,
 ): StudioVirtualTerrainProfile {
   if (WATER_PATCHES.some((patch) => inRect(point, patch))) return TERRAIN["shallow-water"];
-  if (manifest.rooms.some((room) => inRect(point, room))) return TERRAIN.stone;
-  const hubs = manifest.rooms.map((room) => ({ x: room.x + room.width / 2, y: room.y + room.height / 2 }));
-  const onPath = hubs.some((from, index) => hubs.slice(index + 1).some((to) => {
-    const aligned = Math.abs(from.x - to.x) < 36 || Math.abs(from.y - to.y) < 36;
-    return aligned && distanceToSegment(point, from, to) < 24;
-  }));
-  return onPath ? TERRAIN.path : TERRAIN.grass;
+  const profile = studioTownTraversalProfile(manifest, point);
+  if (profile.kind === "room") return TERRAIN.stone;
+  if (profile.kind === "bridge") return TERRAIN.bridge;
+  if (profile.kind === "boardwalk") return TERRAIN.boardwalk;
+  if (profile.kind === "garden" || profile.kind === "stone") return TERRAIN.path;
+  return TERRAIN.grass;
 }
 
 export type StudioVirtualDayPhase = "dawn" | "day" | "dusk" | "night";
@@ -68,6 +66,10 @@ export interface StudioLivingWorldTextureKeys {
   readonly foliage: string;
   readonly lights: string;
   readonly weather: string;
+  readonly pathOverlay: string;
+  readonly waterfall: string;
+  readonly waterfallSplash: string;
+  readonly interactionFx: string;
 }
 
 interface AmbientActor {
@@ -91,10 +93,16 @@ export class StudioLivingWorldRuntime {
   private readonly foliage: readonly Phaser.GameObjects.Sprite[];
   private readonly lights: readonly Phaser.GameObjects.Sprite[];
   private readonly weather: readonly Phaser.GameObjects.Sprite[];
+  private readonly pathOverlay: Phaser.GameObjects.Image;
+  private readonly waterfalls: readonly Phaser.GameObjects.Sprite[];
+  private readonly waterfallSplashes: readonly Phaser.GameObjects.Sprite[];
+  private readonly activeEffects: Phaser.GameObjects.Sprite[] = [];
+  private readonly interactionFxKey: string;
   private readonly dayNight: Phaser.GameObjects.Rectangle;
   private readonly ambientActors: readonly AmbientActor[];
   private readonly footsteps: FootstepMark[] = [];
   private lastFootstepAt = -Infinity;
+  private lanternBoostUntil = -Infinity;
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -102,10 +110,19 @@ export class StudioLivingWorldRuntime {
     private readonly style: StudioVirtualArtStyleKey,
     keys: StudioLivingWorldTextureKeys,
   ) {
+    this.interactionFxKey = keys.interactionFx;
     this.cloudBack = scene.add.tileSprite(0, 0, manifest.width, manifest.height, keys.cloudBack)
       .setOrigin(0).setScrollFactor(0.76).setDepth(-998).setAlpha(style === "neon" ? 0.26 : 0.52);
     this.cloudFront = scene.add.tileSprite(0, 0, manifest.width, manifest.height, keys.cloudFront)
       .setOrigin(0).setScrollFactor(1.08).setDepth(39_500).setAlpha(style === "ink" ? 0.2 : 0.18);
+    this.pathOverlay = scene.add.image(0, 0, keys.pathOverlay).setOrigin(0).setDisplaySize(manifest.width, manifest.height)
+      .setDepth(-889).setAlpha(style === "neon" ? .72 : .88);
+    this.waterfalls = STUDIO_TOWN_WATERFALLS.map((waterfall) => scene.add.sprite(
+      waterfall.top.x, waterfall.top.y + waterfall.height / 2, keys.waterfall, 0,
+    ).setDisplaySize(waterfall.width * 1.65, waterfall.height).setDepth(-860).setAlpha(.96));
+    this.waterfallSplashes = STUDIO_TOWN_WATERFALLS.map((waterfall) => scene.add.sprite(
+      waterfall.bottom.x, waterfall.bottom.y, keys.waterfallSplash, 0,
+    ).setDisplaySize(waterfall.width * 2.2, 42).setDepth(waterfall.bottom.y + 840).setAlpha(.9));
     this.water = WATER_PATCHES.map((patch, index) => scene.add.sprite(
       patch.x + patch.width / 2,
       patch.y + patch.height / 2,
@@ -149,11 +166,17 @@ export class StudioLivingWorldRuntime {
     this.cloudFront.tilePositionY += Math.cos(time * 0.00011) * dt * 0.0012;
     const motionTime = reducedMotion ? 0 : time;
     const frame = reducedMotion ? 0 : Math.floor(time / 170) % 4;
+    const waterfallFrame = reducedMotion ? 0 : Math.floor(time / 92) % 8;
+    this.pathOverlay.setAlpha(this.style === "neon" ? .72 : .84 + Math.sin(motionTime * .0008) * (reducedMotion ? 0 : .04));
+    this.waterfalls.forEach((sprite, index) => sprite.setFrame((waterfallFrame + index) % 8));
+    this.waterfallSplashes.forEach((sprite, index) => sprite.setFrame((waterfallFrame + index * 2) % 8)
+      .setScale(1 + Math.sin(motionTime * .003 + index) * (reducedMotion ? 0 : .04), 1));
     this.water.forEach((sprite, index) => sprite.setFrame((frame + index) % 4));
     this.foliage.forEach((sprite, index) => sprite.setFrame((frame + index) % 4)
       .setScale(1 + Math.sin(motionTime * 0.0015 + index) * (reducedMotion ? 0 : 0.018), 1));
+    const lightBoost = time < this.lanternBoostUntil ? .28 : 0;
     this.lights.forEach((sprite, index) => sprite.setFrame((frame + index) % 4)
-      .setAlpha(reducedMotion ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24));
+      .setAlpha(Math.min(1, (reducedMotion ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost)));
     this.weather.forEach((sprite, index) => {
       sprite.setFrame((frame + index) % 4);
       sprite.x -= dt * (this.style === "neon" || this.style === "ink" ? 0.045 : 0.015);
@@ -172,7 +195,46 @@ export class StudioLivingWorldRuntime {
       const distance = Math.hypot(actor.body.x - focus.x, actor.body.y - focus.y);
       actor.body.setAlpha(distance < 160 ? 0.28 : 0.8);
     });
+    for (let index = this.activeEffects.length - 1; index >= 0; index -= 1) {
+      const effect = this.activeEffects[index]!;
+      const bornAt = Number(effect.getData("bornAt") ?? time);
+      const progress = Math.max(0, Math.min(1, (time - bornAt) / 920));
+      effect.setFrame(Math.min(7, Math.floor(progress * 8))).setAlpha(1 - progress * .45);
+      if (progress >= 1) { effect.destroy(); this.activeEffects.splice(index, 1); }
+    }
     this.updateFootsteps(time, reducedMotion ? 0 : speed);
+  }
+
+  triggerEnvironmentEffect(effect: StudioVirtualEnvironmentEffect, point: StudioVirtualSpacePoint, time: number): void {
+    if (effect === "lanterns") this.lanternBoostUntil = time + 5_000;
+    const sprite = this.scene.add.sprite(point.x, point.y - 12, this.interactionFxKey, 0)
+      .setDisplaySize(effect === "gong" ? 180 : effect === "photo" ? 150 : 126, effect === "photo" ? 150 : 126)
+      .setDepth(Math.round(point.y) + 2_200)
+      .setBlendMode(effect === "waterfall-splash" ? "NORMAL" : "ADD")
+      .setData("bornAt", time);
+    this.activeEffects.push(sprite);
+    const color = effect === "waterfall-splash" ? 0x9cecff
+      : effect === "petals" || effect === "pet" ? 0xffa5cd
+        : effect === "lanterns" ? 0xffdf7d
+          : effect === "gong" ? 0xffc857 : 0xd7c5ff;
+    const count = effect === "photo" ? 6 : effect === "gong" ? 18 : 12;
+    for (let index = 0; index < count; index += 1) {
+      const angle = index / count * Math.PI * 2;
+      const particle = this.scene.add.circle(point.x, point.y - 8, effect === "pet" ? 4 : 3, color, .85)
+        .setDepth(Math.round(point.y) + 2_201);
+      this.scene.tweens.add({
+        targets: particle,
+        x: point.x + Math.cos(angle) * (effect === "gong" ? 95 : 54),
+        y: point.y - 8 + Math.sin(angle) * (effect === "waterfall-splash" ? 22 : 54),
+        alpha: 0,
+        scale: effect === "gong" ? 2.2 : .4,
+        duration: effect === "gong" ? 900 : 680,
+        ease: "Cubic.easeOut",
+        onComplete: () => particle.destroy(),
+      });
+    }
+    if (effect === "photo") this.scene.cameras.main.flash(170, 255, 248, 224, false);
+    if (effect === "waterfall-splash" || effect === "gong") this.scene.cameras.main.shake(100, effect === "gong" ? .003 : .0015);
   }
 
   emitFootstep(point: StudioVirtualSpacePoint, terrain: StudioVirtualTerrainProfile, time: number): void {
@@ -204,6 +266,10 @@ export class StudioLivingWorldRuntime {
   destroy(): void {
     this.cloudBack.destroy();
     this.cloudFront.destroy();
+    this.pathOverlay.destroy();
+    this.waterfalls.forEach((item) => item.destroy());
+    this.waterfallSplashes.forEach((item) => item.destroy());
+    this.activeEffects.forEach((item) => item.destroy());
     this.water.forEach((item) => item.destroy());
     this.foliage.forEach((item) => item.destroy());
     this.lights.forEach((item) => item.destroy());

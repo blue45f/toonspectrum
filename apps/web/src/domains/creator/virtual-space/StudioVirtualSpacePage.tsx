@@ -95,6 +95,15 @@ import {
   writeStudioVirtualArtStyle,
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
+import { StudioVirtualSpaceCustomizationPanel } from "./StudioVirtualSpaceCustomizationPanel";
+import {
+  readStudioVirtualCharacterCustomization,
+  readStudioVirtualDecorationState,
+  writeStudioVirtualCharacterCustomization,
+  writeStudioVirtualDecorationState,
+  type StudioVirtualCharacterCustomization,
+  type StudioVirtualDecorationState,
+} from "./studio-virtual-space-customization";
 import {
   StudioVirtualSpacePhaserCanvas,
   type StudioVirtualSpaceEngineLocalState,
@@ -648,6 +657,18 @@ export function VirtualSpaceExperience({
     setArtStyle(next);
     writeStudioVirtualArtStyle(next);
   }, []);
+  const [characterCustomization, setCharacterCustomization] = useState<StudioVirtualCharacterCustomization>(
+    () => readStudioVirtualCharacterCustomization(),
+  );
+  const selectCharacterCustomization = useCallback((next: StudioVirtualCharacterCustomization) => {
+    setCharacterCustomization(next);
+    writeStudioVirtualCharacterCustomization(next);
+  }, []);
+  const [decorations, setDecorations] = useState<StudioVirtualDecorationState>(() => readStudioVirtualDecorationState());
+  const selectDecorations = useCallback((next: StudioVirtualDecorationState) => {
+    setDecorations(next);
+    writeStudioVirtualDecorationState(next);
+  }, []);
   const [moving, setMoving] = useState(false);
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
@@ -911,11 +932,15 @@ export function VirtualSpaceExperience({
       room.participant,
       room.direct,
       selfRef.current,
-      { appearanceForAvatarIndex: studioCharacterAppearanceForAvatarIndex, worldScope: publishedScope },
+      {
+        appearanceForAvatarIndex: (index, identity) => studioCharacterAppearanceForAvatarIndex(index, identity, characterCustomization),
+        worldScope: publishedScope,
+      },
     );
     clearLocalReactionTimer();
     controllerRef.current = controller;
     controller.setAvatarIndex(selfRef.current.avatarIndex);
+    controller.setAppearance?.(studioCharacterAppearanceForAvatarIndex(selfRef.current.avatarIndex, fallbackIdentity, characterCustomization));
     const refresh = () => setSnapshot(controller.snapshot());
     const unsubscribe = controller.subscribe(refresh);
     controller.start();
@@ -925,7 +950,16 @@ export function VirtualSpaceExperience({
       controller.close();
       if (controllerRef.current === controller) controllerRef.current = null;
     };
-  }, [authoringMode, clearLocalReactionTimer, connectivity.serverAvailable, live.availability, live.room, worldReady, publishedScope, sharedWorldAllowed]);
+  }, [authoringMode, characterCustomization, clearLocalReactionTimer, connectivity.serverAvailable, fallbackIdentity,
+    live.availability, live.room, worldReady, publishedScope, sharedWorldAllowed]);
+
+  useEffect(() => {
+    const appearance = studioCharacterAppearanceForAvatarIndex(avatarIndex, fallbackIdentity, characterCustomization);
+    controllerRef.current?.setAppearance?.(appearance);
+    const nextSelf = Object.freeze({ ...selfRef.current, avatarIndex, appearance });
+    selfRef.current = nextSelf;
+    setSnapshot((current) => ({ ...current, self: nextSelf }));
+  }, [avatarIndex, characterCustomization, fallbackIdentity]);
 
   const updatePosition = useCallback((
     point: StudioVirtualSpacePoint,
@@ -1061,8 +1095,13 @@ export function VirtualSpaceExperience({
     });
     if (decision.kind === "world-rule") worldRuleGate.request(decision.interaction);
     else if (decision.kind === "panel") setWorkspacePanel(decision.panel);
-    else navigate(decision.href);
-  }, [navigate, operations.snapshot.project?.aggregate.projectId, pendingInteraction, projectId, worldRuleGate]);
+    else if (decision.kind === "effect") {
+      engineBridge.requestEnvironmentEffect(decision.effect, interaction.point);
+      if (decision.effect === "wish" || decision.effect === "gong") controllerRef.current?.sendReaction("sparkles");
+      if (decision.effect === "pet") controllerRef.current?.sendReaction("heart");
+      setSocialNotice(bt("상호작용 이펙트를 실행했어요.", "Interaction effect activated."));
+    } else navigate(decision.href);
+  }, [bt, engineBridge, navigate, operations.snapshot.project?.aggregate.projectId, pendingInteraction, projectId, worldRuleGate]);
 
   const followingPeer = followingPeerId
     ? snapshot.peers.find((peer) => peer.participant.sessionId === followingPeerId) ?? null
@@ -1377,6 +1416,7 @@ export function VirtualSpaceExperience({
                   debugWorld={authoringMode}
                   atmosphere={activity === "focused" || activity === "away" ? "focus" : atmosphere}
                   artStyle={artStyle}
+                  decorations={decorations}
                   onNpcInteract={handleEngineNpcInteract}
                   onLocalState={handleEngineLocalState}
                   onInteract={handleEngineInteract}
@@ -1597,6 +1637,13 @@ export function VirtualSpaceExperience({
                   ))}
                 </div>
               </fieldset>
+            <StudioVirtualSpaceCustomizationPanel
+              character={characterCustomization}
+              decorations={decorations}
+              selfPoint={snapshot.self}
+              onCharacter={selectCharacterCustomization}
+              onDecorations={selectDecorations}
+            />
             <details><summary>{bt("방별 작업 바로가기", "Room work shortcuts")}</summary>
             {worldReady ? <div className="workspace-live-room-links">
               {worldManifest.rooms.map((room) => (

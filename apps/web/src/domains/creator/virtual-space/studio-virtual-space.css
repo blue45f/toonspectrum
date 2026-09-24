@@ -719,3 +719,23 @@
 .studio-vspace-npc-portrait img{display:block;width:100%;height:100%;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 4px 4px rgb(0 0 0/.32))}
 .studio-vspace-npc-portrait{overflow:hidden;background:radial-gradient(circle at 50% 30%,rgb(255 255 255/.24),transparent 64%),linear-gradient(145deg,rgb(75 188 234/.2),rgb(144 93 241/.2))}
 .studio-vspace-npc-portrait img{display:block;width:100%;height:100%;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 4px 4px rgb(0 0 0/.32))}
+
+/* Gather-inspired living town: readable paths, proximity affordances and safe customization. */
+.studio-vspace-customization{display:grid;gap:.8rem;margin-top:.8rem}
+.studio-vspace-customization>header{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.studio-vspace-customization>header p{margin:0;color:var(--color-accent);font-size:.56rem;font-weight:950;letter-spacing:.14em}
+.studio-vspace-customization>header h2{margin:.18rem 0 0;font-size:.84rem;font-weight:950}
+.studio-vspace-customization fieldset{display:grid;gap:.45rem;border:1px solid var(--vs2-line);border-radius:.85rem;padding:.65rem;background:rgb(255 255 255/.025)}
+.studio-vspace-customization legend{padding:0 .25rem;color:var(--vs2-fg);font-size:.64rem;font-weight:900}
+.studio-vspace-customization fieldset>p{margin:0;color:var(--vs2-muted);font-size:.58rem;line-height:1.5}
+.studio-vspace-customization-options,.studio-vspace-customization-presets,.studio-vspace-customization-catalog{display:flex;flex-wrap:wrap;gap:.35rem}
+.studio-vspace-customization button{min-height:2.1rem;border:1px solid var(--vs2-line);border-radius:.65rem;padding:.28rem .55rem;background:var(--vs2-panel-2);color:var(--vs2-muted);font-size:.58rem;font-weight:850}
+.studio-vspace-customization button:hover,.studio-vspace-customization button:focus-visible{border-color:var(--color-accent);color:var(--vs2-fg)}
+.studio-vspace-customization button[aria-pressed="true"]{border-color:var(--color-accent);background:var(--color-accent-soft);color:var(--color-accent)}
+.studio-vspace-customization button[data-nameplate="rose"][aria-pressed="true"]{border-color:#ff8fbd;color:#ffb9d4}
+.studio-vspace-customization button[data-nameplate="sky"][aria-pressed="true"]{border-color:#70d4ff;color:#aee9ff}
+.studio-vspace-customization button[data-nameplate="amber"][aria-pressed="true"]{border-color:#f7bf56;color:#ffdc96}
+.studio-vspace-customization-placed{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.3rem;margin-top:.45rem}
+.studio-vspace-customization-placed button{display:flex;align-items:center;justify-content:space-between;text-align:left}
+.studio-vspace-stage[data-studio-virtual-space="true"]{background:linear-gradient(180deg,#68bff3,#c3eaff)}
+@media(max-width:640px){.studio-vspace-customization-placed{grid-template-columns:1fr}}

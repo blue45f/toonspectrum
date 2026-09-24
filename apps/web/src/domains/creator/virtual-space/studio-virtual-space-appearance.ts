@@ -1,3 +1,12 @@
+import {
+  DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION,
+  STUDIO_VIRTUAL_ACCESSORY_KEYS,
+  STUDIO_VIRTUAL_AURA_KEYS,
+  STUDIO_VIRTUAL_NAMEPLATE_KEYS,
+  STUDIO_VIRTUAL_TRAIL_KEYS,
+  type StudioVirtualCharacterCustomization,
+} from "./studio-virtual-space-customization";
+
 /** Presentation hints only. These values never authorize media, seats, or collaboration actions. */
 export const STUDIO_VIRTUAL_SPACE_APPEARANCE_CLIPS = Object.freeze([
   "idle", "walk-down", "walk-left", "walk-right", "walk-up", "talk", "draw", "review", "wave", "sit",
@@ -9,6 +18,10 @@ export interface StudioVirtualSpaceAppearance {
   readonly skinKey: string;
   readonly registryRevision: string;
   readonly capabilities: readonly StudioVirtualSpaceAppearanceClip[];
+  readonly accessoryKey?: StudioVirtualCharacterCustomization["accessoryKey"];
+  readonly auraKey?: StudioVirtualCharacterCustomization["auraKey"];
+  readonly trailKey?: StudioVirtualCharacterCustomization["trailKey"];
+  readonly nameplateKey?: StudioVirtualCharacterCustomization["nameplateKey"];
 }
 
 /** Supplied by the local, bundled registry. Remote packets cannot extend this registry. */
@@ -33,10 +46,14 @@ export interface StudioVirtualSpaceResolvedAppearance {
   readonly clip: StudioVirtualSpaceAppearanceClip;
   readonly capabilities: readonly StudioVirtualSpaceAppearanceClip[];
   readonly source: "stable-key" | "legacy-index";
+  readonly accessoryKey: StudioVirtualCharacterCustomization["accessoryKey"];
+  readonly auraKey: StudioVirtualCharacterCustomization["auraKey"];
+  readonly trailKey: StudioVirtualCharacterCustomization["trailKey"];
+  readonly nameplateKey: StudioVirtualCharacterCustomization["nameplateKey"];
   readonly issues: readonly StudioVirtualSpaceAppearanceIssue[];
 }
 
-const APPEARANCE_KEYS = new Set(["skinKey", "registryRevision", "capabilities"]);
+const APPEARANCE_KEYS = new Set(["skinKey", "registryRevision", "capabilities", "accessoryKey", "auraKey", "trailKey", "nameplateKey"]);
 const TOKEN = /^[a-z0-9][a-z0-9_-]{0,63}$/u;
 const MAX_ADVERTISED_CAPABILITIES = 16;
 
@@ -57,10 +74,20 @@ export function parseStudioVirtualSpaceAppearance(value: unknown): StudioVirtual
   // into the runtime, including tokens that resemble permissions such as camera or seat-owner.
   const advertised = candidate.capabilities;
   const capabilities = STUDIO_VIRTUAL_SPACE_APPEARANCE_CLIPS.filter((clip) => advertised.includes(clip));
+  const optionalToken = <T extends readonly string[]>(values: T, value: unknown): T[number] | undefined =>
+    typeof value === "string" && (values as readonly string[]).includes(value) ? value as T[number] : undefined;
+  if ((candidate.accessoryKey !== undefined && optionalToken(STUDIO_VIRTUAL_ACCESSORY_KEYS, candidate.accessoryKey) === undefined)
+    || (candidate.auraKey !== undefined && optionalToken(STUDIO_VIRTUAL_AURA_KEYS, candidate.auraKey) === undefined)
+    || (candidate.trailKey !== undefined && optionalToken(STUDIO_VIRTUAL_TRAIL_KEYS, candidate.trailKey) === undefined)
+    || (candidate.nameplateKey !== undefined && optionalToken(STUDIO_VIRTUAL_NAMEPLATE_KEYS, candidate.nameplateKey) === undefined)) return null;
   return Object.freeze({
     skinKey: candidate.skinKey,
     registryRevision: candidate.registryRevision,
     capabilities: Object.freeze(capabilities),
+    ...(candidate.accessoryKey ? { accessoryKey: optionalToken(STUDIO_VIRTUAL_ACCESSORY_KEYS, candidate.accessoryKey) } : {}),
+    ...(candidate.auraKey ? { auraKey: optionalToken(STUDIO_VIRTUAL_AURA_KEYS, candidate.auraKey) } : {}),
+    ...(candidate.trailKey ? { trailKey: optionalToken(STUDIO_VIRTUAL_TRAIL_KEYS, candidate.trailKey) } : {}),
+    ...(candidate.nameplateKey ? { nameplateKey: optionalToken(STUDIO_VIRTUAL_NAMEPLATE_KEYS, candidate.nameplateKey) } : {}),
   });
 }
 
@@ -85,12 +112,17 @@ export function createStudioVirtualSpaceAppearance(
   registry: StudioVirtualSpaceAppearanceRegistry,
   avatarIndex: number,
   identity?: string,
+  customization: StudioVirtualCharacterCustomization = DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION,
 ): StudioVirtualSpaceAppearance {
   const skin = legacySkin(registry, avatarIndex, identity);
   const appearance = parseStudioVirtualSpaceAppearance({
     skinKey: skin.key,
     registryRevision: registry.revision,
     capabilities: skin.capabilities,
+    accessoryKey: customization.accessoryKey,
+    auraKey: customization.auraKey,
+    trailKey: customization.trailKey,
+    nameplateKey: customization.nameplateKey,
   });
   if (!appearance) throw new Error("Virtual Studio appearance registry contains invalid presentation identifiers");
   return appearance;
@@ -132,6 +164,10 @@ export function resolveStudioVirtualSpaceAppearance(
     clip,
     capabilities: Object.freeze(capabilities),
     source,
+    accessoryKey: appearance?.accessoryKey ?? DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION.accessoryKey,
+    auraKey: appearance?.auraKey ?? DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION.auraKey,
+    trailKey: appearance?.trailKey ?? DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION.trailKey,
+    nameplateKey: appearance?.nameplateKey ?? DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION.nameplateKey,
     issues: Object.freeze(issues),
   });
 }

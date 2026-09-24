@@ -1,3 +1,4 @@
+import type { StudioVirtualEnvironmentEffect } from "./studio-virtual-space-engine-bridge";
 import type { StudioSpatialActionId } from "./studio-virtual-space-spatial-actions";
 import type { StudioWorldInteractionDefinition } from "./studio-virtual-space-world-manifest";
 
@@ -5,6 +6,7 @@ export type StudioVirtualWorkspacePanel = "people" | "space" | "search" | "work"
 export type StudioSpatialInteractionDecision =
   | { readonly kind: "world-rule"; readonly interaction: StudioWorldInteractionDefinition }
   | { readonly kind: "panel"; readonly panel: StudioVirtualWorkspacePanel }
+  | { readonly kind: "effect"; readonly effect: StudioVirtualEnvironmentEffect }
   | { readonly kind: "route"; readonly href: string };
 
 export interface StudioSpatialInteractionContext {
@@ -21,6 +23,17 @@ const panelByAction: Partial<Record<StudioSpatialActionId, StudioVirtualWorkspac
   huddle: "people",
   "team-hub": "team",
   "today-board": "today",
+  "open-customization": "space",
+});
+
+const effectByAction: Partial<Record<StudioSpatialActionId, StudioVirtualEnvironmentEffect>> = Object.freeze({
+  "waterfall-splash": "waterfall-splash",
+  "make-wish": "wish",
+  "take-photo": "photo",
+  "release-petals": "petals",
+  "toggle-lanterns": "lanterns",
+  "pet-animal": "pet",
+  "ring-gong": "gong",
 });
 
 /**
@@ -32,6 +45,8 @@ export function orchestrateStudioSpatialInteraction(
   context: StudioSpatialInteractionContext,
 ): StudioSpatialInteractionDecision {
   if (action === "primary") return { kind: "world-rule", interaction: context.interaction };
+  const effect = effectByAction[action];
+  if (effect) return { kind: "effect", effect };
   const panel = panelByAction[action];
   if (panel) return { kind: "panel", panel };
   const project = encodeURIComponent(context.projectId);
