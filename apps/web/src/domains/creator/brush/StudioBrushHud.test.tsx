@@ -95,11 +95,11 @@ describe("StudioBrushHud", () => {
     revealHud(host);
     const hud = screen.getByRole("toolbar", { name: "브러시 HUD" });
     expect(hud.dataset.studioShortcutBoundary).toBe("true");
-    expect(screen.getByRole("slider", { name: "브러시 크기" })).toHaveProperty(
+    expect(screen.getByRole("slider", { name: "캔버스 브러시 크기" })).toHaveProperty(
       "ariaValueText",
       "12px"
     );
-    expect(screen.getByRole("slider", { name: "브러시 불투명도" })).toHaveProperty(
+    expect(screen.getByRole("slider", { name: "캔버스 브러시 불투명도" })).toHaveProperty(
       "ariaValueText",
       "80%"
     );
@@ -155,12 +155,12 @@ describe("StudioBrushHud", () => {
     const bag = handlers();
     const { host } = renderHud({}, bag);
     revealHud(host);
-    fireEvent.keyDown(screen.getByRole("slider", { name: "브러시 크기" }), {
+    fireEvent.keyDown(screen.getByRole("slider", { name: "캔버스 브러시 크기" }), {
       key: "ArrowRight",
     });
     expect(bag.onStrokeWidthChange).toHaveBeenCalledWith(13);
 
-    fireEvent.keyDown(screen.getByRole("slider", { name: "브러시 불투명도" }), {
+    fireEvent.keyDown(screen.getByRole("slider", { name: "캔버스 브러시 불투명도" }), {
       key: "ArrowLeft",
     });
     expect(bag.onOpacityChange).toHaveBeenCalledWith(0.79);
