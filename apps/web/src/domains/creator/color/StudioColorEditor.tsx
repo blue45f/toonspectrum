@@ -1,4 +1,5 @@
 import { StudioColorSwatches } from "./StudioColorSwatches";
+import { StudioToolHintTarget } from "../StudioToolHint";
 import { Copy, Pipette } from "lucide-react";
 import { lazy, Suspense, useEffect, useLayoutEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { getTintsAndShades } from "../studio-color-harmony-engine";
@@ -12,6 +13,7 @@ import { StudioColorHarmoniesPanel } from "../StudioColorHarmoniesPanel";
 import { StudioWebtoonCelShadePanel } from "../StudioWebtoonCelShadePanel";
 import type { StudioColorSession } from "./studio-color-session";
 import type { StudioPalette } from "../studio-color-palettes";
+import { studioPaletteFamilyHint } from "../studio-color-popover-hints";
 
 const PaletteLibrary = lazy(() => import("../StudioPaletteLibraryPanel").then((module) => ({ default: module.StudioPaletteLibraryPanel })));
 const tabs = [{ id: "select", label: "선택" }, { id: "palettes", label: "팔레트" }, { id: "harmony", label: "배색" }] as const;
@@ -65,6 +67,7 @@ export function StudioColorEditor({ session, onChange: publishRaw, onGestureComm
   const recent = useMemo(() => uniqueColors(recentColors), [recentColors]);
   const authored = useMemo(() => uniqueColors(documentColors), [documentColors]);
   const shades = useMemo(() => uniqueColors(getTintsAndShades(session.color, 9)), [session.color]);
+  const activePalette = palettes.find((palette) => palette.id === paletteId) ?? palettes[0];
   useLayoutEffect(() => { ownerRef.current = session.targetKey; gestureRef.current = null; }, [session.targetKey]);
   useEffect(() => { aliveRef.current = true; return () => { aliveRef.current = false; }; }, []);
   useEffect(() => {
@@ -171,9 +174,14 @@ export function StudioColorEditor({ session, onChange: publishRaw, onGestureComm
           <summary className="min-h-9 cursor-pointer text-xs font-semibold">추천 팔레트</summary>
           {paletteFailure ? <p role="alert" className="text-xs text-warn">추천 팔레트를 불러오지 못했습니다. <button type="button" className={button} onClick={() => setPaletteRetry((value) => value + 1)}>다시 불러오기</button></p>
             : !palettes.length ? <p role="status" className="text-xs">추천 팔레트를 불러오는 중…</p> : <>
-              <select aria-label="추천 팔레트 종류" value={paletteId || palettes[0]?.id} className={`${button} mb-2 w-full bg-card`}
-                onChange={(event) => setPaletteId(event.currentTarget.value)}>{palettes.map((palette) => <option key={palette.id} value={palette.id}>{palette.label}</option>)}</select>
-              {swatches("추천 색", (palettes.find((palette) => palette.id === paletteId) ?? palettes[0])?.colors ?? [])}
+              {activePalette ? <StudioToolHintTarget
+                hint={studioPaletteFamilyHint(activePalette.label, activePalette.tip, activePalette.id)}
+                preferredSide="bottom" className="w-full"
+              >
+                <select aria-label="추천 팔레트 종류" value={activePalette.id} className={`${button} mb-2 w-full bg-card`}
+                  onChange={(event) => setPaletteId(event.currentTarget.value)}>{palettes.map((palette) => <option key={palette.id} value={palette.id}>{palette.label}</option>)}</select>
+              </StudioToolHintTarget> : null}
+              {swatches("추천 색", activePalette?.colors ?? [])}
             </>}
         </details>
         <section aria-label="내 팔레트" className="space-y-2">
