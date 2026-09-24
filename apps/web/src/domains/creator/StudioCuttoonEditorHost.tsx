@@ -1191,16 +1191,8 @@ import {
   type StudioToolOperationMemory,
 } from "./studio-tool-operation-memory";
 import { openStudioToolsCompanionForMenu } from "./studio-tools-companion-runtime";
-import {
-  hasStudioUnloadPromptWork,
-  installStudioUnloadGuard,
-  studioPendingStrokeFingerprint,
-} from "./studio-unsaved-work-guard";
-import {
-  refreshStudioUpdateSafety,
-  registerStudioUpdateSafetySource,
-  type StudioUpdateSafetySourceSnapshot,
-} from "./studio-update-safety";
+import { hasStudioUnloadPromptWork, installStudioUnloadGuard, studioPendingStrokeFingerprint } from "./studio-unsaved-work-guard";
+import { useStudioEditorUpdateSafety } from "./use-studio-editor-update-safety";
 import {
   planStudioVectorEraseToIntersectionApply,
   STUDIO_ERASE_TO_INTERSECTION_LABEL,
@@ -11612,52 +11604,7 @@ export function StudioCuttoonEditor({
       hasUnsavedWork: () => studioUnsavedWorkRef.hasUnsavedStudioWorkNow(),
     });
   }, [studioUnsavedWorkRef, unloadGuardArmed]);
-  const studioUpdateSafetyRef = useStudioStableHandlers<{
-    snapshot: () => StudioUpdateSafetySourceSnapshot;
-  }>({
-    snapshot: () => {
-      if (documentSaveInFlightRef.current) {
-        return {
-          safe: false,
-          reason: "save-in-progress",
-          message: "원고 저장 영수증을 기다리는 중입니다. 저장이 끝난 뒤 업데이트해 주세요.",
-        };
-      }
-      if (studioUnsavedWorkRef.hasUnsavedStudioWorkNow()) {
-        return {
-          safe: false,
-          reason: "unsaved-work",
-          message: "마지막 편집 또는 획이 아직 기기의 내구 저장소에 반영되지 않았습니다.",
-        };
-      }
-      if (collaborationOperationSyncPending || pendingExternalWorkspaceSync !== null) {
-        return {
-          safe: false,
-          reason: "sync-pending",
-          pendingCount: collaborationOperationSyncPending ? 1 : 0,
-          message: collaborationOperationSyncPending
-            ? "공동 편집 변경의 서버 승인 경계가 준비되지 않았습니다. 동기화가 끝난 뒤 업데이트해 주세요."
-            : "다른 창의 작업공간 변경을 확인하는 중입니다. 반영 또는 유지 결정을 마친 뒤 업데이트해 주세요.",
-        };
-      }
-      return { safe: true };
-    },
-  });
-  useLayoutEffect(() => registerStudioUpdateSafetySource(
-    `studio-editor:${autosaveKey}`,
-    () => studioUpdateSafetyRef.snapshot(),
-  ), [autosaveKey, studioUpdateSafetyRef]);
-  useEffect(() => {
-    refreshStudioUpdateSafety();
-  }, [
-    collaborationOperationSyncPending,
-    master,
-    pages,
-    pendingExternalWorkspaceSync,
-    studioUpdateSafetyRef,
-    toolOperationMemoryPersistenceDirty,
-    workHydrated,
-  ]);
+  useStudioEditorUpdateSafety(`studio-editor:${autosaveKey}`, () => documentSaveInFlightRef.current, studioUnsavedWorkRef.hasUnsavedStudioWorkNow, collaborationOperationSyncPending, pendingExternalWorkspaceSync !== null);
   // ── 픽셀 선택 도구(포토샵식 마퀴/올가미) — studio-selection-tools 통합 상태 ──
   // 선택 영역·도구는 "이미지 요소 1개"에 귀속된다(요소가 바뀌면 아래 effect 가 해제).
   const [advancedFillActive, setAdvancedFillActive] = useState(false);
@@ -26163,10 +26110,7 @@ function clearSelectionForEdit() {
     effectiveScale: effScale,
     pageGrade,
     title,
-    exportRevision:
-      loadedWork?.revision
-      ?? sharedDocument?.revision
-      ?? studioRevisionProjectGenerationRef.current,
+    exportRevision: loadedWork?.revision ?? sharedDocument?.revision ?? studioRevisionProjectGenerationRef.current,
     ensureSharedDocumentAvailableForExport,
     ensureWatermarkLoaded,
     captureReadyStageForPage,
