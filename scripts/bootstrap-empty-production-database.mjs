@@ -516,6 +516,7 @@ DROP TABLE IF EXISTS
   public.admin_content_reports,
   public.admin_promos,
   public.admin_security_policies,
+  public.creator_work_publication_media,
   public.creator_work_asset_storage_reference,
   public.creator_asset_storage_object,
   public.creator_marketplace_library_item,
@@ -723,6 +724,7 @@ BEGIN
       AND relation.relname NOT IN (
         'creator_asset_storage_object',
         'creator_work_asset_storage_reference',
+        'creator_work_publication_media',
         'toonspectrum_schema_migration'
       )
     ORDER BY relation.relname

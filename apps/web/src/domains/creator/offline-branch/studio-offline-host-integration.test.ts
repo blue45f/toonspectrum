@@ -66,33 +66,45 @@ function drawingPage(elements: DrawEl[]): PageState {
 }
 
 describe("studio offline host integration", () => {
-  it("mirrors only an owned pending-stroke delete plus induced order changes", () => {
+  it("delegates pending-stroke mirror admission to the lazy offline runtime", () => {
     const before = [drawingPage([stroke("remote-a"), stroke("local-pending"), stroke("remote-b")])];
     const after = [drawingPage([stroke("remote-a"), stroke("remote-b")])];
+    const canMirrorPendingStrokeTransition = vi.fn(() => true);
+    const runtime = {
+      offlineBranch: { canMirrorPendingStrokeTransition },
+    } as unknown as StudioCrdtSceneGraphRuntime;
 
     expect(canMirrorStudioOfflinePendingStrokeTransition(
-      before, after, ["local-pending"],
+      runtime,
+      before,
+      after,
+      ["local-pending"],
     )).toBe(true);
+    expect(canMirrorPendingStrokeTransition).toHaveBeenCalledWith(
+      before,
+      after,
+      ["local-pending"],
+    );
   });
 
-  it("mirrors redo of the exact pending stroke but rejects an unrelated payload edit", () => {
-    const without = [drawingPage([stroke("remote-a"), stroke("remote-b")])];
-    const restored = [drawingPage([
-      stroke("remote-a"),
-      stroke("local-pending"),
-      stroke("remote-b"),
-    ])];
-    expect(canMirrorStudioOfflinePendingStrokeTransition(
-      without, restored, ["local-pending"],
-    )).toBe(true);
+  it("keeps mirror admission closed without a lazy runtime approval", () => {
+    const before = [drawingPage([stroke("remote-a"), stroke("local-pending")])];
+    const after = [drawingPage([stroke("remote-a")])];
+    const runtime = {
+      offlineBranch: { canMirrorPendingStrokeTransition: () => false },
+    } as unknown as StudioCrdtSceneGraphRuntime;
 
-    const editedRemote = [drawingPage([
-      { ...stroke("remote-a"), strokeWidth: 12 },
-      stroke("local-pending"),
-      stroke("remote-b"),
-    ])];
     expect(canMirrorStudioOfflinePendingStrokeTransition(
-      restored, editedRemote, ["local-pending"],
+      runtime,
+      before,
+      after,
+      ["local-pending"],
+    )).toBe(false);
+    expect(canMirrorStudioOfflinePendingStrokeTransition(
+      null,
+      before,
+      after,
+      ["local-pending"],
     )).toBe(false);
   });
 
@@ -158,7 +170,11 @@ describe("studio offline host integration", () => {
     const previousPages = [page("이전")];
     const nextPages = [page("다음")];
     const reportNotice = vi.fn();
-    const stageSceneTransition = vi.fn(() => true);
+    const stageSceneTransition = vi.fn(() => ({
+      staged: true,
+      operations: 1,
+      unsupported: [],
+    }));
     const runtime = {
       offlineBranch: {
         shouldStageSceneTransition: () => true,
@@ -179,7 +195,11 @@ describe("studio offline host integration", () => {
   it("accepts an idempotent no-op when the CRDT frontier already contains the local commit", () => {
     const previousPages = [page("이미 확정")];
     const reportNotice = vi.fn();
-    const stageSceneTransition = vi.fn(() => false);
+    const stageSceneTransition = vi.fn(() => ({
+      staged: false,
+      operations: 0,
+      unsupported: [],
+    }));
     const runtime = {
       offlineBranch: {
         shouldStageSceneTransition: () => true,
@@ -200,7 +220,11 @@ describe("studio offline host integration", () => {
     const runtime = {
       offlineBranch: {
         shouldStageSceneTransition: () => true,
-        stageSceneTransition: () => false,
+        stageSceneTransition: () => ({
+          staged: false,
+          operations: 1,
+          unsupported: ["transition rejected"],
+        }),
       },
     } as unknown as StudioCrdtSceneGraphRuntime;
 

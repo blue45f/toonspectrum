@@ -1,7 +1,19 @@
 import { expect, test } from "./fixtures/non-studio-test";
 
+import type { Locator } from "@playwright/test";
+
 const backup = { _app: "toonspectrum-library", version: 1, ratings: { "isolated-work": 4.5 }, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
 const reference = { id: 'kmas:["id","non-studio-control-fixture"]', title: "검증용 가상 작품", subtitle: "테스트 데이터", writer: "검증용 작가", illustrator: "검증용 작가", publisher: "검증용 출판사", platform: "", genre: "테스트", age: "전체연령", isbn: "", outline: "테스트용 줄거리" };
+
+async function expectReadableSolidControl(locator: Locator): Promise<void> {
+  await expect(locator).toBeVisible();
+  const colors = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { foreground: style.color, background: style.backgroundColor };
+  });
+  expect(colors.background).not.toBe("rgba(0, 0, 0, 0)");
+  expect(colors.foreground).not.toBe(colors.background);
+}
 
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 900 });
@@ -16,6 +28,41 @@ test.beforeEach(async ({ page }) => {
       await route.fulfill({ status: 503, json: { message: "Isolated browser outage fixture" } });
     }
   });
+});
+
+test("workspace primary controls keep their explicit foreground colors", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  await page.goto("/sitemap");
+  await expectReadableSolidControl(page.getByRole("link", { name: "새 프로젝트", exact: true }));
+  await expectReadableSolidControl(page.getByRole("link", { name: "제보·제안", exact: true }));
+
+  await page.goto("/events");
+  await expectReadableSolidControl(page.getByRole("link", { name: "이벤트 보기", exact: true }));
+
+  await page.goto("/events/beta-open");
+  const signupButtons = page.getByRole("button", { name: "가입하고 6개월 무료 받기", exact: true });
+  await expect(signupButtons).toHaveCount(2);
+  await expectReadableSolidControl(signupButtons.first());
+  await expectReadableSolidControl(signupButtons.last());
+
+  await page.goto("/membership/usage");
+  await expectReadableSolidControl(page.getByRole("link", { name: "설정으로 이동", exact: true }));
+
+  await page.goto("/membership");
+  await expectReadableSolidControl(page.getByRole("link", { name: "내 설정 보기", exact: true }));
+
+  await page.goto("/about/workflow");
+  await expectReadableSolidControl(page.getByRole("link", { name: "내 작업으로 이동", exact: true }));
+
+  await page.goto("/accessibility");
+  await expectReadableSolidControl(page.getByRole("button", { name: "포커스 확인 버튼", exact: true }));
+
+  await page.goto("/studio/engines");
+  await expectReadableSolidControl(page.getByRole("link", { name: "작업 큐 열기", exact: true }));
+
+  await page.goto("/studio/toolchain");
+  await expectReadableSolidControl(page.getByRole("link", { name: "제작 작업 시작", exact: true }));
 });
 
 test.describe("mobile campus map keyboard focus", () => {

@@ -11,12 +11,16 @@ export function CoverImage({
   fallback,
   className,
   priority,
+  sizes,
+  srcSet,
 }: {
   src: string;
   alt: string;
   fallback?: React.ReactNode;
   className?: string;
   priority?: boolean; // above-the-fold 커버는 즉시 로드(LCP 개선)
+  sizes?: string;
+  srcSet?: string;
 }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -27,6 +31,8 @@ export function CoverImage({
   return (
     <img
       src={src}
+      srcSet={srcSet}
+      sizes={sizes}
       alt={alt}
       loading={priority ? "eager" : "lazy"}
       fetchPriority={priority ? "high" : undefined}

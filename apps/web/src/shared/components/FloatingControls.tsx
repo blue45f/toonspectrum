@@ -1,11 +1,12 @@
 import { useFx } from "@toonspectrum/core/fx";
 import { Moon, Settings2, Sun, Volume2, VolumeX, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AppearanceTrigger } from "./appearance/AppearanceTrigger";
+import { LanguagePicker } from "./LanguagePicker";
 
 import { cx } from "@/shared/lib/cx";
-import { getLanguageOptions, useI18n, useT } from "@/shared/lib/i18n";
+import { useI18n, useT } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 
 /**
@@ -77,13 +78,6 @@ export function FloatingControls({
   const t = useT();
   const lang = useI18n((s) => s.lang);
   const setLang = useI18n((s) => s.setLang);
-  const languageGroups = useMemo(() => {
-    const options = getLanguageOptions(lang);
-    return {
-      translated: options.filter((option) => option.fullyTranslated),
-      automatic: options.filter((option) => !option.fullyTranslated),
-    };
-  }, [lang]);
   const fx = useFx();
   const soundOn = fx.audio.sfxEnabled && !fx.audio.muted;
 
@@ -175,33 +169,14 @@ export function FloatingControls({
 
       {showTheme && <AppearanceTrigger className={cx(PILL, "border-line text-fg-2 hover:text-fg")} />}
 
-      {/* 언어 선택 — 전 세계 언어 카탈로그와 안전한 영어 폴백을 제공합니다. */}
+      {/* 닫힌 상태에는 현재 언어만 남기고 전체 카탈로그는 검색할 때만 지연 렌더한다. */}
       {showLang && (
-        <div
-          className="inline-flex h-[44px] items-center gap-1 rounded-full border border-line bg-panel/95 p-0.5 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur"
-        >
-          <select
-            aria-label={t("control.language.label")}
-            value={lang}
-            onChange={(event) => setLang(event.target.value)}
-            className="h-[44px] min-h-[44px] max-w-[14rem] rounded-full bg-transparent px-2 py-2 text-xs font-semibold text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/35"
-          >
-            <optgroup label={t("control.language.group.translated")}>
-              {languageGroups.translated.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {option.label}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label={t("control.language.group.englishBase")}>
-              {languageGroups.automatic.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {option.label}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-        </div>
+        <LanguagePicker
+          value={lang}
+          onChange={setLang}
+          ariaLabel={t("control.language.label")}
+          triggerClassName="rounded-full bg-panel/95 shadow-lg shadow-[oklch(0.1_0.02_70/0.35)] backdrop-blur"
+        />
       )}
     </>
   );
@@ -220,6 +195,8 @@ export function FloatingControls({
       {/* 펼친 행 — 무동작 시 흐려지며 물러나고(hover/focus/근접 시 복귀).
           접힘형은 데스크톱(md+)에서 보이고, static 배치는 항상 보인다. */}
       <div
+        aria-hidden={!visible || undefined}
+        inert={!visible || undefined}
         className={cx(
           "items-center gap-2 transition-[opacity,transform] duration-500 ease-out",
           collapsible ? "hidden md:flex" : "flex",

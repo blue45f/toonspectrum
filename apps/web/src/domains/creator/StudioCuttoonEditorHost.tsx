@@ -151,23 +151,18 @@ import { studioCreationLinkParams } from "./creator-studio-links";
 import type { StudioAppSettings } from "./studio-app-settings";
 import { createStudioAssetLibraryMutations } from "./studio-cuttoon-editor/studio-asset-library-mutations";
 import {
-  appendStudioRetainedStrokeRealtimeHistoryRange,
-  discardStudioRetainedStrokeRedo,
-  prepareStudioPendingStrokeCommitPage,
-  restoreStudioRetainedStrokeCommitBatch,
-  resumeStudioRetainedStrokeHistory,
-  studioRetainedStrokeRealtimeIdsForRedo,
-  studioRetainedStrokeRealtimeIdsForUndo,
-  truncateStudioRetainedStrokeRealtimeHistoryRanges,
+  discardStudioRetainedStrokeRedo, prepareStudioPendingStrokeCommitPage,
+  restoreStudioRetainedStrokeCommitBatch, resumeStudioRetainedStrokeHistory,
   undoStudioRetainedStrokeHistory,
-  type StudioRetainedStrokeRealtimeHistoryRange,
 } from "./studio-retained-stroke-history";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import {
-  createStudioDeferredStrokeCommitEngine,
+  commitStudioDeferredStrokeBatch, createStudioDeferredStrokeCommitEngine,
 } from "./studio-cuttoon-editor/studio-deferred-stroke-commit";
 import { useStudioPixelToolSessions } from "./studio-cuttoon-editor/studio-pixel-tool-sessions";
+import { createStudioCrdtTransitionPublisher } from "./studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher";
 import { useStudioCrdtRuntime } from "./studio-cuttoon-editor/runtime/useStudioCrdtRuntime";
+import { useStudioRetainedStrokeRealtimeHistory } from "./studio-cuttoon-editor/runtime/useStudioRetainedStrokeRealtimeHistory";
 import { useStudioHydrationRuntime } from "./studio-cuttoon-editor/runtime/useStudioHydrationRuntime";
 import { useStudioLiveSessionRuntime } from "./studio-cuttoon-editor/runtime/useStudioLiveSessionRuntime";
 import {
@@ -939,7 +934,6 @@ import { insertBlankPageAt } from "./studio-pages";
 import {
   appendStudioPagesHistorySnapshot,
   createStudioLifecycleEmergencyAutosave,
-  mergeStudioPendingStrokeElements,
 } from "./studio-pending-stroke-durability";
 import type { PerspectiveRay, VanishingPoint } from "./studio-perspective-guide";
 import {
@@ -4098,9 +4092,7 @@ export function StudioCuttoonEditor({
     retryCount: number;
     historyIndex: number;
   } | null>(null);
-  const pendingStrokeRealtimeHistoryRangesRef = useRef<
-    readonly StudioRetainedStrokeRealtimeHistoryRange[]
-  >([]);
+  const pendingStrokeRealtimeHistory = useStudioRetainedStrokeRealtimeHistory();
   const deferredStrokePostprocessClientRef = useRef<StudioStrokePostprocessWorkerClient | null>(null);
   const deferredStrokePostprocessControllersRef = useRef<Map<string, AbortController>>(new Map());
   useEffect(() => () => {
@@ -11481,11 +11473,7 @@ export function StudioCuttoonEditor({
     return true;
   }
   function invalidatePendingRetainedRedo(): void {
-    pendingStrokeRealtimeHistoryRangesRef.current =
-      truncateStudioRetainedStrokeRealtimeHistoryRanges(
-        pendingStrokeRealtimeHistoryRangesRef.current,
-        pagesHiRef.current,
-      );
+    pendingStrokeRealtimeHistory.truncate(pagesHiRef.current);
     if (discardStudioRetainedStrokeRedo(
       pendingUndoneStrokeCommitsRef,
       (ids) => liveRetainedMediaOverlayRendererRef.current.discardHiddenSettledStrokes(ids),
@@ -16099,64 +16087,16 @@ const puppetWarpArmed =
     tr.getLayer()?.batchDraw();
   }, [activeSurfaceReviewLocked, selectedId, marqueeIds, tool, elements, groups]);
 
-  function publishStudioCrdtSceneTransition(
-    previousPages: readonly PageState[],
-    nextPages: readonly PageState[],
-    registerNewDraws = true,
-    offlineRealtimeStrokeIds: readonly string[] = [],
-  ): boolean {
-    const document = studioCrdtDocumentRef.current;
-    const runtime = studioCrdtSceneRuntimeRef.current;
-    const stagedOffline = studioOfflineHost.stageStudioOfflineSceneTransition(
-      runtime, previousPages, nextPages, setStatusNotice);
-    const mirrorOfflinePendingStroke = stagedOffline === true
-      && studioOfflineHost.canMirrorStudioOfflinePendingStrokeTransition(
-        previousPages,
-        nextPages,
-        offlineRealtimeStrokeIds,
-      );
-    if (stagedOffline !== null && !mirrorOfflinePendingStroke) return stagedOffline;
-    if (!document && !runtime) return true;
-    if (!document || !runtime) return false;
-    try {
-      if (STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED && studioAuthUserId) {
-        runtime.publishRasterHistoryTransition({
-          document,
-          previousPages,
-          nextPages,
-          actorId: studioAuthUserId,
-        });
-      }
-      runtime.publish(
-        document,
-        previousPages,
-        nextPages,
-        { registerNewDraws }
-      );
-      return true;
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? `실시간 장면 동기화: ${cause.message}`
-          : "장면 요소와 페이지 순서를 팀 문서에 반영하지 못했습니다."
-      );
-      return false;
-    }
-  }
+  const { publishHistoryTransition: publishStudioCrdtHistoryTransition,
+    publishSceneTransition: publishStudioCrdtSceneTransition } =
+    createStudioCrdtTransitionPublisher({
+    actorId: studioAuthUserId,
+    automaticRasterPublicationEnabled: STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED,
+    getDocument: () => studioCrdtDocumentRef.current,
+    getRuntime: () => studioCrdtSceneRuntimeRef.current,
+      reportError: setError, reportNotice: setStatusNotice,
+    });
   publishStudioCrdtSceneTransitionRef.current = publishStudioCrdtSceneTransition;
-
-  function publishStudioCrdtHistoryTransition(
-    previousPages: readonly PageState[],
-    nextPages: readonly PageState[],
-    offlineRealtimeStrokeIds: readonly string[] = [],
-  ): boolean {
-    return publishStudioCrdtSceneTransition(
-      previousPages,
-      nextPages,
-      false,
-      offlineRealtimeStrokeIds,
-    );
-  }
 
   // The commit engine owns synchronous history and canonical-surface handoff outside the compiler boundary.
   const {
@@ -16230,12 +16170,7 @@ const puppetWarpArmed =
     batch: Parameters<typeof expandDeferredStrokeCommitHistoryBase>[0],
   ): void => {
     expandDeferredStrokeCommitHistoryBase(batch);
-    pendingStrokeRealtimeHistoryRangesRef.current =
-      appendStudioRetainedStrokeRealtimeHistoryRange(
-        pendingStrokeRealtimeHistoryRangesRef.current,
-        batch.strokes.map((stroke) => stroke.id),
-        pagesHiRef.current,
-      );
+    pendingStrokeRealtimeHistory.recordBatch(batch, pagesHiRef.current);
   };
   useEffect(() => {
     const sampleId = params.get("sample");
@@ -16307,27 +16242,10 @@ const puppetWarpArmed =
       let baseElements: El[] = [];
       if (targetPage && !masterEditMode) {
         baseElements = targetPage.elements;
-        const committedElements = mergeStudioPendingStrokeElements(
-          baseElements,
-          batch.strokes,
-        );
-        committed = commit(committedElements, undefined, batch.pageId);
-        if (committed) {
-          const document = studioCrdtDocumentRef.current;
-          try {
-            for (const stroke of batch.strokes) {
-              if (document?.getStroke(stroke.id, true)?.status === "drawing") {
-                document.finalizeStroke(stroke.id);
-              }
-            }
-          } catch (cause) {
-            setError(
-              cause instanceof Error
-                ? `실시간 획 확정: ${cause.message}`
-                : "실시간 획을 최종 상태로 확정하지 못했습니다.",
-            );
-          }
-        }
+        committed = commitStudioDeferredStrokeBatch({
+          baseElements, batch, commit,
+          document: studioCrdtDocumentRef.current, reportError: setError,
+        });
       }
       if (!committed) {
         // Never drop the only authoritative copy merely because a save/lock/scope transition
@@ -18218,12 +18136,7 @@ const puppetWarpArmed =
       });
       return;
     }
-    const pendingBeforeUndo = pendingStrokeCommitsRef.current
-      ? {
-          strokeIds: pendingStrokeCommitsRef.current.strokes.map((stroke) => stroke.id),
-          strokeCount: pendingStrokeCommitsRef.current.strokes.length,
-        }
-      : null;
+    const pendingBeforeUndo = pendingStrokeCommitsRef.current;
     if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) {
       // 잠금·저장 중이라 히스토리에 못 넣는 배치는 예전 계약대로 폐기가 유일한 되돌림이다.
       discardPendingStrokeCommitsRef.current();
@@ -18256,17 +18169,9 @@ const puppetWarpArmed =
     const undoBasePages = undoHistory[undoIndex] ?? pages;
     const nextIndex = Math.max(0, undoIndex - 1);
     const nextSnapshot = undoHistory[nextIndex];
-    const flushedPendingStrokeIds = pendingBeforeUndo
-      && pendingStrokeCommitsRef.current === null
-      && pendingBeforeUndo.strokeCount > 0
-      ? pendingBeforeUndo.strokeIds
-      : [];
-    const offlineRealtimeStrokeIds = flushedPendingStrokeIds.length > 0
-      ? flushedPendingStrokeIds
-      : studioRetainedStrokeRealtimeIdsForUndo(
-          pendingStrokeRealtimeHistoryRangesRef.current,
-          undoIndex,
-        );
+    const offlineRealtimeStrokeIds = pendingStrokeRealtimeHistory.idsForUndo(
+      pendingBeforeUndo, pendingStrokeCommitsRef.current, undoIndex,
+    );
     if (nextSnapshot && !publishStudioCrdtHistoryTransition(
       undoBasePages,
       nextSnapshot,
@@ -18360,10 +18265,8 @@ const puppetWarpArmed =
     setAdvancedFillStatus(null);
     const nextIndex = Math.min(pagesHistory.length - 1, pagesHi + 1);
     const nextSnapshot = pagesHistory[nextIndex];
-    const offlineRealtimeStrokeIds = studioRetainedStrokeRealtimeIdsForRedo(
-      pendingStrokeRealtimeHistoryRangesRef.current,
-      pagesHi,
-      nextIndex,
+    const offlineRealtimeStrokeIds = pendingStrokeRealtimeHistory.idsForRedo(
+      pagesHi, nextIndex,
     );
     if (nextSnapshot && !publishStudioCrdtHistoryTransition(
       pages,
@@ -24398,7 +24301,9 @@ const puppetWarpArmed =
       return;
     }
     await runStudioPageSavePipeline(status, {
-      studioAuthUserId, workId, remixId, loggedIn, autosaveKey,
+      studioAuthUserId, workId, remixId,
+      sourceProjectId: studioRoute.projectId, sourceDocumentId: studioRoute.documentId,
+      loggedIn, autosaveKey,
       linkedTitleId, linkedSeriesId, linkedChallengeId, location,
       navigate: studioReviewCaptureSaveNavigation(navigate, workId, options?.preserveEditor),
       currentStudioDocumentScopeRef, editorMountedRef,

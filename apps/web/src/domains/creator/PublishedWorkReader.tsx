@@ -118,6 +118,8 @@ function PagedPublishedWorkReader({
                 pageIndex,
                 pages.length,
               )}
+              priority={pageIndex === 0}
+              sizes="(max-width: 960px) calc(100vw - 1.5rem), 896px"
               className="max-h-[78vh] max-w-full rounded-lg object-contain shadow-lg"
               fallback={
                 <span className="grid aspect-[3/4] w-full max-w-xl place-items-center rounded-lg bg-raised/40 text-xs text-fg-3">

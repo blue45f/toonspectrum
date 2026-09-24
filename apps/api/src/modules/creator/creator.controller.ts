@@ -36,6 +36,7 @@ import {
   CreatorWorkListQueryDto,
   CreatorWorkPageMediaParamsDto,
   CreatorWorkParamsDto,
+  CreatorWorkReadQueryDto,
   CreatorWorkRevisionListParamsDto,
   CreatorWorkRevisionListQueryDto,
   CreatorWorkRevisionParamsDto,
@@ -80,8 +81,15 @@ export class CreatorController {
 
   @Get("/creator/works/:id")
   @Header("Cache-Control", "no-store, max-age=0")
-  async getWork(@Param("id") id: string, @Headers("x-user-id") userId?: string) {
-    return this.creatorService.getWork(id, userId || undefined);
+  async getWork(
+    @Param(new ZodValidationPipe(CreatorWorkParamsDto)) params: CreatorWorkParamsDto,
+    @Query(new ZodValidationPipe(CreatorWorkReadQueryDto)) query: CreatorWorkReadQueryDto,
+    @Headers("x-user-id") userId?: string,
+  ) {
+    return this.creatorService.getWork(
+      params.id,
+      query.publicPreview ? undefined : userId || undefined,
+    );
   }
 
   @Get("/creator/works/:id/media/cover/:digest")

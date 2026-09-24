@@ -168,6 +168,7 @@ test("generated verification covers runtime capabilities and exact migration che
     "runtime database role retains migration schema or ledger privileges",
     "creator_asset_storage_object",
     "creator_work_asset_storage_reference",
+    "creator_work_publication_media",
     "has_column_privilege",
     "has_schema_privilege",
     "has_table_privilege",

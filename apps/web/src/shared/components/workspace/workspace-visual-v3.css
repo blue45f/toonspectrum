@@ -42,10 +42,10 @@
 .workspace-nav-visual-art{position:absolute;inset:0;background-image:var(--workspace-nav-art,var(--workspace-scene-art));background-size:cover;background-position:center;filter:saturate(1.25) contrast(1.08);opacity:.58;transform:scale(1.14);transition:transform .4s ease,opacity .25s ease}
 .workspace-nav-visual::after{content:"";position:absolute;inset:0;background:linear-gradient(145deg,rgba(6,8,20,.18),rgba(7,9,22,.76))}
 .workspace-nav-visual>svg{position:relative;z-index:1;filter:drop-shadow(0 3px 8px rgba(0,0,0,.65))}
-.workspace-nav a[data-navigation-entry="workspace-home"]{--workspace-nav-art:url('/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-research-lab-vertical-depth/background.png')}
-.workspace-nav a[data-navigation-entry="studio"]{--workspace-nav-art:url('/assets/studio/generated-backgrounds/gpt25-v1/fantasy/gpt25-bg-fantasy-dragon-cliff-vertical-depth/background.png')}
-.workspace-nav a[data-navigation-entry="workspace-team"]{--workspace-nav-art:url('/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-boardroom-vertical-depth/background.png')}
-.workspace-nav a[data-navigation-entry="workspace-hub"]{--workspace-nav-art:url('/assets/studio/generated-backgrounds/gpt25-v1/romance/gpt25-bg-romance-ferris-wheel-vertical-depth/background.png')}
+.workspace-nav a[data-navigation-entry="workspace-home"]{--workspace-nav-art:url('/brand/toonstudio-premium-icons/home.webp')}
+.workspace-nav a[data-navigation-entry="studio"]{--workspace-nav-art:url('/brand/toonstudio-premium-icons/canvas.webp')}
+.workspace-nav a[data-navigation-entry="workspace-team"]{--workspace-nav-art:url('/brand/toonstudio-premium-icons/projects.webp')}
+.workspace-nav a[data-navigation-entry="workspace-hub"]{--workspace-nav-art:url('/brand/toonstudio-premium-icons/community.webp')}
 .workspace-sidebar .workspace-nav a:hover{border-color:rgba(170,181,255,.28);background:rgba(255,255,255,.035);transform:translateY(-2px)}
 .workspace-sidebar .workspace-nav a:hover .workspace-nav-visual-art{transform:scale(1.25);opacity:.8}
 .workspace-sidebar .workspace-nav a[aria-current="page"]{border-color:color-mix(in srgb,var(--color-accent) 52%,transparent);background:linear-gradient(145deg,color-mix(in srgb,var(--color-accent) 18%,transparent),rgba(255,255,255,.025));color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.035),0 14px 28px rgba(2,3,14,.2)}
@@ -107,3 +107,14 @@
 }
 @media(prefers-reduced-motion:reduce){.workspace-shell *,.workspace-focused-shell *{animation:none!important;transition:none!important;scroll-behavior:auto!important}.campus-room-media>img{transform:none!important}}
 @media(forced-colors:active){.workspace-shell,.workspace-focused-shell{background:Canvas;color:CanvasText}.workspace-shell::before,.workspace-shell::after,.workspace-focused-shell::before,.workspace-focused-shell::after,.campus-room-aurora,.campus-room-media::after{display:none}.workspace-nav-visual,.campus-room,.campus-room-destinations a,.campus-toolbar{border:1px solid CanvasText;background:Canvas}.workspace-nav-visual-art{display:none}}
+
+/* Premium generated navigation glyphs — direct art with a restrained line fallback. */
+.workspace-nav-visual-art{background-size:118%;background-repeat:no-repeat;filter:blur(8px) saturate(1.5);opacity:.24;transform:scale(.9)}
+.workspace-nav-visual>img{position:relative;z-index:2;width:38px;height:38px;object-fit:contain;filter:saturate(1.42) drop-shadow(0 0 8px rgba(118,103,255,.55));transition:transform .28s cubic-bezier(.2,.8,.2,1),filter .22s ease}
+.workspace-nav-line-icon{position:absolute!important;right:5px!important;bottom:5px!important;z-index:3!important;width:13px!important;height:13px!important;padding:2px;border:1px solid rgba(255,255,255,.18);border-radius:5px;background:rgba(7,9,22,.76);opacity:.72;filter:drop-shadow(0 2px 5px rgba(0,0,0,.8))!important}
+.workspace-nav-visual::after{background:radial-gradient(circle at 50% 42%,rgba(255,255,255,.06),transparent 48%),linear-gradient(145deg,rgba(6,8,20,.08),rgba(7,9,22,.46))}
+.workspace-sidebar .workspace-nav a:hover .workspace-nav-visual>img{transform:translateY(-2px) scale(1.09) rotate(-2deg);filter:saturate(1.58) drop-shadow(0 0 12px rgba(118,103,255,.72))}
+.workspace-sidebar .workspace-nav a[aria-current="page"] .workspace-nav-visual>img{transform:scale(1.08);filter:saturate(1.62) drop-shadow(0 0 14px rgba(118,103,255,.82))}
+@media(max-width:760px){.workspace-nav-visual>img{width:28px;height:28px}.workspace-nav-line-icon{right:2px!important;bottom:2px!important;width:10px!important;height:10px!important;padding:1px}}
+@media(forced-colors:active){.workspace-nav-visual>img,.workspace-nav-line-icon{display:none!important}}
+.workspace-nav-visual>img+.workspace-nav-line-icon{display:none}

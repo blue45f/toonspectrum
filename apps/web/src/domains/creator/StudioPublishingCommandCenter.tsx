@@ -31,7 +31,10 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { buildStudioHref } from "./creator-studio-links";
-import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import {
+  confirmStudioDestructiveAction,
+  recordStudioDestructiveOutcome,
+} from "./studio-destructive-action-preview";
 import { studioDiscardLocalChangesRequest } from "./studio-destructive-command-catalog";
 import { downscaleDataUrl, downscaleImageFile } from "./studio-image-utils";
 import {
@@ -47,6 +50,12 @@ import {
   inspectStudioUploadSourceImage,
   selectStudioUploadDecodedPixelLimit,
 } from "./studio-upload-image-safety";
+import {
+  formatStudioUploadBytes,
+  studioDataUrlByteLength,
+  summarizeStudioUploadConversion,
+  type StudioUploadImageSourceMetadata,
+} from "./studio-upload-conversion";
 import {
   STUDIO_UPLOAD_ACTION_DOCK_CLASS,
   STUDIO_UPLOAD_CONTAINER_CLASS,
@@ -115,6 +124,7 @@ import {
   type CreatorPublicationDirective,
   type CreatorPublicationWorkStatus,
 } from "@/shared/lib/creator-publication-contract";
+import { readCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
 import { cn } from "@/shared/lib/utils";
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
@@ -132,10 +142,18 @@ type UploadPage = {
   width: number;
   height: number;
   name: string;
+  source: StudioUploadImageSourceMetadata | null;
+  outputByteLength: number | null;
+  outputFormat: "webp" | "stored";
 };
 
 type CommandStep = "content" | "distribution" | "review";
 type SaveIntent = "draft" | "publish";
+type PublishHandoffContext = {
+  id: string;
+  pageCount: number;
+  sourceWorkId: string | null;
+};
 
 const COMMAND_STEPS: readonly {
   id: CommandStep;
@@ -214,6 +232,7 @@ export function StudioPublishingCommandCenter({
     typeof window === "undefined" ? null : window.location.hostname,
   );
   const workId = resolveStudioUploadWorkId(routeWorkId, params.get("id"));
+  const handoffId = params.get("handoff");
   const publishResult = parseStudioPublishResultKind(params.get("result"));
   const routeSeriesId = params.get("seriesId");
   const routeChallengeId = params.get("challengeId");
@@ -232,10 +251,15 @@ export function StudioPublishingCommandCenter({
   const [linkedChallengeId, setLinkedChallengeId] = useState<string | null>(routeChallengeId);
   const [linkedTitleId, setLinkedTitleId] = useState<string | null>(routeTitleId);
   const [saving, setSaving] = useState(false);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  const [handoffLoading, setHandoffLoading] = useState(false);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [handoffContext, setHandoffContext] = useState<PublishHandoffContext | null>(null);
   const [publishContext, setPublishContext] = useState<PublishContext>({});
   const [hydrationStatus, setHydrationStatus] = useState<StudioUploadHydrationStatus>(
     workId ? "loading" : "ready",
@@ -249,7 +273,9 @@ export function StudioPublishingCommandCenter({
   const currentScopeRef = useRef<StudioUploadCurrentScope>({ authUserId, workId });
   const committedScopeRef = useRef<StudioUploadCurrentScope>({ authUserId, workId });
   const publishAbortRef = useRef<AbortController | null>(null);
+  const recoveryAbortRef = useRef<AbortController | null>(null);
   const publishRequestIdRef = useRef(0);
+  const handoffGenerationRef = useRef(0);
   currentScopeRef.current = { authUserId, workId };
 
   const currentScope = { authUserId, workId };
@@ -267,8 +293,8 @@ export function StudioPublishingCommandCenter({
     currentScope,
     hydratedScope,
     hydrationStatus,
-    saving,
-    loadingFiles,
+    saving: saving || recoveryBusy,
+    loadingFiles: loadingFiles || handoffLoading,
   });
   const { mutationLocked, publishLocked } = resolveStudioUploadActionLocks({
     workId,
@@ -296,8 +322,11 @@ export function StudioPublishingCommandCenter({
     return () => {
       mountedRef.current = false;
       publishRequestIdRef.current += 1;
+      handoffGenerationRef.current += 1;
       publishAbortRef.current?.abort();
       publishAbortRef.current = null;
+      recoveryAbortRef.current?.abort();
+      recoveryAbortRef.current = null;
     };
   }, []);
 
@@ -328,7 +357,11 @@ export function StudioPublishingCommandCenter({
     publishRequestIdRef.current += 1;
     publishAbortRef.current?.abort();
     publishAbortRef.current = null;
+    recoveryAbortRef.current?.abort();
+    recoveryAbortRef.current = null;
     setSaving(false);
+    setRecoveryBusy(false);
+    setRecoveryError(null);
     setLoadingFiles(false);
     if (resetDraft) {
       setStep("content");
@@ -416,6 +449,9 @@ export function StudioPublishingCommandCenter({
               typeof meta?.name === "string" && meta.name.trim()
                 ? meta.name
                 : `${index + 1}페이지`,
+            source: null,
+            outputByteLength: studioDataUrlByteLength(src),
+            outputFormat: "stored" as const,
           };
         });
         const existingDirective = readCreatorPublicationDirective(loadedDoc);
@@ -463,6 +499,117 @@ export function StudioPublishingCommandCenter({
       });
     return () => controller.abort();
   }, [authUserId, hydrationAttempt, workId]);
+
+  useEffect(() => {
+    const generation = handoffGenerationRef.current + 1;
+    handoffGenerationRef.current = generation;
+    if (!handoffId) {
+      setHandoffLoading(false);
+      setHandoffError(null);
+      setHandoffContext(null);
+      return;
+    }
+    if (workId && hydrationStatus === "error") {
+      setHandoffLoading(false);
+      return;
+    }
+    if (workId && (hydrationStatus !== "ready" || !hydrationScopeCurrent)) {
+      setHandoffLoading(true);
+      return;
+    }
+
+    if (!workId) {
+      setStep("content");
+      setPages([]);
+      setTitle("");
+      setDescription("");
+      setTagsText("");
+      setDirective(initialDirective());
+      setBaseDoc({});
+      setLinkedSeriesId(routeSeriesId);
+      setLinkedChallengeId(routeChallengeId);
+      setLinkedTitleId(routeTitleId);
+      setDirty(false);
+      setError(null);
+      setSuccessMessage(null);
+    }
+    setPublisherConfirmed(false);
+    setHandoffLoading(true);
+    setHandoffError(null);
+    setHandoffContext(null);
+
+    void import("./studio-publish-handoff")
+      .then(({ loadStudioPublishHandoffAsUploadPages }) =>
+        loadStudioPublishHandoffAsUploadPages(handoffId),
+      )
+      .then((loaded) => {
+        if (
+          handoffGenerationRef.current !== generation ||
+          !mountedRef.current ||
+          currentScopeRef.current.workId !== workId
+        ) return;
+        if (!loaded) {
+          throw new Error(
+            "전달받은 원고를 찾지 못했습니다. 편집기에서 게시 화면으로 다시 보내 주세요.",
+          );
+        }
+        setPages(loaded.pages.map((page) => ({
+          id: uid(),
+          src: page.src,
+          width: page.width,
+          height: page.height,
+          name: page.name,
+          source: null,
+          outputByteLength: studioDataUrlByteLength(page.src),
+          outputFormat: "stored" as const,
+        })));
+        setTitle(loaded.title);
+        setDirty(true);
+        setError(null);
+        setSuccessMessage(null);
+        setHandoffContext({
+          id: handoffId,
+          pageCount: loaded.pages.length,
+          sourceWorkId: loaded.sourceWorkId,
+        });
+        setHandoffError(null);
+      })
+      .catch((cause) => {
+        if (
+          handoffGenerationRef.current !== generation ||
+          !mountedRef.current ||
+          currentScopeRef.current.workId !== workId
+        ) return;
+        setHandoffError(
+          cause instanceof Error
+            ? cause.message
+            : "편집기에서 전달한 원고를 불러오지 못했습니다.",
+        );
+      })
+      .finally(() => {
+        if (
+          handoffGenerationRef.current === generation &&
+          mountedRef.current &&
+          currentScopeRef.current.workId === workId
+        ) {
+          setHandoffLoading(false);
+        }
+      });
+
+    return () => {
+      if (handoffGenerationRef.current === generation) {
+        handoffGenerationRef.current += 1;
+      }
+    };
+  }, [
+    handoffId,
+    hydrationScopeCurrent,
+    hydrationStatus,
+    routeChallengeId,
+    routeSeriesId,
+    routeTitleId,
+    workId,
+  ]);
 
   useEffect(() => {
     if (
@@ -589,6 +736,7 @@ export function StudioPublishingCommandCenter({
     setDirty(true);
     setPublisherConfirmed(false);
     setError(null);
+    setRecoveryError(null);
     setSuccessMessage(null);
     if (workId && publishResult) {
       navigate(buildStudioPublishResultHref(workId), { replace: true });
@@ -598,6 +746,7 @@ export function StudioPublishingCommandCenter({
   function leavePublishResult(nextStep: CommandStep) {
     setStep(nextStep);
     setError(null);
+    setRecoveryError(null);
     setSuccessMessage(null);
     if (workId) {
       navigate(buildStudioPublishResultHref(workId), { replace: true });
@@ -636,7 +785,7 @@ export function StudioPublishingCommandCenter({
         deviceMemoryGb: navigatorWithMemory.deviceMemory,
       });
       for (const file of files) {
-        await inspectStudioUploadSourceImage(file, maximumPixels);
+        const inspected = await inspectStudioUploadSourceImage(file, maximumPixels);
         if (!isFileScopeCurrent()) return;
         const scaled = await downscaleImageFile(file, 1600, 0.88);
         if (!isFileScopeCurrent()) return;
@@ -646,6 +795,14 @@ export function StudioPublishingCommandCenter({
           width: scaled.width,
           height: scaled.height,
           name: file.name,
+          source: {
+            width: inspected.width,
+            height: inspected.height,
+            byteLength: file.size,
+            format: inspected.format,
+          },
+          outputByteLength: studioDataUrlByteLength(scaled.src),
+          outputFormat: "webp",
         });
       }
       if (!isFileScopeCurrent()) return;
@@ -719,7 +876,7 @@ export function StudioPublishingCommandCenter({
   }
 
   async function handleSave(intent: SaveIntent) {
-    if (publishAbortRef.current || saving) return;
+    if (publishAbortRef.current || saving || recoveryBusy) return;
     if (intent === "publish" && !publisherConfirmed) {
       setError("현재 로그인 계정과 공개 범위를 확인한 뒤 게시 확인란을 선택해 주세요.");
       setStep("review");
@@ -792,8 +949,37 @@ export function StudioPublishingCommandCenter({
     const publishSeriesId = linkedSeriesId;
     const publishChallengeId = linkedChallengeId;
     const publishTitleId = linkedTitleId;
+    const pageImages = pageSnapshot.map((page) => page.src);
+    let integrityDocument: Record<string, unknown>;
+    try {
+      const { writeStudioPublicationIntegrity } = await import("./studio-publication-integrity");
+      integrityDocument = await writeStudioPublicationIntegrity({
+        document: baseDoc,
+        revisionId: publishScope.workId
+          ? `upload-revision:${(baseRevision ?? 0) + 1}`
+          : "upload-revision:1",
+        pageImages,
+        publisherActor: sharedMetaSnapshot && sharedMetaSnapshot.role !== "owner"
+          ? "collaborator"
+          : "owner",
+        ownerApproved: intent === "publish",
+        ownerUserId: authUserId,
+        approvedAt: intent === "publish" ? new Date().toISOString() : null,
+        toolIds: ["toonstudio-web", "upload-publisher"],
+      });
+    } catch (cause) {
+      setError(cause instanceof Error
+        ? cause.message
+        : "게시 원본의 무결성 정보를 만들지 못했습니다.");
+      return;
+    }
+    if (!isStudioUploadPublishScopeCurrent(
+      publishScope,
+      currentScopeRef.current,
+      mountedRef.current,
+    )) return;
     const baseDocument = {
-      ...baseDoc,
+      ...integrityDocument,
       format: "upload",
       pageMeta: pageSnapshot.map((page) => ({
         width: page.width,
@@ -812,7 +998,6 @@ export function StudioPublishingCommandCenter({
     setError(null);
     setSuccessMessage(null);
     try {
-      const pageImages = pageSnapshot.map((page) => page.src);
       const saved = await runStudioUploadPublishStages({
         scope: publishScope,
         currentScope: () => currentScopeRef.current,
@@ -916,6 +1101,16 @@ export function StudioPublishingCommandCenter({
       if (ownerControlsPolicy && directiveSnapshot) setDirective(directiveSnapshot);
       setDirty(false);
       setPublisherConfirmed(false);
+      if (handoffId) {
+        try {
+          const { acquireStudioPublishHandoffRepository } = await import("./studio-publish-handoff");
+          await acquireStudioPublishHandoffRepository().remove(handoffId);
+          setHandoffContext(null);
+          setHandoffError(null);
+        } catch {
+          // 서버 저장은 이미 성공했다. 인계 원고는 24시간 만료 정리가 있으므로 게시 결과 이동을 막지 않는다.
+        }
+      }
       const resultKind = resolveStudioPublishResultKind(
         intent,
         effectiveStatus,
@@ -983,6 +1178,85 @@ export function StudioPublishingCommandCenter({
     }
   }
 
+  async function handleMakePrivate() {
+    if (!workId || recoveryBusy || saving) return;
+    let recovery: typeof import("./studio-publish-recovery");
+    try {
+      recovery = await import("./studio-publish-recovery");
+    } catch {
+      setRecoveryError("비공개 전환 기능을 불러오지 못했습니다. 다시 시도해 주세요.");
+      return;
+    }
+    const request = recovery.studioPublishRecoveryRequest({
+      title,
+      scheduled: publishResult === "scheduled",
+    });
+    if (!(await confirmStudioDestructiveAction(request))) return;
+
+    recoveryAbortRef.current?.abort();
+    const controller = new AbortController();
+    recoveryAbortRef.current = controller;
+    setRecoveryBusy(true);
+    setRecoveryError(null);
+    try {
+      const result = await recovery.makeStudioPublishedWorkPrivate({
+        workId,
+        signal: controller.signal,
+      });
+      if (
+        controller.signal.aborted ||
+        !mountedRef.current ||
+        currentScopeRef.current.workId !== workId
+      ) return;
+      recordStudioDestructiveOutcome({
+        request,
+        outcome: "committed",
+        detail: publishResult === "scheduled"
+          ? "게시 예약을 취소하고 비공개 초안으로 전환했습니다."
+          : "공개 작품을 비공개 초안으로 전환했습니다.",
+      });
+      setDirective(result.directive);
+      setBaseDoc(result.doc);
+      if (Number.isSafeInteger(result.work.revision)) {
+        setWorkRevision(result.work.revision);
+      }
+      setDirty(false);
+      setPublisherConfirmed(false);
+      setSuccessMessage(
+        publishResult === "scheduled"
+          ? "게시 예약을 취소하고 비공개 초안으로 전환했습니다."
+          : "작품을 비공개 초안으로 전환했습니다.",
+      );
+      navigate(buildStudioPublishResultHref(workId, "private"), { replace: true });
+      setHydrationAttempt((attempt) => attempt + 1);
+    } catch (cause) {
+      if (
+        controller.signal.aborted ||
+        !mountedRef.current ||
+        currentScopeRef.current.workId !== workId
+      ) return;
+      const message = cause instanceof Error
+        ? cause.message
+        : "비공개 전환에 실패했습니다.";
+      recordStudioDestructiveOutcome({
+        request,
+        outcome: "failed",
+        detail: message,
+      });
+      setRecoveryError(message);
+    } finally {
+      if (recoveryAbortRef.current === controller) {
+        recoveryAbortRef.current = null;
+      }
+      if (
+        mountedRef.current &&
+        currentScopeRef.current.workId === workId
+      ) {
+        setRecoveryBusy(false);
+      }
+    }
+  }
+
   const currentStepIndex = COMMAND_STEPS.findIndex((candidate) => candidate.id === step);
   const primaryDisabled =
     !loggedIn ||
@@ -991,6 +1265,38 @@ export function StudioPublishingCommandCenter({
     loadingFiles ||
     (step === "review" && (!preflight.canPublish || !publisherConfirmed));
   const cover = pages[0]?.src ?? null;
+  const conversionSummary = summarizeStudioUploadConversion(
+    pages.map((page) => ({
+      source: page.source,
+      output: {
+        width: page.width,
+        height: page.height,
+        byteLength: page.outputByteLength,
+        format: page.outputFormat,
+      },
+    })),
+  );
+  const receiptDetails = useMemo(() => ({
+    title: title.trim(),
+    visibility: directive.visibility,
+    publishedAt: directive.publishedAt ?? directive.scheduledAt,
+    pages: pages.map((page) => ({
+      name: page.name,
+      width: page.width,
+      height: page.height,
+    })),
+    source: readCreatorPublicationSource(baseDoc),
+    rights: {
+      comments: directive.comments,
+      allowRemix: directive.allowRemix,
+      searchIndexing: directive.searchIndexing,
+      contentRating: directive.contentRating,
+    },
+    preflight: {
+      errors: preflight.errors.length,
+      warnings: preflight.warnings.length,
+    },
+  }), [baseDoc, directive, pages, preflight.errors.length, preflight.warnings.length, title]);
 
   return (
     <div data-route-ready="studio-publish">
@@ -1052,6 +1358,62 @@ export function StudioPublishingCommandCenter({
 
       <StudioPublishContextBanner context={publishContext} />
 
+      {handoffLoading ? (
+        <div
+          className="mb-4 flex items-center gap-2 rounded-xl border border-accent/35 bg-accent/8 px-3 py-2 text-sm text-fg-2"
+          role="status"
+          aria-busy="true"
+        >
+          <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
+          편집기에서 전달한 원고를 확인하고 있어요…
+        </div>
+      ) : null}
+      {handoffError ? (
+        <div
+          className="mb-4 rounded-xl border border-bad/40 bg-bad/10 px-3 py-3"
+          role="alert"
+        >
+          <p className="text-sm font-semibold text-fg">게시 원고를 불러오지 못했어요</p>
+          <p className="mt-1 text-sm leading-relaxed text-fg-2">{handoffError}</p>
+          <Link
+            href="/studio"
+            className={buttonClass({
+              size: "sm",
+              variant: "outline",
+              className: "mt-3 min-h-11 gap-1.5",
+            })}
+          >
+            <PenLine size={14} aria-hidden /> 편집기로 돌아가기
+          </Link>
+        </div>
+      ) : null}
+      {handoffContext && !handoffLoading ? (
+        <div
+          data-studio-publish-handoff-loaded="true"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-good/40 bg-good/8 px-3 py-3"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-good/15 text-good">
+            <Send size={16} aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <strong className="block text-sm text-fg">
+              편집기 원고 {handoffContext.pageCount}페이지를 받았습니다
+            </strong>
+            <span className="mt-0.5 block text-xs leading-relaxed text-fg-2">
+              제목과 페이지 순서를 유지했습니다. 서버 저장이 완료되면 로컬 인계본을 자동 정리하며,
+              저장하지 않아도 24시간 뒤 만료됩니다.
+            </span>
+          </span>
+          {handoffContext.sourceWorkId ? (
+            <span className="max-w-full truncate rounded-full border border-line bg-card/70 px-2.5 py-1 font-mono text-[0.65rem] text-fg-3">
+              {handoffContext.sourceWorkId}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {!loggedIn && (
         <div className="mb-4 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2">
           이미지와 게시 설정을 미리 준비할 수 있지만, 서버 저장과 게시는 로그인 후 가능합니다.
@@ -1073,8 +1435,12 @@ export function StudioPublishingCommandCenter({
           workId={workId}
           revision={workRevision}
           environment={publishEnvironment}
+          details={receiptDetails}
           onContinueEditing={() => leavePublishResult("content")}
           onReviewSettings={() => leavePublishResult("distribution")}
+          onMakePrivate={() => void handleMakePrivate()}
+          recoveryBusy={recoveryBusy}
+          recoveryError={recoveryError}
         />
       ) : null}
       {hydrating && (
@@ -1182,7 +1548,11 @@ export function StudioPublishingCommandCenter({
                     <img src={page.src} alt="" className="h-20 w-14 shrink-0 rounded-lg border border-line object-cover" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-fg">{page.name}</span>
-                      <span className="numeral mt-1 block text-xs text-fg-3">{page.width} × {page.height}px</span>
+                      <span className="numeral mt-1 block text-xs text-fg-3">
+                        {page.source
+                          ? `${page.source.width} × ${page.source.height}px · ${formatStudioUploadBytes(page.source.byteLength)} → ${page.width} × ${page.height}px WebP · ${formatStudioUploadBytes(page.outputByteLength)}`
+                          : `${page.width} × ${page.height}px · 저장된 게시본`}
+                      </span>
                     </span>
                     <span className={STUDIO_UPLOAD_PAGE_CONTROLS_CLASS}>
                       <button type="button" className={STUDIO_UPLOAD_PAGE_CONTROL_CLASS} disabled={mutationLocked || index === 0} onClick={() => movePage(page.id, -1)} aria-label={`${index + 1}번째 이미지를 위로 이동`}><ArrowUp size={14} /></button>
@@ -1304,6 +1674,18 @@ export function StudioPublishingCommandCenter({
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">독자 등급</dt><dd className="font-medium text-fg">{directive.contentRating === "all" ? "전체 이용" : directive.contentRating === "teen" ? "청소년 주의" : "성인 대상"}</dd></div>
               </dl>
             </section>
+            <section className="rounded-2xl border border-line bg-panel/35 p-4">
+              <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><ImagePlus size={15} className="text-accent" /> 원본 → 게시본 변환</h2>
+              <dl className="mt-3 divide-y divide-line text-sm">
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">페이지</dt><dd className="font-medium text-fg">{conversionSummary.pageCount}장 · 변환 {conversionSummary.transformedPageCount}장</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">원본 용량</dt><dd className="font-medium text-fg">{formatStudioUploadBytes(conversionSummary.sourceByteLength)}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">게시본 용량</dt><dd className="font-medium text-fg">{formatStudioUploadBytes(conversionSummary.outputByteLength)}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">출력 규칙</dt><dd className="font-medium leading-relaxed text-fg">최대 1600px · WebP 품질 88 · 비율 유지 · 크롭 없음</dd></div>
+              </dl>
+              {conversionSummary.sourceByteLength === null ? (
+                <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">기존 저장본은 원본 파일 용량을 다시 추정하지 않고 현재 게시본을 유지합니다.</p>
+              ) : null}
+            </section>
             <section className={cn("rounded-2xl border p-4", preflight.errors.length ? "border-bad/40 bg-bad/5" : preflight.warnings.length ? "border-warn/40 bg-warn/5" : "border-good/40 bg-good/5")}>
               <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><Eye size={15} className={preflight.errors.length ? "text-bad" : "text-good"} /> 최종 사전검사</h2>
               <p className="mt-2 text-xs leading-relaxed text-fg-2">오류 {preflight.errors.length}건 · 경고 {preflight.warnings.length}건</p>
@@ -1321,7 +1703,7 @@ export function StudioPublishingCommandCenter({
 
       <div className={cn("mt-5", STUDIO_UPLOAD_ACTION_DOCK_CLASS)}>
         <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-fg-3">
-          {dirty ? <span className="inline-flex items-center gap-1.5 text-warn"><span className="size-2 rounded-full bg-warn" /> 저장되지 않은 변경</span> : <span className="inline-flex items-center gap-1.5 text-good"><Check size={13} /> 현재 revision 저장됨</span>}
+          {dirty ? <span className="inline-flex items-center gap-1.5 text-warn"><span className="size-2 rounded-full bg-warn" /> 저장 또는 게시하면 현재 변경이 새 revision에 함께 반영됩니다.</span> : <span className="inline-flex items-center gap-1.5 text-good"><Check size={13} /> 현재 revision 저장됨</span>}
           {sharedMeta && <span className="hidden sm:inline">· 역할 {sharedMeta.role}</span>}
         </div>
         <button

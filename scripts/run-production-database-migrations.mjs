@@ -163,6 +163,7 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "creator_work_comment_like",
   "creator_work_production_workspace",
   "creator_work_publication",
+  "creator_work_publication_media",
   "creator_work_release",
   "creator_work_release_approval",
   "creator_work_report",
@@ -2143,12 +2144,14 @@ export function buildCreatorAssetObjectStorageRuntimeAclSql(
   return `
 REVOKE ALL ON TABLE
   public.creator_asset_storage_object,
-  public.creator_work_asset_storage_reference
+  public.creator_work_asset_storage_reference,
+  public.creator_work_publication_media
 FROM PUBLIC;
 
 REVOKE ALL ON TABLE
   public.creator_asset_storage_object,
-  public.creator_work_asset_storage_reference
+  public.creator_work_asset_storage_reference,
+  public.creator_work_publication_media
 FROM ${quotedRole};
 
 GRANT SELECT
@@ -2184,6 +2187,22 @@ GRANT INSERT (
   TO ${quotedRole};
 GRANT UPDATE ("state", "deleteToken", "updatedAt")
   ON TABLE public.creator_work_asset_storage_reference
+  TO ${quotedRole};
+
+GRANT SELECT
+  ON TABLE public.creator_work_publication_media
+  TO ${quotedRole};
+GRANT INSERT (
+  "workId",
+  "slot",
+  "pageIndex",
+  "purpose",
+  "objectDigest",
+  "mediaType",
+  "byteLength",
+  "createdBy"
+)
+  ON TABLE public.creator_work_publication_media
   TO ${quotedRole};
 `;
 }
@@ -2352,6 +2371,61 @@ export function buildCreatorAssetObjectStorageRuntimeAclViolationSql(
       WHERE pg_catalog.has_column_privilege(
         ${sqlLiteral(role)},
         'public.creator_work_asset_storage_reference',
+        immutable_column,
+        'UPDATE'
+      )
+    )
+    OR NOT pg_catalog.has_table_privilege(
+      ${sqlLiteral(role)},
+      'public.creator_work_publication_media',
+      'SELECT'
+    )
+    OR pg_catalog.has_table_privilege(
+      ${sqlLiteral(role)},
+      'public.creator_work_publication_media',
+      'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'workId',
+        'slot',
+        'pageIndex',
+        'purpose',
+        'objectDigest',
+        'mediaType',
+        'byteLength',
+        'createdBy'
+      ]::text[]) AS insert_column
+      WHERE NOT pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_work_publication_media',
+        insert_column,
+        'INSERT'
+      )
+    )
+    OR pg_catalog.has_column_privilege(
+      ${sqlLiteral(role)},
+      'public.creator_work_publication_media',
+      'createdAt',
+      'INSERT'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY[
+        'workId',
+        'slot',
+        'pageIndex',
+        'purpose',
+        'objectDigest',
+        'mediaType',
+        'byteLength',
+        'createdBy',
+        'createdAt'
+      ]::text[]) AS immutable_column
+      WHERE pg_catalog.has_column_privilege(
+        ${sqlLiteral(role)},
+        'public.creator_work_publication_media',
         immutable_column,
         'UPDATE'
       )

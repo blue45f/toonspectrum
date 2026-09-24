@@ -40,6 +40,10 @@ export const CreatorWorkParamsSchema = z
   .object({ id: z.string().trim().min(1).max(160) })
   .strict();
 
+export const CreatorWorkReadQuerySchema = z
+  .object({ publicPreview: z.enum(["1", "true"]).optional() })
+  .strict();
+
 const CreatorWorkMediaDigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
 
 export const CreatorWorkCoverMediaParamsSchema = CreatorWorkParamsSchema.extend({
@@ -462,6 +466,7 @@ export const ModerateCreatorAssetSchema = z
 
 export class CreatorWorkListQueryDto extends createZodDto(CreatorWorkListQuerySchema) {}
 export class CreatorWorkParamsDto extends createZodDto(CreatorWorkParamsSchema) {}
+export class CreatorWorkReadQueryDto extends createZodDto(CreatorWorkReadQuerySchema) {}
 export class CreatorWorkCoverMediaParamsDto extends createZodDto(
   CreatorWorkCoverMediaParamsSchema
 ) {}

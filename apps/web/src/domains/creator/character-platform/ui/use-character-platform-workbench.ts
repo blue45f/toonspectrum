@@ -16,6 +16,12 @@ import {
 } from "../pose/character-pose-v2";
 import { useCharacterSurfaceInkRuntime } from "../surface-ink/use-character-surface-ink-runtime";
 import { projectCharacterShaperDocument } from "../../character-shaper/character-shaper-document-projection";
+import {
+  migrateCharacterDocumentV2ToV3,
+  validateCharacterDocumentV3,
+} from "../document/character-document-v3";
+import { createCurrentStudioWebAuthoringRuntimePlan } from "../../studio-web-runtime/studio-web-authoring-runtime";
+import { useCharacterAuthoringAuthority } from "./use-character-authoring-authority";
 import { useCharacterCanonicalParts } from "./use-character-canonical-parts";
 
 import type { CharacterCanonicalManifestV2 } from "../assets/character-canonical-manifest";
@@ -53,6 +59,9 @@ export interface CharacterPlatformWorkbenchState {
   readonly canonicalParts: ReturnType<typeof useCharacterCanonicalParts>;
   readonly compatibility: ReturnType<typeof createCharacterCompatibilityReport>;
   readonly document: ReturnType<typeof projectCharacterShaperDocument>;
+  readonly documentV3: ReturnType<typeof migrateCharacterDocumentV2ToV3>;
+  readonly authoring: ReturnType<typeof useCharacterAuthoringAuthority>;
+  readonly webRuntime: ReturnType<typeof createCurrentStudioWebAuthoringRuntimePlan>;
   readonly renderGraph: ReturnType<typeof createCharacterRenderGraphPlan>;
   readonly presets: readonly CharacterPartPresetV1[];
   readonly presetStoreMessage: string | null;
@@ -317,6 +326,33 @@ export function useCharacterPlatformWorkbench(
       binding.snapshot.semanticMorphs,
     ]),
   });
+  const documentV3Projection = useMemo(() => {
+    const migrated = migrateCharacterDocumentV2ToV3(document);
+    return validateCharacterDocumentV3({
+      ...migrated,
+      surfaceInk: surfaceInk.document,
+    });
+  }, [document, surfaceInk.document]);
+  const sourceFingerprint = useMemo(() => JSON.stringify({
+    revision: document.revision,
+    model: document.model,
+    compatibility: document.compatibility,
+    recipe: document.recipe,
+    customControls: document.customControls,
+    expression: document.expression,
+    pose: document.pose,
+    render: document.render,
+    surfaceInk: surfaceInk.document,
+  }), [document, surfaceInk.document]);
+  const authoring = useCharacterAuthoringAuthority(
+    documentV3Projection,
+    sourceFingerprint,
+  );
+  const webRuntime = useMemo(
+    () => createCurrentStudioWebAuthoringRuntimePlan(),
+    [],
+  );
+  const documentV3 = authoring.snapshot.previewDocument ?? authoring.snapshot.document;
   const hasSurfacePaint = Boolean(
     h.texturePaintCanUndo || h.texturePaintHasContent || h.texturePaintDirty,
   );
@@ -552,6 +588,9 @@ export function useCharacterPlatformWorkbench(
     canonicalParts,
     compatibility,
     document,
+    documentV3,
+    authoring,
+    webRuntime,
     renderGraph,
     presets: presetSnapshot.presets,
     presetStoreMessage: presetSnapshot.message,

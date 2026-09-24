@@ -24,6 +24,7 @@ import {
 } from "../studio-page-shell-runtime";
 import {
   appendStudioPagesHistorySnapshot,
+  mergeStudioPendingStrokeElements,
   projectStudioPendingStrokes,
   stripStudioPendingStrokeEchoes,
   type StudioPagesHistoryAppendResult,
@@ -41,6 +42,7 @@ import {
 } from "../studio-work-asset-edit-guard";
 
 import type { StudioCollaborationWiringContext } from "../live/studio-collaboration-wiring";
+import type { StudioCrdtDocument } from "../live/studio-crdt-document";
 import type { StudioLiveDynamicBrushOverlayRenderer } from "../live/studio-live-dynamic-brush-overlay";
 import type { StudioLiveInkOverlayRenderer } from "../live/studio-live-ink-overlay";
 import type { StudioLiveRetainedMediaOverlayRenderer } from "../live/studio-live-retained-media-overlay";
@@ -173,6 +175,44 @@ export interface StudioDeferredStrokeCommitEngineContext extends Pick<
   readonly setSharedDocumentNotice: (notice: string | null) => void;
   readonly studioRevisionProjectGenerationRef: MutableRefObject<number>;
   readonly webGpuCanvasHandleRef: MutableRefObject<StudioWebGpuCanvasHandle | null>;
+}
+
+export interface StudioDeferredStrokeBatchCommitInput {
+  readonly baseElements: El[];
+  readonly batch: PendingStrokeCommitBatch;
+  readonly commit: StudioDeferredStrokeCommitEngine["commit"];
+  readonly document: StudioCrdtDocument | null;
+  readonly reportError: (message: string) => void;
+}
+
+/** Commit one retained batch and finalize any CRDT strokes that are still marked as drawing. */
+export function commitStudioDeferredStrokeBatch({
+  baseElements,
+  batch,
+  commit,
+  document,
+  reportError,
+}: StudioDeferredStrokeBatchCommitInput): boolean {
+  const committed = commit(
+    mergeStudioPendingStrokeElements(baseElements, batch.strokes),
+    undefined,
+    batch.pageId,
+  );
+  if (!committed) return false;
+  try {
+    for (const stroke of batch.strokes) {
+      if (document?.getStroke(stroke.id, true)?.status === "drawing") {
+        document.finalizeStroke(stroke.id);
+      }
+    }
+  } catch (cause) {
+    reportError(
+      cause instanceof Error
+        ? `실시간 획 확정: ${cause.message}`
+        : "실시간 획을 최종 상태로 확정하지 못했습니다.",
+    );
+  }
+  return true;
 }
 
 export interface StudioDeferredStrokeCommitEngine {

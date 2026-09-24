@@ -352,3 +352,109 @@ export function markCharacterSurfaceInkTopology(
     }))),
   });
 }
+
+const CHARACTER_SURFACE_INK_MAX_LAYERS = 32;
+const CHARACTER_SURFACE_INK_MAX_STROKES = 2_000;
+const CHARACTER_SURFACE_INK_MAX_ANCHORS = 100_000;
+
+function finiteTuple(value: readonly number[], tupleLength: number): boolean {
+  return value.length === tupleLength && value.every(Number.isFinite);
+}
+
+function unitValue(value: number): boolean {
+  return Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
+function validSurfaceInkStyle(style: CharacterSurfaceInkStyle): boolean {
+  return typeof style.color === "string"
+    && style.color.trim().length > 0
+    && (style.widthMode === "surface" || style.widthMode === "screen")
+    && Number.isFinite(style.baseWidth)
+    && style.baseWidth > 0
+    && [
+      style.opacity,
+      style.taperStart,
+      style.taperEnd,
+      style.pressureWidth,
+      style.pressureOpacity,
+      style.smoothing,
+    ].every(unitValue)
+    && Number.isFinite(style.surfaceOffset)
+    && (style.cap === "round" || style.cap === "square")
+    && (style.join === "round" || style.join === "bevel")
+    && typeof style.frontFacesOnly === "boolean";
+}
+
+/** Pure validation entry point safe to import from browser module Workers. */
+export function validateCharacterSurfaceInkDocument(
+  document: CharacterSurfaceInkDocument,
+): CharacterSurfaceInkDocument {
+  if (document.version !== 1
+    || !Array.isArray(document.layers)
+    || document.layers.length > CHARACTER_SURFACE_INK_MAX_LAYERS) {
+    throw new Error("3D 펜선 문서 버전을 읽을 수 없습니다.");
+  }
+  let strokeCount = 0;
+  let anchorCount = 0;
+  const layers = document.layers.map((layer) => {
+    if (typeof layer.layerId !== "string" || layer.layerId.trim().length === 0
+      || typeof layer.name !== "string" || layer.name.trim().length === 0
+      || typeof layer.visible !== "boolean" || typeof layer.locked !== "boolean"
+      || !unitValue(layer.opacity)
+      || (layer.blendMode !== "normal" && layer.blendMode !== "multiply")
+      || !Array.isArray(layer.strokes)) {
+      throw new Error("3D 펜선 레이어가 올바르지 않습니다.");
+    }
+    strokeCount += layer.strokes.length;
+    if (strokeCount > CHARACTER_SURFACE_INK_MAX_STROKES) {
+      throw new Error("3D 펜선 데이터가 안전 한도를 넘었습니다.");
+    }
+    const strokes = layer.strokes.map((stroke: CharacterSurfaceInkStroke) => {
+      if (typeof stroke.strokeId !== "string" || stroke.strokeId.trim().length === 0
+        || typeof stroke.meshAssetId !== "string" || stroke.meshAssetId.trim().length === 0
+        || typeof stroke.topologyRevision !== "string" || stroke.topologyRevision.trim().length === 0
+        || !validSurfaceInkStyle(stroke.style)
+        || !["valid", "needs-reprojection", "orphaned"].includes(stroke.status)
+        || !Array.isArray(stroke.anchors)
+        || stroke.anchors.length < 2) {
+        throw new Error("3D 펜선 획이 올바르지 않습니다.");
+      }
+      anchorCount += stroke.anchors.length;
+      if (anchorCount > CHARACTER_SURFACE_INK_MAX_ANCHORS) {
+        throw new Error("3D 펜선 데이터가 안전 한도를 넘었습니다.");
+      }
+      const anchors = stroke.anchors.map((anchor: CharacterSurfaceInkAnchor) => {
+        if (anchor.meshAssetId !== stroke.meshAssetId
+          || anchor.topologyRevision !== stroke.topologyRevision
+          || !Number.isSafeInteger(anchor.primitiveIndex) || anchor.primitiveIndex < 0
+          || !Number.isSafeInteger(anchor.triangleIndex) || anchor.triangleIndex < 0
+          || !unitValue(anchor.pressure)
+          || !Number.isFinite(anchor.width) || anchor.width <= 0
+          || !finiteTuple(anchor.barycentric, 3)
+          || !finiteTuple(anchor.localNormal, 3)
+          || !finiteTuple(anchor.localTangent, 3)
+          || !finiteTuple(anchor.skinIndices, 4)
+          || !anchor.skinIndices.every((index: number) => Number.isSafeInteger(index) && index >= 0 && index <= 65_535)
+          || !finiteTuple(anchor.skinWeights, 4)
+          || !anchor.skinWeights.every(unitValue)) {
+          throw new Error("3D 펜선 표면점이 올바르지 않습니다.");
+        }
+        return Object.freeze({
+          ...anchor,
+          barycentric: Object.freeze([...anchor.barycentric] as [number, number, number]),
+          localNormal: Object.freeze([...anchor.localNormal] as [number, number, number]),
+          localTangent: Object.freeze([...anchor.localTangent] as [number, number, number]),
+          skinIndices: Object.freeze([...anchor.skinIndices] as [number, number, number, number]),
+          skinWeights: Object.freeze([...anchor.skinWeights] as [number, number, number, number]),
+        });
+      });
+      return Object.freeze({
+        ...stroke,
+        style: Object.freeze({ ...stroke.style }),
+        anchors: Object.freeze(anchors),
+      });
+    });
+    return Object.freeze({ ...layer, strokes: Object.freeze(strokes) });
+  });
+  return Object.freeze({ version: 1, layers: Object.freeze(layers) });
+}

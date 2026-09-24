@@ -98,7 +98,7 @@ describe("StudioInspectorNavigator", () => {
     }
   });
 
-  it("renders a three-tab dock (선택 항목·레이어·페이지) with a capped layer badge", () => {
+  it("renders a three-tab dock (선택 항목·레이어·페이지) with the exact layer count", () => {
     const html = renderNavigator({
       primary: "properties",
       image: "quick",
@@ -112,7 +112,8 @@ describe("StudioInspectorNavigator", () => {
     expect(html).toContain("레이어");
     expect(html).toContain("페이지");
     expect(html).not.toContain('data-studio-inspector-primary-tab="publish"');
-    expect(html).toContain("99+");
+    expect(html).toContain("128");
+    expect(html).not.toContain("99+");
     expect(html).toContain('data-studio-inspector-primary-tab="layers"');
     expect(html).toContain('aria-label="기능·설정 찾기"');
     expect(html).toMatch(/data-studio-inspector-search-trigger="true"[^>]*class="[^"]*lg:hidden/u);

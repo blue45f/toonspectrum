@@ -1,5 +1,3 @@
-import { planStudioOfflineSceneTransition } from "./studio-offline-branch-scene-bridge";
-
 import type { StudioCrdtDocument } from "../live/studio-crdt-document";
 import type {
   StudioCrdtSceneGraphChangedIds,
@@ -120,48 +118,21 @@ export function promoteStudioOfflineBranchPending(input: {
   });
 }
 
-
-function equalOfflinePayloadBytes(
-  left: Uint8Array | null,
-  right: Uint8Array | null,
-): boolean {
-  if (left === right) return true;
-  if (!left || !right || left.byteLength !== right.byteLength) return false;
-  for (let index = 0; index < left.byteLength; index += 1) {
-    if (left[index] !== right[index]) return false;
-  }
-  return true;
-}
-
 /**
- * A pending local stroke already streamed into Yjs may still need an offline-branch record while
- * server authority is unavailable. Its own undo/redo is safe to mirror to the live peer document:
- * only those exact stroke IDs may change semantically; neighbouring strokes may receive order-only
- * upserts because removing one item changes `beforeId`. Any payload edit, page/group change, or
- * unrelated stroke mutation keeps the transition offline-only.
+ * Keep scene-diff planning inside the lazily loaded offline runtime. The Studio shell may delegate
+ * the question, but must not pull the CRDT/Yjs scene bridge back into its static route graph.
  */
 export function canMirrorStudioOfflinePendingStrokeTransition(
+  runtime: StudioCrdtSceneGraphRuntime | null,
   previousPages: readonly PageState[],
   nextPages: readonly PageState[],
   pendingStrokeIds: readonly string[],
 ): boolean {
-  const allowed = new Set(pendingStrokeIds.filter((id) => id.trim().length > 0));
-  if (allowed.size === 0) return false;
-  const plan = planStudioOfflineSceneTransition(previousPages, nextPages);
-  if (plan.unsupported.length > 0 || plan.mutations.length === 0) return false;
-
-  let changesOwnedPendingStroke = false;
-  for (const mutation of plan.mutations) {
-    if (mutation.targetType !== "stroke") return false;
-    if (allowed.has(mutation.targetId)) {
-      changesOwnedPendingStroke = true;
-      continue;
-    }
-    const orderOnly = mutation.action === "upsert"
-      && equalOfflinePayloadBytes(mutation.payload, mutation.previousPayload);
-    if (!orderOnly) return false;
-  }
-  return changesOwnedPendingStroke;
+  return runtime?.offlineBranch?.canMirrorPendingStrokeTransition(
+    previousPages,
+    nextPages,
+    pendingStrokeIds,
+  ) ?? false;
 }
 
 export function stageStudioOfflineSceneTransition(
@@ -172,8 +143,8 @@ export function stageStudioOfflineSceneTransition(
 ): boolean | null {
   const offlineBranch = runtime?.offlineBranch ?? null;
   if (!offlineBranch?.shouldStageSceneTransition()) return null;
-  const staged = offlineBranch.stageSceneTransition(previousPages, nextPages);
-  if (staged) {
+  const result = offlineBranch.stageSceneTransition(previousPages, nextPages);
+  if (result.staged) {
     reportNotice(
       "변경을 Automerge 오프라인 branch에 보호했습니다. 서버 정본 연결 후 안전하게 합칩니다.",
     );
@@ -181,11 +152,7 @@ export function stageStudioOfflineSceneTransition(
   }
 
   // A pointer-contact CRDT stream can materialize the exact completed local stroke before the
-  // deferred React history commit runs. In that case the publication transition is intentionally
-  // empty: the canonical document is already correct, but the local tab still needs to accept the
-  // commit so it can install an undo boundary and release retained surfaces. Distinguish that
-  // successful idempotent no-op from unsupported/over-limit staging failures.
-  const plan = planStudioOfflineSceneTransition(previousPages, nextPages);
-  if (plan.unsupported.length === 0 && plan.mutations.length === 0) return true;
-  return false;
+  // deferred React history commit runs. The lazy runtime reports an empty, supported transition so
+  // this host can accept the history boundary without importing the heavy scene planner itself.
+  return result.operations === 0 && result.unsupported.length === 0;
 }
