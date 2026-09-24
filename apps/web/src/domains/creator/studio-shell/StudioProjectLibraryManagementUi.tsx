@@ -215,6 +215,7 @@ export function StudioProjectLibraryCard({
   useBilingualI18nRevision();
   return (
     <article
+      data-studio-project-card="true"
       data-selected={checked || undefined}
       className={cn(
         "overflow-hidden rounded-2xl border bg-card p-4 shadow-sm transition-colors",
@@ -362,6 +363,7 @@ export function StudioProjectLibraryRecoveryRow({
   useBilingualI18nRevision();
   return (
     <article
+      data-studio-project-card="true"
       data-selected={checked || undefined}
       className={cn(
         "flex flex-col gap-3 rounded-2xl border bg-card p-4 sm:flex-row sm:items-center sm:justify-between",

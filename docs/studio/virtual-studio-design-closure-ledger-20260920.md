@@ -1,5 +1,8 @@
 # 원설계 VS-01–30 구현 근거와 남은 완료 경로
 
+> **Historical status notice (2026-09-24):** This ledger records the implementation state audited on 2026-09-20. Later main-branch work closed the product-code gaps. Use [Virtual Studio and all-pages spatial experience — product-code closure](virtual-studio-all-pages-closure-20260924.md) for the current closure matrix and keep physical-device, WAN, long-session, and production-rollout certification separate.
+
+
 상태: **current 작업트리 감사 / migration 연결 작업 / target 잔여 구분**. 2026-09-20에 원 공유 대화의 [30개 요구](virtual-studio-original-backlog-20260920.md)를 THIRD와 WORLD의 실제 source/tests에 대조했다. THIRD 기준은 `fb5d225f8aa6473daab71ccc7cf3a72b44e91750`, WORLD 게시 클라이언트 기준은 `0f3bfa6b8bcbebd488c72fa62cfd9b1c69dac245`, 서버 대화 동의/heartbeat 기준은 `0cc0a2a86fe719b9f6509c5ca239cfcd858d8024`다. 후속 승인 검수본 ZIP의 로컬 검증은 R7, 실제 저작 후 Host 저장·캡처 검증은 갱신한 R4에 별도 표시한다. 이 문서는 main 병합, 필수 CI, 운영 배포 또는 30개 전체 완료 증명이 아니다.
 
 **구현**은 표에 적힌 사용자 동작과 권한 경계를 갖춘 좁은 기능을 뜻한다. **부분**은 실제 진입점이 있지만 원문 완료 조건의 연결이 남았다는 뜻이다. **미구현**은 조사한 Virtual Studio 흐름에 해당 사용자 완료 경로가 없다는 뜻이며, 다른 도메인의 유사 도구까지 없다고 단정하지 않는다. 버튼·목적지 링크·상태 라벨만으로 완료를 판정하지 않았다.

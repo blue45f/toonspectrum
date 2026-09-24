@@ -4,6 +4,9 @@ import { StudioReviewDeliveryService } from "./review-delivery/review-delivery.s
 import { PinnedReviewShareController } from "./pinned-share/pinned-share.controller";
 import { PinnedReviewShareService } from "./pinned-share/pinned-share.service";
 import { PinnedReviewShareRepository } from "./pinned-share/pinned-share.repository";
+import { StudioReviewVoiceNoteController } from "./studio-review-voice-note.controller";
+import { StudioReviewVoiceNoteRepository } from "./studio-review-voice-note.repository";
+import { StudioReviewVoiceNoteService } from "./studio-review-voice-note.service";
 import { StudioReviewPolicyController, StudioReviewPolicyService } from "./studio-review-policy.controller";
 import { StudioReviewPolicyRepository } from "./studio-review-policy.repository";
 import { StudioSessionEvidenceController, StudioSessionEvidenceService } from "./studio-session-evidence.controller";
@@ -37,9 +40,10 @@ const privateObjectStorageModule = PrivateObjectStorageModule.fromEnvironment(pr
 
 @Module({
   imports: [CreatorModule, ...(privateObjectStorageModule ? [privateObjectStorageModule] : [])],
-  controllers: [StudioReviewDeliveryController, PinnedReviewShareController, StudioReviewPolicyController, StudioSessionEvidenceController, StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
+  controllers: [StudioReviewDeliveryController, StudioReviewVoiceNoteController, PinnedReviewShareController, StudioReviewPolicyController, StudioSessionEvidenceController, StudioWorkSessionController, StudioProjectGraphController, StudioReviewPreviewController, StudioReviewPreviewProducerController, StudioWorldPublicationController, StudioWorldAcousticController, StudioWorldConversationController],
   providers: [
     { provide: STUDIO_REVIEW_DELIVERY_POOL, useValue: dbPool }, StudioReviewDeliveryRepository, StudioReviewDeliveryService,
+    StudioReviewVoiceNoteRepository, StudioReviewVoiceNoteService,
     PinnedReviewShareRepository, PinnedReviewShareService,
     StudioReviewPolicyRepository, StudioReviewPolicyService,
     StudioSessionEvidenceService,

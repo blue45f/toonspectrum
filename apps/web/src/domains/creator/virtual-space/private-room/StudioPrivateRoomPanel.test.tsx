@@ -36,3 +36,28 @@ describe("private panel explicit withdrawal while network work is pending",()=>{
     for(const controller of f.controllers)controller.close();
   });
 });
+
+describe("private-room doorway knock UI", () => {
+  it("keeps knocking and manager admission as two explicit steps", async () => {
+    const f = fixture(); f.setOpen(false);
+    for (const controller of f.controllers) controller.start(); await flush();
+    const zones = [{ id: "zone", roomId: "review", x: 0, y: 0, width: 200, height: 200, policy: "private" as const, doorId: "door" }];
+    function View({ index }: { readonly index: number }) {
+      const controller = f.controllers[index]!;
+      const snapshot = useSyncExternalStore(controller.subscribe, controller.snapshot);
+      return <StudioPrivateRoomPanel room={{ controller, snapshot, available: true, entryReason: null }} zones={zones}
+        zoneId="zone" onZone={() => {}} peers={f.participants.filter((_, peerIndex) => peerIndex !== index)
+          .map((participant) => ({ participant, state: studioVirtualSpaceState({ x: 50, y: 50 }), lastSeen: Date.now(), sequence: 1 }))} />;
+    }
+    const requester = render(<View index={1} />);
+    fireEvent.click(screen.getByRole("button", { name: "문 두드리기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "응답을 기다리는 중…" })).toHaveProperty("disabled", true));
+    requester.unmount();
+    render(<View index={0} />);
+    await waitFor(() => expect(screen.getAllByText("Member 1").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: "이 팀원에게 문 열기" }));
+    await waitFor(() => expect(f.apis[0]!.changeDoor).toHaveBeenCalledOnce());
+    expect(f.controllers[1]!.snapshot().session).toBeNull();
+    for (const controller of f.controllers) controller.close();
+  });
+});

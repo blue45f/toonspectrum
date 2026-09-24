@@ -133,15 +133,15 @@ export function studioVirtualArtAssetUrl(key: StudioVirtualArtStyleKey, sourceUr
   if (style.assetPack === "base" || !sourceUrl.startsWith(`${ART_ROOT}/`)) return sourceUrl;
   if (sourceUrl.startsWith(`${ART_ROOT}/style-packs/`)) return sourceUrl;
   const relative = sourceUrl.slice(`${ART_ROOT}/`.length);
-  if (!/^(?:production-v2|drawn-characters-v1|npc-cast-v3)\/[a-z0-9_.-]+$/iu.test(relative)) return sourceUrl;
+  if (!/^(?:production-v2|drawn-characters-v1|npc-cast-v3|npc-cast-v4)\/[a-z0-9_.-]+$/iu.test(relative)) return sourceUrl;
   const styledRelative = relative.replace(/\.(?:png|webp)$/iu, ".webp");
   return `${ART_ROOT}/style-packs/${style.assetPack}/${styledRelative}`;
 }
 
 export function studioVirtualArtTextureUrl(key: StudioVirtualArtStyleKey, kind: StudioVirtualArtTextureKind): string | null {
+  if (kind === "world-base") return `${ART_ROOT}/art-v4/world/${key}.webp`;
   const style = studioVirtualArtStyle(key);
   if (style.assetPack === "base") return null;
-  if (kind === "world-base") return `${ART_ROOT}/style-packs/${style.assetPack}/tiles/world-base.webp`;
   return `${ART_ROOT}/style-packs/${style.assetPack}/tiles/${kind}-texture.png`;
 }
 

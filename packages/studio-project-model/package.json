@@ -58,6 +58,11 @@
       "types": "./src/graph/review-delivery.ts",
       "import": "./src/graph/review-delivery.ts",
       "default": "./src/graph/review-delivery.ts"
+    },
+    "./review-voice-note": {
+      "types": "./src/graph/review-voice-note.ts",
+      "import": "./src/graph/review-voice-note.ts",
+      "default": "./src/graph/review-voice-note.ts"
     }
   },
   "scripts": {
@@ -88,6 +93,9 @@
       ],
       "review-delivery": [
         "src/graph/review-delivery.ts"
+      ],
+      "review-voice-note": [
+        "src/graph/review-voice-note.ts"
       ]
     }
   }

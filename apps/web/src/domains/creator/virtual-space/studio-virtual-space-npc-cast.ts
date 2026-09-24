@@ -1,9 +1,7 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
-import { type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import {
-  studioCharacterSkinByKey,
   studioCharacterSkinForArtStyle,
-  studioCharacterWalkClip,
   type StudioCharacterAtlasClip,
   type StudioCharacterSkin,
 } from "./studio-virtual-space-character-skins";
@@ -18,16 +16,14 @@ export type StudioNpcCastKey =
   | "npc-security"
   | "npc-host";
 
-const ROOT = "/assets/virtual-studio/npc-cast-v3";
-const BASE_PLAYER: Readonly<Record<StudioNpcCastKey, string>> = Object.freeze({
-  "npc-concierge": "silver",
-  "npc-producer": "dark",
-  "npc-editor": "purple",
-  "npc-artist": "pink",
-  "npc-archivist": "purple",
-  "npc-cafe": "dark",
-  "npc-security": "silver",
-  "npc-host": "pink",
+const ROOT = "/assets/virtual-studio/npc-cast-v4";
+const FRAME = 128;
+const PRESENTATION = Object.freeze({
+  originX: 0.5,
+  originY: 0.95,
+  displayHeightRatio: 0.11,
+  footOffsetX: 0,
+  footOffsetY: 0.5,
 });
 
 function fileStem(key: StudioNpcCastKey): string {
@@ -37,20 +33,24 @@ function fileStem(key: StudioNpcCastKey): string {
 function directional(key: StudioNpcCastKey): Readonly<Record<StudioVirtualSpaceFacing, string>> {
   const stem = fileStem(key);
   return Object.freeze({
-    down: `${ROOT}/npc-${stem}-direction-down.png`,
-    left: `${ROOT}/npc-${stem}-direction-left.png`,
-    right: `${ROOT}/npc-${stem}-direction-right.png`,
-    up: `${ROOT}/npc-${stem}-direction-up.png`,
+    down: `${ROOT}/npc-${stem}-direction-down.webp`,
+    left: `${ROOT}/npc-${stem}-direction-left.webp`,
+    right: `${ROOT}/npc-${stem}-direction-right.webp`,
+    up: `${ROOT}/npc-${stem}-direction-up.webp`,
   });
 }
 
 function walkClip(key: StudioNpcCastKey, facing: StudioVirtualSpaceFacing): StudioCharacterAtlasClip {
-  const reference = studioCharacterWalkClip(studioCharacterSkinByKey(BASE_PLAYER[key]), facing);
-  if (!reference) throw new Error(`NPC base walk is missing: ${key}/${facing}`);
   return Object.freeze({
-    ...reference,
-    textureUrl: `${ROOT}/npc-${fileStem(key)}-walk-${facing}.png`,
+    textureUrl: `${ROOT}/npc-${fileStem(key)}-walk-${facing}.webp`,
     technique: "drawn",
+    frameWidth: FRAME,
+    frameHeight: FRAME,
+    start: 0,
+    end: 3,
+    frameRate: 7.5,
+    repeat: -1,
+    presentation: PRESENTATION,
   });
 }
 
@@ -75,17 +75,19 @@ function npcSkin(
     labelEn,
     directional: directional(key),
     clips: walkClips(key),
+    frame: PRESENTATION,
     ...(state ? { state: Object.freeze(state) } : {}),
   });
 }
 
 const roleState = (key: StudioNpcCastKey, motion: "draw" | "review"): StudioCharacterSkin["state"] => ({
-  [motion]: `${ROOT}/npc-${fileStem(key)}-state-${motion}.png`,
+  [motion]: `${ROOT}/npc-${fileStem(key)}-state-${motion}.webp`,
 });
 
 /**
- * Dedicated high-resolution role cast. NPCs keep the playable cast's animation grammar and visual
- * quality, but independent bytes, accessories, badges and palettes make role identity unmistakable.
+ * Original generated role cast. These assets are not recoloured player copies: every NPC has a
+ * distinct silhouette, hairstyle, outfit and role prop, while retaining the same webtoon-chibi
+ * world scale. Per-style packages are deterministically derived from the original generated sheets.
  */
 export const STUDIO_NPC_CAST: readonly StudioCharacterSkin[] = Object.freeze([
   npcSkin("npc-concierge", "모아 · 컨시어지", "Moa · Concierge"),

@@ -1,7 +1,9 @@
-import { Bot, CalendarDays, MapPinned, MessageCircle, Search, UsersRound, X } from "lucide-react";
+import { CalendarDays, MapPinned, MessageCircle, Search, UsersRound, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { studioNpcCastSkinByKey } from "./studio-virtual-space-npc-cast";
+import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioVirtualSpacePeer } from "./studio-virtual-space-model";
 import { studioNpcLabel, studioNpcRole } from "./studio-virtual-space-npc-director";
 import type { StudioWorldNpcDefinition, StudioWorldRoomDefinition } from "./studio-virtual-space-world-manifest";
@@ -16,8 +18,9 @@ function nextWork(snapshot: StudioVirtualOperationsSnapshot, fallback: string): 
   return task ? `${task.title} · ${task.status}` : fallback;
 }
 
-export function StudioVirtualSpaceNpcDialoguePanel({ npc, room, operations, peers, onAction, onClose }: {
+export function StudioVirtualSpaceNpcDialoguePanel({ npc, room, operations, peers, artStyle, onAction, onClose }: {
   readonly npc: StudioWorldNpcDefinition;
+  readonly artStyle: StudioVirtualArtStyleKey;
   readonly room?: StudioWorldRoomDefinition;
   readonly operations: StudioVirtualOperationsSnapshot;
   readonly peers: readonly StudioVirtualSpacePeer[];
@@ -26,6 +29,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({ npc, room, operations, peer
 }) {
   const bt = useBilingual("StudioVirtualSpaceNpcDialoguePanel");
   const role = studioNpcRole(npc), identity = studioNpcLabel(npc);
+  const portraitUrl = studioNpcCastSkinByKey(npc.skinKey, artStyle).directional.down;
   const questionInput = useRef<HTMLInputElement>(null);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState(() => bt(
@@ -70,7 +74,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({ npc, room, operations, peer
   };
 
   return <section className="studio-vspace-npc-dialogue" role="dialog" aria-modal="true" aria-labelledby="studio-npc-dialogue-title" data-space-interactive="true">
-    <header><div className="studio-vspace-npc-portrait"><Bot size={25} aria-hidden /></div><div><p>{bt(identity.ko, identity.en)}</p><h2 id="studio-npc-dialogue-title">{bt(room?.labelKo ?? "스튜디오", room?.labelEn ?? "Studio")}</h2></div>
+    <header><div className="studio-vspace-npc-portrait"><img src={portraitUrl} alt="" draggable={false} /></div><div><p>{bt(identity.ko, identity.en)}</p><h2 id="studio-npc-dialogue-title">{bt(room?.labelKo ?? "스튜디오", room?.labelEn ?? "Studio")}</h2></div>
       <button type="button" onClick={onClose} aria-label={bt("대화 닫기", "Close dialogue")}><X size={18} aria-hidden /></button></header>
     <div className="studio-vspace-npc-answer"><MessageCircle size={16} aria-hidden /><p>{answer}</p></div>
     <div className="studio-vspace-npc-prompts">{rolePrompts.map((prompt) => { const Icon = prompt.icon; return <button key={prompt.id} type="button" onClick={() => onAction(prompt.id)}><Icon size={15} aria-hidden />{bt(prompt.ko, prompt.en)}</button>; })}</div>

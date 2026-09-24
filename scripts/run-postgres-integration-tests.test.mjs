@@ -242,12 +242,13 @@ describe("PostgreSQL integration test runner", () => {
     ).toBe("true");
   });
 
-  it("runs all nineteen registered PostgreSQL suites without file parallelism", () => {
-    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(19);
-    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 19);
+  it("runs all twenty registered PostgreSQL suites without file parallelism", () => {
+    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(20);
+    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 20);
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/db/admin-schema.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-project-graph-review-race.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-review-preview-producer.integration.test.ts");
+    expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-review-voice-note.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-world-publication.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-work-session.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain(

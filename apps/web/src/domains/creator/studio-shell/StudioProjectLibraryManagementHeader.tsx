@@ -25,13 +25,19 @@ export function StudioProjectLibraryManagementHeader({
     toggleVisibleSelection, archiveProjects, trashProjects, restoreProjects,
   } = controller;
   return (
-    <>
+    <section data-studio-library-toolbar="true" aria-label={bi("프로젝트 라이브러리 도구", "Project library tools")}>
       <header className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">{translateCurrentStaticSourceText("domains.creator.studio.shell.StudioProjectLibraryManagementHeader", "en", "TOONSTUDIO")}</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">
-            {bi((STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS[view]).ko, (STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS[view]).en)}
-          </h1>
+          {view === "active" ? (
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">
+              {bi((STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS[view]).ko, (STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS[view]).en)}
+            </h2>
+          ) : (
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-4xl">
+              {bi((STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS[view]).ko, (STUDIO_PROJECT_LIBRARY_MANAGEMENT_LABELS[view]).en)}
+            </h1>
+          )}
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-2 sm:text-base">
             {bi((STUDIO_PROJECT_LIBRARY_MANAGEMENT_DESCRIPTIONS[view]).ko, (STUDIO_PROJECT_LIBRARY_MANAGEMENT_DESCRIPTIONS[view]).en)}
           </p>
@@ -219,6 +225,6 @@ export function StudioProjectLibraryManagementHeader({
           ) : null}
         </section>
       ) : null}
-    </>
+    </section>
   );
 }

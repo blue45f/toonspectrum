@@ -194,6 +194,7 @@ export const REQUIRED_DATABASE_RELATIONS = [
   "studio_review_policy",
   "studio_review_policy_event",
   "studio_review_reviewer",
+  "studio_review_voice_note",
   "studio_revision",
   "studio_revision_blob",
   "studio_revision_parent",
