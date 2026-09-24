@@ -106,10 +106,26 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     directory: true,
   }),
   route({
+    id: "studio-character-onboarding",
+    path: "/onboarding/character",
+    titleKey: "route.studio",
+    label: { ko: "캐릭터 선택", en: "Choose character" },
+    description: { ko: "서비스와 가상스튜디오에서 사용할 내 캐릭터 선택", en: "Choose your identity for the service and virtual studio" },
+    purpose: "create",
+  }),
+  route({
     id: "workspace-home", path: "/home", titleKey: "route.studio",
-    label: { ko: "스튜디오", en: "Studio" },
-    description: { ko: "내 작업실에서 작품을 이어서 만들기", en: "Resume your work in your studio" },
+    label: { ko: "홈", en: "Home" },
+    description: { ko: "최근 작업과 내 공간에서 다음 행동 선택", en: "Choose the next action from recent work and your space" },
     purpose: "create", projectContext: "optional", directory: true,
+  }),
+  route({
+    id: "studio-personal-space",
+    path: "/studio/space",
+    titleKey: "route.studio",
+    label: { ko: "내 가상스튜디오", en: "My virtual studio" },
+    description: { ko: "직접 고른 캐릭터로 내 공간에 입장", en: "Enter your space with the character you chose" },
+    purpose: "connect",
   }),
   route({
     id: "workspace-team", path: "/team", titleKey: "route.collaborate",

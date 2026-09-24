@@ -142,6 +142,7 @@ import { useStudioVirtualSpaceP2pBoard } from "./use-studio-virtual-space-p2p-bo
 import {
   readStudioVirtualSpaceAvatarIndex,
   readStudioVirtualSpaceEntryPreference,
+  validStudioVirtualSpaceAvatarIndex,
   writeStudioVirtualSpaceAvatarIndex,
   writeStudioVirtualSpaceEntryPreference,
 } from "./studio-virtual-space-entry-preference";
@@ -1886,8 +1887,9 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
       onAvatarIndex={setEntryAvatarIndex}
       onArtStyle={setEntryArtStyle}
       onEnter={() => {
-        writeStudioVirtualSpaceEntryPreference(entryAvatarIndex);
-        writeStudioVirtualArtStyle(entryArtStyle);
+        if (!validStudioVirtualSpaceAvatarIndex(entryAvatarIndex)) return;
+        void writeStudioVirtualSpaceEntryPreference(entryAvatarIndex);
+        void writeStudioVirtualArtStyle(entryArtStyle);
         setEntryOpen(false);
       }}
     />;

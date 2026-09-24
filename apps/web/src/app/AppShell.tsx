@@ -119,7 +119,7 @@ export function AppShell({
   const campus = resolveCampusLocation(pathname, search);
   const protectedCampus = campus?.surface === "protected";
   const taskRoute = protectedCampus ? null : workspaceTaskRoute(pathname, search) ?? campusTaskRoute(campus);
-  const immersiveVirtualHome = ["/", "/home", "/team", "/hub", "/studio"].includes(pathname.replace(/\/+$/u, "") || "/");
+  const immersiveVirtualHome = ["/home", "/team", "/hub", "/studio", "/studio/space", "/onboarding/character"].includes(pathname.replace(/\/+$/u, "") || "/");
   const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/.test(pathname);
   const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null || protectedCampus;
   const publicCreativeRoute = isPublicCreativeRoute(pathname);

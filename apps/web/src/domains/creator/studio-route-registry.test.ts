@@ -22,6 +22,7 @@ describe("Studio route registry", () => {
 
   it("builds canonical product and project destinations", () => {
     expect(studioRoutePath("home")).toBe("/studio");
+    expect(studioRoutePath("personal-space")).toBe("/studio/space");
     expect(studioRoutePath("project-document")).toBe("/studio/p/:projectId/d/:documentId");
     expect(studioProjectSectionPath("series/한글", "story"))
       .toBe("/studio/p/series%2F%ED%95%9C%EA%B8%80/story");
@@ -47,6 +48,7 @@ describe("Studio route registry", () => {
 
   it("resolves canonical and legacy entry points to the same route owner", () => {
     expect(resolveStudioRouteRegistration("/studio/new")?.id).toBe("new");
+    expect(resolveStudioRouteRegistration("/studio/space")?.id).toBe("personal-space");
     expect(resolveStudioRouteRegistration("/make?from=home")?.id).toBe("new");
     expect(resolveStudioRouteRegistration("/brush-lab")?.id).toBe("asset-brush-new");
     expect(resolveStudioRouteRegistration("/studio/p/project-1/review")?.id)

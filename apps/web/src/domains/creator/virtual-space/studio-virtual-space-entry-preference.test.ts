@@ -14,14 +14,14 @@ describe("virtual space entry preference", () => {
     expect(readStudioVirtualSpaceEntryPreference()).toEqual({ avatarIndex: -1, confirmed: false });
   });
 
-  it("persists an explicit player or automatic choice with a versioned record", () => {
+  it("persists only an explicitly selected character with a versioned record", () => {
     expect(writeStudioVirtualSpaceEntryPreference(2)).toBe(true);
     expect(readStudioVirtualSpaceEntryPreference()).toEqual({ avatarIndex: 2, confirmed: true });
     expect(JSON.parse(localStorage.getItem(STUDIO_VIRTUAL_SPACE_ENTRY_STORAGE_KEY)!)).toEqual({
       version: 2, confirmed: true, avatarIndex: 2,
     });
-    expect(writeStudioVirtualSpaceEntryPreference(-1)).toBe(true);
-    expect(readStudioVirtualSpaceEntryPreference()).toEqual({ avatarIndex: -1, confirmed: true });
+    expect(writeStudioVirtualSpaceEntryPreference(-1)).toBe(false);
+    expect(readStudioVirtualSpaceEntryPreference()).toEqual({ avatarIndex: 2, confirmed: true });
   });
 
   it("rejects corrupt and out-of-range values", () => {

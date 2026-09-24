@@ -72,7 +72,7 @@ const START_META: Record<ProductStartDestinationId, StartMeta> = {
 
 const COPY = {
   ko: {
-    primary: "새 작품 시작하기",
+    primary: "내 캐릭터를 고르고 시작하기",
     secondary: "8분 제품 투어 보기",
     projects: "내 프로젝트",
     brandFilm: "8분 제품 투어 보기",
@@ -133,7 +133,7 @@ const COPY = {
     closingSecondary: "샘플 제작 흐름 보기",
   },
   en: {
-    primary: "Start a new work",
+    primary: "Choose a character and start",
     secondary: "Watch the 8-minute product tour",
     projects: "My projects",
     brandFilm: "Watch 8-minute product tour",
@@ -219,7 +219,7 @@ export function CreatorHomeExperience() {
           <h1 id="creator-hero-title">{identity.headline[0]}<br /><em>{identity.headline[1]}</em></h1>
           <p className="cf-lead">{identity.description}</p>
           <div className="cf-actions">
-            <Link href="/studio/new" className="cf-button cf-primary">{copy.primary}<ArrowRight size={17} aria-hidden="true" /></Link>
+            <Link href="/onboarding/character?next=%2Fhome" className="cf-button cf-primary">{copy.primary}<ArrowRight size={17} aria-hidden="true" /></Link>
             <Link href="/product-tour" className="cf-button cf-secondary">{copy.secondary}</Link>
           </div>
           <div className="cf-hero-links">
