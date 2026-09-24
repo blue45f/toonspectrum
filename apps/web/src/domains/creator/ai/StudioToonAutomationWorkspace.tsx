@@ -14,14 +14,9 @@ import {
   UserRound,
   WandSparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 import { downloadBlob } from "../export/studio-export";
-import {
-  choosePreferredDialogueVoice,
-  createBrowserDialogueSpeechAdapter,
-  listDialogueSpeechVoices,
-} from "../lettering/studio-dialogue-read-aloud";
 import {
   STUDIO_EASE,
   STUDIO_FOCUS_RING,
@@ -54,6 +49,13 @@ import {
 
 import type { ScenarioPreviewItem } from "../studio-scenario-layout";
 
+import {
+  chooseNaturalKoreanVoice,
+  isNaturalBrowserSpeechSupported,
+  listNaturalBrowserSpeechVoices,
+  speakNaturalBrowserSpeech,
+  type NaturalBrowserSpeechSession,
+} from "@/shared/lib/natural-browser-speech";
 import { createSecureRandomUuid } from "@/shared/lib/secure-random-id";
 import { cn } from "@/shared/lib/utils";
 
@@ -254,7 +256,8 @@ export function StudioToonAutomationWorkspace({
   const [tab, setTab] = useState<TabId>("overview");
   const [referenceDraft, setReferenceDraft] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
-  const speech = useMemo(() => createBrowserDialogueSpeechAdapter(), []);
+  const speechSupported = isNaturalBrowserSpeechSupported();
+  const speechSessionRef = useRef<NaturalBrowserSpeechSession | null>(null);
   const readiness = useMemo(
     () => studioToonAutomationReadiness({
       document,
@@ -272,8 +275,9 @@ export function StudioToonAutomationWorkspace({
   );
 
   useEffect(() => () => {
-    speech.cancel();
-  }, [speech]);
+    speechSessionRef.current?.cancel();
+    speechSessionRef.current = null;
+  }, []);
 
   const patch = (
     next: Partial<Omit<StudioToonAutomationDocument, "version" | "revision" | "updatedAt">>,
@@ -327,23 +331,34 @@ export function StudioToonAutomationWorkspace({
   const previewNarration = () => {
     const sample = storyText.trim().slice(0, 280)
       || "툰스튜디오 음성 검수입니다. 캐릭터와 장면의 분위기를 확인하세요.";
-    const voices = listDialogueSpeechVoices(speech);
+    const voices = listNaturalBrowserSpeechVoices();
     const configured = document.audio.narrationVoice;
-    const voice = choosePreferredDialogueVoice(
-      voices,
-      { name: configured.voiceId || undefined, lang: configured.locale },
-      configured.locale,
+    const explicitlyConfigured = voices.find((candidate) =>
+      candidate.voiceURI === configured.voiceId || candidate.name === configured.voiceId
     );
-    speech.cancel();
-    const started = speech.speak({
+    const voice = explicitlyConfigured ?? chooseNaturalKoreanVoice(voices, {
+      gender: "neutral",
+      preferLocal: true,
+    });
+    speechSessionRef.current?.cancel();
+    const session = speakNaturalBrowserSpeech({
       text: sample,
+      style: "calm",
       rate: configured.rate,
       voice,
-      onEnd: () => setNotice("음성 검수를 마쳤습니다."),
-      onError: () => setNotice("이 브라우저에서 음성 검수를 재생하지 못했습니다."),
+      maxSegmentChars: 64,
+      onEnd: () => {
+        speechSessionRef.current = null;
+        setNotice("자연스러운 호흡으로 음성 검수를 마쳤습니다.");
+      },
+      onError: () => {
+        speechSessionRef.current = null;
+        setNotice("이 브라우저에서 음성 검수를 재생하지 못했습니다.");
+      },
     });
-    setNotice(started
-      ? "브라우저의 기기 음성으로 대본 일부를 검수합니다."
+    speechSessionRef.current = session;
+    setNotice(session
+      ? "별도 과금 없는 시스템 음성으로 발음·호흡을 보정해 대본 일부를 검수합니다."
       : "이 브라우저에서는 음성 검수를 사용할 수 없습니다.");
   };
 
@@ -1027,7 +1042,7 @@ export function StudioToonAutomationWorkspace({
                     />
                   </label>
                   <div className="flex items-end">
-                    <button type="button" className={cn(PRIMARY, "w-full")} onClick={previewNarration} disabled={!speech.supported}>
+                    <button type="button" className={cn(PRIMARY, "w-full")} onClick={previewNarration} disabled={!speechSupported}>
                       <Mic2 size={14} aria-hidden /> 대본 음성 검수
                     </button>
                   </div>

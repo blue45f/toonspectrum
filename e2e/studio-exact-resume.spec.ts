@@ -1,6 +1,10 @@
 
 import { serializeStudioAutosave, studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
 import {
+  STUDIO_BETA_NOTICE_REVISION,
+  STUDIO_BETA_NOTICE_STORAGE_KEY,
+} from "../apps/web/src/domains/creator/studio-beta-notice-storage";
+import {
   STUDIO_EXACT_RESUME_RESTORED_EVENT,
   studioExactResumeStorageKey,
 } from "../apps/web/src/domains/creator/studio-exact-resume-context";
@@ -122,6 +126,7 @@ test.beforeEach(async ({ page }) => {
       localStorage.setItem(payload.resumeKey, JSON.stringify(payload.resumeContext));
       sessionStorage.setItem("exact-resume-fixture-seeded", "true");
     }
+    localStorage.setItem(payload.betaNoticeKey, payload.betaNoticeRevision);
     (window as Window & { __studioExactResumeEvents?: unknown[] }).__studioExactResumeEvents = [];
     window.addEventListener(restoredEvent, (event) => {
       (window as Window & { __studioExactResumeEvents?: unknown[] }).__studioExactResumeEvents?.push(
@@ -136,6 +141,8 @@ test.beforeEach(async ({ page }) => {
       projectDocuments,
       resumeKey: studioExactResumeStorageKey(PROJECT_ID, DOCUMENT_ID),
       resumeContext,
+      betaNoticeKey: STUDIO_BETA_NOTICE_STORAGE_KEY,
+      betaNoticeRevision: STUDIO_BETA_NOTICE_REVISION,
     },
     restoredEvent: STUDIO_EXACT_RESUME_RESTORED_EVENT,
   });

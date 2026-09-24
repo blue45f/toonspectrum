@@ -314,7 +314,7 @@ export function SettingsPage() {
           <ChevronRight size={18} aria-hidden />
         </Link>
         <Link to="/settings/ai" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
-          <span><strong>통합 AI 설정</strong><span className="mt-1 block text-sm text-fg-2">텍스트·이미지·영상·3D의 사용자 키와 암호화 보관함을 한곳에서 관리</span></span>
+          <span><strong>AI 연결과 사용 순서</strong><span className="mt-1 block text-sm text-fg-2">초보자용 빠른 연결, 자동 무료 AI와 기능별 사용 순서를 한곳에서 관리</span></span>
           <ChevronRight size={18} aria-hidden />
         </Link>
       </div>

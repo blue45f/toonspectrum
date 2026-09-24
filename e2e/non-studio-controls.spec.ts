@@ -40,7 +40,7 @@ test.describe("mobile campus map keyboard focus", () => {
 
 test("anonymous account gate opens and dismisses login without submitting credentials", async ({ page }) => {
   await page.goto("/me");
-  await page.locator("main").getByRole("button", { name: "로그인", exact: true }).click();
+  await page.locator('main button:not([data-auth-trigger])', { hasText: /^로그인$/u }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);

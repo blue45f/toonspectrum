@@ -1,40 +1,44 @@
 import { useEffect, useRef, useState } from "react";
 
+import {
+  chooseNaturalKoreanVoice,
+  speakNaturalBrowserSpeech,
+  type NaturalBrowserSpeechSession,
+  type NaturalVoiceGender,
+} from "../../shared/lib/natural-browser-speech";
 import { buildSteps } from "./fortune-types";
 
 import type { FortunePanel, PlaybackStep } from "./fortune-types";
 
 // 운세 웹툰의 "재생"을 총괄하는 오케스트레이터.
 // 패널을 스텝(대사/나레이션) 시퀀스로 펼쳐, 스텝마다
-//   ① 활성 컷 포커스 ② 음성 낭독 ③ 진행률에 맞춘 말풍선 타이핑
+//   ① 활성 컷 포커스 ② 무료 시스템 음성 낭독 ③ 진행률에 맞춘 말풍선 타이핑
 // 을 동기화해 모션코믹처럼 연출한다.
 //
-// 음성은 무료 브라우저 내장 Web Speech(ko-KR)만 사용한다. 현재 자연스러운 한국어
-// 여성 보이스(유나/Yuna)만 채택하며, 그에 어울리는 캐릭터(아라·레오나)와 나레이션만
-// 낭독한다. 남성 캐릭터(단우·가온)는 어울리는 보이스가 없어 무음으로 두되, 컷
-// 애니메이션과 말풍선 타이핑은 동일하게 진행한다.
+// 별도 TTS API를 호출하지 않는다. 브라우저/운영체제에 설치된 한국어 음성을 품질·화자
+// 성향에 따라 자동 선택하고, 로컬 음성 감독이 문장을 호흡 단위로 나누어 속도와 피치를
+// 미세하게 변화시킨다. 특정 음성이 없어도 어떤 캐릭터도 강제로 무음 처리하지 않는다.
 
 type PlaybackStatus = "idle" | "playing" | "paused";
 
-// 음성으로 낭독할 화자(여성 캐릭터). 그 외(단우·가온)는 무음 + 타이핑만.
-const VOICED_CHARACTERS = new Set(["ara", "leona"]);
-// 캐릭터별 미세 피치(같은 유나 보이스를 살짝 구분)
-const VOICE_PITCH: Record<string, number> = { ara: 1.12, leona: 0.98, _narration: 1.0 };
-const SEGMENT_GAP_MS = 220; // 컷 사이 호흡
+const VOICE_GENDER: Record<string, NaturalVoiceGender> = {
+  ara: "female",
+  leona: "female",
+  danwoo: "male",
+  gaon: "male",
+  _narration: "neutral",
+};
 
-// 유나(Yuna) 한국어 보이스를 우선 선택. 없으면 ko 보이스 폴백.
-function pickYunaVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  const ko = voices.filter((v) => v.lang?.toLowerCase().startsWith("ko"));
-  if (ko.length === 0) return null;
-  const yuna = ko.find((v) => /yuna|유나/i.test(`${v.name} ${v.voiceURI}`));
-  return yuna ?? ko[0];
-}
+// 같은 시스템 음성을 사용하더라도 화자의 인상을 조금씩 구분한다.
+const VOICE_PITCH: Record<string, number> = {
+  ara: 1.055,
+  leona: 0.99,
+  danwoo: 0.94,
+  gaon: 0.9,
+  _narration: 1,
+};
 
-// 나레이션(화자 null)도 유나로 낭독, 단우·가온은 무음
-function shouldVoice(characterId: string | null): boolean {
-  if (!characterId) return true; // 나레이션
-  return VOICED_CHARACTERS.has(characterId);
-}
+const SEGMENT_GAP_MS = 220;
 
 export interface FortunePlayback {
   supported: boolean;
@@ -68,38 +72,42 @@ export function useFortunePlayback(panels: FortunePanel[] | undefined): FortuneP
 
   const stepsRef = useRef<PlaybackStep[]>(steps);
   stepsRef.current = steps;
-  const tokenRef = useRef(0); // 재생 세션 토큰 — stop/play마다 증가, 옛 콜백 무시
+  const tokenRef = useRef(0);
   const speedRef = useRef(1);
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const rafRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelRef = useRef<(() => void) | null>(null);
+  const speechSessionRef = useRef<NaturalBrowserSpeechSession | null>(null);
 
-  // Web Speech 보이스 로드 (Safari는 늦게 채워지므로 voiceschanged 구독)
   useEffect(() => {
     if (!supported) return;
     const synth = window.speechSynthesis;
     const load = () => {
-      voicesRef.current = synth.getVoices();
+      try {
+        voicesRef.current = synth.getVoices();
+      } catch {
+        voicesRef.current = [];
+      }
     };
     load();
     synth.addEventListener("voiceschanged", load);
     return () => {
       synth.removeEventListener("voiceschanged", load);
-      synth.cancel();
+      speechSessionRef.current?.cancel();
+      speechSessionRef.current = null;
+      try { synth.cancel(); } catch { /* capability disappeared */ }
     };
   }, [supported]);
 
-  // 언마운트 정리
   useEffect(() => {
     return () => {
       tokenRef.current += 1;
       clearTimers();
-      try {
-        window.speechSynthesis?.cancel();
-      } catch {
-        /* noop */
-      }
+      cancelRef.current?.();
+      speechSessionRef.current?.cancel();
+      speechSessionRef.current = null;
+      try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
     };
   }, []);
 
@@ -110,85 +118,79 @@ export function useFortunePlayback(panels: FortunePanel[] | undefined): FortuneP
     timerRef.current = null;
   }
 
-  // 한 스텝 낭독 + 진행률(타이핑) 콜백. cancel 함수를 반환.
-  function speakStep(step: PlaybackStep, onProgress: (chars: number) => void, onEnd: () => void): () => void {
-    const text = step.text;
+  function timedTypingStep(
+    text: string,
+    onProgress: (chars: number) => void,
+    onEnd: () => void
+  ): () => void {
     let cancelled = false;
-
-    // 무음(남성 캐릭터) 또는 음성 미지원 → 시간 기반 타이핑만
-    const voiced = supported && shouldVoice(step.characterId);
-    if (!voiced) {
-      const started = performance.now();
-      const cps = 12 * speedRef.current; // 무음 타이핑 속도
-      const tick = () => {
-        if (cancelled) return;
-        const chars = Math.floor(((performance.now() - started) / 1000) * cps);
-        onProgress(Math.min(text.length, chars));
-        if (chars >= text.length) {
-          // 짧은 여운 후 종료
-          timerRef.current = setTimeout(onEnd, 250);
-          return;
-        }
-        rafRef.current = requestAnimationFrame(tick);
-      };
+    const started = performance.now();
+    const cps = 12 * speedRef.current;
+    const tick = () => {
+      if (cancelled) return;
+      const chars = Math.floor(((performance.now() - started) / 1000) * cps);
+      onProgress(Math.min(text.length, chars));
+      if (chars >= text.length) {
+        timerRef.current = setTimeout(onEnd, 250);
+        return;
+      }
       rafRef.current = requestAnimationFrame(tick);
-      return () => {
-        cancelled = true;
-      };
-    }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+  }
 
-    // 유나 보이스로 낭독
-    const synth = window.speechSynthesis;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "ko-KR";
-    u.rate = Math.min(2, 1.0 * speedRef.current);
-    u.pitch = VOICE_PITCH[step.characterId ?? "_narration"] ?? 1.0;
-    const v = pickYunaVoice(voicesRef.current);
-    if (v) u.voice = v;
+  // 한 스텝 낭독 + 진행률(타이핑) 콜백. cancel 함수를 반환한다.
+  function speakStep(
+    step: PlaybackStep,
+    onProgress: (chars: number) => void,
+    onEnd: () => void
+  ): () => void {
+    const text = step.text;
+    if (!supported) return timedTypingStep(text, onProgress, onEnd);
 
-    let boundarySeen = false;
-    let ended = false;
-    let watchdog: ReturnType<typeof setTimeout> | null = null;
+    const speakerKey = step.characterId ?? "_narration";
+    const voice = chooseNaturalKoreanVoice(voicesRef.current, {
+      gender: VOICE_GENDER[speakerKey] ?? "neutral",
+      // 온라인/뉴럴 OS 음성도 사용자가 설치·활성화한 시스템 보이스일 때만 후보가 된다.
+      // 제품의 유료 TTS API를 호출하지 않으며 자연스러움을 우선한다.
+      preferLocal: false,
+    });
+
+    let cancelled = false;
+    let session: NaturalBrowserSpeechSession | null = null;
     const finish = () => {
-      if (watchdog != null) clearTimeout(watchdog);
-      watchdog = null;
-      if (cancelled || ended) return;
-      ended = true;
+      if (cancelled) return;
+      if (speechSessionRef.current === session) speechSessionRef.current = null;
       onProgress(text.length);
       onEnd();
     };
-    u.onboundary = (e: SpeechSynthesisEvent) => {
-      boundarySeen = true;
-      const len = (e as SpeechSynthesisEvent & { charLength?: number }).charLength ?? 1;
-      onProgress(Math.min(text.length, (e.charIndex ?? 0) + len));
-    };
-    u.onend = finish;
-    u.onerror = finish;
-    synth.speak(u);
 
-    // Safari 등 boundary 미지원 + onend 누락 대비: 시간 추정 타이핑 + 워치독
-    const started = performance.now();
-    const cps = 9 * speedRef.current;
-    const estMs = (text.length / Math.max(1, cps)) * 1000 + 2000;
-    watchdog = setTimeout(finish, estMs);
-    const estimate = () => {
-      if (cancelled || ended) return;
-      if (!boundarySeen) {
-        const chars = Math.floor(((performance.now() - started) / 1000) * cps);
-        onProgress(Math.min(text.length, chars));
-      }
-      rafRef.current = requestAnimationFrame(estimate);
-    };
-    rafRef.current = requestAnimationFrame(estimate);
+    session = speakNaturalBrowserSpeech({
+      text,
+      voice,
+      style: step.characterId ? "dialogue" : "fortune",
+      rate: speedRef.current,
+      pitch: VOICE_PITCH[speakerKey] ?? 1,
+      maxSegmentChars: step.characterId ? 48 : 64,
+      onProgress: (chars) => {
+        if (!cancelled) onProgress(Math.min(text.length, chars));
+      },
+      onEnd: finish,
+      // 한 문장의 시스템 음성 오류가 전체 운세 재생을 멈추게 하지 않는다.
+      onError: finish,
+    });
 
+    if (!session) return timedTypingStep(text, onProgress, onEnd);
+    speechSessionRef.current = session;
     return () => {
       cancelled = true;
-      if (watchdog != null) clearTimeout(watchdog);
-      try {
-        synth.cancel();
-      } catch {
-        /* noop */
-      }
+      session?.cancel();
+      if (speechSessionRef.current === session) speechSessionRef.current = null;
     };
   }
 
@@ -198,6 +200,7 @@ export function useFortunePlayback(panels: FortunePanel[] | undefined): FortuneP
     if (i < 0 || i >= list.length) {
       setStatus("idle");
       setActiveStep(-1);
+      speechSessionRef.current = null;
       return;
     }
     setActiveStep(i);
@@ -223,6 +226,8 @@ export function useFortunePlayback(panels: FortunePanel[] | undefined): FortuneP
     tokenRef.current += 1;
     clearTimers();
     cancelRef.current?.();
+    speechSessionRef.current?.cancel();
+    speechSessionRef.current = null;
     setStatus("playing");
     runStep(Math.max(0, Math.min(i, stepsRef.current.length - 1)));
   }
@@ -240,11 +245,9 @@ export function useFortunePlayback(panels: FortunePanel[] | undefined): FortuneP
     clearTimers();
     cancelRef.current?.();
     cancelRef.current = null;
-    try {
-      window.speechSynthesis?.cancel();
-    } catch {
-      /* noop */
-    }
+    speechSessionRef.current?.cancel();
+    speechSessionRef.current = null;
+    try { window.speechSynthesis?.cancel(); } catch { /* noop */ }
     setStatus("idle");
     setActiveStep(-1);
     setTyped(0);
@@ -252,20 +255,16 @@ export function useFortunePlayback(panels: FortunePanel[] | undefined): FortuneP
 
   const pause = () => {
     if (status !== "playing") return;
-    try {
-      window.speechSynthesis?.pause();
-    } catch {
-      /* noop */
+    if (!speechSessionRef.current?.pause()) {
+      try { window.speechSynthesis?.pause(); } catch { /* noop */ }
     }
     setStatus("paused");
   };
 
   const resume = () => {
     if (status !== "paused") return;
-    try {
-      window.speechSynthesis?.resume();
-    } catch {
-      /* noop */
+    if (!speechSessionRef.current?.resume()) {
+      try { window.speechSynthesis?.resume(); } catch { /* noop */ }
     }
     setStatus("playing");
   };
@@ -284,9 +283,9 @@ export function useFortunePlayback(panels: FortunePanel[] | undefined): FortuneP
     startFrom(target);
   };
 
-  const setSpeed = (s: number) => {
-    speedRef.current = s;
-    setSpeedState(s);
+  const setSpeed = (value: number) => {
+    speedRef.current = value;
+    setSpeedState(value);
   };
 
   const activePanel = activeStep >= 0 && steps[activeStep] ? steps[activeStep].panel : -1;

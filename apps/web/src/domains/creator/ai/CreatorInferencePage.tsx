@@ -1,5 +1,5 @@
 import { useUserAi } from "@/shared/ai/user-ai-store";
-import { UnifiedAiSettings } from "@/shared/ai/UnifiedAiSettings";
+import { UnifiedAiSettingsEntryCard } from "@/shared/ai/UnifiedAiSettings";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "@/compat/router-link";
 import { getApiErrorMessage } from "@/infrastructure/api";
@@ -93,7 +93,7 @@ export function CreatorInferencePage() {
   return <div className="creator-inference-page">
     <nav aria-label="제작실 이동"><Link href="/studio">← 스튜디오</Link><Link href="/showcase/promo">컷 기반 홍보 영상</Link><a href="/spatial-reader/">공간형 감상</a></nav>
     <header><p className="inference-kicker">MANAGED CLOUD CREATIVE ENGINES</p><h1>그림에서 움직임으로.<br />입체에서 새로운 그림으로.</h1><p>실제 모델 추론으로 만드는 제작실입니다. 모델과 GPU가 준비되지 않으면 생성 성공으로 표시하지 않습니다.</p></header>
-    <details className="my-6 rounded-xl border border-line p-4"><summary className="min-h-11 cursor-pointer font-semibold">통합 AI 설정 · 클라우드 런타임 연결</summary><UnifiedAiSettings /></details>
+    <UnifiedAiSettingsEntryCard source="inference" title="클라우드 AI 연결" description="3D·영상 런타임 토큰과 기능별 AI 경로는 통합 AI 설정에서 관리해요." className="my-6" />
     <section className="inference-modes" aria-label="추론 방식">{MODES.map((option) => <button key={option.value} type="button" aria-pressed={mode === option.value} disabled={busy || uncertain} onClick={() => { setMode(option.value); setFiles([]); setPrompt(option.value === "image-to-video" ? "The character blinks naturally. Hair and clothes move gently in the breeze. Preserve the original character design and colors." : "Clean Korean webtoon character illustration, faithful silhouette, expressive eyes, refined cel shading."); }}><strong>{option.title}</strong><span>{option.description}</span><small>{caps?.enabled && caps.engines[option.value]?.configured ? "모델 설정 확인됨 · 실제 품질은 결과 검토 필요" : "모델 준비 필요"}</small></button>)}</section>
     <div className="inference-layout"><form onSubmit={(event) => { event.preventDefault(); void run(); }}>
       <h2>생성 설정</h2><fieldset disabled={busy || uncertain}>
