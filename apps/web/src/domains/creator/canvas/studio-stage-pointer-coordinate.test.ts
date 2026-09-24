@@ -49,6 +49,29 @@ describe("snapshotStudioStagePointerBatchMapper", () => {
     expect(fixture.point).toHaveBeenCalledTimes(3);
   });
 
+  it("keeps pointer coordinates stable when browser page zoom changes the rendered CSS box", () => {
+    const fixture = fakeStage({
+      clientWidth: 1_200,
+      clientHeight: 600,
+      rect: { left: 50, top: 20, width: 600, height: 300 },
+    });
+    const mapper = snapshotStudioStagePointerBatchMapper(fixture.stage as never);
+
+    expect(mapper.pointFor({ clientX: 350, clientY: 170 })).toEqual({ x: 600, y: 300 });
+    expect(fixture.getBoundingClientRect).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps non-uniform embedded host scaling independently on each axis", () => {
+    const fixture = fakeStage({
+      clientWidth: 400,
+      clientHeight: 400,
+      rect: { left: 10, top: 30, width: 200, height: 800 },
+    });
+    const mapper = snapshotStudioStagePointerBatchMapper(fixture.stage as never);
+
+    expect(mapper.pointFor({ clientX: 110, clientY: 430 })).toEqual({ x: 200, y: 200 });
+  });
+
   it("falls back to unit CSS scale when layout dimensions are unavailable", () => {
     const fixture = fakeStage({
       clientWidth: 0,

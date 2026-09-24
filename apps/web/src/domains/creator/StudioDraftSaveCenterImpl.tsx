@@ -581,6 +581,15 @@ export function StudioDraftSaveCenter({
       >
         <StatusIcon tone={model.tone} className="h-4 w-4 shrink-0" />
         <span className="truncate">{model.compactLabel}</span>
+        {lastServerSaveAt !== null ? (
+          <time
+            data-studio-last-server-save
+            dateTime={new Date(lastServerSaveAt).toISOString()}
+            className="rounded-full border border-current/20 px-1.5 py-0.5 text-[0.62rem] opacity-80"
+          >
+            서버 {formatStudioDraftSaveTime(lastServerSaveAt)}
+          </time>
+        ) : null}
         <span className="rounded-full border border-current/20 px-1.5 py-0.5 text-[0.62rem] opacity-80">
           {isOnline ? "온라인" : "오프라인"}
         </span>

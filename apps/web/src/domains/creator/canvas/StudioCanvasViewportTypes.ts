@@ -90,6 +90,7 @@ export interface StudioCanvasViewportHandlers {
     targetBounds: StudioGroupUniformResizeBounds,
     rotationDeg: number
   ) => boolean;
+  fitCanvasToViewport: () => void;
   fitCanvasToWidth: () => void;
   onWebGpuFrameInvalid: () => void;
   onWebGpuFrameRequest: (request: StudioWebGpuSurfaceFrameRequest) => void;

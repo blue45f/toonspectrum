@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useI18n } from "@/shared/lib/i18n";
 
@@ -25,32 +25,53 @@ afterEach(() => {
 });
 
 describe("StudioBetaNoticeGate", () => {
-  it("shows the pre-release risks on Studio routes", () => {
-    render(<StudioBetaNoticeGate pathname="/studio" />);
+  it("shows a non-modal notice without blocking the Studio behind it", () => {
+    const onCanvasAction = vi.fn();
+    render(
+      <>
+        <button type="button" onClick={onCanvasAction}>캔버스 작업</button>
+        <StudioBetaNoticeGate pathname="/studio" />
+      </>,
+    );
 
     expect(
-      screen.getByRole("dialog", {
+      screen.getByRole("region", {
         name: "툰스튜디오는 현재 베타 테스트 중입니다",
       }),
     ).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.querySelector("[data-studio-beta-notice-overlay]")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "캔버스 작업" }));
+    expect(onCanvasAction).toHaveBeenCalledOnce();
+  });
+
+  it("keeps detailed risks collapsed until the author asks for them", () => {
+    render(<StudioBetaNoticeGate pathname="/studio" />);
+
+    expect(screen.queryByText("저장 데이터 초기화 가능")).toBeNull();
+    const details = screen.getByRole("button", { name: "주의사항 자세히" });
+    expect(details.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(details);
     expect(screen.getByText("저장 데이터 초기화 가능")).toBeTruthy();
     expect(screen.getByText("기능·정책 수시 변경")).toBeTruthy();
     expect(screen.getByText("중요한 작업은 별도 백업")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "주의사항 접기" }).getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("requires an explicit acknowledgement before closing", () => {
+  it("requires an explicit acknowledgement before storing the current revision", () => {
     render(<StudioBetaNoticeGate pathname="/studio/p/project-1/canvas" />);
 
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByRole("region")).toBeTruthy();
+    expect(window.localStorage.getItem(STUDIO_BETA_NOTICE_STORAGE_KEY)).toBeNull();
 
-    const acknowledge = screen.getByRole("button", {
-      name: "확인하고 툰스튜디오 시작하기",
-    });
+    const acknowledge = screen.getByRole("button", { name: "확인했어요" });
     expect(acknowledge.getAttribute("data-studio-beta-notice-acknowledge")).toBe("true");
     fireEvent.click(acknowledge);
 
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("region")).toBeNull();
     expect(window.localStorage.getItem(STUDIO_BETA_NOTICE_STORAGE_KEY)).toBe(
       STUDIO_BETA_NOTICE_REVISION,
     );
@@ -59,7 +80,7 @@ describe("StudioBetaNoticeGate", () => {
   it("does not mount outside the Studio namespace", () => {
     render(<StudioBetaNoticeGate pathname="/discover" />);
 
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("region")).toBeNull();
     expect(window.localStorage.getItem(STUDIO_BETA_NOTICE_STORAGE_KEY)).toBeNull();
   });
 
@@ -70,7 +91,7 @@ describe("StudioBetaNoticeGate", () => {
     );
 
     render(<StudioBetaNoticeGate pathname="/studio/new" />);
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("region")).toBeNull();
   });
 
   it("shows again when the stored acknowledgement belongs to older copy", () => {
@@ -80,7 +101,7 @@ describe("StudioBetaNoticeGate", () => {
     );
 
     render(<StudioBetaNoticeGate pathname="/studio" />);
-    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByRole("region")).toBeTruthy();
   });
 
   it("uses the current interface language", () => {
@@ -88,10 +109,11 @@ describe("StudioBetaNoticeGate", () => {
 
     render(<StudioBetaNoticeGate pathname="/studio" />);
     expect(
-      screen.getByRole("dialog", {
+      screen.getByRole("region", {
         name: "ToonStudio is currently in beta testing",
       }),
     ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Review beta risks" }));
     expect(screen.getByText("Stored data may be reset")).toBeTruthy();
   });
 });

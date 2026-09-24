@@ -159,6 +159,27 @@ describe("Studio brush cursor", () => {
     expect(atDouble.dash?.map((value) => value * 2)).toEqual([4, 3]);
   });
 
+  it("keeps effect extents in document space while projecting the correct screen footprint", () => {
+    const atHalf = planStudioBrushCursorVisual({
+      brushId: "soft-glow",
+      diameter: 20,
+      effectiveScale: 0.5,
+      mode: "pen",
+    });
+    const atDouble = planStudioBrushCursorVisual({
+      brushId: "soft-glow",
+      diameter: 20,
+      effectiveScale: 2,
+      mode: "pen",
+    });
+
+    expect(atHalf.radius).toBe(42);
+    expect(atDouble.radius).toBe(42);
+    expect(atHalf.radius * 0.5).toBe(21);
+    expect(atDouble.radius * 2).toBe(84);
+    expect(atHalf.innerBoundaryScale).toBe(atDouble.innerBoundaryScale);
+  });
+
   it("adds a center sight for tiny outlines and honors the saved dot style", () => {
     const tiny = planStudioBrushCursorVisual({ diameter: 2, effectiveScale: 1, mode: "pen" });
     const large = planStudioBrushCursorVisual({ diameter: 20, effectiveScale: 1, mode: "pen" });

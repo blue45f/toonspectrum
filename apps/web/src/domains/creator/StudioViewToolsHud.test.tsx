@@ -33,6 +33,7 @@ function props(
     onZoomOut: vi.fn(),
     onSetMagnification: vi.fn(),
     onFit: vi.fn(),
+    onFitViewport: vi.fn(),
     onFitSelection: vi.fn(),
     onActual: vi.fn(),
     onRotateLeft: vi.fn(),
@@ -65,12 +66,25 @@ describe("StudioViewToolsHud", () => {
     expect(html).toContain('aria-label="캔버스 확대율 입력"');
     expect(html).toContain('aria-label="캔버스 확대율 정밀 조절"');
     expect(html).toContain('aria-label="선택 영역에 맞춤"');
+    expect(html).toContain('aria-label="화면에 전체 맞춤"');
     expect(html).toContain('data-studio-view-zoom-preset="25"');
     expect(html).toContain('data-studio-view-zoom-preset="400"');
     expect(html).toContain('aria-label="캔버스 실제 픽셀 100%"');
     expect(html).toContain('aria-label="캔버스 좌우 반전"');
     expect(html).not.toContain(" title=");
     expect(html).not.toContain("왼쪽으로 90도 회전");
+  });
+
+  it("exposes distinct whole-canvas and width-fit actions", () => {
+    const onFitViewport = vi.fn();
+    const onFit = vi.fn();
+    render(<StudioViewToolsHud {...props({ onFitViewport, onFit })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "화면에 전체 맞춤" }));
+    fireEvent.click(screen.getByRole("button", { name: "캔버스 너비에 맞춤" }));
+
+    expect(onFitViewport).toHaveBeenCalledOnce();
+    expect(onFit).toHaveBeenCalledOnce();
   });
 
   it("commits forgiving exact percentage input, slider changes and zoom presets", () => {
