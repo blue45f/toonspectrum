@@ -27,6 +27,7 @@
 @media (max-width: 640px) {
   .pwa-install-nudge { left: max(0.75rem, env(safe-area-inset-left)); right: max(0.75rem, env(safe-area-inset-right)); width: auto; max-height: calc(100dvh - var(--pwa-install-top) - 0.75rem - env(safe-area-inset-bottom)); }
   .pwa-install-nudge[data-surface="home"] { top: auto; bottom: calc(var(--pwa-install-mobile-nav-offset) + env(safe-area-inset-bottom)); max-height: calc(100dvh - var(--site-header-height, 4.25rem) - var(--pwa-install-mobile-nav-offset) - 1.25rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)); animation-name: pwa-install-nudge-enter-up; }
+  body:has([data-site-ost="mounted"]) .pwa-install-nudge[data-surface="home"] { bottom: calc(var(--pwa-install-mobile-nav-offset) + 3.5rem + env(safe-area-inset-bottom)); max-height: calc(100dvh - var(--site-header-height, 4.25rem) - var(--pwa-install-mobile-nav-offset) - 4.75rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
   .pwa-install-nudge__action { width: calc(100% - 3.5rem); }
 }
 @media (max-width: 360px) {

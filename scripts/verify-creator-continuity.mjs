@@ -50,6 +50,12 @@ try {
     });
     await context.addInitScript(({ key, now }) => {
       localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+      // Keep the creator-home assertions in the deterministic task view. The install prompt
+      // is verified later on a public route because immersive workspace chrome does not own it.
+      localStorage.setItem(
+        "toonspectrum-creator-experience-mode-v1",
+        JSON.stringify({ mode: "classic" }),
+      );
       // Seed once: init scripts run again on reload and must not overwrite normalization.
       if (localStorage.getItem(key) !== null) return;
       localStorage.setItem(key, JSON.stringify({
@@ -102,6 +108,11 @@ try {
       "/studio?preset=illustration",
     );
 
+    await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await expect(page.locator(".cf-intent")).toBeVisible();
+    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+
+    await page.goto(`${origin}/`, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await page.evaluate(() => {
       const event = new Event("beforeinstallprompt", { cancelable: true });
       Object.defineProperties(event, {
@@ -115,7 +126,7 @@ try {
     await nudge.getByRole("button", { name: "설치", exact: true }).click();
     await expect(nudge).toHaveCount(0);
 
-    await page.evaluate(() => window.dispatchEvent(new Event("offline")));
+    await page.goto(`${origin}/about/studio`, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await expect(page.locator(".cf-intent")).toBeVisible();
 
     assert.equal(

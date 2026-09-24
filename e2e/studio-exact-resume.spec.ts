@@ -178,11 +178,11 @@ test("Local My work resumes the exact document context and keeps it after return
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await page.goto("/studio", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText("정확히 이어보는 작품")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "정확히 이어보는 작품", exact: true })).toBeVisible();
   await expect(page.getByText("최근 위치 기억됨")).toBeVisible();
   await expect(page.getByText("page-2 · 확대 160% · 선택 1개")).toBeVisible();
 
-  const continueLink = page.getByRole("link", { name: "이어서 작업" });
+  const continueLink = page.getByRole("link", { name: "이어서 작업", exact: true });
   await expect(continueLink).toHaveAttribute(
     "href",
     `/studio/p/${PROJECT_ID}/d/${DOCUMENT_ID}?focus=cut%3A2&language=ko-KR&resume=latest&version=draft-7&workspace=comic`,
