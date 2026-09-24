@@ -1,0 +1,103 @@
+name: Studio manuscript delivery acceptance
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    branches: [main, release/salvage-integration-20260908]
+    paths:
+      - 'scripts/verify-review-delivery-workflow*.mjs'
+      - 'scripts/review-delivery-acceptance-ci.test.mjs'
+      - 'apps/api/src/modules/studio-project-graph/review-delivery/**'
+      - 'apps/api/src/modules/studio-project-graph/studio-review-preview-producer*'
+      - 'apps/web/src/compat/use-auth-actor-id.ts'
+      - 'apps/web/src/domains/creator/production-hub/*Manuscript*'
+      - 'apps/web/src/domains/creator/production-hub/production-manuscript-*'
+      - 'apps/web/src/domains/creator/review-export/**'
+      - 'apps/web/src/domains/creator/review-share/StudioPinnedReviewShareManager*'
+      - 'apps/web/src/domains/creator/virtual-space/StudioPinnedReviewPanel*'
+      - 'apps/web/tools/browser-harnesses/virtual-studio-review-export*'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/studio-manuscript-delivery-acceptance.yml'
+  push:
+    branches: [main, release/salvage-integration-20260908]
+    paths:
+      - 'scripts/verify-review-delivery-workflow*.mjs'
+      - 'scripts/review-delivery-acceptance-ci.test.mjs'
+      - 'apps/api/src/modules/studio-project-graph/review-delivery/**'
+      - 'apps/api/src/modules/studio-project-graph/studio-review-preview-producer*'
+      - 'apps/web/src/compat/use-auth-actor-id.ts'
+      - 'apps/web/src/domains/creator/production-hub/*Manuscript*'
+      - 'apps/web/src/domains/creator/production-hub/production-manuscript-*'
+      - 'apps/web/src/domains/creator/review-export/**'
+      - 'apps/web/src/domains/creator/review-share/StudioPinnedReviewShareManager*'
+      - 'apps/web/src/domains/creator/virtual-space/StudioPinnedReviewPanel*'
+      - 'apps/web/tools/browser-harnesses/virtual-studio-review-export*'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/studio-manuscript-delivery-acceptance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - name: Verify acceptance gate contract
+        run: node --test scripts/review-delivery-acceptance-ci.test.mjs
+      - name: Run manuscript, review, share and delivery regressions
+        run: |
+          pnpm exec vitest run \
+            apps/api/src/modules/studio-project-graph/review-delivery/review-delivery-zip.test.ts \
+            apps/api/src/modules/studio-project-graph/review-delivery/review-delivery.service.test.ts \
+            apps/web/src/domains/creator/production-hub/ProductionManuscriptDeliveryHub.test.tsx \
+            apps/web/src/domains/creator/production-hub/ProductionManuscriptWorkspace.test.tsx \
+            apps/web/src/domains/creator/production-hub/production-manuscript-model.test.ts \
+            apps/web/src/domains/creator/production-hub/production-manuscript-ux.test.ts \
+            apps/web/src/domains/creator/review-export/StudioReviewDelivery.test.tsx \
+            apps/web/src/domains/creator/review-export/StudioReviewExport.test.tsx \
+            apps/web/src/domains/creator/review-share/StudioPinnedReviewShareManager.test.tsx \
+            apps/web/src/domains/creator/virtual-space/StudioPinnedReviewPanel.test.tsx
+      - name: Cache Playwright Chromium
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+      - name: Install Chromium browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install chromium
+      - name: Install Chromium system dependencies
+        run: pnpm exec playwright install-deps chromium
+      - name: Ensure listener inspection is available
+        run: command -v lsof >/dev/null || (sudo apt-get update && sudo apt-get install -y lsof)
+      - name: Run 60-second official delivery acceptance
+        env:
+          STUDIO_DELIVERY_SOAK_MS: '60000'
+        run: pnpm run verify:studio-manuscript-delivery-acceptance
+      - name: Upload delivery acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: studio-manuscript-delivery-acceptance
+          path: .qa/review-delivery-release-acceptance/
+          if-no-files-found: warn
+          retention-days: 7

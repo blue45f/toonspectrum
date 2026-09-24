@@ -30,7 +30,7 @@ function runFanoutGuard(directory) {
 test("production workflow fanout policy passes before dependencies are installed", () => {
   const result = runFanoutGuard(root);
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /21 product workflows/);
+  assert.match(result.stdout, /22 product workflows/);
 });
 
 test("fanout guard rejects representative unsafe trigger changes", () => {

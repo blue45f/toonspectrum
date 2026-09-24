@@ -105,7 +105,7 @@
     "verify:studio-lifecycle": "tsx scripts/verify-studio-lifecycle.mts",
     "verify:studio-service-worker": "tsx scripts/verify-studio-service-worker.mts",
     "verify:studio-artist-journey": "tsx scripts/verify-studio-artist-journey.mts",
-    "verify:studio-manuscript-delivery-acceptance": "node scripts/verify-review-delivery-workflow.mjs",
+    "verify:studio-manuscript-delivery-acceptance": "node scripts/verify-review-delivery-workflow-ci.mjs",
     "verify:studio-professional-validation-kit": "node scripts/verify-studio-professional-validation.mjs --check && node --test scripts/verify-studio-professional-validation.test.mjs",
     "verify:studio-competitor-replacement": "tsx scripts/verify-studio-competitor-replacement.mts && vitest run scripts/verify-studio-competitor-replacement.test.ts && pnpm --filter @toonspectrum/desktop-sync-agent test && pnpm --filter @toonspectrum/desktop-sync-agent typecheck && pnpm run verify:studio-professional-validation-kit && pnpm run test:desktop-sync-release",
     "verify:studio-autosave-opfs": "tsx scripts/verify-studio-autosave-opfs-session.mts",

@@ -88,6 +88,7 @@ describe("database integration runner CI policy", () => {
     "studio-2d-asset-quality.yml",
     "character-shaper-discovery-quality.yml",
     "studio-production-integrity.yml",
+    "studio-manuscript-delivery-acceptance.yml",
     "studio-ai-comic-director-complete.yml",
     "studio-finishing-quality.yml",
     "learning-quality.yml",
