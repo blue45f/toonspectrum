@@ -197,6 +197,8 @@ jobs:
             /docs/architecture/frontend-layered-architecture.md
             /docs/competitor-analysis.md
             /docs/ranking-architecture.md
+            /docs/studio/virtual-studio-design-closure-ledger-20260920.md
+            /docs/studio/virtual-studio-all-pages-closure-20260924.md
             !/tests/benchmarks/results/
       - name: Restore Virtual Studio art for foundation regressions
         if: matrix.shard == 'studio-foundation'
