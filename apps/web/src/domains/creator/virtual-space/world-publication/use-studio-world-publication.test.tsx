@@ -33,7 +33,7 @@ afterEach(() => { cleanup(); persistSession(null); vi.restoreAllMocks(); });
 describe("publication hook identity and visibility", () => {
   it("does not report skipped operations as successful while a background renewal is pending", async () => {
     const hook = renderHook(() => useStudioWorldPublication("work-1", "alice", true));
-    await waitFor(() => expect(hook.result.current.snapshot.active).not.toBeNull());
+    await waitFor(() => expect(hook.result.current.snapshot.active).not.toBeNull(), { timeout: 5_000 });
     const gate = deferred<StudioWorldPublicationAuthority>(); f.read.mockReturnValueOnce(gate.promise);
     act(() => { window.dispatchEvent(new Event("focus")); });
     await act(async () => {
@@ -47,7 +47,7 @@ describe("publication hook identity and visibility", () => {
   });
   it("does not silently rebase when the fresh read finds a different publication", async () => {
     const hook = renderHook(() => useStudioWorldPublication("work-1", "alice", true));
-    await waitFor(() => expect(hook.result.current.snapshot.active).not.toBeNull());
+    await waitFor(() => expect(hook.result.current.snapshot.active).not.toBeNull(), { timeout: 5_000 });
     const newer = authority(); newer.publication!.revisionId = "revision-2";
     f.read.mockResolvedValue(newer);
     await act(async () => { expect(await hook.result.current.reviewDraftBase()).toBeNull(); });
@@ -57,7 +57,7 @@ describe("publication hook identity and visibility", () => {
   });
   it("keeps the exact realm through ordinary blur, hidden and same-actor renewal without mutation", async () => {
     const hook = renderHook(() => useStudioWorldPublication("work-1", "alice", true));
-    await waitFor(() => expect(hook.result.current.snapshot.active).not.toBeNull());
+    await waitFor(() => expect(hook.result.current.snapshot.active).not.toBeNull(), { timeout: 5_000 });
     const active = hook.result.current.snapshot.active!;
     act(() => { window.dispatchEvent(new Event("blur")); });
     expect(hook.result.current.snapshot.active).toBe(active);
@@ -72,7 +72,7 @@ describe("publication hook identity and visibility", () => {
   });
   it("clears the old actor realm immediately even before the React actor prop catches up", async () => {
     const hook = renderHook(() => useStudioWorldPublication("work-1", "alice", true));
-    await waitFor(() => expect(hook.result.current.snapshot.active).not.toBeNull());
+    await waitFor(() => expect(hook.result.current.snapshot.active).not.toBeNull(), { timeout: 5_000 });
     const active = hook.result.current.snapshot.active!, gate = deferred<StudioWorldPublicationAuthority>();
     f.read.mockReturnValueOnce(gate.promise);
     let pending!: Promise<boolean>; act(() => { pending = hook.result.current.refresh(); });

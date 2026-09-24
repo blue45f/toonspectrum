@@ -89,8 +89,8 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
     );
 
     // 발행·검증은 배치 단위 1회 그대로 — 획마다 commit() 을 부르면 같은 태스크의 장면 발행이
-    // 겹쳐 "중복된 드로우 식별자"로 거절된다(브라우저 실측). 배치 병합·commit 본문은
-    // 추출된 commitStudioDeferredStrokeBatch 가 소유하고, 호스트 flush 는 그 경계를 한 번만 호출한다.
+    // 겹쳐 "중복된 드로우 식별자"로 거절된다(브라우저 실측). 실제 병합·커밋은 추출된
+    // commitStudioDeferredStrokeBatch가 소유하고, 호스트는 성공 뒤 히스토리만 펼친다.
     expect(flush).toContain("commitStudioDeferredStrokeBatch({");
     const batchCommit = sliceBetween(
       deferredStrokeCommitSource,
@@ -98,6 +98,7 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
       "export interface StudioDeferredStrokeCommitEngine",
     );
     expect(batchCommit).toContain("mergeStudioPendingStrokeElements(baseElements, batch.strokes)");
+    expect(batchCommit).toContain("const committed = commit(");
     expect(batchCommit).toContain("batch.pageId");
     expect(batchCommit.match(/\bcommit\(/gu)).toHaveLength(1);
     expect(flush.indexOf("expandDeferredStrokeCommitHistory(batch)")).toBeGreaterThan(
