@@ -56,6 +56,9 @@
       ],
       "@toonspectrum/studio-project-model/review-delivery": [
         "../../packages/studio-project-model/src/graph/review-delivery.ts"
+      ],
+      "@toonspectrum/studio-project-model/review-voice-note": [
+        "../../packages/studio-project-model/src/graph/review-voice-note.ts"
       ]
     },
     "outDir": "dist",
