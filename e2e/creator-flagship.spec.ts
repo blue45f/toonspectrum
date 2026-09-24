@@ -1,4 +1,8 @@
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
+import {
+  STUDIO_BETA_NOTICE_REVISION,
+  STUDIO_BETA_NOTICE_STORAGE_KEY,
+} from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 import { STUDIO_EXACT_RESUME_RESTORED_EVENT, studioExactResumeStorageKey } from "../apps/web/src/domains/creator/studio-exact-resume-context";
 import { CREATOR_EXPERIENCE_STORAGE_KEY } from "../apps/web/src/shared/lib/creator-experience-mode";
 import { readDurableStudioAutosaveDocument } from "../scripts/lib/studio-verify-durable-autosave.mjs";
@@ -17,16 +21,26 @@ function themeEnvelope() {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(({ language, themeKey, theme, creatorExperienceKey }) => {
+  await page.addInitScript(({
+    language,
+    themeKey,
+    theme,
+    creatorExperienceKey,
+    betaNoticeKey,
+    betaNoticeRevision,
+  }) => {
     localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: language }, version: 0 }));
     localStorage.setItem(themeKey, theme);
     localStorage.setItem(creatorExperienceKey, JSON.stringify({ mode: "classic" }));
+    localStorage.setItem(betaNoticeKey, betaNoticeRevision);
     sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
   }, {
     language: "ko",
     themeKey: THEME_STORAGE_KEY,
     theme: themeEnvelope(),
     creatorExperienceKey: CREATOR_EXPERIENCE_STORAGE_KEY,
+    betaNoticeKey: STUDIO_BETA_NOTICE_STORAGE_KEY,
+    betaNoticeRevision: STUDIO_BETA_NOTICE_REVISION,
   });
 
   await page.route("**/api/**", async (route) => {
