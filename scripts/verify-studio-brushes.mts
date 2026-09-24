@@ -828,7 +828,31 @@ async function clickPastTransientOverlays(page: Page, target: Locator): Promise<
   await target.click({ timeout: 7_000 });
 }
 
+async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean> {
+  const notice = page.locator('[data-studio-beta-notice="true"]');
+  const visible = await notice
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!visible) return false;
+
+  const acknowledge = notice.locator(
+    '[data-studio-beta-notice-acknowledge="true"]',
+  );
+  try {
+    await acknowledge.click({ timeout: 30_000, noWaitAfter: true });
+  } catch (error) {
+    const alreadyHidden = await notice
+      .isHidden({ timeout: 1_000 })
+      .catch(() => false);
+    if (!alreadyHidden) throw error;
+  }
+  await notice.waitFor({ state: "hidden", timeout: 30_000 });
+  return true;
+}
+
 async function dismissTransientChrome(page: Page, clearAutosave = true): Promise<void> {
+  await acknowledgeStudioBetaNoticeIfPresent(page);
   const quickstart = page.locator('[data-studio-creative-starter="true"]');
   if (await quickstart.isVisible({ timeout: 250 }).catch(() => false)) {
     await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
