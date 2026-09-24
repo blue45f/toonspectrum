@@ -914,10 +914,13 @@ async function clearStudioVerifierOriginStorage(page: Page, studioUrl: string): 
 }
 
 async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
-  page.setDefaultTimeout(7_000);
+  // A cold Vite/browser session may compile the Studio shell, brush catalogue and inspector chunks
+  // serially. Keep interactions bounded, but do not classify that one-time compilation as a
+  // drawing failure or force screenshots to inherit the old 7 s action timeout.
+  page.setDefaultTimeout(20_000);
   await installCleanStudioState(page);
-  await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 20_000 });
-  await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
+  await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 45_000 });
   // Hide transient evidence chrome before any gesture. Moving the pointer or waiting after
   // pointerup would skip the exact live-to-retained boundary this verifier must measure.
   await page.addStyleTag({
@@ -1765,7 +1768,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       await subToolsTrigger.click();
     }
     const summary = page.locator('[data-studio-inspector-brush-summary="true"]');
-    await summary.waitFor({ state: "attached", timeout: 20_000 });
+    await summary.waitFor({ state: "attached", timeout: 45_000 });
     const inspectorSummaryCount = await summary.count();
     const inspectorQuickTrayCount = await page
       .locator('[data-testid="studio-inspector-context-drawing"]')
@@ -2380,7 +2383,11 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         const next = await page.screenshot({ animations: "disabled", clip: usedClip });
         const settled = next.equals(undone);
         undone = next;
-        if (settled) break;
+        // A retained-stroke history jump can look stable for the first two animation frames while
+        // the canonical document surface is still inside its 200 ms deferred commit window. Do
+        // not compare Canvas2D preview coverage with a pre-canonical frame; require at least 300 ms
+        // and then one identical frame after that boundary.
+        if (settled && settleAttempt >= 4) break;
       }
       // Konva may re-rasterize the untouched paper by a few channel values after a history jump.
       // Ignore imperceptible antialias noise while still rejecting any residual ink above Δ20.
@@ -3672,11 +3679,33 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
 
         const undo = await enabledHistoryButton(page, "실행취소");
         invariant(await undo.isEnabled(), `${preset.id}: isolated long-stroke Undo is disabled`);
+        const undoStartedAt = performance.now();
         await page.keyboard.press("Meta+z");
-        await page.waitForTimeout(80);
-        const undone = await page.screenshot({ animations: "disabled", clip });
+        // Long strokes can still be inside the asynchronous document/history publication path at
+        // 80 ms. A screenshot taken before the durable history receipt merely re-captures the
+        // eraser itself and mislabels it as residual ink. Wait for the exact semantic state first,
+        // then require the visual surface to settle to the same state.
+        await waitForPersistedDrawElements(
+          page,
+          (draws) => operation === "erase"
+            ? draws.length === 1 && draws[0]?.mode === "pen"
+            : draws.length === 0,
+          `${preset.id}: isolated long-stroke Undo did not reach durable history`,
+        );
+        const undone = await captureStableEvidence(page, clip);
         const undoDiff = await compareScreenshotPixels(page, before, undone, 20);
         const undoRestoredPixels = undoDiff.changedPixels <= 3;
+        if (REQUESTED_BRUSH_VERIFY_IDS.length > 0) {
+          log(
+            `${preset.id}: long Undo durable+visual settle `
+              + `${Math.round(performance.now() - undoStartedAt)}ms; `
+              + `diff=${JSON.stringify(undoDiff)}`,
+          );
+          if (operation === "erase" && undoDiff.changedPixels > 3) {
+            writeFileSync(join(SCRATCH, `studio-brush-long-${preset.id}-undo-baseline.png`), before);
+            writeFileSync(join(SCRATCH, `studio-brush-long-${preset.id}-undo-restored.png`), undone);
+          }
+        }
         invariant(
           undoRestoredPixels,
           `${preset.id}: isolated long-stroke Undo left ${undoDiff.changedPixels} visible pixels`,
@@ -3688,8 +3717,12 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         if (operation === "erase") {
           invariant(emptyBefore, `${preset.id}: long eraser cleanup lost its empty baseline`);
           await page.keyboard.press("Meta+z");
-          await page.waitForTimeout(80);
-          const fullyCleaned = await page.screenshot({ animations: "disabled", clip });
+          await waitForPersistedDrawElements(
+            page,
+            (draws) => draws.length === 0,
+            `${preset.id}: long paint+erase cleanup did not reach durable history`,
+          );
+          const fullyCleaned = await captureStableEvidence(page, clip);
           const fullCleanupDiff = await compareScreenshotPixels(
             page,
             emptyBefore,
