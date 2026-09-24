@@ -51,6 +51,12 @@ const MobileHeaderNavigation = lazy(() =>
   }))
 );
 
+const EngagementHeaderNotifications = lazy(() =>
+  import("@/domains/engagement/EngagementHeaderNotifications").then((module) => ({
+    default: module.EngagementHeaderNotifications,
+  })),
+);
+
 const STUDIO_PRODUCTION_PREFIXES = ["/production"] as const;
 const STUDIO_ASSET_PREFIXES = [
   "/studio/assets",
@@ -88,6 +94,7 @@ const MY_PURPOSE_PREFIXES = [
   "/my",
   "/me",
   "/library",
+  "/notifications",
   "/messages",
   "/settings",
 ] as const;
@@ -420,6 +427,10 @@ export function SiteHeader() {
                 {keepInlineText(siteNavigationText(create.label, locale))}
               </span>
             </Link>
+
+            <Suspense fallback={null}>
+              <EngagementHeaderNotifications />
+            </Suspense>
 
             <AuthMenuShell />
 

@@ -239,3 +239,10 @@ export const StudioAiSettingsPage = lazyRetry(
   })),
   "StudioAiSettingsPage",
 );
+
+export const CreatorGrowthLabPage = lazyRetry(
+  () => import("@/domains/engagement/CreatorGrowthLabPage").then((module) => ({
+    default: module.CreatorGrowthLabPage,
+  })),
+  "CreatorGrowthLabPage",
+);

@@ -17,6 +17,8 @@ export const appRoutes: AppRouteMeta[] = [
   { path: "/market", label: "route.market" },
   { path: "/shaper", label: "route.shaper" },
   { path: "/library", label: "route.library" },
+  { path: "/notifications", label: "route.library" },
+  { path: "/onboarding/taste", label: "route.recommend" },
   { path: "/compare", label: "route.compare" },
   { path: "/insights", label: "route.insights" },
   { path: "/sitemap", label: "route.sitemap" },

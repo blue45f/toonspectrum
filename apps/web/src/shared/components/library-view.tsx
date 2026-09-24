@@ -2,6 +2,8 @@ import { Sparkles, BookHeart, Star, Compass, BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { CollectionsTab } from "./library-view-collections";
+import { LibraryDiaryTab } from "@/domains/engagement/LibraryDiaryTab";
+import { useEngagement } from "@/domains/engagement/engagement-store";
 import {
   RATED_SORTS,
   DAY_FROM_GETDAY,
@@ -44,6 +46,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
   const adultVerified = useApp((s) => s.adultVerified);
   const setAdultVerified = useApp((s) => s.setAdultVerified);
   const resetAll = useApp((s) => s.resetAll);
+  const diaryEntries = useEngagement((state) => state.diaryEntries);
 
   const [tab, setTab] = useState<Tab>(initialTab);
   const [readTab, setReadTab] = useState<ReadState>("want");
@@ -61,6 +64,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
     });
     collections.forEach((collection) => collection.titleIds.forEach((id) => ids.add(id)));
     recentlyViewed.forEach((id) => ids.add(id));
+    diaryEntries.forEach((entry) => ids.add(entry.titleId));
     return Array.from(ids).sort((a, b) => a.localeCompare(b));
   })();
 
@@ -126,7 +130,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
     return ratedSort === "low" ? a[1] - b[1] : b[1] - a[1];
   });
 
-  const counts: Record<ReadState, number> = { want: 0, reading: 0, done: 0, dropped: 0 };
+  const counts: Record<ReadState, number> = { want: 0, reading: 0, paused: 0, done: 0, dropped: 0 };
   readIds.forEach(([, st]) => (counts[st] = (counts[st] ?? 0) + 1));
   const shelfTitles = readIds
     .filter(([, st]) => st === readTab)
@@ -155,6 +159,7 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
         items={[
           { value: "shelf", label: `서재 ${readIds.length || ""}`.trim() },
           { value: "rated", label: `평가 ${ratedIds.length || ""}`.trim() },
+          { value: "diary", label: `감상 일기 ${diaryEntries.length || ""}`.trim() },
           { value: "alerts", label: `연재 알림 ${subTitles.length || ""}`.trim() },
           { value: "taste", label: "취향 분석" },
           { value: "collections", label: "컬렉션" },
@@ -270,6 +275,10 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
           )}
         </div>
       )}
+
+
+      {/* 감상 일기 */}
+      {tab === "diary" && <LibraryDiaryTab titlesById={titlesById} />}
 
       {/* 취향 분석 */}
       {tab === "taste" && (

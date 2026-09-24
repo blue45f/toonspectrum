@@ -1,4 +1,4 @@
-import { Bookmark, BookOpen, CheckCircle2, XCircle } from "lucide-react";
+import { Bookmark, BookOpen, CheckCircle2, PauseCircle, XCircle } from "lucide-react";
 
 import type { ReadState } from "@/shared/lib/types";
 
@@ -10,6 +10,7 @@ import { cn } from "@/shared/lib/utils";
 const OPTS: { state: ReadState; label: string; icon: typeof Bookmark }[] = [
   { state: "want", label: "관심", icon: Bookmark },
   { state: "reading", label: "보는 중", icon: BookOpen },
+  { state: "paused", label: "보류", icon: PauseCircle },
   { state: "done", label: "완독", icon: CheckCircle2 },
   { state: "dropped", label: "하차", icon: XCircle },
 ];
@@ -20,7 +21,7 @@ export function ReadStateSelector({ titleId, className }: { titleId: string; cla
   const setRead = useApp((s) => s.setRead);
 
   return (
-    <div className={cn("grid grid-cols-4 gap-1.5", className)}>
+    <div className={cn("grid grid-cols-2 gap-1.5 sm:grid-cols-5", className)}>
       {OPTS.map((o) => {
         const active = hydrated && current === o.state;
         return (

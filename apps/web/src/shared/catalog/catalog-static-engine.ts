@@ -279,7 +279,7 @@ function recordNumbers(value: unknown): Record<string, number> {
 }
 function recordReads(value: unknown): Record<string, ReadState> {
   if (!value || typeof value !== "object") return {};
-  const allowed = new Set<ReadState>(["want", "reading", "done", "dropped"]);
+  const allowed = new Set<ReadState>(["want", "reading", "paused", "done", "dropped"]);
   return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter((e): e is [string, ReadState] => allowed.has(e[1] as ReadState)));
 }
 function recommendData(body: Record<string, unknown>) {

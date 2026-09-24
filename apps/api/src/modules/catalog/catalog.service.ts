@@ -522,7 +522,7 @@ function recordNumbers(value: unknown): RatingMap {
 
 function recordReads(value: unknown): ReadStateMap {
   if (!value || typeof value !== "object") return {};
-  const allowed = new Set<ReadState>(["want", "reading", "done", "dropped"]);
+  const allowed = new Set<ReadState>(["want", "reading", "paused", "done", "dropped"]);
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).filter((entry): entry is [string, ReadState] =>
       allowed.has(entry[1] as ReadState)

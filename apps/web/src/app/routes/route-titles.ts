@@ -37,6 +37,8 @@ export const STATIC_TITLES: Record<string, string> = {
   "/admin/community": "route.adminCommunity",
   "/admin/members": "route.adminMembers",
   "/library": "route.library",
+  "/notifications": "route.library",
+  "/onboarding/taste": "route.recommend",
   "/compare": "route.compare",
   "/insights": "route.insights",
   "/authors": "route.authors",
@@ -87,6 +89,7 @@ export function resolveRouteTitle(pathname: string, t: Translator, productLocale
     const titleKey = STATIC_TITLES[canonicalPath];
     return titleKey ? t(titleKey) : t("app.name");
   }
+  if (canonicalPath.startsWith("/lists/")) return t("route.library");
   if (canonicalPath.startsWith("/author/")) return decodePathSegment(canonicalPath.slice(8));
   if (canonicalPath.startsWith("/pencafe/")) return `${decodePathSegment(canonicalPath.slice(9))} ${t("route.pencafeSuffix")}`;
   if (canonicalPath.startsWith("/community/")) return t("route.community");

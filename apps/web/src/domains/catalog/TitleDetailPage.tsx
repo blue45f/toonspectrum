@@ -17,6 +17,8 @@ import { CollectionAdd } from "@/shared/components/collection-add";
 import { CoverImage } from "@/shared/components/cover-image";
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { PriceCompare } from "@/shared/components/price-compare";
+import { AvailabilityHistoryPanel } from "@/domains/engagement/AvailabilityHistoryPanel";
+import { PersonalContentPreferenceNotice } from "@/domains/engagement/PersonalContentPreferenceNotice";
 import { ReadStateSelector } from "@/shared/components/read-state";
 import { ReviewCard } from "@/shared/components/review-card";
 import { ReviewForm } from "@/shared/components/review-form";
@@ -235,6 +237,7 @@ export function TitleDetailPage() {
               {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "플랫폼을 가로질러 가격(무료·기다무·유료)을 비교합니다. 가장 저렴한 진입점을 위로 정렬했어요.")}</p>
           </div>
           <PriceCompare availability={title.availability} />
+          <AvailabilityHistoryPanel title={title} />
         </aside>
 
         <div className="flex flex-col gap-6">
@@ -296,6 +299,8 @@ export function TitleDetailPage() {
               ))}
             </div>
           )}
+
+          <PersonalContentPreferenceNotice title={title} />
 
           <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4">
             {stats.map((item) => (

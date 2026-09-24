@@ -62,7 +62,7 @@ export function parseLibraryBackup(source: string): HydratePayload {
   return {
     ratings: dictionary(data.ratings, rating),
     reads: dictionary<ReadState>(data.reads, (value) => {
-      if (value !== "want" && value !== "reading" && value !== "done" && value !== "dropped") return invalid();
+      if (value !== "want" && value !== "reading" && value !== "paused" && value !== "done" && value !== "dropped") return invalid();
       return value;
     }),
     subscriptions: dictionary(data.subscriptions, boolean),

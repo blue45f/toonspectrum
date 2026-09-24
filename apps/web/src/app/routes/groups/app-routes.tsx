@@ -4,6 +4,7 @@ import { catalogRoutes } from "./catalog.routes";
 import { communityRoutes } from "./community.routes";
 import { creatorResourcesRoutes } from "./creator-resources.routes";
 import { creatorRoutes } from "./creator.routes";
+import { engagementRoutes } from "./engagement.routes";
 import { experienceRoutes } from "./experience.routes";
 import { legalRoutes } from "./legal.routes";
 import { marketRoutes } from "./market.routes";
@@ -18,6 +19,7 @@ import { referenceRoutes } from "./reference.routes";
  */
 export const appRoutes = [
   ...catalogRoutes,
+  ...engagementRoutes,
   ...marketingRoutes,
   ...referenceRoutes,
   ...communityRoutes,
