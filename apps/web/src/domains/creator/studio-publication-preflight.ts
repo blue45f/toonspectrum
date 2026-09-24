@@ -77,6 +77,22 @@ export function parseStudioPublicationTags(value: string | readonly string[]): s
   return source.map(normalizedTag).filter(Boolean).slice(0, 8);
 }
 
+function compactStudioSocialText(value: string, maximum: number): string {
+  const normalized = value.trim().replace(/\s+/gu, " ");
+  if (normalized.length <= maximum) return normalized;
+  const contentLimit = Math.max(1, maximum - 1);
+  const prefix = normalized.slice(0, contentLimit + 1);
+  const sentenceMatches = [...prefix.matchAll(/[.!?。！？](?:\s|$)/gu)];
+  const sentenceBoundary = sentenceMatches.at(-1)?.index;
+  const minimumNaturalBoundary = Math.floor(contentLimit * 0.55);
+  let boundary = sentenceBoundary !== undefined && sentenceBoundary >= minimumNaturalBoundary
+    ? sentenceBoundary + 1
+    : prefix.lastIndexOf(" ", contentLimit);
+  if (boundary < minimumNaturalBoundary) boundary = contentLimit;
+  const compact = normalized.slice(0, boundary).trimEnd().replace(/[,:;·\-–—]+$/gu, "");
+  return `${compact}…`.slice(0, maximum);
+}
+
 export function suggestStudioPublicationSocialMetadata(
   title: string,
   description: string,
@@ -84,8 +100,8 @@ export function suggestStudioPublicationSocialMetadata(
   const cleanTitle = title.trim();
   const cleanDescription = description.trim().replace(/\s+/gu, " ");
   return {
-    socialTitle: cleanTitle.slice(0, 70),
-    socialDescription: cleanDescription.slice(0, 160),
+    socialTitle: compactStudioSocialText(cleanTitle, 70),
+    socialDescription: compactStudioSocialText(cleanDescription, 160),
     canonicalSlug: normalizeCreatorPublicationSlug(cleanTitle),
   };
 }

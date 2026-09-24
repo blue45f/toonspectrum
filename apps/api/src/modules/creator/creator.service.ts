@@ -83,6 +83,7 @@ import {
   CreatorWorkRevisionNotFoundError,
 } from "../../server/creator-work-revisions";
 import {
+  creatorWorkMediaPath,
   decodeCreatorWorkDataImage,
   projectCreatorWorkDetailMedia,
   projectCreatorWorkSummaryMedia,
@@ -111,6 +112,17 @@ import {
   CreatorDraftCollaborationTargetMismatchError,
   CreatorDraftCollaborationWorkRevisionConflictError,
 } from "./creator-draft-collaboration.repository";
+import {
+  CreatorPublicationMediaInputError,
+} from "./creator-publication-media.contract";
+import {
+  CreatorPublicationMediaForbiddenError,
+} from "./creator-publication-media.repository";
+import {
+  CreatorPublicationMediaIntegrityError,
+  CreatorPublicationMediaService,
+  CreatorPublicationMediaStorageUnavailableError,
+} from "./creator-publication-media.service";
 import {
   CreatorDraftCollaborationRoomResponseSchema,
   CreatorSharedDocumentMetaResponseSchema,
@@ -162,6 +174,51 @@ function creatorDraftCollaborationStatusLockedConflict(): ConflictException {
   });
 }
 
+function creatorPublicationMediaUnavailable(
+  recoverableWorkId?: string,
+): ServiceUnavailableException {
+  return new ServiceUnavailableException({
+    code: "creator_publication_media_unavailable",
+    message: recoverableWorkId
+      ? "이미지는 공개되지 않았고 복구 가능한 임시 저장본만 남았습니다. 잠시 후 다시 시도해 주세요."
+      : "작품 이미지를 안전한 저장소에 보관하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+    ...(recoverableWorkId ? { recoverableWorkId } : {}),
+  });
+}
+
+function creatorPublicationMediaInputInvalid(
+  error: CreatorPublicationMediaInputError,
+): BadRequestException {
+  return new BadRequestException({
+    code: "creator_publication_media_invalid",
+    message: error.reason === "mutation-too-large"
+      ? "한 번에 저장하는 작품 이미지의 총 용량은 96MB 이하여야 합니다."
+      : "지원하지 않거나 손상된 작품 이미지 데이터가 포함되어 있습니다.",
+  });
+}
+
+function rethrowCreatorPublicationMediaError(
+  error: unknown,
+  recoverableWorkId?: string,
+): never {
+  if (error instanceof CreatorPublicationMediaInputError) {
+    throw creatorPublicationMediaInputInvalid(error);
+  }
+  if (
+    error instanceof CreatorPublicationMediaStorageUnavailableError
+    || error instanceof CreatorPublicationMediaIntegrityError
+  ) {
+    throw creatorPublicationMediaUnavailable(recoverableWorkId);
+  }
+  if (error instanceof CreatorPublicationMediaForbiddenError) {
+    throw new ForbiddenException({
+      code: "creator_publication_media_forbidden",
+      message: "작성자만 작품 이미지를 저장하거나 확인할 수 있습니다.",
+    });
+  }
+  throw error;
+}
+
 function parseCreatorCommentParentId(value: unknown): string | null {
   if (value == null || value === "") return null;
   if (typeof value !== "string") {
@@ -195,6 +252,9 @@ export class CreatorService {
     @Optional()
     @Inject(MembershipRewardReversalService)
     private readonly rewardReversal?: MembershipRewardReversalService,
+    @Optional()
+    @Inject(CreatorPublicationMediaService)
+    private readonly publicationMedia?: CreatorPublicationMediaService,
   ) {}
 
   private async awardActivity(
@@ -320,10 +380,32 @@ export class CreatorService {
     const value = target.kind === "cover"
       ? work.cover
       : work.pages[target.pageIndex];
-    const media = decodeCreatorWorkDataImage(value);
-    if (!media || media.sha256 !== expectedDigest) {
+    const inlineMedia = decodeCreatorWorkDataImage(value);
+    let media = inlineMedia;
+
+    if (inlineMedia) {
+      if (inlineMedia.sha256 !== expectedDigest) {
+        throw new NotFoundException("작품 이미지가 변경되었거나 존재하지 않습니다.");
+      }
+    } else {
+      const immutablePath = creatorWorkMediaPath(id, target, expectedDigest);
+      if (value !== immutablePath) {
+        throw new NotFoundException("작품 이미지가 변경되었거나 존재하지 않습니다.");
+      }
+      if (!this.publicationMedia) throw creatorPublicationMediaUnavailable();
+      try {
+        media = await this.publicationMedia.read(id, target, expectedDigest);
+      } catch (error) {
+        rethrowCreatorPublicationMediaError(error);
+      }
+      if (!media) {
+        throw new NotFoundException("작품 이미지가 변경되었거나 존재하지 않습니다.");
+      }
+    }
+    if (!media) {
       throw new NotFoundException("작품 이미지가 변경되었거나 존재하지 않습니다.");
     }
+
     const publiclyReadable = !work.isOwner || await this.publiclyReadableWork(work.id);
     return {
       ...media,
@@ -334,16 +416,44 @@ export class CreatorService {
   }
 
   async createWork(userId: string, body: CreateCreatorWorkDto) {
+    let recoverableWorkId: string | undefined;
     try {
-      // 페이지/문서가 클 수 있으나 다른 모듈과 동일하게 별도 크기 제한은 두지 않는다.
-      const work = await createWork(userId, body);
+      const publicationMedia = this.publicationMedia;
+      const resolved = publicationMedia?.resolveMutationPlan(body);
+      let work;
+
+      if (!publicationMedia || !resolved?.shouldExternalize) {
+        work = await createWork(userId, body);
+      } else {
+        // The immutable object path needs a durable work ID. Create a non-public, Base64-free
+        // recovery draft first, upload and persist the objects, then publish one revision that
+        // references only immutable media routes. A failed upload can never leak inline bytes.
+        const staged = await createWork(userId, {
+          ...body,
+          ...resolved.plan.stagedPatch,
+          status: "draft",
+        });
+        recoverableWorkId = staged.id;
+        const mediaPatch = await publicationMedia.externalize(
+          userId,
+          staged.id,
+          body,
+          resolved.plan,
+        );
+        work = await updateWork(userId, staged.id, {
+          ...mediaPatch,
+          baseRevision: staged.revision,
+          ...(body.status !== undefined ? { status: body.status } : {}),
+        });
+      }
+
       await this.awardActivity(
         userId,
         "creator.work.created",
         work.id,
-        { status: body.status ?? "draft" },
+        { status: work.status },
       );
-      if (body.status === "published") {
+      if (work.status === "published") {
         await this.awardActivity(
           userId,
           "creator.work.published",
@@ -354,8 +464,19 @@ export class CreatorService {
       }
       return work;
     } catch (error) {
+      if (
+        error instanceof CreatorPublicationMediaInputError
+        || error instanceof CreatorPublicationMediaStorageUnavailableError
+        || error instanceof CreatorPublicationMediaIntegrityError
+        || error instanceof CreatorPublicationMediaForbiddenError
+      ) {
+        rethrowCreatorPublicationMediaError(error, recoverableWorkId);
+      }
       if (error instanceof StudioLinked3dPassAssetFenceError) {
         throw creatorLinked3dPassAssetFenceConflict(error);
+      }
+      if (recoverableWorkId) {
+        throw creatorPublicationMediaUnavailable(recoverableWorkId);
       }
       throw new BadRequestException(error instanceof Error ? error.message : "작품을 저장할 수 없습니다.");
     }
@@ -363,7 +484,16 @@ export class CreatorService {
 
   async updateWork(userId: string, id: string, body: UpdateCreatorWorkDto) {
     try {
-      const work = await updateWork(userId, id, body);
+      const publicationMedia = this.publicationMedia;
+      const resolved = publicationMedia?.resolveMutationPlan(body);
+      const materializedMedia = publicationMedia && resolved?.shouldExternalize
+        ? await publicationMedia.externalize(userId, id, body, resolved.plan)
+        : undefined;
+      const work = await updateWork(
+        userId,
+        id,
+        materializedMedia ? { ...body, ...materializedMedia } : body,
+      );
       if (body.status === "published") {
         await this.awardActivity(
           userId,
@@ -382,6 +512,14 @@ export class CreatorService {
       }
       return work;
     } catch (error) {
+      if (
+        error instanceof CreatorPublicationMediaInputError
+        || error instanceof CreatorPublicationMediaStorageUnavailableError
+        || error instanceof CreatorPublicationMediaIntegrityError
+        || error instanceof CreatorPublicationMediaForbiddenError
+      ) {
+        rethrowCreatorPublicationMediaError(error, id);
+      }
       if (error instanceof CreatorWorkRevisionConflictError) {
         throw new ConflictException({
           code: "creator_work_revision_conflict",

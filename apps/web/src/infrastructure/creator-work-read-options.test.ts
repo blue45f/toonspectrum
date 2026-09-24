@@ -74,6 +74,12 @@ describe("bounded manuscript GET recovery", () => {
     expect(request instanceof Request && request.signal.aborted).toBe(true);
   });
 
+  it("adds an explicit public-preview query without changing retry behavior", () => {
+    const options = creatorWorkReadOptions(undefined, { publicPreview: "1" });
+    expect(options.params).toEqual({ publicPreview: "1" });
+    expect(options.retry).toMatchObject({ limit: 2, methods: ["get"] });
+  });
+
   it("bounds even the body read and preserves the deadline when a caller also supplies a signal", () => {
     const deadline = new AbortController();
     const timeout = vi.spyOn(AbortSignal, "timeout").mockReturnValue(deadline.signal);

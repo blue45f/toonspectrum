@@ -41,6 +41,7 @@ try {
     "0087_studio_pinned_review_share.sql",
     "0088_studio_review_delivery.sql",
     "0090_studio_review_voice_note.sql",
+    "0091_creator_work_publication_media.sql",
   ]) {
     await pool.query(await readFile(new URL(`../apps/api/src/db/migrations/${migration}`, import.meta.url), "utf8"));
   }

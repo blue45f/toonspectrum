@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { getLanguageOptions } from "@/shared/lib/i18n";
+import { LanguagePicker } from "./LanguagePicker";
 import {
   REGION_COUNTRY_SUGGESTIONS,
   REGION_CURRENCY_SUGGESTIONS,
@@ -20,10 +20,6 @@ type RegionalPreferencesProps = {
 export function RegionalPreferences(props: RegionalPreferencesProps) {
   const { value, disabled, saved, message, onChange } = props;
   const korean = value.language.toLowerCase().startsWith("ko");
-  const languageOptions = useMemo(
-    () => getLanguageOptions(value.language),
-    [value.language],
-  );
   const policy = resolveRegionPolicy(value);
   const countryOptions = useMemo(
     () => [...new Set([value.country, ...REGION_COUNTRY_SUGGESTIONS])],
@@ -65,20 +61,17 @@ export function RegionalPreferences(props: RegionalPreferencesProps) {
             ))}
           </select>
         </label>
-        <label className="grid gap-1 text-sm">
+        <div className="grid gap-1 text-sm">
           <span>{korean ? "언어" : "Language"}</span>
-          <select
+          <LanguagePicker
             value={value.language}
             disabled={disabled}
-            onChange={(event) => onChange("language", event.target.value)}
-          >
-            {languageOptions.map((language) => (
-              <option key={language.code} value={language.code}>
-                {language.label}
-              </option>
-            ))}
-          </select>
-        </label>
+            ariaLabel={korean ? "언어 선택" : "Choose language"}
+            onChange={(nextLanguage) => onChange("language", nextLanguage)}
+            triggerClassName="w-full justify-between rounded-lg bg-canvas text-sm font-normal"
+            panelClassName="bottom-auto left-0 right-auto top-[calc(100%+0.5rem)]"
+          />
+        </div>
         <label className="grid gap-1 text-sm">
           <span>{korean ? "통화" : "Currency"}</span>
           <select

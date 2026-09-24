@@ -51,6 +51,17 @@ describe("studio publication metadata helpers", () => {
     });
   });
 
+  it("shortens long social copy at a sentence or word boundary", () => {
+    const sentence = "첫 문장은 작품의 핵심을 설명합니다. ";
+    const longDescription = `${sentence}${"별빛과 성운의 장면을 자세히 소개하는 문장 ".repeat(8)}`;
+    const suggested = suggestStudioPublicationSocialMetadata("제목", longDescription);
+
+    expect(suggested.socialDescription.length).toBeLessThanOrEqual(160);
+    expect(suggested.socialDescription).toMatch(/…$/u);
+    expect(suggested.socialDescription).not.toMatch(/\s…$/u);
+    expect(suggested.socialDescription).toContain("첫 문장은 작품의 핵심을 설명합니다.");
+  });
+
   it("converts an IANA-zone wall clock to canonical UTC and back", () => {
     expect(resolveStudioPublicationSchedule("2026-09-10T18:30", "Asia/Seoul")).toEqual({
       ok: true,

@@ -12,6 +12,8 @@ import { creatorAssetSchemaPreflightProvider } from "./creator-asset-schema-pref
 import { CreatorCollaborationRepository } from "./creator-collaboration.repository";
 import { creatorDraftCollaborationRepositoryProvider } from "./creator-draft-collaboration.repository";
 import { CreatorController } from "./creator.controller";
+import { CreatorPublicationMediaRepository } from "./creator-publication-media.repository";
+import { CreatorPublicationMediaService } from "./creator-publication-media.service";
 import { creatorPublicationCollaborationRepositoryProvider } from "./creator-publication-collaboration.repository";
 import { CreatorRoleWorkspaceController } from "./creator-role-workspace.controller";
 import { CreatorRoleWorkspaceRepository } from "./creator-role-workspace.repository";
@@ -97,6 +99,7 @@ const privateObjectStorageModule =
   providers: [
     creatorAssetSchemaPreflightProvider,
     creatorPublicationCollaborationRepositoryProvider,
+    CreatorPublicationMediaRepository,
     creatorDraftCollaborationRepositoryProvider,
     studioCrdtClusterLoadRepositoryProvider,
     studioCrdtRasterCheckpointRepositoryProvider,
@@ -112,6 +115,7 @@ const privateObjectStorageModule =
     studioTeamCommentRepositoryProvider,
     studioVoiceIceConfigurationProvider,
     studioWorkAssetRepositoryProvider,
+    CreatorPublicationMediaService,
     CreatorPublicationSchedulerService,
     CreatorRoleWorkspaceRepository,
     CreatorRoleWorkspaceService,

@@ -1,6 +1,7 @@
 import {
   CalendarClock,
   CheckCircle2,
+  Download,
   ExternalLink,
   EyeOff,
   FilePenLine,
@@ -8,8 +9,13 @@ import {
   LockKeyhole,
   Settings2,
 } from "lucide-react";
-import { useId } from "react";
+import { useId, useMemo } from "react";
 
+import {
+  createStudioPublishReceipt,
+  studioPublishReceiptFileName,
+  type StudioPublishReceiptDetails,
+} from "./studio-publish-receipt-data";
 import {
   studioPublishEnvironmentLabel,
   type StudioPublishEnvironment,
@@ -28,6 +34,7 @@ export interface StudioPublishResultReceiptProps {
   readonly workId: string;
   readonly revision?: number;
   readonly environment: StudioPublishEnvironment;
+  readonly details?: StudioPublishReceiptDetails | null;
   readonly onContinueEditing: () => void;
   readonly onReviewSettings: () => void;
   readonly onMakePrivate?: () => void;
@@ -47,6 +54,7 @@ export function StudioPublishResultReceipt({
   workId,
   revision,
   environment,
+  details = null,
   onContinueEditing,
   onReviewSettings,
   onMakePrivate,
@@ -58,6 +66,25 @@ export function StudioPublishResultReceipt({
   const published = kind === "published";
   const recoverable = kind === "published" || kind === "scheduled";
   const recoveryLabel = kind === "scheduled" ? "게시 예약 취소" : "즉시 비공개 전환";
+  const receipt = useMemo(() => createStudioPublishReceipt({
+    kind,
+    workId,
+    revision,
+    environment,
+    details,
+  }), [details, environment, kind, revision, workId]);
+
+  const downloadReceipt = () => {
+    const blob = new Blob([`${JSON.stringify(receipt, null, 2)}\n`], {
+      type: "application/json;charset=utf-8",
+    });
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = studioPublishReceiptFileName(receipt);
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  };
 
   return (
     <section
@@ -96,7 +123,7 @@ export function StudioPublishResultReceipt({
         </span>
       </div>
 
-      <dl className="mt-4 grid gap-2 rounded-xl border border-line bg-card/65 p-3 text-xs sm:grid-cols-2">
+      <dl className="mt-4 grid gap-2 rounded-xl border border-line bg-card/65 p-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
         <div className="min-w-0">
           <dt className="text-fg-3">작품 ID</dt>
           <dd className="mt-0.5 break-all font-mono font-semibold text-fg">{workId}</dd>
@@ -105,6 +132,26 @@ export function StudioPublishResultReceipt({
           <dt className="text-fg-3">저장 revision</dt>
           <dd className="numeral mt-0.5 font-semibold text-fg">{revision ?? "확인 중"}</dd>
         </div>
+        <div>
+          <dt className="text-fg-3">공개 범위</dt>
+          <dd className="mt-0.5 font-semibold text-fg">{details?.visibility ?? "확인 중"}</dd>
+        </div>
+        <div>
+          <dt className="text-fg-3">페이지</dt>
+          <dd className="numeral mt-0.5 font-semibold text-fg">{details?.pages.length ?? "확인 중"}</dd>
+        </div>
+        {details?.source?.revisionId ? (
+          <div className="min-w-0 sm:col-span-2">
+            <dt className="text-fg-3">원본 revision</dt>
+            <dd className="mt-0.5 break-all font-mono font-semibold text-fg">{details.source.revisionId}</dd>
+          </div>
+        ) : null}
+        {details?.source?.contentChecksum ? (
+          <div className="min-w-0 sm:col-span-2">
+            <dt className="text-fg-3">콘텐츠 SHA-256</dt>
+            <dd className="mt-0.5 break-all font-mono font-semibold text-fg">{details.source.contentChecksum}</dd>
+          </div>
+        ) : null}
       </dl>
 
       {recoveryError ? (
@@ -139,6 +186,18 @@ export function StudioPublishResultReceipt({
         ) : null}
         <button
           type="button"
+          onClick={downloadReceipt}
+          className={buttonClass({
+            size: "sm",
+            variant: "outline",
+            className: "min-h-11 gap-1.5",
+          })}
+        >
+          <Download size={14} aria-hidden />
+          게시 영수증 JSON
+        </button>
+        <button
+          type="button"
           onClick={onContinueEditing}
           className={buttonClass({
             size: "sm",
@@ -161,6 +220,21 @@ export function StudioPublishResultReceipt({
           <Settings2 size={14} aria-hidden />
           공개 설정 다시 확인
         </button>
+        {receipt.anonymousPreviewPath ? (
+          <Link
+            href={receipt.anonymousPreviewPath}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonClass({
+              size: "sm",
+              variant: "outline",
+              className: "min-h-11 gap-1.5",
+            })}
+          >
+            <ExternalLink size={14} aria-hidden />
+            비로그인 독자 보기
+          </Link>
+        ) : null}
         {copy.readerActionLabel ? (
           <Link
             href={`/create/${encodeURIComponent(workId)}`}

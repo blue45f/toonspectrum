@@ -22,7 +22,11 @@ function Draft() {
 }
 function Fixture() {
   const location = useLocation(), navigate = useNavigate();
-  const id = location.pathname.startsWith("/studio/") ? "creator-studio-project-document" : "experience-fortune";
+  const id = location.pathname.startsWith("/studio/")
+    ? "creator-studio-project-document"
+    : location.pathname.startsWith("/create/")
+      ? "creator-work"
+      : "experience-fortune";
   const binding = campusBinding(id, location.pathname, location.search);
   const route = binding?.surface === "room" ? { titleKo: "관측소", titleEn: "Observatory", hintKo: "", hintEn: "" } : null;
   return <><button type="button" onClick={() => navigate("/fortune?content=dream&cast=dark")}>visit fortune</button>
@@ -69,6 +73,19 @@ describe("campus state continuity", () => {
     expect(screen.queryByTestId("scene")).toBeNull();
     expect(sessionStorage.getItem(CAMPUS_RETURN_KEY)).toBeNull();
   });
+  it("forces public reader previews into focus mode without campus map or scene", () => {
+    render(
+      <MemoryRouter initialEntries={["/create/work-1?view=reader&publicPreview=1"]}>
+        <Fixture />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("button", { name: "공간 지도 열기" })).toBeNull();
+    expect(screen.queryByTestId("scene")).toBeNull();
+    expect(document.documentElement.dataset.campusMode).toBe("focus");
+    expect(screen.getByRole("textbox", { name: "private draft" })).toBeTruthy();
+  });
+
   it("supports a native, keyboard-accessible map and restores focus", async () => {
     render(<MemoryRouter initialEntries={["/fortune"]}><Fixture /></MemoryRouter>);
     const trigger = screen.getByRole("button", { name: "공간 지도 열기" });

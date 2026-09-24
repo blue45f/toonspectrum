@@ -33,6 +33,11 @@ import {
   CreatorDraftCollaborationRoomExpiredError,
   CreatorDraftCollaborationWorkRevisionConflictError,
 } from "./creator-draft-collaboration.repository";
+import { planCreatorPublicationMediaMutation } from "./creator-publication-media.contract";
+import {
+  CreatorPublicationMediaService,
+  CreatorPublicationMediaStorageUnavailableError,
+} from "./creator-publication-media.service";
 import { CreatorService } from "./creator.service";
 
 import type { StudioWorkAssetService } from "./studio-work-asset.service";
@@ -131,11 +136,23 @@ const studioWorkAssetService = {
   deleteGeneratedObjectsForWork: vi.fn(),
 };
 
-function createService(): CreatorService {
+const publicationMediaService = {
+  resolveMutationPlan: vi.fn(),
+  externalize: vi.fn(),
+  read: vi.fn(),
+};
+
+function createService(
+  publicationMedia?: CreatorPublicationMediaService,
+): CreatorService {
   return new CreatorService(
     collaborationRepository as unknown as CreatorCollaborationRepository,
     draftCollaborationRepository as unknown as CreatorDraftCollaborationRepository,
     studioWorkAssetService as unknown as StudioWorkAssetService,
+    undefined,
+    undefined,
+    undefined,
+    publicationMedia,
   );
 }
 
@@ -171,6 +188,9 @@ describe("CreatorService safety gates", () => {
     studioWorkAssetService.deleteGeneratedObjectsForWork
       .mockReset()
       .mockResolvedValue(0);
+    publicationMediaService.resolveMutationPlan.mockReset();
+    publicationMediaService.externalize.mockReset();
+    publicationMediaService.read.mockReset();
     deleteWork.mockReset();
     delete process.env.CREATOR_IMAGE_AI_ENABLED;
   });
@@ -277,7 +297,7 @@ describe("CreatorService safety gates", () => {
   });
 
   it("비소유자의 공개 작품 조회만 조회수를 올린다", async () => {
-    getWork.mockResolvedValue({ id: "work-reader", isOwner: false });
+    getWork.mockResolvedValue({ id: "work-reader", isOwner: false, cover: "", pages: [] });
     await createService().getWork("work-reader", "reader");
     expect(bumpViews).toHaveBeenCalledWith("work-reader");
   });
@@ -392,6 +412,157 @@ describe("CreatorService safety gates", () => {
     expect((error as ConflictException).getResponse()).toMatchObject({
       code: "creator_work_revision_conflict",
       currentRevision: 11,
+    });
+  });
+
+  it("Base64 작품 생성은 비공개 복구 초안 뒤 immutable media 경로로만 공개한다", async () => {
+    const cover = `data:image/png;base64,${Buffer.from("cover-bytes").toString("base64")}`;
+    const body = { title: "immutable illustration", cover, status: "published" as const };
+    const plan = planCreatorPublicationMediaMutation(body);
+    publicationMediaService.resolveMutationPlan.mockReturnValue({
+      plan,
+      shouldExternalize: true,
+    });
+    createWork.mockResolvedValueOnce({
+      id: "work-publication-media",
+      revision: 1,
+      status: "draft",
+    });
+    const immutableCover = `/api/creator/works/work-publication-media/media/cover/${plan.entries[0]!.payload.sha256}`;
+    publicationMediaService.externalize.mockResolvedValueOnce({ cover: immutableCover });
+    updateWork.mockResolvedValueOnce({
+      id: "work-publication-media",
+      revision: 2,
+      status: "published",
+      cover: immutableCover,
+    });
+
+    const result = await createService(
+      publicationMediaService as unknown as CreatorPublicationMediaService,
+    ).createWork("owner", body);
+
+    expect(createWork).toHaveBeenCalledWith("owner", {
+      ...body,
+      cover: "",
+      status: "draft",
+    });
+    expect(publicationMediaService.externalize).toHaveBeenCalledWith(
+      "owner",
+      "work-publication-media",
+      body,
+      plan,
+    );
+    expect(updateWork).toHaveBeenCalledWith("owner", "work-publication-media", {
+      cover: immutableCover,
+      baseRevision: 1,
+      status: "published",
+    });
+    expect(result).toMatchObject({
+      id: "work-publication-media",
+      revision: 2,
+      status: "published",
+      cover: immutableCover,
+    });
+  });
+
+  it("작품 이미지 업로드가 실패하면 Base64를 공개하지 않고 복구 가능한 workId를 반환한다", async () => {
+    const cover = `data:image/png;base64,${Buffer.from("recoverable-cover").toString("base64")}`;
+    const body = { title: "recoverable", cover, status: "published" as const };
+    const plan = planCreatorPublicationMediaMutation(body);
+    publicationMediaService.resolveMutationPlan.mockReturnValue({
+      plan,
+      shouldExternalize: true,
+    });
+    createWork.mockResolvedValueOnce({
+      id: "recoverable-work",
+      revision: 1,
+      status: "draft",
+    });
+    publicationMediaService.externalize.mockRejectedValueOnce(
+      new CreatorPublicationMediaStorageUnavailableError("write-failed"),
+    );
+
+    const error = await createService(
+      publicationMediaService as unknown as CreatorPublicationMediaService,
+    ).createWork("owner", body).catch((cause: unknown) => cause);
+
+    expect(error).toBeInstanceOf(ServiceUnavailableException);
+    expect((error as ServiceUnavailableException).getResponse()).toMatchObject({
+      code: "creator_publication_media_unavailable",
+      recoverableWorkId: "recoverable-work",
+    });
+    expect(createWork).toHaveBeenCalledWith("owner", expect.objectContaining({
+      cover: "",
+      status: "draft",
+    }));
+    expect(updateWork).not.toHaveBeenCalled();
+  });
+
+  it("기존 작품의 Base64 수정은 저장 성공 전까지 현재 revision을 바꾸지 않는다", async () => {
+    const cover = `data:image/png;base64,${Buffer.from("replacement-cover").toString("base64")}`;
+    const body = { title: "kept title", cover, baseRevision: 7 };
+    const plan = planCreatorPublicationMediaMutation(body);
+    const immutableCover = `/api/creator/works/work-update/media/cover/${plan.entries[0]!.payload.sha256}`;
+    publicationMediaService.resolveMutationPlan.mockReturnValue({
+      plan,
+      shouldExternalize: true,
+    });
+    publicationMediaService.externalize.mockResolvedValueOnce({ cover: immutableCover });
+    updateWork.mockResolvedValueOnce({
+      id: "work-update",
+      revision: 8,
+      status: "draft",
+      cover: immutableCover,
+    });
+
+    await expect(createService(
+      publicationMediaService as unknown as CreatorPublicationMediaService,
+    ).updateWork("owner", "work-update", body)).resolves.toMatchObject({ revision: 8 });
+
+    expect(publicationMediaService.externalize).toHaveBeenCalledWith(
+      "owner",
+      "work-update",
+      body,
+      plan,
+    );
+    expect(updateWork).toHaveBeenCalledWith("owner", "work-update", {
+      ...body,
+      cover: immutableCover,
+    });
+  });
+
+  it("외부화된 작품 이미지는 현재 immutable 경로와 digest가 일치할 때만 읽는다", async () => {
+    const digest = "a".repeat(64);
+    const immutableCover = `/api/creator/works/work-media/media/cover/${digest}`;
+    const bytes = Buffer.from("stored-image");
+    getWork.mockResolvedValueOnce({
+      id: "work-media",
+      isOwner: false,
+      cover: immutableCover,
+      pages: [],
+    });
+    publicationMediaService.read.mockResolvedValueOnce({
+      bytes,
+      byteLength: bytes.byteLength,
+      mediaType: "image/png",
+      sha256: digest,
+    });
+
+    const result = await createService(
+      publicationMediaService as unknown as CreatorPublicationMediaService,
+    ).getWorkMedia("work-media", { kind: "cover" }, digest);
+
+    expect(publicationMediaService.read).toHaveBeenCalledWith(
+      "work-media",
+      { kind: "cover" },
+      digest,
+    );
+    expect(result).toMatchObject({
+      bytes,
+      byteLength: bytes.byteLength,
+      mediaType: "image/png",
+      sha256: digest,
+      cacheControl: "public, max-age=31536000, immutable",
     });
   });
 

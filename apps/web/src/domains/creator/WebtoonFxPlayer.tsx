@@ -119,6 +119,7 @@ function RevealPage({
   seqMarks,
   hasAudioFx,
   motionAllowed,
+  priority,
   onEnter,
 }: {
   src: string;
@@ -128,6 +129,7 @@ function RevealPage({
   seqMarks: WorkCutSeqMark[];
   hasAudioFx: boolean;
   motionAllowed: boolean;
+  priority: boolean;
   onEnter: () => void;
 }) {
   const outerRef = useRef<HTMLDivElement>(null);
@@ -195,6 +197,8 @@ function RevealPage({
         <CoverImage
           src={src}
           alt={alt}
+          priority={priority}
+          sizes="(max-width: 960px) 100vw, 896px"
           className="block w-full"
           fallback={
             <span className="grid aspect-[3/4] w-full place-items-center bg-raised/40 text-xs text-fg-3">
@@ -523,6 +527,7 @@ export function WebtoonFxPlayer({
                 seqMarks={cut.seq?.marks ?? []}
                 hasAudioFx={cut.sfx != null || cut.bgmShift != null}
                 motionAllowed={!reduced}
+                priority={index === 0}
                 onEnter={() => handleCutEnter(index)}
               />
             );

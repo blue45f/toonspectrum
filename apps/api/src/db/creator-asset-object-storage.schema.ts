@@ -4,6 +4,7 @@ import {
   check,
   foreignKey,
   index,
+  integer,
   pgTable,
   primaryKey,
   text,
@@ -11,7 +12,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-import { creatorWorkAssets, users } from "./schema";
+import { creatorWorkAssets, creatorWorks, users } from "./schema";
 
 export const creatorAssetStorageObjects = pgTable(
   "creator_asset_storage_object",
@@ -179,6 +180,88 @@ export const creatorWorkAssetStorageReferences = pgTable(
           and ${table.deleteToken} ~
             '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
         )`,
+    ),
+  ],
+);
+
+/**
+ * Immutable publication media references. A work can retain multiple digests for the same slot so
+ * an already-published revision keeps resolving while a replacement upload is prepared. The
+ * current creator_work cover/pages fields select the active digest through their immutable route.
+ */
+export const creatorWorkPublicationMedia = pgTable(
+  "creator_work_publication_media",
+  {
+    workId: text("workId").notNull(),
+    slot: text("slot").notNull(),
+    pageIndex: integer("pageIndex"),
+    purpose: text("purpose").notNull().default("export"),
+    objectDigest: text("objectDigest").notNull(),
+    mediaType: text("mediaType").notNull(),
+    byteLength: bigint("byteLength", { mode: "number" }).notNull(),
+    createdBy: text("createdBy"),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      name: "creator_work_publication_media_pkey",
+      columns: [table.workId, table.slot, table.objectDigest],
+    }),
+    foreignKey({
+      name: "creator_work_publication_media_work_fkey",
+      columns: [table.workId],
+      foreignColumns: [creatorWorks.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "creator_work_publication_media_object_fkey",
+      columns: [table.purpose, table.objectDigest],
+      foreignColumns: [
+        creatorAssetStorageObjects.purpose,
+        creatorAssetStorageObjects.digest,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "creator_work_publication_media_created_by_fkey",
+      columns: [table.createdBy],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+    index("idx_creator_work_publication_media_object").on(
+      table.purpose,
+      table.objectDigest,
+    ),
+    index("idx_creator_work_publication_media_work_created").on(
+      table.workId,
+      table.createdAt.desc(),
+    ),
+    check(
+      "creator_work_publication_media_purpose_check",
+      sql`${table.purpose} = 'export'`,
+    ),
+    check(
+      "creator_work_publication_media_slot_check",
+      sql`(
+        ${table.slot} = 'cover' AND ${table.pageIndex} IS NULL
+      ) OR (
+        ${table.slot} ~ '^page:[0-9]+$'
+        AND ${table.pageIndex} BETWEEN 0 AND 9999
+        AND ${table.slot} = 'page:' || ${table.pageIndex}::text
+      )`,
+    ),
+    check(
+      "creator_work_publication_media_digest_check",
+      sql`${table.objectDigest} ~ '^sha256:[a-f0-9]{64}$'`,
+    ),
+    check(
+      "creator_work_publication_media_type_check",
+      sql`${table.mediaType} IN (
+        'image/avif', 'image/gif', 'image/jpeg', 'image/png', 'image/webp'
+      )`,
+    ),
+    check(
+      "creator_work_publication_media_byte_length_check",
+      sql`${table.byteLength} BETWEEN 1 AND 33554432`,
     ),
   ],
 );
