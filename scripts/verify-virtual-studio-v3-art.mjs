@@ -73,7 +73,11 @@ async function verifyImageManifestDirectory({ root, expectedVersion, expectedCou
     totalBytes += bytes.length;
   }
 
-  const actual = (await listRegularFiles(root)).filter((file) => file !== "art-manifest.json");
+  // Virtual Studio v4 owns the nested NPC pack through art-v4-manifest.json. Keep the v3
+  // style-pack manifest exact for its own files without duplicating v4 integrity ownership.
+  const actual = (await listRegularFiles(root)).filter(
+    (file) => file !== "art-manifest.json" && !file.startsWith("npc-cast-v4/"),
+  );
   requireCondition(JSON.stringify(actual) === JSON.stringify([...declared].sort()), `${manifestPath} does not exactly cover its asset directory`);
   return Object.freeze({ manifest, files: actual, totalBytes });
 }

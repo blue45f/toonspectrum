@@ -1274,11 +1274,11 @@
     },
     {
       "file": "tiles/world-base.webp",
-      "bytes": 55916,
-      "sha256": "fcf97410b7d3ffad20d35ab0a81b2283355cebbb3f4d3c32ef90dc6be3577317",
+      "bytes": 136398,
+      "sha256": "f69a2a5bf22c670d8b92f8029315d4e8a67f3c2590e303b9f8c2b648a1a1854c",
       "size": [
-        1280,
-        960
+        1024,
+        768
       ]
     }
   ]
