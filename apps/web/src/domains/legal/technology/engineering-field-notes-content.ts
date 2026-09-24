@@ -1067,9 +1067,9 @@ export const ENGINEERING_REFERENCE_PRODUCTS = [
 ] as const satisfies readonly EngineeringReferenceProduct[];
 
 export const ENGINEERING_IMPLEMENTATION_INVENTORY: EngineeringImplementationInventory = Object.freeze({
-  reviewedAt: "2026-09-23",
-  workerEntries: 63,
-  workerClients: 57,
+  reviewedAt: "2026-09-25",
+  workerEntries: 64,
+  workerClients: 58,
   serviceWorkerRuntimeFiles: 9,
   localInferenceRuntimes: Object.freeze(["ONNX Runtime Web", "MediaPipe Tasks Vision"]),
   blenderMcpCommands: 8,
