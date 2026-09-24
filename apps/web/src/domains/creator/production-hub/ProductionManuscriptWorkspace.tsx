@@ -759,7 +759,7 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
 
   return <div
     className={cn(
-      "space-y-4",
+      "min-w-0 max-w-full space-y-4 overflow-x-hidden",
       "max-lg:[&_button]:min-h-11 max-lg:[&_button]:min-w-11",
       "max-lg:[&_a]:min-h-11 max-lg:[&_a]:min-w-11",
       "max-lg:[&_input:not([type=checkbox]):not([type=radio]):not([type=range])]:min-h-11",
@@ -769,7 +769,7 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
     aria-busy={loading || undefined}
   >
     <section
-      className="overflow-hidden rounded-3xl border border-line bg-card"
+      className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-card"
       aria-labelledby="manuscript-workspace-title"
     >
       <div className="border-b border-line bg-gradient-to-br from-accent-soft/35 via-card to-card p-5 sm:p-6">
@@ -895,9 +895,9 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
         </div> : null}
       </div>
 
-      <div className="sticky top-0 z-20 flex flex-col gap-3 border-t border-line bg-card/95 p-3 backdrop-blur sm:p-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="sticky top-0 z-20 flex min-w-0 max-w-full flex-col gap-3 border-t border-line bg-card/95 p-3 backdrop-blur sm:p-4 lg:flex-row lg:items-center lg:justify-between">
         <div
-          className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="grid w-full min-w-0 max-w-full grid-cols-3 gap-1 overflow-hidden sm:flex sm:overflow-x-auto sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden lg:flex-1"
           role="tablist"
           aria-label="원고 운영 보기"
         >
@@ -914,7 +914,8 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
             onClick={() => setView(id)}
             onKeyDown={(event) => handleViewTabKey(event, view, setView)}
             className={cn(
-              "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-bold",
+              "inline-flex min-h-11 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-center text-[0.6875rem] font-bold",
+              "sm:shrink-0 sm:flex-row sm:gap-2 sm:px-3 sm:text-xs",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
               view === id ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
             )}

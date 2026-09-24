@@ -266,7 +266,7 @@ export function ProductionMultiManuscriptWorkbench({
   const handleLoaded = useCallback((candidate: ProductionReviewCandidate, snapshot: PaneSnapshot) => {
     setLoaded((current) => {
       const prior = current[candidate.id];
-      if (prior?.current?.sha256 === snapshot.current?.sha256 && prior.previews === snapshot.previews) return current;
+      if (prior && prior.current?.sha256 === snapshot.current?.sha256 && prior.previews === snapshot.previews) return current;
       return { ...current, [candidate.id]: snapshot };
     });
   }, []);

@@ -66,6 +66,17 @@ describe("free team workspace UI", () => {
     expect(value).toContain("#invite=");
     expect(value).toContain("entry=team-lobby");
   });
+  it("prefills the real workspace invite from a least-privileged production role preset", async () => {
+    mocks.command.mockResolvedValue({ workspaceId: "team-a", revision: 4, invitationId: "invite-a", token: "a".repeat(43), delivery: "manual-link" });
+    render(<App path="/production/workspaces/team-a?rolePreset=external-reviewer" />);
+    await screen.findByRole("heading", { name: "구성원 초대" });
+    expect(screen.getByRole("button", { name: "외부 검토자" }).getAttribute("aria-pressed")).toBe("true");
+    expect((screen.getByLabelText("초대 역할") as HTMLSelectElement).value).toBe("guest");
+    expect(screen.getByText(/원본 다운로드/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("초대받을 이메일"), { target: { value: "reviewer@example.test" } });
+    fireEvent.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
+    await waitFor(() => expect(mocks.command).toHaveBeenCalledWith("team-a", 3, { type: "invite", email: "reviewer@example.test", role: "guest" }));
+  });
   it("adds a project-space hint without changing the authoritative invite command", async () => {
     mocks.command.mockResolvedValue({ workspaceId: "team-a", revision: 4, invitationId: "invite-a", token: "a".repeat(43), delivery: "manual-link" });
     render(<App path="/production/workspaces/team-a" />);

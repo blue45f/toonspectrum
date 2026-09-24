@@ -138,14 +138,44 @@ export function ProductionEpisodeProcessMatrix({
 
   if (!cells.length) return null;
 
-  return <section className="rounded-3xl border border-line bg-card p-4 sm:p-6" aria-labelledby="production-matrix-title" data-production-process-matrix="">
+  return <section className="min-w-0 max-w-full overflow-hidden rounded-3xl border border-line bg-card p-4 sm:p-6" aria-labelledby="production-matrix-title" data-production-process-matrix="">
     <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
       <div><p className="text-[0.6875rem] font-black uppercase tracking-[0.14em] text-accent">EPISODE × PROCESS MATRIX</p><h2 id="production-matrix-title" className="mt-2 text-xl font-black text-fg">회차와 공정을 한 표에서 운영합니다</h2><p className="mt-1 max-w-3xl text-sm leading-6 text-fg-2">각 셀에서 담당자·기한·HEAD·FINAL·필수 수정을 확인하고, 여러 셀을 선택해 실제 Production 업무를 일괄 갱신합니다.</p></div>
       <button type="button" onClick={selectAll} className={buttonClass({ variant: "outline", size: "sm" })}>{selected.size === cells.length ? <CheckSquare2 className="size-4" aria-hidden="true" /> : <Square className="size-4" aria-hidden="true" />} {selected.size === cells.length ? "전체 해제" : "전체 선택"}</button>
     </div>
 
+    <div className="mt-5 space-y-3 sm:hidden" aria-label="회차별 공정 운영 카드">
+      {rows.map((episodeId) => <section key={episodeId ?? "project"} className="rounded-2xl border border-line bg-panel p-3">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-black text-fg">{episodeLabel(aggregate, episodeId)}</h3>
+          <span className="text-[0.6875rem] font-bold text-fg-3">{cells.filter((cell) => cell.episodeId === episodeId).length}개 공정</span>
+        </div>
+        <div className="mt-3 space-y-2">
+          {cells.filter((cell) => cell.episodeId === episodeId).map((cell) => {
+            const attention = productionManuscriptAttention(cell.process);
+            return <article key={cell.key} className={cn("rounded-xl border p-3", cellTone(cell))}>
+              <div className="flex items-start gap-2">
+                <button type="button" aria-pressed={selected.has(cell.key)} onClick={() => toggle(cell.key)} className="grid size-11 shrink-0 place-items-center rounded-lg border border-line bg-card text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+                  {selected.has(cell.key) ? <CheckSquare2 className="size-5 text-accent" aria-hidden="true" /> : <Square className="size-5" aria-hidden="true" />}
+                  <span className="sr-only">{cell.process.artifact.title} 선택</span>
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-black text-fg">{cell.process.artifact.title}</p>
+                  <p className="mt-1 text-[0.625rem] text-fg-3">HEAD {cell.process.headRevision?.id.slice(0, 10) ?? "없음"} · FINAL {cell.process.approvedRevision?.id.slice(0, 10) ?? "미지정"}</p>
+                  <p className="mt-2 text-xs text-fg-2">담당 {cell.assigneeNames.join(", ") || "미배정"} · 검수 {cell.process.openReviewCount}건 · 필수 {cell.process.openRequiredFeedbackCount}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => onOpenProcess(cell.process, attention.recommendedView)} className="mt-3 flex min-h-11 w-full items-center justify-between rounded-lg border border-line bg-card px-3 text-xs font-bold text-fg-2 hover:bg-raised">
+                <span>{attention.actionLabel}</span><ChevronRight className="size-4" aria-hidden="true" />
+              </button>
+            </article>;
+          })}
+        </div>
+      </section>)}
+    </div>
+
     {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Wide matrix needs keyboard scrolling. */}
-    <div className="mt-5 overflow-x-auto overscroll-x-contain rounded-2xl border border-line" role="region" aria-label="회차별 공정 운영 표" tabIndex={0}>
+    <div className="mt-5 hidden w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-2xl border border-line [contain:inline-size] sm:block" role="region" aria-label="회차별 공정 운영 표" tabIndex={0}>
       <table className="min-w-[60rem] border-collapse text-left text-xs">
         <caption className="sr-only">행은 회차, 열은 제작 공정입니다. 각 셀에서 현재 버전과 업무 상태를 확인합니다.</caption>
         <thead><tr className="bg-panel"><th scope="col" className="sticky left-0 z-20 min-w-48 border-b border-r border-line bg-panel p-3 font-black text-fg">회차</th>{columns.map((column) => <th key={column.key} scope="col" className="min-w-56 border-b border-line p-3 font-black text-fg">{column.label}</th>)}</tr></thead>
