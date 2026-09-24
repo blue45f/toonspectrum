@@ -925,8 +925,37 @@ export function StudioPublishingCommandCenter({
     const publishSeriesId = linkedSeriesId;
     const publishChallengeId = linkedChallengeId;
     const publishTitleId = linkedTitleId;
+    const pageImages = pageSnapshot.map((page) => page.src);
+    let integrityDocument: Record<string, unknown>;
+    try {
+      const { writeStudioPublicationIntegrity } = await import("./studio-publication-integrity");
+      integrityDocument = await writeStudioPublicationIntegrity({
+        document: baseDoc,
+        revisionId: publishScope.workId
+          ? `upload-revision:${(baseRevision ?? 0) + 1}`
+          : "upload-revision:1",
+        pageImages,
+        publisherActor: sharedMetaSnapshot && sharedMetaSnapshot.role !== "owner"
+          ? "collaborator"
+          : "owner",
+        ownerApproved: intent === "publish",
+        ownerUserId: authUserId,
+        approvedAt: intent === "publish" ? new Date().toISOString() : null,
+        toolIds: ["toonstudio-web", "upload-publisher"],
+      });
+    } catch (cause) {
+      setError(cause instanceof Error
+        ? cause.message
+        : "게시 원본의 무결성 정보를 만들지 못했습니다.");
+      return;
+    }
+    if (!isStudioUploadPublishScopeCurrent(
+      publishScope,
+      currentScopeRef.current,
+      mountedRef.current,
+    )) return;
     const baseDocument = {
-      ...baseDoc,
+      ...integrityDocument,
       format: "upload",
       pageMeta: pageSnapshot.map((page) => ({
         width: page.width,
@@ -945,7 +974,6 @@ export function StudioPublishingCommandCenter({
     setError(null);
     setSuccessMessage(null);
     try {
-      const pageImages = pageSnapshot.map((page) => page.src);
       const saved = await runStudioUploadPublishStages({
         scope: publishScope,
         currentScope: () => currentScopeRef.current,

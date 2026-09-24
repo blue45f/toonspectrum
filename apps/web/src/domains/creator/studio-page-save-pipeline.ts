@@ -73,6 +73,8 @@ export interface StudioPageSavePipelineDeps {
   readonly studioAuthUserId: string | null;
   readonly workId: string | null;
   readonly remixId: string | null;
+  readonly sourceProjectId: string | null;
+  readonly sourceDocumentId: string | null;
   readonly loggedIn: boolean;
   readonly autosaveKey: string;
   readonly linkedTitleId: string | null | undefined;
@@ -204,6 +206,8 @@ export async function runStudioPageSavePipeline(
     studioAuthUserId,
     workId,
     remixId,
+    sourceProjectId,
+    sourceDocumentId,
     loggedIn,
     autosaveKey,
     linkedTitleId,
@@ -491,6 +495,25 @@ export async function runStudioPageSavePipeline(
     setCurrentPageId(originalPageId);
     setMasterEditMode(originalMasterEditMode);
 
+    const { writeStudioPublicationIntegrity } = await import("./studio-publication-integrity");
+    const publicationDocumentBase = await writeStudioPublicationIntegrity({
+      document: sharedDocument?.document.doc ?? loadedWork?.doc,
+      sourceKind: "studio_document",
+      projectId: sourceProjectId,
+      documentId: sourceDocumentId ?? workId,
+      revisionId: `studio-generation:${studioRevisionProjectGenerationRef.current}:history:${saveHistoryIndex}`,
+      pageImages,
+      disclosure: publishAiDisclosure,
+      aiUsage: publishAiUsage,
+      publisherActor: sharedDocument && sharedDocument.role !== "owner"
+        ? "collaborator"
+        : "owner",
+      ownerApproved: status === "published",
+      ownerUserId: studioAuthUserId,
+      approvedAt: status === "published" ? new Date().toISOString() : null,
+      toolIds: ["toonstudio-web", "studio-canvas-editor"],
+    });
+    if (!saveScopeStillCurrent()) return;
     const cover = await downscaleStudioCanvasDataUrl(pageImages[0] || "", 480);
     const {
       buildStudioDirectWorkSavePlan,
@@ -507,7 +530,7 @@ export async function runStudioPageSavePipeline(
       pageImages,
       document: {
         // 연출(fx) 등 다른 owner 도구가 저장한 확장 키를 보존하고, 스튜디오 소유 키만 덮어쓴다.
-        extensionBase: sharedDocument?.document.doc ?? loadedWork?.doc,
+        extensionBase: publicationDocumentBase,
         width: CANVAS_W,
         pagesList: serverSavePages,
         // 비어 있는 마스터는 undefined여서 JSON 직렬화 시 키가 떨어진다(하위호환).
