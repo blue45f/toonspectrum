@@ -304,6 +304,7 @@ export async function importStudioProjectPackage(
       templateId: parsed.project.templateId,
       description: parsed.project.description,
       primaryLocale: parsed.project.primaryLocale,
+      definition: parsed.project.definition,
       createdAt: now,
     }, { target: options.target });
     const restoredDocuments = parsed.documents.map((sourceDocument) => ({

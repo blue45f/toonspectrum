@@ -1851,8 +1851,9 @@ export function StudioCuttoonEditor({
     setPagesHistoryState,
   } = useStudioPageHistorySnapshots({
     initialCanvasHeight: localCanvasSeed?.canvasH,
+    initialPageCount: localCanvasSeed?.pageCount,
     initialPage: localCanvasSeed
-      ? (pageId) => studioLocalCanvasSeedPage(localCanvasSeed, pageId)
+      ? (pageId, pageIndex) => studioLocalCanvasSeedPage(localCanvasSeed, pageId, pageIndex)
       : undefined,
     effectiveWorkId,
     markStudioDocumentChanged,

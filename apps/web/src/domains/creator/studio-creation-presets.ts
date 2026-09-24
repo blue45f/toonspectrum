@@ -22,8 +22,14 @@ export const STUDIO_CREATION_PRESETS: readonly StudioCreationPreset[] = [
   ...WEBTOON_PLATFORM_CREATION_PRESETS,
   { id: "webtoon-four-cut", kind: "webtoon", width: 1080, height: 4320 },
   { id: "webtoon-page", kind: "webtoon", width: 1600, height: 2400 },
+  { id: "cuttoon-square-4", kind: "webtoon", width: 1080, height: 1080 },
+  { id: "cuttoon-portrait-8", kind: "webtoon", width: 1080, height: 1350 },
+  { id: "cuttoon-story-10", kind: "webtoon", width: 1080, height: 1920 },
+  { id: "page-comic-digital-8", kind: "webtoon", width: 1600, height: 2400 },
+  { id: "page-comic-b5-24", kind: "webtoon", width: 1760, height: 2508 },
   { id: "illustration-portrait", kind: "illustration", width: 2048, height: 2560 },
   { id: "illustration-landscape", kind: "illustration", width: 2560, height: 1440 },
+  { id: "illustration-square", kind: "illustration", width: 2048, height: 2048 },
   { id: "quick-sketch", kind: "illustration", width: 1600, height: 1200 },
   { id: "design-cover", kind: "design", width: 1600, height: 2400 },
   { id: "design-social", kind: "design", width: 1080, height: 1080 },
@@ -38,6 +44,8 @@ export const STUDIO_CREATION_PRESETS: readonly StudioCreationPreset[] = [
   { id: "3d-pose", kind: "three-d", width: 1600, height: 2400 },
   { id: "motion-webtoon", kind: "animation", width: 1920, height: 1080 },
   { id: "animation-short", kind: "animation", width: 1080, height: 1920 },
+  { id: "motion-toon-vertical", kind: "animation", width: 1080, height: 1920 },
+  { id: "motion-toon-landscape", kind: "animation", width: 1920, height: 1080 },
 ];
 
 export function studioCreationPreset(kind: StudioProjectKind, templateId?: string | null): StudioCreationPreset {

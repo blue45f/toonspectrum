@@ -1,3 +1,4 @@
+import type { StudioProjectDefinition } from "./studio-project-definition";
 import {
   createStudioProjectDocument,
   ensureInitialStudioProjectDocument,
@@ -40,6 +41,7 @@ export interface CreateStudioProjectWithDocumentInput {
   readonly description?: string;
   readonly primaryLocale?: string;
   readonly createdAt?: string;
+  readonly definition?: StudioProjectDefinition | null;
   readonly document?: StudioInitialDocumentInput;
 }
 
@@ -78,6 +80,7 @@ export function createStudioProjectWithInitialDocument(
     templateId: input.templateId,
     description: input.description,
     primaryLocale: input.primaryLocale,
+    definition: input.definition,
     createdAt,
   }, { target });
 
