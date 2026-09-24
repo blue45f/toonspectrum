@@ -113,7 +113,7 @@ export const MAX_MERGE_ID_LENGTH = 120;
 export const MAX_MERGE_REVIEW_TEXT_LENGTH = 2000;
 export const MAX_MERGE_TAGS = 5;
 export const MAX_MERGE_TAG_LENGTH = 32;
-const VALID_READ_STATES = new Set(["want", "reading", "done", "dropped"]);
+const VALID_READ_STATES = new Set(["want", "reading", "paused", "done", "dropped"]);
 
 interface NormalizedMergePayload {
   ratings: { titleId: string; value: number }[];
@@ -358,7 +358,7 @@ export class MeService {
   async upsertRead(uid: string, payload: ReadPayload) {
     const titleId = toValidTitleId(payload.titleId);
     const state = String(payload.state ?? "").trim();
-    const validStates = ["want", "reading", "done", "dropped", ""];
+    const validStates = ["want", "reading", "paused", "done", "dropped", ""];
 
     if (!state) {
       await db.delete(reads).where(and(eq(reads.userId, uid), eq(reads.titleId, titleId)));

@@ -1,4 +1,4 @@
-import { Plus, Trash2, Pencil, Check, FolderHeart } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, FolderHeart, Share2 } from "lucide-react";
 import { useState } from "react";
 
 import { EmptyTeach } from "./library-view-empty";
@@ -11,7 +11,52 @@ import type { Title } from "@/shared/lib/types";
 import { MAX_COLLECTION_NAME_LENGTH } from "@/shared/lib/collection-contract";
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
+import { toast } from "@/shared/lib/toast-store";
+import { encodePublicCollectionSnapshot, publicCollectionSlug } from "@/domains/engagement/public-list-share";
 import Link from "@/compat/router-link";
+
+
+async function shareCollection(collection: ReturnType<typeof useApp.getState>["collections"][number]): Promise<void> {
+  if (collection.titleIds.length === 0) return;
+  let token: string;
+  try {
+    token = encodePublicCollectionSnapshot({
+      version: 1,
+      name: collection.name,
+      emoji: collection.emoji,
+      description: `${collection.titleIds.length}편을 담은 ToonSpectrum 컬렉션`,
+      titleIds: collection.titleIds,
+      createdAt: collection.createdAt,
+    });
+  } catch {
+    toast("공개 링크를 만들기에는 컬렉션이 너무 큽니다. 작품 수를 줄인 뒤 다시 시도해 주세요.", { tone: "error" });
+    return;
+  }
+  const url = new URL(`/lists/${encodeURIComponent(publicCollectionSlug(collection.name))}`, window.location.origin);
+  url.searchParams.set("snapshot", token);
+  const shareData = { title: collection.name, text: `${collection.name} · ToonSpectrum`, url: url.toString() };
+  if (typeof navigator.share === "function") {
+    try {
+      await navigator.share(shareData);
+      return;
+    } catch (cause) {
+      if ((cause as DOMException)?.name === "AbortError") return;
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url.toString());
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = url.toString();
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.append(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+  toast("공개 리스트 링크를 복사했어요. 현재 작품 구성이 링크 안에 고정됩니다.", { tone: "success" });
+}
 
 export function CollectionsTab({
   collections,
@@ -116,6 +161,16 @@ export function CollectionsTab({
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void shareCollection(c)}
+                      disabled={c.titleIds.length === 0}
+                      aria-label="공개 리스트 링크 공유"
+                      title={c.titleIds.length === 0 ? "작품을 먼저 담아 주세요" : "공개 링크 공유"}
+                      className="text-fg-3 transition-colors hover:text-accent disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      <Share2 size={14} />
+                    </button>
                     {editingId === c.id ? (
                       <button onClick={commitRename} aria-label="이름 저장" className="text-fg-3 transition-colors hover:text-good">
                         <Check size={15} />

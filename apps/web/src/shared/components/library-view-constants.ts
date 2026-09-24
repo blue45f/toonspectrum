@@ -1,6 +1,6 @@
 import type { ReadState, Title } from "@/shared/lib/types";
 
-export type Tab = "shelf" | "rated" | "taste" | "collections" | "alerts";
+export type Tab = "shelf" | "rated" | "diary" | "taste" | "collections" | "alerts";
 export type RatedSort = "high" | "low" | "title";
 
 export const RATED_SORTS: { value: RatedSort; label: string }[] = [
@@ -14,6 +14,7 @@ export const DAY_FROM_GETDAY = [6, 0, 1, 2, 3, 4, 5];
 export const READ_TABS: { value: ReadState; label: string }[] = [
   { value: "want", label: "관심" },
   { value: "reading", label: "보는 중" },
+  { value: "paused", label: "보류" },
   { value: "done", label: "완독" },
   { value: "dropped", label: "하차" },
 ];

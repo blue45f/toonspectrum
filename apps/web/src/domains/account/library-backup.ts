@@ -17,7 +17,7 @@ const collection = z.object({
 const backup = z.object({
   _app: z.literal("toonspectrum-library"), version: z.literal(1),
   ratings: z.record(key, rating),
-  reads: z.record(key, z.enum(["want", "reading", "done", "dropped"])),
+  reads: z.record(key, z.enum(["want", "reading", "paused", "done", "dropped"])),
   subscriptions: z.record(key, z.boolean()),
   reviews: z.record(key, review),
   likedReviews: z.record(key, z.boolean()),

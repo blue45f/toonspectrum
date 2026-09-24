@@ -16,6 +16,13 @@ describe("explicit library backup validation", () => {
     expect(data.collections[0].id).toBe("old-collection");
     expect(Object.keys(data).sort()).toEqual(["ratings", "reads", "subscriptions", "reviews", "likedReviews", "collections"].sort());
   });
+  it("preserves the paused reading state in portable backups", () => {
+    const data = parseLibraryBackup(JSON.stringify({
+      ...validLibraryBackup,
+      reads: { work: "paused" },
+    }));
+    expect(data.reads.work).toBe("paused");
+  });
   it.each([{}, [], null, { ...validLibraryBackup, version: 2 }, { ...validLibraryBackup, _app: "another-app" }, { ...validLibraryBackup, ratings: { work: 99 } }, { ...validLibraryBackup, reads: { work: "invalid" } }, { ...validLibraryBackup, subscriptions: { work: "true" } }, { ...validLibraryBackup, reviews: { other: validLibraryBackup.reviews.work } }, { ...validLibraryBackup, collections: [validLibraryBackup.collections[0], validLibraryBackup.collections[0]] }])("rejects invalid structures instead of clearing existing records", (value) => {
     expect(() => parseLibraryBackup(JSON.stringify(value))).toThrow();
   });

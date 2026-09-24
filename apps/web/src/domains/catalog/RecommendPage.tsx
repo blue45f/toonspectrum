@@ -4,13 +4,17 @@ import { DiscoveryWorkspaceNav } from "@/shared/components/discovery-workspace-n
 import { RecommendView } from "@/shared/components/recommend-view";
 import { Container } from "@/shared/components/section";
 import { parseCatalogDiscoveryState } from "@/shared/lib/catalog-discovery-state";
+import { useEngagement } from "@/domains/engagement/engagement-store";
 
 export function RecommendPage() {
   const [searchParams] = useSearchParams();
   const state = parseCatalogDiscoveryState(searchParams);
+  const savedTaste = useEngagement((engagement) => engagement.tastePreferences);
   const initialGenres = state.tasteGenres.length
     ? [...state.tasteGenres]
-    : [...state.filters.genres];
+    : state.filters.genres.length
+      ? [...state.filters.genres]
+      : [...(savedTaste?.genres ?? [])];
 
   return (
     <Container size="wide" className="py-6 sm:py-10">

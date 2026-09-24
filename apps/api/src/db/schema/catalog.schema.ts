@@ -49,7 +49,7 @@ export const reads = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     titleId: text("titleId").notNull(),
-    state: text("state").notNull(), // want | reading | done | dropped
+    state: text("state").notNull(), // want | reading | paused | done | dropped
   },
   (t) => [primaryKey({ columns: [t.userId, t.titleId] })]
 );

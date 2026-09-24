@@ -160,7 +160,7 @@ async function main() {
     .onConflictDoNothing();
 
   // ── 3. 평점 + 읽음 상태 + 구독(찜) — 여러 사용자 × 여러 작품 ────────────────
-  const readStates = ["want", "reading", "done", "dropped"] as const;
+  const readStates = ["want", "reading", "paused", "done", "dropped"] as const;
   const ratingRows: { userId: string; titleId: string; value: number; updatedAt: Date }[] = [];
   const readRows: { userId: string; titleId: string; state: string }[] = [];
   const subRows: { userId: string; titleId: string }[] = [];

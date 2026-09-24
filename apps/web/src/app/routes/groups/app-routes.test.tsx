@@ -22,6 +22,7 @@ const REQUIRED_STUDIO_FRONT_DOOR_SURFACES: readonly RouteSurface[] = [
   { id: "creator-studio-toolchain", path: "/studio/toolchain" },
   { id: "creator-studio-engines", path: "/studio/engines" },
   { id: "creator-studio-jobs", path: "/studio/jobs" },
+  { id: "creator-growth-lab", path: "/studio/growth" },
   { id: "creator-studio-manual", path: "/studio/manual" },
   { id: "creator-studio-manual-article", path: "/studio/manual/:articleId" },
 ];

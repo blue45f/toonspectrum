@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bell,
   BookOpen,
   CalendarDays,
   Compass,
@@ -280,6 +281,24 @@ export const SITE_NAVIGATION_ITEMS = {
     "저장한 작품과 취향을 한곳에서",
     "Keep saved stories and taste in one place",
   ),
+  notifications: item(
+    "notifications",
+    "/notifications",
+    Bell,
+    "알림 센터",
+    "Notifications",
+    "연재·제공처 변화·제작 업무를 한곳에서",
+    "Release, availability and production updates in one place",
+  ),
+  growthLab: item(
+    "growth-lab",
+    "/studio/growth",
+    BarChart3,
+    "성장 실험",
+    "Growth lab",
+    "썸네일·제목 실험과 익명 독자 퍼널",
+    "Thumbnail and title experiments with aggregate audience funnels",
+  ),
   me: item(
     "me",
     "/my",
@@ -335,7 +354,7 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
     id: "production-flow",
     label: { ko: "제작 흐름", en: "Production flow" },
     description: { ko: "작품 전체를 계획하고 오늘 할 일을 바로 확인", en: "Plan the whole work and see what needs attention today" },
-    items: [I.workspaceHome, I.studio, I.make, I.production],
+    items: [I.workspaceHome, I.studio, I.make, I.production, I.growthLab],
   },
   {
     id: "production-resources",
@@ -392,7 +411,7 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
       ko: "서재·활동·설정을 한곳에서",
       en: "Library, activity and settings in one place",
     },
-    items: [I.library, I.me, I.home],
+    items: [I.library, I.notifications, I.me, I.home],
   },
 ];
 
@@ -417,7 +436,7 @@ export const TOONSPECTRUM_MOBILE_TABS = [
 /** Compatibility export for consumers not yet context-aware. */
 export const MOBILE_SITE_TABS = TOONSPECTRUM_MOBILE_TABS;
 
-export const SITE_UTILITY_NAVIGATION = [I.help, I.settings, I.me] as const;
+export const SITE_UTILITY_NAVIGATION = [I.notifications, I.help, I.settings, I.me] as const;
 
 /** Select the Studio or Spectrum navigation context from the canonical route metadata projection. */
 export function siteNavigationContextForPath(pathname: string): SiteNavigationContext {

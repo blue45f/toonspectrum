@@ -14,7 +14,7 @@ import { RecommendationFeedbackCard } from "./recommendation-feedback-card";
 import { Section, Rail } from "./section";
 
 import type { RecommendPayload } from "./recommend-view-types";
-import type { PlatformId } from "@/shared/lib/types";
+import type { PlatformId, Title } from "@/shared/lib/types";
 
 import { TitleFilterPanel } from "@/shared/components/title-filter-panel";
 import {
@@ -39,6 +39,7 @@ import {
   RECOMMENDATION_FEEDBACK_EVENT,
 } from "@/shared/lib/recommendation-feedback";
 import { useApp, useHydrated, useSavedTitleIds } from "@/shared/lib/store";
+import { useEngagement } from "@/domains/engagement/engagement-store";
 import { GENRES } from "@/shared/lib/taxonomy";
 import {
   applyTitleFilters,
@@ -63,6 +64,7 @@ export function RecommendView({
   const reads = useApp((s) => s.reads);
   const setRating = useApp((s) => s.setRating);
   const setRead = useApp((s) => s.setRead);
+  const tastePreferences = useEngagement((state) => state.tastePreferences);
 
   const savedIds = useSavedTitleIds();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -200,12 +202,20 @@ export function RecommendView({
     };
   }, [requestBody, reloadKey]);
 
-  const pickedRecsRaw = data?.pickedRecs ?? [];
+  const preferenceFilter = useCallback((title: Title): boolean => {
+    if (!tastePreferences) return true;
+    const avoided = new Set(tastePreferences.avoidTags.map((tag) => tag.trim().toLocaleLowerCase("ko-KR")));
+    if (title.tags.some((tag) => avoided.has(tag.trim().toLocaleLowerCase("ko-KR")))) return false;
+    if (tastePreferences.contentIntensity === "gentle") return title.ageRating === "all" || title.ageRating === "12";
+    if (tastePreferences.contentIntensity === "balanced") return title.ageRating !== "19";
+    return true;
+  }, [tastePreferences]);
+  const pickedRecsRaw = (data?.pickedRecs ?? []).filter(preferenceFilter);
   const pickedLabelGenres = data?.pickedLabelGenres ?? picked;
-  const tasteRecsRaw = data?.tasteRecs ?? [];
-  const popular = data?.popular ?? [];
+  const tasteRecsRaw = (data?.tasteRecs ?? []).filter((entry) => preferenceFilter(entry.title));
+  const popular = (data?.popular ?? []).filter(preferenceFilter);
   const seed = data?.seed ?? null;
-  const similarRaw = data?.similar ?? [];
+  const similarRaw = (data?.similar ?? []).filter(preferenceFilter);
   const hasTaste =
     hydrated && !!data && data.profile.ratedCount + data.profile.readCount > 0;
 
