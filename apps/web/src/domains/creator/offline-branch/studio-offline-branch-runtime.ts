@@ -89,6 +89,30 @@ function operationOrder(
   return left.createdAt - right.createdAt || left.id.localeCompare(right.id);
 }
 
+function stageResult(
+  staged: boolean,
+  operations: number,
+  unsupported: readonly string[] = [],
+): StudioOfflineBranchStageResult {
+  return Object.freeze({
+    staged,
+    operations,
+    unsupported: Object.freeze([...unsupported]),
+  });
+}
+
+function equalOfflinePayloadBytes(
+  left: Uint8Array | null,
+  right: Uint8Array | null,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right || left.byteLength !== right.byteLength) return false;
+  for (let index = 0; index < left.byteLength; index += 1) {
+    if (left[index] !== right[index]) return false;
+  }
+  return true;
+}
+
 function operationConflict(
   operation: StudioOfflineBranchOperation,
   code: StudioOfflineBranchConflict["code"],
@@ -295,24 +319,49 @@ export class StudioOfflineBranchRuntime {
     };
   }
 
+  canMirrorPendingStrokeTransition(
+    previousPages: readonly PageState[],
+    nextPages: readonly PageState[],
+    pendingStrokeIds: readonly string[],
+  ): boolean {
+    const allowed = new Set(pendingStrokeIds.filter((id) => id.trim().length > 0));
+    if (allowed.size === 0) return false;
+    const plan = planStudioOfflineSceneTransition(previousPages, nextPages);
+    if (plan.unsupported.length > 0 || plan.mutations.length === 0) return false;
+
+    let changesOwnedPendingStroke = false;
+    for (const mutation of plan.mutations) {
+      if (mutation.targetType !== "stroke") return false;
+      if (allowed.has(mutation.targetId)) {
+        changesOwnedPendingStroke = true;
+        continue;
+      }
+      const orderOnly = mutation.action === "upsert"
+        && equalOfflinePayloadBytes(mutation.payload, mutation.previousPayload);
+      if (!orderOnly) return false;
+    }
+    return changesOwnedPendingStroke;
+  }
+
   stageSceneTransition(
     previousPages: readonly PageState[],
     nextPages: readonly PageState[],
-  ): boolean {
+  ): StudioOfflineBranchStageResult {
     const plan = planStudioOfflineSceneTransition(previousPages, nextPages);
     if (plan.unsupported.length > 0) {
       this.onError(plan.unsupported.join("\n"));
-      return false;
+      return stageResult(false, plan.mutations.length, plan.unsupported);
     }
-    if (plan.mutations.length === 0) return false;
+    if (plan.mutations.length === 0) return stageResult(false, 0);
     if (
       this.snapshotValue.operations.length
       + this.optimistic.size
       + plan.mutations.length
       > STUDIO_OFFLINE_BRANCH_LIMITS.maxOperations
     ) {
-      this.onError("오프라인 변경 보관 한도를 초과했습니다. 먼저 서버 정본과 동기화해 주세요.");
-      return false;
+      const message = "오프라인 변경 보관 한도를 초과했습니다. 먼저 서버 정본과 동기화해 주세요.";
+      this.onError(message);
+      return stageResult(false, plan.mutations.length, [message]);
     }
     try {
       if (this.canonicalPages.length === 0) {
@@ -321,10 +370,11 @@ export class StudioOfflineBranchRuntime {
           : clonePages(previousPages);
       }
     } catch (cause) {
-      this.onError(
-        cause instanceof Error ? cause.message : "오프라인 정본 기준을 복원하지 못했습니다.",
-      );
-      return false;
+      const message = cause instanceof Error
+        ? cause.message
+        : "오프라인 정본 기준을 복원하지 못했습니다.";
+      this.onError(message);
+      return stageResult(false, plan.mutations.length, [message]);
     }
 
     for (const mutation of plan.mutations) {
@@ -348,7 +398,7 @@ export class StudioOfflineBranchRuntime {
         cause instanceof Error ? cause.message : "오프라인 변경을 영속화하지 못했습니다.",
       );
     });
-    return true;
+    return stageResult(true, plan.mutations.length);
   }
 
   private async persistOptimisticEntries(

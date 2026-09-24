@@ -179,13 +179,51 @@ function runtimeOptions(storage: MemoryStorage, actorId = "user-1") {
 }
 
 describe("StudioOfflineBranchRuntime", () => {
+  it("reports a supported idempotent no-op without staging an operation", async () => {
+    const runtime = await StudioOfflineBranchRuntime.create(runtimeOptions(new MemoryStorage()));
+    const current = [page("line")];
+    expect(runtime.stageSceneTransition(current, current)).toEqual({
+      staged: false,
+      operations: 0,
+      unsupported: [],
+    });
+    await runtime.close();
+  });
+  it("mirrors only owned pending-stroke changes and induced order changes", async () => {
+    const runtime = await StudioOfflineBranchRuntime.create(runtimeOptions(new MemoryStorage()));
+    const before = [page("line", [
+      stroke("remote-a", 10),
+      stroke("local-pending", 20),
+      stroke("remote-b", 30),
+    ])];
+    const after = [page("line", [stroke("remote-a", 10), stroke("remote-b", 30)])];
+    expect(runtime.canMirrorPendingStrokeTransition(before, after, ["local-pending"])).toBe(true);
+    const restored = [page("line", [
+      stroke("remote-a", 10),
+      stroke("local-pending", 20),
+      stroke("remote-b", 30),
+    ])];
+    expect(runtime.canMirrorPendingStrokeTransition(after, restored, ["local-pending"])).toBe(true);
+    const editedRemote = [page("line", [
+      { ...stroke("remote-a", 10), strokeWidth: 12 },
+      stroke("local-pending", 20),
+      stroke("remote-b", 30),
+    ])];
+    expect(runtime.canMirrorPendingStrokeTransition(
+      restored,
+      editedRemote,
+      ["local-pending"],
+    )).toBe(false);
+    await runtime.close();
+  });
+
   it("projects immediately and reconstructs a clean canonical baseline after persistence", async () => {
     const storage = new MemoryStorage();
     const runtime = await StudioOfflineBranchRuntime.create(runtimeOptions(storage));
     const previous = [page("선화")];
     const next = [page("채색")];
 
-    expect(runtime.stageSceneTransition(previous, next)).toBe(true);
+    expect(runtime.stageSceneTransition(previous, next).staged).toBe(true);
     expect(runtime.projectPages(previous)[0]?.groups?.[0]?.name).toBe("채색");
     await runtime.exportPeerDocument();
     expect(runtime.status.pendingOperations).toBe(1);
@@ -205,11 +243,11 @@ describe("StudioOfflineBranchRuntime", () => {
     const original = [page("선화")];
     const changed = [page("채색")];
 
-    expect(runtime.stageSceneTransition(original, changed)).toBe(true);
+    expect(runtime.stageSceneTransition(original, changed).staged).toBe(true);
     await runtime.exportPeerDocument();
-    expect(runtime.stageSceneTransition(changed, original)).toBe(true);
+    expect(runtime.stageSceneTransition(changed, original).staged).toBe(true);
     await runtime.exportPeerDocument();
-    expect(runtime.stageSceneTransition(original, changed)).toBe(true);
+    expect(runtime.stageSceneTransition(original, changed).staged).toBe(true);
     await runtime.exportPeerDocument();
 
     expect(runtime.snapshot.operations).toHaveLength(3);
@@ -226,14 +264,14 @@ describe("StudioOfflineBranchRuntime", () => {
 
     for (let index = 1; index <= 10; index += 1) {
       const next = [page("선화", [...current[0]!.elements as DrawEl[], stroke(`stroke-${index}`, index * 10)])];
-      expect(runtime.stageSceneTransition(current, next)).toBe(true);
+      expect(runtime.stageSceneTransition(current, next).staged).toBe(true);
       await runtime.exportPeerDocument();
       current = next;
     }
 
     for (let index = 10; index >= 1; index -= 1) {
       const next = [page("선화", (current[0]!.elements as DrawEl[]).slice(0, -1))];
-      expect(runtime.stageSceneTransition(current, next)).toBe(true);
+      expect(runtime.stageSceneTransition(current, next).staged).toBe(true);
       await runtime.exportPeerDocument();
       current = next;
     }
@@ -241,7 +279,7 @@ describe("StudioOfflineBranchRuntime", () => {
     expect(runtime.projectPages(canonical)[0]?.elements).toEqual([]);
 
     const fresh = [page("선화", [stroke("fresh", 200)])];
-    expect(runtime.stageSceneTransition(current, fresh)).toBe(true);
+    expect(runtime.stageSceneTransition(current, fresh).staged).toBe(true);
     await runtime.exportPeerDocument();
 
     expect(runtime.projectPages(canonical)[0]?.elements.map(({ id }) => id)).toEqual(["fresh"]);
@@ -253,7 +291,7 @@ describe("StudioOfflineBranchRuntime", () => {
     const runtime = await StudioOfflineBranchRuntime.create(runtimeOptions(storage));
     const previous = [page("선화")];
     const next = [page("채색")];
-    expect(runtime.stageSceneTransition(previous, next)).toBe(true);
+    expect(runtime.stageSceneTransition(previous, next).staged).toBe(true);
     await runtime.exportPeerDocument();
     runtime.observeCanonicalPages(previous);
     runtime.setCanonicalAuthority(true);

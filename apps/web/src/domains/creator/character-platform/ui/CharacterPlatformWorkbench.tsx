@@ -1,4 +1,5 @@
 import {
+  Cpu,
   Download,
   Gauge,
   Layers,
@@ -16,6 +17,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createCharacterExportPreflight, formatCharacterBytes } from "../export/character-export-preflight";
 import { STUDIO_FOCUS_RING } from "../../studio-panel-ui";
 import { CHARACTER_SHAPER_TABLET_QUERY, isCharacterShaperTypingTarget, pushCharacterShaperKeyLayer } from "../../character-shaper/character-shaper-ui-model";
+import { executeCharacterAuthoringTaskInBrowser } from "../runtime/character-authoring-worker-client";
 import { CharacterCanonicalPartsPanel } from "./CharacterCanonicalPartsPanel";
 import { useCharacterPlatformWorkbench } from "./use-character-platform-workbench";
 
@@ -28,8 +30,8 @@ import type { ChangeEvent, ReactNode, RefObject } from "react";
 import { cn } from "@/shared/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
-type WorkbenchTab = "quality" | "presets" | "pose" | "ink" | "render";
-type ImportTarget = "manifest" | "presets" | "ink";
+type WorkbenchTab = "quality" | "presets" | "pose" | "ink" | "render" | "runtime";
+type ImportTarget = "manifest" | "presets" | "ink" | "document-v3";
 
 const BUTTON = cn(
   "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-[0.72rem] font-semibold text-fg-2",
@@ -51,6 +53,7 @@ const TABS: readonly { readonly id: WorkbenchTab; readonly label: string; readon
   { id: "pose", label: "Pose 2.0", icon: WandSparkles },
   { id: "ink", label: "3D 펜선", icon: PenLine },
   { id: "render", label: "렌더", icon: Layers },
+  { id: "runtime", label: "웹 코어", icon: Cpu },
 ];
 
 const POSE_REGIONS: readonly { readonly id: CharacterPoseRegion; readonly label: string }[] = [
@@ -111,6 +114,12 @@ function passTone(status: "available" | "conditional" | "unavailable"): string {
   return "text-bad";
 }
 
+function kernelTone(status: "ready" | "degraded" | "unavailable"): string {
+  if (status === "ready") return "border-good/40 bg-good/10 text-good";
+  if (status === "degraded") return "border-warn/45 bg-warn/10 text-warn";
+  return "border-bad/45 bg-bad/10 text-bad";
+}
+
 function hasSlotSelection(binding: CharacterShaperBinding, slot: CharacterSlotKind): boolean {
   const value = binding.recipe.slots[slot];
   return Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.length > 0;
@@ -131,6 +140,8 @@ export function CharacterPlatformWorkbench({ h, binding }: {
   const [presetSlot, setPresetSlot] = useState<CharacterSlotKind>("eyes");
   const [presetName, setPresetName] = useState("");
   const [savingPreset, setSavingPreset] = useState(false);
+  const [runtimeTestStatus, setRuntimeTestStatus] = useState<"idle" | "running" | "passed" | "failed">("idle");
+  const [runtimeTestMessage, setRuntimeTestMessage] = useState<string | null>(null);
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const [launcherRoot, setLauncherRoot] = useState<HTMLElement | null>(null);
   const compact = !useMediaQuery(CHARACTER_SHAPER_TABLET_QUERY);
@@ -228,10 +239,15 @@ export function CharacterPlatformWorkbench({ h, binding }: {
     if (!file) return;
     void (async () => {
       try {
-        const maximum = importTarget === "manifest" ? 512 * 1024 : 4 * 1024 * 1024;
+        const maximum = importTarget === "manifest"
+          ? 512 * 1024
+          : importTarget === "document-v3"
+            ? 8 * 1024 * 1024
+            : 4 * 1024 * 1024;
         const text = await readTextFile(file, maximum);
         if (importTarget === "manifest") await workbench.importCanonicalManifest(text);
         else if (importTarget === "presets") await workbench.importPresets(text);
+        else if (importTarget === "document-v3") await workbench.authoring.importJson(text);
         else workbench.surfaceInk.importJson(text);
       } catch (error) {
         window.alert(error instanceof Error ? error.message : "파일을 읽지 못했습니다.");
@@ -252,6 +268,50 @@ export function CharacterPlatformWorkbench({ h, binding }: {
     } finally {
       savingPresetRef.current = false;
       setSavingPreset(false);
+    }
+  };
+
+  const runRuntimeSelfTest = async () => {
+    if (runtimeTestStatus === "running") return;
+    setRuntimeTestStatus("running");
+    setRuntimeTestMessage("브라우저 Worker에서 실제 3D 리본 메시를 생성하는 중입니다.");
+    try {
+      const result = await executeCharacterAuthoringTaskInBrowser({
+        kind: "build-geometry-stroke",
+        stroke: {
+          strokeId: "stroke:runtime-self-test",
+          name: "Runtime self-test",
+          visible: true,
+          locked: false,
+          status: "valid",
+          style: {
+            color: "#111111",
+            baseWidth: 0.02,
+            opacity: 1,
+            taperStart: 0,
+            taperEnd: 0.5,
+            pressureWidth: 0.5,
+            profile: "ribbon",
+            fill: true,
+            lineOnly: false,
+          },
+          points: [
+            { anchor: { kind: "free", position: [0, 0, 0] }, pressure: 0.5, width: 1, twist: 0 },
+            { anchor: { kind: "free", position: [0.25, 0.2, 0.05] }, pressure: 0.8, width: 0.65, twist: 0.15 },
+            { anchor: { kind: "free", position: [0.5, 0.1, 0.1] }, pressure: 0.25, width: 0.2, twist: 0.3 },
+          ],
+        },
+      });
+      if (result.kind !== "mesh") throw new Error("Worker가 메시 결과를 반환하지 않았습니다.");
+      setRuntimeTestStatus("passed");
+      setRuntimeTestMessage(
+        `브라우저 3D 코어 정상 · 정점 ${result.vertexCount}개 · 삼각형 ${result.triangleCount}개 · ${formatCharacterBytes(result.byteLength)}`,
+      );
+    } catch (error) {
+      setRuntimeTestStatus("failed");
+      setRuntimeTestMessage(
+        error instanceof Error ? error.message : "브라우저 3D 코어 검증에 실패했습니다.",
+      );
     }
   };
 
@@ -415,25 +475,71 @@ export function CharacterPlatformWorkbench({ h, binding }: {
     </div>
   );
 
+  const runtimePanel = (
+    <div className="space-y-3">
+      <Section title="Browser-first 3D Runtime" description="WASM도 브라우저 module Worker에서 실행하며, 프로젝트 열기·편집·저장·렌더에는 네이티브 호스트가 필요하지 않습니다.">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-xl bg-good/10 p-2"><strong className="block text-good">WEB</strong><span className="text-[0.62rem] text-fg-3">기본 환경</span></div>
+          <div className="rounded-xl bg-good/10 p-2"><strong className="block text-good">NO</strong><span className="text-[0.62rem] text-fg-3">Native 필수</span></div>
+          <div className={cn("rounded-xl p-2", workbench.webRuntime.offlineCapable ? "bg-good/10" : "bg-warn/10")}><strong className={cn("block", workbench.webRuntime.offlineCapable ? "text-good" : "text-warn")}>{workbench.webRuntime.offlineCapable ? "YES" : "LIMIT"}</strong><span className="text-[0.62rem] text-fg-3">오프라인</span></div>
+        </div>
+        <ul className="space-y-1.5">
+          {workbench.webRuntime.kernels.map((kernel) => (
+            <li key={kernel.id} className="rounded-xl border border-line bg-panel/70 px-2.5 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0"><p className="truncate text-[0.7rem] font-semibold text-fg">{kernel.label}</p><p className="truncate text-[0.61rem] text-fg-3">{kernel.providerId} · {kernel.execution}</p></div>
+                <span className={cn("rounded-full border px-1.5 py-0.5 text-[0.58rem] font-bold", kernelTone(kernel.status))}>{kernel.status}</span>
+              </div>
+              <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">{kernel.reasons.join(" ")}</p>
+            </li>
+          ))}
+        </ul>
+        {workbench.webRuntime.warnings.slice(0, 3).map((warning) => <p key={warning} className="rounded-lg border border-warn/35 bg-warn/10 p-2 text-[0.62rem] text-warn">{warning}</p>)}
+      </Section>
+      <Section title={`CharacterDocument V3 · r${workbench.documentV3.revision}`} description={`${workbench.documentV3.topology.family} · ${workbench.documentV3.topology.revision}`}>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-[0.68rem]">
+          <dt className="font-semibold text-fg-2">변형 레이어</dt><dd className="text-fg-3">{workbench.documentV3.deformation.layers.length}개</dd>
+          <dt className="font-semibold text-fg-2">Groom</dt><dd className="text-fg-3">{workbench.documentV3.groom.groups.reduce((sum, group) => sum + group.guides.length, 0)} guides</dd>
+          <dt className="font-semibold text-fg-2">표면 펜선</dt><dd className="text-fg-3">{workbench.documentV3.surfaceInk.layers.reduce((sum, layer) => sum + layer.strokes.length, 0)}획</dd>
+          <dt className="font-semibold text-fg-2">Geometry Stroke</dt><dd className="text-fg-3">{workbench.documentV3.geometryStrokes.strokes.length}획</dd>
+          <dt className="font-semibold text-fg-2">Linked Layer</dt><dd className="text-fg-3">{workbench.documentV3.linkedLayers.length}개</dd>
+          <dt className="font-semibold text-fg-2">저장</dt><dd className={workbench.authoring.persistenceStatus === "error" ? "text-bad" : "text-fg-3"}>{workbench.authoring.persistenceStatus}</dd>
+        </dl>
+        {workbench.authoring.persistenceError ? <p role="alert" className="text-[0.66rem] text-bad">{workbench.authoring.persistenceError}</p> : null}
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className={BUTTON} onClick={() => void workbench.authoring.saveNow()}><Save size={14} aria-hidden />지금 저장</button>
+          <button type="button" className={BUTTON} onClick={() => requestImport("document-v3")}><Upload size={14} aria-hidden />V3 불러오기</button>
+          <button type="button" className={BUTTON} onClick={() => downloadText(workbench.authoring.exportJson(), `${workbench.modelId}-character-v3.json`)}><Download size={14} aria-hidden />V3 내보내기</button>
+          <button type="button" className={BUTTON} disabled={!workbench.authoring.snapshot.canUndo} onClick={workbench.authoring.undo}>V3 실행 취소</button>
+          <button type="button" className={BUTTON} disabled={!workbench.authoring.snapshot.canRedo} onClick={workbench.authoring.redo}>V3 다시 실행</button>
+        </div>
+      </Section>
+      <Section title="브라우저 Worker 실동작 검증" description="문서 플래그가 아니라 실제 module Worker 또는 브라우저 fallback에서 리본 메시를 생성하고 반환 버퍼를 검증합니다.">
+        <button type="button" className={PRIMARY_BUTTON} disabled={runtimeTestStatus === "running"} onClick={() => void runRuntimeSelfTest()}><Cpu size={14} aria-hidden />{runtimeTestStatus === "running" ? "검증 중" : "3D 코어 검증"}</button>
+        {runtimeTestMessage ? <p role="status" className={cn("rounded-lg border p-2 text-[0.66rem]", runtimeTestStatus === "failed" ? "border-bad/40 bg-bad/10 text-bad" : runtimeTestStatus === "passed" ? "border-good/40 bg-good/10 text-good" : "border-line bg-panel text-fg-3")}>{runtimeTestMessage}</p> : null}
+      </Section>
+    </div>
+  );
+
   const panel = open ? (
     <>
       {!drawing ? <div aria-hidden className="fixed inset-0 z-[94] bg-black/25" onPointerDown={close} /> : null}
       <div ref={panelRef} role="dialog" aria-modal={!drawing} data-studio-vrm-child-tool="true" data-studio-vrm-child-history={drawing || tab === "ink" ? "surface-ink" : undefined} aria-labelledby={titleId} aria-describedby={descriptionId} tabIndex={-1} className={cn("fixed right-2 z-[95] flex w-[min(31rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.04_0.01_70/0.65)] outline-none", drawing ? "bottom-2" : "inset-y-2")}>
         <header className="flex items-center gap-3 border-b border-line px-3 py-2.5">
-          <div className="min-w-0 flex-1"><p className="text-[0.62rem] font-bold tracking-wide text-accent">CHARACTER PLATFORM V2</p><h2 id={titleId} className="truncate text-base font-bold text-fg">캐릭터 품질 워크벤치</h2><p id={descriptionId} className="sr-only">공식 캐릭터, 파츠 프리셋, Pose 2.0, 3D 펜선, 렌더 패스를 관리합니다.</p></div>
+          <div className="min-w-0 flex-1"><p className="text-[0.62rem] font-bold tracking-wide text-accent">CHARACTER PLATFORM V3 · WEB FIRST</p><h2 id={titleId} className="truncate text-base font-bold text-fg">캐릭터 품질 워크벤치</h2><p id={descriptionId} className="sr-only">공식 캐릭터, 파츠 프리셋, Pose, 3D 펜선, 렌더 패스, 브라우저 저작 코어를 관리합니다.</p></div>
           <button type="button" aria-label="캐릭터 품질 워크벤치 닫기" className={ICON_BUTTON} onClick={close}><X size={17} aria-hidden /></button>
         </header>
         {drawing ? <div className="flex items-center gap-3 p-3">
           <p className="min-w-0 flex-1 text-[0.68rem] leading-relaxed text-fg-3">캐릭터 표면에 그리세요. 그리기를 종료하면 펜선 도구로 돌아갑니다.</p>
           <button type="button" className={PRIMARY_BUTTON} onClick={() => workbench.surfaceInk.setActive(false)}>그리기 종료</button>
-        </div> : <><div role="tablist" aria-label="캐릭터 품질 기능" className="grid grid-cols-5 gap-1 border-b border-line px-2 py-2">
+        </div> : <><div role="tablist" aria-label="캐릭터 품질 기능" className="grid grid-cols-6 gap-1 border-b border-line px-2 py-2">
           {TABS.map((item) => {
             const Icon = item.icon;
             return <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} onClick={() => setTab(item.id)} className={cn("flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[0.62rem] font-semibold", STUDIO_FOCUS_RING, tab === item.id ? "bg-accent-soft text-accent" : "text-fg-3 hover:bg-raised hover:text-fg")}><Icon size={15} aria-hidden /><span className="truncate">{item.label}</span></button>;
           })}
         </div>
         <div role="tabpanel" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
-          {tab === "quality" ? qualityPanel : tab === "presets" ? presetsPanel : tab === "pose" ? posePanel : tab === "ink" ? inkPanel : renderPanel}
+          {tab === "quality" ? qualityPanel : tab === "presets" ? presetsPanel : tab === "pose" ? posePanel : tab === "ink" ? inkPanel : tab === "render" ? renderPanel : runtimePanel}
         </div></>}
         {workbench.notice ? <p role="status" className="border-t border-line bg-card px-3 py-2 text-[0.68rem] font-semibold text-accent">{workbench.notice}</p> : null}
         <input ref={fileInputRef} type="file" accept="application/json,.json" tabIndex={-1} aria-label="캐릭터 품질 데이터 파일 선택" className="sr-only" onChange={onFileChange} />
@@ -442,10 +548,10 @@ export function CharacterPlatformWorkbench({ h, binding }: {
   ) : null;
 
   const launcher = (
-      <button ref={triggerRef} type="button" data-character-quality-trigger="true" aria-label="품질 도구V2" aria-haspopup="dialog" aria-expanded={open} title="캐릭터 품질 도구" onClick={() => setOpen(true)} className={cn("inline-flex min-h-11 items-center justify-center gap-2 border border-accent/55 bg-panel/95 text-[0.72rem] font-bold text-accent hover:bg-accent-soft", launcherRoot ? "size-11 rounded-xl" : "fixed bottom-20 right-4 z-[90] rounded-full px-4 shadow-lg backdrop-blur", STUDIO_FOCUS_RING)}>
+      <button ref={triggerRef} type="button" data-character-quality-trigger="true" aria-label="품질 도구V2" aria-haspopup="dialog" aria-expanded={open} title="캐릭터 저작 도구 V3" onClick={() => setOpen(true)} className={cn("inline-flex min-h-11 items-center justify-center gap-2 border border-accent/55 bg-panel/95 text-[0.72rem] font-bold text-accent hover:bg-accent-soft", launcherRoot ? "size-11 rounded-xl" : "fixed bottom-20 right-4 z-[90] rounded-full px-4 shadow-lg backdrop-blur", STUDIO_FOCUS_RING)}>
         <Gauge size={16} aria-hidden />
-        <span className={launcherRoot ? "sr-only" : undefined}>품질 도구</span>
-        <span className={launcherRoot ? "sr-only" : "rounded-full bg-accent px-1.5 py-0.5 text-[0.58rem] text-on-accent"}>V2</span>
+        <span className={launcherRoot ? "sr-only" : undefined}>저작 도구</span>
+        <span className={launcherRoot ? "sr-only" : "rounded-full bg-accent px-1.5 py-0.5 text-[0.58rem] text-on-accent"}>V3</span>
       </button>
   );
   return portalRoot ? <>{createPortal(launcher, launcherRoot ?? portalRoot)}{createPortal(panel, portalRoot)}</> : null;
