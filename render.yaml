@@ -13,7 +13,9 @@ services:
     rootDir: .
     buildCommand: corepack enable && pnpm install --frozen-lockfile && NODE_OPTIONS='--max-old-space-size=4096' pnpm --filter @webtoon-nest/api build
     startCommand: node apps/api/dist/apps/api/src/main.js
-    healthCheckPath: /api/health/ready
+    # The provider liveness probe must never wake the scale-to-zero database.
+    # Database/schema readiness remains an explicit release gate via verify:render-core-origin.
+    healthCheckPath: /api/health/live
     # Schema migration is a separate, checksum-led single-writer workflow. Never run DDL
     # from build or start. Production releases stay manual so a push cannot switch authority.
     autoDeployTrigger: "off"
@@ -203,7 +205,8 @@ services:
     rootDir: .
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @webtoon-nest/api build
     startCommand: node apps/api/dist/apps/api/src/main.js
-    healthCheckPath: /api/health/ready
+    # Keep the optional Socket.IO fallback probe database-free as well.
+    healthCheckPath: /api/health/live
     autoDeployTrigger: "off"
     envVars:
       - key: NODE_ENV
