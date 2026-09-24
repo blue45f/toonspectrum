@@ -24,6 +24,7 @@ test("the public acceptance command owns its Vite bootstrap", () => {
   assert.match(wrapper, /assertListenersBelongToWorktree/u);
   assert.match(wrapper, /stopDetachedProcessTree/u);
   assert.match(wrapper, /verify-review-delivery-workflow\.mjs/u);
+  assert.match(wrapper, /verify-production-manuscript-workspace\.mjs/u);
 });
 test("the workflow runs the complete delivery evidence gate", () => {
   assert.match(workflow, /^name: Studio manuscript delivery acceptance$/mu);
@@ -32,6 +33,8 @@ test("the workflow runs the complete delivery evidence gate", () => {
   assert.match(workflow, /review-delivery-zip\.test\.ts/u);
   assert.match(workflow, /StudioReviewDelivery\.test\.tsx/u);
   assert.match(workflow, /StudioPinnedReviewPanel\.test\.tsx/u);
+  assert.match(workflow, /verify-production-manuscript-workspace\.mjs/u);
+  assert.match(workflow, /production-manuscript-workspace/u);
   assert.match(workflow, /actions\/upload-artifact@v4/u);
 });
 
@@ -43,7 +46,9 @@ test("the workflow is retriggered by every authority boundary it validates", () 
     "apps/web/src/domains/creator/review-share/StudioPinnedReviewShareManager*",
     "apps/web/src/domains/creator/virtual-space/StudioPinnedReviewPanel*",
     "apps/web/tools/browser-harnesses/virtual-studio-review-export*",
+    "apps/web/tools/browser-harnesses/production-manuscript-workspace*",
     "scripts/verify-review-delivery-workflow*.mjs",
+    "scripts/verify-production-manuscript-workspace.mjs",
   ]) {
     assert.match(workflow, new RegExp(expectedPath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"), "u"));
   }
