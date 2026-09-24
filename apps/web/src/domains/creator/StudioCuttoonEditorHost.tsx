@@ -151,11 +151,16 @@ import { studioCreationLinkParams } from "./creator-studio-links";
 import type { StudioAppSettings } from "./studio-app-settings";
 import { createStudioAssetLibraryMutations } from "./studio-cuttoon-editor/studio-asset-library-mutations";
 import {
+  appendStudioRetainedStrokeRealtimeHistoryRange,
   discardStudioRetainedStrokeRedo,
   prepareStudioPendingStrokeCommitPage,
   restoreStudioRetainedStrokeCommitBatch,
   resumeStudioRetainedStrokeHistory,
+  studioRetainedStrokeRealtimeIdsForRedo,
+  studioRetainedStrokeRealtimeIdsForUndo,
+  truncateStudioRetainedStrokeRealtimeHistoryRanges,
   undoStudioRetainedStrokeHistory,
+  type StudioRetainedStrokeRealtimeHistoryRange,
 } from "./studio-retained-stroke-history";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import {
@@ -4092,11 +4097,9 @@ export function StudioCuttoonEditor({
     retryCount: number;
     historyIndex: number;
   } | null>(null);
-  const pendingStrokeRealtimeHistoryRef = useRef<{
-    strokeIds: readonly string[];
-    baseIndex: number;
-    finalIndex: number;
-  } | null>(null);
+  const pendingStrokeRealtimeHistoryRangesRef = useRef<
+    readonly StudioRetainedStrokeRealtimeHistoryRange[]
+  >([]);
   const deferredStrokePostprocessClientRef = useRef<StudioStrokePostprocessWorkerClient | null>(null);
   const deferredStrokePostprocessControllersRef = useRef<Map<string, AbortController>>(new Map());
   useEffect(() => () => {
@@ -11477,7 +11480,11 @@ export function StudioCuttoonEditor({
     return true;
   }
   function invalidatePendingRetainedRedo(): void {
-    pendingStrokeRealtimeHistoryRef.current = null;
+    pendingStrokeRealtimeHistoryRangesRef.current =
+      truncateStudioRetainedStrokeRealtimeHistoryRanges(
+        pendingStrokeRealtimeHistoryRangesRef.current,
+        pagesHiRef.current,
+      );
     if (discardStudioRetainedStrokeRedo(
       pendingUndoneStrokeCommitsRef,
       (ids) => liveRetainedMediaOverlayRendererRef.current.discardHiddenSettledStrokes(ids),
@@ -16156,7 +16163,7 @@ const puppetWarpArmed =
     commit,
     commitCoalesced,
     commitPages,
-    expandDeferredStrokeCommitHistory,
+    expandDeferredStrokeCommitHistory: expandDeferredStrokeCommitHistoryBase,
     releaseCommittedInkSurfaceCounts,
     scheduleCommittedInkRetainedRetry,
     scheduleCommittedInkSurfaceHandoffRetry,
@@ -16219,6 +16226,17 @@ const puppetWarpArmed =
     studioRevisionProjectGenerationRef,
     webGpuCanvasHandleRef,
   });
+  const expandDeferredStrokeCommitHistory = (
+    batch: Parameters<typeof expandDeferredStrokeCommitHistoryBase>[0],
+  ): void => {
+    expandDeferredStrokeCommitHistoryBase(batch);
+    pendingStrokeRealtimeHistoryRangesRef.current =
+      appendStudioRetainedStrokeRealtimeHistoryRange(
+        pendingStrokeRealtimeHistoryRangesRef.current,
+        batch.strokes.map((stroke) => stroke.id),
+        pagesHiRef.current,
+      );
+  };
   useEffect(() => {
     const sampleId = params.get("sample");
     if (!sampleId || ecosystemSampleImportRef.current === sampleId) return;
@@ -16323,6 +16341,7 @@ const puppetWarpArmed =
         gpuFinalCrdtPublishedRequestIdsRef.current.delete(stroke.id);
       }
       // 한 번의 커밋(=한 번의 CRDT 발행·검증) 뒤, 그 스냅샷을 획 단위 undo 항목으로 펼친다.
+      // Wrapper also records the streamed-stroke provenance used by offline Undo/Redo.
       expandDeferredStrokeCommitHistory(batch);
       // 즉시 커밋 경로와 동일한 래스터 승격 — 배치의 각 획을 개별 작업으로 큐잉한다.
       const rasterWorkId = authorizedWorkAssetScopeId;
@@ -18237,7 +18256,6 @@ const puppetWarpArmed =
     const undoBasePages = undoHistory[undoIndex] ?? pages;
     const nextIndex = Math.max(0, undoIndex - 1);
     const nextSnapshot = undoHistory[nextIndex];
-    const existingRealtimeRange = pendingStrokeRealtimeHistoryRef.current;
     const flushedPendingStrokeIds = pendingBeforeUndo
       && pendingStrokeCommitsRef.current === null
       && pendingBeforeUndo.strokeCount > 0
@@ -18245,11 +18263,10 @@ const puppetWarpArmed =
       : [];
     const offlineRealtimeStrokeIds = flushedPendingStrokeIds.length > 0
       ? flushedPendingStrokeIds
-      : existingRealtimeRange
-        && undoIndex > existingRealtimeRange.baseIndex
-        && undoIndex <= existingRealtimeRange.finalIndex
-        ? existingRealtimeRange.strokeIds
-        : [];
+      : studioRetainedStrokeRealtimeIdsForUndo(
+          pendingStrokeRealtimeHistoryRangesRef.current,
+          undoIndex,
+        );
     if (nextSnapshot && !publishStudioCrdtHistoryTransition(
       undoBasePages,
       nextSnapshot,
@@ -18257,13 +18274,6 @@ const puppetWarpArmed =
     )) return;
     if (nextIndex !== undoIndex && nextSnapshot) {
       recordStudioHistoryUndoRedo("undo", nextSnapshot, nextIndex);
-      if (flushedPendingStrokeIds.length > 0 && pendingBeforeUndo) {
-        pendingStrokeRealtimeHistoryRef.current = {
-          strokeIds: [...new Set(flushedPendingStrokeIds)],
-          baseIndex: Math.max(0, undoIndex - pendingBeforeUndo.strokeCount),
-          finalIndex: undoIndex,
-        };
-      }
     }
     // `setPagesHi` 는 저장 중이면 거절한다. 거절될 갱신으로 ref 를 앞세우면 렌더 없이
     // ref 와 상태가 어긋난 채 남으므로, 커밋 경로와 같은 게이트를 먼저 통과시킨다.
@@ -18350,12 +18360,11 @@ const puppetWarpArmed =
     setAdvancedFillStatus(null);
     const nextIndex = Math.min(pagesHistory.length - 1, pagesHi + 1);
     const nextSnapshot = pagesHistory[nextIndex];
-    const realtimeRange = pendingStrokeRealtimeHistoryRef.current;
-    const offlineRealtimeStrokeIds = realtimeRange
-      && pagesHi >= realtimeRange.baseIndex
-      && nextIndex <= realtimeRange.finalIndex
-      ? realtimeRange.strokeIds
-      : [];
+    const offlineRealtimeStrokeIds = studioRetainedStrokeRealtimeIdsForRedo(
+      pendingStrokeRealtimeHistoryRangesRef.current,
+      pagesHi,
+      nextIndex,
+    );
     if (nextSnapshot && !publishStudioCrdtHistoryTransition(
       pages,
       nextSnapshot,
@@ -23732,6 +23741,7 @@ const puppetWarpArmed =
     colorWheelPressRef,
     colorWheelTimerRef,
     commit,
+    expandDeferredStrokeCommitHistory,
     companionRuntimeRef,
     cropAspect,
     cropDragRef,

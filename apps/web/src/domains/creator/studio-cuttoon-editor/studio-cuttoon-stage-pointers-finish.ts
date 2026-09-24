@@ -254,6 +254,7 @@ export function bindStudioCuttoonStagePointersFinish(
     causalPostCorrectionStateRef,
     collaborationAccessRef,
     commit,
+    expandDeferredStrokeCommitHistory,
     companionRuntimeRef,
     discardDrawingPointerSession,
     draftPreviewStoreRef,
@@ -595,6 +596,16 @@ export function bindStudioCuttoonStagePointersFinish(
                   ? `실시간 획 확정: ${cause.message}`
                   : "실시간 획을 최종 상태로 확정하지 못했습니다.",
               );
+            }
+            if (!masterEditMode) {
+              // A short/immediate stroke may absorb older deferred strokes so publication remains
+              // atomic. Re-expand that combined snapshot here as well: batching is a render/CRDT
+              // optimization, never an Undo-granularity contract.
+              expandDeferredStrokeCommitHistory({
+                pageId: activePage.id,
+                strokes: completedStrokes,
+                retryCount: merged?.retryCount ?? 0,
+              });
             }
             // Immediate strokes never enter pendingStrokeCommitsRef, so the deferred-path
             // pointerup writer cannot see them. Start the same durable OPFS/SQLite write at the

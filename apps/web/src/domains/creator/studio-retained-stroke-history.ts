@@ -100,6 +100,93 @@ export type StudioRetainedStrokeUndoneBatch = StudioRetainedStrokeCommitBatch & 
   historyIndex: number;
 };
 
+export type StudioRetainedStrokeRealtimeHistoryRange = {
+  readonly strokeIds: readonly string[];
+  readonly baseIndex: number;
+  readonly finalIndex: number;
+};
+
+/**
+ * Records one contiguous set of realtime-authored strokes after a deferred batch has been expanded
+ * into one local undo step per stroke. Adjacent drawing batches coalesce into one compact range.
+ */
+export function appendStudioRetainedStrokeRealtimeHistoryRange(
+  ranges: readonly StudioRetainedStrokeRealtimeHistoryRange[],
+  strokeIds: readonly string[],
+  finalIndex: number,
+): readonly StudioRetainedStrokeRealtimeHistoryRange[] {
+  const ids = [...new Set(strokeIds.filter((id) => id.trim().length > 0))];
+  if (ids.length === 0 || !Number.isInteger(finalIndex) || finalIndex < 0) return ranges;
+  const baseIndex = Math.max(0, finalIndex - ids.length);
+  const retained = ranges.filter((range) => range.finalIndex <= baseIndex);
+  const previous = retained.at(-1);
+  if (previous?.finalIndex === baseIndex) {
+    return [
+      ...retained.slice(0, -1),
+      {
+        strokeIds: [...new Set([...previous.strokeIds, ...ids])],
+        baseIndex: previous.baseIndex,
+        finalIndex,
+      },
+    ];
+  }
+  return [...retained, { strokeIds: ids, baseIndex, finalIndex }];
+}
+
+/**
+ * A new edit after Undo cuts only future realtime provenance. Earlier ranges remain available so
+ * later history traversal can still mirror those exact local strokes into the live CRDT.
+ */
+export function truncateStudioRetainedStrokeRealtimeHistoryRanges(
+  ranges: readonly StudioRetainedStrokeRealtimeHistoryRange[],
+  historyIndex: number,
+): readonly StudioRetainedStrokeRealtimeHistoryRange[] {
+  if (!Number.isInteger(historyIndex) || historyIndex < 0) return [];
+  const next: StudioRetainedStrokeRealtimeHistoryRange[] = [];
+  for (const range of ranges) {
+    if (historyIndex <= range.baseIndex) continue;
+    if (historyIndex >= range.finalIndex) {
+      next.push(range);
+      continue;
+    }
+    const keep = Math.min(range.strokeIds.length, historyIndex - range.baseIndex);
+    if (keep <= 0) continue;
+    next.push({
+      strokeIds: range.strokeIds.slice(0, keep),
+      baseIndex: range.baseIndex,
+      finalIndex: historyIndex,
+    });
+  }
+  return next;
+}
+
+export function studioRetainedStrokeRealtimeIdsForUndo(
+  ranges: readonly StudioRetainedStrokeRealtimeHistoryRange[],
+  undoIndex: number,
+): readonly string[] {
+  for (let index = ranges.length - 1; index >= 0; index -= 1) {
+    const range = ranges[index]!;
+    if (undoIndex > range.baseIndex && undoIndex <= range.finalIndex) return range.strokeIds;
+  }
+  return [];
+}
+
+export function studioRetainedStrokeRealtimeIdsForRedo(
+  ranges: readonly StudioRetainedStrokeRealtimeHistoryRange[],
+  historyIndex: number,
+  nextIndex: number,
+): readonly string[] {
+  for (let index = ranges.length - 1; index >= 0; index -= 1) {
+    const range = ranges[index]!;
+    if (
+      historyIndex >= range.baseIndex
+      && nextIndex > historyIndex
+      && nextIndex <= range.finalIndex
+    ) return range.strokeIds;
+  }
+  return [];
+}
+
 type MutableRef<T> = { current: T };
 
 type StudioRetainedStrokeUndoContext = {

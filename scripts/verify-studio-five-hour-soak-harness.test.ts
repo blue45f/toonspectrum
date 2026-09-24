@@ -93,12 +93,18 @@ describe("Studio five-hour soak browser state isolation", () => {
     expect(source).toContain("else if (!visuallyChanged)");
   });
 
-  it("keeps document size bounded while repeatedly exercising undo and redo", () => {
+  it("keeps document size bounded while repeatedly exercising real undo and redo controls", () => {
     expect(source).toContain("HISTORY_CHURN_INTERVAL = 10");
-    expect(source).toContain("exerciseBoundedHistoryChurn(page, strokesSinceHistoryChurn)");
-    expect(source).toContain('page.keyboard.press("Control+Shift+z")');
-    expect(source).toContain("return undoCount + redoCount * 2");
+    expect(source).toContain("clickStudioHistoryAction(");
+    expect(source).toContain('[data-studio-primary-action="');
+    expect(source).toContain('[data-studio-command-bar-command="');
+    expect(source).toContain("N strokes == N layer rows");
+    expect(source).toContain('clickStudioHistoryAction(page, "undo")');
+    expect(source).toContain('clickStudioHistoryAction(page, "redo")');
+    expect(source).toContain("Bounded undo ended at");
+    expect(source).toContain("Bounded history churn ended at");
     expect(source).toContain("strokesSinceHistoryChurn = 0");
+    expect(source).toContain('kind: "final-history-churn"');
   });
 
   it("enters the current drawing canvas route before waiting for the editor", () => {

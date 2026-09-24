@@ -100,6 +100,7 @@ export type StudioCuttoonStagePointersHost = {
   editing: any;
   editorMountedRef: any;
   endLiveResourceEdit: any;
+  expandDeferredStrokeCommitHistory: any;
   eraseToIntersection: any;
   error: any;
   eyedropperActive: any;
