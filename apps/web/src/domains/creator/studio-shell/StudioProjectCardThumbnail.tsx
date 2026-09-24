@@ -270,6 +270,7 @@ export function StudioProjectCardThumbnail({
   return (
     <div
       ref={rootRef}
+      data-studio-project-thumbnail="true"
       className="relative -mx-4 -mt-4 mb-4 aspect-[16/10] overflow-hidden border-b border-line bg-panel/70"
       data-project-preview-state={preview ? "autosave" : storedThumbnail ? "stored" : phase}
     >
