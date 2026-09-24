@@ -6,9 +6,12 @@ import {
 import type { StudioCrc32ExecutionMode } from "../studio-crc32-worker-client";
 
 import {
+  appendStudioDownloadSuffix,
   createStudioDownloadFileName,
   dedupeStudioDownloadFileNames,
   sanitizeStudioDownloadFileName,
+  studioDownloadVersionSuffix,
+  type StudioDownloadVersionContext,
 } from "./studio-download-file-name";
 
 export const STUDIO_DOWNLOAD_BUNDLE_MIME = "application/zip" as const;
@@ -29,6 +32,7 @@ export interface StudioDownloadBundleInput {
   title: string;
   files: readonly StudioDownloadBundleSource[];
   generatedAt?: Date | number | string;
+  versionContext?: StudioDownloadVersionContext;
   signal?: AbortSignal;
   crc32ExecutionMode?: StudioCrc32ExecutionMode;
   onProgress?: (progress: StudioDownloadBundleProgress) => void;
@@ -154,7 +158,10 @@ export async function buildStudioDownloadBundle(
     fileName: createStudioDownloadFileName({
       title: input.title,
       fallbackTitle: "toonspectrum-webtoon",
-      suffix: "strip-bundle",
+      suffix: appendStudioDownloadSuffix(
+        "strip-bundle",
+        studioDownloadVersionSuffix(input.versionContext),
+      ),
       extension: "zip",
     }),
     manifest,

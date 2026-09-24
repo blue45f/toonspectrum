@@ -5,8 +5,11 @@
 import { tagStudioRasterBlobResolution } from "../render/studio-raster-resolution-metadata";
 
 import {
+  appendStudioDownloadSuffix,
   createStudioDownloadFileName,
   sanitizeStudioDownloadFileName,
+  studioDownloadVersionSuffix,
+  type StudioDownloadVersionContext,
 } from "./studio-download-file-name";
 
 export const EXPORT_SCALES = [1, 2, 3] as const;
@@ -106,29 +109,41 @@ export function exportQuality(format: ExportFormat): number | undefined {
   return undefined;
 }
 
-// 단일 페이지 파일명 — `<제목>[-transparent].<확장자>` 규칙을 안전한 휴대용 이름으로 만든다.
-export function pageExportFileName(title: string, format: ExportFormat, transparent: boolean): string {
+// 단일 페이지 파일명 — 제목·revision·내보내기 UTC 시각으로 OS 중복 접미사를 피한다.
+export function pageExportFileName(
+  title: string,
+  format: ExportFormat,
+  transparent: boolean,
+  version: StudioDownloadVersionContext = {},
+): string {
   return createStudioDownloadFileName({
     title,
     fallbackTitle: "toonspectrum-comic",
-    suffix: transparent ? "transparent" : "",
+    suffix: appendStudioDownloadSuffix(
+      transparent ? "transparent" : "",
+      studioDownloadVersionSuffix(version),
+    ),
     extension: format,
   });
 }
 
-// 스트립 파일명 — `<제목>-strip.<확장자>`, 분할 시 `-strip-1of3` 식 접미사.
+// 스트립 파일명 — 분할 식별자 뒤에 같은 revision·UTC 시각을 붙여 한 작업의 산출물을 묶는다.
 export function stripExportFileName(
   title: string,
   format: ExportFormat,
-  part?: { index: number; total: number }
+  part?: { index: number; total: number },
+  version: StudioDownloadVersionContext = {},
 ): string {
-  const suffix = part && part.total > 1
+  const stripSuffix = part && part.total > 1
     ? `strip-${part.index + 1}of${part.total}`
     : "strip";
   return createStudioDownloadFileName({
     title,
     fallbackTitle: "toonspectrum-webtoon",
-    suffix,
+    suffix: appendStudioDownloadSuffix(
+      stripSuffix,
+      studioDownloadVersionSuffix(version),
+    ),
     extension: format,
   });
 }

@@ -26163,6 +26163,10 @@ function clearSelectionForEdit() {
     effectiveScale: effScale,
     pageGrade,
     title,
+    exportRevision:
+      loadedWork?.revision
+      ?? sharedDocument?.revision
+      ?? studioRevisionProjectGenerationRef.current,
     ensureSharedDocumentAvailableForExport,
     ensureWatermarkLoaded,
     captureReadyStageForPage,

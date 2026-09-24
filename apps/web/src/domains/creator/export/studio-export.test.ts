@@ -103,6 +103,15 @@ describe("pageExportFileName", () => {
     expect(pageExportFileName("  ", "jpg", false)).toBe("toonspectrum-comic.jpg");
     expect(pageExportFileName("내 컷툰", "webp", false)).toBe("내 컷툰.webp");
   });
+  it("adds a revision and one UTC export timestamp when provided", () => {
+    const version = { revision: 12, exportedAt: "2026-09-25T02:45:31.999Z" };
+    expect(pageExportFileName("내 컷툰", "png", false, version)).toBe(
+      "내 컷툰-r12-20260925-024531Z.png",
+    );
+    expect(pageExportFileName("내 컷툰", "png", true, version)).toBe(
+      "내 컷툰-transparent-r12-20260925-024531Z.png",
+    );
+  });
 });
 
 describe("stripExportFileName", () => {
@@ -115,6 +124,15 @@ describe("stripExportFileName", () => {
     expect(stripExportFileName("내 웹툰", "jpg", { index: 0, total: 3 })).toBe("내 웹툰-strip-1of3.jpg");
     expect(stripExportFileName("내 웹툰", "png", { index: 2, total: 3 })).toBe("내 웹툰-strip-3of3.png");
     expect(stripExportFileName("내 웹툰", "webp", { index: 1, total: 3 })).toBe("내 웹툰-strip-2of3.webp");
+  });
+  it("keeps every split part in the same revision and timestamp group", () => {
+    const version = { revision: 3, exportedAt: "2026-09-25T02:45:31Z" };
+    expect(stripExportFileName("내 웹툰", "png", { index: 0, total: 2 }, version)).toBe(
+      "내 웹툰-strip-1of2-r3-20260925-024531Z.png",
+    );
+    expect(stripExportFileName("내 웹툰", "png", { index: 1, total: 2 }, version)).toBe(
+      "내 웹툰-strip-2of2-r3-20260925-024531Z.png",
+    );
   });
 });
 
