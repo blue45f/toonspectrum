@@ -135,43 +135,37 @@ describe("mobile site shell accessibility", () => {
     expect(within(quickNavigation as HTMLElement).getByRole("link", { name: "찾기" }).getAttribute("aria-current")).toBe("page");
   });
 
-  it("shows Korean as selected when a fresh browser reports ko-KR", () => {
+  it("shows Korean on the closed search-first language picker", () => {
     useI18n.getState().setLang("ko-KR");
 
     render(<FloatingControls placement="static" showTheme={false} />);
 
-    const language = screen.getByRole<HTMLSelectElement>("combobox", { name: "언어 선택" });
+    const language = screen.getByRole("button", { name: "언어 선택" });
     expect(useI18n.getState().lang).toBe("ko");
-    expect(language.value).toBe("ko");
-    expect(language.selectedOptions[0]?.textContent).toContain("한국어");
+    expect(language.textContent).toContain("한국어");
+    expect(screen.queryByRole("listbox", { name: "언어 검색 결과" })).toBeNull();
   });
 
-  it("restores the worldwide language catalog in the floating control", () => {
+  it("searches the worldwide catalog without rendering every locale while closed", () => {
     useI18n.getState().setLang("ko");
     render(<FloatingControls placement="static" showTheme={false} />);
 
-    const language = screen.getByRole<HTMLSelectElement>("combobox", {
-      name: "언어 선택",
-    });
-    const values = [...language.options].map((option) => option.value);
+    const trigger = screen.getByRole("button", { name: "언어 선택" });
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    fireEvent.click(trigger);
 
-    expect(values).toHaveLength(NORMALIZED_LOCALE_OPTIONS.length);
-    expect(values).toEqual(
-      expect.arrayContaining([
-        "ko",
-        "en",
-        "ja",
-        "af",
-        "ar",
-        "eo",
-        "he",
-        "tlh",
-        "yue",
-        "en-us",
-        "zh-hant",
-      ]),
-    );
-    expect(language.querySelectorAll("optgroup")).toHaveLength(2);
+    const initialOptions = screen.getAllByRole("option");
+    expect(initialOptions.length).toBeGreaterThan(1);
+    expect(initialOptions.length).toBeLessThan(NORMALIZED_LOCALE_OPTIONS.length);
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "언어 검색" }), {
+      target: { value: "tlh" },
+    });
+    const klingon = screen.getByRole("option", { name: /tlh/i });
+    fireEvent.click(klingon);
+
+    expect(useI18n.getState().lang).toBe("tlh");
+    expect(screen.queryByRole("dialog", { name: "언어 선택" })).toBeNull();
   });
 
 
