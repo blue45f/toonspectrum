@@ -211,7 +211,7 @@ describe("Studio five-hour soak beta notice admission", () => {
   it("acknowledges the visible product notice through its action before drawing", () => {
     expect(source).toContain("acknowledgeStudioBetaNoticeIfPresent(page)");
     expect(source).toContain("data-studio-beta-notice");
-    expect(source).toContain('notice.getByRole("button").first()');
+    expect(source).toContain('[data-studio-beta-notice-acknowledge="true"]');
     expect(source).toContain('notice.waitFor({ state: "hidden"');
 
     const navigation = source.indexOf("page.goto(`${preview.origin}/studio/canvas`");

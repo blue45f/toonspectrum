@@ -121,10 +121,11 @@ function FilterChip({ active, label, count, onClick }: {
 }) {
   return <button
     type="button"
+    data-manuscript-touch-target=""
     aria-pressed={active}
     onClick={onClick}
     className={cn(
-      "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-bold",
+      "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-bold",
       "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
       active
         ? "border-accent bg-accent text-on-accent"
@@ -444,8 +445,10 @@ export function ProductionManuscriptProcessBrowser({
           <label className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-card px-3 text-xs font-bold text-fg-2">
             정렬
             <select
+              data-manuscript-touch-target=""
               value={sort}
-              onChange={(event) => onSortChange(event.target.value as ProductionManuscriptSort)}              className="bg-transparent text-fg outline-none"
+              onChange={(event) => onSortChange(event.target.value as ProductionManuscriptSort)}
+              className="min-h-11 bg-transparent text-fg outline-none"
             >
               <option value="attention">확인 필요순</option>
               <option value="recent">최근 활동순</option>
@@ -455,12 +458,13 @@ export function ProductionManuscriptProcessBrowser({
           <div className="inline-flex rounded-xl border border-line bg-card p-1" role="group" aria-label="원고 표시 방식">
             <button
               type="button"
+              data-manuscript-touch-target=""
               aria-pressed={layout === "cards"}
               aria-label="카드 보기"
               title="카드 보기"
               onClick={() => onLayoutChange("cards")}
               className={cn(
-                "flex min-h-9 min-w-9 items-center justify-center rounded-lg",
+                "flex min-h-11 min-w-11 items-center justify-center rounded-lg",
                 layout === "cards" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised",
               )}
             >
@@ -468,13 +472,15 @@ export function ProductionManuscriptProcessBrowser({
             </button>
             <button
               type="button"
+              data-manuscript-touch-target=""
               aria-pressed={layout === "matrix"}
               aria-label="한눈 보기"
               title="한눈 보기 (G)"
               onClick={() => onLayoutChange("matrix")}
               className={cn(
-                "flex min-h-9 min-w-9 items-center justify-center rounded-lg",
-                layout === "matrix" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised",              )}
+                "flex min-h-11 min-w-11 items-center justify-center rounded-lg",
+                layout === "matrix" ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised",
+              )}
             >
               <Rows3 className="size-4" aria-hidden="true" />
             </button>
@@ -497,7 +503,12 @@ export function ProductionManuscriptProcessBrowser({
         {visibleProcesses.length}개 표시
         {filtered ? ` · 전체 ${processes.length}개 중 필터됨` : ""}
       </p>
-      {filtered ? <button type="button" onClick={onReset} className="font-bold text-accent hover:underline">
+      {filtered ? <button
+        type="button"
+        data-manuscript-touch-target=""
+        onClick={onReset}
+        className="inline-flex min-h-11 items-center font-bold text-accent hover:underline"
+      >
         검색·필터 초기화
       </button> : null}
     </div>

@@ -353,7 +353,9 @@ async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean
     .catch(() => false);
   if (!visible) return false;
 
-  const action = notice.getByRole("button").first();
+  const action = notice.locator(
+    '[data-studio-beta-notice-acknowledge="true"]',
+  );
   await action.click({ timeout: 10_000 });
   await notice.waitFor({ state: "hidden", timeout: 10_000 });
   return true;

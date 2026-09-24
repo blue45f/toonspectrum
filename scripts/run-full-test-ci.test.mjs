@@ -20,7 +20,7 @@ describe("complete CI root and performance execution", () => {
     const serial = createVitestArguments();
     expect(serial.slice(1, 3)).toEqual(["run", "--no-file-parallelism"]);
     expect(serial.slice(3)).toEqual(POSTGRES_INTEGRATION_SUITES);
-    expect(new Set(serial.slice(3)).size).toBe(16);
+    expect(new Set(serial.slice(3)).size).toBe(POSTGRES_INTEGRATION_SUITES.length);
     expect(serial.slice(3).every((file) => existsSync(new URL(`../${file}`, import.meta.url)))).toBe(true);
     const remaining = fullTestRemainderArguments();
     expect(remaining.slice(0, 2)).toEqual([serial[0], "run"]);
@@ -47,7 +47,7 @@ describe("complete CI root and performance execution", () => {
         collect("original", []), collect("database", serial.slice(3)),
         collect("remaining", fullTestRemainderArguments().slice(2)),
       ]);
-      expect(database).toHaveLength(16);
+      expect(database).toHaveLength(POSTGRES_INTEGRATION_SUITES.length);
       expect(remaining.filter((file) => database.includes(file))).toEqual([]);
       expect([...database, ...remaining].sort()).toEqual(original);
     } finally { await rm(temporary, { recursive: true, force: true }); }

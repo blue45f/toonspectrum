@@ -237,6 +237,49 @@ describe("ProductionManuscriptWorkspace", () => {
     expect(within(processPanel).getByRole("columnheader", { name: "RELEASE · 전달 기준" })).toBeTruthy();
   });
 
+  it("fails closed instead of replacing an invalid manuscript review with another review", async () => {
+    render(
+      <MemoryRouter initialEntries={[
+        "/production/projects/sample-project/manuscripts?episode=episode-12&artifact=artifact-image&manuscriptView=feedback&manuscriptReview=missing-review",
+      ]}>
+        <ProductionManuscriptWorkspace
+          aggregate={createProductionDemoProject()}
+          canEdit
+          isDemo={false}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "고정 원고 피드백" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "요청한 고정 검수본을 찾을 수 없습니다" })).toBeTruthy();
+    expect(screen.queryByText("PINNED REVIEW PANEL review-image")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /12화 편집 검수/u }));
+    expect(await screen.findByText("PINNED REVIEW PANEL review-image")).toBeTruthy();
+  });
+
+  it("does not let a matching review id escape an invalid artifact coordinate", async () => {
+    render(
+      <MemoryRouter initialEntries={[
+        "/production/projects/sample-project/manuscripts?episode=episode-12&artifact=missing-artifact&manuscriptView=feedback&manuscriptReview=review-image",
+      ]}>
+        <ProductionManuscriptWorkspace
+          aggregate={createProductionDemoProject()}
+          canEdit
+          isDemo={false}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole("heading", { name: "고정 원고 피드백" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "요청한 원고·검수본 조합을 찾을 수 없습니다" })).toBeTruthy();
+    expect(screen.queryByText("PINNED REVIEW PANEL review-image")).toBeNull();
+    expect(screen.queryByRole("button", { name: /12화 편집 검수/u })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "원고 공정 다시 선택" }));
+    expect(await screen.findByRole("searchbox", { name: "원고·공정 검색" })).toBeTruthy();
+  });
+
   it("keeps internal navigation separate from immutable review delivery", async () => {
     render(
       <MemoryRouter initialEntries={["/production/projects/sample-project/manuscripts?episode=episode-12&artifact=artifact-image"]}>

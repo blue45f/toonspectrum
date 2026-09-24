@@ -8,14 +8,15 @@ import { CampusRoom } from "./CampusRoom";
 afterEach(cleanup);
 
 it("keeps the public atelier static and exposes direct actions without walking controls", () => {
+  const district = campusDistrict("market");
   const view = render(
     <MemoryRouter initialEntries={["/market/browse"]}>
-      <CampusRoom district={campusDistrict("market")} objects={[]} />
+      <CampusRoom district={district} objects={[]} />
     </MemoryRouter>,
   );
 
   const artwork = view.container.querySelector<HTMLImageElement>(".campus-room-art > img");
-  expect(artwork?.getAttribute("src")).toBe("/assets/studio/backgrounds/webtoon_street.png");
+  expect(artwork?.getAttribute("src")).toBe(district.artworkUrl);
   expect(view.container.querySelector("canvas")).toBeNull();
   expect(screen.queryByRole("button", { name: /공용 아틀리에 걷기|걷기 멈추기/u })).toBeNull();
 

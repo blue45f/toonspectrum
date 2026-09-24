@@ -226,12 +226,12 @@ describe("generated third-party notice inventory", () => {
     const result = validateShippedEngineNotices();
 
     expect(result.vello.cpuPackageCount).toBe(85);
-    expect(result.vello.gpuPackageCount).toBe(144);
+    expect(result.vello.gpuPackageCount).toBe(137);
     expect(result.opaque).toHaveLength(3);
     expect(
       result.vello.inventory.artifacts.find(({ id }) => id === "pkg-gpu"),
     ).toMatchObject({
-      features: ["fabric", "lottie", "svg"],
+      features: ["hybrid", "lottie", "svg"],
     });
     expect(
       result.vello.inventory.packages.map(({ name, version }) =>
@@ -239,13 +239,13 @@ describe("generated third-party notice inventory", () => {
       ),
     ).toEqual(
       expect.arrayContaining([
-        "vello@0.9.0",
-        "velato@0.11.0",
-        "vello_svg@0.10.0",
-        "usvg@0.46.0",
+        "vello@0.10.0",
+        "vello_hybrid@0.2.0",
+        "velato@0.12.0",
+        "vello_svg@0.11.0",
+        "usvg@0.48.1",
         "parley@0.11.0",
         "harfrust@0.10.0",
-        "skrifa@0.42.1",
         "skrifa@0.43.2",
         "skrifa@0.44.0",
       ]),
@@ -271,7 +271,7 @@ describe("generated third-party notice inventory", () => {
       ),
     );
     inventory.packages = inventory.packages.filter(
-      ({ name, version }) => `${name}@${version}` !== "vello@0.9.0",
+      ({ name, version }) => `${name}@${version}` !== "vello@0.10.0",
     );
 
     expect(() =>
@@ -280,7 +280,7 @@ describe("generated third-party notice inventory", () => {
         inventory,
         validateFiles: false,
       }),
-    ).toThrow("pkg-gpu references an unreviewed package: vello@0.9.0");
+    ).toThrow("pkg-gpu references an unreviewed package: vello@0.10.0");
   });
 
   it("fails when an opaque WASM inventory omits a component or artifact", () => {
@@ -460,7 +460,7 @@ describe("generated third-party notice inventory", () => {
     );
 
     expect(output).toMatch(
-      /^License audit passed \(\d+ pnpm entries, 85\/144 Vello CPU\/GPU crates, 3 opaque WASM inventories, \d+ license texts, \d+ npm packages without a root license file\)\.\n$/u,
+      /^License audit passed \(\d+ pnpm entries, 85\/137 Vello CPU\/GPU crates, 3 opaque WASM inventories, \d+ license texts, \d+ npm packages without a root license file\)\.\n$/u,
     );
   });
 
@@ -508,9 +508,9 @@ describe("generated third-party notice inventory", () => {
         "6cc2f3fa1611d32ad7563f7092aa1bf58741124302630cef7d21561ecd7b7284",
       );
       expect(notice).toContain("## Pinned Vello CPU/GPU Rust/WASM inventories");
-      expect(notice).toContain("| `vello` | 0.9.0 | Apache-2.0 OR MIT | pkg-gpu |");
-      expect(notice).toContain("| `velato` | 0.11.0 | Apache-2.0 OR MIT | pkg-gpu |");
-      expect(notice).toContain("| `vello_svg` | 0.10.0 | Apache-2.0 OR MIT | pkg-gpu |");
+      expect(notice).toContain("| `vello` | 0.10.0 | Apache-2.0 OR MIT | pkg-gpu |");
+      expect(notice).toContain("| `velato` | 0.12.0 | Apache-2.0 OR MIT | pkg-gpu |");
+      expect(notice).toContain("| `vello_svg` | 0.11.0 | Apache-2.0 OR MIT | pkg-gpu |");
       expect(notice).toContain("| `harfrust` | 0.10.0 | MIT | pkg, pkg-gpu |");
       expect(notice).toContain("## Locked opaque WASM engine provenance");
       expect(notice).toContain("`google/ink-stroke-modeler`");

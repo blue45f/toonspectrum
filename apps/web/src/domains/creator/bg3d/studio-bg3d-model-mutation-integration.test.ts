@@ -235,7 +235,7 @@ describe("Studio BG3D model placement and persistent deletion integration", () =
       'const applyCommandHistoryStep = (direction: "undo" | "redo"): void => {',
       "const canAdmitSceneNodes = (",
     );
-    expect(undoRedo).toContain("stepStudioBg3dCommandHistory(commandHistoryRefs, direction)");
+    expect(undoRedo).toContain("stepUnifiedStudio3dHistory(commandHistoryRefs, grade, direction)");
     expect(undoRedo).toContain('const doUndo = () => applyCommandHistoryStep("undo")');
     expect(undoRedo).toContain('const doRedo = () => applyCommandHistoryStep("redo")');
     expect(undoRedo.match(/applyOrDeferStudioBg3dHistoryCamera\(/gu)).toHaveLength(1);
