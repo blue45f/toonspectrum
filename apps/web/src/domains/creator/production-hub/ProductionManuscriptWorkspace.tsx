@@ -343,7 +343,8 @@ function ProcessNavigator({ processes, selected, view, onSelect }: {
           aria-label="이전 공정"
           disabled={!previous}
           onClick={() => previous && onSelect(previous, view)}
-          className="flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-line bg-panel text-fg-2 hover:bg-raised disabled:opacity-40"
+          data-manuscript-touch-target=""
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-line bg-panel text-fg-2 hover:bg-raised disabled:opacity-40"
         >
           <ChevronLeft className="size-4" aria-hidden="true" />
         </button>
@@ -355,7 +356,8 @@ function ProcessNavigator({ processes, selected, view, onSelect }: {
               const process = processes.find((candidate) => candidate.artifact.id === event.target.value);
               if (process) onSelect(process, view);
             }}
-            className="min-h-10 max-w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
+            data-manuscript-touch-target=""
+            className="min-h-11 max-w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent"
           >
             {processes.map((process) => <option key={process.artifact.id} value={process.artifact.id}>
               {process.artifact.title}
@@ -367,7 +369,8 @@ function ProcessNavigator({ processes, selected, view, onSelect }: {
           aria-label="다음 공정"
           disabled={!next}
           onClick={() => next && onSelect(next, view)}
-          className="flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-line bg-panel text-fg-2 hover:bg-raised disabled:opacity-40"
+          data-manuscript-touch-target=""
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-line bg-panel text-fg-2 hover:bg-raised disabled:opacity-40"
         >
           <ChevronRight className="size-4" aria-hidden="true" />
         </button>
@@ -545,13 +548,17 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
     sort: "attention",
   }), [processes]);
   const requestedArtifact = searchParams.get("artifact");
-  const selectedProcess = processes.find((process) => process.artifact.id === requestedArtifact)
-    ?? priorityProcesses[0]
-    ?? null;
+  const exactRequestedProcess = requestedArtifact
+    ? processes.find((process) => process.artifact.id === requestedArtifact) ?? null
+    : null;
+  const selectedProcess = requestedArtifact
+    ? exactRequestedProcess
+    : priorityProcesses[0] ?? null;
   const requestedReviewId = searchParams.get("manuscriptReview");
-  const selectedReview = selectedProcess?.reviews.find((review) => review.id === requestedReviewId)
-    ?? selectedProcess?.reviews[0]
-    ?? null;
+  const selectedReview = requestedReviewId
+    ? exactRequestedProcess?.reviews.find((review) => review.id === requestedReviewId) ?? null
+    : selectedProcess?.reviews[0] ?? null;
+  const requestedReviewMissing = Boolean(requestedReviewId && selectedReview === null);
   const browserSelectedProcess = visibleProcesses.find((process) => process.artifact.id === requestedArtifact)
     ?? visibleProcesses[0]
     ?? null;
@@ -562,8 +569,12 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
     patchSearch({ artifact: process.artifact.id, manuscriptReview: null, manuscriptView: nextView ?? view });
   }, [patchSearch, view]);
   const selectReview = useCallback((reviewId: string) => {
-    patchSearch({ manuscriptReview: reviewId });
-  }, [patchSearch]);
+    if (!selectedProcess) return;
+    patchSearch({
+      artifact: selectedProcess.artifact.id,
+      manuscriptReview: reviewId,
+    });
+  }, [patchSearch, selectedProcess]);
   const resetBrowser = useCallback(() => {
     patchSearch({ manuscriptQuery: null, manuscriptFilter: null });
   }, [patchSearch]);
@@ -595,18 +606,11 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
   }, [episodeIds, patchSearch, requestedEpisode]);
 
   useEffect(() => {
-    if (!data || !requestedArtifact) return;
+    if (!data || !requestedArtifact || requestedReviewId) return;
     if (!processes.some((process) => process.artifact.id === requestedArtifact)) {
       patchSearch({ artifact: null });
     }
-  }, [data, patchSearch, processes, requestedArtifact]);
-
-  useEffect(() => {
-    if (!data || !requestedReviewId || !selectedProcess) return;
-    if (!selectedProcess.reviews.some((review) => review.id === requestedReviewId)) {
-      patchSearch({ manuscriptReview: null });
-    }
-  }, [data, patchSearch, requestedReviewId, selectedProcess]);
+  }, [data, patchSearch, processes, requestedArtifact, requestedReviewId]);
 
   useEffect(() => {
     if (view !== "processes" || !browserSelectedProcess || typeof window === "undefined") return undefined;
@@ -693,7 +697,13 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
   };
 
   return <div
-    className="space-y-4"
+    className={cn(
+      "space-y-4",
+      "max-lg:[&_button]:min-h-11 max-lg:[&_button]:min-w-11",
+      "max-lg:[&_a]:min-h-11 max-lg:[&_a]:min-w-11",
+      "max-lg:[&_input:not([type=checkbox]):not([type=radio]):not([type=range])]:min-h-11",
+      "max-lg:[&_select]:min-h-11",
+    )}
     data-production-manuscript-workspace=""
     aria-busy={loading || undefined}
   >
@@ -833,6 +843,7 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
           {VIEW_ITEMS.map(({ id, label, icon: Icon }, index) => <button
             key={id}
             id={`manuscript-tab-${id}`}
+            data-manuscript-touch-target=""
             type="button"
             role="tab"
             aria-selected={view === id}
@@ -842,7 +853,7 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
             onClick={() => setView(id)}
             onKeyDown={(event) => handleViewTabKey(event, view, setView)}
             className={cn(
-              "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-bold",
+              "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-bold",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
               view === id ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
             )}
@@ -856,16 +867,18 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
             aria-label="이전 회차"
             disabled={!previousEpisodeId}
             onClick={() => chooseEpisode(previousEpisodeId)}
-            className="flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-line bg-panel text-fg-2 hover:bg-raised disabled:opacity-40"
+            data-manuscript-touch-target=""
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-line bg-panel text-fg-2 hover:bg-raised disabled:opacity-40"
           >
             <ChevronLeft className="size-4" aria-hidden="true" />
           </button>
-          <label className="flex min-h-10 items-center gap-2 rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2">
+          <label className="flex min-h-11 items-center gap-2 rounded-xl border border-line bg-panel px-3 text-xs font-bold text-fg-2">
             회차
             <select
+              data-manuscript-touch-target=""
               value={episodeId ?? "all"}
               onChange={(event) => chooseEpisode(event.target.value === "all" ? null : event.target.value)}
-              className="max-w-[12rem] bg-transparent text-fg outline-none"
+              className="min-h-11 max-w-[12rem] bg-transparent text-fg outline-none"
             >
               <option value="all">전체 회차</option>
               {episodeIds.map((id) => <option key={id} value={id}>{id}</option>)}
@@ -876,7 +889,8 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
             aria-label="다음 회차"
             disabled={!nextEpisodeId}
             onClick={() => chooseEpisode(nextEpisodeId)}
-            className="flex min-h-10 min-w-10 items-center justify-center rounded-xl border border-line bg-panel text-fg-2 hover:bg-raised disabled:opacity-40"
+            data-manuscript-touch-target=""
+            className="flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-line bg-panel text-fg-2 hover:bg-raised disabled:opacity-40"
           >
             <ChevronRight className="size-4" aria-hidden="true" />
           </button>
@@ -955,7 +969,22 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
             <UploadCloud className="size-4" aria-hidden="true" /> 검수본 만들기
           </Link> : null}
         </div>
-        {selectedProcess && selectedProcess.reviews.length > 0 ? <div className="mt-5 grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+        {requestedReviewMissing && !selectedProcess ? <div className="mt-5 rounded-2xl border border-warn/35 bg-warn/10 p-6" role="alert">
+          <h3 className="font-black text-fg">요청한 원고·검수본 조합을 찾을 수 없습니다</h3>
+          <p className="mt-1 text-sm leading-6 text-fg-2">다른 공정이나 검수본으로 자동 대체하지 않았습니다. 원고 공정 목록에서 확인할 대상을 다시 선택하세요.</p>
+          <button
+            type="button"
+            data-manuscript-touch-target=""
+            onClick={() => patchSearch({
+              artifact: null,
+              manuscriptReview: null,
+              manuscriptView: "processes",
+            })}
+            className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 min-h-11" })}
+          >
+            원고 공정 다시 선택
+          </button>
+        </div> : selectedProcess && selectedProcess.reviews.length > 0 ? <div className="mt-5 grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
           <aside className="rounded-2xl border border-line bg-panel p-3" aria-label="검수본 선택">
             <div className="flex items-center justify-between gap-2 px-1">
               <h3 className="text-sm font-black text-fg">검수 이력</h3>
@@ -968,7 +997,13 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
                   "rounded-xl border p-3",
                   active ? "border-accent/60 bg-accent-soft/30" : "border-line bg-card",
                 )}>
-                  <button type="button" aria-pressed={active} onClick={() => selectReview(review.id)} className="w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
+                  <button
+                    type="button"
+                    data-manuscript-touch-target=""
+                    aria-pressed={active}
+                    onClick={() => selectReview(review.id)}
+                    className="w-full min-h-11 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                  >
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className={reviewTone(review.status)}>{reviewStatusLabel(review.status)}</Badge>
                       {review.openRequiredCommentCount > 0 ? <Badge className="border-bad/35 bg-bad/10 text-bad"><LockKeyhole className="mr-1 size-3.5" aria-hidden="true" />필수 {review.openRequiredCommentCount}</Badge> : null}
@@ -976,7 +1011,12 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
                     <p className="mt-2 line-clamp-2 text-sm font-black text-fg">{review.title}</p>
                     <p className="mt-1 text-[0.6875rem] leading-5 text-fg-3">{formatDate(review.updatedAt)} · 검토자 {review.reviewerIds.length}명</p>
                   </button>
-                  <Link to={reviewHref(data, selectedProcess, review)} aria-label="고정 검수본 열기" className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-bold text-accent hover:underline">
+                  <Link
+                    to={reviewHref(data, selectedProcess, review)}
+                    aria-label="고정 검수본 열기"
+                    data-manuscript-touch-target=""
+                    className="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-accent hover:underline"
+                  >
                     별도 화면 열기 <Eye className="size-3.5" aria-hidden="true" />
                   </Link>
                 </article>;
@@ -984,7 +1024,10 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
             </div>
           </aside>
           <div className="min-w-0">
-            {selectedReviewSubject ? <StudioPinnedReviewPanel
+            {requestedReviewMissing ? <div className="rounded-2xl border border-warn/35 bg-warn/10 p-6" role="alert">
+              <h3 className="font-black text-fg">요청한 고정 검수본을 찾을 수 없습니다</h3>
+              <p className="mt-1 text-sm leading-6 text-fg-2">다른 검수본이나 최신 HEAD로 자동 대체하지 않았습니다. 왼쪽 검수 이력에서 확인할 검수본을 직접 선택하세요.</p>
+            </div> : selectedReviewSubject ? <StudioPinnedReviewPanel
               subject={selectedReviewSubject}
               showShareTools={false}
               showExportTools={false}

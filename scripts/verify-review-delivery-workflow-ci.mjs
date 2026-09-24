@@ -100,6 +100,7 @@ try {
   }
   process.env.STUDIO_QA_BASE_URL = origin.origin;
   await import("./verify-review-delivery-workflow.mjs");
+  await import("./verify-production-manuscript-workspace.mjs");
 } finally {
   if (webProcess) {
     await stopDetachedProcessTree(webProcess);

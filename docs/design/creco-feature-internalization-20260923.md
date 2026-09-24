@@ -346,3 +346,16 @@ PR `#2018`의 사용성 구현은 merge commit `cb83ba49ab75ff8afb5a9d83b0b85261
 - report와 viewport screenshot을 CI artifact로 보존한다.
 
 이 자동화도 실제 휴대전화·통신사망·운영 인증·운영 object storage 또는 운영 배포 승인을 대신하지 않는다.
+
+## 12. 2026-09-24 최종 설계 계약 폐쇄
+
+잘못되거나 오래된 `manuscriptReview` query는 같은 공정의 첫 검수본 또는 최신 HEAD로 자동 대체하지 않는다. 요청한 review ID가 현재 artifact의 immutable review 목록과 정확히 일치하지 않으면 검수·공유·공식 전달 subject를 `null`로 유지하고, 사용자가 검수 이력에서 대상을 명시적으로 다시 선택하도록 안내한다. URL 정리보다 검수 좌표의 fail-closed 계약을 우선한다.
+
+모바일·태블릿 사용성은 원고 운영 화면 자체를 실제 React component로 실행하는 브라우저 acceptance로 보강한다.
+
+- 1440, 820, 390, 320px viewport에서 잘못된 review deep link가 다른 검수본을 열지 않는지 확인한다.
+- coarse pointer 환경에서 원고 탭, 회차·공정 이동, 검수 이력, 필터와 보기 전환의 주요 조작 영역이 44px 이상인지 실제 geometry로 검사한다.
+- 한눈 보기 표는 좁은 화면에서 문서 전체를 밀지 않고 자기 scroll region 안에서만 가로 스크롤해야 한다.
+- report와 각 viewport screenshot은 기존 `Studio manuscript delivery acceptance` artifact에 함께 보존한다.
+
+이 검증은 실제 iOS/Android 기기, 운영 인증, 통신사망과 운영 object storage의 release sign-off를 대체하지 않는다.
