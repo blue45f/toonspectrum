@@ -196,7 +196,7 @@ export function FloatingControls({
           접힘형은 데스크톱(md+)에서 보이고, static 배치는 항상 보인다. */}
       <div
         aria-hidden={!visible || undefined}
-        {...(!visible ? { inert: "" as const } : {})}
+        inert={!visible || undefined}
         className={cx(
           "items-center gap-2 transition-[opacity,transform] duration-500 ease-out",
           collapsible ? "hidden md:flex" : "flex",

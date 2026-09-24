@@ -7,6 +7,7 @@ import {
   Bookmark,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
   Eye,
   Heart,
   Layers,
@@ -20,8 +21,13 @@ import {
   WandSparkles,
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
+import {
+  buildCreatorReaderManagementHref,
+  buildCreatorPublicReaderPreviewHref,
+  resolveCreatorReaderPreviewMode,
+} from "./creator-public-reader-preview";
 import { SERIES_STATUS_LABEL } from "./creator-community-utils";
 import { resolveCreatorPublicationReaderPolicy } from "./creator-publication-reader";
 import { useCreatorPublicationPageMeta } from "./creator-publication-page-meta";
@@ -235,8 +241,15 @@ function WorkCommunityPanel({
   );
 }
 
-function WorkComments({ workId }: { workId: string }) {
-  const userId = useApp((state) => state.userId);
+function WorkComments({
+  workId,
+  anonymous = false,
+}: {
+  workId: string;
+  anonymous?: boolean;
+}) {
+  const sessionUserId = useApp((state) => state.userId);
+  const userId = anonymous ? null : sessionUserId;
   const [comments, setComments] = useState<WorkComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -454,7 +467,14 @@ function WorkInspector({ doc }: { doc: unknown }) {
 export function CreateWorkPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const previewSearch = searchParams.toString();
+  const { readerView, publicPreview } = useMemo(
+    () => resolveCreatorReaderPreviewMode(previewSearch),
+    [previewSearch],
+  );
   const userId = useApp((s) => s.userId);
+  const interactionUserId = publicPreview ? null : userId;
 
   const [work, setWork] = useState<WorkDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -490,6 +510,8 @@ export function CreateWorkPage() {
     () => readCreatorPublicationSource(work?.doc),
     [work?.doc],
   );
+  const sessionOwnsWork = Boolean(userId && work?.author.id === userId);
+  const ownerControlsVisible = Boolean(work?.isOwner && !readerView);
 
   useCreatorPublicationPageMeta({
     workId: work?.id ?? id ?? null,
@@ -504,8 +526,9 @@ export function CreateWorkPage() {
 
   useEffect(() => {
     if (!work || !id || !publicCanonicalSlug || id === publicCanonicalSlug) return;
-    navigate(`/create/${encodeURIComponent(publicCanonicalSlug)}`, { replace: true });
-  }, [id, navigate, publicCanonicalSlug, work]);
+    const query = previewSearch ? `?${previewSearch}` : "";
+    navigate(`/create/${encodeURIComponent(publicCanonicalSlug)}${query}`, { replace: true });
+  }, [id, navigate, previewSearch, publicCanonicalSlug, work]);
 
   useEffect(() => {
     if (!id) return;
@@ -514,7 +537,7 @@ export function CreateWorkPage() {
     setLoading(true);
     setError(null);
     setNotFound(false);
-    getWork(id, controller.signal)
+    getWork(id, controller.signal, { publicPreview })
       .then((result) => {
         if (alive) setWork(result);
       })
@@ -532,10 +555,10 @@ export function CreateWorkPage() {
       alive = false;
       controller.abort();
     };
-  }, [id, reloadKey]);
+  }, [id, publicPreview, reloadKey]);
 
   async function onToggleLike() {
-    if (!work || !userId || liking) return;
+    if (!work || !interactionUserId || liking) return;
     setLiking(true);
     setActionError(null);
     // 낙관적 토글 — 실패하면 서버 응답이 아닌 이전 상태로 되돌린다.
@@ -553,7 +576,7 @@ export function CreateWorkPage() {
   }
 
   async function onToggleBookmark() {
-    if (!work || !userId || bookmarking) return;
+    if (!work || !interactionUserId || bookmarking) return;
     setBookmarking(true);
     setActionError(null);
     const previous = {
@@ -627,13 +650,42 @@ export function CreateWorkPage() {
     <Container size="prose" className="py-8 lg:py-10">
       {/* 스튜디오 밖 라우트에도 승인 표면을 둔다 — 없으면 네이티브 confirm 으로 떨어진다. */}
       <StudioDestructiveConfirmHost />
-      <CampusObjectSource objects={spatialShowcaseObjects([work])} />
+      {!readerView ? <CampusObjectSource objects={spatialShowcaseObjects([work])} /> : null}
       <Link
         href="/create"
         className="mb-5 inline-flex items-center gap-1.5 text-sm text-fg-3 transition-colors hover:text-fg"
       >
         <ArrowLeft size={15} />
         {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "창작 게시판")}</Link>
+
+      {readerView ? (
+        <section
+          role="status"
+          data-public-reader-preview={publicPreview ? "anonymous" : "reader"}
+          className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-accent/35 bg-accent-soft/20 px-4 py-3 text-sm text-fg-2"
+        >
+          <Eye size={17} className="shrink-0 text-accent" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="font-bold text-fg">
+              {publicPreview ? "실제 비로그인 독자 응답으로 확인 중" : "독자 집중 보기"}
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
+              {publicPreview
+                ? "현재 로그인 세션을 서버 조회에서 제외해 공개 범위와 익명 독자 화면을 그대로 검증합니다."
+                : "창작자 관리 도구와 공간 지도를 접고 작품 감상 흐름만 표시합니다."}
+            </p>
+          </div>
+          {sessionOwnsWork ? (
+            <Link
+              href={buildCreatorReaderManagementHref(work.id)}
+              className={buttonClass({ size: "sm", variant: "outline", className: "min-h-11 gap-1.5" })}
+            >
+              <Settings2 size={14} aria-hidden />
+              관리 보기로 돌아가기
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
 
       <header className="mb-6">
         {/* 리믹스 원작 정보 배지 */}
@@ -790,10 +842,10 @@ export function CreateWorkPage() {
           <button
             type="button"
             onClick={onToggleLike}
-            disabled={!userId || liking}
+            disabled={!interactionUserId || liking}
             aria-pressed={work.liked}
             aria-label={`좋아요 ${formatCount(work.likes)}개`}
-            title={userId ? undefined : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "로그인 후 좋아요를 누를 수 있습니다.")}
+            title={interactionUserId ? undefined : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "비로그인 독자 보기에서는 로그인 상호작용을 사용하지 않습니다.")}
             className={buttonClass({
               size: "sm",
               variant: work.liked ? "solid" : "outline",
@@ -806,10 +858,10 @@ export function CreateWorkPage() {
           <button
             type="button"
             onClick={onToggleBookmark}
-            disabled={!userId || bookmarking}
+            disabled={!interactionUserId || bookmarking}
             aria-pressed={Boolean(work.bookmarked)}
             aria-label={`북마크 ${formatCount(work.bookmarks ?? 0)}개`}
-            title={userId ? undefined : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "로그인 후 북마크할 수 있습니다.")}
+            title={interactionUserId ? undefined : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "비로그인 독자 보기에서는 로그인 상호작용을 사용하지 않습니다.")}
             className={buttonClass({
               size: "sm",
               variant: work.bookmarked ? "solid" : "outline",
@@ -839,7 +891,7 @@ export function CreateWorkPage() {
             <Eye size={14} aria-hidden />
             <span className="numeral">{formatCount(work.views)}</span> {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "조회")}</span>
 
-          {publicationPolicy.remixAllowed ? (
+          {publicationPolicy.remixAllowed && !readerView ? (
             <Link
               href={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "en", "/studio?remix={v0}"), { v0: String(encodeURIComponent(work.id)) })}
               className={buttonClass({
@@ -851,7 +903,7 @@ export function CreateWorkPage() {
               <WandSparkles size={14} />
               <span>{translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "이어서 편집 (Remix)")}</span>
             </Link>
-          ) : work.isOwner ? (
+          ) : ownerControlsVisible ? (
             <span className="ml-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-line bg-card px-3 text-xs font-semibold text-fg-3">
               <WandSparkles size={14} aria-hidden />
               {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "리믹스 비허용")}</span>
@@ -859,7 +911,7 @@ export function CreateWorkPage() {
 
           {!work.isOwner && (
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-              {userId && work.author.id ? (
+              {interactionUserId && work.author.id ? (
                 <Link
                   href={{
                     pathname: "/messages/new",
@@ -880,12 +932,21 @@ export function CreateWorkPage() {
                   <Mail size={14} />
                   {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "작가에게 문의")}</Link>
               ) : null}
-              <CreatorWorkReportControl workId={work.id} authenticated={Boolean(userId)} />
+              <CreatorWorkReportControl workId={work.id} authenticated={Boolean(interactionUserId)} />
             </div>
           )}
 
-          {work.isOwner && (
-            <div className="ml-auto flex items-center gap-2">
+          {ownerControlsVisible && (
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <Link
+                href={buildCreatorPublicReaderPreviewHref(work.id)}
+                target="_blank"
+                rel="noreferrer"
+                className={buttonClass({ size: "sm", variant: "outline", className: "gap-1.5" })}
+              >
+                <ExternalLink size={14} />
+                비로그인 독자 보기
+              </Link>
               <Link
                 href={
                   work.format === "upload"
@@ -910,43 +971,6 @@ export function CreateWorkPage() {
 
         {actionError && <p className="mt-3 text-xs text-bad">{actionError}</p>}
 
-        {/* 작성자 전용: 연재 시리즈/챌린지 연결 설정 */}
-        {work.isOwner && (
-          <WorkCommunityPanel
-            work={work}
-            onUpdated={(patch) => {
-              setWork((current) => (current ? { ...current, ...patch } : current));
-              setReloadKey((value) => value + 1); // 시리즈/회차·이웃 회차 정보 새로고침
-            }}
-          />
-        )}
-
-        {/* 작성자 전용: 저장본 메타데이터·불변 릴리스·외부 게시 이력 */}
-        {work.isOwner && (
-          <CreatorCommunityPublicationPanel
-            work={work}
-            onUpdated={(patch) =>
-              setWork((current) => current ? { ...current, ...patch } : current)
-            }
-          />
-        )}
-
-        {/* 작성자 전용: 효과툰(배경음악·스크롤 모션·분위기) 설정 — doc.fx에 저장 */}
-        {work.isOwner && (
-          <WorkFxPanel
-            work={work}
-            onUpdated={(doc, revision) =>
-              setWork((current) => current ? { ...current, doc, revision: revision ?? current.revision } : current)
-            }
-          />
-        )}
-
-        {/* 작성자 전용: 모션툰 영상(WebM) 내보내기 — 저장된 doc.fx 연출·컷·BGM을 그대로 녹화 */}
-        {work.isOwner && (
-          <Suspense fallback={<div className="skeleton mt-4 h-10 rounded-xl" aria-hidden />}>
-            <StudioMotionExportPanel work={work} />
-          </Suspense>
-        )}
       </header>
 
       {/* 게시 계약을 소비하는 독자 보기 — 세로 효과툰 또는 LTR/RTL 페이지 모드 */}
@@ -957,13 +981,47 @@ export function CreateWorkPage() {
         fx={readWorkFx(work.doc)}
         title={work.title}
         policy={publicationPolicy}
-        isOwner={work.isOwner}
+        isOwner={readerView ? false : work.isOwner}
         altText={work.community?.altText ?? ""}
         contentKind={work.community?.kind ?? "webtoon_episode"}
       />
 
-      {/* 개체/레이어 탐색기 (Inspector) */}
-      <WorkInspector doc={work.doc} />
+      {ownerControlsVisible ? (
+        <details className="mt-6 rounded-2xl border border-line bg-panel/30 p-4 sm:p-5">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-bold text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+            <Settings2 size={16} className="text-accent" aria-hidden />
+            창작자 관리 도구
+            <span className="ml-auto text-xs font-normal text-fg-3">연재·권리·효과·영상 내보내기</span>
+          </summary>
+          <div className="mt-4 space-y-4 border-t border-line pt-4">
+            <WorkCommunityPanel
+              work={work}
+              onUpdated={(patch) => {
+                setWork((current) => (current ? { ...current, ...patch } : current));
+                setReloadKey((value) => value + 1);
+              }}
+            />
+            <CreatorCommunityPublicationPanel
+              work={work}
+              onUpdated={(patch) =>
+                setWork((current) => current ? { ...current, ...patch } : current)
+              }
+            />
+            <WorkFxPanel
+              work={work}
+              onUpdated={(doc, revision) =>
+                setWork((current) => current ? { ...current, doc, revision: revision ?? current.revision } : current)
+              }
+            />
+            <Suspense fallback={<div className="skeleton h-10 rounded-xl" aria-hidden />}>
+              <StudioMotionExportPanel work={work} />
+            </Suspense>
+          </div>
+        </details>
+      ) : null}
+
+      {/* 개체/레이어 탐색기는 관리 보기에서만 노출한다. */}
+      {ownerControlsVisible ? <WorkInspector doc={work.doc} /> : null}
 
       {/* 이 작품을 이어서 그린 리믹스 작품들 */}
       {work.remixedChildren && work.remixedChildren.length > 0 && (
@@ -1053,7 +1111,7 @@ export function CreateWorkPage() {
       )}
 
       {publicationPolicy.commentsAllowed ? (
-        <WorkComments workId={work.id} />
+        <WorkComments workId={work.id} anonymous={publicPreview} />
       ) : (
         <section className="rounded-2xl border border-line bg-panel/30 p-5 text-center">
           <MessageCircle size={18} className="mx-auto text-fg-3" aria-hidden />

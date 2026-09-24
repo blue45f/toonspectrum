@@ -124,6 +124,7 @@ import {
   type CreatorPublicationDirective,
   type CreatorPublicationWorkStatus,
 } from "@/shared/lib/creator-publication-contract";
+import { readCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
 import { cn } from "@/shared/lib/utils";
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
@@ -558,6 +559,9 @@ export function StudioPublishingCommandCenter({
           width: page.width,
           height: page.height,
           name: page.name,
+          source: null,
+          outputByteLength: studioDataUrlByteLength(page.src),
+          outputFormat: "stored" as const,
         })));
         setTitle(loaded.title);
         setDirty(true);
@@ -1272,6 +1276,27 @@ export function StudioPublishingCommandCenter({
       },
     })),
   );
+  const receiptDetails = useMemo(() => ({
+    title: title.trim(),
+    visibility: directive.visibility,
+    publishedAt: directive.publishedAt ?? directive.scheduledAt,
+    pages: pages.map((page) => ({
+      name: page.name,
+      width: page.width,
+      height: page.height,
+    })),
+    source: readCreatorPublicationSource(baseDoc),
+    rights: {
+      comments: directive.comments,
+      allowRemix: directive.allowRemix,
+      searchIndexing: directive.searchIndexing,
+      contentRating: directive.contentRating,
+    },
+    preflight: {
+      errors: preflight.errors.length,
+      warnings: preflight.warnings.length,
+    },
+  }), [baseDoc, directive, pages, preflight.errors.length, preflight.warnings.length, title]);
 
   return (
     <div data-route-ready="studio-publish">
@@ -1410,6 +1435,7 @@ export function StudioPublishingCommandCenter({
           workId={workId}
           revision={workRevision}
           environment={publishEnvironment}
+          details={receiptDetails}
           onContinueEditing={() => leavePublishResult("content")}
           onReviewSettings={() => leavePublishResult("distribution")}
           onMakePrivate={() => void handleMakePrivate()}

@@ -477,9 +477,18 @@ export async function listWorks(
   return unwrapWorks(data);
 }
 
-export async function getWork(id: string, signal?: AbortSignal): Promise<WorkDetail> {
+export async function getWork(
+  id: string,
+  signal?: AbortSignal,
+  options: { publicPreview?: boolean } = {},
+): Promise<WorkDetail> {
   return callOrThrow(
-    () => api.get<WorkDetail>(`${BASE}/works/${encodeURIComponent(id)}`, creatorWorkReadOptions(signal)),
+    () => api.get<WorkDetail>(
+      `${BASE}/works/${encodeURIComponent(id)}`,
+      creatorWorkReadOptions(signal, {
+        publicPreview: options.publicPreview ? "1" : undefined,
+      }),
+    ),
     "창작물을 불러오지 못했습니다."
   );
 }

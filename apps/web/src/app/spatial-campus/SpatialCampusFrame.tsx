@@ -36,9 +36,12 @@ export function SpatialCampusFrame({ binding, route, children }: {
   const [privacyMode, setPrivacyMode] = useState(false);
   const protectedRoute = binding?.surface === "protected";
   const districtId = binding?.districtId ?? null;
+  const readerFocus = pathname.startsWith("/create/")
+    && new URLSearchParams(search).get("view") === "reader";
   const privacySensitive = binding?.surface === "room" && binding.private;
   const privacyActive = Boolean(privacySensitive && privacyMode);
   const sceneObjectsAllowed = !protectedRoute
+    && !readerFocus
     && binding?.surface === "room"
     && districtId !== null
     && districtId !== "observatory"
@@ -104,7 +107,13 @@ export function SpatialCampusFrame({ binding, route, children }: {
   useEffect(() => {
     if (!privacySensitive) setPrivacyMode(false);
   }, [privacySensitive]);
-  const mode: CampusMode = focusPath === pathname ? "focus" : preference === "virtual-studio" ? "scene" : "task";
+  const mode: CampusMode = readerFocus
+    ? "focus"
+    : focusPath === pathname
+      ? "focus"
+      : preference === "virtual-studio"
+        ? "scene"
+        : "task";
   const setMode = (next: CampusMode) => {
     setFocusPath(next === "focus" ? pathname : null);
     if (next !== "focus") setPreference(next === "scene" ? "virtual-studio" : "classic");
@@ -143,7 +152,7 @@ export function SpatialCampusFrame({ binding, route, children }: {
       delete document.documentElement.dataset.campusMode;
     };
   }, [activeDistrictId, mode]);
-  const scene = ownsRoom && mode === "scene" && district ? (
+  const scene = ownsRoom && !readerFocus && mode === "scene" && district ? (
     <CampusSceneBoundary resetKey={district.id} fallback={<CampusSceneRecovery />}>
       <Suspense fallback={<div className="campus-room-loading" role="status">{district.label.ko} · {district.label.en}</div>}>
         <CampusRoom key={district.id} district={district} objects={objects} />
@@ -160,7 +169,7 @@ export function SpatialCampusFrame({ binding, route, children }: {
       <CampusObjectPublisherContext.Provider value={sceneObjectsAllowed ? publishObjects : null}>
         <WorkspaceTaskFrame route={route}
           campusMode={ownsRoom ? mode : undefined}
-          campusControls={ownsRoom ? <CampusControls /> : undefined}
+          campusControls={ownsRoom && !readerFocus ? <CampusControls /> : undefined}
           campusScene={scene}>
           {domain}
         </WorkspaceTaskFrame>

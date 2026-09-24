@@ -100,4 +100,3 @@ describe("studio publication integrity", () => {
     });
   });
 });
-

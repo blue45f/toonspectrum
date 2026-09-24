@@ -14,6 +14,8 @@ import {
   PromoteCreatorDraftCollaborationRoomDto,
   ProvisionCreatorDraftCollaborationRoomDto,
   RespondCreatorTeamInvitationDto,
+  CreatorWorkParamsDto,
+  CreatorWorkReadQueryDto,
   UpdateCreatorSharedDocumentDto,
   UpdateCreatorTeamMemberDto,
 } from "./creator.dto";
@@ -33,6 +35,7 @@ vi.mock("../../server/app-config", () => ({
 }));
 
 const creatorService = {
+  getWork: vi.fn(),
   listSharedWorks: vi.fn(),
   getSharedWorkDocument: vi.fn(),
   getSharedWorkDocumentMeta: vi.fn(),
@@ -61,6 +64,35 @@ describe("CreatorController collaboration collection endpoints", () => {
     expect(() => pipe.transform({ limit: "51" }, metadata)).toThrow();
     expect(() => pipe.transform({ limit: "abc" }, metadata)).toThrow();
     expect(pipe.transform({ limit: "1", extra: "safe_ignore" }, metadata)).toEqual({ limit: 1 });
+  });
+
+  it("공개 미리보기는 로그인 헤더를 의도적으로 무시하고 public projection만 읽는다", async () => {
+    const queryMetadata = { type: "query" as const, metatype: undefined, data: undefined };
+    const paramMetadata = { type: "param" as const, metatype: undefined, data: undefined };
+    const params = new ZodValidationPipe(CreatorWorkParamsDto).transform(
+      { id: " work-1 " },
+      paramMetadata,
+    );
+    const publicQuery = new ZodValidationPipe(CreatorWorkReadQueryDto).transform(
+      { publicPreview: "1" },
+      queryMetadata,
+    );
+    const authenticatedQuery = new ZodValidationPipe(CreatorWorkReadQueryDto).transform(
+      {},
+      queryMetadata,
+    );
+    creatorService.getWork.mockResolvedValue({ id: "work-1" });
+
+    await expect(createController().getWork(params, publicQuery, "owner-1"))
+      .resolves.toEqual({ id: "work-1" });
+    expect(creatorService.getWork).toHaveBeenLastCalledWith("work-1", undefined);
+
+    await createController().getWork(params, authenticatedQuery, "owner-1");
+    expect(creatorService.getWork).toHaveBeenLastCalledWith("work-1", "owner-1");
+    expect(() => new ZodValidationPipe(CreatorWorkReadQueryDto).transform(
+      { publicPreview: "false" },
+      queryMetadata,
+    )).toThrow(BadRequestException);
   });
 
   it("모든 team DTO는 decorator metadata 없이 explicit pipe에서 transform·strict 400을 보장한다", () => {
@@ -188,6 +220,7 @@ describe("CreatorController collaboration collection endpoints", () => {
   });
 
   beforeEach(() => {
+    creatorService.getWork.mockReset();
     creatorService.listSharedWorks.mockReset();
     creatorService.getSharedWorkDocument.mockReset();
     creatorService.getSharedWorkDocumentMeta.mockReset();
