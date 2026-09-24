@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
-import test from "node:test";
+import nodeTest from "node:test";
+import { test as vitestTest } from "vitest";
 import { fileURLToPath } from "node:url";
+
+const test = process.env.VITEST ? vitestTest : nodeTest;
 
 const root = path.resolve(fileURLToPath(new URL("../", import.meta.url)));
 const packageJson = JSON.parse(await fs.readFile(path.join(root, "package.json"), "utf8"));

@@ -1,11 +1,5 @@
-// StudioIntegrationsSettingsPanel의 "마운트 시점" 렌더 계약 회귀 테스트.
-//
-// components/author-line.test.tsx 등 이 저장소 기존 .test.tsx와 동일하게 renderToStaticMarkup만
-// 쓴다(jsdom/happy-dom 미보유 — StudioStockImagePanel.test.tsx 상단 주석 참고). 이 스위트가
-// 증명하는 건 "AI 어시스트 설정(합성한 StudioAiSettingsPanel)과 무료 스톡 이미지(Unsplash) 두 섹션이
-// 모두 렌더되고, 각각 props/storage로 주입한 값을 정확히 반영하는가"까지다 — 입력 이벤트로 값이
-// 바뀌는 상호작용은 이벤트 시뮬레이션이 필요해 스코프 밖이다(StudioStockImagePanel.test.tsx와 동일한
-// 한계).
+// Studio 연동 허브의 정적 렌더 계약. AI 섹션은 비밀값 없는 canonical 설정 진입 카드만
+// 노출하고, Unsplash Access Key는 현재 탭 범위 입력으로 유지되는지 검증한다.
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -57,15 +51,12 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
       <StudioIntegrationsSettingsPanel aiSettings={STUDIO_AI_DEFAULT_SETTINGS} onAiSettingsChange={noopChange} />
     );
 
-    // Unified cloud settings own the AI section now. Localhost/private-network endpoints are
-    // intentionally rejected, and optional BYOK routes remain explicit rather than becoming a
-    // silent fallback.
-    expect(html).toContain("통합 AI 설정");
-    expect(html).toContain("통합 클라우드 AI 설정");
-    expect(html).toContain("자동 무료 AI · 키 입력 불필요");
-    expect(html).toContain("클라우드 공급자 프리셋");
-    expect(html).toContain("등록된 클라우드 연결");
-    expect(html).toContain("모델 목록 연결 확인");
+    // Studio 안에서는 전체 키 편집기를 반복 렌더하지 않고 canonical 설정으로 가는 상태 카드만 보인다.
+    expect(html).toContain("AI 어시스트 연결");
+    expect(html).toContain("AI 설정 열기");
+    expect(html).toContain('/settings/ai?source=studio');
+    expect(html).not.toContain("클라우드 공급자 프리셋");
+    expect(html).not.toContain("API 키 프로필");
     expect(html).not.toContain("http://localhost:8082/v1");
 
     // 무료 스톡 이미지(Unsplash) 섹션 — 헤더·미등록 상태.
@@ -91,19 +82,24 @@ describe("StudioIntegrationsSettingsPanel mount-time render contract", () => {
         ...aiSettings,
         id: "integration",
         label: "Studio 연결",
-        costPolicy: "provider-free-tier",
+        baseUrl: "https://openrouter.ai/api/v1",
+        textModel: "openrouter/free",
+        imageModel: "",
+        costPolicy: "openrouter-free",
+        apiKeys: [{ id: "key-1", label: "기본 키", apiKey: "sk-test-123", enabled: true, priority: 10 }],
+        models: [{ id: "model-1", label: "무료 자동", model: "openrouter/free", capability: "text", enabled: true, priority: 10 }],
       }],
-      assignments: { text: "integration", image: "integration", inference: null, "three-d": null },
+      assignments: { text: "integration", image: null, inference: null, "three-d": null },
     });
 
     const html = renderToStaticMarkup(
       <StudioIntegrationsSettingsPanel aiSettings={aiSettings} onAiSettingsChange={noopChange} />
     );
 
-    // 통합 보관함은 등록 상태만 렌더하고 비밀 값은 서버 렌더 HTML에 다시 싣지 않는다.
-    expect(html).toContain("Studio 연결");
-    expect(html).toContain(STUDIO_AI_DEFAULT_SETTINGS.baseUrl);
-    expect(html).toContain("키 1개 · 모델 2개");
+    // 통합 보관함은 연결 개수만 렌더하고 비밀 값·endpoint·model을 인라인 화면에 다시 싣지 않는다.
+    expect(html).toContain("내 AI 1개 연결됨");
+    expect(html).not.toContain("https://openrouter.ai/api/v1");
+    expect(html).not.toContain("openrouter/free");
     expect(html).not.toContain("sk-test-123");
     // 스톡 이미지 섹션은 현재 탭의 sessionStorage 값만 반영해 "등록됨" 배지가 뜬다.
     expect(html).toContain("Access Key 등록됨");

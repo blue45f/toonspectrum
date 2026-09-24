@@ -66,7 +66,7 @@ export function StudioCreatorSupportPage() {
     { icon: Users, title: bt("제작·어시스트 인력", "Production staffing"), body: bt("역할·예산·지역·계약 조건을 기준으로 소싱 브리프와 후보군 매칭", "Build sourcing briefs and matching pools by role, budget, region and contract terms"), to: "/studio", action: bt("프로젝트 제작 화면", "Open production") },
     { icon: Scale, title: bt("판권·영상화", "Rights & adaptation"), body: bt("권리 정본, 피치 자료, 영화·애니·게임 제안 문의 파이프라인", "Chain of title, pitch material and film, animation or game inquiry pipeline"), to: "/studio", action: bt("프로젝트 내보내기", "Open export") },
     { icon: MonitorSmartphone, title: bt("사용 환경·PWA", "Environment & PWA"), body: bt("WebRTC, 3D, 펜·터치, 저장소, 앱 설치와 오프라인 상태 진단", "Check WebRTC, 3D, pen/touch, storage, install and offline readiness"), to: "/studio/environment", action: bt("환경 진단", "Run environment check") },
-    { icon: Sparkles, title: bt("AI 제작 보조", "AI production assist"), body: bt("대사·구도·배경·캐릭터·색상 작업을 원본을 덮지 않는 제안 방식으로 지원", "Assist dialogue, composition, backgrounds, characters and palettes without overwriting originals"), to: "/studio/ai-settings", action: bt("AI 설정", "AI settings") },
+    { icon: Sparkles, title: bt("AI 제작 보조", "AI production assist"), body: bt("대사·구도·배경·캐릭터·색상 작업을 원본을 덮지 않는 제안 방식으로 지원", "Assist dialogue, composition, backgrounds, characters and palettes without overwriting originals"), to: "/settings/ai?source=studio", action: bt("AI 설정", "AI settings") },
     { icon: HeartHandshake, title: bt("제작 생태계", "Creator ecosystem"), body: bt("번역 승인, 공개 검토, 제작 과정 공유와 공동 창작 흐름", "Translation approval, release review, process sharing and co-creation workflows"), to: "/studio/ecosystem", action: bt("생태계 열기", "Open ecosystem") },
   ] as const;
 

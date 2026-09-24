@@ -89,7 +89,13 @@ Only a public HTTPS origin is accepted. HTTP, loopback, private networks, URL cr
 
 ## Unified settings and secret storage
 
-All AI entry points render `UnifiedAiSettings`. It owns:
+`/settings/ai` is the single canonical credential and routing surface. Studio, integration and inference screens render only a secret-free status card that links to this route instead of mounting duplicate editors. The default experience is progressive:
+
+1. **시작하기** — provider choice, one API key, conditional model/endpoint fields, automatic verification and a plain-language paid-fallback choice;
+2. **AI 사용 순서** — automatic, user-ordered and exact-manual modes with accessible up/down controls;
+3. **고급 설정** — the existing full connection editor, multiple keys/models, exact paths, runtime tokens and encrypted vault.
+
+The canonical owner still controls:
 
 - shared free-pool status and order;
 - automatic/priority/manual routing mode;
@@ -99,7 +105,7 @@ All AI entry points render `UnifiedAiSettings`. It owns:
 - Hyper3D/Rodin and managed Creator Runtime tokens;
 - optional encrypted browser vault.
 
-Personal keys remain in memory by default. The encrypted vault stores the normalized configuration but never stores the vault password. Browser requests omit cookies, reject redirects, and do not automatically retry ambiguous failures.
+Personal keys remain in memory by default. The encrypted vault stores the normalized configuration but never stores the vault password. Embedded entry cards never render secrets, endpoints or model IDs. Browser requests omit cookies, reject redirects, and do not automatically retry ambiguous failures.
 
 ## Review checklist
 
