@@ -62,7 +62,6 @@ import type {
   StudioProjectStartPoint,
 } from "../studio-project-definition";
 import { buildStudioModeLaunchHref, resolveStudioModeCreationPlan } from "../studio-mode-creation-plan";
-import { studioModeLabel } from "../studio-mode-profile";
 import { createStudioProjectWithInitialDocument } from "../studio-project-creation";
 import type { StudioProjectKind } from "../studio-project-library-store";
 import { STUDIO_PROJECT_CREATE_TEMPLATES } from "../save-first/studio-project-create-options";
@@ -274,10 +273,7 @@ export function StudioModeProjectCreatePage() {
     ? selectedAuxiliaryTemplate?.id ?? auxiliary.templateId
     : mainTemplate.id;
   const selectedPageCount = auxiliary ? 1 : mainTemplate.pageCount;
-  const modePlan = useMemo(
-    () => resolveStudioModeCreationPlan(activeKind, selectedTemplateId),
-    [activeKind, selectedTemplateId],
-  );
+  const modePlan = resolveStudioModeCreationPlan(activeKind, selectedTemplateId);
   const onboardingPlan = useMemo(() => buildWebtoonOnboardingPlan(selection), [selection]);
   const supportsProductionPlan = !auxiliary && format.projectKind === "webtoon";
   const structuredWebtoon = supportsProductionPlan && onboardingEnabled;
@@ -371,6 +367,14 @@ export function StudioModeProjectCreatePage() {
         navigate(`/studio/import?projectId=${encodeURIComponent(result.project.id)}&format=${format.id}`, {
           replace: true,
         });
+        return;
+      }
+      if (!auxiliary && effectiveStartPoint === "idea") {
+        navigate(`/studio/p/${encodeURIComponent(result.project.id)}/story`, { replace: true });
+        return;
+      }
+      if (!auxiliary && effectiveStartPoint === "script") {
+        navigate(`/studio/p/${encodeURIComponent(result.project.id)}/story?view=script`, { replace: true });
         return;
       }
       const launchHref = buildStudioModeLaunchHref(result, modePlan);
@@ -745,14 +749,20 @@ export function StudioModeProjectCreatePage() {
                       label={bt("이번 프로젝트 목표", "Project goal")}
                       value={selection.goal}
                       choices={WEBTOON_ONBOARDING_GOALS}
-                      onChange={(goal) => setSelection((current) => ({ ...current, goal }))}
+                      onChange={(goal) => {
+                        setSelection((current) => ({ ...current, goal }));
+                        setPurpose(projectPurposeFromOnboarding(goal));
+                      }}
                     />
                     <OnboardingSelect<WebtoonTeamModelId>
                       id="studio-webtoon-team"
                       label={bt("제작 인원", "Team model")}
                       value={selection.teamModel}
                       choices={WEBTOON_TEAM_MODELS}
-                      onChange={(teamModel) => setSelection((current) => ({ ...current, teamModel }))}
+                      onChange={(teamModel) => {
+                        setSelection((current) => ({ ...current, teamModel }));
+                        setCollaboration(projectCollaborationFromOnboarding(teamModel));
+                      }}
                     />
                     <OnboardingSelect<WebtoonCadenceId>
                       id="studio-webtoon-cadence"

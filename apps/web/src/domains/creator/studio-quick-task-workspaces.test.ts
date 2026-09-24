@@ -54,6 +54,58 @@ describe("quick and task-specific studio workspaces", () => {
       expect(frame.y + frame.height).toBeLessThan(seed.canvasH);
     }
   });
+  it("seeds card and page-comic documents with their format-specific page structure", () => {
+    const cardStorage = new MemoryStorage();
+    const card = createStudioProjectWithInitialDocument(cardStorage, {
+      title: "Card story",
+      kind: "webtoon",
+      templateId: "cuttoon-portrait-8",
+      document: {
+        kind: "webtoon",
+        defaultWorkspace: "comic",
+        width: 1080,
+        height: 1350,
+        pageCount: 8,
+      },
+    });
+    const cardSeed = readStudioLocalCanvasSeed({
+      projectId: card.project.id,
+      documentId: card.document.id,
+      workId: null,
+      remixSourceWorkId: null,
+    }, cardStorage);
+    expect(cardSeed).toMatchObject({ pageCount: 8, initialLayout: "cuttoon-card" });
+    if (!cardSeed) return;
+    const thirdCard = studioLocalCanvasSeedPage(cardSeed, "card-page", 2);
+    expect(thirdCard.name).toBe(`${card.document.title} · 카드 3`);
+    expect(thirdCard.elements).toHaveLength(1);
+
+    const pageStorage = new MemoryStorage();
+    const pageComic = createStudioProjectWithInitialDocument(pageStorage, {
+      title: "Page story",
+      kind: "webtoon",
+      templateId: "page-comic-b5-24",
+      document: {
+        kind: "webtoon",
+        defaultWorkspace: "comic",
+        width: 1760,
+        height: 2508,
+        pageCount: 24,
+      },
+    });
+    const pageSeed = readStudioLocalCanvasSeed({
+      projectId: pageComic.project.id,
+      documentId: pageComic.document.id,
+      workId: null,
+      remixSourceWorkId: null,
+    }, pageStorage);
+    expect(pageSeed).toMatchObject({ pageCount: 24, initialLayout: "page-comic-page" });
+    if (!pageSeed) return;
+    expect(studioLocalCanvasSeedPage(pageSeed, "page-24", 23)).toMatchObject({
+      name: `${pageComic.document.title} · 24p`,
+      elements: [{ type: "frame", strokeWidth: 1 }],
+    });
+  });
   it("rejects unavailable storage and does not borrow another task's template", () => {
     const route = { projectId: "test", documentId: "test", workId: null, remixSourceWorkId: null };
     expect(readStudioLocalCanvasSeed(route, null)).toBeNull();

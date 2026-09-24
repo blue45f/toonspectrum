@@ -55,7 +55,7 @@ describe("StudioProjectCreatePage", () => {
     expect(screen.queryByRole("combobox", { name: /만들 작업 선택|Choose work type/u })).toBeNull();
   });
 
-  it("creates a vertical webtoon with its project definition and canonical launch route", async () => {
+  it("creates a vertical webtoon definition and routes an idea start to project planning", async () => {
     renderCreate();
 
     fireEvent.change(screen.getByRole("textbox", { name: /프로젝트 이름|Project name/u }), {
@@ -67,7 +67,7 @@ describe("StudioProjectCreatePage", () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText("location").textContent).toMatch(
-        /^\/studio\/p\/[^/]+\/d\/[^?]+\?workspace=comic&uiMode=basic&startTool=draw&format=vertical-webtoon$/u,
+        /^\/studio\/p\/[^/]+\/story$/u,
       );
     });
 
@@ -110,6 +110,7 @@ describe("StudioProjectCreatePage", () => {
     const { container } = renderCreate();
 
     fireEvent.click(formatButton(container, "cuttoon"));
+    fireEvent.click(container.querySelector<HTMLButtonElement>('[data-studio-start-point="storyboard"]')!);
     const template = screen.getByRole("combobox", { name: /시작 템플릿|Starting template/u }) as HTMLSelectElement;
     expect(Array.from(template.options, (option) => option.value)).toEqual([
       "cuttoon-square-4",
@@ -150,6 +151,7 @@ describe("StudioProjectCreatePage", () => {
     const { container } = renderCreate();
 
     fireEvent.click(formatButton(container, "page-comic"));
+    fireEvent.click(container.querySelector<HTMLButtonElement>('[data-studio-start-point="storyboard"]')!);
     fireEvent.change(screen.getByRole("combobox", { name: /시작 템플릿|Starting template/u }), {
       target: { value: "page-comic-b5-24" },
     });
@@ -180,6 +182,7 @@ describe("StudioProjectCreatePage", () => {
     const { container } = renderCreate();
 
     fireEvent.click(formatButton(container, "motion-toon"));
+    fireEvent.click(container.querySelector<HTMLButtonElement>('[data-studio-start-point="storyboard"]')!);
     expect(container.querySelector('[data-studio-format-preview="motion-toon"]')).not.toBeNull();
     expect(container.querySelector('[data-studio-mode-preview="animation"]')).not.toBeNull();
     fireEvent.click(screen.getByRole("button", {

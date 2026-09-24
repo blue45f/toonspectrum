@@ -175,15 +175,12 @@ test("new project flow explains a disabled start action and preserves the chosen
   await expect(page.locator('[data-workspace-surface="focused"]')).toBeVisible();
   await expect(page.locator(".workspace-sidebar, .campus-toolbar")).toHaveCount(0);
   await expect(page.getByTestId("site-background-music-player")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "무엇을 만들까요?", exact: true })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "만들 작업 선택", exact: true })).toHaveValue("webtoon");
+  await expect(page.getByRole("heading", { name: "완성할 콘텐츠를 선택하세요", exact: true })).toBeVisible();
+  await expect(page.locator('[data-studio-create-format="vertical-webtoon"]')).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("combobox", { name: "시작 템플릿", exact: true })).toHaveValue("webtoon-vertical");
-  const optionalSettings = page.locator('[data-studio-create-optional-settings="true"]');
-  await expect(optionalSettings).not.toHaveAttribute("open", "");
-  await optionalSettings.getByText("추가 설정", { exact: true }).click();
-  await expect(optionalSettings).toHaveAttribute("open", "");
-  await expect(optionalSettings.getByText("준비되는 작업 화면 보기", { exact: true })).toBeVisible();
-  await optionalSettings.getByText("추가 설정", { exact: true }).click();
+  await expect(page.locator('[data-studio-format-preview="vertical-webtoon"]')).toBeVisible();
+  await expect(page.locator('[data-studio-mode-preview="webtoon"]')).toBeVisible();
+  await expect(page.locator('[data-studio-auxiliary-workspaces="true"]')).not.toHaveAttribute("open", "");
 
   const projectName = page.getByLabel("프로젝트 이름");
   await projectName.fill("");

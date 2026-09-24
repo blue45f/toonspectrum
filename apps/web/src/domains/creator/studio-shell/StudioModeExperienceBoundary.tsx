@@ -13,6 +13,8 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
 import { studioModeHandoffsFor, executeStudioModeHandoff } from "../studio-mode-handoff";
+import { studioProjectFormatProfile } from "../studio-project-format-catalog";
+import type { StudioWorkspaceMode } from "../studio-project-definition";
 import { resolveStudioRuntimeMode, studioModeLabel, studioModeProfile } from "../studio-mode-profile";
 import {
   readStudioProjectDocuments,
@@ -98,30 +100,66 @@ const AI_ACTION_TOOL: Readonly<Record<string, "배경" | "캐릭터" | "구도" 
 
 const EPISODE_AI_ACTIONS = new Set(["script-to-panels", "continuity-check"]);
 
-const EXPORT_LABELS: Readonly<Record<string, string>> = {
-  "webtoon-long-image": "Long image",
-  "episode-package": "Episode package",
-  "platform-preview": "Platform preview",
-  png: "PNG",
-  jpeg: "JPEG",
-  "high-resolution": "High-res",
-  cover: "Cover",
-  "episode-thumbnail": "Thumbnail",
-  "social-square": "Social 1:1",
-  "vertical-promo": "Vertical promo",
-  "pitch-pdf": "Pitch PDF",
-  presentation: "Presentation",
-  "shot-list": "Shot list",
-  animatic: "Animatic",
-  "edited-image": "Edited image",
-  "layered-image": "Layered image",
-  "render-reference": "Render ref",
-  "background-render": "Background render",
-  "camera-snapshot": "Camera snapshot",
-  mp4: "MP4",
-  webm: "WebM",
-  gif: "GIF",
-  "vertical-short": "Vertical short",
+type StudioLocalizedLabel = Readonly<{ ko: string; en: string }>;
+
+const PROJECT_WORKSPACE_LABELS: Readonly<Record<StudioWorkspaceMode, StudioLocalizedLabel>> = {
+  planning: { ko: "기획", en: "Planning" },
+  storyboard: { ko: "스토리보드", en: "Storyboard" },
+  webtoon: { ko: "웹툰 원고", en: "Webtoon artwork" },
+  illustration: { ko: "일러스트", en: "Illustration" },
+  image: { ko: "이미지 편집", en: "Image editing" },
+  design: { ko: "표지·홍보", en: "Cover & promotion" },
+  slides: { ko: "발표 자료", en: "Presentation" },
+  "three-d": { ko: "3D 장면", en: "3D scene" },
+  animation: { ko: "애니메이션·모션", en: "Animation & motion" },
+  localization: { ko: "다국어", en: "Localization" },
+  review: { ko: "검토", en: "Review" },
+};
+
+const DOCUMENT_WORKSPACE_LABELS: Readonly<Record<StudioDocumentWorkspace, StudioLocalizedLabel>> = {
+  draw: { ko: "드로잉", en: "Drawing" },
+  comic: { ko: "컷·웹툰", en: "Panels & webtoon" },
+  image: { ko: "이미지 편집", en: "Image editing" },
+  design: { ko: "디자인", en: "Design" },
+  slides: { ko: "발표 자료", en: "Presentation" },
+  storyboard: { ko: "스토리보드", en: "Storyboard" },
+  whiteboard: { ko: "화이트보드", en: "Whiteboard" },
+  "3d": { ko: "3D", en: "3D" },
+  animation: { ko: "애니메이션", en: "Animation" },
+  motion: { ko: "모션", en: "Motion" },
+  audio: { ko: "오디오", en: "Audio" },
+  localization: { ko: "다국어", en: "Localization" },
+  review: { ko: "검토", en: "Review" },
+};
+
+const EXPORT_LABELS: Readonly<Record<string, StudioLocalizedLabel>> = {
+  "webtoon-long-image": { ko: "긴 세로 원고", en: "Long image" },
+  "episode-package": { ko: "회차 패키지", en: "Episode package" },
+  "platform-preview": { ko: "플랫폼 미리보기", en: "Platform preview" },
+  png: { ko: "PNG", en: "PNG" },
+  jpeg: { ko: "JPEG", en: "JPEG" },
+  "high-resolution": { ko: "고해상도", en: "High-res" },
+  cover: { ko: "표지", en: "Cover" },
+  "episode-thumbnail": { ko: "회차 썸네일", en: "Thumbnail" },
+  "social-square": { ko: "SNS 정사각형", en: "Social 1:1" },
+  "vertical-promo": { ko: "세로 홍보물", en: "Vertical promo" },
+  "pitch-pdf": { ko: "피치 PDF", en: "Pitch PDF" },
+  presentation: { ko: "발표 자료", en: "Presentation" },
+  "shot-list": { ko: "샷 목록", en: "Shot list" },
+  animatic: { ko: "애니매틱", en: "Animatic" },
+  "edited-image": { ko: "편집 이미지", en: "Edited image" },
+  "layered-image": { ko: "레이어 이미지", en: "Layered image" },
+  "render-reference": { ko: "렌더 레퍼런스", en: "Render ref" },
+  "background-render": { ko: "배경 렌더", en: "Background render" },
+  "camera-snapshot": { ko: "카메라 스냅샷", en: "Camera snapshot" },
+  mp4: { ko: "MP4", en: "MP4" },
+  webm: { ko: "WebM", en: "WebM" },
+  gif: { ko: "GIF", en: "GIF" },
+  "vertical-short": { ko: "세로 쇼츠", en: "Vertical short" },
+  "social-card-sequence": { ko: "카드 묶음", en: "Card sequence" },
+  "page-pdf": { ko: "페이지 PDF", en: "Page PDF" },
+  "page-images": { ko: "페이지 이미지", en: "Page images" },
+  "print-package": { ko: "인쇄 패키지", en: "Print package" },
 };
 
 function applyStudioAiAction(actionId: string): boolean {
@@ -224,11 +262,15 @@ export function StudioModeExperienceBoundary({
     const studioDocument = documentState.documents.find((candidate) => candidate.id === documentId);
     if (!project || !studioDocument) return null;
     const mode = resolveStudioRuntimeMode(project, studioDocument);
+    const formatProfile = project.definition
+      ? studioProjectFormatProfile(project.definition.format)
+      : null;
     return {
       project,
       document: studioDocument,
       mode,
       profile: studioModeProfile(mode),
+      formatProfile,
     };
   }, [documentId, projectId, revision]);
 
@@ -240,11 +282,23 @@ export function StudioModeExperienceBoundary({
 
   if (!context) return <>{children}</>;
 
-  const handoffs = studioModeHandoffsFor(context.mode);
   const profile = context.profile;
+  const formatProfile = context.formatProfile;
+  const projectDefinition = context.project.definition ?? null;
+  const handoffs = studioModeHandoffsFor(context.mode).filter((handoff) => (
+    !projectDefinition
+    || projectDefinition.enabledWorkspaces.includes(handoff.target as StudioWorkspaceMode)
+  ));
+  const experienceLabel = formatProfile
+    ? (locale === "ko" ? formatProfile.titleKo : formatProfile.titleEn)
+    : studioModeLabel(profile, locale);
+  const experienceDescription = formatProfile
+    ? (locale === "ko" ? formatProfile.descriptionKo : formatProfile.descriptionEn)
+    : profile.description[locale];
+  const deliveryProfiles = projectDefinition?.deliveryProfileIds ?? profile.exports;
 
   return (
-    <div data-studio-mode-runtime={context.mode} className="contents">
+    <div data-studio-mode-runtime={context.mode} data-studio-project-format={formatProfile?.id ?? "standalone"} className="contents">
       {children}
       <StudioChromePortal targetId="studio-mode-chrome-slot">
       <details
@@ -253,21 +307,21 @@ export function StudioModeExperienceBoundary({
       >
         <summary
           className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-full border border-line-strong bg-card/95 px-3 py-2 text-xs font-black text-fg shadow-lg backdrop-blur supports-[backdrop-filter]:bg-card/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-          aria-label={locale === "ko" ? `${studioModeLabel(profile, locale)} 제작 모드 열기` : `Open ${studioModeLabel(profile, locale)} production mode`}
+          aria-label={locale === "ko" ? `${experienceLabel} 제작 모드 열기` : `Open ${experienceLabel} production mode`}
         >
           <span className="grid size-6 place-items-center rounded-full bg-accent-soft text-accent">
             <Workflow size={13} aria-hidden="true" />
           </span>
-          <span>{studioModeLabel(profile, locale)}</span>
+          <span>{experienceLabel}</span>
           <span className="hidden font-medium text-fg-3 sm:inline">· {profile.headline[locale]}</span>
         </summary>
 
         <div className="mt-2 w-[min(38rem,calc(100vw-1.5rem))] rounded-2xl border border-line bg-card/98 p-4 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-card/95">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[0.6rem] font-black uppercase tracking-[0.15em] text-accent">MODE PROFILE</p>
-              <h2 className="mt-1 text-sm font-black text-fg">{profile.headline[locale]}</h2>
-              <p className="mt-1 text-xs leading-5 text-fg-3">{profile.description[locale]}</p>
+              <p className="text-[0.6rem] font-black uppercase tracking-[0.15em] text-accent">{formatProfile ? "PROJECT FORMAT" : "MODE PROFILE"}</p>
+              <h2 className="mt-1 text-sm font-black text-fg">{experienceLabel}</h2>
+              <p className="mt-1 text-xs leading-5 text-fg-3">{experienceDescription}</p>
             </div>
             <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
               <Layers3 size={15} aria-hidden="true" />
@@ -278,6 +332,18 @@ export function StudioModeExperienceBoundary({
             <section>
               <p className="text-[0.6rem] font-black uppercase tracking-wide text-fg-3">
                 {locale === "ko" ? "작업공간" : "Workspaces"}
+              </p>
+              {projectDefinition ? (
+                <div className="mt-1.5 flex flex-wrap gap-1.5" data-studio-project-workspaces="true">
+                  {projectDefinition.enabledWorkspaces.map((item) => (
+                    <span key={item} className="rounded-full border border-line bg-card px-2 py-1 text-[0.62rem] font-semibold text-fg-3">
+                      {PROJECT_WORKSPACE_LABELS[item][locale]}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <p className="mt-2 text-[0.6rem] font-black uppercase tracking-wide text-fg-3">
+                {locale === "ko" ? "현재 문서에서 전환" : "Switch this document"}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {context.document.allowedWorkspaces.map((item) => (
@@ -293,7 +359,7 @@ export function StudioModeExperienceBoundary({
                         : "border-line bg-panel text-fg-2 hover:bg-raised",
                     )}
                   >
-                    {item}
+                    {DOCUMENT_WORKSPACE_LABELS[item][locale]}
                   </button>
                 ))}
               </div>
@@ -338,7 +404,7 @@ export function StudioModeExperienceBoundary({
                 {locale === "ko" ? "내보내기" : "Export"}
               </button>
               <span className="text-[0.65rem] text-fg-3">
-                {profile.exports.slice(0, 4).map((preset) => EXPORT_LABELS[preset] ?? preset).join(" · ")}
+                {deliveryProfiles.slice(0, 4).map((preset) => (EXPORT_LABELS[preset] ?? { ko: preset, en: preset })[locale]).join(" · ")}
               </span>
             </div>
 

@@ -11,6 +11,8 @@ import {
 } from "../studio-autosave";
 import { readStudioProjectDocuments } from "../studio-project-document-reader";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
+import { studioProjectFormatProfile } from "../studio-project-format-catalog";
+import { StudioProjectFormatVisual } from "./StudioProjectFormatPreview";
 import type { ThumbElement, ThumbPageLike } from "../studio-page-thumbs";
 
 const MAX_PREVIEW_DOCUMENTS = 6;
@@ -185,8 +187,30 @@ function PreviewLoading({ locale: _locale }: { readonly locale: string }) {
   );
 }
 
-function PreviewEmpty({ locale: _locale }: { readonly locale: string }) {
+function PreviewEmpty({
+  locale,
+  project,
+}: {
+  readonly locale: string;
+  readonly project: StudioProjectLibraryEntry;
+}) {
   const bt = useBilingual("StudioProjectCardThumbnail.empty");
+  const formatProfile = project.definition
+    ? studioProjectFormatProfile(project.definition.format)
+    : null;
+  if (formatProfile) {
+    return (
+      <div className="relative h-full bg-panel/70 p-3 text-center text-fg-3">
+        <StudioProjectFormatVisual
+          profile={formatProfile}
+          className="mx-auto h-full max-w-sm bg-card/70"
+        />
+        <span className="absolute inset-x-3 bottom-3 rounded-lg bg-card/90 px-2 py-1.5 text-[0.68rem] font-bold text-fg-2 shadow-sm">
+          {locale.startsWith("ko") ? formatProfile.titleKo : formatProfile.titleEn}
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="grid h-full place-items-center bg-panel/70 px-5 text-center text-fg-3">
       <div>
@@ -295,7 +319,7 @@ export function StudioProjectCardThumbnail({
       ) : phase === "idle" || phase === "loading" ? (
         <PreviewLoading locale={locale} />
       ) : (
-        <PreviewEmpty locale={locale} />
+        <PreviewEmpty locale={locale} project={project} />
       )}
       {preview || storedThumbnail ? (
         <span className="pointer-events-none absolute bottom-2 left-2 rounded-full border border-white/20 bg-black/65 px-2 py-1 text-[0.62rem] font-black text-white shadow-sm backdrop-blur-sm">

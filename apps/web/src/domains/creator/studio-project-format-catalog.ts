@@ -58,6 +58,8 @@ export interface StudioAuxiliaryWorkspaceOption {
   readonly templateId: string;
 }
 
+const workspaceList = (...ids: StudioWorkspaceMode[]): readonly StudioWorkspaceMode[] => Object.freeze(ids);
+
 const template = (
   id: string,
   labelKo: string,
@@ -98,7 +100,7 @@ export const STUDIO_PROJECT_FORMAT_PROFILES: readonly StudioProjectFormatProfile
     outputsKo: ["긴 세로 원고", "플랫폼별 분할 이미지", "회차 업로드 패키지"],
     outputsEn: ["Long scroll image", "Platform slices", "Episode upload package"],
     primaryWorkspace: "webtoon",
-    enabledWorkspaces: ["planning", "storyboard", "webtoon", "image", "three-d", "design", "animation", "localization", "review"],
+    enabledWorkspaces: workspaceList("planning", "storyboard", "webtoon", "image", "three-d", "design", "slides", "animation", "localization", "review"),
     deliveryProfileIds: ["webtoon-long-image", "episode-package", "platform-preview"],
     templates: Object.freeze(verticalTemplates),
   }),
@@ -123,7 +125,7 @@ export const STUDIO_PROJECT_FORMAT_PROFILES: readonly StudioProjectFormatProfile
     outputsKo: ["번호가 붙은 카드 ZIP", "대표 표지", "채널별 변형본"],
     outputsEn: ["Numbered card ZIP", "Cover card", "Channel variants"],
     primaryWorkspace: "webtoon",
-    enabledWorkspaces: ["planning", "storyboard", "webtoon", "image", "design", "animation", "review"],
+    enabledWorkspaces: workspaceList("planning", "storyboard", "webtoon", "image", "design", "slides", "animation", "review"),
     deliveryProfileIds: ["social-card-sequence", "social-square", "vertical-promo"],
     templates: Object.freeze([
       template("cuttoon-square-4", "정사각 4컷 · 1080 × 1080px × 4장", "Square 4-card · 1080 × 1080px × 4", "피드형 4장 카드 세트", "Four-card feed set", 4),
@@ -152,7 +154,7 @@ export const STUDIO_PROJECT_FORMAT_PROFILES: readonly StudioProjectFormatProfile
     outputsKo: ["출판용 PDF", "페이지별 PNG", "디지털 뷰어 패키지"],
     outputsEn: ["Publication PDF", "Page PNG files", "Digital reader package"],
     primaryWorkspace: "webtoon",
-    enabledWorkspaces: ["planning", "storyboard", "webtoon", "image", "three-d", "design", "localization", "review"],
+    enabledWorkspaces: workspaceList("planning", "storyboard", "webtoon", "image", "three-d", "design", "slides", "localization", "review"),
     deliveryProfileIds: ["page-pdf", "page-images", "print-package"],
     templates: Object.freeze([
       template("page-comic-digital-8", "디지털 페이지 · 1600 × 2400px · 8p", "Digital pages · 1600 × 2400px · 8p", "웹·전자책용 8페이지", "Eight pages for web and digital reading", 8),
@@ -180,7 +182,7 @@ export const STUDIO_PROJECT_FORMAT_PROFILES: readonly StudioProjectFormatProfile
     outputsKo: ["MP4", "WebM", "GIF", "9:16 세로 쇼츠"],
     outputsEn: ["MP4", "WebM", "GIF", "9:16 vertical short"],
     primaryWorkspace: "animation",
-    enabledWorkspaces: ["planning", "storyboard", "illustration", "image", "three-d", "animation", "design", "review"],
+    enabledWorkspaces: workspaceList("planning", "storyboard", "illustration", "image", "three-d", "animation", "design", "slides", "review"),
     deliveryProfileIds: ["mp4", "webm", "gif", "vertical-short"],
     templates: Object.freeze([
       template("motion-toon-vertical", "세로 모션툰 · 1080 × 1920px", "Vertical motion toon · 1080 × 1920px", "쇼츠·릴스·세로 재생용", "For shorts, reels and vertical playback", 1),
@@ -208,7 +210,7 @@ export const STUDIO_PROJECT_FORMAT_PROFILES: readonly StudioProjectFormatProfile
     outputsKo: ["고해상도 PNG", "JPEG", "투명 이미지", "편집 원본"],
     outputsEn: ["High-resolution PNG", "JPEG", "Transparent image", "Editable source"],
     primaryWorkspace: "illustration",
-    enabledWorkspaces: ["illustration", "image", "three-d", "design", "review"],
+    enabledWorkspaces: workspaceList("illustration", "image", "three-d", "design", "slides", "review"),
     deliveryProfileIds: ["png", "jpeg", "high-resolution"],
     templates: Object.freeze([
       template("illustration-portrait", "인물 일러스트 · 2048 × 2560px", "Character illustration · 2048 × 2560px", "세로형 인물·키비주얼", "Portrait character or key visual", 1),

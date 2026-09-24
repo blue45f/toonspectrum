@@ -13,7 +13,11 @@ interface UseStudioPageHistorySnapshotsOptions {
   readonly markStudioDocumentChanged: () => boolean;
   readonly workId: string | null;
   readonly initialCanvasHeight?: number;
-  readonly initialPage?: (pageId: string) => Pick<PageState, "canvasH" | "elements" | "name"> | null;
+  readonly initialPageCount?: number;
+  readonly initialPage?: (
+    pageId: string,
+    pageIndex: number,
+  ) => Pick<PageState, "canvasH" | "elements" | "name"> | null;
 }
 
 /** Bounded page-snapshot state used by page, stroke, and document undo/redo commands. */
@@ -22,21 +26,29 @@ export function useStudioPageHistorySnapshots({
   markStudioDocumentChanged,
   workId,
   initialCanvasHeight = 1080,
+  initialPageCount = 1,
   initialPage,
 }: UseStudioPageHistorySnapshotsOptions) {
   const [pagesHistory, setPagesHistoryState] = useState<PageState[][]>(() => {
-    const id = shouldSeedStudioLiveSharedBootstrapPage(workId)
-      ? studioLiveSharedBootstrapPageId(effectiveWorkId)
-      : uid();
-    const seed = workId === null ? initialPage?.(id) : null;
-    return [[{
-      id,
-      elements: seed?.elements ?? [],
-      bg: "#ffffff",
-      bgGrad: null,
-      canvasH: seed?.canvasH ?? initialCanvasHeight,
-      ...(seed?.name !== undefined ? { name: seed.name } : {}),
-    }]];
+    const pageCount = workId === null
+      ? Math.min(Math.max(1, Math.floor(initialPageCount)), 200)
+      : 1;
+    const sharedBootstrap = shouldSeedStudioLiveSharedBootstrapPage(workId);
+    const pages = Array.from({ length: pageCount }, (_, pageIndex) => {
+      const id = pageIndex === 0 && sharedBootstrap
+        ? studioLiveSharedBootstrapPageId(effectiveWorkId)
+        : uid();
+      const seed = workId === null ? initialPage?.(id, pageIndex) : null;
+      return {
+        id,
+        elements: seed?.elements ?? [],
+        bg: "#ffffff",
+        bgGrad: null,
+        canvasH: seed?.canvasH ?? initialCanvasHeight,
+        ...(seed?.name !== undefined ? { name: seed.name } : {}),
+      };
+    });
+    return [pages];
   });
   const setPagesHistory = (next: Parameters<typeof setPagesHistoryState>[0]) => {
     if (!markStudioDocumentChanged()) return;

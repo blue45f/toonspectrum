@@ -1,3 +1,4 @@
+import { projectDefinitionForRead } from "./studio-project-definition";
 import {
   canonicalProjects,
   MAX_PROJECTS,
@@ -154,6 +155,7 @@ export function createStudioProject(
       lastOpenedAt: createdAt,
       lastOpenedDocumentId: null,
       thumbnailUrl: null,
+      definition: projectDefinitionForRead(input.definition, input.kind, input.templateId),
     });
     return Object.freeze({
       schemaVersion: 1,
@@ -236,6 +238,7 @@ export function duplicateStudioProject(
     templateId: source.templateId,
     description: source.description,
     primaryLocale: source.primaryLocale,
+    definition: source.definition,
     createdAt: options.at,
   }, { target: options.target });
 }
