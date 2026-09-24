@@ -3137,12 +3137,26 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
               end: { x: endX, y: y + 4 },
             }, clip)
           : null;
+        let before: Buffer;
         if (eraseBaseline) {
           await selectDesktopBrush(page, preset, expectedSelection);
+          // The destructive-preset switch may synchronously retire the painted live overlay. Undo
+          // restores the surface seen by the eraser after that boundary, so compare against a fresh
+          // post-selection frame rather than the stale pre-switch composite.
+          before = await captureStableEvidence(page, clip);
+          const preparedBaselineDiff = await compareScreenshotPixels(
+            page,
+            eraseBaseline.empty,
+            before,
+          );
+          invariant(
+            hasMeaningfulPixelChange(preparedBaselineDiff),
+            `${preset.id}: selecting the eraser removed its prepared paint baseline`,
+          );
+        } else {
+          before = await captureStableEvidence(page, clip);
         }
         const emptyBefore = eraseBaseline?.empty ?? null;
-        const before = eraseBaseline?.painted
-          ?? await captureStableEvidence(page, clip);
         const canvasReceivesStart = await page.evaluate(({ x, y: pointY }) =>
           document.elementFromPoint(x, pointY)?.closest(".konvajs-content") !== null,
         { x: startX, y: y });

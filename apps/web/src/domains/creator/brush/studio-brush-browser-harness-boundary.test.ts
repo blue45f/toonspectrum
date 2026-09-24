@@ -148,6 +148,9 @@ describe("Studio brush browser harness catalogue boundary", () => {
     expect(harness).toContain("contractOperation === selectionOperation");
     expect(harness).toContain("data-studio-active-draw-mode");
     expect(harness).toContain("prepareVisibleEraserBaseline");
+    expect(
+      harness.match(/selecting the eraser removed its prepared paint baseline/gu),
+    ).toHaveLength(2);
     expect(harness).toContain("pointer-down gesture lost eraser operation authority");
     expect(harness).toContain("eraser gesture had no live retained-layer preview");
     expect(harness).toContain("live low-density gesture retained");
