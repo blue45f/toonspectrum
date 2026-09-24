@@ -71,4 +71,24 @@ describe("buildStudioDownloadBundle", () => {
     });
     expect(STUDIO_DOWNLOAD_BUNDLE_MANIFEST_PATH).toBe("manifest.json");
   });
+
+  it("adds the shared revision and UTC timestamp to the ZIP delivery", async () => {
+    const result = await buildStudioDownloadBundle({
+      title: "별빛 원고",
+      generatedAt: "2026-09-25T02:45:31Z",
+      versionContext: {
+        revision: 4,
+        exportedAt: "2026-09-25T02:45:31Z",
+      },
+      crc32ExecutionMode: "direct-headless",
+      files: [
+        { blob: new Blob(["part"], { type: "image/png" }), fileName: "part.png" },
+      ],
+    });
+
+    expect(result.fileName).toBe(
+      "별빛 원고-strip-bundle-r4-20260925-024531Z.zip",
+    );
+    expect(result.manifest.generatedAt).toBe("2026-09-25T02:45:31.000Z");
+  });
 });

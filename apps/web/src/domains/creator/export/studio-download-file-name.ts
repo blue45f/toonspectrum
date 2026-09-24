@@ -17,6 +17,13 @@ export interface StudioDownloadFileNameInput {
   suffix?: string;
 }
 
+export interface StudioDownloadVersionContext {
+  /** Positive saved or local document revision included as rN. */
+  revision?: number | null;
+  /** UTC export time included as YYYYMMDD-HHmmssZ. Omit to retain legacy names. */
+  exportedAt?: Date | number | string | null;
+}
+
 function truncateCodePoints(value: string, maximum: number): string {
   if (maximum <= 0) return "";
   return Array.from(value).slice(0, maximum).join("");
@@ -51,6 +58,43 @@ function normalizeStem(value: string): string {
     .trim();
   if (WINDOWS_RESERVED_STEM.test(stem)) stem = `_${stem}`;
   return stem;
+}
+
+function twoDigits(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+export function studioDownloadVersionSuffix(
+  context: StudioDownloadVersionContext = {},
+): string {
+  const parts: string[] = [];
+  if (
+    Number.isSafeInteger(context.revision)
+    && (context.revision ?? 0) > 0
+  ) {
+    parts.push(`r${context.revision}`);
+  }
+  if (context.exportedAt !== undefined && context.exportedAt !== null) {
+    const exportedAt = context.exportedAt instanceof Date
+      ? new Date(context.exportedAt.getTime())
+      : new Date(context.exportedAt);
+    if (Number.isFinite(exportedAt.getTime())) {
+      parts.push(
+        `${exportedAt.getUTCFullYear()}${twoDigits(exportedAt.getUTCMonth() + 1)}${twoDigits(exportedAt.getUTCDate())}`
+        + `-${twoDigits(exportedAt.getUTCHours())}${twoDigits(exportedAt.getUTCMinutes())}${twoDigits(exportedAt.getUTCSeconds())}Z`,
+      );
+    }
+  }
+  return parts.join("-");
+}
+
+export function appendStudioDownloadSuffix(
+  ...parts: readonly (string | null | undefined | false)[]
+): string {
+  return parts
+    .map((part) => typeof part === "string" ? normalizeStem(part) : "")
+    .filter(Boolean)
+    .join("-");
 }
 
 function composeFileName(stem: string, extension: string): string {
