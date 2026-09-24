@@ -6,7 +6,7 @@ import {
   type NaturalSpeechStyle,
 } from "../../../shared/lib/natural-browser-speech";
 
-import type { PromoProject } from "./promo-model";
+import type { PromoProject, PromoVoicePresetId } from "./promo-model";
 
 export const PROMO_VOICE_PRESETS = [
   {
@@ -49,8 +49,6 @@ export const PROMO_VOICE_PRESETS = [
   rate: number;
   pitch: number;
 }[];
-
-export type PromoVoicePresetId = (typeof PROMO_VOICE_PRESETS)[number]["id"];
 
 export type PromoVoicePlan = {
   plan: NaturalSpeechSegment[];

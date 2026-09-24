@@ -31,6 +31,11 @@
       "types": "./src/operation-policy.ts",
       "import": "./src/operation-policy.ts",
       "default": "./src/operation-policy.ts"
+    },
+    "./creator-publication-integrity": {
+      "types": "./src/creator-publication-integrity.ts",
+      "import": "./src/creator-publication-integrity.ts",
+      "default": "./src/creator-publication-integrity.ts"
     }
   }
 }

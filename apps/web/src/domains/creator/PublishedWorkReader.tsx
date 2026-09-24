@@ -21,6 +21,10 @@ import { CoverImage } from "@/shared/components/cover-image";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 
 import type { WorkFxSettings } from "./studio-motion-fx";
+import {
+  creatorCommunityPageAltText,
+  type CreatorCommunityContentKind,
+} from "@/shared/lib/creator-community-publication-contract";
 import type { CreatorPublicationReadingDirection } from "@/shared/lib/creator-publication-contract";
 
 interface PublishedWorkReaderProps {
@@ -30,6 +34,8 @@ interface PublishedWorkReaderProps {
   title: string;
   policy: CreatorPublicationReaderPolicy;
   isOwner: boolean;
+  altText: string;
+  contentKind: CreatorCommunityContentKind;
 }
 
 function nextPageIndex(
@@ -64,10 +70,12 @@ function PagedPublishedWorkReader({
   pages,
   title,
   direction,
+  altText,
 }: {
   pages: string[];
   title: string;
   direction: CreatorPublicationReadingDirection;
+  altText: string;
 }) {
   const [pageIndex, setPageIndex] = useState(0);
   const leftCommand: CreatorPublicationPageCommand =
@@ -104,7 +112,12 @@ function PagedPublishedWorkReader({
           <div className="grid min-h-[36rem] place-items-center bg-canvas/60 p-3 sm:p-6">
             <CoverImage
               src={pages[pageIndex] ?? ""}
-              alt={`${title} ${pageIndex + 1}페이지`}
+              alt={creatorCommunityPageAltText(
+                { altText },
+                title,
+                pageIndex,
+                pages.length,
+              )}
               className="max-h-[78vh] max-w-full rounded-lg object-contain shadow-lg"
               fallback={
                 <span className="grid aspect-[3/4] w-full max-w-xl place-items-center rounded-lg bg-raised/40 text-xs text-fg-3">
@@ -192,6 +205,8 @@ export function PublishedWorkReader({
   title,
   policy,
   isOwner,
+  altText,
+  contentKind,
 }: PublishedWorkReaderProps) {
   const maturePolicyKey = policy.requiresMatureConfirmation
     ? `${workId}:mature`
@@ -199,6 +214,12 @@ export function PublishedWorkReader({
   const [confirmedPolicyKey, setConfirmedPolicyKey] = useState<string | null>(null);
   const canRenderContent =
     isOwner || maturePolicyKey === null || confirmedPolicyKey === maturePolicyKey;
+  const pageAltTexts = pages.map((_, pageIndex) =>
+    creatorCommunityPageAltText({ altText }, title, pageIndex, pages.length),
+  );
+  const spatialReaderRelevant =
+    pages.length > 1
+    || ["webtoon_episode", "one_shot", "page_comic", "short_comic"].includes(contentKind);
 
   return (
     <section aria-labelledby="published-work-reader-heading">
@@ -266,15 +287,29 @@ export function PublishedWorkReader({
           </button>
         </section>
       ) : policy.directive.readingMode === "vertical" ? (
-        <WebtoonFxPlayer pages={pages} fx={fx} title={title} />
+        <WebtoonFxPlayer
+          pages={pages}
+          fx={fx}
+          title={title}
+          pageAltTexts={pageAltTexts}
+        />
       ) : (
         <PagedPublishedWorkReader
           pages={pages}
           title={title}
           direction={policy.directive.readingDirection}
+          altText={altText}
         />
       )}
-      {canRenderContent && <SpatialWebtoonReaderLauncher key={workId} workId={workId} pages={pages} title={title} direction={policy.directive.readingDirection} />}
+      {canRenderContent && spatialReaderRelevant && (
+        <SpatialWebtoonReaderLauncher
+          key={workId}
+          workId={workId}
+          pages={pages}
+          title={title}
+          direction={policy.directive.readingDirection}
+        />
+      )}
     </section>
   );
 }

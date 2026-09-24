@@ -1,4 +1,5 @@
 import { getActiveI18nLocale, translateBilingualValueForActiveLocale } from "@/shared/lib/i18n-bilingual-copy";
+import { studioProjectFormatProfile } from "../studio-project-format-catalog";
 import {
   studioSaveProfileNeedsDestination,
   type StudioSaveProfile,
@@ -54,6 +55,14 @@ export const STUDIO_PROJECT_KIND_LABELS: Readonly<
   animation: { ko: "애니메이션", en: "Animation" },
 };
 
+export function studioProjectLibraryTypeLabel(project: StudioProjectLibraryEntry): string {
+  if (project.definition) {
+    const profile = studioProjectFormatProfile(project.definition.format);
+    return bi(profile.titleKo, profile.titleEn);
+  }
+  return bi(STUDIO_PROJECT_KIND_LABELS[project.kind].ko, STUDIO_PROJECT_KIND_LABELS[project.kind].en);
+}
+
 export function studioProjectLibraryLocale(_language: string): StudioProjectLibraryLocale {
   return getActiveI18nLocale();
 }
@@ -97,7 +106,7 @@ export function studioProjectLibrarySearchText(
   return [
     project.title,
     project.description,
-    bi((STUDIO_PROJECT_KIND_LABELS[project.kind]).ko, (STUDIO_PROJECT_KIND_LABELS[project.kind]).en),
+    studioProjectLibraryTypeLabel(project),
   ].join(" ").toLocaleLowerCase();
 }
 

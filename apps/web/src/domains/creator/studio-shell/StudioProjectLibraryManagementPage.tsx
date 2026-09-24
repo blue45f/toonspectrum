@@ -10,6 +10,7 @@ import { StudioRoleWorkspacePanel } from "./StudioRoleWorkspacePanel";
 import { useStudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
 
 import "./studio-visual-identity.css";
+import "./studio-visual-identity-v2.css";
 
 export function StudioProjectLibraryManagementPage() {
   const controller = useStudioProjectLibraryManagementController();

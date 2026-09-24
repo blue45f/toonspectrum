@@ -45,11 +45,11 @@ afterEach(() => {
 });
 
 describe("createCreatorPublicationPageMetaModel", () => {
-  it("uses author-provided social metadata and a stable encoded canonical path", () => {
+  it("uses author-provided social metadata and a public canonical slug", () => {
     const model = createCreatorPublicationPageMetaModel(input());
 
     expect(model).toMatchObject({
-      canonicalPath: "/create/work%2F1",
+      canonicalPath: "/create/episode-1",
       title: "공유 제목",
       description: "공유 설명",
       indexable: true,
@@ -60,6 +60,16 @@ describe("createCreatorPublicationPageMetaModel", () => {
       contentRating: "전체 이용",
       isFamilyFriendly: true,
     });
+  });
+
+  it("falls back to the opaque work id when the work is not publicly discoverable", () => {
+    const directive = {
+      ...createDefaultCreatorPublicationDirective("UTC"),
+      visibility: "unlisted" as const,
+      canonicalSlug: "private-slug",
+    };
+    expect(createCreatorPublicationPageMetaModel(input({ directive }))?.canonicalPath)
+      .toBe("/create/work%2F1");
   });
 
   it("forces private, unlisted and draft owner views out of search indexing", () => {

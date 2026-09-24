@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 
-import { recordNaturalBrowserSpeech } from "../../../shared/lib/natural-browser-speech";
+import { recordNaturalBrowserSpeechSequence } from "../../../shared/lib/natural-browser-speech";
 import { completeAutomaticFreeText } from "../studio-server-ai-client";
 import { usePromoDraft } from "./promo-draft";
 import { importPromoAudio, importPromoPanels } from "./promo-import";
 import { createPromoPoster } from "./promo-poster";
 import { createPromoSoundtrack, type PromoSoundtrack } from "./promo-soundtrack";
+import { PromoAudioMixer } from "./PromoAudioMixer";
 import { PromoDirectorControls } from "./PromoDirectorControls";
+import { PromoMicrophoneRecorder } from "./PromoMicrophoneRecorder";
 import { downloadPromoRemotion } from "./promo-downloads";
 import { downloadPromoBlob, importPromoPanel, promoRecorderMime, recordPromoVideo } from "./promo-media";
-import { emptyPromoProject, localPromoPlan, parsePromoAiPlan, parsePromoProject, PROMO_MAX_PANELS, PROMO_STYLES, PROMO_STYLE_LABELS, promoAiPrompt, promoShotList, promoSrt, promoTimeline, promoVtt } from "./promo-model";
+import { emptyPromoProject, localPromoPlan, parsePromoAiPlan, parsePromoProject, PROMO_MAX_PANELS, PROMO_STYLES, PROMO_STYLE_LABELS, promoAiPrompt, promoKaraokeVtt, promoShotList, promoSrt, promoTimeline, promoVtt } from "./promo-model";
 import { PromoPanelEditor } from "./PromoPanelEditor";
 import { PromoPreflight } from "./PromoPreflight";
 import { PromoPreview } from "./PromoPreview";
@@ -110,10 +112,37 @@ export function StudioPromoPage() {
       if (!controller.signal.aborted) { patch({ voiceover: { ...voice, volume: 0.9, startSec: 0 } }); setMessage("내레이션을 추가했어요. 음성 구간에는 BGM을 자동으로 낮춥니다."); }
     } catch (reason) { failed(reason, controller.signal); } finally { finish(controller); }
   };
+  const importRecordedVoice = async (blob: Blob) => {
+    const controller = start("import");
+    if (!controller) throw new Error("다른 작업이 끝난 뒤 다시 녹음해 주세요.");
+    try {
+      const extension = blob.type.includes("mp4")
+        ? "m4a"
+        : blob.type.includes("ogg")
+          ? "ogg"
+          : "webm";
+      const file = new File([blob], `toonstudio-microphone.${extension}`, {
+        type: blob.type || "audio/webm",
+      });
+      const voice = await importPromoAudio(file, controller.signal);
+      if (!controller.signal.aborted) {
+        patch({ voiceover: { ...voice, volume: 0.9, startSec: 0 } });
+        setMessage("마이크 녹음을 내레이션 트랙에 연결했어요.");
+      }
+    } catch (reason) {
+      failed(reason, controller.signal);
+      throw reason;
+    } finally {
+      finish(controller);
+    }
+  };
   const generateFreeVoice = async (request: PromoVoiceGenerationRequest) => {
     const controller = start("voice"); if (!controller) return;
     try {
-      const blob = await recordNaturalBrowserSpeech({ ...request, signal: controller.signal });
+      const blob = await recordNaturalBrowserSpeechSequence({
+        items: request.items,
+        signal: controller.signal,
+      });
       if (controller.signal.aborted) throw new DOMException("취소했어요.", "AbortError");
       const extension = blob.type.includes("ogg") ? "ogg" : "webm";
       const file = new File([blob], `toonstudio-system-voice.${extension}`, { type: blob.type || "audio/webm" });
@@ -224,7 +253,21 @@ export function StudioPromoPage() {
             <div className="promo-button-row"><button type="button" onClick={() => addSoundtrack("ambient")}>앰비언트 생성</button><button type="button" onClick={() => addSoundtrack("pulse")}>펄스 생성</button><button type="button" onClick={() => addSoundtrack("suspense")}>서스펜스 생성</button></div>
             <label htmlFor="promo-audio">BGM 파일 · 20MB / 3분 이하 · 사용 권한을 확보한 음원</label><input id="promo-audio" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadAudio(event.target.files?.[0]); event.target.value = ""; }} />
             {project.audio ? <div className="promo-button-row"><label htmlFor="promo-volume">BGM 음량 {Math.round(project.audio.volume * 100)}%<input id="promo-volume" type="range" min={0} max={1} step={0.05} value={project.audio.volume} onChange={(event) => { if (project.audio) patch({ audio: { ...project.audio, volume: Number(event.target.value) } }); }} /></label><button type="button" onClick={() => patch({ audio: null })}>BGM 제거</button></div> : <p className="promo-muted">무음 저장도 가능합니다. 위의 합성 BGM은 브라우저에서 생성하며, 사람 목소리를 합성하거나 복제하지 않습니다.</p>}
-            <PromoVoiceDirector project={project} disabled={busy} onGenerate={(request) => { void generateFreeVoice(request); }} />
+            <PromoAudioMixer
+              project={project}
+              disabled={busy}
+              onChange={(mixer) => patch({ mixer })}
+            />
+            <PromoVoiceDirector
+              project={project}
+              disabled={busy}
+              onChange={(voiceStudio) => patch({ voiceStudio })}
+              onGenerate={(request) => { void generateFreeVoice(request); }}
+            />
+            <PromoMicrophoneRecorder
+              disabled={busy}
+              onRecorded={importRecordedVoice}
+            />
             <label htmlFor="promo-voice">직접 만든 내레이션 파일 · 20MB / 3분 이하<input id="promo-voice" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadVoice(event.target.files?.[0]); event.target.value = ""; }} /></label>
             {project.voiceover ? <>
               <p className="promo-muted">음성 {project.voiceover.durationSec.toFixed(1)}초 · 반복하지 않고 영상 끝에서 종료 · 내레이션 재생 구간 BGM 자동 감쇠</p>
@@ -248,7 +291,8 @@ export function StudioPromoPage() {
             <div className="promo-button-row">
               <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoSrt(project)], { type: "text/plain;charset=utf-8" }), "toonstudio-captions.srt")}>자막 SRT</button>
               <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoVtt(project)], { type: "text/vtt;charset=utf-8" }), "toonstudio-captions.vtt")}>자막 VTT</button>
-              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoShotList(project)], { type: "application/json" }), "toonstudio-shot-list.json")}>장면 타임코드 JSON</button>
+              {project.voiceStudio?.captionMode === "karaoke" ? <button type="button" disabled={busy || !project.voiceStudio.clips.length} onClick={() => downloadPromoBlob(new Blob([promoKaraokeVtt(project)], { type: "text/vtt;charset=utf-8" }), "toonstudio-karaoke-captions.vtt")}>단어별 VTT</button> : null}
+              <button type="button" disabled={busy || !project.panels.length} onClick={() => downloadPromoBlob(new Blob([promoShotList(project)], { type: "application/json" }), "toonstudio-shot-list.json")}>장면·음성 타임코드 JSON</button>
               <button type="button" disabled={busy || !project.panels.length} onClick={() => void exportPoster(false)}>홍보 썸네일 PNG</button>
               <button type="button" disabled={busy || !project.panels.length} onClick={() => void exportPoster(true)}>콘티 시트 PNG</button>
               <button type="button" disabled={busy} onClick={() => downloadPromoBlob(new Blob([JSON.stringify(project)], { type: "application/json" }), "toonstudio-promo.json")}>프로젝트 JSON 저장</button>

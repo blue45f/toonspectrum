@@ -8,6 +8,7 @@ import {
   normalizeNaturalSpeechText,
   rankNaturalKoreanVoices,
   speakNaturalBrowserSpeech,
+  speakNaturalBrowserSpeechSequence,
   type NaturalSpeechSegment,
   type NaturalSpeechVoice,
 } from "./natural-browser-speech";
@@ -182,5 +183,87 @@ describe("natural browser speech session", () => {
     spoken[0]?.onend?.();
     expect(synthesis.cancel).toHaveBeenCalledTimes(2);
     expect(onEnd).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("natural browser speech timeline", () => {
+  it("starts clips at scheduled offsets and completes them in order", () => {
+    vi.useFakeTimers();
+    class FakeUtterance {
+      lang = "";
+      rate = 1;
+      pitch = 1;
+      volume = 1;
+      voice: SpeechSynthesisVoice | null = null;
+      onboundary: ((event: SpeechSynthesisEvent) => void) | null = null;
+      onend: (() => void) | null = null;
+      onerror: ((event: SpeechSynthesisErrorEvent) => void) | null = null;
+      constructor(readonly text: string) {}
+    }
+    const spoken: FakeUtterance[] = [];
+    const synthesis = {
+      cancel: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      speak: vi.fn((utterance: FakeUtterance) => spoken.push(utterance)),
+      getVoices: () => [],
+    } as unknown as SpeechSynthesis;
+    const scope = {
+      speechSynthesis: synthesis,
+      SpeechSynthesisUtterance: FakeUtterance as unknown as typeof SpeechSynthesisUtterance,
+      requestAnimationFrame: vi.fn(() => 1),
+      cancelAnimationFrame: vi.fn(),
+      performance: { now: () => Date.now() },
+    };
+    const onItemStart = vi.fn();
+    const onEnd = vi.fn();
+    const session = speakNaturalBrowserSpeechSequence({
+      items: [
+        { id: "intro", startMs: 100, text: "첫 대사" },
+        { id: "hero", startMs: 300, text: "두 번째 대사" },
+      ],
+      onItemStart,
+      onEnd,
+    }, scope);
+
+    expect(session).not.toBeNull();
+    vi.advanceTimersByTime(99);
+    expect(spoken).toHaveLength(0);
+    vi.advanceTimersByTime(1);
+    expect(spoken.map((item) => item.text)).toEqual(["첫 대사"]);
+    expect(onItemStart).toHaveBeenCalledWith("intro", 0);
+    spoken[0]?.onend?.();
+    vi.advanceTimersByTime(199);
+    expect(spoken).toHaveLength(1);
+    vi.advanceTimersByTime(1);
+    expect(spoken.map((item) => item.text)).toEqual(["첫 대사", "두 번째 대사"]);
+    expect(onItemStart).toHaveBeenLastCalledWith("hero", 1);
+    spoken[1]?.onend?.();
+    vi.runAllTimers();
+    expect(onEnd).toHaveBeenCalledOnce();
+  });
+
+  it("cancels pending clips without starting a stale utterance", () => {
+    vi.useFakeTimers();
+    const synthesis = {
+      cancel: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      speak: vi.fn(),
+      getVoices: () => [],
+    } as unknown as SpeechSynthesis;
+    const session = speakNaturalBrowserSpeechSequence({
+      items: [{ id: "later", startMs: 500, text: "나중 대사" }],
+    }, {
+      speechSynthesis: synthesis,
+      SpeechSynthesisUtterance: class {} as unknown as typeof SpeechSynthesisUtterance,
+      requestAnimationFrame: vi.fn(() => 1),
+      cancelAnimationFrame: vi.fn(),
+      performance: { now: () => Date.now() },
+    });
+    session?.cancel();
+    vi.advanceTimersByTime(1_000);
+    expect(synthesis.speak).not.toHaveBeenCalled();
   });
 });

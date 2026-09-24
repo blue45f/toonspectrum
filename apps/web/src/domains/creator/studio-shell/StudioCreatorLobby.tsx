@@ -22,8 +22,8 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 
 import {
-  STUDIO_PROJECT_KIND_LABELS,
   studioProjectIsTemporaryWork,
+  studioProjectLibraryTypeLabel,
   studioProjectLibraryDateLabel,
 } from "./studio-project-library-management-model";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
@@ -281,10 +281,7 @@ export function StudioCreatorLobby({
                     <img src={visual} alt="" loading="lazy" decoding="async" />
                     <span className="studio-project-cover__veil" aria-hidden="true" />
                     <span className="studio-project-cover__kind">
-                      {bi(
-                        STUDIO_PROJECT_KIND_LABELS[project.kind].ko,
-                        STUDIO_PROJECT_KIND_LABELS[project.kind].en,
-                      )}
+{studioProjectLibraryTypeLabel(project)}
                     </span>
                     <span className="studio-project-cover__copy">
                       <strong>{`${project.title}${bi(" · 최근", " · Recent")}`}</strong>

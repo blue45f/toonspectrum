@@ -23,7 +23,10 @@ export function WorkspaceNavigation({ activeId, studioHref, teamHref, context }:
           : workspaceNavigationHref(item.href, navigationContext);
         return <Link key={item.id} href={href} aria-current={selected === item.id ? "page" : undefined}
           data-navigation-entry={item.id} title={siteNavigationText(item.description, locale)}>
-          <Icon size={22} strokeWidth={selected === item.id ? 2.35 : 1.9} aria-hidden="true" />
+          <span className="workspace-nav-visual" aria-hidden="true">
+            <span className="workspace-nav-visual-art" />
+            <Icon size={21} strokeWidth={selected === item.id ? 2.35 : 1.9} />
+          </span>
           <span>{siteNavigationText(item.label, locale)}</span>
         </Link>;
       })}

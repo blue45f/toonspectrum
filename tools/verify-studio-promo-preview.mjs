@@ -26,9 +26,9 @@ function preview({ hidden = false, hasAudio = true, playing = true } = {}) {
   const effects = [];
   const listeners = new Set();
   const frames = new Map();
-  const values = [new Map(), 0, playing, "", false];
-  const audio = hasAudio ? { pause: () => { pauses += 1; }, volume: 0 } : null;
-  const refs = [{ current: null }, { current: audio }, { current: 0 }, { current: null }];
+  const values = [new Map(), 0, playing, "", false, false];
+  const audio = hasAudio ? { stop: () => { pauses += 1; }, start: () => {}, volume: 0 } : null;
+  const refs = [{ current: null }, { current: 0 }, { current: null }, { current: audio }, { current: null }];
   const document = {
     hidden,
     addEventListener: (type, listener) => { assert.equal(type, "visibilitychange"); listeners.add(listener); },
@@ -58,8 +58,8 @@ function preview({ hidden = false, hasAudio = true, playing = true } = {}) {
           Object.hasOwn(values ?? {}, key) ? String(values[key]) : match
         ),
     },
-    "./promo-audio": { preparePromoVoicePreview: async () => null },
-    "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map() },
+    "./promo-audio": { preparePromoAudioPreview: async () => null },
+    "./promo-canvas": { drawPromoFrame: () => {}, loadPromoImages: async () => new Map(), releasePromoTextCache: () => {} },
     "./promo-model": { PROMO_FPS: 30, promoMusicGain: () => 0.25, promoTimeline: () => [], promoFrameCount: () => 450, promoSize: () => ({ width: 480, height: 854 }) },
   };
   runInNewContext(outputText, {

@@ -200,4 +200,39 @@ describe("toPublicCreatorDoc", () => {
     expect(serialized).not.toContain("private-key");
     expect(textProvenance.requestId).toBe("provider-request-private");
   });
+  it("publishes source proof while removing private actor audit fields", () => {
+    const checksum = "a".repeat(64);
+    const result = toPublicCreatorDoc({
+      publicationSource: {
+        kind: "studio_document",
+        projectId: "private-project",
+        documentId: "private-document",
+        revisionId: "revision-12",
+        contentChecksum: checksum,
+        disclosure: "운영 브라우저 캔버스에서 제작",
+      },
+      publicationAudit: {
+        editorActor: "agent",
+        publisherActor: "owner",
+        ownerApproved: true,
+        ownerUserId: "private-owner",
+        approvedAt: "2026-09-24T10:47:13.000Z",
+        toolIds: ["browser-automation"],
+      },
+    });
+
+    expect(result).toEqual({
+      publicationSource: {
+        version: 1,
+        kind: "studio_document",
+        revisionId: "revision-12",
+        contentChecksum: checksum,
+        disclosure: "운영 브라우저 캔버스에서 제작",
+      },
+    });
+    expect(JSON.stringify(result)).not.toContain("private-owner");
+    expect(JSON.stringify(result)).not.toContain("private-project");
+    expect(JSON.stringify(result)).not.toContain("browser-automation");
+  });
+
 });

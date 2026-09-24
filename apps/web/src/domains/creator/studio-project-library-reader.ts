@@ -1,3 +1,5 @@
+import { projectDefinitionForRead, type StudioProjectDefinition } from "./studio-project-definition";
+
 /** Read-only project metadata for source routing; CRUD stays in the library store. */
 export const STUDIO_PROJECT_LIBRARY_STORAGE_KEY =
   "toonspectrum:studio-project-library:v1";
@@ -38,6 +40,7 @@ export interface StudioProjectLibraryEntry {
   readonly lastOpenedAt: string;
   readonly lastOpenedDocumentId: string | null;
   readonly thumbnailUrl: string | null;
+  readonly definition?: StudioProjectDefinition | null;
 }
 
 export interface StudioProjectLibraryState {
@@ -63,6 +66,7 @@ export interface CreateStudioProjectInput {
   readonly description?: string;
   readonly primaryLocale?: string;
   readonly createdAt?: string;
+  readonly definition?: StudioProjectDefinition | null;
 }
 
 export const PROJECT_KIND_SET = new Set<string>(STUDIO_PROJECT_KINDS);
@@ -108,6 +112,9 @@ function parseEntry(value: unknown): StudioProjectLibraryEntry | null {
     return null;
   }
   const status = item.status as StudioProjectStatus;
+  const templateId = typeof item.templateId === "string" && item.templateId.trim()
+    ? item.templateId.trim().slice(0, 160)
+    : null;
   const statusBeforeTrash = item.statusBeforeTrash === "active" || item.statusBeforeTrash === "archived"
     ? item.statusBeforeTrash
     : null;
@@ -117,9 +124,7 @@ function parseEntry(value: unknown): StudioProjectLibraryEntry | null {
     kind: item.kind as StudioProjectKind,
     status,
     statusBeforeTrash: status === "trashed" ? statusBeforeTrash ?? "active" : null,
-    templateId: typeof item.templateId === "string" && item.templateId.trim()
-      ? item.templateId.trim().slice(0, 160)
-      : null,
+    templateId,
     description: typeof item.description === "string" ? item.description.trim().slice(0, 1_000) : "",
     primaryLocale: typeof item.primaryLocale === "string" && item.primaryLocale.trim()
       ? item.primaryLocale.trim()
@@ -133,6 +138,7 @@ function parseEntry(value: unknown): StudioProjectLibraryEntry | null {
     thumbnailUrl: typeof item.thumbnailUrl === "string" && item.thumbnailUrl.trim()
       ? item.thumbnailUrl.trim().slice(0, 2_048)
       : null,
+    definition: projectDefinitionForRead(item.definition, item.kind as StudioProjectKind, templateId),
   });
 }
 

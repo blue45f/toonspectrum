@@ -15,6 +15,7 @@ import {
   type StudioProjectLibraryEntry,
 } from "../studio-project-library-store";
 import { buildStudioProjectPackage } from "./studio-project-package";
+import { createStudioProjectDefinition } from "../studio-project-definition";
 import { importStudioProjectPackage } from "./studio-project-package-import";
 import {
   buildStudioProjectWorkspacePackageEntries,
@@ -51,6 +52,15 @@ const sourceProject: StudioProjectLibraryEntry = Object.freeze({
   lastOpenedAt: "2026-09-16T00:30:00.000Z",
   lastOpenedDocumentId: "episode-1",
   thumbnailUrl: null,
+  definition: createStudioProjectDefinition({
+    format: "vertical-webtoon",
+    purpose: "serial",
+    startPoint: "script",
+    collaboration: "team",
+    primaryWorkspace: "webtoon",
+    enabledWorkspaces: ["webtoon", "storyboard", "design", "review"],
+    deliveryProfileIds: ["webtoon-long-image", "episode-package"],
+  }),
 });
 
 const sourceDocument: StudioProjectDocumentEntry = Object.freeze({
@@ -127,6 +137,7 @@ describe("ToonStudio project package import", () => {
     expect(result.restoredSnapshotCount).toBe(1);
     expect(result.href).toContain(`/studio/p/import-fixed-id/d/${importedDocumentId}`);
     expect(readStudioProjectLibrary(target).projects).toHaveLength(1);
+    expect(result.project.definition).toEqual(sourceProject.definition);
     expect(readStudioProjectDocuments(target, result.project.id).documents[0]).toMatchObject({
       id: importedDocumentId,
       projectId: result.project.id,

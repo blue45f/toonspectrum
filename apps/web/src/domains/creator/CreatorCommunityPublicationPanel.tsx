@@ -24,6 +24,7 @@ import {
   CREATOR_COMMUNITY_FEEDBACK_TOPICS,
   CREATOR_COMMUNITY_PROVENANCES,
   readCreatorCommunityMetadata,
+  validateCreatorCommunityMetadata,
   writeCreatorCommunityMetadata,
   type CreatorCommunityContentDescriptor,
   type CreatorCommunityContentKind,
@@ -118,6 +119,13 @@ export function CreatorCommunityPublicationPanel({
   const [externalUrl, setExternalUrl] = useState("");
   const [creatingRelease, setCreatingRelease] = useState(false);
   const [savingExternal, setSavingExternal] = useState(false);
+  const metadataIssues = useMemo(
+    () => validateCreatorCommunityMetadata(metadata, {
+      format: work.format,
+      pageCount: work.pages.length,
+    }),
+    [metadata, work.format, work.pages.length],
+  );
 
   useEffect(() => setMetadata(initialMetadata), [initialMetadata]);
 
@@ -409,6 +417,20 @@ export function CreatorCommunityPublicationPanel({
               />
             </label>
           </div>
+
+          {metadataIssues.length > 0 && (
+            <div className="space-y-1.5" role="status" aria-label="게시 메타데이터 확인 사항">
+              {metadataIssues.map((issue) => (
+                <p
+                  key={issue.code}
+                  className="rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-[0.72rem] leading-relaxed text-fg-2"
+                >
+                  <strong className="mr-1 text-warn">확인</strong>
+                  {issue.message}
+                </p>
+              ))}
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-2">
             <button

@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   creatorCommunityContentGroupOf,
+  creatorCommunityPageAltText,
   normalizeCreatorCommunityMetadata,
   readCreatorCommunityMetadata,
+  validateCreatorCommunityMetadata,
   writeCreatorCommunityMetadata,
 } from "./creator-community-publication-contract";
 
@@ -48,4 +50,29 @@ describe("creator community publication contract", () => {
     expect(creatorCommunityContentGroupOf("one_shot")).toBe("webtoon");
     expect(creatorCommunityContentGroupOf("process")).toBe("process");
   });
+  it("supports explicit AI agent collaboration provenance", () => {
+    expect(normalizeCreatorCommunityMetadata({ provenance: "agent_assisted" }).provenance)
+      .toBe("agent_assisted");
+  });
+
+  it("surfaces accessibility and disclosure warnings before publication", () => {
+    expect(validateCreatorCommunityMetadata({
+      provenance: "agent_assisted",
+      downloadAllowed: true,
+      altText: "",
+      attributionText: "",
+    }, { pageCount: 1 }).map((issue) => issue.code)).toEqual([
+      "ALT_TEXT_REQUIRED",
+      "ASSISTANCE_DISCLOSURE_REQUIRED",
+      "RIGHTS_ATTRIBUTION_RECOMMENDED",
+    ]);
+  });
+
+  it("uses authored alt text and a deterministic title fallback per page", () => {
+    expect(creatorCommunityPageAltText({ altText: "별빛 왕관을 쓴 소녀" }, "작품", 1, 3))
+      .toBe("별빛 왕관을 쓴 소녀 2/3페이지");
+    expect(creatorCommunityPageAltText({}, "성운의 왕관", 0, 1))
+      .toBe("성운의 왕관 작품 이미지");
+  });
+
 });

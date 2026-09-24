@@ -8,6 +8,39 @@ const PALETTES = {
   action: ["#16121a", "#43251c", "#ffc16f"], mystery: ["#0d1820", "#193c45", "#9be0df"],
 } as const;
 
+type FrameCaption = { text: string; progress: number };
+
+function promoFrameCaption(
+  project: PromoProject,
+  frame: number,
+  fallback: string,
+  fallbackProgress: number,
+): FrameCaption {
+  const studio = project.voiceStudio;
+  if (!studio || studio.captionMode === "scene") {
+    return { text: fallback, progress: fallbackProgress };
+  }
+  if (studio.captionMode === "none") return { text: "", progress: 1 };
+  const active = [...studio.clips]
+    .sort((left, right) => left.startSec - right.startSec || left.id.localeCompare(right.id))
+    .find((clip) => {
+      const from = Math.round(clip.startSec * PROMO_FPS);
+      const end = Math.round((clip.startSec + clip.durationSec) * PROMO_FPS);
+      return frame >= from && frame < end;
+    });
+  if (!active) return { text: "", progress: 1 };
+  const speaker = studio.speakers.find((candidate) => candidate.id === active.speakerId);
+  const multipleSpeakers = new Set(studio.clips.map((clip) => clip.speakerId)).size > 1;
+  const prefix = multipleSpeakers && speaker ? `${speaker.name}: ` : "";
+  const from = Math.round(active.startSec * PROMO_FPS);
+  const duration = Math.max(1, Math.round(active.durationSec * PROMO_FPS));
+  const progress = Math.max(0, Math.min(1, (frame - from + 1) / duration));
+  if (studio.captionMode !== "karaoke") return { text: `${prefix}${active.text}`, progress };
+  const words = active.text.trim().split(/\s+/u).filter(Boolean);
+  const visible = Math.max(1, Math.ceil(words.length * progress));
+  return { text: `${prefix}${words.slice(0, visible).join(" ")}`, progress: 1 };
+}
+
 function lines(ctx: CanvasRenderingContext2D, value: string, width: number, maxLines: number): string[] {
   const result: string[] = [];
   let line = "";
@@ -211,15 +244,28 @@ export function drawPromoFrame(ctx: CanvasRenderingContext2D, project: PromoProj
     const textX = width * (safe ? 0.46 : 0.5);
     const textWidth = width * (safe ? 0.7 : 0.8);
     const textY = height * (presentation.captionPosition === "top" ? 0.21 : presentation.captionPosition === "center" ? 0.46 : safe ? 0.7 : 0.77);
-    if (scene.panel.caption) {
+    const fallbackCaptionProgress = Math.min(
+      1,
+      (local + 1) / Math.max(1, Math.min(PROMO_FPS * 1.5, scene.duration * 0.4)),
+    );
+    const frameCaption = promoFrameCaption(
+      project,
+      frame,
+      scene.panel.caption,
+      fallbackCaptionProgress,
+    );
+    if (frameCaption.text) {
       const fontSize = unit * 0.051;
       const caption = presentation.captionStyle === "typewriter" && !presentation.reducedMotion
-        ? Array.from(scene.panel.caption).slice(0, Math.ceil((local + 1) / Math.max(1, Math.min(PROMO_FPS * 1.5, scene.duration * 0.4)) * Array.from(scene.panel.caption).length)).join("")
-        : scene.panel.caption;
+        ? Array.from(frameCaption.text).slice(
+          0,
+          Math.ceil(frameCaption.progress * Array.from(frameCaption.text).length),
+        ).join("")
+        : frameCaption.text;
       if (presentation.captionStyle === "boxed" || presentation.captionPosition !== "bottom") {
         ctx.fillStyle = "rgba(0,0,0,0.76)";
         ctx.font = `700 ${fontSize}px sans-serif`;
-        const count = lines(ctx, scene.panel.caption, textWidth, 3).length;
+        const count = lines(ctx, frameCaption.text, textWidth, 3).length;
         ctx.fillRect(textX - textWidth / 2 - unit * 0.02, textY - fontSize * 0.8, textWidth + unit * 0.04, fontSize * (count * 1.4 + 0.2));
       }
       ctx.fillStyle = "#ffffff";

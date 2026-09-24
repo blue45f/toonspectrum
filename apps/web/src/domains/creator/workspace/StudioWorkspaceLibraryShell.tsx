@@ -7,6 +7,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { STUDIO_DISCOVERY_ROUTE_IDS, studioRouteRegistration } from "../studio-route-registry";
 import "@/shared/components/workspace/workspace.css";
 import "@/shared/components/workspace/workspace-redesign.css";
+import "@/shared/components/workspace/workspace-visual-v3.css";
 
 /** Navigation only: the existing library still owns selection, save, restore and deletion. */
 export function StudioWorkspaceLibraryShell({ children }: { readonly children: ReactNode }) {

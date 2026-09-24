@@ -27,8 +27,8 @@ import type { StudioProjectLibraryEntry } from "../studio-project-library-store"
 import { StudioProjectCardThumbnail } from "./StudioProjectCardThumbnail";
 import { useStudioModalSheet } from "../useStudioModalSheet";
 import {
-  STUDIO_PROJECT_KIND_LABELS,
   studioProjectIsTemporaryWork,
+  studioProjectLibraryTypeLabel,
   studioProjectLibraryDateLabel,
   type StudioProjectLibraryLocale,
   type StudioProjectLibraryManagementView,
@@ -236,7 +236,7 @@ export function StudioProjectLibraryCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-panel px-2.5 py-1 text-[0.66rem] font-bold text-fg-2">
-              {bi((STUDIO_PROJECT_KIND_LABELS[project.kind]).ko, (STUDIO_PROJECT_KIND_LABELS[project.kind]).en)}
+              {studioProjectLibraryTypeLabel(project)}
             </span>
             <StudioProjectSaveBadge profile={profile} locale={locale} />
           </div>
@@ -379,7 +379,7 @@ export function StudioProjectLibraryRecoveryRow({
         <div className="min-w-0">
           <h2 className="truncate font-black text-fg">{project.title}</h2>
           <p className="mt-1 text-xs text-fg-3">
-            {bi((STUDIO_PROJECT_KIND_LABELS[project.kind]).ko, (STUDIO_PROJECT_KIND_LABELS[project.kind]).en)} · {studioProjectLibraryDateLabel(project.updatedAt, locale)}
+            {studioProjectLibraryTypeLabel(project)} · {studioProjectLibraryDateLabel(project.updatedAt, locale)}
           </p>
         </div>
       </div>
