@@ -41,6 +41,10 @@ const pointerFinishSource = readFileSync(
   new URL("./studio-cuttoon-editor/studio-cuttoon-stage-pointers-finish.ts", import.meta.url),
   "utf8",
 );
+const deferredStrokeCommitSource = readFileSync(
+  new URL("./studio-cuttoon-editor/studio-deferred-stroke-commit.ts", import.meta.url),
+  "utf8",
+);
 
 function sliceBetween(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);
@@ -85,9 +89,17 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
     );
 
     // 발행·검증은 배치 단위 1회 그대로 — 획마다 commit() 을 부르면 같은 태스크의 장면 발행이
-    // 겹쳐 "중복된 드로우 식별자"로 거절된다(브라우저 실측).
-    expect(flush).toContain("mergeStudioPendingStrokeElements(");
-    expect(flush).toContain("commit(committedElements, undefined, batch.pageId)");
+    // 겹쳐 "중복된 드로우 식별자"로 거절된다(브라우저 실측). 실제 병합·커밋은 추출된
+    // commitStudioDeferredStrokeBatch가 소유하고, 호스트는 성공 뒤 히스토리만 펼친다.
+    expect(flush).toContain("commitStudioDeferredStrokeBatch({");
+    const batchCommit = sliceBetween(
+      deferredStrokeCommitSource,
+      "export function commitStudioDeferredStrokeBatch({",
+      "export interface StudioDeferredStrokeCommitEngine",
+    );
+    expect(batchCommit).toContain("mergeStudioPendingStrokeElements(baseElements, batch.strokes)");
+    expect(batchCommit).toContain("const committed = commit(");
+    expect(batchCommit).toContain("batch.pageId");
     expect(flush.indexOf("expandDeferredStrokeCommitHistory(batch)")).toBeGreaterThan(
       flush.indexOf("if (!committed)"),
     );
