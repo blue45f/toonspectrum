@@ -61,7 +61,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       '"use strict";\n',
     );
 
-    const optionalModelEntries = ["work-session", "work-session-evidence", "pinned-review-share", "review-delivery", "world-publication", "world-acoustic", "world-conversation"];
+    const optionalModelEntries = ["work-session", "work-session-evidence", "pinned-review-share", "review-delivery", "review-voice-note", "world-publication", "world-acoustic", "world-conversation"];
     for (const name of optionalModelEntries) {
       await compiledPackage(root, `packages/studio-project-model/src/graph/${name}.js`, `module.exports = { contract: ${JSON.stringify(name)} };`);
     }
@@ -189,7 +189,7 @@ test("session evidence is an explicitly emitted API contract, not an external ty
 test("API graph subpaths compile from workspace sources instead of type-only package resolution", async () => {
   const config = JSON.parse(await readFile(new URL("../apps/api/tsconfig.json", import.meta.url), "utf8"));
   const manifest = JSON.parse(await readFile(new URL("../packages/studio-project-model/package.json", import.meta.url), "utf8"));
-  for (const name of ["work-session", "work-session-evidence", "pinned-review-share", "review-delivery", "world-publication", "world-acoustic", "world-conversation"]) {
+  for (const name of ["work-session", "work-session-evidence", "pinned-review-share", "review-delivery", "review-voice-note", "world-publication", "world-acoustic", "world-conversation"]) {
     assert.deepEqual(config.compilerOptions.paths[`@toonspectrum/studio-project-model/${name}`], [
       `../../packages/studio-project-model/src/graph/${name}.ts`,
     ]);
