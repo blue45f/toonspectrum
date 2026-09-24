@@ -1,3 +1,25 @@
+import { parsePromoMixer, parsePromoVoiceStudio, promoMixer as resolvePromoMixer } from "./promo-voice-studio-model";
+
+import type { PromoMixer, PromoVoiceStudio } from "./promo-voice-studio-model";
+
+export {
+  PROMO_DEFAULT_MIXER,
+  PROMO_VOICE_CAPTION_MODES,
+  PROMO_VOICE_GENDERS,
+  PROMO_VOICE_PRESET_IDS,
+  promoMixer,
+} from "./promo-voice-studio-model";
+export type {
+  PromoMixer,
+  PromoPronunciation,
+  PromoVoiceCaptionMode,
+  PromoVoiceClip,
+  PromoVoiceGender,
+  PromoVoicePresetId,
+  PromoVoiceSpeaker,
+  PromoVoiceStudio,
+} from "./promo-voice-studio-model";
+
 /** Portable, dependency-free contract shared by the editor and the Remotion render kit. */
 export const PROMO_FPS = 30;
 export const PROMO_MAX_PANELS = 12;
@@ -38,6 +60,8 @@ export interface PromoProject {
   panels: PromoPanel[];
   audio: { src: string; volume: number } | null;
   voiceover?: { src: string; volume: number; startSec: number; durationSec: number } | null;
+  voiceStudio?: PromoVoiceStudio;
+  mixer?: PromoMixer;
   presentation?: {
     captionStyle: "classic" | "boxed" | "typewriter";
     captionPosition: "bottom" | "center" | "top";
@@ -174,7 +198,7 @@ export function parsePromoProject(input: unknown): PromoProject {
   const seconds = numberIn(value.seconds, 15, 60);
   if (seconds !== 15 && seconds !== 30 && seconds !== 60) throw new Error("영상 길이는 15·30·60초만 지원해요.");
   const audio = value.audio === null ? null : record(value.audio);
-  const extras = parsePromoExtras(value);
+  const extras = parsePromoExtras(value, seconds);
   const mediaSize = panels.reduce((sum, panel) => sum + panel.src.length + (panel.foregroundSrc?.length ?? 0), 0) + (typeof audio?.src === "string" ? audio.src.length : 0) + (extras.voiceover?.src.length ?? 0);
   if (mediaSize > 78_000_000) throw new Error("프로젝트 미디어 합계는 78MB 이하여야 해요. 컷·오디오를 줄여 주세요.");
   return { ...extras, version: 1, title: text(value.title, 80), synopsis: text(value.synopsis, 2000), cta: text(value.cta, 80), ratio: member(value.ratio, ["9:16", "16:9", "1:1"]), seconds, style: member(value.style, PROMO_STYLES), panels, audio: audio ? { src: promoDataUrl(audio.src, "audio"), volume: numberIn(audio.volume, 0, 1) } : null };
@@ -221,10 +245,51 @@ function srtTime(frame: number): string {
   const pad = (value: number, count = 2) => String(value).padStart(count, "0");
   return `${pad(Math.floor(ms / 3600000))}:${pad(Math.floor(ms / 60000) % 60)}:${pad(Math.floor(ms / 1000) % 60)},${pad(ms % 1000, 3)}`;
 }
+export interface PromoCaptionEntry {
+  from: number;
+  end: number;
+  caption: string;
+  speaker?: string;
+}
+export function promoCaptionEntries(project: PromoProject): PromoCaptionEntry[] {
+  const studio = project.voiceStudio;
+  if (studio?.captionMode === "none") return [];
+  if (studio && studio.captionMode !== "scene" && studio.clips.length > 0) {
+    const speakers = new Map(studio.speakers.map((speaker) => [speaker.id, speaker.name]));
+    const multipleSpeakers = new Set(studio.clips.map((clip) => clip.speakerId)).size > 1;
+    return [...studio.clips]
+      .sort((left, right) => left.startSec - right.startSec || left.id.localeCompare(right.id))
+      .flatMap((clip): PromoCaptionEntry[] => {
+        const caption = clip.text.replace(/[\r\n]+/gu, " ").trim();
+        if (!caption || clip.startSec >= project.seconds) return [];
+        const speaker = speakers.get(clip.speakerId);
+        const from = Math.max(0, Math.round(clip.startSec * PROMO_FPS));
+        const end = Math.max(
+          from + 1,
+          Math.min(promoFrameCount(project), Math.round((clip.startSec + clip.durationSec) * PROMO_FPS)),
+        );
+        return [{
+          from,
+          end,
+          caption: multipleSpeakers && speaker ? `${speaker}: ${caption}` : caption,
+          ...(speaker ? { speaker } : {}),
+        }];
+      });
+  }
+  const entries: PromoCaptionEntry[] = promoTimeline(project)
+    .filter(({ panel }) => panel.caption.trim())
+    .map(({ panel, from, duration }) => ({ from, end: from + duration, caption: panel.caption }));
+  if (project.cta) entries.push({
+    from: promoFrameCount(project) - 2 * PROMO_FPS,
+    end: promoFrameCount(project),
+    caption: project.cta,
+  });
+  return entries;
+}
 export function promoSrt(project: PromoProject): string {
-  const entries = promoTimeline(project).filter(({ panel }) => panel.caption.trim()).map(({ panel, from, duration }) => ({ from, end: from + duration, caption: panel.caption }));
-  if (project.cta) entries.push({ from: promoFrameCount(project) - 2 * PROMO_FPS, end: promoFrameCount(project), caption: project.cta });
-  return entries.map((entry, index) => `${index + 1}\n${srtTime(entry.from)} --> ${srtTime(entry.end)}\n${entry.caption.replace(/[\r\n]+/gu, " ")}\n`).join("\n");
+  return promoCaptionEntries(project)
+    .map((entry, index) => `${index + 1}\n${srtTime(entry.from)} --> ${srtTime(entry.end)}\n${entry.caption.replace(/[\r\n]+/gu, " ")}\n`)
+    .join("\n");
 }
 
 export const PROMO_TRANSITIONS = { fade: "페이드", dissolve: "교차 디졸브", wipe: "좌→우 와이프", cut: "하드 컷" } as const;
@@ -244,8 +309,11 @@ function parsePromoDirection(panel: Record<string, unknown>): Partial<PromoPanel
     ...(panel.foregroundSrc === undefined ? {} : { foregroundSrc: promoDataUrl(panel.foregroundSrc, "image") }),
   };
 }
-function parsePromoExtras(value: Record<string, unknown>): Pick<PromoProject, "voiceover" | "presentation"> {
-  const extras: Pick<PromoProject, "voiceover" | "presentation"> = {};
+function parsePromoExtras(
+  value: Record<string, unknown>,
+  seconds: number,
+): Pick<PromoProject, "voiceover" | "presentation" | "voiceStudio" | "mixer"> {
+  const extras: Pick<PromoProject, "voiceover" | "presentation" | "voiceStudio" | "mixer"> = {};
   if (value.voiceover !== undefined) {
     if (value.voiceover === null) extras.voiceover = null;
     else {
@@ -258,6 +326,8 @@ function parsePromoExtras(value: Record<string, unknown>): Pick<PromoProject, "v
     if (typeof options.safeArea !== "boolean" || typeof options.reducedMotion !== "boolean" || typeof options.brandColor !== "string" || !/^#[0-9a-f]{6}$/iu.test(options.brandColor)) throw new Error("자막·브랜드 설정이 올바르지 않아요.");
     extras.presentation = { captionStyle: member(options.captionStyle, ["classic", "boxed", "typewriter"]), captionPosition: member(options.captionPosition, ["bottom", "center", "top"]), safeArea: options.safeArea, reducedMotion: options.reducedMotion, brandColor: options.brandColor, brandText: text(options.brandText, 50) };
   }
+  if (value.voiceStudio !== undefined) extras.voiceStudio = parsePromoVoiceStudio(value.voiceStudio, seconds);
+  if (value.mixer !== undefined) extras.mixer = parsePromoMixer(value.mixer);
   return extras;
 }
 export const PROMO_DIRECTOR_TEMPLATES = [
@@ -284,27 +354,75 @@ export function directPromo(project: PromoProject, id: PromoDirectorTemplateId):
 }
 /** BGM dips around the actual scheduled voice clip; muted narration never ducks music. */
 export function promoMusicGain(project: PromoProject, frame: number): number {
-  const base = promoAudioGain(frame, promoFrameCount(project), project.audio?.volume ?? 0);
+  const mix = resolvePromoMixer(project);
+  const base = promoAudioGain(
+    frame,
+    promoFrameCount(project),
+    (project.audio?.volume ?? 0) * mix.masterVolume,
+  );
   const voice = project.voiceover;
   if (!voice || voice.volume <= 0 || voice.startSec >= project.seconds) return base;
   const time = frame / PROMO_FPS;
   const end = Math.min(project.seconds, voice.startSec + voice.durationSec);
-  const duck = Math.max(0, Math.min(1, (time - voice.startSec + 0.25) / 0.25, (end + 0.35 - time) / 0.35));
-  return base * (1 - duck * 0.72);
+  const duck = Math.max(0, Math.min(
+    1,
+    (time - voice.startSec + mix.attackSec) / mix.attackSec,
+    (end + mix.releaseSec - time) / mix.releaseSec,
+  ));
+  return base * (1 - duck * mix.ducking);
 }
 export function promoVoiceGain(project: PromoProject, frame: number): number {
   const voice = project.voiceover;
   if (!voice) return 0;
+  const mix = resolvePromoMixer(project);
   const time = frame / PROMO_FPS;
   const end = Math.min(project.seconds, voice.startSec + voice.durationSec);
-  return voice.volume * Math.max(0, Math.min(1, (time - voice.startSec) / 0.04, (end - time) / 0.08));
+  return voice.volume * mix.masterVolume * Math.max(
+    0,
+    Math.min(1, (time - voice.startSec) / 0.04, (end - time) / 0.08),
+  );
+}
+function vttTime(frame: number): string {
+  return srtTime(frame).replace(",", ".");
+}
+function escapeVtt(value: string): string {
+  return value.replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;");
 }
 export function promoVtt(project: PromoProject): string {
-  return "WEBVTT\n\n" + promoSrt(project).replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/gu, "$1.$2").replace(/&/gu, "&amp;").replace(/</gu, "&lt;").replace(/>/gu, "&gt;").replace(/--&gt;/gu, "-->");
+  return "WEBVTT\n\n" + promoCaptionEntries(project)
+    .map((entry, index) => `${index + 1}\n${vttTime(entry.from)} --> ${vttTime(entry.end)}\n${escapeVtt(entry.caption)}\n`)
+    .join("\n");
+}
+export function promoKaraokeVtt(project: PromoProject): string {
+  if (project.voiceStudio?.captionMode !== "karaoke") return promoVtt(project);
+  const cues: string[] = [];
+  let cueNumber = 1;
+  for (const entry of promoCaptionEntries(project)) {
+    const words = entry.caption.split(/\s+/u).filter(Boolean);
+    words.forEach((word, index) => {
+      const from = entry.from + Math.floor((entry.end - entry.from) * index / words.length);
+      const end = index === words.length - 1
+        ? entry.end
+        : entry.from + Math.floor((entry.end - entry.from) * (index + 1) / words.length);
+      cues.push(`${cueNumber++}\n${vttTime(from)} --> ${vttTime(Math.max(from + 1, end))}\n${escapeVtt(word)}\n`);
+    });
+  }
+  return `WEBVTT\n\n${cues.join("\n")}`;
 }
 export function promoShotList(project: PromoProject): string {
   return JSON.stringify({ format: "toonstudio-shot-list", version: 1, fps: PROMO_FPS, seconds: project.seconds, title: project.title,
     scenes: promoTimeline(project).map(({ panel, from, duration }) => ({ id: panel.id, startFrame: from, durationFrames: duration, caption: panel.caption, description: panel.description, motion: panel.motion, camera: panel.camera, fit: panel.fit, focusX: panel.focusX ?? 0.5, focusY: panel.focusY ?? 0.5, transition: panel.transition ?? "fade", effect: panel.effect ?? "none" })),
     ending: { startFrame: promoFrameCount(project) - 2 * PROMO_FPS, durationFrames: 2 * PROMO_FPS, caption: project.cta },
+    voiceStudio: project.voiceStudio ? {
+      captionMode: project.voiceStudio.captionMode,
+      speakers: project.voiceStudio.speakers.map(({ id, name, gender, presetId }) => ({
+        id, name, gender, presetId,
+      })),
+      clips: project.voiceStudio.clips.map(({
+        id, speakerId, panelId, text, startSec, durationSec,
+      }) => ({ id, speakerId, panelId, text, startSec, durationSec })),
+      pronunciations: project.voiceStudio.pronunciations,
+    } : null,
+    mixer: resolvePromoMixer(project),
   }, null, 2);
 }

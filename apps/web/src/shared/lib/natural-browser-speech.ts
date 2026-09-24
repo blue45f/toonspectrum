@@ -81,6 +81,34 @@ export type NaturalSpeechRecordingRequest = NaturalBrowserSpeechRequest & {
   tailMs?: number;
 };
 
+export type NaturalBrowserSpeechSequenceItem = {
+  id: string;
+  startMs: number;
+  text: string;
+  plan?: readonly NaturalSpeechSegment[];
+  voice?: SpeechSynthesisVoice | null;
+};
+
+export type NaturalBrowserSpeechSequenceRequest = {
+  items: readonly NaturalBrowserSpeechSequenceItem[];
+  onItemStart?: (id: string, index: number) => void;
+  onProgress?: (id: string, sourceCharacters: number, totalCharacters: number) => void;
+  onEnd?: () => void;
+  onError?: (error: Error) => void;
+};
+
+export type NaturalBrowserSpeechSequenceSession = {
+  pause: () => boolean;
+  resume: () => boolean;
+  cancel: () => void;
+};
+
+export type NaturalSpeechSequenceRecordingRequest = NaturalBrowserSpeechSequenceRequest & {
+  signal?: AbortSignal;
+  leadInMs?: number;
+  tailMs?: number;
+};
+
 type SpeechBoundaryKind = "soft" | "sentence" | "paragraph" | "forced" | "end";
 
 type SpeechRange = {
@@ -609,6 +637,108 @@ export function speakNaturalBrowserSpeech(
   };
 }
 
+export function speakNaturalBrowserSpeechSequence(
+  request: NaturalBrowserSpeechSequenceRequest,
+  injectedScope = browserSpeechScope(),
+): NaturalBrowserSpeechSequenceSession | null {
+  if (!isNaturalBrowserSpeechSupported(injectedScope)) return null;
+  const items = [...request.items]
+    .filter((item) => item.text.trim() && Number.isFinite(item.startMs) && item.startMs >= 0)
+    .sort((left, right) => left.startMs - right.startMs || left.id.localeCompare(right.id));
+  if (items.length === 0) return null;
+
+  const now = () => injectedScope?.performance?.now() ?? Date.now();
+  const sequenceStartedAt = now();
+  let pausedAt = 0;
+  let pausedMs = 0;
+  let current: NaturalBrowserSpeechSession | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let index = 0;
+  let cancelled = false;
+  let completed = false;
+  let paused = false;
+
+  const clearTimer = () => {
+    if (timer != null) clearTimeout(timer);
+    timer = null;
+  };
+  const elapsed = () => Math.max(0, now() - sequenceStartedAt - pausedMs);
+  const finish = () => {
+    if (cancelled || completed) return;
+    completed = true;
+    clearTimer();
+    current = null;
+    request.onEnd?.();
+  };
+  const fail = (error: Error) => {
+    if (cancelled || completed) return;
+    cancelled = true;
+    clearTimer();
+    current?.cancel();
+    current = null;
+    request.onError?.(error);
+  };
+
+  const schedule = () => {
+    if (cancelled || completed || paused) return;
+    const item = items[index];
+    if (!item) {
+      finish();
+      return;
+    }
+    const waitMs = Math.max(0, item.startMs - elapsed());
+    clearTimer();
+    timer = setTimeout(() => {
+      timer = null;
+      if (cancelled || completed || paused) return;
+      request.onItemStart?.(item.id, index);
+      current = speakNaturalBrowserSpeech({
+        text: item.text,
+        ...(item.plan ? { plan: item.plan } : {}),
+        voice: item.voice,
+        onProgress: (sourceCharacters, totalCharacters) => {
+          request.onProgress?.(item.id, sourceCharacters, totalCharacters);
+        },
+        onEnd: () => {
+          current = null;
+          index += 1;
+          schedule();
+        },
+        onError: fail,
+      }, injectedScope);
+      if (!current) fail(new Error("시스템 음성 타임라인을 시작하지 못했어요."));
+    }, waitMs);
+  };
+
+  schedule();
+  return {
+    pause: () => {
+      if (cancelled || completed || paused) return false;
+      paused = true;
+      pausedAt = now();
+      clearTimer();
+      if (current) return current.pause();
+      return true;
+    },
+    resume: () => {
+      if (cancelled || completed || !paused) return false;
+      paused = false;
+      if (pausedAt > 0) pausedMs += now() - pausedAt;
+      pausedAt = 0;
+      if (current) return current.resume();
+      schedule();
+      return true;
+    },
+    cancel: () => {
+      if (cancelled || completed) return;
+      cancelled = true;
+      clearTimer();
+      current?.cancel();
+      current = null;
+    },
+  };
+}
+
 function recorderMimeType(): string {
   if (typeof MediaRecorder === "undefined") return "";
   for (const mime of ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"]) {
@@ -777,6 +907,126 @@ export async function recordNaturalBrowserSpeech(
     if (abortHandler) request.signal?.removeEventListener("abort", abortHandler);
     speechSession.current?.cancel();
     if (recorder?.state === "recording" || recorder?.state === "paused") recorder.stop();
+    stopTracks();
+  }
+}
+
+/** Records a timed multi-speaker system-voice sequence from current-tab audio. */
+export async function recordNaturalBrowserSpeechSequence(
+  request: NaturalSpeechSequenceRecordingRequest,
+): Promise<Blob> {
+  if (!isNaturalSpeechRecordingSupported()) {
+    throw new Error(
+      "이 브라우저는 시스템 음성 파일 만들기를 지원하지 않아요. 미리듣기 후 음성 파일 업로드를 이용해 주세요.",
+    );
+  }
+  if (request.signal?.aborted) throw abortError();
+  if (request.items.length === 0) throw new Error("녹음할 대사 클립이 없어요.");
+
+  const displayOptions = {
+    video: true,
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+    },
+    preferCurrentTab: true,
+    selfBrowserSurface: "include",
+    surfaceSwitching: "exclude",
+    systemAudio: "include",
+  } as unknown as DisplayMediaStreamOptions;
+
+  const displayStream = await navigator.mediaDevices.getDisplayMedia(displayOptions);
+  const sequenceSession = {
+    current: null as NaturalBrowserSpeechSequenceSession | null,
+  };
+  let recorder: MediaRecorder | null = null;
+  let abortHandler: (() => void) | null = null;
+  const stopTracks = () => displayStream.getTracks().forEach((track) => track.stop());
+
+  try {
+    if (request.signal?.aborted) throw abortError();
+    const audioTracks = displayStream.getAudioTracks();
+    if (audioTracks.length === 0) {
+      throw new Error(
+        "공유한 화면에 오디오 트랙이 없어요. 현재 탭을 선택하고 ‘탭 오디오 공유’를 켜 주세요.",
+      );
+    }
+
+    const audioStream = new MediaStream(audioTracks);
+    const mimeType = recorderMimeType();
+    recorder = new MediaRecorder(audioStream, {
+      ...(mimeType ? { mimeType } : {}),
+      audioBitsPerSecond: 128_000,
+    });
+    const chunks: BlobPart[] = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+    const stopped = new Promise<Blob>((resolve, reject) => {
+      if (!recorder) {
+        reject(new Error("오디오 녹음기를 시작하지 못했어요."));
+        return;
+      }
+      recorder.onerror = () => reject(
+        new Error("시스템 음성 오디오를 기록하지 못했어요."),
+      );
+      recorder.onstop = () => {
+        const type = recorder?.mimeType || mimeType || "audio/webm";
+        const blob = new Blob(chunks, { type });
+        if (blob.size === 0) {
+          reject(new Error(
+            "녹음된 음성이 비어 있어요. 탭 오디오 공유 설정을 확인해 주세요.",
+          ));
+        } else {
+          resolve(blob);
+        }
+      };
+    });
+
+    abortHandler = () => {
+      sequenceSession.current?.cancel();
+      if (recorder?.state === "recording" || recorder?.state === "paused") {
+        recorder.stop();
+      }
+      stopTracks();
+    };
+    request.signal?.addEventListener("abort", abortHandler, { once: true });
+
+    recorder.start(100);
+    await delay(request.leadInMs ?? 260, request.signal);
+    await new Promise<void>((resolve, reject) => {
+      const rejectOnAbort = () => reject(abortError());
+      const complete = () => {
+        request.signal?.removeEventListener("abort", rejectOnAbort);
+        resolve();
+      };
+      const fail = (error: Error) => {
+        request.signal?.removeEventListener("abort", rejectOnAbort);
+        reject(error);
+      };
+      sequenceSession.current = speakNaturalBrowserSpeechSequence({
+        ...request,
+        onEnd: complete,
+        onError: fail,
+      });
+      if (!sequenceSession.current) {
+        fail(new Error("시스템 음성 타임라인을 시작하지 못했어요."));
+        return;
+      }
+      request.signal?.addEventListener("abort", rejectOnAbort, { once: true });
+    });
+    await delay(request.tailMs ?? 360, request.signal);
+    if (recorder.state === "recording" || recorder.state === "paused") recorder.stop();
+    const blob = await stopped;
+    await assertRecordedSpeechIsAudible(blob);
+    return blob;
+  } finally {
+    if (abortHandler) request.signal?.removeEventListener("abort", abortHandler);
+    sequenceSession.current?.cancel();
+    if (recorder?.state === "recording" || recorder?.state === "paused") {
+      recorder.stop();
+    }
     stopTracks();
   }
 }

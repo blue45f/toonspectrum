@@ -1,10 +1,20 @@
-import { parsePromoProject, promoShotList, promoSrt, promoVtt } from "./promo-model";
+import {
+  parsePromoProject,
+  promoKaraokeVtt,
+  promoShotList,
+  promoSrt,
+  promoVtt,
+} from "./promo-model";
 
 import type { PromoProject } from "./promo-model";
 
 /** Pin every Remotion package to the same version. The web app installs none of these. */
 export const PROMO_REMOTION_VERSION = "4.0.487";
-export interface PromoRenderSources { model: string; canvas: string }
+export interface PromoRenderSources {
+  model: string;
+  canvas: string;
+  voiceStudioModel: string;
+}
 function extractMedia(src: string): { bytes: Uint8Array; extension: string } {
   const separator = src.indexOf(",");
   const mime = src.slice(5, src.indexOf(";"));
@@ -46,9 +56,11 @@ export function promoRemotionFiles(input: PromoProject, sources: PromoRenderSour
   }
   files["project.json"] = JSON.stringify({ ...project, panels, audio, voiceover }, null, 2);
   files["captions.vtt"] = promoVtt(project);
+  files["captions-karaoke.vtt"] = promoKaraokeVtt(project);
   files["shot-list.json"] = promoShotList(project);
   files["captions.srt"] = promoSrt(project);
   files["src/promo-model.ts"] = sources.model;
+  files["src/promo-voice-studio-model.ts"] = sources.voiceStudioModel;
   files["src/promo-canvas.ts"] = sources.canvas;
   files["package.json"] = JSON.stringify({
     name: "toonstudio-promo-render", private: true, version: "1.0.0",

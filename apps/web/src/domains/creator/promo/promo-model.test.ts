@@ -99,7 +99,11 @@ describe("untrusted project and AI input", () => {
 });
 describe("portable Remotion kit", () => {
   it("contains local media, real composition, captions and pinned renderer dependencies", () => {
-    const files = promoRemotionFiles(fixture(1), { model: "model source", canvas: "canvas source" });
+    const files = promoRemotionFiles(fixture(1), {
+      model: "model source",
+      canvas: "canvas source",
+      voiceStudioModel: "voice studio model source",
+    });
     const pkg = JSON.parse(String(files["package.json"]));
     expect(pkg.dependencies.remotion).toBe(PROMO_REMOTION_VERSION);
     expect(pkg.dependencies["@remotion/cli"]).toBe(PROMO_REMOTION_VERSION);
@@ -125,6 +129,10 @@ describe("portable Remotion kit", () => {
   it("rejects path traversal and empty render jobs", () => {
     expect(() => promoZip({ "../secret": "x" })).toThrow();
     expect(() => promoZip({ "/absolute": "x" })).toThrow();
-    expect(() => promoRemotionFiles(emptyPromoProject(), { model: "", canvas: "" })).toThrow();
+    expect(() => promoRemotionFiles(emptyPromoProject(), {
+      model: "",
+      canvas: "",
+      voiceStudioModel: "",
+    })).toThrow();
   });
 });

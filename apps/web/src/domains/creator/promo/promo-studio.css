@@ -86,3 +86,26 @@
 .promo-voice-duration { display: grid; align-content: center; min-height: 68px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--promo-border); border-radius: 9px; background: #fff; }
 .promo-voice-duration strong { color: #402477; font-size: 14px; }
 .promo-voice-duration span { margin-top: 4px; color: var(--promo-muted); font-size: 11px; }
+
+.promo-audio-mixer { margin: 18px 0; padding: 16px; border: 1px solid #d5dce9; border-radius: 14px; background: #f8fafc; }
+.promo-audio-mixer h3, .promo-voice-director h4 { margin: 0; font-size: 14px; color: #34445e; }
+.promo-voice-summary { display: grid; gap: 4px; margin: 14px 0; padding: 12px; border: 1px solid #d8cff0; border-radius: 10px; background: #fff; }
+.promo-voice-summary strong { color: #402477; font-size: 14px; }
+.promo-voice-summary span { color: var(--promo-muted); font-size: 11px; }
+.promo-voice-subhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0 10px; }
+.promo-voice-subhead button { min-height: 36px; padding: 6px 10px; }
+.promo-voice-speakers, .promo-voice-clips { display: grid; gap: 12px; }
+.promo-voice-speaker, .promo-voice-clip { min-width: 0; margin: 0; padding: 14px; border: 1px solid #d9deea; border-radius: 12px; background: rgba(255,255,255,.82); }
+.promo-voice-speaker legend, .promo-voice-clip legend { padding: 0 6px; color: #4c36ae; font-size: 12px; font-weight: 750; }
+.promo-voice-sliders { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.promo-voice-clip-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; color: var(--promo-muted); font-size: 11px; }
+.promo-voice-clip-status strong { color: #a22828; }
+.promo-pronunciations { display: grid; gap: 8px; }
+.promo-pronunciation { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; padding: 10px; border: 1px solid #d9deea; border-radius: 10px; background: #fff; }
+.promo-pronunciation label { margin: 0; }
+.promo-pronunciation button { min-height: 44px; }
+.promo-voice-actions { margin-top: 20px; padding-top: 14px; border-top: 1px solid #d8cff0; }
+@media (max-width: 720px) { .promo-voice-sliders, .promo-pronunciation { grid-template-columns: 1fr; } .promo-voice-clip-status { align-items: flex-start; flex-direction: column; gap: 4px; } }
+
+.promo-microphone-recorder { margin: 18px 0; padding: 14px; border: 1px solid #d9deea; border-radius: 12px; background: rgba(255,255,255,.76); }
+.promo-microphone-recorder h3 { margin: 0; font-size: 14px; color: #34445e; }

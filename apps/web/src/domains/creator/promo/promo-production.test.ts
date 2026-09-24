@@ -29,7 +29,11 @@ describe("keyframe camera", () => {
     expect(parsePromoProject(value).panels[0]?.camera).toEqual(camera);
     const legacy = { ...value, panels: [{ ...panel, camera: undefined }] };    expect(parsePromoProject(legacy).panels[0]?.camera).toBeUndefined();
     expect(JSON.parse(promoShotList(value)).scenes[0].camera).toEqual(camera);
-    const files = promoRemotionFiles(value, { model: "model", canvas: "canvas" });
+    const files = promoRemotionFiles(value, {
+      model: "model",
+      canvas: "canvas",
+      voiceStudioModel: "voice-studio-model",
+    });
     expect(JSON.parse(String(files["project.json"])).panels[0].camera).toEqual(camera);
     expect(promoShotList(value)).not.toContain("base64");
   });
