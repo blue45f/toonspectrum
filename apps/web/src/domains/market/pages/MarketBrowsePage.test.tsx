@@ -162,6 +162,43 @@ describe("MarketBrowsePage", () => {
     expect(screen.getByText(/현재/).closest("p")?.textContent).toContain("현재 0개 표시");
   });
 
+  it("merges an immediate submitted search and sort change without dropping the selected kind", () => {
+    render(
+      <MemoryRouter initialEntries={["/market/browse?kind=brush"]}>
+        <MarketBrowsePage />
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    const search = screen.getByRole("searchbox", {
+      name: "마켓 리소스 검색",
+    }) as HTMLInputElement;
+    const form = search.closest("form");
+    expect(form).not.toBeNull();
+
+    fireEvent.change(search, { target: { value: "잉크" } });
+    act(() => {
+      fireEvent.submit(form!);
+      fireEvent.change(screen.getByRole("combobox", { name: "정렬 기준" }), {
+        target: { value: "newest" },
+      });
+    });
+
+    const params = new URLSearchParams(
+      screen.getByLabelText("현재 검색 쿼리").textContent ?? "",
+    );
+    expect(Object.fromEntries(params)).toEqual({
+      kind: "brush",
+      q: "잉크",
+      sort: "newest",
+    });
+    expect(useResources).toHaveBeenLastCalledWith(expect.objectContaining({
+      kind: "brush",
+      search: "잉크",
+      sort: "newest",
+    }));
+  });
+
   it("uses relevance for search by default and keeps an explicit newest choice in the URL", () => {
     render(
       <MemoryRouter initialEntries={["/market/browse?q=ink"]}>

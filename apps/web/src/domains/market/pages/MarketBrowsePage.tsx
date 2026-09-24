@@ -73,6 +73,14 @@ function filterChipClass(active: boolean): string {
 export function MarketBrowsePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigationType = useNavigationType();
+  const serializedSearchParams = searchParams.toString();
+  const searchParamsRef = useRef(new URLSearchParams(searchParams));
+  // React Router search-param updates are navigation calls, not queued React state updates.
+  // Keep an eager snapshot so submit + sort/filter actions in the same turn merge instead of
+  // replacing one another with a stale render's URL.
+  if (searchParamsRef.current.toString() !== serializedSearchParams) {
+    searchParamsRef.current = new URLSearchParams(searchParams);
+  }
   const parsedUrlQuery = parseMarketBrowseQuery(searchParams);
   const [draftSearch, setDraftSearch] = useState(() => parsedUrlQuery.searchDraft);
   const pendingSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,14 +110,13 @@ export function MarketBrowsePage() {
 
   const patchParams = useCallback(
     (patch: Record<string, string | null>) => {
-      setSearchParams((previous) => {
-        const next = new URLSearchParams(previous);
-        for (const [key, value] of Object.entries(patch)) {
-          if (value === null || value.length === 0) next.delete(key);
-          else next.set(key, value);
-        }
-        return next;
-      }, { replace: true });
+      const next = new URLSearchParams(searchParamsRef.current);
+      for (const [key, value] of Object.entries(patch)) {
+        if (value === null || value.length === 0) next.delete(key);
+        else next.set(key, value);
+      }
+      searchParamsRef.current = next;
+      setSearchParams(next, { replace: true });
     },
     [setSearchParams],
   );
@@ -134,7 +141,6 @@ export function MarketBrowsePage() {
     return cancelPendingSearchCommit;
   }, [cancelPendingSearchCommit, committedSearch]);
 
-  const serializedSearchParams = searchParams.toString();
   useEffect(() => {
     if (navigationType !== "POP") return;
     cancelPendingSearchCommit();
