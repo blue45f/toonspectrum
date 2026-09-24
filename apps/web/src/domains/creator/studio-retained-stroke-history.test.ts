@@ -91,6 +91,24 @@ describe("retained stroke history", () => {
     document.destroy();
   });
 
+  it("undoes a retained stroke that a peer already echoed into the current page", () => {
+    const livePages = [{ ...blank[0]!, elements: [eraser] }];
+    const publish = vi.fn(() => true);
+
+    expect(publishStudioRetainedStrokeHistory(livePages, pending, "undo", publish)).toBe(true);
+    expect(publish).toHaveBeenCalledExactlyOnceWith(
+      [{ ...blank[0]!, elements: [eraser] }],
+      blank,
+    );
+
+    publish.mockClear();
+    expect(publishStudioRetainedStrokeHistory(livePages, pending, "redo", publish)).toBe(true);
+    expect(publish).toHaveBeenCalledExactlyOnceWith(
+      blank,
+      [{ ...blank[0]!, elements: [eraser] }],
+    );
+  });
+
   it("preserves the pending batch when its page or publication is unavailable", () => {
     const publish = vi.fn(() => false);
     expect(publishStudioRetainedStrokeHistory([], pending, "undo", publish)).toBe(false);

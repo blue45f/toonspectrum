@@ -1,7 +1,64 @@
-import { projectStudioPendingStrokes, type StudioPendingStrokeBatch } from "./studio-pending-stroke-durability";
+import { mergeStudioPendingStrokeElements, type StudioPendingStrokeBatch } from "./studio-pending-stroke-durability";
 
 import type { DrawEl } from "./studio-element-model";
 import type { PageState } from "./studio-page-state";
+
+type StudioRetainedStrokeHistoryTransition = {
+  readonly withoutPending: readonly PageState[];
+  readonly withPending: readonly PageState[];
+};
+
+/**
+ * Builds both sides of a retained-stroke history transition from the current converged page.
+ *
+ * Another tab may echo our still-pending stroke through the CRDT frontier before local history
+ * commits it. In that state the old projection helper returned `no-new-strokes`, and Undo was
+ * consumed without changing either the document or the local queue. Constructing the two explicit
+ * frontiers makes the operation idempotent whether the current React page already contains the
+ * streamed stroke or still relies solely on the retained overlay.
+ */
+function retainedStrokeHistoryTransition(
+  pages: readonly PageState[],
+  batch: StudioPendingStrokeBatch<DrawEl>,
+): StudioRetainedStrokeHistoryTransition | null {
+  if (batch.strokes.length === 0) return null;
+  const targetIndexes: number[] = [];
+  for (let index = 0; index < pages.length; index += 1) {
+    if (pages[index]?.id === batch.pageId) targetIndexes.push(index);
+  }
+  if (targetIndexes.length !== 1) return null;
+
+  const pendingIds = new Set<string>();
+  for (const stroke of batch.strokes) {
+    if (typeof stroke.id !== "string" || stroke.id.trim().length === 0) return null;
+    pendingIds.add(stroke.id);
+  }
+  if (pendingIds.size === 0) return null;
+
+  const targetIndex = targetIndexes[0]!;
+  const targetPage = pages[targetIndex]!;
+  const containsPending = targetPage.elements.some((element) => pendingIds.has(element.id));
+  const withoutPending = containsPending
+    ? (() => {
+        const next = [...pages];
+        next[targetIndex] = {
+          ...targetPage,
+          elements: targetPage.elements.filter((element) => !pendingIds.has(element.id)),
+        };
+        return next;
+      })()
+    : pages;
+  const withPendingElements = mergeStudioPendingStrokeElements(
+    targetPage.elements,
+    batch.strokes,
+  );
+  const withPending = [...pages];
+  withPending[targetIndex] = {
+    ...targetPage,
+    elements: withPendingElements,
+  };
+  return { withoutPending, withPending };
+}
 
 /** Retained ink is already published to CRDT even while it is outside page-snapshot history. */
 export function publishStudioRetainedStrokeHistory(
@@ -10,11 +67,11 @@ export function publishStudioRetainedStrokeHistory(
   direction: "undo" | "redo",
   publish: (before: readonly PageState[], after: readonly PageState[]) => boolean,
 ): boolean {
-  const projected = projectStudioPendingStrokes(pages, batch);
-  if (projected.status !== "projected") return false;
+  const transition = retainedStrokeHistoryTransition(pages, batch);
+  if (!transition) return false;
   return direction === "undo"
-    ? publish(projected.pagesList, pages)
-    : publish(pages, projected.pagesList);
+    ? publish(transition.withPending, transition.withoutPending)
+    : publish(transition.withoutPending, transition.withPending);
 }
 
 /** A new accepted edit consumes only the undone strokes, never older retained handoffs. */
@@ -53,14 +110,15 @@ type StudioRetainedStrokeUndoContext = {
   isBlocked: (batch: StudioRetainedStrokeQueuedBatch) => boolean;
   publish: (before: readonly PageState[], after: readonly PageState[]) => boolean;
   onUndone: (batch: StudioRetainedStrokeCommitBatch) => void;
-  persist: () => void;
+  persist: (pagesWithoutPending: readonly PageState[]) => void;
 };
 
 /** Replace the pending recovery snapshot after a successful Undo, before returning to input. */
 export function undoStudioRetainedStrokeHistory(context: StudioRetainedStrokeUndoContext): boolean {
   const batch = context.pending.current;
   if (!batch || context.isBlocked(batch)) return false;
-  if (!publishStudioRetainedStrokeHistory(context.getPages(), batch, "undo", context.publish)) {
+  const transition = retainedStrokeHistoryTransition(context.getPages(), batch);
+  if (!transition || !context.publish(transition.withPending, transition.withoutPending)) {
     return false;
   }
   context.pending.current = null;
@@ -70,7 +128,7 @@ export function undoStudioRetainedStrokeHistory(context: StudioRetainedStrokeUnd
   // The host advances its edit generation even if the earlier pointerup receipt is still pending.
   // With an empty pending fingerprint on both sides, that generation is the only dirty signal.
   context.onUndone(taken);
-  context.persist();
+  context.persist(transition.withoutPending);
   return true;
 }
 

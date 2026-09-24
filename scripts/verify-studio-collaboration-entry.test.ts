@@ -36,7 +36,7 @@ describe("collaboration browser entry contract", () => {
     expect(source).toContain("pageC.goto(roomUrl");
     expect(source).toContain('waitForCanvasChange(pageB, blankB, "A -> B remote stroke")');
     expect(source).toContain('waitForCanvasChange(pageA, beforeSecondA, "B -> A remote stroke")');
-    expect(source).toContain("late joiner did not restore authored ink");
+    expect(source).toContain("late joiner did not restore converged ink");
     expect(source).toContain(`page.locator('[data-studio-post-processing-scope=""]')`);
     expect(source).toContain("const screenshot = await page.screenshot({");
     expect(source).toContain("fingerprintStudioCompositedPng");

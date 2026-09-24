@@ -11,6 +11,7 @@ import {
   appendStudioPagesHistorySnapshot,
   createStudioLifecycleEmergencyAutosave,
   createStudioPendingStrokeEmergencyAutosave,
+  mergeStudioPendingStrokeElements,
   projectStudioPendingStrokes,
 } from "./studio-pending-stroke-durability";
 
@@ -21,6 +22,36 @@ function basePayload(pagesList: StudioAutosavePayload["pagesList"]): StudioAutos
     pagesList,
   };
 }
+
+describe("pending stroke commit merge", () => {
+  it("replaces an already streamed local stroke without duplicating its document identity", () => {
+    const remoteBefore = { id: "remote-before", value: "remote" };
+    const streamed = { id: "local", value: "streaming" };
+    const remoteAfter = { id: "remote-after", value: "remote" };
+    const final = { id: "local", value: "final" };
+
+    const merged = mergeStudioPendingStrokeElements(
+      [remoteBefore, streamed, remoteAfter, streamed],
+      [final],
+    );
+
+    expect(merged).toEqual([remoteBefore, final, remoteAfter]);
+    expect(merged.filter(({ id }) => id === "local")).toHaveLength(1);
+  });
+
+  it("appends missing strokes in batch order and keeps the last duplicate pending geometry", () => {
+    const existing = { id: "existing", value: "stable" };
+    const first = { id: "new-a", value: "first" };
+    const latest = { id: "new-a", value: "latest" };
+    const second = { id: "new-b", value: "second" };
+
+    expect(mergeStudioPendingStrokeElements([existing], [first, second, latest])).toEqual([
+      existing,
+      latest,
+      second,
+    ]);
+  });
+});
 
 describe("pending stroke durability", () => {
   it("안정 편집만 있어도 debounce 전에 lifecycle 영수증을 가진 복구본을 만든다", () => {

@@ -26,7 +26,7 @@ const AUTOSAVE_RUNTIME_SOURCE = readFileSync(
 /** 긴급 저장 구현부만 잘라낸다 — 파일의 다른 동적 import 는 이 계약과 무관하다. */
 function emergencyAutosaveImplementation(): string {
   const start = STUDIO_PAGE_SOURCE.indexOf(
-    "persistPendingStrokeEmergencyAutosaveRef.current = (reason) => {",
+    "persistPendingStrokeEmergencyAutosaveRef.current = (reason, stablePagesOverride) => {",
   );
   expect(start, "pointerup 긴급 저장 구현부를 찾지 못했어요").toBeGreaterThan(-1);
   const end = STUDIO_PAGE_SOURCE.indexOf(

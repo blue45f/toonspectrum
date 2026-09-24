@@ -223,6 +223,7 @@ import {
   flushStudioThinLineInkInput,
   shouldFilterStudioThinLineInkInput,
 } from "../studio-thin-line-ink-input-v1";
+import { mergeStudioPendingStrokeElements } from "../studio-pending-stroke-durability";
 import { studioWorkAssetDestructiveEditReason } from "../studio-work-asset-edit-guard";
 import type { StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaborationProvider";
 
@@ -562,8 +563,39 @@ export function bindStudioCuttoonStagePointersFinish(
             flushPendingStrokeCommitsRef.current();
           }
           const merged = takePendingStrokeCommits();
-          const baseElements = merged ? [...elements, ...merged.strokes] : elements;
-          const committed = commit([...baseElements, finished]);
+          const completedStrokes = [...(merged?.strokes ?? []), finished];
+          const currentHistory = h.pagesHistoryRef.current;
+          const currentHistoryIndex = Math.max(
+            0,
+            Math.min(
+              h.pagesHiRef.current,
+              Math.max(0, currentHistory.length - 1),
+            ),
+          );
+          const currentPages = currentHistory[currentHistoryIndex] ?? [activePage];
+          const latestPage = currentPages.find((page: PageState) => page.id === activePage.id);
+          const baseElements = latestPage?.elements ?? elements;
+          const committedElements = mergeStudioPendingStrokeElements(
+            baseElements,
+            completedStrokes,
+          );
+          const committed = commit(committedElements, undefined, activePage.id);
+          if (committed) {
+            const document = studioCrdtDocumentRef.current;
+            try {
+              for (const stroke of completedStrokes) {
+                if (document?.getStroke(stroke.id, true)?.status === "drawing") {
+                  document.finalizeStroke(stroke.id);
+                }
+              }
+            } catch (cause) {
+              setError(
+                cause instanceof Error
+                  ? `실시간 획 확정: ${cause.message}`
+                  : "실시간 획을 최종 상태로 확정하지 못했습니다.",
+              );
+            }
+          }
           if (committed && !masterEditMode && finished.mode !== "eraser") {
             if (liveDraftDirectRef.current) {
               deferInkCleanup = overlayRenderer.isActive

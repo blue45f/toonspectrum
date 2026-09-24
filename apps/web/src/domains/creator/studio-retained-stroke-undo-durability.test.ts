@@ -76,9 +76,14 @@ function fixture(options: { empty?: boolean; holdFirstWrite?: boolean } = {}) {
   ]);
   const writes: Array<Promise<StudioAutosavePersistenceReceipt>> = [];
   const state = { generation: 1, retryRequests: 0, saveInFlight: false };
-  const persist = vi.fn(() => {
+  const persist = vi.fn((pagesOverride?: readonly PageState[]) => {
     const result = createStudioLifecycleEmergencyAutosave({
-      payload: { version: 2, savedAt: "2026-09-07T00:00:00.000Z", pagesList: pages, currentPageId: "page" },
+      payload: {
+        version: 2,
+        savedAt: "2026-09-07T00:00:00.000Z",
+        pagesList: [...(pagesOverride ?? pages)],
+        currentPageId: "page",
+      },
       pending: pending.current,
       reason: "pointerup",
       savedAt: new Date(Date.UTC(2026, 8, 7, 0, 0, state.generation)).toISOString(),
@@ -134,6 +139,22 @@ describe("retained Undo durable recovery", () => {
     expect(f.document.getStroke("pending", true)?.deleted).toBe(true);
     if (!empty) expect(f.document.getStroke("earlier")).toMatchObject({ id: "earlier", deleted: false });
     expect(f.pages[0]!.elements).toEqual(empty ? [] : [earlierStroke]);
+  });
+
+  it("persists Undo when the converged React page already contains the pending stroke", async () => {
+    const f = fixture();
+    f.pages[0] = { ...f.pages[0]!, elements: [...f.pages[0]!.elements, stroke] };
+    f.persist();
+    await f.writes[0];
+
+    expect(undoStudioRetainedStrokeHistory(f.context)).toBe(true);
+    await f.writes[1];
+    const recovered = await f.readAfterCrash();
+    expect(recovered).toMatchObject({
+      state: "snapshot",
+      payload: { pagesList: [{ elements: [{ id: "earlier" }] }] },
+    });
+    expect(f.document.getStroke("pending", true)?.deleted).toBe(true);
   });
 
   it("queues the newer Undo generation while the pointerup checkpoint is still in flight", async () => {

@@ -130,7 +130,7 @@ describe("pending stroke lifecycle source contract", () => {
 
   it("route/page lifecycle은 안정 상태와 대기 획을 내구 저장소에만 요청한다", () => {
     const persistence = sourceBetween(
-      "persistPendingStrokeEmergencyAutosaveRef.current = (reason) =>",
+      "persistPendingStrokeEmergencyAutosaveRef.current = (reason, stablePagesOverride) =>",
       "function applyStudioProjectSnapshotWithPreparedDocuments"
     );
 
@@ -202,6 +202,8 @@ describe("pending stroke lifecycle source contract", () => {
     );
     expect(flushPipeline.indexOf("pendingBatchAwaitsSelectedGpuFinalReceipt"))
       .toBeLessThan(flushPipeline.indexOf("takePendingStrokeCommits()"));
+    expect(flushPipeline).toContain("mergeStudioPendingStrokeElements(");
+    expect(flushPipeline).toContain("document.finalizeStroke(stroke.id)");
     expect(pageCommit).toContain("pendingBatch && !flushPendingStrokeCommitsRef.current()");
     expect(pageCommit).toContain("options.pendingStrokePolicy !== \"drop\"");
     expect(pageCommit).toContain("projectStudioPendingStrokes(nextPages");

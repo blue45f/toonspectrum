@@ -934,6 +934,7 @@ import { insertBlankPageAt } from "./studio-pages";
 import {
   appendStudioPagesHistorySnapshot,
   createStudioLifecycleEmergencyAutosave,
+  mergeStudioPendingStrokeElements,
 } from "./studio-pending-stroke-durability";
 import type { PerspectiveRay, VanishingPoint } from "./studio-perspective-guide";
 import {
@@ -4104,7 +4105,8 @@ export function StudioCuttoonEditor({
   // pen/mouse mark in its own lifecycle slot so emergency recovery never moves it onto a page.
   const lifecycleMasterStrokeRecoveryRef = useRef<DrawEl | null>(null);
   const persistPendingStrokeEmergencyAutosaveRef = useRef<(
-    reason: StudioPendingStrokeDurabilityReason
+    reason: StudioPendingStrokeDurabilityReason,
+    stablePagesOverride?: readonly PageState[],
   ) => void>(() => undefined);
   const recoverActiveStrokeOnUnmountRef = useRef<() => void>(() => undefined);
   // Monotonic generation of the latest browser/server durable snapshot. Pending strokes live
@@ -16267,7 +16269,27 @@ const puppetWarpArmed =
       let baseElements: El[] = [];
       if (targetPage && !masterEditMode) {
         baseElements = targetPage.elements;
-        committed = commit([...baseElements, ...batch.strokes], undefined, batch.pageId);
+        const committedElements = mergeStudioPendingStrokeElements(
+          baseElements,
+          batch.strokes,
+        );
+        committed = commit(committedElements, undefined, batch.pageId);
+        if (committed) {
+          const document = studioCrdtDocumentRef.current;
+          try {
+            for (const stroke of batch.strokes) {
+              if (document?.getStroke(stroke.id, true)?.status === "drawing") {
+                document.finalizeStroke(stroke.id);
+              }
+            }
+          } catch (cause) {
+            setError(
+              cause instanceof Error
+                ? `실시간 획 확정: ${cause.message}`
+                : "실시간 획을 최종 상태로 확정하지 못했습니다.",
+            );
+          }
+        }
       }
       if (!committed) {
         // Never drop the only authoritative copy merely because a save/lock/scope transition
@@ -18152,7 +18174,8 @@ const puppetWarpArmed =
           setHasPendingOverlayCommit(false);
           setHasUndonePendingOverlay(true);
         },
-        persist: () => persistPendingStrokeEmergencyAutosaveRef.current("pointerup"),
+        persist: (stablePages) =>
+          persistPendingStrokeEmergencyAutosaveRef.current("pointerup", stablePages),
       });
       return;
     }
@@ -26396,7 +26419,7 @@ function clearSelectionForEdit() {
   // The empty-dependency page lifecycle listeners below call through this ref, so every render
   // supplies the latest document/scope snapshot without reinstalling global handlers. This is a
   // best-effort durable recovery request; normal editing still uses the debounced autosave.
-  persistPendingStrokeEmergencyAutosaveRef.current = (reason) => {
+  persistPendingStrokeEmergencyAutosaveRef.current = (reason, stablePagesOverride) => {
     const pendingBatch = pendingStrokeCommitsRef.current;
     const activeRecovery = readActiveStrokeLifecycleRecovery();
     const recoveredActiveStroke = activeRecovery.recovery.action === "recover"
@@ -26466,12 +26489,14 @@ function clearSelectionForEdit() {
         pendingStrokeCommits: durableEffectivePendingBatch,
         recoveredMasterStroke: effectiveMasterStroke,
       });
-      const stablePages = resolveStudioDurableProjectPages({
-        pagesHistory: pagesHistoryRef.current,
-        historyIndex: pagesHiRef.current,
-        fallbackPages: pages,
-        pendingStrokeCommits: null,
-      }).pagesList as PageState[];
+      const stablePages = stablePagesOverride
+        ? [...stablePagesOverride] as PageState[]
+        : resolveStudioDurableProjectPages({
+            pagesHistory: pagesHistoryRef.current,
+            historyIndex: pagesHiRef.current,
+            fallbackPages: pages,
+            pendingStrokeCommits: null,
+          }).pagesList as PageState[];
       const basePayload: StudioAutosavePayload = {
         ...snapshot,
         savedAt,

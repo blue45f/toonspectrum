@@ -44,7 +44,8 @@ const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
 const EXISTING_ORIGIN = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.replace(/\/$/u, "") ?? "";
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR
   ?? join(tmpdir(), "toonspectrum-studio-collaboration-sync");
-const READY_PHASES = new Set(["synced", "read-only-follower", "syncing"]);
+const READY_PHASES = new Set(["synced", "read-only-follower", "syncing", "offline-queued"]);
+const SETTLED_PHASES = new Set(["synced", "read-only-follower", "offline-queued"]);
 
 interface PageDiagnostics {
   readonly label: string;
@@ -281,6 +282,85 @@ async function waitForCanvasChange(
   );
 }
 
+async function waitForCanvasNonBlankDelta(
+  page: Page,
+  baseline: StudioCompositedCanvasFingerprint,
+  minimumDelta: number,
+  direction: "increase" | "decrease",
+  label: string,
+): Promise<StudioCompositedCanvasFingerprint> {
+  const deadline = Date.now() + 25_000;
+  let latest = baseline;
+  const reached = (candidate: StudioCompositedCanvasFingerprint) => (
+    direction === "increase"
+      ? candidate.nonBlankSamples >= baseline.nonBlankSamples + minimumDelta
+      : candidate.nonBlankSamples <= baseline.nonBlankSamples - minimumDelta
+  );
+  while (Date.now() < deadline) {
+    latest = await canvasFingerprint(page);
+    if (latest.sampledPixels > 0 && latest.hash !== baseline.hash && reached(latest)) {
+      await page.waitForTimeout(400);
+      const persisted = await canvasFingerprint(page);
+      if (persisted.hash !== baseline.hash && reached(persisted)) return persisted;
+    }
+    await page.waitForTimeout(140);
+  }
+  throw new Error(
+    `${label}: expected ${direction} >= ${minimumDelta}; baseline=${JSON.stringify(baseline)} latest=${JSON.stringify(latest)}`,
+  );
+}
+
+async function readHistoryState(page: Page): Promise<{
+  entryCount: number;
+  undoDepth: number;
+  layerCount: number;
+  pendingText: string;
+}> {
+  return page.locator("#studio-app-shell").evaluate((shell) => {
+    const layerRoot = document.querySelector("[data-studio-layer-available-count]");
+    const pending = [...document.querySelectorAll("[data-studio-sync-phase]")]
+      .map((node) => node.textContent ?? "")
+      .join(" ");
+    return {
+      entryCount: Number(shell.getAttribute("data-studio-history-entry-count") ?? "0"),
+      undoDepth: Number(shell.getAttribute("data-studio-history-undo-depth") ?? "0"),
+      layerCount: Number(layerRoot?.getAttribute("data-studio-layer-available-count") ?? "0"),
+      pendingText: pending.slice(0, 500),
+    };
+  });
+}
+
+async function readSyncPhase(page: Page): Promise<string> {
+  return page.locator('[data-studio-presence-dock="true"]').first()
+    .getAttribute("data-studio-sync-phase")
+    .then((phase) => phase ?? "missing");
+}
+
+async function waitForSettledDocumentLane(
+  page: Page,
+  diagnostics: PageDiagnostics,
+  label: string,
+): Promise<string> {
+  const deadline = Date.now() + 20_000;
+  let latest = "missing";
+  while (Date.now() < deadline) {
+    latest = await readSyncPhase(page);
+    if (diagnostics.phases.at(-1) !== latest) diagnostics.phases.push(latest);
+    if (SETTLED_PHASES.has(latest)) return latest;
+    if ([
+      "durability-risk",
+      "admission-denied",
+      "revoked",
+      "recovery-required",
+      "unsupported-jam",
+    ].includes(latest)) {
+      throw new Error(`${label}: terminal collaboration phase ${latest}`);
+    }
+    await page.waitForTimeout(250);
+  }
+  throw new Error(`${label}: collaboration phase did not settle; latest=${latest}`);
+}
+
 async function drawStroke(
   page: Page,
   verticalFraction: number,
@@ -358,7 +438,7 @@ const browser = await chromium.launch({
 const diagnostics: PageDiagnostics[] = [];
 const report: Record<string, unknown> = {
   criterion:
-    "A storage-cloned duplicate tab receives a distinct live identity, exchanges canvas pixels in both directions, and a late third tab restores the converged document frontier.",
+    "A storage-cloned duplicate tab receives a distinct live identity, survives simultaneous two-tab drawing plus undo/redo propagation, and a late third tab restores the converged document frontier.",
   origin,
   browser: browser.version(),
   status: "FAIL",
@@ -428,6 +508,9 @@ try {
   await drawStroke(pageA, 0.39);
   const authoredOnA = await waitForCanvasChange(pageA, blankA, "A local authored stroke");
   const receivedOnB = await waitForCanvasChange(pageB, blankB, "A -> B remote stroke");
+  const historyAfterAStroke = { A: await readHistoryState(pageA), B: await readHistoryState(pageB) };
+  console.log(`[collaboration-sync] history after A stroke ${JSON.stringify(historyAfterAStroke)}`);
+  report.historyAfterAStroke = historyAfterAStroke;
 
   const beforeSecondA = await settleCanvas(pageA);
   const beforeSecondB = await settleCanvas(pageB);
@@ -435,6 +518,62 @@ try {
   await drawStroke(pageB, 0.58, true);
   const authoredOnB = await waitForCanvasChange(pageB, beforeSecondB, "B local authored stroke");
   const receivedOnA = await waitForCanvasChange(pageA, beforeSecondA, "B -> A remote stroke");
+  const historyAfterBStroke = { A: await readHistoryState(pageA), B: await readHistoryState(pageB) };
+  console.log(`[collaboration-sync] history after B stroke ${JSON.stringify(historyAfterBStroke)}`);
+  report.historyAfterBStroke = historyAfterBStroke;
+
+  const singleStrokeDeltas = [
+    authoredOnA.nonBlankSamples - blankA.nonBlankSamples,
+    receivedOnB.nonBlankSamples - blankB.nonBlankSamples,
+    authoredOnB.nonBlankSamples - beforeSecondB.nonBlankSamples,
+    receivedOnA.nonBlankSamples - beforeSecondA.nonBlankSamples,
+  ].filter((value) => value > 0);
+  assert.equal(singleStrokeDeltas.length, 4, `single-stroke calibration failed: ${JSON.stringify(singleStrokeDeltas)}`);
+  const minimumSingleStrokeDelta = Math.max(8, Math.min(...singleStrokeDeltas));
+  const concurrentMinimumDelta = Math.max(16, Math.floor(minimumSingleStrokeDelta * 1.45));
+  const concurrentBaselineA = await settleCanvas(pageA);
+  const concurrentBaselineB = await settleCanvas(pageB);
+  log("A and B author simultaneous separated strokes");
+  await Promise.all([
+    drawStroke(pageA, 0.27),
+    drawStroke(pageB, 0.73, true),
+  ]);
+  const [concurrentOnA, concurrentOnB] = await Promise.all([
+    waitForCanvasNonBlankDelta(
+      pageA, concurrentBaselineA, concurrentMinimumDelta, "increase", "simultaneous strokes on A",
+    ),
+    waitForCanvasNonBlankDelta(
+      pageB, concurrentBaselineB, concurrentMinimumDelta, "increase", "simultaneous strokes on B",
+    ),
+  ]);
+  const historyAfterConcurrent = { A: await readHistoryState(pageA), B: await readHistoryState(pageB) };
+  console.log(`[collaboration-sync] history after concurrent strokes ${JSON.stringify(historyAfterConcurrent)}`);
+  report.historyAfterConcurrent = historyAfterConcurrent;
+
+  const undoMinimumDelta = Math.max(6, Math.floor(minimumSingleStrokeDelta * 0.35));
+  log("A undo propagates to B, then redo restores both tabs");
+  const historyBeforeUndo = {
+    A: await readHistoryState(pageA),
+    B: await readHistoryState(pageB),
+  };
+  console.log(`[collaboration-sync] history before undo ${JSON.stringify(historyBeforeUndo)}`);
+  report.historyBeforeUndo = historyBeforeUndo;
+  await pageA.keyboard.press("Meta+z");
+  const historyAfterUndoKey = {
+    A: await readHistoryState(pageA),
+    B: await readHistoryState(pageB),
+  };
+  console.log(`[collaboration-sync] history after undo key ${JSON.stringify(historyAfterUndoKey)}`);
+  report.historyAfterUndoKey = historyAfterUndoKey;
+  const [undoOnA, undoOnB] = await Promise.all([
+    waitForCanvasNonBlankDelta(pageA, concurrentOnA, undoMinimumDelta, "decrease", "undo on A"),
+    waitForCanvasNonBlankDelta(pageB, concurrentOnB, undoMinimumDelta, "decrease", "undo A -> B"),
+  ]);
+  await pageA.keyboard.press("Meta+Shift+z");
+  const [redoOnA, redoOnB] = await Promise.all([
+    waitForCanvasNonBlankDelta(pageA, undoOnA, undoMinimumDelta, "increase", "redo on A"),
+    waitForCanvasNonBlankDelta(pageB, undoOnB, undoMinimumDelta, "increase", "redo A -> B"),
+  ]);
 
   const attachedC = await attachPage(context, "C");
   diagnostics.push(attachedC.diagnostics);
@@ -448,9 +587,14 @@ try {
   const lateJoinC = await settleCanvas(pageC);
   assert.ok(
     lateJoinC.hash !== blankB.hash
-      && lateJoinC.nonBlankSamples > blankB.nonBlankSamples + 4,
-    `late joiner did not restore authored ink: blank=${JSON.stringify(blankB)} late=${JSON.stringify(lateJoinC)}`,
+      && lateJoinC.nonBlankSamples > blankB.nonBlankSamples + concurrentMinimumDelta,
+    `late joiner did not restore converged ink: blank=${JSON.stringify(blankB)} late=${JSON.stringify(lateJoinC)}`,
   );
+  const settledPhases = {
+    A: await waitForSettledDocumentLane(pageA, attachedA.diagnostics, "A"),
+    B: await waitForSettledDocumentLane(pageB, attachedB.diagnostics, "B"),
+    C: await waitForSettledDocumentLane(pageC, attachedC.diagnostics, "C"),
+  };
 
   await Promise.all([
     pageA.screenshot({ path: join(SCRATCH, "tab-a.png"), fullPage: true }),
@@ -460,7 +604,7 @@ try {
 
   report.status = "PASS";
   report.roomUrl = roomUrl;
-  report.phases = { A: phaseA, B: phaseB, C: phaseC };
+  report.phases = { initial: { A: phaseA, B: phaseB, C: phaseC }, settled: settledPhases };
   report.peers = peers;
   report.tabIdentity = {
     A: clientInstanceA,
@@ -476,7 +620,21 @@ try {
     beforeSecondB,
     authoredOnB,
     receivedOnA,
+    concurrentBaselineA,
+    concurrentBaselineB,
+    concurrentOnA,
+    concurrentOnB,
+    undoOnA,
+    undoOnB,
+    redoOnA,
+    redoOnB,
     lateJoinC,
+  };
+  report.strokeDeltaCalibration = {
+    singleStrokeDeltas,
+    minimumSingleStrokeDelta,
+    concurrentMinimumDelta,
+    undoMinimumDelta,
   };
   report.diagnostics = diagnostics;
   assert.deepEqual(

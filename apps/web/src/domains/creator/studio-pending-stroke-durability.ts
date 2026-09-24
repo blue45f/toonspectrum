@@ -94,6 +94,50 @@ function nonEmptyId(value: unknown): string | null {
 }
 
 /**
+ * Replaces a streamed/in-memory copy of each completed stroke in-place and appends only strokes
+ * that are not present yet. This is the commit counterpart to `projectStudioPendingStrokes`:
+ * pointer-contact CRDT reconciliation may materialize the same local ID before the deferred React
+ * history commit runs, so blindly appending the batch would create duplicate document identities.
+ *
+ * Existing CRDT order wins when the stroke is already projected. Repeated existing or pending IDs
+ * collapse to one final object; the last pending object is the authoritative completed geometry.
+ */
+export function mergeStudioPendingStrokeElements<Element extends { id: string }>(
+  existingElements: readonly Element[],
+  pendingStrokes: readonly Element[],
+): Element[] {
+  if (pendingStrokes.length === 0) return existingElements as Element[];
+
+  const pendingById = new Map<string, Element>();
+  const pendingOrder: string[] = [];
+  for (const stroke of pendingStrokes) {
+    const id = nonEmptyId(stroke.id);
+    if (!id) throw new Error("확정할 획 식별자가 비어 있습니다.");
+    if (!pendingById.has(id)) pendingOrder.push(id);
+    pendingById.set(id, stroke);
+  }
+
+  const emitted = new Set<string>();
+  const merged: Element[] = [];
+  for (const element of existingElements) {
+    const replacement = pendingById.get(element.id);
+    if (!replacement) {
+      merged.push(element);
+      continue;
+    }
+    if (emitted.has(element.id)) continue;
+    emitted.add(element.id);
+    merged.push(replacement);
+  }
+  for (const id of pendingOrder) {
+    if (emitted.has(id)) continue;
+    emitted.add(id);
+    merged.push(pendingById.get(id)!);
+  }
+  return merged;
+}
+
+/**
  * Projects an in-memory deferred stroke batch into its owning page without mutating the source
  * snapshot. Existing element ids and repeated ids inside the batch are both treated as already
  * durable, so replaying this function is idempotent.
