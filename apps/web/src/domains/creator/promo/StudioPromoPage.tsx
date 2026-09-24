@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { recordNaturalBrowserSpeech } from "../../../shared/lib/natural-browser-speech";
 import { completeAutomaticFreeText } from "../studio-server-ai-client";
 import { usePromoDraft } from "./promo-draft";
 import { importPromoAudio, importPromoPanels } from "./promo-import";
@@ -12,6 +13,7 @@ import { emptyPromoProject, localPromoPlan, parsePromoAiPlan, parsePromoProject,
 import { PromoPanelEditor } from "./PromoPanelEditor";
 import { PromoPreflight } from "./PromoPreflight";
 import { PromoPreview } from "./PromoPreview";
+import { PromoVoiceDirector, type PromoVoiceGenerationRequest } from "./PromoVoiceDirector";
 
 import type { PromoPanel, PromoProject } from "./promo-model";
 
@@ -25,7 +27,7 @@ export function StudioPromoPage() {
   const [splitParts, setSplitParts] = useState<number | "auto">(1);
   const [seekRequest, setSeekRequest] = useState<{ frame: number; token: number }>();
   const draft = usePromoDraft(project, setProject);
-  const [phase, setPhase] = useState<"idle" | "import" | "ai" | "record" | "poster">("idle");
+  const [phase, setPhase] = useState<"idle" | "import" | "ai" | "record" | "poster" | "voice">("idle");
   const [message, setMessage] = useState("컷을 추가하고 원하는 분위기를 골라보세요.");
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
@@ -106,6 +108,20 @@ export function StudioPromoPage() {
     try {
       const voice = await importPromoAudio(file, controller.signal);
       if (!controller.signal.aborted) { patch({ voiceover: { ...voice, volume: 0.9, startSec: 0 } }); setMessage("내레이션을 추가했어요. 음성 구간에는 BGM을 자동으로 낮춥니다."); }
+    } catch (reason) { failed(reason, controller.signal); } finally { finish(controller); }
+  };
+  const generateFreeVoice = async (request: PromoVoiceGenerationRequest) => {
+    const controller = start("voice"); if (!controller) return;
+    try {
+      const blob = await recordNaturalBrowserSpeech({ ...request, signal: controller.signal });
+      if (controller.signal.aborted) throw new DOMException("취소했어요.", "AbortError");
+      const extension = blob.type.includes("ogg") ? "ogg" : "webm";
+      const file = new File([blob], `toonstudio-system-voice.${extension}`, { type: blob.type || "audio/webm" });
+      const voice = await importPromoAudio(file, controller.signal);
+      if (!controller.signal.aborted) {
+        patch({ voiceover: { ...voice, volume: 0.9, startSec: 0 } });
+        setMessage("무료 시스템 음성을 내레이션 트랙에 연결했어요. 영상 저장 전에 미리보기로 발음과 음량을 확인해 주세요.");
+      }
     } catch (reason) { failed(reason, controller.signal); } finally { finish(controller); }
   };
   const uploadForeground = async (id: string, file: File) => {
@@ -208,7 +224,8 @@ export function StudioPromoPage() {
             <div className="promo-button-row"><button type="button" onClick={() => addSoundtrack("ambient")}>앰비언트 생성</button><button type="button" onClick={() => addSoundtrack("pulse")}>펄스 생성</button><button type="button" onClick={() => addSoundtrack("suspense")}>서스펜스 생성</button></div>
             <label htmlFor="promo-audio">BGM 파일 · 20MB / 3분 이하 · 사용 권한을 확보한 음원</label><input id="promo-audio" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadAudio(event.target.files?.[0]); event.target.value = ""; }} />
             {project.audio ? <div className="promo-button-row"><label htmlFor="promo-volume">BGM 음량 {Math.round(project.audio.volume * 100)}%<input id="promo-volume" type="range" min={0} max={1} step={0.05} value={project.audio.volume} onChange={(event) => { if (project.audio) patch({ audio: { ...project.audio, volume: Number(event.target.value) } }); }} /></label><button type="button" onClick={() => patch({ audio: null })}>BGM 제거</button></div> : <p className="promo-muted">무음 저장도 가능합니다. 위의 합성 BGM은 브라우저에서 생성하며, 사람 목소리를 합성하거나 복제하지 않습니다.</p>}
-            <label htmlFor="promo-voice">내레이션 파일 · 20MB / 3분 이하<input id="promo-voice" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadVoice(event.target.files?.[0]); event.target.value = ""; }} /></label>
+            <PromoVoiceDirector project={project} disabled={busy} onGenerate={(request) => { void generateFreeVoice(request); }} />
+            <label htmlFor="promo-voice">직접 만든 내레이션 파일 · 20MB / 3분 이하<input id="promo-voice" type="file" accept="audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/mp4,audio/webm" onChange={(event) => { void uploadVoice(event.target.files?.[0]); event.target.value = ""; }} /></label>
             {project.voiceover ? <>
               <p className="promo-muted">음성 {project.voiceover.durationSec.toFixed(1)}초 · 반복하지 않고 영상 끝에서 종료 · 내레이션 재생 구간 BGM 자동 감쇠</p>
               <label htmlFor="promo-voice-start">내레이션 시작 {project.voiceover.startSec.toFixed(1)}초<input id="promo-voice-start" type="range" min={0} max={project.seconds - 1} step={0.1} value={Math.min(project.seconds - 1, project.voiceover.startSec)} onChange={(event) => { if (project.voiceover) patch({ voiceover: { ...project.voiceover, startSec: Number(event.target.value) } }); }} /></label>
@@ -244,6 +261,7 @@ export function StudioPromoPage() {
             {phase === "poster" ? <p>썸네일과 콘티를 렌더링하고 있어요.</p> : null}
             {phase === "import" ? <p>파일을 검사하고 불러오는 중이에요.</p> : null}
             {phase === "record" ? <><p>영상 저장 중 · {Math.round(progress * 100)}%</p><progress value={progress} max={1} aria-label="영상 저장 진행률" /></> : null}
+            {phase === "voice" ? <p>시스템 음성을 로컬 오디오 파일로 만들고 있어요. 공유창에서는 현재 탭과 탭 오디오를 선택해 주세요.</p> : null}
             {!busy ? <p>{message}</p> : <button type="button" onClick={() => operation.current?.abort()}>작업 취소</button>}
           </div>
           {error ? <p className="promo-error" role="alert">{error}</p> : null}
