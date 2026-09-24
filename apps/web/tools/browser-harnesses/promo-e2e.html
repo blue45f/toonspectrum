@@ -31,6 +31,12 @@
           costPolicy: "openrouter-free",
         }],
         assignments: { text: "promo-e2e", image: null, inference: null, "three-d": null },
+        routing: {
+          mode: "manual",
+          allowPaidFallback: false,
+          managedPoolPriority: 50,
+          serverProviderOrder: ["gemini", "qwen", "groq", "sambanova", "zai", "mistral", "cloudflare", "openrouter", "siliconflow"],
+        },
       });
     }
 

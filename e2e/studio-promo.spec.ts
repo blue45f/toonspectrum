@@ -7,7 +7,7 @@ test("promo editor uploads, edits, plans, exports and cancels", async ({ page },
   page.on("pageerror", (error) => errors.push(error.message));
   let malformed = false;
   let posted = "";
-  await page.route("https://promo-ai.invalid/v1/chat/completions", (route) => {
+  await page.route("https://openrouter.ai/api/v1/chat/completions", (route) => {
     const body = route.request().postDataJSON() as {
       model: string;
       messages: Array<{ role: string; content: string }>;
@@ -15,7 +15,7 @@ test("promo editor uploads, edits, plans, exports and cancels", async ({ page },
     const user = body.messages.find((message) => message.role === "user")?.content ?? "";
     posted = user;
     const data = JSON.parse(user) as { panels: { id: string }[] };
-    expect(body.model).toBe("ci-text-fixture");
+    expect(body.model).toBe("openrouter/free");
     expect(route.request().headers().authorization).toBe("Bearer promo-e2e-key");
     expect(route.request().headers().cookie).toBeUndefined();
     const content = malformed
@@ -165,7 +165,7 @@ test("director templates, layered parallax, narration, assets and local draft su
   await expect(page.locator(".promo-playback output")).toContainText(/3\.\d \/ 15초/u);
   await page.getByRole("button", { name: "일시정지", exact: true }).click();
   await page.screenshot({ path: testInfo.outputPath("director-desktop.png"), fullPage: true });
-  for (const [button, filename] of [["홍보 썸네일 PNG", "poster.png"], ["콘티 시트 PNG", "contact-sheet.png"], ["자막 VTT", "director-captions.vtt"], ["장면 타임코드 JSON", "shot-list.json"], ["Remotion 프로젝트 ZIP", "director-render-kit.zip"]]) {
+  for (const [button, filename] of [["홍보 썸네일 PNG", "poster.png"], ["콘티 시트 PNG", "contact-sheet.png"], ["자막 VTT", "director-captions.vtt"], ["장면·음성 타임코드 JSON", "shot-list.json"], ["Remotion 프로젝트 ZIP", "director-render-kit.zip"]]) {
     const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: button!, exact: true }).click()]);
     await download.saveAs(testInfo.outputPath(filename!));
   }

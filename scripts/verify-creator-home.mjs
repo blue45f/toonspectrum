@@ -90,7 +90,7 @@ try {
       headlineBounds && headlineBounds.x >= 0 && headlineBounds.x + headlineBounds.width <= width + 1,
       `Clipped headline: ${name}`,
     );
-    await expect(page.locator('.cf-hero .cf-primary[href="/studio/new"]')).toBeVisible();
+    await expect(page.locator('.cf-hero .cf-primary[href="/onboarding/character?next=%2Fhome"]')).toBeVisible();
     await expect(page.locator('.cf-hero .cf-secondary[href="/production"]')).toBeVisible();
     await expect(page.locator('.cf-hero-links a[href="/studio/projects"]')).toBeVisible();
     await expect(page.locator(".cf-start-card")).toHaveCount(4);

@@ -68,7 +68,7 @@ for (const width of [320, 390, 820, 1440]) {
 
     await page.goto("/about/studio", { waitUntil: "domcontentloaded" });
     const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
-    const primaryAction = home.locator('.cf-hero a.cf-primary[href="/studio/new"]');
+    const primaryAction = home.locator('.cf-hero a.cf-primary[href="/onboarding/character?next=%2Fhome"]');
     const startCards = home.locator(".cf-start-card");
 
     await expect(home).toBeVisible();
@@ -116,7 +116,7 @@ test("the front door exposes planning, 2D, 3D, assets, collaboration and publish
   await page.goto("/about/studio");
   const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
 
-  await expect(home.locator('.cf-hero a.cf-primary[href="/studio/new"]')).toBeVisible();
+  await expect(home.locator('.cf-hero a.cf-primary[href="/onboarding/character?next=%2Fhome"]')).toBeVisible();
   await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
   await expect(home.locator('.cf-simple-closing a[href="/production/projects/sample-project/overview"]')).toBeVisible();
   await expect(home.locator('.cf-start-card[href="/story-lab"]')).toBeVisible();
