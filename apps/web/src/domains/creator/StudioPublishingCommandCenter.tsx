@@ -51,6 +51,12 @@ import {
   selectStudioUploadDecodedPixelLimit,
 } from "./studio-upload-image-safety";
 import {
+  formatStudioUploadBytes,
+  studioDataUrlByteLength,
+  summarizeStudioUploadConversion,
+  type StudioUploadImageSourceMetadata,
+} from "./studio-upload-conversion";
+import {
   STUDIO_UPLOAD_ACTION_DOCK_CLASS,
   STUDIO_UPLOAD_CONTAINER_CLASS,
   STUDIO_UPLOAD_PAGE_CONTROL_CLASS,
@@ -135,6 +141,9 @@ type UploadPage = {
   width: number;
   height: number;
   name: string;
+  source: StudioUploadImageSourceMetadata | null;
+  outputByteLength: number | null;
+  outputFormat: "webp" | "stored";
 };
 
 type CommandStep = "content" | "distribution" | "review";
@@ -439,6 +448,9 @@ export function StudioPublishingCommandCenter({
               typeof meta?.name === "string" && meta.name.trim()
                 ? meta.name
                 : `${index + 1}페이지`,
+            source: null,
+            outputByteLength: studioDataUrlByteLength(src),
+            outputFormat: "stored" as const,
           };
         });
         const existingDirective = readCreatorPublicationDirective(loadedDoc);
@@ -769,7 +781,7 @@ export function StudioPublishingCommandCenter({
         deviceMemoryGb: navigatorWithMemory.deviceMemory,
       });
       for (const file of files) {
-        await inspectStudioUploadSourceImage(file, maximumPixels);
+        const inspected = await inspectStudioUploadSourceImage(file, maximumPixels);
         if (!isFileScopeCurrent()) return;
         const scaled = await downscaleImageFile(file, 1600, 0.88);
         if (!isFileScopeCurrent()) return;
@@ -779,6 +791,14 @@ export function StudioPublishingCommandCenter({
           width: scaled.width,
           height: scaled.height,
           name: file.name,
+          source: {
+            width: inspected.width,
+            height: inspected.height,
+            byteLength: file.size,
+            format: inspected.format,
+          },
+          outputByteLength: studioDataUrlByteLength(scaled.src),
+          outputFormat: "webp",
         });
       }
       if (!isFileScopeCurrent()) return;
@@ -1241,6 +1261,17 @@ export function StudioPublishingCommandCenter({
     loadingFiles ||
     (step === "review" && (!preflight.canPublish || !publisherConfirmed));
   const cover = pages[0]?.src ?? null;
+  const conversionSummary = summarizeStudioUploadConversion(
+    pages.map((page) => ({
+      source: page.source,
+      output: {
+        width: page.width,
+        height: page.height,
+        byteLength: page.outputByteLength,
+        format: page.outputFormat,
+      },
+    })),
+  );
 
   return (
     <div data-route-ready="studio-publish">
@@ -1491,7 +1522,11 @@ export function StudioPublishingCommandCenter({
                     <img src={page.src} alt="" className="h-20 w-14 shrink-0 rounded-lg border border-line object-cover" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-fg">{page.name}</span>
-                      <span className="numeral mt-1 block text-xs text-fg-3">{page.width} × {page.height}px</span>
+                      <span className="numeral mt-1 block text-xs text-fg-3">
+                        {page.source
+                          ? `${page.source.width} × ${page.source.height}px · ${formatStudioUploadBytes(page.source.byteLength)} → ${page.width} × ${page.height}px WebP · ${formatStudioUploadBytes(page.outputByteLength)}`
+                          : `${page.width} × ${page.height}px · 저장된 게시본`}
+                      </span>
                     </span>
                     <span className={STUDIO_UPLOAD_PAGE_CONTROLS_CLASS}>
                       <button type="button" className={STUDIO_UPLOAD_PAGE_CONTROL_CLASS} disabled={mutationLocked || index === 0} onClick={() => movePage(page.id, -1)} aria-label={`${index + 1}번째 이미지를 위로 이동`}><ArrowUp size={14} /></button>
@@ -1613,6 +1648,18 @@ export function StudioPublishingCommandCenter({
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">독자 등급</dt><dd className="font-medium text-fg">{directive.contentRating === "all" ? "전체 이용" : directive.contentRating === "teen" ? "청소년 주의" : "성인 대상"}</dd></div>
               </dl>
             </section>
+            <section className="rounded-2xl border border-line bg-panel/35 p-4">
+              <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><ImagePlus size={15} className="text-accent" /> 원본 → 게시본 변환</h2>
+              <dl className="mt-3 divide-y divide-line text-sm">
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">페이지</dt><dd className="font-medium text-fg">{conversionSummary.pageCount}장 · 변환 {conversionSummary.transformedPageCount}장</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">원본 용량</dt><dd className="font-medium text-fg">{formatStudioUploadBytes(conversionSummary.sourceByteLength)}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">게시본 용량</dt><dd className="font-medium text-fg">{formatStudioUploadBytes(conversionSummary.outputByteLength)}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">출력 규칙</dt><dd className="font-medium leading-relaxed text-fg">최대 1600px · WebP 품질 88 · 비율 유지 · 크롭 없음</dd></div>
+              </dl>
+              {conversionSummary.sourceByteLength === null ? (
+                <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">기존 저장본은 원본 파일 용량을 다시 추정하지 않고 현재 게시본을 유지합니다.</p>
+              ) : null}
+            </section>
             <section className={cn("rounded-2xl border p-4", preflight.errors.length ? "border-bad/40 bg-bad/5" : preflight.warnings.length ? "border-warn/40 bg-warn/5" : "border-good/40 bg-good/5")}>
               <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><Eye size={15} className={preflight.errors.length ? "text-bad" : "text-good"} /> 최종 사전검사</h2>
               <p className="mt-2 text-xs leading-relaxed text-fg-2">오류 {preflight.errors.length}건 · 경고 {preflight.warnings.length}건</p>
@@ -1630,7 +1677,7 @@ export function StudioPublishingCommandCenter({
 
       <div className={cn("mt-5", STUDIO_UPLOAD_ACTION_DOCK_CLASS)}>
         <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-fg-3">
-          {dirty ? <span className="inline-flex items-center gap-1.5 text-warn"><span className="size-2 rounded-full bg-warn" /> 저장되지 않은 변경</span> : <span className="inline-flex items-center gap-1.5 text-good"><Check size={13} /> 현재 revision 저장됨</span>}
+          {dirty ? <span className="inline-flex items-center gap-1.5 text-warn"><span className="size-2 rounded-full bg-warn" /> 저장 또는 게시하면 현재 변경이 새 revision에 함께 반영됩니다.</span> : <span className="inline-flex items-center gap-1.5 text-good"><Check size={13} /> 현재 revision 저장됨</span>}
           {sharedMeta && <span className="hidden sm:inline">· 역할 {sharedMeta.role}</span>}
         </div>
         <button
