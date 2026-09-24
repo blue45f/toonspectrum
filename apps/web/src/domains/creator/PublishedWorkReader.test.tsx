@@ -7,8 +7,12 @@ import { resolveCreatorPublicationReaderPolicy } from "./creator-publication-rea
 import { readWorkFx } from "./studio-motion-fx";
 
 vi.mock("./WebtoonFxPlayer", () => ({
-  WebtoonFxPlayer: ({ title, pages }: { title: string; pages: string[] }) => (
-    <div data-testid="vertical-reader">{title}:{pages.length}</div>
+  WebtoonFxPlayer: ({ title, pages, pageAltTexts }: {
+    title: string;
+    pages: string[];
+    pageAltTexts?: readonly string[];
+  }) => (
+    <div data-testid="vertical-reader">{title}:{pages.length}:{pageAltTexts?.join("|")}</div>
   ),
 }));
 
@@ -47,10 +51,13 @@ describe("PublishedWorkReader", () => {
         title="작품"
         policy={policy({ readingMode: "vertical" })}
         isOwner={false}
+        altText="별빛 왕관을 쓴 소녀"
+        contentKind="webtoon_episode"
       />,
     );
 
-    expect(screen.getByTestId("vertical-reader").textContent).toBe("작품:1");
+    expect(screen.getByTestId("vertical-reader").textContent)
+      .toBe("작품:1:별빛 왕관을 쓴 소녀");
     expect(screen.getByText("세로 스크롤")).toBeTruthy();
   });
 
@@ -63,14 +70,16 @@ describe("PublishedWorkReader", () => {
         title="작품"
         policy={policy()}
         isOwner={false}
+        altText="별빛 왕관을 쓴 소녀"
+        contentKind="webtoon_episode"
       />,
     );
 
-    expect(screen.getByAltText("작품 1페이지")).toBeTruthy();
+    expect(screen.getByAltText("별빛 왕관을 쓴 소녀 1/3페이지")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "다음 페이지" }));
-    expect(screen.getByAltText("작품 2페이지")).toBeTruthy();
+    expect(screen.getByAltText("별빛 왕관을 쓴 소녀 2/3페이지")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "3페이지로 이동" }));
-    expect(screen.getByAltText("작품 3페이지")).toBeTruthy();
+    expect(screen.getByAltText("별빛 왕관을 쓴 소녀 3/3페이지")).toBeTruthy();
   });
 
   it("maps the physical left arrow to next page for RTL works", () => {
@@ -82,12 +91,14 @@ describe("PublishedWorkReader", () => {
         title="RTL 작품"
         policy={policy({ readingDirection: "rtl" })}
         isOwner={false}
+        altText="별빛 왕관을 쓴 소녀"
+        contentKind="webtoon_episode"
       />,
     );
 
     const reader = screen.getByRole("region", { name: "페이지 넘김 독자 보기" });
     fireEvent.keyDown(reader, { key: "ArrowLeft" });
-    expect(screen.getByAltText("RTL 작품 2페이지")).toBeTruthy();
+    expect(screen.getByAltText("별빛 왕관을 쓴 소녀 2/2페이지")).toBeTruthy();
   });
 
   it("requires an explicit confirmation before rendering mature work for readers", () => {
@@ -99,6 +110,8 @@ describe("PublishedWorkReader", () => {
         title="성인 작품"
         policy={policy({ readingMode: "vertical", contentRating: "mature" })}
         isOwner={false}
+        altText="별빛 왕관을 쓴 소녀"
+        contentKind="webtoon_episode"
       />,
     );
 
@@ -119,6 +132,8 @@ describe("PublishedWorkReader", () => {
         title="성인 작품"
         policy={policy({ readingMode: "vertical", contentRating: "mature" })}
         isOwner
+        altText="성인 장면"
+        contentKind="webtoon_episode"
       />,
     );
 
@@ -126,4 +141,22 @@ describe("PublishedWorkReader", () => {
     expect(screen.getByTestId("vertical-reader")).toBeTruthy();
     expect(screen.getByTestId("spatial-webtoon-reader-launcher")).toBeTruthy();
   });
+  it("does not promote a one-page illustration into an AR/VR reader flow", () => {
+    render(
+      <PublishedWorkReader
+        workId="illustration-1"
+        pages={["page-1"]}
+        fx={fx}
+        title="일러스트"
+        policy={policy({ readingMode: "vertical" })}
+        isOwner={false}
+        altText="보라색 머리의 판타지 소녀"
+        contentKind="illustration"
+      />,
+    );
+
+    expect(screen.getByTestId("vertical-reader")).toBeTruthy();
+    expect(screen.queryByTestId("spatial-webtoon-reader-launcher")).toBeNull();
+  });
+
 });

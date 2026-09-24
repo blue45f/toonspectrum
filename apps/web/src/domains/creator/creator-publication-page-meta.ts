@@ -56,7 +56,11 @@ export function createCreatorPublicationPageMetaModel(
     input.directive.socialDescription.trim()
     || input.description?.trim()
     || `${workTitle} — 툰스튜디오 창작 게시판에서 감상하세요.`;
-  const canonicalPath = `/create/${encodeURIComponent(workId)}`;
+  const canonicalReference =
+    input.directive.visibility === "public" && input.directive.canonicalSlug.trim()
+      ? input.directive.canonicalSlug.trim()
+      : workId;
+  const canonicalPath = `/create/${encodeURIComponent(canonicalReference)}`;
   const image = publicImage(input.cover);
   const publishedAt =
     validIsoDate(input.directive.publishedAt) ?? validIsoDate(input.createdAt);

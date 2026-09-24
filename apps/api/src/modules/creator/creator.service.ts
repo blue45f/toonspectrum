@@ -82,6 +82,12 @@ import {
   CreatorWorkRevisionConflictError,
   CreatorWorkRevisionNotFoundError,
 } from "../../server/creator-work-revisions";
+import {
+  decodeCreatorWorkDataImage,
+  projectCreatorWorkDetailMedia,
+  projectCreatorWorkSummaryMedia,
+  type CreatorWorkMediaTarget,
+} from "../../server/creator-work-media";
 
 import {
   CreatorCollaborationCrdtSequenceConflictError,
@@ -272,7 +278,7 @@ export class CreatorService {
 
   async listWorks(q: CreatorWorkListQueryDto, viewerId?: string) {
     if (q.bookmarked && !viewerId) throw new ForbiddenException("북마크 목록은 로그인 후 볼 수 있습니다.");
-    return listWorks({
+    const works = await listWorks({
       titleId: q.titleId ?? undefined,
       userId: q.userId ?? undefined,
       sort: parseCreatorSort(q.sort),
@@ -285,14 +291,46 @@ export class CreatorService {
       bookmarkedBy: q.bookmarked ? viewerId : undefined,
       viewerId: viewerId ?? undefined,
     });
+    const ownerWorkspace = Boolean(q.userId && viewerId && q.userId === viewerId);
+    return ownerWorkspace ? works : works.map(projectCreatorWorkSummaryMedia);
+  }
+
+  private async publiclyReadableWork(workId: string): Promise<boolean> {
+    const publicWork = await getWork(workId);
+    return Boolean(publicWork && publicWork.status === "published");
   }
 
   async getWork(id: string, viewerId?: string) {
     const work = await getWork(id, viewerId);
     if (!work) throw new NotFoundException("작품을 찾을 수 없습니다.");
     // 소유자가 편집/미리보기로 새로고침하는 횟수는 공개 조회수에 포함하지 않는다.
-    if (!work.isOwner) await bumpViews(id);
-    return work;
+    if (!work.isOwner) await bumpViews(work.id);
+    const canUsePublicMedia = !work.isOwner || await this.publiclyReadableWork(work.id);
+    return canUsePublicMedia ? projectCreatorWorkDetailMedia(work) : work;
+  }
+
+  async getWorkMedia(
+    id: string,
+    target: CreatorWorkMediaTarget,
+    expectedDigest: string,
+    viewerId?: string
+  ) {
+    const work = await getWork(id, viewerId);
+    if (!work) throw new NotFoundException("작품 이미지를 찾을 수 없습니다.");
+    const value = target.kind === "cover"
+      ? work.cover
+      : work.pages[target.pageIndex];
+    const media = decodeCreatorWorkDataImage(value);
+    if (!media || media.sha256 !== expectedDigest) {
+      throw new NotFoundException("작품 이미지가 변경되었거나 존재하지 않습니다.");
+    }
+    const publiclyReadable = !work.isOwner || await this.publiclyReadableWork(work.id);
+    return {
+      ...media,
+      cacheControl: publiclyReadable
+        ? "public, max-age=31536000, immutable"
+        : "private, no-store, max-age=0",
+    };
   }
 
   async createWork(userId: string, body: CreateCreatorWorkDto) {

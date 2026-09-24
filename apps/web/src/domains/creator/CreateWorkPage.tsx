@@ -53,6 +53,7 @@ import {
   compactPublicShareDescription,
   publicShareImageUrl,
 } from "@/shared/lib/public-share-policy";
+import { readCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
@@ -470,7 +471,13 @@ export function CreateWorkPage() {
     [work?.doc],
   );
   const shareable = work ? canShareCreatorWork(work, publicationPolicy.directive) : false;
-  const sharePath = work ? `/create/${encodeURIComponent(work.id)}` : "/create";
+  const publicCanonicalSlug =
+    publicationPolicy.directive.visibility === "public"
+      ? publicationPolicy.directive.canonicalSlug.trim()
+      : "";
+  const sharePath = work
+    ? `/create/${encodeURIComponent(publicCanonicalSlug || work.id)}`
+    : "/create";
   const shareTitle = publicationPolicy.directive.socialTitle.trim() || work?.title || "창작 작품";
   const shareDescription = compactPublicShareDescription(
     publicationPolicy.directive.socialDescription || work?.description,
@@ -479,6 +486,10 @@ export function CreateWorkPage() {
       : "툰스튜디오 창작 게시판의 작품을 감상해 보세요.",
   );
   const shareImage = publicShareImageUrl(work?.cover);
+  const publicationSource = useMemo(
+    () => readCreatorPublicationSource(work?.doc),
+    [work?.doc],
+  );
 
   useCreatorPublicationPageMeta({
     workId: work?.id ?? id ?? null,
@@ -490,6 +501,11 @@ export function CreateWorkPage() {
     status: work?.status ?? null,
     directive: work ? publicationPolicy.directive : null,
   });
+
+  useEffect(() => {
+    if (!work || !id || !publicCanonicalSlug || id === publicCanonicalSlug) return;
+    navigate(`/create/${encodeURIComponent(publicCanonicalSlug)}`, { replace: true });
+  }, [id, navigate, publicCanonicalSlug, work]);
 
   useEffect(() => {
     if (!id) return;
@@ -706,6 +722,36 @@ export function CreateWorkPage() {
           </p>
         )}
 
+        {(work.community || publicationSource) && (
+          <aside
+            className="mt-4 rounded-xl border border-line bg-card/55 px-3.5 py-3 text-xs leading-relaxed text-fg-2"
+            aria-label="제작 출처와 이용 조건"
+          >
+            <p className="font-semibold text-fg">제작 출처와 이용 조건</p>
+            {publicationSource?.disclosure && (
+              <p className="mt-1 whitespace-pre-wrap">{publicationSource.disclosure}</p>
+            )}
+            {work.community?.attributionText && (
+              <p className="mt-1 whitespace-pre-wrap text-fg-3">
+                {work.community.attributionText}
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {publicationSource?.revisionId && (
+                <span className="rounded-full border border-line bg-canvas px-2 py-0.5">
+                  원본 revision {publicationSource.revisionId}
+                </span>
+              )}
+              <span className="rounded-full border border-line bg-canvas px-2 py-0.5">
+                다운로드 {work.community?.downloadAllowed ? "허용" : "비허용"}
+              </span>
+              <span className="rounded-full border border-line bg-canvas px-2 py-0.5">
+                AI 학습 {work.community?.trainingAllowed ? "허용" : "비허용"}
+              </span>
+            </div>
+          </aside>
+        )}
+
         {work.tags.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-1.5">
             {work.tags.map((tag) => (
@@ -746,6 +792,7 @@ export function CreateWorkPage() {
             onClick={onToggleLike}
             disabled={!userId || liking}
             aria-pressed={work.liked}
+            aria-label={`좋아요 ${formatCount(work.likes)}개`}
             title={userId ? undefined : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "로그인 후 좋아요를 누를 수 있습니다.")}
             className={buttonClass({
               size: "sm",
@@ -761,6 +808,7 @@ export function CreateWorkPage() {
             onClick={onToggleBookmark}
             disabled={!userId || bookmarking}
             aria-pressed={Boolean(work.bookmarked)}
+            aria-label={`북마크 ${formatCount(work.bookmarks ?? 0)}개`}
             title={userId ? undefined : translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "로그인 후 북마크할 수 있습니다.")}
             className={buttonClass({
               size: "sm",
@@ -784,8 +832,11 @@ export function CreateWorkPage() {
               />
             </Suspense>
           )}
-          <span className="inline-flex items-center gap-1.5 text-xs text-fg-3">
-            <Eye size={14} />
+          <span
+            className="inline-flex items-center gap-1.5 text-xs text-fg-3"
+            aria-label={`조회 ${formatCount(work.views)}회`}
+          >
+            <Eye size={14} aria-hidden />
             <span className="numeral">{formatCount(work.views)}</span> {translateCurrentStaticSourceText("domains.creator.CreateWorkPage", "ko", "조회")}</span>
 
           {publicationPolicy.remixAllowed ? (
@@ -907,6 +958,8 @@ export function CreateWorkPage() {
         title={work.title}
         policy={publicationPolicy}
         isOwner={work.isOwner}
+        altText={work.community?.altText ?? ""}
+        contentKind={work.community?.kind ?? "webtoon_episode"}
       />
 
       {/* 개체/레이어 탐색기 (Inspector) */}

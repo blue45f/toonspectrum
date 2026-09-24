@@ -1,4 +1,5 @@
 import { projectStudioAiProvenanceForPublish } from "../../../web/src/domains/creator/ai/studio-ai-provenance";
+import { toPublicCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
 import { toPublicCreatorPublicationDirective } from "../../../web/src/shared/lib/creator-publication-contract";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -75,6 +76,8 @@ export function toPublicCreatorDoc(value: unknown): Record<string, unknown> {
     writerRoom: _writerRoom,
     releaseSchedule: _releaseSchedule,
     publicationAnalytics: _publicationAnalytics,
+    publicationAudit: _publicationAudit,
+    publicationSource,
     aiProvenance,
     publication,
     publishPack,
@@ -90,6 +93,8 @@ export function toPublicCreatorDoc(value: unknown): Record<string, unknown> {
     const safePublication = toPublicCreatorPublicationDirective(publication);
     if (safePublication) result.publication = safePublication;
   }
+  const safePublicationSource = toPublicCreatorPublicationSource(publicationSource);
+  if (safePublicationSource) result.publicationSource = safePublicationSource;
   const safePublishPack = publicPublishPack(publishPack);
   if (safePublishPack) result.publishPack = safePublishPack;
   const redacted = redactPrivateAiFields(result);
