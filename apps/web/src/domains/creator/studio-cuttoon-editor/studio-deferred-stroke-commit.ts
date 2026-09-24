@@ -25,6 +25,7 @@ import {
 import {
   appendStudioPagesHistorySnapshot,
   projectStudioPendingStrokes,
+  stripStudioPendingStrokeEchoes,
   type StudioPagesHistoryAppendResult,
 } from "../studio-pending-stroke-durability";
 import {
@@ -619,7 +620,7 @@ export function createStudioDeferredStrokeCommitEngine(
    * 히스토리 배열은 순수한 로컬 UI 상태이므로 이 재구성은 문서를 건드리지 않는다.
    */
   function expandDeferredStrokeCommitHistory(batch: PendingStrokeCommitBatch): void {
-    if (batch.strokes.length < 2) return;
+    if (batch.strokes.length === 0) return;
     const history = pagesHistoryRef.current;
     const finalIndex = Math.max(
       0,
@@ -630,9 +631,30 @@ export function createStudioDeferredStrokeCommitEngine(
     // 직전 스냅샷이 히스토리 상한에 밀려 없어졌다면 펼칠 기준이 없다. 배치 1항목으로 남긴다 —
     // 잘못된 기준으로 접두를 만들면 undo 가 엉뚱한 상태로 점프한다.
     if (!finalPages || !basePages) return;
+
+    // A peer may have echoed this tab's still-pending local stroke into the active React snapshot.
+    // That echo is presentation/convergence evidence, not an older local undo step. Remove only
+    // these exact local IDs from the previous snapshot before constructing per-stroke history.
+    const echoStripped = stripStudioPendingStrokeEchoes(basePages, batch);
+    const normalizedBasePages = echoStripped.status === "stripped"
+      ? echoStripped.pagesList
+      : basePages;
+    if (batch.strokes.length === 1) {
+      if (normalizedBasePages === basePages) return;
+      const normalizedHistory = history.slice();
+      normalizedHistory[finalIndex - 1] = normalizedBasePages;
+      pagesHistoryRef.current = normalizedHistory;
+      setPagesHistory(normalizedHistory);
+      return;
+    }
+
     let accHistory = history;
+    if (normalizedBasePages !== basePages) {
+      accHistory = history.slice();
+      accHistory[finalIndex - 1] = normalizedBasePages;
+    }
     let accIndex = finalIndex - 1;
-    let previousPages = basePages;
+    let previousPages = normalizedBasePages;
     for (let kept = 1; kept <= batch.strokes.length; kept += 1) {
       const dropped = new Set(batch.strokes.slice(kept).map((stroke) => stroke.id));
       const snapshot =

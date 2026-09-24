@@ -13,6 +13,7 @@ import {
   createStudioPendingStrokeEmergencyAutosave,
   mergeStudioPendingStrokeElements,
   projectStudioPendingStrokes,
+  stripStudioPendingStrokeEchoes,
 } from "./studio-pending-stroke-durability";
 
 function basePayload(pagesList: StudioAutosavePayload["pagesList"]): StudioAutosavePayload {
@@ -50,6 +51,39 @@ describe("pending stroke commit merge", () => {
       latest,
       second,
     ]);
+  });
+});
+
+describe("pending stroke history echo stripping", () => {
+  it("removes only echoed local pending IDs while preserving remote order", () => {
+    const remoteBefore = { id: "remote-before" };
+    const localEcho = { id: "local-pending" };
+    const remoteAfter = { id: "remote-after" };
+    const source = [{
+      id: "page-1",
+      elements: [remoteBefore, localEcho, remoteAfter, localEcho],
+    }];
+
+    const result = stripStudioPendingStrokeEchoes(source, {
+      pageId: "page-1",
+      strokes: [{ id: "local-pending" }],
+    });
+
+    expect(result.status).toBe("stripped");
+    expect(result.removedStrokeIds).toEqual(["local-pending"]);
+    expect(result.pagesList[0]?.elements).toEqual([remoteBefore, remoteAfter]);
+    expect(source[0]?.elements).toHaveLength(4);
+  });
+
+  it("returns the original snapshot by identity when no local echo exists", () => {
+    const source = [{ id: "page-1", elements: [{ id: "remote" }] }];
+    const result = stripStudioPendingStrokeEchoes(source, {
+      pageId: "page-1",
+      strokes: [{ id: "local-pending" }],
+    });
+
+    expect(result.status).toBe("unchanged");
+    expect(result.pagesList).toBe(source);
   });
 });
 

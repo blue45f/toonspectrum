@@ -137,6 +137,84 @@ export function mergeStudioPendingStrokeElements<Element extends { id: string }>
   return merged;
 }
 
+export type StudioPendingStrokeEchoStripStatus =
+  | "stripped"
+  | "unchanged"
+  | "no-pending"
+  | "page-missing"
+  | "page-ambiguous";
+
+export type StudioPendingStrokeEchoStrip<Page> = {
+  readonly pagesList: Page[];
+  readonly status: StudioPendingStrokeEchoStripStatus;
+  readonly removedStrokeIds: readonly string[];
+};
+
+/**
+ * Removes only the local deferred stroke IDs from a historical snapshot. A collaboration peer can
+ * echo an in-progress local stroke into the current React projection before the local pointer-up
+ * batch owns an undo entry. If that echoed copy is left in the previous snapshot, flushing the
+ * batch creates two identical history steps and the next Undo appears to do nothing.
+ *
+ * Remote strokes and their ordering remain untouched. The source snapshot is returned by identity
+ * when no local echo is present so ordinary single-stroke commits keep the existing fast path.
+ */
+export function stripStudioPendingStrokeEchoes<
+  Page extends StudioPendingStrokePageLike,
+  Stroke extends StudioPendingStrokeElementLike,
+>(
+  pagesList: readonly Page[],
+  pending: StudioPendingStrokeBatch<Stroke> | null | undefined,
+): StudioPendingStrokeEchoStrip<Page> {
+  const sourcePages = pagesList as Page[];
+  if (!pending || pending.strokes.length === 0) {
+    return { pagesList: sourcePages, status: "no-pending", removedStrokeIds: [] };
+  }
+
+  const pendingIds = new Set(
+    pending.strokes
+      .map((stroke) => nonEmptyId(stroke.id))
+      .filter((id): id is string => id !== null),
+  );
+  if (pendingIds.size === 0) {
+    return { pagesList: sourcePages, status: "no-pending", removedStrokeIds: [] };
+  }
+
+  const targetIndexes: number[] = [];
+  pagesList.forEach((page, index) => {
+    if (page.id === pending.pageId) targetIndexes.push(index);
+  });
+  if (targetIndexes.length === 0) {
+    return { pagesList: sourcePages, status: "page-missing", removedStrokeIds: [] };
+  }
+  if (targetIndexes.length > 1) {
+    return { pagesList: sourcePages, status: "page-ambiguous", removedStrokeIds: [] };
+  }
+
+  const targetIndex = targetIndexes[0]!;
+  const target = pagesList[targetIndex]!;
+  const elements = Array.isArray(target.elements) ? target.elements : [];
+  const removedStrokeIds: string[] = [];
+  const filtered = elements.filter((element) => {
+    if (!element || typeof element !== "object") return true;
+    const id = nonEmptyId((element as StudioPendingStrokeElementLike).id);
+    if (!id || !pendingIds.has(id)) return true;
+    removedStrokeIds.push(id);
+    return false;
+  });
+  if (removedStrokeIds.length === 0) {
+    return { pagesList: sourcePages, status: "unchanged", removedStrokeIds };
+  }
+
+  const nextPages = [...pagesList] as Page[];
+  nextPages[targetIndex] = { ...target, elements: filtered } as Page;
+  return {
+    pagesList: nextPages,
+    status: "stripped",
+    removedStrokeIds: [...new Set(removedStrokeIds)],
+  };
+}
+
 /**
  * Projects an in-memory deferred stroke batch into its owning page without mutating the source
  * snapshot. Existing element ids and repeated ids inside the batch are both treated as already

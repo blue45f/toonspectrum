@@ -4091,6 +4091,11 @@ export function StudioCuttoonEditor({
     retryCount: number;
     historyIndex: number;
   } | null>(null);
+  const pendingStrokeRealtimeHistoryRef = useRef<{
+    strokeIds: readonly string[];
+    baseIndex: number;
+    finalIndex: number;
+  } | null>(null);
   const deferredStrokePostprocessClientRef = useRef<StudioStrokePostprocessWorkerClient | null>(null);
   const deferredStrokePostprocessControllersRef = useRef<Map<string, AbortController>>(new Map());
   useEffect(() => () => {
@@ -11471,6 +11476,7 @@ export function StudioCuttoonEditor({
     return true;
   }
   function invalidatePendingRetainedRedo(): void {
+    pendingStrokeRealtimeHistoryRef.current = null;
     if (discardStudioRetainedStrokeRedo(
       pendingUndoneStrokeCommitsRef,
       (ids) => liveRetainedMediaOverlayRendererRef.current.discardHiddenSettledStrokes(ids),
@@ -16088,13 +16094,20 @@ const puppetWarpArmed =
   function publishStudioCrdtSceneTransition(
     previousPages: readonly PageState[],
     nextPages: readonly PageState[],
-    registerNewDraws = true
+    registerNewDraws = true,
+    offlineRealtimeStrokeIds: readonly string[] = [],
   ): boolean {
     const document = studioCrdtDocumentRef.current;
     const runtime = studioCrdtSceneRuntimeRef.current;
     const stagedOffline = studioOfflineHost.stageStudioOfflineSceneTransition(
       runtime, previousPages, nextPages, setStatusNotice);
-    if (stagedOffline !== null) return stagedOffline;
+    const mirrorOfflinePendingStroke = stagedOffline === true
+      && studioOfflineHost.canMirrorStudioOfflinePendingStrokeTransition(
+        previousPages,
+        nextPages,
+        offlineRealtimeStrokeIds,
+      );
+    if (stagedOffline !== null && !mirrorOfflinePendingStroke) return stagedOffline;
     if (!document && !runtime) return true;
     if (!document || !runtime) return false;
     try {
@@ -16126,9 +16139,15 @@ const puppetWarpArmed =
 
   function publishStudioCrdtHistoryTransition(
     previousPages: readonly PageState[],
-    nextPages: readonly PageState[]
+    nextPages: readonly PageState[],
+    offlineRealtimeStrokeIds: readonly string[] = [],
   ): boolean {
-    return publishStudioCrdtSceneTransition(previousPages, nextPages, false);
+    return publishStudioCrdtSceneTransition(
+      previousPages,
+      nextPages,
+      false,
+      offlineRealtimeStrokeIds,
+    );
   }
 
   // The commit engine owns synchronous history and canonical-surface handoff outside the compiler boundary.
@@ -18179,6 +18198,12 @@ const puppetWarpArmed =
       });
       return;
     }
+    const pendingBeforeUndo = pendingStrokeCommitsRef.current
+      ? {
+          strokeIds: pendingStrokeCommitsRef.current.strokes.map((stroke) => stroke.id),
+          strokeCount: pendingStrokeCommitsRef.current.strokes.length,
+        }
+      : null;
     if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) {
       // 잠금·저장 중이라 히스토리에 못 넣는 배치는 예전 계약대로 폐기가 유일한 되돌림이다.
       discardPendingStrokeCommitsRef.current();
@@ -18211,9 +18236,33 @@ const puppetWarpArmed =
     const undoBasePages = undoHistory[undoIndex] ?? pages;
     const nextIndex = Math.max(0, undoIndex - 1);
     const nextSnapshot = undoHistory[nextIndex];
-    if (nextSnapshot && !publishStudioCrdtHistoryTransition(undoBasePages, nextSnapshot)) return;
+    const existingRealtimeRange = pendingStrokeRealtimeHistoryRef.current;
+    const flushedPendingStrokeIds = pendingBeforeUndo
+      && pendingStrokeCommitsRef.current === null
+      && pendingBeforeUndo.strokeCount > 0
+      ? pendingBeforeUndo.strokeIds
+      : [];
+    const offlineRealtimeStrokeIds = flushedPendingStrokeIds.length > 0
+      ? flushedPendingStrokeIds
+      : existingRealtimeRange
+        && undoIndex > existingRealtimeRange.baseIndex
+        && undoIndex <= existingRealtimeRange.finalIndex
+        ? existingRealtimeRange.strokeIds
+        : [];
+    if (nextSnapshot && !publishStudioCrdtHistoryTransition(
+      undoBasePages,
+      nextSnapshot,
+      offlineRealtimeStrokeIds,
+    )) return;
     if (nextIndex !== undoIndex && nextSnapshot) {
       recordStudioHistoryUndoRedo("undo", nextSnapshot, nextIndex);
+      if (flushedPendingStrokeIds.length > 0 && pendingBeforeUndo) {
+        pendingStrokeRealtimeHistoryRef.current = {
+          strokeIds: [...new Set(flushedPendingStrokeIds)],
+          baseIndex: Math.max(0, undoIndex - pendingBeforeUndo.strokeCount),
+          finalIndex: undoIndex,
+        };
+      }
     }
     // `setPagesHi` 는 저장 중이면 거절한다. 거절될 갱신으로 ref 를 앞세우면 렌더 없이
     // ref 와 상태가 어긋난 채 남으므로, 커밋 경로와 같은 게이트를 먼저 통과시킨다.
@@ -18300,7 +18349,17 @@ const puppetWarpArmed =
     setAdvancedFillStatus(null);
     const nextIndex = Math.min(pagesHistory.length - 1, pagesHi + 1);
     const nextSnapshot = pagesHistory[nextIndex];
-    if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
+    const realtimeRange = pendingStrokeRealtimeHistoryRef.current;
+    const offlineRealtimeStrokeIds = realtimeRange
+      && pagesHi >= realtimeRange.baseIndex
+      && nextIndex <= realtimeRange.finalIndex
+      ? realtimeRange.strokeIds
+      : [];
+    if (nextSnapshot && !publishStudioCrdtHistoryTransition(
+      pages,
+      nextSnapshot,
+      offlineRealtimeStrokeIds,
+    )) return;
     if (nextIndex !== pagesHi && nextSnapshot) {
       recordStudioHistoryUndoRedo("redo", nextSnapshot, nextIndex);
       commitStudioHistoryJournal(stepStudioHistoryJournal(historyJournalRef.current, "redo"));
