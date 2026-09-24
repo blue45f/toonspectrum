@@ -20,6 +20,7 @@ import {
 import Link from "@/compat/router-link";
 import { useDocumentTitle, useJsonLd, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
 import { useI18n } from "@/shared/lib/i18n";
+import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 
 import { creatorHomeLocale } from "./creator-home-content";
 import { CreatorFeatureReels } from "./CreatorFeatureReels";
@@ -106,6 +107,11 @@ export function ProductTourPage() {
           ))}
         </dl>
       </header>
+
+      <ServiceStoryJourney
+        current="tour"
+        className="mx-4 mt-6 sm:mx-6 lg:mx-auto lg:max-w-[94rem]"
+      />
 
       <ProductTourPlayer locale={locale} />
 

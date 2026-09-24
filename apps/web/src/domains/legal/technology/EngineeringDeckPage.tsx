@@ -30,15 +30,16 @@ import { useEngineeringLocale } from "./use-engineering-locale";
 
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
+import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 import { cx } from "@/shared/lib/cx";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringDeckPage", ko, en);
 
 const AUDIENCES = [
-  { id: "investor", ko: "투자자 10장", en: "Investor · 10 slides" },
-  { id: "seminar", ko: "기술 세미나 · 34장", en: "Engineering seminar · 34 slides" },
-  { id: "study", ko: "스터디 심화 · 44장", en: "Study deep dive · 44 slides" },
+  { id: "investor", ko: "핵심 요약", en: "Executive summary" },
+  { id: "seminar", ko: "기술 발표", en: "Engineering talk" },
+  { id: "study", ko: "심화 연구", en: "Deep study" },
 ] as const;
 
 type Audience = (typeof AUDIENCES)[number]["id"];
@@ -133,6 +134,7 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
       chapterSlide("product-intent", locale),
       chapterSlide("architecture", locale),
       chapterSlide("pwa-continuity", locale),
+      chapterSlide("webrtc-media-authority", locale),
       chapterSlide("web-3d-engine", locale),
       chapterSlide("free-ai-routing", locale),
       chapterSlide("cost-engineering", locale),
@@ -165,6 +167,7 @@ function buildSlides(audience: Audience, locale: EngineeringLocale): readonly De
       chapterSlide("brush-engine", locale),
       chapterSlide("brush-render-authority", locale),
       chapterSlide("collaborative-crdt-boundary", locale),
+      chapterSlide("webrtc-media-authority", locale),
       chapterSlide("performance", locale),
       chapterSlide("web-3d-engine", locale),
       chapterSlide("virtual-studio-world-authority", locale),
@@ -384,10 +387,10 @@ export function EngineeringDeckPage() {
       <EngineeringPageIntro
         eyebrow="WEB PRESENTATION"
         title={
-          bi("같은 기술 사실을 투자자·세미나·스터디 깊이로 발표합니다.", "Present the same engineering facts at investor, seminar or study depth.")
+          bi("발표 시간에 맞춰 필요한 깊이만 선택합니다.", "Choose only the depth the presentation needs.")
         }
         description={
-          bi("키보드, 전체 화면, 발표자 노트와 인쇄를 지원합니다. 슬라이드 내용은 기술 스토리 데이터에서 파생되어 웹 설명과 서로 다른 상태를 주장하지 않습니다.", "Use keyboard navigation, fullscreen, speaker notes and print. Slides derive from the engineering-story data so the deck cannot claim a different status from the website.")
+          bi("핵심 요약, 기술 발표, 심화 연구는 같은 기술 스토리에서 필요한 챕터만 조합합니다. 키보드, 전체 화면, 발표자 노트와 인쇄를 지원하며 정해진 시간을 채우기 위해 내용을 반복하지 않습니다.", "Executive, engineering and deep-study modes compose only the chapters they need from one story source. Keyboard navigation, fullscreen, notes and print are supported without repeating material to fill a fixed duration.")
         }
         aside={
           <div className="rounded-3xl border border-line/70 bg-card/70 p-5">
@@ -401,6 +404,8 @@ export function EngineeringDeckPage() {
           </div>
         }
       />
+
+      <ServiceStoryJourney current="deck" className="mb-5" />
 
       <section data-engineering-deck-shell="true" aria-labelledby="deck-preview-title">
         <h2 id="deck-preview-title" className="sr-only">
@@ -549,21 +554,21 @@ export function EngineeringDeckPage() {
       <section className="mt-10 grid gap-4 lg:grid-cols-3" aria-label={bi("발표 대상별 사용법", "Audience guidance")}>
         <article className="rounded-3xl border border-line/70 bg-card/65 p-5">
           <Presentation size={20} className="text-accent" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">{bi("투자자", "Investor")}</h2>
+          <h2 className="mt-4 text-lg font-black text-fg">{bi("핵심 요약", "Executive summary")}</h2>
           <p className="mt-2 text-sm leading-7 text-fg-3">
-            {bi("문제, 기술 방어력, 확장·비용·권리 통제를 10장으로 요약합니다.", "Summarizes problem, defensibility, scale, cost and rights control in ten slides.")}
+            {bi("제품 문제, 기술 방어력, 실시간 협업, 비용과 권리 통제를 빠르게 공유합니다.", "Shares the product problem, defensibility, realtime collaboration, cost and rights controls quickly.")}
           </p>
         </article>
         <article className="rounded-3xl border border-line/70 bg-card/65 p-5">
           <UsersRound size={20} className="text-accent" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">{bi("기술 세미나", "Engineering seminar")}</h2>
+          <h2 className="mt-4 text-lg font-black text-fg">{bi("기술 발표", "Engineering talk")}</h2>
           <p className="mt-2 text-sm leading-7 text-fg-3">
-            {bi("주요 시스템 경계와 실패·검증 설계를 30~45분 분량으로 설명합니다.", "Covers key system boundaries, failure and verification design for a 30–45 minute session.")}
+            {bi("주요 시스템 경계와 실패·복구·검증 설계를 데모와 함께 자연스럽게 설명합니다.", "Explains key system boundaries, failure, recovery and verification naturally alongside demos.")}
           </p>
         </article>
         <article className="rounded-3xl border border-line/70 bg-card/65 p-5">
           <StickyNote size={20} className="text-accent" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">{bi("스터디", "Study")}</h2>
+          <h2 className="mt-4 text-lg font-black text-fg">{bi("심화 연구", "Deep study")}</h2>
           <p className="mt-2 text-sm leading-7 text-fg-3">
             {formatI18nTemplate(String(bi("{value0}개 챕터를 모두 사용하고 각 시스템에 적용할 경계를 토론합니다.", "Uses all {value0} chapters and turns each boundary into a discussion for participants' systems.")), { value0: ENGINEERING_CHAPTERS.length })}
           </p>

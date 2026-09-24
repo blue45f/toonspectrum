@@ -6,150 +6,41 @@ import {
   useVideoConfig,
 } from "remotion";
 
+import technologyFilmScript from "../../../apps/web/src/domains/legal/technology/technology-film-script.json";
+
+interface LocalizedTechnologyText {
+  readonly ko: string;
+  readonly en: string;
+}
+
 interface TechnologyScene {
+  readonly id: string;
   readonly kicker: string;
-  readonly title: string;
-  readonly body: string;
+  readonly title: LocalizedTechnologyText;
+  readonly body: LocalizedTechnologyText;
+  readonly narration: LocalizedTechnologyText;
   readonly label: string;
   readonly points: readonly string[];
 }
 
-const OVERVIEW_SCENES: readonly TechnologyScene[] = [
-  {
-    kicker: "01 · FRAGMENTED CONTEXT",
-    title: "기획부터 연재까지,\n맥락이 끊기지 않도록.",
-    body: "대본, 콘티, 드로잉, 3D, 파일과 검수가 흩어질수록 다음 담당자는 작업의 이유부터 다시 복원해야 합니다.",
-    label: "PROBLEM",
-    points: ["Planning", "Drawing", "3D", "Review"],
-  },
-  {
-    kicker: "02 · PRODUCT BOUNDARY",
-    title: "페이지가 아니라\n프로젝트를 중심에 둡니다.",
-    body: "Workspace, Project, Episode, Cut, Asset와 Approval을 하나의 제작 상태로 연결합니다.",
-    label: "DOMAIN",
-    points: ["Project", "Episode", "Cut", "Approval"],
-  },
-  {
-    kicker: "03 · LOCAL-FIRST CREATION",
-    title: "브러시의 반응성과\n작업 복구를 함께 설계합니다.",
-    body: "실시간 GPU 표시와 최종 문서 commit을 분리하고, OPFS·SQLite·복구 저널로 대형 프로젝트를 지킵니다.",
-    label: "CREATE",
-    points: ["WebGPU", "CanvasKit", "OPFS", "Recovery"],
-  },
-  {
-    kicker: "04 · IDENTITY · SHARE · TRUST",
-    title: "로그인과 공유를\n신뢰 경계로 연결합니다.",
-    body: "OAuth 공급자 토큰과 제품 세션을 분리하고, canonical payload에서 native share·채널 URL·copy·QR과 Open Graph를 만듭니다.",
-    label: "IDENTITY · DISTRIBUTE",
-    points: ["OAuth", "HttpOnly", "Web Share", "Canonical"],
-  },
-  {
-    kicker: "05 · CRDT · SEMANTIC COLLABORATION",
-    title: "CRDT에는 의미를,\n대형 자산에는 별도 권위를.",
-    body: "Yjs는 레이어·벡터·스타일러스 연산을 수렴시키고, 래스터·PSD·GLB는 해시·receipt와 Worker checkpoint로 분리합니다.",
-    label: "COLLABORATE",
-    points: ["Yjs", "Semantic ops", "Receipt", "Checkpoint"],
-  },
-  {
-    kicker: "06 · WORKER · PWA · LOCAL-FIRST · BROWSER EXECUTION",
-    title: "Worker, PWA, 로컬 AI를\n하나의 복구 계약으로.",
-    body: "typed Worker와 Transferable, 사용자 승인형 Service Worker, OPFS·SQLite WASM, ONNX WebGPU/WASM과 MediaPipe를 요청·취소·메모리·결과 권위 뒤에 둡니다.",
-    label: "EXECUTE · RECOVER",
-    points: ["Workers", "PWA", "ONNX", "MediaPipe"],
-  },
-  {
-    kicker: "07 · VIRTUAL STUDIO · LIVING WORLD",
-    title: "가상 공간도\n같은 프로젝트를 바라봅니다.",
-    body: "아바타·방·책상·보드는 공간 UX를 제공하지만 프로젝트·권한·검수와 media recipient는 기존 도메인 계약이 계속 소유합니다.",
-    label: "SPACE · COLLABORATE",
-    points: ["World manifest", "Actions", "Consent", "List path"],
-  },
-  {
-    kicker: "08 · WEB 3D · BLENDER · MCP",
-    title: "거대한 한 엔진보다\n전문 도구를 연결합니다.",
-    body: "Three.js, VRM, OpenCascade·Manifold WASM과 Blender QA를 GLB·VRM·해시 영수증으로 연결하고 MCP는 검증된 host가 있을 때만 사용합니다.",
-    label: "3D · DCC",
-    points: ["Three.js", "VRM", "WASM", "Blender"],
-  },
-  {
-    kicker: "09 · PROVIDER BOUNDARIES",
-    title: "외부 공급자는\n제품 계약 뒤에 둡니다.",
-    body: "OAuth, 개인 클라우드와 AI를 공급자 중립 계약으로 감싸 동의, 예산, 권리와 승인 결과를 보존합니다.",
-    label: "CONNECT",
-    points: ["OAuth", "Cloud", "AI", "Consent"],
-  },
-  {
-    kicker: "10 · FREE-FIRST AI · COST",
-    title: "무료 경로를 우선하되\n품질과 동의를 바꾸지 않습니다.",
-    body: "무료 공급자 allowlist, quota ledger, BYOK 분리와 fail-closed 라우팅으로 중복 추론·자동 과금·개인정보 재전송을 막습니다.",
-    label: "AI · COST",
-    points: ["Free pool", "BYOK", "Budget", "No replay"],
-  },
-  {
-    kicker: "11 · OPEN API · PROVENANCE",
-    title: "자료를 찾는 것과\n사용할 권리를 구분합니다.",
-    body: "Google Books, Poly Haven, Wikimedia와 공식 데이터는 schema·출처·라이선스·조회 시각을 검증한 내부 계약으로 정규화합니다.",
-    label: "OPEN DATA",
-    points: ["Schema", "Source", "License", "Quota"],
-  },
-  {
-    kicker: "12 · TROUBLESHOOTING · EVIDENCE",
-    title: "실패를 숨기지 않고\n회귀 검사로 남깁니다.",
-    body: "PWA 캐시, Worker replay, DCC 파일 변조, AI timeout과 API schema drift를 증상·원인·수정·테스트로 연결합니다.",
-    label: "TROUBLESHOOT",
-    points: ["Symptom", "Cause", "Fix", "Regression"],
-  },
-  {
-    kicker: "13 · VERIFIABLE STATUS",
-    title: "운영·설정·실험을\n같은 말로 표시하지 않습니다.",
-    body: "각 기능 상태를 코드, 테스트, workflow와 문서 근거에 연결해 성공처럼 보이는 미완성 기능을 줄입니다.",
-    label: "VERIFY",
-    points: ["Vitest", "Playwright", "CI", "Evidence"],
-  },
-  {
-    kicker: "14 · REUSABLE ENGINEERING",
-    title: "가져갈 것은 패키지가 아니라\n경계와 검증 순서입니다.",
-    body: "입력, 출력, 데이터 권위, 실패, 비용과 대체 경로를 유지하면 다른 서비스에서도 같은 설계를 재사용할 수 있습니다.",
-    label: "REUSE",
-    points: ["Authority", "Failure", "Fallback", "Budget"],
-  },
-] as const;
+export const TECHNOLOGY_FILM_FPS = technologyFilmScript.fps;
+export const TECHNOLOGY_OVERVIEW_DURATION_SECONDS =
+  technologyFilmScript.variants.overview.durationSeconds;
+export const TECHNOLOGY_INVESTOR_DURATION_SECONDS =
+  technologyFilmScript.variants.investor.durationSeconds;
+export const TECHNOLOGY_PORTRAIT_DURATION_SECONDS =
+  technologyFilmScript.variants.portrait.durationSeconds;
 
-const INVESTOR_SCENES: readonly TechnologyScene[] = [
-  OVERVIEW_SCENES[0],
-  {
-    ...OVERVIEW_SCENES[1],
-    kicker: "02 · CONNECTED PRODUCTION",
-    body: "하나의 프로젝트 맥락이 기획, 제작, 협업과 연재 운영을 연결해 기능 수 이상의 전환 비용을 만듭니다.",
-    points: ["Context", "Workflow", "Handoff", "Scale"],
-  },
-  {
-    ...OVERVIEW_SCENES[5],
-    kicker: "03 · TECHNICAL DEFENSIBILITY",
-    body: "Worker·PWA·로컬 우선 저장과 재현 가능한 복구가 브라우저 창작 도구의 신뢰와 확장성을 함께 지킵니다.",
-    points: ["Worker", "PWA", "Local-first", "Recovery"],
-  },
-  OVERVIEW_SCENES[7],
-  {
-    ...OVERVIEW_SCENES[9],
-    kicker: "05 · CONTROLLED SCALE",
-    title: "무료 우선으로 시작하고\n검증된 병목만 승격합니다.",
-    body: "비용, 권리, 공급자와 품질 상태를 함께 추적해 성장 과정에서도 자동 유료 승격과 숨은 의존을 만들지 않습니다.",
-    points: ["Cost", "Rights", "Providers", "Evidence"],
-  },
-] as const;
-
-const PORTRAIT_SCENES: readonly TechnologyScene[] = [
-  OVERVIEW_SCENES[0],
-  OVERVIEW_SCENES[2],
-  OVERVIEW_SCENES[3],
-  OVERVIEW_SCENES[4],
-  OVERVIEW_SCENES[5],
-  OVERVIEW_SCENES[6],
-  OVERVIEW_SCENES[7],
-  OVERVIEW_SCENES[11],
-  OVERVIEW_SCENES[13],
-] as const;
+const OVERVIEW_SCENES =
+  technologyFilmScript.variants.overview.scenes as readonly TechnologyScene[];
+const INVESTOR_SCENES =
+  technologyFilmScript.variants.investor.scenes as readonly TechnologyScene[];
+const overviewById = new Map(OVERVIEW_SCENES.map((scene) => [scene.id, scene]));
+const PORTRAIT_SCENES = technologyFilmScript.variants.portrait.sceneIds.map((id) => {
+  const scene = overviewById.get(id);
+  if (!scene) throw new Error(`Unknown portrait technology-film scene: ${id}`);
+  return scene;
+});
 
 type TechnologyFilmVariant = "overview" | "investor" | "portrait";
 
@@ -272,7 +163,7 @@ function TechnologyStoryFilm({ variant }: { readonly variant: TechnologyFilmVari
               wordBreak: "keep-all",
             }}
           >
-            {scene.title}
+            {scene.title.ko}
           </div>
           <div
             style={{
@@ -284,7 +175,7 @@ function TechnologyStoryFilm({ variant }: { readonly variant: TechnologyFilmVari
               wordBreak: "keep-all",
             }}
           >
-            {scene.body}
+            {scene.body.ko}
           </div>
         </section>
 

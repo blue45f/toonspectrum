@@ -19,11 +19,11 @@ import {
 const unique = (values: readonly string[]): boolean => new Set(values).size === values.length;
 
 describe("engineering story content", () => {
-  it("keeps a complete, ordered and uniquely addressable 30-chapter story", () => {
-    expect(ENGINEERING_CHAPTERS).toHaveLength(30);
+  it("keeps a complete, ordered and uniquely addressable 31-chapter story", () => {
+    expect(ENGINEERING_CHAPTERS).toHaveLength(31);
     expect(unique(ENGINEERING_CHAPTERS.map((chapter) => chapter.id))).toBe(true);
     expect(ENGINEERING_CHAPTERS.map((chapter) => chapter.order)).toEqual(
-      Array.from({ length: 30 }, (_, index) => index + 1),
+      Array.from({ length: 31 }, (_, index) => index + 1),
     );
   });
 

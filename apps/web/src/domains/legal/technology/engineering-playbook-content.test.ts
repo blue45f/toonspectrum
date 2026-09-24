@@ -56,14 +56,16 @@ describe("engineering playbook content", () => {
     for (const group of ENGINEERING_BENCHMARK_GROUPS) {
       expect(group.products.length, group.id).toBeGreaterThanOrEqual(3);
       expect(unique(group.products), group.id).toBe(true);
+      expect(group.observedPatterns?.length, group.id).toBeGreaterThanOrEqual(2);
       expect(group.learned.length, group.id).toBeGreaterThanOrEqual(3);
       expect(group.applied.length, group.id).toBeGreaterThanOrEqual(2);
       expect(group.doNotClaim.length, group.id).toBeGreaterThanOrEqual(2);
+      expect(group.evidenceNote?.ko.trim(), group.id).not.toBe("");
     }
   });
 
-  it("provides a complete 120-minute seminar with demo and discussion prompts", () => {
-    expect(ENGINEERING_SEMINAR_MODULES.reduce((sum, module) => sum + module.minutes, 0)).toBe(120);
+  it("provides modular talk material with demo and discussion prompts", () => {
+    expect(ENGINEERING_SEMINAR_MODULES.length).toBeGreaterThanOrEqual(5);
     for (const module of ENGINEERING_SEMINAR_MODULES) {
       expect(module.minutes, module.id).toBeGreaterThan(0);
       expect(module.learning.length, module.id).toBeGreaterThanOrEqual(2);

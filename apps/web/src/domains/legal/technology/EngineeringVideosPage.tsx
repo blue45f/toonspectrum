@@ -18,51 +18,35 @@ import {
   EngineeringStoryNav,
 } from "./EngineeringStoryUi";
 import { useEngineeringLocale } from "./use-engineering-locale";
+import technologyFilmScript from "./technology-film-script.json";
 
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Container } from "@/shared/components/section";
+import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringVideosPage", ko, en);
 
-const STORYBOARD = [
-  {
-    time: "00:00–00:12",
-    title: { ko: "끊긴 제작 맥락", en: "Fragmented production context" },
-    body: { ko: "기획·드로잉·3D·파일·검수 도구 사이에서 사라지는 맥락을 보여줍니다.", en: "Shows context being lost between planning, drawing, 3D, files and review tools." },
-  },
-  {
-    time: "00:12–00:25",
-    title: { ko: "프로젝트 중심 도메인", en: "Project-centered domain" },
-    body: { ko: "Workspace, Project, Episode, Cut, Asset와 Approval이 하나의 흐름으로 정렬됩니다.", en: "Workspace, Project, Episode, Cut, Asset and Approval align into one flow." },
-  },
-  {
-    time: "00:25–00:38",
-    title: { ko: "브러시와 로컬 우선 데이터", en: "Brushes and local-first data" },
-    body: { ko: "입력에서 문서 commit까지의 파이프라인과 OPFS·복구 저널을 시각화합니다.", en: "Visualizes the input-to-document pipeline and OPFS recovery journal." },
-  },
-  {
-    time: "00:38–00:51",
-    title: { ko: "Worker·PWA·브라우저 로컬 AI", en: "Workers, PWA and browser-local AI" },
-    body: { ko: "59개 전용 Worker와 버전 있는 Service Worker, ONNX WebGPU/WASM·MediaPipe의 요청·취소·메모리 경계를 설명합니다.", en: "Explains request, cancellation and memory boundaries across 59 dedicated workers, versioned service workers, ONNX WebGPU/WASM and MediaPipe." },
-  },
-  {
-    time: "00:51–01:04",
-    title: { ko: "협업·AI·개인 클라우드", en: "Collaboration, AI and personal cloud" },
-    body: { ko: "외부 공급자를 제품 계약 뒤에 두고 사용자 승인과 권리 정보를 보존합니다.", en: "Places external providers behind product contracts while preserving approval and rights metadata." },
-  },
-  {
-    time: "01:04–01:17",
-    title: { ko: "검증 가능한 상태", en: "Verifiable status" },
-    body: { ko: "운영, 설정, 실험과 문서 상태를 코드·테스트·워크플로 근거와 연결합니다.", en: "Connects live, configured, experimental and documented states to code, tests and workflows." },
-  },
-  {
-    time: "01:17–01:30",
-    title: { ko: "다른 프로젝트에 재사용", en: "Reuse in another project" },
-    body: { ko: "패키지 목록이 아니라 경계, 실패, 대체 경로와 검증 순서를 가져가도록 마무리합니다.", en: "Closes by reusing boundaries, failure, fallback and verification order rather than a package list." },
-  },
-] as const;
+const OVERVIEW_FILM = technologyFilmScript.variants.overview;
+
+function filmTime(seconds: number): string {
+  const totalSeconds = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainder = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
+}
+
+const STORYBOARD = OVERVIEW_FILM.scenes.map((scene, index) => {
+  const duration = OVERVIEW_FILM.durationSeconds / OVERVIEW_FILM.scenes.length;
+  return {
+    id: scene.id,
+    time: `${filmTime(index * duration)}–${filmTime((index + 1) * duration)}`,
+    title: scene.title,
+    body: scene.body,
+    points: scene.points,
+  };
+});
 
 const RENDER_PIPELINE = [
   { ko: "기술 스토리 콘텐츠와 장면 구성을 코드 리뷰", en: "Review engineering content and scene composition in code" },
@@ -87,12 +71,12 @@ export function EngineeringVideosPage() {
       <EngineeringStoryNav className="mt-3" />
 
       <EngineeringPageIntro
-        eyebrow="REMOTION · REVIEWABLE FILM"
+        eyebrow="REMOTION · SINGLE SOURCE · REVIEWABLE FILM"
         title={
-          bi("영상도 페이지와 같은 사실을 말하도록 코드로 만듭니다.", "The film is coded to tell the same facts as the website.")
+          bi("서비스 설명, 발표 화면, 자막과 영상이 같은 장면 원본을 사용합니다.", "Service copy, presentation screens, captions and film share one scene source.")
         }
         description={
-          bi("기존 격리된 Remotion 도구 체인에 기술 스토리 컴포지션을 추가했습니다. 영상은 자동 게시하지 않고, 수동 workflow에서 렌더한 artifact를 사람이 검수한 뒤 배포합니다.", "Engineering-story compositions are registered in the existing isolated Remotion toolchain. Nothing is auto-published: a person reviews manually rendered workflow artifacts before distribution.")
+          bi("장면 JSON에서 웹 스토리보드, Remotion 컴포지션, 한국어·영어 VTT와 대본을 함께 생성합니다. 영상은 자동 게시하지 않고 수동 workflow artifact를 사람이 검수한 뒤 배포합니다.", "One scene JSON drives the web storyboard, Remotion composition, Korean and English VTT and transcripts. Nothing is auto-published: a person reviews workflow artifacts before distribution.")
         }
         aside={
           <div className="rounded-3xl border border-accent/25 bg-accent-soft/30 p-5">
@@ -107,6 +91,8 @@ export function EngineeringVideosPage() {
           </div>
         }
       />
+
+      <ServiceStoryJourney current="film" className="mb-8" />
 
       <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]" aria-labelledby="film-preview-title">
         <div className="relative isolate aspect-video overflow-hidden rounded-[2rem] border border-line/70 bg-[#193629] p-6 text-[#f3f4e9] shadow-2xl sm:p-9">
@@ -123,7 +109,7 @@ export function EngineeringVideosPage() {
               <p className="mt-2 text-[0.58rem] uppercase tracking-[0.18em] text-[#b6c9ae]">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ENGINEERING STORY FILM")}</p>
             </div>
             <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[0.62rem] font-bold text-[#d7e7cf]">
-              {translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "90 SEC · 30 FPS")}</span>
+              {`${OVERVIEW_FILM.durationSeconds} SEC · ${technologyFilmScript.fps} FPS`}</span>
           </header>
 
           <div className="my-auto grid h-[70%] items-center gap-6 lg:grid-cols-[1fr_0.9fr]">
@@ -140,10 +126,16 @@ export function EngineeringVideosPage() {
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur">
               <div className="flex items-center justify-between text-[0.58rem] text-[#c6d8bf]">
                 <span>{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "ARCHITECTURE MAP")}</span>
-                <span>01 / 07</span>
+                <span>{`01 / ${String(STORYBOARD.length).padStart(2, "0")}`}</span>
               </div>
               <div className="mt-4 space-y-2">
-                {["Creative experience", "Domain contracts", "Specialist engines", "Data & infrastructure", "Verification"].map((label, index) => (
+                {[
+                  "Project authority",
+                  "Local-first creation",
+                  "WebRTC media",
+                  "AI · voice · video",
+                  "Rights · evidence",
+                ].map((label, index) => (
                   <div key={label} className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 px-3 py-2">
                     <span className="grid size-6 place-items-center rounded-lg bg-[#d7eca4] text-[0.6rem] font-black text-[#23402b]">{index + 1}</span>
                     <span className="text-[0.66rem] font-bold text-[#eff7eb]">{label}</span>
@@ -154,7 +146,10 @@ export function EngineeringVideosPage() {
           </div>
 
           <div className="absolute inset-x-0 bottom-0 h-1.5 bg-[#294a33]" aria-hidden="true">
-            <div className="h-full w-[16.66%] bg-[#b5d782]" />
+            <div
+              className="h-full bg-[#b5d782]"
+              style={{ width: `${100 / STORYBOARD.length}%` }}
+            />
           </div>
           <span className="absolute bottom-5 right-6 text-[0.58rem] text-[#b6c9ae]">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "toonstudio.cloud")}</span>
         </div>
@@ -181,19 +176,26 @@ export function EngineeringVideosPage() {
       </section>
 
       <section className="py-14 sm:py-20" aria-labelledby="storyboard-title">
-        <p className="eyebrow text-accent">{translateCurrentStaticSourceText("domains.legal.technology.EngineeringVideosPage", "en", "90-SECOND STORYBOARD")}</p>
+        <p className="eyebrow text-accent">{`${OVERVIEW_FILM.durationSeconds}-SECOND STORYBOARD`}</p>
         <h2 id="storyboard-title" className="mt-3 text-2xl font-black tracking-tight text-fg sm:text-3xl">
           {bi("장면마다 하나의 판단만 설명합니다.", "Each scene explains one decision.")}
         </h2>
         <ol className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {STORYBOARD.map((scene, index) => (
-            <li key={scene.time} className="rounded-3xl border border-line/70 bg-panel/55 p-5">
+            <li key={scene.id} className="rounded-3xl border border-line/70 bg-panel/55 p-5">
               <div className="flex items-center justify-between gap-3">
                 <span className="grid size-9 place-items-center rounded-full bg-accent text-xs font-black text-on-accent">{index + 1}</span>
                 <span className="font-display text-[0.66rem] font-bold text-fg-3">{scene.time}</span>
               </div>
               <h3 className="mt-5 text-lg font-black text-fg">{bi((scene.title).ko, (scene.title).en)}</h3>
               <p className="mt-3 text-sm leading-7 text-fg-3">{bi((scene.body).ko, (scene.body).en)}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {scene.points.map((point) => (
+                  <span key={point} className="rounded-full bg-raised px-2.5 py-1 text-[0.64rem] font-bold text-fg-2">
+                    {point}
+                  </span>
+                ))}
+              </div>
             </li>
           ))}
         </ol>
