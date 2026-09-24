@@ -201,7 +201,7 @@ fn parse_rejects_invalid_json_with_explicit_code() {
 
 #[test]
 fn parse_rejects_layer_without_scalar_rotation_instead_of_panicking() {
-    // velato 0.11's importer hits todo!() on a layer transform without `ks.r`
+    // velato 0.12's importer hits todo!() on a layer transform without `ks.r`
     // (src/import/converters.rs conv_transform); the schema pre-pass must turn
     // that into an explicit unsupported error before the importer runs.
     let missing_rotation = TRANSLATING_SQUARE.replace("\"r\": { \"a\": 0, \"k\": 0 },\n", "");

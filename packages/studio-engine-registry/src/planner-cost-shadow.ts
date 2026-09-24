@@ -213,16 +213,16 @@ export interface LaneCostCoefficients {
  *
  * ## perPath / perSegment — DERIVED from a MEASURED slope (large-scene.json)
  * 5000 paths @512² and 15000 paths @512², same wasm build:
- *   gpu 73.7 → 205.0 ms  ⇒ 0.01313 ms/path
- *   cpu 2471.7 → 7410.3 ms ⇒ 0.49386 ms/path
+ *   gpu 74.2 → 214.0 ms   ⇒ 0.01398 ms/path
+ *   cpu 2343.6 → 6965.5 ms ⇒ 0.46219 ms/path
  * The harness canvas is 512² = 0.262 MP and path cost is coverage-dominated,
- * so both slopes are divided by that area: gpu 0.0501, cpu 1.8841 ms/path/MP.
+ * so both slopes are divided by that area: gpu 0.05333, cpu 1.76311 ms/path/MP.
  * The harness draws fixed 24-point strokes (`config.pointsPerStroke`), so
  * per-path and per-segment work cannot be separated by measurement; the model
  * splits the measured slope 1:5 (setup : segment work) across 23 segments per
  * path, which reproduces the measured slope exactly at that shape:
- *   cpu    0.314   + 23 × 0.0683  = 1.885 ms/path/MP  (measured 1.8841)
- *   webgpu 0.0083  + 23 × 0.00181 = 0.0499 ms/path/MP (measured 0.0501)
+ *   cpu    0.2939  + 23 × 0.06388  = 1.7631 ms/path/MP (measured 1.76311)
+ *   webgpu 0.00889 + 23 × 0.001932 = 0.05333 ms/path/MP (measured 0.05333)
  * webgl is ORDINAL at 2× webgpu: it replays per-draw state instead of
  * tessellating in compute, and has no in-repo measurement.
  *
@@ -273,8 +273,8 @@ export const COST_MODEL_COEFFICIENTS = {
   lane: {
     webgpu: {
       base: 2.4,
-      perPath: 0.0083,
-      perSegment: 0.00181,
+      perPath: 0.00889,
+      perSegment: 0.001932,
       perImage: 0.02,
       perGlyph: 0.002,
       perGradient: 0.004,
@@ -284,8 +284,8 @@ export const COST_MODEL_COEFFICIENTS = {
     },
     webgl: {
       base: 3,
-      perPath: 0.0166,
-      perSegment: 0.00362,
+      perPath: 0.01778,
+      perSegment: 0.003864,
       perImage: 0.02,
       perGlyph: 0.0015,
       perGradient: 0.006,
@@ -295,8 +295,8 @@ export const COST_MODEL_COEFFICIENTS = {
     },
     cpu: {
       base: 0,
-      perPath: 0.314,
-      perSegment: 0.0683,
+      perPath: 0.2939,
+      perSegment: 0.06388,
       perImage: 1,
       perGlyph: 0.004,
       perGradient: 0.02,

@@ -179,3 +179,170 @@ URL query:
 - `production.routes.test.ts`
   - canonical manuscript route 소유권.
 - 전체 TypeScript typecheck, 관련 Vitest, production build를 병합 게이트로 사용한다.
+
+## 6. 2026-09-24 사용성 고도화 구현
+
+이번 증분은 새 협업 제품이나 원고 저장소를 만들지 않고 기존 Production·ProjectGraph·pinned review·review delivery·export 권위를 한 화면에서 연결한다.
+
+### 제작 수명주기
+
+원고 공정은 다음 creator-facing 단계로 projection한다.
+
+```text
+empty → editing → submitted → in-review → changes-requested
+                                  ↓
+                               approved → ready-to-deliver → released
+```
+
+이 단계는 서버의 revision/review 상태를 설명하기 위한 읽기 모델이다. 별도 승인 권위나 변경 가능한 상태 열을 만들지 않는다.
+
+- `HEAD`: 가장 최근 작업 revision.
+- `FINAL`: `artifact.approvedRevisionId`가 가리키는 승인 기준.
+- `RELEASE`: 실제 전달·게시 revision.
+- FINAL 이후 HEAD가 변경되면 기존 FINAL은 유지하고 `hasUnapprovedChanges`를 표시한다.
+- 열린 review 또는 changes-requested가 있으면 과거 FINAL/RELEASE가 있어도 현재 다음 행동은 검수로 설명한다.
+- 필수 피드백·열린 review·미승인 변경이 없고 FINAL이 있으면 전달 준비 상태다.
+
+### 공정 Cockpit
+
+- 공정 카드와 한눈 보기 표에 단계, HEAD, FINAL, RELEASE를 동시에 표시한다.
+- 필수 수정 → 열린 검수 → FINAL 이후 변경 → FINAL 미지정 → 전달 준비 → 전달 완료 순으로 다음 행동을 제시한다.
+- 카드의 작업 열기와 검수·버전·전달 행동은 서로 다른 목적지다.
+- 행렬 표는 공정 열을 고정하고 lifecycle·HEAD·FINAL·RELEASE·검수·필수 수정·다음 행동 열을 제공한다.
+
+### 고정 검수 Workspace
+
+피드백 탭은 summary 링크 목록에 머물지 않고 선택한 pinned review workflow를 같은 맥락에서 연다.
+
+- 왼쪽에서 동일 artifact의 검수 이력을 선택한다.
+- `manuscriptReview` query로 선택한 검수본을 복원한다.
+- 선택 대상은 `review-snapshot` revision과 정확한 `rootGraphHash`가 일치할 때만 열린다.
+- 검수본을 찾지 못해도 현재 HEAD나 다른 review로 자동 대체하지 않는다.
+- 본문에서는 페이지·컷·텍스트 anchor, severity, 댓글, 담당자, 기한, 해결·재열기, 수정 revision, 비교, 승인 결정을 기존 pinned review 권위로 처리한다.
+- 개인 검수 메모는 기존 private draft shelf에 보관하고 선택 또는 묶음 발행한다.
+- inline 검수 화면에서는 공유·내보내기 action을 숨기고 아래 전달 Hub에서 의미를 분리한다.
+
+### 공유·전달·내보내기
+
+한 개의 모호한 공유 버튼 대신 네 경계를 나눈다.
+
+1. **현재 화면 URL**: 회차·공정·필터·선택 위치만 복원한다. 권한을 부여하지 않는다.
+2. **외부 검토 링크**: immutable review snapshot, 만료, 폐기, watermark, 현재 접근 권한을 사용한다.
+3. **공식 전달**: 승인 원본, 페이지 checksum, manifest, 수신자 binding, 발행·다운로드·수신·취소 기록을 사용한다.
+4. **목적별 내보내기**: 플랫폼·SNS·인쇄·PDF·보관 profile로 변환하며 공식 전달과 별개다.
+
+전달 준비 점검은 snapshot 선택, 열린 필수 수정, FINAL, FINAL 이후 변경, 선택 review 승인, RELEASE 기록을 따로 보여준다. 모든 민감 action은 서버 권한을 다시 확인한다.
+
+### 접근성·반응형
+
+- 주요 action은 기존 `buttonClass`와 최소 터치 크기를 사용한다.
+- lifecycle은 색만으로 전달하지 않고 아이콘·단계명·현재 단계 semantics를 함께 제공한다.
+- review 목록은 button의 `aria-pressed`, pinned panel은 기존 status/alert/live region을 유지한다.
+- 행렬 표는 가로 scroll region, caption, column scope, sticky 공정 열을 유지한다.
+- 좁은 화면은 lifecycle 카드, review 목록, 전달 도구를 단일 column으로 쌓는다.
+- 현재 URL 복사와 실제 외부 공유는 문구와 action을 분리하고 결과를 live status로 알린다.
+
+## 7. 구현 파일
+
+- `ProductionManuscriptWorkspace.tsx`: URL 상태, lifecycle, inline review, delivery hub 통합.
+- `ProductionManuscriptLifecyclePanel.tsx`: 제작 단계와 HEAD/FINAL/RELEASE 설명.
+- `ProductionManuscriptProcessBrowser.tsx`: 카드·행렬의 공정 판단 정보.
+- `ProductionManuscriptDeliveryHub.tsx`: 내부 URL·외부 검토·공식 전달·변환 출력 분리.
+- `production-manuscript-model.ts`: ProjectGraph 상태의 immutable projection.
+- `production-manuscript-ux.ts`: 주의 우선순위, 검색, 필터, 다음 행동.
+- `StudioPinnedReviewPanel.tsx`: 기존 검수 권위를 inline 또는 독립 화면에서 재사용할 수 있는 presentation 옵션.
+
+## 8. 의도적으로 새로 만들지 않은 것
+
+- Creco 화면, 문구, 아이콘, 과금 모델의 복제.
+- 두 번째 원고 blob 저장소나 두 번째 review/approval 시스템.
+- 브라우저가 임의로 판정하는 승인·게시·수신 완료 상태.
+- 과거 revision을 덮어쓰는 복원.
+- 공유 URL만으로 얻는 편집 권한.
+- review snapshot이 유효하지 않을 때 현재 HEAD로의 자동 fallback.
+- 이번 UI 증분을 위한 DB migration, 운영 secret, 유료 서비스 또는 배포 변경.
+
+## 9. 검증 및 남은 경계
+
+추가 회귀 검증은 다음을 포함한다.
+
+- lifecycle이 열린 필수 수정과 active review를 FINAL보다 우선 설명하는지.
+- HEAD·FINAL·RELEASE identity가 서로 섞이지 않는지.
+- FINAL 이후 변경이 기존 승인본을 지우지 않는지.
+- 검수 탭이 exact review/artifact/revision/hash 좌표를 보존하는지.
+- 내부 URL, immutable share, official delivery, transformed export가 별도 action인지.
+- invalid pinned subject가 다른 review나 현재 HEAD로 대체되지 않는지.
+- 검색·필터·행렬·키보드 경계가 기존 동작을 유지하는지.
+
+이번 증분은 기존 ProjectGraph revision blob과 review preview manifest를 사용한다. 페이지별 중복 저장 감소량이나 외부 전송 성능을 새로 측정하지 않았으며, 새로운 서버 dedup 알고리즘을 추가한 것으로 해석하지 않는다.
+
+운영 배포와 실제 외부 수신자 기기·통신사 WAN 검증은 별도의 운영 release acceptance 대상이다. 브라우저 계정 분리, 네트워크 단절·복구, 대형 원고, 장시간 반복, 동시 명령 충돌은 아래 2026-09-24 후속 acceptance에서 자동화한다. 구현 완료와 물리·운영 환경 검증 완료를 같은 상태로 표시하지 않는다.
+
+## 10. 2026-09-24 병합 후 release acceptance
+
+PR `#2018`의 사용성 구현은 merge commit `cb83ba49ab75ff8afb5a9d83b0b8526148a44e69`로 `main`에 병합했다. 후속 acceptance는 새 기능을 추가하기보다 민감한 공유·전달 동작이 계정, 권한 lease, 네트워크, 재시도, 동시 실행 경계에서 fail-closed인지 검증한다.
+
+### 계정·권한 lease 경계
+
+- `ProductionManuscriptDeliveryHub`, 외부 공유 관리자, 승인본 ZIP, 공식 전달 화면은 현재 actor를 React identity에 포함한다.
+- 로그아웃 또는 계정 전환 시 기존 검수 metadata, 공유 목록, 일회성 링크, 전달 기록과 action을 비동기 재검증보다 먼저 제거한다.
+- 지연된 이전 계정 응답은 session revision과 actor fence를 통과하지 못하므로 화면을 다시 채우지 못한다.
+- 고정 검수 권한 lease가 만료되면 갱신 요청이 멈춰 있어도 외부 공유·공식 전달 도구를 제거한다.
+- focus, visibility 복귀, session publication, online 복귀마다 서버 권한을 다시 읽는다.
+
+### WAN 단절·모호한 응답 재시도
+
+- offline 이벤트가 발생하면 in-flight ZIP 요청을 abort하고 private 목록과 action을 숨긴다.
+- online 복귀 후 새 목록을 받아오기 전에는 공유·전달을 재개하지 않는다.
+- 준비, 발행, 다운로드, 수신 확인은 입력 fingerprint별 `id`와 `operationId`를 유지한다.
+- 서버가 처리를 완료했지만 응답을 받지 못한 경우 같은 버튼을 다시 누르면 같은 operation identity를 재사용한다.
+- 성공을 확정했을 때만 retry identity를 폐기한다. 계정 전환 후에는 이전 계정의 모호한 identity를 재사용하지 않는다.
+
+### 동시 명령·수신자 binding
+
+- PostgreSQL integration에 같은 operation의 동시 replay가 이벤트 하나만 남기는 검증을 추가한다.
+- 서로 다른 operation이 같은 expected version을 동시에 발행하면 하나만 성공하고 다른 하나는 CAS conflict로 종료한다.
+- 수신자 collaborator invitation이 폐기·재발급되면 과거 binding의 다운로드·수신 완료 권한은 복구되지 않는다.
+- 브라우저 acceptance에서는 stale owner tab과 primary owner tab의 동시 발행을 재현하고, 독립 operation identity와 충돌 안내를 확인한다.
+
+### 대형 원고·장시간 반복
+
+- 서버 archive test는 허용 상한인 100페이지의 원본 bytes와 SHA-256을 빠짐없이 ZIP에 포함한다.
+- 같은 입력으로 두 번 생성한 100페이지 archive의 bytes와 archive evidence가 동일한지 확인한다.
+- 브라우저 acceptance fixture도 100페이지 manifest를 사용한다.
+- 60초 동안 225회의 offline/online 반복을 수행했고 DOM node 수는 48–56 범위로 유지됐다.
+- 1440, 820, 390, 320px viewport에서 overflow와 44px 미만 action을 검사했다.
+
+### 자동 검증 도구
+
+- `verify:studio-manuscript-delivery-acceptance`
+  - 실제 `StudioReviewDelivery` React component를 사용한다.
+  - owner primary tab, stale owner tab, recipient context를 분리한다.
+  - 준비·발행·다운로드의 응답 유실, exact operation replay, stale expected-version conflict를 검증한다.
+  - offline/online 복구, 100페이지 manifest, responsive viewport, DOM growth를 검사한다.
+  - `.qa/review-delivery-release-acceptance/report.json`과 viewport screenshot을 생성한다.
+- focused Vitest는 Production manuscript, pinned review, share manager, approved export, official delivery, archive service/model을 함께 실행한다.
+- PostgreSQL URL이 있는 CI에서는 immutable capture·delivery integration의 동시 명령 검증도 실행한다.
+
+### 증거의 범위
+
+브라우저 acceptance의 기기와 WAN은 Playwright viewport 및 offline emulation이다. 실제 휴대전화·태블릿, 통신사망, 운영 인증, 운영 object storage, 운영 배포 자체를 통과했다는 의미는 아니다. 운영 환경에서는 실제 수신자 계정과 기기, 실제 네트워크 단절, 관측 지표와 rollback 기준을 포함한 별도 release sign-off가 필요하다.
+
+## 11. 2026-09-24 main 후속 자동화
+
+`verify:studio-manuscript-delivery-acceptance`는 더 이상 별도 Vite 실행을 암묵적으로 요구하지 않는다.
+
+- 지정 loopback port가 비어 있으면 현재 worktree 소유의 Vite를 직접 시작하고 완료 후 process group까지 종료한다.
+- 같은 port를 현재 worktree의 서버가 사용 중이면 재사용한다.
+- 다른 저장소·worktree의 listener가 있으면 화면을 잘못 검증하지 않고 즉시 실패한다.
+- harness readiness가 확인된 뒤에만 immutable review delivery acceptance를 시작한다.
+
+경로 기반 GitHub Actions `Studio manuscript delivery acceptance`를 추가한다.
+
+- 원고 Cockpit, pinned review, 외부 공유, 공식 전달, ZIP/archive 권위 파일 변경 시 실행한다.
+- DB 비의존 Web/API focused 테스트 10개 파일을 실행한다. PostgreSQL 기반 불변 이력·동시 명령 검증은 필수 core database lane이 계속 소유한다.
+- 실제 `StudioReviewDelivery` 컴포넌트로 100페이지, 모호한 응답 재시도, stale tab 충돌, 수신 확인을 검증한다.
+- 60초 offline/online 반복과 1440/820/390/320px viewport 검사를 수행한다.
+- report와 viewport screenshot을 CI artifact로 보존한다.
+
+이 자동화도 실제 휴대전화·통신사망·운영 인증·운영 object storage 또는 운영 배포 승인을 대신하지 않는다.

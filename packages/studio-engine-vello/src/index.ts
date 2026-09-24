@@ -17,6 +17,7 @@ export {
   probeWebGpu,
   renderSceneToPixelsGpu,
   renderSceneToTextureGpu,
+  renderSceneToTextureHybridGpu,
   type GpuCpuComparison,
   type VelloGpuInitInput,
   type WebGpuAdapterInfo,

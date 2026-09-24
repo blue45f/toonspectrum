@@ -60,18 +60,18 @@ const VELLO_ARTIFACT_POLICIES = Object.freeze([
   }),
   Object.freeze({
     id: "pkg-gpu",
-    features: Object.freeze(["fabric", "lottie", "svg"]),
-    expectedExternalPackageCount: 144,
+    features: Object.freeze(["hybrid", "lottie", "svg"]),
+    expectedExternalPackageCount: 137,
     requiredPackages: Object.freeze([
-      "vello@0.9.0",
+      "vello@0.10.0",
+      "vello_hybrid@0.2.0",
       "vello_cpu@0.2.0",
-      "velato@0.11.0",
-      "vello_svg@0.10.0",
-      "usvg@0.46.0",
+      "velato@0.12.0",
+      "vello_svg@0.11.0",
+      "usvg@0.48.1",
       "wgpu@29.0.4",
       "parley@0.11.0",
       "harfrust@0.10.0",
-      "skrifa@0.42.1",
       "skrifa@0.43.2",
       "skrifa@0.44.0",
     ]),
@@ -1068,7 +1068,7 @@ ${rows.join("\n")}
 `;
 }
 
-function refreshVelloThirdPartyNotices() { // NOSONAR javascript:S3776
+export function refreshVelloThirdPartyNotices() { // NOSONAR javascript:S3776
   const artifacts = VELLO_ARTIFACT_POLICIES.map((policy) => ({
     id: policy.id,
     features: [...policy.features],
@@ -1098,7 +1098,7 @@ function refreshVelloThirdPartyNotices() { // NOSONAR javascript:S3776
       "wasm32-unknown-unknown",
       "--no-default-features",
       "--features",
-      "lottie,fabric,svg",
+      "hybrid,lottie,svg",
     ]),
   );
   const metadataByKey = new Map(
@@ -1109,7 +1109,7 @@ function refreshVelloThirdPartyNotices() { // NOSONAR javascript:S3776
     parseCargoLockPackages(lockText).map((entry) => [packageKey(entry), entry]),
   );
   const packageKeys = [...new Set(artifacts.flatMap(({ packages }) => packages))].sort();
-  const velloMetadata = metadataByKey.get("vello@0.9.0");
+  const velloMetadata = metadataByKey.get("vello@0.10.0");
   const canonicalDualLicenseFiles = findRootLicenseFiles(dirname(velloMetadata.manifest_path));
   if (canonicalDualLicenseFiles.length < 2) {
     throw new Error("Vello canonical MIT/Apache license files are unavailable.");

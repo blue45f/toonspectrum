@@ -365,12 +365,12 @@
   ],
   "gpuBrowser": {
     "harness": "packages/studio-engine-vello/src/__tests__/gpu-browser-large.test.ts (VELLO_GPU_LARGE_PROBE=1)",
-    "engine": "vello 0.9.0 GPU via browser WebGPU (pkg-gpu wasm, wgpu BROWSER_WEBGPU) vs embedded vello_cpu 0.2.0 in the same wasm build",
+    "engine": "vello 0.10.0 GPU via browser WebGPU (pkg-gpu wasm, wgpu BROWSER_WEBGPU) vs embedded vello_cpu 0.2.0 in the same wasm build",
     "note": "gpu/cpu timings include the wasm-side serde parse of the scene JSON (not separable without crate changes) plus, for GPU, pipeline submit and full readback; jsonBoundary isolates the JS-side JSON.parse/JSON.stringify cost of the same payload",
-    "measuredAt": "2026-08-08T00:01:09.969Z",
+    "measuredAt": "2026-09-23T19:08:26.130Z",
     "browser": {
-      "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
-      "version": "140.0.7339.186"
+      "launch": "system chrome headless (metal, unsafe-webgpu)",
+      "version": "153.0.8010.53"
     },
     "adapter": {
       "backend": "BrowserWebGpu",
@@ -389,27 +389,27 @@
         "canvas": "512x512",
         "seed": 504069529,
         "fuzzyMismatchPct": 0,
-        "gpuP50Ms": 73.7,
-        "gpuP95Ms": 76.4,
-        "cpuInBrowserP50Ms": 2471.7,
+        "gpuP50Ms": 74.2,
+        "gpuP95Ms": 75.7,
+        "cpuInBrowserP50Ms": 2343.6,
         "jsonBoundary": {
           "sceneJsonBytes": 8007317,
-          "parseP50Ms": 18,
-          "stringifyP50Ms": 10.2
+          "parseP50Ms": 17.7,
+          "stringifyP50Ms": 10.9
         },
         "gpuSamplesMs": [
-          76.4,
-          72.7,
-          73.7,
-          71.9,
+          74.2,
+          75.7,
+          73.6,
+          75.4,
           73.9
         ],
         "cpuSamplesMs": [
-          2491.8,
-          2477.2,
-          2471.7,
-          2466.6,
-          2470.3
+          2358.3,
+          2327.5,
+          2343.6,
+          2339,
+          2344.5
         ]
       },
       {
@@ -418,27 +418,27 @@
         "canvas": "512x512",
         "seed": 1504099529,
         "fuzzyMismatchPct": 0.0004,
-        "gpuP50Ms": 205,
-        "gpuP95Ms": 210.4,
-        "cpuInBrowserP50Ms": 7410.3,
+        "gpuP50Ms": 214,
+        "gpuP95Ms": 218.6,
+        "cpuInBrowserP50Ms": 6965.5,
         "jsonBoundary": {
           "sceneJsonBytes": 24044610,
-          "parseP50Ms": 54.8,
-          "stringifyP50Ms": 32
+          "parseP50Ms": 52.3,
+          "stringifyP50Ms": 33.2
         },
         "gpuSamplesMs": [
-          210.4,
-          205.8,
-          204.8,
-          203.8,
-          205
+          216,
+          210.7,
+          218.6,
+          214,
+          214
         ],
         "cpuSamplesMs": [
-          7399.7,
-          7414.4,
-          7420.5,
-          7410.3,
-          7408.7
+          6965.5,
+          6975.8,
+          6968.8,
+          6930.8,
+          6956.2
         ]
       }
     ]

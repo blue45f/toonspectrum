@@ -2,6 +2,7 @@ import {
   ArrowRight,
   AudioLines,
   BadgeCheck,
+  CircleDot,
   FileArchive,
   FileImage,
   FileText,
@@ -9,6 +10,7 @@ import {
   LayoutGrid,
   ListFilter,
   MessageSquare,
+  PackageCheck,
   Rows3,
   Search,
   SearchX,
@@ -20,7 +22,9 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
 import {
+  productionManuscriptLifecycleLabel,
   productionManuscriptRevisionLabel,
+  type ProductionManuscriptLifecyclePhase,
   type ProductionManuscriptProcess,
 } from "./production-manuscript-model";
 import {
@@ -48,7 +52,7 @@ interface Props {
   readonly onLayoutChange: (value: ProductionManuscriptLayout) => void;
   readonly onOpenProcess: (
     process: ProductionManuscriptProcess,
-    view: "versions" | "feedback",
+    view: "versions" | "feedback" | "delivery",
   ) => void;
   readonly onReset: () => void;
 }
@@ -81,6 +85,27 @@ function attentionTone(
   if (level === "warning") return "border-warn/35 bg-warn/10 text-warn";
   if (level === "success") return "border-good/35 bg-good/10 text-good";
   return "border-line bg-raised text-fg-2";
+}
+
+function lifecycleTone(phase: ProductionManuscriptLifecyclePhase): string {
+  if (phase === "changes-requested") return "border-bad/35 bg-bad/10 text-bad";
+  if (phase === "submitted" || phase === "in-review") return "border-warn/35 bg-warn/10 text-warn";
+  if (phase === "approved" || phase === "ready-to-deliver" || phase === "released") {
+    return "border-good/35 bg-good/10 text-good";
+  }
+  return "border-line bg-raised text-fg-2";
+}
+
+function revisionSummary(process: ProductionManuscriptProcess, kind: "head" | "final" | "release") {
+  const revision = kind === "head" ? process.headRevision
+    : kind === "final" ? process.approvedRevision : process.releaseRevision;
+  return revision ? {
+    title: productionManuscriptRevisionLabel(revision.kind),
+    detail: formatDate(revision.createdAt),
+  } : {
+    title: kind === "head" ? "작업본 없음" : kind === "final" ? "미지정" : "미전달",
+    detail: "—",
+  };
 }
 
 function workHref(process: ProductionManuscriptProcess, projectHref: string, editorHref: string): string {
@@ -149,6 +174,10 @@ function ProcessCard({  process,
           <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.625rem] font-bold text-fg-2">
             {process.label}
           </span>
+          <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[0.625rem] font-bold", lifecycleTone(process.lifecyclePhase))}>
+            <CircleDot className="mr-1 size-3" aria-hidden="true" />
+            {productionManuscriptLifecycleLabel(process.lifecyclePhase)}
+          </span>
         </div>
         <p className="mt-1 text-xs text-fg-3">
           {process.artifact.scope.episodeId ?? "프로젝트 공통"}
@@ -179,17 +208,24 @@ function ProcessCard({  process,
         <p className="text-[0.6875rem] text-fg-3">필수 수정</p>
       </div>
     </div>
-    {process.headRevision ? <div className="mt-3 rounded-xl border border-line bg-card p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-bold text-fg">
-          현재 작업본 · {productionManuscriptRevisionLabel(process.headRevision.kind)}
-        </p>
-        <span className="font-mono text-[0.625rem] text-fg-3">{process.headRevision.id}</span>
-      </div>
-      <p className="mt-1 line-clamp-2 text-xs leading-5 text-fg-2">
-        {process.headRevision.message ?? "변경 설명 없음"}
-      </p>
-    </div> : null}
+    <div className="mt-3 grid grid-cols-3 gap-2" aria-label={`${process.artifact.title} 버전 기준`}>
+      {(["head", "final", "release"] as const).map((kind) => {
+        const value = revisionSummary(process, kind);
+        return <div key={kind} className={cn(
+          "min-w-0 rounded-xl border p-2.5",
+          kind === "head" ? "border-accent/25 bg-accent-soft/20"
+            : kind === "final" && process.approvedRevision ? "border-good/25 bg-good/5"
+              : "border-line bg-card",
+        )}>
+          <p className="text-[0.5625rem] font-black uppercase tracking-[0.1em] text-fg-3">{kind}</p>
+          <p className="mt-1 truncate text-xs font-black text-fg">{value.title}</p>
+          <p className="mt-1 truncate text-[0.625rem] text-fg-3">{value.detail}</p>
+        </div>;
+      })}
+    </div>
+    {process.hasUnapprovedChanges ? <p className="mt-2 rounded-lg border border-warn/30 bg-warn/10 px-2.5 py-2 text-[0.6875rem] leading-5 text-fg-2">
+      FINAL 이후 변경된 HEAD입니다. 다시 제출·검수해야 합니다.
+    </p> : null}
     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line/70 pt-3">
       <button
         type="button"
@@ -202,7 +238,10 @@ function ProcessCard({  process,
       >
         {attention.recommendedView === "feedback"
           ? <MessageSquare className="size-4" aria-hidden="true" />
-          : <GitCompareArrows className="size-4" aria-hidden="true" />}        {attention.actionLabel}
+          : attention.recommendedView === "delivery"
+            ? <PackageCheck className="size-4" aria-hidden="true" />
+            : <GitCompareArrows className="size-4" aria-hidden="true" />}
+        {attention.actionLabel}
       </button>
       <Link
         to={workHref(process, projectHref, editorHref)}
@@ -227,15 +266,17 @@ function ProcessMatrix({ processes, selectedProcessId, projectHref, editorHref, 
     role="region"
     aria-label="공정 한눈 보기 표"
   >
-    <table className="w-full min-w-[58rem] border-collapse text-left text-xs">
+    <table className="w-full min-w-[76rem] border-collapse text-left text-xs">
       <caption className="sr-only">
         공정별 현재 작업본, 최종본, 진행 검수와 필수 수정 상태
       </caption>
       <thead className="sticky top-0 z-10 bg-raised text-fg-2">
         <tr>
           <th scope="col" className="sticky left-0 z-20 border-r border-line bg-raised px-4 py-3 font-black">공정·원고</th>
-          <th scope="col" className="px-3 py-3 font-black">현재 작업본</th>
-          <th scope="col" className="px-3 py-3 font-black">최종본</th>
+          <th scope="col" className="px-3 py-3 font-black">단계</th>
+          <th scope="col" className="px-3 py-3 font-black">HEAD · 현재 작업</th>
+          <th scope="col" className="px-3 py-3 font-black">FINAL · 승인 기준</th>
+          <th scope="col" className="px-3 py-3 font-black">RELEASE · 전달 기준</th>
           <th scope="col" className="px-3 py-3 text-center font-black">검수</th>
           <th scope="col" className="px-3 py-3 text-center font-black">필수 수정</th>
           <th scope="col" className="px-4 py-3 text-right font-black">다음 행동</th>
@@ -267,6 +308,13 @@ function ProcessMatrix({ processes, selectedProcessId, projectHref, editorHref, 
                 </div>
               </div>
             </td>
+            <td className="px-3 py-3">
+              <span className={cn("inline-flex items-center rounded-full border px-2 py-1 font-bold", lifecycleTone(process.lifecyclePhase))}>
+                <CircleDot className="mr-1 size-3" aria-hidden="true" />
+                {productionManuscriptLifecycleLabel(process.lifecyclePhase)}
+              </span>
+              {process.hasUnapprovedChanges ? <p className="mt-1 text-[0.625rem] text-warn">FINAL 이후 변경</p> : null}
+            </td>
             <td className="px-3 py-3 text-fg-2">
               {process.headRevision ? <>
                 <p className="font-bold text-fg">
@@ -276,9 +324,20 @@ function ProcessMatrix({ processes, selectedProcessId, projectHref, editorHref, 
               </> : "—"}
             </td>
             <td className="px-3 py-3">
-              {process.approvedRevision ? <span className="inline-flex items-center gap-1 rounded-full border border-good/35 bg-good/10 px-2 py-1 font-bold text-good">
-                <BadgeCheck className="size-3.5" aria-hidden="true" /> 확정
-              </span> : <span className="font-bold text-fg-3">미지정</span>}
+              {process.approvedRevision ? <>
+                <span className="inline-flex items-center gap-1 rounded-full border border-good/35 bg-good/10 px-2 py-1 font-bold text-good">
+                  <BadgeCheck className="size-3.5" aria-hidden="true" /> 확정
+                </span>
+                <p className="mt-1 text-[0.625rem] text-fg-3">{formatDate(process.approvedRevision.createdAt)}</p>
+              </> : <span className="font-bold text-fg-3">미지정</span>}
+            </td>
+            <td className="px-3 py-3">
+              {process.releaseRevision ? <>
+                <span className="inline-flex items-center gap-1 rounded-full border border-accent/35 bg-accent-soft px-2 py-1 font-bold text-accent">
+                  <PackageCheck className="size-3.5" aria-hidden="true" /> 기록됨
+                </span>
+                <p className="mt-1 text-[0.625rem] text-fg-3">{formatDate(process.releaseRevision.createdAt)}</p>
+              </> : <span className="font-bold text-fg-3">미전달</span>}
             </td>
             <td className="px-3 py-3 text-center font-black text-fg">{process.openReviewCount}</td>
             <td className={cn(

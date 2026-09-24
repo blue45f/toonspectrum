@@ -1,11 +1,11 @@
-//! Browser WebGPU wasm lane (ADR-0011 lane 2, V12 §4.1 vello 0.9 Classic).
+//! Browser WebGPU wasm lane (ADR-0011 lane 2, V14 vello 0.10 Classic).
 //!
 //! Compiled only for `wasm32` with the `gpu` feature — i.e. the `pkg-gpu/`
 //! wasm-pack artifact. The default `pkg/` CPU artifact never contains this
 //! module. Entry points:
 //! - [`probe_webgpu`]: adapter availability + adapter info as a JSON string.
 //! - [`render_scene_gpu_json`]: SceneIR JSON -> RGBA8 pixels through
-//!   vello 0.9 `render_to_texture` on the browser's WebGPU device, with a
+//!   vello 0.10 `render_to_texture` on the browser's WebGPU device, with a
 //!   256-byte-aligned COPY_SRC readback (evidence collection lane; the
 //!   interactive path never reads back).
 //!
@@ -33,10 +33,21 @@ use crate::scene::SceneIR;
 /// Cached device/queue/renderer — WebGPU adapter acquisition and vello shader
 /// compilation are expensive, and the wasm main thread is single-threaded so a
 /// thread_local slot is a true singleton.
+#[cfg(feature = "hybrid")]
+struct HybridGpuContext {
+    width: u32,
+    height: u32,
+    renderer: vello_hybrid::Renderer,
+    resources: vello_hybrid::Resources,
+}
+
 struct GpuContext {
     device: wgpu::Device,
     queue: wgpu::Queue,
     renderer: RefCell<Renderer>,
+    /// Real upstream Vello Hybrid renderer, rebuilt only when target dimensions change.
+    #[cfg(feature = "hybrid")]
+    hybrid: RefCell<Option<HybridGpuContext>>,
     /// True when the device came from [`adopt_gpu_device`] instead of our own
     /// adapter request — the probe asserts on this so "zero-copy" can never be
     /// claimed for a self-owned device.
@@ -105,6 +116,8 @@ fn install_context(
         device,
         queue,
         renderer: RefCell::new(renderer),
+        #[cfg(feature = "hybrid")]
+        hybrid: RefCell::new(None),
         #[cfg(feature = "fabric")]
         adopted,
     });
@@ -139,7 +152,10 @@ impl Future for MapFuture {
 
 async fn render_scene_gpu(scene_ir: &SceneIR) -> Result<Vec<u8>, String> {
     if scene_ir.version != 11 {
-        return Err(format!("invalid scene: unsupported scene version: {}", scene_ir.version));
+        return Err(format!(
+            "invalid scene: unsupported scene version: {}",
+            scene_ir.version
+        ));
     }
     if scene_ir.width == 0
         || scene_ir.height == 0
@@ -287,7 +303,7 @@ pub async fn render_scene_gpu_json(scene_json: String) -> Result<js_sys::Uint8Ar
 /// WebGPU device and resolves with straight RGBA8 pixels (width * height * 4)
 /// over a transparent base (Lottie output is meant to be composited).
 ///
-/// ADR-0011 Velato lane: velato 0.11 lowers the composition to a vello 0.9
+/// ADR-0011 Velato lane: velato 0.12 lowers the composition to a vello 0.10
 /// `Scene` (`crate::lottie`), which reuses the exact texture/readback path the
 /// SceneIR lane validated. Rejections carry a JSON message
 /// `{"code":"lottie-*","reason":"..."}` — parse failures, unsupported Lottie
@@ -340,7 +356,7 @@ pub fn render_svg_cpu_json(
     Ok(js_sys::Uint8Array::from(pixels.as_slice()))
 }
 
-/// Renders the strict SVG subset through vello_svg 0.10 -> vello 0.9 on the
+/// Renders the strict SVG subset through vello_svg 0.11 -> vello 0.10 on the
 /// browser WebGPU device. Readback exists only for quality evidence/export;
 /// callers must keep the interactive hot path on-GPU.
 #[cfg(feature = "svg")]
@@ -377,7 +393,7 @@ pub async fn probe_webgpu() -> String {
                     "driverInfo": info.driver_info,
                 },
                 "engine": format!(
-                    "studio-engine-vello {} (vello 0.9 GPU, wgpu BROWSER_WEBGPU)",
+                    "studio-engine-vello {} (vello 0.10 GPU, vello_hybrid 0.2, wgpu BROWSER_WEBGPU)",
                     env!("CARGO_PKG_VERSION")
                 ),
             })
@@ -403,8 +419,8 @@ pub async fn probe_webgpu() -> String {
 #[cfg(feature = "fabric")]
 mod fabric {
     use super::{
-        encode_scene, install_context, parse_scene, wgpu, Color, GpuContext, RenderParams,
-        AaConfig, JsError, JsValue, Rc, GPU_CONTEXT,
+        encode_scene, install_context, parse_scene, wgpu, AaConfig, Color, GpuContext, JsError,
+        JsValue, Rc, RenderParams, GPU_CONTEXT,
     };
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsCast;
@@ -442,9 +458,7 @@ mod fabric {
     #[wasm_bindgen]
     pub fn adopt_gpu_device(device: JsValue) -> Result<(), JsError> {
         if !device.is_object() {
-            return Err(JsError::new(
-                "adopt_gpu_device expects a GPUDevice object",
-            ));
+            return Err(JsError::new("adopt_gpu_device expects a GPUDevice object"));
         }
         let handle: wgpu::webgpu::GpuDevice = device.unchecked_into();
         let (device, queue) = wgpu::Device::from_webgpu_handle(handle);
@@ -475,7 +489,8 @@ mod fabric {
     /// directly in its own WGSL pass (V12 §6.3 L4).
     #[wasm_bindgen]
     pub async fn render_scene_gpu_texture_json(scene_json: String) -> Result<JsValue, JsError> {
-        let scene_ir = parse_scene(&scene_json).map_err(|error| JsError::new(&error.to_string()))?;
+        let scene_ir =
+            parse_scene(&scene_json).map_err(|error| JsError::new(&error.to_string()))?;
         if scene_ir.version != 11 {
             return Err(JsError::new(&format!(
                 "invalid scene: unsupported scene version: {}",
@@ -540,6 +555,112 @@ mod fabric {
         // Hand the JS object out and let the Rust wrapper drop: every `Drop`
         // in wgpu's WebGPU backend is a no-op, so the GPUTexture outlives it
         // and its lifetime is now the caller's (the fabric's) business.
+        let handle = texture
+            .as_webgpu()
+            .cloned()
+            .ok_or_else(|| JsError::new("adopted device is not on the WebGPU backend"))?;
+        Ok(JsValue::from(handle))
+    }
+
+    /// Renders the bounded SceneIR subset through the real upstream
+    /// `vello_hybrid` 0.2 sparse-strip renderer on the adopted fabric device.
+    /// The returned texture never crosses CPU memory and is owned by the caller.
+    #[cfg(feature = "hybrid")]
+    #[wasm_bindgen]
+    pub async fn render_scene_hybrid_gpu_texture_json(
+        scene_json: String,
+    ) -> Result<JsValue, JsError> {
+        let scene_ir =
+            parse_scene(&scene_json).map_err(|error| JsError::new(&error.to_string()))?;
+        if scene_ir.version != 11 {
+            return Err(JsError::new(&format!(
+                "invalid scene: unsupported scene version: {}",
+                scene_ir.version
+            )));
+        }
+        if scene_ir.width == 0
+            || scene_ir.height == 0
+            || scene_ir.width > u32::from(u16::MAX)
+            || scene_ir.height > u32::from(u16::MAX)
+        {
+            return Err(JsError::new(&format!(
+                "invalid scene: scene size out of range: {}x{}",
+                scene_ir.width, scene_ir.height
+            )));
+        }
+        let scene = crate::hybrid_scene::encode_hybrid_scene(&scene_ir).map_err(|features| {
+            JsError::new(&format!(
+                "vello-hybrid-wgpu provider cannot render required scene features: {}",
+                features.join(", ")
+            ))
+        })?;
+        let context = adopted_context().map_err(|error| JsError::new(&error))?;
+        let texture = context.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("vello-hybrid-fabric-target"),
+            size: wgpu::Extent3d {
+                width: scene_ir.width,
+                height: scene_ir.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = context
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("vello-hybrid-fabric-render"),
+            });
+        {
+            let mut slot = context.hybrid.borrow_mut();
+            let recreate = slot.as_ref().is_none_or(|cached| {
+                cached.width != scene_ir.width || cached.height != scene_ir.height
+            });
+            if recreate {
+                let (renderer, resources) = vello_hybrid::Renderer::new(
+                    &context.device,
+                    &vello_hybrid::RenderTargetConfig {
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        width: scene_ir.width,
+                        height: scene_ir.height,
+                    },
+                );
+                *slot = Some(super::HybridGpuContext {
+                    width: scene_ir.width,
+                    height: scene_ir.height,
+                    renderer,
+                    resources,
+                });
+            }
+            let cached = slot
+                .as_mut()
+                .ok_or_else(|| JsError::new("Vello Hybrid renderer cache unavailable"))?;
+            cached
+                .renderer
+                .render(
+                    &scene,
+                    &mut cached.resources,
+                    &context.device,
+                    &context.queue,
+                    &mut encoder,
+                    &vello_hybrid::RenderSize {
+                        width: scene_ir.width,
+                        height: scene_ir.height,
+                    },
+                    &view,
+                    &vello_hybrid::TextureBindings::new(),
+                )
+                .map_err(|error| {
+                    JsError::new(&format!("vello hybrid GPU render failed: {error}"))
+                })?;
+        }
+        context.queue.submit([encoder.finish()]);
         let handle = texture
             .as_webgpu()
             .cloned()

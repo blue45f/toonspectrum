@@ -1,6 +1,6 @@
 //! Vello GPU (Classic) native validation (ADR-0010 §4).
 //!
-//! Renders the shared vector corpus through vello 0.9 on a headless wgpu
+//! Renders the shared vector corpus through vello 0.10 on a headless wgpu
 //! device (Metal on macOS) and compares against the deterministic vello_cpu
 //! lane with the same 3×3/δ48 fuzzy metric the JS diff harness uses. With
 //! VELLO_GPU_PROBE=1 it also records per-scene p50/p95 timings to
@@ -285,7 +285,7 @@ fn gpu_matches_cpu_on_the_vector_corpus() {
     if std::env::var("VELLO_GPU_PROBE").as_deref() == Ok("1") {
         let report = serde_json::json!({
             "harness": "crates/studio-engine-vello/tests/gpu_parity.rs",
-            "engine": "vello 0.9.0 (wgpu Metal headless, Area AA) vs vello_cpu 0.2.0",
+            "engine": "vello 0.10.0 (wgpu Metal headless, Area AA) vs vello_cpu 0.2.0",
             "note": "readback is test-only evidence collection; interactive path never reads back",
             "scenes": rows,
         });

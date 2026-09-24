@@ -134,10 +134,10 @@ describe("Virtual Studio game-engine foundation", () => {
     expect(bridge.getJoystick()).toEqual({ x: 0, y: 0 });
   });
 });
-  it("preserves the approved master-art aspect ratio", () => {
+  it("preserves the v3 production-campus aspect ratio", () => {
     expect(
       DEFAULT_STUDIO_WORLD_MANIFEST.width / DEFAULT_STUDIO_WORLD_MANIFEST.height,
-    ).toBeCloseTo(700 / 656, 2);
+    ).toBeCloseTo(4 / 3, 6);
   });
 
   it("keeps every default production interaction reachable", () => {
@@ -237,8 +237,8 @@ describe("Virtual Studio game-engine foundation", () => {
 
   it("loads a valid Tiled world and falls back when the file is unavailable", async () => {
     const tiled: StudioTiledMapLike = {
-      width: 425,
-      height: 399,
+      width: 640,
+      height: 480,
       tilewidth: 2,
       tileheight: 2,
     };
@@ -249,8 +249,8 @@ describe("Virtual Studio game-engine foundation", () => {
         json: async () => tiled,
       }),
     );
-    expect(loaded.width).toBe(850);
-    expect(loaded.height).toBe(798);
+    expect(loaded.width).toBe(1280);
+    expect(loaded.height).toBe(960);
 
     const fallback = await loadStudioVirtualSpaceWorldManifest(
       "/missing.json",

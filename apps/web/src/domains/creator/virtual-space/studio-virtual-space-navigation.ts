@@ -58,41 +58,26 @@ function verticalWall(
   ];
 }
 
-function room(id: string) {
-  const found = STUDIO_VIRTUAL_SPACE_ZONES.find((zone) => zone.id === id);
-  if (!found) throw new Error("Missing Virtual Studio room: " + id);
-  return found;
+const OPEN_HUB_ROOMS = new Set(["live", "lounge"]);
+const TWO_SIDED_ROOMS = new Set(["writers", "drawing", "review", "quality", "teams", "meeting", "lobby"]);
+
+function roomPerimeter(value: (typeof STUDIO_VIRTUAL_SPACE_ZONES)[number]): readonly StudioVirtualSpaceRect[] {
+  if (OPEN_HUB_ROOMS.has(value.id)) return [];
+  const centerX = value.x + value.width / 2;
+  const centerY = value.y + value.height / 2;
+  const hasTop = value.y > 260 || TWO_SIDED_ROOMS.has(value.id);
+  const hasBottom = value.y < 760 || value.id === "lobby";
+  const horizontal = value.id === "assets" || value.id === "writers" || value.id === "teams"
+    ? "right" : value.id === "release" || value.id === "quality" || value.id === "meeting" ? "left" : null;
+  return [
+    ...horizontalWall(value.x, value.y, value.width, hasTop ? centerX : undefined),
+    ...horizontalWall(value.x, value.y + value.height - WALL_Y, value.width, hasBottom ? centerX : undefined),
+    ...verticalWall(value.x, value.y, value.height, horizontal === "left" ? centerY : undefined),
+    ...verticalWall(value.x + value.width - WALL_X, value.y, value.height, horizontal === "right" ? centerY : undefined),
+  ];
 }
 
-const TOP_ROOMS = [room("writers"), room("storyboard")] as const;
-const MIDDLE_ROOMS = [room("lounge"), room("assets"), room("drawing")] as const;
-const BOTTOM_ROOMS = [room("review"), room("assistant")] as const;
-
-const roomWalls: StudioVirtualSpaceRect[] = [];
-for (const room of TOP_ROOMS) {
-  roomWalls.push(
-    ...horizontalWall(room.x, room.y, room.width),
-    ...horizontalWall(room.x, room.y + room.height - WALL_Y, room.width, room.x + room.width / 2),
-    ...verticalWall(room.x, room.y, room.height),
-    ...verticalWall(room.x + room.width - WALL_X, room.y, room.height),
-  );
-}
-for (const room of MIDDLE_ROOMS) {
-  roomWalls.push(
-    ...horizontalWall(room.x, room.y, room.width, room.x + room.width / 2),
-    ...horizontalWall(room.x, room.y + room.height - WALL_Y, room.width, room.x + room.width / 2),
-    ...verticalWall(room.x, room.y, room.height),
-    ...verticalWall(room.x + room.width - WALL_X, room.y, room.height),
-  );
-}
-for (const room of BOTTOM_ROOMS) {
-  roomWalls.push(
-    ...horizontalWall(room.x, room.y, room.width, room.x + room.width / 2),
-    ...horizontalWall(room.x, room.y + room.height - WALL_Y, room.width),
-    ...verticalWall(room.x, room.y, room.height),
-    ...verticalWall(room.x + room.width - WALL_X, room.y, room.height),
-  );
-}
+const roomWalls: StudioVirtualSpaceRect[] = STUDIO_VIRTUAL_SPACE_ZONES.flatMap(roomPerimeter);
 
 function worldRect(
   x: number,
@@ -105,14 +90,20 @@ function worldRect(
 }
 
 const furniture: readonly StudioVirtualSpaceRect[] = [
-  worldRect(90, 308, 112, 30),
-  worldRect(137, 112, 116, 34),
-  worldRect(585, 94, 142, 32),
-  worldRect(75, 474, 116, 32),
-  worldRect(635, 304, 116, 34),
-  worldRect(82, 666, 148, 36),
-  worldRect(590, 666, 148, 36),
-  worldRect(390, 357, 70, 74),
+  worldRect(90, 108, 132, 34),
+  worldRect(405, 72, 140, 30),
+  worldRect(745, 108, 118, 36),
+  worldRect(1045, 108, 122, 36),
+  worldRect(104, 374, 136, 38),
+  worldRect(428, 376, 118, 38),
+  worldRect(752, 352, 126, 34),
+  worldRect(1050, 375, 126, 38),
+  worldRect(88, 665, 96, 34),
+  worldRect(196, 665, 96, 34),
+  worldRect(421, 652, 116, 34),
+  worldRect(746, 671, 68, 68),
+  worldRect(1034, 672, 128, 42),
+  worldRect(428, 834, 124, 36),
 ];
 
 export const STUDIO_VIRTUAL_SPACE_COLLIDERS: readonly StudioVirtualSpaceRect[] = Object.freeze([

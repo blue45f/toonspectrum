@@ -4,8 +4,8 @@ from pathlib import Path
 import re
 import sys
 
-TARGETS = ['marketplace-integrity.yml', 'marketplace-authoring.yml', 'studio-mesh-sync-repair.yml', 'character-merge-validation.yml', 'studio-cc0-library.yml', 'feedback-community-validation.yml', 'studio-manual.yml', 'studio-2d-asset-quality.yml', 'character-shaper-discovery-quality.yml', 'studio-production-integrity.yml', 'studio-ai-comic-director-complete.yml', 'studio-finishing-quality.yml', 'learning-quality.yml', 'studio-collaboration-sync.yml', 'studio-promo-video.yml', 'character-contact-naturalness.yml', 'studio-brush-filter-stability.yml', 'studio-discovery-ux.yml', 'creator-resources.yml', 'studio-vrm-asset-quality.yml', 'kmas-reference-library.yml']
-FOCUSED_ONLY = {'studio-cc0-library.yml', 'studio-vrm-asset-quality.yml'}
+TARGETS = ['marketplace-integrity.yml', 'marketplace-authoring.yml', 'studio-mesh-sync-repair.yml', 'character-merge-validation.yml', 'studio-cc0-library.yml', 'feedback-community-validation.yml', 'studio-manual.yml', 'studio-2d-asset-quality.yml', 'character-shaper-discovery-quality.yml', 'studio-production-integrity.yml', 'studio-manuscript-delivery-acceptance.yml', 'studio-ai-comic-director-complete.yml', 'studio-finishing-quality.yml', 'learning-quality.yml', 'studio-collaboration-sync.yml', 'studio-promo-video.yml', 'character-contact-naturalness.yml', 'studio-brush-filter-stability.yml', 'studio-discovery-ux.yml', 'creator-resources.yml', 'studio-vrm-asset-quality.yml', 'kmas-reference-library.yml']
+FOCUSED_ONLY = {'studio-cc0-library.yml', 'studio-manuscript-delivery-acceptance.yml', 'studio-vrm-asset-quality.yml'}
 ROOT_GATE_PATTERNS = (
     (re.compile(r"^\s*(?:(?:-\s*)?run:\s*)?pnpm exec tsc -p tsconfig\.json(?:\s+[^#\n]+)?\s*$", re.MULTILINE), 'repository-wide TypeScript'),
     (re.compile(r"^\s*(?:(?:-\s*)?run:\s*)?pnpm (?:run )?typecheck(?:\s+[^#\n]+)?\s*$", re.MULTILINE), 'repository-wide typecheck'),

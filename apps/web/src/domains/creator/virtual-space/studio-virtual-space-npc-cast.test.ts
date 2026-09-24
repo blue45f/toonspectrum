@@ -38,13 +38,13 @@ interface NpcArtManifest {
   }[];
 }
 
-const npcAssetRoot = resolve(process.cwd(), "apps/web/public/assets/virtual-studio/npc-cast-v2");
+const npcAssetRoot = resolve(process.cwd(), "apps/web/public/assets/virtual-studio/npc-cast-v3");
 const playerAssetRoot = resolve(process.cwd(), "apps/web/public/assets/virtual-studio/production-v2");
 const sha256 = (data: Uint8Array) => createHash("sha256").update(data).digest("hex");
 
 describe("studio NPC cast", () => {
   it("uses stable NPC-only keys and no player texture URL", () => {
-    expect(STUDIO_NPC_CAST).toHaveLength(4);
+    expect(STUDIO_NPC_CAST).toHaveLength(8);
     expect(new Set(STUDIO_NPC_CAST.map((skin) => skin.key)).size).toBe(STUDIO_NPC_CAST.length);
     expect(STUDIO_NPC_CAST.every((skin) => skin.key.startsWith("npc-"))).toBe(true);
     const overlap = [...studioNpcCastTextureUrls()].filter((url) => playerUrls().has(url));
@@ -55,10 +55,10 @@ describe("studio NPC cast", () => {
     const manifest = JSON.parse(
       readFileSync(resolve(npcAssetRoot, "art-manifest.json"), "utf8"),
     ) as NpcArtManifest;
-    expect(manifest.version).toBe(2);
+    expect(manifest.version).toBe(3);
     expect(manifest.playerSpriteReuse).toBe(false);
     expect(manifest.derivedFromSelectableStyle).toBe(true);
-    expect(manifest.files).toHaveLength(35);
+    expect(manifest.files).toHaveLength(69);
     const pngNames = readdirSync(npcAssetRoot).filter((name) => name.endsWith(".png")).sort();
     expect(pngNames).toEqual(manifest.files.map((item) => item.file).sort());
 

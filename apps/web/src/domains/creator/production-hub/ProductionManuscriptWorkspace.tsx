@@ -57,8 +57,8 @@ import type {
   StudioRevisionRecord,
 } from "../project-graph/studio-project-graph-contract";
 import { StudioProjectVersionStackPanel } from "../project-graph/StudioProjectVersionStackPanel";
-import { StudioExportPanel } from "../studio-shell/StudioExportPanel";
 import { StudioProjectAssistantPanel } from "../studio-shell/StudioProjectAssistantPanel";
+import { StudioPinnedReviewPanel } from "../virtual-space/StudioPinnedReviewPanel";
 import {
   studioVirtualSpaceReviewHref,
   type StudioVirtualSpaceReviewSubject,
@@ -69,6 +69,8 @@ import {
   productionManuscriptMetrics,
   type ProductionManuscriptProcess,
 } from "./production-manuscript-model";
+import { ProductionManuscriptDeliveryHub } from "./ProductionManuscriptDeliveryHub";
+import { ProductionManuscriptLifecyclePanel } from "./ProductionManuscriptLifecyclePanel";
 import { ProductionManuscriptProcessBrowser } from "./ProductionManuscriptProcessBrowser";
 import {
   isProductionManuscriptFilter,
@@ -281,17 +283,14 @@ function ManuscriptWorkspaceSkeleton() {
   </div>;
 }
 
-function reviewHref(
+function reviewSubject(
   data: LoadedManuscriptData,
   process: ProductionManuscriptProcess,
   review: StudioReviewSummary,
-): string {
+): StudioVirtualSpaceReviewSubject | null {
   const revision = process.revisions.find((candidate) => candidate.id === review.revisionId);
-  if (!revision || revision.kind !== "review-snapshot") {
-    const query = new URLSearchParams({ view: "versions", artifact: process.artifact.id });
-    return `/studio/p/${encodeURIComponent(data.project.workId)}/review?${query.toString()}`;
-  }
-  const subject: StudioVirtualSpaceReviewSubject = {
+  if (!revision || revision.kind !== "review-snapshot") return null;
+  return {
     schemaVersion: 1,
     projectId: data.project.id,
     workId: data.project.workId,
@@ -300,13 +299,25 @@ function reviewHref(
     revisionId: revision.id,
     rootGraphHash: revision.rootGraphHash,
   };
+}
+
+function reviewHref(
+  data: LoadedManuscriptData,
+  process: ProductionManuscriptProcess,
+  review: StudioReviewSummary,
+): string {
+  const subject = reviewSubject(data, process, review);
+  if (!subject) {
+    const query = new URLSearchParams({ view: "versions", artifact: process.artifact.id });
+    return `/studio/p/${encodeURIComponent(data.project.workId)}/review?${query.toString()}`;
+  }
   return studioVirtualSpaceReviewHref(subject);
 }
 
 function ProcessNavigator({ processes, selected, view, onSelect }: {
   readonly processes: readonly ProductionManuscriptProcess[];
   readonly selected: ProductionManuscriptProcess | null;
-  readonly view: "versions" | "feedback" | "assistant";
+  readonly view: "versions" | "feedback" | "delivery" | "assistant";
   readonly onSelect: (process: ProductionManuscriptProcess, view: ManuscriptView) => void;
 }) {
   if (!selected) return null;
@@ -537,6 +548,10 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
   const selectedProcess = processes.find((process) => process.artifact.id === requestedArtifact)
     ?? priorityProcesses[0]
     ?? null;
+  const requestedReviewId = searchParams.get("manuscriptReview");
+  const selectedReview = selectedProcess?.reviews.find((review) => review.id === requestedReviewId)
+    ?? selectedProcess?.reviews[0]
+    ?? null;
   const browserSelectedProcess = visibleProcesses.find((process) => process.artifact.id === requestedArtifact)
     ?? visibleProcesses[0]
     ?? null;
@@ -544,8 +559,11 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
   const priorityAttention = priorityProcess ? productionManuscriptAttention(priorityProcess) : null;
 
   const selectProcess = useCallback((process: ProductionManuscriptProcess, nextView?: ManuscriptView) => {
-    patchSearch({ artifact: process.artifact.id, manuscriptView: nextView ?? view });
+    patchSearch({ artifact: process.artifact.id, manuscriptReview: null, manuscriptView: nextView ?? view });
   }, [patchSearch, view]);
+  const selectReview = useCallback((reviewId: string) => {
+    patchSearch({ manuscriptReview: reviewId });
+  }, [patchSearch]);
   const resetBrowser = useCallback(() => {
     patchSearch({ manuscriptQuery: null, manuscriptFilter: null });
   }, [patchSearch]);
@@ -582,6 +600,13 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
       patchSearch({ artifact: null });
     }
   }, [data, patchSearch, processes, requestedArtifact]);
+
+  useEffect(() => {
+    if (!data || !requestedReviewId || !selectedProcess) return;
+    if (!selectedProcess.reviews.some((review) => review.id === requestedReviewId)) {
+      patchSearch({ manuscriptReview: null });
+    }
+  }, [data, patchSearch, requestedReviewId, selectedProcess]);
 
   useEffect(() => {
     if (view !== "processes" || !browserSelectedProcess || typeof window === "undefined") return undefined;
@@ -659,6 +684,13 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
   const projectHref = `/studio/p/${encodeURIComponent(data.project.workId)}`;
   const editorHref = `/studio/work/${encodeURIComponent(data.project.workId)}/canvas`;
   const canEditProject = canEdit && data.project.access.edit;
+  const selectedReviewSubject = selectedProcess && selectedReview
+    ? reviewSubject(data, selectedProcess, selectedReview)
+    : null;
+  const openLifecycleDestination = (destination: "versions" | "feedback" | "delivery") => {
+    if (!selectedProcess) return;
+    selectProcess(selectedProcess, destination);
+  };
 
   return <div
     className="space-y-4"
@@ -721,12 +753,17 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric
-            label="최종본 준비"
+            label="FINAL · 승인 기준"
             value={`${metrics.approvedProcessCount}/${metrics.processCount || 0}`}
-            detail={`전체 ${metrics.processCount}개 공정 · 텍스트 ${metrics.textProcessCount}`}
+            detail={`${metrics.versionCount}개 불변 revision · 텍스트 ${metrics.textProcessCount}`}
             tone={metrics.approvedProcessCount === metrics.processCount && metrics.processCount > 0 ? "success" : "neutral"}
           />
-          <Metric label="버전" value={String(metrics.versionCount)} detail="덮어쓰지 않는 revision" />
+          <Metric
+            label="전달 준비"
+            value={String(metrics.readyToDeliverProcessCount)}
+            detail={`RELEASE ${metrics.releasedProcessCount} · FINAL 이후 변경 ${metrics.unapprovedChangeCount}`}
+            tone={metrics.unapprovedChangeCount > 0 ? "warning" : metrics.readyToDeliverProcessCount > 0 || metrics.releasedProcessCount > 0 ? "success" : "neutral"}
+          />
           <Metric
             label="진행 검수"
             value={String(metrics.openReviewCount)}
@@ -759,8 +796,12 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
                 : priorityAttention.kind === "in-review"
                   ? `${priorityProcess.openReviewCount}건의 검수 결과를 확인하세요.`
                   : priorityAttention.kind === "missing-final"
-                    ? "현재 작업본은 있지만 승인·게시 기준 최종본이 지정되지 않았습니다."
-                    : "현재 범위에서 가장 최근에 확정된 최종본입니다."}
+                    ? priorityProcess.hasUnapprovedChanges
+                      ? "승인된 FINAL 이후 HEAD가 변경됐습니다. 기존 FINAL은 유지하고 새 작업본을 다시 제출하세요."
+                      : "현재 작업본은 있지만 승인 기준 FINAL이 지정되지 않았습니다."
+                    : priorityProcess.lifecyclePhase === "released"
+                      ? "승인 원본의 전달·게시 기록이 있습니다. 수신과 출력 이력을 확인하세요."
+                      : "필수 수정 없이 승인된 FINAL이 준비됐습니다. 공유·전달 조건을 확인하세요."}
             </p>
           </div>
           <button
@@ -847,7 +888,13 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
       id="manuscript-panel-processes"
       role="tabpanel"
       aria-labelledby="manuscript-tab-processes"
+      className="space-y-4"
     >
+      {browserSelectedProcess ? <ProductionManuscriptLifecyclePanel
+        process={browserSelectedProcess}
+        compact
+        onOpen={(destination) => selectProcess(browserSelectedProcess, destination)}
+      /> : null}
       {processes.length > 0 ? <ProductionManuscriptProcessBrowser
         processes={processes}
         visibleProcesses={visibleProcesses}
@@ -884,6 +931,7 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
       className="space-y-4"
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="versions" onSelect={selectProcess} />
+      {selectedProcess ? <ProductionManuscriptLifecyclePanel process={selectedProcess} onOpen={openLifecycleDestination} /> : null}
       <StudioProjectVersionStackPanel projectId={data.project.workId} locale="ko" />
     </div> : null}
 
@@ -894,22 +942,62 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
       className="space-y-4"
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="feedback" onSelect={selectProcess} />
+      {selectedProcess ? <ProductionManuscriptLifecyclePanel process={selectedProcess} compact onOpen={openLifecycleDestination} /> : null}
       <section className="rounded-3xl border border-line bg-card p-4 sm:p-6" aria-labelledby="manuscript-feedback-title">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 id="manuscript-feedback-title" className="text-xl font-black text-fg">고정 원고 피드백</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-fg-2">
-              피드백은 최신 편집본이 아니라 선택한 검수 snapshot의 페이지·컷·텍스트 위치에 고정됩니다. 필수 항목이 열려 있으면 승인을 차단합니다.
+              검수본 선택, 페이지·컷 위치 주석, 개인 초안 묶음 발행, 담당자·기한, 수정 버전 연결, 비교와 승인까지 한 흐름에서 처리합니다. 최신 HEAD로 자동 바꾸지 않습니다.
             </p>
           </div>
           {canEditProject ? <Link to={editorHref} className={buttonClass({ size: "sm" })}>
             <UploadCloud className="size-4" aria-hidden="true" /> 검수본 만들기
           </Link> : null}
         </div>
-      <div className="mt-5 space-y-3">
-        {selectedProcess?.reviews.map((review) => <article key={review.id} className="rounded-2xl border border-line bg-panel p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge className={reviewTone(review.status)}>{reviewStatusLabel(review.status)}</Badge>{review.openRequiredCommentCount > 0 ? <Badge className="border-bad/35 bg-bad/10 text-bad"><LockKeyhole className="mr-1 size-3.5" aria-hidden="true" />필수 {review.openRequiredCommentCount}</Badge> : null}</div><h3 className="mt-2 font-black text-fg">{review.title}</h3><p className="mt-1 text-xs text-fg-3">revision {review.revisionId} · 업데이트 {formatDate(review.updatedAt)} · 검토자 {review.reviewerIds.length}명</p></div><Link to={reviewHref(data, selectedProcess, review)} className={buttonClass({ variant: "outline", size: "sm" })}><Eye className="size-4" aria-hidden="true" />고정 검수본 열기</Link></div></article>)}
-        {selectedProcess && selectedProcess.reviews.length === 0 ? <div className="rounded-2xl border border-dashed border-line p-8 text-center"><MessageSquare className="mx-auto size-7 text-fg-3" aria-hidden="true" /><p className="mt-2 font-black text-fg">아직 검수본이 없습니다</p><p className="mt-1 text-sm text-fg-2">Studio에서 저장된 원고를 고정 검수본으로 캡처하면 위치 피드백·댓글·비교·승인을 사용할 수 있습니다.</p></div> : null}
-      </div>
+        {selectedProcess && selectedProcess.reviews.length > 0 ? <div className="mt-5 grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)]">
+          <aside className="rounded-2xl border border-line bg-panel p-3" aria-label="검수본 선택">
+            <div className="flex items-center justify-between gap-2 px-1">
+              <h3 className="text-sm font-black text-fg">검수 이력</h3>
+              <Badge className="border-line bg-card text-fg-3">{selectedProcess.reviews.length}건</Badge>
+            </div>
+            <div className="mt-3 space-y-2">
+              {selectedProcess.reviews.map((review) => {
+                const active = selectedReview?.id === review.id;
+                return <article key={review.id} className={cn(
+                  "rounded-xl border p-3",
+                  active ? "border-accent/60 bg-accent-soft/30" : "border-line bg-card",
+                )}>
+                  <button type="button" aria-pressed={active} onClick={() => selectReview(review.id)} className="w-full text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/70">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={reviewTone(review.status)}>{reviewStatusLabel(review.status)}</Badge>
+                      {review.openRequiredCommentCount > 0 ? <Badge className="border-bad/35 bg-bad/10 text-bad"><LockKeyhole className="mr-1 size-3.5" aria-hidden="true" />필수 {review.openRequiredCommentCount}</Badge> : null}
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm font-black text-fg">{review.title}</p>
+                    <p className="mt-1 text-[0.6875rem] leading-5 text-fg-3">{formatDate(review.updatedAt)} · 검토자 {review.reviewerIds.length}명</p>
+                  </button>
+                  <Link to={reviewHref(data, selectedProcess, review)} aria-label="고정 검수본 열기" className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-bold text-accent hover:underline">
+                    별도 화면 열기 <Eye className="size-3.5" aria-hidden="true" />
+                  </Link>
+                </article>;
+              })}
+            </div>
+          </aside>
+          <div className="min-w-0">
+            {selectedReviewSubject ? <StudioPinnedReviewPanel
+              subject={selectedReviewSubject}
+              showShareTools={false}
+              showExportTools={false}
+            /> : <div className="rounded-2xl border border-warn/35 bg-warn/10 p-6" role="alert">
+              <h3 className="font-black text-fg">고정 검수 revision을 확인할 수 없습니다</h3>
+              <p className="mt-1 text-sm text-fg-2">일반 작업 버전으로 자동 대체하지 않았습니다. 버전 이력에서 검수 snapshot을 확인하세요.</p>
+            </div>}
+          </div>
+        </div> : <div className="mt-5 rounded-2xl border border-dashed border-line p-8 text-center">
+          <MessageSquare className="mx-auto size-7 text-fg-3" aria-hidden="true" />
+          <p className="mt-2 font-black text-fg">아직 검수본이 없습니다</p>
+          <p className="mt-1 text-sm text-fg-2">Studio에서 저장된 원고를 고정 검수본으로 캡처하면 위치 피드백·개인 초안·댓글·비교·승인을 사용할 수 있습니다.</p>
+        </div>}
       </section>
     </div> : null}
 
@@ -919,8 +1007,14 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
       aria-labelledby="manuscript-tab-delivery"
       className="space-y-4"
     >
-      <section className="rounded-3xl border border-line bg-card p-4 sm:p-6"><div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]"><div><p className="text-[0.6875rem] font-black uppercase tracking-[0.14em] text-accent">SHARE & DELIVERY</p><h2 className="mt-2 text-xl font-black text-fg">검수본 공유와 공식 전달</h2><p className="mt-2 text-sm leading-6 text-fg-2">공유는 현재 head가 아니라 고정된 검수 snapshot을 대상으로 하며, 링크 만료·폐기와 접근 권한을 매번 다시 확인합니다. 승인본은 원본 이미지·체크섬·manifest를 ZIP으로 전달할 수 있습니다.</p><div className="mt-4 flex flex-wrap gap-2"><Link to={`${projectHref}/review?view=versions`} className={buttonClass({ variant: "outline", size: "sm" })}><Link2 className="size-4" aria-hidden="true" />검수·공유 관리</Link><Link to={`${projectHref}/space`} className={buttonClass({ variant: "outline", size: "sm" })}><MonitorSmartphone className="size-4" aria-hidden="true" />협업 스튜디오 초대</Link><Link to={`${projectHref}/export`} className={buttonClass({ size: "sm" })}><Download className="size-4" aria-hidden="true" />내보내기 열기</Link></div></div><div className="rounded-2xl border border-line bg-panel p-4"><h3 className="text-sm font-black text-fg">공유 안전 경계</h3><ul className="mt-3 space-y-2 text-xs leading-5 text-fg-2"><li>• 공유 URL은 편집 권한을 부여하지 않습니다.</li><li>• 공유 후 원고를 수정해도 검수 snapshot은 바뀌지 않습니다.</li><li>• 폐기·만료·권한 변경은 다음 열기부터 즉시 반영됩니다.</li><li>• 공식 전달은 게시나 법적 권리 인증을 대신하지 않습니다.</li></ul></div></div></section>
-      <StudioExportPanel projectId={data.project.workId} locale="ko" />
+      <ProcessNavigator processes={processes} selected={selectedProcess} view="delivery" onSelect={selectProcess} />
+      {selectedProcess ? <ProductionManuscriptLifecyclePanel process={selectedProcess} compact onOpen={openLifecycleDestination} /> : null}
+      <ProductionManuscriptDeliveryHub
+        projectId={data.project.workId}
+        subject={selectedReviewSubject}
+        process={selectedProcess}
+        onOpenFeedback={() => setView("feedback")}
+      />
     </div> : null}
 
     {view === "assistant" ? <div

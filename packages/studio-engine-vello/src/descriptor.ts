@@ -14,7 +14,7 @@ import type { ProviderDescriptor } from "@toonspectrum/studio-engine-registry";
  */
 /**
  * Vello GPU browser (WebGPU wasm) provider descriptor — ADR-0011 lane 2,
- * V12 §4.1 vello 0.9 Classic.
+ * V14 vello 0.10 Classic.
  *
  * Conditions of use (enforced by the gpu-browser wrapper, not by hope):
  * - Requires `navigator.gpu`; `loadVelloGpuBrowser()` rejects with an explicit
@@ -35,7 +35,7 @@ export const velloGpuBrowserProviderDescriptor: ProviderDescriptor =
     id: "vello-gpu-browser",
     kind: "vector-renderer",
     displayName: "Vello GPU (browser WebGPU)",
-    version: "vello 0.9.0 / wgpu 29.0.4 / velato 0.11.0 / crate 0.1.0",
+    version: "vello 0.10.0 / wgpu 29.0.4 / velato 0.12.0 / crate 0.1.0",
     license: "MIT / Apache-2.0",
     attribution: "Linebender Vello project",
     // The engine stays experimental for whole-canvas authority. The product
@@ -66,20 +66,20 @@ export const velloGpuBrowserProviderDescriptor: ProviderDescriptor =
       "readback (render-to-pixels) is an evidence/parity surface; the product document/selection islands present the adopted fabric texture on-GPU",
       "product path-heavy document islands are Vello Classic; FrameGraphCompositor owns the swapchain, not this provider",
       "tolerance determinism only — parity vs vello_cpu gated by the δ48 fuzzy metric, not bit-equality",
-      "lottie lane covers the velato 0.11 subset — text/image layers, split transforms and Add/HardMix blends reject with explicit lottie-* errors (no silent frame drop)",
+      "lottie lane covers the velato 0.12 subset — text/image layers, split transforms and Add/HardMix blends reject with explicit lottie-* errors (no silent frame drop)",
     ],
     previewQuality: "production",
     finalQuality: "preview",
     determinism: "tolerance",
     memoryEstimateMb: 64,
     knownIssues: [
-      "upstream vello repository declares alpha status; adapter pins vello 0.9.0 + wgpu 29.0.4",
+      "upstream vello repository declares alpha status; adapter pins vello 0.10.0 + wgpu 29.0.4",
       "browser WebGPU availability varies by OS/driver; probeWebGpu() is the runtime gate",
     ],
   });
 
 /**
- * V12 native SVG island: strict source audit -> usvg 0.46 -> vello_svg 0.10
+ * V12 native SVG island: strict source audit -> usvg 0.48.1 -> vello_svg 0.11
  * scene, with a sibling vello_cpu lowering of the same normalized tree.
  */
 export const velloSvgNativeProviderDescriptor: ProviderDescriptor =
@@ -88,7 +88,7 @@ export const velloSvgNativeProviderDescriptor: ProviderDescriptor =
     kind: "format",
     displayName: "Vello SVG native (strict subset)",
     version:
-      "vello_svg 0.10.0 / usvg 0.46.0 / vello 0.9.0 / vello_cpu 0.2.0",
+      "vello_svg 0.11.0 / usvg 0.48.1.0 / vello 0.10.0 / vello_cpu 0.2.0",
     license: "MIT / Apache-2.0",
     attribution: "Linebender vello_svg and usvg projects",
     maturity: "conditional",
@@ -113,7 +113,7 @@ export const velloSvgNativeProviderDescriptor: ProviderDescriptor =
     memoryEstimateMb: 72,
     knownIssues: [
       "vello_svg documents conformance gaps and recommends resvg for correctness; the source/tree audits intentionally expose a narrower subset",
-      "vello_svg 0.10 complex-clip and unsupported-paint approximations are bypassed by strict rejection gates",
+      "vello_svg 0.11 complex-clip and unsupported-paint approximations are bypassed by strict rejection gates",
     ],
   });
 
@@ -165,18 +165,18 @@ export const velloClassicWgpuProviderDescriptor: ProviderDescriptor = {
 };
 
 /**
- * FrameGraph Hybrid compositor provider. Uses the Classic WebGPU renderer for
- * vector subsets and binds external textures in the same fabric device.
- * This is not the upstream vello_hybrid sparse-strip GPU API.
+ * Real upstream Vello Hybrid sparse-strip provider. It owns an independent
+ * selected render on the adopted StudioGpuFabric device; Classic is never
+ * attempted after a Hybrid failure.
  */
 export const velloHybridWgpuProviderDescriptor: ProviderDescriptor =
   providerDescriptorSchema.parse({
     id: "vello-hybrid-wgpu",
     kind: "vector-renderer",
-    displayName: "Vello Hybrid compositor (WebGPU)",
-    version: "vello 0.9.0 / frame-graph hybrid / crate 0.1.0",
+    displayName: "Vello Hybrid sparse-strip GPU (WebGPU)",
+    version: "vello_hybrid 0.2.0 / wgpu 29.0.4 / crate 0.1.0",
     license: "MIT / Apache-2.0",
-    attribution: "Linebender Vello project + ToonSpectrum FrameGraph",
+    attribution: "Linebender Vello Hybrid project",
     maturity: "conditional",
     runtime: "webgpu",
     capabilities: [
@@ -186,23 +186,26 @@ export const velloHybridWgpuProviderDescriptor: ProviderDescriptor =
       "render.vector.gradient.sweep",
       "render.group.opacity",
       "render.group.clip",
+      "render.blend.multiply",
+      "render.blend.screen",
+      "render.blend.darken",
+      "render.blend.lighten",
       "render.gpu.webgpu",
-      "render.text.simple",
-      "render.image",
-      "render.external-texture",
       "surface.island.document-vector",
     ],
     limitations: [
-      "Hybrid here is compositor + Classic path islands + external texture binding",
-      "upstream vello_hybrid 0.2 sparse GPU remains a separate unavailable candidate",
-      "paragraph, complex mask, ImageFilter and backdrop blends require separately planned Skia islands",
-      "runtime failure is terminal for this provider binding; it never demotes to Vello Classic",
+      "the current product encoder admits only the bounded SceneIR vector subset",
+      "paragraph text, masks and filters fail during preflight before any GPU submission",
+      "the selected Hybrid request fails closed and never replays through Classic or CPU",
+      "render targets stay on the adopted fabric GPUDevice and are not read back on the hot path",
     ],
     previewQuality: "production",
     finalQuality: "preview",
     determinism: "tolerance",
     memoryEstimateMb: 80,
-    knownIssues: [],
+    knownIssues: [
+      "feature coverage remains narrower than Classic plus specialist texture islands",
+    ],
   });
 
 export const velloCpuReferenceProviderDescriptor: ProviderDescriptor = {

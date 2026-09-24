@@ -1892,12 +1892,27 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
             },
           }, usedClip)
         : null;
+      let before: Buffer;
       if (eraseBaseline) {
         await selectDesktopBrush(page, preset, expectedSelection);
+        // Selecting a destructive preset may synchronously flush the retained paint backdrop.
+        // Capture the comparison baseline after that boundary instead of reusing the earlier
+        // frame, which can still contain the same paint once in committed ink and once in the
+        // retiring live overlay. Undo should be compared with the surface the eraser actually saw.
+        before = await captureStableEvidence(page, usedClip);
+        const preparedBaselineDiff = await compareScreenshotPixels(
+          page,
+          eraseBaseline.empty,
+          before,
+        );
+        invariant(
+          hasMeaningfulPixelChange(preparedBaselineDiff),
+          `${preset.id}: selecting the eraser removed its prepared paint baseline`,
+        );
+      } else {
+        before = await captureStableEvidence(page, usedClip);
       }
       const emptyBefore = eraseBaseline?.empty ?? null;
-      const before = eraseBaseline?.painted
-        ?? await captureStableEvidence(page, usedClip);
       const shortOperationRoute: VerifierStrokeRoute = operation === "erase"
         ? {
             start: {
@@ -3122,12 +3137,26 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
               end: { x: endX, y: y + 4 },
             }, clip)
           : null;
+        let before: Buffer;
         if (eraseBaseline) {
           await selectDesktopBrush(page, preset, expectedSelection);
+          // The destructive-preset switch may synchronously retire the painted live overlay. Undo
+          // restores the surface seen by the eraser after that boundary, so compare against a fresh
+          // post-selection frame rather than the stale pre-switch composite.
+          before = await captureStableEvidence(page, clip);
+          const preparedBaselineDiff = await compareScreenshotPixels(
+            page,
+            eraseBaseline.empty,
+            before,
+          );
+          invariant(
+            hasMeaningfulPixelChange(preparedBaselineDiff),
+            `${preset.id}: selecting the eraser removed its prepared paint baseline`,
+          );
+        } else {
+          before = await captureStableEvidence(page, clip);
         }
         const emptyBefore = eraseBaseline?.empty ?? null;
-        const before = eraseBaseline?.painted
-          ?? await captureStableEvidence(page, clip);
         const canvasReceivesStart = await page.evaluate(({ x, y: pointY }) =>
           document.elementFromPoint(x, pointY)?.closest(".konvajs-content") !== null,
         { x: startX, y: y });

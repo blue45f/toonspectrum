@@ -156,121 +156,115 @@ function worldProp(prop: StudioWorldPropDefinition): StudioWorldPropDefinition {
 }
 
 const DEFAULT_PROPS: readonly StudioWorldPropDefinition[] = [
-  worldProp({ id: "lounge-sofa", kind: "solid", x: 145, y: 330, depth: "y-sort", collider: { x: 90, y: 308, width: 112, height: 30 } }),
-  worldProp({ id: "writers-desk", kind: "solid", x: 195, y: 135, depth: "y-sort", collider: { x: 137, y: 112, width: 116, height: 34 } }),
-  worldProp({ id: "storyboard-wall", kind: "interactive", x: 655, y: 135, depth: "fixed", action: "comic", interactionRadius: 76, labelKo: "콘티 보드", labelEn: "Storyboard Wall", collider: { x: 585, y: 94, width: 142, height: 32 } }),
-  worldProp({ id: "asset-shelf", kind: "interactive", x: 145, y: 505, depth: "fixed", action: "assets", interactionRadius: 72, labelKo: "에셋 라이브러리", labelEn: "Asset Library", collider: { x: 75, y: 474, width: 116, height: 32 } }),
-  worldProp({ id: "drawing-desk", kind: "interactive", x: 705, y: 330, depth: "y-sort", action: "canvas", interactionRadius: 74, labelKo: "드로잉 데스크", labelEn: "Drawing Desk", collider: { x: 635, y: 304, width: 116, height: 34 } }),
-  worldProp({ id: "review-monitor", kind: "interactive", x: 185, y: 690, depth: "y-sort", action: "review", interactionRadius: 78, labelKo: "리뷰 데스크", labelEn: "Review Desk", collider: { x: 82, y: 666, width: 148, height: 36 } }),
-  worldProp({ id: "ai-producer-desk", kind: "interactive", x: 665, y: 690, depth: "y-sort", action: "assistant", interactionRadius: 80, labelKo: "어시스트 데스크", labelEn: "Assistant Desk", collider: { x: 590, y: 666, width: 148, height: 36 } }),
-  worldProp({ id: "creator-plaza", kind: "solid", x: 425, y: 394, depth: "fixed", collider: { x: 390, y: 357, width: 70, height: 74 } }),
+  worldProp({ id: "asset-archive-terminal", kind: "interactive", x: 175, y: 142, depth: "fixed", action: "assets", interactionRadius: 78, labelKo: "에셋 아카이브 터미널", labelEn: "Asset archive terminal", collider: { x: 90, y: 108, width: 132, height: 34 } }),
+  worldProp({ id: "storyboard-wall", kind: "interactive", x: 475, y: 102, depth: "fixed", action: "comic", interactionRadius: 82, labelKo: "스토리보드 월", labelEn: "Storyboard wall", collider: { x: 405, y: 72, width: 140, height: 30 } }),
+  worldProp({ id: "production-control-board", kind: "interactive", x: 805, y: 144, depth: "fixed", action: "assistant", interactionRadius: 82, labelKo: "프로덕션 상태판", labelEn: "Production control board", collider: { x: 745, y: 108, width: 118, height: 36 } }),
+  worldProp({ id: "release-delivery-console", kind: "interactive", x: 1105, y: 144, depth: "fixed", action: "assistant", interactionRadius: 82, labelKo: "출고 콘솔", labelEn: "Release delivery console", collider: { x: 1045, y: 108, width: 122, height: 36 } }),
+  worldProp({ id: "writers-script-desk", kind: "interactive", x: 175, y: 412, depth: "y-sort", action: "story", interactionRadius: 80, labelKo: "대본 데스크", labelEn: "Script desk", collider: { x: 104, y: 374, width: 136, height: 38 } }),
+  worldProp({ id: "drawing-atelier-desk", kind: "interactive", x: 485, y: 414, depth: "y-sort", action: "canvas", interactionRadius: 82, labelKo: "드로잉 데스크", labelEn: "Drawing desk", collider: { x: 428, y: 376, width: 118, height: 38 } }),
+  worldProp({ id: "review-theater-monitor", kind: "interactive", x: 815, y: 386, depth: "fixed", action: "review", interactionRadius: 86, labelKo: "리뷰 시어터 모니터", labelEn: "Review theater monitor", collider: { x: 752, y: 352, width: 126, height: 34 } }),
+  worldProp({ id: "quality-control-console", kind: "interactive", x: 1115, y: 413, depth: "y-sort", action: "review", interactionRadius: 82, labelKo: "최종 QC 콘솔", labelEn: "Final QC console", collider: { x: 1050, y: 375, width: 126, height: 38 } }),
+  worldProp({ id: "team-pod-a", kind: "solid", x: 136, y: 699, depth: "y-sort", collider: { x: 88, y: 665, width: 96, height: 34 } }),
+  worldProp({ id: "team-pod-b", kind: "solid", x: 244, y: 699, depth: "y-sort", collider: { x: 196, y: 665, width: 96, height: 34 } }),
+  worldProp({ id: "cafe-community-table", kind: "interactive", x: 490, y: 686, depth: "y-sort", action: "community", interactionRadius: 82, labelKo: "카페 커뮤니티 테이블", labelEn: "Cafe community table", collider: { x: 421, y: 652, width: 116, height: 34 } }),
+  worldProp({ id: "creator-plaza-fountain", kind: "solid", x: 780, y: 739, depth: "fixed", collider: { x: 746, y: 671, width: 68, height: 68 } }),
+  worldProp({ id: "meeting-room-table", kind: "interactive", x: 1100, y: 714, depth: "y-sort", action: "live", interactionRadius: 88, labelKo: "팀 회의실 콘솔", labelEn: "Team meeting console", collider: { x: 1034, y: 672, width: 128, height: 42 } }),
+  worldProp({ id: "producer-assistant-desk", kind: "interactive", x: 490, y: 870, depth: "y-sort", action: "assistant", interactionRadius: 74, labelKo: "프로듀서 데스크", labelEn: "Producer desk", collider: { x: 428, y: 834, width: 124, height: 36 } }),
 ] as const;
 
 const DEFAULT_NPC_ACTIVITY_PROFILES = [
-  { id: "studio-guide", roomId: "lounge", points: [[220, 365], [78, 365], [220, 275]], facing: "down" },
-  { id: "studio-writer", roomId: "writers", points: [[300, 175], [70, 175], [300, 70]], facing: "left" },
-  { id: "studio-artist", roomId: "drawing", points: [[780, 365], [638, 365], [780, 275]], facing: "left" },
-  { id: "studio-librarian", roomId: "assets", points: [[220, 545], [78, 545], [220, 450]], facing: "left" },
+  { id: "studio-guide", roomId: "lobby", points: [[700, 910], [865, 910], [780, 865]], facing: "down" },
+  { id: "studio-producer", roomId: "production", points: [[900, 195], [730, 195], [900, 80]], facing: "left" },
+  { id: "studio-editor", roomId: "review", points: [[905, 485], [725, 485], [905, 330]], facing: "left" },
+  { id: "studio-artist", roomId: "drawing", points: [[585, 480], [395, 480], [585, 330]], facing: "left" },
+  { id: "studio-archivist", roomId: "assets", points: [[270, 205], [110, 205], [270, 75]], facing: "left" },
+  { id: "studio-cafe", roomId: "lounge", points: [[570, 745], [390, 745], [570, 615]], facing: "left" },
+  { id: "studio-security", roomId: "meeting", points: [[1200, 820], [1010, 820], [1200, 620]], facing: "left" },
+  { id: "studio-host", roomId: "live", points: [[880, 790], [660, 790], [880, 615]], facing: "left" },
 ] as const;
 
 const DEFAULT_NPC_ACTIVITY_ANCHORS: readonly StudioWorldNpcActivityAnchor[] =
-  DEFAULT_NPC_ACTIVITY_PROFILES.flatMap((profile) => profile.points.map(([x, y], index): StudioWorldNpcActivityAnchor => {
-    const anchorPoint = { x, y };
-    return {
-      id: profile.id + "-" + index,
-      roomId: profile.roomId,
-      approachPoint: { x: x - 16, y },
-      anchorPoint,
-      exitPoint: { x: x + 16, y },
-      facing: (index === 2 ? "down" : profile.facing) as StudioVirtualSpaceFacing,
-      activity: index === 0 ? "work" : index === 1 ? "inspect" : "rest",
-      animation: profile.id === "studio-writer" && index < 2 ? "review"
-        : profile.id === "studio-artist" && index < 2 ? index === 0 ? "draw" : "review"
+  DEFAULT_NPC_ACTIVITY_PROFILES.flatMap((profile) => profile.points.map(([x, y], index): StudioWorldNpcActivityAnchor => ({
+    id: profile.id + "-" + index,
+    roomId: profile.roomId,
+    approachPoint: { x: x - 18, y },
+    anchorPoint: { x, y },
+    exitPoint: { x: x + 18, y },
+    facing: (index === 2 ? "down" : profile.facing) as StudioVirtualSpaceFacing,
+    activity: index === 0 ? "work" : index === 1 ? "inspect" : "rest",
+    animation: profile.id === "studio-artist" && index === 0 ? "draw"
+      : (["studio-producer", "studio-editor", "studio-archivist"].includes(profile.id) && index < 2) ? "review"
+        : profile.id === "studio-host" && index === 0 ? "draw"
           : "idle",
-      minDurationMs: index === 0 ? 20000 : 7000,
-      maxDurationMs: index === 0 ? 38000 : 16000,
-    };
-  }));
+    minDurationMs: index === 0 ? 18_000 : 7_000,
+    maxDurationMs: index === 0 ? 36_000 : 16_000,
+  })));
+
+const acousticZones = STUDIO_VIRTUAL_SPACE_ZONES.map(({ id, x, y, width, height }) => ({
+  id: `${id}-audio`, roomId: id, x, y, width, height,
+  policy: id === "meeting" || id === "review" ? "private" as const : "public" as const,
+  ...(id === "meeting" || id === "review" ? { doorId: `${id}-door` } : {}),
+}));
 
 export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Object.freeze<StudioVirtualSpaceWorldManifest>({
   id: "toonspectrum-master-studio",
-  version: 6,
+  version: 7,
   width: STUDIO_VIRTUAL_SPACE_WIDTH,
   height: STUDIO_VIRTUAL_SPACE_HEIGHT,
-  backgroundAssetKey: "studio-modular-campus-base",
-  backgroundUrl: "/assets/virtual-studio/living-world/master-clean-plate.webp",
+  backgroundAssetKey: "studio-modular-campus-v3",
+  backgroundUrl: "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp",
   rooms: STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => ({
-    id: zone.id,
-    labelKo: zone.labelKo,
-    labelEn: zone.labelEn,
-    descriptionKo: zone.descriptionKo,
-    descriptionEn: zone.descriptionEn,
+    id: zone.id, labelKo: zone.labelKo, labelEn: zone.labelEn,
+    descriptionKo: zone.descriptionKo, descriptionEn: zone.descriptionEn,
     action: zone.destination === "none" ? undefined : zone.destination,
-    x: zone.x,
-    y: zone.y,
-    width: zone.width,
-    height: zone.height,
+    x: zone.x, y: zone.y, width: zone.width, height: zone.height,
   })),
-  acousticZones: STUDIO_VIRTUAL_SPACE_ZONES.map(({ id, x, y, width, height }) => ({
-    id: "public-" + id, roomId: id, x, y, width, height, policy: "public",
-  })),
+  acousticZones,
   props: DEFAULT_PROPS,
   colliders: STUDIO_VIRTUAL_SPACE_COLLIDERS.map(({ x, y, width, height }) => ({ x, y, width, height })),
-  interactions: STUDIO_VIRTUAL_SPACE_INTERACTIONS.map((interaction) => ({
-    id: interaction.id,
-    zoneId: interaction.zoneId,
-    point: { x: interaction.x, y: interaction.y },
-    radius: interaction.radius,
-    labelKo: interaction.labelKo,
-    labelEn: interaction.labelEn,
-    action: interaction.action,
+  interactions: STUDIO_VIRTUAL_SPACE_INTERACTIONS.map((item) => ({
+    id: item.id, zoneId: item.zoneId, point: { x: item.x, y: item.y }, radius: item.radius,
+    labelKo: item.labelKo, labelEn: item.labelEn, action: item.action,
   })),
   portals: [],
   spawns: [
-    { id: "main", point: { x: 425, y: 744 }, facing: "up" as const },
-    { id: "lounge", point: { x: 220, y: 365 }, facing: "left" as const },
-    { id: "drawing", point: { x: 780, y: 365 }, facing: "left" as const },
-    { id: "writers", point: { x: 300, y: 175 }, facing: "left" as const },
-    { id: "storyboard", point: { x: 780, y: 175 }, facing: "left" as const },
-    { id: "assets", point: { x: 220, y: 545 }, facing: "left" as const },
-    { id: "review", point: { x: 280, y: 740 }, facing: "up" as const },
-    { id: "assistant", point: { x: 570, y: 740 }, facing: "up" as const },
+    { id: "main", point: { x: 780, y: 918 }, facing: "up" },
+    { id: "lobby", point: { x: 780, y: 900 }, facing: "up" },
+    { id: "teams", point: { x: 300, y: 800 }, facing: "left" },
+    { id: "lounge", point: { x: 590, y: 745 }, facing: "left" },
+    { id: "live", point: { x: 900, y: 790 }, facing: "left" },
+    { id: "meeting", point: { x: 1200, y: 820 }, facing: "left" },
+    { id: "assistant", point: { x: 590, y: 890 }, facing: "left" },
+    { id: "writers", point: { x: 290, y: 485 }, facing: "left" },
+    { id: "drawing", point: { x: 610, y: 485 }, facing: "left" },
+    { id: "review", point: { x: 935, y: 485 }, facing: "left" },
+    { id: "quality", point: { x: 1210, y: 485 }, facing: "left" },
+    { id: "assets", point: { x: 290, y: 205 }, facing: "left" },
+    { id: "storyboard", point: { x: 590, y: 205 }, facing: "left" },
+    { id: "production", point: { x: 920, y: 205 }, facing: "left" },
+    { id: "release", point: { x: 1210, y: 205 }, facing: "left" },
   ],
   occlusionLayers: [],
   interactionSlots: [
-    {
-      id: "review-left", roomId: "review", labelKo: "리뷰 테이블 왼쪽", labelEn: "Review table · left",
-      approachPoint: { x: 145, y: 735 }, anchorPoint: { x: 145, y: 735 },
-      seatAttachmentPoint: { x: 160, y: 690 }, exitPoint: { x: 105, y: 740 }, facing: "up", radius: 10,
-    },
-    {
-      id: "review-right", roomId: "review", labelKo: "리뷰 테이블 오른쪽", labelEn: "Review table · right",
-      approachPoint: { x: 225, y: 735 }, anchorPoint: { x: 225, y: 735 },
-      seatAttachmentPoint: { x: 210, y: 690 }, exitPoint: { x: 265, y: 740 }, facing: "up", radius: 10,
-    },
+    { id: "review-left", roomId: "review", labelKo: "리뷰 테이블 왼쪽", labelEn: "Review table · left",
+      approachPoint: { x: 770, y: 500 }, anchorPoint: { x: 770, y: 500 }, seatAttachmentPoint: { x: 785, y: 452 }, exitPoint: { x: 730, y: 505 }, facing: "up", radius: 10 },
+    { id: "review-right", roomId: "review", labelKo: "리뷰 테이블 오른쪽", labelEn: "Review table · right",
+      approachPoint: { x: 860, y: 500 }, anchorPoint: { x: 860, y: 500 }, seatAttachmentPoint: { x: 845, y: 452 }, exitPoint: { x: 900, y: 505 }, facing: "up", radius: 10 },
+    { id: "meeting-one", roomId: "meeting", labelKo: "회의석 1", labelEn: "Meeting seat 1",
+      approachPoint: { x: 1060, y: 790 }, anchorPoint: { x: 1060, y: 790 }, seatAttachmentPoint: { x: 1070, y: 730 }, exitPoint: { x: 1025, y: 815 }, facing: "up", radius: 10 },
+    { id: "meeting-two", roomId: "meeting", labelKo: "회의석 2", labelEn: "Meeting seat 2",
+      approachPoint: { x: 1140, y: 790 }, anchorPoint: { x: 1140, y: 790 }, seatAttachmentPoint: { x: 1130, y: 730 }, exitPoint: { x: 1175, y: 815 }, facing: "up", radius: 10 },
   ],
   npcActivityAnchors: DEFAULT_NPC_ACTIVITY_ANCHORS,
   npcs: [
-    {
-      id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2"],
-      skinKey: "npc-concierge", roomId: "lounge", point: { x: 220, y: 365 }, facing: "down",
-      scale: 0.94, speed: 58, behavior: "patrol", patrol: [{ x: 78, y: 365 }, { x: 220, y: 275 }],
-    },
-    {
-      id: "studio-writer", activityAnchorIds: ["studio-writer-0", "studio-writer-1", "studio-writer-2"],
-      skinKey: "npc-editor", roomId: "writers", point: { x: 300, y: 175 }, facing: "left",
-      scale: 0.94, speed: 54, behavior: "patrol", patrol: [{ x: 70, y: 175 }, { x: 300, y: 70 }],
-    },
-    {
-      id: "studio-artist", activityAnchorIds: ["studio-artist-0", "studio-artist-1", "studio-artist-2"],
-      skinKey: "npc-atelier", roomId: "drawing", point: { x: 780, y: 365 }, facing: "left",
-      scale: 0.94, speed: 60, behavior: "patrol", patrol: [{ x: 638, y: 365 }, { x: 780, y: 275 }],
-    },
-    {
-      id: "studio-librarian", activityAnchorIds: ["studio-librarian-0", "studio-librarian-1", "studio-librarian-2"],
-      skinKey: "npc-archivist", roomId: "assets", point: { x: 220, y: 545 }, facing: "left",
-      scale: 0.94, speed: 52, behavior: "patrol", patrol: [{ x: 78, y: 545 }, { x: 220, y: 450 }],
-    },
+    { id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2"], skinKey: "npc-concierge", roomId: "lobby", point: { x: 700, y: 910 }, facing: "down", scale: .94, speed: 62, behavior: "patrol", patrol: [{ x: 865, y: 910 }, { x: 780, y: 865 }] },
+    { id: "studio-producer", activityAnchorIds: ["studio-producer-0", "studio-producer-1", "studio-producer-2"], skinKey: "npc-producer", roomId: "production", point: { x: 900, y: 195 }, facing: "left", scale: .94, speed: 57, behavior: "patrol", patrol: [{ x: 730, y: 195 }, { x: 900, y: 80 }] },
+    { id: "studio-editor", activityAnchorIds: ["studio-editor-0", "studio-editor-1", "studio-editor-2"], skinKey: "npc-editor", roomId: "review", point: { x: 905, y: 485 }, facing: "left", scale: .94, speed: 56, behavior: "patrol", patrol: [{ x: 725, y: 485 }, { x: 905, y: 330 }] },
+    { id: "studio-artist", activityAnchorIds: ["studio-artist-0", "studio-artist-1", "studio-artist-2"], skinKey: "npc-artist", roomId: "drawing", point: { x: 585, y: 480 }, facing: "left", scale: .94, speed: 62, behavior: "patrol", patrol: [{ x: 395, y: 480 }, { x: 585, y: 330 }] },
+    { id: "studio-archivist", activityAnchorIds: ["studio-archivist-0", "studio-archivist-1", "studio-archivist-2"], skinKey: "npc-archivist", roomId: "assets", point: { x: 270, y: 205 }, facing: "left", scale: .94, speed: 54, behavior: "patrol", patrol: [{ x: 110, y: 205 }, { x: 270, y: 75 }] },
+    { id: "studio-cafe", activityAnchorIds: ["studio-cafe-0", "studio-cafe-1", "studio-cafe-2"], skinKey: "npc-cafe", roomId: "lounge", point: { x: 570, y: 745 }, facing: "left", scale: .94, speed: 55, behavior: "patrol", patrol: [{ x: 390, y: 745 }, { x: 570, y: 615 }] },
+    { id: "studio-security", activityAnchorIds: ["studio-security-0", "studio-security-1", "studio-security-2"], skinKey: "npc-security", roomId: "meeting", point: { x: 1200, y: 820 }, facing: "left", scale: .94, speed: 59, behavior: "patrol", patrol: [{ x: 1010, y: 820 }, { x: 1200, y: 620 }] },
+    { id: "studio-host", activityAnchorIds: ["studio-host-0", "studio-host-1", "studio-host-2"], skinKey: "npc-host", roomId: "live", point: { x: 880, y: 790 }, facing: "left", scale: .94, speed: 64, behavior: "patrol", patrol: [{ x: 660, y: 790 }, { x: 880, y: 615 }] },
   ],
 });
 

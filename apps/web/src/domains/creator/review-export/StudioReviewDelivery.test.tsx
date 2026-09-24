@@ -79,6 +79,90 @@ describe("official approved review delivery", () => {
     render(<StudioReviewDelivery verified={approved()} />); await screen.findByRole("alert");
     expect(screen.queryByRole("button", { name: "검증 ZIP 저장" })).toBeNull(); expect(screen.queryByRole("button", { name: "수신 완료 확인" })).toBeNull();
   });
+  it("reuses the exact preparation identity after an uncertain network result", async () => {
+    f.prepare.mockRejectedValueOnce(new Error("lost response")).mockResolvedValueOnce(job());
+    render(<StudioReviewDelivery verified={approved()} />);
+    await screen.findByRole("combobox", { name: "수신 팀원" });
+    fireEvent.change(screen.getByRole("textbox", { name: "권리·사용 조건 확인 근거" }), {
+      target: { value: "Owner confirms the exact approved delivery conditions." },
+    });
+    fireEvent.click(screen.getByRole("checkbox"));
+    const prepare = screen.getByRole("button", { name: "전달 준비" });
+    fireEvent.click(prepare);
+    await screen.findByText(/같은 요청으로 다시 시도하면 중복 처리하지 않습니다/);
+    fireEvent.click(prepare);
+    await waitFor(() => expect(f.prepare).toHaveBeenCalledTimes(2));
+    const first = f.prepare.mock.calls[0]![1];
+    const retry = f.prepare.mock.calls[1]![1];
+    expect(retry.id).toBe(first.id);
+    expect(retry.operationId).toBe(first.operationId);
+  });
+
+  it("reuses an issue operation identity after a lost result instead of issuing twice", async () => {
+    const prepared = job();
+    f.list.mockResolvedValue(list([prepared]));
+    f.issue.mockRejectedValueOnce(new Error("lost response")).mockResolvedValueOnce(job("issued"));
+    render(<StudioReviewDelivery verified={approved()} />);
+    const issue = await screen.findByRole("button", { name: "전달 발행" });
+    fireEvent.click(issue);
+    await screen.findByText(/같은 요청으로 다시 시도하면 중복 처리하지 않습니다/);
+    fireEvent.click(issue);
+    await waitFor(() => expect(f.issue).toHaveBeenCalledTimes(2));
+    expect(f.issue.mock.calls[1]![2].operationId).toBe(f.issue.mock.calls[0]![2].operationId);
+  });
+
+  it("aborts an in-flight download, removes private delivery data offline and reloads after reconnection", async () => {
+    let online = true;
+    vi.spyOn(navigator, "onLine", "get").mockImplementation(() => online);
+    const issued = job("issued", { canCancel: false });
+    f.list.mockResolvedValue(list([issued], false));
+    let signal!: AbortSignal;
+    f.download.mockImplementation((_workId, _id, _input, nextSignal: AbortSignal) => {
+      signal = nextSignal;
+      return new Promise((_resolve, reject) => nextSignal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")), { once: true }));
+    });
+    render(<StudioReviewDelivery verified={approved()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "검증 ZIP 저장" }));
+    await waitFor(() => expect(f.download).toHaveBeenCalledOnce());
+    expect(signal.aborted).toBe(false);
+
+    online = false;
+    act(() => globalThis.dispatchEvent(new Event("offline")));
+    await waitFor(() => expect(signal.aborted).toBe(true));
+    expect(screen.queryByRole("button", { name: "검증 ZIP 저장" })).toBeNull();
+    expect((await screen.findByRole("alert")).textContent).toContain("연결이 복구되어");
+
+    online = true;
+    act(() => globalThis.dispatchEvent(new Event("online")));
+    expect(await screen.findByRole("button", { name: "검증 ZIP 저장" })).toBeTruthy();
+    expect(f.list.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("does not carry an uncertain delivery identity into another account", async () => {
+    f.prepare.mockRejectedValueOnce(new Error("lost response")).mockResolvedValueOnce(job());
+    render(<StudioReviewDelivery verified={approved()} />);
+    await screen.findByRole("combobox", { name: "수신 팀원" });
+    const fill = () => {
+      fireEvent.change(screen.getByRole("textbox", { name: "권리·사용 조건 확인 근거" }), {
+        target: { value: "Owner confirms the exact approved delivery conditions." },
+      });
+      fireEvent.click(screen.getByRole("checkbox"));
+    };
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: "전달 준비" }));
+    await screen.findByText(/같은 요청으로 다시 시도하면 중복 처리하지 않습니다/);
+    const first = f.prepare.mock.calls[0]![1];
+
+    await act(async () => { persistSession({ user: { id: "other" }, token: null }); });
+    await screen.findByRole("combobox", { name: "수신 팀원" });
+    fill();
+    fireEvent.click(screen.getByRole("button", { name: "전달 준비" }));
+    await waitFor(() => expect(f.prepare).toHaveBeenCalledTimes(2));
+    const second = f.prepare.mock.calls[1]![1];
+    expect(second.id).not.toBe(first.id);
+    expect(second.operationId).not.toBe(first.operationId);
+  });
+
   it("reloads for a new account and ignores the previous account's late list result", async () => {
     let resolve!: (value: ReturnType<typeof list>) => void;
     f.list.mockImplementationOnce(() => new Promise((done) => { resolve = done; })).mockResolvedValueOnce(list([], false));

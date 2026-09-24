@@ -462,7 +462,27 @@ function log(msg: string) {
   console.log(`[verify-menus] ${msg}`);
 }
 
-async function dismissOverlays(page: Page) {
+export async function dismissOverlays(page: Page) {
+  const betaNotice = page.locator('[data-studio-beta-notice="true"]');
+  const betaNoticeVisible = await betaNotice
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (betaNoticeVisible) {
+    const acknowledge = betaNotice.getByRole("button", {
+      name: /확인하고 툰스튜디오 시작하기|I understand — enter ToonStudio/u,
+    });
+    try {
+      await acknowledge.click({ timeout: 30_000, noWaitAfter: true });
+    } catch {
+      const alreadyHidden = await betaNotice
+        .waitFor({ state: "hidden", timeout: 750 })
+        .then(() => true)
+        .catch(() => false);
+      if (!alreadyHidden) await acknowledge.dispatchEvent("click");
+    }
+    await betaNotice.waitFor({ state: "hidden", timeout: 30_000 });
+  }
   for (const text of ["나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
     try {
       const el = page.getByRole("button", { name: text }).first();

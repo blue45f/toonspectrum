@@ -1,4 +1,5 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
+import { studioVirtualArtAssetUrl, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import {
   createStudioVirtualSpaceAppearance, resolveStudioVirtualSpaceAppearance,
   type StudioVirtualSpaceAppearance, type StudioVirtualSpaceAppearanceClip, type StudioVirtualSpaceAppearanceRegistry,
@@ -172,4 +173,43 @@ export function studioCharacterTextureUrlForSkin(
     return skin.state?.[state] ?? skin.directional[facing];
   }
   return skin.directional[facing];
+}
+
+
+const STYLED_SKIN_CACHE = new Map<string, StudioCharacterSkin>();
+
+/** Every art direction receives distinct texture keys and URLs while preserving the authored frame grid. */
+export function studioCharacterSkinForArtStyle(
+  source: StudioCharacterSkin,
+  artStyle: StudioVirtualArtStyleKey,
+): StudioCharacterSkin {
+  if (artStyle === "webtoon") return source;
+  const cacheKey = `${source.key}:${artStyle}`;
+  const cached = STYLED_SKIN_CACHE.get(cacheKey);
+  if (cached) return cached;
+  const rewriteClip = (clip: StudioCharacterAtlasClip): StudioCharacterAtlasClip => Object.freeze({
+    ...clip,
+    textureUrl: studioVirtualArtAssetUrl(artStyle, clip.textureUrl),
+  });
+  const styled: StudioCharacterSkin = Object.freeze({
+    ...source,
+    key: `${source.key}--${artStyle}`,
+    directional: Object.freeze(Object.fromEntries(Object.entries(source.directional)
+      .map(([facing, url]) => [facing, studioVirtualArtAssetUrl(artStyle, url)])) as Record<StudioVirtualSpaceFacing, string>),
+    state: source.state ? Object.freeze(Object.fromEntries(Object.entries(source.state)
+      .map(([state, url]) => [state, url ? studioVirtualArtAssetUrl(artStyle, url) : url])) as NonNullable<StudioCharacterSkin["state"]>) : undefined,
+    clips: source.clips ? Object.freeze(Object.fromEntries(Object.entries(source.clips)
+      .map(([state, clip]) => [state, clip ? rewriteClip(clip) : clip])) as NonNullable<StudioCharacterSkin["clips"]>) : undefined,
+    actions: source.actions ? Object.freeze(Object.fromEntries(Object.entries(source.actions).map(([state, directions]) => [
+      state,
+      directions ? Object.freeze(Object.fromEntries(Object.entries(directions)
+        .map(([facing, clip]) => [facing, rewriteClip(clip)]))) : directions,
+    ])) as NonNullable<StudioCharacterSkin["actions"]>) : undefined,
+    poses: source.poses ? Object.freeze(Object.fromEntries(Object.entries(source.poses).map(([state, pose]) => [
+      state,
+      pose ? Object.freeze({ ...pose, textureUrl: studioVirtualArtAssetUrl(artStyle, pose.textureUrl) }) : pose,
+    ])) as NonNullable<StudioCharacterSkin["poses"]>) : undefined,
+  });
+  STYLED_SKIN_CACHE.set(cacheKey, styled);
+  return styled;
 }

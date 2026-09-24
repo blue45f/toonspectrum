@@ -15,7 +15,7 @@ import type { Browser, Page } from "playwright";
  *   packages/studio-engine-vello/src/__tests__/lottie-browser-probe.test.ts`
  *
  * Serves the repo over local HTTP, drives Playwright Chromium, loads the
- * committed pkg-gpu artifact (built with `--features lottie`) in the page and
+ * committed pkg-gpu artifact (built with `--features hybrid,lottie,svg`) in the page and
  * renders the hand-authored Lottie fixtures
  * (crates/studio-engine-vello/tests/fixtures/lottie/ — the same corpus the
  * native Metal harness lottie_parity.rs gates) on the browser's WebGPU
@@ -174,7 +174,16 @@ describeProbe("velato lottie real-browser render probe", () => {
     const { chromium } = await import("playwright");
     const moduleUrl = `${baseUrl}/crates/studio-engine-vello/pkg-gpu/studio_engine_vello.js`;
     for (const candidate of LAUNCH_CANDIDATES) {
-      const attempt = await chromium.launch(candidate.options);
+      let attempt: Browser;
+      try {
+        attempt = await chromium.launch(candidate.options);
+      } catch (error) {
+        probe = {
+          supported: false,
+          reason: `${candidate.label}: ${error instanceof Error ? error.message : String(error)}`,
+        };
+        continue;
+      }
       const attemptPage = await attempt.newPage();
       await attemptPage.goto(`${baseUrl}/__lottie-harness__`);
       const payload = (await attemptPage.evaluate(async (url: string) => {
@@ -327,7 +336,7 @@ describeProbe("velato lottie real-browser render probe", () => {
         harness:
           "packages/studio-engine-vello/src/__tests__/lottie-browser-probe.test.ts (VELLO_LOTTIE_BROWSER_PROBE=1)",
         engine:
-          "velato 0.11.0 -> vello 0.9.0 GPU via browser WebGPU (pkg-gpu wasm --features lottie)",
+          "velato 0.12.0 -> vello 0.10.0 GPU via browser WebGPU (pkg-gpu wasm --features hybrid,lottie,svg)",
         note:
           "timings include JSON parse + velato lowering + render + readback + JS boundary; fixtures are hand-authored (crates/studio-engine-vello/tests/fixtures/lottie)",
         measuredAt: new Date().toISOString(),

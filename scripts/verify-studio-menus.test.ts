@@ -26,6 +26,7 @@ import { StudioBackgroundPanel } from "../apps/web/src/domains/creator/StudioBac
 import {
   CATALOGUE_GROUPS,
   closeFloatingUi,
+  dismissOverlays,
   IMAGE_RAIL_ENTRY,
   QUICK_ACCESS_CLOSE_LABEL,
   DESKTOP_FLOATING_LAYOUT_DIALOG,
@@ -202,6 +203,66 @@ describe("production menu verifier follows shipped feature entry points", () => 
       "select", "pen", "eraser", "fill", "marquee-rect", "smart-shape", "text", "image",
     ]);
   });
+});
+
+
+function betaNoticePageFixture(options?: { clickRejects?: boolean }) {
+  const acknowledgeClick = vi.fn(async () => {
+    if (options?.clickRejects) throw new Error("runner click did not settle");
+  });
+  const acknowledgeDispatch = vi.fn(async () => undefined);
+  const noticeWaitFor = vi.fn(async ({ state, timeout }: { state: string; timeout: number }) => {
+    if (options?.clickRejects && state === "hidden" && timeout === 750) {
+      throw new Error("notice is still visible");
+    }
+  });
+  const notice = {
+    getByRole: vi.fn(() => ({ click: acknowledgeClick, dispatchEvent: acknowledgeDispatch })),
+    waitFor: noticeWaitFor,
+  };
+  const optionalOverlay = {
+    first: () => ({ isVisible: vi.fn(async () => false), click: vi.fn(async () => undefined) }),
+  };
+  const keyboardPress = vi.fn(async () => undefined);
+  const page = {
+    locator: vi.fn(() => notice),
+    getByRole: vi.fn(() => optionalOverlay),
+    waitForTimeout: vi.fn(async () => undefined),
+    keyboard: { press: keyboardPress },
+  };
+  return { acknowledgeClick, acknowledgeDispatch, keyboardPress, notice, noticeWaitFor, page };
+}
+
+it("acknowledges the blocking Studio beta notice before menu interactions", async () => {
+  const fixture = betaNoticePageFixture();
+
+  await dismissOverlays(fixture.page as unknown as import("playwright").Page);
+
+  expect(fixture.page.locator).toHaveBeenCalledWith('[data-studio-beta-notice="true"]');
+  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(1, { state: "visible", timeout: 10_000 });
+  expect(fixture.notice.getByRole).toHaveBeenCalledWith("button", {
+    name: /확인하고 툰스튜디오 시작하기|I understand — enter ToonStudio/u,
+  });
+  expect(fixture.acknowledgeClick).toHaveBeenCalledWith({ timeout: 30_000, noWaitAfter: true });
+  expect(fixture.acknowledgeDispatch).not.toHaveBeenCalled();
+  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(2, { state: "hidden", timeout: 30_000 });
+  expect(fixture.acknowledgeClick.mock.invocationCallOrder[0]).toBeLessThan(
+    fixture.keyboardPress.mock.invocationCallOrder[0]!,
+  );
+});
+
+it("falls back to the acknowledgement event when a loaded CI runner cannot settle the pointer click", async () => {
+  const fixture = betaNoticePageFixture({ clickRejects: true });
+
+  await dismissOverlays(fixture.page as unknown as import("playwright").Page);
+
+  expect(fixture.acknowledgeClick).toHaveBeenCalledWith({ timeout: 30_000, noWaitAfter: true });
+  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(2, { state: "hidden", timeout: 750 });
+  expect(fixture.acknowledgeDispatch).toHaveBeenCalledWith("click");
+  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(3, { state: "hidden", timeout: 30_000 });
+  expect(fixture.acknowledgeDispatch.mock.invocationCallOrder[0]).toBeLessThan(
+    fixture.keyboardPress.mock.invocationCallOrder[0]!,
+  );
 });
 
 

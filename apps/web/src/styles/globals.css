@@ -1179,13 +1179,13 @@ body[data-studio-app="true"] .route-stage::before,
 
   /* Mobile sheets own the foreground interaction layer. Keep the global view-options launcher
      from covering inspector/page/draw sheet controls while a sheet is open. */
-  body:has([data-studio-mobile-sheet="true"]) [data-studio-shell-view-options="true"] {
+  body:has([data-studio-mobile-sheet]:not([aria-hidden="true"])) [data-studio-shell-view-options="true"] {
     pointer-events: none;
     opacity: 0;
     transform: translateY(0.5rem);
   }
 
-  body:has([data-studio-mobile-sheet="true"]) .studio-p2p-huddle-dock,
+  body:has([data-studio-mobile-sheet]:not([aria-hidden="true"])) .studio-p2p-huddle-dock,
   body:has([data-studio-mobile-coach="true"]) .studio-p2p-huddle-dock:not([data-studio-shell-force-visible="true"]) {
     pointer-events: none !important;
     visibility: hidden;

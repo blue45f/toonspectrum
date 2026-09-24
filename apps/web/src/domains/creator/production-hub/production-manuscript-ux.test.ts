@@ -87,7 +87,7 @@ function fixture() {
     artifact("required", "12화 작화", "episode-12", "required-head", "required-final"),
     artifact("reviewing", "12화 배경", "episode-12", "reviewing-head", "reviewing-final"),
     artifact("story-missing", "13화 대본", "episode-13", "story-missing-head", null),
-    artifact("approved", "13화 최종 원고", "episode-13", "approved-head", "approved-final"),
+    artifact("approved", "13화 최종 원고", "episode-13", "approved-final", "approved-final"),
   ];
   const project: StudioProjectRecord = {
     id: "graph-project",
@@ -111,8 +111,13 @@ function fixture() {
   const revisionsByArtifact = Object.fromEntries(artifacts.map((entry, index) => [
     entry.id,
     [
-      revision(entry.id, entry.headRevisionId, "checkpoint", 4 + index),
-      ...(entry.approvedRevisionId
+      revision(
+        entry.id,
+        entry.headRevisionId,
+        entry.headRevisionId === entry.approvedRevisionId ? "approved" : "checkpoint",
+        4 + index,
+      ),
+      ...(entry.approvedRevisionId && entry.approvedRevisionId !== entry.headRevisionId
         ? [revision(entry.id, entry.approvedRevisionId, "approved", 2 + index)]
         : []),
     ],
@@ -143,6 +148,11 @@ describe("production manuscript UX projection", () => {
       label: "필수 수정 2개",
       recommendedView: "feedback",
       priority: 0,
+    });
+    const approved = processes.find((process) => process.artifact.id === "approved")!;
+    expect(productionManuscriptAttention(approved)).toMatchObject({
+      label: "전달 준비",
+      recommendedView: "delivery",
     });
   });
 

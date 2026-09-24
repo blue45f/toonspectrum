@@ -274,18 +274,42 @@ export const STUDIO_RENDERER_ROLE_LEDGER: readonly RendererRoleEntry[] =
     Object.freeze({
       id: "vello-hybrid-sparse",
       displayName: "Vello Hybrid sparse-strip GPU (upstream)",
-      role: "lab" as const,
+      role: "provider" as const,
       authorities: Object.freeze([]),
       evidence: Object.freeze([
+        "crates/studio-engine-vello/src/hybrid_scene.rs",
+        "crates/studio-engine-vello/src/gpu_web.rs",
+        "apps/web/src/domains/creator/render/studio-vello-hub.ts",
         "apps/web/src/domains/creator/render/studio-vello-hub-capability.ts",
       ]),
       moduleSpecifiers: Object.freeze(["vello_hybrid"]),
       candidateId: "E03",
       note:
-        "`STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE` 는 status=`unavailable-upstream-api`, "
-        + "eligible=false 다. 고정된 vello 0.9 Classic 브라우저 아티팩트가 upstream "
-        + "vello_hybrid 0.2 sparse-strip GPU 를 채택하지 않았다. 제품의 \"V13 Hybrid\" 는 "
-        + "이 크레이트가 아니라 Classic + StudioFrameGraphCompositor 다.",
+        "고정된 vello_hybrid 0.2 sparse-strip renderer 를 browser WASM에 포함하고 "
+        + "StudioGpuFabric 의 동일 GPUDevice에서 bounded SceneIR을 직접 texture로 렌더한다. "
+        + "text·mask·filter 미지원 조합은 GPU 제출 전에 실패하고 Classic으로 자동 전환하지 않는다.",
+    }),
+    Object.freeze({
+      id: "thorvg-webcanvas",
+      displayName: "ThorVG WebCanvas",
+      role: "provider" as const,
+      authorities: Object.freeze([]),
+      evidence: Object.freeze([
+        "packages/studio-engine-thorvg",
+        "apps/web/src/domains/creator/studio-svg-product-provider-plan.ts",
+        "apps/web/src/domains/creator/StudioSvgAssetPreview.tsx",
+      ]),
+      moduleSpecifiers: Object.freeze([
+        "@toonspectrum/studio-engine-thorvg",
+        "@thorvg/webcanvas",
+      ]),
+      candidateId: "E13",
+      adr: "docs/adr/0018-no-automatic-engine-fallback-vello-primary.md",
+      note:
+        "Vello strict SVG subset 밖의 안전한 filter·mask·text 등 자산을 렌더 전에 "
+        + "명시 선택하는 전문 provider다. WebGPU/WebGL/software 중 하나를 사전 고정하며, "
+        + "실패 뒤 다른 backend나 Vello로 재실행하지 않는다. SVG/Lottie source audit, "
+        + "bounded WASM, ref-counted term/dispose 계약을 강제한다.",
     }),
     Object.freeze({
       id: "velato-lottie",

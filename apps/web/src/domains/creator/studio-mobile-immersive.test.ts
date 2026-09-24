@@ -154,10 +154,10 @@ describe("Studio mobile immersive preference", () => {
     expect(studioGlobalsSource).toContain(":root,");
     expect(studioGlobalsSource).toContain(":root:has(");
     expect(studioGlobalsSource).toContain(
-      'body:has([data-studio-mobile-sheet="true"]) [data-studio-shell-view-options="true"]',
+      'body:has([data-studio-mobile-sheet]:not([aria-hidden="true"])) [data-studio-shell-view-options="true"]',
     );
     expect(studioGlobalsSource).toContain(
-      'body:has([data-studio-mobile-sheet="true"]) .studio-p2p-huddle-dock',
+      'body:has([data-studio-mobile-sheet]:not([aria-hidden="true"])) .studio-p2p-huddle-dock',
     );
     expect(studioMobileEditingDockSource).toContain('data-studio-mobile-coach="true"');
     expect(studioGlobalsSource).toContain(

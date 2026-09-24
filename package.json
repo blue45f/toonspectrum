@@ -105,6 +105,7 @@
     "verify:studio-lifecycle": "tsx scripts/verify-studio-lifecycle.mts",
     "verify:studio-service-worker": "tsx scripts/verify-studio-service-worker.mts",
     "verify:studio-artist-journey": "tsx scripts/verify-studio-artist-journey.mts",
+    "verify:studio-manuscript-delivery-acceptance": "node scripts/verify-review-delivery-workflow-ci.mjs",
     "verify:studio-professional-validation-kit": "node scripts/verify-studio-professional-validation.mjs --check && node --test scripts/verify-studio-professional-validation.test.mjs",
     "verify:studio-competitor-replacement": "tsx scripts/verify-studio-competitor-replacement.mts && vitest run scripts/verify-studio-competitor-replacement.test.ts && pnpm --filter @toonspectrum/desktop-sync-agent test && pnpm --filter @toonspectrum/desktop-sync-agent typecheck && pnpm run verify:studio-professional-validation-kit && pnpm run test:desktop-sync-release",
     "verify:studio-autosave-opfs": "tsx scripts/verify-studio-autosave-opfs-session.mts",
@@ -228,8 +229,8 @@
     "verify:asset-postcuration": "pnpm run audit:visual-assets:strict && pnpm run audit:studio-cc0-classification && pnpm run audit:marketplace-asset-similarity",
     "test:a11y": "PLAYWRIGHT_CHANNEL='' playwright test e2e/a11y-smoke.spec.ts",
     "studio:virtual-space-world:generate": "tsx scripts/generate-virtual-studio-default-world.mts",
-    "test:studio-virtual-art": "node --test scripts/verify-virtual-studio-art-manifest.test.mjs",
-    "verify:studio-virtual-art": "node scripts/verify-virtual-studio-art-manifest.mjs",
+    "test:studio-virtual-art": "node --test scripts/verify-virtual-studio-art-manifest.test.mjs scripts/verify-virtual-studio-v3-art.test.mjs",
+    "verify:studio-virtual-art": "node scripts/verify-virtual-studio-art-manifest.mjs && node scripts/verify-virtual-studio-v3-art.mjs",
     "verify:studio-3d-specialists": "vitest run apps/web/src/domains/creator/scene3d/specialists",
     "verify:studio-3d-specialists:browser": "node scripts/verify-studio-scene3d-specialists.mjs",
     "verify:studio-3d-inplace": "vitest run apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.test.tsx apps/web/src/domains/creator/scene3d/integration/scene3d-derivative-admission.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-meshopt.test.ts apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-inplace-storage.test.ts apps/web/src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel.test.tsx apps/web/src/domains/creator/bg3d/studio-bg3d-libraries-sqlite-opfs.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-history-command-adapter.test.ts apps/web/src/domains/creator/bg3d/useStudioBg3dCanonicalDocumentState.test.tsx",
@@ -238,7 +239,8 @@
     "verify:studio-3d-tiled:browser": "node scripts/verify-studio-scene3d-tiled-output.mjs",
     "verify:workspace-package-links": "node scripts/verify-workspace-package-links.mjs",
     "test:workspace-package-links": "node --test scripts/verify-workspace-package-links.test.mjs",
-    "verify:studio-work-session-workflows": "tsx --tsconfig apps/api/tsconfig.json apps/api/tools/verify-studio-session-workflows.mts"
+    "verify:studio-work-session-workflows": "tsx --tsconfig apps/api/tsconfig.json apps/api/tools/verify-studio-session-workflows.mts",
+    "verify:studio-thorvg-browser": "THORVG_BROWSER_PROBE=1 vitest run packages/studio-engine-thorvg/src/browser-probe.test.ts --pool=threads --maxWorkers=1"
   },
   "dependencies": {
     "@automerge/automerge": "3.5.0",
@@ -278,6 +280,7 @@
     "@toonspectrum/studio-command-registry": "workspace:*",
     "@toonspectrum/studio-engine-registry": "workspace:*",
     "@toonspectrum/studio-engine-skia": "workspace:*",
+    "@toonspectrum/studio-engine-thorvg": "workspace:*",
     "@toonspectrum/studio-engine-vello": "workspace:*",
     "@toonspectrum/studio-format-gateway": "workspace:*",
     "@toonspectrum/studio-project-model": "workspace:*",

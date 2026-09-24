@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioVirtualSpaceGuide } from "./StudioVirtualSpaceGuide";
 import { DEFAULT_STUDIO_WORLD_MANIFEST as manifest } from "./studio-virtual-space-world-manifest";
+import { studioNpcRole } from "./studio-virtual-space-npc-director";
 
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); });
 function setup() {
@@ -12,7 +13,7 @@ function setup() {
 }
 describe("User-operated studio guide", () => {
   it("starts a guided tour only on request, reports waiting, and cancels from the guide without opening a tool", () => {
-    const guide = manifest.npcs.find((npc) => npc.roomId === "lounge")!;
+    const guide = manifest.npcs.find((npc) => studioNpcRole(npc) === "guide")!;
     const actions = { onMove: vi.fn(), onOpen: vi.fn(), onStop: vi.fn(), onFocus: vi.fn(), onStartTour: vi.fn(), onCancelTour: vi.fn() };
     const mounted = render(<StudioVirtualSpaceGuide manifest={manifest} {...actions} />);
     fireEvent.click(screen.getByRole("button", { name: "처음 오셨나요? 시작 안내" }));

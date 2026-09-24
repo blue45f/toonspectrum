@@ -27,18 +27,39 @@ const StudioReviewExport = lazy(async () => ({ default: (await import("../review
 const StudioPinnedReviewShareManager = lazy(async () => ({ default: (await import("../review-share/StudioPinnedReviewShareManager")).StudioPinnedReviewShareManager }));
 
 /** A pinned server review. This surface never substitutes the latest editable document. */
-export function StudioPinnedReviewPanel({ subject, resolutionRequest = null }: { readonly subject: StudioVirtualSpaceReviewSubject | null; readonly resolutionRequest?: StudioReviewResolutionRequest | null }) {
+export function StudioPinnedReviewPanel({
+  subject,
+  resolutionRequest = null,
+  showShareTools = true,
+  showExportTools = true,
+}: {
+  readonly subject: StudioVirtualSpaceReviewSubject | null;
+  readonly resolutionRequest?: StudioReviewResolutionRequest | null;
+  /** Keep review work focused when sharing is presented in a separate delivery hub. */
+  readonly showShareTools?: boolean;
+  /** Keep approved export and delivery actions in their dedicated delivery hub. */
+  readonly showExportTools?: boolean;
+}) {
   const session = useSession();
   const actorId = session.data?.user.id ?? null;
   // Actor changes remove private pixels/notes during the same render and give
   // drafts, idempotency identities and pending writes a separate owner.
-  return <PinnedReviewForActor key={JSON.stringify([actorId, subject])} actorId={actorId} subject={subject} resolutionRequest={resolutionRequest} />;
+  return <PinnedReviewForActor
+    key={JSON.stringify([actorId, subject])}
+    actorId={actorId}
+    subject={subject}
+    resolutionRequest={resolutionRequest}
+    showShareTools={showShareTools}
+    showExportTools={showExportTools}
+  />;
 }
 
-function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
+function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTools, showExportTools }: {
   readonly actorId: string | null;
   readonly subject: StudioVirtualSpaceReviewSubject | null;
   readonly resolutionRequest: StudioReviewResolutionRequest | null;
+  readonly showShareTools: boolean;
+  readonly showExportTools: boolean;
 }) {
   const bt = useBilingual("StudioPinnedReviewPanel");
   const inputId = useId();
@@ -250,8 +271,8 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest }: {
           onStored={() => { setBody(""); setAssigneeIds([]); setDue(""); selectAnnotation(null); setNeedsLocation(false); }}
           onPublished={() => { void refresh(true); }} /> : null}
       <StudioPinnedReviewWorkflow verified={result} onRefresh={() => { void refresh(true); }} onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
-      {result.project.access.edit ? <Suspense fallback={<p className="mt-3 text-sm" role="status">{bt("공유 도구를 불러오는 중…", "Loading sharing tools…")}</p>}><StudioPinnedReviewShareManager verified={result} /></Suspense> : null}
-      {result.review.status === "approved" ? <Suspense fallback={null}><StudioReviewExport verified={result} /></Suspense> : null}
+      {showShareTools && result.project.access.edit ? <Suspense fallback={<p className="mt-3 text-sm" role="status">{bt("공유 도구를 불러오는 중…", "Loading sharing tools…")}</p>}><StudioPinnedReviewShareManager verified={result} /></Suspense> : null}
+      {showExportTools && result.review.status === "approved" ? <Suspense fallback={null}><StudioReviewExport verified={result} /></Suspense> : null}
     </> : null}
     {notice ? <p className="mt-3 text-sm" role="status">{notice}</p> : null}
     <button type="button" className="mt-3 min-h-11 rounded-lg border border-line px-4" disabled={busy || loading} onClick={() => { void refresh(); }}>{bt("검토 기록 새로 확인", "Refresh review")}</button>
