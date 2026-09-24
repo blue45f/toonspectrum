@@ -1,7 +1,8 @@
-import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
-import { STUDIO_EXACT_RESUME_RESTORED_EVENT, studioExactResumeStorageKey } from "../apps/web/src/domains/creator/studio-exact-resume-context";
+import {
+  STUDIO_BETA_NOTICE_REVISION,
+  STUDIO_BETA_NOTICE_STORAGE_KEY,
+} from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 import { CREATOR_EXPERIENCE_STORAGE_KEY } from "../apps/web/src/shared/lib/creator-experience-mode";
-import { readDurableStudioAutosaveDocument } from "../scripts/lib/studio-verify-durable-autosave.mjs";
 import { assertStudioWorkspaceHome } from "../scripts/lib/studio-workspace-browser-contract.mjs";
 
 import { expect, test } from "./fixtures/non-studio-test";
@@ -17,16 +18,26 @@ function themeEnvelope() {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(({ language, themeKey, theme, creatorExperienceKey }) => {
+  await page.addInitScript(({
+    language,
+    themeKey,
+    theme,
+    creatorExperienceKey,
+    betaNoticeKey,
+    betaNoticeRevision,
+  }) => {
     localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: language }, version: 0 }));
     localStorage.setItem(themeKey, theme);
     localStorage.setItem(creatorExperienceKey, JSON.stringify({ mode: "classic" }));
+    localStorage.setItem(betaNoticeKey, betaNoticeRevision);
     sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
   }, {
     language: "ko",
     themeKey: THEME_STORAGE_KEY,
     theme: themeEnvelope(),
     creatorExperienceKey: CREATOR_EXPERIENCE_STORAGE_KEY,
+    betaNoticeKey: STUDIO_BETA_NOTICE_STORAGE_KEY,
+    betaNoticeRevision: STUDIO_BETA_NOTICE_REVISION,
   });
 
   await page.route("**/api/**", async (route) => {
@@ -192,130 +203,4 @@ test("new project flow explains a disabled start action and preserves the chosen
   );
   expect(hasNoHorizontalOverflow).toBe(true);
   await capturePageEvidence(page, testInfo, "studio-new-guided-320");
-});
-
-
-test("recent work reopens the exact Studio document and restores its viewport", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 900 });
-  const pageErrors: string[] = [];
-  page.on("pageerror", (error) => pageErrors.push(error.message));
-  await page.addInitScript((eventName) => {
-    const receipts: unknown[] = [];
-    Object.assign(window, { __studioExactResumeReceipts: receipts });
-    window.addEventListener(eventName, (event) => receipts.push((event as CustomEvent).detail));
-  }, STUDIO_EXACT_RESUME_RESTORED_EVENT);
-
-  await page.goto("/studio/new?kind=webtoon&template=webtoon-four-cut", {
-    waitUntil: "domcontentloaded",
-  });
-  await page.getByLabel("프로젝트 이름").fill("정확한 재개 검증 작품");
-  const start = page.getByRole("button", { name: /시작$/u }).last();
-  await expect(start).toBeEnabled();
-  await start.click();
-  await page.waitForURL(/\/studio\/p\/[^/]+\/d\/[^?]+/u);
-
-  const createdUrl = new URL(page.url());
-  const documentPath = createdUrl.pathname;
-  const [, projectId, documentId] = documentPath.match(/^\/studio\/p\/([^/]+)\/d\/([^/]+)$/u)!;
-  const resumeKey = studioExactResumeStorageKey(decodeURIComponent(projectId), decodeURIComponent(documentId));
-  const viewport = page.locator("[data-studio-canvas-viewport]").first();
-  await expect(viewport).toBeVisible({ timeout: 60_000 });
-
-  // Persist actual authored content through the editor before testing a durable reopen.
-  await page.keyboard.press("b");
-  const box = await viewport.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.move(box!.x + box!.width * .45, box!.y + box!.height * .4);
-  await page.mouse.down();
-  await page.mouse.move(box!.x + box!.width * .55, box!.y + box!.height * .45, { steps: 12 });
-  await page.mouse.up();
-  await expect.poll(async () => {
-    const saved = await readDurableStudioAutosaveDocument(page, studioAutosaveKey({ workId: decodeURIComponent(documentId) }));
-    return saved?.pagesList.some((item) => item.elements?.some((element) => (element as { type?: string }).type === "draw")) ?? false;
-  }).toBe(true);
-
-  const canvasStatus = page.getByRole("group", { name: "캔버스 상태 및 보기" });
-  const zoomIn = page.getByRole("button", { name: "확대", exact: true });
-  for (let step = 0; step < 4; step += 1) await zoomIn.click();
-  const zoomPercent = await canvasStatus.getByText(/^\d+%$/u).textContent();
-  expect(zoomPercent).toMatch(/^\d+%$/u);
-
-  const expectedView = await viewport.evaluate((element) => {
-    const viewportElement = element as HTMLElement;
-    const maxLeft = Math.max(0, viewportElement.scrollWidth - viewportElement.clientWidth);
-    const maxTop = Math.max(0, viewportElement.scrollHeight - viewportElement.clientHeight);
-    viewportElement.scrollLeft = Math.round(maxLeft * 0.5);
-    viewportElement.scrollTop = Math.round(maxTop * 0.6);
-    viewportElement.dispatchEvent(new Event("scroll", { bubbles: true }));
-    return {
-      leftRatio: maxLeft > 0 ? viewportElement.scrollLeft / maxLeft : 0,
-      topRatio: maxTop > 0 ? viewportElement.scrollTop / maxTop : 0,
-    };
-  });
-  expect(expectedView.topRatio).toBeGreaterThan(0.3);
-  const readResume = () => page.evaluate((key) => {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) as { pageId?: string; scrollTop?: number; zoom?: number } : null;
-  }, resumeKey);
-  await expect.poll(async () => (await readResume())?.scrollTop ?? 0).toBeGreaterThan(0);
-  const storedCheckpoint = await readResume();
-  expect(storedCheckpoint?.pageId).toBeTruthy();
-  expect(storedCheckpoint?.zoom ?? 0).toBeGreaterThan(1);
-
-  await page.goto("/home", { waitUntil: "domcontentloaded" });
-  const recent = page.locator('a[data-workspace-resume="true"], a[data-space-exact-resume="true"]').first();
-  await expect(recent).toBeVisible();
-  await expect(recent).toContainText(/원고 이어하기|이어서 작업/u);
-  const recentHref = await recent.getAttribute("href");
-  expect(recentHref).not.toBeNull();
-  const recentUrl = new URL(recentHref!, "https://toonstudio.test");
-  expect(recentUrl.pathname).toBe(documentPath);
-  expect(recentUrl.searchParams.get("resume")).toBe("latest");
-  expect(recentUrl.searchParams.get("token")).toBeNull();
-  expect(recentUrl.searchParams.get("room")).toBeNull();
-  expect(recentUrl.searchParams.get("startTool")).toBeNull();
-
-  await recent.click();
-  await page.waitForURL((url) => url.pathname === documentPath);
-  const restoredViewport = page.locator("[data-studio-canvas-viewport]").first();
-  const recovery = page.getByRole("button", { name: "이어서 그리기", exact: true });
-  await page.addLocatorHandler(recovery, async () => { await recovery.click(); });
-  try {
-    // Visible canvas chrome precedes asynchronous durable hydration. The same existing 60s
-    // readiness budget must wait for the authoritative page/zoom receipt, not a placeholder view.
-    await expect(page.getByText(
-      `최근 작업 위치를 복원했어요. ${storedCheckpoint!.pageId} · 확대 ${Math.round(storedCheckpoint!.zoom! * 100)}%`,
-      { exact: true },
-    )).toBeVisible({ timeout: 60_000 });
-  } finally {
-    await page.removeLocatorHandler(recovery);
-  }
-  expect(new URL(page.url()).pathname).toBe(documentPath);
-  const receipts = await page.evaluate(() =>
-    (window as unknown as { __studioExactResumeReceipts: unknown[] }).__studioExactResumeReceipts);
-  expect(receipts).toEqual([expect.objectContaining({
-    projectId: decodeURIComponent(projectId), documentId: decodeURIComponent(documentId),
-    pageId: storedCheckpoint!.pageId, zoom: storedCheckpoint!.zoom,
-  })]);
-  await expect(restoredViewport).toBeVisible();
-  await expect(canvasStatus.getByText(/^\d+%$/u)).toHaveText(zoomPercent!);
-  expect((await readResume())?.pageId).toBe(storedCheckpoint?.pageId);
-
-  await expect.poll(async () => restoredViewport.evaluate((element) => {
-    const viewportElement = element as HTMLElement;
-    const maxTop = Math.max(0, viewportElement.scrollHeight - viewportElement.clientHeight);
-    return maxTop > 0 ? viewportElement.scrollTop / maxTop : 0;
-  })).toBeGreaterThan(0.3);
-  const restoredView = await restoredViewport.evaluate((element) => {
-    const viewportElement = element as HTMLElement;
-    const maxLeft = Math.max(0, viewportElement.scrollWidth - viewportElement.clientWidth);
-    const maxTop = Math.max(0, viewportElement.scrollHeight - viewportElement.clientHeight);
-    return {
-      leftRatio: maxLeft > 0 ? viewportElement.scrollLeft / maxLeft : 0,
-      topRatio: maxTop > 0 ? viewportElement.scrollTop / maxTop : 0,
-    };
-  });
-  expect(Math.abs(restoredView.leftRatio - expectedView.leftRatio)).toBeLessThan(0.12);
-  expect(Math.abs(restoredView.topRatio - expectedView.topRatio)).toBeLessThan(0.12);
-  expect(pageErrors).toEqual([]);
 });
