@@ -54,6 +54,14 @@ await check('Isolated cached shell is detected without claiming project readines
 await check('Storage values reject NaN, infinity and negative numbers', () => { const api = load(offlinePath); for (const value of [NaN, Infinity, -1, '2', null, undefined]) assert.equal(api.finiteStorageBytes(value), null); assert.equal(api.finiteStorageBytes(0), 0); });
 await check('Rejected browser promises settle safely', async () => { const api = load(offlinePath); assert.equal(await api.boundedStorageRead(Promise.reject(new Error('denied')), null), null); });
 await check('Stalled browser promise has a deadline', async () => { const api = load(offlinePath); assert.equal(await api.boundedStorageRead(new Promise(() => {}), null), null); });
-await check('Actual root has one coherent experience', () => { const rootSource = readFileSync(resolve(root, 'apps/web/src/domains/creator-resources/CreatorHomePage.tsx'), 'utf8'); assert.match(rootSource, /<StudioWorkspacePage \/>/u); assert.doesNotMatch(rootSource, /<CreatorHomeExperience/u); assert.doesNotMatch(rootSource, /<ProductIntentStart/u); const intent = readFileSync(resolve(root, 'apps/web/src/domains/creator-resources/ProductIntentStart.tsx'), 'utf8'); assert.doesNotMatch(intent, /<h1\b/u); });
+await check('Actual root has one coherent public experience', () => {
+  const rootSource = readFileSync(resolve(root, 'apps/web/src/domains/creator-resources/CreatorHomePage.tsx'), 'utf8');
+  assert.match(rootSource, /return <CreatorHomeExperience \/>;/u);
+  assert.match(rootSource, /pathname: "\/about\/studio"/u);
+  assert.doesNotMatch(rootSource, /<StudioWorkspacePage/u);
+  assert.doesNotMatch(rootSource, /<ProductIntentStart/u);
+  const intent = readFileSync(resolve(root, 'apps/web/src/domains/creator-resources/ProductIntentStart.tsx'), 'utf8');
+  assert.doesNotMatch(intent, /<h1\b/u);
+});
 await check('Server request and search explanation both use the shared resolver', () => { assert.match(readFileSync(resolve(root, 'apps/api/src/modules/creator-resources/creator-resources.module.ts'), 'utf8'), /engine\.search\(localizeReferenceProviderQuery\(query\)/u); assert.match(readFileSync(resolve(root, 'apps/web/src/domains/creator-resources/ReferenceQueryExplanation.tsx'), 'utf8'), /resolveReferenceQuery\(query\)/u); });
 console.log(JSON.stringify({ status: 'passed', count: checks.length, checks, scope: 'Pure function and source wiring contracts only; full app typecheck, React browser tests and deployment are separate gates.' }, null, 2));
