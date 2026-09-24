@@ -47,7 +47,7 @@ try {
     const errors = [];
     page.on("pageerror", (error) => errors.push(String(error)));
 
-    await page.goto(origin, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.goto(`${origin}/home`, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await assertStudioWorkspaceHome(page);
     await page.goto(`${origin}/about/studio`, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await page.locator("#product-intent-title").waitFor({ timeout: 60_000 });

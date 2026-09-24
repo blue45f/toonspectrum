@@ -20,9 +20,6 @@ export async function assertStudioWorkspaceHome(page) {
   const selection = home.locator(".workspace-project-select select");
   await expect(selection).toBeEnabled();
   const selectedProject = await selection.inputValue();
-  const viewButtons = home.locator('[data-creator-experience-switch="true"] button');
-  await expect(viewButtons).toHaveCount(2);
-  await viewButtons.first().click();
   await expect(home.locator(".workspace-list-view")).toBeVisible();
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(home.locator(".workspace-list-view")).toBeVisible();
@@ -40,20 +37,20 @@ export async function assertStudioWorkspaceHome(page) {
   await expect(trigger).toBeFocused();
   await expect(home.locator(".workspace-statusbar")).toBeVisible();
 
-  // Spatial Campus now requires an explicit character choice and entry action.
-  // The flagship contract validates that consent boundary; renderer readiness is
-  // covered by the dedicated virtual-studio runtime suites after the user enters.
-  await viewButtons.nth(1).click();
-  const lobby = home.locator('[data-route-ready="studio-virtual-entry"]');
-  await expect(lobby).toBeVisible({ timeout: 30000 });
-  await expect(lobby.getByRole("heading", {
-    name: /^(입장할 캐릭터를 선택하세요|Choose your character before entering)$/u,
-  })).toBeVisible();
-  await expect(lobby.getByRole("group", { name: /^(내 캐릭터|My character)$/u })).toBeVisible();
-  const enter = lobby.getByRole("button", { name: /^(선택하고 입장|Choose and enter)$/u });
+  // The task-first home keeps virtual-space entry explicit. A new visitor must
+  // choose a character first; a returning visitor still enters through a direct CTA.
+  const personalStudio = home.locator(".workspace-personal-studio-card");
+  await expect(personalStudio).toBeVisible();
+  const enter = personalStudio.locator(".workspace-personal-studio-actions .workspace-primary");
   await expect(enter).toBeVisible();
   await expect.poll(async () => (await enter.boundingBox())?.height ?? 0,
     { message: "The explicit spatial entry action must retain a 44px target" }).toBeGreaterThanOrEqual(44);
+  const characterReady = await personalStudio.getAttribute("data-character-ready");
+  assert.equal(
+    await enter.getAttribute("href"),
+    characterReady === "true" ? "/studio/space" : "/onboarding/character?next=%2Fstudio%2Fspace",
+    "Virtual-space entry must preserve the explicit character boundary",
+  );
   await expect(home.locator('[data-studio-engine-status="ready"]')).toHaveCount(0);
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "Workspace must not overflow horizontally");
 }
