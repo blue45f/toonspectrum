@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, expect } from "@playwright/test";
@@ -97,11 +98,34 @@ const reviews = {
   }],
   "artifact-story": [],
 };
+const reviewSubject = {
+  schemaVersion: 1,
+  projectId: project.id,
+  workId: project.workId,
+  artifactId: "artifact-image",
+  reviewId: "review-image",
+  revisionId: "revision-review",
+  rootGraphHash: "a".repeat(64),
+};
+const previewBytes = [
+  Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=", "base64"),
+  Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAX+XDSwAAAABJRU5ErkJggg==", "base64"),
+];
+const previewPages = previewBytes.map((bytes, ordinal) => ({
+  ordinal,
+  sha256: createHash("sha256").update(bytes).digest("hex"),
+  mediaType: "image/png",
+  byteLength: bytes.length,
+  url: `https://manuscript-fixture.invalid/page-${ordinal}.png`,
+  expiresAt: Date.now() + 25_000,
+  mapping: { status: "unmapped", reason: "legacy-review" },
+}));
 
 const browser = await chromium.launch({ headless: true });
 const results = [];
 const pageErrors = [];
 const consoleErrors = [];
+const failedResponses = [];
 const apiRequests = [];
 
 async function installRoutes(page, label) {
@@ -109,17 +133,63 @@ async function installRoutes(page, label) {
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push({ label, message: message.text() });
   });
+  page.on("response", (response) => {
+    if (response.status() >= 400) failedResponses.push({
+      label,
+      status: response.status(),
+      url: response.url(),
+    });
+  });
+  await page.route("https://manuscript-fixture.invalid/**", async (route) => {
+    const match = new URL(route.request().url()).pathname.match(/page-(\d+)\.png$/u);
+    const bytes = match ? previewBytes[Number(match[1])] : null;
+    if (!bytes) return route.fulfill({ status: 404, body: "missing preview fixture" });
+    return route.fulfill({ status: 200, contentType: "image/png", body: bytes });
+  });
   await page.route("**/api/**", async (route) => {
-    const url = new URL(route.request().url());
-    apiRequests.push({ label, method: route.request().method(), pathname: url.pathname });
-    if (url.pathname === "/api/studio-project-graph/works/sample-work/project") {
+    const request = route.request();
+    const url = new URL(request.url());
+    apiRequests.push({ label, method: request.method(), pathname: url.pathname });
+    if (url.pathname === "/api/studio-project-graph/works/sample-work/project"
+      || url.pathname === "/api/studio-project-graph/projects/graph-project") {
       return route.fulfill({ json: project });
     }
     const revisionMatch = url.pathname.match(/^\/api\/studio-project-graph\/artifacts\/([^/]+)\/revisions$/u);
     if (revisionMatch) return route.fulfill({ json: revisions[decodeURIComponent(revisionMatch[1])] ?? [] });
     const reviewMatch = url.pathname.match(/^\/api\/studio-project-graph\/artifacts\/([^/]+)\/reviews$/u);
     if (reviewMatch) return route.fulfill({ json: reviews[decodeURIComponent(reviewMatch[1])] ?? [] });
-    return route.fulfill({ status: 404, json: { message: "Unexpected manuscript fixture request" } });
+    if (url.pathname === "/api/studio-project-graph/reviews/review-image") {
+      return route.fulfill({ json: { ...reviews["artifact-image"][0], comments: [] } });
+    }
+    if (url.pathname === "/api/studio-project-graph/reviews/review-image/previews") {
+      return route.fulfill({ json: {
+        ok: true,
+        subject: reviewSubject,
+        previews: previewPages.map((page) => ({ ...page, expiresAt: Date.now() + 25_000 })),
+        nextCursor: null,
+      } });
+    }
+    if (url.pathname === "/api/studio-project-graph/works/sample-work/review-voice-notes/query"
+      && request.method() === "POST") {
+      return route.fulfill({ json: { items: [] } });
+    }
+    if (url.pathname === "/api/creator/works/sample-work/pinned-review-shares"
+      && request.method() === "GET") {
+      return route.fulfill({ json: { items: [], nextCursor: null } });
+    }
+    if (url.pathname === "/api/creator/works/sample-work/pinned-review-shares/sources"
+      && request.method() === "POST") {
+      return route.fulfill({ json: {
+        subject: reviewSubject,
+        pages: previewPages.map(({ ordinal, sha256, byteLength, mediaType }) => ({
+          ordinal, sha256, byteLength, mediaType, width: 1, height: 1,
+        })),
+        nextOffset: null,
+        approved: false,
+        expiresAt: new Date(Date.now() + 25_000).toISOString(),
+      } });
+    }
+    return route.fulfill({ status: 404, json: { message: `Unexpected manuscript fixture request: ${request.method()} ${url.pathname}` } });
   });
 }
 
@@ -164,7 +234,7 @@ async function assertTouchTargets(page, label) {
     "[data-production-manuscript-workspace] button",
     "[data-production-manuscript-workspace] a[href]",
     "[data-production-manuscript-workspace] select",
-    "[data-production-manuscript-workspace] input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden])",
+    "[data-production-manuscript-workspace] input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=hidden]):not([type=file])",
     "[data-production-manuscript-workspace] summary",
     "[data-production-manuscript-workspace] [role=button]",
   ].join(", ")).evaluateAll((elements) => elements.flatMap((element) => {
@@ -202,7 +272,18 @@ for (const fixture of [
     await page.goto(`${origin.origin}/tools/browser-harnesses/production-manuscript-workspace.html`, {
       waitUntil: "networkidle",
     });
-    await expect(page.getByRole("heading", { name: "고정 원고 피드백" })).toBeVisible();
+    try {
+      await expect(page.getByRole("heading", { name: "고정 원고 피드백" })).toBeVisible();
+    } catch (error) {
+      console.error(JSON.stringify({
+        fixture: fixture.label,
+        pageErrors: pageErrors.filter((entry) => entry.label === fixture.label),
+        consoleErrors: consoleErrors.filter((entry) => entry.label === fixture.label),
+        failedResponses: failedResponses.filter((entry) => entry.label === fixture.label),
+        body: (await page.locator("body").innerText()).slice(0, 2_000),
+      }, null, 2));
+      throw error;
+    }
     await expect(page.getByRole("heading", { name: "요청한 원고·검수본 조합을 찾을 수 없습니다" })).toBeVisible();
     await expect(page.getByText(/다른 공정이나 검수본으로 자동 대체하지 않았습니다/u)).toBeVisible();
     assert.equal(
@@ -249,6 +330,10 @@ for (const fixture of [
 
     await page.getByRole("tab", { name: "버전·비교" }).click();
     await expect(page.getByRole("heading", { name: "수정한 페이지만 바꾸어 새 원고 버전을 구성합니다" })).toBeVisible();
+    await page.getByRole("button", { name: "전체 페이지 불러오기" }).click();
+    await expect(page.getByRole("heading", { name: "새 페이지 구성 · 2장" })).toBeVisible();
+    await expect(page.getByLabel("페이지 구성 변경 요약")).toContainText("재사용 2");
+    await expect(page.getByLabel("페이지 구성 변경 요약")).toContainText("누락 0");
     await assertNoPageOverflow(page, fixture.width, `${fixture.label}-page-builder`);
 
     await page.getByRole("tab", { name: "공유·내보내기" }).click();
@@ -281,13 +366,16 @@ for (const fixture of [
 }
 
 await browser.close();
+if (failedResponses.length) console.error(JSON.stringify({ failedResponses }, null, 2));
 assert.deepEqual(pageErrors, []);
+assert.deepEqual(failedResponses, []);
 assert.deepEqual(consoleErrors, []);
 await fs.writeFile(path.join(output, "manuscript-workspace-report.json"), `${JSON.stringify({
   generatedAt: new Date().toISOString(),
   results,
   apiRequests,
   pageErrors,
+  failedResponses,
   consoleErrors,
   scope: {
     component: "actual ProductionManuscriptWorkspace React component",

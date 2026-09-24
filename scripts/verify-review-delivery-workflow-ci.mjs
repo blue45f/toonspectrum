@@ -92,6 +92,7 @@ try {
           NODE_ENV: "test",
           NEST_API_URL: "http://127.0.0.1:49999",
           STUDIO_QA_BASE_URL: origin.origin,
+          TOONSPECTRUM_VITE_DISABLE_OPTIMIZE_DEPS: "1",
         },
         stdio: "inherit",
       },

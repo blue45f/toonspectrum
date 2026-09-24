@@ -50,6 +50,7 @@ interface PaneProps {
   readonly zoom: ProductionWorkbenchState["zoom"];
   readonly background: ProductionWorkbenchBackground;
   readonly selectedOrdinal: number | null;
+  readonly scrollRatio: number;
   readonly onSelectPage: (candidate: ProductionReviewCandidate, page: StudioVirtualSpaceReviewPreview) => void;
   readonly onLoaded: (candidate: ProductionReviewCandidate, snapshot: PaneSnapshot) => void;
   readonly onScroll: (candidate: ProductionReviewCandidate, page: StudioVirtualSpaceReviewPreview | null, event: UIEvent<HTMLDivElement>) => void;
@@ -64,6 +65,7 @@ function WorkbenchPane({
   zoom,
   background,
   selectedOrdinal,
+  scrollRatio,
   onSelectPage,
   onLoaded,
   onScroll,
@@ -74,6 +76,21 @@ function WorkbenchPane({
   const current = preview.result?.ok
     ? preview.result.previews.find((page) => page.ordinal === selectedOrdinal) ?? preview.result.previews[0] ?? null
     : null;
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const restoreScroll = useCallback(() => {
+    if (layout !== "columns") return;
+    const node = viewportRef.current;
+    if (!node) return;
+    requestAnimationFrame(() => {
+      const max = Math.max(0, node.scrollHeight - node.clientHeight);
+      node.scrollTop = max * Math.min(10_000, Math.max(0, scrollRatio)) / 10_000;
+    });
+  }, [layout, scrollRatio]);
+  const setViewport = useCallback((node: HTMLDivElement | null) => {
+    viewportRef.current = node;
+    registerViewport(candidate.id, node);
+    if (node) restoreScroll();
+  }, [candidate.id, registerViewport, restoreScroll]);
 
   useEffect(() => {
     onLoaded(candidate, {
@@ -85,6 +102,10 @@ function WorkbenchPane({
   useEffect(() => {
     if (current && selectedOrdinal === null) onSelectPage(candidate, current);
   }, [candidate, current, onSelectPage, selectedOrdinal]);
+
+  useEffect(() => {
+    restoreScroll();
+  }, [current?.sha256, restoreScroll, zoom]);
 
   return (
     <section
@@ -161,8 +182,9 @@ function WorkbenchPane({
             </div>
           </nav>
           <div
-            ref={(node) => registerViewport(candidate.id, node)}
+            ref={setViewport}
             onScroll={(event) => onScroll(candidate, current, event)}
+            onLoadCapture={restoreScroll}
             className="max-h-[66vh] min-w-0 overflow-auto overscroll-contain p-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
             style={{ backgroundColor: BACKGROUND_COLORS[background] }}
             tabIndex={0}
@@ -196,13 +218,40 @@ export function ProductionMultiManuscriptWorkbench({
   const [loaded, setLoaded] = useState<Readonly<Record<string, PaneSnapshot>>>({});
   const viewportRefs = useRef(new Map<string, HTMLDivElement>());
   const syncing = useRef(false);
+  const stateRef = useRef(state);
+  const paramsRef = useRef(params);
+  const scrollTimers = useRef(new Map<string, number>());
   const candidateById = useMemo(() => new Map(candidates.map((candidate) => [candidate.id, candidate])), [candidates]);
   const activeCandidate = state.activeReviewId ? candidateById.get(state.activeReviewId) ?? null : null;
 
+  useEffect(() => {
+    stateRef.current = state;
+    paramsRef.current = params;
+  }, [params, state]);
+  useEffect(() => () => {
+    for (const timer of scrollTimers.current.values()) window.clearTimeout(timer);
+    scrollTimers.current.clear();
+  }, []);
+
   const update = useCallback((change: (current: ProductionWorkbenchState) => ProductionWorkbenchState) => {
-    const next = change(state);
-    setParams(writeProductionWorkbenchState(params, next), { replace: true });
-  }, [params, setParams, state]);
+    const next = change(stateRef.current);
+    const nextParams = writeProductionWorkbenchState(paramsRef.current, next);
+    stateRef.current = next;
+    paramsRef.current = nextParams;
+    setParams(nextParams, { replace: true });
+  }, [setParams]);
+
+  const persistScrollRatio = useCallback((reviewId: string, ratio: number) => {
+    const normalized = Math.min(10_000, Math.max(0, Math.round(ratio)));
+    const existing = scrollTimers.current.get(reviewId);
+    if (existing !== undefined) window.clearTimeout(existing);
+    scrollTimers.current.set(reviewId, window.setTimeout(() => {
+      scrollTimers.current.delete(reviewId);
+      update((current) => current.reviewIds.includes(reviewId)
+        ? { ...current, scrollRatios: { ...current.scrollRatios, [reviewId]: normalized } }
+        : current);
+    }, 120));
+  }, [update]);
 
   const fillReviewIds = useCallback((requested: readonly string[], paneCount: ProductionWorkbenchPaneCount): readonly string[] => {
     const ids = [...new Set(requested.filter((id) => candidateById.has(id)))];
@@ -251,6 +300,8 @@ export function ProductionMultiManuscriptWorkbench({
     const source = event.currentTarget;
     const max = source.scrollHeight - source.clientHeight;
     const ratio = max > 0 ? source.scrollTop / max : 0;
+    const ratioBasisPoints = Math.round(ratio * 10_000);
+    persistScrollRatio(candidate.id, ratioBasisPoints);
     syncing.current = true;
     for (const reviewId of state.reviewIds) {
       if (reviewId === candidate.id) continue;
@@ -259,9 +310,10 @@ export function ProductionMultiManuscriptWorkbench({
       if (!target || !targetPage || !sameReviewSourcePage(page, targetPage)) continue;
       const targetMax = target.scrollHeight - target.clientHeight;
       target.scrollTop = ratio * Math.max(0, targetMax);
+      persistScrollRatio(reviewId, ratioBasisPoints);
     }
     requestAnimationFrame(() => { syncing.current = false; });
-  }, [loaded, state.linked, state.reviewIds]);
+  }, [loaded, persistScrollRatio, state.linked, state.reviewIds]);
 
   const handleLoaded = useCallback((candidate: ProductionReviewCandidate, snapshot: PaneSnapshot) => {
     setLoaded((current) => {
@@ -322,7 +374,8 @@ export function ProductionMultiManuscriptWorkbench({
       <div className={cn("grid min-w-0 gap-3", gridClass)}>
         {visibleCandidates.map((candidate, index) => <div key={candidate.id} onPointerDown={() => update((current) => ({ ...current, activeReviewId: candidate.id }))}>
           <WorkbenchPane candidate={candidate} index={index} layout={state.layout} zoom={state.zoom} background={state.background}
-            selectedOrdinal={state.pageOrdinals[candidate.id] ?? null} onSelectPage={selectPage} onLoaded={handleLoaded}
+            selectedOrdinal={state.pageOrdinals[candidate.id] ?? null} scrollRatio={state.scrollRatios[candidate.id] ?? 0}
+            onSelectPage={selectPage} onLoaded={handleLoaded}
             onScroll={onScroll} registerViewport={registerViewport} onRevoked={() => setLoaded((current) => ({ ...current, [candidate.id]: { previews: [], current: null } }))} />
         </div>)}
       </div>

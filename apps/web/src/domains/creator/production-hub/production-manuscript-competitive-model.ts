@@ -71,6 +71,8 @@ export interface ProductionWorkbenchState {
   readonly zoom: 75 | 100 | 125 | 150 | 200;
   readonly background: ProductionWorkbenchBackground;
   readonly pageOrdinals: Readonly<Record<string, number>>;
+  /** Relative scroll positions in basis points, persisted only for visible immutable snapshots. */
+  readonly scrollRatios: Readonly<Record<string, number>>;
 }
 
 export interface ParsedProductionWorkbenchState {
@@ -130,6 +132,14 @@ export function parseProductionWorkbenchState(
     const ordinalValue = separator > 0 ? integer(pair.slice(separator + 1)) : null;
     if (reviewIds.includes(id) && ordinalValue !== null) pageOrdinals[id] = ordinalValue;
   }
+  const scrollPairs = (params.get("compareScroll") ?? "").split(",").filter(Boolean);
+  const scrollRatios: Record<string, number> = {};
+  for (const pair of scrollPairs) {
+    const separator = pair.lastIndexOf(":");
+    const id = separator > 0 ? pair.slice(0, separator) : "";
+    const ratio = separator > 0 ? integer(pair.slice(separator + 1)) : null;
+    if (reviewIds.includes(id) && ratio !== null && ratio <= 10_000) scrollRatios[id] = ratio;
+  }
   return {
     hadExplicitReviews: explicit,
     invalidReviewIds: Object.freeze(invalidReviewIds),
@@ -142,6 +152,7 @@ export function parseProductionWorkbenchState(
       zoom: (zoomValue && ZOOM_VALUES.has(zoomValue) ? zoomValue : 100) as ProductionWorkbenchState["zoom"],
       background: backgroundValue && BACKGROUNDS.has(backgroundValue) ? backgroundValue : "neutral",
       pageOrdinals: Object.freeze(pageOrdinals),
+      scrollRatios: Object.freeze(scrollRatios),
     }),
   };
 }
@@ -165,6 +176,12 @@ export function writeProductionWorkbenchState(
   });
   if (pages.length) next.set("comparePages", pages.join(","));
   else next.delete("comparePages");
+  const scrolls = state.reviewIds.flatMap((reviewId) => {
+    const ratio = state.scrollRatios[reviewId];
+    return Number.isInteger(ratio) && ratio >= 0 && ratio <= 10_000 ? [`${reviewId}:${ratio}`] : [];
+  });
+  if (scrolls.length) next.set("compareScroll", scrolls.join(","));
+  else next.delete("compareScroll");
   return next;
 }
 
@@ -271,6 +288,49 @@ export function productionManifestPageState(
   const prior = baseline[index];
   if (!prior) return "new";
   return prior.sha256 === page.sha256 ? "reused" : "changed";
+}
+
+export interface ProductionManifestSummary {
+  readonly reused: number;
+  readonly changed: number;
+  readonly new: number;
+  readonly duplicate: number;
+  readonly missing: number;
+}
+
+function manifestPageIdentity(page: ProductionManifestPage): string {
+  return `${page.sourceReviewId}:${page.sourceOrdinal}:${page.sha256}`;
+}
+
+export function summarizeProductionManifestPages(
+  pages: readonly ProductionManifestPage[],
+  baseline: readonly ProductionManifestPage[],
+): ProductionManifestSummary {
+  const summary = { reused: 0, changed: 0, new: 0, duplicate: 0, missing: 0 };
+  pages.forEach((page, index) => {
+    summary[productionManifestPageState(page, index, baseline, pages)] += 1;
+  });
+  const current = new Set(pages.map(manifestPageIdentity));
+  summary.missing = baseline.filter((page) => !current.has(manifestPageIdentity(page))).length;
+  return Object.freeze(summary);
+}
+
+export function productionReviewMatchesApprovedFinal(
+  candidate: ProductionReviewCandidate | null,
+  process: ProductionManuscriptProcess | null,
+): boolean {
+  const approved = process?.approvedRevision ?? null;
+  return Boolean(
+    candidate
+      && process
+      && approved
+      && candidate.artifactId === process.artifact.id
+      && candidate.review.status === "approved"
+      && candidate.review.revisionId === candidate.subject.revisionId
+      && candidate.subject.rootGraphHash === approved.rootGraphHash
+      && !process.hasUnapprovedChanges
+      && process.openRequiredFeedbackCount === 0,
+  );
 }
 
 export interface ProductionRolePreset {

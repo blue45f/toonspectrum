@@ -242,6 +242,7 @@ describe("CRECO competitive production workflows", () => {
     render(
       <MemoryRouter initialEntries={[`/production/projects/p/manuscripts?compareReviews=${reviews.slice(0, 2).map((item) => item.id).join(",")}`]}>
         <ProductionMultiManuscriptWorkbench candidates={reviews} preferredReviewId={reviews[0]?.id ?? null} />
+        <LocationProbe />
       </MemoryRouter>,
     );
 
@@ -250,6 +251,26 @@ describe("CRECO competitive production workflows", () => {
     fireEvent.click(screen.getByRole("button", { name: "4분할" }));
     await waitFor(() => expect(screen.getAllByTestId("review-image")).toHaveLength(4));
     expect(screen.getByText(/^PINNED /u)).toBeTruthy();
+
+    const firstPane = screen.getByRole("region", { name: "art-a 원고 1페이지" });
+    Object.defineProperty(firstPane, "scrollHeight", { configurable: true, value: 1_000 });
+    Object.defineProperty(firstPane, "clientHeight", { configurable: true, value: 500 });
+    firstPane.scrollTop = 250;
+    fireEvent.scroll(firstPane);
+    await waitFor(() => expect(decodeURIComponent(screen.getByLabelText("current-location").textContent ?? "")).toContain("compareScroll=art-a-review:5000"));
+    const persistedLocation = screen.getByLabelText("current-location").textContent ?? "";
+
+    cleanup();
+    render(
+      <MemoryRouter initialEntries={[persistedLocation]}>
+        <ProductionMultiManuscriptWorkbench candidates={reviews} preferredReviewId={reviews[0]?.id ?? null} />
+      </MemoryRouter>,
+    );
+    const restoredPane = await screen.findByRole("region", { name: "art-a 원고 1페이지" });
+    Object.defineProperty(restoredPane, "scrollHeight", { configurable: true, value: 1_000 });
+    Object.defineProperty(restoredPane, "clientHeight", { configurable: true, value: 500 });
+    fireEvent.load(restoredPane);
+    await waitFor(() => expect(restoredPane.scrollTop).toBe(250));
 
     cleanup();
     render(
@@ -277,9 +298,11 @@ describe("CRECO competitive production workflows", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "현재 목록 모두 추가" }));
+    fireEvent.click(await screen.findByRole("button", { name: "전체 페이지 불러오기" }));
+    await waitFor(() => expect(f.collectPages).toHaveBeenCalledTimes(1));
     expect(screen.getByRole("heading", { name: "새 페이지 구성 · 2장" })).toBeTruthy();
-    expect(screen.getAllByText("재사용")).toHaveLength(2);
+    expect(screen.getByLabelText("페이지 구성 변경 요약").textContent).toContain("재사용 2");
+    expect(screen.getByLabelText("페이지 구성 변경 요약").textContent).toContain("누락 0");
     fireEvent.click(screen.getByRole("button", { name: "CBZ 빠른 출력" }));
     await waitFor(() => expect(f.buildArchive).toHaveBeenCalledTimes(1));
     expect(f.downloadArchive).toHaveBeenCalledTimes(1);
@@ -366,7 +389,7 @@ describe("CRECO competitive production workflows", () => {
     await waitFor(() => expect(f.collectPages).toHaveBeenCalledTimes(1));
     expect(f.buildArchive).toHaveBeenCalledTimes(1);
     expect(f.downloadArchive).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/승인본 CBZ로 저장했습니다/u)).toBeTruthy();
+    expect(screen.getByText(/승인 FINAL CBZ로 저장했습니다/u)).toBeTruthy();
 
     rerender(
       <MemoryRouter initialEntries={["/production/projects/p/manuscripts"]}>

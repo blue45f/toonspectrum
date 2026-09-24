@@ -29,12 +29,14 @@ import {
   productionManifestPageState,
   removeProductionManifestPage,
   replaceProductionManifestPage,
+  summarizeProductionManifestPages,
   type ProductionManifestPage,
   type ProductionReviewCandidate,
 } from "./production-manuscript-competitive-model";
 import type { ProductionManuscriptProcess } from "./production-manuscript-model";
 import {
   buildProductionPageManifestArchive,
+  collectProductionReviewManifestPages,
   downloadProductionPageManifestArchive,
   type ProductionPageManifestArchiveResult,
 } from "./production-page-manifest-archive";
@@ -93,7 +95,7 @@ export function ProductionPageManifestBuilder({
   const requestedSlot = Number(params.get("builderSlot"));
   const [selectedIndex, setSelectedIndex] = useState(Number.isInteger(requestedSlot) && requestedSlot >= 0 ? requestedSlot : 0);
   const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState<"download" | "import" | null>(null);
+  const [busy, setBusy] = useState<"load" | "download" | "import" | null>(null);
   const [progress, setProgress] = useState(0);
   const [lastArchive, setLastArchive] = useState<ProductionPageManifestArchiveResult | null>(null);
 
@@ -114,6 +116,7 @@ export function ProductionPageManifestBuilder({
   const loadedPages = preview.result?.ok && source
     ? preview.result.previews.map((page) => manifestPageFromPreview(source, page))
     : [];
+  const summary = useMemo(() => summarizeProductionManifestPages(pages, baseline), [baseline, pages]);
 
   const append = (incoming: readonly ProductionManifestPage[]) => {
     const result = appendProductionManifestPages(pages, incoming);
@@ -131,6 +134,25 @@ export function ProductionPageManifestBuilder({
     }
     setPages(replaceProductionManifestPage(pages, selectedIndex, page));
     setNotice(`${selectedIndex + 1}번째 페이지를 ${source?.review.title ?? "선택 검수본"}의 ${page.sourceOrdinal + 1}페이지로 교체했습니다.`);
+  };
+
+  const loadAllPages = async () => {
+    if (!source || busy) return;
+    setBusy("load");
+    setProgress(0);
+    setNotice("");
+    try {
+      const all = await collectProductionReviewManifestPages(source);
+      setPages(all);
+      setBaseline(all);
+      setSelectedIndex(0);
+      setLastArchive(null);
+      setNotice(`${all.length}페이지 전체를 불러왔습니다. 이후 교체·삽입·제거한 차이를 페이지별로 표시합니다.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "전체 페이지 목록을 불러오지 못했습니다.");
+    } finally {
+      setBusy(null);
+    }
   };
 
   const build = async (mode: "download" | "import") => {
@@ -187,7 +209,8 @@ export function ProductionPageManifestBuilder({
           </select>
         </label>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" disabled={!loadedPages.length} onClick={() => append(loadedPages)} className={buttonClass({ variant: "outline", size: "sm" })}><PackagePlus className="size-4" aria-hidden="true" /> 현재 목록 모두 추가</button>
+          <button type="button" disabled={!source || Boolean(busy)} onClick={() => void loadAllPages()} className={buttonClass({ variant: "outline", size: "sm" })}>{busy === "load" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <PackagePlus className="size-4" aria-hidden="true" />} 전체 페이지 불러오기</button>
+          <button type="button" disabled={!loadedPages.length || Boolean(busy)} onClick={() => append(loadedPages)} className={buttonClass({ variant: "outline", size: "sm" })}><PackagePlus className="size-4" aria-hidden="true" /> 현재 목록 모두 추가</button>
           {preview.result?.ok && preview.result.nextCursor ? <button type="button" onClick={() => preview.setCursor(preview.result?.ok ? preview.result.nextCursor : null)} className={buttonClass({ variant: "quiet", size: "sm" })}>다음 페이지 목록</button> : null}
           {preview.cursor ? <button type="button" onClick={() => preview.setCursor(null)} className={buttonClass({ variant: "quiet", size: "sm" })}>처음 목록</button> : null}
           <button type="button" onClick={preview.refresh} disabled={!source} className={buttonClass({ variant: "quiet", size: "sm" })}><RefreshCcw className="size-4" aria-hidden="true" /> 갱신</button>
@@ -207,7 +230,11 @@ export function ProductionPageManifestBuilder({
       </div>
 
       <div className="min-w-0 rounded-2xl border border-line bg-panel p-3">
-        <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-black text-fg">새 페이지 구성 · {pages.length}장</h3><p className="mt-1 text-xs text-fg-3">선택 위치 {pages.length ? `${selectedIndex + 1}번째` : "없음"}</p></div>{pages.length ? <button type="button" onClick={() => { setPages([]); setBaseline([]); setNotice("구성을 비웠습니다."); }} className={buttonClass({ variant: "quiet", size: "sm" })}><Trash2 className="size-4" aria-hidden="true" /> 전체 비우기</button> : null}</div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="text-sm font-black text-fg">새 페이지 구성 · {pages.length}장</h3><p className="mt-1 text-xs text-fg-3">선택 위치 {pages.length ? `${selectedIndex + 1}번째` : "없음"}</p></div>{pages.length ? <button type="button" onClick={() => { setPages([]); setBaseline([]); setLastArchive(null); setNotice("구성을 비웠습니다."); }} className={buttonClass({ variant: "quiet", size: "sm" })}><Trash2 className="size-4" aria-hidden="true" /> 전체 비우기</button> : null}</div>
+        {baseline.length > 0 ? <div className="mt-3 flex flex-wrap gap-2" aria-label="페이지 구성 변경 요약">
+          {(["reused", "changed", "new", "duplicate", "missing"] as const).map((state) => <span key={state} className={cn("inline-flex min-h-7 items-center rounded-full border px-2 text-[0.625rem] font-bold", stateClass(state))}>{STATE_LABELS[state]} {summary[state]}</span>)}
+        </div> : null}
+        {summary.missing > 0 ? <p className="mt-3 rounded-xl border border-bad/35 bg-bad/10 p-3 text-xs font-bold text-bad" role="alert">기준 버전에서 빠진 페이지가 {summary.missing}장 있습니다. 출력하거나 편집기로 넘기기 전에 의도한 제거인지 확인하세요.</p> : null}
         {pages.length === 0 ? <div className="mt-4 rounded-xl border border-dashed border-line p-8 text-center"><CopyPlus className="mx-auto size-7 text-fg-3" aria-hidden="true" /><p className="mt-2 text-sm font-bold text-fg">왼쪽의 고정 검수 페이지를 추가하세요</p><p className="mt-1 text-xs text-fg-2">첫 구성은 비교 기준으로 보존되고 이후 교체·삽입 결과를 신규/변경/재사용으로 표시합니다.</p></div> : <ol className="mt-4 space-y-2" aria-label="새 버전 페이지 순서">
           {pages.map((page, index) => {
             const state = productionManifestPageState(page, index, baseline, pages);
@@ -218,7 +245,7 @@ export function ProductionPageManifestBuilder({
             </button><div className="mt-1 flex justify-end gap-1"><button type="button" disabled={index === 0} onClick={() => setPages(moveProductionManifestPage(pages, index, index - 1))} aria-label={`${index + 1}페이지 위로`} className="grid size-10 place-items-center rounded-lg border border-line bg-card text-fg-2 disabled:opacity-40"><ArrowUp className="size-4" aria-hidden="true" /></button><button type="button" disabled={index === pages.length - 1} onClick={() => setPages(moveProductionManifestPage(pages, index, index + 1))} aria-label={`${index + 1}페이지 아래로`} className="grid size-10 place-items-center rounded-lg border border-line bg-card text-fg-2 disabled:opacity-40"><ArrowDown className="size-4" aria-hidden="true" /></button><button type="button" onClick={() => setPages(removeProductionManifestPage(pages, index))} aria-label={`${index + 1}페이지 제거`} className="grid size-10 place-items-center rounded-lg border border-line bg-card text-bad"><Trash2 className="size-4" aria-hidden="true" /></button></div></li>;
           })}
         </ol>}
-        {busy ? <div className="mt-4 rounded-xl border border-accent/30 bg-accent-soft/20 p-3 text-xs text-fg-2" role="status"><LoaderCircle className="mr-2 inline size-4 animate-spin text-accent" aria-hidden="true" /> 페이지 바이트·SHA-256 검증 및 archive 구성 중 · {progress}%</div> : null}
+        {busy ? <div className="mt-4 rounded-xl border border-accent/30 bg-accent-soft/20 p-3 text-xs text-fg-2" role="status"><LoaderCircle className="mr-2 inline size-4 animate-spin text-accent" aria-hidden="true" /> {busy === "load" ? "고정 검수본의 전체 페이지 목록을 확인하는 중…" : `페이지 바이트·SHA-256 검증 및 archive 구성 중 · ${progress}%`}</div> : null}
         {notice ? <p className="mt-4 rounded-xl border border-line bg-card p-3 text-xs text-fg-2" role="status">{notice}</p> : null}
         {lastArchive ? <p className="mt-2 text-[0.625rem] text-fg-3">최근 생성: {lastArchive.fileName} · {lastArchive.manifest.pageCount}페이지 · {(lastArchive.blob.size / 1024).toFixed(1)} KB</p> : null}
       </div>

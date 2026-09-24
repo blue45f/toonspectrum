@@ -12,7 +12,9 @@ import {
   moveProductionManifestPage,
   parseProductionWorkbenchState,
   productionManifestPageState,
+  productionReviewMatchesApprovedFinal,
   productionRolePreset,
+  summarizeProductionManifestPages,
   writeProductionWorkbenchState,
 } from "./production-manuscript-competitive-model";
 
@@ -56,9 +58,11 @@ describe("production manuscript competitive model", () => {
     const invalid = parseProductionWorkbenchState(new URLSearchParams("comparePanes=4&compareReviews=review-a,missing"), candidates);
     expect(invalid.invalidReviewIds).toEqual(["missing"]);
     expect(invalid.state.reviewIds).toEqual([]);
-    const valid = parseProductionWorkbenchState(new URLSearchParams("comparePanes=4&compareReviews=review-a,review-b&compareActive=review-b&comparePages=review-a:3"), candidates);
-    expect(valid.state).toMatchObject({ paneCount: 4, reviewIds: ["review-a", "review-b"], activeReviewId: "review-b", pageOrdinals: { "review-a": 3 } });
-    expect(writeProductionWorkbenchState(new URLSearchParams(), valid.state).get("compareReviews")).toBe("review-a,review-b");
+    const valid = parseProductionWorkbenchState(new URLSearchParams("comparePanes=4&compareReviews=review-a,review-b&compareActive=review-b&comparePages=review-a:3&compareScroll=review-a:6250,review-b:10001"), candidates);
+    expect(valid.state).toMatchObject({ paneCount: 4, reviewIds: ["review-a", "review-b"], activeReviewId: "review-b", pageOrdinals: { "review-a": 3 }, scrollRatios: { "review-a": 6250 } });
+    const serialized = writeProductionWorkbenchState(new URLSearchParams(), valid.state);
+    expect(serialized.get("compareReviews")).toBe("review-a,review-b");
+    expect(serialized.get("compareScroll")).toBe("review-a:6250");
   });
 
   it("builds, deduplicates, reorders and classifies a page manifest", () => {
@@ -71,6 +75,40 @@ describe("production manuscript competitive model", () => {
     expect(moveProductionManifestPage(appended.pages, 1, 0).map((page) => page.sha256)).toEqual([second.sha256, first.sha256]);
     expect(productionManifestPageState(first, 0, [first, second], [first, second])).toBe("reused");
     expect(productionManifestPageState(second, 0, [first], [second])).toBe("changed");
+    expect(summarizeProductionManifestPages([second], [first, second])).toEqual({
+      reused: 0,
+      changed: 1,
+      new: 0,
+      duplicate: 0,
+      missing: 1,
+    });
+  });
+
+  it("labels quick export as approved only when the pinned review exactly matches FINAL", () => {
+    const base = process("a", "review-a");
+    const candidate = buildProductionReviewCandidates(project, [base])[0]!;
+    const approved = {
+      ...revision("approved-a", "approved"),
+      artifactId: base.artifact.id,
+      rootGraphHash: candidate.subject.rootGraphHash,
+    };
+    const approvedReview = { ...candidate.review, status: "approved" as const };
+    const approvedCandidate = { ...candidate, review: approvedReview };
+    const approvedProcess = {
+      ...base,
+      artifact: { ...base.artifact, approvedRevisionId: approved.id },
+      approvedRevision: approved,
+      reviews: [approvedReview],
+      latestReview: approvedReview,
+      openReviewCount: 0,
+      openRequiredFeedbackCount: 0,
+      lifecyclePhase: "approved" as const,
+    };
+    expect(productionReviewMatchesApprovedFinal(approvedCandidate, approvedProcess)).toBe(true);
+    expect(productionReviewMatchesApprovedFinal(
+      { ...approvedCandidate, subject: { ...approvedCandidate.subject, rootGraphHash: digest("z") } },
+      approvedProcess,
+    )).toBe(false);
   });
 
   it("keeps role presets least-privileged and preserves existing task fields in bulk updates", () => {
