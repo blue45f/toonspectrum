@@ -54,7 +54,11 @@ describe("local comic director", () => {
     const project = directPromo(fixture(), "anime");
     project.panels[0]!.foregroundSrc = project.panels[0]!.src;
     project.voiceover = { src: "data:audio/wav;base64,aGVsbG8=", volume: 0.9, startSec: 2, durationSec: 4 };
-    const files = promoRemotionFiles(project, { model: "shared-model", canvas: "shared-canvas" });
+    const files = promoRemotionFiles(project, {
+      model: "shared-model",
+      canvas: "shared-canvas",
+      voiceStudioModel: "shared-voice-studio-model",
+    });
     expect(files["public/foreground-1.png"]).toBeInstanceOf(Uint8Array);
     expect(files["public/narration.wav"]).toBeInstanceOf(Uint8Array);
     expect(files["project.json"]).not.toContain("base64");
