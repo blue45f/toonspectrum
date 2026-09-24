@@ -44,11 +44,11 @@ describe("StudioBetaNoticeGate", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.getByRole("dialog")).toBeTruthy();
 
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "확인하고 툰스튜디오 시작하기",
-      }),
-    );
+    const acknowledge = screen.getByRole("button", {
+      name: "확인하고 툰스튜디오 시작하기",
+    });
+    expect(acknowledge.getAttribute("data-studio-beta-notice-acknowledge")).toBe("true");
+    fireEvent.click(acknowledge);
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(window.localStorage.getItem(STUDIO_BETA_NOTICE_STORAGE_KEY)).toBe(

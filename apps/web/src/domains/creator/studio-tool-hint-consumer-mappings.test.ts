@@ -41,7 +41,7 @@ describe("Studio rich-hint consumer mappings", () => {
     expectNearby(source, "const lassoToolHintProps", '{ hintPreview: "polygon-lasso" as const }', 600);
     expectNearby(source, "const lassoToolHintProps", '{ hintPreview: "dismiss" as const }', 600);
     expectNearby(source, "const lassoToolHintProps", '{ hintPreview: "lasso" as const }', 600);
-    expectNearby(source, 'label={\n                pixelTool === "lasso"', "{...lassoToolHintProps}", 1_200);
+    expectNearby(source, '"lasso": {', "...lassoToolHintProps", 1_200);
   });
 
   it("maps selection actions to their actual edit result", () => {
@@ -139,10 +139,10 @@ describe("Studio rich-hint consumer mappings", () => {
   });
 
   it("passes each palette identity into its palette-specific preview mapper", () => {
-    const popover = readStudioSource("StudioColorPopover.tsx");
+    const editor = readFileSync(new URL("./color/StudioColorEditor.tsx", import.meta.url), "utf8");
     const hints = readStudioSource("studio-color-popover-hints.ts");
 
-    expect(popover).toContain("studioPaletteFamilyHint(p.label, p.tip, p.id)");
+    expect(editor).toContain("studioPaletteFamilyHint(activePalette.label, activePalette.tip, activePalette.id)");
     for (const paletteId of [
       "skin-natural",
       "hair-natural",

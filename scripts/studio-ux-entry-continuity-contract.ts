@@ -304,7 +304,7 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
           allOf: [
             "onRequestPixelSelection",
             '"선택 시작하기"',
-            'label="변형 (⇧T)"',
+            '"label": "변형 (⇧T)"',
             "pixelTransformRecoveryAvailable || objectTransformPickRecoveryAvailable",
           ],
         }],
@@ -354,8 +354,8 @@ const STUDIO_UX_ENTRY_CONTINUITY_PROMOTED_CONTRACTS: readonly StudioUxEntryConti
           file: "apps/web/src/domains/creator/StudioLeftToolRail.tsx",
           allOf: [
             "onRequestSelectImage",
-            'label={frameAnimationRecoveryAvailable ? "이미지 선택하기"',
-            'className={frameAnimationRecoveryAvailable ? "size-11"',
+            '"label": frameAnimationRecoveryAvailable ? "이미지 선택하기"',
+            '"className": frameAnimationRecoveryAvailable ? "size-11"',
           ],
         }],
       },

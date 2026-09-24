@@ -125,7 +125,6 @@ describe("Studio options-bars module boundary", () => {
     expect(optionsBars.valueImports).toEqual([
       "react",
       "./StudioDrawingWorkbenchControls",
-      "./brush/studio-draw-color-swatches",
       "./studio-page-lazy-ui",
       "@/hooks/use-media-query",
     ]);

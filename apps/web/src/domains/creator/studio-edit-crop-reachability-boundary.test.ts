@@ -135,8 +135,8 @@ describe("Studio edit crop reachability boundary", () => {
     const rail = source("./StudioLeftToolRail.tsx");
     expect(rail).toContain("const rasterRetouchCanStart =");
     expect(rail).toContain("rasterRetouchTargetAvailable");
-    expect(rail).toContain("disabled={!cropActive && !rasterRetouchCanStart}");
-    expect(rail).toContain("unavailableReason={rasterRetouchUnavailableReason(cropActive)}");
-    expect(rail).toContain("onClick={openSelectedLayerCrop}");
+    expect(rail).toContain('"disabled": !cropActive && !rasterRetouchCanStart');
+    expect(rail).toContain('"unavailableReason": rasterRetouchUnavailableReason(cropActive)');
+    expect(rail).toContain('"onClick": openSelectedLayerCrop');
   });
 });

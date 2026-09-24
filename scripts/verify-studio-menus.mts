@@ -469,9 +469,9 @@ export async function dismissOverlays(page: Page) {
     .then(() => true)
     .catch(() => false);
   if (betaNoticeVisible) {
-    const acknowledge = betaNotice.getByRole("button", {
-      name: /확인하고 툰스튜디오 시작하기|I understand — enter ToonStudio/u,
-    });
+    const acknowledge = betaNotice.locator(
+      '[data-studio-beta-notice-acknowledge="true"]',
+    );
     try {
       await acknowledge.click({ timeout: 30_000, noWaitAfter: true });
     } catch {
