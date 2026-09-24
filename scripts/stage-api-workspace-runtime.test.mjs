@@ -16,7 +16,7 @@ async function compiledPackage(root, path, source) {
 }
 
 async function compiledProductionContracts(root) {
-  for (const name of ["production-workspace", "operation-policy"]) {
+  for (const name of ["production-workspace", "operation-policy", "creator-publication-integrity"]) {
     await compiledPackage(root, `packages/contracts/src/${name}.js`, `module.exports = { contract: ${JSON.stringify(name)} };`);
   }
 }
@@ -78,7 +78,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     ]);
 
     const requireFromApi = createRequire(caller);
-    for (const name of ["production-workspace", "operation-policy"]) {
+    for (const name of ["production-workspace", "operation-policy", "creator-publication-integrity"]) {
       assert.deepEqual(requireFromApi(`@toonspectrum/contracts/${name}`), { contract: name });
     }
     assert.deepEqual(requireFromApi("@toonspectrum/contracts/security/csrf"), {
@@ -126,6 +126,10 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       "utf8",
     ));
     assert.equal(contractsPackageJson.exports["./security/csrf"], "./security/csrf.js");
+    assert.equal(
+      contractsPackageJson.exports["./creator-publication-integrity"],
+      "./creator-publication-integrity.js",
+    );
     assert.equal("main" in contractsPackageJson, false);
   } finally {
     await rm(root, { recursive: true, force: true });

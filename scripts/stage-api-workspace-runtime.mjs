@@ -9,6 +9,7 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
       "./security/csrf": "./security/csrf.js",
       "./production-workspace": "./production-workspace.js",
       "./operation-policy": "./operation-policy.js",
+      "./creator-publication-integrity": "./creator-publication-integrity.js",
     },
     subpathEntries: [
       {
@@ -17,6 +18,10 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
       },
       { target: "production-workspace.js", compiledEntry: "packages/contracts/src/production-workspace.js" },
       { target: "operation-policy.js", compiledEntry: "packages/contracts/src/operation-policy.js" },
+      {
+        target: "creator-publication-integrity.js",
+        compiledEntry: "packages/contracts/src/creator-publication-integrity.js",
+      },
     ],
   },
   {

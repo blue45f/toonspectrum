@@ -24102,7 +24102,6 @@ const puppetWarpArmed =
     wetMixArmed,
   });
 
-
   function startCanvasEditText(id: string) {
     const element = elementById.get(id);
     const knownGroup =
@@ -28433,7 +28432,6 @@ function clearSelectionForEdit() {
         ),
     [elements, masterEditMode]
   );
-
   const studioCanvasViewportHandlers = useStudioStableHandlers<StudioCanvasViewportHandlers>({
   activateCanvasTool: activatePrimaryCanvasTool,
   addPage,
