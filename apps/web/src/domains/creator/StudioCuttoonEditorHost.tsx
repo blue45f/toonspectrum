@@ -25401,8 +25401,7 @@ function clearSelectionForEdit() {
     select: (id) => { setSelectedId(id); setMarqueeIds([]); },
     closeMenu: () => setMenu(null), setError,
     onApplied: (stroke) => {
-      // Correction confirmation and the first control-point gesture can occur back-to-back. Flush
-      // selection plus node-edit ownership before the dialog yields focus so that an immediate
+      // Correction confirmation and the first control-point gesture can occur back-to-back. Flush selection plus node-edit ownership before the dialog yields focus so that an immediate
       // pointerdown cannot fall through to the blank-canvas selection clearer.
       flushSync(() => {
         activatePrimaryCanvasTool("select");
