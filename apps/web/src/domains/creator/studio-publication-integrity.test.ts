@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   hashStudioPublicationPages,
+  resolveStudioPublicationOrigin,
   writeStudioPublicationIntegrity,
 } from "./studio-publication-integrity";
 
@@ -26,6 +27,29 @@ beforeEach(() => {
 });
 
 describe("studio publication integrity", () => {
+  it("distinguishes editor handoffs from ordinary file uploads", () => {
+    expect(resolveStudioPublicationOrigin({
+      currentSourceKind: null,
+      studioHandoff: true,
+      sourceWorkId: "work-7",
+    })).toEqual({
+      sourceKind: "studio_document",
+      documentId: "work-7",
+      disclosure: "ToonStudio 브라우저 편집기에서 제작 후 게시 인계한 원고",
+      toolIds: ["toonstudio-web", "studio-editor", "publish-handoff"],
+    });
+    expect(resolveStudioPublicationOrigin({
+      currentSourceKind: "external_tool",
+      studioHandoff: false,
+    })).toEqual({
+      sourceKind: "external_tool",
+      toolIds: ["toonstudio-web", "upload-publisher"],
+    });
+    expect(resolveStudioPublicationOrigin({
+      studioHandoff: false,
+    }).sourceKind).toBe("uploaded_file");
+  });
+
   it("derives an ordered content checksum without exposing page bytes", async () => {
     const first = `data:text/plain;base64,${btoa("first")}`;
     const second = `data:text/plain;base64,${btoa("second")}`;

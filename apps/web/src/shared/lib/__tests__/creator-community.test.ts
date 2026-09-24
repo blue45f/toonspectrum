@@ -264,6 +264,15 @@ describe("creator community (DB)", { timeout: 90000 }, () => {
       doc: {
         versionLabel: "initial",
         privateNote: "owner only",
+        publicationSource: {
+          version: 1,
+          kind: "studio_document",
+          projectId: "project-1",
+          documentId: "document-1",
+          revisionId: "local:1",
+          contentChecksum: "a".repeat(64),
+          disclosure: "ToonStudio에서 직접 제작한 원고",
+        },
         embedded: { src: embeddedDataUrl },
         aiProvenance: {
           operations: [
@@ -276,8 +285,21 @@ describe("creator community (DB)", { timeout: 90000 }, () => {
       },
     });
     createdWorkIds.add(created.id);
-    expect(created.revision).toBe(1);
-    await expect(getWork(created.id, owner)).resolves.toMatchObject({ revision: 1 });
+    expect(created).toMatchObject({
+      revision: 1,
+      pagesCount: 1,
+      sourceKind: "studio_document",
+    });
+    await expect(getWork(created.id, owner)).resolves.toMatchObject({
+      revision: 1,
+      pagesCount: 1,
+      sourceKind: "studio_document",
+    });
+    const ownerFeed = await listWorks({ userId: owner, viewerId: owner });
+    expect(ownerFeed.find((work) => work.id === created.id)).toMatchObject({
+      pagesCount: 1,
+      sourceKind: "studio_document",
+    });
     const publicWork = await getWork(created.id, reader);
     expect(publicWork).not.toHaveProperty("revision");
     expect(publicWork?.doc).not.toHaveProperty("privateNote");
@@ -289,6 +311,15 @@ describe("creator community (DB)", { timeout: 90000 }, () => {
     expect(baseline.snapshot.doc).toEqual({
       versionLabel: "initial",
       privateNote: "owner only",
+      publicationSource: {
+        version: 1,
+        kind: "studio_document",
+        projectId: "project-1",
+        documentId: "document-1",
+        revisionId: "local:1",
+        contentChecksum: "a".repeat(64),
+        disclosure: "ToonStudio에서 직접 제작한 원고",
+      },
       embedded: { src: embeddedDataUrl },
       aiProvenance: {
         operations: [

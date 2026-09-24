@@ -3,6 +3,7 @@ import { creatorWorkReadOptions } from "./creator-work-read-options";
 // 인증은 공유 클라이언트의 HttpOnly 세션 쿠키만 사용하므로 호출부는
 // x-user-id나 브라우저 저장 토큰을 별도로 전달하지 않는다.
 // 새 저장 키를 만들지 않고 auth-session의 getAuthUserId()로 현재 사용자 id를 읽는다.
+import type { CreatorPublicationSourceKind } from "@toonspectrum/contracts/creator-publication-integrity";
 import type {
   CreatorAssetCatalogSort,
   CreatorAssetLicenseId,
@@ -55,6 +56,10 @@ export interface WorkSummary {
   cover: string;
   tags: string[];
   format: WorkFormat;
+  /** Derived by the server; optional while older deployments roll forward. */
+  pagesCount?: number;
+  /** Distinguishes Studio-authored work from direct upload and external-tool origins. */
+  sourceKind?: CreatorPublicationSourceKind | null;
   titleId: string | null;
   status: string;
   author: WorkAuthor;

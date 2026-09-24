@@ -1,5 +1,6 @@
 // 창작 작품(웹툰/컷툰) CRUD — 목록/상세/생성/수정/삭제와 연결 자산 검증.
 import { and, asc, desc, eq, gt, inArray, lt, lte, or, sql } from "drizzle-orm";
+import { readCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
 
 import {
   assertStudioLinked3dPassAssetRows,
@@ -245,6 +246,7 @@ export async function listWorks(opts: {
         cover: creatorWorks.cover,
         tags: creatorWorks.tags,
         format: creatorWorks.format,
+        pagesCount: sql<number>`coalesce(jsonb_array_length(${creatorWorks.pages}), 0)`,
         doc: creatorWorks.doc,
         titleId: creatorWorks.titleId,
         status: creatorWorks.status,
@@ -321,6 +323,8 @@ export async function listWorks(opts: {
       cover: r.cover ?? "",
       tags: parseTagValue(r.tags),
       format: parseFormat(r.format),
+      pagesCount: Number(r.pagesCount ?? 0),
+      sourceKind: readCreatorPublicationSource(r.doc)?.kind ?? null,
       titleId: r.titleId ?? null,
       status: parseStatus(r.status),
       author: authorOf(r),
@@ -528,6 +532,8 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       }));
     }
 
+    const parsedPages = parsePages(row.pages);
+    const sourceKind = readCreatorPublicationSource(row.doc)?.kind ?? null;
     return {
       id: row.id,
       title: row.title,
@@ -535,6 +541,8 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       cover: row.cover ?? "",
       tags: parseTagValue(row.tags),
       format: parseFormat(row.format),
+      pagesCount: parsedPages.length,
+      sourceKind,
       titleId: row.titleId ?? null,
       status: parseStatus(row.status),
       author: authorOf(row),
@@ -555,7 +563,7 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       remixedChildren,
       createdAt: safeDate(row.createdAt),
       updatedAt: safeDate(row.updatedAt),
-      pages: parsePages(row.pages),
+      pages: parsedPages,
       doc: isOwner ? row.doc ?? {} : toPublicCreatorDoc(row.doc),
       isOwner,
       ...(isOwner ? { revision: Number(row.revision ?? 1) } : {}),
@@ -684,6 +692,8 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
     cover,
     tags,
     format,
+    pagesCount: pages.length,
+    sourceKind: readCreatorPublicationSource(doc)?.kind ?? null,
     titleId,
     status,
     author: { id: userId, name: user?.name ?? "익명", avatar: user?.avatar ?? "#7c5cfc" },
