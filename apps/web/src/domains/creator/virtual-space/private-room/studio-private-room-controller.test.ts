@@ -2,10 +2,43 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type StudioAcousticSessionLease } from "@toonspectrum/studio-project-model/world-acoustic";
 import { type StudioConversationSnapshot } from "@toonspectrum/studio-project-model/world-conversation";
 
-import { fixture,ids,flush } from "./studio-private-room-controller.fixture";
+import { fixture,ids,flush,world } from "./studio-private-room-controller.fixture";
+import { canonicalJson } from "@toonspectrum/studio-project-model";
 
 afterEach(()=>vi.restoreAllMocks());
 describe("server-authorized private-room controller",()=>{
+  it("delivers a doorway knock, lets a manager allow only this member, and still requires explicit admission",async()=>{
+    const f=fixture();f.setOpen(false);for(const controller of f.controllers)controller.start();await flush();
+    expect(f.controllers[1]!.canKnock()).toBe(true);expect(f.controllers[1]!.knock()).toBe(true);await flush();
+    const request=f.controllers[0]!.snapshot().knocks[0]!;expect(request.actorId).toBe("actor-1");
+    await f.controllers[0]!.respondKnock(request.requestId,"accepted");await flush();
+    expect(f.apis[0]!.changeDoor).toHaveBeenCalledWith(expect.objectContaining({open:true,allowedUserIds:expect.arrayContaining(["actor-1"])}),expect.any(String),expect.any(AbortSignal));
+    expect(f.controllers[1]!.snapshot().knockOutcome?.decision).toBe("accepted");
+    expect(f.controllers[1]!.snapshot().session).toBeNull();
+  });
+  it("supports an explicit decline without changing the door and rate-limits repeated knocks",async()=>{
+    const f=fixture();f.setOpen(false);for(const controller of f.controllers)controller.start();await flush();
+    expect(f.controllers[1]!.knock()).toBe(true);await flush();const request=f.controllers[0]!.snapshot().knocks[0]!;
+    await f.controllers[0]!.respondKnock(request.requestId,"declined");await flush();
+    expect(f.apis[0]!.changeDoor).not.toHaveBeenCalled();expect(f.controllers[1]!.snapshot().knockOutcome?.decision).toBe("declined");
+    expect(f.controllers[1]!.knock()).toBe(false);f.advance(10_001);expect(f.controllers[1]!.knock()).toBe(true);
+  });
+  it("ignores an accepted response forged by a non-manager who observed the broadcast knock",async()=>{
+    const f=fixture(3);f.setOpen(false);for(const controller of f.controllers)controller.start();await flush();
+    expect(f.controllers[1]!.knock()).toBe(true);await flush();
+    const request=f.controllers[0]!.snapshot().knocks[0]!;
+    f.sendRaw(2,1,JSON.stringify({wire:"studio-private-room-knock-v1",type:"response",workId:"work",world:canonicalJson(world),zoneId:"zone",doorId:"door",
+      requestId:request.requestId,responderActorId:"actor-2",clientInstanceId:"client-2",targetClientInstanceId:"client-1",decision:"accepted",sentAt:Date.now()}));
+    expect(f.controllers[1]!.snapshot().knockPending).toBe(true);
+    expect(f.controllers[1]!.snapshot().knockOutcome).toBeNull();
+  });
+  it("ignores a spoofed actor and refuses knocks away from the authored doorway",async()=>{
+    const f=fixture();f.setOpen(false);for(const controller of f.controllers)controller.start();await flush();
+    const requestId="00000000-0000-4000-8000-000000000099";
+    f.sendRaw(1,0,JSON.stringify({wire:"studio-private-room-knock-v1",type:"request",workId:"work",world:canonicalJson(world),zoneId:"zone",doorId:"door",requestId,actorId:"forged-actor",clientInstanceId:"client-1",sentAt:Date.now()}));
+    expect(f.controllers[0]!.snapshot().knocks).toEqual([]);
+    f.setKnockEligible(false);expect(f.controllers[1]!.canKnock()).toBe(false);expect(f.controllers[1]!.knock()).toBe(false);
+  });
   it.each([false,true])("rejects another admitted person's advertised epoch, including lost-response reconciliation=%s",async(lost)=>{
     const f=fixture(3);await f.start();
     f.spoofEpoch(1,ids[2]!);

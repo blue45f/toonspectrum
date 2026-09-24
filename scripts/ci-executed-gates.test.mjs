@@ -134,6 +134,7 @@ test("review database invariants execute with real PostgreSQL and the accepted g
     .map((match) => match[1]);
   assert.ok(migrationFiles.includes("0087_studio_pinned_review_share.sql"));
   assert.ok(migrationFiles.includes("0088_studio_review_delivery.sql"));
+  assert.ok(migrationFiles.includes("0090_studio_review_voice_note.sql"));
   assert.ok(!migrationFiles.includes("0084_studio_pinned_review_share.sql"));
   for (const migration of migrationFiles) {
     assert.ok(
@@ -261,6 +262,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "the full build art gate does not replace the existing foundation art regression target");
   assert.match(JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")).scripts["test:studio-virtual-art"],
     /verify-virtual-studio-v3-art\.test\.mjs/u,
+    /verify-virtual-studio-v4-art\.test\.mjs/u,
     "the production art gate must execute the v3 NPC/style-pack integrity test");
   const scratch = mkdtempSync(join(tmpdir(), "virtual-studio-ci-inputs-"));
   const git = (...args) => {

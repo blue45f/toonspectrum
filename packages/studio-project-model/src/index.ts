@@ -59,3 +59,4 @@ export * from "./graph/review-policy";
 export * from "./graph/review-policy-history";
 
 export * from "./graph/review-delivery";
+export * from "./graph/review-voice-note";

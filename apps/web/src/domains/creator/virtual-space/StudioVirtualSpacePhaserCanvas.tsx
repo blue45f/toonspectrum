@@ -920,7 +920,10 @@ export function StudioVirtualSpacePhaserCanvas({
         camera.setDeadzone(150, 100);
         const resizeCamera = (gameSize: { width: number; height: number }) => {
           const cover = Math.max(gameSize.width / manifest.width, gameSize.height / manifest.height);
-          camera.setZoom(Math.max(0.72 * viewport.ratio, cover));
+          // Gather-like navigation keeps the avatar and nearby interaction targets readable.
+          // The minimap remains the overview; the main camera should not flatten the campus into a poster.
+          const immersive = Math.max(1.02 * viewport.ratio, cover * 1.38);
+          camera.setZoom(Math.min(2.05, immersive));
         };
         resizeCamera({ width: this.scale.width, height: this.scale.height });
         this.scale.on("resize", (gameSize: { width: number; height: number }) => resizeCamera(gameSize));

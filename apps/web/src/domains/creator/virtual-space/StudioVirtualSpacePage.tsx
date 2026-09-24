@@ -132,6 +132,7 @@ import { StudioVirtualSpaceTeamHub } from "./StudioVirtualSpaceTeamHub";
 import { StudioVirtualSpaceTodayBoard } from "./StudioVirtualSpaceTodayBoard";
 import { StudioVirtualSpaceRtcPanel } from "./StudioVirtualSpaceRtcPanel";
 import { studioSpatialActions, type StudioSpatialActionId } from "./studio-virtual-space-spatial-actions";
+import { orchestrateStudioSpatialInteraction, type StudioVirtualWorkspacePanel } from "./studio-virtual-space-interaction-orchestrator";
 import { useStudioVirtualSpaceOperations } from "./use-studio-virtual-space-operations";
 import { StudioVirtualSpaceEntryLobby } from "./StudioVirtualSpaceEntryLobby";
 import { StudioVirtualSpaceP2pBoard } from "./StudioVirtualSpaceP2pBoard";
@@ -649,7 +650,7 @@ export function VirtualSpaceExperience({
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
   const [selectedPeerId, setSelectedPeerId] = useState<string | null>(null);
-  const [workspacePanel, setWorkspacePanel] = useState<"people" | "space" | "search" | "work" | "sessions" | "board" | "team" | "today" | "rtc" | null>(() => {
+  const [workspacePanel, setWorkspacePanel] = useState<StudioVirtualWorkspacePanel | null>(() => {
     const query = new URLSearchParams(location.search);
     if (query.get("activity") === "board") return "board";
     return query.has("session") || query.get("activity") === "sessions" ? "sessions" : null;
@@ -1051,20 +1052,14 @@ export function VirtualSpaceExperience({
     const interaction = pendingInteraction;
     setPendingInteraction(null);
     if (!interaction) return;
-    if (id === "primary") { worldRuleGate.request(interaction); return; }
-    if (id === "work-inbox") { setWorkspacePanel("work"); return; }
-    if (id === "sessions") { setWorkspacePanel("sessions"); return; }
-    if (id === "board") { setWorkspacePanel("board"); return; }
-    if (id === "people" || id === "huddle") { setWorkspacePanel("people"); return; }
-    if (id === "team-hub") { setWorkspacePanel("team"); return; }
-    if (id === "today-board") { setWorkspacePanel("today"); return; }
-    const productionId = operations.snapshot.project?.aggregate.projectId;
-    if (id === "schedule") navigate(productionId ? `/production/projects/${encodeURIComponent(productionId)}/schedule` : `/studio/p/${encodeURIComponent(projectId)}/production`);
-    else if (id === "production-control") navigate(productionId ? `/production/projects/${encodeURIComponent(productionId)}/control` : `/studio/p/${encodeURIComponent(projectId)}/production`);
-    else if (id === "quality-control") navigate(productionId ? `/production/projects/${encodeURIComponent(productionId)}/review` : `/studio/p/${encodeURIComponent(projectId)}/review`);
-    else if (id === "release-center") navigate(`/studio/p/${encodeURIComponent(projectId)}/export`);
-    else if (id === "project-settings") navigate(`/studio/p/${encodeURIComponent(projectId)}/settings`);
-    else navigate(`/studio/p/${encodeURIComponent(projectId)}/overview`);
+    const decision = orchestrateStudioSpatialInteraction(id, {
+      interaction,
+      projectId,
+      productionProjectId: operations.snapshot.project?.aggregate.projectId,
+    });
+    if (decision.kind === "world-rule") worldRuleGate.request(decision.interaction);
+    else if (decision.kind === "panel") setWorkspacePanel(decision.panel);
+    else navigate(decision.href);
   }, [navigate, operations.snapshot.project?.aggregate.projectId, pendingInteraction, projectId, worldRuleGate]);
 
   const followingPeer = followingPeerId
@@ -1510,6 +1505,7 @@ export function VirtualSpaceExperience({
                   room={roomById.get(dialogueNpc.roomId)}
                   operations={operations.snapshot}
                   peers={snapshot.peers}
+                  artStyle={artStyle}
                   onAction={handleNpcDialogueAction}
                   onClose={() => setDialogueNpc(null)}
                 /> : null}

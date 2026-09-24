@@ -223,6 +223,7 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "studio_review_policy",
   "studio_review_policy_event",
   "studio_review_reviewer",
+  "studio_review_voice_note",
   "studio_revision",
   "studio_revision_blob",
   "studio_revision_parent",
@@ -1181,7 +1182,8 @@ BEGIN
     'studio_pinned_review_share',
     'studio_pinned_review_feedback',
     'studio_review_delivery',
-    'studio_review_delivery_event'
+    'studio_review_delivery_event',
+    'studio_review_voice_note'
   ]::text[] LOOP
     SELECT string_agg(format('%I', attribute.attname), ', ' ORDER BY attribute.attnum)
     INTO column_list
@@ -1213,7 +1215,8 @@ REVOKE ALL ON TABLE
   public.studio_pinned_review_share,
   public.studio_pinned_review_feedback,
   public.studio_review_delivery,
-  public.studio_review_delivery_event
+  public.studio_review_delivery_event,
+  public.studio_review_voice_note
 FROM PUBLIC;
 
 REVOKE ALL ON TABLE
@@ -1224,7 +1227,8 @@ REVOKE ALL ON TABLE
   public.studio_pinned_review_share,
   public.studio_pinned_review_feedback,
   public.studio_review_delivery,
-  public.studio_review_delivery_event
+  public.studio_review_delivery_event,
+  public.studio_review_voice_note
 FROM ${quotedRole};
 
 GRANT SELECT, INSERT
@@ -1236,7 +1240,8 @@ GRANT SELECT, INSERT
     public.studio_pinned_review_share,
     public.studio_pinned_review_feedback,
     public.studio_review_delivery,
-    public.studio_review_delivery_event
+    public.studio_review_delivery_event,
+    public.studio_review_voice_note
   TO ${quotedRole};
 
 GRANT UPDATE ("revision", "document", "updatedBy", "updatedAt")
@@ -1253,6 +1258,9 @@ GRANT UPDATE ("revokedAt")
   TO ${quotedRole};
 GRANT UPDATE (state, version, "archiveSha256", "archiveByteLength", "updatedAt", "issuedAt", "deliveredAt", "acceptedAt", "cancelledAt")
   ON TABLE public.studio_review_delivery
+  TO ${quotedRole};
+GRANT UPDATE ("deletedAt", "deleteOperationId")
+  ON TABLE public.studio_review_voice_note
   TO ${quotedRole};
 GRANT USAGE, SELECT ON SEQUENCE public.studio_review_delivery_event_sequence_seq TO ${quotedRole};
 `;
@@ -1295,7 +1303,8 @@ export function buildStudioProductionRuntimeAclViolationSql(
         ('studio_pinned_review_share'::text, ARRAY['revokedAt']::text[]),
         ('studio_pinned_review_feedback'::text, ARRAY[]::text[]),
         ('studio_review_delivery'::text, ARRAY['state','version','archiveSha256','archiveByteLength','updatedAt','issuedAt','deliveredAt','acceptedAt','cancelledAt']::text[]),
-        ('studio_review_delivery_event'::text, ARRAY[]::text[])
+        ('studio_review_delivery_event'::text, ARRAY[]::text[]),
+        ('studio_review_voice_note'::text, ARRAY['deletedAt','deleteOperationId']::text[])
       ) AS production_contract(relation_name, mutable_columns)
       WHERE NOT pg_catalog.has_table_privilege(
         ${roleLiteral},
