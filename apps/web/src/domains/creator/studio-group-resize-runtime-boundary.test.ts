@@ -536,15 +536,17 @@ describe("Studio group uniform-resize runtime boundary", () => {
     const transformerEffectStart = pageSource.indexOf(
       "// 트랜스포머를 선택 노드",
     );
+    const transformerEffectTerminator =
+      "}, [activeSurfaceReviewLocked, selectedId, marqueeIds, tool, elements, groups]);";
     const transformerEffectEnd = pageSource.indexOf(
-      "function publishStudioCrdtSceneTransition",
+      transformerEffectTerminator,
       transformerEffectStart,
     );
     expect(transformerEffectStart).toBeGreaterThanOrEqual(0);
     expect(transformerEffectEnd).toBeGreaterThan(transformerEffectStart);
     const source = pageSource.slice(
       transformerEffectStart,
-      transformerEffectEnd,
+      transformerEffectEnd + transformerEffectTerminator.length,
     );
 
     expectSourceToken(source, "marqueeIds.length > 0", "single Transformer effect");
