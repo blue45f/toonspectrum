@@ -60,6 +60,29 @@ async function assertNoOverflow(page: Page) {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "horizontal document overflow");
 }
 
+async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean> {
+  const notice = page.locator('[data-studio-beta-notice="true"]');
+  const visible = await notice
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!visible) return false;
+
+  const acknowledge = notice.locator(
+    '[data-studio-beta-notice-acknowledge="true"]',
+  );
+  try {
+    await acknowledge.click({ timeout: 30_000, noWaitAfter: true });
+  } catch (error) {
+    const alreadyHidden = await notice
+      .isHidden({ timeout: 1_000 })
+      .catch(() => false);
+    if (!alreadyHidden) throw error;
+  }
+  await notice.waitFor({ state: "hidden", timeout: 30_000 });
+  return true;
+}
+
 try {
   await Promise.all([waitForServer(devOrigin), waitForServer(previewOrigin)]);
   for (const width of [320, 390, 1440]) {
@@ -114,6 +137,7 @@ try {
   await page.addInitScript({ content: `globalThis.__name ??= fn=>fn; localStorage.setItem("toonspectrum-studio-quick-start-dismissed","1");localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed","1");` });
   await page.goto(`${previewOrigin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 45_000 });
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 45_000 });
+  await acknowledgeStudioBetaNoticeIfPresent(page);
   const dismiss = page.locator('[data-studio-quickstart-dismiss="true"]');
   if (await dismiss.isVisible().catch(() => false)) await dismiss.click();
   await page.keyboard.press("Escape");

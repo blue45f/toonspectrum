@@ -217,7 +217,7 @@ function betaNoticePageFixture(options?: { clickRejects?: boolean }) {
     }
   });
   const notice = {
-    getByRole: vi.fn(() => ({ click: acknowledgeClick, dispatchEvent: acknowledgeDispatch })),
+    locator: vi.fn(() => ({ click: acknowledgeClick, dispatchEvent: acknowledgeDispatch })),
     waitFor: noticeWaitFor,
   };
   const optionalOverlay = {
@@ -240,9 +240,9 @@ it("acknowledges the blocking Studio beta notice before menu interactions", asyn
 
   expect(fixture.page.locator).toHaveBeenCalledWith('[data-studio-beta-notice="true"]');
   expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(1, { state: "visible", timeout: 10_000 });
-  expect(fixture.notice.getByRole).toHaveBeenCalledWith("button", {
-    name: /확인하고 툰스튜디오 시작하기|I understand — enter ToonStudio/u,
-  });
+  expect(fixture.notice.locator).toHaveBeenCalledWith(
+    '[data-studio-beta-notice-acknowledge="true"]',
+  );
   expect(fixture.acknowledgeClick).toHaveBeenCalledWith({ timeout: 30_000, noWaitAfter: true });
   expect(fixture.acknowledgeDispatch).not.toHaveBeenCalled();
   expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(2, { state: "hidden", timeout: 30_000 });

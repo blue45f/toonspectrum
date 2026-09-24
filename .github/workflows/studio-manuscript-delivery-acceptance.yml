@@ -7,6 +7,7 @@ on:
     paths:
       - 'scripts/verify-review-delivery-workflow*.mjs'
       - 'scripts/review-delivery-acceptance-ci.test.mjs'
+      - 'scripts/verify-production-manuscript-workspace.mjs'
       - 'apps/api/src/modules/studio-project-graph/review-delivery/**'
       - 'apps/api/src/modules/studio-project-graph/studio-review-preview-producer*'
       - 'apps/web/src/compat/use-auth-actor-id.ts'
@@ -16,6 +17,7 @@ on:
       - 'apps/web/src/domains/creator/review-share/StudioPinnedReviewShareManager*'
       - 'apps/web/src/domains/creator/virtual-space/StudioPinnedReviewPanel*'
       - 'apps/web/tools/browser-harnesses/virtual-studio-review-export*'
+      - 'apps/web/tools/browser-harnesses/production-manuscript-workspace*'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/studio-manuscript-delivery-acceptance.yml'
@@ -24,6 +26,7 @@ on:
     paths:
       - 'scripts/verify-review-delivery-workflow*.mjs'
       - 'scripts/review-delivery-acceptance-ci.test.mjs'
+      - 'scripts/verify-production-manuscript-workspace.mjs'
       - 'apps/api/src/modules/studio-project-graph/review-delivery/**'
       - 'apps/api/src/modules/studio-project-graph/studio-review-preview-producer*'
       - 'apps/web/src/compat/use-auth-actor-id.ts'
@@ -33,6 +36,7 @@ on:
       - 'apps/web/src/domains/creator/review-share/StudioPinnedReviewShareManager*'
       - 'apps/web/src/domains/creator/virtual-space/StudioPinnedReviewPanel*'
       - 'apps/web/tools/browser-harnesses/virtual-studio-review-export*'
+      - 'apps/web/tools/browser-harnesses/production-manuscript-workspace*'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/studio-manuscript-delivery-acceptance.yml'
