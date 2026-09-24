@@ -413,11 +413,18 @@ describe("Studio PPT-style group convenience boundary", () => {
 
   it("uses the live group union for guides and keeps partial transforms fail-closed", () => {
     const transformerStart = pageSource.indexOf("// 트랜스포머를 선택 노드");
+    const transformerTerminator =
+      "}, [activeSurfaceReviewLocked, selectedId, marqueeIds, tool, elements, groups]);";
     const transformerEnd = pageSource.indexOf(
-      "function publishStudioCrdtSceneTransition",
+      transformerTerminator,
       transformerStart,
     );
-    const transformerSource = pageSource.slice(transformerStart, transformerEnd);
+    expect(transformerStart).toBeGreaterThanOrEqual(0);
+    expect(transformerEnd).toBeGreaterThan(transformerStart);
+    const transformerSource = pageSource.slice(
+      transformerStart,
+      transformerEnd + transformerTerminator.length,
+    );
     const dragStart = pageSource.indexOf("function onStageDragMove");
     const dragEnd = pageSource.indexOf("function onStageDragEnd", dragStart);
     const dragSource = pageSource.slice(dragStart, dragEnd);
