@@ -20,6 +20,7 @@ import {
   StudioAssetHubPage,
   StudioBrushLabPage,
   StudioCharacterConversionPage,
+  StudioCharacterOnboardingPage,
   StudioCreatorSupportPage,
   StudioDocumentWorkspaceRoute,
   StudioHomePage,
@@ -43,6 +44,7 @@ import {
 } from "./creator-route-pages";
 
 export const creatorRoutes = defineAppRoutes([
+  { id: "creator-character-onboarding", path: "/onboarding/character", element: <StudioCharacterOnboardingPage /> },
   { id: "creator-ai-settings", path: studioRoutePath("ai-settings"), element: <StudioAiSettingsPage /> },
   { id: "creator-ai-inference", path: studioRoutePath("ai-lab"), element: <PersonalInferencePage /> },
   { id: "creator-ai-runtime", path: studioRoutePath("ai-runtime"), element: <CreatorInferencePage /> },
@@ -53,6 +55,7 @@ export const creatorRoutes = defineAppRoutes([
   { id: "creator-ecosystem-viewer", path: studioRoutePath("ecosystem-viewer"), element: <CreatorEcosystemViewerPage /> },
   // Canonical ToonStudio front door. Exact routes intentionally precede the editor wildcard.
   { id: "creator-studio-home", path: studioRoutePath("home"), element: <StudioHomeEntryRoute home={<StudioHomePage />} legacy={<StudioRouter />} /> },
+  { id: "creator-studio-personal-space", path: studioRoutePath("personal-space"), element: <StudioVirtualSpacePage projectIdOverride="virtual-demo:personal-home" personal /> },
   { id: "creator-studio-support", path: studioRoutePath("support"), element: <StudioCreatorSupportPage /> },
   { id: "creator-studio-generative", path: studioRoutePath("generate"), element: <StudioGenerativePage /> },
   { id: "creator-studio-toolchain", path: studioRoutePath("toolchain"), element: <StudioProductionToolchainPage /> },

@@ -126,6 +126,12 @@ export const StudioVirtualSpacePage = lazyRetry(
   })),
   "StudioVirtualSpacePage",
 );
+export const StudioCharacterOnboardingPage = lazyRetry(
+  () => import("@/domains/creator/onboarding/StudioCharacterOnboardingPage").then((module) => ({
+    default: module.StudioCharacterOnboardingPage,
+  })),
+  "StudioCharacterOnboardingPage",
+);
 export const StudioDocumentWorkspaceRoute = lazyRetry(
   () => import("@/domains/creator/studio-shell/StudioDocumentWorkspaceRoute").then((module) => ({
     default: module.StudioDocumentWorkspaceRoute,

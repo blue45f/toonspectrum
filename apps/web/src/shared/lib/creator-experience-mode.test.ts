@@ -10,17 +10,17 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("studio view preference", () => {
-  it("defaults to space on desktop and persists a selected list view", async () => {
+  it("defaults to the lightweight home on desktop and persists an explicit space view", async () => {
     const { CREATOR_EXPERIENCE_STORAGE_KEY, useCreatorExperienceMode } = await import("./creator-experience-mode");
-    expect(useCreatorExperienceMode.getState().mode).toBe("virtual-studio");
-    useCreatorExperienceMode.getState().setMode("classic");
-    expect(document.documentElement.dataset.creatorExperience).toBe("classic");
-    expect(JSON.parse(localStorage.getItem(CREATOR_EXPERIENCE_STORAGE_KEY) ?? "{}")).toEqual({ mode: "classic" });
+    expect(useCreatorExperienceMode.getState().mode).toBe("classic");
+    useCreatorExperienceMode.getState().setMode("virtual-studio");
+    expect(document.documentElement.dataset.creatorExperience).toBe("virtual-studio");
+    expect(JSON.parse(localStorage.getItem(CREATOR_EXPERIENCE_STORAGE_KEY) ?? "{}")).toEqual({ mode: "virtual-studio" });
   });
-  it("defaults to virtual studio on a narrow device", async () => {
+  it("also defaults to the lightweight home on a narrow device", async () => {
     vi.stubGlobal("matchMedia", vi.fn(() => ({ matches: true })));
     const { useCreatorExperienceMode } = await import("./creator-experience-mode");
-    expect(useCreatorExperienceMode.getState().mode).toBe("virtual-studio");
+    expect(useCreatorExperienceMode.getState().mode).toBe("classic");
   });
   it.each(["classic", "virtual-studio"])("preserves the explicit legacy preference %s", async (mode) => {
     localStorage.setItem("toonspectrum-creator-experience-mode-v1", JSON.stringify({ mode }));
@@ -37,6 +37,6 @@ describe("studio view preference", () => {
   it("recovers from a corrupt saved value without preventing home rendering", async () => {
     localStorage.setItem("toonspectrum-creator-experience-mode-v1", "{broken");
     const { useCreatorExperienceMode } = await import("./creator-experience-mode");
-    expect(useCreatorExperienceMode.getState().mode).toBe("virtual-studio");
+    expect(useCreatorExperienceMode.getState().mode).toBe("classic");
   });
 });
