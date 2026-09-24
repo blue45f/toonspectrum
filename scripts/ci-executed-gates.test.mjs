@@ -496,9 +496,16 @@ test("focused session checkout retains every non-brand route-purpose image", () 
   const images = [...new Set([...profiles.matchAll(/image:\s*"(\/assets\/[^"\n]+)"/gu)].map((match) => match[1]))];
   assert.ok(images.length >= 2, "route-purpose fixture must include both spatial and review artwork");
   for (const image of images) {
-    assert.ok(
-      existsSync(join(repoRoot, "apps/web/public", image.slice(1))),
-      `route-purpose artwork is missing from the repository: ${image}`,
+    const trackedPath = join("apps/web/public", image.slice(1));
+    const tracked = spawnSync("git", ["ls-files", "--error-unmatch", "--", trackedPath], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    assert.equal(
+      tracked.status,
+      0,
+      `route-purpose artwork is missing from the repository: ${image}
+${tracked.stderr}`,
     );
     assert.ok(
       focused.includes(`/apps/web/public${image}`),
