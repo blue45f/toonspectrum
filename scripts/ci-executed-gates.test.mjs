@@ -10,6 +10,10 @@ import { CORE_DATABASE_VITEST_TARGETS } from "./ci-core-regression-shards.mjs";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 const source = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+const productionIntegritySource = readFileSync(
+  new URL("../.github/workflows/studio-production-integrity.yml", import.meta.url),
+  "utf8",
+);
 const requiredTargets = readFileSync(
   new URL("./ci-required-vitest-targets.txt", import.meta.url),
   "utf8",
@@ -44,6 +48,26 @@ function targetExists(target) {
   return readdirSync(directory).some((entry) => expression.test(entry));
 }
 
+
+test("production integrity follows the real menu verifier and its CI bootstrap", () => {
+  for (const path of [
+    "scripts/verify-studio-menus.mts",
+    "scripts/verify-studio-menus-ci.mjs",
+    "apps/web/src/domains/creator/StudioBetaNoticeGate.tsx",
+    "apps/web/src/domains/creator/studio-beta-notice-storage.ts",
+  ]) {
+    assert.equal(
+      productionIntegritySource.split(`      - '${path}'`).length - 1,
+      2,
+      `production integrity must run for pull requests and main pushes that change ${path}`,
+    );
+  }
+  assert.ok(productionIntegritySource.includes(
+    "      - name: Inspect actual production browser\n"
+      + "        run: pnpm exec tsx scripts/verify-studio-menus-ci.mjs\n",
+  ));
+  assert.doesNotMatch(productionIntegritySource, /run: pnpm run verify:studio-menus/u);
+});
 
 test("core retains every mandatory quality lane without a bypass", () => {
   assert.doesNotMatch(source, /CI_CORE_BYPASS|continue-on-error|if:\s*\$\{\{\s*false/);
