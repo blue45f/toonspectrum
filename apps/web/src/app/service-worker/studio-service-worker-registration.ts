@@ -12,15 +12,19 @@
  *     controls nothing, purges nothing, and the running build keeps every lazy
  *     chunk it already had. There is no mid-stroke swap, ever.
  *  2. The artist is told with a dismissible prompt. Nothing is forced.
- *  3. Applying is a normal `location.reload()` from a user gesture, so Studio's
- *     own `beforeunload` guard fires and the browser asks about unsaved work.
- *     No bespoke coupling to editor state, and no path where the reload wins
- *     over the artist.
+ *  3. The apply action reads Studio's live update-safety registry first. Unsaved ink, an active
+ *     save receipt, or a pending collaboration boundary disables the action before a reload is
+ *     attempted. `beforeunload` remains a final browser-level backstop, not the primary safeguard.
  */
 import {
   STUDIO_SERVICE_WORKER_CACHE_PREFIX,
   STUDIO_SERVICE_WORKER_MESSAGE,
 } from "./studio-service-worker-policy";
+import {
+  getStudioUpdateSafetySnapshot,
+  subscribeStudioUpdateSafety,
+  type StudioUpdateSafetySnapshot,
+} from "../../domains/creator/studio-update-safety";
 
 const SERVICE_WORKER_URL = "/sw.js";
 /** Append to any URL to recover from a bad worker. Documented in DEPLOY.md. */
@@ -54,7 +58,9 @@ interface UpdatePromptCopy {
   readonly cancelledDescription: string;
   readonly failedTitle: string;
   readonly failedDescription: string;
+  readonly blockedTitle: string;
   readonly apply: string;
+  readonly blockedApply: string;
   readonly retry: string;
   readonly dismiss: string;
 }
@@ -148,7 +154,9 @@ function updatePromptCopy(): UpdatePromptCopy {
         cancelledDescription: "Save your work, then try the update again when you are ready.",
         failedTitle: "The update could not be applied",
         failedDescription: "Your current session is unchanged. You can safely try again.",
+        blockedTitle: "Finish saving before updating",
         apply: "Update now",
+        blockedApply: "Waiting for a safe state",
         retry: "Try again",
         dismiss: "Later",
       }
@@ -161,13 +169,15 @@ function updatePromptCopy(): UpdatePromptCopy {
         cancelledDescription: "작업을 저장한 뒤 준비되었을 때 다시 업데이트해 주세요.",
         failedTitle: "업데이트를 적용하지 못했습니다",
         failedDescription: "현재 작업은 그대로 유지됩니다. 안전하게 다시 시도할 수 있습니다.",
+        blockedTitle: "저장과 동기화가 끝난 뒤 업데이트할 수 있습니다",
         apply: "지금 업데이트",
+        blockedApply: "안전 상태 대기 중",
         retry: "다시 시도",
         dismiss: "나중에",
       };
 }
 
-function renderUpdatePrompt(onApply: () => Promise<void>): void {
+export function renderStudioServiceWorkerUpdatePrompt(onApply: () => Promise<void>): void {
   if (document.getElementById("toonspectrum-sw-update")) return;
   const copy = updatePromptCopy();
   const host = document.createElement("div");
@@ -216,6 +226,8 @@ function renderUpdatePrompt(onApply: () => Promise<void>): void {
       .card[data-state="applying"] .spinner { display: inline-block; }
       .card[data-state="applying"] .status-dot { animation: pulse 1s ease-in-out infinite; }
       .card[data-state="error"] .status-dot { background: var(--color-bad, #fb7185); box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-bad, #fb7185) 18%, transparent); }
+      .card[data-state="blocked"] .status-dot { background: var(--color-warn, #fbbf24); box-shadow: 0 0 0 5px color-mix(in oklch, var(--color-warn, #fbbf24) 18%, transparent); }
+      .card[data-state="blocked"] .apply { cursor: not-allowed; }
       @keyframes spin { to { transform: rotate(360deg); } }
       @keyframes pulse { 50% { opacity: .45; transform: scale(.82); } }
       @media (prefers-reduced-motion: reduce) {
@@ -264,6 +276,17 @@ function renderUpdatePrompt(onApply: () => Promise<void>): void {
     applyLabel.textContent = variant === "cancelled" ? copy.retry : copy.apply;
     apply.disabled = false;
     apply.removeAttribute("aria-busy");
+    apply.removeAttribute("aria-disabled");
+    dismiss.disabled = false;
+  };
+  const setBlocked = (snapshot: StudioUpdateSafetySnapshot): void => {
+    card.dataset.state = "blocked";
+    title.textContent = copy.blockedTitle;
+    description.textContent = snapshot.message;
+    applyLabel.textContent = copy.blockedApply;
+    apply.disabled = true;
+    apply.setAttribute("aria-disabled", "true");
+    apply.removeAttribute("aria-busy");
     dismiss.disabled = false;
   };
   const setApplying = (): void => {
@@ -282,27 +305,53 @@ function renderUpdatePrompt(onApply: () => Promise<void>): void {
     applyLabel.textContent = copy.retry;
     apply.disabled = false;
     apply.removeAttribute("aria-busy");
+    apply.removeAttribute("aria-disabled");
     dismiss.disabled = false;
   };
 
-  setReady();
+  const refreshSafety = (snapshot = getStudioUpdateSafetySnapshot()): void => {
+    if (card.dataset.state === "applying") return;
+    if (snapshot.safe) setReady();
+    else setBlocked(snapshot);
+  };
+  refreshSafety();
+  const unsubscribeSafety = subscribeStudioUpdateSafety(refreshSafety);
+  const safetyTimer = globalThis.setInterval(refreshSafety, 1_000);
+  const dispose = () => {
+    unsubscribeSafety();
+    globalThis.clearInterval(safetyTimer);
+  };
   dismiss.textContent = copy.dismiss;
   apply.addEventListener("click", () => {
+    const safety = getStudioUpdateSafetySnapshot();
+    if (!safety.safe) {
+      setBlocked(safety);
+      return;
+    }
     if (apply.disabled) return;
     setApplying();
     void onApply().then(
       () => {
         // If navigation succeeds this context disappears before the timer fires.
-        // If `beforeunload` kept the artist on the page, restore an actionable
-        // prompt instead of leaving a permanently disabled button behind.
+        // If another unload guard kept the artist on the page, restore an actionable prompt.
         globalThis.setTimeout(() => {
-          if (document.getElementById(host.id) === host) setReady("cancelled");
+          if (document.getElementById(host.id) !== host) return;
+          const latest = getStudioUpdateSafetySnapshot();
+          if (latest.safe) setReady("cancelled");
+          else setBlocked(latest);
         }, RELOAD_CANCELLED_FEEDBACK_MS);
       },
-      () => setFailed(),
+      () => {
+        const latest = getStudioUpdateSafetySnapshot();
+        if (latest.safe) setFailed();
+        else setBlocked(latest);
+      },
     );
   });
-  dismiss.addEventListener("click", () => host.remove());
+  dismiss.addEventListener("click", () => {
+    dispose();
+    host.remove();
+  });
   document.body.append(host);
 }
 
@@ -314,6 +363,10 @@ function renderUpdatePrompt(onApply: () => Promise<void>): void {
 export async function applyStudioServiceWorkerUpdate(): Promise<void> {
   const worker = waitingWorker;
   if (!worker) return;
+  const safety = getStudioUpdateSafetySnapshot();
+  if (!safety.safe) {
+    throw new Error(`studio-update-blocked:${safety.reason ?? "unsafe"}:${safety.message}`);
+  }
   const response = await messageWorker(worker, STUDIO_SERVICE_WORKER_MESSAGE.applyUpdate);
   if (
     response
@@ -333,7 +386,7 @@ function watchForUpdate(registration: ServiceWorkerRegistration): void {
     if (!worker || !navigator.serviceWorker.controller) return;
     waitingWorker = worker;
     publishStatus("update-waiting");
-    renderUpdatePrompt(applyStudioServiceWorkerUpdate);
+    renderStudioServiceWorkerUpdatePrompt(applyStudioServiceWorkerUpdate);
   };
 
   announce(registration.waiting);

@@ -91,6 +91,11 @@ import {
 } from "./studio-upload-publish-safety";
 import { resolveStudioUploadWorkId } from "./studio-upload-route";
 import {
+  refreshStudioUpdateSafety,
+  registerStudioUpdateSafetySource,
+  type StudioUpdateSafetySourceSnapshot,
+} from "./studio-update-safety";
+import {
   parseStudioPublicationTags,
   suggestStudioPublicationSocialMetadata,
   validateStudioPublicationPreflight,
@@ -300,7 +305,23 @@ export function StudioPublishingCommandCenter({
   const recoveryAbortRef = useRef<AbortController | null>(null);
   const publishRequestIdRef = useRef(0);
   const handoffGenerationRef = useRef(0);
+  const updateSafetyRef = useRef<StudioUpdateSafetySourceSnapshot>({ safe: true });
   currentScopeRef.current = { authUserId, workId };
+  updateSafetyRef.current = saving || recoveryBusy
+    ? {
+        safe: false,
+        reason: "save-in-progress",
+        message: "게시 원고 저장 또는 복구 작업이 끝날 때까지 업데이트를 기다려 주세요.",
+      }
+    : dirty || loadingFiles || handoffLoading
+      ? {
+          safe: false,
+          reason: "unsaved-work",
+          message: loadingFiles || handoffLoading
+            ? "게시 원고를 준비하는 중입니다. 이미지 처리가 끝난 뒤 업데이트해 주세요."
+            : "게시 화면에 아직 저장되지 않은 변경이 있습니다. 초안 저장 또는 게시 후 업데이트해 주세요.",
+        }
+      : { safe: true };
 
   const currentScope = { authUserId, workId };
   const hydrationScopeCurrent = isStudioUploadHydrationScopeCurrent(
@@ -377,6 +398,13 @@ export function StudioPublishingCommandCenter({
   useEffect(() => {
     setPublisherConfirmed(false);
   }, [authUserId, workId]);
+  useLayoutEffect(() => registerStudioUpdateSafetySource(
+    "studio-publish-command-center",
+    () => updateSafetyRef.current,
+  ), []);
+  useEffect(() => {
+    refreshStudioUpdateSafety();
+  }, [dirty, handoffLoading, loadingFiles, recoveryBusy, saving]);
 
   useEffect(() => {
     if (!dirty) return;
