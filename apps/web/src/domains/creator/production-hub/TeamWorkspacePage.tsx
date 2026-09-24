@@ -1,6 +1,6 @@
 import type { EffectiveOperationPolicy } from "@toonspectrum/contracts/operation-policy";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { isWorkspaceManager, type InvitableWorkspaceRole, type TeamWorkspaceCommandInput,
   type TeamWorkspaceDetail, type TeamWorkspaceSummary, type WorkspaceUsageResponse } from "@toonspectrum/contracts/production-workspace";
 import { useApp } from "@/shared/lib/store";
@@ -8,6 +8,7 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { getApiErrorMessage } from "@/infrastructure/api";
 import { listProductionProjects, type ProductionProjectSummary } from "./production-dashboard-api";
 import { getEffectiveOperationPolicy, acceptTeamInvite, commandTeamWorkspace, createTeamWorkspace, getTeamUsage, getTeamWorkspace, listTeamWorkspaces } from "./team-workspace-api";
+import { PRODUCTION_ROLE_PRESETS, productionRolePreset, type ProductionRolePreset } from "./production-manuscript-competitive-model";
 import {
   createStudioSpatialInviteFragment,
   parseStudioSpatialInviteFragment,
@@ -38,6 +39,9 @@ export function TeamWorkspacePage() {
 function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedPreset = searchParams.get("rolePreset") as ProductionRolePreset["id"] | null;
+  const invitePreset = productionRolePreset(PRODUCTION_ROLE_PRESETS.some((preset) => preset.id === requestedPreset) ? requestedPreset! : "writer");
   const [operationPolicy, setOperationPolicy] = useState<EffectiveOperationPolicy | null>(null);
   const [items, setItems] = useState<readonly TeamWorkspaceSummary[]>([]);
   const [detail, setDetail] = useState<TeamWorkspaceDetail | null>(null);
@@ -45,7 +49,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
   const [available, setAvailable] = useState<readonly ProductionProjectSummary[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<InvitableWorkspaceRole>("member");
+  const [inviteRole, setInviteRole] = useState<InvitableWorkspaceRole>(invitePreset.workspaceRole);
   const [inviteEntryKind, setInviteEntryKind] = useState<StudioSpatialInviteContext["kind"]>("team-lobby");
   const [inviteProjectId, setInviteProjectId] = useState("");
   const [invitationLink, setInvitationLink] = useState("");
@@ -54,6 +58,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
+  useEffect(() => { setInviteRole(invitePreset.workspaceRole); }, [invitePreset.workspaceRole]);
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
     let active = true;
@@ -112,10 +117,10 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
       <button className="ml-4 underline" onClick={() => setInvitationLink("")}>링크 숨기기</button></Card>}
     {loading && <p role="status">워크스페이스를 불러오는 중입니다.</p>}
     {!workspaceId && <Card title="내 워크스페이스"><div className="grid gap-3 sm:grid-cols-2">
-      {items.map((item) => <Link key={item.id} className="rounded-xl border border-line p-4 hover:bg-raised" to={`/production/workspaces/${item.id}`}>
+      {items.map((item) => <Link key={item.id} className="rounded-xl border border-line p-4 hover:bg-raised" to={`/production/workspaces/${item.id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`}>
         <strong>{item.name}</strong><p className="mt-2 text-sm">{roles[item.role]} · 접근 가능한 작품 {item.projectCount}개 · 구성원 {item.memberCount}명</p></Link>)}
       {!loading && items.length === 0 && <p>아직 참여한 팀이 없습니다. 새 팀을 만들거나 초대를 수락해주세요.</p>}</div>
-      <form className="mt-5 flex flex-wrap gap-3" onSubmit={(event: FormEvent) => { event.preventDefault(); void run(async () => { const result = await createTeamWorkspace(name); navigate(`/production/workspaces/${result.workspaceId}`); }); }}>
+      <form className="mt-5 flex flex-wrap gap-3" onSubmit={(event: FormEvent) => { event.preventDefault(); void run(async () => { const result = await createTeamWorkspace(name); navigate(`/production/workspaces/${result.workspaceId}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`); }); }}>
         <label className="flex flex-col gap-2">새 워크스페이스 이름<input required maxLength={20} value={name} onChange={(event) => setName(event.target.value)} className={fieldClass} /></label>
         <button disabled={busy || !name.trim() || !operationPolicy?.features["team-workspace"].enabled} className={`${buttonClass()} self-end`} type="submit">워크스페이스 만들기</button></form></Card>}
     {detail && <><Card title={detail.workspace.name}><p className="text-sm text-fg-2">현재 역할: {roles[detail.workspace.role]}</p>
@@ -139,7 +144,13 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
         <button disabled={busy} className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => { if (window.confirm("팀에서 제외합니다. 별도로 부여한 작품 권한은 작품 설정에서 관리해주세요.")) void run(() => command({ type: "remove-member", userId: member.userId })); }}>팀에서 제외</button>
         {detail.workspace.role === "owner" && <button disabled={busy} className="underline" onClick={() => { if (window.confirm(`${member.displayName}에게 팀 소유권을 이전할까요? 작품 소유권은 바뀌지 않습니다.`)) void run(() => command({ type: "transfer-owner", userId: member.userId })); }}>소유권 이전</button>}
       </>}</li>)}</ul></Card>}
-    {manager && <Card title="구성원 초대"><form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); void run(() => command({ type: "invite", email, role: inviteRole })); }}>
+    {manager && <Card title="구성원 초대"><div className="mb-4 rounded-xl border border-line bg-raised p-3">
+      <p className="text-xs font-bold text-fg-2">제작 역할 프리셋 · 실제 워크스페이스 역할과 가능한 행동을 초대 전에 확인합니다.</p>
+      <div className="mt-2 flex gap-2 overflow-x-auto pb-1">{PRODUCTION_ROLE_PRESETS.map((preset) => <button key={preset.id} type="button" aria-pressed={invitePreset.id === preset.id} className={`min-h-11 shrink-0 rounded-lg border px-3 text-xs font-bold ${invitePreset.id === preset.id ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2"}`} onClick={() => { const next = new URLSearchParams(searchParams); next.set("rolePreset", preset.id); setSearchParams(next, { replace: true }); setInviteRole(preset.workspaceRole); }}>{preset.label}</button>)}</div>
+      <p className="mt-2 text-xs text-fg-2">허용: {invitePreset.allowedActions.join(" · ")}</p>
+      <p className="mt-1 text-xs text-fg-3">차단·별도 승인: {invitePreset.blockedActions.join(" · ")}</p>
+      <p className="mt-1 text-[0.6875rem] text-fg-3">프로젝트 역할 {invitePreset.projectRole}은 미리보기입니다. 이 초대는 워크스페이스 역할만 적용하며 작품별 권한을 자동으로 넓히지 않습니다.</p>
+    </div><form className="flex flex-wrap items-end gap-3" onSubmit={(event) => { event.preventDefault(); void run(() => command({ type: "invite", email, role: inviteRole })); }}>
       <label className="flex flex-col gap-2">초대받을 이메일<input type="email" required maxLength={320} className={fieldClass} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
       <label className="flex flex-col gap-2">초대 역할<select className={fieldClass} value={inviteRole} onChange={(event) => setInviteRole(roleValue(event.target.value))}>
         {detail.workspace.role === "owner" && <option value="admin">관리자</option>}<option value="member">구성원</option><option value="guest">게스트</option></select></label>

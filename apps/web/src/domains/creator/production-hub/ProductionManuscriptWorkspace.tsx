@@ -58,7 +58,6 @@ import type {
 } from "../project-graph/studio-project-graph-contract";
 import { StudioProjectVersionStackPanel } from "../project-graph/StudioProjectVersionStackPanel";
 import { StudioProjectAssistantPanel } from "../studio-shell/StudioProjectAssistantPanel";
-import { StudioPinnedReviewPanel } from "../virtual-space/StudioPinnedReviewPanel";
 import {
   studioVirtualSpaceReviewHref,
   type StudioVirtualSpaceReviewSubject,
@@ -69,7 +68,17 @@ import {
   productionManuscriptMetrics,
   type ProductionManuscriptProcess,
 } from "./production-manuscript-model";
+import { ProductionAdoptionCenter } from "./ProductionAdoptionCenter";
+import { ProductionEpisodeProcessMatrix } from "./ProductionEpisodeProcessMatrix";
+import { ProductionFocusedAiWorkflow } from "./ProductionFocusedAiWorkflow";
 import { ProductionManuscriptDeliveryHub } from "./ProductionManuscriptDeliveryHub";
+import { ProductionMultiManuscriptWorkbench } from "./ProductionMultiManuscriptWorkbench";
+import { ProductionPageManifestBuilder } from "./ProductionPageManifestBuilder";
+import { ProductionQuickExportPanel } from "./ProductionQuickExportPanel";
+import { ProductionRolePresetPanel } from "./ProductionRolePresetPanel";
+import { ProductionUnifiedManuscriptFlow } from "./ProductionUnifiedManuscriptFlow";
+import { buildProductionReviewCandidates } from "./production-manuscript-competitive-model";
+import type { ProductionClientCommand } from "./production-api";
 import { ProductionManuscriptLifecyclePanel } from "./ProductionManuscriptLifecyclePanel";
 import { ProductionManuscriptProcessBrowser } from "./ProductionManuscriptProcessBrowser";
 import {
@@ -84,7 +93,7 @@ import {
   type ProductionManuscriptSort,
 } from "./production-manuscript-ux";
 
-type ManuscriptView = "processes" | "versions" | "feedback" | "delivery" | "assistant" | "activity";
+type ManuscriptView = "processes" | "workbench" | "versions" | "feedback" | "delivery" | "assistant" | "permissions" | "start" | "activity";
 
 interface LoadedManuscriptData {
   readonly project: StudioProjectRecord;
@@ -96,6 +105,7 @@ interface ProductionManuscriptWorkspaceProps {
   readonly aggregate: ProductionProjectAggregate;
   readonly canEdit: boolean;
   readonly isDemo: boolean;
+  readonly execute?: (command: ProductionClientCommand, message: string) => Promise<void>;
 }
 
 const VIEW_ITEMS: readonly {
@@ -104,10 +114,13 @@ const VIEW_ITEMS: readonly {
   readonly icon: LucideIcon;
 }[] = [
   { id: "processes", label: "공정·원고", icon: Workflow },
-  { id: "versions", label: "버전·비교", icon: GitCompareArrows },
+  { id: "workbench", label: "전문 비교", icon: GitCompareArrows },
+  { id: "versions", label: "버전·비교", icon: FileArchive },
   { id: "feedback", label: "피드백", icon: MessageSquare },
   { id: "delivery", label: "공유·내보내기", icon: Download },
   { id: "assistant", label: "AI 도우미", icon: WandSparkles },
+  { id: "permissions", label: "팀·권한", icon: Users },
+  { id: "start", label: "시작 가이드", icon: Sparkles },
   { id: "activity", label: "활동", icon: History },
 ];
 
@@ -314,6 +327,32 @@ function reviewHref(
   return studioVirtualSpaceReviewHref(subject);
 }
 
+function processEditorHref(
+  workId: string,
+  process: ProductionManuscriptProcess | null,
+): string {
+  const surface = process?.processType === "text" ? "comic" : "canvas";
+  const query = new URLSearchParams();
+  if (process) {
+    query.set("artifact", process.artifact.id);
+    const episodeId = process.artifact.scope.episodeId;
+    if (episodeId) query.set("episode", episodeId);
+  }
+  const suffix = query.toString();
+  return `/studio/work/${encodeURIComponent(workId)}/${surface}${suffix ? `?${suffix}` : ""}`;
+}
+
+function episodeLabels(aggregate: ProductionProjectAggregate): Readonly<Record<string, string>> {
+  const labels: Record<string, string> = {};
+  for (const plan of aggregate.episodePlans) {
+    labels[plan.episodeId] = `${plan.episodeNumber}화 · ${plan.title}`;
+  }
+  for (const [index, episode] of aggregate.episodes.entries()) {
+    labels[episode.episodeId] ??= `${index + 1}화 · ${episode.episodeId}`;
+  }
+  return Object.freeze(labels);
+}
+
 function ProcessNavigator({ processes, selected, view, onSelect }: {
   readonly processes: readonly ProductionManuscriptProcess[];
   readonly selected: ProductionManuscriptProcess | null;
@@ -427,7 +466,7 @@ function DemoWorkspace({ aggregate }: { readonly aggregate: ProductionProjectAgg
   </div>;
 }
 
-export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: ProductionManuscriptWorkspaceProps) {
+export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, execute }: ProductionManuscriptWorkspaceProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState<LoadedManuscriptData | null>(null);
   const [loading, setLoading] = useState(!isDemo);
@@ -529,12 +568,18 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
   const requestedEpisode = searchParams.get("episode");
   const episodeId = requestedEpisode && episodeIds.includes(requestedEpisode) ? requestedEpisode : null;
 
-  const processes = useMemo(() => data ? buildProductionManuscriptProcesses({
+  const allProcesses = useMemo(() => data ? buildProductionManuscriptProcesses({
     project: data.project,
     revisionsByArtifact: data.revisionsByArtifact,
     reviewsByArtifact: data.reviewsByArtifact,
-    episodeId,
-  }) : [], [data, episodeId]);
+    episodeId: null,
+  }) : [], [data]);
+  const processes = useMemo(() => episodeId
+    ? allProcesses.filter((process) => process.artifact.scope.episodeId === episodeId)
+    : allProcesses, [allProcesses, episodeId]);
+  const reviewCandidates = useMemo(() => data
+    ? buildProductionReviewCandidates(data.project, allProcesses, episodeLabels(aggregate))
+    : [], [aggregate, allProcesses, data]);
   const metrics = useMemo(() => productionManuscriptMetrics(processes), [processes]);
   const activities = useMemo(() => buildProductionManuscriptActivity(processes), [processes]);
   const visibleProcesses = useMemo(() => queryProductionManuscriptProcesses(processes, {
@@ -558,6 +603,10 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
   const selectedReview = requestedReviewId
     ? exactRequestedProcess?.reviews.find((review) => review.id === requestedReviewId) ?? null
     : selectedProcess?.reviews[0] ?? null;
+  const selectedReviewCandidate = selectedProcess && selectedReview
+    ? reviewCandidates.find((candidate) => candidate.artifactId === selectedProcess.artifact.id
+      && candidate.id === selectedReview.id) ?? null
+    : null;
   const requestedReviewMissing = Boolean(requestedReviewId && selectedReview === null);
   const browserSelectedProcess = visibleProcesses.find((process) => process.artifact.id === requestedArtifact)
     ?? visibleProcesses[0]
@@ -634,14 +683,14 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
         setShortcutsOpen(false);
         return;
       }
-      if (event.repeat && (event.key === "?" || /^[1-6]$/u.test(event.key)
+      if (event.repeat && (event.key === "?" || /^[1-9]$/u.test(event.key)
         || event.key.toLowerCase() === "g")) return;
       if (event.key === "?") {
         event.preventDefault();
         setShortcutsOpen((current) => !current);
         return;
       }
-      if (/^[1-6]$/u.test(event.key)) {
+      if (/^[1-9]$/u.test(event.key)) {
         event.preventDefault();
         setView(VIEW_ITEMS[Number(event.key) - 1].id);
         return;
@@ -686,12 +735,24 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
   if (error || !data) return <section className="rounded-3xl border border-bad/35 bg-bad/10 p-5" role="alert"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 size-5 text-bad" aria-hidden="true" /><div><h2 className="font-black text-fg">원고 운영 화면을 열 수 없습니다</h2><p className="mt-1 text-sm text-fg-2">{error ?? "프로젝트 데이터가 없습니다."}</p><button type="button" onClick={() => void load()} className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-3")}><RefreshCcw className="size-4" aria-hidden="true" />다시 불러오기</button></div></div></section>;
 
   const projectHref = `/studio/p/${encodeURIComponent(data.project.workId)}`;
-  const editorHref = `/studio/work/${encodeURIComponent(data.project.workId)}/canvas`;
+  const editorHref = processEditorHref(data.project.workId, selectedProcess);
+  const defaultEditorHref = processEditorHref(data.project.workId, null);
   const canEditProject = canEdit && data.project.access.edit;
   const selectedReviewSubject = selectedProcess && selectedReview
     ? reviewSubject(data, selectedProcess, selectedReview)
     : null;
-  const openLifecycleDestination = (destination: "versions" | "feedback" | "delivery") => {
+  const selectedExternalReviewHref = selectedProcess && selectedReview
+    ? reviewHref(data, selectedProcess, selectedReview)
+    : null;
+  const openLifecycleDestination = (destination: "versions" | "feedback" | "delivery" | "workbench") => {
+    if (destination === "workbench") {
+      patchSearch({
+        manuscriptView: "workbench",
+        compareActive: selectedReview?.id ?? null,
+        compareReviews: selectedReview?.id ?? null,
+      });
+      return;
+    }
     if (!selectedProcess) return;
     selectProcess(selectedProcess, destination);
   };
@@ -824,7 +885,7 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
         </div> : null}
         {shortcutsOpen ? <div id="manuscript-shortcuts" className="mt-4 rounded-2xl border border-line bg-panel p-4" role="region" aria-label="원고 운영 단축키">
           <div className="grid gap-2 text-xs text-fg-2 sm:grid-cols-2 lg:grid-cols-3">
-            <p><kbd className="mr-2 rounded border border-line bg-card px-1.5 py-0.5 font-mono text-fg">1–6</kbd>보기 탭 전환</p>
+            <p><kbd className="mr-2 rounded border border-line bg-card px-1.5 py-0.5 font-mono text-fg">1–9</kbd>보기 탭 전환</p>
             <p><kbd className="mr-2 rounded border border-line bg-card px-1.5 py-0.5 font-mono text-fg">/</kbd>원고 검색</p>
             <p><kbd className="mr-2 rounded border border-line bg-card px-1.5 py-0.5 font-mono text-fg">J / K</kbd>다음·이전 공정</p>
             <p><kbd className="mr-2 rounded border border-line bg-card px-1.5 py-0.5 font-mono text-fg">G</kbd>카드·한눈 보기</p>
@@ -904,6 +965,14 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
       aria-labelledby="manuscript-tab-processes"
       className="space-y-4"
     >
+      <ProductionEpisodeProcessMatrix
+        aggregate={aggregate}
+        processes={allProcesses}
+        canEdit={canEditProject}
+        isDemo={isDemo}
+        execute={execute}
+        onOpenProcess={(process, destination) => selectProcess(process, destination)}
+      />
       {browserSelectedProcess ? <ProductionManuscriptLifecyclePanel
         process={browserSelectedProcess}
         compact
@@ -938,6 +1007,17 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
       </section>}
     </div> : null}
 
+    {view === "workbench" ? <div
+      id="manuscript-panel-workbench"
+      role="tabpanel"
+      aria-labelledby="manuscript-tab-workbench"
+    >
+      <ProductionMultiManuscriptWorkbench
+        candidates={reviewCandidates}
+        preferredReviewId={selectedReview?.id ?? null}
+      />
+    </div> : null}
+
     {view === "versions" ? <div
       id="manuscript-panel-versions"
       role="tabpanel"
@@ -946,6 +1026,14 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="versions" onSelect={selectProcess} />
       {selectedProcess ? <ProductionManuscriptLifecyclePanel process={selectedProcess} onOpen={openLifecycleDestination} /> : null}
+      <ProductionPageManifestBuilder
+        projectId={data.project.id}
+        workId={data.project.workId}
+        targetProcess={selectedProcess}
+        editorHref={editorHref}
+        candidates={reviewCandidates}
+        canEdit={canEditProject}
+      />
       <StudioProjectVersionStackPanel projectId={data.project.workId} locale="ko" />
     </div> : null}
 
@@ -956,7 +1044,6 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
       className="space-y-4"
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="feedback" onSelect={selectProcess} />
-      {selectedProcess ? <ProductionManuscriptLifecyclePanel process={selectedProcess} compact onOpen={openLifecycleDestination} /> : null}
       <section className="rounded-3xl border border-line bg-card p-4 sm:p-6" aria-labelledby="manuscript-feedback-title">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -1027,11 +1114,12 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
             {requestedReviewMissing ? <div className="rounded-2xl border border-warn/35 bg-warn/10 p-6" role="alert">
               <h3 className="font-black text-fg">요청한 고정 검수본을 찾을 수 없습니다</h3>
               <p className="mt-1 text-sm leading-6 text-fg-2">다른 검수본이나 최신 HEAD로 자동 대체하지 않았습니다. 왼쪽 검수 이력에서 확인할 검수본을 직접 선택하세요.</p>
-            </div> : selectedReviewSubject ? <StudioPinnedReviewPanel
-              subject={selectedReviewSubject}
-              showShareTools={false}
-              showExportTools={false}
-            /> : <div className="rounded-2xl border border-warn/35 bg-warn/10 p-6" role="alert">
+            </div> : selectedReviewCandidate ? <div className="rounded-2xl border border-accent/30 bg-accent-soft/15 p-5">
+              <p className="text-[0.6875rem] font-black uppercase tracking-[0.12em] text-accent">SELECTED REVIEW</p>
+              <h3 className="mt-2 text-lg font-black text-fg">{selectedReviewCandidate.review.title}</h3>
+              <p className="mt-1 text-sm leading-6 text-fg-2">{selectedReviewCandidate.episodeLabel} · {selectedReviewCandidate.processLabel} · {selectedReviewCandidate.subject.revisionId}</p>
+              <p className="mt-3 text-xs text-fg-3">아래 통합 작업대에서 고정 원고 의견·수정·승인과 빠른 출력을 이어갑니다.</p>
+            </div> : <div className="rounded-2xl border border-warn/35 bg-warn/10 p-6" role="alert">
               <h3 className="font-black text-fg">고정 검수 revision을 확인할 수 없습니다</h3>
               <p className="mt-1 text-sm text-fg-2">일반 작업 버전으로 자동 대체하지 않았습니다. 버전 이력에서 검수 snapshot을 확인하세요.</p>
             </div>}
@@ -1042,6 +1130,14 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
           <p className="mt-1 text-sm text-fg-2">Studio에서 저장된 원고를 고정 검수본으로 캡처하면 위치 피드백·개인 초안·댓글·비교·승인을 사용할 수 있습니다.</p>
         </div>}
       </section>
+      {!requestedReviewMissing ? <ProductionUnifiedManuscriptFlow
+        projectId={data.project.id}
+        workId={data.project.workId}
+        process={selectedProcess}
+        candidate={selectedReviewCandidate}
+        editorHref={editorHref}
+        onOpen={openLifecycleDestination}
+      /> : null}
     </div> : null}
 
     {view === "delivery" ? <div
@@ -1052,6 +1148,12 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="delivery" onSelect={selectProcess} />
       {selectedProcess ? <ProductionManuscriptLifecyclePanel process={selectedProcess} compact onOpen={openLifecycleDestination} /> : null}
+      <ProductionQuickExportPanel
+        projectId={data.project.id}
+        workId={data.project.workId}
+        candidate={selectedReviewCandidate}
+        process={selectedProcess}
+      />
       <ProductionManuscriptDeliveryHub
         projectId={data.project.workId}
         subject={selectedReviewSubject}
@@ -1067,6 +1169,11 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
       className="space-y-4"
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="assistant" onSelect={selectProcess} />
+      <ProductionFocusedAiWorkflow
+        workId={data.project.workId}
+        process={selectedProcess}
+        editorHref={editorHref}
+      />
       <section className="rounded-2xl border border-line bg-card p-4">
         <div className="flex items-start gap-3">
           <Sparkles className="mt-0.5 size-5 text-accent" aria-hidden="true" />
@@ -1082,6 +1189,29 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo }: Pr
         projectId={data.project.workId}
         section={selectedProcess?.processType === "text" ? "story" : "review"}
         locale="ko"
+      />
+    </div> : null}
+
+    {view === "permissions" ? <div
+      id="manuscript-panel-permissions"
+      role="tabpanel"
+      aria-labelledby="manuscript-tab-permissions"
+    >
+      <ProductionRolePresetPanel canManage={data.project.access.manageMembers} />
+    </div> : null}
+
+    {view === "start" ? <div
+      id="manuscript-panel-start"
+      role="tabpanel"
+      aria-labelledby="manuscript-tab-start"
+    >
+      <ProductionAdoptionCenter
+        isDemo={isDemo}
+        process={selectedProcess}
+        candidate={selectedReviewCandidate}
+        editorHref={selectedProcess ? editorHref : defaultEditorHref}
+        externalReviewHref={selectedExternalReviewHref}
+        onOpen={(destination) => setView(destination)}
       />
     </div> : null}
 

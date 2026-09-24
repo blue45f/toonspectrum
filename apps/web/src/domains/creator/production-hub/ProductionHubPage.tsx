@@ -1312,7 +1312,7 @@ function SurfaceContent({
     case "overview": return <OverviewSurface aggregate={aggregate} roleLens={roleLens} execute={execute} executeStrict={executeStrict} canEdit={canEdit} isDemo={isDemo} />;
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
-    case "manuscripts": return <ProductionManuscriptWorkspace aggregate={aggregate} canEdit={canEdit} isDemo={isDemo} />;
+    case "manuscripts": return <ProductionManuscriptWorkspace aggregate={aggregate} canEdit={canEdit} isDemo={isDemo} execute={execute} />;
     case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={executeStrict} canEdit={canEdit} canManage={canManage} />;
