@@ -173,6 +173,7 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
           <button
             ref={actionRef}
             type="button"
+            data-studio-beta-notice-acknowledge="true"
             onClick={acknowledge}
             className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-accent px-5 py-3 text-sm font-black text-on-accent shadow-lg transition hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
