@@ -95,11 +95,12 @@ export class StudioReviewVoiceNoteService {
     await this.run(() => this.repository.authorizeCreate(actor, workId, input.subject));
     const storage = this.requireStorage();
     await this.run(() => storage.verifyPrivatePurposeBuckets({}, ["derived"]));
-    const sha256 = createHash("sha256").update(file.buffer).digest("hex");
+    const bytes = Uint8Array.from(file.buffer);
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
     const object = LocatedPrivateObjectReferenceSchema.parse(await this.run(() => storage.uploadImmutable({
       purpose: "derived",
       contentType,
-      bytes: new Uint8Array(file.buffer.buffer, file.buffer.byteOffset, file.buffer.byteLength),
+      bytes,
       controlMetadata: {
         documentId: workId,
         operationId: input.operationId,
