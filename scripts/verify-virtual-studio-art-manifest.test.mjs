@@ -324,12 +324,12 @@ test("rejects generated-world asset or authoring dimension drift", async (contex
   (context.onTestFinished ?? context.after.bind(context))(() => rm(directory, { recursive: true, force: true }));
   const world = {
     layers: [{ name: "background", type: "imagelayer", image: "/assets/virtual-studio/style-packs/pastel/tiles/world-base.webp", imagewidth: 1280, imageheight: 960 }],
-    properties: [{ name: "backgroundUrl", value: "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp" }],
+    properties: [{ name: "backgroundUrl", value: "/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp" }],
   };
   const worldPath = path.join(directory, "world.json");
   await writeFile(worldPath, JSON.stringify(world));
   await assert.rejects(verifyVirtualStudioLivingWorldBindings({ worldPath }), /generated default world/u);
-  world.layers[0].image = "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp";
+  world.layers[0].image = "/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp";
   world.layers[0].imageheight = 961;
   await writeFile(worldPath, JSON.stringify(world));
   await assert.rejects(verifyVirtualStudioLivingWorldBindings({ worldPath }), /actual dimensions/u);

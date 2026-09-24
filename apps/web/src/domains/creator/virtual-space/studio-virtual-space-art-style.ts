@@ -8,7 +8,16 @@ export const STUDIO_VIRTUAL_ART_STYLE_KEYS = [
 ] as const;
 
 export type StudioVirtualArtStyleKey = typeof STUDIO_VIRTUAL_ART_STYLE_KEYS[number];
-export type StudioVirtualArtTextureKind = "floor" | "path" | "water" | "cloud" | "world-base";
+export type StudioVirtualArtTextureKind =
+  | "world-base"
+  | "cloud-back"
+  | "cloud-front"
+  | "water-sheet"
+  | "foliage-sheet"
+  | "lights-sheet"
+  | "weather-sheet"
+  | "terrain-atlas";
+export type StudioVirtualArtObjectKind = "door" | "crate" | "lantern" | "bench";
 
 export interface StudioVirtualArtPalette {
   readonly background: number;
@@ -35,7 +44,7 @@ export interface StudioVirtualArtStyle {
   readonly architectureKo: string;
   readonly architectureEn: string;
   readonly pixelated: boolean;
-  readonly assetPack: "base" | Exclude<StudioVirtualArtStyleKey, "webtoon">;
+  readonly assetPack: StudioVirtualArtStyleKey;
   readonly palette: StudioVirtualArtPalette;
 }
 
@@ -61,7 +70,7 @@ export const STUDIO_VIRTUAL_ART_STYLES: readonly StudioVirtualArtStyle[] = Objec
     architectureKo: "현대형 제작 캠퍼스",
     architectureEn: "Contemporary production campus",
     pixelated: false,
-    assetPack: "base",
+    assetPack: "webtoon",
     palette: { background: 0xf3eee8, floor: 0xe8dccd, floorAlt: 0xdbc7b4, room: 0xfff8ef, wall: 0x6f594f, line: 0xc9b5a4, path: 0xd8c8b8, accent: 0x8f72ff, gate: 0x6f8fff, plant: 0x4f8b62, furniture: 0x9a6b4d, water: 0x72bfda, sky: 0x9fcdf0 },
   },
   {
@@ -127,22 +136,50 @@ export function studioVirtualArtStyle(key: StudioVirtualArtStyleKey): StudioVirt
   return STUDIO_VIRTUAL_ART_STYLES.find((style) => style.key === key) ?? STUDIO_VIRTUAL_ART_STYLES[0]!;
 }
 
-/** Rewrite only allowlisted in-package Virtual Studio art. User/publication asset URLs never cross styles. */
+const V5_ROOT = `${ART_ROOT}/style-packs-v5`;
+
+/** All six art directions load independent v5 images. No CSS recolour/filter fallback is used. */
 export function studioVirtualArtAssetUrl(key: StudioVirtualArtStyleKey, sourceUrl: string): string {
-  const style = studioVirtualArtStyle(key);
-  if (style.assetPack === "base" || !sourceUrl.startsWith(`${ART_ROOT}/`)) return sourceUrl;
-  if (sourceUrl.startsWith(`${ART_ROOT}/style-packs/`)) return sourceUrl;
-  const relative = sourceUrl.slice(`${ART_ROOT}/`.length);
-  if (!/^(?:production-v2|drawn-characters-v1|npc-cast-v3|npc-cast-v4)\/[a-z0-9_.-]+$/iu.test(relative)) return sourceUrl;
-  const styledRelative = relative.replace(/\.(?:png|webp)$/iu, ".webp");
-  return `${ART_ROOT}/style-packs/${style.assetPack}/${styledRelative}`;
+  if (!sourceUrl.startsWith(`${ART_ROOT}/`)) return sourceUrl;
+  const player = /player-([a-z0-9-]+)-(direction|walk|talk|draw|review|state|wave|sit)(?:-([a-z]+))?\.(?:png|webp)$/iu.exec(sourceUrl);
+  if (player) {
+    const [, actor, motion, suffix] = player;
+    const file = `player-${actor}-${motion}${suffix ? `-${suffix}` : ""}.webp`;
+    return `${V5_ROOT}/${key}/players/${file}`;
+  }
+  const npc = /npc-([a-z0-9-]+)-(direction|walk|talk|draw|review|state|wave|sit)(?:-([a-z]+))?\.(?:png|webp)$/iu.exec(sourceUrl);
+  if (npc) {
+    const [, actor, motion, suffix] = npc;
+    const file = `npc-${actor}-${motion}${suffix ? `-${suffix}` : ""}.webp`;
+    return `${V5_ROOT}/${key}/npcs/${file}`;
+  }
+  return sourceUrl;
 }
 
-export function studioVirtualArtTextureUrl(key: StudioVirtualArtStyleKey, kind: StudioVirtualArtTextureKind): string | null {
-  if (kind === "world-base") return `${ART_ROOT}/art-v4/world/${key}.webp`;
-  const style = studioVirtualArtStyle(key);
-  if (style.assetPack === "base") return null;
-  return `${ART_ROOT}/style-packs/${style.assetPack}/tiles/${kind}-texture.png`;
+export function studioVirtualArtTextureUrl(key: StudioVirtualArtStyleKey, kind: StudioVirtualArtTextureKind): string {
+  return `${V5_ROOT}/${key}/world/${kind}.webp`;
+}
+
+export function studioVirtualArtObjectUrl(key: StudioVirtualArtStyleKey, kind: StudioVirtualArtObjectKind): string {
+  return `${V5_ROOT}/${key}/objects/${kind}.webp`;
+}
+
+export function studioVirtualArtPlayerUrl(
+  key: StudioVirtualArtStyleKey,
+  actor: string,
+  motion: "direction" | "walk" | "talk" | "draw" | "review" | "state" | "wave" | "sit",
+  suffix?: string,
+): string {
+  return `${V5_ROOT}/${key}/players/player-${actor}-${motion}${suffix ? `-${suffix}` : ""}.webp`;
+}
+
+export function studioVirtualArtNpcUrl(
+  key: StudioVirtualArtStyleKey,
+  role: string,
+  motion: "direction" | "walk" | "talk" | "draw" | "review" | "state" | "wave" | "sit",
+  suffix?: string,
+): string {
+  return `${V5_ROOT}/${key}/npcs/npc-${role}-${motion}${suffix ? `-${suffix}` : ""}.webp`;
 }
 
 export function readStudioVirtualArtStyle(): StudioVirtualArtStyleKey {

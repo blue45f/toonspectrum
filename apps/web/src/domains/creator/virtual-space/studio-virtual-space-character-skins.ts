@@ -1,5 +1,9 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
-import { studioVirtualArtAssetUrl, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import {
+  studioVirtualArtNpcUrl,
+  studioVirtualArtPlayerUrl,
+  type StudioVirtualArtStyleKey,
+} from "./studio-virtual-space-art-style";
 import {
   createStudioVirtualSpaceAppearance, resolveStudioVirtualSpaceAppearance,
   type StudioVirtualSpaceAppearance, type StudioVirtualSpaceAppearanceClip, type StudioVirtualSpaceAppearanceRegistry,
@@ -177,38 +181,90 @@ export function studioCharacterTextureUrlForSkin(
 
 
 const STYLED_SKIN_CACHE = new Map<string, StudioCharacterSkin>();
+const V5_FRAME = 160;
+const V5_PRESENTATION: StudioCharacterFramePresentation = Object.freeze({
+  originX: 0.5,
+  originY: 0.95,
+  displayHeightRatio: 0.96,
+  seatOriginY: 0.82,
+});
+const V5_FRAMES = Object.freeze(Array.from({ length: 4 }, () => V5_PRESENTATION));
+const V5_DIRECTIONS: readonly StudioVirtualSpaceFacing[] = ["down", "right", "left", "up"];
 
-/** Every art direction receives distinct texture keys and URLs while preserving the authored frame grid. */
+function v5ActorUrl(
+  source: StudioCharacterSkin,
+  style: StudioVirtualArtStyleKey,
+  motion: "direction" | "walk" | "talk" | "draw" | "review" | "state" | "wave" | "sit",
+  suffix?: string,
+): string {
+  if (source.key.startsWith("npc-")) {
+    return studioVirtualArtNpcUrl(style, source.key.slice(4), motion, suffix);
+  }
+  return studioVirtualArtPlayerUrl(style, source.key, motion, suffix);
+}
+
+function v5Clip(source: StudioCharacterSkin, style: StudioVirtualArtStyleKey, motion: "walk" | StudioCharacterAction,
+  facing: StudioVirtualSpaceFacing): StudioCharacterAtlasClip {
+  return Object.freeze({
+    textureUrl: v5ActorUrl(source, style, motion, facing),
+    frameWidth: V5_FRAME,
+    frameHeight: V5_FRAME,
+    start: 0,
+    end: 3,
+    frameRate: motion === "walk" ? 8 : 7,
+    repeat: -1,
+    distancePerCycle: motion === "walk" ? 82 : undefined,
+    technique: "drawn",
+    frames: V5_FRAMES,
+  });
+}
+
+function v5Pose(source: StudioCharacterSkin, style: StudioVirtualArtStyleKey, pose: "wave" | "sit"): StudioCharacterPoseSheet {
+  return Object.freeze({
+    textureUrl: v5ActorUrl(source, style, pose),
+    frameWidth: V5_FRAME,
+    frameHeight: V5_FRAME,
+    directionFrames: Object.freeze({ down: 0, right: 1, left: 2, up: 3 }),
+    frames: V5_FRAMES,
+  });
+}
+
+/** Every art direction is backed by an independently rendered v5 actor pack. */
 export function studioCharacterSkinForArtStyle(
   source: StudioCharacterSkin,
   artStyle: StudioVirtualArtStyleKey,
 ): StudioCharacterSkin {
-  if (artStyle === "webtoon") return source;
-  const cacheKey = `${source.key}:${artStyle}`;
+  const cacheKey = `${source.key}:${artStyle}:v5`;
   const cached = STYLED_SKIN_CACHE.get(cacheKey);
   if (cached) return cached;
-  const rewriteClip = (clip: StudioCharacterAtlasClip): StudioCharacterAtlasClip => Object.freeze({
-    ...clip,
-    textureUrl: studioVirtualArtAssetUrl(artStyle, clip.textureUrl),
-  });
+  const directional = Object.freeze(Object.fromEntries(V5_DIRECTIONS.map((facing) => [
+    facing,
+    v5ActorUrl(source, artStyle, "direction", facing),
+  ])) as Record<StudioVirtualSpaceFacing, string>);
+  const clips = Object.freeze(Object.fromEntries(V5_DIRECTIONS.map((facing) => [
+    `walk-${facing}`,
+    v5Clip(source, artStyle, "walk", facing),
+  ])) as NonNullable<StudioCharacterSkin["clips"]>);
+  const actions = Object.freeze(Object.fromEntries((["talk", "draw", "review"] as const).map((action) => [
+    action,
+    Object.freeze(Object.fromEntries(V5_DIRECTIONS.map((facing) => [
+      facing,
+      v5Clip(source, artStyle, action, facing),
+    ])) as Record<StudioVirtualSpaceFacing, StudioCharacterAtlasClip>),
+  ])) as NonNullable<StudioCharacterSkin["actions"]>);
   const styled: StudioCharacterSkin = Object.freeze({
-    ...source,
-    key: `${source.key}--${artStyle}`,
-    directional: Object.freeze(Object.fromEntries(Object.entries(source.directional)
-      .map(([facing, url]) => [facing, studioVirtualArtAssetUrl(artStyle, url)])) as Record<StudioVirtualSpaceFacing, string>),
-    state: source.state ? Object.freeze(Object.fromEntries(Object.entries(source.state)
-      .map(([state, url]) => [state, url ? studioVirtualArtAssetUrl(artStyle, url) : url])) as NonNullable<StudioCharacterSkin["state"]>) : undefined,
-    clips: source.clips ? Object.freeze(Object.fromEntries(Object.entries(source.clips)
-      .map(([state, clip]) => [state, clip ? rewriteClip(clip) : clip])) as NonNullable<StudioCharacterSkin["clips"]>) : undefined,
-    actions: source.actions ? Object.freeze(Object.fromEntries(Object.entries(source.actions).map(([state, directions]) => [
-      state,
-      directions ? Object.freeze(Object.fromEntries(Object.entries(directions)
-        .map(([facing, clip]) => [facing, rewriteClip(clip)]))) : directions,
-    ])) as NonNullable<StudioCharacterSkin["actions"]>) : undefined,
-    poses: source.poses ? Object.freeze(Object.fromEntries(Object.entries(source.poses).map(([state, pose]) => [
-      state,
-      pose ? Object.freeze({ ...pose, textureUrl: studioVirtualArtAssetUrl(artStyle, pose.textureUrl) }) : pose,
-    ])) as NonNullable<StudioCharacterSkin["poses"]>) : undefined,
+    key: source.key,
+    labelKo: source.labelKo,
+    labelEn: source.labelEn,
+    directional,
+    state: Object.freeze({
+      talk: v5ActorUrl(source, artStyle, "state", "talk"),
+      draw: v5ActorUrl(source, artStyle, "state", "draw"),
+      review: v5ActorUrl(source, artStyle, "state", "review"),
+    }),
+    clips,
+    actions,
+    poses: Object.freeze({ wave: v5Pose(source, artStyle, "wave"), sit: v5Pose(source, artStyle, "sit") }),
   });
   STYLED_SKIN_CACHE.set(cacheKey, styled);
   return styled;
