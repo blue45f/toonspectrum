@@ -281,7 +281,7 @@ export const StudioBrushHud = memo(function StudioBrushHud({
     >
       <StudioInlineScrubber
         surface="brush-size"
-        label="브러시 크기"
+        label="캔버스 브러시 크기"
         value={strokeWidth}
         min={STUDIO_BRUSH_SIZE_RANGE.min}
         max={STUDIO_BRUSH_SIZE_RANGE.max}
@@ -304,7 +304,7 @@ export const StudioBrushHud = memo(function StudioBrushHud({
       </StudioInlineScrubber>
       <StudioInlineScrubber
         surface="brush-opacity"
-        label="브러시 불투명도"
+        label="캔버스 브러시 불투명도"
         value={opacityPercent}
         min={5}
         max={100}

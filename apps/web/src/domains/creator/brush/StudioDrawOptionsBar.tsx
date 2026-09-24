@@ -62,6 +62,7 @@ import { STUDIO_BRUSH_SIZE_RANGE } from "./studio-draw-ux";
 import { MATERIAL_BRUSH_OPACITY_RANGE, MATERIAL_BRUSH_STROKE_WIDTH_RANGE } from "./studio-brush-library";
 import { StudioBrushPresetIcon } from "./StudioBrushPresetIcon";
 import { StudioBrushTray } from "./StudioBrushTray";
+import { StudioPreciseNumberInput } from "./StudioPreciseNumberInput";
 
 import type { StudioBrushSlot } from "./studio-brush-slots";
 import type { StudioBrushTrayItem } from "../studio-creative-ux";
@@ -211,6 +212,13 @@ const BRUSH_OPACITY_HINT_VARIANT = {
   o80: "preset-80",
   o100: "preset-100",
 } as const satisfies Record<(typeof STUDIO_BRUSH_OPACITY_CHIPS)[number]["id"], string>;
+
+const STUDIO_STABILIZER_STRENGTH_PRESETS = [
+  { value: 0, label: "끔", description: "입력 지연 없이 원본 제스처를 그대로 사용합니다.", previewVariant: "standard" },
+  { value: 2, label: "스케치", description: "빠른 러프와 짧은 선을 가볍게 안정화합니다.", previewVariant: "standard" },
+  { value: 5, label: "선화", description: "일반적인 캐릭터 선화에 균형 잡힌 보정을 적용합니다.", previewVariant: "adaptive" },
+  { value: 8, label: "정밀", description: "긴 곡선과 장식선을 강하게 안정화합니다.", previewVariant: "precision" },
+] as const;
 
 export function StudioDrawOptionsBar({
   drawMode,
@@ -598,7 +606,7 @@ export function StudioDrawOptionsBar({
                 "brush-size"
               )}
             >
-              <label
+              <div
                 data-studio-draw-primary-control="size"
                 data-studio-core-draw-control="size"
                 className="flex shrink-0 items-center gap-1 text-fg-3"
@@ -615,10 +623,16 @@ export function StudioDrawOptionsBar({
                   aria-label={strokeWidthLabel}
                   aria-valuetext={`${strokeWidth}픽셀`}
                 />
-                <span className="w-9 tabular-nums text-[0.68rem] font-bold text-fg">
-                  {strokeWidth}px
-                </span>
-              </label>
+                <StudioPreciseNumberInput
+                  label={`${strokeWidthLabel} 직접 입력`}
+                  value={strokeWidth}
+                  min={STUDIO_BRUSH_SIZE_RANGE.min}
+                  max={materialBrush ? MATERIAL_BRUSH_STROKE_WIDTH_RANGE[1] : STUDIO_BRUSH_SIZE_RANGE.max}
+                  step={1}
+                  suffix="px"
+                  onChange={onStrokeWidthChange}
+                />
+              </div>
             </StudioToolHintTarget>
           </>
         ) : null}
@@ -635,7 +649,7 @@ export function StudioDrawOptionsBar({
             "opacity"
           )}
         >
-          <label
+          <div
             data-studio-draw-primary-control="opacity"
             data-studio-core-draw-control="opacity"
             className="flex shrink-0 items-center gap-1 text-fg-3"
@@ -652,10 +666,16 @@ export function StudioDrawOptionsBar({
               className="studio-range w-14 sm:w-16"
             aria-label={opacityLabel}
             />
-            <span className="w-9 tabular-nums text-[0.68rem] font-bold text-fg">
-              {Math.round(brushOpacity * 100)}%
-            </span>
-          </label>
+            <StudioPreciseNumberInput
+              label={`${opacityLabel} 직접 입력`}
+              value={Math.round(brushOpacity * 100)}
+              min={materialBrush ? MATERIAL_BRUSH_OPACITY_RANGE[0] * 100 : 5}
+              max={100}
+              step={1}
+              suffix="%"
+              onChange={(next) => onOpacityChange(next / 100)}
+            />
+          </div>
         </StudioToolHintTarget>
 
         </div>
@@ -1242,7 +1262,7 @@ export function StudioDrawOptionsBar({
               `stabilizer-${stabilizerMode}`
             )}
           >
-            <label className="flex shrink-0 items-center gap-1 text-fg-3">
+            <div className="flex shrink-0 items-center gap-1 text-fg-3">
               <StudioStabilizerGlyph />
               <span className="sr-only">보정</span>
               <input
@@ -1255,23 +1275,53 @@ export function StudioDrawOptionsBar({
                 className="studio-range w-14"
                 aria-label="손떨림 보정"
               />
-              {onCycleStabilizer ? (
+              <StudioPreciseNumberInput
+                label="손떨림 보정 직접 입력"
+                value={stabilizer}
+                min={0}
+                max={10}
+                step={1}
+                onChange={onStabilizerChange}
+                className="[&_input]:w-12"
+              />
+            </div>
+          </StudioToolHintTarget>
+
+          <div
+            className="studio-opt-cluster flex shrink-0 items-center gap-0.5"
+            role="group"
+            aria-label="손떨림 보정 강도 프리셋"
+          >
+            {STUDIO_STABILIZER_STRENGTH_PRESETS.map((preset) => (
+              <StudioToolHintTarget
+                key={preset.value}
+                hint={studioToolHintFromLabel(
+                  `보정 강도 · ${preset.label}`,
+                  `${preset.description} 강도 ${preset.value}/10으로 설정합니다.`,
+                  undefined,
+                  "stabilizer",
+                  preset.previewVariant
+                )}
+              >
                 <button
                   type="button"
-                  aria-label={`보정 강도 ${stabilizer}`}
-                  onClick={onCycleStabilizer}
+                  aria-label={`손떨림 보정 ${preset.label} ${preset.value}`}
+                  aria-pressed={stabilizer === preset.value}
+                  onClick={() => onStabilizerChange(preset.value)}
                   className={cn(
-                    "w-5 rounded tabular-nums text-[0.68rem] font-bold text-fg hover:bg-raised",
-                    STUDIO_FOCUS_RING
+                    "min-w-8 rounded-lg px-1.5 py-1 text-[0.62rem] font-bold tabular-nums",
+                    STUDIO_EASE,
+                    STUDIO_FOCUS_RING,
+                    stabilizer === preset.value
+                      ? "bg-accent text-on-accent"
+                      : "text-fg-3 hover:bg-raised hover:text-fg"
                   )}
                 >
-                  {stabilizer}
+                  {preset.value}
                 </button>
-              ) : (
-                <span className="w-4 tabular-nums text-[0.68rem] font-bold text-fg">{stabilizer}</span>
-              )}
-            </label>
-          </StudioToolHintTarget>
+              </StudioToolHintTarget>
+            ))}
+          </div>
 
           {onStabilizerModeChange ? (
             <div className="flex shrink-0 items-center gap-0.5" role="group" aria-label="보정 방식">
