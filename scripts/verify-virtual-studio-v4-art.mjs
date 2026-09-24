@@ -60,24 +60,44 @@ export async function verifyVirtualStudioV4Art({ root = VIRTUAL_STUDIO_V4_ROOT }
     requireCondition(index < 10_000, "v4 manifest exceeds safety budget");
   }
 
-  for (const style of STYLES) requireCondition(declared.has(`art-v4/world/${style}.webp`), `missing v4 world: ${style}`);
+  const worldHashes = new Set();
+  for (const style of STYLES) {
+    const world = declared.get(`art-v4/world/${style}.webp`);
+    const runtime = declared.get(`style-packs/${style}/tiles/world-base.webp`);
+    requireCondition(world, `missing v4 world: ${style}`);
+    requireCondition(runtime, `missing v4 runtime world copy: ${style}`);
+    requireCondition(world.size[0] >= 1024 && world.size[1] >= 768, `v4 world is below the production resolution floor: ${style}`);
+    requireCondition(runtime.sha256 === world.sha256, `runtime world copy differs from its authored v4 world: ${style}`);
+    worldHashes.add(world.sha256);
+  }
+  requireCondition(worldHashes.size === STYLES.length, "every v4 art direction must ship a materially distinct world image");
   for (const atlas of ["tile-atlas.webp", "props-atlas.webp", "room-modules.webp"])
     requireCondition(declared.has(`art-v4/authoring/${atlas}`), `missing v4 authoring atlas: ${atlas}`);
+  const roleSheetHashes = new Set();
   for (const role of ROLES) {
-    requireCondition(declared.has(`npc-cast-v4/npc-${role}-sheet.webp`), `missing v4 generated source sheet: ${role}`);
+    const sheet = declared.get(`npc-cast-v4/npc-${role}-sheet.webp`);
+    requireCondition(sheet, `missing v4 generated source sheet: ${role}`);
+    roleSheetHashes.add(sheet.sha256);
     for (const direction of DIRECTIONS) {
       requireCondition(declared.has(`npc-cast-v4/npc-${role}-direction-${direction}.webp`), `missing v4 idle: ${role}/${direction}`);
       requireCondition(declared.has(`npc-cast-v4/npc-${role}-walk-${direction}.webp`), `missing v4 walk: ${role}/${direction}`);
+      const styleHashes = new Set([
+        declared.get(`npc-cast-v4/npc-${role}-walk-${direction}.webp`)?.sha256,
+      ]);
       for (const style of STYLES.slice(1)) {
-        requireCondition(declared.has(`style-packs/${style}/npc-cast-v4/npc-${role}-direction-${direction}.webp`),
-          `missing v4 styled idle: ${style}/${role}/${direction}`);
-        requireCondition(declared.has(`style-packs/${style}/npc-cast-v4/npc-${role}-walk-${direction}.webp`),
-          `missing v4 styled walk: ${style}/${role}/${direction}`);
+        const idle = declared.get(`style-packs/${style}/npc-cast-v4/npc-${role}-direction-${direction}.webp`);
+        const walk = declared.get(`style-packs/${style}/npc-cast-v4/npc-${role}-walk-${direction}.webp`);
+        requireCondition(idle, `missing v4 styled idle: ${style}/${role}/${direction}`);
+        requireCondition(walk, `missing v4 styled walk: ${style}/${role}/${direction}`);
+        styleHashes.add(walk.sha256);
       }
+      requireCondition(styleHashes.size === STYLES.length,
+        `NPC art directions are not materially distinct: ${role}/${direction}`);
     }
   }
+  requireCondition(roleSheetHashes.size === ROLES.length, "each v4 NPC role must have an independent source sheet");
 
-  return Object.freeze({ assetCount: declared.size, totalBytes });
+  return Object.freeze({ assetCount: declared.size, totalBytes, worldStyleCount: worldHashes.size, npcRoleCount: roleSheetHashes.size });
 }
 
 async function main() {

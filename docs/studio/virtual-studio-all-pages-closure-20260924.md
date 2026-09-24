@@ -31,7 +31,7 @@ Environment certification is recorded separately. A green component test does no
 | Exact return | Project/work/document/query identity is preserved through spatial transitions. | campus return resolver and route contract tests |
 | Safe fallback | GPU or scene failure leaves the canonical work route available. | campus error/fallback contracts |
 | World authoring | Validated manifests, templates, registered rules, publication CAS, and safe adoption remain separate from arbitrary code. | world template/rule/publication modules |
-| Art and movement | Six art directions, independent NPC cast, fixed-step motion, collision, pathfinding, and reduced-motion handling. | Virtual Studio v3 art/physics tests and asset verifier |
+| Art and movement | Six materially distinct architecture directions, independent eight-role NPC source sheets, style-specific player/NPC runtime art, fixed-step motion, collision, pathfinding, and reduced-motion handling. | Virtual Studio v4 generated-art, style-distinction, physics, and asset-integrity tests |
 
 ## 3. Collaboration closure against VS-01–VS-30
 

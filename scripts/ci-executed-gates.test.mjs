@@ -125,6 +125,7 @@ test("review database invariants execute with real PostgreSQL and the accepted g
   assert.match(database, /STUDIO_LIVE_POSTGRES_INTEGRATION_URL: postgresql:\/\/studio_review_test@127\.0\.0\.1:5432\/studio_review_integration/u);
   assert.match(database, /node scripts\/prepare-studio-review-test-db\.mjs/u);
   assert.match(database, /pnpm exec vitest run --no-file-parallelism/u);
+  assert.match(database, /studio-review-voice-note\.integration\.test\.ts/u);
 
   const preparation = readFileSync(
     new URL("./prepare-studio-review-test-db.mjs", import.meta.url),
@@ -228,6 +229,12 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "apps/web/public/assets/virtual-studio/npc-cast-v3/npc-producer-state-review.png",
     "apps/web/public/assets/virtual-studio/npc-cast-v3/npc-artist-state-draw.png",
     "apps/web/public/assets/virtual-studio/npc-cast-v3/npc-host-walk-up.png",
+    "apps/web/public/assets/virtual-studio/art-v4-manifest.json",
+    "apps/web/public/assets/virtual-studio/art-v4/world/sky-island.webp",
+    "apps/web/public/assets/virtual-studio/art-v4/authoring/tile-atlas.webp",
+    "apps/web/public/assets/virtual-studio/npc-cast-v4/npc-concierge-sheet.webp",
+    "apps/web/public/assets/virtual-studio/style-packs/sky-island/npc-cast-v4/npc-concierge-walk-down.webp",
+    "apps/web/public/assets/virtual-studio/style-packs/webtoon/tiles/world-base.webp",
     "apps/web/public/assets/virtual-studio/drawn-characters-v1/art-manifest.json",
     ...["gentle-window-rain.ogg", "window-rain.ogg", "provenance.json", "CC0-1.0.txt"].map((name) =>
       `apps/web/public/assets/virtual-studio/ambient-audio/${name}`),
@@ -255,15 +262,20 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/npc-cast-v1/",
     "/apps/web/public/assets/virtual-studio/npc-cast-v2/",
     "/apps/web/public/assets/virtual-studio/npc-cast-v3/",
+    "/apps/web/public/assets/virtual-studio/npc-cast-v4/",
+    "/apps/web/public/assets/virtual-studio/art-v4/",
+    "/apps/web/public/assets/virtual-studio/art-v4-manifest.json",
+    "/apps/web/public/assets/virtual-studio/style-packs/",
   ]);
   assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
     "artwork must be present before the required foundation tests execute");
   assert.ok(requiredTargets.includes("scripts/verify-virtual-studio-art-manifest.test.mjs"),
     "the full build art gate does not replace the existing foundation art regression target");
-  assert.match(JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")).scripts["test:studio-virtual-art"],
-    /verify-virtual-studio-v3-art\.test\.mjs/u,
-    /verify-virtual-studio-v4-art\.test\.mjs/u,
+  const artTestScript = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")).scripts["test:studio-virtual-art"];
+  assert.match(artTestScript, /verify-virtual-studio-v3-art\.test\.mjs/u,
     "the production art gate must execute the v3 NPC/style-pack integrity test");
+  assert.match(artTestScript, /verify-virtual-studio-v4-art\.test\.mjs/u,
+    "the production art gate must execute the v4 generated campus and NPC integrity test");
   const scratch = mkdtempSync(join(tmpdir(), "virtual-studio-ci-inputs-"));
   const git = (...args) => {
     const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });

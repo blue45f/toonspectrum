@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
+from collections import deque
 from pathlib import Path
 from typing import Final
 
-from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 
 ROOT: Final = Path(__file__).resolve().parents[1] / "apps/web/public/assets/virtual-studio"
 NPC_ROOT: Final = ROOT / "npc-cast-v4"
@@ -73,6 +75,140 @@ def transform(image: Image.Image, style: str) -> Image.Image:
     return image
 
 
+
+WORLD_CENTERS: Final = {
+    "assets": (140, 116), "storyboard": (380, 116), "production": (644, 116), "release": (884, 116),
+    "writers": (140, 332), "drawing": (388, 332), "review": (652, 332), "quality": (892, 332),
+    "teams": (152, 576), "lounge": (392, 544), "live": (624, 560), "meeting": (876, 576),
+    "assistant": (392, 684), "lobby": (624, 712),
+}
+WORLD_EDGES: Final = (
+    ("assets", "storyboard"), ("storyboard", "production"), ("production", "release"),
+    ("writers", "drawing"), ("drawing", "review"), ("review", "quality"),
+    ("teams", "lounge"), ("lounge", "live"), ("live", "meeting"),
+    ("assets", "writers"), ("storyboard", "drawing"), ("production", "review"), ("release", "quality"),
+    ("writers", "teams"), ("drawing", "lounge"), ("review", "live"), ("quality", "meeting"),
+    ("lounge", "assistant"), ("live", "lobby"), ("assistant", "lobby"),
+)
+
+
+def connected_sky_mask(image: Image.Image) -> Image.Image:
+    """Select only border-connected sky/cloud pixels so architecture remains intact."""
+    rgb = image.convert("RGB")
+    width, height = rgb.size
+    pixels = rgb.load()
+    selected = bytearray(width * height)
+    visited = bytearray(width * height)
+    queue: deque[tuple[int, int]] = deque()
+
+    def candidate(x: int, y: int) -> bool:
+        r, g, b = pixels[x, y]
+        return b >= 112 and b >= r * 1.07 and b >= g * 0.91 and (b - min(r, g)) >= 20
+
+    for x in range(width):
+        for y in (0, height - 1):
+            if candidate(x, y): queue.append((x, y))
+    for y in range(height):
+        for x in (0, width - 1):
+            if candidate(x, y): queue.append((x, y))
+    while queue:
+        x, y = queue.popleft()
+        index = y * width + x
+        if visited[index]: continue
+        visited[index] = 1
+        if not candidate(x, y): continue
+        selected[index] = 255
+        if x: queue.append((x - 1, y))
+        if x + 1 < width: queue.append((x + 1, y))
+        if y: queue.append((x, y - 1))
+        if y + 1 < height: queue.append((x, y + 1))
+    return Image.frombytes("L", (width, height), bytes(selected)).filter(ImageFilter.MaxFilter(5)).filter(ImageFilter.GaussianBlur(1.2))
+
+
+def vertical_gradient(size: tuple[int, int], top: tuple[int, int, int], bottom: tuple[int, int, int]) -> Image.Image:
+    width, height = size
+    canvas = Image.new("RGBA", size)
+    draw = ImageDraw.Draw(canvas)
+    for y in range(height):
+        ratio = y / max(1, height - 1)
+        color = tuple(round(a * (1 - ratio) + b * ratio) for a, b in zip(top, bottom))
+        draw.line((0, y, width, y), fill=(*color, 255))
+    return canvas
+
+
+def draw_world_connections(background: Image.Image, style: str) -> None:
+    draw = ImageDraw.Draw(background, "RGBA")
+    if style == "webtoon":
+        colors, widths = ((255, 246, 221, 225), (157, 118, 91, 150)), (24, 32)
+    elif style == "pastel":
+        colors, widths = ((255, 246, 255, 220), (189, 157, 224, 125)), (28, 38)
+    elif style == "retro":
+        colors, widths = ((239, 205, 105, 255), (36, 46, 70, 255)), (12, 20)
+    elif style == "ink":
+        colors, widths = ((248, 248, 244, 255), (35, 35, 39, 210)), (16, 22)
+    else:
+        colors, widths = ((55, 230, 255, 210), (195, 67, 255, 130)), (8, 24)
+    for left, right in WORLD_EDGES:
+        a, b = WORLD_CENTERS[left], WORLD_CENTERS[right]
+        draw.line((*a, *b), fill=colors[1], width=widths[1])
+        draw.line((*a, *b), fill=colors[0], width=widths[0])
+    for point in WORLD_CENTERS.values():
+        radius = 9 if style == "retro" else 12
+        draw.ellipse((point[0] - radius, point[1] - radius, point[0] + radius, point[1] + radius), fill=colors[0], outline=colors[1], width=3)
+
+
+def world_background(style: str, size: tuple[int, int]) -> Image.Image:
+    if style == "webtoon":
+        image = vertical_gradient(size, (232, 244, 250), (255, 226, 202))
+    elif style == "pastel":
+        image = vertical_gradient(size, (235, 224, 255), (255, 235, 246))
+    elif style == "retro":
+        image = vertical_gradient(size, (32, 45, 69), (24, 72, 66))
+    elif style == "ink":
+        image = vertical_gradient(size, (252, 251, 247), (224, 224, 220))
+    else:
+        image = vertical_gradient(size, (5, 8, 28), (18, 15, 53))
+    draw = ImageDraw.Draw(image, "RGBA")
+    width, height = size
+    rng = random.Random({"webtoon": 11, "pastel": 23, "retro": 37, "ink": 41, "neon": 53}[style])
+    if style in {"webtoon", "pastel"}:
+        # The campus art already carries clouds and foliage; keep the open sky clean so room-focus
+        # overlays never turn decorative marks into visual noise.
+        pass
+    elif style == "retro":
+        for x in range(0, width, 16): draw.line((x, 0, x, height), fill=(110, 145, 139, 35), width=1)
+        for y in range(0, height, 16): draw.line((0, y, width, y), fill=(110, 145, 139, 35), width=1)
+    elif style == "ink":
+        for x in range(-height, width, 9): draw.line((x, 0, x + height, height), fill=(32, 32, 36, 22), width=1)
+    else:
+        for _ in range(180):
+            x, y = rng.randrange(width), rng.randrange(height)
+            color = (80, 222, 255, rng.randrange(45, 150)) if rng.random() < .6 else (224, 93, 255, rng.randrange(35, 120))
+            draw.point((x, y), fill=color)
+    draw_world_connections(image, style)
+    return image
+
+
+def style_world(source: Image.Image, style: str) -> Image.Image:
+    source = source.convert("RGBA")
+    if style == "sky-island": return source
+    sky = connected_sky_mask(source)
+    architecture = source.copy() if style == "retro" else transform(source, style)
+    background = world_background(style, source.size)
+    composed = Image.composite(background, architecture, sky)
+    if style == "retro":
+        small = composed.resize((256, 192), Image.Resampling.BOX)
+        small = ImageEnhance.Color(small).enhance(0.86)
+        small = ImageEnhance.Contrast(small).enhance(1.16)
+        indexed = small.convert("RGB").quantize(colors=56, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert("RGBA")
+        composed = indexed.resize(source.size, Image.Resampling.NEAREST)
+    elif style == "ink":
+        draw = ImageDraw.Draw(composed, "RGBA")
+        for y in range(3, composed.height, 7):
+            for x in range((y // 7) % 2 * 3, composed.width, 7):
+                draw.ellipse((x, y, x + 1, y + 1), fill=(20, 20, 23, 55))
+    return composed
+
 def save_webp(image: Image.Image, path: Path, style: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if style == "retro":
@@ -106,17 +242,21 @@ def main() -> None:
         for style in STYLES:
             build_role(role, sheet, STYLE_ROOT / style / "npc-cast-v4", style)
 
-    # The generated campus art is the visible source of truth for each architecture direction.
+    # Keep one authored high-detail floating-island source while generating materially different
+    # architecture treatments that preserve the same production-room coordinates and permissions.
+    sky_source = Image.open(ART_ROOT / "world" / "sky-island.webp").convert("RGBA")
     for style in ("sky-island", "webtoon", "pastel", "retro", "ink", "neon"):
         source = ART_ROOT / "world" / f"{style}.webp"
-        if source.exists():
-            target = STYLE_ROOT / style / "tiles" / "world-base.webp"
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(source.read_bytes())
+        if style != "sky-island":
+            save_webp(style_world(sky_source, style), source, style)
+        target = STYLE_ROOT / style / "tiles" / "world-base.webp"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(source.read_bytes())
 
     files = []
     roots = [NPC_ROOT, ART_ROOT]
     roots.extend(STYLE_ROOT / style / "npc-cast-v4" for style in STYLES)
+    roots.extend(STYLE_ROOT / style / "tiles" for style in ("sky-island", "webtoon", "pastel", "retro", "ink", "neon"))
     for root in roots:
         for path in sorted(root.rglob("*.webp")):
             with Image.open(path) as image:

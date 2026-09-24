@@ -176,17 +176,17 @@ function activityState(
 }
 
 function interactionMarkerText(interaction: StudioWorldInteractionDefinition): string {
-  const emojiByAction: Record<string, string> = {
-    assistant: "🤖",
-    assets: "📦",
-    canvas: "🎨",
-    community: "☕",
-    comic: "🖼️",
-    live: "🎬",
-    review: "✅",
-    story: "📝",
+  const glyphByAction: Record<string, string> = {
+    assistant: "AI",
+    assets: "AS",
+    canvas: "DR",
+    community: "CO",
+    comic: "SB",
+    live: "LV",
+    review: "RV",
+    story: "ST",
   };
-  return emojiByAction[interaction.action] ?? "✦";
+  return glyphByAction[interaction.action] ?? "GO";
 }
 
 function propTextureKey(prop: StudioWorldPropDefinition): string {
@@ -333,7 +333,7 @@ export function StudioVirtualSpacePhaserCanvas({
       cleanup.push(() => npcDirector.dispose());
       let lastGuideRequestId: string | null = null;
       let lastGuideState = "";
-      const interactionMarkers = new Map<string, import("phaser").GameObjects.Text>();
+      const interactionMarkers = new Map<string, import("phaser").GameObjects.Container>();
       const interactions = studioWorldInteractions(manifest);
       const portals = studioWorldPortals(manifest);
       const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}-${artStyle}`;
@@ -816,14 +816,22 @@ export function StudioVirtualSpacePhaserCanvas({
           fontSize: "24px", backgroundColor: "#182332", padding: { x: 6, y: 4 },
         }).setOrigin(0.5).setDepth(160_000).setVisible(false);
         for (const interaction of interactions) {
-          const marker = this.add.text(interaction.point.x, interaction.point.y, interactionMarkerText(interaction), {
-            fontSize: "18px",
-            backgroundColor: "#111827b8",
-            padding: { x: 5, y: 4 },
-          }).setOrigin(0.5)
+          const markerPlate = this.add.graphics();
+          markerPlate.fillStyle(artProfile.palette.background, 0.58).fillCircle(0, 0, 14);
+          markerPlate.lineStyle(2, artProfile.palette.gate, 0.9).strokeCircle(0, 0, 12);
+          markerPlate.fillStyle(artProfile.palette.accent, 0.92).fillCircle(0, 0, 8);
+          const markerGlyph = this.add.text(0, 0, interactionMarkerText(interaction), {
+            fontFamily: artProfile.pixelated ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "Inter, Pretendard, sans-serif",
+            fontSize: artProfile.pixelated ? "7px" : "8px",
+            fontStyle: "bold",
+            color: "#ffffff",
+          }).setOrigin(0.5);
+          const marker = this.add.container(interaction.point.x, interaction.point.y, [markerPlate, markerGlyph])
+            .setSize(30, 30)
             .setDepth(150_000)
-            .setAlpha(0.62)
-            .setInteractive({ useHandCursor: true });
+            .setAlpha(0.68)
+            .setInteractive(new Phaser.Geom.Circle(0, 0, 17), Phaser.Geom.Circle.Contains);
+          marker.input!.cursor = "pointer";
           marker.on(
             "pointerdown",
             (
@@ -1277,7 +1285,7 @@ export function StudioVirtualSpacePhaserCanvas({
         zoneVeil?.clear();
         if (zone.separated && zone.rect) {
           const rect = zone.rect;
-          const veil = reducedMotion.matches ? 0.42 : 0.55;
+          const veil = artProfile.key === "neon" ? 0.18 : reducedMotion.matches ? 0.22 : 0.28;
           zoneVeil?.fillStyle(0x07060b, veil);
           zoneVeil?.fillRect(0, 0, manifest.width, rect.y);
           zoneVeil?.fillRect(0, rect.y, rect.x, rect.height);

@@ -748,8 +748,8 @@
     },
     {
       "file": "art-v4/world/ink.webp",
-      "bytes": 240700,
-      "sha256": "2f9ef4838fefa10b814e8c0d84bac27db4fd4f14a6b013d5720267fccef73c9b",
+      "bytes": 545934,
+      "sha256": "6c999ae7eb0a0f8ea15c4ce09e15ee1e1f8e16daafba03c4d1211c5e77608296",
       "size": [
         1024,
         768
@@ -757,8 +757,8 @@
     },
     {
       "file": "art-v4/world/neon.webp",
-      "bytes": 100222,
-      "sha256": "0e8e2ebdf3feb198e31dba606c4f46e66485a572916e31fd11d93ed7618b4892",
+      "bytes": 180302,
+      "sha256": "06460d857664fdea800109b19726f7ba93196e22541c1e27b5059093873f5b20",
       "size": [
         1024,
         768
@@ -766,8 +766,8 @@
     },
     {
       "file": "art-v4/world/pastel.webp",
-      "bytes": 97772,
-      "sha256": "39a7b7cb91689aa95aad1378b25bd303fcf0b4fca7927711e29c483dbd8a24dc",
+      "bytes": 178904,
+      "sha256": "0a8b6cc4bdf226fa9daae46bf6b440e5567ae5b34ac34512ece671530b685389",
       "size": [
         1024,
         768
@@ -775,8 +775,8 @@
     },
     {
       "file": "art-v4/world/retro.webp",
-      "bytes": 103092,
-      "sha256": "bd21e44ce0f4b2d2ec2e78d6851832f251d764aabbdc295ceadc57083b65ebfe",
+      "bytes": 29606,
+      "sha256": "52d15b54f789260b999b07425ff03246e898e9ca44a841cbf94c167c535d557a",
       "size": [
         1024,
         768
@@ -793,8 +793,8 @@
     },
     {
       "file": "art-v4/world/webtoon.webp",
-      "bytes": 144016,
-      "sha256": "08e0c379ff70cf0b1defec8e4f09135393e2909a9a4b0421b9ba89d0232167c5",
+      "bytes": 184034,
+      "sha256": "6a9a602fadbb632bace0e69071ce14c7c433e834196e6db25351e90abeb20deb",
       "size": [
         1024,
         768
@@ -3903,6 +3903,60 @@
       "size": [
         512,
         128
+      ]
+    },
+    {
+      "file": "style-packs/sky-island/tiles/world-base.webp",
+      "bytes": 136398,
+      "sha256": "f69a2a5bf22c670d8b92f8029315d4e8a67f3c2590e303b9f8c2b648a1a1854c",
+      "size": [
+        1024,
+        768
+      ]
+    },
+    {
+      "file": "style-packs/webtoon/tiles/world-base.webp",
+      "bytes": 184034,
+      "sha256": "6a9a602fadbb632bace0e69071ce14c7c433e834196e6db25351e90abeb20deb",
+      "size": [
+        1024,
+        768
+      ]
+    },
+    {
+      "file": "style-packs/pastel/tiles/world-base.webp",
+      "bytes": 178904,
+      "sha256": "0a8b6cc4bdf226fa9daae46bf6b440e5567ae5b34ac34512ece671530b685389",
+      "size": [
+        1024,
+        768
+      ]
+    },
+    {
+      "file": "style-packs/retro/tiles/world-base.webp",
+      "bytes": 29606,
+      "sha256": "52d15b54f789260b999b07425ff03246e898e9ca44a841cbf94c167c535d557a",
+      "size": [
+        1024,
+        768
+      ]
+    },
+    {
+      "file": "style-packs/ink/tiles/world-base.webp",
+      "bytes": 545934,
+      "sha256": "6c999ae7eb0a0f8ea15c4ce09e15ee1e1f8e16daafba03c4d1211c5e77608296",
+      "size": [
+        1024,
+        768
+      ]
+    },
+    {
+      "file": "style-packs/neon/tiles/world-base.webp",
+      "bytes": 180302,
+      "sha256": "06460d857664fdea800109b19726f7ba93196e22541c1e27b5059093873f5b20",
+      "size": [
+        1024,
+        768
       ]
     }
   ]
