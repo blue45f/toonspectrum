@@ -31,7 +31,10 @@ import {
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { buildStudioHref } from "./creator-studio-links";
-import { confirmStudioDestructiveAction } from "./studio-destructive-action-preview";
+import {
+  confirmStudioDestructiveAction,
+  recordStudioDestructiveOutcome,
+} from "./studio-destructive-action-preview";
 import { studioDiscardLocalChangesRequest } from "./studio-destructive-command-catalog";
 import { downscaleDataUrl, downscaleImageFile } from "./studio-image-utils";
 import {
@@ -136,6 +139,11 @@ type UploadPage = {
 
 type CommandStep = "content" | "distribution" | "review";
 type SaveIntent = "draft" | "publish";
+type PublishHandoffContext = {
+  id: string;
+  pageCount: number;
+  sourceWorkId: string | null;
+};
 
 const COMMAND_STEPS: readonly {
   id: CommandStep;
@@ -214,6 +222,7 @@ export function StudioPublishingCommandCenter({
     typeof window === "undefined" ? null : window.location.hostname,
   );
   const workId = resolveStudioUploadWorkId(routeWorkId, params.get("id"));
+  const handoffId = params.get("handoff");
   const publishResult = parseStudioPublishResultKind(params.get("result"));
   const routeSeriesId = params.get("seriesId");
   const routeChallengeId = params.get("challengeId");
@@ -232,10 +241,15 @@ export function StudioPublishingCommandCenter({
   const [linkedChallengeId, setLinkedChallengeId] = useState<string | null>(routeChallengeId);
   const [linkedTitleId, setLinkedTitleId] = useState<string | null>(routeTitleId);
   const [saving, setSaving] = useState(false);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  const [handoffLoading, setHandoffLoading] = useState(false);
+  const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [handoffContext, setHandoffContext] = useState<PublishHandoffContext | null>(null);
   const [publishContext, setPublishContext] = useState<PublishContext>({});
   const [hydrationStatus, setHydrationStatus] = useState<StudioUploadHydrationStatus>(
     workId ? "loading" : "ready",
@@ -249,7 +263,9 @@ export function StudioPublishingCommandCenter({
   const currentScopeRef = useRef<StudioUploadCurrentScope>({ authUserId, workId });
   const committedScopeRef = useRef<StudioUploadCurrentScope>({ authUserId, workId });
   const publishAbortRef = useRef<AbortController | null>(null);
+  const recoveryAbortRef = useRef<AbortController | null>(null);
   const publishRequestIdRef = useRef(0);
+  const handoffGenerationRef = useRef(0);
   currentScopeRef.current = { authUserId, workId };
 
   const currentScope = { authUserId, workId };
@@ -267,8 +283,8 @@ export function StudioPublishingCommandCenter({
     currentScope,
     hydratedScope,
     hydrationStatus,
-    saving,
-    loadingFiles,
+    saving: saving || recoveryBusy,
+    loadingFiles: loadingFiles || handoffLoading,
   });
   const { mutationLocked, publishLocked } = resolveStudioUploadActionLocks({
     workId,
@@ -296,8 +312,11 @@ export function StudioPublishingCommandCenter({
     return () => {
       mountedRef.current = false;
       publishRequestIdRef.current += 1;
+      handoffGenerationRef.current += 1;
       publishAbortRef.current?.abort();
       publishAbortRef.current = null;
+      recoveryAbortRef.current?.abort();
+      recoveryAbortRef.current = null;
     };
   }, []);
 
@@ -328,7 +347,11 @@ export function StudioPublishingCommandCenter({
     publishRequestIdRef.current += 1;
     publishAbortRef.current?.abort();
     publishAbortRef.current = null;
+    recoveryAbortRef.current?.abort();
+    recoveryAbortRef.current = null;
     setSaving(false);
+    setRecoveryBusy(false);
+    setRecoveryError(null);
     setLoadingFiles(false);
     if (resetDraft) {
       setStep("content");
@@ -465,6 +488,114 @@ export function StudioPublishingCommandCenter({
   }, [authUserId, hydrationAttempt, workId]);
 
   useEffect(() => {
+    const generation = handoffGenerationRef.current + 1;
+    handoffGenerationRef.current = generation;
+    if (!handoffId) {
+      setHandoffLoading(false);
+      setHandoffError(null);
+      setHandoffContext(null);
+      return;
+    }
+    if (workId && hydrationStatus === "error") {
+      setHandoffLoading(false);
+      return;
+    }
+    if (workId && (hydrationStatus !== "ready" || !hydrationScopeCurrent)) {
+      setHandoffLoading(true);
+      return;
+    }
+
+    if (!workId) {
+      setStep("content");
+      setPages([]);
+      setTitle("");
+      setDescription("");
+      setTagsText("");
+      setDirective(initialDirective());
+      setBaseDoc({});
+      setLinkedSeriesId(routeSeriesId);
+      setLinkedChallengeId(routeChallengeId);
+      setLinkedTitleId(routeTitleId);
+      setDirty(false);
+      setError(null);
+      setSuccessMessage(null);
+    }
+    setPublisherConfirmed(false);
+    setHandoffLoading(true);
+    setHandoffError(null);
+    setHandoffContext(null);
+
+    void import("./studio-publish-handoff")
+      .then(({ loadStudioPublishHandoffAsUploadPages }) =>
+        loadStudioPublishHandoffAsUploadPages(handoffId),
+      )
+      .then((loaded) => {
+        if (
+          handoffGenerationRef.current !== generation ||
+          !mountedRef.current ||
+          currentScopeRef.current.workId !== workId
+        ) return;
+        if (!loaded) {
+          throw new Error(
+            "전달받은 원고를 찾지 못했습니다. 편집기에서 게시 화면으로 다시 보내 주세요.",
+          );
+        }
+        setPages(loaded.pages.map((page) => ({
+          id: uid(),
+          src: page.src,
+          width: page.width,
+          height: page.height,
+          name: page.name,
+        })));
+        setTitle(loaded.title);
+        setDirty(true);
+        setError(null);
+        setSuccessMessage(null);
+        setHandoffContext({
+          id: handoffId,
+          pageCount: loaded.pages.length,
+          sourceWorkId: loaded.sourceWorkId,
+        });
+        setHandoffError(null);
+      })
+      .catch((cause) => {
+        if (
+          handoffGenerationRef.current !== generation ||
+          !mountedRef.current ||
+          currentScopeRef.current.workId !== workId
+        ) return;
+        setHandoffError(
+          cause instanceof Error
+            ? cause.message
+            : "편집기에서 전달한 원고를 불러오지 못했습니다.",
+        );
+      })
+      .finally(() => {
+        if (
+          handoffGenerationRef.current === generation &&
+          mountedRef.current &&
+          currentScopeRef.current.workId === workId
+        ) {
+          setHandoffLoading(false);
+        }
+      });
+
+    return () => {
+      if (handoffGenerationRef.current === generation) {
+        handoffGenerationRef.current += 1;
+      }
+    };
+  }, [
+    handoffId,
+    hydrationScopeCurrent,
+    hydrationStatus,
+    routeChallengeId,
+    routeSeriesId,
+    routeTitleId,
+    workId,
+  ]);
+
+  useEffect(() => {
     if (
       !workId ||
       !authUserId ||
@@ -589,6 +720,7 @@ export function StudioPublishingCommandCenter({
     setDirty(true);
     setPublisherConfirmed(false);
     setError(null);
+    setRecoveryError(null);
     setSuccessMessage(null);
     if (workId && publishResult) {
       navigate(buildStudioPublishResultHref(workId), { replace: true });
@@ -598,6 +730,7 @@ export function StudioPublishingCommandCenter({
   function leavePublishResult(nextStep: CommandStep) {
     setStep(nextStep);
     setError(null);
+    setRecoveryError(null);
     setSuccessMessage(null);
     if (workId) {
       navigate(buildStudioPublishResultHref(workId), { replace: true });
@@ -719,7 +852,7 @@ export function StudioPublishingCommandCenter({
   }
 
   async function handleSave(intent: SaveIntent) {
-    if (publishAbortRef.current || saving) return;
+    if (publishAbortRef.current || saving || recoveryBusy) return;
     if (intent === "publish" && !publisherConfirmed) {
       setError("현재 로그인 계정과 공개 범위를 확인한 뒤 게시 확인란을 선택해 주세요.");
       setStep("review");
@@ -916,6 +1049,16 @@ export function StudioPublishingCommandCenter({
       if (ownerControlsPolicy && directiveSnapshot) setDirective(directiveSnapshot);
       setDirty(false);
       setPublisherConfirmed(false);
+      if (handoffId) {
+        try {
+          const { acquireStudioPublishHandoffRepository } = await import("./studio-publish-handoff");
+          await acquireStudioPublishHandoffRepository().remove(handoffId);
+          setHandoffContext(null);
+          setHandoffError(null);
+        } catch {
+          // 서버 저장은 이미 성공했다. 인계 원고는 24시간 만료 정리가 있으므로 게시 결과 이동을 막지 않는다.
+        }
+      }
       const resultKind = resolveStudioPublishResultKind(
         intent,
         effectiveStatus,
@@ -979,6 +1122,85 @@ export function StudioPublishingCommandCenter({
         )
       ) {
         setSaving(false);
+      }
+    }
+  }
+
+  async function handleMakePrivate() {
+    if (!workId || recoveryBusy || saving) return;
+    let recovery: typeof import("./studio-publish-recovery");
+    try {
+      recovery = await import("./studio-publish-recovery");
+    } catch {
+      setRecoveryError("비공개 전환 기능을 불러오지 못했습니다. 다시 시도해 주세요.");
+      return;
+    }
+    const request = recovery.studioPublishRecoveryRequest({
+      title,
+      scheduled: publishResult === "scheduled",
+    });
+    if (!(await confirmStudioDestructiveAction(request))) return;
+
+    recoveryAbortRef.current?.abort();
+    const controller = new AbortController();
+    recoveryAbortRef.current = controller;
+    setRecoveryBusy(true);
+    setRecoveryError(null);
+    try {
+      const result = await recovery.makeStudioPublishedWorkPrivate({
+        workId,
+        signal: controller.signal,
+      });
+      if (
+        controller.signal.aborted ||
+        !mountedRef.current ||
+        currentScopeRef.current.workId !== workId
+      ) return;
+      recordStudioDestructiveOutcome({
+        request,
+        outcome: "committed",
+        detail: publishResult === "scheduled"
+          ? "게시 예약을 취소하고 비공개 초안으로 전환했습니다."
+          : "공개 작품을 비공개 초안으로 전환했습니다.",
+      });
+      setDirective(result.directive);
+      setBaseDoc(result.doc);
+      if (Number.isSafeInteger(result.work.revision)) {
+        setWorkRevision(result.work.revision);
+      }
+      setDirty(false);
+      setPublisherConfirmed(false);
+      setSuccessMessage(
+        publishResult === "scheduled"
+          ? "게시 예약을 취소하고 비공개 초안으로 전환했습니다."
+          : "작품을 비공개 초안으로 전환했습니다.",
+      );
+      navigate(buildStudioPublishResultHref(workId, "private"), { replace: true });
+      setHydrationAttempt((attempt) => attempt + 1);
+    } catch (cause) {
+      if (
+        controller.signal.aborted ||
+        !mountedRef.current ||
+        currentScopeRef.current.workId !== workId
+      ) return;
+      const message = cause instanceof Error
+        ? cause.message
+        : "비공개 전환에 실패했습니다.";
+      recordStudioDestructiveOutcome({
+        request,
+        outcome: "failed",
+        detail: message,
+      });
+      setRecoveryError(message);
+    } finally {
+      if (recoveryAbortRef.current === controller) {
+        recoveryAbortRef.current = null;
+      }
+      if (
+        mountedRef.current &&
+        currentScopeRef.current.workId === workId
+      ) {
+        setRecoveryBusy(false);
       }
     }
   }
@@ -1052,6 +1274,62 @@ export function StudioPublishingCommandCenter({
 
       <StudioPublishContextBanner context={publishContext} />
 
+      {handoffLoading ? (
+        <div
+          className="mb-4 flex items-center gap-2 rounded-xl border border-accent/35 bg-accent/8 px-3 py-2 text-sm text-fg-2"
+          role="status"
+          aria-busy="true"
+        >
+          <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
+          편집기에서 전달한 원고를 확인하고 있어요…
+        </div>
+      ) : null}
+      {handoffError ? (
+        <div
+          className="mb-4 rounded-xl border border-bad/40 bg-bad/10 px-3 py-3"
+          role="alert"
+        >
+          <p className="text-sm font-semibold text-fg">게시 원고를 불러오지 못했어요</p>
+          <p className="mt-1 text-sm leading-relaxed text-fg-2">{handoffError}</p>
+          <Link
+            href="/studio"
+            className={buttonClass({
+              size: "sm",
+              variant: "outline",
+              className: "mt-3 min-h-11 gap-1.5",
+            })}
+          >
+            <PenLine size={14} aria-hidden /> 편집기로 돌아가기
+          </Link>
+        </div>
+      ) : null}
+      {handoffContext && !handoffLoading ? (
+        <div
+          data-studio-publish-handoff-loaded="true"
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-good/40 bg-good/8 px-3 py-3"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-good/15 text-good">
+            <Send size={16} aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <strong className="block text-sm text-fg">
+              편집기 원고 {handoffContext.pageCount}페이지를 받았습니다
+            </strong>
+            <span className="mt-0.5 block text-xs leading-relaxed text-fg-2">
+              제목과 페이지 순서를 유지했습니다. 서버 저장이 완료되면 로컬 인계본을 자동 정리하며,
+              저장하지 않아도 24시간 뒤 만료됩니다.
+            </span>
+          </span>
+          {handoffContext.sourceWorkId ? (
+            <span className="max-w-full truncate rounded-full border border-line bg-card/70 px-2.5 py-1 font-mono text-[0.65rem] text-fg-3">
+              {handoffContext.sourceWorkId}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+
       {!loggedIn && (
         <div className="mb-4 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2">
           이미지와 게시 설정을 미리 준비할 수 있지만, 서버 저장과 게시는 로그인 후 가능합니다.
@@ -1075,6 +1353,9 @@ export function StudioPublishingCommandCenter({
           environment={publishEnvironment}
           onContinueEditing={() => leavePublishResult("content")}
           onReviewSettings={() => leavePublishResult("distribution")}
+          onMakePrivate={() => void handleMakePrivate()}
+          recoveryBusy={recoveryBusy}
+          recoveryError={recoveryError}
         />
       ) : null}
       {hydrating && (
