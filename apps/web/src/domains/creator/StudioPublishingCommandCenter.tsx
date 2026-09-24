@@ -18,6 +18,7 @@ import {
   Save,
   Send,
   ShieldCheck,
+  Star,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -36,7 +37,7 @@ import {
   recordStudioDestructiveOutcome,
 } from "./studio-destructive-action-preview";
 import { studioDiscardLocalChangesRequest } from "./studio-destructive-command-catalog";
-import { downscaleDataUrl, downscaleImageFile } from "./studio-image-utils";
+import { downscaleImageFile } from "./studio-image-utils";
 import {
   getStudioSharedDocument,
   getStudioSharedDocumentMeta,
@@ -94,6 +95,13 @@ import {
   suggestStudioPublicationSocialMetadata,
   validateStudioPublicationPreflight,
 } from "./studio-publication-preflight";
+import {
+  createStudioPublicationCoverDataUrl,
+  normalizeStudioPublicationCover,
+  readStudioPublicationCover,
+  resolveStudioPublicationCoverPageIndex,
+  writeStudioPublicationCover,
+} from "./studio-publication-cover";
 import { StudioPublicationControls } from "./StudioPublicationControls";
 import {
   StudioPublishContextBanner,
@@ -164,6 +172,18 @@ const COMMAND_STEPS: readonly {
   { id: "distribution", label: "게시 설정", description: "공개·예약·독자 정책" },
   { id: "review", label: "최종 확인", description: "미리보기·사전검사" },
 ];
+
+const COVER_FOCAL_PRESETS = [
+  { label: "좌상단", x: 0, y: 0 },
+  { label: "상단", x: 0.5, y: 0 },
+  { label: "우상단", x: 1, y: 0 },
+  { label: "왼쪽", x: 0, y: 0.5 },
+  { label: "중앙", x: 0.5, y: 0.5 },
+  { label: "오른쪽", x: 1, y: 0.5 },
+  { label: "좌하단", x: 0, y: 1 },
+  { label: "하단", x: 0.5, y: 1 },
+  { label: "우하단", x: 1, y: 1 },
+] as const;
 
 function uid() {
   return `publish-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -242,6 +262,10 @@ export function StudioPublishingCommandCenter({
   const [step, setStep] = useState<CommandStep>("content");
   const [publisherConfirmed, setPublisherConfirmed] = useState(false);
   const [pages, setPages] = useState<UploadPage[]>([]);
+  const [coverPageId, setCoverPageId] = useState<string | null>(null);
+  const [coverFocalX, setCoverFocalX] = useState(0.5);
+  const [coverFocalY, setCoverFocalY] = useState(0.5);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tagsText, setTagsText] = useState("");
@@ -316,6 +340,26 @@ export function StudioPublishingCommandCenter({
       }),
     [description, directive, linkedChallengeId, linkedSeriesId, pages, tags, title],
   );
+  const coverPage = useMemo(
+    () => pages.find((page) => page.id === coverPageId) ?? pages[0] ?? null,
+    [coverPageId, pages],
+  );
+
+  useEffect(() => {
+    let active = true;
+    if (!coverPage) {
+      setCoverPreview(null);
+      return () => { active = false; };
+    }
+    setCoverPreview(coverPage.src);
+    void createStudioPublicationCoverDataUrl(coverPage.src, {
+      focalX: coverFocalX,
+      focalY: coverFocalY,
+    }).then((preview) => {
+      if (active) setCoverPreview(preview);
+    });
+    return () => { active = false; };
+  }, [coverFocalX, coverFocalY, coverPage]);
 
   useLayoutEffect(() => {
     mountedRef.current = true;
@@ -366,6 +410,9 @@ export function StudioPublishingCommandCenter({
     if (resetDraft) {
       setStep("content");
       setPages([]);
+      setCoverPageId(null);
+      setCoverFocalX(0.5);
+      setCoverFocalY(0.5);
       setTitle("");
       setDescription("");
       setTagsText("");
@@ -399,6 +446,9 @@ export function StudioPublishingCommandCenter({
     setStep("content");
     setPublisherConfirmed(false);
     setPages([]);
+    setCoverPageId(null);
+    setCoverFocalX(0.5);
+    setCoverFocalY(0.5);
     setTitle("");
     setDescription("");
     setTagsText("");
@@ -438,6 +488,7 @@ export function StudioPublishingCommandCenter({
               name?: unknown;
             }>)
           : [];
+        const loadedCover = readStudioPublicationCover(loadedDoc);
         const loadedPages = shared.document.pages.map((src, index) => {
           const meta = pageMeta[index];
           return {
@@ -465,7 +516,18 @@ export function StudioPublishingCommandCenter({
             ...suggested,
           });
         const { document: _document, ...meta } = shared;
+        const loadedCoverPageIndex = resolveStudioPublicationCoverPageIndex(
+          loadedCover,
+          loadedPages.length,
+        );
         setPages(loadedPages);
+        setCoverPageId(
+          loadedCoverPageIndex === null
+            ? null
+            : loadedPages[loadedCoverPageIndex]?.id ?? loadedPages[0]?.id ?? null,
+        );
+        setCoverFocalX(loadedCover?.focalX ?? 0.5);
+        setCoverFocalY(loadedCover?.focalY ?? 0.5);
         setTitle(shared.document.title);
         setDescription(shared.document.description);
         setTagsText(shared.document.tags.join(", "));
@@ -521,6 +583,9 @@ export function StudioPublishingCommandCenter({
     if (!workId) {
       setStep("content");
       setPages([]);
+      setCoverPageId(null);
+      setCoverFocalX(0.5);
+      setCoverFocalY(0.5);
       setTitle("");
       setDescription("");
       setTagsText("");
@@ -553,7 +618,7 @@ export function StudioPublishingCommandCenter({
             "전달받은 원고를 찾지 못했습니다. 편집기에서 게시 화면으로 다시 보내 주세요.",
           );
         }
-        setPages(loaded.pages.map((page) => ({
+        const handoffPages = loaded.pages.map((page) => ({
           id: uid(),
           src: page.src,
           width: page.width,
@@ -562,7 +627,11 @@ export function StudioPublishingCommandCenter({
           source: null,
           outputByteLength: studioDataUrlByteLength(page.src),
           outputFormat: "stored" as const,
-        })));
+        }));
+        setPages(handoffPages);
+        setCoverPageId(handoffPages[0]?.id ?? null);
+        setCoverFocalX(0.5);
+        setCoverFocalY(0.5);
         setTitle(loaded.title);
         setDirty(true);
         setError(null);
@@ -807,6 +876,11 @@ export function StudioPublishingCommandCenter({
       }
       if (!isFileScopeCurrent()) return;
       setPages((current) => [...current, ...next]);
+      if (!coverPageId && pages.length === 0 && next[0]) {
+        setCoverPageId(next[0].id);
+        setCoverFocalX(0.5);
+        setCoverFocalY(0.5);
+      }
       markChanged();
       if (!title.trim() && next[0]) {
         const base = next[0].name.replace(/\.[^.]+$/u, "").trim();
@@ -837,7 +911,28 @@ export function StudioPublishingCommandCenter({
 
   function removePage(id: string) {
     if (mutationLocked) return;
-    setPages((current) => current.filter((page) => page.id !== id));
+    const remainingPages = pages.filter((page) => page.id !== id);
+    setPages(remainingPages);
+    if (coverPageId === id) {
+      setCoverPageId(remainingPages[0]?.id ?? null);
+      setCoverFocalX(0.5);
+      setCoverFocalY(0.5);
+    }
+    markChanged();
+  }
+
+  function selectCoverPage(id: string) {
+    if (mutationLocked || coverPageId === id) return;
+    setCoverPageId(id);
+    setCoverFocalX(0.5);
+    setCoverFocalY(0.5);
+    markChanged();
+  }
+
+  function selectCoverFocalPoint(x: number, y: number) {
+    if (mutationLocked || (coverFocalX === x && coverFocalY === y)) return;
+    setCoverFocalX(x);
+    setCoverFocalY(y);
     markChanged();
   }
 
@@ -924,6 +1019,20 @@ export function StudioPublishingCommandCenter({
     }
 
     const pageSnapshot = pages.map((page) => ({ ...page }));
+    const coverPageIndex = Math.max(0, pageSnapshot.findIndex((page) => page.id === coverPageId));
+    const selectedCoverPage = pageSnapshot[coverPageIndex] ?? pageSnapshot[0];
+    const coverMetadata = normalizeStudioPublicationCover({
+      version: 1,
+      pageIndex: coverPageIndex,
+      focalX: coverFocalX,
+      focalY: coverFocalY,
+      aspectRatio: "3:4",
+    });
+    if (!selectedCoverPage || !coverMetadata) {
+      setError("표지 페이지와 초점 위치를 다시 선택해 주세요.");
+      setStep("content");
+      return;
+    }
     const titleSnapshot = title.trim();
     const descriptionSnapshot = description.trim();
     const tagsSnapshot = parseStudioPublicationTags(tagsText);
@@ -952,9 +1061,20 @@ export function StudioPublishingCommandCenter({
     const pageImages = pageSnapshot.map((page) => page.src);
     let integrityDocument: Record<string, unknown>;
     try {
-      const { writeStudioPublicationIntegrity } = await import("./studio-publication-integrity");
+      const { resolveStudioPublicationOrigin, writeStudioPublicationIntegrity } = await import(
+        "./studio-publication-integrity"
+      );
+      const currentSource = readCreatorPublicationSource(baseDoc);
+      const origin = resolveStudioPublicationOrigin({
+        currentSourceKind: currentSource?.kind,
+        studioHandoff: handoffContext !== null,
+        sourceWorkId: handoffContext?.sourceWorkId,
+      });
       integrityDocument = await writeStudioPublicationIntegrity({
         document: baseDoc,
+        sourceKind: origin.sourceKind,
+        documentId: origin.documentId,
+        disclosure: origin.disclosure,
         revisionId: publishScope.workId
           ? `upload-revision:${(baseRevision ?? 0) + 1}`
           : "upload-revision:1",
@@ -965,7 +1085,7 @@ export function StudioPublishingCommandCenter({
         ownerApproved: intent === "publish",
         ownerUserId: authUserId,
         approvedAt: intent === "publish" ? new Date().toISOString() : null,
-        toolIds: ["toonstudio-web", "upload-publisher"],
+        toolIds: origin.toolIds,
       });
     } catch (cause) {
       setError(cause instanceof Error
@@ -978,7 +1098,7 @@ export function StudioPublishingCommandCenter({
       currentScopeRef.current,
       mountedRef.current,
     )) return;
-    const baseDocument = {
+    const baseDocument = writeStudioPublicationCover({
       ...integrityDocument,
       format: "upload",
       pageMeta: pageSnapshot.map((page) => ({
@@ -986,7 +1106,7 @@ export function StudioPublishingCommandCenter({
         height: page.height,
         name: page.name,
       })),
-    };
+    }, coverMetadata);
     const documentSnapshot = directiveSnapshot
       ? writeCreatorPublicationDirective(baseDocument, directiveSnapshot)
       : baseDocument;
@@ -1003,7 +1123,10 @@ export function StudioPublishingCommandCenter({
         currentScope: () => currentScopeRef.current,
         mounted: () => mountedRef.current,
         signal: controller.signal,
-        downscale: () => downscaleDataUrl(pageImages[0] ?? "", 480),
+        downscale: () => createStudioPublicationCoverDataUrl(selectedCoverPage.src, {
+          focalX: coverMetadata.focalX,
+          focalY: coverMetadata.focalY,
+        }),
         loadClient: async () =>
           publishScope.workId
             ? ({
@@ -1264,7 +1387,7 @@ export function StudioPublishingCommandCenter({
     saving ||
     loadingFiles ||
     (step === "review" && (!preflight.canPublish || !publisherConfirmed));
-  const cover = pages[0]?.src ?? null;
+  const cover = coverPreview ?? coverPage?.src ?? null;
   const conversionSummary = summarizeStudioUploadConversion(
     pages.map((page) => ({
       source: page.source,
@@ -1510,7 +1633,7 @@ export function StudioPublishingCommandCenter({
             <div className="flex flex-wrap items-center gap-2">
               <div>
                 <h2 className="text-base font-bold text-fg">원고 이미지</h2>
-                <p className="mt-1 text-xs text-fg-3">PNG·JPG·WebP, 최대 {MAX_PAGES}장 · 첫 이미지가 표지가 됩니다.</p>
+                <p className="mt-1 text-xs text-fg-3">PNG·JPG·WebP, 최대 {MAX_PAGES}장 · 표지 페이지와 3:4 초점을 직접 선택할 수 있습니다.</p>
               </div>
               <label className={cn(buttonClass({ size: "sm", variant: "outline", className: "ml-auto min-h-11 gap-1.5" }), mutationLocked && "pointer-events-none opacity-60")}>
                 {loadingFiles ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
@@ -1554,7 +1677,21 @@ export function StudioPublishingCommandCenter({
                           : `${page.width} × ${page.height}px · 저장된 게시본`}
                       </span>
                     </span>
-                    <span className={STUDIO_UPLOAD_PAGE_CONTROLS_CLASS}>
+                    <span className={cn(STUDIO_UPLOAD_PAGE_CONTROLS_CLASS, "grid-cols-4")}>
+                      <button
+                        type="button"
+                        className={cn(
+                          STUDIO_UPLOAD_PAGE_CONTROL_CLASS,
+                          coverPage?.id === page.id && "border-accent/60 bg-accent/10 text-accent",
+                        )}
+                        disabled={mutationLocked}
+                        aria-pressed={coverPage?.id === page.id}
+                        onClick={() => selectCoverPage(page.id)}
+                        aria-label={`${index + 1}번째 이미지를 표지로 선택`}
+                        title="표지로 선택"
+                      >
+                        <Star size={14} className={cn(coverPage?.id === page.id && "fill-current")} aria-hidden />
+                      </button>
                       <button type="button" className={STUDIO_UPLOAD_PAGE_CONTROL_CLASS} disabled={mutationLocked || index === 0} onClick={() => movePage(page.id, -1)} aria-label={`${index + 1}번째 이미지를 위로 이동`}><ArrowUp size={14} /></button>
                       <button type="button" className={STUDIO_UPLOAD_PAGE_CONTROL_CLASS} disabled={mutationLocked || index === pages.length - 1} onClick={() => movePage(page.id, 1)} aria-label={`${index + 1}번째 이미지를 아래로 이동`}><ArrowDown size={14} /></button>
                       <button type="button" className={cn(STUDIO_UPLOAD_PAGE_CONTROL_CLASS, "text-bad")} disabled={mutationLocked} onClick={() => removePage(page.id)} aria-label={`${index + 1}번째 이미지 삭제`}><Trash2 size={14} /></button>
@@ -1563,6 +1700,60 @@ export function StudioPublishingCommandCenter({
                 ))}
               </ol>
             )}
+
+            {coverPage ? (
+              <section
+                className="mt-4 grid gap-4 rounded-2xl border border-line bg-canvas/55 p-3 sm:grid-cols-[10rem_minmax(0,1fr)]"
+                aria-labelledby="studio-publish-cover-heading"
+              >
+                <div className="relative mx-auto aspect-[3/4] w-full max-w-40 overflow-hidden rounded-xl border border-line bg-raised">
+                  <img
+                    src={coverPreview ?? coverPage.src}
+                    alt={`${title.trim() || "작품"} 표지 미리보기`}
+                    className="h-full w-full object-cover"
+                    style={{ objectPosition: `${coverFocalX * 100}% ${coverFocalY * 100}%` }}
+                  />
+                  <span className="absolute bottom-2 right-2 rounded-full bg-black/70 px-2 py-0.5 text-[0.65rem] font-bold text-white">3:4</span>
+                </div>
+                <div className="min-w-0">
+                  <p className="eyebrow text-accent">COVER THUMBNAIL</p>
+                  <h3 id="studio-publish-cover-heading" className="mt-1 text-sm font-bold text-fg">표지 크롭과 초점</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-fg-3">
+                    <strong className="text-fg-2">{coverPage.name}</strong>을 갤러리·공유 카드용 3:4 표지로 사용합니다. 원고 이미지는 자르지 않습니다.
+                  </p>
+                  <div role="group" aria-label="표지 초점 위치" className="mt-3 grid w-fit grid-cols-3 gap-1.5">
+                    {COVER_FOCAL_PRESETS.map((preset) => {
+                      const selected = coverFocalX === preset.x && coverFocalY === preset.y;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          disabled={mutationLocked}
+                          aria-pressed={selected}
+                          aria-label={`표지 초점 ${preset.label}`}
+                          title={preset.label}
+                          onClick={() => selectCoverFocalPoint(preset.x, preset.y)}
+                          className={cn(
+                            "grid size-9 place-items-center rounded-lg border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50",
+                            selected
+                              ? "border-accent/60 bg-accent/15 text-accent"
+                              : "border-line bg-card/65 text-fg-3 hover:border-accent/35 hover:text-fg",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "size-2 rounded-full border",
+                              selected ? "border-accent bg-accent" : "border-fg-3",
+                            )}
+                            aria-hidden
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+            ) : null}
           </section>
 
           <section className="rounded-2xl border border-line bg-panel/35 p-4 sm:p-5">
@@ -1672,6 +1863,7 @@ export function StudioPublishingCommandCenter({
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">댓글</dt><dd className="font-medium text-fg">{directive.comments === "open" ? "허용" : "새 댓글 차단"}</dd></div>
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">리믹스</dt><dd className="font-medium text-fg">{directive.allowRemix ? "허용" : "차단"}</dd></div>
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">독자 등급</dt><dd className="font-medium text-fg">{directive.contentRating === "all" ? "전체 이용" : directive.contentRating === "teen" ? "청소년 주의" : "성인 대상"}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">표지</dt><dd className="font-medium text-fg">{coverPage?.name ?? "미선택"} · 3:4 크롭</dd></div>
               </dl>
             </section>
             <section className="rounded-2xl border border-line bg-panel/35 p-4">
@@ -1680,7 +1872,7 @@ export function StudioPublishingCommandCenter({
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">페이지</dt><dd className="font-medium text-fg">{conversionSummary.pageCount}장 · 변환 {conversionSummary.transformedPageCount}장</dd></div>
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">원본 용량</dt><dd className="font-medium text-fg">{formatStudioUploadBytes(conversionSummary.sourceByteLength)}</dd></div>
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">게시본 용량</dt><dd className="font-medium text-fg">{formatStudioUploadBytes(conversionSummary.outputByteLength)}</dd></div>
-                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">출력 규칙</dt><dd className="font-medium leading-relaxed text-fg">최대 1600px · WebP 품질 88 · 비율 유지 · 크롭 없음</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">출력 규칙</dt><dd className="font-medium leading-relaxed text-fg">원고 최대 1600px · WebP 품질 88 · 원고 크롭 없음 · 표지만 3:4 크롭</dd></div>
               </dl>
               {conversionSummary.sourceByteLength === null ? (
                 <p className="mt-2 text-[0.7rem] leading-relaxed text-fg-3">기존 저장본은 원본 파일 용량을 다시 추정하지 않고 현재 게시본을 유지합니다.</p>

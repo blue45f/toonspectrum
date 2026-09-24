@@ -12,6 +12,7 @@ import { useId, useState } from "react";
 
 import {
   resolveStudioPublishAudienceReview,
+  studioPublishEnvironmentDescription,
   studioPublishEnvironmentLabel,
   type StudioPublishAudienceMode,
   type StudioPublishEnvironment,
@@ -53,6 +54,7 @@ export function StudioPublishAccountReviewCard({
   const [audienceMode, setAudienceMode] = useState<StudioPublishAudienceMode>("anonymous");
   const audience = resolveStudioPublishAudienceReview(visibility, audienceMode);
   const environmentLabel = studioPublishEnvironmentLabel(environment);
+  const environmentDescription = studioPublishEnvironmentDescription(environment);
   const authenticated = identity.id !== null;
 
   return (
@@ -106,6 +108,30 @@ export function StudioPublishAccountReviewCard({
         </div>
       </dl>
 
+      <div
+        role={environment === "production" || environment === "unknown" ? "alert" : "status"}
+        className={cn(
+          "mt-3 flex gap-2 rounded-xl border px-3 py-2.5 text-xs leading-relaxed text-fg-2",
+          environment === "production"
+            ? "border-bad/40 bg-bad/10"
+            : environment === "local"
+              ? "border-good/40 bg-good/10"
+              : "border-warning/40 bg-warning-soft",
+        )}
+      >
+        <ShieldAlert
+          size={15}
+          className={cn(
+            "mt-0.5 shrink-0",
+            environment === "production" ? "text-bad" : environment === "local" ? "text-good" : "text-warning",
+          )}
+          aria-hidden
+        />
+        <span>
+          <strong className="text-fg">{environmentLabel}.</strong> {environmentDescription}
+        </span>
+      </div>
+
       {identity.elevated ? (
         <div role="alert" className="mt-3 flex gap-2 rounded-xl border border-warning/40 bg-warning-soft px-3 py-2.5 text-xs leading-relaxed text-fg-2">
           <ShieldAlert size={15} className="mt-0.5 shrink-0 text-warning" aria-hidden />
@@ -157,7 +183,7 @@ export function StudioPublishAccountReviewCard({
           className="mt-0.5 size-4 shrink-0 accent-[var(--accent)]"
         />
         <span>
-          <strong className="text-fg">{identity.name}</strong>
+          <strong className="text-fg">{environmentLabel}</strong>에서 <strong className="text-fg">{identity.name}</strong>
           {identity.email ? ` (${identity.email})` : ""} 계정의 작품으로 저장·게시되는 것을 확인했습니다.
         </span>
       </label>
