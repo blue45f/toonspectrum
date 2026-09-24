@@ -44,6 +44,13 @@ describe("collaboration browser entry contract", () => {
     expect(source).not.toContain("documentSurface.screenshot({");
   });
 
+  it("acknowledges the current beta notice before collaboration input begins", () => {
+    expect(source).toContain("STUDIO_BETA_NOTICE_STORAGE_KEY");
+    expect(source).toContain("STUDIO_BETA_NOTICE_REVISION");
+    expect(source).toContain("localStorage.setItem(betaStorageKey, betaRevision)");
+    expect(source).toContain("page.locator('[data-studio-beta-notice=\"true\"]')");
+  });
+
   it("captures the failed page location and screenshot for future navigation regressions", () => {
     expect(source).toContain("failure-tab-${index}.png");
     expect(source).toContain("url: page.url()");

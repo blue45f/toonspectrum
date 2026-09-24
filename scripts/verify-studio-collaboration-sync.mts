@@ -27,6 +27,10 @@ import {
 import {
   STUDIO_LIVE_OWNER_ROOM_SESSION_KEY,
 } from "../apps/web/src/domains/creator/live/studio-live-jam-session";
+import {
+  STUDIO_BETA_NOTICE_REVISION,
+  STUDIO_BETA_NOTICE_STORAGE_KEY,
+} from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 import { STUDIO_DRAFT_CANVAS_PATHNAME } from "../apps/web/src/domains/creator/studio-workspace-route";
 
 import { installStudioCollaborationPreviewSession } from "./lib/studio-collaboration-preview-session";
@@ -68,9 +72,10 @@ async function waitForOrigin(origin: string): Promise<void> {
 }
 
 async function installStudioFirstRunState(page: Page): Promise<void> {
-  await page.addInitScript((quickstartKey) => {
+  await page.addInitScript(({ betaRevision, betaStorageKey, quickstartKey }) => {
     try {
       localStorage.setItem(quickstartKey, "1");
+      localStorage.setItem(betaStorageKey, betaRevision);
       localStorage.setItem(
         "toonspectrum-lang",
         JSON.stringify({ state: { lang: "ko" }, version: 0 }),
@@ -82,7 +87,11 @@ async function installStudioFirstRunState(page: Page): Promise<void> {
     } catch {
       // Storage may be blocked in a hardened browser. The public UI remains the source of truth.
     }
-  }, QUICKSTART_KEY);
+  }, {
+    betaRevision: STUDIO_BETA_NOTICE_REVISION,
+    betaStorageKey: STUDIO_BETA_NOTICE_STORAGE_KEY,
+    quickstartKey: QUICKSTART_KEY,
+  });
 }
 
 function observePage(
@@ -124,6 +133,11 @@ async function attachPage(
 }
 
 async function dismissOverlays(page: Page): Promise<void> {
+  const betaNotice = page.locator('[data-studio-beta-notice="true"]');
+  if (await betaNotice.isVisible().catch(() => false)) {
+    await betaNotice.getByRole("button").first().click({ timeout: 2_000 }).catch(() => undefined);
+    await betaNotice.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
+  }
   const explicitDismiss = page.locator('[data-studio-quickstart-dismiss="true"]');
   if (await explicitDismiss.isVisible().catch(() => false)) {
     await explicitDismiss.click({ timeout: 2_000 }).catch(() => undefined);
