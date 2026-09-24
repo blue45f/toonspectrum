@@ -275,6 +275,9 @@ export class StudioLiveGateway
     });
     if (this.accessRecheckTimer) clearInterval(this.accessRecheckTimer);
     this.accessRecheckTimer = setInterval(() => {
+      // Do not wake the distributed lock database on an otherwise idle API node. Lock expiry is
+      // time-fenced by the repository, and any node with active participants will run the sweep.
+      if (this.participantsBySocket.size === 0) return;
       void this.revalidateAllParticipants();
       void this.purgeExpiredLocks();
     }, STUDIO_LIVE_ACCESS_RECHECK_MS);
