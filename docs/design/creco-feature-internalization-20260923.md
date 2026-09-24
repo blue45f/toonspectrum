@@ -327,3 +327,22 @@ PR `#2018`의 사용성 구현은 merge commit `cb83ba49ab75ff8afb5a9d83b0b85261
 ### 증거의 범위
 
 브라우저 acceptance의 기기와 WAN은 Playwright viewport 및 offline emulation이다. 실제 휴대전화·태블릿, 통신사망, 운영 인증, 운영 object storage, 운영 배포 자체를 통과했다는 의미는 아니다. 운영 환경에서는 실제 수신자 계정과 기기, 실제 네트워크 단절, 관측 지표와 rollback 기준을 포함한 별도 release sign-off가 필요하다.
+
+## 11. 2026-09-24 main 후속 자동화
+
+`verify:studio-manuscript-delivery-acceptance`는 더 이상 별도 Vite 실행을 암묵적으로 요구하지 않는다.
+
+- 지정 loopback port가 비어 있으면 현재 worktree 소유의 Vite를 직접 시작하고 완료 후 process group까지 종료한다.
+- 같은 port를 현재 worktree의 서버가 사용 중이면 재사용한다.
+- 다른 저장소·worktree의 listener가 있으면 화면을 잘못 검증하지 않고 즉시 실패한다.
+- harness readiness가 확인된 뒤에만 immutable review delivery acceptance를 시작한다.
+
+경로 기반 GitHub Actions `Studio manuscript delivery acceptance`를 추가한다.
+
+- 원고 Cockpit, pinned review, 외부 공유, 공식 전달, ZIP/archive 권위 파일 변경 시 실행한다.
+- DB 비의존 Web/API focused 테스트 10개 파일을 실행한다. PostgreSQL 기반 불변 이력·동시 명령 검증은 필수 core database lane이 계속 소유한다.
+- 실제 `StudioReviewDelivery` 컴포넌트로 100페이지, 모호한 응답 재시도, stale tab 충돌, 수신 확인을 검증한다.
+- 60초 offline/online 반복과 1440/820/390/320px viewport 검사를 수행한다.
+- report와 viewport screenshot을 CI artifact로 보존한다.
+
+이 자동화도 실제 휴대전화·통신사망·운영 인증·운영 object storage 또는 운영 배포 승인을 대신하지 않는다.
