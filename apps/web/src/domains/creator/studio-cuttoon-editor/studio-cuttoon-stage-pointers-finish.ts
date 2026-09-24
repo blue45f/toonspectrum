@@ -293,6 +293,7 @@ export function bindStudioCuttoonStagePointersFinish(
     pendingBubbleShapeDraftRef,
     pendingRasterRetouchGestureRef,
     pendingStrokeCommitsRef,
+    persistImmediateStrokeEmergencyAutosave,
     perspectiveRayRef,
     pixelDragRef,
     pixelSelectionHandledNativeEndEventsRef,
@@ -595,6 +596,11 @@ export function bindStudioCuttoonStagePointersFinish(
                   : "실시간 획을 최종 상태로 확정하지 못했습니다.",
               );
             }
+            // Immediate strokes never enter pendingStrokeCommitsRef, so the deferred-path
+            // pointerup writer cannot see them. Start the same durable OPFS/SQLite write at the
+            // microtask checkpoint after commit() has synchronously advanced history refs and
+            // finalized any streamed CRDT strokes, before a navigation task can tear down Studio.
+            globalThis.queueMicrotask(persistImmediateStrokeEmergencyAutosave);
           }
           if (committed && !masterEditMode && finished.mode !== "eraser") {
             if (liveDraftDirectRef.current) {

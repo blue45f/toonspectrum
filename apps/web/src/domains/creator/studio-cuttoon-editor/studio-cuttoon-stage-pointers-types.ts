@@ -213,6 +213,7 @@ export type StudioCuttoonStagePointersHost = {
   pendingPixelSelectionRasterGestureRef: any;
   pendingRasterRetouchGestureRef: any;
   pendingStrokeCommitsRef: any;
+  persistImmediateStrokeEmergencyAutosave: () => void;
   perspectiveRayRef: any;
   pickCanvasColorAt: any;
   pixelBrushRadius: any;

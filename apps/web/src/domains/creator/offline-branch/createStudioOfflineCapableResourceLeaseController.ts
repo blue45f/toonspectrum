@@ -16,6 +16,8 @@ export type CreateStudioOfflineCapableResourceLeaseControllerOptions =
       readonly offlineBranch?: StudioOfflineBranchRuntime | null;
     } | null>;
     readonly reportNotice: (message: string | null) => void;
+    /** A shared work must fail closed while neither its room nor offline branch owns authority. */
+    readonly requiresSharedAuthority: boolean;
   };
 
 function requiresExistingAuthority(
@@ -29,9 +31,14 @@ function requiresOfflineAuthorityFallback(
   room: StudioLiveRoom | null,
   elementIds: readonly string[] | null | undefined,
   intent: StudioCanvasMutationIntent,
+  requiresSharedAuthority: boolean,
 ): boolean {
   if (!requiresExistingAuthority(elementIds, intent)) return false;
-  if (!room) return true;
+  // A local document has a single in-browser author and needs no collaboration/offline lease.
+  // Shared works still fail closed while their room is absent unless an offline branch accepts
+  // the proposal below. Treating every null room as shared authority previously rejected erasers,
+  // transforms, filters, and every other destructive edit in ordinary local Studio documents.
+  if (!room) return requiresSharedAuthority;
   if (room.mode !== "server") return false;
   return !room.ready
     || room.canvasLockPolicy === "append-only"
@@ -43,15 +50,22 @@ function canUseOfflineProposal(
   runtime: StudioOfflineBranchRuntime | null,
   elementIds: readonly string[] | null | undefined,
   intent: StudioCanvasMutationIntent,
+  requiresSharedAuthority: boolean,
 ): runtime is StudioOfflineBranchRuntime {
   return Boolean(
     runtime
-    && requiresOfflineAuthorityFallback(room, elementIds, intent),
+    && requiresOfflineAuthorityFallback(
+      room,
+      elementIds,
+      intent,
+      requiresSharedAuthority,
+    ),
   );
 }
 export function createStudioOfflineCapableResourceLeaseController({
   runtimeRef,
   reportNotice,
+  requiresSharedAuthority,
   ...baseOptions
 }: CreateStudioOfflineCapableResourceLeaseControllerOptions): StudioLiveResourceLeaseController {
   const base = createStudioLiveResourceLeaseController(baseOptions);
@@ -63,7 +77,13 @@ export function createStudioOfflineCapableResourceLeaseController({
     intent: StudioCanvasMutationIntent,
   ): boolean => {
     const runtime = runtimeRef.current?.offlineBranch ?? null;
-    if (!canUseOfflineProposal(roomRef.current, runtime, elementIds, intent)) return false;
+    if (!canUseOfflineProposal(
+      roomRef.current,
+      runtime,
+      elementIds,
+      intent,
+      requiresSharedAuthority,
+    )) return false;
     if (proposalRuntime && proposalRuntime !== runtime) {
       proposalRuntime.endProposal();
       proposalRuntime = null;
@@ -89,7 +109,12 @@ export function createStudioOfflineCapableResourceLeaseController({
     intent: StudioCanvasMutationIntent = "drag",
   ): boolean => {
     if (beginProposal(elementIds, intent)) return true;
-    if (requiresOfflineAuthorityFallback(roomRef.current, elementIds, intent)) {
+    if (requiresOfflineAuthorityFallback(
+      roomRef.current,
+      elementIds,
+      intent,
+      requiresSharedAuthority,
+    )) {
       reportError(
         "서버 편집 잠금 또는 오프라인 제안 권위를 준비한 뒤 기존 요소를 수정해 주세요.",
       );
@@ -102,7 +127,12 @@ export function createStudioOfflineCapableResourceLeaseController({
     intent: StudioCanvasMutationIntent = "transform",
   ): Promise<boolean> => {
     if (beginProposal(elementIds, intent)) return true;
-    if (requiresOfflineAuthorityFallback(roomRef.current, elementIds, intent)) {
+    if (requiresOfflineAuthorityFallback(
+      roomRef.current,
+      elementIds,
+      intent,
+      requiresSharedAuthority,
+    )) {
       reportError(
         "서버 편집 잠금 또는 오프라인 제안 권위를 준비한 뒤 기존 요소를 수정해 주세요.",
       );

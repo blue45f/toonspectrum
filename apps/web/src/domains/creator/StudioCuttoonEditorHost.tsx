@@ -2046,6 +2046,7 @@ export function StudioCuttoonEditor({
     pendingMutationRef: studioLivePendingMutationRef,
     reportError: setError,
     reportNotice: setStatusNotice,
+    requiresSharedAuthority: workId !== null,
     roomRef: studioLiveRoomRef,
     runtimeRef: studioCrdtSceneRuntimeRef,
   });
@@ -23886,6 +23887,8 @@ const puppetWarpArmed =
     pendingPixelSelectionRasterGestureRef,
     pendingRasterRetouchGestureRef,
     pendingStrokeCommitsRef,
+    persistImmediateStrokeEmergencyAutosave: () =>
+      persistPendingStrokeEmergencyAutosaveRef.current("pointerup"),
     perspectiveRayRef,
     pickCanvasColorAt,
     pixelBrushRadius,
