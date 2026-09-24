@@ -85,6 +85,10 @@ import { classifyStudioDryMediaCatalogIdV1 } from "../apps/web/src/domains/creat
 import { studioWetInkBrushDepositsPigment } from "../apps/web/src/domains/creator/brush/studio-wet-ink-brush-runtime";
 import { STUDIO_APP_SETTINGS_STORAGE_KEY } from "../apps/web/src/domains/creator/studio-app-settings";
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
+import {
+  STUDIO_BETA_NOTICE_REVISION,
+  STUDIO_BETA_NOTICE_STORAGE_KEY,
+} from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 import { BRUSH_PRESETS } from "../apps/web/src/domains/creator/studio-brush";
 import {
   resolveStudioCc0MypaintStampTuning,
@@ -709,6 +713,8 @@ async function installCleanStudioState(page: Page): Promise<void> {
   await page.addInitScript(
     ({
       autosavePrefix,
+      betaNoticeRevision,
+      betaNoticeStorageKey,
       cleanSessionKey,
       mobileHintKey,
       quickstartKey,
@@ -718,6 +724,7 @@ async function installCleanStudioState(page: Page): Promise<void> {
       try {
         window.localStorage.setItem(quickstartKey, "1");
         window.localStorage.setItem(mobileHintKey, "1");
+        window.localStorage.setItem(betaNoticeStorageKey, betaNoticeRevision);
         // Quality screenshots must contain ink only. Persist this verifier-only preference before
         // Studio reads settings so the live pointer-down frame cannot include a Konva cursor whose
         // size/softness varies by brush and then disappears from released/settled frames.
@@ -767,6 +774,8 @@ async function installCleanStudioState(page: Page): Promise<void> {
     },
     {
       autosavePrefix: AUTOSAVE_PREFIX,
+      betaNoticeRevision: STUDIO_BETA_NOTICE_REVISION,
+      betaNoticeStorageKey: STUDIO_BETA_NOTICE_STORAGE_KEY,
       cleanSessionKey: CLEAN_SESSION_KEY,
       mobileHintKey: MOBILE_HINT_KEY,
       quickstartKey: QUICKSTART_KEY,
@@ -858,28 +867,60 @@ async function dismissTransientChrome(page: Page, clearAutosave = true): Promise
     await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
   await dismissQuickStartOverlay(page, 250);
-  if (
-    clearAutosave
-    && await page.locator("[data-studio-recovery-notice]")
-      .isVisible({ timeout: 250 })
-      .catch(() => false)
-  ) {
-    const recovery = page.locator("[data-studio-recovery-notice]");
-    const more = recovery.getByRole("button", { name: "다른 방법", exact: true });
-    if (await more.getAttribute("aria-expanded") !== "true") await more.click();
-    await recovery.getByRole("button", { name: "이전 그림 삭제…", exact: true }).click();
-    const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
-    await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click();
-    await confirmation.waitFor({ state: "hidden" });
-    await recovery.waitFor({ state: "hidden" });
+  if (!clearAutosave) return;
+
+  const recovery = page.locator("[data-studio-recovery-notice]").first();
+  if (!(await recovery.isVisible({ timeout: 250 }).catch(() => false))) return;
+
+  // The automatic-resume variant deliberately has no action buttons. Older survey cleanup read
+  // `aria-expanded` from a non-existent "다른 방법" button and let Playwright's default timeout
+  // abort the remaining catalogue after the first product failure. Give auto-resume a bounded
+  // opportunity to settle, then interact only with controls that actually exist.
+  if (await recovery.getAttribute("data-studio-auto-resume") === "true") {
+    await page.waitForFunction(() => {
+      const notice = document.querySelector('[data-studio-recovery-notice]');
+      return !notice || notice.getAttribute("data-studio-auto-resume") !== "true";
+    }, undefined, { timeout: 8_000 }).catch(() => undefined);
+  }
+  if (!(await recovery.isVisible().catch(() => false))) return;
+
+  const more = recovery.getByRole("button", { name: "다른 방법", exact: true });
+  if (await more.count() === 0 || !(await more.isVisible().catch(() => false))) return;
+  if (await more.getAttribute("aria-expanded") !== "true") await more.click();
+  const remove = recovery.getByRole("button", { name: "이전 그림 삭제…", exact: true });
+  if (await remove.count() === 0 || !(await remove.isVisible().catch(() => false))) return;
+  await remove.click();
+  const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
+  await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click();
+  await confirmation.waitFor({ state: "hidden" });
+  await recovery.waitFor({ state: "hidden" });
+}
+
+async function clearStudioVerifierOriginStorage(page: Page, studioUrl: string): Promise<void> {
+  const origin = new URL(studioUrl).origin;
+  // Navigating away first releases the editor's OPFS/SQLite workers and document lease. Clearing
+  // localStorage alone is insufficient: the durable journal would resurrect the failed case on
+  // the next page and turn survey recovery into a second unrelated failure.
+  await page.goto("about:blank", { waitUntil: "load", timeout: 10_000 }).catch(() => undefined);
+  const session = await page.context().newCDPSession(page);
+  try {
+    await session.send("Storage.clearDataForOrigin", {
+      origin,
+      storageTypes: "all",
+    });
+  } finally {
+    await session.detach().catch(() => undefined);
   }
 }
 
 async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
-  page.setDefaultTimeout(7_000);
+  // A cold Vite/browser session may compile the Studio shell, brush catalogue and inspector chunks
+  // serially. Keep interactions bounded, but do not classify that one-time compilation as a
+  // drawing failure or force screenshots to inherit the old 7 s action timeout.
+  page.setDefaultTimeout(20_000);
   await installCleanStudioState(page);
-  await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 20_000 });
-  await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 12_000 });
+  await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
+  await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 45_000 });
   // Hide transient evidence chrome before any gesture. Moving the pointer or waiting after
   // pointerup would skip the exact live-to-retained boundary this verifier must measure.
   await page.addStyleTag({
@@ -1702,6 +1743,9 @@ async function verifyRetainedStrokeHatching(page: Page, point: { x: number; y: n
 async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promise<DesktopBrushResult> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await context.newPage();
+  if (DEBUG_BRUSH_VERIFIER) {
+    page.on("console", (entry) => log(`console(${entry.type()}):${entry.text()}`));
+  }
   const errors = collectBrowserErrors(page, "desktop-brushes", studioUrl);
   const screenshot = join(SCRATCH, `studio-brush-desktop-${BRUSH_MATRIX_CATALOG_COUNT}.png`);
   const catalogScreenshot = join(SCRATCH, "studio-brush-desktop-catalog.png");
@@ -1724,7 +1768,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       await subToolsTrigger.click();
     }
     const summary = page.locator('[data-studio-inspector-brush-summary="true"]');
-    await summary.waitFor({ state: "attached", timeout: 20_000 });
+    await summary.waitFor({ state: "attached", timeout: 45_000 });
     const inspectorSummaryCount = await summary.count();
     const inspectorQuickTrayCount = await page
       .locator('[data-testid="studio-inspector-context-drawing"]')
@@ -2271,6 +2315,19 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // paints visible pixels through the same renderer. Verify the durable identity + exact
       // normalized dynamics before history removes the isolated stroke. Core identities receive
       // the same persistence audit in the long-route matrix below.
+      if (DEBUG_BRUSH_VERIFIER) {
+        const state = await page.evaluate(() => {
+          const root = document.querySelector('[data-studio-history-entry-count]');
+          return {
+            historyEntries: root?.getAttribute("data-studio-history-entry-count"),
+            undoDepth: root?.getAttribute("data-studio-history-undo-depth"),
+            errorText: document.querySelector('[role="alert"]')?.textContent?.trim() ?? "",
+            activeMode: document.querySelector('[data-studio-draw-options="true"]')
+              ?.getAttribute("data-studio-active-draw-mode"),
+          };
+        });
+        log(`[STROKE STATE ${preset.id}] ${JSON.stringify(state)}`);
+      }
       const persistedProStroke = preset.source === "pro" && operation === "paint"
         ? await waitForPersistedSingleCatalogStroke(page, expectedSelection)
         : null;
@@ -2326,12 +2383,26 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         const next = await page.screenshot({ animations: "disabled", clip: usedClip });
         const settled = next.equals(undone);
         undone = next;
-        if (settled) break;
+        // A retained-stroke history jump can look stable for the first two animation frames while
+        // the canonical document surface is still inside its 200 ms deferred commit window. Do
+        // not compare Canvas2D preview coverage with a pre-canonical frame; require at least 300 ms
+        // and then one identical frame after that boundary.
+        if (settled && settleAttempt >= 4) break;
       }
       // Konva may re-rasterize the untouched paper by a few channel values after a history jump.
       // Ignore imperceptible antialias noise while still rejecting any residual ink above Δ20.
       const undoDiff = await compareScreenshotPixels(page, before, undone, 20);
-      const undoRestoredPixels = transparentPaint || undoDiff.changedPixels <= 3;
+      // Eraser Undo may cross the Canvas2D live surface → CanvasKit/WebGL document surface
+      // boundary. Both consume the same causal dab plan, but round-cap edge coverage can differ by
+      // a handful of antialias pixels after the destructive surface is rebuilt. Keep the ordinary
+      // exact bound for paint; for erasers accept only a tiny, low-delta endpoint fringe. A real
+      // un-restored erase changes hundreds of pixels at Δ100+ in this same evidence window.
+      const crossSurfaceAntialiasOnly = operation === "erase"
+        && undoDiff.changedPixels <= 16
+        && undoDiff.maxChannelDelta <= 32;
+      const undoRestoredPixels = transparentPaint
+        || undoDiff.changedPixels <= 3
+        || crossSurfaceAntialiasOnly;
       if (!undoRestoredPixels) {
         writeFileSync(join(SCRATCH, `studio-brush-diagnostic-${preset.id}-before.png`), before);
         writeFileSync(join(SCRATCH, `studio-brush-diagnostic-${preset.id}-stroke.png`), after);
@@ -2378,8 +2449,11 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       await page.waitForTimeout(40);
       const cleaned = await page.screenshot({ animations: "disabled", clip: usedClip });
       const cleanupDiff = await compareScreenshotPixels(page, before, cleaned, 20);
+      const cleanupCrossSurfaceAntialiasOnly = operation === "erase"
+        && cleanupDiff.changedPixels <= 16
+        && cleanupDiff.maxChannelDelta <= 32;
       invariant(
-        cleanupDiff.changedPixels <= 3,
+        cleanupDiff.changedPixels <= 3 || cleanupCrossSurfaceAntialiasOnly,
         `${preset.id}: post-redo cleanup left perceptible stroke pixels behind`,
       );
       if (operation === "erase") {
@@ -2424,6 +2498,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         const message = error instanceof Error ? error.message : String(error);
         surveyFailures.push(message);
         log(`SURVEY FAILURE ${index + 1}/${DESKTOP_STABILITY_CASES.length} ${message}`);
+        await clearStudioVerifierOriginStorage(page, studioUrl);
         await installCleanStudioState(page);
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
@@ -3604,11 +3679,33 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
 
         const undo = await enabledHistoryButton(page, "실행취소");
         invariant(await undo.isEnabled(), `${preset.id}: isolated long-stroke Undo is disabled`);
+        const undoStartedAt = performance.now();
         await page.keyboard.press("Meta+z");
-        await page.waitForTimeout(80);
-        const undone = await page.screenshot({ animations: "disabled", clip });
+        // Long strokes can still be inside the asynchronous document/history publication path at
+        // 80 ms. A screenshot taken before the durable history receipt merely re-captures the
+        // eraser itself and mislabels it as residual ink. Wait for the exact semantic state first,
+        // then require the visual surface to settle to the same state.
+        await waitForPersistedDrawElements(
+          page,
+          (draws) => operation === "erase"
+            ? draws.length === 1 && draws[0]?.mode === "pen"
+            : draws.length === 0,
+          `${preset.id}: isolated long-stroke Undo did not reach durable history`,
+        );
+        const undone = await captureStableEvidence(page, clip);
         const undoDiff = await compareScreenshotPixels(page, before, undone, 20);
         const undoRestoredPixels = undoDiff.changedPixels <= 3;
+        if (REQUESTED_BRUSH_VERIFY_IDS.length > 0) {
+          log(
+            `${preset.id}: long Undo durable+visual settle `
+              + `${Math.round(performance.now() - undoStartedAt)}ms; `
+              + `diff=${JSON.stringify(undoDiff)}`,
+          );
+          if (operation === "erase" && undoDiff.changedPixels > 3) {
+            writeFileSync(join(SCRATCH, `studio-brush-long-${preset.id}-undo-baseline.png`), before);
+            writeFileSync(join(SCRATCH, `studio-brush-long-${preset.id}-undo-restored.png`), undone);
+          }
+        }
         invariant(
           undoRestoredPixels,
           `${preset.id}: isolated long-stroke Undo left ${undoDiff.changedPixels} visible pixels`,
@@ -3620,8 +3717,12 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
         if (operation === "erase") {
           invariant(emptyBefore, `${preset.id}: long eraser cleanup lost its empty baseline`);
           await page.keyboard.press("Meta+z");
-          await page.waitForTimeout(80);
-          const fullyCleaned = await page.screenshot({ animations: "disabled", clip });
+          await waitForPersistedDrawElements(
+            page,
+            (draws) => draws.length === 0,
+            `${preset.id}: long paint+erase cleanup did not reach durable history`,
+          );
+          const fullyCleaned = await captureStableEvidence(page, clip);
           const fullCleanupDiff = await compareScreenshotPixels(
             page,
             emptyBefore,

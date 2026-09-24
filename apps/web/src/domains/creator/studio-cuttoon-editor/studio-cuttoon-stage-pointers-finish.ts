@@ -223,6 +223,7 @@ import {
   flushStudioThinLineInkInput,
   shouldFilterStudioThinLineInkInput,
 } from "../studio-thin-line-ink-input-v1";
+import { mergeStudioPendingStrokeElements } from "../studio-pending-stroke-durability";
 import { studioWorkAssetDestructiveEditReason } from "../studio-work-asset-edit-guard";
 import type { StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaborationProvider";
 
@@ -253,6 +254,7 @@ export function bindStudioCuttoonStagePointersFinish(
     causalPostCorrectionStateRef,
     collaborationAccessRef,
     commit,
+    expandDeferredStrokeCommitHistory,
     companionRuntimeRef,
     discardDrawingPointerSession,
     draftPreviewStoreRef,
@@ -292,6 +294,7 @@ export function bindStudioCuttoonStagePointersFinish(
     pendingBubbleShapeDraftRef,
     pendingRasterRetouchGestureRef,
     pendingStrokeCommitsRef,
+    persistImmediateStrokeEmergencyAutosave,
     perspectiveRayRef,
     pixelDragRef,
     pixelSelectionHandledNativeEndEventsRef,
@@ -344,6 +347,81 @@ export function bindStudioCuttoonStagePointersFinish(
     return false;
   }
   const sealStudioDrawReleaseInput = (...args) => api.sealStudioDrawReleaseInput(...args);
+  function finalizeImmediateStrokeCommitSideEffects(input: {
+    committed: boolean;
+    finished: DrawEl;
+    merged: any;
+    deferInkCleanup: boolean;
+    rasterPlan: any;
+    rasterWorkId: any;
+    rasterDocument: any;
+    rasterRuntime: any;
+    rasterActorId: any;
+  }): { pageId: string; strokeIds: string[] } | null {
+    const {
+      committed,
+      finished,
+      merged,
+      deferInkCleanup,
+      rasterPlan,
+      rasterWorkId,
+      rasterDocument,
+      rasterRuntime,
+      rasterActorId,
+    } = input;
+    const handoff = committed && (merged || deferInkCleanup)
+      ? {
+          pageId: activePage.id,
+          strokeIds: [
+            ...(merged?.strokes.map((stroke) => stroke.id) ?? []),
+            finished.id,
+          ],
+        }
+      : null;
+    if (
+      committed && rasterPlan && rasterWorkId && rasterDocument &&
+      rasterRuntime && rasterActorId
+    ) {
+      queueStudioRasterDrawPromotion({
+        plan: rasterPlan,
+        pageId: activePage.id,
+        layerId: (finished as DrawEl & { groupId?: string }).groupId ?? "page-root",
+        workId: rasterWorkId,
+        actorId: rasterActorId,
+        document: rasterDocument,
+        runtime: rasterRuntime,
+        accessGeneration: collaborationAccessRef.current.accessGeneration,
+      });
+    }
+    if (
+      committed && merged &&
+      STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
+      !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
+      studioCrdtOperationSyncReady
+    ) {
+      for (const strokeEl of merged.strokes) {
+        if (containingPanel(strokeEl, elements)) continue;
+        const plan = rasterRuntime.planRasterDrawPromotion({
+          element: strokeEl,
+          pageId: activePage.id,
+          documentWidth: CANVAS_W,
+          documentHeight: canvasH,
+        });
+        if (!plan) continue;
+        queueStudioRasterDrawPromotion({
+          plan,
+          pageId: activePage.id,
+          layerId: (strokeEl as DrawEl & { groupId?: string }).groupId ?? "page-root",
+          workId: rasterWorkId,
+          actorId: rasterActorId,
+          document: rasterDocument,
+          runtime: rasterRuntime,
+          accessGeneration: collaborationAccessRef.current.accessGeneration,
+        });
+      }
+    }
+    return handoff;
+  }
   function finishDrawingPointer(
     stage: Konva.Stage | null,
     pointerEvent: PointerEvent,
@@ -562,8 +640,54 @@ export function bindStudioCuttoonStagePointersFinish(
             flushPendingStrokeCommitsRef.current();
           }
           const merged = takePendingStrokeCommits();
-          const baseElements = merged ? [...elements, ...merged.strokes] : elements;
-          const committed = commit([...baseElements, finished]);
+          const completedStrokes = [...(merged?.strokes ?? []), finished];
+          const currentHistory = h.pagesHistoryRef.current;
+          const currentHistoryIndex = Math.max(
+            0,
+            Math.min(
+              h.pagesHiRef.current,
+              Math.max(0, currentHistory.length - 1),
+            ),
+          );
+          const currentPages = currentHistory[currentHistoryIndex] ?? [activePage];
+          const latestPage = currentPages.find((page: PageState) => page.id === activePage.id);
+          const baseElements = latestPage?.elements ?? elements;
+          const committedElements = mergeStudioPendingStrokeElements(
+            baseElements,
+            completedStrokes,
+          );
+          const committed = commit(committedElements, undefined, activePage.id);
+          if (committed) {
+            const document = studioCrdtDocumentRef.current;
+            try {
+              for (const stroke of completedStrokes) {
+                if (document?.getStroke(stroke.id, true)?.status === "drawing") {
+                  document.finalizeStroke(stroke.id);
+                }
+              }
+            } catch (cause) {
+              setError(
+                cause instanceof Error
+                  ? `실시간 획 확정: ${cause.message}`
+                  : "실시간 획을 최종 상태로 확정하지 못했습니다.",
+              );
+            }
+            if (!masterEditMode) {
+              // A short/immediate stroke may absorb older deferred strokes so publication remains
+              // atomic. Re-expand that combined snapshot here as well: batching is a render/CRDT
+              // optimization, never an Undo-granularity contract.
+              expandDeferredStrokeCommitHistory({
+                pageId: activePage.id,
+                strokes: completedStrokes,
+                retryCount: merged?.retryCount ?? 0,
+              });
+            }
+            // Immediate strokes never enter pendingStrokeCommitsRef, so the deferred-path
+            // pointerup writer cannot see them. Start the same durable OPFS/SQLite write at the
+            // microtask checkpoint after commit() has synchronously advanced history refs and
+            // finalized any streamed CRDT strokes, before a navigation task can tear down Studio.
+            globalThis.queueMicrotask(persistImmediateStrokeEmergencyAutosave);
+          }
           if (committed && !masterEditMode && finished.mode !== "eraser") {
             if (liveDraftDirectRef.current) {
               deferInkCleanup = overlayRenderer.isActive
@@ -625,57 +749,10 @@ export function bindStudioCuttoonStagePointersFinish(
               deferInkCleanup = true;
             }
           }
-          if (committed && (merged || deferInkCleanup)) {
-            immediateSurfaceHandoff = {
-              pageId: activePage.id,
-              strokeIds: [
-                ...(merged?.strokes.map((stroke) => stroke.id) ?? []),
-                finished.id,
-              ],
-            };
-          }
-          if (
-            committed && rasterPlan && rasterWorkId && rasterDocument &&
-            rasterRuntime && rasterActorId
-          ) {
-            queueStudioRasterDrawPromotion({
-              plan: rasterPlan,
-              pageId: activePage.id,
-              layerId: (finished as DrawEl & { groupId?: string }).groupId ?? "page-root",
-              workId: rasterWorkId,
-              actorId: rasterActorId,
-              document: rasterDocument,
-              runtime: rasterRuntime,
-              accessGeneration: collaborationAccessRef.current.accessGeneration,
-            });
-          }
-          if (
-            committed && merged &&
-            STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
-            !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
-            studioCrdtOperationSyncReady
-          ) {
-            for (const strokeEl of merged.strokes) {
-              if (containingPanel(strokeEl, elements)) continue;
-              const plan = rasterRuntime.planRasterDrawPromotion({
-                element: strokeEl,
-                pageId: activePage.id,
-                documentWidth: CANVAS_W,
-                documentHeight: canvasH,
-              });
-              if (!plan) continue;
-              queueStudioRasterDrawPromotion({
-                plan,
-                pageId: activePage.id,
-                layerId: (strokeEl as DrawEl & { groupId?: string }).groupId ?? "page-root",
-                workId: rasterWorkId,
-                actorId: rasterActorId,
-                document: rasterDocument,
-                runtime: rasterRuntime,
-                accessGeneration: collaborationAccessRef.current.accessGeneration,
-              });
-            }
-          }
+          immediateSurfaceHandoff = finalizeImmediateStrokeCommitSideEffects({
+            committed, finished, merged, deferInkCleanup, rasterPlan,
+            rasterWorkId, rasterDocument, rasterRuntime, rasterActorId,
+          });
         }
       } else if (drawingRef.current && drawingCrdtStrokeActiveRef.current) {
         // Tiny geometric gestures below the intentional completion threshold are discarded locally.

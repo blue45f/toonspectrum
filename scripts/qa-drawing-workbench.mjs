@@ -3,6 +3,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { chromium } from "playwright";
+import {
+  STUDIO_BETA_NOTICE_REVISION,
+  STUDIO_BETA_NOTICE_STORAGE_KEY,
+} from "../apps/web/src/domains/creator/studio-beta-notice-storage.ts";
 import { readDurableStudioAutosaveDocument, readDurableStudioAutosaveError } from "./lib/studio-verify-durable-autosave.mts";
 
 const origin = process.env.DRAWING_QA_ORIGIN ?? "http://127.0.0.1:5274";
@@ -13,9 +17,16 @@ let expectedTransformX = null;
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
-await context.addInitScript(() => {
-  localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-});
+await context.addInitScript(
+  ({ betaNoticeRevision, betaNoticeStorageKey }) => {
+    localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
+    localStorage.setItem(betaNoticeStorageKey, betaNoticeRevision);
+  },
+  {
+    betaNoticeRevision: STUDIO_BETA_NOTICE_REVISION,
+    betaNoticeStorageKey: STUDIO_BETA_NOTICE_STORAGE_KEY,
+  },
+);
 const page = await context.newPage();
 page.on("pageerror", (error) => errors.push(error.message));
 async function record(name, run) {

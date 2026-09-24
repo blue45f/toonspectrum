@@ -3,12 +3,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioCrdtDocument } from "./live/studio-crdt-document";
 import { publishStudioCrdtDrawGraphDiff } from "./live/studio-crdt-scene-publisher";
 import {
+  appendStudioRetainedStrokeRealtimeHistoryRange,
   discardStudioRetainedStrokeRedo,
   prepareStudioPendingStrokeCommitPage,
   publishStudioRetainedStrokeHistory,
   restoreStudioRetainedStrokeCommitBatch,
   resumeStudioRetainedStrokeHistory,
+  studioRetainedStrokeRealtimeIdsForRedo,
+  studioRetainedStrokeRealtimeIdsForUndo,
+  truncateStudioRetainedStrokeRealtimeHistoryRanges,
   type StudioRetainedStrokeQueuedBatch,
+  type StudioRetainedStrokeRealtimeHistoryRange,
   type StudioRetainedStrokeUndoneBatch,
 } from "./studio-retained-stroke-history";
 
@@ -89,6 +94,24 @@ describe("retained stroke history", () => {
     expect(blank[0]!.elements).toEqual([]);
     expect(pending.strokes).toEqual([eraser]);
     document.destroy();
+  });
+
+  it("undoes a retained stroke that a peer already echoed into the current page", () => {
+    const livePages = [{ ...blank[0]!, elements: [eraser] }];
+    const publish = vi.fn(() => true);
+
+    expect(publishStudioRetainedStrokeHistory(livePages, pending, "undo", publish)).toBe(true);
+    expect(publish).toHaveBeenCalledExactlyOnceWith(
+      [{ ...blank[0]!, elements: [eraser] }],
+      blank,
+    );
+
+    publish.mockClear();
+    expect(publishStudioRetainedStrokeHistory(livePages, pending, "redo", publish)).toBe(true);
+    expect(publish).toHaveBeenCalledExactlyOnceWith(
+      blank,
+      [{ ...blank[0]!, elements: [eraser] }],
+    );
   });
 
   it("preserves the pending batch when its page or publication is unavailable", () => {
@@ -240,6 +263,46 @@ describe("retained stroke history", () => {
     vi.advanceTimersByTime(500);
     expect(context.flushPending).toHaveBeenCalledOnce();
     expect(queued.current).toBeNull();
+  });
+});
+
+describe("realtime stroke history ranges", () => {
+  it("coalesces adjacent deferred batches", () => {
+    let ranges: readonly StudioRetainedStrokeRealtimeHistoryRange[] = [];
+    ranges = appendStudioRetainedStrokeRealtimeHistoryRange(ranges, ["a", "b"], 2);
+    ranges = appendStudioRetainedStrokeRealtimeHistoryRange(ranges, ["c"], 3);
+    expect(ranges).toEqual([{
+      strokeIds: ["a", "b", "c"],
+      baseIndex: 0,
+      finalIndex: 3,
+    }]);
+    expect(studioRetainedStrokeRealtimeIdsForUndo(ranges, 1)).toEqual(["a", "b", "c"]);
+    expect(studioRetainedStrokeRealtimeIdsForRedo(ranges, 2, 3)).toEqual(["a", "b", "c"]);
+  });
+
+  it("cuts only the future side when a new branch starts after undo", () => {
+    const ranges: readonly StudioRetainedStrokeRealtimeHistoryRange[] = [
+      { strokeIds: ["a", "b", "c"], baseIndex: 0, finalIndex: 3 },
+      { strokeIds: ["d", "e"], baseIndex: 4, finalIndex: 6 },
+    ];
+    expect(truncateStudioRetainedStrokeRealtimeHistoryRanges(ranges, 5)).toEqual([
+      ranges[0],
+      { strokeIds: ["d"], baseIndex: 4, finalIndex: 5 },
+    ]);
+    expect(truncateStudioRetainedStrokeRealtimeHistoryRanges(ranges, 3)).toEqual([ranges[0]]);
+    expect(truncateStudioRetainedStrokeRealtimeHistoryRanges(ranges, 0)).toEqual([]);
+  });
+
+  it("keeps separate ranges across a non-stroke history step", () => {
+    let ranges: readonly StudioRetainedStrokeRealtimeHistoryRange[] = [];
+    ranges = appendStudioRetainedStrokeRealtimeHistoryRange(ranges, ["a"], 1);
+    ranges = appendStudioRetainedStrokeRealtimeHistoryRange(ranges, ["b"], 3);
+    expect(ranges).toEqual([
+      { strokeIds: ["a"], baseIndex: 0, finalIndex: 1 },
+      { strokeIds: ["b"], baseIndex: 2, finalIndex: 3 },
+    ]);
+    expect(studioRetainedStrokeRealtimeIdsForUndo(ranges, 2)).toEqual([]);
+    expect(studioRetainedStrokeRealtimeIdsForUndo(ranges, 3)).toEqual(["b"]);
   });
 });
 

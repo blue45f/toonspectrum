@@ -36,12 +36,19 @@ describe("collaboration browser entry contract", () => {
     expect(source).toContain("pageC.goto(roomUrl");
     expect(source).toContain('waitForCanvasChange(pageB, blankB, "A -> B remote stroke")');
     expect(source).toContain('waitForCanvasChange(pageA, beforeSecondA, "B -> A remote stroke")');
-    expect(source).toContain("late joiner did not restore authored ink");
+    expect(source).toContain("late joiner did not restore converged ink");
     expect(source).toContain(`page.locator('[data-studio-post-processing-scope=""]')`);
     expect(source).toContain("const screenshot = await page.screenshot({");
     expect(source).toContain("fingerprintStudioCompositedPng");
     expect(source).not.toContain('querySelectorAll<HTMLCanvasElement>(".konvajs-content canvas")');
     expect(source).not.toContain("documentSurface.screenshot({");
+  });
+
+  it("acknowledges the current beta notice before collaboration input begins", () => {
+    expect(source).toContain("STUDIO_BETA_NOTICE_STORAGE_KEY");
+    expect(source).toContain("STUDIO_BETA_NOTICE_REVISION");
+    expect(source).toContain("localStorage.setItem(betaStorageKey, betaRevision)");
+    expect(source).toContain("page.locator('[data-studio-beta-notice=\"true\"]')");
   });
 
   it("captures the failed page location and screenshot for future navigation regressions", () => {

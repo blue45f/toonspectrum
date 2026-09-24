@@ -130,7 +130,7 @@ describe("pending stroke lifecycle source contract", () => {
 
   it("route/page lifecycle은 안정 상태와 대기 획을 내구 저장소에만 요청한다", () => {
     const persistence = sourceBetween(
-      "persistPendingStrokeEmergencyAutosaveRef.current = (reason) =>",
+      "persistPendingStrokeEmergencyAutosaveRef.current = (reason, stablePagesOverride) =>",
       "function applyStudioProjectSnapshotWithPreparedDocuments"
     );
 
@@ -159,6 +159,21 @@ describe("pending stroke lifecycle source contract", () => {
     expect(queue).toContain('persistPendingStrokeEmergencyAutosaveRef.current("pointerup")');
     expect(queue.indexOf("setUnloadGuardArmed(true)")).toBeLessThan(
       queue.indexOf("globalThis.queueMicrotask(() => {")
+    );
+  });
+
+  it("즉시 커밋 획도 pointerup task의 microtask에서 durable write를 시작한다", () => {
+    const immediateCommit = sourceBetween(
+      "const committed = commit(committedElements, undefined, activePage.id);",
+      "if (committed && !masterEditMode && finished.mode !== \"eraser\")",
+    );
+
+    expect(immediateCommit).toContain("if (committed)");
+    expect(immediateCommit).toContain(
+      "globalThis.queueMicrotask(persistImmediateStrokeEmergencyAutosave)",
+    );
+    expect(immediateCommit.indexOf("const committed = commit(")).toBeLessThan(
+      immediateCommit.indexOf("globalThis.queueMicrotask(")
     );
   });
 
@@ -202,6 +217,8 @@ describe("pending stroke lifecycle source contract", () => {
     );
     expect(flushPipeline.indexOf("pendingBatchAwaitsSelectedGpuFinalReceipt"))
       .toBeLessThan(flushPipeline.indexOf("takePendingStrokeCommits()"));
+    expect(flushPipeline).toContain("mergeStudioPendingStrokeElements(");
+    expect(flushPipeline).toContain("document.finalizeStroke(stroke.id)");
     expect(pageCommit).toContain("pendingBatch && !flushPendingStrokeCommitsRef.current()");
     expect(pageCommit).toContain("options.pendingStrokePolicy !== \"drop\"");
     expect(pageCommit).toContain("projectStudioPendingStrokes(nextPages");

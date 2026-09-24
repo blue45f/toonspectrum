@@ -69,7 +69,7 @@ describe("active stroke lifecycle integration boundary", () => {
 
   it("projects a live page or master prefix into pagehide storage without mutating the live session", () => {
     const persistence = sourceBetween(
-      "persistPendingStrokeEmergencyAutosaveRef.current = (reason) => {",
+      "persistPendingStrokeEmergencyAutosaveRef.current = (reason, stablePagesOverride) => {",
       "function applyStudioProjectSnapshotWithPreparedDocuments("
     );
 

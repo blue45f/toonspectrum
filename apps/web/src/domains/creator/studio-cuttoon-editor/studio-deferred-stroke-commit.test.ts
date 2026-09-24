@@ -205,3 +205,64 @@ describe("offline page changes preserve the layer comp wire limit", () => {
     expect(editor.state.setError).not.toHaveBeenCalled();
   });
 });
+
+describe("deferred stroke collaboration echo history", () => {
+  it("restores a one-stroke undo frontier when CRDT echo already reached the previous snapshot", () => {
+    const echoedPage: PageState = {
+      id: "A",
+      elements: [element, stroke],
+      bg: "#ffffff",
+      bgGrad: null,
+      canvasH: 1080,
+    };
+    const editor = createEditor(echoedPage);
+    editor.state.pagesHistoryRef.current = [[echoedPage], [echoedPage]];
+    editor.state.pagesHiRef.current = 1;
+
+    editor.engine().expandDeferredStrokeCommitHistory({
+      pageId: "A",
+      strokes: [stroke],
+      retryCount: 0,
+    });
+
+    const history = editor.state.pagesHistoryRef.current;
+    expect(history).toHaveLength(2);
+    expect(history[0]?.[0]?.elements.map(({ id }) => id)).toEqual(["layer"]);
+    expect(history[1]?.[0]?.elements.map(({ id }) => id)).toEqual(["layer", "undone"]);
+    expect(editor.state.pagesHiRef.current).toBe(1);
+    expect(editor.state.setPagesHistory).toHaveBeenCalledOnce();
+    expect(editor.state.recordStudioHistoryJournalPages).not.toHaveBeenCalled();
+  });
+
+  it("rebuilds per-stroke prefixes from a clean base after two echoed pending strokes", () => {
+    const second: DrawEl = { ...stroke, id: "second", points: [40, 40, 70, 70] };
+    const echoedPage: PageState = {
+      id: "A",
+      elements: [element, stroke, second],
+      bg: "#ffffff",
+      bgGrad: null,
+      canvasH: 1080,
+    };
+    const editor = createEditor(echoedPage);
+    editor.state.pagesHistoryRef.current = [[echoedPage], [echoedPage]];
+    editor.state.pagesHiRef.current = 1;
+
+    editor.engine().expandDeferredStrokeCommitHistory({
+      pageId: "A",
+      strokes: [stroke, second],
+      retryCount: 0,
+    });
+
+    const history = editor.state.pagesHistoryRef.current;
+    expect(history).toHaveLength(3);
+    expect(history[0]?.[0]?.elements.map(({ id }) => id)).toEqual(["layer"]);
+    expect(history[1]?.[0]?.elements.map(({ id }) => id)).toEqual(["layer", "undone"]);
+    expect(history[2]?.[0]?.elements.map(({ id }) => id)).toEqual([
+      "layer",
+      "undone",
+      "second",
+    ]);
+    expect(editor.state.pagesHiRef.current).toBe(2);
+    expect(editor.state.recordStudioHistoryJournalPages).toHaveBeenCalledWith(1, 2);
+  });
+});

@@ -217,7 +217,7 @@ describe("Studio OPFS + SQLite autosave product boundary", () => {
   it("keeps pagehide non-blocking while accepting success only from OPFS/SQLite", () => {
     const lifecycle = sourceBetween(
       studioPage,
-      "persistPendingStrokeEmergencyAutosaveRef.current = (reason) =>",
+      "persistPendingStrokeEmergencyAutosaveRef.current = (reason, stablePagesOverride) =>",
       "function applyStudioProjectSnapshotWithPreparedDocuments",
     );
 

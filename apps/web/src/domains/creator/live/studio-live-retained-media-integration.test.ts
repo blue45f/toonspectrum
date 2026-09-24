@@ -22,11 +22,19 @@ describe("Studio live retained-media overlay integration", () => {
       seal,
     );
     const deferredCommit = finish.indexOf("queueDeferredStrokeCommit(finished)", seal);
-    const immediateCommit = finish.indexOf("commit([...baseElements, finished])", seal);
+    // Immediate completion now merges any older deferred strokes into one publication payload,
+    // then re-expands that snapshot into per-stroke history. The authority order is unchanged:
+    // retained-media seal/rejection must happen before either commit path.
+    const immediateCommit = finish.indexOf(
+      "const committed = commit(committedElements, undefined, activePage.id)",
+      seal,
+    );
+    const immediateGranularity = finish.indexOf("expandDeferredStrokeCommitHistory({", immediateCommit);
     expect(seal).toBeGreaterThan(-1);
     expect(reject).toBeGreaterThan(seal);
     expect(deferredCommit).toBeGreaterThan(reject);
     expect(immediateCommit).toBeGreaterThan(reject);
+    expect(immediateGranularity).toBeGreaterThan(immediateCommit);
 
     const clear = page.slice(
       page.indexOf("const clearDraftPreview ="),

@@ -117,7 +117,7 @@ describe("studio draw pointer-release planning ownership boundary", () => {
       "finishStudioSpecialistStroke(finished)",
       'releasePlan.commitMode === "deferred"',
       "queueDeferredStrokeCommit(finished)",
-      "const committed = commit([...baseElements, finished])",
+      "const committed = commit(committedElements, undefined, activePage.id)",
       "restorePendingStrokeCommits({",
       "studioCrdtDocumentRef.current?.deleteStroke(drawingRef.current.id)",
       "finally {",

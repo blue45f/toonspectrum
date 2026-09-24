@@ -37,6 +37,10 @@ const statusRailSource = readFileSync(
   new URL("./canvas/StudioCanvasStatusRail.tsx", import.meta.url),
   "utf8",
 );
+const pointerFinishSource = readFileSync(
+  new URL("./studio-cuttoon-editor/studio-cuttoon-stage-pointers-finish.ts", import.meta.url),
+  "utf8",
+);
 
 function sliceBetween(source: string, start: string, end: string): string {
   const startIndex = source.indexOf(start);
@@ -82,7 +86,8 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
 
     // 발행·검증은 배치 단위 1회 그대로 — 획마다 commit() 을 부르면 같은 태스크의 장면 발행이
     // 겹쳐 "중복된 드로우 식별자"로 거절된다(브라우저 실측).
-    expect(flush).toContain("commit([...baseElements, ...batch.strokes], undefined, batch.pageId)");
+    expect(flush).toContain("mergeStudioPendingStrokeElements(");
+    expect(flush).toContain("commit(committedElements, undefined, batch.pageId)");
     expect(flush.indexOf("expandDeferredStrokeCommitHistory(batch)")).toBeGreaterThan(
       flush.indexOf("if (!committed)"),
     );
@@ -94,7 +99,8 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
       "// 커밋 지연 파이프라인의 동기화/폐기",
     );
 
-    expect(expand).toContain("if (batch.strokes.length < 2) return;");
+    expect(expand).toContain("if (batch.strokes.length === 0) return;");
+    expect(expand).toContain("if (batch.strokes.length === 1)");
     expect(expand).toContain("batch.strokes.slice(kept).map((stroke) => stroke.id)");
     expect(expand).toContain("page.elements.filter((element) => !dropped.has(element.id))");
     expect(expand).toContain("appendStudioPagesHistorySnapshot(accHistory, accIndex, snapshot)");
@@ -102,6 +108,26 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
     // 기준 스냅샷이 상한에 밀려 사라졌으면 펼치지 않는다(엉뚱한 상태로 점프 금지).
     expect(expand).toContain("if (!finalPages || !basePages) return;");
     expect(expand).toContain("pagesHiRef.current = accIndex");
+  });
+
+  it("즉시 획이 대기 획을 흡수해도 합쳐진 스냅샷을 다시 획 단위로 펼친다", () => {
+    const immediate = sliceBetween(
+      pointerFinishSource,
+      "const merged = takePendingStrokeCommits();",
+      "if (committed && !masterEditMode && finished.mode",
+    );
+
+    expect(immediate).toContain(
+      "const completedStrokes = [...(merged?.strokes ?? []), finished]",
+    );
+    const commitIndex = immediate.indexOf(
+      "const committed = commit(committedElements, undefined, activePage.id)",
+    );
+    const expandIndex = immediate.indexOf("expandDeferredStrokeCommitHistory({");
+    expect(commitIndex).toBeGreaterThanOrEqual(0);
+    expect(expandIndex).toBeGreaterThan(commitIndex);
+    expect(immediate).toContain("strokes: completedStrokes");
+    expect(immediate).toContain("retryCount: merged?.retryCount ?? 0");
   });
 
   it("undo 는 대기 배치를 폐기하지 않고 먼저 히스토리에 안착시킨다", () => {

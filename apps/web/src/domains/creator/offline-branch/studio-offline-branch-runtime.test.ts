@@ -7,6 +7,7 @@ import {
 } from "./studio-offline-branch-automerge";
 import { StudioOfflineBranchRuntime } from "./studio-offline-branch-runtime";
 
+import type { DrawEl } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";
 import type {
   CreateStudioOfflineBranchInput,
@@ -25,14 +26,27 @@ beforeAll(async () => {
   await initializeStudioOfflineBranchAutomerge();
 });
 
-function page(groupName = "선화"): PageState {
+function page(groupName = "선화", elements: DrawEl[] = []): PageState {
   return {
     id: "page-1",
-    elements: [],
+    elements,
     bg: "#ffffff",
     bgGrad: null,
     canvasH: 1_200,
     groups: [{ id: "group-1", name: groupName, hidden: false, locked: false }],
+  };
+}
+
+function stroke(id: string, y: number): DrawEl {
+  return {
+    id,
+    type: "draw",
+    kind: "freehand",
+    mode: "pen",
+    points: [10, y, 40, y + 2],
+    stroke: "#111111",
+    strokeWidth: 4,
+    opacity: 1,
   };
 }
 
@@ -201,6 +215,36 @@ describe("StudioOfflineBranchRuntime", () => {
     expect(runtime.snapshot.operations).toHaveLength(3);
     expect(new Set(runtime.snapshot.operations.map(({ dedupeKey }) => dedupeKey))).toHaveLength(3);
     expect(runtime.projectPages(original)[0]?.groups?.[0]?.name).toBe("채색");
+    await runtime.close();
+  });
+
+  it("does not resurrect a fully undone stroke branch when a fresh stroke starts", async () => {
+    const storage = new MemoryStorage();
+    const runtime = await StudioOfflineBranchRuntime.create(runtimeOptions(storage));
+    const canonical = [page()];
+    let current = canonical;
+
+    for (let index = 1; index <= 10; index += 1) {
+      const next = [page("선화", [...current[0]!.elements as DrawEl[], stroke(`stroke-${index}`, index * 10)])];
+      expect(runtime.stageSceneTransition(current, next)).toBe(true);
+      await runtime.exportPeerDocument();
+      current = next;
+    }
+
+    for (let index = 10; index >= 1; index -= 1) {
+      const next = [page("선화", (current[0]!.elements as DrawEl[]).slice(0, -1))];
+      expect(runtime.stageSceneTransition(current, next)).toBe(true);
+      await runtime.exportPeerDocument();
+      current = next;
+    }
+
+    expect(runtime.projectPages(canonical)[0]?.elements).toEqual([]);
+
+    const fresh = [page("선화", [stroke("fresh", 200)])];
+    expect(runtime.stageSceneTransition(current, fresh)).toBe(true);
+    await runtime.exportPeerDocument();
+
+    expect(runtime.projectPages(canonical)[0]?.elements.map(({ id }) => id)).toEqual(["fresh"]);
     await runtime.close();
   });
 

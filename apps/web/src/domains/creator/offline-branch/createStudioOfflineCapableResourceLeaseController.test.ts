@@ -66,6 +66,7 @@ async function setup(withOfflineBranch: boolean) {
     pendingMutationRef: { current: null },
     reportError,
     reportNotice,
+    requiresSharedAuthority: true,
     roomRef: { current: room },
     runtimeRef: { current: withOfflineBranch ? { offlineBranch } : null },
   });
@@ -80,6 +81,49 @@ async function setup(withOfflineBranch: boolean) {
 }
 
 describe("createStudioOfflineCapableResourceLeaseController", () => {
+  it("keeps destructive edits local when no shared work or live room exists", async () => {
+    const reportError = vi.fn();
+    const reportNotice = vi.fn();
+    const controller = createStudioOfflineCapableResourceLeaseController({
+      heldResourcesRef: { current: [] },
+      mutationGenerationRef: { current: 0 },
+      pageId: "local-page",
+      pendingMutationRef: { current: null },
+      reportError,
+      reportNotice,
+      requiresSharedAuthority: false,
+      roomRef: { current: null },
+      runtimeRef: { current: null },
+    });
+
+    expect(controller.begin(undefined, "page-edit")).toBe(true);
+    expect(controller.begin(["existing-element"], "transform")).toBe(true);
+    expect(await controller.beginAsync(["existing-element"], "transform")).toBe(true);
+    expect(reportError).not.toHaveBeenCalledWith(expect.stringContaining("오프라인 제안 권위"));
+    expect(reportNotice).not.toHaveBeenCalled();
+  });
+
+  it("still fails closed for a shared work before room/offline authority is ready", async () => {
+    const reportError = vi.fn();
+    const controller = createStudioOfflineCapableResourceLeaseController({
+      heldResourcesRef: { current: [] },
+      mutationGenerationRef: { current: 0 },
+      pageId: "shared-page",
+      pendingMutationRef: { current: null },
+      reportError,
+      reportNotice: vi.fn(),
+      requiresSharedAuthority: true,
+      roomRef: { current: null },
+      runtimeRef: { current: null },
+    });
+
+    expect(controller.begin(undefined, "page-edit")).toBe(false);
+    expect(await controller.beginAsync(["existing-element"], "transform")).toBe(false);
+    expect(reportError).toHaveBeenLastCalledWith(
+      expect.stringContaining("오프라인 제안 권위"),
+    );
+  });
+
   it("routes destructive edits to a local proposal when the server has no lock authority", async () => {
     const {
       controller,

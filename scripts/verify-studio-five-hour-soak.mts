@@ -41,8 +41,11 @@ const WEBGPU = process.env.TOONSPECTRUM_SOAK_WEBGPU === "1";
 const INPUT_MODE_REQUEST = parseStudioPointerInputMode(process.env.TOONSPECTRUM_SOAK_INPUT);
 const OUT = process.env.TOONSPECTRUM_SOAK_OUT?.trim()
   || `artifacts/studio-five-hour-soak/${PROFILE_ID}${WEBGPU ? "-webgpu" : ""}`;
-const CYCLE_TARGET_MS = Math.max(5_000, Number(process.env.TOONSPECTRUM_SOAK_CYCLE_MS ?? "30000") || 30_000);
+const CYCLE_TARGET_MS = Math.max(3_000, Number(process.env.TOONSPECTRUM_SOAK_CYCLE_MS ?? "30000") || 30_000);
+const FORCED_BRUSH_ID = process.env.TOONSPECTRUM_SOAK_BRUSH_ID?.trim() || null;
 const INK_MIN_CHANGED_PIXELS = 120;
+const HISTORY_CHURN_INTERVAL = 10;
+const HISTORY_CHURN_REDO_PROBES = 3;
 const CHECKPOINT_MS = 10 * 60_000;
 
 interface HeapSample {
@@ -84,6 +87,14 @@ interface PixelSample {
   readonly tiltYMax: number;
   readonly twistMin: number;
   readonly twistMax: number;
+  readonly layerCountBefore: number | null;
+  readonly layerCountAfter: number | null;
+  readonly historyEntryCountBefore: number | null;
+  readonly historyUndoDepthBefore: number | null;
+  readonly historyEntryCount: number | null;
+  readonly historyUndoDepth: number | null;
+  readonly acceptedByDocument: boolean;
+  readonly rejectedStrokeCount: number;
 }
 
 interface SoakFailure {
@@ -338,6 +349,30 @@ async function ensurePenReady(page: Page): Promise<boolean> {
     await page.waitForTimeout(80);
     return await pen.getAttribute("aria-pressed") === "true";
   }
+
+  // A docked brush-library search box can legitimately retain focus after selection. Keyboard
+  // shortcuts intentionally ignore typing surfaces, so using only "b" makes the soak diagnose
+  // focus ownership as a broken pen. Prefer the real rail control and keep the shortcut as a
+  // fallback for compact layouts where the rail item is not mounted.
+  const railPen = page.locator(
+    '[data-studio-rail-tool-id="pen"], [data-studio-current-tool-id="pen"]',
+  ).first();
+  if (await railPen.isVisible({ timeout: 500 }).catch(() => false)) {
+    if (await railPen.getAttribute("aria-pressed") !== "true") {
+      await railPen.click({ timeout: 5_000 }).catch(() => undefined);
+    }
+    await page.waitForTimeout(80);
+    if (await railPen.getAttribute("aria-pressed") !== "true") return false;
+    return page.locator('[data-studio-draw-options="true"]')
+      .waitFor({ state: "visible", timeout: 4_000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  await page.evaluate(() => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+  }).catch(() => undefined);
   await page.keyboard.press("b");
   return page.locator('[data-studio-draw-options="true"]')
     .waitFor({ state: "visible", timeout: 4_000 })
@@ -370,6 +405,165 @@ async function waitForPenReady(page: Page, timeoutMs = 30_000): Promise<boolean>
   return false;
 }
 
+async function readStudioAvailableLayerCount(page: Page): Promise<number | null> {
+  const raw = await page.locator('[data-studio-layer-available-count]').first()
+    .getAttribute("data-studio-layer-available-count")
+    .catch(() => null);
+  if (raw === null) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+async function readStudioHistoryDepth(page: Page): Promise<{
+  entryCount: number | null;
+  undoDepth: number | null;
+}> {
+  const editor = page.locator('[data-studio-history-entry-count]').first();
+  const [entryRaw, undoRaw] = await Promise.all([
+    editor.getAttribute("data-studio-history-entry-count").catch(() => null),
+    editor.getAttribute("data-studio-history-undo-depth").catch(() => null),
+  ]);
+  const entryCount = entryRaw === null ? null : Number(entryRaw);
+  const undoDepth = undoRaw === null ? null : Number(undoRaw);
+  return {
+    entryCount: Number.isFinite(entryCount) && entryCount! >= 0 ? entryCount : null,
+    undoDepth: Number.isFinite(undoDepth) && undoDepth! >= 0 ? undoDepth : null,
+  };
+}
+
+async function waitForStudioLayerCount(
+  page: Page,
+  predicate: (count: number) => boolean,
+  timeoutMs = 5_000,
+): Promise<number | null> {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    const count = await readStudioAvailableLayerCount(page);
+    if (count !== null && predicate(count)) return count;
+    await page.waitForTimeout(50);
+  } while (Date.now() < deadline);
+  return readStudioAvailableLayerCount(page);
+}
+
+async function waitForStudioDocumentAdvance(
+  page: Page,
+  input: {
+    layerCountBefore: number | null;
+    historyUndoDepthBefore: number | null;
+  },
+  timeoutMs = 4_500,
+): Promise<{
+  layerCountAfter: number | null;
+  historyEntryCount: number | null;
+  historyUndoDepth: number | null;
+  accepted: boolean;
+}> {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    const layerCountAfter = await readStudioAvailableLayerCount(page);
+    const history = await readStudioHistoryDepth(page);
+    const acceptedByLayer = input.layerCountBefore !== null
+      && layerCountAfter !== null
+      && layerCountAfter > input.layerCountBefore;
+    const acceptedByHistory = input.historyUndoDepthBefore !== null
+      && history.undoDepth !== null
+      && history.undoDepth > input.historyUndoDepthBefore;
+    if (acceptedByLayer || acceptedByHistory) {
+      return {
+        layerCountAfter,
+        historyEntryCount: history.entryCount,
+        historyUndoDepth: history.undoDepth,
+        accepted: true,
+      };
+    }
+    await page.waitForTimeout(75);
+  } while (Date.now() < deadline);
+  const layerCountAfter = await readStudioAvailableLayerCount(page);
+  const history = await readStudioHistoryDepth(page);
+  return {
+    layerCountAfter,
+    historyEntryCount: history.entryCount,
+    historyUndoDepth: history.undoDepth,
+    accepted: false,
+  };
+}
+
+async function clickStudioHistoryAction(
+  page: Page,
+  action: "undo" | "redo",
+): Promise<boolean> {
+  const button = page.locator(
+    `[data-studio-primary-action="${action}"]:visible, [data-studio-command-bar-command="${action}"]:visible`,
+  ).first();
+  if (!(await button.isVisible({ timeout: 1_000 }).catch(() => false))) return false;
+  if (await button.isDisabled().catch(() => true)) return false;
+  await button.click({ timeout: 5_000 });
+  return true;
+}
+
+async function exerciseBoundedHistoryChurn(
+  page: Page,
+  strokeCount: number,
+  baselineLayerCount: number | null,
+): Promise<number> {
+  const undoCount = Math.max(0, Math.floor(strokeCount));
+  if (undoCount === 0) return 0;
+  if (baselineLayerCount === null) {
+    throw new Error("Layer navigator count is unavailable; cannot prove bounded history churn.");
+  }
+
+  // Some material brushes keep exact pixels on a retained surface before their canonical layer
+  // settles, so "N strokes == N layer rows" is not a valid invariant. Exercise one Undo per accepted
+  // stroke, then require the canonical document to return to the pre-block baseline.
+  const peak = await readStudioAvailableLayerCount(page);
+  if (peak === null || peak < baselineLayerCount) {
+    throw new Error(`Layer count moved below bounded baseline before history churn: ${peak ?? "n/a"}.`);
+  }
+
+  let actions = 0;
+  for (let index = 0; index < undoCount; index += 1) {
+    if (!(await clickStudioHistoryAction(page, "undo"))) {
+      throw new Error(`Undo became unavailable after ${actions} of ${undoCount} bounded actions.`);
+    }
+    actions += 1;
+    await page.waitForTimeout(80);
+  }
+
+  const settledAfterUndo = await waitForStudioLayerCount(
+    page,
+    (count) => count === baselineLayerCount,
+  );
+  if (settledAfterUndo !== baselineLayerCount) {
+    throw new Error(
+      `Bounded undo ended at ${settledAfterUndo ?? "n/a"} layers instead of ${baselineLayerCount}.`,
+    );
+  }
+
+  const redoCount = Math.min(HISTORY_CHURN_REDO_PROBES, undoCount);
+  let completedRedo = 0;
+  for (let index = 0; index < redoCount; index += 1) {
+    if (!(await clickStudioHistoryAction(page, "redo"))) {
+      throw new Error(`Redo became unavailable after ${completedRedo} of ${redoCount} probes.`);
+    }
+    completedRedo += 1;
+    actions += 1;
+    await page.waitForTimeout(80);
+  }
+  for (let index = 0; index < completedRedo; index += 1) {
+    if (!(await clickStudioHistoryAction(page, "undo"))) {
+      throw new Error("Undo became unavailable while returning redo probe to baseline.");
+    }
+    actions += 1;
+    await page.waitForTimeout(80);
+  }
+
+  const settled = await waitForStudioLayerCount(page, (count) => count === baselineLayerCount);
+  if (settled !== baselineLayerCount) {
+    throw new Error(`Bounded history churn ended at ${settled ?? "n/a"} layers instead of ${baselineLayerCount}.`);
+  }
+  return actions;
+}
+
 async function drawEvidenceStroke(
   page: Page,
   cdp: CDPSession | null,
@@ -390,6 +584,14 @@ async function drawEvidenceStroke(
     twistMin: number;
     twistMax: number;
   };
+  layerCountBefore: number | null;
+  layerCountAfter: number | null;
+  historyEntryCountBefore: number | null;
+  historyUndoDepthBefore: number | null;
+  historyEntryCount: number | null;
+  historyUndoDepth: number | null;
+  acceptedByDocument: boolean;
+  rejectedStrokeCount: number;
 }> {
   if (!(await closeBrushSurfaces(page))) {
     throw new Error("brush surfaces stayed open before drawing evidence");
@@ -405,16 +607,28 @@ async function drawEvidenceStroke(
   }
   const x = Math.max(stageBox.x, viewportBox.x);
   const y = Math.max(stageBox.y, viewportBox.y);
-  const box = {
+  const visibleBox = {
     x,
     y,
     width: Math.min(stageBox.x + stageBox.width, viewportBox.x + viewportBox.width) - x,
     height: Math.min(stageBox.y + stageBox.height, viewportBox.y + viewportBox.height) - y,
   };
+  // Floating canvas controls deliberately overlap the outer workspace. Long-soak input must stay
+  // on the central paper-safe lane so a toolbar hover/move can never masquerade as painted pixels.
+  const insetX = visibleBox.width * 0.2;
+  const insetY = visibleBox.height * 0.2;
+  const box = {
+    x: visibleBox.x + insetX,
+    y: visibleBox.y + insetY,
+    width: visibleBox.width - insetX * 2,
+    height: visibleBox.height - insetY * 2,
+  };
   if (box.width < 120 || box.height < 120) {
-    throw new Error("Studio visible drawing surface is smaller than the pointer acceptance minimum.");
+    throw new Error("Studio safe drawing surface is smaller than the pointer acceptance minimum.");
   }
   await page.waitForTimeout(80);
+  const layerCountBefore = await readStudioAvailableLayerCount(page);
+  const historyBefore = await readStudioHistoryDepth(page);
   const before = await page.screenshot({ clip: box, animations: "disabled" });
   const points = createStudioPointerStrokePoints(box, cycle, { steps: 28 });
   const pointer = await dispatchStudioPointerStroke({
@@ -425,8 +639,25 @@ async function drawEvidenceStroke(
     stepDelayMs: inputMode === "mouse" ? 0 : 2,
   });
   await page.waitForTimeout(500);
+  const advance = await waitForStudioDocumentAdvance(page, {
+    layerCountBefore,
+    historyUndoDepthBefore: historyBefore.undoDepth,
+  });
+  const rejectedStrokeCount = await page.locator("[data-studio-rejected-stroke-notice]").count();
   const after = await page.screenshot({ clip: box, animations: "disabled" });
-  return { changed: changedPixels(before, after), shot: after, pointer };
+  return {
+    changed: changedPixels(before, after),
+    shot: after,
+    pointer,
+    layerCountBefore,
+    layerCountAfter: advance.layerCountAfter,
+    historyEntryCountBefore: historyBefore.entryCount,
+    historyUndoDepthBefore: historyBefore.undoDepth,
+    historyEntryCount: advance.historyEntryCount,
+    historyUndoDepth: advance.historyUndoDepth,
+    acceptedByDocument: advance.accepted,
+    rejectedStrokeCount,
+  };
 }
 
 async function spawnPreview(): Promise<{ origin: string; child: ReturnType<typeof spawnVitePreview> | null }> {
@@ -464,6 +695,7 @@ const report = {
   strokes: 0,
   brushSwitches: 0,
   historyActions: 0,
+  visuallyCoveredStrokes: 0,
   pixelSamples: [] as PixelSample[],
   heapSamples: [] as HeapSample[],
   gpuEvents: [] as GpuEvent[],
@@ -498,6 +730,8 @@ let heapGrowthFailureRecorded = false;
 let heapSlopeFailureRecorded = false;
 let consecutiveNoInk = 0;
 let consecutivePenBlocked = 0;
+let strokesSinceHistoryChurn = 0;
+let boundedLayerBaseline: number | null = null;
 let nextCheckpoint = CHECKPOINT_MS;
 let activeBrush: StudioBrushCatalogItem | null = null;
 
@@ -531,6 +765,10 @@ try {
   if (!(await waitForPenReady(page))) {
     throw new Error("Studio pen tool did not become ready during the bounded preflight window.");
   }
+  boundedLayerBaseline = await readStudioAvailableLayerCount(page);
+  if (boundedLayerBaseline === null) {
+    throw new Error("Studio layer navigator count is unavailable during bounded soak preflight.");
+  }
 
   log(`${PROFILE_ID} · ${MINUTES} min · input=${inputMode} · webgpu=${WEBGPU ? "on" : "off"} · ${preview.origin}`);
 
@@ -551,7 +789,12 @@ try {
       }
 
       if (penReady && (cycle === 1 || cycle % 5 === 0)) {
-        activeBrush = PAINT_BRUSHES[(Math.floor(cycle / 5) * 7) % PAINT_BRUSHES.length] ?? null;
+        activeBrush = FORCED_BRUSH_ID
+          ? PAINT_BRUSHES.find((brush) => brush.id === FORCED_BRUSH_ID) ?? null
+          : PAINT_BRUSHES[(Math.floor(cycle / 5) * 7) % PAINT_BRUSHES.length] ?? null;
+        if (FORCED_BRUSH_ID && !activeBrush) {
+          throw new Error(`Unknown forced soak brush: ${FORCED_BRUSH_ID}`);
+        }
         if (activeBrush && await selectBrush(page, activeBrush)) report.brushSwitches += 1;
         else if (activeBrush) report.failures.push({
           atMs: nowMs(startedAt), cycle, kind: "brush-selection",
@@ -578,12 +821,33 @@ try {
           tiltYMax: evidence.pointer.tiltYMax,
           twistMin: evidence.pointer.twistMin,
           twistMax: evidence.pointer.twistMax,
+          layerCountBefore: evidence.layerCountBefore,
+          layerCountAfter: evidence.layerCountAfter,
+          historyEntryCountBefore: evidence.historyEntryCountBefore,
+          historyUndoDepthBefore: evidence.historyUndoDepthBefore,
+          historyEntryCount: evidence.historyEntryCount,
+          historyUndoDepth: evidence.historyUndoDepth,
+          acceptedByDocument: evidence.acceptedByDocument,
+          rejectedStrokeCount: evidence.rejectedStrokeCount,
         });
-        consecutiveNoInk = evidence.changed >= INK_MIN_CHANGED_PIXELS ? 0 : consecutiveNoInk + 1;
-        if (evidence.changed < INK_MIN_CHANGED_PIXELS) {
+        if (evidence.acceptedByDocument) strokesSinceHistoryChurn += 1;
+        else report.failures.push({
+          atMs: nowMs(startedAt),
+          cycle,
+          kind: "stroke-not-committed",
+          detail: `Pointer input did not advance layer/history authority (history ${evidence.historyUndoDepthBefore ?? "n/a"}→${evidence.historyUndoDepth ?? "n/a"}, layers ${evidence.layerCountBefore ?? "n/a"}→${evidence.layerCountAfter ?? "n/a"}, rejected=${evidence.rejectedStrokeCount}).`,
+        });
+        const acceptedByLayer = evidence.layerCountBefore !== null
+          && evidence.layerCountAfter !== null
+          && evidence.layerCountAfter > evidence.layerCountBefore;
+        const visuallyChanged = evidence.changed >= INK_MIN_CHANGED_PIXELS;
+        consecutiveNoInk = visuallyChanged || acceptedByLayer ? 0 : consecutiveNoInk + 1;
+        if (!visuallyChanged && acceptedByLayer) {
+          report.visuallyCoveredStrokes += 1;
+        } else if (!visuallyChanged) {
           report.failures.push({
             atMs: nowMs(startedAt), cycle, kind: "no-ink",
-            detail: `stroke changed ${evidence.changed} px (${consecutiveNoInk} consecutive; min ${INK_MIN_CHANGED_PIXELS})`,
+            detail: `stroke changed ${evidence.changed} px and layer count did not advance (${consecutiveNoInk} consecutive; min ${INK_MIN_CHANGED_PIXELS})`,
           });
           if (evidence.shot.byteLength > 0) {
             writeFileSync(join(OUT, `no-ink-cycle-${cycle}.png`), evidence.shot);
@@ -591,15 +855,13 @@ try {
         }
       }
 
-      if (cycle % 10 === 0) {
-        for (let index = 0; index < 3; index += 1) {
-          await page.keyboard.press("Control+z").catch(() => undefined);
-          await page.waitForTimeout(100);
-          report.historyActions += 1;
-        }
-        await page.keyboard.press("Control+Shift+z").catch(() => undefined);
-        await page.waitForTimeout(150);
-        report.historyActions += 1;
+      if (strokesSinceHistoryChurn >= HISTORY_CHURN_INTERVAL) {
+        report.historyActions += await exerciseBoundedHistoryChurn(
+          page,
+          strokesSinceHistoryChurn,
+          boundedLayerBaseline,
+        );
+        strokesSinceHistoryChurn = 0;
       }
     } catch (error) {
       report.failures.push({
@@ -687,6 +949,23 @@ try {
   }
 } finally {
   if (page) {
+    if (strokesSinceHistoryChurn > 0) {
+      try {
+        report.historyActions += await exerciseBoundedHistoryChurn(
+          page,
+          strokesSinceHistoryChurn,
+          boundedLayerBaseline,
+        );
+        strokesSinceHistoryChurn = 0;
+      } catch (error) {
+        report.failures.push({
+          atMs: nowMs(startedAt),
+          cycle: report.cycles,
+          kind: "final-history-churn",
+          detail: String(error instanceof Error ? error.message : error).slice(0, 800),
+        });
+      }
+    }
     const finalHeap = await gcHeap(cdp, startedAt);
     if (finalHeap) report.heapSamples.push(finalHeap);
     await page.screenshot({ path: join(OUT, "final.png") }).catch(() => undefined);
@@ -706,7 +985,7 @@ const meaningfulFailures = report.failures.filter((failure) => {
 const worstLongTask = Math.max(0, ...report.longTasks.map((entry) => entry.durationMs));
 const initialHeap = report.heapSamples[0]?.usedBytes ?? null;
 const finalHeap = report.heapSamples.at(-1)?.usedBytes ?? null;
-log(`${report.cycles} cycles · ${report.strokes} strokes · ${report.brushSwitches} brush switches · ${report.historyActions} history actions`);
+log(`${report.cycles} cycles · ${report.strokes} strokes · ${report.brushSwitches} brush switches · ${report.historyActions} history actions · ${report.visuallyCoveredStrokes} visually-covered strokes`);
 log(`${report.runtimeErrors.length} runtime errors · ${report.environmentNoise.length} local-preview environment noises · ${report.gpuEvents.length} GPU events · ${report.longTasks.length} long tasks (worst ${Math.round(worstLongTask)} ms)`);
 if (initialHeap !== null && finalHeap !== null) {
   log(`GC heap ${Math.round(initialHeap / 1048576)} MiB → ${Math.round(finalHeap / 1048576)} MiB`);

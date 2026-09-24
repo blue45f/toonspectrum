@@ -151,11 +151,16 @@ import { studioCreationLinkParams } from "./creator-studio-links";
 import type { StudioAppSettings } from "./studio-app-settings";
 import { createStudioAssetLibraryMutations } from "./studio-cuttoon-editor/studio-asset-library-mutations";
 import {
+  appendStudioRetainedStrokeRealtimeHistoryRange,
   discardStudioRetainedStrokeRedo,
   prepareStudioPendingStrokeCommitPage,
   restoreStudioRetainedStrokeCommitBatch,
   resumeStudioRetainedStrokeHistory,
+  studioRetainedStrokeRealtimeIdsForRedo,
+  studioRetainedStrokeRealtimeIdsForUndo,
+  truncateStudioRetainedStrokeRealtimeHistoryRanges,
   undoStudioRetainedStrokeHistory,
+  type StudioRetainedStrokeRealtimeHistoryRange,
 } from "./studio-retained-stroke-history";
 import { bindStudioCuttoonStagePointers } from "./studio-cuttoon-editor/studio-cuttoon-stage-pointers";
 import {
@@ -934,6 +939,7 @@ import { insertBlankPageAt } from "./studio-pages";
 import {
   appendStudioPagesHistorySnapshot,
   createStudioLifecycleEmergencyAutosave,
+  mergeStudioPendingStrokeElements,
 } from "./studio-pending-stroke-durability";
 import type { PerspectiveRay, VanishingPoint } from "./studio-perspective-guide";
 import {
@@ -2046,6 +2052,7 @@ export function StudioCuttoonEditor({
     pendingMutationRef: studioLivePendingMutationRef,
     reportError: setError,
     reportNotice: setStatusNotice,
+    requiresSharedAuthority: workId !== null,
     roomRef: studioLiveRoomRef,
     runtimeRef: studioCrdtSceneRuntimeRef,
   });
@@ -4091,6 +4098,9 @@ export function StudioCuttoonEditor({
     retryCount: number;
     historyIndex: number;
   } | null>(null);
+  const pendingStrokeRealtimeHistoryRangesRef = useRef<
+    readonly StudioRetainedStrokeRealtimeHistoryRange[]
+  >([]);
   const deferredStrokePostprocessClientRef = useRef<StudioStrokePostprocessWorkerClient | null>(null);
   const deferredStrokePostprocessControllersRef = useRef<Map<string, AbortController>>(new Map());
   useEffect(() => () => {
@@ -4105,7 +4115,8 @@ export function StudioCuttoonEditor({
   // pen/mouse mark in its own lifecycle slot so emergency recovery never moves it onto a page.
   const lifecycleMasterStrokeRecoveryRef = useRef<DrawEl | null>(null);
   const persistPendingStrokeEmergencyAutosaveRef = useRef<(
-    reason: StudioPendingStrokeDurabilityReason
+    reason: StudioPendingStrokeDurabilityReason,
+    stablePagesOverride?: readonly PageState[],
   ) => void>(() => undefined);
   const recoverActiveStrokeOnUnmountRef = useRef<() => void>(() => undefined);
   // Monotonic generation of the latest browser/server durable snapshot. Pending strokes live
@@ -11470,6 +11481,11 @@ export function StudioCuttoonEditor({
     return true;
   }
   function invalidatePendingRetainedRedo(): void {
+    pendingStrokeRealtimeHistoryRangesRef.current =
+      truncateStudioRetainedStrokeRealtimeHistoryRanges(
+        pendingStrokeRealtimeHistoryRangesRef.current,
+        pagesHiRef.current,
+      );
     if (discardStudioRetainedStrokeRedo(
       pendingUndoneStrokeCommitsRef,
       (ids) => liveRetainedMediaOverlayRendererRef.current.discardHiddenSettledStrokes(ids),
@@ -16086,13 +16102,20 @@ const puppetWarpArmed =
   function publishStudioCrdtSceneTransition(
     previousPages: readonly PageState[],
     nextPages: readonly PageState[],
-    registerNewDraws = true
+    registerNewDraws = true,
+    offlineRealtimeStrokeIds: readonly string[] = [],
   ): boolean {
     const document = studioCrdtDocumentRef.current;
     const runtime = studioCrdtSceneRuntimeRef.current;
     const stagedOffline = studioOfflineHost.stageStudioOfflineSceneTransition(
       runtime, previousPages, nextPages, setStatusNotice);
-    if (stagedOffline !== null) return stagedOffline;
+    const mirrorOfflinePendingStroke = stagedOffline === true
+      && studioOfflineHost.canMirrorStudioOfflinePendingStrokeTransition(
+        previousPages,
+        nextPages,
+        offlineRealtimeStrokeIds,
+      );
+    if (stagedOffline !== null && !mirrorOfflinePendingStroke) return stagedOffline;
     if (!document && !runtime) return true;
     if (!document || !runtime) return false;
     try {
@@ -16124,9 +16147,15 @@ const puppetWarpArmed =
 
   function publishStudioCrdtHistoryTransition(
     previousPages: readonly PageState[],
-    nextPages: readonly PageState[]
+    nextPages: readonly PageState[],
+    offlineRealtimeStrokeIds: readonly string[] = [],
   ): boolean {
-    return publishStudioCrdtSceneTransition(previousPages, nextPages, false);
+    return publishStudioCrdtSceneTransition(
+      previousPages,
+      nextPages,
+      false,
+      offlineRealtimeStrokeIds,
+    );
   }
 
   // The commit engine owns synchronous history and canonical-surface handoff outside the compiler boundary.
@@ -16134,7 +16163,7 @@ const puppetWarpArmed =
     commit,
     commitCoalesced,
     commitPages,
-    expandDeferredStrokeCommitHistory,
+    expandDeferredStrokeCommitHistory: expandDeferredStrokeCommitHistoryBase,
     releaseCommittedInkSurfaceCounts,
     scheduleCommittedInkRetainedRetry,
     scheduleCommittedInkSurfaceHandoffRetry,
@@ -16197,6 +16226,17 @@ const puppetWarpArmed =
     studioRevisionProjectGenerationRef,
     webGpuCanvasHandleRef,
   });
+  const expandDeferredStrokeCommitHistory = (
+    batch: Parameters<typeof expandDeferredStrokeCommitHistoryBase>[0],
+  ): void => {
+    expandDeferredStrokeCommitHistoryBase(batch);
+    pendingStrokeRealtimeHistoryRangesRef.current =
+      appendStudioRetainedStrokeRealtimeHistoryRange(
+        pendingStrokeRealtimeHistoryRangesRef.current,
+        batch.strokes.map((stroke) => stroke.id),
+        pagesHiRef.current,
+      );
+  };
   useEffect(() => {
     const sampleId = params.get("sample");
     if (!sampleId || ecosystemSampleImportRef.current === sampleId) return;
@@ -16267,7 +16307,27 @@ const puppetWarpArmed =
       let baseElements: El[] = [];
       if (targetPage && !masterEditMode) {
         baseElements = targetPage.elements;
-        committed = commit([...baseElements, ...batch.strokes], undefined, batch.pageId);
+        const committedElements = mergeStudioPendingStrokeElements(
+          baseElements,
+          batch.strokes,
+        );
+        committed = commit(committedElements, undefined, batch.pageId);
+        if (committed) {
+          const document = studioCrdtDocumentRef.current;
+          try {
+            for (const stroke of batch.strokes) {
+              if (document?.getStroke(stroke.id, true)?.status === "drawing") {
+                document.finalizeStroke(stroke.id);
+              }
+            }
+          } catch (cause) {
+            setError(
+              cause instanceof Error
+                ? `실시간 획 확정: ${cause.message}`
+                : "실시간 획을 최종 상태로 확정하지 못했습니다.",
+            );
+          }
+        }
       }
       if (!committed) {
         // Never drop the only authoritative copy merely because a save/lock/scope transition
@@ -16281,6 +16341,7 @@ const puppetWarpArmed =
         gpuFinalCrdtPublishedRequestIdsRef.current.delete(stroke.id);
       }
       // 한 번의 커밋(=한 번의 CRDT 발행·검증) 뒤, 그 스냅샷을 획 단위 undo 항목으로 펼친다.
+      // Wrapper also records the streamed-stroke provenance used by offline Undo/Redo.
       expandDeferredStrokeCommitHistory(batch);
       // 즉시 커밋 경로와 동일한 래스터 승격 — 배치의 각 획을 개별 작업으로 큐잉한다.
       const rasterWorkId = authorizedWorkAssetScopeId;
@@ -18152,10 +18213,17 @@ const puppetWarpArmed =
           setHasPendingOverlayCommit(false);
           setHasUndonePendingOverlay(true);
         },
-        persist: () => persistPendingStrokeEmergencyAutosaveRef.current("pointerup"),
+        persist: (stablePages) =>
+          persistPendingStrokeEmergencyAutosaveRef.current("pointerup", stablePages),
       });
       return;
     }
+    const pendingBeforeUndo = pendingStrokeCommitsRef.current
+      ? {
+          strokeIds: pendingStrokeCommitsRef.current.strokes.map((stroke) => stroke.id),
+          strokeCount: pendingStrokeCommitsRef.current.strokes.length,
+        }
+      : null;
     if (pendingStrokeCommitsRef.current && !flushPendingStrokeCommitsRef.current()) {
       // 잠금·저장 중이라 히스토리에 못 넣는 배치는 예전 계약대로 폐기가 유일한 되돌림이다.
       discardPendingStrokeCommitsRef.current();
@@ -18188,7 +18256,22 @@ const puppetWarpArmed =
     const undoBasePages = undoHistory[undoIndex] ?? pages;
     const nextIndex = Math.max(0, undoIndex - 1);
     const nextSnapshot = undoHistory[nextIndex];
-    if (nextSnapshot && !publishStudioCrdtHistoryTransition(undoBasePages, nextSnapshot)) return;
+    const flushedPendingStrokeIds = pendingBeforeUndo
+      && pendingStrokeCommitsRef.current === null
+      && pendingBeforeUndo.strokeCount > 0
+      ? pendingBeforeUndo.strokeIds
+      : [];
+    const offlineRealtimeStrokeIds = flushedPendingStrokeIds.length > 0
+      ? flushedPendingStrokeIds
+      : studioRetainedStrokeRealtimeIdsForUndo(
+          pendingStrokeRealtimeHistoryRangesRef.current,
+          undoIndex,
+        );
+    if (nextSnapshot && !publishStudioCrdtHistoryTransition(
+      undoBasePages,
+      nextSnapshot,
+      offlineRealtimeStrokeIds,
+    )) return;
     if (nextIndex !== undoIndex && nextSnapshot) {
       recordStudioHistoryUndoRedo("undo", nextSnapshot, nextIndex);
     }
@@ -18277,7 +18360,16 @@ const puppetWarpArmed =
     setAdvancedFillStatus(null);
     const nextIndex = Math.min(pagesHistory.length - 1, pagesHi + 1);
     const nextSnapshot = pagesHistory[nextIndex];
-    if (nextSnapshot && !publishStudioCrdtHistoryTransition(pages, nextSnapshot)) return;
+    const offlineRealtimeStrokeIds = studioRetainedStrokeRealtimeIdsForRedo(
+      pendingStrokeRealtimeHistoryRangesRef.current,
+      pagesHi,
+      nextIndex,
+    );
+    if (nextSnapshot && !publishStudioCrdtHistoryTransition(
+      pages,
+      nextSnapshot,
+      offlineRealtimeStrokeIds,
+    )) return;
     if (nextIndex !== pagesHi && nextSnapshot) {
       recordStudioHistoryUndoRedo("redo", nextSnapshot, nextIndex);
       commitStudioHistoryJournal(stepStudioHistoryJournal(historyJournalRef.current, "redo"));
@@ -23650,6 +23742,7 @@ const puppetWarpArmed =
     colorWheelPressRef,
     colorWheelTimerRef,
     commit,
+    expandDeferredStrokeCommitHistory,
     companionRuntimeRef,
     cropAspect,
     cropDragRef,
@@ -23805,6 +23898,8 @@ const puppetWarpArmed =
     pendingPixelSelectionRasterGestureRef,
     pendingRasterRetouchGestureRef,
     pendingStrokeCommitsRef,
+    persistImmediateStrokeEmergencyAutosave: () =>
+      persistPendingStrokeEmergencyAutosaveRef.current("pointerup"),
     perspectiveRayRef,
     pickCanvasColorAt,
     pixelBrushRadius,
@@ -26397,7 +26492,7 @@ function clearSelectionForEdit() {
   // The empty-dependency page lifecycle listeners below call through this ref, so every render
   // supplies the latest document/scope snapshot without reinstalling global handlers. This is a
   // best-effort durable recovery request; normal editing still uses the debounced autosave.
-  persistPendingStrokeEmergencyAutosaveRef.current = (reason) => {
+  persistPendingStrokeEmergencyAutosaveRef.current = (reason, stablePagesOverride) => {
     const pendingBatch = pendingStrokeCommitsRef.current;
     const activeRecovery = readActiveStrokeLifecycleRecovery();
     const recoveredActiveStroke = activeRecovery.recovery.action === "recover"
@@ -26467,12 +26562,14 @@ function clearSelectionForEdit() {
         pendingStrokeCommits: durableEffectivePendingBatch,
         recoveredMasterStroke: effectiveMasterStroke,
       });
-      const stablePages = resolveStudioDurableProjectPages({
-        pagesHistory: pagesHistoryRef.current,
-        historyIndex: pagesHiRef.current,
-        fallbackPages: pages,
-        pendingStrokeCommits: null,
-      }).pagesList as PageState[];
+      const stablePages = stablePagesOverride
+        ? [...stablePagesOverride] as PageState[]
+        : resolveStudioDurableProjectPages({
+            pagesHistory: pagesHistoryRef.current,
+            historyIndex: pagesHiRef.current,
+            fallbackPages: pages,
+            pendingStrokeCommits: null,
+          }).pagesList as PageState[];
       const basePayload: StudioAutosavePayload = {
         ...snapshot,
         savedAt,

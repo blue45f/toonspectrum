@@ -29,6 +29,10 @@ import { deflateSync } from "node:zlib";
 import { chromium, type Browser, type Page } from "playwright";
 
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
+import {
+  STUDIO_BETA_NOTICE_REVISION,
+  STUDIO_BETA_NOTICE_STORAGE_KEY,
+} from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 
 import { readDurableStudioAutosaveDocument, type StudioDurableAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
@@ -241,12 +245,32 @@ async function waitForSavedPages(
   description: string,
 ): Promise<StudioDurableAutosaveDocument> {
   const deadline = Date.now() + 15_000;
+  let lastDocument: StudioDurableAutosaveDocument | null = null;
   do {
     const document = await readDurableStudioAutosaveDocument(page, studioAutosaveKey({}));
+    if (document) lastDocument = document;
     if (document && accepts(document)) return document;
     await page.waitForTimeout(150);
   } while (Date.now() < deadline);
-  throw new Error(description);
+  const ui = await page.evaluate(() => {
+    const history = document.querySelector('[data-studio-history-entry-count]');
+    return {
+      activeDrawMode: document.querySelector('[data-studio-draw-options="true"]')
+        ?.getAttribute("data-studio-active-draw-mode") ?? null,
+      errorText: document.querySelector('[role="alert"]')?.textContent?.trim() ?? "",
+      historyEntries: history?.getAttribute("data-studio-history-entry-count") ?? null,
+      layerRows: document.querySelectorAll('[data-studio-layer-row="true"]').length,
+      undoDepth: history?.getAttribute("data-studio-history-undo-depth") ?? null,
+    };
+  });
+  const durableDrawCount = lastDocument?.pagesList.flatMap((item) => item.elements ?? [])
+    .filter((item) => item && typeof item === "object" && "type" in item && item.type === "draw")
+    .length ?? 0;
+  throw new Error(`${description}; diagnostics=${JSON.stringify({
+    durableDrawCount,
+    durableSavedAt: lastDocument?.savedAt ?? null,
+    ui,
+  })}`);
 }
 
 async function compareScreenshotPixels(
@@ -474,9 +498,10 @@ async function main(): Promise<void> {
     const page = await context.newPage();
     collectBrowserErrors(page, browserErrors, url);
     await page.addInitScript(
-      ({ quickstartKey, autosavePrefix }) => {
+      ({ autosavePrefix, betaNoticeRevision, betaNoticeStorageKey, quickstartKey }) => {
         try {
           window.localStorage.setItem(quickstartKey, "1");
+          window.localStorage.setItem(betaNoticeStorageKey, betaNoticeRevision);
           window.localStorage.setItem(
             "toonspectrum-lang",
             JSON.stringify({ state: { lang: "ko" }, version: 0 }),
@@ -493,7 +518,12 @@ async function main(): Promise<void> {
           /* storage unavailable — visible assertions stay strict */
         }
       },
-      { quickstartKey: QUICKSTART_KEY, autosavePrefix: AUTOSAVE_PREFIX },
+      {
+        autosavePrefix: AUTOSAVE_PREFIX,
+        betaNoticeRevision: STUDIO_BETA_NOTICE_REVISION,
+        betaNoticeStorageKey: STUDIO_BETA_NOTICE_STORAGE_KEY,
+        quickstartKey: QUICKSTART_KEY,
+      },
     );
 
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
