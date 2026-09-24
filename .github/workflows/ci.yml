@@ -200,7 +200,7 @@ jobs:
             !/tests/benchmarks/results/
       - name: Restore Virtual Studio art for foundation regressions
         if: matrix.shard == 'studio-foundation'
-        run: git sparse-checkout add /apps/web/public/assets/virtual-studio/production-v2/ /apps/web/public/assets/virtual-studio/living-world/ /apps/web/public/assets/virtual-studio/drawn-characters-v1/ /apps/web/public/assets/virtual-studio/ambient-audio/ /apps/web/public/assets/virtual-studio/npc-cast-v1/ /apps/web/public/assets/virtual-studio/npc-cast-v2/ /apps/web/public/assets/virtual-studio/npc-cast-v3/ /apps/web/public/assets/virtual-studio/npc-cast-v4/ /apps/web/public/assets/virtual-studio/art-v4/ /apps/web/public/assets/virtual-studio/art-v4-manifest.json /apps/web/public/assets/virtual-studio/style-packs/
+        run: git sparse-checkout add /apps/web/public/assets/virtual-studio/production-v2/ /apps/web/public/assets/virtual-studio/living-world/ /apps/web/public/assets/virtual-studio/drawn-characters-v1/ /apps/web/public/assets/virtual-studio/ambient-audio/ /apps/web/public/assets/virtual-studio/npc-cast-v1/ /apps/web/public/assets/virtual-studio/npc-cast-v2/ /apps/web/public/assets/virtual-studio/npc-cast-v3/ /apps/web/public/assets/virtual-studio/npc-cast-v4/ /apps/web/public/assets/virtual-studio/art-v4/ /apps/web/public/assets/virtual-studio/art-v4-manifest.json /apps/web/public/assets/virtual-studio/style-packs/ /apps/web/public/assets/virtual-studio/style-packs-v5/
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:

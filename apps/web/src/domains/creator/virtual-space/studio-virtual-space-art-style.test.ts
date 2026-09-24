@@ -6,6 +6,7 @@ import {
   STUDIO_VIRTUAL_ART_STYLE_KEYS,
   isStudioVirtualArtStyleKey,
   studioVirtualArtAssetUrl,
+  studioVirtualArtObjectUrl,
   studioVirtualArtStyle,
   studioVirtualArtTextureUrl,
 } from "./studio-virtual-space-art-style";
@@ -33,15 +34,18 @@ describe("Virtual Studio art direction", () => {
     }
   });
 
-  it("rewrites only approved Virtual Studio art and supplies style-specific tile textures", () => {
+  it("selects independent v5 actor, world and object packs for every art direction", () => {
     expect(studioVirtualArtAssetUrl("retro", "/assets/virtual-studio/drawn-characters-v1/player-pink-walk-down.png"))
-      .toBe("/assets/virtual-studio/style-packs/retro/drawn-characters-v1/player-pink-walk-down.webp");
+      .toBe("/assets/virtual-studio/style-packs-v5/retro/players/player-pink-walk-down.webp");
     expect(studioVirtualArtAssetUrl("webtoon", "/assets/virtual-studio/drawn-characters-v1/player-pink-walk-down.png"))
-      .toBe("/assets/virtual-studio/drawn-characters-v1/player-pink-walk-down.png");
+      .toBe("/assets/virtual-studio/style-packs-v5/webtoon/players/player-pink-walk-down.webp");
     expect(studioVirtualArtAssetUrl("retro", "https://example.invalid/user-art.png"))
       .toBe("https://example.invalid/user-art.png");
     expect(studioVirtualArtTextureUrl("sky-island", "world-base"))
-      .toBe("/assets/virtual-studio/art-v4/world/sky-island.webp");
-    expect(studioVirtualArtTextureUrl("webtoon", "floor")).toBeNull();
+      .toBe("/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp");
+    expect(studioVirtualArtTextureUrl("webtoon", "water-sheet"))
+      .toBe("/assets/virtual-studio/style-packs-v5/webtoon/world/water-sheet.webp");
+    expect(studioVirtualArtObjectUrl("neon", "crate"))
+      .toBe("/assets/virtual-studio/style-packs-v5/neon/objects/crate.webp");
   });
 });

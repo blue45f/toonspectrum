@@ -18387,6 +18387,7 @@ const puppetWarpArmed =
     redo();
   };
   const {
+    fitCanvasToViewport,
     fitCanvasToWidth,
     preserveStudioViewBeforeCapture,
     resetView,
@@ -28441,6 +28442,7 @@ function clearSelectionForEdit() {
   cancelCanvasSelectionResize: requestCanvasSelectionResizeCancel,
   finalizeCanvasSelectionResize: cancelCanvasSelectionResize,
   commitCanvasSelectionResize,
+  fitCanvasToViewport,
   fitCanvasToWidth,
   onWebGpuFrameInvalid,
   onWebGpuFrameRequest,

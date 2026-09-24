@@ -33,7 +33,6 @@ export function StudioVirtualSpaceEntryLobby({
   readonly onEnter: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceEntryLobby");
-  const previewCharacter = studioCharacterSkinForArtStyle(STUDIO_CHARACTER_SKINS[0]!, artStyle);
   return <div className="studio-vspace-entry" data-route-ready="studio-virtual-entry" data-art-style={artStyle}>
     <Container size="wide" className="studio-vspace-entry-container">
       <section className="studio-vspace-entry-card" aria-labelledby="studio-vspace-entry-title">
@@ -84,11 +83,13 @@ export function StudioVirtualSpaceEntryLobby({
         <fieldset className="studio-vspace-entry-art-styles">
           <legend>{bt("아트 스타일", "Art direction")}</legend>
           <p>{bt(
-            "캐릭터와 공간은 그대로 유지하면서 전체 작화 톤을 바꿉니다. 언제든 공간 안에서 다시 변경할 수 있어요.",
-            "Keep the same character and layout while changing the full art direction. You can switch again inside the space.",
+            "팀과 기능은 유지하면서 캐릭터·NPC·건물·타일·환경 애니메이션을 독립 아트팩으로 전환합니다.",
+            "Keep the same team and tools while switching characters, NPCs, architecture, tiles and environment animation as an independent art pack.",
           )}</p>
           <div>
-            {STUDIO_VIRTUAL_ART_STYLES.map((style) => <button
+            {STUDIO_VIRTUAL_ART_STYLES.map((style) => {
+              const stylePreview = studioCharacterSkinForArtStyle(STUDIO_CHARACTER_SKINS[0]!, style.key);
+              return <button
               key={style.key}
               type="button"
               data-art-style={style.key}
@@ -97,12 +98,13 @@ export function StudioVirtualSpaceEntryLobby({
               onClick={() => onArtStyle?.(style.key)}
             >
               <span className="studio-vspace-entry-art-style-preview" aria-hidden>
-                <img src={previewCharacter.directional.down} alt="" draggable={false} />
+                <img src={stylePreview.directional.down} alt="" draggable={false} />
                 <i />
               </span>
               <strong>{bt(style.labelKo, style.labelEn)}</strong>
               <small>{bt(style.descriptionKo, style.descriptionEn)}</small>
-            </button>)}
+            </button>;
+            })}
           </div>
         </fieldset>
 

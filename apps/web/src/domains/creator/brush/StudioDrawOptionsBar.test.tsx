@@ -45,6 +45,73 @@ describe("StudioDrawOptionsBar", () => {
     expect(onOpacity).toHaveBeenCalledWith(0.02);
   });
 
+  it("accepts exact numeric size and opacity values beside the visual sliders", () => {
+    const onWidth = vi.fn();
+    const onOpacity = vi.fn();
+    render(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="pen"
+        strokeWidth={12}
+        brushOpacity={0.8}
+        stabilizer={4}
+        color="#112233"
+        quickShapeActive={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={onWidth}
+        onOpacityChange={onOpacity}
+        onStabilizerChange={vi.fn()}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    const width = screen.getByRole("spinbutton", { name: "브러시 크기 직접 입력" });
+    fireEvent.focus(width);
+    fireEvent.change(width, { target: { value: "37" } });
+    fireEvent.keyDown(width, { key: "Enter" });
+    expect(onWidth).toHaveBeenCalledExactlyOnceWith(37);
+
+    const opacity = screen.getByRole("spinbutton", { name: "브러시 불투명도 직접 입력" });
+    fireEvent.focus(opacity);
+    fireEvent.change(opacity, { target: { value: "43" } });
+    fireEvent.keyDown(opacity, { key: "Enter" });
+    expect(onOpacity).toHaveBeenCalledExactlyOnceWith(0.43);
+  });
+
+  it("offers named stabilizer strength presets and exact advanced input", () => {
+    const onStabilizerChange = vi.fn();
+    render(
+      <StudioDrawOptionsBar
+        drawMode="pen"
+        brushId="pen"
+        strokeWidth={12}
+        brushOpacity={0.8}
+        stabilizer={5}
+        color="#112233"
+        quickShapeActive={false}
+        onSelectBrush={vi.fn()}
+        onStrokeWidthChange={vi.fn()}
+        onOpacityChange={vi.fn()}
+        onStabilizerChange={onStabilizerChange}
+        onColorChange={vi.fn()}
+        onToggleQuickShape={vi.fn()}
+      />
+    );
+
+    openAdvanced();
+    const presets = screen.getByRole("group", { name: "손떨림 보정 강도 프리셋" });
+    expect(within(presets).getByRole("button", { name: "손떨림 보정 선화 5" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(presets).getByRole("button", { name: "손떨림 보정 정밀 8" }));
+    expect(onStabilizerChange).toHaveBeenCalledWith(8);
+
+    const exact = screen.getByRole("spinbutton", { name: "손떨림 보정 직접 입력" });
+    fireEvent.focus(exact);
+    fireEvent.change(exact, { target: { value: "7" } });
+    fireEvent.keyDown(exact, { key: "Enter" });
+    expect(onStabilizerChange).toHaveBeenCalledWith(7);
+  });
+
   it("renders a compact primary dock with continuous size, opacity, and smart-shape controls", () => {
     const html = renderToStaticMarkup(
       <StudioDrawOptionsBar

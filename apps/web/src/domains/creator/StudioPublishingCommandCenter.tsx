@@ -91,6 +91,17 @@ import {
   type PublishContext,
 } from "./StudioPublishContextBanner";
 import { StudioPublishVisualJourney } from "./StudioPublishVisualJourney";
+import { StudioPublishAccountReviewCard } from "./StudioPublishAccountReviewCard";
+import { StudioPublishResultReceipt } from "./StudioPublishResultReceipt";
+import {
+  resolveStudioPublishEnvironment,
+  resolveStudioPublisherIdentity,
+} from "./studio-publish-review-safety";
+import {
+  buildStudioPublishResultHref,
+  parseStudioPublishResultKind,
+  resolveStudioPublishResultKind,
+} from "./studio-publish-result";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
@@ -196,15 +207,21 @@ export function StudioPublishingCommandCenter({
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { data: session } = useSession();
-  const authUserId = session?.user?.id ?? null;
+  const publisherIdentity = resolveStudioPublisherIdentity(session?.user);
+  const authUserId = publisherIdentity.id;
   const loggedIn = authUserId !== null;
+  const publishEnvironment = resolveStudioPublishEnvironment(
+    typeof window === "undefined" ? null : window.location.hostname,
+  );
   const workId = resolveStudioUploadWorkId(routeWorkId, params.get("id"));
+  const publishResult = parseStudioPublishResultKind(params.get("result"));
   const routeSeriesId = params.get("seriesId");
   const routeChallengeId = params.get("challengeId");
   const routeTitleId = params.get("titleId");
   useDocumentTitle(workId ? "게시 설정 및 수정" : "게시 명령 센터");
 
   const [step, setStep] = useState<CommandStep>("content");
+  const [publisherConfirmed, setPublisherConfirmed] = useState(false);
   const [pages, setPages] = useState<UploadPage[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -285,6 +302,10 @@ export function StudioPublishingCommandCenter({
   }, []);
 
   useEffect(() => {
+    setPublisherConfirmed(false);
+  }, [authUserId, workId]);
+
+  useEffect(() => {
     if (!dirty) return;
     const beforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -343,6 +364,7 @@ export function StudioPublishingCommandCenter({
       return;
     }
     setStep("content");
+    setPublisherConfirmed(false);
     setPages([]);
     setTitle("");
     setDescription("");
@@ -459,6 +481,7 @@ export function StudioPublishingCommandCenter({
     let generation = 0;
     let activeController: AbortController | null = null;
     const failClosed = (message: string) => {
+      setPublisherConfirmed(false);
       setWorkRevision(undefined);
       setHydratedScope(null);
       setSharedMeta(null);
@@ -564,8 +587,21 @@ export function StudioPublishingCommandCenter({
 
   function markChanged() {
     setDirty(true);
+    setPublisherConfirmed(false);
     setError(null);
     setSuccessMessage(null);
+    if (workId && publishResult) {
+      navigate(buildStudioPublishResultHref(workId), { replace: true });
+    }
+  }
+
+  function leavePublishResult(nextStep: CommandStep) {
+    setStep(nextStep);
+    setError(null);
+    setSuccessMessage(null);
+    if (workId) {
+      navigate(buildStudioPublishResultHref(workId), { replace: true });
+    }
   }
 
   async function onPickImages(event: React.ChangeEvent<HTMLInputElement>) {
@@ -684,6 +720,11 @@ export function StudioPublishingCommandCenter({
 
   async function handleSave(intent: SaveIntent) {
     if (publishAbortRef.current || saving) return;
+    if (intent === "publish" && !publisherConfirmed) {
+      setError("현재 로그인 계정과 공개 범위를 확인한 뒤 게시 확인란을 선택해 주세요.");
+      setStep("review");
+      return;
+    }
     if (intent === "publish" && !preflight.canPublish) {
       setError("게시 사전검사의 오류를 해결한 뒤 다시 확인해 주세요.");
       setStep("distribution");
@@ -874,6 +915,13 @@ export function StudioPublishingCommandCenter({
       setBaseDoc(documentSnapshot);
       if (ownerControlsPolicy && directiveSnapshot) setDirective(directiveSnapshot);
       setDirty(false);
+      setPublisherConfirmed(false);
+      const resultKind = resolveStudioPublishResultKind(
+        intent,
+        effectiveStatus,
+        directiveSnapshot,
+      );
+      const resultHref = buildStudioPublishResultHref(saved.workId, resultKind);
       if (publishScope.workId && sharedMetaSnapshot && saved.updatedAt) {
         const nextMeta = advanceStudioUploadSharedMetaAfterSave(sharedMetaSnapshot, {
           workId: saved.workId,
@@ -881,26 +929,14 @@ export function StudioPublishingCommandCenter({
           updatedAt: saved.updatedAt,
         });
         setSharedMeta(nextMeta);
-        if (
-          sharedMetaSnapshot.role === "owner" &&
-          intent === "publish" &&
-          effectiveStatus === "published"
-        ) {
-          navigate(`/create/${saved.workId}`);
+        if (sharedMetaSnapshot.role === "owner" && intent === "publish") {
+          navigate(resultHref);
           return;
         }
         const revision = saved.revision ?? sharedMetaSnapshot.revision;
-        const message =
-          intent === "draft"
-            ? `초안을 revision ${revision}로 안전하게 저장했습니다.`
-            : directiveSnapshot?.visibility === "private"
-              ? `비공개 원고를 revision ${revision}로 저장했습니다.`
-              : directiveSnapshot?.mode === "scheduled"
-                ? `${scheduleLabel(directiveSnapshot)} 예약을 revision ${revision}에 저장했습니다.`
-                : `공동 변경사항을 revision ${revision}로 저장했습니다.`;
-        setSuccessMessage(message);
+        setSuccessMessage(`초안을 revision ${revision}로 안전하게 저장했습니다.`);
       } else {
-        navigate(`/create/${saved.workId}`);
+        navigate(resultHref, { replace: true });
       }
     } catch (cause) {
       if (
@@ -953,7 +989,7 @@ export function StudioPublishingCommandCenter({
     publishLocked ||
     saving ||
     loadingFiles ||
-    (step === "review" && !preflight.canPublish);
+    (step === "review" && (!preflight.canPublish || !publisherConfirmed));
   const cover = pages[0]?.src ?? null;
 
   return (
@@ -1031,6 +1067,16 @@ export function StudioPublishingCommandCenter({
           {successMessage}
         </div>
       )}
+      {workId && publishResult ? (
+        <StudioPublishResultReceipt
+          kind={publishResult}
+          workId={workId}
+          revision={workRevision}
+          environment={publishEnvironment}
+          onContinueEditing={() => leavePublishResult("content")}
+          onReviewSettings={() => leavePublishResult("distribution")}
+        />
+      ) : null}
       {hydrating && (
         <div className="mb-4 flex items-center gap-2 rounded-xl border border-line bg-card/60 px-3 py-2 text-sm text-fg-2" role="status" aria-busy="true">
           <Loader2 size={14} className="animate-spin motion-reduce:animate-none" />
@@ -1240,6 +1286,14 @@ export function StudioPublishingCommandCenter({
           </section>
 
           <aside className="space-y-4">
+            <StudioPublishAccountReviewCard
+              identity={publisherIdentity}
+              environment={publishEnvironment}
+              visibility={directive.visibility}
+              confirmed={publisherConfirmed}
+              onConfirmedChange={setPublisherConfirmed}
+              disabled={workspaceLocked || saving || publishLocked}
+            />
             <section className="rounded-2xl border border-line bg-panel/35 p-4">
               <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><ShieldCheck size={15} className="text-accent" /> 게시 요약</h2>
               <dl className="mt-3 divide-y divide-line text-sm">

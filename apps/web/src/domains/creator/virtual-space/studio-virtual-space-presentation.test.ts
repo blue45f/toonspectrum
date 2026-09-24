@@ -33,7 +33,7 @@ describe("Virtual Studio art and presentation", () => {
   });
   it("uses the occupant-free generated sky-island base for live actors", () => {
     expect(DEFAULT_STUDIO_WORLD_MANIFEST.backgroundUrl)
-      .toBe("/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp");
+      .toBe("/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp");
   });
   it("interpolates positions between fixed physics ticks on 120-Hz displays", () => {
     const pose = new StudioFixedStepPose({ x: 0, y: 0 });

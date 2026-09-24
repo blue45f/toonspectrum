@@ -9,6 +9,7 @@ import {
   Plus,
   RotateCcw,
   RotateCw,
+  Scan,
   ScanLine,
   X,
   ZoomIn,
@@ -56,6 +57,7 @@ export interface StudioViewToolsHudProps {
   onZoomOut: () => void;
   onSetMagnification?: (magnification: number) => void;
   onFit: () => void;
+  onFitViewport?: () => void;
   onFitSelection?: () => void;
   onActual: () => void;
   onRotateLeft: () => void;
@@ -80,6 +82,7 @@ const ZOOM_INPUT_CLASS = cn(
 
 function HudAction({
   label,
+  text,
   hint,
   onClick,
   icon: Icon,
@@ -89,6 +92,7 @@ function HudAction({
   unavailableReason,
 }: {
   label: string;
+  text?: string;
   hint: StudioToolHintSpec;
   onClick: () => void;
   icon?: LucideIcon;
@@ -115,6 +119,7 @@ function HudAction({
         data-studio-view-action={label}
         className={cn(
           HUD_ACTION_CLASS,
+          text && "h-11 w-auto min-w-11 grid-flow-col gap-1.5 px-2.5",
           pressed &&
             "border-accent/50 bg-accent-soft text-accent hover:border-accent/65 hover:bg-accent-soft",
           disabled &&
@@ -122,6 +127,7 @@ function HudAction({
         )}
       >
         {Icon ? <Icon size={16} strokeWidth={1.75} aria-hidden /> : children}
+        {text ? <span className="text-[0.66rem] font-black">{text}</span> : null}
       </button>
     </StudioToolHintTarget>
   );
@@ -201,6 +207,7 @@ export function StudioViewToolsHud({
   onZoomOut,
   onSetMagnification,
   onFit,
+  onFitViewport = onFit,
   onFitSelection,
   onActual,
   onRotateLeft,
@@ -469,7 +476,15 @@ export function StudioViewToolsHud({
               unavailableReason="최대 확대 배율에 도달했습니다."
             />
             <HudAction
+              label={STUDIO_VIEW_ACTION_HINTS.fitViewport.title}
+              text="전체"
+              hint={STUDIO_VIEW_ACTION_HINTS.fitViewport}
+              icon={Scan}
+              onClick={onFitViewport}
+            />
+            <HudAction
               label="캔버스 너비에 맞춤"
+              text="폭"
               hint={STUDIO_VIEW_ACTION_HINTS.fitWidth}
               icon={ScanLine}
               onClick={onFit}

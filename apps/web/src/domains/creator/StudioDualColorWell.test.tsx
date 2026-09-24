@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioDualColorWell, STUDIO_DUAL_COLOR_WELL_HINTS } from "./StudioDualColorWell";
 import { createStudioRecentColorsOwnerToken, registerStudioRecentColorsOwner, resetStudioRecentColorsBridgeForTests } from "./studio-recent-colors-bridge";
@@ -51,6 +51,29 @@ describe("StudioDualColorWell unified editing", () => {
     fireEvent.click(screen.getByRole("button", { name: "주 색과 보조 색 교체" }));
     expect(swap).toHaveBeenCalledOnce();
   });
+
+  it("keeps up to twelve recent colours reachable without crowding the primary toolbar", () => {
+    const remember = vi.fn();
+    registerStudioRecentColorsOwner(createStudioRecentColorsOwnerToken(), {
+      ensureRecentColorsLoaded: vi.fn(), rememberColor: remember, clearRecentColors: vi.fn(),
+    });
+    const primary = vi.fn();
+    const recent = [
+      "#110000", "#220000", "#330000", "#440000", "#550000", "#660000",
+      "#770000", "#880000", "#990000", "#aa0000", "#bb0000", "#cc0000",
+    ];
+    render(<StudioDualColorWell primary="#334455" recent={recent} onPrimaryChange={primary} />);
+
+    const recentGroup = screen.getByRole("group", { name: "최근 선택 색 목록" });
+    expect(within(recentGroup).getAllByRole("button")).toHaveLength(4);
+    fireEvent.click(within(recentGroup).getByRole("button", { name: "최근 선택 색 9개 더 보기" }));
+    const overflow = screen.getByRole("group", { name: "최근 선택 색 더 보기" });
+    expect(within(overflow).getAllByRole("button")).toHaveLength(9);
+    fireEvent.click(within(overflow).getByRole("button", { name: "최근 선택 색 #cc0000 적용" }));
+    expect(primary).toHaveBeenCalledExactlyOnceWith("#cc0000");
+    expect(remember).toHaveBeenCalledExactlyOnceWith("#cc0000");
+  });
+
   it("labels the actual eraser transition without promising transparent-brush rendering", () => {
     const erase = vi.fn();
     render(<StudioDualColorWell primary="#334455" onPrimaryChange={vi.fn()} onTransparentToggle={erase} />);

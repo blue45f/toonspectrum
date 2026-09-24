@@ -50,6 +50,7 @@ export interface StudioCanvasStickyBannersContext {
   ) => boolean;
   readonly dismissQuickStart: () => void;
   readonly effScale: number;
+  readonly fitCanvasToViewport?: () => void;
   readonly fitCanvasToWidth: () => void;
   readonly followingStudioSessionId: string | null;
   readonly navigate: NavigateFunction;
@@ -93,6 +94,7 @@ export function renderStudioCanvasStickyBanners({
   dismissQuickStart,
   effScale,
   fitCanvasToWidth,
+  fitCanvasToViewport = fitCanvasToWidth,
   followingStudioSessionId,
   navigate,
   pages,
@@ -236,6 +238,7 @@ export function renderStudioCanvasStickyBanners({
                     );
                   }}
                   onFit={fitCanvasToWidth}
+                  onFitViewport={fitCanvasToViewport}
                   onFitSelection={zoomToSelection}
                   onActual={setActualPixelView}
                   onRotateLeft={() => rotateCanvasView("left")}

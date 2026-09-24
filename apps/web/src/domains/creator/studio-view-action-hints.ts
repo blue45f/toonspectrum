@@ -46,6 +46,15 @@ export const STUDIO_VIEW_ACTION_HINTS = {
     previewVariant: "fit-width",
     tip: "긴 세로 원고를 위에서 아래로 검토할 때 가로 스크롤을 없앨 수 있어요.",
   },
+  fitViewport: {
+    id: "view:fit-viewport",
+    title: "화면에 전체 맞춤",
+    description:
+      "캔버스 전체가 현재 작업 영역 안에 들어오도록 가로와 세로 배율을 함께 계산합니다.",
+    preview: "zoom-view",
+    previewVariant: "fit-width",
+    tip: "브라우저 확대를 바꾸지 않고 전체 구도와 브러시 좌표를 같은 편집 배율에서 확인하세요.",
+  },
   fitSelection: {
     id: "view:fit-selection",
     title: "선택 영역에 맞춤",

@@ -54,11 +54,18 @@ import {
 import { STUDIO_NPC_CAST, studioNpcCastSkinByKey } from "./studio-virtual-space-npc-cast";
 import {
   DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
+  studioVirtualArtObjectUrl,
   studioVirtualArtStyle,
   studioVirtualArtTextureUrl,
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
 import { drawStudioModularCampus } from "./studio-virtual-space-modular-campus";
+import {
+  StudioLivingWorldRuntime,
+  studioVirtualDayPhase,
+  studioVirtualTerrainAt,
+} from "./studio-virtual-space-living-world";
+import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
 import {
   StudioCharacterAssetResidency,
   studioCharacterFrameGeometry,
@@ -337,13 +344,21 @@ export function StudioVirtualSpacePhaserCanvas({
       const interactions = studioWorldInteractions(manifest);
       const portals = studioWorldPortals(manifest);
       const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}-${artStyle}`;
-      const styledWorldBase = studioVirtualArtTextureUrl(artStyle, "world-base");
-      const backgroundUrl = styledWorldBase ?? worldAssetUrls?.get(manifest.backgroundUrl) ?? manifest.backgroundUrl;
-      const styleTextureKinds = ["floor", "path", "water", "cloud"] as const;
-      const styleTextureAssets = styleTextureKinds.flatMap((kind) => {
-        const url = studioVirtualArtTextureUrl(artStyle, kind);
-        return url ? [{ kind, key: `studio-style-${artStyle}-${kind}`, url }] : [];
-      });
+      const backgroundUrl = studioVirtualArtTextureUrl(artStyle, "world-base");
+      const livingTextureKeys = {
+        cloudBack: `studio-living-${artStyle}-cloud-back`,
+        cloudFront: `studio-living-${artStyle}-cloud-front`,
+        water: `studio-living-${artStyle}-water`,
+        foliage: `studio-living-${artStyle}-foliage`,
+        lights: `studio-living-${artStyle}-lights`,
+        weather: `studio-living-${artStyle}-weather`,
+      } as const;
+      const objectTextureKeys = {
+        door: `studio-object-${artStyle}-door`,
+        crate: `studio-object-${artStyle}-crate`,
+        lantern: `studio-object-${artStyle}-lantern`,
+        bench: `studio-object-${artStyle}-bench`,
+      } as const;
       const portalTracker = new StudioWorldPortalTracker();
       const zoneTracker = new StudioWorldZoneTracker();
       const failedTextures = new Set<string>();
@@ -420,6 +435,10 @@ export function StudioVirtualSpacePhaserCanvas({
       let lastPublishedPoint: StudioVirtualSpacePoint | null = null;
       let nearbyInteractionId: string | null = null;
       let keys: Record<string, import("phaser").Input.Keyboard.Key> | null = null;
+      let livingWorld: StudioLivingWorldRuntime | null = null;
+      let objectRuntime: StudioWorldObjectRuntime | null = null;
+      const staticColliderObjects: import("phaser").GameObjects.GameObject[] = [];
+      let lastFootstepDistance = 0;
 
       const ensureWalkAnimation = (skin: StudioCharacterSkin, direction: StudioVirtualSpaceFacing) => {
         const clip = studioCharacterWalkClip(skin, direction);
@@ -646,7 +665,16 @@ export function StudioVirtualSpacePhaserCanvas({
       scene.preload = function preload() {
         this.load.on("loaderror", (file: import("phaser").Loader.File) => failedTextures.add(file.key));
         this.load.image(backgroundTextureKey, backgroundUrl);
-        for (const texture of styleTextureAssets) this.load.image(texture.key, texture.url);
+        this.load.image(livingTextureKeys.cloudBack, studioVirtualArtTextureUrl(artStyle, "cloud-back"));
+        this.load.image(livingTextureKeys.cloudFront, studioVirtualArtTextureUrl(artStyle, "cloud-front"));
+        this.load.spritesheet(livingTextureKeys.water, studioVirtualArtTextureUrl(artStyle, "water-sheet"), { frameWidth: 256, frameHeight: 128 });
+        this.load.spritesheet(livingTextureKeys.foliage, studioVirtualArtTextureUrl(artStyle, "foliage-sheet"), { frameWidth: 256, frameHeight: 128 });
+        this.load.spritesheet(livingTextureKeys.lights, studioVirtualArtTextureUrl(artStyle, "lights-sheet"), { frameWidth: 256, frameHeight: 128 });
+        this.load.spritesheet(livingTextureKeys.weather, studioVirtualArtTextureUrl(artStyle, "weather-sheet"), { frameWidth: 256, frameHeight: 256 });
+        this.load.image(objectTextureKeys.door, studioVirtualArtObjectUrl(artStyle, "door"));
+        this.load.image(objectTextureKeys.crate, studioVirtualArtObjectUrl(artStyle, "crate"));
+        this.load.image(objectTextureKeys.lantern, studioVirtualArtObjectUrl(artStyle, "lantern"));
+        this.load.image(objectTextureKeys.bench, studioVirtualArtObjectUrl(artStyle, "bench"));
 
         // Ready means the world and a safe actor frame exist, not that every clip has downloaded.
         for (const asset of new Map([fallbackAsset, bootSelfAsset, npcFallbackAsset, ...npcBootAssets].map((item) => [item.key, item])).values()) {
@@ -681,6 +709,9 @@ export function StudioVirtualSpacePhaserCanvas({
           .setOrigin(0)
           .setDisplaySize(backgroundRect.width, backgroundRect.height)
           .setDepth(-1_000);
+
+        livingWorld = new StudioLivingWorldRuntime(this, manifest, artStyle, livingTextureKeys);
+        cleanup.push(() => { livingWorld?.destroy(); livingWorld = null; });
 
         const modularCampus = drawStudioModularCampus(this, manifest, artStyle);
         parent.dataset.worldPresentation = modularCampus.length > 0 ? "modular-campus" : "illustrated";
@@ -790,7 +821,10 @@ export function StudioVirtualSpacePhaserCanvas({
           const zone = this.add.zone(collider.x, collider.y, collider.width, collider.height).setOrigin(0);
           this.physics.add.existing(zone, true);
           this.physics.add.collider(bodyZone, zone);
+          staticColliderObjects.push(zone);
         }
+        objectRuntime = new StudioWorldObjectRuntime(this, manifest, bodyZone, staticColliderObjects, objectTextureKeys);
+        cleanup.push(() => { objectRuntime?.destroy(); objectRuntime = null; });
 
         localShadow = this.add.ellipse(initialPoint.x, initialPoint.y + 3, 50, 14, 0x1c1111, 0.28)
           .setDepth(Math.round(initialPoint.y) + 990);
@@ -1090,12 +1124,14 @@ export function StudioVirtualSpacePhaserCanvas({
         if (!typing) { ix += gamepad.x; iy += gamepad.y; }
 
         const sprint = !typing && Boolean(heldKeys.has("ShiftLeft") || heldKeys.has("ShiftRight") || keys?.shift?.isDown || gamepad.sprint);
+        let currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
+        const terrain = studioVirtualTerrainAt(manifest, currentPoint);
         const config = {
           ...DEFAULT_STUDIO_MOTION_CONFIG,
-          maxSpeed: STUDIO_VIRTUAL_SPACE_WALK_SPEED * (sprint ? 1.35 : 1),
+          acceleration: DEFAULT_STUDIO_MOTION_CONFIG.acceleration / terrain.dragMultiplier,
+          deceleration: DEFAULT_STUDIO_MOTION_CONFIG.deceleration * terrain.dragMultiplier,
+          maxSpeed: STUDIO_VIRTUAL_SPACE_WALK_SPEED * (sprint ? 1.35 : 1) * terrain.speedMultiplier,
         };
-
-        let currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
         const nearbyNpc = [...npcs.values()].filter((npc) => Math.hypot(npc.groundPoint.x - currentPoint.x, npc.groundPoint.y - currentPoint.y) < 55)
           .sort((left, right) => Math.hypot(left.sprite.x - currentPoint.x, left.sprite.y - currentPoint.y) - Math.hypot(right.sprite.x - currentPoint.x, right.sprite.y - currentPoint.y))
           .find((npc) => studioNpcInteraction(manifest, npc.definition));
@@ -1304,6 +1340,8 @@ export function StudioVirtualSpacePhaserCanvas({
         parent.dataset.zoneSeparated = String(zone.separated);
         parent.dataset.zoneAnnounced = String(zone.announce);
         const speed = Math.hypot(motion.velocity.x, motion.velocity.y);
+        objectRuntime?.update(time, currentPoint);
+        livingWorld?.update(time, deltaMs, currentPoint, speed, reducedMotion.matches);
         const traveled = lastPosition ? Math.hypot(currentPoint.x - lastPosition.x, currentPoint.y - lastPosition.y) : 0;
         if (traveled > 0.015) lastMovedAt = time;
         // Render frames can outnumber fixed physics steps. Do not toggle idle/walk on zero-step frames.
@@ -1323,11 +1361,18 @@ export function StudioVirtualSpacePhaserCanvas({
           const distance = Math.hypot(rendered.x - previousRendered.x, rendered.y - previousRendered.y);
           if (distance < 64) localDistance += distance;
         }
+        const footstepGap = terrain.kind === "shallow-water" ? 18 : sprint ? 32 : 25;
+        if (nextMoving && localDistance - lastFootstepDistance >= footstepGap) {
+          livingWorld?.emitFootstep(rendered, terrain, time);
+          lastFootstepDistance = localDistance;
+        }
         previousRendered = rendered;
         localSprite.setData("walkDistance", localDistance);
         localSprite.setData("seatAttached", Boolean(localSeat));
         applyAvatarVisual(localSprite, snapshotRef.current.self, localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, localState, identityRef.current);
-        cameraTarget.x = rendered.x; cameraTarget.y = rendered.y;
+        const lookAhead = reducedMotion.matches ? 0 : sprint ? 0.24 : 0.16;
+        cameraTarget.x = Math.max(0, Math.min(manifest.width, rendered.x + motion.velocity.x * lookAhead));
+        cameraTarget.y = Math.max(0, Math.min(manifest.height, rendered.y + motion.velocity.y * lookAhead));
         const followAmount = snapCamera || reducedMotion.matches ? 1 : studioCameraLerp(dt);
         this.cameras.main.setLerp(followAmount, followAmount);
         if (snapCamera) this.cameras.main.centerOn(rendered.x, rendered.y);
@@ -1457,6 +1502,10 @@ export function StudioVirtualSpacePhaserCanvas({
           parent.dataset.pixelRatio = viewport.ratio.toFixed(2);
           parent.dataset.localMoving = String(nextMoving);
           parent.dataset.localFacing = facing;
+          parent.dataset.terrain = terrain.kind;
+          parent.dataset.dayPhase = studioVirtualDayPhase(time);
+          parent.dataset.livingWorld = String(Boolean(livingWorld));
+          parent.dataset.objectPhysics = String(Boolean(objectRuntime));
           parent.dataset.texture = localSprite.texture.key;
           parent.dataset.appearanceIssues = JSON.stringify(localSprite.getData("appearanceIssues") ?? []);
           parent.dataset.reaction = localReaction?.visible ? localReaction.text : "";
