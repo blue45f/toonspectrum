@@ -28,6 +28,7 @@ import { StudioDrawingGestureBridge } from "./StudioDrawingGestureBridge";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
 import "../studio-shell/studio-visual-identity.css";
+import "../studio-shell/studio-visual-identity-v2.css";
 
 const StudioDraftSaveCenter = lazy(() => import("../StudioDraftSaveCenter").then((module) => ({ default: module.StudioDraftSaveCenter })));
 

@@ -22,6 +22,7 @@ import { StudioWorkspaceActivityRail } from "./StudioWorkspaceActivityRail";
 import { StudioWorkspaceRecentWorks } from "./StudioWorkspaceRecentWorks";
 import "@/shared/components/workspace/workspace.css";
 import "@/shared/components/workspace/workspace-redesign.css";
+import "@/shared/components/workspace/workspace-visual-v3.css";
 
 const WorkspaceLiveHome = lazy(() => import("./StudioWorkspaceLiveHome").then((module) => ({ default: module.StudioWorkspaceLiveHome })));
 

@@ -1,4 +1,6 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import "./studio-shell/studio-visual-identity-v2.css";
+
 import { AlertTriangle, Database, RefreshCw, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
