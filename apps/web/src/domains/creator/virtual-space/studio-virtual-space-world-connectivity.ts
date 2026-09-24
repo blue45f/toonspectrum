@@ -14,7 +14,7 @@ export interface StudioWorldConnectivityBounds {
 }
 
 const CONNECTIVITY_GRID = 6;
-const MAX_CONNECTIVITY_EXPANSIONS = 30_000;
+const MAX_CONNECTIVITY_EXPANSIONS = 40_000;
 const MAX_VALIDATION_EXPANSIONS = MAX_CONNECTIVITY_EXPANSIONS * 4;
 
 export function studioWorldCircleCanOccupy(

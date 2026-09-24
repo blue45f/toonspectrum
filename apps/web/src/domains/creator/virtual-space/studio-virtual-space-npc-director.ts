@@ -1,5 +1,6 @@
 import { studioCharacterActionClip, type StudioCharacterMotionState } from "./studio-virtual-space-character-skins";
 import { studioNpcCastSkinByKey } from "./studio-virtual-space-npc-cast";
+import { studioNpcScheduleIndex } from "./studio-virtual-space-npc-schedule";
 import { StudioNpcActivityReservations, type StudioNpcActivityStage, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
 import { studioNpcGuideStops, type StudioNpcGuideStop, type StudioVirtualNpcGuideTourRequest, type StudioVirtualNpcGuideTourState } from "./studio-virtual-space-npc-guide";
 import type { StudioVirtualSpaceFacing, StudioVirtualSpacePoint } from "./studio-virtual-space-model";
@@ -282,8 +283,11 @@ export class StudioNpcDirector {
     const choices = ids.map((id, index) => ({ index, anchor: this.manifest.npcActivityAnchors?.find((a) => a.id === id) }))
       .filter((choice): choice is { index: number; anchor: StudioWorldNpcActivityAnchor } => Boolean(choice.anchor) && choice.index !== actor.targetIndex);
     if (!choices.length && actor.targetIndex >= 0) { actor.targetIndex = -1; return true; }
-    const choice = actor.targetIndex > 0 && random(actor) < .72 ? choices.find((value) => value.index === 0) ?? choices[0]
-      : choices[actor.targetIndex === -1 ? 0 : Math.floor(random(actor) * choices.length)];
+    const scheduledIndex = studioNpcScheduleIndex(actor.definition.id, this.time, ids.length);
+    const scheduled = choices.find((value) => value.index === scheduledIndex);
+    const choice = scheduled ?? (actor.targetIndex > 0 && random(actor) < .72
+      ? choices.find((value) => value.index === 0) ?? choices[0]
+      : choices[actor.targetIndex === -1 ? 0 : Math.floor(random(actor) * choices.length)]);
     if (!choice || !this.reservations.reserve(choice.anchor, actor.definition.id, environment.people, this.time)) { actor.deadline = this.time + 2500; return true; }
     if (this.route(actor, choice.anchor.approachPoint, "walk")) {
       actor.activity = choice.anchor; actor.activityStage = "approach"; actor.targetIndex = choice.index;

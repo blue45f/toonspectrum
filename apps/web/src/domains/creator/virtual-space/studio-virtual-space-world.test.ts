@@ -241,12 +241,12 @@ describe("Virtual Studio Tiled adapter", () => {
     const background = tiledWorld.layers.find((layer) => layer.name === "background");
     expect(background).toMatchObject({
       type: "imagelayer",
-      image: "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp",
+      image: "/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp",
       imagewidth: 1280,
       imageheight: 960,
     });
     expect(tiledWorld.properties.find((item) => item.name === "backgroundUrl")?.value)
-      .toBe("/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp");
+      .toBe("/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp");
   });
 
   it("supports new rooms, props, portals, spawns and NPCs from data", () => {

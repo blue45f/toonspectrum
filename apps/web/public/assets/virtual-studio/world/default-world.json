@@ -11,12 +11,12 @@
   "version": "1.10",
   "tiledversion": "1.11.2",
   "nextlayerid": 13,
-  "nextobjectid": 195,
+  "nextobjectid": 211,
   "properties": [
     {
       "name": "backgroundUrl",
       "type": "string",
-      "value": "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp"
+      "value": "/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp"
     },
     {
       "name": "backgroundAssetKey",
@@ -26,7 +26,7 @@
     {
       "name": "manifestVersion",
       "type": "float",
-      "value": 7
+      "value": 8
     },
     {
       "name": "manifestId",
@@ -39,7 +39,7 @@
       "id": 1,
       "name": "background",
       "type": "imagelayer",
-      "image": "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp",
+      "image": "/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp",
       "imagewidth": 1280,
       "imageheight": 960,
       "x": 0,
@@ -5328,6 +5328,1014 @@
               "value": 0
             }
           ]
+        },
+        {
+          "id": 187,
+          "name": "studio-guide-3",
+          "type": "",
+          "x": 288,
+          "y": 800,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "teams"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "right"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 24
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 188,
+          "name": "studio-guide-4",
+          "type": "",
+          "x": 1188,
+          "y": 820,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "meeting"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 24
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 189,
+          "name": "studio-producer-3",
+          "type": "",
+          "x": 1210,
+          "y": 473,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "quality"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
+        },
+        {
+          "id": 190,
+          "name": "studio-producer-4",
+          "type": "",
+          "x": 935,
+          "y": 473,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
+        },
+        {
+          "id": 191,
+          "name": "studio-editor-3",
+          "type": "",
+          "x": 610,
+          "y": 473,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "drawing"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
+        },
+        {
+          "id": 192,
+          "name": "studio-editor-4",
+          "type": "",
+          "x": 1210,
+          "y": 193,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "release"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "rest"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
+        },
+        {
+          "id": 193,
+          "name": "studio-artist-3",
+          "type": "",
+          "x": 290,
+          "y": 193,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "assets"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
+        },
+        {
+          "id": 194,
+          "name": "studio-artist-4",
+          "type": "",
+          "x": 888,
+          "y": 790,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "live"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 24
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 195,
+          "name": "studio-archivist-3",
+          "type": "",
+          "x": 610,
+          "y": 473,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "drawing"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
+        },
+        {
+          "id": 196,
+          "name": "studio-archivist-4",
+          "type": "",
+          "x": 935,
+          "y": 473,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
+        },
+        {
+          "id": 197,
+          "name": "studio-cafe-3",
+          "type": "",
+          "x": 288,
+          "y": 800,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "teams"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "right"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 24
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 198,
+          "name": "studio-cafe-4",
+          "type": "",
+          "x": 1188,
+          "y": 820,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "meeting"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 24
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 199,
+          "name": "studio-security-3",
+          "type": "",
+          "x": 1210,
+          "y": 193,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "release"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
+        },
+        {
+          "id": 200,
+          "name": "studio-security-4",
+          "type": "",
+          "x": 920,
+          "y": 193,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "production"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
+        },
+        {
+          "id": 201,
+          "name": "studio-host-3",
+          "type": "",
+          "x": 688,
+          "y": 910,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "lobby"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "down"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "inspect"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 7000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 16000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 24
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 0
+            }
+          ]
+        },
+        {
+          "id": 202,
+          "name": "studio-host-4",
+          "type": "",
+          "x": 1210,
+          "y": 193,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "roomId",
+              "type": "string",
+              "value": "release"
+            },
+            {
+              "name": "facing",
+              "type": "string",
+              "value": "left"
+            },
+            {
+              "name": "activity",
+              "type": "string",
+              "value": "work"
+            },
+            {
+              "name": "animation",
+              "type": "string",
+              "value": "idle"
+            },
+            {
+              "name": "minDurationMs",
+              "type": "float",
+              "value": 18000
+            },
+            {
+              "name": "maxDurationMs",
+              "type": "float",
+              "value": 36000
+            },
+            {
+              "name": "anchorOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "anchorOffsetY",
+              "type": "float",
+              "value": 12
+            },
+            {
+              "name": "exitOffsetX",
+              "type": "float",
+              "value": 0
+            },
+            {
+              "name": "exitOffsetY",
+              "type": "float",
+              "value": 24
+            }
+          ]
         }
       ]
     },
@@ -5342,7 +6350,7 @@
       "y": 0,
       "objects": [
         {
-          "id": 187,
+          "id": 203,
           "name": "studio-guide",
           "type": "",
           "x": 700,
@@ -5385,7 +6393,7 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-guide-0;studio-guide-1;studio-guide-2"
+              "value": "studio-guide-0;studio-guide-1;studio-guide-2;studio-guide-3;studio-guide-4"
             },
             {
               "name": "patrol",
@@ -5395,7 +6403,7 @@
           ]
         },
         {
-          "id": 188,
+          "id": 204,
           "name": "studio-producer",
           "type": "",
           "x": 900,
@@ -5438,7 +6446,7 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-producer-0;studio-producer-1;studio-producer-2"
+              "value": "studio-producer-0;studio-producer-1;studio-producer-2;studio-producer-3;studio-producer-4"
             },
             {
               "name": "patrol",
@@ -5448,7 +6456,7 @@
           ]
         },
         {
-          "id": 189,
+          "id": 205,
           "name": "studio-editor",
           "type": "",
           "x": 905,
@@ -5491,7 +6499,7 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-editor-0;studio-editor-1;studio-editor-2"
+              "value": "studio-editor-0;studio-editor-1;studio-editor-2;studio-editor-3;studio-editor-4"
             },
             {
               "name": "patrol",
@@ -5501,7 +6509,7 @@
           ]
         },
         {
-          "id": 190,
+          "id": 206,
           "name": "studio-artist",
           "type": "",
           "x": 585,
@@ -5544,7 +6552,7 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-artist-0;studio-artist-1;studio-artist-2"
+              "value": "studio-artist-0;studio-artist-1;studio-artist-2;studio-artist-3;studio-artist-4"
             },
             {
               "name": "patrol",
@@ -5554,7 +6562,7 @@
           ]
         },
         {
-          "id": 191,
+          "id": 207,
           "name": "studio-archivist",
           "type": "",
           "x": 270,
@@ -5597,7 +6605,7 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-archivist-0;studio-archivist-1;studio-archivist-2"
+              "value": "studio-archivist-0;studio-archivist-1;studio-archivist-2;studio-archivist-3;studio-archivist-4"
             },
             {
               "name": "patrol",
@@ -5607,7 +6615,7 @@
           ]
         },
         {
-          "id": 192,
+          "id": 208,
           "name": "studio-cafe",
           "type": "",
           "x": 570,
@@ -5650,7 +6658,7 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-cafe-0;studio-cafe-1;studio-cafe-2"
+              "value": "studio-cafe-0;studio-cafe-1;studio-cafe-2;studio-cafe-3;studio-cafe-4"
             },
             {
               "name": "patrol",
@@ -5660,7 +6668,7 @@
           ]
         },
         {
-          "id": 193,
+          "id": 209,
           "name": "studio-security",
           "type": "",
           "x": 1200,
@@ -5703,7 +6711,7 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-security-0;studio-security-1;studio-security-2"
+              "value": "studio-security-0;studio-security-1;studio-security-2;studio-security-3;studio-security-4"
             },
             {
               "name": "patrol",
@@ -5713,7 +6721,7 @@
           ]
         },
         {
-          "id": 194,
+          "id": 210,
           "name": "studio-host",
           "type": "",
           "x": 880,
@@ -5756,7 +6764,7 @@
             {
               "name": "activityAnchorIds",
               "type": "string",
-              "value": "studio-host-0;studio-host-1;studio-host-2"
+              "value": "studio-host-0;studio-host-1;studio-host-2;studio-host-3;studio-host-4"
             },
             {
               "name": "patrol",

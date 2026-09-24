@@ -200,6 +200,29 @@ const DEFAULT_NPC_ACTIVITY_ANCHORS: readonly StudioWorldNpcActivityAnchor[] =
     maxDurationMs: index === 0 ? 36_000 : 16_000,
   })));
 
+
+const EXTRA_NPC_ACTIVITY_ANCHORS: readonly StudioWorldNpcActivityAnchor[] = [
+  ["studio-guide", "teams", 300, 800, "right", "work", "review"], ["studio-guide", "meeting", 1200, 820, "left", "inspect", "talk"],
+  ["studio-producer", "quality", 1210, 485, "left", "work", "review"], ["studio-producer", "review", 935, 485, "left", "inspect", "review"],
+  ["studio-editor", "drawing", 610, 485, "left", "inspect", "review"], ["studio-editor", "release", 1210, 205, "left", "rest", "idle"],
+  ["studio-artist", "assets", 290, 205, "left", "inspect", "review"], ["studio-artist", "live", 900, 790, "left", "work", "draw"],
+  ["studio-archivist", "drawing", 610, 485, "left", "inspect", "review"], ["studio-archivist", "review", 935, 485, "left", "work", "review"],
+  ["studio-cafe", "teams", 300, 800, "right", "work", "talk"], ["studio-cafe", "meeting", 1200, 820, "left", "inspect", "talk"],
+  ["studio-security", "release", 1210, 205, "left", "inspect", "review"], ["studio-security", "production", 920, 205, "left", "work", "review"],
+  ["studio-host", "lobby", 700, 910, "down", "inspect", "talk"], ["studio-host", "release", 1210, 205, "left", "work", "draw"],
+].map(([id, roomId, x, y, facing, activity, animation], index) => {
+  const localIndex = 3 + index % 2;
+  const px = Number(x), py = Number(y);
+  const vertical = [290, 610, 920, 935, 1210].includes(px);
+  return { id: `${id}-${localIndex}`, roomId: String(roomId),
+    approachPoint: vertical ? { x: px, y: py - 12 } : { x: px - 12, y: py },
+    anchorPoint: { x: px, y: py },
+    exitPoint: vertical ? { x: px, y: py + 12 } : { x: px + 12, y: py },
+    facing: facing as StudioVirtualSpaceFacing, activity: activity as StudioWorldNpcActivityAnchor["activity"],
+    animation: animation as StudioWorldNpcActivityAnchor["animation"], minDurationMs: activity === "work" ? 18_000 : 7_000,
+    maxDurationMs: activity === "work" ? 36_000 : 16_000 };
+});
+
 const acousticZones = STUDIO_VIRTUAL_SPACE_ZONES.map(({ id, x, y, width, height }) => ({
   id: `${id}-audio`, roomId: id, x, y, width, height,
   policy: id === "meeting" || id === "review" ? "private" as const : "public" as const,
@@ -208,11 +231,11 @@ const acousticZones = STUDIO_VIRTUAL_SPACE_ZONES.map(({ id, x, y, width, height 
 
 export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Object.freeze<StudioVirtualSpaceWorldManifest>({
   id: "toonspectrum-master-studio",
-  version: 7,
+  version: 8,
   width: STUDIO_VIRTUAL_SPACE_WIDTH,
   height: STUDIO_VIRTUAL_SPACE_HEIGHT,
   backgroundAssetKey: "studio-modular-campus-v3",
-  backgroundUrl: "/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp",
+  backgroundUrl: "/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp",
   rooms: STUDIO_VIRTUAL_SPACE_ZONES.map((zone) => ({
     id: zone.id, labelKo: zone.labelKo, labelEn: zone.labelEn,
     descriptionKo: zone.descriptionKo, descriptionEn: zone.descriptionEn,
@@ -255,16 +278,16 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
     { id: "meeting-two", roomId: "meeting", labelKo: "회의석 2", labelEn: "Meeting seat 2",
       approachPoint: { x: 1140, y: 790 }, anchorPoint: { x: 1140, y: 790 }, seatAttachmentPoint: { x: 1130, y: 730 }, exitPoint: { x: 1175, y: 815 }, facing: "up", radius: 10 },
   ],
-  npcActivityAnchors: DEFAULT_NPC_ACTIVITY_ANCHORS,
+  npcActivityAnchors: [...DEFAULT_NPC_ACTIVITY_ANCHORS, ...EXTRA_NPC_ACTIVITY_ANCHORS],
   npcs: [
-    { id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2"], skinKey: "npc-concierge", roomId: "lobby", point: { x: 700, y: 910 }, facing: "down", scale: .94, speed: 62, behavior: "patrol", patrol: [{ x: 865, y: 910 }, { x: 780, y: 865 }] },
-    { id: "studio-producer", activityAnchorIds: ["studio-producer-0", "studio-producer-1", "studio-producer-2"], skinKey: "npc-producer", roomId: "production", point: { x: 900, y: 195 }, facing: "left", scale: .94, speed: 57, behavior: "patrol", patrol: [{ x: 730, y: 195 }, { x: 900, y: 80 }] },
-    { id: "studio-editor", activityAnchorIds: ["studio-editor-0", "studio-editor-1", "studio-editor-2"], skinKey: "npc-editor", roomId: "review", point: { x: 905, y: 485 }, facing: "left", scale: .94, speed: 56, behavior: "patrol", patrol: [{ x: 725, y: 485 }, { x: 905, y: 330 }] },
-    { id: "studio-artist", activityAnchorIds: ["studio-artist-0", "studio-artist-1", "studio-artist-2"], skinKey: "npc-artist", roomId: "drawing", point: { x: 585, y: 480 }, facing: "left", scale: .94, speed: 62, behavior: "patrol", patrol: [{ x: 395, y: 480 }, { x: 585, y: 330 }] },
-    { id: "studio-archivist", activityAnchorIds: ["studio-archivist-0", "studio-archivist-1", "studio-archivist-2"], skinKey: "npc-archivist", roomId: "assets", point: { x: 270, y: 205 }, facing: "left", scale: .94, speed: 54, behavior: "patrol", patrol: [{ x: 110, y: 205 }, { x: 270, y: 75 }] },
-    { id: "studio-cafe", activityAnchorIds: ["studio-cafe-0", "studio-cafe-1", "studio-cafe-2"], skinKey: "npc-cafe", roomId: "lounge", point: { x: 570, y: 745 }, facing: "left", scale: .94, speed: 55, behavior: "patrol", patrol: [{ x: 390, y: 745 }, { x: 570, y: 615 }] },
-    { id: "studio-security", activityAnchorIds: ["studio-security-0", "studio-security-1", "studio-security-2"], skinKey: "npc-security", roomId: "meeting", point: { x: 1200, y: 820 }, facing: "left", scale: .94, speed: 59, behavior: "patrol", patrol: [{ x: 1010, y: 820 }, { x: 1200, y: 620 }] },
-    { id: "studio-host", activityAnchorIds: ["studio-host-0", "studio-host-1", "studio-host-2"], skinKey: "npc-host", roomId: "live", point: { x: 880, y: 790 }, facing: "left", scale: .94, speed: 64, behavior: "patrol", patrol: [{ x: 660, y: 790 }, { x: 880, y: 615 }] },
+    { id: "studio-guide", activityAnchorIds: ["studio-guide-0", "studio-guide-1", "studio-guide-2", "studio-guide-3", "studio-guide-4"], skinKey: "npc-concierge", roomId: "lobby", point: { x: 700, y: 910 }, facing: "down", scale: .94, speed: 62, behavior: "patrol", patrol: [{ x: 865, y: 910 }, { x: 780, y: 865 }] },
+    { id: "studio-producer", activityAnchorIds: ["studio-producer-0", "studio-producer-1", "studio-producer-2", "studio-producer-3", "studio-producer-4"], skinKey: "npc-producer", roomId: "production", point: { x: 900, y: 195 }, facing: "left", scale: .94, speed: 57, behavior: "patrol", patrol: [{ x: 730, y: 195 }, { x: 900, y: 80 }] },
+    { id: "studio-editor", activityAnchorIds: ["studio-editor-0", "studio-editor-1", "studio-editor-2", "studio-editor-3", "studio-editor-4"], skinKey: "npc-editor", roomId: "review", point: { x: 905, y: 485 }, facing: "left", scale: .94, speed: 56, behavior: "patrol", patrol: [{ x: 725, y: 485 }, { x: 905, y: 330 }] },
+    { id: "studio-artist", activityAnchorIds: ["studio-artist-0", "studio-artist-1", "studio-artist-2", "studio-artist-3", "studio-artist-4"], skinKey: "npc-artist", roomId: "drawing", point: { x: 585, y: 480 }, facing: "left", scale: .94, speed: 62, behavior: "patrol", patrol: [{ x: 395, y: 480 }, { x: 585, y: 330 }] },
+    { id: "studio-archivist", activityAnchorIds: ["studio-archivist-0", "studio-archivist-1", "studio-archivist-2", "studio-archivist-3", "studio-archivist-4"], skinKey: "npc-archivist", roomId: "assets", point: { x: 270, y: 205 }, facing: "left", scale: .94, speed: 54, behavior: "patrol", patrol: [{ x: 110, y: 205 }, { x: 270, y: 75 }] },
+    { id: "studio-cafe", activityAnchorIds: ["studio-cafe-0", "studio-cafe-1", "studio-cafe-2", "studio-cafe-3", "studio-cafe-4"], skinKey: "npc-cafe", roomId: "lounge", point: { x: 570, y: 745 }, facing: "left", scale: .94, speed: 55, behavior: "patrol", patrol: [{ x: 390, y: 745 }, { x: 570, y: 615 }] },
+    { id: "studio-security", activityAnchorIds: ["studio-security-0", "studio-security-1", "studio-security-2", "studio-security-3", "studio-security-4"], skinKey: "npc-security", roomId: "meeting", point: { x: 1200, y: 820 }, facing: "left", scale: .94, speed: 59, behavior: "patrol", patrol: [{ x: 1010, y: 820 }, { x: 1200, y: 620 }] },
+    { id: "studio-host", activityAnchorIds: ["studio-host-0", "studio-host-1", "studio-host-2", "studio-host-3", "studio-host-4"], skinKey: "npc-host", roomId: "live", point: { x: 880, y: 790 }, facing: "left", scale: .94, speed: 64, behavior: "patrol", patrol: [{ x: 660, y: 790 }, { x: 880, y: 615 }] },
   ],
 });
 

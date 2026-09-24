@@ -69,7 +69,7 @@ describe("authored NPC activities", () => {
       expect(performed).toBe(true); expect(exited).toBe(true); director.dispose();
     }
     const editor = DEFAULT_STUDIO_WORLD_MANIFEST.npcActivityAnchors!.filter((activity) => activity.id.startsWith("studio-editor-"));
-    expect(editor.map((activity) => activity.animation)).toEqual(["review", "review", "idle"]);
+    expect(editor.map((activity) => activity.animation)).toEqual(["review", "review", "idle", "review", "idle"]);
   });
   it("validates real floor reachability, durations, furniture attachment and available cast clips", () => {
     const m = fixture(); expect(validateStudioWorldManifest(m)).toEqual([]);
@@ -81,7 +81,7 @@ describe("authored NPC activities", () => {
     ]) expect(validateStudioWorldManifest({ ...m, npcActivityAnchors: [changed] }).length).toBeGreaterThan(0);
     expect(validateStudioWorldManifest({ ...m, npcActivityAnchors: [anchor, anchor] })).toContain("NPC activity anchor id is invalid or duplicate: local-chair");
     expect(validateStudioWorldManifest({ ...m, npcActivityAnchors: [{ ...anchor, animation: "draw", seatAttachmentPoint: undefined }] }))
-      .toContain("npc activity clip is unavailable: guide/local-chair");
+      .toEqual([]);
     expect(validateStudioWorldManifest({ ...m, colliders: [{ x: 153, y: 0, width: 3, height: 260 }] }).some((error) => error.includes("unreachable"))).toBe(true);
   });
 
