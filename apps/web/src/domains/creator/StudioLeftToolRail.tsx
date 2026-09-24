@@ -75,6 +75,8 @@ import {
   StudioRailToolButton,
   StudioVerticalToolRail,
 } from "./studio-chrome-ui";
+import { StudioCreationModeLauncher } from "./StudioCreationModeLauncher";
+import type { StudioCreationMode } from "./studio-creation-mode";
 import {
   resolveStudioRailMorePosition,
   type StudioRailMorePosition,
@@ -1087,6 +1089,29 @@ zoom: { icon: Search, label: zoomViewToolLabel, description: zoomViewToolOpen ? 
     setToolbarBeforeShowAll(appSettings.toolbar);
     commitAppSettings({ ...appSettings, toolbar });
   };
+  const openCreationMode = (mode: StudioCreationMode): void => {
+    switch (mode) {
+      case "draw":
+        activateDrawTool("pen");
+        break;
+      case "story":
+        setMenu("bubble");
+        break;
+      case "character":
+        setCharacterShaperOpen?.(true);
+        break;
+      case "background":
+        setMenu("bgFill");
+        break;
+      case "assets":
+        setMenu("template");
+        break;
+      case "ai":
+        setMenu("aiAssist");
+        break;
+    }
+  };
+
   const railMoreFooter = (
     <div className="relative flex w-full flex-col items-center gap-1" data-studio-tool-rail-settings="true">
       <button type="button" id={railMoreTriggerId}
@@ -1137,6 +1162,8 @@ zoom: { icon: Search, label: zoomViewToolLabel, description: zoomViewToolOpen ? 
       onChange={onPickImage} disabled={activeSurfaceReviewLocked} />
     {studioUiDensityAllows(uiDensityMode, "tool-rail") && !canvasOnlyMode ? (
       <StudioVerticalToolRail className={cn(mobileImmersive && "hidden")} view={appSettings.toolbar.view} footer={railMoreFooter}>
+        <StudioCreationModeLauncher onSelectMode={openCreationMode} />
+        <StudioRailDivider data-studio-rail-group-divider="creator-modes" label="제작 모드" />
         {currentToolId && !visibleRailIds.includes(currentToolId) ? (
           <div className="col-span-full w-full border-b border-line pb-2" data-studio-unpinned-current-tool={currentToolId}>
             <span className="block text-center text-xs text-fg-2">현재</span>
