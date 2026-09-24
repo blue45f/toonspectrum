@@ -108,6 +108,7 @@ import {
   writeStudioPublicationCover,
 } from "./studio-publication-cover";
 import { StudioPublicationControls } from "./StudioPublicationControls";
+import { StudioPublicationRightsControls } from "./StudioPublicationRightsControls";
 import {
   StudioPublishContextBanner,
   type PublishContext,
@@ -127,6 +128,12 @@ import {
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import {
+  createDefaultCreatorCommunityMetadata,
+  readCreatorCommunityMetadata,
+  writeCreatorCommunityMetadata,
+  type CreatorCommunityMetadata,
+} from "@/shared/lib/creator-community-publication-contract";
 import {
   createDefaultCreatorPublicationDirective,
   markCreatorPublicationPublished,
@@ -210,6 +217,10 @@ function initialDirective(): CreatorPublicationDirective {
   return createDefaultCreatorPublicationDirective(browserTimeZone());
 }
 
+function initialCommunityMetadata(): CreatorCommunityMetadata {
+  return createDefaultCreatorCommunityMetadata("upload");
+}
+
 function publicationActionLabel(
   directive: CreatorPublicationDirective,
   editing: boolean,
@@ -275,6 +286,9 @@ export function StudioPublishingCommandCenter({
   const [description, setDescription] = useState("");
   const [tagsText, setTagsText] = useState("");
   const [directive, setDirective] = useState<CreatorPublicationDirective>(initialDirective);
+  const [communityMetadata, setCommunityMetadata] = useState<CreatorCommunityMetadata>(
+    initialCommunityMetadata,
+  );
   const [baseDoc, setBaseDoc] = useState<Record<string, unknown>>({});
   const [linkedSeriesId, setLinkedSeriesId] = useState<string | null>(routeSeriesId);
   const [linkedChallengeId, setLinkedChallengeId] = useState<string | null>(routeChallengeId);
@@ -356,10 +370,20 @@ export function StudioPublishingCommandCenter({
         tags,
         pages,
         directive,
+        community: communityMetadata,
         challengeLinked: Boolean(linkedChallengeId),
         seriesLinked: Boolean(linkedSeriesId),
       }),
-    [description, directive, linkedChallengeId, linkedSeriesId, pages, tags, title],
+    [
+      communityMetadata,
+      description,
+      directive,
+      linkedChallengeId,
+      linkedSeriesId,
+      pages,
+      tags,
+      title,
+    ],
   );
   const coverPage = useMemo(
     () => pages.find((page) => page.id === coverPageId) ?? pages[0] ?? null,
@@ -445,6 +469,7 @@ export function StudioPublishingCommandCenter({
       setDescription("");
       setTagsText("");
       setDirective(initialDirective());
+      setCommunityMetadata(initialCommunityMetadata());
       setBaseDoc({});
       setLinkedSeriesId(workId ? null : routeSeriesId);
       setLinkedChallengeId(workId ? null : routeChallengeId);
@@ -481,6 +506,7 @@ export function StudioPublishingCommandCenter({
     setDescription("");
     setTagsText("");
     setDirective(initialDirective());
+    setCommunityMetadata(initialCommunityMetadata());
     setBaseDoc({});
     setWorkRevision(undefined);
     setHydratedScope(null);
@@ -560,6 +586,7 @@ export function StudioPublishingCommandCenter({
         setDescription(shared.document.description);
         setTagsText(shared.document.tags.join(", "));
         setDirective(loadedDirective);
+        setCommunityMetadata(readCreatorCommunityMetadata(loadedDoc, { format: "upload" }));
         setBaseDoc(loadedDoc);
         setLinkedSeriesId(shared.document.seriesId);
         setLinkedChallengeId(shared.document.challengeId);
@@ -618,6 +645,7 @@ export function StudioPublishingCommandCenter({
       setDescription("");
       setTagsText("");
       setDirective(initialDirective());
+      setCommunityMetadata(initialCommunityMetadata());
       setBaseDoc({});
       setLinkedSeriesId(routeSeriesId);
       setLinkedChallengeId(routeChallengeId);
@@ -1065,7 +1093,11 @@ export function StudioPublishingCommandCenter({
     const descriptionSnapshot = description.trim();
     const tagsSnapshot = parseStudioPublicationTags(tagsText);
     const storedDirective = readCreatorPublicationDirective(baseDoc);
+    const storedCommunityMetadata = readCreatorCommunityMetadata(baseDoc, { format: "upload" });
     const ownerControlsPolicy = !publishScope.workId || sharedMetaSnapshot?.role === "owner";
+    const communitySnapshot = ownerControlsPolicy
+      ? communityMetadata
+      : storedCommunityMetadata;
     let directiveSnapshot = ownerControlsPolicy ? directive : storedDirective;
     const requestedStatus: CreatorPublicationWorkStatus =
       intent === "draft" ? "draft" : "published";
@@ -1092,14 +1124,19 @@ export function StudioPublishingCommandCenter({
       const { resolveStudioPublicationOrigin, writeStudioPublicationIntegrity } = await import(
         "./studio-publication-integrity"
       );
-      const currentSource = readCreatorPublicationSource(baseDoc);
+      const communityDocument = writeCreatorCommunityMetadata(
+        baseDoc,
+        communitySnapshot,
+        { format: "upload" },
+      );
+      const currentSource = readCreatorPublicationSource(communityDocument);
       const origin = resolveStudioPublicationOrigin({
         currentSourceKind: currentSource?.kind,
         studioHandoff: handoffContext !== null,
         sourceWorkId: handoffContext?.sourceWorkId,
       });
       integrityDocument = await writeStudioPublicationIntegrity({
-        document: baseDoc,
+        document: communityDocument,
         sourceKind: origin.sourceKind,
         documentId: origin.documentId,
         disclosure: origin.disclosure,
@@ -1249,7 +1286,10 @@ export function StudioPublishingCommandCenter({
       );
       if (saved.revision !== undefined) setWorkRevision(saved.revision);
       setBaseDoc(documentSnapshot);
-      if (ownerControlsPolicy && directiveSnapshot) setDirective(directiveSnapshot);
+      if (ownerControlsPolicy) {
+        setCommunityMetadata(communitySnapshot);
+        if (directiveSnapshot) setDirective(directiveSnapshot);
+      }
       setDirty(false);
       setPublisherConfirmed(false);
       if (handoffId) {
@@ -1437,6 +1477,15 @@ export function StudioPublishingCommandCenter({
       height: page.height,
     })),
     source: readCreatorPublicationSource(baseDoc),
+    community: {
+      kind: communityMetadata.kind,
+      provenance: communityMetadata.provenance,
+      portfolio: communityMetadata.portfolio,
+      downloadAllowed: communityMetadata.downloadAllowed,
+      trainingAllowed: communityMetadata.trainingAllowed,
+      attributionText: communityMetadata.attributionText,
+      altText: communityMetadata.altText,
+    },
     rights: {
       comments: directive.comments,
       allowRemix: directive.allowRemix,
@@ -1447,7 +1496,15 @@ export function StudioPublishingCommandCenter({
       errors: preflight.errors.length,
       warnings: preflight.warnings.length,
     },
-  }), [baseDoc, directive, pages, preflight.errors.length, preflight.warnings.length, title]);
+  }), [
+    baseDoc,
+    communityMetadata,
+    directive,
+    pages,
+    preflight.errors.length,
+    preflight.warnings.length,
+    title,
+  ]);
 
   return (
     <div data-route-ready="studio-publish">
@@ -1843,6 +1900,15 @@ export function StudioPublishingCommandCenter({
             disabled={mutationLocked || !policyEditable}
             onChange={(next) => { setDirective(next); markChanged(); }}
           />
+          <StudioPublicationRightsControls
+            metadata={communityMetadata}
+            issues={preflight.issues}
+            disabled={mutationLocked || !policyEditable}
+            onChange={(next) => {
+              setCommunityMetadata(next);
+              markChanged();
+            }}
+          />
         </div>
       )}
 
@@ -1891,6 +1957,8 @@ export function StudioPublishingCommandCenter({
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">댓글</dt><dd className="font-medium text-fg">{directive.comments === "open" ? "허용" : "새 댓글 차단"}</dd></div>
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">리믹스</dt><dd className="font-medium text-fg">{directive.allowRemix ? "허용" : "차단"}</dd></div>
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">독자 등급</dt><dd className="font-medium text-fg">{directive.contentRating === "all" ? "전체 이용" : directive.contentRating === "teen" ? "청소년 주의" : "성인 대상"}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">제작 방식</dt><dd className="font-medium text-fg">{communityMetadata.provenance === "human" ? "직접 제작" : communityMetadata.provenance === "ai_assisted" ? "AI 보조 사용" : communityMetadata.provenance === "agent_assisted" ? "AI 에이전트 협업" : communityMetadata.provenance === "ai_generated" ? "AI 생성 중심" : "혼합 제작"}</dd></div>
+                <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">활용 허용</dt><dd className="font-medium text-fg">다운로드 {communityMetadata.downloadAllowed ? "허용" : "비허용"} · AI 학습 {communityMetadata.trainingAllowed ? "허용" : "비허용"}</dd></div>
                 <div className="flex items-start gap-3 py-2.5"><dt className="w-20 shrink-0 text-fg-3">표지</dt><dd className="font-medium text-fg">{coverPage?.name ?? "미선택"} · 3:4 크롭</dd></div>
               </dl>
             </section>
@@ -1910,8 +1978,26 @@ export function StudioPublishingCommandCenter({
               <h2 className="flex items-center gap-2 text-sm font-bold text-fg"><Eye size={15} className={preflight.errors.length ? "text-bad" : "text-good"} /> 최종 사전검사</h2>
               <p className="mt-2 text-xs leading-relaxed text-fg-2">오류 {preflight.errors.length}건 · 경고 {preflight.warnings.length}건</p>
               {preflight.issues.length > 0 ? (
-                <ul className="mt-3 space-y-2">
-                  {preflight.issues.slice(0, 8).map((issue) => <li key={`${issue.code}:${issue.path}`} className={cn("text-xs leading-relaxed", issue.severity === "error" ? "text-bad" : "text-fg-2")}>• {issue.message}</li>)}
+                <ul
+                  className="mt-3 max-h-80 space-y-2 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable]"
+                  aria-label="게시 사전검사 전체 결과"
+                >
+                  {preflight.issues.map((issue) => (
+                    <li
+                      key={`${issue.code}:${issue.path}`}
+                      className={cn(
+                        "rounded-lg border px-2.5 py-2 text-xs leading-relaxed",
+                        issue.severity === "error"
+                          ? "border-bad/30 bg-bad/8 text-bad"
+                          : "border-line bg-card/55 text-fg-2",
+                      )}
+                    >
+                      <span className="block">{issue.message}</span>
+                      <span className="mt-1 block font-mono text-[0.62rem] text-fg-3">
+                        {issue.code} · {issue.path}
+                      </span>
+                    </li>
+                  ))}
                 </ul>
               ) : (
                 <p className="mt-3 flex items-center gap-1.5 text-xs text-good"><Check size={13} /> 게시 가능한 상태입니다.</p>
