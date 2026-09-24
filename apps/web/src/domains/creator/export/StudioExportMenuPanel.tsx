@@ -1,4 +1,4 @@
-import { Copy, FileImage, FileText, Layers, Scissors } from "lucide-react";
+import { Copy, FileImage, FileText, Layers, Loader2, Scissors, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -178,6 +178,10 @@ export interface StudioExportMenuPanelProps {
   exportCurrentPageToRasterInterchange?: (
     format: StudioRasterInterchangeFormat
   ) => Promise<StudioRasterEncoded>;
+  /** 현재 편집 중인 서버 작품 ID. 기존 작품 게시 화면으로 연결할 때만 쓰며 권한 확인을 대신하지 않는다. */
+  sourceWorkId?: string | null;
+  /** SPA host가 제공하면 전체 새로고침 없이 게시 명령 센터로 이동한다. */
+  onNavigateToPublish?: (href: string) => void;
   /** Additional delivery formats share this panel's selection, preflight, and capture lock. */
   renderAdditionalExports?: (context: StudioExportMenuPackageContext) => ReactNode;
 }
@@ -213,6 +217,8 @@ export function StudioExportMenuPanel({
   exportCurrentPageToWillV1,
   exportCurrentPageToPsd,
   exportCurrentPageToRasterInterchange,
+  sourceWorkId = null,
+  onNavigateToPublish,
   renderAdditionalExports,
 }: StudioExportMenuPanelProps) {
   // 규격 슬라이스 실행 상태 — 캡처·저장이 비동기라 패널 안에서 진행/결과를 안내한다.
@@ -248,6 +254,8 @@ export function StudioExportMenuPanel({
   const [pageSelection, setPageSelection] = useState("");
   const [includeDialogueTxt, setIncludeDialogueTxt] = useState(false);
   const [packageStatus, setPackageStatus] = useState<ExportRunStatus | null>(null);
+  const [publishHandoffBusy, setPublishHandoffBusy] = useState(false);
+  const [publishHandoffStatus, setPublishHandoffStatus] = useState<ExportRunStatus | null>(null);
   /**
    * Editable print geometry for package preflight. Seeded from the surviving draft first —
    * this panel unmounts whenever the menu closes, and losing "인쇄 A4 300" on every close made
@@ -427,6 +435,43 @@ export function StudioExportMenuPanel({
       return { pages, indices: plan.indices, rangeLabel };
     }
     return { pages: all, indices: plan.indices, rangeLabel };
+  }
+
+  async function preparePublishingHandoff() {
+    if (
+      publishHandoffBusy || presetBusy || pdfBusy || vectorPdfBusy || svgBusy || psdBusy ||
+      openRasterBusy || archiveBusy !== null || contactBusy || isExporting
+    ) return;
+    setPublishHandoffBusy(true);
+    setPublishHandoffStatus({ tone: "info", text: "선택한 원고를 게시 화면용으로 준비하고 있어요..." });
+    try {
+      const captured = await captureMultiPageExportCanvases();
+      const handoff = await import("../studio-publish-handoff");
+      const record = await handoff.prepareStudioPublishHandoffFromCanvases({
+        title: exportTitle,
+        sourceWorkId,
+        canvases: captured.pages,
+        pageNames: captured.indices.map((index) => pageLabels[index] ?? `page-${index + 1}`),
+      });
+      if (!mountedRef.current) return;
+      const href = handoff.studioPublishHandoffHref(record.id, record.sourceWorkId);
+      setPublishHandoffStatus({
+        tone: "good",
+        text: `${captured.pages.length}페이지를 게시 명령 센터로 전달합니다. (${captured.rangeLabel})`,
+      });
+      if (onNavigateToPublish) onNavigateToPublish(href);
+      else window.location.assign(href);
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setPublishHandoffStatus({
+        tone: "warn",
+        text: error instanceof Error
+          ? error.message
+          : "게시 화면으로 보낼 원고를 준비하지 못했습니다.",
+      });
+    } finally {
+      if (mountedRef.current) setPublishHandoffBusy(false);
+    }
   }
 
   function exportDialogueTxtPackage() {
@@ -898,6 +943,56 @@ export function StudioExportMenuPanel({
       data-studio-export-menu-panel="true"
       className="fixed inset-x-2 top-12 z-[100] max-h-[calc(100dvh-4rem)] w-auto overflow-y-auto rounded-xl border border-line bg-panel p-3 shadow-2xl sm:inset-x-auto sm:right-3 sm:w-72"
     >
+      <div
+        data-studio-publish-handoff-action="true"
+        className="mb-2.5 rounded-xl border border-accent/35 bg-accent-soft/45 p-2.5"
+      >
+        <div className="flex items-start gap-2">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-on-accent shadow-sm">
+            <Send size={15} aria-hidden />
+          </span>
+          <span className="min-w-0">
+            <strong className="block text-xs text-fg">게시 화면으로 바로 보내기</strong>
+            <span className="mt-0.5 block text-[0.62rem] leading-snug text-fg-2">
+              선택한 페이지를 로컬 보관함에 안전하게 준비하고 제목과 순서를 유지해 게시 명령 센터로 이동합니다.
+            </span>
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => void preparePublishingHandoff()}
+          disabled={
+            !packagePreflight.canExport || publishHandoffBusy || presetBusy || pdfBusy ||
+            vectorPdfBusy || svgBusy || psdBusy || openRasterBusy || archiveBusy !== null ||
+            contactBusy || isExporting
+          }
+          className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent shadow-sm transition hover:brightness-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {publishHandoffBusy ? (
+            <Loader2 size={14} className="animate-spin" aria-hidden />
+          ) : (
+            <Send size={14} aria-hidden />
+          )}
+          {publishHandoffBusy ? "게시 원고 준비 중..." : `선택 ${exportRangeCount}페이지 보내기`}
+        </button>
+        {publishHandoffStatus ? (
+          <p
+            role="status"
+            aria-live="polite"
+            className={cx(
+              "mt-2 rounded-md px-2 py-1.5 text-[0.62rem] leading-snug",
+              publishHandoffStatus.tone === "good"
+                ? "bg-good/10 text-good"
+                : publishHandoffStatus.tone === "warn"
+                  ? "bg-warn/10 text-warn"
+                  : "bg-card/70 text-fg-2",
+            )}
+          >
+            {publishHandoffStatus.text}
+          </p>
+        ) : null}
+      </div>
+
       <div className="mb-2.5">
         <span className="mb-1 block text-xs font-semibold text-fg-2">플랫폼 규격</span>
         <div className="flex flex-wrap gap-1">

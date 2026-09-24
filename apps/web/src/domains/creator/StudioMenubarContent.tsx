@@ -1723,6 +1723,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                       pageCount={pageCount}
                       pageLabels={pageLabels}
                       dialoguePages={dialoguePages}
+                      sourceWorkId={workId}
                       capturePagesForPreset={handleCapturePagesForPreset}
                       capturePagesForIndices={handleCapturePagesForIndices}
                       exportCurrentPageToInkMl={exportCurrentPageToInkMl}

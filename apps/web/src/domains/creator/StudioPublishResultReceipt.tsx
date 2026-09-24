@@ -2,7 +2,9 @@ import {
   CalendarClock,
   CheckCircle2,
   ExternalLink,
+  EyeOff,
   FilePenLine,
+  Loader2,
   LockKeyhole,
   Settings2,
 } from "lucide-react";
@@ -28,6 +30,9 @@ export interface StudioPublishResultReceiptProps {
   readonly environment: StudioPublishEnvironment;
   readonly onContinueEditing: () => void;
   readonly onReviewSettings: () => void;
+  readonly onMakePrivate?: () => void;
+  readonly recoveryBusy?: boolean;
+  readonly recoveryError?: string | null;
 }
 
 function ResultIcon({ kind }: { kind: StudioPublishResultKind }) {
@@ -44,10 +49,15 @@ export function StudioPublishResultReceipt({
   environment,
   onContinueEditing,
   onReviewSettings,
+  onMakePrivate,
+  recoveryBusy = false,
+  recoveryError = null,
 }: StudioPublishResultReceiptProps) {
   const titleId = useId();
   const copy = studioPublishResultCopy(kind);
   const published = kind === "published";
+  const recoverable = kind === "published" || kind === "scheduled";
+  const recoveryLabel = kind === "scheduled" ? "게시 예약 취소" : "즉시 비공개 전환";
 
   return (
     <section
@@ -97,7 +107,36 @@ export function StudioPublishResultReceipt({
         </div>
       </dl>
 
+      {recoveryError ? (
+        <p
+          role="alert"
+          className="mt-3 rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-sm leading-relaxed text-bad"
+        >
+          {recoveryError}
+        </p>
+      ) : null}
+
       <div className="mt-4 flex flex-wrap justify-end gap-2">
+        {recoverable && onMakePrivate ? (
+          <button
+            type="button"
+            onClick={onMakePrivate}
+            disabled={recoveryBusy}
+            className={buttonClass({
+              size: "sm",
+              variant: "outline",
+              className:
+                "min-h-11 gap-1.5 border-bad/45 text-bad hover:border-bad/70 hover:bg-bad/10 hover:text-bad",
+            })}
+          >
+            {recoveryBusy ? (
+              <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden />
+            ) : (
+              <EyeOff size={14} aria-hidden />
+            )}
+            {recoveryBusy ? "비공개 전환 중..." : recoveryLabel}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onContinueEditing}

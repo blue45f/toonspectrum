@@ -52,4 +52,44 @@ describe("StudioPublishResultReceipt", () => {
     expect(onContinueEditing).toHaveBeenCalledOnce();
     expect(onReviewSettings).toHaveBeenCalledOnce();
   });
+
+  it("offers an explicit rollback for published and scheduled results", () => {
+    const onMakePrivate = vi.fn();
+    const { rerender } = render(
+      <MemoryRouter>
+        <StudioPublishResultReceipt
+          kind="published"
+          workId="work-live"
+          environment="production"
+          onContinueEditing={() => undefined}
+          onReviewSettings={() => undefined}
+          onMakePrivate={onMakePrivate}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "즉시 비공개 전환" }));
+    expect(onMakePrivate).toHaveBeenCalledOnce();
+
+    rerender(
+      <MemoryRouter>
+        <StudioPublishResultReceipt
+          kind="scheduled"
+          workId="work-scheduled"
+          environment="production"
+          onContinueEditing={() => undefined}
+          onReviewSettings={() => undefined}
+          onMakePrivate={onMakePrivate}
+          recoveryBusy
+          recoveryError="다른 창의 변경을 먼저 확인해 주세요."
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("button", { name: "비공개 전환 중..." })).toHaveProperty(
+      "disabled",
+      true,
+    );
+    expect(screen.getByRole("alert").textContent).toContain("다른 창의 변경");
+  });
 });
