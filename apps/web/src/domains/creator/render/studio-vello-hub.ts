@@ -69,7 +69,7 @@ export const STUDIO_VELLO_HYBRID_BACKEND_ID =
   "vello-hybrid-wgpu" as const;
 export const STUDIO_VELLO_CPU_BACKEND_ID = "vello-cpu" as const;
 export const STUDIO_VELLO_HUB_ENGINE_HASH =
-  "vello-hub-v13:vello-0.9.0:hybrid-compositor:vello_cpu-0.2.0" as const;
+  "vello-hub-v14:vello-0.10.0:vello_hybrid-0.2.0:vello_cpu-0.2.0" as const;
 
 export type StudioVelloHubBackendId =
   | typeof STUDIO_VELLO_CLASSIC_BACKEND_ID
@@ -551,22 +551,90 @@ export function createStudioVelloClassicBrowserBackend(options: {
   };
 }
 
-export function createStudioVelloHybridBrowserBackend(
-  classic: StudioVelloHubBackend = createStudioVelloClassicBrowserBackend(),
-): StudioVelloHubBackend {
+export function createStudioVelloHybridBrowserBackend(options: {
+  readonly loadEngine?: StudioVelloEngineLoader;
+  readonly acquireDevice?: typeof acquireStudioGpuDevice;
+} = {}): StudioVelloHubBackend {
+  const loadEngine = options.loadEngine ?? loadStudioVelloEngine;
+  const acquireDevice = options.acquireDevice ?? acquireStudioGpuDevice;
+  let lease: StudioGpuDeviceLease | null = null;
+  let enginePromise: Promise<StudioVelloEngineModule> | null = null;
+  let readyPromise: Promise<StudioVelloBackendAvailability> | null = null;
+
+  const ready = async (): Promise<StudioVelloBackendAvailability> => {
+    if (lease && !lease.lost && !lease.released) {
+      return { available: true, reason: null };
+    }
+    readyPromise ??= (async () => {
+      const nextLease = await acquireDevice();
+      if (!nextLease) {
+        return { available: false, reason: "StudioGpuFabric device unavailable" };
+      }
+      try {
+        const loaded = await loadEngine();
+        await loaded.loadVelloGpuBrowser();
+        await loaded.adoptGpuDevice(nextLease.device);
+        const adopted = await loaded.gpuDeviceHandle();
+        if (adopted !== nextLease.device) {
+          throw new Error("Vello Hybrid did not adopt the StudioGpuFabric GPUDevice");
+        }
+        if (typeof loaded.renderSceneToTextureHybridGpu !== "function") {
+          throw new Error("Vello Hybrid sparse-strip artifact is unavailable");
+        }
+        lease = nextLease;
+        enginePromise = Promise.resolve(loaded);
+        return { available: true, reason: null };
+      } catch (error) {
+        nextLease.release();
+        return {
+          available: false,
+          reason: error instanceof Error ? error.message : String(error),
+        };
+      }
+    })();
+    const result = await readyPromise;
+    if (!result.available) readyPromise = null;
+    return result;
+  };
+
+  const requireReady = async () => {
+    const availability = await ready();
+    if (!availability.available || !lease || !enginePromise) {
+      throw new Error(availability.reason ?? "Vello Hybrid backend unavailable");
+    }
+    if (lease.lost) throw new Error("Vello Hybrid GPUDevice is lost");
+    return { loaded: await enginePromise, lease };
+  };
+
   return {
     id: STUDIO_VELLO_HYBRID_BACKEND_ID,
-    availability: () => classic.availability(),
+    availability: ready,
     async render(scene) {
-      const frame = await classic.render(scene);
-      if (frame.kind === "pixels") return frame;
-      return { ...frame, backendId: STUDIO_VELLO_HYBRID_BACKEND_ID };
+      const current = await requireReady();
+      const texture = await current.loaded.renderSceneToTextureHybridGpu(scene);
+      let released = false;
+      return {
+        backendId: STUDIO_VELLO_HYBRID_BACKEND_ID,
+        kind: "texture",
+        width: scene.width,
+        height: scene.height,
+        device: current.lease.device,
+        texture,
+        release() {
+          if (released) return;
+          released = true;
+          try {
+            texture.destroy();
+          } catch {
+            // A texture from a lost device may already be invalidated.
+          }
+        },
+      };
     },
-    compareToReference: classic.compareToReference
-      ? (scene) => classic.compareToReference!(scene)
-      : undefined,
     dispose() {
-      // The Classic backend owns the fabric lease when the facade wraps it.
+      lease?.release();
+      lease = null;
+      readyPromise = null;
     },
   };
 }
@@ -730,9 +798,9 @@ export class StudioVelloHub {
     this.cpuBackend = options.cpuBackend ?? createStudioVelloCpuReferenceBackend();
     this.classicBackend = options.classicBackend
       ?? createStudioVelloClassicBrowserBackend();
-    this.ownsHybridBackend = options.hybridBackend !== undefined;
+    this.ownsHybridBackend = options.hybridBackend === undefined;
     this.hybridBackend = options.hybridBackend
-      ?? createStudioVelloHybridBrowserBackend(this.classicBackend);
+      ?? createStudioVelloHybridBrowserBackend();
     this.now = options.now ?? (() => performance.now());
     this.deviceHash = `${options.deviceHash ?? defaultDeviceHash()}|${STUDIO_VELLO_HUB_ENGINE_HASH}`;
     this.isPenDown = options.isPenDown;

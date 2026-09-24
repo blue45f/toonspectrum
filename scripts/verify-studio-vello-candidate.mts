@@ -70,7 +70,7 @@ function main(): void {
     STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.enabledByDefault
       && productCapability.enabled
       && productCapability.scope === "document-vector-hybrid",
-    "The V13 document-vector Hybrid product seam must be enabled by default",
+    "The V14 document-vector Hybrid product seam must be enabled by default",
   );
   invariant(
     STUDIO_VELLO_HUB_PRODUCT_CAPABILITY.brushPixelAuthority === false
@@ -80,15 +80,15 @@ function main(): void {
     "The bounded product seam must not grant brush-pixel or canonical authority",
   );
   invariant(
-    STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE.eligible === false
+    STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE.eligible === true
       && STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE.status
-        === "unavailable-upstream-api",
-    "Hybrid/Sparse GPU must remain an explicit unavailable candidate until its API exists",
+        === "adopted-bounded-provider",
+    "Hybrid/Sparse GPU must remain the bounded adopted provider",
   );
   invariant(
     STUDIO_VELLO_HYBRID_COMPOSITOR.eligible === true
-      && STUDIO_VELLO_HYBRID_COMPOSITOR.status === "production-compositor",
-    "V13 Hybrid compositor must be the eligible Classic+texture production lane",
+      && STUDIO_VELLO_HYBRID_COMPOSITOR.status === "production-sparse-strip-provider",
+    "V14 Hybrid must remain the eligible sparse-strip production lane",
   );
   invariant(
     STUDIO_VELLO_PROMOTION_GATES.every(({ hard }) => hard),

@@ -1,6 +1,11 @@
-import { useEffect, useRef, useState, type ReactElement } from "react";
+import type {
+  ThorvgMountedSurface,
+  ThorvgSurfaceReceipt,
+} from "@toonspectrum/studio-engine-thorvg/runtime";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 import { svgToDataUrl } from "./studio-characters";
+import { planStudioSvgProductProvider } from "./studio-svg-product-provider-plan";
 import {
   STUDIO_SVG_PRODUCT_SELECTED_PROVIDER_ID,
   studioSvgProductTournament,
@@ -35,7 +40,11 @@ function schedulePreview(task: () => void): () => void {
   return () => globalThis.clearTimeout(handle);
 }
 
-function decisionLabel(decision: StudioSvgProductDecision | null): string {
+function decisionLabel(
+  decision: StudioSvgProductDecision | null,
+  thorvgReceipt: ThorvgSurfaceReceipt | null,
+): string {
+  if (thorvgReceipt) return `ThorVG ${thorvgReceipt.backend.toUpperCase()} SVG 미리보기`;
   if (!decision) return "SVG 미리보기 준비 중";
   switch (decision.providerId) {
     case "vello-svg-native":
@@ -45,12 +54,21 @@ function decisionLabel(decision: StudioSvgProductDecision | null): string {
   }
 }
 
+function browserVectorCapability(): { webgpu: boolean; webgl2: boolean } {
+  return {
+    webgpu:
+      typeof globalThis.navigator !== "undefined"
+      && "gpu" in globalThis.navigator,
+    webgl2: typeof globalThis.WebGL2RenderingContext !== "undefined",
+  };
+}
+
 /**
  * Bounded product island for catalog SVG thumbnails.
  *
- * The original SVG image is only a pre-request catalog placeholder. Once the
- * product request preselects Vello, pending and failed epochs never present
- * that browser-rendered image or re-execute the SVG through another provider.
+ * Provider selection completes before rendering: the strict path subset stays
+ * on Vello while a safe, feature-rich asset is assigned to one ThorVG backend.
+ * A selected provider failure is visible and never retries another engine.
  */
 export function StudioSvgAssetPreview({
   assetId,
@@ -61,13 +79,39 @@ export function StudioSvgAssetPreview({
   tournament = studioSvgProductTournament,
 }: StudioSvgAssetPreviewProps): ReactElement {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const thorvgSurfaceRef = useRef<ThorvgMountedSurface | null>(null);
+  const plan = useMemo(
+    () => planStudioSvgProductProvider(
+      svg,
+      width,
+      height,
+      browserVectorCapability(),
+    ),
+    [height, svg, width],
+  );
   const [decision, setDecision] = useState<StudioSvgProductDecision | null>(null);
+  const [thorvgReceipt, setThorvgReceipt] = useState<ThorvgSurfaceReceipt | null>(null);
   const [painted, setPainted] = useState(false);
   const [failed, setFailed] = useState(false);
   const [resolveMs, setResolveMs] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!requested || decision || failed) return;
+    thorvgSurfaceRef.current?.destroy();
+    thorvgSurfaceRef.current = null;
+    setDecision(null);
+    setThorvgReceipt(null);
+    setPainted(false);
+    setFailed(false);
+    setResolveMs(null);
+  }, [assetId, height, plan.providerId, svg, width]);
+
+  useEffect(() => {
+    if (
+      !requested
+      || plan.route !== "vello-native"
+      || decision
+      || failed
+    ) return;
     let live = true;
     const cancel = schedulePreview(() => {
       const started = performance.now();
@@ -92,9 +136,73 @@ export function StudioSvgAssetPreview({
       live = false;
       cancel();
     };
-  }, [assetId, decision, failed, height, requested, svg, tournament, width]);
+  }, [
+    assetId,
+    decision,
+    failed,
+    height,
+    plan.route,
+    requested,
+    svg,
+    tournament,
+    width,
+  ]);
 
   useEffect(() => {
+    if (
+      !requested
+      || plan.route !== "thorvg-specialist"
+      || failed
+      || thorvgReceipt
+    ) return;
+    const canvasElement = canvasRef.current;
+    if (!canvasElement) return;
+    let live = true;
+    let mounted: ThorvgMountedSurface | null = null;
+    const started = performance.now();
+    void import("@toonspectrum/studio-engine-thorvg/runtime")
+      .then(({ mountThorvgAsset }) => mountThorvgAsset({
+        canvas: canvasElement,
+        kind: "svg",
+        source: svg,
+        width,
+        height,
+        backend: plan.backend,
+      }))
+      .then((surface) => {
+      if (!live) {
+        surface.destroy();
+        return;
+      }
+      mounted = surface;
+      thorvgSurfaceRef.current = surface;
+      setResolveMs(performance.now() - started);
+      setThorvgReceipt(surface.receipt);
+      setPainted(true);
+    }).catch(() => {
+      if (!live) return;
+      setResolveMs(performance.now() - started);
+      setFailed(true);
+    });
+    return () => {
+      live = false;
+      mounted?.destroy();
+      if (thorvgSurfaceRef.current === mounted) {
+        thorvgSurfaceRef.current = null;
+      }
+    };
+  }, [
+    failed,
+    height,
+    plan,
+    requested,
+    svg,
+    thorvgReceipt,
+    width,
+  ]);
+
+  useEffect(() => {
+    if (plan.route !== "vello-native") return;
     const canvas = canvasRef.current;
     const pixels = decision?.pixels;
     if (!canvas || !pixels) {
@@ -125,29 +233,46 @@ export function StudioSvgAssetPreview({
       setPainted(false);
       setFailed(true);
     }
-  }, [decision]);
+  }, [decision, plan.route]);
+
+  useEffect(() => () => {
+    thorvgSurfaceRef.current?.destroy();
+    thorvgSurfaceRef.current = null;
+  }, []);
 
   const providerId = painted
-    ? decision?.providerId ?? STUDIO_SVG_PRODUCT_SELECTED_PROVIDER_ID
-    : decision?.providerId === "rejected"
+    ? thorvgReceipt?.activeProviderId
+      ?? decision?.providerId
+      ?? plan.providerId
+    : plan.route === "rejected" || decision?.providerId === "rejected"
       ? "rejected"
       : failed
         ? "unavailable"
         : "pending";
   const rejected = providerId === "rejected" || providerId === "unavailable";
   const sourcePlaceholderVisible = !requested && !painted && !rejected;
+  const route = rejected
+    ? "fail-closed"
+    : painted
+      ? plan.route
+      : "pending";
+  const title = plan.route === "rejected"
+    ? plan.reason
+    : decision?.reasons.join(" · ");
 
   return (
     <span
       className="relative flex h-full w-full items-center justify-center overflow-hidden"
       data-studio-svg-product-preview="true"
       data-studio-svg-preview-provider={providerId}
-      data-studio-svg-preview-route={rejected ? "fail-closed" : decision?.route ?? "pending"}
+      data-studio-svg-preview-route={route}
       data-studio-svg-preview-gpu-readback-bytes={
-        decision?.interactiveGpuReadbackBytes ?? 0
+        thorvgReceipt?.cpuReadbackBytes
+        ?? decision?.interactiveGpuReadbackBytes
+        ?? 0
       }
       data-studio-svg-preview-resolve-ms={resolveMs?.toFixed(3) ?? ""}
-      title={decision?.reasons.join(" · ") || undefined}
+      title={title || undefined}
     >
       <img
         src={svgToDataUrl(svg)}
@@ -163,6 +288,7 @@ export function StudioSvgAssetPreview({
         }
       />
       <canvas
+        key={plan.providerId}
         ref={canvasRef}
         aria-hidden
         className={
@@ -178,9 +304,9 @@ export function StudioSvgAssetPreview({
       ) : null}
       <span className="sr-only" aria-live="polite">
         {failed
-          ? "선택한 Vello SVG 미리보기를 사용할 수 없음"
+          ? `선택한 ${plan.providerId} SVG 미리보기를 사용할 수 없음`
           : requested
-            ? decisionLabel(decision)
+            ? decisionLabel(decision, thorvgReceipt)
             : "SVG 미리보기 대기"}
       </span>
     </span>

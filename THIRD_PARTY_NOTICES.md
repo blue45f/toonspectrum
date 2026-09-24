@@ -36,7 +36,8 @@ obscure, or claim ownership of these libraries.
 | `wasm-bindgen` family | 0.2.123 | MIT OR Apache-2.0 | <https://github.com/wasm-bindgen/wasm-bindgen/tree/0.2.123> |
 | `unicode-ident` data tables | 1.0.24 | (MIT OR Apache-2.0) AND Unicode-3.0 | <https://github.com/dtolnay/unicode-ident/tree/1.0.24> |
 | Vello CPU stack (`vello_cpu`, Parley, HarfRust, Skrifa and transitive crates) | feature-locked Cargo graph | per-crate SPDX expressions | <https://github.com/linebender/vello> |
-| Vello GPU stack (`vello`, Velato, `vello_svg`, usvg, wgpu and transitive crates) | `fabric,lottie,svg` feature-locked Cargo graph | per-crate SPDX expressions | <https://github.com/linebender/vello> |
+| Vello GPU stack (`vello`, `vello_hybrid`, Velato, `vello_svg`, usvg, wgpu and transitive crates) | `hybrid,lottie,svg` feature-locked Cargo graph | per-crate SPDX expressions | <https://github.com/linebender/vello> |
+| `@thorvg/webcanvas` / ThorVG WebAssembly | 1.1.2 | MIT | <https://github.com/thorvg/thorvg.web> |
 | `google/ink` mesh subset | 1.1.0 / `1d0daba661f3035f42f3649b8e6a0061b47aa759` | Apache-2.0 | <https://github.com/google/ink> |
 | `google/ink-stroke-modeler` | 0.1.0 / `f2388813b0b25bc3e33d143d369a8367ab2e30c8` | Apache-2.0 | <https://github.com/google/ink-stroke-modeler> |
 | `abseil-cpp` linked into Google Ink WASM | 20260526.0 and 20250512.0 | Apache-2.0 | <https://github.com/abseil/abseil-cpp> |
@@ -155,12 +156,20 @@ verify:studio-hokusai-wasm:rebuild` additionally requires the pinned Rust
 1.97.1, Cargo 1.97.1, and wasm-pack 0.15.0 toolchain and proves that a clean
 release rebuild is byte-identical to the checked-in JS, types and WASM.
 
+The checked-in ThorVG WebCanvas artifact is a lazy, explicit SVG/Lottie specialist provider.
+`packages/studio-engine-thorvg/wasm/thorvg.wasm` is copied byte-for-byte from
+`@thorvg/webcanvas@1.1.2`, its SHA-256 is pinned in the adjacent
+`INTEGRITY.sha256`, and the package's MIT attribution is preserved in
+`packages/studio-engine-thorvg/NOTICE`. The provider never becomes the document
+authority and never retries a failed WebGPU/WebGL/software selection through a
+second backend.
+
 The checked-in Vello CPU and GPU artifacts have an independent fail-closed
 notice boundary. `crates/studio-engine-vello/THIRD_PARTY_INVENTORY.json`
 records the exact `wasm32-unknown-unknown` package sets, Cargo.lock checksums,
 binary hashes and package-to-license-document mapping. The CPU `pkg` inventory
-contains 85 external crates. The GPU `pkg-gpu` inventory contains 144 external
-crates for the exact `fabric,lottie,svg` feature set, including Vello, Velato,
+contains 85 external crates. The GPU `pkg-gpu` inventory contains the external crates for the exact
+`hybrid,lottie,svg` feature set, including Vello, Vello Hybrid, Velato,
 `vello_svg`, usvg, Parley, HarfRust and all three resolved Skrifa versions.
 Both artifact directories ship a `NOTICE` and exact source-derived license
 bundle (`crates/studio-engine-vello/pkg/THIRD_PARTY_LICENSES.txt` and

@@ -1,9 +1,9 @@
 {
   "harness": "packages/studio-engine-vello/src/__tests__/toon-vello-fork-browser-probe.test.ts (TOON_VELLO_FORK_PROBE=1)",
-  "measuredAt": "2026-08-08T05:41:29.065Z",
+  "measuredAt": "2026-09-23T19:07:29.492Z",
   "browser": {
-    "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",
-    "version": "140.0.7339.186"
+    "launch": "system chrome headless (metal, unsafe-webgpu)",
+    "version": "153.0.8010.53"
   },
   "adapter": {
     "backend": "BrowserWebGpu",
@@ -15,8 +15,8 @@
   "forkTrack": {
     "vendor": "crates/vendor/wgpu-toon (crates.io wgpu 29.0.4 + TOON-PATCH 0001, feature `toon-fabric`)",
     "upstreamCrateSha256": "76e8840e1ba2881d4cbb18d2147627a56af426ff064c0401eb0c8410c6325d07",
-    "buildTrackA": "cargo check --target wasm32-unknown-unknown --features lottie (toon-fabric off; vendored crate is API-identical to upstream)",
-    "buildTrackB": "wasm-pack build --target web --release --out-dir pkg-gpu -- --features lottie,fabric",
+    "buildTrackA": "cargo check --target wasm32-unknown-unknown --features gpu,lottie,svg (toon-fabric off; vendored crate is API-identical to upstream)",
+    "buildTrackB": "wasm-pack build --target web --release --out-dir pkg-gpu -- --features hybrid,lottie,svg",
     "patchSurface": [
       "wgpu::webgpu public handle module (backport of wgpu 30.0.0)",
       "Device::as_webgpu / Queue::as_webgpu / Texture::as_webgpu (backport of wgpu 30.0.0)",
@@ -28,6 +28,7 @@
   "wasmExports": [
     "adapter_version",
     "adopt_gpu_device",
+    "audit_svg_native_json",
     "default",
     "fabric_device_adopted",
     "fabric_device_handle",
@@ -37,7 +38,10 @@
     "render_lottie_gpu_json",
     "render_scene_gpu_json",
     "render_scene_gpu_texture_json",
+    "render_scene_hybrid_gpu_texture_json",
     "render_scene_json",
+    "render_svg_cpu_json",
+    "render_svg_gpu_json",
     "shape_text_json",
     "shape_text_vertical_json"
   ],
@@ -49,6 +53,11 @@
     "bindingAccepted": true,
     "validationError": null
   },
+  "hybridSparseStrip": {
+    "bindingAccepted": true,
+    "validationError": null,
+    "maxFuzzyMismatchPct": 0
+  },
   "pixelParityVsL0Lane": {
     "equal": true,
     "detail": null
@@ -57,35 +66,44 @@
     {
       "size": 256,
       "bytes": 262144,
-      "adoptedRenderToSharedTextureP50Ms": 2.699999988079071,
-      "l4BindAndConsumeP50Ms": 2.300000011920929,
-      "sameDeviceCopyP50Ms": 2.399999976158142,
-      "l0RenderReadbackP50Ms": 2.700000047683716,
-      "l0UploadToFabricP50Ms": 2.400000035762787,
-      "l0ExchangeP50Ms": 5.100000083446503,
-      "exchangeSpeedupVsL0": 1.8888889281347456
+      "adoptedRenderToSharedTextureP50Ms": 1.399999976158142,
+      "l4BindAndConsumeP50Ms": 0.19999998807907104,
+      "sameDeviceCopyP50Ms": 0.20000004768371582,
+      "l0RenderReadbackP50Ms": 1,
+      "l0UploadToFabricP50Ms": 0.30000001192092896,
+      "l0ExchangeP50Ms": 1.300000011920929,
+      "exchangeSpeedupVsL0": 0.9285714528998554,
+      "hybridRenderToSharedTextureP50Ms": 1.199999988079071,
+      "hybridL4BindAndConsumeP50Ms": 0.30000001192092896,
+      "hybridFuzzyMismatchPct": 0
     },
     {
       "size": 512,
       "bytes": 1048576,
-      "adoptedRenderToSharedTextureP50Ms": 2.600000023841858,
-      "l4BindAndConsumeP50Ms": 2.399999976158142,
-      "sameDeviceCopyP50Ms": 2.399999976158142,
-      "l0RenderReadbackP50Ms": 3.099999964237213,
-      "l0UploadToFabricP50Ms": 2.399999976158142,
-      "l0ExchangeP50Ms": 5.499999940395355,
-      "exchangeSpeedupVsL0": 2.115384573061791
+      "adoptedRenderToSharedTextureP50Ms": 0.7000000476837158,
+      "l4BindAndConsumeP50Ms": 0.2999999523162842,
+      "sameDeviceCopyP50Ms": 0.19999998807907104,
+      "l0RenderReadbackP50Ms": 1.5999999642372131,
+      "l0UploadToFabricP50Ms": 0.7000000476837158,
+      "l0ExchangeP50Ms": 2.300000011920929,
+      "exchangeSpeedupVsL0": 3.285714078922675,
+      "hybridRenderToSharedTextureP50Ms": 0.8999999761581421,
+      "hybridL4BindAndConsumeP50Ms": 0.30000001192092896,
+      "hybridFuzzyMismatchPct": 0
     },
     {
       "size": 1024,
       "bytes": 4194304,
-      "adoptedRenderToSharedTextureP50Ms": 3,
-      "l4BindAndConsumeP50Ms": 2.399999976158142,
-      "sameDeviceCopyP50Ms": 2.399999976158142,
-      "l0RenderReadbackP50Ms": 4.400000035762787,
-      "l0UploadToFabricP50Ms": 2.899999976158142,
-      "l0ExchangeP50Ms": 7.300000011920929,
-      "exchangeSpeedupVsL0": 2.4333333373069763
+      "adoptedRenderToSharedTextureP50Ms": 1.600000023841858,
+      "l4BindAndConsumeP50Ms": 0.30000001192092896,
+      "sameDeviceCopyP50Ms": 0.30000001192092896,
+      "l0RenderReadbackP50Ms": 3.600000023841858,
+      "l0UploadToFabricP50Ms": 1.4000000357627869,
+      "l0ExchangeP50Ms": 5.000000059604645,
+      "exchangeSpeedupVsL0": 3.1249999906867743,
+      "hybridRenderToSharedTextureP50Ms": 1.300000011920929,
+      "hybridL4BindAndConsumeP50Ms": 0.40000003576278687,
+      "hybridFuzzyMismatchPct": 0
     }
   ]
 }

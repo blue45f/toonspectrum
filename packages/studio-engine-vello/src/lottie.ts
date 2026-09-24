@@ -4,8 +4,8 @@ import { hasWebGpu, loadVelloGpuBrowser } from "./gpu-browser";
  * Velato Lottie lane of the Vello provider (ADR-0011 Velato lane).
  *
  * Wraps `render_lottie_gpu_json` from the `pkg-gpu/` wasm-pack artifact
- * (built with `--features lottie`): velato 0.11 lowers a Lottie (bodymovin)
- * JSON document to a vello 0.9 `Scene` at the requested frame, which renders
+ * (built with `--features lottie`): velato 0.12 lowers a Lottie (bodymovin)
+ * JSON document to a vello 0.10 `Scene` at the requested frame, which renders
  * through the exact WebGPU texture path the SceneIR lane validated
  * (native gate: crates/studio-engine-vello/tests/lottie_parity.rs).
  *

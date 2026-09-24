@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { createStudioSoakCheckpoint } from "./lib/studio-five-hour-soak-checkpoint.mjs";
+import { isExpectedLocalPreviewRuntimeNoise } from "./lib/studio-five-hour-soak-runtime-noise.mjs";
 
 const source = readFileSync(new URL("./verify-studio-five-hour-soak.mts", import.meta.url), "utf8");
 
@@ -164,5 +165,60 @@ describe("Studio five-hour soak checkpoint telemetry", () => {
   it("wires the tested checkpoint builder into the browser harness", () => {
     expect(source).toContain("report.checkpoints.push(createStudioSoakCheckpoint({");
     expect(source).toContain("heapSamples: report.heapSamples");
+  });
+});
+
+
+describe("Studio five-hour soak local-preview runtime noise", () => {
+  const ticket502 = {
+    channel: "console",
+    text: "Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ http://127.0.0.1:4173/api/studio-realtime/tickets:0",
+  };
+
+  it("classifies only the absent local-preview ticket proxy as environment noise", () => {
+    expect(isExpectedLocalPreviewRuntimeNoise(ticket502, {
+      origin: "http://127.0.0.1:4173",
+      spawnedPreview: true,
+    })).toBe(true);
+  });
+
+  it.each([
+    ["external origin", ticket502, { origin: "https://studio.example.com", spawnedPreview: true }],
+    ["existing preview", ticket502, { origin: "http://127.0.0.1:4173", spawnedPreview: false }],
+    ["page exception", { ...ticket502, channel: "pageerror" }, { origin: "http://127.0.0.1:4173", spawnedPreview: true }],
+    ["different status", {
+      ...ticket502,
+      text: ticket502.text.replace("502 (Bad Gateway)", "500 (Internal Server Error)"),
+    }, { origin: "http://127.0.0.1:4173", spawnedPreview: true }],
+    ["different endpoint", {
+      ...ticket502,
+      text: ticket502.text.replace("studio-realtime/tickets", "projects"),
+    }, { origin: "http://127.0.0.1:4173", spawnedPreview: true }],
+  ])("never suppresses %s", (_name, error, options) => {
+    expect(isExpectedLocalPreviewRuntimeNoise(error, options)).toBe(false);
+  });
+
+  it("wires the classification before runtime failures are recorded", () => {
+    const classification = source.indexOf("isExpectedLocalPreviewRuntimeNoise(error");
+    const failure = source.indexOf("kind: `runtime-${error.channel}`");
+    expect(classification).toBeGreaterThanOrEqual(0);
+    expect(classification).toBeLessThan(failure);
+    expect(source).toContain("report.environmentNoise.push(error)");
+  });
+});
+
+describe("Studio five-hour soak beta notice admission", () => {
+  it("acknowledges the visible product notice through its action before drawing", () => {
+    expect(source).toContain("acknowledgeStudioBetaNoticeIfPresent(page)");
+    expect(source).toContain("data-studio-beta-notice");
+    expect(source).toContain('notice.getByRole("button").first()');
+    expect(source).toContain('notice.waitFor({ state: "hidden"');
+
+    const navigation = source.indexOf("page.goto(`${preview.origin}/studio/canvas`");
+    const acknowledgement = source.lastIndexOf("await acknowledgeStudioBetaNoticeIfPresent(page)");
+    const editorWait = source.indexOf('page.locator(\'[data-studio-editor="true"]\')');
+    expect(navigation).toBeGreaterThanOrEqual(0);
+    expect(acknowledgement).toBeGreaterThan(navigation);
+    expect(editorWait).toBeGreaterThan(acknowledgement);
   });
 });

@@ -159,7 +159,7 @@ export async function renderSvgToPixelsVelloCpu(
 }
 
 /**
- * Browser WebGPU render through vello_svg 0.10 -> Vello 0.9. The returned
+ * Browser WebGPU render through vello_svg 0.11 -> Vello 0.10. The returned
  * pixels are a readback evidence/export surface, not an interactive hot path.
  */
 export async function renderSvgToPixelsVelloGpu(

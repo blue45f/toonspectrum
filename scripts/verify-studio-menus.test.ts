@@ -239,13 +239,13 @@ it("acknowledges the blocking Studio beta notice before menu interactions", asyn
   await dismissOverlays(fixture.page as unknown as import("playwright").Page);
 
   expect(fixture.page.locator).toHaveBeenCalledWith('[data-studio-beta-notice="true"]');
-  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(1, { state: "visible", timeout: 5000 });
+  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(1, { state: "visible", timeout: 10_000 });
   expect(fixture.notice.getByRole).toHaveBeenCalledWith("button", {
     name: /확인하고 툰스튜디오 시작하기|I understand — enter ToonStudio/u,
   });
-  expect(fixture.acknowledgeClick).toHaveBeenCalledWith({ timeout: 8000 });
+  expect(fixture.acknowledgeClick).toHaveBeenCalledWith({ timeout: 30_000, noWaitAfter: true });
   expect(fixture.acknowledgeDispatch).not.toHaveBeenCalled();
-  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(2, { state: "hidden", timeout: 10000 });
+  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(2, { state: "hidden", timeout: 30_000 });
   expect(fixture.acknowledgeClick.mock.invocationCallOrder[0]).toBeLessThan(
     fixture.keyboardPress.mock.invocationCallOrder[0]!,
   );
@@ -256,10 +256,10 @@ it("falls back to the acknowledgement event when a loaded CI runner cannot settl
 
   await dismissOverlays(fixture.page as unknown as import("playwright").Page);
 
-  expect(fixture.acknowledgeClick).toHaveBeenCalledWith({ timeout: 8000 });
+  expect(fixture.acknowledgeClick).toHaveBeenCalledWith({ timeout: 30_000, noWaitAfter: true });
   expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(2, { state: "hidden", timeout: 750 });
   expect(fixture.acknowledgeDispatch).toHaveBeenCalledWith("click");
-  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(3, { state: "hidden", timeout: 10000 });
+  expect(fixture.noticeWaitFor).toHaveBeenNthCalledWith(3, { state: "hidden", timeout: 30_000 });
   expect(fixture.acknowledgeDispatch.mock.invocationCallOrder[0]).toBeLessThan(
     fixture.keyboardPress.mock.invocationCallOrder[0]!,
   );

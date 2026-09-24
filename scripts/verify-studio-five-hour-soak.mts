@@ -24,6 +24,7 @@ import { chromium, type Browser, type CDPSession, type Locator, type Page } from
 import { STUDIO_ERASER_BRUSH_CATALOG_ITEMS, STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS, type StudioBrushCatalogItem } from "../apps/web/src/domains/creator/brush/studio-brush-catalog";
 
 import { createStudioSoakCheckpoint } from "./lib/studio-five-hour-soak-checkpoint.mjs";
+import { isExpectedLocalPreviewRuntimeNoise } from "./lib/studio-five-hour-soak-runtime-noise.mjs";
 import { collectStudioInAppRuntimeErrors, installStudioInAppFirstRunState, installStudioInAppGuestBoundary, STUDIO_INAPP_PROFILES, type StudioInAppRuntimeError } from "./lib/studio-inapp-sweep-harness.mjs";
 import { evaluateStudioSoakHeapGrowth, STUDIO_SOAK_HEAP_MAX_SLOPE_BYTES_PER_HOUR } from "./lib/studio-memory-growth-policy.mjs";
 import {
@@ -344,6 +345,20 @@ async function ensurePenReady(page: Page): Promise<boolean> {
     .catch(() => false);
 }
 
+async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean> {
+  const notice = page.locator('[data-studio-beta-notice="true"]');
+  const visible = await notice
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!visible) return false;
+
+  const action = notice.getByRole("button").first();
+  await action.click({ timeout: 10_000 });
+  await notice.waitFor({ state: "hidden", timeout: 10_000 });
+  return true;
+}
+
 async function waitForPenReady(page: Page, timeoutMs = 30_000): Promise<boolean> {
   const deadline = Date.now() + Math.max(1_000, timeoutMs);
   do {
@@ -452,6 +467,7 @@ const report = {
   gpuEvents: [] as GpuEvent[],
   longTasks: [] as LongTaskSample[],
   runtimeErrors: [] as StudioInAppRuntimeError[],
+  environmentNoise: [] as StudioInAppRuntimeError[],
   failures: [] as SoakFailure[],
   checkpoints: [] as Array<{
     atMs: number;
@@ -507,6 +523,7 @@ try {
     throw new Error(`${inputMode} soak input requires Chromium CDP; refusing a mouse downgrade.`);
   }
   await page.goto(`${preview.origin}/studio/canvas`, { waitUntil: "domcontentloaded", timeout: 90_000 });
+  await acknowledgeStudioBetaNoticeIfPresent(page);
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 90_000 });
   await page.waitForTimeout(3_000);
   if (!(await waitForPenReady(page))) {
@@ -591,8 +608,15 @@ try {
     }
 
     const runtime = errors.drain();
-    report.runtimeErrors.push(...runtime);
     for (const error of runtime) {
+      if (isExpectedLocalPreviewRuntimeNoise(error, {
+        origin: preview.origin,
+        spawnedPreview: preview.child !== null,
+      })) {
+        report.environmentNoise.push(error);
+        continue;
+      }
+      report.runtimeErrors.push(error);
       report.failures.push({
         atMs: nowMs(startedAt), cycle, kind: `runtime-${error.channel}`, detail: `${error.step}: ${error.text}`,
       });
@@ -681,7 +705,7 @@ const worstLongTask = Math.max(0, ...report.longTasks.map((entry) => entry.durat
 const initialHeap = report.heapSamples[0]?.usedBytes ?? null;
 const finalHeap = report.heapSamples.at(-1)?.usedBytes ?? null;
 log(`${report.cycles} cycles · ${report.strokes} strokes · ${report.brushSwitches} brush switches · ${report.historyActions} history actions`);
-log(`${report.runtimeErrors.length} runtime errors · ${report.gpuEvents.length} GPU events · ${report.longTasks.length} long tasks (worst ${Math.round(worstLongTask)} ms)`);
+log(`${report.runtimeErrors.length} runtime errors · ${report.environmentNoise.length} local-preview environment noises · ${report.gpuEvents.length} GPU events · ${report.longTasks.length} long tasks (worst ${Math.round(worstLongTask)} ms)`);
 if (initialHeap !== null && finalHeap !== null) {
   log(`GC heap ${Math.round(initialHeap / 1048576)} MiB → ${Math.round(finalHeap / 1048576)} MiB`);
 }

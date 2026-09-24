@@ -10,12 +10,13 @@ import type { Server } from "node:http";
 import type { Browser, Page } from "playwright";
 
 /**
- * toon-vello fork track (V12 §5) real-browser proof — device adoption + L4.
+ * toon-vello fork track (V14) real-browser proof — device adoption + L4 for
+ * both Vello Classic 0.10 and upstream Vello Hybrid 0.2.
  *
  * Opt-in: `TOON_VELLO_FORK_PROBE=1 pnpm exec vitest run \
  *   packages/studio-engine-vello/src/__tests__/toon-vello-fork-browser-probe.test.ts`
  *
- * 전제: pkg-gpu 가 build track B(`--features lottie,fabric`, crates/vendor/wgpu-toon
+ * 전제: pkg-gpu 가 build track B(`--features hybrid,lottie,svg`, crates/vendor/wgpu-toon
  * 의 `toon-fabric` 패치)로 빌드되어 있어야 한다. 그렇지 않으면 `adopt_gpu_device`
  * export 자체가 없어 (a)에서 즉시 실패한다 — 조용한 폴백 없음.
  *
@@ -23,13 +24,13 @@ import type { Browser, Page } from "playwright";
  *  (a) `adopt_gpu_device(fabricDevice)` 이후 wasm 이 렌더에 쓰는 GPUDevice 가
  *      **JS 가 만든 바로 그 객체**인지 — `fabric_device_handle() === fabricDevice`
  *      참조 동일성으로 판별한다(문자열·플래그가 아니라 객체 아이덴티티).
- *  (b) `render_scene_gpu_texture_json` 이 돌려준 GPUTexture 를 fabric 디바이스가
- *      readback 없이 곧바로 소비할 수 있는지 — 같은 디바이스 GPU copy(L3) 및
- *      바인딩 샘플링(L4)이 검증 오류 없이 통과하는지.
+ *  (b) Classic/Hybrid가 돌려준 GPUTexture 를 fabric 디바이스가 readback 없이
+ *      곧바로 소비할 수 있는지 — 같은 디바이스 GPU copy(L3) 및 바인딩
+ *      샘플링(L4)이 검증 오류 없이 통과하는지.
  *  (c) 교환 비용 — 기존 L0(vello 내부 디바이스 렌더+readback+JS 경계+writeTexture,
  *      `gpu-fabric-probe.json` 기준선) 대비 adopted 렌더의 p50 를 크기별로 대조.
- *  (d) 픽셀 동등성 — adopted 경로가 만든 텍스처를 readback 해 기존 L0 경로의
- *      `render_scene_gpu_json` 결과와 바이트 일치하는지(패치가 렌더를 바꾸지 않음).
+ *  (d) 픽셀 동등성 — Classic adopted 경로는 기존 L0 경로와 바이트 일치하고,
+ *      Hybrid는 같은 CPU/Classic 기준에 대해 δ48 3×3 퍼지 게이트 0.6%를 지키는지.
  *
  * 결과는 tests/benchmarks/results/toon-vello-fork.json 에 기록된다.
  * 기본 verify 스코프에서 제외된 이유는 gpu-fabric-browser-probe 와 동일하다.
@@ -180,7 +181,16 @@ describeProbe("toon-vello fork track: external GPUDevice adoption + L4 texture s
     const { chromium } = await import("playwright");
     const moduleUrl = `${baseUrl}/crates/studio-engine-vello/pkg-gpu/studio_engine_vello.js`;
     for (const candidate of LAUNCH_CANDIDATES) {
-      const attempt = await chromium.launch(candidate.options);
+      let attempt: Browser;
+      try {
+        attempt = await chromium.launch(candidate.options);
+      } catch (error) {
+        probe = {
+          supported: false,
+          reason: `${candidate.label}: ${error instanceof Error ? error.message : String(error)}`,
+        };
+        continue;
+      }
       const attemptPage = await attempt.newPage();
       await attemptPage.goto(`${baseUrl}/__toon-vello-fork-harness__`);
       const payload = (await attemptPage.evaluate(async (url: string) => {
@@ -213,7 +223,7 @@ describeProbe("toon-vello fork track: external GPUDevice adoption + L4 texture s
   });
 
   it(
-    "adopts the fabric GPUDevice and shares vello output with zero readback",
+    "adopts one fabric GPUDevice and shares Classic and Hybrid output with zero readback",
     async () => {
       expect(
         probe.supported,
@@ -237,14 +247,15 @@ describeProbe("toon-vello fork track: external GPUDevice adoption + L4 texture s
           const wasmExports = Object.keys(module).sort();
           const hasAdoption =
             typeof module.adopt_gpu_device === "function"
-            && typeof module.render_scene_gpu_texture_json === "function";
+            && typeof module.render_scene_gpu_texture_json === "function"
+            && typeof module.render_scene_hybrid_gpu_texture_json === "function";
           if (!hasAdoption) {
             return {
               trackB: false,
               wasmExports,
               reason:
                 "pkg-gpu was not built on build track B — rebuild with "
-                + "`wasm-pack build --target web --release --out-dir pkg-gpu -- --features lottie,fabric`",
+                + "`wasm-pack build --target web --release --out-dir pkg-gpu -- --features hybrid,lottie,svg`",
             };
           }
 
@@ -276,6 +287,44 @@ describeProbe("toon-vello fork track: external GPUDevice adoption + L4 texture s
             }
             return samples;
           };
+          const fuzzyMismatchPct = (
+            actual: Uint8Array,
+            expected: Uint8Array,
+            width: number,
+            height: number,
+          ): number => {
+            const channelDelta = 48;
+            let mismatched = 0;
+            for (let y = 0; y < height; y += 1) {
+              for (let x = 0; x < width; x += 1) {
+                const actualOffset = (y * width + x) * 4;
+                let matched = false;
+                for (let dy = -1; dy <= 1 && !matched; dy += 1) {
+                  const sy = y + dy;
+                  if (sy < 0 || sy >= height) continue;
+                  for (let dx = -1; dx <= 1 && !matched; dx += 1) {
+                    const sx = x + dx;
+                    if (sx < 0 || sx >= width) continue;
+                    const expectedOffset = (sy * width + sx) * 4;
+                    matched = true;
+                    for (let channel = 0; channel < 4; channel += 1) {
+                      if (
+                        Math.abs(
+                          (actual[actualOffset + channel] ?? 0)
+                          - (expected[expectedOffset + channel] ?? 0),
+                        ) > channelDelta
+                      ) {
+                        matched = false;
+                        break;
+                      }
+                    }
+                  }
+                }
+                if (!matched) mismatched += 1;
+              }
+            }
+            return (mismatched / (width * height)) * 100;
+          };
 
           // 공유된 텍스처를 fabric 디바이스가 실제로 바인딩·샘플링할 수 있는지 검증하는
           // 커널(rgba8unorm 텍스처 → u32-packed storage buffer). 필터 런타임과 같은
@@ -306,6 +355,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
           const rows: Array<Record<string, unknown>> = [];
           let l4BindingAccepted = true;
           let l4ValidationError: string | null = null;
+          let hybridBindingAccepted = true;
+          let hybridValidationError: string | null = null;
+          let maxHybridFuzzyMismatchPct = 0;
           let pixelParity = true;
           let pixelParityDetail: string | null = null;
 
@@ -376,6 +428,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
               size: byteLength,
               usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
             });
+            const reference = (await (
+              module.render_scene_gpu_json as (json: string) => Promise<Uint8Array>
+            )(sceneJson)) as Uint8Array;
             {
               const encoder = fabricDevice.createCommandEncoder();
               encoder.copyBufferToBuffer(storage, 0, readback, 0, byteLength);
@@ -383,9 +438,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
               await readback.mapAsync(GPUMapMode.READ);
               const shared = new Uint8Array(readback.getMappedRange().slice(0));
               readback.unmap();
-              const reference = (await (
-                module.render_scene_gpu_json as (json: string) => Promise<Uint8Array>
-              )(sceneJson)) as Uint8Array;
               if (reference.length !== shared.length) {
                 pixelParity = false;
                 pixelParityDetail = `length ${reference.length} vs ${shared.length} @${size}`;
@@ -398,6 +450,63 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
                   }
                 }
               }
+            }
+
+            // (e) 실제 upstream vello_hybrid 0.2도 동일 fabric device에서
+            // GPUTexture를 만들고 L4로 소비한다. Classic 실패 뒤 실행하는 폴백이
+            // 아니라, 이 검증 요청에서 사전에 선택한 독립 provider다.
+            let hybridTexture: GPUTexture | undefined;
+            const hybridSamples = await timed(async () => {
+              const previous = hybridTexture;
+              hybridTexture = (await (
+                module.render_scene_hybrid_gpu_texture_json as (
+                  json: string,
+                ) => Promise<GPUTexture>
+              )(sceneJson)) as GPUTexture;
+              previous?.destroy();
+              await fabricDevice.queue.onSubmittedWorkDone();
+            });
+            if (!hybridTexture) throw new Error("hybrid render produced no texture");
+            const hybridStorage = fabricDevice.createBuffer({
+              size: byteLength,
+              usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+            });
+            fabricDevice.pushErrorScope("validation");
+            const hybridBindGroup = fabricDevice.createBindGroup({
+              layout: samplePipeline.getBindGroupLayout(0),
+              entries: [
+                { binding: 0, resource: hybridTexture.createView() },
+                { binding: 1, resource: { buffer: hybridStorage } },
+              ],
+            });
+            const hybridL4Samples = await timed(async () => {
+              const encoder = fabricDevice.createCommandEncoder();
+              const pass = encoder.beginComputePass();
+              pass.setPipeline(samplePipeline);
+              pass.setBindGroup(0, hybridBindGroup);
+              pass.dispatchWorkgroups(workgroups, workgroups);
+              pass.end();
+              fabricDevice.queue.submit([encoder.finish()]);
+              await fabricDevice.queue.onSubmittedWorkDone();
+            });
+            const hybridBindError = await fabricDevice.popErrorScope();
+            if (hybridBindError) {
+              hybridBindingAccepted = false;
+              hybridValidationError = hybridBindError.message;
+            }
+            let hybridFuzzyMismatchPct: number;
+            {
+              const encoder = fabricDevice.createCommandEncoder();
+              encoder.copyBufferToBuffer(hybridStorage, 0, readback, 0, byteLength);
+              fabricDevice.queue.submit([encoder.finish()]);
+              await readback.mapAsync(GPUMapMode.READ);
+              const hybrid = new Uint8Array(readback.getMappedRange().slice(0));
+              readback.unmap();
+              hybridFuzzyMismatchPct = fuzzyMismatchPct(hybrid, reference, size, size);
+              maxHybridFuzzyMismatchPct = Math.max(
+                maxHybridFuzzyMismatchPct,
+                hybridFuzzyMismatchPct,
+              );
             }
 
             // (c-2) 기존 L0 경로 비용을 같은 실행·같은 기기에서 재측정해 나란히 기록한다.
@@ -434,6 +543,9 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
               l0UploadToFabricP50Ms: p50(l0UploadSamples),
               l0ExchangeP50Ms: l0ExchangeP50,
               exchangeSpeedupVsL0: l0ExchangeP50 / adoptedP50,
+              hybridRenderToSharedTextureP50Ms: p50(hybridSamples),
+              hybridL4BindAndConsumeP50Ms: p50(hybridL4Samples),
+              hybridFuzzyMismatchPct,
             });
 
             readback.destroy();
@@ -441,6 +553,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             copyTarget.destroy();
             uploadTarget.destroy();
             (sharedTexture as GPUTexture).destroy();
+            hybridStorage.destroy();
+            hybridTexture.destroy();
           }
 
           fabricDevice.destroy();
@@ -449,6 +563,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
             wasmExports,
             adoption: { adoptedFlag, sameDeviceObject },
             l4: { bindingAccepted: l4BindingAccepted, validationError: l4ValidationError },
+            hybrid: {
+              bindingAccepted: hybridBindingAccepted,
+              validationError: hybridValidationError,
+              maxFuzzyMismatchPct: maxHybridFuzzyMismatchPct,
+            },
             pixelParity: { equal: pixelParity, detail: pixelParityDetail },
             rows,
           };
@@ -464,6 +583,11 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         reason?: string;
         adoption?: { adoptedFlag: boolean; sameDeviceObject: boolean };
         l4?: { bindingAccepted: boolean; validationError: string | null };
+        hybrid?: {
+          bindingAccepted: boolean;
+          validationError: string | null;
+          maxFuzzyMismatchPct: number;
+        };
         pixelParity?: { equal: boolean; detail: string | null };
         rows?: Array<Record<string, unknown>>;
       };
@@ -482,12 +606,20 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
       ).toBe(true);
       // (d) 패치가 렌더 결과를 바꾸지 않는다.
       expect(
+        payload.hybrid?.bindingAccepted,
+        `Hybrid L4 texture binding rejected: ${payload.hybrid?.validationError ?? "unknown"}`,
+      ).toBe(true);
+      expect(payload.hybrid?.maxFuzzyMismatchPct).toBeLessThanOrEqual(0.6);
+      expect(
         payload.pixelParity?.equal,
         `adopted-device output diverged from the L0 lane: ${payload.pixelParity?.detail ?? ""}`,
       ).toBe(true);
       for (const row of payload.rows ?? []) {
         expect(row.adoptedRenderToSharedTextureP50Ms).toBeGreaterThan(0);
         expect(row.l0ExchangeP50Ms).toBeGreaterThan(0);
+        expect(row.hybridRenderToSharedTextureP50Ms).toBeGreaterThan(0);
+        expect(row.hybridL4BindAndConsumeP50Ms).toBeGreaterThan(0);
+        expect(row.hybridFuzzyMismatchPct).toBeLessThanOrEqual(0.6);
       }
 
       const report = {
@@ -500,8 +632,8 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
           vendor: "crates/vendor/wgpu-toon (crates.io wgpu 29.0.4 + TOON-PATCH 0001, feature `toon-fabric`)",
           upstreamCrateSha256:
             "76e8840e1ba2881d4cbb18d2147627a56af426ff064c0401eb0c8410c6325d07",
-          buildTrackA: "cargo check --target wasm32-unknown-unknown --features lottie (toon-fabric off; vendored crate is API-identical to upstream)",
-          buildTrackB: "wasm-pack build --target web --release --out-dir pkg-gpu -- --features lottie,fabric",
+          buildTrackA: "cargo check --target wasm32-unknown-unknown --features gpu,lottie,svg (toon-fabric off; vendored crate is API-identical to upstream)",
+          buildTrackB: "wasm-pack build --target web --release --out-dir pkg-gpu -- --features hybrid,lottie,svg",
           patchSurface: [
             "wgpu::webgpu public handle module (backport of wgpu 30.0.0)",
             "Device::as_webgpu / Queue::as_webgpu / Texture::as_webgpu (backport of wgpu 30.0.0)",
@@ -514,6 +646,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         wasmExports: payload.wasmExports,
         adoption: payload.adoption,
         l4TextureSharing: payload.l4,
+        hybridSparseStrip: payload.hybrid,
         pixelParityVsL0Lane: payload.pixelParity,
         exchangeCost: payload.rows,
       };

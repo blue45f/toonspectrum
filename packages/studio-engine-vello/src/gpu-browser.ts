@@ -9,7 +9,7 @@ import type { SceneIR } from "@toonspectrum/studio-project-model";
 /**
  * Browser WebGPU lane of the Vello provider (ADR-0011 lane 2, V12 §4.1).
  *
- * Wraps the `pkg-gpu/` wasm-pack artifact (vello 0.9 GPU + wgpu 29, built with
+ * Wraps the `pkg-gpu/` wasm-pack artifact (vello 0.10 GPU + vello_hybrid 0.2 + wgpu 29, built with
  * `--features gpu`), which is loaded dynamically so the default CPU lane never
  * pays for the ~4.3MB GPU module. The artifact also carries the identical
  * vello_cpu 0.2.0 pin, which `compareGpuVsCpu` uses as the deterministic
@@ -226,6 +226,25 @@ export async function renderSceneToTextureGpu(scene: SceneIR): Promise<GPUTextur
   }
 }
 
+/**
+ * Renders the same bounded SceneIR through upstream Vello Hybrid 0.2 on the
+ * already adopted StudioGpuFabric device. No Classic render is attempted on
+ * failure and no pixels cross CPU memory.
+ */
+export async function renderSceneToTextureHybridGpu(
+  scene: SceneIR,
+): Promise<GPUTexture> {
+  const module = await requireInitialized();
+  const normalized = sceneIRSchema.parse(scene);
+  try {
+    return (await module.render_scene_hybrid_gpu_texture_json(
+      JSON.stringify(normalized),
+    )) as GPUTexture;
+  } catch (error) {
+    throw mapRenderError(error);
+  }
+}
+
 function directionalMismatches(
   from: Uint8Array,
   to: Uint8Array,
@@ -285,7 +304,7 @@ export function fuzzyMismatchPct(
 
 /**
  * Renders the scene through both lanes of the loaded pkg-gpu module — WebGPU
- * (vello 0.9) and the embedded deterministic vello_cpu 0.2.0 reference — and
+ * (vello 0.10) and the embedded deterministic vello_cpu 0.2.0 reference — and
  * reports the δ48 fuzzy mismatch. This is the browser-side equivalent of the
  * native Metal parity gate (0.6% ceiling in ADR-0011 lane 2).
  */

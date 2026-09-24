@@ -52,7 +52,7 @@ export function probe_webgpu(): Promise<string>;
  * WebGPU device and resolves with straight RGBA8 pixels (width * height * 4)
  * over a transparent base (Lottie output is meant to be composited).
  *
- * ADR-0011 Velato lane: velato 0.11 lowers the composition to a vello 0.9
+ * ADR-0011 Velato lane: velato 0.12 lowers the composition to a vello 0.10
  * `Scene` (`crate::lottie`), which reuses the exact texture/readback path the
  * SceneIR lane validated. Rejections carry a JSON message
  * `{"code":"lottie-*","reason":"..."}` — parse failures, unsupported Lottie
@@ -77,6 +77,13 @@ export function render_scene_gpu_json(scene_json: string): Promise<Uint8Array>;
 export function render_scene_gpu_texture_json(scene_json: string): Promise<any>;
 
 /**
+ * Renders the bounded SceneIR subset through the real upstream
+ * `vello_hybrid` 0.2 sparse-strip renderer on the adopted fabric device.
+ * The returned texture never crosses CPU memory and is owned by the caller.
+ */
+export function render_scene_hybrid_gpu_texture_json(scene_json: string): Promise<any>;
+
+/**
  * Renders SceneIR JSON to straight RGBA8 bytes (width * height * 4).
  */
 export function render_scene_json(scene_json: string): Uint8Array;
@@ -89,7 +96,7 @@ export function render_scene_json(scene_json: string): Uint8Array;
 export function render_svg_cpu_json(svg: string, width: number, height: number): Uint8Array;
 
 /**
- * Renders the strict SVG subset through vello_svg 0.10 -> vello 0.9 on the
+ * Renders the strict SVG subset through vello_svg 0.11 -> vello 0.10 on the
  * browser WebGPU device. Readback exists only for quality evidence/export;
  * callers must keep the interactive hot path on-GPU.
  */
@@ -121,14 +128,15 @@ export interface InitOutput {
     readonly render_lottie_gpu_json: (a: number, b: number, c: number, d: number, e: number) => any;
     readonly render_scene_gpu_json: (a: number, b: number) => any;
     readonly render_scene_gpu_texture_json: (a: number, b: number) => any;
+    readonly render_scene_hybrid_gpu_texture_json: (a: number, b: number) => any;
     readonly render_scene_json: (a: number, b: number) => [number, number, number, number];
     readonly render_svg_cpu_json: (a: number, b: number, c: number, d: number) => [number, number, number];
     readonly render_svg_gpu_json: (a: number, b: number, c: number, d: number) => any;
     readonly shape_text_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly shape_text_vertical_json: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
-    readonly wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue__core_9b3796e30d99ddb7___result__Result_____wasm_bindgen_b055bf54e8b77daf___JsError___true_: (a: number, b: number, c: any) => [number, number];
-    readonly wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___js_sys_76f24397c5a322f2___Function_fn_wasm_bindgen_b055bf54e8b77daf___JsValue_____wasm_bindgen_b055bf54e8b77daf___sys__Undefined___js_sys_76f24397c5a322f2___Function_fn_wasm_bindgen_b055bf54e8b77daf___JsValue_____wasm_bindgen_b055bf54e8b77daf___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
-    readonly wasm_bindgen_b055bf54e8b77daf___convert__closures_____invoke___wasm_bindgen_b055bf54e8b77daf___JsValue______true_: (a: number, b: number, c: any) => void;
+    readonly wasm_bindgen_8b552f3fa8f7f4ac___convert__closures_____invoke___wasm_bindgen_8b552f3fa8f7f4ac___JsValue__core_f0fd674eaa06beef___result__Result_____wasm_bindgen_8b552f3fa8f7f4ac___JsError___true_: (a: number, b: number, c: any) => [number, number];
+    readonly wasm_bindgen_8b552f3fa8f7f4ac___convert__closures_____invoke___js_sys_a4e07be682f03cdf___Function_fn_wasm_bindgen_8b552f3fa8f7f4ac___JsValue_____wasm_bindgen_8b552f3fa8f7f4ac___sys__Undefined___js_sys_a4e07be682f03cdf___Function_fn_wasm_bindgen_8b552f3fa8f7f4ac___JsValue_____wasm_bindgen_8b552f3fa8f7f4ac___sys__Undefined_______true_: (a: number, b: number, c: any, d: any) => void;
+    readonly wasm_bindgen_8b552f3fa8f7f4ac___convert__closures_____invoke___wasm_bindgen_8b552f3fa8f7f4ac___JsValue______true_: (a: number, b: number, c: any) => void;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;
