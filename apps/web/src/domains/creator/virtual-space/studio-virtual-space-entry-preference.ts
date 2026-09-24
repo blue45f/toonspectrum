@@ -1,4 +1,3 @@
-import { STUDIO_VIRTUAL_SPACE_AUTO_AVATAR } from "./studio-virtual-space-model";
 import { STUDIO_CHARACTER_SKINS } from "./studio-virtual-space-character-skins";
 
 export const STUDIO_VIRTUAL_SPACE_AVATAR_STORAGE_KEY = "toonspectrum:virtual-space-avatar:v1";
@@ -11,13 +10,13 @@ export interface StudioVirtualSpaceEntryPreference {
 
 export function validStudioVirtualSpaceAvatarIndex(value: unknown): value is number {
   return Number.isInteger(value)
-    && Number(value) >= STUDIO_VIRTUAL_SPACE_AUTO_AVATAR
+    && Number(value) >= 0
     && Number(value) < STUDIO_CHARACTER_SKINS.length;
 }
 
 export function readStudioVirtualSpaceEntryPreference(): StudioVirtualSpaceEntryPreference {
   if (typeof window === "undefined") {
-    return { avatarIndex: STUDIO_VIRTUAL_SPACE_AUTO_AVATAR, confirmed: false };
+    return { avatarIndex: -1, confirmed: false };
   }
   try {
     const saved = window.localStorage.getItem(STUDIO_VIRTUAL_SPACE_ENTRY_STORAGE_KEY);
@@ -33,9 +32,9 @@ export function readStudioVirtualSpaceEntryPreference(): StudioVirtualSpaceEntry
       if (validStudioVirtualSpaceAvatarIndex(avatarIndex)) return { avatarIndex, confirmed: true };
     }
   } catch {
-    // Private browsing/storage denial keeps a safe session-only choice.
+    // Private browsing or storage denial leaves the character unconfirmed.
   }
-  return { avatarIndex: STUDIO_VIRTUAL_SPACE_AUTO_AVATAR, confirmed: false };
+  return { avatarIndex: -1, confirmed: false };
 }
 
 export function readStudioVirtualSpaceAvatarIndex(): number {
@@ -50,11 +49,7 @@ export function writeStudioVirtualSpaceEntryPreference(avatarIndex: number): boo
       confirmed: true,
       avatarIndex,
     }));
-    if (avatarIndex === STUDIO_VIRTUAL_SPACE_AUTO_AVATAR) {
-      window.localStorage.removeItem(STUDIO_VIRTUAL_SPACE_AVATAR_STORAGE_KEY);
-    } else {
-      window.localStorage.setItem(STUDIO_VIRTUAL_SPACE_AVATAR_STORAGE_KEY, String(avatarIndex));
-    }
+    window.localStorage.setItem(STUDIO_VIRTUAL_SPACE_AVATAR_STORAGE_KEY, String(avatarIndex));
     return true;
   } catch {
     return false;

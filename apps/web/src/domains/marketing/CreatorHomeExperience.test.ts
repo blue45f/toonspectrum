@@ -21,14 +21,15 @@ const BUSINESS_SOURCE = "packages/core/src/business.ts";
 const FOOTER_KO_SOURCE = "apps/web/public/i18n/app/footer/ko.json";
 
 describe("creator home experience contracts", () => {
-  it("renders one coherent root experience instead of appending a second homepage", () => {
+  it("renders a separate public root without mounting the private workspace", () => {
     const source = readFileSync(ROOT_HOME_SOURCE, "utf8");
-    expect(source).toContain("<StudioWorkspacePage />");
-    expect(source).not.toContain("<CreatorHomeExperience");
+    expect(source).toContain("<CreatorHomeExperience />");
+    expect(source).not.toContain("<StudioWorkspacePage");
     const routes = readFileSync("apps/web/src/app/routes/groups/marketing.routes.tsx", "utf8");
     expect(routes).toContain('path: "/about/studio"');
     expect(routes).toContain('default: module.CreatorHomeExperience');
     expect(source).not.toContain("CreatorHubEntry");
+    expect(source).toContain('pathname: "/about/studio"');
   });
 
   it("presents the all-in-one product direction and task-first start points", () => {

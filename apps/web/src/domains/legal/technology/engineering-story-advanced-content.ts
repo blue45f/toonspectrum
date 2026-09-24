@@ -190,10 +190,55 @@ export const ENGINEERING_ADVANCED_CHAPTERS = [
     ],
   },
   {
-    id: "virtual-studio-world-authority",
+    id: "webrtc-media-authority",
     order: 30,
     status: "experimental",
-    eyebrow: "30 · VIRTUAL STUDIO WORLD",
+    eyebrow: "30 · WEBRTC MEDIA AUTHORITY",
+    title: {
+      ko: "문서 협업과 실시간 미디어를 서로 다른 권위로 운영하기",
+      en: "Operating document collaboration and realtime media as separate authorities",
+    },
+    thesis: {
+      ko: "Socket.IO는 참가 승인과 시그널링을, RTCDataChannel은 직접 제어 메시지를, RTP는 음성·영상·화면 공유를 맡고 프로젝트 문서와 미디어 수신자 권위는 서로 섞지 않습니다.",
+      en: "Socket.IO owns admission and signaling, RTCDataChannel direct control messages and RTP voice, video and screen media, without mixing document or recipient authority.",
+    },
+    problem: {
+      ko: "시그널링 서버, STUN·TURN, 문서 동기화와 실제 미디어 경로를 하나의 ‘실시간 연결’로 취급하면 거리 UI와 실제 수신자가 어긋나고 권한 취소·네트워크 변경·늦은 SDP가 개인정보와 자원 누수로 이어집니다.",
+      en: "Treating signaling, STUN or TURN, document sync and media routes as one realtime connection lets spatial UI drift from actual recipients and turns revoked authority, network changes and late SDP into privacy and resource leaks.",
+    },
+    decision: {
+      ko: "room membership과 immutable conversation scope로 peer를 제한하고, 권한 프롬프트 뒤 revision을 다시 확인한 다음에만 track을 연결합니다. perfect negotiation, bounded ICE queue, restartIce, short-lived TURN policy refresh와 명시적 track·peer teardown을 각각 운영합니다.",
+      en: "Room membership and immutable conversation scope bound peers, and authority revision is rechecked after every permission prompt before tracks attach. Perfect negotiation, bounded ICE queues, restartIce, short-lived TURN refresh and explicit track and peer teardown remain separate controls.",
+    },
+    userValue: {
+      ko: "사용자는 누가 실제 음성·영상·화면을 받는지 확인하고 권한 요청 전에도 공간을 탐색할 수 있으며, 네트워크가 바뀌거나 방을 나가면 연결과 장치가 예측 가능하게 복구·종료됩니다.",
+      en: "Users can see actual media recipients, explore before granting device access and rely on predictable recovery or teardown when networks change or they leave a room.",
+    },
+    tradeoff: {
+      ko: "현재 소규모 P2P huddle은 원격 peer를 세 명으로 제한하고 STUN-only 경로가 있으며, 실제 검증 일부는 단일 Chromium loopback입니다. WAN·제한 NAT·물리 장치·대규모 방송은 TURN과 SFU를 포함한 별도 증거가 필요합니다.",
+      en: "The small P2P huddle caps remote peers at three and includes a STUN-only path, while some evidence uses one Chromium loopback. WAN, restrictive NAT, physical devices and large broadcast require separate TURN and SFU evidence.",
+    },
+    technologies: ["WebRTC", "RTCPeerConnection", "RTCDataChannel", "ICE", "STUN/TURN", "getUserMedia", "getDisplayMedia", "Socket.IO signaling"],
+    evidence: [
+      evidence("code", "apps/web/src/domains/creator/live/huddle/studio-p2p-huddle-controller.ts", "P2P 협상·미디어·ICE 복구 controller", "P2P negotiation, media and ICE recovery controller"),
+      evidence("code", "apps/web/src/domains/creator/studio-screen-share.ts", "양방향 동의형 화면 공유", "Two-sided-consent screen sharing"),
+      evidence("code", "apps/web/src/domains/creator/studio-voice-ice-policy.ts", "단기 TURN 정책과 기존 peer 갱신", "Short-lived TURN policy and existing-peer refresh"),
+      evidence("document", "docs/studio-p2p-huddle.md", "시그널링·데이터·미디어 권위 경계", "Signaling, data and media authority boundary"),
+      evidence("document", "docs/studio/virtual-studio-completion-acceptance-20260920.md", "실제 브라우저 수신자·media edge 검증", "Real-browser recipient and media-edge evidence"),
+      evidence("document", "docs/technology/toonstudio-webrtc-realtime-media-2026-09-25.md", "WebRTC 권위·복구·벤치마크 정리", "WebRTC authority, recovery and benchmark review"),
+    ],
+    reuseSteps: [
+      { ko: "identity, admission, recipient, signaling, direct data, media와 durable document 권위를 한 표에서 분리합니다.", en: "Separate identity, admission, recipients, signaling, direct data, media and durable-document authority in one matrix." },
+      { ko: "마이크·카메라·화면 권한은 사용자 동작 뒤 요청하고 응답 시 session generation과 권한 revision을 다시 확인합니다.", en: "Request microphone, camera and screen access after user intent, then recheck session generation and authority revision on response." },
+      { ko: "SDP·ICE 크기와 queue, peer 수, rate, reconnect 횟수, TURN TTL과 teardown을 제한합니다.", en: "Bound SDP and ICE size and queues, peer count, rate, reconnect attempts, TURN TTL and teardown." },
+      { ko: "loopback, 실제 장치, 서로 다른 NAT, TURN relay와 대규모 SFU를 서로 다른 검증 단계로 기록합니다.", en: "Record loopback, physical devices, distinct NATs, TURN relay and large-scale SFU as separate evidence stages." },
+    ],
+  },
+  {
+    id: "virtual-studio-world-authority",
+    order: 31,
+    status: "experimental",
+    eyebrow: "31 · VIRTUAL STUDIO WORLD",
     title: {
       ko: "가상 공간을 장식이 아니라 제작 상태의 또 다른 투영으로",
       en: "Treating the virtual world as another projection of production state",
@@ -337,6 +382,32 @@ export const ENGINEERING_ADVANCED_GUIDES = [
       { ko: "pointer-up·cancel·device loss 뒤 자원·history 상태가 결정적", en: "Resources and history are deterministic after pointer-up, cancellation and device loss" },
       { ko: "backend fallback에서 receipt·Undo·export 의미 유지", en: "Receipts, undo and export semantics survive backend fallback" },
       { ko: "latency뿐 아니라 perceptual quality·memory·committed parity 검증", en: "Perceptual quality, memory and committed parity verified alongside latency" },
+    ],
+  },
+  {
+    id: "webrtc-media-boundary",
+    status: "experimental",
+    title: { ko: "WebRTC 미디어 권위와 복구 설계", en: "WebRTC media authority and recovery" },
+    summary: {
+      ko: "시그널링, peer admission, 실제 수신자, device permission과 media transport를 durable 문서 협업에서 분리합니다.",
+      en: "Separate signaling, peer admission, actual recipients, device permission and media transport from durable document collaboration.",
+    },
+    outcome: {
+      ko: "네트워크 변경과 권한 취소에도 누구에게 어떤 track이 전달되는지 설명하고 검증할 수 있습니다.",
+      en: "Explain and verify which tracks reach which recipients through network changes and revoked authority.",
+    },
+    steps: [
+      { ko: "identity·room admission·conversation membership과 media recipient scope를 먼저 정의합니다.", en: "Define identity, room admission, conversation membership and media-recipient scope first." },
+      { ko: "시그널링 envelope와 SDP·ICE payload를 versioning하고 크기·queue·rate를 제한합니다.", en: "Version signaling envelopes and SDP and ICE payloads, then bound size, queues and rate." },
+      { ko: "getUserMedia·getDisplayMedia 응답 뒤 session generation과 권한 revision을 재검증합니다.", en: "Revalidate session generation and authority revision after getUserMedia or getDisplayMedia resolves." },
+      { ko: "perfect negotiation, pending ICE, restartIce, TURN credential refresh와 device switch를 독립 상태로 처리합니다.", en: "Handle perfect negotiation, pending ICE, restartIce, TURN credential refresh and device switching as explicit states." },
+      { ko: "leave·block·unmount·track ended에서 sender, receiver, track, stream, handler와 peer를 모두 정리합니다.", en: "Clean up sender, receiver, tracks, streams, handlers and peers on leave, block, unmount and track end." },
+    ],
+    checklist: [
+      { ko: "공간상 근접 표시와 실제 media peer scope가 같은 recipient authority를 사용", en: "Spatial proximity and actual media peer scope share one recipient authority" },
+      { ko: "권한 프롬프트가 열린 동안 방·역할 변경 시 늦은 stream을 즉시 중지", en: "Late streams stop immediately when room or role changes during a permission prompt" },
+      { ko: "STUN-only와 TURN relay, loopback과 WAN 결과를 별도 상태로 표시", en: "STUN-only versus TURN relay and loopback versus WAN are reported separately" },
+      { ko: "연결 종료 뒤 열린 track·timer·event handler·peer connection이 없음", en: "No live tracks, timers, handlers or peer connections remain after teardown" },
     ],
   },
   {

@@ -24,4 +24,12 @@ describe("Studio publishing command center account safety wiring", () => {
     expect(source).toContain("if (workId && publishResult)");
     expect(source).toContain("navigate(buildStudioPublishResultHref(workId), { replace: true })");
   });
+
+  it("persists editor handoff provenance and the selected 3:4 cover contract", () => {
+    expect(source).toContain("resolveStudioPublicationOrigin");
+    expect(source).toContain("studioHandoff: handoffContext !== null");
+    expect(source).toContain("writeStudioPublicationCover");
+    expect(source).toContain("createStudioPublicationCoverDataUrl(selectedCoverPage.src");
+    expect(source).toContain('aria-label="표지 초점 위치"');
+  });
 });

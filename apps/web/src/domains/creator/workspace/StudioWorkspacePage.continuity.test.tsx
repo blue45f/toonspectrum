@@ -62,14 +62,14 @@ describe("studio workspace continuity and safe recovery", () => {
     fireEvent.click(nav("팀"));
     fireEvent.click(screen.getByRole("button", { name: "모집·의뢰" }));
     expect(nav("둘러보기").getAttribute("href")).toBe("/hub?project=older");
-    fireEvent.click(nav("둘러보기")); fireEvent.click(nav("스튜디오"));
+    fireEvent.click(nav("둘러보기")); fireEvent.click(nav("홈"));
     expect(screen.getByRole("combobox").getAttribute("disabled")).toBeNull();
     expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("older");
     expect(screen.getByTestId("location").textContent).toBe("/home?project=older");
   });
   it("keeps personal scope through navigation even with existing works", () => {
     render(<App entries={["/home?scope=personal"]} />);
-    fireEvent.click(nav("팀")); fireEvent.click(nav("둘러보기")); fireEvent.click(nav("스튜디오"));
+    fireEvent.click(nav("팀")); fireEvent.click(nav("둘러보기")); fireEvent.click(nav("홈"));
     expect(screen.getByTestId("location").textContent).toBe("/home?scope=personal");
     expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("");
   });
@@ -94,7 +94,7 @@ describe("studio workspace continuity and safe recovery", () => {
     expect(document.querySelector('a[href="/studio/new"]')).toBeNull();
     expect(document.querySelector('a[href^="/studio/p/"]')).toBeNull();
     expect(nav("팀").getAttribute("href")).toBe("/team?project=missing");
-    fireEvent.click(screen.getByRole("button", { name: "개인 작업실로 돌아가기" }));
+    fireEvent.click(screen.getByRole("button", { name: "개인 홈으로 돌아가기" }));
     expect(screen.getByTestId("location").textContent).toBe("/home?scope=personal");
   });
   it("does not expose any artwork action while the library is loading", () => {
@@ -115,7 +115,7 @@ describe("studio workspace continuity and safe recovery", () => {
     state.error = "저장 공간 오류";
     render(<App entries={["/hub?project=older"]} />);
     expect(screen.getByRole("link", { name: /창작 작품 전시/ }).getAttribute("href")).toBe("/showcase");
-    expect(nav("스튜디오").getAttribute("href")).toBe("/home?project=older");
+    expect(nav("홈").getAttribute("href")).toBe("/home?project=older");
   });
 });
 
@@ -145,7 +145,7 @@ describe("workspace search switching integration", () => {
     render(<App entries={["/hub?project=older&tab=materials&panel=projects"]} />);
     fireEvent.click(screen.getByRole("button", { name: /개인 작업실\s*작품을 선택하지 않고/ }));
     expect(screen.getByTestId("location").textContent).toBe("/hub?tab=materials&scope=personal");
-    expect(nav("스튜디오").getAttribute("href")).toBe("/home?scope=personal");
+    expect(nav("홈").getAttribute("href")).toBe("/home?scope=personal");
   });
   it("does not mislabel a library failure as a personal workspace", () => {
     state.error = "저장 공간 오류";
@@ -182,12 +182,16 @@ describe("workspace live resume integration", () => {
   });
 });
 
-it("keeps the space home free of permanent cards and opens work details only on request", async () => {
+it("keeps home task-first and makes every virtual-space entry explicit", () => {
   state.mode = "virtual-studio";
   render(<App entries={["/home?project=older"]} />);
-  await waitFor(() => expect(screen.getByTestId("actual-live-home").getAttribute("data-project")).toBe("older"));
-  expect(document.querySelector(".workspace-main .workspace-activity")).toBeNull();
-  expect(document.querySelector(".workspace-main .workspace-recent")).toBeNull();
+  expect(screen.queryByTestId("actual-live-home")).toBeNull();
+  expect(screen.getByRole("heading", { name: "홈" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: /캐릭터 선택/ }).getAttribute("href"))
+    .toBe("/onboarding/character?next=%2Fstudio%2Fspace");
+  expect(screen.getByRole("link", { name: /작품 협업 공간/ }).getAttribute("href"))
+    .toBe("/studio/p/older/space");
+  expect(document.querySelector(".workspace-main .workspace-recent")).toBeTruthy();
   expect(document.querySelector(".workspace-world")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "작업 바로가기 열기" }));
   expect(document.querySelector(".workspace-activity")).toBeTruthy();

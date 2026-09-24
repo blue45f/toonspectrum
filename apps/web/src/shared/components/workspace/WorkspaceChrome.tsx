@@ -18,7 +18,7 @@ export function WorkspaceBrand({
   const korean = useI18n((state) => state.lang.startsWith("ko"));
   return <Link href={href} className="workspace-brand" aria-label={korean ? "ToonStudio 홈" : "ToonStudio home"}>
     <ToonSpectrumMark className="workspace-brand-mark" />
-    <strong>ToonStudio{compact ? null : <small>VIRTUAL STUDIO</small>}</strong>
+    <strong>ToonStudio{compact ? null : <small>CREATOR HOME</small>}</strong>
   </Link>;
 }
 

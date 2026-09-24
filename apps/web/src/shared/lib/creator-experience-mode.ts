@@ -6,13 +6,13 @@ export const CREATOR_EXPERIENCE_STORAGE_KEY = "toonspectrum-creator-experience-m
 export type CreatorExperienceMode = "classic" | "virtual-studio";
 
 export function defaultCreatorExperienceMode(_narrow: boolean): CreatorExperienceMode {
-  return "virtual-studio";
+  return "classic";
 }
 
 function defaultMode(): CreatorExperienceMode {
   try {
     return defaultCreatorExperienceMode(typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches);
-  } catch { return "virtual-studio"; }
+  } catch { return "classic"; }
 }
 
 function normalizeMode(value: unknown): CreatorExperienceMode {

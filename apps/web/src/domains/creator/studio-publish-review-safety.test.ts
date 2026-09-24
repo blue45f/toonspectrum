@@ -4,6 +4,7 @@ import {
   resolveStudioPublishAudienceReview,
   resolveStudioPublishEnvironment,
   resolveStudioPublisherIdentity,
+  studioPublishEnvironmentDescription,
   studioPublishEnvironmentLabel,
 } from "./studio-publish-review-safety";
 
@@ -46,6 +47,9 @@ describe("Studio publish review safety", () => {
     expect(resolveStudioPublishEnvironment("tempui-MacBookPro.local")).toBe("local");
     expect(resolveStudioPublishEnvironment("")).toBe("unknown");
     expect(studioPublishEnvironmentLabel("production")).toBe("운영 환경");
+    expect(studioPublishEnvironmentDescription("production")).toContain("실제 운영 서비스");
+    expect(studioPublishEnvironmentDescription("local")).toContain("운영 사이트에 반영되지 않습니다");
+    expect(studioPublishEnvironmentDescription("unknown")).toContain("URL을 검토");
   });
 
   it("describes anonymous access without overstating discoverability", () => {

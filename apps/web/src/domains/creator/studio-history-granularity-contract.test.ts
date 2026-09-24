@@ -100,6 +100,7 @@ describe("E — 지연 커밋 배치는 획 개수만큼의 히스토리 항목�
     expect(batchCommit).toContain("mergeStudioPendingStrokeElements(baseElements, batch.strokes)");
     expect(batchCommit).toContain("const committed = commit(");
     expect(batchCommit).toContain("batch.pageId");
+    expect(batchCommit.match(/\bcommit\(/gu)).toHaveLength(1);
     expect(flush.indexOf("expandDeferredStrokeCommitHistory(batch)")).toBeGreaterThan(
       flush.indexOf("if (!committed)"),
     );

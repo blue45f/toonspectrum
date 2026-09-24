@@ -80,6 +80,41 @@ function uniqueTools(...groups: readonly (readonly string[] | undefined)[]): str
     .slice(0, 16);
 }
 
+export interface StudioPublicationOriginResolutionInput {
+  readonly currentSourceKind?: CreatorPublicationSourceKind | null;
+  readonly studioHandoff: boolean;
+  readonly sourceWorkId?: string | null;
+}
+
+export interface StudioPublicationOriginResolution {
+  readonly sourceKind: CreatorPublicationSourceKind;
+  readonly documentId?: string | null;
+  readonly disclosure?: string;
+  readonly toolIds: readonly string[];
+}
+
+/**
+ * Keeps upload and Studio-authored publication origins distinct. A publish handoff is evidence that
+ * the rendered pages came from the browser editor even when the destination work does not exist yet.
+ * Existing works preserve their recorded origin unless a fresh Studio handoff supersedes it.
+ */
+export function resolveStudioPublicationOrigin(
+  input: StudioPublicationOriginResolutionInput,
+): StudioPublicationOriginResolution {
+  if (input.studioHandoff) {
+    return {
+      sourceKind: "studio_document",
+      documentId: input.sourceWorkId?.trim() || null,
+      disclosure: "ToonStudio 브라우저 편집기에서 제작 후 게시 인계한 원고",
+      toolIds: ["toonstudio-web", "studio-editor", "publish-handoff"],
+    };
+  }
+  return {
+    sourceKind: input.currentSourceKind ?? "uploaded_file",
+    toolIds: ["toonstudio-web", "upload-publisher"],
+  };
+}
+
 /**
  * Adds private audit metadata and a public-safe source link at the same document boundary that is
  * committed as the work revision. Existing explicit agent/automation attribution is preserved;

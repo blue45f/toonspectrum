@@ -95,6 +95,21 @@ export function studioPublishEnvironmentLabel(
   return "환경 확인 필요";
 }
 
+export function studioPublishEnvironmentDescription(
+  environment: StudioPublishEnvironment,
+): string {
+  if (environment === "production") {
+    return "실제 운영 서비스입니다. 전체 공개 또는 링크 공개로 게시하면 독자에게 즉시 노출될 수 있습니다.";
+  }
+  if (environment === "preview") {
+    return "미리보기 환경입니다. 여기서 만든 게시 결과는 운영 사이트에 자동 반영되지 않습니다.";
+  }
+  if (environment === "local") {
+    return "로컬 개발 환경입니다. 여기서 만든 게시 결과는 운영 사이트에 반영되지 않습니다.";
+  }
+  return "현재 호스트를 운영·미리보기·로컬 중 하나로 확인하지 못했습니다. URL을 검토한 뒤 계속하세요.";
+}
+
 export function resolveStudioPublishAudienceReview(
   visibility: StudioPublishVisibility,
   mode: StudioPublishAudienceMode,

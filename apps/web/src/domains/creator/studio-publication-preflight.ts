@@ -5,6 +5,10 @@ import {
   type CreatorPublicationDirective,
   type CreatorPublicationValidationSeverity,
 } from "@/shared/lib/creator-publication-contract";
+import {
+  validateCreatorCommunityMetadata,
+  type CreatorCommunityMetadata,
+} from "@/shared/lib/creator-community-publication-contract";
 
 import { resolveStudioReleaseUtc } from "./studio-release-schedule";
 
@@ -23,6 +27,9 @@ export const STUDIO_PUBLICATION_PREFLIGHT_CODES = [
   "VERTICAL_WIDTHS_INCONSISTENT",
   "PAGED_EXTREME_ASPECT_RATIO",
   "SERIES_METADATA_RECOMMENDED",
+  "ALT_TEXT_REQUIRED",
+  "ASSISTANCE_DISCLOSURE_REQUIRED",
+  "RIGHTS_ATTRIBUTION_RECOMMENDED",
 ] as const;
 
 export type StudioPublicationPreflightCode =
@@ -42,6 +49,7 @@ export interface StudioPublicationPreflightInput {
   tags: readonly string[];
   pages: readonly StudioPublicationPageCandidate[];
   directive: CreatorPublicationDirective;
+  community?: CreatorCommunityMetadata;
   challengeLinked?: boolean;
   seriesLinked?: boolean;
   now?: Date;
@@ -279,6 +287,27 @@ export function validateStudioPublicationPreflight(
       "연재 회차에는 이번 화의 핵심 내용을 설명에 적는 것을 권장합니다.",
       "description",
     );
+  }
+
+  if (input.community) {
+    const communityIssues = validateCreatorCommunityMetadata(input.community, {
+      format: "upload",
+      pageCount: input.pages.length,
+    });
+    for (const issue of communityIssues) {
+      const publiclyReadable = directive.visibility !== "private";
+      const blocksPublication = publiclyReadable && (
+        issue.code === "ALT_TEXT_REQUIRED"
+        || issue.code === "ASSISTANCE_DISCLOSURE_REQUIRED"
+        || issue.code === "RIGHTS_ATTRIBUTION_RECOMMENDED"
+      );
+      add(
+        issue.code,
+        blocksPublication ? "error" : "warning",
+        issue.message,
+        `community.${issue.path}`,
+      );
+    }
   }
 
   const policy = validateCreatorPublicationDirective(directive, {

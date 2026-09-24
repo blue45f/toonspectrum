@@ -78,6 +78,7 @@ export interface StudioRasterExportOrchestrationInput {
   readonly effectiveScale: number;
   readonly pageGrade: PageGrade;
   readonly title: string;
+  readonly exportRevision?: number | null;
   readonly ensureSharedDocumentAvailableForExport: () => boolean;
   readonly ensureWatermarkLoaded: () => Promise<WatermarkSettings>;
   readonly drawWatermarkOnCanvas: (
@@ -126,6 +127,7 @@ export function createStudioRasterExportOrchestration({
   exportScale,
   effectiveScale,
   title,
+  exportRevision,
   ensureSharedDocumentAvailableForExport,
   ensureWatermarkLoaded,
   drawWatermarkOnCanvas,
@@ -214,6 +216,7 @@ export function createStudioRasterExportOrchestration({
     preserveStudioViewBeforeCapture();
     setIsExporting(true);
     try {
+      const exportedAt = new Date();
       const transparent = exportTransparent && exportFormat !== "jpg";
       const { canvas } = await captureBakedPageAtScale(
         activePage,
@@ -233,7 +236,12 @@ export function createStudioRasterExportOrchestration({
         exportMimeType(exportFormat),
         exportQuality(exportFormat)
       );
-      downloadBlob(blob, pageExportFileName(title, exportFormat, transparent));
+      downloadBlob(blob, pageExportFileName(
+        title,
+        exportFormat,
+        transparent,
+        { revision: exportRevision, exportedAt },
+      ));
     } catch (error) {
       setError(error instanceof Error ? error.message : "이미지 내보내기에 실패했어요.");
     } finally {
@@ -313,6 +321,8 @@ export function createStudioRasterExportOrchestration({
   async function handleDownloadAll(spacing = 24) {
     if (!ensureSharedDocumentAvailableForExport()) return;
     const watermarkForExport = await ensureWatermarkLoaded();
+    const exportedAt = new Date();
+    const versionContext = { revision: exportRevision, exportedAt };
     setExportMenuOpen(false);
     const {
       MAX_CANVAS_DIM,
@@ -420,10 +430,15 @@ export function createStudioRasterExportOrchestration({
               exportMimeType(exportFormat),
               exportQuality(exportFormat)
             ),
-            fileName: stripExportFileName(title, exportFormat, {
-              index: chunkIndex,
-              total: chunks.length,
-            }),
+            fileName: stripExportFileName(
+              title,
+              exportFormat,
+              {
+                index: chunkIndex,
+                total: chunks.length,
+              },
+              versionContext,
+            ),
           });
         } finally {
           // Encoded Blob owns the bytes now; release the large temporary raster before ZIP work.
@@ -442,6 +457,8 @@ export function createStudioRasterExportOrchestration({
         const bundle = await buildStudioDownloadBundle({
           title,
           files: deliveries,
+          generatedAt: exportedAt,
+          versionContext,
           crc32ExecutionMode: "worker",
         });
         downloadBlob(bundle.blob, bundle.fileName);

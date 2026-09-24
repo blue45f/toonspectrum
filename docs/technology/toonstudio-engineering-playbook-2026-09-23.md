@@ -724,13 +724,13 @@ AI RAG도 같은 원칙을 적용한다. URL만 남기지 말고 retrievedAt, so
 10. troubleshooting·quality evidence
 11. reusable engineering CTA
 
-### 15.4 6분 세미나 오프닝
+### 15.4 짧은 세미나 오프닝 예시
 
-- 1분: 제품·시장 문제
-- 2분: authority map, Worker/PWA/local-first
-- 1분: brush·CRDT·virtual studio tradeoff
-- 1분: 3D·AI·data rights
-- 1분: 장애 기록, 검증과 재사용
+- 제품·시장 문제를 한 장면으로 제시
+- authority map, Worker/PWA/local-first 연결
+- brush·CRDT·WebRTC·virtual studio tradeoff
+- 3D·AI·data rights와 검증 근거
+- 청중의 시스템에 적용할 질문으로 마무리
 
 ### 15.5 영상 검수 체크리스트
 
@@ -744,9 +744,11 @@ AI RAG도 같은 원칙을 적용한다. URL만 남기지 말고 retrievedAt, so
 
 ---
 
-## 16. 120분 스터디·세미나
+## 16. 선택형 스터디·세미나 모듈
 
-| 시간 | 모듈 | 데모/실습 | 토론 질문 |
+아래 시간은 데모와 토론을 포함한 권장 범위다. 청중과 목적에 맞는 모듈만 골라도 문제→권위→실행→복구→증거 흐름이 이어지도록 구성한다.
+
+| 권장 범위 | 모듈 | 데모/실습 | 토론 질문 |
 | ---: | --- | --- | --- |
 | 5분 | 왜 브라우저 제작실인가 | 기획→컷→드로잉→검수 route | 다음 담당자가 가장 자주 복원하는 맥락은? |
 | 10분 | 시장 benchmark | 제품 한 개를 source→lesson→boundary로 변환 | 복제하지 않고 가져올 원칙은? |
@@ -782,8 +784,8 @@ fallback:
 - 실패 demo 한 개 포함
 - 공개 가능한 fixture와 dummy account 사용
 - 실제 secret·private endpoint·계정 식별자 제거
-- audience별 10/34/44 slide deck 사용
-- 마지막 10분은 참가자 시스템 적용 토론에 배정
+- 핵심 요약·기술 발표·심화 연구 중 필요한 깊이 선택
+- 마지막 구간은 참가자 시스템에 적용할 한 가지 경계 선택
 
 ---
 

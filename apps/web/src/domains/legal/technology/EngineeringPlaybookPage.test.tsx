@@ -24,8 +24,8 @@ describe("EngineeringPlaybookPage", () => {
     expect(document.querySelectorAll('article[id^="dossier-"]')).toHaveLength(10);
     expect(screen.getByRole("heading", { name: /경쟁 제품을 기능 체크리스트|Read competing products/u })).toBeTruthy();
     expect(screen.getByRole("heading", { name: /AI를 제품 기능|Separate AI product/u })).toBeTruthy();
-    expect(screen.getByRole("heading", { name: /설명보다 적용 토론|study and seminar structure/u })).toBeTruthy();
-    expect(screen.getByRole("link", { name: /전체 30개 챕터|All 30 chapters/u }).getAttribute("href"))
+    expect(screen.getByRole("heading", { name: /필요한 모듈만 골라도|technical talk that stays coherent/u })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /전체 기술 챕터|All engineering chapters/u }).getAttribute("href"))
       .toBe("/about/technology/story");
   });
 });

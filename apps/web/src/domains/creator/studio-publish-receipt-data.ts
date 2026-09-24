@@ -9,6 +9,16 @@ export interface StudioPublishReceiptPage {
   readonly height: number;
 }
 
+export interface StudioPublishReceiptCommunity {
+  readonly kind: string;
+  readonly provenance: "human" | "ai_assisted" | "agent_assisted" | "ai_generated" | "mixed";
+  readonly portfolio: boolean;
+  readonly downloadAllowed: boolean;
+  readonly trainingAllowed: boolean;
+  readonly attributionText: string;
+  readonly altText: string;
+}
+
 export interface StudioPublishReceiptRights {
   readonly comments: "open" | "closed";
   readonly allowRemix: boolean;
@@ -22,6 +32,7 @@ export interface StudioPublishReceiptDetails {
   readonly publishedAt: string | null;
   readonly pages: readonly StudioPublishReceiptPage[];
   readonly source: CreatorPublicationSourceLink | null;
+  readonly community: StudioPublishReceiptCommunity;
   readonly rights: StudioPublishReceiptRights;
   readonly preflight: {
     readonly errors: number;

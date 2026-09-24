@@ -5,20 +5,13 @@ import { createPortal } from "react-dom";
 import { requestAuthModalOpen } from "@/compat/auth-modal-intent";
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
-import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
-
+import { betaOpenEventGateEligible } from "./beta-open-event-gate-policy";
 import { BETA_OPEN_EVENT, resolveMarketingEventStatus } from "./event-catalog";
 import {
   hasSeenMarketingEventForIdentity,
   markMarketingEventSeen,
 } from "./event-seen";
 import { useMarketingEventText } from "./marketing-event-copy";
-
-function eventGateEligible(pathname: string): boolean {
-  if (!BETA_OPEN_EVENT.firstVisitExposure) return false;
-  if (pathname === "/events" || pathname.startsWith("/events/")) return false;
-  return isPublicCreativeRoute(pathname);
-}
 
 export function BetaOpenEventGate({ pathname }: { pathname: string }) {
   const text = useMarketingEventText();
@@ -31,7 +24,7 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
   const publicContentCount = BETA_OPEN_EVENT.minimumPublicContentCount;
   const publicDays = BETA_OPEN_EVENT.minimumPublicDays;
   const active = resolveMarketingEventStatus(BETA_OPEN_EVENT) === "active";
-  const eligible = active && eventGateEligible(pathname);
+  const eligible = active && betaOpenEventGateEligible(pathname);
 
   const dismiss = useCallback(() => {
     markMarketingEventSeen(BETA_OPEN_EVENT.id, userId);

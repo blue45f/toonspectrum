@@ -2,6 +2,7 @@ import { STUDIO_PROJECT_NAVIGATION } from "./studio-product-ia";
 
 export const STUDIO_ROUTE_IDS = [
   "home",
+  "personal-space",
   "support",
   "new",
   "import",
@@ -83,6 +84,7 @@ function route(
 
 export const STUDIO_ROUTE_REGISTRY: readonly StudioRouteRegistration[] = Object.freeze([
   route("home", "/studio", "studio", "none", "내 작업", "My work", ["/creator-hub"]),
+  route("personal-space", "/studio/space", "project", "none", "내 가상스튜디오", "My virtual studio"),
   route("support", "/studio/support", "reference", "none", "작가 지원", "Creator support"),
   route("new", "/studio/new", "studio", "none", "새로 만들기", "Create new", ["/make"]),
   route("import", "/studio/import", "studio", "none", "가져오기", "Import"),
