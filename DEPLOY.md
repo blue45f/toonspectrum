@@ -77,6 +77,9 @@ pnpm run cloudflare:static:deploy
 Core API에는 `.env.production.example`의 PostgreSQL·인증·CORS·목적별 object storage 설정을
 Render encrypted environment 또는 root `.env.local` Secret File로 주입합니다. `CORE_API_ORIGIN`은
 credential, path, query가 없는 별도 HTTPS origin이어야 하며 readiness와 origin provenance 검사를 통과해야 합니다.
+Render의 상시 플랫폼 헬스체크는 DB를 깨우지 않는 `/api/health/live`만 사용합니다. DB·스키마를 확인하는
+`/api/health/ready`는 수동 릴리스 게이트와 배포 후 점검에서만 호출하여 Neon Free의 scale-to-zero와
+월간 CU-hour 한도를 불필요하게 소모하지 않습니다.
 프런트의 상대경로 `/api/...`는 Cloudflare gateway를 통해 동일 origin 경험을 유지합니다.
 `/market/library`, `/market/publish` 같은 SPA 화면은 Worker를 실행하지 않고 Static Assets가
 처리하며, `/market`, `/market/browse`, `/market/resource/:id`의 crawler HTML만 OG endpoint로 갑니다.

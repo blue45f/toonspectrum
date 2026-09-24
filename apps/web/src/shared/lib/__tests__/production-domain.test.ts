@@ -61,7 +61,7 @@ describe("toonstudio.cloud production domain", () => {
     const core = render.services?.find(({ name }) => name === "toonspectrum-core-api");
     expect(core).toMatchObject({
       autoDeployTrigger: "off",
-      healthCheckPath: "/api/health/ready",
+      healthCheckPath: "/api/health/live",
     });
     expect(core?.envVars).toEqual(expect.arrayContaining([
       { key: "API_RUNTIME_ROLE", value: "full" },
@@ -91,6 +91,10 @@ describe("toonstudio.cloud production domain", () => {
     ]));
 
     const realtime = render.services?.find(({ name }) => name === "toonspectrum-studio-live");
+    expect(realtime).toMatchObject({
+      autoDeployTrigger: "off",
+      healthCheckPath: "/api/health/live",
+    });
     expect(realtime?.envVars).toEqual(expect.arrayContaining([
       { key: "API_RUNTIME_ROLE", value: "studio-live" },
       { key: "STUDIO_REALTIME_TICKET_ENABLED", value: "false" },
