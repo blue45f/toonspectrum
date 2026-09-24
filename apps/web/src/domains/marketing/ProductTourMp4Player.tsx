@@ -5,7 +5,7 @@ import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
-import { ArrowRight, Captions, LoaderCircle, Play, RotateCcw, Volume2 } from "lucide-react";
+import { ArrowRight, AudioLines, Captions, LoaderCircle, Play, RotateCcw, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Link from "@/compat/router-link";
@@ -20,6 +20,7 @@ import {
   productTourSourceForAttempt,
 } from "./product-tour-media-recovery";
 import { PRODUCT_TOUR, PRODUCT_TOUR_COPY, type ProductTourLocale } from "./product-tour-content";
+import { useProductTourVoiceGuide } from "./use-product-tour-voice-guide";
 
 import "./product-tour-player.css";
 
@@ -79,6 +80,13 @@ export function ProductTourMp4Player({
   const [sourceAttempt, setSourceAttempt] = useState(0);
   const [phase, setPhase] = useState<PlayerPhase>(autoPlayOnMount ? "loading" : "idle");
   const [recoveryDetail, setRecoveryDetail] = useState("");
+  const {
+    supported: voiceGuideSupported,
+    speaking: voiceGuideSpeaking,
+    error: voiceGuideError,
+    toggle: toggleVoiceGuide,
+    stop: stopVoiceGuide,
+  } = useProductTourVoiceGuide(locale, activeChapter);
   const source = useMemo(
     () => productTourSourceForAttempt(PRODUCT_TOUR.src, sourceAttempt),
     [sourceAttempt],
@@ -322,6 +330,7 @@ export function ProductTourMp4Player({
             aria-label={copy.videoTitle}
             onLoadedMetadata={(event) => handleLoadedMetadata(event.currentTarget)}
             onPlay={(event) => {
+              stopVoiceGuide();
               resumeAfterLoadRef.current = true;
               suspendBgmForContext(TOUR_AUDIO_CONTEXT);
               setPhase(event.currentTarget.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ? "loading" : "ready");
@@ -406,6 +415,29 @@ export function ProductTourMp4Player({
           </div>
         )}
       </div>
+
+      <div className="product-tour-player__mix" aria-label={bi("제품 투어 음성 안내", "Product tour voice guide")}>
+        <button
+          type="button"
+          className="product-tour-player__mix-button"
+          aria-pressed={voiceGuideSpeaking}
+          disabled={!voiceGuideSupported}
+          onClick={() => {
+            videoRef.current?.pause();
+            toggleVoiceGuide();
+          }}
+        >
+          <AudioLines size={15} aria-hidden="true" />
+          {voiceGuideSpeaking
+            ? bi("챕터 안내 정지", "Stop chapter guide")
+            : bi("현재 챕터 음성 안내", "Read current chapter")}
+        </button>
+      </div>
+      {voiceGuideError ? (
+        <p className="product-tour-player__voice-guide-status" role="alert">
+          {voiceGuideError}
+        </p>
+      ) : null}
 
       <nav className="product-tour-player__chapters" aria-label={bi("제품 투어 챕터", "Product tour chapters")}>
         {PRODUCT_TOUR.chapters.map((chapter, index) => {

@@ -151,6 +151,18 @@ services:
         sync: false
       - key: UPSTASH_COORDINATION_KEY_HASH_SECRET
         sync: false
+      # Login-only AI voice generation. Keys stay on the Core API and are never exposed to Vite.
+      # Provider failures do not trigger a second paid/free API call; the web app offers local speech fallback.
+      - key: CREATOR_INTELLIGENCE_VOICE_ENABLED
+        value: "true"
+      - key: GEMINI_TTS_API_KEY
+        sync: false
+      - key: GEMINI_TTS_MODEL
+        value: gemini-3.8-flash-lite-tts
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: DEEPGRAM_TTS_MODEL
+        value: aura-2-thalia-en
       # External real-time text APIs only. Local LLM, self-hosted and batch routes are excluded.
       - key: STUDIO_AI_FREE_POOL_ENABLED
         value: "true"

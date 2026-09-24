@@ -33,6 +33,7 @@ import {
   type ProductTourAudioIssue,
   type ProductTourRemotionCompositionProps,
 } from "./ProductTourRemotionComposition";
+import { useProductTourVoiceGuide } from "./use-product-tour-voice-guide";
 
 import "./product-tour-player.css";
 
@@ -85,6 +86,13 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
   const [bgmVolume, setBgmVolume] = useState(0.48);
   const [fallbackStart, setFallbackStart] = useState(0);
   const [useFallback, setUseFallback] = useState(false);
+  const {
+    supported: voiceGuideSupported,
+    speaking: voiceGuideSpeaking,
+    error: voiceGuideError,
+    toggle: toggleVoiceGuide,
+    stop: stopVoiceGuide,
+  } = useProductTourVoiceGuide(locale, activeChapter);
 
   const releaseSiteMusic = useCallback(() => {
     resumeBgmForContext(TOUR_AUDIO_CONTEXT);
@@ -134,8 +142,9 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
     if (!player || !started || useFallback) return;
 
     const handlePlay = () => {
+      stopVoiceGuide();
       setStarted(true);
-        setPhase("ready");
+      setPhase("ready");
       suspendBgmForContext(TOUR_AUDIO_CONTEXT);
     };
     const handlePause = () => {
@@ -192,6 +201,7 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
     chapterStarts,
     releaseSiteMusic,
     started,
+    stopVoiceGuide,
     switchToFallback,
     useFallback,
   ]);
@@ -407,6 +417,22 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
         <button
           type="button"
           className="product-tour-player__mix-button"
+          aria-pressed={voiceGuideSpeaking}
+          disabled={!voiceGuideSupported}
+          onClick={() => {
+            playerRef.current?.pause();
+            toggleVoiceGuide();
+          }}
+        >
+          <AudioLines size={15} aria-hidden="true" />
+          {voiceGuideSpeaking
+            ? bi("챕터 안내 정지", "Stop chapter guide")
+            : bi("현재 챕터 음성 안내", "Read current chapter")}
+        </button>
+
+        <button
+          type="button"
+          className="product-tour-player__mix-button"
           onClick={() => switchToFallback(bi(
             "사용자가 호환 MP4 재생으로 전환했습니다.",
             "The user switched to compatible MP4 playback.",
@@ -416,6 +442,11 @@ export function ProductTourPlayer({ locale }: { readonly locale: ProductTourLoca
           {bi("호환 재생", "Compatibility playback")}
         </button>
       </div>
+      {voiceGuideError ? (
+        <p className="product-tour-player__voice-guide-status" role="alert">
+          {voiceGuideError}
+        </p>
+      ) : null}
 
       <nav className="product-tour-player__chapters" aria-label={bi("제품 투어 챕터", "Product tour chapters")}>
         {PRODUCT_TOUR.chapters.map((chapter, index) => {

@@ -109,3 +109,11 @@
 
 .promo-microphone-recorder { margin: 18px 0; padding: 14px; border: 1px solid #d9deea; border-radius: 12px; background: rgba(255,255,255,.76); }
 .promo-microphone-recorder h3 { margin: 0; font-size: 14px; color: #34445e; }
+
+.promo-cloud-voice { margin-top: 18px; padding: 14px; border: 1px solid #cfdcf4; border-radius: 12px; background: linear-gradient(145deg, #f7fbff, #f8f6ff); }
+.promo-cloud-voice .promo-voice-subhead { margin-top: 0; }
+.promo-cloud-voice .promo-voice-subhead span { color: #4c36ae; font-size: 11px; font-weight: 750; }
+.promo-cloud-voice-grid { align-items: end; grid-template-columns: minmax(180px, 1fr) auto auto; }
+.promo-cloud-voice-grid button { min-height: 44px; }
+.promo-cloud-status { margin: 10px 0 0; color: var(--promo-muted); font-size: 11px; line-height: 1.6; }
+@media (max-width: 860px) { .promo-cloud-voice-grid { grid-template-columns: 1fr; } }

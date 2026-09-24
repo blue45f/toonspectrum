@@ -113,3 +113,115 @@ describe("creator intelligence production providers", () => {
     expect(fetcher).not.toHaveBeenCalled();
   });
 });
+describe("creator intelligence voice providers", () => {
+  const voiceEnv = {
+    CREATOR_INTELLIGENCE_VOICE_ENABLED: "true",
+    GEMINI_TTS_API_KEY: "gemini-voice-secret",
+    DEEPGRAM_API_KEY: "deepgram-voice-secret",
+  };
+
+  function minimalWaveBase64(): string {
+    const bytes = Buffer.alloc(44);
+    bytes.write("RIFF", 0, "ascii");
+    bytes.writeUInt32LE(36, 4);
+    bytes.write("WAVE", 8, "ascii");
+    bytes.write("fmt ", 12, "ascii");
+    bytes.writeUInt32LE(16, 16);
+    bytes.writeUInt16LE(1, 20);
+    bytes.writeUInt16LE(1, 22);
+    bytes.writeUInt32LE(24_000, 24);
+    bytes.writeUInt32LE(48_000, 28);
+    bytes.writeUInt16LE(2, 32);
+    bytes.writeUInt16LE(16, 34);
+    bytes.write("data", 36, "ascii");
+    bytes.writeUInt32LE(0, 40);
+    return bytes.toString("base64");
+  }
+
+  it("reports cloud voice availability only after explicit enablement", () => {
+    const disabled = createCreatorIntelligenceCore({ fetch: vi.fn<typeof fetch>(), env: () => ({}) });
+    expect(disabled.describe().voice.gemini.status).toBe("disabled");
+    expect(disabled.describe().voice.deepgram.status).toBe("disabled");
+
+    const ready = createCreatorIntelligenceCore({ fetch: vi.fn<typeof fetch>(), env: () => voiceEnv });
+    expect(ready.describe().voice.gemini.status).toBe("ready");
+    expect(ready.describe().voice.deepgram.status).toBe("ready");
+  });
+
+  it("sends exact authored text and acting metadata to Gemini TTS", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({
+      steps: [{
+        type: "model_output",
+        content: [{
+          type: "audio",
+          data: minimalWaveBase64(),
+          mime_type: "audio/wav",
+        }],
+      }],
+    }));
+    const core = createCreatorIntelligenceCore({ fetch: fetcher, env: () => voiceEnv, now: () => stamp });
+    const result = await core.synthesizeVoice("gemini", {
+      text: "안녕하세요. 자막을 그대로 읽습니다.",
+      style: "차분하고 또렷하게",
+      voice: "Kore",
+      language: "ko",
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      provider: "gemini",
+      model: "gemini-3.8-flash-lite-tts",
+      voice: "Kore",
+      mimeType: "audio/wav",
+      generatedAt: "2026-09-18T00:00:00.000Z",
+    });
+    const [url, init] = fetcher.mock.calls[0] ?? [];
+    expect(String(url)).toBe("https://generativelanguage.googleapis.com/v1beta/interactions");
+    expect(String(url)).not.toContain("gemini-voice-secret");
+    expect(new Headers(init?.headers).get("x-goog-api-key")).toBe("gemini-voice-secret");
+    const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      model: "gemini-3.8-flash-lite-tts",
+      response_format: { type: "audio" },
+      generation_config: { speech_config: [{ voice: "Kore" }] },
+    });
+    expect(JSON.stringify(body)).toContain("안녕하세요. 자막을 그대로 읽습니다.");
+    expect(JSON.stringify(body)).toContain("차분하고 또렷하게");
+  });
+
+  it("uses Deepgram Aura only for supported non-Korean text", async () => {
+    const audio = Uint8Array.from([0x49, 0x44, 0x33, 3, 0, 0, 0, 0]);
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(audio, {
+      status: 200,
+      headers: { "content-type": "audio/mpeg" },
+    }));
+    const core = createCreatorIntelligenceCore({ fetch: fetcher, env: () => voiceEnv, now: () => stamp });
+    const result = await core.synthesizeVoice("deepgram", {
+      text: "Welcome to ToonSpectrum Voice Studio.",
+      language: "en",
+    });
+
+    expect(result).toMatchObject({
+      status: "ready",
+      provider: "deepgram",
+      model: "aura-2-thalia-en",
+      mimeType: "audio/mpeg",
+    });
+    const [url, init] = fetcher.mock.calls[0] ?? [];
+    expect(String(url)).toContain("https://api.deepgram.com/v1/speak");
+    expect(String(url)).toContain("model=aura-2-thalia-en");
+    expect(String(url)).not.toContain("deepgram-voice-secret");
+    expect(new Headers(init?.headers).get("authorization")).toBe("Token deepgram-voice-secret");
+  });
+
+  it.each([
+    { text: "이 자막은 한국어입니다.", language: "ko" },
+    { text: "この字幕は日本語です。", language: "ja" },
+    { text: "Bonjour, ToonSpectrum.", language: "fr" },
+  ])("rejects non-English Deepgram requests before spending provider credit", async ({ text, language }) => {
+    const fetcher = vi.fn<typeof fetch>();
+    const core = createCreatorIntelligenceCore({ fetch: fetcher, env: () => voiceEnv });
+    await expect(core.synthesizeVoice("deepgram", { text, language })).rejects.toThrow("영문 대사");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+});
