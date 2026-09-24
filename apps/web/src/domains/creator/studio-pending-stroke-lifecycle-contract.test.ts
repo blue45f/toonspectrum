@@ -164,7 +164,7 @@ describe("pending stroke lifecycle source contract", () => {
 
   it("즉시 커밋 획도 pointerup task의 microtask에서 durable write를 시작한다", () => {
     const immediateCommit = sourceBetween(
-      "const committed = commit([...baseElements, finished]);",
+      "const committed = commit(committedElements, undefined, activePage.id);",
       "if (committed && !masterEditMode && finished.mode !== \"eraser\")",
     );
 
