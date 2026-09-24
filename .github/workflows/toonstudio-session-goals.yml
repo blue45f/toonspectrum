@@ -8,6 +8,7 @@ on:
       - "apps/web/src/app/routes/groups/**"
       - "apps/web/src/domains/creator/**"
       - "apps/web/src/shared/components/**"
+      - "apps/web/src/shared/lib/site-route-visual.ts"
       - "scripts/verify-toonstudio-session-goals.mjs"
       - ".github/workflows/toonstudio-session-goals.yml"
       - "eslint.config.mjs"
@@ -47,7 +48,20 @@ jobs:
             /apps/web/public/assets/3d/environments/expansion-v1/
             /apps/web/public/assets/virtual-studio/world/default-world.json
             /apps/web/public/assets/create/creator-board-hero.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-boardroom-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/romance/gpt25-bg-romance-cherry-path-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/wuxia/gpt25-bg-wuxia-palace-courtyard-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-convenience-store-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-space-station-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-cyber-alley-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-highway-chase-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/drama/gpt25-bg-drama-hospital-corridor-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/romance/gpt25-bg-romance-ferris-wheel-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-jungle-temple-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/wuxia/gpt25-bg-wuxia-traditional-market-vertical-depth/background.png
             /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-research-lab-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-bedroom-night-vertical-depth/background.png
+            /apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/fantasy/gpt25-bg-fantasy-dragon-cliff-vertical-depth/background.png
             /apps/web/public/assets/3d/characters/thumbnails/refined-v2/
             !/apps/web/public/vrm/
             !/artifacts/

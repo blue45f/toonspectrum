@@ -13906,7 +13906,6 @@ export function StudioCuttoonEditor({
     studioTeamCommentsWorkId,
   });
 
-
   function openStudioCommentThreadPopover(payload: StudioCommentPinClickPayload): void {
     const selection = selectStudioCommentPinThread(payload);
     if (!selection) {
