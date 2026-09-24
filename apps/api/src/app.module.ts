@@ -18,6 +18,7 @@ import { CreatorResourcesModule } from "./modules/creator-resources/creator-reso
 import { FeedbackModule } from "./modules/feedback/feedback.module";
 import { FortuneModule } from "./modules/fortune/fortune.module";
 import { HealthModule } from "./modules/health/health.module";
+import { IntegrationPlatformModule } from "./modules/integration-platform/integration-platform.module";
 import { LegalModule } from "./modules/legal/legal.module";
 import { LearningModule } from "./modules/learning/learning.module";
 import { MeModule } from "./modules/me/me.module";
@@ -70,6 +71,7 @@ const studioRealtimeTicketModule =
       ? [studioRealtimeTicketModule]
       : []),
     HealthModule,
+    IntegrationPlatformModule,
     LegalModule,
     LearningModule,
     FortuneModule,

@@ -140,6 +140,9 @@ export function resolveAdminRedirectHref(
   if (normalized === "/admin/community") {
     return appendLocation(ADMIN_ROUTE_BY_ID.community.path, search, hash);
   }
+  if (normalized === "/admin/integrations") {
+    return appendLocation(ADMIN_ROUTE_BY_ID.ops.path, search, hash || "#integrations");
+  }
 
   const modernRoute = resolveAdminRoute(normalized);
   if (modernRoute && normalized !== pathname) {
