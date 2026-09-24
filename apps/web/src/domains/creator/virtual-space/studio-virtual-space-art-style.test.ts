@@ -41,7 +41,7 @@ describe("Virtual Studio art direction", () => {
     expect(studioVirtualArtAssetUrl("retro", "https://example.invalid/user-art.png"))
       .toBe("https://example.invalid/user-art.png");
     expect(studioVirtualArtTextureUrl("sky-island", "world-base"))
-      .toBe("/assets/virtual-studio/style-packs/sky-island/tiles/world-base.webp");
+      .toBe("/assets/virtual-studio/art-v4/world/sky-island.webp");
     expect(studioVirtualArtTextureUrl("webtoon", "floor")).toBeNull();
   });
 });

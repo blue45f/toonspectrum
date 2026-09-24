@@ -17,6 +17,7 @@ export function StudioPrivateRoomPanel({room,zones,zoneId,onZone,peers,labels,on
   const candidateKey=JSON.stringify(s.candidates.map(candidate=>candidate.peerId));
   useEffect(()=>{const present=new Set<string>(JSON.parse(candidateKey));setSelected(ids=>ids.filter(id=>present.has(id)));},[candidateKey]);
   const name=(id:string)=>peers.find(peer=>peer.participant.sessionId===id)?.participant.displayName??bt("팀원","Teammate");
+  const teamName=(id:string)=>s.team?.members.find(member=>member.userId===id)?.name??bt("팀원","Teammate");
   const own=s.session?.sessionEpoch;
   const errors:Record<string,string>={access:bt("현재 이 방에 접근할 권한을 확인할 수 없어요.","Your room access could not be verified."),
     unavailable:bt("서버 응답을 확인하지 못했어요. 확인 버튼은 결과만 다시 읽습니다.","The server response is uncertain. Check again only reads the result."),
@@ -42,6 +43,17 @@ export function StudioPrivateRoomPanel({room,zones,zoneId,onZone,peers,labels,on
     {s.entryPending?<div><p>{bt("입장 요청 결과를 아직 확인하지 못했어요. 다시 보내기를 직접 선택하면 같은 요청 번호로 재확인합니다.","The entry result is still unknown. An explicit retry uses the same request identity.")}</p>
       <button className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" disabled={s.busy||!s.door?.permitted} onClick={()=>void controller?.retryEntry()}>{bt("같은 입장 요청 다시 보내기","Retry the same entry request")}</button></div>:null}
     {s.door?<p>{s.door.open?bt("문 열림","Door open"):bt("문 닫힘","Door closed")}{!s.door.permitted?` · ${bt("입장 허가 없음","Entry not permitted")}`:""}</p>:null}
+    {!own&&s.door&&(!s.door.open||!s.door.permitted)?<div className="rounded-lg border border-line p-3">
+      <p className="text-sm">{bt("문 앞에서 노크하면 공간 관리자에게 입장 요청만 전달됩니다. 수락하면 현재 문 허용 목록에 추가되며 관리자가 문 정책을 바꿀 때까지 유지됩니다. 노크만으로 문서·대화·마이크 권한은 생기지 않아요.","Knocking sends an admission request to space managers. Acceptance adds you to the current door allowlist until a manager changes the door policy. A knock never grants document, conversation, microphone or camera access.")}</p>
+      <button className="mt-2 min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" disabled={s.busy||s.knockPending||!controller?.canKnock()} onClick={()=>controller?.knock()}>{s.knockPending?bt("응답을 기다리는 중…","Waiting for a response…"):bt("문 두드리기","Knock on the door")}</button>
+      {s.knockOutcome?<p role="status" className="mt-2 text-sm">{s.knockOutcome.decision==="accepted"?bt("입장 요청을 수락했어요. 현재 문 상태를 확인한 뒤 직접 입장하세요.","Your request was accepted. Check the current door state, then enter explicitly."):bt("지금은 입장하기 어려워요. 관리자에게 메시지를 남기거나 나중에 다시 시도하세요.","Entry was declined for now. Leave a message or try again later.")}</p>:null}
+    </div>:null}
+    {s.team?.viewer.capabilities.manageMembers&&s.knocks.length?<section className="rounded-lg border border-line p-3" aria-label={bt("문 앞 입장 요청","Door knock requests")}>
+      <h3 className="font-semibold">{bt("문 앞 입장 요청","Door knock requests")}</h3>
+      {s.knocks.map(knock=><div className="mt-2 flex flex-wrap items-center gap-2" key={knock.requestId}><span className="mr-auto text-sm">{teamName(knock.actorId)}</span>
+        <button className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" disabled={s.busy} onClick={()=>void controller?.respondKnock(knock.requestId,"accepted")}>{bt("이 팀원에게 문 열기","Open for this teammate")}</button>
+        <button className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm disabled:opacity-50" type="button" disabled={s.busy} onClick={()=>void controller?.respondKnock(knock.requestId,"declined")}>{bt("지금은 어려워요","Not now")}</button></div>)}
+    </section>:null}
     {s.team?.viewer.capabilities.manageMembers?<details><summary>{bt("문과 입장 대상 설정","Manage door and entry")}</summary>
       <fieldset className="space-y-2" disabled={s.busy}><legend>{bt("입장할 수 있는 팀원","Allowed teammates")}</legend>
         {s.team.members.filter(member=>member.status==="active").map(member=><label className="flex min-h-11 items-center gap-2" key={member.userId}><input className="size-4" type="checkbox" checked={allowed.includes(member.userId)} onChange={e=>setAllowed(ids=>e.target.checked?[...ids,member.userId]:ids.filter(id=>id!==member.userId))}/>{member.name}</label>)}

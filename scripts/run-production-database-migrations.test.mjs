@@ -46,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(89);
+  expect(manifest).toHaveLength(90);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0089_creator_series_spatial_showcase");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(89);
+  expect(manifest.at(-1).id).toBe("0090_studio_review_voice_note");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(90);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -1452,6 +1452,7 @@ test("historical adoption and post-baseline relations exactly partition runtime 
     "studio_review_policy",
     "studio_review_policy_event",
     "studio_review_reviewer",
+    "studio_review_voice_note",
     "studio_revision",
     "studio_revision_blob",
     "studio_revision_parent",
@@ -1780,5 +1781,22 @@ test("approved review delivery grants only bounded state and archive evidence up
   expect(migration.contents).toContain("studio_review_delivery_guard_update");
   expect(migration.contents).toContain("studio_review_delivery_event_immutable_update");
   expect(migration.contents).toContain("review delivery immutable inputs changed");
+  expect(migration.contents).not.toMatch(/DROP TABLE|TRUNCATE|UPDATE creator_work/iu);
+});
+
+
+test("review voice notes grant only append plus explicit deletion markers", () => {
+  const acl = buildStudioProductionRuntimeAclSql("toonspectrum_runtime"), guard = buildStudioProductionRuntimeAclViolationSql("toonspectrum_runtime");
+  expect(acl).toContain("public.studio_review_voice_note");
+  expect(acl).toContain('GRANT UPDATE ("deletedAt", "deleteOperationId")\n  ON TABLE public.studio_review_voice_note');
+  expect(acl).not.toMatch(/GRANT (?:DELETE|TRUNCATE)\s+ON[^;]*studio_review_voice_note/iu);
+  expect(guard).toContain("'studio_review_voice_note'::text, ARRAY['deletedAt','deleteOperationId']::text[]");
+  const migration = loadMigrationManifest().find((item) => item.id === "0090_studio_review_voice_note");
+  expect(migration.contents.trimStart().startsWith("-- Explicit, short review explanations")).toBe(true);
+  expect(migration.contents).toContain("BEGIN;");
+  expect(migration.contents.trimEnd().endsWith("COMMIT;")).toBe(true);
+  expect(migration.contents).toContain("studio_review_voice_note_guard_update");
+  expect(migration.contents).toContain("review voice note immutable fields changed");
+  expect(migration.contents).toContain("REVOKE ALL ON TABLE studio_review_voice_note FROM PUBLIC");
   expect(migration.contents).not.toMatch(/DROP TABLE|TRUNCATE|UPDATE creator_work/iu);
 });

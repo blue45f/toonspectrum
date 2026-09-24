@@ -8,15 +8,21 @@ import { privateRoomFailure, samePrivatePin, StudioPrivateRoomError, type Studio
 
 const packet=z.object({wire:z.literal("studio-private-room-v1"),workId:z.string().max(160),world:z.string().max(512),zoneId:z.string().max(160),
   doorEpoch:z.uuid(),sessionEpoch:z.uuid(),clientInstanceId:z.string().max(80),conversationId:z.uuid().optional(),targetSessionEpoch:z.uuid().optional()}).strict();
+const knockPacket=z.discriminatedUnion("type",[
+  z.object({wire:z.literal("studio-private-room-knock-v1"),type:z.literal("request"),workId:z.string().max(160),world:z.string().max(512),zoneId:z.string().max(160),doorId:z.string().max(160),requestId:z.uuid(),actorId:z.string().max(160),clientInstanceId:z.string().max(80),sentAt:z.number().int().nonnegative()}).strict(),
+  z.object({wire:z.literal("studio-private-room-knock-v1"),type:z.literal("response"),workId:z.string().max(160),world:z.string().max(512),zoneId:z.string().max(160),doorId:z.string().max(160),requestId:z.uuid(),responderActorId:z.string().max(160),clientInstanceId:z.string().max(80),targetClientInstanceId:z.string().max(80),decision:z.enum(["accepted","declined"]),sentAt:z.number().int().nonnegative()}).strict(),
+]);
 export interface StudioPrivateContext {
   workId:string;actorId:string;world:StudioAcousticWorldPin;zoneId:string;doorId:string;
   binding:{connectionId:string;clientInstanceId:string};
 }
 export interface StudioPrivateCandidate { peerId:string;sessionEpoch:string;seenAt:number }
+export interface StudioPrivateKnock { requestId:string;actorId:string;peerId:string;seenAt:number }
+export interface StudioPrivateKnockOutcome { requestId:string;decision:"accepted"|"declined";seenAt:number }
 export interface StudioPrivateSnapshot {
   door:StudioPrivateDoor|null;team:StudioTeamSnapshot|null;session:StudioAcousticSessionLease|null;
-  conversations:readonly StudioConversationSnapshot[];candidates:readonly StudioPrivateCandidate[];
-  busy:boolean;uncertain:boolean;reason:string|null;
+  conversations:readonly StudioConversationSnapshot[];candidates:readonly StudioPrivateCandidate[];knocks:readonly StudioPrivateKnock[];
+  busy:boolean;uncertain:boolean;reason:string|null;knockPending:boolean;knockOutcome:StudioPrivateKnockOutcome|null;
   entryPending?:boolean;
 }
 export interface StudioPrivateDependencies {
@@ -26,6 +32,8 @@ export interface StudioPrivateDependencies {
   canCleanup?():boolean;
   /** Actual current presence geometry. Callers must never use a room-at fallback. */
   eligible(peerIds:readonly string[],stage:"enter"|"active"):boolean;
+  /** A knock is allowed only at the authored doorway; it never grants admission by itself. */
+  knockEligible(peerId?:string):boolean;
 }
 export class StudioPrivateRoomController {
   private readonly listeners=new Set<()=>void>();
@@ -34,6 +42,7 @@ export class StudioPrivateRoomController {
   private owner=0;private closed=false;private pending:AbortController|null=null;private off:()=>void=()=>{};
   private captureVersion=0;
   private readonly peers=new Map<string,StudioPrivateCandidate>();
+  private readonly knocks=new Map<string,StudioPrivateKnock>();
   private readonly records=new Map<string,StudioConversationSnapshot>();
   private readonly invalidGrants=new Set<string>();
   private readonly terminal=new Set<string>();
@@ -43,15 +52,16 @@ export class StudioPrivateRoomController {
   private attemptedSessionRenew:string|null=null;
   private readonly attemptedConversationRenew=new Map<string,string>();
   private openIntent:{input:StudioAcousticSessionOpen;key:string}|null=null;
-  private nextRead=0;private nextAnnounce=0;private teamUntil=0;private leaseUntil=0;
+  private knockIntent:{requestId:string;sentAt:number}|null=null;
+  private nextRead=0;private nextAnnounce=0;private teamUntil=0;private leaseUntil=0;private lastKnockAt=0;
   private grantUntil=new Map<string,number>();
-  private state:StudioPrivateSnapshot={door:null,team:null,session:null,conversations:[],candidates:[],busy:false,uncertain:false,reason:null};
+  private state:StudioPrivateSnapshot={door:null,team:null,session:null,conversations:[],candidates:[],knocks:[],busy:false,uncertain:false,reason:null,knockPending:false,knockOutcome:null};
   constructor(readonly context:StudioPrivateContext,private readonly deps:StudioPrivateDependencies){this.now=deps.now??Date.now;this.randomId=deps.randomId??(()=>crypto.randomUUID());}
   snapshot=()=>this.state;
   subscribe=(listener:()=>void)=>{this.listeners.add(listener);return()=>this.listeners.delete(listener);};
   private emit(patch:Partial<StudioPrivateSnapshot>={}){const next={...this.state,...patch};this.state={...next,
     conversations:[...this.records.values()].map(record=>this.terminal.has(record.conversationId)?{...record,status:"revoked",reason:record.reason??"left"}:record),
-    candidates:[...this.peers.values()],entryPending:Boolean(this.openIntent&&!next.session)};for(const fn of this.listeners)fn();}
+    candidates:[...this.peers.values()],knocks:[...this.knocks.values()],knockPending:Boolean(this.knockIntent),entryPending:Boolean(this.openIntent&&!next.session)};for(const fn of this.listeners)fn();}
   start(){this.off=this.deps.direct.subscribe((sender,raw)=>this.receive(sender.sessionId,raw));void this.refresh();}
   current=()=>!this.closed&&this.deps.current();
   captureRevision=()=>this.captureVersion;
@@ -67,9 +77,9 @@ export class StudioPrivateRoomController {
   };
   peerIds=(record:StudioConversationSnapshot)=>record.members.filter(member=>member.sessionEpoch!==this.state.session?.sessionEpoch).map(member=>member.binding.clientInstanceId);
   private stopMedia(){for(const id of this.records.keys())this.invalidGrants.add(id);this.emit();}
-  private clearAuthority(reason:string){this.openIntent=null;this.stopMedia();this.peers.clear();this.records.clear();this.pendingReads.clear();this.grantUntil.clear();
+  private clearAuthority(reason:string){this.openIntent=null;this.knockIntent=null;this.stopMedia();this.peers.clear();this.knocks.clear();this.records.clear();this.pendingReads.clear();this.grantUntil.clear();
     this.unresolvedChanges.clear();this.expectedRosters.clear();this.attemptedConversationRenew.clear();this.attemptedSessionRenew=null;
-    this.teamUntil=0;this.leaseUntil=0;this.emit({session:null,team:null,door:null,reason});}
+    this.teamUntil=0;this.leaseUntil=0;this.emit({session:null,team:null,door:null,reason,knockOutcome:null});}
   invalidate(reason="context"){++this.owner;this.pending?.abort();this.pending=null;this.clearAuthority(reason);this.emit({busy:false});}
   close(){if(this.closed)return;const epoch=this.state.session?.sessionEpoch;this.closed=true;this.invalidate();this.off();
     // Same actor only. A new account must never send an old actor's cleanup request.
@@ -126,6 +136,31 @@ export class StudioPrivateRoomController {
       const value=await this.deps.api.read({conversationId:id,selfSessionEpoch:own.sessionEpoch},signal);this.assertCurrent(signal);this.applyRecord(value,started);this.pendingReads.delete(id);
     }
   });
+  canKnock=()=>Boolean(this.current()&&!this.state.session&&this.state.door&&(!this.state.door.open||!this.state.door.permitted)
+    &&this.teamUntil>this.now()&&this.deps.knockEligible()&&!this.knockIntent&&this.now()-this.lastKnockAt>=10_000);
+  knock=()=>{
+    if(!this.canKnock())return false;
+    const requestId=this.randomId(),sentAt=this.now();
+    const payload={wire:"studio-private-room-knock-v1" as const,type:"request" as const,workId:this.context.workId,world:canonicalJson(this.context.world),zoneId:this.context.zoneId,
+      doorId:this.context.doorId,requestId,actorId:this.context.actorId,clientInstanceId:this.context.binding.clientInstanceId,sentAt};
+    let sent=false;for(const peer of this.deps.direct.getPeers())if(peer.role!=="viewer")sent=this.deps.direct.send(peer.sessionId,JSON.stringify(payload))||sent;
+    if(!sent)return false;
+    this.lastKnockAt=sentAt;this.knockIntent={requestId,sentAt};this.emit({knockOutcome:null});return true;
+  };
+  respondKnock=(requestId:string,decision:"accepted"|"declined")=>this.run(async signal=>{
+    const knock=this.knocks.get(requestId),team=this.state.team,door=this.state.door;
+    if(!knock||!team?.viewer.capabilities.manageMembers||!door||this.teamUntil<=this.now())return;
+    const member=team.members.find(item=>item.userId===knock.actorId&&item.status==="active");if(!member)return;
+    if(decision==="accepted"){
+      const allowed=[...new Set([...(door.allowedUserIds??[]),knock.actorId])];
+      await this.deps.api.changeDoor({world:this.context.world,zoneId:this.context.zoneId,expectedDoorEpoch:door.epoch,open:true,allowedUserIds:allowed},this.randomId(),signal);
+      this.assertCurrent(signal);
+    }
+    const response={wire:"studio-private-room-knock-v1" as const,type:"response" as const,workId:this.context.workId,world:canonicalJson(this.context.world),zoneId:this.context.zoneId,
+      doorId:this.context.doorId,requestId,responderActorId:this.context.actorId,clientInstanceId:this.context.binding.clientInstanceId,targetClientInstanceId:knock.peerId,decision,sentAt:this.now()};
+    this.deps.direct.send(knock.peerId,JSON.stringify(response));this.knocks.delete(requestId);
+    if(decision==="accepted")this.clearAuthority("door-changed");else this.emit();
+  },true);
   enter=()=>this.run(async signal=>{
     const door=this.state.door;if(!door?.open||!door.permitted||!door.epoch||this.teamUntil<=this.now()||this.openIntent||this.state.session||!this.deps.eligible([],"enter"))return;
     const input:StudioAcousticSessionOpen={world:this.context.world,zoneId:this.context.zoneId,doorEpoch:door.epoch,...this.context.binding,expectedSessionEpoch:null};
@@ -173,8 +208,23 @@ export class StudioPrivateRoomController {
   hint=(raw:unknown)=>{const parsed=studioConversationInvalidationSchema.safeParse(raw),own=this.state.session;
     if(!parsed.success||parsed.data.workId!==this.context.workId||parsed.data.selfSessionEpoch!==own?.sessionEpoch||this.pendingReads.size>=24)return;
     this.invalidGrants.add(parsed.data.conversationId);this.pendingReads.add(parsed.data.conversationId);this.emit();this.nextRead=0;void this.refresh();};
-  private receive(peerId:string,raw:string){if(raw.length>1500||!this.validLease())return;
-    let data:unknown;try{data=JSON.parse(raw);}catch{return;}const parsed=packet.safeParse(data);if(!parsed.success)return;
+  private receive(peerId:string,raw:string){if(raw.length>1500)return;
+    let data:unknown;try{data=JSON.parse(raw);}catch{return;}
+    const knock=knockPacket.safeParse(data);
+    if(knock.success){const p=knock.data;if(p.workId!==this.context.workId||p.world!==canonicalJson(this.context.world)||p.zoneId!==this.context.zoneId||p.doorId!==this.context.doorId
+        ||!this.deps.direct.getPeers().some(peer=>peer.sessionId===peerId))return;
+      if(p.type==="request"){
+        if(p.clientInstanceId!==peerId||Math.abs(this.now()-p.sentAt)>15_000||!this.state.team?.viewer.capabilities.manageMembers||!this.deps.knockEligible(peerId))return;
+        if(!this.state.team.members.some(member=>member.userId===p.actorId&&member.status==="active"))return;
+        if(this.knocks.size>=16&&!this.knocks.has(p.requestId))return;
+        this.knocks.set(p.requestId,{requestId:p.requestId,actorId:p.actorId,peerId,seenAt:this.now()});this.emit();return;
+      }
+      const responder=this.state.team?.members.find(member=>member.userId===p.responderActorId&&member.status==="active");
+      if(p.clientInstanceId!==peerId||!responder||!(responder.role==="owner"||responder.role==="admin")
+        ||p.targetClientInstanceId!==this.context.binding.clientInstanceId||p.requestId!==this.knockIntent?.requestId||Math.abs(this.now()-p.sentAt)>15_000)return;
+      this.knockIntent=null;this.emit({knockOutcome:{requestId:p.requestId,decision:p.decision,seenAt:this.now()}});if(p.decision==="accepted"){this.nextRead=0;void this.refresh();}return;
+    }
+    if(!this.validLease())return;const parsed=packet.safeParse(data);if(!parsed.success)return;
     const p=parsed.data;if(p.workId!==this.context.workId||p.world!==canonicalJson(this.context.world)||p.zoneId!==this.context.zoneId||p.doorEpoch!==this.state.session?.doorEpoch
       ||p.clientInstanceId!==peerId||!this.deps.direct.getPeers().some(peer=>peer.sessionId===peerId)||!this.deps.eligible([peerId],"enter"))return;
     if(this.peers.size<24||this.peers.has(peerId))this.peers.set(peerId,{peerId,sessionEpoch:p.sessionEpoch,seenAt:this.now()});
@@ -189,6 +239,10 @@ export class StudioPrivateRoomController {
     if(!this.current()){if(this.state.session||this.state.team)this.leave();return;}
     const now=this.now();if(this.teamUntil&&now>=this.teamUntil){this.teamUntil=0;this.emit({team:null,door:null});}
     for(const [id,peer]of this.peers)if(now-peer.seenAt>5000||!this.deps.eligible([id],"enter"))this.peers.delete(id);
+    let knockChanged=false;for(const [id,value]of this.knocks)if(now-value.seenAt>60_000||!this.deps.knockEligible(value.peerId)){this.knocks.delete(id);knockChanged=true;}
+    if(this.knockIntent&&now-this.knockIntent.sentAt>30_000){this.knockIntent=null;knockChanged=true;}
+    if(this.state.knockOutcome&&now-this.state.knockOutcome.seenAt>15_000){this.state={...this.state,knockOutcome:null};knockChanged=true;}
+    if(knockChanged)this.emit();
     for(const [id,value]of this.records)if(value.status!=="revoked"&&value.status==="active"){
       if(!this.deps.eligible(this.peerIds(value),"active")){this.terminal.add(id);this.leave();this.emit({reason:"boundary"});return;}
       // Once a live audience crosses its boundary, a late read cannot restart capture or consent.

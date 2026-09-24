@@ -14,7 +14,12 @@ export interface StudioPrivateRoomOptions {
   zoneId:string|null;room:StudioLiveRoom|null;presence:StudioVirtualSpaceSnapshot;enabled:boolean;
   onConversation?:()=>void;
 }
-const EMPTY:StudioPrivateSnapshot={door:null,team:null,session:null,conversations:[],candidates:[],busy:false,uncertain:false,reason:null};
+const EMPTY:StudioPrivateSnapshot={door:null,team:null,session:null,conversations:[],candidates:[],knocks:[],busy:false,uncertain:false,reason:null,knockPending:false,knockOutcome:null};
+function distanceToZone(point:{readonly x:number;readonly y:number},zone:StudioWorldAcousticZoneDefinition):number{
+  const dx=Math.max(zone.x-point.x,0,point.x-(zone.x+zone.width));
+  const dy=Math.max(zone.y-point.y,0,point.y-(zone.y+zone.height));
+  return Math.hypot(dx,dy);
+}
 export function useStudioPrivateRoom(options:StudioPrivateRoomOptions){
   const latest=useRef(options);latest.current=options;
   const binding=options.room?.acousticCoreBinding;
@@ -39,8 +44,16 @@ export function useStudioPrivateRoom(options:StudioPrivateRoomOptions){
       if(points.some(point=>point.activity==="away"||point.activity==="focused"||resolveStudioAcousticZone(latest.current.zones,point)?.id!==zoneId))return false;
       return points.every(a=>points.every(b=>Math.hypot(a.x-b.x,a.y-b.y)<=(stage==="enter"?120:156)));
     };
+    const knockEligible=(peerId?:string)=>{
+      if(!current())return false;
+      const snapshot=latest.current.presence;
+      const point=peerId?snapshot.peers.find(item=>item.participant.sessionId===peerId)?.state:snapshot.self;
+      if(!point||point.activity==="away"||point.activity==="focused")return false;
+      if(peerId&&!direct.getPeers().some(item=>item.sessionId===peerId&&item.role!=="viewer"))return false;
+      return distanceToZone(point,zone)<=80;
+    };
     const controller=new StudioPrivateRoomController({workId:initial.workId,actorId,world,zoneId:zone.id,doorId:zone.doorId,binding:core},
-      {api:createStudioPrivateRoomApi(initial.workId,zone.id),direct,current,canCleanup:()=>getAuthUserId()===actorId,eligible});
+      {api:createStudioPrivateRoomApi(initial.workId,zone.id),direct,current,canCleanup:()=>getAuthUserId()===actorId,eligible,knockEligible});
     owner.current={key,controller};
     let active:{id:string;dispose:()=>void}|null=null;
     const sync=()=>{

@@ -20,6 +20,7 @@ import { verifyStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewSub
 import { StudioPinnedReviewPreview } from "./StudioPinnedReviewPreview";
 import { StudioPinnedReviewWorkflow } from "./StudioPinnedReviewWorkflow";
 import { StudioPinnedReviewComparison } from "./StudioPinnedReviewComparison";
+import { StudioReviewVoiceNotes } from "./StudioReviewVoiceNotes";
 import { StudioReviewAnnotationLocation, type StudioReviewAnnotationSelection } from "./StudioReviewSpatialAnnotation";
 
 const StudioReviewResolution = lazy(async () => ({ default: (await import("../review-resolution/StudioReviewResolution")).StudioReviewResolution }));
@@ -223,6 +224,7 @@ function PinnedReviewForActor({ actorId, subject, resolutionRequest, showShareTo
           ? { selected: annotation, onSelect: selectAnnotation, disabled: busy, commentInputId: inputId } : undefined} />
       <StudioPinnedReviewComparison subject={subject ?? result.subject} title={result.review.title}
         onRevoked={() => { invalidateActiveView(); setResult({ ok: false, reason: "access-denied" }); }} />
+      <StudioReviewVoiceNotes subject={result.subject} canComment={result.project.access.comment && ["open", "changes-requested"].includes(result.review.status)} />
       <StudioReviewNoteFilters comments={result.review.comments} view={noteView} query={noteQuery} actorId={actorId}
         onView={setNoteView} onQuery={setNoteQuery} onJump={jumpNote} listId={`${inputId}-notes`} />
       <div id={`${inputId}-notes`} className="mt-4 space-y-3" aria-label={bt("검토 의견", "Review notes")}>
