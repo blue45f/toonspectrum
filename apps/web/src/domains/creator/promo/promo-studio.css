@@ -79,3 +79,10 @@
 .promo-preflight li button { justify-self: start; }
 .promo-scene-strip button[aria-pressed=true] { border-color: #baa6ff; background: #ebe4ff; color: #402477; }
 @media (max-width: 540px) { .promo-camera-poses { grid-template-columns: 1fr; } }
+
+.promo-voice-director { margin: 18px 0; padding: 16px; border: 1px solid #d8cff0; border-radius: 14px; background: linear-gradient(145deg, #faf8ff, #f5f7ff); }
+.promo-voice-director h3 { margin: 0; color: #402477; font-size: 15px; }
+.promo-voice-director .promo-section-head span { padding: 4px 8px; border-radius: 999px; background: #e9e2ff; color: #4c36ae; font-size: 11px; font-weight: 750; }
+.promo-voice-duration { display: grid; align-content: center; min-height: 68px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--promo-border); border-radius: 9px; background: #fff; }
+.promo-voice-duration strong { color: #402477; font-size: 14px; }
+.promo-voice-duration span { margin-top: 4px; color: var(--promo-muted); font-size: 11px; }
