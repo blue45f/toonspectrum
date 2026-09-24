@@ -347,6 +347,81 @@ export function bindStudioCuttoonStagePointersFinish(
     return false;
   }
   const sealStudioDrawReleaseInput = (...args) => api.sealStudioDrawReleaseInput(...args);
+  function finalizeImmediateStrokeCommitSideEffects(input: {
+    committed: boolean;
+    finished: DrawEl;
+    merged: any;
+    deferInkCleanup: boolean;
+    rasterPlan: any;
+    rasterWorkId: any;
+    rasterDocument: any;
+    rasterRuntime: any;
+    rasterActorId: any;
+  }): { pageId: string; strokeIds: string[] } | null {
+    const {
+      committed,
+      finished,
+      merged,
+      deferInkCleanup,
+      rasterPlan,
+      rasterWorkId,
+      rasterDocument,
+      rasterRuntime,
+      rasterActorId,
+    } = input;
+    const handoff = committed && (merged || deferInkCleanup)
+      ? {
+          pageId: activePage.id,
+          strokeIds: [
+            ...(merged?.strokes.map((stroke) => stroke.id) ?? []),
+            finished.id,
+          ],
+        }
+      : null;
+    if (
+      committed && rasterPlan && rasterWorkId && rasterDocument &&
+      rasterRuntime && rasterActorId
+    ) {
+      queueStudioRasterDrawPromotion({
+        plan: rasterPlan,
+        pageId: activePage.id,
+        layerId: (finished as DrawEl & { groupId?: string }).groupId ?? "page-root",
+        workId: rasterWorkId,
+        actorId: rasterActorId,
+        document: rasterDocument,
+        runtime: rasterRuntime,
+        accessGeneration: collaborationAccessRef.current.accessGeneration,
+      });
+    }
+    if (
+      committed && merged &&
+      STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
+      !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
+      studioCrdtOperationSyncReady
+    ) {
+      for (const strokeEl of merged.strokes) {
+        if (containingPanel(strokeEl, elements)) continue;
+        const plan = rasterRuntime.planRasterDrawPromotion({
+          element: strokeEl,
+          pageId: activePage.id,
+          documentWidth: CANVAS_W,
+          documentHeight: canvasH,
+        });
+        if (!plan) continue;
+        queueStudioRasterDrawPromotion({
+          plan,
+          pageId: activePage.id,
+          layerId: (strokeEl as DrawEl & { groupId?: string }).groupId ?? "page-root",
+          workId: rasterWorkId,
+          actorId: rasterActorId,
+          document: rasterDocument,
+          runtime: rasterRuntime,
+          accessGeneration: collaborationAccessRef.current.accessGeneration,
+        });
+      }
+    }
+    return handoff;
+  }
   function finishDrawingPointer(
     stage: Konva.Stage | null,
     pointerEvent: PointerEvent,
@@ -674,57 +749,10 @@ export function bindStudioCuttoonStagePointersFinish(
               deferInkCleanup = true;
             }
           }
-          if (committed && (merged || deferInkCleanup)) {
-            immediateSurfaceHandoff = {
-              pageId: activePage.id,
-              strokeIds: [
-                ...(merged?.strokes.map((stroke) => stroke.id) ?? []),
-                finished.id,
-              ],
-            };
-          }
-          if (
-            committed && rasterPlan && rasterWorkId && rasterDocument &&
-            rasterRuntime && rasterActorId
-          ) {
-            queueStudioRasterDrawPromotion({
-              plan: rasterPlan,
-              pageId: activePage.id,
-              layerId: (finished as DrawEl & { groupId?: string }).groupId ?? "page-root",
-              workId: rasterWorkId,
-              actorId: rasterActorId,
-              document: rasterDocument,
-              runtime: rasterRuntime,
-              accessGeneration: collaborationAccessRef.current.accessGeneration,
-            });
-          }
-          if (
-            committed && merged &&
-            STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED &&
-            !masterEditMode && rasterWorkId && rasterDocument && rasterRuntime && rasterActorId &&
-            studioCrdtOperationSyncReady
-          ) {
-            for (const strokeEl of merged.strokes) {
-              if (containingPanel(strokeEl, elements)) continue;
-              const plan = rasterRuntime.planRasterDrawPromotion({
-                element: strokeEl,
-                pageId: activePage.id,
-                documentWidth: CANVAS_W,
-                documentHeight: canvasH,
-              });
-              if (!plan) continue;
-              queueStudioRasterDrawPromotion({
-                plan,
-                pageId: activePage.id,
-                layerId: (strokeEl as DrawEl & { groupId?: string }).groupId ?? "page-root",
-                workId: rasterWorkId,
-                actorId: rasterActorId,
-                document: rasterDocument,
-                runtime: rasterRuntime,
-                accessGeneration: collaborationAccessRef.current.accessGeneration,
-              });
-            }
-          }
+          immediateSurfaceHandoff = finalizeImmediateStrokeCommitSideEffects({
+            committed, finished, merged, deferInkCleanup, rasterPlan,
+            rasterWorkId, rasterDocument, rasterRuntime, rasterActorId,
+          });
         }
       } else if (drawingRef.current && drawingCrdtStrokeActiveRef.current) {
         // Tiny geometric gestures below the intentional completion threshold are discarded locally.
