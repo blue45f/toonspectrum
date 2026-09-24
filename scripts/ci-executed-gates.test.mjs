@@ -488,7 +488,16 @@ test("focused session checkout retains every non-brand route-purpose image", () 
   const profiles = readFileSync(new URL("../apps/web/src/shared/lib/site-route-visual.ts", import.meta.url), "utf8");
   const images = [...new Set([...profiles.matchAll(/image:\s*"(\/assets\/[^"\n]+)"/gu)].map((match) => match[1]))];
   assert.ok(images.length >= 2, "route-purpose fixture must include both spatial and review artwork");
-  for (const image of images) assert.ok(focused.includes(`/apps/web/public${image}`), `focused checkout omits actual route-purpose artwork: ${image}`);
+  for (const image of images) {
+    assert.ok(
+      existsSync(join(repoRoot, "apps/web/public", image.slice(1))),
+      `route-purpose artwork is missing from the repository: ${image}`,
+    );
+    assert.ok(
+      focused.includes(`/apps/web/public${image}`),
+      `focused checkout omits actual route-purpose artwork: ${image}`,
+    );
+  }
 });
 
 
