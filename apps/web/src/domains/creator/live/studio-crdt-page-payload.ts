@@ -1,6 +1,10 @@
 import { parseStudioColorProofDocument, type StudioColorProofDocument } from "../color/studio-color-proof-document";
 import { parseStudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
 import { PAPER_GRAIN_KINDS } from "../brush/studio-paper-texture";
+import {
+  parseStudioDrawingPracticeDocument,
+  type StudioDrawingPracticeDocument,
+} from "../studio-drawing-practice-document";
 import { parseStudioLayerComps } from "../layer/studio-layer-comps-document";
 import { copyStudioAdvancedRulerAsJson, type StudioAdvancedRulerDocument } from "../studio-advanced-ruler-document";
 
@@ -25,7 +29,7 @@ import type { StudioShared3dStagePersistedState } from "../studio-shared-3d-stag
 
 const PAGE_PAYLOAD_KEYS = [
   "bg", "bgGrad", "canvasH", "name", "note", "hideMaster", "shotType", "cameraAngle",
-  "drawingAssist", "paperSurface", "paperGrainVisible", "layerComps", "colorProof",
+  "drawingAssist", "drawingPractice", "paperSurface", "paperGrainVisible", "layerComps", "colorProof",
 ] as const;
 
 export const STUDIO_CRDT_PAGE_PAYLOAD_VERSION = 1 as const;
@@ -57,6 +61,7 @@ export interface StudioCrdtCompatibleOrderedPage<
   shotType?: string;
   cameraAngle?: string;
   drawingAssist?: StudioDrawingAssistDocument;
+  drawingPractice?: StudioDrawingPracticeDocument;
   paperSurface?: StudioPaperSurfaceSettings;
   paperGrainVisible?: boolean;
   layerComps?: readonly StudioLayerComp[];
@@ -140,6 +145,23 @@ function validatePaperSurface(paperSurface: StudioCrdtJsonValue): void {
   }
 }
 
+function normalizeDrawingPractice(value: StudioCrdtJsonValue): StudioCrdtJsonObject {
+  const drawingPractice = parseStudioDrawingPracticeDocument(value);
+  if (!drawingPractice) {
+    throw new Error("페이지 따라 그리기 설정이 손상되었거나 지원하지 않는 버전입니다.");
+  }
+  return {
+    version: drawingPractice.version,
+    attemptId: drawingPractice.attemptId,
+    attemptIndex: drawingPractice.attemptIndex,
+    purpose: drawingPractice.purpose,
+    status: drawingPractice.status,
+    source: { ...drawingPractice.source },
+    view: { ...drawingPractice.view },
+    ...(drawingPractice.targetGroupId ? { targetGroupId: drawingPractice.targetGroupId } : {}),
+  };
+}
+
 function normalizeDrawingAssist(value: StudioCrdtJsonValue): StudioCrdtJsonObject {
   const drawingAssist = parseStudioDrawingAssistDocument(value);
   if (!drawingAssist) {
@@ -199,6 +221,9 @@ export function validateStudioCrdtPagePayload(payload: StudioCrdtPagePayload): S
     props.colorProof = proof as unknown as StudioCrdtJsonValue;
   }
   if ("drawingAssist" in props) props.drawingAssist = normalizeDrawingAssist(props.drawingAssist);
+  if ("drawingPractice" in props) {
+    props.drawingPractice = normalizeDrawingPractice(props.drawingPractice);
+  }
   if (TEXT_ENCODER.encode(JSON.stringify({ version: payload.version, props })).byteLength >
     STUDIO_CRDT_PAGE_MAX_BYTES) {
     throw new Error("페이지 정보가 실시간 동기화 8KiB 한도를 초과했습니다.");

@@ -557,6 +557,18 @@ export type StudioCuttoonEditorViewSessionRest = {
   bg: any;
   densityShowsStatusRail: any;
   drawingShortcutNoticeStore: any;
+  drawingPracticeDocument: any;
+  drawingPracticeSourceDataUrl: any;
+  drawingPracticeSourceState: any;
+  drawingPracticeCompareActive: any;
+  previewDrawingPracticeView: any;
+  commitDrawingPracticeView: any;
+  cancelDrawingPracticePreview: any;
+  setDrawingPracticeCompareActive: any;
+  finishDrawingPractice: any;
+  retryDrawingPractice: any;
+  removeDrawingPractice: any;
+  openDrawingPracticeReferencePanel: any;
   hi: any;
   menuEditRedoDisabled: any;
   menuEditUndoDisabled: any;

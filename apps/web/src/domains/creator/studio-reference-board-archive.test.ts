@@ -10,6 +10,7 @@ import {
   buildStudioProjectArchive as buildStudioProjectArchiveWithBackend,
   importStudioProjectArchive,
 } from "./studio-project-archive";
+import { createStudioDrawingPracticeDocument } from "./studio-drawing-practice-document";
 import {
   DEFAULT_STUDIO_REFERENCE_BOARD_ITEM_VIEW,
   type StudioReferenceBoardDocument,
@@ -137,6 +138,47 @@ describe("studio reference-board archive bridge", () => {
           itemIndex: 1,
         },
       ]);
+  });
+
+  it("archives a page trace-practice source even after it is removed from the reference board", async () => {
+    const bytes = pngBytes(6);
+    const hash = await contentHash(bytes);
+    const drawingPractice = createStudioDrawingPracticeDocument({
+      attemptId: "attempt-archive",
+      source: {
+        sha256: hash,
+        assetId: "trace-local-id",
+        name: "trace-pose.png",
+        mimeType: "image/png",
+        width: 320,
+        height: 180,
+      },
+      viewport: { canvasWidth: 800, canvasHeight: 1_080 },
+    });
+    const project = {
+      ...projectWithBoard({ version: 1, items: [] }),
+      pagesList: [{
+        ...projectWithBoard({ version: 1, items: [] }).pagesList[0],
+        drawingPractice,
+      }],
+    };
+    expect(collectStudioReferenceBoardArchiveReferences(project)).toMatchObject([{
+      sha256: hash,
+      pointer: "/pagesList/0/drawingPractice/source/sha256",
+      pageId: "page-1",
+      pageIndex: 0,
+    }]);
+
+    const prepared = await prepareStudioReferenceBoardArchiveExport(project, {
+      listAssets: async () => [localAsset("trace-local-id", bytes, hash)],
+    });
+    expect(prepared.isComplete).toBe(true);
+    expect(prepared.attachments).toHaveLength(1);
+    expect(prepared.attachments[0]?.documentReferences).toEqual([{
+      pointer: "/pagesList/0/drawingPractice/source/sha256",
+      usage: "reference",
+      mode: "sha256-prefixed",
+    }]);
   });
 
   it("dedupes equal hashes into one verified reference attachment and round-trips self-contained", async () => {

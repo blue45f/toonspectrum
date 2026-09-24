@@ -194,10 +194,12 @@ function ControlledReferencePanel({
   initialDocument,
   onCommit,
   onPickColor,
+  onStartDrawingPractice,
 }: {
   initialDocument: StudioReferenceBoardDocument;
   onCommit: (next: StudioReferenceBoardDocument) => void;
   onPickColor?: (hex: string) => void;
+  onStartDrawingPractice?: Parameters<typeof StudioReferencePanel>[0]["onStartDrawingPractice"];
 }) {
   const [document, setDocument] = useState(initialDocument);
   return (
@@ -206,6 +208,7 @@ function ControlledReferencePanel({
       onClose={vi.fn()}
       document={document}
       onPickColor={onPickColor}
+      onStartDrawingPractice={onStartDrawingPractice}
       onChange={(next) => {
         onCommit(next);
         setDocument(next);
@@ -252,6 +255,29 @@ afterEach(() => {
 });
 
 describe("StudioReferencePanel controlled reference board", () => {
+  it("starts trace practice from the effective selected reference without mutating the board", async () => {
+    const onCommit = vi.fn();
+    const onStartDrawingPractice = vi.fn();
+    render(
+      <ControlledReferencePanel
+        initialDocument={createStudioReferenceBoardDocument([makeItem("ref-practice")])}
+        onCommit={onCommit}
+        onStartDrawingPractice={onStartDrawingPractice}
+      />,
+    );
+
+    await screen.findByRole("button", { name: "동작 A 이동 및 선택" });
+    fireEvent.click(screen.getByRole("button", { name: "선택 이미지 속성" }));
+    fireEvent.click(screen.getByRole("button", { name: "이 이미지로 따라 그리기" }));
+
+    expect(onStartDrawingPractice).toHaveBeenCalledOnce();
+    expect(onStartDrawingPractice).toHaveBeenCalledWith(expect.objectContaining({
+      item: expect.objectContaining({ id: "ref-practice" }),
+      asset: expect.objectContaining({ id: ASSET_A.id, contentHash: HASH_A }),
+    }));
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
   it("opens the synchronized reference canvas in a dedicated window", () => {
     const onOpenDetached = vi.fn();
     render(

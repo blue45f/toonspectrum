@@ -43,6 +43,7 @@ import type { StudioScenarioImageGenerationRequest } from "./ai/studio-scenario-
 import type { StudioAiImageReferenceDocument } from "./ai/studio-ai-image-reference-roles";
 import type { StudioAiProvenanceDocument } from "./ai/studio-ai-provenance";
 import type { StudioAiImageReferenceAssetOption } from "./ai/StudioAiImageReferencePackEditor";
+import type { StudioDrawingPracticeStartRequest } from "./StudioReferencePanel";
 import type { StudioBg3dSceneDocument } from "./bg3d/studio-bg3d-scene-document";
 import type { StudioBg3dShotBatchRecoveryScope } from "./bg3d/studio-bg3d-shot-batch-plan";
 import type { MotionCutImage } from "./export/studio-motion-export";
@@ -213,6 +214,7 @@ export interface StudioLazyPanelStackHandlers {
   setWriterRoom: (next: SetStateAction<StudioWriterRoomDocument>) => void;
   startMacroRecord: () => void;
   stopMacroRecord: () => Promise<void>;
+  startDrawingPractice: (request: StudioDrawingPracticeStartRequest) => void;
   updatePublishPackageSettings: (value: StudioPublishPackageSettings) => void;
 }
 
@@ -654,6 +656,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
     setWriterRoom,
     startMacroRecord,
     stopMacroRecord,
+    startDrawingPractice,
     updatePublishPackageSettings,
     currentStudioProjectSnapshot,
     reloadServerRevisions,
@@ -1148,6 +1151,7 @@ export const StudioLazyPanelStack = memo(function StudioLazyPanelStack({
             document={referenceBoard}
             onChange={setReferenceBoard}
             onOpenDetached={onOpenReferenceWindow}
+            onStartDrawingPractice={startDrawingPractice}
             onPickColor={(nextColor) => {
               setColor(nextColor);
               rememberColor(nextColor);

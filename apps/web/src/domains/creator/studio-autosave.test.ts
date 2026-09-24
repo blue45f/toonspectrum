@@ -8,6 +8,7 @@ import {
 import { createDefaultStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
 import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
 import { captureLayerComp } from "./layer/studio-layer-comps";
+import { createStudioDrawingPracticeDocument } from "./studio-drawing-practice-document";
 import {
   LEGACY_STUDIO_AUTOSAVE_KEY,
   parseStudioAutosave,
@@ -121,6 +122,36 @@ describe("studio autosave", () => {
     }));
     expect(recovered?.pagesList[0]?.elements).toEqual([{ id: "art-1" }]);
     expect(recovered?.pagesList[0]).not.toHaveProperty("shared3dStage");
+  });
+
+  it("따라 그리기 가이드만 있는 빈 원고도 복구 후보로 보존하고 손상 메타데이터만 제거한다", () => {
+    const drawingPractice = createStudioDrawingPracticeDocument({
+      attemptId: "attempt-autosave",
+      source: {
+        sha256: `sha256:${"d".repeat(64)}`,
+        assetId: "reference-autosave",
+        width: 640,
+        height: 480,
+      },
+      viewport: { canvasWidth: STUDIO_CANVAS_WIDTH, canvasHeight: 1_080 },
+    });
+    const parsed = parseStudioAutosave(serializeStudioAutosave({
+      version: 2,
+      savedAt: "2026-09-25T00:00:00.000Z",
+      pagesList: [{ id: "p1", elements: [], canvasH: 1_080, drawingPractice }],
+    }));
+    expect(parsed?.pagesList[0]?.drawingPractice).toEqual(drawingPractice);
+    expect(parsed && studioAutosaveHasContent(parsed)).toBe(true);
+
+    const recovered = parseStudioAutosave(JSON.stringify({
+      pagesList: [{
+        id: "p1",
+        elements: [{ id: "art-1" }],
+        drawingPractice: { ...drawingPractice, futureField: true },
+      }],
+    }));
+    expect(recovered?.pagesList[0]?.elements).toEqual([{ id: "art-1" }]);
+    expect(recovered?.pagesList[0]).not.toHaveProperty("drawingPractice");
   });
 
   it("native v2 다중 장면과 DCC 출처를 자동저장 왕복에서 그대로 보존한다", () => {

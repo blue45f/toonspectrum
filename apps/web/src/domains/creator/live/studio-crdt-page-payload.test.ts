@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createDefaultStudioDrawingAssistDocument } from "../brush/studio-drawing-assist-document";
 import { captureLayerComp } from "../layer/studio-layer-comps";
+import { createStudioDrawingPracticeDocument } from "../studio-drawing-practice-document";
 import { DEFAULT_PAGE_GRADE } from "../studio-page-grade";
 import { cloneJsonObject, jsonObject, jsonValue } from "./studio-crdt-json-value";
 import { studioPageToCrdtPage as bridgePageToCrdtPage } from "./studio-crdt-page-bridge";
@@ -22,6 +23,16 @@ import type { PageState } from "../studio-page-state";
 import type { StudioCrdtJsonObject } from "./studio-crdt-json-value";
 
 const page: PageState = { id: "page", elements: [], bg: "#fff", bgGrad: null, canvasH: 1080 };
+const drawingPractice = createStudioDrawingPracticeDocument({
+  attemptId: "attempt-crdt",
+  source: {
+    sha256: `sha256:${"d".repeat(64)}`,
+    assetId: "reference-crdt",
+    width: 640,
+    height: 480,
+  },
+  viewport: { canvasWidth: 800, canvasHeight: 1_080 },
+});
 
 describe("lightweight page payload admission", () => {
   it("keeps the bridge's existing serializer API identical and preserves the wire projection", () => {
@@ -60,6 +71,7 @@ describe("lightweight page payload admission", () => {
     { name: "페이지 이름" }, { note: "메모" }, { hideMaster: false }, { shotType: "wide" },
     { cameraAngle: "low" }, { paperSurface: { kind: "washi", seed: 1 } }, { paperGrainVisible: false },
     { drawingAssist: createDefaultStudioDrawingAssistDocument({ canvasWidth: 800, canvasHeight: 1080 }) },
+    { drawingPractice },
     { layerComps: [captureLayerComp("콤프", [], "comp", 1)] },
   ] satisfies Partial<PageState>[])("revalidates a changed serialized page property %j", (patch) => {
     expect(hasSameStudioCrdtPageMetadata(page, { ...page, ...patch })).toBe(false);
@@ -81,6 +93,7 @@ describe("lightweight page payload admission", () => {
     { props: { paperSurface: null, layerComps: null }, message: "페이지 종이 표면 설정이 올바르지 않습니다." },
     { props: { layerComps: null, drawingAssist: null }, message: "페이지 레이어 보기 정보가 올바르지 않습니다." },
     { props: { drawingAssist: null, note: "한".repeat(3000) }, message: "페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다." },
+    { props: { drawingPractice: null, note: "한".repeat(3000) }, message: "페이지 따라 그리기 설정이 손상되었거나 지원하지 않는 버전입니다." },
     { props: { note: "한".repeat(3000) }, message: "페이지 정보가 실시간 동기화 8KiB 한도를 초과했습니다." },
   ];
 
@@ -93,10 +106,15 @@ describe("lightweight page payload admission", () => {
     },
   );
 
-  it("detaches paper and drawing-assist state without changing the serialized page", () => {
+  it("detaches paper, drawing-assist, and trace-practice state without changing the serialized page", () => {
     const drawingAssist = createDefaultStudioDrawingAssistDocument({ canvasWidth: 800, canvasHeight: 1080 });
     drawingAssist.perspective.points = [{ id: "point", x: 24, y: 80 }];
-    const props = jsonObject({ ...page, drawingAssist, paperSurface: { kind: "washi", seed: 0xff_ff_ff_ff } });
+    const props = jsonObject({
+      ...page,
+      drawingAssist,
+      drawingPractice,
+      paperSurface: { kind: "washi", seed: 0xff_ff_ff_ff },
+    });
     if (!props) throw new Error("The drawing-assist fixture must be valid JSON.");
     delete props.id;
     delete props.elements;
@@ -105,8 +123,10 @@ describe("lightweight page payload admission", () => {
     expect(validated.props).toEqual(expected);
     expect(validated.props.paperSurface).not.toBe(props.paperSurface);
     expect(validated.props.drawingAssist).not.toBe(props.drawingAssist);
+    expect(validated.props.drawingPractice).not.toBe(props.drawingPractice);
     drawingAssist.perspective.points[0].x = 99;
     props.drawingAssist = null;
+    props.drawingPractice = null;
     expect(validated.props).toEqual(expected);
   });
 });

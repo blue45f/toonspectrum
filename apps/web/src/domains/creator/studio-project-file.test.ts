@@ -10,6 +10,7 @@ import {
   createDefaultStudioBg3dSceneDocument,
 } from "./bg3d/studio-bg3d-scene-document";
 import { createDefaultStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
+import { createStudioDrawingPracticeDocument } from "./studio-drawing-practice-document";
 import { createStudioLinked3dRenderPageFixture } from "./studio-linked-3d-render-test-fixture";
 import {
   parseStudioProjectFile,
@@ -97,6 +98,37 @@ function retainedAiProvenance() {
 }
 
 describe("studio project file", () => {
+  it("페이지 소유 따라 그리기 가이드를 직렬화 왕복하고 손상된 문서를 거부한다", () => {
+    const drawingPractice = createStudioDrawingPracticeDocument({
+      attemptId: "attempt-project",
+      source: {
+        sha256: `sha256:${"d".repeat(64)}`,
+        assetId: "reference-project",
+        name: "pose.png",
+        width: 640,
+        height: 480,
+      },
+      viewport: { canvasWidth: 800, canvasHeight: page.canvasH },
+    });
+    const project = {
+      version: 2,
+      pagesList: [{ ...page, drawingPractice }],
+    };
+
+    const parsed = parseStudioProjectFile(project);
+    expect(parsed.pagesList[0]?.drawingPractice).toEqual(drawingPractice);
+    expect(parseStudioProjectFile(JSON.parse(serializeStudioProjectFile(parsed))))
+      .toMatchObject({ pagesList: [{ drawingPractice }] });
+
+    expect(() => parseStudioProjectFile({
+      ...project,
+      pagesList: [{
+        ...page,
+        drawingPractice: { ...drawingPractice, futureField: true },
+      }],
+    })).toThrow("따라 그리기");
+  });
+
   it("Canvas LT 레이어·공유 Stage·명시적 Shot의 linked3dRender를 함께 왕복하고 dangling 링크를 거부한다", () => {
     const linkedPage = createStudioLinked3dRenderPageFixture("page-linked-project");
     const { linked3dRender } = linkedPage;

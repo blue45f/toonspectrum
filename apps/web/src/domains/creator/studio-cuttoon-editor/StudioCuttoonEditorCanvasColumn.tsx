@@ -13,6 +13,7 @@ import { CANVAS_W } from "../studio-assets";
 import { StudioCommentThreadPopover, StudioPointCommentComposer, StudioCanvasRulerBars } from "../studio-page-lazy-ui";
 import { STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED } from "../studio-page-shell-runtime";
 import { StudioScrollViewportSubscriber } from "../StudioScrollViewportSubscriber";
+import { StudioDrawingPracticeBar } from "../StudioDrawingPracticeBar";
 import { StudioPixelSelectionHud } from "../StudioPixelSelectionHud";
 import { smoothPixelSelection } from "../studio-selection-refinement";
 import {
@@ -84,6 +85,18 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
     drawMode,
     drawShape,
     drawingRef,
+    drawingPracticeDocument,
+    drawingPracticeSourceDataUrl,
+    drawingPracticeSourceState,
+    drawingPracticeCompareActive,
+    previewDrawingPracticeView,
+    commitDrawingPracticeView,
+    cancelDrawingPracticePreview,
+    setDrawingPracticeCompareActive,
+    finishDrawingPractice,
+    retryDrawingPractice,
+    removeDrawingPractice,
+    openDrawingPracticeReferencePanel,
     editing,
     effScale,
     elementById,
@@ -464,6 +477,9 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
           dialogueTranslateOpen={dialogueTranslateOpen}
           drawingRef={drawingRef}
           drawingShortcutNoticeStore={drawingShortcutNoticeStore}
+          drawingPractice={drawingPracticeDocument}
+          drawingPracticeSourceDataUrl={drawingPracticeSourceDataUrl}
+          drawingPracticeCompareActive={drawingPracticeCompareActive}
           drawMode={drawMode}
           drawShape={drawShape}
           editing={editing}
@@ -715,6 +731,29 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
           zoomHostRef={zoomHostRef}
           stableHandlers={studioCanvasViewportHandlers}
         />
+
+        {drawingPracticeDocument && !isExporting ? (
+          <StudioDrawingPracticeBar
+            document={drawingPracticeDocument}
+            sourceState={drawingPracticeSourceState}
+            compareActive={drawingPracticeCompareActive}
+            disabled={
+              activeSurfaceReviewLocked
+              || pageEditLocked
+              || collaborationDocumentLocked
+              || masterEditMode
+              || saving
+            }
+            onPreviewView={previewDrawingPracticeView}
+            onCommitView={commitDrawingPracticeView}
+            onCancelPreview={cancelDrawingPracticePreview}
+            onCompareChange={setDrawingPracticeCompareActive}
+            onOpenReferencePanel={openDrawingPracticeReferencePanel}
+            onFinish={finishDrawingPractice}
+            onRetry={retryDrawingPractice}
+            onRemove={removeDrawingPractice}
+          />
+        ) : null}
 
         <StudioBrushHud
           visible={
