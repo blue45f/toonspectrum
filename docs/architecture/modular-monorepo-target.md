@@ -1,57 +1,93 @@
 # Modular monorepo target
 
-Status: **migration target**. This document deliberately separates current reality from the intended end state.
+Status: **migration target**. This document separates current reality from the intended end state.
 
 ## Decisions
 
-- Keep one repository and one modular API service.
-- Keep logical business domains inside each application; do **not** create `packages/domains/*` yet.
-- Maintain `apps/web` and establish `apps/admin` as separately buildable/deployable frontend surfaces while retaining `apps/api`.
-- Promote only stable shared contracts or primitives after a real second consumer exists.
-- Preserve Studio's runtime-oriented architecture and existing Studio core packages instead of forcing CRUD-style folders onto it.
+- Keep one repository and one modular Core API service.
+- Keep logical business domains inside each application; do **not** create `packages/domains/*`.
+- Use explicit deployable applications: `web`, `admin-web`, `api`, `mobile`, and `desktop-sync`.
+- Promote only stable contracts or pure models after a real second deployable consumer exists.
+- Preserve Studio's runtime-authority architecture and focused engine/model packages instead of
+  forcing page-oriented CRUD folders onto the editor.
 
 ## Current state
 
-The root package still owns the frontend toolchain. `apps/web` is the production browser surface and `apps/api` is a separate workspace package. The new `apps/admin` boundary intentionally follows the root-owned frontend toolchain first, avoiding another lockfile/workspace migration in the same change.
+- `apps/web` remains driven by the root frontend toolchain.
+- `apps/admin-web` is now a separate workspace package with app-owned Vite, TypeScript and
+  Playwright configuration, but most production administrator capability still remains under
+  `apps/web/src/domains/admin` and must migrate capability by capability.
+- `apps/api` is a separate workspace package, while existing API→Web imports remain measured
+  migration debt rather than an accepted final boundary.
+- Mobile native projects, desktop-sync duplication, root tool configuration and large static
+  assets still require later migration slices.
 
 ## Target application layout
 
 ```text
 apps/
   web/
-    src/{app,domains,shared,platform}
-  admin/
-    src/{app,domains,shared,platform}
+    src/{app,domains,platform,shared}
+  admin-web/
+    src/{app,domains,platform,shared}
   api/
-    src/{app,modules,platform}
+    src/{app,modules,platform,shared}
+  mobile/
+  desktop-sync/
+services/
+  creator-inference/
 ```
 
-Domain folders remain logical application boundaries. A capability should be colocated under its domain, and local components/hooks/types stay with the capability until reuse is proven.
+A capability is colocated under the application and domain that owns its behavior. Local
+components, hooks, models, styles and tests stay with the capability until reuse is proven.
 
 ## Dependency direction
 
 ```text
-web   ─┐
-admin ─┼─> focused shared packages
-api   ─┘
+web       ─┐
+admin-web ─┼──> focused shared packages
+api       ─┘
 ```
 
-Applications must never import another application's source. `shared` must not depend on `domains`. Cross-domain deep imports are migration debt and should converge toward explicit public or integration boundaries.
+Applications never import another application's source. `shared` never depends on `domains`;
+platform adapters never own business rules. Cross-domain deep imports converge toward narrow
+`public` or `integrations` boundaries.
 
-## Focused shared contracts
+## Focused shared packages
 
-packages/contracts is the narrow exception to application-local ownership. It contains only runtime-neutral contracts that have real cross-application consumers. The first migrated slice is security/csrf: constants and pure method classification are shared, while browser Headers/RequestInit helpers remain in Web.
+`packages/contracts` contains runtime-neutral DTOs, schemas, protocol constants and pure
+validation with real cross-application consumers. A candidate must remain free of React, DOM,
+NestJS, database, storage and transport implementation dependencies. Pure catalog models may
+move to a focused `catalog-model` package when both Web and API consume the same implementation.
 
-Do not use this package as a dumping ground or create packages/domains. A candidate must have at least two real deployable consumers and remain free of React, DOM, NestJS, database, storage, and transport implementation dependencies.
+Do not use a package to hide application coupling and do not create `packages/domains`.
+
+## Migration sequence
+
+1. Establish the independent `admin-web` package and app-owned configuration.
+2. Eliminate API→Web source imports by classifying contracts, pure models and runtime adapters.
+3. Move the user-Web administrator console to Admin Web capability by capability.
+4. Replace Web top-level `compat/components/hooks/infrastructure/styles/types` with explicit
+   app/domain/platform/shared ownership.
+5. Move API `server/common/infrastructure/db` code to modules and platform boundaries.
+6. Consolidate desktop sync, mobile ownership and root app-specific configuration.
+7. Ratchet Creator root files downward and migrate Studio by authority and lifecycle.
+8. Move large immutable runtime assets to manifest-addressed object storage with verified fallback.
 
 ## Ratchet strategy
 
-`scripts/validate-app-boundaries.mjs` records boundary counts against `config/architecture-boundary-ratchet.json`. New cross-application dependencies and all new Admin boundary violations start with zero tolerance. Existing Web shared/domain and cross-domain debt is observed first; after a migration slice stabilizes, run the validator with `--write-baseline` and ratchet those budgets downward rather than performing a high-risk mass move.
+`scripts/validate-app-boundaries.mjs` records current debt in
+`config/architecture-boundary-ratchet.json`. New Admin boundary violations have zero tolerance.
+After each stable migration slice, update the baseline downward; never raise a budget to make a
+new violation pass.
 
 ## Studio exception
 
-Studio remains organized by runtime authority (document, commands, history, storage, rendering, collaboration, durability, tools) and may continue to use focused core packages. It should not be moved into `packages/domains` or flattened into generic page/component folders.
+Studio remains organized by document, commands, history, persistence, rendering, collaboration,
+durability, assets and tools. It may continue to use focused core packages. It must not be moved
+into `packages/domains` or flattened into generic component/hook/util folders.
 
-## OpenWiki
+## Documentation states
 
-`openwiki/INSTRUCTIONS.md` defines documentation authority and naming. Generated pages must label **current**, **migration**, and **target** states so planned architecture is never presented as already implemented.
+OpenWiki and architecture documents must label **current**, **migration**, **target**, and
+**legacy exception** states so planned structure is never presented as already implemented.

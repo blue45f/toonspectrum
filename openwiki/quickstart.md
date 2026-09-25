@@ -13,7 +13,7 @@ Status: **bootstrap page**. OpenWiki may enrich or replace generated pages, but 
 ## Application boundaries
 
 - `apps/web`: user-facing browser application.
-- `apps/admin`: independent administrator surface being introduced incrementally.
+- `apps/admin-web`: independent administrator surface being introduced incrementally.
 - `apps/api`: backend modular application.
 - Other `apps/*` entries are specialized runtimes/tools and should not be folded into Web or Admin without an explicit decision.
 

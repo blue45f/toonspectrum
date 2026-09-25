@@ -17,7 +17,7 @@
 
 # production
 /dist
-/dist-admin
+/apps/admin-web/dist/
 /apps/api/dist
 
 # misc

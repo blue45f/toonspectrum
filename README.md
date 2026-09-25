@@ -253,7 +253,7 @@ pnpm dev:api                # API: http://127.0.0.1:4001
 pnpm dev:all                # 사용자 웹 + API
 pnpm dev:admin              # 관리자 UI: http://localhost:4174
 pnpm typecheck:admin
-pnpm build:admin            # dist-admin/
+pnpm build:admin            # apps/admin-web/dist/
 pnpm validate:architecture  # 구조 + application boundary ratchet
 pnpm build && pnpm start    # 사용자 웹 프로덕션 프리뷰
 ```

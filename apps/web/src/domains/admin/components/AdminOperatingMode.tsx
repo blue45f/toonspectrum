@@ -5,7 +5,7 @@ import { adminButtonClass } from "./admin-ui-utils";
 
 const endpoint = "/admin/production/operation-policy";
 const label = { free: "무료 운영", paid: "유료 운영" };
-/** Compact launch controls for the existing console; full evidence management remains in apps/admin. */
+/** Compact launch controls for the existing console; full evidence management remains in apps/admin-web. */
 export function AdminOperatingMode({ uid }: { readonly uid: string }) {
   return <OperatingModeControls key={uid} />;
 }

@@ -3,7 +3,7 @@ name: Architecture boundaries
 on:
   pull_request:
     paths:
-      - "apps/admin/**"
+      - "apps/admin-web/**"
       - "apps/web/src/**"
       - "apps/api/src/**"
       - "apps/api/tsconfig.json"
@@ -12,12 +12,12 @@ on:
       - "pnpm-lock.yaml"
       - "config/architecture-boundary-ratchet.json"
       - "scripts/validate-app-boundaries.mjs"
-      - "vite.admin.config.ts"
+      - "apps/admin-web/vite.config.ts"
       - ".github/workflows/architecture-boundaries.yml"
   push:
     branches: [main]
     paths:
-      - "apps/admin/**"
+      - "apps/admin-web/**"
       - "apps/web/src/**"
       - "apps/api/src/**"
       - "apps/api/tsconfig.json"
@@ -26,7 +26,7 @@ on:
       - "pnpm-lock.yaml"
       - "config/architecture-boundary-ratchet.json"
       - "scripts/validate-app-boundaries.mjs"
-      - "vite.admin.config.ts"
+      - "apps/admin-web/vite.config.ts"
 
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - name: Type-check shared contracts
         run: pnpm --filter @toonspectrum/contracts run typecheck
       - name: Type-check Admin boundary
-        run: pnpm exec tsc -p apps/admin/tsconfig.json
+        run: pnpm --filter @toonspectrum/admin-web typecheck
       - name: Build Admin boundary
-        run: pnpm exec vite build --config vite.admin.config.ts
+        run: pnpm --filter @toonspectrum/admin-web build

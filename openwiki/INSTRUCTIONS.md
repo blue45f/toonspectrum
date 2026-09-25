@@ -13,7 +13,7 @@ Organize repository explanations by `Application -> Domain -> Capability -> Surf
 
 The current strategic constraints are:
 
-1. Keep logical domains inside `apps/web`, `apps/admin`, and `apps/api`; do not invent `packages/domains/*`.
+1. Keep logical domains inside `apps/web`, `apps/admin-web`, and `apps/api`; do not invent `packages/domains/*`.
 2. Web, Admin and API must not import one another's application source.
 3. Promote shared contracts/primitives only when there is a real second consumer.
 4. `shared` code must remain independent of business domains.

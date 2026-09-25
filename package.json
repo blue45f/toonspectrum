@@ -224,9 +224,9 @@
     "mobile:android:build": "cap sync android && cd android && ./gradlew assembleDebug",
     "mobile:android:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
     "mobile:ios:prepare": "cap sync ios",
-    "dev:admin": "vite --config vite.admin.config.ts",
-    "build:admin": "vite build --config vite.admin.config.ts",
-    "typecheck:admin": "tsc -p apps/admin/tsconfig.json",
+    "dev:admin": "pnpm --filter @toonspectrum/admin-web dev",
+    "build:admin": "pnpm --filter @toonspectrum/admin-web build",
+    "typecheck:admin": "pnpm --filter @toonspectrum/admin-web typecheck",
     "validate:app-boundaries": "node scripts/validate-app-boundaries.mjs",
     "audit:visual-assets:strict": "node scripts/audit-visual-asset-quality.mjs --strict",
     "audit:marketplace-asset-similarity": "tsx scripts/audit-marketplace-asset-similarity.mts --strict",
@@ -246,7 +246,9 @@
     "verify:workspace-package-links": "node scripts/verify-workspace-package-links.mjs",
     "test:workspace-package-links": "node --test scripts/verify-workspace-package-links.test.mjs",
     "verify:studio-work-session-workflows": "tsx --tsconfig apps/api/tsconfig.json apps/api/tools/verify-studio-session-workflows.mts",
-    "verify:studio-thorvg-browser": "THORVG_BROWSER_PROBE=1 vitest run packages/studio-engine-thorvg/src/browser-probe.test.ts --pool=threads --maxWorkers=1"
+    "verify:studio-thorvg-browser": "THORVG_BROWSER_PROBE=1 vitest run packages/studio-engine-thorvg/src/browser-probe.test.ts --pool=threads --maxWorkers=1",
+    "test:admin": "pnpm --filter @toonspectrum/admin-web test",
+    "test:admin:e2e": "pnpm --filter @toonspectrum/admin-web test:e2e"
   },
   "dependencies": {
     "@automerge/automerge": "3.5.0",

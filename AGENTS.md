@@ -30,7 +30,7 @@
 권위 순서는 **source/tests → accepted ADR → architecture docs → OpenWiki**다. OpenWiki 설명이 source/tests와 다르면 source/tests가 현재 현실이다.
 
 - 논리적 도메인은 각 앱 내부에 유지하고 `packages/domains/*`를 선제적으로 만들지 않는다.
-- `apps/web`, `apps/admin`, `apps/api`는 서로의 application source를 직접 import하지 않는다.
+- `apps/web`, `apps/admin-web`, `apps/api`는 서로의 application source를 직접 import하지 않는다.
 - Admin은 독립 배포 가능한 surface로 점진적으로 이동하며 기존 기능을 한 번에 옮기지 않는다.
 - 공통 DTO/schema 등 실제 두 번째 소비자가 생긴 범위만 focused contracts package 후보로 승격한다.
 - Studio는 page CRUD 규칙보다 runtime authority와 기존 Studio core package 경계를 우선한다.
