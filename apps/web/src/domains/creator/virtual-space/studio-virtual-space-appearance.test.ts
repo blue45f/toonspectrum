@@ -108,6 +108,19 @@ describe("Virtual Studio appearance compatibility", () => {
     expect(Object.isFrozen(parsed?.capabilities)).toBe(true);
   });
 
+  it("round-trips bounded character cosmetics without accepting arbitrary values", () => {
+    const appearance = createStudioVirtualSpaceAppearance(registry, 0, "creator", {
+      accessoryKey: "beret", auraKey: "sparkle", trailKey: "petal", nameplateKey: "rose",
+    });
+    expect(parseStudioVirtualSpaceAppearance(appearance)).toMatchObject({
+      accessoryKey: "beret", auraKey: "sparkle", trailKey: "petal", nameplateKey: "rose",
+    });
+    expect(resolveStudioVirtualSpaceAppearance(registry, { avatarIndex: 0, appearance })).toMatchObject({
+      accessoryKey: "beret", auraKey: "sparkle", trailKey: "petal", nameplateKey: "rose",
+    });
+    expect(parseStudioVirtualSpaceAppearance({ ...appearance, accessoryKey: "https://outside.invalid/a.png" })).toBeNull();
+  });
+
   it.each([
     { skinKey: "https://outsider.test/a.png", registryRevision: "v1", capabilities: ["idle"] },
     { skinKey: "pink", registryRevision: "v1", capabilities: ["idle"], textureUrl: "https://outsider.test/a.png" },

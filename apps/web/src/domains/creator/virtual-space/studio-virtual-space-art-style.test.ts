@@ -9,6 +9,7 @@ import {
   studioVirtualArtObjectUrl,
   studioVirtualArtStyle,
   studioVirtualArtTextureUrl,
+  studioVirtualLivingTownAssetUrl,
 } from "./studio-virtual-space-art-style";
 
 describe("Virtual Studio art direction", () => {
@@ -47,5 +48,9 @@ describe("Virtual Studio art direction", () => {
       .toBe("/assets/virtual-studio/style-packs-v5/webtoon/world/water-sheet.webp");
     expect(studioVirtualArtObjectUrl("neon", "crate"))
       .toBe("/assets/virtual-studio/style-packs-v5/neon/objects/crate.webp");
+    expect(studioVirtualLivingTownAssetUrl("sky-island", "waterfall-sheet"))
+      .toBe("/assets/virtual-studio/living-town-v6/sky-island/waterfall-sheet.webp");
+    expect(studioVirtualLivingTownAssetUrl("retro", "terrain-tile-atlas"))
+      .toBe("/assets/virtual-studio/living-town-v6/retro/terrain-tile-atlas.webp");
   });
 });

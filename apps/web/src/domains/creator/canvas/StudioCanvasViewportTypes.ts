@@ -35,6 +35,10 @@ import type { StudioAppSettings, StudioAppSettingsTab } from "../studio-app-sett
 import type { BrushPreset } from "../studio-brush";
 import type { CropRect } from "../studio-crop";
 import type { StudioDraftPreviewStore } from "../studio-draft-preview-store";
+import type {
+  StudioDrawingPracticeDocument,
+  StudioDrawingPracticeView,
+} from "../studio-drawing-practice-document";
 import type { DrawMode, DrawShapeKind, StudioMenu, Tool } from "../studio-editor-tool-model";
 import type { DrawEl, El, ImageEl } from "../studio-element-model";
 import type { StudioTutorialTryAction } from "../studio-feature-tutorials";
@@ -153,6 +157,7 @@ export interface StudioCanvasViewportHandlers {
   cancelEditText: () => void;
   commitEditText: (finalValue: string) => void;
   commitPages: (nextPages: PageState[], options?: { bypassReviewLock?: boolean; }) => boolean;
+  commitDrawingPracticeView: (patch: Partial<StudioDrawingPracticeView>) => void;
   designateHistoryBrushSource: (index: number) => void;
   dismissQuickStart: () => void;
   downloadAutosaveBackup: () => void;
@@ -309,6 +314,9 @@ export interface StudioCanvasViewportProps {
   dialogueTranslateOpen: StudioDialogueTranslateSurface;
   drawingRef: import("react").RefObject<DrawEl | null>;
   drawingShortcutNoticeStore: StudioDrawingShortcutNoticeStore;
+  drawingPractice: StudioDrawingPracticeDocument | null;
+  drawingPracticeSourceDataUrl: string | null;
+  drawingPracticeCompareActive: boolean;
   drawMode: DrawMode;
   drawShape: DrawShapeKind;
   editing: { id: string; } | null;

@@ -1,0 +1,511 @@
+{
+  "version": 6,
+  "generatedAt": "2026-09-25",
+  "sourceTechnique": "Image Generation 2.5-directed semantic runtime sheet generation; independent style bytes; no CSS filter variants",
+  "imageGeneration25ConceptIds": [
+    "66b20001-32fd-4d90-9a6f-14b676399191",
+    "9ffa2971-6d20-49bd-a8b3-aaa3da97d83f",
+    "22beabfc-ecd4-47a7-8925-1c83b56003c2"
+  ],
+  "styles": [
+    "sky-island",
+    "webtoon",
+    "pastel",
+    "retro",
+    "ink",
+    "neon"
+  ],
+  "sheets": {
+    "terrainTiles": 16,
+    "waterfallFrames": 8,
+    "splashFrames": 8,
+    "interactionFrames": 8,
+    "decorFrames": 12,
+    "accessories": 5,
+    "directions": 4,
+    "districtPreviews": 6
+  },
+  "files": [
+    {
+      "file": "ink/accessory-sheet.webp",
+      "bytes": 8130,
+      "sha256": "27a5cc1ef6590230830747db1a1b1e544a6587a4f6eafa5a7df2ba242dd91e1b",
+      "size": [
+        1920,
+        96
+      ],
+      "visualSignature": "d71f969fed2b753dda436715de0d7260ec347012932885647d4fd361ca023c9a"
+    },
+    {
+      "file": "ink/decor-sheet.webp",
+      "bytes": 10296,
+      "sha256": "b9375cf000b90ebeb6404e62a214815bed21cb2673679beac8f7530be34b4e59",
+      "size": [
+        1536,
+        128
+      ],
+      "visualSignature": "64c4553c9232e4f9f0ab0c825a684046f9e6b4582fbc86de47ad6706e951b1af"
+    },
+    {
+      "file": "ink/district-preview-sheet.webp",
+      "bytes": 90850,
+      "sha256": "257c27090c17e42660bb2220fd2322695c13138af1e015770088648099243ca2",
+      "size": [
+        1920,
+        180
+      ],
+      "visualSignature": "39c2a9708ae0cce3aa31d31d29064fca1e58a0b7c62f31aaf6b3727f0411729d"
+    },
+    {
+      "file": "ink/interaction-fx-sheet.webp",
+      "bytes": 13092,
+      "sha256": "45acea7991082fd47030e3743dc90c7f7b68e7773a3470bf544310aca4777f8d",
+      "size": [
+        1024,
+        128
+      ],
+      "visualSignature": "91debf6205e16a84d91c43238fb3cf7b0f3770e6d3328224334222deae083686"
+    },
+    {
+      "file": "ink/path-overlay.webp",
+      "bytes": 71192,
+      "sha256": "72ea36c014c0b85dbfb53681dc190bbfd817c1aab730dffdd23aa8b34c775e4c",
+      "size": [
+        1280,
+        960
+      ],
+      "visualSignature": "50e6001be4f6380d15bcd9fff91652faad5470a56532015ff2c42db9cf092cf7"
+    },
+    {
+      "file": "ink/terrain-tile-atlas.webp",
+      "bytes": 22656,
+      "sha256": "e2bedef1ade0db2738482ab89bb115e6752b1ebde553c015d44b75077f6647fa",
+      "size": [
+        512,
+        512
+      ],
+      "visualSignature": "fce19a3830747d7d67d1b569ca95d9c4371de9a0218131e827919ad8cf75eb01"
+    },
+    {
+      "file": "ink/waterfall-sheet.webp",
+      "bytes": 23154,
+      "sha256": "5a5b9364132ceb7b217f939710484947a0d0ef970ecaf5e81da2123ead421e83",
+      "size": [
+        1024,
+        192
+      ],
+      "visualSignature": "bef6c2a6b7d9d053e2dd47991986e73e361f908411208074ada39e8fe91c691e"
+    },
+    {
+      "file": "ink/waterfall-splash-sheet.webp",
+      "bytes": 7128,
+      "sha256": "ec5129c204ef44fbf6e80588f00f79b26d9dd6051d12d892b629fbf2bc70a7b6",
+      "size": [
+        1024,
+        64
+      ],
+      "visualSignature": "aca9bcb5a8c31a64d2147f162aa1603b3798fb635a234d6a1a419ed74edccf99"
+    },
+    {
+      "file": "neon/accessory-sheet.webp",
+      "bytes": 12256,
+      "sha256": "b148b0ee4f1be19c5d5eac49b8fa88681aaa670df9dea16cec942e3b50a0b30e",
+      "size": [
+        1920,
+        96
+      ],
+      "visualSignature": "7d4b91799ce003a3c094ea115a7ed5773d29f745bff69ffc59d3f3ccc0486012"
+    },
+    {
+      "file": "neon/decor-sheet.webp",
+      "bytes": 19944,
+      "sha256": "da884aa34f5eca4368bfb5897bcb25e52bb341f0172823a96484e11d75d3a3e9",
+      "size": [
+        1536,
+        128
+      ],
+      "visualSignature": "79b33084def7b21229f709902257cb7600d16ee3c593f96df12ab199e4150a95"
+    },
+    {
+      "file": "neon/district-preview-sheet.webp",
+      "bytes": 28230,
+      "sha256": "2fa7ddcaf34223fe7c7304f115f916438feedfdcd3fe52273221b70d99e59144",
+      "size": [
+        1920,
+        180
+      ],
+      "visualSignature": "40b92631dceb556e1ec5b84b9746eeb3178005e8ee4f577d058b1bc79498a310"
+    },
+    {
+      "file": "neon/interaction-fx-sheet.webp",
+      "bytes": 17958,
+      "sha256": "0f93132f53788b95c430cada6f2e3562df5a95f6b2bddc66e3a681f782c4284e",
+      "size": [
+        1024,
+        128
+      ],
+      "visualSignature": "61e2d58b44bb70e0130960399f07e22c917f42dcae0bfa48e6fba9f0d7813cfc"
+    },
+    {
+      "file": "neon/path-overlay.webp",
+      "bytes": 69038,
+      "sha256": "0d7992be852a3d8180940b6c7c11dec04357d97ad26b31cca5eb771de36315df",
+      "size": [
+        1280,
+        960
+      ],
+      "visualSignature": "cfa14d5f77c54fd8077e5b4e5057de50068d4fe2ee972ab8455440b5aee73f9f"
+    },
+    {
+      "file": "neon/terrain-tile-atlas.webp",
+      "bytes": 43090,
+      "sha256": "9b8fc9d947a6e96a36e9ed175a5ef79017ec77f2a907e9fcb17746a43041974c",
+      "size": [
+        512,
+        512
+      ],
+      "visualSignature": "321b207cbfe7647f400509214f47410f8f212debe81ede9e021d94641f2c0820"
+    },
+    {
+      "file": "neon/waterfall-sheet.webp",
+      "bytes": 46526,
+      "sha256": "6984fa20b2e3a2d4e1870f6d54f33e611c500018895ef5e8e4b7d57797616e53",
+      "size": [
+        1024,
+        192
+      ],
+      "visualSignature": "0e42bd0f5e82f009b5f8892f07f2b548004d21dbb8f7a98003af929c5d1bb22f"
+    },
+    {
+      "file": "neon/waterfall-splash-sheet.webp",
+      "bytes": 9014,
+      "sha256": "dd9915cad89ee8744f5077b0340302fce9fbc79392d3614ccb75cc3167b51804",
+      "size": [
+        1024,
+        64
+      ],
+      "visualSignature": "4a50f60c8dd0c8b28b5906ef517a9c641145780829e6aca812a9b2ca0e05417a"
+    },
+    {
+      "file": "pastel/accessory-sheet.webp",
+      "bytes": 11478,
+      "sha256": "1d867e39e2e2b9644255c50f4e8b82140318c669730bbf24c85d7ae9aa0458e7",
+      "size": [
+        1920,
+        96
+      ],
+      "visualSignature": "3293d71c3a68ae2b66fb8f2883c9e749ff27a169e2e19ab186c8ddfdc3d68102"
+    },
+    {
+      "file": "pastel/decor-sheet.webp",
+      "bytes": 19130,
+      "sha256": "9bbff7aeaa3fa1605108807ef3cd31460a65599de80f0b532ae1072969dc4238",
+      "size": [
+        1536,
+        128
+      ],
+      "visualSignature": "61d61a00af7968ad4cbf3b8a3e8e8462b923abe9ea10acabcc19871cc6b14092"
+    },
+    {
+      "file": "pastel/district-preview-sheet.webp",
+      "bytes": 21394,
+      "sha256": "8e503815d3a4594f4ea1bdacceb4a9289bf0f79beeaf55ffb4b43f0328f3ef49",
+      "size": [
+        1920,
+        180
+      ],
+      "visualSignature": "45bc39e1eb8c4f58bf0dd1bf436fdc9f67cc95b35a8022b7438ad6bfade9a336"
+    },
+    {
+      "file": "pastel/interaction-fx-sheet.webp",
+      "bytes": 16574,
+      "sha256": "84d5d63a58bbb6019a95ae2ad2a1ce4abccc9305fcbac58440a95bd5781245ae",
+      "size": [
+        1024,
+        128
+      ],
+      "visualSignature": "8b6903026eddfa66ebc9b2513cc2ed503bb29bb5dd29e0e73f64b817814f75b5"
+    },
+    {
+      "file": "pastel/path-overlay.webp",
+      "bytes": 73588,
+      "sha256": "cc912d0576b7d9056dbb9dd1b9bdc7630b9dde88344b48f0f99006769aa6992a",
+      "size": [
+        1280,
+        960
+      ],
+      "visualSignature": "b676e9173fbfe6dc7f355cc0d80b0ef87d53fe73274fed3616d1968e186178d8"
+    },
+    {
+      "file": "pastel/terrain-tile-atlas.webp",
+      "bytes": 34792,
+      "sha256": "a8f70d2d5a0a1ca0bdf2ad65bd377c5cc3ad178fefaa1f8c017025be3496a4ac",
+      "size": [
+        512,
+        512
+      ],
+      "visualSignature": "7b02374593668b225c512da6f49c076a83023b72c8517e37ace152b545827c77"
+    },
+    {
+      "file": "pastel/waterfall-sheet.webp",
+      "bytes": 40602,
+      "sha256": "3705181bf0da89cdb8eb1fc383a8c4077694a36d347734fe8936756e151d4b0a",
+      "size": [
+        1024,
+        192
+      ],
+      "visualSignature": "119a8f605634805d1ff9f5606465498a2e99a51c1b77e45c7f68875bf9b16d70"
+    },
+    {
+      "file": "pastel/waterfall-splash-sheet.webp",
+      "bytes": 8076,
+      "sha256": "24f2a10ab44b6a138f8a680cba215cb87db6fecc71a532fd79e079a45fccdb5c",
+      "size": [
+        1024,
+        64
+      ],
+      "visualSignature": "7eebb924f06312dd84e414f90c694f164297c27c398fcde4c5ae5ffe4a3ad0fd"
+    },
+    {
+      "file": "retro/accessory-sheet.webp",
+      "bytes": 1738,
+      "sha256": "f4182d4a4ec2917f3788ae67f10793ab61788df2ac35500827a2068ef358515f",
+      "size": [
+        1920,
+        96
+      ],
+      "visualSignature": "de22160e18a8c516a66dc47bfefd7da679a67a165a6281ed1cc7222d7f50f7b3"
+    },
+    {
+      "file": "retro/decor-sheet.webp",
+      "bytes": 5246,
+      "sha256": "28406f9c7e0ef810d3ddf8db5328309496d69825f1ce259d13601ef7245054c8",
+      "size": [
+        1536,
+        128
+      ],
+      "visualSignature": "8446bcc2121fcf412b439779ce89504303b5982836465d61ba998f0d252362ae"
+    },
+    {
+      "file": "retro/district-preview-sheet.webp",
+      "bytes": 1636,
+      "sha256": "fd41b8d762b2a60129dcfdca0b00b4e38eb01bd8c442dcd76352e33cec0bcdbd",
+      "size": [
+        1920,
+        180
+      ],
+      "visualSignature": "807ac69d076683fb0400904f82b986e5a151d0e84edba2487b11b5b14f1e380b"
+    },
+    {
+      "file": "retro/interaction-fx-sheet.webp",
+      "bytes": 2516,
+      "sha256": "2e354825819b042d59741f6ce3a0cc375942c51d07599af4151e91d41a9cebe5",
+      "size": [
+        1024,
+        128
+      ],
+      "visualSignature": "3bd095212e0d1fd9fd897b5ea9e060d5b4f8263f5ee34abc5e5a5dec7d20f42d"
+    },
+    {
+      "file": "retro/path-overlay.webp",
+      "bytes": 46756,
+      "sha256": "bd848a1e90299854b93eeb87cbf67dfee7a560f2cdb3673759be0996df4b2eb8",
+      "size": [
+        1280,
+        960
+      ],
+      "visualSignature": "2331264b2f92592e3437a2ee9a8682627cc4987cdabe0d0223ea0a18ff1cfece"
+    },
+    {
+      "file": "retro/terrain-tile-atlas.webp",
+      "bytes": 10256,
+      "sha256": "e00d85dbc149ca781cc4d08031aa9b37a06d1b20bf944bd674b9d38101687db3",
+      "size": [
+        512,
+        512
+      ],
+      "visualSignature": "f5e9ee289ff7aca2cd3bf65762a1f233cb8c33f580afb0538bc14c5daf071326"
+    },
+    {
+      "file": "retro/waterfall-sheet.webp",
+      "bytes": 11272,
+      "sha256": "72c2552e0fc1f88f9bd0297b42f749bb9b6f3ae89e90e70c23e2369c3d89187b",
+      "size": [
+        1024,
+        192
+      ],
+      "visualSignature": "80807e662d0f05c01f784e5ec98c06cb34544702a57a9ff7c358187d7a0f1bd5"
+    },
+    {
+      "file": "retro/waterfall-splash-sheet.webp",
+      "bytes": 1454,
+      "sha256": "a5aea153d93a0db9ddc29bab9ce63837b0ecfe6b9205c860885c956b95dfff3f",
+      "size": [
+        1024,
+        64
+      ],
+      "visualSignature": "1e362ee2c88dc1a4c0cb228b7b75ac8ebf8e2fe1cab775b7aa1bed0a2a6eb1ab"
+    },
+    {
+      "file": "sky-island/accessory-sheet.webp",
+      "bytes": 11040,
+      "sha256": "f9220265f3146401d9618f6b46d75317da3bffb5c7b4e1119e07bd4a7ae8e16b",
+      "size": [
+        1920,
+        96
+      ],
+      "visualSignature": "3f0832b225aaa15059d1124c6f6e3c42f2e904258f83ab03749212b965121d68"
+    },
+    {
+      "file": "sky-island/decor-sheet.webp",
+      "bytes": 80838,
+      "sha256": "d61ed034e5f71ff550c597d666e597d449f25a8c1cad21ec04acf76e56e34804",
+      "size": [
+        1536,
+        128
+      ],
+      "visualSignature": "a24b60175da3bea376d415c5763e68508b6bf7997d9d372104e68b5aff62e873"
+    },
+    {
+      "file": "sky-island/district-preview-sheet.webp",
+      "bytes": 237966,
+      "sha256": "9cbce0a8674aa0708ad045a177cdafd72dd24c6508df55d6ad68d9df82156aa1",
+      "size": [
+        2240,
+        180
+      ],
+      "visualSignature": "1592119a736426f39cfc7931b10b3dd2034476080fcfabaaaab3d479081af166"
+    },
+    {
+      "file": "sky-island/interaction-fx-sheet.webp",
+      "bytes": 18230,
+      "sha256": "dc47e8a7dedd24fa0acd232efd1d9c31903bc180c19373b54b06354deb6cd10a",
+      "size": [
+        1024,
+        128
+      ],
+      "visualSignature": "6e8934276965e13cd19781b35326b6683624656df08602fdab817b6739717338"
+    },
+    {
+      "file": "sky-island/path-overlay.webp",
+      "bytes": 77940,
+      "sha256": "5462de842defb58ec66d67d1a5c0d7cdd52c3be88a669b117337ebd30a5653e7",
+      "size": [
+        1280,
+        960
+      ],
+      "visualSignature": "2a120d58d79f3200098e93cf7e12d9562bfdb6d9ae764ffea319f7f9447173f8"
+    },
+    {
+      "file": "sky-island/terrain-tile-atlas.webp",
+      "bytes": 43984,
+      "sha256": "cb7ae23167fba9816d3ebe3876a26a89a9d99574fe00711dfded03800e3dcca5",
+      "size": [
+        512,
+        512
+      ],
+      "visualSignature": "d1e5adce4ced12b6a9118d1c89f22eacdeca53ef2925575350a34fc662006d2e"
+    },
+    {
+      "file": "sky-island/waterfall-sheet.webp",
+      "bytes": 46952,
+      "sha256": "efd461f3158bb1a18b85ac32c5db48ac512488e703a04757863f223d6872aad9",
+      "size": [
+        1024,
+        192
+      ],
+      "visualSignature": "ec32c160e33a3eb6823dfa4c584aa001bf6b9c775c5d94dc99d286652f5a9f97"
+    },
+    {
+      "file": "sky-island/waterfall-splash-sheet.webp",
+      "bytes": 8960,
+      "sha256": "04f6b3d81fca4981feea1660c4e9893d1edeaa8aedae7f50854392e1194bc77e",
+      "size": [
+        1024,
+        64
+      ],
+      "visualSignature": "bb30d3810f086681ece268c2e253e27d1494ad5c56a23c32ffae8013f9215fd3"
+    },
+    {
+      "file": "webtoon/accessory-sheet.webp",
+      "bytes": 10700,
+      "sha256": "0663c8a32cdb23f8e7887ee02504ab8e95ffd74a02796aafe1b8efb6a774358f",
+      "size": [
+        1920,
+        96
+      ],
+      "visualSignature": "07c4185ad722be589348021ab1483a31730edfeedd5aa7c5132d89f5d531313d"
+    },
+    {
+      "file": "webtoon/decor-sheet.webp",
+      "bytes": 19786,
+      "sha256": "a72536b7e902c2e762f405beec481451184ed9794a445ba480d0fbfc019cf7f5",
+      "size": [
+        1536,
+        128
+      ],
+      "visualSignature": "6c50251e611a1afedfca5c4110db0a9da937c26ba269f2043a24bd0ca9037163"
+    },
+    {
+      "file": "webtoon/district-preview-sheet.webp",
+      "bytes": 20400,
+      "sha256": "5ba31d7c73fd9c638efc759c0683cfb371cdc302f58a5476cb22007ae71e9b42",
+      "size": [
+        1920,
+        180
+      ],
+      "visualSignature": "9abdfb212a428a423f1635dc7f1abdd9f34703a68b1c7834f7add777c73c5075"
+    },
+    {
+      "file": "webtoon/interaction-fx-sheet.webp",
+      "bytes": 18026,
+      "sha256": "1ed0b2e4b22cef9e5574114213252a4700d8ea84baff697e7ddb64e432db97d0",
+      "size": [
+        1024,
+        128
+      ],
+      "visualSignature": "7a36971b297c20f53616ff3a92f60a79e4313f933d3394e8dd31f7f15065e7ae"
+    },
+    {
+      "file": "webtoon/path-overlay.webp",
+      "bytes": 75810,
+      "sha256": "b8710438601a7e933748e6116c71aa2184c887ae24bba49c0b32f4c5109ba75b",
+      "size": [
+        1280,
+        960
+      ],
+      "visualSignature": "c7710be7305342909d8fa4587725735027d7b759c17cd8aed2e3a21e4bcd6d42"
+    },
+    {
+      "file": "webtoon/terrain-tile-atlas.webp",
+      "bytes": 39446,
+      "sha256": "691b000965fa7673fd8b893f42d97cea98e74db65f9108deb91e9cd300c8b62f",
+      "size": [
+        512,
+        512
+      ],
+      "visualSignature": "b02578d95f0c1e15345545af90c48b691b18ae0af77e50741073b36c0bc2bcc3"
+    },
+    {
+      "file": "webtoon/waterfall-sheet.webp",
+      "bytes": 44274,
+      "sha256": "42b56bd60f24537fe70699cef8f3536d38fcdfa61b9a04590284a3197593cac7",
+      "size": [
+        1024,
+        192
+      ],
+      "visualSignature": "938e1b6639ddee6b3a5af60e0147965905e4b79c17c779d92de4f018f02021c7"
+    },
+    {
+      "file": "webtoon/waterfall-splash-sheet.webp",
+      "bytes": 9206,
+      "sha256": "da622ed34548e57796da1f274f6cc342a96d296aa4d4f27190da4e1055588557",
+      "size": [
+        1024,
+        64
+      ],
+      "visualSignature": "9377123cf438fccd48d4d6de2d175c09f438eb8936d4dd1f52195a10528da64d"
+    }
+  ],
+  "imageGeneration25SourceManifest": "imagegen25-source-manifest.json"
+}

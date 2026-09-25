@@ -6,7 +6,7 @@ The site-wide soundtrack accepts **ToonSpectrum original productions only**. The
 
 ## Repository release-ready original OST
 
-The original production plan defines nine primary compositions. Six legacy masters are present in this repository; `midnight-storyboard`, `neon-scroll`, and `publish-the-sky` remain planned, not published media. The Prism Awakening expansion adds six new masters (19:45), producing a twelve-master repository catalogue (41:00). This describes repository artifacts, not a confirmed live deployment. A recurring four-note creation motif is a production intention rather than a verified transcription of every generated output.
+The original production plan defines nine primary compositions, and all nine approved masters are now present in this repository (32:05). The Prism Awakening expansion adds six masters (19:45), producing a fifteen-master repository catalogue (51:50). This describes repository artifacts, not a confirmed live deployment. A recurring four-note creation motif is a production intention rather than a verified transcription of every generated output.
 
 | ID | Role | Primary form | Runtime | Purpose |
 | --- | --- | --- | ---: | --- |
@@ -40,7 +40,7 @@ Pinned model artifacts used for this release:
 - VAE SHA-256: `da17edb604c40deaf09e9b24974e590d1ca83a374070e5d0884cfa4bed9a99b0`
 - Qwen3 embedding SHA-256: `0437e45c94563b09e13cb7a64478fc406947a93cb34a7e05870fc8dcd48e23fd`
 
-Generation uses deterministic per-track seeds. ACE-Step produces a 48 kHz FLAC intermediate; FFmpeg then creates a 48 kHz stereo 192 kbps MP3 with `loudnorm=I=-14:TP=-1:LRA=7`. The FLAC is not committed, but its SHA-256 is retained in the adjacent JSON sidecar. The legacy masters use this original 192 kbps/single-pass path; the expansion uses the 320 kbps/two-pass settings above. Each public MP3 must pass automated checks for codec, sample rate, stereo layout, expected duration, delivery bitrate, integrated loudness, true peak and final SHA-256.
+Generation uses deterministic per-track seeds. ACE-Step produces a 48 kHz FLAC intermediate, and the FLAC is not committed; its SHA-256 is retained in the adjacent JSON sidecar. The six legacy core masters use the original 192 kbps/single-pass `loudnorm=I=-14:TP=-1:LRA=7` path. `midnight-storyboard`, `neon-scroll`, and `publish-the-sky` use 192 kbps/two-pass mastering targeting -14 LUFS, -1.5 dBTP and 11 LU LRA. The Prism Awakening expansion uses the 320 kbps/two-pass settings above. Each public MP3 must pass automated checks for codec, sample rate, stereo layout, expected duration, delivery bitrate, integrated loudness, true peak and final SHA-256.
 
 ACE-Step does not provide the Eleven Music C2PA request contract. The runtime therefore treats its provenance separately: an ACE-Step entry is accepted only with `provenance: "local-generation-recorded"`, a pinned 40-character generator revision, a valid SHA-256 and `status: "published"`. Eleven Music entries continue to require `provenance: "c2pa-requested"` plus `c2paRequested: true`; this gate was not weakened.
 

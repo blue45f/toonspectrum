@@ -22,6 +22,7 @@ import {
   type StudioPackageArchiveProgress,
   type StudioPackageArchiveSource,
 } from "./studio-package-archive";
+import { parseStudioDrawingPracticeDocument } from "./studio-drawing-practice-document";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import { parseStudioReferenceBoardDocument } from "./studio-reference-board";
 import {
@@ -1678,12 +1679,23 @@ interface StudioReferenceBoardIntegrityReference {
 function collectReferenceBoardIntegrityReferences(
   project: StudioProjectFile
 ): StudioReferenceBoardIntegrityReference[] {
+  const references: StudioReferenceBoardIntegrityReference[] = [];
   const document = parseStudioReferenceBoardDocument(project.referenceBoard);
-  if (!document) return [];
-  return document.items.map((item, index) => ({
-    pointer: `/referenceBoard/items/${index}/asset/sha256`,
-    sha256: item.asset.sha256.slice("sha256:".length),
-  }));
+  for (const [index, item] of (document?.items ?? []).entries()) {
+    references.push({
+      pointer: `/referenceBoard/items/${index}/asset/sha256`,
+      sha256: item.asset.sha256.slice("sha256:".length),
+    });
+  }
+  for (const [pageIndex, page] of project.pagesList.entries()) {
+    const drawingPractice = parseStudioDrawingPracticeDocument(page.drawingPractice);
+    if (!drawingPractice) continue;
+    references.push({
+      pointer: `/pagesList/${pageIndex}/drawingPractice/source/sha256`,
+      sha256: drawingPractice.source.sha256.slice("sha256:".length),
+    });
+  }
+  return references;
 }
 
 /**

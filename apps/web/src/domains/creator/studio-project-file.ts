@@ -14,6 +14,7 @@ import {
   serializeStudioBg3dSceneDocument,
 } from "./bg3d/studio-bg3d-scene-document";
 import { parseStudioDrawingAssistDocument } from "./brush/studio-drawing-assist-document";
+import { parseStudioDrawingPracticeDocument } from "./studio-drawing-practice-document";
 import {
   parseStudioLinked3dRenderDocument,
   validateStudioLinked3dRenderDocumentAgainstPage,
@@ -173,6 +174,12 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
     if (page.drawingAssist !== undefined && !drawingAssist) {
       throw new Error("페이지 드로잉 보조 설정이 손상되었거나 지원하지 않는 버전입니다.");
     }
+    const drawingPractice = page.drawingPractice === undefined
+      ? undefined
+      : parseStudioDrawingPracticeDocument(page.drawingPractice);
+    if (page.drawingPractice !== undefined && !drawingPractice) {
+      throw new Error("페이지 따라 그리기 설정이 손상되었거나 지원하지 않는 버전입니다.");
+    }
     const colorProof = page.colorProof === undefined ? undefined : parseStudioColorProofDocument(page.colorProof);
     if (colorProof === null) throw new Error("페이지 ICC 설정이 손상되었거나 지원하지 않는 버전입니다.");
     const layerComps = page.layerComps === undefined ? undefined : parseStudioLayerComps(page.layerComps);
@@ -211,17 +218,18 @@ function canonicalizeProjectBg3dScenes(project: StudioProjectFile): StudioProjec
       ...(review === undefined ? {} : { review }),
       elements,
       ...(drawingAssist ? { drawingAssist } : {}),
+      ...(drawingPractice ? { drawingPractice } : {}),
       ...(layerComps ? { layerComps } : {}),
       ...(colorProof ? { colorProof } : {}),
       ...(shared3dStage ? { shared3dStage } : {}),
       ...(linked3dRender ? { linked3dRender } : {}),
     };
-    if (layerComps !== undefined || colorProof !== undefined) {
+    if (layerComps !== undefined || colorProof !== undefined || drawingPractice !== undefined) {
       try {
         // Use the same normalized, aggregate page envelope as collaboration.
         studioPageToCrdtPage(canonicalPage);
       } catch (cause) {
-        throw new Error("레이어 보기와 페이지 설정이 저장 가능한 범위를 벗어났습니다.", { cause });
+        throw new Error("페이지 보기와 따라 그리기 설정이 저장 가능한 범위를 벗어났습니다.", { cause });
       }
     }
     return canonicalPage;

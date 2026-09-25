@@ -8,6 +8,7 @@ import {
   type StudioAsset,
   type StudioAssetWithContentHash,
 } from "./studio-asset-library";
+import { parseStudioDrawingPracticeDocument } from "./studio-drawing-practice-document";
 import { parseStudioProjectFile, type StudioProjectFile } from "./studio-project-file";
 import {
   createDefaultStudioReferenceBoardDocument,
@@ -52,8 +53,10 @@ export interface StudioReferenceBoardArchiveReference {
   sha256: StudioReferenceBoardSha256;
   /** RFC 6901 pointer to the canonical hash field in project.json. */
   pointer: string;
-  itemId: string;
-  itemIndex: number;
+  itemId?: string;
+  itemIndex?: number;
+  pageId?: string;
+  pageIndex?: number;
   asset: StudioReferenceBoardAssetDescriptor;
 }
 
@@ -154,7 +157,7 @@ function referencesByHash(
   return grouped;
 }
 
-/** Collects reference-board hashes in stable z-order and emits their exact project JSON pointers. */
+/** Collects reference-board and page trace-guide hashes with exact project JSON pointers. */
 export function collectStudioReferenceBoardArchiveReferences(
   project: StudioProjectFile | unknown
 ): StudioReferenceBoardArchiveReference[] {
@@ -164,15 +167,29 @@ export function collectStudioReferenceBoardArchiveReferences(
   } catch {
     return [];
   }
+  const references: StudioReferenceBoardArchiveReference[] = [];
   const document = parseStudioReferenceBoardDocument(parsed.referenceBoard);
-  if (!document) return [];
-  return document.items.map((item, itemIndex) => ({
-    sha256: item.asset.sha256,
-    pointer: `/referenceBoard/items/${itemIndex}/asset/sha256`,
-    itemId: item.id,
-    itemIndex,
-    asset: item.asset,
-  }));
+  for (const [itemIndex, item] of (document?.items ?? []).entries()) {
+    references.push({
+      sha256: item.asset.sha256,
+      pointer: `/referenceBoard/items/${itemIndex}/asset/sha256`,
+      itemId: item.id,
+      itemIndex,
+      asset: item.asset,
+    });
+  }
+  for (const [pageIndex, page] of parsed.pagesList.entries()) {
+    const drawingPractice = parseStudioDrawingPracticeDocument(page.drawingPractice);
+    if (!drawingPractice) continue;
+    references.push({
+      sha256: drawingPractice.source.sha256,
+      pointer: `/pagesList/${pageIndex}/drawingPractice/source/sha256`,
+      pageId: page.id,
+      pageIndex,
+      asset: drawingPractice.source,
+    });
+  }
+  return references;
 }
 
 function base64Bytes(payload: string): Uint8Array {

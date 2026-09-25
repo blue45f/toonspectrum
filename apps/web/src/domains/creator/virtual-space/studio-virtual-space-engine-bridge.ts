@@ -1,5 +1,20 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 
+export type StudioVirtualEnvironmentEffect =
+  | "waterfall-splash"
+  | "wish"
+  | "photo"
+  | "petals"
+  | "lanterns"
+  | "pet"
+  | "gong"
+  | "spotlight";
+
+export interface StudioVirtualEnvironmentEffectRequest {
+  readonly effect: StudioVirtualEnvironmentEffect;
+  readonly point: StudioVirtualSpacePoint;
+}
+
 export class StudioVirtualSpaceEngineBridge {
   private joystick: StudioVirtualSpacePoint = { x: 0, y: 0 };
   private moveTarget: StudioVirtualSpacePoint | null = null;
@@ -7,6 +22,7 @@ export class StudioVirtualSpaceEngineBridge {
   private stopRevision = 0;
   private interactRequested = false;
   private unstuckRequested = false;
+  private environmentEffect: StudioVirtualEnvironmentEffectRequest | null = null;
 
   setJoystick(vector: StudioVirtualSpacePoint): void {
     const x = Number.isFinite(vector.x) ? vector.x : 0;
@@ -46,6 +62,15 @@ export class StudioVirtualSpaceEngineBridge {
     const requested = this.unstuckRequested;
     this.unstuckRequested = false;
     return requested;
+  }
+  requestEnvironmentEffect(effect: StudioVirtualEnvironmentEffect, point: StudioVirtualSpacePoint): void {
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+    this.environmentEffect = { effect, point: { x: point.x, y: point.y } };
+  }
+  consumeEnvironmentEffect(): StudioVirtualEnvironmentEffectRequest | null {
+    const request = this.environmentEffect;
+    this.environmentEffect = null;
+    return request;
   }
   clearMovement(): void {
     this.stopRevision += 1;

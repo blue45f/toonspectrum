@@ -18,6 +18,15 @@ export type StudioVirtualArtTextureKind =
   | "weather-sheet"
   | "terrain-atlas";
 export type StudioVirtualArtObjectKind = "door" | "crate" | "lantern" | "bench";
+export type StudioVirtualLivingTownAssetKind =
+  | "path-overlay"
+  | "terrain-tile-atlas"
+  | "waterfall-sheet"
+  | "waterfall-splash-sheet"
+  | "interaction-fx-sheet"
+  | "decor-sheet"
+  | "accessory-sheet"
+  | "district-preview-sheet";
 
 export interface StudioVirtualArtPalette {
   readonly background: number;
@@ -137,6 +146,7 @@ export function studioVirtualArtStyle(key: StudioVirtualArtStyleKey): StudioVirt
 }
 
 const V5_ROOT = `${ART_ROOT}/style-packs-v5`;
+const LIVING_TOWN_V6_ROOT = `${ART_ROOT}/living-town-v6`;
 
 /** All six art directions load independent v5 images. No CSS recolour/filter fallback is used. */
 export function studioVirtualArtAssetUrl(key: StudioVirtualArtStyleKey, sourceUrl: string): string {
@@ -162,6 +172,13 @@ export function studioVirtualArtTextureUrl(key: StudioVirtualArtStyleKey, kind: 
 
 export function studioVirtualArtObjectUrl(key: StudioVirtualArtStyleKey, kind: StudioVirtualArtObjectKind): string {
   return `${V5_ROOT}/${key}/objects/${kind}.webp`;
+}
+
+export function studioVirtualLivingTownAssetUrl(
+  key: StudioVirtualArtStyleKey,
+  kind: StudioVirtualLivingTownAssetKind,
+): string {
+  return `${LIVING_TOWN_V6_ROOT}/${key}/${kind}.webp`;
 }
 
 export function studioVirtualArtPlayerUrl(
