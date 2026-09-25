@@ -1205,7 +1205,7 @@ export function StudioDrawOptionsBar({
                     hint={studioToolHintFromLabel(
                       `브러시 슬롯 ${index + 1}`,
                       slot
-                        ? `${slot.brushId} · ${slot.strokeWidth}px · ${Math.round(slot.brushOpacity * 100)}% 설정을 한 번에 불러옵니다. Shift+클릭하면 현재 브러시로 덮어써요.`
+                        ? `${slot.brushId} · ${slot.strokeWidth}px · ${Math.round(slot.brushOpacity * 100)}%${slot.color ? ` · ${slot.color}` : ""}${slot.stabilizer !== undefined ? ` · 보정 ${slot.stabilizer}` : ""} 설정을 한 번에 불러옵니다. Shift+클릭하면 현재 브러시로 덮어써요.`
                         : onAssignBrushSlot
                           ? "비어 있는 빠른 슬롯입니다. 클릭하면 현재 브러시·크기·불투명도를 저장해 다음에 한 번에 불러올 수 있어요."
                           : "비어 있는 빠른 슬롯입니다. 슬롯 저장 기능이 연결되면 현재 브러시 설정을 보관할 수 있어요.",
@@ -1238,7 +1238,7 @@ export function StudioDrawOptionsBar({
                           style={{
                             width: slotW,
                             height: slotW,
-                            background: color,
+                            background: slot.color ?? color,
                             opacity: slot.brushOpacity,
                           }}
                         />

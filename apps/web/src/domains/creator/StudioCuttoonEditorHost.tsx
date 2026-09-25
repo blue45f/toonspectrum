@@ -5540,6 +5540,8 @@ export function StudioCuttoonEditor({
         enginePrograms: snapshot.enginePrograms,
         strokeWidth: applied.strokeWidth,
         brushOpacity: applied.brushOpacity,
+        color: snapshot.color,
+        stabilizer: snapshot.stabilizer,
       }),
       {
         failureMessage: "최근 브러시 슬롯을 SQLite에 저장하지 못했어요.",
@@ -5853,8 +5855,10 @@ export function StudioCuttoonEditor({
       sourcePresetId: slot.sourcePresetId,
       sourcePresetName: slot.sourcePresetName,
     });
-    setStrokeWidth(slot.strokeWidth);
-    setBrushOpacity(slot.brushOpacity);
+    setStrokeWidth(snapshot.strokeWidth);
+    setBrushOpacity(snapshot.brushOpacity);
+    if (snapshot.color !== color) setColor(snapshot.color);
+    if (snapshot.stabilizer !== stabilizer) setStabilizer(snapshot.stabilizer);
     activatePrimaryCanvasTool(
       "draw",
       resolveStudioBrushPresetDrawMode(slot.brushId),
@@ -18535,6 +18539,7 @@ const puppetWarpArmed =
         applyPixelSelectionHistoryCommand,
         brush,
         brushDynamics,
+        brushEnginePrograms,
         brushOpacity,
         brushSlotsState,
         bubbleShapeArmed,
@@ -18633,6 +18638,7 @@ const puppetWarpArmed =
         saveCurrentStudioView,
         saving,
         secondaryColor,
+        stabilizer,
         selectAllForEdit,
         selected,
         selectedId,
@@ -28042,6 +28048,8 @@ function clearSelectionForEdit() {
           enginePrograms: brushEnginePrograms,
           strokeWidth,
           brushOpacity,
+          color,
+          stabilizer,
         }),
         {
           successMessage: `슬롯 ${index + 1}에 저장`,

@@ -55,6 +55,25 @@ describe("material brush selection transitions", () => {
     expect(studioBrushSlotSelectionSnapshot(saved, { ...legacy, enginePrograms: null }).enginePrograms).toBeNull();
   });
 
+  it("recalls colour and stabilizer when present while legacy slots preserve current values", () => {
+    const current = material();
+    const legacy = studioBrushSlotSelectionSnapshot(current, {
+      brushId: "pen", strokeWidth: 6, brushOpacity: 1,
+    });
+    expect(legacy.color).toBe(current.color);
+    expect(legacy.stabilizer).toBe(current.stabilizer);
+
+    const recalled = studioBrushSlotSelectionSnapshot(current, {
+      brushId: "pen",
+      strokeWidth: 6,
+      brushOpacity: 1,
+      color: "#aabbcc",
+      stabilizer: 8,
+    });
+    expect(recalled.color).toBe("#aabbcc");
+    expect(recalled.stabilizer).toBe(8);
+  });
+
   it("keeps two material slots with the same base id and different pigments independently recallable", () => {
     const a = material();
     const b = createBrushStudioV6ProductBrush(createBrushStudioV6Program("mineral-bloom"));
@@ -79,6 +98,23 @@ describe("material brush selection transitions", () => {
       expect(block.indexOf("currentBrushSnapshotRef.current = snapshot")).toBeGreaterThan(-1);
       expect(block.indexOf("currentBrushSnapshotRef.current = snapshot")).toBeLessThan(block.indexOf("setBrush("));
       expect(block.indexOf("toolOperationMemoryTouchedRef.current = true")).toBeLessThan(block.indexOf("setBrush("));
+      if (name === "applyBrushSlot") {
+        expect(block).toContain("setColor(snapshot.color)");
+        expect(block).toContain("setStabilizer(snapshot.stabilizer)");
+      }
     }
+  });
+
+  it("captures the current colour and stabilizer in recent and numbered slot writes", () => {
+    const source = readStudioCuttoonEditorSource();
+    const recentStart = source.indexOf("rememberStudioBrushSlot(prev, {");
+    const recentBlock = source.slice(recentStart, recentStart + 1_600);
+    expect(recentBlock).toContain("color: snapshot.color");
+    expect(recentBlock).toContain("stabilizer: snapshot.stabilizer");
+
+    const assignedStart = source.indexOf("assignStudioBrushSlot(prev, index, {");
+    const assignedBlock = source.slice(assignedStart, assignedStart + 1_200);
+    expect(assignedBlock).toContain("color,");
+    expect(assignedBlock).toContain("stabilizer,");
   });
 });
