@@ -2,7 +2,7 @@ import { Module } from "@nestjs/common";
 import { OperationPolicyModule } from "./modules/operation-policy/operation-policy.module";
 
 import { BackendCapabilitiesModule } from "./infrastructure/backend-capabilities/backend-capabilities.module";
-import { createFederatedDataPlaneDynamicModule } from "./infrastructure/federated-data-plane/federated-data-plane.module";
+import { createFederatedDataPlaneDynamicModule } from "./platform/federated-data-plane/federated-data-plane.module";
 import { ApiHttpInfrastructureModule } from "./runtime/api-http-infrastructure.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";

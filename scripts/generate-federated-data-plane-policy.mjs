@@ -7,7 +7,7 @@ const root = resolve(import.meta.dirname, "..");
 const inputPath = resolve(root, "config/free-database-federation.json");
 const outputPath = resolve(
   root,
-  "apps/api/src/infrastructure/federated-data-plane/federated-data-plane-policy.generated.ts",
+  "apps/api/src/platform/federated-data-plane/federated-data-plane-policy.generated.ts",
 );
 const check = process.argv.slice(2).includes("--check");
 

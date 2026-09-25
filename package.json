@@ -257,7 +257,7 @@
     "validate:documentation": "node scripts/validate-documentation.mjs && node --test scripts/validate-documentation.test.mjs",
     "generate:federated-data-plane-policy": "node scripts/generate-federated-data-plane-policy.mjs",
     "verify:federated-data-plane-policy": "node scripts/generate-federated-data-plane-policy.mjs --check && node scripts/verify-free-database-federation.mjs",
-    "test:federated-data-plane": "vitest run scripts/free-database-federation.test.mjs scripts/provision-gcp-free-data-plane.test.mjs apps/api/src/infrastructure/federated-data-plane/federated-data-plane-routing.test.ts apps/api/src/infrastructure/federated-data-plane/federated-data-plane.module.test.ts",
+    "test:federated-data-plane": "vitest run scripts/free-database-federation.test.mjs scripts/provision-gcp-free-data-plane.test.mjs apps/api/src/platform/federated-data-plane/federated-data-plane-routing.test.ts apps/api/src/platform/federated-data-plane/federated-data-plane.module.test.ts",
     "gcp:free-data:plan": "node scripts/provision-gcp-free-data-plane.mjs --plan",
     "gcp:free-data:check": "node scripts/provision-gcp-free-data-plane.mjs --check",
     "gcp:free-data:apply": "node scripts/provision-gcp-free-data-plane.mjs --apply",

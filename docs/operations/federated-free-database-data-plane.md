@@ -49,7 +49,7 @@ GCP 프로젝트 billing 비활성. 로컬 PostgreSQL 17에서 정본 91개 migr
 
 - [`config/free-database-federation.json`](../../config/free-database-federation.json)
 - [`config/free-infrastructure-policy.json`](../../config/free-infrastructure-policy.json)
-- 생성된 런타임 정책: `federated-data-plane-policy.generated.ts`
+- 생성된 런타임 정책: [`apps/api/src/platform/federated-data-plane/federated-data-plane-policy.generated.ts`](../../apps/api/src/platform/federated-data-plane/federated-data-plane-policy.generated.ts)
 
 검증:
 

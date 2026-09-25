@@ -2,8 +2,6 @@ apps/api/src/config/cors.test.ts
 apps/api/src/config/env.test.ts
 apps/api/src/config/security-headers.test.ts
 apps/api/src/csrf-middleware.test.ts
-apps/api/src/infrastructure/federated-data-plane/federated-data-plane-routing.test.ts
-apps/api/src/infrastructure/federated-data-plane/federated-data-plane.module.test.ts
 apps/api/src/modules/admin/admin-traffic-d1-query.test.ts
 apps/api/src/modules/admin/admin-traffic-query.test.ts
 apps/api/src/modules/admin/admin-traffic.service.test.ts
@@ -35,6 +33,8 @@ apps/api/src/modules/traffic-analytics/traffic-analytics-repository.provider.tes
 apps/api/src/modules/traffic-analytics/traffic-analytics-store.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics.controller.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics.service.test.ts
+apps/api/src/platform/federated-data-plane/federated-data-plane-routing.test.ts
+apps/api/src/platform/federated-data-plane/federated-data-plane.module.test.ts
 apps/api/src/runtime/runtime-boundary.test.ts
 apps/api/src/session-middleware.test.ts
 apps/web/src/app/app-floating-controls-startup.test.ts

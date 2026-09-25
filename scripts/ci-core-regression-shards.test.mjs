@@ -110,8 +110,8 @@ test("분석·분산 저장소의 비DB 테스트는 product shard에서 반드�
   const executed = resolveRequiredTargets(selectors);
   for (const target of [
     "apps/api/src/config/env.test.ts",
-    "apps/api/src/infrastructure/federated-data-plane/federated-data-plane-routing.test.ts",
-    "apps/api/src/infrastructure/federated-data-plane/federated-data-plane.module.test.ts",
+    "apps/api/src/platform/federated-data-plane/federated-data-plane-routing.test.ts",
+    "apps/api/src/platform/federated-data-plane/federated-data-plane.module.test.ts",
     "apps/api/src/modules/admin/admin-traffic-d1-query.test.ts",
     "apps/api/src/modules/admin/admin-traffic-query.test.ts",
     "apps/api/src/modules/admin/admin-traffic.service.test.ts",
