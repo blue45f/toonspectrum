@@ -24,6 +24,19 @@ const providerStatus: CreatorIntelligenceStatus = {
   soundEffects: disabled,
   meshy: disabled,
   safeSearch: disabled,
+  paidExecution: {
+    enabled: false,
+    distributed: false,
+    requiresAuthentication: true,
+    requiresIdempotencyKey: true,
+    failClosedInProduction: true,
+    reason: "disabled",
+  },
+  meshArtifacts: {
+    configured: false,
+    requiredInProduction: true,
+    providerUrlsReturnedInProduction: false,
+  },
 };
 function renderPanel() {
   return render(
@@ -81,6 +94,20 @@ describe("StudioCreatorIntelligencePanel free reference APIs", () => {
     expect(screen.getAllByText("무료 API").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "이미지" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: "영상" })).toBeTruthy();
+  });
+
+
+  it("keeps free discovery available while paid execution is disabled", async () => {
+    const { container } = renderPanel();
+    await waitFor(() => expect(creatorIntelligenceClient.status).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByText("유료 AI 실행은 현재 비활성입니다.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "번역" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Meshy" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((container.querySelector('input[type="file"][accept="image/png,image/jpeg,image/webp"]') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getAllByRole("button", { name: "검색" })[0] as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("레퍼런스 검색어"), { target: { value: "rain alley" } });
+    expect((screen.getAllByRole("button", { name: "검색" })[0] as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("searches Pexels, shows provenance, and saves the reference", async () => {

@@ -268,7 +268,8 @@
     "typecheck:cloudflare-analytics": "tsc -p deploy/cloudflare-analytics/tsconfig.json",
     "verify:cloudflare-analytics": "pnpm run typecheck:cloudflare-analytics && pnpm run test:cloudflare-analytics && node scripts/deploy-cloudflare-analytics.mjs --dry-run",
     "cloudflare:analytics:dry-run": "node scripts/deploy-cloudflare-analytics.mjs --dry-run",
-    "cloudflare:analytics:deploy": "node scripts/deploy-cloudflare-analytics.mjs --production"
+    "cloudflare:analytics:deploy": "node scripts/deploy-cloudflare-analytics.mjs --production",
+    "verify:ai-provider-status-canary": "tsx scripts/verify-ai-provider-status-canary.mts"
   },
   "dependencies": {
     "@automerge/automerge": "3.5.0",

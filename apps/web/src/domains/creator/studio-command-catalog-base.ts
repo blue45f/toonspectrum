@@ -2437,9 +2437,9 @@ export const STUDIO_COMMAND_CATALOG: readonly StudioCommandCatalogEntry[] =
           "AI 웹툰 생성 슈퍼 스위트",
           "네이버 툰필터 화풍 변환, CSP 음영 어시스트, 고화질 프롬프트 증강, TooNat 콘티 디렉터, 투닝 감정 말풍선을 제공합니다.",
         ),
-        en("Webtoon AI Super Suite"),
+        en("AI + Smart Webtoon Suite"),
       ],
-      aliases: [ours("AI 슈퍼 스위트"), ours("툰필터"), ours("AI 음영"), ours("AI 콘티")],
+      aliases: [ours("AI + 스마트 제작 스위트"), ours("AI 슈퍼 스위트"), ours("툰필터"), ours("AI 음영"), ours("AI 콘티")],
       origins: [menu("comic/ai-super-suite")],
     }),
     defineCommand({

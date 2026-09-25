@@ -6,33 +6,76 @@ import {
   Header,
   Headers,
   HttpException,
-  HttpStatus,
   Inject,
   Module,
   Param,
   Post,
   Query,
   Req,
+  Res,
   UnauthorizedException,
 } from "@nestjs/common";
 
+import { PrivateObjectStorageModule } from "../../infrastructure/private-object-storage/private-object-storage.module";
+import { UpstashCoordinationModule } from "../../infrastructure/upstash-coordination/upstash-coordination.module";
+import { UPSTASH_COORDINATION_PORT } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import {
+  studioRemoteReferenceDnsResolverProvider,
+  studioRemoteReferenceHttpRequesterProvider,
+} from "../creator/studio-remote-reference-image.network";
 import {
   CreatorIntelligenceInputError,
   createCreatorIntelligenceCore,
 } from "./creator-intelligence-core";
+import {
+  CreatorIntelligenceAdmissionError,
+  CreatorIntelligencePaidAdmission,
+  type CreatorIntelligencePaidOperation,
+} from "./creator-intelligence-paid-admission";
+import { CreatorIntelligenceMeshArtifactService } from "./creator-intelligence-mesh-artifact.service";
+import {
+  signCreatorIntelligenceMeshJobToken,
+  verifyCreatorIntelligenceMeshArtifactToken,
+  verifyCreatorIntelligenceMeshJobToken,
+} from "./creator-intelligence-mesh-job-token";
 
-import type { Request } from "express";
-import { LocalAuthRateLimiter } from "../auth/auth-rate-limit";
+import type { Request, Response } from "express";
 import type { CreatorIntelligenceCore } from "./creator-intelligence-core";
 
 const CREATOR_INTELLIGENCE_CORE = Symbol("CREATOR_INTELLIGENCE_CORE");
-const voiceRateLimiter = new LocalAuthRateLimiter({ maximumIdentities: 20_000 });
+const coordinationModule = UpstashCoordinationModule.fromEnvironment(process.env);
+const privateObjectStorageModule = PrivateObjectStorageModule.fromEnvironment(process.env);
 
+function authenticatedUserId(value: string | undefined): string {
+  const userId = value?.trim();
+  if (!userId) {
+    throw new UnauthorizedException("이 클라우드 AI 기능을 사용하려면 로그인하세요.");
+  }
+  return userId;
+}
+
+function requestSignal(request: Request): {
+  readonly signal: AbortSignal;
+  readonly dispose: () => void;
+} {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  request.once("aborted", abort);
+  if (request.aborted) abort();
+  return {
+    signal: controller.signal,
+    dispose: () => request.off("aborted", abort),
+  };
+}
 @Controller("creator-intelligence")
 export class CreatorIntelligenceController {
   constructor(
     @Inject(CREATOR_INTELLIGENCE_CORE)
     private readonly core: CreatorIntelligenceCore,
+    @Inject(CreatorIntelligencePaidAdmission)
+    private readonly admission: CreatorIntelligencePaidAdmission,
+    @Inject(CreatorIntelligenceMeshArtifactService)
+    private readonly meshArtifacts: CreatorIntelligenceMeshArtifactService,
   ) {}
 
   private async execute<T>(operation: () => Promise<T>): Promise<T> {
@@ -42,6 +85,14 @@ export class CreatorIntelligenceController {
       if (error instanceof CreatorIntelligenceInputError) {
         throw new BadRequestException(error.message);
       }
+      if (error instanceof CreatorIntelligenceAdmissionError) {
+        throw new HttpException({
+          code: error.code,
+          message: error.message,
+          retryAfterMs: error.retryAfterMs,
+        }, error.status);
+      }
+      if (error instanceof HttpException) throw error;
       throw new HttpException(
         "외부 창작 도구 제공처의 응답을 확인하지 못했습니다. 잠시 후 다시 시도하세요.",
         502,
@@ -49,10 +100,37 @@ export class CreatorIntelligenceController {
     }
   }
 
+  private async executePaid<T>(input: {
+    readonly operation: CreatorIntelligencePaidOperation;
+    readonly userId: string | undefined;
+    readonly idempotencyKey: string | undefined;
+    readonly body: unknown;
+    readonly request: Request;
+    readonly run: (signal: AbortSignal) => Promise<T>;
+  }): Promise<T> {
+    const client = requestSignal(input.request);
+    try {
+      return await this.execute(() => this.admission.execute({
+        operation: input.operation,
+        userId: authenticatedUserId(input.userId),
+        idempotencyKey: input.idempotencyKey,
+        request: input.body,
+        signal: client.signal,
+        run: () => input.run(client.signal),
+      }));
+    } finally {
+      client.dispose();
+    }
+  }
+
   @Get("status")
   @Header("Cache-Control", "private, no-store")
   status() {
-    return this.core.describe();
+    return {
+      ...this.core.describe(),
+      paidExecution: this.admission.status(),
+      meshArtifacts: this.meshArtifacts.status(),
+    };
   }
 
   @Get("references")
@@ -86,80 +164,179 @@ export class CreatorIntelligenceController {
 
   @Post("voice/synthesize")
   @Header("Cache-Control", "private, no-store")
-  async voiceSynthesize(
+  voiceSynthesize(
     @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body() body: Record<string, unknown>,
     @Req() request: Request,
   ) {
-    if (!userId?.trim()) {
-      throw new UnauthorizedException("클라우드 AI 음성을 사용하려면 로그인하세요.");
-    }
-    const subject = userId.trim();
-    const shortWindow = voiceRateLimiter.consume(
-      `creator-intelligence-voice-short:${subject}`,
-      60,
-      10 * 60_000,
-    );
-    const dailyWindow = voiceRateLimiter.consume(
-      `creator-intelligence-voice-daily:${subject}`,
-      120,
-      24 * 60 * 60_000,
-    );
-    if (shortWindow.status !== "accepted" || dailyWindow.status !== "accepted") {
-      throw new HttpException({
-        code: "creator_intelligence_voice_rate_limited",
-        message: "무료 AI 음성 생성 한도에 도달했어요. 잠시 후 다시 시도하거나 로컬 시스템 음성을 사용해 주세요.",
-      }, HttpStatus.TOO_MANY_REQUESTS);
-    }
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    request.once("aborted", abort);
-    if (request.aborted) abort();
-    try {
-      return await this.execute(() => this.core.synthesizeVoice(
-        body.provider,
-        body,
-        controller.signal,
-      ));
-    } finally {
-      request.off("aborted", abort);
-    }
+    return this.executePaid({
+      operation: "voice",
+      userId,
+      idempotencyKey,
+      body,
+      request,
+      run: (signal) => this.core.synthesizeVoice(body.provider, body, signal),
+    });
   }
 
   @Post("sfx/generate")
   @Header("Cache-Control", "private, no-store")
-  soundGenerate(@Body() body: Record<string, unknown>) {
-    return this.execute(() => this.core.generateSoundEffect(body));
+  soundGenerate(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: Record<string, unknown>,
+    @Req() request: Request,
+  ) {
+    return this.executePaid({
+      operation: "sound-effect",
+      userId,
+      idempotencyKey,
+      body,
+      request,
+      run: () => this.core.generateSoundEffect(body),
+    });
   }
 
   @Post("translate")
   @Header("Cache-Control", "private, no-store")
-  translate(@Body() body: Record<string, unknown>) {
-    return this.execute(() => this.core.translate(body.provider, body));
+  translate(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: Record<string, unknown>,
+    @Req() request: Request,
+  ) {
+    return this.executePaid({
+      operation: "translation",
+      userId,
+      idempotencyKey,
+      body,
+      request,
+      run: () => this.core.translate(body.provider, body),
+    });
   }
 
   @Post("mesh/jobs")
   @Header("Cache-Control", "private, no-store")
-  meshCreate(@Body() body: Record<string, unknown>) {
-    return this.execute(() => this.core.createMeshyJob(body));
+  async meshCreate(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: Record<string, unknown>,
+    @Req() request: Request,
+  ) {
+    const authenticated = authenticatedUserId(userId);
+    this.meshArtifacts.assertCreateReady();
+    const result = await this.executePaid({
+      operation: "mesh-create",
+      userId: authenticated,
+      idempotencyKey,
+      body,
+      request,
+      run: () => this.core.createMeshyJob(body),
+    });
+    return result.status === "ready" && typeof result.jobId === "string"
+      ? { ...result, jobId: signCreatorIntelligenceMeshJobToken(authenticated, result.jobId) }
+      : result;
   }
 
   @Get("mesh/jobs/:jobId")
   @Header("Cache-Control", "private, no-store")
-  meshStatus(@Param("jobId") jobId: string) {
-    return this.execute(() => this.core.getMeshyJob(jobId));
+  async meshStatus(
+    @Headers("x-user-id") userId: string | undefined,
+    @Param("jobId") jobToken: string,
+    @Req() request: Request,
+  ) {
+    const authenticated = authenticatedUserId(userId);
+    const providerJobId = verifyCreatorIntelligenceMeshJobToken(
+      jobToken,
+      authenticated,
+    );
+    if (!providerJobId) {
+      throw new BadRequestException("3D 작업 식별자가 만료됐거나 현재 계정과 일치하지 않아요.");
+    }
+    const client = requestSignal(request);
+    try {
+      const result = await this.execute(() => this.core.getMeshyJob(providerJobId));
+      const internalized = await this.execute(() => this.meshArtifacts.internalize(
+        authenticated,
+        providerJobId,
+        result,
+        client.signal,
+      ));
+      return internalized.status === "ready" && typeof internalized.jobId === "string"
+        ? { ...internalized, jobId: jobToken }
+        : internalized;
+    } finally {
+      client.dispose();
+    }
+  }
+
+  @Get("mesh/artifacts/:artifactToken")
+  @Header("Cache-Control", "private, no-store")
+  async meshArtifact(
+    @Headers("x-user-id") userId: string | undefined,
+    @Param("artifactToken") artifactToken: string,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<void> {
+    const authenticated = authenticatedUserId(userId);
+    const artifact = verifyCreatorIntelligenceMeshArtifactToken(
+      artifactToken,
+      authenticated,
+    );
+    if (!artifact) {
+      throw new BadRequestException("3D 결과 링크가 만료됐거나 현재 계정과 일치하지 않아요.");
+    }
+    const client = requestSignal(request);
+    try {
+      const signed = await this.execute(() => this.meshArtifacts.signedRead(
+        artifact,
+        client.signal,
+      ));
+      response.setHeader("Cache-Control", "private, no-store");
+      response.setHeader("Content-Disposition", `inline; filename="${signed.filename}"`);
+      response.setHeader("X-Content-Type-Options", "nosniff");
+      response.redirect(307, signed.url);
+    } finally {
+      client.dispose();
+    }
   }
 
   @Post("preflight/safe-search")
   @Header("Cache-Control", "private, no-store")
-  safeSearch(@Body() body: Record<string, unknown>) {
-    return this.execute(() => this.core.safeSearch(body));
+  safeSearch(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: Record<string, unknown>,
+    @Req() request: Request,
+  ) {
+    return this.executePaid({
+      operation: "safe-search",
+      userId,
+      idempotencyKey,
+      body,
+      request,
+      run: () => this.core.safeSearch(body),
+    });
   }
 }
 
 @Module({
+  imports: [
+    ...(coordinationModule ? [coordinationModule] : []),
+    ...(privateObjectStorageModule ? [privateObjectStorageModule] : []),
+  ],
   controllers: [CreatorIntelligenceController],
   providers: [
+    ...(
+      coordinationModule
+        ? []
+        : [{ provide: UPSTASH_COORDINATION_PORT, useValue: null }]
+    ),
+    CreatorIntelligencePaidAdmission,
+    CreatorIntelligenceMeshArtifactService,
+    studioRemoteReferenceDnsResolverProvider,
+    studioRemoteReferenceHttpRequesterProvider,
     {
       provide: CREATOR_INTELLIGENCE_CORE,
       useFactory: () => createCreatorIntelligenceCore({

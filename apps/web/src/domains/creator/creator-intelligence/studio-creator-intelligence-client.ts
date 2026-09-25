@@ -1,4 +1,4 @@
-import { api } from "@/platform/api";
+import { api, httpStatus } from "@/platform/api";
 
 export type CreatorIntelligenceReferenceProvider = "openverse" | "pexels" | "pixabay";
 export type CreatorIntelligenceReferenceMediaType = "image" | "video";
@@ -22,6 +22,19 @@ export interface CreatorIntelligenceStatus {
   readonly soundEffects: CreatorIntelligenceProviderStatus;
   readonly meshy: CreatorIntelligenceProviderStatus;
   readonly safeSearch: CreatorIntelligenceProviderStatus;
+  readonly paidExecution?: {
+    readonly enabled: boolean;
+    readonly distributed: boolean;
+    readonly requiresAuthentication: true;
+    readonly requiresIdempotencyKey: true;
+    readonly failClosedInProduction: true;
+    readonly reason: "ready" | "disabled" | "coordination-required";
+  };
+  readonly meshArtifacts?: {
+    readonly configured: boolean;
+    readonly requiredInProduction: true;
+    readonly providerUrlsReturnedInProduction: false;
+  };
 }
 
 export interface CreatorIntelligenceReference {
@@ -171,6 +184,110 @@ export interface SafeSearchResponse {
 // account services are temporarily unavailable.
 const PUBLIC_DISCOVERY_REQUEST = Object.freeze({ credentials: "omit" as const });
 
+const PAID_REQUEST_KEY_TTL_MS = 15 * 60_000;
+const PAID_REQUEST_KEY_CAPACITY = 128;
+let requestSequence = 0;
+const pendingPaidRequestKeys = new Map<string, {
+  readonly key: string;
+  readonly expiresAt: number;
+}>();
+
+function stableRequestJson(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "null";
+  }
+  if (Array.isArray(value)) return `[${value.map(stableRequestJson).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .filter((key) => record[key] !== undefined)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableRequestJson(record[key])}`)
+    .join(",")}}`;
+}
+
+function cleanupPaidRequestKeys(now: number): void {
+  for (const [identity, entry] of pendingPaidRequestKeys) {
+    if (entry.expiresAt <= now) pendingPaidRequestKeys.delete(identity);
+  }
+  while (pendingPaidRequestKeys.size > PAID_REQUEST_KEY_CAPACITY) {
+    const oldest = pendingPaidRequestKeys.keys().next().value;
+    if (oldest === undefined) break;
+    pendingPaidRequestKeys.delete(oldest);
+  }
+}
+
+function compactRequestIdentity(value: string): string {
+  let first = 5_381;
+  let second = 52_711;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first = (first * 33 + code) % 2_147_483_647;
+    second = (second * 65_599 + code) % 2_147_483_629;
+  }
+  return `${value.length.toString(36)}-${first.toString(36)}-${second.toString(36)}`;
+}
+
+function paidRequestKey(prefix: string, payload: unknown): {
+  readonly identity: string;
+  readonly key: string;
+} {
+  const now = Date.now();
+  cleanupPaidRequestKeys(now);
+  const identity = `${prefix}:${compactRequestIdentity(stableRequestJson(payload))}`;
+  const existing = pendingPaidRequestKeys.get(identity);
+  if (existing) return { identity, key: existing.key };
+  requestSequence += 1;
+  const suffix = globalThis.crypto?.randomUUID?.()
+    ?? `${now.toString(36)}-${requestSequence.toString(36)}`;
+  const key = `${prefix}-${suffix}`;
+  pendingPaidRequestKeys.set(identity, {
+    key,
+    expiresAt: now + PAID_REQUEST_KEY_TTL_MS,
+  });
+  return { identity, key };
+}
+
+function paidRequestOptions(key: string, signal?: AbortSignal) {
+  return {
+    signal,
+    timeout: 55_000,
+    retry: 0,
+    headers: { "Idempotency-Key": key },
+  } as const;
+}
+
+async function paidPost<T>(
+  path: string,
+  payload: unknown,
+  prefix: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  const request = paidRequestKey(prefix, payload);
+  try {
+    const result = await api.post<T>(
+      path,
+      payload,
+      paidRequestOptions(request.key, signal),
+    );
+    if (pendingPaidRequestKeys.get(request.identity)?.key === request.key) {
+      pendingPaidRequestKeys.delete(request.identity);
+    }
+    return result;
+  } catch (error) {
+    const status = httpStatus(error);
+    // A definite pre-dispatch rejection is safe to submit again with a new key after the caller
+    // fixes authentication, input, or quota state. Transport errors, 409 receipts, 5xx responses,
+    // and timeouts retain the original key so an uncertain provider outcome can never be charged
+    // twice by a manual retry.
+    if (status !== null && [400, 401, 403, 404, 422, 429, 503].includes(status)) {
+      if (pendingPaidRequestKeys.get(request.identity)?.key === request.key) {
+        pendingPaidRequestKeys.delete(request.identity);
+      }
+    }
+    throw error;
+  }
+}
+
 export const creatorIntelligenceClient = {
   status: () => api.get<CreatorIntelligenceStatus>(
     "/creator-intelligence/status",
@@ -207,24 +324,41 @@ export const creatorIntelligenceClient = {
     readonly voice?: string;
     readonly language?: string;
   }, signal?: AbortSignal) =>
-    api.post<VoiceSynthesizeResponse>(
+    paidPost<VoiceSynthesizeResponse>(
       "/creator-intelligence/voice/synthesize",
       input,
-      { signal, timeout: 55_000, retry: 0 },
+      "voice",
+      signal,
     ),
   soundGenerate: (prompt: string, durationSeconds: number, loop: boolean) =>
-    api.post<SoundGenerateResponse>("/creator-intelligence/sfx/generate", { prompt, durationSeconds, loop }),
+    paidPost<SoundGenerateResponse>(
+      "/creator-intelligence/sfx/generate",
+      { prompt, durationSeconds, loop },
+      "sfx",
+    ),
   translate: (input: {
     readonly provider: CreatorIntelligenceTranslationProvider;
     readonly text: string;
     readonly targetLanguage: string;
     readonly sourceLanguage?: string;
     readonly glossaryId?: string;
-  }) => api.post<TranslateResponse>("/creator-intelligence/translate", input),
+  }) => paidPost<TranslateResponse>(
+    "/creator-intelligence/translate",
+    input,
+    "translation",
+  ),
   meshCreate: (imageUrl: string) =>
-    api.post<MeshyJobResponse>("/creator-intelligence/mesh/jobs", { imageUrl }),
+    paidPost<MeshyJobResponse>(
+      "/creator-intelligence/mesh/jobs",
+      { imageUrl },
+      "mesh",
+    ),
   meshStatus: (jobId: string) =>
     api.get<MeshyJobResponse>(`/creator-intelligence/mesh/jobs/${encodeURIComponent(jobId)}`),
   safeSearch: (dataUrl: string) =>
-    api.post<SafeSearchResponse>("/creator-intelligence/preflight/safe-search", { dataUrl }),
+    paidPost<SafeSearchResponse>(
+      "/creator-intelligence/preflight/safe-search",
+      { dataUrl },
+      "safe-search",
+    ),
 };

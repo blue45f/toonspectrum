@@ -66,6 +66,7 @@ function optionalApiRequestUrl(value: string, origin: string): boolean {
       "/api/studio-ai/status",
     ].includes(url.pathname)
     || url.pathname.startsWith("/api/analytics/traffic/")
+    || url.pathname.startsWith("/api/studio-project-graph/works/")
   );
 }
 
@@ -138,7 +139,19 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
       const start = activePage.getByRole("button", { name: /웹툰 시작|Start Webtoon/u });
       await start.waitFor({ state: "visible", timeout: 30_000 });
       await start.click();
-      await activePage.waitForURL(/\/studio\/p\/[^/]+\/d\/[^?]+/u, { timeout: 30_000 });
+      await activePage.waitForURL(
+        /\/studio\/p\/[^/]+\/(?:d\/[^?]+|story(?:\?|$))/u,
+        { timeout: 30_000 },
+      );
+      if (/\/story(?:\?|$)/u.test(new URL(activePage.url()).pathname)) {
+        const openManuscript = activePage
+          .getByRole("link", { name: /원고 열기|Open manuscript|Open canvas/u })
+          .or(activePage.getByRole("button", { name: /원고 열기|Open manuscript|Open canvas/u }))
+          .first();
+        await openManuscript.waitFor({ state: "visible", timeout: 30_000 });
+        await openManuscript.click();
+        await activePage.waitForURL(/\/studio\/p\/[^/]+\/d\/[^?]+/u, { timeout: 30_000 });
+      }
       const documentMatch = new URL(activePage.url()).pathname.match(/\/studio\/p\/[^/]+\/d\/([^/]+)/u);
       if (documentMatch?.[1]) {
         autosaveKey = studioAutosaveKey({ workId: decodeURIComponent(documentMatch[1]) });

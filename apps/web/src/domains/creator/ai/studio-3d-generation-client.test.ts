@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  STUDIO_3D_INLINE_INPUT_MAX_BYTES,
   Studio3dGenerationHttpClient,
   type Studio3dGenerationJob,
 } from "./studio-3d-generation-client";
@@ -56,6 +57,48 @@ describe("Studio3dGenerationHttpClient", () => {
     expect(headers.get("Idempotency-Key")).toBe("idempotent-1");
     expect(headers.get("X-Studio-3D-Provider-Key")).toBe("session-provider-key");
     expect(String(init?.body)).not.toContain("session-provider-key");
+  });
+
+
+  it("publishes the truthful inline upload contract", async () => {
+    const client = new Studio3dGenerationHttpClient({
+      userId: "user-1",
+      fetchImpl: vi.fn<typeof fetch>().mockImplementation(async () => jsonResponse({
+        configured: true,
+        durable: true,
+        provider: "hyper3d-rodin",
+        modes: ["text-to-3d", "image-to-3d", "multiview-to-3d", "texture-only"],
+        apiKeyExposedToClient: false,
+        inputTransport: "inline-json",
+        maxInlineInputBytes: STUDIO_3D_INLINE_INPUT_MAX_BYTES,
+        largerInputsRequireObjectStorage: true,
+      })),
+    });
+    await expect(client.status()).resolves.toMatchObject({
+      inputTransport: "inline-json",
+      maxInlineInputBytes: 10 * 1024 * 1024,
+      largerInputsRequireObjectStorage: true,
+    });
+  });
+
+  it("blocks oversized inline assets before a network request", async () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    const client = new Studio3dGenerationHttpClient({
+      userId: "user-1",
+      fetchImpl: fetchMock,
+    });
+    const encoded = "A".repeat(
+      Math.ceil(STUDIO_3D_INLINE_INPUT_MAX_BYTES * 4 / 3) + 129,
+    );
+    await expect(client.create({
+      mode: "image-to-3d",
+      images: [{
+        filename: "oversized.png",
+        mimeType: "image/png",
+        dataBase64: encoded,
+      }],
+    }, "idempotent-large")).rejects.toThrow("10MB");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("advances, cancels and restores jobs through stable URLs", async () => {

@@ -39,7 +39,7 @@ it("keeps every direct action available when the artwork fails", () => {
 
   expect(screen.getByRole("status").textContent).toContain("그림 없이도 아래 기능을 사용할 수 있어요.");
   expect(screen.getByRole("link", { name: "배움터" }).getAttribute("href")).toBe("/learn");
-  expect(screen.getByRole("link", { name: "개인 AI 실험실" }).getAttribute("href")).toBe("/studio/ai-lab");
+  expect(screen.getByRole("link", { name: "외부 AI Runtime" }).getAttribute("href")).toBe("/studio/ai-lab");
 });
 
 it("gives scene object links contextual accessible names without colliding with domain cards", () => {

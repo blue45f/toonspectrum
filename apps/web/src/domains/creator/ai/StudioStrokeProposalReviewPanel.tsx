@@ -63,13 +63,13 @@ export function StudioStrokeProposalReviewPanel({
 
   return (
     <section
-      aria-label="AI 획 제안 검토"
+      aria-label="스마트 획 보정 검토"
       className="flex min-h-0 flex-col gap-3 rounded-xl border border-line bg-card p-3 text-fg"
       data-studio-stroke-proposal-panel="true"
     >
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold">획 단위 공동 창작 제안</h3>
+          <h3 className="text-sm font-bold">스마트 획 보정 제안</h3>
           <p className="mt-1 text-[0.65rem] leading-relaxed text-fg-3">
             원본은 바꾸지 않고 최근 획과 선택 영역을 읽어 검토 가능한 ghost 획만 제안합니다.
           </p>

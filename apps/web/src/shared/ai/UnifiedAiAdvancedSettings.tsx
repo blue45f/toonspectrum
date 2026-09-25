@@ -695,13 +695,13 @@ function AiSettingsEditor({
       <details className="rounded-xl border border-line p-4">
         <summary className="min-h-11 cursor-pointer py-2 font-semibold">{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "고급 클라우드 AI 토큰 · 3D와 영상 런타임")}</summary>
         <div className="mt-3 grid gap-4">
-          <p className="text-sm leading-6 text-fg-2">{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "Hyper3D/Rodin과 2D↔3D·영상용 관리형 클라우드 런타임 토큰을 현재 탭에서 관리합니다. localhost와 사설망 주소는 허용하지 않습니다.")}</p>
+          <p className="text-sm leading-6 text-fg-2">{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "Hyper3D/Rodin과 외부 Creator Runtime 자격 증명은 브라우저 저장소에 기록하지 않고 현재 탭의 메모리에서만 유지합니다. 탭을 닫거나 로그아웃하면 즉시 잠깁니다. localhost와 사설망 주소는 허용하지 않습니다.")}</p>
           <label className="block space-y-1">
             <span className="text-sm text-fg-2">{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "Hyper3D / Rodin API 키")}</span>
             <input className={INPUT} type={showSecrets ? "text" : "password"} autoComplete="off" value={auxDraft.hyper3dApiKey} maxLength={4096} onChange={(event) => setAuxDraft((current) => ({ ...current, hyper3dApiKey: event.target.value }))} />
           </label>
           <label className="block space-y-1">
-            <span className="text-sm text-fg-2">{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "관리형 Creator Runtime HTTPS 주소")}</span>
+            <span className="text-sm text-fg-2">{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "외부 Creator Runtime HTTPS 주소")}</span>
             <input className={INPUT} type="url" value={auxDraft.creatorRuntimeBaseUrl} placeholder="https://runtime.example.com" onChange={(event) => setAuxDraft((current) => ({ ...current, creatorRuntimeBaseUrl: event.target.value }))} />
           </label>
           <label className="block space-y-1">
@@ -713,9 +713,9 @@ function AiSettingsEditor({
             <input className={INPUT} value={auxDraft.creatorRuntimeOwner} maxLength={128} onChange={(event) => setAuxDraft((current) => ({ ...current, creatorRuntimeOwner: event.target.value }))} />
           </label>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={BUTTON} disabled={busy} onClick={() => void run(() => { saveUnifiedAiAuxSettings(auxDraft); setMessage("3D·영상 클라우드 토큰을 현재 탭에 적용했습니다."); })}>{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "보조 클라우드 연결 적용")}</button>
+            <button type="button" className={BUTTON} disabled={busy} onClick={() => void run(() => { saveUnifiedAiAuxSettings(auxDraft); setMessage("3D·영상 자격 증명을 현재 탭 메모리에 적용했습니다."); })}>{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "보조 클라우드 연결 적용")}</button>
             <button type="button" className={BUTTON} disabled={busy || !auxDraft.creatorRuntimeBaseUrl || !auxDraft.creatorRuntimeToken} onClick={() => void run(async () => { saveUnifiedAiAuxSettings(auxDraft); const result = await testCreatorRuntime(); if (!result.ok) throw new Error(result.message); setMessage(result.message); })}>{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "클라우드 런타임 확인")}</button>
-            <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "en", "{v0} text-bad"), { v0: String(BUTTON) })} onClick={() => void run(() => { clearUnifiedAiSecrets(); setAuxDraft({ ...DEFAULT_UNIFIED_AI_AUX_SETTINGS }); setMessage("현재 탭의 3D·영상 클라우드 토큰을 삭제했습니다."); })}>{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "보조 토큰 삭제")}</button>
+            <button type="button" className={formatI18nTemplate(translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "en", "{v0} text-bad"), { v0: String(BUTTON) })} onClick={() => void run(() => { clearUnifiedAiSecrets(); setAuxDraft({ ...DEFAULT_UNIFIED_AI_AUX_SETTINGS }); setMessage("현재 탭 메모리의 3D·영상 자격 증명을 삭제했습니다."); })}>{translateCurrentStaticSourceText("shared.ai.UnifiedAiSettings", "ko", "보조 토큰 삭제")}</button>
           </div>
         </div>
       </details>

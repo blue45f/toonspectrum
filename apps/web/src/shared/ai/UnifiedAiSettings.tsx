@@ -25,6 +25,7 @@ import {
   freeAiConnectionPolicyIssue,
   type FreeAiPreset,
 } from "./free-ai-policy";
+import { AiCapabilityStatusBoard } from "./AiCapabilityStatusBoard";
 import { getFreeAiPoolStatus, type FreeAiPoolStatus } from "./free-ai-pool-status";
 import {
   getUserAiSnapshot,
@@ -308,6 +309,12 @@ export function UnifiedAiSettings() {
   const hasPaidConnection = connections.some((connection) =>
     connection.enabled !== false && connection.costPolicy === "user-funded-byok",
   );
+  const readyCapabilities = new Set(readyConnections.flatMap(capabilityList));
+  const managedTextState = pool.mode === "loading"
+    ? "checking" as const
+    : pool.mode === "ready" && pool.status.configured
+      ? "ready" as const
+      : "unavailable" as const;
 
   const updateRouting = (patch: Partial<typeof routing>) => {
     setUserAiConfiguration({
@@ -560,6 +567,13 @@ export function UnifiedAiSettings() {
 
       {view === "start" && (
         <div className="space-y-6">
+          <AiCapabilityStatusBoard
+            managedText={managedTextState}
+            userText={readyCapabilities.has("text")}
+            userImage={readyCapabilities.has("image")}
+            userInference={readyCapabilities.has("inference")}
+            userThreeD={readyCapabilities.has("three-d")}
+          />
           <section aria-labelledby="my-ai-connections-title" className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>

@@ -27,7 +27,7 @@ describe("creator intelligence public discovery transport", () => {
       "/creator-intelligence/references",
       {
         credentials: "omit",
-        params: { provider: "pexels", q: "night alley", page: 2 },
+        params: { provider: "pexels", q: "night alley", page: 2, media: "image" },
       },
     );
     expect(request).toHaveBeenNthCalledWith(
@@ -63,5 +63,62 @@ describe("creator intelligence public discovery transport", () => {
     expect(request).toHaveBeenCalledWith(
       "/creator-intelligence/mesh/jobs/job%2Fid",
     );
+  });
+});
+
+
+describe("creator intelligence paid transport", () => {
+  it("reuses the same key after an uncertain transport failure, then rotates after success", async () => {
+    const request = vi.spyOn(api, "post")
+      .mockRejectedValueOnce(new TypeError("network disconnected"))
+      .mockResolvedValue({ status: "ready" } as never);
+
+    await expect(creatorIntelligenceClient.soundGenerate(
+      "retry-safe rain",
+      2,
+      false,
+    )).rejects.toThrow("network disconnected");
+    await creatorIntelligenceClient.soundGenerate("retry-safe rain", 2, false);
+    await creatorIntelligenceClient.soundGenerate("retry-safe rain", 2, false);
+
+    const keys = request.mock.calls.map((call) => {
+      const options = call[2] as { headers?: Record<string, string> } | undefined;
+      return options?.headers?.["Idempotency-Key"] ?? "";
+    });
+    expect(keys[0]).toBe(keys[1]);
+    expect(keys[2]).not.toBe(keys[1]);
+    expect(request.mock.calls.every((call) => {
+      const options = call[2] as { retry?: number } | undefined;
+      return options?.retry === 0;
+    })).toBe(true);
+  });
+
+  it("adds a unique idempotency key to every operator-funded request", async () => {
+    const request = vi.spyOn(api, "post").mockResolvedValue({ status: "ready" } as never);
+
+    await creatorIntelligenceClient.voiceSynthesize({
+      provider: "gemini",
+      text: "안녕하세요",
+    });
+    await creatorIntelligenceClient.soundGenerate("door slam", 2, false);
+    await creatorIntelligenceClient.translate({
+      provider: "deepl",
+      text: "hello",
+      targetLanguage: "KO",
+    });
+    await creatorIntelligenceClient.meshCreate("https://example.com/input.png");
+    await creatorIntelligenceClient.safeSearch("data:image/png;base64,AAAA");
+
+    const keys = request.mock.calls.map((call) => {
+      const options = call[2] as { headers?: Record<string, string> } | undefined;
+      return options?.headers?.["Idempotency-Key"] ?? "";
+    });
+    expect(keys).toHaveLength(5);
+    expect(keys.every((key) => /^[a-z-]+-[A-Za-z0-9-]{8,}$/u.test(key))).toBe(true);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(request.mock.calls.every((call) => {
+      const options = call[2] as { retry?: number } | undefined;
+      return options?.retry === 0;
+    })).toBe(true);
   });
 });

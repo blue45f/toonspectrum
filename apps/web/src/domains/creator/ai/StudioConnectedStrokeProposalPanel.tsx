@@ -11,7 +11,7 @@ export function StudioConnectedStrokeProposalPanel() {
   if (!bridge.connected) {
     return (
       <section
-        aria-label="AI 획 제안 검토"
+        aria-label="스마트 획 보정 검토"
         className="rounded-xl border border-line bg-card p-3 text-xs text-fg-3"
         data-studio-stroke-proposal-panel="disconnected"
       >

@@ -30,6 +30,8 @@ Creator Intelligence is a project-scoped bridge over Studio capabilities that al
 3. External moderation is opt-in per file. SafeSearch accepts only PNG/JPEG/WebP data URLs up to 2 MB and returns a human-review flag; it never auto-blocks publication.
 4. Meshy only accepts a public HTTPS image URL. Local/private images should use on-device Lift3D instead of silently uploading bytes.
 5. Project research persistence stores normalized metadata/provenance only. Generated audio base64 and API credentials are not persisted.
+6. Every operator-funded POST requires an authenticated session and an idempotency key. Production dispatch is disabled unless `CREATOR_INTELLIGENCE_PAID_EXECUTION_ENABLED=true` and distributed Upstash coordination is available.
+7. Meshy result URLs are resolved through the shared SSRF policy, pinned to a validated public DNS address, revalidated on every redirect, copied into private object storage, and replaced with account-bound short-lived artifact links.
 
 ## Rights and cost gates
 
@@ -38,9 +40,15 @@ Creator Intelligence is a project-scoped bridge over Studio capabilities that al
 - **AniList** remains disabled until `CREATOR_INTELLIGENCE_ANILIST_ENABLED=true` after operator review of commercial/API terms. Only metadata is stored.
 - **Freesound** requires both an enable flag and API key. Each sound keeps its individual license and remains `verify-item-license` before project inclusion.
 - **Open-Meteo/geocoding** has no public production fallback. Configure a contracted/self-hosted geocoder and commercial weather endpoint explicitly.
-- **ElevenLabs SFX** and **Meshy** are paid-provider calls and require explicit enable flags in addition to API keys.
+- **ElevenLabs SFX** and **Meshy** are paid-provider calls and require explicit provider flags, API keys, and the global paid-execution switch.
+- Per-user and service-wide daily limits are reserved before dispatch. An uncertain network/provider outcome retains the original idempotency receipt so browser retries cannot create a second charge.
+- Production Meshy dispatch additionally requires configured private object storage; temporary provider URLs are never returned as durable project assets.
 - **Google Vision SafeSearch** is optional and disabled by default because selected image bytes leave the ToonSpectrum environment.
 
 ## Project persistence
 
 The browser store schema is `toonspectrum.creator-intelligence.project.v1`. Keys are namespaced by project id and retain bounded collections for references, scene cards, AniList metadata, Freesound metadata, and Meshy job records. Reference Vault entries also keep an explicit `project` / `episode` / `scene` target so the same source can belong to different moodboards without losing provenance. Existing Studio project data remains authoritative for story, canvas, review, export, and local media workflows.
+
+## Runtime readiness
+
+`GET /api/creator-intelligence/status` exposes only non-secret readiness metadata: paid-execution enablement, distributed coordination availability, and private mesh-artifact storage readiness. Operations stay unavailable rather than degrading to unmetered paid calls when any required control plane is missing.
