@@ -38,7 +38,7 @@
     radial-gradient(circle at 84% 18%,color-mix(in srgb,var(--color-accent) 17%,transparent),transparent 24%);
 }
 .workspace-current-work--hero>*{position:relative;z-index:1}
-.workspace-current-work--hero .workspace-eyebrow{display:flex;align-items:center;gap:.4rem;color:color-mix(in srgb,var(--color-accent) 72%,white)}
+.workspace-current-work--hero .workspace-eyebrow{display:flex;align-items:center;gap:.4rem;color:var(--color-accent)}
 .workspace-current-work--hero h2{max-width:16ch;margin:.55rem 0;font-size:clamp(2rem,4vw,3.35rem);line-height:1.06;letter-spacing:-.065em}
 .workspace-current-work--hero>p:not(.workspace-eyebrow){max-width:42rem;margin:.65rem 0 1.6rem;color:var(--color-fg-2);font-size:.95rem;line-height:1.75}
 .workspace-current-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.7rem}
@@ -65,7 +65,7 @@
 .workspace-personal-studio-state{position:absolute;z-index:3;top:.85rem;right:.85rem;display:inline-flex;min-height:2rem;align-items:center;border:1px solid rgb(255 255 255/.2);border-radius:999px;padding:.32rem .65rem;background:rgb(12 17 27/.72);color:white;font-size:.62rem;font-weight:900;letter-spacing:.02em;backdrop-filter:blur(10px)}
 .workspace-personal-studio-card[data-character-ready="true"] .workspace-personal-studio-state{border-color:rgb(104 224 168/.34);background:rgb(18 67 51/.72);color:#c9ffe1}
 .workspace-personal-studio-copy{display:grid;align-content:start;gap:.65rem;padding:1.2rem 1.3rem 1.35rem}
-.workspace-personal-studio-copy .workspace-eyebrow{display:flex;align-items:center;gap:.35rem;margin:0;color:color-mix(in srgb,var(--color-accent) 72%,white);font-size:.64rem;font-weight:900;letter-spacing:.12em}
+.workspace-personal-studio-copy .workspace-eyebrow{display:flex;align-items:center;gap:.35rem;margin:0;color:var(--color-accent);font-size:.64rem;font-weight:900;letter-spacing:.12em}
 .workspace-personal-studio-copy h2{margin:0;font-size:clamp(1.25rem,2.2vw,1.7rem);line-height:1.25;letter-spacing:-.045em}
 .workspace-personal-studio-copy>p:not(.workspace-eyebrow){margin:0;color:var(--color-fg-2);font-size:.78rem;line-height:1.65}
 .workspace-personal-studio-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.7rem;margin-top:.2rem}
