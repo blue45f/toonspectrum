@@ -4,6 +4,7 @@ import { CANVAS_W } from "../studio-assets";
 import { StudioColorBlindFilterDefs } from "../StudioColorBlindPreview";
 
 import { StudioCinematicCanvasWelcome } from "./StudioCinematicCanvasWelcome";
+import { shouldShowStudioCinematicCanvasWelcome } from "./studio-cinematic-canvas-welcome-visibility";
 import { useStudioCanvasViewportInteraction } from "./studio-canvas-viewport-interaction";
 import { useStudioCanvasViewportLiveSurfaces } from "./studio-canvas-viewport-live-surfaces";
 import { localizeText } from "./studio-canvas-viewport-primitives";
@@ -82,6 +83,7 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
     canvasRotation,
     closeViewToolWithFocus,
     collaborationDocumentUnavailable,
+    joinedStudioLiveJam,
     commentPinArmed,
     drawMode,
     drawShape,
@@ -400,12 +402,13 @@ export const StudioCanvasViewport = memo(function StudioCanvasViewport({
 
         <StudioCinematicCanvasWelcome
           pageKey={activePage.id}
-          visible={
-            elements.length === 0
-            && !sourceHydrationPending
-            && !workHydrationFailed
-            && !collaborationDocumentUnavailable
-          }
+          visible={shouldShowStudioCinematicCanvasWelcome({
+            elementCount: elements.length,
+            sourceHydrationPending,
+            workHydrationFailed,
+            collaborationDocumentUnavailable,
+            joinedStudioLiveJam,
+          })}
         />
 
         <StudioCanvasViewportStageHost

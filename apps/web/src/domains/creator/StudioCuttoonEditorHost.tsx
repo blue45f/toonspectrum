@@ -1775,7 +1775,7 @@ export function StudioCuttoonEditor({
     editorMountedRef,
     effectiveWorkId,
     expectsSharedDocument,
-    isRealtimeTeamSession,
+    isRealtimeTeamSession, joinedStudioLiveJam,
     lockStudioMutationsNow,
     loggedIn,
     markStudioDocumentChanged,
@@ -28663,7 +28663,7 @@ function clearSelectionForEdit() {
       collaborationDocumentUnavailable={collaborationDocumentUnavailable}
       collaborationLockMessage={collaborationLockMessage}
       collaborationOperationSyncPending={collaborationOperationSyncPending}
-      collaborationReadOnly={collaborationReadOnly}
+      collaborationReadOnly={collaborationReadOnly} joinedStudioLiveJam={joinedStudioLiveJam}
       collaborationRoleLabel={collaborationRoleLabel}
       color={color}
       colorBlindPreview={colorBlindPreview}

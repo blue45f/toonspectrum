@@ -5,8 +5,28 @@ import { describe, expect, it, vi } from "vitest";
 
 import { STUDIO_CREATION_MODE_EVENT } from "../studio-creation-mode";
 import { StudioCinematicCanvasWelcome } from "./StudioCinematicCanvasWelcome";
+import { shouldShowStudioCinematicCanvasWelcome } from "./studio-cinematic-canvas-welcome-visibility";
 
 describe("StudioCinematicCanvasWelcome", () => {
+  it("keeps the empty-canvas launcher out of a joined live room", () => {
+    const base = {
+      elementCount: 0,
+      sourceHydrationPending: false,
+      workHydrationFailed: false,
+      collaborationDocumentUnavailable: false,
+      joinedStudioLiveJam: false,
+    };
+    expect(shouldShowStudioCinematicCanvasWelcome(base)).toBe(true);
+    expect(shouldShowStudioCinematicCanvasWelcome({
+      ...base,
+      joinedStudioLiveJam: true,
+    })).toBe(false);
+    expect(shouldShowStudioCinematicCanvasWelcome({
+      ...base,
+      elementCount: 1,
+    })).toBe(false);
+  });
+
   it("shows image-led starting paths and genre scenes for an empty page", () => {
     render(<StudioCinematicCanvasWelcome pageKey="page-1" visible />);
 
