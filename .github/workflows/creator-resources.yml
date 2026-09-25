@@ -10,6 +10,9 @@ on:
       - 'apps/web/src/domains/creator-resources/**'
       - 'apps/web/src/app/routes/**'
       - 'apps/api/src/modules/creator-resources/**'
+      - 'packages/core/src/creator-resources.ts'
+      - 'packages/core/package.json'
+      - 'apps/api/package.json'
       - 'apps/api/src/app.module.ts'
       - 'tests/creator-resources*'
       - 'tests/creator-resource-workflow*'
@@ -27,6 +30,9 @@ on:
       - 'apps/web/src/domains/creator-resources/**'
       - 'apps/web/src/app/routes/**'
       - 'apps/api/src/modules/creator-resources/**'
+      - 'packages/core/src/creator-resources.ts'
+      - 'packages/core/package.json'
+      - 'apps/api/package.json'
       - 'apps/api/src/app.module.ts'
       - 'tests/creator-resources*'
       - 'tests/creator-resource-workflow*'
@@ -53,7 +59,7 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Install isolated TypeScript checker
-        run: npm install --prefix "$RUNNER_TEMP/creator-checker" --ignore-scripts --no-audit --no-fund typescript@6.0.3 playwright@1.62.1
+        run: npm install --prefix "$RUNNER_TEMP/creator-checker" --ignore-scripts --no-audit --no-fund typescript@6.0.3 playwright@1.62.1 fast-xml-parser@5.10.1
       - name: Strict types and provider/storage/export regression cases
         run: NODE_PATH="$RUNNER_TEMP/creator-checker/node_modules" node scripts/check-creator-resources.mjs
       - name: Install Chromium for real cross-tab persistence checks

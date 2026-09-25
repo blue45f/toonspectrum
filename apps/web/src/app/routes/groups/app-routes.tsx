@@ -6,6 +6,7 @@ import { creatorResourcesRoutes } from "./creator-resources.routes";
 import { creatorRoutes } from "./creator.routes";
 import { engagementRoutes } from "./engagement.routes";
 import { experienceRoutes } from "./experience.routes";
+import { integrationRoutes } from "./integrations.routes";
 import { legalRoutes } from "./legal.routes";
 import { marketRoutes } from "./market.routes";
 import { marketingRoutes } from "./marketing.routes";
@@ -26,6 +27,7 @@ export const appRoutes = [
   ...creatorRoutes,
   ...productionRoutes,
   ...creatorResourcesRoutes,
+  ...integrationRoutes,
   ...marketRoutes,
   ...accountRoutes,
   ...adminRoutes,

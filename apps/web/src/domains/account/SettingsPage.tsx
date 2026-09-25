@@ -1,4 +1,4 @@
-import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles } from "lucide-react";
+import { Settings, Globe, Star, SlidersHorizontal, ShieldCheck, Trash2, Check, Download, Upload, Clock, SearchX, UserCog, ChevronRight, Sparkles, PlugZap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -315,6 +315,10 @@ export function SettingsPage() {
         </Link>
         <Link to="/settings/ai" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
           <span><strong>AI 연결과 사용 순서</strong><span className="mt-1 block text-sm text-fg-2">초보자용 빠른 연결, 자동 무료 AI와 기능별 사용 순서를 한곳에서 관리</span></span>
+          <ChevronRight size={18} aria-hidden />
+        </Link>
+        <Link to="/settings/integrations" className="flex min-h-16 items-center justify-between rounded-xl border border-line p-4 text-accent">
+          <span className="flex items-start gap-3"><PlugZap size={18} className="mt-0.5 shrink-0" aria-hidden /><span><strong>{lang.startsWith("ko") ? "외부 시스템 연동" : "External integrations"}</strong><span className="mt-1 block text-sm text-fg-2">{lang.startsWith("ko") ? "저장소·업무·알림·게시·결제 연결 상태와 권한 확인" : "Review storage, work, notification, publishing and payment connections"}</span></span></span>
           <ChevronRight size={18} aria-hidden />
         </Link>
       </div>
