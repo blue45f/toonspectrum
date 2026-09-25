@@ -7,7 +7,7 @@ const serverUrl = configuredServerUrl || productionServerUrl;
 const config: CapacitorConfig = {
   appId: "cloud.toonstudio.app",
   appName: "툰스튜디오",
-  webDir: "mobile-shell",
+  webDir: "shell",
   backgroundColor: "#10182d",
   appendUserAgent: " ToonStudioMobile/0.1.0",
   loggingBehavior: process.env.NODE_ENV === "production" ? "none" : "debug",

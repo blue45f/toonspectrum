@@ -8,6 +8,8 @@
   자체 Vite·TypeScript·Playwright 설정과 `dist/` 출력을 소유합니다.
 - `apps/api`는 독립 NestJS workspace package입니다. HTTP, WebSocket, DB, 영속성,
   외부 서비스 연동은 서버 전용으로 유지합니다.
+- `apps/mobile`은 `@toonspectrum/mobile` workspace package이며 Capacitor 설정, Android/iOS
+  native project, launch shell, resources와 native 검증을 직접 소유합니다.
 - `packages`에는 두 개 이상의 실행 앱이 실제로 공유하는 런타임 중립 계약·순수 모델·
   Studio 엔진만 둡니다. 애플리케이션 내부 구현을 공유 패키지로 우회하지 않습니다.
 - 루트에는 workspace 설정, 저장소 횡단 검증, 문서와 운영 자동화만 둡니다.
@@ -44,6 +46,12 @@ apps/api/                         # 서버 전용 NestJS workspace package
   src/infrastructure/             # platform으로 이전 중인 서버 adapter
   src/db/                         # schema·migration·seed
   src/server/                     # modules로 이전 중인 레거시 유스케이스
+
+apps/mobile/                      # 독립 Capacitor native wrapper workspace
+  capacitor.config.ts            # app origin, native plugin과 shell 정책
+  android/, ios/                  # native projects
+  shell/, resources/             # launch/offline shell과 source assets
+  scripts/                        # native permission·ownership 검증
 
 packages/                         # focused contracts, pure models, Studio engines
 data/asset-releases/              # 검토된 릴리스 manifest·출처·visual review 증거

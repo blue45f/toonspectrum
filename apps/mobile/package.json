@@ -1,0 +1,34 @@
+{
+  "name": "@toonspectrum/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Capacitor Android and iOS wrapper for the ToonStudio web application.",
+  "scripts": {
+    "build": "pnpm run typecheck && pnpm run verify:native-media",
+    "typecheck": "tsc -p tsconfig.json",
+    "verify:native-media": "node scripts/verify-native-media-permissions.mjs",
+    "doctor": "pnpm run verify:native-media && pnpm run sync && cap doctor",
+    "sync": "cap sync",
+    "assets": "capacitor-assets generate --android --iconBackgroundColor '#10182d' --iconBackgroundColorDark '#10182d' --splashBackgroundColor '#10182d' --splashBackgroundColorDark '#10182d' && capacitor-assets generate --ios --iconBackgroundColor '#10182d' --iconBackgroundColorDark '#10182d' --splashBackgroundColor '#10182d' --splashBackgroundColorDark '#10182d'",
+    "android:build": "cap sync android && cd android && ./gradlew assembleDebug",
+    "android:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "ios:prepare": "cap sync ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/browser": "8.0.4",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/ios": "8.5.2",
+    "@capacitor/keyboard": "8.0.5",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.2",
+    "@types/node": "^24.13.2",
+    "typescript": "~6.0.3"
+  }
+}

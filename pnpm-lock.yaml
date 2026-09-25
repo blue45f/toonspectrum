@@ -70,30 +70,6 @@ importers:
       '@babylonjs/loaders':
         specifier: 9.19.0
         version: 9.19.0(@babylonjs/core@9.19.0)(babylonjs-gltf2interface@9.19.0)
-      '@capacitor/android':
-        specifier: 8.5.2
-        version: 8.5.2(@capacitor/core@8.5.2)
-      '@capacitor/app':
-        specifier: 8.1.1
-        version: 8.1.1(@capacitor/core@8.5.2)
-      '@capacitor/browser':
-        specifier: 8.0.4
-        version: 8.0.4(@capacitor/core@8.5.2)
-      '@capacitor/core':
-        specifier: 8.5.2
-        version: 8.5.2
-      '@capacitor/ios':
-        specifier: 8.5.2
-        version: 8.5.2(@capacitor/core@8.5.2)
-      '@capacitor/keyboard':
-        specifier: 8.0.5
-        version: 8.0.5(@capacitor/core@8.5.2)
-      '@capacitor/splash-screen':
-        specifier: 8.0.2
-        version: 8.0.2(@capacitor/core@8.5.2)
-      '@capacitor/status-bar':
-        specifier: 8.0.3
-        version: 8.0.3(@capacitor/core@8.5.2)
       '@dimforge/rapier3d-deterministic-compat':
         specifier: 0.19.3
         version: 0.19.3
@@ -371,12 +347,6 @@ importers:
       '@babel/core':
         specifier: ^7.29.7
         version: 7.29.7
-      '@capacitor/assets':
-        specifier: 3.0.5
-        version: 3.0.5(@types/node@24.13.2)
-      '@capacitor/cli':
-        specifier: 8.5.2
-        version: 8.5.2
       '@cloudflare/vitest-pool-workers':
         specifier: 0.19.1
         version: 0.19.1(@types/node@24.13.2)(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(vitest@4.1.11)
@@ -709,6 +679,46 @@ importers:
       vitest:
         specifier: 4.1.11
         version: 4.1.11(@types/node@24.13.2)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+
+  apps/mobile:
+    dependencies:
+      '@capacitor/android':
+        specifier: 8.5.2
+        version: 8.5.2(@capacitor/core@8.5.2)
+      '@capacitor/app':
+        specifier: 8.1.1
+        version: 8.1.1(@capacitor/core@8.5.2)
+      '@capacitor/browser':
+        specifier: 8.0.4
+        version: 8.0.4(@capacitor/core@8.5.2)
+      '@capacitor/core':
+        specifier: 8.5.2
+        version: 8.5.2
+      '@capacitor/ios':
+        specifier: 8.5.2
+        version: 8.5.2(@capacitor/core@8.5.2)
+      '@capacitor/keyboard':
+        specifier: 8.0.5
+        version: 8.0.5(@capacitor/core@8.5.2)
+      '@capacitor/splash-screen':
+        specifier: 8.0.2
+        version: 8.0.2(@capacitor/core@8.5.2)
+      '@capacitor/status-bar':
+        specifier: 8.0.3
+        version: 8.0.3(@capacitor/core@8.5.2)
+    devDependencies:
+      '@capacitor/assets':
+        specifier: 3.0.5
+        version: 3.0.5(@types/node@24.13.2)
+      '@capacitor/cli':
+        specifier: 8.5.2
+        version: 8.5.2
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
 
   packages/contracts: {}
 
