@@ -302,6 +302,7 @@ export interface StudioCanvasViewportProps {
   hardCanvasInteractionBlock: boolean;
   collaborationDocumentLocked: boolean;
   collaborationDocumentUnavailable: boolean;
+  joinedStudioLiveJam: boolean;
   commentQuickReplyActive: boolean;
   collaborationLockMessage: () => string;
   closeViewToolWithFocus: (options?: { preferCanvas?: boolean }) => void;
