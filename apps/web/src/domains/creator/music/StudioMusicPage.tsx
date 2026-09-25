@@ -25,6 +25,7 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { MusicProviderToolkit } from "./MusicProviderToolkit";
 import { MusicTrackCard } from "./MusicTrackCard";
 import { ANIME_OST_STARTERS } from "./studio-anime-ost-presets";
 import { generateMusic, getMusicStatus } from "./studio-music-client";
@@ -486,6 +487,19 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
           <p className="mt-2 text-fg-2">{translateCurrentStaticSourceText("domains.creator.music.StudioMusicPage", "ko", "음악 생성과 개인 보관함은 로그인 후 이용할 수 있습니다. 사이트의 로그인 메뉴를 이용해 주세요.")}</p>
         ) : null}
       </section>
+
+      <MusicProviderToolkit
+        brief={brief}
+        prompt={preview}
+        onNotice={(message) => {
+          setError("");
+          setNotice(message);
+        }}
+        onError={(message) => {
+          setNotice("");
+          setError(message);
+        }}
+      />
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(24rem,0.85fr)]">
         <form

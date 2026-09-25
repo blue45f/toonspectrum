@@ -61,3 +61,15 @@ The library tests cover round-trip bytes, ordering, account isolation, concurren
 - https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API
 
 Commercial use depends on the provider subscription and intended use. No universal royalty-free resale, copyright ownership, voice-imitation or unrestricted-distribution guarantee is made.
+
+## Free-provider toolkit and review handoff
+
+The `/music` route also exposes a rights-aware provider toolkit for ACE-Step, Adobe Firefly,
+Soundverse, ElevenLabs, Suno, Stable Audio, Mubert and Udio. It can open an official work surface,
+copy the current original/non-imitation prompt and download a review-only handoff manifest.
+It does not submit a generation request or promote an external result into the site playlist.
+
+The manifest fixes the selected provider, work/episode scope, prompt, source-rights acknowledgement,
+`reviewRequired: true`, `autoPublish: false`, and the required license/provenance checks. The same
+catalogue is available through `pnpm music:providers`; `pnpm music:handoff` creates an offline manifest
+from a validated `MusicBrief` file. See [AI music provider operations](./ai-music-provider-operations.md).

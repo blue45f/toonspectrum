@@ -58,7 +58,9 @@ def prompt_for(track):
         base += '; clear natural Korean diction; expressive original lead vocal; strong verse-to-chorus lift; memorable non-derivative hook; sing only the supplied lyrics'
     return base
 
-def wait_job(task_id, max_wait_seconds=900):
+def wait_job(task_id, max_wait_seconds=None):
+    if max_wait_seconds is None:
+        max_wait_seconds=int(os.environ.get('ACESTEP_MAX_WAIT_SECONDS','2400'))
     last=None; started=time.time()
     while True:
         if time.time()-started > max_wait_seconds:
@@ -131,7 +133,7 @@ def sha(path):
         for b in iter(lambda:f.read(8*1024*1024),b''): h.update(b)
     return h.hexdigest()
 
-def generate(track, force=False, approve=False, keep_source=False):
+def generate(track, force=False, approve=False, keep_source=False, resume_task=None):
     variant=track['primaryVariant']; duration=track['durationMs']/1000; seed=seed_for(track['id'])
     raw=RAW/f"{track['id']}-{variant}.flac"; out=OUT/f"{track['id']}-{variant}.mp3"; side=OUT/f"{track['id']}-{variant}.json"
     if out.exists() and side.exists() and not force:
@@ -139,8 +141,13 @@ def generate(track, force=False, approve=False, keep_source=False):
     payload={'prompt':prompt_for(track),'lyrics':lyrics_for(track) if variant=='vocal' else '', 'thinking':False,'model':'acestep-v15-turbo',
              'bpm':track['bpm'],'key_scale':track.get('keyScale',''),'time_signature':'4','use_cot_caption':False,'use_cot_language':False,'vocal_language':track['language'] if variant=='vocal' else 'unknown','audio_duration':duration,
              'batch_size':1,'use_random_seed':False,'seed':seed,'inference_steps':8,'guidance_scale':1.0,'audio_format':'flac','task_type':'text2music','use_format':False}
-    print(f"START {track['id']} {variant} {duration:.0f}s seed={seed}",flush=True)
-    submit=post('/release_task',payload); task=submit['data']['task_id']
+    if resume_task:
+        task=resume_task
+        print(f"RESUME {track['id']} {variant} task={task}",flush=True)
+    else:
+        print(f"START {track['id']} {variant} {duration:.0f}s seed={seed}",flush=True)
+        submit=post('/release_task',payload); task=submit['data']['task_id']
+        print(f"TASK {task}",flush=True)
     entry=wait_job(task)
     file_url=entry.get('file')
     if not file_url: raise RuntimeError(f"missing file url: {entry}")
@@ -173,13 +180,18 @@ def main():
     parser.add_argument('--keep-source', action='store_true', help='Keep the original 48 kHz FLAC outside the repository for archival and editing.')
     parser.add_argument('--force', action='store_true', help='Replace existing audio and sidecar files.')
     parser.add_argument('--approve-generated', action='store_true', help='Mark generated sidecars approved for site publication.')
+    parser.add_argument('--resume-task', help='Resume one existing ACE-Step task; requires exactly one --track.')
     args=parser.parse_args()
     if args.all and args.track: parser.error('Use --all or --track, not both.')
     selected=config['tracks'] if args.all else [t for t in config['tracks'] if t['id'] in set(args.track)]
     if not selected: parser.error('Select --all or at least one valid --track id.')
     missing=set(args.track)-{t['id'] for t in selected}
     if missing: parser.error('Unknown track id(s): '+', '.join(sorted(missing)))
-    for track in selected: generate(track, force=args.force, approve=args.approve_generated, keep_source=args.keep_source)
+    if args.resume_task and len(selected) != 1:
+        parser.error('--resume-task requires exactly one --track.')
+    for track in selected:
+        generate(track, force=args.force, approve=args.approve_generated,
+                 keep_source=args.keep_source, resume_task=args.resume_task)
     print(f'Generated {len(selected)} primary master(s). Run the Node publisher after reviewing sidecars.', flush=True)
 
 if __name__ == '__main__':
