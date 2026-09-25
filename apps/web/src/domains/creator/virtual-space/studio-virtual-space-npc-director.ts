@@ -9,12 +9,16 @@ import { DEFAULT_STUDIO_MOTION_CONFIG, stepStudioVirtualSpaceMotion } from "./st
 import { advanceStudioWorldPath } from "./studio-virtual-space-path-steering";
 import { studioStableFacing } from "./studio-virtual-space-presentation";
 import {
+  studioWorldCollisionRects,
   studioWorldInteractions,
   type StudioVirtualSpaceWorldManifest,
   type StudioWorldInteractionDefinition,
   type StudioWorldNpcDefinition,
+  type StudioWorldRect,
 } from "./studio-virtual-space-world-manifest";
-import { findStudioWorldPath, studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
+import { findStudioWorldPath, STUDIO_WORLD_PLAYER_RADIUS, studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
+import { studioWorldCircleCanOccupy } from "./studio-virtual-space-world-connectivity";
+import { studioSemanticSurfaceAt } from "./studio-virtual-space-semantic-world";
 
 export type StudioNpcAtmosphere = "focus" | "balanced" | "lively";
 export type StudioNpcRole = "guide" | "producer" | "editor" | "writer" | "artist" | "librarian" | "cafe" | "security" | "host" | "resident";
@@ -73,6 +77,7 @@ interface NpcActor {
   retries: number;
   seed: number;
   distance: number;
+  previousDistance: number;
   moving: boolean;
   activity: StudioWorldNpcActivityAnchor | null;
   activityStage: StudioNpcActivityStage | null;
@@ -165,6 +170,7 @@ function random(actor: NpcActor): number {
 /** Cosmetic local actors never enter presence, lease a shared seat, or call an AI service. */
 export class StudioNpcDirector {
   private readonly actors: NpcActor[];
+  private readonly colliders: readonly StudioWorldRect[];
   private accumulator = 0;
   private time = 0;
   private lastGreetingAt = -Infinity;
@@ -176,6 +182,8 @@ export class StudioNpcDirector {
   private lastTourState: StudioVirtualNpcGuideTourState | null = null;
 
   constructor(private readonly manifest: StudioVirtualSpaceWorldManifest) {
+    // 한 director는 읽기 전용 월드 revision에 속한다. 매 미세 이동마다 동일한 collider 목록을 재구성하지 않는다.
+    this.colliders = studioWorldCollisionRects(manifest);
     // Invalid spawns are omitted, never silently teleported to the player's spawn.
     this.actors = manifest.npcs.slice(0, 8).filter((npc) => studioWorldCanOccupy(manifest, npc.point)).map((definition) => {
       const anchors = [definition.point, ...(definition.patrol ?? [])]
@@ -187,7 +195,7 @@ export class StudioNpcDirector {
         velocity: ZERO, facing: definition.facing ?? "down", phase: definition.activityAnchorIds?.length ? "wait" : "work", resumePhase: "work",
         targetIndex: definition.activityAnchorIds?.length ? -1 : 0, target: null, path: [], deadline: definition.activityAnchorIds?.length ? 400 + seed % 1800 : 6500 + seed % 13000,
         nextDecisionAt: seed % DECISION_MS, nextAwarenessAt: 0, threat: null,
-        blockedSince: null, retries: 0, seed, distance: 0, moving: false, activity: null, activityStage: null,
+        blockedSince: null, retries: 0, seed, distance: 0, previousDistance: 0, moving: false, activity: null, activityStage: null,
       };
     });
   }
@@ -206,7 +214,9 @@ export class StudioNpcDirector {
       return {
         id: actor.definition.id,
         point: { x: actor.previous.x + (actor.point.x - actor.previous.x) * alpha, y: actor.previous.y + (actor.point.y - actor.previous.y) * alpha },
-        facing: actor.facing, phase: actor.phase, animation: availableAnimation(actor, animation), distance: actor.distance,
+        facing: actor.facing, phase: actor.phase, animation: availableAnimation(actor, animation),
+        // 좌표와 발걸음 위상을 같은 시각으로 보간해 중간 렌더 프레임의 발 미끄러짐을 막는다.
+        distance: actor.previousDistance + (actor.distance - actor.previousDistance) * alpha,
         moving: actor.moving, greeting: actor.phase === "greet",
         activityAnchorId: actor.activity?.id, activityStage: actor.activityStage,
         ...(actor.activityStage === "perform" && actor.activity?.animation === "sit" && availableAnimation(actor, "sit") === "sit"
@@ -361,7 +371,9 @@ export class StudioNpcDirector {
   private segmentClear(from: StudioVirtualSpacePoint, to: StudioVirtualSpacePoint): boolean {
     const steps = Math.max(1, Math.ceil(distance(from, to) / 3));
     for (let i = 1; i <= steps; i++) {
-      if (!studioWorldCanOccupy(this.manifest, { x: from.x + (to.x - from.x) * i / steps, y: from.y + (to.y - from.y) * i / steps })) return false;
+      const point = { x: from.x + (to.x - from.x) * i / steps, y: from.y + (to.y - from.y) * i / steps };
+      if (!studioWorldCircleCanOccupy(this.manifest, this.colliders, point, STUDIO_WORLD_PLAYER_RADIUS)
+        || !studioSemanticSurfaceAt(this.manifest, point).walkable) return false;
     }
     return true;
   }
@@ -409,6 +421,7 @@ export class StudioNpcDirector {
     }
     for (const actor of this.actors) {
       actor.previous = actor.point;
+      actor.previousDistance = actor.distance;
       const viewport = environment.viewport;
       const offscreen = viewport && (actor.point.x < viewport.x - 100 || actor.point.y < viewport.y - 100
         || actor.point.x > viewport.x + viewport.width + 100 || actor.point.y > viewport.y + viewport.height + 100);
@@ -516,7 +529,8 @@ export class StudioNpcDirector {
     let next = { x: actor.point.x + motion.velocity.x * FIXED_STEP, y: actor.point.y + motion.velocity.y * FIXED_STEP };
     // Grid smoothing can graze a rounded collider corner. Project the tiny fixed step
     // onto a clear axis, like the player's Arcade body, instead of retrying that same chord forever.
-    if (!this.segmentClear(actor.point, next)) {
+    let nextIsClear = this.segmentClear(actor.point, next);
+    if (!nextIsClear) {
       const slide = [
         { x: next.x, y: actor.point.y },
         { x: actor.point.x, y: next.y },
@@ -527,14 +541,15 @@ export class StudioNpcDirector {
       ].filter((point) => distance(point, actor.point) > 0.001 && this.segmentClear(actor.point, point)
         && distance(point, target) < distance(actor.point, target))
         .sort((left, right) => distance(left, target) - distance(right, target))[0];
-      if (slide) next = slide;
+      // 위 filter에서 검증한 동일 후보를 다시 검사하지 않는다. 사람/NPC 점유는 아래에서 별도로 확인한다.
+      if (slide) { next = slide; nextIsClear = true; }
     }
     // Real people always win. NPCs have no solid body in the player's physics world.
     const personBlocked = environment.people.some((person) => distance(next, person.point) < PERSON_CLEARANCE
       && distance(next, person.point) <= distance(actor.point, person.point));
     const npcBlocked = this.actors.some((other) => other !== actor && distance(next, other.point) < NPC_CLEARANCE
       && distance(next, other.point) <= distance(actor.point, other.point));
-    if (personBlocked || npcBlocked || !this.segmentClear(actor.point, next)) {
+    if (personBlocked || npcBlocked || !nextIsClear) {
       actor.velocity = ZERO; actor.moving = false;
       actor.blockedSince ??= this.time;
       if (this.time - actor.blockedSince > 1000 && this.pathsThisStep === 0) {

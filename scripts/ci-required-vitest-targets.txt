@@ -272,6 +272,7 @@ packages/studio-project-model/src/__tests__/work-session.test.ts
 packages/studio-project-model/src/__tests__/world-acoustic.test.ts
 packages/studio-project-model/src/__tests__/world-conversation.test.ts
 packages/studio-project-model/src/__tests__/world-publication.test.ts
+packages/studio-project-model/src/__tests__/world-tilemap.test.ts
 scripts/bootstrap-empty-production-database.test.mjs
 scripts/browser-core-entry-isolation.test.ts
 scripts/creator-career-confirmation-database-contract.test.mjs

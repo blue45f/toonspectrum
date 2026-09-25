@@ -1,5 +1,6 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
 import type { StudioVirtualCharacterCustomization } from "./studio-virtual-space-customization";
+import { pixelMakerNativeWalkClip } from "./studio-virtual-space-character-native-art";
 import {
   studioVirtualArtNpcUrl,
   studioVirtualArtPlayerUrl,
@@ -54,7 +55,7 @@ export interface StudioCharacterAtlasClip {
   readonly repeat?: number;
   /** Preserve phase while speed/direction changes. */
   readonly distancePerCycle?: number;
-  readonly technique?: "cutout-rig" | "drawn";
+  readonly technique?: "cutout-rig" | "drawn" | "translated-still";
   readonly frames?: readonly StudioCharacterFramePresentation[];
 }
 
@@ -65,6 +66,8 @@ export interface StudioCharacterSkin {
   readonly directional: Readonly<Record<StudioVirtualSpaceFacing, string>>;
   readonly state?: Readonly<Partial<Record<"talk" | "draw" | "review", string>>>;
   readonly clips?: Readonly<Partial<Record<StudioCharacterWalkClipKey, StudioCharacterAtlasClip>>>;
+  /** 별도 정지 이미지 대신 걷기 atlas의 검수된 접지 프레임을 사용한다. */
+  readonly idleFrames?: Readonly<Partial<Record<StudioVirtualSpaceFacing, number>>>;
   /** Actual stationary action frames; load only the active direction. */
   readonly actions?: Readonly<Partial<Record<StudioCharacterAction, Readonly<Record<StudioVirtualSpaceFacing, StudioCharacterAtlasClip>>>>>;
   readonly poses?: Readonly<Partial<Record<"sit" | "wave", StudioCharacterPoseSheet>>>;
@@ -97,17 +100,17 @@ function imagegen25DirectionUrls(): Readonly<Record<StudioVirtualSpaceFacing, st
   ])) as Record<StudioVirtualSpaceFacing, string>);
 }
 
-function imagegen25Clip(action: "walk" | StudioCharacterAction, facing: StudioVirtualSpaceFacing): StudioCharacterAtlasClip {
+function imagegen25Clip(action: StudioCharacterAction, facing: StudioVirtualSpaceFacing): StudioCharacterAtlasClip {
   return Object.freeze({
     textureUrl: `${IMAGEGEN25_CHARACTER_ROOT}/player-imagegen25-${action}-${facing}.webp`,
     frameWidth: 160,
     frameHeight: 160,
     start: 0,
     end: 3,
-    frameRate: action === "walk" ? 8 : 7,
+    frameRate: 7,
     repeat: -1,
-    distancePerCycle: action === "walk" ? 70 : undefined,
-    technique: "drawn",
+    // 보존된 v6 행동은 정지 그림의 평행 이동이며 실제 동작 작화로 분류하지 않는다.
+    technique: "translated-still",
     frames: IMAGEGEN25_FRAMES,
   });
 }
@@ -115,7 +118,7 @@ function imagegen25Clip(action: "walk" | StudioCharacterAction, facing: StudioVi
 function imagegen25Skin(): StudioCharacterSkin {
   const clips = Object.freeze(Object.fromEntries(IMAGEGEN25_DIRECTIONS.map((facing) => [
     `walk-${facing}`,
-    imagegen25Clip("walk", facing),
+    pixelMakerNativeWalkClip(facing),
   ])) as NonNullable<StudioCharacterSkin["clips"]>);
   const actions = Object.freeze(Object.fromEntries((["talk", "draw", "review"] as const).map((action) => [
     action,
@@ -136,6 +139,8 @@ function imagegen25Skin(): StudioCharacterSkin {
     labelKo: "픽셀 메이커",
     labelEn: "Pixel Maker",
     directional: imagegen25DirectionUrls(),
+    // 양발 접촉이 보이는 첫 프레임을 유지한다. 전용 standing 작화는 후속 범위다.
+    idleFrames: Object.freeze({ down: 0, left: 0, right: 0, up: 0 }),
     clips,
     actions,
     poses: Object.freeze({ wave: pose("wave"), sit: pose("sit") }),
@@ -170,7 +175,7 @@ export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.fre
 
 const FALLBACK_SKIN = STUDIO_CHARACTER_SKINS[0]!;
 
-export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1-actions-3-imagegen25";
+export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1-actions-3-native-pixel-maker";
 export const STUDIO_CHARACTER_APPEARANCE_REGISTRY: StudioVirtualSpaceAppearanceRegistry = Object.freeze({
   revision: STUDIO_CHARACTER_REGISTRY_REVISION,
   fallbackSkinKey: FALLBACK_SKIN.key,
@@ -309,7 +314,7 @@ export function studioCharacterSkinForArtStyle(
   source: StudioCharacterSkin,
   artStyle: StudioVirtualArtStyleKey,
 ): StudioCharacterSkin {
-  // The optional Image Generation 2.5 sprite is already a complete authored pack.
+  // 네이티브 걷기 원본을 보존한다. 나머지 v6 행동은 별도 교체가 필요한 레거시다.
   if (source.key === "imagegen25") return source;
   const cacheKey = `${source.key}:${artStyle}:v5`;
   const cached = STYLED_SKIN_CACHE.get(cacheKey);

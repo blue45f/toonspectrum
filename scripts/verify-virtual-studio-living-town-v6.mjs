@@ -105,6 +105,9 @@ export async function verifyVirtualStudioLivingTownV6() {
   if (generatedDirections.some((item) => JSON.stringify(item?.size) !== JSON.stringify([160, 160]))) {
     errors.push("ImageGen character directions must use the 160px runtime cell");
   }
+  if (new Set(generatedDirections.map((item) => item?.visualSignature).filter(Boolean)).size !== 4) {
+    errors.push("ImageGen 캐릭터 방향 파일의 visualSignature 네 개가 서로 달라야 합니다");
+  }
 
   const runtime = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas.tsx"), "utf8");
   if (!runtime.includes("studioVirtualLivingTownAssetUrl")) errors.push("runtime does not load living-town v6 assets");

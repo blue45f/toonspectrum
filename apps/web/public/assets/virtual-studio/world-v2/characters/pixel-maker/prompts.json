@@ -1,0 +1,50 @@
+{
+  "createdAt": "2026-09-26",
+  "preservation": "출력 원본 PNG 그대로. 셀/앵커는 원본을 고치지 않고 렌더러 메타데이터로 지정.",
+  "images": [
+    {
+      "direction": "down",
+      "source": "exec-fa18ca19-b44b-4b4e-b607-ef3d306f555b.png",
+      "file": "walk-down.png",
+      "tool": "image_gen.imagegen",
+      "modelVersion": "unreported-by-tool",
+      "requestedModel": "ImageGen 2.5",
+      "mode": "edit",
+      "referencedImage": "living-town-v6/imagegen25-character/player-imagegen25-direction-down.webp",
+      "prompt": "Edit the attached character reference into a PRODUCTION WALK ANIMATION SPRITESHEET. Preserve this same original character identity: short chestnut-brown bob haircut with straight bangs, warm ivory face, dark eyes, cream shirt, dark grey suspenders and apron, slate-blue trousers, brown shoes; charming small creator in an elegant cozy creative-office MMORPG. Improve to polished crisp hand-painted 2D game quality with refined outlines and soft upper-left shading. Output PNG with REAL TRANSPARENT ALPHA background, no opaque or checkerboard background. EXACTLY FOUR isolated full-body poses in a strict 2 columns × 2 rows grid, one pose centered within each equal quadrant, large empty transparent gutters and margins, all feet inside own cell. No words, labels, numbers, borders, ground, props or shadows. All four poses face DOWN toward the viewer, strict consistent top-down-three-quarter game camera, same body scale and outfit throughout. Reading order top-left, top-right, bottom-left, bottom-right is a true sequential walking cycle: 1 left foot forward planted/right arm forward and right foot back; 2 passing pose right knee bent and lifted moving forward with left leg supporting; 3 right foot forward planted/left arm forward and left foot back; 4 passing pose left knee bent and lifted with right leg supporting. Distinct articulated leg and arm geometry must genuinely change in each frame, never duplicate a standing pose with translation. Torso/head stable, natural weight transfer, no dramatic bounce. Keep the baseline foot contact near 88% height within each cell. Leave generous transparent space between limbs of neighboring cells. Sheet at highest native square resolution with exact equal quadrants."
+    },
+    {
+      "direction": "up",
+      "source": "exec-e0fcccd0-d7a4-4d97-9a7c-07d707886b88.png",
+      "file": "walk-up.png",
+      "tool": "image_gen.imagegen",
+      "modelVersion": "unreported-by-tool",
+      "requestedModel": "ImageGen 2.5",
+      "mode": "edit",
+      "referencedImage": "exec-fa18ca19-b44b-4b4e-b607-ef3d306f555b.png",
+      "prompt": "Use attached production DOWN-facing animation sheet ONLY as the exact character/style reference. Make a NEW production UP-facing walk sprite sheet of this SAME character, with the same chestnut bob haircut, cream shirt, charcoal grey apron/suspenders, slate-blue trousers and brown shoes, same polished crisp hand-painted cozy MMORPG proportions, soft upper-left shading, same silhouette scale. Output native highest quality square PNG with REAL TRANSPARENT ALPHA, no background, no checkerboard, no ground shadow, no labels or numbers. Exactly FOUR full-body poses in strict 2×2 equal quadrants, transparent generous margins/gutters. One isolated actor per cell, feet and head wholly within cell. All four full-body poses face STRAIGHT UP, walking AWAY from viewer. See only the back of the chestnut bob haircut, back of cream shirt and dark-grey crossed apron straps, slate blue pants, brown shoes. NO face, eyes, bangs visible in any pose, no turning head. True rear-facing walk cycle alternating heels and soles. Reading order top-left, top-right, bottom-left, bottom-right: first leg forward planted/opposite leg trailing; passing pose with trailing knee lifted and supporting leg planted; opposite leg forward planted/first leg trailing; opposite passing pose with first knee lifted. Each frame must genuinely redraw different limb geometry, not translate a static pose. Stable head and torso, natural weight transfer, no exaggerated bounce. Match the reference's character height about 77% of each cell and ground contact baseline about 89% of the cell height. Preserve exact outfit, hairstyle and identity throughout. Do not include the old front-facing poses in the new sheet."
+    },
+    {
+      "direction": "left",
+      "source": "exec-d0d406a0-31a5-4ca6-bad3-b1b277561218.png",
+      "file": "walk-left.png",
+      "tool": "image_gen.imagegen",
+      "modelVersion": "unreported-by-tool",
+      "requestedModel": "ImageGen 2.5",
+      "mode": "edit",
+      "referencedImage": "exec-fa18ca19-b44b-4b4e-b607-ef3d306f555b.png",
+      "prompt": "Use attached production DOWN-facing animation sheet ONLY as the exact character/style reference. Make a NEW production LEFT-facing walk sprite sheet of this SAME character, with the same chestnut bob haircut, cream shirt, charcoal grey apron/suspenders, slate-blue trousers and brown shoes, same polished crisp hand-painted cozy MMORPG proportions, soft upper-left shading, same silhouette scale. Output native highest quality square PNG with REAL TRANSPARENT ALPHA, no background, no checkerboard, no ground shadow, no labels or numbers. Exactly FOUR full-body poses in strict 2×2 equal quadrants, transparent generous margins/gutters. One isolated actor per cell, feet and head wholly within cell. All four full-body poses face STRAIGHT LEFT, walking to the LEFT edge, a consistent left-facing side profile. Nose and toes point left in every pose. One left-profile eye and side haircut visible; no face facing viewer. True leftward walk cycle with clear alternating forward/backward legs and opposing arms. Reading order top-left, top-right, bottom-left, bottom-right: first leg forward planted/opposite leg trailing; passing pose with trailing knee lifted and supporting leg planted; opposite leg forward planted/first leg trailing; opposite passing pose with first knee lifted. Each frame must genuinely redraw different limb geometry, not translate a static pose. Stable head and torso, natural weight transfer, no exaggerated bounce. Match the reference's character height about 77% of each cell and ground contact baseline about 89% of the cell height. Preserve exact outfit, hairstyle and identity throughout. Do not include the old front-facing poses in the new sheet."
+    },
+    {
+      "direction": "right",
+      "source": "exec-0378c303-be5d-47cb-af2d-3ef03b8d110b.png",
+      "file": "walk-right.png",
+      "tool": "image_gen.imagegen",
+      "modelVersion": "unreported-by-tool",
+      "requestedModel": "ImageGen 2.5",
+      "mode": "edit",
+      "referencedImage": "exec-fa18ca19-b44b-4b4e-b607-ef3d306f555b.png",
+      "prompt": "Use attached production DOWN-facing animation sheet ONLY as the exact character/style reference. Make a NEW production RIGHT-facing walk sprite sheet of this SAME character, with the same chestnut bob haircut, cream shirt, charcoal grey apron/suspenders, slate-blue trousers and brown shoes, same polished crisp hand-painted cozy MMORPG proportions, soft upper-left shading, same silhouette scale. Output native highest quality square PNG with REAL TRANSPARENT ALPHA, no background, no checkerboard, no ground shadow, no labels or numbers. Exactly FOUR full-body poses in strict 2×2 equal quadrants, transparent generous margins/gutters. One isolated actor per cell, feet and head wholly within cell. All four full-body poses face STRAIGHT RIGHT, walking to the RIGHT edge, a consistent right-facing side profile. Nose and toes point right in every pose. One right-profile eye and side haircut visible; no face facing viewer. True rightward walk cycle with clear alternating forward/backward legs and opposing arms. Reading order top-left, top-right, bottom-left, bottom-right: first leg forward planted/opposite leg trailing; passing pose with trailing knee lifted and supporting leg planted; opposite leg forward planted/first leg trailing; opposite passing pose with first knee lifted. Each frame must genuinely redraw different limb geometry, not translate a static pose. Stable head and torso, natural weight transfer, no exaggerated bounce. Match the reference's character height about 77% of each cell and ground contact baseline about 89% of the cell height. Preserve exact outfit, hairstyle and identity throughout. Do not include the old front-facing poses in the new sheet."
+    }
+  ]
+}

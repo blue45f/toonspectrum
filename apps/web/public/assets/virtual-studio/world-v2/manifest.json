@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "createdAt": "2026-09-26",
+  "generator": "image_gen.imagegen",
+  "requestedModel": "ImageGen 2.5",
+  "reportedModel": null,
+  "sourcePreservation": "원본 PNG 바이트·크기·알파를 그대로 사용. 반복 연결은 Tiled GID 반전으로 지정.",
+  "assets": [
+    {
+      "file": "tiles/limestone-native.png",
+      "source": "exec-2e1ae5f5-68a3-49d3-b0a6-7a3b4b93c9f8.png",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 2769687,
+      "sha256": "09217b7a1a69d918d904b4aec6768e351f03cc26deabb202919d580a809dd142",
+      "alpha": false,
+      "repeatMode": "mirrored-gid",
+      "straightRepeatApproved": false,
+      "prompt": "Use case: stylized-concept. Create ONE production game seamless texture tile, an edge-to-edge square warm ivory limestone courtyard floor for an elegant cozy creative-office MMORPG village. Pure overhead orthographic view, zero perspective, opaque rectangular image filled completely by the same ground material. Precisely aligned small square and subtly rounded rectangular limestone pavers, low-contrast cream and sand tones, thin beige mortar, refined hand-painted fine mineral texture and soft upper-left micro-light. Beautiful clean authored game material, detailed but quiet enough under small chibi characters. Exactly1024x1024 PNG. This is ONE CONTINUOUS REPEATABLE MATERIAL, not an atlas, sheet, grid of different textures or a scene. Opposite outer edges MUST tile seamlessly both left/right and top/bottom, with matching stone-joint positions and identical edge colors, no perimeter bevel, no border or fade. Keep stone block rhythm consistent across edges; irregularities only inside blocks. No building, furniture, props, grass, water, text, logo, human, character, symbols or directional cast shadow. No large focal features. The entire image is the floor material."
+    },
+    {
+      "file": "tiles/grass-native.png",
+      "source": "exec-de09257b-d2e5-44df-900e-7db7a9600b6e.png",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 3744922,
+      "sha256": "4bec776c597f94f6449ffb0f86ce3d50a7929f60dbf367ba60cddb044999318c",
+      "alpha": false,
+      "repeatMode": "mirrored-gid",
+      "straightRepeatApproved": false,
+      "prompt": "Use case: stylized-concept. Create ONE premium production game seamless ground texture: a lush sage-green lawn for an elegant cozy creative-office MMORPG village, gently hand-painted with physically believable very fine grass blades and clean small-scale readability. This is a pure orthographic overhead material, completely edge-to-edge opaque, one continuous material over the full square PNG, not an atlas, concept board or scene. Fine grass in muted emerald/sage greens with restrained warm highlights, soft upper-left micro-light, even density and low contrast. Absolutely no bare earth, flowers, stones, paths, objects, trees, buildings, humans, words, labels, cast shadows, vignette, frame or border. Opposite image edges must match seamlessly in both directions; no perceptible repeating central motif. Deliver a square PNG at the tool's native highest quality. Preserve fine original detail; do not simulate pixel art."
+    }
+  ]
+}

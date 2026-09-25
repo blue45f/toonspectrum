@@ -68,6 +68,7 @@ import {
   studioVirtualTerrainAt,
 } from "./studio-virtual-space-living-world";
 import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
+import { createStudioWorldTileRuntime, type StudioWorldTileRuntime } from "./studio-virtual-space-tile-runtime";
 import { StudioVirtualDecorationRuntime } from "./studio-virtual-space-decoration-runtime";
 import { StudioDeskPodRuntime } from "./studio-virtual-space-desk-pods";
 import { studioRuntimeBudget, studioTownInterestSnapshot } from "./studio-virtual-space-town-program";
@@ -76,6 +77,11 @@ import {
   DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
   type StudioVirtualExperiencePreference,
 } from "./studio-virtual-space-experience-preference";
+import {
+  DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
+  studioVirtualBackdropUrl,
+  type StudioVirtualEnvironmentPreference,
+} from "./studio-virtual-space-environment-preference";
 import {
   StudioVirtualAdaptiveQualityController,
   studioVirtualAutomaticQualityTier,
@@ -102,7 +108,7 @@ import {
   studioCharacterActionSheetMatches,
   studioCharacterPoseTextureKey,
   studioCharacterStaticAsset,
-  studioCharacterStaticTextureKey as staticTextureKey,
+  studioCharacterStaticSheetMatches,
   studioCharacterVisualAssets,
   studioCharacterWalkAnimationKey as walkAnimationKey,
   studioCharacterWalkTextureKey as walkSheetKey,
@@ -156,6 +162,7 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly artStyle?: StudioVirtualArtStyleKey;
   readonly decorations?: StudioVirtualDecorationState;
   readonly experiencePreference?: StudioVirtualExperiencePreference;
+  readonly environmentPreference?: StudioVirtualEnvironmentPreference;
   readonly onRuntimeMetrics?: (metrics: StudioVirtualRuntimeMetrics) => void;
   readonly selfPose?: { readonly state: "sit"; readonly facing: StudioVirtualSpaceFacing };
   readonly waveActorIds?: readonly string[];
@@ -276,6 +283,7 @@ export function StudioVirtualSpacePhaserCanvas({
   artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
   decorations = EMPTY_DECORATIONS,
   experiencePreference = DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
+  environmentPreference = DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
   onRuntimeMetrics,
   selfPose,
   waveActorIds = [],
@@ -304,6 +312,8 @@ export function StudioVirtualSpacePhaserCanvas({
   decorationsRef.current = decorations;
   const experienceRef = useRef(experiencePreference);
   experienceRef.current = experiencePreference;
+  const environmentRef = useRef(environmentPreference);
+  environmentRef.current = environmentPreference;
   const metricsCallbackRef = useRef(onRuntimeMetrics);
   metricsCallbackRef.current = onRuntimeMetrics;
   const guideTourRef = useRef(guideTourRequest);
@@ -368,8 +378,15 @@ export function StudioVirtualSpacePhaserCanvas({
     setReady(false);
     let cancelled = false;
     let sceneReady = false;
+    let engineFailed = false;
     const cleanup: (() => void)[] = [];
-    const fail = () => { if (!cancelled) { setFailure(true); setReady(false); } };
+    const fail = () => {
+      if (cancelled) return;
+      engineFailed = true;
+      bridge.clearMovement();
+      setFailure(true);
+      setReady(false);
+    };
     const bootDeadline = globalThis.setTimeout(fail, 25000);
     cleanup.push(() => globalThis.clearTimeout(bootDeadline));
     let game: import("phaser").Game | null = null;
@@ -424,6 +441,8 @@ export function StudioVirtualSpacePhaserCanvas({
       const portals = studioWorldPortals(manifest);
       const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}-${artStyle}`;
       const backgroundUrl = studioVirtualArtTextureUrl(artStyle, "world-base");
+      const horizonTextureKey = `studio-imagegen25-horizon-${environmentPreference.backdrop}`;
+      const horizonUrl = studioVirtualBackdropUrl(environmentPreference.backdrop);
       const livingTextureKeys = {
         cloudBack: `studio-living-${artStyle}-cloud-back`,
         cloudFront: `studio-living-${artStyle}-cloud-front`,
@@ -431,6 +450,7 @@ export function StudioVirtualSpacePhaserCanvas({
         foliage: `studio-living-${artStyle}-foliage`,
         lights: `studio-living-${artStyle}-lights`,
         weather: `studio-living-${artStyle}-weather`,
+        terrain: `studio-living-${artStyle}-terrain`,
         pathOverlay: `studio-living-${artStyle}-path-overlay`,
         waterfall: `studio-living-${artStyle}-waterfall`,
         waterfallSplash: `studio-living-${artStyle}-waterfall-splash`,
@@ -525,6 +545,10 @@ export function StudioVirtualSpacePhaserCanvas({
       let nearbyInteractionId: string | null = null;
       let keys: Record<string, import("phaser").Input.Keyboard.Key> | null = null;
       let livingWorld: StudioLivingWorldRuntime | null = null;
+      let tileWorld: StudioWorldTileRuntime | null = null;
+      let initialTilesReady = false;
+      const runtimeInputBlocked = () => engineFailed || (manifest.tilemap !== undefined && !initialTilesReady)
+        || studioWorldInputBlocked(document, modalInputBlocked);
       let objectRuntime: StudioWorldObjectRuntime | null = null;
       let decorationRuntime: StudioVirtualDecorationRuntime | null = null;
       let deskPodRuntime: StudioDeskPodRuntime | null = null;
@@ -538,6 +562,8 @@ export function StudioVirtualSpacePhaserCanvas({
         const key = walkSheetKey(skin, direction);
         if (!clip || cancelled || !scene.textures.exists(key) || scene.anims.exists(walkAnimationKey(skin, direction))) return;
         const texture = scene.textures.get(key);
+        const source = texture.source[0];
+        if (clip.atlas && (!source || !studioCharacterActionSheetMatches(clip, source.width, source.height))) return;
         if (!Number.isSafeInteger(clip.start) || !Number.isSafeInteger(clip.end)
           || clip.end < clip.start || clip.start < 0 || clip.end >= texture.frameTotal - 1) return;
         scene.anims.create({ key: walkAnimationKey(skin, direction), frames: scene.anims.generateFrameNumbers(key, { start: clip.start, end: clip.end }), frameRate: clip.frameRate, repeat: clip.repeat ?? -1 });
@@ -548,6 +574,11 @@ export function StudioVirtualSpacePhaserCanvas({
         const geometry = studioCharacterFrameGeometry(presentation, sprite.frame.width, sprite.frame.height,
           Number(sprite.getData("visualWidth") ?? 92), Number(sprite.getData("visualHeight") ?? 123), Boolean(sprite.getData("seatAttached")));
         sprite.setDisplaySize(geometry.width, geometry.height).setOrigin(geometry.originX, geometry.originY);
+      };
+      const hasStaticAsset = (asset: ReturnType<typeof studioCharacterStaticAsset>) => {
+        if (!scene.textures.exists(asset.key)) return false;
+        const source = scene.textures.get(asset.key).source[0];
+        return Boolean(source && studioCharacterStaticSheetMatches(asset, source.width, source.height));
       };
       const applySpriteVisual = (
         sprite: import("phaser").GameObjects.Sprite,
@@ -606,13 +637,17 @@ export function StudioVirtualSpacePhaserCanvas({
           }
         }
         if (sprite.anims.isPlaying) sprite.stop();
-        const key = staticTextureKey(skin, nextFacing, nextState);
-        const directional = staticTextureKey(skin, nextFacing);
-        const texture = scene.textures.exists(key) ? key
-          : scene.textures.exists(directional) ? directional
-            : scene.textures.exists(sprite.texture.key) ? sprite.texture.key : fallbackAsset.key;
-        if (scene.textures.exists(texture) && sprite.texture.key !== texture) {
-          sprite.setTexture(texture).setData("framePresentation", undefined);
+        const current = studioCharacterStaticAsset(skin, nextFacing, nextState);
+        const standing = studioCharacterStaticAsset(skin, nextFacing);
+        const asset = hasStaticAsset(current) ? current
+          : hasStaticAsset(standing) ? standing
+            : scene.textures.exists(sprite.texture.key) ? undefined : fallbackAsset;
+        if (asset && scene.textures.exists(asset.key)) {
+          // 걷기와 idle은 같은 텍스처여도 선택 프레임이 다르므로 반드시 함께 비교한다.
+          if (sprite.texture.key !== asset.key || (asset.frame !== undefined && String(sprite.frame.name) !== String(asset.frame))) {
+            sprite.setTexture(asset.key, asset.frame);
+          }
+          sprite.setData("framePresentation", asset.presentation);
         }
         updateDisplaySize(sprite);
       };
@@ -634,6 +669,7 @@ export function StudioVirtualSpacePhaserCanvas({
         snapshotRef.current.peers.find((peer) => peer.participant.sessionId === id);
 
       const setPathTo = (point: StudioVirtualSpacePoint) => {
+        if (runtimeInputBlocked()) return;
         if (!localBody) return;
         path = findStudioWorldPath(
           manifest,
@@ -647,9 +683,10 @@ export function StudioVirtualSpacePhaserCanvas({
         let visual = peers.get(id);
         const state = activityState(peer.state.moving, nearby, peer.state.activity);
         const skin = studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(peer.state, id).skin, artStyle);
-        const key = staticTextureKey(skin, peer.state.facing, state);
+        const requestedPeerAsset = studioCharacterStaticAsset(skin, peer.state.facing, state);
+        const peerInitialAsset = hasStaticAsset(requestedPeerAsset) ? requestedPeerAsset : fallbackAsset;
         if (!visual) {
-          const sprite = scene.add.sprite(peer.state.x, peer.state.y, scene.textures.exists(key) ? key : fallbackAsset.key)
+          const sprite = scene.add.sprite(peer.state.x, peer.state.y, peerInitialAsset.key, peerInitialAsset.frame)
             .setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
             .setData({ visualWidth: 92, visualHeight: 123, assetOwner: `peer:${id}` })
             .setDisplaySize(92, 123)
@@ -664,6 +701,7 @@ export function StudioVirtualSpacePhaserCanvas({
               event: InputEventLike,
             ) => {
               event.stopPropagation();
+              if (runtimeInputBlocked()) return;
               queuedWalkOver = { id, point: { x: sprite.x, y: sprite.y } };
               bridge.setFollowingPeer(id);
             },
@@ -762,13 +800,19 @@ export function StudioVirtualSpacePhaserCanvas({
 
       scene.preload = function preload() {
         this.load.on("loaderror", (file: import("phaser").Loader.File) => failedTextures.add(file.key));
-        this.load.image(backgroundTextureKey, backgroundUrl);
+        if (!manifest.tilemap || (manifest.occlusionLayers?.length ?? 0) > 0) this.load.image(backgroundTextureKey, backgroundUrl);
+        this.load.image(horizonTextureKey, horizonUrl);
         this.load.image(livingTextureKeys.cloudBack, studioVirtualArtTextureUrl(artStyle, "cloud-back"));
         this.load.image(livingTextureKeys.cloudFront, studioVirtualArtTextureUrl(artStyle, "cloud-front"));
         this.load.spritesheet(livingTextureKeys.water, studioVirtualArtTextureUrl(artStyle, "water-sheet"), { frameWidth: 256, frameHeight: 128 });
         this.load.spritesheet(livingTextureKeys.foliage, studioVirtualArtTextureUrl(artStyle, "foliage-sheet"), { frameWidth: 256, frameHeight: 128 });
         this.load.spritesheet(livingTextureKeys.lights, studioVirtualArtTextureUrl(artStyle, "lights-sheet"), { frameWidth: 256, frameHeight: 128 });
         this.load.spritesheet(livingTextureKeys.weather, studioVirtualArtTextureUrl(artStyle, "weather-sheet"), { frameWidth: 256, frameHeight: 256 });
+        this.load.spritesheet(
+          livingTextureKeys.terrain,
+          artStyle === "sky-island" ? "/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp" : studioVirtualLivingTownAssetUrl(artStyle, "terrain-tile-atlas"),
+          { frameWidth: 128, frameHeight: 128 },
+        );
         this.load.image(livingTextureKeys.pathOverlay, studioVirtualLivingTownAssetUrl(artStyle, "path-overlay"));
         this.load.spritesheet(livingTextureKeys.waterfall, studioVirtualLivingTownAssetUrl(artStyle, "waterfall-sheet"), { frameWidth: 128, frameHeight: 192 });
         this.load.spritesheet(livingTextureKeys.waterfallSplash, studioVirtualLivingTownAssetUrl(artStyle, "waterfall-splash-sheet"), { frameWidth: 128, frameHeight: 64 });
@@ -782,7 +826,9 @@ export function StudioVirtualSpacePhaserCanvas({
 
         // Ready means the world and a safe actor frame exist, not that every clip has downloaded.
         for (const asset of new Map([fallbackAsset, bootSelfAsset, npcFallbackAsset, ...npcBootAssets].map((item) => [item.key, item])).values()) {
-          this.load.image(asset.key, asset.url);
+          if (asset.type === "spritesheet" && asset.frameWidth && asset.frameHeight) {
+            this.load.spritesheet(asset.key, asset.url, { frameWidth: asset.frameWidth, frameHeight: asset.frameHeight });
+          } else this.load.image(asset.key, asset.url);
         }
 
         const loadedProps = new Set<string>();
@@ -796,31 +842,50 @@ export function StudioVirtualSpacePhaserCanvas({
       };
 
       scene.create = function create() {
-        if (cancelled) return;
-        if (failedTextures.has(backgroundTextureKey) || !this.textures.exists(fallbackAsset.key)) { fail(); return; }
+        if (cancelled || engineFailed) return;
+        if (((!manifest.tilemap || (manifest.occlusionLayers?.length ?? 0) > 0) && failedTextures.has(backgroundTextureKey))
+          || !this.textures.exists(fallbackAsset.key)) { fail(); return; }
         characterAssets.use("fallback", [fallbackAsset]);
         if (this.textures.exists(bootSelfAsset.key)) characterAssets.use("self", [bootSelfAsset]);
         this.physics.world.setBounds(0, 0, manifest.width, manifest.height);
 
-        const backgroundSource = this.textures.get(backgroundTextureKey).getSourceImage();
+        const backgroundSource = this.textures.exists(backgroundTextureKey)
+          ? this.textures.get(backgroundTextureKey).getSourceImage() : { width: manifest.width, height: manifest.height };
         const backgroundRect = studioCoverRect(
           manifest.width,
           manifest.height,
           backgroundSource.width,
           backgroundSource.height,
         );
-        this.add.image(backgroundRect.x, backgroundRect.y, backgroundTextureKey)
-          .setOrigin(0)
-          .setDisplaySize(backgroundRect.width, backgroundRect.height)
-          .setDepth(-1_000);
+        this.add.image(manifest.width / 2, manifest.height / 2, horizonTextureKey)
+          .setDisplaySize(manifest.width * 1.08, manifest.height * 1.08)
+          .setScrollFactor(0.92)
+          .setDepth(-1_004)
+          .setAlpha(environmentPreference.backdrop === "city" ? 0.96 : 0.90);
+        if (!manifest.tilemap) {
+          this.add.image(backgroundRect.x, backgroundRect.y, backgroundTextureKey)
+            .setOrigin(0)
+            .setDisplaySize(backgroundRect.width, backgroundRect.height)
+            .setDepth(-1_000)
+            .setAlpha(environmentPreference.backdrop === "sky" ? 0.96 : 0.72);
+        } else {
+          tileWorld = createStudioWorldTileRuntime(this, manifest.tilemap, `studio-world-${manifest.id}`, {
+            resolveUrl: (url) => worldAssetUrls?.get(url) ?? url,
+            parseGid: Phaser.Tilemaps.Parsers.Tiled.ParseGID,
+            onError: (message) => { parent.dataset.tileError = message; fail(); },
+          });
+          cleanup.push(() => { tileWorld?.destroy(); tileWorld = null; });
+        }
 
         livingWorld = new StudioLivingWorldRuntime(this, manifest, artStyle, livingTextureKeys);
         cleanup.push(() => { livingWorld?.destroy(); livingWorld = null; });
-        deskPodRuntime = new StudioDeskPodRuntime(this);
-        cleanup.push(() => { deskPodRuntime?.destroy(); deskPodRuntime = null; });
+        if (!manifest.tilemap) {
+          deskPodRuntime = new StudioDeskPodRuntime(this);
+          cleanup.push(() => { deskPodRuntime?.destroy(); deskPodRuntime = null; });
+        }
 
-        const modularCampus = drawStudioModularCampus(this, manifest, artStyle);
-        parent.dataset.worldPresentation = modularCampus.length > 0 ? "modular-campus" : "illustrated";
+        const modularCampus = manifest.tilemap ? [] : drawStudioModularCampus(this, manifest, artStyle);
+        parent.dataset.worldPresentation = manifest.tilemap ? "tilemap" : modularCampus.length > 0 ? "modular-campus" : "illustrated";
         cleanup.push(() => modularCampus.forEach((item) => item.destroy()));
 
         for (const layer of manifest.occlusionLayers ?? []) {
@@ -919,7 +984,11 @@ export function StudioVirtualSpacePhaserCanvas({
         localBodyPhysics.setCollideWorldBounds(true);
         localBodyPhysics.setMaxVelocity(STUDIO_VIRTUAL_SPACE_WALK_SPEED * 1.4);
         const observePhysics = (fixedDelta: number) => {
-          if (localBodyPhysics) localPose.observe(localBodyPhysics.center, fixedStepClock.advance(fixedDelta));
+          if (localBodyPhysics) {
+            localPose.observe(localBodyPhysics.center, fixedStepClock.advance(fixedDelta));
+            // 충돌 뒤의 실제 속도를 받아 벽에서 반대로 움직일 때 불필요한 제동을 없앤다.
+            motion = { velocity: { x: localBodyPhysics.velocity.x, y: localBodyPhysics.velocity.y } };
+          }
         };
         this.physics.world.on(Phaser.Physics.Arcade.Events.WORLD_STEP, observePhysics);
         cleanup.push(() => this.physics.world.off(Phaser.Physics.Arcade.Events.WORLD_STEP, observePhysics));
@@ -930,20 +999,26 @@ export function StudioVirtualSpacePhaserCanvas({
           this.physics.add.collider(bodyZone, zone);
           staticColliderObjects.push(zone);
         }
-        objectRuntime = new StudioWorldObjectRuntime(this, manifest, bodyZone, staticColliderObjects, objectTextureKeys);
-        cleanup.push(() => { objectRuntime?.destroy(); objectRuntime = null; });
+        if (!manifest.tilemap) {
+          objectRuntime = new StudioWorldObjectRuntime(this, manifest, bodyZone, staticColliderObjects, objectTextureKeys);
+          cleanup.push(() => { objectRuntime?.destroy(); objectRuntime = null; });
+        }
 
         localShadow = this.add.ellipse(initialPoint.x, initialPoint.y + 3, 50, 14, 0x1c1111, 0.28)
           .setDepth(Math.round(initialPoint.y) + 990);
         const localSkin = studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(self, identityRef.current).skin, artStyle);
+        const requestedLocalAsset = studioCharacterStaticAsset(localSkin, facing);
+        const localInitialAsset = hasStaticAsset(requestedLocalAsset) ? requestedLocalAsset : fallbackAsset;
         localSprite = this.add.sprite(
           initialPoint.x,
           initialPoint.y,
-          this.textures.exists(staticTextureKey(localSkin, facing)) ? staticTextureKey(localSkin, facing) : fallbackAsset.key,
+          localInitialAsset.key,
+          localInitialAsset.frame,
         ).setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
-          .setData({ visualWidth: 98, visualHeight: 131, assetOwner: "self" })
+          .setData({ visualWidth: 98, visualHeight: 131, assetOwner: "self", framePresentation: localInitialAsset.presentation })
           .setDisplaySize(98, 131)
           .setDepth(Math.round(initialPoint.y) + 1_001);
+        updateDisplaySize(localSprite);
         localLabel = this.add.text(initialPoint.x, initialPoint.y + 20, displayNameRef.current, {
           fontFamily: "Inter, Pretendard, sans-serif",
           fontSize: "10px",
@@ -994,15 +1069,49 @@ export function StudioVirtualSpacePhaserCanvas({
         }
 
         for (const portal of portals) {
-          this.add.ellipse(
+          const gateway = this.add.ellipse(
             portal.point.x,
             portal.point.y,
-            portal.radius * 1.55,
-            portal.radius * 0.72,
-            0x8b5cf6,
-            0.08,
-          ).setStrokeStyle(2, 0x9b7cff, 0.45)
-            .setDepth(600);
+            portal.radius * 1.75,
+            portal.radius * 0.82,
+            artProfile.palette.gate,
+            0.14,
+          ).setStrokeStyle(2, artProfile.palette.gate, 0.82)
+            .setDepth(600)
+            .setInteractive({ useHandCursor: true });
+          gateway.on("pointerdown", (
+            _pointer: import("phaser").Input.Pointer,
+            _localX: number,
+            _localY: number,
+            event: InputEventLike,
+          ) => {
+            event.stopPropagation();
+            if (runtimeInputBlocked()) return;
+            setPathTo(portal.point);
+          });
+          const room = portal.targetRoomId ? manifest.rooms.find((candidate) => candidate.id === portal.targetRoomId) : undefined;
+          if (room) {
+            const label = this.add.text(portal.point.x, portal.point.y - portal.radius - 8, btRef.current(room.labelKo, room.labelEn), {
+              fontFamily: artProfile.pixelated ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "Inter, Pretendard, sans-serif",
+              fontSize: artProfile.pixelated ? "7px" : "8px",
+              fontStyle: "bold",
+              color: "#ffffff",
+              backgroundColor: "#171522d8",
+              padding: { x: 5, y: 3 },
+            }).setOrigin(0.5, 1).setDepth(602).setInteractive({ useHandCursor: true });
+            label.on(
+              "pointerdown",
+              (
+                _pointer: import("phaser").Input.Pointer,
+                _localX: number,
+                _localY: number,
+                event: InputEventLike,
+              ) => {
+                event.stopPropagation();
+                setPathTo(portal.point);
+              },
+            );
+          }
         }
 
         for (const view of npcDirector.views) {
@@ -1012,11 +1121,13 @@ export function StudioVirtualSpacePhaserCanvas({
           const identity = studioNpcLabel(npcDefinition);
           const shadow = this.add.ellipse(view.point.x, view.point.y + 1, 30 * visualScale, 10 * visualScale, 0x15151c, 0.2)
             .setDepth(Math.round(view.point.y) + 990);
-          const npcInitialAsset = studioCharacterStaticAsset(skin, view.facing);
+          const requestedNpcAsset = studioCharacterStaticAsset(skin, view.facing);
+          const npcInitialAsset = hasStaticAsset(requestedNpcAsset) ? requestedNpcAsset : npcFallbackAsset;
           const sprite = this.add.sprite(
             view.point.x,
             view.point.y,
-            this.textures.exists(npcInitialAsset.key) ? npcInitialAsset.key : npcFallbackAsset.key,
+            npcInitialAsset.key,
+            npcInitialAsset.frame,
           )
             .setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
             .setData({ visualWidth: 92 * visualScale, visualHeight: 123 * visualScale, assetOwner: `npc:${view.id}` })
@@ -1024,7 +1135,7 @@ export function StudioVirtualSpacePhaserCanvas({
             .setDepth(Math.round(view.point.y) + 1_000);
           const selectNpc = (_pointer: import("phaser").Input.Pointer, _x: number, _y: number, event: InputEventLike) => {
             event.stopPropagation();
-            if (studioWorldInputBlocked(document, modalInputBlocked)) return;
+            if (runtimeInputBlocked()) return;
             const interaction = studioNpcInteraction(manifest, npcDefinition);
             if (!interaction) return;
             if (callbacksRef.current.onNpcInteract) callbacksRef.current.onNpcInteract(interaction, npcDefinition);
@@ -1060,7 +1171,7 @@ export function StudioVirtualSpacePhaserCanvas({
         }, false, false) as Record<string, import("phaser").Input.Keyboard.Key> | null;
 
         this.input.on("pointerdown", (pointer: import("phaser").Input.Pointer) => {
-          if (!pointer.leftButtonDown()) return;
+          if (!pointer.leftButtonDown() || runtimeInputBlocked()) return;
           const nativePointer = pointer.event as PointerEvent | undefined;
           if (nativePointer?.pointerType === "touch" && experienceRef.current.controlMode !== "tap") return;
           bridge.setFollowingPeer(null);
@@ -1094,7 +1205,7 @@ export function StudioVirtualSpacePhaserCanvas({
         canvas.setAttribute("aria-label", "Virtual Studio · WASD / arrows · E: interact · Tab: leave game");
         const focusCanvas = () => canvas.focus({ preventScroll: true });
         const queueKeyboardInteraction = () => {
-          if (document.activeElement === canvas && !studioWorldInputBlocked(document)) {
+          if (document.activeElement === canvas && !runtimeInputBlocked()) {
             keyboardInteractQueued = true;
           }
         };
@@ -1120,7 +1231,7 @@ export function StudioVirtualSpacePhaserCanvas({
         const preventGameScrolling = (event: KeyboardEvent) => {
           if (event.target !== canvas) return;
           if (event.key === "Escape") { npcDirector.cancelGuideTour(); stopMovement(); return; }
-          if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey || studioWorldInputBlocked(document)) return;
+          if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey || runtimeInputBlocked()) return;
           if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft", "ShiftRight", "KeyE"].includes(event.code)) return;
           heldKeys.add(event.code);
           if (event.code === "KeyE" && !event.repeat) queueKeyboardInteraction();
@@ -1195,9 +1306,11 @@ export function StudioVirtualSpacePhaserCanvas({
         parent.append(note, unstuckButton);
         cleanup.push(() => { note.remove(); unstuckButton.remove(); });
         sceneReady = true;
-        globalThis.clearTimeout(bootDeadline);
         setFailure(false);
-        setReady(true);
+        if (!manifest.tilemap) {
+          globalThis.clearTimeout(bootDeadline);
+          setReady(true);
+        }
         const contextLost = (event: Event) => { event.preventDefault(); stopMovement(); fail(); };
         canvas.addEventListener("webglcontextlost", contextLost);
         cleanup.push(() => canvas.removeEventListener("webglcontextlost", contextLost));
@@ -1232,7 +1345,7 @@ export function StudioVirtualSpacePhaserCanvas({
           lastAssetCollectionAt = time;
         }
         fixedStepClock.reconcile(this.game.loop.time);
-        const blocked = studioWorldInputBlocked(document, modalInputBlocked);
+        const blocked = runtimeInputBlocked();
         if (blocked && !wasInputBlocked) {
           heldKeys.clear();
           bridge.clearMovement();
@@ -1535,6 +1648,17 @@ export function StudioVirtualSpacePhaserCanvas({
           lastDecorationRevision = decorationsRef.current.revision;
         }
         decorationRuntime?.update(time, currentPoint, reducedMotion.matches);
+        tileWorld?.update(this.cameras.main.worldView);
+        if (tileWorld) {
+          const tileMetrics = tileWorld.diagnostics;
+          parent.dataset.tileChunks = String(tileMetrics.chunks);
+          parent.dataset.tileTextures = String(tileMetrics.textures);
+          if (!engineFailed && !initialTilesReady && tileMetrics.ready) {
+            initialTilesReady = true;
+            globalThis.clearTimeout(bootDeadline);
+            setReady(true);
+          }
+        }
         const environmentEffect = bridge.consumeEnvironmentEffect();
         if (environmentEffect) livingWorld?.triggerEnvironmentEffect(environmentEffect.effect, environmentEffect.point, time);
         livingWorld?.update(
@@ -1545,6 +1669,7 @@ export function StudioVirtualSpacePhaserCanvas({
           reducedMotion.matches,
           currentQualityProfile,
           experienceRef.current.effectLevel,
+          environmentRef.current,
         );
         const traveled = lastPosition ? Math.hypot(currentPoint.x - lastPosition.x, currentPoint.y - lastPosition.y) : 0;
         if (traveled > 0.015) lastMovedAt = time;
@@ -1700,6 +1825,14 @@ export function StudioVirtualSpacePhaserCanvas({
             })),
           ],
         });
+        const mobileNameplates = parent.clientWidth < 600;
+        const nearestMobileNpcId = mobileNameplates && npcViews.length > 0
+          ? npcViews.reduce((nearest, candidate) => {
+              const nearestDistance = Math.hypot(nearest.point.x - currentPoint.x, nearest.point.y - currentPoint.y);
+              const candidateDistance = Math.hypot(candidate.point.x - currentPoint.x, candidate.point.y - currentPoint.y);
+              return candidateDistance < nearestDistance ? candidate : nearest;
+            }).id
+          : null;
         const tourState = npcDirector.guideTourState;
         const npcInterest = studioTownInterestSnapshot(manifest, currentPoint, npcViews.map((view) => ({
           id: "npc:" + view.id, point: view.point, kind: "npc" as const, important: view.id === tourState?.guideId,
@@ -1744,10 +1877,12 @@ export function StudioVirtualSpacePhaserCanvas({
             activity: view.phase === "inspect" ? "reviewing" : view.phase === "rest" || view.phase === "wait" ? "away" : "available",
           });
           const npcLabelY = attached ? headY - 22 : visualPoint.y + 9;
+          const npcLabelVisible = npcNameplate.visible
+            && (!mobileNameplates || importantNpc || Boolean(view.greeting) || view.id === nearestMobileNpcId);
           npc.label.setText(npcNameplate.text).setPosition(visualPoint.x, npcLabelY)
             .setDepth(attached ? 160_000 : studioTownDepthForPoint(manifest, groundPoint, 1_002))
-            .setAlpha(npcNameplate.alpha).setScale(npcNameplate.scale).setVisible(npcNameplate.visible);
-          if (npcNameplate.visible) {
+            .setAlpha(npcNameplate.alpha).setScale(npcNameplate.scale).setVisible(npcLabelVisible);
+          if (npcLabelVisible) {
             const id = `npc:${view.id}`;
             nameplateCandidates.push({
               id, x: npc.label.x, y: npc.label.y, width: npc.label.displayWidth,
@@ -1820,7 +1955,10 @@ export function StudioVirtualSpacePhaserCanvas({
           parent.dataset.localFacing = facing;
           parent.dataset.terrain = terrain.kind;
           parent.dataset.pathAllowed = String(studioTownTraversalProfile(manifest, currentPoint).allowed);
-          parent.dataset.dayPhase = studioVirtualDayPhase(time);
+          parent.dataset.dayPhase = environmentRef.current.dayPhase === "auto"
+            ? studioVirtualDayPhase(time) : environmentRef.current.dayPhase;
+          parent.dataset.weather = environmentRef.current.weather;
+          parent.dataset.backdrop = environmentRef.current.backdrop;
           parent.dataset.livingWorld = String(Boolean(livingWorld));
           parent.dataset.objectPhysics = String(Boolean(objectRuntime));
           parent.dataset.decorationCount = String(decorationsRef.current.placements.length);
@@ -1907,7 +2045,7 @@ export function StudioVirtualSpacePhaserCanvas({
       game?.destroy(true);
       mount.remove();
     };
-  }, [artStyle, attempt, bridge, debugWorld, manifest, renderer, worldAssetUrls]);
+  }, [artStyle, attempt, bridge, debugWorld, environmentPreference.backdrop, manifest, renderer, worldAssetUrls]);
 
   return (
     <div
@@ -1917,6 +2055,7 @@ export function StudioVirtualSpacePhaserCanvas({
       data-studio-engine-status={failure ? "error" : ready ? "ready" : "loading"}
       data-world-id={manifest.id}
       data-art-style={artStyle}
+      data-backdrop={environmentPreference.backdrop}
     >
       {failure ? (
         <div className="studio-vspace-engine-message" role="alert">

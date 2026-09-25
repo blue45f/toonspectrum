@@ -134,6 +134,11 @@ export function studioWorldManifestToTiledMap(
       opacity: 1,
       visible: true,
     },
+    ...(manifest.tilemap?.layers.map((layer) => ({
+      id: layerId++, name: layer.name, type: "tilelayer", width: layer.width, height: layer.height,
+      x: 0, y: 0, offsetx: layer.x, offsety: layer.y, visible: layer.visible, opacity: layer.opacity,
+      data: [...layer.data], properties: properties({ studioLayerId: layer.id, depth: layer.depth }),
+    })) ?? []),
     objectLayer("rooms", manifest.rooms.map((room) => object(
       room.id,
       room.x,
@@ -261,10 +266,16 @@ export function studioWorldManifestToTiledMap(
 
   return {
     compressionlevel: -1,
-    height: manifest.height,
-    width: manifest.width,
-    tileheight: 1,
-    tilewidth: 1,
+    height: manifest.tilemap?.height ?? manifest.height,
+    width: manifest.tilemap?.width ?? manifest.width,
+    tileheight: manifest.tilemap?.tileHeight ?? 1,
+    tilewidth: manifest.tilemap?.tileWidth ?? 1,
+    tilesets: manifest.tilemap?.tilesets.map((set) => ({
+      firstgid: set.firstGid, name: set.name, image: set.imageUrl,
+      imagewidth: set.imageWidth, imageheight: set.imageHeight, tilewidth: set.tileWidth, tileheight: set.tileHeight,
+      columns: set.columns, tilecount: set.tileCount, margin: set.margin, spacing: set.spacing,
+      ...(set.wangSets === undefined ? {} : { wangsets: structuredClone(set.wangSets) }),
+    })) ?? [],
     infinite: false,
     orientation: "orthogonal",
     renderorder: "right-down",

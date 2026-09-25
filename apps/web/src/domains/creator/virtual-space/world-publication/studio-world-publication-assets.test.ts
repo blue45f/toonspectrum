@@ -4,6 +4,7 @@ import type { StudioWorldPublication } from "@toonspectrum/studio-project-model/
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "../studio-virtual-space-world-manifest";
 import { prepareStudioWorldAssets, type StudioWorldAssetDependencies } from "./studio-world-publication-assets";
 import { parseStudioWorldPublication, studioWorldDigest, studioWorldPublishManifest } from "./studio-world-publication-client";
+import { pinStudioWorldAssets } from "../studio-world-template-package";
 
 beforeEach(() => vi.stubGlobal("crypto", webcrypto));
 afterEach(() => vi.unstubAllGlobals());
@@ -41,5 +42,29 @@ describe("publication bytes and identity", () => {
     const first = await prepareStudioWorldAssets(f.publication, new AbortController().signal, f.deps);
     const undo = await prepareStudioWorldAssets({ ...f.publication, revisionId: "rev-undo", sequence: 3 }, new AbortController().signal, f.deps);
     expect(first.scope).not.toBe(undo.scope); first.dispose(); undo.dispose();
+  });
+  it("타일 아틀라스를 한 번 읽어 무결성을 고정하고 게시 원본 URL 대신 검증한 bytes를 준비한다", async () => {
+    const f = await fixture();
+    const tilemap = {
+      orientation: "orthogonal" as const, renderOrder: "right-down" as const,
+      width: 20, height: 15, tileWidth: 64, tileHeight: 64,
+      tilesets: [{ firstGid: 1, name: "ground", imageUrl: "/tiles.png", imageWidth: 512, imageHeight: 512,
+        tileWidth: 256, tileHeight: 256, columns: 2, tileCount: 4, margin: 0, spacing: 0 }],
+      layers: [{ id: "ground", name: "Ground", x: 0, y: 0, width: 1, height: 1, data: [1], opacity: 1, visible: true, depth: 10 }],
+    };
+    const signal = new AbortController().signal;
+    const pinned = await pinStudioWorldAssets({ ...f.publication.manifest, tilemap }, signal, f.deps);
+    expect(f.deps.fetch).toHaveBeenCalledTimes(3);
+    expect(pinned.assetIntegrity?.find((item) => item.url === "/tiles.png")?.sha256).toMatch(/^[a-f0-9]{64}$/u);
+    vi.mocked(f.deps.fetch).mockClear();
+    const manifest = studioWorldPublishManifest(pinned);
+    const publication = { ...f.publication, manifest, contentHash: await studioWorldDigest(manifest) };
+    const result = await prepareStudioWorldAssets(publication, signal, f.deps);
+    expect(f.deps.fetch).toHaveBeenCalledTimes(3);
+    expect(result.assetUrls.get("/tiles.png")).toMatch(/^blob:/);
+    const changed = studioWorldPublishManifest({ ...manifest, tilemap: { ...tilemap, layers: [{ ...tilemap.layers[0], data: [2] }] } });
+    expect(await studioWorldDigest(changed)).not.toBe(publication.contentHash);
+    await expect(parseStudioWorldPublication({ ...publication, manifest: changed }, "work-1")).rejects.toMatchObject({ reason: "invalid-world" });
+    result.dispose();
   });
 });

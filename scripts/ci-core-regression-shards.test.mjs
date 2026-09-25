@@ -62,6 +62,7 @@ test("required foundation execution includes virtual-world consent, media and co
     "apps/web/src/domains/creator/review-task-completion",
     "apps/web/src/domains/creator/review-resolution",
     "packages/studio-project-model/src/__tests__/review-task-role-assignment.test.ts",
+    "packages/studio-project-model/src/__tests__/world-tilemap.test.ts",
     "apps/web/src/domains/creator/studio-comment-editor-selection.test.ts",
     "apps/web/src/domains/creator/live/huddle",
     "apps/web/tests/vite-react-compiler-runtime-interop.test.ts",

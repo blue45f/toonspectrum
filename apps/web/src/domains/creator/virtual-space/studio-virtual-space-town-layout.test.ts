@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
+import { studioSemanticSurfaceAt } from "./studio-virtual-space-semantic-world";
 import {
   STUDIO_TOWN_LANDMARKS,
   STUDIO_TOWN_PLAZAS,
@@ -10,9 +11,30 @@ import {
   studioTownNearestWalkablePoint,
   studioTownPathSegments,
   studioTownTraversalProfile,
+  studioTownUsesLivingLayout,
 } from "./studio-virtual-space-town-layout";
 
 describe("Virtual Studio living town layout", () => {
+  it("기존 월드 ID를 재사용한 authored tilemap에 숨은 하늘 통행 제한과 고정 물 지형을 적용하지 않는다", () => {
+    const authored = {
+      ...DEFAULT_STUDIO_WORLD_MANIFEST,
+      tilemap: {
+        orientation: "orthogonal" as const, renderOrder: "right-down" as const,
+        width: 40, height: 30, tileWidth: 32, tileHeight: 32,
+        tilesets: [{ firstGid: 1, name: "ground", imageUrl: "/ground.png", imageWidth: 32, imageHeight: 32, tileWidth: 32, tileHeight: 32, columns: 1, tileCount: 1, margin: 0, spacing: 0 }],
+        layers: [{ id: "ground", name: "새 바닥", width: 40, height: 30, x: 0, y: 0, visible: true, opacity: 1, depth: -1000, data: Array.from({ length: 1200 }, () => 1) }],
+      },
+    };
+    const oldSky = { x: 10, y: 450 };
+    expect(studioTownUsesLivingLayout(DEFAULT_STUDIO_WORLD_MANIFEST)).toBe(true);
+    expect(studioTownUsesLivingLayout(authored)).toBe(false);
+    expect(studioTownTraversalProfile(DEFAULT_STUDIO_WORLD_MANIFEST, oldSky).allowed).toBe(false);
+    expect(studioTownTraversalProfile(authored, oldSky)).toEqual({ allowed: true, onPath: false, distanceToPath: 0, kind: "room", cost: 1 });
+    expect(studioTownNearestWalkablePoint(authored, oldSky)).toEqual(oldSky);
+    expect(studioTownLineCanTraverse(authored, oldSky, { x: 10, y: 600 })).toBe(true);
+    expect(studioSemanticSurfaceAt(authored, { x: 585, y: 550 })).toMatchObject({ kind: "room", elevation: 0, speedMultiplier: 1 });
+  });
+
   it("authors a connected, readable path network with varied destinations", () => {
     const segments = studioTownPathSegments(DEFAULT_STUDIO_WORLD_MANIFEST);
     expect(segments.length).toBeGreaterThanOrEqual(18);
