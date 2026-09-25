@@ -12,10 +12,10 @@ import {
 } from "./brush-studio-v5-quality";
 
 describe("Brush Studio quality authority", () => {
-  it("ships the same 88 materially distinct product brushes as the normal picker", () => {
-    expect(BRUSH_QUALITY_CATALOG).toHaveLength(88);
+  it("ships the same 95 materially distinct product brushes as the normal picker", () => {
+    expect(BRUSH_QUALITY_CATALOG).toHaveLength(95);
     expect(new Set(BRUSH_QUALITY_CATALOG.map((entry) => entry.id)).size).toBe(
-      88,
+      95,
     );
     expect(
       new Set(BRUSH_QUALITY_CATALOG.map((entry) => entry.group)).size,
@@ -180,7 +180,7 @@ describe("Brush Studio quality authority", () => {
       }),
     );
     expect(optimized.output.liveScale).toBe(0.5);
-    expect(optimized.simulation.pressureIterations).toBeLessThanOrEqual(12);
+    expect(optimized.simulation.pressIterations).toBeLessThanOrEqual(12);
     expect(optimized.simulation.bristleStrands).toBeLessThanOrEqual(48);
     expect(
       optimized.simulation.bristleContactIterations,
