@@ -58,7 +58,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
     projectId: params.get("project") || project?.id,
     personal: params.get("scope") === "personal",
   };
-  const homeHref = workspaceNavigationHref("/home", navigationContext);
+  const homeHref = workspaceNavigationHref("/", navigationContext);
 
   // Freeze the resolved default in this history entry, without marking artwork as opened.
   useEffect(() => {
@@ -129,7 +129,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
     : surface === "hub"
       ? bt("둘러보기", "Explore")
       : bt("홈", "Home");
-  const activeId = surface === "home" ? "workspace-home" : surface === "team" ? "workspace-team" : "workspace-hub";
+  const activeId = surface === "home" ? "workspace-home" : surface === "team" ? "community" : "explore";
   const userName = session.data?.user.name;
   const canResume = Boolean(project && !library.error && !context.missing);
 
@@ -334,7 +334,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
                     <Link className="workspace-primary" href={personalStudioHref}>{selectedCharacter
                       ? bt("내 스튜디오 입장", "Enter my studio")
                       : bt("캐릭터 선택", "Choose character")}<ArrowRight size={18} aria-hidden="true" /></Link>
-                    {selectedCharacter ? <Link href="/onboarding/character?next=%2Fhome">{bt("캐릭터 변경", "Change character")}</Link> : null}
+                    {selectedCharacter ? <Link href="/onboarding/character?next=%2F">{bt("캐릭터 변경", "Change character")}</Link> : null}
                   </div>
                 </div>
               </section>

@@ -24,14 +24,16 @@ describe("site navigation information architecture", () => {
     expect(TOONSTUDIO_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
       "workspace-home",
       "studio",
-      "workspace-team",
-      "workspace-hub",
+      "explore",
+      "community",
+      "all-menu",
     ]);
     expect(TOONSPECTRUM_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
+      "workspace-home",
+      "studio",
       "explore",
-      "ranking",
       "community",
-      "library",
+      "all-menu",
     ]);
 
     expect(SITE_NAVIGATION_ITEMS.studio.href).toBe("/studio");
@@ -137,20 +139,16 @@ describe("site navigation information architecture", () => {
     expect(mobileSiteTabsForPath("/discover")).toBe(TOONSPECTRUM_MOBILE_TABS);
   });
 
-  it("uses four Studio destinations and preserves reader navigation", () => {
-    expect(TOONSTUDIO_MOBILE_TABS.map((item) => item.id)).toEqual([
+  it("uses the same five destinations across Studio and discovery contexts", () => {
+    const expected = [
       "workspace-home",
       "studio",
-      "workspace-team",
-      "workspace-hub",
-    ]);
-    expect(TOONSPECTRUM_MOBILE_TABS.map((item) => item.id)).toEqual([
-      "home",
       "explore",
-      "ranking",
       "community",
-      "library",
-    ]);
+      "all-menu",
+    ];
+    expect(TOONSTUDIO_MOBILE_TABS.map((item) => item.id)).toEqual(expected);
+    expect(TOONSPECTRUM_MOBILE_TABS.map((item) => item.id)).toEqual(expected);
   });
 
   it("keeps notifications, Help, Settings and account destinations available from the utility area", () => {

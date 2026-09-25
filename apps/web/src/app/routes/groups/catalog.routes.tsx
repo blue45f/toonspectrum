@@ -3,8 +3,8 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const HomePage = lazyRetry(
-  () => import("@/domains/creator-resources/CreatorHomePage").then((module) => ({ default: module.CreatorHomePage })),
-  "HomePage",
+  () => import("@/domains/marketing/UnifiedHomePage").then((module) => ({ default: module.UnifiedHomePage })),
+  "UnifiedHomePage",
 );
 const DiscoverHubPage = lazyRetry(
   () => import("@/domains/catalog/DiscoverHubPage").then((module) => ({ default: module.DiscoverHubPage })),

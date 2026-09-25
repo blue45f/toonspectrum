@@ -1,5 +1,4 @@
 import {
-  translateBilingualValueForLocale,
   translateCurrentStaticSourceText,
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
@@ -364,19 +363,6 @@ export function SiteHeader() {
                 </Link>
               );
             })}
-            <Link
-              href="/sitemap"
-              data-navigation-entry="all-menu"
-              title={translateBilingualValueForLocale(
-                locale,
-                "shared.components.site.header",
-                "목적별 전체 메뉴 보기",
-                "Browse every destination by purpose"
-              )}
-              className="inline-flex min-h-10 items-center rounded-xl px-3 py-2 text-[0.82rem] font-semibold text-fg-2 outline-none transition-colors hover:bg-raised/80 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-            >
-              {t("nav.allMenu")}
-            </Link>
           </nav>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
