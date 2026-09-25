@@ -1,7 +1,7 @@
-# Admin Web shared
+# Admin Web 공용 영역
 
-Reusable Admin-only UI primitives and pure helpers belong here when more than one Admin
-domain actually consumes them. Shared code must not import `src/domains` or `src/app`.
+둘 이상의 Admin domain이 실제로 사용하는 UI primitive와 순수 helper를 둔다. `shared`는
+`src/domains`나 `src/app`을 import하지 않는다.
 
-Code needed by Web and Admin is not copied here and must not be imported from `apps/web`;
-promote only the narrow runtime-neutral contract or primitive to a focused package.
+Web과 Admin이 함께 필요한 코드를 복사하거나 `apps/web`에서 import하지 않는다. 좁고 실행 환경에
+중립적인 계약·primitive만 focused package로 승격한다.

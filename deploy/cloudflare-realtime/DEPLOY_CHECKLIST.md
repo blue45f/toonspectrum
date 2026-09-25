@@ -1,154 +1,85 @@
-# Cloudflare Realtime Deployment Checklist
+# Cloudflare 실시간 조정자 배포 체크리스트
 
-Deployment is intentionally separate from this scaffold. Complete every item
-before routing production clients to the Worker.
+- 상태: **운영 승인 체크리스트**
+- 최종 갱신: **2026-09-26**
 
-## 1. Authority and ticket issuance
+scaffold와 production routing은 별개다. 모든 항목을 확인하기 전 production client를 Worker로 보내지 않는다.
 
-- [ ] Set `STUDIO_REALTIME_TICKET_ENABLED=true` only on the authenticated NestJS
-      deployment that owns `POST /api/studio-realtime/tickets`.
-- [ ] Configure all `STUDIO_REALTIME_CLOUDFLARE_*` values from the README; a
-      partially enabled configuration must fail API bootstrap.
-- [ ] Enable `STUDIO_REALTIME_REVOCATION_ENABLED` only after the exact control
-      URL and a dedicated control secret are present; never reuse the ticket
-      secret.
-- [ ] Authorize the actor's access to the exact `workId + roomId` scope before
-      signing.
-- [ ] Confirm saved and provisional clients send their creator work ID as both
-      `workId` and `roomId`; never substitute the `draft-room_<uuid>` lease ID.
-- [ ] Generate a cryptographically random, single-use nonce for every ticket.
-- [ ] Keep ticket TTL at or below two minutes and session TTL at or below five
-      minutes. The session lease must never outlive the verified web session or
-      the authoritative room-authorization lease.
-- [ ] Use the exact canonicalization and HMAC context in `src/ticket.ts`.
-- [ ] Return the ticket only to the authorized browser over HTTPS.
-- [ ] Never persist or log the ticket.
+## 1. 권위와 ticket 발급
 
-## 2. Cloudflare configuration
+- [ ] `POST /api/studio-realtime/tickets`를 소유한 인증 NestJS deployment에서만
+      `STUDIO_REALTIME_TICKET_ENABLED=true` 설정
+- [ ] README의 `STUDIO_REALTIME_CLOUDFLARE_*` 전체 설정; 부분 활성화는 bootstrap 실패
+- [ ] exact control URL과 별도 control secret 준비 뒤 revoke 기능 활성화; ticket secret 재사용 금지
+- [ ] exact `workId + roomId` scope 권한 확인 뒤 서명
+- [ ] saved/provisional client 모두 creator work ID를 workId와 roomId에 사용; `draft-room_<uuid>` 금지
+- [ ] ticket마다 cryptographic random single-use nonce
+- [ ] ticket TTL 2분 이하, session TTL 5분 이하이며 Web session/authorization lease보다 짧게 유지
+- [ ] `src/ticket.ts` canonicalization과 HMAC context 그대로 사용
+- [ ] HTTPS로 승인 browser에만 반환하고 ticket 저장·log 금지
 
-- [ ] Use a current Wrangler release that supports declarative Durable Object
-      `exports`.
-- [ ] Review `wrangler.jsonc` against the target account and deployed namespace
-      history. `wrangler.jsonc.example` is a documentation mirror; do not
-      deploy `wrangler.test.jsonc`.
-- [ ] Confirm `RealtimeRoom` and `RealtimeActorDirectory` are SQLite-backed.
-      Do not create KV-backed namespaces.
-- [ ] Bind `REALTIME_ROOMS` to `RealtimeRoom`.
-- [ ] Bind `REALTIME_ACTORS` to `RealtimeActorDirectory`.
-- [ ] Store `REALTIME_TICKET_SECRET` with a Workers secret or Secrets Store
-      binding, never in `vars`, source control, CI output, or shell history.
-- [ ] Store a distinct `REALTIME_CONTROL_SECRET` the same way and inject the
-      matching value into Nest only through its server secret store.
-- [ ] For local Worker development, keep the secret only in `.dev.vars` (or an
-      environment-specific `.dev.vars.*`) after confirming the nested
-      `.gitignore` excludes it. Never copy the secret into
-      `wrangler.jsonc`/`vars`.
-- [ ] Configure issuer and audience to exactly match the API signer.
-- [ ] Review receipt count/byte and resume request/egress limits against the
-      room-size canary. Never disable pre-admission or raise the byte ceilings
-      to the Durable Object storage/account maximum.
-- [ ] Keep the origin list explicit. Do not add `*`, HTTP origins, lookalike
-      domains, or unrelated preview hosts.
-- [x] Attach the intended custom hostname `realtime.toonstudio.cloud` and
-      retain `workers.dev` as an independently probeable canary/rollback.
-- [x] Verify public DNS and TLS for `realtime.toonstudio.cloud` and the
-      retained `workers.dev` canary.
-- [ ] Review account limits, Durable Object billing, and rollback ownership.
+## 2. Cloudflare 구성
 
-If the deployment toolchain predates declarative `exports`, upgrade it. A
-legacy one-time migration may use:
+- [ ] declarative Durable Object `exports`를 지원하는 최신 Wrangler 사용
+- [ ] account와 namespace history 기준으로 `wrangler.jsonc` 검토; example/test config 배포 금지
+- [ ] `RealtimeRoom`, `RealtimeActorDirectory`를 SQLite-backed로 생성
+- [ ] `REALTIME_ROOMS`, `REALTIME_ACTORS` binding 정확히 연결
+- [ ] ticket/control secret은 Worker secret 또는 Secrets Store에 저장; vars/source/CI/shell history 금지
+- [ ] local development secret은 ignore된 `.dev.vars` 계열에만 저장
+- [ ] issuer/audience가 API signer와 exact match
+- [ ] receipt count/byte, resume request/egress limit을 room canary로 검토; admission 비활성 금지
+- [ ] origin allowlist에 `*`, HTTP, 유사 domain, 무관 preview host 금지
+- [x] `realtime.toonstudio.cloud` custom hostname과 독립 workers.dev canary 유지
+- [x] custom domain·canary DNS/TLS 확인
+- [ ] account limit, DO billing, rollback owner 확인
 
-```jsonc
-{
-  "migrations": [
-    {
-      "tag": "realtime-sqlite-v1",
-      "new_sqlite_classes": ["RealtimeRoom", "RealtimeActorDirectory"]
-    }
-  ]
-}
-```
+구형 toolchain의 one-time migration은 현재 Wrangler schema와 namespace history를 확인한 뒤에만 사용한다.
+두 lifecycle 형식을 동시에 선언하지 않는다.
 
-Do not configure both lifecycle formats without checking the current Wrangler
-schema and the namespace's deployed history.
+## 3. Browser·edge 보안
 
-## 3. Browser and edge security
+- [x] Studio CSP `connect-src`에 `wss://realtime.toonstudio.cloud` 추가
+- [ ] ticket은 `ts-ticket.*` WebSocket subprotocol로만 전송
+- [ ] ticket/token/jwt/authorization/access_token query 거부
+- [ ] Origin 필수·exact match
+- [ ] proxy가 Upgrade, Connection, Origin, Sec-WebSocket-Protocol 보존
+- [ ] response protocol은 `toonspectrum-realtime-v1`만 선택
+- [ ] byte limit 대신 permessage-deflate/미검토 compression을 사용하지 않음
 
-- [x] Add `wss://realtime.toonstudio.cloud` to the Studio page's CSP
-      `connect-src`.
-- [ ] Send the ticket only as the `ts-ticket.*` WebSocket subprotocol.
-- [ ] Confirm query strings containing `ticket`, `token`, `jwt`,
-      `authorization`, or `access_token` are rejected.
-- [ ] Confirm `Origin` is required and matched exactly.
-- [ ] Ensure proxies preserve `Upgrade`, `Connection`, `Origin`, and
-      `Sec-WebSocket-Protocol`.
-- [ ] Ensure the selected response protocol is only
-      `toonspectrum-realtime-v1`.
-- [ ] Do not enable permessage-deflate or an unreviewed compression extension
-      as a substitute for the protocol byte limits.
+## 4. Log·관측
 
-## 4. Logging and observability
+- [ ] route의 request header/body capture 비활성
+- [ ] revoke endpoint header/body 전체 제외; timestamp/nonce/signature/ID/raw error log 금지
+- [ ] Logpush, Tail Worker, trace, error/support proxy에서 `Sec-WebSocket-Protocol` 제거
+- [ ] aggregate counter와 close code, replay gap, capacity rejection, room-size bucket만 기록
+- [ ] work/room/actor/client ID, nonce, comment body, SDP, ICE, ticket, raw exception을 label/log로 사용 금지
+- [ ] payload 없이 1011, 반복 1013, capacity rejection, alarm/storage error alert
 
-- [ ] Disable request-header/body capture for this route.
-- [ ] Exclude `/v1/control/revocations` headers and body entirely; never log its
-      timestamp, nonce, signature, actor/work/room identifiers, or raw error.
-- [ ] Redact `Sec-WebSocket-Protocol` in Cloudflare Logpush, Tail Workers,
-      tracing, error reporting, support tooling, and third-party proxies.
-- [ ] Log only aggregate non-secret counters such as accepted connections,
-      close codes, replay-gap counts, capacity rejections, and room-size
-      buckets.
-- [ ] Never use work IDs, room IDs, actor IDs, client IDs, nonces, comment
-      bodies, SDP, ICE candidates, tickets, or raw exceptions as metric labels
-      or logs.
-- [ ] Alert on `1011`, repeated `1013`, capacity rejection, alarm failure, and
-      Durable Object storage errors without attaching payloads.
+## 5. 통합·품질 gate
 
-## 5. Integration and quality gates
+- [ ] README의 Vitest, TypeScript, ESLint 실행
+- [x] workerd + SQLite DO 통합 스위트 유지
+- [ ] production canary로 close/error와 account limit 검증
+- [ ] 같은 work의 actor 2명과 multi-tab 테스트
+- [ ] comments, presence, offer/answer/ICE/hangup end-to-end
+- [ ] exact replay, paginated replay, `resume-gap`
+- [ ] repeated/old/post-completion resume rejection와 hibernation budget persistence
+- [ ] duplicate idempotency key와 out-of-order client sequence
+- [ ] receipt count/byte exhaustion에서 sequence/state 미변경, cleanup 뒤 admission 회복
+- [ ] ticket replay, wrong work/room/origin/audience, expiry/future time, malformed signature, rotation
+- [ ] revoke body tamper, timestamp, nonce replay, partial config, logout, ACL removal, race interleaving
+- [ ] binary, raster data URL, oversized comment/SDP/ICE, unknown key/type
+- [ ] room/actor capacity, slow-client backpressure, 1013 뒤 회복
+- [ ] close/expiry당 presence leave와 `signal.stop` 정확히 1회; idle connect-close는 event/receipt 0
+- [ ] owner eject, viewer self-end, peer/expired share cleanup, same-ID reannounce
+- [ ] truncation, fidelity 저하, channel 비활성, partial protocol fallback이 없는지 확인
+- [ ] coordinator 장애에서도 canonical project/comment persistence가 동작하는지 확인
 
-- [ ] Run the focused Vitest, TypeScript, and ESLint commands in the README.
-- [x] Keep the official Cloudflare Vitest/workerd integration suite for actual
-      WebSocket upgrade, nonce replay, hibernation eviction, SQLite
-      persistence, channel replay, and alarm rearming.
-- [ ] Add production-canary coverage for WebSocket close/error behavior and
-      Cloudflare account-specific limits.
-- [ ] Test two actors and multiple browser tabs in the same work.
-- [ ] Test comments, presence, and offer/answer/ICE/hangup end to end.
-- [ ] Test reconnect with an exact replay, paginated replay, and `resume-gap`.
-- [ ] Test repeated/old/post-completion resume rejection, resume budget
-      persistence across hibernation, and budget recovery after its window.
-- [ ] Test duplicate idempotency keys and out-of-order client sequences.
-- [ ] Test receipt count and byte exhaustion: rejection must not advance a
-      channel sequence or mutate presence/signaling state, and expiry cleanup
-      must advance the corresponding replay floor before admission recovers.
-- [ ] Test one-time ticket replay, wrong work, wrong room, wrong origin, wrong
-      audience, expiry, future issue time, malformed signature, and secret
-      rotation.
-- [ ] Test HMAC control body tampering, stale/future timestamp, nonce replay,
-      partial configuration, session logout across multiple rooms, exact-room
-      ACL removal, and preflight/revocation/final-confirm interleaving.
-- [ ] Test binary frames, raster data URLs, oversized comments/SDP/ICE, unknown
-      keys, and unknown message kinds.
-- [ ] Test room capacity, per-actor capacity, slow-client backpressure, and
-      recovery after `1013`.
-- [ ] Test alarm-before-close ordering for exactly one presence leave and
-      exactly one `signal.stop`; an idle connect-close churn case must create no
-      leave event or receipt.
-- [ ] Test owner-eject and viewer-self-end screen flows, peer cleanup, expired
-      share cleanup, and same-ID reannounce without inherited grants.
-- [ ] Confirm no branch silently truncates an event, lowers fidelity, disables a
-      channel, or falls back to a partial protocol.
-- [ ] Verify canonical project/comment persistence remains operational when the
-      realtime coordinator is unavailable.
+## 6. Rollout·rollback
 
-## 6. Rollout and rollback
-
-- [ ] Start with an internal work allowlist and a separate custom hostname.
-- [ ] Measure connection count, active-duration cost, SQLite writes, alarm
-      invocations, replay size, and close-code distribution.
-- [ ] Expand gradually only after the full feature and security matrix passes.
-- [ ] Keep the existing realtime transport available during rollout; choose
-      transports before connection, never downgrade an active room's protocol.
-- [ ] Document who can disable the route, rotate the secret, restore a Durable
-      Object using point-in-time recovery, and revert the client endpoint.
-- [ ] Revoke the hostname and ticket issuer together during rollback so stale
-      tickets cannot open new connections.
+- [ ] 내부 work allowlist와 별도 custom hostname으로 시작
+- [ ] connection count, active duration 비용, SQLite write, alarm, replay size, close-code 측정
+- [ ] 전체 feature/security matrix 통과 뒤 점진 확대
+- [ ] rollout 동안 기존 transport 유지; 연결 전에 선택하고 active room protocol downgrade 금지
+- [ ] route disable, secret rotation, DO point-in-time restore, client endpoint revert owner 문서화
+- [ ] rollback에서 hostname과 ticket issuer를 함께 revoke해 stale ticket 신규 연결 차단

@@ -22,13 +22,9 @@ Commits의 type/scope, 코드 식별자, 명령어, 외부 제품명과 오류 �
 
 ## 커밋 규칙
 
-형식은 다음과 같다.
-
 ```text
 <type>(<scope>): <한글 요약>
 ```
-
-주요 type은 다음과 같다.
 
 | Type | 용도 |
 | --- | --- |
@@ -62,7 +58,7 @@ breaking change는 헤더의 `!` 또는 `BREAKING CHANGE:` footer로 표시한�
 - `prepare-commit-msg`: 한글 Conventional Commit 작성 템플릿 제공
 - `pre-commit`: 하네스 무결성, lockfile, staged ESLint, Secretlint 검사
 - `commit-msg`: commitlint 검사
-- `pre-push`: 하네스 테스트, 아키텍처, typecheck, 변경 파일 lint·Secretlint 검사
+- `pre-push`: 하네스 테스트, 아키텍처, 문서, typecheck, 변경 파일 lint·Secretlint 검사
 
 추적되는 hook을 editor 전용 검사로 대체하거나 `--no-verify`로 상시 우회하지 않는다.
 
@@ -76,20 +72,62 @@ breaking change는 헤더의 `!` 또는 `BREAKING CHANGE:` footer로 표시한�
 | `pnpm test:agent-harness` | 하네스 정책 단위 테스트 |
 | `pnpm verify:push` | 저장소 전체 push 수준 검증 |
 
-## 코드 품질 명령
+## 구조 변경 원칙
+
+- 애플리케이션은 다른 애플리케이션 소스를 import하지 않는다.
+- 기능 구현은 먼저 해당 앱의 `domains/<domain>/<capability>`에 둔다.
+- 실제 두 번째 소비자가 없는 코드를 공유 패키지로 올리지 않는다.
+- 교차 앱 테스트는 `tests/integration`에 둔다.
+- 앱 전용 설정은 해당 앱 디렉터리가 소유한다.
+- 안정된 마이그레이션 조각이 완료되면 ratchet을 실제 수치로 낮춘다.
+- Studio는 문서·명령·history·저장·렌더링 권위를 우선하며 범용 폴더로 평탄화하지 않는다.
+
+자세한 경계는 `ARCHITECTURE.md`와 `docs/README.md`를 따른다.
+
+## 코드·문서 품질 명령
 
 | 명령 | 용도 |
 | --- | --- |
+| `pnpm run validate:documentation` | 현재 문서, 내부 링크와 폐기 경로 검사 |
+| `pnpm run validate:architecture` | 저장소·source·dependency·문서 경계 검사 |
 | `pnpm lint:strict` | import·JSX 접근성을 포함한 전체 ESLint |
 | `pnpm typecheck` | 애플리케이션과 API TypeScript 검사 |
 | `pnpm quality:imports` | Knip 미해결 import·미선언 의존성 검사 |
 | `pnpm quality:secrets` | 추적 텍스트 전체 Secretlint 검사 |
+| `pnpm quality:secrets:changed` | 현재 변경 텍스트 Secretlint 검사 |
 | `pnpm quality:deadcode` | 전체 dead code·dependency inventory |
-| `pnpm quality:cycles` | 순환 의존성 inventory |
+| `pnpm quality:cycles` | 순환 dependency inventory |
 | `pnpm test:a11y` | 주요 공개 경로 axe-core 브라우저 smoke |
 
-코드가 직접 import하는 패키지는 소유 workspace에 선언한다. transitive dependency에 기대지 않는다.
-의존성 manifest를 바꾸면 `pnpm-lock.yaml`을 함께 갱신하고 보안·라이선스 검사를 실행한다.
+`quality:imports`는 CI 차단용이다. 기존 dead code와 cycle은 명시적 목록으로 관리하며 점진적으로 줄인다.
+Secretlint 예외는 넓은 폴더 무시 대신 규칙별·파일별로 최소화한다.
+
+## 접근성
+
+정적 JSX 접근성은 ESLint로 검사한다. 실행 시점 접근성은 `@axe-core/playwright`를 사용한다.
+자동 검사는 키보드, screen reader, 확대, 대비, 실제 사용성 검토를 대신하지 않는다.
+
+## 의존성 위생
+
+직접 import한 package는 해당 workspace의 manifest에 선언한다. transitive dependency에 기대지 않는다.
+브라우저 제공 virtual module이나 절대 import는 `knip.json`에 좁은 예외와 이유를 기록한다.
+
+manifest를 바꾸면 `pnpm-lock.yaml`도 함께 커밋하고 다음을 실행한다.
+
+```sh
+pnpm quality:imports
+pnpm typecheck
+pnpm lint:strict
+```
+
+## 문서 변경
+
+- 현재 구조 문서는 구현과 같은 변경에서 갱신한다.
+- `구현`, `로컬 검증`, `병합`, `운영 배포`를 구분한다.
+- 생성 문서는 직접 수정하지 않는다.
+- 일회성 프롬프트, 임시 연구 메모, 백업 복사본을 커밋하지 않는다.
+- 상대 링크와 저장소 경로는 실제 존재 여부를 검사한다.
+- 기본 언어는 한국어다. 코드 식별자와 외부 원문은 필요한 범위에서 유지한다.
 
 ## Pull Request
 

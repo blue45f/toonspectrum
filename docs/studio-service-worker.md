@@ -118,5 +118,5 @@ Studio 워커 스크립트에 CORP 헤더가 없으면 miss 로 처리하고 지
 - `studio-service-worker-precache-plan.test.ts` — 프리캐시 선택·예산·buildId 안정성
 - `studio-service-worker-entry.test.ts` — 실제 워커 모듈을 인메모리 Cache API 로 구동
   (install 원자성, `skipWaiting` 미호출, activate 정리, 오프라인 셸 분기, 킬 스위치)
-- `scripts/verify-studio-service-worker.mts` — 실제 브라우저. `vercel.json` 의 헤더 규칙을
-  그대로 적용하는 정적 서버로 `dist/` 를 서빙하므로 **프로덕션 헤더 설정이 퇴화하면 실패한다.**
+- `scripts/verify-studio-service-worker.mts` — 실제 브라우저. `config/http-response-headers.json`과
+  Cloudflare 정적 헤더 산출물을 적용한 서버로 `dist/`를 제공하므로 **프로덕션 헤더 설정이 퇴화하면 실패한다.**

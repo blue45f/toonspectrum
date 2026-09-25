@@ -1,204 +1,161 @@
-# ToonSpectrum coturn data plane
+# ToonSpectrum coturn 데이터 plane
 
-This directory is an **opt-in, single-node Linux deployment scaffold** for Studio voice relay.
-The Nest API remains the credential control plane; coturn carries encrypted WebRTC packets when
-the browser cannot establish a direct path. The stack is independent from the core API deployment and
-does not change local development.
+- 상태: **선택형 단일 Linux node 배포 scaffold**
+- 최종 갱신: **2026-09-26**
 
-The configuration matches `StudioVoiceIcePolicyService`: coturn REST credentials use a
-`<unix-expiry>:<opaque-identity>` username and `base64(HMAC-SHA1(shared-secret, username))`
-password. The shared secret must be identical on the API and this data plane, but must never be
-sent to a browser or stored in git.
+Studio voice에서 직접 WebRTC 연결이 불가능할 때 암호화된 packet을 relay한다. Nest API가 단기 credential
+control plane이며 coturn은 독립 data plane이다. Core API 배포와 분리되고 로컬 개발을 변경하지 않는다.
 
-## Topology and ports
+`StudioVoiceIcePolicyService`와 같은 REST credential 계약을 사용한다.
 
 ```text
-Browser ── UDP/TCP 3478 ─┐
-Browser ── TLS/TCP 5349 ─┼─> voice.example.com / static public IP ─> coturn
-                         └── UDP 49160-49259 relay allocations ─> public WebRTC peers
-
-Authenticated API ── short-lived ICE policy ─> Browser
-                  └── shared secret (server-side only) ─> same value as coturn
+username = <unix-expiry>:<opaque-identity>
+password = base64(HMAC-SHA1(shared-secret, username))
 ```
 
-The official coturn container recommends host networking for relay port ranges. Consequently this
-compose file targets a Linux VM, uses `network_mode: host`, and publishes no Docker bridge ports.
-The default range has 100 UDP relay ports and the bootstrap rejects an unbounded range.
+shared secret은 API와 coturn에서 같아야 하지만 browser나 Git에 노출하지 않는다.
 
-Open these host firewall and cloud security-list ingress rules:
+## topology와 port
 
-| Protocol | Port | Purpose |
+```text
+Browser -- UDP/TCP 3478 --┐
+Browser -- TLS/TCP 5349 --┼-> voice.example.com / 고정 public IP -> coturn
+                          └-> UDP 49160-49259 relay allocation -> peer
+
+API -> 단기 ICE policy -> Browser
+    -> 같은 shared secret -> coturn
+```
+
+공식 container 권장에 따라 Linux VM에서 `network_mode: host`를 사용하고 Docker bridge port를 publish하지
+않는다. 기본 relay range는 UDP 100개이며 bootstrap이 unbounded range를 거부한다.
+
+| protocol | port | 용도 |
 | --- | ---: | --- |
-| UDP | 3478 | STUN and TURN over UDP |
-| TCP | 3478 | TURN fallback over TCP |
-| TCP | 5349 | TURN over TLS (`turns:`) |
-| UDP | 5349 | DTLS listener; optional today, reserved for an audited client policy |
-| UDP | 49160–49259 | Allocated WebRTC relay media |
+| UDP | 3478 | STUN/TURN |
+| TCP | 3478 | TURN TCP fallback |
+| TCP | 5349 | TURN TLS (`turns:`) |
+| UDP | 5349 | DTLS listener, 현재 선택적 |
+| UDP | 49160-49259 | WebRTC relay media |
 
-Allow outbound UDP to public WebRTC peers plus the host's DNS, NTP, certificate-renewal, and image
-registry dependencies. If `TURN_RELAY_MIN_PORT` or `TURN_RELAY_MAX_PORT` changes, update both the
-host firewall and the cloud security list. Never expose coturn CLI, web admin, SQLite, Docker, or a
-metrics port publicly.
+relay range를 바꾸면 host firewall과 cloud security list를 함께 바꾼다. coturn CLI, Web admin, SQLite,
+Docker, metrics port는 공개하지 않는다.
 
-## Provisioning
+## provision
 
-1. Create a dedicated `voice.<domain>` DNS **A record** for the static public IPv4 address. This
-   scaffold is IPv4-only; do not publish an AAAA record until relay/listener IPv6 has been tested.
-2. Obtain a PEM certificate full chain and an **unencrypted** PEM private key whose SAN contains
-   that exact DNS name. Keep renewal outside the container and restart coturn after replacing the
-   files. Do not mount Caddy's internal storage path directly; copy renewed files with a restricted
-   deploy hook instead.
-3. Create local runtime directories and a high-entropy base64url secret:
+1. 고정 public IPv4에 `voice.<domain>` A record를 만든다. IPv6 relay/listener를 검증하기 전 AAAA를
+   publish하지 않는다.
+2. exact DNS SAN을 가진 PEM full chain과 암호화되지 않은 PEM private key를 준비한다. renewal은 container
+   밖에서 수행하고 교체 뒤 coturn을 재시작한다.
+3. 제한된 runtime directory와 고 entropy secret을 만든다.
 
-   ```bash
-   cd deploy/coturn
-   umask 077
-   mkdir -p secrets certs
-   openssl rand -base64 48 | tr '+/' '-_' | tr -d '=\n' > secrets/static-auth-secret
-   cp /secure/source/fullchain.pem certs/fullchain.pem
-   cp /secure/source/privkey.pem certs/privkey.pem
-   chmod 600 secrets/static-auth-secret certs/privkey.pem
-   chmod 644 certs/fullchain.pem
-   sudo chown root:root secrets/static-auth-secret certs/fullchain.pem certs/privkey.pem
-   cp .env.example .env
-   ```
+```bash
+cd deploy/coturn
+umask 077
+mkdir -p secrets certs
+openssl rand -base64 48 | tr '+/' '-_' | tr -d '=\n' > secrets/static-auth-secret
+cp /secure/source/fullchain.pem certs/fullchain.pem
+cp /secure/source/privkey.pem certs/privkey.pem
+chmod 600 secrets/static-auth-secret certs/privkey.pem
+chmod 644 certs/fullchain.pem
+sudo chown root:root secrets/static-auth-secret certs/fullchain.pem certs/privkey.pem
+cp .env.example .env
+```
 
-4. Edit `.env`. `TURN_REALM` must be the certificate DNS name and `TURN_EXTERNAL_IP` must be the
-   static numeric public IP. The bootstrap intentionally refuses example domains, documentation
-   IP ranges, empty secrets, weak secrets, unlimited quotas, and invalid port ranges.
-5. When the VM owns its public IP directly, leave `TURN_RELAY_IP` empty. Behind simple 1:1 NAT, set
-   it to the private interface IP and preserve **identical relay port mappings** through the NAT.
-   More complex multi-IP/NAT deployments need an explicit mapping per address and are outside this
-   single-node scaffold.
-6. Set the API control-plane variables to the same endpoint and current secret:
+4. `.env`에서 `TURN_REALM`은 certificate DNS, `TURN_EXTERNAL_IP`는 숫자 public IP로 설정한다. example
+   domain, documentation IP, 빈/약한 secret, 무제한 quota, 잘못된 port range는 거부한다.
+5. VM이 public IP를 직접 소유하면 `TURN_RELAY_IP`를 비운다. 단순 1:1 NAT이면 private interface IP를
+   지정하고 relay port mapping을 동일하게 유지한다.
+6. API에 같은 endpoint와 current secret을 설정한다.
 
-   ```dotenv
-   STUDIO_VOICE_STUN_URLS=stun:voice.example.com:3478
-   STUDIO_VOICE_TURN_URLS=turn:voice.example.com:3478?transport=udp,turn:voice.example.com:3478?transport=tcp,turns:voice.example.com:5349?transport=tcp
-   STUDIO_VOICE_TURN_SHARED_SECRET=<exact contents of secrets/static-auth-secret>
-   STUDIO_VOICE_TURN_REQUIRED=true
-   STUDIO_VOICE_TURN_TTL_SECONDS=900
-   ```
+```dotenv
+STUDIO_VOICE_STUN_URLS=stun:voice.example.com:3478
+STUDIO_VOICE_TURN_URLS=turn:voice.example.com:3478?transport=udp,turn:voice.example.com:3478?transport=tcp,turns:voice.example.com:5349?transport=tcp
+STUDIO_VOICE_TURN_SHARED_SECRET=<secrets/static-auth-secret의 정확한 내용>
+STUDIO_VOICE_TURN_REQUIRED=true
+STUDIO_VOICE_TURN_TTL_SECONDS=900
+```
 
-   The `turn:` TCP URL and `turns:` TLS URL are deliberately separate fallbacks. The API secret is
-   a server-only variable and must never use a `VITE_` prefix.
-7. Validate and start explicitly:
+server secret에만 두고 `VITE_` prefix를 사용하지 않는다.
 
-   ```bash
-   docker compose --profile turn --env-file .env config >/dev/null
-   docker compose --profile turn --env-file .env up -d
-   docker compose --profile turn --env-file .env ps
-   docker compose --profile turn --env-file .env logs --tail=50 coturn
-   ```
+7. 명시적으로 검증·시작한다.
 
-The image tag is pinned rather than `latest`. Review coturn release notes and rebuild in staging
-before updating it. For stronger supply-chain controls, pin the reviewed multi-architecture digest
-appropriate for the production CPU in the private deployment manifest.
+```bash
+docker compose --profile turn --env-file .env config >/dev/null
+docker compose --profile turn --env-file .env up -d
+docker compose --profile turn --env-file .env ps
+docker compose --profile turn --env-file .env logs --tail=50 coturn
+```
 
-## Security defaults
+image tag는 `latest`가 아니라 pin한다. 갱신 전 release note와 staging을 검토하고 가능하면 production CPU에
+맞는 multi-architecture digest를 고정한다.
 
-- `use-auth-secret` is active and no anonymous TURN allocation mode is configured. Anonymous STUN
-  binding remains available because the client policy publishes a credential-free `stun:` URL.
-- The bootstrap reads current and previous secrets from Compose secret mounts, writes the effective
-  config to a mode-0600 tmpfs file, never places a secret in process arguments, and never prints it.
-- The container filesystem is read-only. Linux capabilities are dropped except `SETUID`/`SETGID`,
-  which coturn needs to drop from bootstrap root to the official `nobody:nogroup` account after it
-  has read host-owned TLS and secret files. `no-new-privileges`, a PID limit, and tmpfs runtime
-  directories are active.
-- RFC 6062 peer-side TCP relay is disabled. This does **not** disable browser-to-TURN TCP or TLS;
-  those listener fallbacks stay enabled while WebRTC media allocations use bounded UDP ports.
-- Loopback is rejected by coturn's secure default. The template additionally denies private,
-  link-local, carrier-grade NAT, multicast, documentation, benchmark, and reserved peer ranges to
-  keep a public relay from becoming a path into the VM/VPC.
-- CLI, web admin, Prometheus, verbose logging, binding logging, and software version attributes are
-  absent. Do not enable them on a public interface without a separate authenticated management
-  network and firewall review.
+## 보안 기본값
 
-Standalone Docker Compose secrets are file mounts, not a cloud KMS or HSM. Keep the host paths
-root-owned and mode 0600, restrict Docker access, encrypt host disks and backups, and use the cloud
-secret manager to deliver them in a mature deployment.
+- `use-auth-secret` 활성, anonymous TURN allocation 금지; credential-free STUN binding만 허용
+- secret mount에서 current/previous secret을 읽고 mode 0600 tmpfs config 생성
+- read-only filesystem, 필요한 `SETUID`/`SETGID` 외 capability 제거, `no-new-privileges`, PID limit 적용
+- RFC 6062 peer-side TCP relay 비활성; browser->TURN TCP/TLS listener는 유지
+- loopback/private/link-local/CGNAT/multicast/documentation/reserved peer range 거부
+- CLI, Web admin, Prometheus, verbose/binding log와 software version attribute 비활성
 
-## Quotas and observability
+Standalone Compose secret은 KMS/HSM이 아니다. host 경로를 root-owned 0600으로 유지하고 Docker 접근,
+disk·backup 암호화, cloud secret delivery를 별도로 관리한다.
 
-Defaults are intentionally conservative for an audio-only, maximum-six-person P2P mesh:
+## quota와 관측
 
-- `user-quota=12`: enough for five peer connections plus short reconnect overlap.
-- `total-quota=100`: never greater than the 100-port relay range; the bootstrap enforces this.
-- `max-bps=262144`: 256 KiB/s in each direction per session, above normal Opus audio needs.
-- `bps-capacity=26214400`: 25 MiB/s aggregate capacity before coturn suppresses excess traffic.
+audio-only 최대 6인 P2P mesh 기준 기본값:
 
-These are admission ceilings, not capacity promises. Alert on health transitions, allocation
-rejections, sustained egress, packet loss, host socket exhaustion, disk/log pressure, and cloud
-egress cost. Increase the relay range and total quota together only after load testing and capacity
-review.
+- `user-quota=12`
+- `total-quota=100`
+- `max-bps=262144`
+- `bps-capacity=26214400`
 
-The API HMACs the work/user identity before placing it in the temporary username, but coturn logs
-can still contain IP addresses and a timestamped opaque pseudonym. Treat them as security/personal
-metadata. The default logs at warning level to stdout and Docker retains at most three 10 MiB files.
-Ship only the minimum fields needed, redact usernames/IPs at the collector where policy requires,
-apply a short retention period, and never ingest the rendered config, secret mounts, environment,
-SDP, ICE credentials, or debug traces.
+capacity 약속이 아니라 admission ceiling이다. health, allocation rejection, egress, packet loss, socket,
+disk/log pressure와 cloud egress 비용을 관측한다. load test와 capacity review 없이 range·quota를 올리지
+않는다.
 
-## Secret and certificate rotation
+temporary username은 work/user identity를 HMAC 처리하지만 log에는 IP와 timestamped pseudonym이 남을 수
+있다. security/personal metadata로 취급하고 짧게 보관하며 secret, rendered config, environment, SDP,
+ICE credential, debug trace를 수집하지 않는다.
 
-coturn accepts multiple shared secrets. This scaffold mounts current and previous values to allow
-overlap without invalidating credentials already issued by the API:
+## secret·certificate rotation
 
-1. Create `secrets/static-auth-secret.next` and retain the old file.
-2. Set `TURN_SHARED_SECRET_PATH` to the new file and `TURN_PREVIOUS_SHARED_SECRET_PATH` to the old
-   file, then recreate coturn. It now accepts both while the API still issues the old credential.
-3. Change `STUDIO_VOICE_TURN_SHARED_SECRET` on the API to the new value and restart the API.
-4. Wait at least `STUDIO_VOICE_TURN_TTL_SECONDS` plus refresh/backoff and clock-skew margin. Confirm
-   no old credential is being issued.
-5. Point both compose secret paths to the new file, recreate coturn, then securely remove the old
-   file according to the host storage policy.
+1. 새 secret file을 만들고 old file을 보존한다.
+2. current path를 새 값, previous path를 old 값으로 설정해 coturn을 재생성한다.
+3. API의 `STUDIO_VOICE_TURN_SHARED_SECRET`을 새 값으로 바꾼다.
+4. credential TTL, refresh/backoff, clock skew 여유만큼 기다린다.
+5. 두 path를 새 값으로 수렴하고 old file을 정책에 따라 제거한다.
 
-Never put either secret on a command line. A certificate renewal can replace the cert/key files and
-recreate coturn without changing the auth secret; run the external smoke check after every renewal.
+secret을 command line에 넣지 않는다. certificate renewal은 auth secret을 바꾸지 않아도 되며 교체마다
+외부 smoke를 실행한다.
 
-## Verification
-
-Run the repository checks first:
+## 검증
 
 ```bash
 pnpm exec vitest run deploy/coturn/scaffold.test.ts
 sh -n deploy/coturn/entrypoint.sh
 bash -n deploy/coturn/smoke.sh
-docker compose --profile turn --env-file deploy/coturn/.env.example -f deploy/coturn/compose.yml config
+docker compose --profile turn --env-file deploy/coturn/.env.example \
+  -f deploy/coturn/compose.yml config
 ```
 
-From a machine outside the TURN VM network, verify DNS, TCP and certificate/TLS:
+외부 network에서:
 
 ```bash
 deploy/coturn/smoke.sh voice.example.com
 ```
 
-Add `--stun` only after explicitly pulling/reviewing the pinned image; it sends a safe,
-unauthenticated UDP STUN binding request and never reads the shared secret. The compose healthcheck
-is similarly only a local STUN-listener liveness check.
+`--stun`은 pinned image를 검토한 뒤에만 사용한다. health/smoke는 TURN auth나 end-to-end relay를 증명하지
+않는다. production 승인은 서로 다른 network의 browser 2개에서 `iceTransportPolicy: "relay"`, relay
+candidate pair, 증가하는 RTP byte를 확인하고 UDP 차단 TCP/TLS fallback, credential refresh, restart,
+certificate renewal, network 변경을 반복 검증해야 한다.
 
-Neither check proves TURN authentication or end-to-end relay. Production approval still requires
-two isolated browsers/networks with `iceTransportPolicy: "relay"`, a selected candidate pair whose
-local and remote candidate types are `relay`, and increasing inbound/outbound RTP bytes in
-`RTCPeerConnection.getStats()`. Repeat while blocking UDP to prove TCP/TLS fallback, then test
-credential refresh, coturn restart, certificate renewal, and Wi-Fi/mobile network changes.
+## 제한
 
-## Deliberate limitations
+- 단일 VM은 HA가 아니다. 별도 failure domain, DNS routing, admission과 node별 관측이 필요하다.
+- IPv4-only이며 TLS는 5349를 사용한다.
+- credential을 command argument에 넣지 않기 위해 CLI auth smoke를 제공하지 않는다.
+- coturn은 DTLS-SRTP packet을 relay하지만 metadata와 public bandwidth를 소비한다.
+- SFU, recording, moderation, abuse response, large-room scaling을 제공하지 않는다.
 
-- One VM is not highly available. A second independent TURN node, distinct failure domain, DNS
-  routing, capacity admission, and per-node observation are required before claiming HA.
-- This scaffold is IPv4-only and TLS uses 5349. A dedicated host can additionally offer TLS on 443,
-  but a shared application host may already reserve 443 and cannot share that socket.
-- The health/smoke scripts intentionally do not pass a temporary password to `turnutils_uclient`,
-  because command arguments and CI logs can expose credentials. Authenticated relay is verified in
-  a browser using the API-issued short-lived policy.
-- coturn relays encrypted DTLS-SRTP packets but observes connection metadata and consumes public
-  bandwidth. It does not turn the six-person P2P mesh into an SFU and does not solve recording,
-  moderation, abuse response, or large-room scaling.
-
-## Primary references
-
-- [coturn official Docker image guide](https://github.com/coturn/coturn/blob/master/docker/coturn/README.md)
-- [coturn official configuration reference](https://github.com/coturn/coturn/blob/master/examples/etc/turnserver.conf)
-- [coturn `turnserver` reference](https://github.com/coturn/coturn/blob/master/README.turnserver)
-- [coturn `turnadmin` reference](https://github.com/coturn/coturn/blob/master/README.turnadmin)
+공식 coturn Docker guide와 configuration/turnserver/turnadmin 원문을 갱신 검토의 기준으로 사용한다.

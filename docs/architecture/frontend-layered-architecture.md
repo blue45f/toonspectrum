@@ -1,151 +1,133 @@
-# ToonSpectrum frontend layered architecture
+# Web·Admin 계층형 프런트엔드 구조
 
-Status: adopted on 2026-09-04
+- 상태: **현재 적용 중**
+- 최초 채택: 2026-09-04
+- 최종 갱신: 2026-09-26
 
-## Why this architecture
+## 목적
 
-ToonSpectrum is a large Vite SPA with catalogue, community, creator, market, admin, and a desktop-class Studio editor. A universal feature taxonomy would add another naming system without removing the editor's real coupling. The repository therefore uses a small dependency-directed layered architecture and colocates code by product ownership.
+Web과 Admin의 최상위 소유권을 `app`, `domains`, `platform`, `shared` 네 영역으로 고정한다.
+이 구분은 폴더 모양을 맞추기 위한 것이 아니라 의존성 방향과 변경 책임을 분명하게 하기 위한 것이다.
 
-The quality goal is **change locality**: a change should be discoverable from its URL or product domain, and should cross as few ownership boundaries as possible. Line count is a guardrail, not the architecture itself. A split that merely moves a closure bag or hundreds of opaque props into another file is not accepted.
-
-## Layers and dependency direction
-
-```text
-src/app            application bootstrap, providers, URL composition, global boundaries
-    ↓
-src/domains/*      product modules and use-case orchestration
-    ↓
-src/platform       browser, HTTP, storage and external-service adapters
-    ↓
-src/shared         domain-independent UI, hooks, navigation, SEO and utilities
-```
-
-The dependency direction mechanically enforced by ESLint is:
-
-- `app` may compose every lower layer.
-- `domains` may use reviewed domain contracts, platform, and shared code, but may not import `app`.
-- `platform` may use platform and shared code only and may not own business rules.
-- shared code may not know product domains.
-
-The former root `compat`, `components`, `hooks`, `infrastructure`, `generated`, `styles`, and `types` trees have been removed. Their code now belongs to app, domain, platform, or shared ownership, and the source-layout ratchet prevents those paths from returning. Cross-domain imports target a stable `public` or `integrations` boundary instead of page internals, and broad `index.ts` barrels are avoided. This refactor tightens the current model rather than introducing an FSD parallel tree.
-
-## Design inputs and stack review
-
-The structure follows the same practical principle emphasized in Toss Frontend Fundamentals and Toss frontend discussions: organize code so a reader can locate it from the product change, keep related behavior close, and avoid speculative abstraction. Route declarations are therefore grouped by URL ownership, while stateful Studio work is split by authority and lifecycle rather than by generic `features`, `entities`, or line-count folders.
-
-The 2026 stack was reviewed before adding dependencies. ToonSpectrum already uses React 19, React Router 7, Vite 8/Rolldown, TypeScript 6, Zustand 5, Vitest 4, and the React Compiler. No architecture framework or new state container was added. React Router framework-mode route modules can provide deeper automatic route splitting, but adopting them would replace the reviewed declarative `BrowserRouter` security boundary and change data-loading semantics. This pass keeps the current router mode and uses typed registries plus existing dynamic imports. Vite 8 already provides the production bundler upgrade, so performance work stays focused on chunk ownership and startup waterfalls rather than another toolchain migration.
-
-References:
-
-- https://frontend-fundamentals.com
-- https://toss.tech/article/firesidechat_frontend_10
-- https://reactrouter.com/changelog
-- https://api.reactrouter.com/v7/index.html
-- https://vite.dev/blog/announcing-vite8
-
-## Application routing
-
-`src/app/routes/AppRouter.tsx` owns only cross-domain behavior:
-
-- React Router `<Routes>` / `<Route>` composition
-- route transition staging
-- the global error boundary and fallback
-- document-title synchronization
-- Studio cross-origin-isolation gating
-
-Product URLs live in `src/app/routes/groups/*.routes.tsx`. Each entry has a stable semantic `id`, a `path`, and a lazy page element. `groups/app-routes.tsx` defines ordering once, with the catch-all route last. The registry test rejects duplicate IDs and paths and guarantees one canonical `/studio/*` entry.
-
-A domain route group may select a page and its delivery boundary, but it must not own application-wide chrome or providers. Heavy Studio code remains behind a dynamic import so catalogue and community visits do not initialize editor subsystems.
-
-## Studio route ownership
-
-`src/domains/creator/studio-router/StudioRouter.tsx` is a small resolver and dispatcher. It owns canonical URL resolution and chooses a semantic surface only.
+## 현재 구조
 
 ```text
-StudioRouter
-├── routes/StudioEditorRoute.tsx   document identity, runtime boundary, layout, editor chunk
-├── routes/StudioPublishRoute.tsx  publish identity and publish chunk
-├── StudioLift3dPage               independent tool surface
-└── StudioToolsCompanionPage       companion surface
+apps/web/src/
+  app/
+  domains/
+  platform/
+  shared/
+
+apps/admin-web/src/
+  app/
+  domains/
+  platform/
+  shared/
 ```
 
-Editor document lifetime is keyed outside the legacy adapter. The document layout survives canvas/DCC surface switches, while the editor implementation remains lazy. Inspector preloading belongs to the editor route because it is a route-delivery concern, not editor business logic.
+Web의 `@/*` alias는 `apps/web/src/*`를 가리킨다. Admin은 자체 Vite·TypeScript 설정에서 Admin 전용
+경로를 해석한다.
 
-## Studio editor application services
+## 영역별 책임
 
-`StudioCuttoonEditorHost.tsx` is still a migration host, not the desired long-term module boundary. New stateful logic must move to narrowly named, typed services under:
+### `app`
+
+- 부트스트랩과 provider 조립
+- 전역 route와 앱 셸
+- 전역 오류·격리·서비스 워커 경계
+- 앱 전체 스타일과 환경 초기화
+
+`app`은 도메인 구현을 소유하지 않고 조립한다.
+
+### `domains`
+
+- 사용자가 인지하는 제품 도메인과 capability
+- capability 전용 UI, hook, model, API adapter, 테스트
+- 도메인 내부의 `public` 또는 호출자 `integrations` 경계
+
+재사용 가능성만으로 도메인 구현을 `shared`나 패키지로 옮기지 않는다.
+
+### `platform`
+
+- HTTP transport
+- 브라우저 API와 저장소 adapter
+- 인증·telemetry·환경 adapter
+- 외부 SDK의 제품 중립 래퍼
+
+`platform`은 비즈니스 규칙을 소유하거나 `domains`를 import하지 않는다.
+
+### `shared`
+
+- 둘 이상의 도메인이 실제로 사용하는 앱 내부 UI primitive
+- 순수 helper와 범용 hook
+- navigation, SEO, 접근성, 공용 타입
+
+`shared`는 `domains`와 `app`을 알지 못한다. 특정 도메인의 이름이나 상태 전이를 포함하면 해당
+도메인으로 되돌린다.
+
+## 의존성 방향
 
 ```text
-src/domains/creator/studio-cuttoon-editor/runtime/
+app      -> domains, platform, shared
+domains  -> 같은 domain, 명시적 public/integrations, platform, shared
+platform -> shared
+shared   -> shared
 ```
 
-Current runtime ownership includes:
+금지:
 
-- CRDT document lifecycle
-- source and work hydration
-- collaboration access projection
-- draft collaboration provisioning
-- mutation authority and stale-result tickets
-- history snapshots, sidecars, retention, and durability
-- preferences and comment documents
-- raster publication
-- vector-operation cancellation epochs
-- layer-lift worker and preview resources
-- live-session and tournament persistence boot
+- `shared -> domains`
+- `platform -> domains`
+- `shared -> app`
+- 한 도메인에서 다른 도메인의 page·component·internal model deep import
+- Web과 Admin 사이의 소스 import
 
-Every runtime module has one explicit lifecycle reason to change, uses typed inputs/outputs, and may not import the host back. New runtime modules are kept below 300 lines. Larger flows must be split by authority or lifecycle rather than by arbitrary line ranges.
+기존 위반은 `scripts/validate-app-boundaries.mjs`와 ratchet으로 수치화한다. 예산을 올려 신규 위반을
+허용하지 않는다.
 
-Pure transformations live next to their domain, for example Writer Room page projection under `writer-room/`. Stateful browser or persistence behavior is exposed through intent-level commands, such as the brush quick-slot controller and the live-resource lease controller.
+## capability 배치 예시
 
-## File and API guardrails
+```text
+apps/web/src/domains/marketplace/
+  browse/
+    MarketplaceBrowsePage.tsx
+    marketplace-browse-model.ts
+    marketplace-browse.test.ts
+  resource-detail/
+  public/
+    index.ts
 
-- Application and Studio router seams: at most 100 lines.
-- New Studio runtime modules: at most 300 lines and zero explicit `any`.
-- The legacy Studio host line ceiling is a ratchet and may only decrease. The adoption ceiling is 29,459 lines.
-- UI components do not receive new raw React setter bags. Prefer intent-level commands or a typed client.
-- Runtime modules do not import `StudioCuttoonEditorHost`.
-- Route IDs and paths are unique and the catch-all is last.
-- Browser workers, service workers, dynamic imports, and generated assets must be checked before deleting an apparently unused file.
+apps/admin-web/src/domains/operations/
+  operation-policy/
+    OperationPolicyPage.tsx
+    operation-policy-api.ts
+    operation-policy.test.ts
+```
 
-Exceptions must be recorded in the existing legacy-exception ledger and may only decrease. New files are not added to that ledger to bypass lint or React Compiler rules.
+component, hook, model, test는 해당 capability 옆에 둔다. 최상위 `components`, `hooks`, `types`,
+`utils` 폴더를 다시 만들지 않는다.
 
-## Performance policy
+## 공유 패키지 승격 조건
 
-Architecture is the first performance boundary:
+다음 조건을 모두 만족할 때만 `packages/*`로 승격한다.
 
-1. Split by URL and high-cost surface with dynamic imports.
-2. Preload only a surface that is predictably needed, such as the desktop inspector next to the Studio editor request.
-3. Keep document-scoped workers and abort controllers under a single lifecycle owner.
-4. Keep hot canvas projections identity-stable and avoid subscribing the full editor host to transient pointer state.
-5. Validate the production chunk graph with the existing Studio bundle gate before adding manual chunk rules.
+1. 두 개 이상의 배포 가능한 앱이 실제로 같은 구현을 사용한다.
+2. React·DOM·NestJS·DB·transport 구현과 분리할 수 있다.
+3. 공개 API가 좁고 안정적이다.
+4. 앱 소스 직접 import를 감추는 우회가 아니다.
 
-React Router framework-mode route modules were reviewed, but ToonSpectrum currently uses a declarative `BrowserRouter` boundary that is also part of the security review. Migrating router modes would combine architecture, security, and data-loading changes. This refactor instead obtains the route-ownership and code-splitting benefits with the current reviewed runtime and Vite dynamic imports.
+DTO, schema, protocol 상수와 순수 validation은 `packages/contracts` 후보가 될 수 있다.
+도메인 구현을 `packages/domains/*`로 옮기지는 않는다.
 
-## Adoption verification
+## 테스트 소유권
 
-The final adoption candidate was normalized and verified as one coherent change set on 2026-09-04:
+앱 내부 테스트는 자기 앱만 검증한다. 다른 앱 소스를 함께 검사하는 테스트는
+`tests/integration/<boundary>`로 옮긴다.
 
-- changed-file ESLint auto-fix followed by a zero-warning changed-file lint gate
-- the repository architecture validator
-- full frontend and API TypeScript checks
-- route registry, Studio host ratchet, i18n loading, inspector boundary, Studio router boundary, and Writer Room projection tests
-- Git whitespace and patch-integrity checks
+## 마이그레이션 규칙
 
-The focused suite passed 6 test files and 29 tests. The verification commit also proved that every newly extracted runtime stays within the size, explicit-`any`, reverse-import, and dependency-cycle guardrails described above.
-
-## Repository hygiene
-
-Execution receipts and one-off soak trigger notes belong in GitHub Actions artifacts, not source control. The architecture and source-layout validators reject tracked `.qa`, `artifacts`, `.github/qa`, and `scripts/qa/runs` receipt paths. Durable findings belong in an ADR, an architecture document, or a maintained runbook.
-
-## Migration rule
-
-When touching the legacy host:
-
-1. Identify one authority or lifecycle boundary.
-2. Define typed inputs, outputs, and intent-level commands.
-3. Move state and cleanup together; do not move callbacks alone.
-4. Preserve the route, document key, and async cancellation contract.
-5. Lower the host ratchet after the extraction.
-6. Add a focused contract test when the behavior can regress without a type error.
-
-The target is not a zero-line host. The target is a thin editor-session composition root whose dependencies are understandable without reading the canvas engine, collaboration transport, persistence adapters, and every panel at once.
+- 변경하는 capability부터 규칙을 적용한다.
+- 이동과 동작 변경을 가능하면 별도 commit으로 나눈다.
+- alias만 추가해 과거 폴더를 영구 보존하지 않는다.
+- 한 조각이 안정되면 source-layout과 dependency ratchet을 실제 수치로 낮춘다.
+- Studio는 문서·명령·저장·렌더 권위를 우선하므로 억지로 페이지 중심 폴더로 재배치하지 않는다.

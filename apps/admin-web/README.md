@@ -1,10 +1,9 @@
 # ToonSpectrum Admin Web
 
-`apps/admin-web` is the independently buildable administrator browser application.
-It is a pnpm workspace package named `@toonspectrum/admin-web`; its source and build
-configuration are owned by this directory instead of the repository root.
+`apps/admin-web`은 독립 빌드 가능한 관리자 브라우저 애플리케이션이다. pnpm workspace 이름은
+`@toonspectrum/admin-web`이며 source와 빌드 설정을 이 디렉터리가 소유한다.
 
-## Commands
+## 명령
 
 ```sh
 pnpm --filter @toonspectrum/admin-web dev
@@ -14,19 +13,17 @@ pnpm --filter @toonspectrum/admin-web build
 pnpm --filter @toonspectrum/admin-web test:e2e
 ```
 
-Production output is written to `apps/admin-web/dist/`. Deployment remains a separate,
-explicitly approved operation and is not implied by a build or merge.
+생성물은 `apps/admin-web/dist/`에 쓴다. 빌드와 머지는 운영 배포 승인이 아니다.
 
-## Ownership
+## 소유권
 
 ```text
-src/app       bootstrap, providers, routes, shell and application-wide styles
-src/domains   administrator capabilities grouped by business responsibility
-src/platform  HTTP, authentication, telemetry and browser/runtime adapters
-src/shared    Admin-only reusable UI and helpers with no domain dependency
+src/app       bootstrap, provider, route, shell, 전역 스타일
+src/domains   업무 책임별 관리자 capability
+src/platform  HTTP, 인증, telemetry, browser/runtime adapter
+src/shared    domain 의존성이 없는 Admin 전용 UI·순수 helper
 ```
 
-Admin Web must never import source from `apps/web` or `apps/api`. Shared runtime-neutral
-DTOs and schemas may be promoted to `packages/contracts` only after a real second consumer
-exists. The existing user-Web administrator console is migration debt and moves capability
-by capability; it must not become a shared source dependency of this application.
+Admin은 `apps/web`이나 `apps/api` source를 import하지 않는다. 실행 환경에 중립적인 안정된 DTO·schema는
+실제 두 번째 소비자가 생긴 뒤 `packages/contracts`로 승격한다. 기존 Web 관리자 console은 기능
+단위로 이전하며 Admin의 공유 source로 사용하지 않는다.

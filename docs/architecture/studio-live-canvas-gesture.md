@@ -1,274 +1,210 @@
-# Studio live canvas gesture architecture
+# Studio 라이브 캔버스 제스처 아키텍처
 
-Status: implemented vertical slice for single `DrawEl` resize/rotation; common lifecycle ready for
-drawing and multi-selection adapters.
+- 상태: **단일 `DrawEl` 크기 조절·회전 vertical slice 구현 완료**
+- 범위: 공통 수명주기, transient preview, durable commit, renderer handoff
+- 최종 갱신: **2026-09-26**
 
-## Decision
+## 결정
 
-Canvas gestures use one renderer-neutral lifecycle:
+캔버스 제스처는 renderer와 무관한 하나의 수명주기를 사용한다.
 
-1. acquire a document lease and capture immutable source identity;
-2. offer absolute transient frames through a latest-frame mailbox;
-3. present at most one newest frame per animation frame;
-4. close renderer claims before the sole durable commit;
-5. settle any retained terminal preview after commit acceptance or rejection, while keeping the
-   writer lease until authoritative source pixels have acknowledged the terminal handoff;
-6. release every claim on Escape, pointer cancel, blur, hidden document, source/selection change,
-   disable, unmount, preview failure, or commit failure.
+1. 문서 lease를 획득하고 변경 불가능한 source identity를 캡처한다.
+2. 절대 좌표 transient frame을 latest-frame mailbox에 넣는다.
+3. animation frame마다 최신 frame 하나만 표시한다.
+4. 유일한 durable commit 전에 renderer claim을 닫는다.
+5. commit 성공·실패 뒤 retained terminal preview를 authoritative source와 인계한다.
+6. Escape, pointer cancel, blur, hidden document, source/selection 변경, disable, unmount,
+   preview 실패, commit 실패에서 모든 claim을 해제한다.
 
-Pointer movement never writes scene state, history, autosave, or CRDT state. Pointer-up is the only
-durable boundary and calls the existing document commit exactly once.
+pointer 이동은 scene state, history, autosave, CRDT를 쓰지 않는다. pointer-up만 durable boundary이며
+기존 문서 commit을 정확히 한 번 호출한다.
 
-The common Interface lives in `studio-live-canvas-gesture.ts`. It intentionally knows nothing about
-Konva, React, brushes, document storage, history, or collaboration. A future CanvasKit/Vello/WebGPU
-adapter can implement the same transient Interface without changing the caller or commit port.
+공통 interface는
+`apps/web/src/domains/creator/studio-live-canvas-gesture.ts`에 있다. Konva, React, brush, storage,
+history, collaboration을 알지 못한다. CanvasKit, Vello, WebGPU adapter도 같은 transient interface를
+구현할 수 있다.
 
-## Transform presentation strategy
+## 변형 표시 전략
 
-One presentation technique cannot be both fast and correct for every stroke, so single-draw
-transforms use a capability- and cost-selected hierarchy. A renderer being safe to execute as an
-isolated exact draft is not evidence that its already-rendered subtree is affine-equivalent.
+모든 stroke에 빠르고 정확한 단일 표시 방식은 없다. 단일 draw 변형은 capability와 비용에 따라 다음
+순서를 사용한다.
 
-| Frame | Presentation | Cost | Correctness basis |
+| frame 조건 | 표시 방식 | 비용 | 정확성 근거 |
 | --- | --- | ---: | --- |
-| Renderer-certified matrix-equivalent frame | retained affine on an isolated lifted wrapper | O(1) scene writes plus isolated Layer paint | renderer-owned signature/capability must prove equivalence |
-| Exact-safe and under the renderer work budget | isolated model draft | O(points + one stroke render) per displayed frame | same `planStudioDrawObjectTransform` and `StudioDrawNode` as pointer-up |
-| Exact-safe but over budget | source remains authoritative; release-only | O(1) during drag | prevents an unbounded rAF long task and never substitutes a visibly different approximation |
-| Malformed transient frame | hold the last valid presentation | O(1) | transient Konva boxes can recover on the next event |
-| Valid but uncommittable or renderer-ineligible frame | neutral, commit-at-release fallback | O(1) | never freeze ink at a pose the handles have left |
+| renderer가 matrix equivalence를 증명 | 격리 wrapper의 retained affine | O(1) scene write + 격리 Layer paint | renderer signature/capability |
+| exact-safe이고 work budget 이하 | 격리된 model draft | 표시 frame마다 O(points + stroke render) | pointer-up과 같은 planner·renderer |
+| exact-safe지만 budget 초과 | source 유지, release-only | drag 중 O(1) | 무제한 rAF long task 방지 |
+| malformed transient frame | 마지막 정상 표시 유지 | O(1) | 다음 event에서 복구 가능 |
+| commit 불가 또는 renderer 부적격 | neutral release-only | O(1) | 다른 모양의 근사 금지 |
 
-`push()` only replaces a mailbox and schedules at most one callback. Classification, model planning,
-React publication, Konva writes, and clip calculation happen in that callback, never in the pointer
-event itself.
+`push()`는 mailbox를 교체하고 callback을 최대 하나만 예약한다. classification, model planning,
+React publication, Konva write, clip 계산은 pointer event가 아니라 rAF callback 안에서 실행한다.
 
-The current admitted engines (`causal-ink`, `calligraphy-segments`, `perfect-outline`) all contain
-absolute-pixel spacing, quantization, radius or topology rules. The compiler therefore marks all of
-them `model-draft-only`; the retained affine tier is structurally available for a future renderer
-that supplies positive equivalence evidence and passes the same isolated-Layer lift, but it is not
-currently used by the shipped allowlist.
+현재 admission 대상인 `causal-ink`, `calligraphy-segments`, `perfect-outline`은 spacing, quantization,
+radius, topology 규칙 때문에 모두 `model-draft-only`다. retained affine tier는 미래 renderer가
+동등성을 증명할 때만 사용한다.
 
-Exact admission is O(1) per frame over gesture-start complexity facts. A separate O(1)
-`array.length`/engine/scene preflight runs before the compiler, so a release-only 100k-sample stroke
-is not first cloned, stringified, or path-scanned at `transformstart`. Each accepted sample channel
-is bounded before the immutable snapshot is built. The page lease uses element identity plus a
-monotonic document-generation/mutation ticket instead of serializing the whole Draw payload.
+## O(1) admission과 안전 예산
 
-Causal work uses a conservative `sampleCount + ceil(pathLength / 0.5)` dab upper bound: even a
-sub-0.5px non-empty segment emits one dab. Its coverage budget uses the alias-resolved renderer
-diameter, maximum pressure radius, target scale, Stage scale and canvas DPR, so a Retina/backing-pixel
-fill cannot hide behind a small document-pixel estimate. Calligraphy and perfect-freehand admission
-also charges the renderer-expanded worst case, rather than trusting source sample count: at most
-2,048 path commands, 8,194 serialized coordinate scalars and four million backing pixels per
-presented frame. The pinned planners expose O(1) structural bounds (`208S - 2` calligraphy outline
-scalars / `108S + 2` worst-run Canvas commands, and `28 * max(N, 5) + 42` perfect-freehand outline
-points). This currently admits the tested 19-sample calligraphy and 71-sample perfect boundaries,
-while the next samples fail closed before planning. The generic lane charges both a rotated paint
-AABB and a zoom/DPR-scaled path sweep. Every future retained route passes the same common budget
-before clip scans, and clip work is capped by scene element count. Admission also charges the full
-current Layer `SceneCanvas.getWidth() * getHeight()` backing store, because Konva's synchronous
-`drawScene()` clears that entire physical-pixel surface even when the selected object's AABB is
-small. Missing or non-finite canvas ownership fails closed. Calligraphy bounds distinguish the
-single-point pressure-scaled dot from a multi-point nib, and perfect-freehand bounds include the 3px
-compact-dot/fallback floor without changing the real planner size. These ceilings are safety limits,
-not document limits and must not be raised without p95 browser evidence.
+제스처 시작 시 source complexity fact를 bounded snapshot으로 만들고, frame admission은 O(1)로
+판정한다. 100k sample stroke를 clone·stringify·path scan한 뒤 거절하지 않는다.
 
-## Exact model-draft surface
+- Causal 경로: `sampleCount + ceil(pathLength / 0.5)` 보수적 dab 상한
+- coverage: renderer diameter, 최대 pressure radius, target scale, Stage scale, DPR 포함
+- Calligraphy/Perfect Freehand: source sample 수가 아니라 renderer-expanded worst case를 비용에 반영
+- 허용 상한: path command 2,048, serialized coordinate scalar 8,194, backing pixel 4,000,000
+- Calligraphy 구조 상한: `208S - 2` outline scalar, `108S + 2` Canvas command
+- Perfect Freehand 구조 상한: `28 * max(N, 5) + 42` outline point
+- generic 경로: 회전 paint AABB와 zoom/DPR path sweep을 함께 계산
+- clip 비용: scene element 수로 제한
+- Konva Layer: 선택 객체 AABB뿐 아니라 실제 backing store 전체 draw 비용을 반영
 
-The exact fallback does not update the document `elements` array. It publishes one transformed
-`DrawEl` to `studio-live-transform-draft-store.ts`, an external store owned locally by the Stage
-host. Only `StudioLiveTransformDraftNode` subscribes, so React replans one stroke instead of the
-whole document tree.
+이 값은 문서 제한이 아니라 라이브 preview 안전 상한이다. browser p95 증거 없이 올리지 않는다.
 
-The draft root is always mounted as the first child of the existing
-`studio-single-object-drag-layer`. This is load-bearing:
+## exact model-draft surface
 
-- it allocates no additional full-DPR canvas;
-- the root is pixel-empty outside an exact transform;
-- imperative lift appends the source wrapper, proxy, and Transformer after it;
-- the exact draft therefore remains below handles without mounting a new root above them mid-drag;
-- main document Layer repaint remains limited to gesture begin and finish.
+exact fallback은 document `elements` 배열을 바꾸지 않는다.
+`studio-live-transform-draft-store.ts`에 변형된 `DrawEl` 하나를 publish하고
+`StudioLiveTransformDraftNode`만 subscribe한다. 따라서 전체 document tree가 아니라 stroke 하나만
+React에서 다시 계획한다.
 
-Transform drafts use settled geometry, but `renderPurpose="transform-draft"` suppresses
-document-owned diagnostics, committed coverage cache keys, living-ink background bake requests,
-and GPU bristle requests. The preview copy also sets `exposeSceneIdentity={false}`, so wrapper
-lookup, drag mirrors, cached-duplicate checks, and late selection chrome cannot mistake it for the
-authoritative element.
+Draft root는 기존 `studio-single-object-drag-layer`의 첫 child로 항상 mount한다.
 
-Draft publication crosses a synchronous renderer barrier before source visibility changes and then
-draws the Layer that actually owns the source. Every live route requires the isolated drag-Layer
-lift; a failed lift is release-only because a retained attr write would still repaint the unbounded
-document SceneCanvas. On the reverse transition the source attrs/visibility are restored and its
-current Layer receives a synchronous pixel receipt first; the exact React child is then removed and
-the isolated Layer is drawn again. When both live in one Layer, the intermediate draw is
-unobservable inside the same JavaScript turn. With exact work bounded before this barrier, one
-browser paint cannot see a blank source/draft pair or both authorities at once.
+- 추가 full-DPR canvas를 만들지 않는다.
+- exact transform 밖에서는 pixel-empty다.
+- source wrapper, proxy, Transformer보다 아래에 위치한다.
+- handle보다 아래에서 정확한 draft를 표시한다.
+- main document Layer repaint는 begin/finish에 제한한다.
 
-## Ownership and terminal handoff
+transform draft는 settled geometry를 사용하지만 `renderPurpose="transform-draft"`로 document-owned
+진단, committed coverage cache, living-ink background bake, GPU bristle request를 억제한다.
+`exposeSceneIdentity={false}`로 authoritative element identity도 노출하지 않는다.
 
-Every model-draft claim has a monotonically increasing generation plus an explicit page/master
-scope. An old rAF callback, cleanup, authoritative receipt, or page teardown may not present, clear,
-or settle a newer gesture's draft or a draft from another surface.
+source visibility를 바꾸기 전 synchronous renderer barrier를 통과하고 source가 속한 Layer를 그린다.
+역전환에서는 source attr·visibility를 복구하고 현재 Layer의 pixel receipt를 받은 뒤 draft를 제거한다.
+동일한 JavaScript turn 안에서 빈 frame이나 source+draft 중복 frame을 표시하지 않는다.
 
-On a valid pointer-up, the renderer synchronously builds the exact terminal candidate before it
-releases the lifted nodes. It then keeps that candidate visible while the document commit runs.
-After commit acceptance, the store enters `handoff` and waits for the Stage host to render an exact
-model receipt. The authoritative wrapper remains hidden until that receipt; a layout effect then
-clears the draft and restores the wrapper before paint. This prevents a one-frame jump back to the
-source pose and prevents a duplicate source-plus-draft frame. Handoff registration is pending, not
-settled: the common lifecycle retains the page/local/CRDT writer lease until source restoration and
-the exact claim generation both acknowledge release. Failed source raster receipts remain retryable.
+## 소유권과 terminal handoff
 
-Commit rejection or throw first synchronously paints the restored source, then clears the candidate.
-A bounded timeout performs the same source-first transfer if an interrupted/unmounted React render
-never acknowledges the receipt.
+모든 model-draft claim은 증가하는 generation과 page/master scope를 가진다. 오래된 rAF callback,
+cleanup, receipt, page teardown은 더 새 generation이나 다른 surface의 draft를 변경할 수 없다.
 
-## Invariants
+정상 pointer-up 흐름:
 
-- Source bounds and admitted array-valued input channels become bounded immutable gesture-start
-  snapshots. Element identity plus monotonic document/mutation generations guard the page lease;
-  no unbounded payload serialization runs at begin. Every frame is absolute; deltas never accumulate.
-- `offer` is transient-only. `commit` is the sole scene/history/CRDT writer.
-- Resolution seals a session before callbacks, so synchronous `transformend` or re-entrant cancel
-  cannot resolve it twice.
-- Proxy restoration, renderer cleanup, Layer restore, clip restore, wrapper neutralization, chrome
-  restore, and lease release are independently attempted. Layer setup rollback and final cleanup use
-  the same phase-aware recovery record, including hosts that mutate move/position/z and then throw.
-  A failed `close`/`settle` retains renderer ownership and retries with bounded exponential backoff;
-  the page lease is not released and body drag is writer-gated until close-critical ownership is
-  actually restored. Structural ownership errors remain distinct from Transformer/canvas
-  presentation errors.
-- Live retained and exact drafts are available only after the existing drag-Layer composition/lift
-  preflight succeeds. Cached, clipped, masked, backdrop-sensitive, stacking-sensitive, or otherwise
-  non-liftable strokes remain release-only; no live route repaints the document Layer per frame.
-- An exact lift is refused when any ordinary visible authored paint leaf exists above the selected
-  wrapper. The preflight descends Konva containers, so a mounted shell whose parked children are
-  all hidden does not block the lift; a visible or cached paint subtree still fails closed. Moving
-  the draft to a later Layer would otherwise invert occlusion until pointer-up.
-- Panel clip membership is recomputed from transformed points with the same geometry the commit
-  reads, and travels atomically with the exact draft snapshot.
-- No preview subtree exposes the authoritative `studioElementId`.
-- A retained terminal draft disappears only on authoritative receipt, rollback, superseding
-  generation, or safety timeout.
+1. exact terminal candidate를 동기적으로 만든다.
+2. lifted node를 풀기 전에 candidate를 표시한다.
+3. document commit을 실행한다.
+4. commit 성공 후 store를 `handoff`로 전환한다.
+5. Stage host의 authoritative model receipt를 기다린다.
+6. layout effect에서 draft를 지우고 source wrapper를 복구한다.
+7. source 복구와 claim release가 모두 확인된 뒤 writer lease를 해제한다.
 
-## Current capability boundary
+commit 거절·예외에서는 source를 먼저 동기적으로 그린 뒤 candidate를 지운다. React render가
+중단되거나 unmount되어 receipt가 오지 않으면 bounded timeout이 같은 source-first transfer를 수행한다.
 
-The shipped vertical slice covers one selected `DrawEl` whose renderer, complexity, and composition
-preflights are positively allowed. Current admitted ink renderers use the exact model-draft path for
-uniform, non-uniform, and rotated frames; an over-budget stroke keeps the release-only path rather
-than blocking the UI. Resize and rotation still bake into points in one existing document commit,
-so undo, autosave, and CRDT semantics do not fork.
+## 불변식
 
-The isolated exact path also requires the selected wrapper to be topmost among authored painting
-siblings. Cached/clipped/masked/backdrop-sensitive strokes and strokes with effective per-sample
-calligraphy orientation remain release-only. The orientation scan runs only after the calligraphy
-compiler preflight has capped it at 256 samples; ordinary Stage React renders never scan tilt/twist
-arrays for every stroke.
+- source bounds와 array input channel은 bounded immutable gesture-start snapshot이다.
+- element identity와 monotonic document/mutation generation이 lease를 보호한다.
+- 모든 frame은 absolute이며 delta를 누적하지 않는다.
+- `offer`는 transient-only, `commit`은 scene/history/CRDT의 유일 writer다.
+- session은 callback 실행 전에 seal되며 re-entrant cancel도 두 번 resolve하지 않는다.
+- proxy, renderer, Layer, clip, wrapper, chrome, lease cleanup을 각각 시도한다.
+- close/settle 실패 시 bounded exponential backoff로 재시도하고 ownership 복구 전에는 lease를 풀지 않는다.
+- exact/retained live path는 isolated drag-Layer lift preflight를 통과한 경우에만 사용한다.
+- cached, clipped, masked, backdrop-sensitive, stacking-sensitive, non-liftable stroke는 release-only다.
+- 선택 wrapper 위에 일반 authored paint leaf가 있으면 exact lift를 거절한다.
+- panel clip membership은 commit과 같은 transformed point geometry로 계산한다.
+- preview subtree는 authoritative `studioElementId`를 노출하지 않는다.
+- terminal draft는 authoritative receipt, rollback, 새 generation, safety timeout에서만 사라진다.
 
-This does not yet make every multi-selection live. The current group planner deliberately preserves
-many stroke/effect radii while a root Konva scale enlarges them, so applying one affine to arbitrary
-draw/text/frame/image mixtures would lie about pointer-up. Multi-selection must either render a
-planner-produced ephemeral scene or stay commit-at-release.
+## 현재 capability 경계
 
-The current draw model also stores one scalar `strokeWidth`. Under a non-uniform transform the
-commit uses the geometric mean of X/Y scale; the exact draft matches that product rule. A truly
-anisotropic nib would require a separate model/CRDT/export/render-schema decision and is not implied
-by this gesture architecture.
+현재 vertical slice는 positively allowed된 renderer·complexity·composition을 가진 단일 selected
+`DrawEl`을 처리한다. 허용된 ink renderer는 uniform, non-uniform, rotated frame에서 exact model draft를
+사용하고 budget 초과 stroke는 UI를 막지 않고 release-only로 남긴다.
 
-## Long-term decision and migration roadmap
+resize·rotation은 기존 한 번의 document commit에서 point로 bake하므로 undo, autosave, CRDT 의미가
+갈라지지 않는다.
 
-The durable end state is a first-class, renderer-neutral object transform matrix on scene nodes.
-Pointer-up should commit that matrix in O(1), making the retained gesture matrix and the saved
-document mean exactly the same thing even for a 100,000-sample stroke. Baking points/width becomes
-an explicit `Flatten/Reshape` operation executed off the interaction path.
+제한:
 
-The visual contract is `T(Render(raw geometry))`, not `Render(T(raw geometry))`. That distinction
-is observable for symmetry, bounds-derived primitives, textured/noisy brushes, calligraphy nibs,
-paper grain and raster-backed surfaces. A durable renderer should therefore keep an outer wrapper
-at the element's stable z/composite/clip slot and put paint plus its hit shape under one inner
-content-transform group. A transform-only commit must preserve the raw render-payload identity so
-`StudioDrawNode` does not rerun an O(points) brush planner just because the matrix changed.
+- selected wrapper가 authored painting sibling 중 최상위여야 한다.
+- cached/clipped/masked/backdrop-sensitive stroke는 release-only다.
+- sample별 calligraphy orientation은 256 sample preflight 뒤에만 scan한다.
+- 임의의 draw/text/frame/image multi-selection은 아직 live exact를 보장하지 않는다.
+- 현재 `DrawEl.strokeWidth`는 scalar다. non-uniform transform은 X/Y scale의 기하평균 규칙을 사용한다.
+  비등방 nib는 별도 model/CRDT/export 결정이 필요하다.
 
-This cannot be introduced as a DrawEl-only optional field in one patch. Today the CRDT draw bridge
-drops unknown transform state, older peers can overwrite it, and bounds, hit testing, node editing,
-masking, raster promotion, alternate renderers and SVG/PSD/WILL export read raw points directly.
-Shipping the writer before every reader would make collaborators and exporters see different
-artwork. Migration must therefore be reader-first:
+## 장기 목표: renderer-neutral object matrix
 
-1. define and validate a versioned finite/invertible `Mat2d` scene-node contract;
-2. teach project load, CRDT payloads, mixed-version negotiation and recovery to preserve it;
-3. centralize transformed bounds, hit testing, clipping and render projection;
-4. make every export/alternate-render surface either consume the matrix or explicitly flatten it;
-5. fail closed or flatten before point-editing tools that are not yet transform-aware;
-6. only then switch pointer-up from point baking to an O(1) matrix commit and add an explicit
-   background/worker flatten command.
+최종 목표는 scene node에 versioned finite/invertible `Mat2d`를 저장하는 것이다. pointer-up은 O(1)로
+matrix를 commit하고 point/width bake는 명시적 `Flatten/Reshape` 작업으로 interaction path 밖에서
+실행한다.
 
-The smallest safe first writer is deliberately narrower than the final matrix type: one `DrawEl`,
-translation/rotation/positive uniform scale, finite invertible orientation-preserving similarity,
-and no shear, reflection or non-uniform scale. Its gesture composes in document space as
-`Tnew = Ggesture · Told`. Before that writer can turn on, the project/autosave format needs a
-minimum-reader version (the current repository implies project v3), the typed CRDT stroke payload
-and room protocol need coordinated version gates (the current next versions are stroke v5 and room
-v7), and old peers must be unable to join a transform-bearing room while silently ignoring the
-field. Node edit, vector erase, boolean operations, mixed/group resize, frame reflow, InkML/WILL,
-and alternate renderers must either consume the matrix or expose an explicit unavailable reason.
-No command may keep running against raw points as if they were still world coordinates.
+시각 계약은 `Render(T(raw geometry))`가 아니라 `T(Render(raw geometry))`다. symmetry,
+bounds-derived primitive, texture/noise brush, calligraphy nib, paper grain, raster surface에서 결과가 다르다.
+따라서 outer wrapper가 안정된 z/composite/clip slot을 유지하고 paint·hit shape가 inner content-transform
+group 아래에 있어야 한다.
 
-Until those reader gates are complete, exact-under-budget plus release-only is intentional. A
-retained approximation followed by an exact pointer-up swap would reintroduce the visible snap this
-work is meant to remove.
+Writer를 켜기 전 reader-first 순서:
 
-### 1. Progressive long-stroke presentation
+1. versioned finite/invertible `Mat2d` 계약 정의
+2. project load, autosave, CRDT, mixed-version negotiation, recovery에서 보존
+3. transformed bounds, hit test, clipping, render projection 중앙화
+4. 모든 export·alternate renderer가 matrix를 소비하거나 명시적으로 flatten
+5. matrix 미지원 point-edit tool은 fail-closed 또는 사전 flatten
+6. 이후 pointer-up을 O(1) matrix commit으로 전환
 
-Move exact geometry and raster planning to a generation-tagged Worker/OffscreenCanvas or GPU
-ephemeral surface. Only the newest completed generation may present. A deadline miss keeps a stable
-proxy for the rest of that gesture (hysteresis), rather than oscillating between modes. The
-main-thread React tree should receive an `ImageBitmap`/surface receipt, not rebuild a huge stroke
-subtree every frame.
+첫 writer 범위도 단일 `DrawEl`, translation/rotation/positive uniform scale,
+orientation-preserving similarity로 제한한다. shear, reflection, non-uniform scale은 이후 단계다.
+
+## 후속 확장
+
+### 1. 긴 stroke의 progressive 표시
+
+exact geometry와 raster planning을 generation-tagged Worker/OffscreenCanvas 또는 GPU ephemeral surface로
+옮긴다. 최신 완료 generation만 표시한다. deadline miss가 나면 같은 gesture 동안 stable proxy를
+유지해 모드가 흔들리지 않게 한다. main-thread React에는 거대한 stroke subtree 대신
+`ImageBitmap` 또는 surface receipt를 전달한다.
 
 ### 2. Multi-selection
 
-Add a `group-uniform` renderer adapter behind the same transient Interface. It must preflight the
-whole selection and present all-or-none. A retained-affine slice may admit only model types whose
-planner semantics are matrix-equivalent; the general solution is an isolated ephemeral scene
-produced by `planStudioGroupUniformResize`. Selection UI must pass document facts and node resolution
-only—eligibility, caches, clips, masks, and renderer ownership remain inside the adapter.
+같은 transient interface 뒤에 `group-uniform` adapter를 추가한다. 전체 selection을 preflight하고
+all-or-none으로 표시한다. 일반 해법은 `planStudioGroupUniformResize`가 만든 격리 ephemeral scene이다.
+UI는 document fact와 node resolution만 전달하고 eligibility, cache, clip, mask, renderer ownership은
+adapter가 소유한다.
 
-### 3. Drawing gestures
+### 3. Drawing gesture
 
-Wrap the existing live drawing rAF pumps in the common begin/offer/finish/cancel lifecycle. Drawing
-keeps its specialized incremental renderers, but lease/cancel/late-frame/history rules become the
-same as transforms. A drawing terminal frame still seals through its existing one-shot commit.
+기존 drawing rAF pump를 공통 begin/offer/finish/cancel 수명주기로 감싼다. 전문 incremental renderer는
+유지하지만 lease, cancel, late frame, history 규칙을 transform과 통일한다. terminal frame은 기존
+one-shot commit으로 seal한다.
 
-### 4. Renderer replacement
+### 4. Renderer 교체
 
-Keep geometry planning and the common lifecycle in-process and renderer-free. Konva remains one
-local-substitutable adapter. CanvasKit/Vello/WebGPU adapters may consume the same absolute frame and
-either apply a retained matrix or render an ephemeral scene-IR candidate. Unsupported capabilities
-must neutralize and retain the release-only commit path, never silently approximate.
+geometry planning과 공통 lifecycle은 renderer-free로 유지한다. Konva는 교체 가능한 adapter 하나다.
+CanvasKit/Vello/WebGPU adapter는 같은 absolute frame을 받아 retained matrix 또는 ephemeral SceneIR을
+표시한다. 미지원 capability는 neutralize하고 release-only를 유지하며 근사하지 않는다.
 
-### 5. Strict whole-document pixel parity
+### 5. 전체 문서 pixel parity
 
-The current exact lift refuses any later visible painting sibling, preserving correctness at the
-cost of live eligibility. A less conservative implementation needs an overlap gate that includes
-shadows/filters/clips, an in-place draft slot, or prefix/candidate/suffix render surfaces. A durable
-scene-node matrix naturally keeps the original z slot and is the preferred end state.
+현재 exact lift는 뒤에 보이는 paint sibling이 하나라도 있으면 거절한다. 더 넓히려면 shadow/filter/clip을
+포함한 overlap gate, in-place draft slot 또는 prefix/candidate/suffix surface가 필요하다. 원래 z slot을
+유지하는 durable scene-node matrix가 선호하는 최종 구조다.
 
-## Release gates
+## 릴리스 게이트
 
-- Unit: lifecycle exactly-once behavior, all cancel reasons, setup/cleanup failures, generation
-  isolation, commit rejection/throw, and terminal handoff timeout.
-- Planner: non-uniform width/points parity, route thresholds, coordinate/width rejection, rotation,
-  arrow and companion geometry.
-- Renderer: affine/model mode switching, clip switching, source visibility, Layer ordering,
-  identity isolation, late callback invalidation, cancel and commit receipt.
-- Browser: trusted handle drag while pointer is held, transient motion before mouseup, durable and
-  history state unchanged mid-gesture, one history entry on release, Escape rollback before late
-  mouseup, and complete neutral attrs afterward. Evidence must sample the native Konva SceneCanvas
-  backing pixels (not an exported/offscreen rerender), prove the source footprint was replaced, and
-  match proxy translation plus width/height ratios during the held top-left resize.
-- Performance: 100+ input events coalesce to one latest presentation per frame; document Layer
-  draws only at begin/finish; one-stroke draft memory stays bounded; geometry/planning CPU targets
-  6-8ms and presented-frame p95 targets 16.7ms on the 60Hz tier (33ms fallback tier). Ratchets cover
-  2k/10k/50k samples, causal/perfect/calligraphy, dropped frames, document-Layer draw count and GC
-  spikes. The current main-thread exact lane is admitted conservatively until those browser
-  ratchets and the progressive worker/GPU lane exist.
+- Unit: exactly-once lifecycle, 모든 cancel reason, setup/cleanup 실패, generation 격리,
+  commit reject/throw, terminal timeout
+- Planner: non-uniform point/width parity, route threshold, coordinate/width 거절, rotation,
+  arrow·companion geometry
+- Renderer: mode 전환, clip, source visibility, Layer ordering, identity 격리, late callback,
+  cancel·commit receipt
+- Browser: pointer hold 중 transient motion, mouseup 전 durable/history 불변, release 시 history 1건,
+  Escape rollback, native Konva SceneCanvas backing pixel 증거
+- Performance: 100+ input event를 frame당 최신 표시 하나로 coalesce, document Layer draw는 begin/finish,
+  one-stroke draft memory bounded, geometry/planning 6~8ms, 60Hz p95 16.7ms, fallback tier 33ms
+
+2k/10k/50k sample, causal/perfect/calligraphy, dropped frame, document-Layer draw 수와 GC spike를 ratchet으로
+검증한다. Worker/GPU progressive lane이 완성될 때까지 main-thread exact lane은 보수적으로 admission한다.

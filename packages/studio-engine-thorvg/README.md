@@ -1,16 +1,16 @@
 # @toonspectrum/studio-engine-thorvg
 
-Bounded ThorVG WebCanvas provider for safe SVG and Lottie specialist islands.
+안전한 SVG·Lottie 전문 island를 위한 bounded ThorVG WebCanvas provider다.
 
-- `audit` is dependency-light and runs before any WASM or renderer initialization.
-- `runtime` is dynamically imported only after the immutable provider plan selects ThorVG.
-- Exactly one of `wg`, `gl`, or `sw` is selected for a request. Runtime failure never retries another backend or Vello.
-- Active/external SVG surfaces, Lottie expressions and external image assets are rejected.
-- `wasm/thorvg.wasm` is copied byte-for-byte from `@thorvg/webcanvas@1.1.2` and pinned by `INTEGRITY.sha256`.
-- Canvas paint is detached and disposed before the canvas/backend is destroyed; the process-global engine is terminated only after the final lease releases.
+- `audit`은 WASM이나 renderer 초기화 전에 실행하는 경량 의존성 검사다.
+- immutable provider plan이 ThorVG를 선택한 뒤에만 `runtime`을 동적 import한다.
+- 요청마다 `wg`, `gl`, `sw` 중 정확히 하나만 선택한다. 실패해도 다른 backend나 Vello를 재시도하지 않는다.
+- 활성·외부 SVG surface, Lottie expression, 외부 image asset을 거부한다.
+- `wasm/thorvg.wasm`은 `@thorvg/webcanvas@1.1.2`의 바이트를 그대로 복사하고 `INTEGRITY.sha256`으로 고정한다.
+- Canvas paint를 분리·dispose한 뒤 canvas/backend를 제거한다. process-global engine은 마지막 lease가 해제된 뒤 종료한다.
 
-Browser lifecycle verification:
+브라우저 수명주기 검증:
 
-```bash
+```sh
 pnpm run verify:studio-thorvg-browser
 ```

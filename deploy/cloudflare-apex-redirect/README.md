@@ -1,21 +1,18 @@
 # ToonStudio apex canonical redirect
 
-This Worker owns only the Cloudflare zone route `toonstudio.cloud/*` and returns
-an HTTP `308` to the same path and query on `https://www.toonstudio.cloud`.
-Keeping this redirect separate lets the main `toonspectrum-web` Static Assets
-Worker continue to serve `www.toonstudio.cloud/*` without forcing every static
-request through Worker code.
+이 Worker는 Cloudflare zone route `toonstudio.cloud/*`만 소유하고 같은 path와 query를
+`https://www.toonstudio.cloud`로 HTTP 308 redirect한다. main `toonspectrum-web` Static Assets Worker는
+`www.toonstudio.cloud/*`를 계속 제공하므로 모든 정적 요청이 Worker code를 통과하지 않는다.
 
-## Verify
+## 검증
 
-```bash
+```sh
 pnpm run verify:cloudflare-apex-redirect
 ```
 
-The least-privilege deployment token uploads and deploys Worker Versions but
-does not mutate zone routes. Upload and promote a reviewed version with:
+최소 권한 token은 Worker Version을 upload·deploy하지만 zone route를 변경하지 않는다.
 
-```bash
+```sh
 pnpm exec wrangler versions upload \
   --config deploy/cloudflare-apex-redirect/wrangler.jsonc \
   --message "toonstudio apex canonical redirect"
@@ -25,11 +22,10 @@ pnpm exec wrangler versions deploy <version-id>@100 \
   --yes
 ```
 
-The Cloudflare Dashboard must retain this production route:
+Cloudflare Dashboard에서 다음 production route를 유지한다.
 
 - pattern: `toonstudio.cloud/*`
 - zone: `toonstudio.cloud`
 - failure mode: fail-open
 
-The `workers.dev` URL remains enabled as a canary. It is not a canonical public
-URL and always redirects to the `www` origin.
+`workers.dev` URL은 canary로 유지하며 canonical public URL이 아니다. 항상 `www` origin으로 redirect한다.

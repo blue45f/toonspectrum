@@ -553,7 +553,7 @@ CURRENT_STORAGE_BOUNDARY
 CURRENT_WORKER_BOUNDARY
 ```
 
-결과는 `docs/rewrite/current-studio-boundary.md`에 파일 경로와 의존성 그래프로 기록한다.
+결과는 `docs/architecture/studio-current-boundaries.md`에 파일 경로와 의존성 그래프로 기록한다.
 
 ## 12.3 논리 모듈은 현재 Studio 안에 배치
 

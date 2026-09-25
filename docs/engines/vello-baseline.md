@@ -1,6 +1,6 @@
 # Vello Baseline Pin (V14 current / V12 history)
 
-- 요구 근거: `docs/architecture/ToonStudio_Codex_Vello차세대엔진_공격적활용_기존Studio전면교체_V12_2026-08-08.md` §4.1
+- 요구 근거: `docs/architecture/ToonStudio_Vello차세대엔진_공격적활용_CSP초월_인플레이스최종아키텍처_V12_2026-08-08.md`의 Vello 핀·vendor 요구
   — "정확한 commit, Cargo.lock, source URL, license를 `docs/engines/vello-baseline.md`에 기록한다."
 - 핀의 단일 진실 원천: `crates/studio-engine-vello/Cargo.lock` (아래 버전 전부 이 파일에서 실측).
   직접 의존 선언은 `crates/studio-engine-vello/Cargo.toml`.

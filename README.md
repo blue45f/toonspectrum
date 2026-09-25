@@ -18,25 +18,35 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
 
 ## 현재 저장소와 개발 기준
 
-2026-09-25 기준 ToonSpectrum은 하나의 모노레포에서 사용자 웹, 관리자 웹, API와 Studio 핵심 패키지를 함께 관리합니다. 도메인은 아직 별도 `packages/domains/*`로 쪼개지 않고 각 애플리케이션 안에서 논리적으로 구분합니다.
+2026-09-26 기준 ToonSpectrum은 하나의 모노레포에서 Web, Admin, API, Mobile, Desktop Sync,
+선택형 서비스와 Studio 핵심 패키지를 함께 관리합니다. 도메인은 `packages/domains/*`로 분리하지 않고
+각 애플리케이션 안에서 논리적으로 구성합니다.
 
 ```text
 apps/
-  web/                 사용자용 Vite/React 애플리케이션
-  admin-web/           독립 빌드 가능한 관리자 UI(기능 이전 중)
+  web/                 사용자·창작자용 Vite/React 애플리케이션
+  admin-web/           독립 관리자 UI, 기능 이전 중
   api/                 NestJS API
+  mobile/              Capacitor Android/iOS wrapper
+  desktop-sync/        로컬·클라우드 양방향 동기화
+services/
+  creator-inference/   선택형 GPU 추론 서비스
 packages/
-  contracts/           Web/Admin/API가 실제로 공유하는 런타임 중립 계약
-  studio-*/            Studio 문서·명령·렌더링 등 집중 패키지
-openwiki/              코드 기반 탐색·설명 문서
-docs/                  ADR·아키텍처·운영·역사적 증거 문서
+  contracts/           Web/Admin/API가 실제로 공유하는 runtime-neutral 계약
+  studio-*/            Studio 문서·명령·렌더링 focused package
+tests/integration/     앱·패키지 사이 교차 경계 테스트
+tools/                 제품 번들 밖의 authoring·automation·DCC 도구
+openwiki/              코드 기반 탐색 문서
+docs/                  현재 문서, ADR와 역사적 증거
 ```
 
 - **현재 구조:** [ARCHITECTURE.md](ARCHITECTURE.md)
-- **합의된 목표/마이그레이션:** [docs/architecture/modular-monorepo-target.md](docs/architecture/modular-monorepo-target.md)
+- **문서 지도:** [docs/README.md](docs/README.md)
+- **목표와 마이그레이션:** [docs/architecture/modular-monorepo-target.md](docs/architecture/modular-monorepo-target.md)
+- **Studio 현재 경계:** [docs/architecture/studio-current-boundaries.md](docs/architecture/studio-current-boundaries.md)
 - **운영·배포 권위:** [DEPLOY.md](DEPLOY.md)와 [최소 비용 배포 정책](docs/operations/minimum-cost-deployment-policy.md)
 - **AI/문서 탐색:** [openwiki/quickstart.md](openwiki/quickstart.md)
-- 문서 권위는 **source/tests → accepted ADR → architecture docs → OpenWiki** 순서입니다.
+- 문서 권위는 **source/tests → 기계 원장·ratchet → 현재 아키텍처 문서 → ADR → 역사 자료 → OpenWiki** 순서입니다.
 
 ## 왜 만들었나 — 기존 서비스의 빈자리
 
@@ -399,28 +409,39 @@ Studio writer를 drain해야 합니다. Render pre-deploy 등 다른 migration w
 
 ```text
 apps/
-  web/               사용자용 Vite·React 브라우저 애플리케이션
-    src/app/          부트스트랩·라우팅·앱 셸
-    src/domains/      앱 내부의 논리적 업무 도메인
-    src/platform/     HTTP·브라우저·storage·외부 integration adapter
-    src/shared/       도메인 독립 UI·hook·navigation·SEO·공용 코드
-    public/           그대로 배포되는 정적 자산
-  admin-web/         독립 빌드 가능한 관리자 surface(기능 이전 중)
-    src/app/
-    src/domains/
-    src/shared/
-    src/platform/
-  api/               NestJS 백엔드 workspace package
+  web/                       사용자·창작자용 Vite/React Web
+    index.html
+    vite.config.ts
+    src/{app,domains,platform,shared}/
+    public/
+  admin-web/                 독립 관리자 Web
+    src/{app,domains,platform,shared}/
+  api/                       NestJS backend
+    drizzle.config.ts
+    src/{modules,infrastructure,db,server,...}/
+  mobile/                    Capacitor Android/iOS wrapper
+  desktop-sync/              로컬·cloud 동기화
+services/
+  creator-inference/         선택형 GPU inference worker
 packages/
-  contracts/         실제 Web/Admin/API 공용 런타임 중립 계약
-  core/              기존 공용 순수 모델/계약
-  studio-*/          Studio 핵심 엔진·문서·명령 패키지
-openwiki/            코드 기반 탐색·설명 레이어
-docs/                ADR·아키텍처·운영·역사적 증거
-scripts/, tools/     저장소 횡단 생성·검증 도구
+  contracts/                 교차 앱 runtime-neutral 계약
+  core/                      기존 공용 순수 모델·계약
+  studio-*/                  Studio engine·document·command package
+tests/
+  integration/               Web/Admin/API/package 교차 경계 테스트
+  benchmarks/                성능·품질 비교
+  corpus/                    검증 코퍼스
+tools/                       authoring·automation·DCC utility
+data/                        검토된 카탈로그·asset release 자료
+deploy/                      Cloudflare·Coturn 등 배포 단위
+config/                      기계 정책과 아키텍처 ratchet
+openwiki/                    탐색·설명 보조 문서
+docs/                        현재 문서, ADR, 역사 자료
 ```
 
-`packages/domains/*`는 아직 만들지 않습니다. 기능은 먼저 각 앱의 `domains/<domain>/<capability>`에 두고, 실제 두 번째 소비자가 생긴 좁은 계약만 `packages/contracts` 등으로 승격합니다.
+`packages/domains/*`는 만들지 않습니다. 기능은 먼저 각 앱의
+`domains/<domain>/<capability>`에 두고, 실제 두 번째 소비자가 생긴 좁은 계약만
+`packages/contracts` 같은 focused package로 승격합니다.
 
 <br/>
 
@@ -428,8 +449,13 @@ scripts/, tools/     저장소 횡단 생성·검증 도구
 
 ## 저장소 구조 원칙
 
-브라우저 애플리케이션은 `apps/web`, NestJS 백엔드는 `apps/api`에 있습니다. 웹과 API가 함께 사용하는 계약·엔진은 `packages`에 두고, 저장소 전용 검증 코드는 `scripts`, `tools`, `e2e`, `tests`에 둡니다. 경계와 경로 규칙은 [ARCHITECTURE.md](ARCHITECTURE.md)를 참고하세요.
+배포 가능한 애플리케이션은 `apps/`, 선택형 독립 서비스는 `services/`, 안정된 공용 계약과 엔진은
+`packages/`에 둡니다. 교차 앱 테스트는 `tests/integration`, 제품 번들 밖의 제작 도구는 `tools/`가
+소유합니다. 정확한 경계와 ratchet은 [ARCHITECTURE.md](ARCHITECTURE.md)를 따릅니다.
 
 ### 런타임 소스 지도
 
-프런트엔드는 `apps/web/src/app`(부트스트랩·라우팅), `apps/web/src/domains`(기능 도메인), `apps/web/src/platform`(기술 adapter), `apps/web/src/shared`(도메인 독립 UI·hook·navigation·SEO)를 중심으로 구성합니다. 백엔드 기능은 `apps/api/src/modules`, 외부 서비스 어댑터는 `apps/api/src/infrastructure`, 스키마·마이그레이션은 `apps/api/src/db`, 서버 유스케이스는 `apps/api/src/server`에 둡니다. 운영 HTTP 진입점은 Render에서 실행되는 `apps/api/src/main.ts` 하나입니다.
+Web과 Admin은 `app/domains/platform/shared` 소유권을 사용합니다. API 기능은
+`apps/api/src/modules`, 외부 adapter는 `apps/api/src/infrastructure`, schema·migration은
+`apps/api/src/db`가 소유합니다. `apps/api/src/server`와 `common`은 점진적으로 축소하는 레거시
+경계입니다. 운영 HTTP 진입점은 `apps/api/src/main.ts`입니다.
