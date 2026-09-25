@@ -66,6 +66,7 @@ function optionalApiRequestUrl(value: string, origin: string): boolean {
       "/api/studio-ai/status",
     ].includes(url.pathname)
     || url.pathname.startsWith("/api/analytics/traffic/")
+    || url.pathname.startsWith("/api/studio-project-graph/")
   );
 }
 
@@ -138,10 +139,23 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
       const start = activePage.getByRole("button", { name: /웹툰 시작|Start Webtoon/u });
       await start.waitFor({ state: "visible", timeout: 30_000 });
       await start.click();
-      await activePage.waitForURL(/\/studio\/p\/[^/]+\/d\/[^?]+/u, { timeout: 30_000 });
-      const documentMatch = new URL(activePage.url()).pathname.match(/\/studio\/p\/[^/]+\/d\/([^/]+)/u);
-      if (documentMatch?.[1]) {
-        autosaveKey = studioAutosaveKey({ workId: decodeURIComponent(documentMatch[1]) });
+      await activePage.waitForURL(
+        /\/studio\/(?:p\/[^/]+\/(?:d\/[^/?]+|[^/?]+)|work\/[^/]+\/[^/?]+)/u,
+        { timeout: 30_000 },
+      );
+      const currentPath = new URL(activePage.url()).pathname;
+      const documentMatch = currentPath.match(/\/studio\/p\/[^/]+\/d\/([^/]+)/u);
+      const projectMatch = currentPath.match(/\/studio\/p\/([^/]+)\//u);
+      const workMatch = currentPath.match(/\/studio\/work\/([^/]+)\//u);
+      const rawWorkId = documentMatch?.[1] ?? workMatch?.[1] ?? projectMatch?.[1];
+      assert.ok(rawWorkId, `could not resolve work id from ${currentPath}`);
+      const workId = decodeURIComponent(rawWorkId);
+      autosaveKey = studioAutosaveKey({ workId });
+      if (!documentMatch && !workMatch) {
+        await activePage.goto(
+          `${origin}/studio/work/${encodeURIComponent(workId)}/canvas`,
+          { waitUntil: "domcontentloaded" },
+        );
       }
       await viewport.waitFor({ state: "visible", timeout: 30_000 });
     }
