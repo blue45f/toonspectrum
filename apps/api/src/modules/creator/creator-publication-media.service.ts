@@ -141,6 +141,7 @@ export async function fetchCreatorPublicationMediaObject(
 @Injectable()
 export class CreatorPublicationMediaService {
   constructor(
+    @Inject(CreatorPublicationMediaRepository)
     private readonly repository: CreatorPublicationMediaRepository,
     @Optional()
     @Inject(PRIVATE_OBJECT_STORAGE_PORT)
