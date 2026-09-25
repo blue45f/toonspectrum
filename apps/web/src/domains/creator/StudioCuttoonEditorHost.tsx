@@ -1296,12 +1296,9 @@ import {
   type StudioWorkspaceLayout,
   type StudioWorkspaceLoadResult,
 } from "./studio-workspaces";
-import {
-  createEmptyStudioWriterRoomDocument,
-  normalizeStudioWriterRoomDocument,
-  replaceStudioWriterRoomStage,
-  type StudioWriterRoomDocument,
-  type StudioWriterRoomStage,
+import type {
+  StudioWriterRoomDocument,
+  StudioWriterRoomStage,
 } from "./studio-writer-room";
 import {
   projectStudioWriterRoomToCanvasPlan,
@@ -1457,6 +1454,20 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/compat/auth-session-store";
+
+type StudioWriterRoomRuntime = Pick<
+  typeof import("./studio-writer-room"),
+  "createEmptyStudioWriterRoomDocument"
+    | "normalizeStudioWriterRoomDocument"
+    | "replaceStudioWriterRoomStage"
+>;
+
+let studioWriterRoomRuntimePromise: Promise<StudioWriterRoomRuntime> | null = null;
+
+function loadStudioWriterRoomRuntime(): Promise<StudioWriterRoomRuntime> {
+  studioWriterRoomRuntimePromise ??= import("./studio-writer-room");
+  return studioWriterRoomRuntimePromise;
+}
 
 const bi = <T,>(ko: T, en: T): T =>
   translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
@@ -14666,16 +14677,22 @@ const puppetWarpArmed =
           referenceBoard?: unknown;
           publishPack?: unknown;
         };
-        const normalizedReleaseSchedule = remixId
-          ? createEmptyStudioReleaseScheduleSnapshot()
-          : await normalizeStudioReleaseScheduleDeferred(doc?.releaseSchedule);
+        const [
+          normalizedReleaseSchedule,
+          normalizedPublicationAnalytics,
+          writerRoomRuntime,
+        ] = await Promise.all([
+          remixId
+            ? Promise.resolve(createEmptyStudioReleaseScheduleSnapshot())
+            : normalizeStudioReleaseScheduleDeferred(doc?.releaseSchedule),
+          remixId
+            ? Promise.resolve(createEmptyStudioPublicationAnalyticsSnapshot())
+            : normalizeStudioPublicationAnalyticsDeferred(doc?.publicationAnalytics),
+          loadStudioWriterRoomRuntime(),
+        ]);
+        // Optional sidecars must settle before the single hydration mutation begins. Route teardown
+        // still invalidates every result before it reaches React state.
         if (!alive || controller.signal.aborted) return;
-        const normalizedPublicationAnalytics = remixId
-          ? createEmptyStudioPublicationAnalyticsSnapshot()
-          : await normalizeStudioPublicationAnalyticsDeferred(doc?.publicationAnalytics);
-        // Optional analytics must not make a document without analytics depend on its chunk, and
-        // every async dependency still settles before the single hydration mutation begins.
-        if (!alive) return;
         const parsedProject = creatorWorkSnapshotToStudioProject(w);
         const hasLinked3dRender = parsedProject.pagesList.some(
           (page) => page.linked3dRender !== undefined,
@@ -14768,8 +14785,8 @@ const puppetWarpArmed =
         // ref 까지 함께 옮겨야 같은 태스크의 첫 사이드카 편집이 낡은 `before` 를 기록하지 않는다.
         const hydratedCharacterBible = normalizeStudioCharacterBible(doc?.characterBible);
         const hydratedWriterRoom = remixId
-          ? createEmptyStudioWriterRoomDocument()
-          : normalizeStudioWriterRoomDocument(doc?.writerRoom);
+          ? writerRoomRuntime.createEmptyStudioWriterRoomDocument()
+          : writerRoomRuntime.normalizeStudioWriterRoomDocument(doc?.writerRoom);
         hydrateSourceSidecarsFromEffect({
           characterBible: hydratedCharacterBible,
           writerRoom: hydratedWriterRoom,
@@ -15239,14 +15256,27 @@ const puppetWarpArmed =
       setWriterRoomAiBusy(false);
     }
   }
-  function applyWriterRoomAiReview() {
-    if (!writerRoomAiReview || collaborationDocumentLocked) return;
-    setWriterRoom((current) =>
-      replaceStudioWriterRoomStage(current, writerRoomAiReview.stage, writerRoomAiReview.draft)
-    );
-    setSharedDocumentNotice(null);
-    setWriterRoomAiReview(null);
-    setWriterRoomAiError(null);
+  async function applyWriterRoomAiReview() {
+    const review = writerRoomAiReview;
+    if (!review || collaborationDocumentLocked || writerRoomAiBusy) return;
+    const mutationTicket = captureStudioMutationTicket();
+    setWriterRoomAiBusy(true);
+    try {
+      const { replaceStudioWriterRoomStage } = await loadStudioWriterRoomRuntime();
+      if (!canApplyStudioMutation(mutationTicket)) return;
+      setWriterRoom((current) =>
+        replaceStudioWriterRoomStage(current, review.stage, review.draft)
+      );
+      setSharedDocumentNotice(null);
+      setWriterRoomAiReview(null);
+      setWriterRoomAiError(null);
+    } catch {
+      if (canApplyStudioMutation(mutationTicket)) {
+        setWriterRoomAiError("작가실 적용 도구를 불러오지 못했습니다. 다시 시도해 주세요.");
+      }
+    } finally {
+      if (canApplyStudioMutation(mutationTicket)) setWriterRoomAiBusy(false);
+    }
   }
   function cancelWriterRoomAi() {
     writerRoomAiAbortRef.current?.abort();
@@ -26556,6 +26586,7 @@ function clearSelectionForEdit() {
   function applyStudioProjectSnapshotWithPreparedDocuments(
     projectData: StudioProjectFile,
     normalizeReleaseSchedule: (value: unknown) => StudioReleaseSchedule,
+    normalizeWriterRoomDocument: (value: unknown) => StudioWriterRoomDocument,
     publicationAnalyticsDocument: StudioPublicationAnalyticsDocument,
   ): boolean {
     if (!editorMountedRef.current) return false;
@@ -26629,7 +26660,7 @@ function clearSelectionForEdit() {
     setMaster(normalizeDocumentMaster(projectData.master) as DocumentMaster<El>);
     hydrateStudioSidecarDocuments({
       characterBible: normalizeStudioCharacterBible(projectData.characterBible),
-      writerRoom: normalizeStudioWriterRoomDocument(projectData.writerRoom),
+      writerRoom: normalizeWriterRoomDocument(projectData.writerRoom),
     });
     setAiProvenance(
       recoverInterruptedStudioAiOperations(
@@ -26650,15 +26681,18 @@ function clearSelectionForEdit() {
     const mutationTicket = captureStudioMutationTicket();
     const [
       { normalizeStudioReleaseSchedule },
+      { normalizeStudioWriterRoomDocument },
       publicationAnalyticsDocument,
     ] = await Promise.all([
       loadStudioReleaseScheduleRuntime(),
+      loadStudioWriterRoomRuntime(),
       normalizeStudioPublicationAnalyticsDeferred(projectData.publicationAnalytics),
     ]);
     if (!canApplyStudioMutation(mutationTicket)) return false;
     return applyStudioProjectSnapshotWithPreparedDocuments(
       projectData,
       normalizeStudioReleaseSchedule,
+      normalizeStudioWriterRoomDocument,
       publicationAnalyticsDocument,
     );
   }

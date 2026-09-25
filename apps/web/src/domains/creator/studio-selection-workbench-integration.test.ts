@@ -33,6 +33,17 @@ describe("studio pixel-selection workbench integration", () => {
     expect(hudSource).toContain("data-studio-pixel-selection-hud=\"true\"");
   });
 
+  it("loads the selection-refinement kernel only when smoothing is requested", () => {
+    const workbenchSource = readCreatorFile("StudioSelectionWorkbenchPanel.tsx");
+    const canvasSource = readCreatorFile("studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx");
+
+    expect(workbenchSource).toContain('from "./studio-selection-refinement-contract"');
+    expect(workbenchSource).toContain('import("./studio-selection-refinement")');
+    expect(workbenchSource).not.toContain('from "./studio-selection-refinement"');
+    expect(canvasSource).toContain('import("../studio-selection-refinement")');
+    expect(canvasSource).not.toContain('from "../studio-selection-refinement"');
+  });
+
   it("does not claim menubar coverage for inspector-only and contextual capabilities", () => {
     const selectGroup = STUDIO_MENU_GROUP_SPEC.find((group) => group.id === "select");
     expect(selectGroup).toBeTruthy();

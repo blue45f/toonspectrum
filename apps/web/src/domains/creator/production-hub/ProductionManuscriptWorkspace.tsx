@@ -30,6 +30,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
+  lazy,
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -68,15 +70,7 @@ import {
   productionManuscriptMetrics,
   type ProductionManuscriptProcess,
 } from "./production-manuscript-model";
-import { ProductionAdoptionCenter } from "./ProductionAdoptionCenter";
-import { ProductionEpisodeProcessMatrix } from "./ProductionEpisodeProcessMatrix";
-import { ProductionFocusedAiWorkflow } from "./ProductionFocusedAiWorkflow";
 import { ProductionManuscriptDeliveryHub } from "./ProductionManuscriptDeliveryHub";
-import { ProductionMultiManuscriptWorkbench } from "./ProductionMultiManuscriptWorkbench";
-import { ProductionPageManifestBuilder } from "./ProductionPageManifestBuilder";
-import { ProductionQuickExportPanel } from "./ProductionQuickExportPanel";
-import { ProductionRolePresetPanel } from "./ProductionRolePresetPanel";
-import { ProductionUnifiedManuscriptFlow } from "./ProductionUnifiedManuscriptFlow";
 import { buildProductionReviewCandidates } from "./production-manuscript-competitive-model";
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionManuscriptLifecyclePanel } from "./ProductionManuscriptLifecyclePanel";
@@ -92,6 +86,31 @@ import {
   type ProductionManuscriptLayout,
   type ProductionManuscriptSort,
 } from "./production-manuscript-ux";
+
+const ProductionAdoptionCenter = lazy(async () => ({
+  default: (await import("./ProductionAdoptionCenter")).ProductionAdoptionCenter,
+}));
+const ProductionEpisodeProcessMatrix = lazy(async () => ({
+  default: (await import("./ProductionEpisodeProcessMatrix")).ProductionEpisodeProcessMatrix,
+}));
+const ProductionFocusedAiWorkflow = lazy(async () => ({
+  default: (await import("./ProductionFocusedAiWorkflow")).ProductionFocusedAiWorkflow,
+}));
+const ProductionMultiManuscriptWorkbench = lazy(async () => ({
+  default: (await import("./ProductionMultiManuscriptWorkbench")).ProductionMultiManuscriptWorkbench,
+}));
+const ProductionPageManifestBuilder = lazy(async () => ({
+  default: (await import("./ProductionPageManifestBuilder")).ProductionPageManifestBuilder,
+}));
+const ProductionQuickExportPanel = lazy(async () => ({
+  default: (await import("./ProductionQuickExportPanel")).ProductionQuickExportPanel,
+}));
+const ProductionRolePresetPanel = lazy(async () => ({
+  default: (await import("./ProductionRolePresetPanel")).ProductionRolePresetPanel,
+}));
+const ProductionUnifiedManuscriptFlow = lazy(async () => ({
+  default: (await import("./ProductionUnifiedManuscriptFlow")).ProductionUnifiedManuscriptFlow,
+}));
 
 type ManuscriptView = "processes" | "workbench" | "versions" | "feedback" | "delivery" | "assistant" | "permissions" | "start" | "activity";
 
@@ -265,6 +284,19 @@ function Metric({ label, value, detail, tone = "neutral" }: {
     <p className="mt-1 text-2xl font-black text-fg">{value}</p>
     <p className="mt-1 text-xs text-fg-2">{detail}</p>
   </div>;
+}
+
+function ManuscriptFeatureFallback({ label }: { readonly label: string }) {
+  return <section
+    className="rounded-2xl border border-line bg-card p-5"
+    role="status"
+    aria-label={`${label} 불러오는 중`}
+  >
+    <div className="flex min-h-20 items-center justify-center gap-2 text-sm font-semibold text-fg-2">
+      <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+      {label} 불러오는 중…
+    </div>
+  </section>;
 }
 
 function ManuscriptWorkspaceSkeleton() {
@@ -966,14 +998,16 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       aria-labelledby="manuscript-tab-processes"
       className="space-y-4"
     >
-      <ProductionEpisodeProcessMatrix
-        aggregate={aggregate}
-        processes={allProcesses}
-        canEdit={canEditProject}
-        isDemo={isDemo}
-        execute={execute}
-        onOpenProcess={(process, destination) => selectProcess(process, destination)}
-      />
+      <Suspense fallback={<ManuscriptFeatureFallback label="회차·공정 매트릭스" />}>
+        <ProductionEpisodeProcessMatrix
+          aggregate={aggregate}
+          processes={allProcesses}
+          canEdit={canEditProject}
+          isDemo={isDemo}
+          execute={execute}
+          onOpenProcess={(process, destination) => selectProcess(process, destination)}
+        />
+      </Suspense>
       {browserSelectedProcess ? <ProductionManuscriptLifecyclePanel
         process={browserSelectedProcess}
         compact
@@ -1013,10 +1047,12 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       role="tabpanel"
       aria-labelledby="manuscript-tab-workbench"
     >
-      <ProductionMultiManuscriptWorkbench
-        candidates={reviewCandidates}
-        preferredReviewId={selectedReview?.id ?? null}
-      />
+      <Suspense fallback={<ManuscriptFeatureFallback label="전문 비교 작업대" />}>
+        <ProductionMultiManuscriptWorkbench
+          candidates={reviewCandidates}
+          preferredReviewId={selectedReview?.id ?? null}
+        />
+      </Suspense>
     </div> : null}
 
     {view === "versions" ? <div
@@ -1027,14 +1063,16 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="versions" onSelect={selectProcess} />
       {selectedProcess ? <ProductionManuscriptLifecyclePanel process={selectedProcess} onOpen={openLifecycleDestination} /> : null}
-      <ProductionPageManifestBuilder
-        projectId={data.project.id}
-        workId={data.project.workId}
-        targetProcess={selectedProcess}
-        editorHref={editorHref}
-        candidates={reviewCandidates}
-        canEdit={canEditProject}
-      />
+      <Suspense fallback={<ManuscriptFeatureFallback label="페이지 버전 조립" />}>
+        <ProductionPageManifestBuilder
+          projectId={data.project.id}
+          workId={data.project.workId}
+          targetProcess={selectedProcess}
+          editorHref={editorHref}
+          candidates={reviewCandidates}
+          canEdit={canEditProject}
+        />
+      </Suspense>
       <StudioProjectVersionStackPanel projectId={data.project.workId} locale="ko" />
     </div> : null}
 
@@ -1131,14 +1169,16 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
           <p className="mt-1 text-sm text-fg-2">Studio에서 저장된 원고를 고정 검수본으로 캡처하면 위치 피드백·개인 초안·댓글·비교·승인을 사용할 수 있습니다.</p>
         </div>}
       </section>
-      {!requestedReviewMissing ? <ProductionUnifiedManuscriptFlow
-        projectId={data.project.id}
-        workId={data.project.workId}
-        process={selectedProcess}
-        candidate={selectedReviewCandidate}
-        editorHref={editorHref}
-        onOpen={openLifecycleDestination}
-      /> : null}
+      {!requestedReviewMissing ? <Suspense fallback={<ManuscriptFeatureFallback label="통합 제작 흐름" />}>
+        <ProductionUnifiedManuscriptFlow
+          projectId={data.project.id}
+          workId={data.project.workId}
+          process={selectedProcess}
+          candidate={selectedReviewCandidate}
+          editorHref={editorHref}
+          onOpen={openLifecycleDestination}
+        />
+      </Suspense> : null}
     </div> : null}
 
     {view === "delivery" ? <div
@@ -1149,12 +1189,14 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="delivery" onSelect={selectProcess} />
       {selectedProcess ? <ProductionManuscriptLifecyclePanel process={selectedProcess} compact onOpen={openLifecycleDestination} /> : null}
-      <ProductionQuickExportPanel
-        projectId={data.project.id}
-        workId={data.project.workId}
-        candidate={selectedReviewCandidate}
-        process={selectedProcess}
-      />
+      <Suspense fallback={<ManuscriptFeatureFallback label="빠른 출력" />}>
+        <ProductionQuickExportPanel
+          projectId={data.project.id}
+          workId={data.project.workId}
+          candidate={selectedReviewCandidate}
+          process={selectedProcess}
+        />
+      </Suspense>
       <ProductionManuscriptDeliveryHub
         projectId={data.project.workId}
         subject={selectedReviewSubject}
@@ -1170,11 +1212,13 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       className="space-y-4"
     >
       <ProcessNavigator processes={processes} selected={selectedProcess} view="assistant" onSelect={selectProcess} />
-      <ProductionFocusedAiWorkflow
-        workId={data.project.workId}
-        process={selectedProcess}
-        editorHref={editorHref}
-      />
+      <Suspense fallback={<ManuscriptFeatureFallback label="비파괴 AI 보조" />}>
+        <ProductionFocusedAiWorkflow
+          workId={data.project.workId}
+          process={selectedProcess}
+          editorHref={editorHref}
+        />
+      </Suspense>
       <section className="rounded-2xl border border-line bg-card p-4">
         <div className="flex items-start gap-3">
           <Sparkles className="mt-0.5 size-5 text-accent" aria-hidden="true" />
@@ -1198,7 +1242,9 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       role="tabpanel"
       aria-labelledby="manuscript-tab-permissions"
     >
-      <ProductionRolePresetPanel canManage={data.project.access.manageMembers} />
+      <Suspense fallback={<ManuscriptFeatureFallback label="역할·권한 프리셋" />}>
+        <ProductionRolePresetPanel canManage={data.project.access.manageMembers} />
+      </Suspense>
     </div> : null}
 
     {view === "start" ? <div
@@ -1206,14 +1252,16 @@ export function ProductionManuscriptWorkspace({ aggregate, canEdit, isDemo, exec
       role="tabpanel"
       aria-labelledby="manuscript-tab-start"
     >
-      <ProductionAdoptionCenter
-        isDemo={isDemo}
-        process={selectedProcess}
-        candidate={selectedReviewCandidate}
-        editorHref={selectedProcess ? editorHref : defaultEditorHref}
-        externalReviewHref={selectedExternalReviewHref}
-        onOpen={(destination) => setView(destination)}
-      />
+      <Suspense fallback={<ManuscriptFeatureFallback label="역할별 시작 가이드" />}>
+        <ProductionAdoptionCenter
+          isDemo={isDemo}
+          process={selectedProcess}
+          candidate={selectedReviewCandidate}
+          editorHref={selectedProcess ? editorHref : defaultEditorHref}
+          externalReviewHref={selectedExternalReviewHref}
+          onOpen={(destination) => setView(destination)}
+        />
+      </Suspense>
     </div> : null}
 
     {view === "activity" ? <div

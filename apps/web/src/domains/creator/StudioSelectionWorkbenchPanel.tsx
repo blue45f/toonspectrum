@@ -26,9 +26,8 @@ import {
 import {
   PIXEL_SELECTION_SMOOTH_PRESETS,
   canSmoothPixelSelection,
-  smoothPixelSelection,
   type PixelSelectionSmoothPresetId,
-} from "./studio-selection-refinement";
+} from "./studio-selection-refinement-contract";
 import {
   STUDIO_SELECTION_SUBJECT_THRESHOLD_DEFAULT,
   STUDIO_SELECTION_SUBJECT_THRESHOLD_RANGE,
@@ -81,7 +80,7 @@ export interface StudioSelectionWorkbenchPanelProps {
   ) => void;
 }
 
-type SourceJob = "opaque" | "subject" | "border" | null;
+type SourceJob = "opaque" | "subject" | "border" | "smooth" | null;
 
 function browserStorage(explicit: StudioSelectionStorage | null | undefined): StudioSelectionStorage | null {
   if (explicit !== undefined) return explicit;
@@ -144,6 +143,7 @@ export function StudioSelectionWorkbenchPanel({
   const [sourceJob, setSourceJob] = useState<SourceJob>(null);
   const [status, setStatus] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const smoothGenerationRef = useRef(0);
 
   useEffect(() => {
     abortRef.current?.abort();
@@ -157,8 +157,12 @@ export function StudioSelectionWorkbenchPanel({
     // Changing tools/selection elsewhere in the editor must never be overwritten by this panel.
     abortRef.current?.abort();
     abortRef.current = null;
+    smoothGenerationRef.current += 1;
     setSourceJob(null);
-    return () => abortRef.current?.abort();
+    return () => {
+      abortRef.current?.abort();
+      smoothGenerationRef.current += 1;
+    };
   }, [selection, operation, imageSource, scopeKey, aspect, displayWidth, displayHeight, flipX, flipY, busy]);
 
   useEffect(() => {
@@ -274,13 +278,27 @@ export function StudioSelectionWorkbenchPanel({
     }
   };
 
-  const applySmoothPreset = (presetId: PixelSelectionSmoothPresetId) => {
+  const applySmoothPreset = async (presetId: PixelSelectionSmoothPresetId) => {
     if (!selection || smoothDisabled) return;
     const preset = PIXEL_SELECTION_SMOOTH_PRESETS.find((candidate) => candidate.id === presetId);
     if (!preset) return;
-    const next = smoothPixelSelection(selection, preset);
-    onCommitSelection(next, "smooth");
-    setStatus(`선택 경계를 ${preset.label} 다듬었습니다.`);
+    const generation = smoothGenerationRef.current + 1;
+    smoothGenerationRef.current = generation;
+    setSourceJob("smooth");
+    setStatus("선택 경계 정제기를 준비하고 있습니다.");
+    try {
+      const { smoothPixelSelection } = await import("./studio-selection-refinement");
+      if (smoothGenerationRef.current !== generation) return;
+      const next = smoothPixelSelection(selection, preset);
+      onCommitSelection(next, "smooth");
+      setStatus(`선택 경계를 ${preset.label} 다듬었습니다.`);
+    } catch {
+      if (smoothGenerationRef.current === generation) {
+        setStatus("선택 경계 정제기를 불러오지 못했습니다. 다시 시도해 주세요.");
+      }
+    } finally {
+      if (smoothGenerationRef.current === generation) setSourceJob(null);
+    }
   };
 
   const persistLibrary = (next: StudioSavedSelectionLibrary, successMessage: string) => {
@@ -461,7 +479,7 @@ export function StudioSelectionWorkbenchPanel({
               type="button"
               className="min-h-8 rounded-md border border-line bg-card px-1.5 text-[0.65rem] font-medium text-fg-2 transition hover:border-accent/50 hover:text-fg disabled:cursor-not-allowed disabled:opacity-45 pointer-coarse:min-h-11 max-lg:min-h-11"
               disabled={smoothDisabled}
-              onClick={() => applySmoothPreset(preset.id)}
+              onClick={() => { void applySmoothPreset(preset.id); }}
               aria-label={`선택 경계 ${preset.label} 스무딩`}
             >
               {preset.label}
