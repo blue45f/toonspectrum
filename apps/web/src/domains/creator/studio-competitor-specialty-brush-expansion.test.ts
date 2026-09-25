@@ -163,8 +163,8 @@ describe("competitor specialty brush expansion", () => {
     }
   });
 
-it("keeps the catalogue exhaustive and assigns unique runtime variants", () => {
-    expect(STUDIO_BRUSH_CATALOG_COUNTS.pro).toBe(200);
+  it("keeps the catalogue exhaustive and assigns unique runtime variants", () => {
+    expect(STUDIO_BRUSH_CATALOG_COUNTS.pro).toBe(207);
     expect(STUDIO_BRUSH_CATALOG_COUNTS.core).toBeGreaterThanOrEqual(99);
     expect(STUDIO_BRUSH_CATALOG_COUNTS.total).toBe(
       STUDIO_BRUSH_CATALOG_COUNTS.core + STUDIO_BRUSH_CATALOG_COUNTS.pro,

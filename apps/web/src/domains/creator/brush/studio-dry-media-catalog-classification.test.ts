@@ -21,7 +21,7 @@ describe("dry-media catalogue classification v1", () => {
   );
 
   it("classifies every shipped dry-media catalogue item exactly once", () => {
-    expect(dryDescriptors).toHaveLength(72);
+    expect(dryDescriptors).toHaveLength(74);
     expect([...anisotropicIds].filter((id) => discreteIds.has(id))).toEqual([]);
 
     const shippedIds = new Set(dryDescriptors.map(({ catalogId }) => catalogId));
@@ -51,7 +51,7 @@ describe("dry-media catalogue classification v1", () => {
   });
 
   it("preserves every new material footprint instead of substituting a generic fibre kernel", () => {
-    expect(STUDIO_DRY_MEDIA_AUTHORED_MORPHOLOGY_CATALOG_IDS_V1).toHaveLength(11);
+    expect(STUDIO_DRY_MEDIA_AUTHORED_MORPHOLOGY_CATALOG_IDS_V1).toHaveLength(13);
     for (const id of STUDIO_DRY_MEDIA_AUTHORED_MORPHOLOGY_CATALOG_IDS_V1) {
       expect(anisotropicIds.has(id)).toBe(false);
       expect(discreteIds.has(id)).toBe(false);
