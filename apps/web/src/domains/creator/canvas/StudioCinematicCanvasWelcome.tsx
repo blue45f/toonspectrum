@@ -5,6 +5,7 @@ import {
   requestStudioCreationMode,
   type StudioCreationMode,
 } from "../studio-creation-mode";
+import "./studio-cinematic-collaboration-guard.css";
 
 const ICON_ROOT = "/brand/toonstudio-premium-icons";
 const SCENE_ROOT = "/assets/studio/generated-backgrounds/gpt25-v1";
