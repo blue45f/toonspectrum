@@ -3,7 +3,6 @@ import {
   ConflictException,
   HttpException,
   HttpStatus,
-  Injectable,
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -101,7 +100,6 @@ function normalizedIdempotencyKey(value: string | undefined): string {
   return key;
 }
 
-@Injectable()
 export class CreatorIntelligenceAdmissionGuard {
   private readonly env: () => NodeJS.ProcessEnv;
   private readonly limiter: LocalAuthRateLimiter;
