@@ -283,13 +283,13 @@ function dictionaryRows(value: unknown): { rows: unknown[]; total: number } {
 export async function koreanOpenDataSearch(provider: KoreanOpenDataProvider, query: string, page: number, key: string, request: Request): Promise<ResourceSearchResult> {
   const url = koreanOpenDataUrl(provider, query, page, key);
   const usesXml = provider === "kheritage" || provider === "neis";
-  const providerHeaders = provider === "kheritage"
-    ? { "User-Agent": "ToonStudio/1.0" }
-    : provider === "neis"
-      // NEIS returns HTTP 500 when an XML-specific Accept header is sent,
-      // even though Type=xml produces a valid XML response with Accept */*.
-      ? { Accept: "*/*" }
-      : {};
+  const providerHeaders: Record<string, string> = {};
+  if (provider === "kheritage") providerHeaders["User-Agent"] = "ToonStudio/1.0";
+  if (provider === "neis") {
+    // NEIS returns HTTP 500 when an XML-specific Accept header is sent,
+    // even though Type=xml produces a valid XML response with Accept */*.
+    providerHeaders.Accept = "*/*";
+  }
   const source = await request(url, providerHeaders, usesXml ? "xml" : "json");
   if (provider === "kheritage") {
     if (!validKoreanOpenDataTextShape(url, source.value)) throw new Error("upstream_schema");
