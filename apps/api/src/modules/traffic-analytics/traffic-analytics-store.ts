@@ -7,7 +7,7 @@ import type {
 
 const RETENTION_ADVISORY_LOCK = "toonspectrum:traffic-analytics:retention:v2";
 
-type TrafficSessionRecord = Readonly<{
+export type TrafficSessionRecord = Readonly<{
   sessionHash: string;
   visitorHash: string;
   firstSeenAt: Date;
@@ -67,9 +67,15 @@ export async function persistTrafficPageView(input: {
   session: TrafficSessionRecord;
 }): Promise<void> {
   const { event, session } = input;
-  await dbPool.query(
-    `
-      WITH admitted_session AS (
+  if (event.sessionHash !== session.sessionHash || event.visitorHash !== session.visitorHash) {
+    throw new Error("트래픽 세션과 이벤트 소유자가 일치하지 않습니다.");
+  }
+  const client = await dbPool.connect();
+  try {
+    await client.query("BEGIN");
+    // PostgreSQL은 한 명령의 CTE에서 같은 row를 두 번 수정할 수 없어 별도 명령으로 나눈다.
+    await client.query(
+      `
         INSERT INTO public.traffic_session (
           session_hash,
           visitor_hash,
@@ -92,25 +98,25 @@ export async function persistTrafficPageView(input: {
           updated_at
         )
         VALUES (
-          $4,
+          $1,
+          $2,
           $3,
-          $18,
-          $19,
-          $20,
-          $21,
-          $22,
-          $23,
-          $24,
-          $25,
-          $26,
-          $27,
-          $28,
-          $29,
-          $30,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9,
+          $10,
+          $11,
+          $12,
+          $13,
+          $14,
+          $15,
           0,
-          $31,
-          $32,
-          $19
+          $16,
+          $17,
+          $4
         )
         ON CONFLICT (session_hash) DO UPDATE SET
           entry_path = CASE
@@ -183,7 +189,17 @@ export async function persistTrafficPageView(input: {
             EXCLUDED.updated_at
           )
         WHERE public.traffic_session.visitor_hash = EXCLUDED.visitor_hash
-        RETURNING session_hash, visitor_hash
+      `,
+      [session.sessionHash, session.visitorHash, session.firstSeenAt, session.lastSeenAt,
+        session.entryPath, session.lastPath, session.referrerHost, session.source,
+        session.medium, session.campaign, session.countryCode, session.deviceType,
+        session.browser, session.os, session.screenClass, session.engagedSeconds, session.isBot],
+    );
+    await client.query(
+      `
+      WITH admitted_session AS (
+        SELECT session_hash, visitor_hash FROM public.traffic_session
+        WHERE session_hash = $4 AND visitor_hash = $3
       ),
       inserted_event AS (
         INSERT INTO public.traffic_page_view (
@@ -232,42 +248,19 @@ export async function persistTrafficPageView(input: {
       FROM inserted_event
       WHERE target.session_hash = inserted_event.session_hash
         AND target.visitor_hash = inserted_event.visitor_hash
-    `,
-    [
-      event.id,
-      event.occurredAt,
-      event.visitorHash,
-      event.sessionHash,
-      event.path,
-      event.title,
-      event.referrerHost,
-      event.source,
-      event.medium,
-      event.campaign,
-      event.countryCode,
-      event.deviceType,
-      event.browser,
-      event.os,
-      event.screenClass,
-      event.loadTimeMs,
-      event.isBot,
-      session.firstSeenAt,
-      session.lastSeenAt,
-      session.entryPath,
-      session.lastPath,
-      session.referrerHost,
-      session.source,
-      session.medium,
-      session.campaign,
-      session.countryCode,
-      session.deviceType,
-      session.browser,
-      session.os,
-      session.screenClass,
-      session.engagedSeconds,
-      session.isBot,
-    ],
-  );
+      `,
+      [event.id, event.occurredAt, event.visitorHash, event.sessionHash, event.path,
+        event.title, event.referrerHost, event.source, event.medium, event.campaign,
+        event.countryCode, event.deviceType, event.browser, event.os, event.screenClass,
+        event.loadTimeMs, event.isBot],
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function persistTrafficHeartbeat(input: {

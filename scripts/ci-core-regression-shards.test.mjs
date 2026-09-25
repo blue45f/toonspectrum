@@ -105,6 +105,38 @@ test("real product selectors partition into static and mandatory PostgreSQL exec
   }
 });
 
+test("분석·분산 저장소의 비DB 테스트는 product shard에서 반드시 실행한다", () => {
+  const selectors = expandGlobTargets(executionTargetsByShard().product);
+  const executed = resolveRequiredTargets(selectors);
+  for (const target of [
+    "apps/api/src/config/env.test.ts",
+    "apps/api/src/platform/federated-data-plane/federated-data-plane-routing.test.ts",
+    "apps/api/src/platform/federated-data-plane/federated-data-plane.module.test.ts",
+    "apps/api/src/modules/admin/admin-traffic-d1-query.test.ts",
+    "apps/api/src/modules/admin/admin-traffic-query.test.ts",
+    "apps/api/src/modules/admin/admin-traffic.service.test.ts",
+    "apps/api/src/modules/health/health-analytics-readiness.test.ts",
+    "apps/api/src/modules/traffic-analytics/traffic-analytics-d1.client.test.ts",
+    "apps/api/src/modules/traffic-analytics/traffic-analytics-d1.repository.test.ts",
+    "apps/api/src/modules/traffic-analytics/traffic-analytics-repository.provider.test.ts",
+    "apps/api/src/modules/traffic-analytics/traffic-analytics-store.test.ts",
+    "apps/api/src/modules/traffic-analytics/traffic-analytics.controller.test.ts",
+    "apps/api/src/modules/traffic-analytics/traffic-analytics.service.test.ts",
+    "deploy/cloudflare-analytics/src/index.test.ts",
+    "scripts/deploy-cloudflare-analytics.test.mjs",
+    "scripts/free-database-federation.test.mjs",
+    "scripts/prepare-managed-database-bootstrap.test.mjs",
+    "scripts/provision-cloudflare-free-data-plane.test.mjs",
+    "scripts/provision-gcp-free-data-plane.test.mjs",
+  ]) {
+    assert.ok(REQUIRED_VITEST_TARGETS.includes(target), `필수 회귀 목록 누락: ${target}`);
+    assert.equal(shardForTarget(target), "product", target);
+    assert.ok(executed.includes(target), `product 실행 목록 누락: ${target}`);
+  }
+  assert.ok(!executed.includes("apps/api/src/modules/traffic-analytics/traffic-analytics-parity.postgres.test.ts"),
+    "opt-in PostgreSQL 비교는 비DB shard에서 실행하지 않는다");
+});
+
 test("directory targets remove redundant child execution without reducing coverage", () => {
   const input = [
     "apps/web/src/domains/creator/export",

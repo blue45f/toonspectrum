@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { OperationPolicyModule } from "./modules/operation-policy/operation-policy.module";
 
 import { BackendCapabilitiesModule } from "./infrastructure/backend-capabilities/backend-capabilities.module";
+import { createFederatedDataPlaneDynamicModule } from "./platform/federated-data-plane/federated-data-plane.module";
 import { ApiHttpInfrastructureModule } from "./runtime/api-http-infrastructure.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -36,6 +37,9 @@ import { StudioProjectGraphModule } from "./modules/studio-project-graph/studio-
 import { createStudioRealtimeTicketDynamicModule } from "./modules/studio-realtime-ticket/studio-realtime-ticket.integration";
 import { TrafficAnalyticsModule } from "./modules/traffic-analytics/traffic-analytics.module";
 
+const federatedDataPlaneModule =
+  createFederatedDataPlaneDynamicModule(process.env);
+
 const studioRealtimeTicketModule =
   createStudioRealtimeTicketDynamicModule(process.env);
 
@@ -43,6 +47,7 @@ const studioRealtimeTicketModule =
   imports: [
     ApiHttpInfrastructureModule,
     BackendCapabilitiesModule,
+    federatedDataPlaneModule,
     AuthModule,
     CareerConfirmationModule,
     MeModule,

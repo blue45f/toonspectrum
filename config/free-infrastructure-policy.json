@@ -1,5 +1,5 @@
 {
-  "version": "toonspectrum.free-infrastructure.v2",
+  "version": "toonspectrum.free-infrastructure.v3",
   "mode": "free-strict",
   "automaticDeployments": false,
   "automaticPaidFailover": false,
@@ -21,9 +21,9 @@
     "edgeGateway": "cloudflare-workers",
     "edgeConfiguration": "cloudflare-kv",
     "edgeRelationalIndex": "cloudflare-d1",
-    "transactionalDatabase": "neon-postgres",
+    "transactionalDatabase": "cockroachdb-basic",
     "derivedReadModels": "turso-libsql",
-    "socialDatabase": "supabase-social",
+    "socialDatabase": "tidb-community",
     "playgroundDatabase": "supabase-playground",
     "realtimeCoordination": "cloudflare-durable-objects",
     "eventDelivery": "cloudflare-queues",
@@ -34,7 +34,23 @@
     "userOwnedProjects": "user-owned-storage",
     "email": "resend",
     "batchCompute": "local-m2-runner",
-    "legacyCompute": "cloud-run-compatibility"
+    "legacyCompute": "cloud-run-compatibility",
+    "identityDatabase": "tidb-identity",
+    "projectDatabase": "tidb-projects",
+    "commerceDatabase": "tidb-commerce",
+    "communityDatabase": "tidb-community",
+    "collaborationDatabase": "tidb-collaboration",
+    "documentDatabase": "azure-cosmos-free",
+    "auditDatabase": "aws-dynamodb-free",
+    "notificationDatabase": "firestore-free",
+    "presenceDatabase": "firebase-rtdb-free",
+    "aiJobDatabase": "mongodb-atlas-m0",
+    "liveReviewDatabase": "convex-free",
+    "feedbackDatabase": "appwrite-free",
+    "analyticsDatabase": "bigquery-sandbox",
+    "adHocAnalytics": "motherduck-lite",
+    "legacyDatabase": "neon-postgres",
+    "analyticsIngestDatabase": "cloudflare-d1"
   },
   "providers": {
     "cloudflare-static-assets": {
@@ -72,7 +88,9 @@
         "edge-config-read",
         "edge-index-read",
         "edge-index-write",
-        "public-catalog-read"
+        "public-catalog-read",
+        "analytics-ingest-read",
+        "analytics-ingest-write"
       ],
       "billingBoundary": "hard-stop-free",
       "applicationHardCapRatio": 0.8
@@ -113,12 +131,12 @@
     },
     "neon-postgres": {
       "roles": [
-        "transactional-read",
-        "transactional-write",
-        "outbox-write"
+        "legacy-postgres-read",
+        "legacy-postgres-write"
       ],
       "billingBoundary": "hard-stop-free",
-      "applicationHardCapRatio": 0.8
+      "applicationHardCapRatio": 0.8,
+      "optional": true
     },
     "turso-libsql": {
       "roles": [
@@ -131,8 +149,8 @@
     },
     "supabase-social": {
       "roles": [
-        "social-read",
-        "social-write",
+        "social-compat-read",
+        "social-compat-write",
         "social-attachments"
       ],
       "billingBoundary": "hard-stop-free",
@@ -237,6 +255,134 @@
       "billingBoundary": "free-allowance-with-app-cap",
       "applicationHardCapRatio": 0.8,
       "optional": true
+    },
+    "cockroachdb-basic": {
+      "roles": [
+        "transactional-read",
+        "transactional-write",
+        "outbox-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "tidb-identity": {
+      "roles": [
+        "identity-read",
+        "identity-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "tidb-projects": {
+      "roles": [
+        "project-metadata-read",
+        "project-metadata-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "tidb-commerce": {
+      "roles": [
+        "commerce-read",
+        "commerce-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "tidb-community": {
+      "roles": [
+        "community-read",
+        "community-write",
+        "social-read",
+        "social-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "tidb-collaboration": {
+      "roles": [
+        "collaboration-read",
+        "collaboration-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "azure-cosmos-free": {
+      "roles": [
+        "project-document-read",
+        "project-document-write"
+      ],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.75,
+      "optional": true
+    },
+    "aws-dynamodb-free": {
+      "roles": [
+        "audit-event-read",
+        "audit-event-write"
+      ],
+      "billingBoundary": "free-allowance-with-app-cap",
+      "applicationHardCapRatio": 0.7,
+      "optional": true
+    },
+    "firestore-free": {
+      "roles": [
+        "notification-read",
+        "notification-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "firebase-rtdb-free": {
+      "roles": [
+        "presence-read",
+        "presence-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8
+    },
+    "mongodb-atlas-m0": {
+      "roles": [
+        "ai-job-read",
+        "ai-job-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
+    "convex-free": {
+      "roles": [
+        "live-review-read",
+        "live-review-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
+    "appwrite-free": {
+      "roles": [
+        "feedback-read",
+        "feedback-write"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
+    },
+    "bigquery-sandbox": {
+      "roles": [
+        "analytics-read",
+        "analytics-batch-load"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.75
+    },
+    "motherduck-lite": {
+      "roles": [
+        "analytics-read"
+      ],
+      "billingBoundary": "hard-stop-free",
+      "applicationHardCapRatio": 0.8,
+      "optional": true
     }
   },
   "workloads": {
@@ -295,9 +441,9 @@
     "critical-ledger-read": {
       "operation": "read",
       "consistency": "authoritative",
-      "authority": "neon-postgres",
+      "authority": "cockroachdb-basic",
       "candidates": [
-        "neon-postgres"
+        "cockroachdb-basic"
       ],
       "requiredRoles": [
         "transactional-read"
@@ -307,9 +453,9 @@
     "critical-ledger-write": {
       "operation": "write",
       "consistency": "authoritative",
-      "authority": "neon-postgres",
+      "authority": "cockroachdb-basic",
       "candidates": [
-        "neon-postgres"
+        "cockroachdb-basic"
       ],
       "requiredRoles": [
         "transactional-write"
@@ -319,9 +465,9 @@
     "outbox-write": {
       "operation": "write",
       "consistency": "authoritative",
-      "authority": "neon-postgres",
+      "authority": "cockroachdb-basic",
       "candidates": [
-        "neon-postgres"
+        "cockroachdb-basic"
       ],
       "requiredRoles": [
         "outbox-write"
@@ -331,9 +477,9 @@
     "social-read": {
       "operation": "read",
       "consistency": "authoritative",
-      "authority": "supabase-social",
+      "authority": "tidb-community",
       "candidates": [
-        "supabase-social"
+        "tidb-community"
       ],
       "requiredRoles": [
         "social-read"
@@ -343,9 +489,9 @@
     "social-write": {
       "operation": "write",
       "consistency": "authoritative",
-      "authority": "supabase-social",
+      "authority": "tidb-community",
       "candidates": [
-        "supabase-social"
+        "tidb-community"
       ],
       "requiredRoles": [
         "social-write"
@@ -549,6 +695,331 @@
       ],
       "requiredRoles": [
         "legacy-nest-api"
+      ],
+      "allowReadFallback": false
+    },
+    "identity-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-identity",
+      "candidates": [
+        "tidb-identity"
+      ],
+      "requiredRoles": [
+        "identity-read"
+      ],
+      "allowReadFallback": false
+    },
+    "identity-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-identity",
+      "candidates": [
+        "tidb-identity"
+      ],
+      "requiredRoles": [
+        "identity-write"
+      ],
+      "allowReadFallback": false
+    },
+    "project-metadata-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-projects",
+      "candidates": [
+        "tidb-projects"
+      ],
+      "requiredRoles": [
+        "project-metadata-read"
+      ],
+      "allowReadFallback": false
+    },
+    "project-metadata-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-projects",
+      "candidates": [
+        "tidb-projects"
+      ],
+      "requiredRoles": [
+        "project-metadata-write"
+      ],
+      "allowReadFallback": false
+    },
+    "commerce-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-commerce",
+      "candidates": [
+        "tidb-commerce"
+      ],
+      "requiredRoles": [
+        "commerce-read"
+      ],
+      "allowReadFallback": false
+    },
+    "commerce-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-commerce",
+      "candidates": [
+        "tidb-commerce"
+      ],
+      "requiredRoles": [
+        "commerce-write"
+      ],
+      "allowReadFallback": false
+    },
+    "community-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-community",
+      "candidates": [
+        "tidb-community"
+      ],
+      "requiredRoles": [
+        "community-read"
+      ],
+      "allowReadFallback": false
+    },
+    "community-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-community",
+      "candidates": [
+        "tidb-community"
+      ],
+      "requiredRoles": [
+        "community-write"
+      ],
+      "allowReadFallback": false
+    },
+    "collaboration-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-collaboration",
+      "candidates": [
+        "tidb-collaboration"
+      ],
+      "requiredRoles": [
+        "collaboration-read"
+      ],
+      "allowReadFallback": false
+    },
+    "collaboration-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-collaboration",
+      "candidates": [
+        "tidb-collaboration"
+      ],
+      "requiredRoles": [
+        "collaboration-write"
+      ],
+      "allowReadFallback": false
+    },
+    "project-document-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "azure-cosmos-free",
+      "candidates": [
+        "azure-cosmos-free"
+      ],
+      "requiredRoles": [
+        "project-document-read"
+      ],
+      "allowReadFallback": false
+    },
+    "project-document-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "azure-cosmos-free",
+      "candidates": [
+        "azure-cosmos-free"
+      ],
+      "requiredRoles": [
+        "project-document-write"
+      ],
+      "allowReadFallback": false
+    },
+    "notification-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "firestore-free",
+      "candidates": [
+        "firestore-free"
+      ],
+      "requiredRoles": [
+        "notification-read"
+      ],
+      "allowReadFallback": false
+    },
+    "notification-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "firestore-free",
+      "candidates": [
+        "firestore-free"
+      ],
+      "requiredRoles": [
+        "notification-write"
+      ],
+      "allowReadFallback": false
+    },
+    "presence-read": {
+      "operation": "read",
+      "consistency": "ephemeral",
+      "authority": "firebase-rtdb-free",
+      "candidates": [
+        "firebase-rtdb-free"
+      ],
+      "requiredRoles": [
+        "presence-read"
+      ],
+      "allowReadFallback": false
+    },
+    "presence-write": {
+      "operation": "write",
+      "consistency": "ephemeral",
+      "authority": "firebase-rtdb-free",
+      "candidates": [
+        "firebase-rtdb-free"
+      ],
+      "requiredRoles": [
+        "presence-write"
+      ],
+      "allowReadFallback": false
+    },
+    "ai-job-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "mongodb-atlas-m0",
+      "candidates": [
+        "mongodb-atlas-m0"
+      ],
+      "requiredRoles": [
+        "ai-job-read"
+      ],
+      "allowReadFallback": false
+    },
+    "ai-job-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "mongodb-atlas-m0",
+      "candidates": [
+        "mongodb-atlas-m0"
+      ],
+      "requiredRoles": [
+        "ai-job-write"
+      ],
+      "allowReadFallback": false
+    },
+    "live-review-read": {
+      "operation": "read",
+      "consistency": "ephemeral",
+      "authority": "convex-free",
+      "candidates": [
+        "convex-free"
+      ],
+      "requiredRoles": [
+        "live-review-read"
+      ],
+      "allowReadFallback": false
+    },
+    "live-review-write": {
+      "operation": "write",
+      "consistency": "ephemeral",
+      "authority": "convex-free",
+      "candidates": [
+        "convex-free"
+      ],
+      "requiredRoles": [
+        "live-review-write"
+      ],
+      "allowReadFallback": false
+    },
+    "feedback-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "appwrite-free",
+      "candidates": [
+        "appwrite-free"
+      ],
+      "requiredRoles": [
+        "feedback-read"
+      ],
+      "allowReadFallback": false
+    },
+    "feedback-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "appwrite-free",
+      "candidates": [
+        "appwrite-free"
+      ],
+      "requiredRoles": [
+        "feedback-write"
+      ],
+      "allowReadFallback": false
+    },
+    "audit-event-read": {
+      "operation": "read",
+      "consistency": "replicated",
+      "authority": "aws-dynamodb-free",
+      "candidates": [
+        "aws-dynamodb-free"
+      ],
+      "requiredRoles": [
+        "audit-event-read"
+      ],
+      "allowReadFallback": false
+    },
+    "audit-event-write": {
+      "operation": "write",
+      "consistency": "replicated",
+      "authority": "aws-dynamodb-free",
+      "candidates": [
+        "aws-dynamodb-free"
+      ],
+      "requiredRoles": [
+        "audit-event-write"
+      ],
+      "allowReadFallback": false
+    },
+    "analytics-event-write": {
+      "operation": "write",
+      "consistency": "derived",
+      "authority": "cloudflare-d1",
+      "candidates": [
+        "cloudflare-d1"
+      ],
+      "requiredRoles": [
+        "analytics-ingest-write"
+      ],
+      "allowReadFallback": false
+    },
+    "analytics-read": {
+      "operation": "read",
+      "consistency": "derived",
+      "authority": "bigquery-sandbox",
+      "candidates": [
+        "motherduck-lite",
+        "bigquery-sandbox"
+      ],
+      "requiredRoles": [
+        "analytics-read"
+      ],
+      "allowReadFallback": true
+    },
+    "analytics-batch-load": {
+      "operation": "write",
+      "consistency": "derived",
+      "authority": "bigquery-sandbox",
+      "candidates": [
+        "bigquery-sandbox"
+      ],
+      "requiredRoles": [
+        "analytics-batch-load"
       ],
       "allowReadFallback": false
     }

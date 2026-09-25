@@ -1,0 +1,10 @@
+[
+  { "name": "observed_at", "type": "TIMESTAMP", "mode": "REQUIRED" },
+  { "name": "shard_id", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "provider_id", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "health", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "usage_ratio", "type": "FLOAT", "mode": "REQUIRED" },
+  { "name": "forecast_ratio", "type": "FLOAT", "mode": "NULLABLE" },
+  { "name": "dimensions_json", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "source", "type": "STRING", "mode": "REQUIRED" }
+]

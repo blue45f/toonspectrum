@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { validateReleaseWorkflows } from "./release-workflow-policy.mjs";
 
 export const FREE_INFRASTRUCTURE_POLICY_VERSION =
-  "toonspectrum.free-infrastructure.v2";
+  "toonspectrum.free-infrastructure.v3";
 
 const BILLING_BOUNDARIES = new Set([
   "hard-stop-free",
@@ -139,8 +139,24 @@ export function validateFreeInfrastructurePolicy(policy) { // NOSONAR javascript
     "edgeConfiguration",
     "edgeRelationalIndex",
     "transactionalDatabase",
-    "derivedReadModels",
+    "identityDatabase",
+    "projectDatabase",
+    "commerceDatabase",
+    "communityDatabase",
     "socialDatabase",
+    "collaborationDatabase",
+    "documentDatabase",
+    "auditDatabase",
+    "notificationDatabase",
+    "presenceDatabase",
+    "aiJobDatabase",
+    "liveReviewDatabase",
+    "feedbackDatabase",
+    "analyticsDatabase",
+    "analyticsIngestDatabase",
+    "adHocAnalytics",
+    "legacyDatabase",
+    "derivedReadModels",
     "playgroundDatabase",
     "realtimeCoordination",
     "eventDelivery",

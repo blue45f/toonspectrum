@@ -1,24 +1,12 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 
-import { dbPool } from "../../db";
+import { TRAFFIC_ANALYTICS_REPOSITORY, type TrafficAnalyticsRepository } from "../traffic-analytics/traffic-analytics.repository";
 import { TRAFFIC_DEFAULT_RETENTION_DAYS } from "../traffic-analytics/traffic-analytics-model";
 
-import {
-  ADMIN_TRAFFIC_OVERVIEW_QUERY,
-  ADMIN_TRAFFIC_PULSE_QUERY,
-} from "./admin-traffic-query";
 import { requireAdminUser } from "./admin-types";
 
 const SUPPORTED_RANGES = [1, 7, 30, 90] as const;
 const PULSE_CACHE_MS = 5_000;
-
-type AnalyticsRow = {
-  analytics: Record<string, unknown> | null;
-};
-
-type PulseRow = {
-  pulse: Record<string, unknown> | null;
-};
 
 function normalizeRangeDays(value: unknown): number {
   const parsed = Number(value);
@@ -44,6 +32,7 @@ function retentionDays(): number {
 
 @Injectable()
 export class AdminTrafficService {
+  constructor(@Inject(TRAFFIC_ANALYTICS_REPOSITORY) private readonly repository: TrafficAnalyticsRepository) {}
   private pulseCache:
     | { expiresAt: number; value: Record<string, unknown> }
     | null = null;
@@ -55,18 +44,7 @@ export class AdminTrafficService {
     const days = normalizeRangeDays(daysValue);
     const now = new Date();
     const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1_000);
-    const result = await dbPool.query<AnalyticsRow>(
-      ADMIN_TRAFFIC_OVERVIEW_QUERY,
-      [start, bucketSeconds(days), now, days, retentionDays()],
-    );
-
-    return (
-      result.rows[0]?.analytics ?? {
-        generatedAt: now.toISOString(),
-        rangeDays: days,
-        status: "empty",
-      }
-    );
+    return this.repository.overview({ start, now, days, bucketSeconds: bucketSeconds(days), retentionDays: retentionDays() });
   }
 
   async getPulse(userId: string) {
@@ -90,22 +68,6 @@ export class AdminTrafficService {
     const now = new Date();
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1_000);
     const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1_000);
-    const result = await dbPool.query<PulseRow>(ADMIN_TRAFFIC_PULSE_QUERY, [
-      fiveMinutesAgo,
-      thirtyMinutesAgo,
-      now,
-    ]);
-    return (
-      result.rows[0]?.pulse ?? {
-        generatedAt: now.toISOString(),
-        windowMinutes: 5,
-        activeVisitors: 0,
-        activeSessions: 0,
-        pageViews5m: 0,
-        pageViews30m: 0,
-        latestAt: null,
-        series: [],
-      }
-    );
+    return this.repository.pulse({ fiveMinutesAgo, thirtyMinutesAgo, now });
   }
 }

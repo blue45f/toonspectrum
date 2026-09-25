@@ -38,6 +38,12 @@ test("manifest parsing rejects duplicate, unordered and unsafe selectors", () =>
   );
 });
 
+test("배포 Worker 테스트 루트를 허용하되 경로 탈출은 차단한다", () => {
+  assert.deepEqual(parseRequiredTargets("deploy/cloudflare-analytics/src/index.test.ts\n"),
+    ["deploy/cloudflare-analytics/src/index.test.ts"]);
+  assert.throws(() => parseRequiredTargets("deploy/../outside.test.ts\n"), /unsafe/u);
+});
+
 test("glob expansion is deterministic and deduplicates overlapping selectors", () => {
   const fixture = mkdtempSync(join(tmpdir(), "toon-core-vitest-"));
   try {
