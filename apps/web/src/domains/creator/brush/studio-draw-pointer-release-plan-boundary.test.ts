@@ -93,7 +93,9 @@ describe("studio draw pointer-release planning ownership boundary", () => {
     expect(finish).not.toContain("smoothStrokePoints(");
     expect(finish).not.toContain("isStudioImmediateFreehandCommit(");
     expect(finish).not.toContain("let finished = drawingRef.current");
-    expect(finish.split("\n").length).toBeLessThanOrEqual(420);
+    // Pending-admission preservation added the fail-closed release branch. Keep a bounded ratchet
+    // so recovery logic remains owned here without allowing the pointerup function to grow freely.
+    expect(finish.split("\n").length).toBeLessThanOrEqual(440);
     expect(sealStart).toBeGreaterThan(-1);
     expectTokenOrder(sealInput, [
       "updateActiveShapeEndpoint(stage, pointerEvent, false)",

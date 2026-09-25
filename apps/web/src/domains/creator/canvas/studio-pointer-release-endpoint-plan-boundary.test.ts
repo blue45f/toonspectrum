@@ -108,7 +108,7 @@ describe("studio pointer-release endpoint planning ownership boundary", () => {
       "planStudioDrawPointerRelease({",
       "const finished = releasePlan.stroke",
       "finishStudioSpecialistStroke(finished)",
-      "const committed = commit([...baseElements, finished])",
+      "const committed = commit(committedElements, undefined, activePage.id)",
       "finally {",
       "releaseDrawingPointerSession()",
     ]);

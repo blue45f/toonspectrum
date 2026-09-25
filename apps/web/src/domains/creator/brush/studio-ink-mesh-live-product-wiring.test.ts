@@ -45,7 +45,7 @@ describe("Google Ink mesh actual /studio product wiring", () => {
     expect(page).toContain("inkMeshLivePreviewRuntimeRef.current?.finish(");
     expect(page.match(/inkMeshLivePreviewRuntimeRef\.current\?\.cancel\(\)/gu)?.length ?? 0)
       .toBeGreaterThanOrEqual(3);
-    expect(page).toContain("const committed = commit([...baseElements, finished])");
+    expect(page).toContain("const committed = commit(committedElements, undefined, activePage.id)");
     expect(page).toContain("draftPreviewStoreRef.current.settle(finished)");
   });
 
