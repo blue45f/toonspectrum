@@ -1296,14 +1296,8 @@ import {
   type StudioWorkspaceLayout,
   type StudioWorkspaceLoadResult,
 } from "./studio-workspaces";
-import type {
-  StudioWriterRoomDocument,
-  StudioWriterRoomStage,
-} from "./studio-writer-room";
-import {
-  projectStudioWriterRoomToCanvasPlan,
-  type StudioWriterRoomCanvasProjectionResult,
-} from "./studio-writer-room-canvas-projection";
+import type { StudioWriterRoomDocument, StudioWriterRoomStage } from "./studio-writer-room";
+import { projectStudioWriterRoomToCanvasPlan, type StudioWriterRoomCanvasProjectionResult } from "./studio-writer-room-canvas-projection";
 import { buildStudioWriterRoomCanvasPages, insertStudioWriterRoomCanvasPages } from "./writer-room/buildStudioWriterRoomCanvasPages";
 import { shouldSuppressStudioQuickStartAutoOpen } from "./studio-quick-start-auto-open";
 import type {
@@ -1455,22 +1449,12 @@ import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/compat/auth-session-store";
 
-type StudioWriterRoomRuntime = Pick<
-  typeof import("./studio-writer-room"),
-  "createEmptyStudioWriterRoomDocument"
-    | "normalizeStudioWriterRoomDocument"
-    | "replaceStudioWriterRoomStage"
->;
-
+type StudioWriterRoomRuntime = Pick<typeof import("./studio-writer-room"), "createEmptyStudioWriterRoomDocument" | "normalizeStudioWriterRoomDocument" | "replaceStudioWriterRoomStage">;
 let studioWriterRoomRuntimePromise: Promise<StudioWriterRoomRuntime> | null = null;
-
 function loadStudioWriterRoomRuntime(): Promise<StudioWriterRoomRuntime> {
-  studioWriterRoomRuntimePromise ??= import("./studio-writer-room");
-  return studioWriterRoomRuntimePromise;
+  return (studioWriterRoomRuntimePromise ??= import("./studio-writer-room"));
 }
-
-const bi = <T,>(ko: T, en: T): T =>
-  translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
+const bi = <T,>(ko: T, en: T): T => translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
 
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
 export function StudioCuttoonEditor({
@@ -14681,26 +14665,15 @@ const puppetWarpArmed =
           referenceBoard?: unknown;
           publishPack?: unknown;
         };
-        const [
-          normalizedReleaseSchedule,
-          normalizedPublicationAnalytics,
-          writerRoomRuntime,
-        ] = await Promise.all([
-          remixId
-            ? Promise.resolve(createEmptyStudioReleaseScheduleSnapshot())
-            : normalizeStudioReleaseScheduleDeferred(doc?.releaseSchedule),
-          remixId
-            ? Promise.resolve(createEmptyStudioPublicationAnalyticsSnapshot())
-            : normalizeStudioPublicationAnalyticsDeferred(doc?.publicationAnalytics),
+        const [normalizedReleaseSchedule, normalizedPublicationAnalytics, writerRoomRuntime] = await Promise.all([
+          remixId ? Promise.resolve(createEmptyStudioReleaseScheduleSnapshot()) : normalizeStudioReleaseScheduleDeferred(doc?.releaseSchedule),
+          remixId ? Promise.resolve(createEmptyStudioPublicationAnalyticsSnapshot()) : normalizeStudioPublicationAnalyticsDeferred(doc?.publicationAnalytics),
           loadStudioWriterRoomRuntime(),
         ]);
-        // Optional sidecars must settle before the single hydration mutation begins. Route teardown
-        // still invalidates every result before it reaches React state.
+        // Optional sidecars settle before the single hydration mutation; route teardown invalidates every result before React state.
         if (!alive || controller.signal.aborted) return;
         const parsedProject = creatorWorkSnapshotToStudioProject(w);
-        const hasLinked3dRender = parsedProject.pagesList.some(
-          (page) => page.linked3dRender !== undefined,
-        );
+        const hasLinked3dRender = parsedProject.pagesList.some((page) => page.linked3dRender !== undefined);
         if (remixId && hasLinked3dRender) {
           setWorkHydrationFailed(true);
           setError(
@@ -15263,28 +15236,18 @@ const puppetWarpArmed =
   async function applyWriterRoomAiReview() {
     const review = writerRoomAiReview;
     if (!review || collaborationDocumentLocked || writerRoomAiBusy) return;
-    const mutationTicket = captureStudioMutationTicket();
-    setWriterRoomAiBusy(true);
+    const mutationTicket = captureStudioMutationTicket(); setWriterRoomAiBusy(true);
     try {
-      const { replaceStudioWriterRoomStage } = await loadStudioWriterRoomRuntime();
-      if (!canApplyStudioMutation(mutationTicket)) return;
-      setWriterRoom((current) =>
-        replaceStudioWriterRoomStage(current, review.stage, review.draft)
-      );
-      setSharedDocumentNotice(null);
-      setWriterRoomAiReview(null);
-      setWriterRoomAiError(null);
+      const { replaceStudioWriterRoomStage } = await loadStudioWriterRoomRuntime(); if (!canApplyStudioMutation(mutationTicket)) return;
+      setWriterRoom((current) => replaceStudioWriterRoomStage(current, review.stage, review.draft));
+      setSharedDocumentNotice(null); setWriterRoomAiReview(null); setWriterRoomAiError(null);
     } catch {
-      if (canApplyStudioMutation(mutationTicket)) {
-        setWriterRoomAiError("작가실 적용 도구를 불러오지 못했습니다. 다시 시도해 주세요.");
-      }
+      if (canApplyStudioMutation(mutationTicket)) setWriterRoomAiError("작가실 적용 도구를 불러오지 못했습니다. 다시 시도해 주세요.");
     } finally {
       if (canApplyStudioMutation(mutationTicket)) setWriterRoomAiBusy(false);
     }
   }
-  function cancelWriterRoomAi() {
-    writerRoomAiAbortRef.current?.abort();
-  }
+  function cancelWriterRoomAi() { writerRoomAiAbortRef.current?.abort(); }
   // Writer Room projection is pure application logic; this command owns only editor insertion.
   function applyWriterRoomCanvasPlan() {
     const plan = writerRoomCanvasPlan;
@@ -16191,16 +16154,11 @@ const puppetWarpArmed =
     webGpuCanvasHandleRef,
   });
   const drawingPractice = useStudioDrawingPracticeRuntime({
-    traceRequested: tracePracticeRequested, activePage, currentPageId, assets, assetsLoaded, assetsLoading,
-    masterEditMode, activePageMutationLocked, canvasWidth: CANVAS_W, readCurrentPages: () => pagesHistoryRef.current[pagesHiRef.current] ?? pages,
-    readCurrentPageId: () => currentPageIdRef.current, readAssets: () => assetsRef.current, replaceAssets: replaceStudioAssets, setAssetsLoaded,
-    loadAssets: () => { void loadAssetsList(); }, markDocumentChanged: markStudioDocumentChanged, commitPages, setError,
-    preloadReferencePanel: preloadStudioReferencePanel, setReferencePanelOpen, clearSelection: () => setSelectedId(null),
-    activateDrawTool: () => setTool("draw"), announce: announceDrawingShortcut,
+    traceRequested: tracePracticeRequested, activePage, currentPageId, assets, assetsLoaded, assetsLoading, masterEditMode, activePageMutationLocked, canvasWidth: CANVAS_W, readCurrentPages: () => pagesHistoryRef.current[pagesHiRef.current] ?? pages,
+    readCurrentPageId: () => currentPageIdRef.current, readAssets: () => assetsRef.current, replaceAssets: replaceStudioAssets, setAssetsLoaded, loadAssets: () => { void loadAssetsList(); }, markDocumentChanged: markStudioDocumentChanged, commitPages, setError,
+    preloadReferencePanel: preloadStudioReferencePanel, setReferencePanelOpen, clearSelection: () => setSelectedId(null), activateDrawTool: () => setTool("draw"), announce: announceDrawingShortcut,
   });
-  const expandDeferredStrokeCommitHistory = (batch: Parameters<typeof expandDeferredStrokeCommitHistoryBase>[0]): void => {
-    expandDeferredStrokeCommitHistoryBase(batch); pendingStrokeRealtimeHistory.recordBatch(batch, pagesHiRef.current);
-  };
+  const expandDeferredStrokeCommitHistory = (batch: Parameters<typeof expandDeferredStrokeCommitHistoryBase>[0]): void => { expandDeferredStrokeCommitHistoryBase(batch); pendingStrokeRealtimeHistory.recordBatch(batch, pagesHiRef.current); };
   useEffect(() => {
     const sampleId = params.get("sample");
     if (!sampleId || ecosystemSampleImportRef.current === sampleId) return;
