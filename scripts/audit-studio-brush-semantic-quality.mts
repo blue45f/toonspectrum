@@ -10,6 +10,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+
 import {
   STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS,
   STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS,
@@ -36,10 +37,15 @@ import {
 import {
   resolveStudioBrushRuntimeContract,
 } from "../apps/web/src/domains/creator/brush/studio-brush-runtime-contract";
+import { profileStudioBrushTipSemanticEvidence } from "../apps/web/src/domains/creator/brush/studio-brush-semantic-evidence";
 import {
   auditStudioBrushSemanticClaims,
   type StudioBrushSemanticAuditResult,
 } from "../apps/web/src/domains/creator/brush/studio-brush-semantic-quality";
+import { resolveStudioStampBrushKind } from "../apps/web/src/domains/creator/brush/studio-brush-stamp-engine";
+import { planStudioWebAssistSamplesForBrush } from "../apps/web/src/domains/creator/studio-web-drawing-assist-kit";
+import { planStudioWebColoringSamplesForBrush } from "../apps/web/src/domains/creator/studio-web-drawing-coloring-kit";
+import { planStudioWebCompetitiveSamplesForBrush } from "../apps/web/src/domains/creator/studio-web-drawing-competitive-kit";
 
 const CHECK = process.argv.includes("--check");
 const OUT_DIR_ARGUMENT = process.argv.find((argument) => argument.startsWith("--out-dir="));
@@ -140,6 +146,13 @@ for (const item of STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS) {
   if (materialProfile) materialProfiles.push(materialProfile);
   const portfolio = PORTFOLIO_BY_ID.get(item.id);
   const pressureResponsive = pressureResponsiveFor(item, dynamics);
+  const probePoints = [{ x: 8, y: 12, pressure: 0.2 }, { x: 70, y: 31, pressure: 0.8 }];
+  const patternResponse = [
+    planStudioWebAssistSamplesForBrush(item.id, probePoints),
+    planStudioWebColoringSamplesForBrush(item.id, probePoints),
+    planStudioWebCompetitiveSamplesForBrush(item.id, probePoints),
+  ].some((samples) => samples.length > 0);
+  const stampKind = resolveStudioStampBrushKind(item.id);
   const semantic = auditStudioBrushSemanticClaims({
     catalogId: item.id,
     runtimeBrushId,
@@ -150,6 +163,9 @@ for (const item of STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS) {
     previewStyle: item.previewStyle,
     portfolioLabel: portfolio?.label,
     pressureResponsive,
+    tipEvidence: dynamics ? profileStudioBrushTipSemanticEvidence(dynamics) : null,
+    patternResponse,
+    dryStampResponse: ["pencil", "pastel", "charcoal", "crayon", "chalk"].includes(stampKind ?? ""),
     axes: portfolio
       ? {
           ...STUDIO_BRUSH_TEXTURE_PROFILES[portfolio.textureProfile].axes,
@@ -211,6 +227,7 @@ const defaultExactCollisions = defaultAllPairs.filter(
 
 const failures = [
   ...semanticErrors.map((entry) => `${entry.catalogId}: ${entry.messageKo}`),
+  ...semanticWarnings.map((entry) => `${entry.catalogId}: ${entry.messageKo}`),
   ...defaultExactCollisions.map((pair) => (
     `${pair.leftId} / ${pair.rightId}: default portfolio material response is byte-identical`
   )),
@@ -284,8 +301,8 @@ const markdown = [
   "",
   "## Interpretation",
   "",
-  "- Distance measures normalized spacing, size variation, scatter, flow/opacity buildup, tip alpha, grain, occupancy and dual-tip blending.",
-  "- A warning is a curation task, not an automatic rename: authored alpha maps can carry evidence that the lightweight runtime contract cannot express.",
+  "- Distance combines normalized spacing, size variation, scatter, flow/opacity buildup, grain, occupancy, dual-tip blending and opacity-normalized spatial tip coverage.",
+  "- Authored alpha topology, input mappings, dry stamp kinds and the actual pattern planners supply evidence beyond the generic carrier contract. Remaining semantic warnings fail check mode.",
   "- A hard error means the selected runtime/operation is contradictory or missing, or two default representatives are exactly identical on the deterministic material probe.",
   "",
 ].join("\n");

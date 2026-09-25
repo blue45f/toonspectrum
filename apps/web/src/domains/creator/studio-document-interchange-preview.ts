@@ -103,7 +103,7 @@ function psdFeatureCategory(
 ): StudioInterchangeLossConstraint["category"] {
   if (feature === "layers" || feature === "groups" || feature === "blend-mode") return "layers";
   if (feature === "resolution") return "resolution";
-  if (feature === "layer-mask") return "alpha";
+  if (feature === "layer-mask" || feature === "clipping") return "alpha";
   if (feature === "color-space" || feature === "bit-depth") return "color-space";
   return "editability";
 }
@@ -127,6 +127,14 @@ export function createStudioPsdImportLossPreview(
           : decision.message,
       })) ?? [];
   constraints.push(...boundedMessages(result.skipped, "editability"));
+  if (result.originalFile) constraints.push({
+    category: "editability", severity: "notice",
+    message: "적용하면 원본 PSD를 이 기기에 그대로 보관하고 프로젝트에 연결합니다. 다른 기기로 옮길 때는 원본을 포함하는 프로젝트 아카이브를 사용하세요.",
+  });
+  if (result.compositeElement) constraints.push({
+    category: "editability", severity: "notice",
+    message: "원본에 저장된 합성본을 선택하면 조정·효과·그룹 합성을 한 이미지로 유지합니다. 개별 레이어 편집과 텍스트 편집본은 레이어 방식에서 사용할 수 있어요.",
+  });
   if (originalLayerPixels) constraints.push({
     category: "resolution", severity: "notice",
     message: "각 레이어의 원본 픽셀을 무손실 PNG로 보관합니다. 페이지에 맞춘 배치 크기는 저장 픽셀 크기와 다르며, 원본 PSD의 모든 편집 구조를 보존한다는 의미는 아닙니다.",
@@ -176,7 +184,7 @@ export function createStudioPsdImportLossPreview(
           : "WebP 레이어",
       width: displayed.width,
       height: displayed.height,
-      originalRetained: false,
+      originalRetained: !!result.originalFile,
     },
     constraints,
   };

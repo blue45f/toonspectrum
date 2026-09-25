@@ -371,7 +371,7 @@ export interface StudioToolBeltContentHandlers {
     at?: { x: number; y: number; },
     editImmediately?: boolean
   ) => void;
-  addBuiltinRasterAsset: (asset: StudioRasterAsset) => Promise<void>;
+  addBuiltinRasterAsset: (asset: StudioRasterAsset) => Promise<boolean | void>;
   addCatalogElement: (item: { svg: string; width: number; height: number; label: string; }) => boolean;
   /**
    * Elements 3D rail: open BG3D / VRM with a one-shot template·primitive·prop seed.
@@ -397,7 +397,7 @@ export interface StudioToolBeltContentHandlers {
     isAnimatedGif?: boolean,
     elementPatch?: Partial<ImageEl> & { name?: string }
   ) => boolean;
-  addSceneTemplate: (template: SceneTemplate) => Promise<void>;
+  addSceneTemplate: (template: SceneTemplate) => Promise<boolean | void>;
   addSfxPreset: (preset: SfxPreset) => Promise<void>;
   addSpeedLines: () => void;
   addSticker: (emoji: string, at?: { x: number; y: number; }) => void;

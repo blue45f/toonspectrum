@@ -69,7 +69,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       page.indexOf("function onStageDown("),
     );
     expect(liveSurfaceStart).toContain("overlayCandidate");
-    expect(liveSurfaceStart).toContain("const selectedMedia = selectStudioLiveStrokeMedia(next, {");
+    expect(liveSurfaceStart).toContain("const selectedMedia = pinnedMedia ?? selectStudioLiveStrokeMedia(next, {");
     const mediaSelection = source("../live/studio-live-stroke-media-selection.ts");
     for (const exclusiveSelection of [
       "const livingInkSelected =",
@@ -109,7 +109,7 @@ describe("Studio advanced WebGPU live-ink integration", () => {
       page.indexOf("function onStageDown("),
     );
     expectInOrder(liveSurfaceStart, [
-      "const selectedMedia = selectStudioLiveStrokeMedia(next, {",
+      "const selectedMedia = pinnedMedia ?? selectStudioLiveStrokeMedia(next, {",
       "explicitBackend: import.meta.env.VITE_STUDIO_LIVE_INK_BACKEND",
       "hardwareReady:",
       "rolloutPrefersGpu:",

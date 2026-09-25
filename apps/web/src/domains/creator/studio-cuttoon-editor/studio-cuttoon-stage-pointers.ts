@@ -1,5 +1,6 @@
 /* Extracted stage pointer handlers from StudioCuttoonEditor.
  * Closures keep the original editor typing envelope via an `any` host bag. */
+import type { StudioCatalogInputGesture } from "../brush/studio-pending-catalog-input";
 import type { StudioCuttoonStagePointersHost } from "./studio-cuttoon-stage-pointers-types";
 import type { StudioCuttoonStagePointersApi } from "./studio-cuttoon-stage-pointers-api";
 import { bindStudioCuttoonStagePointersDownArmed } from "./studio-cuttoon-stage-pointers-down-armed";
@@ -45,6 +46,33 @@ export function bindStudioCuttoonStagePointers(h: StudioCuttoonStagePointersHost
   bindStudioCuttoonStagePointersCursors(h, api);
   bindStudioCuttoonStagePointersDrag(h, api);
   return {
+    replayPendingCatalogGesture(gesture: StudioCatalogInputGesture): string | false {
+      if (h.drawingRef.current) return false;
+      const position = gesture.start.mapper.pointFor(gesture.start.pointer);
+      if (!position) return false;
+      const replayApi = { ...api };
+      if (gesture.brushSnapshot) {
+        const snapshot = gesture.brushSnapshot;
+        bindStudioCuttoonStagePointersDownDraw({
+          ...h, ...snapshot, brush: snapshot.brushId,
+          brushEnginePrograms: snapshot.enginePrograms,
+          drawMode: gesture.operation === "erase" ? "eraser" : "pen",
+          activeCatalogBrush: { id: gesture.catalogId, name: snapshot.sourcePresetName ?? gesture.catalogId },
+        }, replayApi);
+      }
+      replayApi.tryStageDownDraw({ target: gesture.stage, evt: gesture.start.pointer }, gesture.start.pointer, position);
+      if (!h.drawingRef.current) return false;
+      const strokeId: string = h.drawingRef.current.id;
+      for (const batch of gesture.moves) {
+        api.consumeFreehandPointerBatch(gesture.stage, batch.pointer, false, { coordinateMapper: batch.mapper });
+      }
+      if (gesture.end) api.finishDrawingPointer(gesture.stage, gesture.end, {
+        consumeReleaseSample: gesture.end.type === "pointerup",
+        coordinateMapper: gesture.endMapper,
+      });
+      return strokeId;
+    },
+    finishDrawingPointer: api.finishDrawingPointer,
     onStageDown: api.onStageDown,
     onStageMove: api.onStageMove,
     onStagePointerCancel: api.onStagePointerCancel,

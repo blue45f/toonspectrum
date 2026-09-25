@@ -27,7 +27,7 @@ describe("Studio stroke surface route wiring boundary", () => {
       "function onStageDown(",
     );
     const selectionAndAdmissions = [
-      "const selectedMedia = selectStudioLiveStrokeMedia(next,",
+      "const selectedMedia = pinnedMedia ?? selectStudioLiveStrokeMedia(next,",
       "const livingInkAdmitted = (selectedMedia.kind === \"living-ink\")",
       "beginStudioLivingInkStroke(next, pointerSample)",
       "if ((selectedMedia.kind === \"living-ink\") && !livingInkAdmitted)",

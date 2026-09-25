@@ -1,4 +1,20 @@
+import { STUDIO_ILLUSTRATION_BG_SCENES } from "./catalog/studio-illustration-pack";
+
+const availableIllustrations = new Set(STUDIO_ILLUSTRATION_BG_SCENES.map((scene) => scene.id));
+function illustrationBackgrounds(preferred: string, ...fallbacks: string[]): readonly string[] {
+  return Object.freeze([...(availableIllustrations.has(preferred) ? [preferred] : []), ...fallbacks]);
+}
+
 const TEMPLATE_BACKGROUND_IDS: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  "illustrated-autumn-return": illustrationBackgrounds("illustration-autumn-alley-morning", "polyhaven-background-wide-street-01", "webtoon-bedroom"),
+  "illustrated-rain-crossing": illustrationBackgrounds("illustration-rainy-street", "webtoon-sf-cyberpunk-street", "polyhaven-background-crosswalk"),
+  "illustrated-cafe-small-talk": illustrationBackgrounds("illustration-sunlit-cafe", "polyhaven-background-decor-shop", "polyhaven-background-wooden-lounge"),
+  "illustrated-classroom-promise": illustrationBackgrounds("illustration-school-classroom", "polyhaven-background-large-corridor", "polyhaven-background-cayley-interior"),
+  "illustrated-forest-threshold": illustrationBackgrounds("illustration-fantasy-forest", "polyhaven-background-misty-pines", "webtoon-fantasy-dragon-peak"),
+  "illustrated-rooftop-wish": illustrationBackgrounds("illustration-starlit-rooftop", "polyhaven-background-rooftop-night", "webtoon-romance-cherry-blossom"),
+  "illustrated-orbit-signal": illustrationBackgrounds("illustration-retro-sf-interior", "webtoon-sf-space-station", "webtoon-sf-research-lab"),
+  "illustrated-beach-farewell": illustrationBackgrounds("illustration-beach-sunset", "polyhaven-background-venice-sunset", "webtoon-romance-cherry-blossom"),
+
   confession: ["webtoon-romance-cherry-blossom", "polyhaven-background-rooftop-night"],
   "action-impact": ["webtoon-action-ruined-city", "polyhaven-background-empty-warehouse-01"],
   "daily-talk": ["webtoon-bedroom", "webtoon-convenience"],

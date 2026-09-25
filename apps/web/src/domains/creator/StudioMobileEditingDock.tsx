@@ -3,8 +3,6 @@ import {
   ArrowDownToLine,
   ArrowUpToLine,
   Download,
-  ChevronDown,
-  ChevronUp,
   Copy,
   Eraser,
   Files,
@@ -48,6 +46,8 @@ import {
 import { StudioDualColorWell } from "./StudioDualColorWell";
 import { useStudioColorWorkspace } from "./color/StudioColorWorkspaceContext";
 import { requestStudioAllTools } from "./studio-toolbar-channel";
+import { studioTouchGestureHint } from "./studio-cuttoon-editor/studio-touch-gesture-policy";
+import type { StudioAppSettings } from "./studio-app-settings";
 import { STUDIO_DRAW_SHAPE_PICKER_KINDS } from "./brush/studio-draw-hud";
 import {
   STUDIO_BRUSH_OPACITY_RANGE,
@@ -150,72 +150,6 @@ function clampZoom(z: number): number {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 20) / 20));
 }
 
-function syncStudioMobileScrollCue(scroller: HTMLDivElement | null): void {
-  if (!scroller) return;
-  const host = scroller.closest<HTMLElement>("[data-studio-mobile-scroll-host]");
-  if (!host) return;
-
-  const maxScrollLeft = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
-  const overflow = maxScrollLeft > 1;
-  const before = overflow && scroller.scrollLeft > 1;
-  const after = overflow && scroller.scrollLeft < maxScrollLeft - 1;
-  host.style.setProperty("--studio-mobile-scroll-before", before ? "1" : "0");
-  host.style.setProperty("--studio-mobile-scroll-after", after ? "1" : "0");
-  scroller.dataset.studioMobileOverflow = !overflow
-    ? "none"
-    : before && after
-      ? "both"
-      : before
-        ? "before"
-        : "after";
-
-  const status = host.querySelector<HTMLElement>("[data-studio-mobile-scroll-status]");
-  if (!status) return;
-  status.textContent = !overflow
-    ? "현재 도구막대의 모든 도구가 표시되어 있습니다."
-    : before && after
-      ? "왼쪽과 오른쪽에 도구가 더 있습니다. 도구막대를 좌우로 밀어 이동하세요."
-      : before
-        ? "왼쪽에 도구가 더 있습니다. 도구막대를 오른쪽으로 밀어 이동하세요."
-        : "오른쪽에 도구가 더 있습니다. 도구막대를 왼쪽으로 밀어 이동하세요.";
-}
-
-function StudioMobileScrollCues({
-  descriptionId,
-  placement,
-}: {
-  descriptionId: string;
-  placement: "primary" | "secondary";
-}) {
-  return (
-    <>
-      <span
-        aria-hidden
-        data-studio-mobile-scroll-cue={`${placement}-before`}
-        className="pointer-events-none absolute inset-y-0 left-0 z-[2] grid w-5 place-items-center bg-gradient-to-r from-panel via-panel/80 to-transparent text-[0.8rem] font-black leading-none text-fg-2 opacity-0 transition-opacity"
-        style={{ opacity: "var(--studio-mobile-scroll-before, 0)" }}
-      >
-        ‹
-      </span>
-      <span
-        aria-hidden
-        data-studio-mobile-scroll-cue={`${placement}-after`}
-        className="pointer-events-none absolute inset-y-0 right-0 z-[2] grid w-5 place-items-center bg-gradient-to-l from-panel via-panel/80 to-transparent text-[0.8rem] font-black leading-none text-fg-2 opacity-0 transition-opacity"
-        style={{ opacity: "var(--studio-mobile-scroll-after, 0)" }}
-      >
-        ›
-      </span>
-      <span
-        id={descriptionId}
-        data-studio-mobile-scroll-status={placement}
-        className="sr-only"
-      >
-        도구막대를 좌우로 밀면 숨은 도구를 볼 수 있습니다.
-      </span>
-    </>
-  );
-}
-
 function studioDrawSheetSizeStyle(
   snap: StudioMobileSheetSnap,
   keyboardInset: number,
@@ -226,12 +160,10 @@ function studioDrawSheetSizeStyle(
     // Only the compact snap needs the floor; medium and full are already taller than it everywhere.
     snap === "compact" ? STUDIO_MOBILE_DRAW_SHEET_COMPACT_MIN_HEIGHT : undefined,
   );
-  // Some compact editor breakpoints intentionally reduce the root rem size while the dock keeps
-  // 44px touch targets plus borders/padding. A rem-only inset can therefore become shorter than
-  // the physical dock and let the draw sheet cover its top edge. Keep a pixel floor that reflects
-  // the real one-row dock while retaining the larger expanded/safe-area CSS variable.
+  // 작은 화면에서 rem 기준이 줄어도 44px 터치 목표와 안전 영역은 그대로 남긴다.
+  // 펼침 메뉴는 도크 위에 겹치므로 한 줄 도크 실측치와 64px 최소 여백만 예약한다.
   const reservedBottom =
-    `calc(max(var(--studio-canvas-bottom-inset, 7rem), var(--studio-mobile-dock-measured-height, 0px), calc(120px + env(safe-area-inset-bottom))) + ${keyboardInset}px)`;
+    `calc(max(var(--studio-canvas-bottom-inset, 7rem), var(--studio-mobile-dock-measured-height, 0px), calc(64px + env(safe-area-inset-bottom))) + ${keyboardInset}px)`;
   const height = `min(${String(baseSize.height)}, calc(100dvh - env(safe-area-inset-top) - 0.75rem - ${reservedBottom}))`;
   return {
     "--studio-draw-sheet-height": height,
@@ -277,7 +209,7 @@ function StudioMobileFilterSelect({
       ? `${filterTargetLabel}: ${unavailableReason}`
       : `${filterTargetLabel}: 적용할 필터를 선택하세요.`;
   const shellClassName = cn(
-    "relative flex min-h-11 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2",
+    "relative flex min-h-[44px] min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl px-2 text-[0.62rem] font-semibold text-fg-2",
     STUDIO_EASE,
     "focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
     disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-raised",
@@ -341,6 +273,7 @@ function StudioMobileFilterSelect({
 }
 
 export interface StudioBrushCatalogHandlers {
+  selectionLifecycle?: (event: import("./brush/studio-pending-catalog-input").StudioBrushSelectionLifecycle) => void;
   close: (
     reason: StudioBrushCatalogCloseReason
   ) => void;
@@ -412,6 +345,7 @@ export type StudioMobileSheet =
   | null;
 
 export interface StudioMobileEditingDockProps {
+  touchPreferences: Pick<StudioAppSettings["touch"], "twoFinger" | "threeFinger">;
   activeCatalogBrushId: string;
   activeCatalogBrushName: string;
   activeSavedBrushId: string | null;
@@ -526,6 +460,7 @@ export interface StudioMobileEditingDockProps {
 }
 
 export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
+  touchPreferences,
   activeCatalogBrushId,
   activeCatalogBrushName,
   activeSavedBrushId,
@@ -689,6 +624,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     undoAria: localizeStudioText(t, "실행취소", "studio.mainMenu.item.edit.command.undo"),
     redo: localizeStudioText(t, "다시", "studio.mobileDock.tool.redo"),
     redoAria: localizeStudioText(t, "다시실행", "studio.mainMenu.item.edit.command.redo"),
+    color: localizeStudioText(t, "브러시 색상", "studio.toolsCompanion.review.brushColor"),
     brush: localizeStudioText(t, "브러시", "studio.quickStart.step.brush-kit.label"),
     pagesOpenAria: localizeStudioText(t, "페이지 목록 열기", "studio.mobileDock.pagesOpen"),
     pagesCloseAria: localizeStudioText(t, "페이지 목록 닫기", "studio.mobileDock.pagesClose"),
@@ -715,8 +651,10 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   );
   const [workspaceDockExpanded, setWorkspaceDockExpanded] = useState<boolean>(false);
   const scrollDescriptionId = useId();
-  const primaryDockScrollRef = useRef<HTMLDivElement>(null);
-  const secondaryDockScrollRef = useRef<HTMLDivElement>(null);
+  const [colorToolsOpen, setColorToolsOpen] = useState(false);
+  const colorToolsButtonRef = useRef<HTMLButtonElement>(null);
+  const workspaceToggleRef = useRef<HTMLButtonElement>(null);
+  const workspacePanelRef = useRef<HTMLElement>(null);
   const suppressBrushHintOnReturnFocusRef = useRef(false);
   const dismissDrawSettings = () => {
     suppressBrushHintOnReturnFocusRef.current = true;
@@ -724,7 +662,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   };
   const mobileControlSide = workspaceState.mobileControlSide === "left" ? "left" : "right";
   const colorWorkspace = useStudioColorWorkspace();
-  const mobileColorControlsRef = useRef<HTMLDivElement>(null);
+  const mobileColorControlsRef = useRef<HTMLElement>(null);
   const colorVisionOpen = mobileSheet === "color-vision";
   const safeMobileKeyboardInset = Number.isFinite(mobileKeyboardInset)
     ? Math.max(0, Math.round(mobileKeyboardInset))
@@ -734,6 +672,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   const selectionModeActive = tool === "select" && !advancedFillActive;
   const penModeActive = tool === "draw" && drawMode === "pen";
   const pixelModeActive = tool === "draw" && drawMode === "pixel";
+  const eraserModeActive = tool === "draw" && drawMode === "eraser";
   const shapeModeActive = tool === "draw" && drawMode === "shape";
   const eraserPresetActive =
     drawMode === "eraser" && resolveStudioBrushPresetOperation(brush) === "erase";
@@ -777,6 +716,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
     marqueeIds.length === 0 &&
     selected !== null;
   const workspaceDockHasActiveTool =
+    selectionModeActive || pixelModeActive || shapeModeActive || advancedFillActive ||
     commentPinArmed ||
     quickActionsOpen ||
     mobileSheet === "pages" ||
@@ -792,34 +732,39 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
   }, [isMobile, mobileSheet, setQuickStartOpen]);
 
   useEffect(() => {
-    if (!isMobile) return;
-    const scrollers = [
-      primaryDockScrollRef.current,
-      secondaryDockScrollRef.current,
-    ].filter((scroller): scroller is HTMLDivElement => scroller !== null);
-    const update = () => {
-      for (const scroller of scrollers) syncStudioMobileScrollCue(scroller);
-    };
-    update();
-    const frame = globalThis.requestAnimationFrame?.(update) ?? null;
-    const observer = typeof globalThis.ResizeObserver === "function"
-      ? new globalThis.ResizeObserver(update)
-      : null;
-    for (const scroller of scrollers) {
-      scroller.addEventListener("scroll", update, { passive: true });
-      observer?.observe(scroller);
+    if (!isMobile) {
+      setWorkspaceDockExpanded(false);
+      setColorToolsOpen(false);
+      return;
     }
-    globalThis.addEventListener("resize", update);
-    return () => {
-      if (frame !== null) globalThis.cancelAnimationFrame?.(frame);
-      for (const scroller of scrollers) {
-        scroller.removeEventListener("scroll", update);
-        observer?.unobserve(scroller);
-      }
-      observer?.disconnect();
-      globalThis.removeEventListener("resize", update);
+    if (!workspaceDockExpanded && !colorToolsOpen) return;
+    const panel = workspaceDockExpanded ? workspacePanelRef.current : mobileColorControlsRef.current;
+    panel?.querySelector<HTMLButtonElement>("[data-studio-mobile-sheet-close]")?.focus();
+    const onOutsidePointer = (event: PointerEvent) => {
+      if (event.target instanceof Node && measuredDockRef.current?.contains(event.target)) return;
+      // 색상 팝오버는 포털이므로 내부 조작을 도크 밖 클릭으로 오인하지 않는다.
+      if (event.target instanceof Element && event.target.closest('[role="dialog"], [data-studio-color-popover]')) return;
+      setWorkspaceDockExpanded(false);
+      setColorToolsOpen(false);
     };
-  }, [isMobile, workspaceDockExpanded]);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || !(event.target instanceof Node) || !panel?.contains(event.target)) return;
+      event.stopPropagation();
+      if (workspaceDockExpanded) {
+        setWorkspaceDockExpanded(false);
+        workspaceToggleRef.current?.focus();
+      } else {
+        setColorToolsOpen(false);
+        colorToolsButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onOutsidePointer);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onOutsidePointer);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isMobile, workspaceDockExpanded, colorToolsOpen]);
 
   const penHintPreviewProps = penModeActive
     ? {
@@ -967,8 +912,8 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               <p className="text-[0.8rem] font-semibold text-fg">한 손으로 그려보세요</p>
               <p className="mt-0.5 text-[0.72rem] leading-snug text-fg-3">
                 아래 막대에서 <span className="font-medium text-fg-2">펜·픽셀 펜·지우개·도형</span>을 고르고,{" "}
-                <span className="font-medium text-fg-2">브러시</span>를 눌러 굵기·색을 바꿔요. 두 손가락으로
-                이동·확대하고, 짧게 두 손가락 톡은 되돌리기·세 손가락 톡은 다시 실행이에요.
+                <span className="font-medium text-fg-2">브러시</span>를 눌러 굵기·색을 바꿔요.{" "}
+                {studioTouchGestureHint(touchPreferences)}
               </p>
             </div>
             <button
@@ -1199,7 +1144,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
             </div>
 
             {drawMode !== "eraser" ? <button type="button" className="mb-3 flex min-h-11 w-full items-center gap-2 rounded-lg border border-line px-3 text-sm"
-              onClick={() => mobileColorControlsRef.current?.querySelector<HTMLButtonElement>('button[aria-label="주 색"]')?.click()}>
+              onClick={() => { setMobileSheet(null); setWorkspaceDockExpanded(false); setColorToolsOpen(true); }}>
               <span className="size-6 rounded border border-line-strong" style={{ background: color }} aria-hidden />색상 편집 · {color.toUpperCase()}
             </button> : null}
 
@@ -1588,8 +1533,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
           </section>
         ) : null}
 
-        {/* 모바일 하단 드로잉 도크 — 한 손으로 그리기 위한 핵심 도구를 thumb 사정권에.
-            1행: 가로 스크롤 그리기 도구 + 고정 도구 disclosure. 2행: 보조 내비와 작업 패널. */}
+        {/* 기본 행은 6개의 고정 슬롯만 유지한다. 추가 도구는 스크롤 대신 작업 메뉴에서 찾는다. */}
         {isMobile && (
           <nav
             aria-label={label.dock}
@@ -1601,54 +1545,13 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
               suppressBrushHintOnReturnFocusRef.current = false;
               event.stopPropagation();
             }}
-            className="fixed inset-x-0 bottom-0 z-[55] flex flex-col gap-1 border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(0.375rem,env(safe-area-inset-left))] pr-[max(0.375rem,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-[55] border-t border-line bg-panel/95 pb-[max(0.35rem,env(safe-area-inset-bottom))] pl-[max(6px,env(safe-area-inset-left))] pr-[max(6px,env(safe-area-inset-right))] pt-1.5 backdrop-blur lg:hidden [&_button]:min-h-[44px] [&_button]:min-w-[44px]"
             style={{ bottom: safeMobileKeyboardInset }}
           >
-            <div className="flex min-h-12 items-center justify-between gap-1 border-b border-line pb-1" data-studio-mobile-primary-actions="true">
-              <span className="min-w-0 max-w-16 truncate text-xs text-fg-2" aria-label="현재 도구">{drawMode === "eraser" ? "지우개" : tool === "select" ? "선택" : activeCatalogBrushName}</span>
-              <div ref={mobileColorControlsRef} data-studio-mobile-color-controls="true">
-                <StudioDualColorWell compact primary={color} secondary={colorWorkspace?.secondary}
-                  onPrimaryChange={setColor} onSecondaryChange={colorWorkspace?.onSecondaryChange}
-                  onSwap={colorWorkspace ? () => { colorWorkspace.onPrimaryChange(colorWorkspace.secondary); colorWorkspace.onSecondaryChange(colorWorkspace.primary); } : undefined} />
-              </div>
-              <button type="button" aria-label="레이어 열기" className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent"
-                onClick={() => { setMenu(null); openInspectorRoute({ primary: "layers" }, "props"); }}><Layers size={18} aria-hidden /></button>
-              <button type="button" aria-label="전체 도구 열기" className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent"
-                onClick={(event) => { setMobileSheet(null); setMenu(null); requestStudioAllTools(event.currentTarget); }}><Grid3X3 size={18} aria-hidden /></button>
-            </div>
-            {/* 1행: 핵심 드로잉 도구 — 선택 | 펜/지우개/채우기/도형 | 히스토리 | 브러시 (CSP/Procreate 도크 IA) */}
-            <div className="flex min-w-0 items-stretch gap-1">
-              <div
-                className="relative min-w-0 flex-1 overflow-hidden"
-                data-studio-mobile-scroll-host="primary"
-              >
-                <div
-                  ref={primaryDockScrollRef}
-                  // 44px 드로잉 타깃 9개는 어느 폰에서도 한 줄에 들어가지 않는다. 우측 44px
-                  // disclosure 를 고정해도 다음 도구의 일부와 페이드 큐가 남도록 작은 간격을 쓰고,
-                  // 여유가 생기는 390px 부터만 4px 간격으로 넓힌다.
-                  className="flex min-w-0 touch-pan-x items-stretch gap-0.5 overflow-x-auto overscroll-x-contain pr-1 [scrollbar-width:none] min-[390px]:gap-1 [&::-webkit-scrollbar]:hidden"
-                  role="toolbar"
-                  aria-label={label.drawingTools}
-                  aria-describedby={`${scrollDescriptionId}-primary`}
-                  data-studio-mobile-dock-scroll="primary"
-                >
+            <div role="toolbar" aria-label={label.drawingTools} data-studio-mobile-primary-actions="true"
+              className="grid min-w-0 grid-cols-6 items-stretch gap-1 [&>span>button]:w-full [&>button]:w-full">
               <StudioDockButton
-                icon={MousePointer2}
-                label={label.select}
-                hintDescription="요소를 선택해 이동·크기 조절·정렬하고 속성 패널에서 세부 값을 편집합니다."
-                hintShortcut="V"
-                active={selectionModeActive}
-                onClick={() => {
-                  setWorkspaceDockExpanded(false);
-                  activateCanvasTool("select");
-                  setMenu(null);
-                  setMobileSheet(null);
-                }}
-                aria-pressed={selectionModeActive}
-              />
-              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
-              <StudioDockButton
+                ref={mobileBrushDockButtonRef}
                 icon={Pencil}
                 label={label.pen}
                 data-studio-primary-action="draw"
@@ -1664,6 +1567,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 펜을 사용할 수 있어요" : "펜 (B)"}
                 onClick={() => {
                   setWorkspaceDockExpanded(false);
+                  setColorToolsOpen(false);
                   if (penModeActive) {
                     setMobileSheet((s) => (s === "draw" ? null : "draw"));
                     return;
@@ -1675,6 +1579,128 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 aria-pressed={penModeActive}
                 aria-expanded={penModeActive ? drawSettingsOpen : undefined}
                 aria-controls={penModeActive ? MOBILE_DRAW_SETTINGS_ID : undefined}
+              />
+              <StudioDockButton
+                icon={Eraser}
+                label={label.eraser}
+                data-studio-mobile-tool="eraser"
+                hintDescription={eraserModeActive
+                  ? drawSettingsOpen
+                    ? "지우개 설정을 닫고 캔버스로 돌아갑니다."
+                    : "지우개는 유지하고 설정을 열어 굵기·강도·종류를 조절합니다."
+                  : "현재 레이어의 획을 지웁니다. 선택한 뒤 다시 누르면 지우개 설정을 열 수 있어요."}
+                hintShortcut="E"
+                active={eraserModeActive}
+                disabled={activeSurfaceReviewLocked}
+                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
+                onClick={() => {
+                  setWorkspaceDockExpanded(false);
+                  setColorToolsOpen(false);
+                  if (eraserModeActive) {
+                    setMobileSheet((sheet) => (sheet === "draw" ? null : "draw"));
+                    return;
+                  }
+                  activateCanvasTool("draw", "eraser");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={eraserModeActive}
+                aria-expanded={eraserModeActive ? drawSettingsOpen : undefined}
+                aria-controls={eraserModeActive ? MOBILE_DRAW_SETTINGS_ID : undefined}
+              />
+              <button type="button" ref={colorToolsButtonRef}
+                aria-label={label.color} aria-controls={`${scrollDescriptionId}-colors`} aria-expanded={colorToolsOpen}
+                onClick={() => { setWorkspaceDockExpanded(false); setMobileSheet(null); setColorToolsOpen((open) => !open); }}
+                className={cn("flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-0.5 rounded-xl text-[0.625rem] font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent", colorToolsOpen ? "bg-accent-soft" : "hover:bg-raised")}
+              >
+                <span aria-hidden className="relative h-5 w-7">
+                  <span className="absolute bottom-0 right-0 size-4 rounded-md border border-line-strong" style={{ backgroundColor: colorWorkspace?.secondary ?? "#ffffff" }} />
+                  <span className="absolute left-0 top-0 size-4 rounded-md border border-line-strong" style={{ backgroundColor: color }} />
+                </span>
+                <span className="max-w-full truncate">{label.color}</span>
+              </button>
+              <StudioDockButton
+                icon={Undo2}
+                label={label.undo}
+                data-studio-primary-action="undo"
+                hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
+                hintUnavailableReason={undoDisabled ? undoUnavailableTitle : undefined}
+                disabled={undoDisabled}
+                title={undoDisabled ? undoUnavailableTitle : "실행취소"}
+                onClick={() => {
+                  setWorkspaceDockExpanded(false);
+                  setColorToolsOpen(false);
+                  undo();
+                }}
+                aria-label={label.undoAria}
+              />
+              <StudioDockButton
+                icon={Redo2}
+                label={label.redo}
+                data-studio-primary-action="redo"
+                hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
+                hintUnavailableReason={redoDisabled ? redoUnavailableTitle : undefined}
+                disabled={redoDisabled}
+                title={redoDisabled ? redoUnavailableTitle : "다시실행"}
+                onClick={() => {
+                  setWorkspaceDockExpanded(false);
+                  setColorToolsOpen(false);
+                  redo();
+                }}
+                aria-label={label.redoAria}
+              />
+              <button
+                type="button" ref={workspaceToggleRef}
+                aria-controls={MOBILE_WORKSPACE_TOOLS_ID} aria-expanded={workspaceDockExpanded}
+                aria-label={workspaceToggleAccessibleLabel} title={workspaceToggleAccessibleLabel}
+                data-studio-mobile-workspace-toggle="true"
+                onFocus={preloadStudioInspectorDrawingSurface} onPointerDown={preloadStudioInspectorDrawingSurface} onPointerEnter={preloadStudioInspectorDrawingSurface}
+                onClick={() => { setColorToolsOpen(false); setMobileSheet(null); setWorkspaceDockExpanded((expanded) => !expanded); }}
+                className={cn("relative flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-0.5 rounded-xl text-[0.625rem] font-semibold text-fg-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent", workspaceDockExpanded ? "bg-accent-soft text-accent" : "hover:bg-raised")}
+              >
+                <Grid3X3 size={18} aria-hidden />
+                <span>{workspaceDockExpanded ? label.collapse : label.workspaceToggle}</span>
+                {!workspaceDockExpanded && workspaceDockHasActiveTool ? <span aria-hidden className="absolute right-1 top-1 size-1.5 rounded-full bg-accent" /> : null}
+              </button>
+            </div>
+            <section id={`${scrollDescriptionId}-colors`} ref={mobileColorControlsRef} hidden={!colorToolsOpen}
+              aria-label={label.color} aria-hidden={!colorToolsOpen} data-studio-mobile-color-controls="true"
+              data-studio-mobile-sheet="colors" data-studio-shortcut-boundary="true"
+              className="absolute left-[max(6px,env(safe-area-inset-left))] right-[max(6px,env(safe-area-inset-right))] bottom-[calc(100%+6px)] rounded-2xl border border-line bg-panel p-3 shadow-xl"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-fg">{label.color}</span>
+                <button type="button" data-studio-mobile-sheet-close="true" aria-label={`${label.color} · ${label.collapse}`} className="grid size-11 place-items-center rounded-xl hover:bg-raised"
+                  onClick={() => { setColorToolsOpen(false); colorToolsButtonRef.current?.focus(); }}><X size={18} aria-hidden /></button>
+              </div>
+              <StudioDualColorWell compact primary={color} secondary={colorWorkspace?.secondary} className="justify-center border-0! bg-transparent! p-0! [&_button]:min-h-[44px] [&_button]:min-w-[44px]"
+                onPrimaryChange={setColor} onSecondaryChange={colorWorkspace?.onSecondaryChange}
+                onSwap={colorWorkspace ? () => { colorWorkspace.onPrimaryChange(colorWorkspace.secondary); colorWorkspace.onSecondaryChange(colorWorkspace.primary); } : undefined} />
+            </section>
+            <section id={MOBILE_WORKSPACE_TOOLS_ID} ref={workspacePanelRef} hidden={!workspaceDockExpanded}
+              aria-label={label.workspaceToggle} aria-hidden={!workspaceDockExpanded} data-studio-mobile-workspace-menu="true"
+              data-studio-mobile-sheet="tools" data-studio-shortcut-boundary="true"
+              className="absolute left-[max(6px,env(safe-area-inset-left))] right-[max(6px,env(safe-area-inset-right))] bottom-[calc(100%+6px)] max-h-[min(60dvh,420px)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-panel p-2 shadow-xl"
+            >
+              <div className="mb-2 flex items-center justify-between gap-2 border-b border-line pb-1">
+                <div className="min-w-0 px-1"><p className="text-sm font-semibold text-fg">{label.workspaceToggle}</p><p aria-label="현재 도구" className="truncate text-xs text-fg-2">{activeCatalogBrushName}</p></div>
+                <button type="button" data-studio-mobile-sheet-close="true" aria-label={`${label.workspaceToggle} · ${label.collapse}`} className="grid size-11 place-items-center rounded-xl hover:bg-raised"
+                  onClick={() => { setWorkspaceDockExpanded(false); workspaceToggleRef.current?.focus(); }}><X size={18} aria-hidden /></button>
+              </div>
+              <div role="toolbar" aria-label={`${label.workspaceToggle} · ${label.drawingTools}`} className="mb-2 grid grid-cols-4 gap-1 [&>span>button]:w-full">
+              <StudioDockButton
+                icon={MousePointer2}
+                label={label.select}
+                hintDescription="요소를 선택해 이동·크기 조절·정렬하고 속성 패널에서 세부 값을 편집합니다."
+                hintShortcut="V"
+                active={selectionModeActive}
+                onClick={() => {
+                  setWorkspaceDockExpanded(false);
+                  activateCanvasTool("select");
+                  setMenu(null);
+                  setMobileSheet(null);
+                }}
+                aria-pressed={selectionModeActive}
               />
               <StudioDockButton
                 icon={Grid3X3}
@@ -1702,23 +1728,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 aria-pressed={pixelModeActive}
                 aria-expanded={pixelModeActive ? drawSettingsOpen : undefined}
                 aria-controls={pixelModeActive ? MOBILE_DRAW_SETTINGS_ID : undefined}
-              />
-              <StudioDockButton
-                icon={Eraser}
-                label={label.eraser}
-                data-studio-mobile-tool="eraser"
-                hintDescription="현재 레이어의 획을 지웁니다. 브러시 크기와 불투명도 설정을 그대로 활용합니다."
-                hintShortcut="E"
-                active={tool === "draw" && drawMode === "eraser"}
-                disabled={activeSurfaceReviewLocked}
-                title={activeSurfaceReviewLocked ? "편집 잠금을 해제한 뒤 지우개를 사용할 수 있어요" : "지우개 (E)"}
-                onClick={() => {
-                  setWorkspaceDockExpanded(false);
-                  activateCanvasTool("draw", "eraser");
-                  setMenu(null);
-                  setMobileSheet(null);
-                }}
-                aria-pressed={tool === "draw" && drawMode === "eraser"}
               />
               <StudioDockButton
                 icon={PaintBucket}
@@ -1765,49 +1774,6 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 aria-expanded={shapeModeActive ? drawSettingsOpen : undefined}
                 aria-controls={shapeModeActive ? MOBILE_DRAW_SETTINGS_ID : undefined}
               />
-              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
-              <StudioDockButton
-                icon={Undo2}
-                label={label.undo}
-                data-studio-primary-action="undo"
-                hintDescription="마지막 편집을 한 단계 되돌립니다. 공동 작업 변경 이력과 함께 안전하게 이동합니다."
-                hintUnavailableReason={undoDisabled ? undoUnavailableTitle : undefined}
-                disabled={undoDisabled}
-                title={undoDisabled ? undoUnavailableTitle : "실행취소"}
-                onClick={() => {
-                  setWorkspaceDockExpanded(false);
-                  undo();
-                }}
-                aria-label={label.undoAria}
-              />
-              <StudioDockButton
-                icon={Redo2}
-                label={label.redo}
-                data-studio-primary-action="redo"
-                hintDescription="되돌린 편집을 한 단계 다시 적용합니다."
-                hintUnavailableReason={redoDisabled ? redoUnavailableTitle : undefined}
-                disabled={redoDisabled}
-                title={redoDisabled ? redoUnavailableTitle : "다시실행"}
-                onClick={() => {
-                  setWorkspaceDockExpanded(false);
-                  redo();
-                }}
-                aria-label={label.redoAria}
-              />
-              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
-              <StudioDockButton
-                icon={Files}
-                label={label.pages}
-                hintDescription="페이지 목록을 열어 추가·복제·순서를 바꿉니다."
-                data-studio-primary-action="pages"
-                active={mobileSheet === "pages"}
-                aria-label={mobileSheet === "pages" ? label.pagesCloseAria : label.pagesOpenAria}
-                aria-pressed={mobileSheet === "pages"}
-                onClick={() => {
-                  setWorkspaceDockExpanded(false);
-                  setMobileSheet((s) => (s === "pages" ? null : "pages"));
-                }}
-              />
               {handleDownload ? (
                 <StudioDockButton
                   icon={Download}
@@ -1821,9 +1787,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   }}
                 />
               ) : null}
-              <span aria-hidden className="my-1 w-px self-stretch bg-line/70" />
               <StudioDockButton
-                ref={mobileBrushDockButtonRef}
                 label={label.brush}
                 hintDescription={drawSettingsOpen
                   ? "열려 있는 브러시 설정을 닫고 캔버스로 돌아갑니다."
@@ -1857,59 +1821,16 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   />
                 )}
               />
-                </div>
-                <StudioMobileScrollCues
-                  descriptionId={`${scrollDescriptionId}-primary`}
-                  placement="primary"
-                />
+                <StudioDockNavButton icon={Layers} label="레이어" aria-label="레이어 열기"
+                  onClick={() => { setWorkspaceDockExpanded(false); setMenu(null); openInspectorRoute({ primary: "layers" }, "props"); }} />
+                <StudioDockNavButton icon={Grid3X3} label="전체 도구" aria-label="전체 도구 열기"
+                  onClick={(event) => { setWorkspaceDockExpanded(false); setMobileSheet(null); setMenu(null); requestStudioAllTools(workspaceToggleRef.current ?? event.currentTarget); }} />
               </div>
-              {/* 보조 도구 disclosure 는 가로 스크롤 밖에 고정한다. 320px 에서도 사용자가
-                  숨은 도구를 찾기 위해 먼저 드로잉 행을 밀지 않도록 하는 발견성 계약이다. */}
-              <button
-                type="button"
-                aria-controls={MOBILE_WORKSPACE_TOOLS_ID}
-                aria-expanded={workspaceDockExpanded}
-                aria-label={workspaceToggleAccessibleLabel}
-                title={workspaceDockExpanded
-                  ? workspaceToggleAccessibleLabel
-                  : "댓글·페이지·필터·새 작업·작업 패널·색각·줌 도구 펼치기"}
-                data-studio-mobile-workspace-toggle="true"
-                onFocus={preloadStudioInspectorDrawingSurface}
-                onPointerDown={preloadStudioInspectorDrawingSurface}
-                onPointerEnter={preloadStudioInspectorDrawingSurface}
-                onClick={() => setWorkspaceDockExpanded((expanded) => !expanded)}
-                style={{ minWidth: 44 }}
-                className={cn(
-                  "relative flex min-h-11 min-w-11 flex-none flex-col items-center justify-center gap-0.5 rounded-xl border border-line/70 bg-raised/75 px-1 text-[0.6rem] font-bold leading-none text-fg-2",
-                  STUDIO_EASE,
-                  "hover:bg-raised",
-                  "focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent",
-                  (workspaceDockExpanded || workspaceDockHasActiveTool) && "text-accent",
-                )}
-              >
-                {workspaceDockExpanded ? (
-                  <ChevronDown size={17} strokeWidth={2} aria-hidden />
-                ) : (
-                  <ChevronUp size={17} strokeWidth={2} aria-hidden />
-                )}
-                <span>{workspaceDockExpanded ? label.collapse : label.workspaceToggle}</span>
-                {!workspaceDockExpanded && workspaceDockHasActiveTool ? (
-                  <span
-                    aria-hidden
-                    className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-accent"
-                  />
-                ) : null}
-              </button>
-            </div>
-
-            {/* 2행: 보조 내비 — 댓글·퀵 메뉴·작업 패널·페이지·필터·새 작업·색각·줌 */}
             <div
-              id={MOBILE_WORKSPACE_TOOLS_ID}
-              hidden={!workspaceDockExpanded}
-              className="flex min-w-0 items-stretch overflow-hidden border-t border-line/60 pt-1"
+              id={`${MOBILE_WORKSPACE_TOOLS_ID}-navigation`}
+              className="grid min-w-0 grid-cols-4 gap-1 border-t border-line/60 pt-2"
               role="toolbar"
               aria-label={label.workspaceTools}
-              aria-describedby={`${scrollDescriptionId}-secondary`}
               data-studio-mobile-control-side={mobileControlSide}
             >
               <StudioDockNavButton
@@ -1923,25 +1844,25 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                 className="min-h-11 min-w-11 shrink-0"
                 onClick={() => {
                   setMobileSheet(null);
+                  setWorkspaceDockExpanded(false);
                   toggleStudioCommentPinPlacement();
                 }}
               />
               {mobileControlSide === "left" ? (
                 <div
-                  className="flex size-11 min-h-11 min-w-11 shrink-0 [&>button]:min-h-11 [&>button]:min-w-11"
+                  className="flex size-11 min-h-11 min-w-11 shrink-0 [&>button]:min-h-11 [&>button]:min-w-11 [&>button]:text-[0.6875rem] [&>button]:leading-tight"
                   data-studio-mobile-quick-actions-slot="left"
                 >
                   {mobileQuickActionsButton}
                 </div>
               ) : null}
               <div
-                className="relative min-w-0 flex-1"
-                data-studio-mobile-scroll-host="secondary"
+                className="contents"
+                data-studio-mobile-workspace-grid="true"
               >
                 <div
-                  ref={secondaryDockScrollRef}
-                  className="flex h-full min-w-0 touch-pan-x items-stretch gap-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] min-[360px]:gap-0.5 [&::-webkit-scrollbar]:hidden"
-                  data-studio-mobile-dock-scroll="secondary"
+                  className="contents"
+                  data-studio-mobile-workspace-items="true"
                 >
                 <StudioDockNavButton
                   icon={Layers}
@@ -1965,6 +1886,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                       setMobileSheet(null);
                       return;
                     }
+                    setWorkspaceDockExpanded(false);
                     openInspectorRoute(
                       {
                         primary:
@@ -1988,6 +1910,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   aria-haspopup="dialog"
                   data-studio-mobile-search-trigger="true"
                   onClick={() => {
+                    setWorkspaceDockExpanded(false);
                     requestStudioCommandSearch({ scope: "all" });
                   }}
                 />
@@ -1999,7 +1922,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   aria-haspopup="dialog"
                   aria-expanded={mobileSheet === "pages"}
                   active={mobileSheet === "pages"}
-                  onClick={() => setMobileSheet((s) => (s === "pages" ? null : "pages"))}
+                  onClick={() => { setWorkspaceDockExpanded(false); setMobileSheet((s) => (s === "pages" ? null : "pages")); }}
                 />
                 <StudioMobileFilterSelect
                   filterMutationLocked={filterMutationLocked}
@@ -2017,6 +1940,7 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   title="템플릿과 웹툰 마법사로 새 작업 시작"
                   onClick={() => {
                     setMobileSheet(null);
+                    setWorkspaceDockExpanded(false);
                     setQuickStartOpen(true);
                   }}
                 />
@@ -2027,11 +1951,11 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   active={colorVisionOpen || colorBlindPreview !== "none"}
                   aria-pressed={colorVisionOpen}
                   data-studio-color-vision-trigger="true"
-                  onClick={() => setMobileSheet((sheet) =>
+                  onClick={() => { setWorkspaceDockExpanded(false); setMobileSheet((sheet) =>
                     sheet === "color-vision" ? null : "color-vision"
-                  )}
+                  ); }}
                 />
-                <div className="flex w-[8.25rem] flex-none items-center justify-center">
+                <div className="col-span-3 flex min-w-0 items-center justify-between rounded-xl bg-card">
                   <button
                     type="button"
                     onClick={() => setZoom((z) => clampZoom(z - 0.25))}
@@ -2060,20 +1984,17 @@ export const StudioMobileEditingDock = memo(function StudioMobileEditingDock({
                   </button>
                 </div>
                 </div>
-                <StudioMobileScrollCues
-                  descriptionId={`${scrollDescriptionId}-secondary`}
-                  placement="secondary"
-                />
               </div>
               {mobileControlSide === "right" ? (
                 <div
-                  className="flex size-11 min-h-11 min-w-11 shrink-0 [&>button]:min-h-11 [&>button]:min-w-11"
+                  className="flex size-11 min-h-11 min-w-11 shrink-0 [&>button]:min-h-11 [&>button]:min-w-11 [&>button]:text-[0.6875rem] [&>button]:leading-tight"
                   data-studio-mobile-quick-actions-slot="right"
                 >
                   {mobileQuickActionsButton}
                 </div>
               ) : null}
             </div>
+            </section>
           </nav>
         )}
     </>

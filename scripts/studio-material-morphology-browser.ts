@@ -29,8 +29,8 @@ function element(id: string, pressure?: number, tilt = 20, size = 48, samples = 
     brushDynamics: selection.brushDynamics, stroke: "#244358", strokeWidth: size, opacity: 1,
   };
 }
-function render(source: DrawEl, live = false, dpr = 1) {
-  const target = canvas(450 * dpr, 164 * dpr);
+function render(source: DrawEl, live = false, dpr = 1, width = 450, height = 164) {
+  const target = canvas(width * dpr, height * dpr);
   const ctx = target.getContext("2d")!; ctx.scale(dpr, dpr);
   const started = performance.now();
   const planned = planStudioDynamicBrushRender(source, source.brush!, live);
@@ -54,6 +54,60 @@ function render(source: DrawEl, live = false, dpr = 1) {
   let mass = 0, visible = 0;
   for (let i = 3; i < rgba.length; i += 4) { mass += rgba[i]!; if (rgba[i]! > 8) visible++; }
   return { target, rgba, mass, visible, planningMs, submissionMs, marks: coverage.marks.length, bytes: receipt.allocatedBytes };
+}
+
+/** 신규 촉과 수정한 필버트의 짧은 획·긴 획을 실제 제품 렌더러로 비교한다. */
+export async function auditStudioMaterialBrushStrokeScenarios() {
+  const ids = ["material-graphite-contour", "material-broken-chalk", "material-flat-gouache",
+    "material-dry-edge-ink", "material-foliage-bough", "material-stitch-ladder", "material-filbert-bristle", "oil-filbert", "layered-oval"];
+  const names = ["짧은 획 · 낮은 필압", "짧은 획 · 높은 필압", "긴 획 · 필압 변화", "긴 획 · 일정 필압"];
+  const sheets = [], cases = [];
+  for (const id of ids) {
+    const sheet = canvas(980, 750), context = sheet.getContext("2d")!;
+    context.fillStyle = "white"; context.fillRect(0, 0, sheet.width, sheet.height);
+    context.fillStyle = "#18232d"; context.font = "bold 20px sans-serif";
+    context.fillText(studioMaterialBrushDefinition(id)?.name ?? id, 24, 32);
+    const results = [];
+    for (let scenario = 0; scenario < names.length; scenario++) {
+      const short = scenario < 2;
+      const sampleCount = short ? 12 : 768;
+      const source = element(id, scenario === 0 ? 0.15 : scenario === 1 ? 0.85 : scenario === 3 ? 0.5 : undefined,
+        20, 48, sampleCount);
+      source.points = Array.from({ length: sampleCount * 2 }, (_, index) => {
+        const t = Math.floor(index / 2) / (sampleCount - 1);
+        return index % 2 === 0 ? 38 + t * (short ? 138 : 900)
+          : 75 + Math.sin(t * Math.PI * (short ? 1 : 4)) * (short ? 12 : 24);
+      });
+      const retained = render(source, false, 1, 960);
+      const live = render(source, true, 1, 960);
+      const replay = render(JSON.parse(JSON.stringify(source)) as DrawEl, false, 1, 960);
+      invariant(difference(retained.rgba, live.rgba) === 0, `${id}/${scenario}: live mismatch`);
+      invariant(difference(retained.rgba, replay.rgba) === 0, `${id}/${scenario}: replay mismatch`);
+      invariant(retained.visible > 10, `${id}/${scenario}: blank stroke`);
+      let endPixels = 0;
+      const endpointX = short ? 176 : 938;
+      const definition = studioMaterialBrushDefinition(id);
+      const endMargin = definition?.mode === "stamp" || definition?.mode === "scatter"
+        ? Math.ceil(48 * definition.spacing * 1.6 + 24) : 24;
+      for (let y = 25; y < 125; y++) {
+        for (let x = endpointX - endMargin; x < endpointX + 4; x++) {
+          if ((retained.rgba[(y * 960 + x) * 4 + 3] ?? 0) > 8) endPixels++;
+        }
+      }
+      // 분리 도장은 끝점에 추가 도장을 강제하지 않으므로 실제 최대 간격만큼 되짚는다.
+      invariant(endPixels > 0, `${id}/${scenario}: missing stroke end`);
+      context.fillStyle = "#536173"; context.font = "14px sans-serif";
+      context.fillText(names[scenario]!, 24, 61 + scenario * 172);
+      context.drawImage(retained.target, 8, 65 + scenario * 172);
+      results.push({ scenario: names[scenario], samples: sampleCount, mass: retained.mass,
+        visiblePixels: retained.visible, endPixels, markCount: retained.marks, liveDifference: 0, replayDifference: 0 });
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+    invariant(results[1]!.mass > results[0]!.mass * 1.1, `${id}: short stroke pressure ineffective`);
+    cases.push({ id, results });
+    sheets.push(sheet.toDataURL("image/png"));
+  }
+  return { cases, sheets, scope: "Canvas2D 제품 렌더러, 합성 입력, 짧은 12샘플/긴 768샘플, 실제 펜 검증 아님" };
 }
 function difference(a: Uint8ClampedArray, b: Uint8ClampedArray): number {
   invariant(a.length === b.length, "incompatible image sizes");

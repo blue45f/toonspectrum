@@ -1,5 +1,5 @@
 /** Browser pixels and measured CPU submission on the real shared product renderer. */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ mkdirSync(output, { recursive: true });
 const harness = "/__material_morphology_audit__";
 const vite = await createServer({
   configFile: false, root,
+  cacheDir: join(output, ".vite-cache"),
   resolve: { alias: { "@": join(root, "apps/web/src") } },
   server: { host: "127.0.0.1", port: 0, fs: { allow: [root] } },
   plugins: [{ name: "material-morphology-audit", configureServer(server) {
@@ -32,6 +33,8 @@ try {
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
   page.on("pageerror", (error) => diagnostics.push(error.message));
+  page.on("requestfailed", (request) => diagnostics.push(`${request.url()}: ${request.failure()?.errorText}`));
+  page.on("console", (message) => { if (message.type() === "error") diagnostics.push(message.text()); });
   await page.goto(`http://127.0.0.1:${address.port}${harness}`);
   const result = await page.evaluate(async () => {
     const entry = await import("/scripts/studio-material-morphology-browser.ts");
@@ -41,8 +44,18 @@ try {
     writeFileSync(join(output, `materials-${index + 1}.png`), Buffer.from(png.split(",")[1], "base64"));
   }
   delete result.sheets;
+  const scenarios = await page.evaluate(async () => {
+    const entry = await import("/scripts/studio-material-morphology-browser.ts");
+    return entry.auditStudioMaterialBrushStrokeScenarios();
+  });
+  for (const [index, png] of scenarios.sheets.entries()) {
+    writeFileSync(join(output, `stroke-scenarios-${index + 1}.png`), Buffer.from(png.split(",")[1], "base64"));
+  }
+  delete scenarios.sheets;
+  writeFileSync(join(output, "stroke-scenarios.json"), `${JSON.stringify(scenarios, null, 2)}\n`);
   writeFileSync(join(output, "report.json"), `${JSON.stringify({ ...result, diagnostics }, null, 2)}\n`);
   if (diagnostics.length) throw new Error(diagnostics.join("\n"));
+  rmSync(join(output, "failure.json"), { force: true });
   console.log(JSON.stringify({ count: result.cases.length, ...result.performance, output }));
 } catch (error) {
   writeFileSync(join(output, "failure.json"), JSON.stringify({ error: String(error), diagnostics }, null, 2));

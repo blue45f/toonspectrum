@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { filterStudio2dScenes, STUDIO_2D_ASSET_METADATA } from "./studio-2d-asset-quality";
 import { BG_SCENE_COMPATIBILITY_LIBRARY, BG_SCENES, groupBgScenes } from "./studio-bg-scenes";
 
+import { STUDIO_ILLUSTRATION_BG_SCENES } from "./catalog/studio-illustration-pack";
+
 const assets = new Map(STUDIO_2D_ASSET_METADATA.map((asset) => [asset.id, asset]));
 
 describe("native-size 2D content review", () => {
@@ -24,7 +26,7 @@ describe("native-size 2D content review", () => {
     const legacy = STUDIO_2D_ASSET_METADATA.filter((asset) => asset.provenance.kind === "legacy-catalog");
     const cc0 = STUDIO_2D_ASSET_METADATA.filter((asset) => asset.provenance.kind === "poly-haven-cc0");
     const generated = STUDIO_2D_ASSET_METADATA.filter((asset) => asset.provenance.kind === "gpt-image-2.5");
-    expect(STUDIO_2D_ASSET_METADATA).toHaveLength(57);
+    expect(STUDIO_2D_ASSET_METADATA).toHaveLength(57 + STUDIO_ILLUSTRATION_BG_SCENES.length);
     expect(STUDIO_2D_ASSET_METADATA.every((asset) => asset.review.method === "full-image")).toBe(true);
     expect(legacy).toHaveLength(9);
     expect(legacy.every((asset) => asset.provenance.licenseStatus === "unverified")).toBe(true);
@@ -32,7 +34,7 @@ describe("native-size 2D content review", () => {
     expect(cc0.every((asset) => asset.provenance.licenseStatus === "cc0-verified")).toBe(true);
     expect(generated).toHaveLength(20);
     expect(generated.every((asset) => asset.provenance.licenseStatus === "first-party-generated")).toBe(true);
-    expect(STUDIO_2D_ASSET_METADATA.filter((asset) => asset.recommended)).toHaveLength(53);
+    expect(STUDIO_2D_ASSET_METADATA.filter((asset) => asset.recommended)).toHaveLength(53 + STUDIO_ILLUSTRATION_BG_SCENES.length);
     expect(STUDIO_2D_ASSET_METADATA.filter((asset) => asset.review.status === "small-panel-only")).toHaveLength(0);
     expect(BG_SCENE_COMPATIBILITY_LIBRARY).toHaveLength(4);
   });

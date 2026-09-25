@@ -38,6 +38,13 @@ function expectInOrder(source: string, needles: readonly string[]): void {
  * re-enters the document through the explicit, user-triggered restore.
  */
 describe("rejected stroke recovery integration boundary", () => {
+  it("provider 준비 획과 미완료 체크포인트 저장을 기존 이탈 경고 경계에 포함한다", () => {
+    expect(host).toContain("(pendingStrokeAdmissionRef.current?.size ?? 0) > 0\n      || hasUnpersistedStudioPendingStrokeCheckpoints()");
+    expect(host).toContain("checkpoint: (stroke) => checkpointPendingStroke(stroke, capturedScope.pageId, capturedScope.generation)");
+    const deferred = sourceBetween(host, "const deferSelectedSurface =", "// 다이렉트 라이브 초안 무장");
+    expectInOrder(deferred, ["setUnloadGuardArmed(true)", "pendingStrokeAdmission().defer({"]);
+  });
+
   it("parks the live stroke before the mid-stroke provider rejection discards it", () => {
     const reject = sourceBetween(
       host,
@@ -109,7 +116,8 @@ describe("rejected stroke recovery integration boundary", () => {
       "export type StudioSalvageRejectedStroke",
     );
     expect(restore).toContain("record.pageId !== activePageId");
-    expect(restore).toContain("id: nextId()");
+    expect(restore).toContain("record.restoredStrokeId ?? nextId()");
+    expect(restore).toContain("record.scopeKey !== context?.scopeKey");
     expect(restore).toContain("queueDeferredStrokeCommit(restored)");
     expect(recoveryHost).toContain("setStudioRejectedStrokeRestorer((record) =>");
     expect(recoveryHost).toContain("unregister();");
@@ -117,5 +125,18 @@ describe("rejected stroke recovery integration boundary", () => {
     expect(host).not.toContain("promotePendingGpuAuthoritiesToKonva");
     expect(host).not.toContain("relinquishGpuLiveInkToKonva");
     expect(recoveryHost).not.toMatch(/from\s+["'](?:react-konva|konva)/u);
+  });
+
+  it("프로젝트 저장 키와 권한 세대를 기존 호스트에서 받고 SQLite 저장 확인 경계를 사용한다", () => {
+    const persistence = readFileSync(new URL("./live/studio-rejected-stroke-recovery-persistence.ts", import.meta.url), "utf8");
+    const wiring = sourceBetween(host, "useStudioRejectedStrokeRecoveryHost({", "function rejectActiveSelectedLiveSurface(");
+    expect(wiring).toContain("documentKey: autosaveKey");
+    expect(wiring).toContain("ownerId: studioAuthUserId");
+    expect(wiring).toContain("projectId: studioRoute.projectId");
+    expect(wiring).toContain("documentId: studioRoute.documentId");
+    expect(wiring).toContain("collaborationAccessRef.current.documentGeneration");
+    expect(persistence).toContain("database.asAsyncKeyValueStore(STUDIO_REJECTED_STROKE_RECOVERY_NAMESPACE)");
+    expect(persistence).toContain("autosave.read(scope.documentKey)");
+    expect(persistence).not.toContain("localStorage");
   });
 });

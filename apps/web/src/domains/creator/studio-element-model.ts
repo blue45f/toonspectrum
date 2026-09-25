@@ -1,3 +1,4 @@
+import type { StudioSavedSelectionLibrary } from "./studio-saved-selections";
 import type { StudioLiveAdjustmentMetadata } from "./contracts/studio-live-adjustment-contract";
 import type { StudioTextAiProvenance } from "./ai/studio-ai-client";
 import type {
@@ -84,6 +85,8 @@ import type { StudioFilterMaskSurfaceId } from "@/shared/lib/studio-filter-mask-
 import type { StudioInkInputContract } from "@/shared/lib/studio-ink-input-contract";
 
 export interface ImageEl {
+  /** 이미지에 귀속되어 자동저장 및 프로젝트 아카이브에 함께 보존되는 이름 있는 선택. */
+  savedSelections?: StudioSavedSelectionLibrary;
   id: string;
   type: "image";
   src: string;
@@ -605,6 +608,11 @@ interface StudioElementLayerMetadata {
   blendMode?: string;
   lockAspect?: boolean;
   groupId?: string;
+  /** PSD 폴더 UI의 소속과 원본 중첩 경로를 잇는 교환 메타데이터. */
+  psdGroupId?: string;
+  psdRasterSourceId?: string;
+  psdSource?: import("./export/studio-psd-source").StudioPsdSource;
+  psdFolderPath?: readonly import("./export/studio-psd-folder-structure").StudioPsdFolder[];
   clipBelow?: boolean;
   alphaLocked?: boolean;
   maskSrc?: string;

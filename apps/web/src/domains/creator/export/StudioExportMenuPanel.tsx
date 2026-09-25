@@ -58,6 +58,8 @@ import {
   recommendScale,
   validateExport,
   type PresetExportScope,
+  type PresetExportResult,
+  type PresetSliceExportOptions,
 } from "./studio-export-presets";
 import { exportPagesToPdf, pdfExportResultMessage } from "./studio-pdf-export";
 
@@ -156,6 +158,10 @@ export interface StudioExportMenuPanelProps {
    * Parent (StudioPage) may omit this; the panel then falls back to "all" (+ slice).
    */
   capturePagesForIndices?: (indices: number[]) => Promise<HTMLCanvasElement[]>;
+  exportPresetSlicesFromDocument?: (
+    indices: readonly number[] | null,
+    options: Omit<PresetSliceExportOptions, "pages">,
+  ) => Promise<PresetExportResult>;
   /**
    * 현재 페이지를 벡터 SVG로 직렬화 — 요소 데이터가 필요하므로 StudioPage가 페이지
    * elements/배경/그룹/테마를 넘겨 studio-svg-export.exportPageToSvg 를 호출해 결과를 준다.
@@ -211,6 +217,7 @@ export function StudioExportMenuPanel({
   onCopyToClipboard,
   capturePagesForPreset,
   capturePagesForIndices,
+  exportPresetSlicesFromDocument,
   exportCurrentPageToSvg,
   exportCurrentPageToVectorPdf,
   exportCurrentPageToInkMl,
@@ -840,19 +847,51 @@ export function StudioExportMenuPanel({
       const [result, { SVG_EXPORT_MIME, svgExportFileName, svgExportResultMessage }] =
         await Promise.all([exportCurrentPageToSvg(), loadStudioSvgExportModule()]);
       if (!mountedRef.current) return;
-      const blob = new Blob([result.svg], { type: SVG_EXPORT_MIME });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = svgExportFileName(exportTitle);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      if (result.skipped.length > 0) {
+        setSvgStatus({
+          tone: "warn",
+          text: `외관이 달라지는 요소가 있어 벡터 SVG 저장을 중단했어요. ${[...new Set(result.skipped.map((item) => item.label))].join(" ")} 현재 원고의 질감·클리핑·혼합 결과를 유지하려면 외관 보존 SVG를 선택해 주세요.`,
+        });
+        return;
+      }
+      downloadBlob(new Blob([result.svg], { type: SVG_EXPORT_MIME }), svgExportFileName(exportTitle));
       setSvgStatus({ tone: result.skipped.length > 0 ? "warn" : "good", text: svgExportResultMessage(result) });
     } catch (err) {
       if (!mountedRef.current) return;
       setSvgStatus({ tone: "warn", text: err instanceof Error ? err.message : "SVG 내보내기에 실패했어요." });
+    } finally {
+      if (mountedRef.current) setSvgBusy(false);
+    }
+  }
+
+  async function runAppearanceSvgExport() {
+    if (
+      svgBusy || psdBusy || pdfBusy || presetBusy || isExporting ||
+      contactBusy || archiveBusy !== null || vectorPdfBusy
+    ) return;
+    setSvgBusy(true);
+    setSvgStatus({ tone: "info", text: "질감과 클리핑을 보존하는 SVG를 준비하는 중…" });
+    try {
+      const [{ exportStudioAppearanceSvg }, canvases] = await Promise.all([
+        import("./studio-svg-export-appearance"),
+        capturePagesForPreset("current"),
+      ]);
+      if (!mountedRef.current) return;
+      const canvas = canvases[0];
+      if (!canvas || canvases.length !== 1) throw new Error("외관 보존 SVG용 현재 페이지 캡처를 만들지 못했어요.");
+      const result = await exportStudioAppearanceSvg(canvas);
+      if (!mountedRef.current) return;
+      downloadBlob(
+        new Blob([result.svg], { type: "image/svg+xml;charset=utf-8" }),
+        `${safeExportBaseName(exportTitle)}.appearance.svg`,
+      );
+      setSvgStatus({
+        tone: "good",
+        text: `외관 보존 SVG를 저장했어요(${result.pixelWidth}×${result.pixelHeight}px, 무손실 PNG 포함). 획과 글자는 벡터로 편집할 수 없어요.`,
+      });
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setSvgStatus({ tone: "warn", text: error instanceof Error ? error.message : "외관 보존 SVG를 만들지 못했어요." });
     } finally {
       if (mountedRef.current) setSvgBusy(false);
     }
@@ -901,17 +940,22 @@ export function StudioExportMenuPanel({
       text: scope === "all" ? `${pendingRange} 캡처 중…` : "페이지 캡처 중…",
     });
     try {
-      let pages: HTMLCanvasElement[];
+      let pages: HTMLCanvasElement[] = [];
       let rangeSuffix = "";
-      if (scope === "all") {
+      let indices: readonly number[] | null = null;
+      if (exportPresetSlicesFromDocument && scope === "all") {
+        if (!packagePreflight.canExport) throw new Error(packagePreflight.errors[0]?.message ?? "내보내기 설정을 확인하세요.");
+        indices = packagePreflight.pageIndices;
+        if (indices.length === 0) throw new Error("선택한 범위에 내보낼 페이지가 없습니다.");
+        rangeSuffix = ` (${formatStudioExportPageSelection(indices)})`;
+      } else if (!exportPresetSlicesFromDocument && scope === "all") {
         const captured = await captureMultiPageExportCanvases();
         pages = captured.pages;
         rangeSuffix = ` (${captured.rangeLabel})`;
-      } else {
+      } else if (!exportPresetSlicesFromDocument) {
         pages = await capturePagesForPreset("current");
       }
-      const result = await exportPresetSlices({
-        pages,
+      const options: Omit<PresetSliceExportOptions, "pages"> = {
         preset: selectedPreset,
         format: exportFormat,
         title: exportTitle,
@@ -921,7 +965,10 @@ export function StudioExportMenuPanel({
             tone: "info",
             text: `${done}/${total}장 저장 중…${rangeSuffix}`,
           }),
-      });
+      };
+      const result = exportPresetSlicesFromDocument
+        ? await exportPresetSlicesFromDocument(indices, options)
+        : await exportPresetSlices({ ...options, pages });
       setPresetStatus({
         tone: result.oversized > 0 ? "warn" : "good",
         text: `${presetExportResultMessage(result, selectedPreset)}${rangeSuffix}`,
@@ -1732,6 +1779,20 @@ export function StudioExportMenuPanel({
           >
             <FileText size={13} /> SVG (벡터, 현재 페이지)
           </button>
+          <button
+            type="button"
+            onClick={() => void runAppearanceSvgExport()}
+            disabled={
+              svgBusy || psdBusy || pdfBusy || presetBusy || isExporting || contactBusy || archiveBusy !== null || vectorPdfBusy
+            }
+            className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card py-1.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+            aria-describedby="studio-svg-appearance-description"
+          >
+            <FileImage size={13} /> SVG (외관 보존, 현재 페이지)
+          </button>
+          <p id="studio-svg-appearance-description" className="mt-1.5 text-[10px] leading-snug text-fg-2">
+            외관 보존 SVG는 선택한 내보내기 해상도의 PNG를 담아 질감·클리핑을 유지해요. 획과 글자는 벡터로 편집할 수 없어요.
+          </p>
           <p
             aria-live="polite"
             className={cx(

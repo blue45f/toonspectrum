@@ -1,3 +1,5 @@
+import { throwIfStudioPsdImportAborted } from "./studio-psd-import-progress";
+import type { StudioPsdSource } from "./export/studio-psd-source";
 import type {
   StudioArchiveImportApplyOptions,
   StudioArchiveImportPageDraft,
@@ -125,6 +127,8 @@ export interface StudioDocumentInterchangeCommitOptions {
   readonly pages: readonly PageState[];
   readonly anchorPageId: string;
   readonly choice: StudioInterchangeImportChoice;
+  readonly psdRepresentation?: "layers" | "composite";
+  readonly preservePsdSource?: (file: File) => Promise<StudioPsdSource>;
   readonly canvasWidth: number;
   readonly createId: () => string;
   readonly createBlankPage: (createId: () => string, canvasHeight: number) => PageState;
@@ -175,7 +179,18 @@ export async function prepareStudioDocumentInterchangeCommit(
   const index = anchorIndex(options.pages, options.anchorPageId);
 
   if (pending.kind === "psd") {
-    const importedElements = pending.result.elements as El[];
+    throwIfStudioPsdImportAborted(options.signal);
+    const originalFile = pending.result.originalFile;
+    const source = originalFile
+      ? await (options.preservePsdSource ?? (await import("./export/studio-psd-source")).storeStudioPsdSource)(originalFile)
+      : undefined;
+    throwIfStudioPsdImportAborted(options.signal);
+    const sourceElements = options.psdRepresentation === "composite"
+      ? pending.result.compositeElement ? [pending.result.compositeElement] : null
+      : pending.result.elements.flatMap((element) => [element, ...(pending.result.editableTextElements ?? []).filter((text) => text.psdRasterSourceId === element.id)]);
+    if (!sourceElements) throw new Error("이 PSD에는 원본 합성 이미지가 없어 합성본으로 적용할 수 없어요.");
+    const importedElements: El[] = sourceElements.map((element) => source ? { ...element, psdSource: source } : { ...element });
+    const importedGroups = options.psdRepresentation === "composite" ? [] : pending.result.groups ?? [];
     const importedHeight = Math.max(
       1,
       Math.round(pending.result.sourceHeight * pending.result.scale),
@@ -188,6 +203,7 @@ export async function prepareStudioDocumentInterchangeCommit(
             ...page,
             canvasH: Math.max(page.canvasH, importedHeight),
             elements: [...page.elements, ...importedElements],
+            groups: [...(page.groups ?? []), ...importedGroups],
           }
         : page);
     } else {
@@ -195,13 +211,14 @@ export async function prepareStudioDocumentInterchangeCommit(
         ...options.createBlankPage(options.createId, importedHeight),
         name: pending.fileName.replace(/\.psd$/iu, "") || "PSD 가져오기",
         elements: importedElements,
+        groups: importedGroups,
       };
       pages = [...options.pages];
       pages.splice(index + 1, 0, page);
       selectedPageId = page.id;
     }
     const skipped = pending.result.skipped.length;
-    const text = `${pending.result.elements.length}개 PSD 레이어를 적용했어요.${
+    const text = `${options.psdRepresentation === "composite" ? "PSD 원본 합성본을" : `${pending.result.elements.length}개 PSD 레이어를`} 적용했어요.${
       skipped > 0 ? ` 재현하지 못한 항목 ${skipped}건을 확인해 주세요.` : ""
     }`;
     return {

@@ -96,7 +96,8 @@ describe("ToonStudio Draw PWA", () => {
     const presentation = source("apps/web/src/domains/creator/studio-drawing-presentation.ts");
     const switcher = source("apps/web/src/domains/creator/studio-shell/StudioDocumentWorkspaceSwitcher.tsx");
     const appBar = source("apps/web/src/domains/creator/studio-cuttoon-editor/StudioDrawingAppBar.tsx");
-    const gestures = source("apps/web/src/domains/creator/studio-cuttoon-editor/StudioDrawingGestureBridge.tsx");
+    const host = source("apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx");
+    const gestures = source("apps/web/src/domains/creator/studio-mobile-history-touch-gesture-host.ts");
 
     expect(view).toContain("useStudioDrawingPresentation");
     expect(view).toContain("<StudioDrawingAppBar session={s} />");
@@ -106,8 +107,9 @@ describe("ToonStudio Draw PWA", () => {
     expect(switcher).toContain("withStudioDrawingPresentation");
     expect(appBar).toContain('studioBrushCatalogHandlers?.toggle?.("desktop-dock"');
     expect(appBar).toContain("setQuickAccessPaletteOpen");
-    expect(gestures).toContain("candidate.count === 2");
-    expect(gestures).toContain("candidate.count === 3");
-    expect(gestures).toContain("setCanvasOnlyMode");
+    expect(view).not.toContain("StudioDrawingGestureBridge");
+    expect(host).toContain("useStudioMobileHistoryTouchGestures({");
+    expect(gestures).toContain("resolveStudioTouchTapAction");
+    expect(gestures).toContain("gestureRef.current.toggleUi()");
   });
 });

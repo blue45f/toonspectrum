@@ -32,10 +32,10 @@ describe("Studio brush catalogue lazy boundary", () => {
     expect(STUDIO_CORE_BRUSH_CATALOG_ITEMS).toHaveLength(STUDIO_BRUSH_CATALOG_COUNTS.core);
     expect(STUDIO_BRUSH_CATALOG_COUNTS).toEqual({
       core: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length,
-      pro: 200,
-      total: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length + 200,
+      pro: 207,
+      total: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length + 207,
       erase: 2,
-      paint: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length - 2 + 200,
+      paint: STUDIO_CORE_BRUSH_CATALOG_ITEMS.length - 2 + 207,
     });
   });
 

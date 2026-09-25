@@ -225,7 +225,7 @@ export function reconcileStudioAssetComparisonIds(
 }
 
 function assetPixels(item: StudioUnifiedAssetItem): number | null {
-  if (item.source.kind === "local") {
+  if (item.source.kind === "local" || item.source.kind === "builtin-raster") {
     return item.source.value.width * item.source.value.height;
   }
   if (item.source.kind === "background") {
@@ -269,6 +269,13 @@ function applySteps(
         "편집 가능한 벡터 요소를 새 객체로 삽입합니다.",
         "색상·크기·위치를 이후에도 조정할 수 있습니다.",
       ]);
+    case "builtin-raster":
+      return Object.freeze([
+        "선택한 컷 또는 현재 화면에 원본 비율로 일러스트를 배치합니다.",
+        item.source.value.kind === "bubble-decoration"
+          ? "장식 그림과 대사가 독립 레이어로 삽입되어 대사를 계속 편집할 수 있습니다."
+          : "원본 이미지의 크기·회전·위치와 합성 방식을 조정할 수 있습니다.",
+      ]);
     case "object-3d":
       return Object.freeze([
         "3D 편집 도구에서 선택 모델과 호환성을 확인합니다.",
@@ -304,7 +311,9 @@ function applyWarnings(
     warnings.push("라이선스와 원본 출처를 확인한 뒤 사용해야 합니다.");
   }
   if (editability === "flattened") {
-    warnings.push("평면 에셋이므로 내부 구성 요소를 개별 편집할 수 없습니다.");
+    warnings.push(item.source.kind === "builtin-raster" && item.source.value.kind === "bubble-decoration"
+      ? "장식 그림은 이미지이며, 함께 추가되는 대사는 별도 텍스트 레이어에서 수정할 수 있습니다."
+      : "평면 에셋이므로 내부 구성 요소를 개별 편집할 수 없습니다.");
   }
   if (performanceTier === "heavy") {
     warnings.push("고품질 에셋으로 GPU 또는 메모리 사용량이 높을 수 있습니다.");

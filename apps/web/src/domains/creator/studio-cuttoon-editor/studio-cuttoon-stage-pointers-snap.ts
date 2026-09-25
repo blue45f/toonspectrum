@@ -522,6 +522,10 @@ export function bindStudioCuttoonStagePointersSnap(
     }
     const next = { ...current, points: [x0, y0, x1, y1] };
     drawingRef.current = next;
+    if (h.pendingStrokeAdmissionRef?.current?.has(next.id)) {
+      h.pendingStrokeAdmissionRef.current.update(next);
+      return true;
+    }
     drawingGesturePreviewPublisherRef.current.replaceShape(next);
     if (schedulePreview) scheduleDraft(next);
     return true;

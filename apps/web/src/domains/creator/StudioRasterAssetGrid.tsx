@@ -19,6 +19,9 @@ const COLLECTION_LABEL: Record<StudioRasterAsset["collection"], string> = {
   school: "학교",
   fantasy: "판타지",
   urban: "도시",
+  scifi: "SF",
+  coastal: "바다",
+  romance: "로맨스",
 };
 
 const FOCUS_RING_CLASS =
@@ -63,10 +66,10 @@ export function StudioRasterAssetGrid({
         </span>
         <div className="min-w-0 flex-1">
           <h3 id="studio-raster-assets-heading" className="text-xs font-bold text-fg">
-            고품질 장면 소품
+            고품질 장면 일러스트
           </h3>
           <p className="mt-0.5 text-[0.65rem] leading-relaxed text-fg-3">
-            투명 배경·권리 메타데이터를 검수한 자체 제작 전경 세트입니다.
+            소품·말풍선 장식·효과·질감을 원본 이미지로 배치합니다.
           </p>
         </div>
         <button

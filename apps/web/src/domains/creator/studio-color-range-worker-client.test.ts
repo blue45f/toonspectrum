@@ -5,6 +5,7 @@ import {
   createStudioColorRangeWorkerSession,
   type StudioColorRangeWorkerLike,
 } from "./studio-color-range-worker-client";
+import { STUDIO_COLOR_RANGE_WORKER_MAX_SUBPATHS } from "./studio-color-range-worker-protocol";
 import { executeStudioColorRangeWorkerRequest } from "./studio-color-range-worker-runtime";
 
 import type {
@@ -110,7 +111,7 @@ describe("createStudioColorRangeWorkerSession", () => {
     expect(worker.transfers).toEqual([[]]);
     worker.emitSuccess(worker.messages[0]!.requestId, null);
     await expect(pending).resolves.toEqual({ execution: "worker", selection: null });
-    for (const invalid of [{ width: 641 }, { widthPx: NaN }, { displayHeight: 0 }]) {
+    for (const invalid of [{ width: 8193 }, { widthPx: NaN }, { displayHeight: 0 }]) {
       await expect(session.run({ ...input, ...invalid })).rejects.toThrow();
     }
     session.dispose();
@@ -344,7 +345,7 @@ describe("createStudioColorRangeWorkerSession", () => {
         version: 1,
         requestId,
         selection: {
-          subpaths: Array.from({ length: 129 }, () => ({
+          subpaths: Array.from({ length: STUDIO_COLOR_RANGE_WORKER_MAX_SUBPATHS + 1 }, () => ({
             mode: "add",
             points: [
               { x: 0, y: 0 },

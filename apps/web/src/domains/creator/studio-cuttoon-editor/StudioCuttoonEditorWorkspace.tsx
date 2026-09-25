@@ -283,6 +283,7 @@ export function StudioCuttoonEditorWorkspace(s: StudioCuttoonEditorViewSession) 
               restoredView={s.proDrawPrefs.brushLibraryView[drawMode === "eraser" ? "erase" : "paint"]}
               onViewStateChange={(view) => s.studioBrushCatalogHandlers.rememberView?.(view, drawMode === "eraser" ? "erase" : "paint", s.studioOptionsBarsDrawModel.workspaceOwnerScope)}
               onSelect={s.applyStudioBrushCatalogSelection}
+              onSelectionLifecycle={s.studioBrushCatalogHandlers.selectionLifecycle}
               onToggleFavorite={s.studioBrushCatalogHandlers.toggleFavorite}
               onCollapse={s.studioOptionsBarsHandlers.toggleBrushDock}
               onOpenBrushStudio={s.studioOptionsBarsHandlers.openBrushStudio}

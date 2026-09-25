@@ -470,9 +470,12 @@ export function createStudioProjectArchiveOrchestration({
             isCurrent: () => revisionProjectGenerationRef.current === exportGeneration,
           })
         : [];
+      const { prepareStudioPsdSourceArchiveExport } = await import("./export/studio-psd-source-archive");
+      const psdAttachments = await prepareStudioPsdSourceArchiveExport(linked3dProject);
       const result = await buildStudioProjectArchiveWithVerifiedBg3dModels({
         project: linked3dProject,
         attachments: [
+          ...psdAttachments,
           ...referenceArchive.attachments,
           ...vrmArchive.attachments,
           ...texturePaintAttachments,
@@ -692,6 +695,9 @@ export function createStudioProjectArchiveOrchestration({
             diagnostics: preparedTexturePaint.diagnostics,
           };
       const installAndApply = async (project: StudioProjectFile) => {
+        if (!canApplyStudioMutation(mutationTicket)) return false;
+        const { installStudioPsdSourceArchive } = await import("./export/studio-psd-source-archive");
+        await installStudioPsdSourceArchive(result);
         if (!canApplyStudioMutation(mutationTicket)) return false;
         const referenceCommit = await installPreparedStudioReferenceBoardArchiveImportAndApply(
           preparedReferences,

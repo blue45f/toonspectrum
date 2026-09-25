@@ -15,8 +15,10 @@
  *   TOONSPECTRUM_SOAK_OUT=<directory>
  *   TOONSPECTRUM_VERIFY_ORIGIN=http://127.0.0.1:4173  # optional existing preview
  */
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { decodePng } from "image-js";
 import { chromium, type Browser, type CDPSession, type Locator, type Page } from "playwright";
@@ -43,6 +45,9 @@ const OUT = process.env.TOONSPECTRUM_SOAK_OUT?.trim()
   || `artifacts/studio-five-hour-soak/${PROFILE_ID}${WEBGPU ? "-webgpu" : ""}`;
 const CYCLE_TARGET_MS = Math.max(3_000, Number(process.env.TOONSPECTRUM_SOAK_CYCLE_MS ?? "30000") || 30_000);
 const FORCED_BRUSH_ID = process.env.TOONSPECTRUM_SOAK_BRUSH_ID?.trim() || null;
+const BRUSH_CYCLES = Math.max(1, Math.floor(Number(process.env.TOONSPECTRUM_SOAK_BRUSH_CYCLES ?? "5") || 5));
+const STOP_ON_FAILURE = process.env.TOONSPECTRUM_SOAK_STOP_ON_FAILURE === "1";
+const BUILD_DIRECTORY = resolve(process.env.TOONSPECTRUM_SOAK_DIST_DIR?.trim() || "dist");
 const INK_MIN_CHANGED_PIXELS = 120;
 const HISTORY_CHURN_INTERVAL = 10;
 const HISTORY_CHURN_REDO_PROBES = 3;
@@ -254,6 +259,11 @@ async function openMobileBrushLibrary(page: Page): Promise<Locator | null> {
     name: "브러시 설정 (굵기·색·프리셋)",
     exact: true,
   });
+  if (!(await settings.isVisible().catch(() => false))) {
+    const workspace = dock.locator('[data-studio-mobile-workspace-toggle="true"]');
+    if (!(await workspace.isVisible().catch(() => false))) return null;
+    if (await workspace.getAttribute("aria-expanded") !== "true") await workspace.click();
+  }
   if (!(await settings.isVisible().catch(() => false))) return null;
   if (await settings.getAttribute("aria-expanded") !== "true") {
     await settings.click({ timeout: 5_000 }).catch(() => undefined);
@@ -664,7 +674,7 @@ async function spawnPreview(): Promise<{ origin: string; child: ReturnType<typeo
   const external = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   if (external) return { origin: external.replace(/\/$/u, ""), child: null };
   const port = await findFreePort({ unavailableMessage: "could not allocate five-hour soak preview port" });
-  const child = spawnVitePreview({ port, runner: "pnpm-exec" });
+  const child = spawnVitePreview({ port, runner: "pnpm-exec", outDir: BUILD_DIRECTORY });
   const origin = `http://127.0.0.1:${port}`;
   await waitForServer(origin, { timeoutMs: 30_000, notReadyMessage: "five-hour soak preview did not become ready" });
   return { origin, child };
@@ -672,7 +682,8 @@ async function spawnPreview(): Promise<{ origin: string; child: ReturnType<typeo
 
 mkdirSync(OUT, { recursive: true });
 const startedAt = Date.now();
-const deadline = startedAt + MINUTES * 60_000;
+let sessionStartedAt: number | null = null;
+let sessionEndedAt: number | null = null;
 const profile = PROFILE_ID === "desktop"
   ? null
   : STUDIO_INAPP_PROFILES.find((candidate) => candidate.id === PROFILE_ID) ?? null;
@@ -681,7 +692,17 @@ const inputMode = resolveStudioPointerInputMode(INPUT_MODE_REQUEST, { mobile: pr
 
 const report = {
   startedAt: new Date(startedAt).toISOString(),
+  sourceCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
+  buildLabel: process.env.TOONSPECTRUM_SOAK_BUILD_LABEL?.trim() || null,
+  previewIndexSha256: existsSync(join(BUILD_DIRECTORY, "index.html"))
+    ? createHash("sha256").update(readFileSync(join(BUILD_DIRECTORY, "index.html"))).digest("hex")
+    : null,
+  renderEnvironment: "chromium-swiftshader",
   requestedMinutes: MINUTES,
+  brushCycles: BRUSH_CYCLES,
+  stopOnFailure: STOP_ON_FAILURE,
+  actionDurationMs: 0,
+  scheduledRestMs: 0,
   profile: PROFILE_ID,
   webgpuRequested: WEBGPU,
   pointerInputRequested: INPUT_MODE_REQUEST,
@@ -715,10 +736,22 @@ const report = {
 };
 
 const writeReport = (): void => {
-  writeFileSync(join(OUT, "report.json"), JSON.stringify({
+  const coveredBrushIds = new Set(report.pixelSamples.map((sample) => sample.brushId).filter(Boolean));
+  const temporaryPath = join(OUT, "report.json.tmp");
+  writeFileSync(temporaryPath, JSON.stringify({
     ...report,
     elapsedMinutes: Number((nowMs(startedAt) / 60_000).toFixed(2)),
+    sessionStartedAt: sessionStartedAt === null ? null : new Date(sessionStartedAt).toISOString(),
+    sessionEndedAt: sessionEndedAt === null ? null : new Date(sessionEndedAt).toISOString(),
+    sessionDurationMs: sessionStartedAt === null ? 0 : (sessionEndedAt ?? Date.now()) - sessionStartedAt,
+    paintBrushCoverage: {
+      total: PAINT_BRUSHES.length,
+      exercised: [...coveredBrushIds],
+      pending: PAINT_BRUSHES.filter((brush) => !coveredBrushIds.has(brush.id)).map((brush) => brush.id),
+      erasersIncluded: false,
+    },
   }, null, 2));
+  renameSync(temporaryPath, join(OUT, "report.json"));
 };
 
 let browser: Browser | null = null;
@@ -762,6 +795,11 @@ try {
   await acknowledgeStudioBetaNoticeIfPresent(page);
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 90_000 });
   await page.waitForTimeout(3_000);
+  const canvasWelcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
+  if (await canvasWelcome.isVisible()) {
+    await canvasWelcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click();
+    await canvasWelcome.waitFor({ state: "hidden" });
+  }
   if (!(await waitForPenReady(page))) {
     throw new Error("Studio pen tool did not become ready during the bounded preflight window.");
   }
@@ -772,6 +810,10 @@ try {
 
   log(`${PROFILE_ID} · ${MINUTES} min · input=${inputMode} · webgpu=${WEBGPU ? "on" : "off"} · ${preview.origin}`);
 
+  // 준비·빌드·서버 대기 시간은 실제 편집 세션의 최소 시간에 포함하지 않는다.
+  sessionStartedAt = Date.now();
+  const deadline = sessionStartedAt + MINUTES * 60_000;
+  writeReport();
   while (Date.now() < deadline) {
     const cycleStarted = Date.now();
     report.cycles += 1;
@@ -788,18 +830,19 @@ try {
         });
       }
 
-      if (penReady && (cycle === 1 || cycle % 5 === 0)) {
+      if (penReady && (cycle - 1) % BRUSH_CYCLES === 0) {
         activeBrush = FORCED_BRUSH_ID
           ? PAINT_BRUSHES.find((brush) => brush.id === FORCED_BRUSH_ID) ?? null
-          : PAINT_BRUSHES[(Math.floor(cycle / 5) * 7) % PAINT_BRUSHES.length] ?? null;
+          : PAINT_BRUSHES[Math.floor((cycle - 1) / BRUSH_CYCLES) % PAINT_BRUSHES.length] ?? null;
         if (FORCED_BRUSH_ID && !activeBrush) {
           throw new Error(`Unknown forced soak brush: ${FORCED_BRUSH_ID}`);
         }
         if (activeBrush && await selectBrush(page, activeBrush)) report.brushSwitches += 1;
-        else if (activeBrush) report.failures.push({
-          atMs: nowMs(startedAt), cycle, kind: "brush-selection",
-          detail: `Could not select ${activeBrush.id} (${activeBrush.name})`,
-        });
+        else if (activeBrush) {
+          const failedBrush = activeBrush;
+          activeBrush = null;
+          throw new Error(`브러시 선택 실패: ${failedBrush.id} (${failedBrush.name}). 실제 선택되지 않은 브러시를 검증한 것으로 기록하지 않습니다.`);
+        }
       }
 
       if (penReady) {
@@ -936,7 +979,7 @@ try {
       }));
       await page.screenshot({ path: join(OUT, `checkpoint-${Math.round(nowMs(startedAt) / 60000)}m.png`) }).catch(() => undefined);
       writeReport();
-      nextCheckpoint += CHECKPOINT_MS;
+      nextCheckpoint = (Math.floor(nowMs(startedAt) / CHECKPOINT_MS) + 1) * CHECKPOINT_MS;
       log(`checkpoint ${Math.round(nowMs(startedAt) / 60000)}m · cycle ${cycle} · failures ${report.failures.length} · heap ${heap ? Math.round(heap.usedBytes / 1048576) + " MiB" : "n/a"}`);
     }
 
@@ -944,10 +987,21 @@ try {
       log(`critical liveness regression persists at cycle ${cycle}; continuing soak to collect accumulation evidence`);
     }
 
-    const rest = CYCLE_TARGET_MS - (Date.now() - cycleStarted);
-    if (rest > 0) await page.waitForTimeout(rest);
+    report.actionDurationMs += Date.now() - cycleStarted;
+    writeReport();
+    if (STOP_ON_FAILURE && report.failures.length > 0) {
+      log("실패를 기록했습니다. 원인 수정과 재검증을 위해 장시간 실행을 중단합니다.");
+      break;
+    }
+    const rest = Math.min(deadline - Date.now(), CYCLE_TARGET_MS - (Date.now() - cycleStarted));
+    if (rest > 0) {
+      const restStartedAt = Date.now();
+      await page.waitForTimeout(rest);
+      report.scheduledRestMs += Date.now() - restStartedAt;
+    }
   }
 } finally {
+  sessionEndedAt = sessionStartedAt === null ? null : Date.now();
   if (page) {
     if (strokesSinceHistoryChurn > 0) {
       try {

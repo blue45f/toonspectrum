@@ -1,49 +1,9 @@
+import { flipColorRangeMask } from "../studio-color-range";
+import { applyExactSelectionMask } from "../selection/studio-selection-exact-mask";
 /**
- * Studio Layer Alpha → Selection — "레이어 불투명도를 선택 범위로" 순수 코어.
- *
- * 포토샵의 레이어 썸네일 Ctrl(⌘)+클릭 = "이 레이어가 실제로 칠해져 있는 자리"를 그대로 선택으로
- * 가져오는 동작. 셀 채색·광원 합성·후처리 마스킹의 출발점이라 없으면 매번 마술봉으로 흉내 내야 한다.
- *
- * 문제: PixelSelection(studio-selection-tools.ts)은 **벡터** 모델(폴리곤/브러시 서브패스)이라
- * 알파 래스터를 그대로 담을 수 없다. 그래서 알파 채널 → 이진화 → 윤곽선(닫힌 링) 추출 →
- * 서브패스 결합이라는 변환이 필요하다.
- *
- * 재사용(기하 코드 중복 금지 원칙):
- *  - 경계 추적은 studio-magic-wand.ts의 traceMaskContours(격자 크랙 추적 — 마칭스퀘어와 동치인
- *    "전경을 항상 진행 방향 오른쪽에 두는" 방향성 간선 걷기)를 쓴다. 대각선 모호성(체커보드)은
- *    그쪽 desaddleMask가 이미 결정적으로 해소한다.
- *  - 분리 성분(4방향) 라벨링 + 성분별 추적은 studio-quick-mask.ts의 traceMaskRegions를 공유한다
- *    (퀵 마스크 종료 경로와 **같은 구현**이다 — 링 순서 계약도 그쪽 docstring이 정본).
- *  - 1차 단순화(simplifyLassoPolygon)는 traceMaskContours 안에서 이미 돌아간다.
- *    이 모듈은 그 위에 **오차 한계가 보장되는 2차 단순화(RDP)** 를 얹는다.
- *
- * 점 수 예산 — 세 겹으로 막는다(실측 근거 포함):
- *   (1) 추적 해상도 캡 — 긴 변 LAYER_ALPHA_TRACE_MAX_DIM(640)으로 박스 평균 다운샘플.
- *       크랙 둘레의 상한이 대략 4·640 = 2560 꼭짓점으로 묶인다.
- *   (2) simplifyLassoPolygon(1차) — 중복점 제거 문턱이 **정규화 거리** LASSO_MIN_POINT_DIST
- *       (0.004 = 박스의 0.4%)라서, 실은 무손실이 아니라 해상도 의존 데시메이션이다. 덕분에
- *       링 하나가 이미 수백 점 규모로 떨어진다(1200px 원판 실측: 원본 해상도 추적에서도 346점).
- *       다만 이건 "가까운 점 버리기"라 **모양 오차 한계가 없다** — 뾰족한 모서리를 깎을 수 있다.
- *   (3) Ramer–Douglas–Peucker(2차) — 텍셀 단위 허용오차(기본 0.75텍셀) 안에서만 점을 버리므로
- *       모양 오차가 그 값으로 **보장**된다(1200px 원판 실측: 335 → 158점). 그래도 링이
- *       maxPointsPerRing을 넘으면 허용오차를 2배씩 올려 재시도하고(최대 8회), 끝내 안 되면
- *       균일 데시메이션으로 절단한다 — 결과적으로 점 수에 **하드 상한**이 있다.
- *
- * 결정성 계약(같은 입력 → 같은 링 배열, 바이트 단위로):
- *   - 링 순서: 성분은 시드 픽셀 래스터 스캔 순서(traceMaskRegions 계약 — 감싸는 성분이 항상 먼저),
- *     성분 안에서는 외곽 링 1개 뒤에 구멍 링들이 앵커((y,x) 사전순 최소 꼭짓점) 오름차순.
- *   - 링 방향: 외곽은 부호 있는 면적 > 0, 구멍은 < 0 (x→오른쪽 / y→아래 좌표계 기준). 강제 적용.
- *   - 꼭짓점 순서: 각 링은 앵커 꼭짓점이 index 0이 되도록 회전시켜 저장한다 — 추적 시작점이나
- *     Map 순회 순서에 결과가 흔들리지 않는다.
- *
- * 정직한 근사(문서화):
- *   - 소프트(안티에일리어싱) 경계는 이진 문턱 하나로 잘린다 — 기본 128이면 "알파 50% 지점"이
- *     경계다. 반투명 그라데이션 레이어는 그 등고선 하나로 축약된다(포토샵은 소프트 선택을
- *     그대로 갖지만 이 앱의 선택 모델은 페더 스칼라 1개뿐이라는 기존 한계와 같은 축).
- *   - 다운샘플은 박스 평균이라, 1텍셀 두께의 얇은 선은 평균이 문턱 아래로 내려가 사라질 수 있다.
- *     그럴 땐 maxDim을 올려 호출한다.
- *
- * DOM 의존성 0 · 전부 결정적(랜덤/Date 없음) — node 환경에서 그대로 유닛 테스트한다.
+ * 레이어 알파 → 선택. 확정은 원본 픽셀의 경계를 손실 없이 보존한다.
+ * 아래의 축소/RDP 도우미는 maxDim을 명시한 미리보기와 기존 호출자에만 사용한다.
+ * 알파 문턱(기본 128)과 스칼라 페더는 기존 PixelSelection 계약을 유지한다.
  */
 import { flipMagicWandRegion, MAGIC_WAND_MAX_LOOPS, MAGIC_WAND_TRACE_MAX_DIM } from "../studio-magic-wand";
 import { traceMaskRegions } from "../studio-quick-mask";
@@ -357,7 +317,7 @@ function canonicalizeRing(
 
 /**
  * 알파 비트맵 → 닫힌 링 배열(정규화 0..1). 비트맵은 **이미 추적 해상도**여야 한다
- * (필요하면 downsampleAlphaBitmap을 먼저 부른다 — layerAlphaToPixelSelection은 알아서 부른다).
+ * (필요하면 downsampleAlphaBitmap을 먼저 부른다 — layerAlphaToPixelSelection의 maxDim 옵션 경로가 부른다).
  * 아무것도 안 칠해져 있으면 빈 배열. 모듈 docstring의 순서·방향·꼭짓점 계약을 만족한다.
  */
 export function traceAlphaContourRings(
@@ -470,13 +430,13 @@ export function alphaRingsToPixelSelection(
 
 export type LayerAlphaToSelectionOptions = TraceAlphaContourOptions &
   AlphaRingsToSelectionOptions & {
-    /** 추적 해상도 상한(긴 변 텍셀). 기본 LAYER_ALPHA_TRACE_MAX_DIM. */
+    /** 미리보기 추적 해상도 상한. 생략하면 원본 픽셀로 확정한다. */
     maxDim?: number;
   };
 
 /**
  * 레이어 알파 비트맵 → PixelSelection (한 방 진입점 — 포토샵 레이어 썸네일 Ctrl+클릭).
- * 다운샘플 → 추적 → 링 규범화 → 서브패스 접기를 한 번에 한다. 선택할 게 없으면 null.
+ * 확정은 원본 픽셀을 유지한다. maxDim을 명시한 미리보기만 기존 축소 추적을 사용한다.
  */
 export function layerAlphaToPixelSelection(
   bitmap: AlphaBitmap,
@@ -485,7 +445,14 @@ export function layerAlphaToPixelSelection(
   const w = sanitizeDim(bitmap.width);
   const h = sanitizeDim(bitmap.height);
   if (!w || !h || bitmap.alpha.length !== w * h) return null;
-  const scaled = downsampleAlphaBitmap(bitmap, opts?.maxDim ?? LAYER_ALPHA_TRACE_MAX_DIM);
+  if (opts?.maxDim === undefined) {
+    const displayed = opts?.flipX || opts?.flipY ? flipColorRangeMask(bitmap, opts.flipX === true, opts.flipY === true) : bitmap;
+    const result = applyExactSelectionMask(opts?.base ?? null, displayed, opts?.mode ?? (opts?.base ? "add" : "replace"), { threshold: opts?.threshold });
+    return result && Number.isFinite(opts?.featherPx)
+      ? { ...result, featherPx: Math.round(Math.min(SELECTION_FEATHER_RANGE.max, Math.max(SELECTION_FEATHER_RANGE.min, opts!.featherPx!))) }
+      : result;
+  }
+  const scaled = downsampleAlphaBitmap(bitmap, opts.maxDim);
   const rings = traceAlphaContourRings(scaled, opts);
   if (rings.length === 0) return null;
   return alphaRingsToPixelSelection(rings, opts);

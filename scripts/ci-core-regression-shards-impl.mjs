@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const TARGETS_FILE = new URL("./ci-required-vitest-targets.txt", import.meta.url);
 const GLOB_PATTERN = /[*?[\]]/u;
-const SAFE_TARGET = /^(?:apps|deploy|packages|scripts|tests)\/[A-Za-z0-9_./*?\[\]-]+$/u;
+const SAFE_TARGET = /^(?:apps|deploy|packages|scripts|tests\/integration)\/[A-Za-z0-9_./*?\[\]-]+$/u;
 
 export const SHARD_NAMES = Object.freeze([
   "product",

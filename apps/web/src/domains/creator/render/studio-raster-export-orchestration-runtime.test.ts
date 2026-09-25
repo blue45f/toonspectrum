@@ -136,6 +136,39 @@ function orchestrationInput(
 }
 
 describe("raster export renderer migration", () => {
+  it("대형 규격 출력은 전체 페이지 캔버스를 만들지 않고 같은 문서 renderer의 영역만 읽는다", async () => {
+    const module = await import("../export/studio-export-presets");
+    const h = stageHarness();
+    const capture = vi.fn(async () => { throw new Error("전체 캡처는 실행되면 안 됩니다."); });
+    const input = orchestrationInput(h.stage, capture);
+    const page = { ...input.activePage, canvasH: 20_000 };
+    const runtime = createStudioRasterExportOrchestration({ ...input, activePage: page, pages: [page] });
+    const sizes: number[][] = [];
+    vi.mocked(h.stage.toCanvas).mockImplementation(() => {
+      sizes.push([h.stage.width(), h.stage.height()]);
+      return {
+        width: h.stage.width(), height: h.stage.height(),
+        getContext: () => ({ getImageData: (_x: number, _y: number, width: number, height: number) => ({ data: new Uint8ClampedArray(width * height * 4).fill(127) }) }),
+      } as unknown as HTMLCanvasElement;
+    });
+    const exporter = vi.spyOn(module, "exportPresetSlices").mockImplementation(async (options) => {
+      const source = options.pages[0];
+      if (!source || !("kind" in source)) throw new Error("타일 원본이 연결되지 않았습니다.");
+      expect(source.height).toBe(20_000);
+      expect(await source.readRegion({ x: 8, y: 19_990, width: 16, height: 10 })).toHaveLength(640);
+      return { files: 2, oversized: 0, format: "png", targetWidth: 720, tiledPages: 1 };
+    });
+    try {
+      const preset = module.findExportPreset("original");
+      if (!preset) throw new Error("테스트 프리셋 없음");
+      expect(await runtime.handleExportPresetSlices(null, { preset, format: "png", title: "원고" })).toMatchObject({ tiledPages: 1 });
+      expect(sizes).toEqual([[16, 10]]);
+      expect(capture).not.toHaveBeenCalled();
+      expect(input.setIsExporting).toHaveBeenLastCalledWith(false);
+      expect(input.setCurrentPageId).toHaveBeenLastCalledWith(page.id);
+    } finally { exporter.mockRestore(); }
+  });
+
   it("uses an exact detached Skia document capture without reading visible Stage pixels", async () => {
     const h = stageHarness();
     const skiaCanvas = document.createElement("canvas");

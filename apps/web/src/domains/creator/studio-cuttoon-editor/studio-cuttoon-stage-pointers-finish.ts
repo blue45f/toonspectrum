@@ -425,9 +425,24 @@ export function bindStudioCuttoonStagePointersFinish(
   function finishDrawingPointer(
     stage: Konva.Stage | null,
     pointerEvent: PointerEvent,
-    options: { consumeReleaseSample?: boolean } = {}
+    options: { consumeReleaseSample?: boolean; coordinateMapper?: StudioStagePointerBatchMapper; quickShapeSnapshot?: ReturnType<typeof snapshotQuickShapeTracking> } = {}
   ) {
     if (!drawingRef.current && !requireStudioDrawingPointerTransport(drawingPointerTransportRef).getSession()) return;
+    if (drawingRef.current && h.pendingStrokeAdmissionRef?.current?.has(drawingRef.current.id)) {
+      stopFixedRateStrokePump();
+      const source = sealStudioDrawReleaseInput(stage, pointerEvent, options.consumeReleaseSample !== false, options.coordinateMapper) ?? drawingRef.current;
+      const quickShapeSnapshot = snapshotQuickShapeTracking();
+      if (source) h.pendingStrokeAdmissionRef.current.complete(source, () => {
+        finishDrawingPointer(stage, pointerEvent, { consumeReleaseSample: false, quickShapeSnapshot });
+      });
+      // 이전 GPU/자연매체의 확정 표면은 이 접촉이 소유하지 않는다. 일반 표면 정리를 호출하지 않는다.
+      releaseDrawingPointerSession();
+      drawingRef.current = null;
+      stopQuickShapeTracking();
+      scheduleLiveDrawPressure(null);
+      h.endLiveResourceEdit();
+      return;
+    }
     const finishingStrokeId = drawingRef.current?.id ?? null;
     let completedLiveStrokeBackendAudit = false;
     let gesturePreviewFinished = false;
@@ -443,7 +458,7 @@ export function bindStudioCuttoonStagePointersFinish(
       const releasePoint = stage.getRelativePointerPosition();
       if (releasePoint) noteQuickShapePointerMoved(releasePoint);
     }
-    const quickShapeSnapshot = snapshotQuickShapeTracking();
+    const quickShapeSnapshot = options.quickShapeSnapshot ?? snapshotQuickShapeTracking();
     // 지연 커밋 경로에서만 true — finally 의 초안 정리가 라이브 잉크를 표면에 남기게 한다.
         let deferInkCleanup = false;
         // GPU 지연 표면에는 후보정 이전의, 실제 라이브 표면과 동일한 권위 획을 유지한다.
@@ -456,6 +471,7 @@ export function bindStudioCuttoonStagePointersFinish(
         stage,
         pointerEvent,
         options.consumeReleaseSample !== false,
+        options.coordinateMapper,
       );
       if (authoritativeLiveStroke) {
         // Seal the upstream InProgressStroke from hardware-backed DrawEl samples only. The mesh

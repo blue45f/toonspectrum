@@ -97,7 +97,7 @@ describe("StudioSelectionWorkbenchPanel", () => {
     expect(html).toContain('aria-label="주인공 실루엣 선택 불러오기"');
     expect(html).toContain('aria-label="주인공 실루엣 저장 선택 삭제"');
     expect(html).toContain("1개 영역 · 페더 3px");
-    expect(html).toContain("1/16");
+    expect(html).toContain("이 이미지 · 이 기기 · 1개");
   });
 
   it("explains and disables unavailable source and boundary work", () => {

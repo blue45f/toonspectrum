@@ -6,7 +6,7 @@ import { StudioBrushLibrarySheet, type StudioBrushLibrarySheetProps } from "./St
 
 export interface StudioBrushWorkbenchDockProps extends Pick<StudioBrushLibrarySheetProps,
   "activeBrushId" | "operation" | "favoriteIds" | "recentIds" | "restoredView"
-  | "onViewStateChange" | "onSelect" | "onToggleFavorite"> {
+  | "onViewStateChange" | "onSelectionLifecycle" | "onSelect" | "onToggleFavorite"> {
   width?: number;
   onWidthChange?: (width: number) => void;
   sizeLocked?: boolean;
