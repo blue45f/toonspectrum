@@ -1,11 +1,14 @@
 import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import {
   ArrowRight,
+  Blocks,
   CircleHelp,
+  FlaskConical,
   FolderOpen,
   Palette,
   Search,
   Sparkles,
+  Target,
   UserRound,
 } from "lucide-react";
 
@@ -43,7 +46,9 @@ const PAGE_COPY = {
     coreDescription: "제작 시작, 배우고 준비하기, 작품 발견, 함께하고 관리하기 네 흐름으로 자주 쓰는 목적지를 먼저 모았습니다.",
     personal: "내 공간과 환경",
     extended: "전체 기능과 페이지",
-    extendedDescription: "직접 열 수 있는 제작·3D·AI·학습·에셋·리서치·데이터·지원 페이지를 역할별로 나눠 빠르게 훑을 수 있습니다.",
+    extendedDescription: "직접 열 수 있는 제작·3D·AI·학습·에셋·리서치·데이터·지원 페이지는 필요할 때 펼쳐 확인합니다.",
+    levels: "서비스 단계",
+    levelsDescription: "핵심 제작 흐름은 항상 앞에 두고, 연결 서비스와 실험 도구는 필요할 때만 꺼냅니다.",
   },
   en: {
     eyebrow: "TOONSTUDIO DIRECTORY",
@@ -57,7 +62,9 @@ const PAGE_COPY = {
     coreDescription: "Frequent destinations are grouped into four flows: create, prepare, discover, and connect or manage.",
     personal: "Your space and preferences",
     extended: "All features and pages",
-    extendedDescription: "Scan every directly accessible creation, 3D, AI, learning, asset, research, data and support page by role.",
+    extendedDescription: "Open the complete creation, 3D, AI, learning, asset, research, data and support directory only when needed.",
+    levels: "Service levels",
+    levelsDescription: "Keep the core production flow first, then open connected services and experimental tools when they are useful.",
   },
 } as const;
 
@@ -156,6 +163,57 @@ export function SitemapPage() {
       <SiteDirectorySearch entries={SITEMAP_DIRECTORY_ENTRIES} locale={locale} />
       <SiteDirectoryPersonalized entries={SITEMAP_DIRECTORY_ENTRIES} locale={locale} />
 
+      <section className="mt-10 sm:mt-14" aria-labelledby="sitemap-levels-title">
+        <div className="max-w-3xl">
+          <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">00 · PRODUCT MAP</p>
+          <h2 id="sitemap-levels-title" className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
+            {copy.levels}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-fg-3">{copy.levelsDescription}</p>
+        </div>
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          {[
+            {
+              tier: "core",
+              icon: Target,
+              title: bi("핵심 제작", "Core production"),
+              body: bi("새 작품·프로젝트·제작 관리·소재·검토·내보내기의 완결된 작업 흐름", "The complete path through new work, projects, production, assets, review and export"),
+              tone: "border-accent/35 bg-gradient-to-br from-accent-soft/80 to-card",
+            },
+            {
+              tier: "ecosystem",
+              icon: Blocks,
+              title: bi("연결 생태계", "Connected ecosystem"),
+              body: bi("학습·리서치·마켓·협업·커뮤니티·작품 탐색을 현재 작업에 연결", "Connect learning, research, market, collaboration, community and discovery to the current work"),
+              tone: "border-line-strong bg-card/75",
+            },
+            {
+              tier: "labs",
+              icon: FlaskConical,
+              title: bi("Labs · 자료", "Labs & resources"),
+              body: bi("전문 3D·개인 AI·기술 자료처럼 선택적으로 사용하는 실험·고급 도구", "Optional experimental and advanced tools such as professional 3D, personal AI and engineering resources"),
+              tone: "border-warning/35 bg-warning-soft/45",
+            },
+          ].map(({ tier, icon: Icon, title, body, tone }) => (
+            <Link
+              key={tier}
+              href={`/sitemap?tier=${tier}`}
+              className={`group flex min-h-40 flex-col rounded-3xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-md ${tone}`}
+            >
+              <span className="grid size-11 place-items-center rounded-2xl border border-line bg-panel/80 text-accent">
+                <Icon size={20} aria-hidden="true" />
+              </span>
+              <strong className="mt-5 font-display text-lg font-bold text-fg">{title}</strong>
+              <span className="mt-2 text-xs leading-6 text-fg-2">{body}</span>
+              <span className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-bold text-accent">
+                {bi("해당 단계만 보기", "View this level")}
+                <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       <section className="mt-12 sm:mt-16" aria-labelledby="sitemap-core-title">
         <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
           <div>
@@ -169,54 +227,66 @@ export function SitemapPage() {
             {translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "Create · Learn · Discover · Connect")}</span>
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
-          {SITEMAP_CORE_DESTINATION_GROUPS.map((group, groupIndex) => (
-            <section
-              key={group.id}
-              className="rounded-3xl border border-line/70 bg-panel/45 p-4 shadow-sm sm:p-5"
-              aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-{v0}"), { v0: String(group.id) })}
-            >
-              <div className="flex items-start gap-3 px-1 pb-4 sm:px-2">
-                <span aria-hidden="true" className="pt-0.5 font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent">
-                  {String(groupIndex + 1).padStart(2, "0")}
-                </span>
-                <div>
-                  <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-{v0}"), { v0: String(group.id) })} className="font-display text-lg font-bold text-fg">
-                    {siteNavigationText(group.label, locale)}
-                  </h3>
-                  <p className="mt-1 text-sm leading-6 text-fg-3">
-                    {siteNavigationText(group.description, locale)}
-                  </p>
+        <div className="mt-6 grid gap-3 lg:grid-cols-2">
+          {SITEMAP_CORE_DESTINATION_GROUPS.map((group, groupIndex) => {
+            const titleId = formatI18nTemplate(
+              translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-{v0}"),
+              { v0: String(group.id) },
+            );
+            return (
+              <details
+                key={group.id}
+                open={groupIndex === 0}
+                className="group rounded-3xl border border-line/70 bg-panel/45 shadow-sm open:bg-panel/60"
+              >
+                <summary className="flex min-h-24 cursor-pointer list-none items-start gap-3 rounded-3xl px-4 py-4 outline-none transition-colors hover:bg-card/35 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/70 sm:px-5 [&::-webkit-details-marker]:hidden">
+                  <span aria-hidden="true" className="pt-0.5 font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent">
+                    {String(groupIndex + 1).padStart(2, "0")}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <strong id={titleId} className="block font-display text-lg font-bold text-fg">
+                      {siteNavigationText(group.label, locale)}
+                    </strong>
+                    <span className="mt-1 block text-sm leading-6 text-fg-3">
+                      {siteNavigationText(group.description, locale)}
+                    </span>
+                  </span>
+                  <span className="shrink-0 rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-bold text-fg-3 group-open:border-accent/30 group-open:text-accent">
+                    {group.items.length}
+                  </span>
+                  <span aria-hidden="true" className="text-lg text-fg-3 transition-transform group-open:rotate-45 group-open:text-accent">＋</span>
+                </summary>
+                <div className="border-t border-line/70 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+                  <ul className="grid gap-2 sm:grid-cols-2" aria-labelledby={titleId}>
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <li key={item.id}>
+                          <Link
+                            href={item.href}
+                            className="group/link flex min-h-[5.5rem] h-full items-start gap-3 rounded-2xl border border-line bg-card/75 p-3.5 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:bg-card hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                          >
+                            <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-colors group-hover/link:border-accent/30 group-hover/link:text-accent">
+                              <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+                            </span>
+                            <span className="min-w-0 pt-0.5">
+                              <strong className="block text-sm font-bold text-fg transition-colors group-hover/link:text-accent">
+                                {siteNavigationText(item.label, locale)}
+                              </strong>
+                              <span className="mt-1 block text-xs leading-5 text-fg-3">
+                                {siteNavigationText(item.description, locale)}
+                              </span>
+                              <RouteConditionBadges href={item.href} locale={locale} />
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-              </div>
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {group.items.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <li key={item.id}>
-                      <Link
-                        href={item.href}
-                        className="group flex min-h-[6.25rem] h-full items-start gap-3 rounded-2xl border border-line bg-card/75 p-3.5 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:bg-card hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-                      >
-                        <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-panel text-fg-3 transition-colors group-hover:border-accent/30 group-hover:text-accent">
-                          <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
-                        </span>
-                        <span className="min-w-0 pt-0.5">
-                          <strong className="block text-sm font-bold text-fg transition-colors group-hover:text-accent">
-                            {siteNavigationText(item.label, locale)}
-                          </strong>
-                          <span className="mt-1 block text-xs leading-5 text-fg-3">
-                            {siteNavigationText(item.description, locale)}
-                          </span>
-                          <RouteConditionBadges href={item.href} locale={locale} />
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+              </details>
+            );
+          })}
         </div>
       </section>
 
@@ -252,15 +322,23 @@ export function SitemapPage() {
         </div>
       </section>
 
-      <section className="mt-12 border-t border-line/70 pt-12 sm:mt-16 sm:pt-16" aria-labelledby="sitemap-extended-title">
-        <div>
-          <p className="font-display text-[0.64rem] font-bold uppercase tracking-[0.15em] text-accent">{translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "02 · COMPLETE DIRECTORY")}</p>
-          <h2 id="sitemap-extended-title" className="mt-2 font-display text-2xl font-bold tracking-[-0.035em] text-fg sm:text-3xl">
-            {copy.extended}
-          </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-3">{copy.extendedDescription}</p>
-        </div>
-
+      <details className="group mt-12 border-t border-line/70 pt-8 sm:mt-16 sm:pt-10">
+        <summary className="flex min-h-20 cursor-pointer list-none items-center gap-4 rounded-3xl border border-line/70 bg-panel/45 px-5 py-4 outline-none transition-colors hover:bg-panel/70 focus-visible:ring-2 focus-visible:ring-accent/70 [&::-webkit-details-marker]:hidden">
+          <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-line bg-card text-accent">
+            <Blocks size={20} aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="font-display text-[0.62rem] font-bold uppercase tracking-[0.15em] text-accent">02 · COMPLETE DIRECTORY</span>
+            <strong id="sitemap-extended-title" className="mt-1 block font-display text-xl font-bold tracking-[-0.03em] text-fg sm:text-2xl">
+              {copy.extended}
+            </strong>
+            <span className="mt-1 block text-xs leading-5 text-fg-3 sm:text-sm">{copy.extendedDescription}</span>
+          </span>
+          <span className="hidden rounded-full border border-line bg-card px-3 py-1.5 text-xs font-bold text-fg-3 sm:inline-flex">
+            {SITEMAP_DIRECTORY_ENTRIES.length}+
+          </span>
+          <span aria-hidden="true" className="text-xl text-fg-3 transition-transform group-open:rotate-45 group-open:text-accent">＋</span>
+        </summary>
         <div className="mt-6 grid gap-3 lg:grid-cols-2">
           {SITEMAP_EXTENDED_DESTINATION_GROUPS.map((group) => {
             const GroupIcon = group.icon;
@@ -317,7 +395,7 @@ export function SitemapPage() {
             );
           })}
         </div>
-      </section>
+      </details>
 
       <section className="mt-8 flex flex-col gap-4 rounded-2xl border border-line/70 bg-card/55 p-5 sm:flex-row sm:items-center sm:justify-between" aria-label={t("footer.link.support")}>
         <div className="flex items-start gap-3">

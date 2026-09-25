@@ -31,7 +31,7 @@ const ROUTES: Readonly<Record<string, WorkspaceTaskRoute>> = {
   "/studio/import": focusedTask("파일 가져오기", "Import files", "원본을 보존하고 지원 범위를 확인한 뒤 가져옵니다.", "Keep the source and review compatibility before importing."),
   "/studio/templates": focusedTask("시작 템플릿", "Templates", "만들려는 작업에 맞는 시작 형식을 선택하세요.", "Choose a starting format for your work."),
   "/studio/assets": task("소재와 사용 조건", "Materials and usage terms", "필요한 소재를 찾고 현재 작업에 연결하세요.", "Find materials and connect them to your work."),
-  "/studio/projects": task("제작 작업", "Production tasks", "담당 작업과 검수 상태를 확인하세요.", "Review assignments and review status."),
+  "/studio/projects": task("내 제작 작업", "My production tasks", "현재 프로젝트의 할 일과 검수 상태를 확인하세요.", "Review tasks and review status for the current project."),
   "/studio/review": task("검수와 수정", "Review and corrections", "어떤 버전을 확인하는지 살펴보고 의견을 남기세요.", "Check the target version before leaving feedback."),
   "/studio/versions": task("변경 기록", "Version history", "원고 버전과 제작 운영 체크포인트를 구분합니다.", "Artwork versions and production checkpoints are separate."),
   "/studio/present": task("발표 준비", "Presentation", "선택한 작업의 내용을 정리하고 발표하세요.", "Prepare and present the selected work."),
