@@ -58,7 +58,7 @@ describe("Studio Tripo MCP free-wallet environment pack v1", () => {
       textureQuality: "detailed",
       pbr: true,
       faceLimit: 40_000,
-      totalCreditCost: 600,
+      totalCreditCost: 200,
       billingMode: "free-api-wallet",
       paymentMethodUsed: false,
     });
@@ -141,7 +141,7 @@ describe("Studio Tripo MCP free-wallet environment pack v1", () => {
         asset_nonexclusive: true,
         asset_provider_retains_rights: true,
         asset_credit_source: "free-api-wallet",
-        asset_credit_cost: 50,
+        asset_credit_cost: 20,
         units: "metres",
         ground_plane: "glTF-Y=0",
         ground_y_m: 0,
@@ -165,7 +165,7 @@ describe("Studio Tripo MCP free-wallet environment pack v1", () => {
         providerRetainsRights: true,
         billingMode: "free-api-wallet",
         paymentMethodUsed: false,
-        creditCost: 50,
+        creditCost: 20,
         externalResources: 0,
       });
       expect(getStudioBg3dEnvironmentAsset(asset.id)).toBe(asset);
@@ -195,7 +195,7 @@ describe("Studio Tripo MCP free-wallet environment pack v1", () => {
       });
       expect(report.billing).toEqual({
         mode: "free-api-wallet",
-        creditCost: 50,
+        creditCost: 20,
         paymentMethodUsed: false,
         paidUpgradeUsed: false,
       });

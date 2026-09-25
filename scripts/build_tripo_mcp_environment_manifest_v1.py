@@ -260,7 +260,7 @@ def main() -> None:
             "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
             "billing": {
                 "mode": "free-api-wallet",
-                "creditCost": 50,
+                "creditCost": 20,
                 "paymentMethodUsed": False,
                 "paidUpgradeUsed": False,
             },
