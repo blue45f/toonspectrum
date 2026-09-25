@@ -73,3 +73,13 @@ The manifest fixes the selected provider, work/episode scope, prompt, source-rig
 `reviewRequired: true`, `autoPublish: false`, and the required license/provenance checks. The same
 catalogue is available through `pnpm music:providers`; `pnpm music:handoff` creates an offline manifest
 from a validated `MusicBrief` file. See [AI music provider operations](./ai-music-provider-operations.md).
+
+## Zero-cost key boundary
+
+Provider sign-up credits are not treated as a renewable production budget. Soundverse API and
+Google Lyria are paid-only for music generation, ElevenLabs Free music is personal-use only, and
+Stable Audio Free web output is non-commercial. Their keys are therefore not copied into the
+production runtime and do not enable a public generation endpoint. The already deployed Gemini and
+Deepgram credentials remain scoped to the separate voice workflow. Site OST publication continues
+to use reviewed local ACE-Step masters; external free outputs remain draft-only unless a generation-time
+commercial license is captured and reviewed.
