@@ -144,20 +144,20 @@ const TOOL_BELT_HINTS = {
     "character-3d"
   ),
   characterShaper: studioToolHintFromLabel(
-    "캐릭터 셰이퍼",
+    "캐릭터 만들기",
     "프리셋 카드로 얼굴·헤어·체형·의상을 고르고, 사진·웹캠으로 포즈를 잡고, 투명 PNG나 레이어 PSD로 내보냅니다.",
     undefined,
     "character-3d"
   ),
   mannequin3d: studioToolHintFromLabel(
-    "3D 데생 인형",
+    "기본 데생 인형",
     "모델 파일 없이 체형을 조절하고 포즈를 잡아 드로잉 참고 이미지로 캡처합니다.",
     undefined,
     "mannequin-3d"
   ),
   bg3d: studioToolHintFromLabel(
-    "3D 배경",
-    "3D 오브젝트와 씬을 배치하고 카메라 앵글을 조절해 웹툰 배경 이미지를 추출합니다.",
+    "장면 도우미",
+    "장소·인물·소품을 고르고 구도와 작화 스타일을 정해 현재 컷에 바로 적용합니다.",
     undefined,
     "background-library"
   ),

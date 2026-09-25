@@ -28,7 +28,7 @@ function createHost() {
     generateId: vi.fn(() => `template-test-${++seed}`),
     setSelectedIds: vi.fn<(ids: Set<string>) => void>(),
     setError: vi.fn<(error: string | null) => void>(),
-    addSceneTemplate: (_templateId: string) => {},
+    addSceneTemplate: (_templateId: string) => true,
     replaceCanonicalDocumentState: vi.fn((mutation: StudioBg3dCanonicalDocumentMutation) => {
       live.current = {
         revision: live.current.revision + 1,
@@ -56,7 +56,7 @@ describe("BG3D template insertion through the actual command host", () => {
   it.each(BG_SCENE_TEMPLATES.map((template) => [template.id, template] as const))(
     "inserts %s using module dependencies instead of nonexistent host exports", (_id, template) => {
       const { host, live } = createHost();
-      expect(() => host.addSceneTemplate(template.id)).not.toThrow();
+      expect(host.addSceneTemplate(template.id)).toBe(true);
       expect(live.current.primitives).toHaveLength(instantiateSceneTemplate(template, 0).length);
       expect(host.commitImmediateHistoryTransition).toHaveBeenCalledOnce();
       expect(host.replaceCanonicalDocumentState).toHaveBeenCalledOnce();
@@ -85,7 +85,7 @@ describe("BG3D template insertion through the actual command host", () => {
     "does not mutate while physics is %s", (phase) => {
       const { host, live } = createHost();
       host.physicsPhaseRef.current = phase;
-      host.addSceneTemplate(BG_SCENE_TEMPLATES[0].id);
+      expect(host.addSceneTemplate(BG_SCENE_TEMPLATES[0].id)).toBe(false);
       expect(live.current.primitives).toEqual([]);
       expect(host.commitImmediateHistoryTransition).not.toHaveBeenCalled();
     },
@@ -97,7 +97,7 @@ describe("BG3D template insertion through the actual command host", () => {
       if (reason === "closed") host.open = false;
       if (reason === "restoring") host.isRestoringScene = true;
       if (reason === "renderer-unavailable") host.modelRenderer = null;
-      host.addSceneTemplate(BG_SCENE_TEMPLATES[0].id);
+      expect(host.addSceneTemplate(BG_SCENE_TEMPLATES[0].id)).toBe(false);
       expect(host.replaceCanonicalDocumentState).not.toHaveBeenCalled();
       expect(host.commitImmediateHistoryTransition).not.toHaveBeenCalled();
     },
@@ -105,7 +105,7 @@ describe("BG3D template insertion through the actual command host", () => {
 
   it("leaves the scene unchanged for an unknown template", () => {
     const { host } = createHost();
-    expect(() => host.addSceneTemplate("missing-template")).not.toThrow();
+    expect(host.addSceneTemplate("missing-template")).toBe(false);
     expect(host.replaceCanonicalDocumentState).not.toHaveBeenCalled();
   });
 
@@ -116,7 +116,7 @@ describe("BG3D template insertion through the actual command host", () => {
         complexity: { ...live.current.document.budgets.complexity, maxNodes: 1 },
       },
     } };
-    host.addSceneTemplate(BG_SCENE_TEMPLATES[0].id);
+    expect(host.addSceneTemplate(BG_SCENE_TEMPLATES[0].id)).toBe(false);
     expect(host.setError).toHaveBeenCalledWith(expect.stringContaining("최대 1개"));
     expect(host.replaceCanonicalDocumentState).not.toHaveBeenCalled();
     expect(host.commitImmediateHistoryTransition).not.toHaveBeenCalled();
@@ -128,7 +128,7 @@ describe("BG3D template insertion through the actual command host", () => {
     const child = { ...createPrimitive("box", 0), parentId: live.current.primitives[0].id };
     host.replaceCanonicalDocumentState({ primitives: [...live.current.primitives, child] });
     const before = live.current;
-    host.addSceneTemplate(BG_SCENE_TEMPLATES[1].id);
+    expect(host.addSceneTemplate(BG_SCENE_TEMPLATES[1].id)).toBe(false);
     expect(live.current).toBe(before);
     expect(host.commitImmediateHistoryTransition).toHaveBeenCalledOnce();
     expect(host.setError).toHaveBeenLastCalledWith(expect.stringContaining("외부 오브젝트"));

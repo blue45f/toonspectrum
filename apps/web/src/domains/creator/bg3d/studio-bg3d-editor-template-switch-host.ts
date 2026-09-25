@@ -28,7 +28,7 @@ export interface StudioBg3dEditorTemplateSwitchHost {
   readonly replaceCanonicalDocumentState: StudioBg3dCanonicalDocumentState["replaceCanonicalDocumentState"];
   readonly setError: (error: string | null) => void;
   readonly setSelectedIds: (ids: Set<string>) => void;
-  addSceneTemplate: (templateId: string) => void;
+  addSceneTemplate: (templateId: string) => boolean;
 }
 
 /** Override the append-only command with one active catalog template and one history transition. */
@@ -44,10 +44,10 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h: StudioBg3dEditorTemp
   } = h;
 
   h.addSceneTemplate = (templateId: string) => {
-    if (!isStudioBg3dSceneEditReady(h)) return;
-    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return;
+    if (!isStudioBg3dSceneEditReady(h)) return false;
+    if (isStudioBg3dPhysicsTransientPhase(physicsPhaseRef.current)) return false;
     const template = BG_SCENE_TEMPLATES.find((entry) => entry.id === templateId);
-    if (!template) return;
+    if (!template) return false;
 
     const live = physicsRuntimeSourceRef.current;
     const switchPlan = planStudioBg3dCatalogTemplateSwitch({
@@ -56,10 +56,10 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h: StudioBg3dEditorTemp
     });
     if (!switchPlan) {
       setError("현재 템플릿에 연결된 외부 오브젝트가 있어 안전하게 전환하지 못했습니다.");
-      return;
+      return false;
     }
     const rawParts = instantiateSceneTemplate(template, switchPlan.insertionOffset);
-    if (rawParts.length === 0) return;
+    if (rawParts.length === 0) return false;
     const nodeLimit = Math.min(
       STUDIO_BG3D_SCENE_DOCUMENT_MAX_NODES,
       live.document.budgets.complexity.maxNodes,
@@ -69,7 +69,7 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h: StudioBg3dEditorTemp
       + rawParts.length;
     if (finalNodeCount > nodeLimit) {
       setError(`이 장면에는 오브젝트를 최대 ${nodeLimit.toLocaleString()}개까지 둘 수 있습니다.`);
-      return;
+      return false;
     }
     const allocation = allocateStudioBg3dTemplateInstanceNodeIds({
       sourceKind: "catalog",
@@ -81,7 +81,7 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h: StudioBg3dEditorTemp
     });
     if (!allocation) {
       setError("템플릿을 한 묶음으로 추적할 안전한 식별자를 만들지 못해 장면을 변경하지 않았습니다.");
-      return;
+      return false;
     }
     const parts = rawParts.map((part, index) => ({
       ...part,
@@ -106,5 +106,6 @@ export function attachStudioBg3dEditorTemplateSwitchHost(h: StudioBg3dEditorTemp
     });
     setSelectedIds(new Set(orderStudioBg3dHierarchySelectionRootsFirst(parts)));
     setError(null);
+    return true;
   };
 }

@@ -29,9 +29,9 @@
   "studio.settings.tool.zoomFit": "화면 맞춤",
   "studio.settings.tool.rotateView": "화면 회전",
   "studio.settings.tool.frameAnim": "프레임 애니메이션",
-  "studio.settings.tool.mannequin": "3D 데생 인형",
-  "studio.settings.tool.vrm3d": "3D 캐릭터",
-  "studio.settings.tool.bg3d": "3D 배경",
+  "studio.settings.tool.mannequin": "기본 데생 인형",
+  "studio.settings.tool.vrm3d": "인물·포즈 편집",
+  "studio.settings.tool.bg3d": "장면 도우미",
   "studio.settings.tool.reference": "참고 이미지",
   "studio.settings.shortcut.toolSelect": "선택",
   "studio.settings.shortcut.toolHand": "화면 이동",
@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "변경한 설정은 이 기기에 자동으로 저장됩니다.",
   "studio.settings.state.hide": "숨김",
   "studio.settings.state.show": "표시",
-  "studio.settings.state.open": "열림"
+  "studio.settings.state.open": "열림",
+  "studio.settings.tool.characterShaper": "캐릭터 만들기"
 }

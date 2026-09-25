@@ -49,8 +49,8 @@ describe("site route UX contracts", () => {
     }
   });
 
-  it("marks precision 3D work as desktop-required without hiding review workflows on mobile", () => {
-    expect(resolveSiteRouteUxContract("/studio/bg3d").mobilePolicy).toBe("desktop-required");
+  it("supports the scene assistant on mobile without hiding review workflows", () => {
+    expect(resolveSiteRouteUxContract("/studio/bg3d").mobilePolicy).toBe("full");
     expect(resolveSiteRouteUxContract("/studio/publish").mobilePolicy).toBe("review");
     expect(resolveSiteRouteUxContract("/production/projects/sample/review").mobilePolicy).toBe("review");
   });

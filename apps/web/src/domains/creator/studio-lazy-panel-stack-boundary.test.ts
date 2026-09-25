@@ -264,7 +264,7 @@ describe("Studio lazy panel stack boundary", () => {
       expect(stack).toContain(`<Suspense fallback={<${name} />}>`);
     }
     expect(retainedBg3dHost).toContain("function Bg3DRetainedLoadingOverlay()");
-    expect(retainedBg3dHost).toContain("3D 배경 도구를 여는 중");
+    expect(retainedBg3dHost).toContain("장면 도우미를 여는 중");
     expect(retainedBg3dHost).toContain(
       "<Suspense fallback={lease.logicalOpen ? <Bg3DRetainedLoadingOverlay /> : null}>",
     );

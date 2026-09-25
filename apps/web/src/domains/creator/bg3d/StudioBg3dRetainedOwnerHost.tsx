@@ -23,7 +23,7 @@ function Bg3DRetainedLoadingOverlay() {
     <div aria-live="polite" className="fixed inset-0 z-50 grid place-items-center bg-[oklch(0.08_0.01_70/0.72)] p-4 text-fg backdrop-blur-sm">
       <div className="inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-4 py-3 text-sm font-semibold shadow-xl">
         <Loader2 className="animate-spin text-accent" size={16} aria-hidden />
-        <span>3D 배경 도구를 여는 중</span>
+        <span>장면 도우미를 여는 중</span>
       </div>
     </div>
   );
