@@ -154,8 +154,10 @@ import { studioSemanticWorldGraph } from "./studio-virtual-space-semantic-world"
 import { StudioVirtualSpaceRoomCatalog } from "./StudioVirtualSpaceRoomCatalog";
 import { useStudioVirtualSpaceP2pBoard } from "./use-studio-virtual-space-p2p-board";
 import {
+  normalizeStudioVirtualSpaceNickname,
   readStudioVirtualSpaceAvatarIndex,
   readStudioVirtualSpaceEntryPreference,
+  studioVirtualSpaceNicknameFromAccount,
   validStudioVirtualSpaceAvatarIndex,
   writeStudioVirtualSpaceAvatarIndex,
   writeStudioVirtualSpaceEntryPreference,
@@ -436,12 +438,12 @@ function ChibiAvatar({
           {reactionEmoji}
         </span>
       ) : null}
-      <span className="absolute -bottom-4 left-1/2 z-40 flex max-w-32 -translate-x-1/2 items-center gap-1 truncate rounded-full border border-line bg-panel/95 px-2 py-0.5 text-[0.58rem] font-black text-fg shadow-sm backdrop-blur">
+      <span className="studio-vspace-avatar-nameplate absolute -bottom-4 left-1/2 z-40 flex max-w-32 -translate-x-1/2 items-center gap-1 truncate rounded-full border border-line bg-panel/95 px-2 py-0.5 text-[0.58rem] font-black text-fg shadow-sm backdrop-blur">
         {self ? <Sparkles size={9} className="shrink-0 text-accent" aria-hidden /> : null}
         <span className="truncate">{name}</span>
       </span>
       {self ? (
-        <span className="absolute -right-1 top-1 z-30 rounded-full bg-accent px-1.5 py-0.5 text-[0.45rem] font-black uppercase tracking-wide text-on-accent shadow-sm">
+        <span className="studio-vspace-avatar-self-badge absolute -right-1 top-1 z-30 rounded-full bg-accent px-1.5 py-0.5 text-[0.45rem] font-black uppercase tracking-wide text-on-accent shadow-sm">
           ME
         </span>
       ) : null}
@@ -611,11 +613,15 @@ export function VirtualSpaceExperience({
   personal = false,
   initialAvatarIndexOverride,
   initialArtStyleOverride,
+  nickname,
+  onNicknameChange,
 }: {
   readonly homeHeader?: ReactNode;
   readonly personal?: boolean;
   readonly initialAvatarIndexOverride?: number;
   readonly initialArtStyleOverride?: StudioVirtualArtStyleKey;
+  readonly nickname: string;
+  readonly onNicknameChange: (nickname: string) => void;
   readonly publication: ReturnType<typeof useStudioWorldPublication>;
   readonly projectId: string;
   readonly preparing: boolean;
@@ -1145,7 +1151,7 @@ export function VirtualSpaceExperience({
     }
     // Local portal teleport is owned by the physics runtime, not a second path request.
   }, [navigate]);
-  const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || bt("나", "Me");
+  const localName = live.room?.participant.displayName.replace(/\s*·\s*이 탭$/u, "") || nickname || bt("나", "Me");
 
   const sendReaction = useCallback((reaction: StudioVirtualSpaceReaction) => {
     const controller = controllerRef.current;
@@ -1548,7 +1554,7 @@ export function VirtualSpaceExperience({
                   </button>
                 </div>
 
-                <div className="absolute bottom-4 right-4 z-50 lg:hidden" data-space-interactive="true">
+                <div className="studio-vspace-touch-joystick-wrap absolute bottom-4 right-4 z-50 lg:hidden" data-space-interactive="true">
                   <StudioVirtualSpaceJoystick
                     onVectorChange={(vector) => {
                       engineBridge.setJoystick(vector);
@@ -1569,10 +1575,10 @@ export function VirtualSpaceExperience({
                       : bt("상호작용", "Interact")}
                   </span>
                 </button>
-                <div className="absolute left-1/2 top-3 z-50 -translate-x-1/2 rounded-full border border-line bg-panel/85 px-3 py-1.5 text-[0.65rem] font-black text-fg shadow-lg backdrop-blur lg:hidden">
+                <div className="studio-vspace-mobile-room-pill absolute left-1/2 top-3 z-50 -translate-x-1/2 rounded-full border border-line bg-panel/85 px-3 py-1.5 text-[0.65rem] font-black text-fg shadow-lg backdrop-blur lg:hidden">
                   {bt(currentRoom.labelKo, currentRoom.labelEn)}
                 </div>
-                <div className="absolute left-3 top-14 z-50 flex items-center gap-1 rounded-2xl border border-line bg-panel/85 p-1.5 shadow-lg backdrop-blur lg:hidden" data-space-interactive="true">
+                <div className="studio-vspace-touch-reactions absolute left-3 top-14 z-50 flex items-center gap-1 rounded-2xl border border-line bg-panel/85 p-1.5 shadow-lg backdrop-blur lg:hidden" data-space-interactive="true">
                   {VIRTUAL_SPACE_REACTIONS.map((reaction) => (
                     <button
                       key={reaction.id}
@@ -1680,6 +1686,13 @@ export function VirtualSpaceExperience({
               : <p role="status">{bt("공간 목록을 확인 중입니다.", "Checking the space directory.")}</p>}
           </div>
           <div hidden={workspacePanel !== "space"}>
+            <nav className="studio-vspace-mobile-more-grid" aria-label={bt("추가 스튜디오 기능", "More studio tools")}>
+              <button type="button" onClick={() => setWorkspacePanel("team")}><UsersRound size={17} aria-hidden />{bt("팀·초대", "Teams")}</button>
+              <button type="button" onClick={() => setWorkspacePanel("rtc")}><Radio size={17} aria-hidden />{bt("연결 상태", "Connection")}</button>
+              <Link href={personal ? "/studio/new" : `/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>
+                <ExternalLink size={17} aria-hidden />{personal ? bt("새 작품", "New work") : bt("원고 목록", "Manuscripts")}
+              </Link>
+            </nav>
             <StudioVirtualSpaceRoomCatalog
               projectAvailable={!personal}
               onPanel={(panel) => setWorkspacePanel(panel)}
@@ -1712,9 +1725,11 @@ export function VirtualSpaceExperience({
                 </div>
               </fieldset>
             <StudioVirtualSpaceCustomizationPanel
+              nickname={nickname}
               character={characterCustomization}
               decorations={decorations}
               selfPoint={snapshot.self}
+              onNickname={onNicknameChange}
               onCharacter={selectCharacterCustomization}
               onDecorations={selectDecorations}
             />
@@ -1930,17 +1945,17 @@ export function VirtualSpaceExperience({
             {sharedActivity ? <span role="status">{bt("공동 작업 진행 중", "Shared activity active")}</span> : null}
           </div>
           <div className="workspace-live-actions" data-space-interactive="true">
-            <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("today"); }}>
+            <button type="button" data-mobile-slot="today" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("today"); }}>
               <CalendarDays size={18} aria-hidden />{bt("오늘", "Today")}
             </button>
             <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("team"); }}>
               <UsersRound size={18} aria-hidden />{bt("팀·초대", "Teams")}
             </button>
-            <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("people"); }}>
+            <button type="button" data-mobile-slot="people" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("people"); }}>
               <UsersRound size={18} aria-hidden />{bt("사람·대화", "People & conversations")}
               {socialSnapshot.requests.some((request) => request.direction === "incoming" && request.status === "offered") ? <span>{bt("요청 있음", "Request")}</span> : null}
             </button>
-            <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("space"); }}>
+            <button type="button" data-mobile-slot="space" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("space"); }}>
               <Settings size={18} aria-hidden />{bt("공간·꾸미기", "Space & settings")}
             </button>
             <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("rtc"); }}>
@@ -1963,26 +1978,33 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
   const initialEntryPreference = useMemo(() => readStudioVirtualSpaceEntryPreference(), []);
   const [entryAvatarIndex, setEntryAvatarIndex] = useState(initialEntryPreference.avatarIndex);
   const [entryArtStyle, setEntryArtStyle] = useState<StudioVirtualArtStyleKey>(() => readStudioVirtualArtStyle());
+  const [entryNickname, setEntryNickname] = useState(initialEntryPreference.nickname);
   const [entryOpen, setEntryOpen] = useState(() =>
     !initialEntryPreference.confirmed || new URLSearchParams(location.search).get("lobby") === "1",
   );
   const session = useSession();
   const userId = session.data?.user.id ?? null;
+  const accountNickname = studioVirtualSpaceNicknameFromAccount(session.data?.user.name);
+  useEffect(() => {
+    if (entryNickname.trim()) return;
+    setEntryNickname(accountNickname ?? bt("크리에이터", "Creator"));
+  }, [accountNickname, bt, entryNickname]);
   const publication = useStudioWorldPublication(decodedProjectId, userId, !entryOpen && !personal && session.ready && Boolean(userId)
     && validProjectId(decodedProjectId) && !/^(?:virtual-demo|draft|local)(?:$|[:_-])/u.test(decodedProjectId));
   const transportFactory = useStudioLiveTransportAuth({
     authReady: !entryOpen && session.ready && !personal,
     userId: personal ? null : userId,
   });
+  const publicNickname = normalizeStudioVirtualSpaceNickname(entryNickname)
+    ?? accountNickname
+    ?? bt("게스트 크리에이터", "Guest creator");
   const participant = useMemo(() => {
     if (personal || !session.ready || !transportFactory) return null;
     return {
-      displayName: session.data?.user.name
-        ?? session.data?.user.email
-        ?? bt("게스트 크리에이터", "Guest creator"),
+      displayName: publicNickname,
       role: session.data ? "editor" as const : "viewer" as const,
     };
-  }, [bt, personal, session.data, session.ready, transportFactory]);
+  }, [personal, publicNickname, session.data, session.ready, transportFactory]);
 
   useDocumentTitle(`${bt("협업 스튜디오", "Collaboration Studio")} · ToonStudio`);
 
@@ -2003,13 +2025,17 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
     return <StudioVirtualSpaceEntryLobby
       avatarIndex={entryAvatarIndex}
       artStyle={entryArtStyle}
+      nickname={entryNickname}
       returning={initialEntryPreference.confirmed}
       projectName={personal ? bt("나의 아틀리에", "My atelier") : decodedProjectId}
       onAvatarIndex={setEntryAvatarIndex}
       onArtStyle={setEntryArtStyle}
+      onNickname={setEntryNickname}
       onEnter={() => {
-        if (!validStudioVirtualSpaceAvatarIndex(entryAvatarIndex)) return;
-        void writeStudioVirtualSpaceEntryPreference(entryAvatarIndex);
+        const resolvedNickname = normalizeStudioVirtualSpaceNickname(entryNickname);
+        if (!validStudioVirtualSpaceAvatarIndex(entryAvatarIndex) || !resolvedNickname) return;
+        setEntryNickname(resolvedNickname);
+        void writeStudioVirtualSpaceEntryPreference(entryAvatarIndex, resolvedNickname);
         void writeStudioVirtualArtStyle(entryArtStyle);
         setEntryOpen(false);
       }}
@@ -2034,6 +2060,15 @@ export function StudioVirtualSpacePage({ projectIdOverride, homeHeader, personal
         projectId={decodedProjectId}
         initialAvatarIndexOverride={entryAvatarIndex}
         initialArtStyleOverride={entryArtStyle}
+        nickname={publicNickname}
+        onNicknameChange={(value) => {
+          const resolvedNickname = normalizeStudioVirtualSpaceNickname(value);
+          if (!resolvedNickname) return;
+          setEntryNickname(resolvedNickname);
+          if (validStudioVirtualSpaceAvatarIndex(entryAvatarIndex)) {
+            void writeStudioVirtualSpaceEntryPreference(entryAvatarIndex, resolvedNickname);
+          }
+        }}
         homeHeader={homeHeader}
         personal={personal}
         preparing={!personal && (!session.ready || !transportFactory)}
