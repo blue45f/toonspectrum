@@ -6,33 +6,31 @@ import {
   Header,
   Headers,
   HttpException,
-  HttpStatus,
   Inject,
   Module,
   Param,
   Post,
   Query,
   Req,
-  UnauthorizedException,
 } from "@nestjs/common";
 
 import {
   CreatorIntelligenceInputError,
   createCreatorIntelligenceCore,
 } from "./creator-intelligence-core";
+import { CreatorIntelligenceAdmissionGuard } from "./creator-intelligence-admission";
 
 import type { Request } from "express";
-import { LocalAuthRateLimiter } from "../auth/auth-rate-limit";
 import type { CreatorIntelligenceCore } from "./creator-intelligence-core";
 
 const CREATOR_INTELLIGENCE_CORE = Symbol("CREATOR_INTELLIGENCE_CORE");
-const voiceRateLimiter = new LocalAuthRateLimiter({ maximumIdentities: 20_000 });
 
 @Controller("creator-intelligence")
 export class CreatorIntelligenceController {
   constructor(
     @Inject(CREATOR_INTELLIGENCE_CORE)
     private readonly core: CreatorIntelligenceCore,
+    private readonly admission: CreatorIntelligenceAdmissionGuard,
   ) {}
 
   private async execute<T>(operation: () => Promise<T>): Promise<T> {
@@ -52,7 +50,23 @@ export class CreatorIntelligenceController {
   @Get("status")
   @Header("Cache-Control", "private, no-store")
   status() {
-    return this.core.describe();
+    const current = this.core.describe();
+    const admission = this.admission.describe();
+    if (admission.paidRoutesEnabled) return { ...current, admission };
+
+    const disabled = {
+      status: "disabled",
+      reason: "operator paid-route admission gate is disabled",
+    } as const;
+    return {
+      ...current,
+      translation: { deepl: disabled, libretranslate: disabled },
+      voice: { gemini: disabled, deepgram: disabled },
+      soundEffects: disabled,
+      meshy: disabled,
+      safeSearch: disabled,
+      admission,
+    };
   }
 
   @Get("references")
@@ -88,29 +102,11 @@ export class CreatorIntelligenceController {
   @Header("Cache-Control", "private, no-store")
   async voiceSynthesize(
     @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body() body: Record<string, unknown>,
     @Req() request: Request,
   ) {
-    if (!userId?.trim()) {
-      throw new UnauthorizedException("클라우드 AI 음성을 사용하려면 로그인하세요.");
-    }
-    const subject = userId.trim();
-    const shortWindow = voiceRateLimiter.consume(
-      `creator-intelligence-voice-short:${subject}`,
-      60,
-      10 * 60_000,
-    );
-    const dailyWindow = voiceRateLimiter.consume(
-      `creator-intelligence-voice-daily:${subject}`,
-      120,
-      24 * 60 * 60_000,
-    );
-    if (shortWindow.status !== "accepted" || dailyWindow.status !== "accepted") {
-      throw new HttpException({
-        code: "creator_intelligence_voice_rate_limited",
-        message: "무료 AI 음성 생성 한도에 도달했어요. 잠시 후 다시 시도하거나 로컬 시스템 음성을 사용해 주세요.",
-      }, HttpStatus.TOO_MANY_REQUESTS);
-    }
+    this.admission.admit("voice-synthesize", userId, idempotencyKey);
     const controller = new AbortController();
     const abort = () => controller.abort();
     request.once("aborted", abort);
@@ -128,31 +124,55 @@ export class CreatorIntelligenceController {
 
   @Post("sfx/generate")
   @Header("Cache-Control", "private, no-store")
-  soundGenerate(@Body() body: Record<string, unknown>) {
+  soundGenerate(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: Record<string, unknown>,
+  ) {
+    this.admission.admit("sound-generate", userId, idempotencyKey);
     return this.execute(() => this.core.generateSoundEffect(body));
   }
 
   @Post("translate")
   @Header("Cache-Control", "private, no-store")
-  translate(@Body() body: Record<string, unknown>) {
+  translate(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: Record<string, unknown>,
+  ) {
+    this.admission.admit("translate", userId, idempotencyKey);
     return this.execute(() => this.core.translate(body.provider, body));
   }
 
   @Post("mesh/jobs")
   @Header("Cache-Control", "private, no-store")
-  meshCreate(@Body() body: Record<string, unknown>) {
+  meshCreate(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: Record<string, unknown>,
+  ) {
+    this.admission.admit("mesh-create", userId, idempotencyKey);
     return this.execute(() => this.core.createMeshyJob(body));
   }
 
   @Get("mesh/jobs/:jobId")
   @Header("Cache-Control", "private, no-store")
-  meshStatus(@Param("jobId") jobId: string) {
+  meshStatus(
+    @Headers("x-user-id") userId: string | undefined,
+    @Param("jobId") jobId: string,
+  ) {
+    this.admission.admit("mesh-status", userId);
     return this.execute(() => this.core.getMeshyJob(jobId));
   }
 
   @Post("preflight/safe-search")
   @Header("Cache-Control", "private, no-store")
-  safeSearch(@Body() body: Record<string, unknown>) {
+  safeSearch(
+    @Headers("x-user-id") userId: string | undefined,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: Record<string, unknown>,
+  ) {
+    this.admission.admit("safe-search", userId, idempotencyKey);
     return this.execute(() => this.core.safeSearch(body));
   }
 }
@@ -160,6 +180,7 @@ export class CreatorIntelligenceController {
 @Module({
   controllers: [CreatorIntelligenceController],
   providers: [
+    CreatorIntelligenceAdmissionGuard,
     {
       provide: CREATOR_INTELLIGENCE_CORE,
       useFactory: () => createCreatorIntelligenceCore({
