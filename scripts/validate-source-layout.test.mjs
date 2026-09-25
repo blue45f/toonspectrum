@@ -34,6 +34,9 @@ test("counts only direct Creator root files while counting all files for migrati
     rootMobileShellFiles: 0,
     rootMobileResourcesFiles: 0,
     rootCapacitorConfigFiles: 0,
+    rootMediaFiles: 0,
+    rootAutomationFiles: 0,
+    rootMarketplaceBenchmarkFiles: 0,
   });
 });
 

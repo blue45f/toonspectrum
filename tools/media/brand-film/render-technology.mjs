@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const cwd = dirname(fileURLToPath(import.meta.url));
-const repositoryRoot = resolve(cwd, "../..");
+const repositoryRoot = resolve(cwd, "../../..");
 const output = resolve(repositoryRoot, "apps/web/public/technology");
 const scriptPath = resolve(
   repositoryRoot,

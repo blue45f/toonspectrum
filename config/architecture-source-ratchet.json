@@ -20,5 +20,8 @@
   "rootIosFiles": 0,
   "rootMobileShellFiles": 0,
   "rootMobileResourcesFiles": 0,
-  "rootCapacitorConfigFiles": 0
+  "rootCapacitorConfigFiles": 0,
+  "rootMediaFiles": 0,
+  "rootAutomationFiles": 0,
+  "rootMarketplaceBenchmarkFiles": 0
 }

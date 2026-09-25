@@ -5,9 +5,9 @@ const { test } = process.env.VITEST
   ? await import("vitest")
   : await import("node:test");
 
-const index = readFileSync("media/brand-film/src/index.tsx", "utf8");
-const renderer = readFileSync("media/brand-film/render-technology.mjs", "utf8");
-const film = readFileSync("media/brand-film/src/TechnologyStoryFilm.tsx", "utf8");
+const index = readFileSync("tools/media/brand-film/src/index.tsx", "utf8");
+const renderer = readFileSync("tools/media/brand-film/render-technology.mjs", "utf8");
+const film = readFileSync("tools/media/brand-film/src/TechnologyStoryFilm.tsx", "utf8");
 const workflow = readFileSync(
   ".github/workflows/technology-story-film.yml",
   "utf8",

@@ -6,7 +6,7 @@ import {
   useVideoConfig,
 } from "remotion";
 
-import technologyFilmScript from "../../../apps/web/src/domains/legal/technology/technology-film-script.json";
+import technologyFilmScript from "../../../../apps/web/src/domains/legal/technology/technology-film-script.json";
 
 interface LocalizedTechnologyText {
   readonly ko: string;

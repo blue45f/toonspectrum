@@ -689,7 +689,7 @@ export const ENGINEERING_CHAPTERS = [
     technologies: ["Structured content", "React presentation", "Remotion", "VTT captions", "Review artifacts"],
     evidence: [
       evidence("code", "apps/web/src/domains/legal/technology", "공용 기술 스토리 콘텐츠", "Shared engineering-story content"),
-      evidence("code", "media/brand-film/src/TechnologyStoryFilm.tsx", "Remotion 기술 필름", "Remotion engineering film"),
+      evidence("code", "tools/media/brand-film/src/TechnologyStoryFilm.tsx", "Remotion 기술 필름", "Remotion engineering film"),
       evidence("workflow", ".github/workflows/technology-story-film.yml", "검토용 영상 artifact", "Reviewable film artifacts"),
     ],
     reuseSteps: [

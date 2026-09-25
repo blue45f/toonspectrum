@@ -9,7 +9,7 @@ coverage/
 # Generated QA, benchmark and deployment artifacts
 artifacts/
 .qa/
-marketplace-benchmark/
+tests/benchmarks/marketplace/
 media/
 data/
 

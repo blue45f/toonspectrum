@@ -26,6 +26,8 @@ Status: **migration target**. This document separates current reality from the i
   `artifacts` paths are ignored and may not be tracked.
 - `apps/mobile` now owns Capacitor configuration, Android/iOS native projects, launch shell,
   resources and native validation as an independent workspace package.
+- Non-runtime authoring and automation now live under `tools/media` and `tools/automation`;
+  marketplace comparison material lives under `tests/benchmarks/marketplace`.
 - Remaining root app-specific configuration and large static assets still require later slices.
 
 ## Target application layout

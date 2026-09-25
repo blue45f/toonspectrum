@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const cwd = dirname(fileURLToPath(import.meta.url));
-const root = resolve(cwd, "../..");
+const root = resolve(cwd, "../../..");
 const specPath = resolve(cwd, "audio/product-tour-narration.json");
 const audioPath = resolve(cwd, "audio/toonstudio-product-tour-narration.ko.m4a");
 const metadataPath = resolve(cwd, "audio/toonstudio-product-tour-narration.ko.json");

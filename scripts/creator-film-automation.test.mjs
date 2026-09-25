@@ -4,7 +4,7 @@ import vm from "node:vm";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
-const workflow = JSON.parse(readFileSync("automation/n8n/toonstudio-brand-film.json", "utf8"));
+const workflow = JSON.parse(readFileSync("tools/automation/n8n/toonstudio-brand-film.json", "utf8"));
 const node = (name) => workflow.nodes.find((entry) => entry.name === name);
 const executeCode = (name, input) => vm.runInNewContext(`(function () { ${node(name).parameters.jsCode} })()`, { $input: { first: () => ({ json: input }) } }, { timeout: 1000 });
 
@@ -46,7 +46,7 @@ test("every edge targets an existing node and the renderer cannot publish", () =
     assert(names.has(source));
     for (const list of outputs.main) for (const edge of list) assert(names.has(edge.node));
   }
-  const renderer = readFileSync("media/brand-film/render.mjs", "utf8");
+  const renderer = readFileSync("tools/media/brand-film/render.mjs", "utf8");
   assert(renderer.includes('filename: "toonstudio-route-header.mp4"'));
   assert(renderer.includes('width: 1920, height: 768'));
   assert(renderer.includes('"--crf=18"'));

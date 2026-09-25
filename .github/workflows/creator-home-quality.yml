@@ -23,8 +23,8 @@ on:
       - "apps/web/public/brand/**"
       - "apps/web/public/i18n/app/**"
       - "apps/web/public/manifest.webmanifest"
-      - "media/brand-film/**"
-      - "automation/n8n/**"
+      - "tools/media/brand-film/**"
+      - "tools/automation/n8n/**"
       - "scripts/verify-purpose-first-home.mjs"
       - "scripts/verify-creator-home.mjs"
       - "scripts/verify-creator-film-upgrades.mjs"
@@ -55,8 +55,8 @@ on:
       - "apps/web/public/brand/**"
       - "apps/web/public/i18n/app/**"
       - "apps/web/public/manifest.webmanifest"
-      - "media/brand-film/**"
-      - "automation/n8n/**"
+      - "tools/media/brand-film/**"
+      - "tools/automation/n8n/**"
       - "scripts/verify-purpose-first-home.mjs"
       - "scripts/verify-creator-home.mjs"
       - "scripts/verify-creator-film-upgrades.mjs"
@@ -139,7 +139,7 @@ jobs:
                   install=true
                   film=true
                   ;;
-                media/brand-film/*|automation/n8n/*|scripts/verify-creator-film-upgrades.mjs)
+                tools/media/brand-film/*|tools/automation/n8n/*|scripts/verify-creator-film-upgrades.mjs)
                   install=true
                   purpose=true
                   film=true
@@ -333,8 +333,8 @@ jobs:
               scripts/verify-creator-continuity.mjs|\
               scripts/creator-film-automation.test.mjs|\
               scripts/creator-home-checkout-policy.test.mjs|\
-              media/brand-film/src/*|\
-              media/brand-film/render.mjs)
+              tools/media/brand-film/src/*|\
+              tools/media/brand-film/render.mjs)
                 files+=("$file")
                 ;;
             esac
@@ -384,8 +384,8 @@ jobs:
           scripts/verify-creator-continuity.mjs
           scripts/creator-home-checkout-policy.test.mjs
           scripts/creator-film-automation.test.mjs
-          media/brand-film/src
-          media/brand-film/render.mjs
+          tools/media/brand-film/src
+          tools/media/brand-film/render.mjs
 
       - name: Focused homepage unit contracts
         if: steps.scope.outputs.unit == 'true'
