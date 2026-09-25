@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const cwd = dirname(fileURLToPath(import.meta.url));
 // The web app owns public/ since the apps/web move. Writing to the repository root would
 // also recreate the legacy public/ directory that scripts/validate-architecture.mjs forbids.
-const output = resolve(cwd, "../../apps/web/public/brand");
+const output = resolve(cwd, "../../../apps/web/public/brand");
 const format = process.argv[2] || "all";
 const formats = {
   landscape: { id: "ToonStudioLandscape", filename: "toonstudio-intro.mp4", width: 1280, height: 720 },
@@ -23,7 +23,7 @@ const run = (args) => {
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`Remotion exited with ${result.status}`);
 };
-const publicDirectory = `--public-dir=${resolve(cwd, "../../apps/web/public")}`;
+const publicDirectory = `--public-dir=${resolve(cwd, "../../../apps/web/public")}`;
 const manifestPath = resolve(output, "film-manifest.json");
 const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, "utf8")) : { version: 1, duration: 24, fps: 30, assets: {} };
 for (const [name, item] of Object.entries(formats)) {

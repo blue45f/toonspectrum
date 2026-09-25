@@ -9,7 +9,7 @@ on:
       - "apps/web/src/domains/creator/MarketplaceBrush*"
       - "apps/web/src/domains/creator/**/StudioBrushStudio.tsx"
       - "e2e/marketplace-authoring-*.spec.ts"
-      - "marketplace-benchmark/**"
+      - "tests/benchmarks/marketplace/**"
       - ".github/workflows/marketplace-authoring.yml"
   push:
     branches: ["main"]
@@ -19,7 +19,7 @@ on:
       - "apps/web/src/domains/creator/MarketplaceBrush*"
       - "apps/web/src/domains/creator/**/StudioBrushStudio.tsx"
       - "e2e/marketplace-authoring-*.spec.ts"
-      - "marketplace-benchmark/**"
+      - "tests/benchmarks/marketplace/**"
       - ".github/workflows/marketplace-authoring.yml"
   workflow_dispatch:
 

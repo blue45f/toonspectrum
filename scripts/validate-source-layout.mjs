@@ -60,6 +60,9 @@ export function measureSourceLayout(files) {
     rootMobileShellFiles: filesUnder(files, "mobile-shell"),
     rootMobileResourcesFiles: filesUnder(files, "resources"),
     rootCapacitorConfigFiles: files.includes("capacitor.config.ts") ? 1 : 0,
+    rootMediaFiles: filesUnder(files, "media"),
+    rootAutomationFiles: filesUnder(files, "automation"),
+    rootMarketplaceBenchmarkFiles: filesUnder(files, "marketplace-benchmark"),
   };
 }
 

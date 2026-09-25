@@ -4,8 +4,8 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const cwd = dirname(fileURLToPath(import.meta.url));
-const output = resolve(cwd, "../../apps/web/public/brand");
-const publicDirectory = `--public-dir=${resolve(cwd, "../../apps/web/public")}`;
+const output = resolve(cwd, "../../../apps/web/public/brand");
+const publicDirectory = `--public-dir=${resolve(cwd, "../../../apps/web/public")}`;
 const executable = resolve(cwd, "node_modules/.bin/remotion");
 const visualPath = resolve(output, "toonstudio-product-tour.visual.mp4");
 const videoPath = resolve(output, "toonstudio-product-tour.mp4");

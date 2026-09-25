@@ -143,6 +143,10 @@ requirePaths(
     "apps/mobile/ios",
     "apps/mobile/shell/index.html",
     "apps/mobile/scripts/verify-native-media-permissions.mjs",
+    "tools/README.md",
+    "tools/media/brand-film/package.json",
+    "tools/automation/n8n/toonstudio-brand-film.json",
+    "tests/benchmarks/marketplace/results.yaml",
     "vite.config.ts",
   ],
   "app entry",
@@ -172,6 +176,10 @@ forbidPaths(
 forbidPaths(
   ["android", "ios", "mobile-shell", "resources", "capacitor.config.ts"],
   "legacy root mobile path must stay under apps/mobile",
+);
+forbidPaths(
+  ["media", "automation", "marketplace-benchmark"],
+  "legacy root tooling path must stay under tools or tests/benchmarks",
 );
 
 // Lint exception ledger and its ratchet tests must remain machine-readable.
@@ -224,9 +232,9 @@ forbidPaths(
     "scripts/apply-blender-source-aware-quality.py",
     "scripts/fix-blender-orion-capability-audit.py",
     "scripts/zz-fable-probe.mts",
-    "marketplace-benchmark/.route-marker",
-    "marketplace-benchmark/.upload-probe.txt",
-    "marketplace-benchmark/.upload-route-readme.md",
+    "tests/benchmarks/marketplace/.route-marker",
+    "tests/benchmarks/marketplace/.upload-probe.txt",
+    "tests/benchmarks/marketplace/.upload-route-readme.md",
   ],
   "ephemeral receipt or completed migration path belongs outside maintained source",
 );

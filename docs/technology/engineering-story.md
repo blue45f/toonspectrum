@@ -102,16 +102,16 @@ Vitest, Playwright and repository verification scripts remain the source of trut
 
 ## Remotion workflow
 
-The engineering film extends the isolated `media/brand-film` package. The website never imports Remotion.
+The engineering film extends the isolated `tools/media/brand-film` package. The website never imports Remotion.
 
 ```bash
-npm --prefix media/brand-film ci
-npm --prefix media/brand-film run typecheck
-npm --prefix media/brand-film run studio
-npm --prefix media/brand-film run render:technology -- overview
-npm --prefix media/brand-film run render:technology -- investor
-npm --prefix media/brand-film run render:technology -- portrait
-npm --prefix media/brand-film run render:technology -- all
+npm --prefix tools/media/brand-film ci
+npm --prefix tools/media/brand-film run typecheck
+npm --prefix tools/media/brand-film run studio
+npm --prefix tools/media/brand-film run render:technology -- overview
+npm --prefix tools/media/brand-film run render:technology -- investor
+npm --prefix tools/media/brand-film run render:technology -- portrait
+npm --prefix tools/media/brand-film run render:technology -- all
 ```
 
 The manual `technology-story-film.yml` workflow:
@@ -152,7 +152,7 @@ pnpm exec vitest run \
   apps/web/src/app/routes/groups/about-routes.test.tsx \
   scripts/technology-story-film.test.mjs
 
-npm --prefix media/brand-film run typecheck
+npm --prefix tools/media/brand-film run typecheck
 pnpm typecheck
 pnpm lint:quick
 ```

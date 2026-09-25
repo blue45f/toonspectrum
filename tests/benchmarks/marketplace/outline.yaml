@@ -86,5 +86,5 @@ items:
 execution:
   batch_size: 3
   items_per_agent: 4
-  output_dir: ./marketplace-benchmark
-  consolidated_results: ./marketplace-benchmark/results.yaml
+  output_dir: ./tests/benchmarks/marketplace
+  consolidated_results: ./tests/benchmarks/marketplace/results.yaml

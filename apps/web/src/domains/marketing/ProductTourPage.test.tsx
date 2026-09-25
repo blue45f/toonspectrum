@@ -11,11 +11,11 @@ const PAGE_SOURCE = "apps/web/src/domains/marketing/ProductTourPage.tsx";
 const PLAYER_SOURCE = "apps/web/src/domains/marketing/ProductTourPlayer.tsx";
 const ROUTE_SOURCE = "apps/web/src/app/routes/groups/marketing.routes.tsx";
 const HOME_SOURCE = "apps/web/src/domains/marketing/CreatorHomeExperience.tsx";
-const REMOTION_SOURCE = "media/brand-film/src/ProductTourFilm.tsx";
+const REMOTION_SOURCE = "tools/media/brand-film/src/ProductTourFilm.tsx";
 const SHARED_REMOTION_SOURCE = "packages/product-tour-film/src/ProductTourFilm.tsx";
 const FALLBACK_PLAYER_SOURCE = "apps/web/src/domains/marketing/ProductTourMp4Player.tsx";
 const RUNTIME_AUDIO_MANIFEST = `${PUBLIC_BRAND}/product-tour/product-tour-audio.json`;
-const REMOTION_ROOT = "media/brand-film/src/index.tsx";
+const REMOTION_ROOT = "tools/media/brand-film/src/index.tsx";
 
 describe("long-form product tour contracts", () => {
   it("keeps the walkthrough intentionally long and chaptered", () => {
@@ -129,7 +129,7 @@ describe("long-form product tour contracts", () => {
       },
     });
     expect(manifest.audio?.bgm).toHaveLength(2);
-    expect(existsSync("media/brand-film/audio/toonstudio-product-tour-narration.ko.m4a")).toBe(true);
+    expect(existsSync("tools/media/brand-film/audio/toonstudio-product-tour-narration.ko.m4a")).toBe(true);
 
     for (const locale of ["ko", "en"] as const) {
       const captions = readFileSync(`${PUBLIC_BRAND}/toonstudio-product-tour.${locale}.vtt`, "utf8");

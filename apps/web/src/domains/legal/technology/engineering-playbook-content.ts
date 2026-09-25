@@ -452,7 +452,7 @@ export const ENGINEERING_PLAYBOOK_DOSSIERS = [
       { ko: "저장소 path는 구현 존재를 보여 줄 뿐 운영 성공·시장 성과를 자동 증명하지 않습니다.", en: "Repository paths show implementation existence, not operating success or market outcome." },
       { ko: "고객·투자자용 정량 수치는 독립적으로 측정하고 시점·표본·환경을 함께 공개해야 합니다.", en: "Customer and investor metrics require independent measurement with time, sample and environment disclosed." },
     ],
-    evidence: ["apps/web/src/domains/legal/technology", "media/brand-film/src/TechnologyStoryFilm.tsx", "docs/marketing/creator-first-home.md", "docs/marketing/creator-film-playback-hardening.md"],
+    evidence: ["apps/web/src/domains/legal/technology", "tools/media/brand-film/src/TechnologyStoryFilm.tsx", "docs/marketing/creator-first-home.md", "docs/marketing/creator-film-playback-hardening.md"],
   },
 ] as const satisfies readonly EngineeringPlaybookDossier[];
 

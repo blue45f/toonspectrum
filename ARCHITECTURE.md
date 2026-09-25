@@ -12,6 +12,8 @@
   native project, launch shell, resources와 native 검증을 직접 소유합니다.
 - `packages`에는 두 개 이상의 실행 앱이 실제로 공유하는 런타임 중립 계약·순수 모델·
   Studio 엔진만 둡니다. 애플리케이션 내부 구현을 공유 패키지로 우회하지 않습니다.
+- `tools`는 제품 번들에 포함되지 않는 media authoring, workflow automation, DCC bridge를
+  소유하고, `tests/benchmarks`는 재현 가능한 비교 자료와 benchmark 결과를 소유합니다.
 - 루트에는 workspace 설정, 저장소 횡단 검증, 문서와 운영 자동화만 둡니다.
 
 `@/*`는 `apps/web/src/*`, `@admin/*`는 `apps/admin-web/src/*`를 가리킵니다.
@@ -55,7 +57,11 @@ apps/mobile/                      # 독립 Capacitor native wrapper workspace
 
 packages/                         # focused contracts, pure models, Studio engines
 data/asset-releases/              # 검토된 릴리스 manifest·출처·visual review 증거
-scripts/, tools/, e2e/, tests/    # 저장소 횡단 도구와 검증 코드
+tools/                            # 제품 runtime과 격리된 authoring·automation·DCC 도구
+tools/media/brand-film/           # 독립 Remotion film authoring project
+tools/automation/n8n/             # 외부 workflow automation 정의
+tests/benchmarks/marketplace/     # marketplace 비교 계약·자료·결과
+scripts/, e2e/, tests/            # 저장소 횡단 명령과 검증 코드
 ```
 
 브라우저 fixture와 harness는 Vite root인 `apps/web` 아래의 `tests/browser-fixtures`와
