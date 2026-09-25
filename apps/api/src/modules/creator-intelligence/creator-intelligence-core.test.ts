@@ -28,7 +28,8 @@ describe("creator intelligence provider gates", () => {
     const result = await core.searchReferences("pexels", "night street");
     expect(result.status).toBe("not_configured");
     expect(fetcher).not.toHaveBeenCalled();
-  });});
+  });
+});
 
 describe("creator intelligence reference providers", () => {
   it("normalizes Openverse as discovery-only and keeps source provenance", async () => {
@@ -79,9 +80,51 @@ describe("creator intelligence reference providers", () => {
       license: "Pexels License",
       rightsStatus: "provider-license",
     });
+    expect(result.cache).toEqual({ hit: false, ttlSeconds: 21_600 });
     const [url, init] = fetcher.mock.calls[0] ?? [];
     expect(String(url)).not.toContain("secret-key");
     expect(new Headers(init?.headers).get("authorization")).toBe("secret-key");
+  });
+
+  it("uses a 24-hour Pixabay cache to protect the free rate limit", async () => {
+    let current = stamp;
+    const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => json({
+      totalHits: 1,
+      hits: [{
+        id: 34,
+        pageURL: "https://pixabay.com/photos/city-night-34/",
+        tags: "city, night, lights",
+        user: "Reference Maker",
+        webformatURL: "https://cdn.pixabay.com/photo/34_640.jpg",
+        imageWidth: 1920,
+        imageHeight: 1080,
+      }],
+    }));
+    const core = createCreatorIntelligenceCore({
+      fetch: fetcher,
+      env: () => ({ PIXABAY_API_KEY: "pixabay-secret" }),
+      now: () => current,
+    });
+
+    const first = await core.searchReferences("pixabay", "night city", 1);
+    const second = await core.searchReferences("pixabay", "night city", 1);
+
+    expect(first.items[0]).toMatchObject({
+      id: "pixabay:34",
+      license: "Pixabay Content License",
+      rightsStatus: "provider-license",
+    });
+    expect(first.cache).toEqual({ hit: false, ttlSeconds: 86_400 });
+    expect(second.cache).toEqual({ hit: true, ttlSeconds: 86_400 });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const requestUrl = new URL(String(fetcher.mock.calls[0]?.[0]));
+    expect(requestUrl.searchParams.get("key")).toBe("pixabay-secret");
+    expect(requestUrl.searchParams.get("safesearch")).toBe("true");
+
+    current += 24 * 60 * 60 * 1_000 + 1;
+    const refreshed = await core.searchReferences("pixabay", "night city", 1);
+    expect(refreshed.cache).toEqual({ hit: false, ttlSeconds: 86_400 });
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });
 describe("creator intelligence production providers", () => {

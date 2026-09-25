@@ -15,6 +15,36 @@ export interface CreatorIntelligenceCoreOptions {
   readonly now?: () => number;
 }
 
+export interface CreatorIntelligenceReferenceItem {
+  readonly id: string;
+  readonly provider: CreatorIntelligenceReferenceProvider;
+  readonly title: string;
+  readonly creator: string;
+  readonly sourceUrl: string;
+  readonly previewUrl?: string;
+  readonly creatorUrl?: string;
+  readonly license: string;
+  readonly licenseUrl: string;
+  readonly width?: number | null;
+  readonly height?: number | null;
+  readonly rightsStatus: "verify-source" | "provider-license";
+  readonly importable: false;
+  readonly fetchedAt: string;
+}
+
+export interface CreatorIntelligenceReferenceSearchResponse {
+  readonly provider: CreatorIntelligenceReferenceProvider;
+  readonly status: CreatorIntelligenceProviderStatus;
+  readonly page: number;
+  readonly items: readonly CreatorIntelligenceReferenceItem[];
+  readonly hasMore: boolean;
+  readonly notice?: string;
+  readonly cache?: {
+    readonly hit: boolean;
+    readonly ttlSeconds: number;
+  };
+}
+
 export class CreatorIntelligenceInputError extends Error {}
 
 const MAX_JSON_BYTES = 2 * 1024 * 1024;
@@ -23,6 +53,10 @@ const MAX_TTS_JSON_BYTES = Math.ceil(MAX_AUDIO_BYTES * 4 / 3) + 128 * 1024;
 const REQUEST_TIMEOUT_MS = 10_000;
 const TTS_REQUEST_TIMEOUT_MS = 45_000;
 const PAGE_SIZE = 12;
+const HOUR_MS = 60 * 60 * 1_000;
+const PEXELS_REFERENCE_CACHE_TTL_MS = 6 * HOUR_MS;
+const PIXABAY_REFERENCE_CACHE_TTL_MS = 24 * HOUR_MS;
+const MAX_REFERENCE_CACHE_ENTRIES = 120;
 const USER_AGENT = "ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler)";
 
 const GEMINI_TTS_MODELS = new Set([
@@ -315,6 +349,41 @@ function geminiOutputAudio(payload: JsonRecord): { data: unknown; mimeType: stri
 
 export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOptions) {
   const now = options.now ?? Date.now;
+  const referenceCache = new Map<string, {
+    readonly expiresAt: number;
+    readonly value: CreatorIntelligenceReferenceSearchResponse;
+  }>();
+
+  async function cachedReferenceSearch(
+    cacheKey: string,
+    ttlMs: number,
+    load: () => Promise<CreatorIntelligenceReferenceSearchResponse>,
+  ): Promise<CreatorIntelligenceReferenceSearchResponse> {
+    const current = now();
+    const cached = referenceCache.get(cacheKey);
+    if (cached && cached.expiresAt > current) {
+      return {
+        ...cached.value,
+        cache: { hit: true, ttlSeconds: Math.floor(ttlMs / 1_000) },
+      };
+    }
+    if (cached) referenceCache.delete(cacheKey);
+    for (const [entryKey, entry] of referenceCache) {
+      if (entry.expiresAt <= current) referenceCache.delete(entryKey);
+    }
+
+    const loaded = await load();
+    const ttlSeconds = Math.floor(ttlMs / 1_000);
+    if (loaded.status === "ready") {
+      const { cache: _cache, ...cacheable } = loaded;
+      if (referenceCache.size >= MAX_REFERENCE_CACHE_ENTRIES) {
+        const oldest = referenceCache.keys().next().value as string | undefined;
+        if (oldest) referenceCache.delete(oldest);
+      }
+      referenceCache.set(cacheKey, { expiresAt: current + ttlMs, value: cacheable });
+    }
+    return { ...loaded, cache: { hit: false, ttlSeconds } };
+  }
 
   function describe() {
     const env = options.env();
@@ -328,8 +397,12 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
       schema: "toonspectrum.creator-intelligence.status.v1",
       references: {
         openverse: status("ready", "discovery-only; verify source rights before reuse"),
-        pexels: key(env, "PEXELS_API_KEY") ? status("ready", "server key configured") : status("not_configured", "PEXELS_API_KEY required"),
-        pixabay: key(env, "PIXABAY_API_KEY") ? status("ready", "server key configured") : status("not_configured", "PIXABAY_API_KEY required"),
+        pexels: key(env, "PEXELS_API_KEY")
+          ? status("ready", "free reference search configured; attribution retained; six-hour cache protects rate limits")
+          : status("not_configured", "PEXELS_API_KEY required"),
+        pixabay: key(env, "PIXABAY_API_KEY")
+          ? status("ready", "free reference search configured; source links retained; 24-hour cache enabled")
+          : status("not_configured", "PIXABAY_API_KEY required"),
       },
       translation: {
         deepl: key(env, "DEEPL_API_KEY") ? status("ready", "server key configured") : status("not_configured", "DEEPL_API_KEY required"),
@@ -350,8 +423,8 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
         ? status("ready", "operator confirmed commercial/API terms")
         : status("disabled", "commercial use requires explicit operator enablement"),
       freesound: enabled(env, "CREATOR_INTELLIGENCE_FREESOUND_ENABLED") && key(env, "FREESOUND_API_KEY")
-        ? status("ready", "operator confirmed API terms; per-sound license still required")
-        : status("disabled", "enable flag and FREESOUND_API_KEY required"),
+        ? status("ready", "operator confirmed API and commercial terms; per-sound license still required")
+        : status("disabled", "commercial API terms were not enabled; local/project audio remains available"),
       soundEffects: enabled(env, "CREATOR_INTELLIGENCE_ELEVENLABS_SFX_ENABLED") && key(env, "ELEVENLABS_API_KEY")
         ? status("ready", "paid generation enabled by operator")
         : status("disabled", "explicit paid SFX enablement required"),
@@ -380,7 +453,7 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
       url.search = new URLSearchParams({ q: query, page: String(page), page_size: String(PAGE_SIZE), mature: "false" }).toString();
       const payload = record(await readJson(await options.fetch(url.href, requestInit())));
       const totalPages = Math.max(1, Math.ceil((finite(payload.result_count) ?? 0) / PAGE_SIZE));
-      const items = rows(payload.results).slice(0, PAGE_SIZE).map((value) => {
+      const items = rows(payload.results).slice(0, PAGE_SIZE).map((value): CreatorIntelligenceReferenceItem | null => {
         const item = record(value);
         const id = text(item.id, 160);
         const sourceUrl = safeHttps(item.foreign_landing_url);
@@ -400,67 +473,73 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
           importable: false,
           fetchedAt: new Date(now()).toISOString(),
         };
-      }).filter(Boolean);
+      }).filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
       return { provider, status: "ready", page, items, hasMore: page < Math.min(totalPages, 20), notice: "Openverse is discovery-only. Verify the original source and current license before reuse." };
     }
 
     if (provider === "pexels") {
-      const url = new URL("https://api.pexels.com/v1/search");
-      url.search = new URLSearchParams({ query, page: String(page), per_page: String(PAGE_SIZE) }).toString();
-      const payload = record(await readJson(await options.fetch(url.href, requestInit({ headers: { Authorization: key(env, "PEXELS_API_KEY") } }))));
-      const items = rows(payload.photos).slice(0, PAGE_SIZE).map((value) => {
-        const item = record(value);
-        const src = record(item.src);
-        const id = finite(item.id);
-        const sourceUrl = safeHttps(item.url);
-        if (id === null || !sourceUrl) return null;
-        return {
-          id: `pexels:${Math.trunc(id)}`,
-          provider,
-          title: text(item.alt, 300) || "Pexels photo",
-          creator: text(item.photographer, 200),
-          sourceUrl,
-          creatorUrl: safeHttps(item.photographer_url),
-          previewUrl: safeHttps(src.medium) || safeHttps(src.small),
-          license: "Pexels License",
-          licenseUrl: "https://www.pexels.com/license/",
-          width: finite(item.width),
-          height: finite(item.height),
-          rightsStatus: "provider-license",
-          importable: false,
-          fetchedAt: new Date(now()).toISOString(),
-        };
-      }).filter(Boolean);
-      const total = finite(payload.total_results) ?? 0;
-      return { provider, status: "ready", page, items, hasMore: total > page * PAGE_SIZE, notice: "Keep photographer/Pexels attribution metadata and re-check current provider terms before publishing." };
+      const cacheId = `pexels:${query.toLocaleLowerCase("en-US")}:${page}`;
+      return cachedReferenceSearch(cacheId, PEXELS_REFERENCE_CACHE_TTL_MS, async () => {
+          const url = new URL("https://api.pexels.com/v1/search");
+          url.search = new URLSearchParams({ query, page: String(page), per_page: String(PAGE_SIZE) }).toString();
+          const payload = record(await readJson(await options.fetch(url.href, requestInit({ headers: { Authorization: key(env, "PEXELS_API_KEY") } }))));
+          const items = rows(payload.photos).slice(0, PAGE_SIZE).map((value): CreatorIntelligenceReferenceItem | null => {
+            const item = record(value);
+            const src = record(item.src);
+            const id = finite(item.id);
+            const sourceUrl = safeHttps(item.url);
+            if (id === null || !sourceUrl) return null;
+            return {
+              id: `pexels:${Math.trunc(id)}`,
+              provider,
+              title: text(item.alt, 300) || "Pexels photo",
+              creator: text(item.photographer, 200),
+              sourceUrl,
+              creatorUrl: safeHttps(item.photographer_url),
+              previewUrl: safeHttps(src.medium) || safeHttps(src.small),
+              license: "Pexels License",
+              licenseUrl: "https://www.pexels.com/license/",
+              width: finite(item.width),
+              height: finite(item.height),
+              rightsStatus: "provider-license",
+              importable: false,
+              fetchedAt: new Date(now()).toISOString(),
+            };
+          }).filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
+          const total = finite(payload.total_results) ?? 0;
+          return { provider, status: "ready", page, items, hasMore: total > page * PAGE_SIZE, notice: "Keep photographer/Pexels attribution metadata and re-check current provider terms before publishing." };
+      });
     }
 
-    const url = new URL("https://pixabay.com/api/");
-    url.search = new URLSearchParams({ key: key(env, "PIXABAY_API_KEY"), q: query, page: String(page), per_page: String(PAGE_SIZE), safesearch: "true", image_type: "all" }).toString();
-    const payload = record(await readJson(await options.fetch(url.href, requestInit())));
-    const items = rows(payload.hits).slice(0, PAGE_SIZE).map((value) => {
-      const item = record(value);
-      const id = finite(item.id);
-      const sourceUrl = safeHttps(item.pageURL);
-      if (id === null || !sourceUrl) return null;
-      return {
-        id: `pixabay:${Math.trunc(id)}`,
-        provider,
-        title: text(item.tags, 300) || "Pixabay image",
-        creator: text(item.user, 200),
-        sourceUrl,
-        previewUrl: safeHttps(item.webformatURL) || safeHttps(item.previewURL),
-        license: "Pixabay Content License",
-        licenseUrl: "https://pixabay.com/service/license-summary/",
-        width: finite(item.imageWidth),
-        height: finite(item.imageHeight),
-        rightsStatus: "provider-license",
-        importable: false,
-        fetchedAt: new Date(now()).toISOString(),
-      };
-    }).filter(Boolean);
-    const total = finite(payload.totalHits) ?? 0;
-    return { provider, status: "ready", page, items, hasMore: total > page * PAGE_SIZE, notice: "Treat search results as references; verify the current Pixabay Content License and third-party rights before reuse." };
+    const cacheId = `pixabay:${query.toLocaleLowerCase("en-US")}:${page}`;
+    return cachedReferenceSearch(cacheId, PIXABAY_REFERENCE_CACHE_TTL_MS, async () => {
+        const url = new URL("https://pixabay.com/api/");
+        url.search = new URLSearchParams({ key: key(env, "PIXABAY_API_KEY"), q: query, page: String(page), per_page: String(PAGE_SIZE), safesearch: "true", image_type: "all" }).toString();
+        const payload = record(await readJson(await options.fetch(url.href, requestInit())));
+        const items = rows(payload.hits).slice(0, PAGE_SIZE).map((value): CreatorIntelligenceReferenceItem | null => {
+          const item = record(value);
+          const id = finite(item.id);
+          const sourceUrl = safeHttps(item.pageURL);
+          if (id === null || !sourceUrl) return null;
+          return {
+            id: `pixabay:${Math.trunc(id)}`,
+            provider,
+            title: text(item.tags, 300) || "Pixabay image",
+            creator: text(item.user, 200),
+            sourceUrl,
+            previewUrl: safeHttps(item.webformatURL) || safeHttps(item.previewURL),
+            license: "Pixabay Content License",
+            licenseUrl: "https://pixabay.com/service/license-summary/",
+            width: finite(item.imageWidth),
+            height: finite(item.imageHeight),
+            rightsStatus: "provider-license",
+            importable: false,
+            fetchedAt: new Date(now()).toISOString(),
+          };
+        }).filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
+        const total = finite(payload.totalHits) ?? 0;
+        return { provider, status: "ready", page, items, hasMore: total > page * PAGE_SIZE, notice: "Treat search results as references; verify the current Pixabay Content License and third-party rights before reuse." };
+    });
   }
 
   async function translate(providerRaw: unknown, body: JsonRecord) {
