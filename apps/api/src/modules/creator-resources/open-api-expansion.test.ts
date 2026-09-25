@@ -127,6 +127,49 @@ describe("open API expansion", () => {
     expect(new URL(String(fetcher.mock.calls[0]?.[0])).searchParams.get("ccbaMnm1")).toBe("궁궐");
   });
 
+  it("parses NEIS XML responses with a server key", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(xml(`<?xml version="1.0" encoding="UTF-8"?>
+      <schoolInfo><head><list_total_count>1</list_total_count><RESULT>
+      <CODE>INFO-000</CODE><MESSAGE>정상 처리되었습니다.</MESSAGE>
+      </RESULT></head><row>
+      <ATPT_OFCDC_SC_CODE><![CDATA[T10]]></ATPT_OFCDC_SC_CODE>
+      <ATPT_OFCDC_SC_NM><![CDATA[제주특별자치도교육청]]></ATPT_OFCDC_SC_NM>
+      <SD_SCHUL_CODE><![CDATA[9299048]]></SD_SCHUL_CODE>
+      <SCHUL_NM><![CDATA[가마초등학교]]></SCHUL_NM>
+      <SCHUL_KND_SC_NM><![CDATA[초등학교]]></SCHUL_KND_SC_NM>
+      <FOND_SC_NM><![CDATA[공립]]></FOND_SC_NM>
+      <ORG_RDNMA><![CDATA[제주특별자치도 서귀포시 표선면 일주동로6285번길 8]]></ORG_RDNMA>
+      <COEDU_SC_NM><![CDATA[남여공학]]></COEDU_SC_NM>
+      <FOND_YMD><![CDATA[19460901]]></FOND_YMD>
+      </row></schoolInfo>`));
+    const result = await engine(fetcher, { NEIS_API_KEY: "NEIS_TEST_KEY" })
+      .search({ provider: "neis", q: "가마초등학교" });
+    expect(result.status).toBe("ready");
+    expect(result.items[0]).toMatchObject({
+      provider: "neis",
+      title: "가마초등학교",
+      creator: "제주특별자치도교육청",
+      license: "metadata-only",
+    });
+    const requestUrl = new URL(String(fetcher.mock.calls[0]?.[0]));
+    expect(requestUrl.searchParams.get("Type")).toBe("xml");
+    expect(requestUrl.searchParams.get("KEY")).toBe("NEIS_TEST_KEY");
+  });
+
+  it("returns an empty NEIS result for INFO-200 XML", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(xml(`<?xml version="1.0" encoding="UTF-8"?>
+      <RESULT><CODE>INFO-200</CODE><MESSAGE>해당하는 데이터가 없습니다.</MESSAGE></RESULT>`));
+    const result = await engine(fetcher, { NEIS_API_KEY: "NEIS_TEST_KEY" })
+      .search({ provider: "neis", q: "존재하지않는학교" });
+    expect(result).toMatchObject({
+      provider: "neis",
+      status: "ready",
+      items: [],
+      total: 0,
+      hasMore: false,
+    });
+  });
+
   it("does not call credentialed Korean APIs until server keys exist", async () => {
     const fetcher = vi.fn<typeof fetch>();
     const api = engine(fetcher);

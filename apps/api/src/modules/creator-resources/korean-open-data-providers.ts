@@ -19,16 +19,39 @@ export function isKoreanOpenDataProvider(value: unknown): value is KoreanOpenDat
   return value === "kheritage" || value === "neis" || value === "tourapi" || value === "korean";
 }
 
+function parseXmlRoot(value: unknown, root: string): Record<string, unknown> {
+  if (typeof value !== "string" || value.length > 2 * 1024 * 1024 || !value.includes(`<${root}`)) return {};
+  try { return recordOf(recordOf(XML.parse(value))[root]); } catch { return {}; }
+}
+
 function parseHeritageXml(value: unknown): Record<string, unknown> {
-  if (typeof value !== "string" || value.length > 2 * 1024 * 1024 || !value.includes("<result")) return {};
-  try { return recordOf(recordOf(XML.parse(value)).result); } catch { return {}; }
+  return parseXmlRoot(value, "result");
+}
+
+function parseNeisXml(value: unknown): Record<string, unknown> {
+  return parseXmlRoot(value, "schoolInfo");
 }
 
 export function validKoreanOpenDataTextShape(url: URL, value: unknown): boolean {
-  if (url.hostname !== "khs.go.kr" || url.pathname !== "/cha/SearchKindOpenapiList.do") return false;
-  const result = parseHeritageXml(value);
-  const count = integer(result.totalCnt);
-  return String(result.totalCnt ?? "") === String(count) && (count === 0 || rows(result.item).length > 0);
+  if (url.hostname === "khs.go.kr" && url.pathname === "/cha/SearchKindOpenapiList.do") {
+    const result = parseHeritageXml(value);
+    const count = integer(result.totalCnt);
+    return String(result.totalCnt ?? "") === String(count) && (count === 0 || rows(result.item).length > 0);
+  }
+  if (url.hostname === "open.neis.go.kr" && url.pathname === "/hub/schoolInfo") {
+    const schoolInfo = parseNeisXml(value);
+    if (Object.keys(schoolInfo).length === 0) {
+      const result = parseXmlRoot(value, "RESULT");
+      return result.CODE === "INFO-200";
+    }
+    const head = recordOf(schoolInfo.head);
+    const result = recordOf(head.RESULT);
+    const count = integer(head.list_total_count);
+    return result.CODE === "INFO-000"
+      && String(head.list_total_count ?? "") === String(count)
+      && (count === 0 || rows(schoolInfo.row).length > 0);
+  }
+  return false;
 }
 
 export function validKoreanOpenDataShape(url: URL, value: unknown): boolean {
@@ -64,7 +87,7 @@ export function heritageUrl(query: string, page: number): URL {
 
 function neisUrl(query: string, page: number, key: string): URL {
   const url = new URL("https://open.neis.go.kr/hub/schoolInfo");
-  url.search = new URLSearchParams({ KEY: key, Type: "json", pIndex: String(page), pSize: String(SIZE), SCHUL_NM: query }).toString();
+  url.search = new URLSearchParams({ KEY: key, Type: "xml", pIndex: String(page), pSize: String(SIZE), SCHUL_NM: query }).toString();
   return url;
 }
 
@@ -224,7 +247,11 @@ function normalizeKoreanDictionary(raw: unknown, fetchedAt: string): CreatorReso
 }
 
 function neisRows(value: unknown): { rows: unknown[]; total: number } {
-  const data = recordOf(value);
+  const data = typeof value === "string" ? parseNeisXml(value) : recordOf(value);
+  if (typeof value === "string") {
+    const head = recordOf(data.head);
+    return { rows: rows(data.row), total: integer(head.list_total_count) };
+  }
   if (!Array.isArray(data.schoolInfo)) return { rows: [], total: 0 };
   let resultRows: unknown[] = [];
   let resultTotal = 0;
@@ -252,10 +279,11 @@ function dictionaryRows(value: unknown): { rows: unknown[]; total: number } {
 
 export async function koreanOpenDataSearch(provider: KoreanOpenDataProvider, query: string, page: number, key: string, request: Request): Promise<ResourceSearchResult> {
   const url = koreanOpenDataUrl(provider, query, page, key);
+  const usesXml = provider === "kheritage" || provider === "neis";
   const source = await request(
     url,
     provider === "kheritage" ? { "User-Agent": "ToonStudio/1.0" } : {},
-    provider === "kheritage" ? "xml" : "json",
+    usesXml ? "xml" : "json",
   );
   if (provider === "kheritage") {
     if (!validKoreanOpenDataTextShape(url, source.value)) throw new Error("upstream_schema");
@@ -266,20 +294,35 @@ export async function koreanOpenDataSearch(provider: KoreanOpenDataProvider, que
     return { provider, status: items.length === candidates.length ? "ready" : "partial", items, page, hasMore: page < 20 && found > page * SIZE, total: found, fetchedAt: source.fetchedAt,
       message: "국가유산청 공식 Open API의 국가유산 명칭·분류·지역·관리기관·좌표 메타데이터입니다. 사진·해설·2차 저작물의 공공누리 유형은 상세 원문에서 따로 확인하세요." };
   }
+  if (provider === "neis") {
+    if (!validKoreanOpenDataTextShape(url, source.value)) throw new Error("upstream_schema");
+    const found = neisRows(source.value);
+    const candidates = found.rows.slice(0, SIZE);
+    const normalized = candidates
+      .map((item) => normalizeNeis(item, source.fetchedAt))
+      .filter((item): item is CreatorResource => item !== null);
+    const items = [...new Map(normalized.map((item) => [item.id, item])).values()];
+    return {
+      provider,
+      status: items.length === candidates.length ? "ready" : "partial",
+      items,
+      page,
+      hasMore: page < 20 && found.total > page * SIZE,
+      total: found.total,
+      fetchedAt: source.fetchedAt,
+      message: "NEIS 학교 기본정보 메타데이터입니다. 학교물 설정의 실제 학사일정·시간표·행사는 학교와 교육청의 최신 공지를 다시 확인하세요.",
+    };
+  }
   if (!validKoreanOpenDataShape(url, source.value)) throw new Error("upstream_schema");
-  const found = provider === "neis" ? neisRows(source.value) : provider === "tourapi" ? tourRows(source.value) : dictionaryRows(source.value);
+  const found = provider === "tourapi" ? tourRows(source.value) : dictionaryRows(source.value);
   const candidates = found.rows.slice(0, SIZE);
-  const normalized = candidates.map((item) => provider === "neis"
-    ? normalizeNeis(item, source.fetchedAt)
-    : provider === "tourapi"
-      ? normalizeTourApi(item, source.fetchedAt, query)
-      : normalizeKoreanDictionary(item, source.fetchedAt)).filter((item): item is CreatorResource => item !== null);
+  const normalized = candidates.map((item) => provider === "tourapi"
+    ? normalizeTourApi(item, source.fetchedAt, query)
+    : normalizeKoreanDictionary(item, source.fetchedAt)).filter((item): item is CreatorResource => item !== null);
   const items = [...new Map(normalized.map((item) => [item.id, item])).values()];
-  const message = provider === "neis"
-    ? "NEIS 학교 기본정보 메타데이터입니다. 학교물 설정의 실제 학사일정·시간표·행사는 학교와 교육청의 최신 공지를 다시 확인하세요."
-    : provider === "tourapi"
-      ? "한국관광공사 TourAPI의 장소·주소·좌표 메타데이터입니다. 영업·행사·접근 정보와 사진 이용조건은 공식 원문에서 다시 확인하세요."
-      : "국립국어원 표준국어대사전의 표제어·품사·뜻풀이 메타데이터입니다. 사전 예문을 작품 대사로 복제하지 않고 말투·용어 조사 근거로 사용하세요.";
+  const message = provider === "tourapi"
+    ? "한국관광공사 TourAPI의 장소·주소·좌표 메타데이터입니다. 영업·행사·접근 정보와 사진 이용조건은 공식 원문에서 다시 확인하세요."
+    : "국립국어원 표준국어대사전의 표제어·품사·뜻풀이 메타데이터입니다. 사전 예문을 작품 대사로 복제하지 않고 말투·용어 조사 근거로 사용하세요.";
   return { provider: provider as ResourceProvider, status: items.length === candidates.length ? "ready" : "partial", items, page,
     hasMore: page < 20 && found.total > page * SIZE, total: found.total, fetchedAt: source.fetchedAt, message };
 }
