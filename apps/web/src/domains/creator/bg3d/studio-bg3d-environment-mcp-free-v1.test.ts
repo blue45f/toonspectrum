@@ -4,14 +4,14 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import webtoonManifest from "../../../../public/assets/3d/environments/webtoon-v7/manifest.json";
+import mcpManifest from "../../../../public/assets/3d/environments/mcp-free-v1/manifest.json";
 import { SAMPLE_BG3D_MODEL_ENTRIES } from "./bg3d-model-library";
 import {
   STUDIO_BG3D_ENVIRONMENT_ASSETS,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1,
+  STUDIO_BG3D_ENVIRONMENT_ASSETS_MCP_FREE_V1,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7,
-  STUDIO_BG3D_ENVIRONMENT_ASSETS_MCP_FREE_V1,
   getStudioBg3dEnvironmentAsset,
   getStudioBg3dEnvironmentAssetByHash,
 } from "./studio-bg3d-environment-catalog";
@@ -19,12 +19,14 @@ import {
   DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
   validateStudioBg3dGlb,
 } from "./studio-bg3d-glb-validation";
+import { STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS } from "./studio-bg3d-meshopt";
 
 const GLB_JSON_CHUNK = 0x4e4f534a;
 
 interface GltfDocument {
   readonly buffers?: readonly { readonly uri?: string }[];
-  readonly images?: readonly { readonly uri?: string }[];
+  readonly images?: readonly { readonly uri?: string; readonly mimeType?: string }[];
+  readonly extensionsRequired?: readonly string[];
   readonly nodes?: readonly {
     readonly name?: string;
     readonly extras?: Readonly<Record<string, unknown>>;
@@ -47,10 +49,20 @@ function parseJsonChunk(bytes: Uint8Array): GltfDocument {
   ) as GltfDocument;
 }
 
-describe("Studio original webtoon environment pack v7", () => {
-  it("publishes three original procedural scenes after the refined and expansion packs", () => {
-    expect(webtoonManifest.schema).toBe("toonspectrum.bg3d-environment-pack.v7");
-    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7).toHaveLength(3);
+describe("Studio Tripo MCP free-wallet environment pack v1", () => {
+  it("adds ten audited webtoon modules after all original environment packs", () => {
+    expect(mcpManifest.schema).toBe("toonspectrum.bg3d-environment-pack.mcp-free-v1");
+    expect(mcpManifest.generation).toMatchObject({
+      providerModelVersion: "v3.0-20250812",
+      geometryQuality: "detailed",
+      textureQuality: "detailed",
+      pbr: true,
+      faceLimit: 40_000,
+      totalCreditCost: 600,
+      billingMode: "free-api-wallet",
+      paymentMethodUsed: false,
+    });
+    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS_MCP_FREE_V1).toHaveLength(10);
     expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toEqual([
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1,
@@ -63,76 +75,98 @@ describe("Studio original webtoon environment pack v7", () => {
     expect(SAMPLE_BG3D_MODEL_ENTRIES.map(({ id }) => id)).toEqual(
       STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id),
     );
-    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7.map(({ fileName }) => fileName)).toEqual([
-      "webtoon_rooftop_utility_platform.glb",
-      "webtoon_corner_store_facade.glb",
-      "webtoon_street_prop_pack.glb",
-    ]);
   });
 
-  it.each(STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7)(
-    "$fileName is self-contained, hash-pinned, and admitted by the mobile profile",
+  it.each(STUDIO_BG3D_ENVIRONMENT_ASSETS_MCP_FREE_V1)(
+    "$fileName is self-contained, hash-pinned, WebP/meshopt compressed, and mobile-admitted",
     async (asset) => {
       const bytes = new Uint8Array(readFileSync(publicAssetPath(asset.url)));
       expect(bytes.byteLength).toBe(asset.byteSize);
       expect(`sha256:${createHash("sha256").update(bytes).digest("hex")}`).toBe(asset.sha256);
-      expect(bytes.byteLength).toBeLessThan(2 * 1024 * 1024);
+      expect(bytes.byteLength).toBeLessThan(700 * 1024);
 
       const admission = await validateStudioBg3dGlb(bytes, {
         declared: { byteSize: asset.byteSize, sha256: asset.sha256 },
         cumulative: { usedBytes: 0, maximumBytes: 64 * 1024 * 1024 },
         profile: "mobile",
         budgets: DEFAULT_STUDIO_BG3D_GLB_BUDGET_PROFILES,
+        supportedRequiredExtensions: STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS,
         digest: async (input) => createHash("sha256").update(input).digest("hex"),
       });
       expect(admission, asset.id).toMatchObject({ ok: true, code: "valid" });
       if (!admission.ok) return;
       expect(admission.metrics.triangles).toBeLessThanOrEqual(40_000);
-      expect(admission.metrics.drawCalls).toBeLessThanOrEqual(24);
-      expect(admission.metrics.textures).toBe(2);
-      expect(admission.metrics.maxImageDimension).toBe(128);
+      expect(admission.metrics.drawCalls).toBeLessThanOrEqual(4);
+      expect(admission.metrics.textures).toBe(3);
+      expect(admission.metrics.maxImageDimension).toBe(1024);
       expect(admission.metrics.undeterminedImageDimensions).toBe(0);
       expect(admission.metrics.lights).toBe(0);
       expect(admission.metrics.animations).toBe(0);
+      expect(admission.metrics.skins).toBe(0);
 
       const document = parseJsonChunk(bytes);
+      expect(document.extensionsRequired).toEqual([
+        "EXT_meshopt_compression",
+        "EXT_texture_webp",
+        "KHR_mesh_quantization",
+      ]);
       expect((document.buffers ?? []).every(({ uri }) => uri === undefined)).toBe(true);
       expect((document.images ?? []).every(({ uri }) => uri === undefined)).toBe(true);
-      const report = webtoonManifest.assets.find(({ id }) => id === asset.id);
+      expect((document.images ?? []).every(({ mimeType }) => mimeType === "image/webp")).toBe(true);
+
+      const report = mcpManifest.assets.find(({ id }) => id === asset.id);
       expect(report).toBeDefined();
       expect(report?.externalRuntimeResources).toBe(0);
-      expect(report?.originalProceduralGeometry).toBe(true);
-      expect(report?.semanticParts.length).toBeGreaterThanOrEqual(8);
+      expect(report?.visualReviewLevel).toBe("three-angle-local-structural-review");
       expect(report?.allAnglesArtisticallyApproved).toBe(false);
-      expect(report?.referenceWorkflow).toMatchObject({
-        embeddedThirdPartyModelBytes: false,
-        embeddedThirdPartyImageBytes: false,
+      expect(report?.previewReview).toMatchObject({
+        visibleStructuralBlocker: false,
+        reviewedImageWidth: 960,
+        reviewedImageHeight: 720,
+        reviewedModelSha256: asset.sha256,
       });
+
       const root = document.nodes?.find(({ name }) =>
         name === `TS_ENV_${asset.fileName.replace(/\.glb$/u, "")}_Root`,
       );
       expect(root?.extras).toMatchObject({
         asset_id: asset.id,
         asset_type: "studio-bg3d-environment",
-        asset_author: "ToonSpectrum",
-        asset_generator: "scripts/blender/generate_environment_pack_v7.py",
-        asset_generator_version: "7.0.0-blender-5.2",
-        asset_license: "CC0-1.0",
+        asset_provider: "Tripo",
+        asset_generator: "official-tripo-mcp",
+        asset_model_version: "v3.0-20250812",
+        asset_license: "Tripo Terms of Service - Free User Output",
+        asset_license_url: "https://www.tripo3d.ai/terms",
+        asset_commercial_use: true,
+        asset_nonexclusive: true,
+        asset_provider_retains_rights: true,
+        asset_credit_source: "free-api-wallet",
+        asset_credit_cost: 50,
         units: "metres",
         ground_plane: "glTF-Y=0",
         ground_y_m: 0,
-        embedded_texture_count: 2,
-        embedded_texture_max_dimension: 128,
+        embedded_texture_max_dimension: 1024,
       });
+      expect(root?.extras?.asset_provider_task_id).toMatch(/^[a-f0-9-]{36}$/u);
+      expect(root?.extras?.asset_prompt_sha256).toMatch(/^[a-f0-9]{64}$/u);
 
       expect(asset.normalization).toBe("authored-metres");
       expect(asset.provenance).toMatchObject({
-        origin: "original-procedural",
-        generator: "scripts/blender/generate_environment_pack_v7.py",
-        license: "CC0-1.0",
-        externalResources: 0,
+        origin: "ai-generated-free-wallet",
+        author: "ToonSpectrum",
+        provider: "Tripo",
+        generator: "official-tripo-mcp",
+        providerModelVersion: "v3.0-20250812",
+        license: "Tripo Terms of Service - Free User Output",
+        licenseUrl: "https://www.tripo3d.ai/terms",
         attributionRequired: false,
         commercialUse: true,
+        nonExclusive: true,
+        providerRetainsRights: true,
+        billingMode: "free-api-wallet",
+        paymentMethodUsed: false,
+        creditCost: 50,
+        externalResources: 0,
       });
       expect(getStudioBg3dEnvironmentAsset(asset.id)).toBe(asset);
       expect(getStudioBg3dEnvironmentAssetByHash(asset.sha256)).toBe(asset);
@@ -147,4 +181,26 @@ describe("Studio original webtoon environment pack v7", () => {
         .toBe(report?.previewReview.reviewedImageSha256);
     },
   );
+
+  it("keeps generated rights explicit rather than widening the pack to CC0", () => {
+    for (const report of mcpManifest.assets) {
+      expect(report.license).toEqual({
+        name: "Tripo Terms of Service - Free User Output",
+        url: "https://www.tripo3d.ai/terms",
+        commercialUse: true,
+        attributionRequired: false,
+        exclusive: false,
+        providerRetainsRights: true,
+        cc0: false,
+      });
+      expect(report.billing).toEqual({
+        mode: "free-api-wallet",
+        creditCost: 50,
+        paymentMethodUsed: false,
+        paidUpgradeUsed: false,
+      });
+      expect(report.prompt).not.toMatch(/(?:api[_-]?key|tsk_|bearer)/iu);
+      expect(report).not.toHaveProperty("providerDownloadUrl");
+    }
+  });
 });

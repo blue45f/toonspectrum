@@ -184,6 +184,7 @@ test("mandatory lanes start independently and dependency-free contracts run firs
     "/apps/web/public/assets/3d/environments/refined-v6/manifest.json",
     "/apps/web/public/assets/3d/environments/expansion-v1/manifest.json",
     "/apps/web/public/assets/3d/environments/webtoon-v7/manifest.json",
+    "/apps/web/public/assets/3d/environments/mcp-free-v1/manifest.json",
   ]) {
     assert.ok(typecheck.includes(requiredManifest), `typecheck checkout is missing ${requiredManifest}`);
   }

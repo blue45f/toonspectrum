@@ -5,6 +5,7 @@ import {
   STUDIO_BG3D_KTX2_EXTENSION,
   STUDIO_BG3D_QUANTIZATION_EXTENSION,
   STUDIO_BG3D_MESHOPT_EXTENSION,
+  STUDIO_BG3D_WEBP_EXTENSION,
   resolveStudioBg3dMeshoptWorkerCount,
 } from "./studio-bg3d-meshopt";
 
@@ -14,6 +15,7 @@ describe("studio-bg3d-meshopt", () => {
       STUDIO_BG3D_MESHOPT_EXTENSION,
       STUDIO_BG3D_QUANTIZATION_EXTENSION,
       STUDIO_BG3D_KTX2_EXTENSION,
+      STUDIO_BG3D_WEBP_EXTENSION,
     ]);
     expect(Object.isFrozen(STUDIO_BG3D_CANONICAL_REQUIRED_GLTF_EXTENSIONS)).toBe(true);
   });
