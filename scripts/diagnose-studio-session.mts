@@ -14,7 +14,7 @@ mkdirSync(out, { recursive: true });
 const manifest = JSON.parse(readFileSync("dist/.vite/manifest.json", "utf8"));
 const storePath = `/${manifest[viteManifestKey("apps/web/src/domains/creator/studio-autosave-sqlite-store.ts")].file}`;
 const ids = ["pen", "pencil", "pencil--side-shade", "inkwash-water-brush", "core-round", "flex-ink", "precision-pencil"];
-const server = spawn("pnpm", ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", "4179", "--strictPort"], { stdio: "ignore" });
+const server = spawn("pnpm", ["exec", "vite", "preview", "--config", "apps/web/vite.config.ts", "--host", "127.0.0.1", "--port", "4179", "--strictPort"], { stdio: "ignore" });
 const url = "http://127.0.0.1:4179/studio";
 const records: unknown[] = [];
 const browser = await chromium.launch({ headless: true });

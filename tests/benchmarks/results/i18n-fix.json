@@ -101,7 +101,7 @@
     }
   },
   "entryModulePreload": {
-    "contract": "ENTRY_PRELOAD_EXCLUSIONS in vite.config.ts, enforced by scripts/check-studio-bundle.mjs against dist/index.html",
+    "contract": "ENTRY_PRELOAD_EXCLUSIONS in apps/web/vite.config.ts, enforced by scripts/check-studio-bundle.mjs against dist/index.html",
     "before": [
       "/assets/rolldown-runtime-CMxvf4Kt.js",
       "/assets/lucide-initial-icons-Q6dwqRL8.js",

@@ -166,7 +166,7 @@ SPA 링크가 아니라 일반 문서 링크(`<a href="/studio">`)로 바꾸면*
 - decoded 1,839 KiB / gzip 70 KiB — **비율 26.2배.**
 - 원본은 `lib/i18n.ts`, **2,135,813 바이트 / 40,737줄의 손으로 쓴 단일 파일**. `lib/i18n.ts:19`의 `DICT` 하나에 **75개 로케일 × 약 519키**가 전부 인라인.
 - **74개 비-ko 로케일 중 67개가 영어와 바이트 동일**하다(`id vi th ru pt it ar hi tr nl pl sv fil ms af am as az be bg bn bs ca cs da el et eu fa fi gl gu he hr hu hy is ka kk km kn ky lo lt lv mk ml mn mr my ne no or pa ro si sk sl sq sr sw ta te uk ur uz zu`). 실제 번역은 `ko en ja zh zh-hant es fr de` 8개뿐.
-- `vite.config.ts:15`의 `ENTRY_PRELOAD_EXCLUSIONS`는 Konva·three·VRM만 제외하고 **i18n은 빠뜨렸다.**
+- `apps/web/vite.config.ts`의 `ENTRY_PRELOAD_EXCLUSIONS`는 Konva·three·VRM만 제외하고 **i18n은 빠뜨렸다.**
 - 앱 엔트리 정적 그래프가 2,354 KiB인데 그중 1,839 KiB가 이것 하나다(78%). 예산 초과 4.73배의 정체.
 
 **개선안**

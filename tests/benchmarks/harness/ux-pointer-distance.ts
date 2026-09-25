@@ -658,7 +658,7 @@ async function main(): Promise<void> {
         process.execPath,
         [
           join(REPO_ROOT, "node_modules", "vite", "bin", "vite.js"),
-          "preview",
+          "preview", "--config", "apps/web/vite.config.ts",
           "--port",
           String(port),
           "--strictPort",

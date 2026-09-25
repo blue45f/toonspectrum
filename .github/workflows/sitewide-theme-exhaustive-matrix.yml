@@ -65,7 +65,7 @@ jobs:
           mkdir -p .qa/visual-ux
           LOG_FILE=".qa/visual-ux/vite-${PROFILE}-${VIEWPORT}-${SHARD}.log"
           PID_FILE=".qa/visual-ux/vite-${PROFILE}-${VIEWPORT}-${SHARD}.pid"
-          nohup pnpm exec vite --host 127.0.0.1 --port 5276 --strictPort >"${LOG_FILE}" 2>&1 &
+          nohup pnpm exec vite --config apps/web/vite.config.ts --host 127.0.0.1 --port 5276 --strictPort >"${LOG_FILE}" 2>&1 &
           echo $! >"${PID_FILE}"
           for attempt in $(seq 1 120); do
             if curl --fail --silent --show-error http://127.0.0.1:5276/ >/dev/null; then

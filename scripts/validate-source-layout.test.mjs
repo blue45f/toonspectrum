@@ -37,6 +37,8 @@ test("counts only direct Creator root files while counting all files for migrati
     rootMediaFiles: 0,
     rootAutomationFiles: 0,
     rootMarketplaceBenchmarkFiles: 0,
+    rootViteConfigFiles: 0,
+    rootDrizzleConfigFiles: 0,
   });
 });
 

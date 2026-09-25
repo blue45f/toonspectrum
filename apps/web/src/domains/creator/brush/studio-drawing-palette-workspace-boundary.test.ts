@@ -19,8 +19,8 @@ const workspaceSource = readFileSync(
   new URL("../studio-workspaces.ts", import.meta.url),
   "utf8",
 );
-// The manual-chunk policy moved out of `vite.config.ts` into `apps/web/config/vite-manual-chunks.ts`
-// in the 2026-09 apps/web move; `vite.config.ts` now only calls `createStudioManualChunks()`.
+// The manual-chunk policy moved out of `apps/web/vite.config.ts` into `apps/web/config/vite-manual-chunks.ts`
+// in the 2026-09 apps/web move; `apps/web/vite.config.ts` now only calls `createStudioManualChunks()`.
 const viteSource = readFileSync(
   new URL("../../../../config/vite-manual-chunks.ts", import.meta.url),
   "utf8",

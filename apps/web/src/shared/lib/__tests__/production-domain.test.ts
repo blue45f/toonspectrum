@@ -33,7 +33,7 @@ describe("toonstudio.cloud production domain", () => {
   });
 
   it("loads public production build variables from the repository root", () => {
-    const viteConfig = read("vite.config.ts");
+    const viteConfig = read("apps/web/vite.config.ts");
     const productionExample = read(".env.production.example");
 
     expect(viteConfig).toContain("envDir: repositoryRoot");

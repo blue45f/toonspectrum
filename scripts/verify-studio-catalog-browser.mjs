@@ -24,7 +24,7 @@ async function waitForServer(url) {
 const out = path.resolve(process.env.STUDIO_CATALOG_EVIDENCE_DIR ?? "artifacts/studio-catalog-browser");
 await mkdir(out, { recursive: true });
 const port = await findFreePort();
-const server = spawn("pnpm", ["exec", "vite", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { stdio: "pipe" });
+const server = spawn("pnpm", ["exec", "vite", "--config", "apps/web/vite.config.ts", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { stdio: "pipe" });
 let logs = "";
 server.stdout.on("data", (data) => { logs = (logs + data).slice(-100000); });
 server.stderr.on("data", (data) => { logs = (logs + data).slice(-100000); });

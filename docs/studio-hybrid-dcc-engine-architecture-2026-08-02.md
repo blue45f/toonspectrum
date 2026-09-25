@@ -205,7 +205,7 @@ CI는 동일 `(featureId, stage, evidenceRevision)`의 파일이 사라지거나
 | Playwright | 1.55.1 | production preview/harness 검증 |
 | workspace | root, API, core, play-core | [`pnpm-workspace.yaml`](../pnpm-workspace.yaml) |
 
-Vite는 WASM 자산, COOP/COEP 헤더, React Compiler, Babylon 수동 chunk, OCCT optimize 제외를 다룬다. 기준은 [`vite.config.ts`](../vite.config.ts), [`vitest.config.ts`](../vitest.config.ts), [`playwright.config.ts`](../playwright.config.ts)다.
+Vite는 WASM 자산, COOP/COEP 헤더, React Compiler, Babylon 수동 chunk, OCCT optimize 제외를 다룬다. 기준은 [`apps/web/vite.config.ts`](../apps/web/vite.config.ts), [`vitest.config.ts`](../vitest.config.ts), [`playwright.config.ts`](../playwright.config.ts)다.
 
 ### 3.2 실제 강점
 

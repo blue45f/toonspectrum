@@ -20,7 +20,7 @@ describe("Marketplace CC0 catalogue bundle boundary", () => {
   });
 
   it("keeps the catalogue out of entry modulepreloads", () => {
-    const vite = readFileSync(resolve(import.meta.dirname, "../vite.config.ts"), "utf8");
+    const vite = readFileSync(resolve(import.meta.dirname, "../apps/web/vite.config.ts"), "utf8");
     expect(vite).toContain('"studio-marketplace-cc0-catalog"');
     expect(vite).toContain("ENTRY_PRELOAD_EXCLUSIONS");
   });

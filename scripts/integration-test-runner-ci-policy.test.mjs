@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, matchesGlob } from "node:path";
 
@@ -45,11 +45,7 @@ describe("database integration runner CI policy", () => {
 
   it.each(["bg3d-runtime-regression.yml", "studio-ink-live-commit.yml"])(
     "does not resurrect superseded PR 1280 workflow %s", (filename) => {
-      const workflow = readYaml(`.github/workflows/${filename}`);
-      expect(workflow.on).not.toHaveProperty("pull_request");
-      expect(workflow.on.push.branches).toEqual(["integration/final-main-consolidation-20260910"]);
-      expect(workflow.jobs.retired.if).toBe("${{ false }}");
-      expect(workflow.on.push.paths).toEqual([`.github/workflows/${filename}`]);
+      expect(existsSync(new URL(`.github/workflows/${filename}`, repositoryRoot))).toBe(false);
     },
   );
 
@@ -68,7 +64,7 @@ describe("database integration runner CI policy", () => {
         "scripts/lib/studio-crdt-bundle-boundary.test.mjs",
         "scripts/lib/repo-paths.mjs",
         "scripts/integration-test-runner-ci-policy.test.mjs",
-        "vite.config.ts", "package.json", "pnpm-lock.yaml",
+        "apps/web/vite.config.ts", "package.json", "pnpm-lock.yaml",
       ]) {
         expect(paths.some((pattern) => matchesGlob(changedFile, pattern)),
           `${filename} ${event} misses ${changedFile}`).toBe(true);
@@ -144,10 +140,10 @@ describe("database integration runner CI policy", () => {
     // The bundle-only build the browser gates use must be exactly the `vite build` half of
     // `build`: tsc is `noEmit`, so the dist is byte-identical and `typecheck` proves the types.
     expect(packageManifest.scripts?.build).toBe(
-      "NODE_OPTIONS='--max-old-space-size=12288' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=12288' vite build",
+      "NODE_OPTIONS='--max-old-space-size=12288' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=12288' vite build --config apps/web/vite.config.ts",
     );
     expect(packageManifest.scripts?.["build:bundle"]).toBe(
-      "NODE_OPTIONS='--max-old-space-size=12288' vite build",
+      "NODE_OPTIONS='--max-old-space-size=12288' vite build --config apps/web/vite.config.ts",
     );
     // pnpm runs `pre<script>`/`post<script>` around any script name. `build` gets the catalog
     // generation (apps/web/public/data/ is gitignored, so without it the bundle ships no catalog) and the

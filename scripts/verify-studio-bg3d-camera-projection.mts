@@ -18,6 +18,7 @@ let server: ChildProcess | undefined;
 let browser: Browser | undefined;
 try {
   server = spawn(process.execPath, ["node_modules/vite/bin/vite.js", ...(source ? [] : ["preview"]),
+    "--config", "apps/web/vite.config.ts",
     "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
   { cwd: process.cwd(), env: process.env, stdio: "ignore" });
   await waitForServer(origin);

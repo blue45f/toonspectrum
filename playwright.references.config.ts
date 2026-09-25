@@ -14,7 +14,7 @@ export default defineConfig({
   outputDir: "test-results/references/results",
   use: { baseURL, locale: "ko-KR", reducedMotion: "reduce", trace: "retain-on-failure", screenshot: "only-on-failure" },
   webServer: {
-    command: `pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
+    command: `pnpm exec vite preview --config apps/web/vite.config.ts --host 127.0.0.1 --port ${port} --strictPort`,
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

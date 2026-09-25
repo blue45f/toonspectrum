@@ -97,7 +97,7 @@ describe("BG3D production verification configuration", () => {
 
   it("requires a real build and starts a fresh preview, not a Vite dev graph", () => {
     expect(source).toContain('existsSync("dist/index.html")');
-    expect(source).toContain("pnpm exec vite preview");
+    expect(source).toContain("pnpm exec vite preview --config apps/web/vite.config.ts");
     expect(source).toContain("reuseExistingServer: false");
     expect(source).not.toContain("tools/browser-harnesses/hybrid-dcc-e2e.html");
   });

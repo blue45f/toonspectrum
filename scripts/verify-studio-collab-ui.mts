@@ -209,7 +209,7 @@ async function main(): Promise<void> {
     ? null
     : spawn(
         process.execPath,
-        [join(process.cwd(), "node_modules", "vite", "bin", "vite.js"), "preview", "--port", String(new URL(origin).port), "--strictPort", "--host", "127.0.0.1"],
+        [join(process.cwd(), "node_modules", "vite", "bin", "vite.js"), "preview", "--config", "apps/web/vite.config.ts", "--port", String(new URL(origin).port), "--strictPort", "--host", "127.0.0.1"],
         { stdio: "ignore" },
       );
   const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });

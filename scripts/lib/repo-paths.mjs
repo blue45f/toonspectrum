@@ -4,8 +4,9 @@
  * Single source of truth for every repo-layout path a script depends on.
  *
  * These constants are the canonical paths for the apps/web frontend.
- * The Vite frontend lives under `apps/web`; root Vite config and `dist/` remain
- * deployment-level workspace infrastructure. Scripts must use these constants rather than re-deriving paths from process.cwd().
+ * The Vite frontend and its configuration live under `apps/web`; only the production `dist/`
+ * output remains at repository root. Scripts must use these constants rather than re-deriving
+ * paths from process.cwd().
  *
  * Every constant is anchored to `import.meta.url`, never `process.cwd()`, so the
  * resolved paths do not depend on the directory a script happens to be launched
@@ -38,14 +39,14 @@ export const WEB_PUBLIC = join(WEB_ROOT, "public");
 export const WEB_INDEX_HTML = join(WEB_ROOT, "index.html");
 
 /** Vite config consumed by the programmatic `createServer`/`build` callers. */
-export const WEB_VITE_CONFIG = join(REPO_ROOT, "vite.config.ts");
+export const WEB_VITE_CONFIG = join(WEB_ROOT, "vite.config.ts");
 
 /** Production build output directory (`<repository root>/dist`). */
 export const DIST_DIR = join(REPO_ROOT, "dist");
 
 /**
  * Product Vite resolve.alias entries for harnesses that set `configFile: false`
- * while still loading app modules that import `@/…` (same order as root vite.config.ts).
+ * while still loading app modules that import `@/…` (same order as apps/web/vite.config.ts).
  * Every frontend alias resolves from the source root.
  */
 export const WEB_VITE_ALIASES = Object.freeze([

@@ -228,7 +228,7 @@ async function main() { // NOSONAR javascript:S3776
   const baseUrl = externalBaseUrl ?? `http://127.0.0.1:${port}`;
   const preview = externalBaseUrl ? null : spawn(
     "pnpm",
-    ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+    ["exec", "vite", "preview", "--config", "apps/web/vite.config.ts", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
     { detached: true, env: { ...process.env, CI: "1" }, stdio: ["ignore", "pipe", "pipe"] },
   );
   preview?.stdout.on("data", (chunk) => process.stdout.write(chunk));

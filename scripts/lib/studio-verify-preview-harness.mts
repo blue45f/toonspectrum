@@ -100,7 +100,7 @@ export interface SpawnVitePreviewOptions {
   readonly port: number;
   /**
    * How the preview process is spawned:
-   * - "pnpm-exec": `pnpm exec vite preview` with stdio fully ignored
+   * - "pnpm-exec": `pnpm exec vite preview --config apps/web/vite.config.ts` with stdio fully ignored
    *   (launch verifier).
    * - "node-vite-bin": node running vite's bin entry with piped stdout/stderr
    *   (lifecycle/brush verifiers) so the preview log can be captured.
@@ -118,6 +118,8 @@ export function spawnVitePreview({
 }: SpawnVitePreviewOptions): ChildProcess {
   const previewArgs = [
     "preview",
+    "--config",
+    "apps/web/vite.config.ts",
     "--port",
     String(port),
     "--strictPort",

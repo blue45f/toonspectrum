@@ -116,7 +116,7 @@ describe("Studio p5.brush permanent real-runtime gate", () => {
     expect(verifier).toContain("envFile: false");
     expect(verifier).toContain("entries: [HARNESS_ENTRY.slice(1)]");
     expect(verifier).not.toContain(
-      'configFile: join(process.cwd(), "vite.config.ts")',
+      'configFile: join(process.cwd(), "apps/web/vite.config.ts")',
     );
   });
 

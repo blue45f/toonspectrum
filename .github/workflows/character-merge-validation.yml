@@ -9,7 +9,7 @@ on:
       - 'scripts/lib/studio-crdt-bundle-boundary*'
       - 'scripts/lib/repo-paths.mjs'
       - 'scripts/integration-test-runner-ci-policy.test.mjs'
-      - 'vite.config.ts'
+      - 'apps/web/vite.config.ts'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - ".github/workflows/character-merge-validation.yml"
@@ -26,7 +26,7 @@ on:
       - 'scripts/lib/studio-crdt-bundle-boundary*'
       - 'scripts/lib/repo-paths.mjs'
       - 'scripts/integration-test-runner-ci-policy.test.mjs'
-      - 'vite.config.ts'
+      - 'apps/web/vite.config.ts'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - ".github/workflows/character-merge-validation.yml"

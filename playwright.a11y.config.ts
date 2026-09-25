@@ -22,7 +22,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: `pnpm exec vite --host 127.0.0.1 --port ${A11Y_PORT} --strictPort`,
+    command: `pnpm exec vite --config apps/web/vite.config.ts --host 127.0.0.1 --port ${A11Y_PORT} --strictPort`,
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

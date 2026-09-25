@@ -178,7 +178,7 @@ async function spawnPreview(): Promise<{ origin: string; child: ChildProcess | n
   const external = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   if (external) return { origin: external, child: null };
   const port = 4600 + Math.floor(Math.random() * 300);
-  const child = spawn("npx", ["vite", "preview", "--port", String(port), "--strictPort"], {
+  const child = spawn("npx", ["vite", "preview", "--config", "apps/web/vite.config.ts", "--port", String(port), "--strictPort"], {
     stdio: "ignore",
     detached: false,
   });

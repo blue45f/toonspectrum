@@ -169,7 +169,7 @@ async function main(): Promise<void> {
     ? null
     : spawn(
         process.execPath,
-        [join(process.cwd(), "node_modules", "vite", "bin", "vite.js"), "preview", "--port", String(port), "--strictPort", "--host", "127.0.0.1"],
+        [join(process.cwd(), "node_modules", "vite", "bin", "vite.js"), "preview", "--config", "apps/web/vite.config.ts", "--port", String(port), "--strictPort", "--host", "127.0.0.1"],
         { stdio: ["ignore", "pipe", "pipe"] },
       );
   server?.stdout?.on("data", (chunk) => appendFileSync(LOG_PATH, String(chunk)));

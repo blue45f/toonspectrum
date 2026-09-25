@@ -103,6 +103,8 @@ function startWebServer() {
     [
       "exec",
       "vite",
+      "--config",
+      "apps/web/vite.config.ts",
       "--host",
       url.hostname,
       "--port",

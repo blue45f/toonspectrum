@@ -23,5 +23,7 @@
   "rootCapacitorConfigFiles": 0,
   "rootMediaFiles": 0,
   "rootAutomationFiles": 0,
-  "rootMarketplaceBenchmarkFiles": 0
+  "rootMarketplaceBenchmarkFiles": 0,
+  "rootViteConfigFiles": 0,
+  "rootDrizzleConfigFiles": 0
 }

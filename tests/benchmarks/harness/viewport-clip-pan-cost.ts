@@ -729,7 +729,7 @@ async function main(): Promise<void> {
     origin = `http://127.0.0.1:${port}`;
     preview = spawn(
       "npx",
-      ["vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+      ["vite", "preview", "--config", "apps/web/vite.config.ts", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
       { cwd: REPO_ROOT, stdio: "ignore" },
     );
     await waitForServer(origin);

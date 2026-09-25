@@ -70,7 +70,8 @@
     "noEmitOnError": true
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "drizzle.config.ts"
   ],
   "exclude": [
     "src/**/*.test.ts",
