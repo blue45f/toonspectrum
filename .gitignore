@@ -60,6 +60,17 @@ __pycache__/
 # AI agent local caches and session state (로컬 전용, 절대 커밋 금지)
 /.impeccable/
 /.claude/
+
+# 저장소 하네스 지침은 사용자 전역 ignore보다 우선해 의도적으로 추적한다.
+!/CLAUDE.md
+!/**/AGENTS.md
+!/.github/copilot-instructions.md
+!/.cursor/
+/.cursor/*
+!/.cursor/rules/
+/.cursor/rules/*
+!/.cursor/rules/toonspectrum.mdc
+
 # opencode loop/goal 플러그인 상태 및 로컬 의존성 (커맨드·에이전트 정의 및 설정은 추적)
 /.opencode/goals/
 /.opencode/opencode-loop/

@@ -139,6 +139,21 @@ export function inspectHarness(root = ROOT) {
     }
   }
 
+  const gitignorePath = join(root, ".gitignore");
+  if (existsSync(gitignorePath)) {
+    const gitignore = read(root, ".gitignore");
+    for (const marker of [
+      "!/CLAUDE.md",
+      "!/**/AGENTS.md",
+      "!/.github/copilot-instructions.md",
+      "!/.cursor/rules/toonspectrum.mdc",
+    ]) {
+      if (!gitignore.includes(marker)) problems.push(`하네스 추적 예외 누락: ${marker}`);
+    }
+  } else {
+    problems.push(".gitignore 파일 누락");
+  }
+
   const commitlintPath = join(root, "commitlint.config.cjs");
   if (!existsSync(commitlintPath) || !read(root, "commitlint.config.cjs").includes("subject-korean")) {
     problems.push("commitlint 한글 제목 규칙이 연결되지 않음");
