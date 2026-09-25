@@ -124,9 +124,24 @@ function safeRead(key: string): unknown {
   try { const raw = window.localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
-function safeWrite(key: string, value: unknown): boolean {
+function writeCharacterCustomization(value: StudioVirtualCharacterCustomization): boolean {
   if (typeof window === "undefined") return false;
-  try { window.localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; }
+  try {
+    window.localStorage.setItem(CHARACTER_STORAGE_KEY, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function writeDecorationState(value: StudioVirtualDecorationState): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.setItem(DECOR_STORAGE_KEY, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function readStudioVirtualCharacterCustomization(): StudioVirtualCharacterCustomization {
@@ -136,7 +151,7 @@ export function readStudioVirtualCharacterCustomization(): StudioVirtualCharacte
 
 export function writeStudioVirtualCharacterCustomization(value: StudioVirtualCharacterCustomization): boolean {
   const parsed = parseStudioVirtualCharacterCustomization(value);
-  return parsed ? safeWrite(CHARACTER_STORAGE_KEY, parsed) : false;
+  return parsed ? writeCharacterCustomization(parsed) : false;
 }
 
 function placement(id: string, type: StudioVirtualDecorType, x: number, y: number, rotation: 0 | 90 | 180 | 270 = 0, scale = 1): StudioVirtualDecorPlacement {
@@ -183,7 +198,7 @@ export function readStudioVirtualDecorationState(): StudioVirtualDecorationState
 
 export function writeStudioVirtualDecorationState(value: StudioVirtualDecorationState): boolean {
   const parsed = parseStudioVirtualDecorationState(value);
-  return parsed ? safeWrite(DECOR_STORAGE_KEY, parsed) : false;
+  return parsed ? writeDecorationState(parsed) : false;
 }
 
 export function addStudioVirtualDecoration(
