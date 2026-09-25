@@ -180,7 +180,7 @@ describe("Brush Studio quality authority", () => {
       }),
     );
     expect(optimized.output.liveScale).toBe(0.5);
-    expect(optimized.simulation.pressIterations).toBeLessThanOrEqual(12);
+    expect(optimized.simulation.pressureIterations).toBeLessThanOrEqual(12);
     expect(optimized.simulation.bristleStrands).toBeLessThanOrEqual(48);
     expect(
       optimized.simulation.bristleContactIterations,
