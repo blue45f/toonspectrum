@@ -20,6 +20,10 @@ declare global {
     __scene3dTiledProof?: unknown;
   }
 }
+
+const PRODUCTION_TILED_WORKER_PATH = "/__scene3d_tiled_worker__.js";
+const PRODUCTION_PSD_WORKER_PATH = "/__scene3d_psd_worker__.js";
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -78,24 +82,20 @@ function composite(
 async function run() {
   if (!navigator.gpu)
     return { status: "unsupported", reason: "WebGPU unavailable" };
-  const workerUrl = new URL(location.href).searchParams.get("worker");
-  if (
-    workerUrl &&
-    !/^\/assets\/studio-bg3d-tiled-artifact\.worker-[A-Za-z0-9_-]+\.js$/.test(
-      workerUrl,
-    )
-  )
-    throw new Error("Invalid production worker path.");
+  const parameters = new URL(location.href).searchParams;
+  const useProductionTiledWorker = parameters.get("productionTiledWorker") === "1";
+  const useProductionPsdWorker = parameters.get("productionPsdWorker") === "1";
   let activeWorkers = 0,
     peakWorkers = 0,
     workersCreated = 0;
   const workerFactory = () => {
     const worker = new Worker(
-      workerUrl ??
-        new URL(
-          "../../src/domains/creator/bg3d/studio-bg3d-tiled-artifact.worker.ts",
-          import.meta.url,
-        ),
+      useProductionTiledWorker
+        ? PRODUCTION_TILED_WORKER_PATH
+        : new URL(
+            "../../src/domains/creator/bg3d/studio-bg3d-tiled-artifact.worker.ts",
+            import.meta.url,
+          ),
       { type: "module" },
     );
     activeWorkers++;
@@ -415,24 +415,16 @@ async function run() {
       cancelled = error instanceof Error && error.name === "AbortError";
     }
     assert(cancelled, "Tile cancellation did not abort output.");
-    const psdWorkerUrl = new URL(location.href).searchParams.get("psdWorker");
-    if (
-      psdWorkerUrl &&
-      !/^\/assets\/studio-bg3d-shot-psd\.worker-[A-Za-z0-9_-]+\.js$/.test(
-        psdWorkerUrl,
-      )
-    )
-      throw new Error("Invalid production PSD worker path.");
     const originalWorker = window.Worker;
-    if (workerUrl)
+    if (useProductionTiledWorker || useProductionPsdWorker)
       window.Worker = class extends originalWorker {
         constructor(url: string | URL, options?: WorkerOptions) {
+          const source = String(url);
           super(
-            String(url).includes("/studio-bg3d-tiled-artifact.worker.ts")
-              ? workerUrl!
-              : psdWorkerUrl &&
-                  String(url).includes("/studio-bg3d-shot-psd.worker.ts")
-                ? psdWorkerUrl
+            useProductionTiledWorker && source.includes("/studio-bg3d-tiled-artifact.worker.ts")
+              ? PRODUCTION_TILED_WORKER_PATH
+              : useProductionPsdWorker && source.includes("/studio-bg3d-shot-psd.worker.ts")
+                ? PRODUCTION_PSD_WORKER_PATH
                 : url,
             options,
           );
@@ -495,7 +487,7 @@ async function run() {
             isFallbackAdapter: device.adapterInfo.isFallbackAdapter,
           }
         : null,
-      productionWorker: workerUrl,
+      productionWorker: useProductionTiledWorker ? PRODUCTION_TILED_WORKER_PATH : null,
     };
   } finally {
     for (const adapter of adapters) adapter.dispose?.();

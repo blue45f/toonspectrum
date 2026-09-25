@@ -12,6 +12,9 @@ import { join, resolve, extname } from "node:path";
 import { chromium } from "playwright";
 import { createServer } from "vite";
 import { REPO_ROOT, WEB_VITE_ALIASES } from "./lib/repo-paths.mjs";
+
+const PRODUCTION_TILED_WORKER_PATH = "/__scene3d_tiled_worker__.js";
+const PRODUCTION_PSD_WORKER_PATH = "/__scene3d_psd_worker__.js";
 const scratch =
   process.env.TOONSPECTRUM_VERIFY_DIR ??
   join(tmpdir(), `scene3d-tiles-${Date.now()}`);
@@ -80,6 +83,23 @@ const vite = await createServer({
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
           const url = new URL(req.url ?? "/", "http://localhost");
+          const aliasedWorker = url.pathname === PRODUCTION_TILED_WORKER_PATH
+            ? built
+            : url.pathname === PRODUCTION_PSD_WORKER_PATH
+              ? psdBuilt
+              : null;
+          if (aliasedWorker) {
+            const file = resolve(REPO_ROOT, "dist/assets", aliasedWorker);
+            if (!existsSync(file)) {
+              res.statusCode = 404;
+              res.end();
+              return;
+            }
+            res.setHeader("Content-Security-Policy", csp);
+            res.setHeader("Content-Type", "application/javascript");
+            createReadStream(file).pipe(res);
+            return;
+          }
           if (built && url.pathname.startsWith("/assets/")) {
             const assets = resolve(REPO_ROOT, "dist/assets"),
               file = resolve(REPO_ROOT, "dist", "." + url.pathname);
@@ -147,8 +167,11 @@ try {
   page.on("requestfailed", (request) =>
     errors.push(`${request.url()}: ${request.failure()?.errorText}`),
   );
+  const productionWorkerQuery = built
+    ? `?productionTiledWorker=1${psdBuilt ? "&productionPsdWorker=1" : ""}`
+    : "";
   await page.goto(
-    `http://127.0.0.1:${address.port}/__scene3d_tiles__${built ? "?worker=" + encodeURIComponent("/assets/" + built) + (psdBuilt ? "&psdWorker=" + encodeURIComponent("/assets/" + psdBuilt) : "") : ""}`,
+    `http://127.0.0.1:${address.port}/__scene3d_tiles__${productionWorkerQuery}`,
   );
   await page.waitForFunction(
     () => window.__scene3dTiledProof !== undefined,

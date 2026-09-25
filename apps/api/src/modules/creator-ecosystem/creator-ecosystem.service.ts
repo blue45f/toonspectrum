@@ -27,6 +27,11 @@ import {
 } from "../../db";
 import { isOfficialUser } from "../../server/feedback";
 
+import {
+  LIBRARY_HOLDINGS_XML_BYTE_LIMIT,
+  parseLibraryHoldingsXml,
+} from "./library-holdings-xml";
+
 import type {
   BusinessVerificationStatus,
   CollaborationCreatorDirectoryEntry,
@@ -41,27 +46,6 @@ function safeString(value: unknown, maximum: number): string {
   return typeof value === "string"
     ? value.trim().replace(/\s+/gu, " ").slice(0, maximum)
     : "";
-}
-
-function xmlDecode(value: string): string {
-  return value
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/gu, "$1")
-    .replace(/&lt;/gu, "<")
-    .replace(/&gt;/gu, ">")
-    .replace(/&quot;/gu, '"')
-    .replace(/&#39;|&apos;/gu, "'")
-    .replace(/&amp;/gu, "&")
-    .trim();
-}
-
-function xmlTag(block: string, name: string): string {
-  const match = block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`, "iu"));
-  return match ? xmlDecode(match[1].replace(/<[^>]+>/gu, "")) : "";
-}
-
-function xmlBlocks(xml: string, name: string): string[] {
-  return [...xml.matchAll(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`, "giu"))]
-    .map((match) => match[1]);
 }
 
 function publicProposal(row: typeof creatorIpProposals.$inferSelect) {
@@ -501,16 +485,27 @@ export class CreatorEcosystemService {
         message: "도서관 정보나루 응답을 확인하지 못했어요.",
       };
     }
-    const xml = await response.text();
-    const items = xmlBlocks(xml, "lib").slice(0, 100).map((block) => ({
-      libraryCode: xmlTag(block, "libCode"),
-      name: xmlTag(block, "libName"),
-      address: xmlTag(block, "address"),
-      telephone: xmlTag(block, "tel"),
-      homepage: xmlTag(block, "homepage"),
-      latitude: xmlTag(block, "latitude"),
-      longitude: xmlTag(block, "longitude"),
-    })).filter((item) => item.libraryCode && item.name);
+    const declaredLength = Number(response.headers.get("content-length") ?? "0");
+    if (Number.isFinite(declaredLength)
+      && declaredLength > LIBRARY_HOLDINGS_XML_BYTE_LIMIT) {
+      return {
+        status: "unavailable",
+        items: [],
+        sourceUrl: DATA4LIBRARY_SOURCE,
+        message: "도서관 정보나루 응답 크기가 허용 범위를 초과했습니다.",
+      };
+    }
+    let items: ReturnType<typeof parseLibraryHoldingsXml>;
+    try {
+      items = parseLibraryHoldingsXml(await response.text());
+    } catch {
+      return {
+        status: "unavailable",
+        items: [],
+        sourceUrl: DATA4LIBRARY_SOURCE,
+        message: "도서관 정보나루 응답 형식을 확인하지 못했어요.",
+      };
+    }
     return {
       status: "ready",
       items,

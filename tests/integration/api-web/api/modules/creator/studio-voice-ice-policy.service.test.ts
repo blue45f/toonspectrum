@@ -151,9 +151,8 @@ describe("Studio voice ICE credential issuance", () => {
     expect(turn?.username).toBe(`1784362200:${opaqueIdentity}`);
     expect(turn?.username).not.toContain("private-user-id");
     expect(turn?.username).not.toContain("private-work-id");
-    expect(turn?.credential).toBe(
-      createHmac("sha1", TURN_SECRET).update(turn?.username ?? "").digest("base64")
-    );
+    // Independent coturn REST HMAC-SHA1 test vector for the fixed username above.
+    expect(turn?.credential).toBe("Sx6lIgQJSISRRXKM/XF1Kvic3o0=");
   });
 
   it("returns explicit direct or STUN-only policies when relay is optional", () => {
