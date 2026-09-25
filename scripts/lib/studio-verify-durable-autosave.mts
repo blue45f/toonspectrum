@@ -170,9 +170,13 @@ async function installBridge(
         sessions: new Map(),
         async resolveModuleUrl() {
           if (bridge.moduleUrl) return bridge.moduleUrl;
-          const resourceUrls = performance.getEntriesByType("resource")
-            .map((entry) => entry.name)
-            .filter((url) => url.startsWith(window.location.origin));
+          const resourceUrls = [...new Set([
+            ...performance.getEntriesByType("resource").map((entry) => entry.name),
+            ...Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]'))
+              .map((link) => link.href),
+            ...Array.from(document.querySelectorAll<HTMLScriptElement>('script[type="module"][src]'))
+              .map((script) => script.src),
+          ].filter((url) => url.startsWith(window.location.origin)))];
           let found = resourceUrls.find((url) =>
             /\/assets\/studio-autosave-opfs-session-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
           ) ?? resourceUrls.find((url) =>
@@ -188,16 +192,20 @@ async function installBridge(
             // The session chunk is loaded lazily with the durable autosave runtime; before
             // that lands, follow either editor entry chunk's own import specifier. Production
             // bundling may fold StudioPage into the legacy adapter while preserving the same
-            // durable autosave authority.
-            const editorUrl = resourceUrls.find((url) =>
+            // durable autosave authority. Inspect every matching entry because the first one
+            // may not be the chunk that imports the autosave session.
+            const editorUrls = resourceUrls.filter((url) =>
               /\/assets\/(?:StudioPage|studio-legacy-editor-adapter)-[A-Za-z0-9_-]+\.js(?:\?.*)?$/u.test(url)
             );
-            if (editorUrl) {
+            for (const editorUrl of editorUrls) {
               const source = await fetch(editorUrl).then((response) => response.text());
               const match = source.match(
                 /\.\/studio-autosave-opfs-session-[A-Za-z0-9_-]+\.js/u,
               );
-              if (match) found = new URL(match[0], editorUrl).href;
+              if (match) {
+                found = new URL(match[0], editorUrl).href;
+                break;
+              }
             }
           }
           bridge.moduleUrl = found;
