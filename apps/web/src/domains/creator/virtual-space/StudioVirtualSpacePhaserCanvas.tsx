@@ -69,6 +69,8 @@ import {
 } from "./studio-virtual-space-living-world";
 import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
 import { createStudioWorldTileRuntime, type StudioWorldTileRuntime } from "./studio-virtual-space-tile-runtime";
+import { studioVirtualPlaceTileAssetUrl } from "./studio-virtual-space-place-world";
+import { studioWorldPointInsideOcclusionPolygon } from "./studio-virtual-space-occlusion";
 import { StudioVirtualDecorationRuntime } from "./studio-virtual-space-decoration-runtime";
 import { StudioDeskPodRuntime } from "./studio-virtual-space-desk-pods";
 import { studioRuntimeBudget, studioTownInterestSnapshot } from "./studio-virtual-space-town-program";
@@ -197,6 +199,12 @@ interface PeerVisual {
   moving: boolean;
   activity: StudioVirtualSpacePeer["state"]["activity"];
   nearby: boolean;
+}
+
+interface OcclusionVisual {
+  readonly polygon: readonly StudioVirtualSpacePoint[];
+  readonly object: import("phaser").GameObjects.Image | import("phaser").GameObjects.Graphics;
+  readonly outsideAlpha: number;
 }
 
 interface NpcVisual {
@@ -434,9 +442,10 @@ export function StudioVirtualSpacePhaserCanvas({
       let lastGuideRequestId: string | null = null;
       let lastGuideState = "";
       const interactionMarkers = new Map<string, import("phaser").GameObjects.Container>();
+      const occlusionVisuals: OcclusionVisual[] = [];
       const interactions = Object.freeze([
         ...studioWorldInteractions(manifest),
-        ...studioTownEnvironmentInteractions(),
+        ...(manifest.tilemap ? [] : studioTownEnvironmentInteractions()),
       ]) as readonly StudioWorldInteractionDefinition[];
       const portals = studioWorldPortals(manifest);
       const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}-${artStyle}`;
@@ -800,7 +809,7 @@ export function StudioVirtualSpacePhaserCanvas({
 
       scene.preload = function preload() {
         this.load.on("loaderror", (file: import("phaser").Loader.File) => failedTextures.add(file.key));
-        if (!manifest.tilemap || (manifest.occlusionLayers?.length ?? 0) > 0) this.load.image(backgroundTextureKey, backgroundUrl);
+        this.load.image(backgroundTextureKey, backgroundUrl);
         this.load.image(horizonTextureKey, horizonUrl);
         this.load.image(livingTextureKeys.cloudBack, studioVirtualArtTextureUrl(artStyle, "cloud-back"));
         this.load.image(livingTextureKeys.cloudFront, studioVirtualArtTextureUrl(artStyle, "cloud-front"));
@@ -837,13 +846,13 @@ export function StudioVirtualSpacePhaserCanvas({
           const key = propTextureKey(prop);
           if (loadedProps.has(key)) continue;
           loadedProps.add(key);
-          this.load.image(key, worldAssetUrls?.get(prop.assetUrl) ?? prop.assetUrl);
+          this.load.image(key, worldAssetUrls?.get(prop.assetUrl) ?? studioVirtualPlaceTileAssetUrl(prop.assetUrl, artStyle));
         }
       };
 
       scene.create = function create() {
         if (cancelled || engineFailed) return;
-        if (((!manifest.tilemap || (manifest.occlusionLayers?.length ?? 0) > 0) && failedTextures.has(backgroundTextureKey))
+        if ((!manifest.tilemap && failedTextures.has(backgroundTextureKey))
           || !this.textures.exists(fallbackAsset.key)) { fail(); return; }
         characterAssets.use("fallback", [fallbackAsset]);
         if (this.textures.exists(bootSelfAsset.key)) characterAssets.use("self", [bootSelfAsset]);
@@ -862,15 +871,16 @@ export function StudioVirtualSpacePhaserCanvas({
           .setScrollFactor(0.92)
           .setDepth(-1_004)
           .setAlpha(environmentPreference.backdrop === "city" ? 0.96 : 0.90);
-        if (!manifest.tilemap) {
+        if (this.textures.exists(backgroundTextureKey)) {
           this.add.image(backgroundRect.x, backgroundRect.y, backgroundTextureKey)
             .setOrigin(0)
             .setDisplaySize(backgroundRect.width, backgroundRect.height)
             .setDepth(-1_000)
-            .setAlpha(environmentPreference.backdrop === "sky" ? 0.96 : 0.72);
-        } else {
+            .setAlpha(manifest.tilemap ? 0.24 : environmentPreference.backdrop === "sky" ? 0.96 : 0.72);
+        }
+        if (manifest.tilemap) {
           tileWorld = createStudioWorldTileRuntime(this, manifest.tilemap, `studio-world-${manifest.id}`, {
-            resolveUrl: (url) => worldAssetUrls?.get(url) ?? url,
+            resolveUrl: (url) => worldAssetUrls?.get(url) ?? studioVirtualPlaceTileAssetUrl(url, artStyle),
             parseGid: Phaser.Tilemaps.Parsers.Tiled.ParseGID,
             onError: (message) => { parent.dataset.tileError = message; fail(); },
           });
@@ -889,11 +899,27 @@ export function StudioVirtualSpacePhaserCanvas({
         cleanup.push(() => modularCampus.forEach((item) => item.destroy()));
 
         for (const layer of manifest.occlusionLayers ?? []) {
+          if (manifest.tilemap) {
+            const foreground = this.add.graphics().setDepth(layer.depth);
+            foreground.fillStyle(artProfile.palette.room, 1).fillPoints([...layer.polygon], true);
+            foreground.lineStyle(4, artProfile.palette.wall, 0.86).strokePoints([...layer.polygon], true);
+            const minX = Math.min(...layer.polygon.map((point) => point.x));
+            const maxX = Math.max(...layer.polygon.map((point) => point.x));
+            const minY = Math.min(...layer.polygon.map((point) => point.y));
+            const maxY = Math.max(...layer.polygon.map((point) => point.y));
+            foreground.lineStyle(2, artProfile.palette.line, 0.42)
+              .lineBetween(minX + 18, (minY + maxY) / 2, maxX - 18, (minY + maxY) / 2);
+            foreground.setAlpha(0.9);
+            occlusionVisuals.push({ polygon: layer.polygon, object: foreground, outsideAlpha: 0.9 });
+            cleanup.push(() => foreground.destroy());
+            continue;
+          }
           const maskGraphics = this.add.graphics().fillStyle(0xffffff).fillPoints([...layer.polygon], true).setVisible(false);
           const mask = maskGraphics.createGeometryMask();
           const foreground = this.add.image(backgroundRect.x, backgroundRect.y, backgroundTextureKey)
             .setOrigin(0).setDisplaySize(backgroundRect.width, backgroundRect.height)
             .setDepth(layer.depth).setMask(mask);
+          occlusionVisuals.push({ polygon: layer.polygon, object: foreground, outsideAlpha: 1 });
           cleanup.push(() => { foreground.clearMask(true); foreground.destroy(); maskGraphics.destroy(); });
         }
 
@@ -1398,6 +1424,12 @@ export function StudioVirtualSpacePhaserCanvas({
           lastWalkablePoint = currentPoint;
         }
         const terrain = studioVirtualTerrainAt(manifest, currentPoint);
+        for (const visual of occlusionVisuals) {
+          const inside = studioWorldPointInsideOcclusionPolygon(currentPoint, visual.polygon);
+          const target = visual.outsideAlpha * (inside ? 0.18 : 1);
+          const ratio = reducedMotion.matches ? 1 : Math.min(1, Math.max(0, deltaMs) / 140);
+          visual.object.setAlpha(visual.object.alpha + (target - visual.object.alpha) * ratio);
+        }
         const config = {
           ...DEFAULT_STUDIO_MOTION_CONFIG,
           acceleration: DEFAULT_STUDIO_MOTION_CONFIG.acceleration / terrain.dragMultiplier,
@@ -1623,7 +1655,8 @@ export function StudioVirtualSpacePhaserCanvas({
           important: bridge.getFollowingPeer() === id,
         })), currentQualityProfile.interestRadius);
         proximityOverlay?.clear();
-        if (proximityOverlay && atmosphereRef.current !== "focus" && activity !== "focused" && activity !== "away") {
+        if (proximityOverlay && experienceRef.current.interactionRings
+          && atmosphereRef.current !== "focus" && activity !== "focused" && activity !== "away") {
           const origin = studioProjectTownPoint(manifest, currentPoint);
           const visiblePeers = [...peers].map(([id, peer]) => ({ id, peer, distance: Math.hypot(peer.targetX - currentPoint.x, peer.targetY - currentPoint.y) }))
             .filter((item) => item.distance <= 190);

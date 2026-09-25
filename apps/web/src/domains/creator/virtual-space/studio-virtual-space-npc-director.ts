@@ -118,15 +118,15 @@ function availableAnimation(actor: NpcActor, requested: StudioCharacterMotionSta
 
 /** Roles derive from the authored room, so both manifest and existing Tiled exports retain them. */
 export function studioNpcRole(definition: StudioWorldNpcDefinition): StudioNpcRole {
-  if (definition.roomId === "lobby") return "guide";
-  if (definition.roomId === "production" || definition.roomId === "assistant") return "producer";
-  if (definition.roomId === "review" || definition.roomId === "quality") return "editor";
-  if (definition.roomId === "writers") return "writer";
-  if (definition.roomId === "drawing" || definition.roomId === "storyboard") return "artist";
-  if (definition.roomId === "assets") return "librarian";
-  if (definition.roomId === "lounge") return "cafe";
-  if (definition.roomId === "meeting") return "security";
-  if (definition.roomId === "live" || definition.roomId === "release") return "host";
+  if (definition.roomId === "lobby" || definition.roomId === "skyport") return "guide";
+  if (["production", "assistant", "production-control", "garden"].includes(definition.roomId)) return "producer";
+  if (["review", "quality", "review-gallery", "observatory"].includes(definition.roomId)) return "editor";
+  if (definition.roomId === "writers" || definition.roomId === "story-lab") return "writer";
+  if (["drawing", "storyboard", "personal-atelier", "arcade"].includes(definition.roomId)) return "artist";
+  if (definition.roomId === "assets" || definition.roomId === "tree-library") return "librarian";
+  if (["lounge", "creator-cafe", "beach"].includes(definition.roomId)) return "cafe";
+  if (definition.roomId === "meeting" || definition.roomId === "team-meeting") return "security";
+  if (["live", "release", "creator-plaza", "event-stage"].includes(definition.roomId)) return "host";
   return "resident";
 }
 

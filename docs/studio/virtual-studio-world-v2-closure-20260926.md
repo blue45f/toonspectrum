@@ -268,3 +268,15 @@ PY
 - 마지막 NPC 26개 검사 중 24개가 통과했으나, 두 20분 시뮬레이션은 로컬에서 각각 87.402초·41.790초가 걸려 기존 60초·30초 제한을 넘겼다. 제한·시뮬레이션 길이·skip을 변경하지 않았다. `/tmp/virtual-studio-npc-final-26-tests.log`에 실패를 보존했으며 원격 CI 결과와 구분한다.
 
 위 기록은 실행 시점의 로컬 결과다. 최종 타입 검사·최신 main 통합·원격 CI·병합 결과는 연결된 PR의 현재 상태로 확인한다. 이 브랜치의 병합은 독립 장소 전체 완성이나 운영 배포를 뜻하지 않는다.
+
+## 2026-09-26 독립 장소 월드 후속 통합
+
+상태: **migration / playable place graph**. 기존 v2 타일 런타임 위에 장소 카탈로그의 14개 항목을 각각 별도 manifest ID·tile data·충돌·spawn·NPC·interaction·portal·acoustic scope로 생성하도록 연결했다. URL의 `place` 값과 장소별 presence/position/board scope를 분리했으며, portal 진입은 쿼리를 바꾸고 새 manifest로 재생성한다. 개인 공간의 portal cycle은 `team-meeting`과 `production-control`을 노출하지 않고 프로젝트 공간에서만 해당 장소를 포함한다.
+
+- `studio-virtual-space-place-world.ts`가 960×640 장소 manifest와 세 레이어 tilemap을 만들며, 모든 장소는 검증 가능한 왕복 portal과 점유 가능한 spawn을 가진다.
+- tilemap 장소에서는 기존 중앙 캠퍼스 전용 환경 interaction·고정 물 지형·장식 좌석을 중복 생성하지 않는다.
+- 실내 장소는 tilemap 전경 roof polygon을 별도로 그리며 플레이어가 polygon 안으로 들어가면 부드럽게 18% alpha까지 낮춘다. legacy illustration manifest는 기존 geometry-mask foreground를 유지한다.
+- 장소 선택은 개인/프로젝트 권한 모드로 다시 정규화하므로 금지된 장소 ID를 URL이나 UI에서 주입해도 허용 장소로 복구한다.
+- 집중 회귀는 place graph, 개인 portal cycle, session scope, NPC 장시간 이동, tile terrain 격리, occlusion 경계, manifest acceptance를 포함해 **8개 파일 72개 테스트**가 통과했다. 변경 파일 ESLint도 경고 0으로 통과했다.
+
+이 통합은 독립 동선과 runtime 권위를 완성한 범위다. ImageGen 장소 preview crop을 실제 playable background로 오인하지 않으며, 장소별 건축·소품을 별도 생성한 4개 gold art pack, 3개 완성 theme, 47종 전환 작화, 물리 기기 GPU/WAN 검증은 계속 별도 품질 조건으로 남긴다. 최종 타입 검사·latest main 통합·원격 CI·PR 병합 결과는 이후 기록과 GitHub 상태를 기준으로 한다.

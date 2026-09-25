@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { studioWorldOcclusionPolygonValid } from "./studio-virtual-space-occlusion";
+import {
+  studioWorldOcclusionPolygonValid,
+  studioWorldPointInsideOcclusionPolygon,
+} from "./studio-virtual-space-occlusion";
 import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest } from "./studio-virtual-space-world-manifest";
 import { studioWorldManifestFromTiled } from "./studio-virtual-space-tiled-adapter";
 
@@ -13,6 +16,12 @@ describe("Virtual Studio foreground geometry", () => {
       [{x:-1,y:1},{x:9,y:1},{x:9,y:9}],
       [{x:NaN,y:1},{x:9,y:1},{x:9,y:9}],
     ]) expect(studioWorldOcclusionPolygonValid(polygon,10,10)).toBe(false);
+  });
+  it("treats polygon boundaries as inside and separates roof interior from exterior", () => {
+    const polygon = [{ x: 10, y: 10 }, { x: 90, y: 10 }, { x: 90, y: 70 }, { x: 10, y: 70 }];
+    expect(studioWorldPointInsideOcclusionPolygon({ x: 50, y: 40 }, polygon)).toBe(true);
+    expect(studioWorldPointInsideOcclusionPolygon({ x: 10, y: 40 }, polygon)).toBe(true);
+    expect(studioWorldPointInsideOcclusionPolygon({ x: 50, y: 80 }, polygon)).toBe(false);
   });
   it("ships bounded roof foregrounds so actors pass behind architecture", () => {
     const layers = DEFAULT_STUDIO_WORLD_MANIFEST.occlusionLayers ?? [];

@@ -4,7 +4,6 @@ import { ArrowRight, LockKeyhole, MapPin, Sparkles } from "lucide-react";
 import "./studio-virtual-space-place-gallery.css";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import type { StudioVirtualSpaceZoneId } from "./studio-virtual-space-model";
 import {
   STUDIO_VIRTUAL_PLACE_CATEGORIES,
   studioVirtualPlacesForMode,
@@ -15,8 +14,8 @@ import type { StudioWorldInteractionDefinition } from "./studio-virtual-space-wo
 
 export interface StudioVirtualSpacePlaceGalleryProps {
   readonly personal: boolean;
-  readonly currentRoomId: StudioVirtualSpaceZoneId;
-  readonly onMove: (roomId: StudioVirtualSpaceZoneId) => void;
+  readonly currentPlaceId: string;
+  readonly onSelectPlace: (placeId: string) => void;
   readonly onOpen?: (action: StudioWorldInteractionDefinition["action"]) => void;
 }
 
@@ -38,8 +37,8 @@ function placeLabel(place: StudioVirtualPlaceDefinition, bilingual: (ko: string,
 
 export function StudioVirtualSpacePlaceGallery({
   personal,
-  currentRoomId,
-  onMove,
+  currentPlaceId,
+  onSelectPlace,
   onOpen,
 }: StudioVirtualSpacePlaceGalleryProps) {
   const bt = useBilingual("domains.creator.virtual-space.StudioVirtualSpacePlaceGallery");
@@ -80,7 +79,7 @@ export function StudioVirtualSpacePlaceGallery({
 
       <div className="studio-place-gallery__grid">
         {places.map((place) => {
-          const active = place.roomId === currentRoomId;
+          const active = place.id === currentPlaceId;
           const label = placeLabel(place, bt);
           return (
             <article key={place.id} data-active={active || undefined} data-recommended={place.recommended || undefined}>
@@ -88,7 +87,7 @@ export function StudioVirtualSpacePlaceGallery({
                 type="button"
                 className="studio-place-gallery__preview"
                 aria-label={bt(`${place.labelKo}로 이동`, `Move to ${place.labelEn}`)}
-                onClick={() => onMove(place.roomId)}
+                onClick={() => onSelectPlace(place.id)}
               >
                 <img src={place.previewUrl} alt="" loading="lazy" decoding="async" draggable={false} />
                 <span className="studio-place-gallery__shade" aria-hidden />
@@ -101,7 +100,7 @@ export function StudioVirtualSpacePlaceGallery({
                 <h3>{label}</h3>
                 <p>{bt(place.descriptionKo, place.descriptionEn)}</p>
                 <div>
-                  <button type="button" onClick={() => onMove(place.roomId)}>
+                  <button type="button" onClick={() => onSelectPlace(place.id)}>
                     <MapPin size={14} aria-hidden />{active ? bt("둘러보기", "Explore") : bt("이동", "Move")}
                   </button>
                   {place.action && onOpen ? (

@@ -13,28 +13,32 @@ interface StudioSessionPositionStorage {
 export interface StudioVirtualSpacePositionScope {
   readonly projectId: string;
   readonly mode: "production" | "authoring-preview";
+  readonly placeId?: string;
 }
 
 export function studioVirtualSpacePositionScope(
   projectId: string,
   authoringPreview: boolean,
+  placeId?: string,
 ): StudioVirtualSpacePositionScope {
   return Object.freeze({
     projectId,
     mode: authoringPreview ? "authoring-preview" : "production",
+    ...(placeId ? { placeId } : {}),
   });
 }
 
 export function studioVirtualSpacePositionStorageKey(
   scope: StudioVirtualSpacePositionScope,
 ): string {
-  return `${VIRTUAL_SPACE_POSITION_STORAGE_PREFIX}:${scope.mode}:${scope.projectId.length}:${scope.projectId}`;
+  const place = scope.placeId ? `:${scope.placeId.length}:${scope.placeId}` : "";
+  return `${VIRTUAL_SPACE_POSITION_STORAGE_PREFIX}:${scope.mode}:${scope.projectId.length}:${scope.projectId}${place}`;
 }
 
 function legacyProductionStorageKey(scope: StudioVirtualSpacePositionScope): string | null {
   // The old authoring namespace was `${projectId}:local-world-preview`, so a
   // production project with that suffix cannot safely distinguish legacy data.
-  return scope.mode === "production" && !scope.projectId.endsWith(":local-world-preview")
+  return scope.mode === "production" && !scope.placeId && !scope.projectId.endsWith(":local-world-preview")
     ? `${LEGACY_VIRTUAL_SPACE_POSITION_STORAGE_PREFIX}:${scope.projectId}`
     : null;
 }
