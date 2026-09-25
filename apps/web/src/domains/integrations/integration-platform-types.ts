@@ -120,3 +120,99 @@ export interface DeveloperManifestResponse {
   readonly safety: Record<string, boolean>;
   readonly providers: number;
 }
+
+export type IntegrationRuntimeProviderId =
+  | "notion"
+  | "linear"
+  | "jira"
+  | "trello"
+  | "slack"
+  | "microsoft-teams"
+  | "figma"
+  | "zoom"
+  | "naver-datalab"
+  | "wikidata"
+  | "google-books";
+
+export interface IntegrationRuntimeConnectorStatus {
+  readonly providerId: IntegrationRuntimeProviderId;
+  readonly name: string;
+  readonly action: string;
+  readonly category: "work-management" | "communication" | "creation" | "data";
+  readonly configured: boolean;
+  readonly missingConfigurationCount: number;
+  readonly writesExternalState: boolean;
+  readonly executionMode: "operator-token" | "operator-webhook" | "public-protocol";
+  readonly summary: string;
+  readonly exampleInput: Readonly<Record<string, unknown>>;
+}
+
+export interface IntegrationRuntimeConnectorsResponse {
+  readonly generatedAt: string;
+  readonly durability: "database-receipt";
+  readonly connectors: readonly IntegrationRuntimeConnectorStatus[];
+  readonly safety: {
+    readonly explicitConfirmation: boolean;
+    readonly idempotencyReceipt: boolean;
+    readonly unofficialBrowserAutomation: boolean;
+    readonly providerPasswordsAccepted: boolean;
+  };
+}
+
+export interface IntegrationRuntimeExecuteRequest {
+  readonly projectId: string;
+  readonly mutationId: string;
+  readonly dryRun: boolean;
+  readonly confirm: boolean;
+  readonly request: {
+    readonly providerId: IntegrationRuntimeProviderId;
+    readonly action: string;
+    readonly input: Readonly<Record<string, unknown>>;
+  };
+}
+
+export interface IntegrationRuntimeExecutionResponse {
+  readonly schema: string;
+  readonly state: "planned" | "succeeded";
+  readonly projectId: string;
+  readonly mutationId: string;
+  readonly requestDigest: string;
+  readonly providerId: IntegrationRuntimeProviderId;
+  readonly action: string;
+  readonly replayed?: boolean;
+  readonly transientResult?: boolean;
+  readonly generatedAt?: string;
+  readonly completedAt?: string;
+  readonly configured?: boolean;
+  readonly executable?: boolean;
+  readonly writesExternalState?: boolean;
+  readonly executionMode?: string;
+  readonly missingConfigurationCount?: number;
+  readonly notice?: string;
+  readonly externalId?: string | null;
+  readonly result?: Readonly<Record<string, unknown>>;
+}
+
+export type IntegrationRuntimeReceiptState =
+  | "pending"
+  | "succeeded"
+  | "failed"
+  | "uncertain";
+
+export interface IntegrationRuntimeReceipt {
+  readonly projectId: string;
+  readonly mutationId: string;
+  readonly provider: string;
+  readonly operation: string;
+  readonly state: IntegrationRuntimeReceiptState;
+  readonly externalId: string | null;
+  readonly errorCode: string | null;
+  readonly response: Readonly<Record<string, unknown>> | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface IntegrationRuntimeReceiptsResponse {
+  readonly generatedAt: string;
+  readonly receipts: readonly IntegrationRuntimeReceipt[];
+}
