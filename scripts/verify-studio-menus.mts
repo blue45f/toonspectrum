@@ -987,6 +987,16 @@ async function assertRailTools(page: Page): Promise<string[]> {
   return failures;
 }
 
+export async function dismissCinematicCanvasWelcome(page: Page): Promise<boolean> {
+  const welcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
+  if (!(await welcome.isVisible().catch(() => false))) return false;
+  await welcome
+    .getByRole("button", { name: "시작 안내 닫기", exact: true })
+    .click({ timeout: 5_000 });
+  await welcome.waitFor({ state: "hidden", timeout: 5_000 });
+  return true;
+}
+
 export async function closeFloatingUi(page: Page) {
   await page.keyboard.press("Escape").catch(() => undefined);
   await page.waitForTimeout(80);
@@ -1188,6 +1198,9 @@ async function assertDrawOptionsBar(page: Page): Promise<string[]> {
 async function assertFloatingLayoutManager(page: Page): Promise<string[]> {
   const failures: string[] = [];
   try {
+    // The empty-canvas welcome intentionally hides this launcher until dismissed. It can
+    // mount after the initial overlay sweep on slower CI runners, so resolve it here too.
+    await dismissCinematicCanvasWelcome(page);
     // Drawing options are now a persistent inline workbench, not a floating dock.
     // Exercise the real optional arrangement launcher and keep offline/save safety visible.
     const workbench = page.locator('[data-studio-workbench-options="true"]');

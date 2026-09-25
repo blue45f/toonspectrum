@@ -26,6 +26,7 @@ import { StudioBackgroundPanel } from "../apps/web/src/domains/creator/StudioBac
 import {
   CATALOGUE_GROUPS,
   closeFloatingUi,
+  dismissCinematicCanvasWelcome,
   dismissOverlays,
   IMAGE_RAIL_ENTRY,
   QUICK_ACCESS_CLOSE_LABEL,
@@ -232,6 +233,23 @@ function betaNoticePageFixture(options?: { clickRejects?: boolean }) {
   };
   return { acknowledgeClick, acknowledgeDispatch, keyboardPress, notice, noticeWaitFor, page };
 }
+
+it("dismisses the late empty-canvas welcome before using the intentionally hidden view launcher", async () => {
+  const click = vi.fn(async () => undefined);
+  const waitFor = vi.fn(async () => undefined);
+  const getByRole = vi.fn(() => ({ click }));
+  const welcome = { isVisible: vi.fn(async () => true), getByRole, waitFor };
+  const page = { locator: vi.fn(() => welcome) };
+
+  await expect(dismissCinematicCanvasWelcome(
+    page as unknown as import("playwright").Page,
+  )).resolves.toBe(true);
+
+  expect(page.locator).toHaveBeenCalledWith('[data-studio-cinematic-canvas-welcome="true"]');
+  expect(getByRole).toHaveBeenCalledWith("button", { name: "시작 안내 닫기", exact: true });
+  expect(click).toHaveBeenCalledWith({ timeout: 5_000 });
+  expect(waitFor).toHaveBeenCalledWith({ state: "hidden", timeout: 5_000 });
+});
 
 it("acknowledges the blocking Studio beta notice before menu interactions", async () => {
   const fixture = betaNoticePageFixture();
