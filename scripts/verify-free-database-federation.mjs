@@ -3,7 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { readFreeDatabaseFederation } from "./free-database-federation.mjs";
+import { FREE_DATABASE_FEDERATION_ROOT, readFreeDatabaseFederation } from "./free-database-federation.mjs";
 
 const REQUIRED_MANIFESTS = [
   "deploy/federated-data-plane/cockroachdb/ledger.sql",
@@ -25,7 +25,7 @@ const REQUIRED_MANIFESTS = [
   "docs/operations/federated-free-database-data-plane.md",
 ];
 
-function verifyManifests(root = process.cwd()) {
+function verifyManifests(root = FREE_DATABASE_FEDERATION_ROOT) {
   const missing = REQUIRED_MANIFESTS.filter((path) => !existsSync(resolve(root, path)));
   if (missing.length > 0) {
     throw new Error(`Missing federated data-plane manifests: ${missing.join(", ")}`);

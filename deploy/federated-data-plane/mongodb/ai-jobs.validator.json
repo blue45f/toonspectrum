@@ -11,6 +11,7 @@
       "updatedAt"
     ],
     "properties": {
+      "_id": { "bsonType": ["objectId", "string"] },
       "ownerId": { "bsonType": "string", "maxLength": 191 },
       "jobType": { "bsonType": "string", "maxLength": 120 },
       "status": {
