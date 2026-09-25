@@ -131,8 +131,8 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
         data-stable-contrast="true"
         className="pointer-events-auto w-[min(30rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-warning/45 bg-panel/95 text-fg shadow-[0_20px_70px_oklch(0.05_0.02_265/0.55)] backdrop-blur-xl"
       >
-        <div className="flex items-start gap-3 p-3.5 sm:p-4">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-warning/40 bg-warning-soft text-warning">
+        <div className="flex items-start gap-2.5 p-2.5 sm:gap-3 sm:p-4">
+          <span className="grid size-8 shrink-0 sm:size-10 place-items-center rounded-xl border border-warning/40 bg-warning-soft text-warning">
             <AlertTriangle size={20} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
@@ -140,11 +140,11 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
               <span className="rounded-full border border-warning/40 bg-warning-soft px-2 py-0.5 text-[0.62rem] font-black tracking-[0.14em] text-warning">
                 {copy.badge}
               </span>
-              <h2 id={titleId} className="text-sm font-black leading-5 text-fg">
+              <h2 id={titleId} className="text-xs font-black leading-5 text-fg sm:text-sm">
                 {copy.title}
               </h2>
             </div>
-            <p className="mt-1.5 text-xs leading-5 text-fg-2">{copy.intro}</p>
+            <p className="mt-1.5 hidden text-xs leading-5 text-fg-2 sm:block">{copy.intro}</p>
           </div>
         </div>
 
@@ -168,13 +168,13 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
           </div>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line/70 bg-card/45 px-3.5 py-2.5 sm:px-4">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-line/70 bg-card/45 px-2.5 py-2 sm:flex sm:flex-wrap sm:justify-end sm:px-4 sm:py-2.5">
           <button
             type="button"
             aria-expanded={detailsOpen}
             aria-controls={detailsId}
             onClick={() => setDetailsOpen((current) => !current)}
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-bold text-fg-2 transition hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-2.5 sm:min-h-10 sm:px-3 text-xs font-bold text-fg-2 transition hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             {detailsOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
             {detailsOpen ? copy.hideDetails : copy.showDetails}
@@ -183,7 +183,7 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
             type="button"
             data-studio-beta-notice-acknowledge="true"
             onClick={acknowledge}
-            className="inline-flex min-h-10 items-center justify-center rounded-xl bg-accent px-4 text-xs font-black text-on-accent shadow-sm transition hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="inline-flex min-h-9 items-center justify-center rounded-xl bg-accent px-3 sm:min-h-10 sm:px-4 text-xs font-black text-on-accent shadow-sm transition hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             {copy.action}
           </button>

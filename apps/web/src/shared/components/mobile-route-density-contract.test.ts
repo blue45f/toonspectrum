@@ -37,11 +37,17 @@ describe("mobile route density contract", () => {
     const beta = source("../../domains/creator/StudioBetaNoticeGate.tsx");
     const shell = source("./public-site-shell.css");
     const scene = source("./route-purpose-scene.css");
+    const workspace = source("./workspace/workspace-visual-v3.css");
+    const research = source("../../domains/creator-resources/CreatorHubPage.tsx");
 
     expect(floating).toContain("calc(9rem+env(safe-area-inset-bottom))");
     expect(beta).toContain("bottom-[calc(9rem+env(safe-area-inset-bottom))]");
     expect(shell).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
     expect(scene).toContain("min-height: 8rem");
     expect(scene).toContain(".route-purpose-scene__cards,");
+    expect(workspace).toContain("grid-template-columns:repeat(5,minmax(0,1fr))");
+    expect(workspace).toContain('data-navigation-entry="all-menu"');
+    expect(research).toContain("이동할 섹션 선택");
+    expect(research).toContain('className="hidden gap-2 overflow-x-auto rounded-2xl border border-line bg-panel p-2 sm:flex"');
   });
 });

@@ -65,7 +65,7 @@
   .workspace-topbar{flex-wrap:wrap;gap:8px;padding:8px 16px;height:auto;min-height:112px}
   .workspace-brand{flex:1}.workspace-brand strong{font-size:16px}.workspace-utilities{order:1;flex:none}
   .workspace-project-select{order:2;flex-basis:100%}.workspace-project-select>span{display:inline}.workspace-project-select select{max-width:none}
-  .workspace-nav{position:fixed;inset:auto 0 0;z-index:60;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;min-height:70px;padding:4px 6px calc(4px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--color-line)}
+  .workspace-nav{position:fixed;inset:auto 0 0;z-index:60;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;min-height:70px;padding:4px 6px calc(4px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--color-line)}
   .workspace-nav a{min-height:60px;gap:4px;font-size:12px;padding:5px 2px}.workspace-nav svg{width:20px;height:20px}
   .workspace-main{padding:20px 16px;overflow:visible;flex:1}.workspace-heading{align-items:flex-start;flex-direction:column;gap:12px;margin-bottom:20px}.workspace-heading h1{font-size:24px}
   .workspace-list-view{display:flex;flex-direction:column;gap:18px}.workspace-current-work{padding:8px 0 4px}.workspace-current-work h2{font-size:28px}
