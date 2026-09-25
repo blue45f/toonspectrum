@@ -1,7 +1,8 @@
 # @toonspectrum/contracts
 
-Focused runtime-neutral contracts shared by two or more deployable applications.
+둘 이상의 배포 가능한 애플리케이션이 공유하는 좁고 실행 환경에 중립적인 계약 package다.
 
-Keep this package free of React, DOM/browser runtime APIs, NestJS, database clients, HTTP clients, storage adapters, and application source imports. UI helpers stay in their owning app; only stable DTO/schema/constants/pure validation belong here.
+React, DOM/browser runtime API, NestJS, DB client, HTTP client, storage adapter와 application source import를
+금지한다. UI helper는 소유 앱에 남기고 안정된 DTO, schema, protocol 상수, 순수 validation만 둔다.
 
-Do not use this package as a shortcut for `packages/domains/*`. New exports require a real second consumer.
+`packages/domains/*`의 우회 경로로 사용하지 않는다. 새 export에는 실제 두 번째 소비자가 필요하다.

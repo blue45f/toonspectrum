@@ -1,28 +1,26 @@
 # ToonSpectrum Desktop Sync
 
-`apps/desktop-sync` is the single desktop synchronization application and library.
-It owns conflict-safe bidirectional sync, cloud providers, credentials, release packaging,
-and the local folder polling capability that previously lived in a separate workspace.
+`apps/desktop-sync`는 단일 desktop 동기화 애플리케이션이자 library다. 충돌 안전 양방향 동기화,
+cloud provider, credential, release packaging과 과거 별도 workspace였던 local folder polling을 소유한다.
 
-## Structure
+## 구조
 
 ```text
 src/
-  local-agent/      local folder scan, append journal, polling and short-lived upload grants
-  cloud/            Google Drive, Dropbox and OneDrive adapters
-  agent.ts          verified plan execution and atomic local/remote mutation
-  planner.ts        bidirectional reconciliation and conflict classification
-  journal.ts        canonical sync state journal
-  conflict-*.ts     explicit conflict review and resolution
-  runtime.ts        sync session lifecycle
-  cli.ts            packaged command-line entry
+  local-agent/   폴더 스캔, append journal, polling, 단기 upload grant
+  cloud/         Google Drive, Dropbox, OneDrive adapter
+  agent.ts       검증된 plan 실행과 원자적 local/remote mutation
+  planner.ts     양방향 reconciliation과 충돌 분류
+  journal.ts     동기화 상태 원장
+  conflict-*.ts  명시적 충돌 검토·해결
+  runtime.ts     sync session 수명주기
+  cli.ts         배포 CLI 진입점
 ```
 
-The package root exports the canonical bidirectional sync API. The local polling API is
-available through `@toonspectrum/desktop-sync/local-agent` so its transport types do not
-collide with the root execution transport.
+package root는 canonical bidirectional sync API를 공개한다. local polling API는
+`@toonspectrum/desktop-sync/local-agent` subpath로 분리해 root 실행 transport와 타입이 충돌하지 않게 한다.
 
-## Commands
+## 명령
 
 ```sh
 pnpm --filter @toonspectrum/desktop-sync typecheck

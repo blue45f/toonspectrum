@@ -1,5 +1,8 @@
 # ToonSpectrum Studio 아키텍처·성능 개선 외부 검토 (2026-09-02)
 
+> **역사 자료:** 2026-09-02 시점의 외부 검토 기록이다. 현재 구조와 엔진 역할은 `ARCHITECTURE.md`, `docs/architecture/studio-current-boundaries.md`, `docs/engines/renderer-roles.md`가 우선한다.
+
+
 - 출처: ChatGPT 공유 대화 「아키텍처 성능 개선 검토」
   (https://chatgpt.com/share/6a971776-f7f4-83ee-8186-d1127baa70b0, 모델 `gpt-5-6-pro`)
 - 검토 대상: 저장소 `main` 커밋 `e90aadbe` 시점 소스 + https://www.toonstudio.cloud/studio
@@ -28,7 +31,7 @@
 | 8 | Hokusai 최종 픽셀은 원본 payload를 다시 읽어 영향 없음 | **확인** | `packages/studio-brush-platform/src/raster-compile.ts`가 `sourcePayload`를 재해석 | provider-native 목록 드리프트 가드 추가 |
 | 9 | Quick Start가 blocking modal로 첫 획을 막음 | **stale(부분)** | 2026-08-08 감사 이후 backdrop은 `pointer-events-none`으로 바뀌어 캔버스 클릭은 통과. 그러나 `aria-modal` 포커스 트랩·전면 blur backdrop·상단 중앙 배치는 남아 있음 | 비모달 우하단 카드로 전환, backdrop 제거, Esc는 카드 내부 포커스일 때만 |
 | 10 | 기본 도구가 `select`라 첫 획 전에 전환이 필요 | **확인** | `useState<Tool>("select")` (host 5048행), `showQuickStart`가 `tool !== "draw"`를 요구 | 신규/빈 문서는 draw, 기존 문서는 마지막 도구 복원(`primary-tool` 선호값) |
-| 11 | 매뉴얼은 "WebGPU 기반 캔버스", 경계 감사는 Konva 권위 | **확인** | `STUDIO_MANUAL.md:26` vs `docs/rewrite/current-studio-boundary.md` §1 | 매뉴얼 문장 수정, 렌더러 역할 문서를 원장에서 자동 생성 |
+| 11 | 매뉴얼은 "WebGPU 기반 캔버스", 경계 감사는 Konva 권위 | **확인** | `STUDIO_MANUAL.md:26` vs `docs/architecture/studio-current-boundaries.md` §1 | 매뉴얼 문장 수정, 렌더러 역할 문서를 원장에서 자동 생성 |
 | 12 | 실험 진입점이 `src` 최상위에 제품 소스와 혼재 | **확인** | `src/hand-compare-main.ts`, `src/props-compare-main.ts`, `src/hybrid-dcc-e2e-main.tsx` + 루트 html 3개 | `tools/browser-harnesses/`로 이동, `validate:architecture`가 재발 차단 |
 | 13 | 패키지 설명이 "V11/V12" 단계명에 묶임 | **확인** | `packages/*/package.json` description 6개 | 책임 기반 문구로 교체 |
 | 14 | `studio-project-model` 책임 과다(IR+CommandBus+journal+recovery+browser/node) | **확인** | `exports`에 `./node`, `./browser` 하위 런타임 포함 | 분리는 P1 로드맵(경계 테스트 먼저) |

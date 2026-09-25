@@ -1,46 +1,44 @@
-# Security advisory coverage
+# 보안 advisory 예외 정책
 
-`pnpm run audit:security` checks production and development dependencies at every
-severity level. It is part of the required CI `core` gate through the lint job.
-`scripts/verify-security-advisory-exceptions.mjs` rejects nonempty or malformed
-advisory exclusion lists before running the registry audit. There are no active
-dependency advisory exceptions.
+- 상태: **현재 보안 정책**
+- 최종 갱신: **2026-09-26**
 
-## Retired React Router exception
+`pnpm run audit:security`는 production·development dependency를 모든 severity에서 검사하며 필수 CI core
+lint gate에 포함된다. `scripts/verify-security-advisory-exceptions.mjs`는 registry audit 전에 비어 있지
+않거나 잘못된 advisory exclusion list를 거부한다.
 
-The former `GHSA-qwww-vcr4-c8h2` exclusion was removed on 2026-09-08. The
-[GitHub advisory](https://github.com/advisories/GHSA-qwww-vcr4-c8h2) now correctly
-identifies React Router 7.18.2 as the first fixed v7 release. The installed
-`react-router-dom@7.18.2` / `react-router@7.18.2` pair therefore passes the audit
-without an exception. The old RSC-only configuration restrictions and review
-deadline existed solely to justify that metadata exclusion and are retired with it.
+**현재 dependency advisory 예외는 없다.**
 
-## Reviewed code-scanning exceptions
+## 종료된 React Router 예외
 
-The following alerts were reviewed against their actual data flows. Their GitHub
-records contain the rationale; the scanning rules remain enabled for other occurrences.
+과거 `GHSA-qwww-vcr4-c8h2` metadata 예외는 2026-09-08 제거했다. GitHub advisory가
+React Router 7.18.2를 v7 최초 수정 release로 반영했으므로 설치된
+`react-router-dom@7.18.2`/`react-router@7.18.2`는 예외 없이 audit을 통과한다. 예외를 정당화하던 RSC-only
+제약과 review deadline도 종료됐다.
 
-| Alert | Evidence |
+## 검토된 code-scanning 예외
+
+다음 alert는 실제 data flow를 검토했고 GitHub alert record에 근거를 남겼다. scanning rule은 다른
+발생 위치에서 계속 활성화된다.
+
+| alert | 검토 근거 |
 | --- | --- |
-| [12](https://github.com/blue45f/toonspectrum/security/code-scanning/12) | The cookie contains an HS256-signed session JWT with an opaque user id, session version, issuer/audience and timestamps. It does not contain OAuth provider passwords or access tokens. HttpOnly, production Secure, SameSite=Lax and expiry are enforced. |
-| [24](https://github.com/blue45f/toonspectrum/security/code-scanning/24) | The SHA-256 HMAC authenticates JWT messages with a server key; it does not hash user passwords. The OAuth callback passes only user id and session version to `signSession`. |
-| [18](https://github.com/blue45f/toonspectrum/security/code-scanning/18), [19](https://github.com/blue45f/toonspectrum/security/code-scanning/19) | The coturn TURN REST protocol requires HMAC-SHA1 for expiring relay credentials. This is a keyed MAC, not an unkeyed SHA-1 digest. Private user/work identity is independently protected with HMAC-SHA256. The test intentionally verifies protocol compatibility. |
-| [59](https://github.com/blue45f/toonspectrum/security/code-scanning/59) | The private preview component receives only a browser-generated `URL.createObjectURL(file)` value or an empty string. No filename or DOM text becomes HTML. A regression test checks a markup-like filename and URL revocation. |
-| [100](https://github.com/blue45f/toonspectrum/security/code-scanning/100) | Reviewed on 2026-09-17. Naver's disconnect-callback protocol derives the AES/HMAC key material from the client secret with MD5. The digest is not a password hash or a general application primitive: HMAC-SHA256 authenticates the timestamped callback fields, AES-128-CBC decrypts the provider id, and fixed protocol vectors cover interoperability. Only this exact query occurrence is suppressed in source. |
+| code scanning #12 | cookie는 opaque user ID, session version, issuer/audience, timestamp를 가진 HS256-signed session JWT다. provider password/access token은 없고 HttpOnly, production Secure, SameSite=Lax, expiry를 적용한다. |
+| #24 | SHA-256 HMAC은 server key로 JWT message를 인증하며 user password hash가 아니다. OAuth callback은 user ID와 session version만 `signSession`에 전달한다. |
+| #18, #19 | coturn REST protocol이 expiring relay credential에 HMAC-SHA1을 요구한다. unkeyed SHA-1 digest가 아니며 private identity는 별도 HMAC-SHA256으로 보호한다. |
+| #59 | private preview는 `URL.createObjectURL(file)` 또는 빈 문자열만 받는다. filename/DOM text를 HTML로 만들지 않으며 markup-like filename과 URL revoke 회귀 검사가 있다. |
+| #100 | Naver disconnect callback protocol이 client secret에서 AES/HMAC key material을 MD5로 파생한다. password hash/general primitive가 아니며 HMAC-SHA256, AES-128-CBC와 protocol vector로 범위를 제한한다. |
 
-Protocol references: [Naver Login development guide](https://developers.naver.com/docs/login/devguide/devguide.md),
-[coturn TURN REST documentation](https://github.com/coturn/coturn/blob/master/README.turnserver#turn-rest-api),
-and [SVG image processing modes](https://www.w3.org/TR/SVG/conform.html#processing-modes).
+Naver Login, coturn TURN REST, SVG processing mode의 공식 protocol 문서를 상호운용 근거로 사용한다.
 
-The two secret-scanning findings were also reviewed as synthetic test data:
-a hand-written diagnostic-redaction token and an example UUID used as a test
-publisher id. They were resolved as `used_in_tests`; their literal fixtures were
-replaced with a provider-neutral redaction string and a generated test UUID.
+## secret-scanning 검토
 
-On 2026-09-17, secret-scanning alerts [3](https://github.com/blue45f/toonspectrum/security/secret-scanning/3),
-[4](https://github.com/blue45f/toonspectrum/security/secret-scanning/4), and
-[5](https://github.com/blue45f/toonspectrum/security/secret-scanning/5) were reviewed as
-OpenVSX-token false positives. Each value was a distinct synthetic publisher UUID in a
-test file, not a credential. The fixtures now assemble the same valid UUIDs from segments
-instead of expanding secret-scanning path ignores; the alerts are resolved as
-`false_positive`.
+hand-written diagnostic token과 test publisher UUID는 synthetic fixture로 확인해 `used_in_tests`로
+종료했고 provider-neutral redaction string과 generated UUID로 교체했다.
+
+2026-09-17 OpenVSX token alert #3, #4, #5는 서로 다른 synthetic publisher UUID를 credential로 오인한
+false positive였다. path ignore를 넓히지 않고 fixture가 같은 UUID를 segment에서 조립하도록 바꾸고
+`false_positive`로 종료했다.
+
+새 예외를 추가하기보다 dependency 또는 code를 수정한다. 불가피한 protocol 예외는 정확한 발생 위치,
+data flow, 공식 protocol 근거, review date와 회귀 검사를 함께 기록한다.

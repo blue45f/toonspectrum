@@ -1,35 +1,30 @@
-# Creator inference worker
+# Creator Inference Worker
 
-Actual model adapters for Wan2.1 image-to-video, TripoSR single-view reconstruction,
-and Blender-rendered SDXL ControlNet image-to-image. There is **no success-shaped
-placeholder inference**. An unconfigured model returns 503; failed inference remains failed.
+Wan2.1 image-to-video, TripoSR single-view reconstruction, Blender-rendered SDXL ControlNet
+image-to-image를 실행하는 별도 model adapter 서비스다. 성공 형태의 placeholder inference는 없다.
+model이 설정되지 않으면 503, inference가 실패하면 실패 상태를 유지한다.
 
-## Operational status
+## 운영 상태
 
-The CPU API/validation tests run without model weights, with an explicitly injected
-**test-only runner**. They do not measure generated visual quality. This integration
-has not been qualified on a CUDA GPU or deployed to production. Before exposing it
-to creators, run `gpu-smoke.py`, inspect its actual outputs and establish GPU memory,
-latency, disk, license and content-moderation budgets for your installation.
+CPU API·validation test는 weight 없이 **test-only runner**를 주입해 실행한다. 생성 품질을 측정하지
+않으며 CUDA GPU 운영 검증이나 production 배포 완료를 의미하지 않는다. Creator에게 노출하기 전에
+`gpu-smoke.py`를 실행하고 실제 output, GPU memory, latency, disk, license, content moderation budget을
+검토한다.
 
-No third-party paid API is called. Owning model files is not free GPU hosting. Do not
-provision hardware, accept a model license or download large weights automatically.
+유료 third-party API를 호출하지 않는다. model 파일을 소유해도 GPU hosting 비용은 사라지지 않는다.
+hardware provision, license 수락, 대용량 weight download를 자동화하지 않는다.
 
-## Setup (Linux, Python 3.11/3.12, one worker process per data directory)
+## 설치
 
-1. Create a virtual environment. Install a matching CUDA PyTorch/torchvision pair
-   using the official PyTorch installation selector. Install system `ffmpeg` and
-   a current security-patched Blender binary. Do not expose Blender directly.
-2. `python -m pip install -r requirements-models.txt`. Resolve and freeze this profile
-   in your approved runtime image after real GPU tests; it is not a GPU-tested lock.
-3. Review and clone `VAST-AI-Research/TripoSR` to an immutable approved commit under
-   `/opt/TripoSR`. Compile `tatsy/torchmcubes` at an approved commit against the same
-   CUDA/PyTorch version. Do not run upstream's entire old requirements file over this
-   environment; it pins older Transformers/Pillow. The adapter overrides only DINO
-   config loading, keeping all network access out of inference.
-4. For each selected model, inspect its model card/license and copy the **40-character
-   repository revision** into the explicit acquisition command below. This command
-   downloads model weights and requires an operator's network/storage budget.
+대상: Linux, Python 3.11/3.12, data directory당 worker process 1개.
+
+1. virtual environment를 만들고 공식 PyTorch selector로 CUDA에 맞는 PyTorch/torchvision을 설치한다.
+   system `ffmpeg`와 security patch가 적용된 Blender를 설치하되 Blender를 직접 외부에 노출하지 않는다.
+2. `python -m pip install -r requirements-models.txt`를 실행한다. 실제 GPU 검증 뒤 승인된 runtime image에
+   resolution을 고정한다.
+3. `VAST-AI-Research/TripoSR`과 `tatsy/torchmcubes`를 검토된 immutable commit으로 설치한다. upstream의
+   오래된 전체 requirements를 이 환경에 덮어쓰지 않는다.
+4. 각 model card·license를 검토하고 정확한 40자리 repository revision을 명시해 weight를 받는다.
 
 ```sh
 python install-models.py wan --directory /models --revision "$WAN_REVISION" --accept-model-license
@@ -39,15 +34,14 @@ python install-models.py sdxl --directory /models --revision "$SDXL_REVISION" --
 python install-models.py controlnet --directory /models --revision "$CONTROLNET_REVISION" --accept-model-license
 ```
 
-The variables above must contain reviewed revisions, not `main`. The downloader
-records per-file SHA-256 manifests and excludes executable code and generic pickle
-formats. TripoSR's explicitly allowed `model.ckpt` is loaded with `weights_only=True`.
-Retain manifests and notices with the read-only model volume. Transparent PNG is
-sufficient for TripoSR. For opaque source removal, separately install `rembg[cpu]`
-and review/place `u2net.onnx` in `/models/rembg`; it is never auto-acquired by this app.
+`main` 같은 이동 branch를 revision으로 사용하지 않는다. downloader는 파일별 SHA-256 manifest를 만들고
+실행 code와 일반 pickle을 제외한다. 명시적으로 허용한 TripoSR `model.ckpt`는 `weights_only=True`로
+읽는다. manifest와 notice는 read-only model volume과 함께 보존한다.
+
+opaque background 제거가 필요하면 `rembg[cpu]`와 검토한 `u2net.onnx`를 `/models/rembg`에 별도 설치한다.
+이 애플리케이션은 자동으로 받지 않는다.
 
 ```sh
-# Supply a secret using your secret manager; never commit it or send it to a browser.
 export CREATOR_INFERENCE_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
 export CREATOR_MODEL_ROOT=/models
 export CREATOR_TRIPOSR_CODE=/opt/TripoSR
@@ -57,83 +51,71 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 uvicorn app:application --factory --host 127.0.0.1 --port 8090 --workers 1
 ```
 
-Configure the existing Nest API with the same secret and `CREATOR_INFERENCE_URL`:
-loopback/private container URL, or a protected **HTTPS** origin reachable from the
-actual API deployment. A Vercel function's localhost is not the GPU machine. An API
-URL root has no credentials, path, query or fragment. The browser uses the existing
-signed HttpOnly session + CSRF middleware; only the API sees this shared secret.
+Nest API에는 같은 secret과 `CREATOR_INFERENCE_URL`을 설정한다. URL은 실제 API 배포에서 접근 가능한
+loopback/private container URL 또는 보호된 HTTPS origin이어야 한다. browser는 기존 signed HttpOnly
+session + CSRF를 사용하고 shared secret은 API만 본다.
 
-Do not enable multiworker uvicorn; an OS advisory lock refuses a second runtime on
-one data directory. Keep the SQLite directory on durable local storage (not NFS).
-Run unprivileged, mount model/code read-only, give the data volume only to this worker,
-allow ingress only from your authenticated gateway, and deny model-subprocess network
-egress in the container/firewall. The child environment explicitly excludes gateway
-and database credentials. Protect restricted `worker.log` files and rotate them.
+multiworker uvicorn을 사용하지 않는다. OS advisory lock이 같은 data directory의 두 번째 runtime을
+거부한다. SQLite는 durable local storage에 두고 NFS를 사용하지 않는다. unprivileged user로 실행하고
+model/code는 read-only, data volume은 worker 전용, ingress는 인증 gateway만 허용한다. child process
+network egress와 credential 전달을 차단하고 restricted `worker.log`를 보호·회전한다.
 
-## API behavior
+## API·저장 계약
 
-Uploads use 1 MiB authenticated JSON/base64 chunks, full SHA-256 and format validation.
-Inputs never accept a URL; GLB rejects external HTTP/file references. Owner IDs are
-set by validated server sessions, not browser headers. Inputs and outputs stay within
-that owner. Jobs persist to SQLite, and a stable idempotency key prevents duplicate
-submission after ambiguous network failure. One GPU job runs at a time. Restart marks
-running jobs interrupted rather than claiming success or invisibly charging another run.
+- upload: 1 MiB 인증 JSON/base64 chunk, 전체 SHA-256과 format 검증
+- input URL 금지, GLB external HTTP/file reference 금지
+- owner ID는 browser header가 아니라 검증된 server session에서 설정
+- job은 SQLite에 저장하고 stable idempotency key로 중복 제출 방지
+- GPU job은 한 번에 하나
+- restart 시 running job은 성공으로 위장하지 않고 interrupted 처리
+- cancel 시 subprocess group 종료
+- terminal result와 사용하지 않는 upload는 사용자 명시 삭제 지원
 
-Cancellation terminates the subprocess group. The UI can delete terminal results and
-explicitly remove unused uploaded inputs. Active/cancelling jobs protect their inputs.
-Limits: 2 active jobs/user, 12 global queued+running, 12 submissions/user/day by default,
-256 MiB/user upload allocation, 2 GiB free-disk reserve, one-hour job timeout. Set
-`CREATOR_DAILY_JOB_LIMIT` and `CREATOR_JOB_TIMEOUT_SECONDS` for your measured deployment.
-No automatic retention deletion is configured; publish a retention policy and run
-owner-requested deletion or an operator-reviewed retention process before production.
+기본 한도:
 
-Results are validated, sized and SHA-256 hashed before success. Browser downloads
-also use 1 MiB chunks, respecting serverless response-size limits. All job endpoints
-are `no-store`; no private content is put in a service-worker cache.
+- 사용자당 active job 2개
+- 전체 queued+running 12개
+- 사용자당 하루 submission 12개
+- 사용자당 upload allocation 256 MiB
+- free disk reserve 2 GiB
+- job timeout 1시간
 
-## Semantics and limitations
+`CREATOR_DAILY_JOB_LIMIT`, `CREATOR_JOB_TIMEOUT_SECONDS`는 실제 측정 뒤 조정한다. 자동 retention 삭제는
+기본 제공하지 않는다. production 전에 정책을 게시하고 owner 요청 또는 운영자 검토 절차로 삭제한다.
 
-- Wan generates new frames (not just camera transforms), then combines up to 8 shots
-  with an MP4, SRT captions and a provenance storyboard. There is no synthetic speech,
-  music or guarantee of character consistency between shots.
-- TripoSR infers a colored GLB mesh from a single image. Hidden surfaces are guesses.
-  It does not produce a skeletal rig, guaranteed watertight production topology or
-  a scan-equivalent reconstruction. `preview.png` is the normalized input reference.
-- 3D→2D renders the uploaded GLB at the requested yaw using Blender, extracts Canny
-  control structure and runs SDXL img2img. It preserves structure as conditioning,
-  not as a mathematical guarantee of face, hand or character identity.
+결과는 success 전에 format, size, SHA-256을 검증한다. download도 1 MiB chunk를 사용한다. 모든 job
+endpoint는 `no-store`이며 private content를 service worker cache에 넣지 않는다.
 
-## Dependency security baseline
+## 기능 의미와 제한
 
-The model profile pins `diffusers==0.38.0` to address
-[GHSA-98h9-4798-4q5v](https://github.com/advisories/GHSA-98h9-4798-4q5v) and
-[GHSA-7wx4-6vff-v64p](https://github.com/advisories/GHSA-7wx4-6vff-v64p).
-Use stable `safetensors>=0.8,<1` with this release. The existing Transformers 4.x
-and Hugging Face Hub 0.x ranges remain in place; this security update does not
-require a major-version migration or changes to the model acquisition command.
-The CPU test profile pins `pytest==9.0.3` for
-[GHSA-6w46-j5rx-g56g](https://github.com/advisories/GHSA-6w46-j5rx-g56g).
+- Wan: 새 frame을 생성하고 최대 8개 shot을 MP4, SRT caption, provenance storyboard로 묶는다.
+  synthetic speech·music이나 shot 간 character consistency를 보장하지 않는다.
+- TripoSR: 단일 image에서 colored GLB mesh를 추론한다. 보이지 않는 면은 추정이며 rig, watertight topology,
+  scan-equivalent 결과를 보장하지 않는다.
+- 3D -> 2D: Blender yaw render에서 Canny structure를 추출하고 SDXL img2img를 실행한다. structure
+  conditioning이며 얼굴·손·character identity를 수학적으로 보장하지 않는다.
 
-Run `python -m pytest services/creator-inference/test_runtime.py -q` from the
-repository root after installing `requirements-test.txt`. This includes regression
-checks on the dependency security floors. Dependency resolution and CPU tests do
-not qualify a CUDA/PyTorch pair or prove real model inference quality; retain the
-operator-run GPU acceptance process above. Do not download weights or enable an
-engine just to verify this dependency update.
+## dependency 보안 기준
 
-## Licenses / primary implementation references
+- `diffusers==0.38.0`: GHSA-98h9-4798-4q5v, GHSA-7wx4-6vff-v64p 대응
+- `safetensors>=0.8,<1`
+- CPU test profile `pytest==9.0.3`: GHSA-6w46-j5rx-g56g 대응
 
-Retain model notices and review usage restrictions before publishing the feature.
-Wan weights: Apache-2.0 model card. TripoSR code/weights: MIT per publisher. SDXL and
-ControlNet: CreativeML Open RAIL++-M, including usage restrictions, not an unrestricted
-MIT/Apache equivalent. Blender and each transitive runtime dependency retain their own
-licenses. No model weights or third-party source are vendored in this change.
+```sh
+python -m pytest services/creator-inference/test_runtime.py -q
+```
 
-- https://huggingface.co/docs/diffusers/v0.38.0/api/pipelines/wan
-- https://huggingface.co/Wan-AI/Wan2.1-I2V-14B-480P-Diffusers
-- https://github.com/VAST-AI-Research/TripoSR
-- https://huggingface.co/stabilityai/TripoSR
-- https://huggingface.co/facebook/dino-vitb16
-- https://huggingface.co/docs/diffusers/api/pipelines/controlnet_sdxl
-- https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/blob/main/LICENSE.md
-- https://huggingface.co/diffusers/controlnet-canny-sdxl-1.0
+dependency resolution과 CPU test는 CUDA/PyTorch 조합이나 실제 생성 품질을 인증하지 않는다. 이 보안
+갱신만 확인하기 위해 weight를 받거나 engine을 켜지 않는다.
+
+## 라이선스와 원 구현
+
+model notice와 사용 제한을 feature 공개 전에 검토·보존한다.
+
+- Wan weight: model card의 Apache-2.0
+- TripoSR code/weight: 게시자 기준 MIT
+- SDXL·ControlNet: CreativeML Open RAIL++-M, 사용 제한 포함
+- Blender와 transitive runtime: 각자 license 유지
+
+model weight나 third-party source를 저장소에 vendor하지 않는다. 원 구현 링크는 model acquisition
+검토 시 공식 문서와 model card에서 확인한다.

@@ -398,7 +398,7 @@ a별 출력 곡선을 산출 — 곡선이 위 프로파일(약한 값 보존, �
 | 캔버스 | cls | live 잉크(px) | released 잉크(px) |
 | --- | --- | ---: | ---: |
 | 09 | hidden(activeCanvas) | 1,515 | 0 |
-| 10 | pointer-events-none z-[11](presentation) | 1,481 (09의 0.92×=요소 불투명도) | 0 |
+| 10 | `pointer-events-none z-[11]` (presentation) | 1,481 (09의 0.92×=요소 불투명도) | 0 |
 | 02 | konvajs-content(메인) | 0 | 799 |
 
 라이브 잉크는 전부 오버레이 두 표면 위에 있고 릴리스와 함께 사라지며, 커밋은 별도

@@ -1,5 +1,8 @@
 # ToonStudio UI/UX 동선 감사 — V5 §15 수용 기준 실측
 
+> **역사 자료:** 2026-08-08 특정 worktree의 UI/UX 감사다. 현재 제품 상태나 수치를 의미하지 않는다.
+
+
 - 감사 일자: 2026-08-08
 - 감사 대상 워크트리: `/Users/hjunkim/WebstormProjects/toonspectrum/.claude/worktrees/toonstudio-v11-codex-master-23fdef`, 브랜치 `claude/toonstudio-v11-codex-master-23fdef`
 - 기준 문서: `docs/architecture/ToonStudio_최종공유본_초확장_멀티엔진_제품기능_UIUX_성능품질_아키텍처_V5_2026-08-07.md:533-660`
@@ -413,7 +416,7 @@ Undo/Redo/작업 내역은 갖춰져 있다. 그러나 V5가 요구하는 **prev
 ## 5. 부록 — 참고 자료
 
 - 정량 원본: `tests/benchmarks/results/ux-audit.json`
-- 선행 감사(경계값): `docs/rewrite/current-studio-boundary.md`
+- 선행 감사(경계값): `docs/architecture/studio-current-boundaries.md`
 - 주요 실측 대상 파일
   - `src/domains/creator/studio-main-menu-groups.ts` (8그룹/116항목/85 `onSelect`)
   - `src/domains/creator/studio-main-menu-model.ts:11-28` (`StudioMainMenuItem` — `commandId` 없음)

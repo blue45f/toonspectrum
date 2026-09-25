@@ -75,7 +75,7 @@ pnpm run cloudflare:static:deploy
 
 ## Vercel 제거 상태
 
-저장소의 Vercel 런타임, 서버리스 진입점, `vercel.json`, GitHub 배포 workflow와 관련 검증 코드는
+저장소의 Vercel 런타임, 서버리스 진입점, 퇴역 배포 구성, GitHub 배포 workflow와 관련 검증 코드는
 제거되어 정상 배포나 비상 롤백에 사용되지 않는다. Cloudflare Static Assets/Worker와 Render의
 직전 검증 version이 각각의 롤백 단위다. Vercel 프로젝트, custom domain 연결, 팀 플랜과 잔여
 배포 삭제는 코드 변경과 분리한 운영 작업으로 수행한다.

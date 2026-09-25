@@ -1,6 +1,6 @@
 # ToonStudio V12 최종 구현·실측 증거 보고서
 
-- 기준 문서: `ToonStudio_Codex_Vello차세대엔진_공격적활용_기존Studio전면교체_V12_2026-08-08.md`
+- 기준 문서: `../architecture/ToonStudio_Vello차세대엔진_공격적활용_CSP초월_인플레이스최종아키텍처_V12_2026-08-08.md`
 - 제품 경계: 기존 `/studio` 인플레이스 전면 교체
 - 데이터 정책: `LEGACY_DATA_MIGRATION=FALSE`; V12 내부 데이터만 SQLite/OPFS에 새로 저장
 - 판정 원칙: 품질·필압·손맛을 성능보다 우선하고, 자동화할 수 없는 실기기/CSP 판정은 완료로 위장하지 않는다.

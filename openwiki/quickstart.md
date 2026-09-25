@@ -1,29 +1,35 @@
-# ToonSpectrum repository quickstart
+# ToonSpectrum 저장소 빠른 시작
 
-Status: **bootstrap page**. OpenWiki may enrich or replace generated pages, but `openwiki/INSTRUCTIONS.md` is user-authored policy and must be preserved.
+- 상태: **탐색 시작 페이지**
+- 최종 갱신: **2026-09-26**
 
-## Reading order
+## 읽는 순서
 
-1. `AGENTS.md` — deployment/operations policy and agent rules.
-2. `ARCHITECTURE.md` — current repository architecture.
-3. `docs/architecture/modular-monorepo-target.md` — agreed migration target.
-4. Relevant domain/runtime source and tests.
-5. Relevant ADRs under `docs/adr/` when present.
+1. `AGENTS.md` — 운영·배포 정책과 agent 규칙
+2. `ARCHITECTURE.md` — 현재 저장소 구조
+3. `docs/README.md` — 문서 분류와 권위
+4. `docs/architecture/modular-monorepo-target.md` — 합의된 목표
+5. 관련 앱·도메인 source와 테스트
+6. 관련 ADR
 
-## Application boundaries
+## 애플리케이션
 
-- `apps/web`: user-facing browser application.
-- `apps/admin-web`: independent administrator surface being introduced incrementally.
-- `apps/api`: backend modular application.
-- Other `apps/*` entries are specialized runtimes/tools and should not be folded into Web or Admin without an explicit decision.
+- `apps/web`: 사용자·창작자 브라우저 앱
+- `apps/admin-web`: 독립 관리자 브라우저 앱, 기능 이전 중
+- `apps/api`: NestJS backend
+- `apps/mobile`: Capacitor Android/iOS wrapper
+- `apps/desktop-sync`: 로컬·클라우드 동기화 앱
+- `services/creator-inference`: 선택형 GPU 추론 서비스
 
-Logical domains stay inside applications. There is intentionally no `packages/domains` target at this stage.
+논리적 도메인은 앱 안에 둔다. `packages/domains`는 목표가 아니다.
 
 ## Studio
 
-Studio is an architectural exception to ordinary page-oriented organization. Follow runtime authority and the existing Studio core packages. Do not move Studio code merely to make folder shapes look uniform.
+Studio는 일반 페이지 중심 구조의 예외다. `docs/architecture/studio-current-boundaries.md`와
+`docs/engines/renderer-roles.md`를 읽고 document, command, history, storage, rendering 권위를 따른다.
+폴더 모양만 맞추기 위해 Studio 코드를 이동하지 않는다.
 
-## OpenWiki commands
+## OpenWiki 갱신
 
 ```sh
 npm install -g openwiki@0.5.2
@@ -31,6 +37,8 @@ openwiki --init
 openwiki --update
 ```
 
-For local/manual maintenance, the repository includes the project-scoped Codex integration under `.agents/skills/openwiki` and `.codex/config.toml`. Restart Codex after checkout, then ask it to initialize or update this repository's OpenWiki. Host-driven generation uses the coding agent's authenticated model session, so it does not require a separate OpenWiki provider credential.
+저장소에는 `.agents/skills/openwiki`와 `.codex/config.toml` 기반 통합도 포함되어 있다. checkout 뒤
+Codex를 다시 시작하고 이 저장소의 OpenWiki 초기화 또는 갱신을 요청한다.
 
-The scheduled workflow is intentionally non-auto-merge and runs weekly to bound inference cost. It only generates when `OPENWIKI_PROVIDER` and `OPENWIKI_MODEL_ID` repository variables plus `OPENROUTER_API_KEY` and the dedicated `OPENWIKI_PR_TOKEN` secrets are configured. `.openwikiignore` keeps generated, binary, and high-volume runtime assets outside the documentation read boundary.
+주기 workflow는 비용과 검토를 위해 자동 병합하지 않는다. 생성 문서는
+`openwiki/INSTRUCTIONS.md`의 정책과 현재 아키텍처 문서를 따라야 한다.
