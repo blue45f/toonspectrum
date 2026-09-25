@@ -30,8 +30,13 @@ export interface StudioCatalogInputGesture {
 /** 브라우저 이벤트 수명이 끝나도 원본 센서와 coalesced 표본을 그대로 소유한다. */
 export function snapshotStudioCatalogPointer(event: PointerEvent, coalesced = true): PointerEvent {
   const samples = coalesced ? (event.getCoalescedEvents?.() ?? []).map((sample) => snapshotStudioCatalogPointer(sample, false)) : [];
-  return {
-    type: event.type, target: event.target, currentTarget: event.currentTarget,
+  const snapshot = new Event(event.type, {
+    bubbles: event.bubbles,
+    cancelable: event.cancelable,
+    composed: event.composed,
+  }) as PointerEvent;
+  const values = {
+    target: event.target, currentTarget: event.currentTarget,
     pointerId: event.pointerId, pointerType: event.pointerType, isPrimary: event.isPrimary,
     clientX: event.clientX, clientY: event.clientY, screenX: event.screenX, screenY: event.screenY,
     width: event.width, height: event.height, pressure: event.pressure,
@@ -41,8 +46,11 @@ export function snapshotStudioCatalogPointer(event: PointerEvent, coalesced = tr
     altKey: event.altKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey,
     movementX: event.movementX, movementY: event.movementY,
     getCoalescedEvents: () => samples, getPredictedEvents: () => [],
-    preventDefault: () => undefined, stopPropagation: () => undefined,
-  } as PointerEvent;
+  };
+  Object.defineProperties(snapshot, Object.fromEntries(Object.entries(values).map(([key, value]) => [
+    key, { configurable: true, enumerable: true, value },
+  ])));
+  return snapshot;
 }
 
 /** 선택 준비는 문서 획이 아니다. 실제 브러시가 활성화된 뒤 정상 샘플러에만 전달한다. */

@@ -111,7 +111,7 @@ describe("PSD editable text one-way export", () => {
     const element: PsdExportEl = { id: "masked", type: "image", x: 0, y: 0, width: 2, height: 2, opacity: 0.5, maskSrc: "data:image/png;base64,MASK" };
     const { stage, toCanvasById } = fakeStage([{ id: "masked", documentRect: { x: 0, y: 0, width: 2, height: 2 }, maskCanvas: pixelCanvas(2, 2, [12, 34, 56, 64]) }]);
     const result = await exportPagePsd(stage, [element], 2, 2, 1, { includeBackground: false });
-    initializeCanvas(() => document.createElement("canvas"), (width, height) => ({ width, height, data: new Uint8ClampedArray(width * height * 4) }));
+    initializeCanvas(() => document.createElement("canvas"), (width, height) => ({ width, height, colorSpace: "srgb", data: new Uint8ClampedArray(width * height * 4) }));
     const parsed = readPsd(await result.blob.arrayBuffer(), { useImageData: true, skipCompositeImageData: true });
     expect(parsed.children?.[0]?.opacity).toBe(1);
     expect(Array.from(parsed.children?.[0]?.imageData?.data ?? [])).toEqual(Array.from({ length: 4 }, () => [12, 34, 56, 64]).flat());
