@@ -291,7 +291,21 @@ export function MarketBrowsePage() {
           ) : <span />}
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <details className="group relative">
+            <label className="grid min-w-[10.5rem] gap-1 text-[0.66rem] font-bold text-fg-3 sm:hidden">
+              라이선스
+              <select
+                aria-label="라이선스 필터"
+                value={activeLicense ?? ""}
+                onChange={(event) => patchParams({ license: event.target.value || null })}
+                className="min-h-11 rounded-xl border border-line bg-card px-3 text-sm text-fg"
+              >
+                <option value="">전체 라이선스</option>
+                {MARKET_LICENSES.map((license) => (
+                  <option key={license.license} value={license.license}>{license.label}</option>
+                ))}
+              </select>
+            </label>
+            <details className="group relative hidden sm:block">
               <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-semibold text-fg-2 hover:bg-raised hover:text-fg [&::-webkit-details-marker]:hidden">
                 <SlidersHorizontal className="size-3.5" aria-hidden="true" />
                 세부 조건

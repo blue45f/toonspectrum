@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { ChangeEvent, SyntheticEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { RESOURCE_BUTTON } from "./navigation";
+import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 import { ProviderStatus } from "./ProviderStatus";
 import { ResearchCoverageMap } from "./ResearchCoverageMap";
 import { ResearchMissionPanel } from "./ResearchMissionPanel";
@@ -216,7 +216,23 @@ export function CreatorHubPage() {
       onSearch={launchSearch}
     />
 
-    <nav aria-label="리서치 데스크 빠른 이동" className="flex gap-2 overflow-x-auto rounded-2xl border border-line bg-panel p-2">
+    <label className="grid gap-2 rounded-2xl border border-line bg-panel p-3 sm:hidden">
+      <span className="text-xs font-bold text-fg-2">리서치 데스크 빠른 이동</span>
+      <select
+        aria-label="리서치 데스크 빠른 이동"
+        defaultValue=""
+        className={RESOURCE_INPUT}
+        onChange={(event) => {
+          const target = document.querySelector<HTMLElement>(event.currentTarget.value);
+          target?.scrollIntoView({ behavior: "smooth", block: "start" });
+          event.currentTarget.value = "";
+        }}
+      >
+        <option value="" disabled>이동할 섹션 선택</option>
+        {DESK_SECTIONS.map(([href, label]) => <option key={href} value={href}>{label}</option>)}
+      </select>
+    </label>
+    <nav aria-label="리서치 데스크 빠른 이동" className="hidden gap-2 overflow-x-auto rounded-2xl border border-line bg-panel p-2 sm:flex">
       {DESK_SECTIONS.map(([href, label]) => <a key={href} href={href} className={`${RESOURCE_BUTTON} shrink-0 bg-canvas`}>{label}</a>)}
     </nav>
 

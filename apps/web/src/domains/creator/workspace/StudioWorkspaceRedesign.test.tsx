@@ -49,13 +49,16 @@ describe("studio-first visual redesign retains real actions", () => {
     fireEvent.click(toggle); expect(toggle.getAttribute("aria-pressed")).toBe("false");
     fireEvent.click(toggle); expect(toggle.getAttribute("aria-pressed")).toBe("true");
   });
-  it("keeps one four-destination navigation and a consistent UI brand", () => {
-    render(<MemoryRouter initialEntries={["/team?project=exact"]}><WorkspaceBrand /><WorkspaceSidebar activeId="workspace-team" /></MemoryRouter>);
+  it("keeps one five-destination navigation and a consistent UI brand", () => {
+    render(<MemoryRouter initialEntries={["/team?project=exact"]}><WorkspaceBrand /><WorkspaceSidebar activeId="community" /></MemoryRouter>);
     const nav = screen.getByRole("navigation", { name: "주 메뉴" });
-    expect(within(nav).getAllByRole("link")).toHaveLength(4);
-    expect(within(nav).getByRole("link", { name: "팀" }).getAttribute("aria-current")).toBe("page");
-    expect(within(nav).getByRole("link", { name: "홈" }).getAttribute("href")).toBe("/home?project=exact");
-    expect(screen.getByRole("link", { name: "ToonStudio 홈" }).getAttribute("href")).toBe("/home");
+    expect(within(nav).getAllByRole("link")).toHaveLength(5);
+    expect(within(nav).getByRole("link", { name: "커뮤니티" }).getAttribute("aria-current")).toBe("page");
+    expect(within(nav).getByRole("link", { name: "홈" }).getAttribute("href")).toBe("/?project=exact");
+    expect(within(nav).getByRole("link", { name: "제작" }).getAttribute("href")).toBe("/studio");
+    expect(within(nav).getByRole("link", { name: "탐색" }).getAttribute("href")).toBe("/discover");
+    expect(within(nav).getByRole("link", { name: "전체" }).getAttribute("href")).toBe("/sitemap");
+    expect(screen.getByRole("link", { name: "ToonStudio 홈" }).getAttribute("href")).toBe("/");
   });
 });
 

@@ -234,56 +234,84 @@ export function CafesPage() {
             )}
           </div>
 
-          <div className="rail -mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-            <button
-              type="button"
-              onClick={() => setKind("")}
-              className={cn(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
-                !kind ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
-              )}
-            >
-              모든 유형
-            </button>
-            {COMMUNITY_CAFE_KINDS.map((value) => (
+          <div className="mb-3">
+            <label className="grid gap-1.5 text-[0.68rem] font-bold text-fg-3 sm:hidden">
+              커뮤니티 유형
+              <select
+                value={kind}
+                onChange={(event) => setKind(event.target.value as CommunityCafeKind | "")}
+                className="min-h-12 w-full rounded-2xl border border-line bg-card px-4 text-sm font-semibold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+              >
+                <option value="">모든 유형</option>
+                {COMMUNITY_CAFE_KINDS.map((value) => (
+                  <option key={value} value={value}>{COMMUNITY_CAFE_KIND_LABELS[value]}</option>
+                ))}
+              </select>
+            </label>
+            <div className="rail hidden gap-1.5 overflow-x-auto pb-1 sm:flex">
               <button
-                key={value}
                 type="button"
-                onClick={() => setKind((current) => (current === value ? "" : value))}
+                onClick={() => setKind("")}
                 className={cn(
                   "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
-                  kind === value ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
+                  !kind ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
                 )}
               >
-                {COMMUNITY_CAFE_KIND_LABELS[value]}
+                모든 유형
               </button>
-            ))}
+              {COMMUNITY_CAFE_KINDS.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setKind((current) => (current === value ? "" : value))}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
+                    kind === value ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
+                  )}
+                >
+                  {COMMUNITY_CAFE_KIND_LABELS[value]}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="rail -mx-4 mb-5 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-            <button
-              type="button"
-              onClick={() => setGenre("")}
-              className={cn(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
-                !genre ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
-              )}
-            >
-              장르 전체
-            </button>
-            {GENRES.map((value) => (
+          <div className="mb-5">
+            <label className="grid gap-1.5 text-[0.68rem] font-bold text-fg-3 sm:hidden">
+              관심 장르
+              <select
+                value={genre}
+                onChange={(event) => setGenre(event.target.value)}
+                className="min-h-12 w-full rounded-2xl border border-line bg-card px-4 text-sm font-semibold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+              >
+                <option value="">장르 전체</option>
+                {GENRES.map((value) => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </label>
+            <div className="rail hidden gap-1.5 overflow-x-auto pb-1 sm:flex">
               <button
-                key={value}
                 type="button"
-                onClick={() => setGenre((current) => (current === value ? "" : value))}
+                onClick={() => setGenre("")}
                 className={cn(
                   "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
-                  genre === value ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
+                  !genre ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
                 )}
               >
-                {value}
+                장르 전체
               </button>
-            ))}
+              {GENRES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setGenre((current) => (current === value ? "" : value))}
+                  className={cn(
+                    "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
+                    genre === value ? "border-accent/55 bg-accent-soft text-accent" : "border-line text-fg-2",
+                  )}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
           </div>
 
           {error && (

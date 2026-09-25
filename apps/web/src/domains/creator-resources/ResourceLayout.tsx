@@ -31,10 +31,17 @@ export function ResourceLayout({
       </div>
       {isDesk ? <ResearchSceneStudy /> : <img className="resource-masthead-image" src={isPlanning ? "/brand/atelier-process.webp" : "/brand/atelier-materials.webp"} alt={isPlanning ? "스케치부터 채색으로 이어지는 제작 과정 콘셉트 아트" : "드로잉 재료와 소품을 모은 작업대 콘셉트 아트"} width={640} height={480} />}
     </header>
-    <nav aria-label="창작 리서치 메뉴" className="resource-menu">
+    <nav aria-label="창작 리서치 메뉴" className="resource-menu resource-menu--desktop">
       {RESOURCE_PAGES.slice(1).map((page) => <Link key={page.path} to={page.path} aria-current={pathname === page.path ? "page" : undefined}
         className={`${RESOURCE_BUTTON} ${pathname === page.path ? "bg-accent-soft text-accent" : "bg-panel"}`}>{page.title}</Link>)}
     </nav>
+    <details className="resource-menu-mobile">
+      <summary>리서치·학습 전체 메뉴 <span aria-hidden="true">⌄</span></summary>
+      <nav aria-label="모바일 창작 리서치 메뉴">
+        {RESOURCE_PAGES.slice(1).map((page) => <Link key={page.path} to={page.path} aria-current={pathname === page.path ? "page" : undefined}
+          className={pathname === page.path ? "bg-accent-soft text-accent" : "bg-panel text-fg-2"}>{page.title}</Link>)}
+      </nav>
+    </details>
     {children}
     <footer className="resource-next-work">
       <div><p className="eyebrow text-accent">FROM REFERENCE TO CANVAS</p><h2>찾아낸 장면을, 웹툰으로 그릴 시간.</h2><p>자료에서 얻은 형태와 분위기를 내 이야기로 바꿔보세요. ToonStudio의 브러시와 레이어로 구도를 잡고, 필요한 표현은 제작 강좌에서 익힐 수 있습니다.</p></div>

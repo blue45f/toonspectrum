@@ -103,8 +103,21 @@ export function NewsPage() {
 
       {!loading && !error && items.length > 0 && (
         <div className="mb-5 flex flex-col gap-3">
+          <label className="grid gap-1.5 text-[0.68rem] font-bold text-fg-3 sm:hidden">
+            소식 카테고리
+            <select
+              value={tab}
+              onChange={(event) => setTab(event.target.value as NewsCategory | "all")}
+              className="min-h-12 w-full rounded-2xl border border-line bg-card px-4 text-sm font-semibold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+            >
+              {CATEGORY_TABS.map(({ key, label }) => {
+                const count = key === "all" ? items.length : countByCategory[key] ?? 0;
+                return <option key={key} value={key}>{label} · {count.toLocaleString("ko-KR")}</option>;
+              })}
+            </select>
+          </label>
           <div
-            className="rail -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0"
+            className="hidden flex-wrap gap-1.5 sm:flex"
             role="group"
             aria-label="뉴스 카테고리 필터"
           >
@@ -118,7 +131,7 @@ export function NewsPage() {
                   onClick={() => setTab(key)}
                   aria-pressed={active}
                   className={cn(
-                    "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[0.78rem] transition-colors",
+                    "inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[0.78rem] transition-colors",
                     active
                       ? "border-accent/60 bg-accent-soft/50 font-medium text-fg"
                       : "border-line bg-card text-fg-2 hover:bg-raised"

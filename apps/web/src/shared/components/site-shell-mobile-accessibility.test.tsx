@@ -74,7 +74,7 @@ describe("mobile site shell accessibility", () => {
 
     const primaryNavigation = container.querySelector<HTMLElement>('nav[aria-label="주요 메뉴"]');
     expect(primaryNavigation?.querySelector('a[href="/about/technology"]')).toBeNull();
-    expect(Array.from(primaryNavigation?.querySelectorAll("a[data-navigation-entry]") ?? []).map((link) => link.getAttribute("href"))).toEqual(["/home", "/studio", "/team", "/hub", "/sitemap"]);
+    expect(Array.from(primaryNavigation?.querySelectorAll("a[data-navigation-entry]") ?? []).map((link) => link.getAttribute("href"))).toEqual(["/", "/studio", "/discover", "/community", "/sitemap"]);
 
     const trigger = screen.getByRole("button", { name: "전체 메뉴" });
     trigger.focus();
@@ -127,12 +127,12 @@ describe("mobile site shell accessibility", () => {
     );
 
     const primaryNavigation = container.querySelector<HTMLElement>('nav[aria-label="주요 메뉴"]');
-    expect(Array.from(primaryNavigation?.querySelectorAll("a[data-navigation-entry]") ?? []).map((link) => link.getAttribute("href"))).toEqual(["/discover", "/ranking", "/community", "/library", "/sitemap"]);
+    expect(Array.from(primaryNavigation?.querySelectorAll("a[data-navigation-entry]") ?? []).map((link) => link.getAttribute("href"))).toEqual(["/", "/studio", "/discover", "/community", "/sitemap"]);
 
     const quickNavigation = container.querySelector<HTMLElement>('nav[aria-label="빠른 이동"]');
-    expect(Array.from(quickNavigation?.querySelectorAll("a") ?? []).map((link) => link.getAttribute("href"))).toEqual(["/", "/discover", "/ranking", "/community", "/library"]);
+    expect(Array.from(quickNavigation?.querySelectorAll("a") ?? []).map((link) => link.getAttribute("href"))).toEqual(["/", "/studio", "/discover", "/community", "/sitemap"]);
     expect(quickNavigation?.firstElementChild?.className).toContain("grid-cols-5");
-    expect(within(quickNavigation as HTMLElement).getByRole("link", { name: "찾기" }).getAttribute("aria-current")).toBe("page");
+    expect(within(quickNavigation as HTMLElement).getByRole("link", { name: "탐색" }).getAttribute("aria-current")).toBe("page");
   });
 
   it("shows Korean on the closed search-first language picker", () => {

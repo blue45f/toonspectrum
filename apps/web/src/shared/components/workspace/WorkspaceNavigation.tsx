@@ -14,8 +14,9 @@ import {
 const PREMIUM_NAV_ART: Readonly<Record<string, string>> = {
   "workspace-home": "/brand/toonstudio-premium-icons/home.webp",
   studio: "/brand/toonstudio-premium-icons/canvas.webp",
-  "workspace-team": "/brand/toonstudio-premium-icons/projects.webp",
-  "workspace-hub": "/brand/toonstudio-premium-icons/community.webp",
+  explore: "/brand/toonstudio-premium-icons/assets.webp",
+  community: "/brand/toonstudio-premium-icons/community.webp",
+  "all-menu": "/brand/toonstudio-premium-icons/settings.webp",
 };
 
 export function WorkspaceNavigation({ activeId, studioHref, teamHref, context }: {

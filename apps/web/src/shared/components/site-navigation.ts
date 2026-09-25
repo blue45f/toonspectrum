@@ -167,7 +167,7 @@ export const SITE_NAVIGATION_ITEMS = {
     "explore",
     "/discover",
     Compass,
-    "찾기",
+    "탐색",
     "Discover",
     "검색·취향·추천에서 원하는 작품 발견",
     "Find stories through search, taste and recommendations",
@@ -317,6 +317,16 @@ export const SITE_NAVIGATION_ITEMS = {
     "언어·데이터·서비스 환경",
     "Language, data and service preferences",
   ),
+  allMenu: item(
+    "all-menu",
+    "/sitemap",
+    LayoutGrid,
+    "전체",
+    "All",
+    "모든 기능과 신규 콘텐츠를 한곳에서",
+    "Open every tool, destination and new experience",
+    true,
+  ),
   help: item(
     "help",
     "/help",
@@ -330,21 +340,17 @@ export const SITE_NAVIGATION_ITEMS = {
 
 const I = SITE_NAVIGATION_ITEMS;
 
-/** Production navigation: four durable destinations, regardless of feature count. */
-export const TOONSTUDIO_PRIMARY_NAVIGATION = [
+/** One stable product journey on every screen: Home · Create · Discover · Community · All. */
+export const UNIFIED_PRIMARY_NAVIGATION = [
   I.workspaceHome,
   I.studio,
-  I.workspaceTeam,
-  I.workspaceHub,
+  I.explore,
+  I.community,
+  I.allMenu,
 ] as const;
 
-/** Reader navigation remains separate from the creation product. */
-export const TOONSPECTRUM_PRIMARY_NAVIGATION = [
-  I.explore,
-  I.ranking,
-  I.community,
-  I.library,
-] as const;
+export const TOONSTUDIO_PRIMARY_NAVIGATION = UNIFIED_PRIMARY_NAVIGATION;
+export const TOONSPECTRUM_PRIMARY_NAVIGATION = UNIFIED_PRIMARY_NAVIGATION;
 
 /** Compatibility export for consumers not yet context-aware. */
 export const PRIMARY_SITE_NAVIGATION = TOONSPECTRUM_PRIMARY_NAVIGATION;
@@ -418,20 +424,9 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
 /** Compatibility export for the legacy all-menu consumer. */
 export const SITE_NAVIGATION_GROUPS = TOONSPECTRUM_NAVIGATION_GROUPS;
 
-export const TOONSTUDIO_MOBILE_TABS = [
-  I.workspaceHome,
-  I.studio,
-  I.workspaceTeam,
-  I.workspaceHub,
-] as const;
-
-export const TOONSPECTRUM_MOBILE_TABS = [
-  I.home,
-  I.explore,
-  I.ranking,
-  I.community,
-  I.library,
-] as const;
+export const UNIFIED_MOBILE_TABS = UNIFIED_PRIMARY_NAVIGATION;
+export const TOONSTUDIO_MOBILE_TABS = UNIFIED_MOBILE_TABS;
+export const TOONSPECTRUM_MOBILE_TABS = UNIFIED_MOBILE_TABS;
 
 /** Compatibility export for consumers not yet context-aware. */
 export const MOBILE_SITE_TABS = TOONSPECTRUM_MOBILE_TABS;
