@@ -13,9 +13,11 @@ describe("StudioVirtualSpaceCustomizationPanel", () => {
   it("shows ImageGen-backed district and decor previews and updates the selected district", () => {
     const onDecorations = vi.fn();
     render(<StudioVirtualSpaceCustomizationPanel
+      nickname="희준 작가"
       character={DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION}
       decorations={studioVirtualDecorationPreset("minimal")}
       selfPoint={{ x: 780, y: 700 }}
+      onNickname={vi.fn()}
       onCharacter={vi.fn()}
       onDecorations={onDecorations}
     />);
@@ -33,5 +35,22 @@ describe("StudioVirtualSpaceCustomizationPanel", () => {
     expect(onDecorations).toHaveBeenLastCalledWith(expect.objectContaining({
       placements: [expect.objectContaining({ type: "fountain" })],
     }));
+  });
+
+  it("validates and commits a public nickname", () => {
+    const onNickname = vi.fn();
+    render(<StudioVirtualSpaceCustomizationPanel
+      nickname="희준 작가"
+      character={DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION}
+      decorations={studioVirtualDecorationPreset("minimal")}
+      selfPoint={{ x: 780, y: 700 }}
+      onNickname={onNickname}
+      onCharacter={vi.fn()}
+      onDecorations={vi.fn()}
+    />);
+
+    fireEvent.change(screen.getByRole("textbox", { name: "공개 이름" }), { target: { value: "희준 스튜디오" } });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(onNickname).toHaveBeenCalledWith("희준 스튜디오");
   });
 });

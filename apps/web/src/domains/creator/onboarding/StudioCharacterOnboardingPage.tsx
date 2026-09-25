@@ -10,6 +10,7 @@ import {
   type StudioVirtualArtStyleKey,
 } from "../virtual-space/studio-virtual-space-art-style";
 import {
+  normalizeStudioVirtualSpaceNickname,
   readStudioVirtualSpaceEntryPreference,
   validStudioVirtualSpaceAvatarIndex,
   writeStudioVirtualSpaceEntryPreference,
@@ -27,19 +28,24 @@ export function StudioCharacterOnboardingPage() {
       : -1,
   );
   const [artStyle, setArtStyle] = useState<StudioVirtualArtStyleKey>(() => readStudioVirtualArtStyle());
+  const [nickname, setNickname] = useState(initialPreference.nickname || bt("크리에이터", "Creator"));
 
   return <StudioVirtualSpaceEntryLobby
     avatarIndex={avatarIndex}
     artStyle={artStyle}
+    nickname={nickname}
     returning={initialPreference.confirmed}
     projectName={bt("나의 창작 홈", "My creative home")}
     variant="character-onboarding"
     backHref="/home"
     onAvatarIndex={setAvatarIndex}
     onArtStyle={setArtStyle}
+    onNickname={setNickname}
     onEnter={() => {
-      if (!validStudioVirtualSpaceAvatarIndex(avatarIndex)) return;
-      void writeStudioVirtualSpaceEntryPreference(avatarIndex);
+      const resolvedNickname = normalizeStudioVirtualSpaceNickname(nickname);
+      if (!validStudioVirtualSpaceAvatarIndex(avatarIndex) || !resolvedNickname) return;
+      setNickname(resolvedNickname);
+      void writeStudioVirtualSpaceEntryPreference(avatarIndex, resolvedNickname);
       void writeStudioVirtualArtStyle(artStyle);
       navigate(destination, { replace: true });
     }}
