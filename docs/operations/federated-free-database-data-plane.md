@@ -155,6 +155,16 @@ pnpm run gcp:free-data:check
 기존 membership 상태를 복구했다. 보호 schema 보존, Data API 접근 차단, runtime DML,
 중간 실패 시 전체 transaction rollback을 확인했다. 이 로컬 근거와 원격 DB 적용 결과는 별개다.
 
+적용 후 Supabase security advisor에는 `search_path` 미고정 함수 39개와
+`SECURITY DEFINER` trigger 함수 4개의 `anon`/`authenticated` EXECUTE 경고가 남아 있다.
+후자는 역할별로 각각 4건이며 외부 RPC가 동작한다는 뜻은 아니다. 원격에서 두 역할의 앱 schema
+USAGE가 차단된 것을 확인했고, 해당 4개 함수는 trigger 반환형·고정 `search_path`·완전 수식 관계
+참조를 사용한다. 동일 PostgreSQL 17 fixture에서 두 역할의 직접 호출 8건은 `42501`, 소유자의
+직접 호출 4건은 trigger context 요구 오류 `0A000`으로 거부되었다. advisor 0건으로 보고하지
+않으며, 향후 schema 노출·함수 권한·호출 경계를 변경할 때 이 조건을 다시 검증한다.
+[함수 경로 경고](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable),
+[익명 역할의 definer 실행 경고](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable).
+
 ### Cloudflare D1 분석 DB — 생성·단독 검증 완료, 운영 미연결
 
 현재 실제 생성한 D1 DB는 `toonspectrum-analytics-buffer` 1개다. 분석 테이블과 migration checkpoint를
