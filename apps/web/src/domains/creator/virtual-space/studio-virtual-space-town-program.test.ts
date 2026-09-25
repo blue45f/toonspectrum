@@ -6,6 +6,7 @@ import {
   studioRuntimeBudget,
   studioTownActiveEvent,
   studioTownCompanionSnapshot,
+  studioTownDeskPodForActor,
   studioTownEvents,
   studioTownInterestSnapshot,
   studioTownQuests,
@@ -38,6 +39,14 @@ describe("Virtual Studio town program", () => {
     expect(studioTownActiveEvent(new Date("2026-09-25T16:10:00+09:00").getTime())?.kind).toBe("live-drawing");
     expect(STUDIO_TOWN_MINI_GAMES.every((game) => game.players[0] >= 1 && game.players[1] <= 12)).toBe(true);
     expect(STUDIO_TOWN_BLUEPRINTS.every((blueprint) => blueprint.decor.length > 0)).toBe(true);
+  });
+
+  it("assigns a stable role-aware personal desk without exposing document content", () => {
+    const first = studioTownDeskPodForActor("actor-1", "artist");
+    const second = studioTownDeskPodForActor("actor-1", "artist");
+    expect(first).toBe(second);
+    expect(first.roles).toContain("artist");
+    expect(studioTownDeskPodForActor("actor-2", "unknown").id).toMatch(/crew$/u);
   });
 
   it("limits active simulation by semantic chunks and device budgets", () => {

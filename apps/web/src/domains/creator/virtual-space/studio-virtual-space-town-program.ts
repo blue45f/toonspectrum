@@ -1,5 +1,6 @@
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import type { StudioVirtualRewardId } from "./studio-virtual-space-rewards";
 import type { StudioVirtualDecorationState, StudioVirtualDecorPlacement, StudioVirtualDecorType } from "./studio-virtual-space-customization";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import { studioSemanticWorldInterestKey } from "./studio-virtual-space-semantic-world";
@@ -16,6 +17,7 @@ export interface StudioTownQuest {
   readonly progress: number;
   readonly target: number;
   readonly reward: string;
+  readonly rewardId: StudioVirtualRewardId;
 }
 
 export type StudioTownEventKind = "standup" | "review-hour" | "live-drawing" | "gallery-opening" | "release-ceremony";
@@ -41,6 +43,7 @@ export interface StudioTownMiniGame {
   readonly durationSeconds: number;
   readonly players: readonly [number, number];
   readonly reward: string;
+  readonly rewardId: StudioVirtualRewardId;
 }
 
 export interface StudioTownBlueprint {
@@ -61,12 +64,12 @@ export interface StudioTownDeskPod {
 }
 
 export const STUDIO_TOWN_MINI_GAMES: readonly StudioTownMiniGame[] = Object.freeze([
-  { id: "panel-order", labelKo: "컷 순서 재구성", labelEn: "Panel order", descriptionKo: "흩어진 컷을 이야기 흐름에 맞게 정렬해요.", descriptionEn: "Reorder shuffled panels into a coherent scene.", roomId: "storyboard", durationSeconds: 75, players: [1, 6], reward: "Storyboard badge" },
-  { id: "palette-match", labelKo: "팔레트 매칭", labelEn: "Palette match", descriptionKo: "레퍼런스 장면과 가장 가까운 색 조합을 찾아요.", descriptionEn: "Match the closest palette to the reference scene.", roomId: "drawing", durationSeconds: 60, players: [1, 8], reward: "Color swatch" },
-  { id: "pose-guess", labelKo: "포즈 맞히기", labelEn: "Pose guess", descriptionKo: "짧게 표시되는 실루엣의 감정을 맞혀요.", descriptionEn: "Guess the emotion from a brief silhouette.", roomId: "live", durationSeconds: 45, players: [2, 12], reward: "Expression emote" },
-  { id: "hidden-assets", labelKo: "숨은 소재 찾기", labelEn: "Hidden assets", descriptionKo: "아카이브에 숨은 제작 소재를 찾아요.", descriptionEn: "Find hidden production assets in the archive.", roomId: "assets", durationSeconds: 90, players: [1, 8], reward: "Archivist pin" },
-  { id: "perspective-grid", labelKo: "원근 그리드", labelEn: "Perspective grid", descriptionKo: "건물과 소품을 올바른 소실점에 배치해요.", descriptionEn: "Place props against the correct vanishing points.", roomId: "drawing", durationSeconds: 90, players: [1, 4], reward: "Architect frame" },
-  { id: "deadline-relay", labelKo: "마감 릴레이", labelEn: "Deadline relay", descriptionKo: "팀이 역할을 나눠 제작 체크포인트를 통과해요.", descriptionEn: "Pass production checkpoints as a coordinated team.", roomId: "production", durationSeconds: 180, players: [2, 12], reward: "Team banner" },
+  { id: "panel-order", labelKo: "컷 순서 재구성", labelEn: "Panel order", descriptionKo: "흩어진 컷을 이야기 흐름에 맞게 정렬해요.", descriptionEn: "Reorder shuffled panels into a coherent scene.", roomId: "storyboard", durationSeconds: 75, players: [1, 6], reward: "Storyboard badge", rewardId: "storyboard-badge" },
+  { id: "palette-match", labelKo: "팔레트 매칭", labelEn: "Palette match", descriptionKo: "레퍼런스 장면과 가장 가까운 색 조합을 찾아요.", descriptionEn: "Match the closest palette to the reference scene.", roomId: "drawing", durationSeconds: 60, players: [1, 8], reward: "Color swatch", rewardId: "color-swatch" },
+  { id: "pose-guess", labelKo: "포즈 맞히기", labelEn: "Pose guess", descriptionKo: "짧게 표시되는 실루엣의 감정을 맞혀요.", descriptionEn: "Guess the emotion from a brief silhouette.", roomId: "live", durationSeconds: 45, players: [2, 12], reward: "Expression emote", rewardId: "expression-emote" },
+  { id: "hidden-assets", labelKo: "숨은 소재 찾기", labelEn: "Hidden assets", descriptionKo: "아카이브에 숨은 제작 소재를 찾아요.", descriptionEn: "Find hidden production assets in the archive.", roomId: "assets", durationSeconds: 90, players: [1, 8], reward: "Archivist pin", rewardId: "archivist-pin" },
+  { id: "perspective-grid", labelKo: "원근 그리드", labelEn: "Perspective grid", descriptionKo: "건물과 소품을 올바른 소실점에 배치해요.", descriptionEn: "Place props against the correct vanishing points.", roomId: "drawing", durationSeconds: 90, players: [1, 4], reward: "Architect frame", rewardId: "architect-frame" },
+  { id: "deadline-relay", labelKo: "마감 릴레이", labelEn: "Deadline relay", descriptionKo: "팀이 역할을 나눠 제작 체크포인트를 통과해요.", descriptionEn: "Pass production checkpoints as a coordinated team.", roomId: "production", durationSeconds: 180, players: [2, 12], reward: "Team banner", rewardId: "team-banner" },
 ]);
 
 export const STUDIO_TOWN_BLUEPRINTS: readonly StudioTownBlueprint[] = Object.freeze([
@@ -99,6 +102,20 @@ export const STUDIO_TOWN_DESK_PODS: readonly StudioTownDeskPod[] = Object.freeze
   { id: "release-crew", labelKo: "출고 크루", labelEn: "Release crew", roomId: "release", point: { x: 1130, y: 195 }, roles: ["producer", "qc", "publisher"] },
 ]);
 
+export function studioTownDeskPodForActor(actorId: string, role?: string | null): StudioTownDeskPod {
+  const normalizedRole = role?.trim().toLowerCase() ?? "";
+  const roleMatches = normalizedRole
+    ? STUDIO_TOWN_DESK_PODS.filter((pod) => pod.roles.includes(normalizedRole))
+    : [];
+  const candidates = roleMatches.length ? roleMatches : STUDIO_TOWN_DESK_PODS;
+  let hash = 2166136261;
+  for (const char of actorId.normalize("NFC")) {
+    hash ^= char.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return candidates[hash % candidates.length] ?? STUDIO_TOWN_DESK_PODS[0]!;
+}
+
 function roomExists(manifest: Pick<StudioVirtualSpaceWorldManifest, "rooms">, id: string): boolean {
   return manifest.rooms.some((room) => room.id === id);
 }
@@ -112,12 +129,12 @@ export function studioTownQuests(
   const dueCount = operations.inbox.filter((item) => /due|today|마감/iu.test(`${item.status} ${item.taskTitle}`)).length;
   const meetingCount = operations.calendar.length;
   const quests: StudioTownQuest[] = [
-    { id: "welcome-route", kind: "onboarding", labelKo: "오늘의 동선 확인", labelEn: "Check today's route", descriptionKo: "로비의 Today Board에서 다음 작업을 확인해요.", descriptionEn: "Check your next action on the Lobby Today Board.", roomId: "lobby", progress: operations.phase === "ready" ? 1 : 0, target: 1, reward: "Navigator badge" },
-    { id: "review-round", kind: "review", labelKo: "검수 라운드", labelEn: "Review round", descriptionKo: "대기 중인 검수본을 Review Theater에서 확인해요.", descriptionEn: "Inspect pending review snapshots in the Review Theater.", roomId: "review", progress: reviewCount ? 0 : 1, target: 1, reward: "Review sparkle" },
-    { id: "deadline-control", kind: "production", labelKo: "마감 점검", labelEn: "Deadline check", descriptionKo: "Production Control에서 마감과 병목을 확인해요.", descriptionEn: "Check deadlines and bottlenecks in Production Control.", roomId: "production", progress: dueCount ? 0 : 1, target: 1, reward: "Producer title" },
-    { id: "meeting-ready", kind: "social", labelKo: "회의 준비", labelEn: "Prepare a meeting", descriptionKo: "예정된 회의의 공간과 참가자를 확인해요.", descriptionEn: "Confirm the room and participants for an upcoming meeting.", roomId: "meeting", progress: meetingCount ? 0 : 1, target: 1, reward: "Team emote" },
-    { id: "district-tour", kind: "exploration", labelKo: "마을 지구 탐방", labelEn: "Explore the districts", descriptionKo: "서로 다른 제작 지구 세 곳을 방문해요.", descriptionEn: "Visit three distinct production districts.", roomId: "live", progress: 0, target: 3, reward: "Explorer frame" },
-    { id: "decorate-home", kind: "customization", labelKo: "내 공간 꾸미기", labelEn: "Customize your space", descriptionKo: "안전한 내장 오브젝트를 세 개 배치해요.", descriptionEn: "Place three safe bundled objects.", roomId: "lounge", progress: Math.min(3, customizationCount), target: 3, reward: "Decorator pin" },
+    { id: "welcome-route", kind: "onboarding", labelKo: "오늘의 동선 확인", labelEn: "Check today's route", descriptionKo: "로비의 Today Board에서 다음 작업을 확인해요.", descriptionEn: "Check your next action on the Lobby Today Board.", roomId: "lobby", progress: operations.phase === "ready" ? 1 : 0, target: 1, reward: "Navigator badge", rewardId: "navigator-badge" },
+    { id: "review-round", kind: "review", labelKo: "검수 라운드", labelEn: "Review round", descriptionKo: "대기 중인 검수본을 Review Theater에서 확인해요.", descriptionEn: "Inspect pending review snapshots in the Review Theater.", roomId: "review", progress: reviewCount ? 0 : 1, target: 1, reward: "Review sparkle", rewardId: "review-sparkle" },
+    { id: "deadline-control", kind: "production", labelKo: "마감 점검", labelEn: "Deadline check", descriptionKo: "Production Control에서 마감과 병목을 확인해요.", descriptionEn: "Check deadlines and bottlenecks in Production Control.", roomId: "production", progress: dueCount ? 0 : 1, target: 1, reward: "Producer title", rewardId: "producer-title" },
+    { id: "meeting-ready", kind: "social", labelKo: "회의 준비", labelEn: "Prepare a meeting", descriptionKo: "예정된 회의의 공간과 참가자를 확인해요.", descriptionEn: "Confirm the room and participants for an upcoming meeting.", roomId: "meeting", progress: meetingCount ? 0 : 1, target: 1, reward: "Team emote", rewardId: "team-emote" },
+    { id: "district-tour", kind: "exploration", labelKo: "마을 지구 탐방", labelEn: "Explore the districts", descriptionKo: "서로 다른 제작 지구 세 곳을 방문해요.", descriptionEn: "Visit three distinct production districts.", roomId: "live", progress: 0, target: 3, reward: "Explorer frame", rewardId: "explorer-frame" },
+    { id: "decorate-home", kind: "customization", labelKo: "내 공간 꾸미기", labelEn: "Customize your space", descriptionKo: "안전한 내장 오브젝트를 세 개 배치해요.", descriptionEn: "Place three safe bundled objects.", roomId: "lounge", progress: Math.min(3, customizationCount), target: 3, reward: "Decorator pin", rewardId: "decorator-pin" },
   ];
   return Object.freeze(quests.filter((quest) => roomExists(manifest, quest.roomId)));
 }

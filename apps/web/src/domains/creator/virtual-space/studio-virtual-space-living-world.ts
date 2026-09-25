@@ -2,7 +2,9 @@ import type * as Phaser from "phaser";
 
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioVirtualEnvironmentEffect } from "./studio-virtual-space-engine-bridge";
+import type { StudioVirtualEffectLevel } from "./studio-virtual-space-experience-preference";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import type { StudioVirtualQualityProfile } from "./studio-virtual-space-quality";
 import { studioSemanticSurfaceAt, studioSemanticWorldGraph } from "./studio-virtual-space-semantic-world";
 import { STUDIO_TOWN_WATERFALLS, studioTownPathSegments } from "./studio-virtual-space-town-layout";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
@@ -109,6 +111,8 @@ export class StudioLivingWorldRuntime {
   private readonly footsteps: FootstepMark[] = [];
   private lastFootstepAt = -Infinity;
   private lanternBoostUntil = -Infinity;
+  private qualityProfile: StudioVirtualQualityProfile | null = null;
+  private effectLevel: StudioVirtualEffectLevel = "balanced";
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -208,29 +212,43 @@ export class StudioLivingWorldRuntime {
     });
   }
 
-  update(time: number, deltaMs: number, focus: StudioVirtualSpacePoint, speed: number, reducedMotion = false): void {
-    const dt = reducedMotion ? 0 : Math.min(48, Math.max(0, deltaMs));
+  update(
+    time: number,
+    deltaMs: number,
+    focus: StudioVirtualSpacePoint,
+    speed: number,
+    reducedMotion = false,
+    qualityProfile?: StudioVirtualQualityProfile,
+    effectLevel: StudioVirtualEffectLevel = "balanced",
+  ): void {
+    this.qualityProfile = qualityProfile ?? null;
+    this.effectLevel = effectLevel;
+    const motionSuppressed = reducedMotion || qualityProfile?.tier === "accessibility";
+    const effectMultiplier = effectLevel === "low" ? .55 : effectLevel === "high" ? 1.25 : 1;
+    const dt = motionSuppressed ? 0 : Math.min(48, Math.max(0, deltaMs)) * effectMultiplier;
     this.environmentState = decayStudioEnvironmentState(this.environmentState, time);
     const flowMultiplier = studioEnvironmentFlowMultiplier(this.environmentState);
     this.cloudBack.tilePositionX += dt * 0.006;
     this.cloudBack.tilePositionY += Math.sin(time * 0.00007) * dt * 0.0008;
     this.cloudFront.tilePositionX -= dt * 0.011;
     this.cloudFront.tilePositionY += Math.cos(time * 0.00011) * dt * 0.0012;
-    const motionTime = reducedMotion ? 0 : time;
-    const frame = reducedMotion ? 0 : Math.floor(time / 170) % 4;
-    const waterfallFrame = reducedMotion ? 0 : Math.floor(time / Math.max(44, 92 / flowMultiplier)) % 8;
-    this.pathOverlay.setAlpha(this.style === "neon" ? .72 : .84 + Math.sin(motionTime * .0008) * (reducedMotion ? 0 : .04));
+    const motionTime = motionSuppressed ? 0 : time;
+    const frame = motionSuppressed ? 0 : Math.floor(time / 170) % 4;
+    const waterfallFrame = motionSuppressed ? 0 : Math.floor(time / Math.max(44, 92 / flowMultiplier)) % 8;
+    this.pathOverlay.setAlpha(this.style === "neon" ? .72 : .84 + Math.sin(motionTime * .0008) * (motionSuppressed ? 0 : .04));
     this.waterfalls.forEach((sprite, index) => sprite.setFrame((waterfallFrame + index) % 8)
       .setAlpha(Math.min(1, .82 + this.environmentState.waterfallEnergy * .018)));
     this.waterfallSplashes.forEach((sprite, index) => sprite.setFrame((waterfallFrame + index * 2) % 8)
-      .setScale(1 + this.environmentState.waterfallEnergy * .012 + Math.sin(motionTime * .003 + index) * (reducedMotion ? 0 : .04), 1));
+      .setScale(1 + this.environmentState.waterfallEnergy * .012 + Math.sin(motionTime * .003 + index) * (motionSuppressed ? 0 : .04), 1));
     this.water.forEach((sprite, index) => sprite.setFrame((frame + index) % 4));
     this.foliage.forEach((sprite, index) => sprite.setFrame((frame + index) % 4)
-      .setScale(1 + Math.sin(motionTime * 0.0015 + index) * (reducedMotion ? 0 : 0.018), 1));
+      .setScale(1 + Math.sin(motionTime * 0.0015 + index) * (motionSuppressed ? 0 : 0.018), 1));
     const lightBoost = time < this.lanternBoostUntil ? .28 : 0;
-    this.lights.forEach((sprite, index) => sprite.setFrame((frame + index) % 4)
-      .setAlpha(Math.min(1, (reducedMotion ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost)));
+    this.lights.forEach((sprite, index) => sprite.setVisible(qualityProfile?.dynamicLights !== false)
+      .setFrame((frame + index) % 4)
+      .setAlpha(Math.min(1, (motionSuppressed ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost)));
     this.weather.forEach((sprite, index) => {
+      sprite.setVisible(qualityProfile?.weather !== false && effectLevel !== "low");
       sprite.setFrame((frame + index) % 4);
       sprite.x -= dt * (this.style === "neon" || this.style === "ink" ? 0.045 : 0.015);
       sprite.y += dt * (this.style === "neon" || this.style === "ink" ? 0.11 : 0.025);
@@ -246,8 +264,11 @@ export class StudioLivingWorldRuntime {
     this.portalAura.setAlpha(.03 + this.environmentState.portalCharge * .025 + pulse).setScale(1 + this.environmentState.portalCharge * .008);
     this.treeAura.setAlpha(.025 + this.environmentState.treeBloom * .022 + pulse).setScale(1 + this.environmentState.treeBloom * .006);
     this.ambientActors.forEach((actor, index) => {
+      const ambientVisible = qualityProfile?.ambientActors !== false && effectLevel !== "low";
+      actor.body.setVisible(ambientVisible);
+      actor.shadow.setVisible(ambientVisible);
       actor.body.x = (actor.body.x + dt * actor.speed * (18 + index)) % (this.manifest.width + 30);
-      actor.body.y = actor.baseY + Math.sin(motionTime * 0.0017 + index) * (reducedMotion ? 0 : actor.amplitude);
+      actor.body.y = actor.baseY + Math.sin(motionTime * 0.0017 + index) * (motionSuppressed ? 0 : actor.amplitude);
       actor.shadow.setPosition(actor.body.x, actor.baseY + 20);
       const distance = Math.hypot(actor.body.x - focus.x, actor.body.y - focus.y);
       actor.body.setAlpha(distance < 160 ? 0.28 : 0.8);
@@ -259,7 +280,7 @@ export class StudioLivingWorldRuntime {
       effect.setFrame(Math.min(7, Math.floor(progress * 8))).setAlpha(1 - progress * .45);
       if (progress >= 1) { effect.destroy(); this.activeEffects.splice(index, 1); }
     }
-    this.updateFootsteps(time, reducedMotion ? 0 : speed);
+    this.updateFootsteps(time, motionSuppressed || qualityProfile?.particleRatio === 0 ? 0 : speed);
   }
 
   triggerEnvironmentEffect(effect: StudioVirtualEnvironmentEffect, point: StudioVirtualSpacePoint, time: number): void {
@@ -276,7 +297,9 @@ export class StudioLivingWorldRuntime {
         : effect === "lanterns" ? 0xffdf7d
           : effect === "gong" ? 0xffc857
             : effect === "spotlight" ? 0xaee9ff : 0xd7c5ff;
-    const count = effect === "photo" ? 6 : effect === "gong" || effect === "spotlight" ? 18 : 12;
+    const baseCount = effect === "photo" ? 6 : effect === "gong" || effect === "spotlight" ? 18 : 12;
+    const effectMultiplier = this.effectLevel === "low" ? .5 : this.effectLevel === "high" ? 1.25 : 1;
+    const count = Math.max(0, Math.round(baseCount * (this.qualityProfile?.particleRatio ?? 1) * effectMultiplier));
     for (let index = 0; index < count; index += 1) {
       const angle = index / count * Math.PI * 2;
       const particle = this.scene.add.circle(point.x, point.y - 8, effect === "pet" ? 4 : 3, color, .85)

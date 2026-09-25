@@ -26,6 +26,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useReducer,
   useState,
   useSyncExternalStore,
   type CSSProperties,
@@ -97,6 +98,17 @@ import {
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
 import { StudioVirtualSpaceCustomizationPanel } from "./StudioVirtualSpaceCustomizationPanel";
+import { StudioVirtualSpaceExperiencePanel } from "./StudioVirtualSpaceExperiencePanel";
+import { captureStudioVirtualPhoto } from "./studio-virtual-space-photo-mode";
+import {
+  readStudioVirtualExperiencePreference,
+  writeStudioVirtualExperiencePreference,
+  type StudioVirtualExperiencePreference,
+} from "./studio-virtual-space-experience-preference";
+import {
+  EMPTY_STUDIO_VIRTUAL_RUNTIME_METRICS,
+  type StudioVirtualRuntimeMetrics,
+} from "./studio-virtual-space-observability";
 import {
   readStudioVirtualCharacterCustomization,
   readStudioVirtualDecorationState,
@@ -105,6 +117,14 @@ import {
   type StudioVirtualCharacterCustomization,
   type StudioVirtualDecorationState,
 } from "./studio-virtual-space-customization";
+import {
+  applyStudioVirtualReward,
+  readStudioVirtualRewardInventory,
+  unlockStudioVirtualReward,
+  writeStudioVirtualRewardInventory,
+  type StudioVirtualRewardId,
+  type StudioVirtualRewardInventory,
+} from "./studio-virtual-space-rewards";
 import {
   StudioVirtualSpacePhaserCanvas,
   type StudioVirtualSpaceEngineLocalState,
@@ -144,12 +164,16 @@ import { StudioVirtualSpaceTodayBoard } from "./StudioVirtualSpaceTodayBoard";
 import { StudioVirtualSpaceRtcPanel } from "./StudioVirtualSpaceRtcPanel";
 import { studioSpatialActions, type StudioSpatialActionId } from "./studio-virtual-space-spatial-actions";
 import { orchestrateStudioSpatialInteraction, type StudioVirtualWorkspacePanel } from "./studio-virtual-space-interaction-orchestrator";
+import {
+  EMPTY_STUDIO_SPATIAL_INTERACTION_STATE,
+  reduceStudioSpatialInteraction,
+} from "./studio-virtual-space-interaction-state";
 import { useStudioVirtualSpaceOperations } from "./use-studio-virtual-space-operations";
 import { StudioVirtualSpaceEntryLobby } from "./StudioVirtualSpaceEntryLobby";
 import { StudioVirtualSpaceP2pBoard } from "./StudioVirtualSpaceP2pBoard";
 import { StudioVirtualSpaceLiveAnnotationPanel } from "./StudioVirtualSpaceLiveAnnotationPanel";
 import { StudioVirtualSpaceTownProgramPanel } from "./StudioVirtualSpaceTownProgramPanel";
-import { studioTownActiveEvent, type StudioTownEvent } from "./studio-virtual-space-town-program";
+import { studioTownActiveEvent, studioTownDeskPodForActor, type StudioTownEvent } from "./studio-virtual-space-town-program";
 import { studioSemanticWorldGraph } from "./studio-virtual-space-semantic-world";
 import { StudioVirtualSpaceRoomCatalog } from "./StudioVirtualSpaceRoomCatalog";
 import { useStudioVirtualSpaceP2pBoard } from "./use-studio-virtual-space-p2p-board";
@@ -650,14 +674,21 @@ export function VirtualSpaceExperience({
   );
   const controllerRef = useRef<StudioVirtualSpacePresenceController | null>(null);
   const fallbackIdentity = live.room?.participant.sessionId ?? `space:${projectId}`;
+  const initialExperiencePreference = useMemo(() => readStudioVirtualExperiencePreference(), []);
   const initial = useMemo(() => {
     const preferred = studioVirtualSpaceInitialPoint(fallbackIdentity);
+    if (initialExperiencePreference.startLocation === "lobby") {
+      return studioWorldSpawn(DEFAULT_STUDIO_WORLD_MANIFEST, "lobby").point;
+    }
+    if (initialExperiencePreference.startLocation === "desk") {
+      return studioTownDeskPodForActor(fallbackIdentity, live.room?.participant.role).point;
+    }
     return resolveStudioVirtualSpaceSessionPoint(
       positionScope,
       DEFAULT_STUDIO_WORLD_MANIFEST,
       preferred,
     ) ?? preferred;
-  }, [fallbackIdentity, positionScope]);
+  }, [fallbackIdentity, initialExperiencePreference.startLocation, live.room?.participant.role, positionScope]);
   const initialAvatarIndex = useMemo(
     () => initialAvatarIndexOverride ?? readStudioVirtualSpaceAvatarIndex(),
     [initialAvatarIndexOverride],
@@ -686,11 +717,42 @@ export function VirtualSpaceExperience({
     setCharacterCustomization(next);
     writeStudioVirtualCharacterCustomization(next);
   }, []);
+  const [rewardInventory, setRewardInventory] = useState<StudioVirtualRewardInventory>(
+    () => readStudioVirtualRewardInventory(),
+  );
+  const claimReward = useCallback((id: StudioVirtualRewardId) => {
+    setRewardInventory((current) => {
+      const next = unlockStudioVirtualReward(current, id);
+      writeStudioVirtualRewardInventory(next);
+      return next;
+    });
+  }, []);
+  const equipReward = useCallback((id: StudioVirtualRewardId) => {
+    setCharacterCustomization((current) => {
+      const next = applyStudioVirtualReward(current, id);
+      writeStudioVirtualCharacterCustomization(next);
+      return next;
+    });
+  }, []);
   const [decorations, setDecorations] = useState<StudioVirtualDecorationState>(() => readStudioVirtualDecorationState());
   const selectDecorations = useCallback((next: StudioVirtualDecorationState) => {
     setDecorations(next);
     writeStudioVirtualDecorationState(next);
   }, []);
+  const [experiencePreference, setExperiencePreference] = useState<StudioVirtualExperiencePreference>(initialExperiencePreference);
+  const selectExperiencePreference = useCallback((next: StudioVirtualExperiencePreference) => {
+    setExperiencePreference(next);
+    writeStudioVirtualExperiencePreference(next);
+  }, []);
+  const [runtimeMetrics, setRuntimeMetrics] = useState<StudioVirtualRuntimeMetrics>(EMPTY_STUDIO_VIRTUAL_RUNTIME_METRICS);
+  const captureVirtualPhoto = useCallback(() => {
+    void captureStudioVirtualPhoto().then((capture) => {
+      const kilobytes = Math.max(1, Math.round(capture.bytes / 1024));
+      setSocialNotice(bt(`월드 사진을 저장했어요 · ${kilobytes}KB`, `World photo saved · ${kilobytes}KB`));
+    }).catch(() => {
+      setSocialNotice(bt("월드 사진을 저장하지 못했어요.", "The world photo could not be saved."));
+    });
+  }, [bt]);
   const [moving, setMoving] = useState(false);
   const [gamepadConnected, setGamepadConnected] = useState(false);
   const [followingPeerId, setFollowingPeerId] = useState<string | null>(null);
@@ -738,6 +800,10 @@ export function VirtualSpaceExperience({
   const [worldLoadError, setWorldLoadError] = useState(false);
   const [currentInteraction, setCurrentInteraction] = useState<StudioWorldInteractionDefinition | null>(null);
   const [pendingInteraction, setPendingInteraction] = useState<StudioWorldInteractionDefinition | null>(null);
+  const [interactionState, dispatchInteraction] = useReducer(
+    reduceStudioSpatialInteraction,
+    EMPTY_STUDIO_SPATIAL_INTERACTION_STATE,
+  );
   const [dialogueNpc, setDialogueNpc] = useState<StudioWorldNpcDefinition | null>(null);
   const operations = useStudioVirtualSpaceOperations(projectId, signedIn && !personal);
   const engineBridge = useMemo(() => new StudioVirtualSpaceEngineBridge(), []);
@@ -1077,11 +1143,13 @@ export function VirtualSpaceExperience({
   const currentRoom = roomById.get(snapshot.self.zoneId)
     ?? worldManifest.rooms[0]
     ?? DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!;
+  const productionProjectId = operations.snapshot.project?.aggregate.projectId ?? null;
 
   const requestInteraction = useCallback((interaction: StudioWorldInteractionDefinition) => {
     engineBridge.clearMovement();
     setDialogueNpc(null);
     setPendingInteraction(interaction);
+    dispatchInteraction({ type: "choose", interactionId: interaction.id });
   }, [engineBridge]);
 
   const activateCurrentRoom = useCallback(() => {
@@ -1109,28 +1177,63 @@ export function VirtualSpaceExperience({
   const handleEngineNpcInteract = useCallback((interaction: StudioWorldInteractionDefinition, npc: StudioWorldNpcDefinition) => {
     engineBridge.clearMovement();
     setPendingInteraction(null);
+    dispatchInteraction({ type: "close" });
     setDialogueNpc(npc);
     setCurrentInteraction(interaction);
   }, [engineBridge]);
 
+  const handleNearbyInteractionChange = useCallback((interaction: StudioWorldInteractionDefinition | null) => {
+    setCurrentInteraction(interaction);
+    dispatchInteraction(interaction
+      ? { type: "nearby", interactionId: interaction.id }
+      : { type: "leave" });
+  }, []);
+
+  const executeSpatialAction = useCallback((id: StudioSpatialActionId) => {
+    const interaction = pendingInteraction;
+    if (!interaction) return;
+    dispatchInteraction({ type: "run" });
+    setPendingInteraction(null);
+    try {
+      const decision = orchestrateStudioSpatialInteraction(id, {
+        interaction,
+        projectId,
+        productionProjectId,
+      });
+      if (decision.kind === "world-rule") worldRuleGate.request(decision.interaction);
+      else if (decision.kind === "panel") setWorkspacePanel(decision.panel);
+      else if (decision.kind === "effect") {
+        engineBridge.requestEnvironmentEffect(decision.effect, interaction.point);
+        if (decision.effect === "wish" || decision.effect === "gong") controllerRef.current?.sendReaction("sparkles");
+        if (decision.effect === "pet") controllerRef.current?.sendReaction("heart");
+        setSocialNotice(bt("상호작용 이펙트를 실행했어요.", "Interaction effect activated."));
+      } else navigate(decision.href);
+      dispatchInteraction({ type: "complete" });
+    } catch (error) {
+      dispatchInteraction({ type: "fail", error: error instanceof Error ? error.message : "interaction-failed" });
+      setSocialNotice(bt("상호작용을 완료하지 못했어요.", "The interaction could not be completed."));
+    }
+  }, [bt, engineBridge, navigate, pendingInteraction, productionProjectId, projectId, setSocialNotice, worldRuleGate]);
+
   const handleSpatialAction = useCallback((id: StudioSpatialActionId) => {
     const interaction = pendingInteraction;
-    setPendingInteraction(null);
     if (!interaction) return;
-    const decision = orchestrateStudioSpatialInteraction(id, {
-      interaction,
-      projectId,
-      productionProjectId: operations.snapshot.project?.aggregate.projectId,
-    });
-    if (decision.kind === "world-rule") worldRuleGate.request(decision.interaction);
-    else if (decision.kind === "panel") setWorkspacePanel(decision.panel);
-    else if (decision.kind === "effect") {
-      engineBridge.requestEnvironmentEffect(decision.effect, interaction.point);
-      if (decision.effect === "wish" || decision.effect === "gong") controllerRef.current?.sendReaction("sparkles");
-      if (decision.effect === "pet") controllerRef.current?.sendReaction("heart");
-      setSocialNotice(bt("상호작용 이펙트를 실행했어요.", "Interaction effect activated."));
-    } else navigate(decision.href);
-  }, [bt, engineBridge, navigate, operations.snapshot.project?.aggregate.projectId, pendingInteraction, projectId, worldRuleGate]);
+    const selected = studioSpatialActions(interaction, roomById.get(interaction.zoneId)).find((item) => item.id === id);
+    if (!selected) return;
+    const guarded = selected.risk === "authority" || selected.risk === "collaborative";
+    dispatchInteraction({ type: "select-action", actionId: id, authority: guarded });
+    if (guarded) {
+      dispatchInteraction({ type: "confirm" });
+      return;
+    }
+    executeSpatialAction(id);
+  }, [executeSpatialAction, pendingInteraction, roomById]);
+
+  const confirmSpatialAction = useCallback(() => {
+    const actionId = interactionState.actionId as StudioSpatialActionId | null;
+    if (!actionId || interactionState.phase !== "confirming") return;
+    executeSpatialAction(actionId);
+  }, [executeSpatialAction, interactionState.actionId, interactionState.phase]);
 
   const followingPeer = followingPeerId
     ? snapshot.peers.find((peer) => peer.participant.sessionId === followingPeerId) ?? null
@@ -1259,7 +1362,7 @@ export function VirtualSpaceExperience({
     engineBridge.requestEnvironmentEffect("spotlight", point);
     openStudioP2pHuddle({ conversationId: scope.id, peerIds, source: "virtual-space" });
     setSocialNotice(bt("현재 동의한 대화 그룹에 Spotlight를 준비했어요. 마이크·카메라·화면은 직접 선택합니다.", "Spotlight is prepared for the consenting conversation. Choose microphone, camera and screen explicitly."));
-  }, [activeConversation, pairConversation, live.room?.participant.sessionId, bt, engineBridge, worldManifest]);
+  }, [activeConversation, pairConversation, live.room?.participant.sessionId, bt, engineBridge, setSocialNotice, worldManifest]);
   const handleAcceptedActivity = useCallback((request: StudioSpaceSocialRequest) => {
     if (activeConversation) leaveConversation(activeConversation.id);
     if (sharedActivityRef.current?.id !== request.id) finishSharedActivity();
@@ -1452,6 +1555,9 @@ export function VirtualSpaceExperience({
                 className="studio-vspace-stage relative min-h-[30rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-[34rem]"
                 style={{ aspectRatio: `${worldManifest.width}/${worldManifest.height}` }}
                 data-studio-virtual-space="true"
+                data-handedness={experiencePreference.handedness}
+                data-control-mode={experiencePreference.controlMode}
+                data-quality-preset={experiencePreference.qualityPreset}
                 data-spotlight-active={spotlightEventId ? "true" : undefined}
               >
                 {worldReady ? <StudioVirtualSpacePhaserCanvas
@@ -1460,6 +1566,7 @@ export function VirtualSpaceExperience({
                   snapshot={snapshot}
                   bridge={engineBridge}
                   selfIdentity={fallbackIdentity}
+                  selfDisplayName={nickname}
                   seatedActors={seatedActors}
                   waveActorIds={waveActorIds}
                   guideTourRequest={guideTourRequest}
@@ -1468,10 +1575,12 @@ export function VirtualSpaceExperience({
                   atmosphere={activity === "focused" || activity === "away" ? "focus" : atmosphere}
                   artStyle={artStyle}
                   decorations={decorations}
+                  experiencePreference={experiencePreference}
+                  onRuntimeMetrics={setRuntimeMetrics}
                   onNpcInteract={handleEngineNpcInteract}
                   onLocalState={handleEngineLocalState}
                   onInteract={handleEngineInteract}
-                  onNearbyInteractionChange={setCurrentInteraction}
+                  onNearbyInteractionChange={handleNearbyInteractionChange}
                   onPeerSelect={handleEnginePeerSelect}
                   onCancelFollow={cancelFollowing}
                   onPortal={handleEnginePortal}
@@ -1554,8 +1663,12 @@ export function VirtualSpaceExperience({
                   </button>
                 </div>
 
-                <div className="studio-vspace-touch-joystick-wrap absolute bottom-4 right-4 z-50 lg:hidden" data-space-interactive="true">
+                <div className="studio-vspace-touch-joystick-wrap absolute bottom-4 right-4 z-50 lg:hidden"
+                  data-handedness={experiencePreference.handedness}
+                  data-control-mode={experiencePreference.controlMode}
+                  data-space-interactive="true">
                   <StudioVirtualSpaceJoystick
+                    mode={experiencePreference.controlMode}
                     onVectorChange={(vector) => {
                       engineBridge.setJoystick(vector);
                     }}
@@ -1596,8 +1709,11 @@ export function VirtualSpaceExperience({
                   interaction={pendingInteraction}
                   room={roomById.get(pendingInteraction.zoneId)}
                   actions={studioSpatialActions(pendingInteraction, roomById.get(pendingInteraction.zoneId))}
+                  phase={interactionState.phase}
+                  selectedActionId={interactionState.actionId as StudioSpatialActionId | null}
                   onChoose={handleSpatialAction}
-                  onClose={() => setPendingInteraction(null)}
+                  onConfirm={confirmSpatialAction}
+                  onClose={() => { setPendingInteraction(null); dispatchInteraction({ type: "close" }); }}
                 /> : null}
                 {dialogueNpc ? <StudioVirtualSpaceNpcDialoguePanel
                   npc={dialogueNpc}
@@ -1605,6 +1721,9 @@ export function VirtualSpaceExperience({
                   operations={operations.snapshot}
                   peers={snapshot.peers}
                   artStyle={artStyle}
+                  dialogueScale={experiencePreference.dialogueScale}
+                  ttsEnabled={experiencePreference.ttsEnabled}
+                  onDialogueScale={(dialogueScale) => selectExperiencePreference({ ...experiencePreference, dialogueScale })}
                   onAction={handleNpcDialogueAction}
                   onClose={() => setDialogueNpc(null)}
                 /> : null}
@@ -1671,8 +1790,11 @@ export function VirtualSpaceExperience({
             operations={operations.snapshot}
             manifest={worldManifest}
             decorations={decorations}
+            rewards={rewardInventory}
             spotlightActive={Boolean(spotlightEventId)}
             onDecorations={selectDecorations}
+            onClaimReward={(id) => { claimReward(id); setSocialNotice(bt("꾸미기 보상을 획득했어요.", "Cosmetic reward unlocked.")); }}
+            onEquipReward={(id) => { equipReward(id); setSocialNotice(bt("꾸미기 보상을 적용했어요.", "Cosmetic reward equipped.")); }}
             onMoveToRoom={(roomId) => { queuePathTo(studioWorldSpawn(worldManifest, roomId).point); setWorkspacePanel(null); }}
             onOpenPeople={() => setWorkspacePanel("people")}
             onOpenAnnotation={() => setWorkspacePanel("annotation")}
@@ -1724,6 +1846,12 @@ export function VirtualSpaceExperience({
                   ))}
                 </div>
               </fieldset>
+            <StudioVirtualSpaceExperiencePanel
+              value={experiencePreference}
+              metrics={runtimeMetrics}
+              onChange={selectExperiencePreference}
+              onCapture={captureVirtualPhoto}
+            />
             <StudioVirtualSpaceCustomizationPanel
               nickname={nickname}
               character={characterCustomization}
