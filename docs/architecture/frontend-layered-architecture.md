@@ -15,22 +15,19 @@ src/app            application bootstrap, providers, URL composition, global bou
     ↓
 src/domains/*      product modules and use-case orchestration
     ↓
-src/infrastructure platform and transport adapters
+src/platform       browser, HTTP, storage and external-service adapters
     ↓
-src/components
-src/hooks
-src/compat
-src/styles         shared UI and cross-domain utilities
+src/shared         domain-independent UI, hooks, navigation, SEO and utilities
 ```
 
 The dependency direction mechanically enforced by ESLint is:
 
 - `app` may compose every lower layer.
-- `domains` may use domain contracts, infrastructure, and shared code, but may not import `app`.
-- `infrastructure` may use infrastructure and shared code only.
+- `domains` may use reviewed domain contracts, platform, and shared code, but may not import `app`.
+- `platform` may use platform and shared code only and may not own business rules.
 - shared code may not know product domains.
 
-The root `components/` and `lib/` trees predate this boundary map and remain a documented migration exception; new product logic must not be added there. Cross-domain imports should target a stable contract instead of another domain's page internals, and broad `index.ts` barrels are avoided. Those two rules are review conventions today and will become mechanical checks as legacy imports are reduced. This refactor tightens the current model rather than introducing an FSD parallel tree.
+The former root `compat`, `components`, `hooks`, `infrastructure`, `generated`, `styles`, and `types` trees have been removed. Their code now belongs to app, domain, platform, or shared ownership, and the source-layout ratchet prevents those paths from returning. Cross-domain imports target a stable `public` or `integrations` boundary instead of page internals, and broad `index.ts` barrels are avoided. This refactor tightens the current model rather than introducing an FSD parallel tree.
 
 ## Design inputs and stack review
 
@@ -138,7 +135,7 @@ The focused suite passed 6 test files and 29 tests. The verification commit also
 
 ## Repository hygiene
 
-Execution receipts and one-off soak trigger notes belong in GitHub Actions artifacts, not source control. The architecture validator rejects the old `.github/qa` and `scripts/qa/runs` receipt directories. Durable findings belong in an ADR, an architecture document, or a maintained runbook.
+Execution receipts and one-off soak trigger notes belong in GitHub Actions artifacts, not source control. The architecture and source-layout validators reject tracked `.qa`, `artifacts`, `.github/qa`, and `scripts/qa/runs` receipt paths. Durable findings belong in an ADR, an architecture document, or a maintained runbook.
 
 ## Migration rule
 

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const stage = path.join(root, 'artifacts/studio-premium-20260913');
+const stage = path.join(root, 'data/asset-releases/studio-premium-20260913');
 const destination = path.join(root, 'apps/web/public/assets/studio/cc0-20260906');
 const load = async file => JSON.parse(await readFile(file, 'utf8'));
 const current = await load(path.join(destination, 'manifest.json'));
@@ -31,7 +31,7 @@ for (const asset of additions) {
   const bytes = await readFile(path.join(destination, asset.path));
   assert.equal(createHash('sha256').update(bytes).digest('hex'), asset.sha256);
   assert.equal(bytes.length, asset.bytes);
-  assert(asset.visualReviewSource.startsWith('artifacts/studio-premium-20260913/review/'));
+  assert(asset.visualReviewSource.startsWith('data/asset-releases/studio-premium-20260913/review/'));
   await readFile(path.join(root, asset.visualReviewSource));
 }
 const byKind = Object.fromEntries([...new Set(additions.map(asset => asset.kind))].map(kind => [kind, additions.filter(asset => asset.kind === kind).length]));
@@ -82,7 +82,7 @@ Poly Haven의 CC0 원본을 공식 API와 다운로드 도메인에서 수집했
 - scripts/verify-studio-premium-release.mjs: 배포 파일 해시, PBR 맵, 원본·파생 연결, 실제 이미지 삽입·PNG 출력, 라이브러리 컴포넌트 필터·검색·미리보기·삽입.
 - .github/workflows/studio-premium-assets-quality.yml: 읽기 전용 신규 및 기존 CC0 회귀 검사. 실제 통과 상태는 해당 PR의 Actions 결과로 확인한다.
 
-선별 판정은 data/studio-assets/premium-20260913-decisions.json, 수집·렌더·메모리 검사와 컨택트 시트는 artifacts/studio-premium-20260913에 있다. 배포 후 중복 스테이징 바이너리와 임시 쓰기 워크플로는 최종 변경에서 제거한다.
+선별 판정은 data/studio-assets/premium-20260913-decisions.json, 수집·렌더·메모리 검사와 컨택트 시트는 data/asset-releases/studio-premium-20260913에 있다. 배포 후 중복 스테이징 바이너리와 임시 쓰기 워크플로는 최종 변경에서 제거한다.
 `;
 await writeFile(path.join(documents, 'studio-premium-assets-20260913.md'), doc);
 // These paths belong exclusively to this task. Published originals and review evidence remain.

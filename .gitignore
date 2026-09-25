@@ -163,3 +163,6 @@ crates/**/target/
 
 # Generated 3D normalization intermediates
 apps/web/public/assets/3d/environments/mcp-free-v1/.work/
+
+# Local and CI QA receipts are generated evidence, never maintained source.
+/.qa/

@@ -1,10 +1,10 @@
 # GPT Image 2.5 background atlas transfer
 
-## Historical transfer payload
+## Historical transfer conclusion
 
-The bytes preserved from `feat/studio-gpt25-2d-background-atlas-20260916` are
-kept only for forensic comparison so the abandoned branch can remain deleted
-without losing its original payload.
+The bytes formerly preserved from `feat/studio-gpt25-2d-background-atlas-20260916` were
+forensically inspected before removal from the maintained source tree. Their original form remains
+recoverable from Git history.
 
 - `overlay.tar.gz` is a truncated gzip (`invalid distance` / incomplete stream).
 - `parts/part00`–`part09` are staged transfer chunks, but they do not form a
@@ -12,9 +12,8 @@ without losing its original payload.
 - These files are **not** the maintained source of the Studio background atlas
   and should not be copied into product code or treated as installable assets.
 
-The manual workflow `Diagnose studio GPT Image 2.5 background atlas transfer`
-remains available through `workflow_dispatch` for diagnostics only. It does not
-run on pushes or pull requests.
+The one-shot diagnostic workflow and invalid transfer chunks were removed after the maintained
+implementation was reconstructed. They are not required for build, test, release or rollback.
 
 ## Current maintained implementation
 

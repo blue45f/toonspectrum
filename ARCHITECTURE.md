@@ -24,11 +24,10 @@ apps/web/                         # 사용자·창작자 브라우저 애플리�
   index.html                      # Web 프로덕션 HTML 진입점
   public/                         # URL로 직접 제공되는 정적 자산
   src/
-    app/                          # 부트스트랩, 라우팅, 서비스 워커, 앱 셸
+    app/                          # 부트스트랩, 라우팅, 서비스 워커, 앱 셸, 전역 style
     domains/                      # 제품 도메인별 UI·유스케이스·모델
-    shared/                       # 도메인을 모르는 Web 공용 코드
-    infrastructure/              # platform으로 이전 중인 레거시 adapter
-    compat/, components/, hooks/ # 소유 영역으로 이전 중인 레거시 경계
+    platform/                     # HTTP·browser·storage·외부 integration adapter
+    shared/                       # 도메인을 모르는 Web 공용 UI·hook·navigation·SEO·타입
 
 apps/admin-web/                   # 독립 관리자 Frontend workspace package
   package.json
@@ -42,11 +41,12 @@ apps/admin-web/                   # 독립 관리자 Frontend workspace package
 
 apps/api/                         # 서버 전용 NestJS workspace package
   src/modules/                    # 기능 모듈과 HTTP 경계
-  src/platform/             # platform으로 이전 중인 adapter
+  src/infrastructure/             # platform으로 이전 중인 서버 adapter
   src/db/                         # schema·migration·seed
   src/server/                     # modules로 이전 중인 레거시 유스케이스
 
 packages/                         # focused contracts, pure models, Studio engines
+data/asset-releases/              # 검토된 릴리스 manifest·출처·visual review 증거
 scripts/, tools/, e2e/, tests/    # 저장소 횡단 도구와 검증 코드
 ```
 
@@ -76,7 +76,7 @@ application source    -X-> another application source
 ## 검증과 생성물 정책
 
 `pnpm run validate:architecture`는 canonical entry, workspace package, 문서·스크립트,
-경로 재등장과 애플리케이션 경계를 검사합니다. `dist`, `coverage`, `qa-results`,
+source-layout ratchet, 경로 재등장과 애플리케이션 경계를 검사합니다. `dist`, `coverage`, `qa-results`,
 Playwright screenshot과 임시 진단 파일은 소스가 아니며 CI artifact 또는 재현 가능한
 명령으로 생성합니다.
 

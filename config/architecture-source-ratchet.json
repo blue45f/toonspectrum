@@ -1,0 +1,19 @@
+{
+  "creatorRootFiles": 3442,
+  "webAdminFiles": 73,
+  "apiServerFiles": 69,
+  "apiCommonFiles": 11,
+  "apiInfrastructureFiles": 78,
+  "apiDbFiles": 138,
+  "packagesCoreFiles": 124,
+  "desktopSyncAgentFiles": 10,
+  "trackedQaFiles": 0,
+  "trackedArtifactFiles": 0,
+  "webCompatFiles": 0,
+  "webComponentsFiles": 0,
+  "webHooksFiles": 0,
+  "webInfrastructureFiles": 0,
+  "webGeneratedFiles": 0,
+  "webStylesFiles": 0,
+  "webTypesFiles": 0
+}

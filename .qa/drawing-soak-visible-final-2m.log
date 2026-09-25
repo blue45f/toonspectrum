@@ -1,6 +1,0 @@
-[studio-five-hour-soak] desktop · 2 min · input=pen · webgpu=off · http://127.0.0.1:5173
-[studio-five-hour-soak] checkpoint 0m · cycle 1 · failures 0 · heap 112 MiB
-[studio-five-hour-soak] 23 cycles · 23 strokes · 5 brush switches · 8 history actions
-[studio-five-hour-soak] 0 runtime errors · 0 GPU events · 0 long tasks (worst 0 ms)
-[studio-five-hour-soak] GC heap 112 MiB → 129 MiB
-[studio-five-hour-soak] 0 recorded failures · report /Users/hjunkim/.chatgpt-worktrees/toonspectrum-drawing-browser-stability-20260923/.qa/drawing-soak-visible-final-2m/report.json

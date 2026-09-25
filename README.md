@@ -18,12 +18,12 @@ ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너�
 
 ## 현재 저장소와 개발 기준
 
-2026-09-18 기준 ToonSpectrum은 하나의 모노레포에서 사용자 웹, 관리자 웹 경계, API와 Studio 핵심 패키지를 함께 관리합니다. 도메인은 아직 별도 `packages/domains/*`로 쪼개지 않고 각 애플리케이션 안에서 논리적으로 구분합니다.
+2026-09-25 기준 ToonSpectrum은 하나의 모노레포에서 사용자 웹, 관리자 웹, API와 Studio 핵심 패키지를 함께 관리합니다. 도메인은 아직 별도 `packages/domains/*`로 쪼개지 않고 각 애플리케이션 안에서 논리적으로 구분합니다.
 
 ```text
 apps/
   web/                 사용자용 Vite/React 애플리케이션
-  admin/               독립 빌드 가능한 관리자 UI 경계(점진적 이전 중)
+  admin-web/           독립 빌드 가능한 관리자 UI(기능 이전 중)
   api/                 NestJS API
 packages/
   contracts/           Web/Admin/API가 실제로 공유하는 런타임 중립 계약
@@ -254,7 +254,7 @@ pnpm dev:all                # 사용자 웹 + API
 pnpm dev:admin              # 관리자 UI: http://localhost:4174
 pnpm typecheck:admin
 pnpm build:admin            # apps/admin-web/dist/
-pnpm validate:architecture  # 구조 + application boundary ratchet
+pnpm validate:architecture  # 구조 + source-layout + application boundary ratchet
 pnpm build && pnpm start    # 사용자 웹 프로덕션 프리뷰
 ```
 
@@ -402,10 +402,10 @@ apps/
   web/               사용자용 Vite·React 브라우저 애플리케이션
     src/app/          부트스트랩·라우팅·앱 셸
     src/domains/      앱 내부의 논리적 업무 도메인
-    src/shared/       도메인 독립 UI·브라우저 공용 코드
-    src/platform/
+    src/platform/     HTTP·브라우저·storage·외부 integration adapter
+    src/shared/       도메인 독립 UI·hook·navigation·SEO·공용 코드
     public/           그대로 배포되는 정적 자산
-  admin/             독립 빌드 가능한 관리자 surface(점진적 이전 중)
+  admin-web/         독립 빌드 가능한 관리자 surface(기능 이전 중)
     src/app/
     src/domains/
     src/shared/
@@ -432,4 +432,4 @@ scripts/, tools/     저장소 횡단 생성·검증 도구
 
 ### 런타임 소스 지도
 
-프런트엔드는 `apps/web/src/app`(부트스트랩·라우팅), `apps/web/src/domains`(기능 도메인), `apps/web/src/shared`(도메인 간 브라우저 서비스·호환 경계)를 중심으로 구성합니다. 백엔드 기능은 `apps/api/src/modules`, 외부 서비스 어댑터는 `apps/api/src/infrastructure`, 스키마·마이그레이션은 `apps/api/src/db`, 서버 유스케이스는 `apps/api/src/server`에 둡니다. 운영 HTTP 진입점은 Render에서 실행되는 `apps/api/src/main.ts` 하나입니다.
+프런트엔드는 `apps/web/src/app`(부트스트랩·라우팅), `apps/web/src/domains`(기능 도메인), `apps/web/src/platform`(기술 adapter), `apps/web/src/shared`(도메인 독립 UI·hook·navigation·SEO)를 중심으로 구성합니다. 백엔드 기능은 `apps/api/src/modules`, 외부 서비스 어댑터는 `apps/api/src/infrastructure`, 스키마·마이그레이션은 `apps/api/src/db`, 서버 유스케이스는 `apps/api/src/server`에 둡니다. 운영 HTTP 진입점은 Render에서 실행되는 `apps/api/src/main.ts` 하나입니다.

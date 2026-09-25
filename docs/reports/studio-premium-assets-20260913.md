@@ -30,4 +30,4 @@ Poly Haven의 CC0 원본을 공식 API와 다운로드 도메인에서 수집했
 - scripts/verify-studio-premium-release.mjs: 배포 파일 해시, PBR 맵, 원본·파생 연결, 실제 이미지 삽입·PNG 출력, 라이브러리 컴포넌트 필터·검색·미리보기·삽입.
 - .github/workflows/studio-premium-assets-quality.yml: 읽기 전용 신규 및 기존 CC0 회귀 검사. 실제 통과 상태는 해당 PR의 Actions 결과로 확인한다.
 
-선별 판정은 data/studio-assets/premium-20260913-decisions.json, 수집·렌더·메모리 검사와 컨택트 시트는 artifacts/studio-premium-20260913에 있다. 배포 후 중복 스테이징 바이너리와 임시 쓰기 워크플로는 최종 변경에서 제거한다.
+선별 판정은 data/studio-assets/premium-20260913-decisions.json, 수집·렌더·메모리 검사와 컨택트 시트는 data/asset-releases/studio-premium-20260913에 있다. 배포 후 중복 스테이징 바이너리와 임시 쓰기 워크플로는 최종 변경에서 제거한다.
