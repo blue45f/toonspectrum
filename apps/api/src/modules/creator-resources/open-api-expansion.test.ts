@@ -129,7 +129,7 @@ describe("open API expansion", () => {
 
   it("parses NEIS XML responses with a server key", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(xml(`<?xml version="1.0" encoding="UTF-8"?>
-      <schoolInfo><head><list_total_count>1</list_total_count><RESULT>
+      <schoolInfo><head><list_total_count>1</list_total_count></head><head><RESULT>
       <CODE>INFO-000</CODE><MESSAGE>정상 처리되었습니다.</MESSAGE>
       </RESULT></head><row>
       <ATPT_OFCDC_SC_CODE><![CDATA[T10]]></ATPT_OFCDC_SC_CODE>

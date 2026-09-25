@@ -44,11 +44,13 @@ export function validKoreanOpenDataTextShape(url: URL, value: unknown): boolean 
       const result = parseXmlRoot(value, "RESULT");
       return result.CODE === "INFO-200";
     }
-    const head = recordOf(schoolInfo.head);
-    const result = recordOf(head.RESULT);
-    const count = integer(head.list_total_count);
+    const heads = rows(schoolInfo.head).map(recordOf);
+    const result = heads.map((head) => recordOf(head.RESULT))
+      .find((entry) => Object.keys(entry).length > 0) ?? {};
+    const countHead = heads.find((head) => head.list_total_count !== undefined) ?? {};
+    const count = integer(countHead.list_total_count);
     return result.CODE === "INFO-000"
-      && String(head.list_total_count ?? "") === String(count)
+      && String(countHead.list_total_count ?? "") === String(count)
       && (count === 0 || rows(schoolInfo.row).length > 0);
   }
   return false;
@@ -249,8 +251,9 @@ function normalizeKoreanDictionary(raw: unknown, fetchedAt: string): CreatorReso
 function neisRows(value: unknown): { rows: unknown[]; total: number } {
   const data = typeof value === "string" ? parseNeisXml(value) : recordOf(value);
   if (typeof value === "string") {
-    const head = recordOf(data.head);
-    return { rows: rows(data.row), total: integer(head.list_total_count) };
+    const heads = rows(data.head).map(recordOf);
+    const countHead = heads.find((head) => head.list_total_count !== undefined) ?? {};
+    return { rows: rows(data.row), total: integer(countHead.list_total_count) };
   }
   if (!Array.isArray(data.schoolInfo)) return { rows: [], total: 0 };
   let resultRows: unknown[] = [];
