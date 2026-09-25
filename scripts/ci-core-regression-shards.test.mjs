@@ -52,6 +52,22 @@ test("semantic sharding keeps expensive domains isolated", () => {
   }
 });
 
+test("통합 테스트 위치를 허용하면서 경로 이탈과 명령 인자를 거부한다", () => {
+  const targets = [
+    ...REQUIRED_VITEST_TARGETS,
+    "tests/integration/web-api/studio-history-regression.test.ts",
+  ].sort();
+  assert.doesNotThrow(() => assertShardManifest(targets));
+  for (const unsafe of [
+    "tests/integration/../../outside.test.ts",
+    "tests/fixtures/ignored.test.ts",
+    "--run",
+    "tests/integration/case.test.ts;exit",
+  ]) {
+    assert.throws(() => assertShardManifest([...targets, unsafe].sort()), /Unsafe CI regression target/u);
+  }
+});
+
 test("required foundation execution includes virtual-world consent, media and compiler integration regressions", () => {
   const foundation = executionTargetsByShard()["studio-foundation"];
   for (const target of [

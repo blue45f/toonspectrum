@@ -130,6 +130,29 @@ function withPatchedElement(
 }
 
 describe("CRDT 장면 재조정 구조 공유", () => {
+  it("수렴한 문서를 다시 반영하면 페이지와 요소 배열까지 유지하고 변경을 보고하지 않는다", () => {
+    const document = new StudioCrdtDocument();
+    try {
+      const authored = [page("page-a", [stroke("s-a", 1)]), page("page-b", [stroke("s-b", 2)])];
+      const seeded = commit(document, [], authored);
+      const stable = merge(document, seeded);
+      const result = reconcileStudioCrdtSceneGraphPages(
+        stable, document.getStrokes({ includeDeleted: true }),
+        document.getSceneElements({ includeDeleted: true }), document.getPages(true),
+        document.getLayerGroups({ includeDeleted: true }),
+      );
+      expect(result.changed).toBe(false);
+      expect(result.pages[0]).toBe(stable[0]);
+      expect(result.pages[1]).toBe(stable[1]);
+      const next = commit(document, stable, withPatchedElement(stable, "page-a", "s-a", { stroke: "#ff0000" }));
+      expect(next[0]).not.toBe(stable[0]);
+      expect(next[1]).toBe(stable[1]);
+      expect(next[1]?.elements).toBe(stable[1]?.elements);
+    } finally {
+      document.destroy();
+    }
+  });
+
   it("한 요소만 바뀐 커밋은 나머지 요소 객체를 그대로 재사용한다", () => {
     const document = new StudioCrdtDocument();
     try {

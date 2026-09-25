@@ -22,7 +22,9 @@ describe("Studio live gesture preview publisher wiring", () => {
     expect(pointerStart).toBeGreaterThan(0);
     expect(previewBegin).toBeGreaterThan(pointerStart);
     expect(previewBegin).toBeLessThan(liveSurfaceBegin);
-    expect(source.slice(previewBegin, liveSurfaceBegin)).toContain("element: next");
+    expect(source.slice(previewBegin, liveSurfaceBegin)).toContain("element: admittedStroke");
+    expect(source).toContain("onAdmitted: beginAdmittedCollaboration");
+    expect(source).toContain("admission.onAdmitted?.(stroke)");
   });
 
   it("publishes only authoritative freehand suffixes and coalesced shape endpoints", () => {

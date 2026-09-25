@@ -1,7 +1,7 @@
-import { applyColorRangeMaskToSelection, type ColorRangeMask } from "./studio-color-range";
-import { MAGIC_WAND_MAX_LOOPS, MAGIC_WAND_TRACE_MAX_DIM } from "./studio-magic-wand";
+import type { ColorRangeMask } from "./studio-color-range";
+import { assertExactSelectionSize, exactSelectionFromMask } from "./selection/studio-selection-exact-mask";
 
-import { MIN_SELECTION_SUBPATH_AREA, type PixelSelection } from "./studio-selection-tools";
+import type { PixelSelection } from "./studio-selection-tools";
 
 export type StudioSelectionBorderPlacement = "inside" | "center" | "outside";
 export const STUDIO_SELECTION_BORDER_MAX_WIDTH_PX = 128;
@@ -23,11 +23,12 @@ export function studioSelectionBorderRasterSize(displayWidth: number, displayHei
   if (![displayWidth, displayHeight].every((value) => Number.isFinite(value) && value > 0)) {
     throw new RangeError("선택 테두리의 이미지 크기가 올바르지 않습니다.");
   }
-  const scale = Math.min(1, MAGIC_WAND_TRACE_MAX_DIM / Math.max(displayWidth, displayHeight));
+  assertExactSelectionSize(Math.ceil(displayWidth), Math.ceil(displayHeight));
+  const scale = 1;
   return {
     width: Math.max(1, Math.round(displayWidth * scale)),
     height: Math.max(1, Math.round(displayHeight * scale)),
-    minimumWidthPx: Math.max(1, Math.ceil(2 / scale)),
+    minimumWidthPx: 1,
   };
 }
 
@@ -99,10 +100,10 @@ function distancesTo(mask: ColorRangeMask, selected: boolean, xSpacing: number, 
 export function buildStudioSelectionBorderMask(mask: ColorRangeMask, options: StudioSelectionBorderOptions): ColorRangeMask {
   const { width, height, alpha } = mask;
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1
-    || width > MAGIC_WAND_TRACE_MAX_DIM || height > MAGIC_WAND_TRACE_MAX_DIM
     || alpha.length !== width * height) {
-    throw new RangeError("선택 테두리 마스크는 축당 최대 640px이며 버퍼 크기가 일치해야 합니다.");
+    throw new RangeError("선택 테두리 마스크와 버퍼 크기가 일치해야 합니다.");
   }
+  assertExactSelectionSize(width, height);
   studioSelectionBorderRasterSize(options.displayWidth, options.displayHeight);
   if (!Number.isFinite(options.widthPx) || options.widthPx <= 0 || options.widthPx > STUDIO_SELECTION_BORDER_MAX_WIDTH_PX
     || !STUDIO_SELECTION_BORDER_PLACEMENTS.some((placement) => placement.id === options.placement)) {
@@ -110,8 +111,8 @@ export function buildStudioSelectionBorderMask(mask: ColorRangeMask, options: St
   }
   const xSpacing = options.displayWidth / width;
   const ySpacing = options.displayHeight / height;
-  const innerWidth = options.placement === "outside" ? 0 : options.widthPx / (options.placement === "center" ? 2 : 1);
-  const outerWidth = options.placement === "inside" ? 0 : options.widthPx / (options.placement === "center" ? 2 : 1);
+  const innerWidth = options.placement === "outside" ? 0 : (options.placement === "center" ? Math.ceil(options.widthPx / 2) : options.widthPx);
+  const outerWidth = options.placement === "inside" ? 0 : (options.placement === "center" ? Math.floor(options.widthPx / 2) : options.widthPx);
   const toOutside = innerWidth > 0 ? distancesTo(mask, false, xSpacing, ySpacing) : null;
   const toInside = outerWidth > 0 ? distancesTo(mask, true, xSpacing, ySpacing) : null;
   const result = new Uint8ClampedArray(alpha.length);
@@ -128,46 +129,8 @@ export function buildStudioSelectionBorderMask(mask: ColorRangeMask, options: St
   return { width, height, alpha: result };
 }
 
-/** The shared contour tracer has a finite topology budget; reject, never silently drop loops. */
-function assertBorderTopology(mask: ColorRangeMask) {
-  const visited = new Uint8Array(mask.alpha.length);
-  const stack = new Int32Array(mask.alpha.length);
-  const minimumArea = Math.ceil(MIN_SELECTION_SUBPATH_AREA * mask.alpha.length);
-  let islands = 0;
-  let holes = 0;
-  for (let start = 0; start < mask.alpha.length; start += 1) {
-    if (visited[start]) continue;
-    const selected = mask.alpha[start]! >= 128;
-    let count = 0;
-    let touchesEdge = false;
-    let pending = 1;
-    stack[0] = start;
-    visited[start] = 1;
-    while (pending > 0) {
-      const index = stack[--pending]!;
-      count += 1;
-      const x = index % mask.width;
-      const y = Math.floor(index / mask.width);
-      touchesEdge ||= x === 0 || y === 0 || x === mask.width - 1 || y === mask.height - 1;
-      for (const neighbor of [x > 0 ? index - 1 : -1, x + 1 < mask.width ? index + 1 : -1,
-        y > 0 ? index - mask.width : -1, y + 1 < mask.height ? index + mask.width : -1]) {
-        if (neighbor < 0 || visited[neighbor] || (mask.alpha[neighbor]! >= 128) !== selected) continue;
-        visited[neighbor] = 1;
-        stack[pending++] = neighbor;
-      }
-    }
-    if (selected) islands += 1;
-    else if (!touchesEdge) holes += 1;
-    if (islands > MAGIC_WAND_MAX_LOOPS || holes >= MAGIC_WAND_MAX_LOOPS
-      || ((selected || !touchesEdge) && count < minimumArea)) {
-      throw new RangeError("테두리에 너무 많은 영역이나 매우 작은 구멍이 있습니다. 기존 선택을 유지했습니다. 영역을 나누거나 테두리 두께를 조절해 주세요.");
-    }
-  }
-}
-
 export function studioSelectionBorderFromMask(mask: ColorRangeMask, selection: PixelSelection, options: StudioSelectionBorderOptions): PixelSelection | null {
   const border = buildStudioSelectionBorderMask(mask, options);
-  assertBorderTopology(border);
-  const next = applyColorRangeMaskToSelection(null, border, "add");
+  const next = exactSelectionFromMask(border);
   return next ? { ...next, featherPx: selection.featherPx } : null;
 }

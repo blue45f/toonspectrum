@@ -44,17 +44,17 @@ const perfect = {
 } as const;
 
 describe("consolidated Studio brush product portfolio", () => {
-  it("keeps 88 quality representatives first inside the complete selectable catalogue", () => {
-    expect(STUDIO_BRUSH_QUALITY_PORTFOLIO).toHaveLength(88);
-    expect(new Set(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS).size).toBe(88);
+  it("keeps 95 quality representatives first inside the complete selectable catalogue", () => {
+    expect(STUDIO_BRUSH_QUALITY_PORTFOLIO).toHaveLength(95);
+    expect(new Set(STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS).size).toBe(95);
     expect(STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS).toMatchObject({
-      total: 88,
-      paint: 86,
+      total: 95,
+      paint: 93,
       erase: 2,
     });
     expect(STUDIO_BRUSH_DEFAULT_PORTFOLIO_COUNTS).toEqual({
-      total: 88,
-      paint: 86,
+      total: 95,
+      paint: 93,
       erase: 2,
     });
 
@@ -78,7 +78,7 @@ describe("consolidated Studio brush product portfolio", () => {
     expect(STUDIO_LISTED_ERASER_BRUSH_CATALOG_ITEMS).toHaveLength(
       STUDIO_BRUSH_LISTED_CATALOG_COUNTS.erase,
     );
-    expect(STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(86);
+    expect(STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS).toHaveLength(93);
     expect(STUDIO_DEFAULT_QUALITY_ERASER_BRUSH_CATALOG_ITEMS).toHaveLength(2);
     expect(
       filterStudioBrushCatalogItems({ category: "all" }).map(

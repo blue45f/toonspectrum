@@ -76,6 +76,7 @@ import { StudioNextGenBrushPreview } from "./StudioNextGenBrushPreview";
 import type { StudioToolOperation } from "../studio-brush";
 import type { StudioBrushCatalogItem } from "./studio-brush-catalog";
 import type { StudioBrushCatalogSelection } from "./studio-brush-selection";
+import type { StudioBrushSelectionLifecycle } from "./studio-pending-catalog-input";
 import type { StudioBrushTrayItem } from "../studio-creative-ux";
 
 import { cn } from "@/shared/lib/utils";
@@ -106,6 +107,7 @@ export interface StudioBrushLibrarySheetProps {
   onViewStateChange?: (view: StudioBrushCatalogRestoredView) => void;
   onClose: (reason: StudioBrushCatalogCloseReason) => void;
   onSelect: (selection: StudioBrushCatalogSelection) => void;
+  onSelectionLifecycle?: (event: StudioBrushSelectionLifecycle) => void;
   onToggleFavorite?: (brushId: string) => void;
   className?: string;
   style?: CSSProperties;
@@ -143,6 +145,7 @@ export interface StudioBrushCatalogPortalProps {
   mobileKeyboardInset?: number;
   onClose: (reason: StudioBrushCatalogCloseReason) => void;
   onSelect: (selection: StudioBrushCatalogSelection) => void;
+  onSelectionLifecycle?: (event: StudioBrushSelectionLifecycle) => void;
   onToggleFavorite: (brushId: string) => void;
 }
 
@@ -940,6 +943,7 @@ export function StudioBrushLibrarySheet({
   onViewStateChange,
   onClose,
   onSelect,
+  onSelectionLifecycle,
   onToggleFavorite,
   className,
   style,
@@ -958,6 +962,9 @@ export function StudioBrushLibrarySheet({
   const progressiveObserverEpochRef = useRef(0);
   const mountedRef = useRef(true);
   const selectionRequestEpochRef = useRef(0);
+  const selectionLifecycleRef = useRef<StudioBrushSelectionLifecycle | null>(null);
+  const selectionLifecycleCallbackRef = useRef(onSelectionLifecycle);
+  selectionLifecycleCallbackRef.current = onSelectionLifecycle;
   const viewStateRef = useRef<StudioBrushCatalogRestoredView>({
     tab: restoredView?.tab ?? "",
     query: restoredView?.query ?? "",
@@ -1010,6 +1017,10 @@ export function StudioBrushLibrarySheet({
     return () => {
       mountedRef.current = false;
       selectionRequestEpochRef.current += 1;
+      const pending = selectionLifecycleRef.current;
+      if (pending?.phase === "preparing") {
+        selectionLifecycleCallbackRef.current?.({ ...pending, phase: "cancelled" });
+      }
     };
   }, []);
 
@@ -1238,6 +1249,9 @@ export function StudioBrushLibrarySheet({
     setSelectionError(null);
     setAwaitingActivationId(null);
     setPendingSelectionId(item.id);
+    const lifecycle: StudioBrushSelectionLifecycle = { requestId: `${titleId}:${requestEpoch}`, catalogId: item.id, operation, phase: "preparing" };
+    selectionLifecycleRef.current = lifecycle;
+    onSelectionLifecycle?.(lifecycle);
     let waitForActivation = false;
     try {
       const selection = await materializeStudioBrushCatalogSelection(item.id);
@@ -1246,6 +1260,9 @@ export function StudioBrushLibrarySheet({
       waitForActivation = !closeOnSelection && item.id !== activeBrushId;
       if (waitForActivation) setAwaitingActivationId(item.id);
       onSelect(selection);
+      const applied = { ...lifecycle, phase: "applied" as const };
+      selectionLifecycleRef.current = applied;
+      onSelectionLifecycle?.(applied);
       if (!requestIsCurrent()) return;
       if (closeOnSelection || !waitForActivation) {
         selectionRequestEpochRef.current += 1;
@@ -1255,6 +1272,11 @@ export function StudioBrushLibrarySheet({
       if (closeOnSelection) onClose("selection");
     } catch (error) {
       if (!requestIsCurrent()) return;
+      waitForActivation = false;
+      setAwaitingActivationId(null);
+      const failed = { ...lifecycle, phase: "failed" as const };
+      selectionLifecycleRef.current = failed;
+      onSelectionLifecycle?.(failed);
       setSelectionError(
         error instanceof Error && error.message
           ? error.message
@@ -1988,6 +2010,7 @@ export function StudioBrushCatalogPortal({
   mobileKeyboardInset = 0,
   onClose,
   onSelect,
+  onSelectionLifecycle,
   onToggleFavorite,
 }: StudioBrushCatalogPortalProps): ReactElement | null {
   const desktop = placement === "desktop-dock";
@@ -2021,6 +2044,7 @@ export function StudioBrushCatalogPortal({
       onViewStateChange={onViewStateChange}
       onClose={onClose}
       onSelect={onSelect}
+      onSelectionLifecycle={onSelectionLifecycle}
       onToggleFavorite={onToggleFavorite}
       className={desktop
         ? "h-full w-full"

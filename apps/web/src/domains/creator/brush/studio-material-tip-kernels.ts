@@ -23,6 +23,8 @@ export const STUDIO_MATERIAL_TIP_PROGRAMS = [
   "herringbone-twill", "guilloche-rosette", "fish-scale", "sequin-paillettes",
   "sakura-petal", "bamboo-joint", "feather-quill", "lightning-fork",
   "zipper-teeth", "cobblestone-joints", "knit-cable", "wave-seigaiha",
+  "graphite-contour", "broken-chalk", "flat-gouache", "dry-edge-ink", "foliage-bough", "stitch-ladder",
+  "filbert-bristle",
 ] as const;
 export type StudioMaterialTipProgram = (typeof STUDIO_MATERIAL_TIP_PROGRAMS)[number];
 const PROGRAMS: ReadonlySet<string> = new Set(STUDIO_MATERIAL_TIP_PROGRAMS);
@@ -135,6 +137,74 @@ export function createStudioMaterialTipField(
     const r = Math.hypot(x, y);
     const disc = edge(r - 0.94, 0.07);
     switch (program) {
+      case "filbert-bristle": {
+        // 타원 안의 굵은 강모 다섯 줄. 빈 홈을 실제 알파에 남겨 겹쳐도 단색 면이 되지 않는다.
+        const silhouette = edge(Math.hypot(x * 1.18, y) - 0.9, 0.06);
+        const fibers = Math.pow(0.5 + 0.5 * Math.cos((x + Math.sin(y * 2.8) * 0.008) * 18), 4);
+        return silhouette * fibers * (0.77 + 0.23 * noise(x * 21, y * 17, stableSeed));
+      }
+      case "graphite-contour": {
+        // 좁고 진한 중심과 양옆의 가는 흑연 결: 넓은 판상 흑연 음영 촉과 다른 선화용 단면.
+        const center = ellipse(x, y, 0.16, 0.88);
+        const side = Math.max(line(x, y, -0.32, -0.65, -0.28, 0.75, 0.028),
+          line(x, y, 0.28, -0.79, 0.37, 0.59, 0.017));
+        const tooth = 0.48 + noise(x * 41, y * 33, stableSeed) * 0.52;
+        return Math.max(center * tooth, side * 0.48 * edge(0.33 - noise(x * 15, y * 17, stableSeed)));
+      }
+      case "broken-chalk": {
+        // 비대칭의 넓은 두 덩어리와 비스듬한 절단 홈. 기존 초크의 작은 균열과 구분한다.
+        const silhouette = edge(Math.max(Math.abs(x) * 0.96, Math.abs(y) * 1.05) - 0.84
+          + (noise(x * 8, y * 7, stableSeed) - 0.5) * 0.20, 0.04);
+        const fracture = edge(0.095 - Math.abs(x + y * 0.26 + 0.12), 0.045);
+        const chip = 1 - ellipse(x - 0.54, y + 0.51, 0.22, 0.21);
+        const powder = edge(0.32 - noise(x * 25, y * 28, stableSeed), 0.20);
+        return silhouette * fracture * chip * powder * (x + y * 0.26 < -0.12 ? 0.95 : 0.66);
+      }
+      case "flat-gouache": {
+        // 불투명한 넓은 면과 한쪽에만 남는 마른 홈. 유체 확산·물감 높이를 주장하지 않는다.
+        const plate = edge(Math.max(Math.abs(x) * 0.96, Math.abs(y) * 1.65) - 0.86, 0.026);
+        const groove = 1 - edge(Math.abs(x + 0.63) - 0.035, 0.02) * 0.92;
+        const edgeTooth = 0.92 + 0.08 * noise(x * 27, y * 31, stableSeed);
+        return plate * groove * edgeTooth;
+      }
+      case "dry-edge-ink": {
+        // 잉크 중심은 유지하고 한쪽 가장자리만 길이와 굵기가 다른 건필 가닥으로 끊는다.
+        const center = ellipse(x + 0.19, y, 0.32, 0.84);
+        let fibers = 0;
+        for (let strand = 0; strand < 4; strand++) {
+          const sx = 0.17 + strand * 0.16;
+          fibers = Math.max(fibers, line(x, y, sx, -0.75 + strand * 0.12,
+            sx + 0.055, 0.82 - strand * 0.08, 0.024 - strand * 0.003));
+        }
+        const breaks = edge(0.36 - noise(x * 11, y * 8 + 3, stableSeed), 0.13);
+        return Math.max(center, fibers * breaks * 0.84);
+      }
+      case "foliage-bough": {
+        // 한쪽으로 휘어진 가지와 크기가 다른 잎 다섯 장. 방사 수관·깃잎을 복제하지 않는다.
+        let result = Math.max(line(x, y, -0.78, 0.70, 0.04, 0.02, 0.026),
+          line(x, y, 0.04, 0.02, 0.76, -0.58, 0.020));
+        const leaves = [[-0.46, 0.12, 0.24, 0.14], [-0.08, 0.42, 0.26, 0.17],
+          [0.08, -0.35, 0.29, 0.16], [0.42, -0.02, 0.23, 0.16], [0.61, -0.57, 0.21, 0.13]];
+        for (const [cx, cy, rx, ry] of leaves) {
+          const u = (x - cx!) * 0.82 + (y - cy!) * 0.57;
+          const v = (y - cy!) * 0.82 - (x - cx!) * 0.57;
+          const leaf = ellipse(u, v, rx!, ry!);
+          const vein = 1 - line(u, v, -rx! * 0.8, 0, rx! * 0.8, 0, 0.012) * 0.62;
+          result = Math.max(result, leaf * vein);
+        }
+        return result;
+      }
+      case "stitch-ladder": {
+        // 평행한 두 바느질 줄 사이에 사선 실밥을 엇갈려 연결한 열린 사다리 촉.
+        const rails = Math.max(line(x, y, -0.53, -0.89, -0.53, 0.89, 0.031),
+          line(x, y, 0.53, -0.89, 0.53, 0.89, 0.031));
+        let thread = 0;
+        for (let step = 0; step < 5; step++) {
+          const cy = -0.72 + step * 0.36;
+          thread = Math.max(thread, line(x, y, -0.53, cy, 0.53, cy + 0.16, 0.018));
+        }
+        return Math.max(rails * 0.68, thread);
+      }
       case "capillary-dendrite": {
         // Branch skeleton with side capillaries: connected ribs, not isotropic noise dots.
         let result = line(x, y, 0, 0.88, -0.08, -0.83, 0.033);

@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { StudioColorWorkspaceProvider } from "./color/StudioColorWorkspaceContext";
 import { DEFAULT_STUDIO_LIVING_INK_MATERIAL_CONTROLS } from "./studio-living-ink-gpu-protocol";
 import {
   STUDIO_MOBILE_DRAW_SHEET_DEFAULT_SNAP,
@@ -194,6 +195,7 @@ function createProps(
   overrides: Partial<StudioMobileEditingDockProps> = {},
 ): StudioMobileEditingDockProps {
   return {
+    touchPreferences: { twoFinger: "pan-zoom", threeFinger: "undo" },
     activeCatalogBrushId: "gpen",
     activeCatalogBrushName: "G펜",
     activeSavedBrushId: null,
@@ -359,7 +361,7 @@ describe("StudioMobileEditingDock", () => {
     expect(setQuickStartOpen).toHaveBeenCalledWith(false);
   });
 
-  it("preserves dock rows, safe-area placement, and history disabled semantics", () => {
+  it("preserves a single essential row, safe-area placement, and history disabled semantics", () => {
     const props = createProps({ isMobile: true, mobileKeyboardInset: 18 });
     const view = render(<StudioMobileEditingDock {...props} />);
     let dock = screen.getByRole("navigation", { name: "스튜디오 모바일 도구막대" });
@@ -374,17 +376,17 @@ describe("StudioMobileEditingDock", () => {
       name: "작업 메뉴",
     });
     expect(workspaceToggle.closest('[data-studio-mobile-dock-scroll="primary"]')).toBeNull();
-    expect(drawingToolbar.parentElement?.className).toContain("overflow-hidden");
-    expect(drawingToolbar.parentElement?.nextElementSibling).toBe(workspaceToggle);
+    expect(drawingToolbar.className).toContain("grid-cols-6");
+    expect(drawingToolbar.lastElementChild).toBe(workspaceToggle);
+    expect(within(drawingToolbar).getAllByRole("button")).toHaveLength(6);
     expect(workspaceToggle.getAttribute("aria-controls")).toBe("studio-mobile-workspace-tools");
     expect(workspaceToggle.getAttribute("aria-expanded")).toBe("false");
     expect(workspaceToggle.textContent).toBe("작업 메뉴");
     expect(workspaceToggle.getAttribute("aria-label")).toContain(
       workspaceToggle.textContent,
     );
-    expect(workspaceToggle.className).toContain("min-h-11");
-    expect(workspaceToggle.className).toContain("min-w-11");
-    expect(workspaceToggle.className).toContain("flex-none");
+    expect(workspaceToggle.className).toContain("min-h-[44px]");
+    expect(workspaceToggle.className).toContain("min-w-[44px]");
     expect(workspaceToggle.className).not.toContain("absolute");
     expect(dock.querySelector("#studio-mobile-workspace-tools")?.hasAttribute("hidden")).toBe(true);
     fireEvent.click(workspaceToggle);
@@ -473,6 +475,7 @@ describe("StudioMobileEditingDock", () => {
     );
 
     vi.mocked(stableHandlers.openInspectorRoute).mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     view.rerender(
       <StudioMobileEditingDock
         {...createProps({
@@ -519,6 +522,7 @@ describe("StudioMobileEditingDock", () => {
     fireEvent.click(pages);
     expect(setMobileSheet).toHaveBeenCalledWith(expect.any(Function));
 
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     const newWork = within(workspace).getByRole("button", {
       name: "빠른 시작 · 새 작업 열기",
     });
@@ -539,6 +543,7 @@ describe("StudioMobileEditingDock", () => {
         })}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     workspace = screen.getByRole("toolbar", { name: "작업 공간" });
     const closePages = within(workspace).getByRole("button", { name: "페이지 목록 닫기" });
     expect(closePages.getAttribute("aria-expanded")).toBe("true");
@@ -568,44 +573,123 @@ describe("StudioMobileEditingDock", () => {
     expect(mobileInspectorPreload.drawingSurface).toHaveBeenCalledTimes(6);
   });
 
-  it("signals horizontally hidden tools without overlaying the scroll lane", () => {
+  it("keeps drawing, color, history and the work menu reachable without horizontal scrolling", () => {
     render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
+    const row = screen.getByRole("toolbar", { name: "드로잉 도구" });
+    expect(within(row).getAllByRole("button").map((button) => button.getAttribute("aria-label"))).toEqual([
+      "펜", "지우개", "브러시 색상", "실행취소", "다시실행", "작업 메뉴",
+    ]);
+    expect(row.className).toContain("grid-cols-6");
+    expect(row.closest('[data-studio-mobile-dock-scroll]')).toBeNull();
+    expect(screen.queryByRole("button", { name: "도형" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "주 색" })).toBeNull();
 
-    const drawingTools = screen.getByRole("toolbar", { name: "드로잉 도구" });
-    const scroller = drawingTools.closest<HTMLDivElement>(
-      '[data-studio-mobile-dock-scroll="primary"]',
-    );
-    const host = scroller?.closest<HTMLElement>(
-      '[data-studio-mobile-scroll-host="primary"]',
-    );
-    expect(scroller).not.toBeNull();
-    expect(host).not.toBeNull();
-    expect(drawingTools.getAttribute("aria-describedby")).toBe(
-      host?.querySelector("[data-studio-mobile-scroll-status]")?.id,
-    );
-    expect(host?.querySelectorAll("[data-studio-mobile-scroll-cue]")).toHaveLength(2);
-    expect(
-      host?.querySelector('[data-studio-mobile-scroll-cue="primary-after"]')?.className,
-    ).toContain("pointer-events-none");
+    fireEvent.click(within(row).getByRole("button", { name: "작업 메뉴" }));
+    const tools = screen.getByRole("toolbar", { name: "작업 메뉴 · 드로잉 도구" });
+    for (const name of ["선택", "픽셀", "채우기", "도형", "브러시 설정 (굵기·색·프리셋)", "레이어 열기", "전체 도구 열기"]) {
+      expect(within(tools).getByRole("button", { name })).toBeTruthy();
+    }
+    expect(tools.className).toContain("grid-cols-4");
+    expect(within(row).getByRole("button", { name: "실행취소" })).toBeTruthy();
+    expect(within(row).getByRole("button", { name: "다시실행" })).toBeTruthy();
+  });
 
-    Object.defineProperties(scroller!, {
-      clientWidth: { configurable: true, value: 378 },
-      scrollLeft: { configurable: true, value: 0, writable: true },
-      scrollWidth: { configurable: true, value: 492 },
-    });
-    fireEvent.scroll(scroller!);
-    expect(scroller?.getAttribute("data-studio-mobile-overflow")).toBe("after");
-    expect(host?.style.getPropertyValue("--studio-mobile-scroll-after")).toBe("1");
-    expect(host?.style.getPropertyValue("--studio-mobile-scroll-before")).toBe("0");
-    expect(host?.querySelector("[data-studio-mobile-scroll-status]")?.textContent).toContain(
-      "오른쪽에 도구가 더 있습니다",
-    );
+  it("returns keyboard focus and dismisses expanded controls without hiding essential tools", () => {
+    render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
+    const work = screen.getByRole("button", { name: "작업 메뉴" });
+    fireEvent.click(work);
+    const closeWork = screen.getByRole("button", { name: "작업 메뉴 · 접기" });
+    expect(document.activeElement).toBe(closeWork);
+    fireEvent.keyDown(closeWork, { key: "Escape" });
+    expect(document.activeElement).toBe(work);
+    expect(work.getAttribute("aria-expanded")).toBe("false");
 
-    scroller!.scrollLeft = 114;
-    fireEvent.scroll(scroller!);
-    expect(scroller?.getAttribute("data-studio-mobile-overflow")).toBe("before");
-    expect(host?.style.getPropertyValue("--studio-mobile-scroll-after")).toBe("0");
-    expect(host?.style.getPropertyValue("--studio-mobile-scroll-before")).toBe("1");
+    const color = screen.getByRole("button", { name: "브러시 색상" });
+    fireEvent.click(color);
+    const closeColor = screen.getByRole("button", { name: "브러시 색상 · 접기" });
+    expect(document.activeElement).toBe(closeColor);
+    expect(screen.queryByRole("region", { name: "작업 메뉴" })).toBeNull();
+    fireEvent.keyDown(closeColor, { key: "Escape" });
+    expect(document.activeElement).toBe(color);
+    expect(color.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(work);
+    fireEvent.pointerDown(document.body);
+    expect(work.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("button", { name: "실행취소" })).toBeTruthy();
+    fireEvent.click(color);
+    fireEvent.click(screen.getByRole("button", { name: "지우개" }));
+    expect(color.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("returns to a compact dock after switching through a desktop viewport", () => {
+    const view = render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
+    for (const name of ["작업 메뉴", "브러시 색상"]) {
+      fireEvent.click(screen.getByRole("button", { name }));
+      expect(screen.getByRole("button", { name: name === "작업 메뉴" ? "접기 · 작업 메뉴" : name }).getAttribute("aria-expanded")).toBe("true");
+      view.rerender(<StudioMobileEditingDock {...createProps({ isMobile: false })} />);
+      expect(screen.queryByRole("navigation", { name: "스튜디오 모바일 도구막대" })).toBeNull();
+      view.rerender(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
+      expect(screen.getByRole("button", { name }).getAttribute("aria-expanded")).toBe("false");
+    }
+  });
+
+  it("returns the all-tools dialog to the visible work-menu trigger", () => {
+    render(<StudioMobileEditingDock {...createProps({ isMobile: true })} />);
+    const trigger = screen.getByRole("button", { name: "작업 메뉴" });
+    let requestedTrigger: HTMLElement | undefined;
+    const onRequest = (event: Event) => {
+      requestedTrigger = (event as CustomEvent<{ trigger: HTMLElement }>).detail.trigger;
+    };
+    document.addEventListener("studio:open-all-tools", onRequest);
+    try {
+      fireEvent.click(trigger);
+      fireEvent.click(screen.getByRole("button", { name: "전체 도구 열기" }));
+      expect(requestedTrigger).toBe(trigger);
+      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+      expect(screen.queryByRole("region", { name: "작업 메뉴" })).toBeNull();
+    } finally {
+      document.removeEventListener("studio:open-all-tools", onRequest);
+    }
+  });
+
+  it("keeps primary, secondary, swap and canvas sampling connected inside the color controls", () => {
+    const onPrimaryChange = vi.fn();
+    const onSecondaryChange = vi.fn();
+    const onRequestSample = vi.fn();
+    render(
+      <StudioColorWorkspaceProvider value={{
+        ownerKey: "mobile-doc", selectionKey: "", primary: "#112233", secondary: "#abcdef",
+        elements: [], pinned: false, isMobile: true, onPrimaryChange, onSecondaryChange,
+        onPinnedChange: vi.fn(), onRevealDock: vi.fn(), onBeforePopupOpen: vi.fn(), onRequestSample,
+      }}>
+        <StudioMobileEditingDock {...createProps({ isMobile: true, color: "#112233", setColor: onPrimaryChange })} />
+      </StudioColorWorkspaceProvider>,
+    );
+    expect(screen.queryByRole("button", { name: "주 색" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "브러시 색상" }));
+    const controls = screen.getByRole("region", { name: "브러시 색상" });
+    for (const name of ["주 색", "보조 색", "주 색과 보조 색 교체", "캔버스 스포이드"]) {
+      expect(within(controls).getByRole("button", { name })).toBeTruthy();
+    }
+    fireEvent.click(within(controls).getByRole("button", { name: "주 색과 보조 색 교체" }));
+    expect(onPrimaryChange).toHaveBeenCalledWith("#abcdef");
+    expect(onSecondaryChange).toHaveBeenCalledWith("#112233");
+    fireEvent.click(within(controls).getByRole("button", { name: "캔버스 스포이드" }));
+    expect(onRequestSample).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it("updates the first-use gesture guide when the actual touch settings change", () => {
+    const view = render(<StudioMobileEditingDock {...createProps({ isMobile: true, showMobileHint: true })} />);
+    expect(screen.getByText(/두 손가락으로 캔버스를 이동·확대해요/)).toBeTruthy();
+    expect(screen.queryByText(/세 손가락.*다시 실행/)).toBeNull();
+    view.rerender(<StudioMobileEditingDock {...createProps({
+      isMobile: true, showMobileHint: true,
+      touchPreferences: { twoFinger: "undo-redo", threeFinger: "toggle-ui" },
+    })} />);
+    expect(screen.getByText(/두 손가락을 짧게 탭하면 실행 취소해요/)).toBeTruthy();
+    expect(screen.getByText(/세 손가락 탭으로 도구막대를 숨기거나 표시해요/)).toBeTruthy();
+    expect(screen.queryByText(/두 손가락으로 캔버스를 이동·확대해요/)).toBeNull();
   });
 
   it("keeps the comment first and pins the quick menu beside it for a left-hand layout", () => {
@@ -628,13 +712,14 @@ describe("StudioMobileEditingDock", () => {
     const comment = within(workspace).getByRole<HTMLButtonElement>("button", {
       name: "캔버스 위치 댓글",
     });
-    const scrollLane = workspace.querySelector('[data-studio-mobile-dock-scroll="secondary"]');
+    const scrollLane = workspace.querySelector('[data-studio-mobile-workspace-items="true"]');
     const panelLauncher = within(scrollLane as HTMLElement).getByRole("button", {
       name: "작업 패널",
     });
     const quickSlot = workspace.querySelector('[data-studio-mobile-quick-actions-slot="left"]');
     expect(workspace.getAttribute("data-studio-mobile-control-side")).toBe("left");
-    expect(scrollLane?.className).toContain("overflow-x-auto");
+    expect(workspace.className).toContain("grid-cols-4");
+    expect(scrollLane?.className).not.toContain("overflow-x-auto");
     expect(workspace.firstElementChild).toBe(comment);
     expect(workspace.children.item(1)).toBe(quickSlot);
     expect(scrollLane?.firstElementChild).toBe(panelLauncher);
@@ -650,6 +735,7 @@ describe("StudioMobileEditingDock", () => {
     fireEvent.click(comment);
     expect(setMobileSheet).toHaveBeenCalledWith(null);
     expect(stableHandlers.toggleStudioCommentPinPlacement).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("toolbar", { name: "작업 공간" })).toBeNull();
 
     view.rerender(
       <StudioMobileEditingDock
@@ -661,6 +747,7 @@ describe("StudioMobileEditingDock", () => {
         })}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     const cancel = within(
       screen.getByRole("toolbar", { name: "작업 공간" }),
     ).getByRole<HTMLButtonElement>("button", { name: "댓글 위치 선택 취소" });
@@ -686,7 +773,7 @@ describe("StudioMobileEditingDock", () => {
     const workspace = screen.getByRole("toolbar", { name: "작업 공간" });
     const comment = within(workspace).getByRole("button", { name: "캔버스 위치 댓글" });
     const quickSlot = workspace.querySelector('[data-studio-mobile-quick-actions-slot="right"]');
-    const scrollLane = workspace.querySelector('[data-studio-mobile-dock-scroll="secondary"]');
+    const scrollLane = workspace.querySelector('[data-studio-mobile-workspace-items="true"]');
     const panelLauncher = within(scrollLane as HTMLElement).getByRole("button", {
       name: "작업 패널",
     });
@@ -696,7 +783,7 @@ describe("StudioMobileEditingDock", () => {
     expect(workspace.lastElementChild).toBe(quickSlot);
     expect(scrollLane?.firstElementChild).toBe(panelLauncher);
     expect(
-      scrollLane?.closest('[data-studio-mobile-scroll-host="secondary"]')?.nextElementSibling,
+      scrollLane?.parentElement?.nextElementSibling,
     ).toBe(quickSlot);
     expect(within(quickSlot as HTMLElement).getByRole("button", { name: "빠른 작업" })).not.toBeNull();
     expect(quickSlot?.className).toContain("size-11");
@@ -1095,9 +1182,8 @@ describe("StudioMobileEditingDock", () => {
         {...createProps({ isMobile: true, tool: "select", drawMode: "pen" })}
       />,
     );
-    const drawingTools = () => within(
-      screen.getByRole("toolbar", { name: "드로잉 도구" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
+    const drawingTools = () => within(screen.getByRole("navigation", { name: "스튜디오 모바일 도구막대" }));
 
     const inactivePen = drawingTools().getByRole("button", { name: "펜" });
     expect(inactivePen.getAttribute("data-hint-preview")).toBe("ink");
@@ -1163,6 +1249,7 @@ describe("StudioMobileEditingDock", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
+    setMobileSheet.mockClear();
     fireEvent.click(screen.getByRole("button", { name: "색각·명암 검수" }));
     expect(setMobileSheet).toHaveBeenCalledOnce();
 
@@ -1216,7 +1303,7 @@ describe("StudioMobileEditingDock", () => {
     ).toContain("20px");
     expect(
       drawSheet.style.getPropertyValue("--studio-draw-sheet-reserved-bottom"),
-    ).toContain("120px");
+    ).toContain("64px");
     // Opens compact so the canvas under it stays judgeable; the grabber promotes from there.
     expect(handle.getAttribute("aria-valuenow")).toBe("0");
     expect(drawSheet.getAttribute("data-studio-sheet-snap")).toBe("compact");
@@ -1469,7 +1556,7 @@ describe("StudioMobileEditingDock", () => {
     });
     expect(within(filter).getAllByRole("option")).toHaveLength(6);
     expect(within(toolbar).queryByRole("button", { name: "채우기" })).toBeNull();
-    expect(filter.closest("label")?.className).toContain("min-h-11");
+    expect(filter.closest("label")?.className).toContain("min-h-[44px]");
     expect(filter.title).toContain("현재 페이지 합성본");
   });
 
@@ -1538,7 +1625,7 @@ describe("StudioMobileEditingDock", () => {
       name: "현재 페이지 합성본 필터 선택",
     });
     expect(filter.disabled).toBe(false);
-    expect(filter.closest("label")?.className).toContain("min-h-11");
+    expect(filter.closest("label")?.className).toContain("min-h-[44px]");
     expect(filter.closest("label")?.className).toContain("min-w-14");
 
     fireEvent.change(filter, { target: { value: "gaussian-blur" } });
@@ -1657,7 +1744,7 @@ describe("StudioMobileEditingDock", () => {
     expect(stableHandlers.toggleAdvancedFill).toHaveBeenCalledOnce();
   });
 
-  it("keeps fill in the primary mobile drawing toolbar without requiring a selection", () => {
+  it("keeps fill reachable from the work menu without requiring a selection", () => {
     const stableHandlers = createHandlers();
     const setMenu = vi.fn();
     const setMobileSheet = vi.fn();
@@ -1674,8 +1761,9 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     const fill = within(
-      screen.getByRole("toolbar", { name: "드로잉 도구" }),
+      screen.getByRole("toolbar", { name: "작업 메뉴 · 드로잉 도구" }),
     ).getByRole<HTMLButtonElement>("button", { name: "채우기" });
     expect(fill.disabled).toBe(false);
     expect(fill.getAttribute("data-hint-description")).toContain(
@@ -1700,7 +1788,8 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
-    const drawingToolbar = screen.getByRole("toolbar", { name: "드로잉 도구" });
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
+    const drawingToolbar = screen.getByRole("toolbar", { name: "작업 메뉴 · 드로잉 도구" });
     expect(
       within(drawingToolbar).getByRole("button", { name: "선택" }).getAttribute("aria-pressed"),
     ).toBe("false");
@@ -1719,7 +1808,8 @@ describe("StudioMobileEditingDock", () => {
   ])("exposes exactly one pressed primary canvas owner for %s", (state, expectedLabel) => {
     render(<StudioMobileEditingDock {...createProps({ ...state, isMobile: true })} />);
 
-    const toolbar = screen.getByRole("toolbar", { name: "드로잉 도구" });
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
+    const toolbar = screen.getByRole("navigation", { name: "스튜디오 모바일 도구막대" });
     const pressed = [...toolbar.querySelectorAll<HTMLButtonElement>('button[aria-pressed="true"]')];
     expect(pressed).toHaveLength(1);
     expect(pressed[0]?.getAttribute("aria-label") ?? pressed[0]?.textContent).toContain(expectedLabel);
@@ -1732,12 +1822,15 @@ describe("StudioMobileEditingDock", () => {
         {...createProps({ isMobile: true, tool: "select", stableHandlers })}
       />,
     );
-    const toolbar = within(screen.getByRole("toolbar", { name: "드로잉 도구" }));
+    const toolbar = within(screen.getByRole("navigation", { name: "스튜디오 모바일 도구막대" }));
 
     fireEvent.click(toolbar.getByRole("button", { name: "펜" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     fireEvent.click(toolbar.getByRole("button", { name: "픽셀" }));
     fireEvent.click(toolbar.getByRole("button", { name: "지우개" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     fireEvent.click(toolbar.getByRole("button", { name: "도형" }));
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
     fireEvent.click(toolbar.getByRole("button", { name: "선택" }));
 
     expect(stableHandlers.activateCanvasTool).toHaveBeenNthCalledWith(1, "draw", "pen");
@@ -1745,6 +1838,22 @@ describe("StudioMobileEditingDock", () => {
     expect(stableHandlers.activateCanvasTool).toHaveBeenNthCalledWith(3, "draw", "eraser");
     expect(stableHandlers.activateCanvasTool).toHaveBeenNthCalledWith(4, "draw", "shape");
     expect(stableHandlers.activateCanvasTool).toHaveBeenNthCalledWith(5, "select");
+  });
+
+  it("opens eraser properties by tapping the active eraser again", () => {
+    const stableHandlers = createHandlers();
+    const setMobileSheet = vi.fn();
+    render(<StudioMobileEditingDock {...createProps({
+      isMobile: true, tool: "draw", drawMode: "eraser", stableHandlers, setMobileSheet,
+    })} />);
+    const eraser = screen.getByRole("button", { name: "지우개" });
+    expect(eraser.getAttribute("aria-expanded")).toBe("false");
+    expect(eraser.getAttribute("data-hint-description")).toContain("굵기·강도·종류");
+    fireEvent.click(eraser);
+    expect(stableHandlers.activateCanvasTool).not.toHaveBeenCalled();
+    const update = setMobileSheet.mock.calls[0]?.[0];
+    expect(update(null)).toBe("draw");
+    expect(update("draw")).toBeNull();
   });
 
   it("opens brush settings without turning selection into a drawing tool", () => {
@@ -1767,6 +1876,8 @@ describe("StudioMobileEditingDock", () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole("button", { name: "작업 메뉴" }));
+    setMobileSheet.mockClear();
     const settings = screen.getByRole("button", {
       name: "브러시 설정 (굵기·색·프리셋)",
     });
@@ -1851,7 +1962,7 @@ describe("StudioMobileEditingDock", () => {
 
     const toolbar = screen.getByRole("toolbar", { name: "Drawing tools" });
     expect(screen.getByRole("navigation", { name: "Studio mobile toolbar" })).toBeTruthy();
-    for (const name of ["Select", "Pen", "Pixel", "Eraser", "Fill", "Shape"]) {
+    for (const name of ["Pen", "Eraser", "Brush color", "Tools"]) {
       expect(within(toolbar).getByRole("button", { name })).toBeTruthy();
     }
     expect(
@@ -1860,9 +1971,11 @@ describe("StudioMobileEditingDock", () => {
     ).toBe("eraser");
     expect(within(toolbar).getByRole("button", { name: "Undo" })).toBeTruthy();
     expect(within(toolbar).getByRole("button", { name: "Redo" })).toBeTruthy();
-    expect(
-      within(toolbar).getByRole("button", { name: "Brush settings (size, color, presets)" }),
-    ).toBeTruthy();
+    fireEvent.click(within(toolbar).getByRole("button", { name: "Tools" }));
+    const tools = screen.getByRole("toolbar", { name: "Tools · Drawing tools" });
+    for (const name of ["Select", "Pixel", "Fill", "Shape", "Brush settings (size, color, presets)"]) {
+      expect(within(tools).getByRole("button", { name })).toBeTruthy();
+    }
 
     // No Hangul may survive anywhere in the tool row once a non-Korean locale is active.
     expect(toolbar.textContent ?? "").not.toMatch(/[가-힣]/u);

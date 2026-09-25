@@ -1,0 +1,642 @@
+{
+  "version": 1,
+  "generatedOn": "2026-09-26",
+  "generator": {
+    "provider": "openai",
+    "tool": "built-in image_gen",
+    "model": "unverified",
+    "modelVersionVerified": false
+  },
+  "assets": [
+    {
+      "id": "illustration-autumn-alley-morning",
+      "kind": "background",
+      "title": "가을 아침 주택가 골목",
+      "genre": "일상",
+      "collection": "urban",
+      "src": "/assets/studio/illustration-20260926/autumn-alley-morning.png",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2731641,
+      "sha256": "94fd89b4c776abab185147f5f1a6facfce04c66944139f06a41d04eeaefc60ba",
+      "hasAlpha": false,
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "tags": [
+        "가을",
+        "아침",
+        "골목",
+        "주택가",
+        "단풍",
+        "한국",
+        "일상",
+        "autumn",
+        "alley",
+        "morning"
+      ],
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "인물과 글자 없는 전경을 전체 이미지로 확인했습니다.",
+          "원본 PNG를 해상도 변경 없이 보존했습니다.",
+          "최종 편집본에서 서명 형태 장식을 제거했습니다."
+        ]
+      },
+      "postProcessing": [
+        "built-in-image-edit"
+      ],
+      "sourcePromptId": "alley-morning",
+      "promptSha256": "094c2992ca6f8199d35a250b01aaea725e9fd5155d04c45c7eb5b61f7d6d80ce",
+      "editPromptSha256": "ae13a517b581a5d393e463a58b119a0f179982b7bd551acd67dcb84b02b726c1"
+    },
+    {
+      "id": "illustration-rainy-street",
+      "kind": "background",
+      "title": "비 오는 밤의 도시 거리",
+      "genre": "로맨스",
+      "collection": "urban",
+      "src": "/assets/studio/illustration-20260926/rainy-street.png",
+      "width": 1672,
+      "height": 941,
+      "bytes": 3079351,
+      "sha256": "4207af449b6963e092a8d8884658e8752b9d51da053144cdb97ae3bfa1db67e8",
+      "hasAlpha": false,
+      "environment": "실외",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "tags": [
+        "도시",
+        "비",
+        "야간",
+        "젖은 거리",
+        "로맨스",
+        "rain",
+        "night",
+        "street"
+      ],
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 전체 이미지를 검수해 인물·글자·워터마크가 없음을 확인했습니다.",
+          "원본 PNG를 해상도 변경 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": [],
+      "sourcePromptId": "rainy-street",
+      "promptSha256": "ad438cbd57e1a0b163e40330fe212648040e57c82e314103169770b3fc119ee4"
+    },
+    {
+      "id": "illustration-sunlit-cafe",
+      "kind": "background",
+      "title": "햇살이 머무는 카페",
+      "genre": "일상",
+      "collection": "daily",
+      "src": "/assets/studio/illustration-20260926/sunlit-cafe.png",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2532586,
+      "sha256": "ef1628187c292e531146f99a1258e373ef748fba66c53befa974bc407418396a",
+      "hasAlpha": false,
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "tags": [
+        "카페",
+        "햇살",
+        "창가",
+        "커피",
+        "일상",
+        "cafe",
+        "sunlight",
+        "interior"
+      ],
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 전체 이미지를 검수해 인물·글자·워터마크가 없음을 확인했습니다.",
+          "원본 PNG를 해상도 변경 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": [],
+      "sourcePromptId": "sunlit-cafe",
+      "promptSha256": "f9868aeaa5166204fa89aa596f6779fca4387b6eb4285c723e5699feeb9ba5a5"
+    },
+    {
+      "id": "illustration-school-classroom",
+      "kind": "background",
+      "title": "햇살이 드는 빈 교실",
+      "genre": "일상·학원",
+      "collection": "school",
+      "src": "/assets/studio/illustration-20260926/school-classroom.png",
+      "width": 1672,
+      "height": 941,
+      "bytes": 1984031,
+      "sha256": "8d63712fa14174b77f9f98d76518970ba393a208d398a8e40303cb530193d659",
+      "hasAlpha": false,
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "tags": [
+        "학교",
+        "교실",
+        "햇살",
+        "방과후",
+        "책상",
+        "학원",
+        "school",
+        "classroom"
+      ],
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 전체 이미지를 검수해 인물·글자·워터마크가 없음을 확인했습니다.",
+          "원본 PNG를 해상도 변경 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": [],
+      "sourcePromptId": "sunny-classroom",
+      "promptSha256": "3ccbaf5cb1faafbe2c54cdf3d02dccd2820f7031dbf949bfaf9f6ccbe2f997b0"
+    },
+    {
+      "id": "illustration-fantasy-forest",
+      "kind": "background",
+      "title": "오래된 아치가 있는 환상 숲",
+      "genre": "판타지",
+      "collection": "fantasy",
+      "src": "/assets/studio/illustration-20260926/fantasy-forest.png",
+      "width": 1672,
+      "height": 941,
+      "bytes": 3465702,
+      "sha256": "49b7cb451aae4080574474e765cbfc223c06c9a9cd2d4dcfa8d94d96fdfd8173",
+      "hasAlpha": false,
+      "environment": "실외",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "tags": [
+        "판타지",
+        "숲",
+        "아치",
+        "이끼",
+        "안개",
+        "새벽",
+        "fantasy",
+        "forest",
+        "arch"
+      ],
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 전체 이미지를 검수해 인물·글자·워터마크가 없음을 확인했습니다.",
+          "원본 PNG를 해상도 변경 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": [],
+      "sourcePromptId": "forest-arch",
+      "promptSha256": "f12c8c381ffcb22b61e340cee3a68ea284a79bbe439302b26d8a3faacf62c244"
+    },
+    {
+      "id": "illustration-starlit-rooftop",
+      "kind": "background",
+      "title": "별빛 아래 옥상",
+      "genre": "로맨스",
+      "collection": "urban",
+      "src": "/assets/studio/illustration-20260926/starlit-rooftop.png",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2601865,
+      "sha256": "e858580a8f3f2ef23ba62ab6930b8bd7d76ae184a91ab7891cf3da133be8ab26",
+      "hasAlpha": false,
+      "environment": "실외",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "tags": [
+        "옥상",
+        "별빛",
+        "하늘",
+        "도시",
+        "밤",
+        "로맨스",
+        "rooftop",
+        "night",
+        "stars"
+      ],
+      "sourcePromptId": "starlit-rooftop",
+      "promptSha256": "a65cb22806d59cabcc69410340a9ba06097876aa5d2102eb542269d177144a9d",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 전체 이미지를 검수해 인물·글자·워터마크가 없음을 확인했습니다.",
+          "원본 PNG를 해상도 변경 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": []
+    },
+    {
+      "id": "illustration-retro-sf-interior",
+      "kind": "background",
+      "title": "궤도 정거장의 라운지",
+      "genre": "SF",
+      "collection": "scifi",
+      "src": "/assets/studio/illustration-20260926/retro-sf-interior.png",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2531039,
+      "sha256": "24de98e6f1cb946ba8d45d1015d69c5d2c2872051626edd014158971edb49105",
+      "hasAlpha": false,
+      "environment": "실내",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "tags": [
+        "SF",
+        "우주",
+        "궤도",
+        "정거장",
+        "복고",
+        "라운지",
+        "space",
+        "orbital",
+        "lounge"
+      ],
+      "sourcePromptId": "orbital-lounge",
+      "promptSha256": "d01e5646cb58f310c2c1e3ef91a996bd5b3001e7770eff25243562153f8f3e1e",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 전체 이미지를 검수해 인물·글자·워터마크가 없음을 확인했습니다.",
+          "원본 PNG를 해상도 변경 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": []
+    },
+    {
+      "id": "illustration-beach-sunset",
+      "kind": "background",
+      "title": "노을이 물든 해변",
+      "genre": "로맨스",
+      "collection": "coastal",
+      "src": "/assets/studio/illustration-20260926/beach-sunset.png",
+      "width": 1672,
+      "height": 941,
+      "bytes": 2512937,
+      "sha256": "6589b74de8bd8d6a2fe7c605bb4f1bfbf7184790a6129132c43197898b5ffc05",
+      "hasAlpha": false,
+      "environment": "실외",
+      "timeOfDay": "노을",
+      "containsPeople": false,
+      "containsText": false,
+      "tags": [
+        "해변",
+        "바다",
+        "노을",
+        "여름",
+        "추억",
+        "일몰",
+        "beach",
+        "sunset",
+        "sea"
+      ],
+      "sourcePromptId": "sunset-beach",
+      "promptSha256": "b4cafd89e512d7ddf57ffcdca1b9969f13668b64024db228afde74ead33d6a7d",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 전체 이미지를 검수해 인물·글자·워터마크가 없음을 확인했습니다.",
+          "원본 PNG를 해상도 변경 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": []
+    },
+    {
+      "id": "illustration-brass-lantern",
+      "kind": "prop-cluster",
+      "title": "따뜻한 불빛의 황동 랜턴",
+      "genre": "판타지",
+      "collection": "fantasy",
+      "src": "/assets/studio/illustration-20260926/brass-lantern.png",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 1133468,
+      "sha256": "73c5618864ce51d294ebf0f1b795af3c42120e86b8a9bd81f210361fb293fd7a",
+      "hasAlpha": true,
+      "environment": "실외",
+      "timeOfDay": "밤",
+      "containsPeople": false,
+      "containsText": false,
+      "tags": [
+        "랜턴",
+        "등불",
+        "황동",
+        "빛",
+        "탐험",
+        "밤",
+        "판타지",
+        "lantern",
+        "brass",
+        "light",
+        "fantasy"
+      ],
+      "sourcePromptId": "brass-lantern",
+      "promptSha256": "ed8cc12a2e82d413034e28581136655daa30a740571d1745d1f98c93b51edf1f",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "흰색·회색·짙은 배경에서 원본 RGBA를 합성해 테두리와 여백을 확인했습니다.",
+          "순수 빨강 RGB 잔여는 alpha 1~2/255로 실제 합성에서 눈에 띄는 붉은 테두리가 없습니다.",
+          "원본 PNG를 재인코딩하지 않고 보존했습니다."
+        ]
+      },
+      "postProcessing": [
+        "built-in-image-edit"
+      ],
+      "editPromptSha256": "106e58199f5c8268ef12a6f03785195d15a85fb323b05f2ee592bfa6f1144444"
+    },
+    {
+      "id": "illustration-botanical-dialogue",
+      "kind": "bubble-decoration",
+      "title": "초록 잎사귀 장식 말풍선",
+      "genre": "로맨스",
+      "collection": "romance",
+      "tags": [
+        "말풍선",
+        "대사",
+        "식물",
+        "잎사귀",
+        "아이보리",
+        "장식",
+        "로맨스",
+        "dialogue",
+        "speech",
+        "botanical"
+      ],
+      "src": "/assets/studio/illustration-20260926/botanical-dialogue.png",
+      "width": 1448,
+      "height": 1086,
+      "bytes": 1220243,
+      "sha256": "fa07cc22c50975d9baf1ba002e63f33c8db0ab1c6a9cf04efc8424988b0b8603",
+      "hasAlpha": true,
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "sourcePromptId": "botanical-dialogue",
+      "promptSha256": "1120c6d824810d2d9de7d2ee3aa4ac6ca702a62c24f4299193fa6d2250c17974",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 흰색·회색·짙은 배경에 합성해 테두리와 투명 배경이 깨끗함을 확인했습니다.",
+          "실제 RGBA·픽셀 크기·원본 SHA-256을 검증했습니다.",
+          "원본 PNG를 해상도 변경과 재인코딩 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": []
+    },
+    {
+      "id": "illustration-clothbound-books",
+      "kind": "prop-cluster",
+      "title": "천 표지 책과 독서 소품",
+      "genre": "일상·학원",
+      "collection": "school",
+      "tags": [
+        "책",
+        "독서",
+        "천 표지",
+        "서재",
+        "학교",
+        "문구",
+        "books",
+        "reading",
+        "clothbound"
+      ],
+      "src": "/assets/studio/illustration-20260926/clothbound-books.png",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 2008001,
+      "sha256": "cf6f6afeb3e9b5942315d61bfcdb728e550892fff431a363cd31f3ca4a690ab5",
+      "hasAlpha": true,
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "sourcePromptId": "clothbound-books",
+      "promptSha256": "fbabd2e97be3c8169a1f3278ee1de8265489e8d2adac8c0227a6cf1dab099bd2",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 흰색·회색·짙은 배경에 합성해 테두리와 투명 배경이 깨끗함을 확인했습니다.",
+          "실제 RGBA·픽셀 크기·원본 SHA-256을 검증했습니다.",
+          "원본 PNG를 해상도 변경과 재인코딩 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": []
+    },
+    {
+      "id": "illustration-ceramic-fern",
+      "kind": "prop-cluster",
+      "title": "도자기 화분의 푸른 고사리",
+      "genre": "일상",
+      "collection": "daily",
+      "tags": [
+        "화분",
+        "고사리",
+        "식물",
+        "도자기",
+        "실내",
+        "초록",
+        "fern",
+        "plant",
+        "ceramic"
+      ],
+      "src": "/assets/studio/illustration-20260926/ceramic-fern.png",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 1991653,
+      "sha256": "c251f49c30037771af6e4075d372cf2df2ed4d4f0969dd1e112368c83e87e7e3",
+      "hasAlpha": true,
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "sourcePromptId": "ceramic-fern",
+      "promptSha256": "00751d22ae19d676d314cc8fe04f75a27db4b4a29a12bfe3b9453dfd5683e242",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 흰색·회색·짙은 배경에 합성해 테두리와 투명 배경이 깨끗함을 확인했습니다.",
+          "실제 RGBA·픽셀 크기·원본 SHA-256을 검증했습니다.",
+          "원본 PNG를 해상도 변경과 재인코딩 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": []
+    },
+    {
+      "id": "illustration-porcelain-tea",
+      "kind": "prop-cluster",
+      "title": "우아한 도자기 찻잔 세트",
+      "genre": "일상",
+      "collection": "daily",
+      "tags": [
+        "찻잔",
+        "홍차",
+        "도자기",
+        "티타임",
+        "카페",
+        "tea",
+        "porcelain",
+        "teacup"
+      ],
+      "src": "/assets/studio/illustration-20260926/porcelain-tea.png",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 1540987,
+      "sha256": "092925cacdf983b90a47a159e9f73f7d45368af88288c688b1b20fb196743cbc",
+      "hasAlpha": true,
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "sourcePromptId": "porcelain-tea",
+      "promptSha256": "2f72377becef7df878367cb2d26e86f133c8dabb07b1ceabfeb6a5ef4bb13a4d",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "생성 담당자가 흰색·회색·짙은 배경에 합성해 테두리와 투명 배경이 깨끗함을 확인했습니다.",
+          "실제 RGBA·픽셀 크기·원본 SHA-256을 검증했습니다.",
+          "원본 PNG를 해상도 변경과 재인코딩 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": []
+    },
+    {
+      "id": "illustration-vintage-camera",
+      "kind": "prop-cluster",
+      "title": "짙은 남색의 빈티지 카메라",
+      "genre": "일상",
+      "collection": "urban",
+      "tags": [
+        "카메라",
+        "사진",
+        "여행",
+        "빈티지",
+        "필름",
+        "camera",
+        "vintage",
+        "film"
+      ],
+      "src": "/assets/studio/illustration-20260926/vintage-camera.png",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 2136524,
+      "sha256": "267c421ad364d901ef12f0669f22d492604b3cb20319ab582381a155ad5d9c30",
+      "hasAlpha": true,
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "sourcePromptId": "vintage-camera",
+      "promptSha256": "2438f90a62f36ea23eb33c09723b749c120e25afa9a51777d0e08fad32f93fa9",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "전체 원본 이미지에서 형태·여백·글자 유무를 확인했습니다.",
+          "실제 RGBA와 alpha>16의 경계를 검사했습니다. 순수 빨강 잔여 픽셀의 alpha는 최대 2/255입니다.",
+          "흰색·회색·짙은 배경별 브라우저 합성 검수는 실행하지 않았습니다.",
+          "원본 PNG를 해상도 변경과 재인코딩 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": []
+    },
+    {
+      "id": "illustration-canvas-backpack",
+      "kind": "prop-cluster",
+      "title": "가죽 장식 캔버스 탐험 배낭",
+      "genre": "판타지",
+      "collection": "fantasy",
+      "tags": [
+        "배낭",
+        "가방",
+        "탐험",
+        "여행",
+        "캔버스",
+        "가죽",
+        "backpack",
+        "travel",
+        "canvas"
+      ],
+      "src": "/assets/studio/illustration-20260926/canvas-backpack.png",
+      "width": 1254,
+      "height": 1254,
+      "bytes": 2306668,
+      "sha256": "9d23db07ee28702f302e4fab73e8b79d077759bfe9e6e93806bb699b2b3f7261",
+      "hasAlpha": true,
+      "environment": "실내",
+      "timeOfDay": "낮",
+      "containsPeople": false,
+      "containsText": false,
+      "sourcePromptId": "canvas-backpack",
+      "promptSha256": "7038e60fb6cf14b63b1195836c79cd53b5ff71239bb56bef2bdd299ee18eb306",
+      "review": {
+        "method": "full-image",
+        "status": "usable",
+        "reviewedAt": "2026-09-26",
+        "reviewer": "assistant",
+        "notes": [
+          "전체 원본 이미지에서 형태·여백·글자 유무를 확인했습니다.",
+          "실제 RGBA와 alpha>16의 경계를 검사했습니다. 순수 빨강 잔여 픽셀의 alpha는 최대 2/255입니다.",
+          "흰색·회색·짙은 배경별 브라우저 합성 검수는 실행하지 않았습니다.",
+          "원본 PNG를 해상도 변경과 재인코딩 없이 보존했습니다."
+        ]
+      },
+      "postProcessing": []
+    }
+  ]
+}

@@ -627,6 +627,8 @@ export function StudioInspectorSelectedImageTools({
                           operation={pixelCombine}
                           imageSource={selectedReadableImageSource ?? null}
                           scopeKey={selected.id}
+                          savedSelections={selected.savedSelections}
+                          onSaveSelections={(savedSelections) => patchEl(selected.id, { savedSelections })}
                           displayWidth={selected.width}
                           displayHeight={selected.height}
                           aspect={selected.width > 0 ? selected.height / selected.width : 1}

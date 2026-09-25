@@ -10,9 +10,13 @@ import {
   restoreStudioRejectedStroke,
   setStudioRejectedStrokeRestorer,
   subscribeStudioRejectedStrokeRecovery,
+  activateStudioRejectedStrokeRecovery,
+  hydrateStudioRejectedStrokeRecords,
+  retryStudioRejectedStrokePersistence,
 } from "./studio-rejected-stroke-recovery";
 
 import type { DrawEl } from "./studio-element-model";
+import type { StudioRejectedStrokeRecord } from "./studio-rejected-stroke-recovery";
 
 function drawEl(overrides: Partial<DrawEl> & { id: string }): DrawEl {
   return {
@@ -156,7 +160,7 @@ describe("rejected stroke recovery store", () => {
     }).toThrow();
   });
 
-  it("drops the oldest record beyond the limit", () => {
+  it("표시 한도를 넘어도 오래된 복구 원본을 모두 보관한다", () => {
     for (let index = 0; index < STUDIO_REJECTED_STROKE_RECOVERY_LIMIT + 3; index += 1) {
       recordStudioRejectedStroke({
         stroke: drawEl({ id: `s${index}` }),
@@ -167,9 +171,9 @@ describe("rejected stroke recovery store", () => {
       });
     }
     const records = getStudioRejectedStrokeRecords();
-    expect(records).toHaveLength(STUDIO_REJECTED_STROKE_RECOVERY_LIMIT);
+    expect(records).toHaveLength(STUDIO_REJECTED_STROKE_RECOVERY_LIMIT + 3);
     expect(records[0]?.id).toBe(`s${STUDIO_REJECTED_STROKE_RECOVERY_LIMIT + 2}`);
-    expect(records.some((record) => record.id === "s0")).toBe(false);
+    expect(records.some((record) => record.id === "s0")).toBe(true);
   });
 
   it("restores only through the registered restorer and keeps refused records", () => {
@@ -230,5 +234,54 @@ describe("rejected stroke recovery store", () => {
     dismissStudioRejectedStroke("a");
     expect(listener).toHaveBeenCalledTimes(1);
     expect(getStudioRejectedStrokeRecords()).toEqual([]);
+  });
+
+  it("기기 저장 실패 뒤 원본을 메모리에 남기고 명시적인 재시도로 저장한다", async () => {
+    const save = vi.fn().mockRejectedValueOnce(new Error("quota")).mockResolvedValue(undefined);
+    activateStudioRejectedStrokeRecovery("project", { save, delete: async () => undefined, confirmRestored: async () => undefined });
+    recordStudioRejectedStroke({ stroke: drawEl({ id: "failed" }), pageId: "page", provider: "GPU", reason: "device-lost", scopeKey: "project", sourceGeneration: 1, restoredStrokeId: "restore-failed" });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getStudioRejectedStrokeRecords()[0]?.durability).toBe("failed");
+    expect(getStudioRejectedStrokeRecords()[0]?.storageError).toContain("탭");
+    retryStudioRejectedStrokePersistence("failed");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getStudioRejectedStrokeRecords()[0]?.durability).toBe("saved");
+    expect(getStudioRejectedStrokeRecords()[0]?.storageError).toBeUndefined();
+  });
+
+  it("버리기를 확정한 뒤 늦게 읽힌 과거 목록이 원본을 되살리지 않는다", async () => {
+    const saved: StudioRejectedStrokeRecord = { id: "stale", scopeKey: "project", pageId: "page", stroke: drawEl({ id: "stale" }), provider: "GPU", reason: "device-lost", at: 1, sourceGeneration: 1, restoredStrokeId: "restore-stale", durability: "saved" };
+    activateStudioRejectedStrokeRecovery("project", { save: async () => undefined, delete: async () => undefined, confirmRestored: async () => undefined });
+    hydrateStudioRejectedStrokeRecords("project", [saved]);
+    dismissStudioRejectedStroke("stale");
+    await Promise.resolve();
+    await Promise.resolve();
+    hydrateStudioRejectedStrokeRecords("project", [saved]);
+    expect(getStudioRejectedStrokeRecords()).toEqual([]);
+  });
+
+  it("버리기 저장이 실패하면 원본을 화면에 유지한다", async () => {
+    const saved: StudioRejectedStrokeRecord = { id: "kept", scopeKey: "project", pageId: "page", stroke: drawEl({ id: "kept" }), provider: "GPU", reason: "device-lost", at: 1 };
+    activateStudioRejectedStrokeRecovery("project", { save: async () => undefined, delete: async () => { throw new Error("write failed"); }, confirmRestored: async () => undefined });
+    hydrateStudioRejectedStrokeRecords("project", [saved]);
+    dismissStudioRejectedStroke("kept");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getStudioRejectedStrokeRecords()[0]).toMatchObject({ id: "kept", durability: "failed" });
+  });
+
+  it("저장 완료 전에 복구한 획도 뒤늦은 저장 실패가 나면 원본과 오류를 다시 보여 준다", async () => {
+    const write = Promise.withResolvers<void>();
+    activateStudioRejectedStrokeRecovery("project", { save: () => write.promise, delete: async () => undefined, confirmRestored: async () => false });
+    recordStudioRejectedStroke({ stroke: drawEl({ id: "pending" }), pageId: "page", provider: "GPU", reason: "device-lost", scopeKey: "project", sourceGeneration: 1, restoredStrokeId: "restore-pending" });
+    setStudioRejectedStrokeRestorer((record) => ({ status: "restored", recordId: record.id, restoredStrokeId: "restore-pending" }));
+    restoreStudioRejectedStroke("pending");
+    expect(getStudioRejectedStrokeRecords()).toEqual([]);
+    write.reject(new Error("quota"));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(getStudioRejectedStrokeRecords()[0]).toMatchObject({ id: "pending", durability: "failed" });
   });
 });

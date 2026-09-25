@@ -1,14 +1,14 @@
 /**
- * 모바일 두/세 손가락 탭 제스처(실행 취소·UI 토글)를 캔버스 래퍼에 붙이는 훅.
- * StudioCuttoonEditorHost 에서 통째로 옮겨온 이펙트로, 호스트 로컬은 다섯 개(래퍼 ref, 모바일
- * 여부, 포인터 소유 판정, 앱 설정 ref, 제스처 동작 ref)만 받는다. 동작은 추출 전과 동일하다 —
- * 캔버스 포인터 제스처가 이미 소유 중이거나 뷰 도구 HUD 를 눌렀으면 후보를 버리고, 손가락이
- * 12px 넘게 움직였거나 320ms 를 넘기면 탭으로 치지 않는다.
+ * 통합 Studio와 Draw의 두/세/네 손가락 탭을 캔버스 래퍼 한 곳에서 처리한다.
+ * 터치 이벤트만 구독하므로 모바일과 터치 노트북에 같은 사용자 설정을 적용한다.
+ * 다른 캔버스 제스처가 소유 중이거나 뷰 도구 HUD를 눌렀으면 후보를 버린다.
+ * 손가락이 12px 넘게 움직였거나 320ms를 넘기면 탭으로 치지 않는다.
  */
 
 import { useEffect } from "react";
 
 import { isStudioViewToolsHudEventTarget } from "./studio-page-shell-runtime";
+import { resolveStudioTouchTapAction } from "./studio-cuttoon-editor/studio-touch-gesture-policy";
 
 import type { StudioAppSettings } from "./studio-app-settings";
 import type { RefObject } from "react";
@@ -21,30 +21,27 @@ export type StudioMobileHistoryGestureActions = {
 
 export function useStudioMobileHistoryTouchGestures({
   surfaceRef,
-  isMobile,
   canvasPointerGestureIsOwned,
   appSettingsRef,
   gestureRef,
 }: {
   readonly surfaceRef: RefObject<HTMLDivElement | null>;
-  readonly isMobile: boolean;
   readonly canvasPointerGestureIsOwned: () => boolean;
   readonly appSettingsRef: RefObject<StudioAppSettings>;
   readonly gestureRef: RefObject<StudioMobileHistoryGestureActions>;
 }): void {
-  // 세 ref 는 호스트가 한 번 만든 useRef 객체라 정체성이 바뀌지 않는다 — 의존성 배열에 적혀 있어도
-  // 실제 재구독 조건은 추출 전과 같은 `isMobile` 과 포인터 소유 판정 두 가지뿐이다.
+  // 최신 설정과 명령은 ref에서 읽어 렌더 중에도 진행 중인 탭 후보를 유지한다.
   useEffect(() => {
     const node = surfaceRef.current;
-    if (!isMobile || !node) return;
+    if (!node) return;
     let candidate: {
-      count: 2 | 3;
+      count: 2 | 3 | 4;
       startedAt: number;
       points: Map<number, { x: number; y: number }>;
       moved: boolean;
     } | null = null;
     const onTouchStart = (event: TouchEvent) => {
-      if (isStudioViewToolsHudEventTarget(event.target)) {
+      if (event.defaultPrevented || isStudioViewToolsHudEventTarget(event.target)) {
         candidate = null;
         return;
       }
@@ -52,15 +49,11 @@ export function useStudioMobileHistoryTouchGestures({
         candidate = null;
         return;
       }
-      if (event.touches.length !== 2 && event.touches.length !== 3) {
+      if (event.touches.length !== 2 && event.touches.length !== 3 && event.touches.length !== 4) {
         candidate = null;
         return;
       }
-      const touchPrefs = appSettingsRef.current.touch;
-      if (
-        (event.touches.length === 2 && touchPrefs.twoFinger !== "undo-redo")
-        || (event.touches.length === 3 && touchPrefs.threeFinger === "none")
-      ) {
+      if (!resolveStudioTouchTapAction(event.touches.length, appSettingsRef.current.touch)) {
         candidate = null;
         return;
       }
@@ -77,7 +70,8 @@ export function useStudioMobileHistoryTouchGestures({
       };
     };
     const onTouchMove = (event: TouchEvent) => {
-      if (!candidate || event.touches.length !== candidate.count) {
+      if (!candidate || event.defaultPrevented || canvasPointerGestureIsOwned()
+        || event.touches.length !== candidate.count) {
         candidate = null;
         return;
       }
@@ -95,18 +89,12 @@ export function useStudioMobileHistoryTouchGestures({
       const completed = !candidate.moved && performance.now() - candidate.startedAt <= 320;
       const count = candidate.count;
       candidate = null;
-      if (!completed) return;
+      if (!completed || event.defaultPrevented || canvasPointerGestureIsOwned()) return;
+      const action = resolveStudioTouchTapAction(count, appSettingsRef.current.touch);
+      if (!action) return;
       event.preventDefault();
-      const touchPrefs = appSettingsRef.current.touch;
-      if (count === 2 && touchPrefs.twoFinger === "undo-redo") {
-        gestureRef.current.undo();
-      } else if (count === 3 && touchPrefs.threeFinger === "undo") {
-        gestureRef.current.undo();
-      } else if (count === 3 && touchPrefs.threeFinger === "toggle-ui") {
-        gestureRef.current.toggleUi();
-      } else {
-        return;
-      }
+      if (action === "undo") gestureRef.current.undo();
+      else gestureRef.current.toggleUi();
       if (typeof globalThis.navigator?.vibrate === "function") globalThis.navigator.vibrate(8);
     };
     const onTouchCancel = () => {
@@ -122,5 +110,5 @@ export function useStudioMobileHistoryTouchGestures({
       node.removeEventListener("touchend", onTouchEnd);
       node.removeEventListener("touchcancel", onTouchCancel);
     };
-  }, [isMobile, canvasPointerGestureIsOwned, surfaceRef, appSettingsRef, gestureRef]);
+  }, [canvasPointerGestureIsOwned, surfaceRef, appSettingsRef, gestureRef]);
 }

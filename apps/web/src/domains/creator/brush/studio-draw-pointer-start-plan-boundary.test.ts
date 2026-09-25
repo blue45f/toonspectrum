@@ -157,6 +157,9 @@ describe("studio draw pointer-start planning ownership boundary", () => {
     expect(onStageDown).toContain(
       'strokeDrawMode === "pen" || strokeDrawMode === "shape" || strokeDrawMode === "eraser"',
     );
+    // 준비 전에는 원본만 수집하고, 같은 callback이 즉시/지연 admission 뒤 CRDT 시작을 소유한다.
+    expect(drawDown).toContain("drawingCrdtPublisherRef.current.begin(admittedStroke.id");
+    expect(drawDown).toContain("onAdmitted: beginAdmittedCollaboration");
     expectTokenOrder(onStageDown, [
       "if (!studioCrdtDocumentRef.current && !beginLiveResourceEdit(undefined, leaseIntent)) return",
       "beginStudioStrokePointerSession(pointerSample, penButtonPolicy)",
@@ -166,8 +169,8 @@ describe("studio draw pointer-start planning ownership boundary", () => {
       "requireStudioDrawingPointerTransport(drawingPointerTransportRef).start({",
       "drawingImmediateCausalInputRef.current = causalInputPlan.quantizeImmediately",
       "drawingRef.current = next",
-      "beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin)",
-      "drawingCrdtPublisherRef.current.begin(next.id",
+      "beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin, {",
+      "beginAdmittedCollaboration(next)",
       "startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp)",
     ]);
   });

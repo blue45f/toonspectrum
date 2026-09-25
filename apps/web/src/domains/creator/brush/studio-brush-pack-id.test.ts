@@ -6,9 +6,9 @@ import {
 } from "./studio-brush-pack-id";
 
 describe("procedural brush pack ids", () => {
-  it("publishes exactly 200 stable, unique catalogue ids", () => {
-    expect(STUDIO_BRUSH_PACK_CATALOG_IDS).toHaveLength(200);
-    expect(new Set(STUDIO_BRUSH_PACK_CATALOG_IDS).size).toBe(200);
+  it("publishes exactly 207 stable, unique catalogue ids", () => {
+    expect(STUDIO_BRUSH_PACK_CATALOG_IDS).toHaveLength(207);
+    expect(new Set(STUDIO_BRUSH_PACK_CATALOG_IDS).size).toBe(207);
     for (const id of STUDIO_BRUSH_PACK_CATALOG_IDS) {
       expect(id).toMatch(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/);
       expect(isStudioBrushPackCatalogId(id)).toBe(true);

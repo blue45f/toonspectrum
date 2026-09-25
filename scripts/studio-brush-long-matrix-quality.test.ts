@@ -144,7 +144,7 @@ describe("Studio exhaustive long-brush quality policy", () => {
     expect(policies.filter(({ source }) => source === "core")).toHaveLength(
       STUDIO_ALL_BRUSH_CATALOG_ITEMS.filter(({ source }) => source === "core").length,
     );
-    expect(policies.filter(({ source }) => source === "pro")).toHaveLength(200);
+    expect(policies.filter(({ source }) => source === "pro")).toHaveLength(207);
   });
 
   it("uses declared material stamp/scatter modes without exempting continuous or ribbon media", () => {

@@ -41,6 +41,8 @@ export interface StudioStageDocumentGeometry {
   readonly effectiveScale: number;
   /** Logical output density for callers using an additional toCanvas pixelRatio. */
   readonly capturePixelRatio?: number;
+  /** 출력 픽셀 좌표의 부분 캡처. 문서 변환은 유지하고 임시 표면만 이 영역으로 제한한다. */
+  readonly captureRegion?: Readonly<{ x: number; y: number; width: number; height: number }>;
 }
 
 /**
@@ -104,11 +106,12 @@ export function readStudioStageInDocumentView<Result>(
     scaleY: stage.scaleY(),
   };
   const documentView = planStudioStageDocumentViewBox(geometry);
+  const region = geometry.captureRegion;
   let restoreCaches: (() => void) | undefined;
 
   try {
-    stage.size({ width: documentView.width, height: documentView.height });
-    stage.position({ x: documentView.x, y: documentView.y });
+    stage.size({ width: region?.width ?? documentView.width, height: region?.height ?? documentView.height });
+    stage.position({ x: documentView.x - (region?.x ?? 0), y: documentView.y - (region?.y ?? 0) });
     stage.rotation(documentView.rotation);
     stage.scale({ x: documentView.scaleX, y: documentView.scaleY });
     restoreCaches = prepareStudioRasterCapture(stage, Math.max(1, geometry.capturePixelRatio ?? geometry.effectiveScale));

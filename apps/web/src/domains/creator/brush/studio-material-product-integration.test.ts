@@ -23,7 +23,7 @@ import {
 
 describe("original material product integration", () => {
   it("shares exact ordered identities across the picker, quality editor and curated inventory", () => {
-    expect(STUDIO_MATERIAL_BRUSH_IDS).toHaveLength(40);
+    expect(STUDIO_MATERIAL_BRUSH_IDS).toHaveLength(47);
     expect(BRUSH_QUALITY_CATALOG.map(({ id }) => id)).toEqual(
       STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS,
     );

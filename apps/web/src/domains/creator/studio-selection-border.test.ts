@@ -26,7 +26,7 @@ function bruteBorder(mask: ColorRangeMask, opts: StudioSelectionBorderOptions) {
   for (let y = 0; y < mask.height; y += 1) for (let x = 0; x < mask.width; x += 1) {
     const inside = at(mask, x, y)! >= 128;
     if (inside ? opts.placement === "outside" : opts.placement === "inside") continue;
-    const limit = opts.widthPx / (opts.placement === "center" ? 2 : 1);
+    const limit = opts.placement === "center" ? (inside ? Math.ceil(opts.widthPx / 2) : Math.floor(opts.widthPx / 2)) : opts.widthPx;
     for (let sy = -1; sy <= mask.height; sy += 1) for (let sx = -1; sx <= mask.width; sx += 1) {
       const targetInside = sx >= 0 && sy >= 0 && sx < mask.width && sy < mask.height && at(mask, sx, sy)! >= 128;
       if (targetInside === inside) continue;
@@ -102,7 +102,7 @@ describe("selection border", () => {
   });
 
   it("validates finite sizes, bounded allocation and useful preview precision without mutating inputs", () => {
-    expect(studioSelectionBorderRasterSize(2560, 1280)).toEqual({ width: 640, height: 320, minimumWidthPx: 8 });
+    expect(studioSelectionBorderRasterSize(2560, 1280)).toEqual({ width: 2560, height: 1280, minimumWidthPx: 1 });
     expect(() => studioSelectionBorderRasterSize(NaN, 32)).toThrow(RangeError);
     const mask = raster(rectangle);
     const before = mask.alpha.slice();
@@ -113,13 +113,13 @@ describe("selection border", () => {
     expect(() => buildStudioSelectionBorderMask({ ...mask, alpha: new Uint8ClampedArray(1) }, options)).toThrow(RangeError);
   });
 
-  it("rejects excessive islands or tiny holes instead of silently truncating the selection", () => {
+  it("preserves disconnected pixels and tiny holes without truncating the selection", () => {
     const mask = { width: 100, height: 100, alpha: new Uint8ClampedArray(10000) };
     for (let index = 0; index < 49; index += 1) mask.alpha[(Math.floor(index / 7) * 12 + 2) * 100 + (index % 7) * 12 + 2] = 255;
-    expect(() => studioSelectionBorderFromMask(mask, rectangle, { ...options, displayWidth: 100, displayHeight: 100 })).toThrow("너무 많은 영역");
+    expect(studioSelectionBorderFromMask(mask, rectangle, { ...options, displayWidth: 100, displayHeight: 100 })?.subpaths).toHaveLength(49);
     const full = { width: 640, height: 640, alpha: new Uint8ClampedArray(640 * 640).fill(255) };
     full.alpha[320 * 640 + 320] = 0;
-    expect(() => studioSelectionBorderFromMask(full, rectangle, { ...options, displayWidth: 640, displayHeight: 640 })).toThrow("작은 구멍");
+    expect(pointInSelection(studioSelectionBorderFromMask(full, rectangle, { ...options, displayWidth: 640, displayHeight: 640 }), { x: 320.5 / 640, y: 320.5 / 640 })).toBe(false);
   });
 
   it("processes the maximum 640px mask without width-dependent allocations or losing its hole", () => {
@@ -132,7 +132,7 @@ describe("selection border", () => {
 
   it("rejects malformed raw worker requests before allocating or reading any canvas", () => {
     const readMask = vi.fn(() => raster(rectangle));
-    for (const dimensions of [{ width: 641, height: 1 }, { width: NaN, height: 32 }, { width: 32, height: 0 }]) {
+    for (const dimensions of [{ width: 8193, height: 1 }, { width: NaN, height: 32 }, { width: 32, height: 0 }]) {
       expect(() => executeStudioSelectionBorderWorkerRequest({ kind: "selection-border", ...options, ...dimensions, selection: rectangle }, readMask)).toThrow(RangeError);
     }
     expect(readMask).not.toHaveBeenCalled();

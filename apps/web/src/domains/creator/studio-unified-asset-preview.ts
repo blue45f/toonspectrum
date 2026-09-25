@@ -208,7 +208,7 @@ export function resolveStudioUnifiedAssetRichPreview(
     const source = item.source;
     const aspectRatio = source.kind === "background"
       ? positiveAspectRatio(source.value.width, source.value.height)
-      : source.kind === "local"
+      : source.kind === "local" || source.kind === "builtin-raster"
         ? positiveAspectRatio(source.value.width, source.value.height)
         : null;
     return {

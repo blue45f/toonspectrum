@@ -1,3 +1,4 @@
+import { groupPsdExportLayers, type StudioPsdFolder } from "./studio-psd-folder-structure";
 /**
  * Studio PSD Layer Export — 레이어별 PSD(.psd) 내보내기.
  *
@@ -78,7 +79,10 @@ interface PsdElMeta {
   clipBelow?: boolean;
   noClip?: boolean;
   groupId?: string;
+  psdGroupId?: string;
+  psdFolderPath?: readonly StudioPsdFolder[];
   maskSrc?: string;
+  maskEnabled?: boolean;
   filterMaskSrc?: string;
   smartFilters?: { entries?: readonly unknown[] };
   adjustmentLayer?: { version: 1; scope: "composite-below" | "clip-previous" };
@@ -196,6 +200,7 @@ export type PsdExportEl =
 export interface PsdExportOptions {
   /** 출력 배율 — 래스터 크기·left/top 좌표에 곱한다. 기본 1(캔버스 원본 크기). */
   scale?: number;
+  groups?: readonly import("../studio-layers").LayerGroup[];
   /** Whole-document grade is baked when a live adjustment graph requires composite export. */
   pageGrade?: Partial<PageGrade>;
   /** 배경(단색/그라데이션) 레이어를 맨 아래에 추가할지. `background` 가 없으면 무의미. 기본 true. */
@@ -949,6 +954,28 @@ function findElementNode(stage: Konva.Stage, elementId: string): Konva.Node | un
   });
 }
 
+/** 자기 마스크까지만 포함한다. 아래 레이어 클리핑은 PSD clipping 속성으로 보존한다. */
+export function psdLayerCaptureNode(node: Konva.Node, element: PsdExportEl): Konva.Node {
+  if (!element.maskSrc || element.maskEnabled === false) return node;
+  let ancestor = node.getParent?.();
+  while (ancestor) {
+    if (ancestor.getAttr("studioLayerMaskOwnerId") === element.id) return ancestor;
+    ancestor = ancestor.getParent();
+  }
+  throw new Error(`${element.name ?? element.id}: 적용된 레이어 마스크의 캡처 경계를 찾지 못해 PSD 내보내기를 중단했어요.`);
+}
+
+function capturePsdLayerCanvas(node: Konva.Node, options: Parameters<Konva.Node["toCanvas"]>[0]): HTMLCanvasElement {
+  const previous = node.globalCompositeOperation?.();
+  try {
+    // 레이어 자체를 투명 표면에 캡처할 때는 외부 블렌드를 제거한다. PSD descriptor가 적용한다.
+    if (previous) node.globalCompositeOperation("source-over");
+    return node.toCanvas(options);
+  } finally {
+    if (previous) node.globalCompositeOperation(previous);
+  }
+}
+
 /** 배경(단색 또는 세로 2색 그라데이션) 래스터 레이어 — studio-svg-export 의 배경 rect와 동일 규칙. */
 function makeBackgroundLayer(width: number, height: number, background: { color: string; gradient?: string[] | null }): Layer {
   const canvas = document.createElement("canvas");
@@ -1066,38 +1093,21 @@ function withPsdExportLossDecisions(
   if (groupCount > 0) {
     decisions.push(exportDecision(
       "groups",
-      "dropped",
+      "preserved",
       groupCount,
-      `Studio 그룹 ${groupCount.toLocaleString("ko-KR")}개의 폴더 구조는 PSD에 만들지 않고 z-order만 유지합니다.`,
+      `Studio 그룹 ${groupCount.toLocaleString("ko-KR")}개를 PSD 폴더로 기록하고 가져온 원본 중첩 경로와 z-order를 유지합니다.`,
     ));
   }
-  const maskCount = capturedElements.filter((element) => !!element.maskSrc).length;
-  if (maskCount > 0) {
-    // 정직성 계약: 여기서 "레이어 픽셀에 합성한다"고 말하면 거짓말이 된다.
-    //
-    // 레이어 마스크는 StudioCanvasViewport 가 요소 노드를 ClipMaskGroup(마스크 형제 +
-    // source-in 내용물) 으로 **바깥에서** 한 겹 더 감싸서 적용한다. 반면 이 파일의 캡처는
-    // `findElementNode` 로 `studioElementId` 가 달린 **안쪽** 요소 노드를 찾아
-    // `node.toCanvas()` 를 부른다 — 마스크 샌드위치는 그 노드의 조상이라 캡처 범위 밖이고,
-    // 결과 레이어에는 마스크가 전혀 반영되지 않는다.
-    //
-    // 실측(2026-08-13, 400×400 이미지 + 숨기기 마스크 스트로크, 2× PSD):
-    //   캔버스(Konva 씬 레이어) 지운 영역 픽셀 = rgba(0,0,0,0)
-    //   같은 좌표의 PSD 레이어 픽셀        = rgba(0,0,255,255)  ← 가린 영역이 되살아남
-    //   PSD 레이어 알파 히스토그램: a=0 은 1px 테두리뿐, 스트로크 자국 없음
-    //   ag-psd `layer.mask` = 없음(마스크 채널도 기록하지 않음)
-    // 즉 마스크 채널로도, 픽셀 합성으로도 남지 않는 완전한 유실이다.
-    //
-    // 이 항목의 범위는 합성을 구현하는 것이 아니라 **거짓 고지를 멈추는 것**이다. 나중에
-    // 캡처가 마스크 샌드위치 루트를 잡도록 고쳐지면 그때 disposition 을 되돌리면 된다.
-    decisions.push(exportDecision(
-      "layer-mask",
-      "dropped",
-      maskCount,
-      `Studio 레이어 마스크 ${maskCount.toLocaleString("ko-KR")}개는 PSD에 기록하지 못합니다 — 마스크 채널로도, 레이어 픽셀 합성으로도 남지 않아 마스크로 가린 영역이 PSD에서는 다시 나타납니다.`,
-      "마스크 재편집이 필요하면 ToonSpectrum 프로젝트 아카이브를 함께 보관하세요.",
-    ));
-  }
+  const maskCount = capturedElements.filter((element) => !!element.maskSrc && element.maskEnabled !== false).length;
+  if (maskCount > 0) decisions.push(exportDecision(
+    "layer-mask", "rasterized", maskCount,
+    `레이어 마스크 ${maskCount.toLocaleString("ko-KR")}개의 현재 외관을 레이어 픽셀에 합성합니다. PSD에서 마스크를 따로 편집하려면 원본 프로젝트를 함께 보관하세요.`,
+  ));
+  const disabledMaskCount = capturedElements.filter((element) => !!element.maskSrc && element.maskEnabled === false).length;
+  if (disabledMaskCount > 0) decisions.push(exportDecision(
+    "layer-mask", "dropped", disabledMaskCount,
+    `비활성 레이어 마스크 ${disabledMaskCount.toLocaleString("ko-KR")}개는 화면처럼 적용하지 않으며 PSD 마스크 채널로 별도 저장하지 않습니다.`,
+  ));
   const adjustmentCount = capturedElements.filter((element) =>
     (element.smartFilters?.entries?.length ?? 0) > 0 || !!element.filterMaskSrc
   ).length;
@@ -1331,11 +1341,14 @@ export async function exportPagePsd(
 
     const el = elements[i];
     const label = elementLabel(el, i);
-    const node = findElementNode(stage, el.id);
-    if (!node) {
+    const elementNode = findElementNode(stage, el.id);
+    if (!elementNode) {
       skipped.push(`${label}: 캔버스에서 찾지 못해 건너뜀`);
       continue;
     }
+
+    const node = psdLayerCaptureNode(elementNode, el);
+    const maskBaked = node !== elementNode;
 
     // 뷰(화면 줌 반영) 공간 사각형 — toCanvas() 캡처 좌표계와 동일해야 한다.
     const rawAbs = node.getClientRect();
@@ -1374,7 +1387,7 @@ export async function exportPagePsd(
     try {
       canvas = documentCapture
         ? capturePsdDrawNode(node, stage, canvasW, canvasH, scale)
-        : node.toCanvas({ x: captureX, y: captureY, width: captureW, height: captureH, pixelRatio });
+        : capturePsdLayerCanvas(node, { x: captureX, y: captureY, width: captureW, height: captureH, pixelRatio });
     } catch {
       skipped.push(`${label}: 래스터화 실패로 건너뜀`);
       continue;
@@ -1427,7 +1440,7 @@ export async function exportPagePsd(
       top,
       ...(drawPixels ? { imageData: drawPixels } : { canvas }),
       // Custom draw sceneFuncs have already baked stroke opacity into their pixel alpha.
-      opacity: documentCapture ? 1 : clampOpacity(el.opacity),
+      opacity: documentCapture || maskBaked ? 1 : clampOpacity(el.opacity),
       blendMode: mapBlendMode(el.blendMode),
       clipping: !!el.clipBelow,
     };
@@ -1480,7 +1493,7 @@ export async function exportPagePsd(
   }
 
   // Studio: 뒤→앞(elements[0]=BACK) → ag-psd: 위→아래(children[0]=TOP) — 반드시 뒤집는다.
-  const children = [...layers].reverse();
+  const children = groupPsdExportLayers([...layers].reverse(), [...capturedElements].reverse(), opts.groups);
 
   if (includeBg && opts.background) {
     children.push(makeBackgroundLayer(psdWidth, psdHeight, opts.background));

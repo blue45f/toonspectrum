@@ -1,12 +1,29 @@
+import { StudioIllustrationScenePreview } from "./StudioIllustrationScenePreview";
+
 import type { StudioSceneTemplateSummary } from "./studio-scene-template-summary";
+
+import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 
 /** Intentionally schematic: reads the native seed bounds, does not claim final font/effect parity. */
 export function StudioSceneTemplateMap({ summary, label }: { summary: StudioSceneTemplateSummary; label: string }) {
+  const schematic = <StudioSceneTemplateSchematic summary={summary} label={label} />;
+  return summary.seeds.some((seed) => seed.type === "frame" && seed.bg)
+    ? <StudioIllustrationScenePreview summary={summary} label={label} fallback={schematic} />
+    : schematic;
+}
+
+function StudioSceneTemplateSchematic({ summary, label }: { summary: StudioSceneTemplateSummary; label: string }) {
   return <svg role="img" aria-label={`${label} 구성도. 실제 작화 렌더가 아닙니다.`} viewBox={`0 0 ${summary.width} ${summary.height}`}
     className="h-full max-h-full w-full object-contain" preserveAspectRatio="xMidYMid meet" data-studio-scene-map="true">
     {summary.seeds.map((seed, index) => {
-      if (seed.type === "frame") return <rect key={index} x={seed.x} y={seed.y} width={seed.width} height={seed.height}
-        fill={seed.bgColor ?? "#ffffff"} stroke={seed.stroke ?? "#282828"} strokeWidth={Math.max(2, seed.strokeWidth ?? 2)} />;
+      if (seed.type === "frame") return <g key={index}>
+        <rect x={seed.x} y={seed.y} width={seed.width} height={seed.height} fill={seed.bgColor ?? "#ffffff"} />
+        {seed.bg ? <svg x={seed.x} y={seed.y} width={seed.width} height={seed.height} viewBox={`0 0 ${seed.width} ${seed.height}`}>
+          <image href={resolveAssetUrl(seed.bg)} width={seed.width} height={seed.height} preserveAspectRatio="xMidYMid slice" />
+        </svg> : null}
+        <rect x={seed.x} y={seed.y} width={seed.width} height={seed.height}
+          fill="none" stroke={seed.stroke ?? "#282828"} strokeWidth={Math.max(2, seed.strokeWidth ?? 2)} />
+      </g>;
       if (seed.type === "bubble") return <g key={index}>
         <rect x={seed.x} y={seed.y} width={seed.width} height={seed.height} rx={seed.variant === "box" || seed.variant === "system" ? 5 : 28}
           fill={seed.fill} stroke={seed.textFill} strokeWidth={2} />

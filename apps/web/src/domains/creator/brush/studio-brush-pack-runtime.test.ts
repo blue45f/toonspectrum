@@ -64,9 +64,9 @@ function withoutSeedFields(value: unknown): unknown {
 }
 
 describe("procedural brush pack runtime", () => {
-  it("materializes all 200 descriptors into the shared selection contract", () => {
+  it("materializes all 207 descriptors into the shared selection contract", () => {
     const selections = materializeAllStudioBrushPackSelections();
-    expect(selections).toHaveLength(200);
+    expect(selections).toHaveLength(207);
     expect(selections.map((selection) => selection.catalogId)).toEqual(
       STUDIO_BRUSH_PACK_CATALOG_IDS
     );
@@ -77,7 +77,7 @@ describe("procedural brush pack runtime", () => {
     const dryMediaSelections = selections.filter(
       ({ runtimeBrushId }) => runtimeBrushId === "dry-media"
     );
-    expect(dryMediaSelections).toHaveLength(72);
+    expect(dryMediaSelections).toHaveLength(74);
     expect(dryMediaSelections.every(
       ({ brushDynamics }) => brushDynamics.depositPipeline
         === STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V4
@@ -146,7 +146,7 @@ describe("procedural brush pack runtime", () => {
     )).toBe(true);
   });
 
-  it("gives all 200 catalogue brushes a distinct deterministic runtime fingerprint", () => {
+  it("gives all 207 catalogue brushes a distinct deterministic runtime fingerprint", () => {
     const first = STUDIO_BRUSH_PACK_CATALOG_IDS.map(studioBrushPackRuntimeSignature);
     const second = STUDIO_BRUSH_PACK_CATALOG_IDS.map(studioBrushPackRuntimeSignature);
     const physical = materializeAllStudioBrushPackSelections().map((selection) => JSON.stringify(withoutSeedFields({
@@ -155,9 +155,9 @@ describe("procedural brush pack runtime", () => {
     })));
     expect(first).toEqual(second);
     expect(first.every((signature) => typeof signature === "string" && signature.length > 100)).toBe(true);
-    expect(new Set(first).size).toBe(200);
+    expect(new Set(first).size).toBe(207);
     // Neither the stroke seed nor nested grain seeds may be the sole differentiator.
-    expect(new Set(physical).size).toBe(200);
+    expect(new Set(physical).size).toBe(207);
   });
 
   it("plans a finite, visible, deterministic engine stroke for every catalogue preset", () => {

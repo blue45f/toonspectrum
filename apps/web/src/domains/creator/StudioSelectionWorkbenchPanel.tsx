@@ -1,3 +1,4 @@
+import { EXACT_SELECTION_MAX_AXIS, EXACT_SELECTION_MAX_PIXELS } from "./selection/studio-selection-exact-mask";
 import {
   FolderOpen,
   Layers,
@@ -33,12 +34,13 @@ import {
   STUDIO_SELECTION_SUBJECT_THRESHOLD_RANGE,
 } from "./studio-selection-source";
 import {
+  readStudioSelectionSourceSize,
   selectOpaqueFromImageSource,
   selectSubjectFromImageSource,
   studioSelectionSourceErrorMessage,
 } from "./studio-selection-source-browser";
 import {
-  STUDIO_SAVED_SELECTION_MAX_ITEMS,
+  EMPTY_STUDIO_SAVED_SELECTION_LIBRARY,
   readStudioSavedSelectionLibrary,
   removeStudioSavedSelection,
   studioSavedSelectionStorageKey,
@@ -74,6 +76,8 @@ export interface StudioSelectionWorkbenchPanelProps {
   readonly flipY?: boolean;
   readonly busy?: boolean;
   readonly storage?: StudioSelectionStorage | null;
+  readonly savedSelections?: StudioSavedSelectionLibrary;
+  readonly onSaveSelections?: (library: StudioSavedSelectionLibrary) => void;
   readonly onCommitSelection: (
     selection: PixelSelection | null,
     intent: StudioSelectionWorkbenchCommitIntent,
@@ -92,14 +96,17 @@ function browserStorage(explicit: StudioSelectionStorage | null | undefined): St
   }
 }
 
+let savedSelectionFallbackSequence = 0;
+
 function makeSavedSelectionId(): string {
   try {
     const id = globalThis.crypto?.randomUUID?.();
     if (id) return `selection-${id}`;
   } catch {
-    // Fall through to the monotonic-enough local fallback.
+    // 같은 밀리초에 연속 저장해도 서로 다른 선택으로 남긴다.
   }
-  return `selection-${Date.now().toString(36)}`;
+  savedSelectionFallbackSequence += 1;
+  return `selection-${Date.now().toString(36)}-${savedSelectionFallbackSequence.toString(36)}`;
 }
 
 function operationLabel(operation: SelectionOperationMode): string {
@@ -125,6 +132,8 @@ export function StudioSelectionWorkbenchPanel({
   flipY,
   busy = false,
   storage,
+  savedSelections,
+  onSaveSelections,
   onCommitSelection,
 }: StudioSelectionWorkbenchPanelProps) {
   const nameInputId = useId();
@@ -133,9 +142,10 @@ export function StudioSelectionWorkbenchPanel({
   const [borderWidth, setBorderWidth] = useState(8);
   const [borderPlacement, setBorderPlacement] = useState<StudioSelectionBorderPlacement>("inside");
   const resolvedStorage = useMemo(() => browserStorage(storage), [storage]);
-  const [library, setLibrary] = useState<StudioSavedSelectionLibrary>(() => (
+  const [deviceLibrary, setLibrary] = useState<StudioSavedSelectionLibrary>(() => (
     readStudioSavedSelectionLibrary(resolvedStorage, scopeKey)
   ));
+  const library = onSaveSelections ? savedSelections ?? EMPTY_STUDIO_SAVED_SELECTION_LIBRARY : deviceLibrary;
   const [name, setName] = useState("선택 1");
   const [subjectThreshold, setSubjectThreshold] = useState(
     STUDIO_SELECTION_SUBJECT_THRESHOLD_DEFAULT,
@@ -180,7 +190,8 @@ export function StudioSelectionWorkbenchPanel({
   const sourceDisabled = busy || sourceJob !== null || !imageSource;
   const smoothDisabled = busy || sourceJob !== null || !canSmoothPixelSelection(selection);
   const selectedOperationLabel = operationLabel(operation);
-  const borderGeometryValid = [displayWidth, displayHeight].every((value) => Number.isFinite(value) && value > 0);
+  const borderGeometryValid = [displayWidth, displayHeight].every((value) => Number.isFinite(value) && value > 0 && value <= EXACT_SELECTION_MAX_AXIS)
+    && Math.ceil(displayWidth) * Math.ceil(displayHeight) <= EXACT_SELECTION_MAX_PIXELS;
   const borderRaster = borderGeometryValid
     ? studioSelectionBorderRasterSize(displayWidth, displayHeight)
     : { width: 1, height: 1, minimumWidthPx: 1 };
@@ -197,15 +208,19 @@ export function StudioSelectionWorkbenchPanel({
     setSourceJob("border");
     setStatus("선택 영역의 테두리를 계산하고 있습니다.");
     try {
+      const originalSize = imageSource
+        ? await readStudioSelectionSourceSize(imageSource, controller.signal)
+        : borderRaster;
+      if (controller.signal.aborted) return;
       const result = await session.run({
         kind: "selection-border",
         selection,
-        width: borderRaster.width,
-        height: borderRaster.height,
+        width: originalSize.width,
+        height: originalSize.height,
         widthPx: effectiveBorderWidth,
         placement: borderPlacement,
-        displayWidth,
-        displayHeight,
+        displayWidth: originalSize.width,
+        displayHeight: originalSize.height,
       }, { signal: controller.signal });
       if (controller.signal.aborted || abortRef.current !== controller) return;
       onCommitSelection(result.selection, "border");
@@ -302,6 +317,16 @@ export function StudioSelectionWorkbenchPanel({
   };
 
   const persistLibrary = (next: StudioSavedSelectionLibrary, successMessage: string) => {
+    if (onSaveSelections) {
+      try {
+        onSaveSelections(next);
+        setStatus(successMessage);
+        return true;
+      } catch {
+        setStatus("작품에 선택을 저장하지 못했습니다. 기존 저장 선택을 유지했습니다.");
+        return false;
+      }
+    }
     if (!writeStudioSavedSelectionLibrary(resolvedStorage, scopeKey, next)) {
       setStatus("브라우저 저장소를 사용할 수 없어 선택을 저장하지 못했습니다.");
       return false;
@@ -314,13 +339,16 @@ export function StudioSelectionWorkbenchPanel({
   const saveCurrentSelection = () => {
     if (!selection || !selectionReady || busy) return;
     try {
+      const id = makeSavedSelectionId();
       const next = upsertStudioSavedSelection(library, {
-        id: makeSavedSelectionId(),
+        id,
         name,
         selection,
       });
-      if (persistLibrary(next, `“${name.trim()}” 선택을 이 기기에 저장했습니다.`)) {
-        setName(`선택 ${Math.min(STUDIO_SAVED_SELECTION_MAX_ITEMS, next.items.length + 1)}`);
+      const saved = next.items.find((item) => item.id === id);
+      if (!saved) throw new Error("새 선택을 저장 목록에 추가하지 못했습니다.");
+      if (persistLibrary(next, `“${saved.name}” 선택을 이 기기에 저장했습니다.`)) {
+        setName(`선택 ${next.items.length + 1}`);
       }
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "선택을 저장하지 못했습니다.");
@@ -351,7 +379,7 @@ export function StudioSelectionWorkbenchPanel({
       <div className="space-y-2 rounded-lg border border-line/80 bg-bg/35 p-2.5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[0.68rem] font-semibold text-fg-2">선택 소스</span>
-          <span className="text-[0.6rem] text-fg-3">최대 640px 추적 · 원본 비파괴</span>
+          <span className="text-[0.6rem] text-fg-3">불투명도는 원본 픽셀 · 원본 비파괴</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -463,7 +491,7 @@ export function StudioSelectionWorkbenchPanel({
             ? "이미지의 너비와 높이를 지정한 뒤 테두리를 선택할 수 있습니다."
             : borderRaster.minimumWidthPx > STUDIO_SELECTION_BORDER_MAX_WIDTH_PX
               ? "이미지가 너무 커서 테두리를 계산할 수 없습니다. 표시 크기를 줄여 주세요."
-              : `현재 크기에서 최소 ${borderRaster.minimumWidthPx}px · 현재 페더 유지${Math.max(displayWidth, displayHeight) > 640 ? " · 미세한 경계는 근사됩니다." : ""}`}
+              : "원본 픽셀 경계로 계산 · 최소 1px · 현재 페더 유지"}
         </p>
       </div>
 
@@ -496,8 +524,16 @@ export function StudioSelectionWorkbenchPanel({
       <div className="space-y-2 rounded-lg border border-line/80 bg-bg/35 p-2.5">
         <div className="flex items-center justify-between gap-2">
           <span className="text-[0.68rem] font-semibold text-fg-2">저장된 선택</span>
-          <span className="text-[0.6rem] text-fg-3">이 이미지 · 이 기기 · {library.items.length}/{STUDIO_SAVED_SELECTION_MAX_ITEMS}</span>
+          <span className="text-[0.6rem] text-fg-3">이 이미지 · {onSaveSelections ? "이 작품" : "이 기기"} · {library.items.length}개</span>
         </div>
+        {onSaveSelections && savedSelections === undefined && deviceLibrary.items.length > 0 ? (
+          <button type="button" className="min-h-9 rounded-md border border-line px-2 text-[0.65rem] pointer-coarse:min-h-11"
+            disabled={busy || sourceJob !== null}
+            onClick={() => persistLibrary(deviceLibrary, "이 기기의 저장 선택을 작품에 가져왔습니다.")}
+          >
+            이 기기 선택 {deviceLibrary.items.length}개 작품에 가져오기
+          </button>
+        ) : null}
         <div className="flex gap-1.5">
           <label htmlFor={nameInputId} className="sr-only">저장할 선택 이름</label>
           <input
@@ -565,7 +601,7 @@ export function StudioSelectionWorkbenchPanel({
           </ul>
         ) : (
           <p className="text-[0.62rem] leading-relaxed text-fg-3">
-            자주 다시 쓰는 선택 경계를 이름으로 저장해 두세요. 프로젝트 데이터에는 포함되지 않습니다.
+            {onSaveSelections ? "자주 다시 쓰는 선택을 이름으로 저장하세요. 작품 자동저장과 프로젝트 아카이브에 함께 보존됩니다." : "자주 다시 쓰는 선택 경계를 이름으로 저장해 두세요. 프로젝트 데이터에는 포함되지 않습니다."}
           </p>
         )}
       </div>

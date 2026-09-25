@@ -20,6 +20,8 @@ import {
 
 import type { Studio2dScene } from "./studio-2d-asset-quality";
 
+import { STUDIO_ILLUSTRATION_BG_SCENES } from "./catalog/studio-illustration-pack";
+
 const groups = groupBgScenes(BG_SCENES);
 const scene = (id: string) => BG_SCENES.find((item) => item.id === id)!;
 const anyScene = (id: string) => ALL_BG_SCENES.find((item) => item.id === id)!;
@@ -27,7 +29,7 @@ const anyScene = (id: string) => ALL_BG_SCENES.find((item) => item.id === id)!;
 describe("2D scene quality and discovery", () => {
   it("exposes only reviewed large raster originals in the default picker", () => {
     const result = filterStudio2dScenes(groups, { quality: "recommended" });
-    expect(result).toHaveLength(53);
+    expect(result).toHaveLength(53 + STUDIO_ILLUSTRATION_BG_SCENES.length);
     expect(result.every(isRecommendedStudio2dScene)).toBe(true);
     expect(filterStudio2dScenes(groups, { quality: "raster" })).toEqual(result);
     expect(result).toContain(scene("webtoon-bedroom"));
@@ -56,7 +58,7 @@ describe("2D scene quality and discovery", () => {
   it("retains every active ID exactly once after recommendation regrouping", () => {
     const sections = bgSceneSections(BG_SCENES);
     expect(sections[0].genre).toBe("추천");
-    expect(sections[0].scenes).toHaveLength(53);
+    expect(sections[0].scenes).toHaveLength(53 + STUDIO_ILLUSTRATION_BG_SCENES.length);
     const ids = sections.flatMap((group) => group.scenes.map((item) => item.id));
     expect(new Set(ids).size).toBe(BG_SCENES.length);
     expect(ids).toHaveLength(BG_SCENES.length);
@@ -76,7 +78,7 @@ describe("2D scene quality and discovery", () => {
   it("keeps high-quality raster scenes discoverable in their normalized genre", () => {
     expect(filterStudio2dScenes(groups, { genre: "일상·학원", quality: "raster" })).toContain(scene("polyhaven-background-wide-street-01"));
     expect(filterStudio2dScenes(groups, { genre: "로맨스", quality: "recommended" })).toContain(scene("webtoon-rooftop-sunset"));
-    expect(filterStudio2dScenes(groups, { genre: "로맨스", quality: "recommended" })).toHaveLength(8);
+    expect(filterStudio2dScenes(groups, { genre: "로맨스", quality: "recommended" })).toHaveLength(8 + STUDIO_ILLUSTRATION_BG_SCENES.filter((item) => item.genre === "로맨스").length);
   });
   it("searches multiple terms across tags and time of day", () => {
     expect(filterStudio2dScenes(groups, { query: " 비   밤 " })).toContain(scene("webtoon-neon-alley"));
@@ -87,7 +89,7 @@ describe("2D scene quality and discovery", () => {
     expect(filterStudio2dScenes(groups, { query: "ｓｆ" })).toEqual(filterStudio2dScenes(groups, { query: "SF" }));
   });
   it("filters reviewed source aspect ratios without guessing vector dimensions", () => {
-    expect(filterStudio2dScenes(groups, { orientation: "landscape" })).toHaveLength(32);
+    expect(filterStudio2dScenes(groups, { orientation: "landscape" })).toHaveLength(32 + STUDIO_ILLUSTRATION_BG_SCENES.filter((item) => item.width > item.height).length);
     expect(filterStudio2dScenes(groups, { orientation: "square" })).toEqual([scene("webtoon-palace")]);
     expect(filterStudio2dScenes(groups, { orientation: "portrait" })).toHaveLength(20);
   });

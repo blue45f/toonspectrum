@@ -27,6 +27,11 @@ import {
 } from "./studio-episode-byte-budget";
 import { MAX_CANVAS_DIM, canvasToBlob, downloadBlob, exportMimeType, exportQuality } from "./studio-export";
 import {
+  renderStudioPresetTiledRegion,
+  studioPresetCanvasTileSource,
+  type StudioPresetTiledRasterSource,
+} from "./studio-preset-tiled-raster";
+import {
   negotiateStudioExportQuality,
   studioQualityNegotiationMessage,
 } from "./studio-export-quality-negotiation";
@@ -383,6 +388,8 @@ export interface PresetExportResult {
    * 라우팅된 페이지가 없으면 키 자체가 없다(기존 결과 shape 불변 — pristine 계약).
   */
   vipsRoutedPages?: number;
+  /** 원본 크기를 유지하며 영역 단위로 읽고 합성한 페이지 수. */
+  tiledPages?: number;
 }
 
 /** 실행 결과를 한 줄 한글 안내로 — 용량 초과·vips 레인 정보를 덧붙인다. */
@@ -398,12 +405,15 @@ export function presetExportResultMessage(result: PresetExportResult, preset: Ex
   if (result.vipsRoutedPages !== undefined && result.vipsRoutedPages > 0) {
     parts.push(`고해상 페이지 ${result.vipsRoutedPages}장은 고품질 축소(wasm-vips)로 저장했어요.`);
   }
+  if (result.tiledPages) parts.push(`대형 페이지 ${result.tiledPages}장은 원본을 타일로 읽어 저장했어요.`);
   return parts.join(" ");
 }
 
+export type PresetExportPage = HTMLCanvasElement | StudioPresetTiledRasterSource;
+
 export interface PresetSliceExportOptions {
   /** 캡처된 페이지 캔버스(색보정 합성 완료, 페이지 순서). */
-  pages: HTMLCanvasElement[];
+  pages: PresetExportPage[];
   preset: ExportPreset;
   /** 사용자가 고른 포맷 — 프리셋이 허용하지 않으면 권장 포맷으로 강제된다. */
   format: ExportFormat;
@@ -479,11 +489,12 @@ export class PresetVipsUnavailableError extends Error {
 /** vips 레인 준비 결과 — 슬라이스 합성 루프가 그대로 소비한다. */
 export interface PresetVipsPreparedPages {
   /** 슬라이스 drawImage 가 쓸 페이지 캔버스 — 라우팅 안 된 페이지는 원본 참조 그대로. */
-  drawPages: HTMLCanvasElement[];
+  drawPages: PresetExportPage[];
   /** 라우팅된 페이지는 source 크기가 리샘플 결과로 갱신된 레이아웃(1:1 blit). */
   layouts: PresetPageLayout[];
   /** wasm-vips 로 실제 리샘플된 페이지 수. */
   vipsRoutedPages: number;
+  tiledPages: ReadonlyMap<number, StudioPresetTiledRasterSource>;
 }
 
 /** getImageData 기반 기본 픽셀 읽기 — 컨텍스트가 없으면 선택된 vips 작업이 실패한다. */
@@ -517,7 +528,7 @@ function defaultCreateResampledPresetPage(raster: StudioVipsRaster): HTMLCanvasE
  * provider가 준비/실행되지 않으면 다운로드 전에 명시적으로 실패한다.
  */
 export async function prepareVipsRoutedPresetPages(
-  pages: HTMLCanvasElement[],
+  pages: PresetExportPage[],
   plan: PresetSlicePlan,
   options: Pick<
     PresetSliceExportOptions,
@@ -527,17 +538,16 @@ export async function prepareVipsRoutedPresetPages(
   // 슬라이스 합성 루프와 같은 인덱스 규약: layouts[k] ↔ pages[k].
   const drawPages = pages.slice();
   const layouts = plan.pages.slice();
+  const tiledPages = new Map<number, StudioPresetTiledRasterSource>();
 
   // 라우팅 판정만 먼저 — 대상이 없으면 wasm 로드 자체가 일어나지 않는다(pristine).
   const routedIndices: number[] = [];
   layouts.forEach((layout, index) => {
     const route = planVipsExportRoute(layout.sourceWidth, layout.sourceHeight, options.vipsLimits).route;
-    if (route === "out-of-core") {
-      throw new PresetVipsUnavailableError({
-        stage: "out-of-core",
-        pageIndex: index,
-        message: `페이지 ${index + 1}은 단일 vips 처리 한계를 넘어 타일 내보내기 provider가 필요해요.`,
-      });
+    const page = pages[index];
+    if (page && ("kind" in page || route === "out-of-core")) {
+      tiledPages.set(index, "kind" in page ? page : studioPresetCanvasTileSource(page));
+      return;
     }
     // vips 는 다운스케일 전용 레인 — 규격 폭이 원본 폭 이상이면 기존 경로 유지.
     if (route === "vips" && plan.targetWidth < layout.sourceWidth) routedIndices.push(index);
@@ -546,6 +556,7 @@ export async function prepareVipsRoutedPresetPages(
     drawPages,
     layouts,
     vipsRoutedPages: routed,
+    tiledPages,
   });
   if (routedIndices.length === 0) return finish(0);
 
@@ -566,7 +577,7 @@ export async function prepareVipsRoutedPresetPages(
   for (const index of routedIndices) {
     const layout = layouts[index];
     const page = drawPages[index];
-    if (!layout || !page) continue;
+    if (!layout || !page || "kind" in page) continue;
     const rgba = readPageRgba(page);
     if (!rgba) {
       throw new PresetVipsUnavailableError({
@@ -742,6 +753,7 @@ export async function exportPresetSlices(options: PresetSliceExportOptions): Pro
   let nextDownloadAt = Number.NEGATIVE_INFINITY;
   for (const slice of plan.slices) {
     const canvas = createCanvas(plan.targetWidth, slice.height);
+    try {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("슬라이스 캔버스를 만들지 못했어요. 다시 시도해주세요.");
     ctx.fillStyle = "#ffffff";
@@ -750,7 +762,24 @@ export async function exportPresetSlices(options: PresetSliceExportOptions): Pro
     ctx.imageSmoothingQuality = "high";
     for (const op of planSliceDrawOps(slice, prepared.layouts)) {
       const page = prepared.drawPages[op.pageIndex];
-      ctx.drawImage(page, 0, op.srcY, page.width, op.srcHeight, 0, op.destY, plan.targetWidth, op.destHeight);
+      const tiled = prepared.tiledPages.get(op.pageIndex);
+      const layout = prepared.layouts[op.pageIndex];
+      if (tiled && layout) {
+        const outputY = Math.max(0, slice.y - layout.y);
+        await renderStudioPresetTiledRegion(tiled, plan.targetWidth, layout.height, {
+          x: 0, y: outputY, width: plan.targetWidth, height: op.destHeight,
+        }, (tile, rgba) => {
+          const surface = (options.createResampledPage ?? defaultCreateResampledPresetPage)({
+            width: tile.width, height: tile.height,
+            rgba: new Uint8Array(rgba.buffer, rgba.byteOffset, rgba.byteLength),
+          });
+          if (!surface) throw new Error("리샘플한 타일을 합성 표면으로 만들지 못했어요.");
+          try { ctx.drawImage(surface, 0, 0, tile.width, tile.height, tile.x, op.destY + tile.y - outputY, tile.width, tile.height); }
+          finally { surface.width = 1; surface.height = 1; }
+        });
+      } else if (page && !("kind" in page)) {
+        ctx.drawImage(page, 0, op.srcY, page.width, op.srcHeight, 0, op.destY, plan.targetWidth, op.destHeight);
+      }
     }
     if (watermark) drawWatermarkOnSlice(canvas, watermark);
     const blob = await canvasToBlob(canvas, mime, quality);
@@ -761,6 +790,10 @@ export async function exportPresetSlices(options: PresetSliceExportOptions): Pro
     download(blob, presetSliceFileName(title, preset.id, plan.format, { index: slice.index, total: plan.slices.length }));
     nextDownloadAt = now() + delayMs;
     onProgress?.(slice.index + 1, plan.slices.length);
+    } finally {
+      // 기본 표면은 이 실행이 소유한다. 주입한 표면의 수명은 호출자가 관리한다.
+      if (!options.createCanvas) { canvas.width = 1; canvas.height = 1; }
+    }
   }
   return {
     files: plan.slices.length,
@@ -769,5 +802,6 @@ export async function exportPresetSlices(options: PresetSliceExportOptions): Pro
     targetWidth: plan.targetWidth,
     // pristine 계약: 라우팅이 없으면 결과 shape 도 기존 그대로(키 부재).
     ...(prepared.vipsRoutedPages > 0 ? { vipsRoutedPages: prepared.vipsRoutedPages } : {}),
+    ...(prepared.tiledPages.size > 0 ? { tiledPages: prepared.tiledPages.size } : {}),
   };
 }

@@ -48,7 +48,7 @@ const TEMPLATE_GROUPS = groupTemplates(TEMPLATES);
 
 const FX_PICKER_SECTIONS: { id: FxPickerSection; label: string }[] = [
   { id: "all", label: "전체" },
-  { id: "raster", label: "장면 소품" },
+  { id: "raster", label: "일러스트" },
   { id: "sfx", label: "효과음" },
   { id: "emoji", label: "이모지" },
   { id: "comic", label: "만화 스티커" },

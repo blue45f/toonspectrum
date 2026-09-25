@@ -229,7 +229,7 @@ describe("psdImportResultMessage", () => {
       scale: 1,
       skipped: [],
     });
-    expect(msg).toBe("PSD 가져오기 완료 — 레이어 2개");
+    expect(msg).toBe("PSD 준비 완료 — 레이어 2개");
   });
 
   it("알림이 있으면 건수를 이어붙인다", () => {
@@ -240,7 +240,7 @@ describe("psdImportResultMessage", () => {
       scale: 1,
       skipped: ["a", "b"],
     });
-    expect(msg).toBe("PSD 가져오기 완료 — 레이어 0개 · 알림 2건");
+    expect(msg).toBe("PSD 준비 완료 — 레이어 0개 · 알림 2건");
   });
 });
 
@@ -312,7 +312,7 @@ describe("importPsdFile (원본 PNG 보존, 마스크 및 손실 보고)", () =>
     const byFeature = new Map(
       result.lossManifest?.decisions.map((decision) => [decision.feature, decision]),
     );
-    expect(byFeature.get("groups")).toMatchObject({ disposition: "dropped", count: 1 });
+    expect(byFeature.get("groups")).toMatchObject({ disposition: "preserved", count: 1 });
     expect(byFeature.get("text")).toMatchObject({ disposition: "rasterized", count: 1 });
     expect(byFeature.get("smart-object")).toMatchObject({ disposition: "rasterized", count: 1 });
     expect(byFeature.get("layer-effects")).toMatchObject({ disposition: "dropped", count: 1 });
@@ -349,7 +349,7 @@ describe("importPsdFile (원본 PNG 보존, 마스크 및 손실 보고)", () =>
       expect.arrayContaining([
         "이펙트있음: 레이어 스타일(그림자 등)은 반영되지 않아요",
         "스마트오브젝트: 스마트 오브젝트는 편집 가능한 원본이 아니라 미리보기 이미지로 가져왔어요",
-        "텍스트: 텍스트 레이어는 편집 가능한 글자가 아니라 이미지로 가져왔어요",
+        "텍스트: 복잡한 문자 서식은 원본 이미지로 유지해요. 문자 편집 정보는 함께 보관한 PSD에서 다시 열 수 있어요",
       ])
     );
   });
@@ -601,7 +601,7 @@ describe("importPsdFile (원본 PNG 보존, 마스크 및 손실 보고)", () =>
       },
     });
     expect(calls).toEqual([{
-      skipCompositeImageData: true,
+      skipCompositeImageData: false,
       skipThumbnail: true,
       skipLinkedFilesData: true,
       totalMemoryLimit: PSD_IMPORT_MAX_DECODED_BYTES,

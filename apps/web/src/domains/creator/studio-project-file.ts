@@ -1,3 +1,5 @@
+import { parseStudioPsdSource } from "./export/studio-psd-source";
+import { parseStudioSavedSelectionLibrary } from "./studio-saved-selections";
 import { canonicalizeStudioLiveAdjustmentElement } from "./contracts/studio-live-adjustment-contract";
 import { parseStudioColorProofDocument } from "./color/studio-color-proof-document";
 import { z } from "zod";
@@ -151,6 +153,14 @@ function canonicalizeVrmSceneElement(value: unknown): unknown {
 }
 
 function canonicalizeStudio3dSceneElement(value: unknown): unknown {
+  if (isRecord(value) && value.psdSource !== undefined) {
+    const source = parseStudioPsdSource(value.psdSource);
+    if (!source) throw new Error("PSD 원본 참조가 손상되어 프로젝트를 열 수 없어요.");
+    value = { ...value, psdSource: source };
+  }
+  if (isRecord(value) && value.type === "image" && value.savedSelections !== undefined) {
+    value = { ...value, savedSelections: parseStudioSavedSelectionLibrary(value.savedSelections) };
+  }
   return canonicalizeStudioLiveAdjustmentElement(canonicalizeVrmSceneElement(canonicalizeBg3dSceneElement(value)));
 }
 

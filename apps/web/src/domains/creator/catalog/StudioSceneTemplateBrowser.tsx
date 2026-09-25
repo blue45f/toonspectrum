@@ -15,7 +15,7 @@ import "./studio-catalog-browser.css";
 
 export function StudioSceneTemplateBrowser({ templates, categories, loading, error, onAdd, acquirePreferences }: {
   templates: readonly SceneTemplate[]; categories: readonly { id: string; label: string }[];
-  loading: boolean; error: string | null; onAdd: (template: SceneTemplate) => Promise<void>;
+  loading: boolean; error: string | null; onAdd: (template: SceneTemplate) => Promise<boolean | void>;
   acquirePreferences?: () => Promise<StudioCatalogPreferencesRepository>;
 }) {
   const searchId = useId();
@@ -45,7 +45,11 @@ export function StudioSceneTemplateBrowser({ templates, categories, loading, err
     if (inserting.current) return;
     inserting.current = true; setPendingId(template.id); setNotice("");
     try {
-      await onAdd(template);
+      const inserted = await onAdd(template);
+      if (inserted === false) {
+        setNotice("장면을 추가하지 못했습니다. 화면 상태를 확인한 뒤 다시 시도해 주세요.");
+        return;
+      }
       preferences.dispatch({ kind: "recent", id: template.id });
       setPreviewId(null);
       setNotice(`${template.label} 적용 요청을 처리했습니다.`);

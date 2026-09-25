@@ -155,6 +155,9 @@ function workspaceFacetForItem(
   if (source.kind === "object-3d") return "3d";
   if (source.kind === "local") return "mine";
   if (source.kind === "native-tool") return "story";
+  if (source.kind === "builtin-raster") {
+    return source.value.kind === "bubble-decoration" || source.value.kind === "effect-overlay" ? "story" : "prop";
+  }
 
   const searchable = [
     item.id,
@@ -201,6 +204,13 @@ function detailsForItem(item: StudioUnifiedAssetItem): readonly string[] {
   }
   if (source.kind === "element") {
     return Object.freeze([source.value.category, "벡터 크기 조절", "회전·복제 가능"]);
+  }
+  if (source.kind === "builtin-raster") {
+    return Object.freeze([
+      `${source.value.width} × ${source.value.height}px`,
+      source.value.hasAlpha ? "투명 배경 일러스트" : "질감 이미지 원본",
+      source.value.kind === "bubble-decoration" ? "대사는 별도 텍스트로 편집" : "크기·회전·복제 가능",
+    ]);
   }
   if (source.kind === "local") {
     return Object.freeze([

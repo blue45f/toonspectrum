@@ -9,6 +9,7 @@ import {
   svgAlphaMapTextureAsset,
   svgSoftFalloffTextureAsset,
 } from "./studio-svg-export-png";
+import { StudioSvgMarkupChunks } from "./studio-svg-markup-chunks";
 import {
   STUDIO_SVG_R8_STREAMING_RGBA_BYTE_BUDGET,
   visitStudioSvgR8StreamingCoverage,
@@ -28,12 +29,6 @@ export function serializeStudioDynamicCoverageMark(
   boundedFlow: boolean,
   retainAlphaMapIdentity = true,
   materialIdentity?: StudioDynamicBrushMaterialIdentity,
-  /**
-   * Skip the texture-asset branches and take the geometric one. Used only after an exact pass has
-   * already failed on the document's texture budget, so the stroke lands as untextured coverage
-   * rather than not landing at all.
-   */
-  geometricFallback = false,
 ): string | null {
   const opacity = Math.min(
     1,
@@ -140,7 +135,7 @@ export function serializeStudioDynamicCoverageMark(
     );
   }
 
-  if (mark.texture?.kind === "alpha-map" && !geometricFallback) {
+  if (mark.texture?.kind === "alpha-map") {
     const asset = svgAlphaMapTextureAsset(
       ctx,
       mark.texture.alphaMap,
@@ -158,7 +153,7 @@ export function serializeStudioDynamicCoverageMark(
     );
   }
 
-  if ("falloff" in mark && mark.falloff?.kind === "analytic-radial" && !geometricFallback) {
+  if ("falloff" in mark && mark.falloff?.kind === "analytic-radial") {
     const asset = svgSoftFalloffTextureAsset(
       ctx,
       mark.falloff.exponent,
@@ -205,8 +200,6 @@ export function serializeStudioDynamicCoverageMarks(
   strokeOpacity: number,
   boundedFlow: boolean,
   materialIdentity: StudioDynamicBrushMaterialIdentity | undefined,
-  /** Set when the stroke had to be drawn without its tip textures to fit the budget. */
-  approximated: { textureBudgetExhausted: boolean },
 ): string | null {
   if (marks.length === 0) return null;
   const initialDefsLength = ctx.defs.length;
@@ -228,8 +221,8 @@ export function serializeStudioDynamicCoverageMarks(
     }
     return null;
   };
-  const serializeAll = (geometricFallback: boolean): string[] | null => {
-    const out: string[] = [];
+  const markup = new StudioSvgMarkupChunks();
+  try {
     for (const mark of marks) {
       const serialized = serializeStudioDynamicCoverageMark(
         ctx,
@@ -238,34 +231,20 @@ export function serializeStudioDynamicCoverageMarks(
         boundedFlow,
         true,
         materialIdentity,
-        geometricFallback,
       );
-      if (serialized === null) return null;
-      out.push(serialized);
+      if (serialized === null) return rollbackAssets();
+      markup.append(serialized);
     }
-    return out;
-  };
-
-  let markup = serializeAll(false);
-  if (markup === null) {
-    // The document's texture budget is gone. Every texture branch would fail from here, so the
-    // exact pass is abandoned and the stroke is re-serialised as untextured coverage — the same
-    // positions, radii, rotations, colours and opacities, drawn as the geometric branch the
-    // renderer already falls back to. It loses the tip's alpha map; it does NOT lose the stroke.
-    //
-    // Dropping was silent data loss on every real page: paint-tube's three-stroke cell serialises
-    // to 21.2MB while its curve alone needs 22.7MB, so the second stroke exhausted the budget and
-    // the exporter removed it outright. A single-stroke probe cannot see that — the drop only
-    // appears once a page holds more than one stroke. erodible-pencil is next at 22.4MB.
+  } catch (error) {
+    // 예산 초과를 무질감 타원이나 누락된 획으로 바꾸지 않는다. 부분 자산을 돌려놓고
+    // 전체 작업에 실패를 전달해야 원고와 다른 파일이 성공으로 다운로드되지 않는다.
     rollbackAssets();
-    markup = serializeAll(true);
-    if (markup === null) return null;
-    approximated.textureBudgetExhausted = true;
+    throw error;
   }
 
   return boundedFlow
-    ? `<g opacity="${fmtDabOpacity(strokeOpacity)}">${markup.join("")}</g>`
-    : `<g>${markup.join("")}</g>`;
+    ? `<g opacity="${fmtDabOpacity(strokeOpacity)}">${markup.finish()}</g>`
+    : `<g>${markup.finish()}</g>`;
 }
 
 /**
@@ -307,34 +286,40 @@ export function serializeStudioR8DynamicCoverageMarks(
     }
     return null;
   };
-  const markupByVariation = input.dabVariations.map(() => [] as string[]);
+  const markupByVariation = input.dabVariations.map(() => new StudioSvgMarkupChunks());
   const remainingRgbaByteBudget =
     STUDIO_SVG_R8_STREAMING_RGBA_BYTE_BUDGET - initialR8EmbeddedRgbaBytes;
   if (remainingRgbaByteBudget <= 0) return rollbackAssets();
-  const streamed = visitStudioSvgR8StreamingCoverage(
-    {
-      ...input,
-      rgbaByteBudget: remainingRgbaByteBudget,
-    },
-    (mark, variationIndex) => {
-      const serialized = serializeStudioDynamicCoverageMark(
-        ctx,
-        mark,
-        strokeOpacity,
-        boundedFlow,
-        false,
-      );
-      if (serialized === null) return false;
-      markupByVariation[variationIndex]!.push(serialized);
-      return true;
-    },
-  );
+  let streamed: ReturnType<typeof visitStudioSvgR8StreamingCoverage>;
+  try {
+    streamed = visitStudioSvgR8StreamingCoverage(
+      {
+        ...input,
+        rgbaByteBudget: remainingRgbaByteBudget,
+      },
+      (mark, variationIndex) => {
+        const serialized = serializeStudioDynamicCoverageMark(
+          ctx,
+          mark,
+          strokeOpacity,
+          boundedFlow,
+          false,
+        );
+        if (serialized === null) return false;
+        markupByVariation[variationIndex]!.append(serialized);
+        return true;
+      },
+    );
+  } catch (error) {
+    rollbackAssets();
+    throw error;
+  }
   if (!streamed.ok) return rollbackAssets();
   ctx.r8EmbeddedRgbaBytes =
     initialR8EmbeddedRgbaBytes + streamed.embeddedRgbaBytes;
   return markupByVariation.map((markup) => (
     boundedFlow
-      ? `<g opacity="${fmtDabOpacity(strokeOpacity)}">${markup.join("")}</g>`
-      : `<g>${markup.join("")}</g>`
+      ? `<g opacity="${fmtDabOpacity(strokeOpacity)}">${markup.finish()}</g>`
+      : `<g>${markup.finish()}</g>`
   ));
 }

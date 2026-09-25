@@ -12,11 +12,12 @@ import {
   profileStudioBrushMaterialResponse,
   type StudioBrushMaterialResponse,
 } from "./studio-brush-material-response";
+import { profileStudioBrushTipSemanticEvidence } from "./studio-brush-semantic-evidence";
 
 import type { StudioBrushDynamicsSettings } from "./studio-brush-dynamics";
 
 export const STUDIO_BRUSH_MATERIAL_DISTINCTNESS_VERSION =
-  "studio-brush-material-distinctness-v1" as const;
+  "studio-brush-material-distinctness-v2" as const;
 
 export interface StudioBrushMaterialDistinctnessInput {
   readonly catalogId: string;
@@ -34,6 +35,7 @@ export interface StudioBrushMaterialDistinctnessProfile {
   readonly response: StudioBrushMaterialResponse;
   /** Unit-normalized response vector. It intentionally excludes identity strings. */
   readonly vector: readonly number[];
+  readonly spatialAlpha: readonly number[];
   readonly behaviorFingerprint: string;
 }
 
@@ -147,15 +149,18 @@ export function profileStudioBrushMaterialDistinctness(
     seed: input.seed,
   });
   const vector = responseVector(response, input.defaultWidth);
+  const spatialAlpha = profileStudioBrushTipSemanticEvidence(input.brushDynamics ?? {}).spatialAlpha;
   return Object.freeze({
     version: STUDIO_BRUSH_MATERIAL_DISTINCTNESS_VERSION,
     catalogId: input.catalogId,
     runtimeBrushId: input.runtimeBrushId,
     response,
     vector,
+    spatialAlpha,
     behaviorFingerprint: JSON.stringify({
       version: STUDIO_BRUSH_MATERIAL_DISTINCTNESS_VERSION,
       vector,
+      spatialAlpha,
       response: response.fingerprints.combined,
     }),
   });
@@ -176,7 +181,16 @@ export function studioBrushMaterialDistinctnessDistance(
     weightedSquaredDistance += weight * delta * delta;
     totalWeight += weight;
   }
-  return rounded(Math.sqrt(weightedSquaredDistance / Math.max(Number.EPSILON, totalWeight)));
+  const responseDistanceSquared = weightedSquaredDistance / Math.max(Number.EPSILON, totalWeight);
+  const leftMass = left.spatialAlpha.reduce((sum, alpha) => sum + alpha, 0);
+  const rightMass = right.spatialAlpha.reduce((sum, alpha) => sum + alpha, 0);
+  let spatialDistance = 0;
+  for (let index = 0; index < left.spatialAlpha.length; index++) {
+    spatialDistance += Math.abs((left.spatialAlpha[index] ?? 0) / Math.max(Number.EPSILON, leftMass)
+      - (right.spatialAlpha[index] ?? 0) / Math.max(Number.EPSILON, rightMass)) / 2;
+  }
+  // 평균·분산이 같아도 회로와 잎은 다른 촉이다. 농도를 제거한 공간 차이도 함께 비교한다.
+  return rounded(Math.sqrt(responseDistanceSquared * 0.65 + spatialDistance ** 2 * 0.35));
 }
 
 export function listStudioBrushMaterialNearestPairs(
