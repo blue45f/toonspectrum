@@ -24,8 +24,9 @@ Status: **migration target**. This document separates current reality from the i
   their implementation consolidation remains a later slice.
 - Reviewed historical release evidence lives under `data/asset-releases`; generated `.qa` and
   `artifacts` paths are ignored and may not be tracked.
-- Mobile native projects, root app-specific configuration and large static assets still require
-  later migration slices.
+- `apps/mobile` now owns Capacitor configuration, Android/iOS native projects, launch shell,
+  resources and native validation as an independent workspace package.
+- Remaining root app-specific configuration and large static assets still require later slices.
 
 ## Target application layout
 
@@ -74,7 +75,7 @@ Do not use a package to hide application coupling and do not create `packages/do
 3. Move the user-Web administrator console to Admin Web capability by capability.
 4. Keep the completed Web `app/domain/platform/shared` ownership split from regressing.
 5. Move API `server/common/infrastructure/db` code to modules and platform boundaries.
-6. Consolidate desktop sync, mobile ownership and root app-specific configuration.
+6. Consolidate desktop sync and root app-specific configuration; preserve the completed mobile boundary.
 7. Ratchet Creator root files downward and migrate Studio by authority and lifecycle.
 8. Move large immutable runtime assets to manifest-addressed object storage with verified fallback.
 

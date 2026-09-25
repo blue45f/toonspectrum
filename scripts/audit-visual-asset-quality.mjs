@@ -66,7 +66,7 @@ function dimensions(buffer, kind) {
   return null;
 }
 
-const BRAND_ALIAS_PATH = /^(?:apps\/web\/public\/(?:brand\/spectrum-ribbon-v2\/)?(?:apple-touch-icon\.png|favicon-(?:32|96)\.png|favicon\.svg|icon-(?:192|512)\.png|icon-maskable-(?:192|512)\.png|icon-maskable\.svg|safari-pinned-tab\.svg)|mobile-shell\/icon-192\.png)$/u;
+const BRAND_ALIAS_PATH = /^(?:apps\/web\/public\/(?:brand\/spectrum-ribbon-v2\/)?(?:apple-touch-icon\.png|favicon-(?:32|96)\.png|favicon\.svg|icon-(?:192|512)\.png|icon-maskable-(?:192|512)\.png|icon-maskable\.svg|safari-pinned-tab\.svg)|apps\/mobile\/shell\/icon-192\.png)$/u;
 const LEGACY_BACKGROUND_ALIAS = /^apps\/web\/public\/assets\/studio\/backgrounds\/(webtoon_[a-z0-9_]+)\.(?:jpg|png)$/u;
 const KNOWN_ASSEMBLY_PREVIEW_COLLISION = new Set([
   "apps/web/public/assets/studio/cc0-20260906/previews/kenney-nature-cliff-block-cave-rock.png",
@@ -75,10 +75,10 @@ const KNOWN_ASSEMBLY_PREVIEW_COLLISION = new Set([
 
 function intentionalDuplicateReason(group) {
   const paths = group.map((asset) => asset.path).toSorted();
-  if (paths.every((value) => /^android\/app\/src\/main\/res\/drawable[^/]*\/splash\.png$/u.test(value))) {
+  if (paths.every((value) => /^apps\/mobile\/android\/app\/src\/main\/res\/drawable[^/]*\/splash\.png$/u.test(value))) {
     return "android-density-theme-splash-contract";
   }
-  if (paths.every((value) => value.startsWith("ios/App/App/Assets.xcassets/Splash.imageset/"))) {
+  if (paths.every((value) => value.startsWith("apps/mobile/ios/App/App/Assets.xcassets/Splash.imageset/"))) {
     return "ios-splash-appearance-scale-contract";
   }
   if (paths.every((value) => BRAND_ALIAS_PATH.test(value))) {

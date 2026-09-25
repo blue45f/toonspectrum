@@ -29,6 +29,11 @@ test("counts only direct Creator root files while counting all files for migrati
     webGeneratedFiles: 0,
     webStylesFiles: 0,
     webTypesFiles: 0,
+    rootAndroidFiles: 0,
+    rootIosFiles: 0,
+    rootMobileShellFiles: 0,
+    rootMobileResourcesFiles: 0,
+    rootCapacitorConfigFiles: 0,
   });
 });
 

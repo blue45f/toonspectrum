@@ -137,6 +137,12 @@ requirePaths(
     "apps/web/config/vite-manual-chunks.ts",
     "apps/web/tests/browser-fixtures/studio-catalog/index.html",
     "apps/web/tools/browser-harnesses/hybrid-dcc-e2e.html",
+    "apps/mobile/package.json",
+    "apps/mobile/capacitor.config.ts",
+    "apps/mobile/android",
+    "apps/mobile/ios",
+    "apps/mobile/shell/index.html",
+    "apps/mobile/scripts/verify-native-media-permissions.mjs",
     "vite.config.ts",
   ],
   "app entry",
@@ -162,6 +168,10 @@ for (const entry of list(".")) {
 forbidPaths(
   ["tools/browser-harnesses", "tests/browser-fixtures/studio-catalog"],
   "legacy or duplicate browser fixture path",
+);
+forbidPaths(
+  ["android", "ios", "mobile-shell", "resources", "capacitor.config.ts"],
+  "legacy root mobile path must stay under apps/mobile",
 );
 
 // Lint exception ledger and its ratchet tests must remain machine-readable.

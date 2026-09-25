@@ -55,6 +55,11 @@ export function measureSourceLayout(files) {
     webGeneratedFiles: filesUnder(files, "apps/web/src/generated"),
     webStylesFiles: filesUnder(files, "apps/web/src/styles"),
     webTypesFiles: filesUnder(files, "apps/web/src/types"),
+    rootAndroidFiles: filesUnder(files, "android"),
+    rootIosFiles: filesUnder(files, "ios"),
+    rootMobileShellFiles: filesUnder(files, "mobile-shell"),
+    rootMobileResourcesFiles: filesUnder(files, "resources"),
+    rootCapacitorConfigFiles: files.includes("capacitor.config.ts") ? 1 : 0,
   };
 }
 
