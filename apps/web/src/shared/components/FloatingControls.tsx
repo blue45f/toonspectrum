@@ -49,8 +49,8 @@ const PILL =
 
 const PLACEMENT_CLASS: Record<NonNullable<FloatingControlsProps["placement"]>, string> = {
   // 모바일: 우하단(하단 탭바 ~56px + safe-area 위로 띄움). 데스크톱: 좌하단.
-  "bottom-left": "fixed z-40 bottom-4 left-4 max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] max-md:left-auto max-md:right-4",
-  "bottom-right": "fixed right-4 bottom-4 z-40",
+  "bottom-left": "fixed z-40 bottom-4 left-4 max-md:bottom-[calc(9rem+env(safe-area-inset-bottom))] max-md:left-auto max-md:right-4",
+  "bottom-right": "fixed right-4 bottom-4 z-40 max-md:bottom-[calc(9rem+env(safe-area-inset-bottom))]",
   static: "",
 };
 

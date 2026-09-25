@@ -62,11 +62,11 @@ export function DiscoveryWorkspaceNav({
     <nav
       aria-label={bi("작품 발견 방식", "Discovery modes")}
       className={cn(
-        "overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "overflow-visible sm:overflow-x-auto sm:overscroll-x-contain sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden",
         className,
       )}
     >
-      <div className="grid min-w-[42rem] grid-cols-3 gap-2 sm:min-w-0">
+      <div className="grid grid-cols-3 gap-1.5 sm:min-w-0 sm:gap-2">
         {DESTINATIONS.map((destination) => {
           const active = destination.id === current;
           const Icon = destination.icon;
@@ -76,7 +76,7 @@ export function DiscoveryWorkspaceNav({
               href={catalogDiscoveryHref(destination.id, params)}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "group flex min-h-16 min-w-0 items-center gap-3 rounded-2xl border px-3 py-2.5 transition-[border-color,background-color,transform]",
+                "group flex min-h-[5.25rem] min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl border px-1.5 py-2 text-center transition-[border-color,background-color,transform] sm:min-h-16 sm:flex-row sm:justify-start sm:gap-3 sm:px-3 sm:py-2.5 sm:text-left",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                 active
                   ? "border-accent/55 bg-accent-soft text-fg"
@@ -93,11 +93,11 @@ export function DiscoveryWorkspaceNav({
               >
                 <Icon size={17} aria-hidden="true" />
               </span>
-              <span className="min-w-0">
-                <strong className="block truncate text-sm font-bold">
+              <span className="min-w-0 max-w-full">
+                <strong className="block truncate text-[0.68rem] font-bold sm:text-sm">
                   {bi(destination.ko, destination.en)}
                 </strong>
-                <span className="mt-0.5 block truncate text-[0.7rem] text-fg-3">
+                <span className="mt-0.5 hidden truncate text-[0.7rem] text-fg-3 sm:block">
                   {bi(destination.koDescription, destination.enDescription)}
                 </span>
               </span>

@@ -10,14 +10,14 @@ import { CreatorHomePage } from "@/domains/creator-resources/CreatorHomePage";
  * duplicating workspace chrome inside the marketing shell.
  */
 export function UnifiedHomePage() {
-  const { status } = useSession();
+  const { ready, status } = useSession();
   const { search } = useLocation();
 
   if (status === "authenticated") {
     return <Navigate to={{ pathname: "/home", search }} replace />;
   }
 
-  if (status === "loading") {
+  if (!ready) {
     return (
       <section
         aria-label="ToonStudio"

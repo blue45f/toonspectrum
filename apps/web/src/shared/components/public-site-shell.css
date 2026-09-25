@@ -139,9 +139,27 @@
 }
 
 @media (width < 768px) {
-  .public-site-journey__inner { padding-inline: 8px; }
-  .public-site-journey__routes { gap: 3px; flex: 1; }
-  .public-site-journey__routes a { gap: 5px; font-size: 0.65rem; padding-inline: 8px; }
+  .public-site-journey__inner { padding-inline: 4px; }
+  .public-site-journey__routes {
+    display: grid;
+    flex: 1;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+    overflow: visible;
+  }
+  .public-site-journey__routes a {
+    min-width: 0;
+    justify-content: center;
+    gap: 3px;
+    padding-inline: 2px;
+    font-size: clamp(0.54rem, 2.45vw, 0.64rem);
+    white-space: nowrap;
+  }
+  .public-site-journey__routes a > span:last-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .public-site-journey__step,
   .public-site-journey__about { display: none; }
   .public-footer-invitation { min-height: 390px; align-items: end; }

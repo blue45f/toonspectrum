@@ -229,7 +229,21 @@ export function RankingBoard({
           </span>
         </div>
 
-        <div className="rail -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-2 sm:px-0 lg:grid-cols-4">
+        <label className="grid gap-1.5 sm:hidden">
+          <span className="text-[0.68rem] font-bold text-fg-3">랭킹 기준 선택</span>
+          <select
+            aria-label="랭킹 산식 축"
+            value={axis}
+            onChange={(event) => setAxis(event.target.value as RankAxis)}
+            className="min-h-12 w-full rounded-2xl border border-accent/40 bg-card px-4 text-sm font-bold text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+          >
+            {RANK_AXES.map((entry) => (
+              <option key={entry.key} value={entry.key}>{entry.label} · {entry.desc}</option>
+            ))}
+          </select>
+        </label>
+
+        <div className="hidden gap-2 sm:grid sm:grid-cols-2 lg:grid-cols-4">
           {RANK_AXES.map((a) => {
             const active = a.key === axis;
             const Icon = axisIcons[a.key];

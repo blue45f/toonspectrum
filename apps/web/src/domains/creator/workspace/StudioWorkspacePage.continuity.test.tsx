@@ -57,19 +57,20 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
 describe("studio workspace continuity and safe recovery", () => {
-  it("preserves an older selected work through team, explore and home without carrying panel or category state", async () => {
+  it("keeps the selected work on the unified home destination without leaking it into public routes", () => {
     render(<App entries={["/home?project=older"]} />);
-    fireEvent.click(nav("팀"));
-    fireEvent.click(screen.getByRole("button", { name: "모집·의뢰" }));
-    expect(nav("둘러보기").getAttribute("href")).toBe("/hub?project=older");
-    fireEvent.click(nav("둘러보기")); fireEvent.click(nav("홈"));
+    expect(nav("홈").getAttribute("href")).toBe("/?project=older");
+    expect(nav("탐색").getAttribute("href")).toBe("/discover");
+    expect(nav("커뮤니티").getAttribute("href")).toBe("/community");
     expect(screen.getByRole("combobox").getAttribute("disabled")).toBeNull();
     expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("older");
     expect(screen.getByTestId("location").textContent).toBe("/home?project=older");
   });
-  it("keeps personal scope through navigation even with existing works", () => {
+  it("keeps personal scope only on the unified home destination", () => {
     render(<App entries={["/home?scope=personal"]} />);
-    fireEvent.click(nav("팀")); fireEvent.click(nav("둘러보기")); fireEvent.click(nav("홈"));
+    expect(nav("홈").getAttribute("href")).toBe("/?scope=personal");
+    expect(nav("탐색").getAttribute("href")).toBe("/discover");
+    expect(nav("커뮤니티").getAttribute("href")).toBe("/community");
     expect(screen.getByTestId("location").textContent).toBe("/home?scope=personal");
     expect((screen.getByRole("combobox") as HTMLSelectElement).value).toBe("");
   });
@@ -93,7 +94,8 @@ describe("studio workspace continuity and safe recovery", () => {
     expect(document.querySelector('.workspace-world')).toBeNull();
     expect(document.querySelector('a[href="/studio/new"]')).toBeNull();
     expect(document.querySelector('a[href^="/studio/p/"]')).toBeNull();
-    expect(nav("팀").getAttribute("href")).toBe("/team?project=missing");
+    expect(nav("홈").getAttribute("href")).toBe("/?project=missing");
+    expect(nav("커뮤니티").getAttribute("href")).toBe("/community");
     fireEvent.click(screen.getByRole("button", { name: "개인 홈으로 돌아가기" }));
     expect(screen.getByTestId("location").textContent).toBe("/home?scope=personal");
   });
@@ -115,7 +117,7 @@ describe("studio workspace continuity and safe recovery", () => {
     state.error = "저장 공간 오류";
     render(<App entries={["/hub?project=older"]} />);
     expect(screen.getByRole("link", { name: /창작 작품 전시/ }).getAttribute("href")).toBe("/showcase");
-    expect(nav("홈").getAttribute("href")).toBe("/home?project=older");
+    expect(nav("홈").getAttribute("href")).toBe("/?project=older");
   });
 });
 
@@ -145,7 +147,7 @@ describe("workspace search switching integration", () => {
     render(<App entries={["/hub?project=older&tab=materials&panel=projects"]} />);
     fireEvent.click(screen.getByRole("button", { name: /개인 작업실\s*작품을 선택하지 않고/ }));
     expect(screen.getByTestId("location").textContent).toBe("/hub?tab=materials&scope=personal");
-    expect(nav("홈").getAttribute("href")).toBe("/home?scope=personal");
+    expect(nav("홈").getAttribute("href")).toBe("/?scope=personal");
   });
   it("does not mislabel a library failure as a personal workspace", () => {
     state.error = "저장 공간 오류";

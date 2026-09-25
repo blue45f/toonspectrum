@@ -121,7 +121,7 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
   return (
     <div
       data-studio-beta-notice-host="true"
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] flex justify-end p-3 sm:p-4"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(9rem+env(safe-area-inset-bottom))] z-[90] flex justify-end px-3 pb-1 sm:bottom-0 sm:p-4"
     >
       <aside
         role="region"

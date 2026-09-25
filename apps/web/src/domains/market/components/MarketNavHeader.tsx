@@ -94,7 +94,33 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
 
         <div className="flex items-center gap-2">
           {findingAsset ? (
-            <details className="group relative" open={pathname === "/market/fit" || pathname === "/market/compare" ? true : undefined}>
+            <div className="grid grid-cols-2 gap-2 sm:hidden">
+              <Link
+                href="/market/fit"
+                aria-current={pathname === "/market/fit" ? "page" : undefined}
+                className={cn(
+                  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 text-[0.68rem] font-bold",
+                  pathname === "/market/fit" ? "border-accent/50 bg-accent-soft text-accent" : "border-line bg-card text-fg-2",
+                )}
+              >
+                <ShieldCheck className="size-3.5" aria-hidden="true" />
+                조건 맞춤
+              </Link>
+              <Link
+                href="/market/compare"
+                aria-current={pathname === "/market/compare" ? "page" : undefined}
+                className={cn(
+                  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border px-2 text-[0.68rem] font-bold",
+                  pathname === "/market/compare" ? "border-accent/50 bg-accent-soft text-accent" : "border-line bg-card text-fg-2",
+                )}
+              >
+                <GitCompareArrows className="size-3.5" aria-hidden="true" />
+                후보 비교
+              </Link>
+            </div>
+          ) : null}
+          {findingAsset ? (
+            <details className="group relative hidden sm:block" open={pathname === "/market/fit" || pathname === "/market/compare" ? true : undefined}>
               <summary
                 className={cn(
                   buttonClass({ variant: "ghost", size: "sm" }),
@@ -138,12 +164,12 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
       {findingAsset ? (
         <div className="mt-3 border-t border-line/50 pt-3">
           <p className="mb-2 text-[0.65rem] font-semibold text-fg-3">무엇을 찾고 있나요?</p>
-          <div className="flex max-w-full items-stretch gap-1.5 overflow-x-auto pb-1">
+          <div className="grid grid-cols-3 gap-1.5 pb-1 sm:flex sm:max-w-full sm:items-stretch sm:overflow-x-auto">
             <Link
               href="/market/browse"
               aria-current={!kind && pathname === "/market/browse" ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-xs font-semibold transition-colors",
+                "inline-flex min-h-11 min-w-0 items-center justify-center rounded-xl border px-2 text-[0.68rem] font-semibold transition-colors sm:shrink-0 sm:px-3 sm:text-xs",
                 !kind && pathname === "/market/browse"
                   ? "border-accent/50 bg-accent-soft text-accent"
                   : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
@@ -160,7 +186,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
                   href={marketResourceBrowseHref(family.subcategories[0])}
                   aria-current={active && pathname === "/market/browse" ? "location" : undefined}
                   className={cn(
-                    "group inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition-colors",
+                    "group inline-flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-xl border px-2 text-[0.68rem] font-semibold transition-colors sm:shrink-0 sm:gap-2 sm:px-3 sm:text-xs",
                     active
                       ? "border-accent/50 bg-accent-soft text-accent"
                       : "border-line bg-card text-fg-2 hover:border-line-strong hover:text-fg",
