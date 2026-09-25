@@ -8,6 +8,10 @@ import {
 } from "./ai/studio-ai-provenance";
 import { studioDrawingAssistHasContent } from "./brush/studio-drawing-assist-document";
 import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
+import {
+  parseStudioDrawingPracticeDocument,
+  studioDrawingPracticeHasContent,
+} from "./studio-drawing-practice-document";
 import { parseStudioLayerComps } from "./layer/studio-layer-comps-document";
 import { normalizeStudioPublishPackageSettings } from "./studio-publish-package";
 import { normalizeStudioPublishPackSettings } from "./studio-publish-preflight";
@@ -68,6 +72,7 @@ export type StudioAutosavePayload = {
     elements?: unknown[];
     canvasH?: unknown;
     drawingAssist?: unknown;
+    drawingPractice?: unknown;
     layerComps?: unknown;
     shared3dStage?: unknown;
   }>;
@@ -250,12 +255,23 @@ export function parseStudioAutosave(raw: string | null): StudioAutosavePayload |
     const pagesList = record.pagesList.map((page) => {
       if (!page || typeof page !== "object" || Array.isArray(page)) return page;
       const pageRecord = page as Record<string, unknown>;
-      if (!Object.hasOwn(pageRecord, "shared3dStage")) return pageRecord;
-      const { shared3dStage: rawSharedStage, ...rest } = pageRecord;
-      const shared3dStage = migrateStudioShared3dStageCollectionDocument(rawSharedStage);
-      // Autosave is a recovery surface: preserve the artwork even when only the optional link is
-      // corrupt. Project import remains fail-closed for the same malformed document.
-      return shared3dStage ? { ...rest, shared3dStage } : rest;
+      const {
+        drawingPractice: rawDrawingPractice,
+        shared3dStage: rawSharedStage,
+        ...rest
+      } = pageRecord;
+      const drawingPractice = Object.hasOwn(pageRecord, "drawingPractice")
+        ? parseStudioDrawingPracticeDocument(rawDrawingPractice)
+        : undefined;
+      const shared3dStage = Object.hasOwn(pageRecord, "shared3dStage")
+        ? migrateStudioShared3dStageCollectionDocument(rawSharedStage)
+        : undefined;
+      // Autosave is a recovery surface: preserve artwork even when an optional guide/link is corrupt.
+      return {
+        ...rest,
+        ...(drawingPractice ? { drawingPractice } : {}),
+        ...(shared3dStage ? { shared3dStage } : {}),
+      };
     }) as StudioAutosavePayload["pagesList"];
     return {
       version: record.version === 3 ? 3 : minimumStudioProjectFileVersion(pagesList, record.master),
@@ -332,10 +348,22 @@ function normalizedStudioAutosavePayload(payload: StudioAutosavePayload) {
   const pagesList = payload.pagesList.map((page) => {
     if (!page || typeof page !== "object" || Array.isArray(page)) return page;
     const pageRecord = page as Record<string, unknown>;
-    if (!Object.hasOwn(pageRecord, "shared3dStage")) return page;
-    const { shared3dStage: rawSharedStage, ...rest } = pageRecord;
-    const shared3dStage = migrateStudioShared3dStageCollectionDocument(rawSharedStage);
-    return shared3dStage ? { ...rest, shared3dStage } : rest;
+    const {
+      drawingPractice: rawDrawingPractice,
+      shared3dStage: rawSharedStage,
+      ...rest
+    } = pageRecord;
+    const drawingPractice = Object.hasOwn(pageRecord, "drawingPractice")
+      ? parseStudioDrawingPracticeDocument(rawDrawingPractice)
+      : undefined;
+    const shared3dStage = Object.hasOwn(pageRecord, "shared3dStage")
+      ? migrateStudioShared3dStageCollectionDocument(rawSharedStage)
+      : undefined;
+    return {
+      ...rest,
+      ...(drawingPractice ? { drawingPractice } : {}),
+      ...(shared3dStage ? { shared3dStage } : {}),
+    };
   });
   return {
     ...payload,
@@ -451,6 +479,7 @@ export function studioAutosaveHasContent(payload: StudioAutosavePayload): boolea
         ? page.canvasH
         : 1_080,
     })) ||
+    payload.pagesList.some((page) => studioDrawingPracticeHasContent(page?.drawingPractice)) ||
     (typeof payload.master === "object" &&
       payload.master !== null &&
       Array.isArray((payload.master as { elements?: unknown[] }).elements) &&

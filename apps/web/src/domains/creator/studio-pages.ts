@@ -13,6 +13,10 @@ import {
   parseStudioDrawingAssistDocument,
 } from "./brush/studio-drawing-assist-document";
 import {
+  mirrorStudioDrawingPracticeDocument,
+  parseStudioDrawingPracticeDocument,
+} from "./studio-drawing-practice-document";
+import {
   remapStudioLinked3dRenderDocumentElementIds,
   studioLinked3dRenderElementIds,
 } from "./studio-linked-3d-render-document";
@@ -46,6 +50,7 @@ export interface PageLike {
   grade?: unknown;
   groups?: Array<{ id: string }>;
   drawingAssist?: unknown;
+  drawingPractice?: unknown;
   layerComps?: unknown;
   shared3dStage?: unknown;
   linked3dRender?: unknown;
@@ -206,6 +211,7 @@ export function duplicateMirroredPage<P extends PageLike>(
   canvasW: number
 ): P {
   const drawingAssist = parseStudioDrawingAssistDocument(page.drawingAssist);
+  const drawingPractice = parseStudioDrawingPracticeDocument(page.drawingPractice);
   const elementIdMap = new Map<string, string>();
   const sourceIdCounts = new Map<string, number>();
   for (const element of page.elements) {
@@ -260,6 +266,9 @@ export function duplicateMirroredPage<P extends PageLike>(
     elements: mirroredEls,
     ...(drawingAssist
       ? { drawingAssist: mirrorStudioDrawingAssistDocument(drawingAssist, canvasW) }
+      : {}),
+    ...(drawingPractice
+      ? { drawingPractice: mirrorStudioDrawingPracticeDocument(drawingPractice, canvasW) }
       : {}),
   } as P;
   if (page.layerComps !== undefined) {

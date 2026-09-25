@@ -17,6 +17,7 @@ import {
   type StudioPendingStrokePageLike,
   type StudioPendingStrokeProjection,
 } from "./studio-pending-stroke-durability";
+import { studioDrawingPracticeHasContent } from "./studio-drawing-practice-document";
 import {
   studioReferenceBoardHasContent,
   type StudioReferenceBoardDocument,
@@ -203,6 +204,7 @@ export function studioProjectSnapshotHasMeaningfulContent(
         canvasHeight: page.canvasH,
       })
     ) ||
+    snapshot.pagesList.some((page) => studioDrawingPracticeHasContent(page.drawingPractice)) ||
     (snapshot.master?.elements.length ?? 0) > 0 ||
     snapshot.characterBible.characters.length > 0 ||
     studioWriterRoomHasContent(snapshot.writerRoom) ||

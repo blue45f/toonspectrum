@@ -15,6 +15,7 @@ import { STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED } from "../render/studio-ra
 import { CANVAS_W } from "../studio-assets";
 import { studioBackgroundGradientColorStops } from "../studio-background-gradient-color-stops";
 import { vignetteCss } from "../studio-page-grade";
+import { shouldRenderStudioDrawingPracticeGuide } from "../studio-drawing-practice-runtime";
 import { createStudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import {
   STUDIO_KONVA_DOCUMENT_SHADOW_NAME,
@@ -37,6 +38,7 @@ import {
   STUDIO_STAGE_DOCUMENT_STYLE,
 } from "./studio-canvas-viewport-primitives";
 import { StudioCanvasGuideUnderlay } from "./StudioCanvasGuideLayers";
+import { StudioDrawingPracticeGuide } from "./StudioDrawingPracticeGuide";
 import { renderStudioCanvasSelectionDecorations } from "./StudioCanvasSelectionDecorations";
 import { StudioSkiaDocumentHitLayer } from "./StudioSkiaDocumentHitLayer";
 import {
@@ -519,6 +521,38 @@ export function StudioCanvasViewportStageHost({
     webGpuViewportSurface: viewport.webGpuViewportSurface,
   };
 
+  const drawingPracticeRenderable = shouldRenderStudioDrawingPracticeGuide({
+    document: viewport.drawingPractice,
+    sourceDataUrl: viewport.drawingPracticeSourceDataUrl,
+    compareActive: viewport.drawingPracticeCompareActive,
+    exporting: viewport.isExporting,
+    saving: viewport.saving,
+    timelapseCapturing: viewport.timelapseCapturing,
+  });
+  const drawingPracticeInteractionBlocked =
+    canvasInteractionBlocked
+    || hardCanvasInteractionBlock
+    || activeSurfaceReviewLocked
+    || viewport.collaborationDocumentLocked
+    || masterEditMode;
+  const renderDrawingPracticeGuide = (placement: "below-artwork" | "above-artwork") => {
+    const document = viewport.drawingPractice;
+    const sourceDataUrl = viewport.drawingPracticeSourceDataUrl;
+    if (!drawingPracticeRenderable || !document || !sourceDataUrl || document.view.placement !== placement) {
+      return null;
+    }
+    return (
+      <StudioDrawingPracticeGuide
+        key={`${document.attemptId}:${placement}`}
+        document={document}
+        sourceDataUrl={sourceDataUrl}
+        effectiveScale={effScale}
+        interactionBlocked={drawingPracticeInteractionBlocked}
+        onCommitView={viewport.stableHandlers.commitDrawingPracticeView}
+      />
+    );
+  };
+
   return (
     <>
           {/* 페이지 색보정 미리보기: Stage에 CSS filter, 그 위에 비네트 오버레이(내보내기 때 픽셀로 합성) */}
@@ -704,6 +738,7 @@ export function StudioCanvasViewportStageHost({
                 showWebtoonGuides={showWebtoonGuides}
                 webtoonGuides={webtoonGuides}
               />
+              {renderDrawingPracticeGuide("below-artwork")}
               <Group
                 name={STUDIO_KONVA_DOCUMENT_SHADOW_NAME}
                 visible={!frameGraphOwnsDocumentPixels}
@@ -719,6 +754,7 @@ export function StudioCanvasViewportStageHost({
                   onSelect={documentLayerProps.selectElementFromCanvas}
                 />
               ) : null}
+              {renderDrawingPracticeGuide("above-artwork")}
               {renderStudioCanvasSelectionDecorations({
                 activeGroupId,
                 activeSurfaceReviewLocked,

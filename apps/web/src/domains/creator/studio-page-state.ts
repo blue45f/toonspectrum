@@ -6,6 +6,7 @@ import type { StudioLayerComp } from "./layer/studio-layer-comps";
 import type { AnimationTimelineDoc } from "./studio-anim-tracks";
 import type { El } from "./studio-element-model";
 import type { LayerGroup } from "./studio-layers";
+import type { StudioDrawingPracticeDocument } from "./studio-drawing-practice-document";
 import type { StudioLinked3dRenderDocument } from "./studio-linked-3d-render-document";
 import type { PageGrade } from "./studio-page-grade";
 import type { PageReviewState } from "./studio-page-review";
@@ -45,6 +46,8 @@ export interface PageState {
   review?: PageReviewState; // 페이지 검토 상태·담당·메모·로컬 편집 잠금.
   /** 페이지 소유 원근자·아이소메트릭 가이드. 미설정 레거시는 비활성 기본값으로 정규화. */
   drawingAssist?: StudioDrawingAssistDocument;
+  /** 페이지에 정렬된 비출력 따라 그리기 가이드. 원본 바이트는 에셋 저장소에만 존재한다. */
+  drawingPractice?: StudioDrawingPracticeDocument;
   /** 여러 BG3D 원본과 각 장면의 canonical VRM 원본을 잇는 엄격한 참조 컬렉션. */
   shared3dStage?: StudioShared3dStagePersistedState;
   /** 실제 Canvas LT 레이어를 canonical Scene Shot에 잇는 ref-only 교차참조 영수증. */

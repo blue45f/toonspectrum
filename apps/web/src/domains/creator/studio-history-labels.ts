@@ -13,6 +13,10 @@ import {
   normalizeStudioDrawingAssistDocument,
 } from "./brush/studio-drawing-assist-document";
 import { STUDIO_CANVAS_WIDTH } from "./canvas/studio-canvas-constants";
+import {
+  areStudioDrawingPracticeDocumentsEqual,
+  parseStudioDrawingPracticeDocument,
+} from "./studio-drawing-practice-document";
 
 // StudioPage 의 El 과 구조 호환되는 최소 형태 — diff 휴리스틱에 쓰는 필드만 선언한다.
 export interface HistoryElementLike {
@@ -48,6 +52,7 @@ export interface HistoryPageLike {
   name?: unknown;
   note?: unknown;
   drawingAssist?: unknown;
+  drawingPractice?: unknown;
 }
 
 /** 히스토리 한 칸 = 전체 페이지 배열 스냅샷(StudioPage pagesHistory 의 원소). */
@@ -213,6 +218,7 @@ interface PageDiff {
   groups: boolean;
   meta: boolean;
   drawingAssist: boolean;
+  drawingPractice: boolean;
 }
 
 function drawingAssistDocumentsDiffer(
@@ -233,6 +239,14 @@ function drawingAssistDocumentsDiffer(
   );
 }
 
+function drawingPracticeDocumentsDiffer(previous: unknown, next: unknown): boolean {
+  if (Object.is(previous, next)) return false;
+  return !areStudioDrawingPracticeDocumentsEqual(
+    parseStudioDrawingPracticeDocument(previous),
+    parseStudioDrawingPracticeDocument(next)
+  );
+}
+
 function diffPage(prev: HistoryPageLike, next: HistoryPageLike): PageDiff {
   const diff: PageDiff = {
     elements: null,
@@ -245,6 +259,10 @@ function diffPage(prev: HistoryPageLike, next: HistoryPageLike): PageDiff {
       prev.drawingAssist,
       next.drawingAssist,
       next.canvasH
+    ),
+    drawingPractice: drawingPracticeDocumentsDiffer(
+      prev.drawingPractice,
+      next.drawingPractice
     ),
   };
   if (prev.elements !== next.elements) diff.elements = diffElements(prev.elements, next.elements);
@@ -339,6 +357,7 @@ function pageDiffLabel(diff: PageDiff): string | null {
   if (diff.grade) parts.push("색보정 변경");
   if (diff.meta) parts.push("페이지 정보 수정");
   if (diff.drawingAssist) parts.push("드로잉 가이드 변경");
+  if (diff.drawingPractice) parts.push("따라 그리기 가이드 변경");
   if (parts.length === 0) return null;
   if (parts.length > 2) return "여러 항목 편집";
   return parts.join(" · ");
@@ -381,17 +400,20 @@ export function describeHistoryStep(prev: HistorySnapshot | null | undefined, ne
   const n = pageDiffs.length;
   const isAll = n === next.length;
   const scope = isAll ? "전체" : `페이지 ${n}개`;
-  if (pageDiffs.every((d) => !d.elements && d.grade && !d.bg && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist)) {
+  if (pageDiffs.every((d) => !d.elements && d.grade && !d.bg && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist && !d.drawingPractice)) {
     return `${scope} 색보정 변경`;
   }
-  if (pageDiffs.every((d) => !d.elements && d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist)) {
+  if (pageDiffs.every((d) => !d.elements && d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist && !d.drawingPractice)) {
     return `${scope} 배경 변경`;
   }
-  if (pageDiffs.every((d) => d.elements?.onlyTextEdits && !d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist)) {
+  if (pageDiffs.every((d) => d.elements?.onlyTextEdits && !d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist && !d.drawingPractice)) {
     return "대사 일괄 수정";
   }
-  if (pageDiffs.every((d) => !d.elements && !d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && d.drawingAssist)) {
+  if (pageDiffs.every((d) => !d.elements && !d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && d.drawingAssist && !d.drawingPractice)) {
     return `${scope} 드로잉 가이드 변경`;
+  }
+  if (pageDiffs.every((d) => !d.elements && !d.bg && !d.grade && !d.canvasH && !d.groups && !d.meta && !d.drawingAssist && d.drawingPractice)) {
+    return `${scope} 따라 그리기 가이드 변경`;
   }
   return `페이지 ${n}개 편집`;
 }

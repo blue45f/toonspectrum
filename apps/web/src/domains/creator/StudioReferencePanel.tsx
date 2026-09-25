@@ -13,6 +13,7 @@ import {
   Loader2,
   LayoutGrid,
   Palette,
+  PencilLine,
   Pipette,
   RefreshCw,
   RotateCw,
@@ -89,6 +90,11 @@ import type {
   ReactElement,
 } from "react";
 
+export interface StudioDrawingPracticeStartRequest {
+  item: StudioReferenceBoardItem;
+  asset: StudioAsset;
+}
+
 export interface StudioReferencePanelProps {
   open: boolean;
   onClose: () => void;
@@ -100,6 +106,8 @@ export interface StudioReferencePanelProps {
   onPickColor?: (hex: string) => void;
   /** Opens the synchronized project-owned canvas in a dedicated browser window. */
   onOpenDetached?: () => void;
+  /** Starts a page-owned, non-destructive trace guide from the effective selected asset. */
+  onStartDrawingPractice?: (request: StudioDrawingPracticeStartRequest) => void;
   /** Test/runtime injection seam; product defaults to the shared SQLite/OPFS authority. */
   acquirePreferences?: () => Promise<StudioReferencePanelPreferencesRepository>;
 }
@@ -320,6 +328,7 @@ export function StudioReferencePanel({
   onChange,
   onPickColor,
   onOpenDetached,
+  onStartDrawingPractice,
   acquirePreferences = acquireProductStudioReferencePanelPreferencesRepository,
 }: StudioReferencePanelProps): ReactElement | null {
   const [settings, setSettings] = useState<ReferencePanelSettings>(() =>
@@ -1893,6 +1902,25 @@ export function StudioReferencePanel({
                 <Trash2 size={12} aria-hidden />
               </button>
             </div>
+            <button
+              type="button"
+              className={cx(
+                CONTROL_BUTTON,
+                "mb-2 w-full border-accent/45 bg-accent-soft text-accent hover:border-accent hover:bg-accent/15",
+              )}
+              disabled={!effectiveSelectedAsset || !onStartDrawingPractice}
+              title={
+                effectiveSelectedAsset
+                  ? "선택한 이미지를 현재 페이지의 비출력 가이드로 사용합니다."
+                  : "이 기기에서 원본 에셋을 찾을 수 없습니다."
+              }
+              onClick={() => {
+                if (!effectiveSelectedAsset || !onStartDrawingPractice) return;
+                onStartDrawingPractice({ item: effectiveSelectedItem, asset: effectiveSelectedAsset });
+              }}
+            >
+              <PencilLine size={13} aria-hidden /> 이 이미지로 따라 그리기
+            </button>
             <div className="space-y-1.5">
               <ReferenceRangeControl
                 label="크기"
