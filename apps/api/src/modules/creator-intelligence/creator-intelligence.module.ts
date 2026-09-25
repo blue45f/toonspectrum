@@ -14,6 +14,12 @@ import {
   Req,
 } from "@nestjs/common";
 
+import { UpstashCoordinationModule } from "../../infrastructure/upstash-coordination/upstash-coordination.module";
+import {
+  UPSTASH_COORDINATION_PORT,
+  type UpstashCoordinationPort,
+} from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+
 import {
   CreatorIntelligenceInputError,
   createCreatorIntelligenceCore,
@@ -24,6 +30,7 @@ import type { Request } from "express";
 import type { CreatorIntelligenceCore } from "./creator-intelligence-core";
 
 const CREATOR_INTELLIGENCE_CORE = Symbol("CREATOR_INTELLIGENCE_CORE");
+const coordinationModule = UpstashCoordinationModule.fromEnvironment(process.env);
 
 @Controller("creator-intelligence")
 export class CreatorIntelligenceController {
@@ -56,7 +63,9 @@ export class CreatorIntelligenceController {
 
     const disabled = {
       status: "disabled",
-      reason: "operator paid-route admission gate is disabled",
+      reason: admission.enforcement === "unavailable"
+        ? "distributed paid-route admission is unavailable"
+        : "operator paid-route admission gate is disabled",
     } as const;
     return {
       ...current,
@@ -111,7 +120,7 @@ export class CreatorIntelligenceController {
     @Body() body: Record<string, unknown>,
     @Req() request: Request,
   ) {
-    this.admission.admit("voice-synthesize", userId, idempotencyKey);
+    await this.admission.admit("voice-synthesize", userId, idempotencyKey);
     const controller = new AbortController();
     const abort = () => controller.abort();
     request.once("aborted", abort);
@@ -129,23 +138,23 @@ export class CreatorIntelligenceController {
 
   @Post("sfx/generate")
   @Header("Cache-Control", "private, no-store")
-  soundGenerate(
+  async soundGenerate(
     @Headers("x-user-id") userId: string | undefined,
     @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body() body: Record<string, unknown>,
   ) {
-    this.admission.admit("sound-generate", userId, idempotencyKey);
+    await this.admission.admit("sound-generate", userId, idempotencyKey);
     return this.execute(() => this.core.generateSoundEffect(body));
   }
 
   @Post("translate")
   @Header("Cache-Control", "private, no-store")
-  translate(
+  async translate(
     @Headers("x-user-id") userId: string | undefined,
     @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body() body: Record<string, unknown>,
   ) {
-    this.admission.admit("translate", userId, idempotencyKey);
+    await this.admission.admit("translate", userId, idempotencyKey);
     return this.execute(() => this.core.translate(body.provider, body));
   }
 
@@ -156,7 +165,7 @@ export class CreatorIntelligenceController {
     @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body() body: Record<string, unknown>,
   ) {
-    const actorId = this.admission.admit(
+    const actorId = await this.admission.admit(
       "mesh-create",
       userId,
       idempotencyKey,
@@ -172,33 +181,41 @@ export class CreatorIntelligenceController {
 
   @Get("mesh/jobs/:jobId")
   @Header("Cache-Control", "private, no-store")
-  meshStatus(
+  async meshStatus(
     @Headers("x-user-id") userId: string | undefined,
     @Param("jobId") jobId: string,
   ) {
-    const actorId = this.admission.admit("mesh-status", userId);
+    const actorId = await this.admission.admit("mesh-status", userId);
     const providerJobId = this.admission.unwrapMeshJob(actorId, jobId);
     return this.execute(() => this.core.getMeshyJob(providerJobId));
   }
 
   @Post("preflight/safe-search")
   @Header("Cache-Control", "private, no-store")
-  safeSearch(
+  async safeSearch(
     @Headers("x-user-id") userId: string | undefined,
     @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body() body: Record<string, unknown>,
   ) {
-    this.admission.admit("safe-search", userId, idempotencyKey);
+    await this.admission.admit("safe-search", userId, idempotencyKey);
     return this.execute(() => this.core.safeSearch(body));
   }
 }
 
 @Module({
+  imports: [...(coordinationModule ? [coordinationModule] : [])],
   controllers: [CreatorIntelligenceController],
   providers: [
+    ...(
+      coordinationModule
+        ? []
+        : [{ provide: UPSTASH_COORDINATION_PORT, useValue: null }]
+    ),
     {
       provide: CreatorIntelligenceAdmissionGuard,
-      useFactory: () => new CreatorIntelligenceAdmissionGuard(),
+      useFactory: (coordination: UpstashCoordinationPort | null) =>
+        new CreatorIntelligenceAdmissionGuard({ coordination }),
+      inject: [UPSTASH_COORDINATION_PORT],
     },
     {
       provide: CREATOR_INTELLIGENCE_CORE,
