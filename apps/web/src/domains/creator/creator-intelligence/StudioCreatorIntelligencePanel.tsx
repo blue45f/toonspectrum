@@ -30,7 +30,8 @@ import {
   type SafeSearchResponse,
   type SceneReferenceResponse,
   type SoundEffectReference,
-} from "./studio-creator-intelligence-client";import {
+} from "./studio-creator-intelligence-client";
+import {
   createSavedSceneReference,
   loadStudioCreatorIntelligenceStore,
   patchStudioCreatorIntelligenceStore,
@@ -49,6 +50,54 @@ const INPUT = "min-h-10 w-full rounded-xl border border-line bg-canvas px-3 py-2
 const BUTTON = "inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-line bg-raised px-3 py-2 text-sm font-semibold text-fg transition hover:border-accent/50 disabled:cursor-not-allowed disabled:opacity-50";
 const PRIMARY = `${BUTTON} border-accent bg-accent text-white hover:bg-accent/90`;
 const EMPTY_SOUND_CAPTIONS = "data:text/vtt;charset=utf-8,WEBVTT%0A%0A";
+
+const REFERENCE_STARTERS = {
+  ko: [
+    ["배경", "cinematic rainy night alley background"],
+    ["실내", "cozy studio apartment interior reference"],
+    ["소품", "vintage desk objects prop reference"],
+    ["복식", "modern street fashion full body reference"],
+    ["조명", "dramatic rim lighting portrait reference"],
+    ["자연", "misty forest path environment reference"],
+  ],
+  en: [
+    ["Background", "cinematic rainy night alley background"],
+    ["Interior", "cozy studio apartment interior reference"],
+    ["Props", "vintage desk objects prop reference"],
+    ["Costume", "modern street fashion full body reference"],
+    ["Lighting", "dramatic rim lighting portrait reference"],
+    ["Nature", "misty forest path environment reference"],
+  ],
+} as const;
+
+const REFERENCE_PROVIDER_META: Readonly<Record<
+  CreatorIntelligenceReferenceProvider,
+  {
+    readonly label: string;
+    readonly cacheLabel: string;
+    readonly policyKo: string;
+    readonly policyEn: string;
+  }
+>> = {
+  openverse: {
+    label: "Openverse",
+    cacheLabel: "discovery only",
+    policyKo: "원본 출처의 현재 라이선스를 다시 확인한 뒤 사용하세요.",
+    policyEn: "Verify the current license on the original source before reuse.",
+  },
+  pexels: {
+    label: "Pexels",
+    cacheLabel: "6h API cache",
+    policyKo: "Pexels와 사진가 출처를 함께 유지하며 레퍼런스 용도로 탐색합니다.",
+    policyEn: "Keep both Pexels and photographer attribution with every reference.",
+  },
+  pixabay: {
+    label: "Pixabay",
+    cacheLabel: "24h API cache",
+    policyKo: "검색 결과는 임시 미리보기이며 실제 사용 전 콘텐츠 라이선스와 제3자 권리를 확인합니다.",
+    policyEn: "Search previews are temporary; verify the content license and third-party rights before use.",
+  },
+};
 
 function message(error: unknown): string {
   return error instanceof Error && error.message
@@ -69,7 +118,9 @@ function stateLabel(state: CreatorIntelligenceProviderState, locale: Props["loca
   if (state === "ready") return locale === "ko" ? "사용 가능" : "Ready";
   if (state === "disabled") return locale === "ko" ? "운영 비활성" : "Disabled";
   return locale === "ko" ? "설정 필요" : "Setup required";
-}function ProviderBadge({
+}
+
+function ProviderBadge({
   state,
   locale,
 }: {
@@ -128,6 +179,11 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
   const [referenceScopeId, setReferenceScopeId] = useState("");
   const [referenceQuery, setReferenceQuery] = useState("");
   const [referenceResults, setReferenceResults] = useState<readonly CreatorIntelligenceReference[]>([]);
+  const [referenceFeedback, setReferenceFeedback] = useState<{
+    readonly notice: string;
+    readonly cacheHit: boolean;
+    readonly ttlSeconds: number;
+  } | null>(null);
 
   const [scenePlace, setScenePlace] = useState("");
   const [sceneDate, setSceneDate] = useState(new Date().toISOString().slice(0, 10));
@@ -146,7 +202,8 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
   const [translationProvider, setTranslationProvider] = useState<CreatorIntelligenceTranslationProvider>("deepl");
   const [translationText, setTranslationText] = useState("");
   const [translationTarget, setTranslationTarget] = useState("EN");
-  const [translatedText, setTranslatedText] = useState("");  const [meshImageUrl, setMeshImageUrl] = useState("");
+  const [translatedText, setTranslatedText] = useState("");
+  const [meshImageUrl, setMeshImageUrl] = useState("");
   const [meshJob, setMeshJob] = useState<MeshyJobResponse | null>(null);
   const [safeSearchResult, setSafeSearchResult] = useState<SafeSearchResponse | null>(null);
 
@@ -186,7 +243,9 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
     } finally {
       setBusy("");
     }
-  };  const saveReference = (item: CreatorIntelligenceReference) => {
+  };
+
+  const saveReference = (item: CreatorIntelligenceReference) => {
     const targetId = referenceScope === "project" ? projectId : referenceScopeId.trim();
     if (!targetId) {
       setError(locale === "ko" ? "에피소드/장면 ID를 입력하세요." : "Enter an episode/scene id.");
@@ -200,14 +259,23 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
     persist({ references: [saved, ...projectStore.references] });
   };
 
-  const searchReferences = () => run(
-    "references",
-    () => creatorIntelligenceClient.references(referenceProvider, referenceQuery),
-    (value) => {
-      setReferenceResults(value.items);
-      if (value.status !== "ready") setError(stateLabel(value.status, locale));
-    },
-  );
+  const searchReferences = (queryOverride?: string) => {
+    const query = (queryOverride ?? referenceQuery).trim();
+    if (queryOverride) setReferenceQuery(queryOverride);
+    void run(
+      "references",
+      () => creatorIntelligenceClient.references(referenceProvider, query),
+      (value) => {
+        setReferenceResults(value.items);
+        setReferenceFeedback({
+          notice: value.notice ?? "",
+          cacheHit: value.cache?.hit ?? false,
+          ttlSeconds: value.cache?.ttlSeconds ?? 0,
+        });
+        if (value.status !== "ready") setError(stateLabel(value.status, locale));
+      },
+    );
+  };
 
   const searchScene = () => run(
     "scene",
@@ -234,7 +302,9 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
       setSoundResults(value.items);
       if (value.status !== "ready") setError(stateLabel(value.status, locale));
     },
-  );  const generateSound = () => run(
+  );
+
+  const generateSound = () => run(
     "sound-generate",
     () => creatorIntelligenceClient.soundGenerate(soundPrompt, soundDuration, false),
     (value) => {
@@ -267,7 +337,9 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
       setMeshJob(value);
       if (value.status !== "ready") setError(stateLabel(value.status, locale));
     },
-  );  const refreshMesh = () => {
+  );
+
+  const refreshMesh = () => {
     if (!meshJob?.jobId) return;
     void run(
       "mesh-status",
@@ -344,7 +416,9 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
             ? <a key={id} className={className} href={href}>{content}</a>
             : <Link key={id} className={className} to={href}>{content}</Link>;
         })}
-      </div>      <div className={CARD}>
+      </div>
+
+      <div className={CARD}>
         <ToolHeader icon={ShieldCheck} title={locale === "ko" ? "외부 Provider 상태" : "External provider status"} detail={locale === "ko" ? "유료·상업 라이선스·개인정보 전송이 가능한 기능은 명시적으로 활성화된 경우에만 호출합니다." : "Paid, commercially gated, or externally processed capabilities only call providers after explicit operator enablement."} />
         <div className="mt-4 flex flex-wrap gap-2">
           {providerStatus ? (
@@ -364,31 +438,189 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
 
       <div className="grid gap-5 xl:grid-cols-2">
         <section id="reference-vault" className={CARD}>
-          <ToolHeader icon={Search} title="Reference Vault" detail={locale === "ko" ? "Openverse/Pexels/Pixabay를 동일 계약으로 탐색하고 출처·라이선스 상태를 프로젝트에 보존합니다." : "Search Openverse/Pexels/Pixabay through one contract while preserving provenance and license state."} />
+          <ToolHeader
+            icon={Search}
+            title="Reference Vault"
+            detail={locale === "ko"
+              ? "무료 Openverse/Pexels/Pixabay 검색을 하나의 보드로 연결하고, 출처·작가·라이선스를 프로젝트와 함께 보존합니다. 외부 이미지는 자동 반입하지 않습니다."
+              : "Connect free Openverse, Pexels, and Pixabay search in one board while preserving source, creator, and license metadata. External images are never auto-imported."}
+          />
           <div className="mt-4 grid gap-2 sm:grid-cols-[9rem_1fr_auto]">
-            <select className={INPUT} value={referenceProvider} onChange={(event) => setReferenceProvider(event.target.value as CreatorIntelligenceReferenceProvider)} aria-label="reference provider">
-              <option value="openverse">Openverse</option><option value="pexels">Pexels</option><option value="pixabay">Pixabay</option>
+            <select
+              className={INPUT}
+              value={referenceProvider}
+              onChange={(event) => {
+                setReferenceProvider(event.target.value as CreatorIntelligenceReferenceProvider);
+                setReferenceResults([]);
+                setReferenceFeedback(null);
+              }}
+              aria-label="reference provider"
+            >
+              <option value="openverse">Openverse</option>
+              <option value="pexels">Pexels</option>
+              <option value="pixabay">Pixabay</option>
             </select>
-            <input className={INPUT} value={referenceQuery} onChange={(event) => setReferenceQuery(event.target.value)} placeholder={locale === "ko" ? "복식, 배경, 소품…" : "Costume, background, prop…"} />
-            <button type="button" className={PRIMARY} disabled={busy === "references" || referenceQuery.trim().length < 2} onClick={searchReferences}>{busy === "references" ? <Loader2 className="size-4 animate-spin" /> : <Search size={15} />} {locale === "ko" ? "검색" : "Search"}</button>
+            <input
+              className={INPUT}
+              value={referenceQuery}
+              onChange={(event) => setReferenceQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && referenceQuery.trim().length >= 2) searchReferences();
+              }}
+              placeholder={locale === "ko" ? "복식, 배경, 소품…" : "Costume, background, prop…"}
+              aria-label={locale === "ko" ? "레퍼런스 검색어" : "Reference search query"}
+            />
+            <button
+              type="button"
+              className={PRIMARY}
+              disabled={busy === "references" || referenceQuery.trim().length < 2}
+              onClick={() => searchReferences()}
+            >
+              {busy === "references" ? <Loader2 className="size-4 animate-spin" /> : <Search size={15} />}
+              {locale === "ko" ? "검색" : "Search"}
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2" aria-label={locale === "ko" ? "추천 레퍼런스 검색" : "Suggested reference searches"}>
+            {REFERENCE_STARTERS[locale].map(([label, query]) => (
+              <button
+                key={query}
+                type="button"
+                className="inline-flex min-h-9 items-center rounded-full border border-line bg-canvas px-3 text-xs font-semibold text-fg-2 transition hover:border-accent/50 hover:text-accent disabled:opacity-50"
+                disabled={busy === "references"}
+                onClick={() => searchReferences(query)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs leading-5 text-fg-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-bold text-fg">{REFERENCE_PROVIDER_META[referenceProvider].label}</span>
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-700 dark:text-emerald-300">
+                {locale === "ko" ? "무료 API" : "Free API"}
+              </span>
+              <span className="rounded-full border border-line bg-panel px-2 py-0.5 font-semibold text-fg-3">
+                {REFERENCE_PROVIDER_META[referenceProvider].cacheLabel}
+              </span>
+              {providerStatus?.references[referenceProvider] ? (
+                <ProviderBadge state={providerStatus.references[referenceProvider].status} locale={locale} />
+              ) : null}
+            </div>
+            <p className="mt-2">
+              {locale === "ko"
+                ? REFERENCE_PROVIDER_META[referenceProvider].policyKo
+                : REFERENCE_PROVIDER_META[referenceProvider].policyEn}
+            </p>
+            {providerStatus?.references[referenceProvider]?.reason ? (
+              <p className="mt-1 text-fg-3">{providerStatus.references[referenceProvider].reason}</p>
+            ) : null}
           </div>
           <div className="mt-3 grid gap-2 sm:grid-cols-[9rem_1fr]">
-            <select className={INPUT} value={referenceScope} onChange={(event) => setReferenceScope(event.target.value as "project" | "episode" | "scene")} aria-label="reference scope">
-              <option value="project">Project</option><option value="episode">Episode</option><option value="scene">Scene</option>
+            <select
+              className={INPUT}
+              value={referenceScope}
+              onChange={(event) => setReferenceScope(event.target.value as "project" | "episode" | "scene")}
+              aria-label="reference scope"
+            >
+              <option value="project">Project</option>
+              <option value="episode">Episode</option>
+              <option value="scene">Scene</option>
             </select>
-            {referenceScope === "project" ? <div className="flex min-h-10 items-center rounded-xl border border-line bg-canvas px-3 text-xs text-fg-3">{projectId}</div> : <input className={INPUT} value={referenceScopeId} onChange={(event) => setReferenceScopeId(event.target.value)} placeholder={referenceScope === "episode" ? "episode-id" : "scene-id"} aria-label="reference scope id" />}
+            {referenceScope === "project" ? (
+              <div className="flex min-h-10 items-center rounded-xl border border-line bg-canvas px-3 text-xs text-fg-3">{projectId}</div>
+            ) : (
+              <input
+                className={INPUT}
+                value={referenceScopeId}
+                onChange={(event) => setReferenceScopeId(event.target.value)}
+                placeholder={referenceScope === "episode" ? "episode-id" : "scene-id"}
+                aria-label="reference scope id"
+              />
+            )}
           </div>
-          <div className="mt-4 space-y-2">
+          {referenceFeedback ? (
+            <div className="mt-3 rounded-xl border border-line bg-canvas px-3 py-2 text-xs leading-5 text-fg-3" role="status">
+              {referenceFeedback.ttlSeconds > 0 ? (
+                <span className="mr-2 font-semibold text-fg-2">
+                  {referenceFeedback.cacheHit
+                    ? (locale === "ko" ? "캐시 응답" : "Cached response")
+                    : (locale === "ko" ? "새 API 응답" : "Fresh API response")}
+                  {` · ${Math.round(referenceFeedback.ttlSeconds / 3_600)}h`}
+                </span>
+              ) : null}
+              {referenceFeedback.notice}
+            </div>
+          ) : null}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {referenceResults.slice(0, 8).map((item) => {
               const targetId = referenceScope === "project" ? projectId : referenceScopeId.trim();
-              const saved = projectStore.references.some((candidate) => candidate.id === item.id && candidate.target.kind === referenceScope && candidate.target.id === targetId);
+              const saved = projectStore.references.some((candidate) =>
+                candidate.id === item.id
+                && candidate.target.kind === referenceScope
+                && candidate.target.id === targetId);
               return (
-                <article key={item.id} className="rounded-2xl border border-line bg-canvas p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0"><p className="truncate text-sm font-bold text-fg">{item.title}</p><p className="mt-1 text-xs text-fg-3">{item.creator || item.provider} · {item.license || "license verify"}</p></div>
-                    <button type="button" className={BUTTON} disabled={saved} onClick={() => saveReference(item)}>{saved ? <CheckCircle2 size={15} /> : <BookOpenCheck size={15} />} {saved ? (locale === "ko" ? "저장됨" : "Saved") : (locale === "ko" ? "보관" : "Save")}</button>
+                <article key={item.id} className="overflow-hidden rounded-2xl border border-line bg-canvas">
+                  <a
+                    className="block aspect-[4/3] overflow-hidden border-b border-line bg-raised"
+                    href={item.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${item.title} source`}
+                  >
+                    {item.previewUrl ? (
+                      <img
+                        className="size-full object-cover transition duration-300 hover:scale-[1.02]"
+                        src={item.previewUrl}
+                        alt={item.title}
+                        loading="lazy"
+                        decoding="async"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span className="grid size-full place-items-center text-xs font-semibold text-fg-3">
+                        {locale === "ko" ? "미리보기 없음" : "No preview"}
+                      </span>
+                    )}
+                  </a>
+                  <div className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 text-sm font-bold text-fg">{item.title}</p>
+                        <p className="mt-1 truncate text-xs text-fg-3">
+                          {item.creatorUrl && item.creator ? (
+                            <a className="text-accent underline" href={item.creatorUrl} target="_blank" rel="noreferrer">{item.creator}</a>
+                          ) : (item.creator || item.provider)}
+                          {item.width && item.height ? ` · ${item.width}×${item.height}` : ""}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-1 text-[10px] font-bold uppercase text-fg-3">
+                        {item.provider}
+                      </span>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-xs text-fg-2">{item.license || "license verify"}</p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+                      <a className="text-accent underline" href={item.sourceUrl} target="_blank" rel="noreferrer">
+                        {locale === "ko" ? "원본 출처" : "Source"}
+                      </a>
+                      {item.licenseUrl ? (
+                        <a className="text-accent underline" href={item.licenseUrl} target="_blank" rel="noreferrer">
+                          {locale === "ko" ? "라이선스" : "License"}
+                        </a>
+                      ) : null}
+                      <span className="text-fg-3">{item.rightsStatus}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`${BUTTON} mt-3 w-full`}
+                      disabled={saved}
+                      onClick={() => saveReference(item)}
+                    >
+                      {saved ? <CheckCircle2 size={15} /> : <BookOpenCheck size={15} />}
+                      {saved
+                        ? (locale === "ko" ? "출처와 함께 저장됨" : "Saved with provenance")
+                        : (locale === "ko" ? "프로젝트에 보관" : "Save to project")}
+                    </button>
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-3 text-xs"><a className="text-accent underline" href={item.sourceUrl} target="_blank" rel="noreferrer">source</a>{item.licenseUrl ? <a className="text-accent underline" href={item.licenseUrl} target="_blank" rel="noreferrer">license</a> : null}<span className="text-fg-3">{item.rightsStatus}</span></div>
                 </article>
               );
             })}

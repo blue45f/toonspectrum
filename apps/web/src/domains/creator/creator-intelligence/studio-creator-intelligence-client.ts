@@ -47,6 +47,10 @@ export interface ReferenceSearchResponse {
   readonly items: readonly CreatorIntelligenceReference[];
   readonly hasMore: boolean;
   readonly notice?: string;
+  readonly cache?: {
+    readonly hit: boolean;
+    readonly ttlSeconds: number;
+  };
 }
 
 export interface SceneReferenceResponse {
