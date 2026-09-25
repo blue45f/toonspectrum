@@ -47,6 +47,9 @@ jobs:
             /apps/web/public/assets/3d/environments/refined-v6/manifest.json
             /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
             /apps/web/public/assets/3d/environments/webtoon-v7/manifest.json
+            /apps/web/public/assets/3d/environments/refined-v6/hospital_reception.glb
+            /apps/web/public/assets/3d/environments/expansion-v1/library_reading_room.glb
+            /apps/web/public/assets/3d/environments/expansion-v1/thumbnails/library_reading_room.png
             /apps/web/public/assets/3d/environments/mcp-free-v1/
             /apps/web/public/assets/3d/ENVIRONMENT_LICENSES.md
             /apps/web/public/assets/studio/cc0-20260906/manifest.json
