@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import "./types/pigment-libraries";
+import "./shared/types/vendor/pigment-libraries";
 
 declare global {
 interface ImportMetaEnv {
