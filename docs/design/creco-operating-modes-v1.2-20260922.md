@@ -14,7 +14,7 @@ Creative Commons의 NonCommercial FAQ도 사용의 목적과 맥락에 따라 �
 
 ## 2. 관리자 화면
 
-실제 관리자 라우터의 `/admin/platform/operations` (`/admin?tab=ops`에서 이동)에 모드 전환·모드별 한도·변경 미리보기/적용 패널을 연결했다. 독립 `apps/admin`에는 **운영 모드와 라이선스** 상세 검토 화면을 추가했다. 같은 출처의 `/api/admin/production/operation-policy`와 관리자 로그인 세션을 사용한다. 기존 운영 도메인·프록시·로그인 정책을 이번 작업에서 변경하지 않는다. 이 surface 배포는 별도 승인 대상이다.
+실제 관리자 라우터의 `/admin/platform/operations` (`/admin?tab=ops`에서 이동)에 모드 전환·모드별 한도·변경 미리보기/적용 패널을 연결했다. 독립 `apps/admin-web`에는 **운영 모드와 라이선스** 상세 검토 화면을 추가했다. 같은 출처의 `/api/admin/production/operation-policy`와 관리자 로그인 세션을 사용한다. 기존 운영 도메인·프록시·로그인 정책을 이번 작업에서 변경하지 않는다. 이 surface 배포는 별도 승인 대상이다.
 
 - 무료·유료 모드 선택: 라디오 토글, 선택만으로 저장하지 않는다.
 - 두 모드의 구성은 따로 저장: 소유 워크스페이스, 조직별 프로젝트, 구성원+대기 초대 한도, 기능 상태, 사용자 안내.
@@ -94,6 +94,6 @@ Creative Commons의 NonCommercial FAQ도 사용의 목적과 맥락에 따라 �
 
 ## 8. 검증
 
-관련 단위/DB/UI 테스트는 `apps/api/src/modules/operation-policy`, `team-workspace.repository.integration.test.ts`, `apps/admin/src/domains/operation-policy`에 있다. DB fixture는 기존 운영 DB를 상속하지 않는 로컬 전용 데이터베이스와 무작위 schema를 사용한다. migration·동시 생성/마감이 아닌 조직변경·승인 만료/배포물 불일치·재전송·자료 보존을 확인한다.
+관련 단위/DB/UI 테스트는 `apps/api/src/modules/operation-policy`, `team-workspace.repository.integration.test.ts`, `apps/admin-web/src/domains/operations/operation-policy`에 있다. DB fixture는 기존 운영 DB를 상속하지 않는 로컬 전용 데이터베이스와 무작위 schema를 사용한다. migration·동시 생성/마감이 아닌 조직변경·승인 만료/배포물 불일치·재전송·자료 보존을 확인한다.
 
 원격 main 병합 전 검증 결과와 미완료 목록은 별도 implementation report에 기록한다. mock UI 성공을 운영 DB나 전체 서비스 기능 완료로 바꾸어 보고하지 않는다.

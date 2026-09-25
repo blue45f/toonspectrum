@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OperationPolicyPanel } from "./OperationPolicyPanel";
 
 const mocks = vi.hoisted(()=>({load:vi.fn(),preview:vi.fn(),apply:vi.fn()}));
-vi.mock('./api',()=>({loadOperationPolicy:mocks.load,previewOperationPolicy:mocks.preview,applyOperationPolicy:mocks.apply}));
+vi.mock('./api/operation-policy-api',()=>({loadOperationPolicy:mocks.load,previewOperationPolicy:mocks.preview,applyOperationPolicy:mocks.apply}));
 const record = () => ({revision:0,draft:initialOperationPolicy(),updatedAt:'2026-09-22T00:00:00Z'});
 beforeEach(()=>{
   vi.clearAllMocks();

@@ -4,7 +4,17 @@ import path from "node:path";
 const ROOT = process.cwd();
 const CONFIG_PATH = path.join(ROOT, "config/architecture-boundary-ratchet.json");
 const SOURCE_EXTENSIONS = new Set([".js", ".jsx", ".mjs", ".mts", ".ts", ".tsx"]);
-const SOURCE_ROOTS = ["apps/web/src", "apps/admin/src", "apps/api/src", "packages/contracts/src"];
+const APP_SOURCE_ROOTS = {
+  web: "apps/web/src",
+  admin: "apps/admin-web/src",
+  api: "apps/api/src",
+};
+const PACKAGE_SOURCE_ROOTS = fs.existsSync(path.join(ROOT, "packages"))
+  ? fs.readdirSync(path.join(ROOT, "packages"), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(ROOT, "packages", entry.name, "src")))
+      .map((entry) => path.posix.join("packages", entry.name, "src"))
+  : [];
+const SOURCE_ROOTS = [...Object.values(APP_SOURCE_ROOTS), ...PACKAGE_SOURCE_ROOTS];
 const CONTRACT_FORBIDDEN_IMPORT_PREFIXES = [
   "react",
   "react-dom",
@@ -45,7 +55,7 @@ function importsFrom(source) {
 function normalizeTarget(file, specifier) {
   const clean = specifier.split(/[?#]/, 1)[0];
   if (clean.startsWith("@/")) return path.posix.join("apps/web/src", clean.slice(2));
-  if (clean.startsWith("@admin/")) return path.posix.join("apps/admin/src", clean.slice(7));
+  if (clean.startsWith("@admin/")) return path.posix.join("apps/admin-web/src", clean.slice(7));
   if (clean.startsWith("apps/")) return clean;
   if (!clean.startsWith(".")) return null;
   const absolute = path.resolve(ROOT, path.dirname(file), clean);
@@ -53,16 +63,25 @@ function normalizeTarget(file, specifier) {
 }
 
 function domainOf(file, app) {
-  const prefix = `apps/${app}/src/domains/`;
+  const sourceRoot = APP_SOURCE_ROOTS[app];
+  if (!sourceRoot) return null;
+  const prefix = `${sourceRoot}/domains/`;
   if (!file.startsWith(prefix)) return null;
   return file.slice(prefix.length).split("/", 1)[0] || null;
 }
 
+function packageSource(file) {
+  return PACKAGE_SOURCE_ROOTS.some((root) => file.startsWith(`${root}/`));
+}
+
 const counts = {
   webToAdmin: 0,
+  webToApi: 0,
   adminToWeb: 0,
+  adminToApi: 0,
   apiToWeb: 0,
   apiToAdmin: 0,
+  packagesToApps: 0,
   adminSharedToDomain: 0,
   adminCrossDomainDeepImport: 0,
   webSharedToDomain: 0,
@@ -97,14 +116,18 @@ for (const file of SOURCE_ROOTS.flatMap(walk)) {
       record("contractsToApps", file, target);
     }
 
-    if (file.startsWith("apps/web/src/") && target.startsWith("apps/admin/")) record("webToAdmin", file, target);
-    if (file.startsWith("apps/admin/src/") && target.startsWith("apps/web/")) record("adminToWeb", file, target);
-    if (file.startsWith("apps/api/src/") && target.startsWith("apps/web/")) record("apiToWeb", file, target);
-    if (file.startsWith("apps/api/src/") && target.startsWith("apps/admin/")) record("apiToAdmin", file, target);
+    if (file.startsWith(`${APP_SOURCE_ROOTS.web}/`) && target.startsWith("apps/admin-web/")) record("webToAdmin", file, target);
+    if (file.startsWith(`${APP_SOURCE_ROOTS.web}/`) && target.startsWith("apps/api/")) record("webToApi", file, target);
+    if (file.startsWith(`${APP_SOURCE_ROOTS.admin}/`) && target.startsWith("apps/web/")) record("adminToWeb", file, target);
+    if (file.startsWith(`${APP_SOURCE_ROOTS.admin}/`) && target.startsWith("apps/api/")) record("adminToApi", file, target);
+    if (file.startsWith(`${APP_SOURCE_ROOTS.api}/`) && target.startsWith("apps/web/")) record("apiToWeb", file, target);
+    if (file.startsWith(`${APP_SOURCE_ROOTS.api}/`) && target.startsWith("apps/admin-web/")) record("apiToAdmin", file, target);
+    if (packageSource(file) && target.startsWith("apps/")) record("packagesToApps", file, target);
 
     for (const app of ["web", "admin"]) {
-      const sharedPrefix = `apps/${app}/src/shared/`;
-      const domainPrefix = `apps/${app}/src/domains/`;
+      const appRoot = APP_SOURCE_ROOTS[app];
+      const sharedPrefix = `${appRoot}/shared/`;
+      const domainPrefix = `${appRoot}/domains/`;
       if (file.startsWith(sharedPrefix) && target.startsWith(domainPrefix)) {
         record(`${app}SharedToDomain`, file, target);
       }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { applyOperationPolicy, loadOperationPolicy, previewOperationPolicy } from "./api";
+import { applyOperationPolicy, loadOperationPolicy, previewOperationPolicy } from "./api/operation-policy-api";
 
 import type { LicenseReview, ModeProfile, OperatingMode, OperationFeature, OperationPolicyAdminView, OperationPolicyDraft, OperationPolicyPreview } from "@toonspectrum/contracts/operation-policy";
 

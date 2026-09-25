@@ -1,13 +1,19 @@
-# Admin application
+# Admin Web application
 
 Status: **migration**.
 
-`apps/admin` establishes a separate administrator browser surface without moving existing production capability in one risky change. It is independently type-checkable and buildable with the repository root frontend toolchain and emits `dist-admin/`.
-
-Admin feature placement should follow:
+`apps/admin-web` is a separate pnpm workspace package and independently type-checkable, testable
+and buildable administrator browser surface. It owns its Vite, TypeScript and Playwright
+configuration and emits `apps/admin-web/dist/`. Production deployment remains separately approved.
 
 ```text
-src/domains/<domain>/<capability>/...
+src/app       bootstrap, shell, routes and app-wide styles
+src/domains   administrator capabilities
+src/platform  technical adapters
+src/shared    domain-independent Admin-only primitives
 ```
 
-Use `src/shared` only for Admin-wide code that is domain-independent and `src/platform` for infrastructure adapters. Never import `apps/web` source. When Web and Admin genuinely need the same DTO/schema, promote that narrow contract to a focused shared contracts package rather than sharing UI or application internals.
+Existing production administrator capability under `apps/web/src/domains/admin` is migration
+debt. Move it capability by capability with route, API client, translations and tests together.
+Admin Web never imports Web or API source. Narrow shared DTOs and schemas belong in focused
+contracts packages only after a real second consumer exists.

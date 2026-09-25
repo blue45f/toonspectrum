@@ -6,7 +6,7 @@ The safe dependency direction is from deployable applications toward focused sha
 
 ```text
 apps/web   ─┐
-apps/admin ─┼──> packages/* (only focused, justified packages)
+apps/admin-web ─┼──> packages/* (only focused, justified packages)
 apps/api   ─┘
 ```
 
