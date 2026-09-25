@@ -199,6 +199,12 @@ Core의 `TRAFFIC_ANALYTICS_STORE=d1` 전환이 끝나기 전까지 현재 운영
 - 두 테이블 모두 일 단위 partition과 partition filter를 강제한다.
 - Sandbox는 streaming insert를 허용하지 않으므로 D1 buffer에서 NDJSON/Parquet batch load만 수행한다.
 
+2026-09-26 재확인한 [공식 Sandbox 제한](https://docs.cloud.google.com/bigquery/docs/sandbox)은
+저장 한도를 **평생 누적 10 GiB, 삭제해도 복구되지 않는 한도**로 설명한다. 월 1 TiB 쿼리 처리량과
+별개이며 테이블·뷰·partition은 최대 60일 뒤 만료된다. 따라서 주기적 삭제만으로 지속 가능한
+원시 이벤트 저장소나 영구 감사 기록으로 계산하지 않는다. 현재 dataset·table은 비어 있고
+운영 export·batch load 연결은 구현·활성화하지 않았다.
+
 재검증 또는 동일 구성 적용:
 
 ```bash
@@ -207,6 +213,24 @@ pnpm run gcp:free-data:check
 TOONSPECTRUM_GCP_FREE_DATA_CONFIRMATION=APPLY-TOONSPECTRUM-GCP-FREE-DATA \
   pnpm run gcp:free-data:apply
 ```
+
+### 다음 확장 후보의 제어 도구 — 2026-09-26 읽기 확인
+
+공급자 조작 전 MCP·공식 CLI·API와 현재 인증부터 확인한다. 아래 조사는 신규 로그인, 계정 생성,
+유료 전환 또는 운영 연결을 수행한 기록이 아니다.
+
+| 공급자 | 공식 제어 경로 | 현재 가능한 범위 |
+| --- | --- | --- |
+| Firestore | Firebase/Firestore MCP, `gcloud`, REST API | 기존 계정·결제 비활성 프로젝트 조회 가능. Render 서비스 인증과 독립 workload adapter는 미연결 |
+| BigQuery | BigQuery MCP, `bq`, REST API | 기존 `bq` 인증으로 조회 가능. Sandbox 누적 저장 한도 때문에 제한된 배치 분석 후보로 유지 |
+| Turso | 공식 OAuth MCP, `turso`, Platform API | 현재 인증·CLI 없음. 계정 연결 후 Free와 조직 한도를 확인할 다음 SQL 후보 |
+| TiDB Starter | 공식 MCP, `ti` CLI, API | 현재 인증·CLI 없음. 무료 지출 한도 0 확인과 MySQL 계약 검증 필요 |
+
+[Turso MCP](https://docs.turso.tech/integrations/mcp),
+[TiDB CLI](https://docs.pingcap.com/tidbcloud/get-started-with-cli/),
+[Firestore MCP](https://docs.cloud.google.com/firestore/docs/reference/mcp).
+계정의 독립 무료 할당량과 실제 workload 계약을 검증한 뒤 연결하며,
+후보 정책 파일의 공급자 개수를 현재 운영 처리량으로 합산하지 않는다.
 
 ### 보존한 Supabase compatibility schema
 
