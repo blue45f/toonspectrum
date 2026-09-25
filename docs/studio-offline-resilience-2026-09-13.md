@@ -10,12 +10,13 @@
 - Critical code is read from the install precache as well as the runtime cache;
   Cache API denial no longer blocks an otherwise successful online asset request.
 - A failed dictionary warm-up can retry on a later Studio navigation.
-- The editor has a lazy, collapsible Korean offline-preparation panel. Preparation
-  happens only on a click; it covers the app shells, critical code, Studio dictionaries
-  and the same-origin build resources currently recorded by the page's resource timing.
-- The optional panel has its own error boundary and a non-reloading lazy loader.
-  A failed panel chunk cannot unmount or reload the drawing document.
-- Preparation is limited to 400 requested URLs, 32 MiB downloaded, 8 MiB per resource
+- Every `/studio` route mounts an optional, isolated offline runtime. It prepares the
+  bounded core pack during idle time without a setup step, while Data Saver, hidden
+  documents and storage pressure suppress automatic downloads. The collapsible Korean
+  panel remains available for status, diagnostics and an explicit retry.
+- The optional runtime and panel have independent error boundaries and non-reloading
+  lazy loaders. A failed automation or panel chunk cannot unmount or reload the route.
+- Preparation is limited to 1,024 requested URLs, 32 MiB downloaded, 8 MiB per resource
   and a 30-second network preparation window. Fetches are sequential. Private API URLs,
   external hosts, credentialed/query URLs and non-build media are not admitted.
 - Every item is re-read after writes, so quota failures and cache trimming cannot
@@ -56,7 +57,7 @@ been claimed from helper or UI tests.
 
 The initial resource-timing-only preparation missed modules after the browser's timing buffer filled. Chromium could draw, but an offline reload failed on missing editor chunks; recovery subsequently exposed a missing release-schedule normalizer. These failures were reproduced before the fixes, not waived.
 
-- Build a bounded explicit-click static closure for the editor/router, inspector/hints, autosave/history, SQLite worker/WASM, and document recovery metadata. This is not an install or automatic warm-up payload.
+- Build a bounded Studio-triggered static closure for the editor/router, inspector/hints, autosave/history, SQLite worker/WASM, and document recovery metadata. It is not an install payload: the optional runtime requests it only after a `/studio` route opens, and the panel can retry explicitly.
 - Pin only this build-bounded core pack into the versioned precache. Remove duplicate runtime copies only after verifying the protected copy. Keep optional assets under the runtime cache bounds.
 - Supplement timing entries with actual module-preload/stylesheet/script URLs. The request limit is now 1,024 URLs; download/time/per-file limits still apply. This does not enable arbitrary origin, API, or query-string caching.
 - Include the drawing pack in the worker build fingerprint; reject a renamed/missing core module, missing storage worker/WASM, or a core pack over 32 MiB at build time.

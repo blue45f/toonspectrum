@@ -302,8 +302,9 @@ async function main(): Promise<void> {
       `warmUpStarted=${String(warmState?.warmUpStarted)} data entries=${warmEntries.data ?? 0}`,
     );
 
-    // Preparing the full editor is explicit. An unprepared client intentionally
-    // uses the small independent rescue instead; test that path in local-first-browser.
+    // Product runtime prepares the full editor automatically in idle time. The verifier sends the
+    // same bounded request directly so readiness is deterministic before the network is disabled.
+    // An unprepared client still uses the independent rescue path tested in local-first-browser.
     const prepared = await page.evaluate(async () => {
       const controller = navigator.serviceWorker.controller;
       if (!controller) return false;

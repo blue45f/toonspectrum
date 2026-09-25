@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { STUDIO_OFFLINE_AUTOMATION_EVENT } from "./studio-offline-automation";
 import { StudioOfflinePanel } from "./StudioOfflinePanel";
 
 const runtime = vi.hoisted(() => ({
@@ -99,47 +100,23 @@ describe("automatic Studio offline mode", () => {
     expect(screen.getByText(/서버 AI는 연결 복구 전 일시 중지/u)).toBeTruthy();
   });
 
-  it("prepares the current Studio pack automatically after mount", async () => {
-    vi.useFakeTimers();
-    runtime.inspect.mockResolvedValue({ ...device, offlineReady: false });
-    const view = openPanel();
-    await act(async () => { await Promise.resolve(); });
-    await act(async () => { await vi.runOnlyPendingTimersAsync(); });
-    vi.useRealTimers();
-    expect(runtime.prepare).toHaveBeenCalledTimes(1);
-    expect(view.container.querySelector('[data-studio-offline-panel="true"]')).toBeNull();
-  });
-
-  it("rechecks an incomplete offline pack after the server recovers", async () => {
-    vi.useFakeTimers();
-    runtime.inspect.mockResolvedValue({ ...device, offlineReady: false });
-    runtime.prepare
-      .mockResolvedValueOnce({
-        schema: 1, buildId: "build-1", checked: 5, cached: 3,
-        downloadedBytes: 20, missing: ["/assets/tool.js"], complete: false,
-      })
-      .mockResolvedValueOnce({
-        schema: 1, buildId: "build-1", checked: 5, cached: 5,
-        downloadedBytes: 10, missing: [], complete: true,
-      });
+  it("reflects automatic runtime readiness without starting a second preparation", async () => {
     useServerUnavailable();
-    const view = openPanel();
-    await act(async () => { await Promise.resolve(); });
-    await act(async () => { await vi.runOnlyPendingTimersAsync(); });
-    expect(runtime.prepare).toHaveBeenCalledTimes(1);
+    runtime.inspect.mockResolvedValue({ ...device, offlineReady: false });
+    openPanel();
+    await screen.findByText("서버 장애 · 로컬 작업 중");
 
-    connection.current = {
-      ...connection.current,
-      serverReachable: true,
-      mode: "online",
-      serverAvailable: true,
-      localOnly: false,
-    };
-    view.rerender(<StudioOfflinePanel />);
-    await act(async () => { await vi.runOnlyPendingTimersAsync(); });
-    vi.useRealTimers();
-    expect(runtime.prepare).toHaveBeenCalledTimes(2);
-    expect(view.container.querySelector('[data-studio-offline-panel="true"]')).toBeNull();
+    act(() => {
+      window.dispatchEvent(new CustomEvent(STUDIO_OFFLINE_AUTOMATION_EVENT, {
+        detail: {
+          phase: "ready",
+          message: "오프라인 앱 준비가 완료됐습니다.",
+        },
+      }));
+    });
+
+    expect(await screen.findByText("오프라인 앱 준비가 완료됐습니다.")).toBeTruthy();
+    expect(runtime.prepare).not.toHaveBeenCalled();
   });
 
   it("distinguishes a cached Studio navigation from browser connectivity", async () => {
@@ -169,21 +146,6 @@ describe("automatic Studio offline mode", () => {
     const button = await screen.findByRole("button", { name: "오프라인 준비 다시 시도" });
     fireEvent.click(button);
     expect(await screen.findByText(/일부 도구는 연결이 필요/u)).toBeTruthy();
-  });
-
-  it("skips automatic downloads when data saver is enabled", async () => {
-    vi.useFakeTimers();
-    Object.defineProperty(navigator, "connection", {
-      configurable: true,
-      value: { saveData: true },
-    });
-    runtime.inspect.mockResolvedValue({ ...device, offlineReady: false });
-    const view = openPanel();
-    await act(async () => { await Promise.resolve(); });
-    await act(async () => { await vi.runOnlyPendingTimersAsync(); });
-    vi.useRealTimers();
-    expect(runtime.prepare).not.toHaveBeenCalled();
-    expect(view.container.querySelector('[data-studio-offline-panel="true"]')).toBeNull();
   });
 
   it("keeps an unsupported browser actionable with a backup explanation", async () => {

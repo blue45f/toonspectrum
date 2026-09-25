@@ -6,6 +6,10 @@ import {
   requestStudioPersistentStorage,
   type StudioOfflineDeviceState,
 } from "./studio-offline-client";
+import {
+  STUDIO_OFFLINE_AUTOMATION_EVENT,
+  isStudioOfflineAutomationDetail,
+} from "./studio-offline-automation";
 import { useStudioConnectivity } from "./use-studio-connectivity";
 
 function dataSaverEnabled(): boolean {
@@ -29,8 +33,6 @@ export function StudioOfflinePanel() {
   );
   const mounted = useRef(false);
   const operation = useRef(false);
-  const automaticAttempt = useRef<string | null>(null);
-  const previousServerAvailable = useRef(connectivity.serverAvailable);
 
   const refresh = useCallback(async (): Promise<StudioOfflineDeviceState | null> => {
     const value = await inspectStudioOfflineDevice();
@@ -43,12 +45,19 @@ export function StudioOfflinePanel() {
   useEffect(() => {
     mounted.current = true;
     void refresh();
-    const invalidate = (): void => {
-      automaticAttempt.current = null;
+    const invalidate = (): void => { void refresh(); };
+    const automationChanged = (event: Event): void => {
+      const detail = event instanceof CustomEvent ? event.detail : null;
+      if (!isStudioOfflineAutomationDetail(detail)) return;
+      setBusy(detail.phase === "preparing");
+      if (detail.phase === "ready") setPrepared(true);
+      if (detail.phase === "partial" || detail.phase === "error") setPrepared(false);
+      setMessage(detail.message);
       void refresh();
     };
     window.addEventListener("online", invalidate);
     window.addEventListener("offline", invalidate);
+    window.addEventListener(STUDIO_OFFLINE_AUTOMATION_EVENT, automationChanged);
     let workers: ServiceWorkerContainer | undefined;
     try {
       workers = navigator.serviceWorker;
@@ -60,18 +69,17 @@ export function StudioOfflinePanel() {
       mounted.current = false;
       window.removeEventListener("online", invalidate);
       window.removeEventListener("offline", invalidate);
+      window.removeEventListener(STUDIO_OFFLINE_AUTOMATION_EVENT, automationChanged);
       workers?.removeEventListener("controllerchange", invalidate);
     };
   }, [refresh]);
 
-  const prepare = useCallback(async (automatic = false): Promise<void> => {
+  const prepare = useCallback(async (): Promise<void> => {
     if (operation.current) return;
     operation.current = true;
     setBusy(true);
     setPrepared(false);
-    setMessage(automatic
-      ? "오프라인 전환에 필요한 편집 도구를 백그라운드에서 준비하고 있습니다. 작업은 계속할 수 있습니다."
-      : "현재 버전의 편집 도구를 다시 확인하고 있습니다. 원고를 서버로 보내거나 화면을 새로고침하지 않습니다.");
+    setMessage("현재 버전의 편집 도구를 다시 확인하고 있습니다. 원고를 서버로 보내거나 화면을 새로고침하지 않습니다.");
     try {
       const report = await prepareLoadedStudioOfflineResources();
       if (!mounted.current) return;
@@ -91,29 +99,6 @@ export function StudioOfflinePanel() {
       if (mounted.current) setBusy(false);
     }
   }, [refresh]);
-
-  useEffect(() => {
-    const recovered = !previousServerAvailable.current && connectivity.serverAvailable;
-    previousServerAvailable.current = connectivity.serverAvailable;
-    if (!recovered) return;
-    automaticAttempt.current = null;
-    void refresh();
-  }, [connectivity.serverAvailable, refresh]);
-
-  useEffect(() => {
-    if (
-      !device?.supported
-      || !device.controlled
-      || device.offlineReady === true
-      || !connectivity.browserOnline
-      || dataSaverEnabled()
-    ) return;
-    const key = device.buildId ?? "current";
-    if (automaticAttempt.current === key) return;
-    automaticAttempt.current = key;
-    const timer = window.setTimeout(() => { void prepare(true); }, 1_200);
-    return () => window.clearTimeout(timer);
-  }, [connectivity.browserOnline, connectivity.serverAvailable, device, prepare]);
 
   const persist = async (): Promise<void> => {
     if (operation.current) return;
@@ -190,7 +175,7 @@ export function StudioOfflinePanel() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => { automaticAttempt.current = null; void prepare(false); }}
+              onClick={() => { void prepare(); }}
               disabled={busy || !device?.controlled || !device.supported || !connectivity.browserOnline}
               className="min-h-11 rounded-lg border border-line px-3 font-semibold disabled:opacity-50"
               aria-busy={busy}
