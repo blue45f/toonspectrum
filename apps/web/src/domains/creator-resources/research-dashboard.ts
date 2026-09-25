@@ -13,12 +13,29 @@ import type {
 } from "@/shared/lib/creator-resources";
 
 const DAY_MS = 86_400_000;
-const RESOURCE_PROVIDERS: readonly ResourceProvider[] = ["met", "openlibrary", "googlebooks", "openbd", "kakao", "bizinfo", "aic", "cleveland", "polyhaven"];
+const RESOURCE_PROVIDERS: readonly ResourceProvider[] = ["met", "openlibrary", "googlebooks", "openbd", "kakao", "bizinfo", "aic", "cleveland", "polyhaven", "ambientcg", "nasa", "vam", "rijksmuseum", "googlefonts", "gbif", "musicbrainz", "internetarchive", "metweather", "kheritage", "neis", "tourapi", "korean", "smithsonian", "wikimedia", "europeana", "dpla"];
 
 const SOURCE_REVIEW_DAYS: Record<ResourceProvider, number> = {
   aic: 30,
   cleveland: 30,
   polyhaven: 30,
+  ambientcg: 30,
+  nasa: 90,
+  vam: 90,
+  rijksmuseum: 90,
+  googlefonts: 30,
+  gbif: 30,
+  musicbrainz: 90,
+  internetarchive: 90,
+  metweather: 1,
+  kheritage: 90,
+  neis: 30,
+  tourapi: 7,
+  korean: 180,
+  smithsonian: 90,
+  wikimedia: 1,
+  europeana: 90,
+  dpla: 90,
   met: 180,
   openlibrary: 180,
   googlebooks: 180,
@@ -140,6 +157,8 @@ export function researchSearchHref(mode: ResearchSearchMode, value: string): str
 
 export function resourceLicenseLabel(license: CreatorResource["license"]): string {
   if (license === "CC0") return "CC0 공개 자료";
+  if (license === "CC-BY-4.0") return "출처표시 공개 자료";
+  if (license === "reference-only") return "레퍼런스 전용";
   if (license === "book-promotion") return "도서 소개 목적";
   return "메타데이터 · 원문 확인";
 }

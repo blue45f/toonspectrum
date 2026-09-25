@@ -26,6 +26,7 @@
     "./creator-role": "./src/creator-role.ts",
     "./studio-music": "./src/studio-music.ts",
     "./reference-query-language": "./src/reference-query-language.ts",
+    "./creator-resources": "./src/creator-resources.ts",
     "./server": {
       "types": "./src/server/index.ts",
       "import": "./src/server/index.ts",

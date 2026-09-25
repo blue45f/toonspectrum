@@ -6,12 +6,17 @@ export interface ProviderAvailability {
   provider: ResourceProvider;
   availability: "keyless" | "configured" | "not_configured";
 }
-const KEYLESS_PROVIDERS = new Set<ResourceProvider>(["met", "openlibrary", "openbd", "aic", "cleveland", "polyhaven"]);
+const KEYLESS_PROVIDERS = new Set<ResourceProvider>(["met", "openlibrary", "openbd", "aic", "cleveland", "polyhaven", "ambientcg", "nasa", "vam", "rijksmuseum", "gbif", "musicbrainz", "internetarchive", "metweather", "kheritage", "wikimedia"]);
 const LEGACY_PROVIDERS: ResourceProvider[] = ["met", "openlibrary", "openbd", "kakao", "bizinfo"];
 const EXPANDED_PROVIDERS: ResourceProvider[] = [...LEGACY_PROVIDERS, "aic", "cleveland"];
 const EXPECTED_PROVIDERS: ResourceProvider[] = [...EXPANDED_PROVIDERS, "googlebooks", "polyhaven"];
+const OPEN_REFERENCE_PROVIDERS: ResourceProvider[] = [...EXPECTED_PROVIDERS, "ambientcg", "nasa", "vam", "rijksmuseum"];
+const FONT_PROVIDERS: ResourceProvider[] = [...OPEN_REFERENCE_PROVIDERS, "googlefonts"];
+const DISCOVERY_PROVIDERS: ResourceProvider[] = [...FONT_PROVIDERS, "gbif", "musicbrainz", "internetarchive", "metweather"];
+const KOREAN_OPEN_DATA_PROVIDERS: ResourceProvider[] = [...DISCOVERY_PROVIDERS, "kheritage", "neis", "tourapi", "korean"];
+const INTERNATIONAL_DISCOVERY_PROVIDERS: ResourceProvider[] = [...KOREAN_OPEN_DATA_PROVIDERS, "smithsonian", "wikimedia", "europeana", "dpla"];
 /** Public configuration summary only; it is not a health check or a credential endpoint. */
-export function providerAvailability(configured: { kakao: boolean; bizinfo: boolean; googlebooks: boolean }): ProviderAvailability[] {
+export function providerAvailability(configured: { kakao: boolean; bizinfo: boolean; googlebooks: boolean; googlefonts: boolean; neis?: boolean; tourapi?: boolean; korean?: boolean; smithsonian?: boolean; europeana?: boolean; dpla?: boolean }): ProviderAvailability[] {
   return [
     { provider: "met", availability: "keyless" },
     { provider: "openlibrary", availability: "keyless" },
@@ -22,12 +27,35 @@ export function providerAvailability(configured: { kakao: boolean; bizinfo: bool
     { provider: "cleveland", availability: "keyless" },
     { provider: "googlebooks", availability: configured.googlebooks ? "configured" : "not_configured" },
     { provider: "polyhaven", availability: "keyless" },
+    { provider: "ambientcg", availability: "keyless" },
+    { provider: "nasa", availability: "keyless" },
+    { provider: "vam", availability: "keyless" },
+    { provider: "rijksmuseum", availability: "keyless" },
+    { provider: "googlefonts", availability: configured.googlefonts ? "configured" : "not_configured" },
+    { provider: "gbif", availability: "keyless" },
+    { provider: "musicbrainz", availability: "keyless" },
+    { provider: "internetarchive", availability: "keyless" },
+    { provider: "metweather", availability: "keyless" },
+    { provider: "kheritage", availability: "keyless" },
+    { provider: "neis", availability: configured.neis ? "configured" : "not_configured" },
+    { provider: "tourapi", availability: configured.tourapi ? "configured" : "not_configured" },
+    { provider: "korean", availability: configured.korean ? "configured" : "not_configured" },
+    { provider: "smithsonian", availability: configured.smithsonian ? "configured" : "not_configured" },
+    { provider: "wikimedia", availability: "keyless" },
+    { provider: "europeana", availability: configured.europeana ? "configured" : "not_configured" },
+    { provider: "dpla", availability: configured.dpla ? "configured" : "not_configured" },
   ];
 }
 export function parseProviderAvailability(value: unknown): ProviderAvailability[] | null {
-  if (!Array.isArray(value) || ![LEGACY_PROVIDERS.length, EXPANDED_PROVIDERS.length, EXPECTED_PROVIDERS.length].includes(value.length)) return null;
+  if (!Array.isArray(value) || ![LEGACY_PROVIDERS.length, EXPANDED_PROVIDERS.length, EXPECTED_PROVIDERS.length, OPEN_REFERENCE_PROVIDERS.length, FONT_PROVIDERS.length, DISCOVERY_PROVIDERS.length, KOREAN_OPEN_DATA_PROVIDERS.length, INTERNATIONAL_DISCOVERY_PROVIDERS.length].includes(value.length)) return null;
   const expected = value.length === LEGACY_PROVIDERS.length ? LEGACY_PROVIDERS
-    : value.length === EXPANDED_PROVIDERS.length ? EXPANDED_PROVIDERS : EXPECTED_PROVIDERS;
+    : value.length === EXPANDED_PROVIDERS.length ? EXPANDED_PROVIDERS
+      : value.length === EXPECTED_PROVIDERS.length ? EXPECTED_PROVIDERS
+        : value.length === OPEN_REFERENCE_PROVIDERS.length ? OPEN_REFERENCE_PROVIDERS
+          : value.length === FONT_PROVIDERS.length ? FONT_PROVIDERS
+            : value.length === DISCOVERY_PROVIDERS.length ? DISCOVERY_PROVIDERS
+              : value.length === KOREAN_OPEN_DATA_PROVIDERS.length ? KOREAN_OPEN_DATA_PROVIDERS
+                : INTERNATIONAL_DISCOVERY_PROVIDERS;
   const entries: ProviderAvailability[] = [];
   for (const raw of value) {
     if (raw === null || typeof raw !== "object") return null;

@@ -33,6 +33,78 @@ const PolyHavenPage = lazyRetry(
   () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.PolyHavenPage })),
   "PolyHavenPage",
 );
+const AmbientCgPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.AmbientCgPage })),
+  "AmbientCgPage",
+);
+const NasaImagesPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.NasaImagesPage })),
+  "NasaImagesPage",
+);
+const VamCollectionsPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.VamCollectionsPage })),
+  "VamCollectionsPage",
+);
+const RijksmuseumPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.RijksmuseumPage })),
+  "RijksmuseumPage",
+);
+const GoogleFontsPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.GoogleFontsPage })),
+  "GoogleFontsPage",
+);
+const GbifPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.GbifPage })),
+  "GbifPage",
+);
+const MusicBrainzPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.MusicBrainzPage })),
+  "MusicBrainzPage",
+);
+const InternetArchivePage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.InternetArchivePage })),
+  "InternetArchivePage",
+);
+const MetWeatherPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.MetWeatherPage })),
+  "MetWeatherPage",
+);
+const KoreanHeritagePage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.KoreanHeritagePage })),
+  "KoreanHeritagePage",
+);
+const NeisSchoolPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.NeisSchoolPage })),
+  "NeisSchoolPage",
+);
+const TourApiPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.TourApiPage })),
+  "TourApiPage",
+);
+const KoreanDictionaryPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.KoreanDictionaryPage })),
+  "KoreanDictionaryPage",
+);
+const SmithsonianPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.SmithsonianPage })),
+  "SmithsonianPage",
+);
+const WikimediaInterestPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.WikimediaInterestPage })),
+  "WikimediaInterestPage",
+);
+const EuropeanaPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.EuropeanaPage })),
+  "EuropeanaPage",
+);
+const DplaPage = lazyRetry(
+  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.DplaPage })),
+  "DplaPage",
+);
+const OpenDataLabPage = lazyRetry(
+  () => import("@/domains/creator-resources/OpenDataLabPage").then((module) => ({ default: module.OpenDataLabPage })),
+  "OpenDataLabPage",
+);
 const GlobalBooksPage = lazyRetry(
   () => import("@/domains/creator-resources/GlobalBooksPage").then((module) => ({ default: module.GlobalBooksPage })),
   "GlobalBooksPage",
@@ -91,6 +163,30 @@ export const creatorResourcesRoutes = defineAppRoutes([
   { id: "research-content-packs", path: "/research/packs", element: <ContentPacksPage /> },
   { id: "research-books", path: "/research/books", element: <GlobalBooksPage /> },
   { id: "research-polyhaven", path: "/research/3d-assets", element: <PolyHavenPage /> },
+  { id: "research-ambientcg", path: "/research/material-assets", element: <AmbientCgPage /> },
+  { id: "research-nasa-images", path: "/research/space-assets", element: <NasaImagesPage /> },
+  { id: "research-vam", path: "/research/vam", element: <VamCollectionsPage /> },
+  { id: "research-rijksmuseum", path: "/research/rijksmuseum", element: <RijksmuseumPage /> },
+  { id: "research-google-fonts", path: "/research/fonts", element: <GoogleFontsPage /> },
+  { id: "research-gbif", path: "/research/creatures", element: <GbifPage /> },
+  { id: "research-musicbrainz", path: "/research/music-metadata", element: <MusicBrainzPage /> },
+  { id: "research-internet-archive", path: "/research/archive", element: <InternetArchivePage /> },
+  { id: "research-met-weather", path: "/research/weather-light", element: <MetWeatherPage /> },
+  { id: "research-open-data", path: "/research/open-data", element: <OpenDataLabPage /> },
+  { id: "research-open-data-heritage", path: "/research/open-data/kheritage", element: <KoreanHeritagePage /> },
+  { id: "research-open-data-schools", path: "/research/open-data/neis", element: <NeisSchoolPage /> },
+  { id: "research-open-data-tour", path: "/research/open-data/tourapi", element: <TourApiPage /> },
+  { id: "research-open-data-korean", path: "/research/open-data/korean", element: <KoreanDictionaryPage /> },
+  { id: "research-open-data-smithsonian", path: "/research/open-data/smithsonian", element: <SmithsonianPage /> },
+  { id: "research-open-data-wikimedia", path: "/research/open-data/wikimedia", element: <WikimediaInterestPage /> },
+  { id: "research-open-data-europeana", path: "/research/open-data/europeana", element: <EuropeanaPage /> },
+  { id: "research-open-data-dpla", path: "/research/open-data/dpla", element: <DplaPage /> },
+  { id: "research-open-data-ambientcg", path: "/research/open-data/ambientcg", element: <AmbientCgPage /> },
+  { id: "research-open-data-vam", path: "/research/open-data/vam", element: <VamCollectionsPage /> },
+  { id: "research-open-data-nasa", path: "/research/open-data/nasa", element: <NasaImagesPage /> },
+  { id: "research-open-data-gbif", path: "/research/open-data/gbif", element: <GbifPage /> },
+  { id: "research-open-data-musicbrainz", path: "/research/open-data/musicbrainz", element: <MusicBrainzPage /> },
+  { id: "research-open-data-internet-archive", path: "/research/open-data/internetarchive", element: <InternetArchivePage /> },
   { id: "resources-references", path: "/creator-hub/references", element: <Navigate to="/research/assets" replace /> },
   { id: "resources-opportunities", path: "/opportunities", element: <OpportunitiesPage /> },
   { id: "resources-recipes", path: "/learn/recipes", element: <RecipesPage /> },

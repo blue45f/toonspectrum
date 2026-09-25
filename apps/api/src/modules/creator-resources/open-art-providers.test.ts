@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { openArtUrl } from "./open-art-providers";
 import { createResourceEngine } from "./resource-engine";
-import { parseResource, parseSearchResult, parseWorkspace } from "../../../../web/src/shared/lib/creator-resources";
+import { parseResource, parseSearchResult, parseWorkspace } from "@toonspectrum/core/creator-resources";
 import { parseProviderAvailability, providerAvailability } from "../../../../web/src/shared/lib/creator-resource-workflow";
 import { localizeReferenceProviderQuery } from "../../../../../packages/core/src/reference-query-language";
 
@@ -56,11 +56,15 @@ describe("keyless museum adapters", () => {
     expect(localizeReferenceProviderQuery({ provider: "kakao", q: "갑옷" }).q).toBe("갑옷");
   });
   it("accepts complete old and new status contracts during staggered rollout", () => {
-    const all = providerAvailability({ kakao: false, bizinfo: false, googlebooks: false });
-    expect(all).toHaveLength(9); expect(parseProviderAvailability(all)).toHaveLength(9);
+    const all = providerAvailability({ kakao: false, bizinfo: false, googlebooks: false, googlefonts: false });
+    expect(all).toHaveLength(26); expect(parseProviderAvailability(all)).toHaveLength(26);
     expect(parseProviderAvailability(all.slice(0, 5))).toHaveLength(5);
     expect(parseProviderAvailability(all.slice(0, 7))).toHaveLength(7);
-    expect(parseProviderAvailability(all.slice(0, 8))).toBeNull();
+    expect(parseProviderAvailability(all.slice(0, 9))).toHaveLength(9);
+    expect(parseProviderAvailability(all.slice(0, 13))).toHaveLength(13);
+    expect(parseProviderAvailability(all.slice(0, 14))).toHaveLength(14);
+    expect(parseProviderAvailability(all.slice(0, 18))).toHaveLength(18);
+    expect(parseProviderAvailability(all.slice(0, 12))).toBeNull();
   });
   it("enforces a shared per-host request ceiling across client identifiers", async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async () => Response.json(body([])));

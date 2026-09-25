@@ -128,7 +128,7 @@ export function resolveSiteBgmExperience(pathname: string): SiteBgmExperience {
   if (hasPrefix(path, ["/studio/bg3d", "/studio/lift3d", "/studio/immersive"])) return THEMES.story;
   if (hasPrefix(path, ["/studio/templates", "/discover", "/search", "/recommend", "/random", "/explore", "/compare", "/research/catalog"])) return THEMES.discovery;
   if (hasPrefix(path, ["/studio/assets/brushes", "/studio/brushes"])) return THEMES.creator;
-  if (hasPrefix(path, ["/studio/assets", "/market", "/creator-resources", "/resources", "/opportunities", "/research/assets", "/research/packs", "/research/3d-assets"])) return THEMES.market;
+  if (hasPrefix(path, ["/studio/assets", "/market", "/creator-resources", "/resources", "/opportunities", "/research/assets", "/research/packs", "/research/3d-assets", "/research/material-assets", "/research/space-assets", "/research/vam", "/research/rijksmuseum", "/research/fonts", "/research/creatures", "/research/music-metadata", "/research/archive", "/research/weather-light", "/research/open-data"])) return THEMES.market;
   if (hasPrefix(path, ["/studio/manual", "/learn", "/guide", "/reference", "/references", "/manual", "/technology", "/design-system", "/design", "/research"])) return THEMES.learning;
   if (hasPrefix(path, ["/studio", "/create", "/creator", "/open-creation"])) return THEMES.creator;
   if (hasPrefix(path, ["/title", "/titles", "/author", "/authors", "/tags", "/library", "/global-books", "/research/books"])) return THEMES.catalog;

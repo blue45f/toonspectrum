@@ -1,5 +1,5 @@
-import { parseResource, recordOf, textOf } from "../../../../web/src/shared/lib/creator-resources";
-import type { CreatorResource, ResourceSearchResult } from "../../../../web/src/shared/lib/creator-resources";
+import { parseResource, recordOf, textOf } from "@toonspectrum/core/creator-resources";
+import type { CreatorResource, ResourceSearchResult } from "@toonspectrum/core/creator-resources";
 
 type Request = (url: URL, headers?: Record<string, string>) => Promise<{ value: unknown; fetchedAt: string }>;
 const SIZE = 12;

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { googleBooksUrl } from "./google-books-provider";
 import { polyHavenUrl } from "./polyhaven-provider";
 import { createResourceEngine } from "./resource-engine";
-import { parseResource, parseSearchResult } from "../../../../web/src/shared/lib/creator-resources";
+import { parseResource, parseSearchResult } from "@toonspectrum/core/creator-resources";
 
 const stamp = "2026-09-15T12:00:00.000Z";
 

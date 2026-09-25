@@ -30,6 +30,7 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
     exports: {
       ".": "./index.js",
       "./creator-role": "./creator-role.js",
+      "./creator-resources": "./creator-resources.js",
       "./production": "./production/index.js",
     },
     subpathEntries: [
@@ -40,6 +41,10 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
       {
         target: "production/index.js",
         compiledEntry: "packages/core/src/production/index.js",
+      },
+      {
+        target: "creator-resources.js",
+        compiledEntry: "packages/core/src/creator-resources.js",
       },
     ],
   },

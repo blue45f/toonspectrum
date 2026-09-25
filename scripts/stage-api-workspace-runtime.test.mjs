@@ -42,6 +42,11 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     );
     await compiledPackage(
       root,
+      "packages/core/src/creator-resources.js",
+      '"use strict"; module.exports = { creatorResources: "shared" };\n',
+    );
+    await compiledPackage(
+      root,
       "packages/core/src/production/index.js",
       '"use strict"; module.exports = { production: "risk-v2" };\n',
     );
@@ -90,6 +95,9 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     assert.deepEqual(requireFromApi("@toonspectrum/core/production"), {
       production: "risk-v2",
     });
+    assert.deepEqual(requireFromApi("@toonspectrum/core/creator-resources"), {
+      creatorResources: "shared",
+    });
     assert.deepEqual(requireFromApi("@toonspectrum/studio-project-model"), {
       model: "v3",
     });
@@ -120,6 +128,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       "utf8",
     ));
     assert.equal(corePackageJson.exports["./creator-role"], "./creator-role.js");
+    assert.equal(corePackageJson.exports["./creator-resources"], "./creator-resources.js");
     assert.equal(corePackageJson.exports["./production"], "./production/index.js");
     const contractsPackageJson = JSON.parse(await readFile(
       resolve(root, "node_modules", "@toonspectrum", "contracts", "package.json"),

@@ -1,4 +1,4 @@
-# 무료 API 발급·연동 대장 — 2026-09-15~16
+# 무료 API 발급·연동 대장 — 2026-09-15~25
 
 이 문서는 `/insights/resources`에 노출되는 외부 자료원 중 무료로 사용할 수 있는 항목의 발급·승인·운영 연결 상태를 기록한다. 비밀키 값, 개인 연락처, 세션 정보는 저장하지 않는다.
 
@@ -11,6 +11,9 @@
 | Poly Haven | 키·결제 없음 | 신청 불필요 | `/research/3d-assets` 검색 구현 | 상업 용도를 포함해 무료인 공식 API를 고유 `User-Agent`와 명확한 Poly Haven 출처 표시로 사용한다. CC0 3D 모델·HDRI·텍스처의 미리보기와 메타데이터만 검색하며 대용량 파일은 공식 원문으로 연결한다. |
 | Wikimedia Commons | 키·결제 없음 | 신청 불필요 | `/research/open-creation` CC0 검색 구현 | `LicenseShortName=CC0`, 출처·미리보기 호스트, 제한 없음이 모두 확인된 파일만 표시한다. 파일별 저작자·크레딧·조회일·원문 링크를 보존하고 그 밖의 CCL 이미지는 현재 가져오지 않는다. |
 | 만화규장각 KMAS | 무료·승인키 | 관리자 승인 완료, 2027-07-06 만료 | 기존 런타임 검색·카탈로그 보강 구현, 로컬 서버 키 연결·실호출 검증 완료 | `bookAndWebtoonList` 검색이 HTTP 200 및 `resultState=success`로 동작함을 확인했다. 일 1,000회 한도를 보호하기 위해 키는 서버 비밀로만 저장하고 자동 전체 수집보다 사용자 검색·제한적 보강을 우선한다. |
+| Smithsonian Open Access | 무료·결제 없음 | api.data.gov 키 발급 완료 | 서버 비밀 등록·`/research/open-data/smithsonian` 검색 어댑터 구현 | 레코드 메타데이터만 저장하며 이미지·3D·인물·상표 등 미디어 권리는 원문에서 별도 확인한다. |
+| DPLA | 무료·결제 없음 | 이메일 기반 무료 키 발급 완료 | 서버 비밀 등록·`/research/open-data/dpla` 검색 어댑터 구현 | 미국 문화유산 통합 메타데이터만 저장하고 이미지·원문 권리는 원 제공기관을 최종 기준으로 확인한다. |
+| Wikimedia Pageviews | 키·결제 없음 | 신청 불필요 | `/research/open-data/wikimedia` 최근 30일 집계 구현 | 백과 조회량은 관심 참고 신호로만 표시하며 독자 수·매출·성공 가능성과 합산하지 않는다. |
 
 Google Books 키를 처음 생성하는 과정에서 CLI 출력에 값이 노출된 인스턴스는 즉시 폐기했다. 현재 사용하는 키는 새로 발급한 대체 키이며 저장소·문서·로그에 값을 남기지 않는다.
 
@@ -22,9 +25,9 @@ Google Books 키를 처음 생성하는 과정에서 CLI 출력에 값이 노출
 | 카카오 책 검색 | Kakao Developers 로그인 → 앱 생성/선택 → REST API 키 확인 → 플랫폼·서비스 제한 설정 | 미발급 | 계정 소유자가 앱 약관과 서비스 정보를 확인한 뒤 앱을 생성한다. 키는 서버 비밀로만 저장한다. |
 | 국립중앙도서관 | 회원 가입/로그인 → Open API 이용 신청 → 담당자 승인 | 미신청 | 승인 후 ISBN·판사항 보강용 최소 범위부터 연결한다. |
 | 도서관 정보나루 | 회원 가입 → 인증키 신청 → 발급 | 미신청 | 개인·지역·연령 신호를 플랫폼 성과 지표와 분리해 표시하는 설계 후 신청한다. |
-| Europeana | 계정 가입 → 이메일 확인 → API 키 요청 | 미신청 | rights statement와 원 제공기관을 레코드별로 보존하는 어댑터를 먼저 준비한다. |
+| Europeana | 계정 생성 → 이메일 확인 → API 키 요청 | 검색 어댑터 구현 완료. 공식 가입 화면에 Google 소셜 로그인이 없고 별도 비밀번호 계정이 필요해 미가입 | 계정 소유자가 비밀번호·약관을 직접 확정한 뒤 `EUROPEANA_API_KEY`만 서버 비밀 저장소에 등록한다. |
+| NEIS | 로그인 → 이용 목적·연락처·서비스 URL 제출 → 승인 | 로그인·신청서 규격 확인, 어댑터 구현 완료. 필수 개인 연락처 자동 제출은 보안 제한으로 미제출 | 승인키를 받은 뒤 `NEIS_API_KEY`를 서버에 등록한다. 학생·개인정보는 조회하지 않는다. |
 | KOSIS | 회원 로그인 → Open API 인증키 신청, 통상 자동 승인 | 미신청 | 통계표 ID·단위·조사연도·작성기관을 함께 저장하는 스키마 확정 후 신청한다. |
-| Smithsonian Open Access | api.data.gov 키 신청 또는 공개 데이터 덤프 사용 | 미신청 | 소량 실시간 검색은 키, 정기 대량 갱신은 공식 공개 JSON 덤프를 우선 검토한다. |
 | KOPIS·KMDb·KOBIS·문화데이터 계열 | 기관별 회원/공공데이터 서비스키 신청과 승인 | 미신청 | 작품 관계·행사 캘린더에 필요한 API만 개별 신청한다. 범용 키 수집은 하지 않는다. |
 
 ## 신청 없이 먼저 사용할 수 있는 추가 공개 소스
@@ -45,3 +48,38 @@ AniList 상업 라이선스, TMDB 상업 사용, Freesound API 계약, Open-Mete
 3. 가능한 경우 API 단위 제한을 적용하고, 고정 egress IP가 확보된 배포 환경에만 IP 제한을 추가한다.
 4. 키 교체 시 기존 키를 먼저 폐기하거나 짧은 중첩 기간만 허용한다.
 5. 무료 쿼터를 비용 안전장치로 보지 않는다. 앱 내부 요청 제한·캐시·백오프를 함께 유지한다.
+
+## 2026-09-25 확장 구현
+
+| 제공처 | 인증 | 구현 상태 | 권리·제품 경계 |
+| --- | --- | --- | --- |
+| ambientCG API v3 | 키 없음 | `/research/material-assets` 실검색 구현 | CC0 미리보기·메타데이터와 출처를 저장한다. 실제 파일 형식·해상도·맵 구성은 원문에서 확인한다. |
+| NASA Images | 키 없음 | `/research/space-assets` 실검색 구현 | 안전한 미리보기와 메타데이터만 레퍼런스 보드에 저장한다. 표장·인물·제3자 권리 확인 전 Studio 직접 반입을 차단한다. |
+| V&A Collections | 키 없음 | `/research/vam` 실검색 구현 | 소장품 미리보기와 메타데이터를 레퍼런스 전용으로 저장한다. 작품별 조건과 V&A 약관을 최종 기준으로 삼는다. |
+| Rijksmuseum Data Services | 키 없음 | `/research/rijksmuseum` Search·Linked Data 구현 | 제목 검색 결과를 Resolver로 확인해 제작자·시대·설명·권리 표시를 보존한다. 상세 호출은 3건씩 제한한다. |
+| Library of Congress | 키 없음 | 운영 비활성 | 2026-09-25 현재 서버 네트워크의 공식 JSON 요청이 HTTP 403으로 차단됐다. 우회 수집하지 않고 공식 접근 가능 여부를 재검증한다. |
+
+새 제공처는 기존 공급자 중립 엔진의 HTTPS 호스트 허용 목록, 응답 크기 제한, schema gate, 요청 캐시, 동시성 제한, 제공처별 미리보기 호스트 검증을 통과해야 한다. NASA·V&A처럼 항목별 권리를 검색 응답만으로 확정할 수 없는 자료는 `reference-only`로 저장한다.
+
+### 신청·승인 대기 환경변수 계약
+
+| 기능 묶음 | 후보 제공처 | 서버 환경변수 | 활성화 전 확인 |
+| --- | --- | --- | --- |
+| 한국 배경·문화유산 | 국가유산청, 국가유산 지식이음, TourAPI, Odii, VWorld | `NATIONAL_HERITAGE_API_KEY`, `NRICH_API_KEY`, `TOUR_API_KEY`, `ODII_API_KEY`, `VWORLD_API_KEY` | 공공누리·미디어 권리, 위치 정확도, 삭제·변경 동기화 |
+| 주소·대사 | 도로명주소, 국립국어원 | `JUSO_API_KEY`, `KOREAN_DICTIONARY_API_KEY` | 주소 데이터 보존 범위, 사전 예문 복제 금지 |
+| 생물·날씨 | 국립생물자원관, 기상청 | `NIBR_API_KEY`, `KMA_API_KEY` | 이미지별 라이선스, 관측·예보 시점과 단위 |
+| 관심 신호 | 네이버 DataLab, KOSIS | `NAVER_DATALAB_CLIENT_ID`, `NAVER_DATALAB_CLIENT_SECRET`, `KOSIS_API_KEY` | 검색량·통계의 의미 분리, 조사연도·집계범위 표시 |
+| 도시·학교 | 서울 열린데이터광장, NEIS | `SEOUL_OPEN_DATA_KEY`, `NEIS_API_KEY` | 데이터셋별 약관, 개인정보 미수집 |
+| 글로벌 확장 | Smithsonian, Europeana, OpenTopography, Google Fonts, DPLA | `SMITHSONIAN_API_KEY`, `EUROPEANA_API_KEY`, `OPENTOPOGRAPHY_API_KEY`, `GOOGLE_FONTS_API_KEY`, `DPLA_API_KEY` | 레코드별 권리, 키 제한, 캐시·쿼터 정책 |
+
+실제 키 값은 저장소·브라우저·문서·로그에 남기지 않는다. 계정 가입 과정에서 본인확인, 약관 동의, 연락처, 결제수단, 기관명 또는 사용 목적 제출이 필요한 경우 해당 제공처의 승인 완료 전까지 제품 상태를 `신청·승인 필요`로 유지한다.
+
+### Google Fonts Developer API 발급·구현 상태 — 2026-09-25
+
+- 기존 로그인된 일반 Chrome과 `toonstudio-cloud-20260915` 프로젝트를 사용해 Web Fonts Developer API를 활성화했다.
+- Books·YouTube 키의 권한을 넓히지 않고 Web Fonts API만 허용하는 별도 제한키를 발급했다.
+- 최초 생성 명령이 응답에 키 문자열을 노출하는 동작을 확인해 해당 키를 즉시 폐기했다. 대체 키는 출력하지 않고 macOS Keychain에 저장했으며 실제 API 호출 HTTP 200을 확인했다.
+- 대체 키의 리소스 식별자만 `~/.config/toonstudio/google-fonts-api-key-resource`에 보관한다. 저장소·문서·로그에는 비밀값을 남기지 않는다.
+- 부분 응답(`family`, `variants`, `subsets`, `version`, `lastModified`, `category`)은 실측 613,980바이트, 1,955개 글꼴 가족이며 `korean` 서브셋 38개를 확인했다. 기존 외부 응답 2MB 상한 안에서 캐시하고 검색은 서버에서 로컬 필터링한다.
+- `/research/fonts`에서 한글·장르·굵기 검색과 실제 브라우저 글꼴 미리보기를 제공한다. 개별 글꼴의 작품 포함·임베딩·재배포 조건은 Google Fonts 상세 페이지의 라이선스를 최종 기준으로 사용한다.
+- 배포 환경의 `GOOGLE_FONTS_API_KEY` 등록과 서비스 배포는 별도 배포 승인 전까지 수행하지 않는다.

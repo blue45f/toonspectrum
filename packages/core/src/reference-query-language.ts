@@ -146,7 +146,7 @@ export function resolveReferenceQuery(input: string): ReferenceQueryResolution {
 
 /** Museum adapters share bounded vocabulary expansion; books keep their contract. */
 export function localizeReferenceProviderQuery(query: Record<string, unknown>): Record<string, unknown> {
-  if (typeof query.provider !== "string" || !["met", "aic", "cleveland"].includes(query.provider) || typeof query.q !== "string") return query;
+  if (typeof query.provider !== "string" || !["met", "aic", "cleveland", "nasa", "vam", "rijksmuseum"].includes(query.provider) || typeof query.q !== "string") return query;
   const resolution = resolveReferenceQuery(query.q);
   return resolution.status === "translated" || resolution.status === "partial"
     ? { ...query, q: resolution.providerQuery }

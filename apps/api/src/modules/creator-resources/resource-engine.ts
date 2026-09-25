@@ -1,18 +1,27 @@
 import { providerAvailability, upstreamRetrySeconds } from "../../../../web/src/shared/lib/creator-resource-workflow";
 import {
   httpsUrl, isProvider, parseDeadline, parseResource, recordOf, textOf,
-} from "../../../../web/src/shared/lib/creator-resources";
+} from "@toonspectrum/core/creator-resources";
 import {
   isReferenceSearchField,
   MET_DEPARTMENT_IDS,
 } from "../../../../web/src/shared/lib/reference-assets";
 
-import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "../../../../web/src/shared/lib/creator-resources";
+import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@toonspectrum/core/creator-resources";
 import type { ReferenceSearchField } from "../../../../web/src/shared/lib/reference-assets";
 
+import { ambientCgSearch, validAmbientCgShape } from "./ambientcg-provider";
 import { googleBooksSearch, validGoogleBooksShape } from "./google-books-provider";
+import { gbifSearch, validGbifShape } from "./gbif-provider";
+import { googleFontsSearch, validGoogleFontsShape } from "./google-fonts-provider";
 import { isOpenArtProvider, openArtSearch, validOpenArtShape } from "./open-art-providers";
+import { isOpenCatalogProvider, openCatalogSearch, validOpenCatalogShape } from "./open-catalog-providers";
+import { metWeatherSearch, validMetWeatherShape } from "./met-weather-provider";
+import { isKoreanOpenDataProvider, koreanOpenDataSearch, validKoreanOpenDataShape, validKoreanOpenDataTextShape } from "./korean-open-data-providers";
+import { internationalDiscoverySearch, isInternationalDiscoveryProvider, validInternationalDiscoveryShape } from "./international-discovery-providers";
 import { polyHavenSearch, validPolyHavenShape } from "./polyhaven-provider";
+import { isReferenceMediaProvider, referenceMediaSearch, validReferenceMediaShape } from "./reference-media-providers";
+import { rijksmuseumSearch, validRijksmuseumShape } from "./rijksmuseum-provider";
 
 type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 export interface ResourceEngineOptions {
@@ -26,12 +35,29 @@ const PAGE_SIZE = 12;
 const MAX_BODY = 2 * 1024 * 1024;
 const MAX_CACHE = 256;
 const LIMIT = 20;
-const USER_AGENT = "ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler; blue45f@gmail.com)";
+const USER_AGENT = "ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler)";
 const PROVIDER_KEY: Record<ResourceProvider, string> = {
   met: "",
   aic: "",
   cleveland: "",
   polyhaven: "",
+  ambientcg: "",
+  nasa: "",
+  vam: "",
+  rijksmuseum: "",
+  googlefonts: "GOOGLE_FONTS_API_KEY",
+  gbif: "",
+  musicbrainz: "",
+  internetarchive: "",
+  metweather: "",
+  kheritage: "",
+  neis: "NEIS_API_KEY",
+  tourapi: "TOUR_API_SERVICE_KEY",
+  korean: "KOREAN_DICTIONARY_API_KEY",
+  smithsonian: "SMITHSONIAN_API_KEY",
+  wikimedia: "",
+  europeana: "EUROPEANA_API_KEY",
+  dpla: "DPLA_API_KEY",
   openlibrary: "",
   googlebooks: "GOOGLE_BOOKS_API_KEY",
   openbd: "",
@@ -77,9 +103,19 @@ function finiteNumber(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 function validUpstreamShape(url: URL, value: unknown): boolean {
+  if (typeof value === "string") return validKoreanOpenDataTextShape(url, value);
+  if (["open.neis.go.kr", "apis.data.go.kr", "stdict.korean.go.kr"].includes(url.hostname)) return validKoreanOpenDataShape(url, value);
   if (url.hostname === "api.artic.edu" || url.hostname === "openaccess-api.clevelandart.org") return validOpenArtShape(url, value);
   if (url.hostname === "api.polyhaven.com") return validPolyHavenShape(url, value);
-  if (url.hostname === "www.googleapis.com") return validGoogleBooksShape(url, value);
+  if (url.hostname === "ambientcg.com") return validAmbientCgShape(url, value);
+  if (url.hostname === "images-api.nasa.gov" || url.hostname === "api.vam.ac.uk") return validReferenceMediaShape(url, value);
+  if (url.hostname === "data.rijksmuseum.nl") return validRijksmuseumShape(url, value);
+  if (url.hostname === "api.gbif.org") return validGbifShape(url, value);
+  if (url.hostname === "musicbrainz.org" || url.hostname === "archive.org") return validOpenCatalogShape(url, value);
+  if (url.hostname === "api.met.no") return validMetWeatherShape(url, value);
+  if (["api.si.edu", "api.europeana.eu", "api.dp.la", "wikimedia.org"].includes(url.hostname)) return validInternationalDiscoveryShape(url, value);
+  if (url.hostname === "www.googleapis.com" && url.pathname === "/books/v1/volumes") return validGoogleBooksShape(url, value);
+  if (url.hostname === "www.googleapis.com" && url.pathname === "/webfonts/v1/webfonts") return validGoogleFontsShape(url, value);
   if (url.hostname === "api.openbd.jp") return Array.isArray(value);
   const shape = recordOf(value);
   if (url.hostname === "openlibrary.org") {
@@ -167,13 +203,25 @@ function parseMetFilters(input: Record<string, unknown>): MetSearchFilters {
     isHighlight: rawHighlight === "true" || rawHighlight === true,
   };
 }
-async function limitedJson(response: Response): Promise<unknown> {
-  if (!response.ok || response.redirected || !response.headers.get("content-type")?.toLowerCase().includes("json")) { await response.body?.cancel(); throw new Error("upstream_response"); }
+type UpstreamBodyType = "json" | "xml";
+async function limitedBody(response: Response, bodyType: UpstreamBodyType): Promise<unknown> {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  const expectedContentType = bodyType === "json"
+    ? contentType.includes("json")
+    : contentType.includes("xml") || contentType.includes("text/plain");
+  if (!response.ok || response.redirected || !expectedContentType) {
+    await response.body?.cancel();
+    throw new Error("upstream_response");
+  }
   const size = Number(response.headers.get("content-length"));
-  if (Number.isFinite(size) && size > MAX_BODY) { await response.body?.cancel(); throw new Error("upstream_size"); }
+  if (Number.isFinite(size) && size > MAX_BODY) {
+    await response.body?.cancel();
+    throw new Error("upstream_size");
+  }
   const reader = response.body?.getReader();
   if (!reader) throw new Error("upstream_body");
-  let bytes = 0; let output = "";
+  let bytes = 0;
+  let output = "";
   const decoder = new TextDecoder();
   try {
     for (;;) {
@@ -184,15 +232,21 @@ async function limitedJson(response: Response): Promise<unknown> {
       output += decoder.decode(chunk.value, { stream: true });
     }
     output += decoder.decode();
-    return JSON.parse(output) as unknown;
-  } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+    return bodyType === "json" ? JSON.parse(output) as unknown : output;
+  } finally {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
 }
+
+const SECRET_QUERY_PARAMETERS = new Set(["api_key", "crtfckey", "key", "servicekey", "wskey"]);
 
 export function createResourceEngine(options: ResourceEngineOptions) {
   const now = options.now ?? Date.now;
   const cache = new Map<string, { until: number; value: unknown; fetchedAt: string; bytes: number }>();
   const pending = new Map<string, Promise<{ value: unknown; fetchedAt: string }>>();
   const cooldowns = new Map<string, number>();
+  const hostNextRequestAt = new Map<string, number>();
   const museumBudgets = new Map<string, { until: number; count: number }>();
   const clients = new Map<string, { until: number; count: number }>();
   let active = 0; let budgetStart = 0; let budget = 0; let cacheBytes = 0;
@@ -214,9 +268,9 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       clients.set(key, { until: time + 60000, count: 1 });
     }
   }
-  async function request(url: URL, headers: Record<string, string> = {}) {
+  async function request(url: URL, headers: Record<string, string> = {}, bodyType: UpstreamBodyType = "json") {
     // Keys only exist in the outbound URL/header. Never return/log URL, headers or upstream errors.
-    const identity = url.origin + url.pathname + "?" + [...url.searchParams].filter(([key]) => key !== "crtfcKey").map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
+    const identity = `${bodyType}:` + url.origin + url.pathname + "?" + [...url.searchParams].filter(([key]) => !SECRET_QUERY_PARAMETERS.has(key.toLowerCase())).map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`).join("&");
     const time = now();
     const hit = cache.get(identity);
     if (hit && hit.until > time) return hit;
@@ -228,7 +282,7 @@ export function createResourceEngine(options: ResourceEngineOptions) {
     if (time - budgetStart >= 60000) { budgetStart = time; budget = 0; }
     if (budget >= 120) throw new Error("upstream_budget");
     // Per-process ceilings; these are not distributed billing quotas.
-    if (url.hostname === "api.artic.edu" || url.hostname === "openaccess-api.clevelandart.org" || url.hostname === "api.polyhaven.com") {
+    if (["api.artic.edu", "openaccess-api.clevelandart.org", "api.polyhaven.com", "ambientcg.com", "images-api.nasa.gov", "api.vam.ac.uk", "data.rijksmuseum.nl", "api.gbif.org", "musicbrainz.org", "archive.org", "api.met.no", "khs.go.kr", "open.neis.go.kr", "apis.data.go.kr", "stdict.korean.go.kr", "api.si.edu", "api.europeana.eu", "api.dp.la", "wikimedia.org"].includes(url.hostname)) {
       const previous = museumBudgets.get(url.hostname);
       const bucket = previous && previous.until > time ? previous : { until: time + 60000, count: 0 };
       if (bucket.count >= 30) throw new Error("upstream_budget");
@@ -237,8 +291,15 @@ export function createResourceEngine(options: ResourceEngineOptions) {
     }
     budget += 1; active += 1;
     const task = (async () => {
+      const minimumInterval = url.hostname === "musicbrainz.org" ? 1100 : 0;
+      if (minimumInterval) {
+        const current = Date.now();
+        const scheduled = Math.max(current, hostNextRequestAt.get(url.hostname) ?? 0);
+        hostNextRequestAt.set(url.hostname, scheduled + minimumInterval);
+        if (scheduled > current) await new Promise((resolve) => setTimeout(resolve, scheduled - current));
+      }
       const response = await options.fetch(url.href, {
-        headers: { Accept: "application/json", "User-Agent": USER_AGENT, ...headers },
+        headers: { Accept: bodyType === "json" ? "application/json" : "application/xml,text/xml,text/plain;q=0.9", "User-Agent": USER_AGENT, ...headers },
         signal: AbortSignal.timeout(6000),
         redirect: "error",
         credentials: "omit",
@@ -248,13 +309,19 @@ export function createResourceEngine(options: ResourceEngineOptions) {
         await response.body?.cancel();
         throw new Error("upstream_cooldown");
       }
-      const value = await limitedJson(response);
+      const value = await limitedBody(response, bodyType);
       if (!validUpstreamShape(url, value)) throw new Error("upstream_schema");
       const fetchedAt = new Date(now()).toISOString();
-      const bytes = new TextEncoder().encode(JSON.stringify(value)).length;
+      const bytes = new TextEncoder().encode(typeof value === "string" ? value : JSON.stringify(value)).length;
       while (cache.size > 0 && (cache.size >= MAX_CACHE || cacheBytes + bytes > 8 * 1024 * 1024)) removeCached(cache.keys().next().value as string);
       cacheBytes += bytes;
-      cache.set(identity, { value, fetchedAt, bytes, until: now() + 300000 });
+      const cacheTtl = url.hostname === "api.met.no" ? 30 * 60_000
+        : url.hostname === "musicbrainz.org" || url.hostname === "archive.org" || url.hostname === "api.gbif.org"
+          ? 15 * 60_000
+          : ["khs.go.kr", "open.neis.go.kr", "apis.data.go.kr", "stdict.korean.go.kr", "api.si.edu", "api.europeana.eu", "api.dp.la", "wikimedia.org"].includes(url.hostname)
+            ? 15 * 60_000
+            : 5 * 60_000;
+      cache.set(identity, { value, fetchedAt, bytes, until: now() + cacheTtl });
       return { value, fetchedAt };
     })().finally(() => { active -= 1; pending.delete(identity); });
     pending.set(identity, task);
@@ -519,6 +586,13 @@ export function createResourceEngine(options: ResourceEngineOptions) {
         kakao: Boolean(env.KAKAO_REST_API_KEY?.trim()),
         bizinfo: Boolean(env.BIZINFO_API_KEY?.trim()),
         googlebooks: Boolean(env.GOOGLE_BOOKS_API_KEY?.trim()),
+        googlefonts: Boolean(env.GOOGLE_FONTS_API_KEY?.trim()),
+        neis: Boolean(env.NEIS_API_KEY?.trim()),
+        tourapi: Boolean(env.TOUR_API_SERVICE_KEY?.trim() || env.TOUR_API_KEY?.trim()),
+        korean: Boolean(env.KOREAN_DICTIONARY_API_KEY?.trim()),
+        smithsonian: Boolean(env.SMITHSONIAN_API_KEY?.trim()),
+        europeana: Boolean(env.EUROPEANA_API_KEY?.trim()),
+        dpla: Boolean(env.DPLA_API_KEY?.trim()),
       });
     },
     async search(raw: unknown, clientId = "anonymous"): Promise<ResourceSearchResult> {
@@ -532,17 +606,30 @@ export function createResourceEngine(options: ResourceEngineOptions) {
       takeClient(clientId);
       const result = (status: "not_configured" | "unavailable", message: string): ResourceSearchResult => ({ provider, status, items: [], page, hasMore: false, fetchedAt: null, message });
       const keyName = PROVIDER_KEY[provider];
-      const key = keyName ? options.env()[keyName]?.trim() ?? "" : "";
+      const env = options.env();
+      const key = provider === "tourapi"
+        ? env.TOUR_API_SERVICE_KEY?.trim() || env.TOUR_API_KEY?.trim() || ""
+        : keyName ? env[keyName]?.trim() ?? "" : "";
       if (keyName && !key) return result("not_configured", "서버 API 인증키가 등록되지 않았습니다. 공식 사이트에서 직접 확인할 수 있습니다.");
       try {
         if (provider === "met" && metFilters) return await met(input.q.trim(), page, metFilters);
         if (isOpenArtProvider(provider)) return await openArtSearch(provider, input.q.trim(), page, request);
         if (provider === "polyhaven") return await polyHavenSearch(input.q.trim(), page, request);
+        if (provider === "ambientcg") return await ambientCgSearch(input.q.trim(), page, request);
+        if (isReferenceMediaProvider(provider)) return await referenceMediaSearch(provider, input.q.trim(), page, request);
+        if (provider === "rijksmuseum") return await rijksmuseumSearch(input.q.trim(), page, request);
         if (provider === "openlibrary") return await openLibrary(input.q.trim(), page);
         if (provider === "googlebooks") return await googleBooksSearch(input.q.trim(), page, key, request);
+        if (provider === "googlefonts") return await googleFontsSearch(input.q.trim(), page, key, request);
+        if (provider === "gbif") return await gbifSearch(input.q.trim(), page, request);
+        if (isOpenCatalogProvider(provider)) return await openCatalogSearch(provider, input.q.trim(), page, request);
+        if (provider === "metweather") return await metWeatherSearch(input.q.trim(), page, request);
+        if (isKoreanOpenDataProvider(provider)) return await koreanOpenDataSearch(provider, input.q.trim(), page, key, request);
+        if (isInternationalDiscoveryProvider(provider)) return await internationalDiscoverySearch(provider, input.q.trim(), page, key, request, now());
         if (provider === "openbd") return await openBd(input.q.trim(), page);
         if (provider === "kakao") return await kakao(input.q.trim(), page, key);
-        return await bizinfo(input.q.trim(), page, key);
+        if (provider === "bizinfo") return await bizinfo(input.q.trim(), page, key);
+        throw new Error("unsupported_provider");
       } catch {
         return result("unavailable", "제공처 응답을 확인하지 못했습니다. 잠시 후 다시 검색하거나 공식 사이트를 이용하세요.");
       }

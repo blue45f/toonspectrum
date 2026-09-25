@@ -28,6 +28,23 @@ export const creatorResourceWorkflowCases: WorkflowCase[] = [
       { provider: "cleveland", availability: "keyless" },
       { provider: "googlebooks", availability: "not_configured" },
       { provider: "polyhaven", availability: "keyless" },
+      { provider: "ambientcg", availability: "keyless" },
+      { provider: "nasa", availability: "keyless" },
+      { provider: "vam", availability: "keyless" },
+      { provider: "rijksmuseum", availability: "keyless" },
+      { provider: "googlefonts", availability: "not_configured" },
+      { provider: "gbif", availability: "keyless" },
+      { provider: "musicbrainz", availability: "keyless" },
+      { provider: "internetarchive", availability: "keyless" },
+      { provider: "metweather", availability: "keyless" },
+      { provider: "kheritage", availability: "keyless" },
+      { provider: "neis", availability: "not_configured" },
+      { provider: "tourapi", availability: "not_configured" },
+      { provider: "korean", availability: "not_configured" },
+      { provider: "smithsonian", availability: "not_configured" },
+      { provider: "wikimedia", availability: "keyless" },
+      { provider: "europeana", availability: "not_configured" },
+      { provider: "dpla", availability: "not_configured" },
     ]);
     equal(JSON.stringify(api.describe()).includes("PRIVATE_SECRET"), false);
   } },
@@ -38,7 +55,7 @@ export const creatorResourceWorkflowCases: WorkflowCase[] = [
     equal(api.describe()[3].availability, "configured");
   } },
   { name: "provider status parser rejects missing, duplicate and contradictory entries", run() {
-    const all = providerAvailability({ kakao: false, bizinfo: true, googlebooks: false }); ok(parseProviderAvailability(all));
+    const all = providerAvailability({ kakao: false, bizinfo: true, googlebooks: false, googlefonts: false }); ok(parseProviderAvailability(all));
     equal(parseProviderAvailability(all.slice(1)), null);
     equal(parseProviderAvailability([all[0], all[0], all[2], all[3], all[4]]), null);
     equal(parseProviderAvailability([{ provider: "met", availability: "configured" }, all[1], all[2], all[3], all[4]]), null);

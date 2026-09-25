@@ -1,0 +1,458 @@
+/** Versioned, dependency-free contracts shared by the API, browser and regression tests. */
+export type ResourceProvider = "met" | "openlibrary" | "googlebooks" | "openbd" | "kakao" | "bizinfo" | "aic" | "cleveland" | "polyhaven" | "ambientcg" | "nasa" | "vam" | "rijksmuseum" | "googlefonts" | "gbif" | "musicbrainz" | "internetarchive" | "metweather" | "kheritage" | "neis" | "tourapi" | "korean" | "smithsonian" | "wikimedia" | "europeana" | "dpla";
+export type ResourceStatus = "ready" | "partial" | "not_configured" | "unavailable";
+export type ResourceLicense = "CC0" | "CC-BY-4.0" | "reference-only" | "metadata-only" | "book-promotion";
+export type ResourceImportPermission = "direct" | "reference-only" | "metadata-only" | "blocked";
+
+export interface ResourceProvenanceReceipt {
+  provider: ResourceProvider;
+  originalId: string;
+  sourceUrl: string;
+  title: string;
+  creator: string;
+  license: ResourceLicense;
+  rightsStatement: string;
+  attribution: string;
+  fetchedAt: string;
+  termsReviewedAt?: string;
+  importPermission: ResourceImportPermission;
+  modified: boolean;
+}
+
+export interface CreatorAssetMetadata {
+  objectName: string;
+  department: string;
+  culture: string;
+  period: string;
+  dynasty: string;
+  medium: string;
+  dimensions: string;
+  classification: string;
+  country: string;
+  objectBeginDate?: number;
+  objectEndDate?: number;
+  isHighlight: boolean;
+  tags: string[];
+  originalImageUrl?: string;
+  additionalImageUrls: string[];
+}
+
+export interface CreatorResource {
+  id: string;
+  provider: ResourceProvider;
+  title: string;
+  creator: string;
+  description: string;
+  sourceUrl: string;
+  license: ResourceLicense;
+  licenseUrl: string;
+  credit: string;
+  fetchedAt: string;
+  imageUrl?: string;
+  dateLabel?: string;
+  deadline?: string;
+  eligibility?: string;
+  isbn?: string;
+  asset?: CreatorAssetMetadata;
+  provenance?: ResourceProvenanceReceipt;
+}
+
+export interface ResourceSearchResult {
+  provider: ResourceProvider;
+  status: ResourceStatus;
+  items: CreatorResource[];
+  page: number;
+  hasMore: boolean;
+  fetchedAt: string | null;
+  message: string;
+  total?: number;
+}
+
+export const RESOURCE_LABELS: Record<ResourceProvider, string> = {
+  met: "The Met · 공개 미술 자료",
+  aic: "시카고 미술관 · 공개 미술 자료",
+  cleveland: "클리블랜드 미술관 · 공개 미술 자료",
+  polyhaven: "Poly Haven · 무료 CC0 3D·HDRI·텍스처",
+  ambientcg: "ambientCG · 무료 CC0 PBR·3D·HDRI",
+  nasa: "NASA Images · 우주·과학 이미지",
+  vam: "V&A · 패션·디자인·장식미술",
+  rijksmuseum: "Rijksmuseum · 미술·복식·장식",
+  googlefonts: "Google Fonts · 레터링·폰트",
+  gbif: "GBIF · 생물종·관찰 기록",
+  musicbrainz: "MusicBrainz · 음악가 메타데이터",
+  internetarchive: "Internet Archive · 역사 자료",
+  metweather: "MET Norway · 날씨·빛 참고",
+  kheritage: "국가유산청 · 국가유산 메타데이터",
+  neis: "NEIS · 학교 기본정보",
+  tourapi: "TourAPI · 국내 장소·관광",
+  korean: "표준국어대사전 · 대사·말투 연구",
+  smithsonian: "Smithsonian · 박물관·과학·문화유산",
+  wikimedia: "Wikimedia · 백과 조회 관심 신호",
+  europeana: "Europeana · 유럽 문화유산 통합검색",
+  dpla: "DPLA · 미국 문화유산 통합검색",
+  openlibrary: "Open Library · 글로벌 도서",
+  googlebooks: "Google Books · 무료 글로벌 도서 API",
+  openbd: "openBD · 일본 서지",
+  kakao: "카카오 · 도서 검색",
+  bizinfo: "기업마당 · 지원사업",
+};
+
+export function recordOf(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+}
+
+export function textOf(value: unknown, max = 500): string {
+  return typeof value === "string" ? value.slice(0, max).trim() : "";
+}
+
+export function httpsUrl(value: unknown, hosts?: readonly string[]): string {
+  if (typeof value !== "string" || value.length > 2048 || /[\r\n\t]/u.test(value)) return "";
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) return "";
+    if (hosts && !hosts.includes(url.hostname)) return "";
+    return url.href;
+  } catch { return ""; }
+}
+
+const SOURCE_HOSTS: Record<ResourceProvider, readonly string[]> = {
+  met: ["www.metmuseum.org", "metmuseum.org"],
+  aic: ["www.artic.edu", "artic.edu"],
+  cleveland: ["www.clevelandart.org", "clevelandart.org"],
+  polyhaven: ["polyhaven.com", "www.polyhaven.com"],
+  ambientcg: ["ambientcg.com", "www.ambientcg.com"],
+  nasa: ["images.nasa.gov"],
+  vam: ["collections.vam.ac.uk"],
+  rijksmuseum: ["www.rijksmuseum.nl", "id.rijksmuseum.nl"],
+  googlefonts: ["fonts.google.com"],
+  gbif: ["www.gbif.org"],
+  musicbrainz: ["musicbrainz.org"],
+  internetarchive: ["archive.org"],
+  metweather: ["api.met.no"],
+  kheritage: ["www.khs.go.kr", "khs.go.kr"],
+  neis: ["www.schoolinfo.go.kr", "schoolinfo.go.kr", "open.neis.go.kr"],
+  tourapi: ["korean.visitkorea.or.kr", "visitkorea.or.kr", "api.visitkorea.or.kr"],
+  korean: ["stdict.korean.go.kr"],
+  smithsonian: ["www.si.edu", "si.edu"],
+  wikimedia: ["ko.wikipedia.org"],
+  europeana: ["www.europeana.eu"],
+  dpla: ["dp.la", "www.dp.la"],
+  openlibrary: ["openlibrary.org", "www.openlibrary.org"],
+  googlebooks: ["books.google.com"],
+  openbd: ["openbd.jp", "www.openbd.jp"],
+  kakao: ["search.daum.net", "book.daum.net", "m.search.daum.net"],
+  bizinfo: ["www.bizinfo.go.kr", "bizinfo.go.kr"],
+};
+
+const MET_IMAGE_HOSTS = ["images.metmuseum.org"] as const;
+const PUBLIC_IMAGE_HOSTS: Partial<Record<ResourceProvider, readonly string[]>> = {
+  met: MET_IMAGE_HOSTS, aic: ["www.artic.edu"], cleveland: ["openaccess-cdn.clevelandart.org"],
+  polyhaven: ["cdn.polyhaven.com"], ambientcg: ["acg-media.struffelproductions.com"],
+  nasa: ["images-assets.nasa.gov"], vam: ["framemark.vam.ac.uk"],
+};
+const CC0_PROVIDERS = new Set<ResourceProvider>(["met", "aic", "cleveland", "polyhaven", "ambientcg", "rijksmuseum"]);
+const REFERENCE_ONLY_PROVIDERS = new Set<ResourceProvider>(["nasa", "vam", "rijksmuseum"]);
+const CC_BY_PROVIDERS = new Set<ResourceProvider>(["metweather"]);
+const REFERENCE_LICENSE_URLS: Partial<Record<ResourceProvider, string>> = {
+  nasa: "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+  vam: "https://www.vam.ac.uk/info/va-websites-terms-conditions",
+  rijksmuseum: "https://data.rijksmuseum.nl/policy",
+};
+
+export function isProvider(value: unknown): value is ResourceProvider {
+  return value === "met"
+    || value === "aic"
+    || value === "cleveland"
+    || value === "polyhaven"
+    || value === "ambientcg"
+    || value === "nasa"
+    || value === "vam"
+    || value === "rijksmuseum"
+    || value === "googlefonts"
+    || value === "gbif"
+    || value === "musicbrainz"
+    || value === "internetarchive"
+    || value === "metweather"
+    || value === "kheritage"
+    || value === "neis"
+    || value === "tourapi"
+    || value === "korean"
+    || value === "smithsonian"
+    || value === "wikimedia"
+    || value === "europeana"
+    || value === "dpla"
+    || value === "openlibrary"
+    || value === "googlebooks"
+    || value === "openbd"
+    || value === "kakao"
+    || value === "bizinfo";
+}
+
+export function dateOnly(value: unknown): string | undefined {
+  const raw = textOf(value, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(raw)) return undefined;
+  const date = new Date(`${raw}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === raw ? raw : undefined;
+}
+
+/** Ambiguous/open-ended periods remain unknown, never fabricated as an active deadline. */
+export function parseDeadline(period: unknown): string | undefined {
+  const match = textOf(period, 100).match(/^\s*(\d{4})-?(\d{2})-?(\d{2})\s*~\s*(\d{4})-?(\d{2})-?(\d{2})\s*$/u);
+  if (!match) return undefined;
+  const start = dateOnly(`${match[1]}-${match[2]}-${match[3]}`);
+  const end = dateOnly(`${match[4]}-${match[5]}-${match[6]}`);
+  return start && end && start <= end ? end : undefined;
+}
+
+export function deadlineLabel(deadline: string | undefined, now = new Date()): string {
+  const day = dateOnly(deadline);
+  if (!day) return "마감일 원문 확인";
+  const todayKst = new Date(now.getTime() + 9 * 3600000).toISOString().slice(0, 10);
+  const days = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${todayKst}T00:00:00Z`)) / 86400000);
+  return days < 0 ? "마감일 경과" : days === 0 ? "오늘 마감 · 시간 확인" : `D-${days}`;
+}
+
+function safeYear(value: unknown): number | undefined {
+  return typeof value === "number"
+    && Number.isInteger(value)
+    && value >= -10000
+    && value <= 3000
+    ? value
+    : undefined;
+}
+
+function safeTextList(value: unknown, maximumItems: number, maximumLength: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((item) => textOf(item, maximumLength))
+    .filter(Boolean))]
+    .slice(0, maximumItems);
+}
+
+function safeMetImages(value: unknown, maximumItems: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value
+    .map((item) => httpsUrl(item, MET_IMAGE_HOSTS))
+    .filter(Boolean))]
+    .slice(0, maximumItems);
+}
+
+export function parseCreatorAssetMetadata(value: unknown): CreatorAssetMetadata | undefined {
+  const v = recordOf(value);
+  const objectBeginDate = safeYear(v.objectBeginDate);
+  const objectEndDate = safeYear(v.objectEndDate);
+  const originalImageUrl = httpsUrl(v.originalImageUrl, MET_IMAGE_HOSTS);
+  const tags = safeTextList(v.tags, 24, 80);
+  const additionalImageUrls = safeMetImages(v.additionalImageUrls, 8);
+  const metadata: CreatorAssetMetadata = {
+    objectName: textOf(v.objectName, 200),
+    department: textOf(v.department, 240),
+    culture: textOf(v.culture, 240),
+    period: textOf(v.period, 240),
+    dynasty: textOf(v.dynasty, 240),
+    medium: textOf(v.medium, 800),
+    dimensions: textOf(v.dimensions, 1200),
+    classification: textOf(v.classification, 240),
+    country: textOf(v.country, 240),
+    isHighlight: v.isHighlight === true,
+    tags,
+    additionalImageUrls,
+    ...(objectBeginDate !== undefined ? { objectBeginDate } : {}),
+    ...(objectEndDate !== undefined ? { objectEndDate } : {}),
+    ...(originalImageUrl ? { originalImageUrl } : {}),
+  };
+  const hasContent = metadata.isHighlight
+    || metadata.tags.length > 0
+    || metadata.additionalImageUrls.length > 0
+    || metadata.originalImageUrl
+    || objectBeginDate !== undefined
+    || objectEndDate !== undefined
+    || [
+      metadata.objectName,
+      metadata.department,
+      metadata.culture,
+      metadata.period,
+      metadata.dynasty,
+      metadata.medium,
+      metadata.dimensions,
+      metadata.classification,
+      metadata.country,
+    ].some(Boolean);
+  return hasContent ? metadata : undefined;
+}
+
+export function parseResource(value: unknown): CreatorResource | null {
+  const v = recordOf(value);
+  if (!isProvider(v.provider)) return null;
+  const provider = v.provider;
+  const id = textOf(v.id, 180);
+  const title = textOf(v.title, 300);
+  const sourceUrl = httpsUrl(v.sourceUrl, SOURCE_HOSTS[provider]);
+  const fetchedAt = textOf(v.fetchedAt, 40);
+  if (!id.startsWith(`${provider}:`) || id.length <= provider.length + 1 || !title || !sourceUrl || !Number.isFinite(Date.parse(fetchedAt))) return null;
+  const license: ResourceLicense = CC0_PROVIDERS.has(provider) && v.license === "CC0"
+    ? "CC0"
+    : CC_BY_PROVIDERS.has(provider) && v.license === "CC-BY-4.0"
+      ? "CC-BY-4.0"
+      : REFERENCE_ONLY_PROVIDERS.has(provider) && v.license === "reference-only"
+        ? "reference-only"
+        : provider === "openbd" && v.license === "book-promotion"
+          ? "book-promotion"
+          : "metadata-only";
+  const imageUrl = license === "CC0" || license === "reference-only"
+    ? httpsUrl(v.imageUrl, PUBLIC_IMAGE_HOSTS[provider] ?? [])
+    : "";
+  const licenseUrl = license === "CC0"
+    ? "https://creativecommons.org/publicdomain/zero/1.0/"
+    : license === "CC-BY-4.0"
+      ? "https://creativecommons.org/licenses/by/4.0/"
+      : license === "reference-only"
+        ? REFERENCE_LICENSE_URLS[provider] ?? ""
+        : license === "book-promotion"
+          ? "https://openbd.jp/terms/"
+          : "";
+  const asset = provider === "met" && license === "CC0" ? parseCreatorAssetMetadata(v.asset) : undefined;
+  const creator = textOf(v.creator, 300);
+  const credit = textOf(v.credit, 500);
+  const requestedPermission = textOf(v.importPermission, 40);
+  const importPermission: ResourceImportPermission = requestedPermission === "blocked"
+    ? "blocked"
+    : license === "CC0"
+      ? "direct"
+      : license === "reference-only"
+        ? "reference-only"
+        : "metadata-only";
+  const rightsStatement = textOf(v.rightsStatement, 500) || (license === "CC0"
+    ? "CC0 공개 이용 표시 확인 · 초상권·상표권 등 별도 권리 확인"
+    : license === "CC-BY-4.0"
+      ? "CC BY 4.0 · 출처표시 필요"
+      : license === "reference-only"
+        ? "레퍼런스 전용 · 원본 반입 전 개별 권리 확인"
+        : "메타데이터·원문 링크 전용");
+  const termsReviewedAt = dateOnly(v.termsReviewedAt);
+  const provenance: ResourceProvenanceReceipt = {
+    provider,
+    originalId: textOf(v.originalId, 180) || id.slice(provider.length + 1),
+    sourceUrl, title, creator, license, rightsStatement,
+    attribution: textOf(v.attribution, 500) || credit || RESOURCE_LABELS[provider],
+    fetchedAt,
+    ...(termsReviewedAt ? { termsReviewedAt } : {}),
+    importPermission,
+    modified: v.modified === true,
+  };
+  return {
+    id, provider, title, sourceUrl, fetchedAt, license, licenseUrl, creator,
+    description: textOf(v.description, 1200), credit, provenance,
+    ...(imageUrl ? { imageUrl } : {}),
+    dateLabel: textOf(v.dateLabel, 100), deadline: dateOnly(v.deadline),
+    eligibility: textOf(v.eligibility, 300), isbn: textOf(v.isbn, 100),
+    ...(asset ? { asset } : {}),
+  };
+}
+
+export function parseSearchResult(value: unknown): ResourceSearchResult | null {
+  const v = recordOf(value);
+  if (!isProvider(v.provider) || !["ready", "partial", "not_configured", "unavailable"].includes(String(v.status)) || !Array.isArray(v.items) || v.items.length > 100) return null;
+  const items = v.items.map(parseResource).filter((item): item is CreatorResource => item !== null && item.provider === v.provider);
+  if (items.length !== v.items.length || new Set(items.map((item) => item.id)).size !== items.length) return null;
+  if ((v.status === "not_configured" || v.status === "unavailable") && items.length > 0) return null;
+  if (v.status === "not_configured" && v.hasMore === true) return null;
+  const total = v.total === undefined
+    ? undefined
+    : typeof v.total === "number" && Number.isSafeInteger(v.total) && v.total >= 0
+      ? v.total
+      : null;
+  if (total === null) return null;
+  return {
+    provider: v.provider, status: v.status as ResourceStatus, items,
+    page: typeof v.page === "number" && Number.isInteger(v.page) && v.page > 0 ? v.page : 1,
+    hasMore: v.hasMore === true, fetchedAt: typeof v.fetchedAt === "string" ? v.fetchedAt : null,
+    message: textOf(v.message, 500),
+    ...(total !== undefined ? { total } : {}),
+  };
+}
+
+export interface CreatorWorkspace {
+  version: 1;
+  saved: CreatorResource[];
+  story: Record<string, string>;
+  checks: string[];
+}
+
+export const STORY_FIELDS = ["title", "protagonist", "desire", "obstacle", "stakes", "world", "turn", "ending"] as const;
+export type StoryField = typeof STORY_FIELDS[number];
+export const STORY_LABELS: Record<StoryField, string> = {
+  title: "작품 가제", protagonist: "주인공은 누구인가요?", desire: "주인공이 원하는 것", obstacle: "가로막는 인물·상황",
+  stakes: "실패하면 잃는 것", world: "세계관의 규칙", turn: "첫 화의 전환점", ending: "마지막에 달라지는 것",
+};
+
+export function emptyWorkspace(): CreatorWorkspace { return { version: 1, saved: [], story: {}, checks: [] }; }
+
+export function parseWorkspace(raw: string | null): CreatorWorkspace {
+  if (!raw) return emptyWorkspace();
+  if (new TextEncoder().encode(raw).length > 1000000) throw new Error("저장 파일이 너무 큽니다. 1 MB 이하 파일을 사용하세요.");
+  const v = recordOf(JSON.parse(raw));
+  if (v.version !== 1 || !Array.isArray(v.saved) || v.saved.length > 200 || !Array.isArray(v.checks) || v.checks.length > 200) throw new Error("지원하지 않는 창작 보드 형식입니다.");
+  const saved = v.saved.map(parseResource);
+  if (saved.some((item) => !item)) throw new Error("출처 또는 이용조건이 유효하지 않은 항목이 있습니다.");
+  const story: Record<string, string> = {};
+  const incomingStory = recordOf(v.story);
+  for (const field of STORY_FIELDS) story[field] = typeof incomingStory[field] === "string" ? incomingStory[field].slice(0, 2000) : "";
+  return { version: 1, saved: [...new Map((saved as CreatorResource[]).map((item) => [item.id, item])).values()], story,
+    checks: [...new Set(v.checks.filter((item): item is string => typeof item === "string" && /^[\w-]{1,100}$/u.test(item)))],
+  };
+}
+
+const markdownText = (value: string) => value.replace(/[\\[\]<>`*_]/gu, "\\$&");
+
+function assetAttributionLines(item: CreatorResource): string {
+  if (!item.asset) return "";
+  const values = [
+    ["부서", item.asset.department],
+    ["유형", item.asset.objectName || item.asset.classification],
+    ["문화권", item.asset.culture],
+    ["시대", item.asset.period || item.dateLabel || ""],
+    ["재료·기법", item.asset.medium],
+    ["크기", item.asset.dimensions],
+  ].filter((entry) => entry[1]);
+  return values.map(([label, value]) => `- ${label}: ${markdownText(value)}\n`).join("");
+}
+
+export function attributionMarkdown(items: readonly CreatorResource[]): string {
+  return "# 창작 자료 출처 기록\n\n검색·열람 권한은 이미지 재배포 허가와 다릅니다. 제작에 사용하기 전 원문 조건을 다시 확인하세요.\n\n" + items.map((item) =>
+    `## ${markdownText(item.title)}\n- 제공처: ${RESOURCE_LABELS[item.provider]}\n- 저작자: ${markdownText(item.creator || "원문 확인")}\n- 원문: ${item.sourceUrl}\n- 이용조건: ${item.license}\n- 반입 범위: ${item.provenance?.importPermission ?? "metadata-only"}\n- 권리 메모: ${markdownText(item.provenance?.rightsStatement ?? "원문 확인")}\n- 크레딧: ${markdownText(item.credit)}\n${assetAttributionLines(item)}- 조회일: ${item.fetchedAt}\n`,
+  ).join("\n");
+}
+
+export function storyMarkdown(story: Record<string, string>): string {
+  return "# 웹툰 기획 워크시트\n\n직접 작성하는 기획 도구입니다. AI 생성 결과가 아닙니다.\n\n" + STORY_FIELDS.map((field) =>
+    `## ${STORY_LABELS[field]}\n${markdownText(story[field] || "아직 작성하지 않음")}\n`,
+  ).join("\n");
+}
+
+function icsText(value: string): string {
+  return value.replaceAll("\\", "\\\\").replace(/\r\n|\r|\n/gu, "\\n").replaceAll(",", "\\,").replaceAll(";", "\\;");
+}
+
+function foldIcs(line: string): string {
+  const encoder = new TextEncoder();
+  let output = ""; let width = 0;
+  for (const char of line) {
+    const bytes = encoder.encode(char).length;
+    if (width + bytes > 75) { output += "\r\n "; width = 1; }
+    output += char; width += bytes;
+  }
+  return output;
+}
+
+export function deadlineCalendar(item: CreatorResource, now = new Date()): string {
+  const day = dateOnly(item.deadline);
+  if (item.provider !== "bizinfo" || !day) throw new Error("확인된 마감일이 없습니다.");
+  const nextDay = new Date(Date.parse(`${day}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//ToonStudio//Creator Resources//KO", "CALSCALE:GREGORIAN",
+    "BEGIN:VEVENT", `UID:${encodeURIComponent(item.id)}@toonstudio.cloud`, `DTSTAMP:${now.toISOString().replace(/[-:]/gu, "").replace(/\.\d{3}/u, "")}`,
+    `DTSTART;VALUE=DATE:${day.replaceAll("-", "")}`, `DTEND;VALUE=DATE:${nextDay.replaceAll("-", "")}`,
+    `SUMMARY:${icsText(item.title)} 마감일 확인`, `DESCRIPTION:${icsText(`한국 시간 기준 마감일 참고 일정입니다. 정확한 접수 시간과 변경 여부는 원문에서 확인하세요.\n${item.sourceUrl}`)}`,
+    `URL:${item.sourceUrl}`, "END:VEVENT", "END:VCALENDAR", ""].map(foldIcs).join("\r\n");
+}

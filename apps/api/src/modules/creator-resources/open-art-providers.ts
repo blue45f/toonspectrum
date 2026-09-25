@@ -1,5 +1,5 @@
-import { httpsUrl, parseResource, recordOf, textOf } from "../../../../web/src/shared/lib/creator-resources";
-import type { CreatorResource, ResourceSearchResult } from "../../../../web/src/shared/lib/creator-resources";
+import { httpsUrl, parseResource, recordOf, textOf } from "@toonspectrum/core/creator-resources";
+import type { CreatorResource, ResourceSearchResult } from "@toonspectrum/core/creator-resources";
 
 export type OpenArtProvider = "aic" | "cleveland";
 type Request = (url: URL) => Promise<{ value: unknown; fetchedAt: string }>;

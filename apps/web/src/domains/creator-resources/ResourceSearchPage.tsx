@@ -6,39 +6,52 @@ import { ProviderStatus } from "./ProviderStatus";
 import { LocalSaveNotice, ResourceLayout } from "./ResourceLayout";
 import { downloadText, useCreatorWorkspace } from "./workspace";
 
-import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@/shared/lib/creator-resources";
+import type { CreatorResource, ResourceSearchResult } from "@/shared/lib/creator-resources";
 
 import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
 import { apiPath } from "@/infrastructure/api";
 
-type ResourceSearchProvider = Extract<ResourceProvider, "met" | "kakao" | "bizinfo" | "polyhaven">;
-interface ResourceSearchConfig {
-  title: string;
-  intro: string;
-  hint: string;
-  url: string;
-  examples: string[];
-}
-const CONFIG: Record<ResourceSearchProvider, ResourceSearchConfig> = {
-  met: { title: "창작 레퍼런스", intro: "복식·장식·가구·미술 자료를 찾아 출처와 함께 저장하세요. 공개 이용이 확인된 Met 자료만 미리보기를 제공합니다.", hint: "예: armor, costume, furniture, Korea", url: "https://www.metmuseum.org/art/collection", examples: ["armor", "costume", "furniture", "Korea"] },
-  kakao: { title: "만화·작법서 탐색", intro: "만화 단행본, 작법서와 참고 도서를 검색하세요. 작품과 판본의 관계는 원출처에서 확인하며 자동으로 동일 작품으로 합치지 않습니다.", hint: "예: 만화 작법, 웹툰, 스토리", url: "https://search.daum.net/search?w=book&q=%EB%A7%8C%ED%99%94", examples: ["만화 작법", "웹툰", "스토리"] },
-  bizinfo: { title: "작가 기회센터", intro: "기업마당 최근 최대 100건에서 지원사업을 찾습니다. 모든 공모전을 포함하지 않으며, 개인 작가와 사업자의 신청 자격은 공고 원문을 확인해야 합니다.", hint: "예: 웹툰, 만화, 콘텐츠", url: "https://www.bizinfo.go.kr/", examples: ["웹툰", "만화", "콘텐츠"] },
-  polyhaven: { title: "무료 3D·HDRI·텍스처 재료실", intro: "Poly Haven의 CC0 3D 모델·HDRI·텍스처를 검색해 배경과 소품 제작 자료로 저장하세요. 미리보기와 메타데이터만 불러오며 실제 파일 포맷·크기·의존성은 원문에서 확인합니다.", hint: "예: chair, architecture, forest, concrete", url: "https://polyhaven.com/", examples: ["chair", "architecture", "forest", "concrete"] },
-};
+import { RESOURCE_SEARCH_CONFIG } from "./resource-search-config";
+
+import type { ResourceSearchProvider } from "./resource-search-config";
+
 function resourceUsageLabel(item: CreatorResource): string {
   if (item.license === "CC0") return "공개 이용 확인";
+  if (item.license === "CC-BY-4.0") return "출처표시 이용";
+  if (item.license === "reference-only") return "레퍼런스 전용";
   if (item.license === "book-promotion") return "도서 소개 목적";
   return "정보·원문 링크";
 }
 function resourceUsageDescription(item: CreatorResource): string {
   if (item.license === "CC0") return "공식 제공처의 공개 이용 표시를 확인했습니다. 초상·상표 등 기타 권리는 별도 확인하세요.";
+  if (item.license === "CC-BY-4.0") return "출처표시가 필요한 공개 데이터입니다. 결과와 함께 제공기관·라이선스·조회 시점을 보존하세요.";
+  if (item.license === "reference-only") return "안전한 미리보기와 메타데이터만 저장합니다. 작품별 권리·표장·초상·제3자 조건을 확인하기 전 Studio 직접 가져오기는 허용하지 않습니다.";
   if (item.license === "book-promotion") return "도서 소개·홍보 목적의 서지정보입니다. 원본 데이터 재판매나 임의 변경은 허용 범위를 다시 확인하세요.";
   return "검색 메타데이터입니다. 이미지·본문 재배포 또는 각색 허락을 의미하지 않습니다.";
 }
+function GoogleFontPreview({ family }: { family: string }) {
+  const safeFamily = family.replace(/["'\\]/gu, "");
+  useEffect(() => {
+    if (!safeFamily) return;
+    const id = `toonstudio-google-font-${safeFamily.toLocaleLowerCase("en").replace(/[^a-z0-9]+/gu, "-")}`;
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(safeFamily).replace(/%20/gu, "+")}&display=swap`;
+    document.head.append(link);
+  }, [safeFamily]);
+  return <div className="border-b border-line bg-raised px-5 py-6" aria-label={`${family} 글꼴 미리보기`}>
+    <p className="break-words text-2xl leading-relaxed text-fg" style={{ fontFamily: `"${safeFamily}", sans-serif` }}>가나다라마바사 ABC 123</p>
+    <p className="mt-2 text-xs text-fg-3">실제 브라우저 렌더링 · 문구와 글리프 지원은 상세 페이지 확인</p>
+  </div>;
+}
+
 export function ResourceCard({ item, saved, onToggle, disabled }: { item: CreatorResource; saved: boolean; onToggle: () => void; disabled: boolean }) {
   const [imageFailed, setImageFailed] = useState(false);
   return <article className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-panel">
     {item.imageUrl && !imageFailed && <img src={item.imageUrl} alt={item.title} loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} className="h-52 w-full bg-raised object-contain p-3" />}
+    {item.provider === "googlefonts" && <GoogleFontPreview family={item.title} />}
     <div className="flex flex-1 flex-col space-y-3 p-5">
       <p className="text-xs font-semibold text-accent">{RESOURCE_LABELS[item.provider]} · {resourceUsageLabel(item)}</p>
       <h2 className="break-words text-lg font-bold">{item.title}</h2>
@@ -60,7 +73,7 @@ export function ResourceCard({ item, saved, onToggle, disabled }: { item: Creato
   </article>;
 }
 export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvider }) {
-  const config = CONFIG[provider];
+  const config = RESOURCE_SEARCH_CONFIG[provider];
   const [params, setParams] = useSearchParams();
   const query = params.get("q") ?? "";
   const pageValue = Number(params.get("page") ?? 1);
@@ -141,3 +154,20 @@ export function ReferencesPage() { return <ResourceSearchPage provider="met" />;
 export function OpportunitiesPage() { return <ResourceSearchPage provider="bizinfo" />; }
 export function WorksPage() { return <ResourceSearchPage provider="kakao" />; }
 export function PolyHavenPage() { return <ResourceSearchPage provider="polyhaven" />; }
+export function AmbientCgPage() { return <ResourceSearchPage provider="ambientcg" />; }
+export function NasaImagesPage() { return <ResourceSearchPage provider="nasa" />; }
+export function VamCollectionsPage() { return <ResourceSearchPage provider="vam" />; }
+export function RijksmuseumPage() { return <ResourceSearchPage provider="rijksmuseum" />; }
+export function GoogleFontsPage() { return <ResourceSearchPage provider="googlefonts" />; }
+export function GbifPage() { return <ResourceSearchPage provider="gbif" />; }
+export function MusicBrainzPage() { return <ResourceSearchPage provider="musicbrainz" />; }
+export function InternetArchivePage() { return <ResourceSearchPage provider="internetarchive" />; }
+export function MetWeatherPage() { return <ResourceSearchPage provider="metweather" />; }
+export function KoreanHeritagePage() { return <ResourceSearchPage provider="kheritage" />; }
+export function NeisSchoolPage() { return <ResourceSearchPage provider="neis" />; }
+export function TourApiPage() { return <ResourceSearchPage provider="tourapi" />; }
+export function KoreanDictionaryPage() { return <ResourceSearchPage provider="korean" />; }
+export function SmithsonianPage() { return <ResourceSearchPage provider="smithsonian" />; }
+export function WikimediaInterestPage() { return <ResourceSearchPage provider="wikimedia" />; }
+export function EuropeanaPage() { return <ResourceSearchPage provider="europeana" />; }
+export function DplaPage() { return <ResourceSearchPage provider="dpla" />; }

@@ -235,7 +235,7 @@ export function resolveSiteRouteVisualKind(input: string): SiteRouteVisualKind {
     family(pathname, ["/read/spatial", "/studio/3d", "/studio/bg3d", "/studio/immersive", "/studio/lift3d", "/studio/poser"])
     || pathname.includes("/scene")
   ) return "spatial";
-  if (family(pathname, ["/studio/assets", "/market", "/research/assets", "/research/packs", "/research/3d-assets"])) return "assets";
+  if (family(pathname, ["/studio/assets", "/market", "/research/assets", "/research/packs", "/research/3d-assets", "/research/material-assets", "/research/space-assets", "/research/vam", "/research/rijksmuseum", "/research/fonts", "/research/creatures", "/research/music-metadata", "/research/archive", "/research/weather-light", "/research/open-data"])) return "assets";
   if (pathname.includes("/review") || family(pathname, ["/reviews", "/feedback"])) return "review";
   if (pathname.includes("/publish") || family(pathname, ["/showcase", "/create"])) return "publish";
   if (family(pathname, ["/studio/manual", "/studio/environment", "/learn", "/help", "/guide", "/references", "/research", "/about/workflow", "/about/technology"])) return "learn";
