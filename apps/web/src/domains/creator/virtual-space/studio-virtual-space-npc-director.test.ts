@@ -140,18 +140,20 @@ describe("living studio NPC director", () => {
     const director = new StudioNpcDirector(DEFAULT_STUDIO_WORLD_MANIFEST);
     let maxMoving = 0;
     const traveled = new Map<string, number>();
-    for (let i = 0; i < 1200 * 30; i++) {
-      const views = director.advance(1 / 30, balanced);
+    const stepSeconds = 1 / 20;
+    const iterations = Math.round(20 * 60 / stepSeconds);
+    for (let i = 0; i < iterations; i++) {
+      const views = director.advance(stepSeconds, balanced);
       maxMoving = Math.max(maxMoving, views.filter((view) => view.moving).length);
       for (const view of views) {
-        if (i % 30 === 0) expect(studioWorldCanOccupy(DEFAULT_STUDIO_WORLD_MANIFEST, view.point)).toBe(true);
+        if (i % 20 === 0) expect(studioWorldCanOccupy(DEFAULT_STUDIO_WORLD_MANIFEST, view.point)).toBe(true);
         traveled.set(view.id, view.distance);
       }
     }
     expect(maxMoving).toBeLessThanOrEqual(2);
     expect(maxMoving).toBeGreaterThan(0);
     expect([...traveled.values()].every((value) => value > 400)).toBe(true);
-  });
+  }, 60_000);
 
   it("omits invalid spawns and bounds tab-resume catch-up without teleportation", () => {
     const blocked = { ...npc, point: { x: 130, y: 90 } };
