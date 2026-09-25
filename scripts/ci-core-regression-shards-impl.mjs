@@ -84,8 +84,8 @@ export function shardForTarget(target) {
     || target.startsWith("apps/web/src/domains/fortune/")
     || target.startsWith("apps/web/src/shared/catalog/")
     || target === "apps/web/src/shared/lib/__tests__/search.test.ts"
-    || target === "apps/web/src/infrastructure/search-client.test.ts"
-    || target === "apps/web/src/infrastructure/use-paginated-search.test.tsx"
+    || target === "apps/web/src/platform/search-client.test.ts"
+    || target === "apps/web/src/platform/use-paginated-search.test.tsx"
   ) {
     return "product";
   }

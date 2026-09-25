@@ -3,7 +3,7 @@
 import { Module } from "@nestjs/common";
 
 import { MembershipWalletModule } from "../membership-wallet/membership-wallet.module";
-import { UpstashCoordinationModule } from "../../infrastructure/upstash-coordination/upstash-coordination.module";
+import { UpstashCoordinationModule } from "../../platform/upstash-coordination/upstash-coordination.module";
 import { FortuneEnrichmentController } from "./fortune-enrichment.controller";
 import { FortuneEnrichmentService } from "./fortune-enrichment.service";
 import { fortuneEnrichmentConfig, FORTUNE_ENRICHMENT_CONFIG, FORTUNE_ENRICHMENT_RUNTIME } from "./fortune-enrichment.provider";

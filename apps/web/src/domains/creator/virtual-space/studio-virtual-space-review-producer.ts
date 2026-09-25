@@ -1,6 +1,6 @@
 import { canonicalJson, isoTimestampSchema, sha256Schema, studioEntityIdSchema } from "@toonspectrum/studio-project-model";
 import { z } from "zod";
-import { api, apiPath, httpStatus } from "@/infrastructure/api";
+import { api, apiPath, httpStatus } from "@/platform/api";
 import { parseStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-subject";
 
 const BASE = "/studio-project-graph/review-captures";

@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { fortuneMonthDays } from "../../../../../packages/core/src/fortune";
 import { KASI_POLICY_REVISION } from "./fortune-enrichment.provider";
 import { describe, expect, it, vi } from "vitest";
-import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import type { UpstashCoordinationPort } from "../../platform/upstash-coordination/upstash-coordination.port";
 import { FixtureSnapshots, followupConfig, followupCoordination, followupNow, specialXml } from "../../../test/fortune-followup-fixtures";
 import { FortuneEnrichmentService } from "./fortune-enrichment.service";
 import { fortuneSnapshotKey, parseFortuneSnapshot, type FortunePublicSnapshot } from "./fortune-snapshot";

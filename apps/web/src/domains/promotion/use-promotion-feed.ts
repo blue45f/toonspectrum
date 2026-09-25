@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { PromotionPage } from "../../../../../packages/core/src/promotion";
 
-import { promotionClient } from "@/infrastructure/promotion-client";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { promotionClient } from "@/platform/promotion-client";
+import { getApiErrorMessage } from "@/platform/api";
 
 export function usePromotionFeed(query: string, userId: string | null) {
   const key = JSON.stringify([query, userId]);

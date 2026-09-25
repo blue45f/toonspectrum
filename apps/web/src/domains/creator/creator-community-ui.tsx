@@ -20,7 +20,7 @@ import {
   type SeriesStatus,
   type SeriesSummary,
   type WorkSummary,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 
 // 아바타 컬러 hex → 그라디언트 원형 + 이니셜 (review-card 패턴 재사용)

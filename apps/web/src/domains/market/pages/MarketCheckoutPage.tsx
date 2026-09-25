@@ -19,7 +19,7 @@ import type {
   CommercePaymentMethod,
   MarketplaceCommerceQuote,
 } from "@toonspectrum/core/commerce";
-import type { TossWidgets } from "@/infrastructure/toss-payments-sdk";
+import type { TossWidgets } from "@/platform/toss-payments-sdk";
 
 import {
   confirmMarketplaceCommercePayment,
@@ -37,11 +37,11 @@ import Link from "@/compat/router-link";
 import {
   getCreatorMarketplaceResource,
   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget,
-} from "@/infrastructure/creator-marketplace-client";
-import { getApiErrorMessage } from "@/infrastructure/api";
+} from "@/platform/creator-marketplace-client";
+import { getApiErrorMessage } from "@/platform/api";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { loadTossPaymentsSdk } from "@/infrastructure/toss-payments-sdk";
+import { loadTossPaymentsSdk } from "@/platform/toss-payments-sdk";
 import {
   useDocumentTitle,
   useMetaDescription,

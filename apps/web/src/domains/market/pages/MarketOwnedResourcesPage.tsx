@@ -35,7 +35,7 @@ import {
   deleteCreatorMarketplaceResource,
   listCreatorMarketplaceOwnedHeads,
   relistCreatorMarketplaceResource,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 const PAGE_SIZE = 20;
 type LoadState = "idle" | "loading" | "ready" | "error";

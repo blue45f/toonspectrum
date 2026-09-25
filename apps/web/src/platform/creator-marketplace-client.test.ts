@@ -60,7 +60,7 @@ const { apiDelete, apiGet, apiPatch, apiPost, getApiErrorMessage, toApiError } =
   ),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: {
     delete: apiDelete,
     get: apiGet,

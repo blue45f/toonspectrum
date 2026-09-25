@@ -44,7 +44,7 @@ import { Link, useSearchParams } from "react-router-dom";
 
 import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
 
-import { getApiErrorMessage, httpStatus } from "@/infrastructure/api";
+import { getApiErrorMessage, httpStatus } from "@/platform/api";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 

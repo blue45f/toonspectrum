@@ -9,7 +9,7 @@ import { loadStudioReviewResolutionCaptures } from "../studio-review-capture-att
 import { studioReviewPageRasterSchema } from "../studio-review-source-map";
 import { lockStudioReviewPreviewStorage } from "../studio-review-preview-storage";
 import { studioReviewPreviewObject, type StudioReviewPreviewBlobRow } from "../studio-review-preview";
-import type { LocatedPrivateObjectReference } from "../../../infrastructure/private-object-storage/private-object-storage.contract";
+import type { LocatedPrivateObjectReference } from "../../../platform/private-object-storage/private-object-storage.contract";
 
 export class PinnedShareError extends Error {
   constructor(readonly code: "forbidden" | "not-found" | "expired" | "revoked" | "invalid-source" | "conflict" | "quota" | "unavailable") { super(`pinned_share_${code}`); }

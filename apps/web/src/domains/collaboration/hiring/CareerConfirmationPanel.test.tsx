@@ -12,7 +12,7 @@ import type { CreatorCareerItem } from "../../../../../../packages/contracts/src
 const session = vi.hoisted(() => ({ actor: "author" }));
 vi.mock("@/shared/lib/store", () => ({ useApp: (select: (s: { userId: string }) => unknown) => select({ userId: session.actor }) }));
 vi.mock("./career-confirmation-client", () => ({ careerConfirmationClient: { capability: vi.fn(), collaborators: vi.fn(), preview: vi.fn(), request: vi.fn(), list: vi.fn(), action: vi.fn(), publicSummaries: vi.fn() } }));
-vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: async (e: Error) => e.message, api: { get: vi.fn(async () => []), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
+vi.mock("@/platform/api", () => ({ getApiErrorMessage: async (e: Error) => e.message, api: { get: vi.fn(async () => []), post: vi.fn(), patch: vi.fn(), delete: vi.fn() } }));
 vi.mock("@/compat/router-link", () => ({ default: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
 vi.mock("@/shared/components/section", () => ({ Container: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }));
 vi.mock("../collaboration-ui", () => ({ CollabField: ({ label, children }: { label: string; children: React.ReactNode }) => <label>{label}{children}</label>, CollabNotice: ({ children }: { children: React.ReactNode }) => <div role="alert">{children}</div>, collabButton: "", collabInput: "", collabPrimary: "" }));

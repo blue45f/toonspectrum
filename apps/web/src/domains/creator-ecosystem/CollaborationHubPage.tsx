@@ -7,7 +7,7 @@ import {
   COLLABORATION_TYPES,
   COLLABORATION_TYPE_LABELS,
 } from "@/shared/lib/types";
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 import { useApp } from "@/shared/lib/store";
 
 import type {

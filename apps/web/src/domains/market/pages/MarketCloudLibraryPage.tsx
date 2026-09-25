@@ -35,7 +35,7 @@ import {
 import {
   listCreatorMarketplaceCloudLibrary,
   setCreatorMarketplaceCloudLibraryArchived,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 const PAGE_SIZE = 50;
 type LoadState = "idle" | "loading" | "ready" | "error";

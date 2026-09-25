@@ -13,7 +13,7 @@ import {
   listWorks,
   type ChallengeSummary,
   type WorkSummary,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 
 function SectionShell({

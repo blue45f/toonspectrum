@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { useI18n } from "@/shared/lib/i18n";
 
 import { integrationPlatformClient } from "./integration-platform-client";

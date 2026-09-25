@@ -41,7 +41,7 @@ import {
   deleteCreatorMarketplaceResource,
   listCreatorMarketplaceOwnedHeads,
   relistCreatorMarketplaceResource,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 export function MarketManagePage() {
   useDocumentTitle("내 등록 에셋 관리 · 창작 마켓");

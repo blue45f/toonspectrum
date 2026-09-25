@@ -19,7 +19,7 @@ vi.mock("@/shared/lib/store", () => ({
   useSavedTitleIds: () => new Set<string>(),
 }));
 
-vi.mock("@/infrastructure/use-paginated-search", () => ({
+vi.mock("@/platform/use-paginated-search", () => ({
   usePaginatedSearch: () => ({
     items: [],
     total: 0,

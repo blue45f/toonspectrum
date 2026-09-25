@@ -22,7 +22,7 @@ import {
 
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
 

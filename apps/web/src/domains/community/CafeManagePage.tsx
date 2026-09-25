@@ -45,7 +45,7 @@ import { useApp } from "@/shared/lib/store";
 import { GENRES } from "@/shared/lib/taxonomy";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 
 function rulesToText(rules: CommunityCafeRule[]): string {
   return rules.map((rule) => `${rule.title}${rule.description ? `|${rule.description}` : ""}`).join("\n");

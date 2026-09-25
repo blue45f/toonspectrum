@@ -9,7 +9,7 @@ import { useAdminGate } from "./components/admin-gate-state";
 import { CreatorMarketplaceModerationBoard } from "./components/CreatorMarketplaceModerationBoard";
 
 import type { FanCafeScopeFilter } from "@/shared/lib/types";
-import type { SharedAssetModerationQueueItem } from "@/infrastructure/creator-client";
+import type { SharedAssetModerationQueueItem } from "@/platform/creator-client";
 
 import { Container } from "@/shared/components/section";
 import { COMMUNITY_SCOPE_LABEL_WITH_ALL } from "@/shared/lib/community-ui";
@@ -22,7 +22,7 @@ import {
   getSharedAssetContent,
   listSharedAssetModerationQueue,
   moderateSharedAsset,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 interface ModerationPost {
   id: string;

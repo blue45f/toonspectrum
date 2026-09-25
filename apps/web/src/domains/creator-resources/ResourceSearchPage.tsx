@@ -9,7 +9,7 @@ import { downloadText, useCreatorWorkspace } from "./workspace";
 import type { CreatorResource, ResourceSearchResult } from "@/shared/lib/creator-resources";
 
 import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 
 import { RESOURCE_SEARCH_CONFIG } from "./resource-search-config";
 

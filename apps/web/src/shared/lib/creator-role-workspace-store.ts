@@ -2,7 +2,7 @@ import {
   CreatorRoleWorkspaceConflictError,
   getCreatorRoleWorkspace,
   saveCreatorRoleWorkspace,
-} from "@/infrastructure/creator-role-workspace-client";
+} from "@/platform/creator-role-workspace-client";
 import {
   creatorRoleWorkspacePreferenceForProfile,
   normalizeCreatorRoleWorkspacePreference,

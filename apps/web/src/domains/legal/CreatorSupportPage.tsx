@@ -33,7 +33,7 @@ import {
 import { useSession } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
 import { useT } from "@/shared/lib/i18n";

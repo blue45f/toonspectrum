@@ -10,8 +10,8 @@ import type { CollaborationList } from "../../../../../packages/core/src/collabo
 
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { collaborationClient } from "@/infrastructure/collaboration-client";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { collaborationClient } from "@/platform/collaboration-client";
+import { getApiErrorMessage } from "@/platform/api";
 import { Container } from "@/shared/components/section";
 import { useApp } from "@/shared/lib/store";
 

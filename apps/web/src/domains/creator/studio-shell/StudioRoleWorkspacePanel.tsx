@@ -15,7 +15,7 @@ import { useEffect, useState } from "react";
 
 import Link from "@/compat/router-link";
 import { useSession } from "@/compat/auth-session-store";
-import { getMyProfile, updateMyProfile, type MeProfile } from "@/infrastructure/me-client";
+import { getMyProfile, updateMyProfile, type MeProfile } from "@/platform/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   creatorRoleDefinition,

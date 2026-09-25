@@ -4,7 +4,7 @@ import { CollabField, CollabNotice, collabButton, collabInput, collabPrimary } f
 
 import type { CreatorTeam, CreatorTeamGroup, CreatorTeamInvite, CreatorTeamMember } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 
 const root = "/collaborations/teams";
 export function CreatorTeamsPanel({ actor }: { actor: string }) {

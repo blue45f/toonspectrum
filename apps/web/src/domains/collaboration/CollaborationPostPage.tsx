@@ -17,8 +17,8 @@ import {
   useMetaDescription,
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
-import { getApiErrorMessage } from "@/infrastructure/api";
-import { collaborationClient } from "@/infrastructure/collaboration-client";
+import { getApiErrorMessage } from "@/platform/api";
+import { collaborationClient } from "@/platform/collaboration-client";
 import { Container } from "@/shared/components/section";
 import {
   canShareCollaborationPost,

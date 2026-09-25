@@ -11,7 +11,7 @@ import { emptyResume } from "./hiring-form-values";
 import type { HiringResume, HiringResumeVersion } from "../../../../../../packages/contracts/src/creator-hiring";
 
 vi.mock("./hiring-client", () => ({ hiringClient: { resumes: vi.fn(), versions: vi.fn(), submit: vi.fn() } }));
-vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: async (e: Error) => e.message }));
+vi.mock("@/platform/api", () => ({ getApiErrorMessage: async (e: Error) => e.message }));
 vi.mock("@/compat/router-link", () => ({ default: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
 vi.mock("../collaboration-ui", () => ({ CollabField: ({ label, children }: { label: string; children: React.ReactNode }) => <label>{label}{children}</label>, CollabNotice: ({ children }: { children: React.ReactNode }) => <div role="alert">{children}</div>, collabButton: "", collabInput: "", collabPrimary: "" }));
 const version = (id: string, resumeId = "a", revision = 1): HiringResumeVersion => ({ id, resumeId, revision, content: { ...emptyResume().content, penName: `private-${id}` }, createdAt: "2026-09-20T01:00:00Z" });

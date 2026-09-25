@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HealthService } from "./health.service";
 
-import type { BackendCapabilityGatewayExecutor } from "../../infrastructure/backend-capabilities/backend-capability-gateway-executor";
-import type { SupabaseObjectStoragePort } from "../../infrastructure/supabase-object-storage/supabase-object-storage.port";
-import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import type { BackendCapabilityGatewayExecutor } from "../../platform/backend-capabilities/backend-capability-gateway-executor";
+import type { SupabaseObjectStoragePort } from "../../platform/supabase-object-storage/supabase-object-storage.port";
+import type { UpstashCoordinationPort } from "../../platform/upstash-coordination/upstash-coordination.port";
 
 const DIRECT_POSTGRES_URL =
   "postgresql://artist:secret@ep-direct.example.net/toonspectrum?sslmode=require";

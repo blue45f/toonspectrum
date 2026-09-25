@@ -14,7 +14,7 @@ import { Stars } from "@/shared/components/ui/stars";
 import { spectrumGradient } from "@/shared/lib/genre-color";
 import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+import { useApiResource } from "@/platform/use-api-resource";
 
 
 

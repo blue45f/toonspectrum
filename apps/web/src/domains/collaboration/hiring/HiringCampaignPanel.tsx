@@ -6,7 +6,7 @@ import { CollabNotice, collabButton, collabPrimary } from "../collaboration-ui";
 import type { HiringCampaign, HiringInvitation, HiringSlot } from "../../../../../../packages/contracts/src/creator-hiring";
 
 import Link from "@/compat/router-link";
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 
 const root = "/collaborations/hiring";
 export function HiringCampaignPanel({ slot, postVersion }: { slot: HiringSlot; postVersion: number }) {

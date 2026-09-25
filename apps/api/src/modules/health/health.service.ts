@@ -1,15 +1,15 @@
 import { Inject, Injectable, Optional } from "@nestjs/common";
 
-import { BackendCapabilityGatewayExecutor } from "../../infrastructure/backend-capabilities/backend-capability-gateway-executor";
+import { BackendCapabilityGatewayExecutor } from "../../platform/backend-capabilities/backend-capability-gateway-executor";
 import {
   PRIVATE_OBJECT_STORAGE_PORT,
   type PrivateObjectStoragePort,
-} from "../../infrastructure/private-object-storage/private-object-storage.port";
-import { resolveUpstashCoordinationConfig } from "../../infrastructure/upstash-coordination/upstash-coordination.config";
+} from "../../platform/private-object-storage/private-object-storage.port";
+import { resolveUpstashCoordinationConfig } from "../../platform/upstash-coordination/upstash-coordination.config";
 import {
   UPSTASH_COORDINATION_PORT,
   type UpstashCoordinationPort,
-} from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+} from "../../platform/upstash-coordination/upstash-coordination.port";
 import { resolveStudioLiveClusterAdapterConfig } from "../../realtime/studio-postgres-io.adapter";
 import { resolveAuthRateLimitConfig } from "../auth/auth-rate-limit.config";
 

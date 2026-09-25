@@ -9,7 +9,7 @@ on:
       - "apps/web/src/domains/creator/**"
       # The verifier owns apps/web/src/domains/creator/studio-integration-closure.test.ts.
       - "apps/web/src/shared/components/**"
-      - "apps/web/src/infrastructure/**"
+      - "apps/web/src/platform/**"
       - "apps/web/public/i18n/**"
       - "packages/core/**"
       - "packages/play-core/**"
@@ -116,7 +116,7 @@ jobs:
                   ui=true
                   editor=true
                   ;;
-                apps/web/src/infrastructure/*)
+                apps/web/src/platform/*)
                   ui=true
                   ;;
                 apps/web/public/i18n/*)
@@ -261,7 +261,7 @@ jobs:
               ui:apps/web/src/domains/creator/ai/StudioAiProjectHandoffHost.*|\
               ui:apps/web/src/app/routes/groups/*|\
               ui:apps/web/src/shared/components/*|\
-              ui:apps/web/src/infrastructure/*)
+              ui:apps/web/src/platform/*)
                 include=true
                 ;;
               editor:apps/web/src/domains/creator/brush-lab/*|\

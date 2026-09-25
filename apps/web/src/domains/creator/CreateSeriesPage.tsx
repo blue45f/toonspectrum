@@ -45,7 +45,7 @@ import {
   useMetaDescription,
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
-import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/infrastructure/creator-client";
+import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/platform/creator-client";
 
 
 // 회차 행 — 목록형(웹툰 회차 리스트 스타일).

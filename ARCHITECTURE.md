@@ -42,7 +42,7 @@ apps/admin-web/                   # 독립 관리자 Frontend workspace package
 
 apps/api/                         # 서버 전용 NestJS workspace package
   src/modules/                    # 기능 모듈과 HTTP 경계
-  src/infrastructure/             # platform으로 이전 중인 adapter
+  src/platform/             # platform으로 이전 중인 adapter
   src/db/                         # schema·migration·seed
   src/server/                     # modules로 이전 중인 레거시 유스케이스
 

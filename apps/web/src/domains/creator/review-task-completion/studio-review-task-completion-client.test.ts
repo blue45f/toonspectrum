@@ -3,7 +3,7 @@ import { completeStudioReviewTask, readStudioReviewTaskCompletion } from "./stud
 import { completionFixture } from "./studio-review-task-completion-fixture";
 
 const io = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
-vi.mock("@/infrastructure/api", () => ({ api: io, isHttpError: () => false }));
+vi.mock("@/platform/api", () => ({ api: io, isHttpError: () => false }));
 beforeEach(() => { vi.clearAllMocks(); });
 describe("task completion authenticated HTTP contract", () => {
   it("keeps a legal Unicode task ID in the encoded route and accepts exact raw API JSON", async () => {

@@ -21,8 +21,8 @@ vi.mock("./studio-music-import", () => ({ importExternalMusicTrack: mocks.import
 vi.mock("./studio-music-library", () => ({ loadMusicTracks: mocks.load, saveMusicTrack: mocks.save, deleteMusicTrack: mocks.remove }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: mocks.ownerId ? { user: { id: mocks.ownerId } } : null }) }));
 vi.mock("@/domains/creator/studio-server-ai-client", () => ({ completeAutomaticFreeText: mocks.lyrics }));
-vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: mocks.error }));
-vi.mock("@/infrastructure/creator-client", () => ({ getWork: mocks.getWork, updateWork: mocks.updateWork }));
+vi.mock("@/platform/api", () => ({ getApiErrorMessage: mocks.error }));
+vi.mock("@/platform/creator-client", () => ({ getWork: mocks.getWork, updateWork: mocks.updateWork }));
 
 function output(index = 1, ownerId = "owner-a", workId = "work-a"): LocalMusicTrack {
   return {

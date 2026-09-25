@@ -16,7 +16,7 @@ import {
   listCreatorMarketplaceCloudLibrary,
   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget,
   setCreatorMarketplaceCloudLibraryArchived,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 interface ReceiptSnapshot {
   readonly libraryItemId: string;

@@ -6,7 +6,7 @@ import { automaticInvitations } from "./hiring-automation-client";
 import type { AutomaticInvitationState } from "./hiring-automation-client";
 import type { HiringSlot } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 export function HiringAutomationPanel({ slot, postVersion }: { slot: HiringSlot; postVersion: number }) {
   return <AutomaticCampaign key={`${slot.postId}:${slot.id}:${slot.revision}:${postVersion}`} slot={slot} postVersion={postVersion} />;

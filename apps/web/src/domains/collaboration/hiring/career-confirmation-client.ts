@@ -1,4 +1,4 @@
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 import type { CareerConfirmationActionInput, CareerConfirmationCollaborator, CareerConfirmationPage, CareerConfirmationPreview, CareerConfirmationPublicSummary, CareerConfirmationReceipt, CareerConfirmationRequest, CareerConfirmationRequestInput, CareerConfirmationSelection } from "../../../../../../packages/contracts/src/creator-career-confirmation";
 

@@ -26,7 +26,7 @@ import {
   dismissOrphanedReport,
   listCreatorMarketplaceModerationQueue,
   moderateCreatorMarketplaceResource,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 const PAGE_SIZE = 10;
 

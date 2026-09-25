@@ -32,7 +32,7 @@ import {
   type SeriesSummary,
   type WorkSort,
   type WorkSummary,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 
 const SORTS: { value: WorkSort; label: string }[] = [

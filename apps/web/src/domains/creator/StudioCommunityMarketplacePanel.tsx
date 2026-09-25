@@ -127,8 +127,8 @@ import {
   listCreatorMarketplaceResources,
   publishCreatorMarketplaceResource,
   setCreatorMarketplaceCloudLibraryArchived,
-} from "@/infrastructure/creator-marketplace-client";
-import { NotFoundError } from "@/infrastructure/use-api-resource";
+} from "@/platform/creator-marketplace-client";
+import { NotFoundError } from "@/platform/use-api-resource";
 
 
 function marketplaceImageAssetName(asset: StudioMarketplaceImageAsset): string {

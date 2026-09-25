@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MeetingRoom } from "./CreatorMeetingRoom";
 import { deferred, fixtureMessage, fixtureRoom } from "./creator-meeting.test-fixtures";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
-vi.mock("@/infrastructure/api", () => ({ api: { get: vi.fn(), post: vi.fn() }, getApiErrorMessage: async () => "테스트 연결 오류" }));
+vi.mock("@/platform/api", () => ({ api: { get: vi.fn(), post: vi.fn() }, getApiErrorMessage: async () => "테스트 연결 오류" }));
 beforeEach(() => {
   vi.resetAllMocks(); vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
   vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);

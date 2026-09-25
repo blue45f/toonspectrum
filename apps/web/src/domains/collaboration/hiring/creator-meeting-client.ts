@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import type { CreatorRoom, CreatorRoomMessage } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 const id = z.string().min(1).max(256);
 const status = z.enum(["invited", "waiting", "admitted", "removed", "left"]);

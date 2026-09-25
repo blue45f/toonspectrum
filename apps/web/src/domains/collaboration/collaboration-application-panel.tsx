@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { APPLICATION_STATUS, validateCollaborationApplication } from "../../../../../packages/core/src/collaboration";
 import { CollabField, CollabLogin, CollabNotice, PortfolioLink, collabButton, collabInput, collabPrimary } from "./collaboration-ui";
 import type { CollaborationApplication, CollaborationDetail } from "../../../../../packages/core/src/collaboration";
-import { getApiErrorMessage } from "@/infrastructure/api";
-import { collaborationClient } from "@/infrastructure/collaboration-client";
+import { getApiErrorMessage } from "@/platform/api";
+import { collaborationClient } from "@/platform/collaboration-client";
 
 import { InterviewScheduleButton } from "./hiring/CreatorMeetingPanel";
 import { HiringSnapshotPanel, HiringSubmissionPanel } from "./hiring/HiringSubmissionPanel";

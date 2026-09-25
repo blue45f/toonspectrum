@@ -40,7 +40,7 @@ import {
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { cn } from "@/shared/lib/utils";
 import { signIn } from "@/compat/auth-session-store";
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 
 // 실제 OAuth 미설정 시 데모 폴백임을 버튼에 명확히 표시(정직성).
 function DemoTag({ dark }: { dark?: boolean }) {

@@ -23,8 +23,8 @@ import {
   useMetaDescription,
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
-import { api } from "@/infrastructure/api";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+import { api } from "@/platform/api";
+import { useApiResource } from "@/platform/use-api-resource";
 
 
 // 토론 스레드 상세 — 목록 카드에서 진입하는 분할 라우트(/community/post/:id).

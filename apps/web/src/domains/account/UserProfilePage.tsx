@@ -35,8 +35,8 @@ import {
   type CreatorProfile,
   type SeriesSummary,
   type WorkSummary,
-} from "@/infrastructure/creator-client";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+} from "@/platform/creator-client";
+import { useApiResource } from "@/platform/use-api-resource";
 import { getActiveI18nLocale, useBilingualI18nRevision,
   translateCurrentStaticSourceText,
 } from "@/shared/lib/i18n-bilingual-copy";

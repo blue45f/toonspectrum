@@ -14,7 +14,7 @@ import {
   writeAuthoritativeCachedMarketResource,
 } from "@/domains/market/models/market-resource-cache";
 import { getCreatorMarketplaceResource } from "@/domains/market/remotes/market-resource-remote";
-import { NotFoundError } from "@/infrastructure/use-api-resource";
+import { NotFoundError } from "@/platform/use-api-resource";
 
 vi.mock("@/domains/market/remotes/market-resource-remote", () => ({
   getCreatorMarketplaceResource: vi.fn(),

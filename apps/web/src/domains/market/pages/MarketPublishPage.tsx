@@ -39,7 +39,7 @@ import {
   useDocumentTitle,
   useMetaDescription,
 } from "@/hooks/use-document-title";
-import { publishCreatorMarketplaceResource } from "@/infrastructure/creator-marketplace-client";
+import { publishCreatorMarketplaceResource } from "@/platform/creator-marketplace-client";
 
 export function MarketPublishPage() {
   useDocumentTitle("에셋 등록 · 창작 마켓");

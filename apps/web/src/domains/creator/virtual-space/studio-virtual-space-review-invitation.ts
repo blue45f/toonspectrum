@@ -1,4 +1,4 @@
-import { httpStatus } from "@/infrastructure/api";
+import { httpStatus } from "@/platform/api";
 
 import {
   getStudioProject, getStudioProjectByWork, getStudioReview,

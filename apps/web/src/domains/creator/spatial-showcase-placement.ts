@@ -1,4 +1,4 @@
-import type { SeriesSummary, WorkSummary } from "@/infrastructure/creator-client";
+import type { SeriesSummary, WorkSummary } from "@/platform/creator-client";
 import {
   canonicalCampusObjectCandidate,
   type CampusObject,

@@ -1,7 +1,7 @@
 import { Braces, Download, KeyRound, Webhook } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { useI18n } from "@/shared/lib/i18n";
 
 import { IntegrationLoading, IntegrationPage } from "./IntegrationUi";

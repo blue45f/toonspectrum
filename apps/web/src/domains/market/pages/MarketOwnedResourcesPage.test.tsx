@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/compat/auth-session-store", () => ({ useSession: mocks.session }));
-vi.mock("@/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/platform/creator-marketplace-client", () => ({
   listCreatorMarketplaceOwnedHeads: mocks.list,
   deleteCreatorMarketplaceResource: mocks.delist,
   relistCreatorMarketplaceResource: mocks.relist,

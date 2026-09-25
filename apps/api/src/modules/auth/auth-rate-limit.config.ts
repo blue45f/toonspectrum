@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { resolveUpstashCoordinationConfig } from "../../infrastructure/upstash-coordination/upstash-coordination.config";
+import { resolveUpstashCoordinationConfig } from "../../platform/upstash-coordination/upstash-coordination.config";
 
 const DistributedRateLimitEnabledSchema = z.enum(["true", "false"]);
 const AuthRateLimitModeSchema = z.enum([

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeviceTest } from "./CreatorMeetingPanel";
 
 vi.mock("../collaboration-ui", () => ({ CollabField: () => null, CollabNotice: () => null, collabButton: "", collabInput: "", collabPrimary: "" }));
-vi.mock("@/infrastructure/api", () => ({ api: {}, getApiErrorMessage: vi.fn() }));
+vi.mock("@/platform/api", () => ({ api: {}, getApiErrorMessage: vi.fn() }));
 beforeEach(() => { vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible"); });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 describe("local device test", () => {

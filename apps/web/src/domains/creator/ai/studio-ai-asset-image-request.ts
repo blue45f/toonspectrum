@@ -1,5 +1,5 @@
 import type { StudioAiImageSize } from "./studio-ai-client";
-import type { GeneratedAssetQuality, GeneratedAssetSize } from "@/infrastructure/creator-client";
+import type { GeneratedAssetQuality, GeneratedAssetSize } from "@/platform/creator-client";
 
 /** Build the BYOK request without adding provider policy to the editor host. */
 export function buildStudioAiAssetImageRequest(

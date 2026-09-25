@@ -5,7 +5,7 @@ import type {
   CreatorSupportProject,
 } from "@toonspectrum/core/creator-support";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 export interface CreatorSupportProjectListResponse {
   items: CreatorSupportProject[];

@@ -8,7 +8,7 @@ import { useI18n, useT } from "@/shared/lib/i18n";
 import { formatCount } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+import { useApiResource } from "@/platform/use-api-resource";
 
 
 interface AuthorEntry {

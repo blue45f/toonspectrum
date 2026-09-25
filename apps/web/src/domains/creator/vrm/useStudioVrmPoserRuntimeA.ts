@@ -69,7 +69,7 @@ import {
   getSharedAssetContent,
   markSharedAssetUsed,
   type SharedAssetCatalogItem,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 export function useStudioVrmPoserRuntimeA(h: StudioVrmPoserHost): void {
   const {

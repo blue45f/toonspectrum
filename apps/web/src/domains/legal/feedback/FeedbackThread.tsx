@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { FeedbackComment } from "@toonspectrum/core/feedback";
 import type { FormEvent, KeyboardEvent } from "react";
 
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 import { useApp } from "@/shared/lib/store";
 import { feedbackTimeLabel } from "@toonspectrum/core/feedback";
 import {

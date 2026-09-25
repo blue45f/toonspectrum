@@ -27,7 +27,7 @@ import {
   getMembershipOverview,
   type MembershipCatalog,
   type MembershipOverview,
-} from "@/infrastructure/membership-wallet-client";
+} from "@/platform/membership-wallet-client";
 import { useApp } from "@/shared/lib/store";
 
 const number = new Intl.NumberFormat("ko-KR");

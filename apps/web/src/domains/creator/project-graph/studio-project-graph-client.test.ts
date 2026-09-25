@@ -13,7 +13,7 @@ const http = vi.hoisted(() => ({
   post: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/api", () => ({ api: http }));
+vi.mock("@/platform/api", () => ({ api: http }));
 
 const HASH = "a".repeat(64);
 const NOW = "2026-09-17T05:30:00.000Z";

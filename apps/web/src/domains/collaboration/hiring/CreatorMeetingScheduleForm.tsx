@@ -6,7 +6,7 @@ import { dateInput } from "./hiring-form-values";
 
 import type { CreatorRoomInput } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 
 type Scope = Pick<CreatorRoomInput, "kind" | "applicationId" | "teamId" | "participantIds">;
 interface Props { scope: Scope; onCreated: (id: string) => void }

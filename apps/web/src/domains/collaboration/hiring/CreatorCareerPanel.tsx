@@ -11,7 +11,7 @@ import { CollabField, CollabNotice, collabButton, collabInput, collabPrimary } f
 import type { CreatorActivitySummary, CreatorCareerInput, CreatorCareerItem, CreatorCareerPublic, CreatorCareerVersion } from "../../../../../../packages/contracts/src/creator-hiring";
 
 import Link from "@/compat/router-link";
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 import { Container } from "@/shared/components/section";
 
 const root = "/collaborations/career";

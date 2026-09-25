@@ -21,7 +21,7 @@ const { apiRawPost } = vi.hoisted(() => ({
   apiRawPost: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: { raw: { post: apiRawPost } },
   apiPath: (path: string) => `/api${path}`,
 }));

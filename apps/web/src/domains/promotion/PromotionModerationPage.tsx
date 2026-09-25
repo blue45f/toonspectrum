@@ -5,8 +5,8 @@ import "./promotion-community.css";
 
 import type { PromotionReport } from "../../../../../packages/core/src/promotion";
 
-import { promotionClient } from "@/infrastructure/promotion-client";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { promotionClient } from "@/platform/promotion-client";
+import { getApiErrorMessage } from "@/platform/api";
 import { useApp } from "@/shared/lib/store";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 

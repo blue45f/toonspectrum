@@ -22,7 +22,7 @@ import {
   listChallenges,
   type ChallengeSummary,
   type WorkSummary,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 
 // 마감 D-day 칩 — 마감 임박(3일 이내)은 경고 톤.

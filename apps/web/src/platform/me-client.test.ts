@@ -14,7 +14,7 @@ const { apiGet, apiPatch } = vi.hoisted(() => ({
   apiPatch: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: {
     get: apiGet,
     patch: apiPatch,

@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { fortuneKstDate } from "../../../../../packages/core/src/fortune";
-import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import type { UpstashCoordinationPort } from "../../platform/upstash-coordination/upstash-coordination.port";
 import type { FortuneEnrichmentConfig, FortuneEnrichmentRuntime } from "./fortune-enrichment.provider";
 import { parseFortuneSnapshot, type FortunePublicResult, type FortuneSnapshotPort } from "./fortune-snapshot";
 

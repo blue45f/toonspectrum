@@ -8,9 +8,9 @@ import { emptyTerms } from "./hiring-form-values";
 
 import type { HiringPositionPage } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
-vi.mock("@/infrastructure/api", () => ({ api: { get: vi.fn() }, getApiErrorMessage: async () => "연결 실패" }));
+vi.mock("@/platform/api", () => ({ api: { get: vi.fn() }, getApiErrorMessage: async () => "연결 실패" }));
 vi.mock("./HiringSlotEditor", () => ({ HiringTermsView: () => <div>모집 조건</div> }));
 const get = vi.mocked(api.get);
 function page(title: string, next: string | null = null): HiringPositionPage {

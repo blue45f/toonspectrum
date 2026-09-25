@@ -12,7 +12,7 @@ import { adminButtonClass } from "./admin-ui-utils";
 
 import { Switch } from "@/shared/components/ui/switch";
 import { useT } from "@/shared/lib/i18n";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 
 interface AppConfig {

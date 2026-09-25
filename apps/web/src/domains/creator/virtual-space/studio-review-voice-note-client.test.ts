@@ -7,7 +7,7 @@ import {
 } from "./studio-review-voice-note-client";
 
 const io = vi.hoisted(() => ({ post: vi.fn(), rawPost: vi.fn(), json: vi.fn() }));
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: { post: io.post, raw: { post: io.rawPost } },
   apiPath: (value: string) => `/api${value}`,
 }));

@@ -1,6 +1,6 @@
 import { request } from "node:https";
 import { isIP } from "node:net";
-import { parsePublicWebhookDestination, pinnedPublicLookup, resolvePublicOutboundAddress } from "../../infrastructure/network/public-endpoint";
+import { parsePublicWebhookDestination, pinnedPublicLookup, resolvePublicOutboundAddress } from "../../platform/network/public-endpoint";
 import { ProductionExternalHttpError } from "./production-integration-http";
 
 async function withinSignal<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {

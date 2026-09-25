@@ -65,7 +65,7 @@ import {
 } from "@/shared/lib/title-filters";
 import { cn } from "@/shared/lib/utils";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { usePaginatedSearch } from "@/infrastructure/use-paginated-search";
+import { usePaginatedSearch } from "@/platform/use-paginated-search";
 
 type FilterToken = { key: string; label: string; category: string };
 

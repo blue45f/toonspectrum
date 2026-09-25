@@ -4,7 +4,7 @@ import { canonicalJson } from "@toonspectrum/studio-project-model";
 import type { PoolClient } from "pg";
 
 import { dbPool } from "../../db";
-import type { LocatedPrivateObjectReference } from "../../infrastructure/private-object-storage/private-object-storage.contract";
+import type { LocatedPrivateObjectReference } from "../../platform/private-object-storage/private-object-storage.contract";
 import {
   assertAccess, loadArtifactAccess, projectAccess, StudioProjectGraphRepository,
   StudioProjectNotFoundError, StudioRepositoryInvariantError, StudioIdempotencyConflictError,

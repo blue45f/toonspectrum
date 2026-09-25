@@ -6,7 +6,7 @@ import { validateFortuneSpecialDays, type FortuneSpecialDay, type FortuneSpecial
   type FortuneCalendarEnrichment, type FortuneHoroscopeEnrichment, type FortuneUnavailableReason,
   type FortunePeriod, type FortuneZodiacId  } from "../../../../../packages/core/src/fortune";
 import { Inject, Injectable, Optional } from "@nestjs/common";
-import { UPSTASH_COORDINATION_PORT, type UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import { UPSTASH_COORDINATION_PORT, type UpstashCoordinationPort } from "../../platform/upstash-coordination/upstash-coordination.port";
 import { FORTUNE_ENRICHMENT_CONFIG, FORTUNE_ENRICHMENT_RUNTIME, KASI_POLICY_REVISION,
   compareKasiCalendar, horoscopeUrl, kasiCalendarUrl, parseKasiCalendarPage, parseProviderHoroscope, readBoundedProviderBody,
   type FortuneEnrichmentConfig, type FortuneEnrichmentRuntime, type KasiCalendarRow } from "./fortune-enrichment.provider";

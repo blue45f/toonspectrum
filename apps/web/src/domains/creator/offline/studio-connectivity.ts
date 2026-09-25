@@ -1,4 +1,4 @@
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 
 export const STUDIO_CONNECTIVITY_EVENT = "toonspectrum:studio-connectivity";
 

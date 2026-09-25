@@ -202,7 +202,7 @@ import type {
 
 import type {
   SharedAssetCatalogItem,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 export function useStudioVrmPoserState({
   open,

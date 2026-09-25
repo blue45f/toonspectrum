@@ -10,7 +10,7 @@ import type { AutomaticInvitationState } from "./hiring-automation-client";
 import type { HiringSlot } from "../../../../../../packages/contracts/src/creator-hiring";
 
 vi.mock("./hiring-automation-client", () => ({ automaticInvitations: { read: vi.fn(), start: vi.fn(), stop: vi.fn() } }));
-vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: async () => "요청 결과를 확인하지 못했어요" }));
+vi.mock("@/platform/api", () => ({ getApiErrorMessage: async () => "요청 결과를 확인하지 못했어요" }));
 const available: AutomaticInvitationState = { enabled: true, supported: true, job: null };
 const slot: HiringSlot = { id: "slot", postId: "post", revision: 1, state: "open", terms: emptyTerms(), createdAt: new Date().toISOString() };
 const running: AutomaticInvitationState = { ...available, job: { id: "job", generation: 1, termsRevision: 1, status: "queued", attempts: 0, nextExecutionAt: new Date().toISOString(), updatedAt: new Date().toISOString() } };

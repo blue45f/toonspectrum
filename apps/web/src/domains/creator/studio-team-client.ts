@@ -1,4 +1,4 @@
-import { api, toApiError } from "@/infrastructure/api";
+import { api, toApiError } from "@/platform/api";
 import {
   normalizePublicCreatorRoleProfile,
   type PublicCreatorRoleProfile,

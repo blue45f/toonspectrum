@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { Readable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { isPublicOutboundAddress, parsePublicWebhookDestination } from "../../infrastructure/network/public-endpoint";
+import { isPublicOutboundAddress, parsePublicWebhookDestination } from "../../platform/network/public-endpoint";
 import { sendProtectedWebhook } from "./production-webhook-network";
 
 const f = vi.hoisted(() => ({ lookup: vi.fn(), request: vi.fn() }));

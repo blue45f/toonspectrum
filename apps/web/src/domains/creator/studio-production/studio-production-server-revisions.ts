@@ -1,4 +1,4 @@
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 
 export interface StudioServerRevisionSummary {
   readonly revision: number;

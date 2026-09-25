@@ -9,7 +9,7 @@ import type { CreatorMarketplaceCloudLibraryItem } from "@/shared/lib/creator-ma
 import { useSession } from "@/compat/auth-session-store";
 import { getProductionPersonalInbox } from "@/domains/creator/production-hub/production-api";
 import { useApp } from "@/shared/lib/store";
-import { listCreatorMarketplaceCloudLibrary } from "@/infrastructure/creator-marketplace-client";
+import { listCreatorMarketplaceCloudLibrary } from "@/platform/creator-marketplace-client";
 
 const TITLE_CHUNK_SIZE = 80;
 

@@ -12,7 +12,7 @@ import { useSession } from "@/compat/auth-session-store";
 import {
   acquireCreatorMarketplaceCloudLibraryRelease,
   listCreatorMarketplaceCloudLibrary,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 export interface AcquiredMarketItem {
   id: string;

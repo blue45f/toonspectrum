@@ -11,7 +11,7 @@ import {
   type CreatorRoleId,
   type CreatorSpecialtyId,
 } from "@/shared/lib/creator-role-contract";
-import { api, isHttpError, toApiError } from "@/infrastructure/api";
+import { api, isHttpError, toApiError } from "@/platform/api";
 
 interface WorkspaceEnvelope {
   readonly projectKey?: unknown;

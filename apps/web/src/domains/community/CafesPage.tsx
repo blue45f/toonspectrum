@@ -32,7 +32,7 @@ import { GENRES } from "@/shared/lib/taxonomy";
 import { cn, relativeDate } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 
 const SORTS = [
   { value: "popular", label: "인기순" },

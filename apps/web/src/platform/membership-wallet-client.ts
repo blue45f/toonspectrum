@@ -1,4 +1,4 @@
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 export type EconomyPolicy = {
   mode: "dual-wallet-beta";

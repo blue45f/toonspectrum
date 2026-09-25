@@ -167,7 +167,7 @@ export default defineConfig(
         mode: 'full',
       },
       { type: 'shared', pattern: 'apps/web/src/catalog-static*.ts', mode: 'full' },
-      { type: 'infrastructure', pattern: 'apps/web/src/infrastructure/**/*', mode: 'full' },
+      { type: 'infrastructure', pattern: 'apps/web/src/platform/**/*', mode: 'full' },
     ],
     rules: [
       { from: ['app'], allow: ['app', 'domains', 'shared', 'infrastructure'] },
@@ -192,7 +192,7 @@ export default defineConfig(
   // 얽힌 대규모 리팩터라 이번 도메인화 범위 밖이다. 순수 shared(hooks·styles)는 계속 strict.
   {
     files: [
-      'apps/web/src/infrastructure/use-api-resource.ts',
+      'apps/web/src/platform/use-api-resource.ts',
       'apps/web/src/hooks/use-app-config.ts',
       'apps/web/src/compat/**/*.{ts,tsx}',
     ],

@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { check, index, integer, jsonb, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
 import type { StudioReviewVoiceNoteSubject } from "@toonspectrum/studio-project-model/review-voice-note";
 
-import type { LocatedPrivateObjectReference } from "../../infrastructure/private-object-storage/private-object-storage.contract";
+import type { LocatedPrivateObjectReference } from "../../platform/private-object-storage/private-object-storage.contract";
 import { users } from "./auth.schema";
 import { creatorWorks } from "./creator.schema";
 

@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 

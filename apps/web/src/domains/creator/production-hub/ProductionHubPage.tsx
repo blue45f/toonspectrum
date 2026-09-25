@@ -24,8 +24,8 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { creatorRoleLens, type CreatorRoleLens } from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
 import { useApp } from "@/shared/lib/store";
-import { getApiErrorMessage, httpStatus } from "@/infrastructure/api";
-import { getMyProfile } from "@/infrastructure/me-client";
+import { getApiErrorMessage, httpStatus } from "@/platform/api";
+import { getMyProfile } from "@/platform/me-client";
 
 export type ProductionProjectSurface =
   | "overview"

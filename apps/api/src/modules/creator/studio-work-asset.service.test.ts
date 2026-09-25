@@ -35,7 +35,7 @@ import {
 
 import type { DrizzleStudioCrdtTransaction } from "./studio-crdt.repository";
 import type { StudioWorkAssetRepository } from "./studio-work-asset.repository";
-import type { SupabaseObjectStoragePort } from "../../infrastructure/supabase-object-storage/supabase-object-storage.port";
+import type { SupabaseObjectStoragePort } from "../../platform/supabase-object-storage/supabase-object-storage.port";
 
 const manifest: StudioWorkAssetManifest = {
   version: 1,

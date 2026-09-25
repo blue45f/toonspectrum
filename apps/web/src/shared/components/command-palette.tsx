@@ -41,7 +41,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
   fetchSearchResponse,
   isSearchAbortError,
-} from "@/infrastructure/search-client";
+} from "@/platform/search-client";
 
 export function CommandPalette({
   open,

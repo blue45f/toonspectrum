@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PinnedReviewShareService } from "./pinned-share.service";
 import { PinnedShareError } from "./pinned-share-storage";
 import type { PinnedReviewShareRepository } from "./pinned-share.repository";
-import type { PrivateObjectStoragePort } from "../../../infrastructure/private-object-storage/private-object-storage.port";
+import type { PrivateObjectStoragePort } from "../../../platform/private-object-storage/private-object-storage.port";
 
 const bytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const hash = createHash("sha256").update(bytes).digest("hex");

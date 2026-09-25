@@ -90,7 +90,7 @@ describe("Studio AI generated asset fail-closed boundary", () => {
       "saveStudioAssetMutation",
       "addRenderedImage",
     ]);
-    expect(value).not.toContain('import("@/infrastructure/creator-client")');
+    expect(value).not.toContain('import("@/platform/creator-client")');
     expect(value).not.toContain("await generateAsset");
     expect(value).not.toContain('transport: "server"');
   });

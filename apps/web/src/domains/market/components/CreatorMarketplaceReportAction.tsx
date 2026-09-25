@@ -15,7 +15,7 @@ import { useSession } from "@/compat/auth-session-store";
 import {
   creatorMarketplaceReportErrorCode,
   reportCreatorMarketplaceResource,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 const REASON_OPTIONS: ReadonlyArray<{
   readonly value: CreatorMarketplaceResourceReportReason;

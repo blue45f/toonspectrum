@@ -20,7 +20,7 @@ import {
   StudioWorkAssetManifestSchema,
   serializeStudioWorkAssetDescriptorCanonical,
 } from "@/shared/lib/studio-work-asset-contract";
-import { api, apiPath, isHttpError, toApiError } from "@/infrastructure/api";
+import { api, apiPath, isHttpError, toApiError } from "@/platform/api";
 
 export { readBoundedStudioAssetResponse as readBoundedStudioWorkAssetResponse } from "./studio-bounded-asset-response";
 

@@ -7,7 +7,7 @@ import { studioHandoffReceiptQuery } from "../creator/studio-handoff-receipt-que
 import { canonicalJson, createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type * as DatabaseRuntime from "../../db";
-import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
+import type { PrivateObjectStoragePort } from "../../platform/private-object-storage/private-object-storage.port";
 import type { DrizzleStudioWorkAssetRepository } from "../creator/studio-work-asset.repository";
 import type { StudioWorkAssetService } from "../creator/studio-work-asset.service";
 import type { StudioProjectGraphRepository } from "./studio-project-graph.repository";

@@ -3,7 +3,7 @@ import { StudioReviewResolutionController } from "./studio-review-resolution-con
 import { StudioReviewResolutionError } from "./studio-review-resolution-authority";
 import { reviewResolutionFixture } from "./studio-review-resolution-test-fixture";
 
-vi.mock("@/infrastructure/api", () => ({ httpStatus: (error: unknown) => error instanceof Response ? error.status : null }));
+vi.mock("@/platform/api", () => ({ httpStatus: (error: unknown) => error instanceof Response ? error.status : null }));
 function fixture() {
   const f = reviewResolutionFixture(1000), context = { actorId: "actor" as string | null, generation: 1, available: true };
   const read = vi.fn(async () => f.authority), resolve = vi.fn(async () => ({ id: "comment", status: "resolved" as const,

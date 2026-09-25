@@ -11,7 +11,7 @@ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-mark
 import {
   acquireCreatorMarketplaceCloudLibraryRelease,
   listCreatorMarketplaceCloudLibrary,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 const mocks = vi.hoisted(() => ({
   useSession: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock("@/compat/auth-session-store", () => ({
   useSession: mocks.useSession,
 }));
 
-vi.mock("@/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/platform/creator-marketplace-client", () => ({
   acquireCreatorMarketplaceCloudLibraryRelease: mocks.acquire,
   listCreatorMarketplaceCloudLibrary: mocks.list,
 }));

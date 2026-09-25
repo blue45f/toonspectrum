@@ -30,7 +30,7 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-vi.mock("@/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/platform/creator-marketplace-client", () => ({
   acquireCreatorMarketplaceCloudLibraryRelease: mocks.acquire,
   listCreatorMarketplaceCloudLibrary: mocks.list,
   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget: mocks.resolveTarget,

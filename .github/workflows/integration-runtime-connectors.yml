@@ -8,7 +8,7 @@ on:
       - 'apps/api/src/modules/production-collaboration/**'
       - 'apps/api/src/db/schema/production.schema.ts'
       - 'apps/web/src/domains/integrations/**'
-      - 'apps/web/src/infrastructure/api.ts'
+      - 'apps/web/src/platform/api.ts'
       - 'deploy/integration-runtime-connectors.env.example'
       - 'docs/integration-runtime-connectors.md'
       - '.github/workflows/integration-runtime-connectors.yml'

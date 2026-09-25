@@ -26,7 +26,7 @@ import {
 } from "react";
 
 import { useSession } from "@/compat/auth-session-store";
-import { getMyProfile, updateMyProfile, type MeProfile } from "@/infrastructure/me-client";
+import { getMyProfile, updateMyProfile, type MeProfile } from "@/platform/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   CREATOR_EXPERIENCE_LEVELS,

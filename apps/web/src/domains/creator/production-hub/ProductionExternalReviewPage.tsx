@@ -18,7 +18,7 @@ import {
 } from "./production-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { cn } from "@/shared/lib/utils";
 
 type Decision = "comment" | "approve" | "request-changes";

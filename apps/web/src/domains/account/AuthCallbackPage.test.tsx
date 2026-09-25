@@ -29,7 +29,7 @@ vi.mock("@/compat/router-link", () => ({
   ),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: { raw: apiRaw },
   apiPath: (path: string) => `/api${path}`,
 }));

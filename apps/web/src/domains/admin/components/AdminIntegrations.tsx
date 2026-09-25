@@ -1,7 +1,7 @@
 import { PlugZap, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 import { useI18n } from "@/shared/lib/i18n";
 
 interface RuntimeProvider {

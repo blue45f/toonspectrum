@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { OperationPolicyAdminView, OperationPolicyDraft, OperationPolicyPreview, OperatingMode } from "@toonspectrum/contracts/operation-policy";
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 import { adminButtonClass } from "./admin-ui-utils";
 
 const endpoint = "/admin/production/operation-policy";

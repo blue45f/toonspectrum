@@ -31,7 +31,7 @@ import {
   useDocumentTitle,
   useMetaDescription,
 } from "@/hooks/use-document-title";
-import { getCreatorMarketplaceResourceIdentity, publishCreatorMarketplaceResource } from "@/infrastructure/creator-marketplace-client";
+import { getCreatorMarketplaceResourceIdentity, publishCreatorMarketplaceResource } from "@/platform/creator-marketplace-client";
 
 const MAX_SOURCE_FILE_BYTES = 512 * 1024;
 

@@ -3,7 +3,7 @@ import { creatorMeetingClient, meetingIsTerminal } from "./creator-meeting-clien
 import type { MeetingCommand } from "./creator-meeting-client";
 import type { CreatorRoom, CreatorRoomMessage } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 export interface MeetingSessionState {
   phase: "loading" | "ready" | "paused" | "error";

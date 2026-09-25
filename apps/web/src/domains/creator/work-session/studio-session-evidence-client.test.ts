@@ -4,7 +4,7 @@ import { studioSessionEvidenceNote } from "./studio-session-evidence-note";
 import type { StudioSessionEvidenceResponse } from "@toonspectrum/studio-project-model/work-session-evidence";
 
 const get = vi.hoisted(() => vi.fn());
-vi.mock("@/infrastructure/api", () => ({ api: { get } }));
+vi.mock("@/platform/api", () => ({ api: { get } }));
 const digest = "a".repeat(64);
 function response(): StudioSessionEvidenceResponse {
   const source = { version: 1 as const, sourceServerRevision: 4, sourceContentDigest: digest, pageOrdinal: 0, pageId: "page" };

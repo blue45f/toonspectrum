@@ -24,7 +24,7 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: { raw: apiRaw },
   apiPath: (path: string) => `/api${path}`,
 }));

@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 
 import { ErrorBoundary } from "../components/error-boundary";
-import { apiPath } from "../infrastructure/api";
+import { apiPath } from "../platform/api";
 
 import { AppShell } from "./AppShell";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";

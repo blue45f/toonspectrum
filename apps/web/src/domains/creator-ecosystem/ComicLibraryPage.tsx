@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { CreatorEcosystemLayout } from "./CreatorEcosystemLayout";
 
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 import { RESOURCE_LABELS } from "@/shared/lib/creator-resources";
 import { useApp } from "@/shared/lib/store";
 

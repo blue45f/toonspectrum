@@ -152,7 +152,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   getChallenge,
   getSeries,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 const MAX_PAGES = 40;
 
@@ -1201,7 +1201,7 @@ export function StudioPublishingCommandCenter({
               })
             : ({
                 kind: "create" as const,
-                module: await import("@/infrastructure/creator-client"),
+                module: await import("@/platform/creator-client"),
               }),
         mutate: async (client, cover, signal) => {
           const editableContent = {

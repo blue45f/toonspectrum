@@ -6,7 +6,7 @@ import { hiringMatchingClient } from "./hiring-matching-client";
 
 import type { HiringCandidate, HiringCandidatePage, HiringSlot } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 export function HiringDiscovery({ slot, postVersion = 1 }: { slot: HiringSlot; postVersion?: number }) {
   return <CandidateDiscovery key={`${slot.postId}:${slot.id}:${slot.revision}:${slot.state}:${postVersion}`} slot={slot} />;

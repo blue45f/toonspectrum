@@ -73,7 +73,7 @@ import { StudioReviewLinkManager } from "./StudioReviewLinkManager";
 import { StudioServerVersionsCard } from "./StudioServerVersionsCard";
 import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
 
-import { getMyProfile, type MeProfile } from "@/infrastructure/me-client";
+import { getMyProfile, type MeProfile } from "@/platform/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,

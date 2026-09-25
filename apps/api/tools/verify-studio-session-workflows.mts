@@ -11,7 +11,7 @@ import { Pool } from "pg";
 
 import { validatePostgresIntegrationUrl } from "../../../scripts/run-postgres-integration-tests.mjs";
 
-import type { PrivateObjectStoragePort } from "../src/infrastructure/private-object-storage/private-object-storage.port";
+import type { PrivateObjectStoragePort } from "../src/platform/private-object-storage/private-object-storage.port";
 
 // Never inherits a production connection or tests an arbitrary remote origin.
 const connection = process.env.TEST_DATABASE_URL;

@@ -9,7 +9,7 @@ import {
   type CreatorRoleProfile,
 } from "@/shared/lib/creator-role-contract";
 import { parseRegionSettings, type RegionSettings } from "@/shared/lib/region-settings";
-import { api, toApiError } from "@/infrastructure/api";
+import { api, toApiError } from "@/platform/api";
 
 export interface MeProfile {
   id: string;

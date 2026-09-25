@@ -1,7 +1,7 @@
 import type { MusicBrief, MusicStatus, MusicTrackMetadata } from "@toonspectrum/core/studio-music";
 
 import { isMp3, MUSIC_MAX_BYTES, MUSIC_OUTPUT_FORMAT, MUSIC_TERMS_URL, parseMusicBrief } from "@toonspectrum/core/studio-music";
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 
 export interface LocalMusicTrack { metadata: MusicTrackMetadata; audio: Blob; ownerId: string }

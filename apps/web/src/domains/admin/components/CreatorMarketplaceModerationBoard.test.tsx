@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   moderate: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/platform/creator-marketplace-client", () => ({
   dismissOrphanedReport: mocks.dismissOrphan,
   listCreatorMarketplaceModerationQueue: mocks.listQueue,
   moderateCreatorMarketplaceResource: mocks.moderate,

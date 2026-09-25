@@ -12,7 +12,7 @@ import {
   searchCreatorDirectory,
   type CreatorDirectoryEntry,
   type CreatorDirectoryQuery,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {

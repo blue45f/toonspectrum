@@ -1,8 +1,8 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION } from "../../infrastructure/private-object-storage/private-object-storage.contract";
-import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
+import { PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION } from "../../platform/private-object-storage/private-object-storage.contract";
+import type { PrivateObjectStoragePort } from "../../platform/private-object-storage/private-object-storage.port";
 import { StudioProjectForbiddenError, StudioProjectGraphRepository, StudioProjectNotFoundError, StudioRepositoryInvariantError } from "./studio-project-graph.repository";
 import { studioReviewPreviewObject, type StudioReviewPreviewBlobRow } from "./studio-review-preview";
 import { StudioReviewPreviewController, StudioReviewPreviewQueryDto } from "./studio-review-preview.controller";

@@ -25,7 +25,7 @@ import type {
   StudioVrmJointHandleBone,
 } from "./StudioVrmJointHandles";
 import type { StudioVrmTexturePaintPanelSettings } from "./StudioVrmTexturePaintPanel";
-import type { SharedAssetCatalogPage } from "@/infrastructure/creator-client";
+import type { SharedAssetCatalogPage } from "@/platform/creator-client";
 import type { VRM, VRMHumanBoneName } from "@pixiv/three-vrm";
 
 export type StudioVrmPoserProps = {

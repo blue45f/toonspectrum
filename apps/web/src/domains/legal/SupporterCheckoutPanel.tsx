@@ -26,7 +26,7 @@ import {
   type TossWidgets,
 } from "./supporter-toss-sdk";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { useT } from "@/shared/lib/i18n";
 
 const DEFAULT_AMOUNT = 5_000;

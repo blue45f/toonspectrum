@@ -3,7 +3,7 @@ import type { PlatformId, Title } from "@/shared/lib/types";
 
 import { withCsrfProtection } from "@/shared/lib/csrf";
 
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 
 export type SearchCatalogMeta = {
   source: string;

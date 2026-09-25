@@ -1,6 +1,6 @@
 import { canonicalJson, studioReviewTaskCompletionContextSchema, studioReviewTaskCompletionInputSchema,
   type StudioReviewTaskCompletionContext, type StudioReviewTaskCompletionInput } from "@toonspectrum/studio-project-model";
-import { api, isHttpError } from "@/infrastructure/api";
+import { api, isHttpError } from "@/platform/api";
 import type { StudioReviewProductionRequest } from "../review-production/studio-review-production-model";
 
 export class StudioReviewTaskCompletionClientError extends Error {

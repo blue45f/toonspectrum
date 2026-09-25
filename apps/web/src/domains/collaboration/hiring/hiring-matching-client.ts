@@ -1,4 +1,4 @@
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 import type { HiringAcceptance, HiringAvailability, HiringAvailabilityInput, HiringCandidatePage, HiringCandidateQuery, HiringOffer } from "../../../../../../packages/contracts/src/creator-hiring";
 

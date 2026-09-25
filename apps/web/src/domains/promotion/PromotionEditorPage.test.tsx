@@ -12,8 +12,8 @@ vi.mock("@/shared/lib/store", () => ({
   useHydrated: () => true,
 }));
 vi.mock("@/hooks/use-document-title", () => ({ useDocumentTitle: () => undefined }));
-vi.mock("@/infrastructure/promotion-client", () => ({ promotionClient: mocks }));
-vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: async () => "등록 실패: 입력 내용이 유지됩니다." }));
+vi.mock("@/platform/promotion-client", () => ({ promotionClient: mocks }));
+vi.mock("@/platform/api", () => ({ getApiErrorMessage: async () => "등록 실패: 입력 내용이 유지됩니다." }));
 function view() {
   return render(<MemoryRouter initialEntries={["/community/promote/new"]}><Routes>
     <Route path="/community/promote/new" element={<PromotionEditorPage />} />

@@ -5,7 +5,7 @@ import {
   shouldLoadSharedPoseLibrary,
 } from "./studio-vrm-shared-pose-library";
 
-import type { SharedAssetCatalogItem } from "../../../infrastructure/creator-client";
+import type { SharedAssetCatalogItem } from "../../../platform/creator-client";
 
 function asset(overrides: Partial<SharedAssetCatalogItem>): SharedAssetCatalogItem {
   return {

@@ -39,7 +39,7 @@ import {
   useMetaDescription,
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
-import { api, apiPath, getApiErrorMessage } from "@/infrastructure/api";
+import { api, apiPath, getApiErrorMessage } from "@/platform/api";
 
 const SharePageButton = lazy(async () => {
   const module = await import("@/shared/components/share-page-button");

@@ -28,7 +28,7 @@ import {
   adminFetch,
   type AdminMe,
 } from "@/domains/admin/components/admin-client";
-import { messagingClient } from "@/infrastructure/messaging-client";
+import { messagingClient } from "@/platform/messaging-client";
 
 // Mouse, keyboard and touch share the same 44px account-menu interaction contract.
 const ITEM_CLASS =

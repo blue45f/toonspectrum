@@ -45,7 +45,7 @@ import {
   updateWork,
   type WorkDetail,
   type WorkReportReason,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 const DESCRIPTOR_LABEL: Record<CreatorCommunityContentDescriptor, string> = {
   violence: "폭력",

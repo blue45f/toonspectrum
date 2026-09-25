@@ -1,6 +1,6 @@
 import { studioWorkSessionId } from "@toonspectrum/studio-project-model/work-session";
 import { studioSessionEvidenceResponseSchema, type StudioSessionEvidenceResponse } from "@toonspectrum/studio-project-model/work-session-evidence";
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 export async function getStudioSessionEvidence(workId: string, sessionId: string, inputDigest: string,
   offset: number, signal: AbortSignal): Promise<StudioSessionEvidenceResponse> {

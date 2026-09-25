@@ -10,7 +10,7 @@ import {
 import { sameStudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-subject";
 
 const http = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
-vi.mock("@/infrastructure/api", () => ({ api: http,
+vi.mock("@/platform/api", () => ({ api: http,
   httpStatus: (error: { response?: { status: number } }) => error?.response?.status ?? null }));
 
 const subject = Object.freeze({ schemaVersion: 1 as const, projectId: "graph-1", workId: "work-1",

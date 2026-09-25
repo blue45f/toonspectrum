@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { MeProfile } from "@/infrastructure/me-client";
+import type { MeProfile } from "@/platform/me-client";
 import {
   creatorSpecialtyDefinition,
   creatorText,
@@ -27,11 +27,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/compat/auth-session-store", () => ({
   useSession: () => ({ status: "authenticated" }),
 }));
-vi.mock("@/infrastructure/me-client", () => ({
+vi.mock("@/platform/me-client", () => ({
   getMyProfile: mocks.getMyProfile,
   updateMyProfile: vi.fn(),
 }));
-vi.mock("@/infrastructure/creator-role-workspace-client", () => ({
+vi.mock("@/platform/creator-role-workspace-client", () => ({
   batchPublicCreatorRoleProfiles: vi.fn(),
   searchPublicCreatorRoles: mocks.searchPublicCreatorRoles,
 }));

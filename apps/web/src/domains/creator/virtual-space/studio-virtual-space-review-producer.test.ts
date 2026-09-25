@@ -5,7 +5,7 @@ import { cancelStudioVirtualSpaceReviewCapture, getStudioVirtualSpaceReviewCaptu
   produceStudioVirtualSpaceReviewCapture, studioReviewCaptureContentDigest, type StudioReviewCaptureInput, type StudioReviewCaptureIntent } from "./studio-virtual-space-review-producer";
 
 const http = vi.hoisted(() => ({ post: vi.fn(), put: vi.fn() }));
-vi.mock("@/infrastructure/api", () => ({ api: { post: http.post, raw: { put: http.put } }, apiPath: (path: string) => `/api${path}`,
+vi.mock("@/platform/api", () => ({ api: { post: http.post, raw: { put: http.put } }, apiPath: (path: string) => `/api${path}`,
   httpStatus: (error: { status?: number }) => error?.status ?? null }));
 
 const capture: StudioReviewCaptureInput = { intentId: "intent-1", workId: "work-1", sourceServerRevision: 4,

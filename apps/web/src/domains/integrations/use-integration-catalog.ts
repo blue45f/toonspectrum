@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 import { integrationPlatformClient } from "./integration-platform-client";
 import type { IntegrationCatalogResponse } from "./integration-platform-types";

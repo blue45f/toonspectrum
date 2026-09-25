@@ -1,4 +1,4 @@
-import type { SharedAssetCatalogItem } from "../../../infrastructure/creator-client";
+import type { SharedAssetCatalogItem } from "../../../platform/creator-client";
 
 export interface SharedPoseLibraryGate {
   editorOpen: boolean;

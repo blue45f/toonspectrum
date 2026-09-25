@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TagsPage } from "./TagsPage";
 
 const resource = vi.hoisted(() => ({ read: vi.fn(), reload: vi.fn() }));
-vi.mock("@/infrastructure/use-api-resource", () => ({ useApiResource: resource.read }));
+vi.mock("@/platform/use-api-resource", () => ({ useApiResource: resource.read }));
 
 const tags = Array.from({ length: 130 }, (_, index) => ({
   tag: `태그${String(index).padStart(3, "0")}`,

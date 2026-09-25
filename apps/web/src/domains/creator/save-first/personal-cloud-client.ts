@@ -1,4 +1,4 @@
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 
 export const PERSONAL_CLOUD_PROVIDER_IDS = [
   "google-drive",

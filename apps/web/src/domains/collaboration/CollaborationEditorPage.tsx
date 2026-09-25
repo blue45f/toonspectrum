@@ -14,8 +14,8 @@ import type { CollaborationDetails, CollaborationInput } from "../../../../../pa
 
 import Link from "@/compat/router-link";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { getApiErrorMessage } from "@/infrastructure/api";
-import { collaborationClient } from "@/infrastructure/collaboration-client";
+import { getApiErrorMessage } from "@/platform/api";
+import { collaborationClient } from "@/platform/collaboration-client";
 import { Container } from "@/shared/components/section";
 import { useApp } from "@/shared/lib/store";
 

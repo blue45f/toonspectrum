@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 
-import { BackendCapabilitiesModule } from "../../infrastructure/backend-capabilities/backend-capabilities.module";
+import { BackendCapabilitiesModule } from "../../platform/backend-capabilities/backend-capabilities.module";
 
 import { healthReadinessRepositoryProvider } from "./health-readiness.repository";
 import {

@@ -7,7 +7,7 @@ import {
   type PinnedShareView,
 } from "@toonspectrum/studio-project-model/pinned-review-share";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 import {

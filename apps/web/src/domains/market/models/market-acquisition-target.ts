@@ -4,7 +4,7 @@ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-mark
 import {
   getCreatorMarketplaceResource,
   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 
 type AvailableAcquisitionTarget = Extract<

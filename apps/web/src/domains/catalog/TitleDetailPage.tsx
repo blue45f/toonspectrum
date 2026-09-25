@@ -50,7 +50,7 @@ import {
   useMetaRobots,
   usePageSocialMeta,
 } from "@/hooks/use-document-title";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+import { useApiResource } from "@/platform/use-api-resource";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 
 

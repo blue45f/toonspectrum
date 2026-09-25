@@ -1,4 +1,4 @@
-import type { SeriesStatus, WorkSummary } from "@/infrastructure/creator-client";
+import type { SeriesStatus, WorkSummary } from "@/platform/creator-client";
 
 export const FORMAT_LABEL: Record<WorkSummary["format"], string> = {
   cuttoon: "컷툰",

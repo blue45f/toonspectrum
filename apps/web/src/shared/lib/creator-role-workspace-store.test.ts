@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   CreatorRoleWorkspaceConflictError,
-} from "@/infrastructure/creator-role-workspace-client";
+} from "@/platform/creator-role-workspace-client";
 import {
   getCreatorRoleWorkspaceStoreState,
   loadCreatorRoleWorkspace,
@@ -20,9 +20,9 @@ const doubles = vi.hoisted(() => ({
   save: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/creator-role-workspace-client", async (original) => {
+vi.mock("@/platform/creator-role-workspace-client", async (original) => {
   const actual = await original<
-    typeof import("@/infrastructure/creator-role-workspace-client")
+    typeof import("@/platform/creator-role-workspace-client")
   >();
   return {
     ...actual,

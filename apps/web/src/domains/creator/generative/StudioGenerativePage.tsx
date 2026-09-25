@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { localSpatialImage } from "../spatial-reader/spatial-book";
 import { GlbCapture } from "./GlbCapture";
 import { cancelInferenceJob, createInferenceJob, getInferenceJob, inferenceArtifact, inferenceStatus, isInferenceTerminal, listInferenceJobs, type InferenceJob, type InferenceKind, type InferenceRequest, type InferenceStatus } from "./media-inference-client";

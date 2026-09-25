@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 import { creatorIntelligenceClient } from "./studio-creator-intelligence-client";
 

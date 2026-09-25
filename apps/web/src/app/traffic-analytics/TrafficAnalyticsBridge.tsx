@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
-import { apiPath } from "../../infrastructure/api";
+import { apiPath } from "../../platform/api";
 
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { TOONSPECTRUM_SHARE_EVENT } from "@/shared/lib/share";

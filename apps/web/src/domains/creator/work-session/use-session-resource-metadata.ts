@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { StudioSessionResources, StudioWorkSession } from "@toonspectrum/studio-project-model/work-session";
 
-import { httpStatus } from "@/infrastructure/api";
+import { httpStatus } from "@/platform/api";
 import { getStudioSessionResources } from "./studio-work-session-client";
 
 /** Owned by the existing actor-keyed session surface; never persists private metadata. */

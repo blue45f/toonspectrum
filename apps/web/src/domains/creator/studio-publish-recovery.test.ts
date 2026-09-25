@@ -10,7 +10,7 @@ import type {
   UpdateWorkInput,
   WorkDetail,
   WorkSummary,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 function detail(overrides: Partial<WorkDetail> = {}): WorkDetail {
   return {

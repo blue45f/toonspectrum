@@ -3,7 +3,7 @@ import { studioHandoffClient, StudioHandoffClientError } from "./studio-handoff-
 import { handoffFixture } from "./studio-handoff-envelope-fixture";
 
 const io = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
-vi.mock("@/infrastructure/api", () => ({ api: io, isHttpError: (error: unknown) => Boolean(error && typeof error === "object" && "response" in error) }));
+vi.mock("@/platform/api", () => ({ api: io, isHttpError: (error: unknown) => Boolean(error && typeof error === "object" && "response" in error) }));
 const signal = () => new AbortController().signal;
 function input() {
   const { prepared, choice } = handoffFixture(), recipient = prepared.recipients[0]!;

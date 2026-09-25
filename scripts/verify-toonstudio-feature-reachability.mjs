@@ -118,7 +118,7 @@ const required = [
   "apps/web/src/domains/creator/music/StudioMusicPage.tsx",
   "apps/web/src/domains/creator/music/studio-music-publication.ts",
   "apps/web/src/domains/creator/StudioAssetMenuPanel.tsx",
-  "apps/web/src/infrastructure/creator-client.ts",
+  "apps/web/src/platform/creator-client.ts",
   "apps/web/src/domains/creator/WebtoonFxPlayer.tsx",
   "apps/web/src/domains/creator/studio-project-feature-suite-store.ts",
   "apps/web/src/domains/creator/studio-shell/StudioProjectFeatureSuitePanel.tsx",

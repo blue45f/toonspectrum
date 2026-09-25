@@ -34,11 +34,11 @@ import type {
 import { ensureArray } from "@/shared/lib/http-safe";
 import { projectRevisionComparisonValue } from "@/shared/lib/revision-comparison-projection";
 import { getAuthUserId } from "@/compat/auth-session-store";
-import { api, isHttpError, toApiError } from "@/infrastructure/api";
+import { api, isHttpError, toApiError } from "@/platform/api";
 import {
   validateSharedAssetCatalogItem,
   validateSharedAssetContentResponse,
-} from "@/infrastructure/creator-asset-response-validation";
+} from "@/platform/creator-asset-response-validation";
 
 
 export type WorkFormat = "cuttoon" | "upload";

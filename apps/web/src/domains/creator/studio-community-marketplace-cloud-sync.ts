@@ -10,7 +10,7 @@ import {
 } from "@/shared/lib/creator-marketplace-cloud-library-contract";
 import {
   confirmCreatorMarketplaceStudioInstall,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 export interface StudioCommunityMarketplaceCloudSyncDependencies {
   readonly confirm: (

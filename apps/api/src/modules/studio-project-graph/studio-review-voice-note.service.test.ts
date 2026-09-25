@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
+import type { PrivateObjectStoragePort } from "../../platform/private-object-storage/private-object-storage.port";
 import { StudioReviewVoiceNoteRepositoryError, type StudioReviewVoiceNoteRepository } from "./studio-review-voice-note.repository";
 import { StudioReviewVoiceNoteService } from "./studio-review-voice-note.service";
 

@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, NotFoundException,
   ServiceUnavailableException, UnprocessableEntityException } from "@nestjs/common";
 
-import { LocatedPrivateObjectReferenceSchema } from "../../infrastructure/private-object-storage/private-object-storage.contract";
+import { LocatedPrivateObjectReferenceSchema } from "../../platform/private-object-storage/private-object-storage.contract";
 import { StudioWorkAssetService, type StudioWorkAssetUploadFile } from "../creator/studio-work-asset.service";
 import { StudioIdempotencyConflictError, StudioProjectForbiddenError, StudioProjectNotFoundError, StudioRepositoryInvariantError } from "./studio-project-graph.repository";
 import { canonicalizeStudioReviewPreview, StudioReviewPreviewValidationError } from "./studio-review-preview-canonicalizer";

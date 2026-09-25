@@ -46,7 +46,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+import { useApiResource } from "@/platform/use-api-resource";
 
 type ExploreParams = Record<string, string | undefined>;
 

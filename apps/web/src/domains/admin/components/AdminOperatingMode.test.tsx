@@ -5,7 +5,7 @@ import { initialOperationPolicy, resolveOperationPolicy } from "@toonspectrum/co
 import { AdminOperatingMode } from "./AdminOperatingMode";
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
-vi.mock("@/infrastructure/api", () => ({ api: mocks, getApiErrorMessage: async (error: unknown) => error instanceof Error ? error.message : "실패" }));
+vi.mock("@/platform/api", () => ({ api: mocks, getApiErrorMessage: async (error: unknown) => error instanceof Error ? error.message : "실패" }));
 const policy = () => ({ revision: 0, draft: initialOperationPolicy(), updatedAt: "2026-09-22T00:00:00Z" });
 beforeEach(() => {
   vi.clearAllMocks();

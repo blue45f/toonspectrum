@@ -4,7 +4,7 @@ import { deriveStudioReviewPageMapping } from "@toonspectrum/studio-project-mode
 import { getStudioVirtualSpaceReviewPreview } from "./studio-virtual-space-review-preview";
 
 const http = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
-vi.mock("@/infrastructure/api", () => ({ api: http,
+vi.mock("@/platform/api", () => ({ api: http,
   httpStatus: (error: { response?: { status: number } }) => error?.response?.status ?? null }));
 
 const subject = { schemaVersion: 1 as const, projectId: "graph-1", workId: "work-1", artifactId: "artifact-1",

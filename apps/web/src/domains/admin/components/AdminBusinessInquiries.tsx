@@ -14,7 +14,7 @@ import {
   type BusinessInquiryStatus,
 } from "@toonspectrum/core/business-inquiry";
 
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 import { AdminBusinessVerifications } from "./AdminBusinessVerifications";
 
 function formatDate(value: string): string {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { api, apiPath } from "@/infrastructure/api";
+import { api, apiPath } from "@/platform/api";
 
 // 404 를 흐름 제어(notFound)로 다루기 위한 센티넬 에러. 일반 에러와 구분한다.
 export class NotFoundError extends Error {

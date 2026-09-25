@@ -6,7 +6,7 @@ import { evidenceTestResponse, evidenceTestView } from "./studio-session-evidenc
 
 const mocks = vi.hoisted(() => ({ load: vi.fn(), revision: 0, listeners: new Set<(session: { user: { id: string } } | null) => void>() }));
 vi.mock("./studio-session-evidence-client", () => ({ getStudioSessionEvidence: mocks.load }));
-vi.mock("@/infrastructure/api", () => ({ httpStatus: (error: { status?: number }) => error.status }));
+vi.mock("@/platform/api", () => ({ httpStatus: (error: { status?: number }) => error.status }));
 vi.mock("@/compat/auth-session-state", () => ({ getAuthSessionRevision: () => mocks.revision, listeners: mocks.listeners }));
 const session = evidenceTestView().session;
 beforeEach(() => { vi.useFakeTimers(); mocks.load.mockReset(); mocks.listeners.clear(); mocks.revision = 0; Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" }); });

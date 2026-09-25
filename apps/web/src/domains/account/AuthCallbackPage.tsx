@@ -6,7 +6,7 @@ import { Container } from "@/shared/components/section";
 import { useT } from "@/shared/lib/i18n";
 import { completeOAuthLogin } from "@/compat/auth-session-store";
 import Link from "@/compat/router-link";
-import { api, apiPath } from "@/infrastructure/api";
+import { api, apiPath } from "@/platform/api";
 
 type Phase = "working" | "done" | "error";
 

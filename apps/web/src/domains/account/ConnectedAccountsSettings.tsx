@@ -10,7 +10,7 @@ import {
   type AuthProviderDiscovery,
 } from "@/domains/auth/public/connected-accounts";
 import { persistSession } from "@/compat/auth-session-store";
-import { api, apiPath } from "@/infrastructure/api";
+import { api, apiPath } from "@/platform/api";
 
 type ProviderId = "google" | "apple" | "kakao" | "naver" | "github";
 

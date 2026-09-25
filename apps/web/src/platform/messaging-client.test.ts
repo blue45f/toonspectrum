@@ -9,7 +9,7 @@ const { apiDelete, apiGet, apiPatch, apiPost } = vi.hoisted(() => ({
   apiPost: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: {
     delete: apiDelete,
     get: apiGet,

@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { getStudioSessionResources } from "./studio-work-session-client";
 
 const get = vi.hoisted(() => vi.fn());
-vi.mock("@/infrastructure/api", () => ({ api: { get } }));
+vi.mock("@/platform/api", () => ({ api: { get } }));
 const digest = "a".repeat(64);
 const resource = () => ({ workId: "work", sessionId: "session", inputDigest: digest,
   sourceStatus: "mapped", expiresAt: new Date(Date.now() + 15000).toISOString(), pages: [], nextPageOffset: null, assets: [] });

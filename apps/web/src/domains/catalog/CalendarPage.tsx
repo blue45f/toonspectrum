@@ -24,7 +24,7 @@ import { useRememberedFilters } from "@/shared/lib/use-remembered-filters";
 import { cn } from "@/shared/lib/utils";
 import Link from "@/compat/router-link";
 import { ErrorState } from "@/components/error-state";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+import { useApiResource } from "@/platform/use-api-resource";
 
 
 

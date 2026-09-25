@@ -9,7 +9,7 @@ import type { HiringApplicationSnapshot, HiringResume, HiringResumeVersion } fro
 import type { CollaborationAction } from "../collaboration-application-panel";
 
 import Link from "@/compat/router-link";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 export function HiringSubmissionPanel({ postId, postVersion, busy, act }: { postId: string; postVersion: number; busy: boolean; act: CollaborationAction }) {
   const [resumes, setResumes] = useState<HiringResume[] | null>(null), [resumeId, setResumeId] = useState("");

@@ -13,8 +13,8 @@ const { reportCreatorMarketplaceResource } = vi.hoisted(() => ({
   reportCreatorMarketplaceResource: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/creator-marketplace-client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/infrastructure/creator-marketplace-client")>()),
+vi.mock("@/platform/creator-marketplace-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/platform/creator-marketplace-client")>()),
   reportCreatorMarketplaceResource,
 }));
 

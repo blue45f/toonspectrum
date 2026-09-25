@@ -38,7 +38,7 @@ vi.mock("@/domains/creator/studio-shared-asset-preview", () => ({
   createStudioSharedAssetPreview,
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: {
     delete: vi.fn(),
     get: apiGet,

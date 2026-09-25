@@ -5,11 +5,11 @@ import { Inject, Injectable, Optional } from "@nestjs/common";
 import {
   PRIVATE_OBJECT_STORAGE_PORT,
   type PrivateObjectStoragePort,
-} from "../../infrastructure/private-object-storage/private-object-storage.port";
+} from "../../platform/private-object-storage/private-object-storage.port";
 import {
   PrivateObjectReferenceSchema,
   type PrivateObjectReference,
-} from "../../infrastructure/private-object-storage/private-object-storage.contract";
+} from "../../platform/private-object-storage/private-object-storage.contract";
 import type {
   CreatorWorkMediaPayload,
   CreatorWorkMediaTarget,

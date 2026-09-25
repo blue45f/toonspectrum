@@ -1,4 +1,4 @@
-import { HTTPError, api, getApiErrorMessage } from "@/infrastructure/api";
+import { HTTPError, api, getApiErrorMessage } from "@/platform/api";
 import { completeWithUserTextKey } from "@/shared/ai/unified-ai-settings";
 import {
   getUserAiSnapshot,
