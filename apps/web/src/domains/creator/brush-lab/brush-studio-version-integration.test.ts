@@ -11,7 +11,7 @@ import {
 
 describe("Brush Studio product integration", () => {
   it("keeps every paint product reachable through a real V6 editing recipe", () => {
-    expect(BRUSH_QUALITY_CATALOG).toHaveLength(88);
+    expect(BRUSH_QUALITY_CATALOG).toHaveLength(95);
     expect(auditBrushStudioVersionIntegration()).toEqual([]);
 
     for (const entry of BRUSH_QUALITY_CATALOG) {
