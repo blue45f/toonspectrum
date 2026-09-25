@@ -2,150 +2,43 @@ import { Navigate } from "react-router-dom";
 
 import { defineAppRoutes } from "../app-route-definition";
 
-import { lazyRetry } from "@/shared/lib/lazy-retry";
-
-const CatalogResearchPage = lazyRetry(
-  () => import("@/domains/creator-resources/CatalogResearchPage").then((module) => ({ default: module.CatalogResearchPage })),
-  "CatalogResearchPage",
-);
-
-const CreatorHubPage = lazyRetry(
-  () => import("@/domains/creator-resources/CreatorHubPage").then((module) => ({ default: module.CreatorHubPage })),
-  "CreatorHubPage",
-);
-const NowPage = lazyRetry(
-  () => import("@/domains/creator-resources/NowPage").then((module) => ({ default: module.NowPage })),
-  "NowPage",
-);
-const OpportunitiesPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.OpportunitiesPage })),
-  "OpportunitiesPage",
-);
-const ReferenceAssetsPage = lazyRetry(
-  () => import("@/domains/creator-resources/ReferenceAssetsPage").then((module) => ({ default: module.ReferenceAssetsPage })),
-  "ReferenceAssetsPage",
-);
-const WorksPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.WorksPage })),
-  "WorksPage",
-);
-const PolyHavenPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.PolyHavenPage })),
-  "PolyHavenPage",
-);
-const AmbientCgPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.AmbientCgPage })),
-  "AmbientCgPage",
-);
-const NasaImagesPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.NasaImagesPage })),
-  "NasaImagesPage",
-);
-const VamCollectionsPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.VamCollectionsPage })),
-  "VamCollectionsPage",
-);
-const RijksmuseumPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.RijksmuseumPage })),
-  "RijksmuseumPage",
-);
-const GoogleFontsPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.GoogleFontsPage })),
-  "GoogleFontsPage",
-);
-const GbifPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.GbifPage })),
-  "GbifPage",
-);
-const MusicBrainzPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.MusicBrainzPage })),
-  "MusicBrainzPage",
-);
-const InternetArchivePage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.InternetArchivePage })),
-  "InternetArchivePage",
-);
-const MetWeatherPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.MetWeatherPage })),
-  "MetWeatherPage",
-);
-const KoreanHeritagePage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.KoreanHeritagePage })),
-  "KoreanHeritagePage",
-);
-const NeisSchoolPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.NeisSchoolPage })),
-  "NeisSchoolPage",
-);
-const TourApiPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.TourApiPage })),
-  "TourApiPage",
-);
-const KoreanDictionaryPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.KoreanDictionaryPage })),
-  "KoreanDictionaryPage",
-);
-const SmithsonianPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.SmithsonianPage })),
-  "SmithsonianPage",
-);
-const WikimediaInterestPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.WikimediaInterestPage })),
-  "WikimediaInterestPage",
-);
-const EuropeanaPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.EuropeanaPage })),
-  "EuropeanaPage",
-);
-const DplaPage = lazyRetry(
-  () => import("@/domains/creator-resources/ResourceSearchPage").then((module) => ({ default: module.DplaPage })),
-  "DplaPage",
-);
-const OpenDataLabPage = lazyRetry(
-  () => import("@/domains/creator-resources/OpenDataLabPage").then((module) => ({ default: module.OpenDataLabPage })),
-  "OpenDataLabPage",
-);
-const GlobalBooksPage = lazyRetry(
-  () => import("@/domains/creator-resources/GlobalBooksPage").then((module) => ({ default: module.GlobalBooksPage })),
-  "GlobalBooksPage",
-);
-const RecipesPage = lazyRetry(
-  () => import("@/domains/creator-resources/RecipesPage").then((module) => ({ default: module.RecipesPage })),
-  "RecipesPage",
-);
-const StoryLabPage = lazyRetry(
-  () => import("@/domains/creator-resources/StoryLabPage").then((module) => ({ default: module.StoryLabPage })),
-  "StoryLabPage",
-);
-const OpenCreationPage = lazyRetry(
-  () => import("@/domains/creator-resources/OpenCreationPage").then((module) => ({ default: module.OpenCreationPage })),
-  "OpenCreationPage",
-);
-const SourcesPage = lazyRetry(
-  () => import("@/domains/creator-resources/SourcesPage").then((module) => ({ default: module.SourcesPage })),
-  "SourcesPage",
-);
-
-const ContentPacksPage = lazyRetry(
-  () => import("@/domains/creator-resources/ContentPacksPage").then((module) => ({ default: module.ContentPacksPage })),
-  "ContentPacksPage",
-);
-const EducationHubPage = lazyRetry(
-  () => import("@/domains/creator-ecosystem/EducationHubPage").then((module) => ({ default: module.EducationHubPage })),
-  "EducationHubPage",
-);
-const CollaborationHubPage = lazyRetry(
-  () => import("@/domains/creator-ecosystem/CollaborationHubPage").then((module) => ({ default: module.CollaborationHubPage })),
-  "CollaborationHubPage",
-);
-const FandomCosplayPage = lazyRetry(
-  () => import("@/domains/creator-ecosystem/FandomCosplayPage").then((module) => ({ default: module.FandomCosplayPage })),
-  "FandomCosplayPage",
-);
-const ComicLibraryPage = lazyRetry(
-  () => import("@/domains/creator-ecosystem/ComicLibraryPage").then((module) => ({ default: module.ComicLibraryPage })),
-  "ComicLibraryPage",
-);
+import {
+  CatalogResearchPage,
+  CreatorHubPage,
+  NowPage,
+  OpportunitiesPage,
+  ReferenceAssetsPage,
+  WorksPage,
+  PolyHavenPage,
+  AmbientCgPage,
+  NasaImagesPage,
+  VamCollectionsPage,
+  RijksmuseumPage,
+  GoogleFontsPage,
+  GbifPage,
+  MusicBrainzPage,
+  InternetArchivePage,
+  MetWeatherPage,
+  KoreanHeritagePage,
+  NeisSchoolPage,
+  TourApiPage,
+  KoreanDictionaryPage,
+  SmithsonianPage,
+  WikimediaInterestPage,
+  EuropeanaPage,
+  DplaPage,
+  OpenDataLabPage,
+  GlobalBooksPage,
+  RecipesPage,
+  StoryLabPage,
+  OpenCreationPage,
+  SourcesPage,
+  ContentPacksPage,
+  EducationHubPage,
+  CollaborationHubPage,
+  FandomCosplayPage,
+  ComicLibraryPage,
+} from "./creator-resources-route-pages";
 
 export const creatorResourcesRoutes = defineAppRoutes([
   // Legacy creator hubs now resolve to the canonical ToonStudio front door.

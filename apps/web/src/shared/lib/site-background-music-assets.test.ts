@@ -12,7 +12,7 @@ function hasMp3Signature(bytes: Uint8Array): boolean {
 }
 
 describe("site background music assets", () => {
-  it("publishes twelve approved originals including the six Prism Awakening masters", () => {
+  it("publishes fifteen approved originals including the six Prism Awakening masters", () => {
     const manifest = JSON.parse(readFileSync(new URL("playlist.json", AUDIO_DIRECTORY), "utf8")) as {
       version?: unknown;
       publishedAt?: unknown;
@@ -22,7 +22,7 @@ describe("site background music assets", () => {
     expect(manifest.version).toBe(3);
     expect(typeof manifest.publishedAt).toBe("string");
     const tracks = parseSiteBgmManifest(manifest);
-    expect(tracks).toHaveLength(12);
+    expect(tracks).toHaveLength(15);
     const ids = new Set(tracks.map((track) => track.id));
     for (const id of ["spectrum-breaker-vocal", "wings-of-the-unwritten-vocal", "oath-of-a-thousand-lights-vocal", "where-the-stars-return-vocal", "atlas-of-starlight-instrumental", "dawnfall-protocol-instrumental"]) {
       expect(ids.has(id)).toBe(true);
