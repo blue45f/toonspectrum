@@ -18,6 +18,7 @@ class MemoryStorage implements StudioCreatorIntelligenceStorage {
 const reference = {
   id: "openverse:1",
   provider: "openverse" as const,
+  mediaType: "image" as const,
   title: "Pose",
   creator: "Artist",
   sourceUrl: "https://example.org/source",

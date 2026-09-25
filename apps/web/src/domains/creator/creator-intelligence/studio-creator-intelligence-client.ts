@@ -1,6 +1,7 @@
 import { api } from "@/infrastructure/api";
 
 export type CreatorIntelligenceReferenceProvider = "openverse" | "pexels" | "pixabay";
+export type CreatorIntelligenceReferenceMediaType = "image" | "video";
 export type CreatorIntelligenceTranslationProvider = "deepl" | "libretranslate";
 export type CreatorIntelligenceVoiceProvider = "gemini" | "deepgram";
 export type CreatorIntelligenceProviderState = "ready" | "not_configured" | "disabled";
@@ -26,6 +27,7 @@ export interface CreatorIntelligenceStatus {
 export interface CreatorIntelligenceReference {
   readonly id: string;
   readonly provider: CreatorIntelligenceReferenceProvider;
+  readonly mediaType: CreatorIntelligenceReferenceMediaType;
   readonly title: string;
   readonly creator: string;
   readonly sourceUrl: string;
@@ -35,6 +37,7 @@ export interface CreatorIntelligenceReference {
   readonly licenseUrl: string;
   readonly width?: number | null;
   readonly height?: number | null;
+  readonly durationSeconds?: number | null;
   readonly rightsStatus: "verify-source" | "provider-license";
   readonly importable: false;
   readonly fetchedAt: string;
@@ -42,6 +45,7 @@ export interface CreatorIntelligenceReference {
 
 export interface ReferenceSearchResponse {
   readonly provider: CreatorIntelligenceReferenceProvider;
+  readonly mediaType: CreatorIntelligenceReferenceMediaType;
   readonly status: CreatorIntelligenceProviderState;
   readonly page: number;
   readonly items: readonly CreatorIntelligenceReference[];
@@ -172,11 +176,15 @@ export const creatorIntelligenceClient = {
     "/creator-intelligence/status",
     PUBLIC_DISCOVERY_REQUEST,
   ),
-  references: (provider: CreatorIntelligenceReferenceProvider, query: string, page = 1) =>
-    api.get<ReferenceSearchResponse>("/creator-intelligence/references", {
-      ...PUBLIC_DISCOVERY_REQUEST,
-      params: { provider, q: query, page },
-    }),
+  references: (
+    provider: CreatorIntelligenceReferenceProvider,
+    query: string,
+    page = 1,
+    media: CreatorIntelligenceReferenceMediaType = "image",
+  ) => api.get<ReferenceSearchResponse>("/creator-intelligence/references", {
+    ...PUBLIC_DISCOVERY_REQUEST,
+    params: { provider, q: query, page, media },
+  }),
   scene: (place: string, date: string) =>
     api.get<SceneReferenceResponse>("/creator-intelligence/scene", {
       ...PUBLIC_DISCOVERY_REQUEST,

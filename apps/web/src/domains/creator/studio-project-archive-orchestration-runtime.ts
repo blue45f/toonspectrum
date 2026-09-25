@@ -8,6 +8,7 @@ import type { StudioProjectSnapshot } from "./studio-project-snapshot";
 import type { StudioPublicationAnalyticsDocument } from "./studio-publication-analytics";
 import type { StudioReleaseSchedule } from "./studio-release-schedule";
 import type { StudioReleaseScheduleRuntime } from "./studio-release-schedule-loader";
+import type { StudioWriterRoomDocument } from "./studio-writer-room";
 import type {
   StudioVrmProjectArchiveAttestationPlan,
   StudioVrmProjectArchiveUseContextInput,
@@ -149,6 +150,7 @@ export interface StudioProjectArchiveOrchestrationInput {
   readonly applyStudioProjectSnapshotWithPreparedDocuments: (
     project: StudioProjectFile,
     normalizeReleaseSchedule: (value: unknown) => StudioReleaseSchedule,
+    normalizeWriterRoomDocument: (value: unknown) => StudioWriterRoomDocument,
     publicationAnalytics: StudioPublicationAnalyticsDocument
   ) => boolean;
   /**
@@ -615,6 +617,7 @@ export function createStudioProjectArchiveOrchestration({
         { acquireStudioLinked3dPassProductAuthority },
         { runStudioProjectArchiveFinalInstallExclusive },
         { normalizeStudioReleaseSchedule },
+        { normalizeStudioWriterRoomDocument },
       ] = await Promise.all([
         import("./studio-project-archive"),
         import( "./bg3d/studio-bg3d-project-library"),
@@ -625,6 +628,7 @@ export function createStudioProjectArchiveOrchestration({
         import("./studio-linked-3d-pass-product-authority"),
         import("./studio-project-archive-final-install-lock"),
         loadStudioReleaseScheduleRuntime(),
+        import("./studio-writer-room"),
       ]);
       const result = await importStudioProjectArchive(file, {
         rehydrateDataUrls: true,
@@ -714,6 +718,7 @@ export function createStudioProjectArchiveOrchestration({
                             projectApplied = applyStudioProjectSnapshotWithPreparedDocuments(
                               preparedProject,
                               normalizeStudioReleaseSchedule,
+                              normalizeStudioWriterRoomDocument,
                               publicationAnalyticsDocument,
                             );
                             return projectApplied;

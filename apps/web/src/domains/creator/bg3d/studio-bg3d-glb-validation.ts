@@ -874,7 +874,9 @@ function validateTextureImageReferences(
   )) return failure("invalid-gltf-root");
   const samplers = (samplersRaw ?? []) as readonly unknown[];
   const basisImageIndices = new Set<number>();
+  const webpImageIndices = new Set<number>();
   let usesBasisTexture = false;
+  let usesWebpTexture = false;
 
   for (const texture of textures) {
     if (!isRecord(texture)) return failure("invalid-gltf-root");
@@ -886,42 +888,57 @@ function validateTextureImageReferences(
     const coreSource = texture.source;
     if (
       coreSource !== undefined && (
-        !isSafeNonNegativeInteger(coreSource) || coreSource >= images.length ||
-        !isRecord(images[coreSource]) || images[coreSource].mimeType === "image/ktx2"
+        !isSafeNonNegativeInteger(coreSource) ||
+        coreSource >= images.length ||
+        !isRecord(images[coreSource]) ||
+        (images[coreSource].mimeType !== "image/png" && images[coreSource].mimeType !== "image/jpeg")
       )
     ) return failure("invalid-image");
     const extensions = texture.extensions;
     if (extensions !== undefined && !isRecord(extensions)) return failure("invalid-gltf-root");
     const basis = isRecord(extensions) ? extensions.KHR_texture_basisu : undefined;
-    if (basis === undefined) {
+    const webp = isRecord(extensions) ? extensions.EXT_texture_webp : undefined;
+    if (basis !== undefined && webp !== undefined) return failure("invalid-image");
+    if (basis === undefined && webp === undefined) {
       if (coreSource === undefined) return failure("invalid-image");
       continue;
     }
-    if (!isRecord(basis) || !isSafeNonNegativeInteger(basis.source) || basis.source >= images.length) {
+
+    const extension = basis ?? webp;
+    const extensionName = basis !== undefined ? "KHR_texture_basisu" : "EXT_texture_webp";
+    const expectedMimeType = basis !== undefined ? "image/ktx2" : "image/webp";
+    if (
+      !isRecord(extension) ||
+      !isSafeNonNegativeInteger(extension.source) ||
+      extension.source >= images.length
+    ) return failure("invalid-image");
+    const extensionImage = images[extension.source];
+    if (
+      !isRecord(extensionImage) ||
+      extensionImage.mimeType !== expectedMimeType ||
+      !used.has(extensionName)
+    ) return failure("invalid-image");
+    if (coreSource === undefined && !required.has(extensionName)) {
       return failure("invalid-image");
     }
-    const basisImage = images[basis.source];
-    if (!isRecord(basisImage) || basisImage.mimeType !== "image/ktx2" || !used.has("KHR_texture_basisu")) {
-      return failure("invalid-image");
+    if (basis !== undefined) {
+      usesBasisTexture = true;
+      basisImageIndices.add(extension.source);
+    } else {
+      usesWebpTexture = true;
+      webpImageIndices.add(extension.source);
     }
-    if (coreSource !== undefined) {
-      const fallbackImage = images[coreSource];
-      if (
-        !isRecord(fallbackImage) ||
-        (fallbackImage.mimeType !== "image/png" && fallbackImage.mimeType !== "image/jpeg")
-      ) return failure("invalid-image");
-    }
-    if (coreSource === undefined && !required.has("KHR_texture_basisu")) {
-      return failure("invalid-image");
-    }
-    usesBasisTexture = true;
-    basisImageIndices.add(basis.source);
   }
 
   if (used.has("KHR_texture_basisu") !== usesBasisTexture) return failure("invalid-image");
+  if (used.has("EXT_texture_webp") !== usesWebpTexture) return failure("invalid-image");
   for (let index = 0; index < images.length; index += 1) {
     const image = images[index];
-    if (isRecord(image) && image.mimeType === "image/ktx2" && !basisImageIndices.has(index)) {
+    if (!isRecord(image)) continue;
+    if (image.mimeType === "image/ktx2" && !basisImageIndices.has(index)) {
+      return failure("invalid-image");
+    }
+    if (image.mimeType === "image/webp" && !webpImageIndices.has(index)) {
       return failure("invalid-image");
     }
   }

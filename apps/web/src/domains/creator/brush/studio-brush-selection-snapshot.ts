@@ -40,6 +40,8 @@ export function studioBrushSlotSelectionSnapshot(
     sourcePresetName: slot.sourcePresetName,
     strokeWidth: slot.strokeWidth,
     brushOpacity: slot.brushOpacity,
+    color: slot.color ?? current.color,
+    stabilizer: slot.stabilizer ?? current.stabilizer,
     stampTuning: defaultStampTuningForBrushId(slot.brushId),
     brushDynamics: normalizeStudioBrushDynamicsSettings(
       slot.brushDynamics ?? (preset ? studioBrushDynamicsSettingsForBrushId(preset.id) : undefined),

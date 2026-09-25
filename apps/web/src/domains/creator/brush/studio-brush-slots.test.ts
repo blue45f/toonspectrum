@@ -36,6 +36,30 @@ describe("studio brush slots", () => {
     expect(studioBrushSlotAt(state, 0)).toBeNull();
   });
 
+  it("normalizes optional colour and stabilizer receipts without breaking legacy slots", () => {
+    expect(normalizeStudioBrushSlot({
+      brushId: "pen",
+      strokeWidth: 6,
+      brushOpacity: 1,
+      color: "#AbC",
+      stabilizer: 99,
+    })).toMatchObject({
+      color: "#aabbcc",
+      stabilizer: 10,
+    });
+    expect(normalizeStudioBrushSlot({
+      brushId: "pen",
+      strokeWidth: 6,
+      brushOpacity: 1,
+      color: "not-a-color",
+      stabilizer: "not-a-number",
+    })).toEqual({
+      brushId: "pen",
+      strokeWidth: 6,
+      brushOpacity: 1,
+    });
+  });
+
   it("persists through storage helpers", () => {
     const map = new Map<string, string>();
     const storage = {
@@ -158,5 +182,24 @@ describe("studio brush slots", () => {
     });
     expect(state.slots.filter(Boolean)).toHaveLength(3);
     expect(state.slots[0]?.brushDynamics?.seed).toBe(11);
+  });
+
+  it("keeps colour and stabilizer as part of the exact quick-slot identity", () => {
+    let state = emptyStudioBrushSlots();
+    state = rememberStudioBrushSlot(state, {
+      brushId: "pen", strokeWidth: 6, brushOpacity: 1, color: "#112233", stabilizer: 2,
+    });
+    state = rememberStudioBrushSlot(state, {
+      brushId: "pen", strokeWidth: 6, brushOpacity: 1, color: "#445566", stabilizer: 2,
+    });
+    state = rememberStudioBrushSlot(state, {
+      brushId: "pen", strokeWidth: 6, brushOpacity: 1, color: "#445566", stabilizer: 8,
+    });
+    expect(state.slots.filter(Boolean)).toHaveLength(3);
+    expect(state.slots.slice(0, 3).map((slot) => [slot?.color, slot?.stabilizer])).toEqual([
+      ["#445566", 8],
+      ["#445566", 2],
+      ["#112233", 2],
+    ]);
   });
 });

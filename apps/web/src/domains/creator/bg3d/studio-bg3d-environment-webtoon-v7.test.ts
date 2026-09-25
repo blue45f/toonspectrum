@@ -11,6 +11,7 @@ import {
   STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7,
+  STUDIO_BG3D_ENVIRONMENT_ASSETS_MCP_FREE_V1,
   getStudioBg3dEnvironmentAsset,
   getStudioBg3dEnvironmentAssetByHash,
 } from "./studio-bg3d-environment-catalog";
@@ -54,10 +55,11 @@ describe("Studio original webtoon environment pack v7", () => {
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1,
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7,
+      ...STUDIO_BG3D_ENVIRONMENT_ASSETS_MCP_FREE_V1,
     ]);
-    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toHaveLength(21);
-    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id)).size).toBe(21);
-    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ sha256 }) => sha256)).size).toBe(21);
+    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toHaveLength(31);
+    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id)).size).toBe(31);
+    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ sha256 }) => sha256)).size).toBe(31);
     expect(SAMPLE_BG3D_MODEL_ENTRIES.map(({ id }) => id)).toEqual(
       STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id),
     );

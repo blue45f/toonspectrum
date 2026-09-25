@@ -1,0 +1,1409 @@
+{
+  "schema": "toonspectrum.bg3d-environment-pack.mcp-free-v1",
+  "version": "mcp-free-v1",
+  "generatedAt": "2026-09-25T07:43:53Z",
+  "provider": "Tripo",
+  "connection": {
+    "mcp": "official Tripo MCP",
+    "blenderAddon": "official Tripo 3D for Blender",
+    "cliCompanion": "Meshy CLI 0.4.0 connected separately; free task creation unavailable"
+  },
+  "generation": {
+    "providerModelVersion": "v3.0-20250812",
+    "geometryQuality": "detailed",
+    "textureQuality": "detailed",
+    "pbr": true,
+    "faceLimit": 40000,
+    "totalCreditCost": 200,
+    "billingMode": "free-api-wallet",
+    "paymentMethodUsed": false
+  },
+  "assets": [
+    {
+      "id": "ts-bg3d-webtoon_neighborhood_bus_stop-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "bac1b4ec-3c54-42a2-a07a-431e1bd5ba8a",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A compact contemporary Korean neighborhood bus-stop shelter module: dark powder-coated metal frame, clear glass side panels, shallow roof canopy, warm wooden bench, blank route-information board, two safety bollards, and a low curb base. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:e311a8bebe4759de3384422b49253292a7b68cd979e052664245e127ce7ab809",
+      "semanticParts": [
+        "roof canopy",
+        "metal frame",
+        "glass side panels",
+        "wood bench",
+        "blank information board",
+        "two safety bollards",
+        "curb platform"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 558552,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 33023,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 558552,
+      "sha256": "sha256:6d4ad1dda9d7655c59634f3a513ccf142ac70d3d6e4eefdc5427a0a9e2f4f0d4",
+      "bounds": [
+        4.225898,
+        2.65,
+        1.719861
+      ],
+      "camera": {
+        "position": [
+          6.128,
+          3.296,
+          6.846
+        ],
+        "target": [
+          0.0,
+          1.139,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_neighborhood_bus_stop.glb",
+      "fileName": "webtoon_neighborhood_bus_stop.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_neighborhood_bus_stop.png",
+      "name": "웹툰 동네 버스 정류장",
+      "theme": "transit",
+      "description": "유리 패널·목재 벤치·노선 안내판·안전 볼라드와 낮은 승강장 기단이 결합된 한국형 동네 정류장 모듈",
+      "tags": [
+        "webtoon",
+        "bus stop",
+        "shelter",
+        "bench",
+        "transit",
+        "웹툰",
+        "버스 정류장",
+        "벤치",
+        "교통"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_neighborhood_bus_stop_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_neighborhood_bus_stop-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "bac1b4ec-3c54-42a2-a07a-431e1bd5ba8a",
+          "asset_prompt_sha256": "e311a8bebe4759de3384422b49253292a7b68cd979e052664245e127ce7ab809",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_neighborhood_bus_stop.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:6d4ad1dda9d7655c59634f3a513ccf142ac70d3d6e4eefdc5427a0a9e2f4f0d4",
+        "reviewedImageSha256": "sha256:e09a03076f93e9258f1d435dcf3ce13d654c38316165e2bf0c303ef4197fcc75",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_school_gate_module-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "ffee2ca3-7508-41de-862d-398a0cfbb885",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A contemporary Korean middle-school front-gate module: two pale stone-and-brick gate piers, dark sliding metal gate partly open, short security booth, low boundary-wall segments, pedestrian side gate, blank school-name plaque, and a small raised planter. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:eda9a48e1f75a64701feaf5e3f536242cf628a08e4eff6597a31cf4aed7ec5de",
+      "semanticParts": [
+        "gate piers",
+        "sliding metal gate",
+        "pedestrian gate",
+        "boundary wall wings",
+        "blank plaque",
+        "raised planter"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 504080,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 26705,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 504080,
+      "sha256": "sha256:c2f456cf2c9cb2367523b656d9004afc1ed2fc190988ec1c31bb6e5b2b0685ad",
+      "bounds": [
+        2.344587,
+        3.8,
+        8.928126
+      ],
+      "camera": {
+        "position": [
+          12.946,
+          6.964,
+          14.464
+        ],
+        "target": [
+          0.0,
+          1.634,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_school_gate_module.glb",
+      "fileName": "webtoon_school_gate_module.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_school_gate_module.png",
+      "name": "웹툰 한국 학교 정문",
+      "theme": "education",
+      "description": "석재·벽돌 문주, 슬라이딩 철문, 보행자 출입구와 담장 날개를 묶은 학교 정문 배경 모듈",
+      "tags": [
+        "webtoon",
+        "school",
+        "gate",
+        "education",
+        "korea",
+        "웹툰",
+        "학교",
+        "정문",
+        "담장"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_school_gate_module_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_school_gate_module-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "ffee2ca3-7508-41de-862d-398a0cfbb885",
+          "asset_prompt_sha256": "eda9a48e1f75a64701feaf5e3f536242cf628a08e4eff6597a31cf4aed7ec5de",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_school_gate_module.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:c2f456cf2c9cb2367523b656d9004afc1ed2fc190988ec1c31bb6e5b2b0685ad",
+        "reviewedImageSha256": "sha256:93d2ee78593c0b6cb0a6ae99e14b04743f2806846b9eddb5ac40e49a49d0d0d3",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_rooftop_stairwell_entry-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "a596c8ae-0832-4b71-939d-ff25b09c7239",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A Korean school rooftop stairwell entrance module: compact concrete utility room, blue-gray fire door, small awning, exposed ventilation duct, electrical conduit, rooftop safety railing segment, utility pipe bundle, and subtle weathering. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:6a76fe3ab8f97ad9333b8dc591c2ef0afacd8d7d664fdb48ee36c69a8d35a8bb",
+      "semanticParts": [
+        "concrete utility room",
+        "fire doors",
+        "door awning",
+        "ventilation duct",
+        "electrical conduit",
+        "pipe bundle",
+        "safety railings"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 523092,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 28542,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 523092,
+      "sha256": "sha256:b42cf8c3a9e1a432ddeaaff186484335806a2710edbfd1e71ec6f39f90fe2027",
+      "bounds": [
+        4.015864,
+        3.25,
+        3.945795
+      ],
+      "camera": {
+        "position": [
+          5.823,
+          3.835,
+          6.506
+        ],
+        "target": [
+          0.0,
+          1.397,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_rooftop_stairwell_entry.glb",
+      "fileName": "webtoon_rooftop_stairwell_entry.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_rooftop_stairwell_entry.png",
+      "name": "웹툰 학교 옥상 계단실",
+      "theme": "education",
+      "description": "방화문·차양·배관·환기 설비와 옥상 안전 난간이 결합된 한국 학교 옥상 계단실 모듈",
+      "tags": [
+        "webtoon",
+        "school",
+        "rooftop",
+        "stairwell",
+        "utility",
+        "웹툰",
+        "학교",
+        "옥상",
+        "계단실"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_rooftop_stairwell_entry_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_rooftop_stairwell_entry-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "a596c8ae-0832-4b71-939d-ff25b09c7239",
+          "asset_prompt_sha256": "6a76fe3ab8f97ad9333b8dc591c2ef0afacd8d7d664fdb48ee36c69a8d35a8bb",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_rooftop_stairwell_entry.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:b42cf8c3a9e1a432ddeaaff186484335806a2710edbfd1e71ec6f39f90fe2027",
+        "reviewedImageSha256": "sha256:a65b82ca1ce43f0b0cbaeb1b05b4cf5a98cd51b03972a5ecabacd374c295142d",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_alley_food_cart-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "cbed629d-f46b-4441-90ac-b9a858fbf8f4",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A mobile Korean night-alley street-food cart: stainless counter, red canvas canopy with no writing, glass display case, two cooking burners, cylindrical gas tank enclosure, condiment shelf, foldable side table, small stools, storage drawers, warm practical lamps turned off. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:f97639eab3a12cc7f86dd1d2ba87ac9ce5b4a519b19b833eac5e4c1db8332b16",
+      "semanticParts": [
+        "red canopy",
+        "stainless counter",
+        "glass display",
+        "cooking burners",
+        "storage drawers",
+        "wheel chassis",
+        "side stool"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 507984,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 36362,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 507984,
+      "sha256": "sha256:0a13d34e593a66bb8c6f6d23607c81f9734f2bfe02bd8cb3f71eec6c3f1f9176",
+      "bounds": [
+        1.437837,
+        2.55,
+        2.758248
+      ],
+      "camera": {
+        "position": [
+          3.999,
+          3.009,
+          4.468
+        ],
+        "target": [
+          0.0,
+          1.096,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_alley_food_cart.glb",
+      "fileName": "webtoon_alley_food_cart.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_alley_food_cart.png",
+      "name": "웹툰 골목 포장마차 카트",
+      "theme": "urban",
+      "description": "스테인리스 조리대·붉은 차양·진열대·버너·수납과 간이 의자를 갖춘 이동식 골목 포장마차",
+      "tags": [
+        "webtoon",
+        "street food",
+        "food cart",
+        "alley",
+        "urban",
+        "웹툰",
+        "포장마차",
+        "노점",
+        "골목"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_alley_food_cart_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_alley_food_cart-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "cbed629d-f46b-4441-90ac-b9a858fbf8f4",
+          "asset_prompt_sha256": "f97639eab3a12cc7f86dd1d2ba87ac9ce5b4a519b19b833eac5e4c1db8332b16",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_alley_food_cart.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:0a13d34e593a66bb8c6f6d23607c81f9734f2bfe02bd8cb3f71eec6c3f1f9176",
+        "reviewedImageSha256": "sha256:2e0898d6e9a3fbf9c4f7bcc577d63fe2983b789b37511d91ab546c427f778e9b",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_one_room_furniture_cluster-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "55215331-81a2-4da1-b0d5-f24dd3ae9ed8",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A compact Korean one-room apartment furniture cluster arranged as one modular set: single bed with folded neutral bedding, low desk, ergonomic chair, narrow wardrobe, open bookshelf, small side table, floor lamp, rug, and a tiny potted plant; no room walls. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:f5b1d0e4c62537ac54e2308b0be4114a8b5e620a22cb183131168c3bf136390c",
+      "semanticParts": [
+        "single bed",
+        "study desk",
+        "office chair",
+        "wardrobe",
+        "bookshelf",
+        "floor lamp",
+        "rug",
+        "side table",
+        "potted plant"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 372552,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 31641,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 372552,
+      "sha256": "sha256:953c7e60731da5a44788b803aa7216d017e931ea95773bcda22c2dc793558306",
+      "bounds": [
+        3.370431,
+        2.25,
+        3.451774
+      ],
+      "camera": {
+        "position": [
+          5.005,
+          2.692,
+          5.592
+        ],
+        "target": [
+          0.0,
+          0.968,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_one_room_furniture_cluster.glb",
+      "fileName": "webtoon_one_room_furniture_cluster.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_one_room_furniture_cluster.png",
+      "name": "웹툰 원룸 가구 클러스터",
+      "theme": "home",
+      "description": "싱글 침대·책상·의자·옷장·책장·조명과 작은 생활 소품을 한 번에 배치하는 원룸 세트",
+      "tags": [
+        "webtoon",
+        "one room",
+        "furniture",
+        "bed",
+        "desk",
+        "home",
+        "웹툰",
+        "원룸",
+        "가구",
+        "침실"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_one_room_furniture_cluster_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_one_room_furniture_cluster-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "55215331-81a2-4da1-b0d5-f24dd3ae9ed8",
+          "asset_prompt_sha256": "f5b1d0e4c62537ac54e2308b0be4114a8b5e620a22cb183131168c3bf136390c",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_one_room_furniture_cluster.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:953c7e60731da5a44788b803aa7216d017e931ea95773bcda22c2dc793558306",
+        "reviewedImageSha256": "sha256:0f2b1c7bc36d121e0384cb532474472d2bdd2b825d1fa4b98fa69a56294d4bb9",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_apartment_lobby_module-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "b9cd1dda-a94b-401c-a1d5-953b590e517c",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A modern Korean apartment shared-entrance lobby module: glass double entry doors, stone portal frame, parcel locker bank with blank doors, intercom panel without readable UI, shoe-cleaning mat, bench, ceiling canopy, security camera, and wall-mounted notice board with blank paper shapes. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:05d5e9cc79c2e809d550751b2a313db2a11505273f30c8bcad8bad7350930fa2",
+      "semanticParts": [
+        "glass entry doors",
+        "stone portal",
+        "parcel lockers",
+        "intercom panel",
+        "entry mat",
+        "bench",
+        "notice board",
+        "security camera"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 385340,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 26848,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 385340,
+      "sha256": "sha256:12bb5e578e8a2872b2a89be084ab5be4c458fd18021bab6c830c1d9aa1de01e4",
+      "bounds": [
+        3.123389,
+        3.4,
+        4.464115
+      ],
+      "camera": {
+        "position": [
+          6.473,
+          4.012,
+          7.232
+        ],
+        "target": [
+          0.0,
+          1.462,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_apartment_lobby_module.glb",
+      "fileName": "webtoon_apartment_lobby_module.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_apartment_lobby_module.png",
+      "name": "웹툰 아파트 공동현관",
+      "theme": "home",
+      "description": "유리 출입문·석재 포털·택배함·인터폰·벤치·공지판으로 구성된 현대 아파트 공동현관 모듈",
+      "tags": [
+        "webtoon",
+        "apartment",
+        "lobby",
+        "entrance",
+        "parcel locker",
+        "웹툰",
+        "아파트",
+        "공동현관",
+        "택배함"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_apartment_lobby_module_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_apartment_lobby_module-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "b9cd1dda-a94b-401c-a1d5-953b590e517c",
+          "asset_prompt_sha256": "05d5e9cc79c2e809d550751b2a313db2a11505273f30c8bcad8bad7350930fa2",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_apartment_lobby_module.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:12bb5e578e8a2872b2a89be084ab5be4c458fd18021bab6c830c1d9aa1de01e4",
+        "reviewedImageSha256": "sha256:85ccf7584161c7455ab2e09943415c1eabc968a353936a0c33110312135e92b9",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_hanok_courtyard_gate-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "e982cb33-bfaa-499d-94cb-2fb5a12faca5",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A detailed Korean hanok courtyard gate module: dark timber columns and beams, traditional tiled hip roof, paired wooden lattice doors partly open, stone threshold, short white plaster-and-stone wall wings, brass door fittings, and two onggi jars. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:d0e16f64ea0db0be8cc800daf68ebbeb02c8b10d752b3ac06c48c57bdc015774",
+      "semanticParts": [
+        "timber columns",
+        "tiled hip roof",
+        "lattice doors",
+        "stone threshold",
+        "plaster wall wings",
+        "brass fittings",
+        "onggi jars"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 582212,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 37653,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 582212,
+      "sha256": "sha256:4c4377f95484d8d62c3f60616eb55abe57d7aa333afa0c2f8adf45de62b1d0f6",
+      "bounds": [
+        3.271805,
+        4.2,
+        5.911444
+      ],
+      "camera": {
+        "position": [
+          8.572,
+          4.956,
+          9.577
+        ],
+        "target": [
+          0.0,
+          1.806,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_hanok_courtyard_gate.glb",
+      "fileName": "webtoon_hanok_courtyard_gate.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_hanok_courtyard_gate.png",
+      "name": "웹툰 한옥 안마당 대문",
+      "theme": "heritage",
+      "description": "목재 기둥·기와지붕·격자문·석재 문턱·담장 날개와 옹기를 갖춘 한옥 대문 배경 모듈",
+      "tags": [
+        "webtoon",
+        "hanok",
+        "gate",
+        "heritage",
+        "korea",
+        "웹툰",
+        "한옥",
+        "대문",
+        "기와"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_hanok_courtyard_gate_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_hanok_courtyard_gate-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "e982cb33-bfaa-499d-94cb-2fb5a12faca5",
+          "asset_prompt_sha256": "d0e16f64ea0db0be8cc800daf68ebbeb02c8b10d752b3ac06c48c57bdc015774",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_hanok_courtyard_gate.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:4c4377f95484d8d62c3f60616eb55abe57d7aa333afa0c2f8adf45de62b1d0f6",
+        "reviewedImageSha256": "sha256:44111a977ad738661ebe7fd2cbb193f27270427b0e97b5389309effd485abdf8",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_convenience_store_fixture_cluster-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "59122562-e8ec-487d-b624-365f225a4b78",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A Korean convenience-store interior fixture cluster arranged as one reusable module: two double-sided product gondolas with generic color blocks, glass-door beverage refrigerator, compact checkout counter, microwave shelf, waste-sorting cabinet, basket stack, and a blank hanging aisle sign; no store walls. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:5c1d6116b6a53410a6de4eeaccba956fa0642829e36437bb4435937deeb9bc8e",
+      "semanticParts": [
+        "product gondolas",
+        "glass-door refrigerator",
+        "checkout counter",
+        "microwave shelf",
+        "sorting cabinet",
+        "basket stack",
+        "blank aisle sign"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 517588,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 31561,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 517588,
+      "sha256": "sha256:03064ae4c4fdf2ea68a2c1a2b7d3751a9955dca20b19683fe2b7d5416910d4b1",
+      "bounds": [
+        3.246023,
+        2.35,
+        2.434732
+      ],
+      "camera": {
+        "position": [
+          4.707,
+          2.773,
+          5.259
+        ],
+        "target": [
+          0.0,
+          1.01,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_convenience_store_fixture_cluster.glb",
+      "fileName": "webtoon_convenience_store_fixture_cluster.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_convenience_store_fixture_cluster.png",
+      "name": "웹툰 편의점 집기 클러스터",
+      "theme": "retail",
+      "description": "상품 진열대·음료 냉장고·계산대·전자레인지 선반·분리수거함과 장바구니를 묶은 편의점 집기 세트",
+      "tags": [
+        "webtoon",
+        "convenience store",
+        "retail",
+        "shelves",
+        "refrigerator",
+        "웹툰",
+        "편의점",
+        "진열대",
+        "계산대"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_convenience_store_fixture_cluster_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_convenience_store_fixture_cluster-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "59122562-e8ec-487d-b624-365f225a4b78",
+          "asset_prompt_sha256": "5c1d6116b6a53410a6de4eeaccba956fa0642829e36437bb4435937deeb9bc8e",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_convenience_store_fixture_cluster.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:03064ae4c4fdf2ea68a2c1a2b7d3751a9955dca20b19683fe2b7d5416910d4b1",
+        "reviewedImageSha256": "sha256:b77e02d3ddb5159c18a9fd2e9de6ed7def45e568db1d94d391c50f6cc040e0a4",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_neighborhood_police_box-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "ac5d3688-c21a-46a4-a349-afacbaae2992",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A compact contemporary Korean neighborhood police-substation exterior module: clean pale facade, glazed entrance, shallow blue-gray canopy, short accessibility ramp with railings, wall-mounted emergency light, security camera, bicycle rack, two planter boxes, and blank official sign panels. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:e7d1c08a539bcbc127620048c367246634dd5063b2831f4325ea2fdb7022c133",
+      "semanticParts": [
+        "pale facade",
+        "glazed entrance",
+        "entry canopy",
+        "accessible ramp",
+        "security camera",
+        "bicycle rack",
+        "planter boxes",
+        "blank sign panels"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 425964,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 26124,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 425964,
+      "sha256": "sha256:97cde696597ed3714ec31be37138b56785cbfe057a58618c3433738ef2f4a23d",
+      "bounds": [
+        6.167993,
+        4.0,
+        5.013998
+      ],
+      "camera": {
+        "position": [
+          8.944,
+          4.811,
+          9.992
+        ],
+        "target": [
+          0.0,
+          1.72,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_neighborhood_police_box.glb",
+      "fileName": "webtoon_neighborhood_police_box.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_neighborhood_police_box.png",
+      "name": "웹툰 동네 지구대 외관",
+      "theme": "urban",
+      "description": "유리 출입구·차양·경사로·보안 설비·자전거 거치대와 화단을 갖춘 소형 지구대 외관 모듈",
+      "tags": [
+        "webtoon",
+        "police box",
+        "public building",
+        "urban",
+        "korea",
+        "웹툰",
+        "지구대",
+        "파출소",
+        "공공건물"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_neighborhood_police_box_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_neighborhood_police_box-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "ac5d3688-c21a-46a4-a349-afacbaae2992",
+          "asset_prompt_sha256": "e7d1c08a539bcbc127620048c367246634dd5063b2831f4325ea2fdb7022c133",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_neighborhood_police_box.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:97cde696597ed3714ec31be37138b56785cbfe057a58618c3433738ef2f4a23d",
+        "reviewedImageSha256": "sha256:1d06aaf59a556d6c9384b245a9933fd5af03cc442fdef6aa77e2c8b28b858f22",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_riverside_park_pavilion-mcp-v1",
+      "provider": "Tripo",
+      "providerTaskId": "dc0f0bda-cda2-47be-b636-ee7aea460ebb",
+      "generator": "official-tripo-mcp",
+      "generatorVersion": "local-patched-v3-free-wallet-20260925",
+      "providerModelVersion": "v3.0-20250812",
+      "blenderProcessor": "scripts/blender/process_tripo_mcp_environment_pack_v1.py",
+      "blenderVersion": "5.2",
+      "optimizer": "glTF-Transform 4.4.2 / meshopt / WebP",
+      "billing": {
+        "mode": "free-api-wallet",
+        "creditCost": 20,
+        "paymentMethodUsed": false,
+        "paidUpgradeUsed": false
+      },
+      "license": {
+        "name": "Tripo Terms of Service - Free User Output",
+        "url": "https://www.tripo3d.ai/terms",
+        "commercialUse": true,
+        "attributionRequired": false,
+        "exclusive": false,
+        "providerRetainsRights": true,
+        "cc0": false
+      },
+      "prompt": "A contemporary Korean riverside-park rest pavilion module: lightweight curved metal roof, timber-slat ceiling, four slim columns, two integrated benches, picnic table, drinking fountain, waste-sorting bins, bicycle stand, low deck platform, and two ornamental grass planters. Isolated complete 3D asset or modular set, centered at world origin, realistic Korean architectural proportions in metres, clean production topology suitable for a real-time web viewer, coherent joined parts, high-quality detailed PBR materials, stylized-realistic Korean color-webtoon art direction, readable silhouette from multiple camera angles, no people, no vehicles, no readable text, no letters, no numbers, no logo, no brand, no watermark, no floating parts, no unrelated surrounding scene.",
+      "promptSha256": "sha256:32b174e45483652ff377cd67aac663cfd4c2296f685678525608e42a5c716547",
+      "semanticParts": [
+        "curved metal roof",
+        "timber ceiling",
+        "slender columns",
+        "integrated benches",
+        "picnic table",
+        "drinking fountain",
+        "sorting bins",
+        "bicycle stand",
+        "deck platform"
+      ],
+      "externalRuntimeResources": 0,
+      "metrics": {
+        "bytes": 443732,
+        "nodes": 2,
+        "meshes": 1,
+        "triangles": 35454,
+        "drawCalls": 1,
+        "materials": 1,
+        "textures": 3,
+        "images": 3,
+        "maxImageDimension": 1024,
+        "undeterminedImageDimensions": 0,
+        "animations": 0,
+        "skins": 0,
+        "lights": 0,
+        "extensionsUsed": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "extensionsRequired": [
+          "EXT_meshopt_compression",
+          "EXT_texture_webp",
+          "KHR_mesh_quantization"
+        ],
+        "externalResources": 0
+      },
+      "byteSize": 443732,
+      "sha256": "sha256:9cd7c287d364dd6a0bf3575bedd4d69c1af07c778b9dc7b9641491c3e22daed5",
+      "bounds": [
+        4.503227,
+        3.55,
+        4.400464
+      ],
+      "camera": {
+        "position": [
+          6.53,
+          4.189,
+          7.295
+        ],
+        "target": [
+          0.0,
+          1.526,
+          0.0
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/mcp-free-v1/webtoon_riverside_park_pavilion.glb",
+      "fileName": "webtoon_riverside_park_pavilion.glb",
+      "thumbnailUrl": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_riverside_park_pavilion.png",
+      "name": "웹툰 한강 공원 쉼터",
+      "theme": "urban",
+      "description": "곡면 금속 지붕·목재 천장·벤치·피크닉 테이블·음수대와 자전거 거치대를 갖춘 강변 공원 쉼터",
+      "tags": [
+        "webtoon",
+        "riverside",
+        "park",
+        "pavilion",
+        "bench",
+        "웹툰",
+        "한강",
+        "공원",
+        "쉼터"
+      ],
+      "normalization": "authored-metres",
+      "rootMetadata": {
+        "name": "TS_ENV_webtoon_riverside_park_pavilion_Root",
+        "extras": {
+          "asset_id": "ts-bg3d-webtoon_riverside_park_pavilion-mcp-v1",
+          "asset_type": "studio-bg3d-environment",
+          "asset_provider": "Tripo",
+          "asset_generator": "official-tripo-mcp",
+          "asset_model_version": "v3.0-20250812",
+          "asset_provider_task_id": "dc0f0bda-cda2-47be-b636-ee7aea460ebb",
+          "asset_prompt_sha256": "32b174e45483652ff377cd67aac663cfd4c2296f685678525608e42a5c716547",
+          "asset_license": "Tripo Terms of Service - Free User Output",
+          "asset_license_url": "https://www.tripo3d.ai/terms",
+          "asset_commercial_use": true,
+          "asset_nonexclusive": true,
+          "asset_provider_retains_rights": true,
+          "asset_credit_source": "free-api-wallet",
+          "asset_credit_cost": 20,
+          "units": "metres",
+          "ground_plane": "glTF-Y=0",
+          "ground_y_m": 0,
+          "embedded_texture_max_dimension": 1024
+        }
+      },
+      "visualReviewed": true,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "three-angle-local-structural-review",
+      "visualReviewSource": "/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_riverside_park_pavilion.png",
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "Primary oblique render plus local front and rear structural reviews; only the primary thumbnail is shipped.",
+        "reviewedModelSha256": "sha256:9cd7c287d364dd6a0bf3575bedd4d69c1af07c778b9dc7b9641491c3e22daed5",
+        "reviewedImageSha256": "sha256:ed096146af15a71c021db8769128c01780d5e8a3572479d4855a3446f3d627c9",
+        "reviewedImageWidth": 960,
+        "reviewedImageHeight": 720,
+        "visibleStructuralBlocker": false
+      }
+    }
+  ]
+}

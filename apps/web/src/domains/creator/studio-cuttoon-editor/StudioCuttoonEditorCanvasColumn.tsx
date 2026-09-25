@@ -15,7 +15,6 @@ import { STUDIO_TRANSIENT_PEN_INK_SURFACE_ENABLED } from "../studio-page-shell-r
 import { StudioScrollViewportSubscriber } from "../StudioScrollViewportSubscriber";
 import { StudioDrawingPracticeBar } from "../StudioDrawingPracticeBar";
 import { StudioPixelSelectionHud } from "../StudioPixelSelectionHud";
-import { smoothPixelSelection } from "../studio-selection-refinement";
 import {
   SELECTION_EXPAND_DEFAULT,
   expandContractSelection,
@@ -804,10 +803,14 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
             );
           }}
           onSmooth={() => {
-            s.commitPixelSelectionState(
-              (selection) => smoothPixelSelection(selection, { passes: 2, strength: 0.26 }),
-              "transform",
-            );
+            void import("../studio-selection-refinement")
+              .then(({ smoothPixelSelection }) => {
+                s.commitPixelSelectionState(
+                  (selection) => smoothPixelSelection(selection, { passes: 2, strength: 0.26 }),
+                  "transform",
+                );
+              })
+              .catch(() => undefined);
           }}
           onFeatherChange={(featherPx) => {
             s.commitPixelSelectionState(

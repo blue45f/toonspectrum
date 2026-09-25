@@ -8,6 +8,8 @@ const readCreatorFile = (name: string) => readFileSync(
   "utf8",
 );
 
+const dynamicImportExpression = (specifier: string) => `import(${JSON.stringify(specifier)})`;
+
 describe("studio pixel-selection workbench integration", () => {
   it("mounts the inspector workbench on the verified raster selection path", () => {
     const source = readCreatorFile("StudioInspectorImageToolsSection.tsx");
@@ -31,6 +33,17 @@ describe("studio pixel-selection workbench integration", () => {
     expect(hudSource).toContain("studioOnCanvasSafeArea");
     expect(hudSource).toContain("createPortal(");
     expect(hudSource).toContain("data-studio-pixel-selection-hud=\"true\"");
+  });
+
+  it("loads the selection-refinement kernel only when smoothing is requested", () => {
+    const workbenchSource = readCreatorFile("StudioSelectionWorkbenchPanel.tsx");
+    const canvasSource = readCreatorFile("studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx");
+
+    expect(workbenchSource).toContain('from "./studio-selection-refinement-contract"');
+    expect(workbenchSource).toContain(dynamicImportExpression("./studio-selection-refinement"));
+    expect(workbenchSource).not.toContain('from "./studio-selection-refinement"');
+    expect(canvasSource).toContain(dynamicImportExpression("../studio-selection-refinement"));
+    expect(canvasSource).not.toContain('from "../studio-selection-refinement"');
   });
 
   it("does not claim menubar coverage for inspector-only and contextual capabilities", () => {

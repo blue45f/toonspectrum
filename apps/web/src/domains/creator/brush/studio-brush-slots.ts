@@ -8,7 +8,8 @@
  * automatically imports either key (LEGACY_DATA_MIGRATION=false).
  */
 
-import { BRUSH_PRESETS } from "../studio-brush";
+import { BRUSH_PRESETS, STABILIZER_MAX } from "../studio-brush";
+import { normalizeHexColor } from "../studio-color-utils";
 
 import {
   normalizeStudioBrushDynamicsSettings,
@@ -32,6 +33,10 @@ export interface StudioBrushSlot extends StudioBrushSourcePresetMetadata {
   brushId: string;
   strokeWidth: number;
   brushOpacity: number;
+  /** 슬롯을 저장할 때 선택한 전경색. 없는 기존 슬롯은 현재 색을 유지한다. */
+  color?: string;
+  /** 슬롯을 저장할 때 사용한 손떨림 보정 강도. 없는 기존 슬롯은 현재 값을 유지한다. */
+  stabilizer?: number;
   /** 팩 프리셋의 압력·산포·팁을 포함한 전체 동역학. v1 슬롯은 이 필드가 없다. */
   brushDynamics?: NormalizedStudioBrushDynamicsSettings;
   /** An explicit program snapshot, including material; omitted on legacy slots. */
@@ -57,6 +62,12 @@ function clampOpacity(n: number, range: readonly [number, number]): number {
   return Math.min(range[1], Math.max(range[0], Math.round(n * 100) / 100));
 }
 
+function normalizeSlotStabilizer(value: unknown): number | undefined {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return undefined;
+  return Math.min(STABILIZER_MAX, Math.max(0, Math.round(numeric)));
+}
+
 function knownBrushId(id: string): boolean {
   return BRUSH_PRESETS.some((p) => p.id === id);
 }
@@ -75,11 +86,15 @@ export function normalizeStudioBrushSlot(value: unknown): StudioBrushSlot | null
     : normalizeStudioBrushDynamicsSettings(record.brushDynamics);
   const enginePrograms = normalizeStudioBrushEngineProgramSet(record.enginePrograms);
   const ranges = studioBrushSnapshotRanges(enginePrograms);
+  const color = typeof record.color === "string" ? normalizeHexColor(record.color) : null;
+  const stabilizer = normalizeSlotStabilizer(record.stabilizer);
   return {
     ...sourcePresetMetadata,
     brushId: record.brushId,
     strokeWidth: clampWidth(Number(record.strokeWidth), ranges.strokeWidth),
     brushOpacity: clampOpacity(Number(record.brushOpacity), ranges.opacity),
+    ...(color ? { color } : {}),
+    ...(stabilizer !== undefined ? { stabilizer } : {}),
     ...(brushDynamics ? { brushDynamics } : {}),
     ...(record.enginePrograms !== undefined ? { enginePrograms } : {}),
   };
@@ -116,6 +131,8 @@ function studioBrushSlotsEqual(left: StudioBrushSlot, right: StudioBrushSlot): b
   return left.brushId === right.brushId
     && left.strokeWidth === right.strokeWidth
     && left.brushOpacity === right.brushOpacity
+    && left.color === right.color
+    && left.stabilizer === right.stabilizer
     && left.sourcePresetId === right.sourcePresetId
     && left.sourcePresetName === right.sourcePresetName
     && dynamicsEqual

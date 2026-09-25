@@ -92,6 +92,7 @@ export interface StudioShortcutHandlerContext {
   readonly applyPixelSelectionHistoryCommand: (command: "undo" | "redo") => boolean;
   readonly brush: string;
   readonly brushDynamics: NormalizedStudioBrushDynamicsSettings;
+  readonly brushEnginePrograms?: StudioBrushEngineProgramSet | null;
   readonly brushOpacity: number;
   readonly brushSlotsState: StudioBrushSlotsState;
   readonly bubbleShapeArmed: boolean;
@@ -205,6 +206,7 @@ export interface StudioShortcutHandlerContext {
   readonly saveCurrentStudioView: () => void;
   readonly saving: boolean;
   readonly secondaryColor: string;
+  readonly stabilizer: number;
   readonly selectAllForEdit: () => void;
   readonly selected: El | null;
   readonly selectedId: string | null;
@@ -304,6 +306,7 @@ export function buildStudioShortcutHandler(
     applyPixelSelectionHistoryCommand,
     brush,
     brushDynamics,
+    brushEnginePrograms,
     brushOpacity,
     brushSlotsState,
     bubbleShapeArmed,
@@ -402,6 +405,7 @@ export function buildStudioShortcutHandler(
     saveCurrentStudioView,
     saving,
     secondaryColor,
+    stabilizer,
     selectAllForEdit,
     selected,
     selectedId,
@@ -1018,8 +1022,11 @@ export function buildStudioShortcutHandler(
                 }
               : {}),
             brushDynamics,
+            enginePrograms: brushEnginePrograms,
             strokeWidth,
             brushOpacity,
+            color,
+            stabilizer,
           }),
           {
             successMessage: `슬롯 ${index + 1}에 저장`,

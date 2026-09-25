@@ -207,7 +207,7 @@ describe("ProductionManuscriptWorkspace", () => {
     expect(await screen.findByRole("heading", { name: "고정 원고 피드백" })).toBeTruthy();
     expect(screen.getAllByText("12화 편집 검수").length).toBeGreaterThan(0);
     expect(screen.getAllByText("필수 2").length).toBeGreaterThan(0);
-    expect(screen.getByText("PINNED REVIEW PANEL review-image")).toBeTruthy();
+    expect(await screen.findByText("PINNED REVIEW PANEL review-image")).toBeTruthy();
     const link = screen.getByRole("link", { name: "고정 검수본 열기" });
     await waitFor(() => expect(link.getAttribute("href")).toContain("sharedReview=review-image"));
     expect(link.getAttribute("href")).toContain("revision=revision-review");

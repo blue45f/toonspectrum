@@ -5,6 +5,8 @@ import {
   Braces,
   CheckCircle2,
   CloudSun,
+  Film,
+  ImageIcon,
   Languages,
   Loader2,
   ScanSearch,
@@ -23,6 +25,7 @@ import {
   type AniListReference,
   type CreatorIntelligenceProviderState,
   type CreatorIntelligenceReference,
+  type CreatorIntelligenceReferenceMediaType,
   type CreatorIntelligenceReferenceProvider,
   type CreatorIntelligenceStatus,
   type CreatorIntelligenceTranslationProvider,
@@ -52,22 +55,42 @@ const PRIMARY = `${BUTTON} border-accent bg-accent text-white hover:bg-accent/90
 const EMPTY_SOUND_CAPTIONS = "data:text/vtt;charset=utf-8,WEBVTT%0A%0A";
 
 const REFERENCE_STARTERS = {
-  ko: [
-    ["배경", "cinematic rainy night alley background"],
-    ["실내", "cozy studio apartment interior reference"],
-    ["소품", "vintage desk objects prop reference"],
-    ["복식", "modern street fashion full body reference"],
-    ["조명", "dramatic rim lighting portrait reference"],
-    ["자연", "misty forest path environment reference"],
-  ],
-  en: [
-    ["Background", "cinematic rainy night alley background"],
-    ["Interior", "cozy studio apartment interior reference"],
-    ["Props", "vintage desk objects prop reference"],
-    ["Costume", "modern street fashion full body reference"],
-    ["Lighting", "dramatic rim lighting portrait reference"],
-    ["Nature", "misty forest path environment reference"],
-  ],
+  image: {
+    ko: [
+      ["배경", "cinematic rainy night alley background"],
+      ["실내", "cozy studio apartment interior reference"],
+      ["소품", "vintage desk objects prop reference"],
+      ["복식", "modern street fashion full body reference"],
+      ["조명", "dramatic rim lighting portrait reference"],
+      ["자연", "misty forest path environment reference"],
+    ],
+    en: [
+      ["Background", "cinematic rainy night alley background"],
+      ["Interior", "cozy studio apartment interior reference"],
+      ["Props", "vintage desk objects prop reference"],
+      ["Costume", "modern street fashion full body reference"],
+      ["Lighting", "dramatic rim lighting portrait reference"],
+      ["Nature", "misty forest path environment reference"],
+    ],
+  },
+  video: {
+    ko: [
+      ["카메라 이동", "cinematic slow camera movement city"],
+      ["걷기", "person walking full body side view"],
+      ["군중", "busy city crowd movement"],
+      ["비", "rain falling at night cinematic"],
+      ["바다", "ocean waves slow motion"],
+      ["연기", "smoke drifting dark background"],
+    ],
+    en: [
+      ["Camera move", "cinematic slow camera movement city"],
+      ["Walking", "person walking full body side view"],
+      ["Crowd", "busy city crowd movement"],
+      ["Rain", "rain falling at night cinematic"],
+      ["Ocean", "ocean waves slow motion"],
+      ["Smoke", "smoke drifting dark background"],
+    ],
+  },
 } as const;
 
 const REFERENCE_PROVIDER_META: Readonly<Record<
@@ -175,6 +198,7 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
   const [error, setError] = useState("");
 
   const [referenceProvider, setReferenceProvider] = useState<CreatorIntelligenceReferenceProvider>("openverse");
+  const [referenceMediaType, setReferenceMediaType] = useState<CreatorIntelligenceReferenceMediaType>("image");
   const [referenceScope, setReferenceScope] = useState<"project" | "episode" | "scene">("project");
   const [referenceScopeId, setReferenceScopeId] = useState("");
   const [referenceQuery, setReferenceQuery] = useState("");
@@ -264,7 +288,7 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
     if (queryOverride) setReferenceQuery(queryOverride);
     void run(
       "references",
-      () => creatorIntelligenceClient.references(referenceProvider, query),
+      () => creatorIntelligenceClient.references(referenceProvider, query, 1, referenceMediaType),
       (value) => {
         setReferenceResults(value.items);
         setReferenceFeedback({
@@ -442,10 +466,42 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
             icon={Search}
             title="Reference Vault"
             detail={locale === "ko"
-              ? "무료 Openverse/Pexels/Pixabay 검색을 하나의 보드로 연결하고, 출처·작가·라이선스를 프로젝트와 함께 보존합니다. 외부 이미지는 자동 반입하지 않습니다."
-              : "Connect free Openverse, Pexels, and Pixabay search in one board while preserving source, creator, and license metadata. External images are never auto-imported."}
+              ? "무료 Openverse/Pexels/Pixabay 이미지와 Pexels/Pixabay 영상 레퍼런스를 한 보드에서 탐색하고, 출처·작가·라이선스를 프로젝트와 함께 보존합니다. 외부 원본은 자동 반입하지 않습니다."
+              : "Explore free Openverse, Pexels, and Pixabay images plus Pexels and Pixabay motion references while preserving source, creator, and license metadata. Originals are never auto-imported."}
           />
-          <div className="mt-4 grid gap-2 sm:grid-cols-[9rem_1fr_auto]">
+          <div
+            className="mt-4 inline-flex rounded-xl border border-line bg-canvas p-1"
+            role="group"
+            aria-label={locale === "ko" ? "레퍼런스 미디어 유형" : "Reference media type"}
+          >
+            {([
+              ["image", ImageIcon, locale === "ko" ? "이미지" : "Images"],
+              ["video", Film, locale === "ko" ? "영상" : "Motion"],
+            ] as const).map(([mediaType, Icon, label]) => (
+              <button
+                key={mediaType}
+                type="button"
+                aria-pressed={referenceMediaType === mediaType}
+                className={`inline-flex min-h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold transition ${
+                  referenceMediaType === mediaType
+                    ? "bg-accent text-white shadow-sm"
+                    : "text-fg-2 hover:bg-raised hover:text-fg"
+                }`}
+                onClick={() => {
+                  setReferenceMediaType(mediaType);
+                  if (mediaType === "video" && referenceProvider === "openverse") {
+                    setReferenceProvider("pexels");
+                  }
+                  setReferenceResults([]);
+                  setReferenceFeedback(null);
+                }}
+              >
+                <Icon size={14} aria-hidden="true" />
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[9rem_1fr_auto]">
             <select
               className={INPUT}
               value={referenceProvider}
@@ -456,7 +512,7 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
               }}
               aria-label="reference provider"
             >
-              <option value="openverse">Openverse</option>
+              <option value="openverse" disabled={referenceMediaType === "video"}>Openverse</option>
               <option value="pexels">Pexels</option>
               <option value="pixabay">Pixabay</option>
             </select>
@@ -467,7 +523,9 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
               onKeyDown={(event) => {
                 if (event.key === "Enter" && referenceQuery.trim().length >= 2) searchReferences();
               }}
-              placeholder={locale === "ko" ? "복식, 배경, 소품…" : "Costume, background, prop…"}
+              placeholder={referenceMediaType === "video"
+                ? (locale === "ko" ? "카메라 이동, 걷기, 비, 연기…" : "Camera move, walking, rain, smoke…")
+                : (locale === "ko" ? "복식, 배경, 소품…" : "Costume, background, prop…")}
               aria-label={locale === "ko" ? "레퍼런스 검색어" : "Reference search query"}
             />
             <button
@@ -481,7 +539,7 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
             </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-2" aria-label={locale === "ko" ? "추천 레퍼런스 검색" : "Suggested reference searches"}>
-            {REFERENCE_STARTERS[locale].map(([label, query]) => (
+            {REFERENCE_STARTERS[referenceMediaType][locale].map(([label, query]) => (
               <button
                 key={query}
                 type="button"
@@ -501,6 +559,11 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
               </span>
               <span className="rounded-full border border-line bg-panel px-2 py-0.5 font-semibold text-fg-3">
                 {REFERENCE_PROVIDER_META[referenceProvider].cacheLabel}
+              </span>
+              <span className="rounded-full border border-line bg-panel px-2 py-0.5 font-semibold text-fg-3">
+                {referenceMediaType === "video"
+                  ? (locale === "ko" ? "영상 동작 참고" : "Motion reference")
+                  : (locale === "ko" ? "이미지 참고" : "Image reference")}
               </span>
               {providerStatus?.references[referenceProvider] ? (
                 <ProviderBadge state={providerStatus.references[referenceProvider].status} locale={locale} />
@@ -561,7 +624,7 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
               return (
                 <article key={item.id} className="overflow-hidden rounded-2xl border border-line bg-canvas">
                   <a
-                    className="block aspect-[4/3] overflow-hidden border-b border-line bg-raised"
+                    className="relative block aspect-[4/3] overflow-hidden border-b border-line bg-raised"
                     href={item.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
@@ -581,6 +644,15 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
                         {locale === "ko" ? "미리보기 없음" : "No preview"}
                       </span>
                     )}
+                    {item.mediaType === "video" ? (
+                      <span className="absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur-sm">
+                        <Film size={12} aria-hidden="true" />
+                        {locale === "ko" ? "영상 레퍼런스" : "Motion reference"}
+                        {item.durationSeconds !== null && item.durationSeconds !== undefined
+                          ? ` · ${Math.round(item.durationSeconds)}s`
+                          : ""}
+                      </span>
+                    ) : null}
                   </a>
                   <div className="p-3">
                     <div className="flex items-start justify-between gap-3">
@@ -591,10 +663,13 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
                             <a className="text-accent underline" href={item.creatorUrl} target="_blank" rel="noreferrer">{item.creator}</a>
                           ) : (item.creator || item.provider)}
                           {item.width && item.height ? ` · ${item.width}×${item.height}` : ""}
+                          {item.mediaType === "video" && item.durationSeconds !== null && item.durationSeconds !== undefined
+                            ? ` · ${Math.round(item.durationSeconds)}s`
+                            : ""}
                         </p>
                       </div>
                       <span className="shrink-0 rounded-full border border-line bg-panel px-2 py-1 text-[10px] font-bold uppercase text-fg-3">
-                        {item.provider}
+                        {item.provider} · {item.mediaType === "video" ? "video" : "image"}
                       </span>
                     </div>
                     <p className="mt-2 line-clamp-2 text-xs text-fg-2">{item.license || "license verify"}</p>

@@ -160,3 +160,6 @@ crates/**/target/
 /.qa/virtual-studio-review-production/
 /.qa/virtual-studio-review-resolution/
 /.qa/virtual-studio-review-export/
+
+# Generated 3D normalization intermediates
+apps/web/public/assets/3d/environments/mcp-free-v1/.work/

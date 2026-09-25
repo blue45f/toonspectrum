@@ -11,6 +11,8 @@ const workflow = (name) => parse(readFileSync(new URL(`.github/workflows/${name}
 const manifests = [
   "apps/web/public/assets/3d/environments/refined-v6/manifest.json",
   "apps/web/public/assets/3d/environments/expansion-v1/manifest.json",
+  "apps/web/public/assets/3d/environments/webtoon-v7/manifest.json",
+  "apps/web/public/assets/3d/environments/mcp-free-v1/manifest.json",
 ];
 
 describe("Scene3D output CI inputs", () => {
@@ -71,7 +73,7 @@ it("runs the real specialist CSP lane when pinned dependencies or compatibility 
 });
 
 
-it("keeps both current environment packs for related tests, without admitting unrelated asset trees", () => {
+it("keeps all current environment manifests for related tests, without admitting unrelated asset trees", () => {
   const lane = workflow("toonstudio-session-goals.yml").jobs["focused-validation"];
   const checkout = lane.steps.find((step) => step.uses?.startsWith("actions/checkout@"));
   const wanted = [
@@ -79,6 +81,8 @@ it("keeps both current environment packs for related tests, without admitting un
     "apps/web/public/assets/3d/environments/refined-v6/hospital_reception.glb",
     "apps/web/public/assets/3d/environments/expansion-v1/library_reading_room.glb",
     "apps/web/public/assets/3d/environments/expansion-v1/thumbnails/library_reading_room.png",
+    "apps/web/public/assets/3d/environments/mcp-free-v1/webtoon_neighborhood_bus_stop.glb",
+    "apps/web/public/assets/3d/environments/mcp-free-v1/thumbnails/webtoon_neighborhood_bus_stop.png",
     "apps/web/public/assets/3d/characters/thumbnails/refined-v2/manifest.json",
     "apps/web/src/domains/creator/bg3d/studio-bg3d-inplace-storage.test.ts",
   ];

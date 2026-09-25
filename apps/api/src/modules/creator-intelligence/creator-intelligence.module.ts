@@ -61,8 +61,9 @@ export class CreatorIntelligenceController {
     @Query("provider") provider: string,
     @Query("q") query: string,
     @Query("page") page?: string,
+    @Query("media") media?: string,
   ) {
-    return this.execute(() => this.core.searchReferences(provider, query, page));
+    return this.execute(() => this.core.searchReferences(provider, query, page, media));
   }
 
   @Get("scene")

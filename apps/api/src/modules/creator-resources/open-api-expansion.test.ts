@@ -154,6 +154,7 @@ describe("open API expansion", () => {
     const requestUrl = new URL(String(fetcher.mock.calls[0]?.[0]));
     expect(requestUrl.searchParams.get("Type")).toBe("xml");
     expect(requestUrl.searchParams.get("KEY")).toBe("NEIS_TEST_KEY");
+    expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get("Accept")).toBe("*/*");
   });
 
   it("returns an empty NEIS result for INFO-200 XML", async () => {

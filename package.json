@@ -8,6 +8,7 @@
     "pnpm": ">=11"
   },
   "scripts": {
+    "music:local": "node scripts/toonstudio-music-local.mjs",
     "prepare": "node scripts/prepare-git-hooks.mjs",
     "verify:pnpm-lockfile": "node scripts/verify-pnpm-lockfile.mjs",
     "test:pnpm-lockfile": "node --test scripts/verify-pnpm-lockfile.test.mjs",

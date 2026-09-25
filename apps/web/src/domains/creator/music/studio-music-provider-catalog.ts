@@ -1,4 +1,4 @@
-import type { MusicBrief } from "@toonspectrum/core/studio-music";
+import type { MusicBrief, MusicProviderId as StoredMusicProviderId } from "@toonspectrum/core/studio-music";
 
 export type MusicProviderCapability = "browser" | "api" | "cli" | "mcp" | "local";
 export type MusicProviderPublicationPolicy =
@@ -28,7 +28,7 @@ export const MUSIC_PROVIDER_IDS = [
   "stable-audio",
   "mubert",
   "udio",
-] as const;
+] as const satisfies readonly Exclude<StoredMusicProviderId, "external">[];
 
 export type MusicProviderId = (typeof MUSIC_PROVIDER_IDS)[number];
 
@@ -192,6 +192,11 @@ export function findMusicProvider(providerId: string): MusicProviderCatalogEntry
   const provider = MUSIC_PROVIDER_CATALOG.find((candidate) => candidate.id === providerId);
   if (!provider) throw new Error("지원하지 않는 AI 음악 서비스입니다.");
   return provider;
+}
+
+export function musicProviderLabel(providerId: StoredMusicProviderId): string {
+  if (providerId === "external") return "외부 음원";
+  return MUSIC_PROVIDER_CATALOG.find((candidate) => candidate.id === providerId)?.name ?? providerId;
 }
 
 export function buildMusicProviderHandoff(

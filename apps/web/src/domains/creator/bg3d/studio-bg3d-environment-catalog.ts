@@ -1,13 +1,15 @@
 /**
- * First-party CC0 environment catalog for Studio BG3D.
+ * Curated environment catalog for Studio BG3D.
  *
- * Entries are immutable deployment metadata. Runtime bytes still pass through the same SHA-256,
+ * Original CC0 scenes and explicitly licensed provider-generated scenes share the same immutable
+ * deployment metadata. Runtime bytes still pass through the same SHA-256,
  * GLB structure, device-budget, and Three.js admission path as a user-imported model.
  */
 
 import refinedV6Manifest from "../../../../public/assets/3d/environments/refined-v6/manifest.json";
 import expansionV1Manifest from "../../../../public/assets/3d/environments/expansion-v1/manifest.json";
 import webtoonV7Manifest from "../../../../public/assets/3d/environments/webtoon-v7/manifest.json";
+import mcpFreeV1Manifest from "../../../../public/assets/3d/environments/mcp-free-v1/manifest.json";
 
 export const STUDIO_BG3D_ENVIRONMENT_PACK_ID =
   "toonspectrum-bg3d-environment-pack-v1" as const;
@@ -26,7 +28,10 @@ export type StudioBg3dEnvironmentTheme =
   | "science-fiction";
 
 export interface StudioBg3dEnvironmentProvenance {
-  readonly origin: "original-procedural" | "original-procedural-with-cc0-sources";
+  readonly origin:
+    | "original-procedural"
+    | "original-procedural-with-cc0-sources"
+    | "ai-generated-free-wallet";
   readonly author: "ToonSpectrum";
   readonly generator:
     | "scripts/blender/generate_environment_pack_v3.py"
@@ -34,14 +39,26 @@ export interface StudioBg3dEnvironmentProvenance {
     | "scripts/blender/generate_environment_pack_v5.py"
     | "scripts/blender/refine_studio_environments_v6.py"
     | "scripts/blender/generate_studio_environment_expansion_v1.py"
-    | "scripts/blender/generate_environment_pack_v7.py";
+    | "scripts/blender/generate_environment_pack_v7.py"
+    | "official-tripo-mcp";
   readonly blenderVersion: "5.2";
-  readonly license: "CC0-1.0";
-  readonly licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/";
+  readonly license: "CC0-1.0" | "Tripo Terms of Service - Free User Output";
+  readonly licenseUrl:
+    | "https://creativecommons.org/publicdomain/zero/1.0/"
+    | "https://www.tripo3d.ai/terms";
   readonly attributionRequired: false;
   readonly commercialUse: true;
   readonly externalResources: 0;
   readonly sources?: readonly string[];
+  readonly provider?: "Tripo";
+  readonly providerModelVersion?: "v3.0-20250812";
+  readonly providerTaskId?: string;
+  readonly promptSha256?: `sha256:${string}`;
+  readonly nonExclusive?: true;
+  readonly providerRetainsRights?: true;
+  readonly billingMode?: "free-api-wallet";
+  readonly paymentMethodUsed?: false;
+  readonly creditCost?: number;
 }
 
 export interface StudioBg3dEnvironmentAsset {
@@ -370,10 +387,56 @@ export const STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7 = Object.freeze(
   }, WEBTOON_V7_PROVENANCE)),
 );
 
+export const STUDIO_BG3D_ENVIRONMENT_ASSETS_MCP_FREE_V1 = Object.freeze(
+  mcpFreeV1Manifest.assets.map((asset) => defineEnvironment({
+    id: asset.id,
+    name: asset.name,
+    description: asset.description,
+    theme: asset.theme as StudioBg3dEnvironmentTheme,
+    tags: asset.tags,
+    fileName: asset.fileName as `${string}.glb`,
+    url: asset.url as `/assets/3d/environments/${string}.glb`,
+    thumbnailUrl: asset.thumbnailUrl as `/assets/3d/environments/${string}.png`,
+    byteSize: asset.byteSize,
+    sha256: asset.sha256 as `sha256:${string}`,
+    bounds: asset.bounds as [number, number, number],
+    camera: {
+      position: asset.camera.position as [number, number, number],
+      target: asset.camera.target as [number, number, number],
+      fovDegrees: asset.camera.fovDegrees,
+    },
+  }, Object.freeze({
+    origin: "ai-generated-free-wallet",
+    author: "ToonSpectrum",
+    provider: "Tripo",
+    generator: "official-tripo-mcp",
+    providerModelVersion: "v3.0-20250812",
+    providerTaskId: asset.providerTaskId,
+    promptSha256: asset.promptSha256 as `sha256:${string}`,
+    blenderVersion: "5.2",
+    license: "Tripo Terms of Service - Free User Output",
+    licenseUrl: "https://www.tripo3d.ai/terms",
+    attributionRequired: false,
+    commercialUse: true,
+    nonExclusive: true,
+    providerRetainsRights: true,
+    billingMode: "free-api-wallet",
+    paymentMethodUsed: false,
+    creditCost: asset.billing.creditCost,
+    externalResources: 0,
+    sources: Object.freeze([
+      "https://github.com/VAST-AI-Research/tripo-mcp",
+      "https://github.com/VAST-AI-Research/tripo-3d-for-blender",
+      "https://www.tripo3d.ai/terms",
+    ]),
+  }))),
+);
+
 export const STUDIO_BG3D_ENVIRONMENT_ASSETS = Object.freeze([
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1,
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7,
+  ...STUDIO_BG3D_ENVIRONMENT_ASSETS_MCP_FREE_V1,
 ]);
 
 const RESOLVABLE_ENVIRONMENT_ASSETS = [

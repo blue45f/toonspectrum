@@ -302,8 +302,9 @@ export class Bg3dModelLibraryError extends Error {
   }
 }
 
-// First-party Blender 5.2 environments are authored by ToonSpectrum and released as CC0. Their
-// immutable hashes/sizes are checked before the existing BG3D validator and renderer admit them.
+// Deployment-owned environments include original CC0 scenes and explicitly licensed provider
+// outputs. Their immutable hashes/sizes are checked before the existing BG3D validator and renderer
+// admit them; rights are projected from each catalog entry instead of being widened to CC0.
 export const SAMPLE_BG3D_MODELS: SampleBg3dModel[] =
   STUDIO_BG3D_ENVIRONMENT_ASSETS.map((asset) => Object.freeze({
     id: asset.id,
@@ -344,10 +345,12 @@ async function loadBundledEnvironmentRecord(
             ),
           },
           rights: {
-            status: "public-domain",
-            commercialUse: true,
-            attributionRequired: false,
-            licenseName: "CC0 1.0",
+            status: asset.provenance.license === "CC0-1.0" ? "public-domain" : "licensed",
+            commercialUse: asset.provenance.commercialUse,
+            attributionRequired: asset.provenance.attributionRequired,
+            licenseName: asset.provenance.license === "CC0-1.0"
+              ? "CC0 1.0"
+              : asset.provenance.license,
           },
           expectedSha256: asset.sha256,
         }, {

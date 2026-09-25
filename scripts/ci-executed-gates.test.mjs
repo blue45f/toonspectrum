@@ -184,6 +184,7 @@ test("mandatory lanes start independently and dependency-free contracts run firs
     "/apps/web/public/assets/3d/environments/refined-v6/manifest.json",
     "/apps/web/public/assets/3d/environments/expansion-v1/manifest.json",
     "/apps/web/public/assets/3d/environments/webtoon-v7/manifest.json",
+    "/apps/web/public/assets/3d/environments/mcp-free-v1/manifest.json",
   ]) {
     assert.ok(typecheck.includes(requiredManifest), `typecheck checkout is missing ${requiredManifest}`);
   }
@@ -460,7 +461,7 @@ test("focused ToonStudio checkout includes imported metadata and fault evidence 
   const workflow = readFileSync(new URL("../.github/workflows/toonstudio-session-goals.yml", import.meta.url), "utf8");
   const patterns = workflow.match(/sparse-checkout: \|\n((?: {12}[^\n]*\n)+)/u)?.[1];
   assert.ok(patterns, "focused workflow must declare its checkout");
-  const manifests = ["3d/environments/refined-v6/manifest.json", "3d/environments/expansion-v1/manifest.json", "3d/environments/webtoon-v7/manifest.json", "virtual-studio/world/default-world.json"].map((file) => `apps/web/public/assets/${file}`);
+  const manifests = ["3d/environments/refined-v6/manifest.json", "3d/environments/expansion-v1/manifest.json", "3d/environments/webtoon-v7/manifest.json", "3d/environments/mcp-free-v1/manifest.json", "virtual-studio/world/default-world.json"].map((file) => `apps/web/public/assets/${file}`);
   const faultEvidence = "tests/benchmarks/results/v12-runtime-fault-matrix.json";
   const unrelatedResult = "tests/benchmarks/results/unrelated-benchmark.json";
   const artwork = "apps/web/public/assets/3d/environments/unrelated-pack/large-model.glb";
