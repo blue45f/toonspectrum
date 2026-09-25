@@ -268,7 +268,6 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       destination("/studio/ecosystem", "창작 생태계", "Creator ecosystem", "제작 도구·작업·리소스를 한곳에서 관리", "Manage creation tools, work and resources together"),
       destination("/studio/growth", "창작 성장 대시보드", "Creator growth dashboard", "작품 성과·운영 과제·다음 성장 단계를 한곳에서 관리", "Manage performance, operating tasks and the next growth stage in one place"),
       destination("/studio/growth-ip", "작가 성장·IP 확장", "Creator growth & IP", "신인 발굴·지원·웹소설 각색·판권·교육·협업 관리", "Manage creator support, adaptation, rights, education and collaboration"),
-      I.growthLab,
       destination("/studio/environment", "사용 환경 안내", "Environment guide", "브라우저 기능·PWA 설치·권한·오프라인 준비 상태 점검", "Check browser capabilities, PWA installation, permissions and offline readiness"),
       destination("/studio/ecosystem/viewer", "생태계 뷰어", "Ecosystem viewer", "연결된 제작 자산과 흐름을 시각화", "Visualize connected creative assets and workflows"),
     ],
