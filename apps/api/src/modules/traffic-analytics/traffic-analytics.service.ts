@@ -18,9 +18,11 @@ import {
   normalizeTrafficPath,
   normalizeTrafficReferrerHost,
   normalizeTrafficScreenClass,
+  normalizeTrafficSharePath,
   requireTrafficIdentifier,
   requireTrafficShareChannel,
   requireTrafficShareOutcome,
+  toStoredTrafficShareOutcome,
   TRAFFIC_DEFAULT_RETENTION_DAYS,
   TRAFFIC_MAX_ENGAGED_SECONDS,
   type TrafficHeartbeatPayload,
@@ -291,7 +293,7 @@ export class TrafficAnalyticsService {
   ): Promise<{ accepted: boolean; excluded?: boolean }> {
     if (context.privacyOptOut) return { accepted: false, excluded: true };
 
-    const path = normalizeTrafficPath(payload.sourcePath);
+    const path = normalizeTrafficSharePath(payload);
     if (isExcludedTrafficPath(path)) return { accepted: false, excluded: true };
 
     const device = classifyTrafficDevice(context.userAgent);
@@ -310,7 +312,7 @@ export class TrafficAnalyticsService {
       sessionHash,
       path,
       channel: requireTrafficShareChannel(payload.channel),
-      outcome: requireTrafficShareOutcome(payload.outcome),
+      outcome: toStoredTrafficShareOutcome(requireTrafficShareOutcome(payload.outcome)),
       countryCode: normalizeTrafficCountryCode(context.countryCode),
       deviceType: device.deviceType,
       browser: device.browser,

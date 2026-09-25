@@ -122,6 +122,7 @@ test("분석·분산 저장소의 비DB 테스트는 product shard에서 반드�
     "apps/api/src/modules/traffic-analytics/traffic-analytics-store.test.ts",
     "apps/api/src/modules/traffic-analytics/traffic-analytics.controller.test.ts",
     "apps/api/src/modules/traffic-analytics/traffic-analytics.service.test.ts",
+    "apps/api/src/modules/traffic-analytics/traffic-analytics-share-contract.test.ts",
     "deploy/cloudflare-analytics/src/index.test.ts",
     "scripts/deploy-cloudflare-analytics.test.mjs",
     "scripts/free-database-federation.test.mjs",
