@@ -153,8 +153,9 @@ describe("site navigation information architecture", () => {
     ]);
   });
 
-  it("keeps Help, Settings and account destinations available from the utility area", () => {
+  it("keeps notifications, Help, Settings and account destinations available from the utility area", () => {
     expect(SITE_UTILITY_NAVIGATION).toEqual([
+      SITE_NAVIGATION_ITEMS.notifications,
       SITE_NAVIGATION_ITEMS.help,
       SITE_NAVIGATION_ITEMS.settings,
       SITE_NAVIGATION_ITEMS.me,
