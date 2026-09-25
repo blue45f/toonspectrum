@@ -48,6 +48,13 @@ export type StudioBg3dEngineRuntimePhase = "probing" | "ready";
  * visible after this notification expires.
  */
 export const STUDIO_BG3D_DEVICE_LOSS_NOTICE_MS = 10_000;
+/**
+ * Preference storage must not hold the editor behind a blank probing viewport. OPFS/SQLite can be
+ * temporarily busy in another tab or while the browser restores its storage process, so the
+ * current session continues with the explicit WebGPU default after this deadline. A late storage
+ * result is ignored to avoid remounting the renderer after the artist has started working.
+ */
+export const STUDIO_BG3D_ENGINE_PREFERENCE_LOAD_TIMEOUT_MS = 2_000;
 
 export interface StudioBg3dEngineRuntimeState {
   readonly diagnostics: StudioScene3dGpuDiagnostics;
@@ -82,6 +89,8 @@ export interface UseStudioBg3dEngineRuntimeOptions {
   /** Test seam; production reads the browser. */
   readonly probe?: typeof probeStudioBg3dWebGpuCapability;
   readonly loadPreference?: () => Promise<StudioBg3dEnginePreference>;
+  /** Test seam and host override for the preference-storage response deadline. */
+  readonly preferenceLoadTimeoutMs?: number;
   readonly savePreference?: (preference: StudioBg3dEnginePreference) => Promise<void>;
   readonly createWebGpuRenderer?: typeof createStudioBg3dThreeWebGpuRenderer;
 }
@@ -110,6 +119,26 @@ async function persistPreference(preference: StudioBg3dEnginePreference): Promis
   await repository.saveBg3dEnginePreference(preference);
 }
 
+function loadPreferenceBeforeDeadline(
+  loadPreference: () => Promise<StudioBg3dEnginePreference>,
+  timeoutMs: number,
+): Promise<StudioBg3dEnginePreference> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (preference: StudioBg3dEnginePreference) => {
+      if (settled) return;
+      settled = true;
+      globalThis.clearTimeout(timer);
+      resolve(preference);
+    };
+    const timer = globalThis.setTimeout(() => finish("webgpu"), timeoutMs);
+    void loadPreference().then(
+      (preference) => finish(preference),
+      () => finish("webgpu"),
+    );
+  });
+}
+
 function readHostSignals(): { userAgent?: string } {
   if (typeof navigator === "undefined") return {};
   return { userAgent: navigator.userAgent };
@@ -127,9 +156,13 @@ export function useStudioBg3dEngineRuntime(
     observedWebglOnlyFeatures,
     probe: probeCapability = probeStudioBg3dWebGpuCapability,
     loadPreference = loadPersistedPreference,
+    preferenceLoadTimeoutMs = STUDIO_BG3D_ENGINE_PREFERENCE_LOAD_TIMEOUT_MS,
     savePreference = persistPreference,
     createWebGpuRenderer,
   } = options;
+  const boundedPreferenceLoadTimeoutMs = Number.isFinite(preferenceLoadTimeoutMs)
+    ? Math.min(10_000, Math.max(50, Math.floor(preferenceLoadTimeoutMs)))
+    : STUDIO_BG3D_ENGINE_PREFERENCE_LOAD_TIMEOUT_MS;
 
   const [preference, setPreferenceState] = useState<StudioBg3dEnginePreference>("webgpu");
   const [probe, setProbe] = useState<StudioBg3dWebGpuProbeResult>(PENDING_PROBE);
@@ -201,8 +234,10 @@ export function useStudioBg3dEngineRuntime(
     const controller = new AbortController();
     const revisionAtStart = preferenceRevisionRef.current;
     void (async () => {
-      const restoredPromise = loadPreference()
-        .catch(() => "webgpu" as StudioBg3dEnginePreference);
+      const restoredPromise = loadPreferenceBeforeDeadline(
+        loadPreference,
+        boundedPreferenceLoadTimeoutMs,
+      );
       const probePromise = probeCapability({
         secureContext: typeof window !== "undefined" && window.isSecureContext === true,
         gpu: (navigator as Navigator & { gpu?: Parameters<typeof probeCapability>[0]["gpu"] }).gpu,
@@ -244,7 +279,7 @@ export function useStudioBg3dEngineRuntime(
       cancelled = true;
       controller.abort();
     };
-  }, [enabled, loadPreference, probeCapability]);
+  }, [boundedPreferenceLoadTimeoutMs, enabled, loadPreference, probeCapability]);
 
   const plan = useMemo(
     () => resolveStudioBg3dEngineRuntime({
