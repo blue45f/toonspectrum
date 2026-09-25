@@ -71,7 +71,7 @@ describe("unified AI secret storage", () => {
     expect(settings.getUnifiedAiAuxSettings()).toMatchObject({
       hyper3dApiKey: "new-hyper3d-secret",
       creatorRuntimeToken: "new-runtime-secret",
-      creatorRuntimeBaseUrl: "https://runtime.example.com/",
+      creatorRuntimeBaseUrl: "https://runtime.example.com",
       creatorRuntimeOwner: "artist-2",
     });
     expect(JSON.parse(sessionStorage.getItem(LEGACY_KEY) ?? "null")).toMatchObject({
@@ -81,7 +81,7 @@ describe("unified AI secret storage", () => {
     expect(JSON.parse(sessionStorage.getItem(AUX_KEY) ?? "null")).toMatchObject({
       hyper3dApiKey: "",
       creatorRuntimeToken: "",
-      creatorRuntimeBaseUrl: "https://runtime.example.com/",
+      creatorRuntimeBaseUrl: "https://runtime.example.com",
       creatorRuntimeOwner: "artist-2",
     });
   });
