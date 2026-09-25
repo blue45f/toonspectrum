@@ -33,7 +33,7 @@ Poly Haven 공식 API와 다운로드 도메인의 CC0 원본을 사용했다. �
 
 컨택트 시트 12장 전체를 확인했다. 식재 구성 세트와 그 렌더, 사용하기 어려운 배경 7종, 명암 대비가 약한 백색 조각상의 2D 렌더를 제외했다. 모든 각도의 예술적 검수나 전체 작품 저장·재열기 검증을 완료한 것은 아니다.
 
-판정 기록은 `data/studio-assets/diversity-20260913-decisions.json`, 수집 및 검사 근거는 `artifacts/studio-diversity-20260913/`에 있다.
+판정 기록은 `data/studio-assets/diversity-20260913-decisions.json`, 수집 및 검사 근거는 `data/asset-releases/studio-diversity-20260913/`에 있다.
 
 `node scripts/verify-studio-premium-release.mjs TOOLS_DIRECTORY diversity-20260913`으로 등록 파일과 PBR 보조 맵, 3D 원본과 2D 파생본의 연결, 비모델 81개 전부의 브라우저 로딩 및 PNG 출력, 실제 라이브러리 컴포넌트의 필터·검색·확대·삽입을 검사한다.
 

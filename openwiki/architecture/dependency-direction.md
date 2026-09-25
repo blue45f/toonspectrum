@@ -5,19 +5,19 @@ Status: **migration**.
 The safe dependency direction is from deployable applications toward focused shared packages. Application source is never a library for another application.
 
 ```text
-apps/web   ─┐
+apps/web       ─┐
 apps/admin-web ─┼──> packages/* (only focused, justified packages)
-apps/api   ─┘
+apps/api       ─┘
 ```
 
 Forbidden direct source edges:
 
-- Web -> Admin
-- Admin -> Web
-- API -> Web
-- API -> Admin
+- Web -> Admin Web or API source
+- Admin Web -> Web or API source
+- API -> Web or Admin Web source
+- packages -> application source
 - app `shared` -> app `domains`
 
 Cross-domain deep imports inside an app are tracked as migration debt. New Admin debt starts at zero; existing Web debt is measured before a numeric baseline is frozen and then ratcheted downward.
 
-See `scripts/validate-app-boundaries.mjs` and `config/architecture-boundary-ratchet.json` for the machine-enforced view.
+See `scripts/validate-app-boundaries.mjs`, `scripts/validate-source-layout.mjs`, and their ratchet configs for the machine-enforced view.

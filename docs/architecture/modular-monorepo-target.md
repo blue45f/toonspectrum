@@ -13,14 +13,19 @@ Status: **migration target**. This document separates current reality from the i
 
 ## Current state
 
-- `apps/web` remains driven by the root frontend toolchain.
-- `apps/admin-web` is now a separate workspace package with app-owned Vite, TypeScript and
+- `apps/web` remains driven by the root frontend toolchain, but its source now uses only the
+  `app`, `domains`, `platform`, and `shared` top-level ownership boundaries.
+- `apps/admin-web` is a separate workspace package with app-owned Vite, TypeScript and
   Playwright configuration, but most production administrator capability still remains under
   `apps/web/src/domains/admin` and must migrate capability by capability.
-- `apps/api` is a separate workspace package, while existing API→Web imports remain measured
-  migration debt rather than an accepted final boundary.
-- Mobile native projects, desktop-sync duplication, root tool configuration and large static
-  assets still require later migration slices.
+- `apps/api` is a separate workspace package, while existing API→Web imports and the
+  `server/common/infrastructure/db` layout remain measured migration debt.
+- `apps/desktop-sync` and `apps/desktop-sync-agent` now have distinct package identities, but
+  their implementation consolidation remains a later slice.
+- Reviewed historical release evidence lives under `data/asset-releases`; generated `.qa` and
+  `artifacts` paths are ignored and may not be tracked.
+- Mobile native projects, root app-specific configuration and large static assets still require
+  later migration slices.
 
 ## Target application layout
 
@@ -67,8 +72,7 @@ Do not use a package to hide application coupling and do not create `packages/do
 1. Establish the independent `admin-web` package and app-owned configuration.
 2. Eliminate API→Web source imports by classifying contracts, pure models and runtime adapters.
 3. Move the user-Web administrator console to Admin Web capability by capability.
-4. Replace Web top-level `compat/components/hooks/infrastructure/styles/types` with explicit
-   app/domain/platform/shared ownership.
+4. Keep the completed Web `app/domain/platform/shared` ownership split from regressing.
 5. Move API `server/common/infrastructure/db` code to modules and platform boundaries.
 6. Consolidate desktop sync, mobile ownership and root app-specific configuration.
 7. Ratchet Creator root files downward and migrate Studio by authority and lifecycle.
@@ -76,10 +80,11 @@ Do not use a package to hide application coupling and do not create `packages/do
 
 ## Ratchet strategy
 
-`scripts/validate-app-boundaries.mjs` records current debt in
-`config/architecture-boundary-ratchet.json`. New Admin boundary violations have zero tolerance.
-After each stable migration slice, update the baseline downward; never raise a budget to make a
-new violation pass.
+`scripts/validate-app-boundaries.mjs` records dependency debt in
+`config/architecture-boundary-ratchet.json`. `scripts/validate-source-layout.mjs` records source
+placement debt in `config/architecture-source-ratchet.json`. New Admin violations and removed
+legacy paths have zero tolerance. After each stable migration slice, update baselines downward;
+never raise a budget to make a new violation pass.
 
 ## Studio exception
 

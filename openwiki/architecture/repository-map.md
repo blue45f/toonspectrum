@@ -5,14 +5,16 @@ Status: **migration**.
 ```text
 apps/
   web/                  user-facing browser source
-  admin/                administrator surface boundary
+  admin-web/            administrator browser application
   api/                  backend application
-  desktop-sync*/        specialized Studio companion runtimes
+  desktop-sync/         full local/cloud sync CLI
+  desktop-sync-agent/   focused watcher/journal companion pending consolidation
 packages/
   contracts/             focused cross-application runtime-neutral contracts
   core/                  existing focused shared/core code
   studio-*/              Studio runtime/engine packages
-config/                  machine-readable policy and ratchets
+config/                  machine-readable policy and dependency/source ratchets
+data/asset-releases/      durable reviewed asset-release evidence
 docs/architecture/       human-authored current/target design
 openwiki/                generated/maintained navigation layer
 scripts/                 verification and migration tooling

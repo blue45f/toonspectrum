@@ -48,7 +48,7 @@ const manifestBytes = readFileSync(path.join(publicPack, "manifest.json"));
 const manifest = JSON.parse(manifestBytes.toString("utf8")) as RawManifest;
 // The September 8 digest belongs to its historical release, not a future expanded catalog.
 // Every historical entry is still compared deeply against the current shipped entry below.
-const priorCatalogPath = path.join(root, "artifacts/studio-premium-20260913/catalog-before-expansion.json");
+const priorCatalogPath = path.join(root, "data/asset-releases/studio-premium-20260913/catalog-before-expansion.json");
 const priorCatalogBytes = existsSync(priorCatalogPath) ? readFileSync(priorCatalogPath) : manifestBytes;
 const priorCatalog = JSON.parse(priorCatalogBytes.toString("utf8")) as RawManifest;
 const originals = [
