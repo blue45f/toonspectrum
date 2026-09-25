@@ -122,10 +122,20 @@ export function studioTownQuests(
   return Object.freeze(quests.filter((quest) => roomExists(manifest, quest.roomId)));
 }
 
+const STUDIO_TOWN_TIME_ZONE_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+function studioTownLocalDate(now: number): Date {
+  return new Date(now + STUDIO_TOWN_TIME_ZONE_OFFSET_MS);
+}
+
 function todayAt(now: number, hour: number, minute = 0): number {
-  const date = new Date(now);
-  date.setHours(hour, minute, 0, 0);
-  return date.getTime();
+  const local = studioTownLocalDate(now);
+  return Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), hour, minute)
+    - STUDIO_TOWN_TIME_ZONE_OFFSET_MS;
+}
+
+function studioTownDateKey(epochMs: number): string {
+  return studioTownLocalDate(epochMs).toISOString().slice(0, 10);
 }
 
 export function studioTownEvents(now = Date.now()): readonly StudioTownEvent[] {
@@ -139,7 +149,7 @@ export function studioTownEvents(now = Date.now()): readonly StudioTownEvent[] {
   return Object.freeze(definitions.map(([kind, labelKo, labelEn, roomId, hour, minute, duration, spotlight]) => {
     let startsAt = todayAt(now, hour, minute);
     if (startsAt + duration * 60_000 < now - 30 * 60_000) startsAt += 24 * 60 * 60_000;
-    return Object.freeze({ id: `${kind}:${new Date(startsAt).toISOString().slice(0, 10)}`, kind, labelKo, labelEn, roomId, startsAt, endsAt: startsAt + duration * 60_000, spotlight });
+    return Object.freeze({ id: `${kind}:${studioTownDateKey(startsAt)}`, kind, labelKo, labelEn, roomId, startsAt, endsAt: startsAt + duration * 60_000, spotlight });
   }));
 }
 
@@ -256,7 +266,7 @@ export interface StudioTownSeasonPresentation {
 }
 
 export function studioTownSeasonAt(now = Date.now()): StudioTownSeasonPresentation {
-  const month = new Date(now).getMonth() + 1;
+  const month = studioTownLocalDate(now).getUTCMonth() + 1;
   if (month >= 3 && month <= 5) return Object.freeze({ season: "spring", labelKo: "벚꽃 창작제", labelEn: "Cherry creator festival", foliageTint: 0xffc3dc, weatherTint: 0xffd9e9, ambience: "petals" });
   if (month >= 6 && month <= 8) return Object.freeze({ season: "summer", labelKo: "해변 작업 캠프", labelEn: "Beach work camp", foliageTint: 0x78d382, weatherTint: 0xb7efff, ambience: "breeze" });
   if (month >= 9 && month <= 11) return Object.freeze({ season: "autumn", labelKo: "스토리 공모제", labelEn: "Story festival", foliageTint: 0xe99555, weatherTint: 0xffd2a2, ambience: "leaves" });

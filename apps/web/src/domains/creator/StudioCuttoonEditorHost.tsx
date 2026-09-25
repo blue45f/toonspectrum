@@ -614,7 +614,6 @@ import {
   isEffectivelyLocked,
   missingLayerGroupIds,
   reorderLayerItem,
-  type LayerGroup,
 } from "./studio-layers";
 import {
   acquireProductStudioUiPreferencesRepository,
@@ -1045,17 +1044,7 @@ import {
   type StudioRawPenInkPreviewEligibility,
   type StudioRawPenInkPreviewState,
 } from "./studio-raw-pen-ink-preview";
-import {
-  completeStudioDrawingPracticeDocument,
-  createStudioDrawingPracticeDocument,
-  patchStudioDrawingPracticeDocument,
-  relinkStudioDrawingPracticeSource,
-  resetStudioDrawingPracticePlacement,
-  retryStudioDrawingPracticeDocument,
-  type StudioDrawingPracticeDocument,
-  type StudioDrawingPracticeView,
-} from "./studio-drawing-practice-document";
-import { resolveStudioDrawingPracticeAsset } from "./studio-drawing-practice-runtime";
+import { useStudioDrawingPracticeRuntime } from "./use-studio-drawing-practice-runtime";
 import {
   createDefaultStudioReferenceBoardDocument,
   normalizeStudioReferenceBoardDocument,
@@ -1453,7 +1442,6 @@ import type { StudioLeftToolRailHandlers } from "./StudioLeftToolRail";
 import type { StudioMenubarContentHandlers } from "./StudioMenubarContent";
 import type { StudioBrushCatalogHandlers, StudioMobileEditingDockHandlers, StudioMobileSheet } from "./StudioMobileEditingDock";
 import type { StudioPageListPaneHandlers } from "./StudioPageListPane";
-import type { StudioDrawingPracticeStartRequest } from "./StudioReferencePanel";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type { CreatorAssetReportReason } from "@/shared/lib/creator-asset-contract";
@@ -6404,42 +6392,16 @@ export function StudioCuttoonEditor({
       id,
     ));
   }
-  // 게시된 작품(workId 존재)을 스튜디오에서 다시 열었을 때만 채워진다 — WorkDetail.pages(렌더링된
-  // 컷 이미지)가 있어야 컷별 연출(WorkFxPanel)의 "컷 이미지 클릭해 마크 찍기" UI가 성립하므로,
-  // 아직 게시 전(pages 없음)인 신규 작품에는 이 패널을 노출하지 않는다.
+  // WorkFxPanel requires rendered WorkDetail pages, so unpublished projects keep it hidden.
   const [fxPanelOpen, setFxPanelOpen] = useState(false);
   const [fxPanelLoading, setFxPanelLoading] = useState(false);
   const [referencePanelOpen, setReferencePanelOpen] = useState(() => tracePracticeRequested);
-  const [drawingPracticePreview, setDrawingPracticePreview] = useState<{
-    pageId: string;
-    source: StudioDrawingPracticeDocument;
-    document: StudioDrawingPracticeDocument;
-  } | null>(null);
-  const [drawingPracticeCompareActive, setDrawingPracticeCompareActive] = useState(false);
-  const tracePracticeInstructionAnnouncedRef = useRef(false);
-  useEffect(() => {
-    if (!tracePracticeRequested) return;
-    preloadStudioReferencePanel();
-    setReferencePanelOpen(true);
-    if (!tracePracticeInstructionAnnouncedRef.current) {
-      tracePracticeInstructionAnnouncedRef.current = true;
-      announceDrawingShortcutRef.current(
-        "레퍼런스를 선택한 뒤 ‘이 이미지로 따라 그리기’를 누르세요.",
-      );
-    }
-  }, [tracePracticeRequested]);
-  useEffect(() => {
-    setDrawingPracticePreview(null);
-    setDrawingPracticeCompareActive(false);
-  }, [currentPageId]);
   const [timelapseOpen, setTimelapseOpen] = useState(false);
   const [storyboardGridOpen, setStoryboardGridOpen] = useState(false);
   const [scrollPreviewOpen, setScrollPreviewOpen] = useState(false);
   const [continuityOpen, setContinuityOpen] = useState(false);
   const [webtoonAssistantOpen, setWebtoonAssistantOpen] = useState(false);
-  // null defers the first load; false keeps an already requested dialog's drafts mounted.
-  const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState<boolean | null>(null);
-  // useMemo: 패널 스택 memo 자식 prop 안정성(패널 닫힘 시 빈 배열 상수, 열림 시 pages 기준 재계산).
+  const [aiSuperSuiteOpen, setAiSuperSuiteOpen] = useState<boolean | null>(null); // null defers first load.
   const continuityScenes = useMemo(() => continuityOpen || productionInsightsOpen
     ? pages.flatMap((page, pageIndex) =>
         page.elements
@@ -15089,39 +15051,6 @@ const puppetWarpArmed =
     }
   }, [menu]);
 
-  const persistedDrawingPractice = activePage.drawingPractice ?? null;
-  const drawingPracticeDocument = useMemo(() => {
-    if (
-      drawingPracticePreview
-      && drawingPracticePreview.pageId === activePage.id
-      && drawingPracticePreview.source === persistedDrawingPractice
-    ) {
-      return drawingPracticePreview.document;
-    }
-    return persistedDrawingPractice;
-  }, [activePage.id, drawingPracticePreview, persistedDrawingPractice]);
-  const drawingPracticeAsset = useMemo(
-    () => resolveStudioDrawingPracticeAsset(drawingPracticeDocument, assets),
-    [assets, drawingPracticeDocument],
-  );
-  const drawingPracticeSourceDataUrl = drawingPracticeAsset?.dataUrl ?? null;
-  const drawingPracticeSourceState = drawingPracticeAsset
-    ? "ready" as const
-    : assetsLoading || !assetsLoaded
-      ? "loading" as const
-      : "missing" as const;
-  const drawingPracticeTargetGroupId =
-    drawingPracticeDocument?.status === "active"
-    && drawingPracticeDocument.targetGroupId
-    && groups.some((group) => group.id === drawingPracticeDocument.targetGroupId)
-      ? drawingPracticeDocument.targetGroupId
-      : null;
-
-  useEffect(() => {
-    if (!drawingPracticeDocument || assetsLoading || assetsLoaded) return;
-    void loadAssetsListFromEffect();
-  }, [assetsLoaded, assetsLoading, drawingPracticeDocument]);
-
   // 에셋 라이브러리 고도화 상태 및 함수
   const [assetSearchQuery, setAssetSearchQuery] = useState("");
   const [assetSortOrder, setAssetSortOrder] = useState<StudioAssetSortOrder>("newest");
@@ -16227,11 +16156,16 @@ const puppetWarpArmed =
     studioRevisionProjectGenerationRef,
     webGpuCanvasHandleRef,
   });
-  const expandDeferredStrokeCommitHistory = (
-    batch: Parameters<typeof expandDeferredStrokeCommitHistoryBase>[0],
-  ): void => {
-    expandDeferredStrokeCommitHistoryBase(batch);
-    pendingStrokeRealtimeHistory.recordBatch(batch, pagesHiRef.current);
+  const drawingPractice = useStudioDrawingPracticeRuntime({
+    traceRequested: tracePracticeRequested, activePage, currentPageId, assets, assetsLoaded, assetsLoading,
+    masterEditMode, activePageMutationLocked, canvasWidth: CANVAS_W, readCurrentPages: () => pagesHistoryRef.current[pagesHiRef.current] ?? pages,
+    readCurrentPageId: () => currentPageIdRef.current, readAssets: () => assetsRef.current, replaceAssets: replaceStudioAssets, setAssetsLoaded,
+    loadAssets: () => { void loadAssetsList(); }, markDocumentChanged: markStudioDocumentChanged, commitPages, setError,
+    preloadReferencePanel: preloadStudioReferencePanel, setReferencePanelOpen, clearSelection: () => setSelectedId(null),
+    activateDrawTool: () => setTool("draw"), announce: announceDrawingShortcut,
+  });
+  const expandDeferredStrokeCommitHistory = (batch: Parameters<typeof expandDeferredStrokeCommitHistoryBase>[0]): void => {
+    expandDeferredStrokeCommitHistoryBase(batch); pendingStrokeRealtimeHistory.recordBatch(batch, pagesHiRef.current);
   };
   useEffect(() => {
     const sampleId = params.get("sample");
@@ -23736,7 +23670,7 @@ const puppetWarpArmed =
     drawingImmediateCausalInputRef,
     drawingInkTimeOriginRef,
     drawingInputSettingsRef,
-    drawingPracticeTargetGroupId,
+    drawingPracticeTargetGroupId: drawingPractice.targetGroupId,
     drawingLastAuthoritativePointerRef,
     drawingPointerTransportRef,
     drawingPrecisionStabilizerBridgeRef,
@@ -27604,210 +27538,6 @@ function clearSelectionForEdit() {
     togglePageSequence: () => setPageSequenceOpen((current) => !current),
   });
 
-  function currentDrawingPracticePages(): PageState[] {
-    return pagesHistoryRef.current[pagesHiRef.current] ?? pages;
-  }
-
-  function createDrawingPracticeResultGroup(attemptIndex: number): LayerGroup {
-    return createLayerGroup(uid(), `따라 그리기 ${attemptIndex}회차`);
-  }
-
-  function commitDrawingPracticeDocument(
-    nextDocument: StudioDrawingPracticeDocument | null,
-    options: { resultGroup?: LayerGroup } = {},
-  ): boolean {
-    if (masterEditMode || activePageMutationLocked) {
-      setError("현재 페이지가 잠겨 있어 따라 그리기 가이드를 변경할 수 없어요.");
-      return false;
-    }
-    const latest = currentDrawingPracticePages();
-    const targetPageId = currentPageIdRef.current;
-    const target = latest.find((page) => page.id === targetPageId);
-    if (!target) {
-      setError("현재 페이지를 찾지 못해 따라 그리기 가이드를 변경하지 않았어요.");
-      return false;
-    }
-    if (!markStudioDocumentChanged()) return false;
-    const nextPages = latest.map((page) => {
-      if (page !== target) return page;
-      const currentGroups = page.groups ?? [];
-      const resultGroup = options.resultGroup;
-      const nextGroups = resultGroup
-        && !currentGroups.some((group) => group.id === resultGroup.id)
-          ? [...currentGroups, resultGroup]
-          : page.groups;
-      if (nextDocument) {
-        return {
-          ...page,
-          ...(nextGroups === undefined ? {} : { groups: nextGroups }),
-          drawingPractice: nextDocument,
-        };
-      }
-      const { drawingPractice: _drawingPractice, ...rest } = page;
-      return rest as PageState;
-    });
-    const committed = commitPages(nextPages);
-    if (committed) {
-      setDrawingPracticePreview(null);
-      setDrawingPracticeCompareActive(false);
-      setError(null);
-    }
-    return committed;
-  }
-
-  function startDrawingPractice(request: StudioDrawingPracticeStartRequest): void {
-    const latest = currentDrawingPracticePages();
-    const target = latest.find((page) => page.id === currentPageIdRef.current);
-    if (!target) {
-      setError("현재 페이지를 찾지 못해 따라 그리기를 시작하지 않았어요.");
-      return;
-    }
-    const source = {
-      ...request.item.asset,
-      assetId: request.asset.id,
-      name: request.asset.name,
-      width: request.asset.width,
-      height: request.asset.height,
-    };
-    const existing = target.drawingPractice;
-    const existingSourceMissing = Boolean(
-      existing && !resolveStudioDrawingPracticeAsset(existing, assetsRef.current),
-    );
-    if (!assetsRef.current.some((asset) => asset.id === request.asset.id)) {
-      replaceStudioAssets([...assetsRef.current, request.asset]);
-    }
-    setAssetsLoaded(true);
-    const viewport = { canvasWidth: CANVAS_W, canvasHeight: target.canvasH };
-    if (existing && existingSourceMissing) {
-      let relinked = relinkStudioDrawingPracticeSource(existing, source, viewport);
-      const existingGroupAvailable = Boolean(
-        relinked.targetGroupId
-        && target.groups?.some((group) => group.id === relinked.targetGroupId),
-      );
-      const resultGroup = existingGroupAvailable
-        ? undefined
-        : createDrawingPracticeResultGroup(relinked.attemptIndex);
-      if (resultGroup) {
-        relinked = patchStudioDrawingPracticeDocument(
-          relinked,
-          { targetGroupId: resultGroup.id },
-          viewport,
-        );
-      }
-      if (!commitDrawingPracticeDocument(relinked, { resultGroup })) return;
-      setReferencePanelOpen(false);
-      setSelectedId(null);
-      setTool("draw");
-      announceDrawingShortcut("누락된 따라 그리기 원본을 다시 연결했어요.");
-      return;
-    }
-    const resultGroup = createDrawingPracticeResultGroup(1);
-    const document = createStudioDrawingPracticeDocument({
-      attemptId: uid(),
-      source,
-      viewport,
-      purpose: target.elements.length > 0 ? "production-assist" : "practice",
-      targetGroupId: resultGroup.id,
-    });
-    if (!commitDrawingPracticeDocument(document, { resultGroup })) return;
-    setReferencePanelOpen(false);
-    setSelectedId(null);
-    setTool("draw");
-    announceDrawingShortcut("선택한 이미지를 따라 그리기 가이드로 배치했어요.");
-  }
-
-  function previewDrawingPracticeView(patch: Partial<StudioDrawingPracticeView>): void {
-    const persisted = activePage.drawingPractice ?? null;
-    if (!persisted) return;
-    const base = drawingPracticePreview
-      && drawingPracticePreview.pageId === activePage.id
-      && drawingPracticePreview.source === persisted
-      ? drawingPracticePreview.document
-      : persisted;
-    setDrawingPracticePreview({
-      pageId: activePage.id,
-      source: persisted,
-      document: patchStudioDrawingPracticeDocument(
-        base,
-        { view: patch },
-        { canvasWidth: CANVAS_W, canvasHeight: activePage.canvasH },
-      ),
-    });
-  }
-
-  function commitDrawingPracticeView(patch: Partial<StudioDrawingPracticeView>): void {
-    const latest = currentDrawingPracticePages();
-    const target = latest.find((page) => page.id === currentPageIdRef.current);
-    const persisted = target?.drawingPractice;
-    if (!target || !persisted) return;
-    const base = drawingPracticePreview
-      && drawingPracticePreview.pageId === target.id
-      && drawingPracticePreview.source === persisted
-      ? drawingPracticePreview.document
-      : persisted;
-    const next = patchStudioDrawingPracticeDocument(
-      base,
-      { view: patch },
-      { canvasWidth: CANVAS_W, canvasHeight: target.canvasH },
-    );
-    if (!commitDrawingPracticeDocument(next)) return;
-    if (next.view.mode === "reference-window") {
-      preloadStudioReferencePanel();
-      setReferencePanelOpen(true);
-    }
-  }
-
-  function cancelDrawingPracticePreview(): void {
-    setDrawingPracticePreview(null);
-  }
-
-  function finishDrawingPractice(): void {
-    if (!drawingPracticeDocument) return;
-    const completed = completeStudioDrawingPracticeDocument(drawingPracticeDocument);
-    commitDrawingPracticeDocument({
-      ...completed,
-      view: { ...completed.view, visible: false, locked: true },
-    });
-  }
-
-  function retryDrawingPractice(): void {
-    if (!drawingPracticeDocument) return;
-    const nextAttemptIndex = Math.min(9_999, drawingPracticeDocument.attemptIndex + 1);
-    const resultGroup = createDrawingPracticeResultGroup(nextAttemptIndex);
-    const retried = retryStudioDrawingPracticeDocument(
-      drawingPracticeDocument,
-      uid(),
-      resultGroup.id,
-    );
-    if (commitDrawingPracticeDocument(retried, { resultGroup })) {
-      setSelectedId(null);
-      setTool("draw");
-      announceDrawingShortcut(`따라 그리기 ${retried.attemptIndex}회차를 시작했어요.`);
-    }
-  }
-
-  function resetDrawingPracticePlacement(): void {
-    if (!drawingPracticeDocument) return;
-    const reset = resetStudioDrawingPracticePlacement(
-      drawingPracticeDocument,
-      { canvasWidth: CANVAS_W, canvasHeight: activePage.canvasH },
-    );
-    if (commitDrawingPracticeDocument(reset)) {
-      announceDrawingShortcut("따라 그리기 원본을 페이지에 맞춰 다시 배치했어요.");
-    }
-  }
-
-  function removeDrawingPractice(): void {
-    if (commitDrawingPracticeDocument(null)) {
-      announceDrawingShortcut("가이드만 제거했어요. 그린 내용은 그대로 유지됩니다.");
-    }
-  }
-
-  function openDrawingPracticeReferencePanel(): void {
-    preloadStudioReferencePanel();
-    setReferencePanelOpen(true);
-  }
-
   const studioLazyPanelStackHandlers = useStudioStableHandlers<StudioLazyPanelStackHandlers>({
     addPage,
     applyStudioCommentsPanelChange,
@@ -27964,7 +27694,7 @@ function clearSelectionForEdit() {
     setWriterRoom,
     startMacroRecord,
     stopMacroRecord,
-    startDrawingPractice,
+    startDrawingPractice: drawingPractice.start,
     updatePublishPackageSettings,
     captureTimelapseStep,
     currentStudioProjectSnapshot,
@@ -28654,7 +28384,7 @@ function clearSelectionForEdit() {
     commitCoalesced,
     commitEditText,
     commitPages,
-    commitDrawingPracticeView,
+    commitDrawingPracticeView: drawingPractice.commitView,
     dismissQuickStart,
     downloadAutosaveBackup,
     duplicateSelected,
@@ -29881,19 +29611,7 @@ function clearSelectionForEdit() {
       bg={bg}
       densityShowsStatusRail={densityShowsStatusRail}
       drawingShortcutNoticeStore={drawingShortcutNoticeStore}
-      drawingPracticeDocument={drawingPracticeDocument}
-      drawingPracticeSourceDataUrl={drawingPracticeSourceDataUrl}
-      drawingPracticeSourceState={drawingPracticeSourceState}
-      drawingPracticeCompareActive={drawingPracticeCompareActive}
-      previewDrawingPracticeView={previewDrawingPracticeView}
-      commitDrawingPracticeView={commitDrawingPracticeView}
-      cancelDrawingPracticePreview={cancelDrawingPracticePreview}
-      setDrawingPracticeCompareActive={setDrawingPracticeCompareActive}
-      finishDrawingPractice={finishDrawingPractice}
-      retryDrawingPractice={retryDrawingPractice}
-      resetDrawingPracticePlacement={resetDrawingPracticePlacement}
-      removeDrawingPractice={removeDrawingPractice}
-      openDrawingPracticeReferencePanel={openDrawingPracticeReferencePanel}
+      {...drawingPractice.viewProps}
       hi={hi}
       menuEditRedoDisabled={menuEditRedoDisabled}
       menuEditUndoDisabled={menuEditUndoDisabled}
