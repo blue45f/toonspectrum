@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Image as KImage, Transformer } from "react-konva/lib/ReactKonvaCore";
+import { Group, Image as KImage, Transformer } from "react-konva/lib/ReactKonvaCore";
 
 import { studioKonvaRuntime as KonvaRuntime } from "../render/studio-konva-runtime";
+import { registerStudioDrawingPracticeCaptureExclusion } from "../studio-drawing-practice-runtime";
 
 import type {
   StudioDrawingPracticeDocument,
@@ -26,6 +27,7 @@ export function StudioDrawingPracticeGuide({
   onCommitView,
 }: StudioDrawingPracticeGuideProps) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const groupRef = useRef<Konva.Group>(null);
   const imageRef = useRef<Konva.Image>(null);
   const transformerRef = useRef<Konva.Transformer>(null);
   const view = document.view;
@@ -48,6 +50,8 @@ export function StudioDrawingPracticeGuide({
       next.onerror = null;
     };
   }, [sourceDataUrl]);
+
+  useEffect(() => registerStudioDrawingPracticeCaptureExclusion(groupRef.current), [image]);
 
   useEffect(() => {
     const node = imageRef.current;
@@ -74,7 +78,7 @@ export function StudioDrawingPracticeGuide({
   if (!image) return null;
 
   return (
-    <>
+    <Group ref={groupRef} name="studio-drawing-practice-guide-group">
       <KImage
         ref={imageRef}
         name="studio-drawing-practice-guide"
@@ -132,6 +136,6 @@ export function StudioDrawingPracticeGuide({
           )}
         />
       ) : null}
-    </>
+    </Group>
   );
 }

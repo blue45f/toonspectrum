@@ -567,6 +567,7 @@ export type StudioCuttoonEditorViewSessionRest = {
   setDrawingPracticeCompareActive: any;
   finishDrawingPractice: any;
   retryDrawingPractice: any;
+  resetDrawingPracticePlacement: any;
   removeDrawingPractice: any;
   openDrawingPracticeReferencePanel: any;
   hi: any;

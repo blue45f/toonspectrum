@@ -1,6 +1,8 @@
+import { registerStudioRasterCapturePreparation } from "./render/studio-raster-presentation-cache";
 import { canonicalizeStudioAssetContentHash, type StudioAsset } from "./studio-asset-library";
 
 import type { StudioDrawingPracticeDocument } from "./studio-drawing-practice-document";
+import type Konva from "konva";
 
 /** SHA-256 is authoritative. assetId remains a same-device recovery hint only. */
 export function resolveStudioDrawingPracticeAsset(
@@ -35,4 +37,27 @@ export function shouldRenderStudioDrawingPracticeGuide(input: {
     && !input.saving
     && !input.timelapseCapturing
   );
+}
+
+export function routeStudioDrawingPracticeStroke<Element extends object>(
+  element: Element,
+  targetGroupId: string | null,
+): Element & { groupId?: string } {
+  return targetGroupId ? { ...element, groupId: targetGroupId } : element;
+}
+
+/**
+ * The guide is a live editor aid, never authored pixels. Register it with the same synchronous
+ * capture fence used by document-raster reads so eyedropper, thumbnails, exports and save-time
+ * captures cannot accidentally sample it even before React has committed an exporting state.
+ */
+export function registerStudioDrawingPracticeCaptureExclusion(
+  node: Konva.Node | null,
+): () => void {
+  if (!node) return () => undefined;
+  return registerStudioRasterCapturePreparation(node, () => {
+    const ownVisibility = node.visible();
+    node.visible(false);
+    return () => { node.visible(ownVisibility); };
+  });
 }

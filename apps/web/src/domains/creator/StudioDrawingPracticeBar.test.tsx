@@ -27,6 +27,7 @@ const defaultProps = {
   onOpenReferencePanel: vi.fn(),
   onFinish: vi.fn(),
   onRetry: vi.fn(),
+  onResetPlacement: vi.fn(),
   onRemove: vi.fn(),
 };
 
@@ -43,7 +44,9 @@ describe("StudioDrawingPracticeBar", () => {
     expect(screen.getByRole("button", { name: "원본 숨기기" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "배치 잠금" })).toBeTruthy();
     expect(screen.getByRole("slider", { name: "따라 그리기 원본 투명도" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "맞춤 배치" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "연습 마치기" })).toBeTruthy();
+    expect(screen.getByRole("toolbar").className).toContain("--studio-canvas-bottom-inset");
     expect(screen.getByRole("button", { name: "가이드 제거" })).toBeTruthy();
   });
 
@@ -55,6 +58,8 @@ describe("StudioDrawingPracticeBar", () => {
     expect(defaultProps.onCommitView).toHaveBeenCalledWith({ visible: false });
     fireEvent.click(screen.getByRole("button", { name: "비교" }));
     expect(defaultProps.onCompareChange).toHaveBeenCalledWith(true);
+    fireEvent.click(screen.getByRole("button", { name: "맞춤 배치" }));
+    expect(defaultProps.onResetPlacement).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("button", { name: "다시 연습" }));
     fireEvent.click(screen.getByRole("button", { name: "연습 마치기" }));
     fireEvent.click(screen.getByRole("button", { name: "가이드 제거" }));

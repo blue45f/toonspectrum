@@ -95,6 +95,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
     setDrawingPracticeCompareActive,
     finishDrawingPractice,
     retryDrawingPractice,
+    resetDrawingPracticePlacement,
     removeDrawingPractice,
     openDrawingPracticeReferencePanel,
     editing,
@@ -751,6 +752,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
             onOpenReferencePanel={openDrawingPracticeReferencePanel}
             onFinish={finishDrawingPractice}
             onRetry={retryDrawingPractice}
+            onResetPlacement={resetDrawingPracticePlacement}
             onRemove={removeDrawingPractice}
           />
         ) : null}

@@ -614,6 +614,7 @@ import {
   isEffectivelyLocked,
   missingLayerGroupIds,
   reorderLayerItem,
+  type LayerGroup,
 } from "./studio-layers";
 import {
   acquireProductStudioUiPreferencesRepository,
@@ -1048,6 +1049,8 @@ import {
   completeStudioDrawingPracticeDocument,
   createStudioDrawingPracticeDocument,
   patchStudioDrawingPracticeDocument,
+  relinkStudioDrawingPracticeSource,
+  resetStudioDrawingPracticePlacement,
   retryStudioDrawingPracticeDocument,
   type StudioDrawingPracticeDocument,
   type StudioDrawingPracticeView,
@@ -15107,6 +15110,12 @@ const puppetWarpArmed =
     : assetsLoading || !assetsLoaded
       ? "loading" as const
       : "missing" as const;
+  const drawingPracticeTargetGroupId =
+    drawingPracticeDocument?.status === "active"
+    && drawingPracticeDocument.targetGroupId
+    && groups.some((group) => group.id === drawingPracticeDocument.targetGroupId)
+      ? drawingPracticeDocument.targetGroupId
+      : null;
 
   useEffect(() => {
     if (!drawingPracticeDocument || assetsLoading || assetsLoaded) return;
@@ -23727,6 +23736,7 @@ const puppetWarpArmed =
     drawingImmediateCausalInputRef,
     drawingInkTimeOriginRef,
     drawingInputSettingsRef,
+    drawingPracticeTargetGroupId,
     drawingLastAuthoritativePointerRef,
     drawingPointerTransportRef,
     drawingPrecisionStabilizerBridgeRef,
@@ -27598,8 +27608,13 @@ function clearSelectionForEdit() {
     return pagesHistoryRef.current[pagesHiRef.current] ?? pages;
   }
 
+  function createDrawingPracticeResultGroup(attemptIndex: number): LayerGroup {
+    return createLayerGroup(uid(), `따라 그리기 ${attemptIndex}회차`);
+  }
+
   function commitDrawingPracticeDocument(
     nextDocument: StudioDrawingPracticeDocument | null,
+    options: { resultGroup?: LayerGroup } = {},
   ): boolean {
     if (masterEditMode || activePageMutationLocked) {
       setError("현재 페이지가 잠겨 있어 따라 그리기 가이드를 변경할 수 없어요.");
@@ -27615,7 +27630,19 @@ function clearSelectionForEdit() {
     if (!markStudioDocumentChanged()) return false;
     const nextPages = latest.map((page) => {
       if (page !== target) return page;
-      if (nextDocument) return { ...page, drawingPractice: nextDocument };
+      const currentGroups = page.groups ?? [];
+      const resultGroup = options.resultGroup;
+      const nextGroups = resultGroup
+        && !currentGroups.some((group) => group.id === resultGroup.id)
+          ? [...currentGroups, resultGroup]
+          : page.groups;
+      if (nextDocument) {
+        return {
+          ...page,
+          ...(nextGroups === undefined ? {} : { groups: nextGroups }),
+          drawingPractice: nextDocument,
+        };
+      }
       const { drawingPractice: _drawingPractice, ...rest } = page;
       return rest as PageState;
     });
@@ -27642,18 +27669,50 @@ function clearSelectionForEdit() {
       width: request.asset.width,
       height: request.asset.height,
     };
-    const document = createStudioDrawingPracticeDocument({
-      attemptId: globalThis.crypto.randomUUID(),
-      source,
-      viewport: { canvasWidth: CANVAS_W, canvasHeight: target.canvasH },
-      purpose: "practice",
-    });
+    const existing = target.drawingPractice;
+    const existingSourceMissing = Boolean(
+      existing && !resolveStudioDrawingPracticeAsset(existing, assetsRef.current),
+    );
     if (!assetsRef.current.some((asset) => asset.id === request.asset.id)) {
       replaceStudioAssets([...assetsRef.current, request.asset]);
     }
     setAssetsLoaded(true);
-    if (!commitDrawingPracticeDocument(document)) return;
+    const viewport = { canvasWidth: CANVAS_W, canvasHeight: target.canvasH };
+    if (existing && existingSourceMissing) {
+      let relinked = relinkStudioDrawingPracticeSource(existing, source, viewport);
+      const existingGroupAvailable = Boolean(
+        relinked.targetGroupId
+        && target.groups?.some((group) => group.id === relinked.targetGroupId),
+      );
+      const resultGroup = existingGroupAvailable
+        ? undefined
+        : createDrawingPracticeResultGroup(relinked.attemptIndex);
+      if (resultGroup) {
+        relinked = patchStudioDrawingPracticeDocument(
+          relinked,
+          { targetGroupId: resultGroup.id },
+          viewport,
+        );
+      }
+      if (!commitDrawingPracticeDocument(relinked, { resultGroup })) return;
+      setReferencePanelOpen(false);
+      setSelectedId(null);
+      setTool("draw");
+      announceDrawingShortcut("누락된 따라 그리기 원본을 다시 연결했어요.");
+      return;
+    }
+    const resultGroup = createDrawingPracticeResultGroup(1);
+    const document = createStudioDrawingPracticeDocument({
+      attemptId: uid(),
+      source,
+      viewport,
+      purpose: target.elements.length > 0 ? "production-assist" : "practice",
+      targetGroupId: resultGroup.id,
+    });
+    if (!commitDrawingPracticeDocument(document, { resultGroup })) return;
     setReferencePanelOpen(false);
+    setSelectedId(null);
+    setTool("draw");
     announceDrawingShortcut("선택한 이미지를 따라 그리기 가이드로 배치했어요.");
   }
 
@@ -27713,12 +27772,28 @@ function clearSelectionForEdit() {
 
   function retryDrawingPractice(): void {
     if (!drawingPracticeDocument) return;
+    const nextAttemptIndex = Math.min(9_999, drawingPracticeDocument.attemptIndex + 1);
+    const resultGroup = createDrawingPracticeResultGroup(nextAttemptIndex);
     const retried = retryStudioDrawingPracticeDocument(
       drawingPracticeDocument,
-      globalThis.crypto.randomUUID(),
+      uid(),
+      resultGroup.id,
     );
-    if (commitDrawingPracticeDocument(retried)) {
+    if (commitDrawingPracticeDocument(retried, { resultGroup })) {
+      setSelectedId(null);
+      setTool("draw");
       announceDrawingShortcut(`따라 그리기 ${retried.attemptIndex}회차를 시작했어요.`);
+    }
+  }
+
+  function resetDrawingPracticePlacement(): void {
+    if (!drawingPracticeDocument) return;
+    const reset = resetStudioDrawingPracticePlacement(
+      drawingPracticeDocument,
+      { canvasWidth: CANVAS_W, canvasHeight: activePage.canvasH },
+    );
+    if (commitDrawingPracticeDocument(reset)) {
+      announceDrawingShortcut("따라 그리기 원본을 페이지에 맞춰 다시 배치했어요.");
     }
   }
 
@@ -29816,6 +29891,7 @@ function clearSelectionForEdit() {
       setDrawingPracticeCompareActive={setDrawingPracticeCompareActive}
       finishDrawingPractice={finishDrawingPractice}
       retryDrawingPractice={retryDrawingPractice}
+      resetDrawingPracticePlacement={resetDrawingPracticePlacement}
       removeDrawingPractice={removeDrawingPractice}
       openDrawingPracticeReferencePanel={openDrawingPracticeReferencePanel}
       hi={hi}

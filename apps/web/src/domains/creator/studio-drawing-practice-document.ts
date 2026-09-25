@@ -25,7 +25,8 @@ export interface StudioDrawingPracticeView {
   centerX: number;
   centerY: number;
   width: number;
-  height: number;  rotationDeg: number;
+  height: number;
+  rotationDeg: number;
   opacity: number;
   grayscale: boolean;
   flipX: boolean;
@@ -52,7 +53,8 @@ export interface StudioDrawingPracticeViewport {
   canvasHeight: number;
 }
 
-export interface CreateStudioDrawingPracticeInput {  attemptId: string;
+export interface CreateStudioDrawingPracticeInput {
+  attemptId: string;
   source: StudioReferenceBoardAssetDescriptor;
   viewport: StudioDrawingPracticeViewport;
   purpose?: StudioDrawingPracticePurpose;
@@ -77,9 +79,13 @@ function finiteNumber(value: unknown, fallback: number): number {
 }
 
 function boundedCoordinate(value: unknown, fallback: number): number {
-  return clamp(finiteNumber(value, fallback), -STUDIO_DRAWING_PRACTICE_MAX_COORDINATE,
-    STUDIO_DRAWING_PRACTICE_MAX_COORDINATE);
+  return clamp(
+    finiteNumber(value, fallback),
+    -STUDIO_DRAWING_PRACTICE_MAX_COORDINATE,
+    STUDIO_DRAWING_PRACTICE_MAX_COORDINATE,
+  );
 }
+
 function boundedDimension(value: unknown, fallback: number): number {
   return clamp(finiteNumber(value, fallback), 1, STUDIO_DRAWING_PRACTICE_MAX_COORDINATE);
 }
@@ -110,6 +116,7 @@ function safeViewport(viewport: StudioDrawingPracticeViewport): StudioDrawingPra
     canvasHeight: boundedDimension(viewport.canvasHeight, 1_200),
   };
 }
+
 function normalizeRotation(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 0;
   const normalized = ((value + 180) % 360 + 360) % 360 - 180;
@@ -139,7 +146,8 @@ function exactDataRecord(
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   try {
     const prototype = Object.getPrototypeOf(value);
-    if (prototype !== Object.prototype && prototype !== null) return null;    const ownKeys = Reflect.ownKeys(value);
+    if (prototype !== Object.prototype && prototype !== null) return null;
+    const ownKeys = Reflect.ownKeys(value);
     if (ownKeys.some((key) => typeof key !== "string" || !keys.includes(key))) return null;
     if (required.some((key) => !ownKeys.includes(key))) return null;
     const descriptors = Object.getOwnPropertyDescriptors(value);
@@ -167,7 +175,8 @@ function normalizeSource(value: unknown): StudioReferenceBoardAssetDescriptor | 
     ? Math.round(clamp(source.width, 1, STUDIO_DRAWING_PRACTICE_MAX_COORDINATE)) : undefined;
   const height = typeof source.height === "number" && Number.isFinite(source.height) && source.height > 0
     ? Math.round(clamp(source.height, 1, STUDIO_DRAWING_PRACTICE_MAX_COORDINATE)) : undefined;
-  return {    sha256,
+  return {
+    sha256,
     ...(assetId && safeIdentifier(assetId) ? { assetId } : {}),
     ...(name ? { name } : {}),
     ...(mimeType && IMAGE_MIME_TYPE_PATTERN.test(mimeType) ? { mimeType } : {}),
@@ -195,10 +204,13 @@ export function fitStudioDrawingPracticeToPage(
   source: Pick<StudioReferenceBoardAssetDescriptor, "width" | "height">,
   viewport: StudioDrawingPracticeViewport,
 ): Pick<StudioDrawingPracticeView, "centerX" | "centerY" | "width" | "height"> {
-  const safe = safeViewport(viewport);  const sourceWidth = boundedDimension(source.width, safe.canvasWidth);
+  const safe = safeViewport(viewport);
+  const sourceWidth = boundedDimension(source.width, safe.canvasWidth);
   const sourceHeight = boundedDimension(source.height, safe.canvasHeight);
-  const scale = Math.min((safe.canvasWidth * 0.92) / sourceWidth,
-    (safe.canvasHeight * 0.92) / sourceHeight);
+  const scale = Math.min(
+    (safe.canvasWidth * 0.92) / sourceWidth,
+    (safe.canvasHeight * 0.92) / sourceHeight,
+  );
   return {
     centerX: safe.canvasWidth / 2,
     centerY: safe.canvasHeight / 2,
@@ -224,7 +236,8 @@ export function createStudioDrawingPracticeDocument(
     source,
     view: {
       mode: "overlay",
-      ...fit,      rotationDeg: 0,
+      ...fit,
+      rotationDeg: 0,
       opacity: STUDIO_DRAWING_PRACTICE_DEFAULT_OPACITY,
       grayscale: false,
       flipX: false,
@@ -251,9 +264,13 @@ export function normalizeStudioDrawingPracticeDocument(
   const normalized: StudioDrawingPracticeDocument = {
     version: STUDIO_DRAWING_PRACTICE_DOCUMENT_VERSION,
     attemptId: root.attemptId,
-    attemptIndex: clamp(Math.round(finiteNumber(root.attemptIndex, 1)), 1,
-      STUDIO_DRAWING_PRACTICE_MAX_ATTEMPT_INDEX),
-    purpose: root.purpose === "production-assist" ? "production-assist" : "practice",    status: root.status === "completed" ? "completed" : "active",
+    attemptIndex: clamp(
+      Math.round(finiteNumber(root.attemptIndex, 1)),
+      1,
+      STUDIO_DRAWING_PRACTICE_MAX_ATTEMPT_INDEX,
+    ),
+    purpose: root.purpose === "production-assist" ? "production-assist" : "practice",
+    status: root.status === "completed" ? "completed" : "active",
     source,
     view: {
       mode: rawView.mode === "reference-window" ? "reference-window" : "overlay",
@@ -280,8 +297,12 @@ export function normalizeStudioDrawingPracticeDocument(
 export function parseStudioDrawingPracticeDocument(
   value: unknown,
 ): StudioDrawingPracticeDocument | null {
-  const root = exactDataRecord(value, ROOT_KEYS,
-    ["version", "attemptId", "attemptIndex", "purpose", "status", "source", "view"]);  if (!root || root.version !== STUDIO_DRAWING_PRACTICE_DOCUMENT_VERSION
+  const root = exactDataRecord(
+    value,
+    ROOT_KEYS,
+    ["version", "attemptId", "attemptIndex", "purpose", "status", "source", "view"],
+  );
+  if (!root || root.version !== STUDIO_DRAWING_PRACTICE_DOCUMENT_VERSION
     || !safeIdentifier(root.attemptId)
     || typeof root.attemptIndex !== "number" || !Number.isSafeInteger(root.attemptIndex)
     || root.attemptIndex < 1 || root.attemptIndex > STUDIO_DRAWING_PRACTICE_MAX_ATTEMPT_INDEX
@@ -307,7 +328,8 @@ export function parseStudioDrawingPracticeDocument(
     || typeof view.flipY !== "boolean" || typeof view.visible !== "boolean"
     || typeof view.locked !== "boolean"
     || (view.placement !== "below-artwork" && view.placement !== "above-artwork")) return null;
-  if (Object.hasOwn(root, "targetGroupId") && !safeIdentifier(root.targetGroupId)) return null;  const parsed: StudioDrawingPracticeDocument = {
+  if (Object.hasOwn(root, "targetGroupId") && !safeIdentifier(root.targetGroupId)) return null;
+  const parsed: StudioDrawingPracticeDocument = {
     version: STUDIO_DRAWING_PRACTICE_DOCUMENT_VERSION,
     attemptId: root.attemptId,
     attemptIndex: root.attemptIndex,
@@ -335,7 +357,8 @@ export function parseStudioDrawingPracticeDocument(
     <= STUDIO_DRAWING_PRACTICE_MAX_SERIALIZED_BYTES ? parsed : null;
 }
 
-export function patchStudioDrawingPracticeDocument(  document: StudioDrawingPracticeDocument,
+export function patchStudioDrawingPracticeDocument(
+  document: StudioDrawingPracticeDocument,
   patch: Partial<Omit<StudioDrawingPracticeDocument, "version" | "source" | "view">> & {
     view?: Partial<StudioDrawingPracticeView>;
   },
@@ -355,17 +378,47 @@ export function completeStudioDrawingPracticeDocument(
   return { ...document, status: "completed" };
 }
 
+export function relinkStudioDrawingPracticeSource(
+  document: StudioDrawingPracticeDocument,
+  sourceValue: StudioReferenceBoardAssetDescriptor,
+  viewport: StudioDrawingPracticeViewport,
+): StudioDrawingPracticeDocument {
+  const source = normalizeSource(sourceValue);
+  if (!source) return document;
+  const fit = fitStudioDrawingPracticeToPage(source, viewport);
+  return normalizeStudioDrawingPracticeDocument({
+    ...document,
+    source,
+    status: "active",
+    view: {
+      ...document.view,
+      ...fit,
+      rotationDeg: 0,
+      visible: true,
+      locked: true,
+    },
+  }, viewport) ?? document;
+}
+
 export function retryStudioDrawingPracticeDocument(
   document: StudioDrawingPracticeDocument,
   attemptId: string,
+  targetGroupId?: string,
 ): StudioDrawingPracticeDocument {
   if (!safeIdentifier(attemptId)) return document;
+  const nextTargetGroupId = targetGroupId && safeIdentifier(targetGroupId)
+    ? targetGroupId
+    : document.targetGroupId;
   return {
     ...document,
     attemptId,
-    attemptIndex: Math.min(STUDIO_DRAWING_PRACTICE_MAX_ATTEMPT_INDEX,
-      document.attemptIndex + 1),    status: "active",
+    attemptIndex: Math.min(
+      STUDIO_DRAWING_PRACTICE_MAX_ATTEMPT_INDEX,
+      document.attemptIndex + 1,
+    ),
+    status: "active",
     view: { ...document.view, visible: true, locked: true },
+    ...(nextTargetGroupId ? { targetGroupId: nextTargetGroupId } : {}),
   };
 }
 
@@ -393,7 +446,8 @@ export function mirrorStudioDrawingPracticeDocument(
       ...document.view,
       centerX: boundedCoordinate(canvasWidth, 0) - document.view.centerX,
       flipX: !document.view.flipX,
-      rotationDeg: normalizeRotation(-document.view.rotationDeg),    },
+      rotationDeg: normalizeRotation(-document.view.rotationDeg),
+    },
   };
 }
 

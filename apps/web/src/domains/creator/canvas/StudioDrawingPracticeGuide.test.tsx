@@ -36,6 +36,22 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
     getLayer: vi.fn(() => ({ batchDraw: vi.fn() })),
     nodes: vi.fn(),
   };
+  const stage = {};
+  let groupVisible = true;
+  const groupNode = {
+    getParent: vi.fn(() => null),
+    getStage: vi.fn(() => stage),
+    isVisible: vi.fn(() => groupVisible),
+    visible: vi.fn((next?: boolean) => {
+      if (next === undefined) return groupVisible;
+      groupVisible = next;
+      return groupNode;
+    }),
+  };
+  const Group = React.forwardRef((props: Record<string, unknown>, ref) => {
+    React.useImperativeHandle(ref, () => groupNode);
+    return React.createElement(React.Fragment, null, props.children as ReactNode);
+  });
   const Image = React.forwardRef((props: Record<string, unknown>, ref) => {
     capture.images.push(props);
     React.useImperativeHandle(ref, () => node);
@@ -46,7 +62,7 @@ vi.mock("react-konva/lib/ReactKonvaCore", async () => {
     React.useImperativeHandle(ref, () => transformerNode);
     return React.createElement(React.Fragment, null, props.children as ReactNode);
   });
-  return { Image, Transformer };
+  return { Group, Image, Transformer };
 });
 
 class ImmediateImage {

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { createStudioDrawingPracticeDocument } from "./studio-drawing-practice-document";
+import { prepareStudioRasterCapture } from "./render/studio-raster-presentation-cache";
 import {
+  registerStudioDrawingPracticeCaptureExclusion,
   resolveStudioDrawingPracticeAsset,
+  routeStudioDrawingPracticeStroke,
   shouldRenderStudioDrawingPracticeGuide,
 } from "./studio-drawing-practice-runtime";
 
@@ -74,4 +77,43 @@ describe("studio drawing-practice runtime", () => {
       document: { ...document, view: { ...document.view, visible: false } },
     })).toBe(false);
   });
+
+  it("routes only active practice strokes into the current attempt group", () => {
+    const stroke = { id: "stroke-a", type: "draw" };
+    expect(routeStudioDrawingPracticeStroke(stroke, null)).toBe(stroke);
+    expect(routeStudioDrawingPracticeStroke(stroke, "practice-group-a")).toEqual({
+      ...stroke,
+      groupId: "practice-group-a",
+    });
+    expect(stroke).not.toHaveProperty("groupId");
+  });
+
+  it("hides the live guide for synchronous document raster reads and restores it", () => {
+    const stage = {};
+    let visible = true;
+    const node = {
+      getStage: () => stage,
+      getParent: () => null,
+      isVisible: () => visible,
+      visible: (next?: boolean) => {
+        if (next === undefined) return visible;
+        visible = next;
+        return node;
+      },
+    };
+    const unregister = registerStudioDrawingPracticeCaptureExclusion(
+      node as unknown as import("konva").default.Node,
+    );
+
+    const restore = prepareStudioRasterCapture(stage, 1);
+    expect(visible).toBe(false);
+    restore();
+    expect(visible).toBe(true);
+
+    unregister();
+    const noLongerRegistered = prepareStudioRasterCapture(stage, 1);
+    expect(visible).toBe(true);
+    noLongerRegistered();
+  });
+
 });

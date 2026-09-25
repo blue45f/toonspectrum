@@ -8,6 +8,7 @@ import {
   Lock,
   PanelRightOpen,
   RefreshCw,
+  Scaling,
   Trash2,
   Unlock,
 } from "lucide-react";
@@ -32,11 +33,12 @@ export interface StudioDrawingPracticeBarProps {
   onOpenReferencePanel: () => void;
   onFinish: () => void;
   onRetry: () => void;
+  onResetPlacement: () => void;
   onRemove: () => void;
 }
 
 const buttonClass =
-  "inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45";
+  "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-xs font-semibold text-fg-2 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45 lg:min-h-9";
 
 function toggleLabel(active: boolean, on: string, off: string): string {
   return active ? on : off;
@@ -54,6 +56,7 @@ export function StudioDrawingPracticeBar({
   onOpenReferencePanel,
   onFinish,
   onRetry,
+  onResetPlacement,
   onRemove,
 }: StudioDrawingPracticeBarProps) {
   const [opacityDraft, setOpacityDraft] = useState(document.view.opacity);
@@ -71,7 +74,7 @@ export function StudioDrawingPracticeBar({
       <div
         role="alert"
         data-studio-drawing-practice-bar="missing"
-        className="pointer-events-auto absolute left-1/2 top-3 z-40 flex w-[min(92vw,680px)] -translate-x-1/2 flex-wrap items-center justify-between gap-2 rounded-xl border border-danger/40 bg-panel/95 px-3 py-2 shadow-xl backdrop-blur"
+        className="pointer-events-auto absolute inset-x-2 bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+0.5rem)] z-40 mx-auto flex w-auto max-w-[680px] flex-wrap items-center justify-between gap-2 rounded-xl border border-danger/40 bg-panel/95 px-3 py-2 shadow-xl backdrop-blur lg:inset-x-auto lg:bottom-auto lg:left-1/2 lg:top-3 lg:w-[min(92vw,680px)] lg:-translate-x-1/2"
       >
         <div className="min-w-0">
           <p className="text-xs font-bold text-fg">따라 그리기 원본을 찾지 못했어요</p>
@@ -89,9 +92,13 @@ export function StudioDrawingPracticeBar({
       role="toolbar"
       aria-label="따라 그리기 조작"
       data-studio-drawing-practice-bar={document.status}
-      className="pointer-events-auto absolute left-1/2 top-3 z-40 flex w-[min(96vw,980px)] -translate-x-1/2 flex-wrap items-center gap-1.5 rounded-xl border border-line bg-panel/95 p-2 shadow-xl backdrop-blur"
+      className="pointer-events-auto absolute inset-x-2 bottom-[calc(var(--studio-canvas-bottom-inset,7rem)+0.5rem)] z-40 mx-auto flex max-h-[min(42dvh,24rem)] w-auto max-w-[980px] flex-wrap items-center gap-1.5 overflow-y-auto overscroll-contain rounded-xl border border-line bg-panel/95 p-2 shadow-xl backdrop-blur lg:inset-x-auto lg:bottom-auto lg:left-1/2 lg:top-3 lg:max-h-none lg:w-[min(96vw,980px)] lg:-translate-x-1/2 lg:overflow-visible"
     >
-      <span className="mr-1 max-w-40 truncate px-1 text-xs font-bold text-fg" title={document.source.name}>
+      <span
+        aria-live="polite"
+        className="mr-1 max-w-40 truncate px-1 text-xs font-bold text-fg"
+        title={document.source.name}
+      >
         따라 그리기 {document.attemptIndex}회차
       </span>
 
@@ -130,7 +137,7 @@ export function StudioDrawingPracticeBar({
         {toggleLabel(document.view.locked, "배치 잠금", "배치 편집")}
       </button>
 
-      <label className="flex min-h-9 items-center gap-2 rounded-lg border border-line bg-card px-2.5 text-[0.7rem] font-semibold text-fg-2">
+      <label className="flex min-h-11 items-center gap-2 rounded-lg border border-line bg-card px-2.5 text-[0.7rem] font-semibold text-fg-2 lg:min-h-9">
         투명도
         <input
           aria-label="따라 그리기 원본 투명도"
@@ -166,6 +173,11 @@ export function StudioDrawingPracticeBar({
             opacityDraftRef.current = document.view.opacity;
             setOpacityDraft(document.view.opacity);
             onCancelPreview();
+          }}
+          onKeyUp={(event) => {
+            if (event.key === "Escape" || !editingOpacityRef.current) return;
+            editingOpacityRef.current = false;
+            onCommitView({ opacity: opacityDraftRef.current });
           }}
           onBlur={() => {
             if (!editingOpacityRef.current) return;
@@ -218,6 +230,14 @@ export function StudioDrawingPracticeBar({
       <button
         type="button"
         className={buttonClass}
+        disabled={disabled || document.view.mode !== "overlay"}
+        onClick={onResetPlacement}
+      >
+        <Scaling size={14} aria-hidden /> 맞춤 배치
+      </button>
+      <button
+        type="button"
+        className={buttonClass}
         aria-pressed={compareActive}
         disabled={disabled || sourceState !== "ready"}
         onClick={() => onCompareChange(!compareActive)}
@@ -227,7 +247,12 @@ export function StudioDrawingPracticeBar({
       <button type="button" className={buttonClass} disabled={disabled} onClick={onRetry}>
         <RefreshCw size={14} aria-hidden /> 다시 연습
       </button>
-      <button type="button" className={buttonClass} disabled={disabled} onClick={onFinish}>
+      <button
+        type="button"
+        className={buttonClass}
+        disabled={disabled || document.status === "completed"}
+        onClick={onFinish}
+      >
         <Check size={14} aria-hidden /> {document.status === "completed" ? "완료됨" : "연습 마치기"}
       </button>
       <button type="button" className={buttonClass} disabled={disabled} onClick={onRemove}>

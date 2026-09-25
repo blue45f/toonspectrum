@@ -9,6 +9,7 @@ import {
   normalizeStudioDrawingPracticeDocument,
   parseStudioDrawingPracticeDocument,
   patchStudioDrawingPracticeDocument,
+  relinkStudioDrawingPracticeSource,
   retryStudioDrawingPracticeDocument,
 } from "./studio-drawing-practice-document";
 
@@ -80,7 +81,8 @@ describe("studio drawing-practice document", () => {
         locked: false,
         placement: "below-artwork",
       },
-    }, viewport);    expect(normalized).not.toBeNull();
+    }, viewport);
+    expect(normalized).not.toBeNull();
     expect(normalized?.source.sha256).toBe(SHA);
     expect(normalized?.attemptIndex).toBe(9_999);
     expect(normalized?.view).toMatchObject({
@@ -106,17 +108,44 @@ describe("studio drawing-practice document", () => {
       view: { opacity: 0.55, locked: false, centerX: 123 },
     }, viewport);
     const completed = completeStudioDrawingPracticeDocument(patched);
-    const retried = retryStudioDrawingPracticeDocument(completed, "attempt-b");
+    const retried = retryStudioDrawingPracticeDocument(completed, "attempt-b", "group-b");
     const mirrored = mirrorStudioDrawingPracticeDocument(retried, 800);
     expect(retried).toMatchObject({
       attemptId: "attempt-b",      attemptIndex: 2,
       status: "active",
+      targetGroupId: "group-b",
       source: { sha256: SHA },
       view: { visible: true, locked: true },
     });
     expect(mirrored.view.centerX).toBe(677);
     expect(mirrored.view.flipX).toBe(true);
     expect(mirrored.source.sha256).toBe(SHA);
+  });
+
+  it("relinks a missing source without replacing the attempt or result group", () => {
+    const created = createStudioDrawingPracticeDocument({
+      attemptId: "attempt-a",
+      source,
+      viewport,
+      targetGroupId: "group-a",
+    });
+    const replacement = {
+      ...source,
+      sha256: `sha256:${"b".repeat(64)}` as const,
+      assetId: "asset-b",
+      name: "교체 원본.png",
+      width: 400,
+      height: 800,
+    };
+    const relinked = relinkStudioDrawingPracticeSource(created, replacement, viewport);
+    expect(relinked).toMatchObject({
+      attemptId: "attempt-a",
+      attemptIndex: 1,
+      targetGroupId: "group-a",
+      status: "active",
+      source: { sha256: replacement.sha256, assetId: "asset-b" },
+      view: { centerX: 400, centerY: 600, width: 552, height: 1_104, locked: true },
+    });
   });
 
   it("rejects unknown fields, unsafe identities, accessors, and non-canonical numbers", () => {

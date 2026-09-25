@@ -70,6 +70,7 @@ import {
 } from "../studio-crop";
 import { NODE_SMOOTH_DRAG_RANGE_PX, smoothPointsAroundIndex, updateSmoothStrengthDrag } from "../studio-curve-smoothing";
 import { planStudioDeferredStrokePostprocess } from "../studio-deferred-stroke-postprocess";
+import { routeStudioDrawingPracticeStroke } from "../studio-drawing-practice-runtime";
 import { containingPanel, elBounds } from "../studio-element-geometry";
 import { attachStudioFilterMaskSurfaceAcrossHistory } from "../filter/studio-filter-mask-surface-admission";
 import {
@@ -272,6 +273,7 @@ export function bindStudioCuttoonStagePointersDownDraw(
     drawingImmediateCausalInputRef,
     drawingInkTimeOriginRef,
     drawingInputSettingsRef,
+    drawingPracticeTargetGroupId,
     drawingLastAuthoritativePointerRef,
     drawingPointerTransportRef,
     drawingPrecisionStabilizerBridgeRef,
@@ -551,6 +553,7 @@ export function bindStudioCuttoonStagePointersDownDraw(
         stylus,
       } = drawStartPlan;
       let { element: next, strokeOrigin } = drawStartPlan;
+      next = routeStudioDrawingPracticeStroke(next, drawingPracticeTargetGroupId);
       const linked3dCorrection = !isRealtimeTeamSession && strokeDrawMode === "pen"
         ? createStudioLinked3dCorrectionProvenance(
             activePage.linked3dRender,

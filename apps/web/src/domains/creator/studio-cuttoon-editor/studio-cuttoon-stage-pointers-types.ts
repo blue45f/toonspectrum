@@ -87,6 +87,7 @@ export type StudioCuttoonStagePointersHost = {
   drawingImmediateCausalInputRef: any;
   drawingInkTimeOriginRef: any;
   drawingInputSettingsRef: any;
+  drawingPracticeTargetGroupId: string | null;
   drawingLastAuthoritativePointerRef: any;
   drawingPointerTransportRef: any;
   drawingPrecisionStabilizerBridgeRef: any;
