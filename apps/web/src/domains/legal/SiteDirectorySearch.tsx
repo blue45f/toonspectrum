@@ -27,6 +27,7 @@ import type {
   SiteRouteMaturity,
   SiteRouteProduct,
   SiteRoutePurpose,
+  SiteRouteTier,
 } from "@/shared/lib/site-route-metadata";
 
 
@@ -35,8 +36,9 @@ const PURPOSE_VALUES = ["create", "discover", "learn", "connect", "manage", "tru
 const MATURITY_VALUES = ["stable", "beta", "experimental"] as const satisfies readonly SiteRouteMaturity[];
 const ACCESS_VALUES = ["public", "sign-in", "project"] as const satisfies readonly SiteRouteAccess[];
 const DEVICE_VALUES = ["responsive", "desktop-first"] as const satisfies readonly SiteRouteDevice[];
+const TIER_VALUES = ["core", "ecosystem", "labs"] as const satisfies readonly SiteRouteTier[];
 
-type FilterName = "product" | "purpose" | "maturity" | "access" | "device";
+type FilterName = "product" | "purpose" | "maturity" | "access" | "device" | "tier";
 
 const FILTER_COPY = {
   ko: {
@@ -46,14 +48,16 @@ const FILTER_COPY = {
     maturity: "안정성",
     access: "사용 조건",
     device: "환경",
+    tier: "노출 단계",
     favorites: "즐겨찾기만",
     reset: "필터 초기화",
     showFilters: "조건으로 좁혀 찾기",
-    productValues: { studio: "Studio", spectrum: "작품 탐색", docs: "도움·정책" },
+    productValues: { studio: "ToonStudio 제작", spectrum: "Spectrum 탐색", docs: "도움·정책" },
     purposeValues: { create: "만들기", discover: "발견", learn: "배우기", connect: "함께하기", manage: "관리", trust: "신뢰·정책" },
     maturityValues: { stable: "안정", beta: "베타", experimental: "실험" },
     accessValues: { public: "바로 사용", "sign-in": "로그인 필요", project: "프로젝트 필요" },
     deviceValues: { responsive: "모든 기기", "desktop-first": "데스크톱 권장" },
+    tierValues: { core: "핵심", ecosystem: "생태계", labs: "실험·자료" },
     addFavorite: "즐겨찾기에 추가",
     removeFavorite: "즐겨찾기에서 제거",
   },
@@ -64,14 +68,16 @@ const FILTER_COPY = {
     maturity: "Readiness",
     access: "Access",
     device: "Device",
+    tier: "Visibility tier",
     favorites: "Favorites only",
     reset: "Reset filters",
     showFilters: "Narrow by conditions",
-    productValues: { studio: "Studio", spectrum: "Story discovery", docs: "Help & policy" },
+    productValues: { studio: "ToonStudio create", spectrum: "Spectrum discover", docs: "Help & policy" },
     purposeValues: { create: "Create", discover: "Discover", learn: "Learn", connect: "Connect", manage: "Manage", trust: "Trust & policy" },
     maturityValues: { stable: "Stable", beta: "Beta", experimental: "Experimental" },
     accessValues: { public: "Open now", "sign-in": "Sign-in required", project: "Project required" },
     deviceValues: { responsive: "All devices", "desktop-first": "Desktop recommended" },
+    tierValues: { core: "Core", ecosystem: "Ecosystem", labs: "Labs & resources" },
     addFavorite: "Add to favorites",
     removeFavorite: "Remove from favorites",
   },
@@ -93,18 +99,20 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
   const maturity = allowedParam(params.get("maturity"), MATURITY_VALUES);
   const access = allowedParam(params.get("access"), ACCESS_VALUES);
   const device = allowedParam(params.get("device"), DEVICE_VALUES);
+  const tier = allowedParam(params.get("tier"), TIER_VALUES);
   const favoritesOnly = params.get("saved") === "1";
   const copy = bi((FILTER_COPY).ko, (FILTER_COPY).en);
-  const activeFilters = product !== "all" || purpose !== "all" || maturity !== "all" || access !== "all" || device !== "all" || favoritesOnly;
+  const activeFilters = product !== "all" || purpose !== "all" || maturity !== "all" || access !== "all" || device !== "all" || tier !== "all" || favoritesOnly;
   const results = useMemo(() => filterSiteDirectory(entries, query, {
     product,
     purpose,
     maturity,
     access,
     device,
+    tier,
     favorites,
     favoritesOnly,
-  }), [access, device, entries, favorites, favoritesOnly, maturity, product, purpose, query]);
+  }), [access, device, entries, favorites, favoritesOnly, maturity, product, purpose, query, tier]);
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const resultRef = useRef<HTMLUListElement>(null);
@@ -132,7 +140,7 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
   const reset = () => {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
-      for (const key of ["menu", "product", "purpose", "maturity", "access", "device", "saved"]) next.delete(key);
+      for (const key of ["menu", "product", "purpose", "maturity", "access", "device", "tier", "saved"]) next.delete(key);
       return next;
     }, { replace: true, preventScrollReset: true });
     inputRef.current?.focus();
@@ -180,6 +188,7 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
             {select("maturity", copy.maturity, maturity, MATURITY_VALUES, copy.maturityValues)}
             {select("access", copy.access, access, ACCESS_VALUES, copy.accessValues)}
             {select("device", copy.device, device, DEVICE_VALUES, copy.deviceValues)}
+            {select("tier", copy.tier, tier, TIER_VALUES, copy.tierValues)}
             <button
               type="button"
               className="directory-search__saved-filter"
@@ -211,6 +220,7 @@ export function SiteDirectorySearch({ entries, locale }: { entries: readonly Sit
                 <span>{siteNavigationText(entry.description, locale)}</span>
                 <span className="directory-search__badges" aria-label={bi("페이지 상태", "Page status")}>
                   <small data-kind={metadata.product}>{copy.productValues[metadata.product]}</small>
+                  <small data-kind={metadata.tier}>{copy.tierValues[metadata.tier]}</small>
                   <small data-kind={metadata.maturity}>{copy.maturityValues[metadata.maturity]}</small>
                   {metadata.access !== "public" ? <small data-kind={metadata.access}>{copy.accessValues[metadata.access]}</small> : null}
                   {metadata.device === "desktop-first" ? <small data-kind="desktop">{copy.deviceValues[metadata.device]}</small> : null}

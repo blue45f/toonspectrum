@@ -29,6 +29,12 @@ describe("site route authority", () => {
       .toBe("production-project");
   });
 
+  it("assigns core, ecosystem and labs visibility at the route authority", () => {
+    expect(resolveSiteRouteAuthority("/production")?.tier).toBe("core");
+    expect(resolveSiteRouteAuthority("/team")?.tier).toBe("ecosystem");
+    expect(resolveSiteRouteAuthority("/automation")?.tier).toBe("labs");
+  });
+
   it("provides every current primary navigation destination", () => {
     expect(SITE_PRIMARY_ROUTE_IDS.map((id) => primarySiteRouteAuthority(id).canonicalPath))
       .toEqual([

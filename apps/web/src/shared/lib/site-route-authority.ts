@@ -4,6 +4,7 @@ export type SiteRouteMaturity = "stable" | "beta" | "experimental";
 export type SiteRouteAccess = "public" | "sign-in" | "project";
 export type SiteRouteDevice = "responsive" | "desktop-first";
 export type SiteRouteProjectContext = "none" | "optional" | "required";
+export type SiteRouteTier = "core" | "ecosystem" | "labs";
 export type SiteRouteAuthorityKind = "static" | "family";
 
 export interface SiteRouteText {
@@ -25,6 +26,7 @@ export interface SiteRouteAuthorityDefinition {
   readonly access: SiteRouteAccess;
   readonly device: SiteRouteDevice;
   readonly projectContext: SiteRouteProjectContext;
+  readonly tier: SiteRouteTier;
   readonly directory: boolean;
 }
 
@@ -37,6 +39,8 @@ interface RouteDefinitionOptions {
   readonly purpose: SiteRoutePurpose;
   readonly access?: SiteRouteAccess;
   readonly projectContext?: SiteRouteProjectContext;
+  readonly product?: SiteRouteProduct;
+  readonly tier?: SiteRouteTier;
   readonly directory?: boolean;
   readonly kind?: SiteRouteAuthorityKind;
   readonly maturity?: SiteRouteMaturity;
@@ -52,6 +56,8 @@ const route = ({
   purpose,
   access = "public",
   projectContext = "none",
+  product = "studio",
+  tier,
   directory = false,
   kind = "static",
   maturity = "stable",
@@ -64,12 +70,19 @@ const route = ({
   titleKey,
   label,
   description,
-  product: "studio",
+  product,
   purpose,
   maturity,
   access,
   device,
   projectContext,
+  tier: tier ?? (
+    maturity === "experimental"
+      ? "labs"
+      : product !== "studio" || purpose === "discover" || purpose === "learn" || purpose === "connect"
+        ? "ecosystem"
+        : "core"
+  ),
   directory,
 });
 
@@ -103,6 +116,7 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     label: { ko: "서비스 소개", en: "Studio introduction" },
     description: { ko: "제작 흐름과 기능을 살펴보는 공개 소개", en: "Explore the production workflow and tools" },
     purpose: "learn",
+    tier: "ecosystem",
     directory: true,
   }),
   route({
@@ -126,6 +140,7 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     label: { ko: "내 가상스튜디오", en: "My virtual studio" },
     description: { ko: "직접 고른 캐릭터로 내 공간에 입장", en: "Enter your space with the character you chose" },
     purpose: "connect",
+    tier: "ecosystem",
   }),
   route({
     id: "workspace-team", path: "/team", titleKey: "route.collaborate",
@@ -138,6 +153,7 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     label: { ko: "둘러보기", en: "Explore" },
     description: { ko: "공개 작품·소재·사람·배움 둘러보기", en: "Discover public work, materials, people and learning" },
     purpose: "discover", directory: true,
+    tier: "ecosystem",
   }),
   route({
     id: "integration-center",
@@ -147,6 +163,7 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     description: { ko: "외부 계정·권한·실행 가능 상태 관리", en: "Manage external accounts, grants and executable state" },
     purpose: "manage",
     access: "sign-in",
+    tier: "ecosystem",
     directory: true,
   }),
   route({
@@ -158,6 +175,7 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     purpose: "manage",
     access: "sign-in",
     projectContext: "optional",
+    tier: "labs",
     directory: true,
   }),
   route({
@@ -178,6 +196,7 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     label: { ko: "개발자", en: "Developers" },
     description: { ko: "REST API·Webhook·MCP 권한 계약", en: "REST API, webhook and MCP permission contracts" },
     purpose: "connect",
+    tier: "labs",
     directory: true,
   }),
   route({

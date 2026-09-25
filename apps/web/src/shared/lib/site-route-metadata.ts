@@ -7,6 +7,7 @@ import {
   type SiteRouteProduct,
   type SiteRouteProjectContext,
   type SiteRoutePurpose,
+  type SiteRouteTier,
 } from "./site-route-authority";
 
 export { canonicalSitePath, SITE_ROUTE_ALIASES } from "./site-route-authority";
@@ -17,6 +18,7 @@ export type {
   SiteRouteProduct,
   SiteRouteProjectContext,
   SiteRoutePurpose,
+  SiteRouteTier,
 } from "./site-route-authority";
 
 export interface SiteRouteMetadata {
@@ -27,6 +29,7 @@ export interface SiteRouteMetadata {
   readonly access: SiteRouteAccess;
   readonly device: SiteRouteDevice;
   readonly projectContext: SiteRouteProjectContext;
+  readonly tier: SiteRouteTier;
 }
 
 const pathMatches = (pathname: string, route: string) => pathname === route || pathname.startsWith(`${route}/`);
@@ -144,6 +147,49 @@ const DESKTOP_FIRST_ROUTES = [
 
 const STUDIO_NAVIGATION_DOC_ROUTES = ["/about/technology", "/help"] as const;
 
+const LABS_ROUTES = [
+  "/about/technology",
+  "/developers",
+  "/fortune",
+  "/play",
+  "/read/spatial",
+  "/research/open-data",
+  "/studio/3d",
+  "/studio/ai-lab",
+  "/studio/ai-runtime",
+  "/studio/ecosystem/viewer",
+  "/studio/generate",
+  "/studio/lift3d",
+] as const;
+
+const CORE_EXACT_ROUTES = [
+  "/",
+  "/help",
+  "/my",
+  "/production",
+  "/production/projects",
+  "/settings",
+  "/studio",
+  "/studio/animation",
+  "/studio/assets",
+  "/studio/bg3d",
+  "/studio/character",
+  "/studio/comic",
+  "/studio/import",
+  "/studio/new",
+  "/studio/poser",
+  "/studio/publish",
+  "/studio/storyworld",
+  "/studio/templates",
+] as const;
+
+const CORE_FAMILY_ROUTES = [
+  "/production/projects",
+  "/studio/p",
+  "/studio/remix",
+  "/studio/work",
+] as const;
+
 export function resolveSiteRouteMetadata(input: string): SiteRouteMetadata {
   const canonicalPath = canonicalSitePath(input);
   const authority = resolveSiteRouteAuthority(canonicalPath);
@@ -156,6 +202,7 @@ export function resolveSiteRouteMetadata(input: string): SiteRouteMetadata {
       access: authority.access,
       device: authority.device,
       projectContext: authority.projectContext,
+      tier: authority.tier,
     };
   }
   const product: SiteRouteProduct = pathMatchesAny(canonicalPath, DOC_ROUTES)
@@ -189,6 +236,13 @@ export function resolveSiteRouteMetadata(input: string): SiteRouteMetadata {
       ? "optional"
       : "none";
 
+  const tier: SiteRouteTier = pathMatchesAny(canonicalPath, LABS_ROUTES) || maturity === "experimental"
+    ? "labs"
+    : CORE_EXACT_ROUTES.includes(canonicalPath as (typeof CORE_EXACT_ROUTES)[number])
+      || pathMatchesAny(canonicalPath, CORE_FAMILY_ROUTES)
+      ? "core"
+      : "ecosystem";
+
   return {
     canonicalPath,
     product,
@@ -197,6 +251,7 @@ export function resolveSiteRouteMetadata(input: string): SiteRouteMetadata {
     access,
     device: pathMatchesAny(canonicalPath, DESKTOP_FIRST_ROUTES) ? "desktop-first" : "responsive",
     projectContext,
+    tier,
   };
 }
 
@@ -218,5 +273,6 @@ export function siteRouteMetadataSearchText(metadata: SiteRouteMetadata): string
     metadata.access,
     metadata.device,
     metadata.projectContext,
+    metadata.tier,
   ].join(" ");
 }

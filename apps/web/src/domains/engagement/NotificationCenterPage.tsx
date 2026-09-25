@@ -20,6 +20,7 @@ import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 
@@ -139,12 +140,30 @@ export function NotificationCenterPage() {
       </div>
 
       {visible.length === 0 ? (
-        <div className="mt-8 rounded-3xl border border-dashed border-line bg-card/50 p-12 text-center">
-          <BellRing className="mx-auto size-10 text-fg-3" aria-hidden="true" />
-          <h2 className="mt-4 text-lg font-black text-fg">표시할 알림이 없습니다</h2>
-          <p className="mt-2 text-sm text-fg-3">작품 연재 알림을 켜거나 제작 프로젝트에 참여하면 이곳에 모입니다.</p>
-          <Link href="/library?tab=alerts" className={buttonClass({ className: "mt-5" })}>연재 알림 관리</Link>
-        </div>
+        <ActionableEmptyState
+          className="mt-8"
+          icon={BellRing}
+          title={filter === "archived" ? "보관한 알림이 없습니다" : "아직 확인할 알림이 없습니다"}
+          description={filter === "archived"
+            ? "알림을 보관하면 나중에 다시 확인할 수 있습니다. 보관하지 않은 알림은 전체 탭에 남습니다."
+            : "연재 알림을 켜거나 제작 프로젝트를 시작하면 출시 일정, 검수 요청과 제공처 변화를 이곳에서 한 번에 확인합니다."}
+          primary={{ href: "/library?tab=alerts", label: "연재 알림 설정" }}
+          secondary={{ href: "/production/projects", label: "제작 프로젝트 보기" }}
+          sample={{ href: "/production/projects/sample-project/overview", label: "샘플 알림 흐름 미리 보기" }}
+        >
+          <div className="grid gap-2 text-xs sm:grid-cols-3">
+            {[
+              ["연재", "요일·공개 일정"],
+              ["제작", "마감·검수·인수인계"],
+              ["마켓", "소재 업데이트·권리 변경"],
+            ].map(([label, detail]) => (
+              <div key={label} className="rounded-xl border border-line bg-panel/70 p-3">
+                <strong className="text-fg">{label}</strong>
+                <p className="mt-1 text-fg-3">{detail}</p>
+              </div>
+            ))}
+          </div>
+        </ActionableEmptyState>
       ) : (
         <div className="mt-6 grid gap-3">
           {visible.map((notification) => {
