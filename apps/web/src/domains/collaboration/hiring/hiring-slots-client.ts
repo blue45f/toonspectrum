@@ -1,4 +1,4 @@
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 import type { HiringSlot, HiringSlotTerms } from "../../../../../../packages/contracts/src/creator-hiring";
 

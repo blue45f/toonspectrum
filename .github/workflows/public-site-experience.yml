@@ -13,7 +13,7 @@ on:
       - 'apps/web/src/app/App.tsx'
       - 'apps/web/src/app/AppShell.tsx'
       - 'apps/web/src/domains/catalog/SearchPage*'
-      - 'apps/web/src/components/NotFoundPage.tsx'
+      - 'apps/web/src/shared/components/feedback/NotFoundPage.tsx'
   workflow_dispatch:
 
 permissions:

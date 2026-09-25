@@ -13,7 +13,7 @@ import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
 import { toast } from "@/shared/lib/toast-store";
 import { encodePublicCollectionSnapshot, publicCollectionSlug } from "@/domains/engagement/public-list-share";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 
 async function shareCollection(collection: ReturnType<typeof useApp.getState>["collections"][number]): Promise<void> {

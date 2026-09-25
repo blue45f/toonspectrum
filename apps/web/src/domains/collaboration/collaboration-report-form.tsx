@@ -2,7 +2,7 @@ import { ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { CollabField, collabButton, collabInput } from "./collaboration-ui";
 import type { CollaborationAction } from "./collaboration-application-panel";
-import { collaborationClient } from "@/infrastructure/collaboration-client";
+import { collaborationClient } from "@/platform/collaboration-client";
 
 export function ReportForm({ id, busy, act }: { id: string; busy: boolean; act: CollaborationAction }) {
   const [reason, setReason] = useState("");

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { getAuthUserId, listeners } from "@/compat/auth-session-state";
+import { getAuthUserId, listeners } from "@/domains/auth/public/session/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import type { StudioReviewEditorRequest } from "../review-handoff/studio-review-editor-handoff";

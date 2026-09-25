@@ -7,7 +7,7 @@ import {
 
 import type { PolicyDocument } from "../../../../../packages/core/src/legal-policy";
 
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 
 export {
   getStaticPolicyDocument,

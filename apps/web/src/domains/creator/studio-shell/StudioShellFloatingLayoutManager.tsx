@@ -47,7 +47,7 @@ import {
   type StudioShellFloatingVisibilityId,
 } from "./studio-shell-floating-layout";
 
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { Switch } from "@/shared/components/ui/switch";
 import { cn } from "@/shared/lib/utils";
 

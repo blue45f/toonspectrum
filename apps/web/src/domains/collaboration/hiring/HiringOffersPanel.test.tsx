@@ -9,7 +9,7 @@ import { HiringDiscovery } from "./HiringOffersPanel";
 import type { HiringCandidate, HiringSlot } from "../../../../../../packages/contracts/src/creator-hiring";
 
 vi.mock("./hiring-matching-client", () => ({ hiringMatchingClient: { discover: vi.fn(), send: vi.fn() } }));
-vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: async () => "연결 실패" }));
+vi.mock("@/platform/api", () => ({ getApiErrorMessage: async () => "연결 실패" }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 describe("offer request identity", () => {
   it("retries uncertain requests unchanged, and blocks repeated success and re-queries after a terms edit", async () => {

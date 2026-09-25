@@ -11,7 +11,7 @@ import { cx } from "@/shared/lib/cx";
 import {
   listCreatorMarketplaceOwnedHistory,
   relistCreatorMarketplaceResource,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 const FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-panel";

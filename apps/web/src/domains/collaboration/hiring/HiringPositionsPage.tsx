@@ -8,8 +8,8 @@ import { parseHiringPositionPage } from "./hiring-position-response";
 
 import type { HiringPositionPage } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import Link from "@/compat/router-link";
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import Link from "@/shared/navigation/router-link";
+import { api, getApiErrorMessage } from "@/platform/api";
 
 export function HiringPublicPositions({ postId }: { postId?: string }) {
   // A parent change must not reuse the previous post's cursors or results.

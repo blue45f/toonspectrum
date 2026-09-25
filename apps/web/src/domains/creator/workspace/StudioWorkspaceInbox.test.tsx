@@ -5,12 +5,12 @@ import { StudioWorkspaceInbox } from "./StudioWorkspaceInbox";
 import { createEmptyProductionWorkspace } from "../studio-production/studio-production-workspace-runtime";
 
 const f = vi.hoisted(() => ({ actor: "host", revision: 1, listeners: new Set<() => void>(), load: vi.fn(), reviews: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } }, ready: true }) }));
-vi.mock("@/compat/auth-session-state", () => ({ getAuthSessionRevision: () => f.revision, getAuthUserId: () => f.actor, listeners: f.listeners }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } }, ready: true }) }));
+vi.mock("@/domains/auth/public/session/auth-session-state", () => ({ getAuthSessionRevision: () => f.revision, getAuthUserId: () => f.actor, listeners: f.listeners }));
 vi.mock("../studio-production/studio-production-server-client", () => ({ loadStudioServerProductionWorkspace: f.load }));
 vi.mock("../virtual-space/studio-virtual-space-review-invitation", () => ({ listStudioVirtualSpaceReviewSubjects: f.reviews, studioVirtualSpaceReviewHref: () => "/review-fixture" }));
 vi.mock("../handoff-envelope/StudioHandoffEnvelope", () => ({ StudioHandoffEnvelopeInbox: () => <div>Separate handoff boundary</div> }));
-vi.mock("@/compat/router-link", () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
+vi.mock("@/shared/navigation/router-link", () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }));
 beforeEach(() => {
   f.actor = "host"; f.revision = 1; f.listeners.clear(); f.load.mockReset(); f.reviews.mockReset();
   f.load.mockResolvedValue({ workId: "work", revision: 1, capabilities: { view: true }, document: { ...createEmptyProductionWorkspace("work:work"),

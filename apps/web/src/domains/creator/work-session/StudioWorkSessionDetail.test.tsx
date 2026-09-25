@@ -9,7 +9,7 @@ import type { StudioWorkSessionController } from "./studio-work-session-controll
 vi.mock("../virtual-space/use-studio-review-roster", () => ({ useStudioReviewRoster: () => ({ members: [], candidates: [], status: "idle", refresh: vi.fn() }) }));
 vi.mock("./StudioWorkSessionPreview", () => ({ StudioWorkSessionPreview: () => <div>Real preview boundary</div> }));
 vi.mock("./StudioWorkSessionResultPicker", () => ({ StudioWorkSessionResultPicker: () => <div>Existing outcome picker boundary</div> }));
-vi.mock("@/compat/router-link", () => ({ default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a> }));
+vi.mock("@/shared/navigation/router-link", () => ({ default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a> }));
 beforeEach(() => sessionStorage.clear());
 afterEach(cleanup);
 function fixture() {

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const appEntry = readFileSync(new URL("../../app/main.tsx", import.meta.url), "utf8");
 const saveCenter = readFileSync(new URL("./StudioDraftSaveCenterImpl.tsx", import.meta.url), "utf8");
-const overlayCss = readFileSync(new URL("../../styles/studio-overlay-stacking.css", import.meta.url), "utf8");
+const overlayCss = readFileSync(new URL("../../app/styles/studio-overlay-stacking.css", import.meta.url), "utf8");
 
 describe("Studio global status overlay stacking", () => {
   it("loads the narrowly scoped Studio overlay boundary", () => {

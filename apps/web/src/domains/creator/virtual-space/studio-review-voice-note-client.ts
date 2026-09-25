@@ -12,7 +12,7 @@ import {
   type StudioReviewVoiceNoteView,
 } from "@toonspectrum/studio-project-model/review-voice-note";
 import { z } from "zod";
-import { api, apiPath } from "@/infrastructure/api";
+import { api, apiPath } from "@/platform/api";
 
 const base = (workId: string) => `/studio-project-graph/works/${encodeURIComponent(workId)}/review-voice-notes`;
 const createdSchema = z.object({ view: studioReviewVoiceNoteViewSchema, replayed: z.boolean() }).strict();

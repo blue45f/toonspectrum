@@ -37,7 +37,7 @@ import { downloadText, useCreatorWorkspace } from "./workspace";
 import type { CreatorResource, ResourceSearchResult } from "@/shared/lib/creator-resources";
 import type { ReferenceSearchState, ReferenceViewState } from "@/shared/lib/reference-assets";
 
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 import { attributionMarkdown, parseSearchResult } from "@/shared/lib/creator-resources";
 import {
   buildReferenceApiParams,

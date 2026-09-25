@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthModal } from "./auth-modal";
 
 const fetchMock = vi.hoisted(() => vi.fn());
-vi.mock("@/compat/auth-session-store", () => ({ signIn: vi.fn() }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ signIn: vi.fn() }));
 vi.mock("./google-identity-button", () => ({ GoogleIdentityButton: () => null }));
 
 const unavailable = "로그인 서비스를 확인하지 못했어요. 일시적인 연결 문제나 서비스 점검 중일 수 있어요. 잠시 후 다시 확인해 주세요.";

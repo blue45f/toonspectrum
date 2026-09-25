@@ -1,4 +1,4 @@
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 function authorPageHref(name: string): string {
   return `/author/${encodeURIComponent(name)}`;

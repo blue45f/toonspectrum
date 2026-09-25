@@ -6,7 +6,7 @@ import type {
   SupporterVisibility,
 } from "@toonspectrum/core/supporter-payment";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 export interface SupporterPaymentConfigResponse {
   enabled: boolean;

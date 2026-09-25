@@ -1,4 +1,4 @@
-import { httpStatus } from "@/infrastructure/api";
+import { httpStatus } from "@/platform/api";
 import type { resolveStudioReviewComment } from "../project-graph/studio-project-graph-client";
 
 import { StudioReviewResolutionError, type StudioReviewResolutionAuthority, type StudioReviewResolutionReason } from "./studio-review-resolution-authority";

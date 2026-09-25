@@ -2,7 +2,7 @@ import { formatI18nTemplate, translateBilingualValueForActiveLocale, useBilingua
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { useI18n } from "@/shared/lib/i18n";
 
 import { removeStudioSaveProfilesBulk } from "../save-first/studio-save-profile-bulk";

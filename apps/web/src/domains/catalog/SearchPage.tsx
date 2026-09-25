@@ -9,7 +9,7 @@ import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { parseCatalogDiscoveryState } from "@/shared/lib/catalog-discovery-state";
 import { useT } from "@/shared/lib/i18n";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 export function SearchPage() {
   const [searchParams] = useSearchParams();

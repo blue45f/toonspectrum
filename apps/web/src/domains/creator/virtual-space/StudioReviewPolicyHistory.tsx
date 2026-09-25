@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { canonicalJson, type ReviewPolicyHistoryResponse, type ReviewPolicyPin } from "@toonspectrum/studio-project-model";
-import { getAuthSessionRevision, getAuthUserId } from "@/compat/auth-session-state";
-import { useSession } from "@/compat/auth-session-store";
+import { getAuthSessionRevision, getAuthUserId } from "@/domains/auth/public/session/auth-session-state";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { getStudioReviewPolicyHistory } from "./studio-review-policy-client";
 

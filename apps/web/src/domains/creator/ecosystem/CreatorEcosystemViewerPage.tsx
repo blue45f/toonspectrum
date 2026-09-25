@@ -2,7 +2,7 @@ import { Download, FileUp, MessageSquareText } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 
 import { BETA_FEEDBACK_PACKAGE_SCHEMA, BETA_PACKAGE_SCHEMA, PROCESS_PACKAGE_SCHEMA, type BetaPackage, type ProcessPackage } from "./ecosystem-record";

@@ -1436,18 +1436,18 @@ import type { StudioPageListPaneHandlers } from "./StudioPageListPane";
 import type { PublishContext } from "./StudioPublishContextBanner";
 import type { StudioWebGpuCanvasHandle } from "./StudioWebGpuCanvas";
 import type { CreatorAssetReportReason } from "@/shared/lib/creator-asset-contract";
-import type { GeneratedAssetQuality, GeneratedAssetSize, SharedAssetCatalogItem, WorkDetail, WorkRevisionSummary } from "@/infrastructure/creator-client";
+import type { GeneratedAssetQuality, GeneratedAssetSize, SharedAssetCatalogItem, WorkDetail, WorkRevisionSummary } from "@/platform/creator-client";
 import type Konva from "konva";
 import { scheduleIdle } from "@/domains/auth/components/schedule-idle";
-import { useIsMobile } from "@/hooks/use-media-query";
-import { useResizable } from "@/hooks/use-resizable";
+import { useIsMobile } from "@/shared/hooks/use-media-query";
+import { useResizable } from "@/shared/hooks/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
 import { useT } from "@/shared/lib/i18n";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 
 type StudioWriterRoomRuntime = Pick<typeof import("./studio-writer-room"), "createEmptyStudioWriterRoomDocument" | "normalizeStudioWriterRoomDocument" | "replaceStudioWriterRoomStage">;
 let studioWriterRoomRuntimePromise: Promise<StudioWriterRoomRuntime> | null = null;
@@ -8078,7 +8078,7 @@ export function StudioCuttoonEditor({
     }
     sharedAssetContentInFlightRef.current.add(asset.id);
     try {
-      const { getSharedAssetContent } = await import("@/infrastructure/creator-client");
+      const { getSharedAssetContent } = await import("@/platform/creator-client");
       const content = await getSharedAssetContent(asset.id);
       return await verifyStudioSharedAssetContent(asset, content);
     } finally {
@@ -8088,7 +8088,7 @@ export function StudioCuttoonEditor({
 
   function recordCommunityAssetUse(assetId: string) {
     if (!studioAuthUserId) return;
-    void import("@/infrastructure/creator-client")
+    void import("@/platform/creator-client")
       .then(({ markSharedAssetUsed }) => markSharedAssetUsed(assetId))
       .catch(() => {
         // Usage analytics must never roll back a successful, locally persisted insertion.
@@ -14627,7 +14627,7 @@ const puppetWarpArmed =
       }
 
       // 리믹스와 비로그인 공개 작품 열람은 기존 public getWork 흐름을 그대로 유지한다.
-      const { getWork } = await import("@/infrastructure/creator-client");
+      const { getWork } = await import("@/platform/creator-client");
       const publicWork = await getWork(resolvedTargetId, controller.signal);
       return {
         work: publicWork,
@@ -14861,7 +14861,7 @@ const puppetWarpArmed =
       const next: PublishContext = {};
       if (publishContextSeriesId) {
         try {
-          const { getSeries } = await import("@/infrastructure/creator-client");
+          const { getSeries } = await import("@/platform/creator-client");
           const series = await getSeries(publishContextSeriesId, controller.signal);
           if (!alive) return;
           const maxEpisode = series.episodeList.reduce(
@@ -14879,7 +14879,7 @@ const puppetWarpArmed =
       }
       if (publishContextChallengeId) {
         try {
-          const { getChallenge } = await import("@/infrastructure/creator-client");
+          const { getChallenge } = await import("@/platform/creator-client");
           const challenge = await getChallenge(publishContextChallengeId, controller.signal);
           if (!alive) return;
           next.challenge = {
@@ -15629,7 +15629,7 @@ const puppetWarpArmed =
     setSharedLoading(true);
     setSharedError(null);
     try {
-      const { listSharedAssetCatalog } = await import("@/infrastructure/creator-client");
+      const { listSharedAssetCatalog } = await import("@/platform/creator-client");
       const page = await listSharedAssetCatalog({
         limit: 20,
         search: assetSearchQuery.trim() || undefined,
@@ -15651,7 +15651,7 @@ const puppetWarpArmed =
     setSharedLoadingMore(true);
     setSharedError(null);
     try {
-      const { listSharedAssetCatalog } = await import("@/infrastructure/creator-client");
+      const { listSharedAssetCatalog } = await import("@/platform/creator-client");
       const page = await listSharedAssetCatalog({
         limit: 20,
         offset: sharedNextOffset,
@@ -15675,7 +15675,7 @@ const puppetWarpArmed =
     const controller = new AbortController();
     setSharedLoading(true);
     setSharedError(null);
-    void import("@/infrastructure/creator-client")
+    void import("@/platform/creator-client")
       .then(({ listSharedAssetCatalog }) => listSharedAssetCatalog({
         limit: 20,
         search: assetSearchQuery.trim() || undefined,
@@ -15818,7 +15818,7 @@ const puppetWarpArmed =
               { getProductStudioMarketplaceRuntimeCompatibility },
               { synchronizeStudioCommunityMarketplaceInstalledPack },
             ] = await Promise.all([
-              import("@/infrastructure/creator-marketplace-client"),
+              import("@/platform/creator-marketplace-client"),
               import("./studio-community-marketplace"),
               import("./studio-creator-pack-product-runtime"),
               import("./studio-creator-pack-runtime"),
@@ -15960,7 +15960,7 @@ const puppetWarpArmed =
     }
     setPublishingId(asset.id);
     try {
-      const { publishAsset } = await import("@/infrastructure/creator-client");
+      const { publishAsset } = await import("@/platform/creator-client");
       await publishAsset({
         name: asset.name,
         dataUrl: asset.dataUrl,
@@ -16021,7 +16021,7 @@ const puppetWarpArmed =
 
   async function onDeleteSharedAsset(id: string) {
     try {
-      const { deleteSharedAsset } = await import("@/infrastructure/creator-client");
+      const { deleteSharedAsset } = await import("@/platform/creator-client");
       await deleteSharedAsset(id);
       removeAssetFavorite(createStudioAssetFavoriteId("community", id));
       await loadSharedAssets();
@@ -16040,7 +16040,7 @@ const puppetWarpArmed =
       return;
     }
     try {
-      const { reportSharedAsset } = await import("@/infrastructure/creator-client");
+      const { reportSharedAsset } = await import("@/platform/creator-client");
       await reportSharedAsset(asset.id, { reason, details });
       announceDrawingShortcut("신고가 접수되었습니다. 검수 결과에 따라 공개 상태가 조정됩니다.");
       await loadSharedAssets();
@@ -26704,7 +26704,7 @@ function clearSelectionForEdit() {
       });
     setServerRevisionLoading(true);
     setServerRevisionError(null);
-    void import("@/infrastructure/creator-client")
+    void import("@/platform/creator-client")
       .then(({ listWorkRevisions }) => {
         if (!requestIsCurrent()) return null;
         return listWorkRevisions(workId, 20, controller.signal);
@@ -26758,7 +26758,7 @@ function clearSelectionForEdit() {
       });
     setFxPanelLoading(true);
     try {
-      const { getWork } = await import("@/infrastructure/creator-client");
+      const { getWork } = await import("@/platform/creator-client");
       if (!requestIsCurrent()) return;
       const detail = await getWork(workId, controller.signal);
       if (!requestIsCurrent()) return;
@@ -26801,7 +26801,7 @@ function clearSelectionForEdit() {
     setServerRevisionLoading(true);
     setServerRevisionError(null);
     try {
-      const { listWorkRevisions } = await import("@/infrastructure/creator-client");
+      const { listWorkRevisions } = await import("@/platform/creator-client");
       if (!requestIsCurrent()) return;
       const revisions = await listWorkRevisions(workId, 20, controller.signal);
       if (requestIsCurrent()) setServerRevisions(revisions);

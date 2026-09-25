@@ -39,18 +39,18 @@ import { useApp } from "@/shared/lib/store";
 import { AGE_LABEL, STATUS_LABEL, TYPE_LABEL } from "@/shared/lib/taxonomy";
 import { mergedUniverse } from "@/shared/lib/title-universe";
 import { formatCount } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
-import { NotFoundPage } from "@/components/NotFoundPage";
-import { useAppConfig } from "@/hooks/use-app-config";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
+import { useAppConfig } from "@/platform/environment/use-app-config";
 import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
   useMetaRobots,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+} from "@/shared/seo/use-document-title";
+import { useApiResource } from "@/platform/use-api-resource";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 
 

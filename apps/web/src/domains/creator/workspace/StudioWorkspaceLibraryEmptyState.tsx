@@ -1,5 +1,5 @@
 import { ArrowRight, FolderOpen, Plus, Upload } from "lucide-react";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 /** An empty library is a state to act on, not another product introduction. */

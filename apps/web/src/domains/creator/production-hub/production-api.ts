@@ -53,7 +53,7 @@ import type {
 
 import type { ProductionProjectAccess } from "./production-dashboard-api";
 
-import { api, apiPath } from "@/infrastructure/api";
+import { api, apiPath } from "@/platform/api";
 
 export type ProductionPlanningRecord =
   | { readonly kind: "project-brief"; readonly value: ProjectBrief }

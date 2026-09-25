@@ -13,7 +13,7 @@ import { recordVisit, usePlayJournal } from "./lab/play-storage";
 import "./play-lab.css";
 
 import { Container } from "@/shared/components/section";
-import { claimMembershipActivity } from "@/infrastructure/membership-wallet-client";
+import { claimMembershipActivity } from "@/platform/membership-wallet-client";
 import { SharePageButton } from "@/shared/components/share-page-button";
 
 const FILTERS = [["all", "전체"], ["draw", "드로잉"], ["story", "스토리"], ["sense", "색감"], ["arcade", "아케이드"], ["favorites", "즐겨찾기"]] as const;

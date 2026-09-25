@@ -10,10 +10,10 @@ import type { PromotionDraft as Draft } from "./promotion-draft";
 import "./promotion-community.css";
 
 
-import { promotionClient } from "@/infrastructure/promotion-client";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { promotionClient } from "@/platform/promotion-client";
+import { getApiErrorMessage } from "@/platform/api";
 import { useApp, useHydrated } from "@/shared/lib/store";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 export function PromotionEditorPage() {
   const { id } = useParams(), userId = useApp((state) => state.userId), hydrated = useHydrated();

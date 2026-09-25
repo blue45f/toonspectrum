@@ -4,10 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioProductionTaskBoard } from "./StudioProductionTaskBoard";
 import { StudioProductionSavedViews } from "./StudioProductionSavedViews";
 import { createEmptyProductionWorkspace, type ProductionWorkspace } from "./studio-production-workspace-runtime";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 
 const f = vi.hoisted(() => ({ actor: "artist-a", load: vi.fn(), save: vi.fn(), remove: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
 vi.mock("./studio-production-saved-views", async (original) => ({ ...(await original<typeof import("./studio-production-saved-views")>()),
   acquireProductionViewsRepository: async () => ({ load: f.load, save: f.save, remove: f.remove }) }));
 function workspace(): ProductionWorkspace {

@@ -1,14 +1,14 @@
 import { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { persistSession } from "../../src/compat/auth-session-state";
+import { persistSession } from "../../src/domains/auth/public/session/auth-session-state";
 import { studioReviewEditorHref } from "../../src/domains/creator/review-handoff/studio-review-editor-route";
 import { reviewEditorFixture } from "../../src/domains/creator/review-handoff/studio-review-editor-test-fixture";
 import { StudioReviewEditorHandoffMount } from "../../src/domains/creator/review-handoff/StudioReviewEditorHandoffMount";
 import { selectStudioEditorCommentTarget, type StudioEditorCommentSelection } from "../../src/domains/creator/studio-comment-editor-selection";
 import { useStudioMutationAuthorityRuntime } from "../../src/domains/creator/studio-cuttoon-editor/runtime/useStudioMutationAuthorityRuntime";
 import { studioReviewCaptureContentDigest } from "../../src/domains/creator/virtual-space/studio-virtual-space-review-producer";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Development-only synthetic document. Real Host authority/projection/selection adapters and
 // HTTP parsers run here, but this is not the full Konva editor or a production-authenticated work.

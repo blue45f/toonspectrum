@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { studioReviewTaskReferenceSchema, type StudioReviewTaskReference, type ReviewPolicyExpectation } from "@toonspectrum/studio-project-model";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 import {
   compatibilityReportSchema,

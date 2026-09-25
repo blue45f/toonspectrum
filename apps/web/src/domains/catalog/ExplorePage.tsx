@@ -44,9 +44,9 @@ import {
   type TitleFilterState,
 } from "@/shared/lib/title-filters";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { useApiResource } from "@/platform/use-api-resource";
 
 type ExploreParams = Record<string, string | undefined>;
 

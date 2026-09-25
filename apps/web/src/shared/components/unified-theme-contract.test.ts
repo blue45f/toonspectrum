@@ -7,7 +7,7 @@ const read = (relativePath: string) =>
 const entrySource = read("../../app/main.tsx");
 const routeStageSource = read("../../app/routes/route-stage.tsx");
 const appRouterSource = read("../../app/routes/AppRouter.tsx");
-const contractCss = read("../../styles/unified-theme-contract.css");
+const contractCss = read("../../app/styles/unified-theme-contract.css");
 const themeSource = read("../../shared/lib/theme-presets.ts");
 const editorCss = read("../../domains/creator/studio-shell/studio-visual-identity-v2.css");
 

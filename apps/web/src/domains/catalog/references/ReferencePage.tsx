@@ -21,7 +21,7 @@ import type { FormEvent } from "react";
 
 import { useT } from "@/shared/lib/i18n";
 import { isReferenceField, parseReferenceQuery, ReferenceError, referenceSearchParams } from "@/shared/lib/kmas-reference";
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 
 import "./reference.css";
 

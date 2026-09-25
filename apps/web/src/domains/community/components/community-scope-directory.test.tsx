@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { CommunityScopeDirectory, type DirectoryScope } from "./community-scope-directory";
 
 const resource = vi.hoisted(() => ({ read: vi.fn(), reload: vi.fn() }));
-vi.mock("@/infrastructure/use-api-resource", () => ({ useApiResource: resource.read }));
+vi.mock("@/platform/use-api-resource", () => ({ useApiResource: resource.read }));
 vi.mock("@/shared/lib/i18n", () => ({ useT: () => (key: string) => key }));
 
 beforeEach(() => {

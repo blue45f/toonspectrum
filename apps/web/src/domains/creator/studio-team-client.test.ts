@@ -24,7 +24,7 @@ const { apiDelete, apiGet, apiPatch, apiPost, toApiError } = vi.hoisted(() => ({
   toApiError: vi.fn(async (_error: unknown, fallback: string) => new Error(`안전 오류: ${fallback}`)),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: {
     delete: apiDelete,
     get: apiGet,

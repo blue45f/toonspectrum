@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { BrowserCompatibilityResult } from "../compat/browser-check";
+import type { BrowserCompatibilityResult } from "../platform/browser/browser-check";
 import {
   isGraphicsCapabilityRoute,
   shouldPromptForBrowserCompatibility,

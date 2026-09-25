@@ -6,8 +6,8 @@ import type { ProductionSavedFilter } from "./studio-production-saved-views";
 import { StudioProductionMatrix } from "./StudioProductionMatrix";
 import { newTaskEdit, taskEditDirty, taskEditConflict, reconcileTaskEdit, taskIdentity, guardTaskEdit, type TaskDraft } from "./studio-production-task-editing";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import { getAuthSessionRevision } from "@/compat/auth-session-state";
-import { useSession } from "@/compat/auth-session-store";
+import { getAuthSessionRevision } from "@/domains/auth/public/session/auth-session-state";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { PRODUCTION_SMART_VIEWS, productionDueDay, productionLocalDay, productionSmartMatches, type ProductionSmartView } from "./studio-production-smart-views";
 import {
   CheckCircle2,

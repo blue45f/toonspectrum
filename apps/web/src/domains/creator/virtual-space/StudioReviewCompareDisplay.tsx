@@ -1,6 +1,6 @@
 import { StudioReviewFrameComparison } from "./StudioReviewFrameComparison";
 import { useId, useState } from "react";
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { reviewPreviewIdentity } from "./studio-review-viewport";
 import { useReviewCompareViewport } from "./use-review-compare-viewport";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";

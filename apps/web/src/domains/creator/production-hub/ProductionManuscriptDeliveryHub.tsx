@@ -20,8 +20,8 @@ import {
   getAuthUserId,
   listeners as sessionListeners,
   type Session,
-} from "@/compat/auth-session-state";
-import { useAuthActorId } from "@/compat/use-auth-actor-id";
+} from "@/domains/auth/public/session/auth-session-state";
+import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 

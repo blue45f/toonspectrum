@@ -287,7 +287,7 @@ function deterministicUuid(seed) {
 
 async function buildSbom(bundleRoot, metadata) {
   const components = await installedComponents(bundleRoot);
-  const applicationRef = `pkg:npm/%40toonspectrum/desktop-sync-agent@${metadata.version}`;
+  const applicationRef = `pkg:npm/%40toonspectrum/desktop-sync@${metadata.version}`;
   return {
     bomFormat: "CycloneDX",
     specVersion: "1.6",
@@ -298,7 +298,7 @@ async function buildSbom(bundleRoot, metadata) {
       component: {
         type: "application",
         "bom-ref": applicationRef,
-        name: "@toonspectrum/desktop-sync-agent",
+        name: "@toonspectrum/desktop-sync",
         version: metadata.version,
         purl: applicationRef,
       },

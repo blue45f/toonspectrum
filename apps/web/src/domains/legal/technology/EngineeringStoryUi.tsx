@@ -2,8 +2,8 @@ import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from
 import { BookOpen, CheckCircle2, CircleDashed, CircleDot, Film, FlaskConical, GraduationCap, LibraryBig, Presentation, Scale, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 
-import Link from "@/compat/router-link";
-import { usePathname } from "@/compat/navigation";
+import Link from "@/shared/navigation/router-link";
+import { usePathname } from "@/shared/navigation/navigation";
 import { cx } from "@/shared/lib/cx";
 
 import { ENGINEERING_STATUS_META, type EngineeringLocale, type EngineeringStatus } from "./engineering-story-content";

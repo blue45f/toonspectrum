@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { getAuthSessionRevision, getAuthUserId, listeners as sessionListeners } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, getAuthUserId, listeners as sessionListeners } from "@/domains/auth/public/session/auth-session-state";
 import { getStudioTeam, type StudioTeamMember } from "../studio-team-client";
 import { studioReviewAssignmentCandidates } from "./studio-review-comment-assignment";
 

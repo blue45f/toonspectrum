@@ -18,7 +18,7 @@ vi.mock("./VerifyEmailPage", () => ({
   VerifyEmailPage: () => <div>verify-email-page</div>,
 }));
 
-vi.mock("@/components/NotFoundPage", () => ({
+vi.mock("@/shared/components/feedback/NotFoundPage", () => ({
   NotFoundPage: () => <div>not-found</div>,
 }));
 

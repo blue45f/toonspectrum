@@ -24,7 +24,7 @@ import {BG_SCENES,groupBgScenes} from '../apps/web/src/domains/creator/studio-bg
 import {BG_SCENES_EXTRA} from '../apps/web/src/domains/creator/studio-bg-scenes-extra';
 import {filterStudio2dScenes} from '../apps/web/src/domains/creator/studio-2d-asset-quality';
 import {createStudio2dCanvasImage} from '../apps/web/src/domains/creator/studio-2d-source-size';
-import '../apps/web/src/styles/globals.css';
+import '../apps/web/src/app/styles/globals.css';
 const groups=groupBgScenes([...BG_SCENES,...BG_SCENES_EXTRA]);
 const baseFilters={query:'',genre:'all',quality:'all',orientation:'all',sort:'recommended',emptySceneOnly:false,environment:'all',timeOfDay:'all',textFreeOnly:false} as const;
 const sceneCounts={

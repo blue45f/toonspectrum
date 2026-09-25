@@ -2,7 +2,7 @@ import { translateCurrentStaticSourceText, formatI18nTemplate, translateBilingua
 import { Archive, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import type { ChangeEvent } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
 

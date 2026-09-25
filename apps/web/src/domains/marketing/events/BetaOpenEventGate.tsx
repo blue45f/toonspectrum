@@ -2,9 +2,9 @@ import { ArrowRight, BadgeCheck, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { requestAuthModalOpen } from "@/compat/auth-modal-intent";
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import { betaOpenEventGateEligible } from "./beta-open-event-gate-policy";
 import { BETA_OPEN_EVENT, resolveMarketingEventStatus } from "./event-catalog";
 import {

@@ -33,13 +33,13 @@ import {
 } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
-import { api, apiPath, getApiErrorMessage } from "@/infrastructure/api";
+} from "@/shared/seo/use-document-title";
+import { api, apiPath, getApiErrorMessage } from "@/platform/api";
 
 const SharePageButton = lazy(async () => {
   const module = await import("@/shared/components/share-page-button");

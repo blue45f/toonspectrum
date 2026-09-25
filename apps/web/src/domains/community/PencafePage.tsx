@@ -6,7 +6,7 @@ import { useParams } from "react-router-dom";
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { Container } from "@/shared/components/section";
 import { compactPublicShareDescription } from "@/shared/lib/public-share-policy";
-import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
+import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/shared/seo/use-document-title";
 
 const SharePageButton = lazy(async () => {
   const module = await import("@/shared/components/share-page-button");

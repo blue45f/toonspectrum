@@ -24,7 +24,7 @@ const studioMobileEditingDockSource = readFileSync(
   "utf8",
 );
 const studioChromeSource = readFileSync(new URL("./studio-chrome-ui.tsx", import.meta.url), "utf8");
-const studioGlobalsSource = readFileSync(new URL("../../styles/globals.css", import.meta.url), "utf8");
+const studioGlobalsSource = readFileSync(new URL("../../app/styles/globals.css", import.meta.url), "utf8");
 
 function memoryStorage(initial?: string) {
   const values = new Map<string, string>();

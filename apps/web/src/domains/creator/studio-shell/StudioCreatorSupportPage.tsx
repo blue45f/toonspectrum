@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 type SupportCategory = "story" | "production" | "staffing" | "rights" | "localization" | "environment";

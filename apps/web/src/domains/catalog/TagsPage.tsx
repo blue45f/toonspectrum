@@ -9,11 +9,11 @@ import {
   type TagDirectorySort,
 } from "./tag-directory";
 
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Container } from "@/shared/components/section";
 import { genreBorder, genreTextColor, genreTint } from "@/shared/lib/genre-color";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+import { useApiResource } from "@/platform/use-api-resource";
 
 interface TagsResponse {
   readonly tags: TagDirectoryEntry[];

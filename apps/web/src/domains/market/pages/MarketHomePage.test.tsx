@@ -21,7 +21,7 @@ vi.mock("../components/MarketResourceCard", () => ({
   ),
 }));
 
-vi.mock("@/hooks/use-document-title", () => ({
+vi.mock("@/shared/seo/use-document-title", () => ({
   useDocumentTitle: vi.fn(),
   useJsonLd: vi.fn(),
   useMetaDescription: vi.fn(),

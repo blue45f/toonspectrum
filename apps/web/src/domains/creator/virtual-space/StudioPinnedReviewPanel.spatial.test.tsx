@@ -2,12 +2,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveStudioReviewPageMapping } from "@toonspectrum/studio-project-model";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { StudioPinnedReviewPanel } from "./StudioPinnedReviewPanel";
 import type { StudioVirtualSpaceReviewVerification } from "./studio-virtual-space-review-invitation";
 
 const f = vi.hoisted(() => ({ verify: vi.fn(), read: vi.fn(), create: vi.fn(), newId: vi.fn(), actor: "actor-a" }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
 vi.mock("./studio-virtual-space-review-invitation", () => ({ verifyStudioVirtualSpaceReviewSubject: f.verify }));
 vi.mock("./studio-virtual-space-review-preview", () => ({ getStudioVirtualSpaceReviewPreview: f.read }));
 vi.mock("./StudioPinnedReviewComparison", () => ({ StudioPinnedReviewComparison: () => <div>Independent comparison</div> }));

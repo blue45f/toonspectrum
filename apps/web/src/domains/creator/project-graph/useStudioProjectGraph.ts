@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { httpStatus } from "@/infrastructure/api";
+import { httpStatus } from "@/platform/api";
 
 import {
   readStudioProjectGraphCache,

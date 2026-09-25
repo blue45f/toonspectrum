@@ -1,7 +1,7 @@
 import { BadgeCheck, ExternalLink, RefreshCw, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import { api, getApiErrorMessage } from "@/infrastructure/api";
+import { api, getApiErrorMessage } from "@/platform/api";
 
 import type { BusinessVerificationStatus } from "@/shared/lib/types";
 

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { FanCafePanel } from "./components/fan-cafe-panel";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 
 const EVENT_GUIDE = [

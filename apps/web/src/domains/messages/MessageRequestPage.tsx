@@ -2,15 +2,15 @@ import { ArrowLeft, LoaderCircle, MailPlus, Send, ShieldCheck } from "lucide-rea
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-import Link from "@/compat/router-link";
-import { useSession } from "@/compat/auth-session-store";
-import { useDocumentTitle } from "@/hooks/use-document-title";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import Link from "@/shared/navigation/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import { getApiErrorMessage } from "@/platform/api";
 import {
   messagingClient,
   type MessagingContextType,
   type MessagingRequestCategory,
-} from "@/infrastructure/messaging-client";
+} from "@/platform/messaging-client";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 

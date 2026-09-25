@@ -2,11 +2,11 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 
-import { persistSession } from "../../src/compat/auth-session-state";
-import { SessionContext } from "../../src/compat/auth-session-store";
+import { persistSession } from "../../src/domains/auth/public/session/auth-session-state";
+import { SessionContext } from "../../src/domains/auth/public/session/auth-session-store";
 import { createEmptyProductionWorkspace, type ProductionWorkspace } from "../../src/domains/creator/studio-production/studio-production-workspace-runtime";
 import { StudioProductionTaskBoard } from "../../src/domains/creator/studio-production/StudioProductionTaskBoard";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Synthetic task data; only saved view preferences use real local SQLite/OPFS.
 // This is neither a real login nor evidence of server authorization or concurrent DB transactions.

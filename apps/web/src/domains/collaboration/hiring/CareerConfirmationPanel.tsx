@@ -8,7 +8,7 @@ import { careerConfirmationClient as client } from "./career-confirmation-client
 import type { CareerConfirmationCollaborator, CareerConfirmationPage, CareerConfirmationPreview, CareerConfirmationRequest, CareerConfirmationState } from "../../../../../../packages/contracts/src/creator-career-confirmation";
 import type { CreatorCareerItem, CreatorCareerVersion } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { useApp } from "@/shared/lib/store";
 
 const labels: Record<CareerConfirmationState, string> = { requested: "응답 대기", confirmed: "상대방 확인", declined: "거절됨", revoked: "철회·효력 종료", expired: "만료됨" };

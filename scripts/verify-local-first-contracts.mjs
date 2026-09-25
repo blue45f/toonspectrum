@@ -28,7 +28,7 @@ function load(path) {
   const localRequire = name => {
     if(name==='@nestjs/common') return exceptions;
     if(name==='pg') return {Pool:class{constructor(){throw new Error('Real database access is forbidden in contract test');}}};
-    if(name==='@/infrastructure/api') return {api:{},apiPath:x=>x};
+    if(name==='@/platform/api') return {api:{},apiPath:x=>x};
     if(name.startsWith('.')) return load(join(dirname(path),`${name}.ts`));
     return require(name);
   };

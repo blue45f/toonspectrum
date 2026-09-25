@@ -34,7 +34,7 @@ const { apiGet, apiPost, toApiError } = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: { get: apiGet, post: apiPost },
   toApiError,
 }));

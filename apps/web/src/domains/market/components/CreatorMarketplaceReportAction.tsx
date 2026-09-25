@@ -11,11 +11,11 @@ import {
   CREATOR_MARKETPLACE_RESOURCE_REPORT_DETAILS_MAX_CHARACTERS,
 } from "@/shared/lib/creator-marketplace-resource-contract";
 import { cx } from "@/shared/lib/cx";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import {
   creatorMarketplaceReportErrorCode,
   reportCreatorMarketplaceResource,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";
 
 const REASON_OPTIONS: ReadonlyArray<{
   readonly value: CreatorMarketplaceResourceReportReason;

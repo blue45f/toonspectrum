@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { canonicalJson, createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 
 import { selectStudioEditorCommentTarget } from "../studio-comment-editor-selection";
 import type { StudioEditorMutationTicket } from "../studio-editor-scope";

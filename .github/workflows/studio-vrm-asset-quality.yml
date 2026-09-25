@@ -9,7 +9,7 @@ on:
       - "apps/web/public/assets/3d/models/**"
       - "apps/web/public/vrm/**"
       - "apps/web/src/domains/creator/vrm/**"
-      - "apps/web/src/types/gltf-validator.d.ts"
+      - "apps/web/src/shared/types/vendor/gltf-validator.d.ts"
       - "scripts/generate-vrm-model-technical-denylist.ts"
       - "scripts/generate-vrm-thumbnail-technical-denylist.ts"
       - "scripts/repair-studio-vrm-models.ts"
@@ -24,7 +24,7 @@ on:
       - "apps/web/public/assets/3d/models/**"
       - "apps/web/public/vrm/**"
       - "apps/web/src/domains/creator/vrm/**"
-      - "apps/web/src/types/gltf-validator.d.ts"
+      - "apps/web/src/shared/types/vendor/gltf-validator.d.ts"
       - "scripts/generate-vrm-model-technical-denylist.ts"
       - "scripts/generate-vrm-thumbnail-technical-denylist.ts"
       - "scripts/repair-studio-vrm-models.ts"
@@ -113,7 +113,7 @@ jobs:
             apps/web/src/domains/creator/vrm/studio-vrm-model-quality-integration.test.ts \
             apps/web/src/domains/creator/vrm/studio-vrm-model-technical-denylist.generated.ts \
             apps/web/src/domains/creator/vrm/vrm-library.ts \
-            apps/web/src/types/gltf-validator.d.ts \
+            apps/web/src/shared/types/vendor/gltf-validator.d.ts \
             scripts/generate-vrm-thumbnail-technical-denylist.ts \
             scripts/generate-vrm-model-technical-denylist.ts \
             scripts/repair-studio-vrm-models.ts \

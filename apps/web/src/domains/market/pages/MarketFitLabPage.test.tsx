@@ -32,7 +32,7 @@ vi.mock("../components/MarketResourceCard", () => ({
     <article data-testid="fit-card">{record.name}</article>
   ),
 }));
-vi.mock("@/hooks/use-document-title", () => ({
+vi.mock("@/shared/seo/use-document-title", () => ({
   useDocumentTitle: vi.fn(),
   useMetaDescription: vi.fn(),
   usePageSocialMeta: vi.fn(),

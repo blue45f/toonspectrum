@@ -18,7 +18,7 @@ import { StudioEditorRoute } from "./StudioEditorRoute";
 import type { StudioWorkspaceRoute } from "../../studio-workspace-route";
 
 const observed = vi.hoisted(() => ({ sources: [] as (string | null)[] }));
-vi.mock("@/compat/auth-session-store", () => ({
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({
   useSession: () => ({ data: { user: { id: "owner" } }, ready: true }),
 }));
 vi.mock("../../studio-legacy-editor-adapter", () => ({

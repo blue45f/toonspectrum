@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import { useApp } from "../apps/web/src/shared/lib/store";
 import { FeedbackPage } from "../apps/web/src/domains/legal/FeedbackPage";
-import "../apps/web/src/styles/globals.css";
+import "../apps/web/src/app/styles/globals.css";
 
 const viewer = new URLSearchParams(window.location.search).get("viewer");
 useApp.getState().setSessionIdentity(viewer === "guest" ? null : "member", null);

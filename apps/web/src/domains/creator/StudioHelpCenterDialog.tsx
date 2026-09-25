@@ -30,7 +30,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 
-import { checkBrowserCompatibility, getBrowserInfo } from "../../compat/browser-check";
+import { checkBrowserCompatibility, getBrowserInfo } from "../../platform/browser/browser-check";
 
 import { getStudioGpuFabricCapabilities } from "./render/studio-gpu-fabric";
 import { studioBrowserStorageEstimator } from "./studio-browser-storage-estimator";

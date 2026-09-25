@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SeriesSummary, WorkSummary } from "@/infrastructure/creator-client";
+import type { SeriesSummary, WorkSummary } from "@/platform/creator-client";
 import { createDefaultCreatorCommunityMetadata } from "@/shared/lib/creator-community-publication-contract";
 import {
   spatialShowcaseObjects,

@@ -1,4 +1,4 @@
-import type { BrowserCompatibilityResult } from "../compat/browser-check";
+import type { BrowserCompatibilityResult } from "../platform/browser/browser-check";
 
 const WEBGL_FEATURE = "WebGL 3D Graphic Engine";
 

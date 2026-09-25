@@ -2,8 +2,8 @@ import { translateCurrentStaticSourceText, getActiveI18nLocale, translateBilingu
 import { ArrowRight, BookOpen, Boxes, Brush, FileImage, FilePlus2, FileText, FileUp, FolderKanban, ImagePlus, LayoutGrid, Lightbulb, Music2, Palette, PlayCircle, Presentation, Search, Sparkles, Store, UserRoundPen, Users, UsersRound, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";

@@ -29,8 +29,8 @@ import { useMemo } from "react";
 import { Navigate, useLocation, useParams } from "react-router-dom";
 
 
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { buttonClass } from "@/shared/components/ui/button-utils";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { WorkSummary } from "@/infrastructure/creator-client";
+import type { WorkSummary } from "@/platform/creator-client";
 
 import { buildCreatorProfileShowcase } from "./creator-profile-showcase";
 

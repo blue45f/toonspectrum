@@ -163,11 +163,16 @@ export default defineConfig(
       { type: 'domains', pattern: 'apps/web/src/domains/*/**/*', mode: 'full' },
       {
         type: 'shared',
-        pattern: 'apps/web/src/{components,hooks,styles,compat,catalog-static,catalog-static-engine}*/**/*',
+        pattern: 'apps/web/src/shared/{navigation,seo,hooks}/**/*',
+        mode: 'full',
+      },
+      {
+        type: 'shared',
+        pattern: 'apps/web/src/shared/components/feedback/**/*',
         mode: 'full',
       },
       { type: 'shared', pattern: 'apps/web/src/catalog-static*.ts', mode: 'full' },
-      { type: 'infrastructure', pattern: 'apps/web/src/infrastructure/**/*', mode: 'full' },
+      { type: 'infrastructure', pattern: 'apps/web/src/platform/**/*', mode: 'full' },
     ],
     rules: [
       { from: ['app'], allow: ['app', 'domains', 'shared', 'infrastructure'] },
@@ -184,17 +189,16 @@ export default defineConfig(
       'import/resolver': { typescript: { project: 'tsconfig.json' }, node: true },
     },
   },
-  // 기술부채 완화(차기 패스에서 정리 예정). 페이지 중심으로 자란 앱이라 계층 결합이 광범위하다:
-  // - infrastructure/use-api-resource 는 매핑상 infra 지만 React 훅이라 도메인 페이지가 직접 쓴다.
-  // - shared(compat/auth) 는 인증 부트스트랩에서 infrastructure(api 클라이언트)를 오케스트레이션한다.
-  // - hooks/use-app-config 는 런타임 설정을 공유 api(ky) 클라이언트로 읽는 부트스트랩 훅이다.
-  // 이들을 strict 계층으로 분리하는 것은 SiteHeader·CommandPalette 같은 루트 공용 컴포넌트까지
-  // 얽힌 대규모 리팩터라 이번 도메인화 범위 밖이다. 순수 shared(hooks·styles)는 계속 strict.
+  // 기존 platform client 일부가 인증·Creator 도메인 구현을 직접 참조하는 migration debt.
+  // 새 platform 파일에는 예외를 추가하지 않으며, capability별 API client 이전과 함께 이 목록을 줄인다.
   {
     files: [
-      'apps/web/src/infrastructure/use-api-resource.ts',
-      'apps/web/src/hooks/use-app-config.ts',
-      'apps/web/src/compat/**/*.{ts,tsx}',
+      'apps/web/src/platform/api.ts',
+      'apps/web/src/platform/api.test.ts',
+      'apps/web/src/platform/creator-client.ts',
+      'apps/web/src/platform/creator-client.test.ts',
+      'apps/web/src/platform/me-client.ts',
+      'apps/web/src/platform/me-client.test.ts',
     ],
     rules: { 'boundaries/element-types': 'off' },
   },

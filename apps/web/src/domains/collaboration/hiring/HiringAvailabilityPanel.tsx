@@ -9,7 +9,7 @@ import { ChoiceSet } from "./ResumeEditor";
 
 import type { CreatorHiringRole, HiringAvailability, HiringAvailabilityInput } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 const initial = (): HiringAvailabilityInput => ({ startsAt: new Date().toISOString(), endsAt: new Date(Date.now() + 86400000).toISOString(), roles: [], tools: [], formats: [], capacity: 1, minRate: 10000, rateUnit: "cut", discoverable: false, notificationOptIn: false, expectedRevision: 0 });
 export function HiringAvailabilityPanel() {

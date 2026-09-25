@@ -10,7 +10,7 @@ const creatorClient = vi.hoisted(() => ({
   updateSeries: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/creator-client", () => ({
+vi.mock("@/platform/creator-client", () => ({
   createSeries: creatorClient.createSeries,
   updateSeries: creatorClient.updateSeries,
 }));

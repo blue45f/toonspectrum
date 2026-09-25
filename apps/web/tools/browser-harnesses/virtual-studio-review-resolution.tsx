@@ -2,13 +2,13 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
-import { persistSession, SessionContext } from "../../src/compat/auth-session-store";
+import { persistSession, SessionContext } from "../../src/domains/auth/public/session/auth-session-store";
 import { EMPTY_STUDIO_REVIEW_CAPTURE } from "../../src/domains/creator/review-capture/studio-review-capture-bridge";
 import { StudioReviewCaptureDialog } from "../../src/domains/creator/review-capture/StudioReviewCaptureDialog";
 import { studioReviewResolutionRequestFromLocation } from "../../src/domains/creator/review-resolution/studio-review-resolution-route";
 import { reviewResolutionFixture } from "../../src/domains/creator/review-resolution/studio-review-resolution-test-fixture";
 import { StudioPinnedReviewPanel } from "../../src/domains/creator/virtual-space/StudioPinnedReviewPanel";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Synthetic HTTP records only. No real capture, work, login, server receipt or approval
 // is produced here. Actual dialog, route parser, panel, comparison and clients are used.

@@ -1,4 +1,4 @@
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 
 import { buildYouTubeLearningSearchUrl } from "./learning-resources";
 

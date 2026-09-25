@@ -1,4 +1,4 @@
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 import type { FortuneSign, SourcedFortune } from "../../../../../../packages/contracts/src/fortune-provenance";
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { siteDirectoryEntryMetadata, type SiteDirectoryEntry } from "./site-directory-search";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { siteNavigationText, type SiteNavigationLocale } from "@/shared/components/site-navigation";
 import {
   readFavoriteSiteRoutes,

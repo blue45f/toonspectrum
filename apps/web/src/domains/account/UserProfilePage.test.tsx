@@ -7,21 +7,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { UserProfilePage } from "./UserProfilePage";
 
-import { getCreatorProfile, type CreatorProfile } from "@/infrastructure/creator-client";
+import { getCreatorProfile, type CreatorProfile } from "@/platform/creator-client";
 import {
   publicCreatorRoleProfile,
   type PublicCreatorRoleProfile,
 } from "@/shared/lib/creator-role-contract";
 import { useI18n } from "@/shared/lib/i18n";
 
-vi.mock("@/infrastructure/creator-client", () => ({
+vi.mock("@/platform/creator-client", () => ({
   getCreatorProfile: vi.fn(),
   listSeries: vi.fn(),
   listWorks: vi.fn(),
   toggleFollow: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/use-api-resource", () => ({
+vi.mock("@/platform/use-api-resource", () => ({
   useApiResource: () => ({
     data: { feed: [], stats: { total: 0, avg: 0, spoilerPct: 0, distinctTitles: 0 } },
     loading: false,
@@ -34,7 +34,7 @@ vi.mock("@/shared/lib/store", () => ({
   useApp: (selector: (state: { userId: string | null }) => unknown) => selector({ userId: null }),
 }));
 
-vi.mock("@/hooks/use-document-title", () => ({
+vi.mock("@/shared/seo/use-document-title", () => ({
   useDocumentTitle: vi.fn(),
   useMetaDescription: vi.fn(),
   usePageSocialMeta: vi.fn(),

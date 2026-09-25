@@ -21,8 +21,8 @@ import { getAdminShellCopy } from "./admin-shell-copy";
 
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
-import { usePathname } from "@/compat/navigation";
-import Link from "@/compat/router-link";
+import { usePathname } from "@/shared/navigation/navigation";
+import Link from "@/shared/navigation/router-link";
 
 import "./admin-shell.css";
 import "./admin-visual-v2.css";

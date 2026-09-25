@@ -14,7 +14,7 @@ import {
 } from "./site-directory-search";
 import "./site-directory-search.css";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { siteNavigationText, type SiteNavigationLocale } from "@/shared/components/site-navigation";
 import {
   readFavoriteSiteRoutes,

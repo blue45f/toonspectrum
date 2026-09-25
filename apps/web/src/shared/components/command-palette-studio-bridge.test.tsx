@@ -18,7 +18,7 @@ class ResizeObserverStub {
 }
 
 const mockPush = vi.fn();
-vi.mock("@/compat/navigation", () => ({
+vi.mock("@/shared/navigation/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 

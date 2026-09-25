@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SupportPage } from "./SupportPage";
 
-vi.mock("@/hooks/use-document-title", () => ({ useDocumentTitle: vi.fn() }));
+vi.mock("@/shared/seo/use-document-title", () => ({ useDocumentTitle: vi.fn() }));
 
 afterEach(cleanup);
 beforeEach(() => window.history.replaceState({}, "", "/support?token=private#draft"));

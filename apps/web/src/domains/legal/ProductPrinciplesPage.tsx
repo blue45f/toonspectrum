@@ -16,8 +16,8 @@ import {
 import { AboutSectionNav } from "./AboutSectionNav";
 import { PRODUCT_DECISION_CHECKS, PRODUCT_PRINCIPLE_GROUPS } from "./product-principles";
 
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
 

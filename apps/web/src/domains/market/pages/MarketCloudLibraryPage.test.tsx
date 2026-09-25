@@ -14,8 +14,8 @@ import {
 } from "@/shared/lib/creator-marketplace-install-receipt";
 
 const api = vi.hoisted(() => ({ session: vi.fn(), list: vi.fn(), archive: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: api.session }));
-vi.mock("@/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: api.session }));
+vi.mock("@/platform/creator-marketplace-client", () => ({
   listCreatorMarketplaceCloudLibrary: api.list,
   setCreatorMarketplaceCloudLibraryArchived: api.archive,
 }));

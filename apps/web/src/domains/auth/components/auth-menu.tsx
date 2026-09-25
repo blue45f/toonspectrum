@@ -21,14 +21,14 @@ import { AuthModal } from "./auth-modal";
 
 import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
-import { useSession, signOut } from "@/compat/auth-session-store";
-import { subscribeAuthModalRequests } from "@/compat/auth-modal-intent";
-import Link from "@/compat/router-link";
+import { useSession, signOut } from "@/domains/auth/public/session/auth-session-store";
+import { subscribeAuthModalRequests } from "@/domains/auth/public/session/auth-modal-intent";
+import Link from "@/shared/navigation/router-link";
 import {
   adminFetch,
   type AdminMe,
 } from "@/domains/admin/components/admin-client";
-import { messagingClient } from "@/infrastructure/messaging-client";
+import { messagingClient } from "@/platform/messaging-client";
 
 // Mouse, keyboard and touch share the same 44px account-menu interaction contract.
 const ITEM_CLASS =

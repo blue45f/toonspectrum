@@ -1,7 +1,7 @@
 import { ArrowUpRight, Brush, Layers3, Palette } from "lucide-react";
 import { useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 import "./market-atelier.css";
 

@@ -1,7 +1,7 @@
 import { Download, FileCheck2, Rss, Send } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 import { useI18n } from "@/shared/lib/i18n";
 
 import { IntegrationError, IntegrationLoading, IntegrationPage } from "./IntegrationUi";

@@ -8,10 +8,10 @@ import { CreatorMarketplaceCloudLibraryAction } from "./CreatorMarketplaceCloudL
 
 import type { CreatorMarketplaceAcquisitionTarget } from "@/shared/lib/creator-marketplace-cloud-library-contract";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
-import type { SessionContextValue } from "@/compat/auth-session-store";
+import type { SessionContextValue } from "@/domains/auth/public/session/auth-session-store";
 
 import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
-import { SessionContext } from "@/compat/auth-session-store";
+import { SessionContext } from "@/domains/auth/public/session/auth-session-store";
 
 const mocks = vi.hoisted(() => ({
   acquire: vi.fn(),
@@ -30,7 +30,7 @@ function deferred<T>() {
   return { promise, reject, resolve };
 }
 
-vi.mock("@/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/platform/creator-marketplace-client", () => ({
   acquireCreatorMarketplaceCloudLibraryRelease: mocks.acquire,
   listCreatorMarketplaceCloudLibrary: mocks.list,
   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget: mocks.resolveTarget,

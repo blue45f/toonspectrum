@@ -4,7 +4,7 @@ import { useEngagement } from "./engagement-store";
 
 import type { Title } from "@/shared/lib/types";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 export function PersonalContentPreferenceNotice({ title }: { readonly title: Title }) {
   const preferences = useEngagement((state) => state.tastePreferences);

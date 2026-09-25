@@ -25,7 +25,7 @@ import {
 import { Container } from "@/shared/components/section";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { resolveSiteRouteMetadata } from "@/shared/lib/site-route-metadata";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("SitemapPage", ko, en);

@@ -29,8 +29,8 @@ import {
 } from "./technology/EngineeringStoryUi";
 import { useEngineeringLocale } from "./technology/use-engineering-locale";
 
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";
 

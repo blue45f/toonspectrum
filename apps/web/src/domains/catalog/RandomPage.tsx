@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 
 import type { Title } from "@/shared/lib/types";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { TitleCard } from "@/shared/components/title-card";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useSearchParams } from "@/compat/navigation";
+import { useSearchParams } from "@/shared/navigation/navigation";
 
 interface RandomResponse {
   slug?: string | null;

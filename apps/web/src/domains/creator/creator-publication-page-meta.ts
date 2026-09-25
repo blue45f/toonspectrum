@@ -6,7 +6,7 @@ import {
   useJsonLd,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 
 import type { CreatorPublicationDirective } from "@/shared/lib/creator-publication-contract";
 

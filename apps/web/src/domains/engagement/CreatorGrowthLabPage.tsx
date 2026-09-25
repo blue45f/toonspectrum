@@ -21,7 +21,7 @@ import {
 import { useEngagement } from "./engagement-store";
 
 import { Container } from "@/shared/components/section";
-import { useDocumentTitle, useMetaRobots } from "@/hooks/use-document-title";
+import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";

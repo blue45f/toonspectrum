@@ -13,7 +13,7 @@ const http = vi.hoisted(() => ({
   post: vi.fn(),
   put: vi.fn(),
 }));
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: http,
   isHttpError: () => false,
   toApiError: async (error: unknown, fallback: string) =>

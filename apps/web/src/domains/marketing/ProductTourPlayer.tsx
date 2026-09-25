@@ -22,7 +22,7 @@ import type { AnyZodObject } from "remotion";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 import { creatorFilmChapterAt } from "./creator-film-playback";
 import { PRODUCT_TOUR_RUNTIME_AUDIO } from "./product-tour-audio.generated";

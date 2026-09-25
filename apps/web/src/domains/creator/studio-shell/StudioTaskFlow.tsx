@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { cn } from "@/shared/lib/utils";
 
 export type StudioTaskFlowState = "complete" | "current" | "upcoming";

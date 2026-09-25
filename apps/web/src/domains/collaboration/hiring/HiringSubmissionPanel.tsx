@@ -8,8 +8,8 @@ import { ResumePreview } from "./ResumePreview";
 import type { HiringApplicationSnapshot, HiringResume, HiringResumeVersion } from "../../../../../../packages/contracts/src/creator-hiring";
 import type { CollaborationAction } from "../collaboration-application-panel";
 
-import Link from "@/compat/router-link";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import Link from "@/shared/navigation/router-link";
+import { getApiErrorMessage } from "@/platform/api";
 
 export function HiringSubmissionPanel({ postId, postVersion, busy, act }: { postId: string; postVersion: number; busy: boolean; act: CollaborationAction }) {
   const [resumes, setResumes] = useState<HiringResume[] | null>(null), [resumeId, setResumeId] = useState("");

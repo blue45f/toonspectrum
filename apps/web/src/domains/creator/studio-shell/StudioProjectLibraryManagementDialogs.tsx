@@ -6,7 +6,7 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 import { Cloud, FileArchive, Trash2 } from "lucide-react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 
 import { StudioProjectLibraryModal } from "./StudioProjectLibraryManagementUi";

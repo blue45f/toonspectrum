@@ -6,7 +6,7 @@ import { StudioWorkSessionController } from "../../src/domains/creator/work-sess
 import { StudioSessionWorkflowPanel } from "../../src/domains/creator/work-session/StudioSessionWorkflowPanel";
 
 import type { StudioSessionPreviewRequest } from "../../src/domains/creator/work-session/StudioWorkSessionPreview";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 declare global { interface Window { __STUDIO_PURPOSE_TEST__: { workId: string; sessionId: string; actorId: string } } }
 function Fixture() {

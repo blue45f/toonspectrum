@@ -16,7 +16,7 @@ const { deleteRequest, get, put } = vi.hoisted(() => ({
   put: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: { raw: { delete: deleteRequest, get, put } },
   apiPath: (path: string) => `/api${path}`,
   isHttpError: () => false,

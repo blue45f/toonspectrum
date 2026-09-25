@@ -9,8 +9,8 @@ import { RouteStage } from "./route-stage";
 import { useRouteTitle } from "./route-titles";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
-import { ErrorBoundary } from "@/components/error-boundary";
-import { useRouteSeoPolicy } from "@/hooks/use-document-title";
+import { ErrorBoundary } from "@/app/errors/error-boundary";
+import { useRouteSeoPolicy } from "@/shared/seo/use-document-title";
 import { SiteRouteExperienceBoundary } from "@/shared/components/SiteRouteExperienceBoundary";
 import { StudioOfflineRuntimeBoundary } from "@/domains/creator/offline/StudioOfflineRuntimeBoundary";
 import { isStudioOfflineRuntimePath } from "@/domains/creator/offline/studio-offline-runtime-path";

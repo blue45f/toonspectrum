@@ -3,7 +3,7 @@ import { ArrowRight, ArrowUpRight, BookOpen, Compass, Images, Store } from "luci
 import { useId } from "react";
 import { useLocation } from "react-router-dom";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 import { nextPublicDestinations } from "./public-site-destinations";
 

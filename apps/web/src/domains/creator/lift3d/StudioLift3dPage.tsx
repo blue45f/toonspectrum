@@ -32,8 +32,8 @@ import type {
 } from "./studio-lift3d-library-handoff";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 const StudioLift3dPreview = lazyRetry(
   () => import("./StudioLift3dPreview").then((module) => ({

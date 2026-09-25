@@ -2,10 +2,10 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
-import { persistSession, SessionContext } from "../../src/compat/auth-session-store";
+import { persistSession, SessionContext } from "../../src/domains/auth/public/session/auth-session-store";
 import { reviewProductionFixture } from "../../src/domains/creator/review-production/studio-review-production-test-fixture";
 import { StudioReviewProductionConnection } from "../../src/domains/creator/review-production/StudioReviewProductionConnection";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Synthetic records only. Browser acceptance intercepts all server requests. This runs the
 // actual form, controller, authenticated client and response parsers, not a production work.

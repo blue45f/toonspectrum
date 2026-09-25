@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { persistSession,SessionContext } from "../../src/compat/auth-session-store";
+import { persistSession,SessionContext } from "../../src/domains/auth/public/session/auth-session-store";
 import StudioP2pHuddleLauncher from "../../src/domains/creator/live/huddle/StudioP2pHuddleLauncher";
 import { StudioLiveCollaborationContext,EMPTY_STUDIO_LIVE_CONTEXT } from "../../src/domains/creator/live/studio-live-collaboration-context";
 import { StudioPrivateRoomPanel } from "../../src/domains/creator/virtual-space/private-room/StudioPrivateRoomPanel";
@@ -11,7 +11,7 @@ import { studioVirtualSpaceState } from "../../src/domains/creator/virtual-space
 import type { StudioLiveParticipant } from "../../src/domains/creator/live/studio-live-collaboration-protocol";
 import type { StudioLiveRoom } from "../../src/domains/creator/live/studio-live-collaboration-room";
 import type { StudioVirtualSpaceSnapshot } from "../../src/domains/creator/virtual-space/studio-virtual-space-presence";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 import "../../src/domains/creator/virtual-space/studio-virtual-space.css";
 import "../../src/shared/components/virtual-studio/virtual-studio-shell.css";
 

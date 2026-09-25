@@ -3,8 +3,8 @@ import { CheckCircle2, CloudOff, Copy, Download, ExternalLink, FileArchive, Fold
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useI18n } from "@/shared/lib/i18n";

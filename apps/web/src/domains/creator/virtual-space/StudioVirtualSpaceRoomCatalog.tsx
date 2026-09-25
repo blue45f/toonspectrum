@@ -1,7 +1,7 @@
 import { DoorOpen, LockKeyhole, Network, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 import type { StudioVirtualSpaceZoneId } from "./studio-virtual-space-model";

@@ -21,7 +21,7 @@ vi.mock("@/shared/lib/store", () => ({
   ),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: { get: mocks.get, post: mocks.post },
   getApiErrorMessage: mocks.error,
 }));

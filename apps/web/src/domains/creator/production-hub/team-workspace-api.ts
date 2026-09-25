@@ -3,7 +3,7 @@ import type {
   TeamWorkspaceSummary, TeamWorkspaceDetail, TeamWorkspaceCommandInput,
   WorkspaceMutationResult, WorkspaceUsageResponse,
 } from "@toonspectrum/contracts/production-workspace";
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 const root = "/production/workspaces";
 const path = (id: string): string => `${root}/${encodeURIComponent(id)}`;

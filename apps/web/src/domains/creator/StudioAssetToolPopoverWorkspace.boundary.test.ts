@@ -14,7 +14,7 @@ const previewModelSource = read("./studio-unified-asset-preview.ts");
 const insertModelSource = read("./studio-insert-hub-model.ts");
 const lazySource = read("./studio-unified-asset-lazy-ui.ts");
 const createModeGroupsSource = read("./StudioToolBeltCreateModeGroups.tsx");
-const globalsSource = read("../../styles/globals.css");
+const globalsSource = read("../../app/styles/globals.css");
 const floatingLayoutsSource = read("./studio-floating-menu-layouts.ts");
 
 describe("Studio asset workspace boundaries", () => {

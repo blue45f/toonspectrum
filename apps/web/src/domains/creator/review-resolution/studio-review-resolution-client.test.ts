@@ -3,7 +3,7 @@ import { resolveStudioReviewComment } from "../project-graph/studio-project-grap
 import { reviewResolutionFixture } from "./studio-review-resolution-test-fixture";
 
 const io = vi.hoisted(() => ({ post: vi.fn() }));
-vi.mock("@/infrastructure/api", () => ({ api: io }));
+vi.mock("@/platform/api", () => ({ api: io }));
 beforeEach(() => { io.post.mockReset().mockResolvedValue({ id: "comment", status: "resolved", resolutionRevisionId: "submission-new", resolvedBy: "actor", updatedAt: "now" }); });
 describe("optional source-proof resolve HTTP contract", () => {
   it("preserves the legacy body and admits the explicit new proof without changing the target revision", async () => {

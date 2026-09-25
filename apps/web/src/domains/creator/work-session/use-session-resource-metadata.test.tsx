@@ -6,7 +6,7 @@ import { useSessionResourceMetadata } from "./use-session-resource-metadata";
 
 const load = vi.hoisted(() => vi.fn());
 vi.mock("./studio-work-session-client", () => ({ getStudioSessionResources: load }));
-vi.mock("@/infrastructure/api", () => ({ httpStatus: (error: { status?: number }) => error.status }));
+vi.mock("@/platform/api", () => ({ httpStatus: (error: { status?: number }) => error.status }));
 const session = createStudioWorkSession({ id: "session", operationId: "create", title: "Session", purpose: "Test", kind: "reading", invitedUserIds: [],
   input: { schemaVersion: 1, workId: "work", projectId: "project", artifactId: "artifact", reviewId: "review", revisionId: "revision", rootGraphHash: "a".repeat(64) } },
   { userId: "host", canComment: true, canEdit: true }, "2026-09-21T10:00:00.000Z");

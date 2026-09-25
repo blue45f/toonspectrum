@@ -403,7 +403,7 @@ apps/
     src/app/          부트스트랩·라우팅·앱 셸
     src/domains/      앱 내부의 논리적 업무 도메인
     src/shared/       도메인 독립 UI·브라우저 공용 코드
-    src/infrastructure/
+    src/platform/
     public/           그대로 배포되는 정적 자산
   admin/             독립 빌드 가능한 관리자 surface(점진적 이전 중)
     src/app/

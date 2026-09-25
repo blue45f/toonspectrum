@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { StudioReviewCompareDisplay } from "../../src/domains/creator/virtual-space/StudioReviewCompareDisplay";
 
 import type { StudioVirtualSpaceReviewPreview } from "../../src/domains/creator/virtual-space/studio-virtual-space-review-preview";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Local layout fixture, not authentication, server approval or a production document.
 const image = (label: string) => `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="6000"><rect width="800" height="6000" fill="white"/>${Array.from({ length: 12 }, (_, i) => `<rect x="30" y="${i * 500 + 40}" width="740" height="400" rx="12" fill="${i % 2 ? "#dddddd" : "#eeeeee"}" stroke="black"/><text x="70" y="${i * 500 + 110}" font-size="40">${label} / ${i + 1}</text>`).join("")}</svg>`)}`;

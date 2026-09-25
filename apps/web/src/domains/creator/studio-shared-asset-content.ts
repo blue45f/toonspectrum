@@ -1,7 +1,7 @@
 import type {
   SharedAssetCatalogItem,
   SharedAssetContent,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 interface DecodedStudioSharedAssetBitmap {
   width: number;

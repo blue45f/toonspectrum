@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_REVIEW_DELIVERY_PROFILE, createReviewDeliveryManifest, type ReviewDeliveryJob } from "@toonspectrum/studio-project-model/review-delivery";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { reviewProductionFixture } from "../review-production/studio-review-production-test-fixture";
 import { StudioReviewDelivery } from "./StudioReviewDelivery";
 

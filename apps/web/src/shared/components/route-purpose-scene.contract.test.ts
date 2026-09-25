@@ -7,7 +7,7 @@ import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
 
 const component = readFileSync(new URL("./RoutePurposeScene.tsx", import.meta.url), "utf8");
 const routeCss = readFileSync(new URL("./route-purpose-scene.css", import.meta.url), "utf8");
-const systemCss = readFileSync(new URL("../../styles/sitewide-visual-ux.css", import.meta.url), "utf8");
+const systemCss = readFileSync(new URL("../../app/styles/sitewide-visual-ux.css", import.meta.url), "utf8");
 const experienceCss = readFileSync(new URL("./site-experience/site-experience.css", import.meta.url), "utf8");
 const choreographyCss = readFileSync(new URL("./site-experience/site-theme-choreography.css", import.meta.url), "utf8");
 const entry = readFileSync(new URL("../../app/main.tsx", import.meta.url), "utf8");

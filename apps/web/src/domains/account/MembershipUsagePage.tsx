@@ -14,7 +14,7 @@ import {
   getMembershipOperationsOverview,
   markMembershipNoticeSeen,
   type MembershipOperationsOverview,
-} from "@/infrastructure/membership-operations-client";
+} from "@/platform/membership-operations-client";
 import { Container } from "@/shared/components/section";
 import { useApp } from "@/shared/lib/store";
 

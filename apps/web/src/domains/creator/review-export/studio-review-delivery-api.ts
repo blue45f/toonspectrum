@@ -1,7 +1,7 @@
 import { reviewDeliveryAcceptSchema, reviewDeliveryActionSchema, reviewDeliveryJobSchema,
   reviewDeliveryListSchema, reviewDeliveryPrepareSchema, type ReviewDeliveryAccept,
   type ReviewDeliveryAction, type ReviewDeliveryPrepare } from "@toonspectrum/studio-project-model/review-delivery";
-import { api, apiPath } from "@/infrastructure/api";
+import { api, apiPath } from "@/platform/api";
 
 const base = (workId: string) => `/creator/works/${encodeURIComponent(workId)}/review-deliveries`;
 export async function listStudioReviewDeliveries(workId: string) {

@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 
 import type { StudioReviewCaptureHostBindings } from "../review-capture/studio-review-capture-host-context";
 import type { StudioEditorCommentTarget } from "../studio-comment-editor-selection";

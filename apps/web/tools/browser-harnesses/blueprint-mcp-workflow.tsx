@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { persistSession } from "../../src/compat/auth-session-state";
-import { SessionContext } from "../../src/compat/auth-session-store";
+import { persistSession } from "../../src/domains/auth/public/session/auth-session-state";
+import { SessionContext } from "../../src/domains/auth/public/session/auth-session-store";
 import { createEmptyProductionWorkspace, type ProductionWorkspace } from "../../src/domains/creator/studio-production/studio-production-workspace-runtime";
 import { StudioProductionTaskBoard } from "../../src/domains/creator/studio-production/StudioProductionTaskBoard";
 import { StudioReviewDraftShelf } from "../../src/domains/creator/virtual-space/StudioReviewDraftShelf";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Dev-only synthetic identity. The browser verifier blocks every API request.
 // This exercises the actual component and SQLite/OPFS storage, not server authentication.

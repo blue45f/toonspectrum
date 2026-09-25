@@ -32,7 +32,7 @@ import type {
 } from "./studio-live-sync-safety";
 import type { StudioScreenShareState } from "../studio-screen-share";
 
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { cn } from "@/shared/lib/utils";
 
 export type StudioLiveCollaborationSection =

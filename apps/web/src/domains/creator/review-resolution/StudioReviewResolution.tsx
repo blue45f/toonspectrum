@@ -1,6 +1,6 @@
 import { canonicalJson } from "@toonspectrum/studio-project-model";
 import { useEffect, useMemo, useState } from "react";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { Button } from "@/shared/components/ui/button";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 

@@ -17,14 +17,14 @@ import {
 } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
-import { api } from "@/infrastructure/api";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+} from "@/shared/seo/use-document-title";
+import { api } from "@/platform/api";
+import { useApiResource } from "@/platform/use-api-resource";
 
 
 // 토론 스레드 상세 — 목록 카드에서 진입하는 분할 라우트(/community/post/:id).

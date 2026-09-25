@@ -13,7 +13,7 @@ import {
   type StudioSharedWork,
 } from "./studio-shared-works-client";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 
 function sharedWork(overrides: Record<string, unknown> = {}) {

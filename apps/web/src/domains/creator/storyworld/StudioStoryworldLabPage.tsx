@@ -58,8 +58,8 @@ import {
 } from "./studio-storyworld-causality";
 import "./studio-storyworld-lab.css";
 
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 export interface StudioStoryworldLabPageProps {
   readonly workId: string | null;

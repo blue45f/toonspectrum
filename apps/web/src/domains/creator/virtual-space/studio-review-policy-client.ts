@@ -1,5 +1,5 @@
 import { reviewPolicyCommandSchema, reviewPolicyResponseSchema, reviewPolicyHistoryQuerySchema, reviewPolicyHistoryResponseSchema, studioEntityIdSchema, type ReviewPolicyCommand } from "@toonspectrum/studio-project-model";
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 const path = (reviewId: string) => `/studio-project-graph/reviews/${encodeURIComponent(studioEntityIdSchema.parse(reviewId))}/policy`;
 export async function getStudioReviewPolicy(reviewId: string) {

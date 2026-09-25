@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PinnedShareCreate, PinnedShareOwnerView } from "@toonspectrum/studio-project-model/pinned-review-share";
 
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { reviewProductionFixture } from "../review-production/studio-review-production-test-fixture";
 import { StudioPinnedReviewShareManager } from "./StudioPinnedReviewShareManager";
 

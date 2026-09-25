@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 
 import { StudioPinnedReviewComparison } from "./StudioPinnedReviewComparison";
 
@@ -11,7 +11,7 @@ import type { StudioVirtualSpaceReviewPreview, StudioVirtualSpaceReviewPreviews 
 import type { StudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-subject";
 
 const f = vi.hoisted(() => ({ history: vi.fn(), read: vi.fn(), actor: "actor-a" as string | null }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: f.actor ? { user: { id: f.actor } } : null }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: f.actor ? { user: { id: f.actor } } : null }) }));
 vi.mock("./studio-virtual-space-review-invitation", () => ({ listStudioVirtualSpaceReviewHistory: f.history }));
 vi.mock("./studio-virtual-space-review-preview", () => ({ getStudioVirtualSpaceReviewPreview: f.read }));
 const base: StudioVirtualSpaceReviewSubject = { schemaVersion: 1, workId: "work", projectId: "graph", artifactId: "artifact",

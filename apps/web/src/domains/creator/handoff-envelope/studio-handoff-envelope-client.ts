@@ -1,7 +1,7 @@
 import { studioHandoffEnvelopeCreateSchema, studioHandoffEnvelopePrepareSchema, studioHandoffEnvelopeViewSchema, studioHandoffEnvelopeListSchema,
   studioHandoffEnvelopeActionSchema, studioHandoffEnvelopeAcceptSchema, type StudioHandoffEnvelopeCreate, type StudioHandoffEnvelopeAction,
   type StudioHandoffEnvelopeView } from "@toonspectrum/studio-project-model";
-import { api, isHttpError } from "@/infrastructure/api";
+import { api, isHttpError } from "@/platform/api";
 /** Only a definitive server rejection can discard a pending mutation identity. */
 export class StudioHandoffClientError extends Error {
   constructor(readonly reason: "denied" | "missing" | "changed" | "invalid") { super(reason); }

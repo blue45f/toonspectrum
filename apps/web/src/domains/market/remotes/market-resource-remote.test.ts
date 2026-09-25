@@ -5,7 +5,7 @@ import {
   listCreatorMarketplaceResources,
 } from "./market-resource-remote";
 
-import * as client from "@/infrastructure/creator-marketplace-client";
+import * as client from "@/platform/creator-marketplace-client";
 
 
 describe("market-resource-remote", () => {

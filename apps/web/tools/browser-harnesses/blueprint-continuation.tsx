@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { persistSession } from "../../src/compat/auth-session-state";
-import { SessionContext } from "../../src/compat/auth-session-store";
+import { persistSession } from "../../src/domains/auth/public/session/auth-session-state";
+import { SessionContext } from "../../src/domains/auth/public/session/auth-session-store";
 import { createProductionDemoProject } from "../../src/domains/creator/production-hub/production-demo";
 import { ProductionAutomationExecutionControl } from "../../src/domains/creator/production-hub/ProductionAutomationExecutionControl";
 import { ProductionNotificationDigest } from "../../src/domains/creator/production-hub/ProductionNotificationDigest";
@@ -12,7 +12,7 @@ import { StudioReviewPolicyPanel } from "../../src/domains/creator/virtual-space
 import type { ProductionClientCommand } from "../../src/domains/creator/production-hub/production-api";
 import type { StudioVirtualSpaceVerifiedReview } from "../../src/domains/creator/virtual-space/studio-virtual-space-review-invitation";
 import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 persistSession({ user: { id: "fixture-artist" }, token: null });
 const base = createProductionDemoProject(), assignmentId = base.assignments[0]!.id;

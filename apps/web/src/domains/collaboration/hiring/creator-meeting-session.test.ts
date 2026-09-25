@@ -5,7 +5,7 @@ import { deferred, fixtureMessage, fixtureRoom } from "./creator-meeting.test-fi
 
 import type { CreatorRoom } from "../../../../../../packages/contracts/src/creator-hiring";
 
-vi.mock("@/infrastructure/api", () => ({ api: {}, getApiErrorMessage: async () => "연결 확인 실패" }));
+vi.mock("@/platform/api", () => ({ api: {}, getApiErrorMessage: async () => "연결 확인 실패" }));
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };

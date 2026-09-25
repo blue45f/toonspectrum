@@ -22,7 +22,7 @@ vi.mock("../studio-shell/useStudioProjectLibrary", () => ({ useStudioProjectLibr
   projects: state.projects, state: state.loaded ? { schemaVersion: 1, projects: state.projects } : null,
   error: state.error, reload: state.reload,
 }) }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: null }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: null }) }));
 vi.mock("@/shared/lib/i18n-bilingual-copy", () => ({ useBilingual: () => (ko: string) => ko }));
 vi.mock("@/shared/lib/creator-experience-mode", () => ({
   useCreatorExperienceMode: (selector: (value: typeof state) => unknown) => selector(state),

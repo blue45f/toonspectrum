@@ -1,8 +1,8 @@
 import { ArrowLeft, ChevronRight, Search } from "lucide-react";
 import { useRef, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import { OpenSearchButton } from "@/shared/components/open-search-button";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { WorkspaceAccountAction, WorkspaceBrand, WorkspaceSidebar } from "./WorkspaceChrome";

@@ -13,7 +13,7 @@ import {
   type UpdateWorkInput,
   type WorkDetail,
   type WorkSummary,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 export class StudioPublishRecoveryError extends Error {
   constructor(message: string) {

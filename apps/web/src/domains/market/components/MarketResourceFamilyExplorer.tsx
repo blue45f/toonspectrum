@@ -7,7 +7,7 @@ import {
 } from "../models/market-resource-taxonomy";
 
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 interface MarketResourceFamilyExplorerProps {
   readonly className?: string;

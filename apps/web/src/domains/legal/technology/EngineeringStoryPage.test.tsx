@@ -11,7 +11,7 @@ import { EngineeringReferencesPage } from "./EngineeringReferencesPage";
 import { EngineeringStoryPage } from "./EngineeringStoryPage";
 import { EngineeringVideosPage } from "./EngineeringVideosPage";
 
-vi.mock("@/hooks/use-document-title", () => ({ useDocumentTitle: vi.fn() }));
+vi.mock("@/shared/seo/use-document-title", () => ({ useDocumentTitle: vi.fn() }));
 
 afterEach(cleanup);
 

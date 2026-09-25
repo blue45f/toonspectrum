@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 
 import { StudioReviewCaptureDialog } from "../review-capture/StudioReviewCaptureDialog";
 import { EMPTY_STUDIO_REVIEW_CAPTURE } from "../review-capture/studio-review-capture-bridge";
@@ -11,7 +11,7 @@ import { studioReviewResolutionRequestFromLocation } from "./studio-review-resol
 import { reviewResolutionFixture } from "./studio-review-resolution-test-fixture";
 
 const io = vi.hoisted(() => ({ actor: "actor", verify: vi.fn(), revisions: vi.fn(), resolve: vi.fn(), create: vi.fn(), team: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: io.actor } } }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: io.actor } } }) }));
 vi.mock("../virtual-space/studio-virtual-space-review-invitation", async (original) => ({ ...await original<object>(), verifyStudioVirtualSpaceReviewSubject: io.verify }));
 vi.mock("../project-graph/studio-project-graph-client", async (original) => ({ ...await original<object>(), listStudioArtifactRevisions: io.revisions, resolveStudioReviewComment: io.resolve,
   createStudioReviewComment: io.create, newStudioProjectGraphId: () => "must-not-create" }));

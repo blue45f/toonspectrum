@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
-import { listeners as authListeners } from "@/compat/auth-session-state";
+import { listeners as authListeners } from "@/domains/auth/public/session/auth-session-state";
 import { Button } from "@/shared/components/ui/button";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 

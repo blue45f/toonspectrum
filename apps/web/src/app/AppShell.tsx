@@ -7,7 +7,7 @@ import { SpatialCampusFrame } from "./spatial-campus/SpatialCampusFrame";
 import { campusTaskRoute, resolveCampusLocation } from "./spatial-campus/campus-route-adapter";
 import { workspaceTaskRoute } from "@/shared/components/workspace/workspace-task-route";
 
-import { ErrorBoundary } from "@/components/error-boundary";
+import { ErrorBoundary } from "@/app/errors/error-boundary";
 import { AuthMenuShell } from "@/domains/auth/components/auth-menu-shell";
 import { WorkspaceAccountContext } from "@/shared/components/workspace/workspace-account-context";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";

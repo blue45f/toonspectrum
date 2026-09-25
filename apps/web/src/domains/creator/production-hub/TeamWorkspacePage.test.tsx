@@ -9,7 +9,7 @@ import { TeamWorkspacePage, TeamWorkspaceJoinPage } from "./TeamWorkspacePage";
 const mocks = vi.hoisted(() => ({ userId: "owner" as string | null,
   list: vi.fn(), detail: vi.fn(), usage: vi.fn(), create: vi.fn(), command: vi.fn(), accept: vi.fn(), projects: vi.fn(), operation: vi.fn() }));
 vi.mock("@/shared/lib/store", () => ({ useApp: () => mocks.userId }));
-vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: async (_error: unknown, fallback: string) => fallback }));
+vi.mock("@/platform/api", () => ({ getApiErrorMessage: async (_error: unknown, fallback: string) => fallback }));
 vi.mock("./team-workspace-api", () => ({ getEffectiveOperationPolicy: mocks.operation, listTeamWorkspaces: mocks.list, getTeamWorkspace: mocks.detail,
   getTeamUsage: mocks.usage, createTeamWorkspace: mocks.create, commandTeamWorkspace: mocks.command, acceptTeamInvite: mocks.accept }));
 vi.mock("./production-dashboard-api", () => ({ listProductionProjects: mocks.projects }));

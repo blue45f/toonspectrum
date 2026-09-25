@@ -21,7 +21,7 @@ import {
 } from "@/shared/lib/use-remembered-filters";
 import { formatCount } from "@/shared/lib/utils";
 import { patchRegionSettings, type RegionSettings, type RegionSettingsPatch } from "@/shared/lib/region-settings";
-import { getMyProfile, updateMyProfile } from "@/infrastructure/me-client";
+import { getMyProfile, updateMyProfile } from "@/platform/me-client";
 
 function Choice<T extends string>({
   options,

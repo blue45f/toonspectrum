@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 
 import { StudioSessionClosingDraft } from "../../src/domains/creator/work-session/StudioSessionClosingDraft";
 import { StudioWorkSessionEntry } from "../../src/domains/creator/work-session/StudioWorkSessionEntry";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 const original = createStudioWorkSession({ id: "fixture-session", operationId: "fixture-create", title: "리딩 마무리", purpose: "첫 장면 시선 검토", kind: "reading",
   input: { schemaVersion: 1, workId: "fixture-work", projectId: "fixture-project", artifactId: "fixture-artifact", reviewId: "fixture-review", revisionId: "fixture-pin", rootGraphHash: "a".repeat(64) }, invitedUserIds: [] },

@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import type { StudioTeamSnapshot } from "../studio-team-client";
 import { StudioPinnedReviewPanel } from "./StudioPinnedReviewPanel";
 import { normalizeStudioReviewAssignees, studioReviewAssignmentCandidates, studioReviewDueAt } from "./studio-review-comment-assignment";
 
 const f = vi.hoisted(() => ({ actor: "actor-a" as string | null, verify: vi.fn(), team: vi.fn(), create: vi.fn(), newId: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: f.actor ? { user: { id: f.actor } } : null }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: f.actor ? { user: { id: f.actor } } : null }) }));
 vi.mock("../studio-team-client", () => ({ getStudioTeam: f.team }));
 vi.mock("./studio-virtual-space-review-invitation", () => ({ verifyStudioVirtualSpaceReviewSubject: f.verify }));
 vi.mock("../project-graph/studio-project-graph-client", () => ({ createStudioReviewComment: f.create, newStudioProjectGraphId: f.newId }));

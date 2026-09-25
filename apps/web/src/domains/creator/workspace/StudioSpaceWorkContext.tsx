@@ -1,5 +1,5 @@
 import { useMemo, type MouseEvent } from "react";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useI18n } from "@/shared/lib/i18n";
 import { useStudioProjectLibrary } from "../studio-shell/useStudioProjectLibrary";

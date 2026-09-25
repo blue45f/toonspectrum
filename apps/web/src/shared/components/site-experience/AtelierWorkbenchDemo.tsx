@@ -5,7 +5,7 @@ import { useId, useState, type CSSProperties, type KeyboardEvent } from "react";
 import { ATELIER_SCENES, ATELIER_SCENE_IDS, type AtelierLocale, type AtelierScene } from "./site-atelier-content";
 import { useAtelierMotion } from "./use-atelier-motion";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import "./atelier-workbench.css";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>

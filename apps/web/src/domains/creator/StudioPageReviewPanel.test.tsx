@@ -12,7 +12,7 @@ import { patchPageReviewState, type PageReviewPatch } from "./studio-page-review
 
 const viewportState = vi.hoisted(() => ({ mobile: false }));
 
-vi.mock("@/hooks/use-media-query", () => ({
+vi.mock("@/shared/hooks/use-media-query", () => ({
   useIsMobile: () => viewportState.mobile,
 }));
 

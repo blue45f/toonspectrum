@@ -28,7 +28,7 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { cn } from "@/shared/lib/utils";
 import { useApp } from "@/shared/lib/store";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 const DATE_ONLY = new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" });
 

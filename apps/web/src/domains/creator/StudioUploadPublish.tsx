@@ -68,13 +68,13 @@ import { StudioPublishContextBanner, type PublishContext } from "./StudioPublish
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
   getChallenge,
   getSeries,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 const MAX_PAGES = 40;
 
@@ -568,7 +568,7 @@ export function StudioUploadPublish({ workId: routeWorkId }: StudioUploadPublish
               })
             : ({
                 kind: "create" as const,
-                module: await import("@/infrastructure/creator-client"),
+                module: await import("@/platform/creator-client"),
               }),
         mutate: async (client, cover, signal) => {
           const editableContent = {

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { StudioWorkSession } from "@toonspectrum/studio-project-model/work-session";
 import type { StudioSessionEvidenceResponse } from "@toonspectrum/studio-project-model/work-session-evidence";
-import { httpStatus } from "@/infrastructure/api";
-import { getAuthSessionRevision, listeners, type Session } from "@/compat/auth-session-state";
+import { httpStatus } from "@/platform/api";
+import { getAuthSessionRevision, listeners, type Session } from "@/domains/auth/public/session/auth-session-state";
 import { getStudioSessionEvidence } from "./studio-session-evidence-client";
 
 export function useSessionEvidence(session: StudioWorkSession, actorId: string, enabled: boolean, onRevoked: () => void) {

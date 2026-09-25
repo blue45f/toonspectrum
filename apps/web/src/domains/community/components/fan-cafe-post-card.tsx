@@ -13,7 +13,7 @@ import { COMMUNITY_SCOPE_LABEL } from "@/shared/lib/community-ui";
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { useApp } from "@/shared/lib/store";
 import { cn, relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 export default function FanPostCard({
   post,

@@ -7,7 +7,7 @@ import { SiteAtelierChapter } from "./SiteAtelierChapter";
 import { DESTINATION_ART } from "./site-atelier-content";
 import { useSiteExperience } from "./site-experience-context";
 import { EXPERIENCE_DESTINATIONS, nextExperienceDestinations } from "./site-experience-model";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>

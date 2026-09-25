@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, BookOpen, Boxes, ClipboardCheck, MapPin, ScanLine, Users } from "lucide-react";
 import { workspaceNavigationHref } from "@/shared/components/workspace/workspace-navigation-model";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import type { workspaceProjectLinks } from "./studio-workspace-model";

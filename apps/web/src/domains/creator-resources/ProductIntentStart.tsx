@@ -13,7 +13,7 @@ import {
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { WorkflowTrustBadge } from "@/shared/components/WorkflowTrustBadge";
 import {
   creatorRecentDestinationDescription,

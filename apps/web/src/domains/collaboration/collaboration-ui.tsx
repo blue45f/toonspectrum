@@ -8,7 +8,7 @@ import {
 import type { CollaborationPost } from "../../../../../packages/core/src/collaboration";
 import type { ReactNode } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 export const collabInput = "mt-2 min-h-11 w-full rounded-xl border border-line-strong bg-canvas px-3 py-2.5 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 disabled:opacity-50";
 const collabButtonBase = "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";

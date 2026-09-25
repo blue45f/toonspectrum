@@ -34,8 +34,8 @@ import {
 import { useSiteHeaderHeight } from "./use-site-header-height";
 
 import { isImmersiveMobileRoute } from "@/app/routes/immersive-mobile-route";
-import { usePathname } from "@/compat/navigation";
-import Link from "@/compat/router-link";
+import { usePathname } from "@/shared/navigation/navigation";
+import Link from "@/shared/navigation/router-link";
 import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { keepInlineText } from "@/shared/lib/text";

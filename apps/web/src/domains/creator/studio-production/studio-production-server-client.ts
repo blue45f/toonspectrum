@@ -6,7 +6,7 @@ import {
   type ProductionWorkspace,
 } from "./studio-production-workspace-runtime";
 
-import { api, isHttpError, toApiError } from "@/infrastructure/api";
+import { api, isHttpError, toApiError } from "@/platform/api";
 
 const MAX_REVIEW_LINKS = 100;
 const MAX_REVIEW_FEEDBACK = 1_000;

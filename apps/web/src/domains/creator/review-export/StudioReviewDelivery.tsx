@@ -10,8 +10,8 @@ import {
   getAuthSessionRevision,
   getAuthUserId,
   listeners as sessionListeners,
-} from "@/compat/auth-session-state";
-import { useAuthActorId } from "@/compat/use-auth-actor-id";
+} from "@/domains/auth/public/session/auth-session-state";
+import { useAuthActorId } from "@/domains/auth/public/session/use-auth-actor-id";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpaceVerifiedReview } from "../virtual-space/studio-virtual-space-review-invitation";
 import {

@@ -30,7 +30,7 @@ import {
 } from "./production-push-client";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 const FIELD_CLASS =
   "min-h-10 w-full rounded-xl border border-line bg-panel px-3 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20";

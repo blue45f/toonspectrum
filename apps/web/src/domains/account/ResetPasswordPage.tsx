@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
-import { api, apiPath } from "@/infrastructure/api";
+import { api, apiPath } from "@/platform/api";
 
 function readError(payload: unknown): string {
   if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {

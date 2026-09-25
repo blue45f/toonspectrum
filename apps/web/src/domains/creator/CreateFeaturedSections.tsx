@@ -6,14 +6,14 @@ import { buildStudioHref } from "./creator-studio-links";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   challengeDday,
   listChallenges,
   listWorks,
   type ChallengeSummary,
   type WorkSummary,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 
 function SectionShell({

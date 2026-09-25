@@ -12,7 +12,7 @@ import { emptyTerms } from "./hiring-form-values";
 
 import type { HiringSlot, HiringSlotTerms } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import { getApiErrorMessage } from "@/infrastructure/api";
+import { getApiErrorMessage } from "@/platform/api";
 
 export function HiringPostPanel({ postId, postVersion, canManage }: { postId: string; postVersion: number; canManage: boolean }) {
   const [items, setItems] = useState<HiringSlot[] | null>(null), [refresh, setRefresh] = useState(0), [error, setError] = useState("");

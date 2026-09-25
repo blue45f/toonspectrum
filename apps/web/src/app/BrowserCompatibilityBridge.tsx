@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import {
   checkBrowserCompatibility,
   type BrowserCompatibilityResult,
-} from "../compat/browser-check";
-import { BrowserCompatModal } from "../components/browser-compat-modal";
+} from "../platform/browser/browser-check";
+import { BrowserCompatModal } from "../app/errors/browser-compat/browser-compat-modal";
 
 import { shouldPromptForBrowserCompatibility } from "./browser-compatibility-scope";
 import {

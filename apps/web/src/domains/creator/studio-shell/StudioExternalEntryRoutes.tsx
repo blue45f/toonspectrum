@@ -1,7 +1,7 @@
 import { CircleAlert, ExternalLink } from "lucide-react";
 import { Navigate, useParams } from "react-router-dom";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { useT } from "@/shared/lib/i18n";
 import {

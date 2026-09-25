@@ -19,9 +19,9 @@ import { useMemo, useState } from "react";
 
 import "./support-center.css";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/container";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 const SUPPORT_PATHS = [
   {

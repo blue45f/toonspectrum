@@ -1,8 +1,8 @@
 import { useUserAi } from "@/shared/ai/user-ai-store";
 import { UnifiedAiSettingsEntryCard } from "@/shared/ai/UnifiedAiSettings";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "@/compat/router-link";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import Link from "@/shared/navigation/router-link";
+import { getApiErrorMessage } from "@/platform/api";
 import {
   cancelInferenceJob, cleanupUserInferenceUploads, deleteUserInferenceJob, downloadInferenceArtifact,
   inferenceCapabilities, listInferenceJobs, removeUserInferenceUpload, submitInferenceJob, uploadInferenceAsset,

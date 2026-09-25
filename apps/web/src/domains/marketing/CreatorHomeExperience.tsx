@@ -1,7 +1,7 @@
 import { translateCurrentStaticSourceText, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
 import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, ClipboardCheck, FileOutput, FolderKanban, Handshake, PackageCheck, PanelsTopLeft, ShieldCheck, Sparkles, Users, Workflow, type LucideIcon } from "lucide-react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
 import { PRODUCT_IDENTITY, PRODUCT_START_DESTINATIONS, resolveProductLocale, type ProductStartDestinationId } from "@/shared/lib/product-identity";
 import { useI18n } from "@/shared/lib/i18n";

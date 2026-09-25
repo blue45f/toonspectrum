@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 
-import { persistSession } from "../../src/compat/auth-session-state";
+import { persistSession } from "../../src/domains/auth/public/session/auth-session-state";
 import { StudioReviewExport } from "../../src/domains/creator/review-export/StudioReviewExport";
 import { reviewProductionFixture } from "../../src/domains/creator/review-production/studio-review-production-test-fixture";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 if (!import.meta.env.DEV) throw new Error("Review export fixture is development-only");
 const fixture = reviewProductionFixture().verified;

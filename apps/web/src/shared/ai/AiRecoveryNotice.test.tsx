@@ -8,7 +8,7 @@ import { MemoryRouter } from "react-router-dom";
 import {
   AUTH_MODAL_REQUEST_EVENT,
   type AuthModalRequestDetail,
-} from "@/compat/auth-modal-intent";
+} from "@/domains/auth/public/session/auth-modal-intent";
 
 import { AiRecoveryNotice } from "./AiRecoveryNotice";
 import { inferAiRecoveryCode } from "./ai-recovery-code";

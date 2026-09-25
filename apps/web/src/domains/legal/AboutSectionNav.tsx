@@ -1,8 +1,8 @@
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { Layers, Scale, Sparkles, Wrench } from "lucide-react";
 
-import Link from "@/compat/router-link";
-import { usePathname } from "@/compat/navigation";
+import Link from "@/shared/navigation/router-link";
+import { usePathname } from "@/shared/navigation/navigation";
 import { cx } from "@/shared/lib/cx";
 
 

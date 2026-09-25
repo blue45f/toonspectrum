@@ -9,20 +9,20 @@ import { useAdminGate } from "./components/admin-gate-state";
 import { CreatorMarketplaceModerationBoard } from "./components/CreatorMarketplaceModerationBoard";
 
 import type { FanCafeScopeFilter } from "@/shared/lib/types";
-import type { SharedAssetModerationQueueItem } from "@/infrastructure/creator-client";
+import type { SharedAssetModerationQueueItem } from "@/platform/creator-client";
 
 import { Container } from "@/shared/components/section";
 import { COMMUNITY_SCOPE_LABEL_WITH_ALL } from "@/shared/lib/community-ui";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn, relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { verifyStudioSharedAssetContent } from "@/domains/creator/public/shared-asset-content";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
   getSharedAssetContent,
   listSharedAssetModerationQueue,
   moderateSharedAsset,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 
 interface ModerationPost {
   id: string;

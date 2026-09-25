@@ -5,15 +5,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CreatorProjectRoleSwitcher } from "./CreatorProjectRoleSwitcher";
 
-import type { MeProfile } from "@/infrastructure/me-client";
+import type { MeProfile } from "@/platform/me-client";
 import { normalizeCreatorRoleProfile } from "@/shared/lib/creator-role-contract";
 
 const { updateMyProfile } = vi.hoisted(() => ({
   updateMyProfile: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/me-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/infrastructure/me-client")>();
+vi.mock("@/platform/me-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/platform/me-client")>();
   return { ...actual, updateMyProfile };
 });
 

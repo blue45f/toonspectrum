@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import { activePublicJourney, PUBLIC_JOURNEY } from "./public-site-destinations";
 import { useSiteExperience } from "./site-experience/site-experience-context";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 import "./public-site-shell.css";
 import "./public-site-vibrance.css";

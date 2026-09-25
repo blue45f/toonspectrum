@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EngineeringPlaybookPage } from "./EngineeringPlaybookPage";
 
-vi.mock("@/hooks/use-document-title", () => ({ useDocumentTitle: vi.fn() }));
+vi.mock("@/shared/seo/use-document-title", () => ({ useDocumentTitle: vi.fn() }));
 
 afterEach(cleanup);
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 import { parseSearchResult } from "@/shared/lib/creator-resources";
 import type { ResourceSearchResult } from "@/shared/lib/creator-resources";
 

@@ -8,7 +8,7 @@ import { StudioVirtualSpaceAmbientAudio } from "../../src/domains/creator/virtua
 
 import type { StudioLiveRoom } from "../../src/domains/creator/live/studio-live-collaboration-room";
 
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 if (!import.meta.env.DEV) throw new Error("Ambient acceptance is development-only");
 // Actual Web Audio decode/graph/playback and Huddle controller, with an empty synthetic room.

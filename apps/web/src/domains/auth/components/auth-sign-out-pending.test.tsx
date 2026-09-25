@@ -11,7 +11,7 @@ const sessionMocks = vi.hoisted(() => ({
   signOut: vi.fn(),
 }));
 
-vi.mock("@/compat/auth-session-store", () => ({
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({
   useSession: () => ({
     data: {
       user: {
@@ -34,7 +34,7 @@ vi.mock("@/domains/admin/components/admin-client", () => ({
   adminFetch: vi.fn().mockRejectedValue(new Error("not an admin")),
 }));
 
-vi.mock("@/compat/router-link", () => ({
+vi.mock("@/shared/navigation/router-link", () => ({
   default: ({ href, children, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
     <a href={href} {...props}>{children}</a>
   ),

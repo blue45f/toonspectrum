@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { studioReviewPageMappingSchema, type StudioReviewPageMapping } from "@toonspectrum/studio-project-model";
 
-import { api, httpStatus } from "@/infrastructure/api";
+import { api, httpStatus } from "@/platform/api";
 
 import { parseStudioVirtualSpaceReviewSubject, sameStudioVirtualSpaceReviewSubject,
   type StudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-subject";

@@ -7,7 +7,7 @@ import {
 import { useMemo, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   runStudioExportPreflight,
   STUDIO_EXPORT_TARGET_PROFILES,

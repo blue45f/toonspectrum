@@ -6,7 +6,7 @@ import type {
   MarketplaceCommerceQuote,
 } from "@toonspectrum/core/commerce";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
 export interface MarketCommerceOrder extends CommerceOrderPublicEntry {
   clientKey: string | null;

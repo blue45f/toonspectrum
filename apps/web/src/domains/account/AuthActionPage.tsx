@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 
-import { NotFoundPage } from "@/components/NotFoundPage";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 
 import { AuthCallbackPage } from "./AuthCallbackPage";
 import { ResetPasswordPage } from "./ResetPasswordPage";

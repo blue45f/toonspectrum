@@ -8,10 +8,10 @@ import { CollaborationCard, CollaborationSafety, CollabLogin, CollabNotice, coll
 
 import type { CollaborationList } from "../../../../../packages/core/src/collaboration";
 
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
-import { collaborationClient } from "@/infrastructure/collaboration-client";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import { collaborationClient } from "@/platform/collaboration-client";
+import { getApiErrorMessage } from "@/platform/api";
 import { Container } from "@/shared/components/section";
 import { useApp } from "@/shared/lib/store";
 

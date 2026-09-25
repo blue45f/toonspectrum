@@ -20,8 +20,8 @@ import {
 import { useEngineeringLocale } from "./use-engineering-locale";
 import technologyFilmScript from "./technology-film-script.json";
 
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 

@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { creatorMeetingClient, parseCreatorRoom, parseCreatorRoomMessages } from "./creator-meeting-client";
 import { deferred, fixtureMessage, fixtureRoom } from "./creator-meeting.test-fixtures";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
-vi.mock("@/infrastructure/api", () => ({ api: { get: vi.fn(), post: vi.fn() } }));
+vi.mock("@/platform/api", () => ({ api: { get: vi.fn(), post: vi.fn() } }));
 beforeEach(() => vi.resetAllMocks());
 describe("private meeting response boundary", () => {
   it("accepts only the expected room and current participant projection", () => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import Link from "@/compat/router-link";
-import { useSession } from "@/compat/auth-session-store";
-import { getAuthSessionRevision, getAuthUserId, listeners } from "@/compat/auth-session-state";
+import Link from "@/shared/navigation/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { getAuthSessionRevision, getAuthUserId, listeners } from "@/domains/auth/public/session/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { StudioWorkSessionEntry } from "../work-session/StudioWorkSessionEntry";
 import { StudioHandoffEnvelopeInbox } from "../handoff-envelope/StudioHandoffEnvelope";

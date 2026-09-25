@@ -9,7 +9,7 @@ import { traceStudioP2pDirectPort, type DirectPacketDiagnostic } from "./studio-
 
 import type { StudioLiveRoom } from "../../src/domains/creator/live/studio-live-collaboration-room";
 import type { StudioLiveTransport } from "../../src/domains/creator/live/studio-live-collaboration-transport";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Local fixture only: real RTC/SCTP/RTP and product UI, NOT production authentication/signaling.
 export const primaryPackets: StudioLiveEnvelope[] = [];

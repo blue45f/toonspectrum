@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   getApiErrorMessage: vi.fn(async (_error: unknown, fallback: string) => fallback),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: { get: mocks.get, post: mocks.post },
   getApiErrorMessage: mocks.getApiErrorMessage,
 }));

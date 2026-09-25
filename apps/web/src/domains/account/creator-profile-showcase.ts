@@ -1,4 +1,4 @@
-import type { WorkSummary } from "@/infrastructure/creator-client";
+import type { WorkSummary } from "@/platform/creator-client";
 
 export interface CreatorProfileShowcase {
   featured: WorkSummary[];

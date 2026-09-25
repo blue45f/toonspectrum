@@ -16,7 +16,7 @@ const { apiPost, isHttpError, toApiError } = vi.hoisted(() => ({
   toApiError: vi.fn(async (_error: unknown, fallback: string) => new Error(fallback)),
 }));
 
-vi.mock("@/infrastructure/api", () => ({
+vi.mock("@/platform/api", () => ({
   api: { raw: { post: apiPost } },
   apiPath: (path: string) => path,
   isHttpError,

@@ -34,15 +34,15 @@ import {
 } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import { WorkspaceNavigation } from "@/shared/components/workspace/WorkspaceNavigation";
 import { StudioSpaceWorkContext } from "../workspace/StudioSpaceWorkContext";
 import { StudioWorkspaceInbox } from "../workspace/StudioWorkspaceInbox";
 import { WorkspaceContextPanel } from "@/shared/components/workspace/WorkspaceContextPanel";
 import "@/shared/components/workspace/workspace.css";
 import "@/shared/components/workspace/workspace-visual-v3.css";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";

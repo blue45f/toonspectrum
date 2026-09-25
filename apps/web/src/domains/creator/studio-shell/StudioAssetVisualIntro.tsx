@@ -2,7 +2,7 @@ import "./studio-asset-visual-intro.css";
 import { ArrowRight, Box, Brush, Image, Library, ShieldCheck, Store, Type, UserRound } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useT } from "@/shared/lib/i18n";
 import { translateParallelBilingualCopy } from "@/shared/lib/i18n-bilingual-copy";
 

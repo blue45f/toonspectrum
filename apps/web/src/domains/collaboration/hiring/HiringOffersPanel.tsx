@@ -7,8 +7,8 @@ import { HiringTermsView } from "./HiringSlotEditor";
 
 import type { HiringOffer } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import Link from "@/compat/router-link";
-import { getApiErrorMessage } from "@/infrastructure/api";
+import Link from "@/shared/navigation/router-link";
+import { getApiErrorMessage } from "@/platform/api";
 
 export function HiringOffersPanel({ actor }: { actor: string }) {
   const [items, setItems] = useState<HiringOffer[] | null>(null), [refresh, setRefresh] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState(""), [note, setNote] = useState("");

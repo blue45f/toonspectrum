@@ -2,7 +2,7 @@ import { Boxes, Library, Palette, Search, ShieldCheck, Store } from "lucide-reac
 import { lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { MarketBrowsePage } from "@/domains/market/pages/MarketBrowsePage";
 import { MarketLibraryPage } from "@/domains/market/pages/MarketCloudLibraryPage";
 import { MarketManagePage } from "@/domains/market/pages/MarketOwnedResourcesPage";

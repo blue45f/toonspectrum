@@ -2,7 +2,7 @@ import { Archive, CheckCircle2, CircleAlert, Download, FileArchive, FileCheck2, 
 import { useMemo, useState } from "react";
 
 import { useBilingual, useBilingualLocalizer, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { WEBTOON_PLATFORM_SPECS, type WebtoonImageFormat, type WebtoonPlatformId } from "../assistant/webtoon-platform-spec-validator";
 import { planStudioArchiveRestore, validateStudioArchiveManifest, type StudioArchiveManifest } from "../studio-archive-manifest";
 import { planStudioPublish, type StudioPublishConnector, type StudioPublishPlan } from "../studio-publishing-connector";

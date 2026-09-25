@@ -29,9 +29,9 @@ import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
-import { getApiErrorMessage } from "@/infrastructure/api";
-import { promotionClient } from "@/infrastructure/promotion-client";
+} from "@/shared/seo/use-document-title";
+import { getApiErrorMessage } from "@/platform/api";
+import { promotionClient } from "@/platform/promotion-client";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import {

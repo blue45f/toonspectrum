@@ -4,7 +4,7 @@ import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { ArrowRight, ArrowLeft, Search, Star, Sparkles, BookOpen, Trash2, BookmarkPlus } from "lucide-react";
 import { FORTUNE_EXPERIENCES, FORTUNE_GROUPS, FORTUNE_DISCLAIMER, buildFortuneReading, fortuneKstDate, fortuneReadingText } from "@toonspectrum/core/fortune";
 import type { FortuneBirthInput, FortuneGroup, FortuneReading } from "@toonspectrum/core/fortune";

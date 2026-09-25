@@ -7,7 +7,7 @@ import { emptyTerms } from "./hiring-form-values";
 import type { HiringCandidate, HiringCandidatePage, HiringSlot } from "../../../../../../packages/contracts/src/creator-hiring";
 
 vi.mock("./hiring-matching-client", () => ({ hiringMatchingClient: { discover: vi.fn(), send: vi.fn() } }));
-vi.mock("@/infrastructure/api", () => ({ getApiErrorMessage: async () => "연결 실패" }));
+vi.mock("@/platform/api", () => ({ getApiErrorMessage: async () => "연결 실패" }));
 const discover = vi.mocked(hiringMatchingClient.discover);
 const send = vi.mocked(hiringMatchingClient.send);
 const slot: HiringSlot = { id: "slot", postId: "post", revision: 1, state: "open", terms: emptyTerms(), createdAt: new Date().toISOString() };

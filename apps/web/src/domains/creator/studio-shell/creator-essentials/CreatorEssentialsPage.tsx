@@ -5,8 +5,8 @@ import {
 } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 import { CREATOR_ESSENTIALS, ESSENTIALS_KINDS, ESSENTIALS_LABELS, essentialsByteLabel, essentialsEditorHref, essentialsFormat, essentialsKind, filterCreatorEssentials, type CreatorEssential, type EssentialsLocale } from "./creator-essentials-catalog";

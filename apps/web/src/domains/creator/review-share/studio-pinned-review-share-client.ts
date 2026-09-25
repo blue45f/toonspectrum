@@ -14,7 +14,7 @@ import {
   type PinnedShareFeedbackInput,
 } from "@toonspectrum/studio-project-model/pinned-review-share";
 
-import { api, apiPath } from "@/infrastructure/api";
+import { api, apiPath } from "@/platform/api";
 
 const ownerListSchema = z.object({
   items: z.array(pinnedShareOwnerViewSchema).max(25),

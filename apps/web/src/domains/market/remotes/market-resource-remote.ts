@@ -5,4 +5,4 @@
 export {
   getCreatorMarketplaceResource,
   listCreatorMarketplaceResources,
-} from "@/infrastructure/creator-marketplace-client";
+} from "@/platform/creator-marketplace-client";

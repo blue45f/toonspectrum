@@ -5,7 +5,7 @@ import {
   studioCompanionPopupGuidanceFor,
 } from "./studio-companion-popup-guidance";
 
-import { diagnoseStudioInAppBrowser } from "@/compat/in-app-browser";
+import { diagnoseStudioInAppBrowser } from "@/platform/browser/in-app-browser";
 
 const HREF = "https://toonspectrum.app/studio";
 const KAKAO_ANDROID =

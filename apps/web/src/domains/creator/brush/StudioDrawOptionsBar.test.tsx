@@ -15,7 +15,7 @@ const drawOptionsSource = readFileSync(
   resolve(process.cwd(), "apps/web/src/domains/creator/brush/StudioDrawOptionsBar.tsx"),
   "utf8"
 );
-const studioGlobalsSource = readFileSync(resolve(process.cwd(), "apps/web/src/styles/globals.css"), "utf8");
+const studioGlobalsSource = readFileSync(resolve(process.cwd(), "apps/web/src/app/styles/globals.css"), "utf8");
 
 afterEach(cleanup);
 

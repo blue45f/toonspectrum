@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CreatorRoleOnboarding } from "./CreatorRoleOnboarding";
 
-import type { MeProfile } from "@/infrastructure/me-client";
+import type { MeProfile } from "@/platform/me-client";
 import {
   CREATOR_ROLE_PROFILE_VERSION,
   normalizeCreatorRoleProfile,
@@ -15,8 +15,8 @@ const { updateMyProfile } = vi.hoisted(() => ({
   updateMyProfile: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/me-client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/infrastructure/me-client")>();
+vi.mock("@/platform/me-client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/platform/me-client")>();
   return { ...actual, updateMyProfile };
 });
 

@@ -33,8 +33,8 @@ import {
   usePathname,
   useRouter,
   useSearchParams,
-} from "@/compat/navigation";
-import Link from "@/compat/router-link";
+} from "@/shared/navigation/navigation";
+import Link from "@/shared/navigation/router-link";
 
 export function AdminPage() {
   const { gate, uid } = useAdminGate();

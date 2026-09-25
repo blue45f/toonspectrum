@@ -5,16 +5,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CreatorMarketplaceReportAction } from "./CreatorMarketplaceReportAction";
 
-import type { SessionContextValue } from "@/compat/auth-session-store";
+import type { SessionContextValue } from "@/domains/auth/public/session/auth-session-store";
 
-import { SessionContext } from "@/compat/auth-session-store";
+import { SessionContext } from "@/domains/auth/public/session/auth-session-store";
 
 const { reportCreatorMarketplaceResource } = vi.hoisted(() => ({
   reportCreatorMarketplaceResource: vi.fn(),
 }));
 
-vi.mock("@/infrastructure/creator-marketplace-client", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/infrastructure/creator-marketplace-client")>()),
+vi.mock("@/platform/creator-marketplace-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/platform/creator-marketplace-client")>()),
   reportCreatorMarketplaceResource,
 }));
 

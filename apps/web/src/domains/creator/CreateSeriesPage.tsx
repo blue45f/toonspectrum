@@ -37,15 +37,15 @@ import {
   publicShareImageUrl,
 } from "@/shared/lib/public-share-policy";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
-import { NotFoundPage } from "@/components/NotFoundPage";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
-import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/infrastructure/creator-client";
+} from "@/shared/seo/use-document-title";
+import { deleteSeries, getSeries, type SeriesDetail, type WorkSummary } from "@/platform/creator-client";
 
 
 // 회차 행 — 목록형(웹툰 회차 리스트 스타일).

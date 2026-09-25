@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { useSession } from "@/compat/auth-session-store";
-import { getAuthSessionRevision } from "@/compat/auth-session-state";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { getAuthSessionRevision } from "@/domains/auth/public/session/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { listStudioVirtualSpaceReviewHistory, type StudioVirtualSpaceReviewChoice,
   type StudioVirtualSpaceReviewChoices } from "./studio-virtual-space-review-invitation";

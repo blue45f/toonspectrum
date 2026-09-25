@@ -31,7 +31,7 @@ import type {
 import type { CSSProperties, ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { useIsMobile } from "@/hooks/use-media-query";
+import { useIsMobile } from "@/shared/hooks/use-media-query";
 
 const SELECTION_LAYOUT_HINTS = {
   group: {

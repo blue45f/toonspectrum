@@ -8,7 +8,7 @@ import {
   StudioVoiceIcePolicyResponseSchema,
   type StudioVoiceIcePolicyMode,
 } from "@/shared/lib/studio-voice-ice-policy-contract";
-import { api, toApiError } from "@/infrastructure/api";
+import { api, toApiError } from "@/platform/api";
 
 const STUDIO_SCREEN_ICE_REQUEST_TIMEOUT_MS = 10_000;
 

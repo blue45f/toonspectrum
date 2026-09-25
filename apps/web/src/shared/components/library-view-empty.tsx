@@ -1,6 +1,6 @@
 import { Star } from "lucide-react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 export function EmptyTeach({
   icon: Icon,

@@ -13,7 +13,7 @@ import type {
 
 const mocks = vi.hoisted(() => ({ getHistory: vi.fn() }));
 
-vi.mock("@/infrastructure/creator-marketplace-client", () => ({
+vi.mock("@/platform/creator-marketplace-client", () => ({
   getCreatorMarketplaceResourceHistory: mocks.getHistory,
 }));
 

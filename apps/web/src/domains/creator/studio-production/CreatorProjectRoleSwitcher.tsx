@@ -1,7 +1,7 @@
 import { BellRing, CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { updateMyProfile, type MeProfile } from "@/infrastructure/me-client";
+import { updateMyProfile, type MeProfile } from "@/platform/me-client";
 import {
   CREATOR_ROLE_NOTIFICATION_LABELS,
   creatorProjectRolePreference,

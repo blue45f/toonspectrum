@@ -2,12 +2,12 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { evaluateReviewPolicy, type ReviewPolicyResponse, type ReviewPolicyVoteRecord } from "@toonspectrum/studio-project-model";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { StudioReviewPolicyPanel } from "./StudioReviewPolicyPanel";
 import type { StudioVirtualSpaceVerifiedReview } from "./studio-virtual-space-review-invitation";
 
 const f = vi.hoisted(() => ({ actor: "actor-a", get: vi.fn(), command: vi.fn(), decide: vi.fn(), refreshed: vi.fn(), known: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
 vi.mock("./studio-review-policy-client", () => ({ getStudioReviewPolicy: f.get, applyStudioReviewPolicyCommand: f.command }));
 vi.mock("../project-graph/studio-project-graph-client", () => ({ decideStudioReview: f.decide }));
 const pin = { reviewId: "review", artifactId: "artifact", revisionId: "revision", rootGraphHash: "a".repeat(64) };

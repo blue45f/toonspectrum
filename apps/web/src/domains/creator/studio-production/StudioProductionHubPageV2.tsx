@@ -73,7 +73,7 @@ import { StudioReviewLinkManager } from "./StudioReviewLinkManager";
 import { StudioServerVersionsCard } from "./StudioServerVersionsCard";
 import { getStudioTeam, type StudioTeamSnapshot } from "../studio-team-client";
 
-import { getMyProfile, type MeProfile } from "@/infrastructure/me-client";
+import { getMyProfile, type MeProfile } from "@/platform/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   GLOBAL_CREATOR_ROLE_WORKSPACE_KEY,
@@ -82,7 +82,7 @@ import {
 } from "@/shared/lib/creator-role-workspace-contract";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 const StudioHandoffEnvelopeInbox = lazy(() => import("../handoff-envelope/StudioHandoffEnvelope").then((module) => ({ default: module.StudioHandoffEnvelopeInbox })));
 

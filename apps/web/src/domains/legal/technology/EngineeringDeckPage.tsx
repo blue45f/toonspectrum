@@ -28,7 +28,7 @@ import {
 } from "./EngineeringStoryUi";
 import { useEngineeringLocale } from "./use-engineering-locale";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 import { cx } from "@/shared/lib/cx";

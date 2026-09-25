@@ -8,7 +8,7 @@ import type { ResourceProvider } from "@/shared/lib/creator-resources";
 
 import { parseProviderAvailability } from "@/shared/lib/creator-resource-workflow";
 import { RESOURCE_LABELS } from "@/shared/lib/creator-resources";
-import { apiPath } from "@/infrastructure/api";
+import { apiPath } from "@/platform/api";
 
 export function ProviderStatus({ provider }: { provider?: ResourceProvider }) {
   const inRouter = useInRouterContext();

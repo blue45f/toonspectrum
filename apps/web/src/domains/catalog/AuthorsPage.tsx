@@ -6,9 +6,9 @@ import { Container } from "@/shared/components/section";
 import { genreTint, genreBorder, genreTextColor } from "@/shared/lib/genre-color";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { formatCount } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
-import { useApiResource } from "@/infrastructure/use-api-resource";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { useApiResource } from "@/platform/use-api-resource";
 
 
 interface AuthorEntry {

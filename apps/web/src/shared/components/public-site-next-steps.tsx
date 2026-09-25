@@ -7,7 +7,7 @@ import { artworkSourcesForPath } from "./site-experience/site-art-direction";
 import { publicSiteNextSteps } from "./public-site-pathways";
 import { isPublicCreativeRoute } from "./site-public-routes";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 
 import "./public-site-vibrance.css";

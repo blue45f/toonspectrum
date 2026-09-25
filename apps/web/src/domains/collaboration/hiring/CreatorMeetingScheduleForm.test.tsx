@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MeetingScheduleForm } from "./CreatorMeetingScheduleForm";
 import { deferred } from "./creator-meeting.test-fixtures";
 
-import { api } from "@/infrastructure/api";
+import { api } from "@/platform/api";
 
-vi.mock("@/infrastructure/api", () => ({ api: { post: vi.fn() }, getApiErrorMessage: async () => "예약 확인 오류" }));
+vi.mock("@/platform/api", () => ({ api: { post: vi.fn() }, getApiErrorMessage: async () => "예약 확인 오류" }));
 const scope = { kind: "interview" as const, applicationId: "app-a", teamId: null, participantIds: ["guest-a"] };
 beforeEach(() => vi.resetAllMocks()); afterEach(cleanup);
 describe("scope-bound meeting scheduling", () => {

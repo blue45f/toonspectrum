@@ -1,7 +1,7 @@
 import { HelpCircle, Settings, UserRound } from "lucide-react";
 import { useContext, type ReactNode } from "react";
 import { WorkspaceAccountContext } from "./workspace-account-context";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useI18n } from "@/shared/lib/i18n";
 import { WorkspaceNavigation } from "./WorkspaceNavigation";
 import { CampusControls } from "../spatial-campus/CampusControls";

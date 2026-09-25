@@ -1,7 +1,7 @@
 
 
 
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 import { WebIO } from "@gltf-transform/core";
 import { createRoot } from "react-dom/client";
 

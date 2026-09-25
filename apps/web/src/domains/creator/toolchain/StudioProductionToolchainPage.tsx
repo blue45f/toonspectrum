@@ -15,7 +15,7 @@ import {
 import { useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 
 import { StudioProductionJobWorkspace } from "./StudioProductionJobWorkspace";

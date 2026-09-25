@@ -20,7 +20,7 @@
 
 **중요 — 기존 "AI 에셋 생성" 기능과는 완전히 별개의 독립 경로다.** `StudioPage.tsx`에는 이미
 `onGenerateAsset`(4601행 부근, `assetPrompt`/`assetGenerating` 상태, `StudioAssetMenuPanel`의
-"내 에셋 > AI 에셋 생성" 탭)이 있는데, 이건 `src/infrastructure/creator-client.ts`의 `generateAsset`을
+"내 에셋 > AI 에셋 생성" 탭)이 있는데, 이건 `src/platform/creator-client.ts`의 `generateAsset`을
 통해 **이 앱의 NestJS 백엔드가 서버 보유 키로 대신 호출**하는(로그인 필요, 서버가 비용을 대납하는)
 유료 기능이다. 이번 BYOK 기능은 로그인 불필요·사용자가 자기 키로 직접 호출하는 완전히 다른 경로이니
 통합 시 두 경로를 섞거나 재사용하지 않는다. 다만 **"생성형 AI 최초 사용 고지" 모달(`aiNoticeOpen`/

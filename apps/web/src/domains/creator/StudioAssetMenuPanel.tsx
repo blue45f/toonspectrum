@@ -49,7 +49,7 @@ import type {
   GeneratedAssetSize,
   PublishAssetInput,
   SharedAssetCatalogItem,
-} from "@/infrastructure/creator-client";
+} from "@/platform/creator-client";
 import type { ChangeEvent, Dispatch, DragEvent, KeyboardEvent, SetStateAction } from "react";
 
 import {

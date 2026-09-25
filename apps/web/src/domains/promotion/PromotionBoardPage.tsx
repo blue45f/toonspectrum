@@ -8,7 +8,7 @@ import "./promotion-community.css";
 
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { useApp } from "@/shared/lib/store";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 export function PromotionBoardPage() {
   useDocumentTitle("신작·작가 홍보 커뮤니티 · ToonStudio");

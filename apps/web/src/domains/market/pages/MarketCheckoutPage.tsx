@@ -19,7 +19,7 @@ import type {
   CommercePaymentMethod,
   MarketplaceCommerceQuote,
 } from "@toonspectrum/core/commerce";
-import type { TossWidgets } from "@/infrastructure/toss-payments-sdk";
+import type { TossWidgets } from "@/platform/toss-payments-sdk";
 
 import {
   confirmMarketplaceCommercePayment,
@@ -32,20 +32,20 @@ import { useMarketLibrary } from "../hooks/use-market-library";
 import { useMarketResourceDetail } from "../hooks/use-market-resource-detail";
 import { marketLicenseMeta } from "../models/market-kind";
 
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import {
   getCreatorMarketplaceResource,
   resolveCreatorMarketplaceCloudLibraryAcquisitionTarget,
-} from "@/infrastructure/creator-marketplace-client";
-import { getApiErrorMessage } from "@/infrastructure/api";
+} from "@/platform/creator-marketplace-client";
+import { getApiErrorMessage } from "@/platform/api";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { loadTossPaymentsSdk } from "@/infrastructure/toss-payments-sdk";
+import { loadTossPaymentsSdk } from "@/platform/toss-payments-sdk";
 import {
   useDocumentTitle,
   useMetaDescription,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 
 const PAYMENT_METHOD_LABELS: Record<CommercePaymentMethod, string> = {
   card: "신용·체크카드",

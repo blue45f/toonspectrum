@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { updateMyProfile, type MeProfile } from "@/infrastructure/me-client";
+import { updateMyProfile, type MeProfile } from "@/platform/me-client";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   CREATOR_ROLE_DEFINITIONS,

@@ -2,7 +2,7 @@ import { CheckCircle2, LayoutTemplate, X } from "lucide-react";
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 import { useBilingual, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
