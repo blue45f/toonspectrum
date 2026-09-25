@@ -11,6 +11,17 @@ export interface CreatorIntelligenceProviderStatus {
   readonly reason: string;
 }
 
+export interface CreatorIntelligenceAdmissionStatus {
+  readonly paidRoutesEnabled: boolean;
+  readonly enforcement: "authenticated-bounded-process-local";
+  readonly operations: Readonly<Record<string, {
+    readonly shortLimit: number;
+    readonly shortWindowMs: number;
+    readonly dailyLimit: number;
+    readonly requiresIdempotency: boolean;
+  }>>;
+}
+
 export interface CreatorIntelligenceStatus {
   readonly schema: "toonspectrum.creator-intelligence.status.v1";
   readonly references: Readonly<Record<CreatorIntelligenceReferenceProvider, CreatorIntelligenceProviderStatus>>;
@@ -22,6 +33,7 @@ export interface CreatorIntelligenceStatus {
   readonly soundEffects: CreatorIntelligenceProviderStatus;
   readonly meshy: CreatorIntelligenceProviderStatus;
   readonly safeSearch: CreatorIntelligenceProviderStatus;
+  readonly admission: CreatorIntelligenceAdmissionStatus;
 }
 
 export interface CreatorIntelligenceReference {
@@ -171,6 +183,16 @@ export interface SafeSearchResponse {
 // account services are temporarily unavailable.
 const PUBLIC_DISCOVERY_REQUEST = Object.freeze({ credentials: "omit" as const });
 
+function protectedOperationId(operation: string): string {
+  const randomId = globalThis.crypto?.randomUUID?.()
+    ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+  return `${operation}:${randomId}`;
+}
+
+function protectedHeaders(operation: string) {
+  return { "Idempotency-Key": protectedOperationId(operation) } as const;
+}
+
 export const creatorIntelligenceClient = {
   status: () => api.get<CreatorIntelligenceStatus>(
     "/creator-intelligence/status",
@@ -210,21 +232,58 @@ export const creatorIntelligenceClient = {
     api.post<VoiceSynthesizeResponse>(
       "/creator-intelligence/voice/synthesize",
       input,
-      { signal, timeout: 55_000, retry: 0 },
+      {
+        signal,
+        timeout: 55_000,
+        retry: 0,
+        headers: protectedHeaders("voice"),
+      },
     ),
   soundGenerate: (prompt: string, durationSeconds: number, loop: boolean) =>
-    api.post<SoundGenerateResponse>("/creator-intelligence/sfx/generate", { prompt, durationSeconds, loop }),
+    api.post<SoundGenerateResponse>(
+      "/creator-intelligence/sfx/generate",
+      { prompt, durationSeconds, loop },
+      {
+        timeout: 55_000,
+        retry: 0,
+        headers: protectedHeaders("sfx"),
+      },
+    ),
   translate: (input: {
     readonly provider: CreatorIntelligenceTranslationProvider;
     readonly text: string;
     readonly targetLanguage: string;
     readonly sourceLanguage?: string;
     readonly glossaryId?: string;
-  }) => api.post<TranslateResponse>("/creator-intelligence/translate", input),
+  }) => api.post<TranslateResponse>(
+    "/creator-intelligence/translate",
+    input,
+    {
+      timeout: 30_000,
+      retry: 0,
+      headers: protectedHeaders("translate"),
+    },
+  ),
   meshCreate: (imageUrl: string) =>
-    api.post<MeshyJobResponse>("/creator-intelligence/mesh/jobs", { imageUrl }),
+    api.post<MeshyJobResponse>(
+      "/creator-intelligence/mesh/jobs",
+      { imageUrl },
+      {
+        timeout: 30_000,
+        retry: 0,
+        headers: protectedHeaders("mesh"),
+      },
+    ),
   meshStatus: (jobId: string) =>
     api.get<MeshyJobResponse>(`/creator-intelligence/mesh/jobs/${encodeURIComponent(jobId)}`),
   safeSearch: (dataUrl: string) =>
-    api.post<SafeSearchResponse>("/creator-intelligence/preflight/safe-search", { dataUrl }),
+    api.post<SafeSearchResponse>(
+      "/creator-intelligence/preflight/safe-search",
+      { dataUrl },
+      {
+        timeout: 30_000,
+        retry: 0,
+        headers: protectedHeaders("safe-search"),
+      },
+    ),
 };
