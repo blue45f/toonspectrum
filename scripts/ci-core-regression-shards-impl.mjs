@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const TARGETS_FILE = new URL("./ci-required-vitest-targets.txt", import.meta.url);
 const GLOB_PATTERN = /[*?[\]]/u;
-const SAFE_TARGET = /^(?:apps|packages|scripts)\/[A-Za-z0-9_./*?\[\]-]+$/u;
+const SAFE_TARGET = /^(?:apps|deploy|packages|scripts|tests)\/[A-Za-z0-9_./*?\[\]-]+$/u;
 
 export const SHARD_NAMES = Object.freeze([
   "product",
@@ -80,6 +80,12 @@ function isDirectoryTarget(target) {
 export function shardForTarget(target) {
   if (
     target.startsWith("apps/api/")
+    || target.startsWith("deploy/cloudflare-analytics/")
+    || target === "scripts/deploy-cloudflare-analytics.test.mjs"
+    || target === "scripts/free-database-federation.test.mjs"
+    || target === "scripts/prepare-managed-database-bootstrap.test.mjs"
+    || target === "scripts/provision-cloudflare-free-data-plane.test.mjs"
+    || target === "scripts/provision-gcp-free-data-plane.test.mjs"
     || target.startsWith("packages/core/")
     || target.startsWith("apps/web/src/domains/fortune/")
     || target.startsWith("apps/web/src/shared/catalog/")

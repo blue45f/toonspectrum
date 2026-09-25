@@ -1,6 +1,12 @@
 apps/api/src/config/cors.test.ts
+apps/api/src/config/env.test.ts
 apps/api/src/config/security-headers.test.ts
 apps/api/src/csrf-middleware.test.ts
+apps/api/src/infrastructure/federated-data-plane/federated-data-plane-routing.test.ts
+apps/api/src/infrastructure/federated-data-plane/federated-data-plane.module.test.ts
+apps/api/src/modules/admin/admin-traffic-d1-query.test.ts
+apps/api/src/modules/admin/admin-traffic-query.test.ts
+apps/api/src/modules/admin/admin-traffic.service.test.ts
 apps/api/src/modules/catalog/catalog-pagination.test.ts
 apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts
 apps/api/src/modules/catalog/catalog-search-cache.test.ts
@@ -9,6 +15,7 @@ apps/api/src/modules/creator/studio-live-acoustic-binding.test.ts
 apps/api/src/modules/creator/studio-review-task-completion-invalidation.test.ts
 apps/api/src/modules/creator/studio-review-task-completion.repository.test.ts
 apps/api/src/modules/fortune/fortune.controller.test.ts
+apps/api/src/modules/health/health-analytics-readiness.test.ts
 apps/api/src/modules/og/og-page.test.ts
 apps/api/src/modules/production-collaboration/production-collaboration.service.test.ts
 apps/api/src/modules/production-collaboration/production-integration-providers.test.ts
@@ -22,6 +29,12 @@ apps/api/src/modules/studio-project-graph/studio-review-preview-producer.service
 apps/api/src/modules/studio-project-graph/studio-review-preview.test.ts
 apps/api/src/modules/studio-project-graph/studio-session-evidence-projection.test.ts
 apps/api/src/modules/studio-project-graph/studio-session-evidence.service.test.ts
+apps/api/src/modules/traffic-analytics/traffic-analytics-d1.client.test.ts
+apps/api/src/modules/traffic-analytics/traffic-analytics-d1.repository.test.ts
+apps/api/src/modules/traffic-analytics/traffic-analytics-repository.provider.test.ts
+apps/api/src/modules/traffic-analytics/traffic-analytics-store.test.ts
+apps/api/src/modules/traffic-analytics/traffic-analytics.controller.test.ts
+apps/api/src/modules/traffic-analytics/traffic-analytics.service.test.ts
 apps/api/src/runtime/runtime-boundary.test.ts
 apps/api/src/session-middleware.test.ts
 apps/web/src/app/app-floating-controls-startup.test.ts
@@ -256,6 +269,7 @@ apps/web/src/shared/lib/creator-role-contract.test.ts
 apps/web/src/shared/lib/creator-role-workspace-contract.test.ts
 apps/web/tests/vite-react-compiler-runtime-interop.test.ts
 apps/web/tools/browser-harnesses/studio-p2p-direct-diagnostics.test.ts
+deploy/cloudflare-analytics/src/index.test.ts
 packages/core/src/fortune/fortune-engine.security.test.ts
 packages/core/src/fortune/fortune-observatory.test.ts
 packages/core/src/production/notification-digest.test.ts
@@ -276,7 +290,9 @@ scripts/bootstrap-empty-production-database.test.mjs
 scripts/browser-core-entry-isolation.test.ts
 scripts/creator-career-confirmation-database-contract.test.mjs
 scripts/creator-hiring-automation-database-contract.test.mjs
+scripts/deploy-cloudflare-analytics.test.mjs
 scripts/deploy-cloudflare-static.test.mjs
+scripts/free-database-federation.test.mjs
 scripts/free-infrastructure-policy.test.mjs
 scripts/lib/character-psd-reference-compositor.test.mjs
 scripts/lib/studio-3d-production-audit-policy.test.mjs
@@ -285,6 +301,9 @@ scripts/lib/studio-memory-growth-policy.test.mjs
 scripts/lib/studio-p2p-failure-diagnostics.test.ts
 scripts/lib/studio-verify-shape-readiness.test.tsx
 scripts/pigment-dependency-install-policy.test.mjs
+scripts/prepare-managed-database-bootstrap.test.mjs
+scripts/provision-cloudflare-free-data-plane.test.mjs
+scripts/provision-gcp-free-data-plane.test.mjs
 scripts/release-static-chunk-boundary.test.ts
 scripts/run-production-database-migrations.test.mjs
 scripts/studio-production-realtime.test.ts

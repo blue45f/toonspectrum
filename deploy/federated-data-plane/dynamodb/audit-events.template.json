@@ -1,0 +1,38 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "ToonSpectrum free-tier guarded append-only audit events",
+  "Resources": {
+    "AuditEvents": {
+      "Type": "AWS::DynamoDB::Table",
+      "Properties": {
+        "TableName": "toonspectrum-audit-events",
+        "BillingMode": "PROVISIONED",
+        "ProvisionedThroughput": {
+          "ReadCapacityUnits": 1,
+          "WriteCapacityUnits": 1
+        },
+        "AttributeDefinitions": [
+          { "AttributeName": "partitionKey", "AttributeType": "S" },
+          { "AttributeName": "sortKey", "AttributeType": "S" }
+        ],
+        "KeySchema": [
+          { "AttributeName": "partitionKey", "KeyType": "HASH" },
+          { "AttributeName": "sortKey", "KeyType": "RANGE" }
+        ],
+        "SSESpecification": { "SSEEnabled": true },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": false
+        },
+        "DeletionProtectionEnabled": true,
+        "TimeToLiveSpecification": {
+          "AttributeName": "expiresAt",
+          "Enabled": true
+        },
+        "Tags": [
+          { "Key": "toonspectrum:billing-boundary", "Value": "free-allowance-with-app-cap" },
+          { "Key": "toonspectrum:workload", "Value": "append-only-audit" }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "version": "toonspectrum.cloudflare-free-data-plane.v1",
+  "quotaScope": "cloudflare-account",
+  "primaryLocationHint": "apac",
+  "databases": [
+    {
+      "shardId": "d1-edge-index",
+      "name": "toonspectrum-edge-index",
+      "schemaFiles": ["edge-index.sql"],
+      "migrationId": "edge-index-v1"
+    },
+    {
+      "shardId": "d1-analytics-buffer",
+      "name": "toonspectrum-analytics-buffer",
+      "schemaFiles": ["analytics-buffer.sql", "traffic-analytics.sql"],
+      "migrationId": "analytics-buffer-v2"
+    }
+  ]
+}

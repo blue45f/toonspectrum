@@ -1,0 +1,995 @@
+{
+  "version": "toonspectrum.free-database-federation.v1",
+  "verifiedAt": "2026-09-26",
+  "mode": "maximum-free-traffic",
+  "automaticPaidOverflow": false,
+  "automaticAuthoritativeWriteFailover": false,
+  "synchronousCrossProviderWrites": false,
+  "quotaSnapshotMaxAgeSeconds": 900,
+  "providers": {
+    "cloudflare-d1": {
+      "engine": "sqlite",
+      "quotaScope": "cloudflare-account",
+      "provisioning": "externally-managed",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "databaseCount": {
+          "value": 10,
+          "period": "total"
+        },
+        "storageBytes": {
+          "value": 5368709120,
+          "period": "total"
+        },
+        "rowsRead": {
+          "value": 5000000,
+          "period": "day"
+        },
+        "rowsWritten": {
+          "value": 100000,
+          "period": "day"
+        }
+      },
+      "source": "https://developers.cloudflare.com/d1/platform/pricing/",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    },
+    "turso-libsql": {
+      "engine": "libsql",
+      "quotaScope": "turso-account",
+      "provisioning": "external-auth-required",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "databaseCount": {
+          "value": 100,
+          "period": "total"
+        },
+        "storageBytes": {
+          "value": 5000000000,
+          "period": "total"
+        },
+        "rowsRead": {
+          "value": 500000000,
+          "period": "month"
+        },
+        "rowsWritten": {
+          "value": 10000000,
+          "period": "month"
+        },
+        "syncBytes": {
+          "value": 3000000000,
+          "period": "month"
+        }
+      },
+      "source": "https://turso.tech/pricing",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 3
+    },
+    "tidb-cloud-starter": {
+      "engine": "mysql-compatible-distributed-sql",
+      "quotaScope": "tidb-organization",
+      "provisioning": "external-auth-required",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "instanceCount": {
+          "value": 5,
+          "period": "total"
+        },
+        "rowStorageBytes": {
+          "value": 26843545600,
+          "period": "total"
+        },
+        "columnStorageBytes": {
+          "value": 26843545600,
+          "period": "total"
+        },
+        "requestUnits": {
+          "value": 250000000,
+          "period": "month"
+        }
+      },
+      "source": "https://docs.pingcap.com/tidbcloud/select-cluster-tier/",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    },
+    "cockroachdb-basic": {
+      "engine": "postgres-wire-distributed-sql",
+      "quotaScope": "cockroach-organization",
+      "provisioning": "external-auth-required",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "storageBytes": {
+          "value": 10737418240,
+          "period": "total"
+        },
+        "requestUnits": {
+          "value": 50000000,
+          "period": "month"
+        }
+      },
+      "source": "https://www.cockroachlabs.com/pricing/",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    },
+    "azure-cosmos-free": {
+      "engine": "document-key-value",
+      "quotaScope": "azure-account",
+      "provisioning": "external-auth-required",
+      "applicationHardCapRatio": 0.75,
+      "limits": {
+        "storageBytes": {
+          "value": 25000000000,
+          "period": "total"
+        },
+        "requestUnitsPerSecond": {
+          "value": 1000,
+          "period": "second"
+        }
+      },
+      "source": "https://learn.microsoft.com/azure/cosmos-db/free-tier",
+      "billingBoundary": "free-allowance-with-app-cap",
+      "trafficWeight": 1
+    },
+    "aws-dynamodb-free": {
+      "engine": "key-value-document",
+      "quotaScope": "aws-payer-region",
+      "provisioning": "external-auth-required",
+      "applicationHardCapRatio": 0.7,
+      "limits": {
+        "storageBytes": {
+          "value": 26843545600,
+          "period": "total"
+        },
+        "readCapacityUnits": {
+          "value": 25,
+          "period": "second"
+        },
+        "writeCapacityUnits": {
+          "value": 25,
+          "period": "second"
+        },
+        "streamReadRequests": {
+          "value": 2500000,
+          "period": "month"
+        },
+        "egressBytes": {
+          "value": 1073741824,
+          "period": "month"
+        }
+      },
+      "source": "https://aws.amazon.com/dynamodb/pricing/",
+      "billingBoundary": "free-allowance-with-app-cap",
+      "trafficWeight": 1
+    },
+    "firestore-free": {
+      "engine": "document",
+      "quotaScope": "gcp-project-free-database",
+      "provisioning": "provisioned",
+      "resourceHint": "toonstudio-cloud-20260915/(default):asia-northeast3",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "storageBytes": {
+          "value": 1073741824,
+          "period": "total"
+        },
+        "documentReads": {
+          "value": 50000,
+          "period": "day"
+        },
+        "documentWrites": {
+          "value": 20000,
+          "period": "day"
+        },
+        "documentDeletes": {
+          "value": 20000,
+          "period": "day"
+        },
+        "egressBytes": {
+          "value": 10737418240,
+          "period": "month"
+        }
+      },
+      "source": "https://firebase.google.com/docs/firestore/pricing",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    },
+    "firebase-rtdb-free": {
+      "engine": "realtime-json-tree",
+      "quotaScope": "firebase-project",
+      "provisioning": "provisioned",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "storageBytes": {
+          "value": 1000000000,
+          "period": "total"
+        },
+        "downloadBytes": {
+          "value": 10000000000,
+          "period": "month"
+        },
+        "concurrentConnections": {
+          "value": 100,
+          "period": "instant"
+        }
+      },
+      "source": "https://firebase.google.com/pricing",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1,
+      "resourceHint": "toonstudio-cloud-20260915-default-rtdb:asia-southeast1"
+    },
+    "mongodb-atlas-m0": {
+      "engine": "document",
+      "quotaScope": "atlas-project",
+      "provisioning": "external-auth-required",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "storageBytes": {
+          "value": 536870912,
+          "period": "total"
+        },
+        "operations": {
+          "value": 100,
+          "period": "second"
+        },
+        "transferBytes": {
+          "value": 10000000000,
+          "period": "rolling-7-days"
+        }
+      },
+      "source": "https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    },
+    "convex-free": {
+      "engine": "reactive-document",
+      "quotaScope": "convex-team",
+      "provisioning": "external-auth-required",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "databaseStorageBytes": {
+          "value": 536870912,
+          "period": "total"
+        },
+        "databaseIoBytes": {
+          "value": 1073741824,
+          "period": "month"
+        },
+        "functionCalls": {
+          "value": 1000000,
+          "period": "month"
+        },
+        "concurrentSessions": {
+          "value": 1000,
+          "period": "instant"
+        }
+      },
+      "source": "https://docs.convex.dev/production/state/limits",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    },
+    "appwrite-free": {
+      "engine": "document-tables",
+      "quotaScope": "appwrite-account",
+      "provisioning": "external-auth-required",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "projectCount": {
+          "value": 2,
+          "period": "total"
+        },
+        "databaseCountPerProject": {
+          "value": 1,
+          "period": "total"
+        },
+        "storageBytes": {
+          "value": 2147483648,
+          "period": "total"
+        },
+        "reads": {
+          "value": 500000,
+          "period": "month"
+        },
+        "writes": {
+          "value": 250000,
+          "period": "month"
+        },
+        "realtimeConnections": {
+          "value": 250,
+          "period": "instant"
+        }
+      },
+      "source": "https://appwrite.io/pricing",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    },
+    "neon-free": {
+      "engine": "postgresql",
+      "quotaScope": "neon-account-and-project",
+      "provisioning": "connected",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "projectCount": {
+          "value": 10,
+          "period": "total"
+        },
+        "storageBytesPerProject": {
+          "value": 536870912,
+          "period": "total"
+        },
+        "computeSecondsPerProject": {
+          "value": 180000,
+          "period": "month"
+        },
+        "egressBytesPerProject": {
+          "value": 5368709120,
+          "period": "month"
+        }
+      },
+      "source": "https://neon.com/pricing",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    },
+    "supabase-free": {
+      "engine": "postgresql",
+      "quotaScope": "supabase-organization",
+      "provisioning": "provisioned",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "activeProjectCount": {
+          "value": 2,
+          "period": "total"
+        },
+        "databaseStorageBytesPerProject": {
+          "value": 500000000,
+          "period": "total"
+        }
+      },
+      "source": "https://supabase.com/pricing",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1,
+      "resourceHint": "ybsgfhofuvkhywbpytnl:toonspectrum_federation(private)"
+    },
+    "upstash-redis-free": {
+      "engine": "redis-compatible",
+      "quotaScope": "upstash-account",
+      "provisioning": "connected",
+      "applicationHardCapRatio": 0.75,
+      "limits": {
+        "storageBytes": {
+          "value": 268435456,
+          "period": "total"
+        },
+        "commands": {
+          "value": 500000,
+          "period": "month"
+        },
+        "bandwidthBytes": {
+          "value": 10737418240,
+          "period": "month"
+        }
+      },
+      "source": "https://upstash.com/pricing/redis",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    },
+    "bigquery-sandbox": {
+      "engine": "columnar-analytics",
+      "quotaScope": "gcp-project",
+      "provisioning": "provisioned",
+      "resourceHint": "toonstudio-cloud-20260915:toonspectrum_analytics:asia-northeast3",
+      "applicationHardCapRatio": 0.75,
+      "limits": {
+        "storageBytes": {
+          "value": 10737418240,
+          "period": "total"
+        },
+        "queryBytes": {
+          "value": 1099511627776,
+          "period": "month"
+        },
+        "tableRetentionDays": {
+          "value": 60,
+          "period": "maximum"
+        }
+      },
+      "source": "https://cloud.google.com/bigquery/pricing",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1,
+      "ingestionMode": "batch-only"
+    },
+    "motherduck-lite": {
+      "engine": "duckdb-analytics",
+      "quotaScope": "motherduck-account",
+      "provisioning": "external-auth-required",
+      "applicationHardCapRatio": 0.8,
+      "limits": {
+        "storageBytes": {
+          "value": 10000000000,
+          "period": "total"
+        },
+        "pulseComputeSeconds": {
+          "value": 36000,
+          "period": "month"
+        }
+      },
+      "source": "https://motherduck.com/product/pricing/",
+      "billingBoundary": "hard-stop-free",
+      "trafficWeight": 1
+    }
+  },
+  "shards": {
+    "crdb-ledger": {
+      "provider": "cockroachdb-basic",
+      "domains": [
+        "payment-ledger",
+        "entitlement-ledger",
+        "idempotency-receipts"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "single-authority"
+    },
+    "tidb-identity": {
+      "provider": "tidb-cloud-starter",
+      "domains": [
+        "identity",
+        "accounts",
+        "sessions",
+        "authorization"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "single-authority"
+    },
+    "tidb-projects": {
+      "provider": "tidb-cloud-starter",
+      "domains": [
+        "creator-projects",
+        "work-metadata",
+        "revision-metadata"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "single-authority"
+    },
+    "tidb-commerce": {
+      "provider": "tidb-cloud-starter",
+      "domains": [
+        "marketplace",
+        "catalog-authority",
+        "order-state"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "single-authority"
+    },
+    "tidb-community": {
+      "provider": "tidb-cloud-starter",
+      "domains": [
+        "community",
+        "social-graph",
+        "comments",
+        "reactions"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "single-authority"
+    },
+    "tidb-collaboration": {
+      "provider": "tidb-cloud-starter",
+      "domains": [
+        "collaboration",
+        "messaging",
+        "team-workspace"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "single-authority"
+    },
+    "cosmos-project-documents": {
+      "provider": "azure-cosmos-free",
+      "domains": [
+        "project-manifests",
+        "document-snapshots",
+        "large-json-state"
+      ],
+      "virtualShardCount": 8,
+      "writeMode": "partition-key-authority"
+    },
+    "dynamodb-audit-events": {
+      "provider": "aws-dynamodb-free",
+      "domains": [
+        "append-only-audit",
+        "delivery-receipts",
+        "usage-events"
+      ],
+      "virtualShardCount": 4,
+      "writeMode": "partition-key-authority"
+    },
+    "turso-public-catalog": {
+      "provider": "turso-libsql",
+      "domains": [
+        "public-catalog",
+        "public-creator-profile",
+        "public-search-read-model"
+      ],
+      "virtualShardCount": 32,
+      "writeMode": "hash-sharded-authority"
+    },
+    "d1-edge-index": {
+      "provider": "cloudflare-d1",
+      "domains": [
+        "edge-catalog-index",
+        "ranking-snapshot",
+        "route-manifest"
+      ],
+      "virtualShardCount": 8,
+      "writeMode": "derived-replica"
+    },
+    "firestore-notifications": {
+      "provider": "firestore-free",
+      "domains": [
+        "notification-inbox",
+        "activity-inbox",
+        "user-device-state"
+      ],
+      "virtualShardCount": 16,
+      "writeMode": "partition-key-authority"
+    },
+    "firebase-presence": {
+      "provider": "firebase-rtdb-free",
+      "domains": [
+        "presence",
+        "typing",
+        "ephemeral-room-state"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "ephemeral-authority"
+    },
+    "atlas-ai-jobs": {
+      "provider": "mongodb-atlas-m0",
+      "domains": [
+        "ai-job-documents",
+        "moderation-evidence",
+        "provider-payloads"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "single-authority"
+    },
+    "convex-live-review": {
+      "provider": "convex-free",
+      "domains": [
+        "live-review",
+        "review-presence",
+        "small-reactive-workflows"
+      ],
+      "virtualShardCount": 4,
+      "writeMode": "partition-key-authority"
+    },
+    "appwrite-feedback": {
+      "provider": "appwrite-free",
+      "domains": [
+        "feedback",
+        "support-intake",
+        "business-inquiries"
+      ],
+      "virtualShardCount": 2,
+      "writeMode": "partition-key-authority"
+    },
+    "neon-legacy-compat": {
+      "provider": "neon-free",
+      "domains": [
+        "legacy-postgres-compatibility",
+        "migration-bridge"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "single-authority"
+    },
+    "supabase-social-compat": {
+      "provider": "supabase-free",
+      "domains": [
+        "social-compatibility",
+        "playground",
+        "storage-control-metadata"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "single-authority"
+    },
+    "upstash-hot-cache": {
+      "provider": "upstash-redis-free",
+      "domains": [
+        "rate-limit",
+        "short-idempotency",
+        "hot-cache"
+      ],
+      "virtualShardCount": 64,
+      "writeMode": "ephemeral-authority"
+    },
+    "bigquery-analytics": {
+      "provider": "bigquery-sandbox",
+      "domains": [
+        "analytics-batch",
+        "quota-telemetry",
+        "offline-funnels"
+      ],
+      "virtualShardCount": 32,
+      "writeMode": "append-only-authority"
+    },
+    "motherduck-analysis": {
+      "provider": "motherduck-lite",
+      "domains": [
+        "ad-hoc-analysis",
+        "exported-parquet",
+        "offline-reporting"
+      ],
+      "virtualShardCount": 1,
+      "writeMode": "derived-replica"
+    },
+    "d1-analytics-buffer": {
+      "provider": "cloudflare-d1",
+      "domains": [
+        "analytics-ingest-buffer"
+      ],
+      "virtualShardCount": 2,
+      "writeMode": "append-only-authority"
+    }
+  },
+  "routes": {
+    "critical-ledger-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "crdb-ledger",
+      "candidates": [
+        "crdb-ledger"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "critical-ledger-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "crdb-ledger",
+      "candidates": [
+        "crdb-ledger"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "identity-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-identity",
+      "candidates": [
+        "tidb-identity"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "identity-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-identity",
+      "candidates": [
+        "tidb-identity"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "project-metadata-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-projects",
+      "candidates": [
+        "tidb-projects"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "project-metadata-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-projects",
+      "candidates": [
+        "tidb-projects"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "commerce-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-commerce",
+      "candidates": [
+        "tidb-commerce"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "commerce-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-commerce",
+      "candidates": [
+        "tidb-commerce"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "community-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-community",
+      "candidates": [
+        "tidb-community"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "community-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-community",
+      "candidates": [
+        "tidb-community"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "collaboration-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "tidb-collaboration",
+      "candidates": [
+        "tidb-collaboration"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "collaboration-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "tidb-collaboration",
+      "candidates": [
+        "tidb-collaboration"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "project-document-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "cosmos-project-documents",
+      "candidates": [
+        "cosmos-project-documents"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "project-document-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "cosmos-project-documents",
+      "candidates": [
+        "cosmos-project-documents"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "public-catalog-read": {
+      "operation": "read",
+      "consistency": "derived",
+      "authority": "turso-public-catalog",
+      "candidates": [
+        "d1-edge-index",
+        "turso-public-catalog"
+      ],
+      "allowReadFallback": true,
+      "trafficDistribution": "weighted-rendezvous"
+    },
+    "public-catalog-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "turso-public-catalog",
+      "candidates": [
+        "turso-public-catalog"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "audit-event-write": {
+      "operation": "write",
+      "consistency": "replicated",
+      "authority": "dynamodb-audit-events",
+      "candidates": [
+        "dynamodb-audit-events"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "notification-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "firestore-notifications",
+      "candidates": [
+        "firestore-notifications"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "notification-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "firestore-notifications",
+      "candidates": [
+        "firestore-notifications"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "presence-read": {
+      "operation": "read",
+      "consistency": "ephemeral",
+      "authority": "firebase-presence",
+      "candidates": [
+        "firebase-presence"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "presence-write": {
+      "operation": "write",
+      "consistency": "ephemeral",
+      "authority": "firebase-presence",
+      "candidates": [
+        "firebase-presence"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "ai-job-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "atlas-ai-jobs",
+      "candidates": [
+        "atlas-ai-jobs"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "ai-job-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "atlas-ai-jobs",
+      "candidates": [
+        "atlas-ai-jobs"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "live-review-read": {
+      "operation": "read",
+      "consistency": "ephemeral",
+      "authority": "convex-live-review",
+      "candidates": [
+        "convex-live-review"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "live-review-write": {
+      "operation": "write",
+      "consistency": "ephemeral",
+      "authority": "convex-live-review",
+      "candidates": [
+        "convex-live-review"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "feedback-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "appwrite-feedback",
+      "candidates": [
+        "appwrite-feedback"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "feedback-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "appwrite-feedback",
+      "candidates": [
+        "appwrite-feedback"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "legacy-compat-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "neon-legacy-compat",
+      "candidates": [
+        "neon-legacy-compat"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "legacy-compat-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "neon-legacy-compat",
+      "candidates": [
+        "neon-legacy-compat"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "social-compat-read": {
+      "operation": "read",
+      "consistency": "authoritative",
+      "authority": "supabase-social-compat",
+      "candidates": [
+        "supabase-social-compat"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "social-compat-write": {
+      "operation": "write",
+      "consistency": "authoritative",
+      "authority": "supabase-social-compat",
+      "candidates": [
+        "supabase-social-compat"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "hot-cache-read": {
+      "operation": "read",
+      "consistency": "ephemeral",
+      "authority": "upstash-hot-cache",
+      "candidates": [
+        "upstash-hot-cache"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "hot-cache-write": {
+      "operation": "write",
+      "consistency": "ephemeral",
+      "authority": "upstash-hot-cache",
+      "candidates": [
+        "upstash-hot-cache"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "analytics-event-write": {
+      "operation": "write",
+      "consistency": "derived",
+      "authority": "d1-analytics-buffer",
+      "candidates": [
+        "d1-analytics-buffer"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    },
+    "analytics-read": {
+      "operation": "read",
+      "consistency": "derived",
+      "authority": "bigquery-analytics",
+      "candidates": [
+        "motherduck-analysis",
+        "bigquery-analytics"
+      ],
+      "allowReadFallback": true,
+      "trafficDistribution": "weighted-rendezvous"
+    },
+    "analytics-batch-load": {
+      "operation": "write",
+      "consistency": "derived",
+      "authority": "bigquery-analytics",
+      "candidates": [
+        "bigquery-analytics"
+      ],
+      "allowReadFallback": false,
+      "trafficDistribution": "headroom"
+    }
+  }
+}

@@ -10,7 +10,7 @@ export const CORE_VITEST_MANIFEST_URL = new URL(
 );
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const SAFE_TARGET_PREFIX = /^(?:apps|packages|scripts|tests)\//u;
+const SAFE_TARGET_PREFIX = /^(?:apps|deploy|packages|scripts|tests)\//u;
 const GLOB_META = /[*?[\]{}]/u;
 const TEST_EXTENSIONS = "{js,jsx,mjs,cjs,ts,tsx,mts,cts}";
 
