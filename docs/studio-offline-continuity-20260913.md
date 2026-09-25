@@ -2,7 +2,7 @@
 
 ## User behavior
 
-1. Open Studio online and use **오프라인 리소스 준비**. Preparation is explicit and bounded; ordinary readers do not download the drawing pack.
+1. Open any `/studio` route online once. `StudioOfflineRuntime` prepares the bounded core drawing pack during browser idle time without a setup step; ordinary readers do not download it. Data Saver, hidden documents and storage pressure skip automatic downloads, while the existing panel remains a manual retry and diagnostics surface.
 2. A prepared current-build editor is preferred over the independent rescue drawing page during an outage. Missing/evicted/invalid resources still fall back safely to rescue.
 3. Pen, undo/redo, OPFS/SQLite autosave, first-use PNG/project export and recovery resources are included in the core pack. This is not a claim that every optional font, brush or 3D model is downloaded.
 4. The save center records a content-free intent under the existing local document/account scope. It does not require a live auth endpoint to remember a local task; it does not grant server authentication or unlock a server document.

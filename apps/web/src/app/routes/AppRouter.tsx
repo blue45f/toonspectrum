@@ -1,5 +1,5 @@
 import { legacyStudioEditorHref, readInitialDocumentPathname } from "./studio-entry-redirect";
-import { Suspense } from "react";
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { appRoutes } from "./groups/app-routes";
@@ -12,10 +12,18 @@ import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useRouteSeoPolicy } from "@/hooks/use-document-title";
 import { SiteRouteExperienceBoundary } from "@/shared/components/SiteRouteExperienceBoundary";
+import { StudioOfflineRuntimeBoundary } from "@/domains/creator/offline/StudioOfflineRuntimeBoundary";
+import { isStudioOfflineRuntimePath } from "@/domains/creator/offline/studio-offline-runtime-path";
 import {
   isStudioWorkspaceLocation,
   isStudioWorkspaceRoutePathname,
 } from "@/domains/creator/studio-workspace-route";
+
+const StudioOfflineRuntime = lazy(
+  () => import("@/domains/creator/offline/StudioOfflineRuntime").then((module) => ({
+    default: module.StudioOfflineRuntime,
+  })),
+);
 
 // This module lives for one browser document. Retain editor delivery mode across SPA transitions,
 // but do not load cross-origin isolation for the lightweight Studio home, assets or learning pages.
@@ -35,6 +43,11 @@ function AppRouteTree({
   return (
     <RouteStage pathname={pathname} search={search} accessibleTitle={title}>
       <ErrorBoundary resetKey={`${pathname}${search}`}>
+        {isStudioOfflineRuntimePath(pathname) ? (
+          <StudioOfflineRuntimeBoundary>
+            <Suspense fallback={null}><StudioOfflineRuntime /></Suspense>
+          </StudioOfflineRuntimeBoundary>
+        ) : null}
         <CommandPaletteEventBridge />
         <Suspense fallback={<RouteFallback accessibleTitle={title} />}>
           <Routes>
