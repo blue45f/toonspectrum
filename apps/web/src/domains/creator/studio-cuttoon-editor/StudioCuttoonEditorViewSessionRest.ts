@@ -4,6 +4,11 @@
 import type { StudioAnimaticWorkspaceDocument } from "../animatic/studio-animatic-workspace";
 
 import type { StudioSaveIntentScope } from "../studio-durable-save-intent";
+import type {
+  StudioDrawingPracticeDocument,
+  StudioDrawingPracticeView,
+} from "../studio-drawing-practice-document";
+import type { StudioDrawingPracticeSourceState } from "../StudioDrawingPracticeBar";
 
 export type StudioCuttoonEditorViewSessionRest = {
   quickAccessLaunchPoint?: { x: number; y: number } | null;
@@ -557,19 +562,19 @@ export type StudioCuttoonEditorViewSessionRest = {
   bg: any;
   densityShowsStatusRail: any;
   drawingShortcutNoticeStore: any;
-  drawingPracticeDocument: any;
-  drawingPracticeSourceDataUrl: any;
-  drawingPracticeSourceState: any;
-  drawingPracticeCompareActive: any;
-  previewDrawingPracticeView: any;
-  commitDrawingPracticeView: any;
-  cancelDrawingPracticePreview: any;
-  setDrawingPracticeCompareActive: any;
-  finishDrawingPractice: any;
-  retryDrawingPractice: any;
-  resetDrawingPracticePlacement: any;
-  removeDrawingPractice: any;
-  openDrawingPracticeReferencePanel: any;
+  drawingPracticeDocument: StudioDrawingPracticeDocument | null;
+  drawingPracticeSourceDataUrl: string | null;
+  drawingPracticeSourceState: StudioDrawingPracticeSourceState;
+  drawingPracticeCompareActive: boolean;
+  previewDrawingPracticeView: (patch: Partial<StudioDrawingPracticeView>) => void;
+  commitDrawingPracticeView: (patch: Partial<StudioDrawingPracticeView>) => void;
+  cancelDrawingPracticePreview: () => void;
+  setDrawingPracticeCompareActive: (active: boolean) => void;
+  finishDrawingPractice: () => void;
+  retryDrawingPractice: () => void;
+  resetDrawingPracticePlacement: () => void;
+  removeDrawingPractice: () => void;
+  openDrawingPracticeReferencePanel: () => void;
   hi: any;
   menuEditRedoDisabled: any;
   menuEditUndoDisabled: any;
