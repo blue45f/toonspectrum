@@ -81,7 +81,7 @@ const REELS: readonly ReelVisual[] = [
     id: "continuity",
     icon: Cloud,
     image: "/brand/production-os-hero.svg",
-    href: "/studio/projects",
+    href: "/studio",
     label: { ko: "SAVE & CONTINUE", en: "SAVE & CONTINUE" },
     title: { ko: "저장은 신경 쓰지 말고, 이어서 그리세요.", en: "Keep creating without managing save steps." },
     body: {

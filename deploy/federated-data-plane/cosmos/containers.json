@@ -1,0 +1,25 @@
+{
+  "databaseId": "toonspectrum-free",
+  "freeTierRequired": true,
+  "sharedManualThroughput": 400,
+  "containers": [
+    {
+      "id": "project-manifests",
+      "partitionKey": "/ownerId",
+      "defaultTtlSeconds": -1,
+      "uniqueKeys": [["/projectId", "/sourceVersion"]]
+    },
+    {
+      "id": "document-snapshots",
+      "partitionKey": "/projectId",
+      "defaultTtlSeconds": 2592000,
+      "uniqueKeys": [["/snapshotId"]]
+    }
+  ],
+  "guardrails": {
+    "autoscale": false,
+    "serverless": false,
+    "multiRegionWrites": false,
+    "applicationHardCapRatio": 0.75
+  }
+}

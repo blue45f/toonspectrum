@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { devNull, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -30,20 +30,37 @@ function baseConfig(overrides = {}) {
   };
 }
 
-function fixture(t, { config = baseConfig(), files = {} } = {}) {
+function fixtureEnvironment(environment = process.env) {
+  // hook의 GIT_DIR 등은 cwd보다 우선한다. 임시 저장소가 호출자의 공통 config/index를 수정하지 않게 격리한다.
+  return {
+    ...Object.fromEntries(Object.entries(environment).filter(([key]) => !key.startsWith("GIT_"))),
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_GLOBAL: devNull,
+  };
+}
+
+function git(root, args, environment = process.env) {
+  const result = spawnSync("git", args, {
+    cwd: root, encoding: "utf8", env: fixtureEnvironment(environment),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
+function fixture(t, { config = baseConfig(), files = {}, environment = process.env } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "toonspectrum-documentation-"));
   t.after(() => rmSync(root, { force: true, recursive: true }));
-  const initialized = spawnSync("git", ["init", "--quiet"], { cwd: root, encoding: "utf8" });
-  assert.equal(initialized.status, 0, initialized.stderr);
+  git(root, ["init", "--quiet"], environment);
   write(root, "config/documentation-authority.json", `${JSON.stringify(config, null, 2)}\n`);
   for (const [relativePath, contents] of Object.entries(files)) write(root, relativePath, contents);
   return root;
 }
 
-function validate(root) {
+function validate(root, environment = process.env) {
   return spawnSync(process.execPath, [VALIDATOR], {
     cwd: root,
     encoding: "utf8",
+    env: fixtureEnvironment(environment),
   });
 }
 
@@ -120,3 +137,46 @@ test("역사 문서에도 폐기된 전역 표현을 허용하지 않는다", (t
   assert.match(result.stderr, /문서 전체에 폐기된 표현이 남았습니다/u);
 });
 
+for (const fullHookContext of [false, true]) {
+  test(`linked worktree hook 환경을 상속해도 호출자 config와 index를 보존한다 (${fullHookContext ? "전체 Git 환경" : "GIT_DIR"})`, (t) => {
+    const caller = fixture(t, { files: { "docs/current.md": `# 호출자 문서\n\n${KOREAN_BODY}\n` } });
+    git(caller, ["add", "."]);
+    git(caller, ["-c", "user.name=Documentation Fixture", "-c", "user.email=fixture@example.invalid",
+      "commit", "--quiet", "-m", "fixture"]);
+    const linked = path.join(caller, "linked");
+    git(caller, ["worktree", "add", "--detach", "--quiet", linked, "HEAD"]);
+    const gitDirectory = git(linked, ["rev-parse", "--absolute-git-dir"]);
+    const configPath = path.join(caller, ".git/config");
+    const indexPath = path.join(gitDirectory, "index");
+    const beforeConfig = readFileSync(configPath);
+    const beforeIndex = readFileSync(indexPath);
+    const hookEnvironment = {
+      ...process.env,
+      GIT_DIR: gitDirectory,
+      ...(fullHookContext ? {
+        GIT_COMMON_DIR: path.join(caller, ".git"),
+        GIT_WORK_TREE: linked,
+        GIT_INDEX_FILE: indexPath,
+        GIT_OBJECT_DIRECTORY: path.join(caller, ".git/objects"),
+        GIT_CONFIG_COUNT: "1",
+        GIT_CONFIG_KEY_0: "core.bare",
+        GIT_CONFIG_VALUE_0: "true",
+        GIT_CONFIG_PARAMETERS: "'core.bare=true'",
+      } : {}),
+    };
+    const root = fixture(t, {
+      environment: hookEnvironment,
+      files: {
+        "docs/current.md": `# 임시 문서\n\n${KOREAN_BODY}\n\n[세부 문서](./detail.md)\n`,
+        "docs/detail.md": "# 임시 세부 문서\n",
+      },
+    });
+    const result = validate(root, hookEnvironment);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /2개 관리 대상 문서/u);
+    assert.equal(git(root, ["rev-parse", "--show-toplevel"]), realpathSync(root));
+    assert.deepEqual(readFileSync(configPath), beforeConfig);
+    assert.deepEqual(readFileSync(indexPath), beforeIndex);
+    assert.equal(git(caller, ["config", "--local", "--get", "core.bare"]), "false");
+  });
+}

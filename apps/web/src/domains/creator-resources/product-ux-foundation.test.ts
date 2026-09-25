@@ -43,7 +43,7 @@ describe("purpose-first product UX foundation", () => {
     const hub = readFileSync(MAKE_HUB, "utf8");
     const routes = readFileSync(CREATOR_ROUTES, "utf8");
     expect(routes).toContain('path: "/make"');
-    expect(hub).toContain('href="/studio/projects"');
+    expect(hub).toContain('href="/studio"');
     expect(hub).toContain('/studio?preset=webtoon');
     expect(hub).toContain('/studio?preset=4cut');
     expect(hub).toContain('/studio?preset=illustration');

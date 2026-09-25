@@ -32,7 +32,7 @@ describe("site route authority", () => {
   it("provides every current primary navigation destination", () => {
     expect(SITE_PRIMARY_ROUTE_IDS.map((id) => primarySiteRouteAuthority(id).canonicalPath))
       .toEqual([
-        "/",
+        "/home",
         "/team",
         "/hub",
         "/production",

@@ -620,8 +620,8 @@ export function ProductionLandingPage() {
                 <Link className={buttonClass({ size: "lg" })} to={`/production/projects/${demo.projectId}/overview`}>
                   기능 미리 보기 <ArrowRight className="size-4" aria-hidden="true" />
                 </Link>
-                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/studio/projects">
-                  내 프로젝트 열기
+                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/studio">
+                  내 작품 열기
                 </Link>
               </div>
             </div>
@@ -639,7 +639,7 @@ export function ProductionLandingPage() {
             className="mt-6"
             title="내 제작 포트폴리오"
             description="여러 작품의 다음 연재, 일정 안정도, 차단·검수·인력 공백을 같은 기준으로 비교합니다. 위험한 작품을 먼저 표시합니다."
-            action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to="/studio/projects">프로젝트 만들기</Link>}
+            action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to="/studio/new">새 프로젝트 만들기</Link>}
           >
             {projectsLoading ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록 불러오는 중">

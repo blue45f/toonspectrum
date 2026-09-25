@@ -82,7 +82,6 @@ export const SITE_ROUTE_ALIASES = {
   "/create/promo": "/showcase/promo",
   "/creator-hub": "/studio",
   "/creator-hub/references": "/research/assets",
-  "/home": "/",
   "/make": "/studio/new",
   "/music": "/studio/assets/audio",
   "/publishing": "/studio/publish",
@@ -115,8 +114,8 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     purpose: "create",
   }),
   route({
-    id: "workspace-home", path: "/", titleKey: "route.studio",
-    label: { ko: "홈", en: "Home" },
+    id: "workspace-home", path: "/home", titleKey: "route.studio",
+    label: { ko: "내 홈", en: "My home" },
     description: { ko: "최근 작업과 내 공간에서 다음 행동 선택", en: "Choose the next action from recent work and your space" },
     purpose: "create", projectContext: "optional", directory: true,
   }),
@@ -205,6 +204,7 @@ export const SITE_ROUTE_AUTHORITIES = Object.freeze([
     },
     purpose: "manage",
     projectContext: "optional",
+    directory: true,
   }),
   route({
     id: "production-project",

@@ -40,7 +40,6 @@ const INTENTIONAL_NON_DIRECTORY_ROUTES = new Set([
   "/creator-hub/references",
   // Token-bearing immutable review links require a fragment lease and are not a standalone destination.
   "/production/pinned-review",
-  "/production/projects",
   "/showcase",
   "/sitemap",
   "/studio/brush-lab",
@@ -84,7 +83,6 @@ const NESTED_USER_FACING_DESTINATIONS = [
   "/studio/manual",
   "/studio/poser",
   "/studio/present",
-  "/studio/projects",
   "/studio/publish",
   "/studio/review",
   "/studio/share",
@@ -170,7 +168,7 @@ describe("site directory experience contracts", () => {
 
   it("keeps creator entry points and the product tour visible before the long directory", () => {
     expect(sitemapSource).toContain('href="/studio/new"');
-    expect(sitemapSource).toContain('href="/studio/projects"');
+    expect(sitemapSource).toContain('href="/studio"');
     expect(sitemapSource).toContain('href="/product-tour"');
     expect(sitemapSource.indexOf('href="/product-tour"')).toBeLessThan(
       sitemapSource.indexOf("SITEMAP_EXTENDED_DESTINATION_GROUPS.map"),
@@ -230,6 +228,12 @@ describe("site directory experience contracts", () => {
     expect(directoryPaths).toContain("/studio/new");
     expect(directoryPaths).toContain("/studio/assets");
     expect(directoryPaths).toContain("/studio/publish");
+  });
+
+  it("keeps the long directory collapsed by category until the user opens it", () => {
+    expect(sitemapSource).toContain("<details");
+    expect(sitemapSource).toContain("<summary");
+    expect(sitemapSource).toContain("{group.items.length}");
   });
 
   it("provides bilingual page copy and keyboard-visible focus treatments", () => {

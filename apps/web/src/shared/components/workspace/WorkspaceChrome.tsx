@@ -9,7 +9,7 @@ import { ToonSpectrumMark } from "../visual-marks";
 import type { WorkspaceNavigationContext } from "./workspace-navigation-model";
 
 export function WorkspaceBrand({
-  href = "/",
+  href = "/home",
   compact = false,
 }: {
   readonly href?: string;

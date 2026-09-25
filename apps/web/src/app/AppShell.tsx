@@ -116,13 +116,17 @@ export function AppShell({
   mainClassName = "min-h-screen pb-20 outline-none md:pb-0",
 }: AppShellProps) {
   const { pathname, search } = useLocation();
-  const campus = resolveCampusLocation(pathname, search);
+  const publicCreativeRoute = isPublicCreativeRoute(pathname);
+  // Public discovery, community, learning and marketplace pages keep one predictable public
+  // shell. Spatial/workspace chrome is reserved for signed-in work management and authoring.
+  const campus = publicCreativeRoute ? null : resolveCampusLocation(pathname, search);
   const protectedCampus = campus?.surface === "protected";
-  const taskRoute = protectedCampus ? null : workspaceTaskRoute(pathname, search) ?? campusTaskRoute(campus);
+  const taskRoute = publicCreativeRoute || protectedCampus
+    ? null
+    : workspaceTaskRoute(pathname, search) ?? campusTaskRoute(campus);
   const immersiveVirtualHome = ["/home", "/team", "/hub", "/studio", "/studio/space", "/onboarding/character"].includes(pathname.replace(/\/+$/u, "") || "/");
   const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/.test(pathname);
   const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null || protectedCampus;
-  const publicCreativeRoute = isPublicCreativeRoute(pathname);
   const enhancedSite = Boolean(header) && supportsSiteExperience(pathname) && !immersiveVirtualExperience;
   const resolvedMainClassName = immersiveVirtualHome || taskRoute !== null
     ? "min-h-[100dvh] bg-canvas outline-none"

@@ -1,38 +1,92 @@
 # ToonSpectrum 무료 우선 인프라 운영 기준
 
-상태: **활성 아키텍처 정책**
+상태: **current — 무료 우선 정책 / migration — Supabase 빈 시작·D1 연결 준비 / target — 추가 공급자 후보 보류**
+
+기준일: **2026-09-26**. 이 문서는 운영 중인 경계, 생성·구현 후 운영 반영을 기다리는 항목,
+장기 후보를 구분한다. 정책 파일에 공급자가 있다고 해서 해당 공급자가 생성되었거나 운영 요청을
+처리한다고 해석하지 않는다.
 
 정책 파일: [`config/free-infrastructure-policy.json`](../config/free-infrastructure-policy.json)
+
+DB 연합 운영 기준: [`operations/federated-free-database-data-plane.md`](operations/federated-free-database-data-plane.md)
 
 검증: `pnpm run verify:free-infrastructure`
 
 ## 목표
 
 운영자 비용을 가능한 한 0원에 가깝게 유지하되 기능, 품질, 데이터 무결성, 보안 수준을 낮추지
-않는다. 무료 자원의 개수를 늘리는 것보다 다음 경계를 먼저 지킨다.
+않는다. 서로 독립적인 무료 할당량을 최대한 활용해 실제 처리 가능한 트래픽을 늘리는 것이
+목표다. 분산은 다음 데이터·실행 경계를 유지하면서 진행한다.
 
 1. 정적 요청은 정적 CDN이 직접 처리한다.
 2. 작품 원본과 무거운 렌더링은 로컬 우선으로 처리한다.
 3. 개인 대용량 데이터는 사용자 소유 저장소(BYOS)를 기본 확장 경로로 사용한다.
-4. 회원, 권한, 작품 소유권, 거래 상태는 하나의 PostgreSQL 원장에 유지한다.
+4. 원자 작업의 경계를 보존하고 각 데이터의 쓰기 권위를 하나로 정해 독립 workload부터 분산한다.
 5. 실시간 조정, 공개 에셋, 백업은 목적별 공급자로 분리한다.
 6. 유료 전환과 유료 failover는 자동화하지 않는다.
 7. Oracle/OCI는 운영, 폴백, 백업 후보에서 제외한다.
 
-## 최종 배치
+## 현재 운영 경계 — current
 
-| 책임 | 기본 경계 | 원칙 |
+아래는 기존 서비스의 운영 경계다. 새 DB와 분석 저장소의 전환 완료를 의미하지 않으며,
+현재 장애 복구와 배포 후 검증은 다음 절에서 별도로 관리한다.
+
+| 책임 | 현재 경계 | 원칙 |
 |---|---|---|
 | 정적 웹·카탈로그 | Cloudflare Static Assets | 정적 요청은 Worker를 실행하지 않는다. |
 | 동적 경로 게이트웨이 | Cloudflare Worker | `/api`, Socket.IO, OG 경로만 처리하고 liveness는 edge에서 응답한다. |
-| 핵심 원장 | Neon/호환 PostgreSQL | 회원·ACL·소유권·거래의 단일 쓰기 권위다. |
 | 실시간 room 조정 | Cloudflare Durable Objects | presence·cursor·comment·signaling만 담당한다. |
 | 공개 에셋 | Cloudflare R2 Standard | 해시 기반 불변 객체와 장기 캐시를 사용한다. |
-| 원본·DB 백업 | Backblaze B2 + 암호화 로컬 사본 | 주 공급자와 실패 도메인을 분리한다. |
+| private 객체 | 기록된 공급자 위치 + 목적별 고정 라우팅 | R2/Supabase/B2 adapter 지원과 실제 bucket·복제 완료 여부는 구분한다. |
 | 개인 프로젝트 | OPFS/로컬 파일/BYOS | 운영자 중앙 저장소를 무제한 개인 드라이브로 사용하지 않는다. |
-| 이메일 | Resend | 인증·보안·거래 메일을 우선하고 알림은 digest한다. |
 | Core NestJS API | Render `toonspectrum-core-api` | scale-to-zero full authority이며 수동 release만 허용한다. |
-| AI | 사용자 키 또는 로컬 모델 | 운영자 AI key를 기본 경로로 사용하지 않는다. |
+
+AI는 기능에서 제외하지 않는다. 사용자 키는 통합 설정에서 재사용하고, 로컬 실행은 해당 기능의
+결과·품질·사용성을 보존하는 경우에 사용한다. 키 미설정·한도·실패를 이유로 운영자 유료 추론으로
+자동 전환하지 않는다. 이메일은 인증·보안·거래 계약을 유지하며 비용만을 이유로 필수 전달을
+생략하거나 사용자에게 불필요한 대기를 추가하지 않는다.
+
+## 이번 구현과 운영 반영 대기 — migration
+
+사용자는 2026-09-26 기존 Neon 원본을 보존하고 기존 데이터 이관을 생략한 새 무료 DB의 빈 시작을
+승인했다. 기존 Neon은 quota 장애가 확인된 보존 원본이며 정상 복구 대상으로 검증된 상태가 아니다.
+
+| 대상 | 실제 완료·검증 | 아직 완료하지 않은 운영 경계 |
+| --- | --- | --- |
+| Supabase PostgreSQL 17 핵심 DB | 정본 스키마 적용, migration 원장 92행·marker 13개·사용자 0행, 제한 runtime TLS 인증·권한·rollback 검증 | Render DB·CA 설정과 배포된 API의 가입·로그인·저장 검증 |
+| Supabase 앱 readiness | 실제 runtime과 CA `verify-full`로 Node `PostgresHealthReadinessRepository` 실행: `database=true`, `schema=true` | 배포된 HTTP readiness 및 사용자 흐름 검증 |
+| Cloudflare D1 분석 DB | 실제 DB 1개 `toonspectrum-analytics-buffer`, `analytics-buffer-v2` 적용, 단독 중복 이벤트·heartbeat·overview·pulse canary 통과 | 인증 Worker 배포와 Core 수집·관리자 조회의 `TRAFFIC_ANALYTICS_STORE=d1` 전환 |
+| Firestore·Firebase RTDB·BigQuery | 무료 자원과 초기 규칙·테이블 생성, GCP billing 비활성 | 제품 repository·권한·실제 runtime 연결; 아직 알림·presence·분석의 운영 권위가 아님 |
+| Supabase compatibility schema | private `toonspectrum_federation` 3개 테이블 보존 | 이관 검증용 보조 schema이며 소셜 운영 권위로 전환하지 않음 |
+| 공급자 후보 라우터 | 정책·quota 검사·경로 계획 코드 | 기본 비활성; `plan()` 실행만으로 제품 읽기·쓰기가 분산되지 않음 |
+
+Supabase의 공개 CA는 검증된 파일을 Linux image에 포함하고 `NODE_EXTRA_CA_CERTS`로 신뢰를
+추가하는 방식으로 배포 준비한다. DB·CA의 개별 검증은 운영 연결 완료와 구분한다. SQL 적용
+체크섬, 원격 검증 근거와 남은 전환 기준은 [상세 운영 기록](operations/federated-free-database-data-plane.md)에 둔다.
+
+D1 v2 원격 canary에서는 새 세션과 page view를 기록하는 쓴 행 수가 12행에서 9행으로
+25% 줄었다. 이는 동일한 단일 canary의 D1 `meta` 측정이며 일일 처리량이나 실제 트래픽 규모를
+보장하는 수치가 아니다.
+
+직전 Core image에는 새 공개 CA와 D1 adapter가 없다. 새 Supabase·D1 환경변수를 유지한 채
+이전 image만 복원하면 TLS 연결이 실패하거나 분석 쓰기 권위가 PostgreSQL로 돌아갈 수 있다.
+Neon의 quota `402`도 해소되지 않았으므로 기존 DB를 정상 rollback 대상으로 간주하지 않는다.
+새 image에서 TLS readiness와 D1 수집·조회를 먼저 검증하고, 복구는 image·환경변수·DB 쓰기 권위를
+함께 판단한다. 새 권위에 쓰기가 시작된 뒤 원장이나 분석 저장소를 자동으로 되돌리지 않는다.
+
+## 장기 공급자 후보 — target, 활성화 보류
+
+| 후보 공급자 | 검토할 독립 workload | 활성화 전제 |
+| --- | --- | --- |
+| CockroachDB·TiDB | 거래 원장, 계정·프로젝트·커뮤니티·협업 중 독립성이 검증된 도메인 | 원자 작업·인가·멱등성·복구 계약과 무료량 확인; 현재 운영 DB가 아님 |
+| Cosmos·DynamoDB·MongoDB Atlas | 큰 JSON, 감사 이벤트, AI job 문서 | 데이터 계약, runtime 인증, repository와 quota 검증 |
+| Turso·추가 D1·MotherDuck | 공개 read model, edge index, 오프라인 분석 | 재생성·동등성·행 비용·실제 무료 할당량 검증 |
+| Convex·Appwrite | 독립 review·feedback workflow | 기존 기능·품질·권한을 유지하는 연결 구현과 운영 검증 |
+
+특정 엔진이나 DB 수를 최종 배치로 고정하지 않는다. 초안의 TiDB 5개 instance와 D1 edge 8개·분석
+2개 shard는 배치 후보였으며 생성·연결 완료 수가 아니다. D1처럼 계정 전체 한도를 공유하는
+공급자는 DB를 늘려도 무료 읽기·쓰기·저장량 합계가 늘지 않는다. 독립 무료량이 실제로 추가되는지와
+요청당 행·저장·전송 비용을 측정한 뒤 채택한다.
 
 ## 현재 구현된 전환 경계
 
@@ -85,7 +139,10 @@ pnpm run infra:storage-routing-fingerprint -- \
 된다. B2 adapter가 존재한다고 해서 R2 객체가 자동 백업되는 것도 아니다. 검증된 secondary copy는
 `creator_asset_storage_replica` inventory에 기록하고 복제·승격은 별도의 승인된 작업으로 수행한다.
 
-## 저장소 배치 규칙
+## 저장소 배치 규칙 — target 계약
+
+이 표는 데이터 배치와 보존의 기준이다. adapter나 bucket의 존재만으로 자동 백업·복제·복구까지
+운영 중이라고 판단하지 않는다.
 
 | 데이터 | 기본 위치 | 운영자 클라우드 업로드 조건 |
 |---|---|---|
@@ -103,27 +160,32 @@ pnpm run infra:storage-routing-fingerprint -- \
 통해 신규 데이터 배치와 이전을 분리한다. 파일 이전은 `복사 → 크기·SHA-256 검증 → 등록부 전환
 → 관찰 기간 → 이전 객체 삭제` 순서로 수행한다.
 
-## DB 분리 규칙
+## DB 연합 배치 규칙
 
-### 단일 원장에 남기는 데이터
+상세 운영 계약은
+[`operations/federated-free-database-data-plane.md`](operations/federated-free-database-data-plane.md)를
+따른다. 무료 DB를 연결할 때도 aggregate마다 쓰기 권위는 하나뿐이다.
 
-- 사용자와 인증 상태
-- 작품·프로젝트 소유권
-- 팀·협업 ACL
-- 마켓 거래·라이선스·정산 상태
-- asset 위치와 lifecycle 원장
-- 관리자 감사 이벤트
+### 원자 작업과 쓰기 권위
 
-### 분리 가능한 파생 데이터
+계정 병합, 작품 저장, 게시 승인, 거래 확정처럼 함께 성공하거나 실패해야 하는 작업은 현재의
+transaction 경계를 유지한다. 이번 빈 시작은 이 계약을 Supabase PostgreSQL에 구성하는 단계다.
+PostgreSQL이나 하나의 DB를 영구 조건으로 두지 않으며, 별도 공급자로 분리할 때는 확정 버전,
+인가·멱등성·복구 프로토콜을 먼저 구현한다. 요청 한 번에서 여러 DB로 권위 쓰기를 동시에 보내거나
+장애 시 다른 DB에 자동으로 쓰지 않는다.
 
-- 공개 카탈로그와 정적 검색 shard
-- 추천 후보와 인기 집계
-- 기능 플래그와 에지 설정
-- 재생성 가능한 검색 인덱스
-- 짧은 TTL cache와 idempotency receipt
+### 독립 workload와 파생 데이터
 
-파생 저장소 장애는 원장의 의미를 바꾸지 않는다. 요청 중 여러 DB에 동시 쓰지 않고 원장
-transaction과 outbox를 완료한 뒤 idempotent consumer가 파생 데이터를 갱신한다.
+방문 분석처럼 원장 외래키에 의존하지 않는 workload부터 실제 수집·조회·retention을 함께
+분리한다. 공개 카탈로그는 현재 Static Assets 경로를 유지하고, Turso 같은 read model은
+추가 효과와 동등성을 검증한 뒤 도입한다. Firestore·RTDB·BigQuery는 생성되어 있어도 repository가
+연결되기 전에는 운영 트래픽 분산으로 계산하지 않는다. BigQuery Sandbox는 streaming 대신
+검증한 batch load를 후보로 사용한다.
+
+파생 데이터의 비동기 복제는 권위 transaction과 outbox, 멱등 consumer를 갖춘 경로에 한해
+사용한다. 후보 라우터는 기본 비활성이며, 환경변수 quota snapshot은 자동 갱신 경로가 검증되기
+전까지 운영 중앙 쓰기의 공통 게이트로 활성화하지 않는다. 실제 활성화된 admission은 snapshot이
+없거나 만료되면 실패로 처리하고, 유료 failover나 다른 엔진으로 자동 쓰기 전환하지 않는다.
 
 ## 무료 한도 가드레일
 
@@ -234,7 +296,7 @@ asset digest, ACL, 샘플 프로젝트 열기를 검증한다.
 - 무료 용량 우회를 위한 다중 계정 순환
 - 사용자에게 알리지 않은 품질·해상도·기능 하향
 - 공급자 한도 초과 시 자동 유료 전환
-- 핵심 원장의 기능별 다중 DB 분할
+- 원자 작업·권한·복구 계약을 구현하지 않은 핵심 원장의 다중 DB 분할
 - Queue를 영구 이벤트 원장으로 사용
 - 프로젝트 원본을 PostgreSQL BLOB에 저장
 - 파일 바이트를 NestJS가 받아 다시 object storage로 중계

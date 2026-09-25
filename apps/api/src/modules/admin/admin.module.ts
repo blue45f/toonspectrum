@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { TrafficAnalyticsModule } from "../traffic-analytics/traffic-analytics.module";
 
 import { AdminAnnouncementsService } from "./admin-announcements.service";
 import { AdminCampaignsService } from "./admin-campaigns.service";
@@ -13,6 +14,7 @@ import { AdminController } from "./admin.controller";
 import { AdminService } from "./admin.service";
 
 @Module({
+  imports: [TrafficAnalyticsModule],
   controllers: [AdminController, AdminTrafficController],
   providers: [
     AdminService,

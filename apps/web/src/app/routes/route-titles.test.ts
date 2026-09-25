@@ -29,7 +29,9 @@ describe("route title resolution", () => {
   });
 
   it("uses the primary route authority for Production and Studio front doors", () => {
+    expect(resolveRouteTitle("/home", translate)).toBe("내 홈");
     expect(resolveRouteTitle("/production", translate)).toBe("route.production");
+    expect(resolveRouteTitle("/production/projects", translate)).toBe("제작 프로젝트");
     expect(resolveRouteTitle("/production/projects/sample-project/review", translate)).toBe("route.production");
     expect(resolveRouteTitle("/studio/new", translate)).toBe("route.studioNew");
     expect(resolveRouteTitle("/studio/assets", translate)).toBe("route.studioAssets");

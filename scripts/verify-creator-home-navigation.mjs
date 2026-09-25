@@ -69,7 +69,7 @@ try {
     await expect(page.locator(".cf-hero .cf-primary")).toHaveAttribute("href", "/onboarding/character?next=%2Fhome");
     await expect(page.locator(".cf-hero .cf-secondary")).toHaveAttribute("href", "/product-tour");
     await expect(page.locator('.cf-simple-closing a[href="/production/projects/sample-project/overview"]')).toHaveCount(1);
-    await expect(page.locator('.cf-hero-links a[href="/studio/projects"]')).toHaveCount(1);
+    await expect(page.locator('.cf-hero-links a[href="/studio"]')).toHaveCount(1);
     await expect(page.locator('.cf-hero-links a[href="/brand-film"]')).toHaveCount(1);
     await expect(page.locator(".cf-jump-nav a")).toHaveCount(4);
     for (const href of ["#creator-start", "#creator-flow", "#creator-principles", "#creator-support"]) {

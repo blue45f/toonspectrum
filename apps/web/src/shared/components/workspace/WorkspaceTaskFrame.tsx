@@ -89,7 +89,14 @@ export function WorkspaceTaskFrame({ route, children, campusMode, campusControls
       </header>
     ) : null}
     {route && !focused ? <WorkspaceSidebar context={context} key="navigation" /> : null}
-    <div ref={content} key="content" className={contentClassName}>
+    <div
+      ref={content}
+      key="content"
+      className={contentClassName}
+      role={focused ? "region" : undefined}
+      tabIndex={focused ? 0 : undefined}
+      aria-label={focused ? bt("작업 내용", "Task content") : undefined}
+    >
       {!focused && campusControls ? <div className="campus-toolbar" key="campus-controls">{campusControls}</div> : null}
       {route && !campusMode && !focused ? <div className="workspace-task-purpose" key="purpose">
         <p>{bt(route.hintKo, route.hintEn)}</p>

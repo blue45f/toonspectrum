@@ -1,4 +1,5 @@
 import { Inject, Injectable, Optional } from "@nestjs/common";
+import { ModuleRef } from "@nestjs/core";
 
 import { BackendCapabilityGatewayExecutor } from "../../infrastructure/backend-capabilities/backend-capability-gateway-executor";
 import {
@@ -12,6 +13,10 @@ import {
 } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 import { resolveStudioLiveClusterAdapterConfig } from "../../realtime/studio-postgres-io.adapter";
 import { resolveAuthRateLimitConfig } from "../auth/auth-rate-limit.config";
+import {
+  TRAFFIC_ANALYTICS_REPOSITORY,
+  type TrafficAnalyticsRepository,
+} from "../traffic-analytics/traffic-analytics.repository";
 
 import {
   HEALTH_READINESS_REPOSITORY,
@@ -27,6 +32,7 @@ export const HEALTH_ENVIRONMENT = Symbol("HEALTH_ENVIRONMENT");
 export type HealthEnvironment = Partial<
   Record<
     | "NODE_ENV"
+    | "TRAFFIC_ANALYTICS_STORE"
     | "AUTH_RATE_LIMIT_MODE"
     | "AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED"
     | "BACKEND_DISTRIBUTION_ENABLED"
@@ -76,6 +82,9 @@ export class HealthService {
     @Optional()
     @Inject(BackendCapabilityGatewayExecutor)
     private readonly backendCapabilityExecutor?: BackendCapabilityGatewayExecutor,
+    @Optional()
+    @Inject(ModuleRef)
+    private readonly moduleRef?: ModuleRef,
   ) {}
 
   async checkReadiness(): Promise<HealthReadinessReport> {
@@ -84,7 +93,8 @@ export class HealthService {
     );
     const schema =
       database &&
-      (await this.safeCheck(() => this.repository.isSchemaReady()));
+      (await this.safeCheck(() => this.repository.isSchemaReady())) &&
+      (await this.isAnalyticsSchemaReady());
     const realtime = this.isRealtimeReady();
     const objectStorage = await this.isObjectStorageReady();
     const coordination = await this.isCoordinationReady();
@@ -116,6 +126,17 @@ export class HealthService {
       // Invalid/missing direct PostgreSQL configuration must never be treated as a local fallback.
       return false;
     }
+  }
+
+  private async isAnalyticsSchemaReady(): Promise<boolean> {
+    if (this.environment.TRAFFIC_ANALYTICS_STORE !== "d1") return true;
+    // 실시간 전용 앱에 분석 controller를 등록하지 않고 현재 앱의 repository를 확인한다.
+    return this.safeCheck(async () => {
+      const repository = this.moduleRef?.get<TrafficAnalyticsRepository>(
+        TRAFFIC_ANALYTICS_REPOSITORY, { strict: false },
+      );
+      return repository ? repository.checkHealth() : false;
+    });
   }
 
   private async safeCheck(check: () => Promise<boolean>): Promise<boolean> {

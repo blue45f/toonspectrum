@@ -91,8 +91,8 @@ try {
       `Clipped headline: ${name}`,
     );
     await expect(page.locator('.cf-hero .cf-primary[href="/onboarding/character?next=%2Fhome"]')).toBeVisible();
-    await expect(page.locator('.cf-hero .cf-secondary[href="/production"]')).toBeVisible();
-    await expect(page.locator('.cf-hero-links a[href="/studio/projects"]')).toBeVisible();
+    await expect(page.locator('.cf-hero .cf-secondary[href="/product-tour"]')).toBeVisible();
+    await expect(page.locator('.cf-hero-links a[href="/studio"]')).toBeVisible();
     await expect(page.locator(".cf-start-card")).toHaveCount(4);
     await expect(page.locator(".cf-flow li a")).toHaveCount(6);
     await expect(page.locator(".cf-support-grid a")).toHaveCount(3);

@@ -1,0 +1,25 @@
+{
+  "schema": "authority-schema.sql",
+  "instances": [
+    {
+      "shardId": "tidb-identity",
+      "domains": ["identity", "accounts", "sessions", "authorization"]
+    },
+    {
+      "shardId": "tidb-projects",
+      "domains": ["creator-projects", "work-metadata", "revision-metadata"]
+    },
+    {
+      "shardId": "tidb-commerce",
+      "domains": ["marketplace", "catalog-authority", "order-state"]
+    },
+    {
+      "shardId": "tidb-community",
+      "domains": ["community", "social-graph", "comments", "reactions"]
+    },
+    {
+      "shardId": "tidb-collaboration",
+      "domains": ["collaboration", "messaging", "team-workspace"]
+    }
+  ]
+}

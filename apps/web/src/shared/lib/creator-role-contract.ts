@@ -280,7 +280,7 @@ export const CREATOR_ROLE_DEFINITIONS = [
     actions: [
       action("/story-lab", "대본·설정 열기", "Open scripts & canon", "캐릭터, 장면, 대사와 설정을 관리합니다.", "Manage characters, scenes, dialogue and canon."),
       action("/production", "회차 기획 확인", "Review episode plans", "스토리 공정과 다음 인수인계를 확인합니다.", "Review the story lane and the next handoff."),
-      action("/studio/projects", "프로젝트 이어가기", "Continue a project", "담당 회차와 최근 작업을 엽니다.", "Open assigned episodes and recent work."),
+      action("/studio", "프로젝트 이어가기", "Continue a project", "담당 회차와 최근 작업을 엽니다.", "Open assigned episodes and recent work."),
     ],
   },
   {
@@ -424,7 +424,7 @@ export const CREATOR_ROLE_DEFINITIONS = [
     actions: [
       action("/learn/classroom", "수업·과제 관리", "Manage classes & assignments", "수업 흐름과 학생 과제를 준비합니다.", "Prepare lessons and student assignments."),
       action("/learn", "교육 자료", "Learning resources", "작화·스토리 제작 자료를 찾습니다.", "Find drawing and storytelling resources."),
-      action("/studio/projects", "학생 작품·실습", "Student work & practice", "실습 프로젝트와 피드백 대상을 엽니다.", "Open practice projects and critique targets."),
+      action("/studio", "학생 작품·실습", "Student work & practice", "실습 프로젝트와 피드백 대상을 엽니다.", "Open practice projects and critique targets."),
     ],
   },
   {
@@ -471,7 +471,7 @@ export const CREATOR_ROLE_DEFINITIONS = [
     recommendedSpecialties: ["production-schedule", "budget", "quality-control", "episode-planning"],
     actions: [
       action("/production", "제작 대시보드", "Production dashboard", "전체 프로젝트의 일정과 위험을 확인합니다.", "Review schedules and risks across projects."),
-      action("/studio/projects", "프로젝트 관리", "Manage projects", "활성 프로젝트와 최근 작업을 정리합니다.", "Organize active projects and recent work."),
+      action("/production/projects", "프로젝트 관리", "Manage projects", "활성 프로젝트와 최근 작업을 정리합니다.", "Organize active projects and recent work."),
       action("/studio?view=publications", "연재 일정", "Publishing schedule", "게시 준비와 공개 상태를 확인합니다.", "Review publishing readiness and release state."),
     ],
   },
