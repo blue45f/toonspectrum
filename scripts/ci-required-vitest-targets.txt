@@ -30,10 +30,10 @@ apps/api/src/modules/studio-project-graph/studio-session-evidence.service.test.t
 apps/api/src/modules/traffic-analytics/traffic-analytics-d1.client.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics-d1.repository.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics-repository.provider.test.ts
+apps/api/src/modules/traffic-analytics/traffic-analytics-share-contract.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics-store.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics.controller.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics.service.test.ts
-apps/api/src/modules/traffic-analytics/traffic-analytics-share-contract.test.ts
 apps/api/src/platform/federated-data-plane/federated-data-plane-routing.test.ts
 apps/api/src/platform/federated-data-plane/federated-data-plane.module.test.ts
 apps/api/src/runtime/runtime-boundary.test.ts
