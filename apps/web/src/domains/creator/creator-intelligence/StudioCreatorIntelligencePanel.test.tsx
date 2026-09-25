@@ -38,6 +38,7 @@ beforeEach(() => {
   vi.spyOn(creatorIntelligenceClient, "status").mockResolvedValue(providerStatus);
   vi.spyOn(creatorIntelligenceClient, "references").mockResolvedValue({
     provider: "pexels",
+    mediaType: "image",
     status: "ready",
     page: 1,
     hasMore: false,
@@ -46,6 +47,7 @@ beforeEach(() => {
     items: [{
       id: "pexels:42",
       provider: "pexels",
+      mediaType: "image",
       title: "Rainy city reference",
       creator: "Reference Photographer",
       sourceUrl: "https://www.pexels.com/photo/42/",
@@ -72,11 +74,13 @@ describe("StudioCreatorIntelligencePanel free reference APIs", () => {
     renderPanel();
 
     await waitFor(() => expect(creatorIntelligenceClient.status).toHaveBeenCalledTimes(1));
-    expect(screen.getByText("무료 Openverse/Pexels/Pixabay 검색을 하나의 보드로 연결하고, 출처·작가·라이선스를 프로젝트와 함께 보존합니다. 외부 이미지는 자동 반입하지 않습니다.")).toBeTruthy();
+    expect(screen.getByText(/무료 Openverse\/Pexels\/Pixabay 이미지와 Pexels\/Pixabay 영상 레퍼런스/u)).toBeTruthy();
     expect(screen.getByRole("button", { name: "배경" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "실내" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "소품" })).toBeTruthy();
     expect(screen.getAllByText("무료 API").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "이미지" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "영상" })).toBeTruthy();
   });
 
   it("searches Pexels, shows provenance, and saves the reference", async () => {
@@ -90,6 +94,8 @@ describe("StudioCreatorIntelligencePanel free reference APIs", () => {
     await waitFor(() => expect(creatorIntelligenceClient.references).toHaveBeenCalledWith(
       "pexels",
       "cinematic rainy night alley background",
+      1,
+      "image",
     ));
     expect(await screen.findByRole("img", { name: "Rainy city reference" })).toBeTruthy();
     expect(screen.getByText("Pexels License")).toBeTruthy();
@@ -105,4 +111,51 @@ describe("StudioCreatorIntelligencePanel free reference APIs", () => {
     const savedButton = await screen.findByRole("button", { name: "출처와 함께 저장됨" });
     expect((savedButton as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it("routes motion reference searches through free Pexels video search", async () => {
+    vi.mocked(creatorIntelligenceClient.references).mockResolvedValueOnce({
+      provider: "pexels",
+      mediaType: "video",
+      status: "ready",
+      page: 1,
+      hasMore: false,
+      cache: { hit: false, ttlSeconds: 21_600 },
+      notice: "Motion references open on Pexels.",
+      items: [{
+        id: "pexels-video:77",
+        provider: "pexels",
+        mediaType: "video",
+        title: "Cinematic city walk",
+        creator: "Motion Creator",
+        sourceUrl: "https://www.pexels.com/video/77/",
+        creatorUrl: "https://www.pexels.com/@motion-creator/",
+        previewUrl: "https://images.pexels.com/videos/77/poster.jpeg",
+        license: "Pexels License",
+        licenseUrl: "https://www.pexels.com/license/",
+        width: 1920,
+        height: 1080,
+        durationSeconds: 8,
+        rightsStatus: "provider-license",
+        importable: false,
+        fetchedAt: "2026-09-25T00:00:00.000Z",
+      }],
+    });
+    renderPanel();
+    await waitFor(() => expect(creatorIntelligenceClient.status).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "영상" }));
+    expect((screen.getByLabelText("reference provider") as HTMLSelectElement).value).toBe("pexels");
+    fireEvent.click(screen.getByRole("button", { name: "카메라 이동" }));
+
+    await waitFor(() => expect(creatorIntelligenceClient.references).toHaveBeenCalledWith(
+      "pexels",
+      "cinematic slow camera movement city",
+      1,
+      "video",
+    ));
+    expect(await screen.findByRole("img", { name: "Cinematic city walk" })).toBeTruthy();
+    expect(screen.getAllByText(/영상 레퍼런스/u).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/8s/u).length).toBeGreaterThan(0);
+  });
+
 });

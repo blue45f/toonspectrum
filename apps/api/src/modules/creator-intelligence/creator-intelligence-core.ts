@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 
 export type CreatorIntelligenceProviderStatus = "ready" | "not_configured" | "disabled";
 export type CreatorIntelligenceReferenceProvider = "openverse" | "pexels" | "pixabay";
+export type CreatorIntelligenceReferenceMediaType = "image" | "video";
 export type CreatorIntelligenceTranslationProvider = "deepl" | "libretranslate";
 export type CreatorIntelligenceVoiceProvider = "gemini" | "deepgram";
 
@@ -18,6 +19,7 @@ export interface CreatorIntelligenceCoreOptions {
 export interface CreatorIntelligenceReferenceItem {
   readonly id: string;
   readonly provider: CreatorIntelligenceReferenceProvider;
+  readonly mediaType: CreatorIntelligenceReferenceMediaType;
   readonly title: string;
   readonly creator: string;
   readonly sourceUrl: string;
@@ -27,6 +29,7 @@ export interface CreatorIntelligenceReferenceItem {
   readonly licenseUrl: string;
   readonly width?: number | null;
   readonly height?: number | null;
+  readonly durationSeconds?: number | null;
   readonly rightsStatus: "verify-source" | "provider-license";
   readonly importable: false;
   readonly fetchedAt: string;
@@ -34,6 +37,7 @@ export interface CreatorIntelligenceReferenceItem {
 
 export interface CreatorIntelligenceReferenceSearchResponse {
   readonly provider: CreatorIntelligenceReferenceProvider;
+  readonly mediaType: CreatorIntelligenceReferenceMediaType;
   readonly status: CreatorIntelligenceProviderStatus;
   readonly page: number;
   readonly items: readonly CreatorIntelligenceReferenceItem[];
@@ -148,6 +152,12 @@ function cleanPage(value: unknown): number {
     throw new CreatorIntelligenceInputError("페이지는 1~20 범위여야 합니다.");
   }
   return page;
+}
+
+function cleanReferenceMediaType(value: unknown): CreatorIntelligenceReferenceMediaType {
+  if (value === undefined || value === null || value === "") return "image";
+  if (value === "image" || value === "video") return value;
+  throw new CreatorIntelligenceInputError("레퍼런스 미디어 유형은 image 또는 video여야 합니다.");
 }
 
 function safeHttps(value: unknown): string {
@@ -437,53 +447,157 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
     } as const;
   }
 
-  async function searchReferences(providerRaw: unknown, queryRaw: unknown, pageRaw?: unknown) {
+  async function searchReferences(
+    providerRaw: unknown,
+    queryRaw: unknown,
+    pageRaw?: unknown,
+    mediaRaw?: unknown,
+  ) {
     const provider = providerRaw as CreatorIntelligenceReferenceProvider;
     if (!(["openverse", "pexels", "pixabay"] as const).includes(provider)) {
       throw new CreatorIntelligenceInputError("지원하지 않는 레퍼런스 제공처입니다.");
     }
     const query = cleanQuery(queryRaw);
     const page = cleanPage(pageRaw);
+    const mediaType = cleanReferenceMediaType(mediaRaw);
     const env = options.env();
-    if (provider === "pexels" && !key(env, "PEXELS_API_KEY")) return { provider, status: "not_configured", page, items: [], hasMore: false };
-    if (provider === "pixabay" && !key(env, "PIXABAY_API_KEY")) return { provider, status: "not_configured", page, items: [], hasMore: false };
+    if (provider === "pexels" && !key(env, "PEXELS_API_KEY")) {
+      return { provider, mediaType, status: "not_configured", page, items: [], hasMore: false };
+    }
+    if (provider === "pixabay" && !key(env, "PIXABAY_API_KEY")) {
+      return { provider, mediaType, status: "not_configured", page, items: [], hasMore: false };
+    }
 
     if (provider === "openverse") {
+      if (mediaType === "video") {
+        return {
+          provider,
+          mediaType,
+          status: "disabled",
+          page,
+          items: [],
+          hasMore: false,
+          notice: "Openverse video search is unavailable. Choose Pexels or Pixabay for motion references.",
+        };
+      }
       const url = new URL("https://api.openverse.org/v1/images/");
-      url.search = new URLSearchParams({ q: query, page: String(page), page_size: String(PAGE_SIZE), mature: "false" }).toString();
+      url.search = new URLSearchParams({
+        q: query,
+        page: String(page),
+        page_size: String(PAGE_SIZE),
+        mature: "false",
+      }).toString();
       const payload = record(await readJson(await options.fetch(url.href, requestInit())));
       const totalPages = Math.max(1, Math.ceil((finite(payload.result_count) ?? 0) / PAGE_SIZE));
-      const items = rows(payload.results).slice(0, PAGE_SIZE).map((value): CreatorIntelligenceReferenceItem | null => {
-        const item = record(value);
-        const id = text(item.id, 160);
-        const sourceUrl = safeHttps(item.foreign_landing_url);
-        if (!id || !sourceUrl) return null;
-        return {
-          id: `openverse:${id}`,
-          provider,
-          title: text(item.title, 300) || "Untitled reference",
-          creator: text(item.creator, 200),
-          sourceUrl,
-          previewUrl: safeHttps(item.thumbnail) || safeHttps(item.url),
-          license: [text(item.license, 40).toUpperCase(), text(item.license_version, 20)].filter(Boolean).join(" "),
-          licenseUrl: safeHttps(item.license_url),
-          width: finite(item.width),
-          height: finite(item.height),
-          rightsStatus: "verify-source",
-          importable: false,
-          fetchedAt: new Date(now()).toISOString(),
-        };
-      }).filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
-      return { provider, status: "ready", page, items, hasMore: page < Math.min(totalPages, 20), notice: "Openverse is discovery-only. Verify the original source and current license before reuse." };
+      const items = rows(payload.results)
+        .slice(0, PAGE_SIZE)
+        .map((value): CreatorIntelligenceReferenceItem | null => {
+          const item = record(value);
+          const id = text(item.id, 160);
+          const sourceUrl = safeHttps(item.foreign_landing_url);
+          if (!id || !sourceUrl) return null;
+          return {
+            id: `openverse:${id}`,
+            provider,
+            mediaType: "image",
+            title: text(item.title, 300) || "Untitled reference",
+            creator: text(item.creator, 200),
+            sourceUrl,
+            previewUrl: safeHttps(item.thumbnail) || safeHttps(item.url),
+            license: [
+              text(item.license, 40).toUpperCase(),
+              text(item.license_version, 20),
+            ].filter(Boolean).join(" "),
+            licenseUrl: safeHttps(item.license_url),
+            width: finite(item.width),
+            height: finite(item.height),
+            rightsStatus: "verify-source",
+            importable: false,
+            fetchedAt: new Date(now()).toISOString(),
+          };
+        })
+        .filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
+      return {
+        provider,
+        mediaType,
+        status: "ready",
+        page,
+        items,
+        hasMore: page < Math.min(totalPages, 20),
+        notice: "Openverse is discovery-only. Verify the original source and current license before reuse.",
+      };
     }
 
     if (provider === "pexels") {
-      const cacheId = `pexels:${query.toLocaleLowerCase("en-US")}:${page}`;
+      const cacheId = `pexels:${mediaType}:${query.toLocaleLowerCase("en-US")}:${page}`;
       return cachedReferenceSearch(cacheId, PEXELS_REFERENCE_CACHE_TTL_MS, async () => {
-          const url = new URL("https://api.pexels.com/v1/search");
-          url.search = new URLSearchParams({ query, page: String(page), per_page: String(PAGE_SIZE) }).toString();
-          const payload = record(await readJson(await options.fetch(url.href, requestInit({ headers: { Authorization: key(env, "PEXELS_API_KEY") } }))));
-          const items = rows(payload.photos).slice(0, PAGE_SIZE).map((value): CreatorIntelligenceReferenceItem | null => {
+        if (mediaType === "video") {
+          const url = new URL("https://api.pexels.com/v1/videos/search");
+          url.search = new URLSearchParams({
+            query,
+            page: String(page),
+            per_page: String(PAGE_SIZE),
+          }).toString();
+          const payload = record(await readJson(await options.fetch(
+            url.href,
+            requestInit({ headers: { Authorization: key(env, "PEXELS_API_KEY") } }),
+          )));
+          const items = rows(payload.videos)
+            .slice(0, PAGE_SIZE)
+            .map((value): CreatorIntelligenceReferenceItem | null => {
+              const item = record(value);
+              const user = record(item.user);
+              const id = finite(item.id);
+              const sourceUrl = safeHttps(item.url);
+              if (id === null || !sourceUrl) return null;
+              const picture = rows(item.video_pictures)
+                .map((entry) => safeHttps(record(entry).picture))
+                .find(Boolean) ?? "";
+              return {
+                id: `pexels-video:${Math.trunc(id)}`,
+                provider,
+                mediaType,
+                title: text(item.alt, 300) || `${query} · Pexels motion reference`,
+                creator: text(user.name, 200),
+                sourceUrl,
+                creatorUrl: safeHttps(user.url),
+                previewUrl: safeHttps(item.image) || picture,
+                license: "Pexels License",
+                licenseUrl: "https://www.pexels.com/license/",
+                width: finite(item.width),
+                height: finite(item.height),
+                durationSeconds: finite(item.duration),
+                rightsStatus: "provider-license",
+                importable: false,
+                fetchedAt: new Date(now()).toISOString(),
+              };
+            })
+            .filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
+          const total = finite(payload.total_results) ?? 0;
+          return {
+            provider,
+            mediaType,
+            status: "ready",
+            page,
+            items,
+            hasMore: total > page * PAGE_SIZE,
+            notice: "Motion references open on Pexels. Keep Pexels and creator attribution, and re-check provider terms before publishing.",
+          };
+        }
+
+        const url = new URL("https://api.pexels.com/v1/search");
+        url.search = new URLSearchParams({
+          query,
+          page: String(page),
+          per_page: String(PAGE_SIZE),
+        }).toString();
+        const payload = record(await readJson(await options.fetch(
+          url.href,
+          requestInit({ headers: { Authorization: key(env, "PEXELS_API_KEY") } }),
+        )));
+        const items = rows(payload.photos)
+          .slice(0, PAGE_SIZE)
+          .map((value): CreatorIntelligenceReferenceItem | null => {
             const item = record(value);
             const src = record(item.src);
             const id = finite(item.id);
@@ -492,6 +606,7 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
             return {
               id: `pexels:${Math.trunc(id)}`,
               provider,
+              mediaType,
               title: text(item.alt, 300) || "Pexels photo",
               creator: text(item.photographer, 200),
               sourceUrl,
@@ -505,18 +620,83 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
               importable: false,
               fetchedAt: new Date(now()).toISOString(),
             };
-          }).filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
-          const total = finite(payload.total_results) ?? 0;
-          return { provider, status: "ready", page, items, hasMore: total > page * PAGE_SIZE, notice: "Keep photographer/Pexels attribution metadata and re-check current provider terms before publishing." };
+          })
+          .filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
+        const total = finite(payload.total_results) ?? 0;
+        return {
+          provider,
+          mediaType,
+          status: "ready",
+          page,
+          items,
+          hasMore: total > page * PAGE_SIZE,
+          notice: "Keep photographer/Pexels attribution metadata and re-check current provider terms before publishing.",
+        };
       });
     }
 
-    const cacheId = `pixabay:${query.toLocaleLowerCase("en-US")}:${page}`;
+    const cacheId = `pixabay:${mediaType}:${query.toLocaleLowerCase("en-US")}:${page}`;
     return cachedReferenceSearch(cacheId, PIXABAY_REFERENCE_CACHE_TTL_MS, async () => {
-        const url = new URL("https://pixabay.com/api/");
-        url.search = new URLSearchParams({ key: key(env, "PIXABAY_API_KEY"), q: query, page: String(page), per_page: String(PAGE_SIZE), safesearch: "true", image_type: "all" }).toString();
-        const payload = record(await readJson(await options.fetch(url.href, requestInit())));
-        const items = rows(payload.hits).slice(0, PAGE_SIZE).map((value): CreatorIntelligenceReferenceItem | null => {
+      const url = new URL(mediaType === "video"
+        ? "https://pixabay.com/api/videos/"
+        : "https://pixabay.com/api/");
+      const parameters: Record<string, string> = {
+        key: key(env, "PIXABAY_API_KEY"),
+        q: query,
+        page: String(page),
+        per_page: String(PAGE_SIZE),
+        safesearch: "true",
+      };
+      if (mediaType === "image") parameters.image_type = "all";
+      url.search = new URLSearchParams(parameters).toString();
+      const payload = record(await readJson(await options.fetch(url.href, requestInit())));
+
+      if (mediaType === "video") {
+        const items = rows(payload.hits)
+          .slice(0, PAGE_SIZE)
+          .map((value): CreatorIntelligenceReferenceItem | null => {
+            const item = record(value);
+            const videos = record(item.videos);
+            const preferred = ["medium", "small", "tiny", "large"]
+              .map((name) => record(videos[name]))
+              .find((variant) => Boolean(safeHttps(variant.thumbnail))) ?? {};
+            const id = finite(item.id);
+            const sourceUrl = safeHttps(item.pageURL);
+            if (id === null || !sourceUrl) return null;
+            return {
+              id: `pixabay-video:${Math.trunc(id)}`,
+              provider,
+              mediaType,
+              title: text(item.tags, 300) || "Pixabay motion reference",
+              creator: text(item.user, 200),
+              sourceUrl,
+              previewUrl: safeHttps(preferred.thumbnail),
+              license: "Pixabay Content License",
+              licenseUrl: "https://pixabay.com/service/license-summary/",
+              width: finite(preferred.width),
+              height: finite(preferred.height),
+              durationSeconds: finite(item.duration),
+              rightsStatus: "provider-license",
+              importable: false,
+              fetchedAt: new Date(now()).toISOString(),
+            };
+          })
+          .filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
+        const total = finite(payload.totalHits) ?? 0;
+        return {
+          provider,
+          mediaType,
+          status: "ready",
+          page,
+          items,
+          hasMore: total > page * PAGE_SIZE,
+          notice: "Motion references open on Pixabay. Verify the current Content License and third-party rights before reuse.",
+        };
+      }
+
+      const items = rows(payload.hits)
+        .slice(0, PAGE_SIZE)
+        .map((value): CreatorIntelligenceReferenceItem | null => {
           const item = record(value);
           const id = finite(item.id);
           const sourceUrl = safeHttps(item.pageURL);
@@ -524,6 +704,7 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
           return {
             id: `pixabay:${Math.trunc(id)}`,
             provider,
+            mediaType,
             title: text(item.tags, 300) || "Pixabay image",
             creator: text(item.user, 200),
             sourceUrl,
@@ -536,9 +717,18 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
             importable: false,
             fetchedAt: new Date(now()).toISOString(),
           };
-        }).filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
-        const total = finite(payload.totalHits) ?? 0;
-        return { provider, status: "ready", page, items, hasMore: total > page * PAGE_SIZE, notice: "Treat search results as references; verify the current Pixabay Content License and third-party rights before reuse." };
+        })
+        .filter((item): item is CreatorIntelligenceReferenceItem => item !== null);
+      const total = finite(payload.totalHits) ?? 0;
+      return {
+        provider,
+        mediaType,
+        status: "ready",
+        page,
+        items,
+        hasMore: total > page * PAGE_SIZE,
+        notice: "Treat search results as references; verify the current Pixabay Content License and third-party rights before reuse.",
+      };
     });
   }
 

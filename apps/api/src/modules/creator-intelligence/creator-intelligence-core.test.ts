@@ -53,6 +53,7 @@ describe("creator intelligence reference providers", () => {
     expect(result.status).toBe("ready");
     expect(result.items[0]).toMatchObject({
       id: "openverse:ov-1",
+      mediaType: "image",
       title: "Rainy alley",
       rightsStatus: "verify-source",
       importable: false,
@@ -77,6 +78,7 @@ describe("creator intelligence reference providers", () => {
     const result = await core.searchReferences("pexels", "street pose");
     expect(result.items[0]).toMatchObject({
       id: "pexels:12",
+      mediaType: "image",
       license: "Pexels License",
       rightsStatus: "provider-license",
     });
@@ -111,6 +113,7 @@ describe("creator intelligence reference providers", () => {
 
     expect(first.items[0]).toMatchObject({
       id: "pixabay:34",
+      mediaType: "image",
       license: "Pixabay Content License",
       rightsStatus: "provider-license",
     });
@@ -126,6 +129,110 @@ describe("creator intelligence reference providers", () => {
     expect(refreshed.cache).toEqual({ hit: false, ttlSeconds: 86_400 });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
+
+  it("keeps Openverse image-only and avoids unsupported motion calls", async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    const core = createCreatorIntelligenceCore({ fetch: fetcher, env: () => ({}) });
+    const result = await core.searchReferences("openverse", "camera movement", 1, "video");
+    expect(result).toMatchObject({
+      provider: "openverse",
+      mediaType: "video",
+      status: "disabled",
+      items: [],
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("normalizes free Pexels video search as motion-reference metadata", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({
+      total_results: 1,
+      videos: [{
+        id: 77,
+        width: 1920,
+        height: 1080,
+        duration: 9,
+        url: "https://www.pexels.com/video/77/",
+        image: "https://images.pexels.com/videos/77/poster.jpeg",
+        user: {
+          name: "Motion Creator",
+          url: "https://www.pexels.com/@motion-creator/",
+        },
+        video_pictures: [],
+      }],
+    }));
+    const core = createCreatorIntelligenceCore({
+      fetch: fetcher,
+      env: () => ({ PEXELS_API_KEY: "pexels-video-key" }),
+      now: () => stamp,
+    });
+
+    const result = await core.searchReferences("pexels", "city walk", 1, "video");
+    expect(result).toMatchObject({
+      provider: "pexels",
+      mediaType: "video",
+      status: "ready",
+      cache: { hit: false, ttlSeconds: 21_600 },
+    });
+    expect(result.items[0]).toMatchObject({
+      id: "pexels-video:77",
+      mediaType: "video",
+      creator: "Motion Creator",
+      durationSeconds: 9,
+      previewUrl: "https://images.pexels.com/videos/77/poster.jpeg",
+      importable: false,
+    });
+    const [rawUrl, init] = fetcher.mock.calls[0] ?? [];
+    const url = new URL(String(rawUrl));
+    expect(url.pathname).toBe("/v1/videos/search");
+    expect(new Headers(init?.headers).get("authorization")).toBe("pexels-video-key");
+  });
+
+  it("normalizes and caches free Pixabay video search without exposing downloadable media", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(json({
+      totalHits: 1,
+      hits: [{
+        id: 91,
+        pageURL: "https://pixabay.com/videos/city-rain-91/",
+        tags: "city, rain, night",
+        duration: 12,
+        user: "Motion Maker",
+        videos: {
+          medium: {
+            url: "https://cdn.pixabay.com/video/91_medium.mp4",
+            width: 1280,
+            height: 720,
+            thumbnail: "https://cdn.pixabay.com/video/91_medium.jpg",
+          },
+        },
+      }],
+    }));
+    const core = createCreatorIntelligenceCore({
+      fetch: fetcher,
+      env: () => ({ PIXABAY_API_KEY: "pixabay-video-key" }),
+      now: () => stamp,
+    });
+
+    const first = await core.searchReferences("pixabay", "rain city", 1, "video");
+    const second = await core.searchReferences("pixabay", "rain city", 1, "video");
+    expect(first.items[0]).toMatchObject({
+      id: "pixabay-video:91",
+      mediaType: "video",
+      title: "city, rain, night",
+      durationSeconds: 12,
+      width: 1280,
+      height: 720,
+      previewUrl: "https://cdn.pixabay.com/video/91_medium.jpg",
+      importable: false,
+    });
+    expect(first.items[0]).not.toHaveProperty("mediaUrl");
+    expect(second.cache).toEqual({ hit: true, ttlSeconds: 86_400 });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const requestUrl = new URL(String(fetcher.mock.calls[0]?.[0]));
+    expect(requestUrl.pathname).toBe("/api/videos/");
+    expect(requestUrl.searchParams.get("key")).toBe("pixabay-video-key");
+    expect(requestUrl.searchParams.get("safesearch")).toBe("true");
+  });
+
 });
 describe("creator intelligence production providers", () => {
   it("translates through DeepL without exposing the key in the request URL", async () => {

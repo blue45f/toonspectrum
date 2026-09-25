@@ -91,6 +91,7 @@ function validReference(value: unknown): StudioProjectReference | null {
     || typeof item.provider !== "string"
     || !["openverse", "pexels", "pixabay"].includes(item.provider)
     || typeof item.title !== "string"
+    || (item.mediaType !== undefined && !["image", "video"].includes(String(item.mediaType)))
     || typeof item.sourceUrl !== "string"
     || typeof item.license !== "string"
     || typeof item.savedAt !== "string"
