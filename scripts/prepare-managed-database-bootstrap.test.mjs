@@ -111,11 +111,11 @@ describe("관리형 빈 DB bootstrap SQL 준비", () => {
     expect(validateManagedRuntimeRole(ROLE)).toBe(ROLE);
   });
 
-  test("초기 행은 92개 정본 원장과 모든 필수 cutover 및 소스의 초기 설정뿐이다", () => {
+  test("초기 행은 93개 정본 원장과 모든 필수 cutover 및 소스의 초기 설정뿐이다", () => {
     const contract = loadBootstrapContract();
     const result = buildManagedInitialRows(contract, RELEASE);
     expect(result.ledgerCount).toBe(contract.manifest.length + 1);
-    expect(result.ledgerCount).toBe(92);
+    expect(result.ledgerCount).toBe(93);
     for (const entry of contract.manifest) expect(result.sql).toContain(entry.checksum);
     for (const marker of loadHealthReadinessContract().migrationIds) expect(result.sql).toContain(marker);
     expect(result.sql).toContain("'0023_production_migration_ledger'");
@@ -138,7 +138,7 @@ describe("관리형 빈 DB bootstrap SQL 준비", () => {
 
   test("단일 transaction·빈 대상 guard·Data API 차단·최종 검증·NOLOGIN 종료를 생성한다", () => {
     const bundle = prepareManagedBootstrap({ schemaDump, expectedSchemaSha256: digest(schemaDump), releaseSha: RELEASE, runtimeRole: ROLE });
-    expect(bundle.report).toMatchObject({ status: "prepared-unverified", sourceDataRead: false, databaseWritesPerformed: false, migrationLedgerRows: 92 });
+    expect(bundle.report).toMatchObject({ status: "prepared-unverified", sourceDataRead: false, databaseWritesPerformed: false, migrationLedgerRows: 93 });
     expect(bundle.report.preparedSqlSha256).toBe(digest(bundle.sql));
     expect(bundle.sql).toContain("NOLOGIN NOINHERIT NOSUPERUSER");
     expect(bundle.sql).toContain("to_regnamespace('toonspectrum_ops') IS NOT NULL");
