@@ -66,7 +66,7 @@ jobs:
             AGENTS.md
             CLAUDE.md
           branch: openwiki/update
-          commit-message: "docs: update OpenWiki"
+          commit-message: "docs(openwiki): OpenWiki 문서 갱신"
           title: "docs: update OpenWiki"
           body: |
             Automated OpenWiki documentation update. This workflow never auto-merges.

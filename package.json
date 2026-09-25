@@ -10,6 +10,10 @@
   "scripts": {
     "music:local": "node scripts/toonstudio-music-local.mjs",
     "prepare": "node scripts/prepare-git-hooks.mjs",
+    "harness:doctor": "node scripts/agent-harness.mjs doctor",
+    "harness:check": "node scripts/agent-harness.mjs check",
+    "harness:verify": "node scripts/agent-harness.mjs verify",
+    "test:agent-harness": "node --test scripts/agent-harness.test.mjs",
     "verify:pnpm-lockfile": "node scripts/verify-pnpm-lockfile.mjs",
     "test:pnpm-lockfile": "node --test scripts/verify-pnpm-lockfile.test.mjs",
     "dev": "vite --config apps/web/vite.config.ts --host 0.0.0.0",
