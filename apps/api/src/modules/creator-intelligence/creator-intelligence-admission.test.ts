@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CreatorIntelligenceAdmissionGuard } from "./creator-intelligence-admission";
 
+import type { ConsumeRateLimit } from "../../infrastructure/upstash-coordination/upstash-coordination.contract";
+
 const JOB_TOKEN_SECRET = "creator-intelligence-test-secret-at-least-32-bytes";
 
 async function statusOf(run: () => unknown | Promise<unknown>): Promise<number> {
@@ -49,10 +51,10 @@ describe("CreatorIntelligenceAdmissionGuard", () => {
   });
 
   it("uses distributed counters before production provider dispatch", async () => {
-    const consumeRateLimit = vi.fn(async () => ({
+    const consumeRateLimit = vi.fn(async (input: ConsumeRateLimit) => ({
       accepted: true,
       requestCount: 1,
-      remainingTtlMs: 60_000,
+      remainingTtlMs: input.windowMs,
     }));
     const guard = new CreatorIntelligenceAdmissionGuard({
       env: () => ({
