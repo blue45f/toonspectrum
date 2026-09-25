@@ -24,7 +24,8 @@ function Fixture() {
         }}>예시 계정 전환</button>
       </div>
       <VirtualSpaceExperience key={JSON.stringify(["world-qa", actor, publication.snapshot.active?.scope ?? "bundled"])}
-        projectId="world-qa" preparing={false} signedIn publication={publication} />
+        projectId="world-qa" preparing={false} signedIn publication={publication}
+        nickname="개발 예시 관리자" onNicknameChange={() => undefined} />
       <output id="fixture-state" className="sr-only">{JSON.stringify({ phase: publication.snapshot.phase,
         revision: publication.snapshot.active?.publication.revisionId ?? null, scope: publication.snapshot.active?.scope ?? null })}</output>
     </BrowserRouter>

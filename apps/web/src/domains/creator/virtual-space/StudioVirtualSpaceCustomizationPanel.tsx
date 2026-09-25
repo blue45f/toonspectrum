@@ -1,4 +1,5 @@
-import { Sparkles, Trash2 } from "lucide-react";
+import { Sparkles, Trash2, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
   STUDIO_VIRTUAL_ACCESSORY_KEYS,
@@ -14,6 +15,10 @@ import {
   type StudioVirtualDecorationState,
   type StudioVirtualDecorPresetKey,
 } from "./studio-virtual-space-customization";
+import {
+  STUDIO_VIRTUAL_SPACE_NICKNAME_MAX_GRAPHEMES,
+  normalizeStudioVirtualSpaceNickname,
+} from "./studio-virtual-space-entry-preference";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { STUDIO_TOWN_DISTRICT_IDS, studioTownDistrictPresentation } from "./studio-virtual-space-town-layout";
 
@@ -53,21 +58,47 @@ const DECOR_LABELS = {
 } as const;
 
 export function StudioVirtualSpaceCustomizationPanel({
-  character, decorations, selfPoint, onCharacter, onDecorations,
+  nickname, character, decorations, selfPoint, onNickname, onCharacter, onDecorations,
 }: {
+  readonly nickname: string;
   readonly character: StudioVirtualCharacterCustomization;
   readonly decorations: StudioVirtualDecorationState;
   readonly selfPoint: StudioVirtualSpacePoint;
+  readonly onNickname: (nickname: string) => void;
   readonly onCharacter: (value: StudioVirtualCharacterCustomization) => void;
   readonly onDecorations: (value: StudioVirtualDecorationState) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceCustomizationPanel");
+  const [nicknameDraft, setNicknameDraft] = useState(nickname);
+  useEffect(() => setNicknameDraft(nickname), [nickname]);
+  const normalizedNickname = normalizeStudioVirtualSpaceNickname(nicknameDraft);
   const patchCharacter = (patch: Partial<StudioVirtualCharacterCustomization>) => onCharacter({ ...character, ...patch });
   return <section className="vs2-panel studio-vspace-customization" data-space-interactive="true">
     <header>
       <div><p>BUILD & STYLE</p><h2>{bt("캐릭터·공간 꾸미기", "Character & space customization")}</h2></div>
       <Sparkles size={19} aria-hidden />
     </header>
+    <fieldset className="studio-vspace-customization-identity">
+      <legend>{bt("내 닉네임", "My nickname")}</legend>
+      <form onSubmit={(event) => {
+        event.preventDefault();
+        if (!normalizedNickname) return;
+        setNicknameDraft(normalizedNickname);
+        onNickname(normalizedNickname);
+      }}>
+        <label htmlFor="studio-vspace-customization-nickname"><UserRound size={15} aria-hidden />{bt("공개 이름", "Public name")}</label>
+        <div>
+          <input id="studio-vspace-customization-nickname" value={nicknameDraft}
+            maxLength={STUDIO_VIRTUAL_SPACE_NICKNAME_MAX_GRAPHEMES} autoComplete="nickname"
+            aria-invalid={nicknameDraft.length > 0 && !normalizedNickname}
+            onChange={(event) => setNicknameDraft(event.target.value)} />
+          <button type="submit" disabled={!normalizedNickname || normalizedNickname === nickname}>{bt("저장", "Save")}</button>
+        </div>
+        <small data-invalid={nicknameDraft.length > 0 && !normalizedNickname || undefined}>{normalizedNickname
+          ? bt("팀원 목록과 캐릭터 이름표에 즉시 반영됩니다.", "Updates teammate lists and your character nameplate immediately.")
+          : bt("2~16자의 한글·영문·숫자·공백을 사용해 주세요.", "Use 2–16 letters, numbers or spaces.")}</small>
+      </form>
+    </fieldset>
     <fieldset>
       <legend>{bt("액세서리", "Accessory")}</legend>
       <div className="studio-vspace-customization-options">
