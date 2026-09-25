@@ -379,7 +379,7 @@
     padding: 0.9rem 4.1rem 0.9rem 1rem;
     background: linear-gradient(90deg, color-mix(in oklch, var(--color-canvas) 94%, transparent) 0 42%, color-mix(in oklch, var(--color-canvas) 72%, transparent) 72%, transparent);
   }
-  .route-purpose-scene__eyebrow { margin-bottom: 0.35rem; font-size: 0.58rem; }
+  .route-purpose-scene__eyebrow { margin-bottom: 0.35rem; font-size: 0.6875rem; }
   .route-purpose-scene h2,
   .route-purpose-scene-shell[data-density="compact"] h2 {
     max-width: 14ch;
