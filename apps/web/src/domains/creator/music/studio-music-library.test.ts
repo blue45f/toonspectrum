@@ -75,6 +75,34 @@ describe("music library shared SQLite authority", () => {
     const unavailable = createMusicLibrary(async () => { throw new Error("OPFS unavailable"); }, async (_name, operation) => operation());
     await expect(unavailable.save(track(1))).rejects.toThrow("OPFS unavailable");
   });
+  it("round-trips a bounded imported WAV with provenance", async () => {
+    const { library } = harness();
+    const bytes = new Uint8Array(64);
+    bytes.set([82, 73, 70, 70], 0);
+    bytes.set([87, 65, 86, 69], 8);
+    const imported: LocalMusicTrack = {
+      ownerId: "owner-a",
+      audio: new Blob([bytes], { type: "audio/wav" }),
+      metadata: {
+        id: "00000000-0000-4000-8000-000000000777",
+        createdAt: "2026-09-25T00:00:00.000Z",
+        provider: "ace-step-local",
+        model: "external",
+        format: "wav_external",
+        source: "imported",
+        sourceFilename: "focus.wav",
+        sha256: "a".repeat(64),
+        termsUrl: "https://github.com/ace-step/ACE-Step-1.5/blob/main/LICENSE",
+        brief: { ...defaultMusicBrief(), scene: "조용한 작업실", rightsConfirmed: true },
+      },
+    };
+    await library.save(imported);
+    const [loaded] = await library.load("owner-a");
+    expect(loaded.metadata).toMatchObject(imported.metadata);
+    expect(loaded.audio.type).toBe("audio/wav");
+    expect(new Uint8Array(await loaded.audio.arrayBuffer())).toEqual(bytes);
+  });
+
   it("rejects malformed metadata, fake audio and oversized payloads before storage", async () => {
     const { library, acquire } = harness();
     await expect(library.save({ ...track(1), audio: new Blob(["<html>error</html>"], { type: "audio/mpeg" }) })).rejects.toThrow();

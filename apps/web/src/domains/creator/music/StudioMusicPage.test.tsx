@@ -7,16 +7,17 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { StudioMusicPage } from "./StudioMusicPage";
 
 import type { LocalMusicTrack } from "./studio-music-client";
-import type { MusicBrief } from "@toonspectrum/core/studio-music";
+import type { MusicBrief, MusicProviderId } from "@toonspectrum/core/studio-music";
 
 import { defaultMusicBrief, MUSIC_TERMS_URL } from "@toonspectrum/core/studio-music";
 
 const mocks = vi.hoisted(() => ({
   ownerId: "owner-a",
-  load: vi.fn(), save: vi.fn(), remove: vi.fn(), generate: vi.fn(), status: vi.fn(), error: vi.fn(), lyrics: vi.fn(),
+  load: vi.fn(), save: vi.fn(), remove: vi.fn(), generate: vi.fn(), importTrack: vi.fn(), status: vi.fn(), error: vi.fn(), lyrics: vi.fn(),
   getWork: vi.fn(), updateWork: vi.fn(),
 }));
 vi.mock("./studio-music-client", () => ({ generateMusic: mocks.generate, getMusicStatus: mocks.status }));
+vi.mock("./studio-music-import", () => ({ importExternalMusicTrack: mocks.importTrack }));
 vi.mock("./studio-music-library", () => ({ loadMusicTracks: mocks.load, saveMusicTrack: mocks.save, deleteMusicTrack: mocks.remove }));
 vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: mocks.ownerId ? { user: { id: mocks.ownerId } } : null }) }));
 vi.mock("@/domains/creator/studio-server-ai-client", () => ({ completeAutomaticFreeText: mocks.lyrics }));
@@ -105,6 +106,20 @@ beforeEach(() => {
     result.metadata = { ...result.metadata, id: requestId, brief: { ...brief, instruments: [...brief.instruments] } };
     return result;
   });
+  mocks.importTrack.mockReset().mockImplementation(async (_file: File, providerId: MusicProviderId, brief: MusicBrief, ownerId: string) => {
+    const result = output(77, ownerId, brief.workId);
+    result.metadata = {
+      ...result.metadata,
+      provider: providerId,
+      model: "external",
+      format: "mp3_external",
+      source: "imported",
+      sourceFilename: "external-result.mp3",
+      termsUrl: "https://example.test/music-terms",
+      brief: { ...brief, rightsConfirmed: true, instruments: [...brief.instruments] },
+    };
+    return result;
+  });
   mocks.error.mockReset().mockImplementation(async (reason: unknown, fallback: string) => reason instanceof Error ? reason.message : fallback);
   mocks.lyrics.mockReset().mockResolvedValue({
     ok: true,
@@ -125,6 +140,26 @@ describe("music workspace rendered recovery and route regression", () => {
     fireEvent.click(within(toolkit).getAllByRole("button", { name: "검수 인계 JSON" })[0]!);
     expect(createUrl).toHaveBeenCalledTimes(1);
     expect(mocks.generate).not.toHaveBeenCalled();
+  });
+
+  it("imports a verified external audio file without dispatching paid generation", async () => {
+    render(<Harness />);
+    await ready();
+    fillBrief();
+    const panel = screen.getByRole("region", { name: "생성 결과 가져오기" });
+    const bytes = new Uint8Array([73, 68, 51, ...Array<number>(61).fill(0)]);
+    fireEvent.change(within(panel).getByLabelText(/MP3 또는 WAV/u), {
+      target: { files: [new File([bytes.buffer], "external-result.mp3", { type: "audio/mpeg" })] },
+    });
+    fireEvent.click(within(panel).getByRole("checkbox", { name: /이 파일과 입력 자료를 사용할 권한/u }));
+    fireEvent.click(within(panel).getByRole("button", { name: "검증 후 보관함에 가져오기" }));
+
+    await waitFor(() => expect(mocks.importTrack).toHaveBeenCalledTimes(1));
+    expect(mocks.importTrack.mock.calls[0][1]).toBe("ace-step-local");
+    expect(mocks.save).toHaveBeenCalledTimes(1);
+    expect(mocks.generate).not.toHaveBeenCalled();
+    const card = await screen.findByRole("article", { name: "새 음악 음원" });
+    expect(within(card).getByText(/외부 생성 결과 가져오기/u)).toBeTruthy();
   });
 
   it("keeps guests out of personal storage and paid generation", async () => {

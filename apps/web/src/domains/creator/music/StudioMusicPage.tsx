@@ -25,6 +25,7 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
+import { MusicExternalImportPanel } from "./MusicExternalImportPanel";
 import { MusicProviderToolkit } from "./MusicProviderToolkit";
 import { MusicTrackCard } from "./MusicTrackCard";
 import { ANIME_OST_STARTERS } from "./studio-anime-ost-presets";
@@ -364,6 +365,30 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
     }
   };
 
+  const importExternalTrack = async (track: LocalMusicTrack) => {
+    const currentLibrary = recovery.getSnapshot();
+    if (pending.current || lyricsPending.current || currentLibrary.loading || !currentLibrary.loaded
+      || currentLibrary.loadError || currentLibrary.pendingIds.length) {
+      throw new Error("진행 중인 생성·저장을 마친 뒤 외부 음원을 가져와 주세요.");
+    }
+    if (currentLibrary.tracks.length >= 20) {
+      throw new Error("보관함은 계정당 20곡까지입니다. 기존 음원을 다운로드한 뒤 삭제해 주세요.");
+    }
+    recovery.retain(track);
+    setQuery("");
+    setOnlyWork(false);
+    setOnlyEpisode(false);
+    setSavingTrack(true);
+    try {
+      await recovery.save(track.metadata.id);
+    } catch (reason) {
+      setNotice("파일은 화면에 유지되지만 기기 저장 완료를 확인하지 못했습니다. 먼저 음원 파일을 별도로 보관해 주세요.");
+      throw reason;
+    } finally {
+      setSavingTrack(false);
+    }
+  };
+
   const preview = (() => {
     try {
       return buildMusicPrompt({ ...brief, rightsConfirmed: true });
@@ -491,6 +516,22 @@ function StudioMusicWorkspace({ ownerId }: { readonly ownerId: string }) {
       <MusicProviderToolkit
         brief={brief}
         prompt={preview}
+        onNotice={(message) => {
+          setError("");
+          setNotice(message);
+        }}
+        onError={(message) => {
+          setNotice("");
+          setError(message);
+        }}
+      />
+
+      <MusicExternalImportPanel
+        brief={brief}
+        ownerId={ownerId}
+        trackCount={tracks.length}
+        disabled={busy || lyricsBusy || libraryLoading || Boolean(library.loadError) || pendingIds.length > 0}
+        onImport={importExternalTrack}
         onNotice={(message) => {
           setError("");
           setNotice(message);

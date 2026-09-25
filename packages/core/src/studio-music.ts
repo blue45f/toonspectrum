@@ -108,13 +108,33 @@ export const MUSIC_THEME_PACKS: readonly MusicThemePack[] = [
 ] as const;
 
 export const MUSIC_DURATIONS = [15, 30, 45, 60] as const;
+/** Direct provider responses stay deliberately small enough for the API response contract. */
 export const MUSIC_MAX_BYTES = 2_500_000;
+/** Browser imports may be lossless WAV files, but remain bounded for device-local persistence. */
+export const MUSIC_IMPORTED_MAX_BYTES = 20_000_000;
 export const MUSIC_TERMS_URL = "https://elevenlabs.io/eleven-music-model-specific-terms";
 export const MUSIC_OUTPUT_FORMAT_REQUEST = "auto" as const;
 export const MUSIC_OUTPUT_FORMAT = "mp3_48000_192" as const;
 export const MUSIC_LEGACY_OUTPUT_FORMAT = "mp3_44100_128" as const;
-export type MusicOutputFormat = typeof MUSIC_OUTPUT_FORMAT | typeof MUSIC_LEGACY_OUTPUT_FORMAT;
-export type MusicProviderModel = "music_v1" | "music_v2_5";
+export const MUSIC_IMPORTED_MP3_FORMAT = "mp3_external" as const;
+export const MUSIC_IMPORTED_WAV_FORMAT = "wav_external" as const;
+export type MusicOutputFormat =
+  | typeof MUSIC_OUTPUT_FORMAT
+  | typeof MUSIC_LEGACY_OUTPUT_FORMAT
+  | typeof MUSIC_IMPORTED_MP3_FORMAT
+  | typeof MUSIC_IMPORTED_WAV_FORMAT;
+export type MusicProviderId =
+  | "elevenlabs"
+  | "ace-step-local"
+  | "adobe-firefly"
+  | "soundverse"
+  | "suno"
+  | "stable-audio"
+  | "mubert"
+  | "udio"
+  | "external";
+export type MusicProviderModel = "music_v1" | "music_v2_5" | "external";
+export type MusicTrackSource = "generated" | "imported";
 
 export interface MusicBrief {
   title: string;
@@ -148,12 +168,16 @@ export interface MusicStatus {
 export interface MusicTrackMetadata {
   id: string;
   createdAt: string;
-  provider: "elevenlabs";
+  provider: MusicProviderId;
   model: MusicProviderModel;
   format: MusicOutputFormat;
+  source?: MusicTrackSource;
   c2paRequested?: boolean;
   storeForInpainting?: boolean;
   songId?: string;
+  sourceFilename?: string;
+  licenseNote?: string;
+  sha256?: string;
   brief: MusicBrief;
   termsUrl: string;
 }
@@ -410,7 +434,7 @@ export function buildMusicCompositionPlan(brief: MusicBrief): MusicCompositionPl
   };
 }
 
-export function musicFilename(title: string): string {
+export function musicFilename(title: string, extension: "mp3" | "wav" = "mp3"): string {
   if (typeof title !== "string") throw new TypeError("Music title must be a string");
   const safe = title.replace(/[\\/:*?"<>|]/gu, "_").split("")
     .map((character) => character.charCodeAt(0) < 32 ? "_" : character).join("");
@@ -418,9 +442,23 @@ export function musicFilename(title: string): string {
   let end = safe.length;
   while (start < end && safe[start] === ".") start++;
   while (end > start && safe[end - 1] === ".") end--;
-  return (safe.slice(start, end).trim().slice(0, 80) || "toonstudio-music") + ".mp3";
+  return `${safe.slice(start, end).trim().slice(0, 80) || "toonstudio-music"}.${extension}`;
 }
 
 export function isMp3(bytes: Uint8Array): boolean {
   return bytes.length > 10 && ((bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) || (bytes[0] === 0xff && (bytes[1] & 0xe0) === 0xe0));
+}
+
+export function isWav(bytes: Uint8Array): boolean {
+  return bytes.length > 44
+    && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+    && bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45;
+}
+
+export function musicFileExtension(format: MusicOutputFormat): "mp3" | "wav" {
+  return format === MUSIC_IMPORTED_WAV_FORMAT ? "wav" : "mp3";
+}
+
+export function musicMimeType(format: MusicOutputFormat): "audio/mpeg" | "audio/wav" {
+  return format === MUSIC_IMPORTED_WAV_FORMAT ? "audio/wav" : "audio/mpeg";
 }
