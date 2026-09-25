@@ -22,6 +22,7 @@ import {
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V5,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
   STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1,
+  STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7,
   getStudioBg3dEnvironmentAsset,
   getStudioBg3dEnvironmentAssetByHash,
   isStudioBg3dEnvironmentAssetId,
@@ -235,11 +236,12 @@ describe("Studio BG3D Blender 5.2 Wave 5 environment pack", () => {
     expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toEqual([
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1,
+      ...STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7,
     ]);
-    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toHaveLength(18);
-    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id)).size).toBe(18);
-    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ fileName }) => fileName)).size).toBe(18);
-    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ sha256 }) => sha256)).size).toBe(18);
+    expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toHaveLength(21);
+    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id)).size).toBe(21);
+    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ fileName }) => fileName)).size).toBe(21);
+    expect(new Set(STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ sha256 }) => sha256)).size).toBe(21);
     expect(STUDIO_BG3D_ENVIRONMENT_ASSETS_V5.map(({ theme }) => theme)).toEqual([
       "retail",
       "transit",
@@ -522,8 +524,8 @@ describe("Studio BG3D Blender 5.2 Wave 5 environment pack", () => {
   });
 
   it("projects all active bundled cards independently of local OPFS availability", () => {
-    expect(SAMPLE_BG3D_MODEL_ENTRIES).toHaveLength(18);
-    expect(STUDIO_BG3D_BUNDLED_ENVIRONMENT_LIBRARY_ENTRIES).toHaveLength(18);
+    expect(SAMPLE_BG3D_MODEL_ENTRIES).toHaveLength(21);
+    expect(STUDIO_BG3D_BUNDLED_ENVIRONMENT_LIBRARY_ENTRIES).toHaveLength(21);
     expect(STUDIO_BG3D_BUNDLED_ENVIRONMENT_LIBRARY_ENTRIES.map(({ id }) => id)).toEqual(
       STUDIO_BG3D_ENVIRONMENT_ASSETS.map(({ id }) => id),
     );

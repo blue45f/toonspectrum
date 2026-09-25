@@ -251,15 +251,23 @@ describe("studio-mannequin-model 비례 수학", () => {
     }
   });
 
-  it("각 손은 네 손가락과 엄지 캡슐을 가지며 좌우 디테일이 X축 미러다", () => {
+  it("각 손은 네 손가락과 엄지를 2마디로 만들고 좌우 디테일이 X축 미러다", () => {
     const spec = buildStudioMannequinSpec(params());
     const digits = (jointId: "leftHand" | "rightHand") => spec.primitives.filter(
       (primitive) => primitive.kind === "capsule" && primitive.jointId === jointId,
     );
+    const digitJoints = (jointId: "leftHand" | "rightHand") => spec.primitives.filter(
+      (primitive) => primitive.kind === "sphere"
+        && primitive.jointId === jointId
+        && primitive.materialRole === "joint"
+        && primitive.center[1] < 0,
+    );
     const left = digits("leftHand");
     const right = digits("rightHand");
-    expect(left).toHaveLength(5);
-    expect(right).toHaveLength(5);
+    expect(left).toHaveLength(10);
+    expect(right).toHaveLength(10);
+    expect(digitJoints("leftHand")).toHaveLength(5);
+    expect(digitJoints("rightHand")).toHaveLength(5);
 
     for (let index = 0; index < left.length; index += 1) {
       const leftDigit = left[index];
@@ -268,6 +276,7 @@ describe("studio-mannequin-model 비례 수학", () => {
       expect(rightDigit.from).toEqual([-leftDigit.from[0], leftDigit.from[1], leftDigit.from[2]]);
       expect(rightDigit.to).toEqual([-leftDigit.to[0], leftDigit.to[1], leftDigit.to[2]]);
       expect(rightDigit.radius).toBe(leftDigit.radius);
+      expect(rightDigit.endRadius).toBe(leftDigit.endRadius);
     }
   });
 
@@ -290,22 +299,36 @@ describe("studio-mannequin-model 비례 수학", () => {
       expect(mainHeadTuned.scale?.[0]).toBeGreaterThan(mainHeadBase.scale?.[0] ?? 0);
     }
 
-    const eyeBase = baseHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[2] === 0.38);
-    const eyeTuned = tunedHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[2] === 0.38);
+    const eyeBase = baseHead.find((primitive) => primitive.materialRole === "eye");
+    const eyeTuned = tunedHead.find((primitive) => primitive.materialRole === "eye");
     if (eyeBase?.kind === "sphere" && eyeTuned?.kind === "sphere") {
       expect(eyeTuned.radius).toBeGreaterThan(eyeBase.radius);
       expect(Math.abs(eyeTuned.center[0])).toBeGreaterThan(Math.abs(eyeBase.center[0]));
     }
 
-    const noseBase = baseHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[0] === 0.55);
-    const noseTuned = tunedHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[0] === 0.55);
+    const noseBase = baseHead.find((primitive) =>
+      primitive.kind === "sphere"
+      && primitive.materialRole === "landmark"
+      && primitive.center[0] === 0);
+    const noseTuned = tunedHead.find((primitive) =>
+      primitive.kind === "sphere"
+      && primitive.materialRole === "landmark"
+      && primitive.center[0] === 0);
     if (noseBase?.kind === "sphere" && noseTuned?.kind === "sphere") {
       expect(noseTuned.scale?.[2]).toBeGreaterThan(noseBase.scale?.[2] ?? 0);
       expect(noseTuned.center[2]).toBeGreaterThan(noseBase.center[2]);
     }
 
-    const jawBase = baseHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[2] === 0.72);
-    const jawTuned = tunedHead.find((primitive) => primitive.kind === "sphere" && primitive.scale?.[2] === 0.72);
+    const jawBase = baseHead.find((primitive) =>
+      primitive.kind === "sphere"
+      && primitive.materialRole === "body"
+      && primitive.center[0] === 0
+      && primitive.scale?.[1] !== 1);
+    const jawTuned = tunedHead.find((primitive) =>
+      primitive.kind === "sphere"
+      && primitive.materialRole === "body"
+      && primitive.center[0] === 0
+      && primitive.scale?.[1] !== 1);
     if (jawBase?.kind === "sphere" && jawTuned?.kind === "sphere") {
       expect(jawTuned.scale?.[0]).toBeGreaterThan(jawBase.scale?.[0] ?? 0);
       expect(jawTuned.scale?.[1]).toBeGreaterThan(jawBase.scale?.[1] ?? 0);
@@ -319,7 +342,7 @@ describe("studio-mannequin-model 비례 수학", () => {
     const eyes = spec.primitives.filter((primitive) =>
       primitive.kind === "sphere"
       && primitive.jointId === "head"
-      && primitive.scale?.[2] === 0.38,
+      && primitive.materialRole === "eye",
     );
     expect(eyes).toHaveLength(2);
     if (eyes[0]?.kind === "sphere" && eyes[1]?.kind === "sphere") {
@@ -327,6 +350,21 @@ describe("studio-mannequin-model 비례 수학", () => {
       expect(eyes[0].center.slice(1)).toEqual(eyes[1].center.slice(1));
     }
     expect(studioMannequinRestStature(spec)).toBeCloseTo(spec.heightM, 12);
+  });
+
+  it("몸체·관절구·해부학 랜드마크·시선 가이드를 서로 다른 재질 역할로 분리한다", () => {
+    const spec = buildStudioMannequinSpec(params());
+    const roles = new Set(spec.primitives.map((primitive) => primitive.materialRole ?? "body"));
+    expect(roles).toEqual(new Set(["body", "joint", "landmark", "eye"]));
+
+    for (const jointId of ["leftLowerArm", "rightLowerArm", "leftLowerLeg", "rightLowerLeg"] as const) {
+      const landmark = spec.primitives.find((primitive) =>
+        primitive.kind === "sphere"
+        && primitive.jointId === jointId
+        && primitive.materialRole === "landmark");
+      expect(landmark, jointId).toBeDefined();
+      if (landmark?.kind === "sphere") expect(landmark.center[2]).toBeGreaterThan(0);
+    }
   });
 });
 

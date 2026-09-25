@@ -1,0 +1,332 @@
+{
+  "schema": "toonspectrum.bg3d-environment-pack.v7",
+  "version": "webtoon-v7",
+  "assets": [
+    {
+      "id": "ts-bg3d-webtoon_rooftop_utility_platform-v7",
+      "generator": "scripts/blender/generate_environment_pack_v7.py",
+      "generatorVersion": "7.0.0-blender-5.2",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "originalProceduralGeometry": true,
+      "externalRuntimeResources": 0,
+      "referenceWorkflow": {
+        "mode": "free-generator-preview-reviewed-original-procedural-rebuild",
+        "embeddedThirdPartyModelBytes": false,
+        "embeddedThirdPartyImageBytes": false,
+        "note": "A free web-generator preview informed scene coverage; all delivered geometry, materials and textures were authored procedurally in Blender by ToonSpectrum."
+      },
+      "semanticParts": [
+        "rooftop slab",
+        "cylindrical water tank",
+        "braced steel support frame",
+        "access ladder with safety hoops",
+        "two outdoor AC units",
+        "electrical cabinet",
+        "pipe and conduit network",
+        "safety railings"
+      ],
+      "studioRuntimeVerified": false,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "single-perspective-render-reviewed",
+      "metrics": {
+        "bytes": 1027792,
+        "nodes": 18,
+        "meshes": 17,
+        "triangles": 31532,
+        "drawCalls": 17,
+        "materials": 10,
+        "textures": 2,
+        "images": 2,
+        "animations": 0,
+        "skins": 0
+      },
+      "byteSize": 1027792,
+      "sha256": "sha256:250e8f788aeedc9d182fc650432ac0b915ad18e2c2e9841d8b2af5890230122e",
+      "bounds": [
+        6.0,
+        4.32,
+        4.8
+      ],
+      "camera": {
+        "position": [
+          8.4,
+          7.0,
+          9.6
+        ],
+        "target": [
+          0.0,
+          1.75,
+          -0.1
+        ],
+        "fovDegrees": 52
+      },
+      "url": "/assets/3d/environments/webtoon-v7/webtoon_rooftop_utility_platform.glb",
+      "fileName": "webtoon_rooftop_utility_platform.glb",
+      "thumbnailUrl": "/assets/3d/environments/webtoon-v7/thumbnails/webtoon_rooftop_utility_platform.png",
+      "name": "웹툰 학교 옥상 설비 플랫폼",
+      "theme": "education",
+      "description": "물탱크 지지 프레임, 사다리, 이중 실외기, 제어함, 배관과 안전 난간을 분리 배치할 수 있는 한국형 옥상 설비 세트",
+      "tags": [
+        "webtoon",
+        "rooftop",
+        "utility",
+        "water tank",
+        "air conditioner",
+        "웹툰",
+        "옥상",
+        "물탱크",
+        "실외기"
+      ],
+      "visualReviewed": true,
+      "visualReviewSource": "/assets/3d/environments/webtoon-v7/thumbnails/webtoon_rooftop_utility_platform.png",
+      "rootMetadata": {
+        "asset_id": "ts-bg3d-webtoon_rooftop_utility_platform-v7",
+        "asset_type": "studio-bg3d-environment",
+        "asset_author": "ToonSpectrum",
+        "asset_generator": "scripts/blender/generate_environment_pack_v7.py",
+        "asset_generator_version": "7.0.0-blender-5.2",
+        "asset_license": "CC0-1.0",
+        "asset_license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "units": "metres",
+        "ground_plane": "glTF-Y=0",
+        "ground_y_m": 0.0,
+        "nominal_width_m": 6.0,
+        "nominal_depth_m": 4.8,
+        "nominal_height_m": 4.32,
+        "semantic_parts": "rooftop-slab,water-tank,steel-support-frame,access-ladder,two-outdoor-ac-units,electrical-cabinet,pipe-network,safety-railings",
+        "embedded_texture_count": 2,
+        "embedded_texture_max_dimension": 128,
+        "reference_workflow": "free-generator-preview-reviewed, original-procedural-rebuild"
+      },
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "One authored oblique scene overview, not a multi-angle approval",
+        "reviewedModelSha256": "sha256:250e8f788aeedc9d182fc650432ac0b915ad18e2c2e9841d8b2af5890230122e",
+        "reviewedImageSha256": "sha256:4a44c145e607dab78f0444b8a2caf67c89d9bd1701ae5999b3932a243ef0b3b9",
+        "observations": "Water tank, braced frame, access ladder, two fan-front condenser units, cabinet, pipe runs and safety rails are individually legible in the reviewed overview.",
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_corner_store_facade-v7",
+      "generator": "scripts/blender/generate_environment_pack_v7.py",
+      "generatorVersion": "7.0.0-blender-5.2",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "originalProceduralGeometry": true,
+      "externalRuntimeResources": 0,
+      "referenceWorkflow": {
+        "mode": "free-generator-preview-reviewed-original-procedural-rebuild",
+        "embeddedThirdPartyModelBytes": false,
+        "embeddedThirdPartyImageBytes": false,
+        "note": "A free web-generator preview informed scene coverage; all delivered geometry, materials and textures were authored procedurally in Blender by ToonSpectrum."
+      },
+      "semanticParts": [
+        "corner facade shell",
+        "glazed storefront",
+        "sliding entrance door",
+        "emissive sign fascia",
+        "awning and lamps",
+        "visible product shelves",
+        "detailed vending machine",
+        "outdoor AC unit",
+        "stacked crates",
+        "bollards and service conduit"
+      ],
+      "studioRuntimeVerified": false,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "single-perspective-render-reviewed",
+      "metrics": {
+        "bytes": 1158992,
+        "nodes": 17,
+        "meshes": 16,
+        "triangles": 26900,
+        "drawCalls": 16,
+        "materials": 12,
+        "textures": 2,
+        "images": 2,
+        "animations": 0,
+        "skins": 0
+      },
+      "byteSize": 1158992,
+      "sha256": "sha256:58be959e95a56492b204ba8031b6d919265b9cb4dd2a7a758e2439ef76306f29",
+      "bounds": [
+        7.6,
+        4.73,
+        4.2
+      ],
+      "camera": {
+        "position": [
+          10.6,
+          7.8,
+          12.6
+        ],
+        "target": [
+          0.0,
+          2.0,
+          -0.22
+        ],
+        "fovDegrees": 50
+      },
+      "url": "/assets/3d/environments/webtoon-v7/webtoon_corner_store_facade.glb",
+      "fileName": "webtoon_corner_store_facade.glb",
+      "thumbnailUrl": "/assets/3d/environments/webtoon-v7/thumbnails/webtoon_corner_store_facade.png",
+      "name": "웹툰 골목 코너 상점 외관",
+      "theme": "retail",
+      "description": "유리 쇼윈도, 야간 간판, 차양, 상품 선반, 자판기, 실외기와 골목 소품으로 구성된 코너 상점 파사드",
+      "tags": [
+        "webtoon",
+        "corner store",
+        "shopfront",
+        "vending machine",
+        "night",
+        "웹툰",
+        "골목",
+        "상점",
+        "가게 외관",
+        "자판기"
+      ],
+      "visualReviewed": true,
+      "visualReviewSource": "/assets/3d/environments/webtoon-v7/thumbnails/webtoon_corner_store_facade.png",
+      "rootMetadata": {
+        "asset_id": "ts-bg3d-webtoon_corner_store_facade-v7",
+        "asset_type": "studio-bg3d-environment",
+        "asset_author": "ToonSpectrum",
+        "asset_generator": "scripts/blender/generate_environment_pack_v7.py",
+        "asset_generator_version": "7.0.0-blender-5.2",
+        "asset_license": "CC0-1.0",
+        "asset_license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "units": "metres",
+        "ground_plane": "glTF-Y=0",
+        "ground_y_m": 0.0,
+        "nominal_width_m": 7.6,
+        "nominal_depth_m": 4.2,
+        "nominal_height_m": 4.73,
+        "semantic_parts": "corner-facade,glazed-shopfront,sliding-door,lit-signage,awning,vending-machine,product-shelves,outdoor-ac,crates,bollards,service-conduit",
+        "embedded_texture_count": 2,
+        "embedded_texture_max_dimension": 128,
+        "reference_workflow": "free-generator-preview-reviewed, original-procedural-rebuild"
+      },
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "One authored oblique scene overview, not a multi-angle approval",
+        "reviewedModelSha256": "sha256:58be959e95a56492b204ba8031b6d919265b9cb4dd2a7a758e2439ef76306f29",
+        "reviewedImageSha256": "sha256:b3d051065b208eb858a592026ae4a28bac1774ebc6abf123ebc2d07eb258df39",
+        "observations": "Glazed bays, entrance, lit fascia, awning lamps, shelf products, vending-machine controls, condenser fan and street-level props remain distinct in the reviewed overview.",
+        "visibleStructuralBlocker": false
+      }
+    },
+    {
+      "id": "ts-bg3d-webtoon_street_prop_pack-v7",
+      "generator": "scripts/blender/generate_environment_pack_v7.py",
+      "generatorVersion": "7.0.0-blender-5.2",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "originalProceduralGeometry": true,
+      "externalRuntimeResources": 0,
+      "referenceWorkflow": {
+        "mode": "free-generator-preview-reviewed-original-procedural-rebuild",
+        "embeddedThirdPartyModelBytes": false,
+        "embeddedThirdPartyImageBytes": false,
+        "note": "A free web-generator preview informed scene coverage; all delivered geometry, materials and textures were authored procedurally in Blender by ToonSpectrum."
+      },
+      "semanticParts": [
+        "utility pole",
+        "transformer and crossarms",
+        "overhead service cables",
+        "arched street lamp",
+        "slatted bench",
+        "fire hydrant",
+        "dual recycling bins",
+        "road barrier",
+        "street signpost",
+        "planted street pot"
+      ],
+      "studioRuntimeVerified": false,
+      "allAnglesArtisticallyApproved": false,
+      "visualReviewLevel": "single-perspective-render-reviewed",
+      "metrics": {
+        "bytes": 912368,
+        "nodes": 21,
+        "meshes": 20,
+        "triangles": 28100,
+        "drawCalls": 20,
+        "materials": 11,
+        "textures": 2,
+        "images": 2,
+        "animations": 0,
+        "skins": 0
+      },
+      "byteSize": 912368,
+      "sha256": "sha256:fd5c15ace15c6db1a5942120e2c4f45e71ce21e4fa2b2ed40a64764b7aee3c69",
+      "bounds": [
+        7.4,
+        4.47,
+        5.2
+      ],
+      "camera": {
+        "position": [
+          9.8,
+          8.5,
+          11.8
+        ],
+        "target": [
+          0.0,
+          1.75,
+          -0.05
+        ],
+        "fovDegrees": 52
+      },
+      "url": "/assets/3d/environments/webtoon-v7/webtoon_street_prop_pack.glb",
+      "fileName": "webtoon_street_prop_pack.glb",
+      "thumbnailUrl": "/assets/3d/environments/webtoon-v7/thumbnails/webtoon_street_prop_pack.png",
+      "name": "웹툰 도심 거리 소품 팩",
+      "theme": "urban",
+      "description": "전신주·변압기·가공선, 가로등, 벤치, 소화전, 분리수거함, 방호대, 표지판과 화분을 한 번에 제공하는 거리 세트",
+      "tags": [
+        "webtoon",
+        "street props",
+        "utility pole",
+        "streetlight",
+        "bench",
+        "hydrant",
+        "웹툰",
+        "거리",
+        "전신주",
+        "가로등",
+        "벤치",
+        "소화전"
+      ],
+      "visualReviewed": true,
+      "visualReviewSource": "/assets/3d/environments/webtoon-v7/thumbnails/webtoon_street_prop_pack.png",
+      "rootMetadata": {
+        "asset_id": "ts-bg3d-webtoon_street_prop_pack-v7",
+        "asset_type": "studio-bg3d-environment",
+        "asset_author": "ToonSpectrum",
+        "asset_generator": "scripts/blender/generate_environment_pack_v7.py",
+        "asset_generator_version": "7.0.0-blender-5.2",
+        "asset_license": "CC0-1.0",
+        "asset_license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+        "units": "metres",
+        "ground_plane": "glTF-Y=0",
+        "ground_y_m": 0.0,
+        "nominal_width_m": 7.4,
+        "nominal_depth_m": 5.2,
+        "nominal_height_m": 4.47,
+        "semantic_parts": "utility-pole,transformer,crossarms,overhead-cables,street-lamp,slatted-bench,fire-hydrant,recycling-bins,road-barrier,signpost,planter",
+        "embedded_texture_count": 2,
+        "embedded_texture_max_dimension": 128,
+        "reference_workflow": "free-generator-preview-reviewed, original-procedural-rebuild"
+      },
+      "previewReview": {
+        "renderer": "Blender 5.2 / Eevee / AgX Medium High Contrast / 960x720",
+        "scope": "One authored oblique scene overview, not a multi-angle approval",
+        "reviewedModelSha256": "sha256:fd5c15ace15c6db1a5942120e2c4f45e71ce21e4fa2b2ed40a64764b7aee3c69",
+        "reviewedImageSha256": "sha256:b2995487afe734b3c510e67ad8cc76e652f14ea2d46beae14b8b9177022d1016",
+        "observations": "Transformer pole, cable runs, lamp, bench, bins, striped barrier, hydrant, sign and planter are separately recognizable and can be isolated after import.",
+        "visibleStructuralBlocker": false
+      }
+    }
+  ]
+}
