@@ -20,7 +20,7 @@ export const OPEN_API_FEATURES: OpenApiFeature[] = [
   { title: "소재·장르 관심 레이더", description: "검색·백과·뉴스 관심 신호를 서로 합산하지 않고 나란히 보여줍니다.", providers: "Wikimedia Analytics · 네이버 DataLab · GDELT", status: "부분 사용", route: "/research/open-data/wikimedia" },
   { title: "레터링·폰트 매처", description: "한글 지원·장르·굵기·스타일을 검색하고 실제 문구 렌더링으로 말풍선과 타이틀 후보를 비교합니다.", providers: "Google Fonts", status: "사용 가능", route: "/research/fonts" },
   { title: "역사 사진·신문 아카이브", description: "역사 사진·지도·신문·잡지를 원 제공기관 권리와 함께 발견합니다.", providers: "Internet Archive · Smithsonian · Europeana · DPLA", status: "부분 사용", route: "/research/archive" },
-  { title: "학교물 현실성 캘린더", description: "개학·시험·방학·시간표를 에피소드 타임라인의 현실성 검사에 연결합니다.", providers: "NEIS", status: "신청 준비", route: "/research/open-data/neis" },
+  { title: "학교물 현실성 캘린더", description: "학교 기본정보를 학교물 설정과 타임라인 검수에 연결하고, 학사일정·시간표는 최신 원문을 다시 확인합니다.", providers: "NEIS", status: "사용 가능", route: "/research/open-data/neis" },
   { title: "서울 도시 고증 랩", description: "교통·공원·시설·환경 데이터를 도시 배경과 이동 동선의 근거로 사용합니다.", providers: "서울 열린데이터광장 · VWorld", status: "신청 준비" },
   { title: "연재 배포 허브", description: "공지와 에피소드 링크를 채널별 형식으로 미리보기한 뒤 명시적 승인으로 게시합니다.", providers: "WordPress · Mastodon · Bluesky · Discord", status: "OAuth 설계" },
 ];

@@ -20,6 +20,7 @@ Worker는 다음 동적 경로에만 먼저 실행된다.
 | workload | 경로 | Worker 변수 | 실패·폴백 정책 |
 |---|---|---|---|
 | edge liveness | `/api/health`, `/api/health/live`의 `GET`/`HEAD` | Worker 자체 | Core API를 깨우지 않고 `no-store`로 `status=ok` 응답 |
+| NEIS 창작 자료 | `/api/creator-resources/search?provider=neis` | Worker secret `NEIS_API_KEY` | 키를 우선 사용하고 공급자 오류 시 공식 무키 샘플 5건으로 축소 폴백, 15분 캐시·호출 제한 적용 |
 | core | 나머지 `/api/*`, OG crawler 경로, `/api/catalog/*`, `/api/health/ready`, `/api/config` | `CORE_API_ORIGIN` | 단일 권위, 자동 write failover 없음 |
 | public read | 안전한 `GET`/`HEAD`/`OPTIONS`의 `/api/random`, `/api/home`, `/api/calendar`, `/api/insights`, `/api/ranking`, `/api/explore`, `/api/tags`, `/api/search`, `/api/titles/*`, `/api/authors/*`, `/api/kmas/book-webtoons`, `/api/cover`, `/api/public/*` | `PUBLIC_READ_API_ORIGINS` | 최대 8개 동일 계약 origin에 결정적 분산, `502`/`503`/`504`와 네트워크 오류만 다음 origin 재시도 |
 | social | `/api/community`, `/api/reviews` | `SOCIAL_API_ORIGIN` | 미설정 시 core, 명시한 설정이 잘못되면 fail closed |
@@ -49,7 +50,7 @@ core·social·playground·admin·realtime 요청의 전달 IP는 클라이언트
 - `x-toonspectrum-edge-attempt: 0..n`
 - 대형 파일 응답의 `x-toonspectrum-large-asset-source: static-br | static-gzip | r2`
 
-사용자 credential을 Worker 변수에 저장하지 않는다.
+사용자 credential을 Worker 변수에 저장하지 않는다. `NEIS_API_KEY`는 사용자 계정 토큰이 아닌 서버 전용 제공처 키이며, 평문 `vars`나 저장소 파일이 아니라 Wrangler secret으로만 등록한다. 키 호출이 실패하면 같은 요청에서 비밀값 없이 공식 샘플 조회로 전환하고, 이후 10분 동안 실패한 키를 다시 호출하지 않는다.
 
 ## Origin 설정 계약
 
@@ -88,6 +89,7 @@ pnpm run cloudflare:static:dry-run
 - POST body stream을 손상하지 않는 URL rewrite
 - OG route mapping과 WebSocket passthrough
 - provider-neutral 보안 헤더 계약과 Cloudflare 동적 응답 동기화
+- NEIS 키 우선 검색, 무키 5건 폴백, 캐시·회로차단·호출 제한과 출처 영수증
 - R2 대형 파일의 전체·HEAD·Range·ETag 응답과 원본 fallback
 
 `dry-run`은 로컬 프로덕션 빌드를 만든 뒤 Wrangler 번들·Static Assets 구성과 모든 origin 변수를 검사하지만 원격에 배포하지 않는다.
@@ -115,6 +117,8 @@ export CLOUDFLARE_REALTIME_API_ORIGIN=https://<realtime-origin>
 export CLOUDFLARE_LARGE_ASSET_ORIGIN=https://<immutable-origin>
 export VITE_CATALOG_SOURCE=static
 export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
+# 최초 등록·교체 때만 대화형 입력으로 저장한다. 값은 shell history에 쓰지 않는다.
+pnpm exec wrangler secret put NEIS_API_KEY --config deploy/cloudflare-static/wrangler.jsonc
 pnpm run cloudflare:static:deploy
 ```
 
