@@ -137,6 +137,29 @@ test("역사 문서에도 폐기된 전역 표현을 허용하지 않는다", (t
   assert.match(result.stderr, /문서 전체에 폐기된 표현이 남았습니다/u);
 });
 
+for (const category of ["currentDocuments", "generatedDocuments", "pinnedEnglishDocuments", "historicalDocuments"]) {
+  for (const installed of [false, true]) {
+    test(`의존성 문서 원장 등록을 설치 여부와 관계없이 거부한다 (${category}, installed=${installed})`, (t) => {
+      const dependencyPath = installed
+        ? "apps/api/node_modules/example/LICENSES.md"
+        : "node_modules/.pnpm/example@1.0.0/node_modules/example/LICENSES.md";
+      const root = fixture(t, {
+        config: baseConfig({ [category]: [dependencyPath] }),
+        files: {
+          "docs/current.md": `# 현재 문서\n\n${KOREAN_BODY}\n`,
+          ".gitignore": "node_modules/\n",
+          ...(installed ? { [dependencyPath]: `# 의존성 문서\n\n${KOREAN_BODY}\n` } : {}),
+        },
+      });
+
+      const result = validate(root);
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /문서 원장에는 의존성 설치 경로를 등록할 수 없습니다/u);
+      assert.ok(result.stderr.includes(dependencyPath));
+    });
+  }
+}
+
 for (const fullHookContext of [false, true]) {
   test(`linked worktree hook 환경을 상속해도 호출자 config와 index를 보존한다 (${fullHookContext ? "전체 Git 환경" : "GIT_DIR"})`, (t) => {
     const caller = fixture(t, { files: { "docs/current.md": `# 호출자 문서\n\n${KOREAN_BODY}\n` } });

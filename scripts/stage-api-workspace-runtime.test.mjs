@@ -52,6 +52,11 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     );
     await compiledPackage(
       root,
+      "packages/core/src/infrastructure-fabric.js",
+      '"use strict"; module.exports = { infrastructureFabric: "free-only" };\n',
+    );
+    await compiledPackage(
+      root,
       "packages/studio-project-model/src/index.js",
       '"use strict"; module.exports = { model: "v3" };\n',
     );
@@ -98,6 +103,9 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     assert.deepEqual(requireFromApi("@toonspectrum/core/creator-resources"), {
       creatorResources: "shared",
     });
+    assert.deepEqual(requireFromApi("@toonspectrum/core/infrastructure-fabric"), {
+      infrastructureFabric: "free-only",
+    });
     assert.deepEqual(requireFromApi("@toonspectrum/studio-project-model"), {
       model: "v3",
     });
@@ -130,6 +138,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     assert.equal(corePackageJson.exports["./creator-role"], "./creator-role.js");
     assert.equal(corePackageJson.exports["./creator-resources"], "./creator-resources.js");
     assert.equal(corePackageJson.exports["./production"], "./production/index.js");
+    assert.equal(corePackageJson.exports["./infrastructure-fabric"], "./infrastructure-fabric.js");
     const contractsPackageJson = JSON.parse(await readFile(
       resolve(root, "node_modules", "@toonspectrum", "contracts", "package.json"),
       "utf8",
@@ -191,6 +200,21 @@ test("fails instead of staging a missing compiled package", async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("분산 라우팅의 컴파일된 runtime 계약이 없으면 배포 패키징을 거부한다", async () => {
+  const root = await mkdtemp(join(tmpdir(), "toonstudio-api-fabric-missing-"));
+  try {
+    await compiledProductionContracts(root);
+    await compiledPackage(root, "packages/contracts/src/security/csrf.js", "module.exports = {};\n");
+    for (const name of ["index", "creator-role", "production/index", "creator-resources"]) {
+      await compiledPackage(root, `packages/core/src/${name}.js`, "module.exports = {};\n");
+    }
+    await assert.rejects(
+      stageApiWorkspaceRuntime(root),
+      /packages\/core\/src\/infrastructure-fabric\.js/u,
+    );
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test("session evidence is an explicitly emitted API contract, not an external type-only resolution", async () => {
