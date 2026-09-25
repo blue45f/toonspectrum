@@ -87,6 +87,7 @@ import { StudioVirtualSpaceEngineBridge } from "./studio-virtual-space-engine-br
 import {
   STUDIO_CHARACTER_SKINS,
   studioCharacterAppearanceForAvatarIndex,
+  studioCharacterSkinForArtStyle,
   resolveStudioCharacterAppearance,
 } from "./studio-virtual-space-character-skins";
 import {
@@ -146,6 +147,10 @@ import { orchestrateStudioSpatialInteraction, type StudioVirtualWorkspacePanel }
 import { useStudioVirtualSpaceOperations } from "./use-studio-virtual-space-operations";
 import { StudioVirtualSpaceEntryLobby } from "./StudioVirtualSpaceEntryLobby";
 import { StudioVirtualSpaceP2pBoard } from "./StudioVirtualSpaceP2pBoard";
+import { StudioVirtualSpaceLiveAnnotationPanel } from "./StudioVirtualSpaceLiveAnnotationPanel";
+import { StudioVirtualSpaceTownProgramPanel } from "./StudioVirtualSpaceTownProgramPanel";
+import { studioTownActiveEvent, type StudioTownEvent } from "./studio-virtual-space-town-program";
+import { studioSemanticWorldGraph } from "./studio-virtual-space-semantic-world";
 import { StudioVirtualSpaceRoomCatalog } from "./StudioVirtualSpaceRoomCatalog";
 import { useStudioVirtualSpaceP2pBoard } from "./use-studio-virtual-space-p2p-board";
 import {
@@ -258,6 +263,8 @@ function VirtualSpaceMiniMap({
 }) {
   const bt = useBilingual("StudioVirtualSpaceMiniMap");
   const [expanded, setExpanded] = useState(false);
+  const semanticGraph = useMemo(() => studioSemanticWorldGraph(manifest), [manifest]);
+  const semanticNodes = useMemo(() => new Map(semanticGraph.nodes.map((node) => [node.id, node] as const)), [semanticGraph]);
 
   return (
     <div
@@ -287,11 +294,20 @@ function VirtualSpaceMiniMap({
           }));
         }}
       >
+        <svg className="studio-vspace-minimap-paths absolute inset-0 size-full" viewBox={`0 0 ${manifest.width} ${manifest.height}`} aria-hidden>
+          {semanticGraph.edges.map((edge) => {
+            const from = semanticNodes.get(edge.from), to = semanticNodes.get(edge.to);
+            if (!from || !to) return null;
+            return <line key={edge.id} x1={from.point.x} y1={from.point.y} x2={to.point.x} y2={to.point.y}
+              data-path-kind={edge.kind} data-elevation-delta={edge.elevationDelta || undefined} />;
+          })}
+        </svg>
         {manifest.rooms.map((room) => (
           <span
             key={room.id}
             className="studio-vspace-minimap-zone absolute rounded-[3px] border"
             data-active={room.id === currentRoom.id || undefined}
+            data-elevation={semanticNodes.get(`room:${room.id}`)?.elevation ?? 0}
             style={{
               left: ((room.x / manifest.width) * 100) + "%",
               top: ((room.y / manifest.height) * 100) + "%",
@@ -696,6 +712,13 @@ export function VirtualSpaceExperience({
     try { const saved = localStorage.getItem("toonspectrum:virtual-atmosphere:v1"); return saved === "focus" || saved === "lively" ? saved : "balanced"; }
     catch { return "balanced"; }
   });
+  const [townClock, setTownClock] = useState(() => Date.now());
+  const [spotlightEventId, setSpotlightEventId] = useState<string | null>(null);
+  useEffect(() => {
+    const timer = globalThis.setInterval(() => setTownClock(Date.now()), 30_000);
+    return () => globalThis.clearInterval(timer);
+  }, []);
+  const activeTownEvent = useMemo(() => studioTownActiveEvent(townClock), [townClock]);
 
   const [worldManifest, setWorldManifest] = useState<StudioVirtualSpaceWorldManifest>(
     DEFAULT_STUDIO_WORLD_MANIFEST,
@@ -741,7 +764,7 @@ export function VirtualSpaceExperience({
     port: live.room?.direct,
     scope: boardScope,
     storageOwnerId: privateActorId,
-    enabled: workspacePanel === "board" && signedIn && worldReady && !authoringMode,
+    enabled: (workspacePanel === "board" || workspacePanel === "annotation") && signedIn && worldReady && !authoringMode,
   });
   const cancelGuideTour = useCallback(() => {
     guideRequestRef.current = null; setGuideTourRequest(null);
@@ -1213,6 +1236,24 @@ export function VirtualSpaceExperience({
     : null, [sharedActivity, live.room]);
   const activeConversation = conversation.snapshot.active;
   const leaveConversation = conversation.leave;
+  const stopSpotlight = useCallback(() => setSpotlightEventId(null), []);
+  const startSpotlight = useCallback((event: StudioTownEvent) => {
+    const scope = activeConversation ?? pairConversation;
+    const selfSessionId = live.room?.participant.sessionId;
+    if (!event.spotlight) return;
+    if (!scope || !selfSessionId) {
+      setSocialNotice(bt("발표 전에 근처 팀원과 Bubble 또는 회의를 먼저 합의해 주세요.", "Create a consenting bubble or meeting before starting Spotlight."));
+      setWorkspacePanel("people");
+      return;
+    }
+    const peerIds = scope.memberIds.filter((id) => id !== selfSessionId);
+    if (!peerIds.length) return;
+    setSpotlightEventId(event.id);
+    const point = studioWorldSpawn(worldManifest, event.roomId).point;
+    engineBridge.requestEnvironmentEffect("spotlight", point);
+    openStudioP2pHuddle({ conversationId: scope.id, peerIds, source: "virtual-space" });
+    setSocialNotice(bt("현재 동의한 대화 그룹에 Spotlight를 준비했어요. 마이크·카메라·화면은 직접 선택합니다.", "Spotlight is prepared for the consenting conversation. Choose microphone, camera and screen explicitly."));
+  }, [activeConversation, pairConversation, live.room?.participant.sessionId, bt, engineBridge, worldManifest]);
   const handleAcceptedActivity = useCallback((request: StudioSpaceSocialRequest) => {
     if (activeConversation) leaveConversation(activeConversation.id);
     if (sharedActivityRef.current?.id !== request.id) finishSharedActivity();
@@ -1320,6 +1361,7 @@ export function VirtualSpaceExperience({
     if (action === "today") setWorkspacePanel("today");
     else if (action === "team") setWorkspacePanel("team");
     else if (action === "people") setWorkspacePanel("people");
+    else if (action === "town") setWorkspacePanel("town");
     else if (action === "review") setWorkspacePanel("work");
     else if (action === "assets") navigate(personal ? "/studio/assets" : `/studio/p/${encodeURIComponent(projectId)}/assets`);
     else {
@@ -1382,6 +1424,8 @@ export function VirtualSpaceExperience({
               onClick={() => setWorkspacePanel("search")}>{bt("방·팀원 찾기", "Find rooms & people")} <kbd>⌘ / Ctrl K</kbd></button>
             <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "today"}
               onClick={() => setWorkspacePanel("today")}>{bt("오늘의 동선", "Today")}</button>
+            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "town"}
+              onClick={() => setWorkspacePanel("town")}>{bt("마을 활동", "Town activities")}</button>
             <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "team"}
               onClick={() => setWorkspacePanel("team")}>{bt("팀·초대", "Teams & invites")}</button>
             <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "work"}
@@ -1402,6 +1446,7 @@ export function VirtualSpaceExperience({
                 className="studio-vspace-stage relative min-h-[30rem] w-full cursor-crosshair overflow-hidden rounded-[2rem] border border-line shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:min-h-[34rem]"
                 style={{ aspectRatio: `${worldManifest.width}/${worldManifest.height}` }}
                 data-studio-virtual-space="true"
+                data-spotlight-active={spotlightEventId ? "true" : undefined}
               >
                 {worldReady ? <StudioVirtualSpacePhaserCanvas
                   manifest={worldManifest}
@@ -1427,6 +1472,12 @@ export function VirtualSpaceExperience({
                 /> : <div className="studio-vspace-engine-message" role="status">{worldLoadError
                   ? bt("이 월드에는 안전하게 시작할 수 있는 바닥이 없습니다.", "This world has no safe floor where a player can start.")
                   : bt("공간 데이터 불러오는 중…", "Loading world data…")}</div>}
+                {activeTownEvent || spotlightEventId ? <div className="studio-vspace-live-event-banner" data-space-interactive="true">
+                  <Sparkles size={15} aria-hidden />
+                  <strong>{spotlightEventId ? bt("Spotlight 발표 모드", "Spotlight presentation") : bt(activeTownEvent!.labelKo, activeTownEvent!.labelEn)}</strong>
+                  <span>{spotlightEventId ? bt("동의한 대화 그룹에만 송출", "Broadcast to consenting conversation only") : bt("마을 이벤트 진행 중", "Town event live")}</span>
+                  {spotlightEventId ? <button type="button" onClick={stopSpotlight}>{bt("종료", "Stop")}</button> : <button type="button" onClick={() => setWorkspacePanel("town")}>{bt("보기", "View")}</button>}
+                </div> : null}
 
                 {worldReady ? <>
                 <VirtualSpaceMiniMap
@@ -1576,7 +1627,9 @@ export function VirtualSpaceExperience({
                 : workspacePanel === "work" ? bt("검수·작업함", "Reviews & inbox")
                   : workspacePanel === "sessions" ? bt("공동 작업 세션", "Work sessions")
                     : workspacePanel === "board" ? bt("P2P 공유 화이트보드", "P2P shared whiteboard")
-                      : workspacePanel === "team" ? bt("팀·그룹·초대", "Teams, groups & invites")
+                      : workspacePanel === "annotation" ? bt("공유 화면 라이브 주석", "Live shared-screen annotation")
+                        : workspacePanel === "town" ? bt("살아 있는 제작 마을", "Living production town")
+                          : workspacePanel === "team" ? bt("팀·그룹·초대", "Teams, groups & invites")
                         : workspacePanel === "today" ? bt("오늘의 제작 동선", "Today's production flow")
                           : workspacePanel === "rtc" ? bt("실시간 연결 상태", "Live connection status")
                             : bt("사람과 대화", "People and conversations")}
@@ -1599,6 +1652,27 @@ export function VirtualSpaceExperience({
             onNote={p2pBoard.addNote}
             onRemove={p2pBoard.remove}
             onClearOwn={p2pBoard.clearOwn}
+          /> : null}
+          {workspacePanel === "annotation" ? <StudioVirtualSpaceLiveAnnotationPanel
+            snapshot={p2pBoard.snapshot}
+            selfSessionId={live.room?.participant.sessionId}
+            onStroke={p2pBoard.addStroke}
+            onNote={p2pBoard.addNote}
+            onRemove={p2pBoard.remove}
+            onClearOwn={p2pBoard.clearOwn}
+          /> : null}
+          {workspacePanel === "town" ? <StudioVirtualSpaceTownProgramPanel
+            operations={operations.snapshot}
+            manifest={worldManifest}
+            decorations={decorations}
+            spotlightActive={Boolean(spotlightEventId)}
+            onDecorations={selectDecorations}
+            onMoveToRoom={(roomId) => { queuePathTo(studioWorldSpawn(worldManifest, roomId).point); setWorkspacePanel(null); }}
+            onOpenPeople={() => setWorkspacePanel("people")}
+            onOpenAnnotation={() => setWorkspacePanel("annotation")}
+            onOpenSessions={() => setWorkspacePanel("sessions")}
+            onStartSpotlight={startSpotlight}
+            onStopSpotlight={stopSpotlight}
           /> : null}
           <div hidden={workspacePanel !== "search"}>
             {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
@@ -1810,7 +1884,7 @@ export function VirtualSpaceExperience({
                       onClick={() => selectAvatar(index)}
                     >
                       <img
-                        src={avatar.directional.down}
+                        src={studioCharacterSkinForArtStyle(avatar, artStyle).directional.down}
                         alt=""
                         draggable={false}
                         className={cn(

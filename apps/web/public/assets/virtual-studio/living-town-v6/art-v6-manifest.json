@@ -3,9 +3,9 @@
   "generatedAt": "2026-09-25",
   "sourceTechnique": "Image Generation 2.5-directed semantic runtime sheet generation; independent style bytes; no CSS filter variants",
   "imageGeneration25ConceptIds": [
-    "b3dd757d-9cf7-423e-88fb-809d52da1a05",
-    "d12f918a-1026-49dc-be5f-0ed7385a2878",
-    "bd92455c-4d04-4cef-8319-287a332d4bd9"
+    "66b20001-32fd-4d90-9a6f-14b676399191",
+    "9ffa2971-6d20-49bd-a8b3-aaa3da97d83f",
+    "22beabfc-ecd4-47a7-8925-1c83b56003c2"
   ],
   "styles": [
     "sky-island",
@@ -358,23 +358,23 @@
     },
     {
       "file": "sky-island/decor-sheet.webp",
-      "bytes": 20332,
-      "sha256": "be291aecdf79ec8131a088ba6dbda785b358a9e60e829ebc12faa1d313075cb5",
+      "bytes": 80838,
+      "sha256": "d61ed034e5f71ff550c597d666e597d449f25a8c1cad21ec04acf76e56e34804",
       "size": [
         1536,
         128
       ],
-      "visualSignature": "5fc745abaacea58d1bb9f046b1854d3eb397e9f2e67b7074cff491dcf67413d3"
+      "visualSignature": "a24b60175da3bea376d415c5763e68508b6bf7997d9d372104e68b5aff62e873"
     },
     {
       "file": "sky-island/district-preview-sheet.webp",
-      "bytes": 154044,
-      "sha256": "7c4c37bdb85d5577de365430f0bef9762295135213e576d61ed3b3d28f15dd4e",
+      "bytes": 237966,
+      "sha256": "9cbce0a8674aa0708ad045a177cdafd72dd24c6508df55d6ad68d9df82156aa1",
       "size": [
-        1920,
+        2240,
         180
       ],
-      "visualSignature": "5dea216d36bb0192f75c7b13b9c4b39c581b1bb0a221a5dbc9a9830f4f7620ed"
+      "visualSignature": "1592119a736426f39cfc7931b10b3dd2034476080fcfabaaaab3d479081af166"
     },
     {
       "file": "sky-island/interaction-fx-sheet.webp",
@@ -398,13 +398,13 @@
     },
     {
       "file": "sky-island/terrain-tile-atlas.webp",
-      "bytes": 40824,
-      "sha256": "08946d888609bba25704041f4579d69c43890ca247bb34cf2e463efac1b69a96",
+      "bytes": 43984,
+      "sha256": "cb7ae23167fba9816d3ebe3876a26a89a9d99574fe00711dfded03800e3dcca5",
       "size": [
         512,
         512
       ],
-      "visualSignature": "0a15cfeff18430fca1e5c8624c9ce13b509285114311ba2989cd7dee659e9d4b"
+      "visualSignature": "d1e5adce4ced12b6a9118d1c89f22eacdeca53ef2925575350a34fc662006d2e"
     },
     {
       "file": "sky-island/waterfall-sheet.webp",
@@ -506,5 +506,6 @@
       ],
       "visualSignature": "9377123cf438fccd48d4d6de2d175c09f438eb8936d4dd1f52195a10528da64d"
     }
-  ]
+  ],
+  "imageGeneration25SourceManifest": "imagegen25-source-manifest.json"
 }

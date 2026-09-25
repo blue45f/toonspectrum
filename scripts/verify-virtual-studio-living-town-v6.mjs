@@ -7,51 +7,61 @@ import { fileURLToPath } from "node:url";
 const repo = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const root = resolve(repo, "apps/web/public/assets/virtual-studio/living-town-v6");
 const manifestPath = resolve(root, "art-v6-manifest.json");
+const imagegenManifestPath = resolve(root, "imagegen25-source-manifest.json");
 const styles = ["sky-island", "webtoon", "pastel", "retro", "ink", "neon"];
 const expectedFiles = 48;
 const requiredConcepts = [
-  "b3dd757d-9cf7-423e-88fb-809d52da1a05",
-  "d12f918a-1026-49dc-be5f-0ed7385a2878",
-  "bd92455c-4d04-4cef-8319-287a332d4bd9",
+  "66b20001-32fd-4d90-9a6f-14b676399191",
+  "9ffa2971-6d20-49bd-a8b3-aaa3da97d83f",
+  "22beabfc-ecd4-47a7-8925-1c83b56003c2",
 ];
 
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const canonicalName = (path) => relative(root, path).split(sep).join("/");
 async function walk(directory) {
   const values = [];
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = resolve(directory, entry.name);
     if (entry.isDirectory()) values.push(...await walk(path));
-    else if (entry.isFile() && path !== manifestPath) values.push(path);
+    else if (entry.isFile()) values.push(path);
   }
   return values;
 }
+
+async function verifyRecord(path, record, errors) {
+  const stat = await lstat(path);
+  const name = canonicalName(path);
+  if (stat.isSymbolicLink()) { errors.push(`symlink forbidden: ${name}`); return 0; }
+  const data = await readFile(path);
+  if (!record) { errors.push(`missing manifest record: ${name}`); return data.length; }
+  if (record.bytes !== data.length) errors.push(`byte length mismatch: ${name}`);
+  if (record.sha256 !== sha256(data)) errors.push(`sha256 mismatch: ${name}`);
+  if (data.length > 10 * 1024 * 1024) errors.push(`oversized asset: ${name}`);
+  return data.length;
+}
+
 export async function verifyVirtualStudioLivingTownV6() {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const errors = [];
   if (manifest.version !== 6) errors.push("living-town manifest version must be 6");
   if (!String(manifest.sourceTechnique).includes("Image Generation 2.5")) errors.push("Image Generation 2.5 provenance is missing");
   if (JSON.stringify(manifest.imageGeneration25ConceptIds) !== JSON.stringify(requiredConcepts)) errors.push("Image Generation 2.5 concept IDs differ");
+  if (manifest.imageGeneration25SourceManifest !== "imagegen25-source-manifest.json") errors.push("ImageGen source manifest is not bound");
   if (JSON.stringify(manifest.styles) !== JSON.stringify(styles)) errors.push("living-town style list differs");
   if (!Array.isArray(manifest.files) || manifest.files.length !== expectedFiles) errors.push(`expected ${expectedFiles} manifest records`);
 
-  const files = await walk(root);
-  if (files.length !== expectedFiles) errors.push(`expected ${expectedFiles} files, got ${files.length}`);
+  const files = (await Promise.all(styles.map((style) => walk(resolve(root, style))))).flat();
+  if (files.length !== expectedFiles) errors.push(`expected ${expectedFiles} style files, got ${files.length}`);
   const records = new Map((manifest.files ?? []).map((item) => [item.file, item]));
   const seen = new Set();
   let bytes = 0;
   for (const path of files) {
-    const stat = await lstat(path);
-    const name = relative(root, path).split(sep).join("/");
-    if (stat.isSymbolicLink()) { errors.push(`symlink forbidden: ${name}`); continue; }
-    const record = records.get(name);
-    if (!record) { errors.push(`missing manifest record: ${name}`); continue; }
-    const data = await readFile(path);
-    seen.add(name); bytes += data.length;
-    if (record.bytes !== data.length) errors.push(`byte length mismatch: ${name}`);
-    if (record.sha256 !== sha256(data)) errors.push(`sha256 mismatch: ${name}`);
-    if (data.length > 10 * 1024 * 1024) errors.push(`oversized asset: ${name}`);
+    const name = canonicalName(path);
+    seen.add(name);
+    bytes += await verifyRecord(path, records.get(name), errors);
   }
-  for (const name of records.keys()) if (!seen.has(name)) errors.push(`missing file: ${name}`);
+  for (const name of records.keys()) if (!seen.has(name)) errors.push(`missing style file: ${name}`);
+
   const coverage = new Map(styles.map((style) => [style, []]));
   for (const name of records.keys()) {
     const [style, ...rest] = name.split("/");
@@ -71,16 +81,46 @@ export async function verifyVirtualStudioLivingTownV6() {
   const decor = records.get("sky-island/decor-sheet.webp");
   if (JSON.stringify(decor?.size) !== JSON.stringify([1536, 128])) errors.push("decor sheet must contain twelve 128px frames");
 
+  const imagegen = JSON.parse(await readFile(imagegenManifestPath, "utf8"));
+  if (imagegen.version !== 1 || !String(imagegen.generator).includes("Image Generation 2.5")) errors.push("ImageGen source contract is invalid");
+  if (JSON.stringify(imagegen.sessionGenerationIds) !== JSON.stringify(requiredConcepts)) errors.push("ImageGen session IDs differ");
+  for (const source of imagegen.sourceFiles ?? []) {
+    const path = resolve(root, source.file);
+    const data = await readFile(path);
+    if (source.bytes !== data.length || source.sha256 !== sha256(data)) errors.push(`ImageGen source mismatch: ${source.file}`);
+    if (!data.includes(Buffer.from("gpt-image")) || !data.includes(Buffer.from("trainedAlgorithmicMedia"))) {
+      errors.push(`C2PA ImageGen provenance missing: ${source.file}`);
+    }
+  }
+  let imagegenBytes = 0;
+  for (const record of imagegen.files ?? []) {
+    const path = resolve(root, record.file);
+    imagegenBytes += await verifyRecord(path, record, errors);
+  }
+  if ((imagegen.files ?? []).length !== 29) errors.push("ImageGen runtime extraction must contain 29 files");
+  const districtPreview = imagegen.files?.find((item) => item.file === "sky-island/district-preview-sheet.webp");
+  if (JSON.stringify(districtPreview?.size) !== JSON.stringify([2240, 180])) errors.push("district preview sheet must contain seven concept-art districts");
+  const generatedDirections = ["down", "left", "right", "up"].map((facing) =>
+    imagegen.files?.find((item) => item.file === `imagegen25-character/player-imagegen25-direction-${facing}.webp`));
+  if (generatedDirections.some((item) => JSON.stringify(item?.size) !== JSON.stringify([160, 160]))) {
+    errors.push("ImageGen character directions must use the 160px runtime cell");
+  }
+
   const runtime = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas.tsx"), "utf8");
   if (!runtime.includes("studioVirtualLivingTownAssetUrl")) errors.push("runtime does not load living-town v6 assets");
   if (!runtime.includes("studioTownTraversalProfile")) errors.push("runtime does not enforce authored paths");
+  if (!runtime.includes("triggerEnvironmentEffect")) errors.push("runtime does not trigger environment interaction effects");
+  const skins = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/studio-virtual-space-character-skins.ts"), "utf8");
+  if (!skins.includes('key: "imagegen25"') || !skins.includes("living-town-v6/imagegen25-character")) {
+    errors.push("ImageGen 2.5 character pack is not selectable");
+  }
   const css = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/studio-virtual-space.css"), "utf8");
   if (/data-art-style=[^\n]*canvas\s*\{[^}]*filter\s*:/u.test(css)) errors.push("style-specific canvas filters are forbidden");
   if (errors.length) throw new Error(errors.join("\n"));
-  return { files: files.length, bytes };
+  return { files: files.length, bytes, imagegenFiles: imagegen.files.length, imagegenBytes };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const result = await verifyVirtualStudioLivingTownV6();
-  console.log(`Virtual Studio living town v6 OK: ${result.files} assets, ${result.bytes.toLocaleString()} bytes`);
+  console.log(`Virtual Studio living town v6 OK: ${result.files} style assets + ${result.imagegenFiles} ImageGen assets, ${(result.bytes + result.imagegenBytes).toLocaleString()} bytes`);
 }

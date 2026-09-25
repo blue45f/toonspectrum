@@ -2,7 +2,7 @@ import type { StudioVirtualEnvironmentEffect } from "./studio-virtual-space-engi
 import type { StudioSpatialActionId } from "./studio-virtual-space-spatial-actions";
 import type { StudioWorldInteractionDefinition } from "./studio-virtual-space-world-manifest";
 
-export type StudioVirtualWorkspacePanel = "people" | "space" | "search" | "work" | "sessions" | "board" | "team" | "today" | "rtc";
+export type StudioVirtualWorkspacePanel = "people" | "space" | "search" | "work" | "sessions" | "board" | "annotation" | "team" | "today" | "town" | "rtc";
 export type StudioSpatialInteractionDecision =
   | { readonly kind: "world-rule"; readonly interaction: StudioWorldInteractionDefinition }
   | { readonly kind: "panel"; readonly panel: StudioVirtualWorkspacePanel }
@@ -24,6 +24,10 @@ const panelByAction: Partial<Record<StudioSpatialActionId, StudioVirtualWorkspac
   "team-hub": "team",
   "today-board": "today",
   "open-customization": "space",
+  bubble: "people",
+  spotlight: "town",
+  "live-annotation": "annotation",
+  "town-hub": "town",
 });
 
 const effectByAction: Partial<Record<StudioSpatialActionId, StudioVirtualEnvironmentEffect>> = Object.freeze({

@@ -1,4 +1,5 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import { STUDIO_TOWN_DISTRICT_IDS, type StudioTownDistrictId } from "./studio-virtual-space-town-layout";
 
 export const STUDIO_VIRTUAL_ACCESSORY_KEYS = ["none", "headset", "beret", "star", "glasses"] as const;
 export const STUDIO_VIRTUAL_AURA_KEYS = ["none", "sparkle", "focus", "neon"] as const;
@@ -29,6 +30,7 @@ export const STUDIO_VIRTUAL_DECOR_TYPES = [
 ] as const;
 export type StudioVirtualDecorType = typeof STUDIO_VIRTUAL_DECOR_TYPES[number];
 export type StudioVirtualDecorPresetKey = "minimal" | "creator-garden" | "festival" | "night-market";
+export type StudioVirtualBackgroundPresentationMode = "minimal" | "decorated" | "festival";
 
 export interface StudioVirtualDecorPlacement extends StudioVirtualSpacePoint {
   readonly id: string;
@@ -39,6 +41,8 @@ export interface StudioVirtualDecorPlacement extends StudioVirtualSpacePoint {
 
 export interface StudioVirtualDecorationState {
   readonly presetKey: StudioVirtualDecorPresetKey;
+  readonly districtKey: StudioTownDistrictId;
+  readonly presentationMode: StudioVirtualBackgroundPresentationMode;
   readonly placements: readonly StudioVirtualDecorPlacement[];
   readonly revision: number;
 }
@@ -96,12 +100,20 @@ export function parseStudioVirtualDecorationState(value: unknown): StudioVirtual
   if (!["minimal", "creator-garden", "festival", "night-market"].includes(String(candidate.presetKey))
     || !Array.isArray(candidate.placements) || candidate.placements.length > MAX_DECORATIONS
     || typeof candidate.revision !== "number" || !Number.isSafeInteger(candidate.revision) || candidate.revision < 0) return null;
+  const presetKey = candidate.presetKey as StudioVirtualDecorPresetKey;
+  const districtKey = oneOf(STUDIO_TOWN_DISTRICT_IDS, candidate.districtKey) ? candidate.districtKey : "commons-market";
+  const fallbackMode: StudioVirtualBackgroundPresentationMode = presetKey === "minimal" ? "minimal"
+    : presetKey === "festival" || presetKey === "night-market" ? "festival" : "decorated";
+  const presentationMode = oneOf(["minimal", "decorated", "festival"] as const, candidate.presentationMode)
+    ? candidate.presentationMode : fallbackMode;
   const placements = candidate.placements.map(parsePlacement);
   if (placements.some((item) => !item)) return null;
   const valid = placements as StudioVirtualDecorPlacement[];
   if (new Set(valid.map((item) => item.id)).size !== valid.length) return null;
   return Object.freeze({
-    presetKey: candidate.presetKey as StudioVirtualDecorPresetKey,
+    presetKey,
+    districtKey,
+    presentationMode,
     placements: Object.freeze(valid),
     revision: candidate.revision,
   });
@@ -158,7 +170,11 @@ export function studioVirtualDecorationPreset(key: StudioVirtualDecorPresetKey):
       placement("night-portal", "portal", 780, 805, 0, .76),
       placement("night-pet", "pet", 540, 710, 0, .78),
     ];
-  return Object.freeze({ presetKey: key, placements: Object.freeze(placements), revision: Date.now() });
+  const districtKey: StudioTownDistrictId = key === "creator-garden" ? "atelier-gardens"
+    : key === "festival" ? "sky-port" : key === "night-market" ? "commons-market" : "story-terrace";
+  const presentationMode: StudioVirtualBackgroundPresentationMode = key === "minimal" ? "minimal"
+    : key === "creator-garden" ? "decorated" : "festival";
+  return Object.freeze({ presetKey: key, districtKey, presentationMode, placements: Object.freeze(placements), revision: Date.now() });
 }
 
 export function readStudioVirtualDecorationState(): StudioVirtualDecorationState {
@@ -185,13 +201,21 @@ export function addStudioVirtualDecoration(
     0,
     1,
   );
-  return Object.freeze({ presetKey: current.presetKey, placements: Object.freeze([...current.placements, candidate]), revision: current.revision + 1 });
+  return Object.freeze({
+    presetKey: current.presetKey,
+    districtKey: current.districtKey,
+    presentationMode: current.presentationMode,
+    placements: Object.freeze([...current.placements, candidate]),
+    revision: current.revision + 1,
+  });
 }
 
 export function removeStudioVirtualDecoration(current: StudioVirtualDecorationState, id: string): StudioVirtualDecorationState {
   if (!TOKEN.test(id)) return current;
   return Object.freeze({
     presetKey: current.presetKey,
+    districtKey: current.districtKey,
+    presentationMode: current.presentationMode,
     placements: Object.freeze(current.placements.filter((item) => item.id !== id)),
     revision: current.revision + 1,
   });

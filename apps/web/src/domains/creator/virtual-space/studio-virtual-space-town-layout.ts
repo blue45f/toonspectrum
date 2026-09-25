@@ -13,6 +13,8 @@ export type StudioTownDistrictId =
 
 export interface StudioTownPathSegment {
   readonly id: string;
+  readonly fromRoomId: string;
+  readonly toRoomId: string;
   readonly from: StudioVirtualSpacePoint;
   readonly to: StudioVirtualSpacePoint;
   readonly width: number;
@@ -76,8 +78,13 @@ function edgeKey(left: string, right: string): string {
   return [left, right].sort().join(":");
 }
 
-export function studioTownUsesLivingLayout(manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey">): boolean {
-  return manifest.id === "toonspectrum-master-studio" && /^studio-modular-campus-v3/u.test(manifest.backgroundAssetKey);
+export function studioTownUsesLivingLayout(
+  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "width" | "height">,
+): boolean {
+  return manifest.id === "toonspectrum-master-studio"
+    && /^studio-modular-campus-v3/u.test(manifest.backgroundAssetKey)
+    && manifest.width === 1280
+    && manifest.height === 960;
 }
 
 export function studioTownPathSegments(
@@ -100,6 +107,8 @@ export function studioTownPathSegments(
     const kind = PATH_KIND_BY_EDGE.get(edgeKey(leftId, rightId)) ?? "stone";
     segments.push(Object.freeze({
       id: `${leftId}-${rightId}`,
+      fromRoomId: leftId,
+      toRoomId: rightId,
       from,
       to,
       width: kind === "bridge" ? 38 : kind === "boardwalk" ? 42 : 48,
@@ -144,6 +153,33 @@ export const STUDIO_TOWN_LANDMARKS: readonly StudioTownLandmark[] = Object.freez
     labelKo: "완료 축하 공", labelEn: "Celebration Gong", kind: "gong" },
 ]);
 
+export const STUDIO_TOWN_DISTRICT_IDS: readonly StudioTownDistrictId[] = Object.freeze([
+  "archive-grove", "story-terrace", "production-heights", "atelier-gardens",
+  "review-falls", "commons-market", "sky-port",
+]);
+
+export interface StudioTownDistrictPresentation {
+  readonly ambientDensity: number;
+  readonly lightColor: number;
+  readonly lightAlpha: number;
+  readonly noteKo: string;
+  readonly noteEn: string;
+}
+
+const DISTRICT_PRESENTATION: Readonly<Record<StudioTownDistrictId, StudioTownDistrictPresentation>> = Object.freeze({
+  "archive-grove": { ambientDensity: .9, lightColor: 0x9fe7b1, lightAlpha: .13, noteKo: "큰 나무와 조용한 자료 정원", noteEn: "Large trees and a quiet reference garden" },
+  "story-terrace": { ambientDensity: .72, lightColor: 0xffdda0, lightAlpha: .12, noteKo: "노을빛 테라스와 스토리 보드", noteEn: "Sunlit terraces and story boards" },
+  "production-heights": { ambientDensity: .55, lightColor: 0xaed7ff, lightAlpha: .1, noteKo: "하늘 관측소와 제작 타워", noteEn: "Sky observatory and production towers" },
+  "atelier-gardens": { ambientDensity: 1, lightColor: 0xffc2dd, lightAlpha: .13, noteKo: "꽃길과 야외 드로잉 정원", noteEn: "Flower paths and outdoor drawing gardens" },
+  "review-falls": { ambientDensity: .8, lightColor: 0x9deaff, lightAlpha: .15, noteKo: "폭포와 수면 반사가 있는 검수 지구", noteEn: "Review district with waterfalls and reflections" },
+  "commons-market": { ambientDensity: 1.15, lightColor: 0xffd17c, lightAlpha: .14, noteKo: "카페와 창작자 마켓이 모인 거리", noteEn: "Creator market streets and cafes" },
+  "sky-port": { ambientDensity: .68, lightColor: 0xc8bbff, lightAlpha: .12, noteKo: "입장 부두와 이벤트 스테이지", noteEn: "Arrival docks and event stages" },
+});
+
+export function studioTownDistrictPresentation(id: StudioTownDistrictId): StudioTownDistrictPresentation {
+  return DISTRICT_PRESENTATION[id];
+}
+
 export interface StudioTownTraversalProfile {
   readonly allowed: boolean;
   readonly onPath: boolean;
@@ -173,7 +209,7 @@ function insidePlaza(plaza: StudioTownPlaza, point: StudioVirtualSpacePoint): bo
 }
 
 export function studioTownTraversalProfile(
-  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "rooms">,
+  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "width" | "height" | "rooms">,
   point: StudioVirtualSpacePoint,
 ): StudioTownTraversalProfile {
   if (!studioTownUsesLivingLayout(manifest)) return { allowed: true, onPath: false, distanceToPath: 0, kind: "room", cost: 1 };
@@ -201,7 +237,7 @@ export function studioTownTraversalProfile(
 }
 
 export function studioTownLineCanTraverse(
-  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "rooms">,
+  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "width" | "height" | "rooms">,
   from: StudioVirtualSpacePoint,
   to: StudioVirtualSpacePoint,
   step = 8,
@@ -219,7 +255,7 @@ export function studioTownLineCanTraverse(
 }
 
 export function studioTownNearestWalkablePoint(
-  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "rooms">,
+  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "width" | "height" | "rooms">,
   point: StudioVirtualSpacePoint,
 ): StudioVirtualSpacePoint {
   if (studioTownTraversalProfile(manifest, point).allowed) return point;

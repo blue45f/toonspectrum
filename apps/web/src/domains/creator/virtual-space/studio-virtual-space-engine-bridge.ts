@@ -7,7 +7,8 @@ export type StudioVirtualEnvironmentEffect =
   | "petals"
   | "lanterns"
   | "pet"
-  | "gong";
+  | "gong"
+  | "spotlight";
 
 export interface StudioVirtualEnvironmentEffectRequest {
   readonly effect: StudioVirtualEnvironmentEffect;

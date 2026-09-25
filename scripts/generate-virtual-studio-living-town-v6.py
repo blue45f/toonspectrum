@@ -11,6 +11,8 @@ import hashlib
 import json
 import math
 import random
+import subprocess
+import sys
 from pathlib import Path
 from typing import Final
 
@@ -21,9 +23,9 @@ V5: Final = ROOT / "apps/web/public/assets/virtual-studio/style-packs-v5"
 OUT: Final = ROOT / "apps/web/public/assets/virtual-studio/living-town-v6"
 STYLES: Final = ("sky-island", "webtoon", "pastel", "retro", "ink", "neon")
 IMAGEGEN_25_CONCEPTS: Final = (
-    "b3dd757d-9cf7-423e-88fb-809d52da1a05",
-    "d12f918a-1026-49dc-be5f-0ed7385a2878",
-    "bd92455c-4d04-4cef-8319-287a332d4bd9",
+    "66b20001-32fd-4d90-9a6f-14b676399191",
+    "9ffa2971-6d20-49bd-a8b3-aaa3da97d83f",
+    "22beabfc-ecd4-47a7-8925-1c83b56003c2",
 )
 
 PALETTES: Final = {
@@ -390,6 +392,7 @@ def main():
         "files":[record(path) for path in sorted(files)],
     }
     target=OUT/"art-v6-manifest.json"; target.parent.mkdir(parents=True,exist_ok=True); target.write_text(json.dumps(manifest,ensure_ascii=False,indent=2)+"\n")
+    subprocess.run([sys.executable, str(ROOT / "scripts/extract-virtual-studio-imagegen25-v6.py")], check=True)
     print(f"Virtual Studio living town v6: {len(files)} assets, {sum(path.stat().st_size for path in files):,} bytes")
 
 

@@ -1,0 +1,316 @@
+{
+  "version": 1,
+  "generator": "OpenAI Image Generation 2.5 concept extraction",
+  "sourceFiles": [
+    {
+      "file": "source/imagegen25-design-board.png",
+      "fileId": "file_000000001c9081fdbfb6bcbe9e715172",
+      "sha256": "5dd17833b338dfb0ccd30b1495b97a7e6114be7c15f30048da4764a5cd2f4598",
+      "bytes": 2730524
+    },
+    {
+      "file": "source/imagegen25-world-concept.png",
+      "fileId": "file_00000000854881f482a2bd88a6ed7433",
+      "sha256": "65971949b87b6fd1820a685ffc6c05360dc895707ff017f7bf490e85142e9722",
+      "bytes": 3026660
+    }
+  ],
+  "sessionGenerationIds": [
+    "66b20001-32fd-4d90-9a6f-14b676399191",
+    "9ffa2971-6d20-49bd-a8b3-aaa3da97d83f",
+    "22beabfc-ecd4-47a7-8925-1c83b56003c2"
+  ],
+  "policy": "Runtime crops only; no CSS filter, hue rotation, or cross-style recolour derivation.",
+  "files": [
+    {
+      "file": "imagegen25-character/player-imagegen25-direction-down.webp",
+      "bytes": 3034,
+      "sha256": "c5d5cb2af9534b03db7eb97a9343f04a64e9c806edf62df2462950c153d7efe1",
+      "size": [
+        160,
+        160
+      ],
+      "visualSignature": "2ef956515d05399e0966c5e3b952ec79f3eeee5702271380950ccbea534aae60"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-direction-left.webp",
+      "bytes": 3030,
+      "sha256": "252808d92882d2589ea97366a0149fefeae3ea75978a21092270b347437478ed",
+      "size": [
+        160,
+        160
+      ],
+      "visualSignature": "7b7eeb17aa499a5d6335d1116aeccf9308e336b0db7fe0296978d348db2c464a"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-direction-right.webp",
+      "bytes": 3034,
+      "sha256": "c5d5cb2af9534b03db7eb97a9343f04a64e9c806edf62df2462950c153d7efe1",
+      "size": [
+        160,
+        160
+      ],
+      "visualSignature": "2ef956515d05399e0966c5e3b952ec79f3eeee5702271380950ccbea534aae60"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-direction-up.webp",
+      "bytes": 3034,
+      "sha256": "c5d5cb2af9534b03db7eb97a9343f04a64e9c806edf62df2462950c153d7efe1",
+      "size": [
+        160,
+        160
+      ],
+      "visualSignature": "2ef956515d05399e0966c5e3b952ec79f3eeee5702271380950ccbea534aae60"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-draw-down.webp",
+      "bytes": 3512,
+      "sha256": "5d5672d9ee947547eac1da641a497e2d4fb0ffc457c64d812c2cbf64fe25661d",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "e6e86d9a3919cce449bf7a2c03785e75e9f177b9ee32f565c394b6945fa0deef"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-draw-left.webp",
+      "bytes": 3514,
+      "sha256": "328e64b182516d15cd97b50a4b5aa24c957382a6d54971c56c470fde3c5c3c05",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "7370687992aca1c7e9f6dc4442a53a5c633cb7d2aded0eaa604335e262fa719d"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-draw-right.webp",
+      "bytes": 3512,
+      "sha256": "5d5672d9ee947547eac1da641a497e2d4fb0ffc457c64d812c2cbf64fe25661d",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "e6e86d9a3919cce449bf7a2c03785e75e9f177b9ee32f565c394b6945fa0deef"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-draw-up.webp",
+      "bytes": 3512,
+      "sha256": "5d5672d9ee947547eac1da641a497e2d4fb0ffc457c64d812c2cbf64fe25661d",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "e6e86d9a3919cce449bf7a2c03785e75e9f177b9ee32f565c394b6945fa0deef"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-preset-sheet.webp",
+      "bytes": 23232,
+      "sha256": "436befa14fbadc758595d9c457e282b08e2e960899910d31fbf6e57ae1b0f7ad",
+      "size": [
+        1024,
+        128
+      ],
+      "visualSignature": "8cf79dc84c95a6b79da04c72d02fa4844e81d3f71cbacf4eaf1e57afc8ba621a"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-review-down.webp",
+      "bytes": 3392,
+      "sha256": "8b25490c5f362386d6b318ea63f2ffd47b127ab13e283d7aa7496500f4ece7b0",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "4430fd2b9de54d4761aa2eedb0676905b1fafa49162792797ff65b63c843b317"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-review-left.webp",
+      "bytes": 3388,
+      "sha256": "ad51dfea69a9ff334445727ea0030cd904d062853d8b0ed288795d5366ea8470",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "92a1a716d4ddad28d67f35fb95e8100a98b1e1b1f2a2df6d7bf46818754e18b4"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-review-right.webp",
+      "bytes": 3392,
+      "sha256": "8b25490c5f362386d6b318ea63f2ffd47b127ab13e283d7aa7496500f4ece7b0",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "4430fd2b9de54d4761aa2eedb0676905b1fafa49162792797ff65b63c843b317"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-review-up.webp",
+      "bytes": 3392,
+      "sha256": "8b25490c5f362386d6b318ea63f2ffd47b127ab13e283d7aa7496500f4ece7b0",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "4430fd2b9de54d4761aa2eedb0676905b1fafa49162792797ff65b63c843b317"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-sit.webp",
+      "bytes": 4900,
+      "sha256": "364ce38ebd96766814b5d845c3a48b8ff9dd759ff6253669364fa0ce74c3819d",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "68f7a3d4f936d29020ecb3d663af13c24028b4a3c7d9c2a9665fa2a98a50241c"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-state-draw.webp",
+      "bytes": 3034,
+      "sha256": "667f1ea92fb24a8be4f059a2560f70cde64dd3816f176f918a49f91727e9e682",
+      "size": [
+        160,
+        160
+      ],
+      "visualSignature": "0f51c54b5a0f58cf9aed92f651e58cee256de50977a426593422283e7327c5a7"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-state-review.webp",
+      "bytes": 3034,
+      "sha256": "c5d5cb2af9534b03db7eb97a9343f04a64e9c806edf62df2462950c153d7efe1",
+      "size": [
+        160,
+        160
+      ],
+      "visualSignature": "2ef956515d05399e0966c5e3b952ec79f3eeee5702271380950ccbea534aae60"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-state-talk.webp",
+      "bytes": 3034,
+      "sha256": "980fbb356fa784408e491723e46f9eb7d494be435d3ccac022330d871d744bb7",
+      "size": [
+        160,
+        160
+      ],
+      "visualSignature": "45fcf8757e9d1429d5b2303242ae8662c0f1783c49e98a87161dfe0a83a6b41a"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-talk-down.webp",
+      "bytes": 3548,
+      "sha256": "ccb4f8b43f506f5d2838ac1f184e4d93d11c9a2cbdb1727f70a6007af652fcb8",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "568a481d93b5ec416f0fc6941fa5152f027a7a0b8d1a922563e12e51538cb8c6"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-talk-left.webp",
+      "bytes": 3514,
+      "sha256": "7780431ec5db987226bd4b1370f3b97c95ec0dc0c3bda0b64b9052ad56d25c4e",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "e75cdf5f856ab8ba85f5e02a05896e5b87eaf503a89534069423306c59d03414"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-talk-right.webp",
+      "bytes": 3548,
+      "sha256": "ccb4f8b43f506f5d2838ac1f184e4d93d11c9a2cbdb1727f70a6007af652fcb8",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "568a481d93b5ec416f0fc6941fa5152f027a7a0b8d1a922563e12e51538cb8c6"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-talk-up.webp",
+      "bytes": 3548,
+      "sha256": "ccb4f8b43f506f5d2838ac1f184e4d93d11c9a2cbdb1727f70a6007af652fcb8",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "568a481d93b5ec416f0fc6941fa5152f027a7a0b8d1a922563e12e51538cb8c6"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-walk-down.webp",
+      "bytes": 3530,
+      "sha256": "304d1ede14b3179a18e87cb82846f2349906b50d26617bc9c0292e3bafea759a",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "c2d3c82f742c7c7f6782a3cbeafaa9e3ee0cc2c5be886c39bc2bc1f15a43aff3"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-walk-left.webp",
+      "bytes": 3528,
+      "sha256": "aa161fda6e92495e2c9aaa4a985039b23a64401236d465a17d1166e1bda98c60",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "71e550ebdb099a8efd585029a224e5ac7ca5a13832fdc71e920df05954ab064b"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-walk-right.webp",
+      "bytes": 3530,
+      "sha256": "304d1ede14b3179a18e87cb82846f2349906b50d26617bc9c0292e3bafea759a",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "c2d3c82f742c7c7f6782a3cbeafaa9e3ee0cc2c5be886c39bc2bc1f15a43aff3"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-walk-up.webp",
+      "bytes": 3530,
+      "sha256": "304d1ede14b3179a18e87cb82846f2349906b50d26617bc9c0292e3bafea759a",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "c2d3c82f742c7c7f6782a3cbeafaa9e3ee0cc2c5be886c39bc2bc1f15a43aff3"
+    },
+    {
+      "file": "imagegen25-character/player-imagegen25-wave.webp",
+      "bytes": 4900,
+      "sha256": "364ce38ebd96766814b5d845c3a48b8ff9dd759ff6253669364fa0ce74c3819d",
+      "size": [
+        640,
+        160
+      ],
+      "visualSignature": "68f7a3d4f936d29020ecb3d663af13c24028b4a3c7d9c2a9665fa2a98a50241c"
+    },
+    {
+      "file": "sky-island/decor-sheet.webp",
+      "bytes": 80838,
+      "sha256": "d61ed034e5f71ff550c597d666e597d449f25a8c1cad21ec04acf76e56e34804",
+      "size": [
+        1536,
+        128
+      ],
+      "visualSignature": "a24b60175da3bea376d415c5763e68508b6bf7997d9d372104e68b5aff62e873"
+    },
+    {
+      "file": "sky-island/district-preview-sheet.webp",
+      "bytes": 237966,
+      "sha256": "9cbce0a8674aa0708ad045a177cdafd72dd24c6508df55d6ad68d9df82156aa1",
+      "size": [
+        2240,
+        180
+      ],
+      "visualSignature": "1592119a736426f39cfc7931b10b3dd2034476080fcfabaaaab3d479081af166"
+    },
+    {
+      "file": "sky-island/terrain-tile-atlas.webp",
+      "bytes": 43984,
+      "sha256": "cb7ae23167fba9816d3ebe3876a26a89a9d99574fe00711dfded03800e3dcca5",
+      "size": [
+        512,
+        512
+      ],
+      "visualSignature": "d1e5adce4ced12b6a9118d1c89f22eacdeca53ef2925575350a34fc662006d2e"
+    }
+  ]
+}

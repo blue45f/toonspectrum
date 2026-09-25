@@ -103,8 +103,11 @@ function legacySkin(registry: StudioVirtualSpaceAppearanceRegistry, avatarIndex:
     hash ^= char.charCodeAt(0);
     hash = Math.imul(hash, 16777619);
   }
-  const index = Number.isInteger(avatarIndex) && avatarIndex >= 0 ? avatarIndex : identity ? hash >>> 0 : 0;
-  return registry.skins[index % registry.skins.length] ?? fallbackSkin(registry);
+  const explicit = Number.isInteger(avatarIndex) && avatarIndex >= 0;
+  const index = explicit ? avatarIndex : identity ? hash >>> 0 : 0;
+  // Preserve the established automatic identity mapping; generated bonus skins are explicit choices.
+  const candidates = explicit ? registry.skins : registry.skins.filter((skin) => skin.key !== "imagegen25");
+  return candidates[index % candidates.length] ?? fallbackSkin(registry);
 }
 
 /** Preserve local avatar selection and advertise its key so another registry order cannot change it. */

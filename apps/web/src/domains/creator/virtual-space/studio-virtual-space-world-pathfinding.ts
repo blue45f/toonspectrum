@@ -1,5 +1,5 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
-import { studioTownLineCanTraverse, studioTownTraversalProfile } from "./studio-virtual-space-town-layout";
+import { studioSemanticLineCanTraverse, studioSemanticSurfaceAt } from "./studio-virtual-space-semantic-world";
 import {
   studioWorldCollisionRects,
   type StudioVirtualSpaceWorldManifest,
@@ -15,14 +15,50 @@ const MAX_EXPANSIONS = 30_000;
 export const STUDIO_WORLD_PLAYER_RADIUS = 9;
 const DEFAULT_RADIUS = STUDIO_WORLD_PLAYER_RADIUS;
 
+interface StudioWorldPathfindingCache {
+  readonly occupancy: Map<string, boolean>;
+  readonly lines: Map<string, boolean>;
+  readonly paths: Map<string, readonly StudioVirtualSpacePoint[]>;
+}
+
+const PATHFINDING_CACHE = new WeakMap<StudioVirtualSpaceWorldManifest, Map<number, StudioWorldPathfindingCache>>();
+
+function cacheFor(manifest: StudioVirtualSpaceWorldManifest, radius: number): StudioWorldPathfindingCache {
+  let byRadius = PATHFINDING_CACHE.get(manifest);
+  if (!byRadius) { byRadius = new Map(); PATHFINDING_CACHE.set(manifest, byRadius); }
+  let cache = byRadius.get(radius);
+  if (!cache) {
+    cache = { occupancy: new Map(), lines: new Map(), paths: new Map() };
+    byRadius.set(radius, cache);
+  }
+  return cache;
+}
+
+function gridKey(point: StudioVirtualSpacePoint): string | null {
+  const gx = point.x / GRID, gy = point.y / GRID;
+  if (Math.abs(gx - Math.round(gx)) > 1e-6 || Math.abs(gy - Math.round(gy)) > 1e-6) return null;
+  return `${Math.round(gx)}:${Math.round(gy)}`;
+}
+
+function boundedCacheSet<T>(map: Map<string, T>, key: string, value: T, max = 12_000): void {
+  if (map.size >= max) map.clear();
+  map.set(key, value);
+}
+
 function canOccupyWithColliders(
   manifest: StudioVirtualSpaceWorldManifest,
   colliders: readonly StudioWorldRect[],
   point: StudioVirtualSpacePoint,
   radius: number,
 ): boolean {
-  return studioWorldCircleCanOccupy(manifest, colliders, point, radius)
-    && studioTownTraversalProfile(manifest, point).allowed;
+  const key = gridKey(point);
+  const cache = key ? cacheFor(manifest, radius) : null;
+  const cached = key ? cache?.occupancy.get(key) : undefined;
+  if (cached !== undefined) return cached;
+  const value = studioWorldCircleCanOccupy(manifest, colliders, point, radius)
+    && studioSemanticSurfaceAt(manifest, point).walkable;
+  if (key && cache) boundedCacheSet(cache.occupancy, key, value);
+  return value;
 }
 
 export function clampStudioWorldPoint(
@@ -56,8 +92,15 @@ function lineWalkable(
   to: StudioVirtualSpacePoint,
   radius: number,
 ): boolean {
-  return studioWorldLineCanOccupy(manifest, colliders, from, to, radius)
-    && studioTownLineCanTraverse(manifest, from, to);
+  const fromKey = gridKey(from), toKey = gridKey(to);
+  const cache = fromKey && toKey ? cacheFor(manifest, radius) : null;
+  const key = fromKey && toKey ? `${fromKey}>${toKey}` : null;
+  const cached = key ? cache?.lines.get(key) : undefined;
+  if (cached !== undefined) return cached;
+  const value = studioWorldLineCanOccupy(manifest, colliders, from, to, radius)
+    && studioSemanticLineCanTraverse(manifest, from, to);
+  if (key && cache) boundedCacheSet(cache.lines, key, value, 20_000);
+  return value;
 }
 
 function smoothPath(
@@ -146,6 +189,10 @@ function nodeKey(gx: number, gy: number): string {
   return `${gx}:${gy}`;
 }
 
+function pathCacheKey(start: StudioVirtualSpacePoint, target: StudioVirtualSpacePoint): string {
+  return `${Math.round(start.x * 2)}:${Math.round(start.y * 2)}>${Math.round(target.x * 2)}:${Math.round(target.y * 2)}`;
+}
+
 function createNode(
   manifest: StudioVirtualSpaceWorldManifest,
   gx: number,
@@ -201,13 +248,21 @@ export function findStudioWorldPath(
   radius = DEFAULT_RADIUS,
 ): readonly StudioVirtualSpacePoint[] {
   if (![start.x, start.y, target.x, target.y, radius].every(Number.isFinite) || radius <= 0) return [];
+  const routeCache = cacheFor(manifest, radius);
+  const routeKey = pathCacheKey(start, target);
+  if (routeCache.paths.has(routeKey)) return routeCache.paths.get(routeKey)!;
   const colliders = studioWorldCollisionRects(manifest);
   const boundedStart = clampStudioWorldPoint(manifest, start, radius);
   const boundedTarget = clampStudioWorldPoint(manifest, target, radius);
 
-  if (!canOccupyWithColliders(manifest, colliders, boundedStart, radius)) return [];
+  if (!canOccupyWithColliders(manifest, colliders, boundedStart, radius)) {
+    boundedCacheSet(routeCache.paths, routeKey, []);
+    return [];
+  }
   if (lineWalkable(manifest, colliders, boundedStart, boundedTarget, radius)) {
-    return [boundedTarget];
+    const direct = Object.freeze([{ ...boundedTarget }]);
+    boundedCacheSet(routeCache.paths, routeKey, direct);
+    return direct;
   }
 
   const startNode = nearestWalkableNode(manifest, colliders, boundedStart, radius, true);
@@ -219,7 +274,10 @@ export function findStudioWorldPath(
     canOccupyWithColliders(manifest, colliders, boundedTarget, radius),
     boundedStart,
   );
-  if (!startNode || !targetNode) return [];
+  if (!startNode || !targetNode) {
+    boundedCacheSet(routeCache.paths, routeKey, []);
+    return [];
+  }
 
   const startKey = nodeKey(startNode.gx, startNode.gy);
   const targetKey = nodeKey(targetNode.gx, targetNode.gy);
@@ -260,7 +318,9 @@ export function findStudioWorldPath(
         && lineWalkable(manifest, colliders, targetNode.point, boundedTarget, radius)) {
         reversed.push(boundedTarget);
       }
-      return smoothPath(manifest, colliders, boundedStart, reversed, radius);
+      const smoothed = Object.freeze([...smoothPath(manifest, colliders, boundedStart, reversed, radius)]);
+      boundedCacheSet(routeCache.paths, routeKey, smoothed, 2_000);
+      return smoothed;
     }
 
     closed.add(currentKey);
@@ -286,8 +346,8 @@ export function findStudioWorldPath(
 
       const key = nodeKey(next.gx, next.gy);
       if (closed.has(key)) continue;
-      const traversal = studioTownTraversalProfile(manifest, next.point);
-      const tentative = currentG + Math.hypot(dx, dy) * traversal.cost;
+      const surface = studioSemanticSurfaceAt(manifest, next.point);
+      const tentative = currentG + Math.hypot(dx, dy) * (1 / Math.max(.35, surface.speedMultiplier));
       if (tentative >= (gScore.get(key) ?? Number.POSITIVE_INFINITY)) continue;
 
       cameFrom.set(key, currentKey);
@@ -298,6 +358,7 @@ export function findStudioWorldPath(
     }
   }
 
+  boundedCacheSet(routeCache.paths, routeKey, [], 2_000);
   return [];
 }
 

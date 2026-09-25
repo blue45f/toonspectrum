@@ -24,12 +24,12 @@ export function StudioVirtualSpaceConversationPanel({ self, snapshot, currentCon
   const canPropose = snapshot.available && members.length >= 2 && members.length <= 4
     && selected.every((id) => snapshot.readyPeers.some((peer) => peer.sessionId === id));
   const pending = snapshot.records.filter((record) => record.status === "offered" || record.status === "waiting");
-  return <section className="vs2-panel" aria-label={bt("함께 대화할 사람", "Conversation members")} data-space-interactive="true">
-    <h2 className="font-bold">{bt("함께 대화하기", "Group conversation")}</h2>
-    <p className="mt-2 text-xs text-fg-2">{bt("나를 포함해 최대 4명. 모든 사람이 아래 전체 명단에 동의하면 대화 패널이 열려요. 마이크와 카메라는 직접 켜야 해요.", "Up to four people, including you. Everyone must accept the entire roster before the chat panel opens. Turn on your microphone and camera yourself.")}</p>
+  return <section className="vs2-panel studio-vspace-bubble-panel" aria-label={bt("소규모 Bubble 대화", "Conversation bubble")} data-space-interactive="true" data-bubble-active={active ? "true" : undefined}>
+    <h2 className="font-bold">{bt("소규모 Bubble 대화", "Conversation bubble")}</h2>
+    <p className="mt-2 text-xs text-fg-2">{bt("나를 포함해 최대 4명. 모든 사람이 전체 명단에 동의해야 열리고, 공간 범위를 벗어나면 종료됩니다. 마이크와 카메라는 직접 켜야 해요.", "Up to four people including you. Everyone must accept the full roster, and the bubble closes when its spatial scope ends. Turn on microphone and camera yourself.")}</p>
     {!snapshot.available ? <p className="mt-2 text-xs text-fg-2" role="status">{bt("이 창에서 같은 프로젝트의 팀 연결을 확인한 뒤 제안할 수 있어요.", "Keep this window active and connect to the same project before proposing a conversation.")}</p> : null}
     {active ? <div className="mt-3 rounded-xl border border-line p-3 text-xs">
-      <p>{bt("현재 대화", "Current conversation")} · {active.memberIds.map(name).join(", ")}</p>
+      <p>{bt("현재 Bubble", "Current bubble")} · {active.memberIds.map(name).join(", ")}</p>
       <button type="button" className={`${button} mt-2`} onClick={() => onLeave(active.id)}>{bt("대화 나가기", "Leave conversation")}</button>
       <p className="mt-2 text-fg-2">{bt("인원을 바꾸면 기존 대화를 닫고 새 명단에 다시 동의해요.", "Changing members closes the previous conversation and requires fresh consent to the new roster.")}</p>
     </div> : null}
@@ -43,7 +43,7 @@ export function StudioVirtualSpaceConversationPanel({ self, snapshot, currentCon
       {!snapshot.readyPeers.length ? <p className="py-2 text-xs text-fg-2">{bt("연결을 확인한 팀원이 아직 없어요.", "No verified teammates are ready yet.")}</p> : null}
     </fieldset>
     <p className="mt-2 text-xs" data-conversation-proposed-roster="true">{bt("제안 명단", "Proposed roster")} · {members.map(name).join(", ")}</p>
-    <button type="button" className={`${button} mt-2`} disabled={!canPropose} onClick={() => setNotice(onPropose(members) === null)}>{bt("이 명단으로 대화 제안", "Propose this roster")}</button>
+    <button type="button" className={`${button} mt-2`} aria-label={bt("이 명단으로 대화 제안", "Propose conversation with this roster")} disabled={!canPropose} onClick={() => setNotice(onPropose(members) === null)}>{bt("이 명단으로 Bubble 제안", "Propose this bubble")}</button>
     {notice ? <p role="status" className="mt-2 text-xs">{bt("제안을 보내지 못했어요. 연결과 참여자 명단을 확인해 주세요.", "The proposal could not be sent. Check the connection and roster.")}</p> : null}
     <div aria-live="polite" className="mt-3 space-y-2">
       {pending.map((record) => <article key={record.id} className="rounded-xl border border-line p-3 text-xs">

@@ -80,6 +80,73 @@ function directionUrls(skin: string): Readonly<Record<StudioVirtualSpaceFacing, 
   };
 }
 
+const IMAGEGEN25_CHARACTER_ROOT = "/assets/virtual-studio/living-town-v6/imagegen25-character";
+const IMAGEGEN25_PRESENTATION: StudioCharacterFramePresentation = Object.freeze({
+  originX: 0.5,
+  originY: 0.95,
+  displayHeightRatio: 0.96,
+  seatOriginY: 0.82,
+});
+const IMAGEGEN25_FRAMES = Object.freeze(Array.from({ length: 4 }, () => IMAGEGEN25_PRESENTATION));
+const IMAGEGEN25_DIRECTIONS: readonly StudioVirtualSpaceFacing[] = ["down", "right", "left", "up"];
+
+function imagegen25DirectionUrls(): Readonly<Record<StudioVirtualSpaceFacing, string>> {
+  return Object.freeze(Object.fromEntries(IMAGEGEN25_DIRECTIONS.map((facing) => [
+    facing,
+    `${IMAGEGEN25_CHARACTER_ROOT}/player-imagegen25-direction-${facing}.webp`,
+  ])) as Record<StudioVirtualSpaceFacing, string>);
+}
+
+function imagegen25Clip(action: "walk" | StudioCharacterAction, facing: StudioVirtualSpaceFacing): StudioCharacterAtlasClip {
+  return Object.freeze({
+    textureUrl: `${IMAGEGEN25_CHARACTER_ROOT}/player-imagegen25-${action}-${facing}.webp`,
+    frameWidth: 160,
+    frameHeight: 160,
+    start: 0,
+    end: 3,
+    frameRate: action === "walk" ? 8 : 7,
+    repeat: -1,
+    distancePerCycle: action === "walk" ? 70 : undefined,
+    technique: "drawn",
+    frames: IMAGEGEN25_FRAMES,
+  });
+}
+
+function imagegen25Skin(): StudioCharacterSkin {
+  const clips = Object.freeze(Object.fromEntries(IMAGEGEN25_DIRECTIONS.map((facing) => [
+    `walk-${facing}`,
+    imagegen25Clip("walk", facing),
+  ])) as NonNullable<StudioCharacterSkin["clips"]>);
+  const actions = Object.freeze(Object.fromEntries((["talk", "draw", "review"] as const).map((action) => [
+    action,
+    Object.freeze(Object.fromEntries(IMAGEGEN25_DIRECTIONS.map((facing) => [
+      facing,
+      imagegen25Clip(action, facing),
+    ])) as Record<StudioVirtualSpaceFacing, StudioCharacterAtlasClip>),
+  ])) as NonNullable<StudioCharacterSkin["actions"]>);
+  const pose = (name: "wave" | "sit"): StudioCharacterPoseSheet => Object.freeze({
+    textureUrl: `${IMAGEGEN25_CHARACTER_ROOT}/player-imagegen25-${name}.webp`,
+    frameWidth: 160,
+    frameHeight: 160,
+    directionFrames: Object.freeze({ down: 0, right: 1, left: 2, up: 3 }),
+    frames: IMAGEGEN25_FRAMES,
+  });
+  return Object.freeze({
+    key: "imagegen25",
+    labelKo: "픽셀 메이커",
+    labelEn: "Pixel Maker",
+    directional: imagegen25DirectionUrls(),
+    clips,
+    actions,
+    poses: Object.freeze({ wave: pose("wave"), sit: pose("sit") }),
+    state: Object.freeze({
+      talk: `${IMAGEGEN25_CHARACTER_ROOT}/player-imagegen25-state-talk.webp`,
+      draw: `${IMAGEGEN25_CHARACTER_ROOT}/player-imagegen25-state-draw.webp`,
+      review: `${IMAGEGEN25_CHARACTER_ROOT}/player-imagegen25-state-review.webp`,
+    }),
+  });
+}
+
 export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.freeze([
   {
     key: "pink",
@@ -98,11 +165,12 @@ export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.fre
   { key: "silver", labelKo: "시나", labelEn: "Sina", directional: directionUrls("silver"), clips: SILVER_DRAWN_WALKS, poses: SILVER_DRAWN_POSES, actions: { review: SILVER_DRAWN_REVIEWS } },
   { key: "dark", labelKo: "지훈", labelEn: "Jihun", directional: directionUrls("dark"), clips: DARK_DRAWN_WALKS, poses: DARK_DRAWN_POSES },
   { key: "purple", labelKo: "리호", labelEn: "Riho", directional: directionUrls("purple"), clips: PURPLE_DRAWN_WALKS, poses: PURPLE_DRAWN_POSES },
+  imagegen25Skin(),
 ]);
 
 const FALLBACK_SKIN = STUDIO_CHARACTER_SKINS[0]!;
 
-export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1-actions-2";
+export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1-actions-3-imagegen25";
 export const STUDIO_CHARACTER_APPEARANCE_REGISTRY: StudioVirtualSpaceAppearanceRegistry = Object.freeze({
   revision: STUDIO_CHARACTER_REGISTRY_REVISION,
   fallbackSkinKey: FALLBACK_SKIN.key,
@@ -136,8 +204,10 @@ export function studioCharacterSkinForAvatarIndex(index: number, identity?: stri
     hash ^= char.charCodeAt(0);
     hash = Math.imul(hash, 16777619);
   }
-  const safe = Number.isInteger(index) && index >= 0 ? index : identity ? hash >>> 0 : 0;
-  return STUDIO_CHARACTER_SKINS[safe % STUDIO_CHARACTER_SKINS.length] ?? FALLBACK_SKIN;
+  const explicit = Number.isInteger(index) && index >= 0;
+  const safe = explicit ? index : identity ? hash >>> 0 : 0;
+  const candidates = explicit ? STUDIO_CHARACTER_SKINS : STUDIO_CHARACTER_SKINS.filter((skin) => skin.key !== "imagegen25");
+  return candidates[safe % candidates.length] ?? FALLBACK_SKIN;
 }
 
 export function studioCharacterSkinByKey(key: string): StudioCharacterSkin {
@@ -239,6 +309,8 @@ export function studioCharacterSkinForArtStyle(
   source: StudioCharacterSkin,
   artStyle: StudioVirtualArtStyleKey,
 ): StudioCharacterSkin {
+  // The optional Image Generation 2.5 sprite is already a complete authored pack.
+  if (source.key === "imagegen25") return source;
   const cacheKey = `${source.key}:${artStyle}:v5`;
   const cached = STYLED_SKIN_CACHE.get(cacheKey);
   if (cached) return cached;

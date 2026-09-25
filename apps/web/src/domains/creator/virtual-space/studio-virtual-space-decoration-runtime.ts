@@ -58,7 +58,9 @@ export class StudioVirtualDecorationRuntime {
     }
   }
   update(time: number, playerPoint: StudioVirtualSpacePoint, reducedMotion: boolean): void {
-    this.decorationSprites.forEach((sprite, index) => {
+    let visualIndex = 0;
+    for (const sprite of this.decorationSprites.values()) {
+      const index = visualIndex++;
       const distance = Math.hypot(sprite.x - playerPoint.x, sprite.y - playerPoint.y);
       const near = distance < 92;
       const type = String(sprite.getData("decorType"));
@@ -69,7 +71,7 @@ export class StudioVirtualDecorationRuntime {
       if (type === "lamp" || type === "portal" || type === "fountain") {
         sprite.setTint(near ? 0xffffff : 0xe9f0ff);
       }
-    });
+    }
     for (const visual of this.actorVisuals.values()) {
       for (let index = visual.trails.length - 1; index >= 0; index -= 1) {
         const trail = visual.trails[index]!;

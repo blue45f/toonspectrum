@@ -27,8 +27,12 @@ describe("Virtual Studio art and presentation", () => {
       expect(clip?.end).toBe(clip?.technique === "drawn" ? 3 : 7);
       expect(["drawn", "cutout-rig"]).toContain(clip?.technique);
       expect(clip?.distancePerCycle).toBeGreaterThan(0);
-      expect(clip?.textureUrl).toContain(clip?.technique === "drawn" ? "/drawn-characters-v1/" : "/production-v2/");
-      expect(skin.directional[direction]).toContain("/production-v2/");
+      const expectedRoot = skin.key === "imagegen25" ? "/living-town-v6/imagegen25-character/"
+        : clip?.technique === "drawn" ? "/drawn-characters-v1/" : "/production-v2/";
+      expect(clip?.textureUrl).toContain(expectedRoot);
+      expect(skin.directional[direction]).toContain(
+        skin.key === "imagegen25" ? "/living-town-v6/imagegen25-character/" : "/production-v2/",
+      );
     }
   });
   it("uses the occupant-free generated sky-island base for live actors", () => {

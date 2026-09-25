@@ -23,7 +23,11 @@ export type StudioSpatialActionId =
   | "toggle-lanterns"
   | "pet-animal"
   | "ring-gong"
-  | "open-customization";
+  | "open-customization"
+  | "bubble"
+  | "spotlight"
+  | "live-annotation"
+  | "town-hub";
 
 export interface StudioSpatialAction {
   readonly id: StudioSpatialActionId;
@@ -58,6 +62,10 @@ const COMMON: Readonly<Record<Exclude<StudioSpatialActionId, "primary">, StudioS
   "pet-animal": action({ id: "pet-animal", labelKo: "고양이 쓰다듬기", labelEn: "Pet the cat", descriptionKo: "주변 동물과 상호작용하고 하트 이펙트를 표시합니다.", descriptionEn: "Interact with a nearby animal and show a heart effect.", risk: "inspect" }),
   "ring-gong": action({ id: "ring-gong", labelKo: "완료 축하 공 울리기", labelEn: "Ring the celebration gong", descriptionKo: "완료를 축하하는 파동 이펙트를 실행합니다.", descriptionEn: "Trigger a celebration wave for completed work.", risk: "collaborative" }),
   "open-customization": action({ id: "open-customization", labelKo: "이 공간 꾸미기", labelEn: "Customize this space", descriptionKo: "안전한 내장 오브젝트와 캐릭터 액세서리를 선택합니다.", descriptionEn: "Choose safe bundled objects and character accessories.", risk: "inspect" }),
+  bubble: action({ id: "bubble", labelKo: "소규모 Bubble 대화", labelEn: "Conversation bubble", descriptionKo: "근처 팀원 최대 세 명과 전체 명단 동의 후 임시 대화를 시작합니다.", descriptionEn: "Start a temporary nearby conversation after everyone accepts the full roster.", risk: "collaborative" }),
+  spotlight: action({ id: "spotlight", labelKo: "Spotlight 발표", labelEn: "Spotlight presentation", descriptionKo: "현재 동의한 대화 그룹을 대상으로 무대 발표 모드를 준비합니다.", descriptionEn: "Prepare stage presentation mode for the currently consenting conversation.", risk: "collaborative" }),
+  "live-annotation": action({ id: "live-annotation", labelKo: "라이브 화면 주석", labelEn: "Live annotation", descriptionKo: "레이저·펜·메모를 P2P로 공유합니다.", descriptionEn: "Share laser, pen and notes over P2P.", risk: "collaborative" }),
+  "town-hub": action({ id: "town-hub", labelKo: "마을 활동·퀘스트", labelEn: "Town activities & quests", descriptionKo: "이벤트, 팀 자리, 미니게임과 블루프린트를 확인합니다.", descriptionEn: "Explore events, desk pods, mini-games and blueprints.", risk: "inspect" }),
 });
 
 function primary(interaction: StudioWorldInteractionDefinition): StudioSpatialAction {
@@ -101,7 +109,7 @@ export function studioSpatialActions(
     COMMON["ring-gong"], COMMON["take-photo"], COMMON.people,
   ]);
   if (/event-stage/u.test(id)) return unique([
-    COMMON["release-petals"], COMMON["toggle-lanterns"], COMMON.huddle, COMMON.people,
+    COMMON.spotlight, COMMON["live-annotation"], COMMON["release-petals"], COMMON.huddle, COMMON.people,
   ]);
   const values: StudioSpatialAction[] = [primary(interaction)];
   switch (interaction.action) {
@@ -110,8 +118,8 @@ export function studioSpatialActions(
     case "canvas": values.push(COMMON.board, COMMON.sessions, COMMON["work-inbox"]); break;
     case "review": values.push(COMMON["work-inbox"], COMMON.sessions, COMMON["quality-control"]); break;
     case "assets": values.push(COMMON["work-inbox"], COMMON["project-overview"]); break;
-    case "live": values.push(COMMON.huddle, COMMON.board, COMMON.people); break;
-    case "community": values.push(COMMON.people, COMMON["team-hub"], COMMON["today-board"]); break;
+    case "live": values.push(COMMON.huddle, COMMON.sessions, COMMON.people, COMMON.board, COMMON.spotlight); break;
+    case "community": values.push(COMMON.bubble, COMMON.people, COMMON["team-hub"], COMMON["town-hub"]); break;
     case "assistant": values.push(COMMON["today-board"], COMMON["production-control"], COMMON.schedule); break;
   }
   if (/meeting|conference|huddle/u.test(id)) values.push(COMMON.huddle, COMMON.sessions, COMMON.people);
