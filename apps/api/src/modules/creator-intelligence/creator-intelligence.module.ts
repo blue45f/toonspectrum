@@ -180,7 +180,10 @@ export class CreatorIntelligenceController {
 @Module({
   controllers: [CreatorIntelligenceController],
   providers: [
-    CreatorIntelligenceAdmissionGuard,
+    {
+      provide: CreatorIntelligenceAdmissionGuard,
+      useFactory: () => new CreatorIntelligenceAdmissionGuard(),
+    },
     {
       provide: CREATOR_INTELLIGENCE_CORE,
       useFactory: () => createCreatorIntelligenceCore({
