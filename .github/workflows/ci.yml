@@ -42,6 +42,7 @@ jobs:
             /apps/web/public/assets/reference-rebuild/
             /apps/web/public/assets/3d/environments/refined-v6/manifest.json
             /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
+            /apps/web/public/assets/3d/environments/webtoon-v7/manifest.json
             !/apps/web/public/vrm/
             !/artifacts/
             !/docs/
@@ -125,6 +126,7 @@ jobs:
             /apps/web/public/assets/virtual-studio/world/
             /apps/web/public/assets/3d/environments/refined-v6/manifest.json
             /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
+            /apps/web/public/assets/3d/environments/webtoon-v7/manifest.json
             !/apps/web/public/vrm/
             !/artifacts/
             !/docs/
@@ -187,6 +189,7 @@ jobs:
             /apps/web/public/assets/reference-rebuild/
             /apps/web/public/assets/3d/environments/refined-v6/manifest.json
             /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
+            /apps/web/public/assets/3d/environments/webtoon-v7/manifest.json
             !/apps/web/public/vrm/
             /apps/web/public/vrm/AvatarSample_B.vrm
             /apps/web/public/vrm/sample.vrm
