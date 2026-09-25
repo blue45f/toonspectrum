@@ -75,6 +75,8 @@ Tauri shell, 자동 업데이트, OS별 설치 패키지는 이 코어를 소비
 
 ```bash
 pnpm typecheck
+pnpm --filter @toonspectrum/desktop-sync typecheck
+pnpm --filter @toonspectrum/desktop-sync test
 pnpm --filter @toonspectrum/desktop-sync-agent typecheck
 pnpm --filter @toonspectrum/desktop-sync-agent test
 pnpm run verify:studio-replacement

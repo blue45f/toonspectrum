@@ -310,6 +310,34 @@ if (exists("pnpm-workspace.yaml")) {
   }
 }
 
+const workspacePackageNames = new Map();
+for (const manifestPath of [
+  "package.json",
+  ...["apps", "packages"].flatMap((base) =>
+    list(base)
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => `${base}/${entry.name}/package.json`)
+      .filter(exists)),
+]) {
+  let manifest;
+  try {
+    manifest = JSON.parse(read(manifestPath));
+  } catch (error) {
+    issues.push(`workspace package manifest is not parseable: ${manifestPath} (${error.message})`);
+    continue;
+  }
+  if (!manifest.name) {
+    issues.push(`workspace package has no name: ${manifestPath}`);
+    continue;
+  }
+  const previous = workspacePackageNames.get(manifest.name);
+  if (previous) {
+    issues.push(`duplicate workspace package name "${manifest.name}": ${previous}, ${manifestPath}`);
+  } else {
+    workspacePackageNames.set(manifest.name, manifestPath);
+  }
+}
+
 const apiPackagePath = "apps/api/package.json";
 if (!exists(apiPackagePath)) {
   issues.push(`missing workspace package: ${apiPackagePath}`);
