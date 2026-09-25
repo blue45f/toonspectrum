@@ -8,10 +8,11 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import react from '@vitejs/plugin-react';
 import { createServer } from 'vite';
 
 import { verifyCc0InsertionCancellation } from './studio-cc0-lifecycle-checks.mjs';
-import { WEB_PUBLIC } from './lib/repo-paths.mjs';
+import { WEB_PUBLIC, WEB_VITE_ALIASES } from './lib/repo-paths.mjs';
 
 const root = process.cwd();
 const output = path.resolve(process.argv[2] ?? '/tmp/studio-cc0-ui');
@@ -71,8 +72,11 @@ const errors = [];
 const steps = [];
 try {
   server = await createServer({
+    configFile: false,
     root,
     publicDir: WEB_PUBLIC,
+    plugins: [react()],
+    resolve: { alias: [...WEB_VITE_ALIASES] },
     optimizeDeps: { entries: [path.join(root, entryName)] },
     server: {
       host: '127.0.0.1',

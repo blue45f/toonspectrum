@@ -4,12 +4,8 @@ apps/api/src/csrf-middleware.test.ts
 apps/api/src/modules/catalog/catalog-pagination.test.ts
 apps/api/src/modules/catalog/catalog-public-cache.interceptor.test.ts
 apps/api/src/modules/catalog/catalog-search-cache.test.ts
-apps/api/src/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts
 apps/api/src/modules/creator/studio-handoff-envelope.repository.test.ts
 apps/api/src/modules/creator/studio-live-acoustic-binding.test.ts
-apps/api/src/modules/creator/studio-live-lock.repository.test.ts
-apps/api/src/modules/creator/studio-live.gateway.test.ts
-apps/api/src/modules/creator/studio-live.protocol.test.ts
 apps/api/src/modules/creator/studio-review-task-completion-invalidation.test.ts
 apps/api/src/modules/creator/studio-review-task-completion.repository.test.ts
 apps/api/src/modules/fortune/fortune.controller.test.ts
@@ -177,7 +173,6 @@ apps/web/src/domains/creator/studio-history-granularity-contract.test.ts
 apps/web/src/domains/creator/studio-host-architecture-ratchet.test.ts
 apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts
 apps/web/src/domains/creator/studio-integration-closure.test.ts
-apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts
 apps/web/src/domains/creator/studio-live-adjustment.test.ts
 apps/web/src/domains/creator/studio-live-transform-*.test.ts
 apps/web/src/domains/creator/studio-marketplace-cc0-provenance.test.ts
@@ -303,3 +298,8 @@ scripts/verify-studio-hybrid-dcc-opfs-race.test.ts
 scripts/verify-studio-living-ink-integration.test.ts
 scripts/verify-studio-menus.test.ts
 scripts/verify-virtual-studio-art-manifest.test.mjs
+tests/integration/api-web/api/modules/creator-marketplace/creator-marketplace-social-boundary.test.ts
+tests/integration/api-web/api/modules/creator/studio-live-lock.repository.test.ts
+tests/integration/api-web/api/modules/creator/studio-live.gateway.test.ts
+tests/integration/api-web/api/modules/creator/studio-live.protocol.test.ts
+tests/integration/web-api/domains/creator/studio-large-epics-product-wiring.test.ts

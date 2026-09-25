@@ -14,9 +14,9 @@
       "title": "Release approval, scheduling and replacement",
       "outcome": "Only approved immutable releases can publish; scheduled promotion, replacement, collaboration policy, and unpublish remain auditable.",
       "evidence": [
-        "apps/api/src/server/creator/publication.test.ts",
-        "apps/api/src/server/creator/publication-api.test.ts",
-        "apps/api/src/modules/creator/creator-publication-collaboration.repository.test.ts",
+        "tests/integration/api-web/api/server/creator/publication.test.ts",
+        "tests/integration/api-web/api/server/creator/publication-api.test.ts",
+        "tests/integration/api-web/api/modules/creator/creator-publication-collaboration.repository.test.ts",
         "apps/web/src/shared/lib/creator-publication-contract.test.ts",
         "apps/web/src/shared/lib/creator-publication-republish.test.ts"
       ]

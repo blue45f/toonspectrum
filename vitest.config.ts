@@ -8,7 +8,6 @@ import { resolveVitestDatabaseTarget } from "./scripts/run-postgres-integration-
 import { SERIAL_TEST_FILES } from "./vitest.serial-test-files.mjs";
 
 const root = fileURLToPath(new URL("./", import.meta.url));
-
 // 테스트가 실제로 존재하는 트리 목록(2026-08-21 기준 수집 루트 전부).
 // Vitest 기본 include 는 "루트 아래 아무 데나" 라서, 트리 하나가 통째로 옮겨가거나 사라져도
 // 남은 글롭이 조용히 더 적은 파일을 수집하고 스위트는 그대로 초록으로 통과한다. 수집 루트를

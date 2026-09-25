@@ -697,7 +697,7 @@ export const ENGINEERING_OPEN_APIS = [
     access: { ko: "Open Access API, has_image와 bounded page 조건", en: "Open Access API with has_image and bounded page rules" },
     rightsGate: { ko: "share_license_status=CC0이며 copyright 필드가 비어 있어야 함", en: "Requires share_license_status=CC0 and an empty copyright field" },
     resilience: { ko: "공급자별 image host와 응답 shape가 다르면 fail closed", en: "Fails closed on unexpected provider image hosts or response shapes" },
-    evidence: [{ kind: "test", path: "apps/api/src/modules/creator-resources/open-art-providers.test.ts", label: { ko: "Cleveland 권리·schema 회귀", en: "Cleveland rights and schema regression" } }],
+    evidence: [{ kind: "test", path: "tests/integration/api-web/api/modules/creator-resources/open-art-providers.test.ts", label: { ko: "Cleveland 권리·schema 회귀", en: "Cleveland rights and schema regression" } }],
     officialUrl: "https://openaccess-api.clevelandart.org/",
   },
   {
@@ -858,7 +858,7 @@ export const ENGINEERING_TROUBLESHOOTING_CASES = [
     fix: { ko: "provider별 exact schema와 rights predicate, image host allowlist, detail re-fetch와 명시적 오류 envelope를 적용했습니다.", en: "Provider-specific exact schemas, rights predicates, image-host allowlists, detail refetch and explicit error envelopes were added." },
     prevention: { ko: "forged CC0, wrong object ID, unsafe image, malformed pagination, 429와 부분 제공처 실패 fixture를 유지합니다.", en: "Fixtures cover forged CC0, wrong object IDs, unsafe images, malformed pagination, 429 and partial provider failure." },
     evidence: [
-      { kind: "test", path: "apps/api/src/modules/creator-resources/open-art-providers.test.ts", label: { ko: "권리·host 공격 fixture", en: "Rights and host attack fixtures" } },
+      { kind: "test", path: "tests/integration/api-web/api/modules/creator-resources/open-art-providers.test.ts", label: { ko: "권리·host 공격 fixture", en: "Rights and host attack fixtures" } },
       { kind: "test", path: "apps/api/src/modules/creator-resources/free-resource-providers.test.ts", label: { ko: "공급자 schema·출처 회귀", en: "Provider schema and provenance regression" } },
       { kind: "test", path: "e2e/open-creation.spec.ts", label: { ko: "실브라우저 rate·CORS·손상 데이터 검증", en: "Browser rate, CORS and corrupt-data verification" } },
     ],

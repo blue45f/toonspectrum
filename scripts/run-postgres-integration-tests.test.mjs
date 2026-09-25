@@ -255,10 +255,10 @@ describe("PostgreSQL integration test runner", () => {
       "scripts/bootstrap-runtime-login-gate.integration.test.mjs",
     );
     expect(POSTGRES_INTEGRATION_SUITES).toContain(
-      "apps/web/src/shared/lib/__tests__/oauth-runtime.integration.test.ts",
+      "tests/integration/web-api/shared/lib/__tests__/oauth-runtime.integration.test.ts",
     );
     expect(POSTGRES_INTEGRATION_SUITES).toContain(
-      "apps/api/src/modules/creator/creator-asset-platform-integrity.integration.test.ts",
+      "tests/integration/api-web/api/modules/creator/creator-asset-platform-integrity.integration.test.ts",
     );
     expect(
       POSTGRES_INTEGRATION_SUITES.every((suite) =>

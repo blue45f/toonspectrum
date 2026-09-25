@@ -4,7 +4,7 @@
  *
  * The document is never edited by hand: engine roles change in the ledger, and
  * the doc is a projection of it. A drift guard in
- * packages/studio-engine-registry/src/__tests__/renderer-roles.test.ts compares
+ * tests/integration/package-web/studio-engine-registry/renderer-roles.test.ts compares
  * the on-disk file against the same renderer, so a stale doc fails `pnpm test`.
  *
  * Usage:

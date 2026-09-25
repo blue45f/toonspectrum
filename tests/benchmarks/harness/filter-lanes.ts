@@ -6,7 +6,7 @@
  * 캔버스 크기에서 레인별로 잰다. 프로덕션 폴백 순서는 StudioKonvaImageNode 가
  * planStudioFilterIslandLanes 로 세우는 `gpu-chain → worker → konva-native` 이고, 이 파일은
  * 그중 **CPU 두 레인 + Worker 레인**을 담당한다(GPU 레인은 브라우저에서만 가능 →
- * packages/studio-engine-registry/src/__tests__/filter-lanes-browser-probe.test.ts 가 같은
+ * tests/integration/package-web/studio-engine-registry/filter-lanes-browser-probe.test.ts 가 같은
  * JSON 에 병합 기록한다).
  *
  * 측정 레인(전부 프로덕션 모듈 그대로, 재구현 없음):
@@ -604,7 +604,7 @@ async function main(): Promise<void> {
     harness: "tests/benchmarks/harness/filter-lanes.ts",
     note:
       "프로덕션 필터 레인(gpu-chain → worker → konva-native) 중 CPU/Worker 레인의 크기별·체인별"
-      + " 실측. GPU 레인은 packages/studio-engine-registry/src/__tests__/filter-lanes-browser-probe.test.ts"
+      + " 실측. GPU 레인은 tests/integration/package-web/studio-engine-registry/filter-lanes-browser-probe.test.ts"
       + " (FILTER_LANE_PROBE=1)가 같은 파일의 gpuLanes/crossover 를 채운다.",
     generatedAt,
     host: {

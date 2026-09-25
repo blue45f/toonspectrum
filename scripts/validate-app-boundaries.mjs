@@ -74,6 +74,34 @@ function packageSource(file) {
   return PACKAGE_SOURCE_ROOTS.some((root) => file.startsWith(`${root}/`));
 }
 
+const TEST_MODULE_PATTERN = /(?:^|\/)(?:__tests__\/.*|[^/]+\.(?:test|spec|integration)\.[cm]?[jt]sx?)$/u;
+const APP_SOURCE_REFERENCE_PATTERNS = [
+  /apps\/(web|admin-web|api)\/src(?:\/|["'`])/gu,
+  /(?:\.\.\/)+(web|admin-web|api)\/src(?:\/|["'`])/gu,
+];
+
+function applicationOwner(file) {
+  for (const [app, root] of Object.entries(APP_SOURCE_ROOTS)) {
+    if (file.startsWith(`${root}/`)) return app;
+  }
+  return packageSource(file) ? "package" : null;
+}
+
+function crossApplicationTestReferences(file, source) {
+  if (!TEST_MODULE_PATTERN.test(file)) return [];
+  const owner = applicationOwner(file);
+  if (!owner) return [];
+  const references = new Set();
+  for (const pattern of APP_SOURCE_REFERENCE_PATTERNS) {
+    pattern.lastIndex = 0;
+    for (const match of source.matchAll(pattern)) {
+      const referenced = match[1] === "admin-web" ? "admin" : match[1];
+      if (owner === "package" || referenced !== owner) references.add(referenced);
+    }
+  }
+  return [...references];
+}
+
 const counts = {
   webToAdmin: 0,
   webToApi: 0,
@@ -88,6 +116,7 @@ const counts = {
   webCrossDomainDeepImport: 0,
   contractsToApps: 0,
   contractsForbiddenImport: 0,
+  crossAppTestOutsideIntegration: 0,
 };
 const examples = new Map(Object.keys(counts).map((key) => [key, []]));
 
@@ -99,6 +128,9 @@ function record(key, file, target) {
 
 for (const file of SOURCE_ROOTS.flatMap(walk)) {
   const source = fs.readFileSync(path.join(ROOT, file), "utf8");
+  for (const referencedApp of crossApplicationTestReferences(file, source)) {
+    record("crossAppTestOutsideIntegration", file, `apps/${referencedApp}/src`);
+  }
   for (const specifier of importsFrom(source)) {
     if (
       file.startsWith("packages/contracts/src/")

@@ -40,7 +40,7 @@ export const STUDIO_COMPETITOR_CAPABILITY_EVIDENCE_SPECS = Object.freeze([
   spec("workspace-layout", "apps/web/src/domains/creator/studio-workspaces.ts", "apps/web/src/domains/creator/studio-workspaces.test.ts"),
   spec("wysiwyg-layout-editor", "apps/web/src/domains/creator/studio-shell/studio-shell-floating-layout.ts", "apps/web/src/domains/creator/studio-shell/studio-shell-floating-layout.test.ts"),
   spec("workflow-profiles", "apps/web/src/domains/creator/studio-workspaces.ts", "apps/web/src/domains/creator/studio-workspaces-2026.test.ts"),
-  spec("cas-blob-store", "apps/api/src/modules/creator/studio-work-asset.repository.ts", "apps/api/src/modules/creator/studio-work-asset.repository.test.ts"),
+  spec("cas-blob-store", "apps/api/src/modules/creator/studio-work-asset.repository.ts", "tests/integration/api-web/api/modules/creator/studio-work-asset.repository.test.ts"),
   spec("revision-local-store", "apps/web/src/domains/creator/studio-autosave-sqlite-store.ts", "apps/web/src/domains/creator/studio-autosave-sqlite-store.test.ts"),
   spec("sync-outbox", "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.ts", "apps/web/src/domains/creator/studio-workflow/studio-mutation-coordinator.test.ts"),
   spec("cloud-revision-api", "apps/web/src/domains/creator/studio-production/studio-production-server-revisions.ts", "apps/web/src/domains/creator/studio-production/studio-production-server-revisions.test.ts"),
