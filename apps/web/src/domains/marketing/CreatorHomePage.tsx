@@ -11,7 +11,7 @@ import "./creator-film.css";
 import "./creator-home-spacing.css";
 
 import { useI18n } from "@/shared/lib/i18n";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorHomePage", ko, en);

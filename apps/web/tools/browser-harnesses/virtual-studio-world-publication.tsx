@@ -2,10 +2,10 @@ import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
-import { persistSession, SessionContext } from "../../src/compat/auth-session-store";
+import { persistSession, SessionContext } from "../../src/domains/auth/public/session/auth-session-store";
 import { VirtualSpaceExperience } from "../../src/domains/creator/virtual-space/StudioVirtualSpacePage";
 import { useStudioWorldPublication } from "../../src/domains/creator/virtual-space/world-publication/use-studio-world-publication";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Real product experience/Phaser and publication hook; synthetic actor and HTTP only.
 // The absent live provider deliberately makes no claim about WAN media or server leases.

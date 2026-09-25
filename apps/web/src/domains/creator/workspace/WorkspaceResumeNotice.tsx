@@ -1,4 +1,4 @@
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { WorkspaceResumeSnapshot } from "./studio-workspace-resume";
 

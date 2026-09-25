@@ -1,6 +1,6 @@
 import { ArrowLeft, Search } from "lucide-react";
 import type { ReactNode } from "react";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { OpenSearchButton } from "@/shared/components/open-search-button";
 import { WorkspaceAccountAction, WorkspaceBrand, WorkspaceSidebar } from "@/shared/components/workspace/WorkspaceChrome";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";

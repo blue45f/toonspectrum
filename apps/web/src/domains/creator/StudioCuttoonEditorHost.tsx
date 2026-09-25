@@ -1439,15 +1439,15 @@ import type { CreatorAssetReportReason } from "@/shared/lib/creator-asset-contra
 import type { GeneratedAssetQuality, GeneratedAssetSize, SharedAssetCatalogItem, WorkDetail, WorkRevisionSummary } from "@/platform/creator-client";
 import type Konva from "konva";
 import { scheduleIdle } from "@/domains/auth/components/schedule-idle";
-import { useIsMobile } from "@/hooks/use-media-query";
-import { useResizable } from "@/hooks/use-resizable";
+import { useIsMobile } from "@/shared/hooks/use-media-query";
+import { useResizable } from "@/shared/hooks/use-resizable";
 import { loadChunkWithReloadRecovery } from "@/shared/lib/chunk-load-recovery";
 import { useT } from "@/shared/lib/i18n";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-asset-contract";
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 
 type StudioWriterRoomRuntime = Pick<typeof import("./studio-writer-room"), "createEmptyStudioWriterRoomDocument" | "normalizeStudioWriterRoomDocument" | "replaceStudioWriterRoomStage">;
 let studioWriterRoomRuntimePromise: Promise<StudioWriterRoomRuntime> | null = null;

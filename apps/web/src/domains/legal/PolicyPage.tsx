@@ -25,8 +25,8 @@ import "./policy-page.css";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { ErrorState } from "@/components/error-state";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 const POLICY_SUMMARIES: Record<PolicySlug, readonly string[]> = {
   "terms-of-service": [

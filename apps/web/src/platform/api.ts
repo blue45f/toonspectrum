@@ -9,7 +9,7 @@ import {
   isCsrfProtectedMethod,
 } from "@/shared/lib/csrf";
 import { resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
-import { handleUnauthorizedSession } from "@/compat/auth-session-state";
+import { handleUnauthorizedSession } from "@/domains/auth/public/session/auth-session-state";
 import { getRuntimeApiBase } from "@/platform/runtime-api-base";
 
 function apiBase() {

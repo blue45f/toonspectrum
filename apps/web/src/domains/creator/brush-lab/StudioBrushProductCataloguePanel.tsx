@@ -1,7 +1,7 @@
 import { ArrowRight, Library, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 import { BRUSH_QUALITY_CATALOG } from "./brush-studio-v5-quality-catalog";
 import { BRUSH_STUDIO_V6_RECIPES } from "./brush-studio-v6-engine";

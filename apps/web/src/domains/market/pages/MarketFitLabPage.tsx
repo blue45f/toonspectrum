@@ -32,7 +32,7 @@ import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 
 const PAGE_SIZE = 20;
 const MARKET_FIT_DESCRIPTION =

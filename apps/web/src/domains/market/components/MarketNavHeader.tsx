@@ -17,7 +17,7 @@ import {
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 interface MarketNavHeaderProps {
   className?: string;

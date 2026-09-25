@@ -1,7 +1,7 @@
 import { canonicalJson } from "@toonspectrum/studio-project-model";
 import { lazy, Suspense, useId, useLayoutEffect, useState } from "react";
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import { Button } from "@/shared/components/ui/button";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useStudioReviewProduction } from "../review-production/use-studio-review-production";

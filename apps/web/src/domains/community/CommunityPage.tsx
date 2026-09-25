@@ -8,13 +8,13 @@ import type { FanCafeScopeFilter } from "@/shared/lib/types";
 import { FanCafePanel } from "@/shared/components/fan-cafe-panel";
 import { Container } from "@/shared/components/section";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
   COMMUNITY_SCOPE_DESCRIPTION,
   COMMUNITY_SCOPE_DIRECTORIES,
   COMMUNITY_SCOPE_LABEL,
 } from "@/shared/lib/community-ui";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 const SCOPES = ["title", "author", "pencafe"] as const;
 

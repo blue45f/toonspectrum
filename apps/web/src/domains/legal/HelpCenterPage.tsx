@@ -13,11 +13,11 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("HelpCenterPage", ko, en);

@@ -23,7 +23,7 @@ import type {
   StudioLivingInkStudioState,
 } from "./studio-living-ink-studio-coordinator";
 
-import { useIsMobile } from "@/hooks/use-media-query";
+import { useIsMobile } from "@/shared/hooks/use-media-query";
 
 export interface StudioOptionsBarsDrawModel {
   visible: boolean;

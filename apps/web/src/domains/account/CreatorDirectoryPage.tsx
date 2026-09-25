@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   searchCreatorDirectory,
   type CreatorDirectoryEntry,

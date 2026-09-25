@@ -11,7 +11,7 @@ import { StudioVirtualSpacePhaserCanvas } from "../../src/domains/creator/virtua
 
 import type { StudioLiveParticipant } from "../../src/domains/creator/live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../../src/domains/creator/live/studio-live-direct-port";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 import "../../src/domains/creator/virtual-space/studio-virtual-space.css";
 
 /** Dev-only harness: real RTCDataChannels with in-page offer/answer, not production admission/signaling. */

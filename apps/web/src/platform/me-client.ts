@@ -3,7 +3,7 @@
 import {
   getAuthSession,
   mergeCurrentSessionProfile,
-} from "@/compat/auth-session-state";
+} from "@/domains/auth/public/session/auth-session-state";
 import {
   normalizeCreatorRoleProfile,
   type CreatorRoleProfile,

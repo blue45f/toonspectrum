@@ -2,8 +2,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CHUNK_RELOAD_FLAG } from "../shared/lib/chunk-load-recovery";
-import { consumeStudioProgrammaticReloadAllowance } from "../shared/lib/programmatic-reload";
+import { CHUNK_RELOAD_FLAG } from "../../shared/lib/chunk-load-recovery";
+import { consumeStudioProgrammaticReloadAllowance } from "../../shared/lib/programmatic-reload";
 
 import { ErrorBoundary } from "./error-boundary";
 

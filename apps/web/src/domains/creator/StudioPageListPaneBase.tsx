@@ -79,7 +79,7 @@ import type {
   StudioUiPreferencesRepository,
 } from "./studio-ui-preferences-sqlite";
 import type { StudioMobileSheet } from "./StudioMobileEditingDock";
-import type { Resizable } from "@/hooks/use-resizable";
+import type { Resizable } from "@/shared/hooks/use-resizable";
 import type {
   Dispatch,
   KeyboardEvent as ReactKeyboardEvent,

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_APPEARANCE, THEME_IDS, THEME_PRESETS, getThemePreset, normalizeAppearance, parseAppearance, resolveDesignTheme } from "./theme-presets";
 
 const bootstrap = readFileSync(new URL("../../../public/bootstrap-theme.js", import.meta.url), "utf8");
-const css = readFileSync(new URL("../../styles/design-themes.css", import.meta.url), "utf8");
+const css = readFileSync(new URL("../../app/styles/design-themes.css", import.meta.url), "utf8");
 
 function bootstrapResult(state: unknown, pathname: string, dark: boolean, blocked = false, contrast = false) {
   const attributes: Record<string, string> = {};

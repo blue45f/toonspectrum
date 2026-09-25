@@ -23,16 +23,16 @@
         "./apps/web/src/*"
       ],
       "canvaskit-wasm": [
-        "./apps/web/src/types/canvaskit-wasm-shim.d.ts"
+        "./apps/web/src/shared/types/vendor/canvaskit-wasm-shim.d.ts"
       ],
       "canvaskit-wasm/bin/canvaskit.wasm?url": [
-        "./apps/web/src/types/canvaskit-wasm-url-shim.d.ts"
+        "./apps/web/src/shared/types/vendor/canvaskit-wasm-url-shim.d.ts"
       ],
       "@toonspectrum/studio-engine-skia": [
-        "./apps/web/src/types/studio-engine-skia-shim.d.ts"
+        "./apps/web/src/shared/types/vendor/studio-engine-skia-shim.d.ts"
       ],
       "mixbox": [
-        "./apps/web/src/types/mixbox.d.ts"
+        "./apps/web/src/shared/types/vendor/mixbox.d.ts"
       ],
       "@toonspectrum/core": [
         "./packages/core/src/index.ts"

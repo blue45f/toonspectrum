@@ -8,7 +8,7 @@ import type {
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { CreatorMarketplaceResourceRecordSchema } from "@/shared/lib/creator-marketplace-resource-contract";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import {
   acquireCreatorMarketplaceCloudLibraryRelease,
   listCreatorMarketplaceCloudLibrary,

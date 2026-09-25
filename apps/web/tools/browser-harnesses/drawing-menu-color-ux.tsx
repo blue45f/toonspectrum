@@ -9,7 +9,7 @@ import { StudioLeftToolRail } from "../../src/domains/creator/StudioLeftToolRail
 import { StudioPaletteWorkbench } from "../../src/domains/creator/StudioPaletteWorkbench";
 import { registerI18nLocaleEntries, useI18n } from "../../src/shared/lib/i18n";
 import { STUDIO_I18N_NAMESPACES } from "../../src/shared/lib/i18n-asset-manifest";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Local-only integration fixture. No document, account or production API is mutated.
 const STORAGE_KEY = "drawing-menu-color-ux-harness-v1";

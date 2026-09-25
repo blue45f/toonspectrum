@@ -1,7 +1,7 @@
 import { ArrowRight, Brush, Images, LayoutTemplate, Palette, Sparkles } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 

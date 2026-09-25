@@ -3,12 +3,12 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { privateObjectStorageRoutingFingerprint } from "../apps/api/src/platform/private-object-storage/private-object-storage.config";
+import { privateObjectStorageRoutingFingerprint } from "../apps/api/src/infrastructure/private-object-storage/private-object-storage.config";
 import {
   PRIVATE_OBJECT_STORAGE_PROVIDER_IDS,
   type PrivateObjectStorageProviderId,
   type PrivateObjectStoragePurposeRouting,
-} from "../apps/api/src/platform/private-object-storage/purpose-routed-private-object-storage.port";
+} from "../apps/api/src/infrastructure/private-object-storage/purpose-routed-private-object-storage.port";
 
 const PURPOSES = ["source", "derived", "export"] as const;
 type Purpose = (typeof PURPOSES)[number];

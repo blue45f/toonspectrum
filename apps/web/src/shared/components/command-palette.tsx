@@ -36,8 +36,8 @@ import { useApp } from "@/shared/lib/store";
 import { TYPE_LABEL } from "@/shared/lib/taxonomy";
 import { toast } from "@/shared/lib/toast-store";
 import { cn } from "@/shared/lib/utils";
-import { useRouter } from "@/compat/navigation";
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useRouter } from "@/shared/navigation/navigation";
+import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import {
   fetchSearchResponse,
   isSearchAbortError,

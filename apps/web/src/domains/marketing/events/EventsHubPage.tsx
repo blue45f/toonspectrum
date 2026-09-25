@@ -1,12 +1,12 @@
 import { ArrowRight, CalendarDays, Gift, Sparkles } from "lucide-react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 
 import {
   MARKETING_EVENTS,

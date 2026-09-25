@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { getAuthSessionRevision, getAuthUserId, listeners as authListeners } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, getAuthUserId, listeners as authListeners } from "@/domains/auth/public/session/auth-session-state";
 import { useStudioStableHandlers } from "../../studio-stable-handlers";
 import { prepareStudioWorldAssets } from "./studio-world-publication-assets";
 import { publishStudioWorld, readStudioWorldPublicationAuthority } from "./studio-world-publication-client";

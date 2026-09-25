@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { lazyRetry } from "../shared/lib/lazy-retry";
+import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 export interface BrowserCompatModalProps {
   isOpen: boolean;

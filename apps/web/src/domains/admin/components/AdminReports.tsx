@@ -30,7 +30,7 @@ import { useAdminToast } from "./use-admin-toast";
 
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 export interface ContentReportItem {
   id: string;

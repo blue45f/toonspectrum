@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BrowserCompatModal } from "./browser-compat-modal";
 
-vi.mock("../compat/browser-check", () => ({
+vi.mock("../platform/browser/browser-check", () => ({
   getBrowserInfo: () => ({ name: "Test Browser", version: "1", os: "Test OS" }),
   checkBrowserCompatibility: () => ({ missingFeatures: [] }),
 }));

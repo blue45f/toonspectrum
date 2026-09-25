@@ -2,7 +2,7 @@ import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from
 import { Compass, Search, Sparkles, type LucideIcon } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { catalogDiscoveryHref, type CatalogDiscoveryMode } from "@/shared/lib/catalog-discovery-state";
 
 import { cn } from "@/shared/lib/utils";

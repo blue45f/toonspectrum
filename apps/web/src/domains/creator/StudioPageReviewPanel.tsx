@@ -32,7 +32,7 @@ import {
 import { StudioFloatingSurface } from "./StudioFloatingSurface";
 import { useStudioFloatingSurfaceLayout } from "./use-studio-floating-surface-layout";
 
-import { useIsMobile } from "@/hooks/use-media-query";
+import { useIsMobile } from "@/shared/hooks/use-media-query";
 
 export interface StudioPageReviewItem {
   id: string;

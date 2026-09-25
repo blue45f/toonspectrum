@@ -1,7 +1,7 @@
 /**
  * GPU trust policy for the host the studio is running inside.
  *
- * Detection itself lives in `src/compat/in-app-browser.ts`, which the mobile shell already uses and
+ * Detection itself lives in `src/platform/browser/in-app-browser.ts`, which the mobile shell already uses and
  * which a dedicated route sweep verifies. This module only answers the question that detector does
  * not: how far a given host can be trusted with a WebGPU device.
  *
@@ -18,7 +18,7 @@ import {
   diagnoseStudioInAppBrowser,
   type StudioInAppBrowserId,
   type StudioInAppBrowserPlatform,
-} from "../../../compat/in-app-browser";
+} from "../../../platform/browser/in-app-browser";
 
 /**
  * How far the host may be trusted with a WebGPU device.

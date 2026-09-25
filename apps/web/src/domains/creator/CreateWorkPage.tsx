@@ -62,9 +62,9 @@ import {
 import { readCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
-import { NotFoundPage } from "@/components/NotFoundPage";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { NotFoundPage } from "@/shared/components/feedback/NotFoundPage";
 import {
   deleteComment,
   deleteWork,

@@ -1,6 +1,6 @@
 import { canonicalJson } from "@toonspectrum/studio-project-model";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { getAuthSessionRevision, getAuthUserId, listeners as authListeners } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, getAuthUserId, listeners as authListeners } from "@/domains/auth/public/session/auth-session-state";
 import { useStudioStableHandlers } from "../studio-stable-handlers";
 import { completeStudioReviewTask, readStudioReviewTaskCompletion, type StudioReviewTaskCompletionRequest } from "./studio-review-task-completion-client";
 import { EMPTY_COMPLETION, StudioReviewTaskCompletionController } from "./studio-review-task-completion-controller";

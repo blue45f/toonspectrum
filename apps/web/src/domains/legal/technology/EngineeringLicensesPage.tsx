@@ -21,7 +21,7 @@ import {
 } from "./EngineeringStoryUi";
 
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>

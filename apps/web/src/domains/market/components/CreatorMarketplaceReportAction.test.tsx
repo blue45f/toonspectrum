@@ -5,9 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CreatorMarketplaceReportAction } from "./CreatorMarketplaceReportAction";
 
-import type { SessionContextValue } from "@/compat/auth-session-store";
+import type { SessionContextValue } from "@/domains/auth/public/session/auth-session-store";
 
-import { SessionContext } from "@/compat/auth-session-store";
+import { SessionContext } from "@/domains/auth/public/session/auth-session-store";
 
 const { reportCreatorMarketplaceResource } = vi.hoisted(() => ({
   reportCreatorMarketplaceResource: vi.fn(),

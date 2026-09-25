@@ -14,7 +14,7 @@ import { useStudioModalSheet } from "./useStudioModalSheet";
 
 import type { StudioAsset } from "./studio-asset-library";
 
-import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 
 const PAGE_SIZE = 24;
 const CONTROL = "min-h-11 rounded-lg border border-line bg-card px-3 text-xs text-fg-2 hover:bg-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-50";

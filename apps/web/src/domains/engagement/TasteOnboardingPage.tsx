@@ -9,7 +9,7 @@ import type { Title } from "@/shared/lib/types";
 
 import { RecommendOnboarding } from "@/shared/components/recommend-view-onboarding";
 import { Container } from "@/shared/components/section";
-import { useDocumentTitle, useMetaRobots } from "@/hooks/use-document-title";
+import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";

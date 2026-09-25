@@ -3,10 +3,10 @@ import { Eye, Keyboard, MousePointer2, Move, Smartphone, Sparkles } from "lucide
 
 import { AccessibilityLab } from "./AccessibilityLab";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("AccessibilityPage", ko, en);

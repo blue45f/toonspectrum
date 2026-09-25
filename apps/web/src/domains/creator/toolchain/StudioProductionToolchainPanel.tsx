@@ -1,7 +1,7 @@
 import { ArrowRight, Layers3, ServerCog, Workflow } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 import { StudioProductionJobWorkspace } from "./StudioProductionJobWorkspace";
 import { StudioToonBridgeConnectionCard } from "./StudioToonBridgeConnectionCard";

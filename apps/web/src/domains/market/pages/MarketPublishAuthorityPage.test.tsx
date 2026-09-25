@@ -12,7 +12,7 @@ import { buildCreatorMarketplaceAuthoringManifest, createCreatorMarketplaceAutho
 import { CREATOR_MARKETPLACE_STARTER_RECORDS } from "@/shared/lib/creator-marketplace-starter-catalog";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), identity: vi.fn(), publish: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: mocks.session }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: mocks.session }));
 vi.mock("@/platform/creator-marketplace-client", () => ({
   getCreatorMarketplaceResourceIdentity: mocks.identity,
   publishCreatorMarketplaceResource: mocks.publish,

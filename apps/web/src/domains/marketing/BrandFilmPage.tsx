@@ -14,13 +14,13 @@ import { BrandFilmStoryboard } from "./BrandFilmStoryboard";
 import { CreatorBrandFilm } from "./CreatorHomePage";
 import { CREATOR_FILM, HOME_COPY, creatorHomeLocale } from "./creator-home-content";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 import { normalizeLocaleCode, useI18n, useT } from "@/shared/lib/i18n";
 import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 

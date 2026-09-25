@@ -48,7 +48,7 @@ import type { StudioServerAiProviderPreference } from "../studio-server-ai-clien
 import type { StudioAiEpisodeProductionPlan } from "./studio-ai-episode-production-director";
 import type { StudioToolBeltContentProps } from "../StudioToolBeltContent";
 
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";
 import {
   useUserAi,

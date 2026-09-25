@@ -6,7 +6,7 @@ import {
   updateMyProfile,
 } from "./me-client";
 
-import { getAuthSession, persistSession } from "@/compat/auth-session-state";
+import { getAuthSession, persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { normalizeCreatorRoleProfile } from "@/shared/lib/creator-role-contract";
 
 const { apiGet, apiPatch } = vi.hoisted(() => ({

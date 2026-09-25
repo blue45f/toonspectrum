@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { canonicalJson, type ReviewPolicyCommand, type ReviewPolicyResponse } from "@toonspectrum/studio-project-model";
-import { getAuthSessionRevision, getAuthUserId } from "@/compat/auth-session-state";
-import { useSession } from "@/compat/auth-session-store";
+import { getAuthSessionRevision, getAuthUserId } from "@/domains/auth/public/session/auth-session-state";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { decideStudioReview } from "../project-graph/studio-project-graph-client";
 import type { StudioVirtualSpaceVerifiedReview } from "./studio-virtual-space-review-invitation";

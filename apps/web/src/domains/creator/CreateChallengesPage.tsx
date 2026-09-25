@@ -13,9 +13,9 @@ import { Container } from "@/shared/components/section";
 import { ShimmerTitle } from "@/shared/components/shimmer-title";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn, formatCount } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
   challengeDday,
   getChallenge,

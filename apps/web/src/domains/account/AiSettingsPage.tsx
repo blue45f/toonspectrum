@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { UnifiedAiSettings } from "@/shared/ai/UnifiedAiSettings";
 import { Container } from "@/shared/components/section";
 

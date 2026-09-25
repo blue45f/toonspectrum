@@ -33,7 +33,7 @@ import type {
 } from "@/shared/lib/creator-role-contract";
 import { ensureArray } from "@/shared/lib/http-safe";
 import { projectRevisionComparisonValue } from "@/shared/lib/revision-comparison-projection";
-import { getAuthUserId } from "@/compat/auth-session-store";
+import { getAuthUserId } from "@/domains/auth/public/session/auth-session-store";
 import { api, isHttpError, toApiError } from "@/platform/api";
 import {
   validateSharedAssetCatalogItem,

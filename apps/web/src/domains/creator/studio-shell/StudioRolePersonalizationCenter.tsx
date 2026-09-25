@@ -35,8 +35,8 @@ import {
   type CreatorRoleDirectoryResult,
 } from "@/platform/creator-role-workspace-client";
 import { getMyProfile, updateMyProfile, type MeProfile } from "@/platform/me-client";
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import {
   CREATOR_ROLE_DEFINITIONS,

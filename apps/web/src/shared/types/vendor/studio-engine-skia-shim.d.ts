@@ -49,12 +49,12 @@ export type {
   SkiaDocumentReceipt,
   SkiaDocumentStats,
   SkiaDocumentRenderer,
-} from "../../../../packages/studio-engine-skia/src/document-contract";
+} from "../../../../../../packages/studio-engine-skia/src/document-contract";
 export interface SkiaDocumentRendererOptions {
   readonly maxPictureBytes?: number;
   readonly onContextLost?: () => void;
   readonly loadFontData?: (
-    font: import("../../../../packages/studio-engine-skia/src/document-contract").SkiaDocumentFontSource,
+    font: import("../../../../../../packages/studio-engine-skia/src/document-contract").SkiaDocumentFontSource,
     signal: AbortSignal,
   ) => Promise<readonly Uint8Array[]>;
   readonly loadImageBitmap?: (src: string, signal: AbortSignal) => Promise<ImageBitmap>;
@@ -62,6 +62,6 @@ export interface SkiaDocumentRendererOptions {
 export function createSkiaDocumentRenderer(
   canvas: HTMLCanvasElement,
   options?: SkiaDocumentRendererOptions,
-): import("../../../../packages/studio-engine-skia/src/document-contract").SkiaDocumentRenderer;
+): import("../../../../../../packages/studio-engine-skia/src/document-contract").SkiaDocumentRenderer;
 
-export { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "../../../../packages/studio-engine-skia/src/document-contract";
+export { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "../../../../../../packages/studio-engine-skia/src/document-contract";

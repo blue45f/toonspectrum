@@ -2,7 +2,7 @@ import { ArrowRight, BookOpen, Brush, Clapperboard, Rocket, type LucideIcon } fr
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   translateBilingualText,
   translateParallelBilingualCopy,

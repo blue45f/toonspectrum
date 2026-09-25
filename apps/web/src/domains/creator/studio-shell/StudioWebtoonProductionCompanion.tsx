@@ -2,7 +2,7 @@ import { ArrowRight, Check, Circle, ExternalLink, Factory, ShieldAlert, Sparkles
 import { useEffect, useMemo, useState } from "react";
 
 import { useBilingual, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { webtoonProductionActionHref, webtoonProductionStagesForProjectView, type WebtoonProductionStageSupport } from "@/shared/lib/webtoon-production-support";
 import { cn } from "@/shared/lib/utils";

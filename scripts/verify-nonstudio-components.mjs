@@ -20,7 +20,7 @@ import { SiteNextSteps } from "@/shared/components/site-experience/SiteNextSteps
 import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteConnectionNotice";
 import { PublicSiteJourney } from "@/shared/components/public-site-journey";
 import { CommunityScopeDirectory } from "@/domains/community/components/community-scope-directory";
-import "@/styles/globals.css";
+import "@/app/styles/globals.css";
 function Harness() {
   const { pathname } = useLocation();
   return <SiteExperienceFrame enabled><header data-site-chrome="header"><PublicSiteJourney pathname={pathname} locale="ko" /></header>

@@ -21,7 +21,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { CREATOR_LAUNCHPAD_COPY } from "./creator-launchpad-copy";
 import "./creator-launchpad.css";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   clearCreatorLaunchPlan,
   clearCreatorRecentDestinations,

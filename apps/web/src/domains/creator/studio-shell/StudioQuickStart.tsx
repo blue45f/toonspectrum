@@ -6,7 +6,7 @@ import { ArrowRight, PanelsTopLeft, PencilLine, Plus, Zap } from "lucide-react";
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { buildStudioModeLaunchHref, resolveStudioModeCreationPlan } from "../studio-mode-creation-plan";
 import { createStudioProjectWithInitialDocument } from "../studio-project-creation";

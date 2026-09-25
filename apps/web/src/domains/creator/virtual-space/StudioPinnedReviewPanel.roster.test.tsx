@@ -2,13 +2,13 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import type { StudioTeamSnapshot } from "../studio-team-client";
 import { StudioPinnedReviewPanel } from "./StudioPinnedReviewPanel";
 import type { StudioVirtualSpaceReviewVerification } from "./studio-virtual-space-review-invitation";
 
 const f = vi.hoisted(() => ({ actor: "actor-a", verify: vi.fn(), team: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
 vi.mock("../studio-team-client", () => ({ getStudioTeam: f.team }));
 vi.mock("./studio-virtual-space-review-invitation", async (importOriginal) => ({
   ...await importOriginal<typeof import("./studio-virtual-space-review-invitation")>(), verifyStudioVirtualSpaceReviewSubject: f.verify,

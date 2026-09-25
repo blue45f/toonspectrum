@@ -43,8 +43,8 @@ import type {
 import { Container } from "@/shared/components/section";
 import { useApp } from "@/shared/lib/store";
 import { GENRES } from "@/shared/lib/taxonomy";
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { api, getApiErrorMessage } from "@/platform/api";
 
 function rulesToText(rules: CommunityCafeRule[]): string {

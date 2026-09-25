@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { CollabLogin, CollabNotice, collabButton } from "./collaboration-ui";
 import type { CollaborationReport } from "../../../../../packages/core/src/collaboration";
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
 import { collaborationClient } from "@/platform/collaboration-client";
 import { Container } from "@/shared/components/section";

@@ -3,7 +3,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 
 import type {
   StudioArtifactRecord,

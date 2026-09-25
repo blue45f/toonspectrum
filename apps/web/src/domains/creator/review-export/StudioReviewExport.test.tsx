@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { reviewProductionFixture } from "../review-production/studio-review-production-test-fixture";
 import { StudioReviewExport } from "./StudioReviewExport";
 

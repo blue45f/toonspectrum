@@ -7,7 +7,7 @@ import type { ProductionClientCommand } from "./production-api";
 import type { ProductionNotificationPolicy } from "@toonspectrum/core/production";
 
 const session = vi.hoisted(() => ({ revision: 0 }));
-vi.mock("@/compat/auth-session-state", () => ({ getAuthSessionRevision: () => session.revision }));
+vi.mock("@/domains/auth/public/session/auth-session-state", () => ({ getAuthSessionRevision: () => session.revision }));
 afterEach(() => { cleanup(); session.revision = 0; });
 function fixture(policy?: ProductionNotificationPolicy) {
   const base = createProductionDemoProject();

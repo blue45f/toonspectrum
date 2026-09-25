@@ -1,6 +1,6 @@
 import { canonicalJson } from "@toonspectrum/studio-project-model";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { getAuthSessionRevision, getAuthUserId, listeners as authListeners } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, getAuthUserId, listeners as authListeners } from "@/domains/auth/public/session/auth-session-state";
 
 import { resolveStudioReviewComment } from "../project-graph/studio-project-graph-client";
 import { useStudioStableHandlers } from "../studio-stable-handlers";

@@ -7,7 +7,7 @@ import { WorkspaceTaskFrame } from "./WorkspaceTaskFrame";
 import { workspaceTaskRoute } from "./workspace-task-route";
 
 vi.mock("@/shared/components/open-search-button", () => ({ OpenSearchButton: ({ children }: { children: React.ReactNode }) => <button type="button">{children}</button> }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: null, ready: true }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: null, ready: true }) }));
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 describe("common task frame", () => {
   it("does not remount or lose the router child when chrome changes", () => {

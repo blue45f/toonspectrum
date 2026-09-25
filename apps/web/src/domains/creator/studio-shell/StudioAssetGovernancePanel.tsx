@@ -36,7 +36,7 @@ import {
   STUDIO_PLUGIN_PERMISSIONS,
   type StudioPluginPermission,
 } from "../studio-plugin-registry";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { cn } from "@/shared/lib/utils";
 
 const DESTINATION_LABELS: Readonly<

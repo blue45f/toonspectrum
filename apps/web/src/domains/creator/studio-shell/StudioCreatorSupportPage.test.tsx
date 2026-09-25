@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { StudioCreatorSupportPage } from "./StudioCreatorSupportPage";
 
 vi.mock("@/shared/lib/i18n-bilingual-copy", () => ({ useBilingual: () => (ko: string) => ko }));
-vi.mock("@/hooks/use-document-title", () => ({ useDocumentTitle: () => undefined }));
+vi.mock("@/shared/seo/use-document-title", () => ({ useDocumentTitle: () => undefined }));
 const BrowserURL = URL;
 beforeEach(() => {
   window.localStorage.clear();

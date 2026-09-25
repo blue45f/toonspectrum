@@ -4,8 +4,8 @@ import { useState } from "react";
 
 import { Container } from "@/shared/components/section";
 import { cn, relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { useApiResource } from "@/platform/use-api-resource";
 
 

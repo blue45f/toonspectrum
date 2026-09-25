@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   userId: "creator-1", authenticated: true,
 }));
 
-vi.mock("@/compat/auth-session-store", () => ({
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({
   useSession: () => ({
     status: mocks.authenticated ? "authenticated" : "unauthenticated",
     data: mocks.authenticated ? { user: { id: mocks.userId } } : null,

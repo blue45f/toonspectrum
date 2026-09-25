@@ -21,7 +21,7 @@ import type {
 
 import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
 import { useI18n } from "@/shared/lib/i18n";
-import { SessionContext } from "@/compat/auth-session-store";
+import { SessionContext } from "@/domains/auth/public/session/auth-session-store";
 import { NotFoundError } from "@/platform/use-api-resource";
 
 const mocks = vi.hoisted(() => ({

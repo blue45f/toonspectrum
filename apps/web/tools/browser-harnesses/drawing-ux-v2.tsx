@@ -21,7 +21,7 @@ import { createRailInput, createMobileHandlers, createMobileProps } from "./draw
 
 import type { DrawMode, Tool } from "../../src/domains/creator/studio-editor-tool-model";
 import type { El } from "../../src/domains/creator/studio-element-model";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Isolated browser profile; uses the real SQLite/OPFS repository, not a production account.
 function Harness() {

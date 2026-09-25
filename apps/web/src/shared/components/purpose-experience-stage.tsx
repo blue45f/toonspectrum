@@ -9,7 +9,7 @@ import {
   Store,
 } from "lucide-react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { cn } from "@/shared/lib/utils";
 
 export type PurposeExperienceVariant = "create" | "discover" | "market" | "my";

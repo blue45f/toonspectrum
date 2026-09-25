@@ -9,7 +9,7 @@ import type {
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { findStarterMarketplaceResourceById } from "@/shared/lib/creator-marketplace-starter-catalog";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { getCreatorMarketplaceResourceHistory } from "@/platform/creator-marketplace-client";
 
 const HISTORY_PAGE_SIZE = 8;

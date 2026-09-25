@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { StudioReviewDraftShelf } from "./StudioReviewDraftShelf";
 import type { ReviewDraftScope, ReviewPrivateDraft } from "./studio-review-draft-shelf";
 

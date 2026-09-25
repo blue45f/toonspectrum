@@ -25,12 +25,12 @@ import type { CreatorMarketplaceOwnedRelease } from "@/shared/lib/creator-market
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 import {
   deleteCreatorMarketplaceResource,
   listCreatorMarketplaceOwnedHeads,

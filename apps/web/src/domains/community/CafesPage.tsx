@@ -30,8 +30,8 @@ import { Container } from "@/shared/components/section";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { GENRES } from "@/shared/lib/taxonomy";
 import { cn, relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { api, getApiErrorMessage } from "@/platform/api";
 
 const SORTS = [

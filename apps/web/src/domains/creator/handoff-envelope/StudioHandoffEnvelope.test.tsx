@@ -2,12 +2,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { StudioHandoffEnvelopeComposer, StudioHandoffEnvelopeInbox } from "./StudioHandoffEnvelope";
 import { handoffFixture } from "./studio-handoff-envelope-fixture";
 
 const io = vi.hoisted(() => ({ actor: "actor", prepare: vi.fn(), list: vi.fn(), read: vi.fn(), create: vi.fn(), act: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: io.actor } } }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: io.actor } } }) }));
 vi.mock("./studio-handoff-envelope-client", async (original) => ({ ...await original<object>(), studioHandoffClient: io }));
 let f = handoffFixture();
 beforeEach(() => {

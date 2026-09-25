@@ -10,7 +10,7 @@ const initialize = vi.hoisted(() => vi.fn());
 const renderButton = vi.hoisted(() => vi.fn());
 let credentialCallback: ((response: { credential?: string }) => void) | null = null;
 
-vi.mock("@/compat/auth-session-store", () => ({
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({
   signInWithGoogleIdToken,
 }));
 

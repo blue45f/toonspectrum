@@ -11,12 +11,12 @@ import { ReportForm } from "./collaboration-report-form";
 import { CollabField, CollabLogin, CollabNotice, CollaborationSafety, PortfolioLink, collabButton, collabInput } from "./collaboration-ui";
 import type { CollaborationDetail } from "../../../../../packages/core/src/collaboration";
 import type { CollaborationAction } from "./collaboration-application-panel";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
 import { collaborationClient } from "@/platform/collaboration-client";
 import { Container } from "@/shared/components/section";

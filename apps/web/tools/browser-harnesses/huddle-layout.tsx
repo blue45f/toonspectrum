@@ -4,7 +4,7 @@ import StudioP2pHuddleLauncher from "../../src/domains/creator/live/huddle/Studi
 import { EMPTY_STUDIO_LIVE_CONTEXT, StudioLiveCollaborationContext } from "../../src/domains/creator/live/studio-live-collaboration-context";
 
 import type { StudioLiveRoom } from "../../src/domains/creator/live/studio-live-collaboration-room";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 import "../../src/domains/creator/virtual-space/studio-workspace-live.css";
 
 // Real launcher and workspace CSS; inert transport, no server or device access.

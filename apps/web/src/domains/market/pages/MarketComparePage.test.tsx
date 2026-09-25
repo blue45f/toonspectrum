@@ -30,7 +30,7 @@ vi.mock("../components/MarketNavHeader", () => ({
   MarketNavHeader: () => <nav aria-label="마켓 주요 내비게이션" />,
 }));
 
-vi.mock("@/hooks/use-document-title", () => ({
+vi.mock("@/shared/seo/use-document-title", () => ({
   useDocumentTitle: vi.fn(),
   useMetaDescription: vi.fn(),
 }));

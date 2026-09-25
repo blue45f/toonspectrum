@@ -2,7 +2,7 @@ import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-co
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 
-import { ErrorBoundary } from "../components/error-boundary";
+import { ErrorBoundary } from "../app/errors/error-boundary";
 import { apiPath } from "../platform/api";
 
 import { AppShell } from "./AppShell";
@@ -30,7 +30,7 @@ const BackToTop = lazy(() =>
   })),
 );
 const DeskCloudMounts = lazy(() =>
-  import("@/components/deskcloud-native/DeskCloudMounts").then((mod) => ({
+  import("@/platform/integrations/deskcloud/DeskCloudMounts").then((mod) => ({
     default: mod.DeskCloudMounts,
   })),
 );

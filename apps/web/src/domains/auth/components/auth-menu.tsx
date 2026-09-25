@@ -21,9 +21,9 @@ import { AuthModal } from "./auth-modal";
 
 import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
-import { useSession, signOut } from "@/compat/auth-session-store";
-import { subscribeAuthModalRequests } from "@/compat/auth-modal-intent";
-import Link from "@/compat/router-link";
+import { useSession, signOut } from "@/domains/auth/public/session/auth-session-store";
+import { subscribeAuthModalRequests } from "@/domains/auth/public/session/auth-modal-intent";
+import Link from "@/shared/navigation/router-link";
 import {
   adminFetch,
   type AdminMe,

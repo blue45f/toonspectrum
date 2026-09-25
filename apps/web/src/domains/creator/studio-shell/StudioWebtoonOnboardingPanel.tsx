@@ -1,7 +1,7 @@
 import { Check, CheckCircle2, Circle, Compass, Flag, ListChecks } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { WEBTOON_CADENCES, WEBTOON_ONBOARDING_GOALS, WEBTOON_STARTING_POINTS, WEBTOON_TEAM_MODELS, buildWebtoonOnboardingPlan, completeStudioWebtoonOnboarding, readStudioWebtoonOnboardingProfile, toggleStudioWebtoonOnboardingTask, webtoonOnboardingProjectHref, writeStudioWebtoonOnboardingProfile, type StudioWebtoonOnboardingProfile } from "@/shared/lib/webtoon-production-onboarding";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";

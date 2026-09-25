@@ -16,8 +16,8 @@ import {
 } from "./site-navigation";
 import { ToonSpectrumMark } from "./visual-marks";
 
-import { usePathname } from "@/compat/navigation";
-import Link from "@/compat/router-link";
+import { usePathname } from "@/shared/navigation/navigation";
+import Link from "@/shared/navigation/router-link";
 import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
 

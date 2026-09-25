@@ -14,7 +14,7 @@ import {
 } from "../../src/domains/creator/studio-drawing-practice-document";
 import { shouldRenderStudioDrawingPracticeGuide } from "../../src/domains/creator/studio-drawing-practice-runtime";
 import { StudioDrawingPracticeBar } from "../../src/domains/creator/StudioDrawingPracticeBar";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 const SHA = `sha256:${"a".repeat(64)}` as const;
 const SOURCE = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`

@@ -12,7 +12,7 @@ import { FORMAT_LABEL, SERIES_STATUS_CLASS, SERIES_STATUS_LABEL } from "./creato
 import { CoverImage } from "@/shared/components/cover-image";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   createSeries,
   updateSeries,

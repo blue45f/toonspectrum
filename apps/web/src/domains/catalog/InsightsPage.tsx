@@ -15,7 +15,7 @@ import { DistributionBars, GenreSpectrum, MeterBar } from "@/shared/components/u
 import { genreColor } from "@/shared/lib/genre-color";
 import { TYPE_LABEL } from "@/shared/lib/taxonomy";
 import { formatCount, formatFull } from "@/shared/lib/utils";
-import { ErrorState } from "@/components/error-state";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { useApiResource } from "@/platform/use-api-resource";
 
 

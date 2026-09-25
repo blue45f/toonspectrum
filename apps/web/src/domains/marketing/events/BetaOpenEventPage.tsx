@@ -11,15 +11,15 @@ import {
   UserPlus,
 } from "lucide-react";
 
-import { requestAuthModalOpen } from "@/compat/auth-modal-intent";
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 
 import { BETA_OPEN_EVENT } from "./event-catalog";
 import { useMarketingEventText } from "./marketing-event-copy";

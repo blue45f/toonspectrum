@@ -2,7 +2,7 @@ import { ArrowRight, Eye, FlipHorizontal2, ImagePlus, Layers3, ShieldCheck } fro
 import { Link } from "react-router-dom";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 const STEPS = [
   {

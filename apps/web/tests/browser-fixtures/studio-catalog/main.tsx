@@ -5,7 +5,7 @@ import { createRoot } from "react-dom/client";
 import { StudioSceneTemplateBrowser } from "../../../src/domains/creator/catalog/StudioSceneTemplateBrowser";
 import { SCENE_TEMPLATES, SCENE_TEMPLATE_CATEGORIES } from "../../../src/domains/creator/studio-scene-templates";
 import { StudioElementsPanel } from "../../../src/domains/creator/StudioElementsPanel";
-import "../../../src/styles/globals.css";
+import "../../../src/app/styles/globals.css";
 
 function Fixture() {
   const [surface, setSurface] = useState("scenes");

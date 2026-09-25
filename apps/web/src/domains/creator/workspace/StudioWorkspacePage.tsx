@@ -15,8 +15,8 @@ import {
   UserRound,
 } from "lucide-react";
 
-import Link from "@/compat/router-link";
-import { useSession } from "@/compat/auth-session-store";
+import Link from "@/shared/navigation/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useI18n } from "@/shared/lib/i18n";
 import { OpenSearchButton } from "@/shared/components/open-search-button";

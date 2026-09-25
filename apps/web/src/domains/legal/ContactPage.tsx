@@ -9,8 +9,8 @@ import {
 
 import { Container } from "@/shared/components/section";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
-import { useDocumentTitle } from "@/hooks/use-document-title";
-import Link from "@/compat/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import Link from "@/shared/navigation/router-link";
 
 const SUPPORT_LINKS = [
   {

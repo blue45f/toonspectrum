@@ -12,13 +12,13 @@ import { marketResourceJsonLd } from "../models/market-jsonld";
 import { Container } from "@/shared/components/section";
 import { FriendlyQuickGuide } from "@/shared/components/purpose-experience-stage";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 
 export function MarketResourceDetailPage() {
   const { id } = useParams<{ id: string }>();

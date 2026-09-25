@@ -23,8 +23,8 @@ import {
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import {
   listFollowingFeed,
   listSeries,

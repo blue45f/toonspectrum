@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 import { Container } from "@/shared/components/section";
 import { useT } from "@/shared/lib/i18n";
-import { completeOAuthLogin } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { completeOAuthLogin } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import { api, apiPath } from "@/platform/api";
 
 type Phase = "working" | "done" | "error";

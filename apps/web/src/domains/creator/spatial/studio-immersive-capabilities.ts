@@ -2,7 +2,7 @@ import { translateBilingualValueForLocale } from "@/shared/lib/i18n-bilingual-co
 import {
   diagnoseStudioInAppBrowser,
   type StudioInAppBrowserDiagnosis,
-} from "@/compat/in-app-browser";
+} from "@/platform/browser/in-app-browser";
 
 const bi = <TKo, TEn>(locale: string, ko: TKo, en: TEn): TKo =>
   translateBilingualValueForLocale(locale, "studio-immersive-capabilities", ko, en);

@@ -1,5 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import { getAuthSessionRevision, getAuthUserId } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, getAuthUserId } from "@/domains/auth/public/session/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { newStudioProjectGraphId } from "../project-graph/studio-project-graph-client";
 import { StudioReviewAnnotationLocation } from "./StudioReviewSpatialAnnotation";

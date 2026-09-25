@@ -1,11 +1,11 @@
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 
-import { persistSession } from "../../src/compat/auth-session-state";
-import { SessionContext } from "../../src/compat/auth-session-store";
+import { persistSession } from "../../src/domains/auth/public/session/auth-session-state";
+import { SessionContext } from "../../src/domains/auth/public/session/auth-session-store";
 import { createProductionDemoProject } from "../../src/domains/creator/production-hub/production-demo";
 import { ProductionManuscriptWorkspace } from "../../src/domains/creator/production-hub/ProductionManuscriptWorkspace";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 if (!import.meta.env.DEV) throw new Error("Production manuscript fixture is development-only");
 

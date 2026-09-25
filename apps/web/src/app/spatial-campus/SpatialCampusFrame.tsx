@@ -4,7 +4,7 @@ import { CampusPaletteContext } from "@/shared/components/spatial-campus/campus-
 import { saveCampusPaletteToStudio } from "./campus-palette-adapter";
 import { campusSceneObjects, type CampusObject } from "@/shared/lib/spatial-campus/campus-objects";
 import { useLocation } from "react-router-dom";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { useCreatorExperienceMode } from "@/shared/lib/creator-experience-mode";
 import { campusDistrict, type CampusBinding, type CampusMode } from "@/shared/lib/spatial-campus/campus-model";
 import { campusDocumentHref, campusSessionStorage, readCampusReturn, writeCampusReturn, CAMPUS_RETURN_TTL, type CampusReturnTarget } from "@/shared/lib/spatial-campus/campus-return";

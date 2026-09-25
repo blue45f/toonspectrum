@@ -18,14 +18,14 @@ import {
   Store,
 } from "lucide-react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import {
   FriendlyQuickGuide,
   PurposeExperienceStage,
 } from "@/shared/components/purpose-experience-stage";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("MakeHubPage", ko, en);

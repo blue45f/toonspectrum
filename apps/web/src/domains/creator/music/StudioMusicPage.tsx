@@ -69,7 +69,7 @@ import {
   type MusicBrief,
   type MusicStatus,
 } from "@toonspectrum/core/studio-music";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { getApiErrorMessage } from "@/platform/api";
 import { getWork, updateWork } from "@/platform/creator-client";
 import { AiRecoveryNotice } from "@/shared/ai/AiRecoveryNotice";

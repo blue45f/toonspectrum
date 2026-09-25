@@ -1,6 +1,6 @@
 import { useSearchParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import { workspaceTab, type workspaceProjectLinks } from "./studio-workspace-model";

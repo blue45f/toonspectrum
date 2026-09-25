@@ -5,12 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
 
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { reviewProductionFixture } from "../review-production/studio-review-production-test-fixture";
 import { StudioPinnedReviewPanel } from "./StudioPinnedReviewPanel";
 
 const io = vi.hoisted(() => ({ verify: vi.fn(), workspace: vi.fn(), team: vi.fn(), save: vi.fn(), create: vi.fn() }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: "actor" } } }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: "actor" } } }) }));
 vi.mock("../studio-team-client", () => ({ getStudioTeam: io.team }));
 vi.mock("./studio-virtual-space-review-invitation", () => ({ verifyStudioVirtualSpaceReviewSubject: io.verify }));
 vi.mock("../studio-production/studio-production-server-client", async (original) => ({ ...await original<object>(),

@@ -3,7 +3,7 @@ import { defineAppRoutes } from "../app-route-definition";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 const NotFoundPage = lazyRetry(
-  () => import("@/components/NotFoundPage").then((module) => ({ default: module.NotFoundPage })),
+  () => import("@/shared/components/feedback/NotFoundPage").then((module) => ({ default: module.NotFoundPage })),
   "NotFoundPage",
 );
 

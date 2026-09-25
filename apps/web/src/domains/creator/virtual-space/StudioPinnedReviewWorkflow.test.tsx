@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { persistSession } from "@/compat/auth-session-state";
+import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { StudioPinnedReviewWorkflow } from "./StudioPinnedReviewWorkflow";
 import type { StudioVirtualSpaceVerifiedReview } from "./studio-virtual-space-review-invitation";
 
 const f = vi.hoisted(() => ({ verify: vi.fn(), decide: vi.fn(), revisions: vi.fn(), resolve: vi.fn(), reopen: vi.fn(), refresh: vi.fn(), revoke: vi.fn(), actor: "reviewer" }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: f.actor } } }) }));
 vi.mock("./studio-virtual-space-review-invitation", () => ({ verifyStudioVirtualSpaceReviewSubject: f.verify }));
 vi.mock("../project-graph/studio-project-graph-client", () => ({ decideStudioReview: f.decide, listStudioArtifactRevisions: f.revisions, resolveStudioReviewComment: f.resolve, reopenStudioReviewComment: f.reopen }));
 const subject = { schemaVersion: 1 as const, workId: "work", projectId: "project", artifactId: "artifact", reviewId: "review", revisionId: "snapshot", rootGraphHash: "a".repeat(64) };

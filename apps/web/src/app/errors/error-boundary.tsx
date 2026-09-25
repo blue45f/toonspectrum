@@ -1,11 +1,11 @@
 import { AlertTriangle, Download, Monitor, RefreshCw, WifiOff } from "lucide-react";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 
-import { allowStudioProgrammaticReload } from "../shared/lib/programmatic-reload";
-import { announceStudioRenderFailure } from "../shared/lib/render-failure-event";
-import { classifyRuntimeError, type ErrorAnalysis } from "../compat/runtime-error-classification";
+import { allowStudioProgrammaticReload } from "../../shared/lib/programmatic-reload";
+import { announceStudioRenderFailure } from "../../shared/lib/render-failure-event";
+import { classifyRuntimeError, type ErrorAnalysis } from "../../platform/browser/runtime-error-classification";
 
-import { BrowserCompatModal } from "./browser-compat-modal";
+import { BrowserCompatModal } from "./browser-compat/browser-compat-modal";
 import { hasAttemptedChunkReload, markChunkReloadAttempted } from "./chunk-reload-guard";
 
 interface Props {
@@ -43,7 +43,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     if (this.state.analysis?.type === "compatibility") {
-      void import("../compat/browser-check")
+      void import("../../platform/browser/browser-check")
         .then(({ classifyError }) => {
           if (this.state.error === error) {
             this.setState({ analysis: classifyError(error), showModal: true });

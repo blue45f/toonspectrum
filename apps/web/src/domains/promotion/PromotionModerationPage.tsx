@@ -8,7 +8,7 @@ import type { PromotionReport } from "../../../../../packages/core/src/promotion
 import { promotionClient } from "@/platform/promotion-client";
 import { getApiErrorMessage } from "@/platform/api";
 import { useApp } from "@/shared/lib/store";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 export function PromotionModerationPage() {
   const userId = useApp((state) => state.userId);

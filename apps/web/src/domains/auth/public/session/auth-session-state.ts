@@ -194,7 +194,7 @@ export function mergeCurrentSessionProfile(
 
 export function emitSession(session: Session) {
   transitionSession(session, false, false);
-  // listeners are registered by src/compat/auth-session.tsx subscribe logic.
+  // listeners are registered by src/domains/auth/public/session/auth-session.tsx subscribe logic.
 }
 
 export function subscribeSessionSyncRequests(

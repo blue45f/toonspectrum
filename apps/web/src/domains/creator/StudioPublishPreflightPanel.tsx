@@ -16,7 +16,7 @@ import type {
 } from "./studio-publish-preflight";
 import { useStudioModalSheet } from "./useStudioModalSheet";
 
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 
 const PREFLIGHT_DEFAULT_LAYOUT: StudioFloatingSurfaceLayout = {
   version: 2,

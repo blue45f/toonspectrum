@@ -30,9 +30,9 @@ import {
   type CreatorSupportReceivedOffer,
 } from "./creator-support-api";
 
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
 import { Container } from "@/shared/components/section";

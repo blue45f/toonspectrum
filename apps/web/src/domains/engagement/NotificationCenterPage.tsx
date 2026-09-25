@@ -16,9 +16,9 @@ import type { EngagementNotificationCategory } from "./engagement-model";
 import { activeEngagementNotifications, useEngagement } from "./engagement-store";
 import { useNotificationClock } from "./use-notification-clock";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
-import { useDocumentTitle, useMetaRobots } from "@/hooks/use-document-title";
+import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";

@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getAuthSessionRevision, persistSession } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { StudioPinnedReviewPanel } from "./StudioPinnedReviewPanel";
 import type { StudioVirtualSpaceReviewVerification } from "./studio-virtual-space-review-invitation";
 
 const f = vi.hoisted(() => ({ verify: vi.fn(), create: vi.fn(), newId: vi.fn(), decide: vi.fn(), revisions: vi.fn(), resolve: vi.fn(), reopen: vi.fn(),
   actor: "actor-a" as string | null, previewRevoke: null as (() => void) | null }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: f.actor ? { user: { id: f.actor } } : null }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: f.actor ? { user: { id: f.actor } } : null }) }));
 vi.mock("./StudioPinnedReviewPreview", () => ({ StudioPinnedReviewPreview: ({ onRevoked }: { onRevoked: () => void }) => {
   f.previewRevoke = onRevoked;
   return <img alt="Private preview" src="https://preview.invalid/image" />;

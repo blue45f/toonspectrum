@@ -47,7 +47,7 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 import type { StudioToolHintConsumerPreviewFields } from "./studio-tool-hint-preview-kind";
 import type { LucideIcon } from "lucide-react";
 
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 

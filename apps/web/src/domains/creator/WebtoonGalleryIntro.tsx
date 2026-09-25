@@ -3,7 +3,7 @@ import { ArrowRight, BookOpen, PenLine, Trophy } from "lucide-react";
 import { buildStudioHref } from "./creator-studio-links";
 import "./webtoon-gallery.css";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 /** Editorial concept artwork illustrates panel rhythm, independently of community work data. */
 export function WebtoonGalleryIntro() {

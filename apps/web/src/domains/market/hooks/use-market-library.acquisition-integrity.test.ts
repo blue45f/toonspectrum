@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
 }));
 
-vi.mock("@/compat/auth-session-store", () => ({
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({
   useSession: mocks.useSession,
 }));
 

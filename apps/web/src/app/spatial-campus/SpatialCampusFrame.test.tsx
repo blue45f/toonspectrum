@@ -10,7 +10,7 @@ import { useCreatorExperienceMode } from "@/shared/lib/creator-experience-mode";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 
 const actor = vi.hoisted(() => ({ id: "user-A", ready: true }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: actor.id } }, ready: actor.ready }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: actor.id } }, ready: actor.ready }) }));
 vi.mock("./CampusRoom", () => ({ CampusRoom: ({ objects = [] }: { objects?: readonly { title: string }[] }) => <div data-testid="scene">Local world · {objects.map((item) => item.title).join(" · ")}</div> }));
 vi.mock("@/shared/components/workspace/WorkspaceChrome", () => ({ WorkspaceBrand: () => <span>Brand</span>, WorkspaceSidebar: () => <aside>Navigation</aside>, WorkspaceAccountAction: () => null }));
 vi.mock("@/shared/components/open-search-button", () => ({ OpenSearchButton: () => <button type="button">Search</button> }));

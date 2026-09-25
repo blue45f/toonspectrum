@@ -10,7 +10,7 @@ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-mark
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { creatorMarketplaceStudioPackId } from "@/shared/lib/creator-marketplace-package-identity";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import {
   acquireCreatorMarketplaceCloudLibraryRelease,
   listCreatorMarketplaceCloudLibrary,

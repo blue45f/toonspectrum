@@ -29,7 +29,7 @@ import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
 import { promotionClient } from "@/platform/promotion-client";
 import { ThreadedCommentSection } from "@/shared/components/comments/threaded-comment-section";

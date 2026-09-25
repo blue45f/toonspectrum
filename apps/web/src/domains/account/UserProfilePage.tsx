@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 
 import type { SeedReview, Title } from "@/shared/lib/types";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 import { ReviewCard } from "@/shared/components/review-card";
 import { Container } from "@/shared/components/section";
@@ -24,9 +24,9 @@ import { useT } from "@/shared/lib/i18n";
 import { compactPublicShareDescription, publicShareImageUrl } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount } from "@/shared/lib/utils";
-import { ErrorState } from "@/components/error-state";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { SeriesCard, WorkCard, WorkGridSkeleton } from "@/domains/creator/public/community-ui";
-import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
+import { useDocumentTitle, useMetaDescription, usePageSocialMeta } from "@/shared/seo/use-document-title";
 import {
   getCreatorProfile,
   listSeries,

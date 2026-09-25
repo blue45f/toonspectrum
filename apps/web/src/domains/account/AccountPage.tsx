@@ -26,9 +26,9 @@ import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
-import { useSession, signOut } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
+import { useSession, signOut } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { listWorks, getCurrentUserId, type WorkSummary } from "@/platform/creator-client";
 import { deleteMyAccount, getMyProfile, updateMyProfile } from "@/platform/me-client";
 import {

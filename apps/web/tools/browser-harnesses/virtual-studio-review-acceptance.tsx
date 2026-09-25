@@ -1,10 +1,10 @@
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 
-import { persistSession } from "../../src/compat/auth-session-state";
-import { SessionContext } from "../../src/compat/auth-session-store";
+import { persistSession } from "../../src/domains/auth/public/session/auth-session-state";
+import { SessionContext } from "../../src/domains/auth/public/session/auth-session-store";
 import { StudioPinnedReviewPanel } from "../../src/domains/creator/virtual-space/StudioPinnedReviewPanel";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 // Development-only rendering fixture. The verifier intercepts every API/image request;
 // this context is not a server login, production admission, or a real user's document.

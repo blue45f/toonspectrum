@@ -82,7 +82,7 @@ import {
 } from "@/shared/lib/creator-role-workspace-contract";
 import { useCreatorRoleWorkspace } from "@/shared/lib/use-creator-role-workspace";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 const StudioHandoffEnvelopeInbox = lazy(() => import("../handoff-envelope/StudioHandoffEnvelope").then((module) => ({ default: module.StudioHandoffEnvelopeInbox })));
 

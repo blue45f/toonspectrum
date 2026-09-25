@@ -17,8 +17,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import Link from "@/compat/router-link";
-import { useDocumentTitle, useJsonLd, useMetaDescription, usePageSocialMeta } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle, useJsonLd, useMetaDescription, usePageSocialMeta } from "@/shared/seo/use-document-title";
 import { useI18n } from "@/shared/lib/i18n";
 import { ServiceStoryJourney } from "@/shared/components/service-story-journey";
 

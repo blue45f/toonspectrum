@@ -34,7 +34,7 @@ vi.mock("@/shared/lib/store", () => ({
   useApp: (selector: (state: { userId: string | null }) => unknown) => selector({ userId: null }),
 }));
 
-vi.mock("@/hooks/use-document-title", () => ({
+vi.mock("@/shared/seo/use-document-title", () => ({
   useDocumentTitle: vi.fn(),
   useMetaDescription: vi.fn(),
   usePageSocialMeta: vi.fn(),

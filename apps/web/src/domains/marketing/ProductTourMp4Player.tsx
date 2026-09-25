@@ -8,7 +8,7 @@ import {
 import { ArrowRight, AudioLines, Captions, LoaderCircle, Play, RotateCcw, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 import { clampCreatorFilmTime, creatorFilmChapterAt } from "./creator-film-playback";
 import {

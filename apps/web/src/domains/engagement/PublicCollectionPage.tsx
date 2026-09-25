@@ -9,12 +9,12 @@ import {
 
 import type { Title } from "@/shared/lib/types";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { TitleCard } from "@/shared/components/title-card";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { CollectionIcon } from "@/shared/components/visual-marks";
-import { useDocumentTitle, useMetaRobots } from "@/hooks/use-document-title";
+import { useDocumentTitle, useMetaRobots } from "@/shared/seo/use-document-title";
 import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 import { useApp } from "@/shared/lib/store";
 

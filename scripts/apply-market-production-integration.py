@@ -142,7 +142,7 @@ change(host,'''  const assetMarketDeepLinkHandledRef = useRef(false);
   }, [uiBooleanPreferencesReady, workHydrated, autosaveChecked, marketInstallResourceId]);''')
 panel=creator+'StudioCommunityMarketplacePanel.tsx'
 change(panel,'import { filterStarterMarketplaceResources } from "@/shared/lib/creator-marketplace-starter-catalog";','''import { filterStarterMarketplaceResources } from "@/shared/lib/creator-marketplace-starter-catalog";
-import Link from "@/compat/router-link";
+import Link from "@/app/navigation/router-link";
 import { marketStudioResourceHref } from "@/domains/market/models/market-studio-handoff";''')
 change(panel,'''      !selectedAsset
       || !onUseAsset''','''      !selectedAsset
@@ -169,7 +169,7 @@ change(host,'                return addRenderedImage(asset.dataUrl, asset.width,
                     attributionRequired: false, commercialUse: true, containsAi: false,
                   } } : {}),
                 });''')
-change(market+'MarketResourceCard.tsx','import Link from "@/compat/router-link";','import Link from "@/compat/router-link";\nimport { resolveStudioMarketplaceCc0Entry } from "@/domains/creator/studio-marketplace-cc0-assets";')
+change(market+'MarketResourceCard.tsx','import Link from "@/app/navigation/router-link";','import Link from "@/app/navigation/router-link";\nimport { resolveStudioMarketplaceCc0Entry } from "@/domains/creator/studio-marketplace-cc0-assets";')
 change(market+'MarketResourceCard.tsx','  const wishlisted = isWishlisted(record.id);','  const wishlisted = isWishlisted(record.id);\n  const hasSourcePreview = Boolean(record.entries[0] && resolveStudioMarketplaceCc0Entry(record, record.entries[0]));')
 change(market+'MarketResourceCard.tsx','record.kind === "3d-asset" && !paletteColors ? (','record.kind === "3d-asset" && !paletteColors && !hasSourcePreview ? (')
 change(creator+'studio-marketplace-cc0-model.test.ts','passes pinned hashes through the real worker/storage boundary and creates one independent model node','passes the pinned hash and worker policy to the importer and constructs an independent model node')

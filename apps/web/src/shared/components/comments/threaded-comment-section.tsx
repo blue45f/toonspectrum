@@ -24,7 +24,7 @@ import {
   type ThreadedCommentSort,
 } from "./threaded-comment-model";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { cn, relativeDate } from "@/shared/lib/utils";
 
 import type { Dispatch, KeyboardEvent, SetStateAction } from "react";

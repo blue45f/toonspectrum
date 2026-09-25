@@ -30,9 +30,9 @@ import {
 } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import Link from "@/compat/router-link";
-import { useSession } from "@/compat/auth-session-store";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import Link from "@/shared/navigation/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { getApiErrorMessage } from "@/platform/api";
 import {
   messagingClient,

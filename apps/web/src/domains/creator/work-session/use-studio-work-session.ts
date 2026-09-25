@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { getAuthSessionRevision, getAuthUserId, listeners } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, getAuthUserId, listeners } from "@/domains/auth/public/session/auth-session-state";
 import { StudioWorkSessionController, type StudioSessionStorage } from "./studio-work-session-controller";
 import { studioWorkSessionApi } from "./studio-work-session-client";
 

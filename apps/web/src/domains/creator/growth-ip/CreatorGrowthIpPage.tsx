@@ -23,7 +23,7 @@ import {
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { SharePageButton } from "@/shared/components/share-page-button";
 import { Container } from "@/shared/components/section";
 import {

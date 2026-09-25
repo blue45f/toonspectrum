@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import { searchWorkspaceProjects, WORKSPACE_PROJECT_PAGE_SIZE, type WorkspaceProjectOrder } from "./studio-workspace-project-search";

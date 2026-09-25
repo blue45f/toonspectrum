@@ -2,7 +2,7 @@ import { Box, Download, Film, Loader2, RefreshCw, Server, Square, X } from "luci
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { Container } from "@/shared/components/section";
 import { useUnifiedAiAuxSettings } from "@/shared/ai/unified-ai-settings";
 

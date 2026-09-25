@@ -28,7 +28,7 @@ import type { CharacterPoseRegion } from "../pose/character-pose-v2";
 import type { ChangeEvent, ReactNode, RefObject } from "react";
 
 import { cn } from "@/shared/lib/utils";
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 
 type WorkbenchTab = "quality" | "presets" | "pose" | "ink" | "render" | "runtime";
 type ImportTarget = "manifest" | "presets" | "ink" | "document-v3";

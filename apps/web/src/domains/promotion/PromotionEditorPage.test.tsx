@@ -11,7 +11,7 @@ vi.mock("@/shared/lib/store", () => ({
   useApp: Object.assign((selector: (state: { userId: string }) => unknown) => selector(mocks.state), { getState: () => mocks.state }),
   useHydrated: () => true,
 }));
-vi.mock("@/hooks/use-document-title", () => ({ useDocumentTitle: () => undefined }));
+vi.mock("@/shared/seo/use-document-title", () => ({ useDocumentTitle: () => undefined }));
 vi.mock("@/platform/promotion-client", () => ({ promotionClient: mocks }));
 vi.mock("@/platform/api", () => ({ getApiErrorMessage: async () => "등록 실패: 입력 내용이 유지됩니다." }));
 function view() {

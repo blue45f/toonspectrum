@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("./studio-music-client", () => ({ generateMusic: mocks.generate, getMusicStatus: mocks.status }));
 vi.mock("./studio-music-import", () => ({ importExternalMusicTrack: mocks.importTrack }));
 vi.mock("./studio-music-library", () => ({ loadMusicTracks: mocks.load, saveMusicTrack: mocks.save, deleteMusicTrack: mocks.remove }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: mocks.ownerId ? { user: { id: mocks.ownerId } } : null }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: mocks.ownerId ? { user: { id: mocks.ownerId } } : null }) }));
 vi.mock("@/domains/creator/studio-server-ai-client", () => ({ completeAutomaticFreeText: mocks.lyrics }));
 vi.mock("@/platform/api", () => ({ getApiErrorMessage: mocks.error }));
 vi.mock("@/platform/creator-client", () => ({ getWork: mocks.getWork, updateWork: mocks.updateWork }));

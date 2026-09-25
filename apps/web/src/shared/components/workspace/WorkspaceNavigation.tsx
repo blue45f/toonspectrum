@@ -1,6 +1,6 @@
 import { useLocation } from "react-router-dom";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useI18n } from "@/shared/lib/i18n";
 
 import { TOONSTUDIO_PRIMARY_NAVIGATION, siteNavigationText } from "../site-navigation";

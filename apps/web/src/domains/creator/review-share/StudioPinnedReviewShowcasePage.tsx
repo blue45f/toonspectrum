@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { z } from "zod";
 import { pinnedSharePublicEntrySchema } from "@toonspectrum/studio-project-model/pinned-review-share";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { listPinnedReviewShowcase } from "./studio-pinned-review-share-client";

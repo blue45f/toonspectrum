@@ -12,8 +12,8 @@ import {
   UserRound,
 } from "lucide-react";
 
-import Link from "@/compat/router-link";
-import { useSession } from "@/compat/auth-session-store";
+import Link from "@/shared/navigation/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { Container } from "@/shared/components/section";
 import {
   FriendlyQuickGuide,
@@ -21,7 +21,7 @@ import {
 } from "@/shared/components/purpose-experience-stage";
 
 import { useApp, useHydrated } from "@/shared/lib/store";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("MySpaceHubPage", ko, en);

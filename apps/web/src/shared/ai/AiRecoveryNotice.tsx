@@ -6,7 +6,7 @@ import {
   WifiOff,
 } from "lucide-react";
 
-import { requestAuthModalOpen } from "@/compat/auth-modal-intent";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { cn } from "@/shared/lib/utils";
 
 import { inferAiRecoveryCode, type AiRecoveryCode } from "./ai-recovery-code";

@@ -19,7 +19,7 @@ import { MarketProductionFitBadge } from "./MarketProductionFitBadge";
 import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-marketplace-resource-contract";
 
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 
 function compactFilterCss(values: Record<string, number | string | boolean>): string {

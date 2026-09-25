@@ -7,7 +7,7 @@ import { HiringTermsView } from "./HiringSlotEditor";
 
 import type { HiringOffer } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { getApiErrorMessage } from "@/platform/api";
 
 export function HiringOffersPanel({ actor }: { actor: string }) {

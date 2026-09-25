@@ -15,9 +15,9 @@ import { Container } from "@/shared/components/section";
 import { COMMUNITY_SCOPE_LABEL_WITH_ALL } from "@/shared/lib/community-ui";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn, relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { verifyStudioSharedAssetContent } from "@/domains/creator/public/shared-asset-content";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
   getSharedAssetContent,
   listSharedAssetModerationQueue,

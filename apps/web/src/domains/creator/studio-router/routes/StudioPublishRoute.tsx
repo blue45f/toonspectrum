@@ -7,7 +7,7 @@ import { useStudioDraftScope } from "../useStudioDraftScope";
 import type { StudioPublishRouteResolution } from "../studio-route-manifest";
 
 import { lazyRetry } from "@/shared/lib/lazy-retry";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 
 const StudioPublishingCommandCenter = lazyRetry(
   () => import("../../StudioPublishingCommandCenter").then((module) => ({

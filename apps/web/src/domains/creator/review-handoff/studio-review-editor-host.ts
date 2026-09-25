@@ -1,4 +1,4 @@
-import { getAuthSessionRevision, getAuthUserId } from "@/compat/auth-session-state";
+import { getAuthSessionRevision, getAuthUserId } from "@/domains/auth/public/session/auth-session-state";
 
 import { studioReviewCaptureHostContext, type StudioReviewCaptureHostBindings } from "../review-capture/studio-review-capture-host-context";
 import { projectStudioReviewCaptureSource } from "../review-capture/studio-review-capture-projection";

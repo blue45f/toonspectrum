@@ -6,7 +6,7 @@ import {
   getAuthSession,
   persistSession,
   subscribeSessionSyncRequests,
-} from "@/compat/auth-session-state";
+} from "@/domains/auth/public/session/auth-session-state";
 
 describe("shared API authentication", () => {
   const originalFetch = globalThis.fetch;

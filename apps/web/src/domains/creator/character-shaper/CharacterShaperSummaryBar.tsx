@@ -19,7 +19,7 @@ import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerE
 
 import { useI18n } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 
 type SummaryPopover = "reset" | "save" | "more";
 

@@ -1,4 +1,4 @@
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 import { createRoot } from "react-dom/client";
 
 import { runScene3dSpecialistInWorker } from "../../src/domains/creator/scene3d/specialists/specialist-client";

@@ -4,7 +4,7 @@ import { ArrowRight, Compass, Search } from "lucide-react";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useT } from "@/shared/lib/i18n";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("NotFoundPage", ko, en);

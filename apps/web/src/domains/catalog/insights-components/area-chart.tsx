@@ -1,6 +1,6 @@
 
 import { cn } from "@/shared/lib/utils";
-import { useInView } from "@/hooks/use-in-view";
+import { useInView } from "@/shared/hooks/use-in-view";
 
 export interface AreaPoint {
   label: string | number;

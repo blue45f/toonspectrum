@@ -19,11 +19,11 @@ vi.mock("@/shared/lib/i18n", () => ({
   useT: () => (key: string) => key,
 }));
 
-vi.mock("@/compat/auth-session-store", () => ({
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({
   completeOAuthLogin,
 }));
 
-vi.mock("@/compat/router-link", () => ({
+vi.mock("@/shared/navigation/router-link", () => ({
   default: ({ children, href }: PropsWithChildren<{ href: string }>) => (
     <a href={href}>{children}</a>
   ),

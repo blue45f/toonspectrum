@@ -1,8 +1,8 @@
 import { canonicalJson, studioReviewTaskAssignmentChoices } from "@toonspectrum/studio-project-model";
 import { useId, useMemo, useRef, useState } from "react";
 
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
 import { Button } from "@/shared/components/ui/button";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 

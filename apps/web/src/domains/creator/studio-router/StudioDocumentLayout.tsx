@@ -19,7 +19,7 @@ import {
 import { useStudioDocumentRuntime } from "./studio-document-runtime-context";
 import { useStudioLocalDraftOwner } from "./useStudioLocalDraftOwner";
 
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 import type { StudioWorkspaceRoute } from "../studio-workspace-route";

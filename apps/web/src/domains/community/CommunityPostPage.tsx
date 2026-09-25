@@ -17,12 +17,12 @@ import {
 } from "@/shared/lib/public-share-policy";
 import { useApp } from "@/shared/lib/store";
 import { relativeDate } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 import { api } from "@/platform/api";
 import { useApiResource } from "@/platform/use-api-resource";
 

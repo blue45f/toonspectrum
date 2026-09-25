@@ -3,7 +3,7 @@ import { Bell } from "lucide-react";
 import { activeEngagementNotifications, useEngagement } from "./engagement-store";
 import { useNotificationClock } from "./use-notification-clock";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { cx } from "@/shared/lib/cx";
 
 export function EngagementNotificationBell() {

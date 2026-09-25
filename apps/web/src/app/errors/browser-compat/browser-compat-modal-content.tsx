@@ -1,8 +1,8 @@
 import { AlertCircle, AlertTriangle, Compass, Globe, Monitor, RefreshCw, X } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 
-import { copyText } from "../shared/lib/copy-text";
-import { checkBrowserCompatibility, getBrowserInfo } from "../compat/browser-check";
+import { copyText } from "../../../shared/lib/copy-text";
+import { checkBrowserCompatibility, getBrowserInfo } from "../../../platform/browser/browser-check";
 
 
 import type { BrowserCompatModalProps } from "./browser-compat-modal";

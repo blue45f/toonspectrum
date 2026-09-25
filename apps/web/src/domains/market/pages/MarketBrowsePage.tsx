@@ -36,13 +36,13 @@ import {
   CreatorMarketplaceResourceSearchQuerySchema,
 } from "@/shared/lib/creator-marketplace-resource-contract";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useJsonLd,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 
 import "../components/market-atelier.css";
 

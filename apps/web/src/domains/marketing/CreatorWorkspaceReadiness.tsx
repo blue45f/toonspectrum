@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, HardDrive, RefreshCw, ShieldCheck } from "lucide-react";
 
 import { boundedStorageRead, creatorServiceWorker, creatorStoragePressure, inspectCreatorDrawingDependencies, inspectCreatorOfflineReadiness, type CreatorOfflineDrawingCheck, type CreatorOfflineSnapshot } from "./creator-offline-readiness";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("CreatorWorkspaceReadiness", ko, en);

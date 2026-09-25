@@ -30,7 +30,7 @@ writeFileSync(html, '<!doctype html><html lang="ko" class="dark"><head><meta cha
 writeFileSync(entry, `
 import {useState} from "react";
 import {createRoot} from "react-dom/client";
-import "./src/styles/globals.css";
+import "./src/app/styles/globals.css";
 import {StudioSubToolPalette} from "./src/domains/creator/brush/StudioSubToolPalette";
 import {studioSubToolPaletteCategoryIdForBrushId} from "./src/domains/creator/brush/studio-sub-tool-palette-data";
 function App(){

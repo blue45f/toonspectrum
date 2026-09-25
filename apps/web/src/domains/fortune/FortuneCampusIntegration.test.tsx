@@ -10,7 +10,7 @@ import { FortuneCreativeMission } from "./FortuneReadingTools";
 import { readFortunePreferences, writeFortunePreferences } from "./fortune-observatory-storage";
 
 const actor = vi.hoisted(() => ({ id: "actor-A" }));
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: actor.id } }, ready: true }) }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => ({ data: { user: { id: actor.id } }, ready: true }) }));
 const context: CampusContextValue = {
   binding: { routeId: "experience-fortune", districtId: "observatory", surface: "room", private: true },
   district: campusDistrict("observatory"), mode: "scene",

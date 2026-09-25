@@ -3,7 +3,7 @@ import { ArrowRight, Box, Brush, Cloud, FileCheck2, PackageOpen, Pause, Play, Sp
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useI18n } from "@/shared/lib/i18n";
 import { resolveProductLocale, type ProductLocale } from "@/shared/lib/product-identity";
 

@@ -9,7 +9,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { useI18n } from "@/shared/lib/i18n";
 import { type BilingualText } from "@/shared/lib/i18n-bilingual-copy";

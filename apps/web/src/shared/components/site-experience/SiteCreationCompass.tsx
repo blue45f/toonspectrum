@@ -5,7 +5,7 @@ import { useLocation } from "react-router-dom";
 
 import { siteArtDirection } from "./site-art-direction";
 import { SiteArtwork } from "./SiteArtwork";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>

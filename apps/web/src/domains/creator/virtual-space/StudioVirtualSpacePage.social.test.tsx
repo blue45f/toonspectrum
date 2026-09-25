@@ -51,7 +51,7 @@ vi.mock("./world-publication/use-studio-world-publication", async () => {
   const { EMPTY_WORLD_PUBLICATION } = await import("./world-publication/studio-world-publication-controller");
   return { useStudioWorldPublication: () => f.worldPublication ?? ({ enabled: false, snapshot: EMPTY_WORLD_PUBLICATION, refresh: vi.fn(), publish: vi.fn() }) };
 });
-vi.mock("@/compat/auth-session-store", () => ({ useSession: () => f.session }));
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => f.session }));
 vi.mock("./private-room/use-studio-private-room",()=>({useStudioPrivateRoom:(options:Parameters<typeof import("./private-room/use-studio-private-room").useStudioPrivateRoom>[0])=>{
   f.privateOptions=options;return {snapshot:{door:null,team:null,session:null,conversations:[],candidates:[],busy:false,uncertain:false,reason:null},controller:null,available:false,entryReason:"outside"};
 }}));

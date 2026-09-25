@@ -65,7 +65,7 @@ import type { CreatorMarketplaceResourceRecord } from "@/shared/lib/creator-mark
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { compactPublicShareDescription } from "@/shared/lib/public-share-policy";
 import { cn } from "@/shared/lib/utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 
 const SharePageButton = lazy(async () => {
   const module = await import("@/shared/components/share-page-button");

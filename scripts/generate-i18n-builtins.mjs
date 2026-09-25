@@ -55,5 +55,5 @@ function sync(targetRelative, contents) {
   process.stdout.write("[i18n-builtins] wrote " + targetRelative + "\n");
 }
 
-sync("apps/web/src/generated/i18n-app-builtins.json", render("app"));
-sync("apps/web/src/generated/i18n-admin-builtins.json", render("admin"));
+sync("apps/web/src/shared/i18n/generated/i18n-app-builtins.json", render("app"));
+sync("apps/web/src/domains/admin/i18n/generated/i18n-admin-builtins.json", render("admin"));

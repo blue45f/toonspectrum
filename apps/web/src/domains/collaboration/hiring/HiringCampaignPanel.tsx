@@ -5,7 +5,7 @@ import { CollabNotice, collabButton, collabPrimary } from "../collaboration-ui";
 
 import type { HiringCampaign, HiringInvitation, HiringSlot } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { api, getApiErrorMessage } from "@/platform/api";
 
 const root = "/collaborations/hiring";

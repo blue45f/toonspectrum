@@ -1,6 +1,6 @@
 import { CalendarClock, CheckCircle2, ClipboardList, RefreshCw, Route, TriangleAlert } from "lucide-react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 

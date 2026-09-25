@@ -2,8 +2,8 @@ import { ArrowRight, MessageCircle, Search } from "lucide-react";
 import { type FormEvent, useId } from "react";
 import { useSearchParams } from "react-router-dom";
 
-import Link from "@/compat/router-link";
-import { ErrorState } from "@/components/error-state";
+import Link from "@/shared/navigation/router-link";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { useApiResource } from "@/platform/use-api-resource";
 import { COMMUNITY_SCOPE_LABEL, COMMUNITY_SORT_OPTIONS, getCommunityScopeTargetLink, parseCommunitySort } from "@/shared/lib/community-ui";
 

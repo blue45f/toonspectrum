@@ -16,12 +16,12 @@ import {
   MEMBERSHIP_PLAN_POLICIES,
 } from "../../../../../packages/core/src/membership-wallet";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
   usePageSocialMeta,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 import {
   getMembershipCatalog,
   getMembershipOverview,

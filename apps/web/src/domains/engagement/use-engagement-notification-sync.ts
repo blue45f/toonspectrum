@@ -6,7 +6,7 @@ import { useEngagement } from "./engagement-store";
 import type { Title } from "@/shared/lib/types";
 import type { CreatorMarketplaceCloudLibraryItem } from "@/shared/lib/creator-marketplace-cloud-library-contract";
 
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { getProductionPersonalInbox } from "@/domains/creator/production-hub/production-api";
 import { useApp } from "@/shared/lib/store";
 import { listCreatorMarketplaceCloudLibrary } from "@/platform/creator-marketplace-client";

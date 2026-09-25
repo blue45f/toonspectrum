@@ -4,9 +4,9 @@ import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { safeAuthProfileImageSrc } from "./auth-menu-profile-image";
 import { AuthMenuTrigger } from "./auth-menu-trigger";
 
-import { subscribeAuthModalRequests } from "@/compat/auth-modal-intent";
+import { subscribeAuthModalRequests } from "@/domains/auth/public/session/auth-modal-intent";
 import { useT } from "@/shared/lib/i18n";
-import { useSession } from "@/compat/auth-session-store";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
 
 type AuthMenuProps = {
   defaultOpen?: boolean;

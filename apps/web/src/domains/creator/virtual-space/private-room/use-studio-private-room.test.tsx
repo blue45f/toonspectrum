@@ -11,7 +11,7 @@ import { useStudioPrivateRoom,type StudioPrivateRoomOptions } from "./use-studio
 import { createStudioPrivateRoomApi } from "./studio-private-room-client";
 
 const auth=vi.hoisted(()=>({actor:"actor",listeners:new Set<()=>void>()}));
-vi.mock("@/compat/auth-session-state",()=>({getAuthUserId:()=>auth.actor,listeners:auth.listeners}));
+vi.mock("@/domains/auth/public/session/auth-session-state",()=>({getAuthUserId:()=>auth.actor,listeners:auth.listeners}));
 vi.mock("./studio-private-room-client",async importOriginal=>({...await importOriginal<typeof import("./studio-private-room-client")>(),createStudioPrivateRoomApi:vi.fn()}));
 
 const world={worldId:"world",revisionId:"revision",contentHash:"a".repeat(64)},epoch="00000000-0000-4000-8000-000000000001";

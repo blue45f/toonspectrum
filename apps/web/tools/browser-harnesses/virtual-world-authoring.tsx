@@ -7,7 +7,7 @@ import { StudioWorldAuthoringEntry } from "../../src/domains/creator/virtual-spa
 import { useStudioWorldRuleGate } from "../../src/domains/creator/virtual-space/StudioWorldRuleGate";
 
 import type { StudioVirtualSpaceActivity } from "../../src/domains/creator/virtual-space/studio-virtual-space-model";
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 
 import "../../src/domains/creator/virtual-space/studio-virtual-space.css";
 import "../../src/shared/components/workspace/workspace.css";

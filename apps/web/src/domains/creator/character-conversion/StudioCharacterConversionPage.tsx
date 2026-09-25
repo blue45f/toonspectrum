@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import { downloadConversion, prepareCharacterImage } from "./conversion-browser";
 import { CHARACTER_VIEWS, CONVERSION_STYLES, DEFAULT_CONVERSION_SETTINGS, PASS_LABELS, QUALITY_PROFILES, VIEW_LABELS, validateReferenceSet, type CharacterRender, type CharacterView, type ConversionSettings, type PreparedCharacterImage, type RenderPass, type ShapeEngine } from "./conversion-contract";
 import { buildCharacterKit } from "./conversion-kit";

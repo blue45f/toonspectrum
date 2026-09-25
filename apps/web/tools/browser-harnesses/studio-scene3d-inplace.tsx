@@ -1,5 +1,5 @@
 
-import "../../src/styles/globals.css";
+import "../../src/app/styles/globals.css";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import * as THREE from "three";

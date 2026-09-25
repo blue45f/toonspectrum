@@ -22,7 +22,7 @@ import "./hiring.css";
 
 import type { HiringResume, HiringResumeInput, HiringResumeVersion } from "../../../../../../packages/contracts/src/creator-hiring";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { getApiErrorMessage } from "@/platform/api";
 import { Container } from "@/shared/components/section";
 import { useApp } from "@/shared/lib/store";

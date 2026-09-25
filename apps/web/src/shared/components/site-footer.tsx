@@ -10,8 +10,8 @@ import {
 } from "./site-navigation";
 import { ToonSpectrumMark } from "./visual-marks";
 
-import Link from "@/compat/router-link";
-import { usePathname } from "@/compat/navigation";
+import Link from "@/shared/navigation/router-link";
+import { usePathname } from "@/shared/navigation/navigation";
 import { isPublicCreativeRoute } from "./site-public-routes";
 
 import "./public-site-shell.css";

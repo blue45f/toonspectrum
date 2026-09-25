@@ -30,11 +30,11 @@ import {
 
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import {
   useDocumentTitle,
   useMetaDescription,
-} from "@/hooks/use-document-title";
+} from "@/shared/seo/use-document-title";
 
 export function MarketComparePage() {
   useDocumentTitle("에셋 비교 · 창작 마켓");

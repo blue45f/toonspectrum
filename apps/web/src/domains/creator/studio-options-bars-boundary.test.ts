@@ -126,7 +126,7 @@ describe("Studio options-bars module boundary", () => {
       "react",
       "./StudioDrawingWorkbenchControls",
       "./studio-page-lazy-ui",
-      "@/hooks/use-media-query",
+      "@/shared/hooks/use-media-query",
     ]);
     expect(drawingInputDeck.valueImports).toEqual([
       "lucide-react",
@@ -139,7 +139,7 @@ describe("Studio options-bars module boundary", () => {
     expect(optionsBars.source).not.toContain("<StudioDrawingInputDeck");
     expect(optionsBars.allImports).not.toContain("konva");
     expect(optionsBars.allImports).not.toContain("react-konva");
-    expect(optionsBars.allImports).not.toContain("@/hooks/use-resizable");
+    expect(optionsBars.allImports).not.toContain("@/shared/hooks/use-resizable");
     expect(drawingInputDeck.allImports).not.toContain("konva");
     expect(drawingInputDeck.allImports).not.toContain("react-konva");
     expect(optionsBars.source).not.toContain("localStorage");

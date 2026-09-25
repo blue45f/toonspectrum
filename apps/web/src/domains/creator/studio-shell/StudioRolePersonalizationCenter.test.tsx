@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
   useCreatorRoleWorkspace: vi.fn(),
 }));
 
-vi.mock("@/compat/auth-session-store", () => ({
+vi.mock("@/domains/auth/public/session/auth-session-store", () => ({
   useSession: () => ({ status: "authenticated" }),
 }));
 vi.mock("@/platform/me-client", () => ({

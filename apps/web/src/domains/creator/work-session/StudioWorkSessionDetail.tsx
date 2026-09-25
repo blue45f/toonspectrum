@@ -1,7 +1,7 @@
 import { useStudioSessionFormDraft } from "./use-studio-session-form-draft";
 import { useLayoutEffect, useState } from "react";
 import type { StudioWorkSession, StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { studioVirtualSpaceReviewHref } from "../virtual-space/studio-virtual-space-review-invitation";
 import { useStudioReviewRoster } from "../virtual-space/use-studio-review-roster";

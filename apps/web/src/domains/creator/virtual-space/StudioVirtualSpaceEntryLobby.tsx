@@ -1,7 +1,7 @@
 import { CameraOff, MicOff, Network, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import { useState } from "react";
 
-import Link from "@/compat/router-link";
+import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";

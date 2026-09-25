@@ -8,7 +8,7 @@ import { useStudioFloatingSurfaceLayout } from "./use-studio-floating-surface-la
 
 import type { StudioAnimaticPageLike } from "./studio-animatic-timeline";
 
-import { useIsMobile } from "@/hooks/use-media-query";
+import { useIsMobile } from "@/shared/hooks/use-media-query";
 
 export interface StudioAnimaticTimelineDialogProps {
   readonly open: boolean;

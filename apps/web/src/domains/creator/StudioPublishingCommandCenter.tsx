@@ -146,9 +146,9 @@ import {
 } from "@/shared/lib/creator-publication-contract";
 import { readCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
 import { cn } from "@/shared/lib/utils";
-import { useSession } from "@/compat/auth-session-store";
-import Link from "@/compat/router-link";
-import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useSession } from "@/domains/auth/public/session/auth-session-store";
+import Link from "@/shared/navigation/router-link";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 import {
   getChallenge,
   getSeries,
