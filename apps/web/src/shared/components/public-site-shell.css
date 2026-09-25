@@ -139,29 +139,9 @@
 }
 
 @media (width < 768px) {
-  .public-site-journey__inner { padding-inline: 4px; }
-  .public-site-journey__routes {
-    display: grid;
-    flex: 1;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0;
-    overflow: visible;
-  }
-  .public-site-journey__routes a {
-    min-width: 0;
-    justify-content: center;
-    gap: 3px;
-    padding-inline: 2px;
-    font-size: clamp(0.54rem, 2.45vw, 0.64rem);
-    white-space: nowrap;
-  }
-  .public-site-journey__routes a > span:last-child {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .public-site-journey__step,
-  .public-site-journey__about { display: none; }
+  /* Mobile already has the global five-item bottom navigation. Removing this duplicate rail
+   * gives the hero back a full row and prevents truncated labels such as "내 프로…". */
+  .public-site-journey { display: none; }
   .public-footer-invitation { min-height: 390px; align-items: end; }
   .public-footer-invitation__art { width: 100%; }
   .public-footer-invitation::after { background: linear-gradient(0deg, var(--color-panel) 8%, oklch(0.185 0.009 68 / 0.94) 42%, oklch(0.185 0.009 68 / 0.25)); }

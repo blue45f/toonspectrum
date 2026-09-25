@@ -341,7 +341,7 @@
 
 .studio-creator-section-heading span {
   color: color-mix(in srgb, var(--toon-violet) 72%, var(--color-fg));
-  font-size: 0.62rem;
+  font-size: 0.68rem;
   font-weight: 950;
   letter-spacing: 0.13em;
 }
@@ -439,7 +439,7 @@
   background: rgba(5, 7, 15, 0.58);
   padding: 0.3rem 0.5rem;
   color: rgba(255, 255, 255, 0.78);
-  font-size: 0.55rem;
+  font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.09em;
   backdrop-filter: blur(10px);
@@ -559,7 +559,7 @@
 }
 
 .studio-ai-director__badge {
-  font-size: 0.56rem;
+  font-size: 0.68rem;
   letter-spacing: 0.08em;
   white-space: nowrap;
 }

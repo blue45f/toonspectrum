@@ -51,7 +51,7 @@ function primary(
   return { ...nav(id, href, labelKo, labelEn, descriptionKo, descriptionEn), workspacePreset };
 }
 
-const PROJECTS = nav("projects", "/studio/projects", "작품", "Projects", "최근 작품과 회차를 확인합니다.", "Open recent projects and episodes.");
+const PROJECTS = nav("projects", "/studio", "작품", "Projects", "최근 작품과 회차를 확인합니다.", "Open recent projects and episodes.");
 const PRODUCTION = nav("production", "/production", "제작 현황", "Production", "담당 업무와 인수인계를 확인합니다.", "Review assigned work and handoffs.");
 const ASSETS = nav("assets", "/studio/assets", "소재", "Assets", "프로젝트 자료와 반복 제작 자산을 엽니다.", "Open project references and reusable assets.");
 const REVIEW = nav("review", "/production", "검수", "Review", "수정 요청과 승인 대기를 확인합니다.", "Review change requests and approvals.");
@@ -148,7 +148,7 @@ const ROLE_EXPERIENCES: Readonly<Record<CreatorRoleId, CreatorRoleExperience>> =
   educator: {
     role: "educator",
     primaryAction: primary("classroom", "/learn/classroom", "수업 이어가기", "Resume teaching", "최근 수업과 학생 실습 흐름을 바로 확인합니다.", "Open the latest class and student practice flow.", "quick-sketch"),
-    navigation: [nav("classroom", "/learn/classroom", "수업·과제", "Classes & assignments", "수업 흐름과 학생 과제를 관리합니다.", "Manage lessons and assignments."), nav("learn", "/learn", "교육 자료", "Learning resources", "웹툰 제작 교육 자료를 찾습니다.", "Find webtoon production resources."), nav("practice", "/studio/projects", "학생 실습", "Student practice", "실습 프로젝트와 작품을 확인합니다.", "Review practice projects and student work."), nav("review", "/production", "피드백·검수", "Feedback & review", "피드백과 수정 요청을 확인합니다.", "Review feedback and revisions."), ASSETS],
+    navigation: [nav("classroom", "/learn/classroom", "수업·과제", "Classes & assignments", "수업 흐름과 학생 과제를 관리합니다.", "Manage lessons and assignments."), nav("learn", "/learn", "교육 자료", "Learning resources", "웹툰 제작 교육 자료를 찾습니다.", "Find webtoon production resources."), nav("practice", "/studio", "학생 실습", "Student practice", "실습 프로젝트와 작품을 확인합니다.", "Review practice projects and student work."), nav("review", "/production", "피드백·검수", "Feedback & review", "피드백과 수정 요청을 확인합니다.", "Review feedback and revisions."), ASSETS],
     emptyStateKo: "진행 중인 수업이 없으면 새 실습 과제를 준비해 보세요.",
     emptyStateEn: "Prepare a new practice assignment when no class is active.",
   },

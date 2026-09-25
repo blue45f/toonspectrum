@@ -256,15 +256,16 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
     <aside
       data-testid="site-background-music-player"
       data-site-ost="mounted"
-      className={dock ? "relative z-50" : "fixed bottom-4 left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))]"}
-      aria-label={korean ? "툰스펙트럼 오리지널 OST" : "ToonSpectrum original OST"}
+      data-site-ost-expanded={expanded || undefined}
+      className={dock ? "relative z-50" : "fixed bottom-4 left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] max-md:left-3"}
+      aria-label={korean ? "툰스튜디오 오리지널 OST" : "ToonStudio original OST"}
     >
       {expanded ? (
         <div className={cn("w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-line bg-panel/95 shadow-2xl backdrop-blur-xl", dock ? "fixed right-3 top-20 sm:absolute sm:right-0 sm:top-14" : "mb-2")}>
           <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
             <div className="min-w-0">
               <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-accent">
-                <Sparkles className="size-3.5" aria-hidden="true" /> TOONSPECTRUM ORIGINAL OST
+                <Sparkles className="size-3.5" aria-hidden="true" /> TOONSTUDIO ORIGINAL OST
               </p>
               <p className="mt-1 truncate text-sm font-black text-fg">{themeLabel}</p>
               <p className="mt-1 text-xs leading-5 text-fg-2">{themeDescription}</p>
@@ -360,17 +361,18 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
         </div>
       ) : null}
 
-      {dock ? <button ref={dockToggle} type="button" onClick={toggleExpanded} className="grid size-11 place-items-center rounded-lg border border-line bg-panel text-fg-2" aria-expanded={expanded} aria-label={korean ? "OST 설정" : "OST settings"}><Music2 size={18} aria-hidden="true" /></button> : <div className="flex max-w-[min(26rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl">
+      {dock ? <button ref={dockToggle} type="button" onClick={toggleExpanded} className="grid size-11 place-items-center rounded-lg border border-line bg-panel text-fg-2" aria-expanded={expanded} aria-label={korean ? "OST 설정" : "OST settings"}><Music2 size={18} aria-hidden="true" /></button> : <div className="flex max-w-[min(26rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl max-md:w-[6.25rem] max-md:max-w-none">
         <button type="button" onClick={() => void togglePlayback()} disabled={!hasPublishedOst} className={cn("grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent", !hasPublishedOst ? "cursor-not-allowed bg-raised text-fg-3" : playing ? "bg-accent text-on-accent" : "bg-raised text-fg-2 hover:text-fg")} aria-label={playing ? (korean ? "OST 일시정지" : "Pause OST") : (korean ? "OST 재생" : "Play OST")} aria-pressed={playing}>
           {playing ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
         </button>
-        <button type="button" onClick={toggleExpanded} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-expanded={expanded}>
-          <span className={cn("size-2 shrink-0 rounded-full", playing ? "animate-pulse bg-good" : hasPublishedOst ? "bg-fg-3" : "bg-warn")} aria-hidden="true" />
-          <span className="min-w-0 flex-1">
+        <button type="button" onClick={toggleExpanded} className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-full px-2 text-left hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent max-md:size-11 max-md:flex-none max-md:justify-center max-md:px-0" aria-expanded={expanded}>
+          <Music2 className="hidden size-4 text-fg-2 max-md:block" aria-hidden="true" />
+          <span className={cn("size-2 shrink-0 rounded-full max-md:hidden", playing ? "animate-pulse bg-good" : hasPublishedOst ? "bg-fg-3" : "bg-warn")} aria-hidden="true" />
+          <span className="min-w-0 flex-1 max-md:sr-only">
             <span className="block truncate text-[0.6875rem] font-bold text-fg-3">{korean ? "오리지널 애니·웹툰 OST" : "Original animation · webtoon OST"}</span>
             <span className="block truncate text-xs font-black text-fg">{activeLabel}</span>
           </span>
-          {expanded ? <ChevronDown className="size-4 shrink-0 text-fg-3" aria-hidden="true" /> : <ChevronUp className="size-4 shrink-0 text-fg-3" aria-hidden="true" />}
+          {expanded ? <ChevronDown className="size-4 shrink-0 text-fg-3 max-md:hidden" aria-hidden="true" /> : <ChevronUp className="size-4 shrink-0 text-fg-3 max-md:hidden" aria-hidden="true" />}
         </button>
       </div>}
     </aside>

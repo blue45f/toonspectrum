@@ -46,7 +46,7 @@ const COPY = {
       "설치한 에셋과 관심 에셋은 마켓의 내 에셋에서 관리합니다.",
     ],
     destinations: [
-      ["프로젝트", "최근 프로젝트, 로컬 초안, 공유 작업, 버전과 복구", "/studio/projects"],
+      ["프로젝트", "최근 프로젝트, 로컬 초안, 공유 작업, 버전과 복구", "/studio"],
       ["내 작품", "공개한 창작물과 시리즈, 작성자 활동", "/me?tab=posts"],
       ["내 서재", "읽고 싶음·읽는 중·완독·평가·컬렉션", "/library"],
       ["내 에셋", "설치·보관한 Studio 리소스와 관심 에셋", "/market/library"],
@@ -76,7 +76,7 @@ const COPY = {
       "Manage installed and bookmarked assets in Market > My Assets.",
     ],
     destinations: [
-      ["Projects", "Recent projects, local drafts, shared work, versions and recovery", "/studio/projects"],
+      ["Projects", "Recent projects, local drafts, shared work, versions and recovery", "/studio"],
       ["My works", "Published creator works, series and author activity", "/me?tab=posts"],
       ["My library", "Want to read, reading, completed, ratings and collections", "/library"],
       ["My assets", "Installed and saved Studio resources plus bookmarked assets", "/market/library"],

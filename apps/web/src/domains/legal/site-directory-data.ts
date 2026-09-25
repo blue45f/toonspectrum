@@ -196,7 +196,7 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       authorityDestination("production"),
       authorityDestination("studio-home"),
       authorityDestination("studio-new"),
-      destination("/studio/projects", "프로젝트 목록", "Project list", "기존 프로젝트를 찾아 이어서 작업", "Find an existing project and continue your work"),
+      destination("/production/projects", "제작 프로젝트 목록", "Production projects", "일정·담당·검수 상태를 기준으로 운영 프로젝트 찾기", "Find operating projects by schedule, assignment and review state"),
       authorityDestination("studio-assets"),
       destination(
         "/market",

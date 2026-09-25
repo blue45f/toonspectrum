@@ -43,7 +43,7 @@ export function StudioProjectLibraryManagementHeader({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/studio/projects" className={buttonClass({ variant: "quiet" })}>
+          <Link href="/production" className={buttonClass({ variant: "quiet" })}>
             {bi("제작 관리", "Production management")}
           </Link>
           <Link href="/studio/import" className={buttonClass({ variant: "outline" })}>

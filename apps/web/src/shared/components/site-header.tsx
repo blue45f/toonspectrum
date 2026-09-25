@@ -217,8 +217,9 @@ export function SiteHeader() {
   const primaryNavigation = primarySiteNavigationForPath(pathname);
   const create = SITE_NAVIGATION_ITEMS.make;
   const brandHref = "/";
-  const brandName =
-    navigationContext === "studio" ? "ToonStudio" : t("app.name");
+  // ToonStudio is the user-facing product name across public and creator contexts. The
+  // navigation contract may change by audience, but the brand must not appear to switch apps.
+  const brandName = "ToonStudio";
   const brandDescription =
     navigationContext === "studio"
       ? SITE_NAVIGATION_ITEMS.production.description
@@ -305,7 +306,7 @@ export function SiteHeader() {
                   {brandName}
                 </span>
                 <span
-                  className="hidden rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-display text-[0.55rem] font-bold uppercase leading-none tracking-[0.12em] text-accent min-[410px]:inline"
+                  className="hidden rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-display text-[0.65rem] font-bold uppercase leading-none tracking-[0.12em] text-accent min-[410px]:inline"
                   title={t("app.brandBeta")}
                 >
                   {translateCurrentStaticSourceText(
@@ -315,7 +316,7 @@ export function SiteHeader() {
                   )}
                 </span>
               </span>
-              <span className="hidden font-display text-[0.56rem] font-semibold uppercase tracking-[0.16em] text-fg-3 lg:block">
+              <span className="hidden font-display text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-fg-3 lg:block">
                 {brandTagline}
               </span>
             </span>
@@ -383,7 +384,7 @@ export function SiteHeader() {
               </span>
               <kbd
                 aria-hidden="true"
-                className="hidden items-center gap-0.5 rounded-md border border-line bg-panel px-1.5 py-0.5 font-display text-[0.62rem] text-fg-3 sm:flex lg:hidden xl:flex"
+                className="hidden items-center gap-0.5 rounded-md border border-line bg-panel px-1.5 py-0.5 font-display text-[0.68rem] text-fg-3 sm:flex lg:hidden xl:flex"
               >
                 ⌘K
               </kbd>

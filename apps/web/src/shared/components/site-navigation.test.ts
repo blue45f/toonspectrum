@@ -29,12 +29,14 @@ describe("site navigation information architecture", () => {
       "all-menu",
     ]);
     expect(TOONSPECTRUM_PRIMARY_NAVIGATION.map((item) => item.id)).toEqual([
-      "workspace-home",
+      "home",
       "studio",
       "explore",
       "community",
       "all-menu",
     ]);
+    expect(SITE_NAVIGATION_ITEMS.workspaceHome.href).toBe("/home");
+    expect(SITE_NAVIGATION_ITEMS.home.href).toBe("/");
 
     expect(SITE_NAVIGATION_ITEMS.studio.href).toBe("/studio");
     expect(SITE_NAVIGATION_ITEMS.make.href).toBe("/studio/new");
@@ -97,58 +99,44 @@ describe("site navigation information architecture", () => {
     );
   });
 
-  it("switches desktop and mobile navigation from the current product context", () => {
-    expect(siteNavigationContextForPath("/")).toBe("studio");
-    expect(siteNavigationContextForPath("/studio")).toBe("studio");
-    expect(siteNavigationContextForPath("/production")).toBe("studio");
-    expect(siteNavigationContextForPath("/brand-film")).toBe("studio");
-    expect(siteNavigationContextForPath("/about/technology")).toBe("studio");
-    expect(siteNavigationContextForPath("/about/technology/story")).toBe("studio");
-    expect(siteNavigationContextForPath("/production/projects/sample-project/overview")).toBe("studio");
-    expect(siteNavigationContextForPath("/studio/canvas")).toBe("studio");
-    expect(siteNavigationContextForPath("/studio/assets/brushes/new")).toBe("studio");
-    expect(siteNavigationContextForPath("/learn/webtoon")).toBe("studio");
-    expect(siteNavigationContextForPath("/help")).toBe("studio");
-    expect(siteNavigationContextForPath("/help/getting-started")).toBe("studio");
-    expect(siteNavigationContextForPath("/market")).toBe("studio");
-    expect(siteNavigationContextForPath("/showcase")).toBe("studio");
-    expect(siteNavigationContextForPath("/collaborate")).toBe("studio");
-    expect(siteNavigationContextForPath("/now")).toBe("studio");
-    expect(siteNavigationContextForPath("/references")).toBe("studio");
-    expect(siteNavigationContextForPath("/make")).toBe("studio");
-    expect(siteNavigationContextForPath("/publishing")).toBe("studio");
-    expect(siteNavigationContextForPath("/shaper")).toBe("studio");
-    expect(siteNavigationContextForPath("/music")).toBe("studio");
-    expect(siteNavigationContextForPath("/brush-lab")).toBe("studio");
-    expect(siteNavigationContextForPath("/discover")).toBe("spectrum");
-    expect(siteNavigationContextForPath("/community")).toBe("spectrum");
-    expect(siteNavigationContextForPath("/fortune")).toBe("spectrum");
+  it("switches desktop and mobile navigation from the current audience context", () => {
+    for (const pathname of [
+      "/", "/brand-film", "/about/technology", "/about/technology/story",
+      "/help", "/market", "/showcase", "/collaborate", "/now", "/references",
+      "/discover", "/community", "/fortune",
+    ]) {
+      expect(siteNavigationContextForPath(pathname), pathname).toBe("spectrum");
+    }
+    for (const pathname of [
+      "/home", "/studio", "/production", "/production/projects/sample-project/overview",
+      "/studio/canvas", "/studio/assets/brushes/new", "/learn/webtoon", "/help/getting-started",
+      "/make", "/publishing", "/shaper", "/music", "/brush-lab",
+    ]) {
+      expect(siteNavigationContextForPath(pathname), pathname).toBe("studio");
+    }
 
-    expect(primarySiteNavigationForPath("/")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
-    expect(primarySiteNavigationForPath("/studio")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
-    expect(primarySiteNavigationForPath("/help")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
-    expect(primarySiteNavigationForPath("/about/technology")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
+    expect(primarySiteNavigationForPath("/")).toBe(TOONSPECTRUM_PRIMARY_NAVIGATION);
     expect(primarySiteNavigationForPath("/discover")).toBe(TOONSPECTRUM_PRIMARY_NAVIGATION);
-    expect(siteNavigationGroupsForPath("/")).toBe(TOONSTUDIO_NAVIGATION_GROUPS);
+    expect(primarySiteNavigationForPath("/help")).toBe(TOONSPECTRUM_PRIMARY_NAVIGATION);
+    expect(primarySiteNavigationForPath("/home")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
+    expect(primarySiteNavigationForPath("/studio")).toBe(TOONSTUDIO_PRIMARY_NAVIGATION);
+    expect(siteNavigationGroupsForPath("/")).toBe(TOONSPECTRUM_NAVIGATION_GROUPS);
+    expect(siteNavigationGroupsForPath("/about/technology")).toBe(TOONSPECTRUM_NAVIGATION_GROUPS);
+    expect(siteNavigationGroupsForPath("/home")).toBe(TOONSTUDIO_NAVIGATION_GROUPS);
     expect(siteNavigationGroupsForPath("/studio")).toBe(TOONSTUDIO_NAVIGATION_GROUPS);
-    expect(siteNavigationGroupsForPath("/about/technology")).toBe(TOONSTUDIO_NAVIGATION_GROUPS);
-    expect(siteNavigationGroupsForPath("/discover")).toBe(TOONSPECTRUM_NAVIGATION_GROUPS);
-    expect(mobileSiteTabsForPath("/")).toBe(TOONSTUDIO_MOBILE_TABS);
-    expect(mobileSiteTabsForPath("/studio")).toBe(TOONSTUDIO_MOBILE_TABS);
-    expect(mobileSiteTabsForPath("/help")).toBe(TOONSTUDIO_MOBILE_TABS);
+    expect(mobileSiteTabsForPath("/")).toBe(TOONSPECTRUM_MOBILE_TABS);
     expect(mobileSiteTabsForPath("/discover")).toBe(TOONSPECTRUM_MOBILE_TABS);
+    expect(mobileSiteTabsForPath("/home")).toBe(TOONSTUDIO_MOBILE_TABS);
+    expect(mobileSiteTabsForPath("/studio")).toBe(TOONSTUDIO_MOBILE_TABS);
   });
 
-  it("uses the same five destinations across Studio and discovery contexts", () => {
-    const expected = [
-      "workspace-home",
-      "studio",
-      "explore",
-      "community",
-      "all-menu",
-    ];
-    expect(TOONSTUDIO_MOBILE_TABS.map((item) => item.id)).toEqual(expected);
-    expect(TOONSPECTRUM_MOBILE_TABS.map((item) => item.id)).toEqual(expected);
+  it("keeps the same purposes while giving public and personal home distinct URLs", () => {
+    expect(TOONSTUDIO_MOBILE_TABS.map((item) => item.id)).toEqual([
+      "workspace-home", "studio", "explore", "community", "all-menu",
+    ]);
+    expect(TOONSPECTRUM_MOBILE_TABS.map((item) => item.id)).toEqual([
+      "home", "studio", "explore", "community", "all-menu",
+    ]);
   });
 
   it("keeps notifications, Help, Settings and account destinations available from the utility area", () => {

@@ -15,7 +15,7 @@ const ICONS = { discover: Compass, learn: BookOpen, market: Store, make: Palette
 const PRODUCTION_ICONS = { production: Workflow, projects: FolderKanban, make: Palette, assets: Boxes, publish: PackageCheck };
 const PRODUCTION_JOURNEY = [
   { id: "production", href: "/production", ko: "제작 관리", en: "Production" },
-  { id: "projects", href: "/studio/projects", ko: "내 프로젝트", en: "Projects" },
+  { id: "projects", href: "/studio", ko: "내 프로젝트", en: "Projects" },
   { id: "make", href: "/studio/new", ko: "새 작품", en: "New work" },
   { id: "assets", href: "/studio/assets", ko: "작품 재료", en: "Assets" },
   { id: "publish", href: "/studio/publish", ko: "검수·내보내기", en: "Review & export" },

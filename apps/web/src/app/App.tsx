@@ -14,6 +14,7 @@ import { installStudioDocumentNavigationBridge } from "./studio-document-navigat
 import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route";
 import { AppearanceBridge } from "@/shared/components/appearance/AppearanceBridge";
 import { SiteHeader } from "@/shared/components/site-header";
+import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { useI18n } from "@/shared/lib/i18n";
 import { useUi } from "@/shared/lib/ui-store";
@@ -253,7 +254,7 @@ function AppRuntime() {
   const studioImmersive = isImmersiveMobileRoute(pathname);
   const adminChrome = isAdminPath(pathname);
   const isolatedChrome = studioImmersive || adminChrome;
-  const publicExperience = !isStudioRoutePathname(pathname) && !adminChrome;
+  const publicExperience = isPublicCreativeRoute(pathname);
 
   // Catalog refresh is unrelated to manuscript creation, review or local recovery.
   useKmasEntryMerge(!adminChrome && /^\/(?:discover|search|ranking|title|genre|tag|platforms|recommendations)(?:\/|$)/u.test(pathname));

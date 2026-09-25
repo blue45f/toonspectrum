@@ -253,7 +253,12 @@ for (const [viewportName, viewport] of viewports) {
             }).catch(() => undefined);
             await page.waitForTimeout(35);
             result.finalPath = new URL(page.url()).pathname;
-            let sceneExpected = auditSceneCheck && routePurposeSceneExpected(result.finalPath);
+            const runtimeSceneExpectation = async () => {
+              const value = await page.evaluate(() => document.documentElement.dataset.routePurposeScene ?? null)
+                .catch(() => null);
+              return value === null ? routePurposeSceneExpected(new URL(page.url()).pathname) : value === "true";
+            };
+            let sceneExpected = auditSceneCheck && await runtimeSceneExpectation();
             if (sceneExpected && auditSceneStrict) {
               await page.locator(".route-purpose-scene[data-route-visual-kind]")
                 .waitFor({ state: "visible", timeout: auditSceneTimeoutMs })
@@ -261,7 +266,7 @@ for (const [viewportName, viewport] of viewports) {
               const settledPath = new URL(page.url()).pathname;
               if (settledPath !== result.finalPath) {
                 result.finalPath = settledPath;
-                sceneExpected = routePurposeSceneExpected(settledPath);
+                sceneExpected = auditSceneCheck && await runtimeSceneExpectation();
               }
             }
             result.metrics = await page.evaluate(({ expectedTheme, expectedScene }) => {

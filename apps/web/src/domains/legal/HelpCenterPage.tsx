@@ -40,7 +40,7 @@ const TOPICS = [
   {
     id: "projects",
     icon: FileWarning,
-    href: "/studio/projects",
+    href: "/studio",
     ko: ["프로젝트·저장·복구", "최근 프로젝트, 로컬 초안, 버전, 백업과 복구 경로를 확인합니다.", "프로젝트 저장 동기화 복구 백업 오프라인"],
     en: ["Projects, save & recovery", "Find recent projects, local drafts, versions, backup and recovery paths.", "project save sync recovery backup offline"],
   },

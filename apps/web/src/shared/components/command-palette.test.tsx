@@ -56,21 +56,21 @@ describe("CommandPalette", () => {
     expect(screen.getByPlaceholderText(/작품 제목, 작가, 기능 명령, 스튜디오 도구 검색/)).toBeDefined();
 
     // 탭 확인
-    expect(screen.getByRole("button", { name: /전체/ })).toBeDefined();
-    expect(screen.getByRole("button", { name: /작품/ })).toBeDefined();
-    expect(screen.getByRole("button", { name: /명령어/ })).toBeDefined();
-    expect(screen.getByRole("button", { name: /스튜디오/ })).toBeDefined();
-    expect(screen.getByRole("button", { name: /페이지/ })).toBeDefined();
+    expect(screen.getByRole("tab", { name: /전체/ })).toBeDefined();
+    expect(screen.getByRole("tab", { name: /작품/ })).toBeDefined();
+    expect(screen.getByRole("tab", { name: /명령어/ })).toBeDefined();
+    expect(screen.getByRole("tab", { name: /스튜디오/ })).toBeDefined();
+    expect(screen.getByRole("tab", { name: /페이지/ })).toBeDefined();
 
     // 키보드 가이드 확인
-    expect(screen.getByText("카테고리 전환")).toBeDefined();
+    expect(screen.getByText("분류 전환")).toBeDefined();
     expect(screen.getByText("접두사 필터")).toBeDefined();
   });
 
   it("카테고리 탭 클릭 시 해당 모드로 필터링된다", async () => {
     render(<CommandPalette open={true} onOpenChange={vi.fn()} />);
 
-    const commandTab = screen.getByRole("button", { name: /명령어/ });
+    const commandTab = screen.getByRole("tab", { name: /명령어/ });
     await act(async () => {
       fireEvent.click(commandTab);
     });
@@ -80,6 +80,22 @@ describe("CommandPalette", () => {
       expect(screen.getAllByText("효과음(SFX) 토글").length).toBeGreaterThan(0);
       expect(screen.getByText("현재 페이지 링크 복사")).toBeDefined();
     });
+  });
+
+  it("방향키로 검색 범위 탭을 이동하고 Tab의 기본 포커스 이동은 가로채지 않는다", async () => {
+    render(<CommandPalette open={true} onOpenChange={vi.fn()} />);
+
+    const allTab = screen.getByRole("tab", { name: "전체" });
+    const titlesTab = screen.getByRole("tab", { name: /작품/ });
+    fireEvent.keyDown(allTab, { key: "ArrowRight" });
+
+    await waitFor(() => {
+      expect(titlesTab.getAttribute("aria-selected")).toBe("true");
+    });
+
+    const tabEvent = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    expect(titlesTab.dispatchEvent(tabEvent)).toBe(true);
+    expect(tabEvent.defaultPrevented).toBe(false);
   });
 
   it("접두사(>) 입력 시 명령어 모드로 자동 전환된다", async () => {

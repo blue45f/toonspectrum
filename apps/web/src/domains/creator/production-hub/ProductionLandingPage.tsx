@@ -15,7 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import {
   getProductionPersonalInbox,
@@ -53,6 +53,8 @@ function Metric({ label, value, detail, icon: Icon, tone = "neutral" }: { readon
 }
 
 export function ProductionLandingPage() {
+  const { pathname } = useLocation();
+  const directoryMode = pathname.replace(/\/+$/u, "") === "/production/projects";
   const userId = useApp((state) => state.userId);
   const [projects, setProjects] = useState<readonly ProductionProjectSummary[]>([]);
   const [inboxItems, setInboxItems] = useState<readonly ProductionPersonalInboxItem[]>([]);
@@ -118,23 +120,34 @@ export function ProductionLandingPage() {
       <div className="mx-auto max-w-[90rem] px-4 py-6 sm:px-6 lg:px-8">
         <header className="rounded-3xl border border-line bg-panel p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-accent">
-            <span>ToonStudio</span><span aria-hidden="true">/</span><span>웹툰 제작 관리</span>
+            <span>ToonStudio</span><span aria-hidden="true">/</span><span>{directoryMode ? "제작 프로젝트" : "웹툰 제작 관리"}</span>
           </div>
           <div className="mt-5 grid gap-6 lg:grid-cols-[1.3fr_0.7fr] lg:items-end">
             <div>
               <h1 className="max-w-4xl text-3xl font-black tracking-tight text-fg sm:text-5xl">
-                흩어진 웹툰 제작을 하나의 흐름으로
+                {directoryMode ? "제작 프로젝트를 찾고 바로 운영하세요" : "흩어진 웹툰 제작을 하나의 흐름으로"}
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-7 text-fg-2 sm:text-base">
-                기획·회차·담당자·일정·파일·검수·계약을 연결해, 팀과 1인 작가 모두 다음 할 일을 바로 알 수 있습니다.
+                {directoryMode
+                  ? "작품별 일정·담당·검수·인수인계 상태를 같은 기준으로 비교하고, 지금 조치할 프로젝트부터 여세요."
+                  : "기획·회차·담당자·일정·파일·검수·계약을 연결해, 팀과 1인 작가 모두 다음 할 일을 바로 알 수 있습니다."}
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/production/workspaces">팀 워크스페이스</Link>
-                <Link className={buttonClass({ size: "lg" })} to="/production/projects/sample-project/overview">
-                  기능 미리 보기 <ArrowRight className="size-4" aria-hidden="true" />
-                </Link>
-                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/studio/projects">
-                  내 프로젝트 열기
+                {directoryMode ? (
+                  <>
+                    <Link className={buttonClass({ size: "lg" })} to="/studio/new">새 프로젝트 만들기</Link>
+                    <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/production">제작 관리 소개</Link>
+                  </>
+                ) : (
+                  <>
+                    <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/production/workspaces">팀 워크스페이스</Link>
+                    <Link className={buttonClass({ size: "lg" })} to="/production/projects/sample-project/overview">
+                      기능 미리 보기 <ArrowRight className="size-4" aria-hidden="true" />
+                    </Link>
+                  </>
+                )}
+                <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/studio">
+                  내 작품 열기
                 </Link>
               </div>
             </div>
@@ -152,7 +165,7 @@ export function ProductionLandingPage() {
             className="mt-6"
             title="내 제작 포트폴리오"
             description="여러 작품의 다음 연재, 일정 안정도, 차단·검수·인력 공백을 같은 기준으로 비교합니다. 위험한 작품을 먼저 표시합니다."
-            action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to="/studio/projects">프로젝트 만들기</Link>}
+            action={<Link className={buttonClass({ variant: "outline", size: "sm" })} to="/studio/new">새 프로젝트 만들기</Link>}
           >
             {projectsLoading ? (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="프로젝트 목록 불러오는 중">
@@ -230,6 +243,28 @@ export function ProductionLandingPage() {
             ) : (
               <div className="rounded-2xl border border-dashed border-line p-8 text-center"><LayoutDashboard className="mx-auto size-8 text-fg-3" aria-hidden="true" /><p className="mt-3 text-sm font-black text-fg">운영 중인 제작 프로젝트가 없습니다</p><p className="mt-1 text-xs text-fg-2">Studio 프로젝트에서 제작 관리 프로젝트를 연결해 주세요.</p></div>
             )}
+          </SectionCard>
+        ) : directoryMode ? (
+          <SectionCard
+            className="mt-6"
+            title="제작 프로젝트를 한곳에서 관리하세요"
+            description="로그인한 팀 프로젝트는 일정·담당·검수 상태와 함께 표시됩니다. 기기 안의 개인 작품은 작품 라이브러리에서 계속 작업할 수 있습니다."
+            action={<Link className={buttonClass({ size: "sm" })} to="/studio/new">새 프로젝트 만들기</Link>}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Link to="/studio" className="group rounded-2xl border border-line bg-panel p-5 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                <LayoutDashboard className="size-6 text-accent" aria-hidden="true" />
+                <h3 className="mt-4 text-base font-black text-fg">내 작품 라이브러리</h3>
+                <p className="mt-2 text-xs leading-6 text-fg-2">최근 작품, 로컬 초안, 공유 작업과 복구 가능한 원고를 확인합니다.</p>
+                <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-accent">작품 열기 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span>
+              </Link>
+              <Link to="/production/projects/sample-project/overview" className="group rounded-2xl border border-line bg-panel p-5 transition-colors hover:border-accent/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                <ClipboardCheck className="size-6 text-accent" aria-hidden="true" />
+                <h3 className="mt-4 text-base font-black text-fg">샘플 제작 프로젝트</h3>
+                <p className="mt-2 text-xs leading-6 text-fg-2">기획부터 작업 배정, 인수인계, 검수와 배포까지 연결된 운영 화면을 미리 확인합니다.</p>
+                <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-accent">샘플 열기 <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" /></span>
+              </Link>
+            </div>
           </SectionCard>
         ) : null}
 

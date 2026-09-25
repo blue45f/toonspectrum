@@ -98,7 +98,7 @@ function productionFlow(_locale: StudioFrontDoorLocale): readonly StudioTaskFlow
 
 const HOME_ACTIONS: readonly FrontDoorCard[] = [
   {
-    href: "/studio/projects",
+    href: "/studio",
     icon: FolderKanban,
     title: { ko: "이어서 작업", en: "Continue working" },
     description: {
@@ -454,7 +454,7 @@ export function StudioNewPage() {
         description={bi("크기·색 공간·레이어 구조는 추천값으로 준비하고, 전문 설정은 필요할 때만 펼칩니다.", "Recommended size, color and layer structure are prepared automatically. Advanced settings stay available when needed.")}
         locale={locale}
         action={
-          <Link href="/studio/projects" className={buttonClass({ variant: "outline", size: "lg", className: "w-full min-w-0 gap-2 sm:w-auto" })}>
+          <Link href="/studio" className={buttonClass({ variant: "outline", size: "lg", className: "w-full min-w-0 gap-2 sm:w-auto" })}>
             <FolderKanban size={17} className="shrink-0" aria-hidden="true" />
             <span className="break-words">{bi("프로젝트 보기", "View projects")}</span>
           </Link>

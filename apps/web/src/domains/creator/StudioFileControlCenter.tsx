@@ -469,7 +469,7 @@ export function StudioFileControlCenter(): ReactElement {
         </div>
         <div className="flex items-center gap-2">
           <a
-            href="/studio/projects"
+            href="/studio"
             className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 text-[0.64rem] font-bold text-fg-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <FolderOpen size={13} aria-hidden /> 프로젝트 라이브러리

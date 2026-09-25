@@ -186,6 +186,7 @@ export function FloatingControls({
   return (
     <div
       ref={rootRef}
+      data-floating-controls="true"
       className={cx(PLACEMENT_CLASS[placement], className)}
       onMouseEnter={reveal}
       onMouseLeave={scheduleHide}

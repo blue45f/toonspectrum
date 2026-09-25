@@ -65,7 +65,7 @@ const COPY = {
       ["오늘의 영감", "빈 화면의 부담을 줄이는 짧은 장면 미션", "/now"],
       ["리서치", "출처와 이용조건을 보존하며 자료 모으기", "/research"],
       ["스토리 연구실", "인물·욕망·갈등·전환점을 구조화", "/story-lab"],
-      ["Studio 프로젝트", "페이지·레이어·3D·협업으로 실제 원고 제작", "/studio/projects"],
+      ["Studio 프로젝트", "페이지·레이어·3D·협업으로 실제 원고 제작", "/studio"],
       ["공개와 피드백", "창작 갤러리와 커뮤니티에서 작품 공유", "/create"],
     ],
     tools: [
@@ -109,7 +109,7 @@ const COPY = {
       ["Daily inspiration", "Short scene prompts that reduce blank-page pressure", "/now"],
       ["Research", "Collect references while preserving sources and usage terms", "/research"],
       ["Story lab", "Structure character, desire, conflict and turning points", "/story-lab"],
-      ["Studio projects", "Build real pages with layers, 3D and collaboration", "/studio/projects"],
+      ["Studio projects", "Build real pages with layers, 3D and collaboration", "/studio"],
       ["Release & feedback", "Share work through the creator gallery and community", "/create"],
     ],
     tools: [
@@ -143,7 +143,7 @@ export function MakeHubPage() {
             <p className="mt-4 max-w-2xl text-sm leading-7 text-fg-2 sm:text-base">{copy.body}</p>
 
             <Link
-              href="/studio/projects"
+              href="/studio"
               className="mt-7 flex max-w-3xl items-center gap-4 rounded-2xl border border-accent/35 bg-accent-soft/35 p-4 transition-all hover:-translate-y-0.5 hover:border-accent/60 hover:bg-accent-soft/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
             >
               <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-accent text-on-accent"><Palette size={20} aria-hidden="true" /></span>

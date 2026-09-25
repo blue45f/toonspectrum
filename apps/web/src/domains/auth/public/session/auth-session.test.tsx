@@ -134,7 +134,7 @@ describe("SessionProvider server reconciliation", () => {
         }),
       ),
     ],
-  ])("초기 %s를 미인증으로 강등하지 않고 cleanup 시 재시도를 취소한다", async (_label, response) => {
+  ])("초기 %s에서도 공개 화면을 준비하고 cleanup 시 재시도를 취소한다", async (_label, response) => {
     vi.useFakeTimers();
     apiRaw.mockImplementation(response);
 
@@ -146,7 +146,7 @@ describe("SessionProvider server reconciliation", () => {
     await flushPendingWork();
 
     expect(apiRaw).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("pending:unauthenticated:none")).toBeTruthy();
+    expect(screen.getByText("ready:unauthenticated:none")).toBeTruthy();
 
     unmount();
     await act(async () => {
@@ -155,7 +155,7 @@ describe("SessionProvider server reconciliation", () => {
     expect(apiRaw).toHaveBeenCalledTimes(1);
   });
 
-  it("미확정 응답은 마지막 공개 프로필을 유지하되 검증 전에는 ready가 아니다", async () => {
+  it("미확정 응답은 마지막 공개 프로필을 유지하면서 공개 화면을 준비한다", async () => {
     vi.useFakeTimers();
     persistSession({ user: { id: "cached-user" }, token: null });
     apiRaw.mockRejectedValue(new TypeError("offline"));
@@ -167,7 +167,7 @@ describe("SessionProvider server reconciliation", () => {
     );
     await flushPendingWork();
 
-    expect(screen.getByText("pending:authenticated:cached-user")).toBeTruthy();
+    expect(screen.getByText("ready:authenticated:cached-user")).toBeTruthy();
     unmount();
   });
 
@@ -186,7 +186,7 @@ describe("SessionProvider server reconciliation", () => {
     });
 
     expect(apiRaw).toHaveBeenCalledTimes(4);
-    expect(screen.getByText("pending:unauthenticated:none")).toBeTruthy();
+    expect(screen.getByText("ready:unauthenticated:none")).toBeTruthy();
 
     apiRaw.mockImplementation(async () => authenticatedResponse());
     await act(async () => {

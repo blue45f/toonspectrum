@@ -223,7 +223,7 @@ export function CreatorHomeExperience() {
             <Link href="/product-tour" className="cf-button cf-secondary">{copy.secondary}</Link>
           </div>
           <div className="cf-hero-links">
-            <Link href="/studio/projects">{copy.projects}<ArrowRight size={14} aria-hidden="true" /></Link>
+            <Link href="/studio">{copy.projects}<ArrowRight size={14} aria-hidden="true" /></Link>
             <Link href="/brand-film">{copy.brandFilm}<ArrowRight size={14} aria-hidden="true" /></Link>
           </div>
           <div className="cf-trust" aria-label={bi("핵심 제작 기능", "Core creation capabilities")}>
