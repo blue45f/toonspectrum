@@ -29,7 +29,11 @@ try {
       if(cache[name])return cache[name].exports;
       if(!sources[name])throw new Error('Unknown module '+name);
       const mod={exports:{}};cache[name]=mod;
-      const require=(request)=>{const parts=name.split('/');parts.pop();for(const part of request.split('/')){if(part==='..')parts.pop();else if(part!=='.')parts.push(part);}return load(parts.join('/')+'.js');};
+      const require=(request)=>{
+        if(request==='@toonspectrum/core/creator-resources')return load('packages/core/src/creator-resources.js');
+        if(request==='fast-xml-parser')return {XMLParser:class{parse(){throw new Error('XML provider parsing is outside the browser workspace harness');}}};
+        const parts=name.split('/');parts.pop();for(const part of request.split('/')){if(part==='..')parts.pop();else if(part!=='.')parts.push(part);}return load(parts.join('/')+'.js');
+      };
       new Function('require','module','exports',sources[name])(require,mod,mod.exports);return mod.exports;
     }
     globalThis.testLibrary=load('apps/web/src/shared/lib/creator-workspace-persistence.js');
