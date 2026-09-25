@@ -98,3 +98,12 @@
  .studio-vspace-mobile-more-grid :is(button,a){display:flex;min-height:48px;align-items:center;justify-content:center;gap:.4rem;border:1px solid var(--vs2-line);border-radius:.75rem;background:var(--vs2-panel-2);color:var(--vs2-fg);font-size:.75rem;font-weight:850;text-decoration:none}
  .workspace-inspector[data-presentation=adaptive],.workspace-inspector[data-presentation=nonmodal]{inset:auto 0 0!important;z-index:140!important;width:100%!important;max-width:none!important;max-height:92dvh!important;border-radius:1.25rem 1.25rem 0 0!important}
 }
+
+/* Player-controlled mobile ergonomics. */
+@media(max-width:760px){
+ .studio-vspace-touch-joystick-wrap[data-handedness=left]{left:.75rem!important;right:auto!important;transform-origin:left bottom}
+ .studio-vspace-stage[data-handedness=left] .studio-vspace-touch-action{left:auto!important;right:.75rem!important}
+ .studio-vspace-touch-joystick-wrap[data-control-mode=tap]{display:none!important}
+ .studio-vspace-stage[data-control-mode=tap] .studio-vspace-touch-action{left:50%!important;right:auto!important;bottom:5.25rem!important;translate:-50% 0;max-width:13rem}
+ .studio-vspace-joystick[data-mode=floating]{width:8rem;height:8rem;border-style:dashed;background:color-mix(in srgb,var(--color-panel) 62%,transparent)}
+}

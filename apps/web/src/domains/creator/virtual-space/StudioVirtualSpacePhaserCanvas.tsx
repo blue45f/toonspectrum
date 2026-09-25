@@ -73,6 +73,23 @@ import { StudioDeskPodRuntime } from "./studio-virtual-space-desk-pods";
 import { studioRuntimeBudget, studioTownInterestSnapshot } from "./studio-virtual-space-town-program";
 import type { StudioVirtualDecorationState } from "./studio-virtual-space-customization";
 import {
+  DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
+  type StudioVirtualExperiencePreference,
+} from "./studio-virtual-space-experience-preference";
+import {
+  StudioVirtualAdaptiveQualityController,
+  studioVirtualAutomaticQualityTier,
+  studioVirtualQualityProfile,
+} from "./studio-virtual-space-quality";
+import {
+  sanitizeStudioVirtualRuntimeMetrics,
+  type StudioVirtualRuntimeMetrics,
+} from "./studio-virtual-space-observability";
+import {
+  layoutStudioVirtualNameplates,
+  studioVirtualNameplatePresentation,
+} from "./studio-virtual-space-nameplate-layout";
+import {
   studioTownEnvironmentInteractions,
   studioTownNearestWalkablePoint,
   studioTownTraversalProfile,
@@ -131,12 +148,15 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly snapshot: StudioVirtualSpaceSnapshot;
   readonly bridge: StudioVirtualSpaceEngineBridge;
   readonly selfIdentity?: string;
+  readonly selfDisplayName?: string;
   /** AUTO in product; Canvas is useful for lifecycle-only browser harnesses. */
   readonly renderer?: "auto" | "webgl" | "canvas";
   readonly debugWorld?: boolean;
   readonly atmosphere?: StudioNpcAtmosphere;
   readonly artStyle?: StudioVirtualArtStyleKey;
   readonly decorations?: StudioVirtualDecorationState;
+  readonly experiencePreference?: StudioVirtualExperiencePreference;
+  readonly onRuntimeMetrics?: (metrics: StudioVirtualRuntimeMetrics) => void;
   readonly selfPose?: { readonly state: "sit"; readonly facing: StudioVirtualSpaceFacing };
   readonly waveActorIds?: readonly string[];
   /** Membership/lease authority belongs to the caller. Anchor attaches the rendered hips only. */
@@ -161,6 +181,7 @@ interface PeerVisual {
   readonly sprite: import("phaser").GameObjects.Sprite;
   readonly label: import("phaser").GameObjects.Text;
   readonly reaction: import("phaser").GameObjects.Text;
+  displayName: string;
   targetX: number;
   targetY: number;
   avatarIndex: number;
@@ -248,11 +269,14 @@ export function StudioVirtualSpacePhaserCanvas({
   snapshot,
   bridge,
   selfIdentity = "local",
+  selfDisplayName = "Me",
   renderer = "auto",
   debugWorld = false,
   atmosphere = "balanced",
   artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
   decorations = EMPTY_DECORATIONS,
+  experiencePreference = DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
+  onRuntimeMetrics,
   selfPose,
   waveActorIds = [],
   seatedActors = [],
@@ -278,10 +302,16 @@ export function StudioVirtualSpacePhaserCanvas({
   poseRef.current = { selfPose, waveActorIds, seatedActors };
   const decorationsRef = useRef(decorations);
   decorationsRef.current = decorations;
+  const experienceRef = useRef(experiencePreference);
+  experienceRef.current = experiencePreference;
+  const metricsCallbackRef = useRef(onRuntimeMetrics);
+  metricsCallbackRef.current = onRuntimeMetrics;
   const guideTourRef = useRef(guideTourRequest);
   guideTourRef.current = guideTourRequest;
   const identityRef = useRef(selfIdentity);
   identityRef.current = selfIdentity;
+  const displayNameRef = useRef(selfDisplayName);
+  displayNameRef.current = selfDisplayName;
   const hostRef = useRef<HTMLDivElement | null>(null);
   const snapshotRef = useRef(snapshot);
   const callbacksRef = useRef({
@@ -351,14 +381,30 @@ export function StudioVirtualSpacePhaserCanvas({
       await new Promise<void>((resolve) => globalThis.requestAnimationFrame(() => resolve()));
       if (cancelled || !mount.isConnected) return;
       const mountRect = parent.getBoundingClientRect();
-      let viewport = studioRenderViewport(mountRect.width, mountRect.height, globalThis.devicePixelRatio || 1);
+      const reducedMotion = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
+      const qualityEnvironment = () => ({
+        viewportWidth: parent.clientWidth,
+        reducedMotion: reducedMotion.matches,
+        deviceMemory: (navigator as Navigator & { readonly deviceMemory?: number }).deviceMemory,
+        hardwareConcurrency: navigator.hardwareConcurrency,
+      });
+      let currentQualityProfile = studioVirtualQualityProfile(experienceRef.current.qualityPreset, qualityEnvironment());
+      const adaptiveQuality = new StudioVirtualAdaptiveQualityController(currentQualityProfile.tier);
+      let resizeRuntime: () => void = () => undefined;
+      let lastMetricsAt = -Infinity;
+      let lastQualityTier = currentQualityProfile.tier;
+      let lastRequestedQualityPreset = experienceRef.current.qualityPreset;
+      let viewport = studioRenderViewport(
+        mountRect.width,
+        mountRect.height,
+        Math.min(globalThis.devicePixelRatio || 1, currentQualityProfile.dprCap),
+      );
       mount.style.width = `${Math.max(1, Math.round(mountRect.width || parent.clientWidth || 1))}px`;
       mount.style.height = `${Math.max(1, Math.round(mountRect.height || parent.clientHeight || 1))}px`;
 
       const Phaser = await import("phaser");
       if (cancelled || !mount.isConnected) return;
 
-      const reducedMotion = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
       const scene = new Phaser.Scene("ToonSpectrumVirtualStudio") as import("phaser").Scene & {
         preload: () => void;
         create: () => void;
@@ -437,6 +483,7 @@ export function StudioVirtualSpacePhaserCanvas({
       cleanup.push(() => characterAssets.close());
       const interactionById = new Map(interactions.map((interaction) => [interaction.id, interaction] as const));
 
+      let applyCameraMode: () => void = () => undefined;
       let localPose = new StudioFixedStepPose(snapshotRef.current.self);
       const fixedStepClock = new StudioFixedStepClock();
       const cameraTarget = { x: snapshotRef.current.self.x, y: snapshotRef.current.self.y };
@@ -636,6 +683,7 @@ export function StudioVirtualSpacePhaserCanvas({
             sprite,
             label,
             reaction,
+            displayName: peer.participant.displayName,
             targetX: peer.state.x,
             targetY: peer.state.y,
             avatarIndex: peer.state.avatarIndex,
@@ -655,6 +703,7 @@ export function StudioVirtualSpacePhaserCanvas({
           moving: peer.state.moving,
           facing: peer.state.facing,
         });
+        visual.displayName = peer.participant.displayName;
         visual.targetX = peer.state.x;
         visual.targetY = peer.state.y;
         visual.avatarIndex = peer.state.avatarIndex;
@@ -704,6 +753,7 @@ export function StudioVirtualSpacePhaserCanvas({
             activityState(moving, false, next.self.activity),
             identityRef.current,
           );
+          localLabel?.setText(displayNameRef.current);
           localReaction?.setText(reactionGlyph(next.selfReaction)).setVisible(Boolean(next.selfReaction));
         }
       };
@@ -894,7 +944,7 @@ export function StudioVirtualSpacePhaserCanvas({
           .setData({ visualWidth: 98, visualHeight: 131, assetOwner: "self" })
           .setDisplaySize(98, 131)
           .setDepth(Math.round(initialPoint.y) + 1_001);
-        localLabel = this.add.text(initialPoint.x, initialPoint.y + 20, "ME", {
+        localLabel = this.add.text(initialPoint.x, initialPoint.y + 20, displayNameRef.current, {
           fontFamily: "Inter, Pretendard, sans-serif",
           fontSize: "10px",
           fontStyle: "bold",
@@ -1011,6 +1061,8 @@ export function StudioVirtualSpacePhaserCanvas({
 
         this.input.on("pointerdown", (pointer: import("phaser").Input.Pointer) => {
           if (!pointer.leftButtonDown()) return;
+          const nativePointer = pointer.event as PointerEvent | undefined;
+          if (nativePointer?.pointerType === "touch" && experienceRef.current.controlMode !== "tap") return;
           bridge.setFollowingPeer(null);
           callbacksRef.current.onCancelFollow();
           approachState = EMPTY_STUDIO_WORLD_APPROACH;
@@ -1021,7 +1073,11 @@ export function StudioVirtualSpacePhaserCanvas({
         const camera = this.cameras.main;
         camera.setBounds(0, 0, manifest.width, manifest.height);
         camera.startFollow(cameraTarget, false, reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
-        camera.setDeadzone(150, 100);
+        applyCameraMode = () => {
+          const mode = experienceRef.current.cameraMode;
+          camera.setDeadzone(mode === "steady" ? 200 : mode === "cinematic" ? 110 : 150, mode === "steady" ? 135 : mode === "cinematic" ? 78 : 100);
+        };
+        applyCameraMode();
         const resizeCamera = (gameSize: { width: number; height: number }) => {
           const cover = Math.max(gameSize.width / manifest.width, gameSize.height / manifest.height);
           // Gather-like navigation keeps the avatar and nearby interaction targets readable.
@@ -1077,7 +1133,16 @@ export function StudioVirtualSpacePhaserCanvas({
           if (document.activeElement !== canvas && !promptHasFocus()) stopMovement();
         };
         const visibility = () => { if (document.hidden) { npcDirector.cancelGuideTour(); stopMovement(); } };
-        const reduceMotionChanged = () => camera.setLerp(reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
+        const reduceMotionChanged = () => {
+          camera.setLerp(reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
+          const tier = experienceRef.current.qualityPreset === "auto"
+            ? studioVirtualAutomaticQualityTier(qualityEnvironment())
+            : experienceRef.current.qualityPreset;
+          adaptiveQuality.reset(tier);
+          currentQualityProfile = studioVirtualQualityProfile(tier, qualityEnvironment());
+          lastQualityTier = currentQualityProfile.tier;
+          resizeRuntime();
+        };
         canvas.addEventListener("pointerdown", focusCanvas);
         canvas.addEventListener("keydown", preventGameScrolling);
         globalThis.addEventListener("keyup", releaseKey);
@@ -1144,6 +1209,24 @@ export function StudioVirtualSpacePhaserCanvas({
         if (!localBody || !localBodyPhysics || !localSprite || !localShadow || !localLabel) return;
         const dt = Math.min(0.05, Math.max(0, deltaMs / 1000));
         if (!sceneReady || cancelled) return;
+        const requestedQuality = experienceRef.current.qualityPreset;
+        if (requestedQuality !== lastRequestedQualityPreset) {
+          lastRequestedQualityPreset = requestedQuality;
+          const selectedTier = requestedQuality === "auto"
+            ? studioVirtualAutomaticQualityTier(qualityEnvironment())
+            : requestedQuality;
+          adaptiveQuality.reset(selectedTier);
+          currentQualityProfile = studioVirtualQualityProfile(selectedTier, qualityEnvironment());
+          lastQualityTier = currentQualityProfile.tier;
+          resizeRuntime();
+        }
+        const qualitySample = adaptiveQuality.sample(deltaMs, requestedQuality === "auto" && !reducedMotion.matches);
+        if (qualitySample.tier !== lastQualityTier) {
+          lastQualityTier = qualitySample.tier;
+          currentQualityProfile = studioVirtualQualityProfile(qualitySample.tier, qualityEnvironment());
+          resizeRuntime();
+        }
+        parent.dataset.qualityTier = currentQualityProfile.tier;
         if (time - lastAssetCollectionAt >= 1_000) {
           characterAssets.collect();
           lastAssetCollectionAt = time;
@@ -1253,12 +1336,13 @@ export function StudioVirtualSpacePhaserCanvas({
             callbacksRef.current.onNearbyInteractionChange?.(highlighted);
             for (const [id, marker] of interactionMarkers) {
               const active = id === nearbyInteractionId;
+              marker.setVisible(active || experienceRef.current.interactionRings);
               marker.setAlpha(active ? 1 : 0.62);
               marker.setScale(active ? 1.16 : 1);
             }
           }
           highlightRing?.clear();
-          if (highlighted) {
+          if (highlighted && experienceRef.current.interactionRings) {
             highlightRing?.lineStyle(3, 0xf5d78a, 1).strokeCircle(highlighted.point.x, highlighted.point.y, highlighted.radius);
           }
           if (decision.activateId) {
@@ -1418,12 +1502,13 @@ export function StudioVirtualSpacePhaserCanvas({
         const activity = snapshotRef.current.self.activity;
         const speed = Math.hypot(motion.velocity.x, motion.velocity.y);
         const runtimeBudget = studioRuntimeBudget(parent.clientWidth, reducedMotion.matches, peers.size);
+        const maxActiveNpcs = Math.min(runtimeBudget.maxActiveNpcs, currentQualityProfile.maxActiveNpcs);
         const peerInterest = studioTownInterestSnapshot(manifest, currentPoint, [...peers].map(([id, peer]) => ({
           id: `peer:${id}`,
           point: { x: peer.targetX, y: peer.targetY },
           kind: "peer" as const,
           important: bridge.getFollowingPeer() === id,
-        })));
+        })), currentQualityProfile.interestRadius);
         proximityOverlay?.clear();
         if (proximityOverlay && atmosphereRef.current !== "focus" && activity !== "focused" && activity !== "away") {
           const origin = studioProjectTownPoint(manifest, currentPoint);
@@ -1452,7 +1537,15 @@ export function StudioVirtualSpacePhaserCanvas({
         decorationRuntime?.update(time, currentPoint, reducedMotion.matches);
         const environmentEffect = bridge.consumeEnvironmentEffect();
         if (environmentEffect) livingWorld?.triggerEnvironmentEffect(environmentEffect.effect, environmentEffect.point, time);
-        livingWorld?.update(time, deltaMs, currentPoint, speed, reducedMotion.matches);
+        livingWorld?.update(
+          time,
+          deltaMs,
+          currentPoint,
+          speed,
+          reducedMotion.matches,
+          currentQualityProfile,
+          experienceRef.current.effectLevel,
+        );
         const traveled = lastPosition ? Math.hypot(currentPoint.x - lastPosition.x, currentPoint.y - lastPosition.y) : 0;
         if (traveled > 0.015) lastMovedAt = time;
         // Render frames can outnumber fixed physics steps. Do not toggle idle/walk on zero-step frames.
@@ -1481,7 +1574,11 @@ export function StudioVirtualSpacePhaserCanvas({
         localSprite.setData("walkDistance", localDistance);
         localSprite.setData("seatAttached", Boolean(localSeat));
         applyAvatarVisual(localSprite, snapshotRef.current.self, localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, localState, identityRef.current);
-        const lookAhead = reducedMotion.matches ? 0 : sprint ? 0.24 : 0.16;
+        applyCameraMode();
+        const cameraMode = experienceRef.current.cameraMode;
+        const lookAhead = reducedMotion.matches || cameraMode === "steady" ? 0
+          : cameraMode === "cinematic" ? sprint ? .32 : .24
+            : sprint ? .24 : .16;
         const cameraGroundTarget = {
           x: Math.max(0, Math.min(manifest.width, rendered.x + motion.velocity.x * lookAhead)),
           y: Math.max(0, Math.min(manifest.height, rendered.y + motion.velocity.y * lookAhead)),
@@ -1489,7 +1586,8 @@ export function StudioVirtualSpacePhaserCanvas({
         const cameraVisualTarget = studioProjectTownPoint(manifest, cameraGroundTarget);
         cameraTarget.x = cameraVisualTarget.x;
         cameraTarget.y = cameraVisualTarget.y;
-        const followAmount = snapCamera || reducedMotion.matches ? 1 : studioCameraLerp(dt);
+        const followBase = cameraMode === "steady" ? .075 : cameraMode === "cinematic" ? .16 : .12;
+        const followAmount = snapCamera || reducedMotion.matches ? 1 : studioCameraLerp(dt, followBase);
         this.cameras.main.setLerp(followAmount, followAmount);
         if (snapCamera) this.cameras.main.centerOn(cameraVisualTarget.x, cameraVisualTarget.y);
 
@@ -1511,6 +1609,15 @@ export function StudioVirtualSpacePhaserCanvas({
           identityRef.current, localSprite, localLabel, localVisualPoint,
           localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, nextMoving, localResolved, time,
         );
+        localLabel.setText(displayNameRef.current).setVisible(true).setAlpha(1).setScale(1);
+        const duplicateNames = new Map<string, number>();
+        for (const name of [displayNameRef.current, ...[...peers.values()].map((peer) => peer.displayName)]) {
+          duplicateNames.set(name, (duplicateNames.get(name) ?? 0) + 1);
+        }
+        const nameplateCandidates: Array<{ id: string; x: number; y: number; width: number; height: number; priority: number }> = [];
+        const nameplateBases = new Map<string, { label: import("phaser").GameObjects.Text; x: number; y: number }>();
+        nameplateCandidates.push({ id: "self", x: localLabel.x, y: localLabel.y, width: localLabel.displayWidth, height: localLabel.displayHeight, priority: 100 });
+        nameplateBases.set("self", { label: localLabel, x: localLabel.x, y: localLabel.y });
 
         for (const [peerId, visual] of peers) {
           const target = visual.timeline.sample(Date.now()) ?? {
@@ -1541,19 +1648,34 @@ export function StudioVirtualSpacePhaserCanvas({
           }
           visual.sprite.setDepth(studioTownDepthForPoint(manifest, peerGroundPoint, 1_001));
           const peerHeadY = visual.sprite.y - visual.sprite.displayHeight * visual.sprite.originY;
-          visual.label.setPosition(visual.sprite.x, peerSeat ? peerHeadY - 24 : visual.sprite.y + 18)
-            .setDepth(peerSeat ? 160_000 : Math.round(visual.sprite.y) + 1_002);
+          const peerLabelY = peerSeat ? peerHeadY - 24 : visual.sprite.y + 18;
+          const nameplate = studioVirtualNameplatePresentation({
+            name: visual.displayName,
+            sessionId: peerId,
+            duplicateCount: duplicateNames.get(visual.displayName) ?? 1,
+            distance: Math.hypot(target.x - currentPoint.x, target.y - currentPoint.y),
+            mode: experienceRef.current.nameplateMode,
+            important: bridge.getFollowingPeer() === peerId || visual.nearby,
+            activity: visual.activity,
+          });
+          visual.label.setText(nameplate.text).setPosition(visual.sprite.x, peerLabelY)
+            .setDepth(peerSeat ? 160_000 : Math.round(visual.sprite.y) + 1_002)
+            .setAlpha(nameplate.alpha).setScale(nameplate.scale);
           visual.reaction.setPosition(visual.sprite.x, peerSeat ? peerHeadY - 48 : visual.sprite.y - 125);
           const peerVisible = peerInterest.activeIds.has("peer:" + peerId);
+          const labelVisible = peerVisible && nameplate.visible;
           visual.sprite.setVisible(peerVisible);
-          visual.label.setVisible(peerVisible);
+          visual.label.setVisible(labelVisible);
+          if (labelVisible) {
+            nameplateCandidates.push({ id: peerId, x: visual.label.x, y: visual.label.y, width: visual.label.displayWidth, height: visual.label.displayHeight, priority: visual.nearby ? 30 : 10 });
+            nameplateBases.set(peerId, { label: visual.label, x: visual.label.x, y: visual.label.y });
+          }
           if (!peerVisible) visual.reaction.setVisible(false);
           decorationRuntime?.syncActor(
             peerId, visual.sprite, visual.label, peerVisualPoint,
             peerSeatRequested?.facing ?? target.facing, target.moving, peerResolved, time,
           );
         }
-
         const tourRequest = guideTourRef.current;
         if ((tourRequest?.id ?? null) !== lastGuideRequestId) {
           lastGuideRequestId = tourRequest?.id ?? null;
@@ -1581,7 +1703,7 @@ export function StudioVirtualSpacePhaserCanvas({
         const tourState = npcDirector.guideTourState;
         const npcInterest = studioTownInterestSnapshot(manifest, currentPoint, npcViews.map((view) => ({
           id: "npc:" + view.id, point: view.point, kind: "npc" as const, important: view.id === tourState?.guideId,
-        })));
+        })), currentQualityProfile.interestRadius);
         let visibleNpcCount = 0;
         const serializedTour = JSON.stringify(tourState);
         if (tourState && serializedTour !== lastGuideState) { lastGuideState = serializedTour; callbacksRef.current.onGuideTourChange?.(tourState); }
@@ -1589,12 +1711,15 @@ export function StudioVirtualSpacePhaserCanvas({
           const npc = npcs.get(view.id);
           if (!npc) continue;
           const importantNpc = view.id === tourState?.guideId;
-          const npcVisible = importantNpc || (npcInterest.activeIds.has("npc:" + view.id) && visibleNpcCount < runtimeBudget.maxActiveNpcs);
+          const npcVisible = importantNpc || (npcInterest.activeIds.has("npc:" + view.id) && visibleNpcCount < maxActiveNpcs);
           if (npcVisible) visibleNpcCount += 1;
           npc.sprite.setVisible(npcVisible);
           npc.shadow.setVisible(npcVisible);
-          npc.label.setVisible(npcVisible);
-          if (!npcVisible) { npc.reaction.setVisible(false); continue; }
+          if (!npcVisible) {
+            npc.label.setVisible(false);
+            npc.reaction.setVisible(false);
+            continue;
+          }
           npc.phase = view.phase;
           npc.groundPoint = view.point;
           const attached = view.seatAttachmentPoint && scene.textures.exists(studioCharacterPoseTextureKey(npc.skin, "sit"));
@@ -1607,12 +1732,55 @@ export function StudioVirtualSpacePhaserCanvas({
           applySpriteVisual(npc.sprite, npc.skin, view.facing, view.animation);
           npc.shadow.setPosition(shadowPoint.x, shadowPoint.y + 1).setDepth(studioTownDepthForPoint(manifest, view.point, 990)).setVisible(!attached);
           const headY = npc.sprite.y - npc.sprite.displayHeight * npc.sprite.originY;
-          npc.label.setPosition(visualPoint.x, attached ? headY - 22 : visualPoint.y + 9)
-            .setDepth(attached ? 160_000 : studioTownDepthForPoint(manifest, groundPoint, 1_002));
+          const identity = studioNpcLabel(npc.definition);
+          const npcName = btRef.current(identity.ko, identity.en);
+          const npcNameplate = studioVirtualNameplatePresentation({
+            name: npcName,
+            sessionId: `npc:${view.id}`,
+            duplicateCount: 1,
+            distance: Math.hypot(view.point.x - currentPoint.x, view.point.y - currentPoint.y),
+            mode: experienceRef.current.nameplateMode,
+            important: importantNpc || Boolean(view.greeting),
+            activity: view.phase === "inspect" ? "reviewing" : view.phase === "rest" || view.phase === "wait" ? "away" : "available",
+          });
+          const npcLabelY = attached ? headY - 22 : visualPoint.y + 9;
+          npc.label.setText(npcNameplate.text).setPosition(visualPoint.x, npcLabelY)
+            .setDepth(attached ? 160_000 : studioTownDepthForPoint(manifest, groundPoint, 1_002))
+            .setAlpha(npcNameplate.alpha).setScale(npcNameplate.scale).setVisible(npcNameplate.visible);
+          if (npcNameplate.visible) {
+            const id = `npc:${view.id}`;
+            nameplateCandidates.push({
+              id, x: npc.label.x, y: npc.label.y, width: npc.label.displayWidth,
+              height: npc.label.displayHeight, priority: importantNpc ? 60 : view.greeting ? 35 : 8,
+            });
+            nameplateBases.set(id, { label: npc.label, x: npc.label.x, y: npc.label.y });
+          }
           const greeting = studioNpcActivityLabel(npc.definition, view.phase);
           npc.reaction.setPosition(visualPoint.x, headY - (attached ? 45 : 8))
             .setVisible(view.greeting && !reducedMotion.matches && atmosphereRef.current !== "focus");
           if (view.greeting) npc.reaction.setText(btRef.current(greeting.ko, greeting.en));
+        }
+
+        const nameplateLayout = layoutStudioVirtualNameplates(nameplateCandidates);
+        for (const [id, base] of nameplateBases) {
+          const offset = nameplateLayout.get(id) ?? { x: 0, y: 0 };
+          base.label.setPosition(base.x + offset.x, base.y + offset.y);
+        }
+
+        if (metricsCallbackRef.current && time - lastMetricsAt >= 1_000) {
+          lastMetricsAt = time;
+          metricsCallbackRef.current(sanitizeStudioVirtualRuntimeMetrics({
+            fps: qualitySample.fps,
+            frameTimeMs: qualitySample.frameTimeMs,
+            qualityTier: currentQualityProfile.tier,
+            peerCount: peers.size,
+            visiblePeerCount: peerInterest.activeIds.size,
+            npcCount: npcs.size,
+            visibleNpcCount,
+            routeWaypoints: path.length,
+            failedTextures: failedTextures.size,
+            updatedAt: Date.now(),
+          }));
         }
 
         const changed = !lastPublishedPoint || Math.hypot(localBody.x - lastPublishedPoint.x, localBody.y - lastPublishedPoint.y) > 0.02
@@ -1660,7 +1828,10 @@ export function StudioVirtualSpacePhaserCanvas({
           parent.dataset.interestKey = peerInterest.key;
           parent.dataset.activePeerVisuals = String(peerInterest.activeIds.size);
           parent.dataset.activeNpcVisuals = String(visibleNpcCount);
-          parent.dataset.maxParticles = String(runtimeBudget.maxParticles);
+          parent.dataset.maxParticles = String(Math.round(runtimeBudget.maxParticles * currentQualityProfile.particleRatio));
+          parent.dataset.qualityTier = currentQualityProfile.tier;
+          parent.dataset.controlMode = experienceRef.current.controlMode;
+          parent.dataset.cameraMode = experienceRef.current.cameraMode;
           parent.dataset.texture = localSprite.texture.key;
           parent.dataset.appearanceIssues = JSON.stringify(localSprite.getData("appearanceIssues") ?? []);
           parent.dataset.reaction = localReaction?.visible ? localReaction.text : "";
@@ -1707,7 +1878,11 @@ export function StudioVirtualSpacePhaserCanvas({
       const resize = () => {
         if (cancelled || !mount.isConnected) return;
         const rect = parent.getBoundingClientRect();
-        const next = studioRenderViewport(rect.width, rect.height, globalThis.devicePixelRatio || 1);
+        const next = studioRenderViewport(
+          rect.width,
+          rect.height,
+          Math.min(globalThis.devicePixelRatio || 1, currentQualityProfile.dprCap),
+        );
         mount.style.width = `${next.cssWidth}px`; mount.style.height = `${next.cssHeight}px`;
         if (game?.isBooted && (next.width !== viewport.width || next.height !== viewport.height || next.ratio !== viewport.ratio)) {
           viewport = next;
@@ -1715,6 +1890,7 @@ export function StudioVirtualSpacePhaserCanvas({
           game.scale.resize(next.width, next.height);
         }
       };
+      resizeRuntime = resize;
       const observer = new ResizeObserver(resize);
       observer.observe(parent);
       globalThis.addEventListener("resize", resize);
