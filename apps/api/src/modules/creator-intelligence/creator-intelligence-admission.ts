@@ -1,12 +1,18 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { createHash } from "node:crypto";
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from "node:crypto";
 
 import { LocalAuthRateLimiter } from "../auth/auth-rate-limit";
 
@@ -25,9 +31,18 @@ interface CreatorIntelligenceAdmissionPolicy {
   readonly requiresIdempotency: boolean;
 }
 
+interface MeshJobTokenPayload {
+  readonly version: 1;
+  readonly providerJobId: string;
+  readonly userFingerprint: string;
+  readonly issuedAtMs: number;
+}
+
 const TEN_MINUTES_MS = 10 * 60_000;
 const THIRTY_MINUTES_MS = 30 * 60_000;
 const ONE_DAY_MS = 24 * 60 * 60_000;
+const MESH_JOB_TOKEN_TTL_MS = 7 * ONE_DAY_MS;
+const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 
 const POLICIES: Readonly<
   Record<CreatorIntelligenceProtectedOperation, CreatorIntelligenceAdmissionPolicy>
@@ -77,7 +92,9 @@ export interface CreatorIntelligenceAdmissionOptions {
 }
 
 function enabled(value: string | undefined): boolean {
-  return ["1", "true", "yes", "on"].includes(value?.trim().toLowerCase() ?? "");
+  return ["1", "true", "yes", "on"].includes(
+    value?.trim().toLowerCase() ?? "",
+  );
 }
 
 function subjectFingerprint(
@@ -85,7 +102,16 @@ function subjectFingerprint(
   userId: string,
 ): string {
   return createHash("sha256")
-    .update(JSON.stringify(["creator-intelligence-admission-v1", operation, userId]), "utf8")
+    .update(
+      JSON.stringify(["creator-intelligence-admission-v1", operation, userId]),
+      "utf8",
+    )
+    .digest("hex");
+}
+
+function meshOwnerFingerprint(userId: string): string {
+  return createHash("sha256")
+    .update(JSON.stringify(["creator-intelligence-mesh-owner-v1", userId]), "utf8")
     .digest("hex");
 }
 
@@ -100,15 +126,29 @@ function normalizedIdempotencyKey(value: string | undefined): string {
   return key;
 }
 
+function validProviderJobId(value: string): boolean {
+  return /^[A-Za-z0-9_-]{6,120}$/u.test(value);
+}
+
+function invalidMeshJobToken(): never {
+  throw new BadRequestException({
+    code: "creator_intelligence_mesh_job_token_invalid",
+    message: "3D 작업 조회 토큰이 올바르지 않습니다.",
+  });
+}
+
 export class CreatorIntelligenceAdmissionGuard {
   private readonly env: () => NodeJS.ProcessEnv;
+  private readonly now: () => number;
   private readonly limiter: LocalAuthRateLimiter;
+  private readonly developmentJobTokenSecret = randomBytes(32);
 
   constructor(options: CreatorIntelligenceAdmissionOptions = {}) {
     this.env = options.env ?? (() => process.env);
+    this.now = options.now ?? Date.now;
     this.limiter = new LocalAuthRateLimiter({
       maximumIdentities: options.maximumIdentities ?? 50_000,
-      now: options.now,
+      now: this.now,
     });
   }
 
@@ -116,6 +156,7 @@ export class CreatorIntelligenceAdmissionGuard {
     return {
       paidRoutesEnabled: this.paidRoutesEnabled(),
       enforcement: "authenticated-bounded-process-local",
+      meshJobOwnership: "signed-user-bound-token",
       operations: Object.fromEntries(
         Object.entries(POLICIES).map(([operation, policy]) => [
           operation,
@@ -150,6 +191,9 @@ export class CreatorIntelligenceAdmissionGuard {
     }
 
     const policy = POLICIES[operation];
+    const idempotencyKey = policy.requiresIdempotency
+      ? normalizedIdempotencyKey(rawIdempotencyKey)
+      : null;
     const subject = subjectFingerprint(operation, userId);
     const shortWindow = this.limiter.consume(
       `short:${subject}`,
@@ -165,12 +209,14 @@ export class CreatorIntelligenceAdmissionGuard {
       throw new HttpException({
         code: "creator_intelligence_rate_limited",
         message: "외부 AI 창작 도구 사용 한도에 도달했습니다. 잠시 후 다시 시도하세요.",
-        retryAfterMs: Math.max(shortWindow.remainingTtlMs, dailyWindow.remainingTtlMs),
+        retryAfterMs: Math.max(
+          shortWindow.remainingTtlMs,
+          dailyWindow.remainingTtlMs,
+        ),
       }, HttpStatus.TOO_MANY_REQUESTS);
     }
 
-    if (policy.requiresIdempotency) {
-      const idempotencyKey = normalizedIdempotencyKey(rawIdempotencyKey);
+    if (idempotencyKey) {
       const idempotency = this.limiter.consume(
         `idempotency:${subject}:${idempotencyKey}`,
         1,
@@ -187,10 +233,98 @@ export class CreatorIntelligenceAdmissionGuard {
     return userId;
   }
 
+  wrapMeshJob(userId: string, providerJobId: string): string {
+    if (!validProviderJobId(providerJobId)) {
+      throw new BadRequestException({
+        code: "creator_intelligence_mesh_provider_job_invalid",
+        message: "3D 제공처 작업 ID가 올바르지 않습니다.",
+      });
+    }
+    const payload: MeshJobTokenPayload = {
+      version: 1,
+      providerJobId,
+      userFingerprint: meshOwnerFingerprint(userId),
+      issuedAtMs: this.now(),
+    };
+    const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString(
+      "base64url",
+    );
+    const signature = createHmac("sha256", this.meshJobTokenSecret())
+      .update(encoded, "utf8")
+      .digest("base64url");
+    return `${encoded}.${signature}`;
+  }
+
+  unwrapMeshJob(userId: string, token: string): string {
+    const normalized = token.trim();
+    if (!normalized || normalized.length > 1_024) invalidMeshJobToken();
+    const [encoded, signature, extra] = normalized.split(".");
+    if (!encoded || !signature || extra !== undefined) invalidMeshJobToken();
+
+    const expected = createHmac("sha256", this.meshJobTokenSecret())
+      .update(encoded, "utf8")
+      .digest();
+    let received: Buffer;
+    try {
+      received = Buffer.from(signature, "base64url");
+    } catch {
+      invalidMeshJobToken();
+    }
+    if (received.length !== expected.length || !timingSafeEqual(received, expected)) {
+      invalidMeshJobToken();
+    }
+
+    let payload: MeshJobTokenPayload;
+    try {
+      payload = JSON.parse(
+        Buffer.from(encoded, "base64url").toString("utf8"),
+      ) as MeshJobTokenPayload;
+    } catch {
+      invalidMeshJobToken();
+    }
+    if (
+      payload.version !== 1
+      || !validProviderJobId(payload.providerJobId)
+      || !/^[a-f\d]{64}$/u.test(payload.userFingerprint)
+      || !Number.isSafeInteger(payload.issuedAtMs)
+    ) {
+      invalidMeshJobToken();
+    }
+    const ageMs = this.now() - payload.issuedAtMs;
+    if (ageMs < -MAX_CLOCK_SKEW_MS || ageMs > MESH_JOB_TOKEN_TTL_MS) {
+      throw new BadRequestException({
+        code: "creator_intelligence_mesh_job_token_expired",
+        message: "3D 작업 조회 토큰이 만료되었습니다.",
+      });
+    }
+    if (payload.userFingerprint !== meshOwnerFingerprint(userId)) {
+      throw new ForbiddenException({
+        code: "creator_intelligence_mesh_job_forbidden",
+        message: "이 계정이 만든 3D 작업만 조회할 수 있습니다.",
+      });
+    }
+    return payload.providerJobId;
+  }
+
   private paidRoutesEnabled(): boolean {
     const env = this.env();
     const explicit = env.CREATOR_INTELLIGENCE_PAID_ROUTES_ENABLED;
     if (explicit !== undefined) return enabled(explicit);
     return env.NODE_ENV !== "production";
+  }
+
+  private meshJobTokenSecret(): Buffer {
+    const env = this.env();
+    const configured = env.CREATOR_INTELLIGENCE_JOB_TOKEN_SECRET?.trim();
+    if (configured && configured.length >= 32) {
+      return Buffer.from(configured, "utf8");
+    }
+    if (env.NODE_ENV === "production") {
+      throw new ServiceUnavailableException({
+        code: "creator_intelligence_mesh_job_token_unconfigured",
+        message: "3D 작업 소유권 토큰 설정이 없어 Meshy 경로를 사용할 수 없습니다.",
+      });
+    }
+    return this.developmentJobTokenSecret;
   }
 }
