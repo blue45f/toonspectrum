@@ -162,16 +162,36 @@ export interface SafeSearchResponse {
   readonly policy?: "flag-for-human-review";
 }
 
+// These discovery reads are public and never depend on user identity. Omitting
+// ambient cookies also keeps the reference vault available when session-backed
+// account services are temporarily unavailable.
+const PUBLIC_DISCOVERY_REQUEST = Object.freeze({ credentials: "omit" as const });
+
 export const creatorIntelligenceClient = {
-  status: () => api.get<CreatorIntelligenceStatus>("/creator-intelligence/status"),
+  status: () => api.get<CreatorIntelligenceStatus>(
+    "/creator-intelligence/status",
+    PUBLIC_DISCOVERY_REQUEST,
+  ),
   references: (provider: CreatorIntelligenceReferenceProvider, query: string, page = 1) =>
-    api.get<ReferenceSearchResponse>("/creator-intelligence/references", { params: { provider, q: query, page } }),
+    api.get<ReferenceSearchResponse>("/creator-intelligence/references", {
+      ...PUBLIC_DISCOVERY_REQUEST,
+      params: { provider, q: query, page },
+    }),
   scene: (place: string, date: string) =>
-    api.get<SceneReferenceResponse>("/creator-intelligence/scene", { params: { place, date } }),
+    api.get<SceneReferenceResponse>("/creator-intelligence/scene", {
+      ...PUBLIC_DISCOVERY_REQUEST,
+      params: { place, date },
+    }),
   anilist: (query: string, type: "MANGA" | "ANIME") =>
-    api.get<AniListResponse>("/creator-intelligence/anilist", { params: { q: query, type } }),
+    api.get<AniListResponse>("/creator-intelligence/anilist", {
+      ...PUBLIC_DISCOVERY_REQUEST,
+      params: { q: query, type },
+    }),
   soundSearch: (query: string, page = 1) =>
-    api.get<SoundSearchResponse>("/creator-intelligence/sfx/search", { params: { q: query, page } }),
+    api.get<SoundSearchResponse>("/creator-intelligence/sfx/search", {
+      ...PUBLIC_DISCOVERY_REQUEST,
+      params: { q: query, page },
+    }),
   voiceSynthesize: (input: {
     readonly provider: CreatorIntelligenceVoiceProvider;
     readonly text: string;
