@@ -8,6 +8,8 @@ const readCreatorFile = (name: string) => readFileSync(
   "utf8",
 );
 
+const dynamicImportExpression = (specifier: string) => `import(${JSON.stringify(specifier)})`;
+
 describe("studio pixel-selection workbench integration", () => {
   it("mounts the inspector workbench on the verified raster selection path", () => {
     const source = readCreatorFile("StudioInspectorImageToolsSection.tsx");
@@ -38,9 +40,9 @@ describe("studio pixel-selection workbench integration", () => {
     const canvasSource = readCreatorFile("studio-cuttoon-editor/StudioCuttoonEditorCanvasColumn.tsx");
 
     expect(workbenchSource).toContain('from "./studio-selection-refinement-contract"');
-    expect(workbenchSource).toContain('import("./studio-selection-refinement")');
+    expect(workbenchSource).toContain(dynamicImportExpression("./studio-selection-refinement"));
     expect(workbenchSource).not.toContain('from "./studio-selection-refinement"');
-    expect(canvasSource).toContain('import("../studio-selection-refinement")');
+    expect(canvasSource).toContain(dynamicImportExpression("../studio-selection-refinement"));
     expect(canvasSource).not.toContain('from "../studio-selection-refinement"');
   });
 
