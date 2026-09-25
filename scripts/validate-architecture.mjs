@@ -143,6 +143,9 @@ requirePaths(
     "apps/mobile/ios",
     "apps/mobile/shell/index.html",
     "apps/mobile/scripts/verify-native-media-permissions.mjs",
+    "apps/desktop-sync/README.md",
+    "apps/desktop-sync/src/local-agent/agent.ts",
+    "apps/desktop-sync/src/local-agent/local-agent.test.ts",
     "tools/README.md",
     "tools/media/brand-film/package.json",
     "tools/automation/n8n/toonstudio-brand-film.json",
@@ -180,6 +183,10 @@ forbidPaths(
 forbidPaths(
   ["media", "automation", "marketplace-benchmark"],
   "legacy root tooling path must stay under tools or tests/benchmarks",
+);
+forbidPaths(
+  ["apps/desktop-sync-agent"],
+  "duplicate desktop sync workspace must stay consolidated under apps/desktop-sync",
 );
 
 // Lint exception ledger and its ratchet tests must remain machine-readable.

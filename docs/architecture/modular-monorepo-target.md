@@ -20,8 +20,9 @@ Status: **migration target**. This document separates current reality from the i
   `apps/web/src/domains/admin` and must migrate capability by capability.
 - `apps/api` is a separate workspace package, while existing API→Web imports and the
   `server/common/infrastructure/db` layout remain measured migration debt.
-- `apps/desktop-sync` and `apps/desktop-sync-agent` now have distinct package identities, but
-  their implementation consolidation remains a later slice.
+- `apps/desktop-sync` is the single desktop synchronization workspace. The previous focused
+  watcher/journal companion is preserved under `apps/desktop-sync/src/local-agent` and exposed
+  through the `@toonspectrum/desktop-sync/local-agent` subpath.
 - Reviewed historical release evidence lives under `data/asset-releases`; generated `.qa` and
   `artifacts` paths are ignored and may not be tracked.
 - `apps/mobile` now owns Capacitor configuration, Android/iOS native projects, launch shell,
@@ -77,7 +78,8 @@ Do not use a package to hide application coupling and do not create `packages/do
 3. Move the user-Web administrator console to Admin Web capability by capability.
 4. Keep the completed Web `app/domain/platform/shared` ownership split from regressing.
 5. Move API `server/common/infrastructure/db` code to modules and platform boundaries.
-6. Consolidate desktop sync and root app-specific configuration; preserve the completed mobile boundary.
+6. Preserve the completed mobile and desktop-sync application boundaries while moving remaining
+   root app-specific configuration to its owning application.
 7. Ratchet Creator root files downward and migrate Studio by authority and lifecycle.
 8. Move large immutable runtime assets to manifest-addressed object storage with verified fallback.
 

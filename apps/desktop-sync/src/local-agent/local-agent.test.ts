@@ -9,7 +9,7 @@ import {
   resolveBoundPath,
   safeRelativePath,
   type DesktopSyncBinding,
-} from "../src/index.js";
+} from "./index.js";
 
 let root = "";
 let outside = "";
