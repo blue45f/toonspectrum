@@ -1,6 +1,7 @@
 // 챌린지 — 시드 보장/목록/상세와 참여 가능 검증.
 import { and, asc, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
 
+import { withDatabaseCapability } from "../../common/service-availability";
 import { creatorChallenges, creatorWorks, db } from "../../db";
 
 import {
@@ -9,7 +10,7 @@ import {
   seedChallengeWindow,
   type CreatorChallengeState,
 } from "./community-contract";
-import { ensureCreatorCommunitySchema } from "./community-schema";
+import { requireCreatorCommunitySchema } from "./community-schema";
 import { excludeTestUserId, safeDate } from "./shared";
 import { listWorks } from "./works";
 
@@ -105,66 +106,63 @@ function mapChallengeRow(row: {
 
 // ── 챌린지 목록 — 진행중 우선(마감 임박 순) → 예정 → 종료(최근 종료 순) ──
 export async function listChallenges(): Promise<CreatorChallengeSummary[]> {
-  try {
-    if (!(await ensureCreatorCommunitySchema())) return [];
+  return withDatabaseCapability("creator.challenges.read", async () => {
+    await requireCreatorCommunitySchema("creator.challenges.read");
     await ensureDefaultChallenges();
-    const rows = await db
-      .select({
-        id: creatorChallenges.id,
-        slug: creatorChallenges.slug,
-        title: creatorChallenges.title,
-        theme: creatorChallenges.theme,
-        startsAt: creatorChallenges.startsAt,
-        endsAt: creatorChallenges.endsAt,
-        createdAt: creatorChallenges.createdAt,
-        entries: challengeEntriesExpr(),
-      })
-      .from(creatorChallenges)
-      .orderBy(asc(creatorChallenges.createdAt), asc(creatorChallenges.id));
-    const mapped = rows.map(mapChallengeRow);
-    const stateRank: Record<CreatorChallengeState, number> = { ongoing: 0, upcoming: 1, ended: 2 };
-    return mapped.sort((a, b) => {
-      if (stateRank[a.state] !== stateRank[b.state]) return stateRank[a.state] - stateRank[b.state];
-      const aEnd = a.endsAt ? new Date(a.endsAt).getTime() : Number.MAX_SAFE_INTEGER;
-      const bEnd = b.endsAt ? new Date(b.endsAt).getTime() : Number.MAX_SAFE_INTEGER;
-      // 진행중·예정은 마감 임박 순, 종료는 최근 종료 순
+  const rows = await db
+    .select({
+      id: creatorChallenges.id,
+      slug: creatorChallenges.slug,
+      title: creatorChallenges.title,
+      theme: creatorChallenges.theme,
+      startsAt: creatorChallenges.startsAt,
+      endsAt: creatorChallenges.endsAt,
+      createdAt: creatorChallenges.createdAt,
+      entries: challengeEntriesExpr(),
+    })
+    .from(creatorChallenges)
+    .orderBy(asc(creatorChallenges.createdAt), asc(creatorChallenges.id));
+  const mapped = rows.map(mapChallengeRow);
+  const stateRank: Record<CreatorChallengeState, number> = { ongoing: 0, upcoming: 1, ended: 2 };
+  return mapped.sort((a, b) => {
+    if (stateRank[a.state] !== stateRank[b.state]) return stateRank[a.state] - stateRank[b.state];
+    const aEnd = a.endsAt ? new Date(a.endsAt).getTime() : Number.MAX_SAFE_INTEGER;
+    const bEnd = b.endsAt ? new Date(b.endsAt).getTime() : Number.MAX_SAFE_INTEGER;
       return a.state === "ended" ? bEnd - aEnd : aEnd - bEnd;
     });
-  } catch {
-    return [];
-  }
+  });
 }
 
 // ── 챌린지 상세(slug 또는 id) + 참여작 목록 ─────────────────────────
 export async function getChallenge(key: string, viewerId?: string): Promise<CreatorChallengeDetail | null> {
-  try {
-    if (!(await ensureCreatorCommunitySchema())) return null;
+  return withDatabaseCapability("creator.challenges.read", async () => {
+    await requireCreatorCommunitySchema("creator.challenges.read");
     await ensureDefaultChallenges();
-    const [row] = await db
-      .select({
-        id: creatorChallenges.id,
-        slug: creatorChallenges.slug,
-        title: creatorChallenges.title,
-        theme: creatorChallenges.theme,
-        startsAt: creatorChallenges.startsAt,
-        endsAt: creatorChallenges.endsAt,
-        createdAt: creatorChallenges.createdAt,
-        entries: challengeEntriesExpr(),
-      })
-      .from(creatorChallenges)
-      .where(or(eq(creatorChallenges.slug, key), eq(creatorChallenges.id, key)))
-      .limit(1);
-    if (!row) return null;
+  const [row] = await db
+    .select({
+      id: creatorChallenges.id,
+      slug: creatorChallenges.slug,
+      title: creatorChallenges.title,
+      theme: creatorChallenges.theme,
+      startsAt: creatorChallenges.startsAt,
+      endsAt: creatorChallenges.endsAt,
+      createdAt: creatorChallenges.createdAt,
+      entries: challengeEntriesExpr(),
+    })
+    .from(creatorChallenges)
+    .where(or(eq(creatorChallenges.slug, key), eq(creatorChallenges.id, key)))
+    .limit(1);
+  if (!row) return null;
     const works = await listWorks({ challengeId: row.id, viewerId, sort: "likes" });
     return { ...mapChallengeRow(row), works };
-  } catch {
-    return null;
-  }
+  });
 }
 
 // 참여 가능 챌린지 검증 — 없거나 마감/시작 전이면 throw.
 export async function assertJoinableChallenge(challengeId: string): Promise<{ id: string; title: string }> {
-  const [challenge] = await db
+  return withDatabaseCapability("creator.challenges.write", async () => {
+    await requireCreatorCommunitySchema("creator.challenges.write");
+    const [challenge] = await db
     .select({
       id: creatorChallenges.id,
       title: creatorChallenges.title,
@@ -177,8 +175,9 @@ export async function assertJoinableChallenge(challengeId: string): Promise<{ id
   if (!challenge) throw new Error("챌린지를 찾을 수 없습니다.");
   const state = challengeStateOf(challenge.startsAt, challenge.endsAt);
   if (state === "ended") throw new Error("이미 마감된 챌린지입니다.");
-  if (state === "upcoming") throw new Error("아직 시작 전인 챌린지입니다.");
-  return { id: challenge.id, title: challenge.title };
+    if (state === "upcoming") throw new Error("아직 시작 전인 챌린지입니다.");
+    return { id: challenge.id, title: challenge.title };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════

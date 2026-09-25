@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { MessageCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -35,7 +36,7 @@ export default function FanPostCard({
     if (!globalThis.confirm("이 글을 삭제할까요? 답글도 함께 삭제됩니다.")) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/community/posts/${encodeURIComponent(post.id)}`, withCsrfProtection({
+      const res = await apiFetch(`/api/community/posts/${encodeURIComponent(post.id)}`, withCsrfProtection({
         method: "DELETE",
         headers: sessionToken ? { "x-user-id": sessionToken } : undefined,
       }));

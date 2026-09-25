@@ -26,6 +26,7 @@ import type {
   CommunityCafeVisibility,
 } from "@/shared/lib/types";
 
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { Container } from "@/shared/components/section";
 import { useApp, useHydrated } from "@/shared/lib/store";
 import { GENRES } from "@/shared/lib/taxonomy";
@@ -127,9 +128,12 @@ export function CafesPage() {
       .then((data) => {
         setCafes(Array.isArray(data?.items) ? (data.items as CommunityCafe[]) : []);
       })
-      .catch((caught) => {
+      .catch(async (caught) => {
         if ((caught as Error).name !== "AbortError") {
-          setError("커뮤니티 목록을 불러오지 못했습니다.");
+          setError(await getApiErrorMessage(
+            caught,
+            "커뮤니티 목록을 불러오지 못했습니다.",
+          ));
         }
       })
       .finally(() => {
@@ -314,19 +318,17 @@ export function CafesPage() {
             </div>
           </div>
 
-          {error && (
-            <div className="mb-4 flex items-center justify-between gap-2 rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-xs text-bad">
-              <span>{error}</span>
-              <button type="button" onClick={() => setRefreshTick((tick) => tick + 1)} className="rounded-lg border border-bad/30 px-2 py-1 font-medium">
-                다시 시도
-              </button>
-            </div>
-          )}
-
           {loading ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {Array.from({ length: 4 }).map((_, index) => <div key={index} className="skeleton h-44 rounded-2xl" />)}
             </div>
+          ) : error ? (
+            <ErrorState
+              title="커뮤니티 목록을 불러오지 못했습니다."
+              message={`${error} 현재 목록이 비어 있다는 뜻은 아닙니다.`}
+              onRetry={() => setRefreshTick((tick) => tick + 1)}
+              className="py-14"
+            />
           ) : cafes.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-line bg-card/45 px-6 py-14 text-center">
               <Sparkles className="mx-auto mb-3 text-accent" size={22} />

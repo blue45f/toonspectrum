@@ -1,9 +1,9 @@
+import { apiFetch } from "@/platform/api";
 import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, useLocation } from "react-router-dom";
 
 import { ErrorBoundary } from "../app/errors/error-boundary";
-import { apiPath } from "../platform/api";
 
 import { AppShell } from "./AppShell";
 import { isImmersiveMobileRoute } from "./routes/immersive-mobile-route";
@@ -15,7 +15,6 @@ import { isStudioRoutePathname } from "@/domains/creator/studio-workspace-route"
 import { AppearanceBridge } from "@/shared/components/appearance/AppearanceBridge";
 import { SiteHeader } from "@/shared/components/site-header";
 import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
-import { withCsrfProtection } from "@/shared/lib/csrf";
 import { useI18n } from "@/shared/lib/i18n";
 import { useUi } from "@/shared/lib/ui-store";
 
@@ -152,14 +151,11 @@ function useKmasEntryMerge(enabled: boolean) {
       // Cancelling the timer while entering the admin workspace must not prevent
       // a later public-route visit from starting the merge.
       kmasEntryMergeStarted = true;
-      fetch(
-        apiPath("/api/kmas/merge-on-access"),
-        withCsrfProtection({
-          method: "POST",
-          cache: "no-store",
-          keepalive: true,
-        }),
-      ).catch(() => {
+      apiFetch("/api/kmas/merge-on-access", {
+        method: "POST",
+        cache: "no-store",
+        keepalive: true,
+      }).catch(() => {
         kmasEntryMergeStarted = false;
       });
     };

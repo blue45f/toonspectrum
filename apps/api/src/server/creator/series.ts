@@ -2,6 +2,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { creatorSeries, creatorWorkLikes, creatorWorks, db, users } from "../../db";
+import { withDatabaseCapability } from "../../common/service-availability";
 
 import {
   MAX_SERIES_TITLE,
@@ -13,7 +14,7 @@ import {
   type CreatorSeriesSort,
   type CreatorSeriesStatus,
 } from "./community-contract";
-import { ensureCreatorCommunitySchema } from "./community-schema";
+import { requireCreatorCommunitySchema } from "./community-schema";
 import {
   clampText,
   cleanTags,
@@ -152,43 +153,43 @@ export async function listSeries(opts: {
   sort?: CreatorSeriesSort;
   viewerId?: string;
 } = {}): Promise<CreatorSeriesSummary[]> {
-  try {
-    if (!(await ensureCreatorCommunitySchema())) return [];
+  return withDatabaseCapability("creator.series.read", async () => {
+    await requireCreatorCommunitySchema("creator.series.read");
     const sort = parseSeriesSort(opts.sort);
     let where: SQL | undefined;
-    const addWhere = (c: SQL | undefined) => {
-      if (!c) return;
-      where = where ? and(where, c) : c;
+    const addWhere = (condition: SQL | undefined) => {
+      if (!condition) return;
+      where = where ? and(where, condition) : condition;
     };
-    const ownerView = !!opts.userId && !!opts.viewerId && opts.viewerId === opts.userId;
+    const ownerView = Boolean(opts.userId && opts.viewerId && opts.viewerId === opts.userId);
     if (!ownerView) addWhere(eq(creatorSeries.hidden, false));
     if (!ownerView) addWhere(excludeTestUserId(users.id));
     if (opts.userId) addWhere(eq(creatorSeries.userId, opts.userId));
 
-    const agg = seriesAggregates();
-    let q = db
+    const aggregates = seriesAggregates();
+    let query = db
       .select(seriesSelectMap())
       .from(creatorSeries)
       .leftJoin(users, eq(creatorSeries.userId, users.id))
       .$dynamic();
-    if (where) q = q.where(where);
-    const orderBy =
-      sort === "likes"
-        ? [desc(agg.likes), desc(creatorSeries.updatedAt), desc(creatorSeries.id)]
-        : sort === "views"
-          ? [desc(agg.views), desc(creatorSeries.updatedAt), desc(creatorSeries.id)]
-          : [desc(creatorSeries.updatedAt), desc(creatorSeries.id)];
-    const rows = await q.orderBy(...orderBy);
+    if (where) query = query.where(where);
+    const orderBy = sort === "likes"
+      ? [desc(aggregates.likes), desc(creatorSeries.updatedAt), desc(creatorSeries.id)]
+      : sort === "views"
+        ? [desc(aggregates.views), desc(creatorSeries.updatedAt), desc(creatorSeries.id)]
+        : [desc(creatorSeries.updatedAt), desc(creatorSeries.id)];
+    const rows = await query.orderBy(...orderBy);
     return rows.map((row) => mapSeriesRow(row, opts.viewerId));
-  } catch {
-    return [];
-  }
+  });
 }
 
 // ── 시리즈 상세(회차 목록 포함) ──────────────────────────────────────
-export async function getSeries(id: string, viewerId?: string): Promise<CreatorSeriesDetail | null> {
-  try {
-    if (!(await ensureCreatorCommunitySchema())) return null;
+export async function getSeries(
+  id: string,
+  viewerId?: string,
+): Promise<CreatorSeriesDetail | null> {
+  return withDatabaseCapability("creator.series.read", async () => {
+    await requireCreatorCommunitySchema("creator.series.read");
     const [row] = await db
       .select({ ...seriesSelectMap(), hidden: creatorSeries.hidden })
       .from(creatorSeries)
@@ -197,39 +198,45 @@ export async function getSeries(id: string, viewerId?: string): Promise<CreatorS
       .limit(1);
     if (!row) return null;
     if (isTestUserId(row.ownerId) && row.ownerId !== viewerId) return null;
-    const isOwner = !!viewerId && viewerId === row.ownerId;
+    const isOwner = Boolean(viewerId && viewerId === row.ownerId);
     if (row.hidden && !isOwner) return null;
-    // 소유자는 초안 회차까지(내 연재 관리), 그 외는 공개 회차만.
     const episodeList = await listWorks({
       seriesId: id,
       viewerId,
       userId: isOwner ? row.ownerId : undefined,
     });
     return { ...mapSeriesRow(row, viewerId), episodeList };
-  } catch {
-    return null;
-  }
+  });
 }
 
 // 소유 시리즈 조회(없으면/남의 것이면 throw) — 회차 추가·시리즈 수정 공용.
-export async function getOwnedSeriesOrThrow(seriesId: string, userId: string): Promise<{ id: string; title: string }> {
-  const [series] = await db
-    .select({ id: creatorSeries.id, title: creatorSeries.title, ownerId: creatorSeries.userId })
-    .from(creatorSeries)
-    .where(eq(creatorSeries.id, seriesId))
-    .limit(1);
-  if (!series) throw new Error("시리즈를 찾을 수 없습니다.");
-  if (series.ownerId !== userId) throw new Error("내 시리즈에만 회차를 추가할 수 있습니다.");
-  return { id: series.id, title: series.title };
+export async function getOwnedSeriesOrThrow(
+  seriesId: string,
+  userId: string,
+): Promise<{ id: string; title: string }> {
+  return withDatabaseCapability("creator.series.write", async () => {
+    await requireCreatorCommunitySchema("creator.series.write");
+    const [series] = await db
+      .select({ id: creatorSeries.id, title: creatorSeries.title, ownerId: creatorSeries.userId })
+      .from(creatorSeries)
+      .where(eq(creatorSeries.id, seriesId))
+      .limit(1);
+    if (!series) throw new Error("시리즈를 찾을 수 없습니다.");
+    if (series.ownerId !== userId) throw new Error("내 시리즈에만 회차를 추가할 수 있습니다.");
+    return { id: series.id, title: series.title };
+  });
 }
 
 // 다음 회차 번호 — 시리즈 내 max(episodeNo) + 1.
 export async function nextEpisodeNoOf(seriesId: string): Promise<number> {
-  const [row] = await db
-    .select({ max: sql<number | null>`max(${creatorWorks.episodeNo})` })
-    .from(creatorWorks)
-    .where(eq(creatorWorks.seriesId, seriesId));
-  return nextEpisodeNumber([row?.max]);
+  return withDatabaseCapability("creator.series.write", async () => {
+    await requireCreatorCommunitySchema("creator.series.write");
+    const [row] = await db
+      .select({ max: sql<number | null>`max(${creatorWorks.episodeNo})` })
+      .from(creatorWorks)
+      .where(eq(creatorWorks.seriesId, seriesId));
+    return nextEpisodeNumber([row?.max]);
+  });
 }
 
 // 회차 추가/연결 시 시리즈 갱신일 bump — recent 정렬("최신 회차 갱신") 근거.
@@ -242,105 +249,117 @@ export async function touchSeries(seriesId: string): Promise<void> {
 }
 
 // ── 시리즈 생성 ──────────────────────────────────────────────────────
-export async function createSeries(userId: string, input: CreatorSeriesInput): Promise<CreatorSeriesSummary> {
-  if (!(await ensureCreatorCommunitySchema())) {
-    throw new Error("연재 시리즈 기능을 준비 중입니다. 잠시 후 다시 시도해 주세요.");
-  }
-  const { value, error } = validateSeriesInput(input);
-  if (error || !value) throw new Error(error ?? "시리즈 정보를 확인해 주세요.");
-  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  const id = crypto.randomUUID();
-  const now = new Date();
-  await db.insert(creatorSeries).values({
-    id,
-    userId,
-    author: user?.name ?? "",
-    avatar: user?.avatar ?? "",
-    title: value.title,
-    description: value.description,
-    cover: value.cover,
-    tags: value.tags,
-    status: value.status,
-    showcaseEnabled: value.showcaseEnabled,
-    createdAt: now,
-    updatedAt: now,
+export async function createSeries(
+  userId: string,
+  input: CreatorSeriesInput,
+): Promise<CreatorSeriesSummary> {
+  return withDatabaseCapability("creator.series.write", async () => {
+    await requireCreatorCommunitySchema("creator.series.write");
+    const { value, error } = validateSeriesInput(input);
+    if (error || !value) throw new Error(error ?? "시리즈 정보를 확인해 주세요.");
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+    const id = crypto.randomUUID();
+    const now = new Date();
+    await db.insert(creatorSeries).values({
+      id,
+      userId,
+      author: user?.name ?? "",
+      avatar: user?.avatar ?? "",
+      title: value.title,
+      description: value.description,
+      cover: value.cover,
+      tags: value.tags,
+      status: value.status,
+      showcaseEnabled: value.showcaseEnabled,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return {
+      id,
+      title: value.title,
+      description: value.description,
+      cover: value.cover,
+      tags: value.tags,
+      status: value.status,
+      showcaseEnabled: value.showcaseEnabled,
+      author: { id: userId, name: user?.name ?? "익명", avatar: user?.avatar ?? "#7c5cfc" },
+      episodes: 0,
+      views: 0,
+      likes: 0,
+      latestEpisodeAt: null,
+      isOwner: true,
+      createdAt: safeDate(now),
+      updatedAt: safeDate(now),
+    };
   });
-  return {
-    id,
-    title: value.title,
-    description: value.description,
-    cover: value.cover,
-    tags: value.tags,
-    status: value.status,
-    showcaseEnabled: value.showcaseEnabled,
-    author: { id: userId, name: user?.name ?? "익명", avatar: user?.avatar ?? "#7c5cfc" },
-    episodes: 0,
-    views: 0,
-    likes: 0,
-    latestEpisodeAt: null,
-    isOwner: true,
-    createdAt: safeDate(now),
-    updatedAt: safeDate(now),
-  };
 }
 
 // ── 시리즈 수정(소유자 전용) ─────────────────────────────────────────
 export async function updateSeries(
   userId: string,
   id: string,
-  patch: CreatorSeriesInput
+  patch: CreatorSeriesInput,
 ): Promise<CreatorSeriesSummary> {
-  if (!(await ensureCreatorCommunitySchema())) {
-    throw new Error("연재 시리즈 기능을 준비 중입니다. 잠시 후 다시 시도해 주세요.");
-  }
-  const [existing] = await db
-    .select({ id: creatorSeries.id, ownerId: creatorSeries.userId })
-    .from(creatorSeries)
-    .where(eq(creatorSeries.id, id))
-    .limit(1);
-  if (!existing) throw new Error("시리즈를 찾을 수 없습니다.");
-  if (existing.ownerId !== userId) throw new Error("시리즈를 만든 사람만 수정할 수 있습니다.");
+  return withDatabaseCapability("creator.series.write", async () => {
+    await requireCreatorCommunitySchema("creator.series.write");
+    const [existing] = await db
+      .select({ id: creatorSeries.id, ownerId: creatorSeries.userId })
+      .from(creatorSeries)
+      .where(eq(creatorSeries.id, id))
+      .limit(1);
+    if (!existing) throw new Error("시리즈를 찾을 수 없습니다.");
+    if (existing.ownerId !== userId) throw new Error("시리즈를 만든 사람만 수정할 수 있습니다.");
 
-  const fields: Record<string, unknown> = { updatedAt: new Date() };
-  if (patch.title !== undefined) {
-    const title = clampText(patch.title, MAX_SERIES_TITLE);
-    if (title.length < 1) throw new Error("시리즈 제목을 입력해 주세요.");
-    fields.title = title;
-  }
-  if (patch.description !== undefined) fields.description = normalizeMultiline(patch.description, MAX_DESCRIPTION);
-  if (patch.cover !== undefined) fields.cover = String(patch.cover ?? "");
-  if (patch.tags !== undefined) fields.tags = cleanTags(patch.tags);
-  if (patch.status !== undefined) fields.status = parseSeriesStatus(patch.status);
-  if (patch.showcaseEnabled !== undefined) {
-    if (typeof patch.showcaseEnabled !== "boolean") {
-      throw new Error("가상 전시관 배치 여부를 확인해 주세요.");
+    const fields: Record<string, unknown> = { updatedAt: new Date() };
+    if (patch.title !== undefined) {
+      const title = clampText(patch.title, MAX_SERIES_TITLE);
+      if (title.length < 1) throw new Error("시리즈 제목을 입력해 주세요.");
+      fields.title = title;
     }
-    fields.showcaseEnabled = patch.showcaseEnabled;
-  }
-  await db.update(creatorSeries).set(fields).where(eq(creatorSeries.id, id));
+    if (patch.description !== undefined) {
+      fields.description = normalizeMultiline(patch.description, MAX_DESCRIPTION);
+    }
+    if (patch.cover !== undefined) fields.cover = String(patch.cover ?? "");
+    if (patch.tags !== undefined) fields.tags = cleanTags(patch.tags);
+    if (patch.status !== undefined) fields.status = parseSeriesStatus(patch.status);
+    if (patch.showcaseEnabled !== undefined) {
+      if (typeof patch.showcaseEnabled !== "boolean") {
+        throw new Error("가상 전시관 배치 여부를 확인해 주세요.");
+      }
+      fields.showcaseEnabled = patch.showcaseEnabled;
+    }
+    await db.update(creatorSeries).set(fields).where(eq(creatorSeries.id, id));
 
-  const detail = await getSeries(id, userId);
-  if (!detail) throw new Error("시리즈를 찾을 수 없습니다.");
-  const { episodeList: _episodes, ...summary } = detail;
-  return summary;
+    const detail = await getSeries(id, userId);
+    if (!detail) throw new Error("시리즈를 찾을 수 없습니다.");
+    const { episodeList: _episodeList, ...summary } = detail;
+    return summary;
+  });
 }
 
 // ── 시리즈 삭제(소유자 또는 관리자) — 회차는 시리즈에서만 분리(작품은 보존) ──
-export async function deleteSeries(userId: string, id: string, isAdmin: boolean): Promise<{ deleted: boolean }> {
-  if (!(await ensureCreatorCommunitySchema())) return { deleted: false };
-  const [existing] = await db
-    .select({ id: creatorSeries.id, ownerId: creatorSeries.userId })
-    .from(creatorSeries)
-    .where(eq(creatorSeries.id, id))
-    .limit(1);
-  if (!existing) return { deleted: false };
-  if (existing.ownerId !== userId && !isAdmin) throw new Error("시리즈를 만든 사람만 삭제할 수 있습니다.");
-  await db
-    .update(creatorWorks)
-    .set({ seriesId: null, episodeNo: null })
-    .where(eq(creatorWorks.seriesId, id));
-  await db.delete(creatorSeries).where(eq(creatorSeries.id, id));
-  return { deleted: true };
+export async function deleteSeries(
+  userId: string,
+  id: string,
+  isAdmin: boolean,
+): Promise<{ deleted: boolean }> {
+  return withDatabaseCapability("creator.series.write", async () => {
+    await requireCreatorCommunitySchema("creator.series.write");
+    const [existing] = await db
+      .select({ id: creatorSeries.id, ownerId: creatorSeries.userId })
+      .from(creatorSeries)
+      .where(eq(creatorSeries.id, id))
+      .limit(1);
+    if (!existing) return { deleted: false };
+    if (existing.ownerId !== userId && !isAdmin) {
+      throw new Error("시리즈를 만든 사람만 삭제할 수 있습니다.");
+    }
+    await db.update(creatorWorks)
+      .set({ seriesId: null, episodeNo: null })
+      .where(eq(creatorWorks.seriesId, id));
+    await db.delete(creatorSeries).where(eq(creatorSeries.id, id));
+    return { deleted: true };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════

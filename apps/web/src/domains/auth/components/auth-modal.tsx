@@ -40,7 +40,7 @@ import {
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { cn } from "@/shared/lib/utils";
 import { signIn } from "@/domains/auth/public/session/auth-session-store";
-import { apiPath } from "@/platform/api";
+import { apiFetch, apiPath } from "@/platform/api";
 
 // 실제 OAuth 미설정 시 데모 폴백임을 버튼에 명확히 표시(정직성).
 function DemoTag({ dark }: { dark?: boolean }) {
@@ -191,7 +191,7 @@ export function AuthModal({
     }, 15_000);
     setProviders({});
     setProviderStatus("loading");
-    fetch(apiPath("/auth/providers"), {
+    apiFetch(apiPath("/auth/providers"), {
       signal: controller.signal,
       cache: "no-store",
       credentials: "same-origin",
@@ -334,7 +334,7 @@ export function AuthModal({
             setErr("비밀번호는 15자 이상이어야 해요.");
             return;
           }
-          const response = await fetch(
+          const response = await apiFetch(
             apiPath("/auth/signup"),
             withCsrfProtection({
               method: "POST",
@@ -393,7 +393,7 @@ export function AuthModal({
         action === "reset"
           ? "/auth/password/reset/request"
           : "/auth/email/verification/resend";
-      const response = await fetch(
+      const response = await apiFetch(
         apiPath(endpoint),
         withCsrfProtection({
           method: "POST",

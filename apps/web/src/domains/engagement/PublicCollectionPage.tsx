@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { CheckCircle2, Copy, ListChecks, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -26,7 +27,7 @@ async function fetchSharedTitles(ids: readonly string[], signal: AbortSignal): P
     chunks.push(ids.slice(index, index + TITLE_CHUNK_SIZE));
   }
   const responses = await Promise.all(chunks.map(async (chunk) => {
-    const response = await fetch(`/api/titles?ids=${encodeURIComponent(chunk.join(","))}`, { signal, cache: "no-store" });
+    const response = await apiFetch(`/api/titles?ids=${encodeURIComponent(chunk.join(","))}`, { signal, cache: "no-store" });
     if (!response.ok) throw new Error(`shared titles unavailable: ${response.status}`);
     const payload = await response.json() as { items?: Title[] };
     return Array.isArray(payload.items) ? payload.items : [];

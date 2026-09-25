@@ -12,6 +12,7 @@ import {
 
 import { fromDb } from "../../../web/src/shared/lib/api-helpers";
 import { getTitle } from "../../../../packages/core/src/server/catalog-store";
+import { withDatabaseCapability } from "../common/service-availability";
 import { db, reviewLikes, reviews, users } from "../db";
 
 export type ReviewSort = "recent" | "likes" | "high" | "low";
@@ -23,29 +24,21 @@ const NON_MARKET_REVIEW_CONDITION = notLike(
 );
 
 export async function getReviewGlobalStats() {
-  try {
-    const rows = await db
-      .select({
-        total: sql<number>`count(*)`.as("total"),
-        distinctUsers: sql<number>`count(distinct ${reviews.userId})`.as("distinctUsers"),
-        distinctTitles: sql<number>`count(distinct ${reviews.titleId})`.as("distinctTitles"),
-      })
-      .from(reviews)
-      .where(NON_MARKET_REVIEW_CONDITION);
+  const rows = await db
+    .select({
+      total: sql<number>`count(*)`.as("total"),
+      distinctUsers: sql<number>`count(distinct ${reviews.userId})`.as("distinctUsers"),
+      distinctTitles: sql<number>`count(distinct ${reviews.titleId})`.as("distinctTitles"),
+    })
+    .from(reviews)
+    .where(NON_MARKET_REVIEW_CONDITION);
 
-    const first = rows[0];
-    return {
-      total: Number(first?.total ?? 0),
-      distinctUsers: Number(first?.distinctUsers ?? 0),
-      distinctTitles: Number(first?.distinctTitles ?? 0),
-    };
-  } catch {
-    return {
-      total: 0,
-      distinctUsers: 0,
-      distinctTitles: 0,
-    };
-  }
+  const first = rows[0];
+  return {
+    total: Number(first?.total ?? 0),
+    distinctUsers: Number(first?.distinctUsers ?? 0),
+    distinctTitles: Number(first?.distinctTitles ?? 0),
+  };
 }
 
 const SORTS: ReviewSort[] = ["recent", "likes", "high", "low"];
@@ -124,15 +117,15 @@ export async function getReviewsData(opts: {
   userId?: string;
   includeHidden?: boolean;
 }) {
-  const sort = normalizeReviewSort(opts.sort);
-  const conditions: SQL[] = [NON_MARKET_REVIEW_CONDITION];
-  if (opts.userId) conditions.push(eq(reviews.userId, opts.userId));
-  if (opts.spoiler === "hide") conditions.push(eq(reviews.spoiler, false));
-  if (opts.rating === "high") conditions.push(gte(reviews.rating, 40));
-  else if (opts.rating === "low") conditions.push(lte(reviews.rating, 30));
-  if (!opts.includeHidden) conditions.push(eq(reviews.hidden, false));
+  return withDatabaseCapability("community.reviews.read", async () => {
+    const sort = normalizeReviewSort(opts.sort);
+    const conditions: SQL[] = [NON_MARKET_REVIEW_CONDITION];
+    if (opts.userId) conditions.push(eq(reviews.userId, opts.userId));
+    if (opts.spoiler === "hide") conditions.push(eq(reviews.spoiler, false));
+    if (opts.rating === "high") conditions.push(gte(reviews.rating, 40));
+    else if (opts.rating === "low") conditions.push(lte(reviews.rating, 30));
+    if (!opts.includeHidden) conditions.push(eq(reviews.hidden, false));
 
-  try {
     const dbRows = await db
       .select({
         id: reviews.id,
@@ -201,18 +194,5 @@ export async function getReviewsData(opts: {
       generatedAt: new Date().toISOString(),
       source: "database",
     };
-  } catch {
-    const feed: ReviewWithTitle[] = [];
-    const { total, avg, spoilerPct, distinctTitles, topReviewed } =
-      buildReviewFeedFromRows(feed);
-
-    return {
-      sort,
-      feed,
-      topReviewed,
-      stats: { total, avg, spoilerPct, distinctTitles },
-      generatedAt: new Date().toISOString(),
-      source: "database",
-    };
-  }
+  });
 }

@@ -1,7 +1,7 @@
+import { apiFetch, apiPath  } from "@/platform/api";
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 
-import { apiPath } from "../../platform/api";
 
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { TOONSPECTRUM_SHARE_EVENT } from "@/shared/lib/share";
@@ -133,7 +133,7 @@ function postTrafficEvent(
     trafficEndpointUnavailable
     || (typeof navigator !== "undefined" && navigator.onLine === false)
   ) return;
-  void fetch(apiPath(`/api/analytics/traffic/${endpoint}`), init)
+  void apiFetch(apiPath(`/api/analytics/traffic/${endpoint}`), init)
     .then((response) => {
       // A 5xx means the collector is not there; it will not be there on the next navigation
       // either. Give up for the session rather than re-firing on every route change.

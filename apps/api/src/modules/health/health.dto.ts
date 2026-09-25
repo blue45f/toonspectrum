@@ -2,50 +2,56 @@ import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 
 export const HealthLiveResponseSchema = z
-  .object({ status: z.literal("ok") })
+  .object({
+    status: z.literal("ok"),
+  })
   .strict();
 
 export const HealthReadyResponseSchema = z
-  .object({ status: z.literal("ready") })
+  .object({
+    status: z.literal("ready"),
+  })
   .strict();
 
 export const HealthNotReadyResponseSchema = z
   .object({
     statusCode: z.literal(503),
+    code: z.literal("SERVICE_NOT_READY"),
     status: z.literal("not_ready"),
     error: z.literal("service_not_ready"),
-    code: z.literal("SERVICE_NOT_READY"),
     capability: z.literal("service.readiness"),
     retryable: z.literal(true),
     retryAfterSeconds: z.number().int().min(1).max(3_600),
-    incidentId: z.string().min(1).max(128),
-    message: z.literal("Service is not ready"),
+    incidentId: z.string().regex(/^inc_[A-Za-z0-9._-]+$/u),
+    message: z.literal("This feature is temporarily unavailable"),
   })
   .strict();
 
-const CapabilityStateSchema = z.enum(["available", "unavailable"]);
+export const HealthCapabilityStateSchema = z.enum([
+  "available",
+  "degraded",
+  "unavailable",
+]);
 
 export const HealthCapabilitiesResponseSchema = z
   .object({
     status: z.enum(["available", "degraded"]),
-    incidentId: z.string().min(1).max(128).nullable(),
-    capabilities: z
-      .object({
-        publicCatalog: CapabilityStateSchema,
-        authSession: CapabilityStateSchema,
-        communityRead: CapabilityStateSchema,
-        communityWrite: CapabilityStateSchema,
-        marketplaceRead: CapabilityStateSchema,
-        studioLocalEditing: CapabilityStateSchema,
-        studioProjectRead: CapabilityStateSchema,
-        studioCloudSave: CapabilityStateSchema,
-        realtimeCollaboration: CapabilityStateSchema,
-        publishing: CapabilityStateSchema,
-        serverAi: CapabilityStateSchema,
-      })
-      .strict(),
-    failedChecks: z.array(z.string().min(1).max(64)).max(16),
+    incidentId: z.string().regex(/^inc_[A-Za-z0-9._-]+$/u).nullable(),
+    retryAfterSeconds: z.number().int().min(1).max(3_600).nullable(),
     checkedAt: z.string().datetime(),
+    capabilities: z.object({
+      publicCatalog: HealthCapabilityStateSchema,
+      authSession: HealthCapabilityStateSchema,
+      communityRead: HealthCapabilityStateSchema,
+      communityWrite: HealthCapabilityStateSchema,
+      marketplaceRead: HealthCapabilityStateSchema,
+      studioLocalEditing: HealthCapabilityStateSchema,
+      studioProjectRead: HealthCapabilityStateSchema,
+      studioCloudSave: HealthCapabilityStateSchema,
+      realtimeCollaboration: HealthCapabilityStateSchema,
+      publishing: HealthCapabilityStateSchema,
+      serverAi: HealthCapabilityStateSchema,
+    }).strict(),
   })
   .strict();
 

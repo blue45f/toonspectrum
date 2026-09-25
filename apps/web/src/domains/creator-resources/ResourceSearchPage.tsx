@@ -9,7 +9,7 @@ import { downloadText, useCreatorWorkspace } from "./workspace";
 import type { CreatorResource, ResourceSearchResult } from "@/shared/lib/creator-resources";
 
 import { attributionMarkdown, deadlineCalendar, deadlineLabel, parseSearchResult, RESOURCE_LABELS } from "@/shared/lib/creator-resources";
-import { apiPath } from "@/platform/api";
+import { apiFetch, apiPath } from "@/platform/api";
 
 import { RESOURCE_SEARCH_CONFIG } from "./resource-search-config";
 
@@ -95,7 +95,7 @@ export function ResourceSearchPage({ provider }: { provider: ResourceSearchProvi
     let disposed = false;
     setLoading(true);
     const search = new URLSearchParams({ provider, q: query, page: String(page) });
-    void fetch(apiPath(`/api/creator-resources/search?${search}`), { signal: controller.signal, headers: { Accept: "application/json" } })
+    void apiFetch(apiPath(`/api/creator-resources/search?${search}`), { signal: controller.signal, headers: { Accept: "application/json" } })
       .then(async (response) => {
         if (response.status === 429) throw new Error("요청이 많습니다. 1분 후 다시 검색하세요.");
         if (!response.ok) throw new Error("검색 서버에 연결하지 못했습니다. 공식 사이트를 이용하거나 다시 시도하세요.");

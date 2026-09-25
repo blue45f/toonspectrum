@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { ShieldCheck, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -43,7 +44,7 @@ export function TasteOnboardingPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch("/api/titles?sort=popular&limit=12", { signal: controller.signal })
+    void apiFetch("/api/titles?sort=popular&limit=12", { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("popular titles unavailable");
         const payload = await response.json() as { items?: Title[] };

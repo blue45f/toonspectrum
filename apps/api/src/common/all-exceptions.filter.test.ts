@@ -1,4 +1,4 @@
-import { BadGatewayException, BadRequestException, Logger } from "@nestjs/common";
+import { BadGatewayException, BadRequestException, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AllExceptionsFilter } from "./all-exceptions.filter";
@@ -129,6 +129,61 @@ describe("AllExceptionsFilter credential boundary", () => {
     expect(JSON.stringify(json.mock.calls)).not.toContain("signature");
   });
 
+
+  it("preserves only allow-listed 5xx recovery metadata and emits retry headers", () => {
+    vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    const { host, json, setHeader } = boundary("/api/community/posts");
+
+    new AllExceptionsFilter().catch(
+      new ServiceUnavailableException({
+        code: "DATABASE_UNAVAILABLE",
+        capability: "community.read",
+        retryable: true,
+        retryAfterSeconds: 45,
+        incidentId: "inc_12345678-1234-1234-1234-123456789abc",
+        message: "postgresql://operator:secret@db.example/internal",
+      }),
+      host,
+    );
+
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 503,
+      code: "DATABASE_UNAVAILABLE",
+      capability: "community.read",
+      retryable: true,
+      retryAfterSeconds: 45,
+      incidentId: "inc_12345678-1234-1234-1234-123456789abc",
+      requestId: expect.stringMatching(/^req_/u),
+    }));
+    expect(setHeader).toHaveBeenCalledWith("Retry-After", "45");
+    expect(setHeader).toHaveBeenCalledWith(
+      "X-Incident-Id",
+      "inc_12345678-1234-1234-1234-123456789abc",
+    );
+    expect(JSON.stringify(json.mock.calls)).not.toContain("operator");
+  });
+
+  it("maps an uncaught database availability error to a retryable 503 without driver details", () => {
+    vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    const { host, json, setHeader, status } = boundary("/api/legacy-db-path");
+
+    new AllExceptionsFilter().catch(
+      Object.assign(new Error("compute time quota exceeded"), { code: "53000" }),
+      host,
+    );
+
+    expect(status).toHaveBeenCalledWith(503);
+    expect(json).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 503,
+      code: "DATABASE_UNAVAILABLE",
+      capability: "database",
+      retryable: true,
+      requestId: expect.stringMatching(/^req_/u),
+    }));
+    expect(setHeader).toHaveBeenCalledWith("Retry-After", "30");
+    expect(JSON.stringify(json.mock.calls)).not.toContain("quota");
+  });
+
   it("overrides shared cache policies with no-store on 5xx so outages are never edge-cached", () => {
     const logger = vi
       .spyOn(Logger.prototype, "error")
@@ -149,6 +204,10 @@ describe("AllExceptionsFilter credential boundary", () => {
       host,
     );
 
-    expect(setHeader).not.toHaveBeenCalled();
+    expect(setHeader).toHaveBeenCalledWith(
+      "X-Request-Id",
+      expect.stringMatching(/^req_/u),
+    );
+    expect(setHeader).not.toHaveBeenCalledWith("Cache-Control", "no-store");
   });
 });

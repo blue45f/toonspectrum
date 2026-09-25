@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   query: vi.fn(),
@@ -17,6 +17,10 @@ describe("creator community schema ensure", () => {
   beforeEach(() => {
     mocks.query.mockReset();
     vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("accepts an expand-compatible schema without issuing DDL and caches readiness", async () => {
@@ -112,7 +116,8 @@ describe("creator community schema ensure", () => {
     errorSpy.mockRestore();
   });
 
-  it("preserves a repair permission failure and retries instead of caching it", async () => {
+  it("backs off a repair permission failure before retrying", async () => {
+    vi.useFakeTimers();
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.query
       .mockRejectedValueOnce(Object.assign(new Error("relation missing"), { code: "42P01" }))
@@ -121,6 +126,10 @@ describe("creator community schema ensure", () => {
     const { ensureCreatorCommunitySchema } = await loadSubject();
 
     await expect(ensureCreatorCommunitySchema()).resolves.toBe(false);
+    await expect(ensureCreatorCommunitySchema()).resolves.toBe(false);
+    expect(mocks.query).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(30_001);
     await expect(ensureCreatorCommunitySchema()).resolves.toBe(true);
 
     expect(mocks.query).toHaveBeenCalledTimes(3);
@@ -150,7 +159,8 @@ describe("creator community schema ensure", () => {
     errorSpy.mockRestore();
   });
 
-  it("does not cache a failed re-verification query after repair", async () => {
+  it("backs off a failed re-verification query after repair", async () => {
+    vi.useFakeTimers();
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.query
       .mockResolvedValueOnce(incompleteResult)
@@ -160,6 +170,10 @@ describe("creator community schema ensure", () => {
     const { ensureCreatorCommunitySchema } = await loadSubject();
 
     await expect(ensureCreatorCommunitySchema()).resolves.toBe(false);
+    await expect(ensureCreatorCommunitySchema()).resolves.toBe(false);
+    expect(mocks.query).toHaveBeenCalledTimes(3);
+
+    await vi.advanceTimersByTimeAsync(30_001);
     await expect(ensureCreatorCommunitySchema()).resolves.toBe(true);
 
     expect(mocks.query).toHaveBeenCalledTimes(4);

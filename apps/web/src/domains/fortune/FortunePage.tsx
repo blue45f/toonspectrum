@@ -1,3 +1,5 @@
+import { apiFetch } from "@/platform/api";
+import { observeApiResponse } from "@/platform/api-error";
 import { FortuneObservatory } from "./FortuneObservatory";
 import { getCharacters } from "@toonspectrum/core/fortune";
 import {
@@ -35,7 +37,6 @@ import type { Title } from "@/shared/lib/types";
 
 import { TitleCard } from "@/shared/components/title-card";
 // 배포 환경에서도 root-relative 이미지 경로가 올바른 오리진을 가리키도록 정규화한다.
-import { withCsrfProtection } from "@/shared/lib/csrf";
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 
@@ -270,21 +271,20 @@ function CharacterFortunePage() {
     setActiveTabResult(activeTab, null);
     retryRef.current = retry;
     try {
-      const response = await fetch(url, withCsrfProtection({
+      const response = await apiFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-      }));
+      });
       if (!response.ok) {
-        // 검증 실패(400) 등 — 서버 메시지를 그대로 보여준다
-        let serverMsg = "";
-        try {
-          const err = await response.json();
-          serverMsg = Array.isArray(err?.message) ? err.message[0] : err?.message ?? "";
-        } catch {
-          /* ignore */
-        }
-        setErrorMsg(serverMsg || "운세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.");
+        const failure = await observeApiResponse(
+          response.clone(),
+          "운세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
+        setErrorMsg(
+          failure?.message
+          ?? "운세를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+        );
         return null;
       }
       const data: FortuneResult = await response.json();
@@ -315,7 +315,7 @@ function CharacterFortunePage() {
   // API 가 유효한 배열을 주면 반영하고, 실패해도 정적 목록이 남아 피커는 계속 동작한다(에러 UI 억제).
   const loadCharacters = () => {
     setCharLoadFailed(false);
-    fetch("/api/fortune/characters")
+    apiFetch("/api/fortune/characters")
       .then((res) => {
         if (!res.ok) throw new Error(`status ${res.status}`);
         return res.json();

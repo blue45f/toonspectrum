@@ -50,7 +50,7 @@ describe("useApiResource fetch 계약", () => {
     );
   });
 
-  it("서버가 JSON message 를 반환하면 해당 메시지를 보존해 던진다", async () => {
+  it("5xx 서버 message는 숨기고 안전한 기능 제한 안내를 사용한다", async () => {
     globalThis.fetch = vi.fn(
       async () => new Response(JSON.stringify({ message: "서버 점검 중입니다." }), {
         status: 503,
@@ -59,7 +59,7 @@ describe("useApiResource fetch 계약", () => {
     ) as unknown as typeof fetch;
 
     await expect(fetchApiResource("/api/home", "홈 데이터를 불러오지 못했습니다.")).rejects.toThrow(
-      "서버 점검 중입니다."
+      "일부 온라인 기능을 일시적으로 사용할 수 없습니다."
     );
   });
 });

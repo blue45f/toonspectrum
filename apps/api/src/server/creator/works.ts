@@ -13,6 +13,10 @@ import {
   type CreatorCommunityProvenance,
 } from "../../../../web/src/shared/lib/creator-community-publication-contract";
 import {
+  capabilityUnavailableException,
+  withDatabaseCapability,
+} from "../../common/service-availability";
+import {
   creatorChallenges,
   creatorDraftCollaborationRooms,
   creatorFollows,
@@ -42,7 +46,10 @@ import {
 
 import { assertJoinableChallenge } from "./challenges";
 import { parseSeriesStatus } from "./community-contract";
-import { ensureCreatorCommunitySchema } from "./community-schema";
+import {
+  ensureCreatorCommunitySchemaForCapability,
+  requireCreatorCommunitySchema,
+} from "./community-schema";
 import { insertCreatorWorkRelease } from "./community-publishing";
 import { deleteOwnedStudioGraphForWork } from "./works-studio-graph-deletion";
 import { getOwnedSeriesOrThrow, nextEpisodeNoOf, touchSeries } from "./series";
@@ -127,10 +134,13 @@ export async function listWorks(opts: {
   provenance?: CreatorCommunityProvenance;
   bookmarkedBy?: string;
 } = {}): Promise<CreatorWorkSummary[]> {
-  try {
-    // 새 테이블·컬럼 보장(멱등, 1회). 실패해도 기본 목록은 동작해야 하므로 ready 플래그로 분기.
-    const ready = await ensureCreatorCommunitySchema();
-    if (!ready && (opts.seriesId || opts.challengeId || opts.followedBy)) return [];
+  return withDatabaseCapability("creator.works.read", async () => {
+    const ready = await ensureCreatorCommunitySchemaForCapability("creator.works.read");
+    if (!ready && (opts.seriesId || opts.challengeId || opts.followedBy)) {
+      throw capabilityUnavailableException("creator.works.read", {
+        code: "SCHEMA_NOT_READY",
+      });
+    }
     const sort = parseCreatorSort(opts.sort);
     let where: SQL | undefined;
     const addWhere = (c: SQL | undefined) => {
@@ -343,15 +353,13 @@ export async function listWorks(opts: {
       remixFromId: r.remixFromId ?? null,
       createdAt: safeDate(r.createdAt),
     }));
-  } catch {
-    return [];
-  }
+  });
 }
 
 // ── 단건 조회(전체) ──────────────────────────────────────────────────
 export async function getWork(id: string, viewerId?: string): Promise<CreatorWorkDetail | null> {
-  try {
-    const ready = await ensureCreatorCommunitySchema();
+  return withDatabaseCapability("creator.works.read", async () => {
+    const ready = await ensureCreatorCommunitySchemaForCapability("creator.works.read");
     const [row] = await db
       .select({
         id: creatorWorks.id,
@@ -572,9 +580,7 @@ export async function getWork(id: string, viewerId?: string): Promise<CreatorWor
       nextEpisode,
       challenge,
     };
-  } catch {
-    return null;
-  }
+  });
 }
 
 // ── 조회수 증가(best-effort) ─────────────────────────────────────────
@@ -591,9 +597,8 @@ export async function bumpViews(id: string): Promise<void> {
 
 // ── 생성 ─────────────────────────────────────────────────────────────
 export async function createWork(userId: string, input: CreatorWorkInput): Promise<CreatorWorkMutationResult> {
-  if (!(await ensureCreatorCommunitySchema())) {
-    throw new Error("작품 revision 저장소를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.");
-  }
+  return withDatabaseCapability("creator.works.write", async () => {
+    await requireCreatorCommunitySchema("creator.works.write");
   const title = clampText(input.title, MAX_TITLE);
   if (title.length < 1) throw new Error("제목을 입력해 주세요.");
   const description = normalizeMultiline(input.description, MAX_DESCRIPTION);
@@ -627,9 +632,7 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
   let seriesTitle: string | null = null;
   let challengeTitle: string | null = null;
   if (seriesId || challengeId) {
-    if (!(await ensureCreatorCommunitySchema())) {
-      throw new Error("연재·챌린지 기능을 준비 중입니다. 잠시 후 다시 시도해 주세요.");
-    }
+    await requireCreatorCommunitySchema("creator.works.write");
     if (seriesId) {
       const series = await getOwnedSeriesOrThrow(seriesId, userId);
       seriesTitle = series.title;
@@ -713,6 +716,7 @@ export async function createWork(userId: string, input: CreatorWorkInput): Promi
     revision: 1,
     createdAt: safeDate(now),
   };
+  });
 }
 
 export const creatorWorkSnapshotSelection = {
@@ -765,9 +769,8 @@ export async function updateWork(
   id: string,
   patch: CreatorWorkInput
 ): Promise<CreatorWorkMutationResult> {
-  if (!(await ensureCreatorCommunitySchema())) {
-    throw new Error("작품 revision 저장소를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.");
-  }
+  return withDatabaseCapability("creator.works.write", async () => {
+    await requireCreatorCommunitySchema("creator.works.write");
   const baseRevision = patch.baseRevision === undefined
     ? undefined
     : parseCreatorWorkRevision(patch.baseRevision, "baseRevision");
@@ -938,12 +941,15 @@ export async function updateWork(
 
   if (bumpSeriesId) await touchSeries(bumpSeriesId);
   return mutationResultForWork(userId, id, updated.revision);
+  });
 }
 
 
 // ── 삭제(작성자 또는 관리자) ─────────────────────────────────────────
 export async function deleteWork(userId: string, id: string, isAdmin: boolean): Promise<{ deleted: boolean }> {
-  return db.transaction(async (transaction) => {
+  return withDatabaseCapability("creator.works.write", async () => {
+    await requireCreatorCommunitySchema("creator.works.write");
+    return db.transaction(async (transaction) => {
     const [existing] = await transaction
       .select({ id: creatorWorks.id, ownerId: creatorWorks.userId })
       .from(creatorWorks)
@@ -980,16 +986,20 @@ export async function deleteWork(userId: string, id: string, isAdmin: boolean): 
       .where(eq(creatorWorks.id, id))
       .returning({ id: creatorWorks.id });
     return { deleted: deleted.length === 1 };
+    });
   });
 }
 
 export async function assertPublicCreatorWork(workId: string): Promise<void> {
-  const [work] = await db
+  return withDatabaseCapability("creator.works.read", async () => {
+    await requireCreatorCommunitySchema("creator.works.read");
+    const [work] = await db
     .select({ id: creatorWorks.id, status: creatorWorks.status, hidden: creatorWorks.hidden, ownerId: creatorWorks.userId })
     .from(creatorWorks)
     .where(eq(creatorWorks.id, workId))
     .limit(1);
   if (!work || work.hidden || work.status !== "published" || isTestUserId(work.ownerId)) {
-    throw new Error("공개된 작품을 찾을 수 없습니다.");
-  }
+      throw new Error("공개된 작품을 찾을 수 없습니다.");
+    }
+  });
 }

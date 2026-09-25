@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { readFortuneResponse, validatedFortuneExpiry } from "./fortune-response-lifetime";
@@ -23,7 +24,7 @@ function SpecialDaysResult({ month, category }: { month: string; category: Fortu
     const timer = window.setTimeout(() => abort.abort(), 15000);
     timeout.current = timer;
     try {
-      const response = await fetch(`/api/fortune/special-days?${new URLSearchParams({ month, category })}`, { cache: "no-store", credentials: "omit", redirect: "error", signal: abort.signal });
+      const response = await apiFetch(`/api/fortune/special-days?${new URLSearchParams({ month, category })}`, { cache: "no-store", credentials: "omit", redirect: "error", signal: abort.signal });
       const value = schema.parse(await readFortuneResponse(response, abort.signal));
       if (request !== sequence.current || abort.signal.aborted) return;
       if (value.month !== month || value.category !== category || !validateFortuneSpecialDays(month, category, value.items)) throw new Error("context-mismatch");

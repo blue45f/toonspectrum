@@ -63,6 +63,40 @@ describe("HealthController", () => {
     await expect(controller.ready()).resolves.toEqual({ status: "ready" });
   });
 
+
+  it("returns user-facing capability state without failing the status request", async () => {
+    const checkCapabilities = vi.fn(async () => ({
+      status: "degraded" as const,
+      incidentId: "inc_status",
+      retryAfterSeconds: 30,
+      checkedAt: "2026-09-26T00:00:00.000Z",
+      capabilities: {
+        publicCatalog: "available" as const,
+        authSession: "degraded" as const,
+        communityRead: "unavailable" as const,
+        communityWrite: "unavailable" as const,
+        marketplaceRead: "unavailable" as const,
+        studioLocalEditing: "available" as const,
+        studioProjectRead: "unavailable" as const,
+        studioCloudSave: "unavailable" as const,
+        realtimeCollaboration: "unavailable" as const,
+        publishing: "unavailable" as const,
+        serverAi: "degraded" as const,
+      },
+    }));
+    const controller = new HealthController({ checkCapabilities } as never);
+
+    await expect(controller.capabilities()).resolves.toMatchObject({
+      status: "degraded",
+      incidentId: "inc_status",
+      capabilities: {
+        publicCatalog: "available",
+        communityRead: "unavailable",
+        studioLocalEditing: "available",
+      },
+    });
+  });
+
   it("returns a generic 503 without database or socket internals", async () => {
     const controller = new HealthController({
       checkReadiness: vi.fn(async () => ({
@@ -75,11 +109,16 @@ describe("HealthController", () => {
 
     const error = await controller.ready().catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ServiceUnavailableException);
-    expect((error as ServiceUnavailableException).getResponse()).toEqual({
+    expect((error as ServiceUnavailableException).getResponse()).toMatchObject({
       statusCode: 503,
+      code: "SERVICE_NOT_READY",
       status: "not_ready",
       error: "service_not_ready",
-      message: "Service is not ready",
+      capability: "service.readiness",
+      retryable: true,
+      retryAfterSeconds: 30,
+      incidentId: expect.stringMatching(/^inc_/u),
+      message: "This feature is temporarily unavailable",
     });
     expect(JSON.stringify((error as ServiceUnavailableException).getResponse()))
       .not.toMatch(/postgres|socket|password|secret|database/iu);
