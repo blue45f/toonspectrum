@@ -8,8 +8,9 @@ import type { StudioVirtualSpacePeer } from "./studio-virtual-space-model";
 import { studioNpcLabel, studioNpcRole } from "./studio-virtual-space-npc-director";
 import type { StudioWorldNpcDefinition, StudioWorldRoomDefinition } from "./studio-virtual-space-world-manifest";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
+import { studioTownCompanionSnapshot, studioTownEvents, studioTownSeasonAt } from "./studio-virtual-space-town-program";
 
-export type StudioNpcDialogueAction = "today" | "team" | "people" | "review" | "assets" | "guide" | "schedule" | "production";
+export type StudioNpcDialogueAction = "today" | "team" | "people" | "review" | "assets" | "guide" | "schedule" | "production" | "town";
 
 function nextWork(snapshot: StudioVirtualOperationsSnapshot, fallback: string): string {
   const task = snapshot.project?.aggregate.tasks
@@ -47,6 +48,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({ npc, room, operations, peer
     if (role === "editor") common.splice(1, 0, { id: "review", ko: "검수 대기 항목 보여줘", en: "Show pending reviews", icon: MessageCircle });
     if (role === "librarian") common.splice(1, 0, { id: "assets", ko: "필요한 소재를 찾고 싶어", en: "Help me find an asset", icon: Search });
     if (role === "cafe" || role === "security") common.splice(1, 0, { id: "team", ko: "팀 초대와 회의 준비", en: "Prepare team invites and meetings", icon: UsersRound });
+    if (role === "host" || role === "guide" || role === "cafe") common.splice(1, 0, { id: "town", ko: "마을 이벤트와 활동", en: "Town events and activities", icon: MapPinned });
     return common;
   }, [role]);
 
@@ -67,6 +69,14 @@ export function StudioVirtualSpaceNpcDialoguePanel({ npc, room, operations, peer
       setAnswer(bt("에셋 아카이브에서 캐릭터·배경·브러시·3D 자료와 버전을 함께 찾을 수 있어요.", "The Asset Archive contains characters, backgrounds, brushes, 3D references and version history."));
     } else if (/초대|그룹|팀|invite|group|team/u.test(normalized)) {
       setAnswer(bt("팀 커먼즈에서 여러 제작 그룹을 만들고 멤버·게스트·외부 검수자를 역할별로 초대할 수 있어요. 초대는 명시적으로 링크를 만든 뒤 전송합니다.", "Team Commons lets you create production groups and invite members, guests or external reviewers by role. Invitations are sent only after you explicitly create a link."));
+    } else if (/이벤트|축제|퀘스트|게임|계절|event|festival|quest|game|season/u.test(normalized)) {
+      const companion = studioTownCompanionSnapshot(operations);
+      const nextEvent = [...studioTownEvents()].sort((left, right) => left.startsAt - right.startsAt)[0];
+      const season = studioTownSeasonAt();
+      setAnswer(bt(
+        `${season.labelKo} 기간이에요. ${companion.summaryKo}.${nextEvent ? ` 다음 마을 일정은 “${nextEvent.labelKo}”입니다.` : ""} 실제 이동·발표·초대는 직접 확인해야 해요.`,
+        `${season.labelEn} is active. ${companion.summaryEn}.${nextEvent ? ` The next town event is “${nextEvent.labelEn}”.` : ""} You must explicitly confirm movement, presentations and invitations.`,
+      ));
     } else {
       setAnswer(bt(`다음으로 추천하는 작업은 “${nextWork(operations, "Today Board 확인")}”입니다. 제가 위치를 안내해도 실제 도구 실행과 승인 작업은 항상 직접 확인해야 해요.`, `Your recommended next action is “${nextWork(operations, "check the Today Board")}”. I can guide you, but tool execution and approvals always require your explicit confirmation.`));
     }

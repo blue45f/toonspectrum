@@ -57,15 +57,26 @@ import {
   studioVirtualArtObjectUrl,
   studioVirtualArtStyle,
   studioVirtualArtTextureUrl,
+  studioVirtualLivingTownAssetUrl,
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
 import { drawStudioModularCampus } from "./studio-virtual-space-modular-campus";
+import { studioProjectTownPoint, studioTownDepthForPoint } from "./studio-virtual-space-semantic-world";
 import {
   StudioLivingWorldRuntime,
   studioVirtualDayPhase,
   studioVirtualTerrainAt,
 } from "./studio-virtual-space-living-world";
 import { StudioWorldObjectRuntime } from "./studio-virtual-space-object-runtime";
+import { StudioVirtualDecorationRuntime } from "./studio-virtual-space-decoration-runtime";
+import { StudioDeskPodRuntime } from "./studio-virtual-space-desk-pods";
+import { studioRuntimeBudget, studioTownInterestSnapshot } from "./studio-virtual-space-town-program";
+import type { StudioVirtualDecorationState } from "./studio-virtual-space-customization";
+import {
+  studioTownEnvironmentInteractions,
+  studioTownNearestWalkablePoint,
+  studioTownTraversalProfile,
+} from "./studio-virtual-space-town-layout";
 import {
   StudioCharacterAssetResidency,
   studioCharacterFrameGeometry,
@@ -125,6 +136,7 @@ export interface StudioVirtualSpacePhaserCanvasProps {
   readonly debugWorld?: boolean;
   readonly atmosphere?: StudioNpcAtmosphere;
   readonly artStyle?: StudioVirtualArtStyleKey;
+  readonly decorations?: StudioVirtualDecorationState;
   readonly selfPose?: { readonly state: "sit"; readonly facing: StudioVirtualSpaceFacing };
   readonly waveActorIds?: readonly string[];
   /** Membership/lease authority belongs to the caller. Anchor attaches the rendered hips only. */
@@ -183,6 +195,13 @@ function activityState(
 }
 
 function interactionMarkerText(interaction: StudioWorldInteractionDefinition): string {
+  if (/falls/u.test(interaction.id)) return "FX";
+  if (/fountain/u.test(interaction.id)) return "WT";
+  if (/garden/u.test(interaction.id)) return "GD";
+  if (/market/u.test(interaction.id)) return "MK";
+  if (/observatory/u.test(interaction.id)) return "OB";
+  if (/gong/u.test(interaction.id)) return "GG";
+  if (/stage/u.test(interaction.id)) return "EV";
   const glyphByAction: Record<string, string> = {
     assistant: "AI",
     assets: "AS",
@@ -199,6 +218,14 @@ function interactionMarkerText(interaction: StudioWorldInteractionDefinition): s
 function propTextureKey(prop: StudioWorldPropDefinition): string {
   return `studio-world-prop-${prop.assetKey ?? prop.id}`;
 }
+
+const EMPTY_DECORATIONS: StudioVirtualDecorationState = Object.freeze({
+  presetKey: "minimal",
+  districtKey: "story-terrace",
+  presentationMode: "minimal",
+  placements: Object.freeze([]),
+  revision: 0,
+});
 
 function nearestInteraction(
   interactions: readonly StudioWorldInteractionDefinition[],
@@ -225,6 +252,7 @@ export function StudioVirtualSpacePhaserCanvas({
   debugWorld = false,
   atmosphere = "balanced",
   artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
+  decorations = EMPTY_DECORATIONS,
   selfPose,
   waveActorIds = [],
   seatedActors = [],
@@ -248,6 +276,8 @@ export function StudioVirtualSpacePhaserCanvas({
   atmosphereRef.current = atmosphere;
   const poseRef = useRef({ selfPose, waveActorIds, seatedActors });
   poseRef.current = { selfPose, waveActorIds, seatedActors };
+  const decorationsRef = useRef(decorations);
+  decorationsRef.current = decorations;
   const guideTourRef = useRef(guideTourRequest);
   guideTourRef.current = guideTourRequest;
   const identityRef = useRef(selfIdentity);
@@ -341,7 +371,10 @@ export function StudioVirtualSpacePhaserCanvas({
       let lastGuideRequestId: string | null = null;
       let lastGuideState = "";
       const interactionMarkers = new Map<string, import("phaser").GameObjects.Container>();
-      const interactions = studioWorldInteractions(manifest);
+      const interactions = Object.freeze([
+        ...studioWorldInteractions(manifest),
+        ...studioTownEnvironmentInteractions(),
+      ]) as readonly StudioWorldInteractionDefinition[];
       const portals = studioWorldPortals(manifest);
       const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}-${artStyle}`;
       const backgroundUrl = studioVirtualArtTextureUrl(artStyle, "world-base");
@@ -352,6 +385,14 @@ export function StudioVirtualSpacePhaserCanvas({
         foliage: `studio-living-${artStyle}-foliage`,
         lights: `studio-living-${artStyle}-lights`,
         weather: `studio-living-${artStyle}-weather`,
+        pathOverlay: `studio-living-${artStyle}-path-overlay`,
+        waterfall: `studio-living-${artStyle}-waterfall`,
+        waterfallSplash: `studio-living-${artStyle}-waterfall-splash`,
+        interactionFx: `studio-living-${artStyle}-interaction-fx`,
+      } as const;
+      const decorationTextureKeys = {
+        decor: `studio-living-${artStyle}-decor`,
+        accessory: `studio-living-${artStyle}-accessory`,
       } as const;
       const objectTextureKeys = {
         door: `studio-object-${artStyle}-door`,
@@ -416,6 +457,7 @@ export function StudioVirtualSpacePhaserCanvas({
       let highlightRing: import("phaser").GameObjects.Graphics | null = null;
       let zoneNote: HTMLParagraphElement | null = null;
       let routeOverlay: import("phaser").GameObjects.Graphics | null = null;
+      let proximityOverlay: import("phaser").GameObjects.Graphics | null = null;
       let motion = { velocity: { x: 0, y: 0 } };
       let facing: StudioVirtualSpaceFacing = snapshotRef.current.self.facing;
       let moving = false;
@@ -437,6 +479,10 @@ export function StudioVirtualSpacePhaserCanvas({
       let keys: Record<string, import("phaser").Input.Keyboard.Key> | null = null;
       let livingWorld: StudioLivingWorldRuntime | null = null;
       let objectRuntime: StudioWorldObjectRuntime | null = null;
+      let decorationRuntime: StudioVirtualDecorationRuntime | null = null;
+      let deskPodRuntime: StudioDeskPodRuntime | null = null;
+      let lastDecorationRevision = -1;
+      let lastWalkablePoint: StudioVirtualSpacePoint = { x: snapshotRef.current.self.x, y: snapshotRef.current.self.y };
       const staticColliderObjects: import("phaser").GameObjects.GameObject[] = [];
       let lastFootstepDistance = 0;
 
@@ -638,6 +684,7 @@ export function StudioVirtualSpacePhaserCanvas({
           visual.sprite.destroy();
           visual.label.destroy();
           visual.reaction.destroy();
+          decorationRuntime?.removeActor(id);
           peers.delete(id);
           characterAssets.release(`peer:${id}`);
         }
@@ -647,6 +694,7 @@ export function StudioVirtualSpacePhaserCanvas({
             localBody.setPosition(next.self.x, next.self.y);
             localBodyPhysics.reset(next.self.x, next.self.y);
             localPose.reset(next.self, fixedStepClock.time);
+            lastWalkablePoint = { x: next.self.x, y: next.self.y };
             previousRendered = null;
           }
           applyAvatarVisual(
@@ -671,6 +719,12 @@ export function StudioVirtualSpacePhaserCanvas({
         this.load.spritesheet(livingTextureKeys.foliage, studioVirtualArtTextureUrl(artStyle, "foliage-sheet"), { frameWidth: 256, frameHeight: 128 });
         this.load.spritesheet(livingTextureKeys.lights, studioVirtualArtTextureUrl(artStyle, "lights-sheet"), { frameWidth: 256, frameHeight: 128 });
         this.load.spritesheet(livingTextureKeys.weather, studioVirtualArtTextureUrl(artStyle, "weather-sheet"), { frameWidth: 256, frameHeight: 256 });
+        this.load.image(livingTextureKeys.pathOverlay, studioVirtualLivingTownAssetUrl(artStyle, "path-overlay"));
+        this.load.spritesheet(livingTextureKeys.waterfall, studioVirtualLivingTownAssetUrl(artStyle, "waterfall-sheet"), { frameWidth: 128, frameHeight: 192 });
+        this.load.spritesheet(livingTextureKeys.waterfallSplash, studioVirtualLivingTownAssetUrl(artStyle, "waterfall-splash-sheet"), { frameWidth: 128, frameHeight: 64 });
+        this.load.spritesheet(livingTextureKeys.interactionFx, studioVirtualLivingTownAssetUrl(artStyle, "interaction-fx-sheet"), { frameWidth: 128, frameHeight: 128 });
+        this.load.spritesheet(decorationTextureKeys.decor, studioVirtualLivingTownAssetUrl(artStyle, "decor-sheet"), { frameWidth: 128, frameHeight: 128 });
+        this.load.spritesheet(decorationTextureKeys.accessory, studioVirtualLivingTownAssetUrl(artStyle, "accessory-sheet"), { frameWidth: 96, frameHeight: 96 });
         this.load.image(objectTextureKeys.door, studioVirtualArtObjectUrl(artStyle, "door"));
         this.load.image(objectTextureKeys.crate, studioVirtualArtObjectUrl(artStyle, "crate"));
         this.load.image(objectTextureKeys.lantern, studioVirtualArtObjectUrl(artStyle, "lantern"));
@@ -712,6 +766,8 @@ export function StudioVirtualSpacePhaserCanvas({
 
         livingWorld = new StudioLivingWorldRuntime(this, manifest, artStyle, livingTextureKeys);
         cleanup.push(() => { livingWorld?.destroy(); livingWorld = null; });
+        deskPodRuntime = new StudioDeskPodRuntime(this);
+        cleanup.push(() => { deskPodRuntime?.destroy(); deskPodRuntime = null; });
 
         const modularCampus = drawStudioModularCampus(this, manifest, artStyle);
         parent.dataset.worldPresentation = modularCampus.length > 0 ? "modular-campus" : "illustrated";
@@ -727,6 +783,7 @@ export function StudioVirtualSpacePhaserCanvas({
         }
 
         routeOverlay = this.add.graphics().setDepth(650);
+        proximityOverlay = this.add.graphics().setDepth(780);
         zoneVeil = this.add.graphics().setDepth(40_000);
         highlightRing = this.add.graphics().setDepth(80_000);
 
@@ -845,6 +902,11 @@ export function StudioVirtualSpacePhaserCanvas({
           backgroundColor: "#7657eedd",
           padding: { x: 6, y: 3 },
         }).setOrigin(0.5, 0).setDepth(Math.round(initialPoint.y) + 1_002);
+        lastWalkablePoint = initialPoint;
+        decorationRuntime = new StudioVirtualDecorationRuntime(this, bodyZone, decorationTextureKeys);
+        decorationRuntime.syncDecorations(decorationsRef.current);
+        lastDecorationRevision = decorationsRef.current.revision;
+        cleanup.push(() => { decorationRuntime?.destroy(); decorationRuntime = null; });
 
         localReaction = this.add.text(initialPoint.x, initialPoint.y - 125, "", {
           fontSize: "24px", backgroundColor: "#182332", padding: { x: 6, y: 4 },
@@ -1125,6 +1187,20 @@ export function StudioVirtualSpacePhaserCanvas({
 
         const sprint = !typing && Boolean(heldKeys.has("ShiftLeft") || heldKeys.has("ShiftRight") || keys?.shift?.isDown || gamepad.sprint);
         let currentPoint = { x: localBodyPhysics.center.x, y: localBodyPhysics.center.y };
+        const traversal = studioTownTraversalProfile(manifest, currentPoint);
+        if (!traversal.allowed) {
+          const fallback = studioTownTraversalProfile(manifest, lastWalkablePoint).allowed
+            ? lastWalkablePoint
+            : studioTownNearestWalkablePoint(manifest, currentPoint);
+          localBodyPhysics.reset(fallback.x, fallback.y);
+          localBody.setPosition(fallback.x, fallback.y);
+          localPose.reset(fallback, fixedStepClock.time);
+          motion = { velocity: { x: 0, y: 0 } };
+          path = [];
+          currentPoint = fallback;
+        } else {
+          lastWalkablePoint = currentPoint;
+        }
         const terrain = studioVirtualTerrainAt(manifest, currentPoint);
         const config = {
           ...DEFAULT_STUDIO_MOTION_CONFIG,
@@ -1339,8 +1415,43 @@ export function StudioVirtualSpacePhaserCanvas({
         parent.dataset.zoneId = zone.zoneId ?? "";
         parent.dataset.zoneSeparated = String(zone.separated);
         parent.dataset.zoneAnnounced = String(zone.announce);
+        const activity = snapshotRef.current.self.activity;
         const speed = Math.hypot(motion.velocity.x, motion.velocity.y);
+        const runtimeBudget = studioRuntimeBudget(parent.clientWidth, reducedMotion.matches, peers.size);
+        const peerInterest = studioTownInterestSnapshot(manifest, currentPoint, [...peers].map(([id, peer]) => ({
+          id: `peer:${id}`,
+          point: { x: peer.targetX, y: peer.targetY },
+          kind: "peer" as const,
+          important: bridge.getFollowingPeer() === id,
+        })));
+        proximityOverlay?.clear();
+        if (proximityOverlay && atmosphereRef.current !== "focus" && activity !== "focused" && activity !== "away") {
+          const origin = studioProjectTownPoint(manifest, currentPoint);
+          const visiblePeers = [...peers].map(([id, peer]) => ({ id, peer, distance: Math.hypot(peer.targetX - currentPoint.x, peer.targetY - currentPoint.y) }))
+            .filter((item) => item.distance <= 190);
+          if (visiblePeers.length) {
+            proximityOverlay.lineStyle(1.5, 0x8fdcff, .13).strokeCircle(origin.x, origin.y, 140);
+            proximityOverlay.lineStyle(2, 0xc5f4ff, .19).strokeCircle(origin.x, origin.y, 72);
+          }
+          for (const item of visiblePeers) {
+            const peerPoint = studioProjectTownPoint(manifest, { x: item.peer.targetX, y: item.peer.targetY });
+            const strength = Math.max(.05, .32 * (1 - item.distance / 190));
+            proximityOverlay.lineStyle(item.distance < 80 ? 2 : 1, item.peer.activity === "focused" ? 0xf9b95d : 0x82e6ff, strength)
+              .lineBetween(origin.x, origin.y, peerPoint.x, peerPoint.y);
+          }
+        }
         objectRuntime?.update(time, currentPoint);
+        deskPodRuntime?.update([
+          { point: currentPoint, focused: activity === "focused" },
+          ...[...peers].map(([, peer]) => ({ point: { x: peer.targetX, y: peer.targetY }, focused: peer.activity === "focused" })),
+        ], time, reducedMotion.matches);
+        if (decorationsRef.current.revision !== lastDecorationRevision) {
+          decorationRuntime?.syncDecorations(decorationsRef.current);
+          lastDecorationRevision = decorationsRef.current.revision;
+        }
+        decorationRuntime?.update(time, currentPoint, reducedMotion.matches);
+        const environmentEffect = bridge.consumeEnvironmentEffect();
+        if (environmentEffect) livingWorld?.triggerEnvironmentEffect(environmentEffect.effect, environmentEffect.point, time);
         livingWorld?.update(time, deltaMs, currentPoint, speed, reducedMotion.matches);
         const traveled = lastPosition ? Math.hypot(currentPoint.x - lastPosition.x, currentPoint.y - lastPosition.y) : 0;
         if (traveled > 0.015) lastMovedAt = time;
@@ -1349,8 +1460,8 @@ export function StudioVirtualSpacePhaserCanvas({
         lastPosition = currentPoint;
         if (speed > 10) facing = studioStableFacing(motion.velocity, facing);
 
-        const activity = snapshotRef.current.self.activity;
-        const localSkin = studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current).skin, artStyle);
+        const localResolved = resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current);
+        const localSkin = studioCharacterSkinForArtStyle(localResolved.skin, artStyle);
         const localSeatRequested = !nextMoving && !directInput && resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current, "sit").clip === "sit" ? poseRef.current.seatedActors.find((actor) => actor.id === identityRef.current) : undefined;
         const localSeat = scene.textures.exists(studioCharacterPoseTextureKey(localSkin, "sit")) ? localSeatRequested : undefined;
         const localPoseOverride = !nextMoving && !directInput && resolveStudioCharacterAppearance(snapshotRef.current.self, identityRef.current, "sit").clip === "sit" ? poseRef.current.selfPose : undefined;
@@ -1371,24 +1482,35 @@ export function StudioVirtualSpacePhaserCanvas({
         localSprite.setData("seatAttached", Boolean(localSeat));
         applyAvatarVisual(localSprite, snapshotRef.current.self, localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, localState, identityRef.current);
         const lookAhead = reducedMotion.matches ? 0 : sprint ? 0.24 : 0.16;
-        cameraTarget.x = Math.max(0, Math.min(manifest.width, rendered.x + motion.velocity.x * lookAhead));
-        cameraTarget.y = Math.max(0, Math.min(manifest.height, rendered.y + motion.velocity.y * lookAhead));
+        const cameraGroundTarget = {
+          x: Math.max(0, Math.min(manifest.width, rendered.x + motion.velocity.x * lookAhead)),
+          y: Math.max(0, Math.min(manifest.height, rendered.y + motion.velocity.y * lookAhead)),
+        };
+        const cameraVisualTarget = studioProjectTownPoint(manifest, cameraGroundTarget);
+        cameraTarget.x = cameraVisualTarget.x;
+        cameraTarget.y = cameraVisualTarget.y;
         const followAmount = snapCamera || reducedMotion.matches ? 1 : studioCameraLerp(dt);
         this.cameras.main.setLerp(followAmount, followAmount);
-        if (snapCamera) this.cameras.main.centerOn(rendered.x, rendered.y);
+        if (snapCamera) this.cameras.main.centerOn(cameraVisualTarget.x, cameraVisualTarget.y);
 
         const hasWalkClip = scene.anims.exists(walkAnimationKey(localSkin, facing)) || reducedMotion.matches;
         const bob = nextMoving && !hasWalkClip ? Math.sin(time * 0.024) * 2.8 : 0;
-        const localVisualPoint = localSeat?.anchorPoint ?? rendered;
+        const localGroundPoint = localSeat?.anchorPoint ?? rendered;
+        const localVisualPoint = studioProjectTownPoint(manifest, localGroundPoint);
+        const localShadowPoint = studioProjectTownPoint(manifest, rendered);
         localSprite.setPosition(localVisualPoint.x, localVisualPoint.y + bob);
         localSprite.setAngle(nextMoving && !hasWalkClip ? Math.sin(time * 0.018) * 0.8 : 0);
-        localSprite.setDepth(Math.round(localVisualPoint.y) + 1_001);
-        localShadow.setPosition(rendered.x, rendered.y + 1);
+        localSprite.setDepth(studioTownDepthForPoint(manifest, localGroundPoint, 1_001));
+        localShadow.setPosition(localShadowPoint.x, localShadowPoint.y + 1);
         localShadow.setVisible(!localSeat).setScale(nextMoving && !reducedMotion.matches ? 0.86 + Math.cos(time * 0.024) * 0.07 : 1, 1);
-        localShadow.setDepth(Math.round(localBody.y) + 990);
+        localShadow.setDepth(studioTownDepthForPoint(manifest, rendered, 990));
         const localHeadY = localVisualPoint.y - localSprite.displayHeight * localSprite.originY;
         localLabel.setPosition(localVisualPoint.x, localSeat ? localHeadY - 24 : localVisualPoint.y + 12).setDepth(localSeat ? 160_000 : Math.round(localVisualPoint.y) + 1_002);
         localReaction?.setPosition(localVisualPoint.x, localSeat ? localHeadY - 48 : localVisualPoint.y - 125);
+        decorationRuntime?.syncActor(
+          identityRef.current, localSprite, localLabel, localVisualPoint,
+          localSeatRequested?.facing ?? localPoseOverride?.facing ?? facing, nextMoving, localResolved, time,
+        );
 
         for (const [peerId, visual] of peers) {
           const target = visual.timeline.sample(Date.now()) ?? {
@@ -1401,12 +1523,14 @@ export function StudioVirtualSpacePhaserCanvas({
           const distance = previousPoint ? Math.hypot(target.x - previousPoint.x, target.y - previousPoint.y) : 0;
           visual.sprite.setData("previousGroundPoint", { x: target.x, y: target.y });
           if (distance < 128) visual.sprite.setData("walkDistance", Number(visual.sprite.getData("walkDistance") ?? 0) + distance);
-          const peerSkin = studioCharacterSkinForArtStyle(resolveStudioCharacterAppearance(visual, peerId).skin, artStyle);
+          const peerResolved = resolveStudioCharacterAppearance(visual, peerId);
+          const peerSkin = studioCharacterSkinForArtStyle(peerResolved.skin, artStyle);
           const peerSeatRequested = !target.moving && resolveStudioCharacterAppearance(visual, peerId, "sit").clip === "sit" ? poseRef.current.seatedActors.find((actor) => actor.id === peerId) : undefined;
           const peerSeat = scene.textures.exists(studioCharacterPoseTextureKey(peerSkin, "sit")) ? peerSeatRequested : undefined;
           const peerWaving = poseRef.current.waveActorIds.includes(peerId)
             || snapshotRef.current.peerReactions.some((reaction) => reaction.sessionId === peerId && reaction.reaction === "wave");
-          const peerVisualPoint = peerSeat?.anchorPoint ?? target;
+          const peerGroundPoint = peerSeat?.anchorPoint ?? target;
+          const peerVisualPoint = studioProjectTownPoint(manifest, peerGroundPoint);
           visual.sprite.setPosition(peerVisualPoint.x, peerVisualPoint.y).setData("seatAttached", Boolean(peerSeat));
           const peerState = target.moving ? "walk" : peerSeatRequested ? "sit" : peerWaving ? "wave" : activityState(false, visual.nearby, visual.activity);
           applyAvatarVisual(visual.sprite, visual, peerSeatRequested?.facing ?? target.facing, peerState, peerId);
@@ -1415,11 +1539,19 @@ export function StudioVirtualSpacePhaserCanvas({
           } else {
             visual.sprite.setAngle(0);
           }
-          visual.sprite.setDepth(Math.round(visual.sprite.y) + 1_001);
+          visual.sprite.setDepth(studioTownDepthForPoint(manifest, peerGroundPoint, 1_001));
           const peerHeadY = visual.sprite.y - visual.sprite.displayHeight * visual.sprite.originY;
           visual.label.setPosition(visual.sprite.x, peerSeat ? peerHeadY - 24 : visual.sprite.y + 18)
             .setDepth(peerSeat ? 160_000 : Math.round(visual.sprite.y) + 1_002);
           visual.reaction.setPosition(visual.sprite.x, peerSeat ? peerHeadY - 48 : visual.sprite.y - 125);
+          const peerVisible = peerInterest.activeIds.has("peer:" + peerId);
+          visual.sprite.setVisible(peerVisible);
+          visual.label.setVisible(peerVisible);
+          if (!peerVisible) visual.reaction.setVisible(false);
+          decorationRuntime?.syncActor(
+            peerId, visual.sprite, visual.label, peerVisualPoint,
+            peerSeatRequested?.facing ?? target.facing, target.moving, peerResolved, time,
+          );
         }
 
         const tourRequest = guideTourRef.current;
@@ -1432,6 +1564,8 @@ export function StudioVirtualSpacePhaserCanvas({
           reducedMotion: reducedMotion.matches,
           focused: activity === "focused" || blocked,
           mobile: parent.clientWidth < 600,
+          eventActive: studioVirtualDayPhase(time) === "dusk" || studioVirtualDayPhase(time) === "night",
+          precipitation: Math.floor(time / 45_000) % 4 === 2,
           viewport: this.cameras.main.worldView,
           people: [
             { id: identityRef.current, point: currentPoint, velocity: motion.velocity, focused: activity === "focused" || blocked },
@@ -1445,22 +1579,36 @@ export function StudioVirtualSpacePhaserCanvas({
           ],
         });
         const tourState = npcDirector.guideTourState;
+        const npcInterest = studioTownInterestSnapshot(manifest, currentPoint, npcViews.map((view) => ({
+          id: "npc:" + view.id, point: view.point, kind: "npc" as const, important: view.id === tourState?.guideId,
+        })));
+        let visibleNpcCount = 0;
         const serializedTour = JSON.stringify(tourState);
         if (tourState && serializedTour !== lastGuideState) { lastGuideState = serializedTour; callbacksRef.current.onGuideTourChange?.(tourState); }
         for (const view of npcViews) {
           const npc = npcs.get(view.id);
           if (!npc) continue;
+          const importantNpc = view.id === tourState?.guideId;
+          const npcVisible = importantNpc || (npcInterest.activeIds.has("npc:" + view.id) && visibleNpcCount < runtimeBudget.maxActiveNpcs);
+          if (npcVisible) visibleNpcCount += 1;
+          npc.sprite.setVisible(npcVisible);
+          npc.shadow.setVisible(npcVisible);
+          npc.label.setVisible(npcVisible);
+          if (!npcVisible) { npc.reaction.setVisible(false); continue; }
           npc.phase = view.phase;
           npc.groundPoint = view.point;
           const attached = view.seatAttachmentPoint && scene.textures.exists(studioCharacterPoseTextureKey(npc.skin, "sit"));
-          const visualPoint = attached ? view.seatAttachmentPoint! : view.point;
-          npc.sprite.setPosition(visualPoint.x, visualPoint.y).setDepth(Math.round(visualPoint.y) + 1_000).setData("seatAttached", Boolean(attached));
+          const groundPoint = attached ? view.seatAttachmentPoint! : view.point;
+          const visualPoint = studioProjectTownPoint(manifest, groundPoint);
+          const shadowPoint = studioProjectTownPoint(manifest, view.point);
+          npc.sprite.setPosition(visualPoint.x, visualPoint.y).setDepth(studioTownDepthForPoint(manifest, groundPoint, 1_000)).setData("seatAttached", Boolean(attached));
           npc.sprite.setData("activityStage", view.activityStage).setData("activityAnchorId", view.activityAnchorId);
           npc.sprite.setData("walkDistance", view.distance);
           applySpriteVisual(npc.sprite, npc.skin, view.facing, view.animation);
-          npc.shadow.setPosition(view.point.x, view.point.y + 1).setDepth(Math.round(view.point.y) + 990).setVisible(!attached);
+          npc.shadow.setPosition(shadowPoint.x, shadowPoint.y + 1).setDepth(studioTownDepthForPoint(manifest, view.point, 990)).setVisible(!attached);
           const headY = npc.sprite.y - npc.sprite.displayHeight * npc.sprite.originY;
-          npc.label.setPosition(visualPoint.x, attached ? headY - 22 : view.point.y + 9).setDepth(attached ? 160_000 : Math.round(view.point.y) + 1_002);
+          npc.label.setPosition(visualPoint.x, attached ? headY - 22 : visualPoint.y + 9)
+            .setDepth(attached ? 160_000 : studioTownDepthForPoint(manifest, groundPoint, 1_002));
           const greeting = studioNpcActivityLabel(npc.definition, view.phase);
           npc.reaction.setPosition(visualPoint.x, headY - (attached ? 45 : 8))
             .setVisible(view.greeting && !reducedMotion.matches && atmosphereRef.current !== "focus");
@@ -1503,9 +1651,16 @@ export function StudioVirtualSpacePhaserCanvas({
           parent.dataset.localMoving = String(nextMoving);
           parent.dataset.localFacing = facing;
           parent.dataset.terrain = terrain.kind;
+          parent.dataset.pathAllowed = String(studioTownTraversalProfile(manifest, currentPoint).allowed);
           parent.dataset.dayPhase = studioVirtualDayPhase(time);
           parent.dataset.livingWorld = String(Boolean(livingWorld));
           parent.dataset.objectPhysics = String(Boolean(objectRuntime));
+          parent.dataset.decorationCount = String(decorationsRef.current.placements.length);
+          parent.dataset.environmentInteractions = String(studioTownEnvironmentInteractions().length);
+          parent.dataset.interestKey = peerInterest.key;
+          parent.dataset.activePeerVisuals = String(peerInterest.activeIds.size);
+          parent.dataset.activeNpcVisuals = String(visibleNpcCount);
+          parent.dataset.maxParticles = String(runtimeBudget.maxParticles);
           parent.dataset.texture = localSprite.texture.key;
           parent.dataset.appearanceIssues = JSON.stringify(localSprite.getData("appearanceIssues") ?? []);
           parent.dataset.reaction = localReaction?.visible ? localReaction.text : "";

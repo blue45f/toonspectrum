@@ -30,10 +30,11 @@ describe("Virtual Studio character texture residency", () => {
     for (let index = 0; index < STUDIO_CHARACTER_SKINS.length; index++) {
       const appearance = studioCharacterAppearanceForAvatarIndex(index);
       expect(appearance.capabilities).toEqual(expect.arrayContaining(["idle", "walk-down", "walk-left", "walk-right", "walk-up", "sit", "wave"]));
-      expect(appearance.capabilities.includes("draw")).toBe(index === 0);
-      expect(appearance.capabilities.includes("review")).toBe(index < 2);
+      const character = STUDIO_CHARACTER_SKINS[index]!;
+      expect(appearance.capabilities.includes("draw")).toBe(index === 0 || character.key === "imagegen25");
+      expect(appearance.capabilities.includes("review")).toBe(index < 2 || character.key === "imagegen25");
       expect(new Set(appearance.capabilities).size).toBe(appearance.capabilities.length);
-      const resolved = resolveStudioCharacterAppearance({ avatarIndex: (index + 1) % 4, appearance }, "peer", "sit");
+      const resolved = resolveStudioCharacterAppearance({ avatarIndex: (index + 1) % STUDIO_CHARACTER_SKINS.length, appearance }, "peer", "sit");
       expect(resolved.skin.key).toBe(STUDIO_CHARACTER_SKINS[index]!.key);
       expect(resolved.clip).toBe("sit");
       const restricted = resolveStudioCharacterAppearance({ avatarIndex: index, appearance: { ...appearance, capabilities: ["idle"] } }, "peer", "sit");

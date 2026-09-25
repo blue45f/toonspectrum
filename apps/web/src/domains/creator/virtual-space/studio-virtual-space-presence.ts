@@ -394,6 +394,15 @@ export class StudioVirtualSpacePresenceController {
     this.update(this.self, this.self.facing, this.self.activity, this.self.moving, avatarIndex, this.self.zoneId);
   }
 
+  setAppearance(appearance: StudioVirtualSpaceAppearance): void {
+    if (this.closed) return;
+    const parsed = parseStudioVirtualSpaceAppearance(appearance);
+    if (!parsed || JSON.stringify(parsed) === JSON.stringify(this.self.appearance)) return;
+    this.self = Object.freeze({ ...this.self, appearance: parsed });
+    this.dirty = true;
+    this.emit();
+  }
+
   sendReaction(reaction: StudioVirtualSpaceReaction): void {
     if (this.closed || !REACTIONS.has(reaction)) return;
     const now = this.now();

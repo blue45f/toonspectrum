@@ -15,7 +15,19 @@ export type StudioSpatialActionId =
   | "project-settings"
   | "production-control"
   | "quality-control"
-  | "release-center";
+  | "release-center"
+  | "waterfall-splash"
+  | "make-wish"
+  | "take-photo"
+  | "release-petals"
+  | "toggle-lanterns"
+  | "pet-animal"
+  | "ring-gong"
+  | "open-customization"
+  | "bubble"
+  | "spotlight"
+  | "live-annotation"
+  | "town-hub";
 
 export interface StudioSpatialAction {
   readonly id: StudioSpatialActionId;
@@ -42,6 +54,18 @@ const COMMON: Readonly<Record<Exclude<StudioSpatialActionId, "primary">, StudioS
   "production-control": action({ id: "production-control", labelKo: "프로덕션 관제실", labelEn: "Production control", descriptionKo: "병목, 일정, 작업 배정과 제작 상태를 확인합니다.", descriptionEn: "Inspect bottlenecks, schedule, assignments and production state.", risk: "inspect" }),
   "quality-control": action({ id: "quality-control", labelKo: "최종 QC 체크", labelEn: "Final quality control", descriptionKo: "미해결 검수, 원고 상태와 출고 전 체크리스트를 확인합니다.", descriptionEn: "Check unresolved reviews, manuscript state and pre-delivery quality gates.", risk: "inspect" }),
   "release-center": action({ id: "release-center", labelKo: "출고·내보내기", labelEn: "Release & export", descriptionKo: "최종 승인 후 플랫폼별 내보내기 절차로 이동합니다.", descriptionEn: "Continue to platform export after final approval.", risk: "authority" }),
+  "waterfall-splash": action({ id: "waterfall-splash", labelKo: "물장난하기", labelEn: "Splash water", descriptionKo: "폭포 안개와 물결 이펙트를 가까이에서 실행합니다.", descriptionEn: "Trigger waterfall mist and ripples nearby.", risk: "inspect", recommended: true }),
+  "make-wish": action({ id: "make-wish", labelKo: "소원 빌기", labelEn: "Make a wish", descriptionKo: "분수·폭포에 별빛 소원 이펙트를 남깁니다.", descriptionEn: "Leave a starlight wish effect at the fountain or falls.", risk: "inspect" }),
+  "take-photo": action({ id: "take-photo", labelKo: "기념 사진", labelEn: "Take a photo", descriptionKo: "현재 장소에서 카메라 플래시와 프레임 이펙트를 실행합니다.", descriptionEn: "Trigger a camera flash and frame effect at this landmark.", risk: "inspect" }),
+  "release-petals": action({ id: "release-petals", labelKo: "꽃잎 날리기", labelEn: "Release petals", descriptionKo: "정원 주변에 꽃잎 파티클을 흩뿌립니다.", descriptionEn: "Release petal particles around the garden.", risk: "inspect" }),
+  "toggle-lanterns": action({ id: "toggle-lanterns", labelKo: "조명 밝히기", labelEn: "Light the lanterns", descriptionKo: "주변 조명을 잠시 더 밝게 만듭니다.", descriptionEn: "Brighten nearby lanterns for a short time.", risk: "inspect" }),
+  "pet-animal": action({ id: "pet-animal", labelKo: "고양이 쓰다듬기", labelEn: "Pet the cat", descriptionKo: "주변 동물과 상호작용하고 하트 이펙트를 표시합니다.", descriptionEn: "Interact with a nearby animal and show a heart effect.", risk: "inspect" }),
+  "ring-gong": action({ id: "ring-gong", labelKo: "완료 축하 공 울리기", labelEn: "Ring the celebration gong", descriptionKo: "완료를 축하하는 파동 이펙트를 실행합니다.", descriptionEn: "Trigger a celebration wave for completed work.", risk: "collaborative" }),
+  "open-customization": action({ id: "open-customization", labelKo: "이 공간 꾸미기", labelEn: "Customize this space", descriptionKo: "안전한 내장 오브젝트와 캐릭터 액세서리를 선택합니다.", descriptionEn: "Choose safe bundled objects and character accessories.", risk: "inspect" }),
+  bubble: action({ id: "bubble", labelKo: "소규모 Bubble 대화", labelEn: "Conversation bubble", descriptionKo: "근처 팀원 최대 세 명과 전체 명단 동의 후 임시 대화를 시작합니다.", descriptionEn: "Start a temporary nearby conversation after everyone accepts the full roster.", risk: "collaborative" }),
+  spotlight: action({ id: "spotlight", labelKo: "Spotlight 발표", labelEn: "Spotlight presentation", descriptionKo: "현재 동의한 대화 그룹을 대상으로 무대 발표 모드를 준비합니다.", descriptionEn: "Prepare stage presentation mode for the currently consenting conversation.", risk: "collaborative" }),
+  "live-annotation": action({ id: "live-annotation", labelKo: "라이브 화면 주석", labelEn: "Live annotation", descriptionKo: "레이저·펜·메모를 P2P로 공유합니다.", descriptionEn: "Share laser, pen and notes over P2P.", risk: "collaborative" }),
+  "town-hub": action({ id: "town-hub", labelKo: "마을 활동·퀘스트", labelEn: "Town activities & quests", descriptionKo: "이벤트, 팀 자리, 미니게임과 블루프린트를 확인합니다.", descriptionEn: "Explore events, desk pods, mini-games and blueprints.", risk: "inspect" }),
 });
 
 function primary(interaction: StudioWorldInteractionDefinition): StudioSpatialAction {
@@ -65,16 +89,37 @@ export function studioSpatialActions(
   interaction: StudioWorldInteractionDefinition,
   room: StudioWorldRoomDefinition | undefined,
 ): readonly StudioSpatialAction[] {
-  const values: StudioSpatialAction[] = [primary(interaction)];
   const id = `${interaction.id}:${room?.id ?? interaction.zoneId}`.toLowerCase();
+  if (/environment-.*falls/u.test(id)) return unique([
+    COMMON["waterfall-splash"], COMMON["make-wish"], COMMON["take-photo"], COMMON["open-customization"],
+  ]);
+  if (/creator-fountain/u.test(id)) return unique([
+    COMMON["make-wish"], COMMON["waterfall-splash"], COMMON["take-photo"], COMMON["open-customization"],
+  ]);
+  if (/garden/u.test(id)) return unique([
+    COMMON["release-petals"], COMMON["take-photo"], COMMON["open-customization"],
+  ]);
+  if (/market|treehouse/u.test(id)) return unique([
+    COMMON["open-customization"], COMMON.people, COMMON["take-photo"],
+  ]);
+  if (/observatory/u.test(id)) return unique([
+    COMMON["toggle-lanterns"], COMMON["take-photo"], COMMON["make-wish"],
+  ]);
+  if (/gong/u.test(id)) return unique([
+    COMMON["ring-gong"], COMMON["take-photo"], COMMON.people,
+  ]);
+  if (/event-stage/u.test(id)) return unique([
+    COMMON.spotlight, COMMON["live-annotation"], COMMON["release-petals"], COMMON.huddle, COMMON.people,
+  ]);
+  const values: StudioSpatialAction[] = [primary(interaction)];
   switch (interaction.action) {
     case "story": values.push(COMMON.sessions, COMMON["today-board"], COMMON["project-overview"]); break;
     case "comic": values.push(COMMON.sessions, COMMON.board, COMMON["work-inbox"]); break;
     case "canvas": values.push(COMMON.board, COMMON.sessions, COMMON["work-inbox"]); break;
     case "review": values.push(COMMON["work-inbox"], COMMON.sessions, COMMON["quality-control"]); break;
     case "assets": values.push(COMMON["work-inbox"], COMMON["project-overview"]); break;
-    case "live": values.push(COMMON.huddle, COMMON.board, COMMON.people); break;
-    case "community": values.push(COMMON.people, COMMON["team-hub"], COMMON["today-board"]); break;
+    case "live": values.push(COMMON.huddle, COMMON.sessions, COMMON.people, COMMON.board, COMMON.spotlight); break;
+    case "community": values.push(COMMON.bubble, COMMON.people, COMMON["team-hub"], COMMON["town-hub"]); break;
     case "assistant": values.push(COMMON["today-board"], COMMON["production-control"], COMMON.schedule); break;
   }
   if (/meeting|conference|huddle/u.test(id)) values.push(COMMON.huddle, COMMON.sessions, COMMON.people);

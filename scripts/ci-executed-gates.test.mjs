@@ -240,6 +240,9 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "apps/web/public/assets/virtual-studio/style-packs-v5/sky-island/world/world-base.webp",
     "apps/web/public/assets/virtual-studio/style-packs-v5/retro/players/player-pink-walk-down.webp",
     "apps/web/public/assets/virtual-studio/style-packs-v5/neon/npcs/npc-concierge-direction-down.webp",
+    "apps/web/public/assets/virtual-studio/living-town-v6/art-v6-manifest.json",
+    "apps/web/public/assets/virtual-studio/living-town-v6/sky-island/path-overlay.webp",
+    "apps/web/public/assets/virtual-studio/living-town-v6/retro/waterfall-sheet.webp",
     "apps/web/public/assets/virtual-studio/drawn-characters-v1/art-manifest.json",
     ...["gentle-window-rain.ogg", "window-rain.ogg", "provenance.json", "CC0-1.0.txt"].map((name) =>
       `apps/web/public/assets/virtual-studio/ambient-audio/${name}`),
@@ -272,6 +275,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/art-v4-manifest.json",
     "/apps/web/public/assets/virtual-studio/style-packs/",
     "/apps/web/public/assets/virtual-studio/style-packs-v5/",
+    "/apps/web/public/assets/virtual-studio/living-town-v6/",
   ]);
   assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
     "artwork must be present before the required foundation tests execute");
@@ -284,6 +288,8 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "the production art gate must execute the v4 generated campus and NPC integrity test");
   assert.match(artTestScript, /verify-virtual-studio-v5-art\.test\.mjs/u,
     "the production art gate must execute the independent v5 RPG art integrity test");
+  assert.match(artTestScript, /verify-virtual-studio-living-town-v6\.test\.mjs/u,
+    "the production art gate must execute the Image Generation 2.5-directed living town integrity test");
   const scratch = mkdtempSync(join(tmpdir(), "virtual-studio-ci-inputs-"));
   const git = (...args) => {
     const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
