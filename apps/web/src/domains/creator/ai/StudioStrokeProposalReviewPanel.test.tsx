@@ -54,7 +54,7 @@ const transform = {
 afterEach(cleanup);
 
 describe("StudioStrokeProposalReviewPanel", () => {
-  it("renders a keyboard-accessible ghost review and applies a selected transaction", () => {
+  it("renders a keyboard-accessible local smoothing review and applies a selected transaction", () => {
     const onApply = vi.fn();
     render(
       <StudioStrokeProposalReviewPanel
@@ -68,8 +68,9 @@ describe("StudioStrokeProposalReviewPanel", () => {
         onCancel={vi.fn()}
       />,
     );
-    expect(screen.getByRole("region", { name: "AI 획 제안 검토" })).not.toBeNull();
-    expect(screen.getByRole("img", { name: /1개 제안 획/u })).not.toBeNull();
+    expect(screen.getByRole("region", { name: "스마트 획 보정 검토" })).not.toBeNull();
+    expect(screen.getByText(/생성형 AI가 아닌 기기 내 선 보정 알고리즘/u)).not.toBeNull();
+    expect(screen.getByRole("img", { name: /1개 보정 획/u })).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "선택 획 적용" }));
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply.mock.calls[0]?.[0].addedStrokes[0]?.id).toBe("stroke-1");
