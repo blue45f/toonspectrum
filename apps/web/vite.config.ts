@@ -1,4 +1,4 @@
-import { collectStudioOfflineDrawingUrls } from "./apps/web/src/app/service-worker/studio-service-worker-drawing-plan";
+import { collectStudioOfflineDrawingUrls } from "./src/app/service-worker/studio-service-worker-drawing-plan";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -9,24 +9,24 @@ import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { build as viteBuild, defineConfig, type Plugin } from "vite";
 
-import { createStudioManualChunks } from "./apps/web/config/vite-manual-chunks";
-import { STUDIO_I18N_NAMESPACES } from "./apps/web/src/shared/lib/i18n-asset-manifest";
+import { createStudioManualChunks } from "./config/vite-manual-chunks";
+import { STUDIO_I18N_NAMESPACES } from "./src/shared/lib/i18n-asset-manifest";
 import {
   STUDIO_SERVICE_WORKER_STATIC_CRITICAL_URLS,
   planStudioServiceWorkerPrecache,
   studioServiceWorkerBuildId,
   type StudioServiceWorkerManifest,
   type StudioViteManifest,
-} from "./apps/web/src/app/service-worker/studio-service-worker-precache-plan";
+} from "./src/app/service-worker/studio-service-worker-precache-plan";
 import {
   STUDIO_CROSS_ORIGIN_ISOLATION_HEADERS,
   STUDIO_CROSS_ORIGIN_ISOLATION_WORKER_HEADERS,
   isStudioCrossOriginIsolationDocumentRequest,
   isStudioCrossOriginIsolationWorkerRequest,
-} from "./apps/web/src/app/studio-cross-origin-isolation";
+} from "./src/app/studio-cross-origin-isolation";
 
-const webRoot = fileURLToPath(new URL("./apps/web", import.meta.url));
-const repositoryRoot = fileURLToPath(new URL("./", import.meta.url));
+const webRoot = fileURLToPath(new URL("./", import.meta.url));
+const repositoryRoot = fileURLToPath(new URL("../../", import.meta.url));
 const nodeRequire = createRequire(import.meta.url);
 
 const reactCompilerRuntimeInteropModule = path.resolve(

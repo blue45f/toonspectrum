@@ -241,7 +241,7 @@ async function spawnPreview(): Promise<{ origin: string; child: ChildProcess | n
   const external = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   if (external) return { origin: external, child: null };
   const port = 4600 + (Date.now() % 300);
-  const child = spawn("npx", ["vite", "preview", "--port", String(port), "--strictPort"], { stdio: "ignore" });
+  const child = spawn("npx", ["vite", "preview", "--config", "apps/web/vite.config.ts", "--port", String(port), "--strictPort"], { stdio: "ignore" });
   const origin = `http://127.0.0.1:${port}`;
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {

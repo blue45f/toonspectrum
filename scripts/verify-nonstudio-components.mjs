@@ -31,7 +31,7 @@ function Harness() {
 createRoot(document.getElementById("root")!).render(<MemoryRouter initialEntries={["/community/title"]}><Harness /></MemoryRouter>);
 `, { flag: "wx" });
 let log = "";
-const server = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--host", "127.0.0.1", "--port", "4175", "--strictPort"], { env: { ...process.env, VITE_CATALOG_SOURCE: "static" }, stdio: ["ignore", "pipe", "pipe"] });
+const server = spawn(process.execPath, ["node_modules/vite/bin/vite.js", "--config", "apps/web/vite.config.ts", "--host", "127.0.0.1", "--port", "4175", "--strictPort"], { env: { ...process.env, VITE_CATALOG_SOURCE: "static" }, stdio: ["ignore", "pipe", "pipe"] });
 server.stdout.on("data", (data) => { log += data; });
 server.stderr.on("data", (data) => { log += data; });
 const results = [];

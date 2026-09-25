@@ -48,7 +48,7 @@ const REQUIRED_PENDING_MIGRATION_IDS = Object.freeze([
   "0037_creator_marketplace_3d_asset_parity",
 ]);
 const DRIZZLE_SCHEMA_PATHS = Object.freeze([
-  "drizzle.config.ts",
+  "apps/api/drizzle.config.ts",
   "apps/api/src/db/schema.ts",
   "apps/api/src/db/schema/admin.schema.ts",
   "apps/api/src/db/admin-schema-contract.ts",
@@ -819,7 +819,7 @@ function runDrizzleFreshProvision(databaseUrl, allowLoopback) {
   });
   const result = spawnSync(
     "pnpm",
-    ["exec", "drizzle-kit", "push", "--force"],
+    ["exec", "drizzle-kit", "push", "--config", "apps/api/drizzle.config.ts", "--force"],
     {
       cwd: REPOSITORY_ROOT,
       encoding: "utf8",

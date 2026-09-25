@@ -36,7 +36,7 @@ export async function withStudioReviewHostQaRuntime(environment, verify, options
   const api = await startIsolatedMarketApi(target, { environment, localReviewStorage: options.localReviewStorage });
   let webProcess;
   try {
-    webProcess = spawn("pnpm", ["exec", "vite", "--host", web.hostname, "--port", web.port, "--strictPort"], {
+    webProcess = spawn("pnpm", ["exec", "vite", "--config", "apps/web/vite.config.ts", "--host", web.hostname, "--port", web.port, "--strictPort"], {
       cwd: ROOT,
       detached: process.platform !== "win32",
       env: {

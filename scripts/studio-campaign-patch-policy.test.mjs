@@ -77,7 +77,7 @@ test("rejects workflow, dependency, lockfile, environment, deployment, and datab
 
 test("rejects build configuration, verification scripts, tools, and arbitrary root files", () => {
   const result = evaluateStudioCampaignPatch(config, [
-    change("vite.config.ts"),
+    change("apps/web/vite.config.ts"),
     change("scripts/check-studio-bundle.mjs"),
     change("tools/generated-runner.mjs"),
     change("unexpected-root.json"),
@@ -85,7 +85,7 @@ test("rejects build configuration, verification scripts, tools, and arbitrary ro
 
   assert.equal(result.ok, false);
   for (const pathname of [
-    "vite.config.ts",
+    "apps/web/vite.config.ts",
     "scripts/check-studio-bundle.mjs",
     "tools/generated-runner.mjs",
     "unexpected-root.json",

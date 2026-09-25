@@ -13,7 +13,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      // Match root vite.config.ts so FeedbackPage and feedback hooks resolve after the apps/web move.
+      // Match apps/web/vite.config.ts so FeedbackPage and feedback hooks resolve after the apps/web move.
       "@": path.resolve(webRoot, "src"),
     },
   },

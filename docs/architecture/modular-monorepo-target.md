@@ -13,13 +13,14 @@ Status: **migration target**. This document separates current reality from the i
 
 ## Current state
 
-- `apps/web` remains driven by the root frontend toolchain, but its source now uses only the
-  `app`, `domains`, `platform`, and `shared` top-level ownership boundaries.
+- `apps/web` remains driven by the root frontend dependency/tool command surface, but it owns
+  its Vite configuration and its source uses only the `app`, `domains`, `platform`, and `shared`
+  top-level ownership boundaries.
 - `apps/admin-web` is a separate workspace package with app-owned Vite, TypeScript and
   Playwright configuration, but most production administrator capability still remains under
   `apps/web/src/domains/admin` and must migrate capability by capability.
-- `apps/api` is a separate workspace package, while existing API→Web imports and the
-  `server/common/infrastructure/db` layout remain measured migration debt.
+- `apps/api` is a separate workspace package and owns its Drizzle configuration, while existing
+  API→Web imports and the `server/common/infrastructure/db` layout remain measured migration debt.
 - `apps/desktop-sync` is the single desktop synchronization workspace. The previous focused
   watcher/journal companion is preserved under `apps/desktop-sync/src/local-agent` and exposed
   through the `@toonspectrum/desktop-sync/local-agent` subpath.
@@ -29,7 +30,9 @@ Status: **migration target**. This document separates current reality from the i
   resources and native validation as an independent workspace package.
 - Non-runtime authoring and automation now live under `tools/media` and `tools/automation`;
   marketplace comparison material lives under `tests/benchmarks/marketplace`.
-- Remaining root app-specific configuration and large static assets still require later slices.
+- Shared repository-level Playwright, lint and TypeScript orchestration remains at the root;
+  application-specific Vite, Drizzle, Capacitor and Admin configuration is app-owned.
+- Large static assets still require a later manifest-addressed object-storage slice.
 
 ## Target application layout
 
@@ -78,8 +81,8 @@ Do not use a package to hide application coupling and do not create `packages/do
 3. Move the user-Web administrator console to Admin Web capability by capability.
 4. Keep the completed Web `app/domain/platform/shared` ownership split from regressing.
 5. Move API `server/common/infrastructure/db` code to modules and platform boundaries.
-6. Preserve the completed mobile and desktop-sync application boundaries while moving remaining
-   root app-specific configuration to its owning application.
+6. Preserve completed app-owned Vite, Drizzle, Capacitor, Admin, mobile and desktop-sync
+   boundaries; keep only genuinely cross-application orchestration at repository root.
 7. Ratchet Creator root files downward and migrate Studio by authority and lifecycle.
 8. Move large immutable runtime assets to manifest-addressed object storage with verified fallback.
 

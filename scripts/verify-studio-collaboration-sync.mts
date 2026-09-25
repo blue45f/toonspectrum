@@ -493,7 +493,7 @@ const server: ChildProcess | null = EXISTING_ORIGIN
       process.execPath,
       [
         join(process.cwd(), "node_modules", "vite", "bin", "vite.js"),
-        "preview",
+        "preview", "--config", "apps/web/vite.config.ts",
         "--port",
         String(new URL(origin).port),
         "--strictPort",

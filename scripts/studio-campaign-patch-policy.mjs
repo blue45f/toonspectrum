@@ -33,6 +33,8 @@ const FORBIDDEN_PATH_RULES = Object.freeze([
   /^scripts\//u,
   /^tools\//u,
   /^(?:vite|vitest|playwright|eslint|postcss|tailwind|commitlint|turbo|tsconfig)(?:\.|$)/u,
+  /^apps\/(?:web|admin-web)\/vite\.config\.ts$/u,
+  /^apps\/api\/drizzle\.config\.ts$/u,
   /^apps\/api\/src\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,
   /^lib\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,
   /^drizzle(?:\.|\/|$)/u,

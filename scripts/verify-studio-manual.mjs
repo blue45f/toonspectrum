@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 const base = "http://127.0.0.1:4173";
 const output = "artifacts/studio-manual";
 await mkdir(output, { recursive: true });
-const server = spawn("pnpm", ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", "4173", "--strictPort"], { stdio: "inherit" });
+const server = spawn("pnpm", ["exec", "vite", "preview", "--config", "apps/web/vite.config.ts", "--host", "127.0.0.1", "--port", "4173", "--strictPort"], { stdio: "inherit" });
 const serverExit = new Promise((resolve) => server.once("exit", resolve));
 let browser;
 const checks = [];

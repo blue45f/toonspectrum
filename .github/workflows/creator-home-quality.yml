@@ -432,7 +432,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort > /tmp/creator-home-preview.log 2>&1 &
+          pnpm exec vite preview --config apps/web/vite.config.ts --host 127.0.0.1 --port 4173 --strictPort > /tmp/creator-home-preview.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" || true' EXIT
 

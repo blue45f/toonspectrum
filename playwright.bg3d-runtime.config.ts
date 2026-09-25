@@ -37,7 +37,7 @@ export default defineConfig({
     trace: { mode: "on", screenshots: false, snapshots: true, sources: true },
   },
   webServer: {
-    command: `pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`,
+    command: `pnpm exec vite preview --config apps/web/vite.config.ts --host 127.0.0.1 --port ${port} --strictPort`,
     url: `${baseURL}/`,
     reuseExistingServer: false,
     timeout: 120_000,

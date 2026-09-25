@@ -4,7 +4,7 @@
  * contract, and the kill switch. Also reports cold vs warm transfer bytes.
  *
  * Run: pnpm exec tsx scripts/verify-studio-service-worker.mts
- * Expects a production build in dist/ (`pnpm exec vite build`).
+ * Expects a production build in dist/ (`pnpm exec vite build --config apps/web/vite.config.ts`).
  *
  * Why this serves `dist/` itself instead of `vite preview`: the production
  * header contract lives in `config/http-response-headers.json`, which applies
@@ -201,7 +201,7 @@ async function inspectWorker(page: Page): Promise<Record<string, unknown> | null
 
 async function main(): Promise<void> {
   if (!existsSync(join(DIST, "sw.js"))) {
-    throw new Error("dist/sw.js missing — run `pnpm exec vite build` first");
+    throw new Error("dist/sw.js missing — run `pnpm exec vite build --config apps/web/vite.config.ts` first");
   }
 
   const notes: string[] = [];

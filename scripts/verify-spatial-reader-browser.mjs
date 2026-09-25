@@ -22,7 +22,7 @@ app.render(React.createElement(Reader,{pages:[page,page],title:'공간 웹툰 �
 let server; let browser;
 try {
   await writeFile(entry, html);
-  server = await createServer({ configFile: path.join(root, "vite.config.ts"), server: { host: "127.0.0.1", port: 5297, strictPort: true, open: false } });
+  server = await createServer({ configFile: path.join(root, "apps/web/vite.config.ts"), server: { host: "127.0.0.1", port: 5297, strictPort: true, open: false } });
   await server.listen();
   browser = await chromium.launch({ headless: true });
   const errors = [];

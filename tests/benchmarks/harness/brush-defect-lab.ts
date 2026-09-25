@@ -334,7 +334,7 @@ async function main(): Promise<void> {
   const port = await findFreePort();
   const viteServer = await createViteServer({
     root: REPO_ROOT,
-    configFile: join(REPO_ROOT, "vite.config.ts"),
+    configFile: join(WEB_ROOT, "vite.config.ts"),
     logLevel: "warn",
     appType: "custom",
     server: { port, strictPort: true, host: "127.0.0.1" },

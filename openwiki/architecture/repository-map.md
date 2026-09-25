@@ -4,9 +4,10 @@ Status: **migration**.
 
 ```text
 apps/
-  web/                  user-facing browser source
+  web/                  user-facing browser source and app-owned Vite configuration
   admin-web/            administrator browser application
-  api/                  backend application
+  api/                  backend application and app-owned Drizzle configuration
+  mobile/               Capacitor Android/iOS wrapper
   desktop-sync/         full local/cloud sync CLI and local-agent capability
 packages/
   contracts/             focused cross-application runtime-neutral contracts
@@ -16,6 +17,7 @@ config/                  machine-readable policy and dependency/source ratchets
 data/asset-releases/      durable reviewed asset-release evidence
 docs/architecture/       human-authored current/target design
 openwiki/                generated/maintained navigation layer
+tools/                   non-runtime authoring, automation and DCC tooling
 scripts/                 verification and migration tooling
 ```
 

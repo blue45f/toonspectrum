@@ -92,7 +92,7 @@ separate unfinished performance target before claiming complete startup optimiza
 ## Local validation executed
 
 - Full repository strict ESLint passed, using the normal repository ignore policy. An earlier
-  changed-file invocation explicitly named ignored vite.config.ts and failed only its ignored-file
+  changed-file invocation explicitly named ignored apps/web/vite.config.ts and failed only its ignored-file
   warning; the full configured strict lint was then run successfully, not bypassed.
 - Standard frontend and API typechecks passed; realtime Worker typecheck passed.
 - Production web bundle, generated third-party notices, static CSP and unchanged bundle gate passed.

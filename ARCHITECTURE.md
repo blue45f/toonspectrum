@@ -26,7 +26,8 @@
 
 ```text
 apps/web/                         # 사용자·창작자 브라우저 애플리케이션
-  config/                         # Web 전용 Vite 정책과 수동 청크 규칙
+  vite.config.ts                  # Web root·alias·build·service-worker 정책
+  config/                         # Web 전용 수동 청크와 compiler runtime 정책
   index.html                      # Web 프로덕션 HTML 진입점
   public/                         # URL로 직접 제공되는 정적 자산
   src/
@@ -46,6 +47,7 @@ apps/admin-web/                   # 독립 관리자 Frontend workspace package
     shared/                       # Admin 전용 공용 UI·순수 helper
 
 apps/api/                         # 서버 전용 NestJS workspace package
+  drizzle.config.ts              # API schema·migration ownership
   src/modules/                    # 기능 모듈과 HTTP 경계
   src/infrastructure/             # platform으로 이전 중인 서버 adapter
   src/db/                         # schema·migration·seed

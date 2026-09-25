@@ -1071,7 +1071,7 @@ async function main() {
   );
   const server: ChildProcess = spawn(
     vitePreviewBin,
-    ["preview", "--port", String(port), "--strictPort", "--host", "127.0.0.1"],
+    ["preview", "--config", "apps/web/vite.config.ts", "--port", String(port), "--strictPort", "--host", "127.0.0.1"],
     { stdio: "ignore" },
   );
 

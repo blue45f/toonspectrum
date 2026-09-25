@@ -132,7 +132,7 @@ async function main() {
   try {
     child = spawn(
       "pnpm",
-      ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+      ["exec", "vite", "preview", "--config", "apps/web/vite.config.ts", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
       { cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"] }
     );
     child.stderr?.on("data", (d) => {

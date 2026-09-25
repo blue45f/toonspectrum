@@ -54,7 +54,7 @@ function startWebServer() {
   const url = new URL(WEB_ORIGIN);
   return spawn(
     "pnpm",
-    ["exec", "vite", "--host", url.hostname, "--port", url.port, "--strictPort"],
+    ["exec", "vite", "--config", "apps/web/vite.config.ts", "--host", url.hostname, "--port", url.port, "--strictPort"],
     {
       cwd: ROOT,
       detached: process.platform !== "win32",

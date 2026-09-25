@@ -24,7 +24,7 @@ const babylonManifestPattern = /(?:@babylonjs|babylon(?:\.js)?)/i;
 const approvedWebgpuRendererEntry =
   "src/domains/creator/bg3d/studio-bg3d-three-webgpu-entry.ts";
 // The entry chunk itself carries Three's `three.webgpu`/`three.tsl` builds. They are deliberately
-// NOT forced into a named manual chunk: see the note in vite.config.ts — naming one drags the
+// NOT forced into a named manual chunk: see the note in apps/web/vite.config.ts — naming one drags the
 // shared `three.core` graph in with it and every three importer then pays for the WebGPU engine.
 const approvedWebgpuRuntimeChunkName = "studio-bg3d-three-webgpu";
 const webgpuRendererManifestPattern =
@@ -900,7 +900,7 @@ if (!fs.existsSync(manifestPath)) {
     // A <link rel="modulepreload"> is a highest-priority fetch on *every* route. The chunks below
     // are either route-specific engines or resolve behind an explicit fallback chain, so none of
     // them may sit on the entry document's critical path. Keep in sync with
-    // ENTRY_PRELOAD_EXCLUSIONS in vite.config.ts.
+    // ENTRY_PRELOAD_EXCLUSIONS in apps/web/vite.config.ts.
     const entryPreloadExclusions = [
       "studio-konva-runtime",
       "StudioVrmPoser",
@@ -924,7 +924,7 @@ if (!fs.existsSync(manifestPath)) {
       if (leaked.length > 0) {
         fail(
           `entry document modulepreloads excluded chunk(s): ${leaked.join(", ")} `
-            + "(see ENTRY_PRELOAD_EXCLUSIONS in vite.config.ts)",
+            + "(see ENTRY_PRELOAD_EXCLUSIONS in apps/web/vite.config.ts)",
         );
       }
     }

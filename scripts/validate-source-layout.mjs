@@ -63,6 +63,8 @@ export function measureSourceLayout(files) {
     rootMediaFiles: filesUnder(files, "media"),
     rootAutomationFiles: filesUnder(files, "automation"),
     rootMarketplaceBenchmarkFiles: filesUnder(files, "marketplace-benchmark"),
+    rootViteConfigFiles: files.includes("vite.config.ts") ? 1 : 0,
+    rootDrizzleConfigFiles: files.includes("drizzle.config.ts") ? 1 : 0,
   };
 }
 

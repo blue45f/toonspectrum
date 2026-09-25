@@ -19,7 +19,7 @@ const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
 
 /**
  * Kept separate to avoid making the primary schema import a table that already references it.
- * `drizzle.config.ts` explicitly catalogs both schema files, while query builders can consume this
+ * `apps/api/drizzle.config.ts` explicitly catalogs both schema files, while query builders can consume this
  * standalone table without introducing a circular module dependency.
  */
 export const creatorWorkRasterAssets = pgTable(

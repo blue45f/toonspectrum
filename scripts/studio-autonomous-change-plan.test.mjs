@@ -84,7 +84,7 @@ test("inspector-only UI changes request browser and build validation without inv
 test("deployment configuration is classified independently", () => {
   const classification = classifyStudioChanges([
     "deploy/cloudflare-static/wrangler.jsonc",
-    "vite.config.ts",
+    "apps/web/vite.config.ts",
   ]);
 
   assert.equal(classification.categories.deployment, true);

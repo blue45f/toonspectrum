@@ -1,6 +1,6 @@
 import { defineConfig } from "drizzle-kit";
 
-import { normalizePgConnectionStringForTls } from "./apps/api/src/db/pg-connection";
+import { normalizePgConnectionStringForTls } from "./src/db/pg-connection";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

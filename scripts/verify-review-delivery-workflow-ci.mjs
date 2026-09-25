@@ -83,7 +83,7 @@ try {
     console.log(`[delivery-qa] Starting owned Vite server at ${origin.origin}.`);
     webProcess = spawn(
       "pnpm",
-      ["exec", "vite", "--host", origin.hostname, "--port", String(port), "--strictPort"],
+      ["exec", "vite", "--config", "apps/web/vite.config.ts", "--host", origin.hostname, "--port", String(port), "--strictPort"],
       {
         cwd: worktree,
         detached: process.platform !== "win32",

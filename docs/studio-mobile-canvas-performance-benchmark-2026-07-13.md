@@ -76,7 +76,7 @@ W3C [Pointer Events Level 3](https://www.w3.org/TR/pointerevents3/)의 coalesced
 
 ## 재발 방지
 
-`vite.config.ts`가 production manifest를 만들고 `pnpm run check:studio-bundle`이 다음을 검사한다.
+`apps/web/vite.config.ts`가 production manifest를 만들고 `pnpm run check:studio-bundle`이 다음을 검사한다.
 
 - Studio 정적 JS: 2,350,000B raw / 750,000B gzip 이하
 - 앱 공통 엔트리: 500,000B raw / 170,000B gzip 이하

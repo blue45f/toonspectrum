@@ -21,7 +21,7 @@ export default defineConfig({
   },
   // Exercise this checkout's CSS chunks, never a reused development server.
   webServer: {
-    command: "pnpm exec vite preview --host 127.0.0.1 --port 5388 --strictPort",
+    command: "pnpm exec vite preview --config apps/web/vite.config.ts --host 127.0.0.1 --port 5388 --strictPort",
     url: baseURL,
     reuseExistingServer: false,
     timeout: 120_000,

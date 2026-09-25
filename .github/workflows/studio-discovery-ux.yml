@@ -189,7 +189,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pnpm exec vite --host 127.0.0.1 --port 5219 --strictPort > /tmp/studio-drawing-ux-vite.log 2>&1 &
+          pnpm exec vite --config apps/web/vite.config.ts --host 127.0.0.1 --port 5219 --strictPort > /tmp/studio-drawing-ux-vite.log 2>&1 &
           fixture_pid=$!
           trap 'kill "$fixture_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 60); do

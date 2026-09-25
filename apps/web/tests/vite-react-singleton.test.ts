@@ -46,7 +46,7 @@ it("bundles the workspace carousel with its renderer's React through mount, upda
       }
     `);
     const loaded = await loadConfigFromFile(
-      { command: "build", mode: "production" }, path.join(root, "vite.config.ts"), root,
+      { command: "build", mode: "production" }, path.join(root, "apps/web/vite.config.ts"), root,
     );
     if (!loaded) throw new Error("Missing application Vite config");
     const result = await build({

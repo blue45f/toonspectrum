@@ -5,7 +5,7 @@ import { loadConfigFromFile, type UserConfig } from "vite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../../..");
-const configFile = path.join(repositoryRoot, "vite.config.ts");
+const configFile = path.join(repositoryRoot, "apps/web/vite.config.ts");
 const interopModule = path.join(
   repositoryRoot,
   "apps/web/config/react-compiler-runtime-interop.mjs",

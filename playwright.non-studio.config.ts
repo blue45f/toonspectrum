@@ -19,7 +19,7 @@ export default defineConfig({
     reducedMotion: "reduce",
   },
   webServer: {
-    command: "pnpm exec vite preview --host 127.0.0.1 --port 5209 --strictPort",
+    command: "pnpm exec vite preview --config apps/web/vite.config.ts --host 127.0.0.1 --port 5209 --strictPort",
     url: "http://127.0.0.1:5209",
     reuseExistingServer: false,
     timeout: 120_000,

@@ -92,7 +92,7 @@ jobs:
       - name: Real browser layout, keyboard, history and recovery checks
         run: |
           set -euo pipefail
-          pnpm exec vite preview --host 127.0.0.1 --port 5281 > /tmp/public-site-preview.log 2>&1 &
+          pnpm exec vite preview --config apps/web/vite.config.ts --host 127.0.0.1 --port 5281 > /tmp/public-site-preview.log 2>&1 &
           PREVIEW_PID=$!
           trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 60); do

@@ -3270,7 +3270,7 @@ async function main(): Promise<void> {
   const studioUrl = `${rootUrl}studio/canvas`;
   const server: ChildProcess = spawn(
     process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-    ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
+    ["exec", "vite", "preview", "--config", "apps/web/vite.config.ts", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
     { cwd: process.cwd(), stdio: ["ignore", "pipe", "pipe"] },
   );
   server.stderr?.on("data", (chunk) => {

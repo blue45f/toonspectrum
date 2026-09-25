@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
-  // drizzle.config.ts intentionally throws without DATABASE_URL. Knip only needs source-level
+  // apps/api/drizzle.config.ts intentionally throws without DATABASE_URL. Knip only needs source-level
   // imports here, so do not execute the Drizzle plugin configuration during static analysis.
   "drizzle": false,
   // Several specialized Playwright configs intentionally fail closed unless their release-gate

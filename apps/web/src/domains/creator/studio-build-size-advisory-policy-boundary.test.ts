@@ -11,7 +11,7 @@ const pageOrchestrationBoundarySource = readFileSync(
   "utf8",
 );
 const viteConfigSource = readFileSync(
-  new URL("../../../../../vite.config.ts", import.meta.url),
+  new URL("../../../vite.config.ts", import.meta.url),
   "utf8",
 );
 const viteManualChunksSource = readFileSync(

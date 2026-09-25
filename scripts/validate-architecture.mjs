@@ -52,6 +52,8 @@ requirePaths(
     "docs/architecture/frontend-layered-architecture.md",
     "pnpm-workspace.yaml",
     "tsconfig.json",
+    "apps/web/vite.config.ts",
+    "apps/api/drizzle.config.ts",
     "commitlint.config.cjs",
     "config/free-infrastructure-policy.json",
     "config/architecture-source-ratchet.json",
@@ -150,7 +152,6 @@ requirePaths(
     "tools/media/brand-film/package.json",
     "tools/automation/n8n/toonstudio-brand-film.json",
     "tests/benchmarks/marketplace/results.yaml",
-    "vite.config.ts",
   ],
   "app entry",
 );
@@ -187,6 +188,10 @@ forbidPaths(
 forbidPaths(
   ["apps/desktop-sync-agent"],
   "duplicate desktop sync workspace must stay consolidated under apps/desktop-sync",
+);
+forbidPaths(
+  ["vite.config.ts", "drizzle.config.ts"],
+  "root app-specific config must stay with its owning application",
 );
 
 // Lint exception ledger and its ratchet tests must remain machine-readable.
@@ -315,6 +320,19 @@ for (const script of requiredScripts) {
 const expectedCspCommand = "node scripts/verify-static-csp.mjs apps/web/index.html";
 if (scripts["verify:csp"] !== expectedCspCommand) {
   issues.push(`verify:csp must target the canonical entry: ${expectedCspCommand}`);
+}
+
+const appOwnedConfigCommands = {
+  dev: "apps/web/vite.config.ts",
+  build: "apps/web/vite.config.ts",
+  "build:bundle": "apps/web/vite.config.ts",
+  preview: "apps/web/vite.config.ts",
+  "db:push": "apps/api/drizzle.config.ts",
+};
+for (const [script, configPath] of Object.entries(appOwnedConfigCommands)) {
+  if (!String(scripts[script] ?? "").includes(configPath)) {
+    issues.push(`${script} must bind the app-owned config: ${configPath}`);
+  }
 }
 
 for (const reference of [

@@ -1,6 +1,6 @@
 # Service Worker — 캐시 정책 · 업데이트 · 복구
 
-`dist/sw.js` 는 `vite.config.ts` 의 `toonspectrum-service-worker` 플러그인이
+`dist/sw.js` 는 `apps/web/vite.config.ts` 의 `toonspectrum-service-worker` 플러그인이
 `src/app/service-worker/studio-service-worker-entry.ts` 를 빌드해 만든다. 라우팅·버저닝
 판단은 전부 `studio-service-worker-policy.ts` 의 순수 함수라 브라우저 없이 단위 테스트된다.
 

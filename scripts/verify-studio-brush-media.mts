@@ -1089,7 +1089,7 @@ async function main(): Promise<void> {
         process.execPath,
         [
           join(process.cwd(), "node_modules", "vite", "bin", "vite.js"),
-          "preview",
+          "preview", "--config", "apps/web/vite.config.ts",
           "--port",
           String(port),
           "--strictPort",
