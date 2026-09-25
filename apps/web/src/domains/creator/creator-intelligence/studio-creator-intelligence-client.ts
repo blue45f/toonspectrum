@@ -13,7 +13,11 @@ export interface CreatorIntelligenceProviderStatus {
 
 export interface CreatorIntelligenceAdmissionStatus {
   readonly paidRoutesEnabled: boolean;
-  readonly enforcement: "authenticated-bounded-process-local";
+  readonly enforcement:
+    | "distributed-upstash"
+    | "single-instance-local"
+    | "unavailable";
+  readonly meshJobOwnership: "signed-user-bound-token";
   readonly operations: Readonly<Record<string, {
     readonly shortLimit: number;
     readonly shortWindowMs: number;
@@ -178,9 +182,6 @@ export interface SafeSearchResponse {
   readonly policy?: "flag-for-human-review";
 }
 
-// These discovery reads are public and never depend on user identity. Omitting
-// ambient cookies also keeps the reference vault available when session-backed
-// account services are temporarily unavailable.
 const PUBLIC_DISCOVERY_REQUEST = Object.freeze({ credentials: "omit" as const });
 
 function protectedOperationId(operation: string): string {
