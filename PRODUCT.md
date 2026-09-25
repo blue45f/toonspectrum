@@ -62,7 +62,7 @@ ToonSpectrum은 크로스플랫폼 작품 탐색과 브라우저 기반 제작 �
 
 ## 데이터 거버넌스
 
-- 운영 카탈로그의 기본 권위는 검증·커밋된 스냅샷이다. 현재 생성 흐름은 `apps/api/data/catalog.json.gz`에서 `public/data/*.json`을 만들고, 웹과 Nest API가 같은 카탈로그 사실을 공유하도록 한다.
+- 운영 카탈로그의 기본 권위는 검증·커밋된 스냅샷이다. 현재 생성 흐름은 `apps/api/data/catalog.json.gz`에서 `apps/web/public/data/*.json`을 만들고, 웹과 Nest API가 같은 카탈로그 사실을 공유하도록 한다.
 - 계정, 사용자 리뷰, 커뮤니티와 창작 데이터는 동적 저장 대상이다. 레거시 카탈로그 DB 경로는 명시적으로 활성화한 경우에만 사용하며 기본 권위로 간주하지 않는다.
 - 수집 대상은 registry에서 관리하고 기본 ingest 모드는 꺼 둔다. 플랫폼별 약관, robots 정책, 공식 API와 라이선스·제휴 조건을 검토한 뒤에만 운영 수집을 활성화한다.
 - 카탈로그에는 공개 작품 메타데이터, 공개 수치, 플랫폼 URL, 출처와 갱신 정보를 저장한다. 외부 플랫폼의 유료 본문, 회차 이미지 바이너리, 외부 리뷰 원문과 개인정보는 저장하지 않는다.
@@ -97,7 +97,7 @@ ToonSpectrum은 크로스플랫폼 작품 탐색과 브라우저 기반 제작 �
 ## 현재 확보한 근거
 
 - 제품·라우트 개요: `README.md`, `apps/web/src/app/routes/AppRouter.tsx`, `apps/web/src/domains/creator/studio-router/studio-route-manifest.ts`
-- Studio 사용·저장·오프라인 경계: `STUDIO_MANUAL.md`, `docs/rewrite/current-studio-boundary.md`
+- Studio 사용·저장·오프라인 경계: `STUDIO_MANUAL.md`, `docs/architecture/studio-current-boundaries.md`, `docs/engines/renderer-roles.md`
 - 실제 화면과 반응형 검증: `docs/screenshots/home.png`, `docs/screenshots/home-mobile.png`, `docs/screenshots/studio-commercial-suite/README.md`
 - Studio 검증 보고서: `docs/reports/toonstudio-v12-final-evidence-2026-08-09.md`
 - 수집·저장·법적 경계: `docs/COMPLIANCE.md`

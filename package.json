@@ -66,7 +66,7 @@
     "verify:cloudflare-realtime": "pnpm run test:cloudflare-realtime && pnpm run typecheck:cloudflare-realtime && pnpm exec wrangler deploy --dry-run --config deploy/cloudflare-realtime/wrangler.jsonc",
     "verify:backend-capability-worker": "node scripts/canary-backend-capability-worker.mjs",
     "verify:csp": "node scripts/verify-static-csp.mjs apps/web/index.html",
-    "validate:architecture": "node scripts/validate-architecture.mjs && pnpm run validate:source-layout && pnpm run validate:app-boundaries",
+    "validate:architecture": "node scripts/validate-architecture.mjs && pnpm run validate:documentation && pnpm run validate:source-layout && pnpm run validate:app-boundaries",
     "verify:toolchain-coverage": "node scripts/verify-toolchain-coverage.mjs",
     "check:studio-bundle": "node scripts/check-studio-bundle.mjs",
     "ci": "pnpm run verify:pnpm-lockfile && pnpm run test:pnpm-lockfile && pnpm run verify:i18n-builtins && pnpm run validate:architecture && pnpm run verify:free-infrastructure && pnpm run verify:cloudflare-apex-redirect && pnpm run verify:cloudflare-static && pnpm run verify:csp && pnpm run verify:toolchain-coverage && pnpm run verify:studio-competitor-capabilities && pnpm run verify:studio-3d-web-authoring && pnpm run verify:mobile-native-media && pnpm run lint:ci && pnpm run typecheck && pnpm run test && pnpm run test:toonbridge && pnpm run verify:cloudflare-realtime && pnpm run build && pnpm run check:studio-bundle && pnpm run audit:licenses && pnpm run build:all",
@@ -253,7 +253,8 @@
     "verify:studio-thorvg-browser": "THORVG_BROWSER_PROBE=1 vitest run packages/studio-engine-thorvg/src/browser-probe.test.ts --pool=threads --maxWorkers=1",
     "test:admin": "pnpm --filter @toonspectrum/admin-web test",
     "test:admin:e2e": "pnpm --filter @toonspectrum/admin-web test:e2e",
-    "validate:source-layout": "node scripts/validate-source-layout.mjs"
+    "validate:source-layout": "node scripts/validate-source-layout.mjs",
+    "validate:documentation": "node scripts/validate-documentation.mjs && node --test scripts/validate-documentation.test.mjs"
   },
   "dependencies": {
     "@automerge/automerge": "3.5.0",

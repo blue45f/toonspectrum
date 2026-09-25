@@ -18,7 +18,7 @@ Cloudflare/Render 배포 단위의 검증된 version으로 수행합니다.
 | 레이어 | 스택 | 기본 호스트 | 배포 산출물 |
 | --- | --- | --- | --- |
 | 프론트 | Vite + React SPA | Cloudflare Static Assets | `dist/` |
-| 카탈로그 | 정적 스냅샷 | Cloudflare Static Assets | `public/data/*.json` |
+| 카탈로그 | 정적 스냅샷 | Cloudflare Static Assets | `apps/web/public/data/*.json` |
 | Edge gateway | Cloudflare Worker | Cloudflare | 동적 경로만 Core API로 전달 |
 | Core API | NestJS | Render `toonspectrum-core-api` | 인증·ACL·거래·원장 transaction |
 | DB | PostgreSQL | Neon/호환 Postgres | 동적 데이터 + checksum migration 원장 |
@@ -56,7 +56,7 @@ pnpm catalog:gen
 pnpm run verify
 ```
 
-`pnpm catalog:gen`은 `apps/api/data/catalog.json.gz`를 읽어 `public/data/*.json`과 `public/data/ranking/*.json`을 만듭니다. 이 산출물은 빌드 시 다시 생성되며, 랭킹 기본 뷰는 `disableLive=true` 스냅샷 산식으로 사전 계산됩니다.
+`pnpm catalog:gen`은 `apps/api/data/catalog.json.gz`를 읽어 `apps/web/public/data/*.json`과 `apps/web/public/data/ranking/*.json`을 만듭니다. 이 산출물은 빌드 시 다시 생성되며, 랭킹 기본 뷰는 `disableLive=true` 스냅샷 산식으로 사전 계산됩니다.
 
 ## 2. 정적 웹과 Core API 배포
 

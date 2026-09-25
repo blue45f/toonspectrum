@@ -3,6 +3,11 @@
 - 상태: Accepted
 - 날짜: 2026-09-02
 - 범위: Studio 2D/3D 렌더러, 브러시 픽셀 경로, 엔진 레지스트리, 실험 엔진 격리, 엔진 문서
+> 2026-09-26 현재 상태 정정: 이 ADR의 역할 예시는 결정 당시 기록이다. 현재 역할과 권위 소유자는
+> `packages/studio-engine-registry/src/renderer-roles.ts`와 생성 문서
+> `docs/engines/renderer-roles.md`가 최종 권위다. 특히 문서 벡터 island와 provider 분류는 이후
+> ADR과 원장 변경을 반영한 생성 문서를 따른다.
+
 - 관련: [ADR-0003](0003-one-primary-surface-owner.md), [ADR-0010](0010-next-gen-engine-risk-posture.md),
   [ADR-0011](0011-v12-frontier-quarantine-ledger.md), [ADR-0018](0018-no-automatic-engine-fallback-vello-primary.md),
   [외부 검토 2026-09-02](../architecture/studio-architecture-review-2026-09-02.md) §1·§5·§8
@@ -13,7 +18,7 @@
 libmypaint WASM, CanvasKit, Vello CPU/Classic/Hybrid, Pixi, p5.brush, perfect-freehand, Rough.js,
 Three/three-vrm, Babylon, WESL, Velato가 함께 있다. 각 엔진의 성숙도는 `ProviderDescriptor.maturity`와
 E01–E28 후보 조사(`manifest/providers.json`)에 기록돼 있지만, **어떤 제품 권위(문서 표시, 포인터 입력,
-래스터 브러시 커밋, 선택 오버레이, 3D 장면 …)를 누가 소유하는가**는 산문 문서(`docs/rewrite/current-studio-boundary.md`)
+래스터 브러시 커밋, 선택 오버레이, 3D 장면 …)를 누가 소유하는가**는 산문 문서(`docs/architecture/studio-current-boundaries.md`)
 에만 있었다. 그 결과 사용자 매뉴얼은 캔버스를 "WebGPU 기반"이라 적고, 경계 감사는 Konva가 표시·포인터
 권위를 유지한다고 적는 불일치가 생겼고, 실험 엔진이 제품 코드로 새는 것을 막는 기계적 계약도 없었다.
 

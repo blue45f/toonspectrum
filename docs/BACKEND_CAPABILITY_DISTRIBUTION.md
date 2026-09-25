@@ -1,222 +1,164 @@
-# Backend capability distribution
+# Backend capability 분산 정책
 
-ToonSpectrum keeps one transactional source of truth and distributes only workloads whose failure
-can be retried or reconstructed. This avoids turning free hosting quotas into a distributed
-transaction problem.
+- 상태: **현재 배치·실패 정책**
+- 최종 갱신: **2026-09-26**
 
-## Authority boundary
+ToonSpectrum은 하나의 transactional source of truth를 유지하고 실패 뒤 재시도·재구성이 가능한 workload만
+외부 provider에 배치한다. 무료 hosting quota를 distributed transaction 권위로 사용하지 않는다.
 
-The following always stay on the NestJS API and authoritative PostgreSQL:
+## 권위 경계
 
-- authentication, sessions and identity linkage
-- work/document saves and billing
-- CRDT document metadata, operation ordering and acknowledgement
-- authorization and marketplace ownership
+다음은 항상 NestJS API와 authoritative PostgreSQL에 남는다.
 
-Render serves the authoritative HTTP API. Socket.IO CRDT fanout and authoritative locks use the
-same Nest application on a separate long-running Render role. The checked-in `render.yaml` defines
-both purpose-specific deployment boundaries and a direct PostgreSQL endpoint for the Socket.IO
-cluster adapter. Neither role is used as an object store, media relay, thumbnail worker or generic
-fallback.
+- 인증, session, identity linkage
+- work/document save와 billing
+- CRDT document metadata, operation ordering, acknowledgement
+- authorization과 marketplace ownership
 
-The capability router intentionally has no IDs for those operations. Feature code cannot route
-them to a free provider by mistake.
+Render의 Core API가 authoritative HTTP를 제공한다. Socket.IO CRDT fanout과 authoritative lock은 같은
+Nest application의 별도 long-running Render role이 소유한다. `render.yaml`은 두 배포 경계와 Socket.IO
+cluster adapter용 direct PostgreSQL endpoint를 선언한다. 어느 role도 object store, media relay,
+thumbnail worker, generic fallback이 아니다.
 
-## Workload-specialized placement
+capability router에는 권위 operation ID가 없다. feature code가 실수로 free provider에 보낼 수 없다.
 
-Provider selection is workload-first, not a generic free-host round robin. Normal traffic has one
-purpose-specific primary owner. Fallback is only a continuity path between providers that expose
-the same complete placement role and exact v1 gateway contract; it is not load balancing and does
-not move unrelated features between hosts.
+## workload별 placement
 
-| Placement role | Workloads | Normal primary owner | Same-role continuity only | Never substituted with |
-| --- | --- | --- | --- |
-| `container-worker` | high-quality thumbnail rendering and conversion | Cloud Run | Fly, Railway, Cloudtype, Render, Koyeb | short edge functions |
-| `edge-short` | webhook validation and short event work | Cloudflare Workers | AWS Lambda, Azure Functions, Netlify, Deno Deploy, Supabase/Firebase functions | long conversion workers |
-| `durable-queue` | cleanup and notification dispatch | Upstash QStash | Cloudflare Queues | process-local timers |
-| `object-store` | source images, 3D assets, thumbnails and exports | Supabase Storage | Cloudflare R2, Firebase Storage | container local filesystems |
-| `realtime-relay` | presence, comment invalidation and screen-share signaling | Cloudflare Durable Objects with channel-isolated state | Supabase/Firebase or a full-contract container relay after its ACL bridge is verified | raster pixels, voice media, comment authority or CRDT ordering |
+provider 선택은 generic round-robin이 아니라 workload-first다. 정상 traffic에는 목적별 primary owner가
+하나 있다. fallback은 동일한 complete placement role과 exact v1 gateway를 제공하는 provider 사이의
+bounded continuity일 뿐 load balancing이나 타 기능 이동이 아니다.
 
-Shared coordination is also purpose-bound but is not a user-data capability: Upstash Redis stores
-only short-lived leases, idempotency receipts, provider circuit state and budget reservations.
-It never stores artwork, asset bytes, sessions, comments or authoritative CRDT operations.
+| placement role | workload | 기본 owner | 동일 역할 continuity | 금지 대체 |
+| --- | --- | --- | --- | --- |
+| `container-worker` | 고품질 thumbnail·conversion | Cloud Run | Fly, Railway, Cloudtype, Render, Koyeb | 짧은 edge function |
+| `edge-short` | webhook validation·짧은 event | Cloudflare Workers | AWS Lambda, Azure Functions, Netlify, Deno, Supabase/Firebase functions | 장시간 conversion worker |
+| `durable-queue` | cleanup·notification dispatch | Upstash QStash | Cloudflare Queues | process-local timer |
+| `object-store` | source image, 3D asset, thumbnail, export | Supabase Storage | Cloudflare R2, Firebase Storage | container local filesystem |
+| `realtime-relay` | presence, comment invalidation, screen signaling | Cloudflare Durable Objects | ACL bridge가 검증된 full-contract relay | raster pixel, voice media, comment 권위, CRDT ordering |
 
-The browser contract includes a lazy Supabase Realtime adapter boundary, but the current production
-profile does not activate it. ToonSpectrum sessions are not Supabase Auth JWTs, so exposing an anon
-channel before a verified JWT/RLS authorization bridge would weaken the existing Creator ACL.
-Cloudflare therefore owns the three ephemeral channels for the first rollout, while each channel
-keeps an independent sequence, replay floor, rate budget and durable state. Supabase in this phase
-is the private object-storage data plane, not an unverified public collaboration shortcut.
+Upstash Redis coordination은 user data capability가 아니다. 짧은 lease, idempotency receipt, provider
+circuit, budget reservation만 저장하고 artwork, asset byte, session, comment, authoritative CRDT를 저장하지
+않는다.
 
-The installed coordination gate performs the distributed execution lifecycle in this order:
+browser의 Supabase Realtime adapter는 lazy boundary만 있으며 production에서는 비활성이다. ToonSpectrum
+session은 Supabase Auth JWT가 아니므로 검증된 JWT/RLS bridge 없이 anon channel을 열지 않는다. 첫 배포의
+세 ephemeral channel은 Cloudflare가 소유하고 Supabase는 private object storage data plane으로 사용한다.
 
-1. read the exact provider circuit;
-2. acquire one of that provider's configured concurrency slots;
-3. atomically reserve the request/cost budget for the UTC day selected by Redis `TIME`;
-4. reserve the command idempotency receipt;
-5. execute and, for long calls, renew the lease;
-6. close/update the circuit, fingerprint the terminal outcome and release the lease.
+## 분산 실행 수명주기
 
-When distribution is disabled, the gate explicitly reports `local-process`; it does not pretend a
-distributed reservation succeeded. Once distribution is enabled, missing, disabled, invalid, or
-unreachable Upstash coordination is a fail-closed configuration/runtime error and readiness must
-also fail. No artwork or provider response body is written to Redis. A receipt keeps the immutable
-request fingerprint that binds tenant, workload, command metadata, and payload, then records only a
-canonical SHA-256 terminal outcome fingerprint. Reusing one idempotency key for a different request
-is an explicit conflict rather than a duplicate success.
+1. exact provider circuit 조회
+2. provider concurrency slot 획득
+3. Redis `TIME` 기준 UTC day request/cost budget 원자 예약
+4. command idempotency receipt 예약
+5. 실행과 장시간 lease renewal
+6. circuit close/update, terminal outcome fingerprint, lease release
 
-If lease renewal becomes uncertain after a provider has already returned an exact response, the
-dispatcher preserves that response for reconciliation and reports `delivery-unknown`; it does not
-turn the call into a terminal cancelled receipt or silently retry it on another provider.
+분산 비활성 시 gate는 `local-process`를 명시한다. 활성화한 뒤 coordination이 누락·비활성·오류·접근 불가면
+configuration/runtime와 readiness를 fail-closed한다. Redis에 artwork/provider response body를 쓰지
+않는다. receipt는 tenant, workload, command metadata, payload를 묶은 immutable request fingerprint와
+canonical SHA-256 terminal outcome fingerprint만 저장한다. 같은 key를 다른 request에 재사용하면 conflict다.
 
-Daily budget rollover is owned by the Redis server clock, not by an API host's wall clock. A stable
-HMAC-derived provider hash is reset atomically when Redis observes a new UTC epoch day and expires
-after the next Redis-observed midnight plus a bounded grace period. API nodes with clock skew
-therefore cannot split one provider budget across two date keys.
+provider가 exact response를 반환한 뒤 lease renewal이 불확실해지면 response를 reconciliation용으로
+보존하고 `delivery-unknown`을 반환한다. cancelled receipt로 바꾸거나 다른 provider에 자동 재시도하지
+않는다.
 
-The router records `placementRole` and `selectionReason: workload-affinity` without URLs, tokens or
-provider response bodies. An async-capable edge provider cannot become a thumbnail fallback merely
-because it accepts HTTP.
+budget day는 API host clock이 아니라 Redis clock이 소유한다. provider hash는 UTC day 변경 시 원자
+reset하고 다음 midnight 뒤 bounded grace에 expire한다.
 
-Render free web services currently spin down after idle time and have ephemeral local files, so they
-are never first choice for latency-sensitive or durable work. Fly autostop is useful for bursty
-workers, but background work must have an explicit lifecycle because an HTTP machine can stop after
-the request closes. Function platforms are treated as bounded request executors, not durable queues.
-Supabase Edge Functions have runtime limits and cannot run Node libraries that need native
-multithreading, so image conversion belongs on a container worker.
+router는 URL, token, response body 없이 `placementRole`과
+`selectionReason: workload-affinity`만 기록한다. HTTP를 받을 수 있다는 이유로 edge provider를 thumbnail
+fallback으로 선택하지 않는다.
 
-Cloud Run services support HTTPS and WebSockets, while Cloud Run jobs run finite container tasks.
-Koyeb can scale to zero and its free instance sleeps, so it is an exact-contract auxiliary
-container rather than a low-latency authority. QStash is modeled only as a durable dispatch facade:
-the facade must return ToonSpectrum's exact gateway acknowledgement and preserve the idempotency key.
+## provider 특성
 
-Official references:
+- Render free service는 idle sleep과 ephemeral local file 때문에 latency/durable 작업의 기본 owner가 아니다.
+- Fly autostop은 burst worker에 사용할 수 있지만 request 종료 뒤 background lifecycle을 명시해야 한다.
+- function platform은 bounded request executor이며 durable queue가 아니다.
+- Supabase Edge Function은 native multithreading image conversion에 부적합하다.
+- Cloud Run service는 HTTPS/WebSocket, job은 finite container task에 적합하다.
+- Koyeb free instance는 sleep하므로 exact-contract auxiliary container다.
+- QStash는 durable dispatch facade이며 exact acknowledgement와 idempotency key를 보존해야 한다.
 
-- [Render free instances](https://render.com/docs/free)
-- [Render service types](https://render.com/docs/service-types)
-- [Fly autostop/autostart](https://fly.io/docs/launch/autostop-autostart/)
-- [Fly Machines background-work lifecycle](https://fly.io/docs/machines/guides-examples/managing-machines-with-the-api/)
-- [Railway cost controls](https://docs.railway.com/pricing/cost-control)
-- [Railway cron, worker and queue guidance](https://docs.railway.com/guides/cron-workers-queues)
-- [Netlify background functions](https://docs.netlify.com/build/functions/background-functions/)
-- [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
-- [Supabase Edge Function limits](https://supabase.com/docs/guides/functions/limits)
-- [Firebase Functions quotas](https://firebase.google.com/docs/functions/quotas)
-- [Cloud Run services, jobs and worker pools](https://cloud.google.com/run/docs/overview/what-is-cloud-run)
-- [AWS Lambda quotas](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html)
-- [Azure Functions hosting and scaling](https://learn.microsoft.com/en-us/azure/azure-functions/functions-scale)
-- [Deno Deploy](https://docs.deno.com/deploy/)
-- [Koyeb scale-to-zero](https://www.koyeb.com/docs/run-and-scale/scale-to-zero)
-- [Upstash QStash background jobs and deduplication](https://upstash.com/docs/qstash/overall/getstarted)
+provider plan limit은 변하므로 code에 광고 무료 quota를 고정하지 않는다. 운영자가 dashboard의 현재 값을
+명시적 hard budget, concurrency, duration, payload 환경값으로 옮긴다.
 
-Provider plan limits change. The code deliberately does not hard-code advertised free quotas.
-Operators copy the current limits from the provider dashboard into explicit hard budget,
-concurrency, duration and payload environment values.
+## fail-closed 설정
 
-## Fail-closed configuration
-
-See [`deploy/backend-capabilities.env.example`](../deploy/backend-capabilities.env.example).
-
-A remote provider is selectable only when all of the following are true:
+예시는 `deploy/backend-capabilities.env.example`을 따른다. remote provider는 다음을 모두 만족해야 한다.
 
 1. `BACKEND_DISTRIBUTION_ENABLED=true`
-2. the provider-specific `ENABLED=true`
-3. its HTTPS gateway URL and a 32+ character credential are present
-4. daily request/cost budgets, duration, payload and concurrency limits are explicit
-5. the request fits the capability and declared provider limits
-6. the provider has the exact workload placement role
-7. the provider's circuit is closed and budget remains
+2. provider별 `ENABLED=true`
+3. HTTPS gateway URL과 32자 이상 credential
+4. daily request/cost, duration, payload, concurrency 명시
+5. request가 capability·provider limit 안에 있음
+6. exact workload placement role 일치
+7. circuit closed, budget 잔여
 
-Local fallback is available only with `BACKEND_LOCAL_FALLBACK=development`, only outside production,
-and only for best-effort work. Durable asset storage never falls back to a process-local filesystem.
+local fallback은 production 밖에서 `BACKEND_LOCAL_FALLBACK=development`로만 best-effort workload에
+허용한다. durable asset storage는 process-local filesystem으로 fallback하지 않는다.
 
-## Exact HTTPS gateway
+## exact HTTPS gateway
 
-Every provider facade implements one fixed endpoint:
+모든 provider facade는 하나의 endpoint만 구현한다.
 
-`/.well-known/toonspectrum/backend-capabilities/v1/execute`
+```text
+/.well-known/toonspectrum/backend-capabilities/v1/execute
+```
 
-Container providers share the checked-in `API_RUNTIME_ROLE=capability-worker` image rather than the
-full application graph. That role publishes only `/api/health/live`, the exact execute endpoint and
-the signed readiness endpoint at
-`/.well-known/toonspectrum/backend-capabilities/v1/health`. Signed readiness uses a provider-scoped
-HMAC and a 60-second timestamp window; the gateway credential itself is not sent in the health
-request. Render, Fly and Railway templates live in `deploy/capability-worker/` and all run the same
-non-root Docker image without `DATABASE_URL`, auth/session secrets, CRDT or Socket.IO modules.
+container provider는 full app graph가 아니라 `API_RUNTIME_ROLE=capability-worker` image를 공유한다. 공개
+surface는 `/api/health/live`, exact execute endpoint, signed readiness endpoint뿐이다. Render/Fly/Railway
+template은 `deploy/capability-worker/`에 있고 `DATABASE_URL`, auth/session, CRDT, Socket.IO module 없이 같은
+non-root image를 실행한다.
 
-The dispatcher sends a canonical, versioned JSON envelope containing the provider, capability,
-workload, timestamp, UUID nonce and idempotency key. It also sends immutable execution requirements:
+dispatch envelope에는 provider, capability, workload, timestamp, UUID nonce, idempotency key와 다음 요구를
+넣는다.
 
-- `fidelity: exact`
-- `allowDegraded: false`
-- `latency: tolerant`
+```text
+fidelity: exact
+allowDegraded: false
+latency: tolerant
+```
 
-Cold starts and queue wait are acceptable. Reduced dimensions, lower image quality, missing layers,
-partial collaboration semantics or altered exports are not. A provider that cannot execute the full
-contract must return a retryable rejection or an exact `accepted` queue acknowledgement. If no
-same-role provider is available, the dispatcher returns unavailable/providers-exhausted so the
-authoritative outbox can wait; it never silently selects a degraded implementation.
+cold start와 queue wait는 허용하지만 축소 dimension, 낮은 image quality, 누락 layer, 부분 collaboration,
+변형 export는 허용하지 않는다. full contract가 불가능하면 retryable rejection 또는 exact `accepted`
+acknowledgement를 반환한다. 동일 역할 provider가 없으면 authoritative outbox가 기다릴 수 있도록
+unavailable/providers-exhausted를 반환한다.
 
-Cleanup and notification facades use the explicit durable-queue executor port. Their strict task
-payloads are `cleanup.dispatch` and `notification.dispatch`, with the envelope idempotency key
-repeated as `requestKey` and a server-declared `task.name` plus canonical JSON `task.body`. The port
-does not receive a URL, HTTP method, headers, credentials, or provider base URL, so a command cannot
-turn the facade into an arbitrary callback/SSRF relay. A facade must declare the exact provider IDs
-and workloads it serves, pass a bounded readiness probe, durably deduplicate the key, and return a
-strict accepted/completed/duplicate/rejected result. The default Nest application installs no such
-port: it remains ready as the authoritative API only while no cleanup/notification durable-queue
-provider role is enabled. Enabling a queue role without a real adapter fails readiness before traffic
-is admitted; incoming execution also fails closed instead of fabricating a queue receipt. The
-production module now installs the QStash producer only when distribution and the QStash provider
-are both explicitly enabled and every required value is valid. It verifies that the configured URL
-Group exists with at least one HTTPS endpoint, publishes a versioned bounded JSON command, uses a
-SHA-256 deduplication identifier, disables redirects/referrers/credentials, and redacts the body in
-QStash logs. The paid publish token is separate from the ToonSpectrum gateway admission token.
-QStash's provider-side deduplication window is ten minutes, so every URL Group consumer must still
-verify `Upstash-Signature` and durably deduplicate the command idempotency key at execution time.
-Cloudflare Queue remains an unregistered continuity adapter and therefore cannot report green
-readiness merely because its policy flag is enabled.
+cleanup/notification facade는 explicit durable-queue executor port를 사용한다. strict payload는
+`cleanup.dispatch`, `notification.dispatch`이며 command에 URL, method, header, credential, provider base URL을
+주지 않아 arbitrary callback/SSRF relay가 되지 않게 한다. default Nest app은 adapter가 없으면 queue role을
+설치하지 않는다. role을 활성화했는데 adapter/readiness가 없으면 traffic 전에 실패한다.
 
-The 16 MiB hard JSON request/response ceiling and each provider's smaller configured ceiling are
-control-plane safety boundaries, not artwork size or quality limits. They apply to both the request
-envelope and a durable adapter's synchronous `completed.result`. Large source images, models and
-exports must be uploaded losslessly to object storage and referenced by immutable asset ID or
-presigned URL. The dispatcher rejects an oversized inline body/result without truncating,
-resampling or sending it.
+QStash producer는 distribution과 QStash provider가 모두 유효할 때만 설치한다. URL Group 존재와 HTTPS
+endpoint를 검증하고 bounded versioned command, SHA-256 dedup ID, redirect/referrer/credential 차단,
+body log redaction을 적용한다. provider dedup window가 10분이므로 consumer도 `Upstash-Signature`와 durable
+idempotency를 검증해야 한다. Cloudflare Queue는 adapter가 등록되기 전 green readiness를 반환하지 않는다.
 
-The shipped thumbnail worker consumes a strict immutable Supabase source-object reference. It
-checks the signed response MIME type, exact byte count and SHA-256 before decode, rejects image and
-pixel bombs against explicit source/output budgets, preserves aspect ratio, and stores deterministic
-PNG/JPEG output in the private derived bucket. Concurrent commands with the same tenant/key share
-one process promise, key reuse with a different fingerprint is rejected, and content-addressed
-immutable upload makes restart replay safe. WebP stays explicitly unsupported instead of silently
-changing fidelity. Long AI has the same strict command/submission port, but remains unadvertised and
-fail-closed until a durable queue adapter proves acceptance.
+16 MiB hard JSON ceiling과 provider별 더 작은 ceiling은 control-plane 한도이며 asset 품질 제한이 아니다.
+큰 source/model/export는 lossless object storage에 올리고 immutable asset ID 또는 presigned URL로 참조한다.
+inline body/result를 truncate·resample하지 않고 거부한다.
 
-The gateway token is present only in `x-toonspectrum-gateway-token`. The token never appears in the
-body, status snapshot or result. Base URLs are secure origins only; userinfo, paths, queries and
-fragments are rejected. The code fixes the path, omits browser credentials/referrers and disables
-redirect following so a provider cannot redirect the credential to another origin. Responses are
-bounded and must match an extra-key-free v1 schema with `fidelity: exact`.
+thumbnail worker는 immutable Supabase source reference를 받아 MIME, byte count, SHA-256을 decode 전에
+검사하고 image/pixel bomb budget, aspect ratio를 지킨 뒤 deterministic PNG/JPEG을 private derived bucket에
+저장한다. 같은 tenant/key 동시 command는 한 promise를 공유하며 다른 fingerprint 재사용은 거부한다.
+WebP는 deterministic encoder가 검증되기 전 unsupported다. Long AI도 strict command port를 사용하지만
+queue acceptance가 증명될 때까지 광고하지 않는다.
 
-Provider failover is bounded by `BACKEND_GATEWAY_MAX_ATTEMPTS`. It occurs only for commands marked
-idempotent and only to another provider with the same placement role. A non-idempotent request whose
-delivery becomes unknown is never replayed. The same idempotency key is preserved across an allowed
-failover.
+gateway token은 `x-toonspectrum-gateway-token`에만 있다. body/status/result에 넣지 않는다. base URL은 path,
+query, fragment, userinfo 없는 secure origin이어야 한다. fixed path와 redirect 차단으로 credential 유출을
+막는다. response는 bounded extra-key-free v1 schema와 `fidelity: exact`를 만족해야 한다.
 
-## Rollout
+failover는 `BACKEND_GATEWAY_MAX_ATTEMPTS` 안에서 idempotent command와 같은 placement role에만 허용한다.
+delivery가 불확실한 non-idempotent request는 재전송하지 않고 같은 idempotency key를 유지한다.
 
-1. Deploy policy, gateway and Upstash coordination with distribution disabled.
-2. Verify the three private Supabase purpose buckets (`source`, `derived`, `export`) through API
-   readiness and perform exact-byte upload/read/delete smoke tests.
-3. Deploy the Cloudflare Durable Object coordinator and enable short-lived Nest admission tickets
-   for presence, comment invalidation and screen-share signaling.
-4. Deploy the long-running Nest Socket.IO host for CRDT fanout and locks; point
-   `VITE_STUDIO_LIVE_ORIGIN` at its exact HTTPS origin.
-5. Deploy one `deploy/capability-worker` template, run the signed health and exact thumbnail canary,
-   then enable that provider in the source API's workload order.
-6. Enable remote gateway execution only after its exact adapter, budget, lease, receipt and
-   end-to-end failure-path tests pass.
+## rollout
 
-Provider selection remains purpose-specific even after rollout. Same-role continuity is a bounded
-recovery path, while different workloads can remain connected to different hosts concurrently.
+1. distribution disabled 상태로 policy, gateway, Upstash coordination 배포
+2. Supabase source/derived/export private bucket readiness와 exact-byte smoke 검증
+3. Cloudflare DO coordinator와 단기 Nest admission ticket 활성화
+4. CRDT fanout/lock용 long-running Nest Socket.IO host 배포
+5. capability-worker 하나를 배포하고 signed health·exact thumbnail canary 실행
+6. adapter, budget, lease, receipt, failure-path 검증 뒤 remote execution 활성화
+
+rollout 뒤에도 provider 선택은 목적별이다. 동일 역할 continuity만 bounded recovery로 사용하고 서로 다른
+workload는 서로 다른 host에 동시에 배치할 수 있다.

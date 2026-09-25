@@ -1,9 +1,12 @@
 # 아키텍처 검토 반영 로드맵 (2026-09-02)
 
+> **역사 자료:** 2026-09-02 검토를 반영하기 위해 작성한 실행 로드맵이다. 표의 상태는 현재 완료 현황을 보장하지 않으며 최신 구조는 `ARCHITECTURE.md`와 `docs/architecture/studio-current-boundaries.md`를 따른다.
+
+
 - 근거: [외부 검토 2026-09-02](../architecture/studio-architecture-review-2026-09-02.md) §11·§12·최우선 실행 항목
 - 결정: [ADR-0019](../adr/0019-renderer-role-ledger-single-authority.md), [ADR-0020](../adr/0020-editor-client-ui-command-boundary.md),
   [ADR-0021](../adr/0021-stroke-budget-myb-disposition-execution-profiles.md)
-- 현재 경계 사실: `current-studio-boundary.md`(2026-08-11), `docs/engines/renderer-roles.md`(원장 생성본)
+- 현재 경계 사실: `../architecture/studio-current-boundaries.md`(현재 요약), `docs/engines/renderer-roles.md`(원장 생성본)
 - 원칙: 새 앱·새 URL 금지(ADR-0001·V11.1 in-place), 자동 엔진 폴백 금지(ADR-0018), 품질·손맛·필압 우선(ADR-0010),
   실험 엔진은 원장 `lab`으로만 진입(ADR-0019)
 
@@ -49,7 +52,7 @@
 
 ## 배포 조건 회귀 테스트(검토 §5 "배포 조건")
 
-COOP `same-origin` + COEP `credentialless` + CSP `wasm-unsafe-eval`은 `vercel.json`에 이미 있다. 다음 회귀
+현재 COOP `same-origin` + COEP `credentialless` + CSP `wasm-unsafe-eval`은 `config/http-response-headers.json`에서 관리하고 Cloudflare 산출물로 생성한다. 다음 회귀
 테스트는 P2 shadow compositor 전에 추가한다: Google 로그인·OAuth, 외부 이미지 credential 제거 영향,
 signed URL 이미지·3D texture, marketplace asset, WebSocket·Realtime, service worker update, iframe·팝업 opener.
 
