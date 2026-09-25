@@ -35,6 +35,12 @@ describe("AI music provider catalogue", () => {
       mcp: { serverUrl: "https://api.elevenlabs.io/v1/mcp", auth: "oauth" },
       cli: { command: "elevenlabs auth login" },
     });
+    expect(findMusicProvider("stable-audio")).toMatchObject({
+      publicationPolicy: "license-review",
+      freeAccess: expect.stringContaining("비상업"),
+      capabilities: expect.arrayContaining(["browser", "api"]),
+    });
+    expect(findMusicProvider("stable-audio").rightsNote).toContain("운영 자동 호출");
     expect(MUSIC_PROVIDER_CATALOG.filter((provider) => (
       provider.publicationPolicy === "site-original"
     )).map((provider) => provider.id)).toEqual(["ace-step-local"]);

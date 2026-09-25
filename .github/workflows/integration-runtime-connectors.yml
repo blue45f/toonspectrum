@@ -1,0 +1,82 @@
+name: Integration runtime connectors
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'apps/api/src/modules/integration-platform/**'
+      - 'apps/api/src/modules/production-collaboration/**'
+      - 'apps/api/src/db/schema/production.schema.ts'
+      - 'apps/web/src/domains/integrations/**'
+      - 'apps/web/src/infrastructure/api.ts'
+      - 'deploy/integration-runtime-connectors.env.example'
+      - 'docs/integration-runtime-connectors.md'
+      - '.github/workflows/integration-runtime-connectors.yml'
+      - 'eslint.config.mjs'
+      - 'tsconfig.json'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-runtime-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Runtime contracts, UI and type safety
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      HUSKY: '0'
+      NODE_OPTIONS: --max-old-space-size=12288
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Lint runtime connector surfaces
+        run: >-
+          pnpm exec eslint --max-warnings=0
+          apps/api/src/modules/integration-platform
+          apps/web/src/domains/integrations
+
+      - name: Run focused runtime and integration-platform tests
+        run: >-
+          pnpm exec vitest run --maxWorkers=2
+          apps/api/src/modules/integration-platform/integration-platform.controller.test.ts
+          apps/api/src/modules/integration-platform/integration-platform.service.test.ts
+          apps/api/src/modules/integration-platform/integration-runtime.controller.test.ts
+          apps/api/src/modules/integration-platform/integration-runtime.dto.test.ts
+          apps/api/src/modules/integration-platform/integration-runtime.providers.test.ts
+          apps/api/src/modules/integration-platform/integration-runtime.repository.test.ts
+          apps/api/src/modules/integration-platform/integration-runtime.service.test.ts
+          apps/api/src/modules/integration-platform/integration-runtime.transport.test.ts
+          apps/web/src/domains/integrations/integration-platform-storage.test.ts
+          apps/web/src/domains/integrations/IntegrationRuntimeWorkbench.test.tsx
+          apps/web/src/domains/integrations/integration-runtime-workbench-model.test.ts
+
+      - name: Type-check API
+        run: pnpm --filter @webtoon-nest/api typecheck
+
+      - name: Type-check Web
+        run: pnpm exec tsc -p tsconfig.json --noEmit
+
+      - name: Scan changed source for committed secrets
+        run: pnpm run quality:secrets:changed

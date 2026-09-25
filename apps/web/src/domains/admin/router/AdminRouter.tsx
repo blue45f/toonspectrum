@@ -127,6 +127,13 @@ const AdminOps = lazyRetry(
     })),
   "AdminOpsV2",
 );
+const AdminIntegrations = lazyRetry(
+  () =>
+    import("../components/AdminIntegrations").then((module) => ({
+      default: module.AdminIntegrations,
+    })),
+  "AdminIntegrationsV1",
+);
 const AdminMembersPage = lazyRetry(
   () =>
     import("../AdminMembersPage").then((module) => ({
@@ -206,7 +213,7 @@ function AdminRouteSurface({
     case "announcements":
       return <AdminAnnouncements userId={uid} />;
     case "ops":
-      return <div className="space-y-6"><AdminOperatingMode uid={uid} /><AdminOps uid={uid} /></div>;
+      return <div className="space-y-6"><AdminOperatingMode uid={uid} /><AdminOps uid={uid} /><AdminIntegrations /></div>;
     case "security":
       return <AdminSecurity userId={uid} />;
     case "audit":

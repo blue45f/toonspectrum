@@ -1,7 +1,6 @@
 import { Navigate } from "react-router-dom";
 
 import { defineAppRoutes } from "../app-route-definition";
-
 import {
   CatalogResearchPage,
   CreatorHubPage,
@@ -38,15 +37,12 @@ import {
   CollaborationHubPage,
   FandomCosplayPage,
   ComicLibraryPage,
-} from "./creator-resources-route-pages";
+} from "./creator-resource-pages";
 
 export const creatorResourcesRoutes = defineAppRoutes([
-  // Legacy creator hubs now resolve to the canonical ToonStudio front door.
   { id: "resources-make", path: "/make", element: <Navigate to="/studio/new" replace /> },
   { id: "resources-hub", path: "/creator-hub", element: <Navigate to="/studio" replace /> },
   { id: "resources-publishing", path: "/publishing", element: <Navigate to="/studio/publish" replace /> },
-
-  // Research remains a public reference destination; project-bound references move into Story.
   { id: "resources-now", path: "/now", element: <NowPage /> },
   { id: "research-catalog", path: "/research/catalog", element: <CatalogResearchPage /> },
   { id: "research-catalog-notebook", path: "/research/catalog/notebook", element: <CatalogResearchPage /> },
@@ -86,15 +82,11 @@ export const creatorResourcesRoutes = defineAppRoutes([
   { id: "resources-story", path: "/story-lab", element: <StoryLabPage /> },
   { id: "resources-works", path: "/discover/works", element: <WorksPage /> },
   { id: "resources-sources", path: "/insights/resources", element: <SourcesPage /> },
-
-  // Creator ecosystem: one coherent entry point instead of adding more top-level navigation.
   { id: "ecosystem-home", path: "/ecosystem", element: <Navigate to="/ecosystem/education" replace /> },
   { id: "ecosystem-education-legacy", path: "/learn/education", element: <Navigate to="/ecosystem/education" replace /> },
   { id: "ecosystem-education", path: "/ecosystem/education", element: <EducationHubPage /> },
   { id: "ecosystem-collaboration", path: "/ecosystem/collaboration", element: <CollaborationHubPage /> },
   { id: "ecosystem-fandom", path: "/ecosystem/fandom", element: <FandomCosplayPage /> },
   { id: "ecosystem-library", path: "/ecosystem/library", element: <ComicLibraryPage /> },
-
-  // Historical aliases keep old links functional without competing for canonical ownership.
   { id: "resources-showcase", path: "/challenges", element: <Navigate to="/showcase/challenges" replace /> },
 ]);

@@ -35,6 +35,11 @@ Studio 라우트 클로저(5.4 MB / 194 청크)는 **의도적으로 프리캐�
 담는다. 즉 **온라인으로 Studio 를 한 번 열면 그 뒤로는 오프라인으로 동작한다.**
 `planStudioServiceWorkerPrecache` 의 warm 예산(512 KiB)이 이 결정을 빌드 실패로 고정한다.
 
+`AppRouter` 는 모든 `/studio` 경로에서 선택형 `StudioOfflineRuntime` 을 띄운다. 이 런타임은
+사용자 설정 없이 idle 시간에 빌드가 고정한 핵심 드로잉 팩을 준비하고, 연결 복구나 워커 교체 때
+다시 검증한다. Data Saver·숨김 탭·저장 공간 90% 이상에서는 자동 다운로드를 건너뛴다. 안내
+패널의 수동 재시도는 복구 수단일 뿐 정상 사용의 선행 절차가 아니다.
+
 ## 2. 교차 출처 격리 계약 (가장 깨지기 쉬운 부분)
 
 `/studio` 는 COOP `same-origin` + COEP `credentialless` 로 격리된다. 캐시된 응답은 저장된

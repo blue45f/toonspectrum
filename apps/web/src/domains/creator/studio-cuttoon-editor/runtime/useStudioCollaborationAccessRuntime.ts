@@ -199,6 +199,7 @@ export function useStudioCollaborationAccessRuntime({
     effectiveWorkId,
     expectsSharedDocument,
     isRealtimeTeamSession,
+    joinedStudioLiveJam,
     requiresStudioLiveServer,
     setDocumentReloadRequired,
     setSharedDocumentScope,

@@ -68,6 +68,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
     collaborationDocumentLocked,
     collaborationDocumentUnavailable,
     collaborationLockMessage,
+    joinedStudioLiveJam,
     color,
     colorBlindPreview,
     colorWheelOpen,
@@ -465,6 +466,7 @@ export function StudioCuttoonEditorCanvasColumn(s: StudioCuttoonEditorViewSessio
           collaborationDocumentLocked={collaborationDocumentLocked}
           collaborationDocumentUnavailable={collaborationDocumentUnavailable}
           collaborationLockMessage={collaborationLockMessage}
+          joinedStudioLiveJam={joinedStudioLiveJam}
           closeViewToolWithFocus={studioCanvasViewportHandlers.closeViewToolWithFocus}
           colorBlindPreview={colorBlindPreview}
           commentPinArmed={commentPinArmed}

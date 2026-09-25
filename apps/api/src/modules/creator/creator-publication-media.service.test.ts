@@ -2,9 +2,12 @@ import { createHash } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
+import {
+  PRIVATE_OBJECT_STORAGE_PORT,
+  type PrivateObjectStoragePort,
+} from "../../infrastructure/private-object-storage/private-object-storage.port";
 import { planCreatorPublicationMediaMutation } from "./creator-publication-media.contract";
-import type { CreatorPublicationMediaRepository } from "./creator-publication-media.repository";
+import { CreatorPublicationMediaRepository } from "./creator-publication-media.repository";
 import {
   CreatorPublicationMediaIntegrityError,
   CreatorPublicationMediaService,
@@ -57,6 +60,17 @@ afterEach(() => {
 });
 
 describe("creator publication media service", () => {
+  it("declares constructor injection tokens for metadata-free API bootstraps", () => {
+    const declared = Reflect.getMetadata(
+      "self:paramtypes",
+      CreatorPublicationMediaService,
+    ) as Array<{ index: number; param: unknown }>;
+    expect([...declared].sort((left, right) => left.index - right.index)).toEqual([
+      { index: 0, param: CreatorPublicationMediaRepository },
+      { index: 1, param: PRIVATE_OBJECT_STORAGE_PORT },
+    ]);
+  });
+
   it("enables externalization when storage is configured and keeps optional legacy fallback otherwise", () => {
     const input = { cover: dataUrl("cover") };
     const configured = new CreatorPublicationMediaService(repository, storage)
