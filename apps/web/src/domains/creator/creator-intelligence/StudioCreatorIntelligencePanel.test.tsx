@@ -26,7 +26,8 @@ const providerStatus: CreatorIntelligenceStatus = {
   safeSearch: disabled,
   admission: {
     paidRoutesEnabled: false,
-    enforcement: "authenticated-bounded-process-local",
+    enforcement: "single-instance-local",
+    meshJobOwnership: "signed-user-bound-token",
     operations: {},
   },
 };
