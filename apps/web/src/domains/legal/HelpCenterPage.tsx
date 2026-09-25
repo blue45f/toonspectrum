@@ -16,6 +16,7 @@ import { useState } from "react";
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
 import { PublicStoryHero } from "@/shared/components/public-story-hero";
+import { BrowserReadinessDiagnostics } from "./BrowserReadinessDiagnostics";
 
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
@@ -180,6 +181,9 @@ export function HelpCenterPage() {
           </div>
         )}
       </section>
+
+
+      <BrowserReadinessDiagnostics />
 
 
       <section className="mt-12 border-t border-line pt-8" aria-labelledby="help-questions-title">

@@ -1,6 +1,7 @@
 import { isRecommendedStudio2dScene } from "./studio-2d-asset-quality";
 import cc0SceneManifest from "./studio-2d-cc0-scene-manifest.json";
 import { GENERATED_GPT25_BG_SCENES } from "./studio-2d-generated-backgrounds";
+import { STUDIO_ILLUSTRATION_BG_SCENES } from "./catalog/studio-illustration-pack";
 
 // 창작 스튜디오 — 장르 전면 배경 씬(풀캔버스 배경 이미지로 삽입).
 // 720×1080 세로 캔버스에 맞춘 자체 벡터 SVG 배경. 라이선스 이슈 없는 순수 원본 벡터만 사용
@@ -746,6 +747,7 @@ export const BG_SCENES: BgScene[] = [
   ...REVIEWED_LEGACY_BG_SCENES,
   ...CURATED_CC0_BG_SCENES,
   ...GENERATED_GPT25_BG_SCENES,
+  ...STUDIO_ILLUSTRATION_BG_SCENES,
   ...VECTOR_BG_SCENES,
 ];
 

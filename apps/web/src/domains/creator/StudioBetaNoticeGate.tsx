@@ -121,7 +121,7 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
   return (
     <div
       data-studio-beta-notice-host="true"
-      className="pointer-events-none fixed inset-x-0 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-[90] flex justify-end px-3 sm:bottom-4 sm:px-4"
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-[90] flex justify-end px-3 sm:bottom-4 sm:px-4"
     >
       <aside
         role="region"
@@ -129,10 +129,11 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
         aria-live="polite"
         data-studio-beta-notice="true"
         data-stable-contrast="true"
-        className="pointer-events-auto w-[min(27rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-warning/45 bg-panel/95 text-fg shadow-[0_20px_70px_oklch(0.05_0.02_265/0.55)] backdrop-blur-xl"
+        data-studio-beta-notice-mode="compact"
+        className="pointer-events-auto grid w-[min(31rem,calc(100vw-1.5rem))] grid-cols-[minmax(0,1fr)_auto] overflow-hidden sm:block rounded-2xl border border-warning/45 bg-panel/95 text-fg shadow-[0_20px_70px_oklch(0.05_0.02_265/0.55)] backdrop-blur-xl"
       >
-        <div className="flex items-start gap-2.5 p-2.5 sm:gap-3 sm:p-4">
-          <span className="grid size-8 shrink-0 sm:size-10 place-items-center rounded-xl border border-warning/40 bg-warning-soft text-warning">
+        <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-2.5 p-2.5 sm:gap-3 sm:px-4 sm:py-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-xl border border-warning/40 bg-warning-soft text-warning">
             <AlertTriangle size={20} aria-hidden />
           </span>
           <div className="min-w-0 flex-1">
@@ -140,16 +141,17 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
               <span className="rounded-full border border-warning/40 bg-warning-soft px-2 py-0.5 text-[0.62rem] font-black tracking-[0.14em] text-warning">
                 {copy.badge}
               </span>
-              <h2 id={titleId} className="text-xs font-black leading-5 text-fg sm:text-sm">
-                {copy.title}
-              </h2>
+              <h2 id={titleId} className="sr-only">{copy.title}</h2>
+              <p aria-hidden="true" className="text-xs font-black leading-5 text-fg sm:text-sm">
+                {korean ? "중요 작업은 별도 백업하세요" : "Keep a separate backup"}
+              </p>
             </div>
-            <p className="mt-1.5 hidden text-xs leading-5 text-fg-2 md:block">{copy.intro}</p>
+            <p className="mt-1 hidden text-[0.68rem] leading-5 text-fg-2 lg:block">{copy.intro}</p>
           </div>
         </div>
 
         {detailsOpen ? (
-          <div id={detailsId} className="grid max-h-[55dvh] gap-2 overflow-y-auto border-t border-line/70 px-3.5 py-3 sm:px-4">
+          <div id={detailsId} className="col-span-2 grid max-h-[55dvh] gap-2 overflow-y-auto border-t border-line/70 px-3.5 py-3 sm:px-4">
             {notices.map(({ icon: Icon, title, body, tone }) => (
               <section key={title} className="flex gap-2.5 rounded-xl border border-line bg-card/75 p-3">
                 <span aria-hidden className={`grid size-8 shrink-0 place-items-center rounded-lg border ${tone}`}>
@@ -168,7 +170,7 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-t border-line/70 bg-card/45 px-2.5 py-2 sm:flex sm:flex-wrap sm:justify-end sm:px-4 sm:py-2.5">
+        <div className="col-start-2 row-start-1 flex items-center gap-1 border-l border-line/70 bg-card/45 p-2 sm:flex sm:border-l-0 sm:border-t sm:justify-end sm:gap-2 sm:px-4">
           <button
             type="button"
             aria-expanded={detailsOpen}
@@ -177,15 +179,17 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
             className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-bold text-fg-2 transition hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             {detailsOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
-            {detailsOpen ? copy.hideDetails : copy.showDetails}
+            <span className="sr-only sm:not-sr-only">{detailsOpen ? copy.hideDetails : copy.showDetails}</span>
           </button>
           <button
             type="button"
+            aria-label={copy.action}
             data-studio-beta-notice-acknowledge="true"
             onClick={acknowledge}
             className="inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-4 text-xs font-black text-on-accent shadow-sm transition hover:bg-accent-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {copy.action}
+            <span className="sm:hidden">{korean ? "확인" : "OK"}</span>
+            <span className="hidden sm:inline">{copy.action}</span>
           </button>
         </div>
       </aside>

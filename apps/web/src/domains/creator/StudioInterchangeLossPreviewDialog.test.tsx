@@ -62,6 +62,17 @@ afterEach(() => {
 });
 
 describe("StudioInterchangeLossPreviewDialog", () => {
+  it("PSD 합성본을 선택하면 픽셀 편집성으로 표시하고 선택한 배치와 함께 적용한다", () => {
+    const onConfirm = vi.fn();
+    render(<StudioInterchangeLossPreviewDialog open preview={{ ...READY_PREVIEW, format: "psd" }}
+      psdResult={{ elements: [], skipped: [], sourceWidth: 4, sourceHeight: 4, scale: 1,
+        compositeElement: { id: "composite", type: "image", src: "data:image/png;base64,AAAA", x: 0, y: 0, width: 4, height: 4, rotation: 0 } }}
+      choices={DESTINATION_CHOICES} selectedChoiceId="current-page" onConfirm={onConfirm} onCancel={vi.fn()} />);
+    expect(screen.getByRole("img", { name: "PSD 원본에 저장된 합성 이미지" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: "원본 합성본으로 외관 보존" }));
+    fireEvent.click(screen.getByRole("button", { name: /확인하고 가져오기/u }));
+    expect(onConfirm).toHaveBeenCalledWith("current-page:composite");
+  });
   it("does not mount its portal while controlled closed", () => {
     render(
       <StudioInterchangeLossPreviewDialog

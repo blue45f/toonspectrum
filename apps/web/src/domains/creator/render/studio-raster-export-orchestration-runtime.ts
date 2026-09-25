@@ -1,4 +1,5 @@
 import { readStudioStageInDocumentView } from "../canvas/studio-stage-document-view";
+import { CANVAS_W } from "../studio-assets";
 import { confirmStudioDestructiveAction } from "../studio-destructive-action-preview";
 import {
   studioExportSplitChoiceRequest,
@@ -13,6 +14,8 @@ import {
 } from "../studio-page-grade";
 
 import type { ExportFormat } from "../export/studio-export";
+import type { PresetExportResult, PresetSliceExportOptions, PresetExportPage } from "../export/studio-export-presets";
+import type { StudioPresetRasterRegion, StudioPresetTiledRasterSource } from "../export/studio-preset-tiled-raster";
 import type { El } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";
 import type {
@@ -32,7 +35,8 @@ export class StudioPageGradeBakeUnavailableError extends Error {
 
 export function bakeStudioPageGradeIntoCanvas(
   source: HTMLCanvasElement,
-  grade: PageGrade
+  grade: PageGrade,
+  region?: StudioPresetRasterRegion & { pageWidth: number; pageHeight: number },
 ): HTMLCanvasElement {
   if (isDefaultPageGrade(grade)) return source;
   const output = document.createElement("canvas");
@@ -44,7 +48,8 @@ export function bakeStudioPageGradeIntoCanvas(
   if (cssFilter) context.filter = cssFilter;
   context.drawImage(source, 0, 0);
   context.filter = "none";
-  drawVignette(context, output.width, output.height, grade.vignette);
+  if (region) context.translate(-region.x, -region.y);
+  drawVignette(context, region?.pageWidth ?? output.width, region?.pageHeight ?? output.height, grade.vignette);
   return output;
 }
 
@@ -96,6 +101,10 @@ export interface StudioRasterExportOrchestrationInput {
 }
 
 export interface StudioRasterExportOrchestration {
+  readonly handleExportPresetSlices: (
+    indices: readonly number[] | null,
+    options: Omit<PresetSliceExportOptions, "pages">,
+  ) => Promise<PresetExportResult>;
   readonly handleDownload: () => Promise<void>;
   readonly exportCurrentPageToRasterInterchange: (
     format: StudioRasterInterchangeFormat
@@ -512,6 +521,82 @@ export function createStudioRasterExportOrchestration({
     return captured;
   }
 
+  async function handleExportPresetSlices(
+    indices: readonly number[] | null,
+    options: Omit<PresetSliceExportOptions, "pages">,
+  ): Promise<PresetExportResult> {
+    if (!ensureSharedDocumentAvailableForExport()) throw new Error("공동 문서를 불러온 뒤 내보낼 수 있어요.");
+    const selected = indices === null
+      ? [pages.find((page) => page.id === currentPageId) ?? activePage]
+      : [...new Set(indices)].map((index) => {
+        const page = Number.isInteger(index) && index >= 0 ? pages[index] : undefined;
+        if (!page) throw new Error("내보낼 페이지 범위가 올바르지 않아요.");
+        return page;
+      });
+    if (selected.length === 0) throw new Error("내보낼 페이지가 없어요.");
+    setSelectedId(null);
+    setMasterEditMode(false);
+    preserveStudioViewBeforeCapture();
+    setIsExporting(true);
+    const owned: HTMLCanvasElement[] = [];
+    try {
+      const [{ exportPresetSlices }, { planVipsExportRoute }] = await Promise.all([
+        import("../export/studio-export-presets"), import("../export/studio-vips-export"),
+      ]);
+      let currentCapture: Awaited<ReturnType<typeof capturePage>> | null = null;
+      const sources: PresetExportPage[] = [];
+      for (const page of selected) {
+        const width = Math.round(CANVAS_W * exportScale);
+        const height = Math.round(page.canvasH * exportScale);
+        if (width <= 16_384 && height <= 16_384
+          && planVipsExportRoute(width, height, options.vipsLimits).route !== "out-of-core") {
+          setCurrentPageId(page.id);
+          const captured = await captureBakedPageAtScale(page, exportScale);
+          owned.push(captured.canvas);
+          sources.push(captured.canvas);
+          continue;
+        }
+        const source: StudioPresetTiledRasterSource = {
+          kind: "studio-preset-tiled-raster", width, height,
+          readRegion: async (region) => {
+            if (currentCapture?.page.id !== page.id) {
+              setCurrentPageId(page.id);
+              currentCapture = await capturePage(page);
+            }
+            const { stage, page: capturedPage } = currentCapture;
+            if (Math.round(capturedPage.canvasH * exportScale) !== height) {
+              throw new Error("캡처 준비 중 페이지 크기가 바뀌어 내보내기를 중단했어요.");
+            }
+            const raw = readStudioStageInDocumentView(stage, {
+              documentWidth: CANVAS_W, documentHeight: capturedPage.canvasH,
+              effectiveScale: exportScale, captureRegion: region,
+            }, () => stage.toCanvas({ pixelRatio: 1 }));
+            let baked: HTMLCanvasElement | undefined;
+            try {
+              baked = bakeStudioPageGradeIntoCanvas(raw, normalizePageGrade(capturedPage.grade), {
+                ...region, pageWidth: width, pageHeight: height,
+              });
+              const context = baked.getContext("2d", { willReadFrequently: true });
+              if (!context) throw new Error("대형 페이지의 타일 픽셀을 읽지 못했어요.");
+              const { data } = context.getImageData(0, 0, region.width, region.height);
+              return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+            } finally {
+              raw.width = 1; raw.height = 1;
+              if (baked && baked !== raw) { baked.width = 1; baked.height = 1; }
+            }
+          },
+        };
+        sources.push(source);
+      }
+      return await exportPresetSlices({ ...options, pages: sources });
+    } finally {
+      for (const canvas of owned) { canvas.width = 1; canvas.height = 1; }
+      setCurrentPageId(currentPageId);
+      setMasterEditMode(masterEditMode);
+      setIsExporting(false);
+    }
+  }
+
   async function handleCapturePagesForPreset(
     scope: "current" | "all"
   ): Promise<HTMLCanvasElement[]> {
@@ -539,6 +624,7 @@ export function createStudioRasterExportOrchestration({
   }
 
   return {
+    handleExportPresetSlices,
     handleDownload,
     exportCurrentPageToRasterInterchange,
     handleCopyToClipboard,

@@ -2,7 +2,7 @@ import { dbPool } from "../../db";
 
 import type {
   TrafficShareChannel,
-  TrafficShareOutcome,
+  TrafficShareStoredOutcome,
 } from "./traffic-analytics-model";
 
 const RETENTION_ADVISORY_LOCK = "toonspectrum:traffic-analytics:retention:v2";
@@ -55,7 +55,7 @@ export type TrafficShareEventRecord = Readonly<{
   sessionHash: string;
   path: string;
   channel: TrafficShareChannel;
-  outcome: TrafficShareOutcome;
+  outcome: TrafficShareStoredOutcome;
   countryCode: string | null;
   deviceType: string;
   browser: string;

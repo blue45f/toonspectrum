@@ -1265,3 +1265,18 @@ it("hydrates an untouched dock's saved search but never replaces an artist's in-
     restoredView={{ tab: "all", query: "marker", viewMode: "stroke" }} />);
   expect(search.value).toBe("내 검색");
 });
+
+
+it("선택 callback 실패 시 준비 상태를 풀고 명시적인 실패 수명주기를 전달한다", async () => {
+  const onSelectionLifecycle = vi.fn();
+  const onSelect = vi.fn(() => { throw new Error("선택 적용 실패"); });
+  render(<StudioBrushLibrarySheet open embedded workbench activeBrushId="pen"
+    closeOnSelection={false} onClose={vi.fn()} onSelect={onSelect}
+    onSelectionLifecycle={onSelectionLifecycle} />);
+  const gpen = screen.getByRole("button", { name: "G펜(필압) 선택" });
+  fireEvent.click(gpen);
+  await waitFor(() => expect(onSelect).toHaveBeenCalledOnce());
+  expect(onSelectionLifecycle.mock.calls.map(([event]) => event.phase)).toEqual(["preparing", "failed"]);
+  expect(gpen.getAttribute("aria-busy")).toBeNull();
+  expect((gpen as HTMLButtonElement).disabled).toBe(false);
+});

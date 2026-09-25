@@ -4,35 +4,50 @@ import { useLocation } from "react-router-dom";
 import { RouteScrollRestoration } from "./RouteScrollRestoration";
 import { AppRouter } from "./routes/AppRouter";
 import { SpatialCampusFrame } from "./spatial-campus/SpatialCampusFrame";
-import { campusTaskRoute, resolveCampusLocation } from "./spatial-campus/campus-route-adapter";
-import { workspaceTaskRoute } from "@/shared/components/workspace/workspace-task-route";
+import {
+  campusTaskRoute,
+  resolveCampusLocation,
+} from "./spatial-campus/campus-route-adapter";
 
 import { ErrorBoundary } from "@/app/errors/error-boundary";
 import { AuthMenuShell } from "@/domains/auth/components/auth-menu-shell";
-import { WorkspaceAccountContext } from "@/shared/components/workspace/workspace-account-context";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
+import {
+  activeProjectIdFromLocation,
+  writeActiveProjectContext,
+} from "@/domains/creator/studio-shell/active-project-context";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
-import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
 import { PwaInstallNudgeHost as PwaInstallNudge } from "@/shared/components/pwa-install-nudge-host";
+import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
 import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteConnectionNotice";
 import { SiteExperienceFrame } from "@/shared/components/site-experience/SiteExperienceFrame";
 import { supportsSiteExperience } from "@/shared/components/site-experience/site-experience-policy";
+import { WorkspaceAccountContext } from "@/shared/components/workspace/workspace-account-context";
+import { workspaceTaskRoute } from "@/shared/components/workspace/workspace-task-route";
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
 import { recordSiteRouteVisit } from "@/shared/lib/site-route-history";
 
 import "@toonspectrum/core/fx/fx.css";
 
 const AccessibleTooltipLayer = lazy(() =>
-  import("@/shared/components/AccessibleTooltipLayer").then((mod) => ({ default: mod.AccessibleTooltipLayer })),
+  import("@/shared/components/AccessibleTooltipLayer").then((mod) => ({
+    default: mod.AccessibleTooltipLayer,
+  })),
 );
 const SiteCreationCompass = lazy(() =>
-  import("@/shared/components/site-experience/SiteCreationCompass").then((mod) => ({ default: mod.SiteCreationCompass })),
+  import("@/shared/components/site-experience/SiteCreationCompass").then((mod) => ({
+    default: mod.SiteCreationCompass,
+  })),
 );
 const PublicSiteWayfinder = lazy(() =>
-  import("@/shared/components/public-site-wayfinder").then((mod) => ({ default: mod.PublicSiteWayfinder })),
+  import("@/shared/components/public-site-wayfinder").then((mod) => ({
+    default: mod.PublicSiteWayfinder,
+  })),
 );
 const SiteNextSteps = lazy(() =>
-  import("@/shared/components/site-experience/SiteNextSteps").then((mod) => ({ default: mod.SiteNextSteps })),
+  import("@/shared/components/site-experience/SiteNextSteps").then((mod) => ({
+    default: mod.SiteNextSteps,
+  })),
 );
 const PublicSiteNextSteps = lazy(() =>
   import("@/shared/components/public-site-next-steps").then((mod) => ({
@@ -40,33 +55,59 @@ const PublicSiteNextSteps = lazy(() =>
   })),
 );
 const AgeGateHost = lazy(() =>
-  import("@/shared/components/age-gate-host").then((mod) => ({ default: mod.AgeGateHost })),
+  import("@/shared/components/age-gate-host").then((mod) => ({
+    default: mod.AgeGateHost,
+  })),
 );
 const StoreSync = lazy(() =>
-  import("@/domains/auth/components/store-sync").then((mod) => ({ default: mod.StoreSync })),
+  import("@/domains/auth/components/store-sync").then((mod) => ({
+    default: mod.StoreSync,
+  })),
 );
 const CreatorAdaptiveOnboardingGate = lazy(() =>
   import("@/shared/components/CreatorAdaptiveOnboardingGate").then((mod) => ({
     default: mod.CreatorAdaptiveOnboardingGate,
   })),
 );
+const ActiveProjectContextBridge = lazy(() =>
+  import("@/domains/creator/studio-shell/ActiveProjectContextBridge").then((mod) => ({
+    default: mod.ActiveProjectContextBridge,
+  })),
+);
 const ToastHost = lazy(() =>
-  import("@/shared/components/toast-host").then((mod) => ({ default: mod.ToastHost })),
+  import("@/shared/components/toast-host").then((mod) => ({
+    default: mod.ToastHost,
+  })),
+);
+const ServiceCapabilityRuntime = lazy(() =>
+  import("@/app/service-state/ServiceCapabilityRuntime").then((mod) => ({
+    default: mod.ServiceCapabilityRuntime,
+  })),
+);
+const ServiceDegradedBanner = lazy(() =>
+  import("@/app/service-state/ServiceDegradedBanner").then((mod) => ({
+    default: mod.ServiceDegradedBanner,
+  })),
 );
 
-/** Records allow-listed creator destinations, never artwork or arbitrary query parameters. */
 function CreatorContinuityTracker() {
   const { pathname, search } = useLocation();
   useEffect(() => {
     const binding = resolveCampusLocation(pathname, search);
-    if (binding?.surface === "protected" || binding?.districtId === "observatory") return;
+    if (binding?.surface === "protected" || binding?.districtId === "observatory") {
+      return;
+    }
     recordCreatorDestination(pathname, search);
     recordSiteRouteVisit(pathname);
+    const projectId = activeProjectIdFromLocation(pathname, search);
+    if (projectId && typeof window !== "undefined") {
+      writeActiveProjectContext(window.sessionStorage, projectId);
+    }
   }, [pathname, search]);
   return null;
 }
 
-function useDeferredByInput(timeoutMs = 4500) {
+function useDeferredByInput(timeoutMs = 4_500) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     if (ready) return;
@@ -89,7 +130,12 @@ function useDeferredByInput(timeoutMs = 4500) {
 function DeferredGlobalOverlays() {
   const ready = useDeferredByInput();
   if (!ready) return null;
-  return <Suspense fallback={null}><AgeGateHost /><ToastHost /></Suspense>;
+  return (
+    <Suspense fallback={null}>
+      <AgeGateHost />
+      <ToastHost />
+    </Suspense>
+  );
 }
 
 export interface AppShellProps {
@@ -117,24 +163,43 @@ export function AppShell({
 }: AppShellProps) {
   const { pathname, search } = useLocation();
   const publicCreativeRoute = isPublicCreativeRoute(pathname);
-  // Public discovery, community, learning and marketplace pages keep one predictable public
-  // shell. Spatial/workspace chrome is reserved for signed-in work management and authoring.
-  const campus = publicCreativeRoute ? null : resolveCampusLocation(pathname, search);
+  const campus = publicCreativeRoute
+    ? null
+    : resolveCampusLocation(pathname, search);
   const protectedCampus = campus?.surface === "protected";
   const taskRoute = publicCreativeRoute || protectedCampus
     ? null
     : workspaceTaskRoute(pathname, search) ?? campusTaskRoute(campus);
-  const immersiveVirtualHome = ["/home", "/team", "/hub", "/studio", "/studio/space", "/onboarding/character"].includes(pathname.replace(/\/+$/u, "") || "/");
-  const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/.test(pathname);
-  const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null || protectedCampus;
-  const enhancedSite = Boolean(header) && supportsSiteExperience(pathname) && !immersiveVirtualExperience;
+  const normalizedPath = pathname.replace(/\/+$/u, "") || "/";
+  const immersiveVirtualHome = [
+    "/home",
+    "/team",
+    "/hub",
+    "/studio",
+    "/studio/space",
+    "/onboarding/character",
+  ].includes(normalizedPath);
+  const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/u.test(pathname);
+  const immersiveVirtualExperience =
+    immersiveVirtualHome
+    || immersiveVirtualProject
+    || taskRoute !== null
+    || protectedCampus;
+  const enhancedSite =
+    Boolean(header)
+    && supportsSiteExperience(pathname)
+    && !immersiveVirtualExperience;
   const resolvedMainClassName = immersiveVirtualHome || taskRoute !== null
     ? "min-h-[100dvh] bg-canvas outline-none"
     : immersiveVirtualProject
       ? "min-h-[100dvh] bg-canvas outline-none"
       : mainClassName;
+
   return (
     <AuthSessionProvider>
+      <Suspense fallback={null}>
+        <ServiceCapabilityRuntime />
+      </Suspense>
       <Suspense fallback={null}><AccessibleTooltipLayer /></Suspense>
       <Suspense fallback={null}><StoreSync /></Suspense>
       {showGlobalOverlays && !immersiveVirtualExperience ? (
@@ -149,12 +214,29 @@ export function AppShell({
           </a>
         ) : null}
         {immersiveVirtualExperience ? null : header}
+        <Suspense fallback={null}>
+          <ServiceDegradedBanner />
+        </Suspense>
         {enhancedSite ? <SiteConnectionNotice /> : null}
         {immersiveVirtualExperience ? null : <PwaInstallNudge />}
-        <main id="main-content" tabIndex={-1} className={resolvedMainClassName} data-public-experience={publicCreativeRoute ? "atelier" : publicExperience || undefined}>
-          {enhancedSite ? <Suspense fallback={null}><SiteCreationCompass /></Suspense> : null}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className={resolvedMainClassName}
+          data-public-experience={
+            publicCreativeRoute ? "atelier" : publicExperience || undefined
+          }
+        >
+          {enhancedSite ? (
+            <Suspense fallback={null}><SiteCreationCompass /></Suspense>
+          ) : null}
+          {publicCreativeRoute ? (
+            <Suspense fallback={null}><ActiveProjectContextBridge /></Suspense>
+          ) : null}
           <WorkspaceAccountContext.Provider value={<AuthMenuShell />}>
-            <SpatialCampusFrame binding={campus} route={taskRoute}><AppRouter /></SpatialCampusFrame>
+            <SpatialCampusFrame binding={campus} route={taskRoute}>
+              <AppRouter />
+            </SpatialCampusFrame>
           </WorkspaceAccountContext.Provider>
           {publicCreativeRoute && !immersiveVirtualExperience ? (
             <ErrorBoundary resetKey={pathname}>

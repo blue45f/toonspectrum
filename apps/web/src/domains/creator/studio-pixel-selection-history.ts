@@ -1,5 +1,4 @@
 import {
-  MIN_SELECTION_SUBPATH_AREA,
   SELECTION_FEATHER_RANGE,
   polygonAreaNorm,
   type PixelSelection,
@@ -47,9 +46,9 @@ export type PixelSelectionHistoryLimits = Readonly<{
 export const DEFAULT_PIXEL_SELECTION_HISTORY_LIMITS: PixelSelectionHistoryLimits = Object.freeze({
   maxEntries: 64,
   maxBytes: 4 * 1024 * 1024,
-  maxSubpathsPerSnapshot: 128,
-  maxPointsPerSubpath: 4_096,
-  maxPointsPerSnapshot: 8_192,
+  maxSubpathsPerSnapshot: 512,
+  maxPointsPerSubpath: 65_536,
+  maxPointsPerSnapshot: 131_072,
 });
 
 export type PixelSelectionHistorySnapshot = Readonly<{
@@ -361,7 +360,7 @@ export function normalizePixelSelection(
         pointsRemaining -= points.length;
         continue;
       }
-      if (kind !== undefined || points.length < 3 || polygonAreaNorm(points) < MIN_SELECTION_SUBPATH_AREA) {
+      if (kind !== undefined || points.length < 3 || polygonAreaNorm(points) <= 0) {
         continue;
       }
       const frozenPoints = Object.freeze(points.slice()) as unknown as SelPoint[];

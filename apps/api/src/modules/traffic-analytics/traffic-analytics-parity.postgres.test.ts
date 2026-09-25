@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
 import { Pool } from "pg";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { D1TrafficAnalyticsRepository } from "./traffic-analytics-d1.repository";
 import { PostgresTrafficAnalyticsRepository } from "./traffic-analytics-postgres.repository";
+import { TrafficAnalyticsService } from "./traffic-analytics.service";
 import type { TrafficD1Executor } from "./traffic-analytics-d1.client";
 import type { TrafficPageViewRecord, TrafficSessionRecord } from "./traffic-analytics-store";
 
@@ -43,6 +44,7 @@ describe.runIf(process.env.TRAFFIC_ANALYTICS_COMPARE_POSTGRES === "true")("Postg
   });
 
   afterAll(async () => { sqlite?.close(); await postgres?.end(); });
+  afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
   beforeEach(async () => {
     await postgres.query("TRUNCATE traffic_page_view, traffic_session, traffic_share_event");
     sqlite.exec("DELETE FROM traffic_page_view; DELETE FROM traffic_session; DELETE FROM traffic_share_event; DELETE FROM traffic_analytics_maintenance");
@@ -55,6 +57,33 @@ describe.runIf(process.env.TRAFFIC_ANALYTICS_COMPARE_POSTGRES === "true")("Postg
     if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/u.test(value)) return new Date(value).toISOString();
     return value;
   }
+
+  it("브라우저 공유와 기존 success 입력을 두 저장소의 완료·열기 집계로 동일하게 연결한다", async () => {
+    vi.stubEnv("TRAFFIC_ANALYTICS_HASH_SECRET", "local-share-parity-hash-fixture");
+    const start = new Date(Date.now() - 60_000);
+    const pendingCleanup: Promise<void>[] = [];
+    for (const repository of [pg, d1]) {
+      const cleanup = repository.cleanup.bind(repository);
+      vi.spyOn(repository, "cleanup").mockImplementation((...args) => {
+        const pending = cleanup(...args);
+        pendingCleanup.push(pending);
+        return pending;
+      });
+      const service = new TrafficAnalyticsService(repository);
+      const identifiers = { visitorId: "visitor_share_contract_01", sessionId: "session_share_contract_01", channel: "copy" };
+      for (const outcome of ["opened", "completed", "cancelled", "failed"]) {
+        await expect(service.recordShareEvent({ ...identifiers, path: "/library", outcome }, {})).resolves.toEqual({ accepted: true });
+      }
+      await expect(service.recordShareEvent({ ...identifiers, sourcePath: "/library", outcome: "success" }, {})).resolves.toEqual({ accepted: true });
+    }
+    await Promise.all(pendingCleanup);
+    const stored = "SELECT path, outcome FROM traffic_share_event ORDER BY outcome";
+    expect((await postgres.query(stored)).rows).toEqual(sqlite.prepare(stored).all());
+    const query = { start, now: new Date(), days: 1, bucketSeconds: 3600, retentionDays: 90 };
+    const actual = await d1.overview(query);
+    expect(actual.sharing).toMatchObject({ attempts: 5, opened: 1, completed: 2, cancelled: 1, failed: 1 });
+    expect(canonical(actual)).toEqual(canonical(await pg.overview(query)));
+  });
 
   it("실제 같은 이벤트를 저장한 뒤 모든 관리자 집계·권한 없는 세션 충돌·retention 결과가 일치한다", async () => {
     for (let index = 0; index < 5; index += 1) {

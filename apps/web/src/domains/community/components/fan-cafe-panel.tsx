@@ -27,6 +27,7 @@ import {
 } from "./fan-cafe-constants";
 import FanPostCard from "./fan-cafe-post-card";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
+import Link from "@/shared/navigation/router-link";
 
 import type { FanCafeComposeLock, FanCafeKindFilter } from "./fan-cafe-constants";
 import type { FanCafePost, FanCafePostKind, FanCafeScopeFilter } from "@/shared/lib/types";
@@ -738,16 +739,29 @@ export function FanCafePanel({
               </div>
             )
           ) : (
-            <div className="rounded-lg border border-dashed border-line bg-canvas/45 px-4 py-8 text-center">
-              <Sparkles className="mx-auto mb-2 text-accent" size={20} />
-              <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "현재 통합 피드에서는 작성이 제한돼요.")}</p>
-              <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "작품·작가·펜카페 보드로 이동해 작성할 수 있습니다.")}</p>
-              <button
-                type="button"
-                onClick={() => appendDemoActivity("blocked", "통합 피드 작성 차단", "대상 보드에서 작성 가능")}
-                className="mt-4 rounded-lg border border-line bg-raised px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-fg"
-              >
-                {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "작성 제한 로그 남기기")}</button>
+            <div className="rounded-2xl border border-dashed border-line bg-gradient-to-br from-card/70 to-panel/45 px-4 py-5 text-left">
+              <div className="flex items-start gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-accent/25 bg-accent-soft text-accent">
+                  <Sparkles size={18} aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-sm font-black text-fg">첫 대화를 시작할 보드를 고르세요</p>
+                  <p className="mt-1 text-xs leading-5 text-fg-3">통합 피드는 모든 대화를 읽는 곳입니다. 작품·챌린지·협업 보드에서 맥락을 정한 뒤 글을 시작하세요.</p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                {[
+                  { href: "/community/cafes?topic=work-checkin", icon: BookOpenText, title: "오늘 작업 인증", body: "막힌 컷과 다음 한 걸음" },
+                  { href: "/showcase/challenges", icon: ImagePlus, title: "3컷 챌린지", body: "작은 결과물 공개" },
+                  { href: "/collaborate", icon: UsersRound, title: "피드백 파트너", body: "함께 검토할 사람 찾기" },
+                ].map(({ href, icon: Icon, title, body }) => (
+                  <Link key={href} href={href} className="rounded-xl border border-line bg-panel/75 p-3 transition-colors hover:border-accent/35 hover:bg-raised">
+                    <Icon size={15} className="text-accent" aria-hidden="true" />
+                    <strong className="mt-2 block text-xs font-black text-fg">{title}</strong>
+                    <span className="mt-0.5 block text-[0.68rem] text-fg-3">{body}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
           )}
           {error && <p className="mt-3 text-xs text-bad">{error}</p>}
@@ -760,11 +774,39 @@ export function FanCafePanel({
               <div className="skeleton h-28 w-full rounded-xl" />
             </>
           ) : posts.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-line bg-card/50 px-5 py-12 text-center">
-              <MessageCircle className="mx-auto mb-3 text-fg-3" size={22} />
-              <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "아직 팬카페 글이 없습니다.")}</p>
-              <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "첫 해석이나 응원을 남겨보세요.")}</p>
-            </div>
+            scope === "all" && filterKind === "all" && !selectedTag && !queryText && !showOnlyMine ? (
+              <div className="rounded-2xl border border-dashed border-line bg-gradient-to-br from-card/70 to-panel/45 px-5 py-7">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-accent/25 bg-accent-soft text-accent">
+                    <MessageCircle size={18} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-black text-fg">첫 대화를 기다리고 있습니다</p>
+                    <p className="mt-1 text-xs leading-5 text-fg-3">사용자 글을 꾸며 채우지 않습니다. 운영 주제에서 시작하거나 원하는 보드로 이동해 첫 기록을 남기세요.</p>
+                  </div>
+                </div>
+                <p className="mt-5 text-[0.64rem] font-black uppercase tracking-[0.14em] text-accent">STARTER TOPICS</p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {[
+                    { href: "/community/cafes?topic=work-checkin", icon: BookOpenText, title: "오늘 작업 인증", body: "막힌 컷과 다음 한 걸음을 나눠요." },
+                    { href: "/showcase/challenges", icon: ImagePlus, title: "3컷 챌린지", body: "작은 결과물로 첫 작품을 공개해요." },
+                    { href: "/collaborate", icon: UsersRound, title: "피드백 파트너", body: "구도·대사·배경을 함께 검토할 사람을 찾아요." },
+                  ].map(({ href, icon: Icon, title, body }) => (
+                    <Link key={href} href={href} className="group rounded-xl border border-line bg-panel/75 p-3 transition-colors hover:border-accent/35 hover:bg-raised">
+                      <Icon size={16} className="text-accent" aria-hidden="true" />
+                      <strong className="mt-3 block text-xs font-black text-fg">{title}</strong>
+                      <span className="mt-1 block text-[0.68rem] leading-5 text-fg-3">{body}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-line bg-card/50 px-5 py-10 text-center">
+                <MessageCircle className="mx-auto mb-3 text-fg-3" size={22} />
+                <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "아직 팬카페 글이 없습니다.")}</p>
+                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "첫 해석이나 응원을 남겨보세요.")}</p>
+              </div>
+            )
           ) : (
             posts.map((post) => (
               <FanPostCard

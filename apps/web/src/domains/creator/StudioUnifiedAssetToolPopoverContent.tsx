@@ -1,5 +1,7 @@
 import { Folder } from "lucide-react";
 
+import { STUDIO_RASTER_ASSETS } from "./render/studio-raster-assets";
+
 import { StudioAssetLegacyPanel } from "./StudioAssetLegacyPanel";
 import { StudioUnifiedAssetWorkspace } from "./StudioUnifiedAssetWorkspace";
 import { CANVAS_W } from "./studio-assets";
@@ -83,10 +85,13 @@ function routeUnifiedAsset(
       return handlers.addBgScene(item.source.value);
     case "scene-template":
       assertInsertMutationAllowed(toolBelt);
-      return handlers.addSceneTemplate(item.source.value).then(() => true);
+      return handlers.addSceneTemplate(item.source.value).then((result) => result !== false);
     case "element":
       assertInsertMutationAllowed(toolBelt);
       return handlers.addCatalogElement(item.source.value);
+    case "builtin-raster":
+      assertInsertMutationAllowed(toolBelt);
+      return handlers.addBuiltinRasterAsset(item.source.value);
     case "object-3d":
       assertInsertMutationAllowed(toolBelt);
       toolBelt.setMenu(null);
@@ -199,6 +204,7 @@ export function StudioUnifiedAssetToolPopoverContent({
 }: StudioUnifiedAssetToolPopoverContentProps) {
   const selectionBounds = resolveSelectionBounds(toolBelt);
   const items = buildStudioUnifiedAssetCatalog({
+    rasterAssets: STUDIO_RASTER_ASSETS,
     backgrounds: [
       ...STUDIO_GENERATED_BG_SCENES,
       ...BG_SCENES,

@@ -1,4 +1,4 @@
-import { Box, Download, Film, Loader2, RefreshCw, Server, Square, X } from "lucide-react";
+import { Box, Cloud, Download, EyeOff, Film, Loader2, PackageCheck, RefreshCw, Server, Square, WalletCards, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -159,6 +159,22 @@ export function PersonalInferencePage() {
           <Link to="/studio" className={BUTTON}>Studio</Link>
         </div>
       </header>
+
+      <section className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-label="AI 실행 준비 상태">
+        {[
+          { icon: Cloud, label: "실행 위치", value: configured ? "연결한 Creator Runtime" : "연결 필요", detail: "브라우저가 지정한 주소로 직접 요청" },
+          { icon: WalletCards, label: "비용", value: "운영측 자동 결제 없음", detail: "내 런타임·공급자 비용만 적용" },
+          { icon: EyeOff, label: "데이터", value: "원본 외부 전송", detail: "선택한 런타임에만 업로드" },
+          { icon: PackageCheck, label: "결과", value: "SHA-256 확인", detail: "모델·시드·설정을 작업 기록에 보존" },
+        ].map(({ icon: Icon, label, value, detail }) => (
+          <article key={label} className="rounded-2xl border border-line bg-card/75 p-4">
+            <Icon size={17} className="text-accent" aria-hidden="true" />
+            <p className="mt-3 text-[0.64rem] font-black uppercase tracking-[0.13em] text-fg-3">{label}</p>
+            <strong className="mt-1 block text-sm text-fg">{value}</strong>
+            <span className="mt-1 block text-xs leading-5 text-fg-3">{detail}</span>
+          </article>
+        ))}
+      </section>
 
       <p className="my-5 rounded-xl border border-line bg-card px-4 py-3 text-sm text-fg-2" role="status">{notice}</p>
       {error ? <p className="mb-5 rounded-xl border border-bad/40 bg-bad/10 px-4 py-3 text-sm text-bad" role="alert">{error}</p> : null}

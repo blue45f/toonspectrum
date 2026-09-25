@@ -1,39 +1,14 @@
-/**
- * Studio PSD Layer Import — 포토샵(.psd) 레이어를 이미지 요소로 가져오기.
- *
- * studio-psd-export.ts(레이어별 PSD 내보내기)의 정확히 반대 방향이다 — ag-psd 의 readPsd 로 파싱한
- * 레이어 트리를 재귀적으로 평탄화해, 각 리프 레이어를 캔버스 좌표/불투명도/기본 블렌드 모드가
- * 보존된 하나의 "image" 요소로 변환한다. 래스터 레이어 마스크는 Studio의 편집 가능한 비파괴
- * maskSrc로 변환하고, 조정 레이어·레이어 이펙트·스마트 오브젝트의 완전한 재현은 명시적으로
- * 스코프 밖이다 — 해당 기능은 래스터 평탄화 또는 정직한 손실 고지로 한정한다
- * (docs/studio-psd-import-integration.md §0/§1.2/§4 참고).
- *
- * 좌표계 규약(studio-psd-export.ts 의 거울):
- *  - ag-psd `Psd.children` 은 포토샵 레이어 패널과 같은 순서([0]=패널 맨 위=화면상 가장 앞)다.
- *  - Studio 는 정반대(elements[0]=맨 뒤, elements[last]=맨 앞)다.
- *  - flattenPsdLayers 가 이 반전을 내부에서 처리해 이미 Studio 순서로 뒤집힌 리프 목록을 반환한다
- *    (studio-psd-export.ts 가 쓰기 방향에서 하는 `[...layers].reverse()`와 정확히 대칭).
- *
- * 그룹(폴더) 처리: 그룹 자신은 요소를 만들지 않는다 — 자식으로 재귀하며 그룹의 불투명도만
- * 곱연산으로 누적하고(숨김은 OR 누적), 그룹 자신의 blendMode 는 버린다(리프 자신의 blendMode만
- * 사용, 기본 "normal"). 포토샵의 격리된 그룹 블렌딩을 완전히 재현하려면 오프스크린 합성이 필요해
- * "단순 평탄화" 스코프를 넘어선다.
- *
- * 구현 결정(설계 문서보다 한 단계 더 좁힌 세부사항 — 편차를 여기 명시한다):
- *  - 그룹 자신의 blendMode 를 버린다는 사실 자체는 skipped 목록에 별도 고지하지 않는다.
- *    flattenPsdLayers 의 반환 타입(FlattenedPsdLayer[])에는 "그룹 단위 1회 고지"를 위한 채널이
- *    없고, 대부분의 실제 PSD 는 그룹을 기본 blendMode("pass through")로 남겨두므로 매번 고지하면
- *    거의 모든 파일에서 뜨는 잡음이 된다 — 마스크/이펙트/스마트오브젝트/텍스트처럼 "실제로 특별한
- *    설정이 있을 때만" 고지하는 정직성 규약과 결이 다르다고 판단해 이 항목만 조용히 근사한다.
- *  - "empty-bounds"/"no-canvas" skip 사유의 정확한 사용자 노출 문구는 설계 문서에 리터럴로
- *    명시돼 있지 않아 이 파일에서 studio-psd-export.ts 와 같은 톤으로 새로 작성했다.
- *
- * 이 파일은 대부분 순수 로직이다 — flattenPsdLayers/mapPsdBlendMode/placementForLayer 는 DOM 없이
- * 단위테스트 가능하고, importPsdFile 자체도 PsdImportDeps 로 readPsd/마스크 변환을 주입받아
- * 테스트에서 실제 파일/canvas 없이 검증 가능하다.
+/** PSD 원본 픽셀, 폴더 경로와 클리핑을 보존하는 교환 경계.
+ * 효과·조정·격리 그룹을 임의 재현하지 않고 원본 합성본과 편집 레이어를 함께 준비한다.
+ * ag-psd의 앞→뒤 순서를 Studio의 뒤→앞 순서로 반전한다.
  */
 
 import { readPsd, type BlendMode, type Layer, type Psd, type ReadOptions } from "ag-psd";
+
+import { studioGroupsFromPsdElements, type StudioPsdFolder } from "./export/studio-psd-folder-structure";
+import { planStudioPsdEditableText } from "./export/studio-psd-text-import";
+import type { El } from "./studio-element-model";
+import type { LayerGroup } from "./studio-layers";
 
 import { encodeStudioLosslessCanvasSource } from "./studio-lossless-canvas-source";
 import { reportStudioPsdImportProgress, throwIfStudioPsdImportAborted, type StudioPsdImportOptions } from "./studio-psd-import-progress";
@@ -69,6 +44,10 @@ export interface PsdImportedElement {
   maskSrc?: string;
   /** Photoshop에서 마스크가 비활성 상태면 false. 미설정은 Studio 관례상 활성. */
   maskEnabled?: false;
+  groupId?: string;
+  psdGroupId?: string;
+  psdFolderPath?: readonly StudioPsdFolder[];
+  clipBelow?: true;
 }
 
 export interface PsdImportResult {
@@ -76,6 +55,13 @@ export interface PsdImportResult {
   layerPixelStorage?: "native-png";
   /** Studio z-order(뒤→앞, elements[0]=맨 뒤)로 이미 정렬된 상태. */
   elements: PsdImportedElement[];
+  groups?: LayerGroup[];
+  /** 원본 이미지 대신 사용자가 켜서 편집할 수 있는 숨겨진 문자 복사본. */
+  editableTextElements?: El[];
+  /** PSD에 저장된 합성 이미지. 임의 효과 엔진으로 재구성하지 않는다. */
+  compositeElement?: PsdImportedElement;
+  /** 원본 파일 바이트는 적용 시 CAS에 보존하고 프로젝트에는 참조만 넣는다. */
+  originalFile?: File;
   /** 원본 PSD 캔버스 크기(스케일 반영 전) — 새 페이지 생성 시 canvasH 계산에 필요. */
   sourceWidth: number;
   sourceHeight: number;
@@ -95,6 +81,7 @@ export type PsdInterchangeFeature =
   | "blend-mode"
   | "color-space"
   | "groups"
+  | "clipping"
   | "layer-effects"
   | "layer-mask"
   | "layers"
@@ -153,7 +140,7 @@ export interface PsdImportPreflight {
 // ── 테스트 주입 지점 — studio-brand-kit.ts 류 DI 패턴 ────────────────────────
 
 export interface PsdImportDeps {
-  /** 기본 ag-psd readPsd(skipCompositeImageData:true). 테스트에서 손으로 만든 Psd 픽스처를
+  /** 기본 ag-psd readPsd(skipCompositeImageData:false). 테스트에서 손으로 만든 Psd 픽스처를
    *  즉시 반환하도록 모킹. */
   readPsdImpl?: (buffer: ArrayBuffer, options?: ReadOptions) => Psd;
   /** @deprecated Kept for adapter compatibility; original layer pixels are never downscaled. */
@@ -184,6 +171,7 @@ export interface FlattenedPsdLayer {
   opacity: number;
   /** 그룹 체인을 따라 OR 로 누적된 숨김 여부. */
   hidden: boolean;
+  folderPath: readonly StudioPsdFolder[];
   /** 이 레이어를 건너뛰어야 하는 이유(있으면 canvas 를 읽지 않고 skipped 에만 기록). */
   skipReason?: "adjustment" | "no-canvas" | "empty-bounds";
 }
@@ -196,6 +184,7 @@ interface RawFlattenedLeaf {
   height: number;
   opacity: number;
   hidden: boolean;
+  folderPath: readonly StudioPsdFolder[];
   skipReason?: FlattenedPsdLayer["skipReason"];
 }
 
@@ -214,14 +203,16 @@ function flattenInto(
   layers: readonly Layer[],
   inheritedOpacity: number,
   inheritedHidden: boolean,
-  out: RawFlattenedLeaf[]
+  out: RawFlattenedLeaf[],
+  folderPath: readonly StudioPsdFolder[] = [],
 ): void {
   for (const layer of layers) {
     const opacity = inheritedOpacity * clamp01(layer.opacity ?? 1);
     const hidden = inheritedHidden || !!layer.hidden;
 
     if (isGroupLayer(layer)) {
-      flattenInto(layer.children, opacity, hidden, out);
+      const folder = { id: createImportedLayerId(), name: layer.name?.trim() || "이름 없는 폴더" };
+      flattenInto(layer.children, opacity, hidden, out, [...folderPath, folder]);
       continue;
     }
 
@@ -240,7 +231,7 @@ function flattenInto(
       skipReason = "no-canvas";
     }
 
-    out.push({ layer, left, top, width, height, opacity, hidden, skipReason });
+    out.push({ layer, left, top, width, height, opacity, hidden, folderPath, skipReason });
   }
 }
 
@@ -324,7 +315,7 @@ export function placementForLayer(
 
 /** 결과 요약 한 줄(상태 배너용) — psdExportResultMessage 와 동일한 톤. */
 export function psdImportResultMessage(result: PsdImportResult): string {
-  const parts = [`PSD 가져오기 완료 — 레이어 ${result.elements.length}개`];
+  const parts = [`PSD 준비 완료 — 레이어 ${result.elements.length}개`];
   if (result.skipped.length > 0) parts.push(`알림 ${result.skipped.length}건`);
   return parts.join(" · ");
 }
@@ -588,7 +579,7 @@ export function preflightPsdImport(
 }
 
 const PSD_READ_OPTIONS: ReadOptions = Object.freeze({
-  skipCompositeImageData: true,
+  skipCompositeImageData: false,
   skipThumbnail: true,
   skipLinkedFilesData: true,
   totalMemoryLimit: PSD_IMPORT_MAX_DECODED_BYTES,
@@ -599,6 +590,23 @@ interface PsdImportLossMetrics {
   maskRasterized: number;
   maskDropped: number;
   unsupportedBlendModes: number;
+}
+
+function psdGroupCompositingWarnings(layers: readonly Layer[], ancestors: readonly string[] = []): string[] {
+  const warnings: string[] = [];
+  for (const layer of layers) {
+    if (!isGroupLayer(layer)) continue;
+    const path = [...ancestors, layer.name?.trim() || "이름 없는 폴더"];
+    const features = [
+      layer.blendMode && layer.blendMode !== "pass through" ? `${layer.blendMode} 격리 합성` : null,
+      (layer.opacity ?? 1) < 1 ? "그룹 불투명도" : null,
+      layer.mask || layer.realMask || layer.vectorMask ? "그룹 마스크" : null,
+      layer.effects ? "그룹 효과" : null,
+    ].filter(Boolean);
+    if (features.length) warnings.push(`${path.join(" / ")}: ${features.join("·")}은 개별 편집 레이어에서 완전히 재현되지 않아요. 원본 외관은 PSD 합성본으로 확인해 주세요.`);
+    warnings.push(...psdGroupCompositingWarnings(layer.children, path));
+  }
+  return warnings;
 }
 
 function countPsdGroups(layers: readonly Layer[]): number {
@@ -643,24 +651,32 @@ function psdImportLossManifest(
       `래스터 레이어 ${importedLayerCount.toLocaleString("ko-KR")}개를 개별 Studio 레이어로 유지합니다.`,
     ));
   }
-  const groupCount = countPsdGroups(psd.children ?? []);
+  const usable = flattened.filter((entry) => entry.skipReason === undefined);
+  const originalGroupCount = countPsdGroups(psd.children ?? []);
+  const groupCount = new Set(usable.flatMap((entry) => entry.folderPath.map((folder) => folder.id))).size;
   if (groupCount > 0) {
     decisions.push(psdDecision(
       "groups",
-      "dropped",
+      "preserved",
       groupCount,
-      `그룹 ${groupCount.toLocaleString("ko-KR")}개의 폴더 구조는 평탄화하고 자식 레이어 순서만 유지합니다.`,
-      "그룹 편집 구조가 중요하면 원본 PSD를 함께 보관하세요.",
+      `그룹 ${groupCount.toLocaleString("ko-KR")}개의 원본 폴더 경로와 레이어 순서를 유지합니다. Studio에서는 전체 경로명으로 폴더를 표시합니다.`,
     ));
   }
-  const usable = flattened.filter((entry) => entry.skipReason === undefined);
+  if (originalGroupCount > groupCount) decisions.push(psdDecision(
+    "groups", "dropped", originalGroupCount - groupCount,
+    "가져올 픽셀이 없는 빈 폴더는 Studio 폴더로 만들지 않으며 원본 PSD에 보존합니다.",
+  ));
+  const clippingCount = usable.filter((entry) => entry.layer.clipping).length;
+  if (clippingCount > 0) decisions.push(psdDecision(
+    "clipping", "preserved", clippingCount, `레이어 ${clippingCount}개의 아래 레이어 클리핑을 유지합니다.`,
+  ));
   const textCount = usable.filter((entry) => !!entry.layer.text).length;
   if (textCount > 0) {
     decisions.push(psdDecision(
       "text",
       "rasterized",
       textCount,
-      `텍스트 레이어 ${textCount.toLocaleString("ko-KR")}개는 글자 편집 정보 대신 화면 픽셀로 가져옵니다.`,
+      `텍스트 레이어 ${textCount.toLocaleString("ko-KR")}개는 글자 편집 정보 대신 화면 픽셀로 가져오며, 표현 가능한 단일 서식은 숨겨진 문자 편집본을 함께 제공합니다.`,
     ));
   }
   const smartObjectCount = usable.filter((entry) => !!entry.layer.placedLayer).length;
@@ -825,6 +841,12 @@ export async function importPsdFile(
   const flattened = flattenPsdLayers(psd);
   const skipped: string[] = [];
   const elements: PsdImportedElement[] = [];
+  const editableTextElements: El[] = [];
+  const groupWarnings = psdGroupCompositingWarnings(psd.children ?? []);
+  skipped.push(...groupWarnings);
+  const seenGroupIds = new Set<string>();
+  let previousFolderId: string | undefined;
+  let groupRunId: string | undefined;
   const lossMetrics: PsdImportLossMetrics = {
     maskPreserved: 0,
     maskRasterized: 0,
@@ -896,6 +918,18 @@ export async function importPsdFile(
       rotation: 0,
       name: entry.name,
     };
+    const folderId = entry.folderPath.at(-1)?.id;
+    if (folderId !== previousFolderId) {
+      groupRunId = folderId && seenGroupIds.has(folderId) ? createImportedLayerId() : folderId;
+      if (folderId) seenGroupIds.add(folderId);
+      previousFolderId = folderId;
+    }
+    if (groupRunId) {
+      el.groupId = groupRunId;
+      el.psdGroupId = groupRunId;
+      el.psdFolderPath = entry.folderPath;
+    }
+    if (entry.layer.clipping) el.clipBelow = true;
     if (entry.opacity < 1) el.opacity = entry.opacity;
     const blendMode = mapPsdBlendMode(entry.layer.blendMode);
     if (blendMode !== "source-over") el.blendMode = blendMode;
@@ -956,6 +990,8 @@ export async function importPsdFile(
       skipped.push(`${entry.name}: 벡터 전용 마스크는 래스터 픽셀이 없어 원본 레이어를 가리지 않고 가져왔어요.`);
     }
     elements.push(el);
+    const editableText = planStudioPsdEditableText(entry.layer, el, scale, createImportedLayerId);
+    if (editableText) editableTextElements.push(editableText);
 
     // 반영은 하되(원본 그대로 래스터에 이미 포함) 재현되지 않는 부분을 정직하게 고지 — v1 명시적
     // 제외 목록(docs/studio-psd-import-integration.md §1.2)과 1:1 대응.
@@ -966,10 +1002,22 @@ export async function importPsdFile(
       skipped.push(`${entry.name}: 스마트 오브젝트는 편집 가능한 원본이 아니라 미리보기 이미지로 가져왔어요`);
     }
     if (entry.layer.text) {
-      skipped.push(`${entry.name}: 텍스트 레이어는 편집 가능한 글자가 아니라 이미지로 가져왔어요`);
+      skipped.push(editableText
+        ? `${entry.name}: 원본 외관은 이미지로 유지하고 숨겨진 텍스트 편집본을 함께 준비했어요. 글꼴·줄바꿈은 편집본을 켜서 확인해 주세요.`
+        : `${entry.name}: 복잡한 문자 서식은 원본 이미지로 유지해요. 문자 편집 정보는 함께 보관한 PSD에서 다시 열 수 있어요`);
     }
   }
 
+  let compositeElement: PsdImportedElement | undefined;
+  if (psd.canvas) {
+    const src = await encodeStudioLosslessCanvasSource(psd.canvas, options.signal);
+    if (isUsableImageDataUrl(src)) compositeElement = {
+      id: createImportedLayerId(), type: "image", src, x: 0, y: 0,
+      width: sourceWidth * scale, height: sourceHeight * scale, rotation: 0,
+      name: "PSD 원본 합성본",
+    };
+  }
+  if (groupWarnings.length) lossMetrics.unsupportedBlendModes += groupWarnings.length;
   reportStudioPsdImportProgress(options, "complete", flattened.length, flattened.length);
   if (elements.length === 0 && skipped.length === 0) {
     skipped.push("PSD에서 가져올 레이어를 찾지 못했어요.");
@@ -978,6 +1026,10 @@ export async function importPsdFile(
   return {
     layerPixelStorage: "native-png",
     elements,
+    groups: studioGroupsFromPsdElements(elements),
+    editableTextElements,
+    ...(compositeElement ? { compositeElement } : {}),
+    originalFile: file,
     sourceWidth,
     sourceHeight,
     scale,

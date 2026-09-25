@@ -1,7 +1,7 @@
 export type StudioCuttoonStagePointersApi = {
   tryStageDownArmedTools: (e: any, stagePointerEvent: PointerEvent) => boolean;
   tryStageDownPixel: (e: any, stagePointerEvent: PointerEvent) => boolean;
-  tryStageDownDraw: (e: any, stagePointerEvent: PointerEvent) => void;
+  tryStageDownDraw: (e: any, stagePointerEvent: PointerEvent, replayPosition?: { x: number; y: number }) => void;
   onStageDown: (e: any) => void;
   updateHealCloneCursorNodes: (destNorm: any, frame: any) => void;
   updateHistoryBrushCursorNode: (destNorm: any, frame: any) => void;

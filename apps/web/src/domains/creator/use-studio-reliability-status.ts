@@ -13,6 +13,7 @@ import {
 } from "./studio-destructive-action-preview";
 import {
   getStudioRejectedStrokeRecords,
+  getStudioRejectedStrokeStorageError,
   subscribeStudioRejectedStrokeRecovery,
 } from "./studio-rejected-stroke-recovery";
 import {
@@ -29,6 +30,14 @@ export function useStudioRejectedStrokeRecords(): readonly StudioRejectedStrokeR
     subscribeStudioRejectedStrokeRecovery,
     getStudioRejectedStrokeRecords,
     getStudioRejectedStrokeRecords,
+  );
+}
+
+export function useStudioRejectedStrokeStorageError(): string | null {
+  return useSyncExternalStore(
+    subscribeStudioRejectedStrokeRecovery,
+    getStudioRejectedStrokeStorageError,
+    getStudioRejectedStrokeStorageError,
   );
 }
 

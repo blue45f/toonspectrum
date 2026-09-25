@@ -110,4 +110,25 @@ describe("StudioReliabilityStatusRail — rejected stroke recovery", () => {
     expect(document.querySelector("[data-studio-rejected-stroke-notice]")).toBeNull();
     expect(document.querySelector("[data-studio-rejected-stroke-outcome]")).toBeNull();
   });
+
+  it("복구 원본 11개를 보존하면서 최근 8개만 표시하고 처리한 자리에 다음 원본을 보여준다", () => {
+    render(<StudioReliabilityStatusRail />);
+    act(() => {
+      for (let index = 0; index < 11; index += 1) {
+        recordStudioRejectedStroke({
+          stroke: { ...stroke, id: `stroke-${index}` }, pageId: "page-1", provider: "WebGPU", reason: "device-lost", at: index,
+        });
+      }
+    });
+    expect(getStudioRejectedStrokeRecords()).toHaveLength(11);
+    expect(document.querySelectorAll("[data-studio-rejected-stroke-notice]")).toHaveLength(8);
+    expect(screen.getByText(/복구할 획 11개가 보관돼 있습니다/)).toBeTruthy();
+    expect(document.querySelector('[data-studio-rejected-stroke-id="stroke-2"]')).toBeNull();
+    const firstDismiss = screen.getAllByRole("button", { name: "버리기" })[0];
+    if (!firstDismiss) throw new Error("버리기 버튼이 없습니다.");
+    fireEvent.click(firstDismiss);
+    expect(getStudioRejectedStrokeRecords()).toHaveLength(10);
+    expect(document.querySelectorAll("[data-studio-rejected-stroke-notice]")).toHaveLength(8);
+    expect(document.querySelector('[data-studio-rejected-stroke-id="stroke-2"]')).not.toBeNull();
+  });
 });

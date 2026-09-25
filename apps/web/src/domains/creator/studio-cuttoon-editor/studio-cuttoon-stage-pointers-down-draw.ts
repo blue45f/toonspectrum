@@ -345,20 +345,8 @@ export function bindStudioCuttoonStagePointersDownDraw(
   } = h;
   const applyStrokeObjectSnapToPoint = (...args) => api.applyStrokeObjectSnapToPoint(...args);
   const updateBrushCursor = (...args) => api.updateBrushCursor(...args);
-  function tryStageDownDraw(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>, stagePointerEvent: PointerEvent) {
+  function tryStageDownDraw(e: Konva.KonvaEventObject<MouseEvent | TouchEvent>, stagePointerEvent: PointerEvent, replayPosition?: { x: number; y: number }) {
     if (tool === "draw") {
-      if (globalThis.document?.querySelector('[data-studio-brush-library="true"][data-studio-brush-selection-pending="true"]')) {
-        announceDrawingShortcut("브러시를 준비하는 중입니다 · 선택이 완료되면 바로 그릴 수 있어요");
-        return;
-      }
-      if (livingInkFinalizingRef.current) {
-        announceDrawingShortcut("수채 번짐 프레임을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
-        return;
-      }
-      if (hokusaiLiveFinalizingRef.current) {
-        announceDrawingShortcut("자연매체 획을 저장하는 중입니다 · 잠시 후 다음 획을 그려 주세요");
-        return;
-      }
       const pointerSample = e.evt as PointerEvent;
       const penButtonPolicy = getStudioPenButtonPolicySnapshot();
       const strokeDrawMode = resolveStudioPenContactDrawMode(
@@ -460,12 +448,6 @@ export function bindStudioCuttoonStagePointersDownDraw(
         flushPending: () => flushPendingStrokeCommitsRef.current(),
         restorePointerPosition: () => stageRef.current?.setPointersPositions(pointerSample),
       });
-      if (!backdropBoundaryExecution.ready) {
-        setError(
-          "앞선 획의 합성 순서를 확정하지 못해 새 획을 시작하지 않았어요. 잠금·동기화 상태를 확인한 뒤 다시 시도해 주세요."
-        );
-        return;
-      }
       // A CRDT stroke has its own conflict-free operation stream, so it must not claim the old
       // page-wide lease that prevented two artists from drawing at once. Keep the lease fallback
       // only while the durable document is not connected.
@@ -481,7 +463,7 @@ export function bindStudioCuttoonStagePointersDownDraw(
         endLiveResourceEdit();
         return;
       }
-      const pos = stageRef.current?.getRelativePointerPosition()
+      const pos = replayPosition ?? stageRef.current?.getRelativePointerPosition()
         ?? e.target.getStage()?.getRelativePointerPosition();
       // Every early exit after a successful begin must release — stranded claimLock is collab-unsafe.
       if (!pos) {
@@ -701,46 +683,57 @@ export function bindStudioCuttoonStagePointersDownDraw(
       if (shouldActivateStudioStrokeFocusForPointer(pointerSample.pointerType)) {
         setStudioStrokeFocusActivity("canvas-stroke", true);
       }
-      drawingGesturePreviewPublisherRef.current.begin({
-        pageId: activePage.id,
-        documentGeneration: collaborationAccessRef.current.documentGeneration,
-        element: next,
-      });
       // The active cursor is outline-only, so it can track the contact without darkening stable
       // pixels or becoming part of the live-ink/commit receipt.
       perspectiveRayRef.current = null; // 새 스트로크마다 원근 락을 다시 잡는다(첫 move에서 재계산).
       isometricAxisRayRef.current = null; // 새 스트로크마다 아이소메트릭 축 락도 다시 잡는다.
       advancedRulerSnapRef.current = null;
-      if (!beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin)) {
+      const beginAdmittedCollaboration = (admittedStroke: DrawEl): void => {
+        drawingGesturePreviewPublisherRef.current.begin({
+          pageId: activePage.id,
+          documentGeneration: collaborationAccessRef.current.documentGeneration,
+          element: admittedStroke,
+        });
+        drawingCrdtPublisherRef.current.cancel();
+        drawingCrdtStrokeActiveRef.current = false;
+        const crdtDocument = studioCrdtDocumentRef.current;
+        if (crdtDocument) {
+          try {
+            const crdtStroke = studioDrawElementToCrdtStroke(activePage.id, admittedStroke);
+            drawingCrdtStrokeActiveRef.current = true;
+            drawingCrdtPublisherRef.current.begin(admittedStroke.id, () => {
+              if (
+                !drawingCrdtStrokeActiveRef.current
+                || studioCrdtDocumentRef.current !== crdtDocument
+              ) {
+                throw new Error("실시간 협업 문서가 획 시작 전에 변경되었습니다.");
+              }
+              crdtDocument.beginStroke(crdtStroke);
+            });
+          } catch (cause) {
+            drawingCrdtPublisherRef.current.cancel(admittedStroke.id);
+            drawingCrdtPublishErrorRef.current(cause);
+          }
+        }
+      };
+      if (!beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin, {
+        pendingBackdrop: !backdropBoundaryExecution.ready,
+        onAdmitted: beginAdmittedCollaboration,
+      })) {
         // The selected renderer failed admission. Do not commit or publish the draft through a
         // different surface; cleanup leaves the previous document frame intact.
         discardDrawingPointerSession();
         return;
       }
-      drawingCrdtPublisherRef.current.cancel();
-      drawingCrdtStrokeActiveRef.current = false;
-      const crdtDocument = studioCrdtDocumentRef.current;
-      if (crdtDocument) {
-        try {
-          const crdtStroke = studioDrawElementToCrdtStroke(activePage.id, next);
-          drawingCrdtStrokeActiveRef.current = true;
-          drawingCrdtPublisherRef.current.begin(next.id, () => {
-            if (
-              !drawingCrdtStrokeActiveRef.current
-              || studioCrdtDocumentRef.current !== crdtDocument
-            ) {
-              throw new Error("실시간 협업 문서가 획 시작 전에 변경되었습니다.");
-            }
-            crdtDocument.beginStroke(crdtStroke);
-          });
-        } catch (cause) {
-          drawingCrdtPublisherRef.current.cancel(next.id);
-          drawingCrdtPublishErrorRef.current(cause);
-        }
-      }
-      startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp);
       if (strokeDrawMode === "pen" && quickShapeActive) startQuickShapeTracking(strokeOrigin);
-      else stopQuickShapeTracking(); // 방어적 — 이전 스트로크 타이머 잔존 방지
+      else stopQuickShapeTracking();
+      if (h.pendingStrokeAdmissionRef?.current?.has(next.id)) {
+        // 샘플 수집은 그대로 진행하되 선택한 provider가 준비되기 전에는 문서/협업에 쓰지 않는다.
+        startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp);
+        return;
+      }
+      beginAdmittedCollaboration(next);
+      startFixedRateStrokePump(pointerSample, pointerDownFrameTimeStamp);
       return;
     }
     // 선택 모드: 빈 영역에서 드래그하면 마퀴(PPT식 박스) 다중선택, 그냥 클릭이면 선택 해제.

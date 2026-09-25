@@ -736,6 +736,7 @@ export function StudioCuttoonEditorChrome(s: StudioCuttoonEditorViewSession) {
             mobileKeyboardInset={mobileKeyboardInset}
             onClose={studioBrushCatalogHandlers.close}
             onSelect={applyStudioBrushCatalogSelection}
+            onSelectionLifecycle={studioBrushCatalogHandlers.selectionLifecycle}
             onToggleFavorite={studioBrushCatalogHandlers.toggleFavorite}
           />
         </Suspense>

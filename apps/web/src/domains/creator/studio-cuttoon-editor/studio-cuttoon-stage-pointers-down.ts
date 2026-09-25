@@ -309,6 +309,7 @@ export function bindStudioCuttoonStagePointersDown(
     if (bubbleShapeDragRef.current) return;
     if (handleStudioPointCommentStageDown(e, stagePointerEvent)) return;
     if (canvasInteractionBlocked && !commentPinArmed) return;
+    if (!isSpacePressed && h.capturePendingCatalogInput?.(stagePointerEvent, e.target.getStage())) return;
     const pendingRetouchPreparation = studioRasterRetouchPreparationRef.current;
     const pendingSelectionPreparation = pixelMarqueeRasterPreparationActivationRef.current;
     if (pendingSelectionPreparation && !isSpacePressed) {

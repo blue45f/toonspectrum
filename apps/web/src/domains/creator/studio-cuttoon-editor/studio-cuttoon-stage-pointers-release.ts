@@ -634,6 +634,7 @@ export function bindStudioCuttoonStagePointersRelease(
     stage: Konva.Stage | null,
     pointerEvent: PointerEvent,
     consumeReleaseSample: boolean,
+    coordinateMapper?: StudioStagePointerBatchMapper,
   ): DrawEl | null {
     const inputSettings = drawingInputSettingsRef.current;
     let authoritativeLiveStroke: DrawEl | null = null;
@@ -668,6 +669,7 @@ export function bindStudioCuttoonStagePointersRelease(
             })
           : undefined,
         authoritativeSource: "parent-only",
+        coordinateMapper,
       });
     }
     if (drawingRef.current && (drawingRef.current.kind ?? "freehand") === "freehand") {
@@ -710,6 +712,11 @@ export function bindStudioCuttoonStagePointersRelease(
           });
           if (endpointPlan.appended) drawingRef.current = endpointPlan.stroke;
         }
+      }
+      if (drawingRef.current && h.pendingStrokeAdmissionRef?.current?.has(drawingRef.current.id)) {
+        // 대기 중에는 샘플만 확정한다. 앞선 획의 provider 상태·CRDT·후보정 상태를 재사용하지 않는다.
+        h.pendingStrokeAdmissionRef.current.update(drawingRef.current);
+        return drawingRef.current;
       }
       if (drawingRef.current) {
         appendDrawingCrdtSampleSuffix(drawingRef.current, crdtReleaseSampleStart);

@@ -1,5 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+export const FREE_DATABASE_FEDERATION_ROOT = fileURLToPath(new URL("../", import.meta.url));
 
 export const FREE_DATABASE_FEDERATION_VERSION =
   "toonspectrum.free-database-federation.v1";
@@ -218,7 +221,7 @@ export function validateFreeDatabaseFederation(policy) { // NOSONAR javascript:S
 }
 
 export function readFreeDatabaseFederation(
-  path = resolve(process.cwd(), "config/free-database-federation.json"),
+  path = resolve(FREE_DATABASE_FEDERATION_ROOT, "config/free-database-federation.json"),
 ) {
   let policy;
   try {

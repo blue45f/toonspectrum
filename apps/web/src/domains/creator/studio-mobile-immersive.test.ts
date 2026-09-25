@@ -117,12 +117,12 @@ describe("Studio mobile immersive preference", () => {
     expect(hostCloser.slice(0, 200)).toContain("setForceRightPanelOpen(false);");
   });
 
-  it("keeps every 320px dock target at 44px and scrolls only the two tool rows", () => {
+  it("keeps every 320px dock target at 44px with a fixed essential row and a disclosed work menu", () => {
     expect(studioChromeSource).toContain(
       '"flex min-h-11 min-w-[44px] flex-none flex-col items-center justify-center',
     );
-    expect(studioMobileEditingDockSource).toContain('data-studio-mobile-dock-scroll="primary"');
-    expect(studioMobileEditingDockSource).toContain('data-studio-mobile-dock-scroll="secondary"');
+    expect(studioMobileEditingDockSource).toContain('data-studio-mobile-primary-actions="true"');
+    expect(studioMobileEditingDockSource).toContain('data-studio-mobile-workspace-menu="true"');
     expect(studioMobileEditingDockSource).toContain(
       'data-studio-mobile-dock-expanded={workspaceDockExpanded ? "true" : "false"}',
     );
@@ -141,16 +141,16 @@ describe("Studio mobile immersive preference", () => {
       'workspaceState.mobileControlSide === "left" ? "left" : "right"',
     );
     expect(studioMobileEditingDockSource).toContain("min-h-11 min-w-11");
-    expect(studioMobileEditingDockSource.match(/touch-pan-x/g)).toHaveLength(2);
-    expect(studioMobileEditingDockSource).toContain("gap-0.5 overflow-x-auto");
-    expect(studioMobileEditingDockSource).toContain("gap-0 overflow-x-auto");
+    expect(studioMobileEditingDockSource).toContain("grid-cols-6");
+    expect(studioMobileEditingDockSource).toContain("[&_button]:min-h-[44px] [&_button]:min-w-[44px]");
+    expect(studioMobileEditingDockSource).not.toContain('data-studio-mobile-dock-scroll="primary"');
     expect(studioGlobalsSource).toContain("[data-studio-mobile-dock-scroll] :focus-visible");
     expect(studioGlobalsSource).toContain("outline-offset: -2px");
   });
 
-  it("measures the primary-action and drawing rows while keeping final canvas pixels scroll-reachable", () => {
-    expect(studioGlobalsSource).toContain("--studio-mobile-dock-compact-height: calc(7rem");
-    expect(studioGlobalsSource).toContain("--studio-mobile-dock-expanded-height: calc(10.5rem");
+  it("measures the single essential row while keeping final canvas pixels scroll-reachable", () => {
+    expect(studioGlobalsSource).toContain("--studio-mobile-dock-compact-height: calc(64px");
+    expect(studioGlobalsSource).toContain("--studio-mobile-dock-expanded-height: var(--studio-mobile-dock-compact-height)");
     expect(studioGlobalsSource).toContain(":root,");
     expect(studioGlobalsSource).toContain(":root:has(");
     expect(studioGlobalsSource).toContain(

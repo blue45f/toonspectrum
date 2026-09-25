@@ -1,3 +1,4 @@
+import { STUDIO_ILLUSTRATION_SCENE_TEMPLATES } from "./catalog/studio-illustration-scene-templates";
 import { STUDIO_AUTHORED_SCENE_TEMPLATES } from "./catalog/studio-authored-scene-templates";
 
 /**
@@ -41,6 +42,7 @@ export type SceneSeedFrame = {
   stroke?: string;
   strokeWidth?: number;
   bgColor?: string;
+  bg?: string;
   dashStyle?: "solid" | "dashed";
 };
 export type SceneSeedBubble = {
@@ -1472,6 +1474,7 @@ export const SCENE_TEMPLATES: SceneTemplate[] = [
     ],
   },
   ...STUDIO_AUTHORED_SCENE_TEMPLATES,
+  ...STUDIO_ILLUSTRATION_SCENE_TEMPLATES,
 ];
 
 /** 카테고리로 템플릿 거르기(미지정이면 전체). */

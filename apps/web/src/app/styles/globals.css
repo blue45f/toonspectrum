@@ -1151,8 +1151,8 @@ body[data-studio-app="true"] .route-stage::before,
 @media (max-width: 63.999rem) {
   :root,
   [data-studio-editor="true"] {
-    --studio-mobile-dock-compact-height: calc(7rem + env(safe-area-inset-bottom));
-    --studio-mobile-dock-expanded-height: calc(10.5rem + env(safe-area-inset-bottom));
+    --studio-mobile-dock-compact-height: calc(64px + env(safe-area-inset-bottom));
+    --studio-mobile-dock-expanded-height: var(--studio-mobile-dock-compact-height);
     --studio-canvas-bottom-inset: max(var(--studio-mobile-dock-expanded-height), var(--studio-mobile-dock-measured-height, 0px));
   }
 

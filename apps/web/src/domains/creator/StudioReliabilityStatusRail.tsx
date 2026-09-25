@@ -34,6 +34,9 @@ import {
 import {
   dismissStudioRejectedStroke,
   restoreStudioRejectedStroke,
+  STUDIO_REJECTED_STROKE_RECOVERY_LIMIT,
+  retryStudioRejectedStrokePersistence,
+  retryStudioRejectedStrokeStorage,
 } from "./studio-rejected-stroke-recovery";
 import {
   describeStudioSafeModeReason,
@@ -43,6 +46,7 @@ import { ensureStudioSafeModeRuntime } from "./studio-safe-mode-runtime";
 import {
   useStudioDestructiveActionRecord,
   useStudioRejectedStrokeRecords,
+  useStudioRejectedStrokeStorageError,
   useStudioReliabilityStatus,
 } from "./use-studio-reliability-status";
 
@@ -137,6 +141,7 @@ export function StudioReliabilityStatusRail() {
   const status = useStudioReliabilityStatus();
   const destructive = useStudioDestructiveActionRecord();
   const rejectedStrokes = useStudioRejectedStrokeRecords();
+  const rejectedStrokeStorageError = useStudioRejectedStrokeStorageError();
   const [detailOpen, setDetailOpen] = useState(false);
   const [rejectedStrokeNotice, setRejectedStrokeNotice] = useState<string | null>(null);
 
@@ -252,7 +257,18 @@ export function StudioReliabilityStatusRail() {
         </div>
       ) : null}
 
-      {rejectedStrokes.map((record) => (
+      {rejectedStrokeStorageError ? (
+        <div role="status" className="pointer-events-auto max-w-[min(30rem,100%)] rounded-lg bg-card/95 px-2.5 py-1.5 text-xs text-warning">
+          {rejectedStrokeStorageError}
+          <button type="button" onClick={retryStudioRejectedStrokeStorage} className="min-h-11 rounded-lg px-3 py-2 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">복구 목록 다시 읽기</button>
+        </div>
+      ) : null}
+      {rejectedStrokes.length > STUDIO_REJECTED_STROKE_RECOVERY_LIMIT ? (
+        <p role="status" className="pointer-events-auto max-w-[min(30rem,100%)] rounded-lg bg-card/95 px-2.5 py-1.5 text-xs text-fg-2">
+          복구할 획 {rejectedStrokes.length}개가 보관돼 있습니다. 최근 {STUDIO_REJECTED_STROKE_RECOVERY_LIMIT}개를 먼저 표시하며, 처리하면 다음 획이 나타납니다.
+        </p>
+      ) : null}
+      {rejectedStrokes.slice(0, STUDIO_REJECTED_STROKE_RECOVERY_LIMIT).map((record) => (
         <div
           key={record.id}
           data-studio-rejected-stroke-notice
@@ -264,7 +280,13 @@ export function StudioReliabilityStatusRail() {
           <span className="min-w-0 flex-1 font-medium leading-relaxed">
             {record.provider} 엔진이 획을 확정하지 못해 미리보기를 중단했습니다. 그린 획은 보존돼 있습니다
             ({record.reason}).
+            {record.durability === "pending" ? " 기기에 복구 원본을 저장하고 있습니다." : null}
+            {record.durability === "saved" ? " 기기에 복구 원본을 저장했습니다." : null}
+            {record.storageError ? ` ${record.storageError}` : null}
           </span>
+          {record.durability === "failed" ? (
+            <button type="button" onClick={() => retryStudioRejectedStrokePersistence(record.id)} className="min-h-11 rounded-lg px-3 py-2 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">복구 원본 저장 재시도</button>
+          ) : null}
           <button
             type="button"
             data-studio-rejected-stroke-restore

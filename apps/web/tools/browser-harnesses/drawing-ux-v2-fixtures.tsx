@@ -43,6 +43,7 @@ export function createMobileProps(
   overrides: Partial<StudioMobileEditingDockProps> = {},
 ): StudioMobileEditingDockProps {
   return {
+    touchPreferences: { twoFinger: "pan-zoom", threeFinger: "undo" },
     activeCatalogBrushId: "gpen",
     activeCatalogBrushName: "G펜",
     activeSavedBrushId: null,

@@ -30,6 +30,7 @@ interface FakeNodeSpec {
   documentRect: Rect;
   viewRect?: Rect;
   canvas?: HTMLCanvasElement;
+  maskCanvas?: HTMLCanvasElement;
 }
 
 function pixelCanvas(width: number, height: number, rgba = [32, 64, 96, 255]): HTMLCanvasElement {
@@ -62,6 +63,12 @@ function fakeStage(specs: readonly FakeNodeSpec[]): {
       getClientRect: (options?: { relativeTo?: unknown }) =>
         options?.relativeTo ? spec.documentRect : (spec.viewRect ?? spec.documentRect),
       toCanvas,
+      ...(spec.maskCanvas ? { getParent: () => ({
+        getAttr: (name: string) => name === "studioLayerMaskOwnerId" ? spec.id : undefined,
+        getClientRect: () => spec.documentRect,
+        getParent: () => null,
+        toCanvas: () => spec.maskCanvas,
+      }) } : {}),
     };
   });
   const stage = {
@@ -100,6 +107,23 @@ async function parseResult(result: Awaited<ReturnType<typeof exportPagePsd>>) {
 }
 
 describe("PSD editable text one-way export", () => {
+  it("자기 마스크가 적용된 픽셀을 PSD로 기록하고 원본 노드를 직접 캡처하지 않는다", async () => {
+    const element: PsdExportEl = { id: "masked", type: "image", x: 0, y: 0, width: 2, height: 2, opacity: 0.5, maskSrc: "data:image/png;base64,MASK" };
+    const { stage, toCanvasById } = fakeStage([{ id: "masked", documentRect: { x: 0, y: 0, width: 2, height: 2 }, maskCanvas: pixelCanvas(2, 2, [12, 34, 56, 64]) }]);
+    const result = await exportPagePsd(stage, [element], 2, 2, 1, { includeBackground: false });
+    initializeCanvas(() => document.createElement("canvas"), (width, height) => ({ width, height, colorSpace: "srgb", data: new Uint8ClampedArray(width * height * 4) }));
+    const parsed = readPsd(await result.blob.arrayBuffer(), { useImageData: true, skipCompositeImageData: true });
+    expect(parsed.children?.[0]?.opacity).toBe(1);
+    expect(Array.from(parsed.children?.[0]?.imageData?.data ?? [])).toEqual(Array.from({ length: 4 }, () => [12, 34, 56, 64]).flat());
+    expect(toCanvasById.get("masked")).not.toHaveBeenCalled();
+    expect(result.lossManifest?.decisions).toContainEqual(expect.objectContaining({ feature: "layer-mask", disposition: "rasterized", count: 1 }));
+  });
+
+  it("마스크 캡처 경계가 없으면 가려진 픽셀을 드러내지 않고 중단한다", async () => {
+    const element: PsdExportEl = { id: "masked", type: "image", x: 0, y: 0, width: 2, height: 2, maskSrc: "data:image/png;base64,MASK" };
+    const { stage } = fakeStage([{ id: "masked", documentRect: { x: 0, y: 0, width: 2, height: 2 } }]);
+    await expect(exportPagePsd(stage, [element], 2, 2, 1, { includeBackground: false })).rejects.toThrow("레이어 마스크의 캡처 경계");
+  });
   it("round-trips a supported horizontal TextEl descriptor on its existing raster layer", async () => {
     const image: PsdExportEl = {
       id: "base",
@@ -435,6 +459,7 @@ describe("PSD export capability and loss preflight", () => {
       height: 100,
       groupId: "group-a",
       maskSrc: "data:image/png;base64,MASK",
+      maskEnabled: false,
       filterMaskSrc: "data:image/png;base64,FILTER_MASK",
       smartFilters: { entries: [{ id: "blur" }] },
       bg3dScene: { version: 1 },
@@ -446,10 +471,8 @@ describe("PSD export capability and loss preflight", () => {
       includeBackground: false,
     });
     expect(result.lossManifest?.decisions).toEqual(expect.arrayContaining([
-      expect.objectContaining({ feature: "groups", disposition: "dropped", count: 1 }),
-      // 마스크는 캡처 노드의 조상(ClipMaskGroup)에 붙어 있어 `node.toCanvas()` 범위 밖이다 —
-      // 브라우저 실측에서 가린 영역이 PSD 레이어에 되살아났다(studio-psd-export.ts 주석 참고).
-      // "픽셀에 합성" 고지는 거짓이므로 dropped 로 고지한다.
+      expect.objectContaining({ feature: "groups", disposition: "preserved", count: 1 }),
+      // 비활성 마스크는 화면에 적용하지 않으며 PSD 마스크 채널은 별도 보존하지 않는다.
       expect.objectContaining({ feature: "layer-mask", disposition: "dropped", count: 1 }),
       expect.objectContaining({ feature: "adjustment-layer", disposition: "rasterized", count: 1 }),
       expect.objectContaining({ feature: "smart-object", disposition: "rasterized", count: 1 }),

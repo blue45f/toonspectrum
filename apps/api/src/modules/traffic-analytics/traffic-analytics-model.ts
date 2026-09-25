@@ -17,10 +17,11 @@ export const TRAFFIC_SHARE_CHANNELS = [
   "copy",
   "qr",
 ] as const;
-export const TRAFFIC_SHARE_OUTCOMES = ["success", "cancelled", "failed"] as const;
+export const TRAFFIC_SHARE_OUTCOMES = ["opened", "completed", "success", "cancelled", "failed"] as const;
 
 export type TrafficShareChannel = (typeof TRAFFIC_SHARE_CHANNELS)[number];
-export type TrafficShareOutcome = (typeof TRAFFIC_SHARE_OUTCOMES)[number];
+export type TrafficSharePayloadOutcome = (typeof TRAFFIC_SHARE_OUTCOMES)[number];
+export type TrafficShareStoredOutcome = "opened" | "completed" | "cancelled" | "failed";
 
 const MAX_PATH_LENGTH = 320;
 const MAX_REFERRER_LENGTH = 256;
@@ -58,6 +59,7 @@ export type TrafficHeartbeatPayload = {
 export type TrafficSharePayload = {
   visitorId?: unknown;
   sessionId?: unknown;
+  path?: unknown;
   sourcePath?: unknown;
   targetPath?: unknown;
   channel?: unknown;
@@ -128,14 +130,14 @@ export function normalizeTrafficShareChannel(
 
 export function normalizeTrafficShareOutcome(
   value: unknown,
-): TrafficShareOutcome {
+): TrafficSharePayloadOutcome {
   if (
     typeof value !== "string"
-    || !TRAFFIC_SHARE_OUTCOMES.includes(value as TrafficShareOutcome)
+    || !TRAFFIC_SHARE_OUTCOMES.includes(value as TrafficSharePayloadOutcome)
   ) {
     throw new BadRequestException("공유 결과가 올바르지 않습니다.");
   }
-  return value as TrafficShareOutcome;
+  return value as TrafficSharePayloadOutcome;
 }
 
 export function normalizeTrafficScreenClass(value: unknown): string {
@@ -168,14 +170,22 @@ export function requireTrafficShareChannel(value: unknown): TrafficShareChannel 
   return value as TrafficShareChannel;
 }
 
-export function requireTrafficShareOutcome(value: unknown): TrafficShareOutcome {
-  if (
-    typeof value !== "string"
-    || !TRAFFIC_SHARE_OUTCOMES.includes(value as TrafficShareOutcome)
-  ) {
-    throw new BadRequestException("공유 결과가 올바르지 않습니다.");
+export function requireTrafficShareOutcome(value: unknown): TrafficSharePayloadOutcome {
+  return normalizeTrafficShareOutcome(value);
+}
+
+export function toStoredTrafficShareOutcome(value: TrafficSharePayloadOutcome): TrafficShareStoredOutcome {
+  // 기존 API의 success는 현재 브라우저와 관리자 집계의 completed와 같은 의미다.
+  return value === "success" ? "completed" : value;
+}
+
+export function normalizeTrafficSharePath(payload: TrafficSharePayload): string {
+  const path = normalizeTrafficPath(payload.path ?? payload.sourcePath);
+  if (payload.path !== undefined && payload.sourcePath !== undefined
+    && path !== normalizeTrafficPath(payload.sourcePath)) {
+    throw new BadRequestException("공유 페이지 경로가 서로 다릅니다.");
   }
-  return value as TrafficShareOutcome;
+  return path;
 }
 
 export function normalizeTrafficPath(value: unknown): string {

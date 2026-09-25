@@ -280,6 +280,13 @@ export const STUDIO_PROCEDURAL_BRUSH_ICON_BY_ID = {
   "material-cobblestone-joints": "grid-2x2",
   "material-knit-cable": "waves",
   "material-wave-seigaiha": "waves",
+  "material-graphite-contour": "pencil",
+  "material-broken-chalk": "square-dashed",
+  "material-flat-gouache": "paint-roller",
+  "material-dry-edge-ink": "pen-tool",
+  "material-foliage-bough": "trees",
+  "material-stitch-ladder": "fence",
+  "material-filbert-bristle": "paintbrush",
 } as const satisfies Readonly<
   Record<StudioBrushPackCatalogId, StudioBrushIconId>
 >;

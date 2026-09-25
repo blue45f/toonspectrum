@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { APPLICATION_STATUS, validateCollaborationApplication } from "../../../../../packages/core/src/collaboration";
 import { CollabField, CollabLogin, CollabNotice, PortfolioLink, collabButton, collabInput, collabPrimary } from "./collaboration-ui";
-import type { CollaborationApplication, CollaborationDetail } from "../../../../../packages/core/src/collaboration";
+import type { ApplicationStatus, CollaborationApplication, CollaborationDetail } from "../../../../../packages/core/src/collaboration";
 import { getApiErrorMessage } from "@/platform/api";
 import { collaborationClient } from "@/platform/collaboration-client";
+import { saveCollaborationOnboarding } from "@/shared/lib/collaboration-onboarding";
 
 import { InterviewScheduleButton } from "./hiring/CreatorMeetingPanel";
 import { HiringSnapshotPanel, HiringSubmissionPanel } from "./hiring/HiringSubmissionPanel";
@@ -28,14 +30,15 @@ export function ApplicationPanel({ data, userId, busy, act }: { data: Collaborat
   if (!userId) return <CollabLogin />;
   if (current && current.status !== "withdrawn") return <section className="rounded-2xl border border-accent/30 bg-accent/5 p-6">
     <h2 className="text-lg font-bold text-fg">내 지원·제안 · {APPLICATION_STATUS[current.status]}</h2>
+    {current.status === "selected" && <p className="mt-3 rounded-xl border border-good/35 bg-good/10 p-3 text-sm font-semibold text-good">합류가 확정됐어요. 작품 접근과 첫 작업은 공고 작성자가 별도 팀 초대로 연결합니다.</p>}
     <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-fg-2">{current.message}</p>
     <p className="mt-3 break-all text-sm text-fg-3">연락처: {current.contact}</p>
     <PortfolioLink url={current.portfolioUrl} />
     <HiringSnapshotPanel postId={post.id} applicationId={current.id} />
     <p className="mt-3 text-xs leading-6 text-fg-3">작성자와 본인만 볼 수 있어요. 협의 중 표시는 계약 체결이나 작업실 접근 권한 부여를 뜻하지 않습니다.</p>
-    <button type="button" disabled={busy} className={`${collabButton} mt-4`} onClick={() => {
+    {current.status !== "selected" && <button type="button" disabled={busy} className={`${collabButton} mt-4`} onClick={() => {
       if (globalThis.confirm("지원을 철회하고 메시지와 연락처를 삭제할까요?")) void act(() => collaborationClient.withdraw(post.id), "지원을 철회하고 연락처를 삭제했어요.");
-    }}>지원 철회</button>
+    }}>지원 철회</button>}
   </section>;
   if (post.status !== "open" || post.expired || post.hidden) return <CollabNotice>이 공고는 현재 새 지원·제안을 받지 않아요.</CollabNotice>;
   return <><HiringSubmissionPanel postId={post.id} postVersion={post.version} busy={busy} act={act} /><form className="space-y-5 rounded-2xl border border-accent/30 bg-panel p-6" onSubmit={(event) => { event.preventDefault(); void apply(); }}>
@@ -49,6 +52,7 @@ export function ApplicationPanel({ data, userId, busy, act }: { data: Collaborat
   </form></>;
 }
 export function ApplicationsPanel({ id, busy, act }: { id: string; busy: boolean; act: CollaborationAction }) {
+  const navigate = useNavigate();
   const [items, setItems] = useState<CollaborationApplication[] | null>(null);
   const [error, setError] = useState("");
   useEffect(() => {
@@ -59,9 +63,29 @@ export function ApplicationsPanel({ id, busy, act }: { id: string; busy: boolean
     }).catch(async (reason) => { const message = await getApiErrorMessage(reason, "지원서를 불러오지 못했어요."); if (!controller.signal.aborted) setError(message); });
     return () => controller.abort();
   }, [id]);
+  async function updateStatus(item: CollaborationApplication, status: Exclude<ApplicationStatus, "withdrawn">) {
+    const selected = status === "selected";
+    const completed = await act(
+      () => collaborationClient.applicationStatus(id, item.id, status),
+      selected ? "합류를 확정했어요. 이제 팀과 작품 권한을 연결해 주세요." : "지원 처리 상태를 변경했어요.",
+    );
+    if (!completed || !selected) return;
+    try {
+      saveCollaborationOnboarding(sessionStorage, {
+        postId: id,
+        applicationId: item.id,
+        candidateUserId: item.userId,
+        candidateName: item.applicantName || "창작자",
+        candidateContact: item.contact,
+      });
+    } catch {
+      // The selected status is already durable; onboarding can continue without browser storage.
+    }
+    navigate(`/team/people?onboard=${encodeURIComponent(item.id)}`);
+  }
   return <section className="rounded-2xl border border-line bg-panel p-6">
     <h2 className="text-xl font-bold text-fg">받은 지원·제안</h2>
-    <p className="mt-2 text-xs leading-6 text-fg-3">작성자 전용 · 최근 200건까지 표시합니다. 지원서를 외부에 공유하지 마세요.</p>
+    <p className="mt-2 text-xs leading-6 text-fg-3">작성자 전용 · 최근 200건까지 표시합니다. 합류 확정 후 사람·권한 화면에서 실제 팀과 작품 접근을 연결합니다.</p>
     {error && <div className="mt-4"><CollabNotice error>{error}</CollabNotice></div>}
     {!items && !error && <p role="status" className="mt-4 text-sm text-fg-3">지원서를 불러오고 있어요.</p>}
     {items?.length === 0 && <p className="mt-5 text-sm text-fg-3">아직 접수된 지원서가 없어요.</p>}
@@ -72,10 +96,12 @@ export function ApplicationsPanel({ id, busy, act }: { id: string; busy: boolean
         <p className="mt-3 break-all text-sm text-fg">연락처: {item.contact}</p>
         <PortfolioLink url={item.portfolioUrl} />
         <HiringSnapshotPanel postId={id} applicationId={item.id} />
-        {item.status !== "declined" && <InterviewScheduleButton applicationId={item.id} candidateId={item.userId} />}
+        {!["declined", "selected"].includes(item.status) && <InterviewScheduleButton applicationId={item.id} candidateId={item.userId} />}
         <CollabField label={`${item.applicantName || "창작자"} 지원 처리 상태`}>
           <select disabled={busy} className={collabInput} value={item.status} onChange={(event) => {
-            void act(() => collaborationClient.applicationStatus(id, item.id, event.target.value), "지원 처리 상태를 변경했어요.");
+            const status = event.target.value as Exclude<ApplicationStatus, "withdrawn">;
+            if (status === "selected" && !globalThis.confirm(`${item.applicantName || "이 지원자"}의 합류를 확정하고 팀 온보딩으로 이동할까요?`)) return;
+            void updateStatus(item, status);
           }}>{Object.entries(APPLICATION_STATUS).filter(([key]) => key !== "withdrawn").map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select>
         </CollabField>
       </>}

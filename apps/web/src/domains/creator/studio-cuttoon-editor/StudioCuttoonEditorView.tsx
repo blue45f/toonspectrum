@@ -24,7 +24,6 @@ import { StudioCuttoonEditorDialogs } from "./StudioCuttoonEditorDialogs";
 import { StudioCuttoonEditorHosts } from "./StudioCuttoonEditorHosts";
 import { StudioCuttoonEditorWorkspace } from "./StudioCuttoonEditorWorkspace";
 import { StudioDrawingAppBar } from "./StudioDrawingAppBar";
-import { StudioDrawingGestureBridge } from "./StudioDrawingGestureBridge";
 import type { StudioCuttoonEditorViewSession } from "./StudioCuttoonEditorViewSession";
 
 import "../studio-shell/studio-visual-identity.css";
@@ -149,7 +148,6 @@ export function StudioCuttoonEditorView(s: StudioCuttoonEditorViewSession) {
       ) : (
         <StudioWorkspaceNavigator />
       )}
-      <StudioDrawingGestureBridge enabled session={s} />
       <StudioCuttoonEditorHosts {...s} />
       <StudioCuttoonEditorDialogs {...s} />
       <Container

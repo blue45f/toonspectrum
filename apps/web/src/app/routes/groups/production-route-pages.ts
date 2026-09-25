@@ -35,6 +35,10 @@ export const StudioPinnedReviewSharePage = lazyRetry(
   "StudioPinnedReviewSharePage",
 );
 
+export const TeamPeoplePage = lazyRetry(
+  () => import("@/domains/creator/production-hub/TeamPeoplePage").then((module) => ({ default: module.TeamPeoplePage })),
+  "TeamPeoplePage",
+);
 export const TeamWorkspacePage = lazyRetry(
   () => import("@/domains/creator/production-hub/TeamWorkspacePage").then((module) => ({ default: module.TeamWorkspacePage })),
   "TeamWorkspacePage",

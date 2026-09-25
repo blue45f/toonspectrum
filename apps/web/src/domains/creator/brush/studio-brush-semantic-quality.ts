@@ -20,6 +20,7 @@ import {
   type StudioBrushRuntimeTexture,
   type StudioBrushRuntimeTip,
 } from "./studio-brush-runtime-contract";
+import type { StudioBrushTipSemanticEvidence } from "./studio-brush-semantic-evidence";
 
 export const STUDIO_BRUSH_RUNTIME_TIP_LABELS_KO: Readonly<
   Record<StudioBrushRuntimeTip, string>
@@ -173,6 +174,10 @@ export interface StudioBrushSemanticAuditInput {
   readonly material?: StudioBrushSemanticMaterialEvidence | null;
   /** Exact planner/dynamics evidence when available. Undefined means “not measured”, not false. */
   readonly pressureResponsive?: boolean;
+  readonly tipEvidence?: StudioBrushTipSemanticEvidence | null;
+  /** 별도 플래너에서 실제 생성한 패턴/건식 스탬프 근거. */
+  readonly patternResponse?: boolean;
+  readonly dryStampResponse?: boolean;
 }
 
 export type StudioBrushSemanticIssueSeverity = "error" | "warning";
@@ -236,7 +241,7 @@ function finiteNonNegative(value: unknown): number {
 
 function combinedClaimText(input: StudioBrushSemanticAuditInput): string {
   return [
-    input.catalogId,
+    // 저장 ID는 재생 호환성을 위해 바꿀 수 없는 내부 키이며 사용자에게 하는 약속이 아니다.
     input.name,
     input.shortName,
     input.hint,
@@ -339,6 +344,7 @@ export function auditStudioBrushSemanticClaims(
 
   const axes = input.axes ?? {};
   const material = input.material ?? {};
+  const tip = input.tipEvidence;
   const previewStyle = input.previewStyle ?? "";
   const supportsWet =
     contract.engine === "watercolor-dabs"
@@ -352,13 +358,16 @@ export function auditStudioBrushSemanticClaims(
     || contract.tip === "bristle"
     || contract.tip === "stamp-pencil"
     || finite01(axes.grain) >= 0.3
+    || tip?.grainTip === true
+    || input.dryStampResponse === true
     || finiteNonNegative(material.grainMultiplierVariance) >= 0.002
     || finiteNonNegative(material.materialAlphaVariance) >= 0.003;
   const supportsBristle =
     contract.engine === "oil-ribbon"
     || contract.texture === "procedural-bristle"
     || contract.tip === "bristle"
-    || finite01(axes.bristle) >= 0.3;
+    || finite01(axes.bristle) >= 0.3
+    || tip?.bristleTip === true;
   const supportsDirectional =
     contract.engine === "oil-ribbon"
     || contract.texture === "procedural-bristle"
@@ -369,7 +378,8 @@ export function auditStudioBrushSemanticClaims(
     || contract.dynamics === "ribbon-pressure"
     || previewStyle === "calligraphy"
     || finite01(axes.anisotropy) >= 0.3
-    || finite01(axes.tiltResponse) >= 0.2;
+    || finite01(axes.tiltResponse) >= 0.2
+    || tip?.directionalTip === true;
   const supportsParticle =
     contract.engine === "particle-scatter"
     || contract.dynamics === "seeded-particles"
@@ -379,7 +389,9 @@ export function auditStudioBrushSemanticClaims(
     || previewStyle === "dots"
     || previewStyle === "glitter"
     || finite01(axes.particleScatter) >= 0.25
-    || finiteNonNegative(material.meanScatterRatio) >= 0.08;
+    || finiteNonNegative(material.meanScatterRatio) >= 0.08
+    // 안료 가루는 넓은 산포와 별개다. 실제 종이 결/미세 공극이 있을 때만 인정한다.
+    || (/(?:가루|알갱이|입자)/u.test(text) && tip?.grainTip === true);
   const supportsGlow =
     contract.engine === "neon-halo"
     || contract.engine === "glow-halo"
@@ -388,11 +400,14 @@ export function auditStudioBrushSemanticClaims(
       contract.texture === "soft-gradient"
       && (contract.tip === "soft-diffuse" || contract.tip === "spark")
     );
-  const supportsTone =
+  const supportsDocumentGrid =
     contract.engine === "screentone-dots"
     || contract.texture === "tone-grid"
-    || contract.dynamics === "global-grid"
-    || previewStyle === "tone";
+    || contract.dynamics === "global-grid";
+  const supportsTone = supportsDocumentGrid
+    || previewStyle === "tone"
+    || input.patternResponse === true
+    || tip?.patternedTip === true;
   const pressureResponsive =
     input.pressureResponsive ?? (
       finite01(axes.pressureResponse) >= 0.1
@@ -406,7 +421,10 @@ export function auditStudioBrushSemanticClaims(
     code: StudioBrushSemanticIssueCode,
     messageKo: string,
   ) => {
-    if (pattern.test(text) && !supported) {
+    const claims = pattern === CLAIM_PATTERNS.particle
+      ? text.replace(/입자\s*(?:간격\s*)?없(?:는|이)/gu, "")
+      : text;
+    if (pattern.test(claims) && !supported) {
       issues.push(issue(input, runtimeBrushId, "warning", code, messageKo));
     }
   };
@@ -449,9 +467,10 @@ export function auditStudioBrushSemanticClaims(
   );
   warn(
     CLAIM_PATTERNS.tone,
-    supportsTone,
+    /(?:문서\s*고정|document[\s-]*fixed|world[\s-]*fixed)/iu.test(text)
+      ? supportsDocumentGrid : supportsTone,
     "tone-claim-without-grid-response",
-    "이름·설명은 망점·해칭·격자를 약속하지만 문서 고정 패턴 응답 근거가 없습니다.",
+    "이름·설명은 망점·해칭·격자를 약속하지만 촉의 무늬 또는 패턴 플래너 근거가 없습니다.",
   );
   warn(
     CLAIM_PATTERNS.pressure,

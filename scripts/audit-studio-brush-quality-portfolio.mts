@@ -22,6 +22,7 @@ import {
   STUDIO_BRUSH_QUALITY_PORTFOLIO,
   STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS,
 } from "../apps/web/src/domains/creator/brush/studio-brush-quality-portfolio";
+import { STUDIO_BRUSH_DEFAULT_PORTFOLIO_COUNTS } from "../apps/web/src/domains/creator/brush/studio-brush-quality-portfolio-counts";
 import { isStudioBrushQuarantinedPresetId } from "../apps/web/src/domains/creator/brush/studio-brush-quarantine";
 
 const outputDirectory = join(
@@ -40,10 +41,28 @@ const expectedListedIds = STUDIO_ALL_BRUSH_CATALOG_ITEMS
   .map((item) => item.id);
 const expectedListedIdSet = new Set(expectedListedIds);
 
-if (productIds.length !== 88) failures.push(`product total is ${productIds.length}, expected 88`);
+if (productIds.length !== STUDIO_BRUSH_DEFAULT_PORTFOLIO_COUNTS.total) {
+  failures.push(
+    `product total is ${productIds.length}, expected ${STUDIO_BRUSH_DEFAULT_PORTFOLIO_COUNTS.total}`,
+  );
+}
 if (new Set(productIds).size !== productIds.length) failures.push("duplicate product ids");
-if (STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint !== 86) failures.push("paint total is not 86");
-if (STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.erase !== 2) failures.push("eraser total is not 2");
+if (
+  STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint
+  !== STUDIO_BRUSH_DEFAULT_PORTFOLIO_COUNTS.paint
+) {
+  failures.push(
+    `paint total is ${STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.paint}, expected ${STUDIO_BRUSH_DEFAULT_PORTFOLIO_COUNTS.paint}`,
+  );
+}
+if (
+  STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.erase
+  !== STUDIO_BRUSH_DEFAULT_PORTFOLIO_COUNTS.erase
+) {
+  failures.push(
+    `eraser total is ${STUDIO_BRUSH_QUALITY_PORTFOLIO_COUNTS.erase}, expected ${STUDIO_BRUSH_DEFAULT_PORTFOLIO_COUNTS.erase}`,
+  );
+}
 
 if (
   STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS.map((item) => item.id).join("\0")

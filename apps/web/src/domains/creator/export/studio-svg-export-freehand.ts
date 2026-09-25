@@ -432,24 +432,14 @@ export function serializeFreehand(
         ?? studioReplaySafeBrushDynamicsSettingsForBrushId(dynamicsPresetId)
     );
     if (causalCoverageMarks) {
-      const approximated = { textureBudgetExhausted: false };
       const exactCoverage = serializeStudioDynamicCoverageMarks(
         ctx,
         causalCoverageMarks,
         strokeOpacity,
         isStudioBoundedFlowPaintModelCompatible(el),
         dynamicMaterialIdentity,
-        approximated,
       );
       if (exactCoverage !== null) {
-        if (approximated.textureBudgetExhausted) {
-          addSkip(
-            ctx,
-            el,
-            "approximated",
-            "문서의 브러시 텍스처 예산을 모두 써서, 이 획은 팁 질감 없이 형태만 그렸어요.",
-          );
-        }
         return exactCoverage;
       }
       addSkip(

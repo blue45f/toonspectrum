@@ -108,6 +108,8 @@ export interface SpawnVitePreviewOptions {
   readonly runner: "pnpm-exec" | "node-vite-bin";
   /** With "node-vite-bin": append the preview's stdout/stderr to this log file. */
   readonly logPath?: string;
+  /** 현재 편집 중인 dist와 분리한 고정 빌드를 검사할 때 사용하는 절대 경로. */
+  readonly outDir?: string;
 }
 
 /** Spawn a strict-port `vite preview` bound to 127.0.0.1 on the given port. */
@@ -115,6 +117,7 @@ export function spawnVitePreview({
   port,
   runner,
   logPath,
+  outDir,
 }: SpawnVitePreviewOptions): ChildProcess {
   const previewArgs = [
     "preview",
@@ -126,6 +129,7 @@ export function spawnVitePreview({
     "--host",
     "127.0.0.1",
   ];
+  if (outDir) previewArgs.push("--outDir", outDir);
   if (runner === "pnpm-exec") {
     return spawn(
       process.platform === "win32" ? "pnpm.cmd" : "pnpm",

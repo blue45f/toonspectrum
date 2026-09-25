@@ -8,6 +8,7 @@ import { applyProductionStudioRevisionLink, createPlanningSnapshot, evaluateHand
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
 import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
+import { ProductionSampleJourneyGuide } from "./ProductionSampleJourneyGuide";
 
 import { ProductionCrewCoverage, ProductionRoleWorkspace } from "./ProductionRoleWorkspace";
 import { ProductionScheduleWorkspace } from "./ProductionScheduleWorkspace";
@@ -1341,6 +1342,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
         <div className="min-w-0 p-4 sm:p-6">
           {project.notice ? <div className={cn("mb-4 rounded-xl border px-3 py-2 text-xs", project.saveState === "error" ? "border-bad/30 bg-bad/10 text-fg" : "border-good/30 bg-good/10 text-fg")} role="status">{project.notice}</div> : null}
+          {project.isDemo ? <ProductionSampleJourneyGuide /> : null}
           <SurfaceContent
             surface={surface}
             aggregate={project.aggregate}

@@ -647,6 +647,34 @@ function materializeConvergedCrdtElement<TElement extends StudioCrdtCompatibleEl
  * Existing CRDT slots are filled in deterministic Yjs order so eraser/pen compositing converges,
  * while non-CRDT layer positions are preserved as far as the existing slot count permits.
  */
+const STUDIO_CRDT_HISTORY_STROKES = new WeakMap<object, {
+  id: string;
+  pageId: string;
+  layerId: string;
+  element: StudioCrdtCompatibleDrawElement;
+}>();
+
+function sameOwnValues(left: object, right: object): boolean {
+  const entries = Object.entries(left);
+  return entries.length === Object.keys(right).length
+    && entries.every(([key, value]) => Object.hasOwn(right, key) && value === Reflect.get(right, key));
+}
+
+// 불변 CRDT 페이로드 하나를 이력 단계마다 복제하지 않는다. 변경된 페이로드는 새 객체이므로
+// 예전 이력과 채널을 혼동하지 않으며, 외부에서 전달한 가변 레코드는 기존 변환을 유지한다.
+function materializeHistoryStroke(record: StudioCrdtStrokeRecord): StudioCrdtCompatibleDrawElement {
+  if (!isStableCrdtPayload(record.payload)) return studioCrdtStrokeToDrawElement(record);
+  const cached = STUDIO_CRDT_HISTORY_STROKES.get(record.payload);
+  if (cached?.id === record.id && cached.pageId === record.pageId && cached.layerId === record.layerId) {
+    return cached.element;
+  }
+  const element = studioCrdtStrokeToDrawElement(record);
+  STUDIO_CRDT_HISTORY_STROKES.set(record.payload, {
+    id: record.id, pageId: record.pageId, layerId: record.layerId, element,
+  });
+  return element;
+}
+
 export function reconcileStudioCrdtPages<
   TElement extends StudioCrdtCompatibleElement,
   TPage extends StudioCrdtCompatiblePage<TElement>,
@@ -671,17 +699,19 @@ export function reconcileStudioCrdtPages<
       }
       const replacement = active[cursor++];
       if (replacement) {
-        nextElements.push(studioCrdtStrokeToDrawElement(replacement) as unknown as TElement);
+        nextElements.push(materializeHistoryStroke(replacement) as unknown as TElement);
       }
-      changed = true;
     }
     while (cursor < active.length) {
       nextElements.push(
-        studioCrdtStrokeToDrawElement(active[cursor++]!) as unknown as TElement
+        materializeHistoryStroke(active[cursor++]!) as unknown as TElement
       );
-      changed = true;
     }
-    return changed ? { ...page, elements: nextElements } : page;
+    const pageChanged = nextElements.length !== page.elements.length
+      || nextElements.some((element, index) => element !== page.elements[index]);
+    if (!pageChanged) return page;
+    changed = true;
+    return { ...page, elements: nextElements };
   });
   return { pages: changed ? nextPages : [...pages], changed };
 }
@@ -722,7 +752,7 @@ export function reconcileStudioCrdtSceneGraphPages<
       if (record.shared3dStage === undefined) delete materialized.shared3dStage;
       else materialized.shared3dStage = record.shared3dStage;
     }
-    return materialized;
+    return source && sameOwnValues(source, materialized) ? source : materialized;
   };
 
   const managedPageIds = new Set<string>();
@@ -745,7 +775,6 @@ export function reconcileStudioCrdtSceneGraphPages<
     (left, right) => left.orderIndex - right.orderIndex || left.id.localeCompare(right.id)
   );
 
-  let topologyChanged = false;
   let pageCursor = 0;
   const orderedPages: TPage[] = [];
   for (const page of pages) {
@@ -755,12 +784,12 @@ export function reconcileStudioCrdtSceneGraphPages<
     }
     const replacement = activePages[pageCursor++];
     if (replacement) orderedPages.push(replacement.page);
-    topologyChanged = true;
   }
   while (pageCursor < activePages.length) {
     orderedPages.push(activePages[pageCursor++]!.page);
-    topologyChanged = true;
   }
+  const topologyChanged = orderedPages.length !== pages.length
+    || orderedPages.some((page, index) => page !== pages[index]);
 
   const pageIdSet = new Set(orderedPages.map((page) => page.id));
   const sourceGroupByKey = new Map<string, {
@@ -940,7 +969,6 @@ export function reconcileStudioCrdtSceneGraphPages<
   const elementPages = orderedPages.map((page) => {
     const active = activeByPage.get(page.id) ?? [];
     let cursor = 0;
-    let pageChanged = false;
     const nextElements: TElement[] = [];
     for (const element of page.elements) {
       if (!managedElementIds.has(element.id)) {
@@ -949,12 +977,12 @@ export function reconcileStudioCrdtSceneGraphPages<
       }
       const replacement = active[cursor++];
       if (replacement) nextElements.push(replacement.element);
-      pageChanged = true;
     }
     while (cursor < active.length) {
       nextElements.push(active[cursor++]!.element);
-      pageChanged = true;
     }
+    const pageChanged = nextElements.length !== page.elements.length
+      || nextElements.some((element, index) => element !== page.elements[index]);
     if (!pageChanged) return page;
     elementChanged = true;
     return { ...page, elements: nextElements };

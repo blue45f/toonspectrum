@@ -19,7 +19,7 @@ const root = "/collaborations/rooms";
 type RoomSummary = Pick<CreatorRoom, "id" | "title" | "kind" | "startsAt" | "endsAt">;
 export function InterviewScheduleButton({ applicationId, candidateId }: { applicationId: string; candidateId: string }) {
   const [open, setOpen] = useState(false), [id, setId] = useState("");
-  return <div className="mt-4 space-y-3"><button className={collabButton} onClick={() => setOpen(!open)}>이 지원자와 면접 예약</button>{open && !id && <MeetingScheduleForm scope={{ kind: "interview", applicationId, teamId: null, participantIds: [candidateId] }} onCreated={setId} />}{id && <Link className={collabButton} href={`/collaborate/workspace?room=${id}`}>예약한 면접 대기실 열기</Link>}</div>;
+  return <div className="mt-4 space-y-3"><button className={collabButton} onClick={() => setOpen(!open)}>이 지원자와 면접 예약</button>{open && !id && <MeetingScheduleForm scope={{ kind: "interview", applicationId, teamId: null, participantIds: [candidateId] }} onCreated={setId} />}{id && <Link className={collabButton} href={`/team/recruiting?room=${id}`}>예약한 면접 대기실 열기</Link>}</div>;
 }
 export function CreatorMeetingPanel({ actor }: { actor: string }) {
   return <MeetingPanelContent key={actor} actor={actor} />;

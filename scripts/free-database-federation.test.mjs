@@ -1,4 +1,7 @@
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
@@ -16,6 +19,23 @@ function clone(value) {
 }
 
 describe("free database federation", () => {
+  it("저장소 밖에서 호출해도 정책과 배포 manifest를 검증한다", () => {
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL("./verify-free-database-federation.mjs", import.meta.url))], {
+      cwd: tmpdir(), encoding: "utf8",
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain("Free database federation verified:");
+  });
+
+  it("MongoDB가 자동 생성하는 식별자와 문자열 작업 ID를 허용한다", () => {
+    const { $jsonSchema: schema } = JSON.parse(readFileSync(
+      new URL("../deploy/federated-data-plane/mongodb/ai-jobs.validator.json", import.meta.url), "utf8",
+    ));
+    expect(schema.additionalProperties).toBe(false);
+    for (const required of schema.required) expect(Object.hasOwn(schema.properties, required)).toBe(true);
+    expect(schema.properties._id.bsonType).toEqual(expect.arrayContaining(["objectId", "string"]));
+  });
+
   it("commits a credential-free maximum-traffic federation", () => {
     expect(validateFreeDatabaseFederation(policy)).toEqual([]);
     expect(readFreeDatabaseFederation()).toEqual(policy);

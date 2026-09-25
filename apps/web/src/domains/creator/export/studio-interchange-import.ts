@@ -296,7 +296,7 @@ export function createStudioInterchangeImportOrchestration(
       });
       if (controller.signal.aborted || documentImportEpochRef.current !== importEpoch) return;
       if (!canApplyStudioMutation(mutationTicket)) return;
-      if (result.elements.length === 0) {
+      if (result.elements.length === 0 && !result.compositeElement) {
         setPsdImportStatus({ tone: "warn", text: psdImportResultMessage(result) });
         return;
       }
@@ -350,10 +350,13 @@ export function createStudioInterchangeImportOrchestration(
       collaborationDocumentLocked ||
       documentImportOperationRef.current !== null
     ) return;
+    const psdRepresentation = pending.kind === "psd" && selectedChoiceId?.endsWith(":composite")
+      ? "composite" as const : "layers" as const;
+    const placementChoiceId = pending.kind === "psd" ? selectedChoiceId?.replace(/:composite$/u, "") : selectedChoiceId;
     const requestedChoice: StudioInterchangeImportChoice | null =
-      selectedChoiceId === "current-page"
+      placementChoiceId === "current-page"
         ? "current-page"
-        : selectedChoiceId === "new-page"
+        : placementChoiceId === "new-page"
           ? "new-page"
           : pending.kind === "will-v1"
             ? willImportChoice
@@ -479,6 +482,7 @@ export function createStudioInterchangeImportOrchestration(
         pages,
         anchorPageId,
         choice: applyChoice,
+        psdRepresentation,
         canvasWidth: CANVAS_W,
         createId: uid,
         createBlankPage: (createId, canvasHeight) => (
@@ -487,6 +491,7 @@ export function createStudioInterchangeImportOrchestration(
         maxEmbeddedBytes: deviceProfile.maxEmbeddedBytes,
         signal: controller.signal,
       });
+      if (controller.signal.aborted || documentImportEpochRef.current !== applyEpoch) return;
       if (!canCommitImport()) return;
       if (!commitImportedPages(draft.pages)) return;
       if (draft.selectedPageId) setCurrentPageId(draft.selectedPageId);

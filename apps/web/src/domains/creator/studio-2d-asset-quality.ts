@@ -1,6 +1,7 @@
 import legacyManifest from "./studio-2d-asset-manifest.json";
 import cc0Manifest from "./studio-2d-cc0-scene-manifest.json";
 import { GENERATED_GPT25_ASSET_METADATA } from "./studio-2d-generated-backgrounds";
+import { STUDIO_ILLUSTRATION_BACKGROUND_METADATA } from "./catalog/studio-illustration-pack";
 
 export interface Studio2dScene {
   readonly id: string;
@@ -33,7 +34,7 @@ export interface Studio2dAssetMetadata {
     readonly notes: readonly string[];
   };
   readonly provenance: {
-    readonly kind: "legacy-catalog" | "poly-haven-cc0" | "gpt-image-2.5";
+    readonly kind: "legacy-catalog" | "poly-haven-cc0" | "gpt-image-2.5" | "built-in-image-gen";
     readonly licenseStatus: "unverified" | "cc0-verified" | "first-party-generated";
     readonly aiLabelInCatalog?: boolean;
     readonly licenseId?: string;
@@ -41,6 +42,7 @@ export interface Studio2dAssetMetadata {
     readonly sourceUrl?: string;
     readonly checkedOn?: string;
     readonly model?: string;
+    readonly modelVersionVerified?: boolean;
     readonly promptHash?: string;
     readonly recipeId?: string;
     readonly generatedAt?: string;
@@ -76,6 +78,7 @@ export const STUDIO_2D_ASSET_METADATA: readonly Studio2dAssetMetadata[] = Object
   ...legacyManifest.assets.filter((asset) => !GENERATED_GPT25_IDS.has(asset.id)),
   ...cc0Manifest.assets,
   ...GENERATED_GPT25_ASSET_METADATA,
+  ...STUDIO_ILLUSTRATION_BACKGROUND_METADATA,
 ] as unknown as Studio2dAssetMetadata[]);
 const byId = new Map(STUDIO_2D_ASSET_METADATA.map((asset) => [asset.id, asset]));
 

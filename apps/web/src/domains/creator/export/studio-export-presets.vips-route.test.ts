@@ -10,6 +10,8 @@
 //    canvaskit-linear 기록치)을 컷오버 경로 그대로 재현한다.
 import { describe, expect, it, vi } from "vitest";
 
+import { renderStudioPresetTiledRegion } from "./studio-preset-tiled-raster";
+
 import {
   PresetVipsUnavailableError,
   exportPresetSlices,
@@ -387,24 +389,29 @@ describe("vips exact provider — 실패 시 다운로드 전에 중단", () => 
     expect(download).not.toHaveBeenCalled();
   });
 
-  it("단일 처리 한계(16384²px) 초과 페이지는 타일 provider 필요 상태로 중단한다", async () => {
-    // 16385×16384 = maxInputPixels + 16384 → out-of-core 라우트.
+  it("단일 처리 한계 초과 페이지를 전체 RGBA 읽기 없이 타일 합성하고 인코딩한다", async () => {
     const loadVipsRuntime = vi.fn();
     const readPageRgba = vi.fn();
-    const createResampledPage = vi.fn();
-    const download = vi.fn();
-    await expect(runPresetExport({
-      pages: [new FakeCanvas(16_385, 16_384)],
-      extra: { loadVipsRuntime, readPageRgba, createResampledPage, download },
-    })).rejects.toMatchObject({
-      name: "PresetVipsUnavailableError",
-      stage: "out-of-core",
-      pageIndex: 0,
+    const page = new FakeCanvas(720, 128);
+    const regions: number[][] = [];
+    Object.assign(page.ctx, { getImageData: (x: number, y: number, width: number, height: number) => {
+      regions.push([x, y, width, height]);
+      return { data: new Uint8ClampedArray(width * height * 4).fill(255) };
+    } });
+    const { result, downloads } = await runPresetExport({
+      pages: [page],
+      extra: {
+        vipsLimits: { singleSurfaceEdgePx: 64, singleSurfacePixels: 4_096, maxInputPixels: 8_192 },
+        loadVipsRuntime, readPageRgba,
+        createResampledPage: (raster) => asCanvas(new FakeCanvas(raster.width, raster.height, "tile")),
+      },
     });
+    expect(result).toMatchObject({ tiledPages: 1, targetWidth: 690, files: 1 });
+    expect(downloads).toHaveLength(1);
+    expect(regions.length).toBeGreaterThan(1);
+    expect(regions.every((region) => (region[2] ?? 0) < page.width)).toBe(true);
     expect(loadVipsRuntime).not.toHaveBeenCalled();
     expect(readPageRgba).not.toHaveBeenCalled();
-    expect(createResampledPage).not.toHaveBeenCalled();
-    expect(download).not.toHaveBeenCalled();
   });
 
   it("규격 폭이 원본 폭 이상이면(업스케일) vips 레인을 쓰지 않는다 — 다운스케일 전용", async () => {
@@ -497,6 +504,27 @@ function psnr(a: Float64Array, b: Float64Array): number {
 }
 
 describe("품질 게이트 — 컷오버 경로가 quality-lab 승자 품질을 그대로 전달한다", () => {
+  it("타일 Lanczos3도 같은 2048→512 상세 카드의 품질 기준을 만족한다", async () => {
+    const src = 2048;
+    const dst = 512;
+    const sourceLuma = detailCardLuma(src);
+    const rgba = lumaToRgba(sourceLuma);
+    const actual = new Float64Array(dst * dst);
+    await renderStudioPresetTiledRegion({
+      kind: "studio-preset-tiled-raster", width: src, height: src,
+      readRegion: ({ x, y, width, height }) => {
+        const bytes = new Uint8Array(width * height * 4);
+        for (let row = 0; row < height; row += 1) bytes.set(rgba.subarray(((y + row) * src + x) * 4, ((y + row) * src + x + width) * 4), row * width * 4);
+        return bytes;
+      },
+    }, dst, dst, { x: 0, y: 0, width: dst, height: dst }, (tile, bytes) => {
+      for (let y = 0; y < tile.height; y += 1) {
+        for (let x = 0; x < tile.width; x += 1) actual[(tile.y + y) * dst + tile.x + x] = (bytes[(y * tile.width + x) * 4] ?? 0) / 255;
+      }
+    });
+    expect(psnr(boxReduce(sourceLuma, src, dst), actual)).toBeGreaterThanOrEqual(26.5);
+  });
+
   it("2048² 페이지를 규격 폭 512로: PSNR > canvaskit-linear 기록치(25.31dB)", async () => {
     const src = 2048;
     const dst = 512;

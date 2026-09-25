@@ -1,3 +1,4 @@
+import { parseStudioPsdSource } from "../export/studio-psd-source";
 import {
   boundedString,
   cloneJsonObject,
@@ -104,7 +105,7 @@ export function studioCrdtLayerGroupKey(pageId: string, groupId: string): string
 const COMMON_SCENE_ELEMENT_KEYS = [
   "name", "hidden", "locked", "noClip", "opacity", "blendMode", "lockAspect", "groupId",
   "clipBelow", "alphaLocked", "maskSrc", "maskEnabled", "layerRole", "layerColor",
-  "emeresSourceId",
+  "emeresSourceId", "psdSource", "psdGroupId", "psdFolderPath", "psdRasterSourceId",
 ] as const;
 
 export const STUDIO_CRDT_SCENE_ELEMENT_KEYS_BY_TYPE: Record<
@@ -400,6 +401,18 @@ export function validateStudioCrdtSceneElementPayload(
         throw new Error(`reference 요소의 ${key} 구조화 필터가 올바르지 않습니다.`);
       }
     }
+  }
+  if ("psdSource" in props && !parseStudioPsdSource(props.psdSource)) {
+    throw new Error("장면 요소의 PSD 원본 참조가 올바르지 않습니다.");
+  }
+  for (const key of ["psdGroupId", "psdRasterSourceId"] as const) {
+    if (key in props && !exactIdentifier(props[key])) throw new Error("PSD 레이어 연결 ID가 올바르지 않습니다.");
+  }
+  if ("psdFolderPath" in props && (!Array.isArray(props.psdFolderPath) || props.psdFolderPath.length > 64
+    || props.psdFolderPath.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry)
+      || !exactIdentifier(entry.id) || !boundedString(entry.name, 512)
+      || Object.keys(entry).some((key) => key !== "id" && key !== "name")))) {
+    throw new Error("PSD 폴더 경로가 올바르지 않습니다.");
   }
   if ("text" in props && !boundedString(props.text)) {
     throw new Error("장면 요소의 텍스트가 올바르지 않습니다.");

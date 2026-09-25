@@ -1,3 +1,5 @@
+import { DEFAULT_PIXEL_SELECTION_HISTORY_LIMITS } from "./studio-pixel-selection-history";
+import { EXACT_SELECTION_MAX_AXIS, EXACT_SELECTION_MAX_PIXELS } from "./selection/studio-selection-exact-mask";
 import { MAGIC_WAND_TRACE_MAX_DIM } from "./studio-magic-wand";
 
 import { STUDIO_SELECTION_BORDER_MAX_WIDTH_PX, type StudioSelectionBorderOptions } from "./studio-selection-border";
@@ -18,9 +20,9 @@ export const STUDIO_COLOR_RANGE_WORKER_MAX_PIXELS =
  * stale cached chunks and protocol regressions must not be able to inject an unbounded selection
  * graph into React/Konva state.
  */
-export const STUDIO_COLOR_RANGE_WORKER_MAX_SUBPATHS = 128;
-export const STUDIO_COLOR_RANGE_WORKER_MAX_POINTS_PER_SUBPATH = 4_096;
-export const STUDIO_COLOR_RANGE_WORKER_MAX_POINTS = 8_192;
+export const STUDIO_COLOR_RANGE_WORKER_MAX_SUBPATHS = DEFAULT_PIXEL_SELECTION_HISTORY_LIMITS.maxSubpathsPerSnapshot;
+export const STUDIO_COLOR_RANGE_WORKER_MAX_POINTS_PER_SUBPATH = DEFAULT_PIXEL_SELECTION_HISTORY_LIMITS.maxPointsPerSubpath;
+export const STUDIO_COLOR_RANGE_WORKER_MAX_POINTS = DEFAULT_PIXEL_SELECTION_HISTORY_LIMITS.maxPointsPerSnapshot;
 export const STUDIO_COLOR_RANGE_WORKER_MAX_FEATHER_PX = 60;
 export const STUDIO_COLOR_RANGE_WORKER_MAX_BRUSH_RADIUS = 4;
 const STUDIO_COLOR_RANGE_WORKER_POINT_MIN = -0.25;
@@ -180,7 +182,8 @@ export function studioColorRangeRequestTransfers(
 export function assertStudioSelectionBorderWorkerRequest(request: StudioSelectionBorderWorkerRunRequest): void {
   if (!Number.isSafeInteger(request.width) || !Number.isSafeInteger(request.height)
     || request.width < 1 || request.height < 1
-    || request.width > MAGIC_WAND_TRACE_MAX_DIM || request.height > MAGIC_WAND_TRACE_MAX_DIM
+    || request.width > EXACT_SELECTION_MAX_AXIS || request.height > EXACT_SELECTION_MAX_AXIS
+    || request.width * request.height > EXACT_SELECTION_MAX_PIXELS
     || !isStudioColorRangeWorkerSelection(request.selection) || request.selection === null
     || !Number.isFinite(request.widthPx) || request.widthPx <= 0 || request.widthPx > STUDIO_SELECTION_BORDER_MAX_WIDTH_PX
     || !["inside", "center", "outside"].includes(request.placement)

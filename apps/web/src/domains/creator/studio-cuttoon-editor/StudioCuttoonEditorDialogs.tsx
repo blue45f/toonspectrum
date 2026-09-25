@@ -331,7 +331,9 @@ export function StudioCuttoonEditorDialogs(s: StudioCuttoonEditorViewSession) {
       <Suspense fallback={null}>
         <LazyStudioInterchangeLossPreviewDialog
           open
+          key={pendingInterchangeImport.fileName}
           preview={pendingInterchangeImport.preview}
+          psdResult={pendingInterchangeImport.kind === "psd" ? pendingInterchangeImport.result : undefined}
           busy={interchangeImportBusy}
           confirmLabel={
             pendingInterchangeImport.kind === "cbz"

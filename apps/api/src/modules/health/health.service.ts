@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { Inject, Injectable, Optional } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 
@@ -64,6 +66,49 @@ export interface HealthReadinessReport {
   readonly durableQueueExecutor: boolean;
 }
 
+export type HealthCapabilityState = "available" | "unavailable";
+
+export interface HealthCapabilityReport {
+  readonly status: "available" | "degraded";
+  readonly incidentId: string | null;
+  readonly capabilities: {
+    readonly publicCatalog: HealthCapabilityState;
+    readonly authSession: HealthCapabilityState;
+    readonly communityRead: HealthCapabilityState;
+    readonly communityWrite: HealthCapabilityState;
+    readonly marketplaceRead: HealthCapabilityState;
+    readonly studioLocalEditing: HealthCapabilityState;
+    readonly studioProjectRead: HealthCapabilityState;
+    readonly studioCloudSave: HealthCapabilityState;
+    readonly realtimeCollaboration: HealthCapabilityState;
+    readonly publishing: HealthCapabilityState;
+    readonly serverAi: HealthCapabilityState;
+  };
+  readonly failedChecks: readonly string[];
+  readonly checkedAt: string;
+}
+
+const READINESS_CHECKS = [
+  "database",
+  "schema",
+  "realtime",
+  "objectStorage",
+  "coordination",
+  "durableQueueExecutor",
+] as const;
+
+function state(value: boolean): HealthCapabilityState {
+  return value ? "available" : "unavailable";
+}
+
+function incidentId(failedChecks: readonly string[]): string | null {
+  if (failedChecks.length === 0) return null;
+  return `svc-${createHash("sha256")
+    .update(JSON.stringify(failedChecks))
+    .digest("hex")
+    .slice(0, 16)}`;
+}
+
 @Injectable()
 export class HealthService {
   constructor(
@@ -92,22 +137,21 @@ export class HealthService {
       this.repository.isDatabaseReachable(),
     );
     const schema =
-      database &&
-      (await this.safeCheck(() => this.repository.isSchemaReady())) &&
-      (await this.isAnalyticsSchemaReady());
+      database
+      && (await this.safeCheck(() => this.repository.isSchemaReady()))
+      && (await this.isAnalyticsSchemaReady());
     const realtime = this.isRealtimeReady();
     const objectStorage = await this.isObjectStorageReady();
     const coordination = await this.isCoordinationReady();
-    const durableQueueExecutor =
-      await this.isDurableQueueExecutorReady();
+    const durableQueueExecutor = await this.isDurableQueueExecutorReady();
     return {
       ready:
-        database &&
-        schema &&
-        realtime &&
-        objectStorage &&
-        coordination &&
-        durableQueueExecutor,
+        database
+        && schema
+        && realtime
+        && objectStorage
+        && coordination
+        && durableQueueExecutor,
       database,
       schema,
       realtime,
@@ -117,23 +161,54 @@ export class HealthService {
     };
   }
 
+  async checkCapabilities(): Promise<HealthCapabilityReport> {
+    const readiness = await this.checkReadiness();
+    const databaseFeatures = readiness.database && readiness.schema;
+    const objectBackedFeatures = databaseFeatures && readiness.objectStorage;
+    const failedChecks = READINESS_CHECKS.filter(
+      (key) => readiness[key] !== true,
+    );
+    const capabilities = {
+      publicCatalog: "available",
+      authSession: "available",
+      communityRead: state(databaseFeatures),
+      communityWrite: state(databaseFeatures),
+      marketplaceRead: state(objectBackedFeatures),
+      studioLocalEditing: "available",
+      studioProjectRead: state(databaseFeatures),
+      studioCloudSave: state(objectBackedFeatures),
+      realtimeCollaboration: state(readiness.realtime),
+      publishing: state(objectBackedFeatures),
+      serverAi: "available",
+    } as const;
+    const degraded = Object.values(capabilities).some(
+      (value) => value === "unavailable",
+    );
+    return {
+      status: degraded ? "degraded" : "available",
+      incidentId: incidentId(failedChecks),
+      capabilities,
+      failedChecks,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
   private isRealtimeReady(): boolean {
     try {
       const config = resolveStudioLiveClusterAdapterConfig(this.environment);
       if (config.mode === "memory") return true;
       return this.runtime.isStudioLivePostgresNamespaceReady();
     } catch {
-      // Invalid/missing direct PostgreSQL configuration must never be treated as a local fallback.
       return false;
     }
   }
 
   private async isAnalyticsSchemaReady(): Promise<boolean> {
     if (this.environment.TRAFFIC_ANALYTICS_STORE !== "d1") return true;
-    // 실시간 전용 앱에 분석 controller를 등록하지 않고 현재 앱의 repository를 확인한다.
     return this.safeCheck(async () => {
       const repository = this.moduleRef?.get<TrafficAnalyticsRepository>(
-        TRAFFIC_ANALYTICS_REPOSITORY, { strict: false },
+        TRAFFIC_ANALYTICS_REPOSITORY,
+        { strict: false },
       );
       return repository ? repository.checkHealth() : false;
     });
@@ -143,7 +218,6 @@ export class HealthService {
     try {
       return (await check()) === true;
     } catch {
-      // Database driver/schema errors stay inside the process and never enter the public response.
       return false;
     }
   }
@@ -156,12 +230,9 @@ export class HealthService {
     const objectStorage = this.objectStorage;
     if (!objectStorage) return false;
     return this.safeCheck(async () => {
-      const readiness =
-        await objectStorage.verifyPrivatePurposeBuckets();
-      return (
-        readiness?.ready === true &&
-        readiness.privatePurposeBuckets === 3
-      );
+      const readiness = await objectStorage.verifyPrivatePurposeBuckets();
+      return readiness?.ready === true
+        && readiness.privatePurposeBuckets === 3;
     });
   }
 
@@ -175,10 +246,6 @@ export class HealthService {
       if (!backendDistributionRequired && !authDistributionRequired) {
         return true;
       }
-
-      // The module graph is built from this same canonical parser, but configuration validity is
-      // not reachability. Any distributed backend or auth limiter advertises readiness only after
-      // a bounded, authenticated Redis PING succeeds through the shared coordination boundary.
       if (resolveUpstashCoordinationConfig(this.environment) === null) {
         return false;
       }
@@ -192,9 +259,6 @@ export class HealthService {
 
   private async isDurableQueueExecutorReady(): Promise<boolean> {
     const executor = this.backendCapabilityExecutor;
-    // The authoritative API may omit a queue adapter only while no durable-queue
-    // provider role is enabled. Enabling that role without wiring its port is a
-    // deployment error and must fail readiness rather than fail at first dispatch.
     if (!executor) return true;
     if (!executor.isDurableQueueExecutorRequired()) return true;
     if (!executor.hasDurableQueueExecutor()) return false;
