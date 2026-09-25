@@ -77,7 +77,12 @@ export class CreatorIntelligenceController {
     @Query("page") page?: string,
     @Query("media") media?: string,
   ) {
-    return this.execute(() => this.core.searchReferences(provider, query, page, media));
+    return this.execute(() => this.core.searchReferences(
+      provider,
+      query,
+      page,
+      media,
+    ));
   }
 
   @Get("scene")
@@ -146,13 +151,23 @@ export class CreatorIntelligenceController {
 
   @Post("mesh/jobs")
   @Header("Cache-Control", "private, no-store")
-  meshCreate(
+  async meshCreate(
     @Headers("x-user-id") userId: string | undefined,
     @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body() body: Record<string, unknown>,
   ) {
-    this.admission.admit("mesh-create", userId, idempotencyKey);
-    return this.execute(() => this.core.createMeshyJob(body));
+    const actorId = this.admission.admit(
+      "mesh-create",
+      userId,
+      idempotencyKey,
+    );
+    const result = await this.execute(() => this.core.createMeshyJob(body));
+    return result.status === "ready" && typeof result.jobId === "string"
+      ? {
+        ...result,
+        jobId: this.admission.wrapMeshJob(actorId, result.jobId),
+      }
+      : result;
   }
 
   @Get("mesh/jobs/:jobId")
@@ -161,8 +176,9 @@ export class CreatorIntelligenceController {
     @Headers("x-user-id") userId: string | undefined,
     @Param("jobId") jobId: string,
   ) {
-    this.admission.admit("mesh-status", userId);
-    return this.execute(() => this.core.getMeshyJob(jobId));
+    const actorId = this.admission.admit("mesh-status", userId);
+    const providerJobId = this.admission.unwrapMeshJob(actorId, jobId);
+    return this.execute(() => this.core.getMeshyJob(providerJobId));
   }
 
   @Post("preflight/safe-search")
