@@ -80,6 +80,8 @@ describe("traffic analytics privacy boundaries", () => {
     expect(requireTrafficShareChannel("kakao")).toBe("kakao");
     expect(requireTrafficShareChannel("copy")).toBe("copy");
     expect(requireTrafficShareOutcome("success")).toBe("success");
+    expect(requireTrafficShareOutcome("opened")).toBe("opened");
+    expect(requireTrafficShareOutcome("completed")).toBe("completed");
     expect(requireTrafficShareOutcome("failed")).toBe("failed");
     expect(requireTrafficShareOutcome("cancelled")).toBe("cancelled");
 
@@ -89,7 +91,7 @@ describe("traffic analytics privacy boundaries", () => {
     expect(() => requireTrafficShareChannel(undefined)).toThrow(
       "공유 채널이 올바르지 않습니다.",
     );
-    expect(() => requireTrafficShareOutcome("completed")).toThrow(
+    expect(() => requireTrafficShareOutcome("unknown")).toThrow(
       "공유 결과가 올바르지 않습니다.",
     );
   });

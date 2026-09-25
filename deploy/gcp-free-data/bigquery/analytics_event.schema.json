@@ -1,0 +1,12 @@
+[
+  { "name": "event_timestamp", "type": "TIMESTAMP", "mode": "REQUIRED" },
+  { "name": "event_id", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "event_name", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "actor_hash", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "session_hash", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "route_id", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "provider_id", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "shard_id", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "properties_json", "type": "STRING", "mode": "NULLABLE" },
+  { "name": "received_at", "type": "TIMESTAMP", "mode": "REQUIRED" }
+]

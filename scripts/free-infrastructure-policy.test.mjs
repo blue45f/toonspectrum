@@ -108,9 +108,17 @@ describe("free infrastructure policy", () => {
     expect(Object.keys(policy.workloads).length).toBeGreaterThanOrEqual(20);
     expect(policy.authorities).toMatchObject({
       staticWeb: "cloudflare-static-assets",
-      transactionalDatabase: "neon-postgres",
+      transactionalDatabase: "cockroachdb-basic",
+      identityDatabase: "tidb-identity",
+      projectDatabase: "tidb-projects",
+      commerceDatabase: "tidb-commerce",
+      collaborationDatabase: "tidb-collaboration",
+      notificationDatabase: "firestore-free",
+      presenceDatabase: "firebase-rtdb-free",
+      analyticsDatabase: "bigquery-sandbox",
+      analyticsIngestDatabase: "cloudflare-d1",
       derivedReadModels: "turso-libsql",
-      socialDatabase: "supabase-social",
+      socialDatabase: "tidb-community",
       playgroundDatabase: "supabase-playground",
       batchCompute: "local-m2-runner",
     });

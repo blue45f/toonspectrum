@@ -217,6 +217,9 @@ jobs:
       - name: Restore generated BG3D pack for studio-3d regressions
         if: matrix.shard == 'studio-3d'
         run: git sparse-checkout add /apps/web/public/assets/3d/environments/mcp-free-v1/
+      - name: Restore documentation inputs for product contracts
+        if: matrix.shard == 'product'
+        run: node scripts/restore-documentation-checkout.mjs
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:

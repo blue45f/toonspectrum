@@ -80,6 +80,12 @@ export function validateDocumentation() {
   const pinnedSet = new Set(config.pinnedEnglishDocuments.map(normalize));
   const historicalSet = new Set((config.historicalDocuments ?? []).map(normalize));
 
+  for (const file of [...currentSet, ...generatedSet, ...pinnedSet, ...historicalSet]) {
+    if (file.split("/").includes("node_modules")) {
+      failures.push(`문서 원장에는 의존성 설치 경로를 등록할 수 없습니다: ${file} (config/documentation-authority.json에서 해당 항목을 제거하세요)`);
+    }
+  }
+
   for (const forbidden of config.forbiddenPaths) {
     if (existsSync(path.join(ROOT, forbidden))) failures.push(`폐기 경로가 다시 생겼습니다: ${forbidden}`);
   }

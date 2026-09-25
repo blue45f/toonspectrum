@@ -109,6 +109,7 @@ apps/api/
   src/
     modules/          기능 모듈과 HTTP/WebSocket 경계
     infrastructure/   외부 서비스·DB·object storage adapter
+    platform/         신규 federation 연결 정책(현재 기본 비활성)
     db/               schema, migration, seed
     server/           modules/platform으로 이전 중인 레거시 유스케이스
     common/           축소 중인 레거시 공용 계층

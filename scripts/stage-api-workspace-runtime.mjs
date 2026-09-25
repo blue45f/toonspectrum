@@ -32,6 +32,7 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
       "./creator-role": "./creator-role.js",
       "./creator-resources": "./creator-resources.js",
       "./production": "./production/index.js",
+      "./infrastructure-fabric": "./infrastructure-fabric.js",
     },
     subpathEntries: [
       {
@@ -45,6 +46,10 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
       {
         target: "creator-resources.js",
         compiledEntry: "packages/core/src/creator-resources.js",
+      },
+      {
+        target: "infrastructure-fabric.js",
+        compiledEntry: "packages/core/src/infrastructure-fabric.js",
       },
     ],
   },

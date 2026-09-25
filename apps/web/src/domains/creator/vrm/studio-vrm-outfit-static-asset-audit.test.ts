@@ -90,9 +90,9 @@ describe("legacy static outfit GLB authority audit", () => {
     const auditPath = join(process.cwd(), "apps/web/public", "assets", "3d", "outfits", "README.md");
     expect(existsSync(auditPath)).toBe(true);
     const audit = readFileSync(auditPath, "utf8");
-    expect(audit).toContain("not** the wardrobe assets shown");
+    expect(audit).toContain("**역사적 참조 자산, 제품 wardrobe 아님**");
     expect(audit).toContain("studio-vrm-skinned-garment.ts");
-    expect(audit).toContain("inverse-bind matrices");
+    expect(audit).toContain("inverse-bind matrix");
   });
 
   it("uses the tested measured, multi-part wardrobe generator for selectable items", () => {

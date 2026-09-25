@@ -138,8 +138,17 @@ const envSchema = z.object({
     .optional(),
   OAUTH_REDIRECT_BASE_URL: z.url().optional(),
   WEB_APP_BASE_URL: z.url().optional(),
-  // PostgreSQL(Neon) 연결 문자열. 미설정 시 로컬 docker 폴백(apps/api/src/db).
+  // 계정·권한·작품 저장의 트랜잭션 원장. 독립 분석 저장소와 별도로 사용한다.
   DATABASE_URL: z.string().min(1).optional(),
+  TRAFFIC_ANALYTICS_STORE: z.enum(["postgres", "d1"]).optional(),
+  TRAFFIC_ANALYTICS_D1_RPC_URL: z.url().optional(),
+  TRAFFIC_ANALYTICS_D1_RPC_TOKEN: z.string().min(32).max(4_096).optional(),
+  TRAFFIC_ANALYTICS_D1_TIMEOUT_MS: boundedPositiveInteger(
+    "TRAFFIC_ANALYTICS_D1_TIMEOUT_MS", 100, 30_000,
+  ).optional(),
+  // 후보 공급자 배치 계획만 계산한다. 실제 데이터 repository 활성화 설정과 구분한다.
+  FEDERATED_DATA_PLANE_ENABLED: z.enum(["true", "false"]).optional(),
+  FEDERATED_DATA_PLANE_QUOTA_SNAPSHOTS_JSON: z.string().min(2).max(262_144).optional(),
   WEBDEX_PG_POOL_MAX: boundedPositiveInteger(
     "WEBDEX_PG_POOL_MAX",
     1,
@@ -537,6 +546,8 @@ const SECRET_KEYS: ReadonlyArray<keyof ValidatedEnv> = [
   "AUTH_STATE_SECRET",
   "CLOUDFLARE_EDGE_ORIGIN_SECRET",
   "DATABASE_URL",
+  "TRAFFIC_ANALYTICS_D1_RPC_TOKEN",
+  "FEDERATED_DATA_PLANE_QUOTA_SNAPSHOTS_JSON",
   "STUDIO_LIVE_POSTGRES_URL",
   "STUDIO_LIVE_POSTGRES_INTEGRATION_URL",
   "STUDIO_TEAM_COMMENT_POSTGRES_INTEGRATION_URL",

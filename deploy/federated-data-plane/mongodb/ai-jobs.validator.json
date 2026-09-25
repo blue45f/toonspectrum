@@ -1,0 +1,29 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": [
+      "_id",
+      "ownerId",
+      "jobType",
+      "status",
+      "sourceVersion",
+      "createdAt",
+      "updatedAt"
+    ],
+    "properties": {
+      "_id": { "bsonType": ["objectId", "string"] },
+      "ownerId": { "bsonType": "string", "maxLength": 191 },
+      "jobType": { "bsonType": "string", "maxLength": 120 },
+      "status": {
+        "enum": ["queued", "running", "succeeded", "failed", "cancelled"]
+      },
+      "sourceVersion": { "bsonType": "long", "minimum": 0 },
+      "providerPayload": { "bsonType": ["object", "null"] },
+      "moderationEvidence": { "bsonType": ["array", "null"] },
+      "createdAt": { "bsonType": "date" },
+      "updatedAt": { "bsonType": "date" },
+      "expiresAt": { "bsonType": ["date", "null"] }
+    },
+    "additionalProperties": false
+  }
+}
