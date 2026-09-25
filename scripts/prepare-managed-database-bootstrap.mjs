@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -410,17 +410,54 @@ export function parseManagedBootstrapArguments(argv) {
   };
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+export function writeManagedBootstrapBundle(outputDirectory, bundle, { writeFile = writeFileSync } = {}) {
+  const output = resolve(outputDirectory);
+  // 빈 디렉터리라도 기존 경로는 재사용하지 않는다. 이전 번들과 섞이지 않게 먼저 예약한다.
+  mkdirSync(output, { mode: 0o700 });
+  const directoryIdentity = lstatSync(output);
+  const created = [];
+  const sameFile = (actual, expected) => actual.dev === expected.dev && actual.ino === expected.ino;
   try {
-    const options = parseManagedBootstrapArguments(process.argv.slice(2));
-    const bundle = prepareManagedBootstrap({ ...options, schemaDump: readFileSync(resolve(options.schemaFile), "utf8") });
-    const output = resolve(options.outputDirectory);
-    mkdirSync(output, { mode: 0o700 });
     for (const [name, contents] of [
       ["managed-bootstrap.sql", bundle.sql],
       ["final-verification.sql", bundle.verificationSql],
       ["preparation-report.json", `${JSON.stringify(bundle.report, null, 2)}\n`],
-    ]) writeFileSync(resolve(output, name), contents, { mode: 0o600, flag: "wx" });
+    ]) {
+      const path = resolve(output, name);
+      const descriptor = openSync(path, "wx", 0o600);
+      try {
+        // 부분 쓰기가 실패해도 소유한 inode를 알고 있어야 안전하게 정리할 수 있다.
+        created.push({ path, identity: fstatSync(descriptor) });
+        writeFile(descriptor, contents);
+      } finally {
+        closeSync(descriptor);
+      }
+    }
+  } catch (error) {
+    let cleanupFailed = false;
+    for (const file of created.reverse()) {
+      try {
+        if (sameFile(lstatSync(file.path), file.identity)) unlinkSync(file.path);
+      } catch (cleanupError) {
+        if (cleanupError.code !== "ENOENT") cleanupFailed = true;
+      }
+    }
+    try {
+      // 재귀 삭제하지 않는다. 다른 실행이 추가한 파일이나 교체한 디렉터리는 보존한다.
+      if (sameFile(lstatSync(output), directoryIdentity)) rmdirSync(output);
+    } catch (cleanupError) {
+      if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(cleanupError.code)) cleanupFailed = true;
+    }
+    if (cleanupFailed) fail("번들 생성과 이번 파일 정리에 실패했습니다. 출력 경로를 검토한 뒤 새 디렉터리를 지정하세요.");
+    throw error;
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    const options = parseManagedBootstrapArguments(process.argv.slice(2));
+    const bundle = prepareManagedBootstrap({ ...options, schemaDump: readFileSync(resolve(options.schemaFile), "utf8") });
+    writeManagedBootstrapBundle(options.outputDirectory, bundle);
     process.stdout.write(`${JSON.stringify(bundle.report, null, 2)}\n`);
   } catch (error) {
     // 파일/드라이버 예외 원문에 연결정보가 섞이지 않도록 알려진 검증 오류만 출력한다.

@@ -54,11 +54,18 @@ function run(command, args, { allowFailure = false, cwd = REPOSITORY_ROOT } = {}
   };
 }
 
-function runJson(command, args, options) {
-  const result = run(command, args, options);
-  if (!result.ok) return null;
+function runJson(command, args, { missingPattern } = {}) {
+  const result = run(command, args, { allowFailure: Boolean(missingPattern) });
+  if (!result.ok) {
+    if (missingPattern?.test(`${result.stderr}\n${result.stdout}`)) return null;
+    fail(`${command} 기존 자원을 확인하지 못했습니다. 조회 권한과 API 상태를 확인한 뒤 --check로 다시 검증하세요.`);
+  }
   try {
-    return JSON.parse(result.stdout);
+    const parsed = JSON.parse(result.stdout);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      fail(`${command} 자원 조회 응답이 객체가 아닙니다. --check로 조회 계약을 확인하세요.`);
+    }
+    return parsed;
   } catch (error) {
     fail(`${command} returned invalid JSON`, error);
   }
@@ -77,7 +84,7 @@ function assertBillingDisabled() {
   }
 }
 
-function firestoreDatabase({ allowFailure = false } = {}) {
+function firestoreDatabase({ allowMissing = false } = {}) {
   return runJson("gcloud", [
     "firestore",
     "databases",
@@ -85,7 +92,7 @@ function firestoreDatabase({ allowFailure = false } = {}) {
     "--database=(default)",
     `--project=${PROJECT_ID}`,
     "--format=json",
-  ], { allowFailure });
+  ], { missingPattern: allowMissing ? /\bNOT_FOUND\b/u : undefined });
 }
 
 function realtimeDatabaseInstances() {
@@ -98,13 +105,13 @@ function realtimeDatabaseInstances() {
   return Array.isArray(result?.result) ? result.result : [];
 }
 
-function bigQueryResource(resource, { allowFailure = false } = {}) {
+function bigQueryResource(resource, { allowMissing = false } = {}) {
   return runJson("bq", [
     `--project_id=${PROJECT_ID}`,
     "show",
     "--format=prettyjson",
     resource,
-  ], { allowFailure });
+  ], { missingPattern: allowMissing ? /\bNot found: (?:Dataset|Table)\b/iu : undefined });
 }
 
 function assertFirestore(database) {
@@ -171,8 +178,7 @@ export function checkGcpFreeDataPlane() {
   });
 }
 
-function ensureFirestore() {
-  const database = firestoreDatabase({ allowFailure: true });
+function ensureFirestore(database) {
   if (database) return;
   run("gcloud", [
     "firestore",
@@ -200,19 +206,9 @@ function ensureFirebaseProject() {
   ]);
 }
 
-function requireRealtimeDatabase() {
-  const exists = realtimeDatabaseInstances().some((entry) =>
-    entry.name === RTDB_INSTANCE);
-  if (!exists) {
-    fail(
-      "The first Spark Realtime Database must be created interactively with firebase init database",
-    );
-  }
-}
-
-function ensureDataset() {
+function ensureDataset(existing) {
   const dataset = `${PROJECT_ID}:${DATASET_ID}`;
-  if (bigQueryResource(dataset, { allowFailure: true })) return;
+  if (existing) return;
   run("bq", [
     `--project_id=${PROJECT_ID}`,
     `--location=${FIRESTORE_LOCATION}`,
@@ -224,9 +220,9 @@ function ensureDataset() {
   ]);
 }
 
-function ensureTable(tableId, schemaFile, partitionField, clusteringFields) {
+function ensureTable(tableId, schemaFile, partitionField, clusteringFields, existing) {
   const resource = `${PROJECT_ID}:${DATASET_ID}.${tableId}`;
-  if (bigQueryResource(resource, { allowFailure: true })) return;
+  if (existing) return;
   run("bq", [
     `--project_id=${PROJECT_ID}`,
     "mk",
@@ -240,11 +236,11 @@ function ensureTable(tableId, schemaFile, partitionField, clusteringFields) {
   ]);
 }
 
-function deployDenyAllRules() {
+function deployNewFirestoreRules() {
   run("firebase", [
     "deploy",
     "--only",
-    "database,firestore:rules,firestore:indexes",
+    "firestore:rules,firestore:indexes",
     "--config",
     FIREBASE_CONFIG,
     "--project",
@@ -252,6 +248,26 @@ function deployDenyAllRules() {
     "--non-interactive",
     "--json",
   ]);
+}
+
+function preflightExistingResources() {
+  // API 활성화·자원 생성·규칙 배포보다 먼저 기존 자원의 전체 검증 계약을 확인한다.
+  // 조회 실패는 명시적 NOT_FOUND인 경우에만 부재로 인정한다.
+  const firestore = firestoreDatabase({ allowMissing: true });
+  if (firestore) assertFirestore(firestore);
+  const instances = realtimeDatabaseInstances();
+  if (!instances.some((entry) => entry.name === RTDB_INSTANCE)) {
+    fail("최초 Spark Realtime Database는 firebase init database로 만든 뒤 --check로 확인하세요.");
+  }
+  assertRealtimeDatabase(instances);
+  const resource = `${PROJECT_ID}:${DATASET_ID}`;
+  const dataset = bigQueryResource(resource, { allowMissing: true });
+  if (dataset) assertDataset(dataset);
+  const analytics = bigQueryResource(`${resource}.analytics_event`, { allowMissing: true });
+  if (analytics) assertPartitionedTable(analytics, "event_timestamp", ["event_name", "provider_id"]);
+  const quota = bigQueryResource(`${resource}.provider_quota_snapshot`, { allowMissing: true });
+  if (quota) assertPartitionedTable(quota, "observed_at", ["provider_id", "shard_id"]);
+  return { firestore, dataset, analytics, quota };
 }
 
 export function applyGcpFreeDataPlane(environment = process.env) {
@@ -264,6 +280,7 @@ export function applyGcpFreeDataPlane(environment = process.env) {
     );
   }
   assertBillingDisabled();
+  const existing = preflightExistingResources();
   run("gcloud", [
     "services",
     "enable",
@@ -274,31 +291,39 @@ export function applyGcpFreeDataPlane(environment = process.env) {
     `--project=${PROJECT_ID}`,
     "--quiet",
   ]);
-  ensureFirestore();
+  ensureFirestore(existing.firestore);
   ensureFirebaseProject();
-  requireRealtimeDatabase();
-  ensureDataset();
+  ensureDataset(existing.dataset);
   ensureTable(
     "analytics_event",
     "analytics_event.schema.json",
     "event_timestamp",
     ["event_name", "provider_id"],
+    existing.analytics,
   );
   ensureTable(
     "provider_quota_snapshot",
     "provider_quota_snapshot.schema.json",
     "observed_at",
     ["provider_id", "shard_id"],
+    existing.quota,
   );
-  deployDenyAllRules();
-  return checkGcpFreeDataPlane();
+  // 기존 Firestore/RTDB는 다른 사용처의 custom rules를 덮어쓰지 않는다.
+  // RTDB는 별도 대화형 생성이 필수이므로 여기서는 항상 기존 규칙을 보존한다.
+  if (!existing.firestore) deployNewFirestoreRules();
+  return {
+    ...checkGcpFreeDataPlane(),
+    existingSecurityRulesPreserved: true,
+    firestoreRulesDeployed: !existing.firestore,
+  };
 }
 
 function planText() {
   return [
     `Project: ${PROJECT_ID} (billing must remain disabled)`,
     `Firestore: (default), ${FIRESTORE_LOCATION}, free tier, delete protected`,
-    `Realtime Database: ${RTDB_INSTANCE}, ${RTDB_LOCATION}, deny-all rules`,
+    `Realtime Database: ${RTDB_INSTANCE}, ${RTDB_LOCATION}, existing rules preserved`,
+    "기존 Firestore/RTDB 규칙은 보존하며 보안 규칙 자체의 검증 완료를 의미하지 않습니다.",
     `BigQuery: ${DATASET_ID}, ${FIRESTORE_LOCATION}, 30-day dataset expiration`,
     "Tables: analytics_event, provider_quota_snapshot; partition filters required",
   ].join("\n");

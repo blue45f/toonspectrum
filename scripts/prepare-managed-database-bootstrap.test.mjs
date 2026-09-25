@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 
 import { loadBootstrapContract } from "./bootstrap-empty-production-database.mjs";
 import { loadHealthReadinessContract } from "./verify-production-database-capabilities.mjs";
@@ -13,6 +16,7 @@ import {
   splitDumpStatements,
   validateManagedRuntimeRole,
   validateManagedSchemaDump,
+  writeManagedBootstrapBundle,
 } from "./prepare-managed-database-bootstrap.mjs";
 
 const RELEASE = "a".repeat(40);
@@ -38,6 +42,16 @@ ALTER TABLE ONLY public.creator_work ADD CONSTRAINT creator_work_id_nonempty CHE
 \\unrestrict abc123
 `;
 const digest = (value) => createHash("sha256").update(value).digest("hex");
+const temporaryDirectories = [];
+const bundleDirectory = () => {
+  const directory = mkdtempSync(join(tmpdir(), "managed-bootstrap-bundle-"));
+  temporaryDirectories.push(directory);
+  return join(directory, "output");
+};
+const smallBundle = { sql: "bootstrap fixture\n", verificationSql: "verification fixture\n", report: { version: "fixture" } };
+afterEach(() => {
+  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+});
 
 describe("관리형 빈 DB bootstrap SQL 준비", () => {
   test("검토된 pg_dump의 public/ops 객체만 남기고 관리 schema는 생성하지 않는다", () => {
@@ -160,5 +174,69 @@ describe("관리형 빈 DB bootstrap SQL 준비", () => {
       "--schema-file", "/tmp/blank-schema.sql", "--schema-sha256", digest(schemaDump),
       "--release-sha", RELEASE, "--runtime-role", ROLE, "--output-directory", "/tmp/new-bundle",
     ])).toMatchObject({ extensionSchema: "extensions", runtimeRole: ROLE });
+  });
+
+  test("새 출력에는 같은 번들의 SQL 두 개와 보고서를 보호된 권한으로 저장한다", () => {
+    const output = bundleDirectory();
+    writeManagedBootstrapBundle(output, smallBundle);
+    expect(readdirSync(output).sort()).toEqual(["final-verification.sql", "managed-bootstrap.sql", "preparation-report.json"]);
+    expect(readFileSync(join(output, "managed-bootstrap.sql"), "utf8")).toBe(smallBundle.sql);
+    expect(readFileSync(join(output, "final-verification.sql"), "utf8")).toBe(smallBundle.verificationSql);
+    expect(JSON.parse(readFileSync(join(output, "preparation-report.json"), "utf8"))).toEqual(smallBundle.report);
+    expect(statSync(output).mode & 0o777).toBe(0o700);
+    for (const file of readdirSync(output)) expect(statSync(join(output, file)).mode & 0o777).toBe(0o600);
+  });
+
+  test.each([[[]], [["final-verification.sql"]], [["preparation-report.json", "other.txt"]]])("기존 출력 디렉터리는 내용 %j를 그대로 보존하고 거부한다", (files) => {
+    const output = bundleDirectory();
+    mkdirSync(output);
+    for (const file of files) writeFileSync(join(output, file), "existing-owner-data");
+    expect(() => writeManagedBootstrapBundle(output, smallBundle)).toThrow();
+    expect(readdirSync(output).sort()).toEqual([...files].sort());
+    for (const file of files) expect(readFileSync(join(output, file), "utf8")).toBe("existing-owner-data");
+  });
+
+  test("두 번째 파일을 부분 기록한 뒤 실패하면 이번 번들 전체를 정리한다", () => {
+    const output = bundleDirectory();
+    let writes = 0;
+    expect(() => writeManagedBootstrapBundle(output, smallBundle, {
+      writeFile(path, contents, options) {
+        writes += 1;
+        writeFileSync(path, writes === 2 ? "partial" : contents, options);
+        if (writes === 2) throw Object.assign(new Error("fixture disk full"), { code: "ENOSPC" });
+      },
+    })).toThrow("fixture disk full");
+    expect(existsSync(output)).toBe(false);
+  });
+
+  test("실패 정리는 동시에 추가된 다른 파일을 삭제하지 않는다", () => {
+    const output = bundleDirectory();
+    let writes = 0;
+    expect(() => writeManagedBootstrapBundle(output, smallBundle, {
+      writeFile(path, contents, options) {
+        writes += 1;
+        writeFileSync(path, contents, options);
+        if (writes === 2) {
+          writeFileSync(join(output, "other-owner.txt"), "preserve");
+          throw new Error("fixture interrupted");
+        }
+      },
+    })).toThrow("fixture interrupted");
+    expect(readdirSync(output)).toEqual(["other-owner.txt"]);
+    expect(readFileSync(join(output, "other-owner.txt"), "utf8")).toBe("preserve");
+  });
+
+  test("예약한 파일 이름을 다른 실행이 선점하면 해당 파일을 덮거나 정리하지 않는다", () => {
+    const output = bundleDirectory();
+    expect(() => writeManagedBootstrapBundle(output, smallBundle, {
+      writeFile(descriptor, contents) {
+        writeFileSync(descriptor, contents);
+        writeFileSync(join(output, "final-verification.sql"), "other-bundle");
+      },
+    })).toThrow();
+    expect(readdirSync(output)).toEqual(["final-verification.sql"]);
+    expect(readFileSync(join(output, "final-verification.sql"), "utf8")).toBe("other-bundle");
+    expect(() => writeManagedBootstrapBundle(output, smallBundle)).toThrow();
+    expect(readdirSync(output)).toEqual(["final-verification.sql"]);
   });
 });
