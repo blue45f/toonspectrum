@@ -126,7 +126,7 @@ export function SitemapPage() {
               <ArrowRight size={15} className="ml-auto transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </Link>
             <Link
-              href="/studio/projects"
+              href="/studio"
               className="group inline-flex min-h-14 items-center gap-3 rounded-2xl border border-line-strong bg-card/80 px-4 py-3 text-sm font-bold text-fg-2 transition-all hover:-translate-y-0.5 hover:border-accent/40 hover:text-accent"
             >
               <FolderOpen size={18} aria-hidden="true" />
@@ -261,50 +261,59 @@ export function SitemapPage() {
           <p className="mt-2 max-w-3xl text-sm leading-6 text-fg-3">{copy.extendedDescription}</p>
         </div>
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div className="mt-6 grid gap-3 lg:grid-cols-2">
           {SITEMAP_EXTENDED_DESTINATION_GROUPS.map((group) => {
             const GroupIcon = group.icon;
+            const titleId = formatI18nTemplate(
+              translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-extended-{v0}"),
+              { v0: String(group.id) },
+            );
             return (
-              <section
+              <details
                 key={group.id}
-                className="rounded-3xl border border-line/70 bg-panel/35 p-4 sm:p-5"
-                aria-labelledby={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-extended-{v0}"), { v0: String(group.id) })}
+                className="group rounded-3xl border border-line/70 bg-panel/35 open:bg-panel/55"
               >
-                <div className="flex items-start gap-3 px-1 pb-4 sm:px-2">
-                  <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-3">
-                    <GroupIcon size={17} aria-hidden="true" />
+                <summary className="flex min-h-20 cursor-pointer list-none items-center gap-3 rounded-3xl px-4 py-4 outline-none marker:hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/70 sm:px-5 [&::-webkit-details-marker]:hidden">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl border border-line bg-card text-fg-3 transition-colors group-open:border-accent/35 group-open:text-accent">
+                    <GroupIcon size={18} aria-hidden="true" />
                   </span>
-                  <div>
-                    <h3 id={formatI18nTemplate(translateCurrentStaticSourceText("domains.legal.SitemapPage", "en", "sitemap-extended-{v0}"), { v0: String(group.id) })} className="font-display text-base font-bold text-fg">
+                  <span className="min-w-0 flex-1">
+                    <strong id={titleId} className="block font-display text-base font-bold text-fg">
                       {siteNavigationText(group.label, locale)}
-                    </h3>
-                    <p className="mt-1 text-xs leading-5 text-fg-3">
+                    </strong>
+                    <span className="mt-1 line-clamp-2 block text-xs leading-5 text-fg-3">
                       {siteNavigationText(group.description, locale)}
-                    </p>
-                  </div>
-                </div>
-                <ul className="grid gap-x-3 gap-y-1 sm:grid-cols-2">
-                  {group.items.map((item) => (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        className="group flex min-h-[4.25rem] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-raised/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
-                      >
-                        <span aria-hidden="true" className="h-px w-2.5 shrink-0 rounded-full bg-line-strong transition-all group-hover:w-4 group-hover:bg-accent" />
-                        <span className="min-w-0">
-                          <strong className="block truncate text-sm font-semibold text-fg-2 transition-colors group-hover:text-accent">
-                            {siteNavigationText(item.label, locale)}
-                          </strong>
-                          <span className="mt-0.5 line-clamp-1 block text-[0.69rem] leading-5 text-fg-3">
-                            {siteNavigationText(item.description, locale)}
+                    </span>
+                  </span>
+                  <span className="shrink-0 rounded-full border border-line bg-card px-2.5 py-1 text-[0.68rem] font-bold text-fg-3 group-open:border-accent/30 group-open:text-accent">
+                    {group.items.length}
+                  </span>
+                  <span aria-hidden="true" className="text-lg text-fg-3 transition-transform group-open:rotate-45 group-open:text-accent">＋</span>
+                </summary>
+                <div className="border-t border-line/70 px-3 pb-4 pt-3 sm:px-5 sm:pb-5">
+                  <ul className="grid gap-x-3 gap-y-1 sm:grid-cols-2" aria-labelledby={titleId}>
+                    {group.items.map((item) => (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          className="group/link flex min-h-[4.25rem] items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-raised/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70"
+                        >
+                          <span aria-hidden="true" className="h-px w-2.5 shrink-0 rounded-full bg-line-strong transition-all group-hover/link:w-4 group-hover/link:bg-accent" />
+                          <span className="min-w-0">
+                            <strong className="block truncate text-sm font-semibold text-fg-2 transition-colors group-hover/link:text-accent">
+                              {siteNavigationText(item.label, locale)}
+                            </strong>
+                            <span className="mt-0.5 line-clamp-1 block text-[0.69rem] leading-5 text-fg-3">
+                              {siteNavigationText(item.description, locale)}
+                            </span>
+                            <RouteConditionBadges href={item.href} locale={locale} />
                           </span>
-                          <RouteConditionBadges href={item.href} locale={locale} />
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </details>
             );
           })}
         </div>

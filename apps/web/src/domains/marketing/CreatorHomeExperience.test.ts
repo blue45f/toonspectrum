@@ -53,7 +53,7 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('data-product-direction="planning-to-publishing"');
     expect(source).toContain("<ProductIntentStart />");
     expect(source).toContain('href="/studio/new"');
-    expect(source).toContain('href="/studio/projects"');
+    expect(source).toContain('href="/studio"');
     expect(source).toContain('href="/brand-film"');
     expect(source).toContain('href: "/production"');
     expect(identity).toContain('href: "/story-lab"');

@@ -14,7 +14,7 @@ const requiredDestinations = [
   "/story-lab",
   "/studio/new",
   "/studio/bg3d",
-  "/studio/projects",
+  "/studio",
   "/studio/assets",
   "/production",
   "/studio/publish",

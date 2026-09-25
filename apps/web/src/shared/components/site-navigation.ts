@@ -31,6 +31,7 @@ import {
   type SitePrimaryRouteId,
 } from "@/shared/lib/site-route-authority";
 import { resolveSiteRouteNavigationContext } from "@/shared/lib/site-route-metadata";
+import { isPublicCreativeRoute } from "./site-public-routes";
 
 
 export type SiteNavigationLocale = "ko" | "en";
@@ -340,8 +341,8 @@ export const SITE_NAVIGATION_ITEMS = {
 
 const I = SITE_NAVIGATION_ITEMS;
 
-/** One stable product journey on every screen: Home · Create · Discover · Community · All. */
-export const UNIFIED_PRIMARY_NAVIGATION = [
+/** Public and personal shells share the same five purposes but keep different home contracts. */
+export const TOONSTUDIO_PRIMARY_NAVIGATION = [
   I.workspaceHome,
   I.studio,
   I.explore,
@@ -349,10 +350,16 @@ export const UNIFIED_PRIMARY_NAVIGATION = [
   I.allMenu,
 ] as const;
 
-export const TOONSTUDIO_PRIMARY_NAVIGATION = UNIFIED_PRIMARY_NAVIGATION;
-export const TOONSPECTRUM_PRIMARY_NAVIGATION = UNIFIED_PRIMARY_NAVIGATION;
+export const TOONSPECTRUM_PRIMARY_NAVIGATION = [
+  I.home,
+  I.studio,
+  I.explore,
+  I.community,
+  I.allMenu,
+] as const;
 
-/** Compatibility export for consumers not yet context-aware. */
+/** Compatibility exports retain the public navigation contract. */
+export const UNIFIED_PRIMARY_NAVIGATION = TOONSPECTRUM_PRIMARY_NAVIGATION;
 export const PRIMARY_SITE_NAVIGATION = TOONSPECTRUM_PRIMARY_NAVIGATION;
 
 export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
@@ -424,17 +431,18 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
 /** Compatibility export for the legacy all-menu consumer. */
 export const SITE_NAVIGATION_GROUPS = TOONSPECTRUM_NAVIGATION_GROUPS;
 
-export const UNIFIED_MOBILE_TABS = UNIFIED_PRIMARY_NAVIGATION;
-export const TOONSTUDIO_MOBILE_TABS = UNIFIED_MOBILE_TABS;
-export const TOONSPECTRUM_MOBILE_TABS = UNIFIED_MOBILE_TABS;
+export const TOONSTUDIO_MOBILE_TABS = TOONSTUDIO_PRIMARY_NAVIGATION;
+export const TOONSPECTRUM_MOBILE_TABS = TOONSPECTRUM_PRIMARY_NAVIGATION;
+export const UNIFIED_MOBILE_TABS = TOONSPECTRUM_MOBILE_TABS;
 
 /** Compatibility export for consumers not yet context-aware. */
 export const MOBILE_SITE_TABS = TOONSPECTRUM_MOBILE_TABS;
 
 export const SITE_UTILITY_NAVIGATION = [I.notifications, I.help, I.settings, I.me] as const;
 
-/** Select the Studio or Spectrum navigation context from the canonical route metadata projection. */
+/** Select a public or personal navigation contract without exposing workspace chrome publicly. */
 export function siteNavigationContextForPath(pathname: string): SiteNavigationContext {
+  if (isPublicCreativeRoute(pathname)) return "spectrum";
   return resolveSiteRouteNavigationContext(pathname);
 }
 

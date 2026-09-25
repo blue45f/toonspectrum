@@ -4,7 +4,7 @@ import { isDiscoverPurposeRoute, isPublicCreativeRoute } from "./site-public-rou
 
 describe("public creative chrome route boundaries", () => {
   it.each([
-    "/", "/about", "/about/", "/help", "/support", "/contact", "/business", "/research/assets",
+    "/", "/about", "/about/", "/help", "/support", "/contact", "/business", "/collaborate", "/creators", "/research/assets",
     "/learn", "/learn/process", "/learn/careers", "/learn/education", "/learn/resources", "/learn/classroom",
     "/learn/lessons/panel-pacing", "/learn/paths/webtoon", "/market/browse",
     "/market/resource/brush-1", "/showcase/work/work-1", "/showcase/reviews",

@@ -135,7 +135,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
       {detail.projects.length === 0 && <p className="text-sm">접근 가능한 연결 작품이 없습니다.</p>}
       {manager && <div className="mt-4"><label className="flex flex-col gap-2">소유한 프로젝트 연결<select aria-label="연결할 프로젝트" className={fieldClass} disabled={busy} value="" onChange={(event) => { const projectId = event.target.value; if (projectId) void run(() => command({ type: "attach-project", projectId })); }}>
         <option value="">기존 프로젝트 선택</option>{available.filter((item) => !detail.projects.some((project) => project.id === item.projectId)).map((project) => <option key={project.projectId} value={project.projectId}>{project.title}</option>)}</select></label>
-        <Link to="/studio/projects" className="mt-3 inline-block underline">작품 만들기·작품별 권한 관리</Link></div>}</Card>
+        <Link to="/studio" className="mt-3 inline-block underline">작품 라이브러리·작품별 권한 관리</Link></div>}</Card>
     {detail.workspace.role !== "guest" && <Card title="구성원"><ul className="space-y-3">{detail.members.map((member) => <li key={member.userId} className="flex flex-wrap items-center gap-3 rounded-lg border border-line p-3">
       <strong className="mr-auto">{member.displayName}</strong><span>{roles[member.role]}</span>
       {manager && member.role !== "owner" && (detail.workspace.role === "owner" || member.role !== "admin") && <>

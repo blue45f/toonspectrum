@@ -122,10 +122,8 @@ export function ProductIntentStart() {
               <motion.div
                 key={destination.id}
                 className="cf-intent-motion-card"
-                initial={prefersReducedMotion ? false : { opacity: 0, y: 14 }}
-                whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-                viewport={{ once: true, amount: 0.25 }}
-                transition={{ duration: 0.4, delay: index * 0.045, ease: [0.16, 1, 0.3, 1] }}
+                initial={false}
+                transition={{ duration: 0.2, delay: index * 0.015, ease: [0.16, 1, 0.3, 1] }}
                 whileHover={prefersReducedMotion ? undefined : { y: -4 }}
               >
                 <Link href={destination.href} title={bi((destination.description).ko, (destination.description).en)}>
@@ -147,14 +145,14 @@ export function ProductIntentStart() {
       <aside>
         <div className="cf-intent-recent">
           <p><Clock3 size={16} aria-hidden="true" />{copy.recent}</p>
-          <Link className="cf-recent-card" href={recent?.href ?? "/studio/projects"}>
+          <Link className="cf-recent-card" href={recent?.href ?? "/studio"}>
             <strong>{recent ? creatorDestinationLabel(recent.id, locale) : copy.fallback}</strong>
             <span>{recent ? creatorRecentDestinationDescription(recent, locale) : copy.fallbackBody}</span>
             {recent && now > 0 ? <small>{formatCreatorRelativeTime(recent.visitedAt, locale, now)}</small> : null}
             {recent ? <WorkflowTrustBadge state="resume-ready" locale={locale} className="w-fit" /> : null}
             <ArrowRight size={18} aria-hidden="true" />
           </Link>
-          <Link className="cf-link" href="/studio/projects">
+          <Link className="cf-link" href="/studio">
             {copy.all}
             <ArrowRight size={15} aria-hidden="true" />
           </Link>

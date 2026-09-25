@@ -7,3 +7,33 @@
   position: relative;
   z-index: 59;
 }
+
+/* Modal and full-screen navigation own the viewport while open. Decorative fixed controls must
+ * leave the interaction layer instead of covering menu items or trapping pointer events. */
+html:has([role="dialog"][aria-modal="true"]) [data-site-ost="mounted"],
+html:has([role="dialog"][aria-modal="true"]) [data-floating-controls="true"],
+html:has([role="dialog"][aria-modal="true"]) [data-studio-beta-notice-host="true"],
+html:has([data-studio-beta-notice-host="true"]) [data-site-ost="mounted"] {
+  display: none !important;
+}
+@media (max-width: 767px) {
+  html:has([data-site-ost-expanded="true"]) [data-floating-controls="true"] {
+    display: none !important;
+  }
+}
+
+/* Reduced-motion users should never observe the low-opacity first route frame. A 0.01ms animation
+ * can still be sampled by assistive tooling before animationend, so make the stable frame explicit. */
+@media (prefers-reduced-motion: reduce) {
+  .route-stage {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .route-stage::before {
+    content: none !important;
+    animation: none !important;
+  }
+}

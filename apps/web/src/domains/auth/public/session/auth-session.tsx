@@ -85,10 +85,15 @@ export function SessionProvider({ children, session = null }: { children: ReactN
             setReady(true);
             return;
           }
+          // Session transport availability must never block public rendering. Keep the last
+          // locally known profile as the honest fallback, expose the application immediately,
+          // and continue the bounded verification retries in the background.
+          setReady(true);
           scheduleRetry(reason);
         },
         () => {
           if (!active || generation !== requestGeneration) return;
+          setReady(true);
           scheduleRetry(reason);
         },
       );

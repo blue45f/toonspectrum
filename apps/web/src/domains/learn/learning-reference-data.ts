@@ -423,7 +423,7 @@ export const WEBTOON_PROCESS_STEPS: readonly WebtoonProcessStep[] = [
     outputs: ["연재 캘린더", "회차 상태표", "반응·개선 노트", "시즌 회고"],
     roleIds: ["creator", "producer"],
     beginnerNote: "모든 반응을 즉시 반영하기보다 작품 목표와 반복해서 나타나는 문제를 구분해 기록하세요.",
-    studioHref: "/studio/projects",
+    studioHref: "/production",
     studioLabel: "프로젝트와 일정 관리하기",
   },
 ] as const;

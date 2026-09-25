@@ -242,35 +242,35 @@ export function MobileHeaderNavigation({
             </div>
 
             <nav className="mx-auto max-w-[1320px] px-4 pb-6 pt-5 sm:px-6 sm:pb-8">
-              <aside className="relative mb-4 min-h-40 overflow-hidden rounded-[1.35rem] border border-accent/25 bg-[oklch(0.16_0.035_275)] shadow-[0_20px_60px_-38px_var(--color-accent)] sm:min-h-44">
+              <aside className="relative mb-4 min-h-40 overflow-hidden rounded-[1.35rem] border border-accent/30 bg-panel shadow-[0_20px_60px_-38px_var(--color-accent)] sm:min-h-44">
                 <img
                   src="/brand/atelier-world-960.webp"
                   alt=""
                   aria-hidden="true"
                   decoding="async"
-                  className="absolute inset-0 size-full object-cover opacity-55"
+                  className="absolute inset-0 size-full object-cover opacity-38 saturate-[0.85]"
                 />
-                <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-[oklch(0.13_0.035_275/0.98)] via-[oklch(0.13_0.035_275/0.86)] to-[oklch(0.13_0.035_275/0.3)]" />
+                <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/92 to-accent-soft/45" />
                 <img
                   src="/brand/toonstudio-visual-identity/ai-creative-director.webp"
                   alt=""
                   aria-hidden="true"
                   decoding="async"
-                  className="absolute -bottom-8 -right-3 h-40 w-auto object-contain drop-shadow-[0_16px_24px_oklch(0.08_0.04_275/0.65)] sm:h-48"
+                  className="absolute -bottom-8 -right-3 h-40 w-auto object-contain drop-shadow-[0_16px_24px_var(--color-canvas)] sm:h-48"
                 />
                 <div className="relative z-[1] max-w-[75%] p-4 sm:p-5">
-                  <p className="font-display text-[0.62rem] font-black uppercase tracking-[0.18em] text-accent">TOONSTUDIO NAVIGATOR</p>
-                  <h2 className="mt-2 font-display text-xl font-black leading-tight text-white sm:text-2xl">
+                  <p className="font-display text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">TOONSTUDIO NAVIGATOR</p>
+                  <h2 className="mt-2 font-display text-xl font-black leading-tight text-fg sm:text-2xl">
                     {bi("어디서든 같은 제작 흐름", "One studio, every screen")}
                   </h2>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/70">
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-fg-2">
                     {bi("제작·탐색·커뮤니티와 새 기능을 두 번의 탭 안에서 찾으세요.", "Reach creation, discovery, community and every new tool within two taps.")}
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Link href="/studio/new" className="inline-flex min-h-10 items-center rounded-xl bg-accent px-3 text-xs font-black text-on-accent shadow-lg shadow-accent/15">
+                    <Link href="/studio/new" className="inline-flex min-h-11 items-center rounded-xl bg-accent px-3 text-xs font-black text-on-accent shadow-lg shadow-accent/15">
                       {bi("새 작품", "New work")}
                     </Link>
-                    <Link href="/sitemap" className="inline-flex min-h-10 items-center rounded-xl border border-white/20 bg-black/25 px-3 text-xs font-bold text-white backdrop-blur-md">
+                    <Link href="/sitemap" className="inline-flex min-h-11 items-center rounded-xl border border-line-strong bg-card/80 px-3 text-xs font-bold text-fg backdrop-blur-md">
                       {bi("전체 기능", "All tools")}
                     </Link>
                   </div>
@@ -287,7 +287,7 @@ export function MobileHeaderNavigation({
                     <div className="mb-3 flex items-start gap-3 px-1 sm:px-2">
                       <span
                         aria-hidden="true"
-                        className="font-display text-[0.62rem] font-bold tracking-[0.14em] text-accent"
+                        className="font-display text-[0.68rem] font-bold tracking-[0.14em] text-accent"
                       >
                         0{groupIndex + 1}
                       </span>
@@ -443,7 +443,7 @@ export function MobileHeaderNavigation({
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
                   className={cx(
-                    "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.62rem] font-semibold transition-all duration-150 active:bg-raised/55",
+                    "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.68rem] font-semibold transition-all duration-150 active:bg-raised/55",
                     active ? "text-accent" : "text-fg-3 hover:text-fg"
                   )}
                 >

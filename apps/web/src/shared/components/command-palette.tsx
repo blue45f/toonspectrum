@@ -257,19 +257,31 @@ export function CommandPalette({
     inputRef.current?.focus();
   };
 
-  // Keyboard navigation for Tab key cycling modes
+  // Tab keeps its native focus-navigation contract. Arrow keys move within the category tablist.
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Tab") {
-      e.preventDefault();
-      const tabKeys = PALETTE_MODE_TABS.map((t) => t.id);
-      const currentIndex = tabKeys.indexOf(mode);
-      const nextIndex = e.shiftKey
-        ? (currentIndex - 1 + tabKeys.length) % tabKeys.length
-        : (currentIndex + 1) % tabKeys.length;
-      handleSelectTab(tabKeys[nextIndex]!);
-    } else if (e.key === "Backspace" && !q && mode !== "all") {
+    if (e.key === "Backspace" && !q && mode !== "all") {
       setMode("all");
     }
+  };
+
+  const handleModeTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    tabId: PaletteMode,
+  ) => {
+    const keys = PALETTE_MODE_TABS.map((tab) => tab.id);
+    const currentIndex = keys.indexOf(tabId);
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % keys.length;
+    if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + keys.length) % keys.length;
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = keys.length - 1;
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const next = keys[nextIndex]!;
+    handleSelectTab(next);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`command-palette-mode-${next}`)?.focus();
+    });
   };
 
   // Filter commands, studio tools, and pages based on effective query and active mode
@@ -397,7 +409,7 @@ export function CommandPalette({
               setResults([]);
               if (!value.trim()) setSearchLoading(false);
             }}
-            placeholder="작품 제목, 작가, 기능 명령, 스튜디오 도구 검색... (Tab으로 탭 전환)"
+            placeholder="작품 제목, 작가, 기능 명령, 스튜디오 도구 검색..."
             className="h-14 flex-1 bg-transparent text-[0.95rem] text-fg outline-none placeholder:text-fg-3"
           />
 
@@ -409,7 +421,8 @@ export function CommandPalette({
                 setResults([]);
                 inputRef.current?.focus();
               }}
-              className="flex size-7 items-center justify-center rounded-lg text-fg-3 transition-colors hover:bg-raised hover:text-fg"
+              aria-label="검색어 지우기"
+              className="flex size-10 items-center justify-center rounded-xl text-fg-3 transition-colors hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
               title="검색어 지우기"
             >
               <X size={15} />
@@ -422,16 +435,21 @@ export function CommandPalette({
         </div>
 
         {/* Category Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto border-b border-line/70 bg-card/40 px-4 py-2 text-xs scrollbar-none">
+        <div role="tablist" aria-label="검색 범위" className="flex items-center gap-1.5 overflow-x-auto border-b border-line/70 bg-card/40 px-4 py-2 text-xs scrollbar-none">
           {PALETTE_MODE_TABS.map((tab) => {
             const isActive = activeMode === tab.id;
             return (
               <button
                 key={tab.id}
+                id={`command-palette-mode-${tab.id}`}
                 type="button"
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
                 onClick={() => handleSelectTab(tab.id)}
+                onKeyDown={(event) => handleModeTabKeyDown(event, tab.id)}
                 className={cn(
-                  "flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 font-medium transition-all",
+                  "flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-2 font-medium transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                   isActive
                     ? "bg-raised text-accent shadow-sm ring-1 ring-accent/30 font-semibold"
                     : "text-fg-3 hover:bg-card hover:text-fg"
@@ -823,10 +841,10 @@ export function CommandPalette({
         <div className="flex items-center justify-between border-t border-line bg-panel/80 px-4 py-2 text-[11px] text-fg-3">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-line bg-card px-1 py-0.5 font-mono text-[9px] text-fg-2">
-                Tab
+              <kbd className="rounded border border-line bg-card px-1 py-0.5 font-mono text-[10px] text-fg-2">
+                ←→
               </kbd>
-              <span>카테고리 전환</span>
+              <span>분류 전환</span>
             </span>
             <span className="flex items-center gap-1">
               <kbd className="rounded border border-line bg-card px-1 py-0.5 font-mono text-[9px] text-fg-2">

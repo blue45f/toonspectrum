@@ -8,9 +8,9 @@ export async function assertStudioWorkspaceHome(page) {
   await expect(page.locator("main h1")).toHaveCount(1);
   await expect(home.locator("#workspace-title")).toBeVisible();
   const navigation = home.locator(".workspace-nav a");
-  await expect(navigation).toHaveCount(4);
+  await expect(navigation).toHaveCount(5);
   assert.deepEqual(await navigation.evaluateAll((links) => links.map((link) => new URL(link.href).pathname)),
-    ["/home", "/studio", "/team", "/hub"]);
+    ["/home", "/studio", "/discover", "/community", "/sitemap"]);
   await expect(home.locator("dialog[open]")).toHaveCount(0);
   await expect(page.locator(".vs2-bottom, .public-site-journey, video")).toHaveCount(0);
   const primary = home.locator(".workspace-statusbar .workspace-primary, .workspace-live-status .workspace-live-actions > a");
