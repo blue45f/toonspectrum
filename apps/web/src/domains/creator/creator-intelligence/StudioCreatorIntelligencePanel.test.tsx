@@ -24,6 +24,11 @@ const providerStatus: CreatorIntelligenceStatus = {
   soundEffects: disabled,
   meshy: disabled,
   safeSearch: disabled,
+  admission: {
+    paidRoutesEnabled: false,
+    enforcement: "authenticated-bounded-process-local",
+    operations: {},
+  },
 };
 function renderPanel() {
   return render(
@@ -56,7 +61,8 @@ beforeEach(() => {
       license: "Pexels License",
       licenseUrl: "https://www.pexels.com/license/",
       width: 1200,
-      height: 800,      rightsStatus: "provider-license",
+      height: 800,
+      rightsStatus: "provider-license",
       importable: false,
       fetchedAt: "2026-09-25T00:00:00.000Z",
     }],
@@ -87,7 +93,8 @@ describe("StudioCreatorIntelligencePanel free reference APIs", () => {
     renderPanel();
     await waitFor(() => expect(creatorIntelligenceClient.status).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByLabelText("reference provider"), {      target: { value: "pexels" },
+    fireEvent.change(screen.getByLabelText("reference provider"), {
+      target: { value: "pexels" },
     });
     fireEvent.click(screen.getByRole("button", { name: "배경" }));
 
@@ -157,5 +164,4 @@ describe("StudioCreatorIntelligencePanel free reference APIs", () => {
     expect(screen.getAllByText(/영상 레퍼런스/u).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/8s/u).length).toBeGreaterThan(0);
   });
-
 });
