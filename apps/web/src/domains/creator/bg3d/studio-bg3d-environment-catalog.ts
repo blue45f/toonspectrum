@@ -7,6 +7,7 @@
 
 import refinedV6Manifest from "../../../../public/assets/3d/environments/refined-v6/manifest.json";
 import expansionV1Manifest from "../../../../public/assets/3d/environments/expansion-v1/manifest.json";
+import webtoonV7Manifest from "../../../../public/assets/3d/environments/webtoon-v7/manifest.json";
 
 export const STUDIO_BG3D_ENVIRONMENT_PACK_ID =
   "toonspectrum-bg3d-environment-pack-v1" as const;
@@ -32,7 +33,8 @@ export interface StudioBg3dEnvironmentProvenance {
     | "scripts/blender/generate_environment_pack_v4.py"
     | "scripts/blender/generate_environment_pack_v5.py"
     | "scripts/blender/refine_studio_environments_v6.py"
-    | "scripts/blender/generate_studio_environment_expansion_v1.py";
+    | "scripts/blender/generate_studio_environment_expansion_v1.py"
+    | "scripts/blender/generate_environment_pack_v7.py";
   readonly blenderVersion: "5.2";
   readonly license: "CC0-1.0";
   readonly licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/";
@@ -84,6 +86,11 @@ const V4_PROVENANCE = Object.freeze({
 const V5_PROVENANCE = Object.freeze({
   ...V3_PROVENANCE,
   generator: "scripts/blender/generate_environment_pack_v5.py",
+} as const);
+
+const WEBTOON_V7_PROVENANCE = Object.freeze({
+  ...V3_PROVENANCE,
+  generator: "scripts/blender/generate_environment_pack_v7.py",
 } as const);
 
 function defineEnvironment(
@@ -342,9 +349,31 @@ export const STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1 = Object.freeze(
   }))),
 );
 
+export const STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7 = Object.freeze(
+  webtoonV7Manifest.assets.map((asset) => defineEnvironment({
+    id: asset.id,
+    name: asset.name,
+    description: asset.description,
+    theme: asset.theme as StudioBg3dEnvironmentTheme,
+    tags: asset.tags,
+    fileName: asset.fileName as `${string}.glb`,
+    url: asset.url as `/assets/3d/environments/${string}.glb`,
+    thumbnailUrl: asset.thumbnailUrl as `/assets/3d/environments/${string}.png`,
+    byteSize: asset.byteSize,
+    sha256: asset.sha256 as `sha256:${string}`,
+    bounds: asset.bounds as [number, number, number],
+    camera: {
+      position: asset.camera.position as [number, number, number],
+      target: asset.camera.target as [number, number, number],
+      fovDegrees: asset.camera.fovDegrees,
+    },
+  }, WEBTOON_V7_PROVENANCE)),
+);
+
 export const STUDIO_BG3D_ENVIRONMENT_ASSETS = Object.freeze([
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
   ...STUDIO_BG3D_ENVIRONMENT_ASSETS_EXPANSION_V1,
+  ...STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7,
 ]);
 
 const RESOLVABLE_ENVIRONMENT_ASSETS = [

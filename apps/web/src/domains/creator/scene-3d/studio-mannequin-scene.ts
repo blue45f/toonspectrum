@@ -33,6 +33,7 @@ import {
   type StudioMannequinChainSpec,
   type StudioMannequinJointId,
   type StudioMannequinMaterialStyle,
+  type StudioMannequinPrimitiveMaterialRole,
   type StudioMannequinSpec,
   type StudioMannequinVec3,
 } from "./studio-mannequin-model";
@@ -216,12 +217,136 @@ function createToonGradientTexture(): THREE.DataTexture {
   return texture;
 }
 
+interface StudioMannequinMaterialPalette {
+  readonly body: THREE.Material;
+  readonly joint: THREE.Material;
+  readonly landmark: THREE.Material;
+  readonly eye: THREE.Material;
+}
+
+function standardMaterial(
+  color: THREE.ColorRepresentation,
+  roughness: number,
+  metalness = 0,
+  emissive?: THREE.ColorRepresentation,
+  emissiveIntensity = 0,
+): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    color,
+    roughness,
+    metalness,
+    ...(emissive === undefined ? {} : { emissive, emissiveIntensity }),
+  });
+}
+
+/**
+ * 같은 형상 안에서도 관절구·랜드마크·시선 가이드를 읽을 수 있게 역할별 재질을 만든다.
+ * 외부 텍스처 없이 재현 가능하며, 색만 달라져도 동일한 포즈·캡처 계약을 유지한다.
+ */
+function createStudioMannequinMaterialPalette(
+  style: StudioMannequinMaterialStyle,
+  gradientMap: THREE.Texture,
+): StudioMannequinMaterialPalette {
+  if (style === "clay") {
+    return {
+      body: standardMaterial(0xe8e2da, 0.86, 0.02),
+      joint: standardMaterial(0xc9beb2, 0.72, 0.03),
+      landmark: standardMaterial(0xf8f3ed, 0.66, 0.01),
+      eye: standardMaterial(0x36312d, 0.74, 0),
+    };
+  }
+  if (style === "wireframe") {
+    return {
+      body: new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.9 }),
+      joint: new THREE.MeshBasicMaterial({ color: 0xf59e0b, wireframe: true, transparent: true, opacity: 0.96 }),
+      landmark: new THREE.MeshBasicMaterial({ color: 0xe2e8f0, wireframe: true, transparent: true, opacity: 0.95 }),
+      eye: new THREE.MeshBasicMaterial({ color: 0x0f172a, wireframe: true }),
+    };
+  }
+  if (style === "shaded") {
+    return {
+      body: new THREE.MeshToonMaterial({ color: 0x94a3b8, gradientMap }),
+      joint: new THREE.MeshToonMaterial({ color: 0xc27d59, gradientMap }),
+      landmark: new THREE.MeshToonMaterial({ color: 0xdbe6ee, gradientMap }),
+      eye: new THREE.MeshToonMaterial({ color: 0x111827, gradientMap }),
+    };
+  }
+  if (style === "magma") {
+    return {
+      body: standardMaterial(0x18181b, 0.3, 0, 0xf97316, 0.68),
+      joint: standardMaterial(0x211216, 0.25, 0, 0xef4444, 0.95),
+      landmark: standardMaterial(0x2b1806, 0.2, 0, 0xfacc15, 1.15),
+      eye: standardMaterial(0x020204, 0.4, 0, 0xffedd5, 0.8),
+    };
+  }
+  if (style === "stencil") {
+    return {
+      body: new THREE.MeshBasicMaterial({ color: 0x09090b }),
+      joint: new THREE.MeshBasicMaterial({ color: 0x17171b }),
+      landmark: new THREE.MeshBasicMaterial({ color: 0x27272a }),
+      eye: new THREE.MeshBasicMaterial({ color: 0x000000 }),
+    };
+  }
+  if (style === "bronze") {
+    return {
+      body: standardMaterial(0x9c6b30, 0.28, 0.72),
+      joint: standardMaterial(0x71451f, 0.24, 0.8),
+      landmark: standardMaterial(0xc5944d, 0.22, 0.68),
+      eye: standardMaterial(0x1e1813, 0.32, 0.55),
+    };
+  }
+  if (style === "porcelain") {
+    const physical = (color: THREE.ColorRepresentation, roughness: number) => new THREE.MeshPhysicalMaterial({
+      color,
+      metalness: 0,
+      roughness,
+      clearcoat: 0.62,
+      clearcoatRoughness: 0.18,
+    });
+    return {
+      body: physical(0xf5efe7, 0.24),
+      joint: physical(0xd9cfc4, 0.3),
+      landmark: physical(0xffffff, 0.18),
+      eye: physical(0x27313c, 0.26),
+    };
+  }
+  if (style === "skin") {
+    const skin = (color: THREE.ColorRepresentation, roughness: number, sheen: number) => new THREE.MeshPhysicalMaterial({
+      color,
+      metalness: 0,
+      roughness,
+      clearcoat: 0.08,
+      clearcoatRoughness: 0.58,
+      sheen,
+      sheenRoughness: 0.72,
+      sheenColor: new THREE.Color(0xffd6c2),
+    });
+    return {
+      body: skin(0xd7a07d, 0.48, 0.24),
+      joint: skin(0xc78669, 0.52, 0.18),
+      landmark: skin(0xedb69b, 0.44, 0.28),
+      eye: standardMaterial(0x2b211d, 0.42, 0),
+    };
+  }
+  return {
+    body: standardMaterial(0xc58b57, 0.62, 0.02),
+    joint: standardMaterial(0x9f6437, 0.54, 0.03),
+    landmark: standardMaterial(0xd39a63, 0.54, 0.01),
+    eye: standardMaterial(0x30251d, 0.48, 0),
+  };
+}
+
+function disposeStudioMannequinMaterialPalette(palette: StudioMannequinMaterialPalette): void {
+  for (const material of new Set(Object.values(palette))) material.dispose();
+}
+
 interface EffectorHandleUserData {
   studioMannequinChainId: StudioMannequinChainId;
 }
 
 interface BodyMeshUserData {
   studioMannequinJointId: StudioMannequinJointId;
+  studioMannequinMaterialRole: StudioMannequinPrimitiveMaterialRole;
 }
 
 export function createStudioMannequinScene(
@@ -290,14 +415,10 @@ export function createStudioMannequinScene(
   helpers.add(grid, shadowCatcher);
   scene.add(helpers);
 
-  // 머티리얼 — 기본은 실제 목조 인형에 가까운 따뜻한 무광 재질(선택 시 accent 틴트).
+  // 머티리얼 — 몸체·관절구·랜드마크·시선 가이드를 역할별로 분리한다.
   const gradientMap = createToonGradientTexture();
-  let bodyMaterial: THREE.Material = new THREE.MeshStandardMaterial({
-    color: 0xc58b57,
-    roughness: 0.62,
-    metalness: 0.02,
-  });
   let currentMaterialStyle: StudioMannequinMaterialStyle = "wood";
+  let materialPalette = createStudioMannequinMaterialPalette(currentMaterialStyle, gradientMap);
   const selectedMaterial = new THREE.MeshToonMaterial({ color: 0xe0925c, gradientMap });
   const handleMaterial = new THREE.MeshBasicMaterial({
     color: 0xe0925c,
@@ -411,19 +532,23 @@ export function createStudioMannequinScene(
   function buildPrimitiveMesh(
     primitive: StudioMannequinSpec["primitives"][number],
   ): THREE.Mesh {
+    const role = primitive.materialRole ?? "body";
+    const material = materialPalette[role];
+    let mesh: THREE.Mesh;
     if (primitive.kind === "sphere") {
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(primitive.radius, 48, 32),
-        bodyMaterial,
+      const relativeRadius = primitive.radius / Math.max(0.001, spec.headUnit);
+      const widthSegments = relativeRadius < 0.055 ? 16 : relativeRadius < 0.11 ? 24 : 40;
+      const heightSegments = relativeRadius < 0.055 ? 10 : relativeRadius < 0.11 ? 16 : 28;
+      mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(primitive.radius, widthSegments, heightSegments),
+        material,
       );
       mesh.position.copy(toVec3(primitive.center));
       if (primitive.scale) mesh.scale.copy(toVec3(primitive.scale));
-      return mesh;
-    }
-    if (primitive.kind === "box") {
+    } else if (primitive.kind === "box") {
       const minimumSize = Math.min(...primitive.size);
       const radius = Math.min(minimumSize * 0.24, spec.headUnit * 0.08);
-      const mesh = new THREE.Mesh(
+      mesh = new THREE.Mesh(
         new RoundedBoxGeometry(
           primitive.size[0],
           primitive.size[1],
@@ -431,39 +556,47 @@ export function createStudioMannequinScene(
           5,
           Math.max(0.001, radius),
         ),
-        bodyMaterial,
+        material,
       );
       mesh.position.copy(toVec3(primitive.center));
-      return mesh;
+    } else {
+      const from = toVec3(primitive.from);
+      const to = toVec3(primitive.to);
+      const segment = new THREE.Vector3().subVectors(to, from);
+      const segmentLength = segment.length();
+      const endRadius = primitive.endRadius;
+      const hasAnatomicalTaper = typeof endRadius === "number"
+        && Number.isFinite(endRadius)
+        && endRadius > 0
+        && Math.abs(endRadius - primitive.radius) > 1e-6;
+      const relativeRadius = primitive.radius / Math.max(0.001, spec.headUnit);
+      const radialSegments = relativeRadius < 0.055 ? 12 : relativeRadius < 0.11 ? 20 : 28;
+      const middleLength = Math.max(0.001, segmentLength - primitive.radius * 2);
+      const geometry = hasAnatomicalTaper
+        ? new THREE.CylinderGeometry(
+            endRadius,
+            primitive.radius,
+            Math.max(0.001, segmentLength),
+            radialSegments,
+            3,
+            false,
+          )
+        : new THREE.CapsuleGeometry(
+            primitive.radius,
+            middleLength,
+            relativeRadius < 0.055 ? 6 : 10,
+            radialSegments,
+          );
+      mesh = new THREE.Mesh(geometry, material);
+      mesh.position.copy(from).addScaledVector(segment, 0.5);
+      if (segmentLength > 1e-9) {
+        mesh.quaternion.setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0),
+          segment.clone().normalize(),
+        );
+      }
     }
-    const from = toVec3(primitive.from);
-    const to = toVec3(primitive.to);
-    const segment = new THREE.Vector3().subVectors(to, from);
-    const segmentLength = segment.length();
-    const endRadius = primitive.endRadius;
-    const hasAnatomicalTaper = typeof endRadius === "number"
-      && Number.isFinite(endRadius)
-      && endRadius > 0
-      && Math.abs(endRadius - primitive.radius) > 1e-6;
-    const middleLength = Math.max(0.001, segmentLength - primitive.radius * 2);
-    const geometry = hasAnatomicalTaper
-      ? new THREE.CylinderGeometry(
-          endRadius,
-          primitive.radius,
-          Math.max(0.001, segmentLength),
-          32,
-          2,
-          false,
-        )
-      : new THREE.CapsuleGeometry(primitive.radius, middleLength, 12, 28);
-    const mesh = new THREE.Mesh(geometry, bodyMaterial);
-    mesh.position.copy(from).addScaledVector(segment, 0.5);
-    if (segmentLength > 1e-9) {
-      mesh.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0, 1, 0),
-        segment.clone().normalize(),
-      );
-    }
+    mesh.name = `studio-mannequin-part:${primitive.jointId}:${role}`;
     return mesh;
   }
 
@@ -484,7 +617,11 @@ export function createStudioMannequinScene(
       const jointGroup = joints.get(primitive.jointId);
       if (!jointGroup) continue;
       const mesh = buildPrimitiveMesh(primitive);
-      (mesh.userData as BodyMeshUserData).studioMannequinJointId = primitive.jointId;
+      const materialRole = primitive.materialRole ?? "body";
+      Object.assign(mesh.userData as BodyMeshUserData, {
+        studioMannequinJointId: primitive.jointId,
+        studioMannequinMaterialRole: materialRole,
+      });
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       jointGroup.add(mesh);
@@ -494,7 +631,13 @@ export function createStudioMannequinScene(
       outline.position.copy(mesh.position);
       outline.quaternion.copy(mesh.quaternion);
       outline.scale.copy(mesh.scale).multiplyScalar(1.026);
-      outline.visible = currentMaterialStyle === "shaded";
+      Object.assign(outline.userData as BodyMeshUserData, {
+        studioMannequinJointId: primitive.jointId,
+        studioMannequinMaterialRole: materialRole,
+      });
+      outline.visible = currentMaterialStyle === "shaded"
+        && materialRole !== "landmark"
+        && materialRole !== "eye";
       outline.castShadow = false;
       outline.receiveShadow = false;
       outline.renderOrder = -1;
@@ -558,8 +701,10 @@ export function createStudioMannequinScene(
 
   function applySelectionTint(): void {
     for (const mesh of bodyMeshes) {
-      const jointId = (mesh.userData as BodyMeshUserData).studioMannequinJointId;
-      mesh.material = jointId === selectedJointId ? selectedMaterial : bodyMaterial;
+      const userData = mesh.userData as BodyMeshUserData;
+      mesh.material = userData.studioMannequinJointId === selectedJointId
+        ? selectedMaterial
+        : materialPalette[userData.studioMannequinMaterialRole];
     }
   }
 
@@ -927,58 +1072,13 @@ export function createStudioMannequinScene(
     setMaterialStyle(style) {
       if (disposed) return;
       currentMaterialStyle = style;
-      let nextMaterial: THREE.Material;
-      if (style === "clay") {
-        nextMaterial = new THREE.MeshStandardMaterial({ color: 0xe6e2dd, roughness: 0.85, metalness: 0.05 });
-      } else if (style === "wireframe") {
-        nextMaterial = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true });
-      } else if (style === "shaded") {
-        nextMaterial = new THREE.MeshToonMaterial({ color: 0x94a3b8, gradientMap });
-      } else if (style === "magma") {
-        nextMaterial = new THREE.MeshStandardMaterial({ color: 0x18181b, emissive: 0xf97316, emissiveIntensity: 0.7, roughness: 0.3 });
-      } else if (style === "stencil") {
-        nextMaterial = new THREE.MeshBasicMaterial({ color: 0x09090b });
-      } else if (style === "bronze") {
-        nextMaterial = new THREE.MeshStandardMaterial({
-          color: 0x9c6b30,
-          metalness: 0.72,
-          roughness: 0.28,
-        });
-      } else if (style === "porcelain") {
-        nextMaterial = new THREE.MeshPhysicalMaterial({
-          color: 0xf5efe7,
-          metalness: 0,
-          roughness: 0.24,
-          clearcoat: 0.65,
-          clearcoatRoughness: 0.18,
-        });
-      } else if (style === "skin") {
-        nextMaterial = new THREE.MeshPhysicalMaterial({
-          color: 0xd7a07d,
-          metalness: 0,
-          roughness: 0.48,
-          clearcoat: 0.08,
-          clearcoatRoughness: 0.58,
-          sheen: 0.24,
-          sheenRoughness: 0.72,
-          sheenColor: new THREE.Color(0xffd6c2),
-        });
-      } else {
-        nextMaterial = new THREE.MeshStandardMaterial({
-          color: 0xc58b57,
-          roughness: 0.62,
-          metalness: 0.02,
-        });
-      }
-      bodyMaterial.dispose();
-      bodyMaterial = nextMaterial;
-      for (const mesh of bodyMeshes) {
-        if (mesh.userData.studioMannequinJointId !== selectedJointId) {
-          mesh.material = bodyMaterial;
-        }
-      }
+      const previousPalette = materialPalette;
+      materialPalette = createStudioMannequinMaterialPalette(style, gradientMap);
+      applySelectionTint();
+      disposeStudioMannequinMaterialPalette(previousPalette);
       for (const outline of outlineMeshes) {
-        outline.visible = style === "shaded";
+        const role = (outline.userData as BodyMeshUserData).studioMannequinMaterialRole;
+        outline.visible = style === "shaded" && role !== "landmark" && role !== "eye";
       }
       invalidate();
     },
@@ -1052,7 +1152,7 @@ export function createStudioMannequinScene(
       controls = null;
       disposeMannequinGraph();
       handleGeometry.dispose();
-      bodyMaterial.dispose();
+      disposeStudioMannequinMaterialPalette(materialPalette);
       selectedMaterial.dispose();
       handleMaterial.dispose();
       outlineMaterial.dispose();
