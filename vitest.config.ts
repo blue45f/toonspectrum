@@ -1,4 +1,3 @@
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -9,10 +8,6 @@ import { resolveVitestDatabaseTarget } from "./scripts/run-postgres-integration-
 import { SERIAL_TEST_FILES } from "./vitest.serial-test-files.mjs";
 
 const root = fileURLToPath(new URL("./", import.meta.url));
-// Cross-application tests live outside apps/api but must resolve Nest from the API workspace
-// that owns that dependency. This does not promote Nest into the root or shared packages.
-const apiRequire = createRequire(path.resolve(root, "apps/api/package.json"));
-
 // 테스트가 실제로 존재하는 트리 목록(2026-08-21 기준 수집 루트 전부).
 // Vitest 기본 include 는 "루트 아래 아무 데나" 라서, 트리 하나가 통째로 옮겨가거나 사라져도
 // 남은 글롭이 조용히 더 적은 파일을 수집하고 스위트는 그대로 초록으로 통과한다. 수집 루트를
@@ -51,7 +46,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(root, "apps/web/src"),
-      "@nestjs/common": apiRequire.resolve("@nestjs/common"),
       "@toonspectrum/core/creator-role": path.resolve(root, "packages/core/src/creator-role.ts"),
     },
   },

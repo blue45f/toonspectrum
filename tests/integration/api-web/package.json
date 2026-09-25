@@ -1,0 +1,17 @@
+{
+  "name": "@toonspectrum/api-web-integration-tests",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@nestjs/common": "^11.1.24",
+    "@toonspectrum/core": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "image-js": "^1.7.0",
+    "js-base64": "^3.9.0",
+    "pg": "^8.21.0",
+    "socket.io": "^4.8.3",
+    "typescript": "~6.0.3",
+    "vitest": "4.1.11",
+    "yjs": "^13.6.31"
+  }
+}

@@ -24,7 +24,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
       // 0043 provisions unrelated administrator tables, absent from this asset-only fixture.
       const number = /\/00(39|40|41|42|44)_/u.exec(path)?.[1];
       if (!number || Number(number) > lastMigration) continue;
-      const migration = await readFile(new URL(`../../../../../${path}`, import.meta.url), "utf8");
+      const migration = await readFile(new URL(`../../../../../../${path}`, import.meta.url), "utf8");
       await connection.query(migration.replaceAll("public.", `"${targetSchema}".`));
     }
   }

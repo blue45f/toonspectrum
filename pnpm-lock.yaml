@@ -814,6 +814,39 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  tests/integration/api-web:
+    devDependencies:
+      '@nestjs/common':
+        specifier: ^11.1.24
+        version: 11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@toonspectrum/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      drizzle-orm:
+        specifier: ^0.45.2
+        version: 0.45.2(@libsql/client@0.17.3)(@types/pg@8.20.0)(pg@8.21.0)
+      image-js:
+        specifier: ^1.7.0
+        version: 1.7.0
+      js-base64:
+        specifier: ^3.9.0
+        version: 3.9.0
+      pg:
+        specifier: ^8.21.0
+        version: 8.21.0
+      socket.io:
+        specifier: ^4.8.3
+        version: 4.8.3
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: 4.1.11
+        version: 4.1.11(@types/node@24.13.2)(@vitest/coverage-v8@4.1.11)(jsdom@29.1.1)(vite@8.0.16(@types/node@24.13.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.22.3)(yaml@2.9.0))
+      yjs:
+        specifier: ^13.6.31
+        version: 13.6.31
+
 packages:
 
   '@alloc/quick-lru@5.2.0':
