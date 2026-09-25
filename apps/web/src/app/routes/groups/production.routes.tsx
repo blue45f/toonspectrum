@@ -12,6 +12,10 @@ import {
 } from "./production-route-pages";
 
 export const productionRoutes = defineAppRoutes([
+  { id: "team-people", path: "/team/people", element: <TeamWorkspacePage /> },
+  { id: "team-people-join", path: "/team/people/join", element: <TeamWorkspaceJoinPage /> },
+  { id: "team-people-detail", path: "/team/people/:workspaceId", element: <TeamWorkspacePage /> },
+  { id: "team-people-usage", path: "/team/people/:workspaceId/usage", element: <TeamWorkspacePage /> },
   { id: "production-workspaces", path: "/production/workspaces", element: <TeamWorkspacePage /> },
   { id: "production-workspace-join", path: "/production/workspaces/join", element: <TeamWorkspaceJoinPage /> },
   { id: "production-workspace-detail", path: "/production/workspaces/:workspaceId", element: <TeamWorkspacePage /> },
