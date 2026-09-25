@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { describe, expect, it, vi } from "vitest";
 import { FORTUNE_SPECIAL_DAY_CATEGORIES, validateFortuneSpecialDays } from "../../../../../packages/core/src/fortune";
-import type { UpstashCoordinationPort } from "../../platform/upstash-coordination/upstash-coordination.port";
+import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 import { followupConfig, followupCoordination, followupNow, specialItem, specialXml } from "../../../test/fortune-followup-fixtures";
 import { FortuneSpecialDaysQuery } from "./fortune-enrichment.controller";
 import { FortuneEnrichmentService } from "./fortune-enrichment.service";

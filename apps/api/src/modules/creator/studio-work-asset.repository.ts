@@ -36,7 +36,7 @@ import {
   samePrivateObjectContent,
   type PrivateObjectPurpose,
   type PrivateObjectReference,
-} from "../../platform/private-object-storage/private-object-storage.contract";
+} from "../../infrastructure/private-object-storage/private-object-storage.contract";
 
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
 import {

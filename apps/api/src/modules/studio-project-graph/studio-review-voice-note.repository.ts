@@ -14,7 +14,7 @@ import {
 import {
   LocatedPrivateObjectReferenceSchema,
   type LocatedPrivateObjectReference,
-} from "../../platform/private-object-storage/private-object-storage.contract";
+} from "../../infrastructure/private-object-storage/private-object-storage.contract";
 import { dbPool } from "../../db";
 import { resolveCreatorCollaborationAccess } from "../creator/creator-collaboration.policy";
 import { pinnedShareCapture, shareHash } from "./pinned-share/pinned-share-storage";

@@ -1,8 +1,8 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import type { StudioReviewPageMapping } from "@toonspectrum/studio-project-model";
 
-import { PrivateSignedReadUrlSchema } from "../../platform/private-object-storage/private-object-storage.contract";
-import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../platform/private-object-storage/private-object-storage.port";
+import { PrivateSignedReadUrlSchema } from "../../infrastructure/private-object-storage/private-object-storage.contract";
+import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
 import { StudioProjectForbiddenError, StudioProjectGraphRepository, StudioProjectNotFoundError, StudioRepositoryInvariantError } from "./studio-project-graph.repository";
 import {
   STUDIO_REVIEW_PREVIEW_URL_SECONDS, studioReviewPreviewObject,

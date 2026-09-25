@@ -16,7 +16,7 @@ import {
 import {
   BackendCapabilityGatewayDispatcher,
   type BackendCapabilityGatewayDispatchResult,
-} from "../../platform/backend-capabilities/backend-capability-gateway-dispatcher";
+} from "../../infrastructure/backend-capabilities/backend-capability-gateway-dispatcher";
 
 import {
   STUDIO_AI_ADMISSION_GATE,

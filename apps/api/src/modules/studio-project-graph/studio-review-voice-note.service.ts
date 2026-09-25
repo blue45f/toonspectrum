@@ -25,11 +25,11 @@ import {
 import {
   LocatedPrivateObjectReferenceSchema,
   PrivateSignedReadUrlSchema,
-} from "../../platform/private-object-storage/private-object-storage.contract";
+} from "../../infrastructure/private-object-storage/private-object-storage.contract";
 import {
   PRIVATE_OBJECT_STORAGE_PORT,
   type PrivateObjectStoragePort,
-} from "../../platform/private-object-storage/private-object-storage.port";
+} from "../../infrastructure/private-object-storage/private-object-storage.port";
 import type { StudioWorkAssetUploadFile } from "../creator/studio-work-asset.service";
 import {
   StudioReviewVoiceNoteRepository,

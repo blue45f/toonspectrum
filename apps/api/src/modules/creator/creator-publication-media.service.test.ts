@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PRIVATE_OBJECT_STORAGE_PORT,
   type PrivateObjectStoragePort,
-} from "../../platform/private-object-storage/private-object-storage.port";
+} from "../../infrastructure/private-object-storage/private-object-storage.port";
 import { planCreatorPublicationMediaMutation } from "./creator-publication-media.contract";
 import { CreatorPublicationMediaRepository } from "./creator-publication-media.repository";
 import {

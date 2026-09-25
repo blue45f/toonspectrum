@@ -17,7 +17,7 @@ const VITEST_ENTRYPOINT = resolve(
   "vitest.mjs"
 );
 const REDIS_INTEGRATION_SUITE =
-  "apps/api/src/platform/upstash-coordination/upstash-coordination.redis.integration.test.ts";
+  "apps/api/src/infrastructure/upstash-coordination/upstash-coordination.redis.integration.test.ts";
 const REDIS_IMAGE = "redis:7-alpine";
 
 function runDocker(arguments_, options = {}) {

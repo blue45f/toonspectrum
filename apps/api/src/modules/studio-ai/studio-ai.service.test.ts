@@ -1,7 +1,7 @@
 import { HttpException, ServiceUnavailableException } from "@nestjs/common";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { type BackendCapabilityGatewayDispatchResult } from "../../platform/backend-capabilities/backend-capability-gateway-dispatcher";
+import { type BackendCapabilityGatewayDispatchResult } from "../../infrastructure/backend-capabilities/backend-capability-gateway-dispatcher";
 
 import { StudioAiService } from "./studio-ai.service";
 

@@ -14,7 +14,7 @@ import { StudioWorkSessionController, StudioWorkSessionService } from "./studio-
 import { StudioWorkSessionRepository } from "./studio-work-session.repository";
 import { Module } from "@nestjs/common";
 import { dbPool } from "../../db";
-import { PrivateObjectStorageModule } from "../../platform/private-object-storage/private-object-storage.module";
+import { PrivateObjectStorageModule } from "../../infrastructure/private-object-storage/private-object-storage.module";
 import { CreatorModule } from "../creator/creator.module";
 
 import { StudioExternalFileBindingRepository } from "./studio-external-file-binding.repository";

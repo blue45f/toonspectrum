@@ -22,7 +22,7 @@ import { resolveOperationPolicy } from "@toonspectrum/contracts/operation-policy
 
 import { resolveCreatorCollaborationAccess } from "../../creator/creator-collaboration.policy";
 import { loadOperationPolicy, runtimeLicenseFingerprint } from "../../operation-policy/operation-policy.repository";
-import type { LocatedPrivateObjectReference } from "../../../platform/private-object-storage/private-object-storage.contract";
+import type { LocatedPrivateObjectReference } from "../../../infrastructure/private-object-storage/private-object-storage.contract";
 import { PinnedShareError, pinnedShareCapture, pinnedShareImages, requireShareManager, shareHash } from "../pinned-share/pinned-share-storage";
 
 export const STUDIO_REVIEW_DELIVERY_POOL = Symbol("STUDIO_REVIEW_DELIVERY_POOL");

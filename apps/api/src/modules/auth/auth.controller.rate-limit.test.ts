@@ -6,7 +6,7 @@ import { AuthRateLimitDependencyError } from "./auth-rate-limit.config";
 import { AuthController } from "./auth.controller";
 
 import type { AuthRateLimitAction } from "./auth-rate-limit";
-import type { UpstashCoordinationPort } from "../../platform/upstash-coordination/upstash-coordination.port";
+import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 import type { Request } from "express";
 
 function coordination(

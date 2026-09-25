@@ -40,11 +40,11 @@ import {
 } from "../../../../web/src/shared/lib/avatar";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe";
 import { accounts, db, sessions, users } from "../../db";
-import { StudioRealtimeRevocationService } from "../../platform/studio-realtime-revocation/studio-realtime-revocation.client";
+import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
 import {
   UPSTASH_COORDINATION_PORT,
   type UpstashCoordinationPort,
-} from "../../platform/upstash-coordination/upstash-coordination.port";
+} from "../../infrastructure/upstash-coordination/upstash-coordination.port";
 import { normalizePersistedAuthRole } from "../../server/admin-roles";
 import {
   AuthEmailConfigurationError,

@@ -12,7 +12,7 @@ import {
   isLocatedPrivateObjectReference,
   samePrivateObjectContent,
   type PrivateObjectReference,
-} from "../../platform/private-object-storage/private-object-storage.contract";
+} from "../../infrastructure/private-object-storage/private-object-storage.contract";
 import type { CreatorWorkMediaTarget } from "../../server/creator-work-media";
 import {
   creatorPublicationMediaPageIndex,

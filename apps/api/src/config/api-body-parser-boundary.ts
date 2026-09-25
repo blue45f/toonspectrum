@@ -3,14 +3,14 @@ import { json, urlencoded } from "express";
 import {
   BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE,
   BACKEND_CAPABILITY_GATEWAY_PATH,
-} from "../platform/backend-capabilities/backend-capability-gateway-contract";
+} from "../infrastructure/backend-capabilities/backend-capability-gateway-contract";
 import {
   backendCapabilityWorkerParserLimitBytes,
   createBackendCapabilityWorkerPreBodyAdmission,
   verifyBackendCapabilityWorkerRawBody,
-} from "../platform/backend-capabilities/backend-capability-worker-http-admission";
+} from "../infrastructure/backend-capabilities/backend-capability-worker-http-admission";
 
-import type { BackendCapabilityPolicy } from "../platform/backend-capabilities/backend-capability-policy";
+import type { BackendCapabilityPolicy } from "../infrastructure/backend-capabilities/backend-capability-policy";
 import type { INestApplication } from "@nestjs/common";
 import type { Request, Response } from "express";
 

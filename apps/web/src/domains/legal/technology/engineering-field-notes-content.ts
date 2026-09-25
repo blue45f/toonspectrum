@@ -440,7 +440,7 @@ export const ENGINEERING_FIELD_NOTES = [
       { kind: "document", path: "docs/operations/minimum-cost-deployment-policy.md", label: { ko: "최소 비용 배포 권위와 수동 릴리스", en: "Minimum-cost deployment authority and manual release" } },
       { kind: "document", path: "docs/operations/quality-preserving-cost-policy.md", label: { ko: "비용 절감 시 품질 불변 정책", en: "Quality-preserving cost policy" } },
       { kind: "code", path: "deploy/cloudflare-static/src/index.ts", label: { ko: "정적·edge 요청 분리", en: "Static and edge request separation" } },
-      { kind: "code", path: "apps/api/src/platform/backend-capabilities/backend-capability-gateway-contract.ts", label: { ko: "공급자 예산·idempotency 계약", en: "Provider budget and idempotency contract" } },
+      { kind: "code", path: "apps/api/src/infrastructure/backend-capabilities/backend-capability-gateway-contract.ts", label: { ko: "공급자 예산·idempotency 계약", en: "Provider budget and idempotency contract" } },
     ],
     reuseSteps: [
       { ko: "요청 유형별로 정적·edge·동적 API·실시간·영속 원장을 분리합니다.", en: "Separate static, edge, dynamic API, realtime and durable-ledger workloads." },

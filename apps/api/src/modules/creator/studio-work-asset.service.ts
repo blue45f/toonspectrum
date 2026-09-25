@@ -38,11 +38,11 @@ import {
   type PrivateObjectPurpose,
   type PrivateObjectReference,
   type PrivateSignedReadUrl,
-} from "../../platform/private-object-storage/private-object-storage.contract";
-import type { PrivateObjectStoragePort } from "../../platform/private-object-storage/private-object-storage.port";
+} from "../../infrastructure/private-object-storage/private-object-storage.contract";
+import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
 import {
   SUPABASE_OBJECT_STORAGE_PORT,
-} from "../../platform/supabase-object-storage/supabase-object-storage.port";
+} from "../../infrastructure/supabase-object-storage/supabase-object-storage.port";
 
 import {
   assertStudioR8GrainAdmissionContents,
