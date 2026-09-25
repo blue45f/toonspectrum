@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const AUDIO_DIR = join(ROOT, "apps/web/public/audio");
 const PLAYLIST = join(AUDIO_DIR, "playlist.json");
-const EXPECTED_TRACKS = 12;
+const EXPECTED_TRACKS = 15;
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -49,6 +49,10 @@ for (const track of manifest.tracks) {
   assert(sidecar.quality?.integratedLufs >= -15.5 && sidecar.quality?.integratedLufs <= -12.5, `Loudness out of range for ${track.id}.`);
   assert(sidecar.quality?.truePeakDbfs <= -0.5, `True peak too high for ${track.id}.`);
   assert(sidecar.review?.approvedForSite === true, `Release approval missing for ${track.id}.`);
+}
+
+for (const id of ["midnight-storyboard-instrumental", "neon-scroll-instrumental", "publish-the-sky-instrumental"]) {
+  assert(ids.has(id), `Missing core album master: ${id}`);
 }
 
 for (const id of ["spectrum-breaker-vocal", "wings-of-the-unwritten-vocal", "oath-of-a-thousand-lights-vocal", "where-the-stars-return-vocal", "atlas-of-starlight-instrumental", "dawnfall-protocol-instrumental"]) {

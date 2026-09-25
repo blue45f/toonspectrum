@@ -12,6 +12,8 @@
     "verify:pnpm-lockfile": "node scripts/verify-pnpm-lockfile.mjs",
     "test:pnpm-lockfile": "node --test scripts/verify-pnpm-lockfile.test.mjs",
     "dev": "vite --host 0.0.0.0",
+    "music:providers": "tsx scripts/ai-music-provider-toolkit.mts list",
+    "music:handoff": "tsx scripts/ai-music-provider-toolkit.mts handoff",
     "build": "NODE_OPTIONS='--max-old-space-size=12288' tsc -p tsconfig.json && NODE_OPTIONS='--max-old-space-size=12288' vite build",
     "build:bundle": "NODE_OPTIONS='--max-old-space-size=12288' vite build",
     "prebuild:bundle": "pnpm run prebuild",

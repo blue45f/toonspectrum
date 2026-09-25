@@ -114,6 +114,19 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("music workspace rendered recovery and route regression", () => {
+  it("exports a provider review handoff without dispatching paid generation", async () => {
+    render(<Harness />);
+    await ready();
+    const toolkit = screen.getByRole("region", { name: "외부 AI 음악 툴킷" });
+    expect(within(toolkit).getByText("Soundverse")).toBeTruthy();
+    expect(within(toolkit).getAllByRole("link", { name: "열기" }).some((link) => (
+      link.getAttribute("href") === "https://www.soundverse.ai/"
+    ))).toBe(true);
+    fireEvent.click(within(toolkit).getAllByRole("button", { name: "검수 인계 JSON" })[0]!);
+    expect(createUrl).toHaveBeenCalledTimes(1);
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+
   it("keeps guests out of personal storage and paid generation", async () => {
     mocks.ownerId = "";
     render(<Harness />); await ready(); fillBrief();
