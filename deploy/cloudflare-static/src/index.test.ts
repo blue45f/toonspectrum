@@ -874,3 +874,164 @@ describe("Cloudflare static gateway", () => {
     expect(await response.text()).toBe('{"error":"CORE_API_UPSTREAM_FAILED"}');
   });
 });
+
+function neisFixture(total = 1) {
+  return {
+    schoolInfo: [
+      {
+        head: [
+          { list_total_count: total },
+          { RESULT: { CODE: "INFO-000", MESSAGE: "정상 처리되었습니다." } },
+        ],
+      },
+      {
+        row: [{
+          ATPT_OFCDC_SC_CODE: "B10",
+          ATPT_OFCDC_SC_NM: "서울특별시교육청",
+          SD_SCHUL_CODE: "7010080",
+          SCHUL_NM: "서울고등학교",
+          SCHUL_KND_SC_NM: "고등학교",
+          FOND_SC_NM: "공립",
+          ORG_RDNMA: "서울특별시 서초구 효령로 197",
+          COEDU_SC_NM: "남",
+          FOND_YMD: "19460201",
+        }],
+      },
+    ],
+  };
+}
+
+describe("NEIS creator-resource edge", () => {  it("serves keyed school metadata without waking the core origin", async () => {
+    const apiKey = "a".repeat(32);
+    const upstream = vi.fn<typeof fetch>(async (request) => {
+      const url = new URL((request as Request).url);
+      expect(url.origin).toBe("https://open.neis.go.kr");
+      expect(url.searchParams.get("KEY")).toBe(apiKey);
+      expect(url.searchParams.get("pSize")).toBe("12");
+      return Response.json(neisFixture());
+    });
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(new Request(
+      "https://www.toonstudio.cloud/api/creator-resources/search?provider=neis&q=%EC%84%9C%EC%9A%B8%EA%B3%A0%EB%93%B1%ED%95%99%EA%B5%90&page=1",
+      { headers: { "cf-connecting-ip": "203.0.113.10" } },
+    ), environment({ NEIS_API_KEY: apiKey }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-toonspectrum-neis-mode")).toBe("keyed");
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({ provider: "neis", status: "ready", total: 1 });
+    const item = (body.items as Array<Record<string, unknown>>)[0];
+    expect(item).toMatchObject({
+      id: "neis:B10-7010080",
+      title: "서울고등학교",
+      license: "metadata-only",
+    });    expect(item?.provenance).toMatchObject({
+      provider: "neis",
+      importPermission: "metadata-only",
+      termsReviewedAt: "2026-09-25",
+    });
+    expect(JSON.stringify(body)).not.toContain(apiKey);
+    expect(upstream).toHaveBeenCalledOnce();
+  });
+
+  it("falls back to the official five-row sample when the key is rejected", async () => {
+    const apiKey = "b".repeat(32);
+    const upstream = vi.fn<typeof fetch>(async (request) => {
+      const url = new URL((request as Request).url);
+      if (url.searchParams.has("KEY")) {
+        return new Response("upstream failure", {
+          status: 500,
+          headers: { "content-type": "text/html" },
+        });
+      }
+      expect(url.searchParams.get("pIndex")).toBe("1");
+      expect(url.searchParams.get("pSize")).toBe("5");
+      return Response.json(neisFixture(42));
+    });
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(new Request(
+      "https://www.toonstudio.cloud/api/creator-resources/search?provider=neis&q=%EA%B3%A0%EB%93%B1%ED%95%99%EA%B5%90&page=2",
+      { headers: { "cf-connecting-ip": "203.0.113.11" } },
+    ), environment({ NEIS_API_KEY: apiKey }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-toonspectrum-neis-mode")).toBe("sample");
+    const body = await response.json() as Record<string, unknown>;
+    expect(body).toMatchObject({
+      provider: "neis",
+      status: "ready",
+      page: 2,
+      hasMore: false,
+      total: 42,
+      items: [],
+    });
+    expect(String(body.message)).toContain("공개 샘플 최대 5건");
+    expect(JSON.stringify(body)).not.toContain(apiKey);
+    expect(upstream).toHaveBeenCalledTimes(2);
+
+    const next = await gateway(new Request(
+      "https://www.toonstudio.cloud/api/creator-resources/search?provider=neis&q=%EC%A4%91%ED%95%99%EA%B5%90&page=1",
+      { headers: { "cf-connecting-ip": "203.0.113.11" } },
+    ), environment({ NEIS_API_KEY: apiKey }));
+    expect(next.headers.get("x-toonspectrum-neis-mode")).toBe("sample");
+    expect(upstream).toHaveBeenCalledTimes(3);
+  });
+
+  it("caches repeated searches and bounds uncached traffic per client", async () => {
+    const upstream = vi.fn<typeof fetch>(async () => Response.json({
+      RESULT: { CODE: "INFO-200", MESSAGE: "해당하는 데이터가 없습니다." },
+    }));
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const request = (query: string) => new Request(
+      `https://www.toonstudio.cloud/api/creator-resources/search?provider=neis&q=${query}&page=1`,
+      { headers: { "cf-connecting-ip": "203.0.113.12" } },
+    );
+
+    const first = await gateway(request("학교00"), environment());
+    const cached = await gateway(request("학교00"), environment());
+    expect(first.headers.get("x-toonspectrum-edge-cache")).toBe("miss");
+    expect(cached.headers.get("x-toonspectrum-edge-cache")).toBe("hit");
+    expect(upstream).toHaveBeenCalledOnce();
+    for (const query of ["학교01", "학교02", "학교03", "학교04"]) {
+      expect((await gateway(request(query), environment())).status).toBe(200);
+    }
+    const limited = await gateway(request("학교05"), environment());
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(upstream).toHaveBeenCalledTimes(5);
+  });
+
+  it("marks NEIS configured in the public provider summary", async () => {
+    const upstream = vi.fn<typeof fetch>(async () => Response.json([
+      { provider: "neis", availability: "not_configured" },
+      { provider: "ambientcg", availability: "keyless" },
+    ]));
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(new Request(
+      "https://www.toonstudio.cloud/api/creator-resources/providers",
+    ), environment({ NEIS_API_KEY: "c".repeat(32) }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get(
+      "x-toonspectrum-creator-resource-source",
+    )).toBe("cloudflare-neis-edge");
+    await expect(response.json()).resolves.toEqual([
+      { provider: "neis", availability: "configured" },
+      { provider: "ambientcg", availability: "keyless" },
+    ]);
+    expect(upstream).toHaveBeenCalledOnce();
+  });
+
+  it("rejects invalid input before any provider request", async () => {
+    const upstream = vi.fn<typeof fetch>();
+    const gateway = createCloudflareStaticGateway({ fetch: upstream });
+    const response = await gateway(new Request(
+      "https://www.toonstudio.cloud/api/creator-resources/search?provider=neis&q=x&page=99",
+    ), environment());
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "invalid_creator_resource_query",
+    });
+    expect(upstream).not.toHaveBeenCalled();
+  });
+});

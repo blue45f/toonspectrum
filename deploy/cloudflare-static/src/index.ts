@@ -13,6 +13,7 @@ import {
   supportsCloudflareStaticSidecar,
   type CloudflareLargeAssetEncoding,
 } from "./large-static-assets";
+import { createNeisCreatorResourceEdge } from "./neis-creator-resource-edge";
 
 export interface AssetsBinding {
   fetch(request: Request): Promise<Response>;
@@ -49,6 +50,8 @@ export interface CloudflareStaticEnv {
   readonly ADMIN_API_ORIGIN?: string;
   readonly REALTIME_API_ORIGIN?: string;
   readonly LARGE_ASSET_ORIGIN?: string;
+  /** Server-only key for the NEIS creator-resource edge adapter. */
+  readonly NEIS_API_KEY?: string;
 }
 
 interface GatewayRuntime {
@@ -838,6 +841,7 @@ async function serveR2LargeAsset(
 export function createCloudflareStaticGateway(
   runtime: GatewayRuntime = DEFAULT_RUNTIME,
 ) {
+  const neisCreatorResources = createNeisCreatorResourceEdge(runtime);
   return async function fetchRequest(
     request: Request,
     env: CloudflareStaticEnv,
@@ -857,6 +861,9 @@ export function createCloudflareStaticGateway(
 
     const policyResponse = edgePolicyResponse(request, requestUrl);
     if (policyResponse) return policyResponse;
+
+    const neisResponse = await neisCreatorResources.search(request, env);
+    if (neisResponse) return withSecurityHeaders(neisResponse);
 
     const route = classifyDynamicRoute(request, requestUrl);
     if (route === "large-asset") {
@@ -925,7 +932,12 @@ export function createCloudflareStaticGateway(
           await cancelRetryResponse(response);
           continue;
         }
-        return withSecurityHeaders(response);
+        const patchedResponse = await neisCreatorResources.patchProviderAvailability(
+          request,
+          response,
+          env,
+        );
+        return withSecurityHeaders(patchedResponse);
       } catch {
         if (
           retryableRead(request, route)
