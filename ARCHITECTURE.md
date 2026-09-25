@@ -10,6 +10,8 @@
   외부 서비스 연동은 서버 전용으로 유지합니다.
 - `apps/mobile`은 `@toonspectrum/mobile` workspace package이며 Capacitor 설정, Android/iOS
   native project, launch shell, resources와 native 검증을 직접 소유합니다.
+- `apps/desktop-sync`는 로컬 폴더 감시, append journal, 충돌 해결, cloud provider와 release
+  packaging을 소유하는 단일 Desktop Sync workspace입니다.
 - `packages`에는 두 개 이상의 실행 앱이 실제로 공유하는 런타임 중립 계약·순수 모델·
   Studio 엔진만 둡니다. 애플리케이션 내부 구현을 공유 패키지로 우회하지 않습니다.
 - `tools`는 제품 번들에 포함되지 않는 media authoring, workflow automation, DCC bridge를
@@ -54,6 +56,12 @@ apps/mobile/                      # 독립 Capacitor native wrapper workspace
   android/, ios/                  # native projects
   shell/, resources/             # launch/offline shell과 source assets
   scripts/                        # native permission·ownership 검증
+
+apps/desktop-sync/                # Desktop local/cloud synchronization workspace
+  src/local-agent/               # folder scan, polling, append journal, upload grants
+  src/cloud/                     # Google Drive, Dropbox, OneDrive adapters
+  src/agent.ts, planner.ts       # canonical bidirectional plan and execution
+  src/conflict-*.ts              # explicit conflict review and resolution
 
 packages/                         # focused contracts, pure models, Studio engines
 data/asset-releases/              # 검토된 릴리스 manifest·출처·visual review 증거

@@ -7,8 +7,7 @@ apps/
   web/                  user-facing browser source
   admin-web/            administrator browser application
   api/                  backend application
-  desktop-sync/         full local/cloud sync CLI
-  desktop-sync-agent/   focused watcher/journal companion pending consolidation
+  desktop-sync/         full local/cloud sync CLI and local-agent capability
 packages/
   contracts/             focused cross-application runtime-neutral contracts
   core/                  existing focused shared/core code

@@ -12,6 +12,11 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./local-agent": {
+      "types": "./src/local-agent/index.ts",
+      "import": "./src/local-agent/index.ts",
+      "default": "./src/local-agent/index.ts"
     }
   },
   "scripts": {
