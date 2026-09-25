@@ -7,6 +7,10 @@ import type {
   IntegrationRecipesResponse,
   IntegrationRecipeValidation,
   IntegrationRuntimeResponse,
+  IntegrationRuntimeConnectorsResponse,
+  IntegrationRuntimeExecuteRequest,
+  IntegrationRuntimeExecutionResponse,
+  IntegrationRuntimeReceiptsResponse,
   PublishPackageRequest,
   PublishPackageResponse,
 } from "./integration-platform-types";
@@ -15,6 +19,17 @@ export const integrationPlatformClient = {
   catalog: () => api.get<IntegrationCatalogResponse>("/integrations/catalog"),
   recipes: () => api.get<IntegrationRecipesResponse>("/integrations/recipes"),
   runtime: () => api.get<IntegrationRuntimeResponse>("/integrations/runtime"),
+  runtimeConnectors: () =>
+    api.get<IntegrationRuntimeConnectorsResponse>("/integrations/runtime-connectors"),
+  runtimeReceipts: (projectId: string, limit = 30) =>
+    api.get<IntegrationRuntimeReceiptsResponse>("/integrations/runtime-connectors/receipts", {
+      params: { projectId, limit },
+    }),
+  executeRuntime: (request: IntegrationRuntimeExecuteRequest) =>
+    api.post<IntegrationRuntimeExecutionResponse>(
+      "/integrations/runtime-connectors/execute",
+      request,
+    ),
   developerManifest: () =>
     api.get<DeveloperManifestResponse>("/integrations/developer-manifest"),
   validateRecipe: (recipe: IntegrationRecipeDraft) =>
