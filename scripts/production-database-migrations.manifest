@@ -89,3 +89,4 @@ apps/api/src/db/migrations/0088_studio_review_delivery.sql
 apps/api/src/db/migrations/0089_creator_series_spatial_showcase.sql
 apps/api/src/db/migrations/0090_studio_review_voice_note.sql
 apps/api/src/db/migrations/0091_creator_work_publication_media.sql
+apps/api/src/db/migrations/0092_collaboration_application_selection.sql

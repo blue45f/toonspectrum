@@ -70,6 +70,7 @@ export const communityRoutes = defineAppRoutes([
   { id: "collaboration-board", path: "/collaborate", element: <CollaborationBoardPage /> },
   { id: "collaboration-positions", path: "/collaborate/positions", element: <HiringPositionsPage /> },
   { id: "collaboration-career-gallery", path: "/collaborate/gallery", element: <CreatorCareerGalleryPage /> },
+  { id: "team-recruiting", path: "/team/recruiting", element: <HiringWorkspacePage /> },
   { id: "collaboration-workspace", path: "/collaborate/workspace", element: <HiringWorkspacePage /> },
   { id: "collaboration-new", path: "/collaborate/new", element: <CollaborationEditorPage /> },
   { id: "collaboration-moderation", path: "/collaborate/moderation", element: <CollaborationModerationPage /> },
