@@ -14,6 +14,7 @@ import "../styles/studio-overlay-stacking.css";
 import "../styles/studio-save-first.css";
 import "../styles/design-themes.css";
 import "../styles/sitewide-visual-ux.css";
+import "../styles/unified-theme-contract.css";
 
 const STUDIO_BG3D_MAGIC_PRODUCTION_PROOF_QUERY =
   "__studioBg3dMagicProductionProof";

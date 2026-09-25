@@ -1,0 +1,662 @@
+/*
+ * ToonStudio unified theme contract.
+ *
+ * Page-owned artwork may remain cinematic, but application chrome, navigation,
+ * controls, cards and accessibility states always inherit one document palette.
+ * These aliases are concrete on purpose: nested workspace shells previously
+ * shadowed --color-* and prevented light/signature/high-contrast themes from
+ * reaching most routes.
+ */
+:root[data-design-theme="aurora"] {
+  --unified-canvas: oklch(0.968 0.018 285);
+  --unified-panel: oklch(0.988 0.012 275);
+  --unified-card: oklch(0.997 0.008 300);
+  --unified-raised: oklch(0.925 0.035 270);
+  --unified-line: oklch(0.82 0.045 275);
+  --unified-line-strong: oklch(0.7 0.06 275);
+  --unified-fg: oklch(0.22 0.035 275);
+  --unified-fg-2: oklch(0.34 0.04 275);
+  --unified-fg-3: oklch(0.41 0.045 275);
+  --unified-accent: oklch(0.43 0.19 300);
+  --unified-accent-2: oklch(0.4 0.19 315);
+  --unified-accent-soft: oklch(0.67 0.16 300 / 0.16);
+  --unified-on-accent: oklch(0.99 0.008 285);
+}
+:root[data-design-theme="blossom"] {
+  --unified-canvas: oklch(0.972 0.02 30);
+  --unified-panel: oklch(0.99 0.014 35);
+  --unified-card: oklch(0.998 0.008 35);
+  --unified-raised: oklch(0.925 0.038 28);
+  --unified-line: oklch(0.82 0.045 25);
+  --unified-line-strong: oklch(0.7 0.06 20);
+  --unified-fg: oklch(0.23 0.04 18);
+  --unified-fg-2: oklch(0.35 0.045 18);
+  --unified-fg-3: oklch(0.42 0.045 18);
+  --unified-accent: oklch(0.44 0.19 18);
+  --unified-accent-2: oklch(0.4 0.18 350);
+  --unified-accent-soft: oklch(0.69 0.15 20 / 0.16);
+  --unified-on-accent: oklch(0.99 0.008 35);
+}
+:root[data-design-theme="starlight"] {
+  --unified-canvas: oklch(0.17 0.045 275);
+  --unified-panel: oklch(0.205 0.052 275);
+  --unified-card: oklch(0.235 0.055 275);
+  --unified-raised: oklch(0.275 0.06 275);
+  --unified-line: oklch(0.43 0.065 275);
+  --unified-line-strong: oklch(0.57 0.075 275);
+  --unified-fg: oklch(0.97 0.015 265);
+  --unified-fg-2: oklch(0.82 0.03 260);
+  --unified-fg-3: oklch(0.74 0.04 255);
+  --unified-accent: oklch(0.81 0.13 290);
+  --unified-accent-2: oklch(0.77 0.14 225);
+  --unified-accent-soft: oklch(0.8 0.13 285 / 0.18);
+  --unified-on-accent: oklch(0.18 0.045 275);
+}
+:root[data-design-theme="dark"] {
+  --unified-canvas: oklch(0.155 0.008 70);
+  --unified-panel: oklch(0.185 0.009 68);
+  --unified-card: oklch(0.208 0.01 66);
+  --unified-raised: oklch(0.247 0.011 64);
+  --unified-line: oklch(0.305 0.012 64);
+  --unified-line-strong: oklch(0.42 0.013 64);
+  --unified-fg: oklch(0.95 0.01 85);
+  --unified-fg-2: oklch(0.745 0.012 78);
+  --unified-fg-3: oklch(0.655 0.012 76);
+  --unified-accent: oklch(0.72 0.185 42);
+  --unified-accent-2: oklch(0.66 0.2 38);
+  --unified-accent-soft: oklch(0.72 0.185 42 / 0.14);
+  --unified-on-accent: oklch(0.2 0.02 60);
+}
+:root[data-design-theme="light"] {
+  --unified-canvas: oklch(0.972 0.008 85);
+  --unified-panel: oklch(0.992 0.006 85);
+  --unified-card: oklch(0.998 0.004 85);
+  --unified-raised: oklch(0.945 0.009 82);
+  --unified-line: oklch(0.88 0.012 80);
+  --unified-line-strong: oklch(0.78 0.014 78);
+  --unified-fg: oklch(0.26 0.02 60);
+  --unified-fg-2: oklch(0.42 0.018 66);
+  --unified-fg-3: oklch(0.49 0.016 70);
+  --unified-accent: oklch(0.5 0.2 41);
+  --unified-accent-2: oklch(0.47 0.2 36);
+  --unified-accent-soft: oklch(0.62 0.2 40 / 0.12);
+  --unified-on-accent: oklch(0.99 0.01 85);
+}
+:root[data-design-theme="graphite"] {
+  --unified-canvas: oklch(0.23 0 0);
+  --unified-panel: oklch(0.265 0 0);
+  --unified-card: oklch(0.285 0 0);
+  --unified-raised: oklch(0.315 0 0);
+  --unified-line: oklch(0.46 0 0);
+  --unified-line-strong: oklch(0.58 0 0);
+  --unified-fg: oklch(0.96 0 0);
+  --unified-fg-2: oklch(0.81 0 0);
+  --unified-fg-3: oklch(0.73 0 0);
+  --unified-accent: oklch(0.8 0.12 80);
+  --unified-accent-2: oklch(0.76 0.12 80);
+  --unified-accent-soft: oklch(0.8 0.12 80 / 0.16);
+  --unified-on-accent: oklch(0.2 0 0);
+}
+:root[data-design-theme="midnight"] {
+  --unified-canvas: oklch(0.205 0.026 260);
+  --unified-panel: oklch(0.245 0.028 260);
+  --unified-card: oklch(0.265 0.029 260);
+  --unified-raised: oklch(0.295 0.032 260);
+  --unified-line: oklch(0.44 0.038 260);
+  --unified-line-strong: oklch(0.58 0.04 260);
+  --unified-fg: oklch(0.96 0.01 250);
+  --unified-fg-2: oklch(0.81 0.018 250);
+  --unified-fg-3: oklch(0.73 0.02 250);
+  --unified-accent: oklch(0.8 0.1 235);
+  --unified-accent-2: oklch(0.76 0.1 235);
+  --unified-accent-soft: oklch(0.8 0.1 235 / 0.16);
+  --unified-on-accent: oklch(0.2 0.02 260);
+}
+:root[data-design-theme="sepia"] {
+  --unified-canvas: oklch(0.93 0.024 85);
+  --unified-panel: oklch(0.957 0.02 85);
+  --unified-card: oklch(0.973 0.016 85);
+  --unified-raised: oklch(0.905 0.028 82);
+  --unified-line: oklch(0.76 0.035 78);
+  --unified-line-strong: oklch(0.61 0.04 72);
+  --unified-fg: oklch(0.26 0.024 60);
+  --unified-fg-2: oklch(0.38 0.024 64);
+  --unified-fg-3: oklch(0.46 0.023 65);
+  --unified-accent: oklch(0.43 0.1 50);
+  --unified-accent-2: oklch(0.4 0.1 50);
+  --unified-accent-soft: oklch(0.43 0.1 50 / 0.12);
+  --unified-on-accent: oklch(0.98 0.008 85);
+}
+:root[data-design-theme="contrast"] {
+  --unified-canvas: oklch(0.15 0 0);
+  --unified-panel: oklch(0.18 0 0);
+  --unified-card: oklch(0.2 0 0);
+  --unified-raised: oklch(0.23 0 0);
+  --unified-line: oklch(0.64 0 0);
+  --unified-line-strong: oklch(0.8 0 0);
+  --unified-fg: oklch(0.98 0 0);
+  --unified-fg-2: oklch(0.94 0 0);
+  --unified-fg-3: oklch(0.87 0 0);
+  --unified-accent: oklch(0.89 0.14 100);
+  --unified-accent-2: oklch(0.85 0.14 100);
+  --unified-accent-soft: oklch(0.89 0.14 100 / 0.2);
+  --unified-on-accent: oklch(0.17 0 0);
+}
+
+:root[data-design-theme] {
+  --color-bg: var(--color-canvas);
+  --unified-shadow: 0 1rem 3rem color-mix(in oklch, var(--unified-fg) 9%, transparent);
+  --unified-shadow-soft: 0 0.5rem 1.5rem color-mix(in oklch, var(--unified-fg) 7%, transparent);
+  --unified-glass: color-mix(in oklch, var(--unified-panel) 88%, transparent);
+  --unified-route-accent: var(--unified-accent);
+  --unified-route-accent-soft: var(--unified-accent-soft);
+}
+
+.route-stage[data-theme-contract="unified"] {
+  --route-accent: var(--unified-route-accent);
+  --route-accent-soft: var(--unified-route-accent-soft);
+  position: relative;
+  min-width: 0;
+  color: var(--color-fg);
+  background:
+    radial-gradient(circle at 92% -5%, color-mix(in oklch, var(--route-accent) 7%, transparent), transparent 34rem),
+    var(--color-canvas);
+}
+.route-stage[data-route-purpose="discover"] { --route-accent: var(--color-cool); }
+.route-stage[data-route-purpose="learn"] { --route-accent: var(--color-good); }
+.route-stage[data-route-purpose="connect"] { --route-accent: var(--color-accent-2); }
+.route-stage[data-route-purpose="trust"] { --route-accent: var(--color-fg-2); }
+.route-stage[data-route-purpose="manage"] { --route-accent: var(--color-accent); }
+
+.route-stage[data-theme-contract="unified"] :where(.bg-canvas) { background-color: var(--color-canvas); }
+.route-stage[data-theme-contract="unified"] :where(.bg-panel) { background-color: var(--color-panel); }
+.route-stage[data-theme-contract="unified"] :where(.bg-card) { background-color: var(--color-card); }
+.route-stage[data-theme-contract="unified"] :where(.bg-raised) { background-color: var(--color-raised); }
+.route-stage[data-theme-contract="unified"] :where(.border-line) { border-color: var(--color-line); }
+.route-stage[data-theme-contract="unified"] :where(.border-line-strong) { border-color: var(--color-line-strong); }
+
+.route-stage[data-theme-contract="unified"]:not([data-route-surface-identity="editor"]) :where(
+  section.bg-panel,
+  article.bg-panel,
+  aside.bg-panel,
+  section.bg-card,
+  article.bg-card,
+  aside.bg-card
+) {
+  box-shadow: var(--unified-shadow-soft);
+}
+
+.route-stage[data-theme-contract="unified"] :where(a, button, input, select, textarea) {
+  accent-color: var(--color-accent);
+}
+.route-stage[data-theme-contract="unified"] :where(.bg-accent) {
+  background-color: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+}
+.route-stage[data-theme-contract="unified"] :where(.text-on-accent, .text-on-accent\/80) {
+  color: var(--color-on-accent) !important;
+}
+
+/* Nested virtual-workspace chrome must use the document palette instead of a private dark palette. */
+:root[data-design-theme] :is(.workspace-shell, .workspace-focused-shell) {
+  --color-canvas: var(--unified-canvas);
+  --color-panel: var(--unified-panel);
+  --color-card: var(--unified-card);
+  --color-raised: var(--unified-raised);
+  --color-line: var(--unified-line);
+  --color-line-strong: var(--unified-line-strong);
+  --color-fg: var(--unified-fg);
+  --color-fg-2: var(--unified-fg-2);
+  --color-fg-3: var(--unified-fg-3);
+  --color-accent: var(--unified-accent);
+  --color-accent-2: var(--unified-accent-2);
+  --color-accent-soft: var(--unified-accent-soft);
+  --color-on-accent: var(--unified-on-accent);
+  color: var(--color-fg);
+  background:
+    radial-gradient(circle at 82% -10%, color-mix(in oklch, var(--workspace-accent-2, var(--color-cool)) 10%, transparent), transparent 34rem),
+    radial-gradient(circle at 13% 8%, color-mix(in oklch, var(--workspace-accent, var(--color-accent)) 10%, transparent), transparent 31rem),
+    linear-gradient(145deg, color-mix(in oklch, var(--color-canvas) 97%, var(--workspace-accent, var(--color-accent)) 3%), var(--color-canvas));
+}
+
+:root[data-design-theme] :is(.workspace-shell, .workspace-focused-shell)::before {
+  background-image:
+    linear-gradient(90deg,
+      color-mix(in oklch, var(--color-canvas) 92%, transparent) 0%,
+      color-mix(in oklch, var(--color-canvas) 72%, transparent) 48%,
+      color-mix(in oklch, var(--color-canvas) 42%, transparent) 100%),
+    var(--workspace-scene-art);
+  opacity: 0.18;
+  filter: saturate(1.08) contrast(1.02);
+}
+:root[data-theme="light"] :is(.workspace-shell, .workspace-focused-shell)::before { opacity: 0.11; }
+
+:root[data-design-theme] :is(.workspace-topbar, .workspace-focused-topbar) {
+  border-color: var(--color-line) !important;
+  background: linear-gradient(105deg,
+    color-mix(in oklch, var(--color-panel) 94%, transparent),
+    color-mix(in oklch, var(--color-card) 90%, transparent)) !important;
+  box-shadow: 0 0.75rem 2.5rem color-mix(in oklch, var(--color-fg) 7%, transparent), inset 0 -1px var(--color-line);
+}
+:root[data-design-theme] .workspace-sidebar {
+  border-color: var(--color-line);
+  background: linear-gradient(180deg, var(--color-panel), color-mix(in oklch, var(--color-panel) 94%, var(--color-canvas)));
+  box-shadow: 0.75rem 0 2.4rem color-mix(in oklch, var(--color-fg) 6%, transparent);
+}
+:root[data-design-theme] .workspace-main {
+  background: linear-gradient(180deg, color-mix(in oklch, var(--color-panel) 32%, transparent), transparent);
+  scrollbar-color: color-mix(in oklch, var(--color-accent) 52%, transparent) transparent;
+}
+:root[data-design-theme] :is(.workspace-search-trigger, .workspace-focused-search) {
+  border-color: var(--color-line) !important;
+  background: var(--color-card) !important;
+  color: var(--color-fg-2) !important;
+}
+:root[data-design-theme] :is(.workspace-search-trigger, .workspace-focused-search):hover {
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent-soft) !important;
+  color: var(--color-fg) !important;
+}
+:root[data-design-theme] .workspace-task-route-content :where(input, textarea, select) {
+  border-color: var(--color-line) !important;
+  background: var(--color-card) !important;
+  color: var(--color-fg) !important;
+  box-shadow: inset 0 1px color-mix(in oklch, var(--color-fg) 5%, transparent);
+}
+:root[data-design-theme] :is(.workspace-statusbar, .campus-toolbar) {
+  border-color: var(--color-line);
+  background: var(--unified-glass);
+  box-shadow: var(--unified-shadow-soft);
+}
+:root[data-design-theme] .campus-control,
+:root[data-design-theme] .campus-modes,
+:root[data-design-theme] .campus-public-objects a,
+:root[data-design-theme] .campus-private-note {
+  border-color: var(--color-line);
+  background: var(--color-card);
+  color: var(--color-fg-2);
+}
+:root[data-design-theme] .campus-room {
+  border-color: var(--color-line);
+  background: linear-gradient(165deg, var(--color-card), var(--color-panel));
+  box-shadow: var(--unified-shadow);
+}
+:root[data-design-theme] .campus-room-destinations a {
+  border-color: var(--color-line);
+  background: linear-gradient(145deg, var(--color-card), color-mix(in oklch, var(--color-panel) 92%, transparent));
+  color: var(--color-fg);
+}
+:root[data-design-theme] .campus-destination-icon {
+  border-color: var(--color-line-strong);
+  background: color-mix(in oklch, var(--color-card) 84%, var(--color-accent) 16%);
+  color: var(--color-fg);
+}
+
+/* Studio lobby keeps generated artwork as media while its UI follows the selected theme. */
+:root[data-design-theme] .studio-visual-identity-page {
+  --toon-violet: var(--color-accent);
+  --toon-blue: var(--color-cool);
+  --toon-pink: var(--color-accent-2);
+  --toon-cyan: var(--color-cool);
+  --toon-amber: var(--color-warn);
+  --toon-ink: var(--color-canvas);
+  --toon-surface: var(--color-card);
+  --toon-surface-strong: var(--color-panel);
+  --toon-line: var(--color-line);
+  color: var(--color-fg);
+  background: linear-gradient(180deg, var(--color-canvas), color-mix(in oklch, var(--color-canvas) 97%, var(--color-accent) 3%));
+}
+:root[data-design-theme] .studio-creator-quick-actions {
+  border-color: var(--color-line);
+  background: color-mix(in oklch, var(--color-panel) 90%, transparent);
+}
+:root[data-design-theme] .studio-creator-quick-action {
+  background: var(--color-card);
+  color: var(--color-fg);
+}
+:root[data-design-theme] .studio-creator-quick-action:hover {
+  background: color-mix(in oklch, var(--color-raised) 84%, var(--quick-tone) 16%);
+}
+:root[data-design-theme] .studio-creator-quick-action__copy small { color: var(--color-fg-2); }
+:root[data-design-theme] :is(.studio-creator-projects, .studio-ai-director) {
+  border-color: var(--color-line);
+  background-color: var(--color-card);
+  box-shadow: var(--unified-shadow);
+}
+:root[data-design-theme] .studio-ai-director {
+  background:
+    radial-gradient(circle at 78% 22%, color-mix(in oklch, var(--color-cool) 14%, transparent), transparent 28%),
+    radial-gradient(circle at 35% 105%, color-mix(in oklch, var(--color-accent) 14%, transparent), transparent 40%),
+    linear-gradient(155deg, var(--color-card), var(--color-panel) 72%);
+  color: var(--color-fg);
+}
+:root[data-design-theme] .studio-ai-director__heading > p { color: var(--color-fg-2); }
+:root[data-design-theme] .studio-ai-director__prompt > * {
+  border-color: var(--color-line);
+  background: color-mix(in oklch, var(--color-raised) 88%, transparent);
+  color: var(--color-fg-2);
+}
+:root[data-design-theme] .studio-ai-director__prompt > *:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-fg);
+}
+:root[data-design-theme] :is(.studio-ai-director__cta, .studio-creator-hero__primary) {
+  border-color: transparent !important;
+  background: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 0.8rem 2rem color-mix(in oklch, var(--color-accent) 24%, transparent);
+}
+:root[data-theme="light"] :is(.workspace-nav-visual, .studio-creator-quick-action__icon) {
+  border-color: var(--color-line);
+  background: color-mix(in oklch, var(--color-card) 84%, var(--color-accent) 16%);
+}
+:root[data-theme="light"] .workspace-nav-visual::after {
+  background: linear-gradient(145deg, color-mix(in oklch, var(--color-card) 32%, transparent), color-mix(in oklch, var(--color-panel) 68%, transparent));
+}
+
+/* Explicit high-contrast theme: decoration recedes and semantic edges become unmistakable. */
+:root[data-design-theme="contrast"] :where(
+  .route-stage,
+  .workspace-shell,
+  .workspace-focused-shell,
+  .studio-visual-identity-page
+) {
+  background-image: none !important;
+}
+:root[data-design-theme="contrast"] :where(
+  .workspace-shell::before,
+  .workspace-shell::after,
+  .workspace-focused-shell::before,
+  .workspace-focused-shell::after,
+  .studio-visual-identity-page::before,
+  .studio-ai-director__glow
+) {
+  display: none !important;
+}
+:root[data-design-theme="contrast"] :where(
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  summary,
+  [role="button"]
+):focus-visible {
+  outline: 3px solid var(--color-accent) !important;
+  outline-offset: 3px !important;
+}
+:root[data-design-theme="contrast"] :where(
+  .workspace-topbar,
+  .workspace-sidebar,
+  .workspace-statusbar,
+  .workspace-nav a,
+  .studio-creator-projects,
+  .studio-ai-director,
+  .studio-creator-quick-action,
+  .campus-toolbar,
+  .campus-room,
+  .campus-room-destinations a
+) {
+  border-color: var(--color-line-strong) !important;
+  box-shadow: none !important;
+}
+:root[data-design-theme="contrast"] :where(.workspace-nav-visual-art, .workspace-nav-visual > img) {
+  opacity: 0.25;
+  filter: grayscale(1) contrast(1.4);
+}
+
+@media (prefers-contrast: more) {
+  :root:not([data-design-theme="contrast"]) {
+    --unified-line: color-mix(in oklch, var(--unified-fg) 40%, var(--unified-panel));
+    --unified-line-strong: color-mix(in oklch, var(--unified-fg) 64%, var(--unified-panel));
+    --unified-fg-2: color-mix(in oklch, var(--unified-fg) 88%, var(--unified-canvas));
+    --unified-fg-3: color-mix(in oklch, var(--unified-fg) 76%, var(--unified-canvas));
+    --color-line: var(--unified-line);
+    --color-line-strong: var(--unified-line-strong);
+    --color-fg-2: var(--unified-fg-2);
+    --color-fg-3: var(--unified-fg-3);
+  }
+  :where(button, a, input, select, textarea, summary, [role="button"]):focus-visible {
+    outline-width: 3px !important;
+    outline-offset: 3px !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :root[data-design-theme] {
+    --unified-canvas: Canvas;
+    --unified-panel: Canvas;
+    --unified-card: Canvas;
+    --unified-raised: Canvas;
+    --unified-line: CanvasText;
+    --unified-line-strong: CanvasText;
+    --unified-fg: CanvasText;
+    --unified-fg-2: CanvasText;
+    --unified-fg-3: CanvasText;
+    --unified-accent: Highlight;
+    --unified-accent-2: Highlight;
+    --unified-accent-soft: Canvas;
+    --unified-on-accent: HighlightText;
+    --color-bg: Canvas;
+    --color-canvas: Canvas;
+    --color-panel: Canvas;
+    --color-card: Canvas;
+    --color-raised: Canvas;
+    --color-line: CanvasText;
+    --color-line-strong: CanvasText;
+    --color-fg: CanvasText;
+    --color-fg-2: CanvasText;
+    --color-fg-3: CanvasText;
+    --color-accent: Highlight;
+    --color-accent-2: Highlight;
+    --color-accent-soft: Canvas;
+    --color-on-accent: HighlightText;
+    --color-control-border: ButtonText;
+    --color-focus-ring: Highlight;
+    --color-selection-bg: Highlight;
+    --color-selection-fg: HighlightText;
+    --color-cool: Highlight;
+    --color-good: CanvasText;
+    --color-warn: CanvasText;
+    --color-warning: CanvasText;
+    --color-warning-soft: Canvas;
+    --color-bad: CanvasText;
+  }
+  [data-site-chrome="footer"] {
+    --color-bg: Canvas;
+    --color-canvas: Canvas;
+    --color-panel: Canvas;
+    --color-card: Canvas;
+    --color-raised: Canvas;
+    --color-line: CanvasText;
+    --color-line-strong: CanvasText;
+    --color-fg: CanvasText;
+    --color-fg-2: CanvasText;
+    --color-fg-3: CanvasText;
+    --color-accent: Highlight;
+    --color-accent-2: Highlight;
+    --color-accent-soft: Canvas;
+    --color-on-accent: HighlightText;
+    background: Canvas !important;
+    color: CanvasText !important;
+  }
+  :root[data-design-theme] [data-site-chrome="footer"] :where(
+    .text-fg,
+    .text-fg-2,
+    .text-fg-3,
+    .text-accent
+  ) {
+    color: CanvasText !important;
+  }
+  :root[data-design-theme] [data-site-chrome="footer"] :where(
+    .bg-panel\/85,
+    .bg-panel\/72,
+    .bg-card,
+    .bg-card\/65
+  ) {
+    background: Canvas !important;
+  }
+  :root[data-design-theme] [data-site-chrome="footer"] .bg-accent {
+    forced-color-adjust: none !important;
+    border-color: Highlight !important;
+    background: Highlight !important;
+    color: HighlightText !important;
+  }
+  :root[data-design-theme] [data-site-chrome="footer"] .bg-accent * {
+    color: HighlightText !important;
+  }
+  :where(
+    .route-stage,
+    .workspace-shell,
+    .workspace-focused-shell,
+    .studio-visual-identity-page,
+    .workspace-topbar,
+    .workspace-sidebar,
+    .workspace-statusbar,
+    .studio-creator-projects,
+    .studio-ai-director,
+    .studio-creator-quick-action,
+    .campus-toolbar,
+    .campus-room,
+    .campus-room-destinations a
+  ) {
+    background: Canvas !important;
+    color: CanvasText !important;
+    box-shadow: none !important;
+  }
+  :where(
+    .route-stage::before,
+    .route-stage::after,
+    .workspace-shell::before,
+    .workspace-shell::after,
+    .workspace-focused-shell::before,
+    .workspace-focused-shell::after,
+    .studio-visual-identity-page::before,
+    .studio-ai-director__glow,
+    .campus-room-aurora,
+    .campus-room-media::after
+  ) { display: none !important; }
+  :root[data-design-theme] .route-stage :where(
+    h1, h2, h3, h4, h5, h6,
+    p, span, small, strong, em, li, dt, dd, label,
+    figcaption, code, kbd, time, output
+  ) {
+    color: CanvasText !important;
+    -webkit-text-fill-color: currentColor !important;
+  }
+  :root[data-design-theme] .route-stage :where(a) {
+    background: Canvas !important;
+    color: LinkText !important;
+    -webkit-text-fill-color: currentColor !important;
+  }
+  :root[data-design-theme] .route-stage :where(button, input, select, textarea, summary, [role="button"]) {
+    background: ButtonFace !important;
+    color: ButtonText !important;
+    -webkit-text-fill-color: currentColor !important;
+  }
+  :where(button, a, input, select, textarea, summary, [role="button"]) {
+    border-color: ButtonText !important;
+  }
+  :where(button, a, input, select, textarea, summary, [role="button"]):focus-visible {
+    outline: 3px solid Highlight !important;
+    outline-offset: 3px !important;
+  }
+  :root[data-design-theme] .route-stage :where(
+    .bg-accent,
+    .bg-fg,
+    .border-accent,
+    .primary,
+    .workspace-primary,
+    .webtoon-gallery-primary,
+    .fb-primary,
+    .learn-primary,
+    .learn-recommended-label,
+    .play-button.primary,
+    .ref-primary,
+    .studio-ai-director__cta,
+    .studio-creator-hero__primary,
+    [aria-current="page"],
+    [aria-selected="true"],
+    [aria-pressed="true"],
+    [data-selected="true"]
+  ) {
+    forced-color-adjust: none !important;
+    border-color: Highlight !important;
+    background: Highlight !important;
+    color: HighlightText !important;
+    -webkit-text-fill-color: currentColor !important;
+  }
+  :root[data-design-theme] .route-stage :where(
+    .bg-accent,
+    .bg-fg,
+    .border-accent,
+    .primary,
+    .workspace-primary,
+    .webtoon-gallery-primary,
+    .fb-primary,
+    .learn-primary,
+    .learn-recommended-label,
+    .play-button.primary,
+    .ref-primary,
+    .studio-ai-director__cta,
+    .studio-creator-hero__primary,
+    [aria-current="page"],
+    [aria-selected="true"],
+    [aria-pressed="true"],
+    [data-selected="true"]
+  ) * {
+    color: HighlightText !important;
+    -webkit-text-fill-color: currentColor !important;
+  }
+  :where(
+    .text-warning,
+    .text-good,
+    .text-bad,
+    .studio-ai-director__badge,
+    [data-studio-beta-notice="true"] [class*="text-warning"]
+  ) {
+    border-color: CanvasText !important;
+    background: Canvas !important;
+    color: CanvasText !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-stage[data-theme-contract="unified"] *,
+  .workspace-shell *,
+  .workspace-focused-shell *,
+  .studio-visual-identity-page * {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Global notices and overlays must not keep a Studio-only dark palette. */
+:root[data-design-theme] [data-studio-beta-notice="true"] {
+  border-color: var(--color-line-strong) !important;
+  background: color-mix(in oklch, var(--color-panel) 96%, transparent) !important;
+  color: var(--color-fg) !important;
+  box-shadow: var(--unified-shadow) !important;
+}
+:root[data-design-theme] [data-studio-beta-notice="true"] > :where(div) {
+  border-color: var(--color-line) !important;
+}
+:root[data-design-theme] [data-studio-beta-notice="true"] :where(.bg-card\/75, .bg-card\/45, .bg-card) {
+  background-color: var(--color-card) !important;
+}
+:root[data-design-theme="contrast"] [data-studio-beta-notice="true"] {
+  border-width: 2px !important;
+  background: var(--color-panel) !important;
+  box-shadow: none !important;
+}
+:root[data-design-theme="contrast"] [data-studio-beta-notice="true"] :where(p, h2, h3) {
+  color: var(--color-fg) !important;
+}
+
+/* Public journey cards keep their generated artwork, but their semantic labels use the active palette. */
+:root[data-design-theme] [data-site-experience] .public-site-next__card {
+  --next-accent: var(--color-accent);
+}
+:root[data-design-theme] [data-site-experience] :is(.public-site-next__tag, .public-site-next__action) {
+  color: var(--color-accent);
+}

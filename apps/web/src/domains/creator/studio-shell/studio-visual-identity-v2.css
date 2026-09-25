@@ -98,3 +98,241 @@
 @media(max-width:900px){[data-studio-editor="true"] [data-studio-app-menubar="true"]{min-height:50px}[data-studio-editor="true"] [data-studio-shell-layout-surface="tool-rail"]::before,[data-studio-editor="true"] [data-studio-detachable-surface="inspector"]::before,[data-studio-editor="true"] [data-studio-detachable-surface="page-list"]::before{display:none}}
 @media(prefers-reduced-motion:reduce){[data-studio-editor="true"] *,[data-studio-beta-notice="true"] *{animation:none!important;transition:none!important;scroll-behavior:auto!important}[data-studio-editor="true"] :where([data-studio-rail-tool-id],[data-studio-current-tool-id],[data-studio-rail-launcher]):hover,[data-studio-beta-notice-acknowledge="true"]:hover{transform:none!important}}
 @media(forced-colors:active){[data-studio-editor="true"],[data-studio-beta-notice="true"]{background:Canvas!important;color:CanvasText}[data-studio-editor="true"]::before,[data-studio-editor="true"] [data-studio-shell-layout-surface="tool-rail"]::before,[data-studio-editor="true"] [data-studio-detachable-surface="inspector"]::before,[data-studio-editor="true"] [data-studio-detachable-surface="page-list"]::before,[data-studio-beta-notice="true"]::before{display:none}:where([data-studio-editor="true"],[data-studio-beta-notice="true"]) :where(button,a,input,select,textarea,[role="button"]){border:1px solid ButtonText!important}}
+
+/* Theme bridge — editor chrome follows the document palette; the artwork canvas stays neutral. */
+:root[data-design-theme] [data-studio-editor="true"] {
+  --color-canvas: var(--unified-canvas);
+  --color-panel: var(--unified-panel);
+  --color-card: var(--unified-card);
+  --color-raised: var(--unified-raised);
+  --color-line: var(--unified-line);
+  --color-line-strong: var(--unified-line-strong);
+  --color-fg: var(--unified-fg);
+  --color-fg-2: var(--unified-fg-2);
+  --color-fg-3: var(--unified-fg-3);
+  --color-accent: var(--unified-accent);
+  --color-accent-2: var(--unified-accent-2);
+  --color-accent-soft: var(--unified-accent-soft);
+  --color-on-accent: var(--unified-on-accent);
+  --studio-identity-violet: var(--color-accent);
+  --studio-identity-blue: var(--color-cool);
+  --studio-identity-pink: var(--color-accent-2);
+  --studio-identity-mint: var(--color-good);
+  color: var(--color-fg);
+  background:
+    radial-gradient(circle at 18% -8%, color-mix(in oklch, var(--color-accent) 10%, transparent), transparent 30rem),
+    radial-gradient(circle at 88% 4%, color-mix(in oklch, var(--color-cool) 7%, transparent), transparent 28rem),
+    var(--color-canvas) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] * {
+  scrollbar-color: color-mix(in oklch, var(--color-accent) 48%, transparent) transparent;
+}
+:root[data-design-theme] [data-studio-editor="true"] [data-studio-app-menubar="true"] {
+  border-color: var(--color-line) !important;
+  background: linear-gradient(105deg, var(--color-panel), color-mix(in oklch, var(--color-card) 92%, transparent)) !important;
+  box-shadow: 0 0.75rem 2.25rem color-mix(in oklch, var(--color-fg) 8%, transparent), inset 0 -1px var(--color-line);
+}
+:root[data-design-theme] [data-studio-editor="true"] [data-studio-app-menubar="true"]::after {
+  background: linear-gradient(90deg, transparent, var(--color-accent), var(--color-cool), var(--color-accent-2), transparent);
+  filter: none;
+}
+:root[data-design-theme] [data-studio-editor="true"] [data-studio-app-menubar="true"] :where(button, a, [role="button"]):not(:disabled):hover {
+  border-color: var(--color-line-strong) !important;
+  background: var(--color-accent-soft) !important;
+  color: var(--color-fg) !important;
+  box-shadow: 0 0.5rem 1.2rem color-mix(in oklch, var(--color-fg) 6%, transparent);
+}
+:root[data-design-theme] [data-studio-editor="true"] [data-studio-menubar-primary="true"] {
+  border-color: var(--color-line-strong) !important;
+  background: var(--color-accent-soft) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] [data-studio-document-window-hub-bar="true"] {
+  border-color: var(--color-line) !important;
+  background: color-mix(in oklch, var(--color-panel) 86%, transparent) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] :is(
+  [data-studio-draw-options-dock="true"],
+  [data-studio-workbench-options="true"],
+  [data-studio-shell-layout-surface="tool-rail"],
+  [data-studio-detachable-surface="inspector"],
+  [data-studio-detachable-surface="page-list"],
+  [data-studio-brush-workbench-dock="true"],
+  [data-studio-layer-list-header],
+  [data-studio-inspector-primary],
+  [data-studio-status-bar]
+) {
+  border-color: var(--color-line) !important;
+  background: linear-gradient(180deg, var(--color-panel), color-mix(in oklch, var(--color-panel) 94%, var(--color-canvas))) !important;
+  box-shadow: 0 0.75rem 2rem color-mix(in oklch, var(--color-fg) 7%, transparent), inset 0 1px color-mix(in oklch, var(--color-fg) 5%, transparent) !important;
+}
+:root[data-theme="light"] [data-studio-editor="true"] :is(
+  [data-studio-shell-layout-surface="tool-rail"],
+  [data-studio-detachable-surface="inspector"],
+  [data-studio-detachable-surface="page-list"]
+)::before {
+  opacity: 0.07;
+  filter: saturate(0.75) contrast(0.95);
+}
+:root[data-design-theme] [data-studio-editor="true"] [data-studio-brush-active-pill="true"] {
+  border-color: var(--color-line-strong) !important;
+  background: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 0.5rem 1.4rem color-mix(in oklch, var(--color-accent) 22%, transparent) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] :where(
+  [data-studio-rail-tool-id],
+  [data-studio-current-tool-id],
+  [data-studio-rail-launcher]
+) {
+  color: var(--color-fg-2) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] :where(
+  [data-studio-rail-tool-id],
+  [data-studio-current-tool-id],
+  [data-studio-rail-launcher]
+):hover {
+  border-color: var(--color-line-strong) !important;
+  background: var(--color-raised) !important;
+  color: var(--color-fg) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] :where(
+  [data-studio-rail-tool-id],
+  [data-studio-current-tool-id]
+)[aria-pressed="true"] {
+  border-color: var(--color-accent) !important;
+  background: color-mix(in oklch, var(--color-card) 78%, var(--color-accent) 22%) !important;
+  color: var(--color-fg) !important;
+  box-shadow: 0 0 0 3px var(--color-accent-soft), 0 0.6rem 1.4rem color-mix(in oklch, var(--color-fg) 8%, transparent) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] :where(
+  [data-studio-brush-profile-card],
+  [data-studio-brush-chip],
+  [data-studio-asset-card],
+  [data-studio-layer-row]
+) {
+  border-color: var(--color-line) !important;
+  background: var(--color-card) !important;
+  color: var(--color-fg) !important;
+  box-shadow: inset 0 1px color-mix(in oklch, var(--color-fg) 4%, transparent) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] :where(dialog, [role="dialog"]) {
+  border-color: var(--color-line-strong) !important;
+  background: linear-gradient(155deg, var(--color-card), var(--color-panel)) !important;
+  color: var(--color-fg) !important;
+  box-shadow: 0 1.75rem 5rem color-mix(in oklch, var(--color-fg) 14%, transparent) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] :where(input, textarea, select) {
+  border-color: var(--color-line) !important;
+  background: var(--color-control-fill) !important;
+  color: var(--color-fg) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] :where(input, textarea, select):focus {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 3px var(--color-accent-soft) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] :where(
+  [data-studio-canvas-status-rail],
+  [data-studio-canvas-control]
+) {
+  border-color: var(--color-line) !important;
+  background: color-mix(in oklch, var(--color-panel) 92%, transparent) !important;
+  color: var(--color-fg) !important;
+}
+:root[data-design-theme] [data-studio-editor="true"] .bg-accent {
+  background: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 0.65rem 1.5rem color-mix(in oklch, var(--color-accent) 22%, transparent);
+}
+
+/* The beta notice is global chrome, not an always-dark promotional card. */
+:root[data-design-theme] [data-studio-beta-notice="true"] {
+  --color-panel: var(--unified-panel);
+  --color-card: var(--unified-card);
+  --color-raised: var(--unified-raised);
+  --color-line: var(--unified-line);
+  --color-line-strong: var(--unified-line-strong);
+  --color-fg: var(--unified-fg);
+  --color-fg-2: var(--unified-fg-2);
+  --color-fg-3: var(--unified-fg-3);
+  --color-accent: var(--unified-accent);
+  --color-accent-2: var(--unified-accent-2);
+  --color-on-accent: var(--unified-on-accent);
+  border-color: var(--color-line-strong) !important;
+  background: linear-gradient(150deg, var(--color-card), var(--color-panel)) !important;
+  color: var(--color-fg) !important;
+  box-shadow: 0 1.5rem 4rem color-mix(in oklch, var(--color-fg) 14%, transparent) !important;
+}
+:root[data-design-theme] [data-studio-beta-notice="true"]::before {
+  background: radial-gradient(circle at 8% 0%, var(--color-accent-soft), transparent 22rem);
+  opacity: 0.7;
+}
+:root[data-design-theme] [data-studio-beta-notice="true"] section {
+  border-color: var(--color-line) !important;
+  background: var(--color-card) !important;
+  color: var(--color-fg) !important;
+  box-shadow: inset 0 1px color-mix(in oklch, var(--color-fg) 5%, transparent);
+}
+:root[data-design-theme] [data-studio-beta-notice-acknowledge="true"] {
+  border-color: transparent !important;
+  background: var(--color-accent) !important;
+  color: var(--color-on-accent) !important;
+  box-shadow: 0 0.75rem 1.75rem color-mix(in oklch, var(--color-accent) 24%, transparent) !important;
+}
+:root[data-design-theme="contrast"] [data-studio-editor="true"] {
+  background: var(--color-canvas) !important;
+}
+:root[data-design-theme="contrast"] [data-studio-editor="true"]::before,
+:root[data-design-theme="contrast"] [data-studio-editor="true"] :is(
+  [data-studio-shell-layout-surface="tool-rail"],
+  [data-studio-detachable-surface="inspector"],
+  [data-studio-detachable-surface="page-list"]
+)::before,
+:root[data-design-theme="contrast"] [data-studio-beta-notice="true"]::before {
+  display: none !important;
+}
+:root[data-design-theme="contrast"] [data-studio-editor="true"] :where(
+  [data-studio-app-menubar="true"],
+  [data-studio-draw-options-dock="true"],
+  [data-studio-workbench-options="true"],
+  [data-studio-shell-layout-surface="tool-rail"],
+  [data-studio-detachable-surface="inspector"],
+  [data-studio-detachable-surface="page-list"],
+  dialog,
+  [role="dialog"]
+),
+:root[data-design-theme="contrast"] [data-studio-beta-notice="true"] {
+  border-color: var(--color-line-strong) !important;
+  box-shadow: none !important;
+}
+
+@media (forced-colors: active) {
+  [data-studio-editor="true"],
+  [data-studio-beta-notice="true"] {
+    background: Canvas !important;
+    color: CanvasText !important;
+    box-shadow: none !important;
+  }
+  [data-studio-editor="true"] :where(
+    [data-studio-app-menubar="true"],
+    [data-studio-draw-options-dock="true"],
+    [data-studio-workbench-options="true"],
+    [data-studio-shell-layout-surface="tool-rail"],
+    [data-studio-detachable-surface="inspector"],
+    [data-studio-detachable-surface="page-list"],
+    dialog,
+    [role="dialog"]
+  ),
+  [data-studio-beta-notice="true"] section {
+    background: Canvas !important;
+    color: CanvasText !important;
+    border-color: CanvasText !important;
+    box-shadow: none !important;
+  }
+  [data-studio-beta-notice-acknowledge="true"],
+  [data-studio-editor="true"] .bg-accent {
+    forced-color-adjust: none !important;
+    border-color: Highlight !important;
+    background: Highlight !important;
+    color: HighlightText !important;
+  }
+}

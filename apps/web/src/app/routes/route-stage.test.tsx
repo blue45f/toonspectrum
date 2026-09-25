@@ -29,6 +29,19 @@ describe("route stage semantic and recovery guarantees", () => {
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 
+  it("publishes the shared theme, product, purpose and maturity contract", () => {
+    render(
+      <RouteStage pathname="/market/browse" search="?type=brush" accessibleTitle="Browse assets">
+        <section data-route-ready=""><h1>Browse assets</h1></section>
+      </RouteStage>,
+    );
+    const stage = document.querySelector("[data-route-stage-key]");
+    expect(stage?.getAttribute("data-theme-contract")).toBe("unified");
+    expect(stage?.getAttribute("data-route-product")).toBe("studio");
+    expect(stage?.getAttribute("data-route-purpose")).toBe("create");
+    expect(stage?.getAttribute("data-route-maturity")).toBe("stable");
+  });
+
   it("publishes pending and ready route state for browser health checks", async () => {
     const { rerender } = render(
       <RouteStage pathname="/production" search="" accessibleTitle="Production">

@@ -2,6 +2,7 @@ import { AlertTriangle, Home, RefreshCw, Rows3 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type AnimationEvent, type ReactNode } from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { resolveSiteRouteMetadata } from "@/shared/lib/site-route-metadata";
 import { inspectRouteContent, routeStageTimeoutMs, type RouteContentSource, type RouteContentState } from "./route-stage-content";
 
 import { allowStudioProgrammaticReload } from "@/shared/lib/programmatic-reload";
@@ -41,6 +42,7 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
 
 
   const location = { pathname, search };
+  const routeMetadata = resolveSiteRouteMetadata(`${pathname}${search}`);
   const studioResolution = isStudioRoutePathname(pathname)
     ? resolveStudioRoute(location)
     : null;
@@ -110,6 +112,10 @@ export function RouteStage({ pathname, search, accessibleTitle, children }: Rout
       data-route-state={routeState === "empty" ? translateCurrentStaticSourceText("app.routes.route.stage", "en", "pending") : routeState}
       data-route-readiness-source={readinessSource}
       data-route-surface-identity={surfaceIdentity}
+      data-theme-contract="unified"
+      data-route-product={routeMetadata.product}
+      data-route-purpose={routeMetadata.purpose}
+      data-route-maturity={routeMetadata.maturity}
       aria-busy={routeState === "pending" || routeState === "empty"}
       className={cn(
         "route-stage",
