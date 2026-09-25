@@ -266,6 +266,7 @@ export const SITEMAP_EXTENDED_DESTINATION_GROUPS: readonly ExtendedDestinationGr
       destination("/studio/ai-runtime", "개인 AI 런타임", "Personal AI runtime", "직접 운영하는 추론 서버 연결", "Connect a creator-operated inference server"),
       destination("/settings/ai", "AI 연결과 사용 순서", "AI connections and routing", "자동 무료 AI, 내 API 키와 기능별 사용 순서 관리", "Manage automatic free AI, personal credentials and per-capability routing"),
       destination("/studio/ecosystem", "창작 생태계", "Creator ecosystem", "제작 도구·작업·리소스를 한곳에서 관리", "Manage creation tools, work and resources together"),
+      destination("/studio/growth", "성장 실험·독자 퍼널", "Growth experiments & audience funnel", "썸네일·제목·소개문 변형을 집계 지표로 비교", "Compare thumbnail, title and description variants with aggregate metrics"),
       destination("/studio/growth-ip", "작가 성장·IP 확장", "Creator growth & IP", "신인 발굴·지원·웹소설 각색·판권·교육·협업 관리", "Manage creator support, adaptation, rights, education and collaboration"),
       destination("/studio/environment", "사용 환경 안내", "Environment guide", "브라우저 기능·PWA 설치·권한·오프라인 준비 상태 점검", "Check browser capabilities, PWA installation, permissions and offline readiness"),
       destination("/studio/ecosystem/viewer", "생태계 뷰어", "Ecosystem viewer", "연결된 제작 자산과 흐름을 시각화", "Visualize connected creative assets and workflows"),
