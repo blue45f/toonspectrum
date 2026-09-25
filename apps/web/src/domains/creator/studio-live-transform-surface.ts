@@ -3,6 +3,9 @@ import { STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS } from "./studio-live-tr
 
 import type Konva from "konva";
 
+export const STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE = "data-studio-live-transform-surface";
+export const STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE_VALUE = "adaptive-preview";
+
 /** Bound only the ephemeral scene surface; document/export and pointer hit pixels stay untouched. */
 export function studioLiveTransformSurfacePixelRatio(
   width: number,
@@ -28,8 +31,13 @@ export function studioLiveTransformSurfacePixelRatio(
 export function attachStudioLiveTransformSurface(layer: Konva.Layer): () => void {
   const stage = layer.getStage();
   if (!stage) return () => undefined;
+  const canvas = layer.getCanvas();
+  const nativeCanvas = canvas._canvas;
+  nativeCanvas.setAttribute(
+    STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE,
+    STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE_VALUE,
+  );
   const syncResolution = () => {
-    const canvas = layer.getCanvas();
     const ratio = studioLiveTransformSurfacePixelRatio(
       stage.width(), stage.height(), studioKonvaRuntime.pixelRatio,
     );
@@ -45,5 +53,6 @@ export function attachStudioLiveTransformSurface(layer: Konva.Layer): () => void
   return () => {
     stage.off(events, syncResolution);
     globalThis.removeEventListener?.("resize", syncResolution);
+    nativeCanvas.removeAttribute(STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE);
   };
 }

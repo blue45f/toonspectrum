@@ -8,6 +8,12 @@
   z-index: 59;
 }
 
+/* First-run notices are sequential, not stacked. The beta acknowledgement owns the shared desktop
+ * corner first; once its host unmounts, the quick-start coach becomes visible without being lost. */
+html:has([data-studio-beta-notice-host="true"]) [data-studio-creative-starter="true"] {
+  display: none !important;
+}
+
 /* Modal and full-screen navigation own the viewport while open. Decorative fixed controls must
  * leave the interaction layer instead of covering menu items or trapping pointer events. */
 html:has([role="dialog"][aria-modal="true"]) [data-site-ost="mounted"],
