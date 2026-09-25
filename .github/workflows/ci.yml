@@ -132,6 +132,8 @@ jobs:
             !/apps/web/public/vrm/
             !/artifacts/
             !/docs/
+            /docs/AGENTS.md
+            /docs/operations/agent-harness.md
             !/tests/benchmarks/results/
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
@@ -139,7 +141,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - name: Verify mandatory CI wiring before installing dependencies
-        run: node --test scripts/ci-core-gate.test.mjs scripts/ci-core-regression-shards.test.mjs scripts/ci-executed-gates.test.mjs scripts/lint-changed-policy.test.mjs scripts/run-core-vitest.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs scripts/ci-throughput-policy.test.mjs
+        run: node --test scripts/ci-core-gate.test.mjs scripts/agent-harness.test.mjs scripts/ci-core-regression-shards.test.mjs scripts/ci-executed-gates.test.mjs scripts/lint-changed-policy.test.mjs scripts/run-core-vitest.test.mjs scripts/studio-bundle-temporary-allowance.test.mjs scripts/ci-merge-reliability.test.mjs scripts/ci-throughput-policy.test.mjs
       - name: Verify deduplicated PR workflow policy
         run: python3 scripts/verify-pr-workflow-fanout.py
       - run: pnpm install --frozen-lockfile --prefer-offline

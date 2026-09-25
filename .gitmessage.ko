@@ -1,0 +1,17 @@
+# ToonSpectrum 커밋 작성 가이드
+#
+# 형식: <type>(<scope>): <한글 요약>
+# 예시: feat(studio): 레이어 그룹 기능 추가
+# 예시: fix(auth): 만료된 소셜 세션 복구
+# 예시: docs(harness): 에이전트 작업 절차 정리
+#
+# 허용 type:
+# build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test
+#
+# 제목 아래 한 줄을 비우고 필요할 때 다음을 설명한다.
+# - 왜 변경했는지
+# - 어떤 방식으로 해결했는지
+# - 호환성·위험·후속 작업이 무엇인지
+#
+# Conventional Commits의 type/scope와 코드 식별자는 영문으로 유지한다.
+# 제목과 본문은 한글을 기본으로 한다.

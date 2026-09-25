@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+set -e
+
+MESSAGE_FILE="$1"
+SOURCE="${2:-}"
+
+case "$SOURCE" in
+  ""|template) ;;
+  *) exit 0 ;;
+esac
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+TEMPLATE="$ROOT/.gitmessage.ko"
+
+[ -n "$ROOT" ] && [ -f "$TEMPLATE" ] || exit 0
+if grep -q "ToonSpectrum 커밋 작성 가이드" "$MESSAGE_FILE" 2>/dev/null; then
+  exit 0
+fi
+
+TEMP_FILE="${MESSAGE_FILE}.toonspectrum-template"
+cat "$TEMPLATE" "$MESSAGE_FILE" > "$TEMP_FILE"
+mv "$TEMP_FILE" "$MESSAGE_FILE"
