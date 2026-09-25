@@ -84,7 +84,7 @@ jobs:
           STUDIO_CAMPAIGN_TEST_DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
         run: >-
           pnpm exec vitest run apps/web/src/domains/admin apps/api/src/modules/admin
-          apps/web/src/shared/lib/__tests__/admin-emails.test.ts apps/web/src/shared/lib/__tests__/admin-security.test.ts
+          tests/integration/web-api/shared/lib/__tests__/admin-emails.test.ts tests/integration/web-api/shared/lib/__tests__/admin-security.test.ts
           --maxWorkers=2 --reporter=default --reporter=json
           --outputFile=test-results/admin-hardening/vitest.json
       - name: Verify isolated accounts and real session APIs

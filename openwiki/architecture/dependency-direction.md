@@ -17,6 +17,7 @@ Forbidden direct source edges:
 - API -> Web or Admin Web source
 - packages -> application source
 - app `shared` -> app `domains`
+- application/package tests outside `tests/integration` -> another application's source
 
 Cross-domain deep imports inside an app are tracked as migration debt. New Admin debt starts at zero; existing Web debt is measured before a numeric baseline is frozen and then ratcheted downward.
 

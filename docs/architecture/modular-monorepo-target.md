@@ -19,8 +19,9 @@ Status: **migration target**. This document separates current reality from the i
 - `apps/admin-web` is a separate workspace package with app-owned Vite, TypeScript and
   Playwright configuration, but most production administrator capability still remains under
   `apps/web/src/domains/admin` and must migrate capability by capability.
-- `apps/api` is a separate workspace package and owns its Drizzle configuration, while existing
-  API→Web imports and the `server/common/infrastructure/db` layout remain measured migration debt.
+- `apps/api` is a separate workspace package and owns its Drizzle configuration. Cross-app test
+  source inspection has moved to `tests/integration`, reducing measured API→Web runtime debt to
+  145 edges; `server/common/infrastructure/db` remains source-layout migration debt.
 - `apps/desktop-sync` is the single desktop synchronization workspace. The previous focused
   watcher/journal companion is preserved under `apps/desktop-sync/src/local-agent` and exposed
   through the `@toonspectrum/desktop-sync/local-agent` subpath.
@@ -32,6 +33,8 @@ Status: **migration target**. This document separates current reality from the i
   marketplace comparison material lives under `tests/benchmarks/marketplace`.
 - Shared repository-level Playwright, lint and TypeScript orchestration remains at the root;
   application-specific Vite, Drizzle, Capacitor and Admin configuration is app-owned.
+- Cross-application and package-to-application tests live under `tests/integration`; application
+  and package source trees no longer own tests that inspect another deployable application's source.
 - Large static assets still require a later manifest-addressed object-storage slice.
 
 ## Target application layout
@@ -63,7 +66,8 @@ api       ─┘
 
 Applications never import another application's source. `shared` never depends on `domains`;
 platform adapters never own business rules. Cross-domain deep imports converge toward narrow
-`public` or `integrations` boundaries.
+`public` or `integrations` boundaries. Cross-application source verification belongs under
+`tests/integration`, not inside an application or shared package source tree.
 
 ## Focused shared packages
 

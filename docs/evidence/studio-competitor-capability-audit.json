@@ -281,7 +281,7 @@
         {
           "dimension": "automated-test",
           "status": "verified",
-          "reference": "apps/api/src/modules/creator/studio-work-asset.repository.test.ts"
+          "reference": "tests/integration/api-web/api/modules/creator/studio-work-asset.repository.test.ts"
         },
         {
           "dimension": "persistence",

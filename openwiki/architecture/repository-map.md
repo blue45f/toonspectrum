@@ -17,6 +17,7 @@ config/                  machine-readable policy and dependency/source ratchets
 data/asset-releases/      durable reviewed asset-release evidence
 docs/architecture/       human-authored current/target design
 openwiki/                generated/maintained navigation layer
+tests/integration/       cross-application and package/application boundary tests
 tools/                   non-runtime authoring, automation and DCC tooling
 scripts/                 verification and migration tooling
 ```

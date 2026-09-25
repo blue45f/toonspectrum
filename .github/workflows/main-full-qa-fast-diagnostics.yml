@@ -67,7 +67,7 @@ jobs:
           - apps/web/src/domains/creator/ai/studio-3d-generation-client.test.ts
           - apps/web/src/domains/creator/filter/studio-adjustment-effect-graph.test.ts
           - apps/web/src/domains/creator/layer/studio-layer-effects-graph-adapter.test.ts
-          - apps/web/src/domains/creator/studio-large-epics-product-wiring.test.ts
+          - tests/integration/web-api/domains/creator/studio-large-epics-product-wiring.test.ts
           - apps/web/src/domains/creator/studio-soft-proofing.test.ts
     steps:
       - uses: actions/checkout@v6

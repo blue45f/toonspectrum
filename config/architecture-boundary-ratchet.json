@@ -1,15 +1,16 @@
 {
   "webToAdmin": 0,
-  "webToApi": 25,
+  "webToApi": 0,
   "adminToWeb": 0,
   "adminToApi": 0,
-  "apiToWeb": 206,
+  "apiToWeb": 145,
   "apiToAdmin": 0,
-  "packagesToApps": 9,
+  "packagesToApps": 0,
   "adminSharedToDomain": 0,
   "adminCrossDomainDeepImport": 0,
-  "webSharedToDomain": 47,
+  "webSharedToDomain": 44,
   "webCrossDomainDeepImport": 54,
   "contractsToApps": 0,
-  "contractsForbiddenImport": 0
+  "contractsForbiddenImport": 0,
+  "crossAppTestOutsideIntegration": 0
 }

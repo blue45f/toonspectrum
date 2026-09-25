@@ -1,6 +1,6 @@
 {
   "harness": "tests/benchmarks/harness/filter-lanes.ts",
-  "note": "프로덕션 필터 레인(gpu-chain → worker → konva-native) 중 CPU/Worker 레인의 크기별·체인별 실측. GPU 레인은 packages/studio-engine-registry/src/__tests__/filter-lanes-browser-probe.test.ts (FILTER_LANE_PROBE=1)가 같은 파일의 gpuLanes/crossover 를 채운다.",
+  "note": "프로덕션 필터 레인(gpu-chain → worker → konva-native) 중 CPU/Worker 레인의 크기별·체인별 실측. GPU 레인은 tests/integration/package-web/studio-engine-registry/filter-lanes-browser-probe.test.ts (FILTER_LANE_PROBE=1)가 같은 파일의 gpuLanes/crossover 를 채운다.",
   "generatedAt": "2026-08-08T05:54:18.069Z",
   "host": {
     "platform": "darwin",
@@ -1919,7 +1919,7 @@
     }
   ],
   "gpuLanes": {
-    "probe": "packages/studio-engine-registry/src/__tests__/filter-lanes-browser-probe.test.ts (FILTER_LANE_PROBE=1)",
+    "probe": "tests/integration/package-web/studio-engine-registry/filter-lanes-browser-probe.test.ts (FILTER_LANE_PROBE=1)",
     "measuredAt": "2026-08-08T05:54:40.746Z",
     "browser": {
       "launch": "playwright chromium headless shell (metal, unsafe-webgpu)",

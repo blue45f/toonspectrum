@@ -71,6 +71,7 @@ tools/                            # 제품 runtime과 격리된 authoring·autom
 tools/media/brand-film/           # 독립 Remotion film authoring project
 tools/automation/n8n/             # 외부 workflow automation 정의
 tests/benchmarks/marketplace/     # marketplace 비교 계약·자료·결과
+tests/integration/                # Web·Admin·API·package 사이의 교차 경계 검증
 scripts/, e2e/, tests/            # 저장소 횡단 명령과 검증 코드
 ```
 
@@ -93,6 +94,8 @@ application source    -X-> another application source
 - 도메인 간 deep import는 `public` 또는 `integrations` 경계로 수렴시킵니다.
 - Web과 API가 함께 써야 하는 DTO/schema/protocol은 Node·DOM·React·NestJS·DB 구현에서
   분리한 뒤 `packages/contracts`에서 공개합니다.
+- 한 앱 또는 package의 테스트가 다른 앱 source를 직접 검증해야 하면 구현 폴더에 두지 않고
+  `tests/integration/<boundary>`에서 소유합니다. 앱 내부 테스트는 자기 앱 경계만 검증합니다.
 - Studio는 페이지 분류보다 document, commands, history, persistence, rendering,
   collaboration, durability, tools 같은 runtime authority와 lifecycle을 우선합니다.
 - 기존 예외는 ratchet으로 증가를 막고 안정된 migration slice마다 예산을 낮춥니다.
