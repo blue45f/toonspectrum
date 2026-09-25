@@ -42,6 +42,7 @@ describe("StudioPage intent-loaded operation locks", () => {
     const handleDownload = vi.fn(async () => undefined);
     const handleCopyToClipboard = vi.fn(async () => undefined);
     const runtime: StudioRasterExportOrchestration = {
+      handleExportPresetSlices: vi.fn(async () => ({ files: 1, oversized: 0, format: "png" as const, targetWidth: 720 })),
       handleDownload,
       exportCurrentPageToRasterInterchange: vi.fn(async () => {
         throw new Error("not used");

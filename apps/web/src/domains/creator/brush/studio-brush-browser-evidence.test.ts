@@ -13,8 +13,8 @@ import { STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS } from "./studio-brush-quality-portf
 import { isStudioBrushQuarantinedPresetId } from "./studio-brush-quarantine";
 
 describe("Studio brush product evidence contract", () => {
-  it("keeps the audited 88-brush portfolio first while exposing the complete safe catalogue", () => {
-    expect(STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS).toHaveLength(88);
+  it("keeps the audited 95-brush portfolio first while exposing the complete safe catalogue", () => {
+    expect(STUDIO_DEFAULT_QUALITY_BRUSH_CATALOG_ITEMS).toHaveLength(95);
     expect(
       STUDIO_LISTED_ALL_BRUSH_CATALOG_ITEMS
         .slice(0, STUDIO_BRUSH_QUALITY_PORTFOLIO_IDS.length)

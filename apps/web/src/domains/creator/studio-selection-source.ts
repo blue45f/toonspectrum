@@ -1,3 +1,4 @@
+import { applyExactSelectionMask } from "./selection/studio-selection-exact-mask";
 /** Pure mask builders and combine semantics for professional pixel-selection sources. */
 import {
   applyColorRangeMaskToSelection,
@@ -27,6 +28,7 @@ export interface ApplySelectionSourceMaskOptions {
   readonly flipY?: boolean;
   readonly vectorThreshold?: number;
   readonly preserveFeather?: boolean;
+  readonly exact?: boolean;
 }
 
 function assertDimensions(width: number, height: number): number {
@@ -150,6 +152,9 @@ export function applySelectionSourceMask(
   const displayMask = options.flipX || options.flipY
     ? flipColorRangeMask(mask, options.flipX === true, options.flipY === true)
     : mask;
+  if (options.exact) return applyExactSelectionMask(selection, displayMask, operation, {
+    aspect: options.aspect, threshold: options.vectorThreshold,
+  });
   const base = selectionOperationBase(selection, operation);
   const result = applyColorRangeMaskToSelection(
     base,

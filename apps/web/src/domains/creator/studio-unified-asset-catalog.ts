@@ -18,6 +18,7 @@ import {
 
 import type { StudioAsset } from "./studio-asset-library";
 import type { SceneTemplate } from "./studio-scene-templates";
+import type { StudioRasterAsset } from "./render/studio-raster-assets";
 
 export type StudioUnifiedAssetCategory =
   | "all"
@@ -61,6 +62,7 @@ export type StudioUnifiedAssetSource =
   | { readonly kind: "background"; readonly value: StudioUnifiedBackgroundSource }
   | { readonly kind: "scene-template"; readonly value: SceneTemplate }
   | { readonly kind: "element"; readonly value: StudioElementItem }
+  | { readonly kind: "builtin-raster"; readonly value: StudioRasterAsset }
   | { readonly kind: "object-3d"; readonly value: StudioObjectInsertItem }
   | { readonly kind: "local"; readonly value: StudioAsset }
   | { readonly kind: "native-tool"; readonly value: StudioUnifiedNativeTool };
@@ -87,6 +89,7 @@ export interface BuildStudioUnifiedAssetCatalogInput {
   readonly sceneTemplates?: readonly SceneTemplate[];
   readonly localAssets?: readonly StudioAsset[];
   readonly elements?: readonly StudioElementItem[];
+  readonly rasterAssets?: readonly StudioRasterAsset[];
   readonly objects?: readonly StudioObjectInsertItem[];
   readonly nativeTools?: readonly StudioUnifiedNativeTool[];
 }
@@ -459,6 +462,30 @@ function localItem(asset: StudioAsset, index: number): StudioUnifiedAssetItem {
   };
 }
 
+function builtinRasterItem(asset: StudioRasterAsset, index: number): StudioUnifiedAssetItem {
+  const decorativeBubble = asset.kind === "bubble-decoration";
+  return {
+    id: `builtin-raster:${asset.id}`,
+    category: "element",
+    scope: "studio",
+    title: asset.label,
+    description: asset.description,
+    categoryLabel: decorativeBubble ? "장식 말풍선" : asset.kind === "texture" ? "질감" : asset.kind === "effect-overlay" ? "연출 효과" : "일러스트 소품",
+    keywords: Object.freeze([...asset.tags, asset.collection, ...(asset.hasAlpha ? ["투명"] : []), "일러스트", asset.kind === "texture" ? "질감" : "소품"]),
+    badges: Object.freeze([
+      asset.hasAlpha ? "투명 배경" : "질감 원본",
+      `${asset.width} × ${asset.height}px`,
+      ...(decorativeBubble ? ["대사 별도 편집"] : []),
+    ]),
+    preview: { kind: "image", src: asset.src },
+    useMode: "insert",
+    useLabel: decorativeBubble ? "장식과 대사 삽입" : "일러스트 삽입",
+    discoverability: "featured",
+    sortPriority: 700 - index,
+    source: { kind: "builtin-raster", value: asset },
+  };
+}
+
 export function buildStudioUnifiedAssetCatalog(
   input: BuildStudioUnifiedAssetCatalogInput = {},
 ): readonly StudioUnifiedAssetItem[] {
@@ -468,6 +495,7 @@ export function buildStudioUnifiedAssetCatalog(
   const nativeTools = input.nativeTools ?? DEFAULT_NATIVE_TOOLS;
   const backgrounds = input.backgrounds ?? [];
   const sceneTemplates = input.sceneTemplates ?? [];
+  const rasterAssets = input.rasterAssets ?? [];
   const localAssets = [...(input.localAssets ?? [])].sort(
     (left, right) => right.createdAt - left.createdAt,
   );
@@ -476,6 +504,7 @@ export function buildStudioUnifiedAssetCatalog(
     ...sceneTemplates.map((item, index) => sceneTemplateItem(item, index, backgrounds)),
     ...localAssets.map((item, index) => localItem(item, index)),
     ...nativeTools.map((item, index) => nativeToolItem(item, index)),
+    ...rasterAssets.map((item, index) => builtinRasterItem(item, index)),
     ...elements.map((item, index) => elementItem(item, index)),
     ...objects.map((item, index) => objectItem(item, index)),
   ];

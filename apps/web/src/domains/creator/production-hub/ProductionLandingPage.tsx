@@ -24,6 +24,7 @@ import {
   type ProductionProjectSummary,
 } from "./production-dashboard-api";
 
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { cn } from "@/shared/lib/utils";
@@ -241,7 +242,22 @@ export function ProductionLandingPage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-dashed border-line p-8 text-center"><LayoutDashboard className="mx-auto size-8 text-fg-3" aria-hidden="true" /><p className="mt-3 text-sm font-black text-fg">운영 중인 제작 프로젝트가 없습니다</p><p className="mt-1 text-xs text-fg-2">Studio 프로젝트에서 제작 관리 프로젝트를 연결해 주세요.</p></div>
+              <ActionableEmptyState
+                icon={LayoutDashboard}
+                title="첫 제작 프로젝트를 연결하세요"
+                description="새 작품을 만든 뒤 제작 관리에 연결하면 회차·담당·마감·검수·인수인계를 한 흐름에서 운영할 수 있습니다."
+                primary={{ href: "/studio/new", label: "새 작품 만들기" }}
+                secondary={{ href: "/studio", label: "기존 작품 열기" }}
+                sample={{ href: "/production/projects/sample-project/overview", label: "10분 샘플로 먼저 보기" }}
+              >
+                <ol className="grid gap-2 text-xs sm:grid-cols-3">
+                  {["작품 만들기", "제작 프로젝트 연결", "팀·일정·검수 운영"].map((label, index) => (
+                    <li key={label} className="rounded-xl border border-line bg-panel/70 p-3 text-fg-2">
+                      <span className="font-black text-accent">{index + 1}</span> · {label}
+                    </li>
+                  ))}
+                </ol>
+              </ActionableEmptyState>
             )}
           </SectionCard>
         ) : directoryMode ? (

@@ -88,7 +88,7 @@ describe(`${CORE_BRUSH_CATALOG_COUNT}-preset brush catalog contract`, () => {
   it("keeps replay registration complete and exposes every non-quarantined brush", () => {
     const counts = STUDIO_BRUSH_CATALOG_COUNTS;
     expect(counts.core).toBe(BRUSH_PRESETS.length);
-    expect(counts.pro).toBe(200);
+    expect(counts.pro).toBe(207);
     expect(counts.total).toBe(counts.core + counts.pro);
     expect(counts.erase).toBe(2);
     expect(counts.paint).toBe(counts.total - counts.erase);

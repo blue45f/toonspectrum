@@ -1,16 +1,11 @@
-/**
- * Project-bundled transparent raster assets for Studio.
- *
- * This catalog intentionally retains prompt hashes, never raw prompts or credentials. The public
- * path, dimensions, alpha contract, placement defaults, license reference, and generation
- * provenance travel together so future pickers/exporters do not have to infer safety metadata from
- * filenames.
- */
+import { STUDIO_ILLUSTRATION_PACK } from "../catalog/studio-illustration-pack";
 
-export const STUDIO_RASTER_ASSET_KINDS = ["prop-cluster"] as const;
+/** 원본 경로·픽셀 크기·알파·배치·출처를 함께 보존하는 제품 번들 이미지 카탈로그. */
+
+export const STUDIO_RASTER_ASSET_KINDS = ["prop-cluster", "bubble-decoration", "effect-overlay", "texture"] as const;
 export type StudioRasterAssetKind = (typeof STUDIO_RASTER_ASSET_KINDS)[number];
 
-export const STUDIO_RASTER_ASSET_COLLECTIONS = ["daily", "school", "fantasy", "urban"] as const;
+export const STUDIO_RASTER_ASSET_COLLECTIONS = ["daily", "school", "fantasy", "urban", "scifi", "coastal", "romance"] as const;
 export type StudioRasterAssetCollection = (typeof STUDIO_RASTER_ASSET_COLLECTIONS)[number];
 
 export const STUDIO_RASTER_ASSET_PLACEMENTS = ["frame-center", "frame-bottom-center"] as const;
@@ -37,19 +32,24 @@ export interface StudioRasterAssetProvenance {
   readonly origin: "ai-generated";
   readonly provider: "openai";
   readonly pipeline: "built-in-image-generation";
-  readonly model: "gpt-image-2";
+  readonly model: "gpt-image-2" | "unverified";
+  readonly modelVersionVerified?: false;
   readonly generatedOn: `${number}-${number}-${number}`;
   /** SHA-256 of the generation prompt. This is not a file-content digest. */
   readonly promptSha256: StudioRasterPromptSha256;
-  /** Optional SHA-256 of a final built-in image edit instruction. Raw edit text is never retained. */
+  /** 최종 이미지 편집 지시문의 SHA-256. 원문 보존 위치는 promptRetention으로 구분한다. */
   readonly editPromptSha256?: StudioRasterPromptSha256;
-  readonly promptRetention: "sha256-only";
+  readonly promptRetention: "sha256-only" | "source-manifest";
+  readonly promptSource?: "/assets/studio/illustration-20260926/PROMPTS.json";
   readonly postProcessing: readonly ("built-in-image-edit" | "local-chroma-key-removal")[];
-  readonly humanReviewed: true;
+  readonly humanReviewed: boolean;
+  readonly assistantReviewed?: true;
 }
 
 export type StudioRasterAssetId = `builtin-raster-${string}`;
-export type StudioRasterAssetPath = `/assets/studio/props/${StudioRasterAssetCollection}/${string}.webp`;
+export type StudioRasterAssetPath =
+  | `/assets/studio/props/${StudioRasterAssetCollection}/${string}.webp`
+  | `/assets/studio/illustration-20260926/${string}.png`;
 
 export interface StudioRasterAsset {
   readonly id: StudioRasterAssetId;
@@ -58,10 +58,13 @@ export interface StudioRasterAsset {
   readonly kind: StudioRasterAssetKind;
   readonly collection: StudioRasterAssetCollection;
   readonly src: StudioRasterAssetPath;
-  readonly mimeType: "image/webp";
+  readonly mimeType: "image/webp" | "image/png";
   readonly width: number;
   readonly height: number;
-  readonly hasAlpha: true;
+  readonly hasAlpha: boolean;
+  readonly repeatable?: boolean;
+  readonly bytes?: number;
+  readonly sha256?: string;
   readonly tags: readonly string[];
   readonly defaultPlacement: StudioRasterAssetPlacement;
   readonly defaultBlendMode: StudioRasterAssetBlendMode;
@@ -124,7 +127,7 @@ const SHARED_IMAGE_METADATA = {
   license: BUILTIN_LICENSE,
 } as const;
 
-export const STUDIO_RASTER_ASSETS = Object.freeze([
+export const STUDIO_LEGACY_RASTER_ASSETS = Object.freeze([
   {
     ...SHARED_IMAGE_METADATA,
     id: "builtin-raster-daily-cafe-table-for-two",
@@ -248,6 +251,62 @@ export const STUDIO_RASTER_ASSETS = Object.freeze([
     provenance: provenance("85173f61ef38f85e612ce371f8bb9678cef171ee0e6926f55a5989be2d4aba96"),
   },
 ] as const satisfies readonly StudioRasterAsset[]);
+
+export const STUDIO_ILLUSTRATION_RASTER_ASSETS: readonly StudioRasterAsset[] = Object.freeze(
+  STUDIO_ILLUSTRATION_PACK.assets.flatMap((asset): StudioRasterAsset[] => {
+    if (asset.kind === "background") return [];
+    // 실제 투명 픽셀과 프롬프트 기록을 검증한 원본만 삽입 목록에 올린다.
+    if ((!asset.hasAlpha && asset.kind !== "texture") || !asset.promptSha256) return [];
+    const filename = asset.src.split("/").at(-1)?.replace(/\.png$/u, "");
+    if (!filename) return [];
+    return [{
+      id: `builtin-raster-${asset.id}`,
+      label: asset.title,
+      description: asset.kind === "bubble-decoration"
+        ? "장식 일러스트와 별도로 편집할 수 있는 대사를 함께 배치합니다."
+        : asset.kind === "texture"
+          ? "원본 질감을 이미지 레이어로 배치하고 불투명도와 합성 방식을 조정할 수 있습니다."
+          : asset.kind === "effect-overlay"
+            ? "투명한 효과 원본을 장면 위에 배치하고 크기·합성 방식을 조정할 수 있습니다."
+            : "투명 배경 원본으로 보존한 장면 소품 일러스트입니다.",
+      kind: asset.kind,
+      collection: asset.collection,
+      src: `/assets/studio/illustration-20260926/${filename}.png`,
+      mimeType: "image/png",
+      width: asset.width,
+      height: asset.height,
+      bytes: asset.bytes,
+      sha256: asset.sha256,
+      hasAlpha: asset.hasAlpha,
+      ...(asset.repeatable === undefined ? {} : { repeatable: asset.repeatable }),
+      tags: asset.tags,
+      defaultPlacement: asset.kind === "prop-cluster" ? "frame-bottom-center" : "frame-center",
+      defaultBlendMode: asset.defaultBlendMode ?? "source-over",
+      defaultOpacity: 1,
+      license: BUILTIN_LICENSE,
+      provenance: {
+        origin: "ai-generated",
+        provider: "openai",
+        pipeline: "built-in-image-generation",
+        model: "unverified",
+        modelVersionVerified: false,
+        generatedOn: "2026-09-26",
+        promptSha256: asPromptSha256(asset.promptSha256),
+        ...(asset.editPromptSha256 ? { editPromptSha256: asPromptSha256(asset.editPromptSha256) } : {}),
+        promptRetention: "source-manifest",
+        promptSource: "/assets/studio/illustration-20260926/PROMPTS.json",
+        postProcessing: asset.postProcessing,
+        humanReviewed: false,
+        assistantReviewed: true,
+      },
+    }];
+  }),
+);
+
+export const STUDIO_RASTER_ASSETS: readonly StudioRasterAsset[] = Object.freeze([
+  ...STUDIO_LEGACY_RASTER_ASSETS,
+  ...STUDIO_ILLUSTRATION_RASTER_ASSETS,
+]);
 
 function normalizeSearchValue(value: string): string {
   return value.normalize("NFKC").trim().toLocaleLowerCase("ko-KR");

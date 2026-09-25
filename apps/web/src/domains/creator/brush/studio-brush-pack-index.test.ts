@@ -38,12 +38,12 @@ const EXTENDED_MEDIA_IDS = [
 ] as const;
 
 describe("procedural brush pack catalogue", () => {
-  it("describes all 200 ids with unique Korean labels and searchable preview metadata", () => {
-    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(200);
+  it("describes all 207 ids with unique Korean labels and searchable preview metadata", () => {
+    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(207);
     expect(STUDIO_BRUSH_PACK_DESCRIPTORS.map((item) => item.catalogId)).toEqual(
       STUDIO_BRUSH_PACK_CATALOG_IDS
     );
-    expect(new Set(STUDIO_BRUSH_PACK_DESCRIPTORS.map((item) => item.catalogName)).size).toBe(200);
+    expect(new Set(STUDIO_BRUSH_PACK_DESCRIPTORS.map((item) => item.catalogName)).size).toBe(207);
 
     for (const descriptor of STUDIO_BRUSH_PACK_DESCRIPTORS) {
       expect(descriptor.catalogName).toMatch(/[가-힣]/);
@@ -107,7 +107,7 @@ describe("procedural brush pack catalogue", () => {
       ["watercolor-detail-round", "세부 묘사"],
       ["watercolor-flat-wash", "물고임"],
       ["opaque-gouache", "매트한"],
-      ["oil-filbert", "강모 결"],
+      ["oil-filbert", "단색 유화 면"],
       ["alcohol-chisel-marker", "알코올"],
       ["taper-brush-marker", "섬유형"],
       ["pixel-square", "픽셀 계단선"],
@@ -186,7 +186,7 @@ describe("procedural brush pack catalogue", () => {
       ["milli-pen-uniform", "제도용"],
       ["watercolor-wet-bleed", "습식"],
       ["watercolor-edge-stain", "워터마크"],
-      ["oil-impasto-heavy", "고점도"],
+      ["oil-impasto-heavy", "촘촘한 강모"],
       ["oil-dry-scumble", "스컴블"],
       ["pastel-paper-soft", "종이 이빨"],
       ["crayon-wax-bold", "그림책"],
@@ -234,7 +234,7 @@ describe("procedural brush pack catalogue", () => {
       ["palette-knife-edge", "물감이 뭉친"],
       ["watercolor-dry-granule", "안료 알갱이"],
       ["watercolor-salt-bloom", "소금 결정"],
-      ["watercolor-backrun-ring", "되밀려"],
+      ["watercolor-backrun-ring", "중심이 빈"],
       ["watercolor-wet-wash", "물층"],
       ["gouache-grain-flat", "매트한"],
       ["acrylic-stiff-flat", "합성모"],

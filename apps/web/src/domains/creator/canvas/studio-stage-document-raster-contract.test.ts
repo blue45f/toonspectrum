@@ -551,6 +551,19 @@ describe("readStudioStageInDocumentView", () => {
     effectiveScale: EFFECTIVE_SCALE,
   } as const;
 
+  it("부분 캡처는 전역 문서 좌표와 배율을 유지하고 원래 보기 상태를 복원한다", () => {
+    const host = createStageHost({ canvasFlipH: true, canvasRotation: 90 });
+    const before = host.stage.currentLayout();
+    const region = { x: 400, y: 5_000, width: 256, height: 128 };
+    readStudioStageInDocumentView(host.stage, { ...geometry, captureRegion: region }, () => {
+      expect(host.stage.currentLayout()).toMatchObject({ width: 256, height: 128, x: -400, y: -5_000, rotation: 0, scaleX: EFFECTIVE_SCALE, scaleY: EFFECTIVE_SCALE });
+      expect(projectDocumentPointToStage(host.stage.currentLayout(), { x: 400 / EFFECTIVE_SCALE, y: 5_000 / EFFECTIVE_SCALE })).toEqual({ x: 0, y: 0 });
+    });
+    expect(host.stage.currentLayout()).toEqual(before);
+    expect(() => readStudioStageInDocumentView(host.stage, { ...geometry, captureRegion: region }, () => { throw new Error("타일 실패"); })).toThrow("타일 실패");
+    expect(host.stage.currentLayout()).toEqual(before);
+  });
+
   it("captures the whole document from a viewport-clipped stage", () => {
     const stage = createGeometryStage();
     stage.applyLayout({
@@ -670,12 +683,13 @@ describe("every stage raster read goes through a choke point", () => {
       "utf8"
     );
     const reads = runtimeSource.match(/\bstage\.toCanvas\(/gu) ?? [];
-    expect(reads).toHaveLength(1);
-    // All six export intents converge on one detached-Skia/compatibility capture choke point.
+    expect(reads).toHaveLength(2);
+    // 전체 캡처와 영역 캡처 모두 같은 준비/문서 좌표 경계를 통과한다.
     expect(runtimeSource.match(/captureStudioRasterAtExportScale\(\s*captured\.stage,/gu) ?? []).toHaveLength(1);
     expect(runtimeSource.match(/await captureReadyStageForPage\(/gu) ?? []).toHaveLength(1);
-    expect(runtimeSource.match(/await capturePage\(/gu) ?? []).toHaveLength(1);
-    expect(runtimeSource.match(/await captureBakedPageAtScale\(/gu) ?? []).toHaveLength(6);
+    expect(runtimeSource.match(/await capturePage\(/gu) ?? []).toHaveLength(2);
+    expect(runtimeSource.match(/await captureBakedPageAtScale\(/gu) ?? []).toHaveLength(7);
+    expect(runtimeSource).toContain("effectiveScale: exportScale, captureRegion: region");
     expect(runtimeSource).toContain("captureSkiaDocumentForExport");
     expect(runtimeSource).toMatch(
       /encodeStudioRasterInterchangeAsync\([\s\S]*?\{\s*executionMode:\s*"worker"\s*\}\s*\)/u,

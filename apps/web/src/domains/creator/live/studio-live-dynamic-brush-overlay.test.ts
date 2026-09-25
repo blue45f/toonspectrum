@@ -830,7 +830,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
   });
 
   it("streams every authored brush pack from only the prior sample plus unseen suffix", () => {
-    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(200);
+    expect(STUDIO_BRUSH_PACK_DESCRIPTORS).toHaveLength(207);
     let dryMediaCount = 0;
     const prefixPointCount = 24;
     const completePointCount = 48;
@@ -933,7 +933,7 @@ describe("StudioLiveDynamicBrushOverlayRenderer", () => {
       ).toEqual(liveMarks);
     }
 
-    expect(dryMediaCount).toBe(72);
+    expect(dryMediaCount).toBe(74);
   });
 
   it("uses the same one-mark analytic soft tip during live drawing, seal and replay", () => {

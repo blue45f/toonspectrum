@@ -292,6 +292,10 @@ export function bindStudioCuttoonStagePointersPublish(
   function publishAuthoritativeFreehandSuffix(startSample: number): DrawEl | null {
     const authoritativeDrawing = drawingRef.current;
     if (!authoritativeDrawing) return null;
+    if (h.pendingStrokeAdmissionRef?.current?.has(authoritativeDrawing.id)) {
+      h.pendingStrokeAdmissionRef.current.update(authoritativeDrawing);
+      return authoritativeDrawing;
+    }
     // The same coalesced suffix that becomes DrawEl/CRDT authority advances Google Ink's retained
     // InProgressStroke. Any previously displayed estimate is replaced by this exact prefix before
     // the normal live surface flushes; no predicted sample enters this call.

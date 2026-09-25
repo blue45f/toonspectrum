@@ -11,6 +11,8 @@ import { StudioMaterialBrushSvgBudgetError } from "../brush/studio-material-brus
 import { STUDIO_Z } from "../studio-z-index";
 
 import { resetStudioExportGeometryDraft } from "./studio-export-geometry-draft";
+import { StudioSvgTextureBudgetError } from "./studio-svg-export-fidelity";
+import { encodeSvgBrushTexturePng } from "./studio-svg-export-png";
 import {
   formatExportPageRangeLabel,
   planMultiPageExportCapture,
@@ -68,6 +70,56 @@ afterEach(() => {
 });
 
 describe("StudioExportMenuPanel commercial chrome", () => {
+  it("클리핑이나 혼합을 보존하지 못한 벡터 파일은 다운로드 전에 안내한다", async () => {
+    const download = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    const capture = vi.fn(async () => []);
+    render(<StudioExportMenuPanel {...baseProps} pageCount={1} pageLabels={["1"]}
+      capturePagesForPreset={capture} exportCurrentPageToSvg={async () => ({
+        svg: "<svg/>", skipped: [{ id: "clip", type: "image", mode: "approximated", label: "아래 레이어 클리핑을 보존할 수 없습니다." }],
+        fontFamilies: [], caveats: [], elementCount: 1,
+      })} />);
+    fireEvent.click(screen.getByRole("button", { name: "SVG (벡터, 현재 페이지)" }));
+    expect(await screen.findByText(/외관이 달라지는 요소가 있어 벡터 SVG 저장을 중단/, {}, { timeout: 10_000 })).toBeTruthy();
+    expect(download).not.toHaveBeenCalled();
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it("벡터 질감 예산이 부족해도 외관 보존 저장은 사용자 선택 전 자동 실행하지 않는다", async () => {
+    const error = new StudioSvgTextureBudgetError(64 * 1024 * 1024);
+    const capture = vi.fn(async () => []);
+    render(<StudioExportMenuPanel {...baseProps} pageCount={1} pageLabels={["1"]}
+      capturePagesForPreset={capture} exportCurrentPageToSvg={async () => { throw error; }} />);
+    fireEvent.click(screen.getByRole("button", { name: "SVG (벡터, 현재 페이지)" }));
+    expect(await screen.findByText(error.message)).toBeTruthy();
+    const appearance = screen.getByRole("button", { name: "SVG (외관 보존, 현재 페이지)" });
+    await waitFor(() => expect((appearance as HTMLButtonElement).disabled).toBe(false));
+    expect(appearance.getAttribute("aria-describedby")).toBe("studio-svg-appearance-description");
+    expect(screen.getByText(/외관 보존 SVG는 선택한 내보내기 해상도의 PNG/).textContent).toContain("벡터로 편집할 수 없어요");
+    expect(capture).not.toHaveBeenCalled();
+  });
+
+  it("외관 보존을 고르면 현재 페이지를 무손실 PNG가 든 SVG로 한 번 저장한다", async () => {
+    const png = encodeSvgBrushTexturePng(new Uint8ClampedArray(8 * 8 * 4).fill(128), 8);
+    if (!png) throw new Error("테스트 PNG 생성 실패");
+    const canvas = {
+      width: 8, height: 8,
+      toDataURL: vi.fn(() => `data:image/png;base64,${Buffer.from(png).toString("base64")}`),
+    } as unknown as HTMLCanvasElement;
+    const capture = vi.fn(async () => [canvas]);
+    const vector = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:appearance") });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    const download = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    render(<StudioExportMenuPanel {...baseProps} pageCount={1} pageLabels={["1"]}
+      capturePagesForPreset={capture} exportCurrentPageToSvg={vector} />);
+    fireEvent.click(screen.getByRole("button", { name: "SVG (외관 보존, 현재 페이지)" }));
+    expect(await screen.findByText(/외관 보존 SVG를 저장했어요/)).toBeTruthy();
+    expect(capture).toHaveBeenCalledExactlyOnceWith("current");
+    expect(vector).not.toHaveBeenCalled();
+    expect(download).toHaveBeenCalledOnce();
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+  });
+
   it("shows a material SVG budget rejection and permits retry without downloading a partial document", async () => {
     const error = new StudioMaterialBrushSvgBudgetError(64 * 1024 * 1024);
     const download = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);

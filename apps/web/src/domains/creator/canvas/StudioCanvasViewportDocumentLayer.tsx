@@ -907,6 +907,7 @@ export function StudioCanvasViewportDocumentLayer({
                     return (
                       <ClipMaskGroup
                         key={`${el.id}-mask`}
+                        layerMaskOwnerId={el.id}
                         cacheKey={mck}
                         {...(sandwichComposite ? { composite: sandwichComposite } : {})}
                       >

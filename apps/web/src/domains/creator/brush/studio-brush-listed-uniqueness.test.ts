@@ -57,7 +57,7 @@ describe("listed paint uniqueness and consolidated product portfolio", () => {
     qualityFirst.forEach((item, index) => {
       expect(item).toBe(STUDIO_DEFAULT_QUALITY_PAINT_BRUSH_CATALOG_ITEMS[index]);
     });
-    expect(qualityFirst).toHaveLength(86);
+    expect(qualityFirst).toHaveLength(93);
     expect(
       new Set(STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.map((item) => item.id)),
     ).toEqual(new Set(expectedSafeIds));

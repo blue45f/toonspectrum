@@ -1,24 +1,24 @@
-# ToonSpectrum — 웹툰·웹소설 통합 인덱스
+# ToonStudio — 기획부터 연재까지 이어지는 웹툰 제작 환경
 
-> 흩어진 이야기를, 한 권의 색인으로.
-> 네이버·카카오·리디·문피아·노벨피아를 가로질러 **검색·랭킹·리뷰**를 한 곳에서 제공하는 디스커버리 서비스.
+> 아이디어부터 완성된 원고까지, 하나의 작업 흐름으로.
+> **기획·2D·3D·협업·검수·내보내기**를 브라우저에서 연결하고, Spectrum 탐색·리서치 계층으로 다음 작품과 제작 근거를 찾습니다.
 
-ToonSpectrum는 콘텐츠를 호스팅하지 않습니다. 플랫폼 장벽 너머에서 **"무엇을, 어디서, 왜 봐야 하는지"** 답하는 디스커버리·큐레이션 레이어입니다.
+**ToonStudio**가 대외 주 제품이며, **Spectrum**은 작품 검색·랭킹·비교·리서치를 담당하는 내부 제품 계층입니다. 외부 플랫폼의 유료 본문이나 회차 이미지를 호스팅하지 않으며, 공개 메타데이터와 사용자가 만든 작품·리뷰·창작 리소스만 각 정책 범위에서 다룹니다.
 
 <br/>
 
 <p align="center">
-  <img src="docs/screenshots/home.png" alt="ToonSpectrum 홈 — 웹툰·웹소설 통합 인덱스(검색·랭킹·리뷰)" width="820" />
+  <img src="docs/screenshots/home.png" alt="ToonStudio 홈 — 기획부터 연재까지 이어지는 웹툰 제작 흐름" width="820" />
 </p>
 <p align="center">
-  <img src="docs/screenshots/home-mobile.png" alt="ToonSpectrum 모바일 홈" width="240" />
+  <img src="docs/screenshots/home-mobile.png" alt="ToonStudio 모바일 홈" width="240" />
 </p>
 
 <br/>
 
 ## 현재 저장소와 개발 기준
 
-2026-09-26 기준 ToonSpectrum은 하나의 모노레포에서 Web, Admin, API, Mobile, Desktop Sync,
+2026-09-26 기준 ToonStudio 저장소는 하나의 모노레포에서 Web, Admin, API, Mobile, Desktop Sync,
 선택형 서비스와 Studio 핵심 패키지를 함께 관리합니다. 도메인은 `packages/domains/*`로 분리하지 않고
 각 애플리케이션 안에서 논리적으로 구성합니다.
 

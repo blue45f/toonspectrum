@@ -6,18 +6,31 @@
  * without the 30k-line component.
  */
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 import { uid } from "./studio-id";
 import {
   recordStudioRejectedStroke,
+  checkpointStudioPendingStroke,
+  releaseStudioPendingStrokeCheckpoint,
+  activateStudioRejectedStrokeRecovery,
+  hydrateStudioRejectedStrokeRecords,
+  setStudioRejectedStrokeStorageError,
   setStudioRejectedStrokeRestorer,
   type StudioRejectedStrokeRecord,
   type StudioRejectedStrokeRestorer,
   type StudioRejectedStrokeSalvagePlan,
 } from "./studio-rejected-stroke-recovery";
+import {
+  acquireStudioRejectedStrokeRecoveryRepository,
+  studioRejectedStrokeRecoveryScopeKey,
+} from "./live/studio-rejected-stroke-recovery-persistence";
 
 import type { DrawEl } from "./studio-element-model";
+import type {
+  StudioRejectedStrokeRecoveryRepository,
+  StudioRejectedStrokeRecoveryScope,
+} from "./live/studio-rejected-stroke-recovery-persistence";
 
 export const STUDIO_GPU_LIVE_INK_PROVIDER_LABEL = "WebGPU 라이브 잉크";
 
@@ -44,7 +57,14 @@ export function restoreStudioRejectedStrokeIntoDocument(
   activePageId: string,
   queueDeferredStrokeCommit: (finished: DrawEl) => boolean,
   nextId: () => string = uid,
+  context?: Readonly<{
+    scopeKey: string;
+    hasRestoredStroke?: (pageId: string, strokeId: string) => boolean;
+  }>,
 ): ReturnType<StudioRejectedStrokeRestorer> {
+  if (record.scopeKey !== context?.scopeKey) {
+    return { status: "refused", recordId: record.id, reason: "다른 프로젝트에서 그린 획입니다. 원래 문서에서 복구하세요." };
+  }
   if (record.pageId !== activePageId) {
     return {
       status: "refused",
@@ -52,7 +72,12 @@ export function restoreStudioRejectedStrokeIntoDocument(
       reason: "다른 페이지에서 그린 획입니다. 그 페이지로 이동한 뒤 복구하세요.",
     };
   }
-  const restored: DrawEl = { ...structuredClone(record.stroke), id: nextId() };
+  const restoredId = record.restoredStrokeId ?? nextId();
+  if (context?.hasRestoredStroke?.(record.pageId, restoredId)
+    || (record.admissionCheckpoint && context?.hasRestoredStroke?.(record.pageId, record.id))) {
+    return { status: "restored", recordId: record.id, restoredStrokeId: restoredId };
+  }
+  const restored: DrawEl = { ...structuredClone(record.stroke), id: restoredId };
   if (!queueDeferredStrokeCommit(restored)) {
     return {
       status: "refused",
@@ -68,11 +93,16 @@ export type StudioSalvageRejectedStroke = (
   providerLabel: string,
   reason: string,
   pageId?: string,
+  sourceGeneration?: number,
 ) => StudioRejectedStrokeSalvagePlan;
 
 export interface StudioRejectedStrokeRecoveryHostInput {
   readonly activePageId: string;
   readonly queueDeferredStrokeCommit: (finished: DrawEl) => boolean;
+  readonly recoveryScope?: StudioRejectedStrokeRecoveryScope;
+  readonly getDocumentGeneration?: () => number;
+  readonly hasRestoredStroke?: (pageId: string, strokeId: string) => boolean;
+  readonly acquireRepository?: (scope: StudioRejectedStrokeRecoveryScope) => Promise<StudioRejectedStrokeRecoveryRepository>;
 }
 
 /**
@@ -82,29 +112,79 @@ export interface StudioRejectedStrokeRecoveryHostInput {
  */
 export function useStudioRejectedStrokeRecoveryHost(
   input: StudioRejectedStrokeRecoveryHostInput,
-): { readonly salvageRejectedStroke: StudioSalvageRejectedStroke } {
+): {
+  readonly salvageRejectedStroke: StudioSalvageRejectedStroke;
+  readonly checkpointPendingStroke: (stroke: DrawEl, pageId: string, sourceGeneration: number) => void;
+  readonly releasePendingStrokeCheckpoint: (strokeId: string, accepted: boolean) => void;
+} {
   const latest = useRef(input);
-  useEffect(() => {
+  const scopeKey = input.recoveryScope ? studioRejectedStrokeRecoveryScopeKey(input.recoveryScope) : undefined;
+  useLayoutEffect(() => {
     latest.current = input;
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const scope = latest.current.recoveryScope;
+    if (!scope || !scopeKey) return;
+    let current = true;
+    const acquire = latest.current.acquireRepository ?? acquireStudioRejectedStrokeRecoveryRepository;
+    let repository: Promise<StudioRejectedStrokeRecoveryRepository> | null = null;
+    const getRepository = () => {
+      repository ??= acquire(scope).catch((cause: unknown) => {
+        repository = null;
+        throw cause;
+      });
+      return repository;
+    };
+    const deactivate = activateStudioRejectedStrokeRecovery(scopeKey, {
+      load: async () => (await getRepository()).load(scopeKey),
+      save: async (record) => (await getRepository()).save(record),
+      delete: async (record) => (await getRepository()).delete(record),
+      confirmRestored: async (record) => (await getRepository()).confirmRestored(record),
+    });
+    void getRepository().then((store) => store.load(scopeKey)).then((records) => {
+      // 프로젝트 변경 또는 StrictMode 재마운트 뒤 도착한 이전 세대의 읽기를 적용하지 않는다.
+      if (current) hydrateStudioRejectedStrokeRecords(scopeKey, records);
+    }).catch(() => {
+      if (current) setStudioRejectedStrokeStorageError(scopeKey, "이 문서의 획 복구 원본을 읽지 못했습니다. 저장소가 준비된 뒤 문서를 다시 열어 주세요.");
+    });
+    return () => {
+      current = false;
+      deactivate();
+    };
+  }, [scopeKey]);
+  useLayoutEffect(() => {
     const unregister = setStudioRejectedStrokeRestorer((record) =>
       restoreStudioRejectedStrokeIntoDocument(
         record,
         latest.current.activePageId,
         latest.current.queueDeferredStrokeCommit,
+        uid,
+        latest.current.recoveryScope ? {
+          scopeKey: studioRejectedStrokeRecoveryScopeKey(latest.current.recoveryScope),
+          hasRestoredStroke: latest.current.hasRestoredStroke,
+        } : undefined,
       ));
     return () => {
       unregister();
     };
   }, []);
   return {
-    salvageRejectedStroke: (stroke, providerLabel, reason, pageId) =>
+    checkpointPendingStroke: (stroke, pageId, sourceGeneration) => checkpointStudioPendingStroke({
+      stroke, pageId, sourceGeneration, scopeKey, restoredStrokeId: uid(),
+      provider: "선택한 렌더러 입력 준비", reason: "준비 중 보관한 원본 입력입니다.",
+    }),
+    releasePendingStrokeCheckpoint: (strokeId, accepted) => releaseStudioPendingStrokeCheckpoint(scopeKey, strokeId, accepted),
+    salvageRejectedStroke: (stroke, providerLabel, reason, pageId, sourceGeneration) =>
       recordStudioRejectedStroke({
         stroke,
-        pageId: pageId ?? latest.current.activePageId,
+        pageId: pageId ?? input.activePageId,
         provider: providerLabel,
         reason,
+        ...(scopeKey === undefined ? {} : {
+          scopeKey,
+          sourceGeneration: sourceGeneration ?? latest.current.getDocumentGeneration?.() ?? 0,
+          restoredStrokeId: uid(),
+        }),
       }),
   };
 }

@@ -1552,7 +1552,10 @@ export function StudioPublishingCommandCenter({
               페이지 <strong className="numeral block text-base text-fg">{pages.length}</strong>
             </span>
             <span className="rounded-lg bg-card/70 px-2 py-2 text-fg-3">
-              검사 오류 <strong className={cn("numeral block text-base", preflight.errors.length ? "text-bad" : "text-good")}>{preflight.errors.length}</strong>
+              검사 상태
+              <strong className={cn("numeral block text-base", pages.length === 0 ? "text-fg-2" : preflight.errors.length ? "text-bad" : "text-good")}>
+                {pages.length === 0 ? "준비 전" : `${preflight.errors.length}건`}
+              </strong>
             </span>
           </div>
         </div>
@@ -1735,7 +1738,8 @@ export function StudioPublishingCommandCenter({
             </div>
 
             {pages.length === 0 ? (
-              <label className={cn("mt-4 flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-canvas/35 px-6 text-center transition-colors hover:border-accent/45 hover:bg-accent/5", mutationLocked && "pointer-events-none opacity-60")}>
+              <>
+                <label className={cn("mt-4 flex min-h-64 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-canvas/35 px-6 text-center transition-colors hover:border-accent/45 hover:bg-accent/5", mutationLocked && "pointer-events-none opacity-60")}>
                 <span className="grid size-12 place-items-center rounded-2xl bg-accent/10 text-accent"><Upload size={22} /></span>
                 <span className="mt-3 text-sm font-semibold text-fg">완성 원고를 선택하세요</span>
                 <span className="mt-1 max-w-sm text-xs leading-relaxed text-fg-3">디코딩 픽셀 수와 원본 배치 크기를 먼저 검사한 뒤 게시용 해상도로 안전하게 변환합니다.</span>
@@ -1748,6 +1752,12 @@ export function StudioPublishingCommandCenter({
                   onChange={onPickImages}
                 />
               </label>
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-2 rounded-xl border border-line bg-card/50 p-3">
+                <span className="w-full text-center text-xs text-fg-3 sm:w-auto sm:text-left">아직 원고가 없다면 Studio에서 샘플을 열거나 제작 흐름을 먼저 확인하세요.</span>
+                <Link href="/studio" className={buttonClass({ variant: "outline", size: "sm" })}>내 원고 열기</Link>
+                <Link href="/production/projects/sample-project/overview" className={buttonClass({ variant: "ghost", size: "sm" })}>샘플 게시 흐름</Link>
+              </div>
+              </>
             ) : (
               <ol className={cn("mt-4", STUDIO_UPLOAD_PAGE_LIST_CLASS)}>
                 {pages.map((page, index) => (

@@ -31,6 +31,7 @@ import type { ReactNode } from "react";
 export function ClipMaskGroup({
   cacheKey,
   composite,
+  layerMaskOwnerId,
   children,
 }: {
   cacheKey: string;
@@ -43,6 +44,8 @@ export function ClipMaskGroup({
    * mode applies exactly once to the flattened bitmap, never per child.
    */
   composite?: Konva.NodeConfig["globalCompositeOperation"];
+  /** 개별 레이어 내보내기가 자기 마스크까지 캡처할 수 있는 경계. */
+  layerMaskOwnerId?: string;
   children: ReactNode;
 }): React.ReactElement {
   const ref = useRef<Konva.Group>(null);
@@ -80,7 +83,7 @@ export function ClipMaskGroup({
   }, [cacheKey]);
 
   return (
-    <Group ref={ref} {...(composite ? { globalCompositeOperation: composite } : {})}>
+    <Group ref={ref} studioLayerMaskOwnerId={layerMaskOwnerId} {...(composite ? { globalCompositeOperation: composite } : {})}>
       {children}
     </Group>
   );

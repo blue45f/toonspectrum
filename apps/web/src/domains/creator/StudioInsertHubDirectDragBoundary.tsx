@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { CANVAS_W } from "./studio-assets";
+import { STUDIO_RASTER_ASSETS } from "./render/studio-raster-assets";
 import { BG_SCENES } from "./studio-bg-scenes";
 import { BG_SCENES_EXTRA } from "./studio-bg-scenes-extra";
 import { listStudioElementLibrary } from "./studio-elements-catalog";
@@ -48,6 +49,7 @@ function buildDirectDragEntries(
   toolBelt: StudioToolBeltContentProps,
 ): readonly StudioInsertHubEntry[] {
   const items = buildStudioUnifiedAssetCatalog({
+    rasterAssets: STUDIO_RASTER_ASSETS,
     backgrounds: [
       ...STUDIO_GENERATED_BG_SCENES,
       ...BG_SCENES,

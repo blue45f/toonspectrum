@@ -871,6 +871,7 @@ export function StudioCuttoonEditorInspectorColumn(s: StudioCuttoonEditorViewSes
         {isMobile ? (
           <Suspense fallback={null}>
             <StudioMobileEditingDock
+          touchPreferences={s.appSettings.touch}
           activeCatalogBrushId={activeCatalogBrush.id}
           activeCatalogBrushName={activeCatalogBrush.name}
           activeSavedBrushId={activeSavedBrushId}

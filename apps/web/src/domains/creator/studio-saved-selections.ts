@@ -1,4 +1,5 @@
-/** Versioned, bounded, local-device storage for named pixel selections. */
+import { isStudioColorRangeWorkerSelection } from "./studio-color-range-worker-protocol";
+/** 작품에 포함되는 이름 있는 선택과 기존 기기 저장소 호환 읽기. */
 import {
   normalizePixelSelection,
 } from "./studio-pixel-selection-history";
@@ -8,9 +9,9 @@ import {
 } from "./studio-selection-tools";
 
 export const STUDIO_SAVED_SELECTION_LIBRARY_VERSION = 1;
-export const STUDIO_SAVED_SELECTION_MAX_ITEMS = 16;
 export const STUDIO_SAVED_SELECTION_NAME_MAX_LENGTH = 48;
-export const STUDIO_SAVED_SELECTION_MAX_SERIALIZED_LENGTH = 512_000;
+export const STUDIO_SAVED_SELECTION_MAX_SERIALIZED_LENGTH = 16 * 1024 * 1024;
+const DEVICE_STORAGE_MAX_SERIALIZED_LENGTH = 512_000;
 const STORAGE_PREFIX = "toonstudio:pixel-selection-library:v1:";
 
 export interface StudioSavedSelectionRecord {
@@ -66,8 +67,11 @@ function sanitizeTimestamp(value: unknown, fallback: number): number {
 }
 
 function cloneSelection(value: unknown): PixelSelection | null {
+  if (!isStudioColorRangeWorkerSelection(value)) return null;
   const normalized = normalizePixelSelection(value);
-  if (!normalized || !isSelectionUsable(normalized)) return null;
+  if (!normalized || !value || !isSelectionUsable(normalized)) return null;
+  if (normalized.subpaths.length !== value.subpaths.length
+    || normalized.subpaths.some((path, index) => path.points.length !== value.subpaths[index]?.points.length)) return null;
   return {
     featherPx: normalized.featherPx,
     invert: normalized.invert,
@@ -125,26 +129,37 @@ export function decodeStudioSavedSelectionLibrary(
     return EMPTY_STUDIO_SAVED_SELECTION_LIBRARY;
   }
   const seenIds = new Set<string>();
-  const seenNames = new Set<string>();
   const items: StudioSavedSelectionRecord[] = [];
   for (let index = 0; index < object.items.length; index += 1) {
     const record = normalizeRecord(object.items[index], index);
     if (!record) continue;
-    const foldedName = record.name.toLocaleLowerCase("ko-KR");
-    if (seenIds.has(record.id) || seenNames.has(foldedName)) continue;
+    if (seenIds.has(record.id)) continue;
     seenIds.add(record.id);
-    seenNames.add(foldedName);
     items.push(record);
-    if (items.length >= STUDIO_SAVED_SELECTION_MAX_ITEMS) break;
   }
   items.sort((left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name, "ko-KR"));
   return { version: STUDIO_SAVED_SELECTION_LIBRARY_VERSION, items };
 }
 
+/** 프로젝트에서는 손상된 선택을 조용히 버리지 않고 가져오기를 중단한다. */
+export function parseStudioSavedSelectionLibrary(value: unknown): StudioSavedSelectionLibrary {
+  const raw = JSON.stringify(value);
+  if (!raw || raw.length > STUDIO_SAVED_SELECTION_MAX_SERIALIZED_LENGTH) {
+    throw new RangeError("저장 선택 데이터가 허용 크기를 초과했습니다.");
+  }
+  const decoded = decodeStudioSavedSelectionLibrary(raw);
+  if (!value || typeof value !== "object" || !("version" in value) || value.version !== 1
+    || !("items" in value) || !Array.isArray(value.items)
+    || decoded.items.length !== value.items.length) {
+    throw new TypeError("프로젝트의 저장 선택 데이터가 올바르지 않습니다.");
+  }
+  return decoded;
+}
+
 export function encodeStudioSavedSelectionLibrary(library: StudioSavedSelectionLibrary): string {
   return JSON.stringify({
     version: STUDIO_SAVED_SELECTION_LIBRARY_VERSION,
-    items: library.items.slice(0, STUDIO_SAVED_SELECTION_MAX_ITEMS),
+    items: library.items,
   });
 }
 
@@ -154,17 +169,21 @@ export function upsertStudioSavedSelection(
 ): StudioSavedSelectionLibrary {
   const selection = cloneSelection(input.selection);
   if (!selection) throw new TypeError("저장할 수 있는 픽셀 선택 영역이 없습니다.");
-  const name = sanitizeText(input.name, STUDIO_SAVED_SELECTION_NAME_MAX_LENGTH);
-  if (!name) throw new TypeError("저장할 선택 이름을 입력하세요.");
+  const requestedName = sanitizeText(input.name, STUDIO_SAVED_SELECTION_NAME_MAX_LENGTH);
+  if (!requestedName) throw new TypeError("저장할 선택 이름을 입력하세요.");
   const now = sanitizeTimestamp(input.now, Date.now());
-  const foldedName = name.toLocaleLowerCase("ko-KR");
   const requestedId = sanitizeId(input.id);
-  const existing = library.items.find((item) => (
-    (requestedId && item.id === requestedId)
-    || item.name.toLocaleLowerCase("ko-KR") === foldedName
-  ));
+  const existing = library.items.find((item) => requestedId && item.id === requestedId);
   const id = existing?.id || requestedId;
   if (!id) throw new TypeError("저장할 선택 식별자를 만들 수 없습니다.");
+  // 이름이 같아도 별도 선택을 덮어쓰지 않는다. 같은 ID의 명시적 갱신만 허용한다.
+  const usedNames = new Set(library.items.filter((item) => item.id !== id)
+    .map((item) => item.name.toLocaleLowerCase("ko-KR")));
+  let name = requestedName;
+  for (let suffix = 2; usedNames.has(name.toLocaleLowerCase("ko-KR")); suffix += 1) {
+    const ending = ` (${suffix})`;
+    name = `${requestedName.slice(0, STUDIO_SAVED_SELECTION_NAME_MAX_LENGTH - ending.length).trimEnd()}${ending}`;
+  }
   const record: StudioSavedSelectionRecord = {
     id,
     name,
@@ -176,9 +195,13 @@ export function upsertStudioSavedSelection(
     record,
     ...library.items.filter((item) => item.id !== id),
   ]
-    .sort((left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name, "ko-KR"))
-    .slice(0, STUDIO_SAVED_SELECTION_MAX_ITEMS);
-  return { version: STUDIO_SAVED_SELECTION_LIBRARY_VERSION, items };
+    .sort((left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name, "ko-KR"));
+  const next: StudioSavedSelectionLibrary = { version: STUDIO_SAVED_SELECTION_LIBRARY_VERSION, items };
+  // 다시 열 때의 동일한 한도를 저장 전에 검사해 재복원할 수 없는 문서를 만들지 않는다.
+  if (encodeStudioSavedSelectionLibrary(next).length > STUDIO_SAVED_SELECTION_MAX_SERIALIZED_LENGTH) {
+    throw new RangeError("저장 선택 데이터가 허용 크기를 초과했습니다. 기존 저장 선택을 정리한 뒤 다시 저장해 주세요.");
+  }
+  return next;
 }
 
 export function removeStudioSavedSelection(
@@ -214,7 +237,7 @@ export function writeStudioSavedSelectionLibrary(
   if (!storage) return false;
   try {
     const encoded = encodeStudioSavedSelectionLibrary(library);
-    if (encoded.length > STUDIO_SAVED_SELECTION_MAX_SERIALIZED_LENGTH) return false;
+    if (encoded.length > DEVICE_STORAGE_MAX_SERIALIZED_LENGTH) return false;
     storage.setItem(studioSavedSelectionStorageKey(scopeKey), encoded);
     return true;
   } catch {

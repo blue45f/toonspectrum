@@ -372,7 +372,7 @@ const STUDIO_CRDT_COMMON_SCENE_KEYS = [
   "maskEnabled",
   "layerRole",
   "layerColor",
-  "emeresSourceId",
+  "emeresSourceId", "psdSource", "psdGroupId", "psdFolderPath", "psdRasterSourceId",
 ] as const;
 
 const STUDIO_CRDT_SCENE_KEYS_BY_TYPE = {
@@ -2297,6 +2297,27 @@ function validateSceneElementRoot(id: string, record: Y.Map<unknown>): boolean {
     "autoShrinkText",
   ]) {
     if (key in props && typeof props[key] !== "boolean") return false;
+  }
+  if ("psdSource" in props) {
+    const value = props.psdSource;
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const source = value as Record<string, unknown>;
+    if (source.version !== 1 || typeof source.hash !== "string" || !/^sha256:[a-f0-9]{64}$/u.test(source.hash)
+      || !boundedExactText(source.name, 512) || typeof source.bytes !== "number" || !Number.isSafeInteger(source.bytes)
+      || source.bytes < 26 || source.bytes > 128 * 1024 * 1024
+      || Object.keys(source).some((key) => !["version", "hash", "name", "bytes"].includes(key))) return false;
+  }
+  for (const key of ["psdGroupId", "psdRasterSourceId"]) {
+    if (key in props && !boundedExactText(props[key], 160)) return false;
+  }
+  if ("psdFolderPath" in props) {
+    const path = props.psdFolderPath;
+    if (!Array.isArray(path) || path.length > 64 || path.some((entry: unknown) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return true;
+      const folder = entry as Record<string, unknown>;
+      return !boundedExactText(folder.id, 160) || !boundedString(folder.name, 512)
+        || Object.keys(folder).some((key) => key !== "id" && key !== "name");
+    })) return false;
   }
   if ("text" in props && !boundedString(props.text, STUDIO_CRDT_JSON_MAX_STRING_LENGTH)) return false;
   if ("stickyNotePresetId" in props && !boundedExactText(props.stickyNotePresetId, 160)) {

@@ -1,3 +1,4 @@
+import { StudioPsdSourceDownloads } from "./export/StudioPsdSourceDownloads";
 import { StudioDocumentChromeSlot } from "./studio-shell/StudioDocumentChromeSlot";
 import {
   Bookmark,
@@ -895,6 +896,7 @@ export interface StudioMenubarContentHandlers extends StudioProjectReviewActionH
   exportCurrentPageToVectorPdf?: () => Promise<StudioVectorPdfExportResult>;
   handleCapturePagesForPreset: (scope: "current" | "all") => Promise<HTMLCanvasElement[]>;
   handleCapturePagesForIndices: (indices: number[]) => Promise<HTMLCanvasElement[]>;
+  handleExportPresetSlices?: import("./render/studio-raster-export-orchestration-runtime").StudioRasterExportOrchestration["handleExportPresetSlices"];
   handleCopyToClipboard: () => Promise<void>;
   handleDownload: () => Promise<void>;
   handleDownloadAll: (spacing?: number) => Promise<void>;
@@ -1116,6 +1118,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
     exportCurrentPageToVectorPdf,
     handleCapturePagesForPreset,
     handleCapturePagesForIndices,
+    handleExportPresetSlices,
     toggleAnimationTimeline,
     openTimelapse,
     openStoryboardGrid,
@@ -1726,6 +1729,7 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
                       sourceWorkId={workId}
                       capturePagesForPreset={handleCapturePagesForPreset}
                       capturePagesForIndices={handleCapturePagesForIndices}
+                      exportPresetSlicesFromDocument={handleExportPresetSlices}
                       exportCurrentPageToInkMl={exportCurrentPageToInkMl}
                       exportCurrentPageToWillV1={exportCurrentPageToWillV1}
                       exportCurrentPageToSvg={exportCurrentPageToSvg}
@@ -2078,11 +2082,12 @@ export const StudioMenubarContent = memo(function StudioMenubarContent({
               psdImportBusy && "border-warn/30 bg-warn/10 text-warn",
               collaborationDocumentLocked && !psdImportBusy && "cursor-not-allowed opacity-50"
             )}
-            title={psdImportBusy ? "현재 PSD 검사를 취소합니다. 기존 문서는 변경하지 않습니다." : collaborationDocumentLocked ? collaborationLockMessage() : "포토샵(.psd) 파일의 레이어를 이미지 요소로 가져와요(래스터 평탄화, 편집 가능한 텍스트/조정 레이어는 재현되지 않음)"}
+            title={psdImportBusy ? "현재 PSD 검사를 취소합니다. 기존 문서는 변경하지 않습니다." : collaborationDocumentLocked ? collaborationLockMessage() : "PSD 원본·폴더·레이어를 보관하고 원본 합성본 또는 개별 레이어로 가져와요"}
           >
             {psdImportBusy ? <X size={14} aria-hidden /> : <Upload size={14} aria-hidden />}
             {psdImportBusy ? "PSD 검사 취소" : "PSD 가져오기"}
           </button>
+          <StudioPsdSourceDownloads pages={dialoguePages} />
           {psdImportStatus && (
             <span
               role="status"

@@ -184,7 +184,7 @@ describe("simplification budget", () => {
   }
 
   it("keeps a downsampled 1200px disc far under the per-ring cap", () => {
-    const selection = layerAlphaToPixelSelection(disc(1200));
+    const selection = layerAlphaToPixelSelection(disc(1200), { maxDim: LAYER_ALPHA_TRACE_MAX_DIM });
     expect(selection).not.toBeNull();
     const points = selection!.subpaths[0]!.points;
     expect(points.length).toBeLessThanOrEqual(LAYER_ALPHA_MAX_POINTS_PER_RING);

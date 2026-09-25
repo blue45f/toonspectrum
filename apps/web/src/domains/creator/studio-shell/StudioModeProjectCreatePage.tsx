@@ -425,7 +425,7 @@ export function StudioModeProjectCreatePage() {
                 <h2 id="studio-format-title" className="text-lg font-black text-fg">
                   {bt("완성할 콘텐츠를 선택하세요", "Choose the final outcome")}
                 </h2>
-                <p className="text-xs text-fg-3">
+                <p className="text-xs text-fg-2">
                   {bt("도구가 아니라 독자와 시청자가 보게 될 형태를 기준으로 선택합니다.", "Choose by what readers or viewers will receive, not by a tool.")}
                 </p>
               </div>
@@ -453,10 +453,10 @@ export function StudioModeProjectCreatePage() {
                     <strong className="mt-3 block text-sm text-fg">
                       {bt(profile.titleKo, profile.titleEn)}
                     </strong>
-                    <span className="mt-1 line-clamp-3 block text-xs leading-5 text-fg-3">
+                    <span className="mt-1 line-clamp-3 block text-xs leading-5 text-fg-2">
                       {bt(profile.descriptionKo, profile.descriptionEn)}
                     </span>
-                    <span className="mt-2 block text-[0.65rem] font-bold text-accent">
+                    <span className={cn("mt-2 block text-[0.65rem] font-bold", active ? "text-fg" : "text-accent")}>
                       {bt("출력", "Output")} · {outputs.slice(0, 2).join(" · ")}
                     </span>
                   </button>
@@ -467,7 +467,7 @@ export function StudioModeProjectCreatePage() {
             <details className="mt-4 rounded-2xl border border-line bg-panel/35" open={Boolean(auxiliary) || undefined} data-studio-auxiliary-workspaces="true">
               <summary className="min-h-12 cursor-pointer content-center px-4 text-sm font-bold text-fg-2">
                 {bt("작품 프로젝트가 아닌 단일 작업실로 시작", "Start with a standalone workspace")}
-                <span className="ml-2 text-xs font-medium text-fg-3">
+                <span className="ml-2 text-xs font-medium text-fg-2">
                   {bt("스토리보드·이미지 편집·3D·홍보·발표", "Storyboard, image, 3D, promotion or slides")}
                 </span>
               </summary>
@@ -489,7 +489,7 @@ export function StudioModeProjectCreatePage() {
                     >
                       <Icon size={18} className={active ? "text-accent" : "text-fg-2"} aria-hidden="true" />
                       <strong className="mt-2 block text-xs text-fg">{bt(option.titleKo, option.titleEn)}</strong>
-                      <span className="mt-1 line-clamp-2 block text-[0.68rem] leading-5 text-fg-3">
+                      <span className="mt-1 line-clamp-2 block text-[0.68rem] leading-5 text-fg-2">
                         {bt(option.descriptionKo, option.descriptionEn)}
                       </span>
                     </button>
@@ -506,7 +506,7 @@ export function StudioModeProjectCreatePage() {
                 <h2 id="studio-start-point-title" className="text-lg font-black text-fg">
                   {bt("지금 어떤 재료를 가지고 있나요?", "What do you have right now?")}
                 </h2>
-                <p className="text-xs text-fg-3">
+                <p className="text-xs text-fg-2">
                   {bt("선택한 위치에서 가장 짧은 제작 경로로 시작합니다.", "Start from the shortest production path for your current material.")}
                 </p>
               </div>
@@ -536,7 +536,7 @@ export function StudioModeProjectCreatePage() {
                     </span>
                     <span>
                       <strong className="block text-sm text-fg">{bt(option.titleKo, option.titleEn)}</strong>
-                      <span className="mt-1 block text-xs leading-5 text-fg-3">
+                      <span className="mt-1 block text-xs leading-5 text-fg-2">
                         {bt(option.descriptionKo, option.descriptionEn)}
                       </span>
                     </span>
@@ -553,7 +553,7 @@ export function StudioModeProjectCreatePage() {
                 <h2 id="studio-project-details-title" className="text-lg font-black text-fg">
                   {bt("프로젝트 세부 설정", "Project details")}
                 </h2>
-                <p className="text-xs text-fg-3">
+                <p className="text-xs text-fg-2">
                   {bt("형식마다 필요한 크기와 초기 문서 구조가 다르게 준비됩니다.", "Each format prepares its own size and initial document structure.")}
                 </p>
               </div>
@@ -589,7 +589,7 @@ export function StudioModeProjectCreatePage() {
                   ))}
                 </select>
                 {!auxiliary ? (
-                  <span className="mt-1.5 block text-[0.68rem] leading-5 text-fg-3">
+                  <span className="mt-1.5 block text-[0.68rem] leading-5 text-fg-2">
                     {bt(mainTemplate.detailKo, mainTemplate.detailEn)}
                   </span>
                 ) : null}
@@ -615,7 +615,7 @@ export function StudioModeProjectCreatePage() {
                           )}
                         >
                           <strong className="block text-xs text-fg">{bt(option.titleKo, option.titleEn)}</strong>
-                          <span className="mt-1 block text-[0.68rem] leading-5 text-fg-3">
+                          <span className="mt-1 block text-[0.68rem] leading-5 text-fg-2">
                             {bt(option.descriptionKo, option.descriptionEn)}
                           </span>
                         </button>
@@ -643,7 +643,7 @@ export function StudioModeProjectCreatePage() {
                         >
                           <Icon size={16} className={active ? "text-accent" : "text-fg-2"} aria-hidden="true" />
                           <strong className="mt-2 block text-xs text-fg">{bt(option.titleKo, option.titleEn)}</strong>
-                          <span className="mt-1 line-clamp-2 block text-[0.68rem] leading-5 text-fg-3">
+                          <span className="mt-1 line-clamp-2 block text-[0.68rem] leading-5 text-fg-2">
                             {bt(option.descriptionKo, option.descriptionEn)}
                           </span>
                         </button>
@@ -653,7 +653,7 @@ export function StudioModeProjectCreatePage() {
                 </fieldset>
               </div>
             ) : (
-              <p className="mt-4 rounded-xl bg-panel/60 px-3 py-2.5 text-xs leading-5 text-fg-3">
+              <p className="mt-4 rounded-xl bg-panel/60 px-3 py-2.5 text-xs leading-5 text-fg-2">
                 {bt(
                   "단일 작업실은 작품 전체 구조 없이 해당 문서와 전문 도구만 준비합니다. 나중에 작품 프로젝트로 이어 만들 수 있습니다.",
                   "A standalone workspace prepares only its document and specialist tools. You can hand it off to a full project later.",
@@ -669,7 +669,7 @@ export function StudioModeProjectCreatePage() {
                 <h2 id="studio-prepared-project-title" className="text-lg font-black text-fg">
                   {bt("준비되는 프로젝트를 확인하세요", "Review what will be prepared")}
                 </h2>
-                <p className="text-xs text-fg-3">
+                <p className="text-xs text-fg-2">
                   {bt("선택 결과가 실제 작업 화면과 출력 방식에 어떻게 반영되는지 보여줍니다.", "See how your choice changes the workspace and delivery.")}
                 </p>
               </div>
@@ -688,7 +688,7 @@ export function StudioModeProjectCreatePage() {
                       </span>
                     ))}
                   </div>
-                  <p className="mt-3 text-xs leading-5 text-fg-3">
+                  <p className="mt-3 text-xs leading-5 text-fg-2">
                     {bt(
                       `${selectedPageCount}개 초기 페이지 · ${format.keyToolsKo.join(" · ")}`,
                       `${selectedPageCount} initial page${selectedPageCount === 1 ? "" : "s"} · ${format.keyToolsEn.join(" · ")}`,
@@ -706,7 +706,7 @@ export function StudioModeProjectCreatePage() {
                   <p className="text-xs font-black text-accent">
                     {bt("회차 제작 계획까지 함께 준비", "Prepare the episode production plan")}
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-fg-3">
+                  <p className="mt-1 text-xs leading-5 text-fg-2">
                     {bt(
                       "대본·콘티·팀 구성과 연재 주기를 반영해 첫 할 일과 제작 게이트를 만듭니다.",
                       "Use your material, team and cadence to create the first tasks and production gates.",
@@ -730,7 +730,7 @@ export function StudioModeProjectCreatePage() {
                   <h3 className="text-base font-black text-fg">
                     {bt(onboardingPlan.titleKo, onboardingPlan.titleEn)}
                   </h3>
-                  <p className="mt-1 text-xs leading-5 text-fg-3">
+                  <p className="mt-1 text-xs leading-5 text-fg-2">
                     {bt(onboardingPlan.summaryKo, onboardingPlan.summaryEn)}
                   </p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">

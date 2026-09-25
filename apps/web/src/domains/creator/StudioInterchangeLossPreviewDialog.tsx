@@ -1,3 +1,4 @@
+import type { PsdImportResult } from "./studio-psd-import";
 import {
   AlertTriangle,
   Blend,
@@ -51,6 +52,7 @@ export interface StudioInterchangeLossPreviewDialogProps {
   readonly open: boolean;
   readonly preview: StudioInterchangeLossPreviewInput;
   readonly busy?: boolean;
+  readonly psdResult?: PsdImportResult;
   readonly confirmLabel?: string;
   /** Optional controlled destination choices, e.g. new page versus current-page placement. */
   readonly choices?: readonly StudioInterchangeLossPreviewChoice[];
@@ -202,6 +204,7 @@ export function StudioInterchangeLossPreviewDialog({
   open,
   preview,
   busy = false,
+  psdResult,
   confirmLabel = "확인하고 가져오기",
   choices,
   selectedChoiceId,
@@ -215,7 +218,16 @@ export function StudioInterchangeLossPreviewDialog({
     typeof document === "undefined" ? null : document.body,
   );
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const summary = summarizeStudioInterchangeLoss(preview);
+  const [psdRepresentation, setPsdRepresentation] = useState<"layers" | "composite">(psdResult?.elements.length === 0 && psdResult.compositeElement ? "composite" : "layers");
+  const compositeSelected = psdResult?.compositeElement && psdRepresentation === "composite";
+  const summary = summarizeStudioInterchangeLoss(compositeSelected ? {
+    ...preview,
+    result: { ...preview.result, layerCount: 1, editability: "pixels" },
+    constraints: [
+      ...(preview.constraints ?? []).filter((constraint) => constraint.gate === "blocking" || constraint.category === "color-space"),
+      { category: "editability", severity: "warning", message: "PSD 파일에 저장된 원본 합성 이미지를 가져옵니다. 개별 레이어는 합성본 안에서 편집할 수 없으며 원본 PSD를 함께 보관합니다. 저장 시점의 합성본이므로 원본 앱에서 저장하지 않은 변경은 포함하지 않아요." },
+    ],
+  } : preview);
   const visibleChoices = uniqueChoices(choices);
   const selectedChoice = visibleChoices.find(
     (choice) => choice.id === selectedChoiceId && !choice.disabled,
@@ -314,6 +326,26 @@ export function StudioInterchangeLossPreviewDialog({
             </div>
           </div>
 
+          {psdResult ? (
+            <fieldset className="mt-3 space-y-2 rounded-xl border border-line p-3" disabled={busy}>
+              <legend className="px-1 text-xs font-bold">PSD 표현 방식</legend>
+              <label className="flex min-h-11 items-center gap-2 text-xs">
+                <input type="radio" name={`${id}-psd-mode`} checked={psdRepresentation === "layers"}
+                  disabled={psdResult.elements.length === 0} onChange={() => setPsdRepresentation("layers")} />
+                개별 레이어·폴더로 편집
+              </label>
+              <label className="flex min-h-11 items-center gap-2 text-xs">
+                <input type="radio" name={`${id}-psd-mode`} checked={psdRepresentation === "composite"}
+                  disabled={!psdResult.compositeElement} onChange={() => setPsdRepresentation("composite")} />
+                원본 합성본으로 외관 보존
+              </label>
+              {psdResult.compositeElement ? (
+                <img src={psdResult.compositeElement.src} alt="PSD 원본에 저장된 합성 이미지"
+                  className="mx-auto max-h-48 max-w-full object-contain" />
+              ) : <p className="text-xs text-fg-3">원본에 합성 이미지가 없어 레이어 방식만 사용할 수 있어요.</p>}
+              <p className="text-xs text-fg-3">복잡한 효과·그룹 합성은 개별 레이어와 다를 수 있어요. 원본 PSD는 적용할 때 함께 보관합니다.</p>
+            </fieldset>
+          ) : null}
           {choiceRequired ? (
             <fieldset
               className="mt-3 rounded-xl border border-line bg-card/35 p-3"
@@ -449,7 +481,7 @@ export function StudioInterchangeLossPreviewDialog({
               disabled={confirmDisabled}
               aria-describedby={selectionMissing ? choicesErrorId : undefined}
               onClick={() => {
-                if (!confirmDisabled) onConfirm(selectedChoice?.id ?? null);
+                if (!confirmDisabled) onConfirm(compositeSelected ? `${selectedChoice?.id ?? "new-page"}:composite` : selectedChoice?.id ?? null);
               }}
               className={cn(
                 "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent px-3 text-xs font-bold text-on-accent hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-45",

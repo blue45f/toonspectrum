@@ -26,6 +26,8 @@ async function ready(page) {
 async function saved(page) { await expect(page.getByTestId("drawing-fixture")).toHaveAttribute("data-persistence", "saved", options); }
 async function apply(page) { await page.getByRole("button", { name: "색상 적용", exact: true }).click(); }
 async function openColor(page, target = "주 색") {
+  const mobileColor = page.locator('[data-studio-mobile-primary-actions="true"]').getByRole("button", { name: "브러시 색상", exact: true });
+  if (await mobileColor.isVisible() && await mobileColor.getAttribute("aria-expanded") !== "true") await mobileColor.click();
   await page.getByRole("button", { name: target, exact: true }).click();
   const dialog = page.getByRole("dialog", { name: `${target} 선택`, exact: true });
   await expect(dialog).toBeVisible();
@@ -217,13 +219,33 @@ async function handheld(browser, engine, size) {
     await expect(controls).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     assert(overflow <= 1, `mobile horizontal overflow ${overflow}`);
-    for (const name of ["주 색", "보조 색", "주 색과 보조 색 교체", "레이어 열기", "전체 도구 열기"]) {
+    await expect(controls.getByRole("button")).toHaveCount(6);
+    for (const name of ["펜", "지우개", "브러시 색상", "실행취소", "다시실행", "작업 메뉴"]) {
       const target = controls.getByRole("button", { name, exact: true });
       const box = await target.boundingBox();
       assert(box && box.width >= 43.5 && box.height >= 43.5 && box.x >= 0 && box.x + box.width <= size.width + 1, `${name}: ${JSON.stringify(box)}`);
     }
     const dock = page.locator('[data-studio-mobile-editing-dock="true"]');
-    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])').click();
+    const openWorkMenu = async () => {
+      const toggle = dock.locator('[data-studio-mobile-workspace-toggle="true"]');
+      if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+    };
+    await page.screenshot({ path: path.join(output, `${engine}-mobile-${size.width}-essential.png`) });
+    await controls.getByRole("button", { name: "브러시 색상", exact: true }).click();
+    const colors = dock.locator('[data-studio-mobile-color-controls="true"]');
+    for (const name of ["주 색", "보조 색", "주 색과 보조 색 교체", "캔버스 스포이드"]) {
+      const box = await colors.getByRole("button", { name, exact: true }).boundingBox();
+      assert(box && box.width >= 43.5 && box.height >= 43.5 && box.x >= 0 && box.x + box.width <= size.width + 1, `${name}: ${JSON.stringify(box)}`);
+    }
+    await page.keyboard.press("Escape");
+    await expect(controls.getByRole("button", { name: "브러시 색상", exact: true })).toBeFocused();
+    await openWorkMenu();
+    for (const name of ["레이어 열기", "전체 도구 열기"]) {
+      const box = await dock.getByRole("button", { name, exact: true }).boundingBox();
+      assert(box && box.width >= 43.5 && box.height >= 43.5 && box.x >= 0 && box.x + box.width <= size.width + 1, `${name}: ${JSON.stringify(box)}`);
+    }
+    await page.screenshot({ path: path.join(output, `${engine}-mobile-${size.width}-work-menu.png`) });
+    await dock.getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)", exact: true }).click();
     const sheet = page.getByRole("dialog", { name: "브러시 설정", exact: true });
     await expect(sheet).toBeVisible();
     const sheetBounds = await sheet.boundingBox(); const dockBounds = await dock.boundingBox();
@@ -231,14 +253,16 @@ async function handheld(browser, engine, size) {
     await sheet.locator('[data-studio-open-brush-library="true"]').click();
     await expect(page.getByTestId("action")).toHaveText("brush-library");
     await sheet.getByRole("button", { name: "브러시 설정 닫기", exact: true }).click();
-    await controls.getByRole("button", { name: "전체 도구 열기", exact: true }).click();
+    await openWorkMenu();
+    await dock.getByRole("button", { name: "전체 도구 열기", exact: true }).click();
     let catalog = page.getByRole("dialog", { name: "전체 도구", exact: true });
     await expect(catalog).toBeVisible();
     await catalog.getByRole("searchbox").fill("스포이드");
     await catalog.getByRole("button", { name: "색 가져오기 사용", exact: true }).click();
     await expect(page.getByTestId("tool")).toHaveText("eyedropper");
     await page.getByRole("button", { name: "캔버스 전용 전환", exact: true }).click();
-    await controls.getByRole("button", { name: "전체 도구 열기", exact: true }).click();
+    await openWorkMenu();
+    await dock.getByRole("button", { name: "전체 도구 열기", exact: true }).click();
     catalog = page.getByRole("dialog", { name: "전체 도구", exact: true });
     await expect(catalog).toBeVisible();
     await catalog.getByRole("button", { name: "전체 도구 닫기", exact: true }).click();
@@ -313,6 +337,7 @@ try {
       await handheld(browser, engine, { width: 390, height: 700 });
       await handheld(browser, engine, { width: 360, height: 640 });
       await handheld(browser, engine, { width: 320, height: 640 });
+      await handheld(browser, engine, { width: 412, height: 800 });
       if (engine === "webkit") report.storageModes.push({ engine, ...await verifyRestrictedDrawingContext(browser, url) });
     } finally { await browser.close(); }
   }

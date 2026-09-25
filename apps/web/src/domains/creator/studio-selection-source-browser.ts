@@ -1,6 +1,6 @@
+import { assertExactSelectionSize } from "./selection/studio-selection-exact-mask";
 /** Browser orchestration for layer-opacity and local semantic pixel selection. */
 import {
-  alphaMaskFromRgba,
   applySelectionSourceMask,
   foregroundConfidenceToMask,
   multiplySelectionSourceMasks,
@@ -86,6 +86,16 @@ function loadImage(src: string, signal?: AbortSignal): Promise<HTMLImageElement>
   });
 }
 
+/** 테두리 확정도 표시 크기가 아닌 원본 픽셀 크기를 사용한다. */
+export async function readStudioSelectionSourceSize(src: string, signal?: AbortSignal) {
+  const image = await loadImage(src, signal);
+  throwIfAborted(signal);
+  const width = image.naturalWidth || image.width;
+  const height = image.naturalHeight || image.height;
+  assertExactSelectionSize(width, height);
+  return { width, height };
+}
+
 function fittedRasterSize(
   sourceWidth: number,
   sourceHeight: number,
@@ -105,7 +115,8 @@ function fittedRasterSize(
   }
   const width = Math.max(1, Math.round(sourceWidth));
   const height = Math.max(1, Math.round(sourceHeight));
-  const scale = Math.min(1, STUDIO_SELECTION_SOURCE_TRACE_MAX_DIM / Math.max(width, height));
+  assertExactSelectionSize(width, height);
+  const scale = 1;
   return {
     width: Math.max(1, Math.round(width * scale)),
     height: Math.max(1, Math.round(height * scale)),
@@ -136,23 +147,30 @@ async function readImageAlphaMask(
   );
   const canvas = document.createElement("canvas");
   canvas.width = width;
-  canvas.height = height;
+  canvas.height = Math.min(256, height);
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("선택 분석 캔버스를 만들 수 없습니다.");
-  context.clearRect(0, 0, width, height);
-  context.drawImage(image, 0, 0, width, height);
-  throwIfAborted(options.signal);
-  let data: Uint8ClampedArray;
+  const alpha = new Uint8ClampedArray(width * height);
   try {
-    data = context.getImageData(0, 0, width, height).data;
+    // RGBA 전체 복사 대신 256행씩 읽어 원본 해상도와 작은 구멍을 유지한다.
+    for (let top = 0; top < height; top += canvas.height) {
+      throwIfAborted(options.signal);
+      const rows = Math.min(canvas.height, height - top);
+      context.clearRect(0, 0, width, canvas.height);
+      context.drawImage(image, 0, -top, width, height);
+      const data = context.getImageData(0, 0, width, rows).data;
+      for (let index = 0; index < width * rows; index += 1) alpha[top * width + index] = data[index * 4 + 3]!;
+      if (top + rows < height) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
   } catch (error) {
-    throw new Error(
-      "이미지 보안 정책 때문에 투명도 픽셀을 읽을 수 없습니다.",
-      { cause: error },
-    );
+    if ((error as { name?: string } | null)?.name === "AbortError") throw error;
+    throw new Error("이미지 보안 정책 때문에 투명도 픽셀을 읽을 수 없습니다.", { cause: error });
+  } finally {
+    canvas.width = 1;
+    canvas.height = 1;
   }
   throwIfAborted(options.signal);
-  return alphaMaskFromRgba(data, width, height);
+  return { width, height, alpha };
 }
 
 export async function selectOpaqueFromImageSource(
@@ -160,6 +178,7 @@ export async function selectOpaqueFromImageSource(
 ): Promise<PixelSelection | null> {
   const mask = await readImageAlphaMask(request.src, { signal: request.signal });
   return applySelectionSourceMask(request.selection, mask, request.operation, {
+    exact: true,
     aspect: request.aspect,
     flipX: request.flipX,
     flipY: request.flipY,

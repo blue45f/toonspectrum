@@ -11,6 +11,9 @@ import {
   type StudioBrushTipAlphaMap,
 } from "../brush/studio-brush-tip-stamp";
 import { calculateStudioCrc32 } from "../studio-crc32";
+import { sha256HexPortable } from "../studio-sha256";
+
+import { StudioSvgTextureBudgetError } from "./studio-svg-export-fidelity";
 
 export const STUDIO_SVG_BRUSH_TEXTURE_SERIALIZED_UTF16_BYTE_BUDGET =
   64 * 1_024 * 1_024;
@@ -149,11 +152,19 @@ export function svgBrushTextureAsset(
   if (cached) return cached;
   const pixels = createPixels();
   if (!pixels) return null;
+  // revision이 다른 팁도 실제 픽셀이 같으면 하나의 PNG/마스크를 공유한다.
+  // 작은 SHA 키만 보관해 전체 base64 원본을 캐시 키로 중복 보관하지 않는다.
+  const contentKey = `texture-rgba:${size}:${sha256HexPortable(new Uint8Array(pixels.buffer, pixels.byteOffset, pixels.byteLength))}`;
+  const identical = ctx.brushTextureAssets.get(contentKey);
+  if (identical) {
+    ctx.brushTextureAssets.set(cacheKey, identical);
+    return identical;
+  }
   const png = encodeSvgBrushTexturePng(pixels, size);
   if (!png) return null;
   const dataUrl = `data:image/png;base64,${encodeStudioBrushTipAlphaMapBase64(png)}`;
 
-  const symbolId = nextId(ctx, "sbt");
+  const symbolId = `sbt${ctx.seq + 1}`;
   const maskId = `${symbolId}m`;
   const asset = Object.freeze({ symbolId, size });
   const definition =
@@ -170,10 +181,14 @@ export function svgBrushTextureAsset(
     || nextSerializedUtf16Bytes
       > STUDIO_SVG_BRUSH_TEXTURE_SERIALIZED_UTF16_BYTE_BUDGET
   ) {
-    return null;
+    throw new StudioSvgTextureBudgetError(
+      STUDIO_SVG_BRUSH_TEXTURE_SERIALIZED_UTF16_BYTE_BUDGET,
+    );
   }
+  ctx.seq += 1;
   ctx.brushTextureSerializedUtf16Bytes = nextSerializedUtf16Bytes;
   ctx.brushTextureAssets.set(cacheKey, asset);
+  ctx.brushTextureAssets.set(contentKey, asset);
   ctx.defs.push(definition);
   return asset;
 }
@@ -221,8 +236,7 @@ export function svgAlphaMapTextureAsset(
     return JSON.stringify([
       "alpha-map-external-v1",
       alphaMap.size,
-      calculateStudioCrc32(bytes),
-      encodeStudioBrushTipAlphaMapBase64(bytes),
+      sha256HexPortable(bytes),
     ]);
   })();
   if (!fallbackKey) return null;

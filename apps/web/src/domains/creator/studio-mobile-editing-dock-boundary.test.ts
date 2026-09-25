@@ -248,7 +248,10 @@ describe("Studio mobile editing dock module boundary", () => {
       expect(page.source).toContain(controllerContract);
       expect(dock.source).not.toContain(controllerContract);
     }
-    expect(dock.source).not.toContain("useState(");
+    // 접힌 색상/작업 메뉴의 표시 상태는 도크가 소유한다. 편집·모달 상태는 Host에 남긴다.
+    for (const hostState of ["mobileSheet", "tool", "drawMode", "brushManagerOpen", "colorVisionOpen"]) {
+      expect(dock.source).not.toContain(`const [${hostState},`);
+    }
     expect(dock.source).not.toContain("useStudioModalSheet");
     expect(page.source).toContain("dismissBrushManager: dismissBrushManagerToDraw,");
     expect(page.source).not.toContain("dismissBrushManager={dismissBrushManagerToDraw}");

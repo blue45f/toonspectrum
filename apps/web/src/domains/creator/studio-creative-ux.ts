@@ -365,10 +365,10 @@ const HINTS: Record<string, string> = {
   screentone: "만화 스크린톤 도트",
   "ink-brush": "속도 반응 딥펜 — 빠르게 그으면 가늘어져요",
   "airbrush-fine": "입자 없는 매끈한 에어브러시 — 부드러운 셰이딩",
-  "pencil-grain": "종이결 그레인 연필 — 러프·해칭",
+  "pencil-grain": "종이 결을 드러내는 그레인 연필 — 거친 스케치",
   "wash-brush": "플로우가 쌓이는 물붓 — 웻엣지 수채",
   "perfect-ink": "필압 테이퍼 잉크 — tldraw급 필기감",
-  "perfect-marker": "매끈한 아웃라인 마커 — 균일 굵기 필기감",
+  "perfect-marker": "매끈한 아웃라인 마커 — 약한 필압 변화와 둥근 마감",
 };
 
 function previewWeightFor(preset: BrushPreset): number {

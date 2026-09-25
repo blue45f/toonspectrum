@@ -32,6 +32,8 @@ describe("Studio five-hour soak browser state isolation", () => {
     const open = sliceFunction("openMobileBrushLibrary", "selectBrush");
     expect(open).toContain('[data-studio-mobile-editing-dock="true"]');
     expect(open).toContain('name: "브러시 설정 (굵기·색·프리셋)"');
+    expect(open).toContain('[data-studio-mobile-workspace-toggle="true"]');
+    expect(open).toContain('await workspace.click()');
     expect(open).toContain('page.locator("#studio-mobile-draw-settings")');
     expect(open).toContain(`sheet.locator('[data-studio-open-brush-library="true"]')`);
     expect(open).toContain('[data-studio-brush-library="true"]');

@@ -80,6 +80,8 @@ export function createStudioRasterExportIntentController(
   };
 
   return {
+    handleExportPresetSlices: (indices, options) =>
+      runExclusive(async () => (await load()).handleExportPresetSlices(indices, options)),
     handleDownload: async () => {
       try {
         await runExclusive(async () => (await load()).handleDownload());

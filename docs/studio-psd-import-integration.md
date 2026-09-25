@@ -1,5 +1,8 @@
 # Studio PSD 레이어 가져오기(Import) — StudioPage.tsx 통합 설계
 
+상태: `legacy exception` 초기 설계 이력. 2026-09-26 구현·보존 범위는
+[PSD 교환 보존 계약](quality/psd-interchange-2026-09-26.md)을 따른다. 아래 평탄화·합성 생략·마스크 제외 지침은 현재 구현 지침이 아니다.
+
 > **2026-09-14 현행 구현 참고:** 아래 내용은 초기 설계 이력입니다. 현재 원본 PNG 보존,
 > 취소·진행 상태와 검증 경계는 `studio-quality-preserving-upgrade-2026-09-14.md`를 확인하세요.
 

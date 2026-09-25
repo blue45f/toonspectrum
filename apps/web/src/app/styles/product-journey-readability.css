@@ -1,0 +1,24 @@
+/*
+ * Product-journey readability follow-up.
+ *
+ * Keep secondary labels readable on compact and mobile layouts without changing the
+ * underlying feature-specific visual systems. This sheet loads after the site-wide
+ * contracts so these narrow accessibility corrections remain authoritative.
+ */
+.research-art-label,
+.route-purpose-scene__eyebrow,
+.atelier-workbench__badge,
+.atelier-workbench__art-note,
+.atelier-workbench__kicker,
+[data-site-experience] .site-atelier-chapter__heading > div > p:first-child {
+  font-size: 0.6875rem;
+}
+
+[data-studio-beta-notice="true"] p.text-center {
+  color: var(--color-fg-2);
+  font-size: 0.68rem;
+}
+
+[data-studio-beta-notice="true"] button[aria-controls] {
+  min-width: 2.75rem;
+}

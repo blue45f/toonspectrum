@@ -8,6 +8,7 @@ import {
   type SiteRouteMetadata,
   type SiteRouteProduct,
   type SiteRoutePurpose,
+  type SiteRouteTier,
 } from "@/shared/lib/site-route-metadata";
 
 export interface SiteDirectoryEntry {
@@ -23,6 +24,7 @@ export interface SiteDirectoryFilters {
   readonly maturity?: SiteRouteMaturity | "all";
   readonly access?: SiteRouteAccess | "all";
   readonly device?: SiteRouteDevice | "all";
+  readonly tier?: SiteRouteTier | "all";
   readonly favorites?: readonly string[];
   readonly favoritesOnly?: boolean;
 }
@@ -82,6 +84,7 @@ export function filterSiteDirectory(
     if (filters.maturity && filters.maturity !== "all" && metadata.maturity !== filters.maturity) return false;
     if (filters.access && filters.access !== "all" && metadata.access !== filters.access) return false;
     if (filters.device && filters.device !== "all" && metadata.device !== filters.device) return false;
+    if (filters.tier && filters.tier !== "all" && metadata.tier !== filters.tier) return false;
     if (filters.favoritesOnly && !favoritePaths.has(metadata.canonicalPath)) return false;
     return true;
   });

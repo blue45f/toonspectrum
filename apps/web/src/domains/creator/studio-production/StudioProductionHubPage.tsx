@@ -114,7 +114,9 @@ export function StudioProductionHubPage(props: {
 
   return (
     <PreserveLinkQueryParams params={preserveDemo ? { demo: "1" } : {}}>
-      {props.surface === "review" ? (
+      {props.surface === "projects" ? (
+        <h1 className="sr-only">내 제작 작업</h1>
+      ) : props.surface === "review" ? (
         <h1 className="sr-only">검토 및 승인</h1>
       ) : null}
       <StudioProductionHubPageV2 {...props} />

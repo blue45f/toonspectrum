@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/app/errors/error-boundary";
 import { AuthMenuShell } from "@/domains/auth/components/auth-menu-shell";
 import { WorkspaceAccountContext } from "@/shared/components/workspace/workspace-account-context";
 import { AuthSessionProvider } from "@/domains/auth/components/session-provider";
+import { activeProjectIdFromLocation, writeActiveProjectContext } from "@/domains/creator/studio-shell/active-project-context";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
 import { PwaInstallNudgeHost as PwaInstallNudge } from "@/shared/components/pwa-install-nudge-host";
@@ -50,6 +51,11 @@ const CreatorAdaptiveOnboardingGate = lazy(() =>
     default: mod.CreatorAdaptiveOnboardingGate,
   })),
 );
+const ActiveProjectContextBridge = lazy(() =>
+  import("@/domains/creator/studio-shell/ActiveProjectContextBridge").then((mod) => ({
+    default: mod.ActiveProjectContextBridge,
+  })),
+);
 const ToastHost = lazy(() =>
   import("@/shared/components/toast-host").then((mod) => ({ default: mod.ToastHost })),
 );
@@ -62,6 +68,10 @@ function CreatorContinuityTracker() {
     if (binding?.surface === "protected" || binding?.districtId === "observatory") return;
     recordCreatorDestination(pathname, search);
     recordSiteRouteVisit(pathname);
+    const projectId = activeProjectIdFromLocation(pathname, search);
+    if (projectId && typeof window !== "undefined") {
+      writeActiveProjectContext(window.sessionStorage, projectId);
+    }
   }, [pathname, search]);
   return null;
 }
@@ -153,6 +163,9 @@ export function AppShell({
         {immersiveVirtualExperience ? null : <PwaInstallNudge />}
         <main id="main-content" tabIndex={-1} className={resolvedMainClassName} data-public-experience={publicCreativeRoute ? "atelier" : publicExperience || undefined}>
           {enhancedSite ? <Suspense fallback={null}><SiteCreationCompass /></Suspense> : null}
+          {publicCreativeRoute ? (
+            <Suspense fallback={null}><ActiveProjectContextBridge /></Suspense>
+          ) : null}
           <WorkspaceAccountContext.Provider value={<AuthMenuShell />}>
             <SpatialCampusFrame binding={campus} route={taskRoute}><AppRouter /></SpatialCampusFrame>
           </WorkspaceAccountContext.Provider>

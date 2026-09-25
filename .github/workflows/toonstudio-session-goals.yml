@@ -44,6 +44,7 @@ jobs:
           sparse-checkout: |
             /*
             !/apps/web/public/assets/
+            /apps/web/public/assets/3d/outfits/
             /apps/web/public/assets/3d/environments/refined-v6/manifest.json
             /apps/web/public/assets/3d/environments/expansion-v1/manifest.json
             /apps/web/public/assets/3d/environments/webtoon-v7/manifest.json

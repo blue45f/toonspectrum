@@ -34,6 +34,8 @@ describe("directory metadata filters", () => {
     ];
     expect(filterSiteDirectory(richerEntries, "", { product: "studio", maturity: "beta" }).map((item) => item.href)).toEqual(["/studio/bg3d"]);
     expect(filterSiteDirectory(richerEntries, "", { product: "docs" }).map((item) => item.href)).toEqual(["/support", "/privacy"]);
+    expect(filterSiteDirectory(richerEntries, "", { tier: "core" }).map((item) => item.href)).toEqual(["/studio/bg3d"]);
+    expect(filterSiteDirectory(richerEntries, "", { tier: "ecosystem" }).map((item) => item.href)).toEqual(["/learn/records", "/market", "/support", "/privacy"]);
   });
 
   it("normalizes aliases and supports a favorites-only view", () => {

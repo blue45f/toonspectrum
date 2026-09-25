@@ -436,6 +436,7 @@ export function bindStudioCuttoonStagePointersBatch(
       const authoritativeDrawing = batch.authoritative.length > 0
         ? publishAuthoritativeFreehandSuffix(crdtSampleStart)
         : drawingRef.current;
+      if (authoritativeDrawing && h.pendingStrokeAdmissionRef?.current?.has(authoritativeDrawing.id)) return;
       const authoritativePointCount = Math.floor((authoritativeDrawing?.points.length ?? 0) / 2);
       const rawPreviewState = rawPenInkPreviewStateRef.current;
       const canonicalPredictionTail = predictedInkTailStateRef.current;

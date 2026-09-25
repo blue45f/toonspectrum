@@ -1,3 +1,5 @@
+import { assertStudioPsdSourceArchiveEvidence } from "./export/studio-psd-source-archive";
+import { STUDIO_PSD_SOURCE_MIME, validateStudioPsdSourceBytes } from "./export/studio-psd-source";
 import { z } from "zod";
 
 import { deriveStudioBg3dGlbBudgetProfiles } from "./bg3d/studio-bg3d-device-quality";
@@ -79,6 +81,7 @@ export const STUDIO_PROJECT_ARCHIVE_ATTACHMENT_KINDS = [
   "gltf",
   "obj",
   "audio",
+  "psd-source",
 ] as const;
 
 export type StudioProjectArchiveAttachmentKind =
@@ -1059,6 +1062,11 @@ function inspectAttachmentBytes(
   declaredMimeType: string,
   diagnostics: StudioProjectArchiveDiagnostic[]
 ): string {
+  if (kind === "psd-source") {
+    try { validateStudioPsdSourceBytes(bytes); } catch { fail("MIME_SIGNATURE_MISMATCH", "PSD 원본 attachment의 서명 또는 크기가 올바르지 않습니다."); }
+    validateDeclaredMime(declaredMimeType, [STUDIO_PSD_SOURCE_MIME]);
+    return STUDIO_PSD_SOURCE_MIME;
+  }
   if (kind === "raster" || kind === "mask" || kind === "reference") {
     const detected = rasterMimeType(bytes);
     if (!detected) fail("MIME_SIGNATURE_MISMATCH", "래스터 attachment의 파일 서명이 올바르지 않습니다.");
@@ -1129,6 +1137,7 @@ function extensionFor(mimeType: string, kinds: ReadonlySet<StudioProjectArchiveA
   if (kinds.has("vrm")) return "vrm";
   const extensions: Record<string, string> = {
     "image/png": "png",
+    "image/vnd.adobe.photoshop": "psd",
     "image/jpeg": "jpg",
     "image/gif": "gif",
     "image/webp": "webp",
@@ -2223,6 +2232,7 @@ export async function buildStudioProjectArchive(
       documentReferences: [...attachment.references.values()],
     }]),
   );
+  assertStudioPsdSourceArchiveEvidence(canonicalProjectValue, [...archiveAttachmentEvidence].map(([sha256, attachment]) => ({ sha256, ...attachment })));
   const surfacePaintPlan = assertVrmSurfacePaintIntegrityReferencesCovered(
     canonicalProjectValue,
     archiveAttachmentEvidence,
@@ -2921,6 +2931,7 @@ export async function importStudioProjectArchive(
         );
     }
   );
+  assertStudioPsdSourceArchiveEvidence(canonicalProject, manifest.attachments);
   scanExternalProjectDependencies(rehydratedValue, "", diagnostics, linked3dCoveredPointers);
   let project: StudioProjectFile;
   try {

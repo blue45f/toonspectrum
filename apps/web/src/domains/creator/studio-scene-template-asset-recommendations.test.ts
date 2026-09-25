@@ -9,6 +9,7 @@ import {
   getStudioSceneTemplateBackgroundIds,
   listStudioSceneTemplateAssetRecommendations,
 } from "./studio-scene-template-asset-recommendations";
+import { STUDIO_ILLUSTRATION_BG_SCENES } from "./catalog/studio-illustration-pack";
 import { SCENE_TEMPLATES } from "./studio-scene-templates";
 
 describe("Studio scene-template asset recommendations", () => {
@@ -17,6 +18,7 @@ describe("Studio scene-template asset recommendations", () => {
   const highQualityBackgroundIds = new Set([
     ...CURATED_CC0_BG_SCENES.map((scene) => scene.id),
     ...GENERATED_GPT25_BG_SCENES.map((scene) => scene.id),
+    ...STUDIO_ILLUSTRATION_BG_SCENES.map((scene) => scene.id),
   ]);
 
   it("covers every scene template with reviewed high-quality backgrounds", () => {

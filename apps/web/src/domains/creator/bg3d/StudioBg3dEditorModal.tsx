@@ -229,6 +229,10 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
             </button>
           </div>
         </header>
+        <div className="flex shrink-0 items-start gap-2 border-b border-line bg-accent-soft/55 px-3 py-2 text-[0.68rem] leading-5 text-fg-2 sm:hidden" role="note">
+          <Sparkles size={14} className="mt-0.5 shrink-0 text-accent" aria-hidden />
+          <span><strong className="text-fg">모바일 간편 모드</strong> · 구도·배치·검토에 맞춰 핵심 도구만 표시합니다. 정밀 모델링과 대량 출력은 데스크톱 사용을 권장합니다.</span>
+        </div>
         <div
           aria-busy={isCapturing || undefined}
           inert={isCapturing}

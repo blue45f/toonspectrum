@@ -287,6 +287,7 @@ export function deriveStudioUnifiedAssetFacet(
         editability: item.preview.kind === "svg" ? "scalable" : "flattened",
       });
     case "local":
+    case "builtin-raster":
       return Object.freeze({
         format: item.preview.kind === "svg" ? "vector" : "image",
         rights,

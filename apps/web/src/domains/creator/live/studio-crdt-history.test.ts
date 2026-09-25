@@ -73,6 +73,48 @@ function draw(id: string, point: number): TestElement {
   };
 }
 
+describe("협업 이력의 불변 획 공유", () => {
+  it("긴 획의 모든 센서 채널을 이력 200단계에서 한 번만 보관하고 반복 반영을 생략한다", () => {
+    const remote = record("remote", 0);
+    remote.payload.points = Array.from({ length: 6000 }, (_, index) => index / 2);
+    remote.payload.pressures = Array.from({ length: 3000 }, (_, index) => index / 3000);
+    Object.freeze(remote.payload.points);
+    Object.freeze(remote.payload.pressures);
+    Object.freeze(remote.payload);
+    const untouched = { id: "page-b", elements: [draw("local", 4)] };
+    const history: TestPage[][] = Array.from({ length: 200 }, () => [
+      { id: "page-a", elements: [] }, untouched,
+    ]);
+    const result = reconcileStudioCrdtHistory(history, 199, [remote], null);
+    const shared = result.history[0]?.[0]?.elements[0];
+    expect(shared?.points).toEqual(remote.payload.points);
+    expect(new Set(result.history.map((snapshot) => snapshot[0]?.elements[0])).size).toBe(1);
+    expect(result.history.every((snapshot) => snapshot[1] === untouched)).toBe(true);
+    const repeated = reconcileStudioCrdtHistory(result.history, 199, [remote], null);
+    expect(repeated.changed).toBe(false);
+    expect(repeated.history).toBe(result.history);
+    expect(history[0]?.[0]?.elements).toEqual([]);
+
+    const updated = record("remote", 8);
+    Object.freeze(updated.payload.points);
+    Object.freeze(updated.payload.pressures);
+    Object.freeze(updated.payload);
+    const next = reconcileStudioCrdtHistory(result.history, 199, [updated], null);
+    expect(next.history[0]?.[0]?.elements[0]?.points).toEqual([8, 8, 9, 9]);
+    expect(shared?.points).toEqual(remote.payload.points);
+  });
+
+  it("가변 입력 레코드 변경을 불변 캐시로 숨기지 않는다", () => {
+    const remote = record("remote", 1);
+    const history: TestPage[][] = [[{ id: "page-a", elements: [] }]];
+    const result = reconcileStudioCrdtHistory(history, 0, [remote], null);
+    remote.payload.points[0] = 99;
+    const updated = reconcileStudioCrdtHistory(result.history, 0, [remote], null);
+    expect(updated.history[0]?.[0]?.elements[0]?.points?.[0]).toBe(99);
+    expect(result.history[0]?.[0]?.elements[0]?.points?.[0]).toBe(1);
+  });
+});
+
 function points(history: TestPage[][], historyIndex: number, id: string): number[] | undefined {
   return history[historyIndex]?.[0]?.elements.find((element) => element.id === id)?.points;
 }

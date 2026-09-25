@@ -106,7 +106,17 @@ describe("site route metadata", () => {
     expect(resolveSiteRouteMetadata("/studio/3d/dcc/sculpt")).toMatchObject({
       maturity: "experimental",
       device: "desktop-first",
+      tier: "labs",
     });
-    expect(resolveSiteRouteMetadata("/studio/bg3d")).toMatchObject({ maturity: "beta", device: "desktop-first" });
+    expect(resolveSiteRouteMetadata("/studio/bg3d")).toMatchObject({
+      maturity: "beta",
+      device: "desktop-first",
+    });
+  });
+
+  it("separates the core product, connected ecosystem and optional labs", () => {
+    expect(resolveSiteRouteMetadata("/studio/new")).toMatchObject({ tier: "core" });
+    expect(resolveSiteRouteMetadata("/ranking")).toMatchObject({ tier: "ecosystem" });
+    expect(resolveSiteRouteMetadata("/studio/ai-lab")).toMatchObject({ tier: "labs" });
   });
 });
