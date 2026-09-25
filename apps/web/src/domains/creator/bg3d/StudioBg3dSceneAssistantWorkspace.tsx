@@ -1,3 +1,7 @@
+"use no memo";
+// The editor exposes one mutable host bag. The assistant polls that bag and must re-render the
+// shared viewport even when the bag identity itself stays stable.
+
 import {
   ArrowLeft,
   ArrowRight,
@@ -68,6 +72,7 @@ export interface StudioBg3dSceneAssistantHost {
   readonly customModels?: readonly AssistantSceneNode[];
   readonly sharedCharacterCaptureElementIds?: readonly string[];
   readonly selectedIds?: ReadonlySet<string>;
+  readonly setSelectedIds?: (ids: Set<string>) => void;
   readonly modelLibrary?: readonly AssistantAsset[];
   readonly genericModelClassifications?: ReadonlyMap<string, string>;
   readonly transformMode?: "translate" | "rotate" | "scale";
@@ -157,9 +162,12 @@ function readAssistantHostSnapshot(h: StudioBg3dSceneAssistantHost): string {
     h.immersiveSceneActive ? 1 : 0,
     h.sharedStageUpdateBlockedReason ?? "",
     h.primitives?.length ?? 0,
+    (h.primitives ?? []).map((node) => node.id).join(","),
     h.customModels?.length ?? 0,
+    (h.customModels ?? []).map((node) => node.id).join(","),
     h.sharedCharacterCaptureElementIds?.length ?? 0,
     h.selectedIds?.size ?? 0,
+    [...(h.selectedIds ?? [])].sort().join(","),
     h.modelLibrary?.length ?? 0,
     h.genericModelClassifications?.size ?? 0,
     h.transformMode ?? "",
@@ -387,7 +395,7 @@ function ChooseStep({
       {goal === "background" ? (
         <section aria-labelledby="scene-assistant-scene-title">
           <div className="scene-assistant__section-title">
-            <div><p>IMAGEGEN 2.5 CURATION</p><h4 id="scene-assistant-scene-title">장면 프리셋</h4></div>
+            <div><p>CURATED SCENE COLLECTION</p><h4 id="scene-assistant-scene-title">장면 프리셋</h4></div>
             {hasScene ? <span>선택하면 현재 장면을 바꿉니다</span> : <span>선택 즉시 3D 장면을 구성합니다</span>}
           </div>
           <div className="scene-assistant__scene-grid">
@@ -701,7 +709,9 @@ export function StudioBg3dSceneAssistantWorkspace({
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [activeCameraPreset, setActiveCameraPreset] = useState("threeQuarter");
   const [outputStyle, setOutputStyle] = useState<StudioBg3dAssistantOutputStyle>("color");
+  const [sceneFramingRequest, requestSceneFraming] = useReducer((revision: number) => revision + 1, 0);
   const hydratedRef = useRef(false);
+  const completedSceneFramingRequestRef = useRef(0);
 
   useEffect(() => {
     if (!h.open) return undefined;
@@ -736,6 +746,39 @@ export function StudioBg3dSceneAssistantWorkspace({
     || Boolean(h.insertBlocked)
     || Boolean(h.immersiveSceneActive)
     || Boolean(h.sharedStageUpdateBlockedReason);
+  const selectableSceneIds = [
+    ...(h.primitives ?? []).map((node) => node.id),
+    ...(h.customModels ?? []).map((node) => node.id),
+  ];
+  const selectableSceneIdSignature = [...selectableSceneIds].sort().join("|");
+  const selectedSceneIdSignature = [...(h.selectedIds ?? [])].sort().join("|");
+
+  useEffect(() => {
+    if (
+      sceneFramingRequest === 0
+      || completedSceneFramingRequestRef.current === sceneFramingRequest
+      || busy
+      || h.focusSelectionDisabledReason
+      || selectableSceneIdSignature.length === 0
+    ) return undefined;
+    if (h.setSelectedIds && selectedSceneIdSignature !== selectableSceneIdSignature) {
+      h.setSelectedIds(new Set(selectableSceneIdSignature.split("|").filter(Boolean)));
+      return undefined;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      completedSceneFramingRequestRef.current = sceneFramingRequest;
+      h.focusSelectedEntity();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [
+    busy,
+    h,
+    h.focusSelectionDisabledReason,
+    sceneFramingRequest,
+    selectableSceneIdSignature,
+    selectedSceneIdSignature,
+  ]);
 
   useEffect(() => {
     if (!modalOpen) {
@@ -762,6 +805,10 @@ export function StudioBg3dSceneAssistantWorkspace({
     setSheetState(next === "choose" ? "full" : "half");
   };
 
+  const frameWholeScene = () => {
+    requestSceneFraming();
+  };
+
   const replaceWithScene = (preset: StudioBg3dAssistantScenePreset) => {
     if (busy) return;
     if (hasScene) {
@@ -773,6 +820,7 @@ export function StudioBg3dSceneAssistantWorkspace({
     const created = h.addSceneTemplate(preset.templateId);
     if (!created) return;
     h.applyCameraPreset(preset.cameraPreset);
+    frameWholeScene();
     setSelectedSceneId(preset.id);
     setActiveCameraPreset(preset.cameraPreset);
     setStep("arrange");
@@ -788,6 +836,7 @@ export function StudioBg3dSceneAssistantWorkspace({
 
   const selectCameraPreset = (presetId: string) => {
     h.applyCameraPreset(presetId);
+    frameWholeScene();
     setActiveCameraPreset(presetId);
   };
 

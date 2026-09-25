@@ -23,6 +23,7 @@ function createHost(
     customModels: [],
     sharedCharacterCaptureElementIds: [],
     selectedIds: new Set<string>(),
+    setSelectedIds: vi.fn(),
     modelLibrary: [],
     genericModelClassifications: new Map(),
     transformMode: "translate",
@@ -111,6 +112,43 @@ describe("StudioBg3dSceneAssistantWorkspace", () => {
     expect(host.addSceneTemplate).toHaveBeenCalledWith("classroom");
     expect(host.applyCameraPreset).toHaveBeenCalledWith("threeQuarter");
     expect(screen.getByText(/개 항목으로 장면 구성됨/)).toBeDefined();
+  });
+
+  it("frames a newly inserted scene after its selectable objects are mounted", async () => {
+    const host = createHost();
+    host.addSceneTemplate = vi.fn(() => {
+      (host as { primitives: readonly { id: string }[] }).primitives = [
+        { id: "classroom-floor" },
+        { id: "classroom-wall" },
+      ];
+      (host as { selectedIds: ReadonlySet<string> }).selectedIds = new Set([
+        "classroom-floor",
+        "classroom-wall",
+      ]);
+      return true;
+    });
+    render(<StudioBg3dSceneAssistantWorkspace h={host} onOpenProfessional={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /교실/ }));
+
+    await waitFor(() => expect(host.focusSelectedEntity).toHaveBeenCalledOnce());
+  });
+
+  it("waits for selectable geometry before framing a camera preset", async () => {
+    const host = createHost({
+      primitives: [{ id: "scene-a" }, { id: "scene-b" }],
+      selectedIds: new Set(["scene-a", "scene-b"]),
+      focusSelectionDisabledReason: "선택한 객체의 지오메트리를 준비하는 중입니다.",
+    });
+    render(<StudioBg3dSceneAssistantWorkspace h={host} onOpenProfessional={vi.fn()} />);
+
+    fireEvent.click(within(screen.getByRole("navigation", { name: "장면 제작 단계" }))
+      .getByRole("button", { name: "3. 구도 잡기" }));
+    fireEvent.click(screen.getByRole("button", { name: /하이앵글/ }));
+    expect(host.focusSelectedEntity).not.toHaveBeenCalled();
+
+    (host as { focusSelectionDisabledReason: string | null }).focusSelectionDisabledReason = null;
+    await waitFor(() => expect(host.focusSelectedEntity).toHaveBeenCalledOnce(), { timeout: 1_000 });
   });
 
   it("stays on scene selection when the runtime rejects a template", () => {
