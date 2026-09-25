@@ -1,0 +1,8 @@
+/* The guided first-scene layer owns interaction while visible. Hide collaboration HUD controls
+ * instead of leaving apparently enabled buttons behind an intercepting modal surface. */
+body:has([data-studio-cinematic-canvas-welcome="true"]) [data-studio-presence-dock="true"],
+body:has([data-studio-cinematic-canvas-welcome="true"]) [data-studio-presence-team-action="true"],
+body:has([data-studio-cinematic-canvas-welcome="true"]) [data-studio-live-quick-controls="true"] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
