@@ -1,0 +1,109 @@
+name: Product journey visual follow-up
+
+on:
+  push:
+    branches:
+      - automation/product-journey-visual-followup-20260926
+    paths:
+      - .github/workflows/product-journey-visual-followup.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: product-journey-visual-followup
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out automation branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply verified readability refinements
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "apps/web/src/domains/creator-resources/resource-atelier.css": [
+                  (
+                      ".research-art-label { position: absolute; bottom: .75rem; left: .8rem; padding: .35rem .6rem; background: oklch(.18 .009 68 / .88); color: oklch(.95 .010 85); font-family: var(--font-display); font-size: .6rem; letter-spacing: .13em; }",
+                      ".research-art-label { position: absolute; bottom: .75rem; left: .8rem; padding: .35rem .6rem; background: oklch(.18 .009 68 / .88); color: oklch(.95 .010 85); font-family: var(--font-display); font-size: .6875rem; letter-spacing: .13em; }",
+                  ),
+              ],
+              "apps/web/src/domains/creator/StudioBetaNoticeGate.tsx": [
+                  (
+                      'text-center text-[0.62rem] leading-4 text-fg-3',
+                      'text-center text-[0.68rem] leading-4 text-fg-2',
+                  ),
+                  (
+                      'inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card',
+                      'inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card',
+                  ),
+              ],
+              "apps/web/src/shared/components/route-purpose-scene.css": [
+                  (
+                      ".route-purpose-scene__eyebrow { margin-bottom: 0.35rem; font-size: 0.58rem; }",
+                      ".route-purpose-scene__eyebrow { margin-bottom: 0.35rem; font-size: 0.6875rem; }",
+                  ),
+              ],
+              "apps/web/src/shared/components/site-experience/atelier-workbench.css": [
+                  (
+                      ".atelier-workbench__badge { font-size: 0.6rem; letter-spacing: 0.08em; color: var(--color-fg-2); }",
+                      ".atelier-workbench__badge { font-size: 0.6875rem; letter-spacing: 0.08em; color: var(--color-fg-2); }",
+                  ),
+                  (
+                      ".atelier-workbench__art-note { position: absolute; z-index: 2; bottom: 13px; left: 18px; right: 18px; font-size: 0.61rem; color: oklch(0.95 0.01 85); }",
+                      ".atelier-workbench__art-note { position: absolute; z-index: 2; bottom: 13px; left: 18px; right: 18px; font-size: 0.6875rem; color: oklch(0.95 0.01 85); }",
+                  ),
+                  (
+                      ".atelier-workbench__kicker { color: var(--color-accent); font-family: var(--font-display); font-size: 0.61rem; letter-spacing: 0.1em; }",
+                      ".atelier-workbench__kicker { color: var(--color-accent); font-family: var(--font-display); font-size: 0.6875rem; letter-spacing: 0.1em; }",
+                  ),
+              ],
+              "apps/web/src/shared/components/site-experience/site-experience.css": [
+                  (
+                      '[data-site-experience] .site-atelier-chapter__heading > div > p:first-child { font-family: var(--font-display); color: var(--color-accent); font-size: 0.59rem; letter-spacing: 0.13em; }',
+                      '[data-site-experience] .site-atelier-chapter__heading > div > p:first-child { font-family: var(--font-display); color: var(--color-accent); font-size: 0.6875rem; letter-spacing: 0.13em; }',
+                  ),
+              ],
+          }
+
+          for filename, pairs in replacements.items():
+              path = Path(filename)
+              text = path.read_text(encoding="utf-8")
+              for old, new in pairs:
+                  old_count = text.count(old)
+                  new_count = text.count(new)
+                  if old_count == 1:
+                      text = text.replace(old, new, 1)
+                  elif old_count == 0 and new_count == 1:
+                      continue
+                  else:
+                      raise SystemExit(
+                          f"unsafe replacement in {filename}: old={old_count}, new={new_count}"
+                      )
+              path.write_text(text, encoding="utf-8")
+
+          Path(".github/workflows/product-journey-visual-followup.yml").unlink()
+          PY
+
+          git diff --check
+          git config user.name "OpenAI Codex"
+          git config user.email "codex@openai.com"
+          git add \
+            apps/web/src/domains/creator-resources/resource-atelier.css \
+            apps/web/src/domains/creator/StudioBetaNoticeGate.tsx \
+            apps/web/src/shared/components/route-purpose-scene.css \
+            apps/web/src/shared/components/site-experience/atelier-workbench.css \
+            apps/web/src/shared/components/site-experience/site-experience.css \
+            .github/workflows/product-journey-visual-followup.yml
+          git commit -m "fix(ux): 보조 텍스트 가독성과 터치 영역 보완"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
