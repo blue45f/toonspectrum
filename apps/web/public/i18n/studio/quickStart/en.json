@@ -18,8 +18,8 @@
   "studio.quickStart.step.collab-focus.hint": "Collapse panels for focus mode",
   "studio.quickStart.step.character.label": "Character",
   "studio.quickStart.step.character.hint": "2D / 3D poses",
-  "studio.quickStart.step.background3d.label": "3D background",
-  "studio.quickStart.step.background3d.hint": "Scene placement · physical fall",
+  "studio.quickStart.step.background3d.label": "Scene assistant",
+  "studio.quickStart.step.background3d.hint": "From scene choice to panel-ready output",
   "studio.quickStart.step.bubble.label": "Bubble",
   "studio.quickStart.step.bubble.hint": "Add dialogue"
 }

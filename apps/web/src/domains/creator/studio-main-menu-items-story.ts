@@ -121,10 +121,21 @@ export function buildStudio3dMenuItems({
 }: StudioMainMenuItemContext): StudioMainMenuItem[] {
   return [
     {
+      id: "bg3d",
+      commandId: "insert.background-3d",
+      legacyPath: "insert/bg3d",
+      label: "장면 도우미",
+      icon: Boxes,
+      separatorAfter: true,
+      onSelect: () => {
+        ui.openBackground3d();
+      },
+    },
+    {
       id: "mannequin3d",
       commandId: "insert.mannequin-3d",
       legacyPath: "insert/mannequin3d",
-      label: "3D 데생 인형",
+      label: "기본 데생 인형",
       icon: PersonStanding,
       onSelect: () => {
         ui.openMannequinPoser();
@@ -134,7 +145,7 @@ export function buildStudio3dMenuItems({
       id: "char",
       commandId: "insert.character-3d",
       legacyPath: "insert/char",
-      label: "3D 캐릭터",
+      label: "인물·포즈 편집",
       icon: Sparkles,
       onSelect: () => {
         ui.openVrmPoser();
@@ -143,27 +154,16 @@ export function buildStudio3dMenuItems({
     {
       id: "character",
       commandId: "insert.character-shaper",
-      label: "캐릭터 셰이퍼",
+      label: "캐릭터 만들기",
       icon: Wand2,
       onSelect: () => {
         ui.openCharacterShaper();
       },
     },
     {
-      id: "bg3d",
-      commandId: "insert.background-3d",
-      legacyPath: "insert/bg3d",
-      label: "3D 배경",
-      icon: Boxes,
-      separatorAfter: true,
-      onSelect: () => {
-        ui.openBackground3d();
-      },
-    },
-    {
       id: "sculpt",
       commandId: "insert.sculpt-3d",
-      label: "3D 스컬프트…",
+      label: "정밀 3D 모델링…",
       icon: Box,
       onSelect: () => {
         ui.openSculptWorkbench();

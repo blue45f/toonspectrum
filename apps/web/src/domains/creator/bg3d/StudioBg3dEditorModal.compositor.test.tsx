@@ -11,6 +11,9 @@ import type { StudioBg3dSceneOutlinerController } from "./studio-bg3d-scene-outl
 vi.mock("./studio-bg3d-editor-runtime-bindings", () => ({}));
 vi.mock("./StudioBg3dEditorViewport", () => ({ StudioBg3dEditorViewport: () => null }));
 vi.mock("./StudioBg3dEditorSidebar", () => ({ StudioBg3dEditorSidebar: () => null }));
+vi.mock("./StudioBg3dSceneAssistantWorkspace", () => ({
+  StudioBg3dSceneAssistantWorkspace: () => <div data-testid="mock-scene-assistant" />,
+}));
 afterEach(() => cleanup());
 
 function emptyOutlinerController(): StudioBg3dSceneOutlinerController {
@@ -64,7 +67,7 @@ function host(
 describe("BG3D modal compositor boundary", () => {
   it("uses a dense readable scrim rather than sampling the underlying full-screen GPU canvas", () => {
     render(createElement(StudioBg3dEditorModal, { h: host() }));
-    const dialog = screen.getByRole("dialog", { name: "3D 장면 연출" });
+    const dialog = screen.getByRole("dialog", { name: "장면 도우미" });
     expect(dialog.className).toContain("bg-[oklch(0.08_0.01_70/0.94)]");
     expect(dialog.className).not.toContain("backdrop-blur");
     expect(dialog.getAttribute("aria-modal")).toBe("true");
@@ -73,12 +76,16 @@ describe("BG3D modal compositor boundary", () => {
 
   it("opens in simple mode and keeps the professional workspace one click away", () => {
     render(createElement(StudioBg3dEditorModal, { h: host() }));
-    const dialog = screen.getByRole("dialog", { name: "3D 장면 연출" });
+    const dialog = screen.getByRole("dialog", { name: "장면 도우미" });
     expect(dialog.getAttribute("data-studio-bg3d-experience")).toBe("simple");
+    expect(dialog.getAttribute("data-studio-bg3d-workspace")).toBe("scene-assistant-v1");
+    expect(screen.getByTestId("mock-scene-assistant")).toBeDefined();
     expect(screen.getByRole("button", { name: /간편/ }).getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: /전문/ }));
+    fireEvent.click(screen.getByRole("button", { name: /정밀/ }));
     expect(dialog.getAttribute("data-studio-bg3d-experience")).toBe("pro");
-    expect(screen.getByRole("button", { name: /전문/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(dialog.getAttribute("data-studio-bg3d-workspace")).toBe("professional-v2");
+    expect(screen.getByRole("dialog", { name: "정밀 3D 편집" })).toBeDefined();
+    expect(screen.getByRole("button", { name: /정밀/ }).getAttribute("aria-pressed")).toBe("true");
   });
 
   it("keeps the keyboard-focusable close action and its original dismissal handler", () => {

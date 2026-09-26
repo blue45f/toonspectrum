@@ -242,7 +242,11 @@ async function dismissHydratedQuickStart(page: Page): Promise<void> {
     .then(() => true)
     .catch(() => false);
   if (!mounted) return;
-  await quickStart.locator('[data-studio-quickstart-dismiss="true"]').click();
+  const dismiss = quickStart.locator('[data-studio-quickstart-dismiss="true"]');
+  // The canvas welcome can mount one frame after the quick-start coach and temporarily overlap
+  // its close control. This verifier is not testing coach z-order, so dispatch the product action
+  // directly instead of timing out on an unrelated transient hit-test race.
+  await dismiss.click({ force: true });
   await quickStart.waitFor({ state: "detached", timeout: 3_000 });
 }
 

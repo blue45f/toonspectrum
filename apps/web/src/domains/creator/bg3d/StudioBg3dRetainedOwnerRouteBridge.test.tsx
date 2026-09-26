@@ -223,11 +223,11 @@ describe("Studio BG3D route-independent WebXR owner", () => {
       </>,
     );
 
-    expect(view.getByText("3D 배경 도구를 여는 중")).toBeTruthy();
+    expect(view.getByText("장면 도우미를 여는 중")).toBeTruthy();
     view.rerender(<StudioBg3dRetainedOwnerHost />);
 
     await waitFor(() => {
-      expect(view.queryByText("3D 배경 도구를 여는 중")).toBeNull();
+      expect(view.queryByText("장면 도우미를 여는 중")).toBeNull();
     });
   });
 
@@ -239,7 +239,7 @@ describe("Studio BG3D route-independent WebXR owner", () => {
         <SuspendedRouteOwner suspension={suspension} />
       </>,
     );
-    expect(view.getByText("3D 배경 도구를 여는 중")).toBeTruthy();
+    expect(view.getByText("장면 도우미를 여는 중")).toBeTruthy();
 
     view.rerender(
       <>

@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
-import { TeamAreaNavigation } from "@/shared/components/TeamAreaNavigation";
 import Link from "@/shared/navigation/router-link";
+import { TeamAreaNavigation } from "@/shared/components/TeamAreaNavigation";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioProjectLibraryEntry } from "../studio-project-library-reader";
 import { workspaceTab, type workspaceProjectLinks } from "./studio-workspace-model";
@@ -26,72 +26,32 @@ export function WorkspaceTeamContent({ project, links }: {
   readonly links: ReturnType<typeof workspaceProjectLinks>;
 }) {
   const bt = useBilingual("WorkspaceTeamContent");
-  const [tab, select] = useWorkspaceSection(["overview", "people", "recruit", "review", "sessions"] as const);
-  const tabs = [
-    ["overview", bt("요약", "Overview")],
-    ["people", bt("사람·권한", "People & access")],
-    ["recruit", bt("채용", "Recruiting")],
-    ["review", bt("검토", "Review")],
-    ["sessions", bt("실시간", "Live")],
-  ] as const;
+  const [tab, select] = useWorkspaceSection(["members", "recruit", "sessions"] as const);
+  const tabs = [["members", bt("멤버·권한", "Members & access")], ["recruit", bt("모집·의뢰", "Recruit & commission")], ["sessions", bt("대화·면접 준비", "Conversations & interviews")]] as const;
   const groups = {
-    overview: {
-      title: bt("팀의 다음 행동을 한곳에서", "Your team's next actions in one place"),
-      description: bt("사람을 찾는 단계부터 작품 권한, 검토와 실시간 세션까지 같은 흐름으로 이어집니다.", "Move from recruiting to access, review and live sessions in one flow."),
-      items: [
-        ["/team/people", bt("사람·권한 관리", "Manage people and access"), bt("팀 소속과 프로젝트 접근을 함께 확인", "Review team and project access together")],
-        ["/team/recruiting", bt("지원·제안 확인", "Review applications and offers"), bt("면접과 합류 확정까지 이어서 처리", "Continue through interviews and onboarding")],
-        [project ? links.review : "/studio", bt("검토 요청과 댓글", "Reviews and comments"), bt("열린 의견과 승인 대기 확인", "Check open feedback and pending approvals")],
-        [project ? links.space : "/studio", bt("실시간 세션 시작", "Start a live session"), bt("공동 편집·검토·통화를 목적에 맞게 시작", "Start editing, review or calls for the task")],
-      ] satisfies Destination[],
-    },
-    people: {
-      title: bt("소속과 작품 권한을 분명하게", "Make membership and access explicit"),
-      description: bt("팀 소속, 작품 접근, 제작 역할은 서로 다릅니다. 한 흐름에서 확인하고 필요한 권한만 부여하세요.", "Team membership, work access and production roles are distinct. Grant only what is needed."),
-      items: [
-        ["/team/people", bt("팀 워크스페이스와 구성원", "Team workspaces and members"), bt("조직 역할·초대·프로젝트 연결 관리", "Manage roles, invitations and project links")],
-        [project ? links.team : "/studio", project ? bt("선택 작품의 권한", "Access for this work") : bt("권한을 관리할 작품 선택", "Choose a work"), bt("편집·검토·열람 권한 확인", "Review edit, comment and view access")],
-        [project ? links.production : "/production", bt("제작 역할과 담당", "Production roles and assignments"), bt("실제 작업 담당과 검토자 배정", "Assign work owners and reviewers")],
-      ] satisfies Destination[],
+    members: {
+      title: bt("함께 만드는 사람과 권한", "People and permissions"),
+      description: bt("현재 작품의 멤버십과 권한을 관리합니다. 모집 게시물은 팀 가입이나 원고 접근 권한이 아닙니다.", "Manage membership and access for the current work. A recruitment post does not grant access."),
+      items: [[project ? links.team : "/studio", project ? bt("선택 작품의 멤버·권한 관리", "Manage this work's team") : bt("팀을 관리할 작품 선택", "Choose a work"), bt("기존 작품 권한 설정으로 이동", "Open existing work permissions")], [project ? links.production : "/production", bt("진행·담당·일정 확인", "Production and assignments"), bt("실제 제작 보드 확인", "Check the production board")], ["/team/people", bt("팀 소속과 접근 권한 관리", "Manage team membership and access"), bt("팀과 작품 권한을 한 흐름에서 확인", "Review team and work access in one flow")]] satisfies Destination[],
     },
     recruit: {
-      title: bt("모집에서 프로젝트 합류까지", "From recruiting to project onboarding"),
-      description: bt("공개 공고, 지원·면접, 합류 확정을 한 채용 파이프라인에서 관리합니다.", "Manage posts, applications, interviews and onboarding in one pipeline."),
-      items: [
-        ["/collaborate/new", bt("모집·의뢰 작성", "Post a role or commission"), bt("역할·작업량·기한·보수를 명확히 제시", "Specify role, scope, deadline and compensation")],
-        ["/collaborate", bt("공개 구인·의뢰", "Public recruiting board"), bt("팀원과 전문 작업자 탐색", "Find teammates and specialists")],
-        ["/team/recruiting", bt("인재·지원 관리", "Recruiting workspace"), bt("이력서·제안·면접·합류 처리", "Manage resumes, offers, interviews and onboarding")],
-      ] satisfies Destination[],
-    },
-    review: {
-      title: bt("댓글에서 승인까지 한 흐름으로", "Move feedback through approval"),
-      description: bt("위치 댓글, 담당 작업, 페이지 상태와 승인본을 같은 작품 문맥에서 확인합니다.", "Keep anchored comments, assignments, page status and approvals in the same work context."),
-      items: [
-        [project ? links.review : "/studio", project ? bt("이 작품의 검토함", "Review this work") : bt("검토할 작품 선택", "Choose a work"), bt("열린 댓글·수정 요청·승인 대기 확인", "Check open comments, change requests and approvals")],
-        [project ? links.production : "/production", bt("작업과 담당자", "Tasks and assignees"), bt("피드백을 실제 제작 작업으로 연결", "Connect feedback to production work")],
-        ["/showcase/reviews", bt("공개 승인본", "Published review snapshots"), bt("공개 동의된 고정 검수본 확인", "View consented pinned review snapshots")],
-      ] satisfies Destination[],
+      title: bt("작품에 필요한 동료를 찾으세요", "Find the right collaborators"),
+      description: bt("역할·작업량·기한·보수를 정리한 뒤 모집합니다. 접속 중이라는 이유로 즉시 작업 가능으로 판단하지 않습니다.", "Specify the role, scope, deadline and compensation. Being online does not mean being available for work."),
+      items: [["/collaborate/new", bt("어시스트 모집·의뢰 작성", "Post a role or commission"), bt("급한 작업은 기한과 착수 가능 일정 명시", "Specify deadlines and start dates for urgent work")], ["/collaborate", bt("구인·의뢰 게시판", "Recruitment and commissions"), bt("공개 모집과 작업자 찾기", "Find public roles and collaborators")], ["/collaborate/positions", bt("역할·도구·보수로 인력 찾기", "Find roles by tools and compensation"), bt("실제 공개 모집 조건 검색", "Search the published hiring conditions")], ["/collaborate/workspace?panel=resumes", bt("이력서·제안 관리", "Resumes and offers"), bt("비공개 이력서와 지원·제안 확인", "Review private resumes, applications and offers")]] satisfies Destination[],
     },
     sessions: {
-      title: bt("목적을 먼저 고르고 함께 작업하세요", "Choose the purpose before going live"),
-      description: bt("공동 편집, 검토, 화면 공유 또는 가상 공간 중 필요한 방식만 시작합니다.", "Start only the editing, review, screen sharing or spatial mode you need."),
-      items: [
-        [project ? links.space : "/studio", project ? bt("이 작품의 실시간 공간", "Live space for this work") : bt("세션을 시작할 작품 선택", "Choose a work"), bt("참여자와 미디어 권한을 직접 확인", "Confirm participants and media permissions")],
-        ["/team/recruiting?panel=rooms", bt("면접·회의", "Interviews and meetings"), bt("대기실·입장 승인·대화 관리", "Manage waiting rooms, admission and chat")],
-        [project ? links.team : "/studio", bt("세션 전 권한 확인", "Check access before a session"), bt("원고와 팀의 비공개 자료 보호", "Protect private work and team materials")],
-      ] satisfies Destination[],
+      title: bt("대화와 작업을 연결하세요", "Connect conversations to work"),
+      description: bt("프로젝트 공간에서 참여자를 확인하고 대화를 요청합니다. 외부 지원자에게 내부 원고 권한을 자동으로 부여하지 않습니다.", "Check participants and request a conversation. Applicants are not automatically granted artwork access."),
+      items: [["/collaborate/workspace?panel=rooms", bt("면접 대기실·회의 관리", "Interview waiting rooms and meetings"), bt("초대·입장 승인·텍스트 대화 · 영상 통화와 분리", "Invitations, admission and text chat; separate from video calling")], [project ? links.space : "/studio", project ? bt("이 작품의 대화 공간 입장", "Enter the conversation space") : bt("대화할 작품 선택", "Choose a work"), bt("미디어는 직접 켜고 참여 권한은 별도로 확인", "Media is opt-in and permissions are checked separately")], [project ? links.team : "/studio", bt("초대 전 공유 권한 확인", "Check access before inviting"), bt("원고와 팀의 비공개 자료 보호", "Protect private work and team materials")]] satisfies Destination[],
     },
   };
   const group = groups[tab];
   return <div className="workspace-section-content">
-    <TeamAreaNavigation compact />
-    <div className="workspace-tabs" role="group" aria-label={bt("협업 업무 선택", "Choose collaboration activity")}>
+    <TeamAreaNavigation compact className="mb-5" />
+    <div className="workspace-tabs" role="group" aria-label={bt("팀 업무 선택", "Choose team activity")}>
       {tabs.map(([key, text]) => <button key={key} type="button" aria-pressed={tab === key} onClick={() => select(key)}>{text}</button>)}
     </div>
-    <section className="workspace-section-body">
-      <div className="workspace-section-intro"><h2>{group.title}</h2><p>{group.description}</p></div>
-      <DestinationList items={group.items} />
-    </section>
+    <section className="workspace-section-body"><div className="workspace-section-intro"><h2>{group.title}</h2><p>{group.description}</p></div><DestinationList items={group.items} /></section>
   </div>;
 }
 

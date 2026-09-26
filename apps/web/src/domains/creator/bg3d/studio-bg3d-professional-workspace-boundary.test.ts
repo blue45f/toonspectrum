@@ -8,10 +8,11 @@ function readSibling(name: string): string {
 }
 
 describe("Studio BG3D professional workspace boundary", () => {
-  it("keeps the modal shell typed and exposes the three-panel desktop workspace", () => {
+  it("keeps the modal shell typed and exposes assistant and three-panel professional workspaces", () => {
     const source = readSibling("./StudioBg3dEditorModal.tsx");
     expect(source).not.toContain("@ts-nocheck");
-    expect(source).toContain('data-studio-bg3d-workspace="professional-v2"');
+    expect(source).toContain('data-studio-bg3d-workspace={experienceMode === "simple" ? "scene-assistant-v1" : "professional-v2"}');
+    expect(source).toContain("<StudioBg3dSceneAssistantWorkspace");
     expect(source).toContain("<StudioBg3dProfessionalWorkspace");
     const workspace = readSibling("./StudioBg3dProfessionalWorkspace.tsx");
     expect(workspace).toContain('data-studio-bg3d-workspace-layout="dockable-v2"');

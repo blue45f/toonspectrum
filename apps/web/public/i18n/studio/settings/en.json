@@ -38,9 +38,9 @@
   "studio.settings.tool.zoomFit": "Fit Width",
   "studio.settings.tool.rotateView": "Rotate View",
   "studio.settings.tool.frameAnim": "Frame Animation",
-  "studio.settings.tool.mannequin": "3D Figure",
-  "studio.settings.tool.vrm3d": "3D Character",
-  "studio.settings.tool.bg3d": "3D Background",
+  "studio.settings.tool.mannequin": "Basic drawing mannequin",
+  "studio.settings.tool.vrm3d": "Characters & poses",
+  "studio.settings.tool.bg3d": "Scene assistant",
   "studio.settings.tool.reference": "Reference Image",
   "studio.settings.shortcut.toolSelect": "Select Tool",
   "studio.settings.shortcut.toolHand": "Hand (Pan)",
@@ -183,5 +183,6 @@
   "studio.settings.state.off": "Off",
   "studio.settings.state.none": "None",
   "studio.settings.state.save": "Save",
-  "studio.settings.state.open": "Open"
+  "studio.settings.state.open": "Open",
+  "studio.settings.tool.characterShaper": "Create a character"
 }
