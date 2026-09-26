@@ -1,6 +1,6 @@
 import { collectStudioOfflineDrawingUrls } from "./src/app/service-worker/studio-service-worker-drawing-plan";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
@@ -521,6 +521,23 @@ function viteServeCacheConfig(command: string): { cacheDir?: string } {
   return command === "serve" && configuredCacheDir
     ? { cacheDir: path.resolve(repositoryRoot, configuredCacheDir) }
     : {};
+}
+
+function debugStudioMicroChunkPlugin(): Plugin | null {
+  if (process.env.TOONSPECTRUM_DEBUG_MICRO_CHUNK !== "1") return null;
+  return {
+    name: "debug-studio-micro-chunk",
+    generateBundle(_options, bundle) {
+      const target = Object.values(bundle).find(
+        (entry) => entry.type === "chunk" && entry.name === "studio-core-micro-contracts",
+      );
+      if (!target || target.type !== "chunk") return;
+      writeFileSync(
+        path.resolve(repositoryRoot, ".qa/studio-core-micro-modules.json"),
+        `${JSON.stringify(Object.keys(target.modules).sort(), null, 2)}\n`,
+      );
+    },
+  };
 }
 
 export default defineConfig(({ command, mode }) => ({
