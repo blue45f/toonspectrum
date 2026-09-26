@@ -268,7 +268,7 @@ export function downloadTrafficOverviewCsv(data: TrafficOverview): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `toonspectrum-traffic-${data.rangeDays}d-${new Date()
+  anchor.download = `toonstudio-traffic-${data.rangeDays}d-${new Date()
     .toISOString()
     .slice(0, 10)}.csv`;
   anchor.click();

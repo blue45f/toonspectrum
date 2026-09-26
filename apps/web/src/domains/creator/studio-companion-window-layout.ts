@@ -8,9 +8,9 @@
 
 export const STUDIO_COMPANION_WINDOW_LAYOUT_VERSION = 1 as const;
 export const STUDIO_COMPANION_WINDOW_LAYOUT_KIND =
-  "toonspectrum.studio.companion-window-layout" as const;
+  "toonstudio.studio.companion-window-layout" as const;
 export const STUDIO_COMPANION_WINDOW_LAYOUT_STORAGE_PREFIX =
-  "toonspectrum.studio.companion-window-layout.v1";
+  "toonstudio.studio.companion-window-layout.v1";
 export const STUDIO_COMPANION_WINDOW_LAYOUT_MAX_RAW_BYTES = 4 * 1024;
 export const STUDIO_COMPANION_WINDOW_LAYOUT_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1_000;
 export const STUDIO_COMPANION_WINDOW_LAYOUT_FUTURE_TOLERANCE_MS = 5 * 60 * 1_000;

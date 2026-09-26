@@ -4,7 +4,7 @@ import {
   type StudioLayerNavigatorFilters,
 } from "./studio-layer-navigator";
 
-export const STUDIO_LAYER_FILTER_PRESET_STORAGE_KEY = "toonspectrum-studio-layer-filter-presets:v1";
+export const STUDIO_LAYER_FILTER_PRESET_STORAGE_KEY = "toonstudio-studio-layer-filter-presets:v1";
 export const STUDIO_LAYER_FILTER_PRESET_LIMIT = 8;
 
 export interface StudioLayerFilterPreset {

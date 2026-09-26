@@ -2,7 +2,7 @@ import { SESSION_TOKEN_TTL_MS } from "./server/session";
 
 import type { CookieOptions } from "express";
 
-const AUTH_SESSION_COOKIE_NAME = "toonspectrum-auth-session";
+const AUTH_SESSION_COOKIE_NAME = "toonstudio-auth-session";
 
 export { AUTH_SESSION_COOKIE_NAME };
 

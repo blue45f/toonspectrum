@@ -12,7 +12,7 @@
       "kind": "sqlite-opfs-sahpool",
       "requestedVfs": "opfs",
       "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
-      "opfsDirectory": "toonspectrum-studio-sqlite",
+      "opfsDirectory": "toonstudio-studio-sqlite",
       "logicalDatabaseFilename": "studio-local-v12.db",
       "memoryVfsUsed": false,
       "localStorageFallbackUsed": false,
@@ -1517,7 +1517,7 @@
       "assets/sqlite3-worker1-N5XM9NUp.js.map",
       "index.html"
     ],
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-brush-library-opfs-ewjLwd"
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-brush-library-opfs-ewjLwd"
   },
   "validationIssues": []
 }

@@ -1,4 +1,4 @@
-"""Render fitted ToonSpectrum everyday props on the bundled reference VRM (Kate).
+"""Render fitted ToonStudio everyday props on the bundled reference VRM (Kate).
 
 Each invocation starts from the exported VRM and GLB binaries, applies the
 same reference-rig transform receipt as the Three runtime, attaches the
@@ -156,7 +156,7 @@ def add_arm_ik(armature, side, wrist_target):
     bpy.context.scene.collection.objects.link(pole)
 
     constraint = lower.constraints.new("IK")
-    constraint.name = "ToonSpectrum_QA_ContactIK"
+    constraint.name = "ToonStudio_QA_ContactIK"
     constraint.target = target
     constraint.pole_target = pole
     constraint.chain_count = 2

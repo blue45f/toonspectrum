@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.i18n-fix/1",
+  "schema": "toonstudio.i18n-fix/1",
   "generatedAt": "2026-08-08T06:25:00.000Z",
   "summary": "Split lib/i18n.ts (75 inlined locale dictionaries, 2,135,813 source bytes) into lazy public/i18n/app/<locale>.json assets, compiled only the ko/en fallback pair into the shell, and excluded the i18n chunk from the entry document's modulepreload set.",
   "method": {

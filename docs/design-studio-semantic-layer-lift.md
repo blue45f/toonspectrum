@@ -1,12 +1,12 @@
-# ToonSpectrum Semantic Layer Lift
+# ToonStudio Semantic Layer Lift
 
 ## 제품 결정
 
-평면 이미지에서 편집 가능한 의미 레이어를 복원하는 기능은 ToonSpectrum에 추가할
+평면 이미지에서 편집 가능한 의미 레이어를 복원하는 기능은 ToonStudio에 추가할
 가치가 높다. Canva의 Magic Layers는 PNG/JPEG의 텍스트, 객체, 배경과 레이아웃 관계를
 복원해 개별 이동·크기 변경·색상 변경·애니메이션·텍스트 수정을 가능하게 한다.
 
-ToonSpectrum은 타사 상표를 제품 기능명으로 사용하거나 Canva의 비공개 Design Model에
+ToonStudio은 타사 상표를 제품 기능명으로 사용하거나 Canva의 비공개 Design Model에
 의존하지 않는다. 기존 `컷 레이어 분리(Scene Layer Lift)`를 다음과 같이 웹툰 제작에
 특화된 `의미 레이어 분리(Semantic Layer Lift)`로 확장한다.
 

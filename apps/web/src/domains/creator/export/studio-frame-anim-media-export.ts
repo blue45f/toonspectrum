@@ -96,7 +96,7 @@ export function isFrameAnimMediaExportSupported(): boolean {
 
 /** 내보내기 파일명 — WebM 경로의 `<제목>-frames.webm` 규칙과 나란한 `.gif`/`.apng`. */
 export function frameAnimMediaFileName(title: string, format: FrameAnimMediaFormat): string {
-  return `${title.trim() || "toonspectrum-frame-anim"}-frames.${format}`;
+  return `${title.trim() || "toonstudio-frame-anim"}-frames.${format}`;
 }
 
 export interface FrameAnimMediaExportRequest {

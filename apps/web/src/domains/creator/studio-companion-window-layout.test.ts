@@ -85,10 +85,10 @@ describe("studio companion window layout persistence", () => {
     );
     expect(new Set(keys).size).toBe(4);
     expect(keys).toEqual([
-      "toonspectrum.studio.companion-window-layout.v1.workspace",
-      "toonspectrum.studio.companion-window-layout.v1.navigator",
-      "toonspectrum.studio.companion-window-layout.v1.review",
-      "toonspectrum.studio.companion-window-layout.v1.reference",
+      "toonstudio.studio.companion-window-layout.v1.workspace",
+      "toonstudio.studio.companion-window-layout.v1.navigator",
+      "toonstudio.studio.companion-window-layout.v1.review",
+      "toonstudio.studio.companion-window-layout.v1.reference",
     ]);
     expect(() => studioCompanionWindowLayoutStorageKey("future" as "workspace"))
       .toThrow(TypeError);

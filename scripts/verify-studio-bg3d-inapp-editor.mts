@@ -37,11 +37,11 @@ import {
 const SCRATCH =
   process.env.TOONSPECTRUM_BG3D_INAPP_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-bg3d-inapp-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-bg3d-inapp-${Date.now()}`);
 
-const QUICK_START_KEY = "toonspectrum-studio-quickstart-dismissed:v1";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed:v1";
-const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
+const QUICK_START_KEY = "toonstudio-studio-quickstart-dismissed:v1";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed:v1";
+const UI_DENSITY_KEY = "toonstudio-studio-ui-density:v1";
 
 /** The minimum comfortable touch target this repository holds mobile controls to. */
 const MIN_TOUCH_TARGET_PX = 44;

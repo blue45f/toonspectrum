@@ -6,8 +6,8 @@
 | --- | --- | --- |
 | SQLite core | SQL engine inside the official WASM distribution | Public domain; retain upstream provenance and exact build identity |
 | `@sqlite.org/sqlite-wasm` | Version `3.53.0-build1`; dynamic browser module, Worker and OPFS SAH-pool VFS | Installed package declares Apache-2.0; include exact version, license and bundled notices in SBOM/NOTICE |
-| OPFS, File System Access, Dedicated Worker, Web Crypto | Browser-provided storage, execution and digest APIs | Web platform APIs; Chromium binary is not shipped by ToonSpectrum |
-| ToonSpectrum TM model/persistence/harness | Validation, canonical JSON, search, ordering and evidence gate | First-party source under repository product terms |
+| OPFS, File System Access, Dedicated Worker, Web Crypto | Browser-provided storage, execution and digest APIs | Web platform APIs; Chromium binary is not shipped by ToonStudio |
+| ToonStudio TM model/persistence/harness | Validation, canonical JSON, search, ordering and evidence gate | First-party source under repository product terms |
 
 No package or lockfile change was required. IndexedDB wrappers and additional SQLite engines were not
 added. The probe's Playwright/Chromium installation is development evidence tooling and is not a
@@ -50,7 +50,7 @@ separate user-visible consent, rights and encryption design.
 
 ## V12 discard and fallback policy
 
-- Product file: `toonspectrum-studio-sqlite/studio-local-v12.db`.
+- Product file: `toonstudio-studio-sqlite/studio-local-v12.db`.
 - Namespace/key: `studio-translation-memory-v12` / `library-v1`.
 - Previous localStorage key is never auto-read.
 - Previous `studio-local.db` is never opened.

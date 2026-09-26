@@ -1,7 +1,7 @@
 import {
   brushProgramIRSchema,
   strokeIRSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -24,7 +24,7 @@ import type {
   ModeledSampleIR,
   SceneIR,
   StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 const WIDTH = 64;
 const HEIGHT = 64;

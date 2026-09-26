@@ -5,7 +5,7 @@ import {
   type RenderNodeIR,
   type RenderSceneIR,
   type SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import { drawBounds } from "../brush/studio-draw-rendering";
 import {

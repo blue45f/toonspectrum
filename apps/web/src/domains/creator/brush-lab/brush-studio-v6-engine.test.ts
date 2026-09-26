@@ -24,7 +24,7 @@ describe("Brush Studio V6 quality authority", () => {
   it("creates recipes with the one actual contact output while preserving unsupported imported output intent", () => {
     const outputNodes = BRUSH_STUDIO_V6_NODES.filter((node) => node.slot === "output" && isBrushStudioV6MaterialNodeImplemented(node.id));
     expect(outputNodes.map((node) => node.id)).toEqual(["output-contact-canvas-svg"]);
-    expect(outputNodes[0]).toMatchObject({ label: "Canvas Contacts + SVG", domain: "main", provider: "ToonSpectrum Contact Kernel", requires: [] });
+    expect(outputNodes[0]).toMatchObject({ label: "Canvas Contacts + SVG", domain: "main", provider: "ToonStudio Contact Kernel", requires: [] });
     for (const recipe of BRUSH_STUDIO_V6_RECIPES) {
       expect(recipe.create().slots.output).toBe("output-contact-canvas-svg");
       expect(normalizeBrushStudioV6MaterialConfig(recipe.create())?.slots.output).toBe("output-contact-canvas-svg");

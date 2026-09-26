@@ -5,7 +5,7 @@
  * Product Studio persists this state through `studio-ui-preferences-sqlite.ts`.
  */
 
-export const STUDIO_ELEMENTS_RECENT_KEY = "toonspectrum-studio-elements-recent:v1";
+export const STUDIO_ELEMENTS_RECENT_KEY = "toonstudio-studio-elements-recent:v1";
 export const STUDIO_ELEMENTS_RECENT_MAX = 24;
 export const STUDIO_ELEMENTS_RECENT_VERSION = 1 as const;
 

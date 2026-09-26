@@ -9,12 +9,12 @@ and portable export.
 The authenticated ToonStudio editor could not be operated by the available browser automation
 connection, and the editor route did not expose a public help document that could be audited. The
 review therefore does **not** infer hidden ToonStudio behavior from screenshots or marketing copy.
-The implementation baseline is ToonSpectrum's shipped code and tests; comparison claims below come
+The implementation baseline is ToonStudio's shipped code and tests; comparison claims below come
 from first-party product documentation whenever possible.
 
 ## 2. Competitive benchmark
 
-| Product | Audited file-lifecycle behavior | Product lesson for ToonSpectrum | First-party evidence |
+| Product | Audited file-lifecycle behavior | Product lesson for ToonStudio | First-party evidence |
 | --- | --- | --- | --- |
 | Figma | Automatic checkpoints, named versions with descriptions, historical preview, restore, duplicate-as-new-file, version-specific links, and extra checkpoints after offline/crash events | Autosave is most useful when it is visible as a timeline and users can create meaningful milestones without destroying the current state | https://help.figma.com/hc/en-us/articles/360038006754-View-a-file-s-version-history |
 | Adobe Photoshop cloud documents | Automatic cloud versions, named/marked versions, revert, opening an earlier version as a new document, recent-file access, and offline availability | “Restore” and “make a copy” are separate intents; a version action should never silently erase the only current state | https://helpx.adobe.com/ca/photoshop/using/manage-cloud-documents-photoshop.html |
@@ -45,7 +45,7 @@ A long menu containing many import/export buttons does not by itself satisfy the
 user needs one place that answers: “Where is my work protected, what can I restore, and what will be
 lost if I open this file?”
 
-## 3. Existing ToonSpectrum baseline
+## 3. Existing ToonStudio baseline
 
 The repository already ships substantial infrastructure:
 
@@ -127,7 +127,7 @@ The report exposes:
 
 Unsupported proprietary formats such as `.clip`, `.cmc`, `.kra`, Office documents, PDF, AI, and
 Affinity documents fail closed and receive a conversion recommendation. A generic `.zip` is not
-mistaken for a ToonSpectrum project: only `.toonproject.zip` is routed to project recovery.
+mistaken for a ToonStudio project: only `.toonproject.zip` is routed to project recovery.
 
 ### 4.5 Privacy-bounded recent local files
 

@@ -13,7 +13,7 @@ export type StudioWebXrMode = "immersive-ar" | "immersive-vr";
 export type StudioWebXrSupportLevel = "supported" | "unsupported" | "unknown";
 
 export interface StudioWebXrSupportSnapshot {
-  readonly kind: "toonspectrum.studio-webxr-support";
+  readonly kind: "toonstudio.studio-webxr-support";
   readonly version: typeof STUDIO_WEBXR_SESSION_VERSION;
   readonly secureContext: boolean;
   readonly immersiveAr: StudioWebXrSupportLevel;
@@ -328,7 +328,7 @@ export function createStudioWebXrSessionController(
       }
       if (!environment.secureContext || !environment.xr) {
         supportSnapshot = Object.freeze({
-          kind: "toonspectrum.studio-webxr-support",
+          kind: "toonstudio.studio-webxr-support",
           version: STUDIO_WEBXR_SESSION_VERSION,
           secureContext: environment.secureContext,
           immersiveAr: "unsupported",
@@ -348,7 +348,7 @@ export function createStudioWebXrSessionController(
         inspectMode("immersive-vr"),
       ]);
       supportSnapshot = Object.freeze({
-        kind: "toonspectrum.studio-webxr-support",
+        kind: "toonstudio.studio-webxr-support",
         version: STUDIO_WEBXR_SESSION_VERSION,
         secureContext: true,
         immersiveAr,

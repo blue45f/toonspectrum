@@ -9,7 +9,7 @@ export const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
 // SQL cutovers that cannot be represented safely by `drizzle-kit push` record a durable marker
 // here. Unlike a column comment, this survives normal schema introspection and data dump/restore,
 // so retrying a migration cannot repeat a destructive one-time transition.
-export const toonspectrumSchemaMigrations = pgTable(
+export const toonstudioSchemaMigrations = pgTable(
   "toonspectrum_schema_migration",
   {
     id: text("id").primaryKey(),

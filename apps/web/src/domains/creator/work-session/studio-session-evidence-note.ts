@@ -1,5 +1,5 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
-import type { StudioSessionEvidence } from "@toonspectrum/studio-project-model/work-session-evidence";
+import { canonicalJson } from "@toonstudio/studio-project-model";
+import type { StudioSessionEvidence } from "@toonstudio/studio-project-model/work-session-evidence";
 
 /** An explicit citation, not an AI execution, manuscript edit, approval, or billing attestation. */
 export function studioSessionEvidenceNote(evidence: StudioSessionEvidence, operation: StudioSessionEvidence["aiOperations"][number]): string {

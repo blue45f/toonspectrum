@@ -93,9 +93,9 @@ import {
 
 import type { StudioBrushMediaPixelImage } from "./studio-brush-media-pixel-quality";
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 const VIEWPORT = { width: 1440, height: 1100 } as const;
 const SCENARIO_NAMES = [
   "curve",
@@ -139,7 +139,7 @@ const DEFAULT_IDS = [
 ] as const;
 
 const OUTPUT_DIR = process.env.TOONSPECTRUM_SCENARIO_DIR?.trim()
-  || join(tmpdir(), `toonspectrum-brush-scenarios-${Date.now()}`);
+  || join(tmpdir(), `toonstudio-brush-scenarios-${Date.now()}`);
 const STRICT = process.env.TOONSPECTRUM_SCENARIO_STRICT === "1";
 const LAYER_PROBE = process.env.TOONSPECTRUM_SCENARIO_LAYER_PROBE === "1";
 /** Diagnostic: trace full-canvas clears, backing-store resizes and the first draw after each clear. */

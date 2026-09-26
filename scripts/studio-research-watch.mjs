@@ -16,7 +16,7 @@ const MAX_BODY_BYTES = 2_000_000;
 const DEFAULT_TIMEOUT_MS = 20_000;
 const PRIORITIES = new Set(["P0", "P1", "P2"]);
 const USER_AGENT =
-  "ToonSpectrum-Studio-Research-Watch/1.0 (+https://github.com/blue45f/toonspectrum)";
+  "ToonStudio-Studio-Research-Watch/1.0 (+https://github.com/blue45f/toonstudio)";
 
 function isObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);

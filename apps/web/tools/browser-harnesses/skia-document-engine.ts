@@ -1,4 +1,4 @@
-import { createSkiaDocumentRenderer, type SkiaDocumentFrame } from "@toonspectrum/studio-engine-skia";
+import { createSkiaDocumentRenderer, type SkiaDocumentFrame } from "@toonstudio/studio-engine-skia";
 
 import { drawLiveFreehandDraftToContext } from "../../src/domains/creator/brush/studio-draw-rendering";
 import { loadStudioSkiaDocumentFontData } from "../../src/domains/creator/render/studio-skia-document-font-source";

@@ -24,7 +24,7 @@ import { prepareCloudflareStaticAssets } from "./prepare-cloudflare-static-asset
 const temporaryDirectories: string[] = [];
 
 function temporaryDist(): string {
-  const directory = mkdtempSync(join(tmpdir(), "toonspectrum-cf-assets-"));
+  const directory = mkdtempSync(join(tmpdir(), "toonstudio-cf-assets-"));
   temporaryDirectories.push(directory);
   return directory;
 }

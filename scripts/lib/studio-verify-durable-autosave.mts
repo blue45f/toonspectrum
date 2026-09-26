@@ -6,7 +6,7 @@
  * Studio recovers the newest snapshot or tombstone from its OPFS recovery journal and
  * worker-owned SQLite store. A pointerup SQLite receipt can survive page teardown while the
  * Window-side journal write is interrupted, so observing only OPFS can report false data loss. The legacy
- * `toonspectrum-studio-autosave*` localStorage JSON slot is no longer written and is
+ * `toonstudio-studio-autosave*` localStorage JSON slot is no longer written and is
  * tombstoned on every durable save — `verify:studio-lifecycle` asserts that zero browser
  * compatibility records survive a save — so a verifier that enumerates localStorage reads
  * an empty store forever.

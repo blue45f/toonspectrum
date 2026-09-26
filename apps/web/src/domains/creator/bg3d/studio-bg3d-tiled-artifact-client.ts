@@ -130,7 +130,7 @@ export async function buildStudioBg3dTiledImages(input: {
       ? input.workerFactory()
       : new Worker(
           new URL("./studio-bg3d-tiled-artifact.worker.ts", import.meta.url),
-          { type: "module", name: "toonspectrum-tiled-shot" },
+          { type: "module", name: "toonstudio-tiled-shot" },
         );
     const exchange = (
       message: StudioBg3dTiledRequest,

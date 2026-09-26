@@ -37,7 +37,7 @@ beforeEach(() => {
   vi.stubEnv("VITE_KAKAO_JAVASCRIPT_KEY", "test-javascript-key");
   setKakaoRuntime(undefined);
   document
-    .getElementById("toonspectrum-kakao-javascript-sdk")
+    .getElementById("toonstudio-kakao-javascript-sdk")
     ?.remove();
 });
 
@@ -46,7 +46,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   setKakaoRuntime(undefined);
   document
-    .getElementById("toonspectrum-kakao-javascript-sdk")
+    .getElementById("toonstudio-kakao-javascript-sdk")
     ?.remove();
 });
 
@@ -65,7 +65,7 @@ describe("Kakao JavaScript SDK initialization", () => {
 
     const sharing = shareWithKakao(payload);
     const script = document.getElementById(
-      "toonspectrum-kakao-javascript-sdk",
+      "toonstudio-kakao-javascript-sdk",
     ) as HTMLScriptElement | null;
     expect(script?.src).toBe(
       "https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js",
@@ -113,7 +113,7 @@ describe("Kakao JavaScript SDK initialization", () => {
 
     const sharing = shareWithKakao(payload);
     const script = document.getElementById(
-      "toonspectrum-kakao-javascript-sdk",
+      "toonstudio-kakao-javascript-sdk",
     );
     setKakaoRuntime(runtime);
     script?.dispatchEvent(new Event("load"));
@@ -139,7 +139,7 @@ describe("Kakao JavaScript SDK initialization", () => {
     expect(runtime.init).not.toHaveBeenCalled();
     expect(sendDefault).toHaveBeenCalledTimes(1);
     expect(
-      document.getElementById("toonspectrum-kakao-javascript-sdk"),
+      document.getElementById("toonstudio-kakao-javascript-sdk"),
     ).toBeNull();
   });
 });

@@ -132,7 +132,7 @@ function createStudioBg3dObjModuleWorker(): StudioBg3dObjWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-bg3d-obj.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-bg3d-obj",
+    name: "toonstudio-bg3d-obj",
   });
 }
 

@@ -14,7 +14,7 @@ import {
 
 export const STUDIO_AI_IMAGE_REFERENCE_STORAGE_VERSION = 1 as const;
 export const STUDIO_AI_IMAGE_REFERENCE_STORAGE_PREFIX =
-  `toonspectrum-studio-ai-image-references:v${STUDIO_AI_IMAGE_REFERENCE_STORAGE_VERSION}`;
+  `toonstudio-studio-ai-image-references:v${STUDIO_AI_IMAGE_REFERENCE_STORAGE_VERSION}`;
 
 export const STUDIO_AI_IMAGE_REFERENCE_STORAGE_LIMITS = Object.freeze({
   maxScopePreviewLength: 48,

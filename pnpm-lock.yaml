@@ -50,7 +50,7 @@ overrides:
   '@esbuild-kit/core-utils>esbuild': 0.25.12
 
 patchedDependencies:
-  '@gltf-transform/functions@4.4.2': bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d
+  '@gltf-transform/functions@4.4.2': 6e750bb844d4b21f5b7ead6ab2063a25ce63953173b1553355c0ad6b2682fe69
   '@react-three/fiber@9.6.1': 68f1cb873dce662afa8148b10c5896d9e74acdcf70313881d944c1588be4c222
   ktx2-encoder@0.6.0: 20ab5cce62142bddaf85f69af8a41633b64f264f931b3ef71c8a57c3e0de5c74
   manifold-3d@3.5.1: 53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad
@@ -81,7 +81,7 @@ importers:
         version: 4.4.2
       '@gltf-transform/functions':
         specifier: 4.4.2
-        version: 4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2)
+        version: 4.4.2(patch_hash=6e750bb844d4b21f5b7ead6ab2063a25ce63953173b1553355c0ad6b2682fe69)(@types/node@24.13.2)
       '@heejun/deskcloud':
         specifier: ^0.1.0
         version: 0.1.0(socket.io-client@4.8.3)
@@ -124,40 +124,40 @@ importers:
       '@techstark/opencv-js':
         specifier: 5.0.0-release.1
         version: 5.0.0-release.1
-      '@toonspectrum/contracts':
+      '@toonstudio/contracts':
         specifier: workspace:*
         version: link:packages/contracts
-      '@toonspectrum/core':
+      '@toonstudio/core':
         specifier: workspace:*
         version: link:packages/core
-      '@toonspectrum/play-core':
+      '@toonstudio/play-core':
         specifier: workspace:*
         version: link:packages/play-core
-      '@toonspectrum/product-tour-film':
+      '@toonstudio/product-tour-film':
         specifier: workspace:*
         version: link:packages/product-tour-film
-      '@toonspectrum/studio-brush-platform':
+      '@toonstudio/studio-brush-platform':
         specifier: workspace:*
         version: link:packages/studio-brush-platform
-      '@toonspectrum/studio-command-registry':
+      '@toonstudio/studio-command-registry':
         specifier: workspace:*
         version: link:packages/studio-command-registry
-      '@toonspectrum/studio-engine-registry':
+      '@toonstudio/studio-engine-registry':
         specifier: workspace:*
         version: link:packages/studio-engine-registry
-      '@toonspectrum/studio-engine-skia':
+      '@toonstudio/studio-engine-skia':
         specifier: workspace:*
         version: link:packages/studio-engine-skia
-      '@toonspectrum/studio-engine-thorvg':
+      '@toonstudio/studio-engine-thorvg':
         specifier: workspace:*
         version: link:packages/studio-engine-thorvg
-      '@toonspectrum/studio-engine-vello':
+      '@toonstudio/studio-engine-vello':
         specifier: workspace:*
         version: link:packages/studio-engine-vello
-      '@toonspectrum/studio-format-gateway':
+      '@toonstudio/studio-format-gateway':
         specifier: workspace:*
         version: link:packages/studio-format-gateway
-      '@toonspectrum/studio-project-model':
+      '@toonstudio/studio-project-model':
         specifier: workspace:*
         version: link:packages/studio-project-model
       ag-psd:
@@ -231,7 +231,7 @@ importers:
         version: 1.17.0(react@19.2.7)
       manifold-3d:
         specifier: 3.5.1
-        version: 3.5.1(patch_hash=53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad)(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2))(esbuild-wasm@0.27.7)
+        version: 3.5.1(patch_hash=53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad)(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(patch_hash=6e750bb844d4b21f5b7ead6ab2063a25ce63953173b1553355c0ad6b2682fe69)(@types/node@24.13.2))(esbuild-wasm@0.27.7)
       meshoptimizer:
         specifier: 1.2.0
         version: 1.2.0
@@ -506,7 +506,7 @@ importers:
 
   apps/admin-web:
     dependencies:
-      '@toonspectrum/contracts':
+      '@toonstudio/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       react:
@@ -573,16 +573,16 @@ importers:
       '@socket.io/postgres-adapter':
         specifier: ^0.5.0
         version: 0.5.0(socket.io-adapter@2.5.8)
-      '@toonspectrum/contracts':
+      '@toonstudio/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@toonspectrum/core':
+      '@toonstudio/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@toonspectrum/studio-format-gateway':
+      '@toonstudio/studio-format-gateway':
         specifier: workspace:*
         version: link:../../packages/studio-format-gateway
-      '@toonspectrum/studio-project-model':
+      '@toonstudio/studio-project-model':
         specifier: workspace:*
         version: link:../../packages/studio-project-model
       drizzle-orm:
@@ -735,10 +735,10 @@ importers:
 
   packages/studio-brush-platform:
     dependencies:
-      '@toonspectrum/studio-engine-registry':
+      '@toonstudio/studio-engine-registry':
         specifier: workspace:*
         version: link:../studio-engine-registry
-      '@toonspectrum/studio-project-model':
+      '@toonstudio/studio-project-model':
         specifier: workspace:*
         version: link:../studio-project-model
       perfect-freehand:
@@ -749,7 +749,7 @@ importers:
 
   packages/studio-engine-registry:
     dependencies:
-      '@toonspectrum/studio-project-model':
+      '@toonstudio/studio-project-model':
         specifier: workspace:*
         version: link:../studio-project-model
       zod:
@@ -758,10 +758,10 @@ importers:
 
   packages/studio-engine-skia:
     dependencies:
-      '@toonspectrum/studio-engine-registry':
+      '@toonstudio/studio-engine-registry':
         specifier: workspace:*
         version: link:../studio-engine-registry
-      '@toonspectrum/studio-project-model':
+      '@toonstudio/studio-project-model':
         specifier: workspace:*
         version: link:../studio-project-model
       canvaskit-wasm:
@@ -784,10 +784,10 @@ importers:
 
   packages/studio-engine-vello:
     dependencies:
-      '@toonspectrum/studio-engine-registry':
+      '@toonstudio/studio-engine-registry':
         specifier: workspace:*
         version: link:../studio-engine-registry
-      '@toonspectrum/studio-project-model':
+      '@toonstudio/studio-project-model':
         specifier: workspace:*
         version: link:../studio-project-model
     devDependencies:
@@ -797,7 +797,7 @@ importers:
 
   packages/studio-format-gateway:
     dependencies:
-      '@toonspectrum/studio-project-model':
+      '@toonstudio/studio-project-model':
         specifier: workspace:*
         version: link:../studio-project-model
       zod:
@@ -819,7 +819,7 @@ importers:
       '@nestjs/common':
         specifier: ^11.1.24
         version: 11.1.24(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@toonspectrum/core':
+      '@toonstudio/core':
         specifier: workspace:*
         version: link:../../../packages/core
       drizzle-orm:
@@ -8810,7 +8810,7 @@ snapshots:
       '@gltf-transform/core': 4.4.2
       ktx-parse: 1.1.0
 
-  '@gltf-transform/functions@4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2)':
+  '@gltf-transform/functions@4.4.2(patch_hash=6e750bb844d4b21f5b7ead6ab2063a25ce63953173b1553355c0ad6b2682fe69)(@types/node@24.13.2)':
     dependencies:
       '@gltf-transform/core': 4.4.2
       '@gltf-transform/extensions': 4.4.2
@@ -13072,11 +13072,11 @@ snapshots:
     dependencies:
       semver: 7.8.5
 
-  manifold-3d@3.5.1(patch_hash=53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad)(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2))(esbuild-wasm@0.27.7):
+  manifold-3d@3.5.1(patch_hash=53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad)(@gltf-transform/core@4.4.2)(@gltf-transform/extensions@4.4.2)(@gltf-transform/functions@4.4.2(patch_hash=6e750bb844d4b21f5b7ead6ab2063a25ce63953173b1553355c0ad6b2682fe69)(@types/node@24.13.2))(esbuild-wasm@0.27.7):
     dependencies:
       '@gltf-transform/core': 4.4.2
       '@gltf-transform/extensions': 4.4.2
-      '@gltf-transform/functions': 4.4.2(patch_hash=bc28ed93c78c65021015ac7f66efdc912c8c7d4f5c661f8a99e6977cfe87ed4d)(@types/node@24.13.2)
+      '@gltf-transform/functions': 4.4.2(patch_hash=6e750bb844d4b21f5b7ead6ab2063a25ce63953173b1553355c0ad6b2682fe69)(@types/node@24.13.2)
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/trace-mapping': 0.3.31
       '@jscadui/3mf-export': 0.5.0

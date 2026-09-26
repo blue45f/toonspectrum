@@ -9,7 +9,7 @@ export const STUDIO_INSERT_HUB_MAX_FAVORITES = 160;
 export const STUDIO_INSERT_HUB_MAX_RECENTS = 24;
 export const STUDIO_INSERT_HUB_MAX_QUERY_LENGTH = 120;
 export const STUDIO_INSERT_HUB_STORAGE_KEY =
-  "toonspectrum-studio-insert-hub:v1";
+  "toonstudio-studio-insert-hub:v1";
 
 export type StudioInsertActionId =
   | "text"

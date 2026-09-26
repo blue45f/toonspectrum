@@ -96,7 +96,7 @@ export function createStudioImageFilterModuleWorker(): StudioImageFilterWorkerLi
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-image-filter.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-image-filter",
+    name: "toonstudio-image-filter",
   }) as unknown as StudioImageFilterWorkerLike;
 }
 

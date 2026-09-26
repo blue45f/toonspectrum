@@ -45,7 +45,7 @@ type JsonValue =
 
 const TEXT_ENCODER = new TextEncoder();
 const SCOPE = "codec.raster.public-clean-room";
-const KEY_ID = "kms/toonspectrum/product-codec/2026-01";
+const KEY_ID = "kms/toonstudio/product-codec/2026-01";
 const EXECUTION_ID = "codec-execution/2026-07-30/0001";
 const VALID_FROM = "2026-01-01T00:00:00.000Z";
 const VALID_UNTIL = "2027-01-01T00:00:00.000Z";
@@ -84,8 +84,8 @@ function signingFixture() {
   const output = Uint8Array.from([4, 5, 6]);
   const receipt = {
     schemaVersion: STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
-    kind: "toonspectrum-codec-provider-execution",
-    providerId: "toonspectrum.raster.qoi.v1",
+    kind: "toonstudio-codec-provider-execution",
+    providerId: "toonstudio.raster.qoi.v1",
     mode: "public-clean-room",
     direction: "encode",
     format: "qoi",
@@ -103,7 +103,7 @@ function signingFixture() {
       sha256: sha256(output),
     },
     licenseGrant: {
-      id: "toonspectrum-public-clean-room-raster-v1",
+      id: "toonstudio-public-clean-room-raster-v1",
       scope: ["public-clean-room", "commercial-use", "encode"],
       expiresAt: null,
     },
@@ -350,7 +350,7 @@ describe("StudioCodecCertificationAuthorityService", () => {
     const verify = vi.fn(async (request) => {
       expect(request).toMatchObject({
         executionId: fixture.executionId,
-        providerId: "toonspectrum.raster.qoi.v1",
+        providerId: "toonstudio.raster.qoi.v1",
         direction: "encode",
         format: "qoi",
       });

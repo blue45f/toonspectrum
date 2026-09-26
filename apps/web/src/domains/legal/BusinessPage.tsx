@@ -18,7 +18,7 @@ import {
   isBusinessInquiryType,
   validateBusinessInquiryInput,
   type BusinessInquiryType,
-} from "@toonspectrum/core/business-inquiry";
+} from "@toonstudio/core/business-inquiry";
 
 import Link from "@/shared/navigation/router-link";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
@@ -41,7 +41,7 @@ const TYPE_DETAILS: Record<BusinessInquiryType, { icon: typeof Handshake; descri
   },
   sponsorship: {
     icon: HandCoins,
-    description: "ToonSpectrum 프로젝트 후원, 브랜드 협찬, 스폰서십을 문의합니다.",
+    description: "ToonStudio 프로젝트 후원, 브랜드 협찬, 스폰서십을 문의합니다.",
   },
   ir_material: {
     icon: FileText,

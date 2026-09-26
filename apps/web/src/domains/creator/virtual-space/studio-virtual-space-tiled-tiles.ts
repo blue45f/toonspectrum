@@ -1,4 +1,4 @@
-import { studioWorldTilemapSchema, type StudioWorldTilemap } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldTilemapSchema, type StudioWorldTilemap } from "@toonstudio/studio-project-model/world-publication";
 
 export interface StudioTiledVisualLayer {
   readonly type: string;

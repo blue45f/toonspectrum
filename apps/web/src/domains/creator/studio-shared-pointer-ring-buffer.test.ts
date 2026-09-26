@@ -136,7 +136,7 @@ describe("SharedArrayBuffer pointer ring capability and descriptor", () => {
 
     const cloned = structuredClone(created.descriptor);
     expect(cloned).toMatchObject({
-      kind: "toonspectrum-studio-pointer-spsc",
+      kind: "toonstudio-studio-pointer-spsc",
       version: STUDIO_SHARED_POINTER_RING_VERSION,
       capacity: 8,
       headerBytes: STUDIO_SHARED_POINTER_RING_HEADER_BYTES,

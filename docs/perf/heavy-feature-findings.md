@@ -86,10 +86,10 @@
 
 | 내보내기 | 코드 도착까지 | 캡처+인코딩+저장 | 총 클릭→다운로드 | 저장된 파일 |
 | --- | ---: | ---: | ---: | --- |
-| PNG 현재 페이지 | 29 KB | — | **97 ms** | `toonspectrum-comic.png` 179 KB |
-| PSD (레이어별) | 91 KB | — | **137 ms** | `toonspectrum-comic.psd` 393 KB |
+| PNG 현재 페이지 | 29 KB | — | **97 ms** | `toonstudio-comic.png` 179 KB |
+| PSD (레이어별) | 91 KB | — | **137 ms** | `toonstudio-comic.psd` 393 KB |
 | 규격 슬라이스 JPG | 6 KB | — | **85 ms** | `…-naver-challenge.jpg` 31 KB |
-| SVG 벡터 | 2 KB | — | **50 ms** | `toonspectrum-comic.svg` 182 KB |
+| SVG 벡터 | 2 KB | — | **50 ms** | `toonstudio-comic.svg` 182 KB |
 
 **내보내기는 병목이 아니다.** 이 콘텐츠 규모에서 전 경로가 50–137 ms 안에 다운로드까지 끝난다.
 다만 규격 슬라이스는 장수에 비례해 `studio-export-presets.ts:610`의 **슬라이스당 250 ms 고정 대기**가

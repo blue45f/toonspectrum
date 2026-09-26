@@ -1,7 +1,7 @@
 /**
  * Runtime decision registry for third-party drawing libraries.
  *
- * These entries describe narrow specialist roles, not competing document engines. ToonSpectrum's
+ * These entries describe narrow specialist roles, not competing document engines. ToonStudio's
  * canonical stroke plan remains the only source of persistence, replay, collaboration and export
  * truth; every external library is therefore explicitly non-authoritative.
  */
@@ -65,7 +65,7 @@ export interface StudioDrawingLibraryStrategy {
   readonly runtimeInstallation: StudioDrawingLibraryRuntimeInstallation;
   /** External libraries must never own persisted/replayed document meaning. */
   readonly canonicalAuthority: false;
-  /** Brush pixels remain owned by ToonSpectrum's versioned live/committed render contracts. */
+  /** Brush pixels remain owned by ToonStudio's versioned live/committed render contracts. */
   readonly brushPixelAuthority: false;
   readonly maintenanceNote: string;
   readonly riskNotes: readonly string[];
@@ -147,7 +147,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
         "Only 19 quality-gated pencil, charcoal and oil identities expose this pre-stroke provider selection; the other 207 shelf identities keep their existing exact routes.",
         "Provider failure is terminal for the selected stroke; a different provider may be selected only before the next stroke, and mid-stroke pixel-authority promotion remains forbidden.",
         "The selected-stroke transparent PNG transform is a separately selected protocol-v2 conversion route.",
-        "The stock WASM binding flattens the full surface over opaque white, so ToonSpectrum ships its own packed dirty-frame binding and fail-closed live Worker protocol v1.",
+        "The stock WASM binding flattens the full surface over opaque white, so ToonStudio ships its own packed dirty-frame binding and fail-closed live Worker protocol v1.",
         "License inventory, checked-in integrity hashes, byte-reproducible release build and real-browser runtime QA gate the local provider.",
         "The project is young and deterministic intent does not imply cross-platform bit identity; version, seed, adapter, dirty bounds, output dimensions, pixel layout and output hashes must be receipted.",
       ],
@@ -196,7 +196,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       maintenanceNote:
         "pixi.js 8.19 is installed with a lazy, explicitly selected WebGPU or WebGL selectable-scene provider. StudioPixiSceneOverlayHost uses an always-on mount for the WebGPU lane on the canvas stage for selection overlays (pointer-inactive) and fails closed if it is unavailable.",
       riskNotes: [
-        "It owns only a dedicated transparent pointer-inactive overlay canvas; the document, selection commands and hit-test meaning remain ToonSpectrum-owned.",
+        "It owns only a dedicated transparent pointer-inactive overlay canvas; the document, selection commands and hit-test meaning remain ToonStudio-owned.",
         "It must never rasterize live or committed brush paint or share another renderer's GPUCanvasContext.",
         "Always-on host is a presentation overlay only; Konva remains the interactive selection/transform authority.",
       ],
@@ -275,7 +275,7 @@ export const STUDIO_DRAWING_LIBRARY_STRATEGIES: readonly StudioDrawingLibraryStr
       maintenanceNote:
         "Candidate isolated Rust/WASM filter Worker; upstream photon-rs 0.3.3 is not installed and remains benchmark-first against the current filter graph.",
       riskNotes: [
-        "A broad function count does not prove better quality, latency or memory than ToonSpectrum's existing WebGPU, OpenCV and image-js paths.",
+        "A broad function count does not prove better quality, latency or memory than ToonStudio's existing WebGPU, OpenCV and image-js paths.",
         "Adoption gate: representative large-canvas color, convolution, dithering and transform benchmarks must validate premultiplied alpha, color-space behavior and transfer-memory budgets.",
         "Adoption gate: only deterministic pixels plus a versioned receipt may cross the Worker boundary; Photon must not own filter-stack, mask or document semantics.",
       ],
@@ -511,8 +511,8 @@ function sourceAudit(
 export const STUDIO_DRAWING_SOURCE_AUDIT:
 readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
   sourceAudit({
-    id: "toonspectrum-canonical-core",
-    displayName: "ToonSpectrum tile/layer/history/preset core",
+    id: "toonstudio-canonical-core",
+    displayName: "ToonStudio tile/layer/history/preset core",
     sourceKind: "first-party",
     officialSource: "apps/web/src/domains/creator",
     versionEvidence: "versioned canonical contracts and receipts",
@@ -539,8 +539,8 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
       "Pointer capture, pointerrawupdate and getCoalescedEvents are the primary low-latency input transport; prediction never mutates committed samples.",
   }),
   sourceAudit({
-    id: "toonspectrum-adaptive-stabilizer",
-    displayName: "ToonSpectrum adaptive stabilizer",
+    id: "toonstudio-adaptive-stabilizer",
+    displayName: "ToonStudio adaptive stabilizer",
     sourceKind: "first-party",
     officialSource: "apps/web/src/domains/creator/studio-stroke-stabilizer.ts",
     versionEvidence: "first-party adaptive time-constant and lag-bound implementation",
@@ -593,7 +593,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "browser-native",
     brushAuthorityOverlap: "none-infrastructure",
     rationale:
-      "The textured dry-media vertical slice uses ToonSpectrum-owned WebGPU lowering and a shared RGBA16F presentation surface behind capability, exact-receipt and atomic-authority gates. The normal Studio viewport promotes one selected, top-most, unclipped dry-media stroke only after exact parity receipts; a failed selected WebGPU operation never reveals a Konva replacement frame.",
+      "The textured dry-media vertical slice uses ToonStudio-owned WebGPU lowering and a shared RGBA16F presentation surface behind capability, exact-receipt and atomic-authority gates. The normal Studio viewport promotes one selected, top-most, unclipped dry-media stroke only after exact parity receipts; a failed selected WebGPU operation never reveals a Konva replacement frame.",
   }),
   sourceAudit({
     id: "perfect-freehand",
@@ -607,7 +607,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "runtime-import",
     brushAuthorityOverlap: "geometry-only",
     rationale:
-      "It supplies pressure-aware outline coordinates synchronously while ToonSpectrum owns samples, compositing, persistence and replay.",
+      "It supplies pressure-aware outline coordinates synchronously while ToonStudio owns samples, compositing, persistence and replay.",
   }),
   sourceAudit({
     id: "lazy-brush",
@@ -991,7 +991,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "behavioral-reference-only",
     brushAuthorityOverlap: "brush-renderer-overlap",
     rationale:
-      "Procedural sketchy, shaded and web proximity-connection algorithms serve as clean-room behavioral inspiration for ToonSpectrum's assist kit; code and assets are excluded.",
+      "Procedural sketchy, shaded and web proximity-connection algorithms serve as clean-room behavioral inspiration for ToonStudio's assist kit; code and assets are excluded.",
   }),
   sourceAudit({
     id: "fabric-brushes",
@@ -1061,7 +1061,7 @@ readonly StudioDrawingSourceAuditEntry[] = Object.freeze([
     codePolicy: "runtime-import",
     brushAuthorityOverlap: "brush-renderer-overlap",
     rationale:
-      "Authoritative natural-media brush presets (Classic, Deevad, Ramon, Tanda) imported through the format gateway into ToonSpectrum brush dynamics.",
+      "Authoritative natural-media brush presets (Classic, Deevad, Ramon, Tanda) imported through the format gateway into ToonStudio brush dynamics.",
   }),
 ]);
 

@@ -103,7 +103,7 @@ function safeExportBaseName(title: string): string {
     })
     .join("")
     .trim()
-    .slice(0, 120) || "toonspectrum-comic";
+    .slice(0, 120) || "toonstudio-comic";
 }
 
 export interface StudioExportMenuPackageContext {
@@ -172,7 +172,7 @@ export interface StudioExportMenuPanelProps {
   exportCurrentPageToVectorPdf?: () => Promise<StudioVectorPdfExportResult>;
   /** 현재 페이지의 보이는 펜 자유곡선을 검증된 bounded InkML로 내보냅니다. */
   exportCurrentPageToInkMl?: () => Promise<StudioInkMlExportResult>;
-  /** 보이는 펜 자유곡선을 ToonSpectrum bounded public-spec WILL v1 Annex B로 내보냅니다. */
+  /** 보이는 펜 자유곡선을 ToonStudio bounded public-spec WILL v1 Annex B로 내보냅니다. */
   exportCurrentPageToWillV1?: () => Promise<StudioWillV1PageExportResult>;
   /**
    * 현재 페이지를 요소별 레이어를 가진 PSD로 캡처 — Konva 스테이지에서 요소를 하나씩
@@ -1677,7 +1677,7 @@ export function StudioExportMenuPanel({
                 isExporting || contactBusy
               }
               className="flex min-h-11 items-center justify-center gap-1 rounded-lg border border-accent/35 bg-accent-soft/35 px-1.5 text-[0.65rem] font-semibold text-fg-2 transition-colors hover:bg-accent-soft focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-45"
-              title="현재 페이지의 보이는 펜 자유곡선을 ToonSpectrum bounded WILL v1 Annex B .will 파일로 저장"
+              title="현재 페이지의 보이는 펜 자유곡선을 ToonStudio bounded WILL v1 Annex B .will 파일로 저장"
             >
               <FileText size={13} aria-hidden />
               {archiveBusy === "will" ? "WILL 생성 중" : "WILL v1"}
@@ -1688,7 +1688,7 @@ export function StudioExportMenuPanel({
           CBZ는 선택 범위와 ComicInfo.xml, ORA는 현재 화면의 합성을 보존합니다.
           {exportCurrentPageToInkMl ? " InkML은 펜 자유곡선의 입력 채널을 검증해 교환합니다." : null}
           {exportCurrentPageToWillV1
-            ? " WILL v1은 ToonSpectrum bounded 공개 명세 프로필이며 Wacom 공식 SDK·인증 파일이 아닙니다."
+            ? " WILL v1은 ToonStudio bounded 공개 명세 프로필이며 Wacom 공식 SDK·인증 파일이 아닙니다."
             : null}
         </p>
         <p

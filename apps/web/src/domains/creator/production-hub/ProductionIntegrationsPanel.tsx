@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import {
   confirmProductionTossPayment,

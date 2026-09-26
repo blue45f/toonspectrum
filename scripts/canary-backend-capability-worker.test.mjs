@@ -11,22 +11,22 @@ const token = "canary-auth-token-that-is-at-least-32-characters";
 describe("backend capability worker canary", () => {
   it("accepts Express charset insertion only when gateway version 1 remains explicit", () => {
     expect(isGatewayResponseContentType(
-      "application/vnd.toonspectrum.backend-capability+json; charset=utf-8; version=1",
+      "application/vnd.toonstudio.backend-capability+json; charset=utf-8; version=1",
     )).toBe(true);
     expect(isGatewayResponseContentType(
-      "application/vnd.toonspectrum.backend-capability+json; charset=utf-8",
+      "application/vnd.toonstudio.backend-capability+json; charset=utf-8",
     )).toBe(false);
   });
 
   it("authenticates signed health without transmitting the gateway token", async () => {
     const fetch = vi.fn(async (_url, init) => {
       const headers = new Headers(init?.headers);
-      expect(headers.get("x-toonspectrum-gateway-token")).toBeNull();
-      expect(headers.get("x-toonspectrum-health-signature")).toBe(
+      expect(headers.get("x-toonstudio-gateway-token")).toBeNull();
+      expect(headers.get("x-toonstudio-health-signature")).toBe(
         createHealthSignature(token, "render", "1800000000000"),
       );
       return Response.json({
-        version: "toonspectrum.backend-capability.v1",
+        version: "toonstudio.backend-capability.v1",
         role: "capability-worker",
         ready: true,
         operations: ["thumbnail.render"],
@@ -56,7 +56,7 @@ describe("backend capability worker canary", () => {
       signals.push(init?.signal);
       if (String(url).endsWith("/health")) {
         return Response.json({
-          version: "toonspectrum.backend-capability.v1",
+          version: "toonstudio.backend-capability.v1",
           role: "capability-worker",
           ready: true,
           operations: ["thumbnail.render"],
@@ -64,7 +64,7 @@ describe("backend capability worker canary", () => {
       }
       const envelope = JSON.parse(String(init?.body));
       return new Response(JSON.stringify({
-        version: "toonspectrum.backend-capability.v1",
+        version: "toonstudio.backend-capability.v1",
         provider: "render",
         idempotencyKey: envelope.idempotencyKey,
         outcome: "completed",
@@ -79,7 +79,7 @@ describe("backend capability worker canary", () => {
         status: 200,
         headers: {
           "content-type":
-            "application/vnd.toonspectrum.backend-capability+json; charset=utf-8; version=1",
+            "application/vnd.toonstudio.backend-capability+json; charset=utf-8; version=1",
         },
       });
     });
@@ -89,7 +89,7 @@ describe("backend capability worker canary", () => {
       BACKEND_CAPABILITY_CANARY_PROVIDER: "render",
       BACKEND_CAPABILITY_CANARY_AUTH_TOKEN: token,
       BACKEND_CAPABILITY_CANARY_SOURCE_OBJECT_JSON: JSON.stringify({
-        contractVersion: "toonspectrum.private-object-storage.v2",
+        contractVersion: "toonstudio.private-object-storage.v2",
         providerId: "cloudflare-r2",
         purpose: "source",
         digest: `sha256:${"a".repeat(64)}`,

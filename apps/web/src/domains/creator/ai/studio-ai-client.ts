@@ -75,7 +75,7 @@ export interface StudioAiStorage {
   removeItem?(key: string): void;
 }
 
-export const STUDIO_AI_SETTINGS_KEY = "toonspectrum-studio-ai-settings";
+export const STUDIO_AI_SETTINGS_KEY = "toonstudio-studio-ai-settings";
 
 export interface StudioAiSettings {
   /** 예: "https://api.openai.com/v1" (끝에 슬래시 없이). 아래 세 경로가 이 뒤에 그대로 붙는다. */

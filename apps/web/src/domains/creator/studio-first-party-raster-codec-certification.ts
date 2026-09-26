@@ -1,8 +1,8 @@
 /**
- * End-to-end first-party raster codec execution + ToonSpectrum product certification.
+ * End-to-end first-party raster codec execution + ToonStudio product certification.
  *
  * This composes the generic provider boundary, deterministic conformance vectors, and the
- * deployment-owned signing authority. The result is an exact-source ToonSpectrum product
+ * deployment-owned signing authority. The result is an exact-source ToonStudio product
  * certificate. It is not a third-party standards-body, codec-vendor, or trademark certificate.
  */
 
@@ -49,7 +49,7 @@ import {
 import type { StudioRasterInterchangeFormat } from "./render/studio-raster-interchange";
 
 export const STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_EVIDENCE_MEDIA_TYPE =
-  "application/vnd.toonspectrum.raster-codec-conformance+json" as const;
+  "application/vnd.toonstudio.raster-codec-conformance+json" as const;
 
 export type StudioFirstPartyRasterCodecExecutionPolicy =
   | "direct"
@@ -76,7 +76,7 @@ export interface ExecuteAndCertifyStudioFirstPartyRasterCodecInput {
 }
 
 export interface StudioFirstPartyRasterCertifiedExecution {
-  readonly kind: "toonspectrum-first-party-raster-certified-execution";
+  readonly kind: "toonstudio-first-party-raster-certified-execution";
   readonly format: StudioRasterInterchangeFormat;
   readonly direction: StudioCodecDirection;
   readonly scope: string;
@@ -165,7 +165,7 @@ export function studioFirstPartyRasterCodecCertificationScope(
   format: StudioRasterInterchangeFormat,
   direction: StudioCodecDirection,
 ): string {
-  return `toonspectrum.product.codec-conformance.${format}-${direction}`;
+  return `toonstudio.product.codec-conformance.${format}-${direction}`;
 }
 
 function providerFor(
@@ -352,7 +352,7 @@ async function executeWithPolicy(
     ...execution,
     executionProviderReceipt: Object.freeze({
       schemaVersion: 1,
-      kind: "toonspectrum-codec-execution-provider-selection",
+      kind: "toonstudio-codec-execution-provider-selection",
       selectedProvider: policy,
       attemptedProviders: Object.freeze([policy]) as readonly [
         StudioFirstPartyRasterCodecExecutionPolicy,
@@ -488,7 +488,7 @@ export async function executeAndCertifyStudioFirstPartyRasterCodec(
       )
     );
     return Object.freeze({
-      kind: "toonspectrum-first-party-raster-certified-execution",
+      kind: "toonstudio-first-party-raster-certified-execution",
       format: input.format,
       direction: input.direction,
       scope,
@@ -543,7 +543,7 @@ export async function verifyStudioFirstPartyRasterCertifiedExecution(
   );
   if (
     execution.kind !==
-      "toonspectrum-first-party-raster-certified-execution"
+      "toonstudio-first-party-raster-certified-execution"
     || execution.scope !== expectedScope
     || verified.certificate.evidence.mediaType
       !== STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_EVIDENCE_MEDIA_TYPE

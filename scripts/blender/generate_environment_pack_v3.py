@@ -1,4 +1,4 @@
-"""Generate ToonSpectrum's six CC0 Studio BG3D environments with Blender 5.2.
+"""Generate ToonStudio's six CC0 Studio BG3D environments with Blender 5.2.
 
 The generator is deterministic, texture-free, and safe to execute either from
 Blender's background CLI or from an MCP-controlled Blender session.  It never
@@ -377,7 +377,7 @@ def add_root_and_export(asset_id, dimensions, semantic_parts):
     root.empty_display_type = "CUBE"
     root["asset_id"] = f"ts-bg3d-{asset_id}-v1"
     root["asset_type"] = "studio-bg3d-environment"
-    root["asset_author"] = "ToonSpectrum"
+    root["asset_author"] = "ToonStudio"
     root["asset_generator"] = GENERATOR
     root["asset_generator_version"] = "3.0.0-blender-5.2"
     root["asset_license"] = "CC0-1.0"
@@ -862,7 +862,7 @@ def main():
     for asset_id in ASSETS:
         if asset_id in selected:
             BUILDERS[asset_id]()
-    print(f"Generated {len(selected)} ToonSpectrum environment assets in {OUTPUT_DIRECTORY}")
+    print(f"Generated {len(selected)} ToonStudio environment assets in {OUTPUT_DIRECTORY}")
 
 
 if __name__ == "__main__":

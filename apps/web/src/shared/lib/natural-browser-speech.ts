@@ -2,7 +2,7 @@
  * Zero-cost browser speech direction.
  *
  * Text preparation, voice ranking and prosody planning run locally. Playback uses
- * the browser/OS Web Speech implementation and never calls a ToonSpectrum AI API.
+ * the browser/OS Web Speech implementation and never calls a ToonStudio AI API.
  * Optional recording captures the user-selected current tab audio so the same
  * system voice can be attached to a video without a paid TTS provider.
  */
@@ -136,7 +136,7 @@ const STYLE_PROFILES: Record<NaturalSpeechStyle, NaturalSpeechProfile> = {
 };
 
 export const DEFAULT_KOREAN_PRONUNCIATIONS: readonly NaturalPronunciation[] = [
-  { source: "ToonSpectrum", spoken: "툰 스펙트럼" },
+  { source: "ToonStudio", spoken: "툰 스펙트럼" },
   { source: "ToonStudio", spoken: "툰 스튜디오" },
   { source: "UI/UX", spoken: "유 아이, 유 엑스" },
   { source: "WebM", spoken: "웹 엠" },

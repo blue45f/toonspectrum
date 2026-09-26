@@ -22,7 +22,7 @@ import { createPortal } from "react-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 
-import { ToonSpectrumMark } from "@/shared/components/visual-marks";
+import { ToonStudioMark } from "@/shared/components/visual-marks";
 
 import {
   parseAuthProviderDiscovery,
@@ -495,7 +495,7 @@ export function AuthModal({
               className="absolute -right-8 -top-8 size-28 rounded-full border border-accent/15 bg-accent/5"
             />
             <div className="relative flex items-start gap-3">
-              <ToonSpectrumMark className="size-11 rounded-xl" />
+              <ToonStudioMark className="size-11 rounded-xl" />
               <div className="min-w-0">
                 <p className="font-display text-[0.66rem] font-bold uppercase tracking-[0.16em] text-accent">
                   {translateCurrentStaticSourceText(

@@ -5,7 +5,7 @@
 | Component | Deployment role | License / notice action |
 | --- | --- | --- |
 | SQLite / official sqlite-wasm 3.53.0-build1 | browser WASM DB, OPFS SAH-pool VFS | SQLite core는 public domain. 배포 artifact의 exact version, checksums, 생성 도구와 third-party notices/SBOM을 릴리스에 유지 |
-| ToonSpectrum animatic validation/persistence | canonical JSON validation, namespace/key routing | 저장소 프로젝트 라이선스와 배포 정책 적용 |
+| ToonStudio animatic validation/persistence | canonical JSON validation, namespace/key routing | 저장소 프로젝트 라이선스와 배포 정책 적용 |
 | Chromium Web Platform OPFS/Worker | runtime capability | 브라우저 제공 API. 앱 번들에 Chromium binary를 포함하지 않음 |
 
 이 문서는 법률 의견을 대신하지 않는다. 릴리스 SBOM과 notice generator가 실제 배포 artifact를
@@ -35,7 +35,7 @@
 - COOP `same-origin`, COEP `require-corp`, CORP `same-origin`.
 - CSP에서 self script/worker와 SQLite WASM 초기화를 위한 `wasm-unsafe-eval` 허용.
 - logical database filename `/studio-local-v12.db`와 SAH-pool directory
-  `toonspectrum-studio-sqlite` 고정.
+  `toonstudio-studio-sqlite` 고정.
 - cache/version 전환 시 이전 `/studio-local.db`를 자동 재개방하거나 병합하지 않음.
 
 ## 권리·데이터 경계

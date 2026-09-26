@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { studioReviewTaskCompletionReceiptSchema } from "@toonspectrum/studio-project-model";
+import { studioReviewTaskCompletionReceiptSchema } from "@toonstudio/studio-project-model";
 import { StudioProductionWorkspaceDocumentSchema } from "./studio-production.dto";
 import { studioReviewTaskCompletionBasis, studioReviewTaskCompletionChangedTasks, studioReviewTaskCompletionFingerprint, studioReviewTaskCompletionInvalidations } from "./studio-review-task-completion-invalidation";
 
@@ -100,7 +100,7 @@ describe("server completion invalidation", () => {
   it("rejects completion evidence in a generic workspace document and client-supplied completion actors", async () => {
     const { document, receipt } = fixture();
     expect(StudioProductionWorkspaceDocumentSchema.safeParse({ ...document, tasks: [{ ...document.tasks[0], reviewCompletion: receipt }] }).success).toBe(false);
-    const { studioReviewTaskCompletionInputSchema } = await import("@toonspectrum/studio-project-model");
+    const { studioReviewTaskCompletionInputSchema } = await import("@toonstudio/studio-project-model");
     expect(studioReviewTaskCompletionInputSchema.safeParse({ requestId: "intent", baseRevision: 1, proofDigest: receipt.proofDigest, confirmedCriteria: ["A"], completedBy: "other" }).success).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 /**
- * Permanent real-runtime gate for ToonSpectrum's p5.brush standalone adapter.
+ * Permanent real-runtime gate for ToonStudio's p5.brush standalone adapter.
  *
  * The successful path is the exact product topology:
  * Chromium page -> production Worker client -> one-shot module Dedicated Worker
@@ -25,7 +25,7 @@ import { REPO_ROOT } from "./lib/repo-paths.mjs";
 const SCRATCH =
   process.env.TOONSPECTRUM_P5_BRUSH_REAL_RUNTIME_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-p5-brush-real-runtime-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-p5-brush-real-runtime-${Date.now()}`);
 const HARNESS_PATH = "/__studio_p5_brush_real_runtime__";
 const HARNESS_ENTRY = "/scripts/studio-p5-brush-real-runtime-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;

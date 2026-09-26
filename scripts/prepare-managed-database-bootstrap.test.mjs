@@ -153,7 +153,7 @@ describe("관리형 빈 DB bootstrap SQL 준비", () => {
     expect(bundle.verificationSql).toContain("Supabase Data API 역할");
     expect(splitDumpStatements(bundle.sql).filter((statement) => /^(?:BEGIN|COMMIT)$/iu.test(statement))).toEqual(["BEGIN", "COMMIT"]);
     expect(bundle.verificationSql.trimEnd()).toMatch(/ROLLBACK;$/u);
-    expect(bundle.verificationSql).toContain("set_config('role', current_setting('toonspectrum.bootstrap_saved_role'), true)");
+    expect(bundle.verificationSql).toContain("set_config('role', current_setting('toonstudio.bootstrap_saved_role'), true)");
   });
 
   test("비superuser 역할 검증은 자기 grantor만 임시 변경하고 원상 복원한다", () => {

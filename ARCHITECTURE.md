@@ -1,4 +1,4 @@
-# ToonSpectrum 아키텍처
+# ToonStudio 아키텍처
 
 - 상태: **현재 구조 + 진행 중인 마이그레이션**
 - 최종 갱신: **2026-09-26**
@@ -84,7 +84,7 @@ apps/web/
 
 ### 3.2 Admin Web
 
-`apps/admin-web`은 `@toonspectrum/admin-web`이라는 독립 pnpm workspace package다. 자체 Vite,
+`apps/admin-web`은 `@toonstudio/admin-web`이라는 독립 pnpm workspace package다. 자체 Vite,
 TypeScript, Vitest, Playwright 설정과 `dist/` 출력을 소유한다.
 
 ```text

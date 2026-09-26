@@ -2,7 +2,7 @@ import {
   refitSettledCenterline,
   type CenterlineFitEngine,
   type SettledCenterlineRefitResult,
-} from "@toonspectrum/studio-brush-platform";
+} from "@toonstudio/studio-brush-platform";
 
 import {
   requireStudioDrawingPointerTransport,

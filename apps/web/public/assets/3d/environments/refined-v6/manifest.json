@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.environment-refinement.v6",
+  "schema": "toonstudio.environment-refinement.v6",
   "records": [
     {
       "fileName": "compact_apartment_interior.glb",

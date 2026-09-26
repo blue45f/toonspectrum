@@ -31,7 +31,7 @@ export function CommandPalettePreview({
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent">
             <Sparkles size={14} />
-            <span>ToonSpectrum ⌘K 통합 팔레트</span>
+            <span>ToonStudio ⌘K 통합 팔레트</span>
           </div>
           <p className="text-sm leading-relaxed text-fg-2">
             작품 탐색부터 스튜디오 도구, 시스템 제어까지 키보드로 즉시 실행하세요.

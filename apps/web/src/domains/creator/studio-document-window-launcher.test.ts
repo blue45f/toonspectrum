@@ -28,7 +28,7 @@ describe("Studio document window launcher", () => {
       "review",
     );
 
-    expect(name).toMatch(/^toonspectrum-studio-/u);
+    expect(name).toMatch(/^toonstudio-studio-/u);
     expect(name).toContain("-review");
     expect(name).not.toContain("secret-project");
     expect(name).not.toContain("secret-document");
@@ -91,7 +91,7 @@ describe("Studio document window launcher", () => {
 
     expect(openWindow).toHaveBeenCalledWith(
       "",
-      expect.stringMatching(/^toonspectrum-studio-.+-3d$/u),
+      expect.stringMatching(/^toonstudio-studio-.+-3d$/u),
       expect.stringContaining("popup=yes"),
     );
     expect(next.replace).toHaveBeenCalledWith(

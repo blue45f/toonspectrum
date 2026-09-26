@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum-v12-runtime-fault-matrix",
+  "schema": "toonstudio-v12-runtime-fault-matrix",
   "version": 1,
   "authority": "docs/architecture/ToonStudio_Vello차세대엔진_공격적활용_CSP초월_인플레이스최종아키텍처_V12_2026-08-08.md §17",
   "runner": "vitest-node with production state machines, sqlite-wasm memory VFS, and deterministic injected boundaries",

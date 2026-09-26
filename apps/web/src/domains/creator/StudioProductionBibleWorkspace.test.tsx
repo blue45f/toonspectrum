@@ -71,7 +71,7 @@ describe("StudioProductionBibleWorkspace", () => {
 
     expect((await screen.findAllByText("학교 도서관")).length).toBeGreaterThan(0);
     expect(load).toHaveBeenCalledWith(
-      "toonspectrum-studio-production-bible:v12:artist-a:work:episode-1"
+      "toonstudio-studio-production-bible:v12:artist-a:work:episode-1"
     );
     fireEvent.click(screen.getAllByRole("button", { name: "소품" })[0]!);
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));

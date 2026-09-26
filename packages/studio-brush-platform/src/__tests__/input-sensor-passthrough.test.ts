@@ -2,7 +2,7 @@ import {
   deviceCalibrationIRSchema,
   modeledSampleIRSchema,
   strokeIRSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import { modelRawInput } from "../input";
@@ -11,7 +11,7 @@ import { applyStabilizer } from "../stabilizer";
 import type {
   ModeledSampleIR,
   RawInputSampleIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * V19 §2.2/§5 — sensor channels must survive the modeled sample stream.

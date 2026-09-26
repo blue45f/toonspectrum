@@ -73,7 +73,7 @@ describe("Studio InkML product interchange", () => {
       traceCount: 1,
       sampleCount: 3,
     });
-    expect(result.xml).toContain("toonspectrum-inkml-v1");
+    expect(result.xml).toContain("toonstudio-inkml-v1");
   });
 
   it("검증된 InkML을 보수적인 pen 요소로 가져오며 모든 입력 채널을 보존한다", async () => {
@@ -144,7 +144,7 @@ describe("Studio InkML product interchange", () => {
 
   it("파일명을 운영체제 금지문자와 길이 예산 안에서 정규화한다", () => {
     expect(studioInkMlFileName("  1화:/초안*  ")).toBe("1화초안.inkml");
-    expect(studioInkMlFileName("")).toBe("toonspectrum-ink.inkml");
+    expect(studioInkMlFileName("")).toBe("toonstudio-ink.inkml");
     expect(studioInkMlFileName("가".repeat(200))).toBe(`${"가".repeat(120)}.inkml`);
   });
 });

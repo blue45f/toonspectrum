@@ -51,7 +51,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1487,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -108,7 +108,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1516,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -166,7 +166,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1524,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -223,7 +223,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1455,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -280,7 +280,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1395,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -337,7 +337,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1502,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -394,7 +394,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1522,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -452,7 +452,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1530,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -509,7 +509,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1479,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -566,7 +566,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1400,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -623,7 +623,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1510,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -680,7 +680,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1482,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -738,7 +738,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1490,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -795,7 +795,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1443,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -852,7 +852,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1400,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -909,7 +909,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1585,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -966,7 +966,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1489,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1024,7 +1024,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1497,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1081,7 +1081,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1484,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1138,7 +1138,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1400,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1195,7 +1195,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1544,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1252,7 +1252,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1531,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1310,7 +1310,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1539,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1367,7 +1367,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1429,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1424,7 +1424,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1400,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1481,7 +1481,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1522,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1538,7 +1538,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1516,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1596,7 +1596,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1524,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1653,7 +1653,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1421,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1710,7 +1710,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1400,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1767,7 +1767,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1493,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1824,7 +1824,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1479,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1882,7 +1882,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1487,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1939,7 +1939,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1449,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -1996,7 +1996,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1400,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2053,7 +2053,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1502,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2110,7 +2110,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1457,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2168,7 +2168,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1465,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2225,7 +2225,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1360,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2282,7 +2282,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1395,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2339,7 +2339,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1502,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2396,7 +2396,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1445,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2454,7 +2454,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1453,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2511,7 +2511,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1455,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2568,7 +2568,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1400,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2625,7 +2625,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1516,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2682,7 +2682,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1485,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2740,7 +2740,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1493,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2797,7 +2797,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1415,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2854,7 +2854,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1400,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2911,7 +2911,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1550,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -2968,7 +2968,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1520,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3026,7 +3026,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1528,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3083,7 +3083,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1463,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3140,7 +3140,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1405,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3197,7 +3197,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1500,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3254,7 +3254,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1492,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3312,7 +3312,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1500,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3369,7 +3369,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1451,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3426,7 +3426,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1400,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3483,7 +3483,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1488,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3540,7 +3540,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1515,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3598,7 +3598,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1523,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3655,7 +3655,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1471,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3712,7 +3712,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1556,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3770,7 +3770,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1564,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3827,7 +3827,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1517,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3884,7 +3884,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1506,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3942,7 +3942,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1514,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -3999,7 +3999,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1497,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4056,7 +4056,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1492,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4114,7 +4114,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1500,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4171,7 +4171,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1476,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4228,7 +4228,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1475,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4286,7 +4286,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1483,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4343,7 +4343,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1495,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4400,7 +4400,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1492,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4458,7 +4458,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1500,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4515,7 +4515,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1481,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4572,7 +4572,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1514,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4630,7 +4630,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1522,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4687,7 +4687,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1508,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4744,7 +4744,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1458,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4802,7 +4802,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1466,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4859,7 +4859,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1500,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4916,7 +4916,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1472,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -4974,7 +4974,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1480,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5031,7 +5031,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1536,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5088,7 +5088,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1576,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5146,7 +5146,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1584,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5203,7 +5203,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1529,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5260,7 +5260,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1578,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5318,7 +5318,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1586,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5375,7 +5375,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1508,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5432,7 +5432,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1520,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5490,7 +5490,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1528,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5547,7 +5547,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1501,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5604,7 +5604,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1522,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5661,7 +5661,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1488,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",
@@ -5718,7 +5718,7 @@ export const CREATOR_MARKETPLACE_CC0_STARTER_RECORDS: readonly CreatorMarketplac
     "manifestByteSize": 1525,
     "publisher": {
       "id": "00000000-0000-4000-8000-0000000000c0",
-      "name": "ToonSpectrum 검수 CC0",
+      "name": "ToonStudio 검수 CC0",
       "avatar": "#3b82f6"
     },
     "createdAt": "2026-09-18T00:00:00.000Z",

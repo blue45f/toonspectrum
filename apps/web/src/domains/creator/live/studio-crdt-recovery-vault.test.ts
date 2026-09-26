@@ -275,14 +275,14 @@ describe("Studio CRDT recovery vault", () => {
     const serialized = JSON.stringify(bundle);
 
     expect(bundle).toMatchObject({
-      format: "toonspectrum-crdt-recovery",
+      format: "toonstudio-crdt-recovery",
       version: 1,
       workId: "work-c",
       frontiers: [{ vaultId: "vault-c" }],
     });
     expect(serialized).not.toContain("private-user-id");
     expect(studioCrdtRecoveryBundleFileName("work/c", 5_000)).toMatch(
-      /^toonspectrum-work-c-crdt-recovery-/
+      /^toonstudio-work-c-crdt-recovery-/
     );
   });
 });

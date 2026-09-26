@@ -9,7 +9,7 @@ export const STUDIO_CHARACTER_BIBLE_MAX_TEXT_LENGTH = 2_000;
 export const STUDIO_CHARACTER_BIBLE_MAX_LIST_ITEMS = 24;
 export const STUDIO_CHARACTER_BIBLE_MAX_LIST_ITEM_LENGTH = 160;
 
-const STUDIO_CHARACTER_BIBLE_STORAGE_PREFIX = "toonspectrum-studio-character-bible:v1";
+const STUDIO_CHARACTER_BIBLE_STORAGE_PREFIX = "toonstudio-studio-character-bible:v1";
 
 export const STUDIO_CHARACTER_BIBLE_FIELDS = [
   "name",

@@ -1,5 +1,5 @@
 /**
- * ToonSpectrum-authored starter assets.
+ * ToonStudio-authored starter assets.
  *
  * Every SVG below is generated from code in this repository. No marketplace thumbnail,
  * product file, texture, model, product name or description is embedded or referenced.
@@ -35,7 +35,7 @@ export const STUDIO_ORIGINAL_FREE_ASSET_LICENSE: StudioMarketplaceLicense =
     derivativesAllowed: true,
     redistributionAllowed: true,
     sourceVerifiedAt: "2026-07-26",
-    summary: "ToonSpectrum이 직접 제작해 CC0로 제공하는 원본입니다. 상업 작품 사용·수정·재배포가 가능합니다.",
+    summary: "ToonStudio이 직접 제작해 CC0로 제공하는 원본입니다. 상업 작품 사용·수정·재배포가 가능합니다.",
   });
 
 export type StudioOriginalFreeAssetCategory =
@@ -595,8 +595,8 @@ function originalPackage(input: {
     accessLabel: "무료",
     origin: "original-procedural",
     creator: {
-      id: "toonspectrum-lab",
-      name: "ToonSpectrum Lab",
+      id: "toonstudio-lab",
+      name: "ToonStudio Lab",
       verified: true,
     },
     version: input.version,

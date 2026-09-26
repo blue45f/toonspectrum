@@ -5,7 +5,7 @@
 - 연구 registry: `studio-research-registry.json`
 - 구현 큐: #557–#563
 
-이 문서는 “이름이 비슷한 버튼”을 만드는 백로그가 아니다. 제품과 논문에서 관찰한 장점을 ToonSpectrum의 엔진·문서·History·저장·브라우저 품질 기준으로 바꾸는 인테이크다.
+이 문서는 “이름이 비슷한 버튼”을 만드는 백로그가 아니다. 제품과 논문에서 관찰한 장점을 ToonStudio의 엔진·문서·History·저장·브라우저 품질 기준으로 바꾸는 인테이크다.
 
 ## 1. 신규 제품에서 흡수할 작업 방식
 
@@ -17,7 +17,7 @@
 - frame animation, onion skin, timeline을 그림 도구와 분리하지 않는 흐름
 - 명시적 계정 종속보다 로컬 파일과 빠른 시작을 앞세우는 진입 방식
 
-ToonSpectrum 적용:
+ToonStudio 적용:
 
 - raster와 vector가 동일한 document operation·selection·history boundary를 사용
 - 애니메이션 frame이 완전히 다른 편집기로 이동하지 않고 현재 페이지·레이어 상태를 유지
@@ -39,7 +39,7 @@ ToonSpectrum 적용:
 - TypeFlow의 template→텍스트 교체→실시간 preview→4K/고프레임 출력
 - Trangram의 vector morph, corner rounding, boolean, trim path
 
-ToonSpectrum 적용:
+ToonStudio 적용:
 
 - AI 또는 template 결과를 flatten video가 아닌 editable layer·effect graph·timeline clip으로 수신
 - 컷·말풍선·타이틀·효과음의 CSV/JSON variable binding과 episode variant batch
@@ -61,7 +61,7 @@ ToonSpectrum 적용:
 - 어떤 variant가 기본 표시인지 명시
 - 에이전트나 외부 도구가 자산을 조회·분류·변형하는 API 지향 workflow
 
-ToonSpectrum 적용:
+ToonStudio 적용:
 
 - 캐릭터 reference, 배경, 말풍선, 브러시, 3D capture를 하나의 asset family와 immutable revision으로 관리
 - variant마다 source hash, crop, transform, color space, generator provenance 저장
@@ -82,7 +82,7 @@ ToonSpectrum 적용:
 - shot planning과 character consistency
 - episode 단위 생성·검토·게시 흐름
 
-ToonSpectrum 적용:
+ToonStudio 적용:
 
 - panel suggestion을 절대 좌표 이미지가 아니라 panel graph와 shot metadata로 생성
 - camera·lens·angle·subject blocking을 3D·perspective ruler·2D camera와 연결
@@ -168,7 +168,7 @@ ToonSpectrum 적용:
 - 하나의 flatten 결과보다 여러 bitmap primitive와 layer를 최적화
 - 위치·크기·투명도·회전 같은 속성을 후편집 가능하게 유지
 
-ToonSpectrum 적용:
+ToonStudio 적용:
 
 - AI 생성·자동 레이아웃 결과를 independent raster primitive·mask·group으로 반환
 - primitive 수와 optimization budget을 명시
@@ -188,7 +188,7 @@ ToonSpectrum 적용:
 - 작은 데이터에서 controllable brushstroke primitive 생성
 - 기존 그림과 비교하며 부족한 영역을 선택적으로 보강
 
-ToonSpectrum 적용:
+ToonStudio 적용:
 
 - active stroke 중에는 모델 호출 금지
 - committed operation log에서 bounded context 생성
@@ -233,7 +233,7 @@ ToonSpectrum 적용:
 
 논문 코드를 그대로 실행했거나 demo가 보인다는 이유만으로 제품 기능으로 세지 않는다.
 
-1. canonical ToonSpectrum document representation
+1. canonical ToonStudio document representation
 2. deterministic fixture 또는 명시적 nondeterminism provenance
 3. CPU/reference 결과와 GPU/candidate 오차
 4. Undo all→Redo all 결과 검증

@@ -1,4 +1,4 @@
-import type { MusicBrief } from "@toonspectrum/core/studio-music";
+import type { MusicBrief } from "@toonstudio/core/studio-music";
 
 function readBoundedId(value: string | null | undefined): string {
   return typeof value === "string" && /^[a-zA-Z0-9_-]{1,80}$/u.test(value) ? value : "";

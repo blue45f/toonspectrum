@@ -5,7 +5,7 @@
   "userProfile.tabs.series": "系列",
   "userProfile.fetchError": "無法載入設定檔。",
   "userProfile.authorFallback": "使用者",
-  "userProfile.metaTemplate": "{author} 個人資料 · {reviews} 評論 · {works} 作品 · 平均評分 {avg} — ToonSpectrum。",
+  "userProfile.metaTemplate": "{author} 個人資料 · {reviews} 評論 · {works} 作品 · 平均評分 {avg} — ToonStudio。",
   "userProfile.follow": "跟隨",
   "userProfile.following": "下列的",
   "userProfile.works.empty": "該用戶還沒有公開作品。",

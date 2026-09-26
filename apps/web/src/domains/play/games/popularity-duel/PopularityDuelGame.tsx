@@ -4,7 +4,7 @@ import {
   startDuel,
   type DuelState,
   type Guess,
-} from "@toonspectrum/play-core";
+} from "@toonstudio/play-core";
 import { ChevronDown, ChevronUp, Eye, RotateCcw, Trophy } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 

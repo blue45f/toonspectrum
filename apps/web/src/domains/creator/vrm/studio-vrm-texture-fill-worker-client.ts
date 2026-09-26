@@ -78,7 +78,7 @@ export function createStudioVrmTextureFillModuleWorker(): StudioVrmTextureFillWo
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-vrm-texture-fill.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-vrm-texture-fill",
+    name: "toonstudio-vrm-texture-fill",
   }) as unknown as StudioVrmTextureFillWorkerLike;
 }
 

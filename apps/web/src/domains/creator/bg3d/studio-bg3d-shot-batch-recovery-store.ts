@@ -45,7 +45,7 @@ import type { StudioOpfsAssetStore } from "../studio-opfs-asset-store";
 import type { StudioOpfsStorageManagerLike } from "../studio-opfs-filesystem";
 
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_DATABASE_NAME =
-  "toonspectrum-studio-bg3d-shot-batch-recovery";
+  "toonstudio-studio-bg3d-shot-batch-recovery";
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_DATABASE_VERSION = 1;
 export const STUDIO_BG3D_SHOT_BATCH_RECOVERY_SQLITE_NAMESPACE =
   "studio-bg3d-shot-batch-recovery-v12";
@@ -177,7 +177,7 @@ export interface StudioBg3dShotBatchRecoverySession {
 }
 
 interface JobRecord {
-  readonly kind: "toonspectrum-bg3d-shot-batch-job";
+  readonly kind: "toonstudio-bg3d-shot-batch-job";
   readonly version: 1;
   readonly recoveryKey: string;
   readonly plan: StudioBg3dShotBatchPlan;
@@ -199,7 +199,7 @@ interface JobRecord {
 }
 
 interface ArtifactRecord {
-  readonly kind: "toonspectrum-bg3d-shot-batch-shot-artifacts";
+  readonly kind: "toonstudio-bg3d-shot-batch-shot-artifacts";
   readonly version: 1;
   readonly artifactKey: string;
   readonly recoveryKey: string;
@@ -211,7 +211,7 @@ interface ArtifactRecord {
 }
 
 interface LeaseRecord {
-  readonly kind: "toonspectrum-bg3d-shot-batch-lease";
+  readonly kind: "toonstudio-bg3d-shot-batch-lease";
   readonly version: 1;
   readonly recoveryKey: string;
   readonly ownerId: string;
@@ -223,7 +223,7 @@ interface LeaseRecord {
 }
 
 interface UsageRecord {
-  readonly kind: "toonspectrum-bg3d-shot-batch-usage";
+  readonly kind: "toonstudio-bg3d-shot-batch-usage";
   readonly version: 1;
   readonly key: typeof META_KEY;
   readonly revision: number;
@@ -595,7 +595,7 @@ function isJobRecord(value: unknown, plan: StudioBg3dShotBatchPlan): value is Jo
   const expectedJobStorageBytes = typeof job.sourceRevision === "string"
     ? estimateJobStorageBytes(job.plan, job.sourceRevision)
     : null;
-  return job.kind === "toonspectrum-bg3d-shot-batch-job" && job.version === 1 &&
+  return job.kind === "toonstudio-bg3d-shot-batch-job" && job.version === 1 &&
     job.recoveryKey === plan.resumeKey && job.plan?.resumeKey === plan.resumeKey &&
     typeof job.sourceRevision === "string" && isQueue(job.queue, plan) &&
     Number.isSafeInteger(job.revision) && job.revision >= 0 &&
@@ -625,7 +625,7 @@ function isLeaseRecord(value: unknown, recoveryKey: string): value is LeaseRecor
     "acquiredAt", "heartbeatAt", "expiresAt",
   ])) return false;
   const lease = value as LeaseRecord;
-  return lease.kind === "toonspectrum-bg3d-shot-batch-lease" && lease.version === 1 &&
+  return lease.kind === "toonstudio-bg3d-shot-batch-lease" && lease.version === 1 &&
     lease.recoveryKey === recoveryKey && typeof lease.ownerId === "string" &&
     lease.ownerId.length >= 1 && lease.ownerId.length <= 200 &&
     typeof lease.leaseToken === "string" && lease.leaseToken.length >= 1 &&
@@ -641,7 +641,7 @@ function isUsageRecord(value: unknown): value is UsageRecord {
     "structuredBytes", "jobCount", "updatedAt",
   ])) return false;
   const usage = value as UsageRecord;
-  return usage.kind === "toonspectrum-bg3d-shot-batch-usage" && usage.version === 1 &&
+  return usage.kind === "toonstudio-bg3d-shot-batch-usage" && usage.version === 1 &&
     usage.key === META_KEY && Number.isSafeInteger(usage.revision) && usage.revision >= 0 &&
     Number.isSafeInteger(usage.artifactBytes) && usage.artifactBytes >= 0 &&
     usage.artifactBytes <= STUDIO_BG3D_SHOT_BATCH_RECOVERY_ORIGIN_MAX_BYTES &&
@@ -666,7 +666,7 @@ function isGcJobRecord(value: unknown): value is JobRecord {
   const expectedJobStorageBytes = typeof job.sourceRevision === "string"
     ? estimateJobStorageBytes(job.plan, job.sourceRevision)
     : null;
-  return job.kind === "toonspectrum-bg3d-shot-batch-job" && job.version === 1 &&
+  return job.kind === "toonstudio-bg3d-shot-batch-job" && job.version === 1 &&
     typeof job.recoveryKey === "string" && RECOVERY_KEY_PATTERN.test(job.recoveryKey) &&
     typeof job.plan === "object" && job.plan !== null &&
     typeof job.sourceRevision === "string" && Number.isSafeInteger(job.revision) && job.revision >= 0 &&
@@ -702,7 +702,7 @@ function isGcArtifactRecord(value: unknown): value is ArtifactRecord {
     "storageBytes", "createdAt",
   ])) return false;
   const record = value as ArtifactRecord;
-  if (record.kind !== "toonspectrum-bg3d-shot-batch-shot-artifacts" || record.version !== 1 ||
+  if (record.kind !== "toonstudio-bg3d-shot-batch-shot-artifacts" || record.version !== 1 ||
     typeof record.recoveryKey !== "string" || !RECOVERY_KEY_PATTERN.test(record.recoveryKey) ||
     typeof record.shotId !== "string" || record.shotId.length < 1 || record.shotId.length > 160 ||
     record.artifactKey !== artifactKey(record.recoveryKey, record.shotId) ||
@@ -749,7 +749,7 @@ function isGcArtifactRecord(value: unknown): value is ArtifactRecord {
 
 function emptyUsage(now: number): UsageRecord {
   return {
-    kind: "toonspectrum-bg3d-shot-batch-usage",
+    kind: "toonstudio-bg3d-shot-batch-usage",
     version: 1,
     key: META_KEY,
     revision: 0,
@@ -774,7 +774,7 @@ function newJob(
     );
   }
   return {
-    kind: "toonspectrum-bg3d-shot-batch-job",
+    kind: "toonstudio-bg3d-shot-batch-job",
     version: 1,
     recoveryKey: plan.resumeKey,
     plan,
@@ -908,7 +908,7 @@ async function verifyArtifactRecords(
     }
     const record = value as ArtifactRecord;
     if (
-      record.kind !== "toonspectrum-bg3d-shot-batch-shot-artifacts" || record.version !== 1 ||
+      record.kind !== "toonstudio-bg3d-shot-batch-shot-artifacts" || record.version !== 1 ||
       record.artifactKey !== expectedKey || record.recoveryKey !== plan.resumeKey ||
       !plan.shots.some(({ shotId }) => shotId === record.shotId) ||
       record.artifactKey !== artifactKey(plan.resumeKey, record.shotId) ||
@@ -1001,17 +1001,17 @@ interface SqliteRecoveryCatalogEntry {
 }
 
 interface SqliteRecoveryCatalog {
-  readonly kind: "toonspectrum-bg3d-shot-batch-recovery-catalog";
+  readonly kind: "toonstudio-bg3d-shot-batch-recovery-catalog";
   readonly version: 1;
   readonly revision: number;
   readonly updatedAt: number;
   readonly entries: readonly SqliteRecoveryCatalogEntry[];
 }
 
-const SQLITE_CATALOG_KIND = "toonspectrum-bg3d-shot-batch-recovery-catalog";
+const SQLITE_CATALOG_KIND = "toonstudio-bg3d-shot-batch-recovery-catalog";
 const SQLITE_CATALOG_VERSION = 1;
 const SQLITE_HASH_PATTERN = /^sha256:([0-9a-f]{64})$/u;
-const SQLITE_CAS_ROOT = "toonspectrum-studio-assets";
+const SQLITE_CAS_ROOT = "toonstudio-studio-assets";
 
 function isSafeNonNegativeInteger(value: unknown): value is number {
   return Number.isSafeInteger(value) && (value as number) >= 0;
@@ -1110,7 +1110,7 @@ function isSqliteRecoveryArtifactRecord(value: unknown): value is SqliteRecovery
     "createdAt",
   ])) return false;
   const record = value as SqliteRecoveryArtifactRecord;
-  return record.kind === "toonspectrum-bg3d-shot-batch-shot-artifacts" && record.version === 1 &&
+  return record.kind === "toonstudio-bg3d-shot-batch-shot-artifacts" && record.version === 1 &&
     typeof record.artifactKey === "string" && typeof record.recoveryKey === "string" &&
     typeof record.shotId === "string" &&
     record.artifactKey === artifactKey(record.recoveryKey, record.shotId) &&
@@ -1916,7 +1916,7 @@ class LegacyIndexedDbStudioBg3dShotBatchRecoveryStore
         throwIfAborted(signal);
         const leaseNow = this.now();
         const lease: LeaseRecord = {
-          kind: "toonspectrum-bg3d-shot-batch-lease",
+          kind: "toonstudio-bg3d-shot-batch-lease",
           version: 1,
           recoveryKey: plan.resumeKey,
           ownerId: this.ownerId,
@@ -1978,7 +1978,7 @@ class LegacyIndexedDbStudioBg3dShotBatchRecoveryStore
     }
     const fence = (record.lease?.fence ?? 0) + 1;
     const lease: LeaseRecord = {
-      kind: "toonspectrum-bg3d-shot-batch-lease",
+      kind: "toonstudio-bg3d-shot-batch-lease",
       version: 1,
       recoveryKey: plan.resumeKey,
       ownerId: this.ownerId,
@@ -2304,7 +2304,7 @@ class LegacyIndexedDbStudioBg3dShotBatchRecoveryStore
       if (!verified) continue;
       const existingKey = artifactKey(session.plan.resumeKey, shot.shotId);
       records.set(existingKey, withArtifactStorageBytes({
-        kind: "toonspectrum-bg3d-shot-batch-shot-artifacts",
+        kind: "toonstudio-bg3d-shot-batch-shot-artifacts",
         version: 1,
         artifactKey: existingKey,
         recoveryKey: session.plan.resumeKey,
@@ -2330,7 +2330,7 @@ class LegacyIndexedDbStudioBg3dShotBatchRecoveryStore
     }
     this.stopHeartbeat(session.plan.resumeKey);
     const lease: LeaseRecord = {
-      kind: "toonspectrum-bg3d-shot-batch-lease",
+      kind: "toonstudio-bg3d-shot-batch-lease",
       version: 1,
       recoveryKey: session.plan.resumeKey,
       ownerId: session.ownerId,
@@ -2341,7 +2341,7 @@ class LegacyIndexedDbStudioBg3dShotBatchRecoveryStore
       expiresAt: now + STUDIO_BG3D_SHOT_BATCH_RECOVERY_LEASE_MS,
     };
     const job: JobRecord = {
-      kind: "toonspectrum-bg3d-shot-batch-job",
+      kind: "toonstudio-bg3d-shot-batch-job",
       version: 1,
       recoveryKey: session.plan.resumeKey,
       plan: session.plan,
@@ -2398,7 +2398,7 @@ class LegacyIndexedDbStudioBg3dShotBatchRecoveryStore
         }
       }
       const durableLeaseIdentity: LeaseRecord = {
-        kind: "toonspectrum-bg3d-shot-batch-lease",
+        kind: "toonstudio-bg3d-shot-batch-lease",
         version: 1,
         recoveryKey: session.plan.resumeKey,
         ownerId: session.ownerId,
@@ -2531,7 +2531,7 @@ class LegacyIndexedDbStudioBg3dShotBatchRecoveryStore
     const key = artifactKey(session.plan.resumeKey, token.shotId);
     const createdAt = this.now();
     const record = withArtifactStorageBytes({
-      kind: "toonspectrum-bg3d-shot-batch-shot-artifacts",
+      kind: "toonstudio-bg3d-shot-batch-shot-artifacts",
       version: 1,
       artifactKey: key,
       recoveryKey: session.plan.resumeKey,

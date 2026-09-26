@@ -1,4 +1,4 @@
-import { triggerParticleBurst } from "@toonspectrum/core/fx";
+import { triggerParticleBurst } from "@toonstudio/core/fx";
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/shared/lib/utils";
@@ -8,7 +8,7 @@ import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
  * SplashScreen — 웹 앱의 동적 인트로/스플래시.
  *
  * IntroSplash 디자인(TOONSPECTRUM 워드마크 + 스펙트럼 링 + 책 로고)을
- * Tailwind + 공유 fx(@toonspectrum/core/fx)로 재구성합니다.
+ * Tailwind + 공유 fx(@toonstudio/core/fx)로 재구성합니다.
  *
  * 모바일 폭 안전:
  *  - 루트는 `fixed inset-0` + `max-w-full overflow-hidden` 으로 가로 오버플로 0.
@@ -27,7 +27,7 @@ import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
  *
  * @example App 에서
  *   import { SplashScreen } from "@/shared/components/SplashScreen";
- *   import "@toonspectrum/core/fx/fx.css"; // (이미 전역 import 되어 있으면 생략)
+ *   import "@toonstudio/core/fx/fx.css"; // (이미 전역 import 되어 있으면 생략)
  *   <SplashScreen />
  *   // 세션 1회만 노출(기본). 매 마운트 노출하려면 <SplashScreen once={false} />
  */
@@ -42,7 +42,7 @@ export interface SplashScreenProps {
   onDone?: () => void;
 }
 
-const SESSION_KEY = "toonspectrum-intro-shown";
+const SESSION_KEY = "toonstudio-intro-shown";
 
 const SPECTRUM_DOTS = [
   { className: "top-0 left-1/2 -translate-x-1/2", color: "#ff3b30" },

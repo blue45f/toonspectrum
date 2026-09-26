@@ -3,14 +3,14 @@ import { createHash } from "node:crypto";
 
 import { Injectable } from "@nestjs/common";
 
-import { canonicalJson, reviewAnchorSchema, scopeContains, scopeRefSchema, validateStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
-import { STUDIO_WORLD_ARTIFACT_PREFIX } from "@toonspectrum/studio-project-model/world-publication";
-import { STUDIO_WORK_SESSION_ARTIFACT_PREFIX } from "@toonspectrum/studio-project-model/work-session";
+import { canonicalJson, reviewAnchorSchema, scopeContains, scopeRefSchema, validateStudioReviewSpatialAnchor } from "@toonstudio/studio-project-model";
+import { STUDIO_WORLD_ARTIFACT_PREFIX } from "@toonstudio/studio-project-model/world-publication";
+import { STUDIO_WORK_SESSION_ARTIFACT_PREFIX } from "@toonstudio/studio-project-model/work-session";
 import {
   compatibilityReportSchema,
   createCompatibilityReport,
   type CompatibilityReport,
-} from "@toonspectrum/studio-format-gateway";
+} from "@toonstudio/studio-format-gateway";
 import type { PoolClient } from "pg";
 import { STUDIO_REVIEW_PREVIEW_PAGE_SIZE, type StudioReviewPreviewBlobRow,
   type StudioReviewPreviewSource, type StudioReviewPreviewSubject } from "./studio-review-preview";

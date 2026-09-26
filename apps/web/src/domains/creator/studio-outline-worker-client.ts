@@ -73,7 +73,7 @@ export function createStudioOutlineModuleWorker(): StudioOutlineWorkerLike | nul
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-outline.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-outline-edt",
+    name: "toonstudio-outline-edt",
   }) as unknown as StudioOutlineWorkerLike;
 }
 

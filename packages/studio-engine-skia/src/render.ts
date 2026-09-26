@@ -1,4 +1,4 @@
-import { UnsupportedSceneFeatureError } from "@toonspectrum/studio-project-model";
+import { UnsupportedSceneFeatureError } from "@toonstudio/studio-project-model";
 
 import type {
   BlendModeIR,
@@ -10,7 +10,7 @@ import type {
   SceneNodeIR,
   StrokePathNodeIR,
   TextNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import type {
   BlendMode,
   Canvas,

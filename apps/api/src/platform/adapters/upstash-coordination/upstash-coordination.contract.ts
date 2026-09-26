@@ -2,7 +2,7 @@ import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 
 export const UPSTASH_COORDINATION_CONTRACT_VERSION =
-  "toonspectrum.upstash-coordination.v1" as const;
+  "toonstudio.upstash-coordination.v1" as const;
 
 export const UpstashCoordinationScopeSchema = z.enum([
   "provider-dispatch",

@@ -49,11 +49,11 @@ try {
       serviceWorkers: "block",
     });
     await context.addInitScript(({ key, now }) => {
-      localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+      localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
       // Keep the creator-home assertions in the deterministic task view. The install prompt
       // is verified later on a public route because immersive workspace chrome does not own it.
       localStorage.setItem(
-        "toonspectrum-creator-experience-mode-v1",
+        "toonstudio-creator-experience-mode-v1",
         JSON.stringify({ mode: "classic" }),
       );
       // Seed once: init scripts run again on reload and must not overwrite normalization.

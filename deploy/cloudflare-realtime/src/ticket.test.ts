@@ -20,8 +20,8 @@ function claims(
 ): RealtimeTicketClaims {
   return {
     version: REALTIME_TICKET_VERSION,
-    issuer: "toonspectrum-api",
-    audience: "toonspectrum-realtime",
+    issuer: "toonstudio-api",
+    audience: "toonstudio-realtime",
     subject: "artist-1",
     sessionVersion: 4,
     authorizationEpochMs: NOW - 5_000,
@@ -39,8 +39,8 @@ function claims(
 }
 
 const expectation = {
-  issuer: "toonspectrum-api",
-  audience: "toonspectrum-realtime",
+  issuer: "toonstudio-api",
+  audience: "toonstudio-realtime",
   workId: "work-1",
   roomId: "room-1",
   origin: "https://toonstudio.cloud",

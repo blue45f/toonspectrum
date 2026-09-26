@@ -63,7 +63,7 @@ describe("material brush controls inside Studio", () => {
     render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material }} onChange={vi.fn()} />);
     const action = screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" });
     expect(screen.queryByRole("link", { name: "브러시 편집기에서 비교·실험" })).toBeNull();
-    const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
+    const storageKey = `toonstudio.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
     navigate.mockImplementation(() => {
       expect(JSON.parse(localStorage.getItem(storageKey)!).tuning).toEqual(material.tuning);
     });
@@ -71,7 +71,7 @@ describe("material brush controls inside Studio", () => {
     expect(navigate).not.toHaveBeenCalled();
     expect(localStorage.getItem(storageKey)).toBeNull();
     fireEvent.click(action, { metaKey });
-    const program = JSON.parse(localStorage.getItem(`toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`)!);
+    const program = JSON.parse(localStorage.getItem(`toonstudio.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`)!);
     expect(program.tuning).toEqual(material.tuning);
     expect(program.input).toEqual(material.input);
     expect(program.slots).toEqual(material.slots);
@@ -98,7 +98,7 @@ describe("material brush controls inside Studio", () => {
     rerender(<StudioBrushEngineProgramControls brushId="brush" programSet={programSet}
       currentSnapshot={{ strokeWidth: 150, brushOpacity: 0.01, color: "#34ab67" }} onChange={onChange} />);
     fireEvent.click(screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" }));
-    const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
+    const storageKey = `toonstudio.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
     const draft = JSON.parse(localStorage.getItem(storageKey)!);
     expect(draft.tuning).toEqual({ ...material.tuning, size: 150, opacity: 0.01, primaryColor: "#34ab67" });
     expect(draft.slots).toEqual(material.slots);
@@ -144,7 +144,7 @@ describe("material brush controls inside Studio", () => {
     render(<StudioBrushEngineProgramControls brushId="brush" programSet={{ version: 1, material }} onChange={vi.fn()} />);
     const button = screen.getByRole("button", { name: "브러시 편집기에서 비교·실험" });
     fireEvent.click(button);
-    const key = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
+    const key = `toonstudio.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
     const first = localStorage.getItem(key);
     fireEvent.click(button);
     expect(navigate.mock.calls[0]![0]).not.toBe(navigate.mock.calls[1]![0]);

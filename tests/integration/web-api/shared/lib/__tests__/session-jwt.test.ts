@@ -18,7 +18,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-const DEV_FALLBACK_SECRET = "toonspectrum-insecure-dev-session-secret";
+const DEV_FALLBACK_SECRET = "toonstudio-insecure-dev-session-secret";
 function sessionSecret(): string {
   return process.env.AUTH_SESSION_SECRET || process.env.AUTH_STATE_SECRET || DEV_FALLBACK_SECRET;
 }
@@ -39,8 +39,8 @@ describe("세션 JWT(HS256) 발급/검증", () => {
     expect(payload).toMatchObject({
       sub: "user-payload",
       sv: 3,
-      iss: "toonspectrum",
-      aud: "toonspectrum-web",
+      iss: "toonstudio",
+      aud: "toonstudio-web",
     });
     expect(payload.iat).toBe(1_000_000_000);
     expect(payload.exp).toBe(Math.floor((1_000_000_000_000 + SESSION_TOKEN_TTL_MS) / 1000));
@@ -51,7 +51,7 @@ describe("세션 JWT(HS256) 발급/검증", () => {
     const [h, p, sig] = token.split(".");
     expect(verifySession(`${h}.${p}.${sig.slice(0, -2)}xy`)).toBeNull();
     // payload 변조 → 서명 불일치
-    const forgedPayload = Buffer.from(JSON.stringify({ sub: "attacker", sv: 1, iss: "toonspectrum", aud: "toonspectrum-web", iat: 1, exp: 9_999_999_999 })).toString("base64url");
+    const forgedPayload = Buffer.from(JSON.stringify({ sub: "attacker", sv: 1, iss: "toonstudio", aud: "toonstudio-web", iat: 1, exp: 9_999_999_999 })).toString("base64url");
     expect(verifySession(`${h}.${forgedPayload}.${sig}`)).toBeNull();
   });
 
@@ -59,12 +59,12 @@ describe("세션 JWT(HS256) 발급/검증", () => {
     // 올바른 비밀로 '제대로 서명된' 토큰이지만 aud 가 다르면 거부돼야 한다(서명 검증을 통과한 뒤 claim 검증).
     const secret = sessionSecret();
     const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-    const body = Buffer.from(JSON.stringify({ sub: "user-aud", sv: 1, iss: "toonspectrum", aud: "someone-else", iat: 1, exp: 9_999_999_999 })).toString("base64url");
+    const body = Buffer.from(JSON.stringify({ sub: "user-aud", sv: 1, iss: "toonstudio", aud: "someone-else", iat: 1, exp: 9_999_999_999 })).toString("base64url");
     const sig = createHmac("sha256", secret).update(`${header}.${body}`).digest("base64url");
     expect(verifySession(`${header}.${body}.${sig}`)).toBeNull();
 
     // iss 가 다른 경우도 동일하게 거부.
-    const body2 = Buffer.from(JSON.stringify({ sub: "user-iss", sv: 1, iss: "evil", aud: "toonspectrum-web", iat: 1, exp: 9_999_999_999 })).toString("base64url");
+    const body2 = Buffer.from(JSON.stringify({ sub: "user-iss", sv: 1, iss: "evil", aud: "toonstudio-web", iat: 1, exp: 9_999_999_999 })).toString("base64url");
     const sig2 = createHmac("sha256", secret).update(`${header}.${body2}`).digest("base64url");
     expect(verifySession(`${header}.${body2}.${sig2}`)).toBeNull();
   });
@@ -111,8 +111,8 @@ describe("Studio 실시간 단기 입장권 경계", () => {
     expect(payload).toMatchObject({
       sub: principal.userId,
       sv: principal.sessionVersion,
-      iss: "toonspectrum",
-      aud: "toonspectrum-studio-live",
+      iss: "toonstudio",
+      aud: "toonstudio-studio-live",
       sexp: Math.floor(principal.expiresAt / 1_000),
     });
     expect(payload.jti).toMatch(

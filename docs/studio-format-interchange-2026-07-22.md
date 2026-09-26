@@ -1,4 +1,4 @@
-# ToonSpectrum Studio 포맷 상호운용 감사 및 확장안
+# ToonStudio Studio 포맷 상호운용 감사 및 확장안
 
 작성일: 2026-07-22
 
@@ -23,7 +23,7 @@
 | 포맷 | 가져오기 | 내보내기 | 왕복 | 현재 손실·제약 |
 | --- | --- | --- | --- | --- |
 | `.toonproject.zip` | 사용 가능 | 사용 가능 | 무손실 | 현재 writer의 deterministic ZIP subset만 허용. 280MB archive, 256MB attachment 합계 한도 |
-| ToonSpectrum `.json` | 사용 가능 | 사용 가능 | 부분 | 외부 URL/IndexedDB 원본은 JSON 한 파일에 포함되지 않을 수 있음 |
+| ToonStudio `.json` | 사용 가능 | 사용 가능 | 부분 | 외부 URL/IndexedDB 원본은 JSON 한 파일에 포함되지 않을 수 있음 |
 | PSD | 부분 | 부분 | 부분 | 텍스트·벡터·스마트 오브젝트·조정 레이어·일부 효과/그룹/마스크를 래스터화 또는 근사 |
 | SVG | 미지원 | 사용 가능 | 없음 | 일부 브러시·래스터 효과를 근사 또는 이미지로 출력 |
 | PDF 1.4 | 미지원 | 사용 가능 | 없음 | 페이지별 JPEG를 담은 공유·검토용 PDF. 편집 가능한 텍스트/벡터 및 PDF/X 아님 |
@@ -100,7 +100,7 @@ Canvas 한 변 16,384px 한도 안에서 배율을 낮추거나 여러 파일로
 | Adobe ACT | 사용 가능 | 사용 가능 | 768/772-byte table, 최대 256색. 색 이름 미지원과 투명 인덱스 손실을 경고 |
 | JASC-PAL | 사용 가능 | 사용 가능 | 최대 256색, 색 이름 미지원 손실을 경고 |
 | CSS custom properties | 사용 가능 | 사용 가능 | `--name: <hex/rgb>` 교환. 팔레트 라이브러리 UI 연결됨 |
-| ToonSpectrum palette JSON | 사용 가능 | 사용 가능 | versioned canonical schema. 팔레트 라이브러리 UI 연결됨 |
+| ToonStudio palette JSON | 사용 가능 | 사용 가능 | versioned canonical schema. 팔레트 라이브러리 UI 연결됨 |
 
 새 팔레트 엔진 `studio-palette-interchange.ts`의 공통 정책은 다음과 같다.
 

@@ -1,6 +1,6 @@
 import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { lazy, Suspense } from "react";
-import { SITE_URL } from "@toonspectrum/core/business";
+import { SITE_URL } from "@toonstudio/core/business";
 import { PenLine } from "lucide-react";
 import { useParams } from "react-router-dom";
 
@@ -67,7 +67,7 @@ export function AuthorPage() {
   );
 
   useDocumentTitle(author || "작가");
-  useMetaDescription(data ? `${shareDescription} — 툰스펙트럼에서 작가별로 모아 봅니다.` : null);
+  useMetaDescription(data ? `${shareDescription} — 툰스튜디오에서 작가별로 모아 봅니다.` : null);
   usePageSocialMeta({
     canonicalPath: sharePath,
     title: `${author} 작가`,

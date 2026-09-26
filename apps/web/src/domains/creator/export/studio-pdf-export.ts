@@ -142,7 +142,7 @@ export function buildPdfFromJpegPages(pages: PdfJpegPage[], opts?: BuildPdfOptio
 
   const title = opts?.title?.trim();
   const titleEntry = title ? `/Title ${pdfHexTextString(title)} ` : "";
-  pushObject(infoObjNum, `<< ${titleEntry}/Producer (ToonSpectrum Studio) >>`);
+  pushObject(infoObjNum, `<< ${titleEntry}/Producer (ToonStudio Studio) >>`);
 
   // xref — 엔트리는 정확히 20바이트(오프셋 10 + 공백 + 세대 5 + 공백 + 타입 + " \n").
   const xrefOffset = offset;
@@ -183,7 +183,7 @@ export async function canvasToJpegBytes(
 
 /** PDF 파일명 — `<제목>.pdf`(빈 제목은 기본 파일명). */
 export function pdfExportFileName(title: string): string {
-  return `${title.trim() || "toonspectrum-webtoon"}.pdf`;
+  return `${title.trim() || "toonstudio-webtoon"}.pdf`;
 }
 
 /** 파일 크기 한글 안내 표기 — 1MB 미만은 KB(최소 1KB), 이상은 소수 1자리 MB. */

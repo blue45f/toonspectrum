@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-09-02",
-  "purpose": "Supplemental official-source registry for young companies, browser-native editors, creative startups, and rapidly changing tools that can reveal product-quality ideas not covered by the mature-product benchmark. Entries are watched for capability changes and converted into ToonSpectrum implementation work rather than copied blindly.",
+  "purpose": "Supplemental official-source registry for young companies, browser-native editors, creative startups, and rapidly changing tools that can reveal product-quality ideas not covered by the mature-product benchmark. Entries are watched for capability changes and converted into ToonStudio implementation work rather than copied blindly.",
   "products": [
     {
       "id": "enkava",

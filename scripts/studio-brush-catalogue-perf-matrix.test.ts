@@ -172,7 +172,7 @@ const HONEST_CRAYON = [123.8, 116.8, 130.4, 123.3, 191.5] as const;
 const HONEST_LIGHTEST = [58.7, 57.6, 55.3, 54.0] as const;
 
 describe("reduceStudioBrushCrayonFamilyGrowth", () => {
-  // The reading that red-flagged blue45f/toonspectrum#81, a PR carrying only VRM binaries and a
+  // The reading that red-flagged blue45f/toonstudio#81, a PR carrying only VRM binaries and a
   // Blender script. CI reported "13.2ms -> 107.8ms" for x8.20, and those two numbers are each
   // side's own minimum across five passes -- so they are from DIFFERENT passes. Pass 2 has the
   // cheapest short leg because the JIT was warm by then; its long leg is the slowest of the five

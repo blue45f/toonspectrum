@@ -25,7 +25,7 @@ import { createServer as createViteServer } from "vite";
 const SCRATCH =
   process.env.TOONSPECTRUM_WEBGPU_PRESENTATION_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-webgpu-presentation-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-webgpu-presentation-${Date.now()}`);
 const HARNESS_PATH = "/__studio_engine_webgpu_presentation__";
 const HARNESS_ENTRY = "/scripts/studio-engine-webgpu-presentation-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;

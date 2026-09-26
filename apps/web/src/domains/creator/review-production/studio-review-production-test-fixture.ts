@@ -1,4 +1,4 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 
 import { createEmptyProductionWorkspace } from "../studio-production/studio-production-workspace-runtime";
 import type { StudioVirtualSpaceVerifiedReview } from "../virtual-space/studio-virtual-space-review-invitation";

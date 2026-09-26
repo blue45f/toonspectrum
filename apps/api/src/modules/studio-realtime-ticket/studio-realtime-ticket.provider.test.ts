@@ -18,8 +18,8 @@ const SECRET = "cloudflare-realtime-ticket-secret-2026-01";
 const CONFIGURATION: CloudflareStudioRealtimeTicketSignerConfiguration = {
   providerId: "cloudflare-realtime-seoul",
   provider: "cloudflare",
-  issuer: "toonspectrum-api",
-  audience: "toonspectrum-realtime",
+  issuer: "toonstudio-api",
+  audience: "toonstudio-realtime",
   hmacSecret: SECRET,
   ticketTtlSeconds: 120,
   sessionTtlSeconds: 5 * 60,

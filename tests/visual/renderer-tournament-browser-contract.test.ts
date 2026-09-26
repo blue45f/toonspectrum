@@ -112,8 +112,8 @@ describe("renderer tournament real Chromium evidence contract", () => {
     const orchestrator = readFileSync(ORCHESTRATOR_URL, "utf8");
     const bootstrap = createRendererTournamentCspBootstrapSource();
 
-    expect(page).toContain('import("@toonspectrum/studio-engine-vello")');
-    expect(page).toContain('import("@toonspectrum/studio-engine-skia")');
+    expect(page).toContain('import("@toonstudio/studio-engine-vello")');
+    expect(page).toContain('import("@toonstudio/studio-engine-skia")');
     expect(page).toContain('import("canvaskit-wasm")');
     expect(page).toContain("performance.now()");
     expect(page).toContain("renderSceneToPixelsGpu");

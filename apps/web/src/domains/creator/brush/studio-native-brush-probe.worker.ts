@@ -4,7 +4,7 @@ import {
 } from "./studio-native-brush-probe-contract";
 
 import type { NativeBrushProbeConfig, NativeBrushProbeEngine, NativeBrushProbeFrame, NativeBrushProbeReply, NativeBrushProbeRequest, NativeBrushProbeSample, NativeBrushSurface } from "./studio-native-brush-probe-contract";
-import type { LibMypaintIncrementalStrokeSession } from "@toonspectrum/studio-brush-platform/libmypaint";
+import type { LibMypaintIncrementalStrokeSession } from "@toonstudio/studio-brush-platform/libmypaint";
 
 
 import { nativeBrushProbeMybDocument, nativeBrushProbeScene } from "./studio-native-brush-probe-program";
@@ -20,8 +20,8 @@ let config: NativeBrushProbeConfig | null = null;
 let samples: NativeBrushProbeSample[] = [];
 let native: LibMypaintIncrementalStrokeSession | null = null;
 let mypaint: Awaited<ReturnType<typeof import("../../../../../../packages/studio-brush-platform/src/libmypaint/index").loadLibMypaint>> | null = null;
-let skia: ReturnType<typeof import("@toonspectrum/studio-engine-skia").createSkiaGpuIslandBackend> | null = null;
-let vello: typeof import("@toonspectrum/studio-engine-vello") | null = null;
+let skia: ReturnType<typeof import("@toonstudio/studio-engine-skia").createSkiaGpuIslandBackend> | null = null;
+let vello: typeof import("@toonstudio/studio-engine-vello") | null = null;
 let device: GPUDevice | null = null;
 let gpuCanvas: OffscreenCanvas | null = null;
 let gpuContext: GPUCanvasContext | null = null;
@@ -45,7 +45,7 @@ async function initialize(selected: NativeBrushProbeEngine) {
     ]);
     mypaint = await raw.loadLibMypaint({ wasmUrl: wasm.default });
   } else if (selected === "canvaskit") {
-    const { createSkiaGpuIslandBackend } = await import("@toonspectrum/studio-engine-skia");
+    const { createSkiaGpuIslandBackend } = await import("@toonstudio/studio-engine-skia");
     skia = createSkiaGpuIslandBackend();
     const warm = await skia.render({ islandId: "test-prewarm", width: surface.width, height: surface.height, revision: 0,
       scene: { version: 11, width: surface.width, height: surface.height, background: { r: 0, g: 0, b: 0, a: 0 }, nodes: [] } });
@@ -58,7 +58,7 @@ async function initialize(selected: NativeBrushProbeEngine) {
     device = await adapter.requestDevice();
     void device.lost.then(() => { failed = true; });
     device.addEventListener("uncapturederror", () => { failed = true; });
-    vello = await import("@toonspectrum/studio-engine-vello");
+    vello = await import("@toonstudio/studio-engine-vello");
     await vello.loadVelloGpuBrowser(); await vello.adoptGpuDevice(device);
     gpuCanvas = new OffscreenCanvas(surface.width, surface.height);
     const context = gpuCanvas.getContext("webgpu") as unknown as GPUCanvasContext | null;
@@ -147,7 +147,7 @@ async function execute(request: NativeBrushProbeRequest): Promise<NativeBrushPro
     native?.dispose(); native = null;
     config = { ...request.config }; samples = []; begun = true;
     if (mypaint) {
-      const { createLibMypaintIncrementalStrokeSession } = await import("@toonspectrum/studio-brush-platform/libmypaint");
+      const { createLibMypaintIncrementalStrokeSession } = await import("@toonstudio/studio-brush-platform/libmypaint");
       native = createLibMypaintIncrementalStrokeSession(mypaint, nativeBrushProbeMybDocument(config), { width: surface.width, height: surface.height, seed: config.seed });
       if (native.settings.unknownSettings.length || native.settings.unknownInputs.length) throw new Error("Unsupported native test settings");
     }

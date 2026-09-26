@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState } from "react";
-import { studioWorldInteractionRuleSchema, type StudioWorldInteractionRule } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldInteractionRuleSchema, type StudioWorldInteractionRule } from "@toonstudio/studio-project-model/world-publication";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { studioWorldInteractions, validateStudioWorldManifest, type StudioVirtualSpaceWorldManifest as World } from "./studio-virtual-space-world-manifest";

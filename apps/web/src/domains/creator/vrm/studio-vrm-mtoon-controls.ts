@@ -19,7 +19,7 @@ import {
   type StudioVrmMtoonBrand,
 } from "./studio-vrm-mtoon-brand";
 
-export const STUDIO_VRM_MTOON_CONTROLS_KIND = "toonspectrum.vrm-mtoon-controls" as const;
+export const STUDIO_VRM_MTOON_CONTROLS_KIND = "toonstudio.vrm-mtoon-controls" as const;
 export const STUDIO_VRM_MTOON_CONTROLS_VERSION = 1 as const;
 
 /** @pixiv/three-vrm-materials-mtoon 의 `MToonMaterialOutlineWidthMode` 문자열 값과 동일하다. */

@@ -7,7 +7,7 @@
  * browser Storage implementation automatically.
  */
 
-export const STUDIO_BACKGROUND_RECENT_KEY = "toonspectrum-studio-bg-recent:v1";
+export const STUDIO_BACKGROUND_RECENT_KEY = "toonstudio-studio-bg-recent:v1";
 export const STUDIO_BACKGROUND_RECENT_MAX = 20;
 export const STUDIO_BACKGROUND_RECENT_VERSION = 1 as const;
 

@@ -4,7 +4,7 @@ import {
   type StudioSkiaDocumentCamera,
 } from "./studio-skia-camera-continuity";
 import { useLayoutEffect, useRef, useState } from "react";
-import type { SkiaDocumentRenderer } from "@toonspectrum/studio-engine-skia";
+import type { SkiaDocumentRenderer } from "@toonstudio/studio-engine-skia";
 import type { StudioSkiaDocumentPresentationCandidate } from "../studio-skia-committed-ink-bridge";
 import type { StudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import { createStudioSkiaDocumentProjector } from "./studio-skia-document-plan";
@@ -503,7 +503,7 @@ export function StudioSkiaDocumentSurface({ enabled, mountParent, width, height,
     submitted.current = submit;
     report("starting", latest.current.sceneRevision, []);
     void Promise.all([
-      import("@toonspectrum/studio-engine-skia"),
+      import("@toonstudio/studio-engine-skia"),
       import("./studio-skia-document-font-source"),
     ]).then(([module, fontSource]) => {
       if (!alive || generation.current !== scope) return;

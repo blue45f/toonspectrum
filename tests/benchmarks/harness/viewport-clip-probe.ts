@@ -17,9 +17,9 @@ import type { Page } from "playwright";
 
 export const REPO_ROOT = new URL("../../..", import.meta.url).pathname;
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 
 export const FRAME_BUDGET_MS = 16.667;
 

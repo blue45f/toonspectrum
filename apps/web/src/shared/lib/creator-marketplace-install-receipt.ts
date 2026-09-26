@@ -8,7 +8,7 @@ import {
 import type { CreatorMarketplaceResourceKind } from "./creator-marketplace-resource-contract";
 
 export const CREATOR_MARKETPLACE_INSTALL_RECEIPT_STORAGE_KEY =
-  "toonspectrum.creator-marketplace-install-receipts.v1" as const;
+  "toonstudio.creator-marketplace-install-receipts.v1" as const;
 export const CREATOR_MARKETPLACE_INSTALL_RECEIPT_EVENT =
   "toonspectrum:creator-marketplace-install-receipt" as const;
 export const CREATOR_MARKETPLACE_INSTALL_RECEIPT_MAX_ENTRIES = 64;

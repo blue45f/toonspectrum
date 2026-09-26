@@ -21,12 +21,12 @@ import type {
   RevisionKind,
   ReviewAnchor,
   ScopeRef,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import type {
   CompatibilityItem,
   CompatibilitySummary,
   SourceCreativeFormat,
-} from "@toonspectrum/studio-format-gateway";
+} from "@toonstudio/studio-format-gateway";
 
 import { users } from "./auth.schema";
 import { creatorWorks } from "./creator.schema";

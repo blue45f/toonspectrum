@@ -4,7 +4,7 @@
 
 ## 목표
 
-툰스펙트럼의 장면·작품 설정을 무료 또는 로컬 AI 음악 도구로 안전하게 넘기고,
+툰스튜디오의 장면·작품 설정을 무료 또는 로컬 AI 음악 도구로 안전하게 넘기고,
 생성 파일·라이선스·출처를 확인한 뒤 작품 BGM 또는 사이트 OST 후보로 연결한다.
 외부 서비스 결과를 자동 게시하거나 브라우저 번들에 API 키를 넣지 않는다.
 
@@ -99,7 +99,7 @@ elevenlabs auth login
 ### ACE-Step 1.5
 
 ```bash
-cd ~/.cache/toonspectrum-ace-step-1.5
+cd ~/.cache/toonstudio-ace-step-1.5
 uv run acestep-api --host 127.0.0.1 --port 8001
 python cli.py
 ```

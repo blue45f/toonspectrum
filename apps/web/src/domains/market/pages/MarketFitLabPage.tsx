@@ -76,7 +76,7 @@ export function MarketFitLabPage() {
   useMetaDescription(MARKET_FIT_DESCRIPTION);
   usePageSocialMeta({
     canonicalPath: "/market/fit",
-    title: "제작 적합성 랩 · 툰스펙트럼",
+    title: "제작 적합성 랩 · 툰스튜디오",
     description: MARKET_FIT_DESCRIPTION,
   });
 

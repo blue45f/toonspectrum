@@ -281,7 +281,7 @@ export function migrateLegacyUserAi(): boolean {
   if (snapshot.configuration.connections.length) {
     throw new Error("기존 통합 연결을 자동 덮어쓰지 않습니다. 연결을 먼저 보관하세요.");
   }
-  const key = "toonspectrum-studio-ai-settings";
+  const key = "toonstudio-studio-ai-settings";
   const sources = [globalThis.sessionStorage, storage()];
   const raw = sources.map((source) => source.getItem(key)).find(Boolean);
   if (!raw) return false;

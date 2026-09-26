@@ -283,7 +283,7 @@ export function useStudioHybridDccPersistence(
         return null;
       }
       const selection = await selectStudioOpfsFileSystem(globalThis, {
-        rootName: "toonspectrum-hybrid-dcc-v1",
+        rootName: "toonstudio-hybrid-dcc-v1",
       });
       if (recoveryTimedOut) return null;
       if (selection.kind !== "opfs") {

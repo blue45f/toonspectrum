@@ -26,7 +26,7 @@ import {
 } from "./studio-shared-3d-stage-document";
 
 export const STUDIO_SHARED_3D_STAGE_COLLECTION_KIND =
-  "toonspectrum.studio-shared-3d-stage-collection" as const;
+  "toonstudio.studio-shared-3d-stage-collection" as const;
 export const STUDIO_SHARED_3D_STAGE_COLLECTION_VERSION = 3 as const;
 export const STUDIO_SHARED_3D_STAGE_COLLECTION_PAGED_VERSION = 4 as const;
 const STUDIO_SHARED_3D_STAGE_COLLECTION_LEGACY_VERSION = 2 as const;
@@ -1185,7 +1185,7 @@ export function planStudioShared3dStageCharacterPlacementUpdate<
 
   const afterPlacementHash = studioShared3dCharacterStageTransformHash(transform);
   const receipt: StudioShared3dCharacterTransformReceipt = Object.freeze({
-    kind: "toonspectrum.shared-3d-character-transform-receipt" as const,
+    kind: "toonstudio.shared-3d-character-transform-receipt" as const,
     version: 1 as const,
     elementId,
     beforeSourceHash: source.sourceHash,

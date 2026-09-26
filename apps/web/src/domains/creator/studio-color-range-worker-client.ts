@@ -77,7 +77,7 @@ export function createStudioColorRangeModuleWorker(): StudioColorRangeWorkerLike
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-color-range.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-color-range",
+    name: "toonstudio-color-range",
   }) as unknown as StudioColorRangeWorkerLike;
 }
 

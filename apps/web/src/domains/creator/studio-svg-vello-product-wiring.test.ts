@@ -50,7 +50,7 @@ describe("SVG product provider boundary", () => {
     for (const head of dynamicImports) {
       expect(head.startsWith('"') || head.startsWith("'"), head).toBe(true);
     }
-    expect(router).toContain('import("@toonspectrum/studio-engine-vello")');
+    expect(router).toContain('import("@toonstudio/studio-engine-vello")');
     expect(router).not.toContain("studio-engine-skia");
     expect(router).not.toContain("canvaskit-wasm");
     expect(router).not.toContain("studio-resvg-svg-provider");

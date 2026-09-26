@@ -9,7 +9,7 @@ import { createServer } from "vite";
 import { REPO_ROOT, WEB_VITE_ALIASES } from "./lib/repo-paths.mjs";
 
 const OUTPUT = process.env.TOONSPECTRUM_BRUSH_V6_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-brush-v6-quality-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-brush-v6-quality-${Date.now()}`);
 const ENTRY = "/scripts/studio-brush-v6-quality-browser.ts";
 const diagnostics = { consoleErrors: [], pageErrors: [], failedRequests: [] };
 const recipeFilter = new Set((process.env.TOONSPECTRUM_BRUSH_V6_VERIFY_FILTER ?? "")

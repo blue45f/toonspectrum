@@ -29,7 +29,7 @@ if (args.length === 0 || args.includes("--help")) {
   const configuredOutput = take("--output");
   const output = configuredOutput
     ? resolve(configuredOutput)
-    : mkdtempSync(join(tmpdir(), "toonspectrum-recovered-experiments-"));
+    : mkdtempSync(join(tmpdir(), "toonstudio-recovered-experiments-"));
   mkdirSync(output, { recursive: true });
   const receipt = {
     startedAt: new Date().toISOString(),

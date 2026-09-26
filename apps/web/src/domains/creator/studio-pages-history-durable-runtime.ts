@@ -40,7 +40,7 @@ import type {
   StudioLocalDatabase,
 } from "./studio-local-database";
 
-const RECOVERY_DATABASE_NAME = "toonspectrum-studio-crdt-recovery-vault";
+const RECOVERY_DATABASE_NAME = "toonstudio-studio-crdt-recovery-vault";
 const RECOVERY_DATABASE_VERSION = 1;
 const RECOVERY_STORE_NAME = "rejected-frontiers";
 const RECOVERY_SCOPE_WORK_INDEX = "scope-work";
@@ -1108,7 +1108,7 @@ export async function createDefaultStudioPagesHistoryDurableRuntime(
       const opfsRecovery: StudioOpfsRecoveryRuntime = await createStudioOpfsRecoveryRuntime({
         probeCapabilities: async () => {
           selection = await selectStudioOpfsFileSystem(scope, {
-            rootName: "toonspectrum-studio-history-recovery",
+            rootName: "toonstudio-studio-history-recovery",
           });
           return {
             fileSystemKind: selection.kind,

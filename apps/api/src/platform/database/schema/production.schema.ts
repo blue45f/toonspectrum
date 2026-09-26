@@ -12,7 +12,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import { users } from "./auth.schema";
 import { creatorWorks } from "./creator.schema";

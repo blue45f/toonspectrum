@@ -27,7 +27,7 @@ not follow that callback and did not create an application session.
 The deleted project was not restored; existing personal-cloud/Drive clients,
 scopes, users and database records were not changed.
 
-The ID and secret were saved to **toonspectrum-core-api** on Render using
+The ID and secret were saved to **toonstudio-core-api** on Render using
 **Save only**. This does not update running instances. No build, deployment,
 restart, migration, plan upgrade or auto-deploy change was requested by this task.
 A private recovery copy is outside the repository in the owner's ToonStudio

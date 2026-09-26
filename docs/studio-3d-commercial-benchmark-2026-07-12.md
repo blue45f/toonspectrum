@@ -1,4 +1,4 @@
-# ToonSpectrum Studio 3D 상용 기능 벤치마크
+# ToonStudio Studio 3D 상용 기능 벤치마크
 
 - 기준일: 2026-07-12
 - 최신 구현 반영: 2026-07-16 (거리 안개/절차적 360° 환경/캡처 경계)
@@ -22,22 +22,22 @@
 Clip Studio Paint는 객체 목록과 화면 조작기를 함께 제공한다. 객체 또는 부품을 선택하고 이동·회전·크기를 바꾸며, 카메라 회전·이동·줌, 평면 이동, 접지, 3D 스냅을 조작기에서 수행한다. 고급 팔레트에는 Transform, Camera, Lens, Light Source, Fog, Panorama, Outline이 분리되어 있다.
 
 - 공식 매뉴얼: [Editing a 3D material](https://help.clip-studio.com/en-us/manual_en/660_3d/Editing_a_3D_material.htm)
-- ToonSpectrum 현재 강점: 프리미티브·완성형 장면 템플릿, 이동/회전/크기 기즈모, 수치 입력, 카메라 프리셋, undo/redo, 다중 선택, 표시·잠금, 접지·스텝 스냅, 초점 맞춤, 평행 투영, All Sides View, 트리 UI, 거리 안개, URL 없는 절차적 360° 환경과 수평 회전
+- ToonStudio 현재 강점: 프리미티브·완성형 장면 템플릿, 이동/회전/크기 기즈모, 수치 입력, 카메라 프리셋, undo/redo, 다중 선택, 표시·잠금, 접지·스텝 스냅, 초점 맞춤, 평행 투영, All Sides View, 트리 UI, 거리 안개, URL 없는 절차적 360° 환경과 수평 회전
 - 남은 격차: 사용자 equirectangular image import·fisheye/UV authoring, 실제 parent transform 계층, 표면 직접 페인팅, normal map 편집, BVH pose sequence
 
 Clip Studio Paint의 객체 목록은 복제, 표시/숨김, 잠금, 부모-자식 계층 연결, 여러 객체의 개별 피벗/중앙 피벗 변형, 재사용 가능한 3D 소재 등록을 제공한다.
 
 - 공식 매뉴얼: [Useful features for 3D materials](https://help.clip-studio.com/en-us/manual_en/660_3d/Useful_features_for_3D_materials.htm)
-- ToonSpectrum 현재 강점: 객체 복제·삭제, 표시·잠금 상태 저장, 다중 선택, 부모-자식 계층, 프리미티브와 업로드 모델 통합 히스토리, 권리 메타데이터가 있는 로컬 모델·장면 라이브러리
+- ToonStudio 현재 강점: 객체 복제·삭제, 표시·잠금 상태 저장, 다중 선택, 부모-자식 계층, 프리미티브와 업로드 모델 통합 히스토리, 권리 메타데이터가 있는 로컬 모델·장면 라이브러리
 - 남은 격차: 다중 객체 부착점 편집과 물리 기반 충돌·파지
 
 Clip Studio Paint EX의 All Sides View는 원근·정면·측면·상단 뷰와 카메라·초점 객체를 함께 보여주며 캔버스와 원근 뷰를 동기화한다.
 
 - 공식 매뉴얼: [All Sides View palette](https://help.clip-studio.com/en-us/manual_en/660_3d/All_Sides_View_palette.htm)
-- ToonSpectrum 현재 강점: 원근·정면·측면·상단 4분할, 선택 대상 중심 맞춤, 모바일 단일 뷰 전환
+- ToonStudio 현재 강점: 원근·정면·측면·상단 4분할, 선택 대상 중심 맞춤, 모바일 단일 뷰 전환
 - 남은 격차: 카메라 프러스텀의 직접 편집과 뷰별 독립 표시 옵션
 
-Clip Studio Paint는 3D 객체·배경·프리미티브·파노라마를 소재 팔레트에서 재사용한다. ToonSpectrum은 GLB/glTF, OBJ/MTL, FBX, DAE, STL, PLY, 3DS와 연결 BIN/텍스처를 함께 받되, 외부 네트워크 참조를 거부하고 자체 포함 GLB 2.0으로 정규화한 뒤 동일한 검증 경계를 통과시킨다.
+Clip Studio Paint는 3D 객체·배경·프리미티브·파노라마를 소재 팔레트에서 재사용한다. ToonStudio은 GLB/glTF, OBJ/MTL, FBX, DAE, STL, PLY, 3DS와 연결 BIN/텍스처를 함께 받되, 외부 네트워크 참조를 거부하고 자체 포함 GLB 2.0으로 정규화한 뒤 동일한 검증 경계를 통과시킨다.
 
 - 공식 매뉴얼: [3D Tools](https://help.clip-studio.com/en-us/manual_en/660_3d/3D_Tools.htm)
 - 공식 매뉴얼: [Importing 3D Files](https://help.clip-studio.com/en-us/manual_en/660_3d/Importing_3D_Files.htm)
@@ -47,7 +47,7 @@ Clip Studio Paint는 3D 객체·배경·프리미티브·파노라마를 소재 
 Clip Studio Paint EX는 3D 레이어를 선화와 톤 레이어로 분리한다. 3D 선화에는 raster/vector, 선 폭·강도, 화면 크기에 따른 정밀도, 외곽선 강조, 깊이, 외곽선에만 깊이 적용, 스무딩이 있고, 텍스처 선과 톤은 별도로 켜고 조정한다. 톤에는 포스터라이즈 단계, 회색조 또는 점 패턴, 형태, 각도, 빈도가 있다.
 
 - 공식 매뉴얼: [Convert to lines and tones](https://help.clip-studio.com/en-us/manual_en/390_filters/Convert_to_lines_and_tones_%28EX_only%29.htm)
-- ToonSpectrum 현재 강점: 엔진 중립 장면 문서에 컬러·선화·텍스처 선·톤 설정과 프리셋을 저장하고, 컬러/톤/텍스처 선/주선을 편집 가능한 별도 PNG 레이어로 삽입
+- ToonStudio 현재 강점: 엔진 중립 장면 문서에 컬러·선화·텍스처 선·톤 설정과 프리셋을 저장하고, 컬러/톤/텍스처 선/주선을 편집 가능한 별도 PNG 레이어로 삽입
 - 2026-07-12 수정: 기본 `tone.mode="none"`이 WebGL 재질색과 조명을 버려 선만 삽입하던 문제를 고쳤다. 신규 장면은 `flat + color`이며, 과거 선화 전용 장면에는 `컬러 렌더 켜기` 복구 동작을 제공한다.
 - 남은 격차: 진짜 vector 선 결과, 깊이 기반 선 굵기, CSP 3D 레이어와 같은 비파괴 재편집, 사용자 정의 출력 프리셋 관리
 
@@ -59,7 +59,7 @@ Khronos glTF 2.0 사양은 GLB 헤더 magic, container version, 전체 길이, J
 - 공식 도구: [glTF Validator](https://github.khronos.org/glTF-Validator/)
 - 공식 도구: [glTF Asset Auditor](https://www.khronos.org/gltf/gltf-asset-auditor/)
 
-ToonSpectrum은 엔진 로더 호출 전에 다음을 자체 검증한다.
+ToonStudio은 엔진 로더 호출 전에 다음을 자체 검증한다.
 
 - 실제 바이트 길이와 선언 길이 일치
 - SHA-256과 저장 메타데이터 일치

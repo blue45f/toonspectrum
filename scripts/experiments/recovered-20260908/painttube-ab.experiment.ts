@@ -23,7 +23,7 @@ const rows: unknown[] = [];
 let skia: { MakeCanvas(w:number,h:number): {getContext(k:'2d'):CanvasRenderingContext2D; dispose():void} };
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 beforeAll(async () => {
-  const specifier = '@toonspectrum/studio-engine-skia/node';
+  const specifier = '@toonstudio/studio-engine-skia/node';
   skia = await (await import(/* @vite-ignore */specifier)).loadCanvasKitNode();
   mkdirSync(out, { recursive:true });
 });

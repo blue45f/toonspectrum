@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { bigint, check, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique } from "drizzle-orm/pg-core";
-import type { ReviewDeliveryManifest, ReviewDeliveryProfile, ReviewDeliveryRights, ReviewDeliverySource } from "@toonspectrum/studio-project-model/review-delivery";
+import type { ReviewDeliveryManifest, ReviewDeliveryProfile, ReviewDeliveryRights, ReviewDeliverySource } from "@toonstudio/studio-project-model/review-delivery";
 
 import { users } from "./auth.schema";
 import { creatorWorks } from "./creator.schema";

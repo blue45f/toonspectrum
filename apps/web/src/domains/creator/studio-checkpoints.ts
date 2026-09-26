@@ -7,8 +7,8 @@ import { acquireStudioLocalDatabase } from "./studio-local-database-runtime";
 import type { StudioLocalDatabase } from "./studio-local-database";
 
 export const STUDIO_CHECKPOINT_LIMIT = 10;
-const STUDIO_CHECKPOINT_PREFIX = "toonspectrum-studio-checkpoints:v12";
-const STUDIO_CHECKPOINT_DATABASE_NAME = "toonspectrum-studio-checkpoints";
+const STUDIO_CHECKPOINT_PREFIX = "toonstudio-studio-checkpoints:v12";
+const STUDIO_CHECKPOINT_DATABASE_NAME = "toonstudio-studio-checkpoints";
 const STUDIO_CHECKPOINT_DATABASE_VERSION = 1;
 const STUDIO_CHECKPOINT_DATABASE_STORE = "documents";
 const STUDIO_CHECKPOINT_DURABLE_FALLBACK_SUFFIX = ":durable-fallback:v12";

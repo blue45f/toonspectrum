@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, BadgeCheck, BookOpenText, Boxes, BriefcaseBu
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
-import { applyProductionStudioRevisionLink, createPlanningSnapshot, evaluateHandoffReadiness, evaluateProductionRisks, evaluateReviewApproval, preflightCreditManifest, transitionProductionRisk, transitionProductionRiskResponse, type ClarificationThread, type EpisodeCollaboration, type ProductionProjectAggregate, type ProductionTask, type ReviewDecision, type StoryToArtHandoffPackage } from "@toonspectrum/core/production";
+import { applyProductionStudioRevisionLink, createPlanningSnapshot, evaluateHandoffReadiness, evaluateProductionRisks, evaluateReviewApproval, preflightCreditManifest, transitionProductionRisk, transitionProductionRiskResponse, type ClarificationThread, type EpisodeCollaboration, type ProductionProjectAggregate, type ProductionTask, type ReviewDecision, type StoryToArtHandoffPackage } from "@toonstudio/core/production";
 
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
 import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";

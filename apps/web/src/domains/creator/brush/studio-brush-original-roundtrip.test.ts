@@ -82,7 +82,7 @@ describe("native brush source through existing storage and JSON owners", () => {
   it("keeps ordinary JSON format and drawing values unchanged", () => {
     const brush = createBrush("기존", DEFAULT_STUDIO_BRUSH_SNAPSHOT);
     const json = JSON.parse(writeBrushJson(brush));
-    expect(json.kind).toBe("toonspectrum-studio-brush");
+    expect(json.kind).toBe("toonstudio-studio-brush");
     expect(json).not.toHaveProperty("originalSource");
     expect(sanitizeBrushSnapshot(importBrushFromJson(JSON.stringify(json)).brush).snapshot)
       .toEqual(sanitizeBrushSnapshot(brush).snapshot);

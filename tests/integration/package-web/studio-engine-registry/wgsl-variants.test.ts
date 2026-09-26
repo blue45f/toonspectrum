@@ -35,7 +35,7 @@ import {
 } from "../../../../packages/studio-engine-registry/src/wgsl-variants";
 
 import type { WgslFilterOpSpec } from "../../../../packages/studio-engine-registry/src/wgsl-variants";
-import type { EffectGraphIR, EffectNodeIR } from "@toonspectrum/studio-project-model";
+import type { EffectGraphIR, EffectNodeIR } from "@toonstudio/studio-project-model";
 
 /**
  * WGSL variant compiler contract (V12 lane 5 WESL 재개 조건 1단계).
@@ -209,7 +209,7 @@ describe("composeWgslVariant — 결정성과 variantKey 구조 계약", () => {
         pixelEquivalent: true,
       },
       licenseProvenance: {
-        spdx: "LicenseRef-ToonSpectrum-Proprietary",
+        spdx: "LicenseRef-ToonStudio-Proprietary",
         source: "ToonStudio deterministic WGSL variant composer",
         generatedFrom: "EffectGraphIR color-operation subsequence",
       },

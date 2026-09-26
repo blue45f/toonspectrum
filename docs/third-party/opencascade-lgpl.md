@@ -1,8 +1,8 @@
 # OpenCascade WASM LGPL boundary
 
-ToonSpectrum uses the unmodified npm package `opencascade.js@1.1.1`, which
+ToonStudio uses the unmodified npm package `opencascade.js@1.1.1`, which
 declares `LGPL-2.1-only`. It is an optional industrial-CAD execution provider;
-ToonSpectrum's document, mesh, command, history, and interchange schemas do not
+ToonStudio's document, mesh, command, history, and interchange schemas do not
 depend on an OCCT object layout.
 
 ## Corresponding source and license
@@ -34,10 +34,10 @@ industrial CAD operation is requested; they are not statically linked into the
 Studio shell or its canonical file format. Node/Vitest loading lives behind a
 separate Node-only module and is absent from the browser manifest.
 
-The distributed binary is the upstream-published npm artifact. ToonSpectrum did
+The distributed binary is the upstream-published npm artifact. ToonStudio did
 not rebuild OCCT, change its Emscripten/build flags, or modify its source. The
 package README identifies the exact upstream OCCT commit above; the lockfile
-integrity and installed WASM checksum seal the reviewed input. No ToonSpectrum
+integrity and installed WASM checksum seal the reviewed input. No ToonStudio
 object file is statically linked into OCCT. The provider remains replaceable at
 the dependency and adapter boundary.
 
@@ -53,13 +53,13 @@ To use a compatible modified build:
 5. Publish the modified library's corresponding source and add a dated
    modification notice to this document and the release notice.
 
-No ToonSpectrum artwork or project migration is required when swapping a
+No ToonStudio artwork or project migration is required when swapping a
 compatible provider. The application receives plain triangle meshes and numeric
 mass properties across the adapter boundary.
 
 ## Modification record
 
-ToonSpectrum currently distributes `opencascade.js@1.1.1` without source modifications.
+ToonStudio currently distributes `opencascade.js@1.1.1` without source modifications.
 Add future changes here with date, commit/source URL, and a concise
 description before distributing their binaries.
 

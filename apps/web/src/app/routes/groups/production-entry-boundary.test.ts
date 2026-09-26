@@ -20,7 +20,7 @@ describe("production landing startup boundary", () => {
   });
 
   it("keeps the dashboard client free of the full production domain type graph", () => {
-    expect(dashboardApi).not.toContain("@toonspectrum/core/production");
+    expect(dashboardApi).not.toContain("@toonstudio/core/production");
     expect(dashboardApi).not.toContain("ProductionProjectAggregate");
   });
 });

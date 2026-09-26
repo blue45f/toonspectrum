@@ -512,7 +512,7 @@ export function rankingItemListJsonLd(items: RankedTitle[], axisLabel: string) {
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: `툰스펙트럼 통합 랭킹 · ${axisLabel}`,
+    name: `툰스튜디오 통합 랭킹 · ${axisLabel}`,
     numberOfItems: topCount,
     itemListElement: elements,
   };

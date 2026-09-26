@@ -1,4 +1,4 @@
-name: toonspectrum-turn
+name: toonstudio-turn
 
 # Explicitly opt in with:
 #   docker compose --profile turn --env-file .env up -d
@@ -24,7 +24,7 @@ services:
       - /run/coturn:rw,noexec,nosuid,nodev,size=16m,mode=0700
       - /var/lib/coturn:rw,noexec,nosuid,nodev,size=16m,mode=0700,uid=65534,gid=65534
       - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
-    entrypoint: ["/bin/sh", "/usr/local/bin/toonspectrum-coturn-entrypoint"]
+    entrypoint: ["/bin/sh", "/usr/local/bin/toonstudio-coturn-entrypoint"]
     command: []
     environment:
       TURN_REALM: ${TURN_REALM:-}
@@ -52,7 +52,7 @@ services:
       - turn_tls_key
     volumes:
       - ./turnserver.conf.template:/etc/coturn/turnserver.conf.template:ro
-      - ./entrypoint.sh:/usr/local/bin/toonspectrum-coturn-entrypoint:ro
+      - ./entrypoint.sh:/usr/local/bin/toonstudio-coturn-entrypoint:ro
     healthcheck:
       # Liveness only: this proves the local UDP STUN listener responds. The authenticated
       # allocation and public relay path are verified separately by smoke.sh / browser E2E.

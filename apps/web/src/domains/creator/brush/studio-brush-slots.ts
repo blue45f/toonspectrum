@@ -24,8 +24,8 @@ import {
 import { normalizeStudioBrushEngineProgramSet, type StudioBrushEngineProgramSet } from "./studio-brush-engine-program-set";
 
 export const STUDIO_BRUSH_SLOT_COUNT = 6;
-export const STUDIO_BRUSH_SLOTS_LEGACY_STORAGE_KEY = "toonspectrum-studio-brush-slots:v1";
-export const STUDIO_BRUSH_SLOTS_STORAGE_KEY = "toonspectrum-studio-brush-slots:v2";
+export const STUDIO_BRUSH_SLOTS_LEGACY_STORAGE_KEY = "toonstudio-studio-brush-slots:v1";
+export const STUDIO_BRUSH_SLOTS_STORAGE_KEY = "toonstudio-studio-brush-slots:v2";
 export const STUDIO_BRUSH_SLOTS_LEGACY_AUTO_MIGRATION = false as const;
 
 export interface StudioBrushSlot extends StudioBrushSourcePresetMetadata {

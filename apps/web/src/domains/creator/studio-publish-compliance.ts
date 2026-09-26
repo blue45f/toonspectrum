@@ -3,7 +3,7 @@
  *
  * This intentionally checks whether the creator supplied internally consistent answers. It does
  * not certify legality, guarantee platform acceptance, or freeze destination policies that can
- * change independently of ToonSpectrum.
+ * change independently of ToonStudio.
  */
 
 import {

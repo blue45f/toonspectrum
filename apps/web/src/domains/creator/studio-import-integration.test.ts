@@ -798,7 +798,7 @@ describe("프로젝트 백업 가져오기", () => {
 
   it("깨진 .json은 한국어 오류로 거부한다", () => {
     expect(() => parseStudioProjectFile({ version: 99 }))
-      .toThrow("올바르지 않은 ToonSpectrum 프로젝트 파일입니다.");
+      .toThrow("올바르지 않은 ToonStudio 프로젝트 파일입니다.");
   });
 
   it(".toonproject.zip 왕복이 내장 이미지 자산까지 복원한다", async () => {
@@ -841,7 +841,7 @@ describe("프로젝트 백업 가져오기", () => {
 
   it("ZIP 리더가 항목 목록과 바이트를 그대로 되돌려준다", async () => {
     const entries = [
-      { path: "mimetype", data: encoder.encode("application/vnd.toonspectrum.project+zip") },
+      { path: "mimetype", data: encoder.encode("application/vnd.toonstudio.project+zip") },
       { path: "assets/one.bin", data: Uint8Array.from({ length: 128 }, (_, index) => index % 251) },
     ];
     const bytes = await buildStudioPackageArchiveBytes(entries, {
@@ -1279,11 +1279,11 @@ describe("가져오기 UI accept ↔ 디코더 경계", () => {
     expect(page).toContain('data-studio-document-import-inputs="true"');
     expect(page).toContain('accept=".json"');
     expect(page).toContain(
-      'accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"'
+      'accept=".toonproject.zip,.zip,application/zip,application/vnd.toonstudio.project+zip"'
     );
     expect(page).toContain('accept=".psd,image/vnd.adobe.photoshop"');
     expect(page).toContain(
-      'accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonspectrum.will-v1-bounded+zip"'
+      'accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonstudio.will-v1-bounded+zip"'
     );
   });
 

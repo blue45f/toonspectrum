@@ -38,7 +38,7 @@ export const STUDIO_AUTOSAVE_OPFS_ENVELOPE_VERSION = 1 as const;
 export const STUDIO_AUTOSAVE_OPFS_ENGINE_VERSION = "studio-autosave-v2" as const;
 
 const AUTOSAVE_PAGE_ID = "document";
-const AUTOSAVE_ROOT_NAME = "toonspectrum-studio-autosave-v3";
+const AUTOSAVE_ROOT_NAME = "toonstudio-studio-autosave-v3";
 const MAX_AUTOSAVE_BYTES = 256 * 1024 * 1024;
 const MAX_AUTOSAVE_JOURNAL_BYTES = 1024 * 1024 * 1024;
 const WRITER_RENEW_WINDOW_MS = 5_000;

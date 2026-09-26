@@ -206,13 +206,13 @@ export function validateVrmAssetSqliteOpfsEvidence(
       !== "acquireStudioLocalDatabase"
     || nested(benchmark, "normal", "authority", "requestedVfs") !== "opfs"
     || nested(benchmark, "normal", "authority", "sqliteOpfsDirectory")
-      !== "toonspectrum-studio-sqlite"
+      !== "toonstudio-studio-sqlite"
     || nested(benchmark, "normal", "authority", "sqliteDatabaseFilename")
       !== "studio-local-v12.db"
     || nested(benchmark, "normal", "authority", "expectedOpenFilename")
       !== "/studio-local-v12.db"
     || nested(benchmark, "normal", "authority", "casOpfsRoot")
-      !== "toonspectrum-studio-vrm-assets-v12"
+      !== "toonstudio-studio-vrm-assets-v12"
     || nested(benchmark, "normal", "authority", "modelNamespace")
       !== "studio-vrm-model-assets-v12"
     || nested(benchmark, "normal", "authority", "textureNamespace")
@@ -225,7 +225,7 @@ export function validateVrmAssetSqliteOpfsEvidence(
     || opened.some((filename) => filename !== "/studio-local-v12.db")
     || !Array.isArray(installed)
     || installed.length !== 2
-    || installed.some((directory) => directory !== "toonspectrum-studio-sqlite")
+    || installed.some((directory) => directory !== "toonstudio-studio-sqlite")
   ) {
     issues.push("authority receipt does not prove exact shared SQLite and native OPFS CAS use");
   }
@@ -581,7 +581,7 @@ export async function runVrmAssetSqliteOpfsBrowserEvidence(
   options: { scratchDirectory?: string; resultPath?: string } = {},
 ): Promise<VrmAssetSqliteOpfsArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-vrm-asset-opfs-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-vrm-asset-opfs-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

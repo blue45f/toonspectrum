@@ -19,9 +19,9 @@ async function acquireStudioCompanionWindowDatabase() {
 export const STUDIO_COMPANION_WINDOW_PREFERENCES_SQLITE_NAMESPACE =
   "studio-companion-window-preferences-v1";
 export const STUDIO_COMPANION_WINDOW_PREFERENCES_CHANNEL =
-  "toonspectrum.studio.companion-window-preferences.v1";
+  "toonstudio.studio.companion-window-preferences.v1";
 
-const SNAPSHOT_KIND = "toonspectrum.studio.companion-window-preferences" as const;
+const SNAPSHOT_KIND = "toonstudio.studio.companion-window-preferences" as const;
 const SNAPSHOT_VERSION = 1 as const;
 const MESSAGE_TYPE = "studio-companion-window-preferences" as const;
 let fallbackIdentitySequence = 0;

@@ -117,7 +117,7 @@ function triangleCount(json: JsonRecord): number {
   return triangles;
 }
 
-describe("ToonSpectrum story prop GLB pack v2", () => {
+describe("ToonStudio story prop GLB pack v2", () => {
   it.each(QUALITY_GATES)("$filename is a detailed, self-contained Blender GLB", (gate) => {
     const bytes = bundledBytes(gate.filename);
     expect(bytes.byteLength).toBeGreaterThanOrEqual(gate.minBytes);
@@ -147,7 +147,7 @@ describe("ToonSpectrum story prop GLB pack v2", () => {
     expect(gate.requiredNodes.every((name) => nodeNames.has(name))).toBe(true);
     expect(root?.extras).toMatchObject({
       asset_id: gate.assetId,
-      asset_author: "ToonSpectrum",
+      asset_author: "ToonStudio",
       asset_generator: GENERATOR,
       asset_license: "CC0-1.0",
       asset_license_url: CC0_LICENSE_URL,

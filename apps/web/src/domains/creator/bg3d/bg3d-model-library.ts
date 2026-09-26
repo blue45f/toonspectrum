@@ -46,7 +46,7 @@ import type {
 } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 import type { StudioOpfsContentHash } from "../studio-opfs-asset-store";
 
-const DB_NAME = "toonspectrum-studio-bg3d-model-library";
+const DB_NAME = "toonstudio-studio-bg3d-model-library";
 export const BG3D_MODEL_LIBRARY_DB_VERSION = 3;
 export const BG3D_MODEL_STORAGE_VERSION = 2 as const;
 export const BG3D_MODEL_VALIDATION_VERSION = 1 as const;
@@ -228,7 +228,7 @@ export interface Bg3dModelImportItem {
 }
 
 export interface Bg3dModelAtomicImportDispositionV12 {
-  readonly kind: "toonspectrum-bg3d-model-atomic-import";
+  readonly kind: "toonstudio-bg3d-model-atomic-import";
   readonly version: 1;
   readonly manifestRevision: number;
   readonly records: readonly Bg3dVerifiedStoredRecord[];
@@ -1563,7 +1563,7 @@ export async function legacyDeleteStoredBg3dModel(
 // ── V12 shared SQLite/OPFS product authority ──────────────────────────────
 
 export const BG3D_MODEL_LIBRARY_V12_MANIFEST_KIND =
-  "toonspectrum-studio-bg3d-model-library-v12";
+  "toonstudio-studio-bg3d-model-library-v12";
 export const BG3D_MODEL_LIBRARY_V12_MANIFEST_VERSION = 1 as const;
 export const BG3D_MODEL_LIBRARY_V12_MAX_ENTRIES = 512;
 export const BG3D_MODEL_LIBRARY_V12_MAX_TOTAL_BYTES = 4 * 1024 * 1024 * 1024;
@@ -1982,7 +1982,7 @@ export async function importVerifiedBg3dModelsAtomicallyWithDispositionV12(
   if (inputs.length === 0) {
     const current = parseV12ModelManifest(await authority.readManifest("models"));
     const empty = Object.freeze({
-      kind: "toonspectrum-bg3d-model-atomic-import" as const,
+      kind: "toonstudio-bg3d-model-atomic-import" as const,
       version: 1 as const,
       manifestRevision: current.revision,
       records: Object.freeze([]) as readonly Bg3dVerifiedStoredRecord[],
@@ -2078,7 +2078,7 @@ export async function importVerifiedBg3dModelsAtomicallyWithDispositionV12(
       nextRaw,
       nextRefs: v12ManifestRefs(nextRaw),
       result: {
-        kind: "toonspectrum-bg3d-model-atomic-import" as const,
+        kind: "toonstudio-bg3d-model-atomic-import" as const,
         version: 1 as const,
         manifestRevision: next.revision,
         records: Object.freeze(result),

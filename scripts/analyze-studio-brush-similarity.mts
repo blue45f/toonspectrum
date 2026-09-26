@@ -294,7 +294,7 @@ function main(): void {
   const suggestedQuarantineIds = [...new Set(clusters.flatMap((cluster) =>
     cluster.suggestedQuarantineIds))].sort();
   const report = {
-    kind: "toonspectrum-brush-quality-curation-v1",
+    kind: "toonstudio-brush-quality-curation-v1",
     generatedAt: new Date().toISOString(),
     sourceCommit: aggregate.sourceCommit ?? null,
     benchmarkDigest: aggregate.benchmarkDigest ?? null,

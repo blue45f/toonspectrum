@@ -10,7 +10,7 @@ import { chromium } from "playwright";
 import { createServer } from "vite";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-psd-original-quality");
+const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonstudio-psd-original-quality");
 mkdirSync(output, { recursive: true });
 const server = await createServer({ configFile: false, envFile: false, root: join(root, "apps/web"),
   publicDir: false, cacheDir: join(root, "node_modules/.cache/psd-original-quality"),

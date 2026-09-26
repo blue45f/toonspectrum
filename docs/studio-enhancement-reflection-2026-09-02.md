@@ -288,9 +288,9 @@ production을 배포하는 것이고(`deploy-vercel.yml`은 수동 폴백일 뿐
 
 원문의 분리 경계(StudioShell → DocumentCore / CommandBus·OperationJournal / InputRouter / …)와
 `StudioOperation` 직렬화 모델은 방향으로 타당하다. 저장소에는 이미 ADR 0007(append journal, two-slot),
-ADR 0012(SQLite/OPFS local authority), `@toonspectrum/studio-command-registry`, journal 관련 93개 파일이
+ADR 0012(SQLite/OPFS local authority), `@toonstudio/studio-command-registry`, journal 관련 93개 파일이
 있으므로 "새로 만들 것"이 아니라 "UI가 직접 문서를 만지는 경로를 command로 밀어 넣는 것"이 실제 과제다.
-이는 [`toonspectrum 핫패스 탈React 계약`]과 같은 축의 리팩터링이며 이 PR 범위 밖이다.
+이는 [`toonstudio 핫패스 탈React 계약`]과 같은 축의 리팩터링이며 이 PR 범위 밖이다.
 
 ## 5. UI/UX 제안 대조
 
@@ -298,7 +298,7 @@ ADR 0012(SQLite/OPFS local authority), `@toonspectrum/studio-command-registry`, 
 
 | 제안 | 현재 | 판단 |
 | --- | --- | --- |
-| 7.3 명령 팔레트 ⌘K | 있음 — `src/components/command-palette-host`(AppShell), `@toonspectrum/studio-command-registry` | 검색 대상에 "실행 불가 사유"·"소재"·"동의어"가 포함되는지는 별도 감사 필요 |
+| 7.3 명령 팔레트 ⌘K | 있음 — `src/components/command-palette-host`(AppShell), `@toonstudio/studio-command-registry` | 검색 대상에 "실행 불가 사유"·"소재"·"동의어"가 포함되는지는 별도 감사 필요 |
 | 7.5 비활성 상태 설명 | 부분 — `disabledReason`/`unavailableReason` 81개 파일(툴벨트 퀵액션, 룰러, 원근 패널 등) | 3D·필터의 GPU/메모리 조건 문구 통일은 백로그 |
 | 7.6 상시 저장 상태 센터 | 부분 — `studio-quick-access-integration.ts`의 `StudioQuickAccessSaveStatus`, 라이브 오버레이 | 로컬/서버/대기 작업 수/복구 지점을 한 곳에 상시 표시하는 UI는 없음 → TS-UX-008 유지 |
 | 7.7 오류 UX 표준화 | 없음(개별 토스트) | "무엇이 실패/데이터 안전/재시도/행동/진단" 5항 템플릿 채택 권고 |
@@ -306,7 +306,7 @@ ADR 0012(SQLite/OPFS local authority), `@toonspectrum/studio-command-registry`, 
 | 7.2 Simple Mode(별도 흐름) | 없음 | 원문 §15 "패널 숨김으로 구현 금지"에 동의. 온보딩 마법사와 겹치는지 먼저 확인 |
 | 7.8 모바일 팜 리젹션 등 | 부분 — palm 관련 19개 파일, 44px·handed dock 기준 있음 | 스타일러스/손가락 역할 분리, 회전 중 스트로크 취소, 백그라운드 직전 journal flush는 확인 필요 |
 | 7.9 접근성 CI | 부분 — 뷰포트 도달성 회귀 테스트(08-09), 포커스 복귀 원칙 | 키보드 전용 패널 순회·고대비·200% 확대 자동화는 백로그 |
-| 7.10 브랜드 통일 | 미해결(PRODUCT 문서상) | 제품명 ToonStudio / 플랫폼 ToonSpectrum 권고에 이견 없음. 출력 ZIP·PDF 생성자 문자열까지 일괄 변경은 별도 PR |
+| 7.10 브랜드 통일 | 미해결(PRODUCT 문서상) | 제품명 ToonStudio / 플랫폼 ToonStudio 권고에 이견 없음. 출력 ZIP·PDF 생성자 문자열까지 일괄 변경은 별도 PR |
 
 ## 6. 클립스튜디오 갭 → 저장소 기준 백로그
 

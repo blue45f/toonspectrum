@@ -254,7 +254,7 @@ export const useI18n = create<I18nState>()(
       },
     }),
     {
-      name: "toonspectrum-lang",
+      name: "toonstudio-lang",
       storage: createJSONStorage(() => safeI18nStorage),
       onRehydrateStorage: () => (state) => {
         if (state) {

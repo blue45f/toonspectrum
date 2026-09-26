@@ -1,7 +1,7 @@
 # Studio realtime collaboration benchmark and V19 upgrade
 
 Date: 2026-09-04  
-Scope: ToonSpectrum Studio canvas collaboration
+Scope: ToonStudio Studio canvas collaboration
 
 ## Executive summary
 
@@ -20,7 +20,7 @@ rewritten by this layer.
 
 ## Benchmark signals
 
-| Product / architecture | Useful pattern | ToonSpectrum status after V19 |
+| Product / architecture | Useful pattern | ToonStudio status after V19 |
 | --- | --- | --- |
 | Figma multiplayer | Visible collaborators, cursor chat, spotlight/follow, cursor-priority rules in large sessions, and a dedicated show/hide multiplayer cursors control | V19 adds persistent cursor visibility, five-second cursor chat, and priority admission for the cursor-chat author, followed collaborator, active drawing, and active editors. Existing page follow remains available. |
 | Miro attention management | Follow a collaborator, opt into a presenter invitation, bring everyone to a presenter, and stop follow on local navigation | V19 adds an authenticated, expiring “current work location” invitation with an explicit Follow or Dismiss choice. It intentionally does not seize another user’s camera. |

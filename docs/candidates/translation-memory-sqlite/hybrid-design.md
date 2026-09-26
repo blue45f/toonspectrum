@@ -10,7 +10,7 @@ StudioDialogueTranslatePanel
     → createStudioTranslationMemorySqlitePersistence
        serialized async save queue
     → acquireStudioLocalDatabase
-    → OPFS SAH-pool /toonspectrum-studio-sqlite/studio-local-v12.db
+    → OPFS SAH-pool /toonstudio-studio-sqlite/studio-local-v12.db
        kv(namespace="studio-translation-memory-v12", key="library-v1")
 ```
 

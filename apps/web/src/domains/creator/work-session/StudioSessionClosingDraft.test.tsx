@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createStudioWorkSession, emptyStudioSessionWorkflow, type StudioWorkSession } from "@toonspectrum/studio-project-model/work-session";
+import { createStudioWorkSession, emptyStudioSessionWorkflow, type StudioWorkSession } from "@toonstudio/studio-project-model/work-session";
 import { StudioSessionClosingDraft } from "./StudioSessionClosingDraft";
 import { buildStudioSessionClosingDraft } from "./studio-session-closing-draft";
 

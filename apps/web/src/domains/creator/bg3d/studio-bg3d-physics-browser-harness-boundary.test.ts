@@ -45,7 +45,7 @@ describe("Studio BG3D physics browser harness boundary", () => {
   });
 
   it("does not hide the removed visit-ping path from browser health failures", () => {
-    expect(harness).not.toContain("/api/v1/apps/toonspectrum/visits/ping");
+    expect(harness).not.toContain("/api/v1/apps/toonstudio/visits/ping");
     expect(harness).toContain('"/api/kmas/merge-on-access"');
     expect(harness).toContain('"/api/studio-ai/status"');
   });

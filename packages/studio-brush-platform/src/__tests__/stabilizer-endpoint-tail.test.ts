@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { applyStabilizer, pathEndpointKinkAngle, pathJitterEnergy } from "../stabilizer";
 
-import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR, StabilizerGraphIR } from "@toonstudio/studio-project-model";
 
 /**
  * Endpoint tail-resolution contracts (slice D-04, ported from

@@ -154,7 +154,7 @@ describe("StudioLiveCollaborationCommandCenter", () => {
       generatedAt: new Date("2026-09-05T00:00:00.000Z"),
     });
 
-    expect(summary).toContain("ToonSpectrum Studio 협업 인계 요약");
+    expect(summary).toContain("ToonStudio Studio 협업 인계 요약");
     expect(summary).toContain("나 포함 6개 작업 탭");
     expect(summary).toContain("세션 채팅: 12개");
     expect(summary).toContain("승인 대기 2개");

@@ -186,7 +186,7 @@ const budgets = {
 const baselinePath = path.resolve(
   process.env.STUDIO_BUNDLE_BASELINE ?? path.join("scripts", "bundle-baseline.json"),
 );
-const baselineSchema = "toonspectrum.bundle-baseline/1";
+const baselineSchema = "toonstudio.bundle-baseline/1";
 const cliFlags = new Set(process.argv.slice(2));
 const hasFlag = (flagName, envName) =>
   cliFlags.has(flagName) || process.env[envName] === "1";
@@ -210,8 +210,8 @@ const runtimeStalenessDays = 7;
 // Onboarding overlays the runtime probe dismisses so it measures a returning
 // user's cold entry rather than the first-run tour. Declared here because the
 // probe is awaited from the main block, above its own definition.
-const runtimeQuickStartKey = "toonspectrum-studio-quick-start-dismissed";
-const runtimeMobileHintKey = "toonspectrum-studio-mobile-hint-dismissed";
+const runtimeQuickStartKey = "toonstudio-studio-quick-start-dismissed";
+const runtimeMobileHintKey = "toonstudio-studio-mobile-hint-dismissed";
 
 // Chunks only a first-run visitor downloads. If any land in the measured pass, the probe is
 // describing onboarding rather than the returning user it claims to, and every byte it reports

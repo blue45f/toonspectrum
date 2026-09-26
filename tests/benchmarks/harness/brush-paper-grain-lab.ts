@@ -1070,7 +1070,7 @@ export function roundPaperBrushRecord(record: PaperBrushRecord): Omit<PaperBrush
 
 export async function loadCanvasKit(): Promise<CanvasKitLike> {
   const loader = (await import(
-    /* @vite-ignore */ "@toonspectrum/studio-engine-skia/node"
+    /* @vite-ignore */ "@toonstudio/studio-engine-skia/node"
   )) as { loadCanvasKitNode: () => Promise<CanvasKitLike> };
   return loader.loadCanvasKitNode();
 }
@@ -1099,7 +1099,7 @@ async function main(): Promise<void> {
       paperKernel:
         "apps/web/src/domains/creator/studio-paper-texture.ts (createPaperHeightField + createPaperGranulationGain) via studio-paper-granulation-runtime.ts",
       policy: "apps/web/src/domains/creator/studio-paper-brush-response.ts",
-      rasteriser: "canvaskit-wasm 2-D canvas via @toonspectrum/studio-engine-skia/node",
+      rasteriser: "canvaskit-wasm 2-D canvas via @toonstudio/studio-engine-skia/node",
       paperSurface: DEFAULT_STUDIO_PAPER_SURFACE,
     },
     definitions: {

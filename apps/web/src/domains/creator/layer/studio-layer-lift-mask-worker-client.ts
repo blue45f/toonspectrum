@@ -88,7 +88,7 @@ export function createStudioLayerLiftMaskModuleWorker():
     new URL("./studio-layer-lift-mask.worker.ts", import.meta.url),
     {
       type: "module",
-      name: "toonspectrum-layer-lift-mask",
+      name: "toonstudio-layer-lift-mask",
     },
   ) as unknown as StudioLayerLiftMaskWorkerLike;
 }

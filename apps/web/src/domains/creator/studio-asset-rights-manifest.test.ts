@@ -405,7 +405,7 @@ describe("studio asset rights deterministic interchange", () => {
       assetId: "asset-a",
       assetVersion: "v1",
       source: { kind: "builtin", id: "builtin-a" },
-      licenseId: "toonspectrum-standard",
+      licenseId: "toonstudio-standard",
       attributionRequired: false,
       attributionText: "",
       pageId: "page-02",
@@ -476,7 +476,7 @@ describe("studio asset rights deterministic interchange", () => {
       validUsage({
         assetId: "asset-a",
         source: { kind: "builtin", id: "builtin-a" },
-        licenseId: "toonspectrum-standard",
+        licenseId: "toonstudio-standard",
         attributionRequired: false,
         attributionText: "",
       }),

@@ -276,7 +276,7 @@ describe("determinism, receipts, alpha, and material distinction", () => {
     const second = applied(applyStudioSelectiveColorBands(request));
     expect(first.image.data).toEqual(second.image.data);
     expect(first.transaction).toEqual(second.transaction);
-    expect(first.transaction.schema).toBe("toonspectrum.advanced-color-filter/v1");
+    expect(first.transaction.schema).toBe("toonstudio.advanced-color-filter/v1");
     expect(first.transaction.operationId).toMatch(/^advanced-color-v1-[0-9a-f]{8}$/);
   });
 

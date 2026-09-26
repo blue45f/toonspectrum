@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { createHash } from "node:crypto";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import { StrictMode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";

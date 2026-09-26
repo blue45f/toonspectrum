@@ -176,7 +176,7 @@ export function issueStudioVoiceIcePolicy(options: {
 
   const expiresAtSeconds = issuedAtSeconds + configuration.turnTtlSeconds;
   const opaqueIdentity = createHmac("sha256", configuration.turnSharedSecret)
-    .update("toonspectrum-studio-voice-identity-v1\0")
+    .update("toonstudio-studio-voice-identity-v1\0")
     .update(workId)
     .update("\0")
     .update(userId)

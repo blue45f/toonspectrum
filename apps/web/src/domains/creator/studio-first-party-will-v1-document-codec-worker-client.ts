@@ -150,7 +150,7 @@ export function createStudioFirstPartyWillV1DocumentCodecModuleWorker():
     ),
     {
       type: "module",
-      name: "toonspectrum-first-party-will-v1-document-codec",
+      name: "toonstudio-first-party-will-v1-document-codec",
     },
   ) as unknown as StudioFirstPartyWillV1DocumentCodecWorkerLike;
 }

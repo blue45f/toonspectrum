@@ -1,5 +1,5 @@
 /**
- * ToonSpectrum-authored, file-free starter geometry for the BG3D primitive runtime.
+ * ToonStudio-authored, file-free starter geometry for the BG3D primitive runtime.
  *
  * The catalog deliberately contains no URL, thumbnail, binary model, texture, or marketplace
  * identity. Every asset expands into the engine-neutral `BgPrimitive[]` contract already consumed
@@ -15,7 +15,7 @@ import { STUDIO_BG3D_CINEMATIC_ASSET_BLUEPRINTS } from "./studio-bg3d-cinematic-
 import type { StudioBg3dComplexityBudget } from "./studio-bg3d-scene-document";
 
 export const STUDIO_BG3D_PROCEDURAL_STARTER_PACK_ID =
-  "toonspectrum-bg3d-procedural-starter-v1" as const;
+  "toonstudio-bg3d-procedural-starter-v1" as const;
 export const STUDIO_BG3D_PROCEDURAL_STARTER_PACK_VERSION = 1 as const;
 
 export const STUDIO_BG3D_PRIMITIVE_TRIANGLE_COUNTS = Object.freeze({
@@ -58,7 +58,7 @@ export const STUDIO_BG3D_PROCEDURAL_STARTER_CATEGORY_LABELS = Object.freeze({
 export interface StudioBg3dProceduralProvenance {
   readonly origin: "original-procedural";
   readonly sourceMethod: "authored-mathematical-primitives";
-  readonly author: "ToonSpectrum";
+  readonly author: "ToonStudio";
   readonly license: {
     readonly spdx: "CC0-1.0";
     readonly label: "CC0 1.0";
@@ -128,7 +128,7 @@ interface StarterAssetInput
 const PROVENANCE: StudioBg3dProceduralProvenance = Object.freeze({
   origin: "original-procedural",
   sourceMethod: "authored-mathematical-primitives",
-  author: "ToonSpectrum",
+  author: "ToonStudio",
   license: Object.freeze({
     spdx: "CC0-1.0",
     label: "CC0 1.0",

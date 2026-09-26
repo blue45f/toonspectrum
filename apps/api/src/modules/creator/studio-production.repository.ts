@@ -1,6 +1,6 @@
 import { studioHandoffChangedRoles, studioHandoffChangedBriefs } from "./studio-handoff-envelope-basis";
 import { studioHandoffReceiptQuery } from "./studio-handoff-receipt-query";
-import { studioHandoffEnvelopeSchema } from "@toonspectrum/studio-project-model";
+import { studioHandoffEnvelopeSchema } from "@toonstudio/studio-project-model";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import { and, count, desc, eq, isNull, sql } from "drizzle-orm";

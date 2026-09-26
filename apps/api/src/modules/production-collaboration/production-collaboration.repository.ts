@@ -1,7 +1,7 @@
 import { and, eq, or } from "drizzle-orm";
 import { Injectable } from "@nestjs/common";
 
-import { migrateProductionProjectAggregate, type ProductionProjectAggregate } from "@toonspectrum/core/production";
+import { migrateProductionProjectAggregate, type ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import {
   creatorWorkCollaborators,

@@ -13,11 +13,11 @@ import {
  */
 
 export const STUDIO_MARKETPLACE_PACKAGE_SCHEMA =
-  "toonspectrum.studio-marketplace-package" as const;
+  "toonstudio.studio-marketplace-package" as const;
 export const STUDIO_MARKETPLACE_SHARE_MANIFEST_SCHEMA =
-  "toonspectrum.studio-marketplace-share-manifest" as const;
+  "toonstudio.studio-marketplace-share-manifest" as const;
 export const STUDIO_MARKETPLACE_LIBRARY_STORAGE_KEY =
-  "toonspectrum.studio-marketplace-library.v1" as const;
+  "toonstudio.studio-marketplace-library.v1" as const;
 export const STUDIO_MARKETPLACE_LIBRARY_VERSION = 1 as const;
 export const STUDIO_MARKETPLACE_MAX_LIBRARY_PACKAGES = 200;
 

@@ -1,5 +1,5 @@
 import { parseSearchPageQuery, searchPageItems, searchPagination, searchPageQueryFromParams, searchParamsFromBody, SearchPaginationError } from "../../../../../packages/core/src/search-pagination";
-import { getRandomData } from "@toonspectrum/core/catalog";
+import { getRandomData } from "@toonstudio/core/catalog";
 
 // Dynamic static-catalog engine. This module intentionally contains the heavy
 // catalog query/ranking logic and is lazy-loaded by catalog-static.ts only when

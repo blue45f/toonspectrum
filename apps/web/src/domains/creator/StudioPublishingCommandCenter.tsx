@@ -144,7 +144,7 @@ import {
   type CreatorPublicationDirective,
   type CreatorPublicationWorkStatus,
 } from "@/shared/lib/creator-publication-contract";
-import { readCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
+import { readCreatorPublicationSource } from "@toonstudio/contracts/creator-publication-integrity";
 import { cn } from "@/shared/lib/utils";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import Link from "@/shared/navigation/router-link";

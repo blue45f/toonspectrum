@@ -16,7 +16,7 @@ import type { StudioLayerComp } from "../apps/web/src/domains/creator/layer/stud
 import type { PageState } from "../apps/web/src/domains/creator/studio-page-state";
 
 const baseUrl = process.env.TOONSPECTRUM_VERIFY_ORIGIN ?? "http://127.0.0.1:5227";
-const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? "/tmp/toonspectrum-studio-layer-comps";
+const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? "/tmp/toonstudio-studio-layer-comps";
 mkdirSync(output, { recursive: true });
 const browser = await launchStudioInAppBrowser();
 const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, locale: "ko-KR" });
@@ -343,7 +343,7 @@ try {
   process.exitCode = 1;
 } finally {
   writeFileSync(join(output, "report.json"), JSON.stringify({
-    kind: "toonspectrum-studio-layer-comps-regression-v1", baseUrl,
+    kind: "toonstudio-studio-layer-comps-regression-v1", baseUrl,
     browser: "Chromium desktop launched with SwiftShader flags; no injected project state", cases, evidence, rendererObservations, autosaveDiagnostics, errors: collector.errors,
   }, null, 2));
   await browser.close();

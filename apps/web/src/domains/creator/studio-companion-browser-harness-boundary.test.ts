@@ -88,7 +88,7 @@ describe("Studio companion browser harness boundary", () => {
       "text.includes(\"WebSocket connection to 'ws://127.0.0.1:\")",
     );
     expect(harness).not.toContain(
-      '"/api/v1/apps/toonspectrum/visits/ping"',
+      '"/api/v1/apps/toonstudio/visits/ping"',
     );
   });
 

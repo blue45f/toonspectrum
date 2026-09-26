@@ -15,7 +15,7 @@ const validInput = {
   contactName: " 김 담당 ",
   email: " Partner@Example.COM ",
   website: "https://example.com/about",
-  message: " ToonSpectrum 투자 및 IR 자료에 대해 논의하고 싶습니다. ",
+  message: " ToonStudio 투자 및 IR 자료에 대해 논의하고 싶습니다. ",
   sourcePath: "/business?type=investment#form",
   consentAccepted: true,
   faxNumber: "",

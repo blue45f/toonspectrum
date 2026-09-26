@@ -84,9 +84,9 @@ export function buildAuthoredSutFixture(options: SutFixtureOptions = {}): Uint8A
       0.42,
       buildPressureGraph([0.05, 0.18, 0.42, 0.72, 1], options.pressureVersion),
       buildPressureGraph([0.1, 0.3, 0.6, 0.82, 1]),
-      "ToonSpectrum QA",
+      "ToonStudio QA",
       "CC0-1.0",
-      "https://example.invalid/toonspectrum",
+      "https://example.invalid/toonstudio",
       "qa@example.invalid",
       Uint8Array.from([0xfa, 0xce]),
     );
@@ -102,9 +102,9 @@ export function buildAuthoredSutFixture(options: SutFixtureOptions = {}): Uint8A
         0.25,
         buildPressureGraph([0, 0.08, 0.3, 0.65, 1]),
         buildPressureGraph([0, 0.2, 0.55, 0.85, 1]),
-        "ToonSpectrum QA",
+        "ToonStudio QA",
         "CC0-1.0",
-        "https://example.invalid/toonspectrum",
+        "https://example.invalid/toonstudio",
         "qa@example.invalid",
         Uint8Array.from([0xbe, 0xef]),
       );

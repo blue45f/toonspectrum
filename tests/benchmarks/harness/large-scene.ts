@@ -21,17 +21,17 @@ import { cpus, platform, arch } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { renderSceneToPixels as renderWithSkia } from "@toonspectrum/studio-engine-skia";
-import { loadCanvasKitNode } from "@toonspectrum/studio-engine-skia/node";
-import { renderSceneToPixels as renderWithVello } from "@toonspectrum/studio-engine-vello";
-import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
+import { renderSceneToPixels as renderWithSkia } from "@toonstudio/studio-engine-skia";
+import { loadCanvasKitNode } from "@toonstudio/studio-engine-skia/node";
+import { renderSceneToPixels as renderWithVello } from "@toonstudio/studio-engine-vello";
+import { loadVelloNode } from "@toonstudio/studio-engine-vello/node";
 import {
   createEmptyScene,
   polylineToPath,
   sceneIRSchema,
   solidPaint,
   type SceneIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 const REPO_ROOT = new URL("../../..", import.meta.url).pathname;
 const RESULTS_DIR = join(REPO_ROOT, "tests", "benchmarks", "results");

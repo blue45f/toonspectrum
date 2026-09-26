@@ -34,7 +34,7 @@ import {
 import type { StudioPdfColor, StudioPdfOp } from "../render/studio-canvaskit-pdf-vector";
 
 export const DIALOGUE_RUBY_EXPORT_METADATA_VERSION = 1;
-export const DIALOGUE_RUBY_EXPORT_XMP_NAMESPACE = "https://toonspectrum.com/ns/dialogue-ruby/1.0/";
+export const DIALOGUE_RUBY_EXPORT_XMP_NAMESPACE = "https://toonstudio.com/ns/dialogue-ruby/1.0/";
 
 export type DialogueRubyExportDisposition =
   | "editable-positioned-pdf-text"

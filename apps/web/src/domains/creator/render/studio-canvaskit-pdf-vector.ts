@@ -190,7 +190,7 @@ export interface StudioPdfDocument {
   pages: readonly StudioPdfPage[];
   title?: string;
   author?: string;
-  /** 기본 "ToonSpectrum Studio". */
+  /** 기본 "ToonStudio Studio". */
   producer?: string;
   /**
    * PDF 날짜 문자열(`D:YYYYMMDDHHmmSS+09'00'`). **넣지 않으면 출력에 날짜가 없다** — 결정적
@@ -651,7 +651,7 @@ function buildPdfConformanceXmp(
 ): Uint8Array {
   const title = document.title?.trim();
   const author = document.author?.trim();
-  const producer = (document.producer ?? "ToonSpectrum Studio").trim() || "ToonSpectrum Studio";
+  const producer = (document.producer ?? "ToonStudio Studio").trim() || "ToonStudio Studio";
   const profileDeclaration = declaration.target === "pdf-a-2b"
     ? `<rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/" `
       + `pdfaid:part="2" pdfaid:conformance="B"/>`
@@ -986,7 +986,7 @@ export function buildVectorPdf(document: StudioPdfDocument): Uint8Array {
   } else if (document.creationDate) {
     info.push(`/CreationDate (${escapeLiteral(document.creationDate)})`);
   }
-  info.push(`/Producer (${escapeLiteral(document.producer ?? "ToonSpectrum Studio")})`);
+  info.push(`/Producer (${escapeLiteral(document.producer ?? "ToonStudio Studio")})`);
   writer.object(infoNum, `<< ${info.join(" ")} >>`);
 
   return writer.finish(catalogNum, infoNum, conformance?.fileIdentifierHex);

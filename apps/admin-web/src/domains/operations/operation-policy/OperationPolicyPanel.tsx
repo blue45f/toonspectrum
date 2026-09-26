@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { applyOperationPolicy, loadOperationPolicy, previewOperationPolicy } from "./api/operation-policy-api";
 
-import type { LicenseReview, ModeProfile, OperatingMode, OperationFeature, OperationPolicyAdminView, OperationPolicyDraft, OperationPolicyPreview } from "@toonspectrum/contracts/operation-policy";
+import type { LicenseReview, ModeProfile, OperatingMode, OperationFeature, OperationPolicyAdminView, OperationPolicyDraft, OperationPolicyPreview } from "@toonstudio/contracts/operation-policy";
 
 const modes: readonly OperatingMode[] = ["free", "paid"];
 const modeLabel = { free: "무료 운영", paid: "유료 운영" };

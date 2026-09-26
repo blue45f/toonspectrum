@@ -13,7 +13,7 @@ async function policyFixture(page: Page, options: { denied?: boolean; commercial
     const request = route.request();
     if (options.denied) return route.fulfill({ status: 403, json: { message: "서비스 관리자 권한이 필요합니다." } });
     if (request.method() === "GET") return route.fulfill({ json: { policy: record(), effective: resolveOperationPolicy(record(), fingerprint, new Date()), runtimeFingerprint: fingerprint, audit: [] } });
-    expect(request.headers()["x-toonspectrum-csrf"]).toBe("1");
+    expect(request.headers()["x-toonstudio-csrf"]).toBe("1");
     const body = request.postDataJSON() as { draft: OperationPolicyDraft; expectedRevision: number; reason?: string; previewDigest?: string };
     const blockedReasons = operationTransitionBlockers(body.draft, fingerprint, new Date());
     if (request.url().endsWith("/preview")) return route.fulfill({ json: {

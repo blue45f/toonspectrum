@@ -1,13 +1,13 @@
 # CI merge reliability and queue discipline
 
-Updated: 2026-09-14 (Asia/Seoul). Repository: `blue45f/toonspectrum`.
+Updated: 2026-09-14 (Asia/Seoul). Repository: `blue45f/toonstudio`.
 Baseline inspected: `f5253816416488d4e4b66c589223e861b4e8d7b2`.
 
 ## What was actually failing
 
 The Actions snapshot contained 512 active runs: 470 queued, 29 pending, and 13 running.
 This is a point-in-time observation, not an ongoing concurrency limit or a measured improvement percentage.
-Run [34757013487](https://github.com/blue45f/toonspectrum/actions/runs/34757013487)
+Run [34757013487](https://github.com/blue45f/toonstudio/actions/runs/34757013487)
 was created at 2026-09-13 12:24:45 UTC and its first job started at 14:07:50 UTC:
 103 minutes 5 seconds of queue delay before preflight. It also had real lint and build failures.
 

@@ -126,7 +126,7 @@ export async function authorizeGoogleDrive(clientId: string): Promise<CloudAuthS
 
 export async function listGoogleDriveFiles(
   accessToken: string,
-  folderName = "ToonSpectrum"
+  folderName = "ToonStudio"
 ): Promise<CloudFileMetadata[]> {
   // 1. Find or create the app folder
   const folderQuery = encodeURIComponent(
@@ -174,7 +174,7 @@ export async function uploadToGoogleDrive(
   accessToken: string,
   fileName: string,
   blob: Blob,
-  folderName = "ToonSpectrum"
+  folderName = "ToonStudio"
 ): Promise<{ fileId: string; webViewLink: string }> {
   // 1. Ensure app folder exists
   const folderQuery = encodeURIComponent(
@@ -205,7 +205,7 @@ export async function uploadToGoogleDrive(
 
   // 2. Multipart upload (simple — suitable for files < 5 MB; use resumable for larger)
   const metadata = JSON.stringify({ name: fileName, parents: [folderId] });
-  const boundary = `toonspectrum-${Date.now()}`;
+  const boundary = `toonstudio-${Date.now()}`;
   const body = [
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`,
     `--${boundary}\r\nContent-Type: ${blob.type || "application/octet-stream"}\r\n\r\n`,
@@ -291,7 +291,7 @@ export async function authorizeOneDrive(clientId: string): Promise<CloudAuthStat
 
 export async function listOneDriveFiles(
   accessToken: string,
-  folderPath = "/ToonSpectrum"
+  folderPath = "/ToonStudio"
 ): Promise<CloudFileMetadata[]> {
   const encodedPath = encodeURIComponent(folderPath.replace(/^\//, ""));
   const res = await fetch(
@@ -332,7 +332,7 @@ export async function uploadToOneDrive(
   accessToken: string,
   fileName: string,
   blob: Blob,
-  folderPath = "/ToonSpectrum"
+  folderPath = "/ToonStudio"
 ): Promise<{ fileId: string; webUrl: string }> {
   const safePath = folderPath.replace(/^\//, "");
   const encodedName = encodeURIComponent(fileName);

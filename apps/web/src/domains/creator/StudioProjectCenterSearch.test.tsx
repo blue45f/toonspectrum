@@ -16,9 +16,9 @@ import {
 } from "./StudioProjectCenterSearch";
 
 const FAVORITE_STORAGE_KEY =
-  "toonspectrum-studio-project-center:favorites:v1";
+  "toonstudio-studio-project-center:favorites:v1";
 const RECENT_STORAGE_KEY =
-  "toonspectrum-studio-project-center:recent-actions:v1";
+  "toonstudio-studio-project-center:recent-actions:v1";
 
 vi.mock("./StudioFileControlCenter", () => ({
   StudioFileControlCenter: () => (

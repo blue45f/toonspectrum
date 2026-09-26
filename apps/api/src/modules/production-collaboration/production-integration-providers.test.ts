@@ -164,12 +164,12 @@ describe("production signature and notification providers", () => {
     expect(result.sent).toBe(1);
     const [, rawHeaders, body] = post.mock.calls[0] as [string, Record<string, string>, string, number];
     const headers = new Headers(rawHeaders);
-    expect(headers.get("x-toonspectrum-signature")).toMatch(
+    expect(headers.get("x-toonstudio-signature")).toMatch(
       /^sha256=[0-9a-f]{64}$/u,
     );
     expect(body).not.toContain("server-only-secret");
-    expect(headers.get("x-toonspectrum-delivery-id")).toMatch(/^sha256:[a-f0-9]{64}$/u);
-    expect(headers.get("x-toonspectrum-delivery-signature")).toBe(webhookSignature("server-only-secret", `${headers.get("x-toonspectrum-delivery-timestamp")}\n${headers.get("x-toonspectrum-delivery-id")}\n${body}`));
+    expect(headers.get("x-toonstudio-delivery-id")).toMatch(/^sha256:[a-f0-9]{64}$/u);
+    expect(headers.get("x-toonstudio-delivery-signature")).toBe(webhookSignature("server-only-secret", `${headers.get("x-toonstudio-delivery-timestamp")}\n${headers.get("x-toonstudio-delivery-id")}\n${body}`));
   });
 });
 
@@ -263,7 +263,7 @@ describe("Google Drive no-cost artifact upload", () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(decodeURIComponent(String(fetchMock.mock.calls[0]?.[0])))
-      .toContain("toonspectrumContentDigest");
+      .toContain("toonstudioContentDigest");
   });
 });
 

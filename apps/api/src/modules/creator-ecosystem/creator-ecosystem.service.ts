@@ -81,7 +81,7 @@ export class CreatorEcosystemService {
         .filter((row) => row.acceptedTypes.length > 0)
         .map((row) => ({
           userId: row.userId,
-          name: row.name?.trim() || "ToonSpectrum Creator",
+          name: row.name?.trim() || "ToonStudio Creator",
           avatar: row.avatar,
           acceptedTypes: row.acceptedTypes,
           acceptUnverified: row.acceptUnverified,

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from "@nestjs/common";
 import type { Pool, PoolClient } from "pg";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import {
   createReviewDeliveryManifest,
   reviewDeliveryActionSchema,
@@ -17,8 +17,8 @@ import {
   type ReviewDeliveryJob,
   type ReviewDeliveryPrepare,
   type ReviewDeliverySource,
-} from "@toonspectrum/studio-project-model/review-delivery";
-import { resolveOperationPolicy } from "@toonspectrum/contracts/operation-policy";
+} from "@toonstudio/studio-project-model/review-delivery";
+import { resolveOperationPolicy } from "@toonstudio/contracts/operation-policy";
 
 import { resolveCreatorCollaborationAccess } from "../../creator/creator-collaboration.policy";
 import { loadOperationPolicy, runtimeLicenseFingerprint } from "../../operation-policy/operation-policy.repository";

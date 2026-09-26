@@ -16,7 +16,7 @@ import { planStudioDynamicBrushRender } from '@/domains/creator/studio-dynamic-b
 const out = resolveExperimentOutput('inkwash-parity');
 const rows: unknown[]=[];
 let kit: CpuCanvasKit;
-beforeAll(async()=>{ const specifier = '@toonspectrum/studio-engine-skia/node'; kit=await (await import(/* @vite-ignore */ specifier)).loadCanvasKitNode(); mkdirSync(out,{recursive:true}); });
+beforeAll(async()=>{ const specifier = '@toonstudio/studio-engine-skia/node'; kit=await (await import(/* @vite-ignore */ specifier)).loadCanvasKitNode(); mkdirSync(out,{recursive:true}); });
 afterAll(()=>writeFileSync(out+'/results.json',JSON.stringify(rows,null,2)));
 const point=(t:number)=>({x:720*(.12+.5*t),y:807*(.2+.42*t-Math.sin(t*Math.PI)*.12)*720/1048});
 const points:number[]=[];

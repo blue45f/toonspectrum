@@ -100,7 +100,7 @@ export const BrowserCompatModalContent: React.FC<BrowserCompatModalProps> = ({
         <div id="browser-compat-description" className="space-y-4 text-sm text-fg-2 leading-relaxed">
           <p>
             현재 사용 중인 브라우저(<strong className="text-fg font-semibold">{browser.name} {browser.version}</strong>)는
-            툰스펙트럼의 3D 리더스튜디오 및 최신 웹 표준 기능을 완벽히 지원하지 않을 수 있습니다.
+            툰스튜디오의 3D 리더스튜디오 및 최신 웹 표준 기능을 완벽히 지원하지 않을 수 있습니다.
           </p>
 
           {reason && (

@@ -14,7 +14,7 @@ async function prepare(page: Page, ended = false) {
     await expect(onboarding).toBeHidden();
   });
   // Explicit local browser session/API fixtures, not production authentication.
-  await page.addInitScript((actor) => sessionStorage.setItem("toonspectrum-auth-session", JSON.stringify({ user: actor })), user);
+  await page.addInitScript((actor) => sessionStorage.setItem("toonstudio-auth-session", JSON.stringify({ user: actor })), user);
   let sends = 0;
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;

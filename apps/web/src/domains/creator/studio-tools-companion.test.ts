@@ -762,7 +762,7 @@ describe("studio-tools-companion protocol", () => {
     expect(open).toHaveBeenCalledOnce();
     const call = open.mock.calls[0] as [string, string, string];
     expect(call[0]).toContain("/studio/tools-companion?session=primary-a-1234");
-    expect(call[1]).toBe("toonspectrum-studio-tools-primary-a-1234");
+    expect(call[1]).toBe("toonstudio-studio-tools-primary-a-1234");
     expect(call[2]).toBe(
       "popup=yes,width=520,height=820,menubar=no,toolbar=no,location=no,status=no"
     );
@@ -816,7 +816,7 @@ describe("studio-tools-companion protocol", () => {
     expect(openStudioToolsCompanionWindow(session, popup, open, "work-2")).toBe(recovered);
     expect(open).toHaveBeenCalledWith(
       expect.stringContaining("id=work-2"),
-      "toonspectrum-studio-tools-primary-a-1234",
+      "toonstudio-studio-tools-primary-a-1234",
       expect.any(String),
     );
   });
@@ -848,7 +848,7 @@ describe("studio-tools-companion protocol", () => {
     )).toBe(navigatorPopup);
     expect(openNavigator).toHaveBeenCalledWith(
       expect.stringContaining("view=navigator"),
-      "toonspectrum-studio-tools-primary-a-1234-navigator",
+      "toonstudio-studio-tools-primary-a-1234-navigator",
       "popup=yes,width=390,height=860,menubar=no,toolbar=no,location=no,status=no"
     );
     expect(isStudioToolsCompanionWindowReusable(primaryA, navigatorPopup, "navigator")).toBe(true);
@@ -857,7 +857,7 @@ describe("studio-tools-companion protocol", () => {
     expect(openStudioCompanionSurfaceWindow(primaryA, "review", null, openReview)).toBe(reviewPopup);
     expect(openReview).toHaveBeenCalledWith(
       expect.stringContaining("view=review"),
-      "toonspectrum-studio-tools-primary-a-1234-review",
+      "toonstudio-studio-tools-primary-a-1234-review",
       "popup=yes,width=420,height=860,menubar=no,toolbar=no,location=no,status=no"
     );
     expect(openStudioCompanionSurfaceWindow(
@@ -868,7 +868,7 @@ describe("studio-tools-companion protocol", () => {
     )).toBe(referencePopup);
     expect(openReference).toHaveBeenCalledWith(
       expect.stringContaining("view=reference"),
-      "toonspectrum-studio-tools-primary-a-1234-reference",
+      "toonstudio-studio-tools-primary-a-1234-reference",
       "popup=yes,width=420,height=860,menubar=no,toolbar=no,location=no,status=no"
     );
     expect(isStudioToolsCompanionWindowReusable(primaryA, referencePopup, "reference")).toBe(true);
@@ -1005,7 +1005,7 @@ describe("studio-tools-companion protocol", () => {
       announce,
     });
 
-    expect(reservation.name).toBe("toonspectrum-studio-tools-primary-a-1234");
+    expect(reservation.name).toBe("toonstudio-studio-tools-primary-a-1234");
     expect(reservation.opener).toBeNull();
     expect(replace).toHaveBeenCalledWith(expect.stringContaining(
       "/studio/tools-companion?session=primary-a-1234&id=work-1"
@@ -1044,7 +1044,7 @@ describe("studio-tools-companion protocol", () => {
     expect(open.mock.calls[0]?.[0]).toContain(
       "/studio/tools-companion?session=primary-a-1234"
     );
-    expect(open.mock.calls[0]?.[1]).toBe("toonspectrum-studio-tools-primary-a-1234");
+    expect(open.mock.calls[0]?.[1]).toBe("toonstudio-studio-tools-primary-a-1234");
 
     for (const href of [
       "http://localhost/studio/tools-companion?session=primary-b-5678",

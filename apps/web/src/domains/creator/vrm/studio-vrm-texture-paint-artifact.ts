@@ -8,7 +8,7 @@
 
 export const STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_SCHEMA_VERSION = 1 as const;
 export const STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_KIND =
-  "toonspectrum/vrm-texture-paint-png" as const;
+  "toonstudio/vrm-texture-paint-png" as const;
 export const STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_MIME = "image/png" as const;
 
 export const STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_LIMITS = Object.freeze({
@@ -52,7 +52,7 @@ export interface StudioVrmTexturePaintArtifactMetadata {
 
 export interface StudioVrmTexturePaintArtifactManifest {
   readonly schemaVersion: typeof STUDIO_VRM_TEXTURE_PAINT_ARTIFACT_SCHEMA_VERSION;
-  readonly kind: "toonspectrum/vrm-texture-paint-artifact-manifest";
+  readonly kind: "toonstudio/vrm-texture-paint-artifact-manifest";
   readonly bindings: readonly StudioVrmTexturePaintArtifactMetadata[];
 }
 
@@ -196,7 +196,7 @@ const PNG_CHUNK_TYPE_PATTERN = /^[A-Za-z]{4}$/u;
 const PNG_CRITICAL_CHUNKS = new Set(["IHDR", "PLTE", "IDAT", "IEND"]);
 const CONTENT_HASH_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const BINDING_KEY_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,255}$/u;
-const MANIFEST_KIND = "toonspectrum/vrm-texture-paint-artifact-manifest" as const;
+const MANIFEST_KIND = "toonstudio/vrm-texture-paint-artifact-manifest" as const;
 const CRC_YIELD_BYTES = 1024 * 1024;
 const NATIVE_BLOB_ARRAY_BUFFER = Blob.prototype.arrayBuffer;
 

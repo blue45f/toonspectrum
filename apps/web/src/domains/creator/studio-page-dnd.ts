@@ -49,7 +49,7 @@ export interface StudioPageDnd {
   indicatorFor: (index: number) => "before" | "after" | null;
 }
 
-const PAGE_DND_MIME = "application/x-toonspectrum-studio-page";
+const PAGE_DND_MIME = "application/x-toonstudio-studio-page";
 
 /**
  * 페이지 스트립 HTML5 드래그 재배열 훅(PPT 방식).

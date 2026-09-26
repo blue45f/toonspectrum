@@ -7,7 +7,7 @@
  *
  * Product stance (vs Canva 3D Content Generator):
  * - Canva optimizes one-shot ornamental 3D for social layouts.
- * - ToonSpectrum optimizes re-editable production objects (pose, grip, LT capture, CRDT).
+ * - ToonStudio optimizes re-editable production objects (pose, grip, LT capture, CRDT).
  * - This catalog is the discoverability layer; generation stays fail-closed until rights/quality land.
  */
 

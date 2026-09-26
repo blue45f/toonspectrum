@@ -68,7 +68,7 @@ import {
   parseMusicBrief,
   type MusicBrief,
   type MusicStatus,
-} from "@toonspectrum/core/studio-music";
+} from "@toonstudio/core/studio-music";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { getApiErrorMessage } from "@/platform/api";
 import { getWork, updateWork } from "@/platform/creator-client";

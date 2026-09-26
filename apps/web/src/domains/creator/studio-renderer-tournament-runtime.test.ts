@@ -1,4 +1,4 @@
-import { WinnerCache, RemoteKillSwitch } from "@toonspectrum/studio-engine-registry";
+import { WinnerCache, RemoteKillSwitch } from "@toonstudio/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,7 +13,7 @@ import {
   type TournamentPersistencePort,
 } from "./studio-renderer-tournament-runtime";
 
-import type { ShadowComparisonReport } from "@toonspectrum/studio-engine-registry";
+import type { ShadowComparisonReport } from "@toonstudio/studio-engine-registry";
 
 /**
  * V12 §5 runtime wiring contracts: winner persistence goes through the async

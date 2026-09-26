@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { CommandRegistry } from "@toonspectrum/studio-command-registry";
+import { CommandRegistry } from "@toonstudio/studio-command-registry";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -39,7 +39,7 @@ import type {
   StudioCommandCatalogEntry,
   StudioCommandSource,
 } from "./studio-command-catalog";
-import type { StudioCommand } from "@toonspectrum/studio-command-registry";
+import type { StudioCommand } from "@toonstudio/studio-command-registry";
 
 const REPO_ROOT = path.resolve(__dirname, "../../../../..");
 

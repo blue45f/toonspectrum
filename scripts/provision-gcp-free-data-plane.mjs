@@ -214,7 +214,7 @@ function ensureDataset(existing) {
     `--location=${FIRESTORE_LOCATION}`,
     "mk",
     "--dataset",
-    "--description=ToonSpectrum append-only analytics and provider quota telemetry; sandbox guarded",
+    "--description=ToonStudio append-only analytics and provider quota telemetry; sandbox guarded",
     "--default_table_expiration=2592000",
     dataset,
   ]);

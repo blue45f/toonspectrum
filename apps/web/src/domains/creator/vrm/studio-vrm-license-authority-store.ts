@@ -44,7 +44,7 @@ type PersistedSource =
     };
 
 interface PersistedEnvelope {
-  readonly schema: "toonspectrum.vrm-license-authority-source";
+  readonly schema: "toonstudio.vrm-license-authority-source";
   readonly version: 1;
   readonly contentHash: string;
   readonly source: PersistedSource;
@@ -143,7 +143,7 @@ function parsePersistedAuthority(raw: string, expectedHash: string): StudioVrmLi
   }
   if (
     !isPlainRecord(parsed)
-    || parsed.schema !== "toonspectrum.vrm-license-authority-source"
+    || parsed.schema !== "toonstudio.vrm-license-authority-source"
     || parsed.version !== 1
     || parsed.contentHash !== expectedHash
     || !isPlainRecord(parsed.source)
@@ -196,7 +196,7 @@ export function createStudioVrmLicenseAuthorityStore(
       const canonicalHash = canonicalContentHash(contentHash);
       const authority = inspectStudioVrmLicenseAuthority(gltfJson);
       const envelope: PersistedEnvelope = {
-        schema: "toonspectrum.vrm-license-authority-source",
+        schema: "toonstudio.vrm-license-authority-source",
         version: 1,
         contentHash: canonicalHash,
         source: selectedSource(gltfJson, authority),

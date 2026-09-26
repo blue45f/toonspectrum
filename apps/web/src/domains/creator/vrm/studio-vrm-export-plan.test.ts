@@ -73,7 +73,7 @@ function skeletonNodes(): StudioVrmExportSceneSnapshot["nodes"] {
 function skeletonSnapshot(): StudioVrmExportSceneSnapshot {
   const nodes = skeletonNodes().slice(0, MESH_NODE);
   return {
-    meta: { name: "루미", authors: ["ToonSpectrum"] },
+    meta: { name: "루미", authors: ["ToonStudio"] },
     humanoidBones: humanoidBones(),
     nodes: nodes.map((node, index) =>
       index === ROOT_NODE ? { ...node, children: [HIPS_NODE] } : node,
@@ -86,7 +86,7 @@ function characterSnapshot(): StudioVrmExportSceneSnapshot {
   return {
     meta: {
       name: "루미",
-      authors: ["ToonSpectrum", "에이치준랩스"],
+      authors: ["ToonStudio", "에이치준랩스"],
       version: "1.0.0",
       thumbnailImage: 0,
       avatarPermission: "onlyAuthor",

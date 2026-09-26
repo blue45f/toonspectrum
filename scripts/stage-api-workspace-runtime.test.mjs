@@ -77,50 +77,50 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     }
     const compiler = JSON.parse(await readFile(new URL("../apps/api/tsconfig.json", import.meta.url), "utf8"));
     for (const name of optionalModelEntries) {
-      assert.deepEqual(compiler.compilerOptions.paths[`@toonspectrum/studio-project-model/${name}`], [`../../packages/studio-project-model/src/graph/${name}.ts`]);
+      assert.deepEqual(compiler.compilerOptions.paths[`@toonstudio/studio-project-model/${name}`], [`../../packages/studio-project-model/src/graph/${name}.ts`]);
     }
     const staged = await stageApiWorkspaceRuntime(root);
     assert.deepEqual(staged.map((entry) => entry.name), [
-      "@toonspectrum/contracts",
-      "@toonspectrum/core",
-      "@toonspectrum/studio-project-model",
-      "@toonspectrum/studio-format-gateway",
+      "@toonstudio/contracts",
+      "@toonstudio/core",
+      "@toonstudio/studio-project-model",
+      "@toonstudio/studio-format-gateway",
     ]);
 
     const requireFromApi = createRequire(caller);
     for (const name of ["production-workspace", "operation-policy", "creator-publication-integrity"]) {
-      assert.deepEqual(requireFromApi(`@toonspectrum/contracts/${name}`), { contract: name });
+      assert.deepEqual(requireFromApi(`@toonstudio/contracts/${name}`), { contract: name });
     }
-    assert.deepEqual(requireFromApi("@toonspectrum/contracts/security/csrf"), {
+    assert.deepEqual(requireFromApi("@toonstudio/contracts/security/csrf"), {
       csrf: "ready",
     });
-    assert.deepEqual(requireFromApi("@toonspectrum/core"), {
+    assert.deepEqual(requireFromApi("@toonstudio/core"), {
       core: "ready",
     });
-    assert.deepEqual(requireFromApi("@toonspectrum/core/production"), {
+    assert.deepEqual(requireFromApi("@toonstudio/core/production"), {
       production: "risk-v2",
     });
-    assert.deepEqual(requireFromApi("@toonspectrum/core/creator-resources"), {
+    assert.deepEqual(requireFromApi("@toonstudio/core/creator-resources"), {
       creatorResources: "shared",
     });
-    assert.deepEqual(requireFromApi("@toonspectrum/core/infrastructure-fabric"), {
+    assert.deepEqual(requireFromApi("@toonstudio/core/infrastructure-fabric"), {
       infrastructureFabric: "free-only",
     });
-    assert.deepEqual(requireFromApi("@toonspectrum/studio-project-model"), {
+    assert.deepEqual(requireFromApi("@toonstudio/studio-project-model"), {
       model: "v3",
     });
-    assert.deepEqual(requireFromApi("@toonspectrum/studio-format-gateway"), {
+    assert.deepEqual(requireFromApi("@toonstudio/studio-format-gateway"), {
       gateway: "compatibility",
     });
 
     for (const name of optionalModelEntries) {
-      assert.deepEqual(requireFromApi(`@toonspectrum/studio-project-model/${name}`), { contract: name });
+      assert.deepEqual(requireFromApi(`@toonstudio/studio-project-model/${name}`), { contract: name });
     }
     const canonicalRoot = await realpath(root);
     for (const name of [
-      "@toonspectrum/core",
-      "@toonspectrum/studio-project-model",
-      "@toonspectrum/studio-format-gateway",
+      "@toonstudio/core",
+      "@toonstudio/studio-project-model",
+      "@toonstudio/studio-format-gateway",
     ]) {
       const resolved = await realpath(requireFromApi.resolve(name));
       assert.ok(resolved.startsWith(`${canonicalRoot}/`));
@@ -132,7 +132,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     }
 
     const corePackageJson = JSON.parse(await readFile(
-      resolve(root, "node_modules", "@toonspectrum", "core", "package.json"),
+      resolve(root, "node_modules", "@toonstudio", "core", "package.json"),
       "utf8",
     ));
     assert.equal(
@@ -144,7 +144,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     assert.equal(corePackageJson.exports["./production"], "./production/index.js");
     assert.equal(corePackageJson.exports["./infrastructure-fabric"], "./infrastructure-fabric.js");
     const contractsPackageJson = JSON.parse(await readFile(
-      resolve(root, "node_modules", "@toonspectrum", "contracts", "package.json"),
+      resolve(root, "node_modules", "@toonstudio", "contracts", "package.json"),
       "utf8",
     ));
     assert.equal(contractsPackageJson.exports["./security/csrf"], "./security/csrf.js");
@@ -229,14 +229,14 @@ test("분산 라우팅의 컴파일된 runtime 계약이 없으면 배포 패키
 test("session evidence is an explicitly emitted API contract, not an external type-only resolution", async () => {
   const apiConfig = JSON.parse(await readFile(new URL("../apps/api/tsconfig.json", import.meta.url), "utf8"));
   const source = "../../packages/studio-project-model/src/graph/work-session-evidence.ts";
-  assert.deepEqual(apiConfig.compilerOptions.paths["@toonspectrum/studio-project-model/work-session-evidence"], [source]);
+  assert.deepEqual(apiConfig.compilerOptions.paths["@toonstudio/studio-project-model/work-session-evidence"], [source]);
 });
 
 test("API graph subpaths compile from workspace sources instead of type-only package resolution", async () => {
   const config = JSON.parse(await readFile(new URL("../apps/api/tsconfig.json", import.meta.url), "utf8"));
   const manifest = JSON.parse(await readFile(new URL("../packages/studio-project-model/package.json", import.meta.url), "utf8"));
   for (const name of ["work-session", "work-session-evidence", "pinned-review-share", "review-delivery", "review-voice-note", "world-publication", "world-acoustic", "world-conversation"]) {
-    assert.deepEqual(config.compilerOptions.paths[`@toonspectrum/studio-project-model/${name}`], [
+    assert.deepEqual(config.compilerOptions.paths[`@toonstudio/studio-project-model/${name}`], [
       `../../packages/studio-project-model/src/graph/${name}.ts`,
     ]);
     assert.equal(manifest.exports[`./${name}`].types, `./src/graph/${name}.ts`);

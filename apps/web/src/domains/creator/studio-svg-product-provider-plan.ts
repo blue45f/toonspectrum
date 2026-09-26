@@ -5,7 +5,7 @@ import {
   thorvgProviderId,
   type ThorvgBackend,
   type ThorvgSvgAudit,
-} from "@toonspectrum/studio-engine-thorvg/audit";
+} from "@toonstudio/studio-engine-thorvg/audit";
 
 import { STUDIO_SVG_PRODUCT_SELECTED_PROVIDER_ID } from "./studio-svg-vello-product-router";
 

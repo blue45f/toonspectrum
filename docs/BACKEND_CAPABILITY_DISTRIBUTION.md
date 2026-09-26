@@ -3,7 +3,7 @@
 - 상태: **현재 배치·실패 정책**
 - 최종 갱신: **2026-09-26**
 
-ToonSpectrum은 하나의 transactional source of truth를 유지하고 실패 뒤 재시도·재구성이 가능한 workload만
+ToonStudio은 하나의 transactional source of truth를 유지하고 실패 뒤 재시도·재구성이 가능한 workload만
 외부 provider에 배치한다. 무료 hosting quota를 distributed transaction 권위로 사용하지 않는다.
 
 ## 권위 경계
@@ -40,7 +40,7 @@ Upstash Redis coordination은 user data capability가 아니다. 짧은 lease, i
 circuit, budget reservation만 저장하고 artwork, asset byte, session, comment, authoritative CRDT를 저장하지
 않는다.
 
-browser의 Supabase Realtime adapter는 lazy boundary만 있으며 production에서는 비활성이다. ToonSpectrum
+browser의 Supabase Realtime adapter는 lazy boundary만 있으며 production에서는 비활성이다. ToonStudio
 session은 Supabase Auth JWT가 아니므로 검증된 JWT/RLS bridge 없이 anon channel을 열지 않는다. 첫 배포의
 세 ephemeral channel은 Cloudflare가 소유하고 Supabase는 private object storage data plane으로 사용한다.
 
@@ -102,7 +102,7 @@ local fallback은 production 밖에서 `BACKEND_LOCAL_FALLBACK=development`로�
 모든 provider facade는 하나의 endpoint만 구현한다.
 
 ```text
-/.well-known/toonspectrum/backend-capabilities/v1/execute
+/.well-known/toonstudio/backend-capabilities/v1/execute
 ```
 
 container provider는 full app graph가 아니라 `API_RUNTIME_ROLE=capability-worker` image를 공유한다. 공개
@@ -144,7 +144,7 @@ thumbnail worker는 immutable Supabase source reference를 받아 MIME, byte cou
 WebP는 deterministic encoder가 검증되기 전 unsupported다. Long AI도 strict command port를 사용하지만
 queue acceptance가 증명될 때까지 광고하지 않는다.
 
-gateway token은 `x-toonspectrum-gateway-token`에만 있다. body/status/result에 넣지 않는다. base URL은 path,
+gateway token은 `x-toonstudio-gateway-token`에만 있다. body/status/result에 넣지 않는다. base URL은 path,
 query, fragment, userinfo 없는 secure origin이어야 한다. fixed path와 redirect 차단으로 credential 유출을
 막는다. response는 bounded extra-key-free v1 schema와 `fidelity: exact`를 만족해야 한다.
 

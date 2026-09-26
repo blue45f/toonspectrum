@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.visual-curation.v1",
+  "schema": "toonstudio.visual-curation.v1",
   "reviewedOn": "2026-09-06",
   "baselineVisualItemsReviewed": 1351,
   "baselineContactPagesViewed": 57,

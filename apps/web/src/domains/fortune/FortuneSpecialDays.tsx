@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { readFortuneResponse, validatedFortuneExpiry } from "./fortune-response-lifetime";
 import { useFortuneExpiry } from "./useFortuneExpiry";
-import { FORTUNE_SPECIAL_DAY_CATEGORIES, FORTUNE_SPECIAL_DAY_LABELS, validateFortuneSpecialDays, type FortuneSpecialDayCategory } from "@toonspectrum/core/fortune";
+import { FORTUNE_SPECIAL_DAY_CATEGORIES, FORTUNE_SPECIAL_DAY_LABELS, validateFortuneSpecialDays, type FortuneSpecialDayCategory } from "@toonstudio/core/fortune";
 
 const schema = z.object({ kind: z.literal("special-days"), month: z.string(), category: z.enum(FORTUNE_SPECIAL_DAY_CATEGORIES),
   status: z.enum(["external", "external-cache", "local-fallback"]), source: z.enum(["local", "kasi"]), policyRevision: z.string().max(100),

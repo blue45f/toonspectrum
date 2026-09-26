@@ -1,5 +1,5 @@
 import { apiFetch } from "@/platform/api";
-import { playSfx } from "@toonspectrum/core/fx";
+import { playSfx } from "@toonstudio/core/fx";
 import { Command } from "cmdk";
 import {
   Search,

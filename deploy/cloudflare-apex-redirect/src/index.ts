@@ -16,7 +16,7 @@ export function canonicalRedirect(request: Request): Response {
       "referrer-policy": "strict-origin-when-cross-origin",
       "strict-transport-security": STRICT_TRANSPORT_SECURITY,
       "x-content-type-options": "nosniff",
-      "x-toonspectrum-canonical-origin": CANONICAL_ORIGIN,
+      "x-toonstudio-canonical-origin": CANONICAL_ORIGIN,
     },
   });
 }

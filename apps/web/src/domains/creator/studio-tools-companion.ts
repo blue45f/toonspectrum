@@ -58,9 +58,9 @@ export type {
   StudioCompanionReferenceProjection,
 } from "./studio-companion-reference-projection";
 
-export const STUDIO_TOOLS_COMPANION_CHANNEL = "toonspectrum.studio.tools-companion.v1";
+export const STUDIO_TOOLS_COMPANION_CHANNEL = "toonstudio.studio.tools-companion.v1";
 export const STUDIO_TOOLS_COMPANION_PATH = "/studio/tools-companion";
-export const STUDIO_TOOLS_COMPANION_WINDOW_NAME = "toonspectrum-studio-tools";
+export const STUDIO_TOOLS_COMPANION_WINDOW_NAME = "toonstudio-studio-tools";
 export const STUDIO_TOOLS_COMPANION_WINDOW_FEATURES =
   "popup=yes,width=520,height=820,menubar=no,toolbar=no,location=no,status=no";
 

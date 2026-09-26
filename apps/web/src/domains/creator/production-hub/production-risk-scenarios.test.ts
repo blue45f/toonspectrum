@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type {
   ProductionProjectAggregate,
   RoleAssignment,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import { createProductionDemoProject } from "./production-demo";
 import { deriveProductionOperationsOverview } from "./production-episode-operations";

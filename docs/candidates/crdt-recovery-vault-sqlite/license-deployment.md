@@ -7,9 +7,9 @@
 | SQLite core | 3.53.0 through the existing repository lock | Public domain | Transactions, constraints, deterministic scans, local database format |
 | `@sqlite.org/sqlite-wasm` | 3.53.0-build1, existing dependency | Package declares Apache-2.0; retain package LICENSE/NOTICE and exact SBOM pin | Browser WASM API and OPFS SAH-pool VFS |
 | OPFS / SyncAccessHandle | Browser platform | Web standard | Durable same-origin backing for `studio-local-v12.db` |
-| V12 recovery schema/adapter | ToonSpectrum source | Project license | Bounded row persistence, corruption checks, marker/chunk/manifest semantics |
-| Same-page marker latch | ToonSpectrum source | Project license | Ephemeral current-page fail-closed guard only |
-| Former IndexedDB/localStorage data | Browser platform plus historical ToonSpectrum formats | Web standard / project license | Destruction inventory or future explicit salvage only; absent from product boot |
+| V12 recovery schema/adapter | ToonStudio source | Project license | Bounded row persistence, corruption checks, marker/chunk/manifest semantics |
+| Same-page marker latch | ToonStudio source | Project license | Ephemeral current-page fail-closed guard only |
+| Former IndexedDB/localStorage data | Browser platform plus historical ToonStudio formats | Web standard / project license | Destruction inventory or future explicit salvage only; absent from product boot |
 
 No dependency, package manifest, lockfile, native binary, or notice change is required for this
 slice. The implementation reuses the repository's already-pinned SQLite WASM distribution.
@@ -24,7 +24,7 @@ slice. The implementation reuses the repository's already-pinned SQLite WASM dis
   -> acquireStudioLocalDatabase()          one app-lifetime handle
   -> requireStudioCrdtRecoveryDatabase()   v6 fail-closed capability
   -> dynamic @sqlite.org/sqlite-wasm
-  -> OPFS SAH-pool/toonspectrum-studio-sqlite
+  -> OPFS SAH-pool/toonstudio-studio-sqlite
   -> studio-local-v12.db
        └─ crdt_recovery_v12_rows
 ```
@@ -48,7 +48,7 @@ VFS in production, reconstruct the removed JSON KV index, or open browser KV as 
 
 `LEGACY_DATA_MIGRATION=FALSE` for this authority:
 
-- product boot does not open `toonspectrum-studio-crdt-recovery-vault` IndexedDB;
+- product boot does not open `toonstudio-studio-crdt-recovery-vault` IndexedDB;
 - product boot does not scan the former permanent-rejection localStorage prefix;
 - no legacy row is copied into v6 automatically;
 - the existing data-destruction inventory may still name historical storage so an explicit,

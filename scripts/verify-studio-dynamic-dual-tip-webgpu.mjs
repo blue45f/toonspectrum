@@ -23,7 +23,7 @@ import { WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 const SCRATCH =
   process.env.TOONSPECTRUM_DYNAMIC_DUAL_TIP_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-dynamic-dual-tip-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-dynamic-dual-tip-${Date.now()}`);
 const HARNESS_PATH = "/__studio_dynamic_dual_tip_webgpu__";
 const HARNESS_ENTRY = "/scripts/studio-dynamic-dual-tip-webgpu-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;

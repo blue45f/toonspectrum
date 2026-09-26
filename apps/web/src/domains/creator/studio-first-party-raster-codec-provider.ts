@@ -1,5 +1,5 @@
 /**
- * ToonSpectrum-owned codec providers for the public raster formats implemented by
+ * ToonStudio-owned codec providers for the public raster formats implemented by
  * `studio-raster-interchange`.
  *
  * The provider contract is byte-only, so encode requests use a compact canonical RGBA envelope.
@@ -64,37 +64,37 @@ interface StudioFirstPartyRasterCodecDescriptor {
 const DESCRIPTORS = Object.freeze([
   {
     format: "bmp",
-    providerId: "toonspectrum.raster.bmp.v1",
+    providerId: "toonstudio.raster.bmp.v1",
     mimeType: "image/bmp",
     extension: ".bmp",
   },
   {
     format: "tga",
-    providerId: "toonspectrum.raster.tga.v1",
+    providerId: "toonstudio.raster.tga.v1",
     mimeType: "image/x-tga",
     extension: ".tga",
   },
   {
     format: "ppm",
-    providerId: "toonspectrum.raster.ppm.v1",
+    providerId: "toonstudio.raster.ppm.v1",
     mimeType: "image/x-portable-pixmap",
     extension: ".ppm",
   },
   {
     format: "pam",
-    providerId: "toonspectrum.raster.pam.v1",
+    providerId: "toonstudio.raster.pam.v1",
     mimeType: "image/x-portable-arbitrarymap",
     extension: ".pam",
   },
   {
     format: "qoi",
-    providerId: "toonspectrum.raster.qoi.v1",
+    providerId: "toonstudio.raster.qoi.v1",
     mimeType: "image/qoi",
     extension: ".qoi",
   },
   {
     format: "tiff",
-    providerId: "toonspectrum.raster.tiff.v1",
+    providerId: "toonstudio.raster.tiff.v1",
     mimeType: "image/tiff",
     extension: ".tiff",
   },
@@ -319,7 +319,7 @@ function createManifest(
     maxOutputBytes: STUDIO_FIRST_PARTY_RASTER_CODEC_LIMITS.maxOutputBytes,
     deterministic: true,
     licenseGrant: Object.freeze({
-      id: `toonspectrum.first-party.${descriptor.format}.v1`,
+      id: `toonstudio.first-party.${descriptor.format}.v1`,
       scope: FIRST_PARTY_CODEC_LICENSE_SCOPE,
       expiresAt: null,
     }),

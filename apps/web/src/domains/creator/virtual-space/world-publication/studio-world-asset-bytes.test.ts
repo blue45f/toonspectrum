@@ -1,6 +1,6 @@
 import { createHash, webcrypto } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { STUDIO_WORLD_ASSET_FILE_MAX_BYTES, STUDIO_WORLD_ASSET_TOTAL_MAX_BYTES } from "@toonspectrum/studio-project-model/world-publication";
+import { STUDIO_WORLD_ASSET_FILE_MAX_BYTES, STUDIO_WORLD_ASSET_TOTAL_MAX_BYTES } from "@toonstudio/studio-project-model/world-publication";
 import { readStudioWorldAssetBytes } from "./studio-world-asset-bytes";
 
 beforeEach(() => vi.stubGlobal("crypto", webcrypto)); afterEach(() => vi.unstubAllGlobals());

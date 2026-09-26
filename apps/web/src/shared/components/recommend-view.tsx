@@ -529,7 +529,7 @@ export function RecommendView({
               나를 위한 개인화 추천 받기
             </h3>
             <p className="text-xs text-fg-3 max-w-sm leading-relaxed">
-              인생작 몇 편과 선호하는 장르를 선택해주시면, 툰스펙트럼의 다축 AI
+              인생작 몇 편과 선호하는 장르를 선택해주시면, 툰스튜디오의 다축 AI
               엔진이 전 플랫폼을 가로질러 맞춤 작품을 즉시 제안해 드립니다.
             </p>
           </div>

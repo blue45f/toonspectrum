@@ -29,7 +29,7 @@ import {
 import { hashStudioShared3dStageBackground } from "./studio-shared-3d-stage-document";
 
 export const STUDIO_LINKED_3D_RENDER_DOCUMENT_KIND =
-  "toonspectrum.studio-linked-3d-render" as const;
+  "toonstudio.studio-linked-3d-render" as const;
 export const STUDIO_LINKED_3D_RENDER_DOCUMENT_VERSION = 2 as const;
 export const STUDIO_LINKED_3D_RENDER_MAX_CORRECTIONS_PER_LINK = 512;
 export const STUDIO_LINKED_3D_RENDER_MAX_BYTES = 192 * 1024;
@@ -53,7 +53,7 @@ export type StudioLinked3dCorrectionConflictCode =
 
 /** Immutable provenance captured on the real DrawEl at pointer-down. */
 export interface StudioLinked3dCorrectionProvenance {
-  readonly kind: "toonspectrum.linked-3d-correction";
+  readonly kind: "toonstudio.linked-3d-correction";
   readonly version: 1;
   readonly bundleId: string;
   readonly pass: "line";
@@ -190,7 +190,7 @@ export function parseStudioLinked3dCorrectionProvenance(
   const objectIdentityHash = safeHash(value.objectIdentityHash);
   const basePassRootHash = safeHash(value.basePassRootHash);
   if (
-    value.kind !== "toonspectrum.linked-3d-correction"
+    value.kind !== "toonstudio.linked-3d-correction"
     || value.version !== 1
     || value.pass !== "line"
     || !bundleId
@@ -202,7 +202,7 @@ export function parseStudioLinked3dCorrectionProvenance(
     || !basePassRootHash
   ) return null;
   return Object.freeze({
-    kind: "toonspectrum.linked-3d-correction",
+    kind: "toonstudio.linked-3d-correction",
     version: 1,
     bundleId,
     pass: "line",
@@ -725,7 +725,7 @@ export function createStudioLinked3dCorrectionProvenance(
   if (!link) return null;
   const pass = link.passRevision;
   return Object.freeze({
-    kind: "toonspectrum.linked-3d-correction",
+    kind: "toonstudio.linked-3d-correction",
     version: 1,
     bundleId: link.bundleId,
     pass: "line",

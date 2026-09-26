@@ -7,7 +7,7 @@
 | SQLite core | 3.53.0 through the existing lockfile | Public domain | SQL engine and database file format |
 | `@sqlite.org/sqlite-wasm` | 3.53.0-build1 | Installed package declares Apache-2.0; preserve package LICENSE/NOTICE and exact version in SBOM | Browser WASM wrapper and OPFS SAH-pool VFS |
 | OPFS / SyncAccessHandle | Browser platform API | Web standard, no bundled third-party code | Durable local file backing for `studio-local-v12.db` |
-| Scene/Emeres repositories and codecs | ToonSpectrum source | Project license | Stable model validation, authority protocol and UI state |
+| Scene/Emeres repositories and codecs | ToonStudio source | Project license | Stable model validation, authority protocol and UI state |
 
 No new package, native binary, font, image corpus or external engine is added by this change.
 
@@ -17,7 +17,7 @@ No new package, native binary, font, image corpus or external engine is added by
 /studio lazy creator UI
   -> acquireStudioLocalDatabase()
   -> existing dynamic @sqlite.org/sqlite-wasm runtime
-  -> OPFS SAH-pool/toonspectrum-studio-sqlite
+  -> OPFS SAH-pool/toonstudio-studio-sqlite
   -> studio-local-v12.db
        ├─ studio-scene-snapshots-v12
        └─ studio-emeres-library-v12

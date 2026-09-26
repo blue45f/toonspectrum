@@ -10,7 +10,7 @@ import type {
   ProductionTask,
   RevisionRef,
   Submission,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 import type {
   StudioProjectGraphSnapshot,
   StudioProjectRevisionRecord,

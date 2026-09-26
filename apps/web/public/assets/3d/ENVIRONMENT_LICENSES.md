@@ -1,10 +1,10 @@
-# ToonSpectrum Studio BG3D environment pack
+# ToonStudio Studio BG3D environment pack
 
-The twelve files under `public/assets/3d/environments/` were created from scratch by ToonSpectrum
+The twelve files under `public/assets/3d/environments/` were created from scratch by ToonStudio
 with the reproducible Blender 5.2 generators
 `scripts/blender/generate_environment_pack_v3.py` and
 `scripts/blender/generate_environment_pack_v4.py` and
-`scripts/blender/generate_environment_pack_v5.py`. ToonSpectrum dedicates these environment models
+`scripts/blender/generate_environment_pack_v5.py`. ToonStudio dedicates these environment models
 to the public domain under **CC0 1.0 Universal**.
 
 - License: CC0-1.0

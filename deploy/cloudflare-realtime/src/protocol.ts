@@ -1,5 +1,5 @@
-export const REALTIME_PROTOCOL_VERSION = "toonspectrum.realtime.v1" as const;
-export const REALTIME_WEBSOCKET_PROTOCOL = "toonspectrum-realtime-v1" as const;
+export const REALTIME_PROTOCOL_VERSION = "toonstudio.realtime.v1" as const;
+export const REALTIME_WEBSOCKET_PROTOCOL = "toonstudio-realtime-v1" as const;
 export const REALTIME_TICKET_PROTOCOL_PREFIX = "ts-ticket." as const;
 
 export const REALTIME_MAX_INBOUND_FRAME_BYTES = 64 * 1024;

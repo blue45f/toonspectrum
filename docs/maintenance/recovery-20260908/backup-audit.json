@@ -25,10 +25,10 @@
             "import { drawElement } from './live/studio-live-dynamic-brush-overlay.fixture';",
             "import { planStudioDynamicBrushRender } from './studio-dynamic-brush-render-plan';",
             "import { planStudioDynamicBrushCoverageMarks, renderStudioDynamicBrushCoverageMark, renderStudioDynamicBrushCoverage } from './studio-dynamic-brush-coverage-renderer';",
-            "const out='/tmp/toonspectrum-inkwash-parity316';",
+            "const out='/tmp/toonstudio-inkwash-parity316';",
             "const rows: unknown[]=[];",
             "let kit: any;",
-            "beforeAll(async()=>{ kit=await (await import('@toonspectrum/studio-engine-skia/node')).loadCanvasKitNode(); mkdirSync(out,{recursive:true}); });",
+            "beforeAll(async()=>{ kit=await (await import('@toonstudio/studio-engine-skia/node')).loadCanvasKitNode(); mkdirSync(out,{recursive:true}); });",
             "afterAll(()=>writeFileSync(out+'/results.json',JSON.stringify(rows,null,2)));",
             "const point=(t:number)=>({x:720*(.12+.5*t),y:807*(.2+.42*t-Math.sin(t*Math.PI)*.12)*720/1048});",
             "const points:number[]=[];",
@@ -198,7 +198,7 @@
             "import { resolve } from \"node:path\";",
             "import { createServer } from \"vite\";",
             "import { chromium } from \"playwright\";",
-            "const scratch=\"/private/tmp/toonspectrum-all-issues-20260908/bg3d-origin-probe-cold\";",
+            "const scratch=\"/private/tmp/toonstudio-all-issues-20260908/bg3d-origin-probe-cold\";",
             "mkdirSync(scratch,{recursive:true});",
             "const vite=await createServer({root:resolve(\"apps/web\"),configFile:resolve(\"vite.config.ts\"),server:{host:\"127.0.0.1\",port:52931,strictPort:true},appType:\"custom\",logLevel:\"warn\"});",
             "vite.middlewares.use(async(req,res,next)=>{if(req.url!==\"/probe\"){next();return;}res.setHeader(\"Content-Type\",\"text/html\");res.end(await vite.transformIndexHtml(\"/probe\",`<!doctype html><div id=\"root\"></div><script type=\"module\" src=\"/tools/browser-harnesses/.bg3d-origin-probe.tsx\"></script>`));});",
@@ -299,12 +299,12 @@
             "import { drawElement } from './live/studio-live-dynamic-brush-overlay.fixture';",
             "import { planStudioDynamicBrushRender } from './studio-dynamic-brush-render-plan';",
             "import type { StudioDynamicBrushCoverageMarkPlanInput } from './studio-dynamic-brush-coverage-renderer';",
-            "const out = '/tmp/toonspectrum-pr944-review314/painttube-ab315';",
+            "const out = '/tmp/toonstudio-pr944-review314/painttube-ab315';",
             "const rows: unknown[] = [];",
             "let skia: { MakeCanvas(w:number,h:number): {getContext(k:'2d'):CanvasRenderingContext2D; dispose():void} };",
             "const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');",
             "beforeAll(async () => {",
-            "  const specifier = '@toonspectrum/studio-engine-skia/node';",
+            "  const specifier = '@toonstudio/studio-engine-skia/node';",
             "  skia = await (await import(/* @vite-ignore */specifier)).loadCanvasKitNode();",
             "  mkdirSync(out, { recursive:true });",
             "});",
@@ -5881,7 +5881,7 @@
       ]
     },
     {
-      "name": "salvage/toonspectrum-arch",
+      "name": "salvage/toonstudio-arch",
       "sha": "0a630760455ad6ddc70e038caf86224861d42b1c",
       "parent": "b6ad9db34b9b1d5c2567095aa7294449f2099fdb",
       "files": [
@@ -8050,7 +8050,7 @@
       ]
     },
     {
-      "name": "salvage/toonspectrum-main-diag",
+      "name": "salvage/toonstudio-main-diag",
       "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
       "parent": "02fc857ce09af00f9ad1c4757e174ff4eb320e42",
       "files": [
@@ -8151,13 +8151,13 @@
       "adaptation": "Preserve exact original versioned results; never overwrite current benchmark baseline."
     },
     {
-      "sourceBranch": "salvage/toonspectrum-arch",
+      "sourceBranch": "salvage/toonstudio-arch",
       "source": "tests/benchmarks/results/{bristle-model,living-ink-fluid}.json",
       "target": "evidence/architecture/",
       "adaptation": "Preserve exact original versioned results; never overwrite current benchmark baseline."
     },
     {
-      "sourceBranch": "salvage/toonspectrum-main-diag",
+      "sourceBranch": "salvage/toonstudio-main-diag",
       "source": "pnpm-workspace.yaml verifyDepsBeforeRun:false",
       "target": "local-config/verify-deps-before-run.yaml + README",
       "adaptation": "Keep original local opt-out as inactive config artifact and explicit local invocation documentation; do not globally weaken workspace validation."

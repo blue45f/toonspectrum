@@ -1,8 +1,8 @@
-# ToonSpectrum operating-cost supporter center
+# ToonStudio operating-cost supporter center
 
 ## Purpose
 
-`/support-us` exists so people can voluntarily help the developer keep ToonSpectrum free.
+`/support-us` exists so people can voluntarily help the developer keep ToonStudio free.
 It is intentionally separated from the existing customer-support route (`/support`) and from creator settlement or business sponsorship.
 
 The public page has three clear boundaries:
@@ -11,7 +11,7 @@ The public page has three clear boundaries:
 2. **Business sponsorship** — routed to `/business?type=sponsorship` when a company expects advertising, deliverables, joint projects, or other consideration.
 3. **Tax-deductible/public-interest donation** — not offered. The site must not promise a statutory donation receipt or tax deduction through this flow.
 
-Supporting ToonSpectrum does not unlock features, change an account tier, provide preferential exposure, create equity/revenue rights, or purchase a membership.
+Supporting ToonStudio does not unlock features, change an account tier, provide preferential exposure, create equity/revenue rights, or purchase a membership.
 Core service access remains independent of support.
 
 ## Payment architecture
@@ -29,7 +29,7 @@ The checkout uses Toss Payments SDK v2 in the browser and Toss Core API on the s
 9. Webhooks never become trusted payment state by themselves. The server retrieves the payment from Toss and reconciles the verified response.
 10. Operators can explicitly re-sync a ledger row with Toss before refund or incident handling.
 
-The browser never receives the secret key. ToonSpectrum never stores card numbers, bank authentication credentials, or virtual-account refund account data.
+The browser never receives the secret key. ToonStudio never stores card numbers, bank authentication credentials, or virtual-account refund account data.
 
 ## Privacy and public supporter wall
 
@@ -88,7 +88,7 @@ Before enabling live payments:
 
 The admin ledger supports full cancellation for payment states that Toss can cancel without collecting additional sensitive data. Cancellation requests include an idempotency key.
 
-An already-deposited virtual-account payment is intentionally not auto-refunded from ToonSpectrum because Toss requires refund-account handling. Operators are directed to the Toss payment manager for that case, so the application does not collect or store bank refund credentials.
+An already-deposited virtual-account payment is intentionally not auto-refunded from ToonStudio because Toss requires refund-account handling. Operators are directed to the Toss payment manager for that case, so the application does not collect or store bank refund credentials.
 
 ## Tax and terminology boundary
 
@@ -98,7 +98,7 @@ Any tax, accounting, cash-receipt, or business-registration obligations for real
 
 The admin ledger supports full cancellation for payment states that Toss can cancel without collecting additional sensitive data. Cancellation requests include an idempotency key.
 
-An already-deposited virtual-account payment is intentionally not auto-refunded from ToonSpectrum because Toss requires refund-account handling. Operators are directed to the Toss payment manager for that case, so the application does not collect or store bank refund credentials.
+An already-deposited virtual-account payment is intentionally not auto-refunded from ToonStudio because Toss requires refund-account handling. Operators are directed to the Toss payment manager for that case, so the application does not collect or store bank refund credentials.
 
 ## Tax and terminology boundary
 

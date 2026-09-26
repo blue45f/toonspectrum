@@ -37,7 +37,7 @@ const EnabledEnvironmentSchema = z
       .min(1)
       .max(64)
       .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u)
-      .default("toonspectrum"),
+      .default("toonstudio"),
     timeoutMs: IntegerEnvironmentValueSchema(2_500, 100, 30_000),
     maximumRequestBytes: IntegerEnvironmentValueSchema(
       16 * 1_024,

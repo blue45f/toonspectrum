@@ -5,7 +5,7 @@ import {
   type InfrastructureProviderPolicy,
   type InfrastructureProviderSnapshot,
   type InfrastructureWorkloadPolicy,
-} from "@toonspectrum/core/infrastructure-fabric";
+} from "@toonstudio/core/infrastructure-fabric";
 
 import type {
   FederatedDataPlanePolicyDefinition,
@@ -17,7 +17,7 @@ import type {
 import { FEDERATED_DATA_PLANE_POLICY } from "./federated-data-plane-policy.generated";
 
 export const FEDERATED_DATA_PLANE_QUOTA_SNAPSHOT_VERSION =
-  "toonspectrum.federated-data-plane-quota.v1" as const;
+  "toonstudio.federated-data-plane-quota.v1" as const;
 
 export class FederatedDataPlaneConfigurationError extends Error {
   constructor(message = "Federated data-plane configuration is invalid") {

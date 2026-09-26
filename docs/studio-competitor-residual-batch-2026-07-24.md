@@ -5,7 +5,7 @@ Finite shippable batch after CSP EX / Magma / Photopea / Procreate / SHAPER surv
 
 ## Shipped this batch
 
-| Competitor class | ToonSpectrum delivery |
+| Competitor class | ToonStudio delivery |
 | --- | --- |
 | CSP EX multi-page multi-select move/delete | `deletePagesBulk` / `movePagesBulk` + `StudioPageListPane` multi-select toolbar |
 | CSP EX lettering 루비 + range format | `studio-dialogue-ruby.ts` + story panel 루비 UI |

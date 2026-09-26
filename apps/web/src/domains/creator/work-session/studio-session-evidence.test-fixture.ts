@@ -1,5 +1,5 @@
-import { createStudioWorkSession, type StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
-import type { StudioSessionEvidenceResponse } from "@toonspectrum/studio-project-model/work-session-evidence";
+import { createStudioWorkSession, type StudioWorkSessionView } from "@toonstudio/studio-project-model/work-session";
+import type { StudioSessionEvidenceResponse } from "@toonstudio/studio-project-model/work-session-evidence";
 
 export const evidenceTestDigest = "a".repeat(64);
 export const evidenceTestSource = { version: 1 as const, sourceServerRevision: 4, sourceContentDigest: evidenceTestDigest, pageOrdinal: 0, pageId: "page-1" };

@@ -5,7 +5,7 @@
 | Component | Deployment role | License / notice action |
 | --- | --- | --- |
 | WebCrypto `SubtleCrypto.digest("SHA-256")` | v1 content digest | 브라우저 Web Platform API라 별도 JS/WASM 배포물 없음. 브라우저 binary를 앱에 포함하지 않음 |
-| ToonSpectrum `studio-package-archive` writer와 recovery reader | deterministic ZIP32/store container, CRC/path/bounds | 저장소 프로젝트 라이선스 적용. 새 외부 라이브러리 없음 |
+| ToonStudio `studio-package-archive` writer와 recovery reader | deterministic ZIP32/store container, CRC/path/bounds | 저장소 프로젝트 라이선스 적용. 새 외부 라이브러리 없음 |
 | `@sqlite.org/sqlite-wasm 3.53.0-build1` | source/destination local history authority | SQLite core public domain. 기존 exact pin·SBOM·notice 정책 유지 |
 | `blake3-wasm 2.1.5` | 비교 challenger, 제품 미사용 | MIT. 현재 `wrangler`의 전이 devDependency라 제품 import/배포 권위 없음. direct 채택 시 exact pin·notice·security review 필요 |
 | `hash-wasm 4.12.0` | registry 조사 후보, 미설치·미실행 | MIT. 채택 전 실제 browser chunk와 공급망 검토 필요 |

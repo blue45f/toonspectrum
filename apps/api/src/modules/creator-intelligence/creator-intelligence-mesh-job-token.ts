@@ -7,7 +7,7 @@ import {
 
 const TOKEN_VERSION = "v1";
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60_000;
-const DEVELOPMENT_SECRET = "toonspectrum-creator-intelligence-dev-secret";
+const DEVELOPMENT_SECRET = "toonstudio-creator-intelligence-dev-secret";
 
 interface MeshJobTokenPayload {
   readonly sub: string;

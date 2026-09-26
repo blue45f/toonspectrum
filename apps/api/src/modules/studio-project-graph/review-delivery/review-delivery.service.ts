@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { ConflictException, ForbiddenException, HttpException, Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException } from "@nestjs/common";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
-import { reviewDeliveryManifestSchema, type ReviewDeliveryAction, type ReviewDeliveryAccept, type ReviewDeliveryPrepare } from "@toonspectrum/studio-project-model/review-delivery";
+import { canonicalJson } from "@toonstudio/studio-project-model";
+import { reviewDeliveryManifestSchema, type ReviewDeliveryAction, type ReviewDeliveryAccept, type ReviewDeliveryPrepare } from "@toonstudio/studio-project-model/review-delivery";
 
 import { PrivateSignedReadUrlSchema, type LocatedPrivateObjectReference } from "../../../platform/adapters/private-object-storage/private-object-storage.contract";
 import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../../platform/adapters/private-object-storage/private-object-storage.port";

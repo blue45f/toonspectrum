@@ -33,14 +33,14 @@ import {
   rotateMat2d,
   scaleMat2d,
   translateMat2d,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import { studioDrawObjectTransformScale } from "./brush/studio-draw-object-transform";
 import { studioLiveTransformRouteSurvivesScale } from "./studio-live-transform-render-route";
 
 import type { StudioDrawObjectTransformBounds } from "./brush/studio-draw-object-transform";
 import type { StudioLiveTransformRenderRoute } from "./studio-live-transform-render-route";
-import type { Mat2d } from "@toonspectrum/studio-project-model";
+import type { Mat2d } from "@toonstudio/studio-project-model";
 
 export interface StudioLiveTransformPreviewFrame {
   /**

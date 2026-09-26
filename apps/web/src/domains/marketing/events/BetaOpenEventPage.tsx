@@ -1,4 +1,4 @@
-import { SITE_URL } from "@toonspectrum/core/business";
+import { SITE_URL } from "@toonstudio/core/business";
 import {
   ArrowLeft,
   ArrowRight,

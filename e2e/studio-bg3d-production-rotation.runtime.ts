@@ -262,10 +262,10 @@ test("WebGPU 기즈모 연속 회전은 이전 실루엣을 누적하지 않는�
       && !text.includes("Failed to load resource") && !text.includes("/api/"))) fatal.push(text);
   });
   await page.addInitScript((session) => {
-    localStorage.setItem("toonspectrum-auth-session-v1", JSON.stringify(session));
+    localStorage.setItem("toonstudio-auth-session-v1", JSON.stringify(session));
   }, {
     user: { id: "11111111-2222-4333-8444-555555555555", name: "테스트 크리에이터",
-      email: "creator-test@toonspectrum.dev", image: null, role: "creator" },
+      email: "creator-test@toonstudio.dev", image: null, role: "creator" },
     expires: new Date(Date.now() + 86_400_000).toISOString(),
   });
   await page.setViewportSize({ width: 1_440, height: 1_000 });

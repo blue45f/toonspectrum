@@ -1,4 +1,4 @@
-# ToonSpectrum OpenWiki 작성 규칙
+# ToonStudio OpenWiki 작성 규칙
 
 현재 runtime 동작의 권위는 소스와 테스트다. ADR은 승인된 결정을 기록한다. 아키텍처 문서는 현재와
 목표를 함께 설명할 수 있지만 OpenWiki는 탐색·설명·증거 연결 계층일 뿐 소스, 테스트, ADR을 덮어쓰지

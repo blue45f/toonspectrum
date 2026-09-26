@@ -89,7 +89,7 @@ export function createStudioAutoColorHintsModuleWorker(): StudioAutoColorHintsWo
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-auto-color-hints.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-auto-color-hints",
+    name: "toonstudio-auto-color-hints",
   }) as unknown as StudioAutoColorHintsWorkerLike;
 }
 

@@ -351,7 +351,7 @@ export const creatorAssetArtifactSets = pgTable(
     check(
       "creator_asset_artifact_set_descriptor_check",
       sql`jsonb_typeof(${table.descriptor}) = 'object'
-        and ${table.descriptor}->>'schema' = 'toonspectrum.creator-asset-artifact-set'
+        and ${table.descriptor}->>'schema' = 'toonstudio.creator-asset-artifact-set'
         and ${table.descriptor}->>'version' = '1'
         and ${table.descriptor}->>'id' = ${table.id}`,
     ),

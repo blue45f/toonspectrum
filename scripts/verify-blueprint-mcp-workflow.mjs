@@ -12,7 +12,7 @@ try {
     const context = await browser.newContext({ viewport: { width, height: 1000 }, locale: "ko-KR", reducedMotion: "reduce" });
     const writes = [], errors = [];
     await context.route("**/api/**", (route) => { if (!["GET", "HEAD", "OPTIONS"].includes(route.request().method())) writes.push(new URL(route.request().url()).pathname); return route.fulfill({ status: 403, json: { error: "fixture network disabled" } }); });
-    await context.addInitScript(() => localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
+    await context.addInitScript(() => localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
     const page = await context.newPage(); page.on("pageerror", (error) => errors.push(error.message));
     page.setDefaultTimeout(20000);
     try {

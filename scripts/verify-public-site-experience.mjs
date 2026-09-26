@@ -26,7 +26,7 @@ async function check(name, run) {
 try {
   for (const width of [1440, 390, 320]) {
     const context = await browser.newContext({ viewport: { width, height: 960 }, locale: 'ko-KR', reducedMotion: 'reduce', serviceWorkers: 'block' });
-    await context.addInitScript(() => localStorage.setItem('toonspectrum-lang', JSON.stringify({ state: { lang: 'ko' }, version: 0 })));
+    await context.addInitScript(() => localStorage.setItem('toonstudio-lang', JSON.stringify({ state: { lang: 'ko' }, version: 0 })));
     const page = await context.newPage();
     await installBetaEventDismissal(page);
     await check(`connected journey and history ${width}`, async () => {
@@ -68,11 +68,11 @@ try {
       await form.getByRole('button', { name: '검색', exact: true }).click();
       await expect(page).toHaveURL(/\/search\?q=/u);
       await expect(page.locator('main h1')).toHaveCount(1);
-      const filters = page.locator('main a[href="#toonspectrum-search-explorer-top"]');
+      const filters = page.locator('main a[href="#toonstudio-search-explorer-top"]');
       await filters.focus();
       await page.keyboard.press('Enter');
-      await expect(page.locator('#toonspectrum-search-explorer-top')).toBeFocused();
-      const top = await page.locator('#toonspectrum-search-explorer-top').evaluate((element) => element.getBoundingClientRect().top);
+      await expect(page.locator('#toonstudio-search-explorer-top')).toBeFocused();
+      const top = await page.locator('#toonstudio-search-explorer-top').evaluate((element) => element.getBoundingClientRect().top);
       assert(top >= 0, 'Filter destination must not be above the viewport');
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     });

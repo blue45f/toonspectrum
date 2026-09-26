@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioProductionWorkspaceDocumentSchema } from "./studio-production.dto";
-import { studioReviewTaskCompletionContextSchema } from "@toonspectrum/studio-project-model";
+import { studioReviewTaskCompletionContextSchema } from "@toonstudio/studio-project-model";
 import { studioReviewTaskCompletionFingerprint as hash } from "./studio-review-task-completion-invalidation";
 import { StudioHandoffEnvelopeRepository } from "./studio-handoff-envelope.repository";
 import { studioHandoffChangedBriefs, studioHandoffChangedRoles } from "./studio-handoff-envelope-basis";

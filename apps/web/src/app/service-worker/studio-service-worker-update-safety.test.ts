@@ -11,14 +11,14 @@ import {
 } from "../../domains/creator/studio-update-safety";
 
 afterEach(() => {
-  document.getElementById("toonspectrum-sw-update")?.remove();
+  document.getElementById("toonstudio-sw-update")?.remove();
   resetStudioUpdateSafetyForTest();
   cleanup();
   vi.restoreAllMocks();
 });
 
 function promptParts() {
-  const host = document.getElementById("toonspectrum-sw-update");
+  const host = document.getElementById("toonstudio-sw-update");
   const root = host?.shadowRoot;
   if (!host || !root) throw new Error("update prompt was not rendered");
   const apply = root.querySelector<HTMLButtonElement>(".apply");

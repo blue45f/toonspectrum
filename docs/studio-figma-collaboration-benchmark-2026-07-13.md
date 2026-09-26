@@ -11,7 +11,7 @@ documentation for [multiplayer tools](https://help.figma.com/hc/en-us/sections/3
 
 ## Product translation
 
-| Figma strength | Webtoon-specific translation | ToonSpectrum status |
+| Figma strength | Webtoon-specific translation | ToonStudio status |
 | --- | --- | --- |
 | Multiplayer presence and cursors | See assistants' cursors on the active long-scroll page, including their current tool | Implemented: authenticated room is editor-lifetime, normalized cursor overlay is isolated from the large editor, immediate leave/page clear plus 3-second stale cleanup, WCAG-readable deterministic colors, no export contamination |
 | Follow another collaborator | Click an assistant avatar to follow page changes while reviewing cuts | Implemented: sticky presence dock and page-follow toggle; invalid/unknown page IDs are ignored |

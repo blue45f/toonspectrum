@@ -4,7 +4,7 @@
 
 The shipped scene-snapshot and user-authored Emeres libraries now use the shared V12
 `studio-local-v12.db` authority. The product path does not read the former scene-snapshot
-IndexedDB database or `toonspectrum-studio-emeres-library` localStorage key. Those old APIs remain
+IndexedDB database or `toonstudio-studio-emeres-library` localStorage key. Those old APIs remain
 only as explicit compatibility/test seams and are covered by the V12 destructive-discard boundary.
 
 This survey was produced from direct browser-storage access in `src/domains/creator`:
@@ -50,8 +50,8 @@ evidence.
 
 | Surface | Former product authority | V12 authority | Data-loss policy |
 |---|---|---|---|
-| Scene snapshot library | `toonspectrum-studio-scene-snapshot-library` IndexedDB | `studio-scene-snapshots-v12` namespace; immutable record keys + `index-v1` | No legacy read or import. Missing/corrupt/index-mismatched records fail the whole load. No partial salvage |
-| Emeres user image-template library | `toonspectrum-studio-emeres-library` localStorage array | `studio-emeres-library-v12` / `library-v1` | No legacy read. Corrupt, duplicate, oversized or non-canonical data fails closed. Accepted failed edits are labelled tab-memory only |
+| Scene snapshot library | `toonstudio-studio-scene-snapshot-library` IndexedDB | `studio-scene-snapshots-v12` namespace; immutable record keys + `index-v1` | No legacy read or import. Missing/corrupt/index-mismatched records fail the whole load. No partial salvage |
+| Emeres user image-template library | `toonstudio-studio-emeres-library` localStorage array | `studio-emeres-library-v12` / `library-v1` | No legacy read. Corrupt, duplicate, oversized or non-canonical data fails closed. Accepted failed edits are labelled tab-memory only |
 
 ### Remaining durable creative or operational authorities
 
@@ -60,7 +60,7 @@ SQLite-complete.
 
 | Priority | Surface and shipped caller | Current authority | Classification / next action |
 |---|---|---|---|
-| P0 | Named palettes: `StudioPaletteLibraryPanel`, `StudioPage`, `StudioBrandKitPanel` | `toonspectrum-studio-palette-library` localStorage | Durable creative library; move all readers/writers together to one SQLite repository |
+| P0 | Named palettes: `StudioPaletteLibraryPanel`, `StudioPage`, `StudioBrandKitPanel` | `toonstudio-studio-palette-library` localStorage | Durable creative library; move all readers/writers together to one SQLite repository |
 | P0 | Brand kits: `StudioBrandKitPanel` | localStorage | Durable colors/fonts/logos; use structured metadata plus OPFS/blob references for logos |
 | P0 | Reusable element clips: `StudioPage` | localStorage | Durable reusable scene fragments; canonical IR validation and SQL namespace required |
 | P0 | VRM custom poses/full states: `StudioVrmPoser` | `studio_custom_poses`, `studio_vrm_full_states` localStorage | Durable authored presets; separate from clipboard fallback and recents, then move to SQLite |

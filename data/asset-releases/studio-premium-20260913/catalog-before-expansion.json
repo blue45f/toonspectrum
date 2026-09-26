@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.asset-delivery.v1",
+  "schema": "toonstudio.asset-delivery.v1",
   "assets": [
     {
       "id": "polyhaven-plastic-monobloc-chair-01",

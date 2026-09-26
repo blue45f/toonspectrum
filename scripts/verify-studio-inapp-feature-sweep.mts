@@ -52,7 +52,7 @@ import type { Locator, Page } from "playwright";
 
 const SCRATCH = process.env.TOONSPECTRUM_SWEEP_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-inapp-sweep");
+  ?? join(tmpdir(), "toonstudio-studio-inapp-sweep");
 
 const REQUESTED_PROFILES = (process.env.TOONSPECTRUM_SWEEP_PROFILES ?? "")
   .split(",").map((value) => value.trim()).filter(Boolean);
@@ -1045,7 +1045,7 @@ async function main(): Promise<void> {
   writeFileSync(
     reportPath,
     `${JSON.stringify({
-      kind: "toonspectrum-studio-inapp-feature-sweep-v1",
+      kind: "toonstudio-studio-inapp-feature-sweep-v1",
       profiles: profiles.map((entry) => entry.id),
       steps: steps.map((step) => step.id),
       reports,

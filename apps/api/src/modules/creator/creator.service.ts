@@ -1215,9 +1215,9 @@ export class CreatorService {
 
   async searchCreatorDirectory(query: {
     q?: string;
-    role?: import("@toonspectrum/core/creator-role").CreatorRoleId;
-    specialty?: import("@toonspectrum/core/creator-role").CreatorSpecialtyId;
-    collaborationStatus?: import("@toonspectrum/core/creator-role").CreatorCollaborationStatus;
+    role?: import("@toonstudio/core/creator-role").CreatorRoleId;
+    specialty?: import("@toonstudio/core/creator-role").CreatorSpecialtyId;
+    collaborationStatus?: import("@toonstudio/core/creator-role").CreatorCollaborationStatus;
     limit?: number;
     offset?: number;
   }) {

@@ -682,7 +682,7 @@ async function main(): Promise<void> {
   const artifactRoot = resolve(
     process.env.TOONSPECTRUM_ARTIST_JOURNEY_VERIFY_DIR
     ?? process.env.TOONSPECTRUM_VERIFY_DIR
-    ?? join(tmpdir(), "toonspectrum-studio-artist-journey")
+    ?? join(tmpdir(), "toonstudio-studio-artist-journey")
   );
   const artifactDirectory = createStudioArtistJourneyRunDirectory(artifactRoot);
   const logPath = join(artifactDirectory, "studio-artist-journey.log");

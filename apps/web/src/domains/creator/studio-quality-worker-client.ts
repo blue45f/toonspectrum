@@ -119,7 +119,7 @@ export function createStudioQualityModuleWorker(): StudioQualityWorkerLike | nul
     new URL("./studio-quality-worker-entry.ts", import.meta.url),
     {
       type: "module",
-      name: "toonspectrum-quality-geometry",
+      name: "toonstudio-quality-geometry",
     },
   ) as unknown as StudioQualityWorkerLike;
 }
@@ -252,7 +252,7 @@ export class StudioQualityWorkerClient {
       ? createStudioQualityModuleWorker
       : options.workerFactory;
     this.#workerEpoch = options.workerEpoch ?? allocateDefaultEpoch();
-    this.#clientBuild = options.clientBuild ?? "toonspectrum-studio-quality";
+    this.#clientBuild = options.clientBuild ?? "toonstudio-studio-quality";
     assertEpoch(this.#workerEpoch);
     assertClientBuild(this.#clientBuild);
     this.#initTimeoutMs = normalizeTimeout(

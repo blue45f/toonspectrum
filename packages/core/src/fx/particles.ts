@@ -1,5 +1,5 @@
 /**
- * @toonspectrum/core/fx/particles — 공용 DOM 파티클 연출(isomorphic).
+ * @toonstudio/core/fx/particles — 공용 DOM 파티클 연출(isomorphic).
  *
  * canvas/렌더 루프 없이, 한 점에서 작은 DOM 노드 한 무더기를 방사상으로 날려 보내고
  * Web Animations API 로 애니메이션한 뒤 **스스로 정리**합니다(메모리 누수 0).

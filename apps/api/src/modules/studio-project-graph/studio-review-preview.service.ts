@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
-import type { StudioReviewPageMapping } from "@toonspectrum/studio-project-model";
+import type { StudioReviewPageMapping } from "@toonstudio/studio-project-model";
 
 import { PrivateSignedReadUrlSchema } from "../../platform/adapters/private-object-storage/private-object-storage.contract";
 import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../platform/adapters/private-object-storage/private-object-storage.port";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { initialOperationPolicy, licenseReviewAllows, operationTransitionBlockers, resolveOperationPolicy, type OperationPolicyDraft } from "@toonspectrum/contracts/operation-policy";
-import { nextSeoulDay } from "@toonspectrum/contracts/production-workspace";
+import { initialOperationPolicy, licenseReviewAllows, operationTransitionBlockers, resolveOperationPolicy, type OperationPolicyDraft } from "@toonstudio/contracts/operation-policy";
+import { nextSeoulDay } from "@toonstudio/contracts/production-workspace";
 import { ApplyOperationPolicySchema, OperationPolicyDraftSchema } from "./operation-policy.dto";
 import { WorkspaceCommandSchema, WorkspaceCreateSchema } from "../production-collaboration/team-workspace.dto";
 

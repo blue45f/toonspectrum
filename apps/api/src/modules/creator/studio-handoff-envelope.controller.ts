@@ -1,7 +1,7 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Header, Headers, HttpCode, Inject, Injectable, NotFoundException, Param, Post, Query } from "@nestjs/common";
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
-import { studioHandoffEnvelopeCreateSchema, studioHandoffEnvelopeActionSchema, studioHandoffEnvelopeAcceptSchema, studioReviewCompletionTaskIdSchema, studioReviewTaskReferenceSchema } from "@toonspectrum/studio-project-model";
+import { studioHandoffEnvelopeCreateSchema, studioHandoffEnvelopeActionSchema, studioHandoffEnvelopeAcceptSchema, studioReviewCompletionTaskIdSchema, studioReviewTaskReferenceSchema } from "@toonstudio/studio-project-model";
 import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { StudioHandoffEnvelopeRepository, StudioHandoffEnvelopeError } from "./studio-handoff-envelope.repository";
 import { StudioReviewTaskCompletionError } from "./studio-review-task-completion.repository";

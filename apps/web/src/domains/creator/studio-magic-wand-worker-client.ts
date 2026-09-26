@@ -41,7 +41,7 @@ export function createStudioMagicWandModuleWorker(): StudioMagicWandWorkerLike |
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-magic-wand.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-magic-wand",
+    name: "toonstudio-magic-wand",
   }) as unknown as StudioMagicWandWorkerLike;
 }
 

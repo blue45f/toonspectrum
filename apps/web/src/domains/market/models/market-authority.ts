@@ -151,9 +151,9 @@ function authoringPackageId(draftId: string): string {
 
 function authoringLicense(rights: Record<string, unknown>): CreatorMarketplaceResourceLicense {
   const value = rights.license === "free" || rights.license === "commercial"
-    ? "toonspectrum-standard" : rights.license;
+    ? "toonstudio-standard" : rights.license;
   if (
-    value === "toonspectrum-standard"
+    value === "toonstudio-standard"
     || value === "cc0-1.0"
     || value === "cc-by-4.0"
     || value === "cc-by-nc-4.0"
@@ -161,7 +161,7 @@ function authoringLicense(rights: Record<string, unknown>): CreatorMarketplaceRe
     if (value !== "cc-by-nc-4.0" && rights.commercialUse !== true) {
       throw new Error("상업 이용을 허용하지 않은 초안을 상업 이용 가능한 사용권으로 게시할 수 없습니다. 선택한 권리에 맞는 공개 manifest를 내보내 주세요.");
     }
-    if (value !== "toonspectrum-standard" && rights.redistribution !== true) {
+    if (value !== "toonstudio-standard" && rights.redistribution !== true) {
       throw new Error("재배포를 허용하지 않은 초안을 재배포 가능한 사용권으로 게시할 수 없습니다. 선택한 권리에 맞는 공개 manifest를 내보내 주세요.");
     }
     return value;
@@ -172,7 +172,7 @@ function authoringLicense(rights: Record<string, unknown>): CreatorMarketplaceRe
 export function authoringUpdateResourceId(source: string): string | null {
   try {
     const value: unknown = JSON.parse(source);
-    if (!isRecord(value) || value.format !== "toonspectrum.creator-marketplace-authoring"
+    if (!isRecord(value) || value.format !== "toonstudio.creator-marketplace-authoring"
       || value.schemaVersion !== 2 || !isRecord(value.release) || value.release.mode !== "update") return null;
     const id = CreatorMarketplaceResourceIdentitySchema.shape.id.safeParse(value.release.previousResourceId);
     return id.success ? id.data : null;
@@ -223,7 +223,7 @@ function convertAuthoringEnvelope(
   updateParent: CreatorMarketplaceResourceIdentity | null,
 ): CreatorMarketplaceResourceManifest {
   if (
-    value.format !== "toonspectrum.creator-marketplace-authoring"
+    value.format !== "toonstudio.creator-marketplace-authoring"
     || value.schemaVersion !== 2
   ) {
     throw new Error("지원하는 Studio 저작 envelope가 아닙니다.");
@@ -301,7 +301,7 @@ function convertAuthoringEnvelope(
       name: title,
       delivery: {
         mode: "portable-json",
-        mediaType: "application/vnd.toonspectrum.brush+json",
+        mediaType: "application/vnd.toonstudio.brush+json",
         payload,
         byteSize: creatorMarketplaceJsonByteSize(payload),
         sha256: sha256Hex(canonicalPayload),
@@ -348,7 +348,7 @@ export function parseAuthoritativeMarketManifest(
     };
   }
 
-  if (isRecord(value) && value.format === "toonspectrum.creator-marketplace-authoring") {
+  if (isRecord(value) && value.format === "toonstudio.creator-marketplace-authoring") {
     try {
       const manifest = convertAuthoringEnvelope(value, updateParent);
       return {

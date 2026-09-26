@@ -23,7 +23,7 @@ import { studioGuidedHelpArticleForCommand } from "./studio-guided-help";
 
 import type { StudioCommandCatalogEntry } from "./studio-command-catalog";
 import type { StudioSearchEntry } from "./studio-command-search";
-import type { TerminologyAlias } from "@toonspectrum/studio-command-registry";
+import type { TerminologyAlias } from "@toonstudio/studio-command-registry";
 
 export {
   resolveStudioActiveToolCommandId,

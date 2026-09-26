@@ -1,4 +1,4 @@
-# ToonSpectrum 배포 가이드
+# ToonStudio 배포 가이드
 
 > **2026-09-15 사용자 정책:** 자동 빌드·배포 금지. PR 병합은 배포 승인이 아닙니다.
 > 승인한 main SHA의 변경 배포 단위만 Cloudflare와 Render에 수동 반영합니다.
@@ -9,7 +9,7 @@
 직접 제공하고, 최소 Worker gateway는 API·Socket.IO·OG crawler 경로만 검토된 Core API origin으로
 전달합니다. Neon/호환 PostgreSQL은 동적 원장, Cloudflare Durable Objects는 Studio의 임시 실시간
 상태, Upstash는 선택형 분산 제한·조정, 목적별 R2/B2/Supabase private storage는 파일 data plane을
-담당합니다. Core API의 기본 origin은 Render `toonspectrum-core-api`이며 배포와 롤백은 각
+담당합니다. Core API의 기본 origin은 Render `toonstudio-core-api`이며 배포와 롤백은 각
 Cloudflare/Render 배포 단위의 검증된 version으로 수행합니다.
 
 한 제공자가 다른 제공자의 전체 폴백이 되지는 않습니다. 각 workload는 하나의 authority를 가지며,
@@ -20,15 +20,15 @@ Cloudflare/Render 배포 단위의 검증된 version으로 수행합니다.
 | 프론트 | Vite + React SPA | Cloudflare Static Assets | `dist/` |
 | 카탈로그 | 정적 스냅샷 | Cloudflare Static Assets | `apps/web/public/data/*.json` |
 | Edge gateway | Cloudflare Worker | Cloudflare | 동적 경로만 Core API로 전달 |
-| Core API | NestJS | Render `toonspectrum-core-api` | 인증·ACL·거래·원장 transaction |
+| Core API | NestJS | Render `toonstudio-core-api` | 인증·ACL·거래·원장 transaction |
 | DB | PostgreSQL | Neon/호환 Postgres | 동적 데이터 + checksum migration 원장 |
 | Studio realtime | Durable Objects | Cloudflare | presence·comment invalidation·screen-share signaling |
 | 분산 제한/조정 | Redis | Upstash(선택) | auth rate-limit·lease·coordination |
 | private object storage | 목적별 private buckets | Supabase/R2/B2 | source·derived·export 고정 라우팅 |
 | 개인 프로젝트 | OPFS/로컬/BYOS | 사용자 기기·저장소 | 운영자 중앙 저장 최소화 |
 
-`render.yaml`은 두 런타임을 정의합니다. `toonspectrum-core-api`는
-`API_RUNTIME_ROLE=full`인 동적 HTTP 권위이고, `toonspectrum-studio-live`는 선택형 Socket.IO
+`render.yaml`은 두 런타임을 정의합니다. `toonstudio-core-api`는
+`API_RUNTIME_ROLE=full`인 동적 HTTP 권위이고, `toonstudio-studio-live`는 선택형 Socket.IO
 폴백입니다. 정적 gateway의 `CORE_API_ORIGIN`은 readiness를 통과한 Core 서비스만 가리켜야 하며,
 실시간 전용 origin이나 정적 사이트 자신을 지정하면 안 됩니다.
 
@@ -68,8 +68,8 @@ pnpm run verify:free-infrastructure
 pnpm run verify:cloudflare-static
 pnpm run cloudflare:static:dry-run
 
-RENDER_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com pnpm run verify:render-core-origin
-export CLOUDFLARE_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com
+RENDER_CORE_API_ORIGIN=https://toonstudio-core-api.onrender.com pnpm run verify:render-core-origin
+export CLOUDFLARE_CORE_API_ORIGIN=https://toonstudio-core-api.onrender.com
 export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
 pnpm run cloudflare:static:deploy
 ```
@@ -154,7 +154,7 @@ Cloudflare 권위를 자동으로 바꾸거나 저장 확인을 생략하지 않
 - `/socket.io`: Studio 실시간 협업 연결
 - 그 밖의 `/api/*`: 일반 API로 처리하지 않음
 
-`toonspectrum-core-api`는 일반 HTTP 권위이고 `toonspectrum-studio-live`는 Socket.IO 전용입니다.
+`toonstudio-core-api`는 일반 HTTP 권위이고 `toonstudio-studio-live`는 Socket.IO 전용입니다.
 Cloudflare의 `CORE_API_ORIGIN`은 전자를, 선택적인 `REALTIME_API_ORIGIN` 또는 프런트의
 `VITE_STUDIO_LIVE_ORIGIN`은 후자를 가리킵니다. 두 runtime role을 서로 바꾸거나 하나의 무료
 인스턴스에 이중 권위로 합치지 않습니다.
@@ -171,7 +171,7 @@ VITE_STUDIO_LIVE_ORIGIN=https://realtime.toonstudio.cloud
 
 # 장기 실행 Nest 서버의 비공개 환경변수
 STUDIO_LIVE_CLUSTER_ADAPTER=postgres
-STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/toonspectrum?sslmode=verify-full&channel_binding=require
+STUDIO_LIVE_POSTGRES_URL=postgresql://USER:PASSWORD@DIRECT_HOST/toonstudio?sslmode=verify-full&channel_binding=require
 STUDIO_LIVE_POSTGRES_POOL_MAX=2
 API_CORS_ALLOWED_ORIGINS=https://www.toonstudio.cloud,https://toonstudio.cloud
 

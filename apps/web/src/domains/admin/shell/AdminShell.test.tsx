@@ -12,7 +12,7 @@ import { useI18n } from "@/shared/lib/i18n";
 vi.mock("../components/AdminHeaderStats", () => ({ AdminHeaderStats: () => null }));
 vi.mock("../components/AdminQuickPalette", () => ({ AdminQuickPalette: () => null }));
 
-const key = "toonspectrum.admin.sidebar.collapsed.v1";
+const key = "toonstudio.admin.sidebar.collapsed.v1";
 
 function renderShell() {
   return render(

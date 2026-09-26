@@ -1,5 +1,5 @@
 {
-  "name": "@toonspectrum/admin-web",
+  "name": "@toonstudio/admin-web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,7 +11,7 @@
     "test:e2e": "playwright test --config playwright.config.ts"
   },
   "dependencies": {
-    "@toonspectrum/contracts": "workspace:*",
+    "@toonstudio/contracts": "workspace:*",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },

@@ -12,7 +12,7 @@ import webtoonV7Manifest from "../../../../public/assets/3d/environments/webtoon
 import mcpFreeV1Manifest from "../../../../public/assets/3d/environments/mcp-free-v1/manifest.json";
 
 export const STUDIO_BG3D_ENVIRONMENT_PACK_ID =
-  "toonspectrum-bg3d-environment-pack-v1" as const;
+  "toonstudio-bg3d-environment-pack-v1" as const;
 export const STUDIO_BG3D_ENVIRONMENT_PACK_VERSION = 1 as const;
 
 export type StudioBg3dEnvironmentTheme =
@@ -32,7 +32,7 @@ export interface StudioBg3dEnvironmentProvenance {
     | "original-procedural"
     | "original-procedural-with-cc0-sources"
     | "ai-generated-free-wallet";
-  readonly author: "ToonSpectrum";
+  readonly author: "ToonStudio";
   readonly generator:
     | "scripts/blender/generate_environment_pack_v3.py"
     | "scripts/blender/generate_environment_pack_v4.py"
@@ -85,7 +85,7 @@ export interface StudioBg3dEnvironmentAsset {
 
 const V3_PROVENANCE = Object.freeze({
   origin: "original-procedural",
-  author: "ToonSpectrum",
+  author: "ToonStudio",
   generator: "scripts/blender/generate_environment_pack_v3.py",
   blenderVersion: "5.2",
   license: "CC0-1.0",
@@ -407,7 +407,7 @@ export const STUDIO_BG3D_ENVIRONMENT_ASSETS_MCP_FREE_V1 = Object.freeze(
     },
   }, Object.freeze({
     origin: "ai-generated-free-wallet",
-    author: "ToonSpectrum",
+    author: "ToonStudio",
     provider: "Tripo",
     generator: "official-tripo-mcp",
     providerModelVersion: "v3.0-20250812",

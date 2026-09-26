@@ -23,7 +23,7 @@ describe("actual marketplace source previews", () => {
   });
   it("does not turn a wrong source or arbitrary entry index into a preview", () => {
     const source = manifests[0] as unknown as CreatorMarketplaceResourceRecord;
-    expect(renderToStaticMarkup(<MarketCc0AssetPreview record={{ ...source, license: "toonspectrum-standard" }} />)).toBe("");
+    expect(renderToStaticMarkup(<MarketCc0AssetPreview record={{ ...source, license: "toonstudio-standard" }} />)).toBe("");
     expect(renderToStaticMarkup(<MarketCc0AssetPreview record={source} entryIndex={99} />)).toBe("");
   });
 });

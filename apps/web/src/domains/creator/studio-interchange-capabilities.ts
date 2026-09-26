@@ -101,7 +101,7 @@ export interface StudioInterchangeMetadataPolicy {
 export interface StudioInterchangeConformance {
   readonly publicSpec: StudioInterchangePublicSpecConformance;
   /**
-   * ToonSpectrum 자체 테스트/서명은 여기에 제3자 인증으로 기록하지 않는다. 인증 기관 또는
+   * ToonStudio 자체 테스트/서명은 여기에 제3자 인증으로 기록하지 않는다. 인증 기관 또는
    * 권리자가 실제로 발급한 근거가 생기기 전까지 항상 `not-claimed`다.
    */
   readonly thirdPartyCertification: "not-claimed";
@@ -202,9 +202,9 @@ type StudioInterchangeCapabilityDefinition =
 const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapabilityDefinition[] = [
   {
     id: "toonproject-archive",
-    label: "ToonSpectrum 프로젝트 아카이브",
+    label: "ToonStudio 프로젝트 아카이브",
     extensions: [".toonproject.zip"],
-    mime: ["application/vnd.toonspectrum.project+zip"],
+    mime: ["application/vnd.toonstudio.project+zip"],
     category: "document",
     import: "available",
     export: "available",
@@ -220,7 +220,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
   },
   {
     id: "toonproject-json",
-    label: "ToonSpectrum 프로젝트 JSON",
+    label: "ToonStudio 프로젝트 JSON",
     extensions: [".json"],
     mime: ["application/json"],
     category: "document",
@@ -297,7 +297,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     status: "available",
     notes: [
       "Studio 이미지 가져오기가 ImageDecoder 지원 런타임에서 AVIF 픽셀과 다중 프레임 timing을 편집 가능한 셀 애니메이션으로 materialize합니다.",
-      "ToonSpectrum이 AV1 decoder를 번들하거나 AVIF 규격 적합성을 인증했다는 뜻이 아닙니다.",
+      "ToonStudio이 AV1 decoder를 번들하거나 AVIF 규격 적합성을 인증했다는 뜻이 아닙니다.",
     ],
     recommendedBridge: ["현재 사용자 작업 흐름에서는 PNG 또는 WebP로 변환 후 가져오기"],
     technicalLayers: {
@@ -576,9 +576,9 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
   },
   {
     id: "toonink",
-    label: "ToonSpectrum InkEnvelope",
+    label: "ToonStudio InkEnvelope",
     extensions: [".toonink"],
-    mime: ["application/vnd.toonspectrum.ink+json"],
+    mime: ["application/vnd.toonstudio.ink+json"],
     category: "document",
     import: "engine-ready",
     export: "engine-ready",
@@ -595,7 +595,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     },
     status: "engine-ready",
     notes: [
-      "상용 SDK의 비공개 wire format과 무관한 ToonSpectrum 독자 규격입니다.",
+      "상용 SDK의 비공개 wire format과 무관한 ToonStudio 독자 규격입니다.",
       "정확한 키 순서·필드·버전·SHA-256을 검증하고 변조·미래 버전·비정규 직렬화를 fail-closed로 거부합니다.",
       "조직 소유 키의 ECDSA P-256 또는 Ed25519 서명과 외부 trust-key resolver를 연결할 수 있습니다.",
       "자체 conformance와 서명 신뢰 체계를 제공하지만 제3자 상표 인증을 사칭하지 않습니다.",
@@ -606,7 +606,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
   },
   {
     id: "inkml",
-    label: "InkML (ToonSpectrum 안전 부분집합)",
+    label: "InkML (ToonStudio 안전 부분집합)",
     extensions: [".inkml"],
     mime: ["application/inkml+xml"],
     category: "vector",
@@ -614,7 +614,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     export: "partial",
     roundTrip: "partial",
     lossModel: [
-      "좌표·필압·기울기·회전·속도·배럴압은 보존하지만 ToonSpectrum 레이어·그룹·브러시 질감은 네이티브 프로젝트에만 유지",
+      "좌표·필압·기울기·회전·속도·배럴압은 보존하지만 ToonStudio 레이어·그룹·브러시 질감은 네이티브 프로젝트에만 유지",
       "외부 InkML의 상대·미분 압축과 간헐 채널은 안전한 v1 프로필에서 거부",
       "mm·dev 좌표, mapping·canvas transform, current context, traceGroup은 해석하지 않고 fail-closed로 거부",
       "단위 없는 basic X/Y는 제한 프로필의 응용 정의 캔버스 좌표로 가져오며 전체 InkML processor conformance를 주장하지 않음",
@@ -631,10 +631,10 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     },
     status: "engine-ready",
     notes: [
-      "상용 잉크 SDK 없이 공개 InkML 사양을 참고한 ToonSpectrum 전용 안전 부분집합을 독립 구현했습니다.",
+      "상용 잉크 SDK 없이 공개 InkML 사양을 참고한 ToonStudio 전용 안전 부분집합을 독립 구현했습니다.",
       "DTD·외부 entity·CDATA·비정규 채널 압축은 fail-closed로 거부합니다.",
       "import→normalize→deterministic export→reimport 채널 오차와 자원 예산을 conformance receipt로 검증합니다.",
-      "px·px/ms는 ToonSpectrum v1 프로필의 명시적 응용 단위이며 공식 W3C processor 또는 Wacom .will/UIM 호환을 주장하지 않습니다.",
+      "px·px/ms는 ToonStudio v1 프로필의 명시적 응용 단위이며 공식 W3C processor 또는 Wacom .will/UIM 호환을 주장하지 않습니다.",
     ],
     recommendedBridge: ["완전한 편집 왕복에는 .toonproject.zip 사용"],
   },
@@ -653,7 +653,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       "WILL 3/UIM 및 Wacom SDK 객체 모델과의 호환성을 주장하지 않음",
     ],
     runtimeRequirement: [
-      "ToonSpectrum clean-room WILL v1 Annex A protobuf codec",
+      "ToonStudio clean-room WILL v1 Annex A protobuf codec",
       "canonical Base-128 Path framing",
       "Web Crypto SHA-256 conformance receipt",
     ],
@@ -665,9 +665,9 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     status: "engine-ready",
     notes: [
       "공개 WILL v1 사양의 Annex A Path protobuf와 §5.3.3 Path 목록만 독립 구현했습니다.",
-      "확장자 .willpb는 전체 .will OPC 문서와 혼동하지 않기 위한 ToonSpectrum의 명시적 경계입니다.",
+      "확장자 .willpb는 전체 .will OPC 문서와 혼동하지 않기 위한 ToonStudio의 명시적 경계입니다.",
       "결정적 encode/decode, 비정규 varint·overflow·자원 예산, 대형 경로를 conformance receipt로 검증합니다.",
-      "ToonSpectrum 제품 인증은 Wacom 공식 인증·SDK 출처·상표 허가를 의미하지 않습니다.",
+      "ToonStudio 제품 인증은 Wacom 공식 인증·SDK 출처·상표 허가를 의미하지 않습니다.",
     ],
     recommendedBridge: [
       "전체 프로젝트 이동에는 .toonproject.zip 사용",
@@ -676,22 +676,22 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
   },
   {
     id: "will-v1-document",
-    label: "WILL v1 문서 (ToonSpectrum Annex B 제한 프로필)",
+    label: "WILL v1 문서 (ToonStudio Annex B 제한 프로필)",
     extensions: [".will"],
-    mime: ["application/vnd.toonspectrum.will-v1-bounded+zip"],
+    mime: ["application/vnd.toonstudio.will-v1-bounded+zip"],
     category: "document",
     import: "available",
     export: "available",
     roundTrip: "partial",
     lossModel: [
-      "ToonSpectrum의 결정적 7-part OPC 프로필과 Annex A 획 스트림만 왕복함",
+      "ToonStudio의 결정적 7-part OPC 프로필과 Annex A 획 스트림만 왕복함",
       "임의 vendor extension·추가 section·paint·배경 media·스크립트는 묵시적으로 버리지 않고 가져오기를 거부함",
-      "공개 명세에 없는 section relationship Type은 ToonSpectrum 소유 URI를 사용하므로 임의 Wacom 파일 상호운용을 주장하지 않음",
+      "공개 명세에 없는 section relationship Type은 ToonStudio 소유 URI를 사용하므로 임의 Wacom 파일 상호운용을 주장하지 않음",
     ],
     runtimeRequirement: [
-      "ToonSpectrum bounded OPC/ZIP32 reader/writer",
+      "ToonStudio bounded OPC/ZIP32 reader/writer",
       "safe XML/SVG profile parser",
-      "ToonSpectrum WILL v1 Annex A protobuf codec",
+      "ToonStudio WILL v1 Annex A protobuf codec",
     ],
     sizeBudget: {
       maxFileBytes: 40 * MiB,
@@ -703,15 +703,15 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     status: "partial",
     notes: [
       "공개 WILL v1 Annex B를 바탕으로 결정적 .will 생성과 엄격한 가져오기를 독립 구현했습니다.",
-      "공개 v1 명세는 최상위 컨테이너 MIME을 정의하지 않으므로 ToonSpectrum 소유 MIME을 사용합니다.",
+      "공개 v1 명세는 최상위 컨테이너 MIME을 정의하지 않으므로 ToonStudio 소유 MIME을 사용합니다.",
       "Content Types, root/section relationship, SVG r:id, CRC와 Path stream을 한 문서 경계에서 검증합니다.",
       "DTD·entity·processing instruction·외부 target·script·foreignObject·경로 순회·압축 폭탄을 fail-closed로 거부합니다.",
       "파일 메뉴에서 전용 Worker 검사, 명시적 새 페이지/현재 페이지 선택, 손실 미리보기 후 가져오며 동일 메뉴에서 내보낼 수 있습니다.",
-      "이 구현과 ToonSpectrum 제품 검증은 Wacom SDK 출처·공식 인증·상표 허가를 의미하지 않습니다.",
+      "이 구현과 ToonStudio 제품 검증은 Wacom SDK 출처·공식 인증·상표 허가를 의미하지 않습니다.",
     ],
     recommendedBridge: [
       "임의 vendor .will 파일은 상호운용 fixture와 별도 프로필 검증 후 가져오기",
-      "전체 ToonSpectrum 편집 프로젝트 이동에는 .toonproject.zip 사용",
+      "전체 ToonStudio 편집 프로젝트 이동에는 .toonproject.zip 사용",
     ],
   },
   {
@@ -742,7 +742,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       "페이지 색보정의 ICC 색상 확인·출력 UI에서 사용자 RGB matrix/TRC 프로필을 권한 확인 후 가져와 문서에 보존하고 소프트 프루프합니다.",
       "ICC 포함 RGB PNG 출력까지 연결되어 있으며, 범용 CMYK/LUT 관리나 모든 PDF OutputIntent 선택을 의미하지 않습니다.",
       "제품 생성 sRGB는 고정 SHA-256 allowlist로 감사하며, 외부 프로파일은 출처·권한·identity가 일치해야 합니다.",
-      "성공 영수증은 ToonSpectrum 정책 통과이며 ICC·인쇄소·vendor의 제3자 공식 인증이 아닙니다.",
+      "성공 영수증은 ToonStudio 정책 통과이며 ICC·인쇄소·vendor의 제3자 공식 인증이 아닙니다.",
     ],
     technicalLayers: {
       format: ["ICC.1 v2/v4 bounded profile"],
@@ -752,7 +752,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     implementation: {
       import: "implemented",
       export: "implemented",
-      notes: ["원본 검사·권한 정책과 결정적 ToonSpectrum sRGB profile builder 구현"],
+      notes: ["원본 검사·권한 정책과 결정적 ToonStudio sRGB profile builder 구현"],
     },
     uiWiring: {
       import: "wired",
@@ -842,7 +842,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     conformance: {
       publicSpec: "tested-public-subset",
       thirdPartyCertification: "not-claimed",
-      notes: ["ToonSpectrum writer/scanner 부분집합을 테스트하며 범용 PDF processor 적합성을 주장하지 않음"],
+      notes: ["ToonStudio writer/scanner 부분집합을 테스트하며 범용 PDF processor 적합성을 주장하지 않음"],
     },
     externalRequirements: {
       provider: "none",
@@ -952,7 +952,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
   },
   {
     id: "dialogue-json",
-    label: "ToonSpectrum dialogue JSON",
+    label: "ToonStudio dialogue JSON",
     extensions: [".dialogue.json", ".json"],
     mime: ["application/json"],
     category: "document",
@@ -1007,7 +1007,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
     lossModel: [
       "Scene Heading은 페이지, Action 순서는 컷 문맥으로만 매핑",
       "Character/Dialogue/Parenthetical 외 Paragraph와 서식·제작 메타데이터는 loss preview로 보고 후 제외",
-      "출력은 ToonSpectrum 페이지·컷 marker를 사용하는 공개 구조 안전 부분집합",
+      "출력은 ToonStudio 페이지·컷 marker를 사용하는 공개 구조 안전 부분집합",
     ],
     runtimeRequirement: ["fatal UTF-8", "bounded clean-room XML parser"],
     sizeBudget: {
@@ -1068,7 +1068,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
   },
   {
     id: "toonaction-json",
-    label: "ToonSpectrum Auto Action",
+    label: "ToonStudio Auto Action",
     extensions: [".toonaction.json"],
     mime: ["application/json"],
     category: "document",
@@ -1083,7 +1083,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
   },
   {
     id: "publish-package",
-    label: "ToonSpectrum publish package",
+    label: "ToonStudio publish package",
     extensions: [".toonpkg.zip"],
     mime: ["application/zip"],
     category: "publication",
@@ -1134,7 +1134,7 @@ const STUDIO_INTERCHANGE_CAPABILITY_DEFINITIONS: readonly StudioInterchangeCapab
       act: { label: "Adobe Color Table", ext: [".act"], mime: ["application/octet-stream"] },
       "jasc-pal": { label: "JASC-PAL", ext: [".pal"], mime: ["text/plain"] },
       "css-palette": { label: "CSS Custom Properties", ext: [".css"], mime: ["text/css"] },
-      "json-palette": { label: "ToonSpectrum Palette JSON", ext: [".palette.json", ".json"], mime: ["application/json"] },
+      "json-palette": { label: "ToonStudio Palette JSON", ext: [".palette.json", ".json"], mime: ["application/json"] },
     }[id];
     return {
       id,
@@ -1481,7 +1481,7 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
 > = {
   "toonproject-archive": {
     technicalLayers: {
-      format: ["ToonSpectrum project archive"],
+      format: ["ToonStudio project archive"],
       container: ["deterministic ZIP32 STORE subset"],
       codec: [],
     },
@@ -1493,7 +1493,7 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     conformance: {
       publicSpec: "project-profile-tested",
       thirdPartyCertification: "not-claimed",
-      notes: ["ToonSpectrum profile 자체 검증이며 일반 ZIP 또는 제3자 인증을 주장하지 않음"],
+      notes: ["ToonStudio profile 자체 검증이며 일반 ZIP 또는 제3자 인증을 주장하지 않음"],
     },
     externalRequirements: {
       provider: "none",
@@ -1516,7 +1516,7 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     conformance: {
       publicSpec: "runtime-provider-dependent",
       thirdPartyCertification: "not-claimed",
-      notes: ["PNG codec 적합성은 browser runtime 경계이며 ToonSpectrum 인증을 주장하지 않음"],
+      notes: ["PNG codec 적합성은 browser runtime 경계이며 ToonStudio 인증을 주장하지 않음"],
     },
     externalRequirements: {
       provider: "browser-runtime",
@@ -1584,13 +1584,13 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     },
     productAssurance: {
       firstPartyCodecProvider: "implemented",
-      firstPartyProviderIds: ["toonspectrum.raster.bmp.v1"],
+      firstPartyProviderIds: ["toonstudio.raster.bmp.v1"],
       toonSpectrumProductCertification: "exact-byte-execution-tested",
       officialThirdPartyCertification: false,
       vendorTrademarkAuthorization: false,
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
-        "공개 형식의 제한 부분집합을 ToonSpectrum이 독립 구현하고 결정적 conformance evidence와 정확한 실행 바이트를 제품 소유 키로 서명할 수 있습니다.",
+        "공개 형식의 제한 부분집합을 ToonStudio이 독립 구현하고 결정적 conformance evidence와 정확한 실행 바이트를 제품 소유 키로 서명할 수 있습니다.",
         "제품 인증은 BMP 공급사·표준 단체의 공식 인증 또는 상표 허가가 아닙니다.",
       ],
     },
@@ -1598,7 +1598,7 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
       provider: "none",
       providers: [],
       license: "project-implementation-only",
-      notes: ["codec 실행은 공개 형식 기반 ToonSpectrum 자체 구현이며 외부 codec provider가 필요하지 않음"],
+      notes: ["codec 실행은 공개 형식 기반 ToonStudio 자체 구현이며 외부 codec provider가 필요하지 않음"],
     },
   },
   tga: {
@@ -1614,13 +1614,13 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     },
     productAssurance: {
       firstPartyCodecProvider: "implemented",
-      firstPartyProviderIds: ["toonspectrum.raster.tga.v1"],
+      firstPartyProviderIds: ["toonstudio.raster.tga.v1"],
       toonSpectrumProductCertification: "exact-byte-execution-tested",
       officialThirdPartyCertification: false,
       vendorTrademarkAuthorization: false,
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
-        "공개 형식의 제한 부분집합을 ToonSpectrum이 독립 구현하고 결정적 conformance evidence와 정확한 실행 바이트를 제품 소유 키로 서명할 수 있습니다.",
+        "공개 형식의 제한 부분집합을 ToonStudio이 독립 구현하고 결정적 conformance evidence와 정확한 실행 바이트를 제품 소유 키로 서명할 수 있습니다.",
         "제품 인증은 TGA 공급사·표준 단체의 공식 인증 또는 상표 허가가 아닙니다.",
       ],
     },
@@ -1628,7 +1628,7 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
       provider: "none",
       providers: [],
       license: "project-implementation-only",
-      notes: ["codec 실행은 공개 형식 기반 ToonSpectrum 자체 구현이며 외부 codec provider가 필요하지 않음"],
+      notes: ["codec 실행은 공개 형식 기반 ToonStudio 자체 구현이며 외부 codec provider가 필요하지 않음"],
     },
   },
   netpbm: {
@@ -1645,8 +1645,8 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     productAssurance: {
       firstPartyCodecProvider: "implemented",
       firstPartyProviderIds: [
-        "toonspectrum.raster.ppm.v1",
-        "toonspectrum.raster.pam.v1",
+        "toonstudio.raster.ppm.v1",
+        "toonstudio.raster.pam.v1",
       ],
       toonSpectrumProductCertification: "exact-byte-execution-tested",
       officialThirdPartyCertification: false,
@@ -1654,14 +1654,14 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
         "PPM과 PAM 각각의 독립 provider를 결정적 conformance evidence 및 정확한 실행 바이트 인증 경계에 연결했습니다.",
-        "ToonSpectrum 제품 인증은 Netpbm 프로젝트나 외부 표준 단체의 공식 인증이 아닙니다.",
+        "ToonStudio 제품 인증은 Netpbm 프로젝트나 외부 표준 단체의 공식 인증이 아닙니다.",
       ],
     },
     externalRequirements: {
       provider: "none",
       providers: [],
       license: "project-implementation-only",
-      notes: ["codec 실행은 공개 형식 기반 ToonSpectrum 자체 구현이며 외부 codec provider가 필요하지 않음"],
+      notes: ["codec 실행은 공개 형식 기반 ToonStudio 자체 구현이며 외부 codec provider가 필요하지 않음"],
     },
   },
   qoi: {
@@ -1677,13 +1677,13 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     },
     productAssurance: {
       firstPartyCodecProvider: "implemented",
-      firstPartyProviderIds: ["toonspectrum.raster.qoi.v1"],
+      firstPartyProviderIds: ["toonstudio.raster.qoi.v1"],
       toonSpectrumProductCertification: "exact-byte-execution-tested",
       officialThirdPartyCertification: false,
       vendorTrademarkAuthorization: false,
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
-        "공개 형식의 제한 부분집합을 ToonSpectrum이 독립 구현하고 결정적 conformance evidence와 정확한 실행 바이트를 제품 소유 키로 서명할 수 있습니다.",
+        "공개 형식의 제한 부분집합을 ToonStudio이 독립 구현하고 결정적 conformance evidence와 정확한 실행 바이트를 제품 소유 키로 서명할 수 있습니다.",
         "제품 인증은 QOI 권리자·외부 표준 단체의 공식 인증 또는 상표 허가가 아닙니다.",
       ],
     },
@@ -1691,7 +1691,7 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
       provider: "none",
       providers: [],
       license: "project-implementation-only",
-      notes: ["codec 실행은 공개 형식 기반 ToonSpectrum 자체 구현이며 외부 codec provider가 필요하지 않음"],
+      notes: ["codec 실행은 공개 형식 기반 ToonStudio 자체 구현이며 외부 codec provider가 필요하지 않음"],
     },
   },
   tiff: {
@@ -1712,13 +1712,13 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     },
     productAssurance: {
       firstPartyCodecProvider: "implemented",
-      firstPartyProviderIds: ["toonspectrum.raster.tiff.v1"],
+      firstPartyProviderIds: ["toonstudio.raster.tiff.v1"],
       toonSpectrumProductCertification: "exact-byte-execution-tested",
       officialThirdPartyCertification: false,
       vendorTrademarkAuthorization: false,
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
-        "baseline 제한 부분집합을 ToonSpectrum이 독립 구현하고 결정적 conformance evidence와 정확한 실행 바이트를 제품 소유 키로 서명할 수 있습니다.",
+        "baseline 제한 부분집합을 ToonStudio이 독립 구현하고 결정적 conformance evidence와 정확한 실행 바이트를 제품 소유 키로 서명할 수 있습니다.",
         "제품 인증은 TIFF 공급사·표준 단체의 공식 인증 또는 상표 허가가 아닙니다.",
       ],
     },
@@ -1726,7 +1726,7 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
       provider: "none",
       providers: [],
       license: "project-implementation-only",
-      notes: ["codec 실행은 공개 형식 기반 ToonSpectrum 자체 구현이며 외부 codec provider가 필요하지 않음"],
+      notes: ["codec 실행은 공개 형식 기반 ToonStudio 자체 구현이며 외부 codec provider가 필요하지 않음"],
     },
   },
   gif: {
@@ -1782,24 +1782,24 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
   },
   toonink: {
     technicalLayers: {
-      format: ["ToonSpectrum InkEnvelope v1"],
+      format: ["ToonStudio InkEnvelope v1"],
       container: ["canonical UTF-8 JSON envelope"],
       codec: [],
     },
     conformance: {
       publicSpec: "project-profile-tested",
       thirdPartyCertification: "not-claimed",
-      notes: ["ToonSpectrum self-conformance/attestation이며 외부 SDK·상표 인증이 아님"],
+      notes: ["ToonStudio self-conformance/attestation이며 외부 SDK·상표 인증이 아님"],
     },
     productAssurance: {
       firstPartyCodecProvider: "implemented",
-      firstPartyProviderIds: ["toonspectrum.ink-envelope.v1"],
+      firstPartyProviderIds: ["toonstudio.ink-envelope.v1"],
       toonSpectrumProductCertification: "exact-byte-execution-tested",
       officialThirdPartyCertification: false,
       vendorTrademarkAuthorization: false,
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
-        "결정적 provider 실행, canonical 왕복 conformance evidence, 정확한 출력 바이트를 ToonSpectrum 제품 소유 키로 함께 서명·검증할 수 있습니다.",
+        "결정적 provider 실행, canonical 왕복 conformance evidence, 정확한 출력 바이트를 ToonStudio 제품 소유 키로 함께 서명·검증할 수 있습니다.",
         "이 제품 인증은 외부 잉크 SDK·형식 공급사의 공식 인증 또는 상표 허가를 주장하지 않습니다.",
       ],
     },
@@ -1812,7 +1812,7 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
   },
   inkml: {
     technicalLayers: {
-      format: ["ToonSpectrum InkML safe profile"],
+      format: ["ToonStudio InkML safe profile"],
       container: ["UTF-8 XML"],
       codec: [],
     },
@@ -1826,13 +1826,13 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     },
     productAssurance: {
       firstPartyCodecProvider: "implemented",
-      firstPartyProviderIds: ["toonspectrum.public-inkml-subset.v1"],
+      firstPartyProviderIds: ["toonstudio.public-inkml-subset.v1"],
       toonSpectrumProductCertification: "exact-byte-execution-tested",
       officialThirdPartyCertification: false,
       vendorTrademarkAuthorization: false,
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
-        "제한형 InkML provider의 결정적 실행, 다중 채널 왕복 conformance evidence, 정확한 출력 바이트를 ToonSpectrum 제품 소유 키로 함께 서명·검증할 수 있습니다.",
+        "제한형 InkML provider의 결정적 실행, 다중 채널 왕복 conformance evidence, 정확한 출력 바이트를 ToonStudio 제품 소유 키로 함께 서명·검증할 수 있습니다.",
         "이 상태는 W3C 전체 processor 적합성, Wacom WILL/UIM 호환, 공급사 공식 인증 또는 상표 허가를 의미하지 않습니다.",
       ],
     },
@@ -1866,13 +1866,13 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
     },
     productAssurance: {
       firstPartyCodecProvider: "implemented",
-      firstPartyProviderIds: ["toonspectrum.will-v1-annex-a.v1"],
+      firstPartyProviderIds: ["toonstudio.will-v1-annex-a.v1"],
       toonSpectrumProductCertification: "exact-byte-execution-tested",
       officialThirdPartyCertification: false,
       vendorTrademarkAuthorization: false,
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
-        "정확한 Path 입력·출력 바이트, provider receipt, deterministic conformance evidence를 ToonSpectrum 제품 소유 키로 함께 서명·검증할 수 있습니다.",
+        "정확한 Path 입력·출력 바이트, provider receipt, deterministic conformance evidence를 ToonStudio 제품 소유 키로 함께 서명·검증할 수 있습니다.",
         "이 제품 인증은 Wacom의 공식 인증, SDK 라이선스, 상표 허가 또는 전체 .will 문서 적합성이 아닙니다.",
       ],
     },
@@ -1881,13 +1881,13 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
       providers: [],
       license: "project-implementation-only",
       notes: [
-        "공개 v1 specification과 public patent license 경계의 ToonSpectrum 독립 구현만 사용합니다.",
+        "공개 v1 specification과 public patent license 경계의 ToonStudio 독립 구현만 사용합니다.",
       ],
     },
   },
   "will-v1-document": {
     technicalLayers: {
-      format: ["WILL Data Format v1 Annex B ToonSpectrum bounded profile"],
+      format: ["WILL Data Format v1 Annex B ToonStudio bounded profile"],
       container: ["deterministic OPC ZIP32 seven-part package"],
       codec: ["Annex A protobuf Path stream", "strict UTF-8 XML/SVG"],
     },
@@ -1903,20 +1903,20 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
       thirdPartyCertification: "not-claimed",
       notes: [
         "공개 Annex B 문서 구조와 Annex A stroke stream을 프로젝트 golden archive·공격 벡터로 검증합니다.",
-        "공개 명세에 없는 section relationship Type은 명시적인 ToonSpectrum 프로필이며 Wacom 공식 적합성 주장이 아닙니다.",
+        "공개 명세에 없는 section relationship Type은 명시적인 ToonStudio 프로필이며 Wacom 공식 적합성 주장이 아닙니다.",
       ],
     },
     productAssurance: {
       firstPartyCodecProvider: "implemented",
       firstPartyProviderIds: [
-        "toonspectrum.will-v1-annex-b-document.v1",
+        "toonstudio.will-v1-annex-b-document.v1",
       ],
       toonSpectrumProductCertification: "exact-byte-execution-tested",
       officialThirdPartyCertification: false,
       vendorTrademarkAuthorization: false,
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
-        "결정적 7-part 문서 출력, provider receipt, Annex B conformance evidence와 exact output bytes를 ToonSpectrum 제품 소유 키로 함께 서명·검증합니다.",
+        "결정적 7-part 문서 출력, provider receipt, Annex B conformance evidence와 exact output bytes를 ToonStudio 제품 소유 키로 함께 서명·검증합니다.",
         "이 제품 인증은 Wacom 공식 인증·SDK 라이선스·상표 허가 또는 임의 vendor .will 상호운용 인증이 아닙니다.",
       ],
     },
@@ -1925,7 +1925,7 @@ const STUDIO_INTERCHANGE_AUDIT_OVERRIDES: Readonly<
       providers: [],
       license: "project-implementation-only",
       notes: [
-        "공개 v1 specification과 public patent license 경계의 ToonSpectrum clean-room 구현만 사용합니다.",
+        "공개 v1 specification과 public patent license 경계의 ToonStudio clean-room 구현만 사용합니다.",
       ],
     },
   },
@@ -2070,7 +2070,7 @@ function auditedCapability(
       vendorTrademarkAuthorization: false,
       externalEvidenceRequiredForVendorClaims: true,
       notes: [
-        "ToonSpectrum 자체 codec provider 또는 제품 인증 연결을 이 capability 행에서 주장하지 않습니다.",
+        "ToonStudio 자체 codec provider 또는 제품 인증 연결을 이 capability 행에서 주장하지 않습니다.",
         "외부 공급사 인증·상표 허가는 해당 권리자가 발급한 별도 증명이 필요합니다.",
       ],
     };

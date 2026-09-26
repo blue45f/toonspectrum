@@ -1,6 +1,6 @@
-import { httpsUrl, parseResource, recordOf, textOf } from "@toonspectrum/core/creator-resources";
+import { httpsUrl, parseResource, recordOf, textOf } from "@toonstudio/core/creator-resources";
 
-import type { CreatorResource, ResourceSearchResult } from "@toonspectrum/core/creator-resources";
+import type { CreatorResource, ResourceSearchResult } from "@toonstudio/core/creator-resources";
 
 type Request = (url: URL) => Promise<{ value: unknown; fetchedAt: string }>;
 

@@ -31,7 +31,7 @@ function memoryStorage(seed?: Record<string, string>): StudioWorkbenchPrefsStora
 
 describe("studio-workbench-prefs storage key", () => {
   it("uses the versioned repo-convention key", () => {
-    expect(STUDIO_WORKBENCH_PREFS_STORAGE_KEY).toBe("toonspectrum-studio-workbench-prefs:v1");
+    expect(STUDIO_WORKBENCH_PREFS_STORAGE_KEY).toBe("toonstudio-studio-workbench-prefs:v1");
   });
 });
 

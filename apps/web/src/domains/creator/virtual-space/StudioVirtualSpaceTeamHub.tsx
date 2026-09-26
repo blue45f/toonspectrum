@@ -1,8 +1,8 @@
 import { Check, Clipboard, Link2, LoaderCircle, Plus, RefreshCw, Send, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { InvitableWorkspaceRole, TeamWorkspaceDetail, TeamWorkspaceSummary } from "@toonspectrum/contracts/production-workspace";
-import { isWorkspaceManager } from "@toonspectrum/contracts/production-workspace";
+import type { InvitableWorkspaceRole, TeamWorkspaceDetail, TeamWorkspaceSummary } from "@toonstudio/contracts/production-workspace";
+import { isWorkspaceManager } from "@toonstudio/contracts/production-workspace";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
   commandTeamWorkspace,

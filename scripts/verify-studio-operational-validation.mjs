@@ -226,7 +226,7 @@ function requireZero(value, label) {
 
 function validateRuntimeFaultMatrix(value) {
   if (
-    value.schema !== "toonspectrum-v12-runtime-fault-matrix"
+    value.schema !== "toonstudio-v12-runtime-fault-matrix"
     || value.version !== 1
   ) {
     throw new Error("Runtime fault matrix identity is invalid.");

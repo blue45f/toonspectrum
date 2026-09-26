@@ -71,10 +71,10 @@ interface CanvasPointHitResult extends Point {
   reachesCanvas: boolean;
 }
 
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 const AUTOSAVE_KEY = `${AUTOSAVE_PREFIX}:v12:guest:new`;
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
 const CANVAS_HEIGHT_ENV = "TOONSPECTRUM_NATIVE_RASTER_CANVAS_HEIGHT";
 const CANVAS_HEIGHT_RANGE = { min: 360, max: 6_000 } as const;
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
@@ -329,7 +329,7 @@ const cancellationRaceActions: readonly RasterPreparationCancellationAction[] | 
 const scratchRoot = process.env.TOONSPECTRUM_NATIVE_RASTER_VERIFY_DIR?.trim();
 const SCRATCH = scratchRoot
   ? scratchRoot
-  : mkdtempSync(join(tmpdir(), `toonspectrum-studio-native-raster-${tier}-`));
+  : mkdtempSync(join(tmpdir(), `toonstudio-studio-native-raster-${tier}-`));
 const LOG_PATH = join(SCRATCH, "studio-native-raster-tools.log");
 const REPORT_PATH = join(SCRATCH, "studio-native-raster-tools-report.json");
 
@@ -453,7 +453,7 @@ async function installCleanStudioState(page: Page): Promise<void> {
       window.localStorage.setItem(quickstartKey, "1");
       window.localStorage.setItem(mobileHintKey, "1");
       window.localStorage.setItem(
-        "toonspectrum-studio-ui-density:v1",
+        "toonstudio-studio-ui-density:v1",
         JSON.stringify({ mode: "full" }),
       );
     } catch {

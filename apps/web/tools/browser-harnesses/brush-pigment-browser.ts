@@ -7,7 +7,7 @@ import { StudioBrushV6Workbench } from "../../src/domains/creator/brush-lab/Stud
 import { benchmarkBrushPigments } from "./brush-pigment-benchmark";
 import { benchmarkPigmentLayers } from "./brush-pigment-layer-benchmark";
 
-const storageKey = "toonspectrum.brush-program-v6:pigment-qa";
+const storageKey = "toonstudio.brush-program-v6:pigment-qa";
 if (!localStorage.getItem(storageKey)) {
   const base = createBrushStudioV6Program("oil-hair-mixer");
   localStorage.setItem(storageKey, JSON.stringify({ ...base, tuning: { ...base.tuning, primaryColor: "#002185", secondaryColor: "#fcd200" } }));

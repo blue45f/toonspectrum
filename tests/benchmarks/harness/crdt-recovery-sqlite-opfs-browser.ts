@@ -168,13 +168,13 @@ export function validateCrdtRecoverySqliteOpfsBrowserEvidence(
   if (
     nested(result, "authority", "kind") !== "shared-sqlite-opfs-crdt-recovery-v6"
     || nested(result, "authority", "requestedVfs") !== "opfs"
-    || nested(result, "authority", "sqliteOpfsDirectory") !== "toonspectrum-studio-sqlite"
+    || nested(result, "authority", "sqliteOpfsDirectory") !== "toonstudio-studio-sqlite"
     || nested(result, "authority", "sqliteFilename") !== "studio-local-v12.db"
     || nested(result, "authority", "schemaVersion") !== 6
     || nested(result, "authority", "table") !== "crdt_recovery_v12_rows"
     || !Array.isArray(nested(result, "authority", "installedOpfsDirectories"))
     || !(nested(result, "authority", "installedOpfsDirectories") as unknown[])
-      .includes("toonspectrum-studio-sqlite")
+      .includes("toonstudio-studio-sqlite")
     || !Array.isArray(nested(result, "authority", "openedOpfsDatabaseFilenames"))
     || !(nested(result, "authority", "openedOpfsDatabaseFilenames") as unknown[])
       .includes("/studio-local-v12.db")
@@ -453,7 +453,7 @@ export async function runCrdtRecoverySqliteOpfsBrowserBenchmark(
   options: { readonly scratchDirectory?: string; readonly resultPath?: string } = {},
 ): Promise<CrdtRecoverySqliteOpfsBrowserArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-crdt-recovery-sqlite-opfs-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-crdt-recovery-sqlite-opfs-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

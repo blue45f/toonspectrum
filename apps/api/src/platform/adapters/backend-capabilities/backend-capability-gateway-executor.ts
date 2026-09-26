@@ -208,7 +208,7 @@ const LongStudioAiPayloadSchema = z
 
 function commandFingerprint(command: BackendCapabilityGatewayEnvelope): string {
   const payload = canonicalJsonStringify({
-    domain: "toonspectrum.backend-capability-gateway-executor-request.v1",
+    domain: "toonstudio.backend-capability-gateway-executor-request.v1",
     tenantId: command.tenantId,
     capability: command.capability,
     workload: command.workload,

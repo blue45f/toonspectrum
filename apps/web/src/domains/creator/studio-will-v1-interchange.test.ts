@@ -86,7 +86,7 @@ describe("WILL Data Format v1 clean-room Annex A codec", () => {
       "Public_Patent_License.pdf",
     );
     expect(STUDIO_WILL_V1_PROFILE).toBe(
-      "will-data-format-v1.0/annex-a-protobuf/toonspectrum-clean-room-1",
+      "will-data-format-v1.0/annex-a-protobuf/toonstudio-clean-room-1",
     );
     expect(STUDIO_WILL_V1_PROFILE).not.toContain("annex-b");
   });

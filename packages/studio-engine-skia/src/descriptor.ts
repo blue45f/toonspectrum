@@ -2,12 +2,12 @@ import {
   providerDescriptorSchema,
   SKIA_CPU_REFERENCE_EXECUTION,
   SKIA_GPU_EXECUTION,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 import type {
   ProviderDescriptor,
   ProviderExecutionContract,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 /**
  * Self-declaration for the CanvasKit (Skia) vector renderer adapter (V11 §2.2),

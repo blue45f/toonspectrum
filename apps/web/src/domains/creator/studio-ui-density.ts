@@ -12,7 +12,7 @@
 export const STUDIO_UI_DENSITY_MODES = ["focus", "simple", "full"] as const;
 export type StudioUiDensityMode = (typeof STUDIO_UI_DENSITY_MODES)[number];
 
-export const STUDIO_UI_DENSITY_STORAGE_KEY = "toonspectrum-studio-ui-density:v1";
+export const STUDIO_UI_DENSITY_STORAGE_KEY = "toonstudio-studio-ui-density:v1";
 /** New users start with the predictable core workflow; persisted users keep their saved mode. */
 export const DEFAULT_STUDIO_UI_DENSITY_MODE: StudioUiDensityMode = "simple";
 

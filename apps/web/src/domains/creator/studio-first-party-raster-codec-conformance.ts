@@ -1,7 +1,7 @@
 /**
- * Deterministic release/runtime conformance evidence for ToonSpectrum-owned raster codecs.
+ * Deterministic release/runtime conformance evidence for ToonStudio-owned raster codecs.
  *
- * This is the testable substance behind a ToonSpectrum product certification: every evidence
+ * This is the testable substance behind a ToonStudio product certification: every evidence
  * record binds the provider manifest, canonical RGBA input, encoded output, decoded output, and
  * the format's declared alpha-loss model. A product signing authority can sign these exact bytes;
  * no vendor or standards-body certification is implied.
@@ -29,7 +29,7 @@ import type {
 } from "./render/studio-raster-interchange";
 
 export const STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_SCHEMA =
-  "toonspectrum.first-party-raster-codec-conformance" as const;
+  "toonstudio.first-party-raster-codec-conformance" as const;
 export const STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_SCHEMA_VERSION = 1 as const;
 
 export type StudioFirstPartyRasterAlphaPolicy =
@@ -52,7 +52,7 @@ export interface StudioFirstPartyRasterConformanceEvidence {
   readonly schema: typeof STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_SCHEMA;
   readonly schemaVersion:
     typeof STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_SCHEMA_VERSION;
-  readonly implementation: "toonspectrum-first-party-raster-codecs";
+  readonly implementation: "toonstudio-first-party-raster-codecs";
   readonly implementationVersion:
     typeof STUDIO_FIRST_PARTY_RASTER_CODEC_VERSION;
   readonly format: StudioRasterInterchangeFormat;
@@ -319,7 +319,7 @@ export async function createStudioFirstPartyRasterConformanceEvidence(
   const evidence: StudioFirstPartyRasterConformanceEvidence = Object.freeze({
     schema: STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_SCHEMA,
     schemaVersion: STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_SCHEMA_VERSION,
-    implementation: "toonspectrum-first-party-raster-codecs",
+    implementation: "toonstudio-first-party-raster-codecs",
     implementationVersion: STUDIO_FIRST_PARTY_RASTER_CODEC_VERSION,
     format,
     profile: STUDIO_FIRST_PARTY_RASTER_CODEC_PROFILE,

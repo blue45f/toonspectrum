@@ -5,7 +5,7 @@ export interface StudioVirtualPhotoCapture {
 
 function photoFilename(now: number): string {
   const stamp = new Date(now).toISOString().replace(/[:.]/gu, "-");
-  return `toonspectrum-virtual-studio-${stamp}.png`;
+  return `toonstudio-virtual-studio-${stamp}.png`;
 }
 
 function canvasBlob(canvas: HTMLCanvasElement): Promise<Blob> {

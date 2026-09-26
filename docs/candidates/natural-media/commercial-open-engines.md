@@ -43,7 +43,7 @@
 ## Mixbox
 
 Rebelle 5 Pro에 탑재된 **상용 안료 스택**. 공개 저장소는 **비상업 CC BY-NC**.
-현재 ToonSpectrum의 무료·비상업 배포 프로필에는 `mixbox@2.0.0`을 정확히 고정해 사용한다.
+현재 ToonStudio의 무료·비상업 배포 프로필에는 `mixbox@2.0.0`을 정확히 고정해 사용한다.
 상용 배포·유료 배포·상업적 포크에서는 Mixbox 프로바이더를 제거하거나 비활성화해야 하며,
 사용하려면 Secret Weapons의 별도 상용 라이선스를 먼저 확보한다.
 `permissive-only` 및 `source-available` 프로필은 Mixbox 노드를 허용하지 않는다.

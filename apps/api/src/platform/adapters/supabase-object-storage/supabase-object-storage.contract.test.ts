@@ -64,7 +64,7 @@ describe("Supabase object storage contract", () => {
     const hash = "a".repeat(64);
     expect(
       SupabaseObjectReferenceSchema.safeParse({
-        contractVersion: "toonspectrum.supabase-object-storage.v1",
+        contractVersion: "toonstudio.supabase-object-storage.v1",
         purpose: "derived",
         digest: `sha256:${hash}`,
         objectPath: `sha256/aa/${hash}`,
@@ -74,7 +74,7 @@ describe("Supabase object storage contract", () => {
     ).toBe(true);
     expect(
       SupabaseObjectReferenceSchema.safeParse({
-        contractVersion: "toonspectrum.supabase-object-storage.v1",
+        contractVersion: "toonstudio.supabase-object-storage.v1",
         purpose: "derived",
         digest: "md5:unsafe",
         objectPath: "custom/path.png",

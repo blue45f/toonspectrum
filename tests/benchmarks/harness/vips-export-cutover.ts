@@ -21,7 +21,7 @@ import { arch, cpus, platform } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { loadCanvasKitNode } from "@toonspectrum/studio-engine-skia/node";
+import { loadCanvasKitNode } from "@toonstudio/studio-engine-skia/node";
 
 import {
   findExportPreset,

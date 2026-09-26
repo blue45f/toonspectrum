@@ -22,9 +22,9 @@ import type { StudioOpfsStorageManagerLike } from "../studio-opfs-filesystem";
 export const STUDIO_BG3D_LIBRARIES_SQLITE_NAMESPACE =
   "studio-bg3d-libraries-v12";
 export const STUDIO_BG3D_LIBRARIES_OPFS_ROOT =
-  "toonspectrum-studio-bg3d-libraries-v12";
+  "toonstudio-studio-bg3d-libraries-v12";
 export const STUDIO_BG3D_LIBRARIES_LOCK_NAME =
-  "toonspectrum-studio-bg3d-libraries-v12-write";
+  "toonstudio-studio-bg3d-libraries-v12-write";
 
 export const STUDIO_BG3D_LIBRARY_MANIFEST_KEYS = Object.freeze({
   models: "models-manifest-v1",

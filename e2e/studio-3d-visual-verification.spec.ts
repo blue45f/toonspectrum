@@ -15,7 +15,7 @@ const TEST_CREATOR_SESSION = {
   user: {
     id: "11111111-2222-4333-8444-555555555555",
     name: "테스트 크리에이터",
-    email: "creator-test@toonspectrum.dev",
+    email: "creator-test@toonstudio.dev",
     image: null,
     role: "creator",
   },
@@ -566,7 +566,7 @@ async function openBg3d(page: Page): Promise<void> {
 test.describe("Studio 3D 표면 실 브라우저 시각 검증", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript((session) => {
-      localStorage.setItem("toonspectrum-auth-session-v1", JSON.stringify(session));
+      localStorage.setItem("toonstudio-auth-session-v1", JSON.stringify(session));
       window.__studioRasterImagePresentationProbe = {
         version: 1,
         expectationEpoch: 0,

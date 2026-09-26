@@ -16,7 +16,7 @@ const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const SCRATCH =
   process.env.TOONSPECTRUM_DAB_BINNING_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-dab-binning-webgpu-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-dab-binning-webgpu-${Date.now()}`);
 const HARNESS_PATH = "/__studio_webgpu_dab_tile_binning_compute__";
 const HARNESS_ENTRY = "/scripts/studio-webgpu-dab-tile-binning-compute-browser.ts";
 const RESULT_TIMEOUT_MS = 180_000;

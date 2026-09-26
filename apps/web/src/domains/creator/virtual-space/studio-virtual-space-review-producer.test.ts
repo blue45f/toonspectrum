@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import { cancelStudioVirtualSpaceReviewCapture, getStudioVirtualSpaceReviewCaptureStatus, prepareStudioVirtualSpaceReviewCapture,
   produceStudioVirtualSpaceReviewCapture, studioReviewCaptureContentDigest, type StudioReviewCaptureInput, type StudioReviewCaptureIntent } from "./studio-virtual-space-review-producer";
 

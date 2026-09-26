@@ -100,7 +100,7 @@ async function githubRequest({ token, repository, path, init = {}, fetchImpl = f
       accept: "application/vnd.github+json",
       authorization: `Bearer ${token}`,
       "x-github-api-version": "2022-11-28",
-      "user-agent": "toonspectrum-actions-queue-cleanup",
+      "user-agent": "toonstudio-actions-queue-cleanup",
       ...(init.headers ?? {}),
     },
   });

@@ -7,7 +7,7 @@ import {
   createFuzzyNeighborhoodGate,
   runShadowComparison,
   type ShadowComparisonReport,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import {
   pathBounds,
   sceneIRSchema,
@@ -15,7 +15,7 @@ import {
   type PathVerbIR,
   type SceneIR,
   type SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import {
   projectStudioSceneDocumentPoint,
@@ -44,7 +44,7 @@ import {
   STUDIO_VELLO_HYBRID_SPARSE_CANDIDATE,
 } from "./studio-vello-hub-capability";
 
-import type { GpuCpuComparison } from "@toonspectrum/studio-engine-vello";
+import type { GpuCpuComparison } from "@toonstudio/studio-engine-vello";
 
 export {
   resolveStudioVelloHubProductCapability,
@@ -416,11 +416,11 @@ export interface StudioVelloHubBackend {
   dispose(): void;
 }
 
-type StudioVelloEngineModule = typeof import("@toonspectrum/studio-engine-vello");
+type StudioVelloEngineModule = typeof import("@toonstudio/studio-engine-vello");
 type StudioVelloEngineLoader = () => Promise<StudioVelloEngineModule>;
 
 const loadStudioVelloEngine: StudioVelloEngineLoader = () =>
-  import("@toonspectrum/studio-engine-vello");
+  import("@toonstudio/studio-engine-vello");
 
 export function createStudioVelloCpuReferenceBackend(
   loadEngine: StudioVelloEngineLoader = loadStudioVelloEngine,

@@ -19,10 +19,10 @@ describe("V12 in-place cutover data-discard policy", () => {
 
   it("keeps browser fallback authorities in V12-only namespaces", () => {
     expect(source("./studio-autosave.ts")).toContain(
-      'STUDIO_AUTOSAVE_PREFIX = "toonspectrum-studio-autosave:v12"',
+      'STUDIO_AUTOSAVE_PREFIX = "toonstudio-studio-autosave:v12"',
     );
     expect(source("./studio-checkpoints.ts")).toContain(
-      'STUDIO_CHECKPOINT_PREFIX = "toonspectrum-studio-checkpoints:v12"',
+      'STUDIO_CHECKPOINT_PREFIX = "toonstudio-studio-checkpoints:v12"',
     );
     expect(source("./studio-checkpoints.ts")).toContain(
       'STUDIO_CHECKPOINT_SQLITE_NAMESPACE = "studio-named-checkpoints-v12"',
@@ -31,16 +31,16 @@ describe("V12 in-place cutover data-discard policy", () => {
       'STUDIO_WORKSPACE_STORAGE_KEY = "toonspectrum:studio:workspaces-v12"',
     );
     expect(source("./studio-renderer-tournament-runtime.ts")).toContain(
-      '"toonspectrum-studio-v12-tournament-winners-v1"',
+      '"toonstudio-studio-v12-tournament-winners-v1"',
     );
     expect(source("./brush/studio-brush-library-sqlite-repository.ts")).toContain(
-      '"toonspectrum-studio-v12-brush-library-fallback"',
+      '"toonstudio-studio-v12-brush-library-fallback"',
     );
     expect(source("./filter/studio-filter-library-sqlite-repository.ts")).toContain(
-      '"toonspectrum.studio-filter-library.v12.fallback"',
+      '"toonstudio.studio-filter-library.v12.fallback"',
     );
     expect(source("./studio-animatic-timeline.ts")).toContain(
-      '"toonspectrum-studio-animatic:v12"',
+      '"toonstudio-studio-animatic:v12"',
     );
     expect(source("./studio-animatic-sqlite-persistence.ts")).toContain(
       'STUDIO_ANIMATIC_SQLITE_NAMESPACE = "studio-animatic-v12"',
@@ -249,7 +249,7 @@ describe("V12 in-place cutover data-discard policy", () => {
   it("keeps destructive reset triple-gated and covers all Studio prefixes", () => {
     const destruction = source("./studio-data-destruction.ts");
     expect(destruction).toContain("REPLACE_CURRENT_TOONSTUDIO_IN_PLACE_V12");
-    expect(destruction).toContain('"toonspectrum-studio-"');
+    expect(destruction).toContain('"toonstudio-studio-"');
     expect(destruction).toContain('RESET_EXISTING_STUDIO_DATA !== "YES"');
   });
 });

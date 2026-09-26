@@ -28,7 +28,7 @@ describe("ToonStudio original free starter asset packs", () => {
     for (const pkg of STUDIO_ORIGINAL_FREE_ASSET_PACKAGES) {
       expect(pkg.access).toBe("free");
       expect(pkg.origin).toBe("original-procedural");
-      expect(pkg.creator.name).toBe("ToonSpectrum Lab");
+      expect(pkg.creator.name).toBe("ToonStudio Lab");
       expect(pkg.availability).toMatchObject({
         catalog: "bundled",
         library: "local-only",

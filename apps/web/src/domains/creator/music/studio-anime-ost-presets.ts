@@ -1,4 +1,4 @@
-import type { MusicBrief } from "@toonspectrum/core/studio-music";
+import type { MusicBrief } from "@toonstudio/core/studio-music";
 
 export interface AnimeOstStarter {
   readonly id: string;
@@ -48,7 +48,7 @@ export const ANIME_OST_STARTERS: readonly AnimeOstStarter[] = [
     id: "creator-theme",
     label: "창작자 테마 송",
     badge: "TOONSTUDIO",
-    description: "빈 캔버스에서 세계가 완성되는 ToonSpectrum 시그니처 곡",
+    description: "빈 캔버스에서 세계가 완성되는 ToonStudio 시그니처 곡",
     patch: { title: "우리가 그린 세계", mood: "youth", purpose: "opening", bpm: 138, instruments: ["guitar", "drums", "synth", "strings"], vocals: true, vocalStyle: "youthful-hero", songStructure: "anime-op", lyricTheme: "빈 캔버스에 각자의 상상을 겹쳐 하나의 세계를 완성한다", intensity: "cinematic", arc: "build", loop: false },
   },
   {

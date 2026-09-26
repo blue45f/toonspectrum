@@ -34,7 +34,7 @@ async function request(name, path, options = {}) {
   if (options.cookie) headers.Cookie = options.cookie;
   if (method !== "GET") {
     headers["Content-Type"] = "application/json";
-    if (options.csrf !== false) headers["x-toonspectrum-csrf"] = "1";
+    if (options.csrf !== false) headers["x-toonstudio-csrf"] = "1";
   }
   const response = await fetch(`${target.apiOrigin}${path}`, {
     method, headers, redirect: "error", signal: AbortSignal.timeout(15_000),
@@ -52,7 +52,7 @@ async function seedAndInspect() {
   target = validateIsolatedMarketApiTarget({
     rawApiUrl: "http://127.0.0.1:4107", rawDatabaseUrl: validated.connectionString,
   });
-  privateDirectory = await mkdtemp(join(tmpdir(), "toonspectrum-admin-qa-"));
+  privateDirectory = await mkdtemp(join(tmpdir(), "toonstudio-admin-qa-"));
   const privateFile = join(privateDirectory, "credentials.json");
   const seed = spawnSync(process.execPath, [
     "--import", "tsx", "scripts/seed/admin-qa-seed.mjs", "--execute",
@@ -82,7 +82,7 @@ async function loginAccounts(accounts) {
       method: "POST", body: { email: account.email, password: account.password },
     });
     check(data.ok === true && data.user?.id === account.id && data.user?.role === account.role, `${account.key}: canonical login principal`);
-    const cookie = response.headers.getSetCookie().find((value) => value.startsWith("toonspectrum-auth-session="));
+    const cookie = response.headers.getSetCookie().find((value) => value.startsWith("toonstudio-auth-session="));
     check(typeof cookie === "string" && /httponly/i.test(cookie), `${account.key}: HttpOnly session cookie`);
     cookies.set(account.key, cookie.split(";")[0]);
     const session = await request(`${account.key}: session`, "/api/auth/session", { cookie: cookies.get(account.key) });

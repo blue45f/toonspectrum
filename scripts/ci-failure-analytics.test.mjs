@@ -15,7 +15,7 @@ const { test } = process.env.VITEST ? await import("vitest") : await import("nod
 test('stripAnsi and normalizeDiagnostic remove terminal and runner-specific noise', () => {
   assert.equal(stripAnsi('\u001b[31mboom\u001b[0m'), 'boom');
   assert.equal(
-    normalizeDiagnostic('/home/runner/work/toonspectrum/toonspectrum/apps/web/a.tsx(1,2): error'),
+    normalizeDiagnostic('/home/runner/work/toonstudio/toonstudio/apps/web/a.tsx(1,2): error'),
     'apps/web/a.tsx(1,2): error',
   );
 });
@@ -185,7 +185,7 @@ test('aggregate and markdown expose cross-workflow root-cause fan-out', () => {
   assert.equal(summary.causes[0].occurrences, 2);
   assert.equal(summary.causes[0].workflows.size, 2);
   const markdown = renderMarkdownReport(summary, {
-    repository: 'blue45f/toonspectrum',
+    repository: 'blue45f/toonstudio',
     generatedAt: '2026-09-18T04:00:00Z',
     lookbackDays: 120,
   });

@@ -1,4 +1,4 @@
-# ToonSpectrum Studio — Babylon.js 제품 활용 전수 검토
+# ToonStudio Studio — Babylon.js 제품 활용 전수 검토
 
 - 검토일: 2026-07-31
 - 검토 기준: Babylon.js 9.19.0, `@babylonjs/core`, `loaders`, `materials`, `serializers`
@@ -8,7 +8,7 @@
 
 ## 결론
 
-Babylon.js는 ToonSpectrum의 모든 2D·3D 기능을 소유하는 범용 엔진보다, 장면의 깊이·노멀·조명·
+Babylon.js는 ToonStudio의 모든 2D·3D 기능을 소유하는 범용 엔진보다, 장면의 깊이·노멀·조명·
 모션·재질 정보를 이용하는 GPU 제작 기능을 필요할 때만 실행하는 specialist 포트폴리오로 쓰는
 것이 가장 가치가 높다.
 
@@ -142,7 +142,7 @@ receipt가 생겼다는 이유로 이 입력 정책이 자동 완화된 것은 �
 
 ## Babylon.js 9 계열에서 특히 주목할 기능
 
-Babylon.js 9.0은 ToonSpectrum과 직접 연결할 수 있는 기능을 다수 추가했다.
+Babylon.js 9.0은 ToonStudio과 직접 연결할 수 있는 기능을 다수 추가했다.
 
 - Clustered Lighting: 많은 광원을 화면 타일과 깊이 구간으로 나눠 계산
 - Textured Area Lights: 이미지 자체를 면광원으로 사용하는 조명
@@ -283,7 +283,7 @@ Frame Graph는 texture allocation 재사용을 지원하지만, back buffer를 �
 - 스크린톤·하프톤·그라데이션 맵
 
 Node Material의 ProceduralTexture/PostProcess 모드를 사용할 수 있지만, 문서에는 Babylon graph가
-아닌 ToonSpectrum 소유의 `kind + bounded parameters + seed + time` recipe를 저장한다.
+아닌 ToonStudio 소유의 `kind + bounded parameters + seed + time` recipe를 저장한다.
 [Node Material modes](https://doc.babylonjs.com/typedoc/enums/BABYLON.NodeMaterialModes)
 
 ### 1.3 Babylon ImageFilter Control
@@ -518,7 +518,7 @@ pass는 생성하지 않는다.
 ### 4.1 애니메이션 리타게팅
 
 Babylon 9의 animation retargeting은 서로 다른 스켈레톤과 체형 사이 동작 공유를 목표로 한다.
-ToonSpectrum에서는 다음으로 재해석할 수 있다.
+ToonStudio에서는 다음으로 재해석할 수 있다.
 
 - VRM과 일반 rigged GLB가 같은 걷기·앉기·전투·감정 pose library 공유
 - 사용자 캐릭터에 pose preset 자동 재매핑
@@ -690,7 +690,7 @@ Node Material Editor와 Node Render Graph Editor의 조작 개념은 차용하�
 - particles, atmosphere, bloom
 - output beauty/transparent layer/LT source
 
-그래프 저장 형식은 ToonSpectrum 소유 버전 스키마로 제한하고, cycle, texture 수, pass 수, 픽셀
+그래프 저장 형식은 ToonStudio 소유 버전 스키마로 제한하고, cycle, texture 수, pass 수, 픽셀
 예산을 사전에 계산한다. 사용자 셰이더 문자열·URL·Babylon 직렬화 객체는 받지 않는다.
 
 ### 7.2 에셋 마켓과 팀 공유
@@ -771,7 +771,7 @@ Babylon은 WebGPU와 WebGL을 병행 지원하며 WebGPU 엔진 초기화가 비
 초기화 실패를 정상적인 분기로 취급해야 한다.
 [WebGPU support](https://doc.babylonjs.com/setup/support/webGPU/)
 
-## 9. 현재 ToonSpectrum 연결 지점
+## 9. 현재 ToonStudio 연결 지점
 
 | 영역 | 현재 코드 | Babylon 연결 |
 | --- | --- | --- |
@@ -936,7 +936,7 @@ Babylon 공식 CDN은 학습·소규모 실험 용도이며 프로덕션 사용�
 
 ## 최종 판단
 
-Babylon.js의 가장 큰 가치는 “3D를 하나 더 보여 주는 것”이 아니다. ToonSpectrum에서는 장면을
+Babylon.js의 가장 큰 가치는 “3D를 하나 더 보여 주는 것”이 아니다. ToonStudio에서는 장면을
 이해하는 GPU 제작 보조 계층으로 사용해야 한다.
 
 - 단순 필터는 기존 WebGPU/Worker

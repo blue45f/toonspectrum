@@ -1,4 +1,4 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import { buildStudioPackageArchiveBlob, STUDIO_PACKAGE_ARCHIVE_LIMITS } from "../studio-package-archive";
 import { createStudioDownloadFileName } from "../export/studio-download-file-name";
 import { verifyStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewVerification } from "../virtual-space/studio-virtual-space-review-invitation";

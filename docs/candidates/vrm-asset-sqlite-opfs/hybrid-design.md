@@ -9,10 +9,10 @@ The durable design is hybrid by payload strength:
   -> vrm-library.ts / studio-vrm-texture-paint-library.ts
   -> studio-vrm-asset-sqlite-opfs-repository.ts
        ├─ acquireStudioLocalDatabase()
-       │    -> toonspectrum-studio-sqlite/studio-local-v12.db
+       │    -> toonstudio-studio-sqlite/studio-local-v12.db
        │         ├─ studio-vrm-model-assets-v12 / manifest-v1
        │         └─ studio-vrm-texture-paint-assets-v12 / manifest-v1
-       └─ OPFS root: toonspectrum-studio-vrm-assets-v12
+       └─ OPFS root: toonstudio-studio-vrm-assets-v12
             ├─ blobs/<sha256>.<codec>
             ├─ commits/<sha256>.json
             └─ asset-store index/owner references

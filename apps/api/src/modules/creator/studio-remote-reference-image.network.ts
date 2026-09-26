@@ -270,7 +270,7 @@ implements StudioRemoteReferenceHttpRequester {
           Accept: accept ?? "image/png,image/jpeg,image/webp,image/gif;q=0.9",
           "Accept-Encoding": "identity",
           Connection: "close",
-          "User-Agent": userAgent ?? "ToonSpectrum-RemoteReference/1.0",
+          "User-Agent": userAgent ?? "ToonStudio-RemoteReference/1.0",
         },
       }, (response) => {
         resolve({

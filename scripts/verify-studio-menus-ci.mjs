@@ -10,7 +10,7 @@
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
 const STUDIO_ROOT_SELECTOR =
   '[data-studio-editor="true"], [data-studio-app-shell="true"]';
 const STUDIO_BOOT_TIMEOUT_MS = 45_000;
@@ -18,14 +18,14 @@ const STUDIO_BOOT_TIMEOUT_MS = 45_000;
 const BROWSER_BOOTSTRAP_SOURCE = `
   globalThis.__name ??= (target) => target;
   try {
-    window.localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-    window.localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
+    window.localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
+    window.localStorage.setItem("toonstudio-studio-mobile-hint-dismissed", "1");
     window.localStorage.setItem(
-      "toonspectrum-lang",
+      "toonstudio-lang",
       JSON.stringify({ state: { lang: "ko" }, version: 0 })
     );
     window.localStorage.setItem(
-      "toonspectrum-studio-ui-density:v1",
+      "toonstudio-studio-ui-density:v1",
       JSON.stringify({ mode: "full" })
     );
   } catch {

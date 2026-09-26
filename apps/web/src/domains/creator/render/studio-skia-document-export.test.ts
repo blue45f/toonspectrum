@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 
-import type { SkiaDocumentFrame, SkiaDocumentRenderer } from "@toonspectrum/studio-engine-skia";
+import type { SkiaDocumentFrame, SkiaDocumentRenderer } from "@toonstudio/studio-engine-skia";
 
 import type { El } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";

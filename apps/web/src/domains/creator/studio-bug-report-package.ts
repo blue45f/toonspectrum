@@ -21,7 +21,7 @@ import {
 
 import type { StudioErrorJournalEntry } from "./studio-error-journal";
 
-export const STUDIO_BUG_REPORT_SCHEMA = "toonspectrum.studio.bug-report/v1" as const;
+export const STUDIO_BUG_REPORT_SCHEMA = "toonstudio.studio.bug-report/v1" as const;
 
 /** UI 가 그대로 보여 주는 "담기는 것". */
 export const STUDIO_BUG_REPORT_INCLUDED: readonly string[] = Object.freeze([

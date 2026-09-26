@@ -6,7 +6,7 @@ import {
   type StudioAppSettingsTab,
 } from "./studio-app-settings";
 
-export const STUDIO_APP_SETTINGS_EXPORT_KIND = "toonspectrum.studio-app-settings" as const;
+export const STUDIO_APP_SETTINGS_EXPORT_KIND = "toonstudio.studio-app-settings" as const;
 export const STUDIO_APP_SETTINGS_EXPORT_VERSION = 1 as const;
 export const STUDIO_APP_SETTINGS_IMPORT_MAX_BYTES = 128 * 1024;
 
@@ -289,7 +289,7 @@ export function importStudioAppSettings(raw: string): StudioAppSettingsImportRes
   if (!isRecord(parsed)) return { ok: false, reason: "invalid-settings", message: "설정 객체를 찾지 못했습니다." };
   if ("kind" in parsed || "version" in parsed || "settings" in parsed) {
     if (parsed.kind !== STUDIO_APP_SETTINGS_EXPORT_KIND) {
-      return { ok: false, reason: "unsupported-kind", message: "ToonSpectrum 설정 파일 형식이 아닙니다." };
+      return { ok: false, reason: "unsupported-kind", message: "ToonStudio 설정 파일 형식이 아닙니다." };
     }
     if (parsed.version !== STUDIO_APP_SETTINGS_EXPORT_VERSION) {
       return { ok: false, reason: "unsupported-version", message: "지원하지 않는 설정 파일 버전입니다." };

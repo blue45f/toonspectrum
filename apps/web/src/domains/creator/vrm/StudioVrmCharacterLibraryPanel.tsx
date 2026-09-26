@@ -247,7 +247,7 @@ export function StudioVrmCharacterLibraryPanel({
           <ChevronDown size={13} className="ml-auto transition-transform group-open:rotate-180" aria-hidden />
         </summary>
         <p className="mt-1 text-[0.68rem] leading-normal text-fg-2">
-          아래 공식/커뮤니티 허브에서 무료 배포 모델을 다운로드해 보세요. 다운로드한 .vrm 파일을 ToonSpectrum에 자유롭게 추가할 수 있습니다.
+          아래 공식/커뮤니티 허브에서 무료 배포 모델을 다운로드해 보세요. 다운로드한 .vrm 파일을 ToonStudio에 자유롭게 추가할 수 있습니다.
         </p>
         <div className="mt-2.5 space-y-2">
           <a
@@ -290,16 +290,16 @@ export function StudioVrmCharacterLibraryPanel({
           <ChevronDown size={13} className="ml-auto text-fg-3 transition-transform group-open:rotate-180" aria-hidden />
         </summary>
         <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-2">
-          ToonSpectrum의 조형 탭은 현재 VRM 리그를 보존한 빠른 비파괴 편집에 적합합니다. 새 스킨 메시·직접 그린 텍스처·VRM 파일 내보내기까지 필요하면 VRoid Studio에서 원본을 만든 뒤 가져오세요.
+          ToonStudio의 조형 탭은 현재 VRM 리그를 보존한 빠른 비파괴 편집에 적합합니다. 새 스킨 메시·직접 그린 텍스처·VRM 파일 내보내기까지 필요하면 VRoid Studio에서 원본을 만든 뒤 가져오세요.
         </p>
 
         <div className="mt-2.5 space-y-1.5 rounded-lg border border-line bg-panel p-2 text-[0.68rem] text-fg-3">
-          <div className="flex items-center gap-1 font-bold text-fg"><Lightbulb size={13} className="text-accent" aria-hidden />툰스펙트럼 적용 가이드:</div>
+          <div className="flex items-center gap-1 font-bold text-fg"><Lightbulb size={13} className="text-accent" aria-hidden />툰스튜디오 적용 가이드:</div>
           <ul className="list-decimal space-y-1 pl-3.5">
             <li>PC/Mac 버전 VRoid Studio를 다운로드하여 설치합니다.</li>
             <li>원하는 슬롯(얼굴, 체형, 헤어, 옷 등)의 프리셋을 골라 취향대로 커스텀합니다.</li>
             <li>우측 상단 [내보내기(Export)] 아이콘 ➜ <span className="font-bold text-fg">Export as VRM</span>을 클릭합니다.</li>
-            <li>정보(이름, 라이선스 등)를 입력하고 내보낸 <span className="font-semibold text-accent">.vrm 파일</span>을 ToonSpectrum에 업로드해 보세요!</li>
+            <li>정보(이름, 라이선스 등)를 입력하고 내보낸 <span className="font-semibold text-accent">.vrm 파일</span>을 ToonStudio에 업로드해 보세요!</li>
           </ul>
         </div>
 

@@ -158,7 +158,7 @@ export function validateAnimaticSqliteOpfsBrowserEvidence(
     || nested(result, "authority", "productionPersistence")
       !== "createStudioAnimaticSqlitePersistence"
     || nested(result, "authority", "namespace") !== "studio-animatic-v12"
-    || nested(result, "authority", "opfsDirectory") !== "toonspectrum-studio-sqlite"
+    || nested(result, "authority", "opfsDirectory") !== "toonstudio-studio-sqlite"
     || nested(result, "authority", "logicalDatabaseFilename") !== "studio-local-v12.db"
     || nested(result, "authority", "expectedOpenFilename") !== "/studio-local-v12.db"
     || nested(result, "authority", "opfsDatabaseOpenCount") !== 2
@@ -174,7 +174,7 @@ export function validateAnimaticSqliteOpfsBrowserEvidence(
     || opened.some((filename) => filename !== "/studio-local-v12.db")
     || !Array.isArray(directories)
     || directories.length !== 2
-    || directories.some((directory) => directory !== "toonspectrum-studio-sqlite")
+    || directories.some((directory) => directory !== "toonstudio-studio-sqlite")
   ) {
     issues.push("authority receipt does not prove two V12-only OPFS opens with zero fallback");
   }
@@ -411,7 +411,7 @@ export async function runAnimaticSqliteOpfsBrowserBenchmark(
   options: { scratchDirectory?: string; resultPath?: string } = {},
 ): Promise<AnimaticSqliteOpfsBrowserArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-animatic-sqlite-opfs-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-animatic-sqlite-opfs-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

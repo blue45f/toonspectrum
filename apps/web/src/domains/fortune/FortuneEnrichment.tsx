@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { readFortuneResponse, validatedFortuneExpiry } from "./fortune-response-lifetime";
 import { useFortuneExpiry } from "./useFortuneExpiry";
-import { localFortuneHoroscope, type FortuneReading, type FortunePeriod, type FortuneUnavailableReason } from "@toonspectrum/core/fortune";
+import { localFortuneHoroscope, type FortuneReading, type FortunePeriod, type FortuneUnavailableReason } from "@toonstudio/core/fortune";
 
 const statusSchema = z.enum(["local", "external", "external-cache", "local-fallback"]);
 const reasonSchema = z.enum(["not-configured", "rights-pending", "coordination-unavailable", "budget-exhausted", "provider-unavailable", "historical-request"]);

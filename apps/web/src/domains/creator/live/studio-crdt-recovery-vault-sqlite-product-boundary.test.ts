@@ -27,7 +27,7 @@ describe("Studio CRDT recovery SQLite product boundary", () => {
     expect(vault).not.toContain("indexedDB");
     expect(vault).not.toContain("IDBDatabase");
     expect(vault).not.toContain("BrowserStudioCrdtRejectionMarkerFallback");
-    expect(vault).not.toContain("toonspectrum-studio-crdt-recovery-vault");
+    expect(vault).not.toContain("toonstudio-studio-crdt-recovery-vault");
     expect(vault).not.toMatch(/migrat|legacy.*read|import.*indexed/i);
     expect(vault).toContain("SamePageStudioCrdtRejectionMarkerLatch");
     expect(vault).toContain('readonly durability = "degraded"');

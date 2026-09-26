@@ -21,7 +21,7 @@ describe("first-party raster codec conformance evidence", () => {
         STUDIO_FIRST_PARTY_RASTER_CONFORMANCE_SCHEMA,
       );
       expect(first.evidence.providerId).toBe(
-        `toonspectrum.raster.${format}.v1`,
+        `toonstudio.raster.${format}.v1`,
       );
       expect(first.evidence.decision).toBe("passed");
       expect(first.evidence.cases).toHaveLength(2);

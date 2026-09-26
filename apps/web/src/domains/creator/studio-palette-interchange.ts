@@ -269,7 +269,7 @@ function prepareExport(
   if (skippedColors > 0) warnings.push(warning("color-skipped", `해석할 수 없는 색 ${skippedColors}개를 건너뛰었습니다.`));
   return {
     colors: limited,
-    name: cleanName(palette.name, "ToonSpectrum 팔레트"),
+    name: cleanName(palette.name, "ToonStudio 팔레트"),
     skippedColors,
     truncated,
     warnings,
@@ -816,7 +816,7 @@ export function exportCssVariablePalette(
 ): StudioPaletteInterchangeExportResult<string> {
   const prepared = prepareExport(palette);
   const used = new Set<string>();
-  const lines = [`/* ${prepared.name} — ToonSpectrum */`, ":root {"];
+  const lines = [`/* ${prepared.name} — ToonStudio */`, ":root {"];
   prepared.colors.forEach((color, index) => {
     lines.push(`  --${cssVariableName(color.name ?? "", index, used)}: ${color.hex};`);
   });
@@ -833,7 +833,7 @@ export function exportCssVariablePalette(
 }
 
 interface JsonPalettePayload {
-  readonly schema: "toonspectrum.palette";
+  readonly schema: "toonstudio.palette";
   readonly version: 1;
   readonly name: string;
   readonly colors: readonly { readonly hex: string; readonly name?: string }[];
@@ -851,7 +851,7 @@ export function importJsonPalette(input: string | Uint8Array): StudioPaletteInte
   } catch (error) {
     return fail("invalid", error);
   }
-  if (!isRecord(value) || value.schema !== "toonspectrum.palette" || value.version !== 1 || !Array.isArray(value.colors)) {
+  if (!isRecord(value) || value.schema !== "toonstudio.palette" || value.version !== 1 || !Array.isArray(value.colors)) {
     fail("invalid");
   }
   const warnings: StudioPaletteInterchangeWarning[] = [];
@@ -884,7 +884,7 @@ export function exportJsonPalette(
 ): StudioPaletteInterchangeExportResult<string> {
   const prepared = prepareExport(palette);
   const payload: JsonPalettePayload = {
-    schema: "toonspectrum.palette",
+    schema: "toonstudio.palette",
     version: 1,
     name: prepared.name,
     colors: prepared.colors.map((color) => ({ hex: color.hex, ...(color.name ? { name: color.name } : {}) })),

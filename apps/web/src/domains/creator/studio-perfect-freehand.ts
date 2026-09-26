@@ -22,7 +22,7 @@ import { getStroke, type StrokeOptions } from "perfect-freehand";
 
 import { resampleStrokePressures } from "./studio-brush";
 
-import type { PathIR } from "@toonspectrum/studio-project-model";
+import type { PathIR } from "@toonstudio/studio-project-model";
 
 /** 렌더러가 perfect-freehand 타입에 직접 의존하지 않도록 재노출하는 스트로커 핸들 타입. */
 export type StudioPerfectFreehandStroker = (

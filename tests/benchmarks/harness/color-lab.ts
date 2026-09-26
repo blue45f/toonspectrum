@@ -29,7 +29,7 @@ import { cpus, platform, arch } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { loadCanvasKitNode } from "@toonspectrum/studio-engine-skia/node";
+import { loadCanvasKitNode } from "@toonstudio/studio-engine-skia/node";
 
 import { convertStudioHighBitLinearGamut } from "../../../apps/web/src/domains/creator/studio-highbit-colorspace";
 import {

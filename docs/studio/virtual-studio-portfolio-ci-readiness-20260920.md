@@ -3,7 +3,7 @@
 Status: **current test repair**. The `Full pnpm test` job for PR #1856 at
 `b96cc5678179ced5a184c840b52c721559bd1c53` failed one portfolio assertion while
 4,584 other files and 52,248 other tests passed. The separate full-test job on
-that same commit passed. [Original failed run](https://github.com/blue45f/toonspectrum/actions/runs/35483328912)
+that same commit passed. [Original failed run](https://github.com/blue45f/toonstudio/actions/runs/35483328912)
 
 `ProductionPortfolioLanding` renders its heading in the loading shell before
 the project and task API promises finish. The test awaited that static heading

@@ -704,11 +704,11 @@ export function planStudioExportDialogueTxt(input: {
   if (items.length === 0) return null;
   const enriched = enrichDialogueItemsWithRubyPreview(items, pages);
   const document = studioDialogueItemsToInterchange(enriched, {
-    title: input.title?.trim() || "toonspectrum-dialogue",
+    title: input.title?.trim() || "toonstudio-dialogue",
   });
   const serialized = serializeStudioDialogueInterchange("txt", document);
   return {
-    fileName: `${(input.title?.trim() || "toonspectrum-dialogue").slice(0, 80)}.txt`,
+    fileName: `${(input.title?.trim() || "toonstudio-dialogue").slice(0, 80)}.txt`,
     mimeType: "text/plain;charset=utf-8",
     text: serialized.text,
     cueCount: document.cues.length,

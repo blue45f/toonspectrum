@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createStudioWorkSession, reduceStudioWorkSession, type StudioSessionResources, type StudioWorkSession, type StudioWorkSessionCommand,
-  type StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
+  type StudioWorkSessionView } from "@toonstudio/studio-project-model/work-session";
 import { StudioSessionAgenda } from "./StudioSessionAgenda";
 import { StudioSessionMaterialBoard } from "./StudioSessionMaterialBoard";
 import type { StudioWorkSessionController } from "./studio-work-session-controller";

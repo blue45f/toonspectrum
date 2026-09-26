@@ -14,7 +14,7 @@ test.describe("스튜디오 & 마켓 mock 브라우저 상호작용 감사", () 
     user: {
       id: "123e4567-e89b-12d3-a456-426614174000",
       name: "테스트 마스터",
-      email: "master-tester@toonspectrum.dev",
+      email: "master-tester@toonstudio.dev",
       image: null,
       role: "creator",
     },
@@ -23,7 +23,7 @@ test.describe("스튜디오 & 마켓 mock 브라우저 상호작용 감사", () 
   test.beforeEach(async ({ page }) => {
     // HttpOnly 인증 쿠키가 아닌, UI 초기 렌더링용 탭 범위 공개 프로필 캐시다.
     await page.addInitScript((session) => {
-      sessionStorage.setItem("toonspectrum-auth-session", JSON.stringify(session));
+      sessionStorage.setItem("toonstudio-auth-session", JSON.stringify(session));
     }, MOCK_PUBLIC_PROFILE);
 
     // 이 스위트는 실제 계정 인증이 아니라 mock 서버 세션과 공개 프로필 캐시의 UI 계약을 검증한다.
@@ -137,7 +137,7 @@ test.describe("스튜디오 & 마켓 mock 브라우저 상호작용 감사", () 
           name: "잉크 브러시",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.brush+json",
+            mediaType: "application/vnd.toonstudio.brush+json",
             payload: brushPayload,
             byteSize: creatorMarketplaceJsonByteSize(brushPayload),
             sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -211,7 +211,7 @@ test.describe("스튜디오 & 마켓 mock 브라우저 상호작용 감사", () 
           name: "사이버펑크 거리",
           delivery: {
             mode: "procedural-recipe",
-            mediaType: "application/vnd.toonspectrum.3d-preset+json",
+            mediaType: "application/vnd.toonstudio.3d-preset+json",
             payload: scene3dPayload,
             byteSize: creatorMarketplaceJsonByteSize(scene3dPayload),
             sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -274,7 +274,7 @@ test.describe("스튜디오 & 마켓 mock 브라우저 상호작용 감사", () 
           name: "액션 템플릿",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.template+json",
+            mediaType: "application/vnd.toonstudio.template+json",
             payload: templatePayload,
             byteSize: creatorMarketplaceJsonByteSize(templatePayload),
             sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

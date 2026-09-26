@@ -1,4 +1,4 @@
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import { strokeOutlinePath } from "../geometry";
@@ -8,7 +8,7 @@ import type {
   ModeledSampleIR,
   PathIR,
   StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * D-03 — sizeDynamics wired into the vector outline lane. The per-sample

@@ -49,7 +49,7 @@ describe("search URL transitions", () => {
   it("keeps a native fragment link and a focusable filter destination", () => {
     mount("/search?q=first");
     const link = screen.getByRole("link", { name: "search.filterButton" });
-    expect(link.getAttribute("href")).toBe("#toonspectrum-search-explorer-top");
-    expect(document.getElementById("toonspectrum-search-explorer-top")?.getAttribute("tabindex")).toBe("-1");
+    expect(link.getAttribute("href")).toBe("#toonstudio-search-explorer-top");
+    expect(document.getElementById("toonstudio-search-explorer-top")?.getAttribute("tabindex")).toBe("-1");
   });
 });

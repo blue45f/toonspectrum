@@ -12,7 +12,7 @@ let failure;
 try {
   for (const scenario of ["delayed-metadata", "close-before-metadata"]) {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "ko-KR", reducedMotion: "reduce", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
+    await context.addInitScript(() => localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
     const page = await context.newPage();
     const errors = [];
     const requests = [];

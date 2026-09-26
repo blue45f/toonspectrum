@@ -4,9 +4,9 @@ Status: focused test repair. No production resume implementation, retry policy, 
 
 ## Remote failure and trace evidence
 
-The b96cc5678 Non-studio experience quality run passed 282 tests and failed the recent-work viewport case. The separately seeded `studio-exact-resume` case passed in that same run. [CI run 35483328889](https://github.com/blue45f/toonspectrum/actions/runs/35483328889)
+The b96cc5678 Non-studio experience quality run passed 282 tests and failed the recent-work viewport case. The separately seeded `studio-exact-resume` case passed in that same run. [CI run 35483328889](https://github.com/blue45f/toonstudio/actions/runs/35483328889)
 
-The failed case expected the displayed effective scale **176%** but its last poll observed **98%** while the restored document was still hydrating. The final failure snapshot already contained the product's exact-resume receipt for the saved page with relative zoom **180%**, and the actual canvas HUD **176%**. Those two percentages use different quantities: the receipt stores user zoom; the HUD multiplies that zoom by the measured fit-width scale. [Browser artifact 10597032332](https://github.com/blue45f/toonspectrum/actions/runs/35483328889/artifacts/10597032332)
+The failed case expected the displayed effective scale **176%** but its last poll observed **98%** while the restored document was still hydrating. The final failure snapshot already contained the product's exact-resume receipt for the saved page with relative zoom **180%**, and the actual canvas HUD **176%**. Those two percentages use different quantities: the receipt stores user zoom; the HUD multiplies that zoom by the measured fit-width scale. [Browser artifact 10597032332](https://github.com/blue45f/toonstudio/actions/runs/35483328889/artifacts/10597032332)
 
 The trace's monotonic timestamps make the race concrete:
 

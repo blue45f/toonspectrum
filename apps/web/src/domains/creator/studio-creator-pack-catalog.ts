@@ -71,8 +71,8 @@ export interface StudioCreatorPackDefinition {
 }
 
 const CREATOR = Object.freeze({
-  id: "toonspectrum-lab",
-  name: "ToonSpectrum Lab",
+  id: "toonstudio-lab",
+  name: "ToonStudio Lab",
   verified: true,
 });
 
@@ -85,7 +85,7 @@ const LICENSE = Object.freeze({
   derivativesAllowed: true,
   redistributionAllowed: true,
   sourceVerifiedAt: "2026-07-26T00:00:00.000Z",
-  summary: "상업 작품 사용·수정·재배포가 가능한 ToonSpectrum 독자 원본입니다.",
+  summary: "상업 작품 사용·수정·재배포가 가능한 ToonStudio 독자 원본입니다.",
 });
 
 const PORTABLE_AVAILABILITY = Object.freeze({
@@ -140,7 +140,7 @@ function definePack(input: {
       budget: Object.freeze({ ...input.budget }),
     }),
     metadata: Object.freeze({
-      schema: "toonspectrum.studio-marketplace-package",
+      schema: "toonstudio.studio-marketplace-package",
       id: input.id,
       name: input.name,
       summary: input.summary,

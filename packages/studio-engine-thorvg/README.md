@@ -1,4 +1,4 @@
-# @toonspectrum/studio-engine-thorvg
+# @toonstudio/studio-engine-thorvg
 
 안전한 SVG·Lottie 전문 island를 위한 bounded ThorVG WebCanvas provider다.
 

@@ -3,8 +3,8 @@ import { expect, test } from "./fixtures/non-studio-test";
 // API failures remain explicit; this suite verifies client-side interaction, not live writes.
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
   });
   await page.route("**/api/**", async (route) => {
     const session = new URL(route.request().url()).pathname.endsWith("/auth/session");

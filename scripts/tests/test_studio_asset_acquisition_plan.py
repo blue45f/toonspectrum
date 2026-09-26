@@ -14,7 +14,7 @@ class AcquisitionPlanTests(unittest.TestCase):
                     'kind': 'model', 'category': 'furniture', 'selectionTerm': 'desk'}
 
     def parse(self, rows=None, excluded=None):
-        return select_planned_assets(self.meta, {'schema': 'toonspectrum.asset-acquisition-plan.v1',
+        return select_planned_assets(self.meta, {'schema': 'toonstudio.asset-acquisition-plan.v1',
                                     'assets': rows if rows is not None else [self.row]}, excluded or set())
 
     def test_preserves_case_sensitive_source_id(self):
@@ -45,8 +45,8 @@ class AcquisitionPlanTests(unittest.TestCase):
                 self.parse([{**self.row, **change}])
 
     def test_rejects_invalid_empty_or_unbounded_plans(self):
-        for plan in [None, {}, [], {'schema': 'toonspectrum.asset-acquisition-plan.v1', 'assets': []},
-                     {'schema': 'toonspectrum.asset-acquisition-plan.v1', 'assets': [self.row] * 161}]:
+        for plan in [None, {}, [], {'schema': 'toonstudio.asset-acquisition-plan.v1', 'assets': []},
+                     {'schema': 'toonstudio.asset-acquisition-plan.v1', 'assets': [self.row] * 161}]:
             with self.subTest(plan_type=type(plan)), self.assertRaises(ValueError):
                 select_planned_assets(self.meta, plan, set())
 

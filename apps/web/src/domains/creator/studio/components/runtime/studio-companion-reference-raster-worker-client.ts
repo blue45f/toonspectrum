@@ -64,7 +64,7 @@ type ActiveJob = {
 function defaultWorkerFactory(): StudioCompanionReferenceRasterWorkerLike {
   return new Worker(
     new URL("./studio-companion-reference-raster-worker.ts", import.meta.url),
-    { type: "module", name: "toonspectrum-reference-raster" }
+    { type: "module", name: "toonstudio-reference-raster" }
   );
 }
 

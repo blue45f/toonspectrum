@@ -7,9 +7,9 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { StudioMusicPage } from "./StudioMusicPage";
 
 import type { LocalMusicTrack } from "./studio-music-client";
-import type { MusicBrief, MusicProviderId } from "@toonspectrum/core/studio-music";
+import type { MusicBrief, MusicProviderId } from "@toonstudio/core/studio-music";
 
-import { defaultMusicBrief, MUSIC_TERMS_URL } from "@toonspectrum/core/studio-music";
+import { defaultMusicBrief, MUSIC_TERMS_URL } from "@toonstudio/core/studio-music";
 
 const mocks = vi.hoisted(() => ({
   ownerId: "owner-a",

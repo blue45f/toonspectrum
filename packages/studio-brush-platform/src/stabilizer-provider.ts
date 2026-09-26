@@ -1,7 +1,7 @@
 import { applyStabilizer } from "./stabilizer";
 
 import type { InkStrokeModeler, InkStrokeModelerParams } from "./ink-modeler";
-import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR, StabilizerGraphIR } from "@toonstudio/studio-project-model";
 
 /**
  * Stabilizer provider seam (ADR-0011 lane 3 promotion prep).
@@ -19,7 +19,7 @@ import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-pr
  *   stays pure/synchronous.
  *
  * Contract: import this file by direct path
- * (`@toonspectrum/studio-brush-platform/src/stabilizer-provider` semantics —
+ * (`@toonstudio/studio-brush-platform/src/stabilizer-provider` semantics —
  * it is intentionally NOT re-exported from the package barrel). Barrel
  * integration is a coordinator decision once lane 3 clears the blind-lab
  * gate (ADR-0009), recorded in ADR-0011.

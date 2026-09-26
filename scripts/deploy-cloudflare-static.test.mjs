@@ -19,7 +19,7 @@ const temporaryDirectories = [];
 const approvedSha = "abcdef0123456789abcdef0123456789abcdef01";
 
 function createFakeProcesses() {
-  const directory = mkdtempSync(join(tmpdir(), "toonspectrum-cloudflare-deploy-"));
+  const directory = mkdtempSync(join(tmpdir(), "toonstudio-cloudflare-deploy-"));
   temporaryDirectories.push(directory);
   const commandLog = join(directory, "commands.ndjson");
   const preload = join(directory, "mock-processes.cjs");

@@ -938,7 +938,7 @@ export function StudioPublishPackagePanel({
               <section aria-labelledby="publish-policy-title">
                 <h3 id="publish-policy-title" className="text-sm font-bold text-fg">사람이 확인할 정책</h3>
                 <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
-                  ToonSpectrum은 제3자 정책의 최신성이나 최종 게시 승인을 대신 보증하지 않습니다.
+                  ToonStudio은 제3자 정책의 최신성이나 최종 게시 승인을 대신 보증하지 않습니다.
                 </p>
                 <div className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-card/25">
                   {preset.requiresCurrentPolicyReview && (

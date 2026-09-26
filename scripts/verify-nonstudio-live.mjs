@@ -90,7 +90,7 @@ async function inspect(page, route, width) {
 try {
   for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
     const context = await browser.newContext({ viewport, locale: "ko-KR", reducedMotion: "reduce", isMobile: viewport.width < 500, hasTouch: viewport.width < 500, bypassCSP: true });
-    await context.addInitScript(() => { try { sessionStorage.setItem("toonspectrum-compat-dismissed", "true"); } catch { /* Restricted storage has dedicated component regressions. */ } });
+    await context.addInitScript(() => { try { sessionStorage.setItem("toonstudio-compat-dismissed", "true"); } catch { /* Restricted storage has dedicated component regressions. */ } });
     await context.route("**/*", (route) => {
       const request = route.request();
       if (request.isNavigationRequest() && excluded(new URL(request.url()).pathname)) return route.abort();

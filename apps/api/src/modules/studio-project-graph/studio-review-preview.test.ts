@@ -34,7 +34,7 @@ describe("pinned preview storage authority", () => {
       { mediaType: "image/svg+xml" }, { mediaType: "text/html" }, { hash: "c".repeat(64) },
       { objectKey: "https://example.test/private.png" }, { objectKey: `sha256/aa/${HASH}` },
       { objectKey: JSON.stringify({ ...object, providerId: "unknown" }) },
-      { objectKey: JSON.stringify({ ...object, contractVersion: "toonspectrum.supabase-object-storage.v1", providerId: undefined }) },
+      { objectKey: JSON.stringify({ ...object, contractVersion: "toonstudio.supabase-object-storage.v1", providerId: undefined }) },
       { objectKey: JSON.stringify({ ...object, purpose: "source" }) },
       { objectKey: JSON.stringify({ ...object, objectPath: `sha256/bb/${HASH}` }) },
       { objectKey: JSON.stringify({ ...object, url: "https://example.test" }) },

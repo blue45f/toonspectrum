@@ -28,7 +28,7 @@ V12 로컬 제품 데이터의 구조화 metadata/manifest 권위는 다음 SQLi
 
 ```text
 @sqlite.org/sqlite-wasm 3.53.0-build1
-  + OPFS SAH-pool directory: toonspectrum-studio-sqlite
+  + OPFS SAH-pool directory: toonstudio-studio-sqlite
   + database: /studio-local-v12.db
   + app-lifetime shared handle: acquireStudioLocalDatabase()
 ```
@@ -70,14 +70,14 @@ V12 로컬 제품 데이터의 구조화 metadata/manifest 권위는 다음 SQLi
 autosave/workspace/history lease가 포함된다.
 
 대형 payload는 SQLite TEXT/base64로 저장하지 않는다. 일반 Studio asset은
-`toonspectrum-studio-assets`를 사용하며 사용자 글꼴도 owner-scoped manifest와 함께 이 CAS를
+`toonstudio-studio-assets`를 사용하며 사용자 글꼴도 owner-scoped manifest와 함께 이 CAS를
 공유한다. VRM 모델·texture-paint는
-`toonspectrum-studio-vrm-assets-v12`, BG3D GLB·thumbnail은
-`toonspectrum-studio-bg3d-libraries-v12` OPFS SHA-256 CAS에 저장하고 SQLite manifest를
+`toonstudio-studio-vrm-assets-v12`, BG3D GLB·thumbnail은
+`toonstudio-studio-bg3d-libraries-v12` OPFS SHA-256 CAS에 저장하고 SQLite manifest를
 마지막 authority switch로 commit한다.
 
 autosave payload의 durable primary는 SQLite KV가 아니라
-`toonspectrum-studio-autosave-v3/recovery-journals` native OPFS journal이다. 문서별 Web Lock이
+`toonstudio-studio-autosave-v3/recovery-journals` native OPFS journal이다. 문서별 Web Lock이
 writer를 직렬화한다. current-version lifecycle sidecar는 독립 권위나 legacy 자동 migration이
 아니며, OPFS snapshot보다 최신이고 schema 검증을 통과할 때만 OPFS로 승격한다. durable clear
 tombstone은 stale primary와 sidecar보다 우선하고 둘을 제거한다.

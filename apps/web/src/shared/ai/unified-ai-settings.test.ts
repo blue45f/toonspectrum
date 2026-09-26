@@ -2,8 +2,8 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const AUX_KEY = "toonspectrum-unified-ai-aux-v1";
-const LEGACY_KEY = "toonspectrum-studio-ai-settings";
+const AUX_KEY = "toonstudio-unified-ai-aux-v1";
+const LEGACY_KEY = "toonstudio-studio-ai-settings";
 const HYPER3D_FIXTURE = "fixture-hyper3d-value";
 const RUNTIME_FIXTURE = "fixture-runtime-value";
 

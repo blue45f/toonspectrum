@@ -15,8 +15,8 @@ vi.mock("../studio-page-lazy-ui", () => ({
 vi.mock("../StudioWorkspaceMenuGate", () => ({ StudioWorkspaceMenuGate: () => null }));
 beforeEach(() => {
   useI18n.setState({ lang: "ko" });
-  window.localStorage.removeItem("toonspectrum-studio-project-center:favorites:v1");
-  window.localStorage.removeItem("toonspectrum-studio-project-center:recent-actions:v1");
+  window.localStorage.removeItem("toonstudio-studio-project-center:favorites:v1");
+  window.localStorage.removeItem("toonstudio-studio-project-center:recent-actions:v1");
 });
 afterEach(cleanup);
 

@@ -17,7 +17,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";

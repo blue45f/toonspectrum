@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deriveStudioReviewPageMapping } from "@toonspectrum/studio-project-model";
+import { deriveStudioReviewPageMapping } from "@toonstudio/studio-project-model";
 
 import { getStudioVirtualSpaceReviewPreview } from "./studio-virtual-space-review-preview";
 

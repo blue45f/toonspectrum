@@ -50,7 +50,7 @@ describe.sequential("V12 runtime fault-injection release matrix", () => {
       journalCrashReopens: 64,
     });
     expect(artifact).toMatchObject({
-      schema: "toonspectrum-v12-runtime-fault-matrix",
+      schema: "toonstudio-v12-runtime-fault-matrix",
       version: 1,
       verdict: {
         automatedStateMachineGate: "pass",

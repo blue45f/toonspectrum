@@ -926,7 +926,7 @@ async function main(): Promise<void> {
   const studioUrl = preview?.studioUrl ?? process.env.STUDIO_URL ?? "http://localhost:5173/studio";
   let browser: Browser | null = null;
   const report: Record<string, unknown> = {
-    kind: "toonspectrum-studio-long-stroke-gate-v1",
+    kind: "toonstudio-studio-long-stroke-gate-v1",
     generatedAt: new Date().toISOString(),
     studioUrl, viewport: VIEWPORT, deviceScaleFactor: DEVICE_SCALE_FACTOR, webgpuFlag: WEBGPU,
     brushId: BRUSH_ID_ENV, brushOperation: BRUSH_OPERATION_ENV,

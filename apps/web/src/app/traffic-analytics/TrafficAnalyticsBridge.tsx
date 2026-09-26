@@ -8,8 +8,8 @@ import { TOONSPECTRUM_SHARE_EVENT } from "@/shared/lib/share";
 
 import { parseShareAnalyticsDetail } from "./share-analytics-event";
 
-const VISITOR_STORAGE_KEY = "toonspectrum-traffic-visitor-v1";
-const SESSION_STORAGE_KEY = "toonspectrum-traffic-session-v1";
+const VISITOR_STORAGE_KEY = "toonstudio-traffic-visitor-v1";
+const SESSION_STORAGE_KEY = "toonstudio-traffic-session-v1";
 const HEARTBEAT_INTERVAL_MS = 60_000;
 const MIN_HEARTBEAT_SECONDS = 5;
 

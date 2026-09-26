@@ -44,7 +44,7 @@ try {
         isMobile: viewport.isMobile,
       });
       await context.addInitScript(({ themeName }) => {
-        localStorage.setItem("toonspectrum-theme", JSON.stringify({
+        localStorage.setItem("toonstudio-theme", JSON.stringify({
           state: { preference: themeName, studioPreference: themeName }, version: 0,
         }));
       }, { themeName: theme });

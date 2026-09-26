@@ -834,7 +834,7 @@ function providerProfileHeaders(
   };
   if (id === "github") {
     headers.Accept = "application/vnd.github+json";
-    headers["User-Agent"] = "ToonSpectrum-OAuth";
+    headers["User-Agent"] = "ToonStudio-OAuth";
     headers["X-GitHub-Api-Version"] = "2026-03-10";
   }
   return headers;
@@ -1062,7 +1062,7 @@ async function upsertOAuthUser(
   });
 
   // 레거시 구현이 저장했던 공급자 토큰도 해당 계정의 다음 로그인에서 제거한다.
-  // 사용자 로그인에는 ToonSpectrum 자체 세션만 필요하며 외부 장기 자격 증명을 보존하지 않는다.
+  // 사용자 로그인에는 ToonStudio 자체 세션만 필요하며 외부 장기 자격 증명을 보존하지 않는다.
   await db
     .update(accounts)
     .set({

@@ -24,7 +24,7 @@ from normalize_studio_asset_glb import read_glb
 from studio_asset_acquisition_plan import select_planned_assets
 
 ROOT = Path(__file__).resolve().parents[1]
-UA = 'ToonStudio-AssetCuration/1.0 (github.com/blue45f/toonspectrum; CC0 provenance retained)'
+UA = 'ToonStudio-AssetCuration/1.0 (github.com/blue45f/toonstudio; CC0 provenance retained)'
 HOSTS = {'api.polyhaven.com', 'dl.polyhaven.org'}
 MAX_FILE = 40 * 1024 * 1024
 MAX_TOTAL = 640 * 1024 * 1024
@@ -287,7 +287,7 @@ def acquire(output: Path, *, exclude_manifest: Path | None = None, profile: str 
             print('PBR EXCLUDED', identifier, str(error)[:300], flush=True)
         if fetch.total >= max_total - MAX_FILE:
             break
-    report = {'schema': 'toonspectrum.asset-delivery.v1', 'selectedCandidates': len(selected),
+    report = {'schema': 'toonstudio.asset-delivery.v1', 'selectedCandidates': len(selected),
               'acquisitionProfile': 'explicit-plan' if plan is not None else profile, 'existingOriginalsExcluded': len(existing),
               'deliveredOriginals': len(assets), 'byKind': dict(Counter(a['kind'] for a in assets)),
               'byCategory': dict(Counter(a['category'] for a in assets)), 'downloadedBytes': fetch.total,

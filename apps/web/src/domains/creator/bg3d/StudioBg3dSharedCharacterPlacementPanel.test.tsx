@@ -48,7 +48,7 @@ function successResult(request: StudioShared3dCharacterTransformUpdateRequest) {
     ok: true as const,
     changed: true,
     receipt: {
-      kind: "toonspectrum.shared-3d-character-transform-receipt" as const,
+      kind: "toonstudio.shared-3d-character-transform-receipt" as const,
       version: 1 as const,
       elementId: request.elementId,
       beforeSourceHash: `sha256:${"a".repeat(64)}` as const,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { StudioWorkSession } from "@toonspectrum/studio-project-model/work-session";
+import type { StudioWorkSession } from "@toonstudio/studio-project-model/work-session";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { buildStudioSessionClosingDraft } from "./studio-session-closing-draft";
 

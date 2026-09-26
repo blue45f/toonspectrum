@@ -1,4 +1,4 @@
-// Copyright 2026 ToonSpectrum Studio.
+// Copyright 2026 ToonStudio Studio.
 //
 // C bridge for google/ink-stroke-modeler (ADR-0009 / ADR-0011 lane 3 PoC).
 // Compiled with emscripten against the upstream static archives; exposes a

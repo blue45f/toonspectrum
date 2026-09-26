@@ -239,7 +239,7 @@ describe("muxWebm 파일 구조", () => {
     const children = parseChildren(bytes, segment!.dataStart, segment!.end);
     const info = parseChildren(bytes, find(children, EBML_ID.info).dataStart, find(children, EBML_ID.info).end);
     expect(uintOf(bytes, find(info, EBML_ID.timestampScale))).toBe(1_000_000);
-    expect(stringOf(bytes, find(info, EBML_ID.writingApp))).toBe("ToonSpectrum Studio");
+    expect(stringOf(bytes, find(info, EBML_ID.writingApp))).toBe("ToonStudio Studio");
     const duration = childData(bytes, find(info, EBML_ID.duration));
     expect(duration).toHaveLength(8);
     const view = new DataView(duration.buffer, duration.byteOffset, duration.byteLength);

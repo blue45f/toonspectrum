@@ -272,7 +272,7 @@ describe("studio dialogue interchange", () => {
   it("CSV 미닫힌 quote, JSON 알 수 없는 cue 필드와 뒤집힌 시간은 fail-closed한다", () => {
     expect(() => parseStudioDialogueInterchange("csv", 'page,text\n1,"열림')).toThrow(/따옴표/u);
     expect(() => parseStudioDialogueInterchange("json", JSON.stringify({
-      schema: "toonspectrum.dialogue-script",
+      schema: "toonstudio.dialogue-script",
       version: 1,
       cues: [{ page: 1, text: "x", javascript: "alert(1)" }],
     }))).toThrow(/알 수 없는 필드/u);

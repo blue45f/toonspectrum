@@ -2,7 +2,7 @@ import {
   CommandRegistry,
   createEditorClientRuntime,
   EDITOR_REQUEST_SERVICE_KEY,
-} from "@toonspectrum/studio-command-registry";
+} from "@toonstudio/studio-command-registry";
 
 import type { StudioAppSettings, StudioAppSettingsTab, StudioRailToolId } from "../studio-app-settings";
 import type { BubbleVariant } from "../studio-assets";
@@ -14,7 +14,7 @@ import type {
   CommandId,
   EditorClient,
   EditorCommandRequest,
-} from "@toonspectrum/studio-command-registry";
+} from "@toonstudio/studio-command-registry";
 import type { ChangeEvent } from "react";
 
 /**

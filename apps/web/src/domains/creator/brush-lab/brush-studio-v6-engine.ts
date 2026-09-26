@@ -95,7 +95,7 @@ const LABELS: Readonly<Record<string, string>> = Object.freeze({
 
 function labelFor(id: string): string { return brushStudioV6Topology(id)?.label ?? brushStudioV7AdvancedSurface(id)?.label ?? LABELS[id] ?? id.replace(/^(deposit|surface|carrier|motion|tip|physics|pattern|finish|pigment|pickup|output)-/u, "").split("-").map((part) => part[0]?.toUpperCase() + part.slice(1)).join(" "); }
 function providerFor(id: string): string {
-  if (brushStudioV6Topology(id)) return "ToonSpectrum CPU Topology";
+  if (brushStudioV6Topology(id)) return "ToonStudio CPU Topology";
   return brushStudioV6ProviderManifestForNode(id)?.label ?? "Unregistered provider";
 }
 function ports(slot: BrushStudioV6Slot): readonly [readonly BrushStudioV6PortType[], readonly BrushStudioV6PortType[]] {
@@ -198,7 +198,7 @@ export function brushStudioV6ActiveNodes(program: BrushStudioV6Program): readonl
     ...program.slots.physics, program.slots.pattern, ...program.slots.finish, program.slots.output].map((id) => {
       const node = nodeFor(id);
       return topology && isBrushStudioV6TopologyNodeCompatible(id)
-        ? Object.freeze({ ...node, domain: "main" as const, provider: "ToonSpectrum CPU contact kernel", requires: Object.freeze([]) })
+        ? Object.freeze({ ...node, domain: "main" as const, provider: "ToonStudio CPU contact kernel", requires: Object.freeze([]) })
         : node;
     }));
 }

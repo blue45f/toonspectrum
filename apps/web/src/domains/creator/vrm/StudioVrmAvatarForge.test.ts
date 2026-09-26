@@ -59,7 +59,7 @@ describe("countDetectedVrmHairMeshes", () => {
   it("excludes generated forge descendants from subsequent detection passes", () => {
     const forge = new THREE.Group();
     forge.userData.toonSpectrumAvatarForge = true;
-    forge.add(mesh("ToonSpectrumAvatarForgeHair_bang", material("Hair_Bang")));
+    forge.add(mesh("ToonStudioAvatarForgeHair_bang", material("Hair_Bang")));
 
     expect(countDetectedVrmHairMeshes(vrmWith(forge))).toBe(0);
   });

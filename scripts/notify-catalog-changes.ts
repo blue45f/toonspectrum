@@ -123,7 +123,7 @@ async function main() {
   const alert = arg("alert");
   if (alert) {
     await postDiscord({
-      username: "ToonSpectrum",
+      username: "ToonStudio",
       embeds: [{ title: "⚠️ 카탈로그 파이프라인 알림", description: alert.slice(0, 4000), color: BAD }],
     });
     return;
@@ -204,8 +204,8 @@ async function main() {
     embeds.push({ title: `📺 새 영상화 ${newAdaptations.length}건`, description: clampList(lines).slice(0, 4000), color: COOL });
   }
 
-  const content = `📚 ToonSpectrum 카탈로그 업데이트 · 신작 ${newTitles.length}편${newAdaptations.length ? ` · 새 영상화 ${newAdaptations.length}건` : ""}`;
-  await postDiscord({ username: "ToonSpectrum", content, embeds });
+  const content = `📚 ToonStudio 카탈로그 업데이트 · 신작 ${newTitles.length}편${newAdaptations.length ? ` · 새 영상화 ${newAdaptations.length}건` : ""}`;
+  await postDiscord({ username: "ToonStudio", content, embeds });
 }
 
 main().catch((e) => {

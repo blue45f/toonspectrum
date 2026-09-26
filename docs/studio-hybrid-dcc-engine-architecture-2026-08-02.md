@@ -1,8 +1,8 @@
-# ToonSpectrum Hybrid 3D DCC 엔진 아키텍처와 전달 증거 계약
+# ToonStudio Hybrid 3D DCC 엔진 아키텍처와 전달 증거 계약
 
 > 기준일: 2026-08-03
 > 저장소 기준: `ef789c388537` + 2026-08-03 작업 트리
-> 원본 요구 문서: `ToonSpectrum_하이브리드_3D_DCC_엔진_라이브러리_포맷_아키텍처_2026-08-01.md` (작업 요청에 첨부된 외부 설계 자료)
+> 원본 요구 문서: `ToonStudio_하이브리드_3D_DCC_엔진_라이브러리_포맷_아키텍처_2026-08-01.md` (작업 요청에 첨부된 외부 설계 자료)
 
 이 문서는 원본 설계서의 방향을 현재 Vite/React/NestJS 저장소에 맞춰 실행 가능한 제품 아키텍처, 라이브러리 격리 규칙, 포맷 약속, 수치 계약, 검증 증거로 고정한다. 기능 목록을 다시 선언하는 문서가 아니라, **호출 가능한 커널과 실제 작가용 제품을 구분하고 둘 사이를 닫기 위한 전달 계약**이다.
 
@@ -12,7 +12,7 @@
 
 ### 0.1 한 문장 결론
 
-현재 ToonSpectrum에는 광범위한 3D/DCC 커널, 실제 OCCT·Manifold·Rapier·Three·Babylon·VRM·IFC·NURBS 자산과 테스트가 존재한다. Phase 0 작업 트리에는 권위 메시를 보여 주는 R3F viewport, object TRS, 점·선·면 stable-ID 선택, 선택 기반 기본 topology 편집, 표준 카메라 view/frame, 되돌릴 수 있는 복제·삭제, 사용자/작품 범위 OPFS workspace 복구, 검증된 GLB derivative handoff, 장면 크기에 맞는 BG3D shadow frustum까지 들어왔다. 또한 현재 페이지의 canonical VRM 레이어를 BG3D 카메라·조명·그림자 아래 읽기 전용으로 함께 보여 주고, 완전하게 표현된 캐릭터만 캡처 receipt와 같은 Studio undo transaction으로 합성하는 첫 공유 장면 수직 경로가 생겼다. Avatar Forge는 기존 VRM 리그를 보존한 얼굴·헤어·색 조형에 제한된 체형 비율 조절을 더했다. 그러나 이 authoring workspace는 아직 canonical Studio 프로젝트 root 및 양방향 2D↔3D live 경로와 하나의 저장·협업 단위로 통합되지 않았고, 공유 장면도 캐릭터 편집/writeback과 모든 의상·소품 상태를 지원하지 않는다. 따라서 **Blender·VRM Studio급 제품 완료 상태가 아니라 실제 편집 수직 경로를 넓히고 있는 Phase 0 통합 단계**다.
+현재 ToonStudio에는 광범위한 3D/DCC 커널, 실제 OCCT·Manifold·Rapier·Three·Babylon·VRM·IFC·NURBS 자산과 테스트가 존재한다. Phase 0 작업 트리에는 권위 메시를 보여 주는 R3F viewport, object TRS, 점·선·면 stable-ID 선택, 선택 기반 기본 topology 편집, 표준 카메라 view/frame, 되돌릴 수 있는 복제·삭제, 사용자/작품 범위 OPFS workspace 복구, 검증된 GLB derivative handoff, 장면 크기에 맞는 BG3D shadow frustum까지 들어왔다. 또한 현재 페이지의 canonical VRM 레이어를 BG3D 카메라·조명·그림자 아래 읽기 전용으로 함께 보여 주고, 완전하게 표현된 캐릭터만 캡처 receipt와 같은 Studio undo transaction으로 합성하는 첫 공유 장면 수직 경로가 생겼다. Avatar Forge는 기존 VRM 리그를 보존한 얼굴·헤어·색 조형에 제한된 체형 비율 조절을 더했다. 그러나 이 authoring workspace는 아직 canonical Studio 프로젝트 root 및 양방향 2D↔3D live 경로와 하나의 저장·협업 단위로 통합되지 않았고, 공유 장면도 캐릭터 편집/writeback과 모든 의상·소품 상태를 지원하지 않는다. 따라서 **Blender·VRM Studio급 제품 완료 상태가 아니라 실제 편집 수직 경로를 넓히고 있는 Phase 0 통합 단계**다.
 
 ### 0.2 지금 증명된 것과 증명되지 않은 것
 
@@ -491,7 +491,7 @@ shipping BG3D의 directional shadow camera도 render cache다. [`studio-bg3d-sha
 
 ### 4.8 2D↔3D Live Bridge
 
-[`studio-live-2d3d-bridge.ts`](../apps/web/src/domains/creator/live/studio-live-2d3d-bridge.ts)의 shared set, shot override, dirty pass, artist correction delta는 ToonSpectrum의 차별화 중심이다.
+[`studio-live-2d3d-bridge.ts`](../apps/web/src/domains/creator/live/studio-live-2d3d-bridge.ts)의 shared set, shot override, dirty pass, artist correction delta는 ToonStudio의 차별화 중심이다.
 
 정상 흐름은 다음과 같다.
 
@@ -816,7 +816,7 @@ P1 종료 시 작가는 단순 소품과 배경 세트를 외부 Blender/SketchU
 - save/recovery/collaboration robustness
 - 웹툰 특화 multi-shot/NPR/artist-delta 생산성
 
-ToonSpectrum의 경쟁 우위는 모든 범용 DCC 영역에서 Blender를 복제하는 데 있지 않다. **동일한 3D 세트를 여러 웹툰 컷에 재사용하고, 변경 후에도 작가의 2D 수정선을 보존하는 종단 workflow**를 더 빠르고 안전하게 만드는 데 있다.
+ToonStudio의 경쟁 우위는 모든 범용 DCC 영역에서 Blender를 복제하는 데 있지 않다. **동일한 3D 세트를 여러 웹툰 컷에 재사용하고, 변경 후에도 작가의 2D 수정선을 보존하는 종단 workflow**를 더 빠르고 안전하게 만드는 데 있다.
 
 ---
 

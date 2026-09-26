@@ -24,7 +24,7 @@ function activeConfigLines(): string[] {
 }
 
 function render(overrides: NodeJS.ProcessEnv = {}) {
-  const directory = mkdtempSync(join(tmpdir(), "toonspectrum-coturn-"));
+  const directory = mkdtempSync(join(tmpdir(), "toonstudio-coturn-"));
   temporaryDirectories.add(directory);
   const template = join(directory, "turnserver.conf.template");
   const secret = join(directory, "secret");
@@ -44,7 +44,7 @@ function render(overrides: NodeJS.ProcessEnv = {}) {
     encoding: "utf8",
     env: {
       ...process.env,
-      TURN_REALM: "voice.toonspectrum.test",
+      TURN_REALM: "voice.toonstudio.test",
       TURN_EXTERNAL_IP: "8.8.8.8",
       TURN_SHARED_SECRET_FILE: secret,
       TURN_PREVIOUS_SHARED_SECRET_FILE: previousSecret,
@@ -94,7 +94,7 @@ describe("coturn deployment scaffold", () => {
 
     expect(result.status, result.stderr).toBe(0);
     const rendered = readFileSync(output, "utf8");
-    expect(rendered).toContain("realm=voice.toonspectrum.test");
+    expect(rendered).toContain("realm=voice.toonstudio.test");
     expect(rendered).toContain("external-ip=8.8.8.8");
     expect(rendered).toContain("min-port=49160");
     expect(rendered).toContain("max-port=49259");
@@ -104,7 +104,7 @@ describe("coturn deployment scaffold", () => {
   });
 
   it("renders current and previous secrets for overlap rotation without logging either", () => {
-    const directory = mkdtempSync(join(tmpdir(), "toonspectrum-coturn-rotation-"));
+    const directory = mkdtempSync(join(tmpdir(), "toonstudio-coturn-rotation-"));
     temporaryDirectories.add(directory);
     const previousSecretPath = join(directory, "previous-secret");
     const previousSecret = "previous_secret_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -131,7 +131,7 @@ describe("coturn deployment scaffold", () => {
     expect(placeholder.result.status).toBe(78);
     expect(placeholder.result.stderr).toContain("certificate DNS name");
 
-    const directory = mkdtempSync(join(tmpdir(), "toonspectrum-coturn-weak-"));
+    const directory = mkdtempSync(join(tmpdir(), "toonstudio-coturn-weak-"));
     temporaryDirectories.add(directory);
     const weakSecret = join(directory, "secret");
     writeFileSync(weakSecret, "short\n", { mode: 0o600 });

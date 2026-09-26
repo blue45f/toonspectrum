@@ -5,7 +5,7 @@ import {
   CREATOR_COLLABORATION_STATUSES,
   CREATOR_ROLE_IDS,
   CREATOR_SPECIALTY_IDS,
-} from "@toonspectrum/core/creator-role";
+} from "@toonstudio/core/creator-role";
 
 import {
   CREATOR_ASSET_CATALOG_MAX_PAGE_SIZE,
@@ -402,7 +402,7 @@ export const CreatorDraftCollaborationRoomResponseSchema = z
   .strict();
 
 const CreatorAssetLicenseSchema = z.enum([
-  "toonspectrum-standard",
+  "toonstudio-standard",
   "cc0-1.0",
   "cc-by-4.0",
   "cc-by-nc-4.0",

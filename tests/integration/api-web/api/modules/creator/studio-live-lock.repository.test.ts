@@ -18,7 +18,7 @@ import { db } from "../../../../../../apps/api/src/platform/database";
 import {
   creatorWorkLiveLockClocks,
   creatorWorkLiveLocks,
-  toonspectrumSchemaMigrations,
+  toonstudioSchemaMigrations,
 } from "../../../../../../apps/api/src/platform/database/schema";
 import {
   parseStudioLiveLockResourceScope,
@@ -270,7 +270,7 @@ describe("studio live distributed lock persistence contract", () => {
     expect(migration).toContain(
       'INSERT INTO "toonspectrum_schema_migration" ("id", "appliedAt")'
     );
-    expect(migration).toContain("ToonSpectrum live-lock revision v1 cutover complete");
+    expect(migration).toContain("ToonStudio live-lock revision v1 cutover complete");
     expect(migration).toMatch(
       /DELETE FROM "creator_work_live_lock"\s+WHERE \(SELECT "required"/u
     );
@@ -447,7 +447,7 @@ describe("studio live distributed lock persistence contract", () => {
   });
 
   it("defines a durable schema-cutover ledger instead of using comments as state", () => {
-    const table = getTableConfig(toonspectrumSchemaMigrations);
+    const table = getTableConfig(toonstudioSchemaMigrations);
 
     expect(table.name).toBe("toonspectrum_schema_migration");
     expect(table.columns.find((column) => column.name === "id")?.primary).toBe(true);

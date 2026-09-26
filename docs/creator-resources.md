@@ -57,7 +57,7 @@ Credentials remain server-only. They must not use a `VITE_` prefix, browser stor
 ## Open Library behavior
 
 - Uses `https://openlibrary.org/search.json` with explicit fields and a maximum of 12 results per request.
-- Sends an identifiable ToonSpectrum User-Agent linking to `/about/crawler`.
+- Sends an identifiable ToonStudio User-Agent linking to `/about/crawler`.
 - Retains title, work key, authors, first publication year, edition count, languages, publishers and a bounded ISBN list.
 - Does not import covers or book content.
 - Is positioned as interactive human discovery. Bulk catalog construction must use the provider's data dumps under a separately reviewed ingestion policy.

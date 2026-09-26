@@ -383,7 +383,7 @@ describe("StudioUnifiedAssetWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "비 오는 밤 학교 즐겨찾기 추가" }));
     fireEvent.click(screen.getByRole("button", { name: "비 오는 밤 학교 배경 삽입" }));
     await waitFor(() => expect(onUseItem).toHaveBeenCalled());
-    const saved = window.localStorage.getItem("toonspectrum-studio-insert-hub:v1") ?? "";
+    const saved = window.localStorage.getItem("toonstudio-studio-insert-hub:v1") ?? "";
     expect(saved).toContain("scene:school");
   });
 

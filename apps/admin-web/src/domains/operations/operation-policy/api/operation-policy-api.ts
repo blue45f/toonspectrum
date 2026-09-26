@@ -1,6 +1,6 @@
 import { requestAdminJson } from "../../../../platform/http/admin-api";
 
-import type { OperationPolicyAdminView, OperationPolicyDraft, OperationPolicyPreview } from "@toonspectrum/contracts/operation-policy";
+import type { OperationPolicyAdminView, OperationPolicyDraft, OperationPolicyPreview } from "@toonstudio/contracts/operation-policy";
 
 const root = "/api/admin/production/operation-policy";
 

@@ -152,17 +152,17 @@ describe("named palette SQLite repository", () => {
     const cases = [
       "{broken",
       JSON.stringify({
-        schema: "toonspectrum.studio.named-palettes",
+        schema: "toonstudio.studio.named-palettes",
         version: 1,
         items: [palette("duplicate"), palette("duplicate", 2)],
       }),
       JSON.stringify({
-        schema: "toonspectrum.studio.named-palettes",
+        schema: "toonstudio.studio.named-palettes",
         version: 1,
         items: [{ ...palette("extra"), future: true }],
       }),
       JSON.stringify({
-        schema: "toonspectrum.studio.named-palettes",
+        schema: "toonstudio.studio.named-palettes",
         version: 1,
         items: [{ ...palette("upper"), colors: ["#ABCDEF"] }],
       }),

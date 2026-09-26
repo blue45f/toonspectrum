@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { studioWorldManifestSchema } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema } from "@toonstudio/studio-project-model/world-publication";
 
 // Only Web imports/exports a reusable package. Keep its metadata out of shared Studio runtime closure.
 const id = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/iu);

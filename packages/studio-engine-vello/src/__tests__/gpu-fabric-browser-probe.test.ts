@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { sceneIRSchema } from "@toonspectrum/studio-project-model";
+import { sceneIRSchema } from "@toonstudio/studio-project-model";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import type { Server } from "node:http";

@@ -1,8 +1,8 @@
-import type { EffectiveOperationPolicy } from "@toonspectrum/contracts/operation-policy";
+import type { EffectiveOperationPolicy } from "@toonstudio/contracts/operation-policy";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { isWorkspaceManager, type InvitableWorkspaceRole, type TeamWorkspaceCommandInput,
-  type TeamWorkspaceDetail, type TeamWorkspaceSummary, type WorkspaceUsageResponse } from "@toonspectrum/contracts/production-workspace";
+  type TeamWorkspaceDetail, type TeamWorkspaceSummary, type WorkspaceUsageResponse } from "@toonstudio/contracts/production-workspace";
 import { useApp } from "@/shared/lib/store";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { getApiErrorMessage } from "@/platform/api";

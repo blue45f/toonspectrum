@@ -486,7 +486,7 @@ export function applyStudioBg3dLinkedCharacterState(
   vrm.scene.rotation.y =
     (typeof baseRotationY === "number" && Number.isFinite(baseRotationY) ? baseRotationY : 0) +
     source.stageTransform.rotationY;
-  vrm.scene.name = `ToonSpectrumSharedCharacter:${source.elementId}`;
+  vrm.scene.name = `ToonStudioSharedCharacter:${source.elementId}`;
   vrm.scene.userData.studioShared3dCharacterElementId = source.elementId;
   applyStudioBg3dRuntimeAssetQuality(vrm.scene, {
     castShadow: true,

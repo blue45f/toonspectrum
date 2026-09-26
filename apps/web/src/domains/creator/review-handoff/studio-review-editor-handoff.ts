@@ -1,5 +1,5 @@
 import { canonicalJson, deriveStudioReviewPageMapping, validateStudioReviewSpatialAnchor,
-  type ReviewAnchor, type StudioReviewMappedPage } from "@toonspectrum/studio-project-model";
+  type ReviewAnchor, type StudioReviewMappedPage } from "@toonstudio/studio-project-model";
 
 import type { StudioEditorCommentTarget } from "../studio-comment-editor-selection";
 import type { StudioReviewCaptureContext, StudioReviewCaptureProjection } from "../review-capture/studio-review-capture-bridge";

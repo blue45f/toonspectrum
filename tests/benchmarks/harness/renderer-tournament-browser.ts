@@ -1532,7 +1532,7 @@ export async function runRendererTournamentBrowserBenchmark(
   options: { scratchDirectory?: string; resultPath?: string } = {},
 ): Promise<RendererTournamentBrowserArtifact> {
   const scratch = options.scratchDirectory ??
-    mkdtempSync(join(tmpdir(), "toonspectrum-renderer-tournament-"));
+    mkdtempSync(join(tmpdir(), "toonstudio-renderer-tournament-"));
   const sourcePath = join(scratch, "production-source");
   const distributionPath = join(scratch, "production-dist");
   mkdirSync(sourcePath, { recursive: true });

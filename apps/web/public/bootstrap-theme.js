@@ -10,7 +10,7 @@
   };
   var state = {};
   try {
-    var serialized = localStorage.getItem("toonspectrum-theme") || localStorage.getItem("webdex-theme");
+    var serialized = localStorage.getItem("toonstudio-theme") || localStorage.getItem("webdex-theme");
     var envelope = serialized ? JSON.parse(serialized) : null;
     if (envelope && envelope.state && typeof envelope.state === "object") state = envelope.state;
   } catch { /* Blocked or damaged storage must not prevent the first paint. */ }

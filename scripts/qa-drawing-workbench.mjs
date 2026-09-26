@@ -19,7 +19,7 @@ const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 1600, height: 1000 } });
 await context.addInitScript(
   ({ betaNoticeRevision, betaNoticeStorageKey }) => {
-    localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
+    localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
     localStorage.setItem(betaNoticeStorageKey, betaNoticeRevision);
   },
   {
@@ -89,7 +89,7 @@ try {
   await record("transformed drawing reaches durable recovery storage", async () => {
     let document = null;
     for (let attempt = 0; attempt < 16; attempt += 1) {
-      document = await readDurableStudioAutosaveDocument(page, "toonspectrum-studio-autosave:v12:guest:new");
+      document = await readDurableStudioAutosaveDocument(page, "toonstudio-studio-autosave:v12:guest:new");
       if (document?.pagesList.some((entry) => entry.elements?.length)) break;
       await page.waitForTimeout(500);
     }

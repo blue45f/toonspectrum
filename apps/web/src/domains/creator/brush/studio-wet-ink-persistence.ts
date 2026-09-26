@@ -20,7 +20,7 @@ import {
 } from "./studio-wet-ink-field";
 
 export const STUDIO_WET_INK_SNAPSHOT_KIND =
-  "toonspectrum.wet-ink-snapshot" as const;
+  "toonstudio.wet-ink-snapshot" as const;
 export const STUDIO_WET_INK_SNAPSHOT_VERSION = 1 as const;
 
 export const STUDIO_WET_INK_SNAPSHOT_LIMITS = Object.freeze({
@@ -271,7 +271,7 @@ export function encodeStudioWetInkFieldSnapshot(
   }
   if (
     !field
-    || field.kind !== "toonspectrum.wet-ink-field"
+    || field.kind !== "toonstudio.wet-ink-field"
     || field.version !== 1
     || !safeInteger(field.simulationStep, 0, field.config.maxSimulationSteps)
     || !safeInteger(field.revision, 0, Number.MAX_SAFE_INTEGER)

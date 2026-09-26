@@ -160,8 +160,8 @@ export function CalendarPage() {
       titleToWeeklyIcsEvent(asTitle(title), titleDays)
     );
     downloadIcs(
-      buildWeeklyIcs(events, { calendarName: "툰스펙트럼 연재 캘린더" }),
-      "toonspectrum-calendar.ics"
+      buildWeeklyIcs(events, { calendarName: "툰스튜디오 연재 캘린더" }),
+      "toonstudio-calendar.ics"
     );
   };
 

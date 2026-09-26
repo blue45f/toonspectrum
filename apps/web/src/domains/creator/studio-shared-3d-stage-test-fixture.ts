@@ -19,7 +19,7 @@ StudioShared3dStageCollectionDocument {
     placement: { position: [-4, 1, 3], rotationY: -1.2 },
   } as const;
   return {
-    kind: "toonspectrum.studio-shared-3d-stage-collection",
+    kind: "toonstudio.studio-shared-3d-stage-collection",
     version: 3,
     authority: "page-shared-3d-stage-collection",
     stages: [

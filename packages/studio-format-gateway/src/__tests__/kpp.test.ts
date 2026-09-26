@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -104,9 +104,9 @@ describe("kpp paintbrush mapping", () => {
   const result = parseKppPreset(buildInkBasicKpp());
 
   it("extracts the preset name and derives a deterministic program id", () => {
-    expect(result.presetName).toBe("ToonSpectrum Ink Crisp");
-    expect(result.program.name).toBe("ToonSpectrum Ink Crisp");
-    expect(result.program.id).toBe("kpp:ToonSpectrum Ink Crisp");
+    expect(result.presetName).toBe("ToonStudio Ink Crisp");
+    expect(result.program.name).toBe("ToonStudio Ink Crisp");
+    expect(result.program.id).toBe("kpp:ToonStudio Ink Crisp");
   });
 
   it("maps brush_definition spacing/diameter/fade into tip and size fields", () => {
@@ -221,7 +221,7 @@ describe("kpp mypaintbrush delegation", () => {
     expect(result.program.sizeDynamics).toHaveLength(1);
     expect(result.program.flowDynamics).toHaveLength(1);
     expect(result.program.providerPreference).toEqual(["hokusai-natural-media"]);
-    expect(result.program.name).toBe("ToonSpectrum MyPaint Wash");
+    expect(result.program.name).toBe("ToonStudio MyPaint Wash");
   });
 
   it("preserves the FULL kpp container and reports no loss for a fully mapped brush", () => {
@@ -342,7 +342,7 @@ describe("kpp determinism and committed corpus", () => {
   it("parses the committed fixtures from disk exactly like in-memory builds", () => {
     const fromDisk = parseKppPreset(corpusBytes("paintbrush-ink-basic.kpp"));
     expect(fromDisk).toEqual(parseKppPreset(buildInkBasicKpp()));
-    expect(fromDisk.presetName).toBe("ToonSpectrum Ink Crisp");
+    expect(fromDisk.presetName).toBe("ToonStudio Ink Crisp");
   });
 });
 

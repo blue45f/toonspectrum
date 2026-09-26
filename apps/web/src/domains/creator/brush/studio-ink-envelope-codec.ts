@@ -1,5 +1,5 @@
 /**
- * ToonSpectrum-owned durable ink interchange envelope.
+ * ToonStudio-owned durable ink interchange envelope.
  *
  * This is a clean-room format built from public JSON, UTF-8, and SHA-256 primitives. It is not a
  * clone of any commercial SDK codec and intentionally makes no claim of wire compatibility with
@@ -16,7 +16,7 @@
  * - optional attestations sign a domain-separated manifest message, never mutable display data.
  *
  * A commercial certification authority can later be connected through the attestation verifier
- * without changing the document model. ToonSpectrum's own conformance tests and signatures prove
+ * without changing the document model. ToonStudio's own conformance tests and signatures prove
  * adherence to this format, but do not impersonate a third party's certification.
  */
 
@@ -31,7 +31,7 @@ import {
 } from "../studio-document-envelope";
 
 export const STUDIO_INK_ENVELOPE_CODEC_ID =
-  "toonspectrum.ink-envelope" as const;
+  "toonstudio.ink-envelope" as const;
 export const STUDIO_INK_ENVELOPE_CODEC_VERSION = 1 as const;
 export const STUDIO_INK_ENVELOPE_SERIALIZATION =
   "canonical-json-utf8" as const;
@@ -87,7 +87,7 @@ export const STUDIO_INK_ENVELOPE_LIMITS = Object.freeze({
 });
 
 export const STUDIO_INK_ENVELOPE_CONFORMANCE_PROFILE = Object.freeze({
-  id: "toonspectrum.ink-envelope.conformance",
+  id: "toonstudio.ink-envelope.conformance",
   version: 1,
   canonicalSerialization: STUDIO_INK_ENVELOPE_SERIALIZATION,
   contentIntegrity: "sha256-canonical-content",

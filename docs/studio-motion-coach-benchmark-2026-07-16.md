@@ -7,7 +7,7 @@
 
 ## 공식 문서에서 확인한 패턴
 
-| 공식 문서 | 확인한 제품 패턴 | ToonSpectrum에 적용한 원칙 |
+| 공식 문서 | 확인한 제품 패턴 | ToonStudio에 적용한 원칙 |
 | --- | --- | --- |
 | [Photoshop Tooltips](https://helpx.adobe.com/photoshop/desktop/get-started/set-up-toolbars-panels/show-or-hide-tool-tips.html) | 표준 툴팁은 도구 이름과 단축키를, Rich Tooltips는 설명과 짧은 동작 영상을 제공하며 환경 설정에서 표시 여부를 제어한다. | 애플리케이션 설정에 `간단 / 동작 미리보기 / 끔`을 제공한다. 숙련자는 설명만 남기고, 처음 쓰는 사용자는 의미 SVG까지 볼 수 있다. |
 | [Magma Editor User Interface](https://help.magma.com/en/articles/6871160-magma-s-editor-user-interface) | 툴바 아이콘에 마우스를 올리면 툴 설명과 영상 설명을 제공하고, 상단 Quick Actions에는 자주 쓰는 동작과 단축키를 함께 배치한다. | 아이콘 이름만 반복하지 않고, 설명·단축키·작업 팁과 툴별 의미 SVG 동작을 2단계 코치로 제공한다. 호스팅 영상 복제 대신 가벼운 자체 미리보기를 사용한다. |

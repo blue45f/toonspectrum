@@ -4,7 +4,7 @@ import { getRelatedInfoForTitle } from "../title-related-info";
 
 import { makeTitle } from "./fixtures";
 
-import type { RelatedInfoItem } from "@toonspectrum/core";
+import type { RelatedInfoItem } from "@toonstudio/core";
 
 describe("title-related-info — 관련 정보 소스 우선순위", () => {
   const crawled: RelatedInfoItem[] = [

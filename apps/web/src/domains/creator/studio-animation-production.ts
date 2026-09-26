@@ -7,7 +7,7 @@ import {
   sceneIRSchema,
   transformSceneNodes,
   translateMat2d,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import type {
   AnimationGraphIR,
@@ -16,7 +16,7 @@ import type {
   Mat2d,
   SceneIR,
   SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * V12 §13 animation-lane production utilities: per-frame X-sheet composition

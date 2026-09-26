@@ -14,7 +14,7 @@ import { makeTitle } from "../../../../../../apps/web/src/shared/lib/__tests__/f
 import { allTitles, getCatalogState, replaceCatalogData } from "../../../../../../apps/web/src/shared/lib/server/catalog-store";
 
 
-const tmpDir = mkdtempSync(path.join(os.tmpdir(), "toonspectrum-catalog-file-"));
+const tmpDir = mkdtempSync(path.join(os.tmpdir(), "toonstudio-catalog-file-"));
 const gzPath = path.join(tmpDir, "catalog.json.gz");
 const originalTitles = allTitles();
 const originalState = getCatalogState();

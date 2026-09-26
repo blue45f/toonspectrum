@@ -27,7 +27,7 @@ import {
 } from "react";
 import { useLocation } from "react-router-dom";
 
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import {
   batchPublicCreatorRoleProfiles,

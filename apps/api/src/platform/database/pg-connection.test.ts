@@ -13,7 +13,7 @@ describe("normalizePgConnectionStringForTls", () => {
     (sslmode) => {
       const result = new URL(
         normalizePgConnectionStringForTls(
-          `postgresql://artist:secret@example.net/toonspectrum?sslmode=${sslmode}&channel_binding=require`
+          `postgresql://artist:secret@example.net/toonstudio?sslmode=${sslmode}&channel_binding=require`
         )
       );
 
@@ -21,13 +21,13 @@ describe("normalizePgConnectionStringForTls", () => {
       expect(result.searchParams.get("channel_binding")).toBe("require");
       expect(result.username).toBe("artist");
       expect(result.password).toBe("secret");
-      expect(result.pathname).toBe("/toonspectrum");
+      expect(result.pathname).toBe("/toonstudio");
     }
   );
 
   it("keeps verify-full idempotent", () => {
     const input =
-      "postgresql://artist:secret@example.net/toonspectrum?sslmode=verify-full";
+      "postgresql://artist:secret@example.net/toonstudio?sslmode=verify-full";
 
     expect(normalizePgConnectionStringForTls(input)).toBe(input);
   });
@@ -35,7 +35,7 @@ describe("normalizePgConnectionStringForTls", () => {
   it("adds verify-full for Neon URLs that omit sslmode", () => {
     const result = new URL(
       normalizePgConnectionStringForTls(
-        "postgresql://artist:secret@ep-example.us-east-1.aws.neon.tech/toonspectrum"
+        "postgresql://artist:secret@ep-example.us-east-1.aws.neon.tech/toonstudio"
       )
     );
 
@@ -43,13 +43,13 @@ describe("normalizePgConnectionStringForTls", () => {
   });
 
   it("does not force TLS query parameters onto loopback development URLs", () => {
-    const input = "postgresql://postgres:postgres@127.0.0.1:55432/toonspectrum";
+    const input = "postgresql://postgres:postgres@127.0.0.1:55432/toonstudio";
 
     expect(normalizePgConnectionStringForTls(input)).toBe(input);
   });
 
   it("preserves an explicit no-verify mode for non-Neon compatibility endpoints", () => {
-    const input = "postgresql://artist:secret@example.net/toonspectrum?sslmode=no-verify";
+    const input = "postgresql://artist:secret@example.net/toonstudio?sslmode=no-verify";
 
     expect(normalizePgConnectionStringForTls(input)).toBe(input);
   });
@@ -57,7 +57,7 @@ describe("normalizePgConnectionStringForTls", () => {
   it("rejects TLS disablement for Neon", () => {
     expect(() =>
       normalizePgConnectionStringForTls(
-        "postgresql://artist:secret@ep-example.neon.tech/toonspectrum?sslmode=disable"
+        "postgresql://artist:secret@ep-example.neon.tech/toonstudio?sslmode=disable"
       )
     ).toThrow("must not disable TLS");
   });
@@ -65,7 +65,7 @@ describe("normalizePgConnectionStringForTls", () => {
   it("rejects duplicate sslmode parameters instead of choosing one", () => {
     expect(() =>
       normalizePgConnectionStringForTls(
-        "postgresql://artist:secret@example.net/toonspectrum?sslmode=require&sslmode=disable"
+        "postgresql://artist:secret@example.net/toonstudio?sslmode=require&sslmode=disable"
       )
     ).toThrow("must not repeat sslmode");
   });
@@ -79,7 +79,7 @@ describe("normalizePgConnectionStringForTls", () => {
 
 describe("observePgPoolIdleErrors", () => {
   const connectionString =
-    "postgresql://artist:secret@example.net/toonspectrum?sslmode=verify-full";
+    "postgresql://artist:secret@example.net/toonstudio?sslmode=verify-full";
 
   it("handles and logs an idle-client error instead of letting EventEmitter throw", () => {
     const pool = new EventEmitter();
@@ -127,17 +127,17 @@ describe("observePgPoolIdleErrors", () => {
     observePgPoolIdleErrors(pool, {
       connectionString:
         // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic percent-encoding fixture
-        "postgresql://artist:p%40ss@example.net/toonspectrum?sslmode=verify-full",
+        "postgresql://artist:p%40ss@example.net/toonstudio?sslmode=verify-full",
       logger,
     });
 
     pool.emit(
       "error",
-      new Error("dial postgresql://artist:p@ss@example.net/toonspectrum failed")
+      new Error("dial postgresql://artist:p@ss@example.net/toonstudio failed")
     );
 
     const logged = logger.error.mock.calls[0]?.[0] ?? "";
-    expect(logged).toContain("postgresql://[REDACTED]@example.net/toonspectrum");
+    expect(logged).toContain("postgresql://[REDACTED]@example.net/toonstudio");
     expect(logged).not.toContain("artist");
     expect(logged).not.toContain("p@ss");
     expect(logged).not.toContain("@ss@");

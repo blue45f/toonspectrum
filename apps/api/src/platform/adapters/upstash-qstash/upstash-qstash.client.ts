@@ -404,7 +404,7 @@ export class UpstashQStashDurableQueuePort
                 accept: "application/json",
                 "content-type": "application/json",
                 "upstash-deduplication-id": deduplicationId,
-                "upstash-label": `toonspectrum-${admitted.workload}`,
+                "upstash-label": `toonstudio-${admitted.workload}`,
                 "upstash-redact-fields": "body",
                 "upstash-retries": String(this.config.retries),
                 "upstash-timeout": `${this.config.deliveryTimeoutSeconds}s`,

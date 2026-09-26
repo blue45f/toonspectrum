@@ -2,7 +2,7 @@
  * THESIS: A flattened webtoon cut becomes editable through one protected review flow, never a
  * surprise destructive action. The canvas remains the hero and settings recede to a compact rail.
  *
- * OWN-WORLD: ToonSpectrum warm-ink surfaces, persimmon matte overlays, hairline partitions and
+ * OWN-WORLD: ToonStudio warm-ink surfaces, persimmon matte overlays, hairline partitions and
  * familiar professional-editor tabs. No decorative glass, nested cards or remote-AI spectacle.
  *
  * STORY: The artist sees what is local, reviews the exact foreground boundary, corrects uncertain

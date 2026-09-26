@@ -6,15 +6,15 @@ import {
   compileRasterBrush,
   renderCompiledBrushStroke,
   standardZigzagStrokeSamples,
-} from "@toonspectrum/studio-brush-platform";
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-brush-platform";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type {
   CompiledRasterBrush,
   HokusaiModuleLike,
-} from "@toonspectrum/studio-brush-platform";
-import type { BrushProgramIR } from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-brush-platform";
+import type { BrushProgramIR } from "@toonstudio/studio-project-model";
 
 /**
  * V12 natural-media lane gate: MYB (BrushProgramIR) → Hokusai raster compile

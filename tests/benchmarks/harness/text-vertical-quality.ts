@@ -9,7 +9,7 @@ import { chromium } from "playwright";
 import { createServer } from "vite";
 
 import type { TextVerticalProductProbe } from "./text-vertical-quality-browser";
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const RESULT_PATH = join(ROOT, "tests/benchmarks/results/text-vertical-quality.json");

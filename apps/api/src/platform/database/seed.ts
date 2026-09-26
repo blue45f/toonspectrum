@@ -73,15 +73,15 @@ async function main() {
     login?: boolean;
   };
   const seedUsers: SeedUser[] = [
-    { id: "seed-admin", name: "데모 관리자", email: "admin@toonspectrum.dev", role: "admin", avatar: "#ef4444", bio: "데모 관리자 계정", login: true },
-    { id: "seed-tester", name: "데모 독자", email: "tester@toonspectrum.dev", role: "user", avatar: "#7c3aed", bio: "로그인 검증용 데모 독자 계정", login: true },
-    { id: "seed-creator", name: "데모 창작자", email: "creator@toonspectrum.dev", role: "user", avatar: "#0ea5e9", bio: "창작 스튜디오 데모 작가", login: true },
-    { id: "seed-user-001", name: "샘플 독자", email: "sample-reader@toonspectrum.dev", role: "user", avatar: "#22c55e", bio: "시드 샘플 계정(기능 점검용)" },
-    { id: "seed-u2", name: "별점요정", email: "seed2@toonspectrum.dev", role: "user", avatar: "#f59e0b", bio: "리뷰 샘플 작성자" },
-    { id: "seed-u3", name: "완독장인", email: "seed3@toonspectrum.dev", role: "user", avatar: "#ec4899", bio: "리뷰 샘플 작성자" },
-    { id: "seed-u4", name: "장르탐험가", email: "seed4@toonspectrum.dev", role: "user", avatar: "#14b8a6", bio: "리뷰 샘플 작성자" },
-    { id: "seed-u5", name: "취향수집가", email: "seed5@toonspectrum.dev", role: "user", avatar: "#8b5cf6", bio: "리뷰 샘플 작성자" },
-    { id: "seed-u6", name: "야간순찰자", email: "seed6@toonspectrum.dev", role: "user", avatar: "#64748b", bio: "리뷰 샘플 작성자" },
+    { id: "seed-admin", name: "데모 관리자", email: "admin@toonstudio.dev", role: "admin", avatar: "#ef4444", bio: "데모 관리자 계정", login: true },
+    { id: "seed-tester", name: "데모 독자", email: "tester@toonstudio.dev", role: "user", avatar: "#7c3aed", bio: "로그인 검증용 데모 독자 계정", login: true },
+    { id: "seed-creator", name: "데모 창작자", email: "creator@toonstudio.dev", role: "user", avatar: "#0ea5e9", bio: "창작 스튜디오 데모 작가", login: true },
+    { id: "seed-user-001", name: "샘플 독자", email: "sample-reader@toonstudio.dev", role: "user", avatar: "#22c55e", bio: "시드 샘플 계정(기능 점검용)" },
+    { id: "seed-u2", name: "별점요정", email: "seed2@toonstudio.dev", role: "user", avatar: "#f59e0b", bio: "리뷰 샘플 작성자" },
+    { id: "seed-u3", name: "완독장인", email: "seed3@toonstudio.dev", role: "user", avatar: "#ec4899", bio: "리뷰 샘플 작성자" },
+    { id: "seed-u4", name: "장르탐험가", email: "seed4@toonstudio.dev", role: "user", avatar: "#14b8a6", bio: "리뷰 샘플 작성자" },
+    { id: "seed-u5", name: "취향수집가", email: "seed5@toonstudio.dev", role: "user", avatar: "#8b5cf6", bio: "리뷰 샘플 작성자" },
+    { id: "seed-u6", name: "야간순찰자", email: "seed6@toonstudio.dev", role: "user", avatar: "#64748b", bio: "리뷰 샘플 작성자" },
   ];
   const pwHash = hashPassword(PASSWORD);
   await db
@@ -392,9 +392,9 @@ async function main() {
   console.log(`  cafes=${cafe} fanPosts=${fp} fanPostReplies=${fpr} feedbackPosts=${fb} creatorWorks=${cw} revenueLedger=${led}`);
   console.log("");
   console.log("  Loginable test accounts (password: Demo1234!):");
-  console.log("    admin@toonspectrum.dev   (role=admin)");
-  console.log("    tester@toonspectrum.dev  (role=user)");
-  console.log("    creator@toonspectrum.dev (role=user, creator profile)");
+  console.log("    admin@toonstudio.dev   (role=admin)");
+  console.log("    tester@toonstudio.dev  (role=user)");
+  console.log("    creator@toonstudio.dev (role=user, creator profile)");
   process.exit(0);
 }
 

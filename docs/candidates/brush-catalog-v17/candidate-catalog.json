@@ -43,7 +43,7 @@
    "최적 브러시 영역": "현재 구현 기준선",
    "도입 상태": "유지·재분류",
    "주요 주의점": "소스 코드에 현재 226종으로 기재",
-   "공식 소스": "https://raw.githubusercontent.com/blue45f/toonspectrum/main/README.md"
+   "공식 소스": "https://raw.githubusercontent.com/blue45f/toonstudio/main/README.md"
   },
   {
    "엔진/라이브러리": "Google Ink",
@@ -223,7 +223,7 @@
    "최적 브러시 영역": "수채·수묵",
    "도입 상태": "차별화 Provider",
    "주요 주의점": "결정성·성능",
-   "공식 소스": "https://github.com/blue45f/toonspectrum"
+   "공식 소스": "https://github.com/blue45f/toonstudio"
   },
   {
    "엔진/라이브러리": "Studio spectral pigment",
@@ -232,7 +232,7 @@
    "최적 브러시 영역": "수채·유화·팔레트",
    "도입 상태": "차별화 Provider",
    "주요 주의점": "색 기준·GPU 정밀도",
-   "공식 소스": "https://github.com/blue45f/toonspectrum"
+   "공식 소스": "https://github.com/blue45f/toonstudio"
   },
   {
    "엔진/라이브러리": "Studio impasto",
@@ -241,7 +241,7 @@
    "최적 브러시 영역": "유화·재질",
    "도입 상태": "차별화 Provider",
    "주요 주의점": "메모리·조명 일관성",
-   "공식 소스": "https://github.com/blue45f/toonspectrum"
+   "공식 소스": "https://github.com/blue45f/toonstudio"
   },
   {
    "엔진/라이브러리": "Studio bristle",
@@ -250,7 +250,7 @@
    "최적 브러시 영역": "붓·드라이브러시",
    "도입 상태": "차별화 Provider",
    "주요 주의점": "물리 비용·재현성",
-   "공식 소스": "https://github.com/blue45f/toonspectrum"
+   "공식 소스": "https://github.com/blue45f/toonstudio"
   },
   {
    "엔진/라이브러리": "Studio physics-particle",
@@ -259,7 +259,7 @@
    "최적 브러시 영역": "효과·자연·장식",
    "도입 상태": "차별화 Provider",
    "주요 주의점": "대량 입자·seed",
-   "공식 소스": "https://github.com/blue45f/toonspectrum"
+   "공식 소스": "https://github.com/blue45f/toonstudio"
   },
   {
    "엔진/라이브러리": "Studio procedural surface",
@@ -268,7 +268,7 @@
    "최적 브러시 영역": "모든 건식·자연매체",
    "도입 상태": "공통 재질 Provider",
    "주요 주의점": "타일 seam·전역 좌표",
-   "공식 소스": "https://github.com/blue45f/toonspectrum"
+   "공식 소스": "https://github.com/blue45f/toonstudio"
   }
  ],
  "variantGroups": [
@@ -1791,7 +1791,7 @@
    "확인 수량": "226",
    "용도": "현재 구현/등록",
    "통합 정책": "기존 항목을 새 VariantGroup·Fidelity Lock으로 재분류",
-   "공식 소스": "https://raw.githubusercontent.com/blue45f/toonspectrum/main/README.md"
+   "공식 소스": "https://raw.githubusercontent.com/blue45f/toonstudio/main/README.md"
   },
   {
    "풀/포맷": "MyPaint/Hokusai Stock",

@@ -22,7 +22,7 @@ wa-sqlite, Yjs, Loro는 후보 비교 대상일 뿐 현재 V12 storage runtime�
 
 storage runtime / Dedicated Worker
   ├─ dynamic import @sqlite.org/sqlite-wasm
-  ├─ installOpfsSAHPoolVfs({directory:"toonspectrum-studio-sqlite"})
+  ├─ installOpfsSAHPoolVfs({directory:"toonstudio-studio-sqlite"})
   ├─ OpfsSAHPoolDb("/studio-local-v12.db")
   └─ validated SQL/repository operations
 

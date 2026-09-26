@@ -19,7 +19,7 @@ Marketplace 게시·팀 공유·수익화는 서버 Rights BOM과 별도 정책 
 `LEGACY_DATA_MIGRATION=FALSE`이므로 기존 Studio localStorage pack marker·brush/filter 배열은 제품
 부팅 입력이 아니다. V12 Creator Pack 영수증은 `studio-creator-pack-v12` namespace와
 `/studio-local-v12.db`에만 기록된다. 명시적 파괴 확인 플래그가 모두 만족되면 공용
-`toonspectrum-studio-sqlite` OPFS root와 함께 폐기된다.
+`toonstudio-studio-sqlite` OPFS root와 함께 폐기된다.
 
 ## 교체 조건
 

@@ -1,7 +1,7 @@
 import { apiFetch } from "@/platform/api";
 import { observeApiResponse } from "@/platform/api-error";
 import { FortuneObservatory } from "./FortuneObservatory";
-import { getCharacters } from "@toonspectrum/core/fortune";
+import { getCharacters } from "@toonstudio/core/fortune";
 import {
   Sparkles,
   User,
@@ -185,7 +185,7 @@ const ELEMENT_KO: Record<string, string> = {
   wood: "목(木)", fire: "화(火)", earth: "토(土)", metal: "금(金)", water: "수(水)",
 };
 
-// 오행 색상 매핑 (ToonSpectrum 디자인 토큰을 활용한 프리미엄 컬러 세트)
+// 오행 색상 매핑 (ToonStudio 디자인 토큰을 활용한 프리미엄 컬러 세트)
 const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   "목": { bg: "bg-emerald-500/10", text: "text-emerald-400", dot: "bg-emerald-500" },
   "화": { bg: "bg-red-500/10", text: "text-red-400", dot: "bg-red-500" },
@@ -210,7 +210,7 @@ function CharacterFortunePage() {
   const clearHistory = useFortuneStore((s) => s.clearHistory);
   const removeFromHistory = useFortuneStore((s) => s.removeFromHistory);
 
-  // 캐릭터 목록은 @toonspectrum/core 의 정적 데이터(웹·API 단일 출처)로 즉시 채운다 —
+  // 캐릭터 목록은 @toonstudio/core 의 정적 데이터(웹·API 단일 출처)로 즉시 채운다 —
   // API(/api/fortune/characters, 로컬은 dev:api 필요)가 없거나 실패해도 피커가 동작한다.
   const [characters, setCharacters] = useState<Character[]>(() => getCharacters());
   const [selectedChar, setSelectedChar] = useState<Character | null>(null);
@@ -224,14 +224,14 @@ function CharacterFortunePage() {
   // 궁합 입력 상태
   const [partnerBirthDate, setPartnerBirthDate] = useState(savedProfile.partnerBirthDate);
   const [partnerBirthTime, setPartnerBirthTime] = useState(savedProfile.partnerBirthTime);
-  
+
   // 처방전 입력 상태
   const [prescriptionQuery, setPrescriptionQuery] = useState("");
-  
+
   // 타로 상태
   const [tarotStep, setTarotStep] = useState<"idle" | "shuffling" | "spread" | "revealed">("idle");
   const [tarotSpread, setTarotSpread] = useState<"one" | "three">("one");
-  
+
   // 결과 상태 — 탭별로 캐시해 탭을 옮겨도 이전 결과가 유지된다
   const [isLoading, setIsLoading] = useState(false);
   const [resultsByTab, setResultsByTab] = useState<Partial<Record<FortuneTab, FortuneResult>>>({});
@@ -336,7 +336,7 @@ function CharacterFortunePage() {
   };
   useEffect(() => {
     loadCharacters();
-     
+
   }, []);
 
   // 결과 도착 시 결과 헤딩으로 포커스 이동 + 스크린리더 안내(접근성)
@@ -354,7 +354,7 @@ function CharacterFortunePage() {
       characters.find((c) => c.id === saved.characterId) ?? {
         id: saved.characterId,
         name: saved.characterName,
-        origin: "ToonSpectrum",
+        origin: "ToonStudio",
         greeting: "",
         avatarUrl: saved.characterAvatar,
       };
@@ -586,7 +586,7 @@ function CharacterFortunePage() {
                     </span>
                   </div>
                 </div>
-                
+
                 <p className="mt-3 text-xs leading-relaxed text-fg-3 line-clamp-2">
                   "{char.greeting}"
                 </p>
@@ -600,7 +600,7 @@ function CharacterFortunePage() {
       ) : (
         /* 캐릭터가 선택되었을 때의 본문 인터페이스 — 캐릭터 무드색을 CSS 변수로 주입 */
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12" style={charThemeVars(selectedChar.id)}>
-          
+
           {/* 왼쪽: 에이전트 정보 및 말풍선 (3/12 cols) */}
           <aside className="lg:col-span-4 flex flex-col gap-4">
             <div className="rounded-2xl border border-line bg-panel/35 p-5 flex flex-col items-center text-center">
@@ -684,7 +684,7 @@ function CharacterFortunePage() {
 
           {/* 오른쪽: 메인 입력 및 결과창 (8/12 cols) */}
           <div className="lg:col-span-8 flex flex-col gap-6">
-            
+
             {/* 탭 네비게이션 — 항상 노출(결과를 보면서도 전환, 탭별 결과 유지) · 모바일 가로 스크롤 + ARIA */}
             <div
               role="tablist"
@@ -748,7 +748,7 @@ function CharacterFortunePage() {
               {/* 결과 출력창 */}
               {!isLoading && fortuneResult && (
                 <div className="space-y-8 animate-reveal">
-                  
+
                   {/* 결과 상단 공통 헤더 */}
                   <div className="border-b border-line/60 pb-4 flex justify-between items-center">
                     <div>
@@ -782,7 +782,7 @@ function CharacterFortunePage() {
                   {/* 오늘의 운세 전용 결과 디스플레이 */}
                   {activeTab === "today" && fortuneResult.today && (
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-                      
+
                       {/* 오늘의 운세 지수 원형 도넛/게이지 */}
                       <div className="md:col-span-4 flex flex-col items-center justify-center p-4 border border-line/45 rounded-2xl bg-card/30 relative overflow-hidden">
                         {/* 고득점 축포 — 컨페티 버스트 */}
@@ -939,14 +939,14 @@ function CharacterFortunePage() {
                     <div className="p-5 border border-amber-500/15 bg-gradient-to-br from-amber-500/5 to-card rounded-2xl relative overflow-hidden space-y-4 text-left">
                       {/* 고풍스러운 문양 장식 */}
                       <div className="absolute top-2 right-4 text-[10px] font-bold text-amber-500/40 uppercase tracking-widest font-display">Prescribed by {selectedChar.name}</div>
-                      
+
                       <div className="space-y-1">
                         <span className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider">PRESCRIPTION SLIP</span>
                         <h4 className="text-sm font-semibold text-fg-2">진단된 고민: "{fortuneResult.query}"</h4>
                       </div>
-                      
+
                       <div className="h-px bg-amber-500/10" />
-                      
+
                       {/* 복약 가이드 / 연출 문구 */}
                       <div className="space-y-2">
                         <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">{tx("복약 처방전 가이드")}</span>
@@ -960,7 +960,7 @@ function CharacterFortunePage() {
                   {/* 궁합 전용 결과 디스플레이 */}
                   {activeTab === "compatibility" && fortuneResult.score && fortuneResult.mySaju && fortuneResult.partnerSaju && (
                     <div className="space-y-6">
-                      
+
                       {/* 궁합 요약 매칭 바 */}
                       <div className="p-5 border border-line/45 bg-card/30 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="flex flex-col gap-1 text-center md:text-left">
@@ -1057,7 +1057,7 @@ function CharacterFortunePage() {
                               {h}
                             </div>
                           ))}
-                          
+
                           {/* 천간행 */}
                           {[
                             fortuneResult.saju.hourPillar,
@@ -1110,8 +1110,8 @@ function CharacterFortunePage() {
                               </div>
                               {/* 오행 게이지 바 */}
                               <div className="h-2 w-full rounded-full bg-card overflow-hidden">
-                                <div 
-                                  className={cn("h-full rounded-full transition-all duration-500", el.col.dot)} 
+                                <div
+                                  className={cn("h-full rounded-full transition-all duration-500", el.col.dot)}
                                   style={{ width: `${el.ratio}%` }}
                                 />
                               </div>
@@ -1435,7 +1435,7 @@ function CharacterFortunePage() {
                     <h3 className="text-lg font-bold text-fg">{tx("아라의 가상 서재: AI 독서 처방전")}</h3>
                     <p className="text-xs text-fg-3 mt-1">오늘 당신의 지친 마음이나 보고 싶은 분위기를 적어보세요.</p>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <label htmlFor="prescription-query" className="text-xs font-semibold text-fg-2 flex items-center gap-1.5">
                       <Sparkles className="h-3.5 w-3.5 text-accent-soft" /> 어떤 이야기가 필요한가요?
@@ -1468,7 +1468,7 @@ function CharacterFortunePage() {
                     <h3 className="text-lg font-bold text-fg">{tx("두 사람의 궁합 분석 정보 입력")}</h3>
                     <p className="text-xs text-fg-3 mt-1">상대방과의 궁합을 웹툰 콘티 연출 형태로 보여 드립니다.</p>
                   </div>
-                  
+
                   {/* 본인 정보 */}
                   <div className="border border-line/40 rounded-xl p-4 bg-card/10 space-y-3">
                     <span className="text-[10px] font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
@@ -1542,7 +1542,7 @@ function CharacterFortunePage() {
                     <h3 className="text-lg font-bold text-fg">{tx("사주팔자 분석 정보 입력")}</h3>
                     <p className="text-xs text-fg-3 mt-1">정확한 연산을 위해 생년월일시를 입력하세요.</p>
                   </div>
-                  
+
                   <div className="space-y-1.5">
                     <label htmlFor="birth-date" className="text-xs font-semibold text-fg-2 flex items-center gap-1">
                       <Calendar className="h-3.5 w-3.5 text-fg-3" /> 생년월일 (양력 기준)
@@ -1710,11 +1710,11 @@ function CharacterFortunePage() {
       {/* 법적 면책 조항 및 자체 캐릭터 안내문 (Disclaimer) */}
       <footer className="mt-16 border-t border-line/40 pt-6 text-center max-w-2xl mx-auto space-y-2">
         <p className="text-[10px] text-fg-3 leading-relaxed">
-          <strong>법적 고지 (Disclaimer)</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다. 
+          <strong>법적 고지 (Disclaimer)</strong>: 본 운세 서비스는 가벼운 엔터테인먼트와 도서 큐레이션을 목적으로 제공됩니다.
           풀이 내용 및 행운 지수는 인공지능 기반 가상의 결과이며 법적·과학적 효력을 지니지 않습니다.
         </p>
         <p className="text-[10px] text-fg-3 leading-relaxed">
-          본 서비스에 등장하는 에이전트(사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온)는 ToonSpectrum이 독자적으로 기획·창작한 고유 캐릭터이며, 
+          본 서비스에 등장하는 에이전트(사서 아라, 도깨비 단우, 점술가 레오나, 검객 가온)는 ToonStudio이 독자적으로 기획·창작한 고유 캐릭터이며,
           특정 실존 인물, 단체 또는 타사 웹툰 저작물과 무관합니다.
         </p>
       </footer>

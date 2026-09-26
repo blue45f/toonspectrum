@@ -73,7 +73,7 @@ const PRIMARY = `inline-flex min-h-11 items-center justify-center rounded-xl bor
 type Tab = "recipes" | "experiment" | "graph" | "input" | "material" | "physics" | "pattern" | "runtime";
 type BrushStudioExperience = "guided" | "expert";
 
-const BRUSH_STUDIO_EXPERIENCE_KEY = "toonspectrum.brush-studio.experience";
+const BRUSH_STUDIO_EXPERIENCE_KEY = "toonstudio.brush-studio.experience";
 const GUIDED_TABS: readonly { id: Tab; label: string }[] = [
   { id: "recipes", label: `시작 레시피 ${BRUSH_STUDIO_V6_RECIPES.length}` },
   { id: "experiment", label: "비교·실험" },
@@ -271,7 +271,7 @@ export function StudioBrushV6Workbench({ scope, initialProgram }: {
 function StudioBrushV6Editor({ scope, initialProgram }: {
   readonly scope: string; readonly initialProgram: BrushStudioV6Program;
 }) {
-  const storageKey = `toonspectrum.brush-program-v6:${encodeURIComponent(scope)}`;
+  const storageKey = `toonstudio.brush-program-v6:${encodeURIComponent(scope)}`;
   const [history, dispatchHistory] = useReducer(reduceBrushStudioV6EditHistory, initialProgram, createBrushStudioV6EditHistory);
   const program = history.present;
   const [reference, setReference] = useState<BrushStudioV6Program>(program);

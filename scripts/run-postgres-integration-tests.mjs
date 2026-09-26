@@ -419,7 +419,7 @@ async function preflightPostgresIntegrationDatabase(
   runtimeDatabaseRole,
 ) {
   const pool = new Pool({
-    application_name: "toonspectrum-postgres-integration-preflight",
+    application_name: "toonstudio-postgres-integration-preflight",
     connectionString: databaseUrl,
     connectionTimeoutMillis: 5_000,
     idleTimeoutMillis: 1_000,

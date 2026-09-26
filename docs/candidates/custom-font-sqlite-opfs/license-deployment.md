@@ -5,7 +5,7 @@
 | Component | Pin/source | License | Deployment role |
 |---|---|---|---|
 | `@sqlite.org/sqlite-wasm` | root package exact `3.53.0-build1`; installed package manifest 실측 | Apache-2.0 | 공용 lazy SQLite runtime/OPFS SAH-pool |
-| Studio OPFS filesystem/CAS | repository source | ToonSpectrum project license | SHA-256 content-addressed original font bytes |
+| Studio OPFS filesystem/CAS | repository source | ToonStudio project license | SHA-256 content-addressed original font bytes |
 | FontFace / OPFS / Web Locks | browser Web APIs | Web platform | verified byte activation, durable storage, writer serialization |
 
 신규 npm dependency나 별도 native binary는 추가하지 않는다. SQLite WASM과 OPFS CAS는 이미 제품에
@@ -24,7 +24,7 @@
 - OPFS/SQLite/Web Locks 부재: 패널이 현재 탭 memory-only임을 표시한다. localStorage/IndexedDB로
   자동 하향하지 않는다.
 - 손상/미검증: 기능을 unavailable로 잠그고 부분 목록을 표시하지 않는다.
-- 기존 `toonspectrum-studio-custom-fonts` localStorage 데이터는 자동 읽기·마이그레이션하지 않는다
+- 기존 `toonstudio-studio-custom-fonts` localStorage 데이터는 자동 읽기·마이그레이션하지 않는다
   (`LEGACY_DATA_MIGRATION=FALSE`). 명시적 import/test 호출만 유지한다.
 - destructive cutover는 중앙 V12 데이터 폐기 승인 플래그가 있는 배포에서만 수행하며 이 레인은
   별도 삭제 명령을 실행하지 않는다.

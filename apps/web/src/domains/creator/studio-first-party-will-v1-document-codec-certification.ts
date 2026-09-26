@@ -1,8 +1,8 @@
 /**
- * End-to-end bounded WILL v1 Annex B provider execution + ToonSpectrum product certification.
+ * End-to-end bounded WILL v1 Annex B provider execution + ToonStudio product certification.
  *
  * This certificate binds exact seven-part document bytes and deterministic conformance evidence.
- * It is a ToonSpectrum product certificate, not Wacom/vendor certification, trademark
+ * It is a ToonStudio product certificate, not Wacom/vendor certification, trademark
  * authorization, or proof that arbitrary `.will` documents interoperate.
  */
 
@@ -54,7 +54,7 @@ import {
 
 export const
 STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_EVIDENCE_MEDIA_TYPE =
-  "application/vnd.toonspectrum.will-v1-annex-b-document-conformance+json" as const;
+  "application/vnd.toonstudio.will-v1-annex-b-document-conformance+json" as const;
 
 export type StudioFirstPartyWillV1DocumentCodecExecutionPolicy =
   | "direct"
@@ -81,7 +81,7 @@ export interface ExecuteAndCertifyStudioFirstPartyWillV1DocumentCodecInput {
 
 export interface StudioFirstPartyWillV1DocumentCertifiedExecution {
   readonly kind:
-    "toonspectrum-first-party-will-v1-annex-b-document-certified-execution";
+    "toonstudio-first-party-will-v1-annex-b-document-certified-execution";
   readonly direction: StudioCodecDirection;
   readonly scope: string;
   readonly bytes: Uint8Array;
@@ -166,7 +166,7 @@ function mapPipelineGuardError(
 export function studioFirstPartyWillV1DocumentCodecCertificationScope(
   direction: StudioCodecDirection,
 ): string {
-  return `toonspectrum.product.codec-conformance.will-v1-annex-b-document-${direction}`;
+  return `toonstudio.product.codec-conformance.will-v1-annex-b-document-${direction}`;
 }
 
 function providerFor(
@@ -364,7 +364,7 @@ async function executeWithPolicy(
     ...execution,
     executionProviderReceipt: Object.freeze({
       schemaVersion: 1,
-      kind: "toonspectrum-codec-execution-provider-selection",
+      kind: "toonstudio-codec-execution-provider-selection",
       selectedProvider: policy,
       attemptedProviders: Object.freeze([policy]) as readonly [
         StudioFirstPartyWillV1DocumentCodecExecutionPolicy,
@@ -500,7 +500,7 @@ export async function executeAndCertifyStudioFirstPartyWillV1DocumentCodec(
     );
     return Object.freeze({
       kind:
-        "toonspectrum-first-party-will-v1-annex-b-document-certified-execution",
+        "toonstudio-first-party-will-v1-annex-b-document-certified-execution",
       direction: input.direction,
       scope,
       bytes: execution.bytes,
@@ -551,7 +551,7 @@ export async function verifyStudioFirstPartyWillV1DocumentCertifiedExecution(
   const receipt = verified.certificate.receipt;
   if (
     execution.kind
-      !== "toonspectrum-first-party-will-v1-annex-b-document-certified-execution"
+      !== "toonstudio-first-party-will-v1-annex-b-document-certified-execution"
     || execution.scope !== expectedScope
     || verified.certificate.evidence.mediaType
       !== STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_EVIDENCE_MEDIA_TYPE

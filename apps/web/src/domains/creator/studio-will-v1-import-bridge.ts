@@ -30,13 +30,13 @@ import type {
 } from "./studio-will-v1-opc-worker-client";
 
 export const STUDIO_WILL_V1_IMPORT_MEDIA_TYPE =
-  "application/vnd.toonspectrum.will-v1-bounded+zip" as const;
+  "application/vnd.toonstudio.will-v1-bounded+zip" as const;
 export const STUDIO_WILL_V1_IMPORT_ACCEPT =
-  ".will,application/vnd.toonspectrum.will-v1-bounded+zip" as const;
+  ".will,application/vnd.toonstudio.will-v1-bounded+zip" as const;
 export const STUDIO_WILL_V1_IMPORT_PROFILE_LABEL =
-  "ToonSpectrum bounded WILL v1 Annex B public-spec profile" as const;
+  "ToonStudio bounded WILL v1 Annex B public-spec profile" as const;
 export const STUDIO_WILL_V1_IMPORT_DISCLAIMER =
-  "ToonSpectrum의 공개 명세 기반 bounded profile만 가져오며 Wacom 공식 SDK·인증 파일 호환을 보증하지 않습니다." as const;
+  "ToonStudio의 공개 명세 기반 bounded profile만 가져오며 Wacom 공식 SDK·인증 파일 호환을 보증하지 않습니다." as const;
 
 /** Matches the persisted project schema and the CRDT page mutation boundary. */
 export const STUDIO_WILL_V1_IMPORT_MAX_ELEMENTS_PER_PAGE = 10_000;
@@ -198,10 +198,10 @@ function assuranceIsBoundedPublicProfile(
   const assurance = result.assurance;
   return (
     assurance.profile === expectedProfile
-    && assurance.implementation === "ToonSpectrum clean-room bounded profile"
+    && assurance.implementation === "ToonStudio clean-room bounded profile"
     && assurance.annexAPathStream === true
     && assurance.annexBOpcSevenPartContainer === true
-    && assurance.canonicalTopLevelMediaTypeOwner === "ToonSpectrum"
+    && assurance.canonicalTopLevelMediaTypeOwner === "ToonStudio"
     && assurance.vendorCertified === false
     && assurance.vendorTrademarkAuthorized === false
     && assurance.arbitraryVendorFileInteroperabilityCertified === false
@@ -606,7 +606,7 @@ export async function inspectStudioWillV1Import(
   throwIfAborted(options.signal);
   if (!assuranceIsBoundedPublicProfile(result, STUDIO_WILL_V1_OPC_PROFILE)) {
     throw new Error(
-      "이 파일은 ToonSpectrum bounded WILL v1 공개 명세 프로필로 검증되지 않아 가져오지 않았습니다.",
+      "이 파일은 ToonStudio bounded WILL v1 공개 명세 프로필로 검증되지 않아 가져오지 않았습니다.",
     );
   }
 

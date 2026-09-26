@@ -159,7 +159,7 @@ export function studioCc0AssetUrl(relativePath: string): string {
 
 export function parseStudioCc0Catalog(value: unknown): readonly StudioCc0Asset[] {
   const manifest = record(value);
-  if (manifest?.schema !== "toonspectrum.asset-delivery.v1" || !Array.isArray(manifest.assets)
+  if (manifest?.schema !== "toonstudio.asset-delivery.v1" || !Array.isArray(manifest.assets)
     || manifest.assets.length > 2400) throw new TypeError("에셋 목록 형식이 올바르지 않습니다.");
   const ids = new Set<string>();
   return Object.freeze(manifest.assets.map((input: unknown): StudioCc0Asset => {

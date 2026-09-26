@@ -371,7 +371,7 @@ export function presetSliceFileName(
   part: { index: number; total: number }
 ): string {
   const suffix = part.total > 1 ? `-${part.index + 1}of${part.total}` : "";
-  return `${title.trim() || "toonspectrum-webtoon"}-${presetId}${suffix}.${format}`;
+  return `${title.trim() || "toonstudio-webtoon"}-${presetId}${suffix}.${format}`;
 }
 
 export interface PresetExportResult {

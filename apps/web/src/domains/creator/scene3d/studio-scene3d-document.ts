@@ -1,4 +1,4 @@
-export const STUDIO_SCENE3D_DOCUMENT_KIND = "toonspectrum.scene3d" as const;
+export const STUDIO_SCENE3D_DOCUMENT_KIND = "toonstudio.scene3d" as const;
 export const STUDIO_SCENE3D_DOCUMENT_VERSION = 1 as const;
 
 export type StudioScene3dVec3 = readonly [number, number, number];

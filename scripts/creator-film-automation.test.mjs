@@ -29,7 +29,7 @@ test("dispatch is authenticated, fixed destination, no automatic duplicate retri
   const dispatch = node("Dispatch approved GitHub renderer");
   assert.equal(dispatch.parameters.authentication, "predefinedCredentialType");
   assert.equal(dispatch.parameters.nodeCredentialType, "githubApi");
-  assert.equal(dispatch.parameters.url, "https://api.github.com/repos/blue45f/toonspectrum/actions/workflows/creator-brand-film.yml/dispatches");
+  assert.equal(dispatch.parameters.url, "https://api.github.com/repos/blue45f/toonstudio/actions/workflows/creator-brand-film.yml/dispatches");
   assert.equal(dispatch.retryOnFail, false);
   assert(!dispatch.parameters.options.response.response.neverError);
 });

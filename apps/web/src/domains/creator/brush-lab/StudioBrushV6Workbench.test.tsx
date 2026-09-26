@@ -37,7 +37,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const stored = (): BrushStudioV6Program => parseBrushStudioV6Import(localStorage.getItem("toonspectrum.brush-program-v6:test")!);
+const stored = (): BrushStudioV6Program => parseBrushStudioV6Import(localStorage.getItem("toonstudio.brush-program-v6:test")!);
 
 describe("V6 brush experiments in the workbench", () => {
   it("starts with result-focused controls and reveals engine internals only on request", () => {
@@ -52,7 +52,7 @@ describe("V6 brush experiments in the workbench", () => {
   });
   it("offers one truthful output authority and explains preserved imported alternatives", () => {
     const original = createBrushStudioV6Program("oil-hair-mixer");
-    localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify({ ...original, slots: { ...original.slots, output: "output-raster-tiles" } }));
+    localStorage.setItem("toonstudio.brush-program-v6:test", JSON.stringify({ ...original, slots: { ...original.slots, output: "output-raster-tiles" } }));
     render(<StudioBrushV6Workbench scope="test" />);
     fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
     fireEvent.click(screen.getByRole("button", { name: "엔진 조합" }));
@@ -69,7 +69,7 @@ describe("V6 brush experiments in the workbench", () => {
     ["oil-hair-mixer", false, "공통 재료 계산기에 네이티브 연결됨"],
   ] as const)("describes retained reservoir pickup according to the %s material", (recipe, inactive, status) => {
     const original = createBrushStudioV6Program(recipe);
-    localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify(original));
+    localStorage.setItem("toonstudio.brush-program-v6:test", JSON.stringify(original));
     render(<StudioBrushV6Workbench scope="test" />);
     fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
     fireEvent.click(screen.getByRole("button", { name: "엔진 조합" }));
@@ -85,7 +85,7 @@ describe("V6 brush experiments in the workbench", () => {
   });
 
   it("disables pickup and secondary pigment for a no-pickup bristle graph", () => {
-    localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify(createBrushStudioV6Program("oil-hair-mixer")));
+    localStorage.setItem("toonstudio.brush-program-v6:test", JSON.stringify(createBrushStudioV6Program("oil-hair-mixer")));
     render(<StudioBrushV6Workbench scope="test" />);
     fireEvent.click(screen.getByRole("button", { name: "전문가 설정" }));
     fireEvent.click(screen.getByRole("button", { name: "엔진 조합" }));
@@ -107,7 +107,7 @@ describe("V6 brush experiments in the workbench", () => {
 
   it("disables the unimplemented finger-water policy and explains imported legacy values", () => {
     const program = createBrushStudioV6Program("mineral-bloom");
-    localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify({
+    localStorage.setItem("toonstudio.brush-program-v6:test", JSON.stringify({
       ...program, input: { ...program.input, touchPolicy: "pen-ink-finger-water" },
     }));
     render(<StudioBrushV6Workbench scope="test" />);
@@ -156,7 +156,7 @@ describe("V6 brush experiments in the workbench", () => {
   });
 
   it("only offers physically active experiment fields when changing materials", () => {
-    localStorage.setItem("toonspectrum.brush-program-v6:test", JSON.stringify(createBrushStudioV6Program("oil-hair-mixer")));
+    localStorage.setItem("toonstudio.brush-program-v6:test", JSON.stringify(createBrushStudioV6Program("oil-hair-mixer")));
     render(<StudioBrushV6Workbench scope="test" />);
     fireEvent.click(screen.getByRole("button", { name: "비교·실험" }));
     const select = screen.getByLabelText("비교할 속성");
@@ -264,7 +264,7 @@ describe("V6 brush experiments in the workbench", () => {
 
   it("shows pinned provider identities and noncommercial/GPL adapter boundaries", () => {
     localStorage.setItem(
-      "toonspectrum.brush-program-v6:test",
+      "toonstudio.brush-program-v6:test",
       JSON.stringify(createBrushStudioV6Program("mixbox-oil-bristle")),
     );
     render(<StudioBrushV6Workbench scope="test" />);
@@ -280,7 +280,7 @@ describe("V6 brush experiments in the workbench", () => {
   it("disables product save when a selected engine has no exact product path", () => {
     const base = createBrushStudioV6Program("clean-ink");
     localStorage.setItem(
-      "toonspectrum.brush-program-v6:test",
+      "toonstudio.brush-program-v6:test",
       JSON.stringify({ ...base, slots: { ...base.slots, pigment: "pigment-painter-lut" } }),
     );
     render(<StudioBrushV6Workbench scope="test" />);
@@ -297,11 +297,11 @@ describe("V6 brush experiments in the workbench", () => {
     const document = JSON.parse(serializeBrushStudioV6Authoring(createBrushStudioV6Program()));
     document.materialReceipt.runtime.bindings[0].version = "unsupported-future";
     const raw = JSON.stringify(document);
-    localStorage.setItem("toonspectrum.brush-program-v6:test", raw);
+    localStorage.setItem("toonstudio.brush-program-v6:test", raw);
     render(<StudioBrushV6Workbench scope="test" />);
     expect(screen.getByRole("alert").textContent).toContain("원본을 변경하지 않고 보존");
     expect(screen.queryByRole("button", { name: "브러시로 저장" })).toBeNull();
-    expect(localStorage.getItem("toonspectrum.brush-program-v6:test")).toBe(raw);
+    expect(localStorage.getItem("toonstudio.brush-program-v6:test")).toBe(raw);
     expect(preview).not.toHaveBeenCalled();
     expect(save).not.toHaveBeenCalled();
   });
@@ -312,7 +312,7 @@ describe("V6 brush experiments in the workbench", () => {
     fireEvent.change(screen.getByRole("slider", { name: /도포 유량/u }), { target: { value: "0" } });
     const before = stored();
     expect(before.tuning.flow).toBe(0);
-    expect(JSON.parse(localStorage.getItem("toonspectrum.brush-program-v6:test")!).materialReceipt.tuning.flow).toBe(0);
+    expect(JSON.parse(localStorage.getItem("toonstudio.brush-program-v6:test")!).materialReceipt.tuning.flow).toBe(0);
     view.unmount();
     render(<StudioBrushV6Workbench scope="test" />);
     expect(stored()).toEqual(before);
@@ -338,9 +338,9 @@ describe("V6 brush experiments in the workbench", () => {
       name: "old.brush.json", size: 123, text: () => new Promise<string>((resolve) => { resolveText = resolve; }),
     }] } });
     view.rerender(<StudioBrushV6Workbench scope="another" />);
-    const before = localStorage.getItem("toonspectrum.brush-program-v6:another");
+    const before = localStorage.getItem("toonstudio.brush-program-v6:another");
     await act(async () => { resolveText(serializeBrushStudioV6Authoring(createBrushStudioV6Program("mineral-bloom"))); });
-    expect(localStorage.getItem("toonspectrum.brush-program-v6:another")).toBe(before);
+    expect(localStorage.getItem("toonstudio.brush-program-v6:another")).toBe(before);
   });
 
 });

@@ -1,4 +1,4 @@
-import { canonicalJson, type StudioReviewTaskCompletionContext, type StudioReviewTaskCompletionInput } from "@toonspectrum/studio-project-model";
+import { canonicalJson, type StudioReviewTaskCompletionContext, type StudioReviewTaskCompletionInput } from "@toonstudio/studio-project-model";
 import { StudioReviewTaskCompletionClientError, type StudioReviewTaskCompletionRequest } from "./studio-review-task-completion-client";
 
 interface Owner { readonly actorId: string | null; readonly generation: number; readonly available: boolean }

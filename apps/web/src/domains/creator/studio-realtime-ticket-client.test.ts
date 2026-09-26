@@ -56,7 +56,7 @@ describe("StudioRealtimeHttpTicketIssuer", () => {
     const headers = new Headers(init?.headers);
     expect(headers.get("content-type")).toBe("application/json");
     expect(headers.has("x-user-id")).toBe(false);
-    expect(headers.get("x-toonspectrum-csrf")).toBe("1");
+    expect(headers.get("x-toonstudio-csrf")).toBe("1");
     expect(init?.credentials).toBe("include");
     expect(JSON.stringify(init)).not.toContain(response.ticket);
   });

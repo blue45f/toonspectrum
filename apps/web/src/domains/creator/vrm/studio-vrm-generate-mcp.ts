@@ -40,7 +40,7 @@ export const STUDIO_VRM_GENERATE_UNAVAILABLE_MESSAGE =
 /** In-process generate MCP. Emits real VRM bytes through the shipped exporter. */
 export function createLocalStudioVrmGenerateMcpHost(): StudioVrmGenerateMcpHost {
   return {
-    id: "toonspectrum-vrm-generate",
+    id: "toonstudio-vrm-generate",
     async isAvailable() {
       return true;
     },

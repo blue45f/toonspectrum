@@ -18,7 +18,7 @@ describe("Virtual Studio photo mode", () => {
 
     const capture = await captureStudioVirtualPhoto(document, Date.UTC(2026, 8, 25, 8, 30));
     expect(capture).toEqual({
-      filename: "toonspectrum-virtual-studio-2026-09-25T08-30-00-000Z.png",
+      filename: "toonstudio-virtual-studio-2026-09-25T08-30-00-000Z.png",
       bytes: 3,
     });
     expect(click).toHaveBeenCalledOnce();

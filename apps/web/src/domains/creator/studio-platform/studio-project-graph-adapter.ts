@@ -6,7 +6,7 @@ import {
   type StudioArtifactRevisionV1,
   type StudioProjectGraphV1,
   type StudioTransactionEnvelope,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import type { StudioVersionCoordinates } from "../studio-foundation/studio-version-coordinates";
 import type {

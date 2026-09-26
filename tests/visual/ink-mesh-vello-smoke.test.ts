@@ -1,7 +1,7 @@
 
-import { renderSceneToPixels } from "@toonspectrum/studio-engine-vello";
-import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
-import { sceneIRSchema, type SceneIR } from "@toonspectrum/studio-project-model";
+import { renderSceneToPixels } from "@toonstudio/studio-engine-vello";
+import { loadVelloNode } from "@toonstudio/studio-engine-vello/node";
+import { sceneIRSchema, type SceneIR } from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {

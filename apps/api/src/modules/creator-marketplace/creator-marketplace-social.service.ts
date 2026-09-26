@@ -55,8 +55,8 @@ import type {
 } from "../../../../web/src/shared/lib/creator-marketplace-social-contract";
 
 const MARKET_SOCIAL_KEY_PREFIX = "toonspectrum:market-package:";
-const MARKET_REVIEW_STORAGE_SCHEMA = "toonspectrum.market-review.v2";
-const LEGACY_MARKET_REVIEW_STORAGE_SCHEMA = "toonspectrum.market-review.v1";
+const MARKET_REVIEW_STORAGE_SCHEMA = "toonstudio.market-review.v2";
+const LEGACY_MARKET_REVIEW_STORAGE_SCHEMA = "toonstudio.market-review.v1";
 const STUDIO_CONFIRMABLE_KINDS = new Set<string>(
   CREATOR_MARKETPLACE_STUDIO_CONFIRMABLE_KINDS,
 );

@@ -571,7 +571,7 @@ describe("§6 P0/P1 DRW/MAT/PUB real lite kernels", () => {
       rights: ["CC-BY"],
       version: "1.2.0",
     });
-    expect(pkg.format).toBe("toonspectrum.publish-package-lite");
+    expect(pkg.format).toBe("toonstudio.publish-package-lite");
     expect(pkg.fileCount).toBeGreaterThan(0);
     const preset = getStudioPublishPlatformPreset("webtoon");
     expect(preset).toBeTruthy();

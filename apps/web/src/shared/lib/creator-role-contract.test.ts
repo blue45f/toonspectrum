@@ -6,7 +6,7 @@ import {
   normalizeCreatorRoleProfile as normalizeCoreProfile,
   normalizePublicCreatorRoleProfile as normalizeCorePublicProfile,
   publicCreatorRoleProfile as corePublicProfile,
-} from "@toonspectrum/core/creator-role";
+} from "@toonstudio/core/creator-role";
 
 import {
   CREATOR_PUBLIC_ROLE_PROFILE_VERSION,

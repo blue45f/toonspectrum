@@ -31,7 +31,7 @@ export type StudioBg3dBabylonSpecialistEntryOptions = Omit<
   "loadBindings"
 >;
 
-/** ToonSpectrum owns loss recovery by disposing and recreating the whole specialist runtime. */
+/** ToonStudio owns loss recovery by disposing and recreating the whole specialist runtime. */
 export const STUDIO_BG3D_BABYLON_DELEGATES_CONTEXT_LOSS_TO_RUNTIME = true;
 
 export function attachStudioBg3dBabylonDeviceLossSignal(

@@ -3,7 +3,7 @@
   "model": "gpt-image-2.5-sunburst",
   "quality": "max",
   "generatedAt": "2026-09-16",
-  "description": "ToonSpectrum Studio 고품질 2D 웹툰 배경용 GPT Image 2.5 생성 레시피 512종. 8개 장르 × 16개 소재 × 4개 구도.",
+  "description": "ToonStudio Studio 고품질 2D 웹툰 배경용 GPT Image 2.5 생성 레시피 512종. 8개 장르 × 16개 소재 × 4개 구도.",
   "safety": {
     "people": "none",
     "readableText": "none",

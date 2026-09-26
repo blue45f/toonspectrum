@@ -15,7 +15,7 @@ export const STUDIO_PRO_DRAW_PREFERENCES_SQLITE_NAMESPACE =
   "studio-pro-draw-preferences-v12";
 export const STUDIO_PRO_DRAW_PREFERENCES_SQLITE_KEY = "snapshot";
 export const STUDIO_PRO_DRAW_PREFERENCES_BROADCAST_CHANNEL =
-  "toonspectrum-studio-pro-draw-preferences-v12";
+  "toonstudio-studio-pro-draw-preferences-v12";
 
 const ENVELOPE_VERSION = 1;
 const MAX_WRITER_ID_LENGTH = 160;

@@ -14,7 +14,7 @@ import { enabledStudioHistoryControl } from "./lib/studio-verify-history-control
 import { isOptionalStudioPreviewApiError } from "./lib/studio-verify-preview-errors.mjs";
 import { findFreePort, spawnVitePreview, stopChildProcess, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
-const scratch = process.env.TOONSPECTRUM_STORYBOARD_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-storyboard-workspace");
+const scratch = process.env.TOONSPECTRUM_STORYBOARD_VERIFY_DIR ?? join(tmpdir(), "toonstudio-storyboard-workspace");
 mkdirSync(scratch, { recursive: true });
 const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.replace(/\/+$/u, "");
 const port = externalOrigin ? null : await findFreePort();

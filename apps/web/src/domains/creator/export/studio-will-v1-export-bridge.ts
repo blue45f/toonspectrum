@@ -4,7 +4,7 @@
  *
  * The small path-preparation bridge stays in Studio's stable graph. The OPC/ZIP protocol and its
  * Worker client load only after an explicit export request; none of that optional interchange
- * graph is needed to open or draw in Studio. This is a ToonSpectrum-owned public-specification
+ * graph is needed to open or draw in Studio. This is a ToonStudio-owned public-specification
  * profile, not Wacom SDK output, vendor certification, or trademark authorization.
  */
 
@@ -23,9 +23,9 @@ import type { StudioWillV1OpcBuildResult } from "../studio-will-v1-opc-interchan
 import type { StudioWillV1OpcWorkerOptions } from "../studio-will-v1-opc-worker-client";
 
 export const STUDIO_WILL_V1_EXPORT_PROFILE_LABEL =
-  "ToonSpectrum bounded WILL v1 Annex B public-spec profile" as const;
+  "ToonStudio bounded WILL v1 Annex B public-spec profile" as const;
 export const STUDIO_WILL_V1_EXPORT_DISCLAIMER =
-  "ToonSpectrum의 공개 명세 기반 bounded profile이며 Wacom 공식 SDK·인증 파일이 아닙니다." as const;
+  "ToonStudio의 공개 명세 기반 bounded profile이며 Wacom 공식 SDK·인증 파일이 아닙니다." as const;
 /** UI export deadline. The generic codec keeps its larger host-configurable ceiling. */
 export const STUDIO_WILL_V1_EXPORT_DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -59,7 +59,7 @@ export interface StudioWillV1PageExportInput {
 export interface StudioWillV1PageExportResult {
   readonly bytes: Uint8Array;
   readonly extension: ".will";
-  readonly mediaType: "application/vnd.toonspectrum.will-v1-bounded+zip";
+  readonly mediaType: "application/vnd.toonstudio.will-v1-bounded+zip";
   readonly profileLabel: typeof STUDIO_WILL_V1_EXPORT_PROFILE_LABEL;
   readonly disclaimer: typeof STUDIO_WILL_V1_EXPORT_DISCLAIMER;
   readonly exportedStrokeIds: readonly string[];
@@ -280,7 +280,7 @@ export async function exportStudioPageToWillV1(
           width: input.width,
           height: input.height,
           title: boundedTitle(input.title),
-          application: "ToonSpectrum",
+          application: "ToonStudio",
           applicationVersion: "1.0",
           paths,
         },

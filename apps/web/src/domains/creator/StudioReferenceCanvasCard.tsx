@@ -24,7 +24,7 @@ const CAPABILITIES = [
 ] as const;
 
 /**
- * Compact entry point for ToonSpectrum's project-owned reference canvas.
+ * Compact entry point for ToonStudio's project-owned reference canvas.
  * The actual WYSIWYG surface and detached companion share the same document;
  * this card deliberately avoids keeping a second, disposable image viewer state.
  */

@@ -19,7 +19,7 @@ import type {
  * this backend must stop before constructing the v2 storage authority.
  */
 export const STUDIO_ENGINE_TILE_STORAGE_OPFS_V2_ROOT_NAME =
-  "toonspectrum-studio-engine-storage-v2";
+  "toonstudio-studio-engine-storage-v2";
 
 const DOCUMENT_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 const ROOT_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;

@@ -54,7 +54,7 @@ on:
       work_title:
         description: "새 작품 제목 (work-id를 비웠을 때 사용)"
         required: false
-        default: "toonspectrum-batch-upload"
+        default: "toonstudio-batch-upload"
       skip_existing:
         description: "이미 존재하면 건너뛰기 (true/false)"
         required: false

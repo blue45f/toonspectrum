@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import {
   evaluateLicenseGate,
   wasmVipsPipelineDescriptor,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import ts from "typescript";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 

@@ -1,6 +1,6 @@
-import { studioWorldManifestSchema } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema } from "@toonstudio/studio-project-model/world-publication";
 import { readStudioWorldAssetBytes } from "./studio-world-asset-bytes";
-import type { StudioWorldPublication } from "@toonspectrum/studio-project-model/world-publication";
+import type { StudioWorldPublication } from "@toonstudio/studio-project-model/world-publication";
 import { StudioWorldPublicationError, studioWorldDigest } from "./studio-world-publication-client";
 
 export interface PreparedStudioWorld {

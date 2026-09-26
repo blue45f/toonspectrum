@@ -1,13 +1,13 @@
 /**
- * ToonSpectrum-owned conformance and self-certification boundary for `.toonink`.
+ * ToonStudio-owned conformance and self-certification boundary for `.toonink`.
  *
  * This report deliberately separates three different claims:
- * - codec conformance: the bytes obey ToonSpectrum's published wire profile;
+ * - codec conformance: the bytes obey ToonStudio's published wire profile;
  * - integrity: the canonical document digest matches the manifest;
  * - trusted attestation: a caller-selected key verifier accepted the signature.
  *
- * A `ToonSpectrum Verified` badge is awarded only for the third case. The badge is a
- * ToonSpectrum product claim; it is not a Wacom, Adobe, standards-body, copyright, or authorship
+ * A `ToonStudio Verified` badge is awarded only for the third case. The badge is a
+ * ToonStudio product claim; it is not a Wacom, Adobe, standards-body, copyright, or authorship
  * certification.
  */
 
@@ -19,10 +19,10 @@ import {
 } from "./brush/studio-ink-envelope-codec";
 
 export const STUDIO_TOONINK_SELF_CERTIFICATION_ID =
-  "toonspectrum.toonink.self-certification" as const;
+  "toonstudio.toonink.self-certification" as const;
 export const STUDIO_TOONINK_SELF_CERTIFICATION_VERSION = 1 as const;
 export const STUDIO_TOONINK_VERIFIED_BADGE =
-  "toonspectrum-verified-v1" as const;
+  "toonstudio-verified-v1" as const;
 
 export const STUDIO_TOONINK_CONFORMANCE_CAPABILITIES = Object.freeze([
   "bounded-decode-v1",
@@ -91,7 +91,7 @@ const REQUEST_KEYS = new Set([
   "version",
 ]);
 const LIMITATIONS = Object.freeze([
-  "The badge proves ToonSpectrum codec conformance, canonical-content integrity, and acceptance by the configured key verifier only.",
+  "The badge proves ToonStudio codec conformance, canonical-content integrity, and acceptance by the configured key verifier only.",
   "The badge does not prove copyright ownership, human authorship, provenance outside the signed envelope, or third-party vendor certification.",
 ] as const);
 

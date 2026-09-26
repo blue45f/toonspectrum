@@ -25,8 +25,8 @@ export function EventsHubPage() {
   const text = useMarketingEventText();
   const title = text({ ko: "이벤트", en: "Events" });
   const description = text({
-    ko: "툰스펙트럼의 베타 오픈, 창작자 혜택과 앞으로 진행될 이벤트를 확인하세요.",
-    en: "Explore ToonSpectrum beta opening benefits, creator rewards, and future events.",
+    ko: "툰스튜디오의 베타 오픈, 창작자 혜택과 앞으로 진행될 이벤트를 확인하세요.",
+    en: "Explore ToonStudio beta opening benefits, creator rewards, and future events.",
   });
 
   useDocumentTitle(title);

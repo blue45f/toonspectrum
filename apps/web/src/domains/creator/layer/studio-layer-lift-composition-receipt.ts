@@ -11,7 +11,7 @@ import type {
 } from "./studio-layer-lift-contract";
 
 export const STUDIO_LAYER_LIFT_COMPOSITION_RECEIPT_KIND =
-  "toonspectrum.scene-layer-lift/composition-receipt" as const;
+  "toonstudio.scene-layer-lift/composition-receipt" as const;
 export const STUDIO_LAYER_LIFT_COMPOSITION_RECEIPT_VERSION = 1 as const;
 
 export const STUDIO_LAYER_LIFT_COMPOSITION_RECEIPT_LIMITS = Object.freeze({

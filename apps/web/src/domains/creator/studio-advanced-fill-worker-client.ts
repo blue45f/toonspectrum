@@ -48,7 +48,7 @@ export function createStudioAdvancedFillModuleWorker(): StudioAdvancedFillWorker
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-advanced-fill.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-advanced-fill",
+    name: "toonstudio-advanced-fill",
   }) as unknown as StudioAdvancedFillWorkerLike;
 }
 

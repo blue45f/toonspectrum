@@ -1,5 +1,5 @@
 import { canonicalJson, studioReviewTaskCompletionContextSchema, studioReviewTaskCompletionInputSchema,
-  type StudioReviewTaskCompletionContext, type StudioReviewTaskCompletionInput } from "@toonspectrum/studio-project-model";
+  type StudioReviewTaskCompletionContext, type StudioReviewTaskCompletionInput } from "@toonstudio/studio-project-model";
 import { api, isHttpError } from "@/platform/api";
 import type { StudioReviewProductionRequest } from "../review-production/studio-review-production-model";
 

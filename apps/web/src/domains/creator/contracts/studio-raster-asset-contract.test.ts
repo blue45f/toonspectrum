@@ -75,8 +75,8 @@ describe("studio raster asset storage contract", () => {
     expect(isStudioRasterAssetMediaType("image/png")).toBe(true);
     for (const legacyReadOnlyMediaType of [
       "image/webp",
-      "application/x-toonspectrum-rgba-zstd",
-      "application/x-toonspectrum-alpha-zstd",
+      "application/x-toonstudio-rgba-zstd",
+      "application/x-toonstudio-alpha-zstd",
     ]) {
       expect(isStudioRasterAssetMediaType(legacyReadOnlyMediaType)).toBe(false);
       expect(StudioRasterAssetManifestSchema.safeParse({

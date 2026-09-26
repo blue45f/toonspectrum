@@ -132,7 +132,7 @@ function extractMeshCounts(bytes: Uint8Array): { vertexCount: number; faceCount:
 function extractMeshBody(bytes: Uint8Array): StudioRhino3dmBodyMesh | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const latin = new TextDecoder("latin1").decode(bytes.subarray(0, Math.min(bytes.length, 512)));
-  // Preferred: explicit ToonSpectrum mesh body marker
+  // Preferred: explicit ToonStudio mesh body marker
   const marker = "TS_MESH_BODY";
   let markerAt = latin.indexOf(marker);
   if (markerAt < 0) {

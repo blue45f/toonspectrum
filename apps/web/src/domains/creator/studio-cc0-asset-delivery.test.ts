@@ -24,7 +24,7 @@ const fixture = () => ({
   sha256: "a".repeat(64), bytes: 4096, browserRenderVerified: true,
   license: {id: "CC0-1.0", provider: "Kenney", sourceUrl: "https://kenney.nl/assets/furniture-kit", commercialUse: true, redistributionAllowed: true},
 });
-const manifest = (assets: unknown[]) => ({schema: "toonspectrum.asset-delivery.v1", assets});
+const manifest = (assets: unknown[]) => ({schema: "toonstudio.asset-delivery.v1", assets});
 
 describe("CC0 delivery catalog boundary", () => {
   it("admits an explicitly licensed, rendered self-hosted model", () => {

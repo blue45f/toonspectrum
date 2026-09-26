@@ -25,7 +25,7 @@ export const DETAIL_SHARD_COUNT = 128;
 // 카탈로그가 파일당 약 3MiB가 되어 Cloudflare Static Assets 25MiB 제한에 넉넉한 여유가 있다.
 export const CATALOG_SHARD_COUNT = 16;
 export const CATALOG_SHARD_MANIFEST_VERSION =
-  "toonspectrum.catalog-shards.v1" as const;
+  "toonstudio.catalog-shards.v1" as const;
 
 export interface CatalogShardDescriptor {
   readonly file: string;

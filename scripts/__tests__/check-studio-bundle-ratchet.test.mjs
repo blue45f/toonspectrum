@@ -74,7 +74,7 @@ describe("studio bundle ratchet gate", () => {
   it("ships a committed baseline with plausible measurements", () => {
     expect(existsSync(baselineFile)).toBe(true);
     const baseline = JSON.parse(readFileSync(baselineFile, "utf8"));
-    expect(baseline.schema).toBe("toonspectrum.bundle-baseline/1");
+    expect(baseline.schema).toBe("toonstudio.bundle-baseline/1");
     expect(Object.keys(baseline.static).length).toBeGreaterThan(10);
     for (const [key, value] of Object.entries(baseline.static)) {
       expect(typeof value, `${key} must be numeric`).toBe("number");

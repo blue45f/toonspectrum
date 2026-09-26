@@ -49,15 +49,15 @@ import type { DrawEl, TextEl } from "../apps/web/src/domains/creator/studio-elem
 const SCRATCH =
   process.env.TOONSPECTRUM_GROUP_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-groups");
+  ?? join(tmpdir(), "toonstudio-studio-groups");
 const LOG_PATH = join(SCRATCH, "studio-group-verify.log");
 const RESULT_PATH = join(SCRATCH, "studio-group-evidence.json");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 /** The guest `/studio/canvas` draft this verifier authors — the document key Studio persists under. */
 const AUTOSAVE_KEY = studioAutosaveKey({});
-const CLEAN_SESSION_KEY = "toonspectrum-group-verifier-cleaned";
+const CLEAN_SESSION_KEY = "toonstudio-group-verifier-cleaned";
 /** Deliberately distinct from Transformer chrome/shadows so backing-canvas pixels are attributable. */
 const LIVE_DRAW_STROKE = "#0b9b6d";
 const FIXTURE_TEXT_FILL = "#16100c";
@@ -337,7 +337,7 @@ async function installCleanStudioState(page: Page): Promise<void> {
         window.localStorage.setItem(quickstartKey, "1");
         window.localStorage.setItem(mobileHintKey, "1");
         window.localStorage.setItem(
-          "toonspectrum-studio-ui-density:v1",
+          "toonstudio-studio-ui-density:v1",
           JSON.stringify({ mode: "full" }),
         );
         if (window.sessionStorage.getItem(cleanSessionKey) !== "1") {
@@ -466,7 +466,7 @@ async function drawMousePath(page: Page, points: readonly ScreenPoint[]): Promis
 /**
  * The persisted document comes from Studio's durable authority — the browser-owned OPFS
  * recovery journal — read through the shipped autosave session module. The old
- * `toonspectrum-studio-autosave*` localStorage JSON slot is not a fallback: the product
+ * `toonstudio-studio-autosave*` localStorage JSON slot is not a fallback: the product
  * tombstones it on every durable save (`verify:studio-lifecycle` asserts zero surviving
  * browser compatibility records), so enumerating localStorage only ever finds nothing.
  */

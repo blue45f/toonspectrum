@@ -4,7 +4,7 @@
 빌드 계약: [`docs/studio/garment-body-fit-brief-2026-09-04.md`](../studio/garment-body-fit-brief-2026-09-04.md)
 1차 보고서: [`character-shaper-implementation-2026-09-04.md`](./character-shaper-implementation-2026-09-04.md)
 
-1차 PR([#704](https://github.com/blue45f/toonspectrum/pull/704))이 병합되면서 그 §6에 남겨 둔 한계
+1차 PR([#704](https://github.com/blue45f/toonstudio/pull/704))이 병합되면서 그 §6에 남겨 둔 한계
 목록이 이번 파동의 작업 목록이 되었다. **가장 눈에 띄는 것부터** 순서대로 처리했다.
 
 ## 1. 절차형 의상이 몸에 맞지 않던 진짜 이유

@@ -6,7 +6,7 @@ CommitDate: Tue Sep 8 21:24:03 2026 +0900
 
     chore: salvage unique uncommitted work from codex/cpu-poc314
     
-    Source worktree: /Users/hjunkim/WebstormProjects/toonspectrum-cpu-poc314
+    Source worktree: /Users/hjunkim/WebstormProjects/toonstudio-cpu-poc314
     Source SHA: e3cbfa7f4eaa3feee905fee43278a848661df267
     Files: 3
 
@@ -25,10 +25,10 @@ index 000000000..d2621efbc
 +import { planStudioDynamicBrushRender } from './studio-dynamic-brush-render-plan';
 +import { planStudioDynamicBrushCoverageMarks, renderStudioDynamicBrushCoverageMark, renderStudioDynamicBrushCoverage } from './studio-dynamic-brush-coverage-renderer';
 +
-+const out='/tmp/toonspectrum-inkwash-parity316';
++const out='/tmp/toonstudio-inkwash-parity316';
 +const rows: unknown[]=[];
 +let kit: any;
-+beforeAll(async()=>{ kit=await (await import('@toonspectrum/studio-engine-skia/node')).loadCanvasKitNode(); mkdirSync(out,{recursive:true}); });
++beforeAll(async()=>{ kit=await (await import('@toonstudio/studio-engine-skia/node')).loadCanvasKitNode(); mkdirSync(out,{recursive:true}); });
 +afterAll(()=>writeFileSync(out+'/results.json',JSON.stringify(rows,null,2)));
 +const point=(t:number)=>({x:720*(.12+.5*t),y:807*(.2+.42*t-Math.sin(t*Math.PI)*.12)*720/1048});
 +const points:number[]=[];

@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { loadCanvasKitNode } from "../node/index";
 import { renderSceneToPixels, renderSceneToPng } from "../render";
 
-import type { ColorIR, SceneIR, SceneNodeIR } from "@toonspectrum/studio-project-model";
+import type { ColorIR, SceneIR, SceneNodeIR } from "@toonstudio/studio-project-model";
 import type { CanvasKit } from "canvaskit-wasm";
 
 /**

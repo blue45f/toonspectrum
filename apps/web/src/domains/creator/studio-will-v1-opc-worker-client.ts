@@ -105,7 +105,7 @@ export function createStudioWillV1OpcModuleWorker(): StudioWillV1OpcWorkerLike |
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-will-v1-opc.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-will-v1-opc",
+    name: "toonstudio-will-v1-opc",
   }) as unknown as StudioWillV1OpcWorkerLike;
 }
 
@@ -546,7 +546,7 @@ function preflightEncodeInput(
     const metadata = [
       input.title ?? "Untitled",
       input.createdAt ?? "1980-01-01T00:00:00Z",
-      input.application ?? "ToonSpectrum",
+      input.application ?? "ToonStudio",
       input.applicationVersion ?? "1.0",
     ];
     if (

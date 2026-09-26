@@ -1,4 +1,4 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import type { PoolClient } from "pg";
 import { LocatedPrivateObjectReferenceSchema, type LocatedPrivateObjectReference } from "../../platform/adapters/private-object-storage/private-object-storage.contract";
 

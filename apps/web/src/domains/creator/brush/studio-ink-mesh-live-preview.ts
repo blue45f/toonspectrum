@@ -24,7 +24,7 @@ import {
   type InkStrokeMeshDelta,
   type InkStrokeMeshReplica,
   type InProgressInkStroke,
-} from "@toonspectrum/studio-brush-platform";
+} from "@toonstudio/studio-brush-platform";
 
 import {
   acquireStudioGpuDevice,
@@ -910,7 +910,7 @@ function finiteChannel(
 
 /**
  * DrawEl channels → ink input points. The tilt/orientation mapping is the
- * canonical live-lane derivation exported by @toonspectrum/studio-brush-platform
+ * canonical live-lane derivation exported by @toonstudio/studio-brush-platform
  * (ink-mesh-derivation) — the same pure module `compileMeshBrush` delegates to —
  * so the preview cannot drift from the compiled mesh programs. This module only
  * keeps the admission validation.
@@ -975,7 +975,7 @@ function strokeInputPoints(
 
 /**
  * DrawEl brushTip snapshot → ink brush params via the canonical live-lane
- * derivation in @toonspectrum/studio-brush-platform; only the fail-closed
+ * derivation in @toonstudio/studio-brush-platform; only the fail-closed
  * width validation lives here.
  */
 function brushParams(stroke: StudioInkMeshStrokeLike): InkMeshBrushParams {

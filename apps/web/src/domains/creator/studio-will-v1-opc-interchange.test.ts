@@ -22,7 +22,7 @@ const SAMPLE: StudioWillV1OpcExportInput = {
   height: 439,
   title: "첫 화 & <연습>",
   createdAt: "2026-07-30T12:34:56Z",
-  application: "ToonSpectrum Studio",
+  application: "ToonStudio Studio",
   applicationVersion: "1.0.0",
   paths: [
     {
@@ -143,7 +143,7 @@ describe("studio-will-v1-opc-interchange", () => {
     expect(first.assurance).toMatchObject({
       profile: STUDIO_WILL_V1_OPC_PROFILE,
       publicSpecificationDefinesTopLevelMediaType: false,
-      canonicalTopLevelMediaTypeOwner: "ToonSpectrum",
+      canonicalTopLevelMediaTypeOwner: "ToonStudio",
       sectionRelationshipNormativeInPublicSpecification: false,
       vendorCertified: false,
       vendorTrademarkAuthorized: false,
@@ -187,7 +187,7 @@ describe("studio-will-v1-opc-interchange", () => {
       height: 80.5,
       title: `A&B <C> "D" 'E'`,
       createdAt: "1980-01-01T00:00:00Z",
-      application: "ToonSpectrum",
+      application: "ToonStudio",
       applicationVersion: "1.0",
     });
   });
@@ -217,7 +217,7 @@ describe("studio-will-v1-opc-interchange", () => {
     await expectOpcError(importStudioWillV1Opc(externalRootTarget), "RELATIONSHIP_INVALID");
   });
 
-  it("pins ToonSpectrum's non-normative stroke relationship to the SVG r:id one-to-one", async () => {
+  it("pins ToonStudio's non-normative stroke relationship to the SVG r:id one-to-one", async () => {
     const built = await buildStudioWillV1OpcBytes(SAMPLE);
     const parts = await entriesOf(built.bytes);
     expect(

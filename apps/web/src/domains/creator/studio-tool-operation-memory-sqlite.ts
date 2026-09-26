@@ -18,7 +18,7 @@ export const STUDIO_TOOL_OPERATION_MEMORY_SQLITE_NAMESPACE =
   "studio-tool-operation-memory-v12";
 export const STUDIO_TOOL_OPERATION_MEMORY_SQLITE_KEY = "profile-v1";
 export const STUDIO_TOOL_OPERATION_MEMORY_SCHEMA =
-  "toonspectrum.studio.tool-operation-memory";
+  "toonstudio.studio.tool-operation-memory";
 export const STUDIO_TOOL_OPERATION_MEMORY_COALESCE_MS = 250;
 const PERSISTED_STUDIO_TOOL_OPERATION_MEMORY_VERSION = 1 as const;
 

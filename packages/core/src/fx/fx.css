@@ -1,5 +1,5 @@
 /*
- * @toonspectrum/core/fx/fx.css — 프레임워크 비종속 공용 fx 키프레임/유틸.
+ * @toonstudio/core/fx/fx.css — 프레임워크 비종속 공용 fx 키프레임/유틸.
  *
  * 클래스 1개만 붙이면 동작하도록 keyframes + .pf-* 헬퍼를 함께 제공합니다.
  *   - pf-jelly-pop  : 탭 스프링(눌렀다 통 튀는 젤리감) — 1회성
@@ -178,7 +178,7 @@
 }
 
 /* ── shimmer-title — 화려한 타이틀(그라데이션 시머 + 글로우, bg-clip-text) ────────
- * aidigestdesk의 aidShimmer/aidGlow 곡선·타이밍을 그대로 이식하되, 색을 툰스펙트럼
+ * aidigestdesk의 aidShimmer/aidGlow 곡선·타이밍을 그대로 이식하되, 색을 툰스튜디오
  * 웜 스펙트럼(퍼시몬→골드→로즈→바이올렛)으로 바꿔 브랜드 hue 축(≈42)에 정합시킵니다.
  * 탭 시 ShimmerTitle 컴포넌트가 파티클 버스트 + 'pop' 사운드를 발화(active=scale).
  */

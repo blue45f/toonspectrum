@@ -1,4 +1,4 @@
-import { applyStabilizer } from "@toonspectrum/studio-brush-platform";
+import { applyStabilizer } from "@toonstudio/studio-brush-platform";
 
 import { selectStabilizerBackend } from "../../../../../../packages/studio-brush-platform/src/stabilizer-provider";
 import { studioStrokeRouteBrushFamilyKey } from "../brush/studio-stroke-route-tournament";
@@ -10,7 +10,7 @@ import type {
   StabilizerBackendId,
   StabilizerProcessParams,
 } from "../../../../../../packages/studio-brush-platform/src/stabilizer-provider";
-import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR, StabilizerGraphIR } from "@toonstudio/studio-project-model";
 
 /**
  * Live-ink stabilizer backend plan — observation-only seam (ADR-0011 lane 3 prep).
@@ -143,7 +143,7 @@ export type StudioLiveInkStabilizerInkExclusion =
   /** Stroke-scoped live-ink backend decision did not select WebGPU. */
   | "backend-not-webgpu";
 
-/** Structurally satisfied by RemoteKillSwitch (@toonspectrum/studio-engine-registry). */
+/** Structurally satisfied by RemoteKillSwitch (@toonstudio/studio-engine-registry). */
 export interface StudioLiveInkStabilizerKillSwitchLike {
   isKilled(providerId: string): boolean;
 }

@@ -15,7 +15,7 @@
   "userProfile.fetchError": "无法加载配置文件。",
   "userProfile.bioFallback": "读者简介和已发表的作品",
   "userProfile.series.empty": "该用户还没有系列。",
-  "userProfile.metaTemplate": "{author} 个人资料 · {reviews} 评论 · {works} 作品 · 平均评分 {avg} — ToonSpectrum。",
+  "userProfile.metaTemplate": "{author} 个人资料 · {reviews} 评论 · {works} 作品 · 平均评分 {avg} — ToonStudio。",
   "userProfile.emptyReviews": "该用户尚未发表评论。",
   "userProfile.tabsLabel": "简介内容",
   "userProfile.stat.works": "创作作品",

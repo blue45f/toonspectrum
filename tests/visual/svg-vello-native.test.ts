@@ -2,8 +2,8 @@ import { readFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 
 import { Resvg, initWasm } from "@resvg/resvg-wasm";
-import { renderSceneToPixels } from "@toonspectrum/studio-engine-vello";
-import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
+import { renderSceneToPixels } from "@toonstudio/studio-engine-vello";
+import { loadVelloNode } from "@toonstudio/studio-engine-vello/node";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {

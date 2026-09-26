@@ -5,7 +5,7 @@
 - License: `(MIT OR Apache-2.0)` per `package.json` and README §license
   ("croquis.js is dual-licensed under Apache 2.0 and MIT terms").
   Author: JongChan Choi <jong@chan.moe>.
-- **ToonSpectrum elects the MIT option** of the dual license.
+- **ToonStudio elects the MIT option** of the dual license.
 
 The upstream repository and the published npm archive declare the dual SPDX
 expression but ship **no standalone license text file** (checked at

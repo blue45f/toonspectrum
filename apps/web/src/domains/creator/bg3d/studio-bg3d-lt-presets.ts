@@ -20,7 +20,7 @@ import type {
 } from "./studio-bg3d-scene-document";
 
 export const STUDIO_BG3D_LT_PRESET_PAYLOAD_KIND =
-  "toonspectrum.bg3d-lt-presets" as const;
+  "toonstudio.bg3d-lt-presets" as const;
 export const STUDIO_BG3D_LT_PRESET_PAYLOAD_VERSION = 1 as const;
 export const STUDIO_BG3D_LT_PRESET_VERSION = 1 as const;
 export const STUDIO_BG3D_LT_PRESET_MAX_COUNT = 32;

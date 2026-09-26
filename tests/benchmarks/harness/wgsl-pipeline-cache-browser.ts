@@ -683,7 +683,7 @@ export async function runWgslPipelineCacheBrowserBenchmark(
 ): Promise<WgslPipelineCacheBrowserArtifact> {
   const scratch =
     options.scratchDirectory ??
-    mkdtempSync(join(tmpdir(), "toonspectrum-wgsl-pipeline-cache-"));
+    mkdtempSync(join(tmpdir(), "toonstudio-wgsl-pipeline-cache-"));
   const sourcePath = join(scratch, "production-source");
   const distributionPath = join(scratch, "production-dist");
   mkdirSync(sourcePath, { recursive: true });

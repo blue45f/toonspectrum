@@ -9,7 +9,7 @@ import type { StudioHybridDccPersistedSnapshot, StudioRightsBomRecord  } from ".
 import type { StudioLiveBridgeDocument } from "./live/studio-live-2d3d-bridge";
 
 export const STUDIO_TOON3D_PACKAGE_REVISION = 1 as const;
-export const STUDIO_TOON3D_PACKAGE_FORMAT = "toonspectrum.toon3d" as const;
+export const STUDIO_TOON3D_PACKAGE_FORMAT = "toonstudio.toon3d" as const;
 
 export interface StudioToon3dManifest {
   readonly format: typeof STUDIO_TOON3D_PACKAGE_FORMAT;

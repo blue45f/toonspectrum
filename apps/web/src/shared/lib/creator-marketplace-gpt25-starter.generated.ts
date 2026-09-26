@@ -11,7 +11,7 @@ import type { CreatorMarketplaceResourceRecord } from "./creator-marketplace-res
 
 const OFFICIAL_PUBLISHER = {
   id: "00000000-0000-4000-8000-000000000001",
-  name: "ToonSpectrum 공식",
+  name: "ToonStudio 공식",
   avatar: "#b4532a",
 } as const;
 
@@ -22,7 +22,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000001",
     "assetId": "webtoon-action-highway-chase",
     "name": "야간 고속도로 · 세로 원근",
-    "description": "야간 고속도로 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "야간 고속도로 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -36,7 +36,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000002",
     "assetId": "webtoon-action-jungle-temple",
     "name": "정글 속 고대 유적 · 세로 원근",
-    "description": "정글 속 고대 유적 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "정글 속 고대 유적 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -51,7 +51,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000003",
     "assetId": "webtoon-action-ruined-city",
     "name": "붕괴한 도심 · 세로 원근",
-    "description": "붕괴한 도심 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "붕괴한 도심 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -66,7 +66,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000004",
     "assetId": "webtoon-bedroom",
     "name": "도시 야경이 보이는 침실 · 세로 원근",
-    "description": "도시 야경이 보이는 침실 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "도시 야경이 보이는 침실 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -82,7 +82,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000005",
     "assetId": "webtoon-convenience",
     "name": "밤 편의점 · 세로 원근",
-    "description": "밤 편의점 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "밤 편의점 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -97,7 +97,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000006",
     "assetId": "webtoon-drama-boardroom",
     "name": "대기업 회의실 · 세로 원근",
-    "description": "대기업 회의실 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "대기업 회의실 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -112,7 +112,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000007",
     "assetId": "webtoon-drama-courtroom",
     "name": "현대 법정 · 세로 원근",
-    "description": "현대 법정 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "현대 법정 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -127,7 +127,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000008",
     "assetId": "webtoon-drama-hospital-corridor",
     "name": "병원 복도 · 세로 원근",
-    "description": "병원 복도 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "병원 복도 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -142,7 +142,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000009",
     "assetId": "webtoon-fantasy-dragon-peak",
     "name": "용이 깃든 절벽 · 세로 원근",
-    "description": "용이 깃든 절벽 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "용이 깃든 절벽 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -157,7 +157,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000010",
     "assetId": "webtoon-horror-abandoned-hospital",
     "name": "폐병원 병동 · 세로 원근",
-    "description": "폐병원 병동 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "폐병원 병동 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -172,7 +172,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000011",
     "assetId": "webtoon-horror-dark-tunnel",
     "name": "끝이 보이지 않는 터널 · 세로 원근",
-    "description": "끝이 보이지 않는 터널 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "끝이 보이지 않는 터널 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -187,7 +187,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000012",
     "assetId": "webtoon-horror-foggy-cabin",
     "name": "안개 속 오두막 · 세로 원근",
-    "description": "안개 속 오두막 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "안개 속 오두막 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -201,7 +201,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000013",
     "assetId": "webtoon-romance-carnival",
     "name": "밤의 대관람차 광장 · 세로 원근",
-    "description": "밤의 대관람차 광장 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "밤의 대관람차 광장 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -217,7 +217,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000014",
     "assetId": "webtoon-romance-cherry-blossom",
     "name": "벚꽃 산책길 · 세로 원근",
-    "description": "벚꽃 산책길 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "벚꽃 산책길 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -232,7 +232,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000015",
     "assetId": "webtoon-sf-cyberpunk-street",
     "name": "비 내리는 사이버 골목 · 세로 원근",
-    "description": "비 내리는 사이버 골목 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "비 내리는 사이버 골목 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -247,7 +247,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000016",
     "assetId": "webtoon-sf-research-lab",
     "name": "미래 연구실 · 세로 원근",
-    "description": "미래 연구실 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "미래 연구실 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -262,7 +262,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000017",
     "assetId": "webtoon-sf-space-station",
     "name": "우주 정거장 전망실 · 세로 원근",
-    "description": "우주 정거장 전망실 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "우주 정거장 전망실 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -277,7 +277,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000018",
     "assetId": "webtoon-wuxia-cliff-duel",
     "name": "절벽 산길 · 세로 원근",
-    "description": "절벽 산길 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "절벽 산길 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -292,7 +292,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000019",
     "assetId": "webtoon-wuxia-market-street",
     "name": "조선시대 저잣거리 · 세로 원근",
-    "description": "조선시대 저잣거리 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "조선시대 저잣거리 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -307,7 +307,7 @@ const DEFINITIONS = Object.freeze([
     "recordId": "e2500000-0000-4000-8000-000000000020",
     "assetId": "webtoon-wuxia-palace-courtyard",
     "name": "궁궐 안뜰 · 세로 원근",
-    "description": "궁궐 안뜰 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonSpectrum 1차 AI 생성 소재입니다.",
+    "description": "궁궐 안뜰 · 세로 원근 — 1152×2048 세로 웹툰 배경. 인물과 읽을 수 있는 텍스트를 배제하도록 생성하고 전체 프레임 시각 검수를 완료한 ToonStudio 1차 AI 생성 소재입니다.",
     "tags": [
       "웹툰 배경",
       "AI 생성",
@@ -355,7 +355,7 @@ function buildRecord(definition: (typeof DEFINITIONS)[number]): CreatorMarketpla
     resourceVersion: "1.0.0",
     minimumStudioVersion: "0.1.0",
     tags: [...definition.tags],
-    license: "toonspectrum-standard" as const,
+    license: "toonstudio-standard" as const,
     attributionText: "",
     containsAi: true,
     rightsConfirmed: true as const,

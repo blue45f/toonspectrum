@@ -1,7 +1,7 @@
 import type {
   SkiaDocumentItem,
   SkiaDocumentRenderer,
-} from "@toonspectrum/studio-engine-skia";
+} from "@toonstudio/studio-engine-skia";
 
 import { resolveStudioPaperGrainVisibleV1 } from "../brush/studio-paper-grain-visibility-v1";
 import { CANVAS_W } from "../studio-assets";
@@ -98,7 +98,7 @@ function backgroundItem(
 
 async function createRenderer(canvas: HTMLCanvasElement): Promise<SkiaDocumentRenderer> {
   const [engine, fontSource] = await Promise.all([
-    import("@toonspectrum/studio-engine-skia"),
+    import("@toonstudio/studio-engine-skia"),
     import("./studio-skia-document-font-source"),
   ]);
   return engine.createSkiaDocumentRenderer(canvas, {

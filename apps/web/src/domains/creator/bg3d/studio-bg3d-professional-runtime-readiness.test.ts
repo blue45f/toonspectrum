@@ -106,6 +106,6 @@ describe("Studio BG3D professional runtime readiness", () => {
       executor: "babylon-specialist",
       enabled: false,
     });
-    expect(result.authority?.kind).toBe("toonspectrum.scene3d-authority");
+    expect(result.authority?.kind).toBe("toonstudio.scene3d-authority");
   });
 });

@@ -60,7 +60,7 @@ export function verifyCompiledApiImports(directory) {
     const requireFromFile = createRequire(filename);
     for (const specifier of runtimeSpecifiers(readFileSync(filename, "utf8"), filename)) {
       if (isBuiltin(specifier)) continue;
-      const localOrWorkspace = specifier.startsWith(".") || specifier.startsWith("@toonspectrum/");
+      const localOrWorkspace = specifier.startsWith(".") || specifier.startsWith("@toonstudio/");
       importsChecked += 1;
       if (!localOrWorkspace && !hasApiPackageBoundaryEntry(packageRoot, specifier)) {
         failures.push(

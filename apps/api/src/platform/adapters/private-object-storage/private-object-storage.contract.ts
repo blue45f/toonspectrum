@@ -19,7 +19,7 @@ import {
 export const PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION =
   SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION;
 export const PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION =
-  "toonspectrum.private-object-storage.v2" as const;
+  "toonstudio.private-object-storage.v2" as const;
 
 export const PRIVATE_OBJECT_STORAGE_PROVIDER_IDS = [
   "supabase",

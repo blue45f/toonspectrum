@@ -268,7 +268,7 @@ describe("Studio BG3D shot batch archive", () => {
     expect(text).toContain("manifest.json");
     expect(text).toContain("shots/001.png");
     expect(text).toContain("shots/002.png");
-    expect(text).toContain("toonspectrum-bg3d-shot-batch");
+    expect(text).toContain("toonstudio-bg3d-shot-batch");
     expect(text).toContain('"output": "beauty"');
     expect(text).toContain("첫 컷");
     expect(onProgress).toHaveBeenLastCalledWith({ completedFiles: 3, totalFiles: 3 });

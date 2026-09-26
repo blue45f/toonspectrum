@@ -4,7 +4,7 @@ import type {
   CommerceProvider,
   CommerceProviderMode,
   MarketplaceCommerceQuote,
-} from "@toonspectrum/core/commerce";
+} from "@toonstudio/core/commerce";
 
 import { api } from "@/platform/api";
 

@@ -23,7 +23,7 @@ describe("studio view preference", () => {
     expect(useCreatorExperienceMode.getState().mode).toBe("classic");
   });
   it.each(["classic", "virtual-studio"])("preserves the explicit legacy preference %s", async (mode) => {
-    localStorage.setItem("toonspectrum-creator-experience-mode-v1", JSON.stringify({ mode }));
+    localStorage.setItem("toonstudio-creator-experience-mode-v1", JSON.stringify({ mode }));
     const { useCreatorExperienceMode } = await import("./creator-experience-mode");
     expect(useCreatorExperienceMode.getState().mode).toBe(mode);
   });
@@ -35,7 +35,7 @@ describe("studio view preference", () => {
     expect(useCreatorExperienceMode.getState().storageAvailable).toBe(false);
   });
   it("recovers from a corrupt saved value without preventing home rendering", async () => {
-    localStorage.setItem("toonspectrum-creator-experience-mode-v1", "{broken");
+    localStorage.setItem("toonstudio-creator-experience-mode-v1", "{broken");
     const { useCreatorExperienceMode } = await import("./creator-experience-mode");
     expect(useCreatorExperienceMode.getState().mode).toBe("classic");
   });

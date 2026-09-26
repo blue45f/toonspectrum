@@ -69,11 +69,11 @@ afterEach(() => {
 
 describe("formatProductTitle", () => {
   it("replaces legacy product suffixes without duplicating the canonical brand", () => {
-    expect(formatProductTitle("먹선 브러시 · 툰스펙트럼", "툰스튜디오"))
+    expect(formatProductTitle("먹선 브러시 · 툰스튜디오", "툰스튜디오"))
       .toBe("먹선 브러시 · 툰스튜디오");
     expect(formatProductTitle("먹선 브러시 · 툰스튜디오", "툰스튜디오"))
       .toBe("먹선 브러시 · 툰스튜디오");
-    expect(formatProductTitle("ToonSpectrum", "툰스튜디오"))
+    expect(formatProductTitle("ToonStudio", "툰스튜디오"))
       .toBe("툰스튜디오");
   });
 });
@@ -118,7 +118,7 @@ describe("useRouteSeoPolicy", () => {
 describe("usePageSocialMeta", () => {
   it("updates canonical, Open Graph, and Twitter metadata for a route", () => {
     installHeadFixtures();
-    render(<MetaProbe path="/market/resource/resource-1" title="먹선 브러시 · 툰스펙트럼" />);
+    render(<MetaProbe path="/market/resource/resource-1" title="먹선 브러시 · 툰스튜디오" />);
 
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href"))
       .toBe("https://www.toonstudio.cloud/market/resource/resource-1");
@@ -141,7 +141,7 @@ describe("usePageSocialMeta", () => {
 
   it("restores the previous route metadata on unmount", () => {
     installHeadFixtures();
-    const view = render(<MetaProbe path="market" title="창작 마켓 · 툰스펙트럼" />);
+    const view = render(<MetaProbe path="market" title="창작 마켓 · 툰스튜디오" />);
     view.unmount();
 
     expect(document.querySelector('link[rel="canonical"]')?.getAttribute("href"))

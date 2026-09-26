@@ -171,7 +171,7 @@ export function createStudioBg3dThreeStaticInstanceBatch(
   if (!sourceMeshes.length) return failure("empty-source");
 
   const root = new THREE.Group();
-  root.name = "ToonSpectrumStaticInstanceBatch";
+  root.name = "ToonStudioStaticInstanceBatch";
   const meshes: THREE.InstancedMesh[] = [];
   const placementMatrix = new THREE.Matrix4();
   const position = new THREE.Vector3();

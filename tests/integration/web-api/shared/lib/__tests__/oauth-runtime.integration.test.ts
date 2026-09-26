@@ -36,7 +36,7 @@ describeWithDirectPostgres("OAuth PostgreSQL DML-only runtime", () => {
     previousDatabaseUrl = process.env.DATABASE_URL;
     previousGoogleClientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
     adminPool = new Pool({
-      application_name: "toonspectrum-oauth-dml-only-observer",
+      application_name: "toonstudio-oauth-dml-only-observer",
       connectionString: INTEGRATION_URL,
       max: 2,
     });

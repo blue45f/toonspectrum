@@ -88,7 +88,7 @@ try {
       console.error(`FAIL ${entry.id}: ${message}`);
     }
   }
-  await writeFile(path.join(output, "report.json"), JSON.stringify({ schema: "toonspectrum.premium-world-runtime.v1", checkedAt: new Date().toISOString(),
+  await writeFile(path.join(output, "report.json"), JSON.stringify({ schema: "toonstudio.premium-world-runtime.v1", checkedAt: new Date().toISOString(),
     results, failures, allAnglesArtisticallyApproved: false, realDevicePerformanceVerified: false }, null, 2) + "\n");
   assert.equal(failures.length, 0, JSON.stringify(failures));
   assert.equal(results.length, 24);

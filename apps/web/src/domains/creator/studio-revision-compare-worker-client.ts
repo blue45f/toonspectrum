@@ -182,7 +182,7 @@ export function createStudioRevisionCompareModuleWorker(): StudioRevisionCompare
   try {
     worker = new Worker(bootstrapUrl, {
       type: "module",
-      name: "toonspectrum-revision-compare",
+      name: "toonstudio-revision-compare",
     }) as unknown as StudioRevisionCompareNativeWorkerLike;
     return new StudioRevisionCompareOwnedModuleWorker(worker, revokeBootstrapUrl);
   } catch (error) {

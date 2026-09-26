@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "toonspectrum-realtime-test",
+  "name": "toonstudio-realtime-test",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-30",
 
@@ -31,10 +31,10 @@
   // Deterministic local-only test credential. Production reads the same binding
   // from Wrangler secrets and never from a committed `vars` value.
   "vars": {
-    "REALTIME_TICKET_SECRET": "toonspectrum-cloudflare-test-secret-32-bytes-minimum",
-    "REALTIME_CONTROL_SECRET": "toonspectrum-cloudflare-control-test-secret-32-bytes-minimum",
-    "REALTIME_TICKET_ISSUER": "toonspectrum-api",
-    "REALTIME_TICKET_AUDIENCE": "toonspectrum-realtime",
+    "REALTIME_TICKET_SECRET": "toonstudio-cloudflare-test-secret-32-bytes-minimum",
+    "REALTIME_CONTROL_SECRET": "toonstudio-cloudflare-control-test-secret-32-bytes-minimum",
+    "REALTIME_TICKET_ISSUER": "toonstudio-api",
+    "REALTIME_TICKET_AUDIENCE": "toonstudio-realtime",
     "REALTIME_ALLOWED_ORIGINS": "https://toonstudio.cloud",
     "REALTIME_MAX_CONNECTIONS_PER_ROOM": "8",
     "REALTIME_MAX_CONNECTIONS_PER_ACTOR": "4",

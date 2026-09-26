@@ -33,7 +33,7 @@ export const FILTER_LIBRARY_LEGACY_MIGRATION_KEY =
 export const FILTER_LIBRARY_LEGACY_MIGRATION_VERSION = 1 as const;
 export const FILTER_LIBRARY_DEFAULT_CATEGORY = "creator-pack";
 export const STUDIO_FILTER_LIBRARY_V12_FALLBACK_KEY =
-  "toonspectrum.studio-filter-library.v12.fallback" as const;
+  "toonstudio.studio-filter-library.v12.fallback" as const;
 export const STUDIO_FILTER_LIBRARY_DATA_POLICY = "discard-existing-studio-data" as const;
 
 export type ProductFilterLibraryAuthority = "sqlite" | "memory-session";

@@ -1,6 +1,6 @@
 import { isValidStudioWorkspaceWorkId, studioCanvasPathname } from "./studio-workspace-route";
 
-export const STUDIO_BROWSER_WORKSPACE_KEY = "toonspectrum.studio.browser-workspace.v1";
+export const STUDIO_BROWSER_WORKSPACE_KEY = "toonstudio.studio.browser-workspace.v1";
 export const STUDIO_BROWSER_WORKSPACE_MAX_BYTES = 8_192;
 export const STUDIO_BROWSER_SURFACES = ["navigator", "review", "reference"] as const;
 export type StudioBrowserSurface = (typeof STUDIO_BROWSER_SURFACES)[number];
@@ -9,14 +9,14 @@ export type StudioBrowserOpenSurfaces = Partial<Record<StudioBrowserSurface, Stu
 
 /** Portable preferences only. No document content, URLs or session credentials. */
 export interface StudioBrowserWorkspaceProfile {
-  readonly schema: "toonspectrum.studio.browser-workspace";
+  readonly schema: "toonstudio.studio.browser-workspace";
   readonly version: 1;
   readonly openMode: StudioCompanionOpenMode;
   readonly pinnedSurfaces: readonly StudioBrowserSurface[];
 }
 
 export function defaultStudioBrowserWorkspace(): StudioBrowserWorkspaceProfile {
-  return { schema: "toonspectrum.studio.browser-workspace", version: 1, openMode: "window", pinnedSurfaces: [] };
+  return { schema: "toonstudio.studio.browser-workspace", version: 1, openMode: "window", pinnedSurfaces: [] };
 }
 export function decodeStudioBrowserWorkspace(text: string): StudioBrowserWorkspaceProfile | null {
   if (text.length > STUDIO_BROWSER_WORKSPACE_MAX_BYTES) return null;
@@ -25,7 +25,7 @@ export function decodeStudioBrowserWorkspace(text: string): StudioBrowserWorkspa
     if (!value || typeof value !== "object" || Array.isArray(value)) return null;
     const record = value as Record<string, unknown>;
     if (Object.keys(record).some((key) => !["schema", "version", "openMode", "pinnedSurfaces"].includes(key))) return null;
-    if (record.schema !== "toonspectrum.studio.browser-workspace" || record.version !== 1) return null;
+    if (record.schema !== "toonstudio.studio.browser-workspace" || record.version !== 1) return null;
     if (record.openMode !== "window" && record.openMode !== "tab") return null;
     if (!Array.isArray(record.pinnedSurfaces) || record.pinnedSurfaces.length > STUDIO_BROWSER_SURFACES.length) return null;
     const surfaces: StudioBrowserSurface[] = [];
@@ -43,7 +43,7 @@ export function decodeStudioBrowserWorkspace(text: string): StudioBrowserWorkspa
 
 export function encodeStudioBrowserWorkspace(profile: StudioBrowserWorkspaceProfile): string {
   return JSON.stringify({
-    schema: "toonspectrum.studio.browser-workspace", version: 1,
+    schema: "toonstudio.studio.browser-workspace", version: 1,
     openMode: profile.openMode, pinnedSurfaces: [...profile.pinnedSurfaces],
   }, null, 2);
 }

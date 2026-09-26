@@ -59,7 +59,7 @@ async function credentials(
     true,
     ["sign", "verify"],
   ) as CryptoKeyPair;
-  const keyId = "toonspectrum.product.release.ink.2026-07";
+  const keyId = "toonstudio.product.release.ink.2026-07";
   return Object.freeze({
     signer: {
       algorithm: "ecdsa-p256-sha256",
@@ -102,7 +102,7 @@ function inputFor(format: "inkml" | "toonink"): Uint8Array {
   }
   return encodeStudioInkEnvelopeDocumentTransport({
     format: {
-      id: "toonspectrum.ink-document",
+      id: "toonstudio.ink-document",
       version: 1,
     },
     document: {
@@ -163,7 +163,7 @@ describe("first-party ink codec product certification", () => {
       if (!verified.ok) return;
       expect(
         verified.certificate.certification
-          .officialToonSpectrumProductCertification,
+          .officialToonStudioProductCertification,
       ).toBe(true);
       expect(
         verified.certificate.certification.codecVendorCertification,
@@ -383,7 +383,7 @@ describe("first-party ink codec product certification", () => {
         receipt: certified.receipt,
         outputBytes: certified.bytes,
         evidenceBytes: certified.conformanceBytes,
-        evidenceMediaType: "application/vnd.toonspectrum.cross-protocol+json",
+        evidenceMediaType: "application/vnd.toonstudio.cross-protocol+json",
         scope,
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,

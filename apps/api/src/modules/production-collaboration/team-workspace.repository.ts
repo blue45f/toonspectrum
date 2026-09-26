@@ -6,10 +6,10 @@ import {
   type TeamWorkspaceDetail, type TeamWorkspaceSummary, type TeamWorkspaceRole,
   type TeamWorkspaceMember, type TeamWorkspaceInvite, type TeamWorkspaceProject,
   type WorkspaceMutationResult, type WorkspaceUsageResponse,
-} from "@toonspectrum/contracts/production-workspace";
+} from "@toonstudio/contracts/production-workspace";
 import type { WorkspaceCommand } from "./team-workspace.dto";
 import { loadOperationPolicy, runtimeLicenseFingerprint, workspaceAdmissionPolicy } from "../operation-policy/operation-policy.repository";
-import { resolveOperationPolicy } from "@toonspectrum/contracts/operation-policy";
+import { resolveOperationPolicy } from "@toonstudio/contracts/operation-policy";
 
 export const PRODUCTION_TEAM_POOL = Symbol("PRODUCTION_TEAM_POOL");
 interface WorkspaceRow { id: string; name: string; owner_user_id: string; revision: number; created_at: Date; role: TeamWorkspaceRole }

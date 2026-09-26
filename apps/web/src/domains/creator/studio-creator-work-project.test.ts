@@ -162,6 +162,6 @@ describe("creatorWorkSnapshotToStudioProject", () => {
           pagesList: [{ id: "page-1", elements: [], bg: "#fff", bgGrad: null, canvasH: -1 }],
         },
       })
-    ).toThrow("올바르지 않은 ToonSpectrum 프로젝트 파일");
+    ).toThrow("올바르지 않은 ToonStudio 프로젝트 파일");
   });
 });

@@ -24,7 +24,7 @@ The following are rejected:
 - RFC1918/private, link-local, and private IPv6 hosts;
 - URL credentials, paths, query strings, and fragments.
 
-The former `STUDIO_COMFYUI_URL` and `STUDIO_COMFYUI_TOKEN` variables are not read. A managed provider may expose a ComfyUI-compatible protocol, but ToonSpectrum does not depend on a local ComfyUI process or local GPU.
+The former `STUDIO_COMFYUI_URL` and `STUDIO_COMFYUI_TOKEN` variables are not read. A managed provider may expose a ComfyUI-compatible protocol, but ToonStudio does not depend on a local ComfyUI process or local GPU.
 
 ## Contract verification
 

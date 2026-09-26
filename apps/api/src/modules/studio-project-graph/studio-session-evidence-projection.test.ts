@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deriveStudioReviewPageMapping } from "@toonspectrum/studio-project-model";
+import { deriveStudioReviewPageMapping } from "@toonstudio/studio-project-model";
 import { projectStudioSessionEvidence } from "./studio-session-evidence-projection";
 
 const pin = { sourceContentDigest: "a".repeat(64), sourceServerRevision: 4 };

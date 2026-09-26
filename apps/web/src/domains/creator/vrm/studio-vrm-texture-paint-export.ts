@@ -25,7 +25,7 @@ export async function exportStudioVrmTexturePaintArchive(
   });
   if (settings.textures.length === 0) throw new Error("내보낼 표면 페인팅이 없습니다.");
   const manifest = {
-    kind: "toonspectrum/surface-textures", version: 1,
+    kind: "toonstudio/surface-textures", version: 1,
     textures: settings.textures.map((texture) => ({
       ...texture, ...studioVrmTexturePaintChannelEncoding(texture.textureSlot),
       path: `textures/${texture.hash.slice(7)}.png`,

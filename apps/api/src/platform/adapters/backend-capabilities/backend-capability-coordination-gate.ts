@@ -191,7 +191,7 @@ function slotStart(
   const digest = createHash("sha256")
     .update(
       canonicalJsonStringify([
-        "toonspectrum.backend-capability-slot.v1",
+        "toonstudio.backend-capability-slot.v1",
         providerId,
         command.workload,
         command.idempotencyKey,
@@ -217,7 +217,7 @@ function outcomeFingerprint(
       }>
 ): `sha256:${string}` {
   const canonical = canonicalJsonStringify({
-    domain: "toonspectrum.backend-capability-coordination-outcome.v1",
+    domain: "toonstudio.backend-capability-coordination-outcome.v1",
     providerId,
     idempotencyKey: command.idempotencyKey,
     workload: command.workload,
@@ -230,7 +230,7 @@ function requestFingerprint(
   command: BackendCapabilityGatewayCommand
 ): `sha256:${string}` {
   const canonical = canonicalJsonStringify({
-    domain: "toonspectrum.backend-capability-coordination-request.v1",
+    domain: "toonstudio.backend-capability-coordination-request.v1",
     tenantId: command.tenantId,
     workload: command.workload,
     command: {

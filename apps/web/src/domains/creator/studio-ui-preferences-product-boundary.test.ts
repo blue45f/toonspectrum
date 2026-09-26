@@ -78,7 +78,7 @@ describe("Studio product UI preference authority", () => {
     expect(page).not.toContain("loadStudioAdvancedFillSettings(");
     expect(page).not.toContain("saveStudioAdvancedFillSettings(");
     expect(page).not.toContain("studioAdvancedFillStorage(");
-    expect(page).not.toContain('"toonspectrum-studio-server-ai-provider"');
+    expect(page).not.toContain('"toonstudio-studio-server-ai-provider"');
     expect(viewport).toContain("commitAppSettings(defaultStudioAppSettings())");
     expect(viewport).not.toContain("studioAppSettingsStorage(");
   });

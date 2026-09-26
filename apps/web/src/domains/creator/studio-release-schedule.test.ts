@@ -356,7 +356,7 @@ describe("studio release schedule RFC 5545 export", () => {
     });
     expect(first.content).toBe(second.content);
     expect(first).toMatchObject({
-      filename: "toonspectrum-release-schedule.ics",
+      filename: "toonstudio-release-schedule.ics",
       mimeType: "text/calendar;charset=utf-8",
       eventCount: 1,
       exportedItemIds: ["private-client-id"],

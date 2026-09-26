@@ -1,5 +1,5 @@
 import type { LocalMusicTrack } from "./studio-music-client";
-import type { MusicBrief } from "@toonspectrum/core/studio-music";
+import type { MusicBrief } from "@toonstudio/core/studio-music";
 
 import {
   findMusicProvider,
@@ -13,7 +13,7 @@ import {
   MUSIC_IMPORTED_MP3_FORMAT,
   MUSIC_IMPORTED_WAV_FORMAT,
   parseMusicBrief,
-} from "@toonspectrum/core/studio-music";
+} from "@toonstudio/core/studio-music";
 
 function cleanFilename(value: string | undefined): string {
   const basename = (value ?? "external-music")

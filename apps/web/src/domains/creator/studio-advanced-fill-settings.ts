@@ -37,7 +37,7 @@ export interface StudioAdvancedFillSettingsStorage {
 }
 
 export const STUDIO_ADVANCED_FILL_SETTINGS_STORAGE_KEY =
-  "toonspectrum-studio-advanced-fill-settings:v1";
+  "toonstudio-studio-advanced-fill-settings:v1";
 
 /** Public numeric constraints shared by sliders, number inputs, and persisted-value recovery. */
 export const STUDIO_ADVANCED_FILL_LIMITS = {

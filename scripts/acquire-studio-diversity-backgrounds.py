@@ -65,7 +65,7 @@ def main() -> None:
                        'files': [receipt], 'projection': asset['projection'], 'sourceDimensions': dimensions})
             assets.append(asset)
             receipts.append({'id': identifier, **receipt})
-            write_json(stage / 'manifest.json', {'schema': 'toonspectrum.asset-delivery.v1', 'assets': assets})
+            write_json(stage / 'manifest.json', {'schema': 'toonstudio.asset-delivery.v1', 'assets': assets})
             print('BACKGROUND ACQUIRED', identifier, flush=True)
         except Exception as error:
             errors.append({'id': slug, 'reason': str(error)[:500]})

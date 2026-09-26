@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-import type { EditorClient } from "@toonspectrum/studio-command-registry";
+import type { EditorClient } from "@toonstudio/studio-command-registry";
 import type { ReactNode } from "react";
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Verified open-source brush kernels used by ToonSpectrum's hybrid natural-media stack.
+ * Verified open-source brush kernels used by ToonStudio's hybrid natural-media stack.
  *
  * These are clean re-implementations of public algorithms from:
  * - Klecks (MIT) — pen scatter, chalk multi-octave alpha tip

@@ -77,7 +77,7 @@ export class WgslVariantAdmissionError extends Error {
 }
 
 const MAX_SHADER_PIXEL_COUNT = 0xffff_ffff;
-const ALLOWED_LICENSES = new Set(["LicenseRef-ToonSpectrum-Proprietary"]);
+const ALLOWED_LICENSES = new Set(["LicenseRef-ToonStudio-Proprietary"]);
 
 function issue(
   code: WgslVariantAdmissionIssueCode,

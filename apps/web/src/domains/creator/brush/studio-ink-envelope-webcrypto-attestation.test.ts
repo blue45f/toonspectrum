@@ -13,7 +13,7 @@ import {
 
 function input() {
   return {
-    format: { id: "toonspectrum.ink-document", version: 1 },
+    format: { id: "toonstudio.ink-document", version: 1 },
     document: {
       id: "ink:webcrypto-test",
       revision: 1,

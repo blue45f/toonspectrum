@@ -191,7 +191,7 @@ export async function verifyStudioInkLiveCommitFidelity(): Promise<readonly Case
 
   const failed = results.filter((result) => !result.ok);
   const aggregate = {
-    kind: "toonspectrum-studio-ink-live-commit-fidelity-v2",
+    kind: "toonstudio-studio-ink-live-commit-fidelity-v2",
     generatedAt: new Date().toISOString(),
     sourceGate: CHILD_SCRIPT,
     spawnPreview: SPAWN_PREVIEW,

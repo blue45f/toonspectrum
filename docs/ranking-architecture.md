@@ -1,6 +1,6 @@
 # Ranking architecture
 
-ToonSpectrum ranking has one active production responsibility: deterministic scoring over the reviewed
+ToonStudio ranking has one active production responsibility: deterministic scoring over the reviewed
 catalog snapshot. Runtime live-ranking fetchers and schedulers have been removed. Every ranking result is
 computed from the same committed catalog used by search, detail, calendar, and recommendations.
 
@@ -36,7 +36,7 @@ Nest API는 같은 파일을 부팅 시 한 번 메모리에 로드합니다. �
 갱신은 로컬 운영자가 아래 명령을 명시적으로 실행한 경우에만 시작됩니다.
 
 ```bash
-pnpm --silent catalog:crawl:manual > /tmp/toonspectrum-catalog.json
+pnpm --silent catalog:crawl:manual > /tmp/toonstudio-catalog.json
 pnpm catalog:update:manual
 ```
 

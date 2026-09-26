@@ -120,7 +120,7 @@ describe("original import → CAS/SQLite → edited copy → portable export", (
     const saved = (await commitStudioBrushPackImport({ ...result, brushes: [candidate] }, f.repository)).materialized[0]!;
     expect(await prepareStudioBrushSourceExport(saved, f.store)).toBe(saved);
     const json = writeBrushJson(saved);
-    expect(JSON.parse(json).kind).toBe("toonspectrum-studio-brush");
+    expect(JSON.parse(json).kind).toBe("toonstudio-studio-brush");
     expect(importBrushFromJson(json).brush).not.toHaveProperty("originalSource");
   });
 });

@@ -17,7 +17,7 @@ function inkEnvelopeInput(
   title = "Ink document",
   payloadData: unknown = {
     brushContract: {
-      id: "toonspectrum.brush-contract",
+      id: "toonstudio.brush-contract",
       version: 3,
       presetId: "g-pen",
     },
@@ -35,7 +35,7 @@ function inkEnvelopeInput(
 ) {
   return {
     format: {
-      id: "toonspectrum.ink-document",
+      id: "toonstudio.ink-document",
       version,
     },
     document: {
@@ -49,7 +49,7 @@ function inkEnvelopeInput(
       data: payloadData,
     },
     extensions: {
-      "toonspectrum.engine": {
+      "toonstudio.engine": {
         renderer: "hybrid-vnext",
       },
     },
@@ -75,8 +75,8 @@ function adapter(
   overrides: Partial<StudioInkEnvelopePayloadAdapter<string>> = {}
 ): StudioInkEnvelopePayloadAdapter<string> {
   return {
-    id: "toonspectrum.ink-document-adapter",
-    formatId: "toonspectrum.ink-document",
+    id: "toonstudio.ink-document-adapter",
+    formatId: "toonstudio.ink-document",
     payloadType: "ink-document",
     minimumVersion: 1,
     currentVersion: 1,
@@ -93,12 +93,12 @@ function adapter(
   };
 }
 
-describe("ToonSpectrum InkEnvelope v1 codec", () => {
+describe("ToonStudio InkEnvelope v1 codec", () => {
   it("emits deterministic canonical bytes and round-trips opaque ink contracts", async () => {
     const first = await encodeStudioInkEnvelope(inkEnvelopeInput());
     const reordered = await encodeStudioInkEnvelope({
       extensions: {
-        "toonspectrum.engine": { renderer: "hybrid-vnext" },
+        "toonstudio.engine": { renderer: "hybrid-vnext" },
       },
       payload: inkEnvelopeInput().payload,
       document: inkEnvelopeInput().document,
@@ -295,7 +295,7 @@ describe("ToonSpectrum InkEnvelope v1 codec", () => {
     await expectInkError(
       () =>
         decodeStudioInkEnvelope(encoded, {
-          adapter: adapter({ formatId: "toonspectrum.other-document" }),
+          adapter: adapter({ formatId: "toonstudio.other-document" }),
         }),
       "ADAPTER_MISMATCH"
     );

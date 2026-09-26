@@ -76,7 +76,7 @@ function record(
 const historicalRecord = record(
   HISTORICAL_ID,
   "1.0.0",
-  "toonspectrum-standard",
+  "toonstudio-standard",
   "이전 버전 출처",
 );
 const currentRecord = record(CURRENT_ID, "2.0.0", "cc0-1.0", "현재 버전 출처");

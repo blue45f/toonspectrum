@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
+import { createStudioReviewSpatialAnchor } from "@toonstudio/studio-project-model";
 import { studioReviewPreviewDigest, studioReviewPreviewIntentKey } from "./studio-review-preview-producer.contract";
 import { studioReviewMappingFromOperation } from "./studio-review-source-map";
 import { StudioProjectGraphRepository } from "./studio-project-graph.repository";

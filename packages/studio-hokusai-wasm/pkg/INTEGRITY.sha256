@@ -1,4 +1,4 @@
-# ToonSpectrum Studio Hokusai WASM reproducible release manifest
+# ToonStudio Studio Hokusai WASM reproducible release manifest
 # rustc 1.97.1
 # cargo 1.97.1
 # wasm-pack 0.15.0

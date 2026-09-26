@@ -7,7 +7,7 @@ import {
 import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_FREEHAND_INPUT_CAS_ROOT_NAME =
-  "toonspectrum-studio-freehand-input-v1";
+  "toonstudio-studio-freehand-input-v1";
 export const STUDIO_FREEHAND_INPUT_CAS_MAX_BLOB_BYTES = 8 * 1024 * 1024;
 export const STUDIO_FREEHAND_INPUT_CAS_MAX_STAGING_RECORD_BYTES = 64 * 1024;
 

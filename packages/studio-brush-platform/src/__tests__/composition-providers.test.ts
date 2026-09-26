@@ -29,7 +29,7 @@ import type {
   ModeledSampleIR,
   PathIR,
   SceneIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * §12.2 row-9..12 provider contracts (장식·패턴 / 파티클 / 리본·헤어·로프 /

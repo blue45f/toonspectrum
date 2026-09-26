@@ -4,7 +4,7 @@ import {
   projectDigest,
   recoverProject,
   snapshotIRSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { z } from "zod";
 
 import {
@@ -26,7 +26,7 @@ import type {
   ProjectStateIR,
   RecoveryReport,
   SnapshotIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * Portable V12 disaster-recovery package.
@@ -42,10 +42,10 @@ import type {
  */
 
 export const STUDIO_V12_RECOVERY_PACKAGE_SCHEMA =
-  "toonspectrum.studio-v12-recovery-package" as const;
+  "toonstudio.studio-v12-recovery-package" as const;
 export const STUDIO_V12_RECOVERY_PACKAGE_VERSION = 1 as const;
 export const STUDIO_V12_RECOVERY_PACKAGE_MIME =
-  "application/vnd.toonspectrum.studio-recovery+zip" as const;
+  "application/vnd.toonstudio.studio-recovery+zip" as const;
 
 export const STUDIO_V12_RECOVERY_PACKAGE_LIMITS = Object.freeze({
   maxArchiveBytes: 256_000_000,
@@ -211,7 +211,7 @@ const PackageMetadataSchema = z
     title: SafeTextSchema.nullable(),
     description: SafeTextSchema.nullable(),
     tags: z.array(SafeTextSchema.max(120)).max(256),
-    sourceApplication: z.literal("ToonSpectrum Studio V12"),
+    sourceApplication: z.literal("ToonStudio Studio V12"),
   })
   .strict();
 
@@ -567,7 +567,7 @@ function normalizePackageMetadata(
     title: normalizedText(input?.title, "metadata.title"),
     description: normalizedText(input?.description, "metadata.description"),
     tags: normalizedList(input?.tags, "metadata.tags"),
-    sourceApplication: "ToonSpectrum Studio V12",
+    sourceApplication: "ToonStudio Studio V12",
   });
 }
 

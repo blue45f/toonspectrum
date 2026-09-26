@@ -1,4 +1,4 @@
-# ToonSpectrum 무료 우선 인프라 운영 기준
+# ToonStudio 무료 우선 인프라 운영 기준
 
 상태: **current — 무료 우선 정책 / migration — Supabase 빈 시작·D1 연결 준비 / target — 추가 공급자 후보 보류**
 
@@ -39,7 +39,7 @@ DB 연합 운영 기준: [`operations/federated-free-database-data-plane.md`](op
 | 공개 에셋 | Cloudflare R2 Standard | 해시 기반 불변 객체와 장기 캐시를 사용한다. |
 | private 객체 | 기록된 공급자 위치 + 목적별 고정 라우팅 | R2/Supabase/B2 adapter 지원과 실제 bucket·복제 완료 여부는 구분한다. |
 | 개인 프로젝트 | OPFS/로컬 파일/BYOS | 운영자 중앙 저장소를 무제한 개인 드라이브로 사용하지 않는다. |
-| Core NestJS API | Render `toonspectrum-core-api` | scale-to-zero full authority이며 수동 release만 허용한다. |
+| Core NestJS API | Render `toonstudio-core-api` | scale-to-zero full authority이며 수동 release만 허용한다. |
 
 AI는 기능에서 제외하지 않는다. 사용자 키는 통합 설정에서 재사용하고, 로컬 실행은 해당 기능의
 결과·품질·사용성을 보존하는 경우에 사용한다. 키 미설정·한도·실패를 이유로 운영자 유료 추론으로
@@ -55,7 +55,7 @@ AI는 기능에서 제외하지 않는다. 사용자 키는 통합 설정에서 
 | --- | --- | --- |
 | Supabase PostgreSQL 17 핵심 DB | 정본 스키마 적용, migration 원장 92행·marker 13개·사용자 0행, 제한 runtime TLS 인증·권한·rollback 검증 | Render DB·CA 설정과 배포된 API의 가입·로그인·저장 검증 |
 | Supabase 앱 readiness | 실제 runtime과 CA `verify-full`로 Node `PostgresHealthReadinessRepository` 실행: `database=true`, `schema=true` | 배포된 HTTP readiness 및 사용자 흐름 검증 |
-| Cloudflare D1 분석 DB | 실제 DB 1개 `toonspectrum-analytics-buffer`, `analytics-buffer-v2` 적용, 단독 중복 이벤트·heartbeat·overview·pulse canary 통과 | 인증 Worker 배포와 Core 수집·관리자 조회의 `TRAFFIC_ANALYTICS_STORE=d1` 전환 |
+| Cloudflare D1 분석 DB | 실제 DB 1개 `toonstudio-analytics-buffer`, `analytics-buffer-v2` 적용, 단독 중복 이벤트·heartbeat·overview·pulse canary 통과 | 인증 Worker 배포와 Core 수집·관리자 조회의 `TRAFFIC_ANALYTICS_STORE=d1` 전환 |
 | Firestore·Firebase RTDB·BigQuery | 무료 자원과 초기 규칙·테이블 생성, GCP billing 비활성 | 제품 repository·권한·실제 runtime 연결; 아직 알림·presence·분석의 운영 권위가 아님 |
 | Supabase compatibility schema | private `toonspectrum_federation` 3개 테이블 보존 | 이관 검증용 보조 schema이며 소셜 운영 권위로 전환하지 않음 |
 | 공급자 후보 라우터 | 정책·quota 검사·경로 계획 코드 | 기본 비활성; `plan()` 실행만으로 제품 읽기·쓰기가 분산되지 않음 |
@@ -132,7 +132,7 @@ pnpm run infra:storage-routing-fingerprint -- \
   --export=backblaze-b2
 ```
 
-신규 저장 참조는 `toonspectrum.private-object-storage.v2`와 `providerId`를 함께 기록한다.
+신규 저장 참조는 `toonstudio.private-object-storage.v2`와 `providerId`를 함께 기록한다.
 `0048_creator_asset_storage_locations`는 기존 v1 행을 역사적 Supabase primary로 승격한다. 따라서
 라우팅 fingerprint를 바꿔도 기존 객체 읽기·삭제는 기록된 공급자로 유지되고 새 객체만 새 배치를
 따른다. 기존 primary를 보유한 공급자 credential은 명시적 migration이 완료될 때까지 제거하면 안
@@ -218,7 +218,7 @@ PostgreSQL이나 하나의 DB를 영구 조건으로 두지 않으며, 별도 �
 
 ```dotenv
 PRIVATE_OBJECT_STORAGE_QUOTA_GUARD_ENABLED=true
-PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON={"version":"toonspectrum.private-object-storage-quota.v1","providers":{"cloudflare-r2":{"capacityBytes":10737418240,"applicationHardCapRatio":0.8,"billingBoundary":"free-allowance-with-app-cap","health":"healthy","usedBytes":0,"forecastBytes":0,"observedAtEpochMs":1800000000000,"staleAfterMs":86400000}}}
+PRIVATE_OBJECT_STORAGE_QUOTA_SNAPSHOTS_JSON={"version":"toonstudio.private-object-storage-quota.v1","providers":{"cloudflare-r2":{"capacityBytes":10737418240,"applicationHardCapRatio":0.8,"billingBoundary":"free-allowance-with-app-cap","health":"healthy","usedBytes":0,"forecastBytes":0,"observedAtEpochMs":1800000000000,"staleAfterMs":86400000}}}
 ```
 
 JSON에는 실제 라우팅에서 선택한 모든 공급자(`cloudflare-r2`, `supabase`, `backblaze-b2`)가
@@ -243,8 +243,8 @@ pnpm run cloudflare:static:dry-run
 git switch main
 git pull --ff-only
 git status --short
-RENDER_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com pnpm run verify:render-core-origin
-export CLOUDFLARE_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com
+RENDER_CORE_API_ORIGIN=https://toonstudio-core-api.onrender.com pnpm run verify:render-core-origin
+export CLOUDFLARE_CORE_API_ORIGIN=https://toonstudio-core-api.onrender.com
 export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
 pnpm run cloudflare:static:deploy
 ```

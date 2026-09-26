@@ -62,7 +62,7 @@ import {
 } from "@/platform/creator-marketplace-client";
 
 export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY =
-  "toonspectrum.studio-creator-filter-presets.v1" as const;
+  "toonstudio.studio-creator-filter-presets.v1" as const;
 
 export interface StudioCreatorPackStorage {
   getItem(key: string): string | null;
@@ -149,12 +149,12 @@ const MAX_RUNTIME_BUDGET = Object.freeze({
   textures: 64,
 });
 const MEDIA_TYPE_BY_KIND = {
-  brush: "application/vnd.toonspectrum.brush+json",
-  filter: "application/vnd.toonspectrum.filter+json",
-  palette: "application/vnd.toonspectrum.palette+json",
-  template: "application/vnd.toonspectrum.template+json",
-  "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
-  "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
+  brush: "application/vnd.toonstudio.brush+json",
+  filter: "application/vnd.toonstudio.filter+json",
+  palette: "application/vnd.toonstudio.palette+json",
+  template: "application/vnd.toonstudio.template+json",
+  "3d-preset": "application/vnd.toonstudio.3d-preset+json",
+  "3d-asset": "application/vnd.toonstudio.3d-asset+json",
 } as const;
 const SNAPSHOT_KEYS = new Set([
   "sourcePresetId",

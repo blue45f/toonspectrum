@@ -45,7 +45,7 @@ export function createStudioCrdtRasterModuleWorker(): StudioCrdtRasterWorkerLike
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-crdt-raster.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-crdt-raster",
+    name: "toonstudio-crdt-raster",
   }) as unknown as StudioCrdtRasterWorkerLike;
 }
 

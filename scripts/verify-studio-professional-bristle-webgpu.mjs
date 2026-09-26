@@ -23,7 +23,7 @@ import { REPO_ROOT, WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 const SCRATCH =
   process.env.TOONSPECTRUM_BRISTLE_WEBGPU_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-professional-bristle-webgpu-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-professional-bristle-webgpu-${Date.now()}`);
 const HARNESS_PATH = "/__studio_professional_bristle_webgpu__";
 const HARNESS_ENTRY = `/@fs/${join(REPO_ROOT, "scripts/studio-professional-bristle-webgpu-browser.ts")}`;
 const RESULT_TIMEOUT_MS = 120_000;

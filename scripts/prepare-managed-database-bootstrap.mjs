@@ -17,7 +17,7 @@ import { buildFortuneSnapshotRuntimeAclSql } from "./fortune-snapshot-database-c
 import { buildCareerConfirmationRuntimeAclSql } from "./creator-career-confirmation-database-contract.mjs";
 import { buildProductionOperationsRuntimeAclSql } from "./production-operations-database-contract.mjs";
 
-export const MANAGED_BOOTSTRAP_VERSION = "toonspectrum.managed-bootstrap-preparation.v1";
+export const MANAGED_BOOTSTRAP_VERSION = "toonstudio.managed-bootstrap-preparation.v1";
 const ALLOWED_SCHEMAS = new Set(["public", "toonspectrum_ops"]);
 const MANAGED_ROLES = ["anon", "authenticated", "service_role"];
 const MARKER = "__managed_history_through_0019__";
@@ -219,12 +219,12 @@ function withoutTransactionWrappers(sql) {
   for (const statement of splitDumpStatements(sql)) {
     if (/^BEGIN$/iu.test(statement)) continue;
     if (/^SET LOCAL ROLE /iu.test(statement)) {
-      output.push("SELECT pg_catalog.set_config('toonspectrum.bootstrap_saved_role', current_setting('role'), true)");
+      output.push("SELECT pg_catalog.set_config('toonstudio.bootstrap_saved_role', current_setting('role'), true)");
       roleChanged = true;
     }
     if (/^COMMIT$/iu.test(statement)) {
       // 독립 helper에서는 COMMIT이 SET LOCAL ROLE도 해제했다. 바깥 transaction에서는 명시 복원한다.
-      if (roleChanged) output.push("SELECT pg_catalog.set_config('role', current_setting('toonspectrum.bootstrap_saved_role'), true)");
+      if (roleChanged) output.push("SELECT pg_catalog.set_config('role', current_setting('toonstudio.bootstrap_saved_role'), true)");
       roleChanged = false;
       continue;
     }
@@ -240,7 +240,7 @@ BEGIN
   IF current_setting('server_version_num')::integer / 10000 <> 17 THEN
     RAISE EXCEPTION '검증 대상은 PostgreSQL 17이어야 합니다';
   END IF;
-  IF NOT pg_try_advisory_xact_lock(hashtext('toonspectrum-managed-empty-bootstrap')) THEN
+  IF NOT pg_try_advisory_xact_lock(hashtext('toonstudio-managed-empty-bootstrap')) THEN
     RAISE EXCEPTION '다른 빈 DB bootstrap 작업이 진행 중입니다';
   END IF;
   IF to_regnamespace('toonspectrum_ops') IS NOT NULL OR EXISTS (
@@ -304,7 +304,7 @@ export function buildManagedRoleVerificationAccessSql(role, { restore = false } 
   validateManagedRuntimeRole(role);
   if (restore) {
     return `DO $managed_role_access_restore$
-DECLARE saved jsonb := current_setting('toonspectrum.bootstrap_role_access')::jsonb;
+DECLARE saved jsonb := current_setting('toonstudio.bootstrap_role_access')::jsonb;
 BEGIN
   IF (saved->>'changed')::boolean THEN
     IF (saved->>'existed')::boolean THEN
@@ -320,7 +320,7 @@ END $managed_role_access_restore$;`;
 DECLARE previous jsonb;
 BEGIN
   IF pg_has_role(current_user, ${literal(role)}, 'SET') THEN
-    PERFORM set_config('toonspectrum.bootstrap_role_access', '{"changed":false}', true);
+    PERFORM set_config('toonstudio.bootstrap_role_access', '{"changed":false}', true);
   ELSE
     SELECT jsonb_build_object('admin',m.admin_option,'inherit',m.inherit_option,'set',m.set_option)
       INTO previous
@@ -328,7 +328,7 @@ BEGIN
       WHERE m.roleid=(SELECT oid FROM pg_roles WHERE rolname=${literal(role)})
         AND m.member=(SELECT oid FROM pg_roles WHERE rolname=current_user)
         AND m.grantor=(SELECT oid FROM pg_roles WHERE rolname=current_user);
-    PERFORM set_config('toonspectrum.bootstrap_role_access',
+    PERFORM set_config('toonstudio.bootstrap_role_access',
       jsonb_build_object('changed',true,'existed',previous IS NOT NULL,'previous',previous)::text, true);
     -- PG17의 CREATEROLE 자동 ADMIN grant는 SET 권한을 주지 않는다. 자기 grantor 행만 임시 변경한다.
     EXECUTE format('GRANT %I TO %I WITH SET TRUE, INHERIT %s, ADMIN %s GRANTED BY %I',

@@ -230,7 +230,7 @@ export interface StudioCompetitiveBrushExternalGate {
 }
 
 export interface StudioCompetitiveBrushQualityReport {
-  readonly kind: "toonspectrum-studio-competitive-brush-quality";
+  readonly kind: "toonstudio-studio-competitive-brush-quality";
   readonly schemaVersion: typeof STUDIO_COMPETITIVE_BRUSH_QUALITY_SCHEMA_VERSION;
   readonly tier: StudioCompetitiveBrushQualityTier;
   readonly policy: Readonly<{
@@ -1564,7 +1564,7 @@ export function benchmarkStudioCompetitiveBrushQuality(
     + (candidates.length === expectedPresetCount ? 0 : 1)
     + duplicateCount;
   return {
-    kind: "toonspectrum-studio-competitive-brush-quality",
+    kind: "toonstudio-studio-competitive-brush-quality",
     schemaVersion: STUDIO_COMPETITIVE_BRUSH_QUALITY_SCHEMA_VERSION,
     tier,
     policy: {

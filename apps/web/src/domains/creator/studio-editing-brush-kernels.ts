@@ -139,7 +139,7 @@ export interface StudioEditingBrushChangedBounds {
  * second full pixel buffer.
  */
 export interface StudioEditingBrushTransactionReceipt {
-  readonly schema: "toonspectrum.editing-brush-operation/v1";
+  readonly schema: "toonstudio.editing-brush-operation/v1";
   readonly operationId: string;
   readonly kernel: StudioEditingBrushKernelId;
   readonly width: number;
@@ -832,7 +832,7 @@ function createTransactionReceipt(input: {
     optionsKey(prepared.normalizedOptions),
   ].join("|");
   return {
-    schema: "toonspectrum.editing-brush-operation/v1",
+    schema: "toonstudio.editing-brush-operation/v1",
     operationId: `editing-v1-${fnv1aText(identity).toString(16).padStart(8, "0")}`,
     kernel: prepared.kernel,
     width: prepared.source.width,

@@ -86,7 +86,7 @@ h1{margin:0 0 8px;font-size:32px}.hero p{margin:0;color:#b6bec9;max-width:1000px
 .pair{border:1px solid #333944;background:#191d23;border-radius:18px;padding:14px}.pair header{display:flex;justify-content:space-between;align-items:baseline}.pair code{color:#7d8996;font-size:11px}
 .compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.compare section{position:relative}.compare b{position:absolute;z-index:2;left:10px;top:8px;background:#11151b;padding:4px 8px;border-radius:999px}
 svg{display:block;width:100%;border-radius:12px}.compare small{display:block;margin-top:5px;color:#7d8996}.pair p{margin:10px 2px 0;color:#b6bec9;font-size:12px}
-</style></head><body><main><section class="hero"><h1>ToonSpectrum Brush V7.1 · Blind A/B Matrix</h1>
+</style></head><body><main><section class="hero"><h1>ToonStudio Brush V7.1 · Blind A/B Matrix</h1>
 <p>후보/기준 브러시 이름을 숨기고 좌우 순서를 결정적으로 섞었다. 동일한 색·크기·불투명도로 실제 material-contact solver 출력을 비교한다. 정답 키는 별도 JSON에만 기록한다.</p></section><section class="grid">${cards.join("")}</section></main></body></html>`;
 await writeFile(`${OUT}/blind-ab.html`, html, "utf8");
 

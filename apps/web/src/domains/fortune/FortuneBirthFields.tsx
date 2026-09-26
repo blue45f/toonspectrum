@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { FortuneBirthInput } from "@toonspectrum/core/fortune";
+import type { FortuneBirthInput } from "@toonstudio/core/fortune";
 
 interface Props { label: string; value: FortuneBirthInput; onChange: (value: FortuneBirthInput) => void }
 export function FortuneBirthFields({ label, value, onChange }: Props) {

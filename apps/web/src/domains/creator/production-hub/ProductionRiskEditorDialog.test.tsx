@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   evaluateProductionRisks,
   type ProductionRisk,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionRiskEditorDialog } from "./ProductionRiskEditorDialog";

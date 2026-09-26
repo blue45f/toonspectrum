@@ -44,8 +44,8 @@ import type { StudioLocalDatabase } from "./studio-local-database";
 export const STUDIO_ASSET_LIBRARY_SQLITE_NAMESPACE = "studio-asset-library-v12";
 export const STUDIO_ASSET_LIBRARY_SQLITE_MANIFEST_KEY = "manifest-v1";
 export const STUDIO_ASSET_LIBRARY_CAS_OWNER = "studio-asset-library-v12";
-export const STUDIO_ASSET_LIBRARY_CAS_ROOT = "toonspectrum-studio-assets";
-export const STUDIO_ASSET_LIBRARY_LOCK_NAME = "toonspectrum-studio-asset-library-v12";
+export const STUDIO_ASSET_LIBRARY_CAS_ROOT = "toonstudio-studio-assets";
+export const STUDIO_ASSET_LIBRARY_LOCK_NAME = "toonstudio-studio-asset-library-v12";
 
 export const STUDIO_ASSET_LIBRARY_LIMITS = Object.freeze({
   assets: 1_000,

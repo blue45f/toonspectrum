@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { BadRequestException, ConflictException } from "@nestjs/common";
-import { deriveProductionAutomationExecutionPlan, type ProductionProjectAggregate } from "@toonspectrum/core/production";
+import { deriveProductionAutomationExecutionPlan, type ProductionProjectAggregate } from "@toonstudio/core/production";
 import type { ProductionCommand } from "./production-collaboration.dto";
 
 /** The client previews changes; the server derives them again from the current stored rules. */

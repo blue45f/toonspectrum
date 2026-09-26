@@ -349,7 +349,7 @@ async function manualRasterArchive(options: ManualArchiveOptions): Promise<Blob>
   const projectBytes = encoder.encode(projectJson);
   const byteSize = options.declaredByteSize ?? options.bytes.length;
   const manifest: StudioProjectArchiveManifest = {
-    schema: "toonspectrum.studio-project-archive",
+    schema: "toonstudio.studio-project-archive",
     version: 1,
     project: {
       path: "project.json",
@@ -385,7 +385,7 @@ async function manualProjectOnlyArchive(project: unknown): Promise<Blob> {
   const projectJson = canonicalJson(project);
   const projectBytes = encoder.encode(projectJson);
   const manifest: StudioProjectArchiveManifest = {
-    schema: "toonspectrum.studio-project-archive",
+    schema: "toonstudio.studio-project-archive",
     version: 2,
     project: {
       path: "project.json",
@@ -430,7 +430,7 @@ function retainedProvenance() {
 describe("studio-project-archive", () => {
   it("Shared Stage v1을 v2로 승격하고 attachment로 오인하지 않으며 deterministic 왕복한다", async () => {
     const shared3dStage = {
-      kind: "toonspectrum.studio-shared-3d-stage" as const,
+      kind: "toonstudio.studio-shared-3d-stage" as const,
       version: 1 as const,
       authority: "page-background-with-linked-character-sources" as const,
       capturePolicy: "require-all-linked" as const,
@@ -557,7 +557,7 @@ describe("studio-project-archive", () => {
     expect(element.referenceThumbnail).toBe(embedded);
     expect(imported.attachments).toHaveLength(1);
     expect(imported.canonicalProject.pagesList[0]!.elements[0]).toMatchObject({
-      src: expect.stringMatching(/^toonspectrum-asset:\/\/sha256\/[a-f0-9]{64}$/u),
+      src: expect.stringMatching(/^toonstudio-asset:\/\/sha256\/[a-f0-9]{64}$/u),
     });
     expect(JSON.stringify(imported.project)).not.toContain("비공개 원문 프롬프트");
     expect(imported.diagnostics.map(({ code }) => code)).toContain("EXTERNAL_PROJECT_DEPENDENCY");
@@ -565,7 +565,7 @@ describe("studio-project-archive", () => {
 
     const referenceOnly = await importStudioProjectArchive(result.blob, { rehydrateDataUrls: false });
     const referencedElement = referenceOnly.project.pagesList[0]!.elements[0] as Record<string, unknown>;
-    expect(referencedElement.src).toMatch(/^toonspectrum-asset:\/\/sha256\/[a-f0-9]{64}$/u);
+    expect(referencedElement.src).toMatch(/^toonstudio-asset:\/\/sha256\/[a-f0-9]{64}$/u);
     expect(resolveStudioProjectArchiveAttachment(referenceOnly.attachments, referencedElement.src)?.blob.type)
       .toBe("image/png");
   });
@@ -631,7 +631,7 @@ describe("studio-project-archive", () => {
     expect(imported.attachments).toHaveLength(4);
     const links = imported.project.pagesList[0]!.elements[0] as Record<string, unknown>;
     for (const key of ["vrm", "glb", "gltf", "obj", "audio"]) {
-      expect(links[key]).toMatch(/^toonspectrum-asset:\/\/sha256\/[a-f0-9]{64}$/u);
+      expect(links[key]).toMatch(/^toonstudio-asset:\/\/sha256\/[a-f0-9]{64}$/u);
     }
     expect(imported.diagnostics.filter(({ code }) => code === "EXTERNAL_ATTACHMENT_DEPENDENCY")).toHaveLength(3);
   });
@@ -1449,7 +1449,7 @@ describe("studio-project-archive", () => {
     const nonCanonicalProject = JSON.stringify(project, null, 2);
     const projectBytes = encoder.encode(nonCanonicalProject);
     const manifest: StudioProjectArchiveManifest = {
-      schema: "toonspectrum.studio-project-archive",
+      schema: "toonstudio.studio-project-archive",
       version: 1,
       project: {
         path: "project.json",

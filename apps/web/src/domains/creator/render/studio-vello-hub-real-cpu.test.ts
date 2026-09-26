@@ -1,4 +1,4 @@
-import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
+import { loadVelloNode } from "@toonstudio/studio-engine-vello/node";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { buildStudioDocumentPresentScene } from "./studio-document-scene-present";

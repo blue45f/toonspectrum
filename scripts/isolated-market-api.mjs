@@ -234,7 +234,7 @@ export function createIsolatedMarketApiEnvironment(
     ...safeEnvironment,
     API_LOCAL_ENV_FILE_ENABLED: "false",
     API_RUNTIME_ROLE: "full",
-    AUTH_SESSION_SECRET: "toonspectrum-isolated-market-qa-session-v1",
+    AUTH_SESSION_SECRET: "toonstudio-isolated-market-qa-session-v1",
     AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "false",
     AUTH_RATE_LIMIT_MODE: "single-instance-local",
     BACKEND_CAPABILITY_WORKER_ENABLED: "false",

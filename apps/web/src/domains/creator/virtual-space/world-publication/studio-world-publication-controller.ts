@@ -1,4 +1,4 @@
-import type { StudioWorldPublication, StudioWorldPublish } from "@toonspectrum/studio-project-model/world-publication";
+import type { StudioWorldPublication, StudioWorldPublish } from "@toonstudio/studio-project-model/world-publication";
 import { httpStatus } from "@/platform/api";
 import { type PreparedStudioWorld } from "./studio-world-publication-assets";
 import { StudioWorldPublicationError, studioWorldPublicationFailure, studioWorldPublishManifest,

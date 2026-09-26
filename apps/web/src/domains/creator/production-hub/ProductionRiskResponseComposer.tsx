@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from "react";
-import type { ProductionProjectAggregate, ProductionRisk, ProductionRiskResponse } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate, ProductionRisk, ProductionRiskResponse } from "@toonstudio/core/production";
 import type { ProductionClientCommand } from "./production-api";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 

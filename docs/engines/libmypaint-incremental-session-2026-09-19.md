@@ -21,7 +21,7 @@ Native fix15 storage, temporary buffers, and the WASM heap are additional memory
 ## Verification
 
 ```sh
-pnpm --filter @toonspectrum/studio-brush-platform typecheck
+pnpm --filter @toonstudio/studio-brush-platform typecheck
 pnpm exec vitest run packages/studio-brush-platform --maxWorkers=1
 ```
 

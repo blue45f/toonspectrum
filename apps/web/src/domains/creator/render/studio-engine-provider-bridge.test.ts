@@ -1,4 +1,4 @@
-import { hokusaiProviderDescriptor } from "@toonspectrum/studio-brush-platform";
+import { hokusaiProviderDescriptor } from "@toonstudio/studio-brush-platform";
 import { describe, expect, it } from "vitest";
 
 import { deriveStudioV11BackendDescriptors } from "./studio-engine-provider-bridge";

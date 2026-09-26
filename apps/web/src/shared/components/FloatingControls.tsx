@@ -1,4 +1,4 @@
-import { useFx } from "@toonspectrum/core/fx";
+import { useFx } from "@toonstudio/core/fx";
 import { Moon, Settings2, Sun, Volume2, VolumeX, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

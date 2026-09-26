@@ -22,7 +22,7 @@ describe("/studio asset-library V12 authority boundary", () => {
     expect(repository).toContain("acquireStudioLocalDatabase");
     expect(repository).toContain("createStudioOpfsAssetStore");
     expect(repository).toContain('"studio-asset-library-v12"');
-    expect(repository).toContain('"toonspectrum-studio-assets"');
+    expect(repository).toContain('"toonstudio-studio-assets"');
     expect(repository).not.toContain("localStorage");
     expect(repository).not.toContain("indexedDB");
   });

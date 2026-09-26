@@ -27,7 +27,7 @@ const SUPPORT_LINKS = [
   },
   {
     icon: HandCoins,
-    title: "ToonSpectrum 응원하기",
+    title: "ToonStudio 응원하기",
     body: "개인 서포터 결제 준비 상태, 기업 스폰서십, 공익 기부의 서로 다른 경로를 확인합니다.",
     href: "/support-us",
   },

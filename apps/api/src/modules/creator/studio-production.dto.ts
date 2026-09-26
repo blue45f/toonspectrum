@@ -1,6 +1,6 @@
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
-import { studioReviewTaskReferenceSchema, studioReviewTaskReferencesAreValid } from "@toonspectrum/studio-project-model";
+import { studioReviewTaskReferenceSchema, studioReviewTaskReferencesAreValid } from "@toonstudio/studio-project-model";
 
 const OpaqueIdSchema = z
   .string()

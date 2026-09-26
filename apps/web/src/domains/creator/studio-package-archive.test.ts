@@ -169,7 +169,7 @@ function errorCode(cause: unknown): string | undefined {
 describe("studio-package-archive ZIP32 writer", () => {
   it("writes unzip-compatible UTF-8 store entries, CRC32, central records, and EOCD", async () => {
     const png = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-    const manifest = textEncoder.encode('{"schema":"toonspectrum.publish-package"}');
+    const manifest = textEncoder.encode('{"schema":"toonstudio.publish-package"}');
     const bytes = await buildStudioPackageArchiveBytes(
       [
         { path: "images/회차 01.png", data: new Blob([png], { type: "image/png" }) },
@@ -234,9 +234,9 @@ describe("studio-package-archive ZIP32 writer", () => {
     const entries = [{ path: "manifest.json", data: textEncoder.encode("{}") }];
     const bytes = await buildStudioPackageArchiveBytes(entries);
     const blob = await buildStudioPackageArchiveBlob(entries, {
-      mimeType: "application/vnd.toonspectrum.package+zip",
+      mimeType: "application/vnd.toonstudio.package+zip",
     });
-    expect(blob.type).toBe("application/vnd.toonspectrum.package+zip");
+    expect(blob.type).toBe("application/vnd.toonstudio.package+zip");
     expect(new Uint8Array(await blob.arrayBuffer())).toEqual(bytes);
     expect(parseStoredZip(new Uint8Array(await blob.arrayBuffer())).entryCount).toBe(1);
   });

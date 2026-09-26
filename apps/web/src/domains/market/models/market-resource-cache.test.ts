@@ -65,7 +65,7 @@ const record = {
       name: "테스트",
       delivery: {
         mode: "portable-json",
-        mediaType: "application/vnd.toonspectrum.palette+json",
+        mediaType: "application/vnd.toonstudio.palette+json",
         payload,
         byteSize: creatorMarketplaceJsonByteSize(payload),
         sha256: sha256(payloadCanonical),
@@ -94,7 +94,7 @@ const record = {
         name: "테스트",
         delivery: {
           mode: "portable-json",
-          mediaType: "application/vnd.toonspectrum.palette+json",
+          mediaType: "application/vnd.toonstudio.palette+json",
           payload,
           byteSize: creatorMarketplaceJsonByteSize(payload),
           sha256: sha256(payloadCanonical),
@@ -141,7 +141,7 @@ describe("market-resource-cache", () => {
 
   it("keeps legacy pages readable without exposing an inert load-more action", () => {
     localStorage.setItem(
-      'toonspectrum.market.page.v1:{"limit":8}',
+      'toonstudio.market.page.v1:{"limit":8}',
       JSON.stringify({ savedAt: new Date().toISOString(), items: [record], hasMore: true })
     );
 
@@ -180,12 +180,12 @@ describe("market-resource-cache", () => {
     });
 
     expect(readCachedMarketPage("delisted")).toBeNull();
-    expect(localStorage.getItem("toonspectrum.market.page.v1:delisted")).toBeNull();
+    expect(localStorage.getItem("toonstudio.market.page.v1:delisted")).toBeNull();
   });
 
   it("does not revive a stored cursor when the cached page declared no next page", () => {
     localStorage.setItem(
-      "toonspectrum.market.page.v1:inconsistent-read",
+      "toonstudio.market.page.v1:inconsistent-read",
       JSON.stringify({
         savedAt: new Date().toISOString(),
         items: [record],
@@ -202,7 +202,7 @@ describe("market-resource-cache", () => {
 
   it("accepts the 24-hour boundary and evicts an older cached page", () => {
     const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
-    const pageKey = "toonspectrum.market.page.v1:age-boundary";
+    const pageKey = "toonstudio.market.page.v1:age-boundary";
     localStorage.setItem(
       pageKey,
       JSON.stringify({
@@ -219,12 +219,12 @@ describe("market-resource-cache", () => {
   });
 
   it("returns null for corrupted JSON", () => {
-    localStorage.setItem('toonspectrum.market.page.v1:{"limit":8}', "{broken");
+    localStorage.setItem('toonstudio.market.page.v1:{"limit":8}', "{broken");
     expect(readCachedMarketPage('{"limit":8}')).toBeNull();
   });
 
   it("returns null when every record is invalid", () => {
-    const key = 'toonspectrum.market.page.v1:{"limit":8}';
+    const key = 'toonstudio.market.page.v1:{"limit":8}';
     localStorage.setItem(
       key,
       JSON.stringify({ savedAt: new Date().toISOString(), items: [{ garbage: true }], hasMore: false })
@@ -253,7 +253,7 @@ describe("market-resource-cache", () => {
 
   it("evicts expired and explicitly removed detail records", () => {
     const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
-    const resourceKey = `toonspectrum.resource.v1:${record.id}`;
+    const resourceKey = `toonstudio.resource.v1:${record.id}`;
     localStorage.setItem(
       resourceKey,
       JSON.stringify({
@@ -273,7 +273,7 @@ describe("market-resource-cache", () => {
 
   it("rejects future-dated entries so a clock-skewed cache cannot remain fresh indefinitely", () => {
     const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
-    const resourceKey = `toonspectrum.resource.v1:${record.id}`;
+    const resourceKey = `toonstudio.resource.v1:${record.id}`;
     localStorage.setItem(
       resourceKey,
       JSON.stringify({
@@ -290,12 +290,12 @@ describe("market-resource-cache", () => {
     const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
     vi.useFakeTimers();
     vi.setSystemTime(nowMs);
-    const expiredPageKey = "toonspectrum.market.page.v1:expired-other-query";
-    const corruptResourceKey = "toonspectrum.resource.v1:corrupt";
-    const overlongMarketKey = `toonspectrum.market.page.v1:${"x".repeat(
+    const expiredPageKey = "toonstudio.market.page.v1:expired-other-query";
+    const corruptResourceKey = "toonstudio.resource.v1:corrupt";
+    const overlongMarketKey = `toonstudio.market.page.v1:${"x".repeat(
       MARKET_CACHE_MAX_KEY_CHARACTERS
     )}`;
-    const unrelatedKey = "toonspectrum.studio.unsaved.v1";
+    const unrelatedKey = "toonstudio.studio.unsaved.v1";
     localStorage.setItem(expiredPageKey, JSON.stringify({
       savedAt: new Date(nowMs - MARKET_CACHE_MAX_AGE_MS - 1).toISOString(),
       items: [record],
@@ -323,13 +323,13 @@ describe("market-resource-cache", () => {
     const nowMs = Date.parse("2026-08-30T12:00:00.000Z");
     vi.useFakeTimers();
     vi.setSystemTime(nowMs);
-    const oldestKey = "toonspectrum.market.page.v1:page-00";
+    const oldestKey = "toonstudio.market.page.v1:page-00";
     localStorage.setItem("unrelated.market.test", "keep-me");
 
     for (let index = 0; index < MARKET_CACHE_MAX_ENTRIES; index += 1) {
       const prefix = index % 2 === 0
-        ? "toonspectrum.market.page.v1:page-"
-        : "toonspectrum.resource.v1:resource-";
+        ? "toonstudio.market.page.v1:page-"
+        : "toonstudio.resource.v1:resource-";
       localStorage.setItem(
         `${prefix}${String(index).padStart(2, "0")}`,
         JSON.stringify({
@@ -352,12 +352,12 @@ describe("market-resource-cache", () => {
     const marketKeys = Array.from({ length: localStorage.length }, (_, index) =>
       localStorage.key(index)
     ).filter((key): key is string => Boolean(
-      key?.startsWith("toonspectrum.market.page.v1:")
-      || key?.startsWith("toonspectrum.resource.v1:")
+      key?.startsWith("toonstudio.market.page.v1:")
+      || key?.startsWith("toonstudio.resource.v1:")
     ));
     expect(marketKeys).toHaveLength(MARKET_CACHE_MAX_ENTRIES);
     expect(localStorage.getItem(oldestKey)).toBeNull();
-    expect(localStorage.getItem("toonspectrum.market.page.v1:newest")).not.toBeNull();
+    expect(localStorage.getItem("toonstudio.market.page.v1:newest")).not.toBeNull();
     expect(localStorage.getItem("unrelated.market.test")).toBe("keep-me");
   });
 });

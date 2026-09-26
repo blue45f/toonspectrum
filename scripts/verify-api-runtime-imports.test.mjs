@@ -23,14 +23,14 @@ function fixture(t) {
 
 test("finds emitted require calls, including lazy calls, without matching comments or strings", () => {
   assert.deepEqual(runtimeSpecifiers(`
-    // require("@toonspectrum/not-executed")
-    const example = 'require("@toonspectrum/example")';
+    // require("@toonstudio/not-executed")
+    const example = 'require("@toonstudio/example")';
     const first = require("./shared");
     const second = require("./shared");
-    const lazy = () => require('@toonspectrum/core/catalog');
+    const lazy = () => require('@toonstudio/core/catalog');
     object.require("./unrelated-method");
     require(variable);
-  `), ["./shared", "@toonspectrum/core/catalog"]);
+  `), ["./shared", "@toonstudio/core/catalog"]);
 });
 
 test("accepts emitted relative shared modules and resolvable third-party packages", (t) => {
@@ -55,20 +55,20 @@ test("rejects a missing emitted relative module", (t) => {
 
 test("rejects the incident alias even when the original TypeScript source exists in CI", (t) => {
   const { dist, write } = fixture(t);
-  write("dist/module.js", 'require("@toonspectrum/core/reference-query-language");');
-  write("node_modules/@toonspectrum/core/package.json", JSON.stringify({
-    name: "@toonspectrum/core",
+  write("dist/module.js", 'require("@toonstudio/core/reference-query-language");');
+  write("node_modules/@toonstudio/core/package.json", JSON.stringify({
+    name: "@toonstudio/core",
     exports: { "./reference-query-language": "./src/reference-query-language.ts" },
   }));
-  write("node_modules/@toonspectrum/core/src/reference-query-language.ts", "export const query = 1;");
+  write("node_modules/@toonstudio/core/src/reference-query-language.ts", "export const query = 1;");
   assert.throws(() => verifyCompiledApiImports(dist), /outside compiled output/);
 });
 
 test("rejects the production alias when its exported source was not packaged", (t) => {
   const { dist, write } = fixture(t);
-  write("dist/module.js", 'require("@toonspectrum/core/reference-query-language");');
-  write("node_modules/@toonspectrum/core/package.json", JSON.stringify({
-    name: "@toonspectrum/core",
+  write("dist/module.js", 'require("@toonstudio/core/reference-query-language");');
+  write("node_modules/@toonstudio/core/package.json", JSON.stringify({
+    name: "@toonstudio/core",
     exports: { "./reference-query-language": "./src/reference-query-language.ts" },
   }));
   assert.throws(() => verifyCompiledApiImports(dist), /cannot resolve \(MODULE_NOT_FOUND\)/);

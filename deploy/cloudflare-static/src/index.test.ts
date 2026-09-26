@@ -107,8 +107,8 @@ describe("Cloudflare static gateway", () => {
     expect(wrangler.assets?.run_worker_first).not.toContain("/market/*");
     expect(wrangler.r2_buckets).toEqual([{
       binding: "LARGE_ASSETS",
-      bucket_name: "toonspectrum-public-assets",
-      preview_bucket_name: "toonspectrum-public-assets",
+      bucket_name: "toonstudio-public-assets",
+      preview_bucket_name: "toonstudio-public-assets",
     }]);
   });
 
@@ -125,7 +125,7 @@ describe("Cloudflare static gateway", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ status: "ok" });
       expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
-      expect(response.headers.get("x-toonspectrum-health-source")).toBe(
+      expect(response.headers.get("x-toonstudio-health-source")).toBe(
         "cloudflare-edge",
       );
     }
@@ -154,7 +154,7 @@ describe("Cloudflare static gateway", () => {
       policySlug: "privacy-policy",
       source: "static",
     }));
-    expect(response.headers.get("x-toonspectrum-policy-source")).toBe(
+    expect(response.headers.get("x-toonstudio-policy-source")).toBe(
       "first-party-release",
     );
     expect(env.ASSETS.fetch).not.toHaveBeenCalled();
@@ -242,7 +242,7 @@ describe("Cloudflare static gateway", () => {
     for (const request of requests) {
       expect(request.headers.get("authorization")).toBeNull();
       expect(request.headers.get("cookie")).toBeNull();
-      expect(request.headers.get("x-toonspectrum-edge-route")).toBe("core");
+      expect(request.headers.get("x-toonstudio-edge-route")).toBe("core");
     }
     expect(env.ASSETS.fetch).not.toHaveBeenCalled();
   });
@@ -292,7 +292,7 @@ describe("Cloudflare static gateway", () => {
       new Request("https://www.toonstudio.cloud/api/auth/session", {
         headers: {
           cookie: "session=opaque",
-          "x-toonspectrum-origin-secret": "client-spoofed-value",
+          "x-toonstudio-origin-secret": "client-spoofed-value",
         },
       }),
       env,
@@ -307,8 +307,8 @@ describe("Cloudflare static gateway", () => {
     );
     expect((proxied as Request).headers.get("cookie")).toBe("session=opaque");
     expect((proxied as Request).headers.get("x-forwarded-host")).toBe("www.toonstudio.cloud");
-    expect((proxied as Request).headers.get("x-toonspectrum-edge-route")).toBe("core");
-    expect((proxied as Request).headers.get("x-toonspectrum-origin-secret")).toBe(
+    expect((proxied as Request).headers.get("x-toonstudio-edge-route")).toBe("core");
+    expect((proxied as Request).headers.get("x-toonstudio-origin-secret")).toBe(
       coreOriginSecret,
     );
     expect(response.headers.get("content-security-policy")).toBe(
@@ -336,7 +336,7 @@ describe("Cloudflare static gateway", () => {
       const proxied = request as Request;
       return new Response(JSON.stringify({
         host: new URL(proxied.url).host,
-        route: proxied.headers.get("x-toonspectrum-edge-route"),
+        route: proxied.headers.get("x-toonstudio-edge-route"),
       }));
     });
     const gateway = createCloudflareStaticGateway({ fetch: upstream });
@@ -392,7 +392,7 @@ describe("Cloudflare static gateway", () => {
     expect(response.headers.get("content-type")).toBe("application/wasm");
     expect(response.headers.get("accept-ranges")).toBe("none");
     expect(response.headers.get("vary")).toContain("Accept-Encoding");
-    expect(response.headers.get("x-toonspectrum-large-asset-source")).toBe(
+    expect(response.headers.get("x-toonstudio-large-asset-source")).toBe(
       "static-br",
     );
     expect(upstream).not.toHaveBeenCalled();
@@ -471,7 +471,7 @@ describe("Cloudflare static gateway", () => {
     expect(response.headers.get("cache-control")).toBe(
       "public, max-age=31536000, immutable",
     );
-    expect(response.headers.get("x-toonspectrum-large-asset-source")).toBe("r2");
+    expect(response.headers.get("x-toonstudio-large-asset-source")).toBe("r2");
     expect(response.headers.get("etag")).toBe('"r2-etag"');
     expect(get).toHaveBeenCalledWith(
       "assets/opencascade.wasm-build123.wasm",
@@ -602,7 +602,7 @@ describe("Cloudflare static gateway", () => {
       const proxied = request as Request;
       return new Response(JSON.stringify({
         url: proxied.url,
-        route: proxied.headers.get("x-toonspectrum-edge-route"),
+        route: proxied.headers.get("x-toonstudio-edge-route"),
         range: proxied.headers.get("range"),
         authorization: proxied.headers.get("authorization"),
         cookie: proxied.headers.get("cookie"),
@@ -673,7 +673,7 @@ describe("Cloudflare static gateway", () => {
 
     expect(await response.text()).toBe("core.example.test");
     const proxied = upstream.mock.calls[0]?.[0] as Request;
-    expect(proxied.headers.get("x-toonspectrum-edge-route")).toBe("social");
+    expect(proxied.headers.get("x-toonstudio-edge-route")).toBe("social");
   });
 
   it("distributes public reads deterministically and retries only safe transient failures", async () => {
@@ -710,9 +710,9 @@ describe("Cloudflare static gateway", () => {
       new URL(attempts[1].url).origin,
     );
     expect(attempts.map((attempt) =>
-      attempt.headers.get("x-toonspectrum-edge-attempt"))).toEqual(["0", "1"]);
+      attempt.headers.get("x-toonstudio-edge-attempt"))).toEqual(["0", "1"]);
     expect(attempts.every((attempt) =>
-      attempt.headers.get("x-toonspectrum-edge-route") === "public-read")).toBe(true);
+      attempt.headers.get("x-toonstudio-edge-route") === "public-read")).toBe(true);
     for (const attempt of attempts) {
       expect(attempt.headers.get("authorization")).toBeNull();
       expect(attempt.headers.get("cookie")).toBeNull();
@@ -741,14 +741,14 @@ describe("Cloudflare static gateway", () => {
     expect(upstream).toHaveBeenCalledOnce();
     const proxied = upstream.mock.calls[0]?.[0] as Request;
     expect(new URL(proxied.url).origin).toBe("https://core.example.test");
-    expect(proxied.headers.get("x-toonspectrum-edge-route")).toBe("core");
+    expect(proxied.headers.get("x-toonstudio-edge-route")).toBe("core");
   });
 
   it("keeps readiness and runtime configuration on core", async () => {
     const upstream = vi.fn<typeof fetch>(async (request) => new Response(
       JSON.stringify({
         host: new URL((request as Request).url).host,
-        route: (request as Request).headers.get("x-toonspectrum-edge-route"),
+        route: (request as Request).headers.get("x-toonstudio-edge-route"),
       }),
     ));
     const gateway = createCloudflareStaticGateway({ fetch: upstream });
@@ -917,7 +917,7 @@ describe("NEIS creator-resource edge", () => {  it("serves keyed school metadata
     ), environment({ NEIS_API_KEY: apiKey }));
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-toonspectrum-neis-mode")).toBe("keyed");
+    expect(response.headers.get("x-toonstudio-neis-mode")).toBe("keyed");
     const body = await response.json() as Record<string, unknown>;
     expect(body).toMatchObject({ provider: "neis", status: "ready", total: 1 });
     const item = (body.items as Array<Record<string, unknown>>)[0];
@@ -954,7 +954,7 @@ describe("NEIS creator-resource edge", () => {  it("serves keyed school metadata
       { headers: { "cf-connecting-ip": "203.0.113.11" } },
     ), environment({ NEIS_API_KEY: apiKey }));
     expect(response.status).toBe(200);
-    expect(response.headers.get("x-toonspectrum-neis-mode")).toBe("sample");
+    expect(response.headers.get("x-toonstudio-neis-mode")).toBe("sample");
     const body = await response.json() as Record<string, unknown>;
     expect(body).toMatchObject({
       provider: "neis",
@@ -972,7 +972,7 @@ describe("NEIS creator-resource edge", () => {  it("serves keyed school metadata
       "https://www.toonstudio.cloud/api/creator-resources/search?provider=neis&q=%EC%A4%91%ED%95%99%EA%B5%90&page=1",
       { headers: { "cf-connecting-ip": "203.0.113.11" } },
     ), environment({ NEIS_API_KEY: apiKey }));
-    expect(next.headers.get("x-toonspectrum-neis-mode")).toBe("sample");
+    expect(next.headers.get("x-toonstudio-neis-mode")).toBe("sample");
     expect(upstream).toHaveBeenCalledTimes(3);
   });
 
@@ -988,8 +988,8 @@ describe("NEIS creator-resource edge", () => {  it("serves keyed school metadata
 
     const first = await gateway(request("학교00"), environment());
     const cached = await gateway(request("학교00"), environment());
-    expect(first.headers.get("x-toonspectrum-edge-cache")).toBe("miss");
-    expect(cached.headers.get("x-toonspectrum-edge-cache")).toBe("hit");
+    expect(first.headers.get("x-toonstudio-edge-cache")).toBe("miss");
+    expect(cached.headers.get("x-toonstudio-edge-cache")).toBe("hit");
     expect(upstream).toHaveBeenCalledOnce();
     for (const query of ["학교01", "학교02", "학교03", "학교04"]) {
       expect((await gateway(request(query), environment())).status).toBe(200);
@@ -1012,7 +1012,7 @@ describe("NEIS creator-resource edge", () => {  it("serves keyed school metadata
 
     expect(response.status).toBe(200);
     expect(response.headers.get(
-      "x-toonspectrum-creator-resource-source",
+      "x-toonstudio-creator-resource-source",
     )).toBe("cloudflare-neis-edge");
     await expect(response.json()).resolves.toEqual([
       { provider: "neis", availability: "configured" },

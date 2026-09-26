@@ -316,7 +316,7 @@ describe("text palette interchange", () => {
 
   it("canonical JSON을 왕복하고 알파/광색역 손실을 경고한다", () => {
     const encoded = JSON.stringify({
-      schema: "toonspectrum.palette",
+      schema: "toonstudio.palette",
       version: 1,
       name: "P3",
       colors: [{ hex: "#ff000080", name: "Glass", alpha: 0.5, colorSpace: "display-p3" }],
@@ -330,9 +330,9 @@ describe("text palette interchange", () => {
 
   it("JSON의 잘못된 schema/version/색 배열을 거부한다", () => {
     expect(errorCode(() => importJsonPalette("{}"))).toBe("invalid");
-    expect(errorCode(() => importJsonPalette('{"schema":"toonspectrum.palette","version":2,"colors":[]}'))).toBe("invalid");
-    expect(errorCode(() => importJsonPalette('{"schema":"toonspectrum.palette","version":1,"colors":[]}'))).toBe("no-colors");
-    expect(errorCode(() => importJsonPalette('{"schema":"toonspectrum.palette","version":1,"colors":[{"hex":"#fff","alpha":2}]}'))).toBe("no-colors");
+    expect(errorCode(() => importJsonPalette('{"schema":"toonstudio.palette","version":2,"colors":[]}'))).toBe("invalid");
+    expect(errorCode(() => importJsonPalette('{"schema":"toonstudio.palette","version":1,"colors":[]}'))).toBe("no-colors");
+    expect(errorCode(() => importJsonPalette('{"schema":"toonstudio.palette","version":1,"colors":[{"hex":"#fff","alpha":2}]}'))).toBe("no-colors");
   });
 
   it("공통 dispatcher가 binary/text codec을 올바르게 선택한다", () => {

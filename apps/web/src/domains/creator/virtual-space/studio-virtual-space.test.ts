@@ -130,7 +130,7 @@ describe("Studio virtual space model", () => {
 describe("Studio virtual space P2P presence", () => {
   it("parses only bounded virtual-space packets", () => {
     const packet = JSON.stringify({
-      wire: "toonspectrum-space-v1",
+      wire: "toonstudio-space-v1",
       kind: "presence",
       sequence: 1,
       at: 10,
@@ -151,7 +151,7 @@ describe("Studio virtual space P2P presence", () => {
 
   it("preserves coordinates and room ids from larger data-driven worlds", () => {
     const parsed = parseStudioVirtualSpacePacket(JSON.stringify({
-      wire: "toonspectrum-space-v1",
+      wire: "toonstudio-space-v1",
       kind: "presence",
       sequence: 7,
       at: 10,
@@ -446,7 +446,7 @@ describe("published world presence isolation", () => {
     peer.start(); expect(scoped.snapshot().peers).toHaveLength(0); peer.close();
     peer = new StudioVirtualSpacePresenceController(B, hub.port(B), { x: 50, y: 50 }, { worldScope: scope });
     peer.start(); peer.sendReaction("wave"); expect(scoped.snapshot().peers).toHaveLength(1); expect(scoped.snapshot().peerReactions).toHaveLength(1);
-    hub.port(B).send(A.sessionId, JSON.stringify({ wire: "toonspectrum-space-v1", kind: "leave", sequence: Number.MAX_SAFE_INTEGER, at: 1, worldScope: "b".repeat(64) }));
+    hub.port(B).send(A.sessionId, JSON.stringify({ wire: "toonstudio-space-v1", kind: "leave", sequence: Number.MAX_SAFE_INTEGER, at: 1, worldScope: "b".repeat(64) }));
     expect(scoped.snapshot().peers).toHaveLength(1); peer.close(); expect(scoped.snapshot().peers).toHaveLength(0); scoped.close();
   });
 });

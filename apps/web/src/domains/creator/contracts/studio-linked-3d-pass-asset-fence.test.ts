@@ -32,7 +32,7 @@ function linkedEnvelope(): CreatorWorkLinked3dJsonEnvelope {
         id: "page-1",
         elements: [{ id: "line-1", type: "image", src: LOCATOR_A }],
         linked3dRender: {
-          kind: "toonspectrum.studio-linked-3d-render",
+          kind: "toonstudio.studio-linked-3d-render",
           version: 2,
           authority: "studio-project-linked-3d-pass-index",
           links: [{

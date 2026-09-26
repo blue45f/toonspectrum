@@ -54,7 +54,7 @@ function result(
     height: 540,
     title: "검증된 WILL",
     createdAt: "2026-07-30T00:00:00Z",
-    application: "ToonSpectrum",
+    application: "ToonStudio",
     applicationVersion: "1.0",
     paths: [path()],
     assurance: STUDIO_WILL_V1_OPC_ASSURANCE,

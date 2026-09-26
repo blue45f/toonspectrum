@@ -1,4 +1,4 @@
-// @toonspectrum/core/catalog — 서버에서 적재되는(브라우저-세이프) 카탈로그 read-model 배럴.
+// @toonstudio/core/catalog — 서버에서 적재되는(브라우저-세이프) 카탈로그 read-model 배럴.
 // 웹과 API가 공유하는 정적 read-model만 모읍니다.
 // 주의: drizzle/pg/db/node API 에 직접 의존하는 진짜 서버 전용 모듈
 // (title·reviews·live·oauth·session 등)은 여기로 옮기지 않고 apps/api/src/server/ 에 남긴다.

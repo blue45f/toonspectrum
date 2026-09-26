@@ -1,4 +1,4 @@
-# ToonSpectrum Studio 기능 완성도 감사
+# ToonStudio Studio 기능 완성도 감사
 
 - 기준일: 2026-07-12
 - 최신 구현 반영: 2026-07-20 (CRDT/WebGPU/다중 서버 adapter/절차적 360° 환경과 3D 후속 감사)
@@ -187,7 +187,7 @@ announce→request→approved→SDP가 같은 `shareId`를 보존했고, `shareI
 
 비교 기준은 CELSYS의 [3D 기능 사용법](https://help.clip-studio.com/ko-kr/manual_kr/660_3d/660_3d.htm), [3D 데이터 종류](https://help.clip-studio.com/ko-kr/manual_kr/660_3d/3D_%EB%8D%B0%EC%9D%B4%ED%84%B0_%EC%A2%85%EB%A5%98.htm), [3D 파일 가져오기](https://help.clip-studio.com/ko-kr/manual_kr/660_3d/3D_%ED%8C%8C%EC%9D%BC_%EA%B0%80%EC%A0%B8%EC%98%A4%EA%B8%B0.htm)다.
 
-| Clip Studio 3D 기능군 | ToonSpectrum | 구현 가능성/격차 |
+| Clip Studio 3D 기능군 | ToonStudio | 구현 가능성/격차 |
 | --- | --- | --- |
 | GLB/glTF/OBJ/FBX 등 import | 부분/강한 부분 | GLB, glTF, OBJ/MTL, FBX, DAE, STL, PLY, 3DS와 연결 리소스를 로컬에서 해석해 self-contained GLB 2.0으로 정규화하는 로더 경로는 구현됐다. 다만 일부 형식은 실제 저작 도구·버전·텍스처 조합을 포함한 release corpus가 아직 미완이므로 모든 변형의 지원 완료로 판정하지 않는다 |
 | KTX2/Basis texture | 완료/강한 부분 | validation Worker가 구조·예산 검사, pinned Basis transcoder attestation과 전체 mip pretranscode를 먼저 수행한다. 검증 성공의 parsed-root `usesBasisTextures` 표식이 있을 때만 viewport가 별도 lazy chunk의 Three `KTX2Loader`를 요청한다. 활성 WebGLRenderer로 GPU 형식 지원을 감지하고, window realm에서도 동일 JS/WASM을 다시 hash-attest한 뒤 embedded `blob:` source만 허용한다. 파싱 완료 즉시 decoder Worker/object URL을 dispose하며 설정·decode 실패는 고정 한국어 코드로 표시한다. 실제 GPU/driver별 pixel golden과 context-loss 재시도 corpus는 후속이다 |

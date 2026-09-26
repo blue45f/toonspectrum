@@ -22,7 +22,7 @@ import type { DrawEl } from "../apps/web/src/domains/creator/studio-element-mode
 
 const origin = process.env.TOONSPECTRUM_VERIFY_ORIGIN;
 assert.ok(origin, "Set TOONSPECTRUM_VERIFY_ORIGIN to the production preview to verify");
-const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? "/tmp/toonspectrum-dry-media-selection";
+const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? "/tmp/toonstudio-dry-media-selection";
 const ids = (process.env.TOONSPECTRUM_BRUSH_VERIFY_IDS ?? "precision-pencil,velvet-charcoal").split(",");
 const items = ids.map(id => {
   const item = STUDIO_LISTED_PAINT_BRUSH_CATALOG_ITEMS.find(candidate => candidate.id === id);

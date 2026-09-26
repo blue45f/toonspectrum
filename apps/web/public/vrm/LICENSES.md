@@ -1,6 +1,6 @@
 # 번들 VRM 모델 출처·라이선스
 
-ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처와 이용조건 요약입니다.
+ToonStudio 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처와 이용조건 요약입니다.
 실제 이용 시에는 각 원본 배포처의 최신 라이선스 전문을 반드시 확인하세요.
 
 ## 신규 추가 모델 (2026-06)
@@ -137,7 +137,7 @@ ToonSpectrum 스튜디오(/studio)에 번들된 VRM 캐릭터 모델의 출처�
 | `Vivi.vrm` | 비비 | madjin/vrm-samples | 저장소 고지 조건 |
 | `Vita.vrm` | 비타 | madjin/vrm-samples | 저장소 고지 조건 |
 | `Victoria_Rubin.vrm` | 루빈 | madjin/vrm-samples | 저장소 고지 조건 |
-| `Avatar_Orion.vrm` | 오리온 (로봇) | Polygonal Mind 원본 메시·텍스처·스킨 + ToonSpectrum VRM 1.0 리그 수리 | 원본 내장 `author: Polygonal Mind`, `licenseName: CC0` |
+| `Avatar_Orion.vrm` | 오리온 (로봇) | Polygonal Mind 원본 메시·텍스처·스킨 + ToonStudio VRM 1.0 리그 수리 | 원본 내장 `author: Polygonal Mind`, `licenseName: CC0` |
 | `cryptovoxels.vrm` | 크립토 (복셀봇) | madjin/vrm-samples | 저장소 고지 조건 |
 | `meebit_09842.vrm` | 미빗 (블록맨) | madjin/vrm-samples | **권리 격리:** Meebits 보유자 이용조건을 일반 번들 재배포·상업 서비스 권한으로 간주할 수 없어 신규 카탈로그 제공과 런타임 로드를 차단함 |
 | `Seed_san.vrm` | 시드상 (마스코트) | madjin/vrm-samples | VRM 프로젝트 마스코트 샘플 고지 조건 |
@@ -163,4 +163,4 @@ exporter로 만든 VRM 1.0 수리본입니다. 기존 `orion` ID와 `/vrm/Avatar
 ## 공개 도메인 원문
 
 - 100Avatars(Polygonal Mind) 모델은 CC0 1.0으로 배포됩니다. 원문: <https://creativecommons.org/publicdomain/zero/1.0/>
-- 퇴역한 ToonSpectrum 오리지널 `TS_Minseo_Campus.vrm`(CC0 1.0, SHA-256 `903601a5…8ebea`)은 번들에서 제거됐지만, 그 모델로 렌더한 `public/catalog/studio-vrm-avatar-reference-catalogue-v1.json`은 그대로 유지되는 파생 산출물입니다.
+- 퇴역한 ToonStudio 오리지널 `TS_Minseo_Campus.vrm`(CC0 1.0, SHA-256 `903601a5…8ebea`)은 번들에서 제거됐지만, 그 모델로 렌더한 `public/catalog/studio-vrm-avatar-reference-catalogue-v1.json`은 그대로 유지되는 파생 산출물입니다.

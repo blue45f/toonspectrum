@@ -36,7 +36,7 @@ for (const asset of additions) {
 }
 const byKind = Object.fromEntries([...new Set(additions.map(asset => asset.kind))].map(kind => [kind, additions.filter(asset => asset.kind === kind).length]));
 const report = {
-  schema: 'toonspectrum.premium-release.v1',
+  schema: 'toonstudio.premium-release.v1',
   previousCatalogEntries: before.assets.length, currentCatalogEntries: current.assets.length,
   addedEntries: additions.length,
   independentOriginals: additions.filter(asset => !asset.derivedFrom).length,

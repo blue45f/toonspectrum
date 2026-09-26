@@ -51,7 +51,7 @@ export function studioAiUserIdempotencyKeyHash(userId: string, key: string): Uin
   if (typeof userId !== "string" || userId.trim().length === 0) {
     throw new TypeError("Studio AI idempotency requires an authenticated user id.");
   }
-  return digestCanonicalTuple(["toonspectrum-studio-ai-user-key-v1", userId, parseStudioAiIdempotencyKey(key)]);
+  return digestCanonicalTuple(["toonstudio-studio-ai-user-key-v1", userId, parseStudioAiIdempotencyKey(key)]);
 }
 
 /**
@@ -60,7 +60,7 @@ export function studioAiUserIdempotencyKeyHash(userId: string, key: string): Uin
  */
 export function studioAiCanonicalRequestHash(input: StudioAiChatDto): Uint8Array<ArrayBuffer> {
   return digestCanonicalTuple([
-    "toonspectrum-studio-ai-request-v1",
+    "toonstudio-studio-ai-request-v1",
     input.task,
     input.provider ?? "auto",
     input.promptVersion,

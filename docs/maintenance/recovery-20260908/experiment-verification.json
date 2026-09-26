@@ -1,6 +1,6 @@
 {
-  "folder": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/scripts/experiments/recovered-20260908",
-  "auditJson": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+  "folder": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/scripts/experiments/recovered-20260908",
+  "auditJson": "/tmp/toonstudio-all-unmerged-backups-a1.json",
   "scope": "Only scripts/experiments/recovered-20260908; no commit, push, ref/worktree removal, GPU/browser/API execution",
   "files": [
     {
@@ -164,7 +164,7 @@
         "failedTests": 0,
         "resultPath": "evidence/cpu-verification/inkwash-parity.json",
         "sha256": "52cc8637b20f76187407f03881765ea43948d3b825bf1db4e3a5b74c75cf5684",
-        "originalRunDirectory": "/tmp/toonspectrum-recovered-experiments-20260908-a1-inkwash-adapted"
+        "originalRunDirectory": "/tmp/toonstudio-recovered-experiments-20260908-a1-inkwash-adapted"
       },
       {
         "experiment": "ink-field",
@@ -172,7 +172,7 @@
         "failedTests": 0,
         "resultPath": "evidence/cpu-verification/ink-field.json",
         "sha256": "17e2565d528fa3edfd590a636b2a3755e2c946f3065a45b7af8e9c2bf543a14a",
-        "originalRunDirectory": "/tmp/toonspectrum-recovered-experiments-20260908-a1"
+        "originalRunDirectory": "/tmp/toonstudio-recovered-experiments-20260908-a1"
       },
       {
         "experiment": "painttube-ab",
@@ -180,7 +180,7 @@
         "failedTests": 0,
         "resultPath": "evidence/cpu-verification/painttube-ab.json",
         "sha256": "356bd6556ed491b4797137659598fe7f2b9d6bbf9a073cc5e32dfb8cc6e36a7d",
-        "originalRunDirectory": "/tmp/toonspectrum-recovered-experiments-20260908-a1-painttube-typed"
+        "originalRunDirectory": "/tmp/toonstudio-recovered-experiments-20260908-a1-painttube-typed"
       }
     ],
     "totalPassedTests": 27,

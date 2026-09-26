@@ -234,7 +234,7 @@ function splitPath(path: string): { dirs: string[]; file: string } {
  */
 export function createStudioOpfsNativeFileSystem(
   storageManager: StudioOpfsStorageManagerLike,
-  rootName = "toonspectrum-studio-assets"
+  rootName = "toonstudio-studio-assets"
 ): StudioOpfsFileSystem {
   let rootPromise: Promise<StudioOpfsDirectoryHandleLike> | null = null;
 
@@ -437,7 +437,7 @@ export function createStudioOpfsLegacyLocalStorageFileSystem(
   storage: StudioOpfsLegacyLocalStorageLike,
   options: StudioOpfsLegacyLocalStorageFileSystemOptions = {}
 ): StudioOpfsFileSystem {
-  const keyPrefix = options.keyPrefix ?? "toonspectrum-studio-opfs-legacy:";
+  const keyPrefix = options.keyPrefix ?? "toonstudio-studio-opfs-legacy:";
   const indexKey = `${keyPrefix}__paths`;
   const maxTotalBytes =
     options.maxTotalBytes ?? STUDIO_OPFS_LEGACY_LOCAL_STORAGE_MAX_TOTAL_BYTES;

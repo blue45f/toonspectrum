@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { readBrowserPreference, writeBrowserPreference } from "./browser-preferences";
 
-export const CREATOR_EXPERIENCE_STORAGE_KEY = "toonspectrum-creator-experience-mode-v1";
+export const CREATOR_EXPERIENCE_STORAGE_KEY = "toonstudio-creator-experience-mode-v1";
 export type CreatorExperienceMode = "classic" | "virtual-studio";
 
 export function defaultCreatorExperienceMode(_narrow: boolean): CreatorExperienceMode {

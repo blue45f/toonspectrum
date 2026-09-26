@@ -29,7 +29,7 @@ for (const [policy, digest] of [
     assert.equal(document.source, "static");
     if (policy === "privacy-policy") {
       assert.equal(document.versionLabel, "내장본 v2026.09.18");
-      assert.equal(document.contentHash, "static-privacy-20260918-toonspectrum-business-inquiries");
+      assert.equal(document.contentHash, "static-privacy-20260918-toonstudio-business-inquiries");
     }
     assert.equal(document, getStaticPolicyDocument(policy));
     assert.equal(Object.isFrozen(document), true);

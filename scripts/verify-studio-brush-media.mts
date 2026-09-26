@@ -62,12 +62,12 @@ import {
 const SCRATCH =
   process.env.TOONSPECTRUM_BRUSH_MEDIA_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-brush-media");
+  ?? join(tmpdir(), "toonstudio-studio-brush-media");
 const LOG_PATH = join(SCRATCH, "studio-brush-media-verify.log");
 const REPORT_PATH = join(SCRATCH, "studio-brush-media-report.json");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 const OPTIONAL_STATIC_PREVIEW_PATHS = [
   "/api/health/ready",
   "/api/auth/session",
@@ -1132,7 +1132,7 @@ async function main(): Promise<void> {
       ...entry.browserErrors.responses,
     ]);
     const report = {
-      kind: "toonspectrum-studio-brush-media-browser-quality-v2",
+      kind: "toonstudio-studio-brush-media-browser-quality-v2",
       generatedAt: new Date().toISOString(),
       route: studioUrl,
       scratch: SCRATCH,

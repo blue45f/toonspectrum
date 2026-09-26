@@ -43,7 +43,7 @@ const ALLOWED = {
 const DESCRIPTOR = {
   providerId: REQUEST.providerId,
   provider: "cloudflare",
-  audience: "toonspectrum-realtime",
+  audience: "toonstudio-realtime",
   workloads: ["presence", "comments", "screen-signaling"],
   capabilities: [
     "presence.snapshot-v1",

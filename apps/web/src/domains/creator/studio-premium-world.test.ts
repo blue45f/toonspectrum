@@ -27,7 +27,7 @@ const publishedPremiumAssets = catalog.filter((asset) => asset.id.startsWith("ts
 // Unrelated GitHub URLs must never become a trusted asset provider.
 describe("premium world provenance boundary", () => {
   it("admits only the exact reviewed first-party generator", () => {
-    expect(isTrustedStudioCc0Source("ToonSpectrum", STUDIO_PREMIUM_WORLD_SOURCE_URL)).toBe(true);
+    expect(isTrustedStudioCc0Source("ToonStudio", STUDIO_PREMIUM_WORLD_SOURCE_URL)).toBe(true);
     for (const url of [
       `${STUDIO_PREMIUM_WORLD_SOURCE_URL}?raw=1`,
       `${STUDIO_PREMIUM_WORLD_SOURCE_URL}#forged`,
@@ -37,7 +37,7 @@ describe("premium world provenance boundary", () => {
       "https://polyhaven.com/a/fake",
       "not a URL",
     ]) {
-      expect(isTrustedStudioCc0Source("ToonSpectrum", url)).toBe(false);
+      expect(isTrustedStudioCc0Source("ToonStudio", url)).toBe(false);
     }
     expect(isTrustedStudioCc0Source("Other", STUDIO_PREMIUM_WORLD_SOURCE_URL)).toBe(false);
   });
@@ -73,7 +73,7 @@ describe("premium world publication boundary", () => {
     candidate.visualReviewed = true;
     candidate.license = {
       ...candidate.license,
-      provider: "ToonSpectrum",
+      provider: "ToonStudio",
       sourceUrl: "https://github.com/other-owner/unrelated/blob/main/asset.py",
     };
 

@@ -12,7 +12,7 @@ function catalogFetch(titles = searchFixture()) {
     const pathname = new URL(String(input), "https://catalog.test").pathname;
     if (pathname === "/data/catalog/manifest.json") {
       return Response.json({
-        version: "toonspectrum.catalog-shards.v1",
+        version: "toonstudio.catalog-shards.v1",
         count: titles.length,
         shards: [
           { file: "catalog/00.json", count: shards[0].length },
@@ -62,7 +62,7 @@ describe("static catalog pagination contract", () => {
       const pathname = new URL(String(input), "https://catalog.test").pathname;
       if (pathname === "/data/catalog/manifest.json") {
         return Response.json({
-          version: "toonspectrum.catalog-shards.v1",
+          version: "toonstudio.catalog-shards.v1",
           count: 2,
           shards: [{ file: "catalog/00.json", count: 2 }],
         });

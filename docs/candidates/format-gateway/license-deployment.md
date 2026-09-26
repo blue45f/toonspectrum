@@ -24,7 +24,7 @@
 - SQLite SUT/SUTG는 `node:sqlite`로 schema와 데이터를 직접 작성한다.
 - Pressure graph는 문서화된 테스트 계약에 맞춰 숫자 tap에서 생성한다.
 - KPP/PNG/XML/MYB/Krita bundle은 리포의 synthetic builder가 생성한다.
-- 이름, 색, 곡선, metadata와 preview는 ToonSpectrum QA의 자가 제작 데이터다.
+- 이름, 색, 곡선, metadata와 preview는 ToonStudio QA의 자가 제작 데이터다.
 - 실제 CSP/Krita 사용자 brush, vendor logo, thumbnail, texture는 포함하지 않는다.
 
 향후 제3자 corpus를 추가할 때 필요한 필드:

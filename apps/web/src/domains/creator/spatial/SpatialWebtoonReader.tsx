@@ -25,7 +25,7 @@ function initialPreferences(id: string, direction?: SpatialReaderDirection) {
     return { ...state, settings: { ...state.settings, ...(direction ? { direction } : {}) } };
   } catch { return { cursor: { page: 0, segment: 0 }, settings: { ...SPATIAL_READER_DEFAULTS, ...(direction ? { direction } : {}) } }; }
 }
-const UNSUPPORTED = { kind: "toonspectrum.studio-webxr-support", version: 1, immersiveAr: "unsupported", immersiveVr: "unsupported" } as const;
+const UNSUPPORTED = { kind: "toonstudio.studio-webxr-support", version: 1, immersiveAr: "unsupported", immersiveVr: "unsupported" } as const;
 export default function SpatialWebtoonReader({ pages: initialPages = EMPTY_PAGES, workId = "local:spatial-preview", title = "나의 공간 웹툰", direction, onClose }: SpatialWebtoonReaderProps) {
   const [initial] = useState(() => initialPreferences(workId, direction));
   const [settings, setSettings] = useState<SpatialReaderSettings>(initial.settings);

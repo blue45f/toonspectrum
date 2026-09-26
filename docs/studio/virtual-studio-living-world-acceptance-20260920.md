@@ -12,14 +12,14 @@
 | 생활 NPC | current / 로컬 ambient | 기본 월드에 안내·작가·그림·자료 역할의 NPC 4명을 둔다. 작업·참조 확인·휴식·이동·양보·인사·대기 상태와 충돌 가능한 경로를 사용하고, 실제 사용자가 가까우면 양보한다. canvas 또는 키보드/터치용 NPC 목록에서 기존 제작 도구를 명시적으로 연다. | NPC director 및 접근성 가능한 목록 테스트. NPC는 온라인 사람 수에 포함하지 않으며, 공유 authoritative NPC 상태 또는 LLM 대화라고 표시하지 않는다. |
 | 분위기와 접근성 | current | Focus / Balanced / Lively 조절, 집중·자리 비움 시 초대 차단과 기존 활동 종료, reduced-motion에 맞춘 NPC 활동 억제, 명시적인 참가자·NPC 버튼을 제공한다. | 컴포넌트·정책 테스트. 제품 전체의 스크린리더 적합성 인증 또는 모든 동작의 수동 접근성 감사 완료를 뜻하지 않는다. |
 | 실제 사용자 초대 | current | 대화·따라가기·함께 검토·축하 요청에 수락/거절/취소/만료를 둔다. 사용자 선택이나 rerender만으로 활동을 시작하지 않는다. 기존 활동 교체, controller 교체, 상대 이탈, 집중 전환, 수동 이동과 일치하는 Huddle 종료 때 소유한 활동을 정리한다. | paired controller, hook, 실제 Page 통합 테스트와 native RTCDataChannel fixture. 서로의 브라우저를 강제 이동하거나 문서를 자동 수정하지 않는다. |
-| Social 전송 | current | 별도 `toonspectrum-space-social-v1` schema와 ordered/reliable direct lane을 사용한다. 실제 transport 참가자, target, epoch, sequence, 요청 ID·만료, 전체 manifest SHA-256을 확인하고 terminal 기록의 재시작을 막는다. 메시지 2048B, pending 4건, 보관 64건 등의 한도를 둔다. | malformed/다른 world/replay·중복·취소·연결 종료 테스트. 기존 방 admission을 재사용하며 별도 게임 서버·TURN·SFU·DB 동기화를 추가하지 않는다. |
+| Social 전송 | current | 별도 `toonstudio-space-social-v1` schema와 ordered/reliable direct lane을 사용한다. 실제 transport 참가자, target, epoch, sequence, 요청 ID·만료, 전체 manifest SHA-256을 확인하고 terminal 기록의 재시작을 막는다. 메시지 2048B, pending 4건, 보관 64건 등의 한도를 둔다. | malformed/다른 world/replay·중복·취소·연결 종료 테스트. 기존 방 admission을 재사용하며 별도 게임 서버·TURN·SFU·DB 동기화를 추가하지 않는다. |
 | 동의된 Huddle | current | social 요청 ID를 conversation ID로 사용하고 승인된 정확한 멤버 집합에만 scoped media link를 만든다. 외부 사용자·다른 scope의 신호/미디어를 거부하며 mic/camera는 자동 활성화하지 않는다. scope 변경·탈퇴·종료는 관련 track과 연결을 닫고 matching 종료 알림을 보낸다. 일반 toolbar Huddle 동작을 유지한다. | controller·launcher 테스트로 대상 제한과 track 정리 확인. 서로 다른 실제 장치에서 카메라/마이크 권한, ICE, 미디어 품질을 종단 간 입증한 것은 아니다. |
 | Presence와 재접속 | current | 위치·아바타·reaction을 기존 저지연 presence로 전달한다. 잃어버린 leave 뒤 controller 또는 모듈이 재생성되어도 session별 sequence가 감소하지 않도록 브라우저 session storage와 메모리에 보존한다. storage 차단 시 로컬 동작을 계속한다. | lost leave·재접속·모듈 reload·storage 차단 회귀 테스트. presence 전송률은 아래 fixture에서 측정한 값이며 WAN 성능 보장은 아니다. |
 | 월드 편집과 안전한 진입 | current | 로컬 authoring preview와 production 위치 저장을 분리한다. JSON/Tiled import/export, asset URL·필수 필드·실제 skin·좌표·충돌·spawn·portal 목적지 검증을 둔다. 홀수 픽셀 크기도 정수 Tiled 크기로 내보낸다. NPC 순찰 각 구간의 연결성을 공통 충돌 규칙과 탐색 한도 안에서 검사한다. room portal은 spawn 이름 대신 실제 위치의 방을 확인한다. | 맵/authoring/pathfinding 테스트. 탐색 한도 초과는 검증 오류이며 도달 가능하다고 낙관하지 않는다. collider 수정은 flattened 배경 속 가구 이미지를 이동시키지 않는다. |
 
 ## 검증 근거
 
-검증 작업 디렉터리는 격리된 `virtual-studio-living-world/toonspectrum`이다. 다른 진행 중 worktree의 파일은 수정하지 않았으며, 기존 polish 변경은 최초 snapshot과 이후 source delta를 비교해 필요한 수정만 통합했다. 생성 리포트·스크린샷과 `/tmp` 로그는 로컬 증거이며 배포 산출물이 아니다.
+검증 작업 디렉터리는 격리된 `virtual-studio-living-world/toonstudio`이다. 다른 진행 중 worktree의 파일은 수정하지 않았으며, 기존 polish 변경은 최초 snapshot과 이후 source delta를 비교해 필요한 수정만 통합했다. 생성 리포트·스크린샷과 `/tmp` 로그는 로컬 증거이며 배포 산출물이 아니다.
 
 - 최종 기능 통합 후 Virtual Space·Huddle·Vite interop의 **23개 파일, 256개 테스트가 모두 통과**했다 (`/tmp/virtual-studio-final-suite.log`). 아래 개별 검사 수는 이 결과와 중복되므로 합산하지 않는다.
 - Huddle 관련 7개 파일의 **80개 테스트 통과**: exact conversation membership, outsider inbound 거부, scope 변경 시 캡처/수신 track 정리, pending/active 종료, matching close와 reentrant 종료 알림, 일반 toolbar 유지.

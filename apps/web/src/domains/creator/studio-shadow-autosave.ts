@@ -3,7 +3,7 @@ import {
   fnv1a64Hex,
   recoverProject,
   sceneDigest,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import { createSqliteJournalStore } from "./studio-sqlite-journal-store";
 
@@ -14,7 +14,7 @@ import type {
   RecoveryReport,
   SceneIR,
   SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * V11 스트랭글러 — 레거시 오토세이브의 **관찰 전용 섀도 미러 레인**.

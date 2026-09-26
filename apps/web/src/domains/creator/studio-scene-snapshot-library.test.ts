@@ -186,7 +186,7 @@ describe("Studio scene snapshot personal library", () => {
       library.STUDIO_SCENE_SNAPSHOT_DATABASE_VERSION
     );
     await putRaw(database, {
-      kind: "toonspectrum-studio-scene-snapshot",
+      kind: "toonstudio-studio-scene-snapshot",
       schemaVersion: 1,
       id: "scene-corrupt",
       name: "손상",

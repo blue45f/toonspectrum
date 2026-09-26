@@ -130,7 +130,7 @@ describe("browser auth session persistence", () => {
       return;
     }
     const logoutSignal = storageSet?.mock.calls.find(
-      ([key]) => key === "toonspectrum-auth-session-logout-v1",
+      ([key]) => key === "toonstudio-auth-session-logout-v1",
     );
     expect(logoutSignal).toBeDefined();
     expect(JSON.stringify(logoutSignal)).not.toContain("private-token");

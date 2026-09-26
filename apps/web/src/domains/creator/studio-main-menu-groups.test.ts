@@ -18,7 +18,7 @@ import type {
   StudioMainMenuGroup,
   StudioMainMenuItem,
 } from "./studio-main-menu-model";
-import type { CommandId } from "@toonspectrum/studio-command-registry";
+import type { CommandId } from "@toonstudio/studio-command-registry";
 
 const AVAILABLE_EDIT_ACTIONS: StudioMainMenuEditAvailability = {
   undoDisabled: false,
@@ -436,7 +436,7 @@ describe("buildStudioMainMenuGroups", () => {
       disabled: true,
     });
     expect(menuItem(groups, "file", "publish")).toMatchObject({
-      label: "ToonSpectrum 게시 수정…",
+      label: "ToonStudio 게시 수정…",
       disabled: true,
     });
     expect(menuItem(groups, "file", "export-archive").disabled).toBe(true);

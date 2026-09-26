@@ -98,7 +98,7 @@ export function personalCloudTokenContext(
   provider: PersonalCloudProviderId,
   kind: "access" | "refresh" | "oauth-cookie",
 ): string {
-  return `toonspectrum.personal-cloud.v1:${kind}:${provider}:${userId}`;
+  return `toonstudio.personal-cloud.v1:${kind}:${provider}:${userId}`;
 }
 
 export function encodePersonalCloudOAuthState(

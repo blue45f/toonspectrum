@@ -671,7 +671,7 @@ async function main(): Promise<void> {
   const digestPayload = JSON.stringify({ sourceCommit, cases });
   const benchmarkDigest = `sha256:${createHash("sha256").update(digestPayload).digest("hex")}`;
   const report = {
-    kind: "toonspectrum-all-brush-screen-fill-gpu-election-v2",
+    kind: "toonstudio-all-brush-screen-fill-gpu-election-v2",
     generatedAt,
     expiresAt,
     sourceCommit,

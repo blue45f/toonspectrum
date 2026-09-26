@@ -9,7 +9,7 @@ import type {
 } from "./studio-3d-asset-supply";
 
 export const STUDIO_3D_ASSET_REFINERY_RECEIPT_SCHEMA =
-  "toonspectrum.studio-3d-asset-refinery-receipt" as const;
+  "toonstudio.studio-3d-asset-refinery-receipt" as const;
 export const STUDIO_3D_ASSET_REFINERY_RECEIPT_VERSION = 1 as const;
 
 export const STUDIO_3D_ASSET_REFINERY_STAGES = [

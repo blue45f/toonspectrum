@@ -53,7 +53,7 @@ export class StudioLivingInkExecutionError extends Error {
 function defaultWorkerFactory(): StudioLivingInkWorkerLike {
   return new Worker(new URL("./studio-living-ink.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-living-ink-selected-gpu",
+    name: "toonstudio-living-ink-selected-gpu",
   });
 }
 

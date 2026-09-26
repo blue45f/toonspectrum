@@ -334,7 +334,7 @@ describe("planFrameAnimationExport", () => {
 describe("frameAnimationExportFileName", () => {
   it("제목 기반 파일명, 빈 제목이면 기본값", () => {
     expect(frameAnimationExportFileName("내 작품")).toBe("내 작품-frames.webm");
-    expect(frameAnimationExportFileName("  ")).toBe("toonspectrum-frame-anim-frames.webm");
+    expect(frameAnimationExportFileName("  ")).toBe("toonstudio-frame-anim-frames.webm");
   });
 });
 

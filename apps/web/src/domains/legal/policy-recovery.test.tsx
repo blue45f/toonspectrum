@@ -23,7 +23,7 @@ describe("first-party legal policy availability", () => {
 
       expect(screen.getByRole("heading", { name: title, level: 1 })).toBeTruthy();
       expect(screen.getByRole("heading", { name: expectedBody, level: 2 })).toBeTruthy();
-      expect(screen.getByText("툰스펙트럼 게시 정책")).toBeTruthy();
+      expect(screen.getByText("툰스튜디오 게시 정책")).toBeTruthy();
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(document.body.textContent).not.toContain("TermsDesk");
       expect(document.body.innerHTML).not.toContain("vercel.app");

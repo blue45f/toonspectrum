@@ -2,7 +2,7 @@ import { ExternalLink, FileAudio, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { LocalMusicTrack } from "./studio-music-client";
-import type { MusicBrief } from "@toonspectrum/core/studio-music";
+import type { MusicBrief } from "@toonstudio/core/studio-music";
 
 import {
   findMusicProvider,

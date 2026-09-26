@@ -496,7 +496,7 @@ export function MarketResourceDetailArticle({
                     {record.containsAi ? translateCurrentStaticSourceText("domains.market.components.MarketResourceDetailArticle", "ko", "AI 사용 포함으로 공개") : translateCurrentStaticSourceText("domains.market.components.MarketResourceDetailArticle", "ko", "AI 사용 미포함으로 공개")}
                   </p>
                   <p className="mt-0.5 text-[0.68rem] leading-relaxed text-fg-3">
-                    {translateCurrentStaticSourceText("domains.market.components.MarketResourceDetailArticle", "ko", "배급자 manifest의 공개값이며 ToonSpectrum의 독립 감정이나 NoAI 보증 배지가 아닙니다.")}</p>
+                    {translateCurrentStaticSourceText("domains.market.components.MarketResourceDetailArticle", "ko", "배급자 manifest의 공개값이며 ToonStudio의 독립 감정이나 NoAI 보증 배지가 아닙니다.")}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2.5 rounded-lg border border-line/60 bg-panel/50 p-3">

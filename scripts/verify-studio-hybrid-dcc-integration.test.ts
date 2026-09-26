@@ -30,7 +30,7 @@ const UNDONE_TRANSFORM = {
   scale: [1, 1, 1],
 } as const;
 const OPFS_FILE = {
-  path: "toonspectrum-hybrid-dcc-v1/dcc-workspaces/document/cp-1-e1-c0.bin",
+  path: "toonstudio-hybrid-dcc-v1/dcc-workspaces/document/cp-1-e1-c0.bin",
   byteLength: 8_192,
   sha256: FILE_HASH,
 } as const;
@@ -184,7 +184,7 @@ function successfulResult(): StudioHybridDccIntegrationResult {
     },
     blocker: null,
     issues: [],
-    evidenceDirectory: "/tmp/toonspectrum-studio-hybrid-dcc-integration",
+    evidenceDirectory: "/tmp/toonstudio-studio-hybrid-dcc-integration",
   };
 }
 

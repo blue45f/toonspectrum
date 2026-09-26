@@ -13,7 +13,7 @@ import { createStudioReviewLocalStorageEnvironment } from "./studio-review-local
 const run = promisify(execFile);
 export const STUDIO_REVIEW_MINIO_IMAGE = "quay.io/minio/minio@sha256:9966a92a734f9411e32f4f41d7d9d826fcdc0f68c4e20b70295bd4e7c11f8a2f";
 export const STUDIO_REVIEW_MC_IMAGE = "quay.io/minio/mc@sha256:37d109dddbbb2c95873f5fc81ac93f37023264770fc580a7564148892087b1b7";
-const OWNER_LABEL = "io.toonspectrum.qa.review-storage";
+const OWNER_LABEL = "io.toonstudio.qa.review-storage";
 const LEGACY_REVIEW_POSTGRES = "codex-virtual-studio-host-pg-20260920";
 const ISOLATED_REVIEW_POSTGRES_PATTERN = /^codex-review-storage-test-pg-[a-f0-9]{10}$/u;
 const REVIEW_POSTGRES_IMAGES = new Set([
@@ -23,14 +23,14 @@ const REVIEW_POSTGRES_IMAGES = new Set([
 
 /** Creates one local CA without installing it in any system trust store. */
 export async function createStudioReviewQaCertificates() {
-  const directory = await mkdtemp(path.join(tmpdir(), "toonspectrum-review-storage-qa-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "toonstudio-review-storage-qa-"));
   await chmod(directory, 0o700);
   try {
     const extensions = path.join(directory, "server.cnf");
     const caConfig = path.join(directory, "ca.cnf");
     await writeFile(caConfig, "[req]\ndistinguished_name=dn\n[dn]\n[v3_ca]\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign\n", { mode: 0o600 });
     await writeFile(extensions, "basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=IP:127.0.0.1,DNS:localhost\n", { mode: 0o600 });
-    await run("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-config", caConfig, "-extensions", "v3_ca", "-subj", "/CN=ToonSpectrum disposable review QA CA",
+    await run("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-config", caConfig, "-extensions", "v3_ca", "-subj", "/CN=ToonStudio disposable review QA CA",
       "-keyout", path.join(directory, "ca.key"), "-out", path.join(directory, "ca.crt")]);
     await run("openssl", ["req", "-new", "-newkey", "rsa:2048", "-nodes", "-subj", "/CN=127.0.0.1",
       "-keyout", path.join(directory, "private.key"), "-out", path.join(directory, "server.csr")]);
@@ -94,7 +94,7 @@ export async function withStudioReviewLocalStorage(environment, output, verify) 
   assert.equal(postgresEnvironment.POSTGRES_DB, database.databaseName);
   assert.equal(postgresEnvironment.POSTGRES_USER, decodeURIComponent(databaseUrl.username));
   if (ISOLATED_REVIEW_POSTGRES_PATTERN.test(pgName)) {
-    assert.equal(postgres.Config.Labels?.["io.toonspectrum.qa.review-storage-postgres"], "true",
+    assert.equal(postgres.Config.Labels?.["io.toonstudio.qa.review-storage-postgres"], "true",
       "The isolated review PostgreSQL container must carry the explicit QA ownership label.");
     assert.equal(postgres.State.Running, true, "A random-port review test container must already be running.");
   }

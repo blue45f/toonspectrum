@@ -2,7 +2,7 @@
  * CanvasKit/Skia quality provider.
  *
  * CanvasKit is deliberately a specialist, not Studio's document or live-frame authority. It
- * consumes ToonSpectrum-owned SVG path data, performs Skia PathOps / stroke expansion, returns
+ * consumes ToonStudio-owned SVG path data, performs Skia PathOps / stroke expansion, returns
  * plain SVG path data, and releases every Embind allocation before returning. The saved document
  * therefore never contains a CanvasKit object or a WASM pointer.
  */

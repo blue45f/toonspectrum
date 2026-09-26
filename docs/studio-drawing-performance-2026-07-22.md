@@ -6,7 +6,7 @@
 
 ## Outcome
 
-ToonSpectrum keeps the interactive canvas, pointer capture, hit testing, brush cursor, accessible
+ToonStudio keeps the interactive canvas, pointer capture, hit testing, brush cursor, accessible
 DOM overlays, and scene ownership on the main thread. CPU-heavy jobs with bounded inputs move to
 Workers; compatible retained composition can use WebGPU; Canvas 2D remains the exact fallback.
 This avoids a full editor rewrite while improving the latency-sensitive path.
@@ -69,7 +69,7 @@ marks it validated and the exact policy has been durably stored as last-known-go
 
 Pointer Events Level 3 specifies that `pointerrawupdate` should be dispatched as soon and as often
 as the page can handle, before the corresponding `pointermove`. It also warns that installing a raw
-listener can hurt performance. ToonSpectrum therefore installs it only for the duration of an
+listener can hurt performance. ToonStudio therefore installs it only for the duration of an
 active pen contact and uses it for a frame-coalesced cosmetic cursor update, never for durable ink.
 
 Primary reference: [W3C Pointer Events Level 3](https://www.w3.org/TR/pointerevents3/).

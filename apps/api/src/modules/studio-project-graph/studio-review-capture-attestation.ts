@@ -1,4 +1,4 @@
-import { studioReviewTaskReferenceSchema } from "@toonspectrum/studio-project-model";
+import { studioReviewTaskReferenceSchema } from "@toonstudio/studio-project-model";
 import type { PoolClient } from "pg";
 
 import { studioReviewPreviewCompleteSchema, studioReviewPreviewDigest, studioReviewPreviewIntentKey,

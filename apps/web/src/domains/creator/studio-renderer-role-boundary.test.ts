@@ -1,7 +1,7 @@
 /**
  * 제품 쪽 경계 테스트.
  *
- * 원장(`@toonspectrum/studio-engine-registry`)의 `lab` 엔진은 구현이 있어도 제품
+ * 원장(`@toonstudio/studio-engine-registry`)의 `lab` 엔진은 구현이 있어도 제품
  * 호출부가 0건이어야 한다. 그 계약을 실제로 지켜야 하는 트리가 `src/` 이므로,
  * 강제 지점도 여기에 둔다. 패키지 쪽 테스트가 지워지거나 스캔 루트가 바뀌어도
  * 이 파일이 제품 코드를 계속 보호한다.
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import {
   STUDIO_RENDERER_ROLE_LEDGER,
   findLabEngineProductImports,
-} from "@toonspectrum/studio-engine-registry/renderer-roles";
+} from "@toonstudio/studio-engine-registry/renderer-roles";
 import { describe, expect, it } from "vitest";
 
 // apps/web/src/domains/creator -> repository root

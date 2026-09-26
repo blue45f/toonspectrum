@@ -8,7 +8,7 @@ import { chromium } from "playwright";
 import { createServer as createViteServer } from "vite";
 
 const EVIDENCE_ROOT = process.env.TOONSPECTRUM_HOKUSAI_LIVE_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-hokusai-live-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-hokusai-live-${Date.now()}`);
 const HARNESS_PATH = "/__studio_hokusai_live_quality__";
 const ENTRY = "/scripts/studio-hokusai-live-brush-quality-browser.ts";
 const TIMEOUT_MS = 150_000;

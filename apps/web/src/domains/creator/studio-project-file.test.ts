@@ -742,7 +742,7 @@ describe("studio project file", () => {
       version: 99,
     }))).toThrow(/3D 배경 장면/);
     expect(() => parseStudioProjectFile(withScene({
-      kind: "toonspectrum.bg3d-scene",
+      kind: "toonstudio.bg3d-scene",
       version: 1,
       nodes: [],
       attachments: [],

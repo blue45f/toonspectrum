@@ -3,7 +3,7 @@ import type {
   CreatorSupportCategory,
   CreatorSupportOfferInput,
   CreatorSupportProject,
-} from "@toonspectrum/core/creator-support";
+} from "@toonstudio/core/creator-support";
 
 import { api } from "@/platform/api";
 

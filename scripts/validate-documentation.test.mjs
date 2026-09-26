@@ -48,7 +48,7 @@ function git(root, args, environment = process.env) {
 }
 
 function fixture(t, { config = baseConfig(), files = {}, environment = process.env } = {}) {
-  const root = mkdtempSync(path.join(tmpdir(), "toonspectrum-documentation-"));
+  const root = mkdtempSync(path.join(tmpdir(), "toonstudio-documentation-"));
   t.after(() => rmSync(root, { force: true, recursive: true }));
   git(root, ["init", "--quiet"], environment);
   write(root, "config/documentation-authority.json", `${JSON.stringify(config, null, 2)}\n`);

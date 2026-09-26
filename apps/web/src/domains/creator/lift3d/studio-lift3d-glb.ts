@@ -33,7 +33,7 @@ import {
 import type { StudioLift3dGeometry } from "./studio-lift3d-mesh";
 
 export const STUDIO_LIFT3D_GLB_GENERATOR =
-  `ToonSpectrum Studio Lift 3D v${STUDIO_LIFT3D_REVISION}` as const;
+  `ToonStudio Studio Lift 3D v${STUDIO_LIFT3D_REVISION}` as const;
 
 const GLTF_FLOAT = 5126;
 const GLTF_UNSIGNED_INT = 5125;

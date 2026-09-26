@@ -44,7 +44,7 @@ function envelope(
   const provider = workload === "cleanup" ? "upstash-qstash" : "cloudflare";
   const idempotencyKey = `${workload}-request-00000001`;
   return BackendCapabilityGatewayEnvelopeSchema.parse({
-    version: "toonspectrum.backend-capability.v1",
+    version: "toonstudio.backend-capability.v1",
     provider,
     tenantId: "tenant-001",
     capability: "async-job",
@@ -133,7 +133,7 @@ describe("backend capability durable queue gateway executor", () => {
     await expect(
       executor.execute(command, "upstash-qstash")
     ).resolves.toEqual({
-      version: "toonspectrum.backend-capability.v1",
+      version: "toonstudio.backend-capability.v1",
       provider: "upstash-qstash",
       idempotencyKey: command.idempotencyKey,
       outcome: "accepted",

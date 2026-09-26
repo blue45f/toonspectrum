@@ -256,5 +256,5 @@ export function createWebCodecsVideoBlob(result: WebCodecsVideoExportResult): Bl
 
 /** 파일명 규칙 — 기존 `<제목>-motion.webm` 계열과 나란하게 유지한다. */
 export function webCodecsVideoFileName(title: string, suffix: string): string {
-  return `${title.trim() || "toonspectrum"}-${suffix}.webm`;
+  return `${title.trim() || "toonstudio"}-${suffix}.webm`;
 }

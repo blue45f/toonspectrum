@@ -20,7 +20,7 @@
 
 ## 작품 탐색과 인사이트
 
-ToonSpectrum 탐색 기능은 ToonStudio의 확장 영역입니다. 공개 작품·장르·태그·랭킹·플랫폼 정보를 찾아 기획 참고자료로 연결할 수 있습니다.
+ToonStudio 탐색 기능은 ToonStudio의 확장 영역입니다. 공개 작품·장르·태그·랭킹·플랫폼 정보를 찾아 기획 참고자료로 연결할 수 있습니다.
 
 - [작품 탐색](https://www.toonstudio.cloud/discover): 작품·장르·태그·플랫폼 흐름 탐색
 - [통합 검색](https://www.toonstudio.cloud/search): 공개 작품과 작가 검색

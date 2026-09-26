@@ -67,7 +67,7 @@ function queueItem({
       name: "신고된 잉크 브러시",
       kind: "brush",
       resourceVersion: "1.2.0",
-      license: "toonspectrum-standard",
+      license: "toonstudio-standard",
       manifestHash: "a".repeat(64),
       manifestByteSize: 2_048,
       releaseCreatedAt: "2026-08-30T01:00:00.000Z",

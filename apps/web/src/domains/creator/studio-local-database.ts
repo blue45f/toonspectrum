@@ -16,13 +16,13 @@
  */
 
 /** opfs-sahpool VFS 메타데이터+DB 파일이 사는 OPFS 루트 디렉터리. */
-export const STUDIO_SQLITE_OPFS_DIRECTORY = "toonspectrum-studio-sqlite";
+export const STUDIO_SQLITE_OPFS_DIRECTORY = "toonstudio-studio-sqlite";
 
 /**
  * Fallback SAH-pool directory when the primary root still has open SyncAccessHandles.
  * Native `removeEntry` cannot delete a locked sahpool tree (`NoModificationAllowedError`).
  */
-export const STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY = "toonspectrum-studio-sqlite-r1";
+export const STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY = "toonstudio-studio-sqlite-r1";
 
 /** VFS name used only with {@link STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY}. */
 export const STUDIO_SQLITE_SAHPOOL_RECOVERY_VFS_NAME = "opfs-sahpool-r1";

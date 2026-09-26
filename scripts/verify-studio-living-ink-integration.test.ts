@@ -175,8 +175,8 @@ describe("Studio Living Ink production-preview integration evidence", () => {
       studioUrl,
     )).toBe(true);
     expect(expectedStudioLivingInkVerifierDiagnostic(
-      "500 https://toonspectrum.example/api/auth/session",
-      "https://toonspectrum.example/studio",
+      "500 https://toonstudio.example/api/auth/session",
+      "https://toonstudio.example/studio",
     )).toBe(false);
     expect(expectedStudioLivingInkVerifierDiagnostic(
       "[LEASE_BUSY] 이 작품의 복구 저장소를 다른 탭이나 창이 사용하고 있어요. "
@@ -191,8 +191,8 @@ describe("Studio Living Ink production-preview integration evidence", () => {
       studioUrl,
     )).toBe(false);
     expect(expectedStudioLivingInkVerifierDiagnostic(
-      "No available adapters. @ https://toonspectrum.example/studio",
-      "https://toonspectrum.example/studio",
+      "No available adapters. @ https://toonstudio.example/studio",
+      "https://toonstudio.example/studio",
     )).toBe(false);
     expect(expectedStudioLivingInkVerifierDiagnostic(
       "GPU stall due to ReadPixels @ http://127.0.0.1:5199/studio",

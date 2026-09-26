@@ -1,4 +1,4 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 import { studioProductionServerClientTestHelpers } from "../studio-production/studio-production-server-client";
 

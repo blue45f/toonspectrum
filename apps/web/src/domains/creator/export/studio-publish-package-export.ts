@@ -278,7 +278,7 @@ export async function executeStudioPublishPackageExport(
       archiveEntries.push({
         path: "ai-disclosure.json",
         data: new Blob([JSON.stringify({
-          schema: "toonspectrum.ai-disclosure",
+          schema: "toonstudio.ai-disclosure",
           version: 1,
           usage: effectivePublishPackageSettings.aiUsage,
           disclosure: effectivePublishPackageSettings.aiDisclosure,
@@ -289,7 +289,7 @@ export async function executeStudioPublishPackageExport(
     archiveEntries.push({
       path: "validation-report.json",
       data: new Blob([JSON.stringify({
-        schema: "toonspectrum.publish-package-validation",
+        schema: "toonstudio.publish-package-validation",
         version: 1,
         generatedAt: actualPlan.manifest.generatedAt,
         destination: actualPlan.settings.destination,
@@ -353,7 +353,7 @@ export async function executeStudioPublishPackageExport(
     });
     const { downloadBlob } = await import("./studio-export");
     const archiveName = `${sanitizeStudioPublishFileStem(title, {
-      fallback: "toonspectrum",
+      fallback: "toonstudio",
       maxCodeUnits: 90,
     })}-${effectivePublishPackageSettings.destination}-publish.toonpkg.zip`;
     downloadBlob(archiveBlob, archiveName);
@@ -411,7 +411,7 @@ export async function downloadStudioPublishPreflightReport(
   if (!ensureSharedDocumentAvailableForExport()) return;
   if (!publishPreflightResult) return;
   const report = {
-    format: "toonspectrum-publish-preflight",
+    format: "toonstudio-publish-preflight",
     version: 2,
     createdAt: new Date().toISOString(),
     destination: publishProfile,
@@ -444,7 +444,7 @@ export async function downloadStudioPublishPreflightReport(
   const { downloadBlob } = await import("./studio-export");
   downloadBlob(
     new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }),
-    `${(title.trim() || "toonspectrum").replace(/[\\/:*?"<>|]+/g, "-")}-publish-preflight.json`
+    `${(title.trim() || "toonstudio").replace(/[\\/:*?"<>|]+/g, "-")}-publish-preflight.json`
   );
 }
 
@@ -471,6 +471,6 @@ export async function downloadStudioPublishPackageManifest(
     new Blob([serializeStudioPublishPackageManifest(publishPackagePlan.manifest)], {
       type: "application/json",
     }),
-    `${(title.trim() || "toonspectrum").replace(/[\\/:*?"<>|]+/g, "-")}-publish-package-manifest.json`
+    `${(title.trim() || "toonstudio").replace(/[\\/:*?"<>|]+/g, "-")}-publish-package-manifest.json`
   );
 }

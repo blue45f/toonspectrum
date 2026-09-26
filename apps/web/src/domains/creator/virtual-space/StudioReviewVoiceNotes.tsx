@@ -7,7 +7,7 @@ import {
   studioReviewVoiceNoteContentTypeSchema,
   type StudioReviewVoiceNoteSubject,
   type StudioReviewVoiceNoteView,
-} from "@toonspectrum/studio-project-model/review-voice-note";
+} from "@toonstudio/studio-project-model/review-voice-note";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import {
   deleteStudioReviewVoiceNote,

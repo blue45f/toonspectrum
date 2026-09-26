@@ -65,7 +65,7 @@ const INTERNAL_MATERIAL_NODE_IDS = Object.freeze([
 
 export const BRUSH_STUDIO_V6_PROVIDER_MANIFEST = Object.freeze([
   provider({
-    id: "toonspectrum-cpu-contact-v2", label: "ToonSpectrum Contact Kernel", version: "2",
+    id: "toonstudio-cpu-contact-v2", label: "ToonStudio Contact Kernel", version: "2",
     license: "Project license", rights: "internal", runtime: "javascript",
     integration: "connected", productPath: "material-contact", materialExecution: "native",
     roles: ["contact", "surface", "physics", "pattern", "output"], nodeIds: INTERNAL_MATERIAL_NODE_IDS,
@@ -207,7 +207,7 @@ export const BRUSH_STUDIO_V6_PROVIDER_MANIFEST = Object.freeze([
     roles: ["paper", "wet", "contact-adapter"], nodeIds: ["physics-porous-paper"],
   }),
   provider({
-    id: "toonspectrum-output-research", label: "ToonSpectrum Output Research", version: "1",
+    id: "toonstudio-output-research", label: "ToonStudio Output Research", version: "1",
     license: "Project license", rights: "internal", runtime: "webgpu",
     integration: "research", productPath: "research",
     roles: ["output"], nodeIds: ["output-raster-tiles", "output-hybrid", "output-vector"],
@@ -235,7 +235,7 @@ export function brushStudioV6ProviderManifestForNode(
   nodeId: string,
 ): BrushStudioV6ProviderManifestEntry | null {
   if (nodeId.startsWith("carrier-cpu-") || nodeId.startsWith("surface-v7-")) {
-    return PROVIDER_BY_ID.get("toonspectrum-cpu-contact-v2") ?? null;
+    return PROVIDER_BY_ID.get("toonstudio-cpu-contact-v2") ?? null;
   }
   return PROVIDER_BY_NODE.get(nodeId) ?? null;
 }

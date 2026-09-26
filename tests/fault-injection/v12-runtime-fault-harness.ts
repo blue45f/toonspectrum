@@ -10,7 +10,7 @@ import {
   projectDigest,
   recoverProject,
   solidPaint,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import { StudioCrdtDocument } from "../../apps/web/src/domains/creator/live/studio-crdt-document";
 import {
@@ -86,7 +86,7 @@ import type {
 import type {
   CommandIR,
   SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 export const V12_FAULT_MATRIX_TARGETS = Object.freeze({
   deviceLossCycles: 100,

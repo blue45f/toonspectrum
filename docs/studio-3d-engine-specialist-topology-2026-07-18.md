@@ -1,4 +1,4 @@
-# ToonSpectrum Studio 3D 엔진·전문 런타임 확장 검토
+# ToonStudio Studio 3D 엔진·전문 런타임 확장 검토
 
 - 작성일: 2026-07-18
 - 상태: SceneDocument v3·범용 2-bone IK·Rapier Worker 물리 preview/bake 구현.
@@ -108,7 +108,7 @@
 
 ## 엔진 및 프레임워크 비교
 
-| 후보 | 확인된 웹 강점 | ToonSpectrum에 가져올 장점 | 채택 위치 | 결론 |
+| 후보 | 확인된 웹 강점 | ToonStudio에 가져올 장점 | 채택 위치 | 결론 |
 | --- | --- | --- | --- | --- |
 | **Three.js + R3F** | 현재 앱의 GLTF/OBJ, VRM, 포즈, 캡처, React UI와 직접 통합 | 가장 작은 증분 비용, 기존 VRM/선화/캡처 자산 재사용 | 기본 편집·캡처 | **프로덕션 유지** |
 | **Babylon.js** | WebGL/WebGPU, AssetContainer, thin instances, 물리/XR, instrumentation, progressive glTF, Node Material/다중 pass | 깊이·노멀 기반 선화/안개/DOF, bloom, 날씨 입자, 대규모 반복 배경 | 완전 지연 Webtoon FX·멀티패스 specialist | **FX 계약 승인**. 일반 편집 병행은 금지 |

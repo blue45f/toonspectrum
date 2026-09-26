@@ -13,7 +13,7 @@ import type {
 import type { ComponentProps } from "react";
 
 const SUPPORTED: StudioWebXrSupportSnapshot = Object.freeze({
-  kind: "toonspectrum.studio-webxr-support",
+  kind: "toonstudio.studio-webxr-support",
   version: 1,
   secureContext: true,
   immersiveAr: "supported",

@@ -1,4 +1,4 @@
-import type { SkiaDocumentFontSource } from "@toonspectrum/studio-engine-skia";
+import type { SkiaDocumentFontSource } from "@toonstudio/studio-engine-skia";
 import {
   buildGoogleFontCss2Url,
   findStudioGoogleFont,

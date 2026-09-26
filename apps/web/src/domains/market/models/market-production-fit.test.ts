@@ -36,7 +36,7 @@ function record(
       name: "느와르 블라썸",
       delivery: {
         mode: "portable-json",
-        mediaType: "application/vnd.toonspectrum.palette+json",
+        mediaType: "application/vnd.toonstudio.palette+json",
         payload: {
           schemaVersion: 1,
           resourceKind: "palette",

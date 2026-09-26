@@ -58,7 +58,7 @@ describe("toonstudio.cloud production domain", () => {
     expect(production).toContain("WEB_APP_BASE_URL=https://www.toonstudio.cloud");
     expect(production).toContain("CANONICAL_HOST=www.toonstudio.cloud");
 
-    const core = render.services?.find(({ name }) => name === "toonspectrum-core-api");
+    const core = render.services?.find(({ name }) => name === "toonstudio-core-api");
     expect(core).toMatchObject({
       autoDeployTrigger: "off",
       healthCheckPath: "/api/health/live",
@@ -90,7 +90,7 @@ describe("toonstudio.cloud production domain", () => {
       { key: "APPLE_PRIVATE_KEY", sync: false },
     ]));
 
-    const realtime = render.services?.find(({ name }) => name === "toonspectrum-studio-live");
+    const realtime = render.services?.find(({ name }) => name === "toonstudio-studio-live");
     expect(realtime).toMatchObject({
       autoDeployTrigger: "off",
       healthCheckPath: "/api/health/live",

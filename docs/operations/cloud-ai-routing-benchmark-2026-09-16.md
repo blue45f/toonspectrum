@@ -2,11 +2,11 @@
 
 Date: 2026-09-16
 
-The phrase “에이다 브라우저” in the product request is treated as **Dia Browser**, based on the product name and the requested browser-AI routing context. This document compares only publicly documented behavior and records ToonSpectrum decisions; it is not a claim that the products expose identical APIs.
+The phrase “에이다 브라우저” in the product request is treated as **Dia Browser**, based on the product name and the requested browser-AI routing context. This document compares only publicly documented behavior and records ToonStudio decisions; it is not a claim that the products expose identical APIs.
 
 ## Benchmarked products
 
-| Product | Documented pattern | ToonSpectrum decision |
+| Product | Documented pattern | ToonStudio decision |
 | --- | --- | --- |
 | Dia Browser | Dia’s changelog documents switching chat to backup AI models when the primary model fails. Dia also exposes profile/context and privacy controls around browser AI. | Keep fallback invisible in automatic mode, but show the selected route and preserve a strict no-duplicate rule for ambiguous failures. |
 | Browser Use Cloud | Hosted browser agents support many model providers, BYOK for major providers, and automatic model matching in the hosted product. | Use one cloud settings surface for provider keys/models and let users add more than one key and model per provider. No local browser runner is required. |

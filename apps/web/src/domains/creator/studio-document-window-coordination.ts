@@ -1,6 +1,6 @@
 import { isStudioDocumentWorkspace, type StudioDocumentWorkspaceId } from "./studio-document-workspace";
 
-const SOURCE = "toonspectrum-studio-document-windows";
+const SOURCE = "toonstudio-studio-document-windows";
 const CHANNEL_PREFIX = "toonspectrum:studio-document-windows:v1:";
 const HEARTBEAT_MS = 15_000;
 const PEER_RETENTION_MS = 180_000;

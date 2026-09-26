@@ -1,7 +1,7 @@
 import { Clock3, Images, LoaderCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { z } from "zod";
-import { pinnedSharePublicEntrySchema } from "@toonspectrum/studio-project-model/pinned-review-share";
+import { pinnedSharePublicEntrySchema } from "@toonstudio/studio-project-model/pinned-review-share";
 
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";

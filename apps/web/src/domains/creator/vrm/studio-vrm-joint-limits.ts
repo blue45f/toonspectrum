@@ -61,7 +61,7 @@ function negateAxis(limit: StudioVrmJointAxisLimit): StudioVrmJointAxisLimit {
 
 /**
  * Mirrors a normalized-bone Euler limit across the character's YZ plane.
- * ToonSpectrum's pose mirror contract keeps X and negates Y/Z.
+ * ToonStudio's pose mirror contract keeps X and negates Y/Z.
  */
 export function mirrorStudioVrmJointLimit(limit: StudioVrmJointLimit): StudioVrmJointLimit {
   return joint(limit.x, negateAxis(limit.y), negateAxis(limit.z));

@@ -53,9 +53,9 @@ export const BRUSH_LIBRARY_LEGACY_MIGRATION_KEY =
   "localstorage-envelope-v1-to-sqlite-v3";
 export const BRUSH_LIBRARY_LEGACY_MIGRATION_VERSION = 1 as const;
 export const BRUSH_LIBRARY_V12_FALLBACK_KEY =
-  "toonspectrum-studio-v12-brush-library-fallback";
+  "toonstudio-studio-v12-brush-library-fallback";
 export const STUDIO_BRUSH_LIBRARY_CHANGED_EVENT =
-  "toonspectrum-studio-v12-brush-library-changed";
+  "toonstudio-studio-v12-brush-library-changed";
 
 export function notifyStudioBrushLibraryChanged(): void {
   globalThis.dispatchEvent?.(new Event(STUDIO_BRUSH_LIBRARY_CHANGED_EVENT));

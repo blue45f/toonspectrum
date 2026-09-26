@@ -158,7 +158,7 @@ export function validateTranslationMemorySqliteOpfsEvidence(
       !== "createStudioTranslationMemorySqlitePersistence"
     || nested(result, "authority", "namespace") !== "studio-translation-memory-v12"
     || nested(result, "authority", "key") !== "library-v1"
-    || nested(result, "authority", "opfsDirectory") !== "toonspectrum-studio-sqlite"
+    || nested(result, "authority", "opfsDirectory") !== "toonstudio-studio-sqlite"
     || nested(result, "authority", "logicalDatabaseFilename") !== "studio-local-v12.db"
     || nested(result, "authority", "expectedOpenFilename") !== "/studio-local-v12.db"
     || nested(result, "authority", "opfsDatabaseOpenCount") !== 2
@@ -173,7 +173,7 @@ export function validateTranslationMemorySqliteOpfsEvidence(
     || opened.some((filename) => filename !== "/studio-local-v12.db")
     || !Array.isArray(directories)
     || directories.length !== 2
-    || directories.some((directory) => directory !== "toonspectrum-studio-sqlite")
+    || directories.some((directory) => directory !== "toonstudio-studio-sqlite")
   ) {
     issues.push("authority receipt does not prove two exact V12 OPFS opens without fallback");
   }
@@ -412,7 +412,7 @@ export async function runTranslationMemorySqliteOpfsBrowserProbe(
   options: { scratchDirectory?: string; resultPath?: string } = {},
 ): Promise<TranslationMemorySqliteOpfsArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-translation-memory-opfs-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-translation-memory-opfs-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

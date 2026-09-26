@@ -24,13 +24,13 @@ import {
 import { BACKEND_CAPABILITY_POLICY } from "./backend-capability-router";
 
 export const BACKEND_CAPABILITY_WORKER_HEALTH_PATH =
-  "/.well-known/toonspectrum/backend-capabilities/v1/health" as const;
+  "/.well-known/toonstudio/backend-capabilities/v1/health" as const;
 export const BACKEND_CAPABILITY_WORKER_HEALTH_PROVIDER_HEADER =
-  "x-toonspectrum-health-provider" as const;
+  "x-toonstudio-health-provider" as const;
 export const BACKEND_CAPABILITY_WORKER_HEALTH_TIMESTAMP_HEADER =
-  "x-toonspectrum-health-timestamp" as const;
+  "x-toonstudio-health-timestamp" as const;
 export const BACKEND_CAPABILITY_WORKER_HEALTH_SIGNATURE_HEADER =
-  "x-toonspectrum-health-signature" as const;
+  "x-toonstudio-health-signature" as const;
 
 const MAXIMUM_HEALTH_CLOCK_SKEW_MS = 60_000;
 const HealthProviderSchema = z.enum(BACKEND_REMOTE_PROVIDER_IDS);

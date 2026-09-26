@@ -17,5 +17,5 @@ SHA-256 동일성, MIME·크기·권리 메타데이터 보존, 손상·누락 �
 ## 선택
 
 Shared SQLite/OPFS 조합을 선택했다. SQLite에는 `studio-asset-library-v12/manifest-v1`만 저장하고,
-바이너리는 `toonspectrum-studio-assets` CAS에 저장한다. IndexedDB는
+바이너리는 `toonstudio-studio-assets` CAS에 저장한다. IndexedDB는
 `createLegacyIndexedDbStudioAssetLibrary({ indexedDB })`를 호출한 경우에만 열린다.

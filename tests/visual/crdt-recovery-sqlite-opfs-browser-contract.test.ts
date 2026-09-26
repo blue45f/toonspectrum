@@ -76,7 +76,7 @@ describe("CRDT recovery-vault v6 real Chromium SQLite/OPFS artifact", () => {
     expect(benchmark.authority).toMatchObject({
       kind: "shared-sqlite-opfs-crdt-recovery-v6",
       requestedVfs: "opfs",
-      sqliteOpfsDirectory: "toonspectrum-studio-sqlite",
+      sqliteOpfsDirectory: "toonstudio-studio-sqlite",
       sqliteFilename: "studio-local-v12.db",
       schemaVersion: 6,
       table: "crdt_recovery_v12_rows",

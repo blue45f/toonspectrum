@@ -220,7 +220,7 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(uploadSource).toContain("license: sharePlan.license");
     expect(uploadSource).toContain("attributionText: sharePlan.attributionText");
     expect(uploadSource).toContain("rightsConfirmed: sharePlan.rightsConfirmed");
-    expect(uploadSource).not.toContain('license: "toonspectrum-standard"');
+    expect(uploadSource).not.toContain('license: "toonstudio-standard"');
     expect(uploadSource).not.toContain("rightsConfirmed: true");
     expect(shareSource).toContain('containsAi: false');
     expect(shareSource).toContain('tags: ["VRM", "3D 데생 인형", "포즈"]');
@@ -285,7 +285,7 @@ describe("Studio VRM visual pose bone boundary", () => {
       "나는 이 아바타의 저작자도, 별도 이용 허락을 받은 사람도 아닙니다",
     );
     expect(attestationPreview).toContain(
-      "ToonSpectrum 플랫폼 게시이며 게시 주체는 법인(corporation)으로 평가됩니다",
+      "ToonStudio 플랫폼 게시이며 게시 주체는 법인(corporation)으로 평가됩니다",
     );
     expect(attestationPreview).toContain("현재 렌더에는 개조된 모델 표현이 포함됩니다");
     expect(attestationPreview).toContain("과도한 폭력: 해당하지 않음");
@@ -340,7 +340,7 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(hostilePreview).not.toContain("다".repeat(161));
     expect(Array.from(hostilePreview).length).toBeLessThan(700);
     expect(destructiveCatalogSource).not.toContain(
-      "ToonSpectrum 표준 사용권으로 공유할 권한",
+      "ToonStudio 표준 사용권으로 공유할 권한",
     );
   });
 

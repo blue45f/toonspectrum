@@ -76,7 +76,7 @@ describe("studio translation-memory SQLite persistence", () => {
     await database.kvSet(
       STUDIO_TRANSLATION_MEMORY_SQLITE_NAMESPACE,
       STUDIO_TRANSLATION_MEMORY_SQLITE_KEY,
-      '{"kind":"toonspectrum.translation-memory","version":1,"entries":[{"bad":true}]}',
+      '{"kind":"toonstudio.translation-memory","version":1,"entries":[{"bad":true}]}',
     );
     const persistence = createStudioTranslationMemorySqlitePersistence({
       acquireDatabase: async () => database,

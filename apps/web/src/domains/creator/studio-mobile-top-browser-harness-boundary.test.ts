@@ -15,7 +15,7 @@ describe("Studio mobile top browser harness boundary", () => {
     );
     const legacy = harness.indexOf("process.env.TOONSPECTRUM_VERIFY_DIR");
     const fallback = harness.indexOf(
-      'join(tmpdir(), "toonspectrum-studio-mobile-top")',
+      'join(tmpdir(), "toonstudio-studio-mobile-top")',
     );
 
     expect(dedicated).toBeGreaterThanOrEqual(0);
@@ -78,7 +78,7 @@ describe("Studio mobile top browser harness boundary", () => {
   });
 
   it("does not suppress the retired visit ping from browser health failures", () => {
-    expect(harness).not.toContain("/api/v1/apps/toonspectrum/visits/ping");
+    expect(harness).not.toContain("/api/v1/apps/toonstudio/visits/ping");
     expect(harness).toContain('"/api/kmas/merge-on-access"');
     expect(harness).toContain('"/api/studio-ai/status"');
   });

@@ -108,7 +108,7 @@ describe("Studio WILL v1 page export bridge", () => {
       width: 800,
       height: 1_200,
       title: "Episode 1",
-      application: "ToonSpectrum",
+      application: "ToonStudio",
       paths: [{
         points: [
           { x: 10, y: 20 },
@@ -124,7 +124,7 @@ describe("Studio WILL v1 page export bridge", () => {
     expect(result).toMatchObject({
       bytes: Uint8Array.from([80, 75, 3, 4]),
       extension: ".will",
-      mediaType: "application/vnd.toonspectrum.will-v1-bounded+zip",
+      mediaType: "application/vnd.toonstudio.will-v1-bounded+zip",
       exportedStrokeIds: ["stroke-1"],
       skipped: [
         { elementId: "hidden", reason: "hidden-element" },
@@ -171,7 +171,7 @@ describe("Studio WILL v1 page export bridge", () => {
     expect(result.bytes).not.toBe(workerBytes);
     expect(result).toMatchObject({
       extension: ".will",
-      mediaType: "application/vnd.toonspectrum.will-v1-bounded+zip",
+      mediaType: "application/vnd.toonstudio.will-v1-bounded+zip",
       exportedStrokeIds: ["stroke-1"],
     });
   });

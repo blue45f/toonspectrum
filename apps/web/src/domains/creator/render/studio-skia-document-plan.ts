@@ -1,6 +1,6 @@
 import { isStudioStrokePaintModelCompatible } from "../brush/studio-stroke-paint-model";
-import type { SkiaDocumentItem } from "@toonspectrum/studio-engine-skia";
-import type { SceneNodeIR } from "@toonspectrum/studio-project-model";
+import type { SkiaDocumentItem } from "@toonstudio/studio-engine-skia";
+import type { SceneNodeIR } from "@toonstudio/studio-project-model";
 import { isDirectLiveDraftEl, resolveStudioCausalInkDrawContract } from "../brush/studio-draw-rendering";
 import { resolveStudioBrushRenderFamily } from "../studio-brush";
 import { planStudioCausalInk } from "../studio-causal-ink";

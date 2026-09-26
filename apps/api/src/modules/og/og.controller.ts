@@ -40,7 +40,7 @@ export class OgController {
     response.status(200);
     response.setHeader("Content-Type", "text/html; charset=utf-8");
     response.setHeader("Cache-Control", page.cacheControl);
-    response.setHeader("X-ToonSpectrum-OG-Source", `render-core:${page.source}`);
+    response.setHeader("X-ToonStudio-OG-Source", `render-core:${page.source}`);
     response.send(page.html);
   }
 }

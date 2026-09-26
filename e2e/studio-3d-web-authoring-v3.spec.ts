@@ -6,8 +6,8 @@ import {
 } from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 
 const SHAPER = '[data-character-shaper="true"]';
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
 
 test("Character Platform V3 executes its authoring core inside the browser", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -20,7 +20,7 @@ test("Character Platform V3 executes its authoring core inside the browser", asy
     localStorage.setItem(quickstart, "1");
     localStorage.setItem(mobileHint, "1");
     localStorage.setItem(betaNoticeKey, betaNoticeRevision);
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
   }, {
     quickstart: QUICKSTART_KEY,
     mobileHint: MOBILE_HINT_KEY,

@@ -163,7 +163,7 @@ function createGitHubClient({ repository, token }) { // NOSONAR javascript:S3776
   const headers = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "toonspectrum-studio-branch-cleanup",
+    "User-Agent": "toonstudio-studio-branch-cleanup",
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 

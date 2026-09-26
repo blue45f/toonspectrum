@@ -448,7 +448,7 @@ JSX 마운트 자체는 바뀌지 않는다. `AiAssetNotice`의 문구("생성�
       설정한 baseURL로 직접** 나가는 것을 확인한다(서버를 거치지 않는다는 원칙 검증).
 - [ ] 기존 "내 에셋 > AI 에셋 생성"(로그인 필요, 서버 비용) 플로우가 §2-4 리팩터 이후에도 그대로
       동작한다(고지 모달 최초 1회, 이후 생략, 로그인 안 했으면 여전히 에러 메시지).
-- [ ] localStorage `toonspectrum-studio-ai-settings` 키를 개발자 도구에서 지우고 새로고침하면
+- [ ] localStorage `toonstudio-studio-ai-settings` 키를 개발자 도구에서 지우고 새로고침하면
       설정 패널이 기본값(`https://api.openai.com/v1`, 빈 키)으로 돌아온다.
 
 ## 9. 스케치 대비 편차(§5, 의도적 스코프 축소·구현 선택)

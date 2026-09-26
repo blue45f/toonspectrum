@@ -1,6 +1,6 @@
-# ToonSpectrum Studio Hokusai WASM
+# ToonStudio Studio Hokusai WASM
 
-Transparent, deterministic natural-media rendering for ToonSpectrum Studio,
+Transparent, deterministic natural-media rendering for ToonStudio Studio,
 built directly from Hokusai 0.3.0.
 
 ## Dependency and pixel contract

@@ -37,7 +37,7 @@ Environment reported by the artifact:
 - 12 logical hardware threads and 8GiB reported device memory;
 - `@sqlite.org/sqlite-wasm` 3.53.0-build1;
 - Vite production build, module Dedicated Worker;
-- exact OPFS root `toonspectrum-studio-sqlite`;
+- exact OPFS root `toonstudio-studio-sqlite`;
 - exact logical DB `studio-local-v12.db`.
 
 | Operation | Samples | p50 | p95 | p99 | Result |

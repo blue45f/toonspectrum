@@ -19,7 +19,7 @@
 2. **API 키는 서버로 절대 전송하지 않는다** — `localStorage`에만 저장하고, 브라우저 → Unsplash로
    직접 `fetch`한다(이 앱 백엔드를 거치지 않음 — "$0 서버비용" 원칙).
 3. `studio-ai-client.ts`(이미 존재하는 BYOK 패턴)와 **정확히 동일한 아키텍처**로 만들되, localStorage
-   네임스페이스 전략은 같은 계열(`toonspectrum-studio-*` 접두사)을 따르면서 키 이름은 별도로 둔다.
+   네임스페이스 전략은 같은 계열(`toonstudio-studio-*` 접두사)을 따르면서 키 이름은 별도로 둔다.
 4. Unsplash API 이용약관(API Guidelines)이 요구하는 **(a) download_location 엔드포인트 트리거**와
    **(b) 작가/Unsplash 크레딧 표시**를 설계에 반영한다(§5).
 
@@ -292,7 +292,7 @@ AI 그룹("AI 어시스트")보다 **"내 에셋"(로컬/커뮤니티 이미지 
       state라 리렌더만으로 반영 — stale-read 문제 자체가 구조적으로 없음).
 - [ ] 검색어 입력 후 Enter 또는 "검색" 버튼 → 결과 그리드가 뜬다. 그리드 각 칸 아래에 작가명·
       "Unsplash" 두 링크가 보이고, 새 탭에서 각각 작가 프로필/사진 페이지로 열린다(URL에
-      `utm_source=toonspectrum&utm_medium=referral`이 붙어 있는지 확인).
+      `utm_source=toonstudio&utm_medium=referral`이 붙어 있는지 확인).
 - [ ] 응답 헤더에 `X-Ratelimit-*`가 있으면 "이번 시간 남은 검색 한도: N/50" 문구가 보인다.
 - [ ] 결과 사진 클릭 → 잠깐 스피너(해당 칸만) → 캔버스에 이미지로 삽입된다(패널/프레임 선택 여부와
       무관하게 새 이미지 요소로 캔버스 중앙에 추가 — `addRenderedImage`와 동일 배치 규칙).

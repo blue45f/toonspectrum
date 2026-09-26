@@ -20,7 +20,7 @@ import type {
 const PRIVATE_OBJECT_STORAGE_ROLE = "private-object-storage" as const;
 
 export const PRIVATE_OBJECT_STORAGE_QUOTA_POLICY_VERSION =
-  "toonspectrum.private-object-storage-quota.v1" as const;
+  "toonstudio.private-object-storage-quota.v1" as const;
 
 export interface PrivateObjectStorageFreeTierBudget {
   readonly providerId: PrivateObjectStorageProviderId;

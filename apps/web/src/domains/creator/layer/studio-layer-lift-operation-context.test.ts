@@ -107,7 +107,7 @@ function current(
 
 function receipt(): StudioLayerLiftArtifactPairReceipt {
   return {
-    kind: "toonspectrum.scene-layer-lift/png-artifact-pair",
+    kind: "toonstudio.scene-layer-lift/png-artifact-pair",
     version: 1,
     requestId: "request-1",
     sourceId: "source",
@@ -174,7 +174,7 @@ function providerSuccess(): StudioSceneLayerLiftSuccess {
   ]);
   const maskBytes = Uint8Array.from([255, 255, 255, 255]);
   const providerReceipt = {
-    kind: "toonspectrum.scene-layer-lift/local-provider-receipt" as const,
+    kind: "toonstudio.scene-layer-lift/local-provider-receipt" as const,
     version: 1 as const,
     providerId: "fixture-provider",
     providerVersion: "1",
@@ -190,7 +190,7 @@ function providerSuccess(): StudioSceneLayerLiftSuccess {
     outcome: "success" as const,
   };
   const parsed = parseStudioSceneLayerLiftResult({
-    kind: "toonspectrum.scene-layer-lift/result",
+    kind: "toonstudio.scene-layer-lift/result",
     version: 1,
     requestId: "request-1",
     status: "success",
@@ -281,7 +281,7 @@ function compositionReceipt(
       mask: { sha256: layer.mask.sha256 },
     })),
     compositor: {
-      id: "toonspectrum-layer-lift-compositor",
+      id: "toonstudio-layer-lift-compositor",
       version: "1.0.0",
     },
     background: {

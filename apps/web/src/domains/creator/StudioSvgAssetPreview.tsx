@@ -1,7 +1,7 @@
 import type {
   ThorvgMountedSurface,
   ThorvgSurfaceReceipt,
-} from "@toonspectrum/studio-engine-thorvg/runtime";
+} from "@toonstudio/studio-engine-thorvg/runtime";
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 
 import { svgToDataUrl } from "./studio-characters";
@@ -160,7 +160,7 @@ export function StudioSvgAssetPreview({
     let live = true;
     let mounted: ThorvgMountedSurface | null = null;
     const started = performance.now();
-    void import("@toonspectrum/studio-engine-thorvg/runtime")
+    void import("@toonstudio/studio-engine-thorvg/runtime")
       .then(({ mountThorvgAsset }) => mountThorvgAsset({
         canvas: canvasElement,
         kind: "svg",

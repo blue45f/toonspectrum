@@ -12,7 +12,7 @@ import { STUDIO_DCC_SECTION6_CATALOG } from "./hybrid-dcc/studio-dcc-section6-fu
 
 const CONFIGURED_SCRATCH = process.env.GROK_SCRATCH ?? process.env.SCRATCH;
 const SCRATCH = CONFIGURED_SCRATCH
-  ?? mkdtempSync(join(tmpdir(), "toonspectrum-section6-matrix-"));
+  ?? mkdtempSync(join(tmpdir(), "toonstudio-section6-matrix-"));
 
 afterAll(() => {
   if (!CONFIGURED_SCRATCH) rmSync(SCRATCH, { force: true, recursive: true });

@@ -65,14 +65,14 @@ import {
 const SCRATCH =
   process.env.TOONSPECTRUM_LIFECYCLE_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-lifecycle");
+  ?? join(tmpdir(), "toonstudio-studio-lifecycle");
 const LOG_PATH = join(SCRATCH, "studio-lifecycle-preview.log");
 const REPORT_PATH = join(SCRATCH, "studio-lifecycle-report.json");
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 const DURABLE_AUTOSAVE_SETTLE_MS = 2_500;
-const CLEAN_SESSION_KEY = "toonspectrum-lifecycle-verifier-cleaned";
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
+const CLEAN_SESSION_KEY = "toonstudio-lifecycle-verifier-cleaned";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
   "/api/kmas/merge-on-access",

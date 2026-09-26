@@ -19,7 +19,7 @@
 
 ## 구현된 능력 경계
 
-- 프로토콜 토큰은 `toonspectrum.external-filter`, 버전은 `1`로 고정한다. 알 수 없는 필드도 거부해 구버전/신버전 의미가 섞이지 않게 한다.
+- 프로토콜 토큰은 `toonstudio.external-filter`, 버전은 `1`로 고정한다. 알 수 없는 필드도 거부해 구버전/신버전 의미가 섞이지 않게 한다.
 - transport adapter가 전달한 실제 origin을 exact allowlist로 검사하고, descriptor의 origin과도 일치시킨다. Worker의 빈 `MessageEvent.origin`을 그대로 신뢰하지 않으며 adapter가 생성 시 고정한 synthetic origin(예: `toonbridge://local.gmic`)을 사용해야 한다.
 - provider allowlist는 provider ID와 허용 SPDX 목록을 한 항목으로 결합한다. 허용 provider의 라이선스를 다른 provider의 허용 라이선스로 바꾸는 교차조합은 통과하지 않는다.
 - descriptor는 capability를 operation ID로 정렬한 canonical JSON의 `efd-v1-*` fingerprint를 handshake에서 대조한다. `binaryBundled=false`, HTTPS source/notice URL을 필수로 한다.

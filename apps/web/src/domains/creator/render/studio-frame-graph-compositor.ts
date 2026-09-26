@@ -1,13 +1,13 @@
 import {
   compileRenderIslands,
   type CompiledRenderIsland,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import {
   renderSceneToSceneIR,
   type FrameGraphIR,
   type RenderSceneIR,
   type SceneIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import { StudioGpuTextureRegistry } from "./studio-gpu-fabric";
 import {

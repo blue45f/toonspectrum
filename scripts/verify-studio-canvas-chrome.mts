@@ -40,10 +40,10 @@ import {
 const SCRATCH =
   process.env.TOONSPECTRUM_CANVAS_CHROME_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-canvas-chrome");
+  ?? join(tmpdir(), "toonstudio-studio-canvas-chrome");
 const RESULT_PATH = join(SCRATCH, "studio-canvas-chrome-evidence.json");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
 
 interface ViewportCase {
   readonly name: string;
@@ -166,11 +166,11 @@ async function main(): Promise<void> {
             globalThis.localStorage.setItem(quickStartKey, "1");
             globalThis.localStorage.setItem(mobileHintKey, "1");
             globalThis.localStorage.setItem(
-              "toonspectrum-lang",
+              "toonstudio-lang",
               JSON.stringify({ state: { lang: "ko" }, version: 0 }),
             );
             globalThis.localStorage.setItem(
-              "toonspectrum-studio-ui-density:v1",
+              "toonstudio-studio-ui-density:v1",
               JSON.stringify({ mode: "full" }),
             );
           } catch {

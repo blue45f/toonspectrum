@@ -1,4 +1,4 @@
-import { studioWorldManifestSchema, type StudioWorldAssetIntegrity, type StudioWorldInteractionRule, type StudioWorldTilemap } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema, type StudioWorldAssetIntegrity, type StudioWorldInteractionRule, type StudioWorldTilemap } from "@toonstudio/studio-project-model/world-publication";
 import { studioWorldOcclusionPolygonValid } from "./studio-virtual-space-occlusion";
 import { parseStudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import { validateStudioNpcActivityAnchors, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
@@ -249,7 +249,7 @@ const DEFAULT_DISTRICT_PORTALS: readonly StudioWorldPortalDefinition[] = Object.
 ]);
 
 export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Object.freeze<StudioVirtualSpaceWorldManifest>({
-  id: "toonspectrum-master-studio",
+  id: "toonstudio-master-studio",
   version: 8,
   width: STUDIO_VIRTUAL_SPACE_WIDTH,
   height: STUDIO_VIRTUAL_SPACE_HEIGHT,

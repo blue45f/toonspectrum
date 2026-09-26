@@ -33,13 +33,13 @@ try {
     });
     await context.addInitScript((language) => {
       localStorage.setItem(
-        "toonspectrum-lang",
+        "toonstudio-lang",
         JSON.stringify({ state: { lang: language.startsWith("ko") ? "ko" : "en" }, version: 0 }),
       );
       // Validate the settled list workspace first, then exercise the explicit
       // Spatial Campus entry boundary later in the same browser contract.
       localStorage.setItem(
-        "toonspectrum-creator-experience-mode-v1",
+        "toonstudio-creator-experience-mode-v1",
         JSON.stringify({ mode: "classic" }),
       );
     }, locale);

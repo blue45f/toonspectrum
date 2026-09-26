@@ -1137,7 +1137,7 @@ describe("StudioToolsCompanionPage", () => {
       expect.stringMatching(
         /\/studio\/tools-companion\?session=primary-a-1234&id=work%2F%ED%95%9C%EA%B8%80&view=navigator/u,
       ),
-      "toonspectrum-studio-tools-primary-a-1234-navigator",
+      "toonstudio-studio-tools-primary-a-1234-navigator",
       expect.any(String),
     );
   });
@@ -1556,7 +1556,7 @@ describe("StudioToolsCompanionPage", () => {
     document.title = "이전 제목";
     const view = renderCompanion();
     const channel = FakeBroadcastChannel.instances[0];
-    expect(document.title).toBe("도구 창 · ToonSpectrum Studio");
+    expect(document.title).toBe("도구 창 · ToonStudio Studio");
     view.unmount();
     expect(channel?.close).toHaveBeenCalledOnce();
     expect(document.title).toBe("이전 제목");

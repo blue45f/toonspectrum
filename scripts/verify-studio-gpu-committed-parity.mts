@@ -33,7 +33,7 @@ import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 const SCRATCH =
   process.env.TOONSPECTRUM_GPU_PARITY_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-gpu-committed-parity");
+  ?? join(tmpdir(), "toonstudio-studio-gpu-committed-parity");
 const HARNESS_PATH = "/__studio_gpu_committed_parity__";
 // The browser entry runs its PARITY_CASES sequentially, each with its own ~10s per-case receipt
 // timeout (see RECEIPT_TIMEOUT_MS in studio-gpu-committed-parity-browser.ts). This outer timeout

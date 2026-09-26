@@ -441,9 +441,9 @@ describe("studio dual-tip engine — packed GPU/WASM-ready execution contract", 
     expect(value.receipt).toBe(STUDIO_DUAL_TIP_RECEIPT);
     expect(value.receipt).toMatchObject({
       provenance: "clean-room-public-behavior",
-      executionSource: "toonspectrum-independent-core",
+      executionSource: "toonstudio-independent-core",
       restrictedSourcePolicy: "prohibited-direct-port",
-      goldenCorpusOwnership: "toonspectrum-independent-behavior-corpus",
+      goldenCorpusOwnership: "toonstudio-independent-behavior-corpus",
       alphaContract: "premultiplied-linear-rgba-f32",
       authority: "cpu-f32-oracle",
       packedCommandContract: "gpu-wasm-ready-f32-v1",

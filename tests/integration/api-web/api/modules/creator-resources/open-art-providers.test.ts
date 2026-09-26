@@ -1,4 +1,4 @@
-import { parseResource, parseSearchResult, parseWorkspace } from "@toonspectrum/core/creator-resources";
+import { parseResource, parseSearchResult, parseWorkspace } from "@toonstudio/core/creator-resources";
 import { describe, expect, it, vi } from "vitest";
 
 import { openArtUrl } from "../../../../../../apps/api/src/modules/creator-resources/open-art-providers";

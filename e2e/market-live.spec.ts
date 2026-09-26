@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 const LIVE_ENABLED = process.env.TOONSPECTRUM_MARKET_LIVE_E2E === "1";
-const SESSION_COOKIE_NAME = "toonspectrum-auth-session";
-const CSRF_HEADERS = { "x-toonspectrum-csrf": "1" } as const;
+const SESSION_COOKIE_NAME = "toonstudio-auth-session";
+const CSRF_HEADERS = { "x-toonstudio-csrf": "1" } as const;
 
 test.describe("creator marketplace opt-in live API", () => {
   test.skip(

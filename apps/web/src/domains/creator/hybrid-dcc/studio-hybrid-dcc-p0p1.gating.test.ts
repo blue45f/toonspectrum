@@ -245,7 +245,7 @@ describe("DOC foundation — command, dirty, OPFS recovery, Rights BOM, content 
     const cube = createStudioUnitCubeMesh();
     session = hybridDccRegisterAsset(session, "asset-cube", cube, {
       source: "primitive",
-      creator: "toonspectrum",
+      creator: "toonstudio",
       license: "CC0-1.0",
       useScope: "commercial",
       derivative: "original",
@@ -757,7 +757,7 @@ f 5 1 4 8
     expect(objReport.counts.meshes).toBeGreaterThan(0);
     expect(objReport.fidelity.rigAnimation).toBe("X");
     const objCommit = commitStudioImportToDocument(objReport, objScene);
-    expect(objCommit.documentKind).toBe("toonspectrum.scene-ir");
+    expect(objCommit.documentKind).toBe("toonstudio.scene-ir");
     expect(objCommit.report.committed).toBe(true);
 
     const vrmPath = existsSync(resolve(process.cwd(), "apps/web/public/vrm/AvatarSample_A.vrm"))

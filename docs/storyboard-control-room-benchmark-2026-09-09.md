@@ -1,16 +1,16 @@
-# ToonSpectrum Studio Storyboard Control Room — 경쟁 제품 벤치마크와 구현 결정
+# ToonStudio Studio Storyboard Control Room — 경쟁 제품 벤치마크와 구현 결정
 
 조사·구현일: 2026-09-09  
 대상: `apps/web/src/domains/creator/StudioStoryboardGridPanel.tsx` 및 페이지 검토 메타데이터  
 원칙: 기능 이름을 복제하지 않고, 웹툰 제작자가 **순서·연출·검토·인계의 병목을 한 화면에서 해결**하도록 제품 가치를 번역한다.
 
 > `toonstudio.cloud/studio`의 배포 편집 화면은 자동화된 문서 수집기에서 직접 열리지 않았다. 따라서 현재
-> ToonSpectrum 저장소의 실제 구현을 기준선으로 삼고, 공개된 경쟁 제품의 공식 매뉴얼·제품 문서와
+> ToonStudio 저장소의 실제 구현을 기준선으로 삼고, 공개된 경쟁 제품의 공식 매뉴얼·제품 문서와
 > 인간-AI 스토리보딩 연구를 교차 검증했다.
 
 ## 1. 결론
 
-ToonSpectrum에는 이미 다음 전문 기능이 존재한다.
+ToonStudio에는 이미 다음 전문 기능이 존재한다.
 
 - 경량 썸네일 기반 페이지 그리드와 공유 DnD 재배열
 - 샷 유형·카메라 앵글 태그
@@ -33,7 +33,7 @@ ToonSpectrum에는 이미 다음 전문 기능이 존재한다.
 
 ## 2. 경쟁 제품에서 검증한 작업 패턴
 
-| 제품/연구 | 공식 자료에서 확인한 패턴 | ToonSpectrum에 번역한 가치 |
+| 제품/연구 | 공식 자료에서 확인한 패턴 | ToonStudio에 번역한 가치 |
 | --- | --- | --- |
 | Toon Boom Storyboard Pro 25/27 | sequence/scene/panel 구조, 패널 타이밍, 대사·액션·노트 캡션, 오디오와 카메라가 결합된 애니매틱 타임라인, 3D 카메라, PDF·movie·데이터 내보내기. v27은 실제 수행 시간을 기록하는 Panel Timer와 scratch audio를 추가 | 정적인 썸네일만 보지 않고 페이지 상태·샷 메타·검토 진행을 함께 보여 주며, 기존 애니매틱 시스템과 연결 가능한 메타 모델 유지 |
 | Boords | 스크립트→프레임·샷리스트, 프레임 재배열과 노트, 캐릭터 일관성 참조, 타이밍·오디오 애니매틱, 프레임 댓글, 버전별 상태, 활동 로그, 승인, review-only 공유 링크, PDF/MP4/이미지 내보내기 | 상태별 검토 큐, 페이지·샷·검토 메타 통합 검색, 승인 진행률, 검토표 내보내기, 향후 버전 승인·공유 링크로 확장 가능한 구조 |
@@ -42,7 +42,7 @@ ToonSpectrum에는 이미 다음 전문 기능이 존재한다.
 | StudioBinder | 스크립트 가져오기, 장면/샷 태그, 위치·촬영일·상태 등의 사용자 정의 그룹, 댓글·작업, 뷰 전용 공유, 커스텀 PDF, 샷리스트·스케줄 연계 | 웹툰에서도 원본 순서와 상태별 작업 큐를 분리해 제공하고, 담당자·상태·잠금을 제작 운영 정보로 승격 |
 | Wonder Unit Storyboarder | 매우 빠른 드로잉, shot type·timing·dialogue·details, Photoshop 왕복, export, 3D Shot Generator | 기존 샷 태그와 3D 도구를 유지하고, 그리드에서 누락 여부를 즉시 발견하도록 함 |
 | KROCK.io | 프레임 단위 리뷰, 핀·댓글·첨부, 버전 비교, 실시간 동기화, 상태·Kanban·일정·작업, PDF | 검토 상태별 4열 보드, 수정 요청·검토 요청 중심의 운영 필터, 향후 프레임 주석과 버전 diff 우선순위 설정 |
-| Milanote | 무한 캔버스, 드래그 재배열, 템플릿, 이미지/영상/PDF 혼합, 댓글·공유·알림, PDF export | 자유 배치보다 ToonSpectrum의 페이지 순서 권위를 유지하되, 탐색 속도를 높이는 검색·밀도 조절·보드 뷰 제공 |
+| Milanote | 무한 캔버스, 드래그 재배열, 템플릿, 이미지/영상/PDF 혼합, 댓글·공유·알림, PDF export | 자유 배치보다 ToonStudio의 페이지 순서 권위를 유지하되, 탐색 속도를 높이는 검색·밀도 조절·보드 뷰 제공 |
 | Animatic.app | 프레임별 notes/dialogue/SFX, 팀·클라이언트 초대, pitch 조절 가능한 오디오와 애니매틱 | 페이지 메모와 검토 메모가 검색·CSV 인계에서 사라지지 않도록 통합하고 기존 애니매틱과 중복 구현하지 않음 |
 | 연구: *AnimAgents: Coordinating Multi-Stage Animation Pre-Production with Human-Multi-Agent Collaboration* | 전문 크리에이티브 디렉터·애니메이터 대상 형성 연구에서 분절된 도구 간 산출물 조정, 대량 정보 관리, 단계 간 연속성과 창작 통제 유지가 핵심 문제로 확인됨. 후속 시스템은 기획·각본·디자인·스토리보드별 전용 보드와 단계 인지형 조정을 제공 | AI 생성량을 늘리는 대신 사람이 전체 제작 상태를 판독하는 Control Room을 두고, 기존 AI·작화·3D 결과를 하나의 운영 흐름에서 감독하도록 설계 |
 
@@ -50,7 +50,7 @@ ToonSpectrum에는 이미 다음 전문 기능이 존재한다.
 
 ### 3.1 생성 기능보다 의사결정 속도
 
-경쟁 제품 다수는 AI 이미지 생성과 애니매틱을 전면에 내세운다. ToonSpectrum은 해당 축을 이미 보유하므로,
+경쟁 제품 다수는 AI 이미지 생성과 애니매틱을 전면에 내세운다. ToonStudio은 해당 축을 이미 보유하므로,
 이번 단계에서는 아래 운영 지표를 첫 화면에 올린다.
 
 - 승인 진행률

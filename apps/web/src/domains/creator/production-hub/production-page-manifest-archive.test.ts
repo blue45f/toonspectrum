@@ -28,7 +28,7 @@ describe("production page manifest archive", () => {
   it("verifies immutable page bytes and produces an operational CBZ input", async () => {
     const archiveBuilder = vi.fn(async (entries: readonly { path: string; data: Blob | Uint8Array | ArrayBuffer }[]) => {
       expect(entries.map((entry) => entry.path)).toEqual([
-        "toonspectrum-page-manifest.json",
+        "toonstudio-page-manifest.json",
         "pages/0001.png",
       ]);
       return new Blob(["zip"], { type: "application/vnd.comicbook+zip" });

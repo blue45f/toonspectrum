@@ -6,7 +6,7 @@ import {
   MUSIC_SONG_STRUCTURES,
   MUSIC_VOCAL_STYLES,
   type MusicBrief,
-} from "@toonspectrum/core/studio-music";
+} from "@toonstudio/core/studio-music";
 
 export const MUSIC_LYRICS_SYSTEM_PROMPT = [
   "You are a professional lyricist for fully original animation-style webtoon opening, ending and character soundtracks.",

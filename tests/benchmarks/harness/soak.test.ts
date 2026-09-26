@@ -115,8 +115,8 @@ describe("soak evidence inputs", () => {
       "utf8",
     );
 
-    expect(source).not.toContain('import("@toonspectrum/studio-engine-skia")');
-    expect(source).not.toContain('import("@toonspectrum/studio-engine-vello")');
+    expect(source).not.toContain('import("@toonstudio/studio-engine-skia")');
+    expect(source).not.toContain('import("@toonstudio/studio-engine-vello")');
     expect(source).toContain(
       'import("../../../packages/studio-engine-skia/src/render.ts")',
     );

@@ -14,9 +14,9 @@ import {
 } from "./studio-pose-material";
 
 export const STUDIO_POSE_MATERIAL_LIBRARY_STORAGE_KEY =
-  "toonspectrum-studio-pose-material-library-v1";
+  "toonstudio-studio-pose-material-library-v1";
 export const STUDIO_POSE_MATERIAL_LIBRARY_KIND =
-  "toonspectrum.studio-pose-material-library" as const;
+  "toonstudio.studio-pose-material-library" as const;
 export const STUDIO_POSE_MATERIAL_LIBRARY_VERSION = 1 as const;
 export const STUDIO_POSE_MATERIAL_LIBRARY_MAX_COUNT = 64;
 export const STUDIO_POSE_MATERIAL_LIBRARY_MAX_BYTES = 256 * 1024;

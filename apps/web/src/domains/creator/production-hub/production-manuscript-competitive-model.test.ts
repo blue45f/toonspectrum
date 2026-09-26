@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { episodeScope, type ProductionProjectAggregate, type ProductionTask } from "@toonspectrum/core/production";
+import { episodeScope, type ProductionProjectAggregate, type ProductionTask } from "@toonstudio/core/production";
 import type { StudioProjectRecord, StudioReviewSummary, StudioRevisionRecord } from "../project-graph/studio-project-graph-contract";
 import type { StudioVirtualSpaceReviewPreview } from "../virtual-space/studio-virtual-space-review-preview";
 import type { ProductionManuscriptProcess } from "./production-manuscript-model";

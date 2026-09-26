@@ -3,7 +3,7 @@ import type * as Phaser from "phaser";
 import { studioVirtualArtStyle, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 
-export const STUDIO_MODULAR_CAMPUS_WORLD_ID = "toonspectrum-master-studio";
+export const STUDIO_MODULAR_CAMPUS_WORLD_ID = "toonstudio-master-studio";
 export const STUDIO_MODULAR_CAMPUS_ASSET_KEY = "studio-modular-campus-v3";
 
 interface CampusRenderable { destroy(): void }

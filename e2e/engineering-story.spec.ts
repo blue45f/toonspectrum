@@ -2,8 +2,8 @@ import { expect, test } from "./fixtures/non-studio-test";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
   });
   await page.route("**/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;

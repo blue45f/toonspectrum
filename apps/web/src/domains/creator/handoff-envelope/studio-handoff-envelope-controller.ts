@@ -1,4 +1,4 @@
-import { type StudioHandoffEnvelopePrepare, type StudioHandoffEnvelopeView, type StudioHandoffEnvelopeCreate, type StudioHandoffEnvelopeAction, type StudioHandoffEnvelopeList } from "@toonspectrum/studio-project-model";
+import { type StudioHandoffEnvelopePrepare, type StudioHandoffEnvelopeView, type StudioHandoffEnvelopeCreate, type StudioHandoffEnvelopeAction, type StudioHandoffEnvelopeList } from "@toonstudio/studio-project-model";
 import { StudioHandoffClientError, studioHandoffClient } from "./studio-handoff-envelope-client";
 
 interface Owner { actorId: string | null; generation: number; available: boolean }

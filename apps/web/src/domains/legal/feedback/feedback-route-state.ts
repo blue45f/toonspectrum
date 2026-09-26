@@ -1,7 +1,7 @@
 import {
   isFeedbackKind,
   type FeedbackKind,
-} from "@toonspectrum/core/feedback";
+} from "@toonstudio/core/feedback";
 
 import type { FeedbackFilters } from "./use-feedback-feed";
 

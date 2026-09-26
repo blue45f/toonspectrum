@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { studioWorldManifestSchema, studioWorldInteractionRuleSchema } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema, studioWorldInteractionRuleSchema } from "@toonstudio/studio-project-model/world-publication";
 
 import { DEFAULT_STUDIO_WORLD_MANIFEST, studioWorldInteractions } from "./studio-virtual-space-world-manifest";
 import { evaluateStudioWorldInteraction } from "./studio-world-interaction-rule";

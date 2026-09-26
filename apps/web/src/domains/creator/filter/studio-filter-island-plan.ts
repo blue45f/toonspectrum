@@ -11,7 +11,7 @@ import {
   type IslandCostShadowReceipt,
   type SurfaceCostShadowReceipt,
   type SurfacePlan,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 import {
   getStudioTournamentRuntime,
@@ -244,7 +244,7 @@ function resolvePixelCount(workload: StudioFilterIslandWorkload): number {
 
 /**
  * AREA ENCODING CONTRACT (shared with
- * `@toonspectrum/studio-engine-registry`'s `presentedMegapixels`, which is the
+ * `@toonstudio/studio-engine-registry`'s `presentedMegapixels`, which is the
  * only consumer of these two fields):
  *
  *     presentedMegapixels = clamp01(visibleAreaRatio) × max(1, dpr)²

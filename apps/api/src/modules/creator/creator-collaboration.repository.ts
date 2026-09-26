@@ -7,7 +7,7 @@ import {
 import {
   publicCreatorRoleProfile,
   type PublicCreatorRoleProfile,
-} from "@toonspectrum/core/creator-role";
+} from "@toonstudio/core/creator-role";
 import { assertCreatorDraftCollaborationStatusMutationAllowed } from "../../server/creator-provisional-work-status";
 import {
   CREATOR_WORK_REVISION_MAX,

@@ -1,4 +1,4 @@
-import { studioEntityIdSchema } from "@toonspectrum/studio-project-model";
+import { studioEntityIdSchema } from "@toonstudio/studio-project-model";
 
 import { newStudioProjectGraphId } from "./studio-project-graph-client";
 

@@ -57,11 +57,11 @@ describe("shared API authentication", () => {
 
       await api.raw("/api/mutation-probe", {
         method,
-        headers: { "x-toonspectrum-csrf": "caller-value" },
+        headers: { "x-toonstudio-csrf": "caller-value" },
       });
 
       const request = mockFetch.mock.calls[0]![0] as unknown as Request;
-      expect(request.headers.get("x-toonspectrum-csrf")).toBe("1");
+      expect(request.headers.get("x-toonstudio-csrf")).toBe("1");
     },
   );
 
@@ -75,7 +75,7 @@ describe("shared API authentication", () => {
     await api.raw("/api/read-probe");
 
     const request = mockFetch.mock.calls[0]![0] as unknown as Request;
-    expect(request.headers.has("x-toonspectrum-csrf")).toBe(false);
+    expect(request.headers.has("x-toonstudio-csrf")).toBe(false);
   });
 
   it("보호 API의 401은 stale 세션을 지우고 서버 세션 재확인을 요청한다", async () => {

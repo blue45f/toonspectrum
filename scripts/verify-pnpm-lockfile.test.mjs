@@ -54,7 +54,7 @@ test("parseWorkspacePatterns supports quoted workspace globs", () => {
 });
 
 test("verifyLockfileImporters catches duplicate, missing and stale entries", () => {
-  const root = mkdtempSync(join(tmpdir(), "toonspectrum-lock-"));
+  const root = mkdtempSync(join(tmpdir(), "toonstudio-lock-"));
   mkdirSync(join(root, "apps", "web"), { recursive: true });
   mkdirSync(join(root, "packages", "core"), { recursive: true });
   writeFileSync(join(root, "package.json"), "{}");

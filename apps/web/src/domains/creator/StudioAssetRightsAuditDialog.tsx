@@ -77,14 +77,14 @@ export function StudioAssetRightsAuditDialog({
           onExportJson={(payload) =>
             downloadLocalManifest(
               payload,
-              "toonspectrum-asset-rights-v1.json",
+              "toonstudio-asset-rights-v1.json",
               "application/json"
             )
           }
           onExportCsv={(payload) =>
             downloadLocalManifest(
               payload,
-              "toonspectrum-asset-rights-v1.csv",
+              "toonstudio-asset-rights-v1.csv",
               "text/csv;charset=utf-8"
             )
           }

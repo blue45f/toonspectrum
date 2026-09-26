@@ -10,7 +10,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import type { MarketplaceCommerceQuote } from "@toonspectrum/core/commerce";
+import type { MarketplaceCommerceQuote } from "@toonstudio/core/commerce";
 
 import { getMarketplaceCommerceQuote } from "../commerce-api";
 import { useMarketLibrary } from "../hooks/use-market-library";

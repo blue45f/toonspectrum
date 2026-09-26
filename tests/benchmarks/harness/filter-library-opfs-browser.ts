@@ -165,7 +165,7 @@ export function validateFilterLibraryOpfsBrowserEvidence(
     || nested(result, "authority", "requestedVfs") !== "opfs"
     || nested(result, "authority", "productRepository")
       !== "createSqliteFilterLibraryRepository"
-    || nested(result, "authority", "opfsDirectory") !== "toonspectrum-studio-sqlite"
+    || nested(result, "authority", "opfsDirectory") !== "toonstudio-studio-sqlite"
     || nested(result, "authority", "logicalDatabaseFilename") !== "studio-local-v12.db"
     || nested(result, "authority", "expectedOpenFilename") !== "/studio-local-v12.db"
     || nested(result, "authority", "opfsDatabaseOpenCount") !== 2
@@ -180,7 +180,7 @@ export function validateFilterLibraryOpfsBrowserEvidence(
     || openedFilenames.some((filename) => filename !== "/studio-local-v12.db")
     || !Array.isArray(installedDirectories)
     || installedDirectories.length !== 2
-    || installedDirectories.some((directory) => directory !== "toonspectrum-studio-sqlite")
+    || installedDirectories.some((directory) => directory !== "toonstudio-studio-sqlite")
   ) {
     issues.push(
       "authority receipt does not prove two V12-only product OPFS opens with zero fallback",
@@ -443,7 +443,7 @@ export async function runFilterLibraryOpfsBrowserBenchmark(
   options: { scratchDirectory?: string; resultPath?: string } = {},
 ): Promise<FilterLibraryOpfsBrowserArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-filter-library-opfs-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-filter-library-opfs-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

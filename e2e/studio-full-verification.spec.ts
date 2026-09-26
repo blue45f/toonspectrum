@@ -114,7 +114,7 @@ const CANONICAL_TEST_BRUSH_SNAPSHOT = {
 } as const;
 
 /**
- * ToonSpectrum 스튜디오 및 창작 마켓 mock 브라우저 상호작용 검증
+ * ToonStudio 스튜디오 및 창작 마켓 mock 브라우저 상호작용 검증
  * - 탭 범위 공개 프로필 캐시를 사용한 로그인 UI 초기 상태
  * - 스튜디오 캔버스 드로잉 엔진 (펜, 지우개, 브러시 크기, 색상, Undo/Redo)
  * - 레이어 관리 시스템
@@ -131,7 +131,7 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
     user: {
       id: "11111111-2222-4333-8444-555555555555",
       name: "테스트 크리에이터",
-      email: "creator-test@toonspectrum.dev",
+      email: "creator-test@toonstudio.dev",
       image: null,
       role: "creator",
     },
@@ -140,7 +140,7 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
   test.beforeEach(async ({ page }) => {
     // HttpOnly 인증 쿠키가 아닌, UI 초기 렌더링용 탭 범위 공개 프로필 캐시다.
     await page.addInitScript((session) => {
-      sessionStorage.setItem("toonspectrum-auth-session", JSON.stringify(session));
+      sessionStorage.setItem("toonstudio-auth-session", JSON.stringify(session));
     }, MOCK_CREATOR_PUBLIC_PROFILE);
 
     // 이 스위트는 실제 계정 인증이 아니라 mock 서버 세션과 공개 프로필 캐시의 UI 계약을 검증한다.
@@ -237,7 +237,7 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
           name: "마스터 잉크 펜",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.brush+json",
+            mediaType: "application/vnd.toonstudio.brush+json",
             payload,
             byteSize,
             sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -399,7 +399,7 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
           name: "비비드 세트",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.palette+json",
+            mediaType: "application/vnd.toonstudio.palette+json",
             payload: palettePayload,
             byteSize: creatorMarketplaceJsonByteSize(palettePayload),
             sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -466,7 +466,7 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
           name: "드라마틱 무드",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.filter+json",
+            mediaType: "application/vnd.toonstudio.filter+json",
             payload: filterPayload,
             byteSize: creatorMarketplaceJsonByteSize(filterPayload),
             sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -504,11 +504,11 @@ test.describe("스튜디오 & 창작 마켓 mock 브라우저 검증", () => {
     await expect(page.locator("body")).toBeVisible();
 
     const storedSession = await page.evaluate(() => {
-      return sessionStorage.getItem("toonspectrum-auth-session");
+      return sessionStorage.getItem("toonstudio-auth-session");
     });
     expect(storedSession).not.toBeNull();
     const parsed = JSON.parse(storedSession ?? "{}");
-    expect(parsed?.user?.email).toBe("creator-test@toonspectrum.dev");
+    expect(parsed?.user?.email).toBe("creator-test@toonstudio.dev");
     expect(parsed?.user?.role).toBe("creator");
   });
 

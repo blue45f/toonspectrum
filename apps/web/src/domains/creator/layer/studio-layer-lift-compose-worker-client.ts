@@ -152,7 +152,7 @@ export function createStudioLayerLiftComposeModuleWorker():
     new URL("./studio-layer-lift-compose.worker.ts", import.meta.url),
     {
       type: "module",
-      name: "toonspectrum-layer-lift-compose",
+      name: "toonstudio-layer-lift-compose",
     },
   ) as unknown as StudioLayerLiftComposeWorkerLike;
 }

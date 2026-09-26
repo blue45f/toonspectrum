@@ -7,7 +7,7 @@ import {
   renderCompiledBrushStroke,
   type HokusaiModuleLike,
   type RasterStrokeSample,
-} from "@toonspectrum/studio-brush-platform";
+} from "@toonstudio/studio-brush-platform";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { importCspToolFile } from "../../packages/studio-format-gateway/src/csp-sut";

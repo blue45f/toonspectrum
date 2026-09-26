@@ -1,6 +1,6 @@
 # MCP Free 3D Environment Pack v1 — provenance and usage
 
-Generated on 2026-09-25 for ToonSpectrum through the official Tripo MCP/API workflow and processed with Blender 5.2 plus glTF-Transform 4.4.2.
+Generated on 2026-09-25 for ToonStudio through the official Tripo MCP/API workflow and processed with Blender 5.2 plus glTF-Transform 4.4.2.
 
 ## Provider and billing boundary
 

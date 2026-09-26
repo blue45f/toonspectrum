@@ -1,4 +1,4 @@
-# ToonSpectrum Studio 3D production multipass — wave 2
+# ToonStudio Studio 3D production multipass — wave 2
 
 Date: 2026-09-04
 

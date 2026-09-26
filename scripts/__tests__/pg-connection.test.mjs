@@ -8,7 +8,7 @@ describe("maintenance-script PostgreSQL TLS normalization", () => {
     (sslmode) => {
       const result = new URL(
         normalizePgConnectionStringForTls(
-          `postgresql://artist:secret@example.net/toonspectrum?sslmode=${sslmode}`
+          `postgresql://artist:secret@example.net/toonstudio?sslmode=${sslmode}`
         )
       );
 
@@ -19,7 +19,7 @@ describe("maintenance-script PostgreSQL TLS normalization", () => {
   it("adds full verification to Neon URLs without an sslmode", () => {
     const result = new URL(
       normalizePgConnectionStringForTls(
-        "postgresql://artist:secret@ep-example.neon.tech/toonspectrum"
+        "postgresql://artist:secret@ep-example.neon.tech/toonstudio"
       )
     );
 
@@ -27,7 +27,7 @@ describe("maintenance-script PostgreSQL TLS normalization", () => {
   });
 
   it("leaves loopback development URLs unchanged", () => {
-    const input = "postgresql://postgres:postgres@127.0.0.1:55432/toonspectrum";
+    const input = "postgresql://postgres:postgres@127.0.0.1:55432/toonstudio";
 
     expect(normalizePgConnectionStringForTls(input)).toBe(input);
   });
@@ -35,12 +35,12 @@ describe("maintenance-script PostgreSQL TLS normalization", () => {
   it("rejects duplicate modes and Neon TLS disablement", () => {
     expect(() =>
       normalizePgConnectionStringForTls(
-        "postgresql://artist:secret@example.net/toonspectrum?sslmode=require&sslmode=disable"
+        "postgresql://artist:secret@example.net/toonstudio?sslmode=require&sslmode=disable"
       )
     ).toThrow("must not repeat sslmode");
     expect(() =>
       normalizePgConnectionStringForTls(
-        "postgresql://artist:secret@ep-example.neon.tech/toonspectrum?sslmode=disable"
+        "postgresql://artist:secret@ep-example.neon.tech/toonstudio?sslmode=disable"
       )
     ).toThrow("must not disable TLS");
   });

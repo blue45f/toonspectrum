@@ -1,7 +1,7 @@
 # ToonStudio apex canonical redirect
 
 이 Worker는 Cloudflare zone route `toonstudio.cloud/*`만 소유하고 같은 path와 query를
-`https://www.toonstudio.cloud`로 HTTP 308 redirect한다. main `toonspectrum-web` Static Assets Worker는
+`https://www.toonstudio.cloud`로 HTTP 308 redirect한다. main `toonstudio-web` Static Assets Worker는
 `www.toonstudio.cloud/*`를 계속 제공하므로 모든 정적 요청이 Worker code를 통과하지 않는다.
 
 ## 검증

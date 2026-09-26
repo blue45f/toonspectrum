@@ -36,7 +36,7 @@ export class CharacterPsdWorkerError extends Error {
 export function createCharacterPsdModuleWorker(): CharacterPsdWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-character-shaper-psd.worker.ts", import.meta.url), {
-    type: "module", name: "toonspectrum-character-psd",
+    type: "module", name: "toonstudio-character-psd",
   });
 }
 let nextId = 1;

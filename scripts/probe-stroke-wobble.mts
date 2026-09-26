@@ -19,7 +19,7 @@ import { join } from "node:path";
 
 import { chromium, type Page } from "playwright";
 
-const SCRATCH = join(tmpdir(), "toonspectrum-stroke-wobble");
+const SCRATCH = join(tmpdir(), "toonstudio-stroke-wobble");
 mkdirSync(SCRATCH, { recursive: true });
 const LOG_PATH = join(SCRATCH, "probe.log");
 

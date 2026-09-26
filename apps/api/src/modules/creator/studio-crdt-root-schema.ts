@@ -822,7 +822,7 @@ function parseStudioCrdtShared3dStageEntry(value: unknown): StudioCrdtShared3dSt
   // reference-only v1 document. Keep that stricter 8 KiB gate as well as the v3 entry's 12 KiB
   // envelope or the server could admit a sidecar that every client aggregate reader rejects.
   const referenceOnlyDocument = {
-    kind: "toonspectrum.studio-shared-3d-stage",
+    kind: "toonstudio.studio-shared-3d-stage",
     version: 1,
     authority: "page-background-with-linked-character-sources",
     capturePolicy: entry.capturePolicy,
@@ -964,7 +964,7 @@ function hasValidStudioCrdtShared3dAggregate(
   let collection: unknown;
   if (entries.length <= STUDIO_CRDT_SHARED_3D_STAGE_PAGE_SIZE) {
     collection = {
-      kind: "toonspectrum.studio-shared-3d-stage-collection",
+      kind: "toonstudio.studio-shared-3d-stage-collection",
       version: 3,
       authority: "page-shared-3d-stage-collection",
       stages: entries,
@@ -986,7 +986,7 @@ function hasValidStudioCrdtShared3dAggregate(
       visibilityReceiptPages.length > STUDIO_CRDT_SHARED_3D_MAX_PAGE_COUNT
     ) return false;
     collection = {
-      kind: "toonspectrum.studio-shared-3d-stage-collection",
+      kind: "toonstudio.studio-shared-3d-stage-collection",
       version: 4,
       authority: "page-shared-3d-stage-collection",
       stagePages,

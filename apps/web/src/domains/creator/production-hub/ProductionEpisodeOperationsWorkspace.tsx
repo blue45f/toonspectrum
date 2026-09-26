@@ -21,7 +21,7 @@ import type {
   EpisodeCollaboration,
   EpisodePlan,
   ProductionProjectAggregate,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import {
   buildEpisodePipelinePlan,

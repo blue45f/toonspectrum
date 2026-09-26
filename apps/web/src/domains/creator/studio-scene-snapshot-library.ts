@@ -3,7 +3,7 @@ import { normalizeAnimationTimelineDoc } from "./studio-anim-tracks";
 import type { PageState } from "./studio-page-state";
 
 export const STUDIO_SCENE_SNAPSHOT_DATABASE_NAME =
-  "toonspectrum-studio-scene-snapshot-library";
+  "toonstudio-studio-scene-snapshot-library";
 export const STUDIO_SCENE_SNAPSHOT_DATABASE_VERSION = 1;
 export const STUDIO_SCENE_SNAPSHOT_MAX_ENTRIES = 64;
 export const STUDIO_SCENE_SNAPSHOT_MAX_BYTES = 12 * 1024 * 1024;
@@ -17,7 +17,7 @@ export const STUDIO_SCENE_SNAPSHOT_MAX_TAGS = 12;
 export const STUDIO_SCENE_SNAPSHOT_MAX_TAG_LENGTH = 32;
 
 const STORE_NAME = "snapshots";
-const RECORD_KIND = "toonspectrum-studio-scene-snapshot";
+const RECORD_KIND = "toonstudio-studio-scene-snapshot";
 const RECORD_SCHEMA_VERSION = 1;
 const MAX_STORED_ROW_SCAN = STUDIO_SCENE_SNAPSHOT_MAX_ENTRIES * 4;
 const MAX_PAGE_ELEMENTS = 10_000;

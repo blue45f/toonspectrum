@@ -22,7 +22,7 @@ PostgreSQL must be an explicitly selected QA container. The accepted forms are:
 
 - the legacy dedicated container `codex-virtual-studio-host-pg-20260920`; or
 - a fresh container named `codex-review-storage-test-pg-<10 lowercase hex>` with label
-  `io.toonspectrum.qa.review-storage-postgres=true`.
+  `io.toonstudio.qa.review-storage-postgres=true`.
 
 The verifier requires one loopback port, an exact PostgreSQL 16 QA image, and a
 `TEST_DATABASE_URL` whose port, database and user match that container. A fresh database must

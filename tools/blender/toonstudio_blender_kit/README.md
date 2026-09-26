@@ -65,8 +65,8 @@ from toonstudio_blender_kit.mcp import dispatch
 receipt = dispatch(
     "run_pipeline",
     {
-        "projectRoot": "/absolute/path/to/toonspectrum",
-        "configPath": "/absolute/path/to/toonspectrum/config/blender/avatar-orion-production.json",
+        "projectRoot": "/absolute/path/to/toonstudio",
+        "configPath": "/absolute/path/to/toonstudio/config/blender/avatar-orion-production.json",
     },
 )
 print(receipt)

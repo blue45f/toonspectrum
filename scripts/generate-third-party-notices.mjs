@@ -604,7 +604,7 @@ export function validateLockedNoticeFiles(
 
 function writeLockedNoticeManifest(directory, requiredFiles) {
   const lines = [
-    "# ToonSpectrum shipped third-party notice lock v1",
+    "# ToonStudio shipped third-party notice lock v1",
     ...[...requiredFiles]
       .sort()
       .map((path) => `${sha256(readFileSync(join(directory, path)))}  ${path}`),
@@ -1027,7 +1027,7 @@ Sources: ${document.sources.join(", ")}
 ${document.text}
 ----- END LICENSE ${digest} -----`;
   });
-  return `ToonSpectrum shipped Rust/WASM third-party license bundle
+  return `ToonStudio shipped Rust/WASM third-party license bundle
 
 Artifact: ${artifact.id}
 Target: wasm32-unknown-unknown
@@ -1037,7 +1037,7 @@ External crates: ${artifact.packages.length}
 The text between every BEGIN/END marker is copied verbatim from the locally
 resolved crate archive or reviewed vendored source after CRLF-to-LF and final
 whitespace normalization. The SHA-256 in the marker covers that normalized
-license text only. Package/source lines are ToonSpectrum inventory metadata
+license text only. Package/source lines are ToonStudio inventory metadata
 and do not alter the upstream license terms.
 
 ${sections.join("\n\n")}
@@ -1049,7 +1049,7 @@ function renderVelloArtifactNotice(artifact, packageByKey) {
     const entry = packageByKey.get(key);
     return `| ${key} | ${entry.license} | ${entry.upstream} |`;
   });
-  return `ToonSpectrum studio-engine-vello third-party NOTICE
+  return `ToonStudio studio-engine-vello third-party NOTICE
 
 Artifact: ${artifact.id}
 Target: wasm32-unknown-unknown
@@ -1232,7 +1232,7 @@ function renderOpaqueNotice(policy, inventory) {
   const artifactRows = inventory.artifacts.map(
     (artifact) => `| ${artifact.path} | ${artifact.sha256} |`,
   );
-  return `ToonSpectrum opaque WASM third-party NOTICE
+  return `ToonStudio opaque WASM third-party NOTICE
 
 Artifact lane: ${policy.id}
 
@@ -2123,7 +2123,7 @@ ${document.text}
     })
     .join("\n\n");
 
-  return `# ToonSpectrum generated third-party notices
+  return `# ToonStudio generated third-party notices
 
 This artifact was generated from the resolved pnpm production graph, the
 Hokusai and Vello Cargo lock graphs, and the locked provenance manifests for

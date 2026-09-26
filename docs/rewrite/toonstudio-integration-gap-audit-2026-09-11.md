@@ -1,7 +1,7 @@
 # ToonStudio 최근 7일 통합 공백 감사
 
 - 감사 범위: 2026-09-04 00:00 KST ~ 2026-09-11 23:59 KST
-- 대상: `blue45f/toonspectrum`의 GitHub에서 관측 가능한 브랜치, 열린/닫힌 PR, `main` 비조상 커밋, 복구·승계 PR, PR 없는 브랜치, 제품 코드와 라우트·호스트·저장·내보내기 사이의 연결
+- 대상: `blue45f/toonstudio`의 GitHub에서 관측 가능한 브랜치, 열린/닫힌 PR, `main` 비조상 커밋, 복구·승계 PR, PR 없는 브랜치, 제품 코드와 라우트·호스트·저장·내보내기 사이의 연결
 - 기준 브랜치: PR #1307 `feat/toonstudio-final-ia-20260911`
 - 제외: 개발자 컴퓨터에만 있고 push되지 않은 파일 및 GitHub에 ref/patch/artifact로 남지 않은 로컬 작업. 이 범위는 원격 저장소만으로 존재를 증명할 수 없다.
 

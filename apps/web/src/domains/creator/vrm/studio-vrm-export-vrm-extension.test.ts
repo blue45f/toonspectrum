@@ -37,7 +37,7 @@ function completeBones(): StudioVrmExportHumanoidBones {
 }
 
 function validMeta(overrides: Partial<StudioVrmExportMeta> = {}): StudioVrmExportMeta {
-  return { name: "루미", authors: ["ToonSpectrum"], ...overrides };
+  return { name: "루미", authors: ["ToonStudio"], ...overrides };
 }
 
 function caught(run: () => unknown): StudioVrmExportError {
@@ -54,7 +54,7 @@ describe("buildStudioVrmExportMeta", () => {
   it("emits the three mandatory VRM 1.0 licence fields", () => {
     const meta = buildStudioVrmExportMeta(validMeta(), { imageCount: 0 });
     expect(meta.name).toBe("루미");
-    expect(meta.authors).toEqual(["ToonSpectrum"]);
+    expect(meta.authors).toEqual(["ToonStudio"]);
     expect(meta.licenseUrl).toBe(STUDIO_VRM_EXPORT_LICENSE_URL);
   });
 

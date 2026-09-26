@@ -1,6 +1,6 @@
 import { reviewDeliveryAcceptSchema, reviewDeliveryActionSchema, reviewDeliveryJobSchema,
   reviewDeliveryListSchema, reviewDeliveryPrepareSchema, type ReviewDeliveryAccept,
-  type ReviewDeliveryAction, type ReviewDeliveryPrepare } from "@toonspectrum/studio-project-model/review-delivery";
+  type ReviewDeliveryAction, type ReviewDeliveryPrepare } from "@toonstudio/studio-project-model/review-delivery";
 import { api, apiPath } from "@/platform/api";
 
 const base = (workId: string) => `/creator/works/${encodeURIComponent(workId)}/review-deliveries`;

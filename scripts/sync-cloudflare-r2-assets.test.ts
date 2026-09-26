@@ -20,7 +20,7 @@ import {
 const temporaryDirectories: string[] = [];
 
 function temporaryDist(): string {
-  const directory = mkdtempSync(join(tmpdir(), "toonspectrum-r2-assets-"));
+  const directory = mkdtempSync(join(tmpdir(), "toonstudio-r2-assets-"));
   temporaryDirectories.push(directory);
   return directory;
 }
@@ -53,7 +53,7 @@ describe("Cloudflare R2 large asset synchronization", () => {
       contentType: "application/wasm",
     });
     expect(r2ObjectPutArgs(assets[0]!)).toEqual(expect.arrayContaining([
-      "toonspectrum-public-assets/assets/opencascade.wasm-build123.wasm",
+      "toonstudio-public-assets/assets/opencascade.wasm-build123.wasm",
       "--content-type",
       "application/wasm",
       "--remote",

@@ -7,7 +7,7 @@ import {
   MUSIC_PROVIDER_VERIFIED_AT,
 } from "./studio-music-provider-catalog";
 
-import { defaultMusicBrief } from "@toonspectrum/core/studio-music";
+import { defaultMusicBrief } from "@toonstudio/core/studio-music";
 
 describe("AI music provider catalogue", () => {
   it("keeps provider identifiers and official destinations deterministic", () => {

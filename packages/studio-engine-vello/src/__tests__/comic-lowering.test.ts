@@ -4,7 +4,7 @@ import {
   polylineToPath,
   sceneIRSchema,
   validateComicGraph,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { loadVelloNode } from "../node";
@@ -15,7 +15,7 @@ import type {
   ComicPageIR,
   SceneIR,
   SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 function rect(x: number, y: number, w: number, h: number) {
   return polylineToPath(
@@ -176,9 +176,9 @@ describe("comic panel clip render parity (wasm)", () => {
     const page = parityPage();
     const { scene } = lowerComicPageToScene(page, { background: RED });
     const velloPixels = renderSceneToPixels(scene);
-    const { loadCanvasKitNode } = await import("@toonspectrum/studio-engine-skia/node");
+    const { loadCanvasKitNode } = await import("@toonstudio/studio-engine-skia/node");
     const { renderSceneToPixels: renderWithSkia } = await import(
-      "@toonspectrum/studio-engine-skia"
+      "@toonstudio/studio-engine-skia"
     );
     const ck = await loadCanvasKitNode();
     const skiaPixels = renderWithSkia(ck, scene);

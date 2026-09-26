@@ -5,14 +5,14 @@ import {
   polylineToPath,
   shardSceneByGrid,
   solidPaint,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { loadVelloNode } from "../node";
 import { renderSceneToPixels } from "../render";
 import { renderShardedScene, renderSceneToPixelsWithFragments } from "../scene-sharding";
 
-import type { SceneIR, ShardGridOptions } from "@toonspectrum/studio-project-model";
+import type { SceneIR, ShardGridOptions } from "@toonstudio/studio-project-model";
 
 /**
  * Cross-render proof for V12 §3.4–3.5: the full-scene render and the

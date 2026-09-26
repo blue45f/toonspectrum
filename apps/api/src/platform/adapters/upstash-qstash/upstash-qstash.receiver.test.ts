@@ -27,7 +27,7 @@ const config: UpstashQStashReceiverConfig = {
 };
 
 const delivery = {
-  contractVersion: "toonspectrum.backend-durable-queue.v1",
+  contractVersion: "toonstudio.backend-durable-queue.v1",
   providerId: "upstash-qstash",
   tenantId: "tenant-1",
   workload: "cleanup",

@@ -28,16 +28,16 @@
       "canvaskit-wasm/bin/canvaskit.wasm?url": [
         "./apps/web/src/shared/types/vendor/canvaskit-wasm-url-shim.d.ts"
       ],
-      "@toonspectrum/studio-engine-skia": [
+      "@toonstudio/studio-engine-skia": [
         "./apps/web/src/shared/types/vendor/studio-engine-skia-shim.d.ts"
       ],
       "mixbox": [
         "./apps/web/src/shared/types/vendor/mixbox.d.ts"
       ],
-      "@toonspectrum/core": [
+      "@toonstudio/core": [
         "./packages/core/src/index.ts"
       ],
-      "@toonspectrum/core/*": [
+      "@toonstudio/core/*": [
         "./packages/core/src/*"
       ]
     },

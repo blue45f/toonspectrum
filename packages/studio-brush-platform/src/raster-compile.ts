@@ -5,7 +5,7 @@ import type { RasterStrokeSample } from "./raster-stroke-samples";
 import type {
   BrushProgramIR,
   DynamicMappingIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 export { standardZigzagStrokeSamples } from "./raster-stroke-samples";
 export type { RasterStrokeSample } from "./raster-stroke-samples";

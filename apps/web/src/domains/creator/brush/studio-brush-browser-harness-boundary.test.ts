@@ -238,6 +238,6 @@ describe("Studio brush browser harness catalogue boundary", () => {
     expect(harness).not.toContain(
       `message.includes("WebSocket connection to 'ws://127.0.0.1:")`,
     );
-    expect(harness).not.toContain("/api/v1/apps/toonspectrum/visits/ping");
+    expect(harness).not.toContain("/api/v1/apps/toonstudio/visits/ping");
   });
 });

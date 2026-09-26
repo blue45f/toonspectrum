@@ -4,7 +4,7 @@ import type {
   ProductionProjectAggregate,
   ProductionRisk,
   ProductionRiskSeverity,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import { cn } from "@/shared/lib/utils";
 

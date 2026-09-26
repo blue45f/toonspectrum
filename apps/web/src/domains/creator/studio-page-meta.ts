@@ -129,11 +129,11 @@ export function withPageMeta<P extends PageMetaCarrier>(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** 페이로드 식별 마커 — 일반 텍스트/타 앱 JSON 과 구분. */
-export const STUDIO_CLIPBOARD_KIND = "toonspectrum/studio-elements";
+export const STUDIO_CLIPBOARD_KIND = "toonstudio/studio-elements";
 /** 페이로드 버전 — 상위 버전 페이로드는 거부(미래 포맷 오독 방지). */
 export const STUDIO_CLIPBOARD_VERSION = 2;
 /** 시스템 클립보드가 막힌 환경(권한 차단·구형 브라우저)용 storage 폴백 키. */
-export const CLIPBOARD_FALLBACK_KEY = "toonspectrum-studio-clipboard";
+export const CLIPBOARD_FALLBACK_KEY = "toonstudio-studio-clipboard";
 /** 같은 페이지 붙여넣기 시 겹침 방지 오프셋(px) — 복제(⌘J)와 동일 감각. */
 export const PASTE_OFFSET = 16;
 /** External clipboard admission budgets. They bound JSON parsing/render work without truncation. */

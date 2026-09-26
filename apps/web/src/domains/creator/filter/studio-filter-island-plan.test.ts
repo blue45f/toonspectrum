@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   PlanUnsatisfiableError,
   presentedMegapixels,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -84,7 +84,7 @@ describe("filter island singleton selection", () => {
 
   it("rejects the same readback island in interactive mode", async () => {
     const { EngineCapabilityRegistry, HybridExecutionPlanner, providerDescriptorSchema } =
-      await import("@toonspectrum/studio-engine-registry");
+      await import("@toonstudio/studio-engine-registry");
     const registry = EngineCapabilityRegistry.forTestFixtures();
     registry.registerTestFixture(
       providerDescriptorSchema.parse({

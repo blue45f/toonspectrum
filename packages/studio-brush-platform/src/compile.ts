@@ -1,4 +1,4 @@
-import { evaluateDynamicMapping, pathIRSchema } from "@toonspectrum/studio-project-model";
+import { evaluateDynamicMapping, pathIRSchema } from "@toonstudio/studio-project-model";
 
 import { strokeOutlinePath } from "./geometry";
 import { inkMeshInputPointFromModeledSample as meshInputPoint } from "./ink-mesh-derivation";
@@ -20,7 +20,7 @@ import type {
   PathIR,
   SceneNodeIR,
   StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * BrushProgramIR compilers for the vector output lanes (V11 §6.1, V19 §2.3).

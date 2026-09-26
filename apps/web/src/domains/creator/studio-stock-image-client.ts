@@ -177,7 +177,7 @@ export const STUDIO_STOCK_IMAGE_RESULTS_PER_PAGE = 20;
 export const STUDIO_STOCK_IMAGE_DEVELOPER_SIGNUP_URL = "https://unsplash.com/developers";
 
 /** Unsplash API Guidelines가 권장하는 UTM 어트리뷰션 파라미터 중 이 앱의 식별자 값. */
-const UTM_SOURCE = "toonspectrum";
+const UTM_SOURCE = "toonstudio";
 
 /** 크레딧 링크에 UTM 파라미터를 붙인다 — 이미 쿼리스트링이 있는 URL도 안전하게 병합한다. */
 function appendUtmParams(rawUrl: string): string {

@@ -8,7 +8,7 @@ The compact brush palette is reduced from 23 to 18 entries in six purpose groups
 
 ## Observed automated run
 
-Run: https://github.com/blue45f/toonspectrum/actions/runs/33982996144
+Run: https://github.com/blue45f/toonstudio/actions/runs/33982996144
 Source revision: 67f2dd766a83d2691541f0fe049774e325486567
 
 - Patch checksum and application against original Git blobs: passed.

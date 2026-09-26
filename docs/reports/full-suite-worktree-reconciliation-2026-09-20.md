@@ -5,8 +5,8 @@ Status: recovered and locally validated; PR #1827 remains draft. No main merge o
 ## Sources and preservation
 
 - Published starting head: `02e48803553a15d4836d42c4c729b997f56da036`.
-- Reviewed worktree: `toonspectrum-full-suite-finish-20260920`, based on `7836ec8a0`.
-- Earlier worktree: `toonspectrum-full-suite-repair-20260919`, local head `ed03d6b68`.
+- Reviewed worktree: `toonstudio-full-suite-finish-20260920`, based on `7836ec8a0`.
+- Earlier worktree: `toonstudio-full-suite-repair-20260919`, local head `ed03d6b68`.
 - Recovered 375 tracked and 5 untracked source files from a hash-checked snapshot.
 - The older worktree's 370 pending files are covered by 366 recovered files and 4 explicit
   thumbnail/catalogue exceptions. No original source worktree was reset, stashed or overwritten.

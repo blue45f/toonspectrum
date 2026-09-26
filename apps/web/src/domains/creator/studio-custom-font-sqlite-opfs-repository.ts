@@ -28,7 +28,7 @@ import type { StudioOpfsAssetStore } from "./studio-opfs-asset-store";
 export const STUDIO_CUSTOM_FONT_SQLITE_NAMESPACE = "studio-custom-font-library-v12";
 export const STUDIO_CUSTOM_FONT_SQLITE_MANIFEST_KEY = "manifest-v1";
 export const STUDIO_CUSTOM_FONT_CAS_OWNER = "studio-custom-font-library-v12";
-export const STUDIO_CUSTOM_FONT_LOCK_NAME = "toonspectrum-studio-custom-font-library-v12";
+export const STUDIO_CUSTOM_FONT_LOCK_NAME = "toonstudio-studio-custom-font-library-v12";
 
 export const STUDIO_CUSTOM_FONT_LIMITS = Object.freeze({
   individualBytes: MAX_CUSTOM_FONT_FILE_BYTES,

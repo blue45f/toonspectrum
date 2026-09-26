@@ -1,5 +1,5 @@
 /**
- * Webtoon-Index (ToonSpectrum) Browser Polyfills & Compatibility Enhancements
+ * Webtoon-Index (ToonStudio) Browser Polyfills & Compatibility Enhancements
  * 다양한 브라우저 환경에서 웹 앱이 안정적으로 동작하도록 표준 API 및 최신 메서드를 보완합니다.
  */
 

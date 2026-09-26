@@ -1,4 +1,4 @@
-import { studioWorldInteractionRuleSchema, type StudioWorldInteractionRule } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldInteractionRuleSchema, type StudioWorldInteractionRule } from "@toonstudio/studio-project-model/world-publication";
 import type { StudioVirtualSpaceActivity } from "./studio-virtual-space-model";
 import { studioWorldInteractions, type StudioVirtualSpaceWorldManifest, type StudioWorldInteractionDefinition } from "./studio-virtual-space-world-manifest";
 

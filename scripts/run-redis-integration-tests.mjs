@@ -113,7 +113,7 @@ function runVitest(redisUrl) {
 
 async function main() {
   const suffix = randomBytes(8).toString("hex");
-  const containerName = `toonspectrum-redis-it-${process.pid}-${suffix}`;
+  const containerName = `toonstudio-redis-it-${process.pid}-${suffix}`;
   const password = `ts_${randomBytes(32).toString("base64url")}`;
   let started = false;
   let cleaning = false;
@@ -145,7 +145,7 @@ async function main() {
       "--name",
       containerName,
       "--label",
-      "com.toonspectrum.purpose=redis-integration",
+      "com.toonstudio.purpose=redis-integration",
       "--publish",
       "127.0.0.1::6379",
       "--memory",

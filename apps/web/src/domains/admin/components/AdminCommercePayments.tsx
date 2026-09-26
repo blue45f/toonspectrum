@@ -10,7 +10,7 @@ import { useCallback, useEffect, useState } from "react";
 import type {
   CommerceOrderPublicEntry,
   CommercePaymentMethod,
-} from "@toonspectrum/core/commerce";
+} from "@toonstudio/core/commerce";
 
 import {
   adminFetch,
@@ -173,7 +173,7 @@ export function AdminCommercePayments({ uid }: { uid: string }) {
             <h1 className="mt-1 text-xl font-bold text-fg">사이트 무료/유료 운영</h1>
             <p className="mt-1 max-w-3xl text-xs leading-5 text-fg-3">
               무료 모드에서는 마켓 획득에 결제를 요구하지 않습니다. 유료 모드에서는 서버 결제 권한이 없는 리소스 획득을 차단하며,
-              리소스 자체의 GPL·CC·ToonSpectrum 라이선스 조건은 가격 정책과 별도로 유지됩니다.
+              리소스 자체의 GPL·CC·ToonStudio 라이선스 조건은 가격 정책과 별도로 유지됩니다.
             </p>
           </div>
           <div className="flex items-center gap-2">

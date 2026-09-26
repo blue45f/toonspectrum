@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { studioWorldManifestSchema, studioWorldPublishSchema } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema, studioWorldPublishSchema } from "@toonstudio/studio-project-model/world-publication";
 
 import { canonicalJson } from "../index";
 

@@ -117,7 +117,7 @@ export interface StudioAdvancedBlurChangedBounds {
 }
 
 export interface StudioAdvancedBlurTransactionReceipt {
-  readonly schema: "toonspectrum.advanced-blur-filter/v1";
+  readonly schema: "toonstudio.advanced-blur-filter/v1";
   readonly operationId: string;
   readonly kernel: StudioAdvancedBlurKernelId;
   readonly width: number;
@@ -970,7 +970,7 @@ function createTransactionReceipt(input: {
     optionsKey(prepared.options),
   ].join("|");
   return {
-    schema: "toonspectrum.advanced-blur-filter/v1",
+    schema: "toonstudio.advanced-blur-filter/v1",
     operationId: `advanced-blur-v1-${fnv1aText(identity).toString(16).padStart(8, "0")}`,
     kernel: prepared.kernel,
     width: prepared.source.width,

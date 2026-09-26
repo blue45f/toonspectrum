@@ -17,9 +17,9 @@
         "kind": "sqlite-opfs-sha256-cas",
         "requestedVfs": "opfs",
         "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
-        "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+        "sqliteOpfsDirectory": "toonstudio-studio-sqlite",
         "sqliteFilename": "studio-local-v12.db",
-        "casOpfsRoot": "toonspectrum-studio-bg3d-libraries-v12",
+        "casOpfsRoot": "toonstudio-studio-bg3d-libraries-v12",
         "manifestNamespace": "studio-bg3d-libraries-v12",
         "normalCloseCompletedBeforeReopen": true,
         "coldOpenMs": 61.355,
@@ -1085,77 +1085,77 @@
       "opfs": {
         "entries": [
           {
-            "path": "toonspectrum-studio-bg3d-libraries-v12",
+            "path": "toonstudio-studio-bg3d-libraries-v12",
             "kind": "directory",
             "bytes": null
           },
           {
-            "path": "toonspectrum-studio-bg3d-libraries-v12/blobs",
+            "path": "toonstudio-studio-bg3d-libraries-v12/blobs",
             "kind": "directory",
             "bytes": null
           },
           {
-            "path": "toonspectrum-studio-bg3d-libraries-v12/blobs/679b4a884da4b8a093246c6e49d01464380f3991acebfdca22378d2fb2d3e344.bin",
+            "path": "toonstudio-studio-bg3d-libraries-v12/blobs/679b4a884da4b8a093246c6e49d01464380f3991acebfdca22378d2fb2d3e344.bin",
             "kind": "file",
             "bytes": 58
           },
           {
-            "path": "toonspectrum-studio-bg3d-libraries-v12/blobs/a9de16592711317ec3cfd19050a3456aed719c1adbc95ae800a08d354612dc09.bin",
+            "path": "toonstudio-studio-bg3d-libraries-v12/blobs/a9de16592711317ec3cfd19050a3456aed719c1adbc95ae800a08d354612dc09.bin",
             "kind": "file",
             "bytes": 1048576
           },
           {
-            "path": "toonspectrum-studio-bg3d-libraries-v12/blobs/e9d49c700d7beec75b585d3706c5866c5622b377755457c503de9e42c222cd5d.bin",
+            "path": "toonstudio-studio-bg3d-libraries-v12/blobs/e9d49c700d7beec75b585d3706c5866c5622b377755457c503de9e42c222cd5d.bin",
             "kind": "file",
             "bytes": 104857600
           },
           {
-            "path": "toonspectrum-studio-bg3d-libraries-v12/blobs/f89cfbb08c46c3d35fdcc8bec5142141fa0f63feb22ccb9d25450051ce7a90a5.bin",
+            "path": "toonstudio-studio-bg3d-libraries-v12/blobs/f89cfbb08c46c3d35fdcc8bec5142141fa0f63feb22ccb9d25450051ce7a90a5.bin",
             "kind": "file",
             "bytes": 33554432
           },
           {
-            "path": "toonspectrum-studio-bg3d-libraries-v12/index.json",
+            "path": "toonstudio-studio-bg3d-libraries-v12/index.json",
             "kind": "file",
             "bytes": 1797
           },
           {
-            "path": "toonspectrum-studio-sqlite",
+            "path": "toonstudio-studio-sqlite",
             "kind": "directory",
             "bytes": null
           },
           {
-            "path": "toonspectrum-studio-sqlite/.opaque",
+            "path": "toonstudio-studio-sqlite/.opaque",
             "kind": "directory",
             "bytes": null
           },
           {
-            "path": "toonspectrum-studio-sqlite/.opaque/27yeomdsqg2",
+            "path": "toonstudio-studio-sqlite/.opaque/27yeomdsqg2",
             "kind": "file",
             "bytes": 774144
           },
           {
-            "path": "toonspectrum-studio-sqlite/.opaque/iroykped23",
+            "path": "toonstudio-studio-sqlite/.opaque/iroykped23",
             "kind": "file",
             "bytes": 4096
           },
           {
-            "path": "toonspectrum-studio-sqlite/.opaque/nh5vx173azc",
+            "path": "toonstudio-studio-sqlite/.opaque/nh5vx173azc",
             "kind": "file",
             "bytes": 4096
           },
           {
-            "path": "toonspectrum-studio-sqlite/.opaque/peoxdtynkzm",
+            "path": "toonstudio-studio-sqlite/.opaque/peoxdtynkzm",
             "kind": "file",
             "bytes": 4096
           },
           {
-            "path": "toonspectrum-studio-sqlite/.opaque/y6z9o7mpvw9",
+            "path": "toonstudio-studio-sqlite/.opaque/y6z9o7mpvw9",
             "kind": "file",
             "bytes": 4096
           },
           {
-            "path": "toonspectrum-studio-sqlite/.opaque/yndtwy3eul",
+            "path": "toonstudio-studio-sqlite/.opaque/yndtwy3eul",
             "kind": "file",
             "bytes": 4096
           }
@@ -1653,7 +1653,7 @@
       "index.html": 389
     },
     "totalBytes": 5075266,
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-bg3d-sqlite-opfs-gGr5EU",
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-bg3d-sqlite-opfs-gGr5EU",
     "buildMs": 508.2017
   },
   "validationIssues": []

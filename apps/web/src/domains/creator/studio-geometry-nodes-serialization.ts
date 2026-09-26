@@ -33,7 +33,7 @@ import type {
 } from "./studio-geometry-nodes-graph";
 import type { StudioGeometryNodeRegistry } from "./studio-geometry-nodes-registry";
 
-export const STUDIO_GEOMETRY_NODES_DOC_KIND = "toonspectrum.geometry-nodes" as const;
+export const STUDIO_GEOMETRY_NODES_DOC_KIND = "toonstudio.geometry-nodes" as const;
 export const STUDIO_GEOMETRY_NODES_DOC_VERSION = 1 as const;
 export const STUDIO_GEOMETRY_NODES_DOC_MAX_BYTES = 256 * 1024;
 /** @deprecated 문서 총량은 개수가 아니라 canonical UTF-8 바이트 admission으로 제한한다. */

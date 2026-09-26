@@ -62,12 +62,12 @@ async function assertNoBlockingViolations(page: Page, route: string) {
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(
-      "toonspectrum-lang",
+      "toonstudio-lang",
       JSON.stringify({ state: { lang: "ko" }, version: 0 }),
     );
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
     localStorage.setItem(
-      "toonspectrum-studio-beta-notice-acknowledged",
+      "toonstudio-studio-beta-notice-acknowledged",
       "2026-09-24-data-and-policy-v1",
     );
   });

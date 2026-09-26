@@ -1,7 +1,7 @@
 import {
   EngineCapabilityRegistry,
   HybridExecutionPlanner,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
 import { INK_MESH_COMMIT } from "../ink-mesh";

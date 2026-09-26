@@ -41,7 +41,7 @@ ToonStudio는 범용 사진 편집기·범용 CAD·범용 드라이브를 외형
 
 `apps/desktop-sync/src/local-agent`는 단일 Desktop Sync 애플리케이션 안에서 로컬 폴더 감시와
 append journal을 소유하는 격리된 capability다. 외부 소비자는
-`@toonspectrum/desktop-sync/local-agent` subpath를 사용한다.
+`@toonstudio/desktop-sync/local-agent` subpath를 사용한다.
 
 - linked, mirrored, embedded binding 계약
 - root 탈출과 traversal 차단, filesystem root binding 금지
@@ -77,9 +77,9 @@ Tauri shell, 자동 업데이트, OS별 설치 패키지는 이 코어를 소비
 
 ```bash
 pnpm typecheck
-pnpm --filter @toonspectrum/desktop-sync typecheck
-pnpm --filter @toonspectrum/desktop-sync test
-pnpm --filter @toonspectrum/desktop-sync build
+pnpm --filter @toonstudio/desktop-sync typecheck
+pnpm --filter @toonstudio/desktop-sync test
+pnpm --filter @toonstudio/desktop-sync build
 pnpm run verify:studio-replacement
 pnpm exec vitest run apps/web/src/domains/creator/project-graph/*.test.ts* \
   packages/studio-project-model/src/__tests__/project-graph.test.ts \

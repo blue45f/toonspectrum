@@ -113,7 +113,7 @@ export function PolicyArticle({ doc }: { doc: PolicyDocument }) {
       <footer className="mt-10 rounded-2xl border border-line/60 bg-card/30 p-4 text-xs leading-relaxed text-fg-3">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <FileCheck2 size={14} className="shrink-0 text-accent" aria-hidden="true" />
-          <span className="font-medium text-fg-2">툰스펙트럼 게시 정책</span>
+          <span className="font-medium text-fg-2">툰스튜디오 게시 정책</span>
           <span>{doc.versionLabel}</span>
           {effective ? <span>· 시행일 {effective}</span> : null}
           <span>· 문서 ID <code className="font-mono text-fg-2">{shortContentHash(doc.contentHash)}</code></span>

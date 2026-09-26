@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import type { CanvasKit, CanvasKitInitOptions } from "canvaskit-wasm";
 
 /**
- * Node-only CanvasKit loader ("@toonspectrum/studio-engine-skia/node").
+ * Node-only CanvasKit loader ("@toonstudio/studio-engine-skia/node").
  *
  * canvaskit-wasm ships a CommonJS emscripten loader, so it is loaded through
  * createRequire; the .wasm blob is resolved next to it via the package export

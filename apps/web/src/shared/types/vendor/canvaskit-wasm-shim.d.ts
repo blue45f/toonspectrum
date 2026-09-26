@@ -1,5 +1,5 @@
 /**
- * Narrow CanvasKit types used by ToonSpectrum's quality-provider boundary.
+ * Narrow CanvasKit types used by ToonStudio's quality-provider boundary.
  *
  * The upstream package references `@webgpu/types` from its global declaration file. Loading that
  * file changes lib.dom's HTMLCanvasElement overload order and in turn breaks unrelated Canvas2D

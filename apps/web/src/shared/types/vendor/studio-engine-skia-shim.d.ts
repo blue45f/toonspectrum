@@ -3,7 +3,7 @@
  *
  * The app already replaces `canvaskit-wasm`'s vendor types with a narrow shim
  * (`canvaskit-wasm-shim.d.ts`) because the upstream global declarations reorder lib.dom's
- * HTMLCanvasElement overloads and break unrelated Canvas2D mocks. `@toonspectrum/studio-engine-skia`
+ * HTMLCanvasElement overloads and break unrelated Canvas2D mocks. `@toonstudio/studio-engine-skia`
  * imports the REAL CanvasKit types, so pulling the package into the app's program surfaces a wall
  * of "no exported member" errors that say nothing about the app.
  *

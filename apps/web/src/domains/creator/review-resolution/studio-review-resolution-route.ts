@@ -1,4 +1,4 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 
 import { parseStudioReviewEditorRequest, type StudioReviewEditorRequest } from "../review-handoff/studio-review-editor-handoff";
 import { studioReviewEditorRequestFromLocation } from "../review-handoff/studio-review-editor-route";

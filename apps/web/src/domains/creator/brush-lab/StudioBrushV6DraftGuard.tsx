@@ -7,7 +7,7 @@ import { parseBrushStudioV6Import } from "./brush-studio-v6-experiments";
 function readDraft(scope: string) {
   let raw: string | null = null;
   try {
-    raw = globalThis.localStorage?.getItem(`toonspectrum.brush-program-v6:${encodeURIComponent(scope)}`) ?? null;
+    raw = globalThis.localStorage?.getItem(`toonstudio.brush-program-v6:${encodeURIComponent(scope)}`) ?? null;
     return { program: raw === null ? createBrushStudioV6Program() : parseBrushStudioV6Import(raw), raw, error: null };
   } catch (error) {
     return { program: null, raw, error: error instanceof Error ? error.message : "브러시 설정을 읽지 못했습니다." };

@@ -109,7 +109,7 @@
         "jsHeapUsedBytes": null,
         "wasmMemoryBytes": null
       },
-      "screenshot": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/desktop-1440x900.png"
+      "screenshot": "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/manual/desktop-1440x900.png"
     },
     {
       "id": "mobile-390x844",
@@ -195,7 +195,7 @@
         "jsHeapUsedBytes": null,
         "wasmMemoryBytes": null
       },
-      "screenshot": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/mobile-390x844.png"
+      "screenshot": "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/manual/mobile-390x844.png"
     },
     {
       "id": "narrow-mobile-320x568",
@@ -281,7 +281,7 @@
         "jsHeapUsedBytes": null,
         "wasmMemoryBytes": null
       },
-      "screenshot": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/narrow-mobile-320x568.png"
+      "screenshot": "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/manual/narrow-mobile-320x568.png"
     }
   ],
   "commands": [
@@ -292,7 +292,7 @@
       "passed": true,
       "durationMs": 241000,
       "durationSource": "coordinator wall clock rounded to nearest second",
-      "artifactDir": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/launch",
+      "artifactDir": "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/launch",
       "outcome": "desktop runs 2/2, mobile drawing, 320/360/390 docks and pages/props/brushes sheets passed; consoleErrors=0"
     },
     {
@@ -302,7 +302,7 @@
       "passed": true,
       "durationMs": 17347,
       "durationSource": "command runner wall clock",
-      "artifactDir": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/menus",
+      "artifactDir": "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/menus",
       "outcome": "main menu, rail, five menu-driven popovers, draw options and export options passed"
     },
     {
@@ -312,7 +312,7 @@
       "passed": true,
       "durationMs": 24116,
       "durationSource": "command runner wall clock",
-      "artifactDir": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/mobile-top",
+      "artifactDir": "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/mobile-top",
       "outcome": "320/360/390/430 immersive and windowed runs passed; overflow, overlap, clipping and errors all zero"
     },
     {
@@ -322,16 +322,16 @@
       "passed": true,
       "durationMs": 7517,
       "durationSource": "command runner wall clock",
-      "artifactDir": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/icons",
+      "artifactDir": "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/icons",
       "outcome": "menubar, tool rail, draw options and main menu icon contracts passed"
     }
   ],
   "visualInspection": {
     "performed": true,
     "screenshotsReviewed": [
-      "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/desktop-1440x900.png",
-      "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/mobile-390x844.png",
-      "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm/manual/narrow-mobile-320x568.png"
+      "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/manual/desktop-1440x900.png",
+      "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/manual/mobile-390x844.png",
+      "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm/manual/narrow-mobile-320x568.png"
     ],
     "findings": [
       "Desktop canvas, page rail, tool rail, menubar, inspector and bottom canvas controls are visible without clipping.",
@@ -367,5 +367,5 @@
     "authenticatedTwoUserCollaboration": "not requested and no disposable authenticated API/database was started",
     "gpuAndMemoryAxes": "not exposed by this production UI QA pass; every viewport records explicit null instead of fabricated zero"
   },
-  "temporaryEvidenceRoot": "/tmp/toonspectrum-studio-v12-browser-qa.Wiwcjm"
+  "temporaryEvidenceRoot": "/tmp/toonstudio-studio-v12-browser-qa.Wiwcjm"
 }

@@ -37,7 +37,7 @@ const storage = {
 function locatedObject(bytes: Buffer) {
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   return {
-    contractVersion: "toonspectrum.private-object-storage.v2" as const,
+    contractVersion: "toonstudio.private-object-storage.v2" as const,
     providerId: "cloudflare-r2" as const,
     purpose: "export" as const,
     digest: `sha256:${sha256}`,

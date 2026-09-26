@@ -383,7 +383,7 @@ let sharedPool: StudioBg3dValidationWorkerPool | null = null;
 function browserWorkerFactory(): StudioBg3dValidationWorkerLike {
   return new Worker(
     new URL("./studio-bg3d-glb-validation.worker.ts", import.meta.url),
-    { name: "toonspectrum-bg3d-glb-validator", type: "module" },
+    { name: "toonstudio-bg3d-glb-validator", type: "module" },
   );
 }
 

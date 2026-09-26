@@ -50,7 +50,7 @@ describe("market-preview", () => {
           kind: "palette",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.palette+json",
+            mediaType: "application/vnd.toonstudio.palette+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "palette",
@@ -83,7 +83,7 @@ describe("market-preview", () => {
           kind: "palette",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.palette+json",
+            mediaType: "application/vnd.toonstudio.palette+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "palette",
@@ -100,7 +100,7 @@ describe("market-preview", () => {
           kind: "palette",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.palette+json",
+            mediaType: "application/vnd.toonstudio.palette+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "palette",
@@ -131,7 +131,7 @@ describe("market-preview", () => {
           kind: "palette",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.palette+json",
+            mediaType: "application/vnd.toonstudio.palette+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "palette",
@@ -155,7 +155,7 @@ describe("market-preview", () => {
           kind: "palette",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.palette+json",
+            mediaType: "application/vnd.toonstudio.palette+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "palette",
@@ -181,7 +181,7 @@ describe("market-preview", () => {
           kind: "brush",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.brush+json",
+            mediaType: "application/vnd.toonstudio.brush+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "brush",
@@ -229,7 +229,7 @@ describe("market-preview", () => {
           kind: "filter",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.filter+json",
+            mediaType: "application/vnd.toonstudio.filter+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "filter",
@@ -266,7 +266,7 @@ describe("market-preview", () => {
           kind: "template",
           delivery: {
             mode: "portable-json",
-            mediaType: "application/vnd.toonspectrum.template+json",
+            mediaType: "application/vnd.toonstudio.template+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "template",
@@ -337,7 +337,7 @@ describe("market-preview", () => {
           kind: "3d-preset",
           delivery: {
             mode: "procedural-recipe",
-            mediaType: "application/vnd.toonspectrum.3d-preset+json",
+            mediaType: "application/vnd.toonstudio.3d-preset+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "3d-preset",
@@ -397,7 +397,7 @@ describe("market-preview", () => {
           kind: "3d-asset",
           delivery: {
             mode: "procedural-recipe",
-            mediaType: "application/vnd.toonspectrum.3d-asset+json",
+            mediaType: "application/vnd.toonstudio.3d-asset+json",
             payload: {
               schemaVersion: 1,
               resourceKind: "3d-asset",

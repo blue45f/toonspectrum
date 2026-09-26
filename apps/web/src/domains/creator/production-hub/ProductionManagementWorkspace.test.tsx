@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ProductionProjectAggregate, ProductionTask } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate, ProductionTask } from "@toonstudio/core/production";
 
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionManagementWorkspace } from "./ProductionManagementWorkspace";

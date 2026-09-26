@@ -331,7 +331,7 @@ describe("deterministic transaction receipts", () => {
     const second = applied(applyStudioEditingBrushKernel(request));
     expect(first.image.data).toEqual(second.image.data);
     expect(first.transaction).toEqual(second.transaction);
-    expect(first.transaction.schema).toBe("toonspectrum.editing-brush-operation/v1");
+    expect(first.transaction.schema).toBe("toonstudio.editing-brush-operation/v1");
     expect(first.transaction.operationId).toMatch(/^editing-v1-[0-9a-f]{8}$/);
     expect(first.transaction.outputFingerprint).toMatch(/^[0-9a-f]{8}$/);
   });

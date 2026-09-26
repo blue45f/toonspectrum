@@ -18,9 +18,9 @@ import {
 import type { StudioLivePostgresListenerLifecycleStatus } from "./studio-postgres-pubsub";
 import type { INestApplicationContext } from "@nestjs/common";
 
-const DIRECT_URL = "postgresql://artist:secret@ep-direct.us-east-1.aws.neon.tech/toonspectrum?sslmode=require";
+const DIRECT_URL = "postgresql://artist:secret@ep-direct.us-east-1.aws.neon.tech/toonstudio?sslmode=require";
 const NORMALIZED_DIRECT_URL =
-  "postgresql://artist:secret@ep-direct.us-east-1.aws.neon.tech/toonspectrum?sslmode=verify-full";
+  "postgresql://artist:secret@ep-direct.us-east-1.aws.neon.tech/toonstudio?sslmode=verify-full";
 const VALID_ATTACHMENT_CATALOG = {
   attachmentTable: STUDIO_LIVE_POSTGRES_ATTACHMENT_TABLE,
   createdAtDefault: "now()",
@@ -109,7 +109,7 @@ describe("Studio live cluster adapter configuration", () => {
   it("matches node-postgres' parser for the accepted authority and TLS contract", () => {
     const connectionString =
       // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic parser fixture
-      "postgresql://artist:s3cret@ep-direct.example.net:5433/toonspectrum?sslmode=verify-full&channel_binding=require";
+      "postgresql://artist:s3cret@ep-direct.example.net:5433/toonstudio?sslmode=verify-full&channel_binding=require";
     const resolved = resolveStudioLiveClusterAdapterConfig({
       NODE_ENV: "production",
       STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
@@ -120,7 +120,7 @@ describe("Studio live cluster adapter configuration", () => {
     const parsed = new Client({ connectionString: resolved.connectionString })
       .connectionParameters;
     expect(parsed).toMatchObject({
-      database: "toonspectrum",
+      database: "toonstudio",
       host: "ep-direct.example.net",
       password: "s3cret",
       port: 5433,
@@ -132,7 +132,7 @@ describe("Studio live cluster adapter configuration", () => {
   it("rejects query overrides that node-postgres would otherwise apply to authority and credentials", () => {
     const unsafe =
       // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic query-override fixture
-      "postgresql://good:original@direct.example.net:5432/toonspectrum?host=evil.example.net&port=6543&user=attacker&password=stolen&ssl=true";
+      "postgresql://good:original@direct.example.net:5432/toonstudio?host=evil.example.net&port=6543&user=attacker&password=stolen&ssl=true";
     const parsed = new Client({ connectionString: unsafe }).connectionParameters;
     expect(parsed).toMatchObject({
       host: "evil.example.net",
@@ -174,7 +174,7 @@ describe("Studio live cluster adapter configuration", () => {
       {
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL:
-          "postgresql://artist:secret@ep-example-pooler.us-east-1.aws.neon.tech/toonspectrum",
+          "postgresql://artist:secret@ep-example-pooler.us-east-1.aws.neon.tech/toonstudio",
       },
       /direct PostgreSQL endpoint/u,
     ],
@@ -183,7 +183,7 @@ describe("Studio live cluster adapter configuration", () => {
         NODE_ENV: "production",
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL:
-          "postgresql://artist:secret@ep-direct.example.net/toonspectrum",
+          "postgresql://artist:secret@ep-direct.example.net/toonstudio",
       },
       /sslmode=require/u,
     ],
@@ -192,7 +192,7 @@ describe("Studio live cluster adapter configuration", () => {
         NODE_ENV: "production",
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL:
-          "postgresql://artist:secret@ep-direct.example.net/toonspectrum?sslmode=disable",
+          "postgresql://artist:secret@ep-direct.example.net/toonstudio?sslmode=disable",
       },
       /sslmode=require/u,
     ],
@@ -200,7 +200,7 @@ describe("Studio live cluster adapter configuration", () => {
       {
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL:
-          "postgresql://artist:secret@pooler.example.net/toonspectrum",
+          "postgresql://artist:secret@pooler.example.net/toonstudio",
       },
       /direct PostgreSQL endpoint/u,
     ],
@@ -208,7 +208,7 @@ describe("Studio live cluster adapter configuration", () => {
       {
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL:
-          "postgresql://artist:secret@pgbouncer.example.net/toonspectrum",
+          "postgresql://artist:secret@pgbouncer.example.net/toonstudio",
       },
       /direct PostgreSQL endpoint/u,
     ],
@@ -282,7 +282,7 @@ describe("Studio live cluster adapter configuration", () => {
         NODE_ENV: "development",
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL:
-          "postgresql://artist:secret@127.0.0.1:55432/toonspectrum",
+          "postgresql://artist:secret@127.0.0.1:55432/toonstudio",
       })
     ).toMatchObject({ mode: "postgres" });
     expect(() =>
@@ -290,7 +290,7 @@ describe("Studio live cluster adapter configuration", () => {
         NODE_ENV: "development",
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL:
-          "postgresql://artist:secret@remote.example.net/toonspectrum",
+          "postgresql://artist:secret@remote.example.net/toonstudio",
       })
     ).toThrow(/plaintext is allowed only for loopback development/u);
   });

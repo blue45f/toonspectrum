@@ -46,8 +46,8 @@ const CARD = "rounded-2xl border border-line bg-card/55 p-4 shadow-sm";
 const INPUT = `min-h-11 w-full rounded-xl border border-line bg-card px-3 text-sm text-fg ${STUDIO_FOCUS_RING}`;
 const BUTTON = `inline-flex min-h-11 items-center justify-center rounded-xl border border-line bg-card px-3 py-2 text-sm font-semibold text-fg transition-colors hover:border-line-strong hover:bg-raised disabled:cursor-not-allowed disabled:opacity-45 ${STUDIO_FOCUS_RING}`;
 const PRIMARY_BUTTON = `inline-flex min-h-11 items-center justify-center rounded-xl border border-accent/45 bg-accent px-3 py-2 text-sm font-bold text-on-accent transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45 ${STUDIO_FOCUS_RING}`;
-const LIBRARY_KEY = "toonspectrum.brush-studio-v5.library";
-const DRAFT_KEY_PREFIX = "toonspectrum.brush-studio-v5.draft:";
+const LIBRARY_KEY = "toonstudio.brush-studio-v5.library";
+const DRAFT_KEY_PREFIX = "toonstudio.brush-studio-v5.draft:";
 
 interface StoredBrushStudioV5Program {
   readonly id: string;
@@ -111,7 +111,7 @@ function writeLibrary(entries: readonly StoredBrushStudioV5Program[]): void {
 
 function downloadJson(program: BrushStudioV5Draft): void {
   const text = JSON.stringify({
-    kind: "toonspectrum.brush-studio-v5",
+    kind: "toonstudio.brush-studio-v5",
     exportedAt: new Date().toISOString(),
     program,
   }, null, 2);

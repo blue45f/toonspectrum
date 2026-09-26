@@ -103,10 +103,10 @@ describe("합성 프로파일 왕복", () => {
 
   it("설명·저작권 문자열을 읽는다", () => {
     const profile = parseOk(bytes);
-    expect(profile.description).toBe("ToonSpectrum sRGB");
+    expect(profile.description).toBe("ToonStudio sRGB");
     expect(profile.copyright).toContain("IEC 61966-2-1");
     expect(describeIccProfile(profile)).toBe(
-      `ToonSpectrum sRGB · RGB · ICC 2.4.0 · 렌더링 인텐트 ${STUDIO_ICC_RENDERING_INTENT_LABELS["media-relative"]}`,
+      `ToonStudio sRGB · RGB · ICC 2.4.0 · 렌더링 인텐트 ${STUDIO_ICC_RENDERING_INTENT_LABELS["media-relative"]}`,
     );
   });
 

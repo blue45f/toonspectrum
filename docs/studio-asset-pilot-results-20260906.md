@@ -4,7 +4,7 @@
 
 ## 실제 취득
 
-GitHub Actions 수집 실행: https://github.com/blue45f/toonspectrum/actions/runs/33976470532
+GitHub Actions 수집 실행: https://github.com/blue45f/toonstudio/actions/runs/33976470532
 
 5개 명시적 무료 CC0 팩 수집 성공, 오류 0. 최초 격리 ZIP SHA-256:
 `06c307e1dea33bd6b150801218508b8786835c70d11299f0fe08d6ac24d61e74`

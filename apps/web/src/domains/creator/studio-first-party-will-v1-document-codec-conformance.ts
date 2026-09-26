@@ -1,5 +1,5 @@
 /**
- * Deterministic conformance evidence for ToonSpectrum's bounded WILL v1 Annex B document codec.
+ * Deterministic conformance evidence for ToonStudio's bounded WILL v1 Annex B document codec.
  *
  * The evidence covers the exact seven-part clean-room profile only. It is not Wacom/vendor
  * certification, trademark authorization, or arbitrary `.will` interoperability evidence.
@@ -25,7 +25,7 @@ import {
 } from "./studio-will-v1-opc-interchange";
 
 export const STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_SCHEMA =
-  "toonspectrum.first-party-will-v1-annex-b-document-conformance" as const;
+  "toonstudio.first-party-will-v1-annex-b-document-conformance" as const;
 export const STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_SCHEMA_VERSION =
   1 as const;
 
@@ -35,7 +35,7 @@ export interface StudioFirstPartyWillV1DocumentConformanceEvidence {
   readonly schemaVersion:
     typeof STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_SCHEMA_VERSION;
   readonly implementation:
-    "toonspectrum-first-party-will-v1-annex-b-document";
+    "toonstudio-first-party-will-v1-annex-b-document";
   readonly implementationVersion:
     typeof STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_VERSION;
   readonly format: typeof STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_FORMAT;
@@ -150,9 +150,9 @@ async function conformanceSource(): Promise<Uint8Array> {
   return encodeStudioWillV1DocumentTransport({
     width: 328,
     height: 439,
-    title: "ToonSpectrum WILL v1 Annex B conformance",
+    title: "ToonStudio WILL v1 Annex B conformance",
     createdAt: "2026-07-30T00:00:00Z",
-    application: "ToonSpectrum Studio",
+    application: "ToonStudio Studio",
     applicationVersion: "1.0.0",
     paths: [
       {
@@ -231,7 +231,7 @@ export async function createStudioFirstPartyWillV1DocumentConformanceEvidence(
       schemaVersion:
         STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_SCHEMA_VERSION,
       implementation:
-        "toonspectrum-first-party-will-v1-annex-b-document",
+        "toonstudio-first-party-will-v1-annex-b-document",
       implementationVersion:
         STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_VERSION,
       format: STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_FORMAT,

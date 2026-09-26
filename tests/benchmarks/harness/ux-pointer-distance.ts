@@ -59,11 +59,11 @@ function log(message: string): void {
 const STORAGE_PRIMING_SOURCE = String.raw`
 (() => {
   try {
-    localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-    localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
+    localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
+    localStorage.setItem("toonstudio-studio-mobile-hint-dismissed", "1");
     const keys = Object.keys(localStorage);
     for (let i = 0; i < keys.length; i += 1) {
-      if (keys[i].indexOf("toonspectrum-studio-autosave") === 0) localStorage.removeItem(keys[i]);
+      if (keys[i].indexOf("toonstudio-studio-autosave") === 0) localStorage.removeItem(keys[i]);
     }
   } catch (error) {
     // Private mode: the studio still boots, just without the primed flags.
@@ -799,7 +799,7 @@ async function main(): Promise<void> {
   const auditBudgets = audit.measurements.pointerDistance.budgets;
 
   const report = {
-    $schema: "https://toonspectrum.local/schemas/ux-pointer-distance.json",
+    $schema: "https://toonstudio.local/schemas/ux-pointer-distance.json",
     gate: "V5 §15 포인터 거리 — on-canvas command surfaces",
     generatedAt: new Date().toISOString(),
     route: "/studio (guest, no auth session)",

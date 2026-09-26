@@ -223,7 +223,7 @@ export function renderStudioCampaignPrompt(config, plan) {
     (signal) => `${signal.name}: ${signal.title || signal.category} ${signal.sourceUrl}`,
   );
 
-  return `You are executing one bounded ToonSpectrum Studio saturation-campaign cycle.
+  return `You are executing one bounded ToonStudio Studio saturation-campaign cycle.
 
 Campaign: ${plan.campaignId}
 Cycle: ${plan.window.cycleIndex}
@@ -248,7 +248,7 @@ Required behavior
 2. Implement exactly one atomic, production-meaningful slice. Do not attempt the whole epic and do not create placeholder UI, fake success states, speculative APIs, or claims unsupported by executable code.
 3. Prefer fixing a confirmed regression, closing a real integration gap, or landing a small end-to-end capability through engine/model, Studio UI, persistence, Undo/Redo, errors, tests, and documentation as applicable.
 4. The repository owner has already supplied the campaign-wide reuse attestation at docs/third-party/studio-owner-attestation-2026-09-02.md. Do not ask for permission again. When an accessible external artifact is actually copied, pin its source/version/SHA-256 and add a truthful row to docs/third-party/studio-reuse-registry.json plus required notices. Never invent a source, hash, license, permission document, or downloaded asset.
-5. When an exact external artifact is unavailable or direct reuse is technically worse, analyze the capability and independently implement an equivalent or better ToonSpectrum-native result.
+5. When an exact external artifact is unavailable or direct reuse is technically worse, analyze the capability and independently implement an equivalent or better ToonStudio-native result.
 6. Preserve project-file compatibility, atomic save/recovery, command-history symmetry, active-stroke cleanup, WebGPU device-loss behavior, and declared WebGL2/Canvas2D/WASM boundaries.
 7. Do not modify .github/workflows, dependency manifests, lockfiles, environment examples, deployment credentials, or campaign automation in this cycle.
 8. Keep the patch under ${config.agent.maxChangedFiles} changed files and ${config.agent.maxChangedLines} changed lines. Avoid broad formatting, renames, and unrelated refactors.

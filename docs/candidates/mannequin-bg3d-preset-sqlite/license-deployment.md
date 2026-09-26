@@ -7,7 +7,7 @@
 | SQLite | Canonical local KV authority | Public domain upstream |
 | `@sqlite.org/sqlite-wasm` | Browser WASM and OPFS SAH-pool bridge | Existing repository pin/notices; no dependency change |
 | Web OPFS | Origin-private durable file backing | Web Platform API |
-| ToonSpectrum repositories and schemas | Validation, ordering, fencing and UI failure semantics | Repository-owned code |
+| ToonStudio repositories and schemas | Validation, ordering, fencing and UI failure semantics | Repository-owned code |
 
 No package, lockfile, native binary, network service or copyleft dependency was added. Persisted
 rows contain engine-neutral JSON only; Three.js objects, GPU resources and executable data are not
@@ -17,7 +17,7 @@ accepted.
 
 - Both product paths acquire the existing app-lifetime handle through
   `acquireStudioLocalDatabase()` and therefore use `studio-local-v12.db` in the established
-  `toonspectrum-studio-sqlite` OPFS root.
+  `toonstudio-studio-sqlite` OPFS root.
 - Lazy panels do not install a second VFS and do not close the shared handle.
 - A database failure never silently switches authority to localStorage or IndexedDB.
 - Corrupt rows are read-only failures; the product does not overwrite them with empty data.

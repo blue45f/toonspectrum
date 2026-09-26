@@ -2,7 +2,7 @@
 
 ## Decision
 
-ToonSpectrum must not treat Student, Amateur, and Professional as mutually exclusive account tiers.
+ToonStudio must not treat Student, Amateur, and Professional as mutually exclusive account tiers.
 Personalization is modeled as three independent axes:
 
 1. **Account context** — Individual, Education, Team/Studio.

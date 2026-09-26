@@ -25,7 +25,7 @@ import {
   siteNavigationText,
 } from "./site-navigation";
 import { workspaceNavigationActiveId } from "./workspace/workspace-navigation-model";
-import { ToonSpectrumMark } from "./visual-marks";
+import { ToonStudioMark } from "./visual-marks";
 import { PublicSiteJourney } from "./public-site-journey";
 import {
   isDiscoverPurposeRoute,
@@ -294,7 +294,7 @@ export function SiteHeader() {
             className="group flex min-h-11 min-w-0 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl pr-1 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:pr-3"
           >
             <span className="relative grid size-10 shrink-0 place-items-center rounded-[0.95rem] border border-line/70 bg-panel/85 shadow-sm transition-transform duration-200 ease-out-expo group-hover:-rotate-3 group-hover:scale-[1.03] motion-reduce:transition-none">
-              <ToonSpectrumMark className="size-9 rounded-[0.8rem]" />
+              <ToonStudioMark className="size-9 rounded-[0.8rem]" />
               <span
                 aria-hidden="true"
                 className="absolute -bottom-1 -right-1 size-2.5 rounded-full border-2 border-canvas bg-accent"

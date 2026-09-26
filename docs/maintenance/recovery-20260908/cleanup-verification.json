@@ -39,7 +39,7 @@
       "mergedAt": "2026-09-08T14:43:09Z",
       "number": 960,
       "state": "MERGED",
-      "url": "https://github.com/blue45f/toonspectrum/pull/960"
+      "url": "https://github.com/blue45f/toonstudio/pull/960"
     },
     "collectionMergeTreeMatchesTestedProduct": true,
     "archiveRefCount": 55,
@@ -52,7 +52,7 @@
     "original repository active checkout and duplicate untracked files",
     "QA/source clones now coordinate on release/salvage-integration-20260908; old remote branch names retired"
   ],
-  "fullReadOnlyReviewLocalPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/final-cleanup-review.json",
+  "fullReadOnlyReviewLocalPath": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/final-cleanup-review.json",
   "scopeNote": "Initial-scope counts exclude later active source branches and temporary branches created for this audit; preserving sources in integration does not mean they are already in main.",
   "finalTwoSourceBranches": {
     "checkedAt": "2026-09-08T15:07:42.620927+00:00",
@@ -77,13 +77,13 @@
   },
   "rootIdeSwitch": {
     "createdAt": "2026-09-08T15:18:35.770813+00:00",
-    "root": "/Users/hjunkim/WebstormProjects/toonspectrum",
+    "root": "/Users/hjunkim/WebstormProjects/toonstudio",
     "oldBranch": "release/salvage-smart-shape-copy-20260908",
     "oldSha": "dce667137fca4849ecd5536fb4e8e9e3e54f4fa3",
     "targetBranch": "release/salvage-integration-20260908",
     "expectedTargetSha": "2797e837b4a4707b74ecb4d6b0fd683d14cb47be",
     "archiveRef": "refs/cleanup-archive/all-unmerged-integration-20260908/root-ide/release/salvage-smart-shape-copy-20260908",
-    "backupDirectory": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909",
+    "backupDirectory": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909",
     "initialProcessAudit": {
       "rootCwdProcessCount": 259,
       "commandCounts": {
@@ -119,7 +119,7 @@
         "bytes": 8684,
         "mode": "0o644",
         "sha256": "159570d3fb55c527a8431a991cdfc6786830290e1c8cb687f672e3174d7f08c4",
-        "backupPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909/files/apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",
+        "backupPath": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909/files/apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",
         "backupVerified": true,
         "targetSha256": "159570d3fb55c527a8431a991cdfc6786830290e1c8cb687f672e3174d7f08c4",
         "exactTarget": true,
@@ -130,7 +130,7 @@
         "bytes": 8085,
         "mode": "0o644",
         "sha256": "95ef125040c1458cced5e59bfeff7caf253289dbfd873c61b24a131a68715b46",
-        "backupPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909/files/apps/web/src/domains/creator/studio-smart-shape-copy.test.ts",
+        "backupPath": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909/files/apps/web/src/domains/creator/studio-smart-shape-copy.test.ts",
         "backupVerified": true,
         "targetSha256": "95ef125040c1458cced5e59bfeff7caf253289dbfd873c61b24a131a68715b46",
         "exactTarget": true,
@@ -141,14 +141,14 @@
         "bytes": 1982,
         "mode": "0o644",
         "sha256": "96ea285855ced080b18bb946a5f8be5446964c39f576416e47c3e3f9358edeeb",
-        "backupPath": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909/files/apps/web/src/domains/creator/studio-smart-shape-copy.ts",
+        "backupPath": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909/files/apps/web/src/domains/creator/studio-smart-shape-copy.ts",
         "backupVerified": true,
         "targetSha256": "88eb7b6c02bea54117208a00f675da08af04580fa99c73b27da735f5ff1170c8",
         "exactTarget": false,
         "knownImportOnlyEquivalent": true
       }
     ],
-    "tar": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909/original-untracked-files.tar.gz",
+    "tar": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/root-ide-switch-backup-20260909/original-untracked-files.tar.gz",
     "tarSha256": "8aa17009a059f5278eab8c8973b0b23f12679b21c0a114caa4e18c90d376d96a",
     "tarMembersVerified": 3,
     "backupBytes": 18751,
@@ -161,7 +161,7 @@
     "actualHead": "2797e837b4a4707b74ecb4d6b0fd683d14cb47be",
     "upstream": "origin/release/salvage-integration-20260908",
     "finalStatus": "",
-    "worktreeList": "worktree /Users/hjunkim/WebstormProjects/toonspectrum\nHEAD 2797e837b4a4707b74ecb4d6b0fd683d14cb47be\nbranch refs/heads/release/salvage-integration-20260908\n\n",
+    "worktreeList": "worktree /Users/hjunkim/WebstormProjects/toonstudio\nHEAD 2797e837b4a4707b74ecb4d6b0fd683d14cb47be\nbranch refs/heads/release/salvage-integration-20260908\n\n",
     "preservedArchiveHead": "dce667137fca4849ecd5536fb4e8e9e3e54f4fa3",
     "movedOrRemovedUntrackedPaths": [
       "apps/web/src/domains/creator/ai/studio-scenario-image-generation.test.ts",

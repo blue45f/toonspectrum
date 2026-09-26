@@ -1,14 +1,14 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { EngineCapabilityRegistry } from "@toonspectrum/studio-engine-registry";
+import { EngineCapabilityRegistry } from "@toonstudio/studio-engine-registry";
 import {
   UnknownAssetCapabilityError,
   brushProgramIRSchema,
   collectSceneFeatures,
   computeAssetContentDigest,
   computeAssetStructuredDigest,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { parseKppPreset } from "../../../../../packages/studio-format-gateway/src/kpp";
@@ -32,7 +32,7 @@ import type {
   StudioSqliteApiHandle,
 } from "./studio-local-database";
 import type { KppImportResult } from "../../../../../packages/studio-format-gateway/src/kpp";
-import type { AssetMetadataIR } from "@toonspectrum/studio-project-model";
+import type { AssetMetadataIR } from "@toonstudio/studio-project-model";
 
 // ---------------------------------------------------------------------------
 // Real fixtures — actual gateway parsers over the committed corpus files.
@@ -47,7 +47,7 @@ function corpusBytes(relative: string): Uint8Array {
 }
 
 const FIXED_NOW = 1_754_600_000_000;
-const CORPUS_LICENSE = { spdx: "CC0-1.0", attribution: "ToonSpectrum corpus" };
+const CORPUS_LICENSE = { spdx: "CC0-1.0", attribution: "ToonStudio corpus" };
 
 const SVG_FIXTURE = `
   <svg width="120" height="80">
@@ -175,9 +175,9 @@ describe("deriveAssetMetadata", () => {
     });
     expect(card.normalizedIrRef).toEqual({
       digest: computeAssetStructuredDigest(result.preset),
-      schema: "toonspectrum.brush-program-ir",
+      schema: "toonstudio.brush-program-ir",
       schemaVersion: 11,
-      mediaType: "application/vnd.toonspectrum.brush-program+json",
+      mediaType: "application/vnd.toonstudio.brush-program+json",
       locator: null,
     });
     expect(card.providerRequirements).toEqual([
@@ -348,9 +348,9 @@ describe("deriveAssetMetadata", () => {
     });
     expect(card.normalizedIrRef).toEqual({
       digest: computeAssetStructuredDigest(result.scene),
-      schema: "toonspectrum.scene-ir",
+      schema: "toonstudio.scene-ir",
       schemaVersion: 11,
-      mediaType: "application/vnd.toonspectrum.scene+json",
+      mediaType: "application/vnd.toonstudio.scene+json",
       locator: null,
     });
     expect(card.rendererVariants.map(({ id, tier, qualityStatus }) => ({

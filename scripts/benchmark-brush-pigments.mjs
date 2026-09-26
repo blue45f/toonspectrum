@@ -38,7 +38,7 @@ try {
   const selections = [];
   for (const [label, id] of [["Spectral.js 선택", "pigment-spectral-js"], ["open-km 분광 선택", "pigment-open-km-spectral"], ["ColorMix.js Lab 선택", "pigment-colormix-lab"]]) {
     await page.getByRole("button", { name: label, exact: true }).click();
-    await page.waitForFunction((node) => JSON.parse(localStorage.getItem("toonspectrum.brush-program-v6:pigment-qa")).slots.pigment === node, id);
+    await page.waitForFunction((node) => JSON.parse(localStorage.getItem("toonstudio.brush-program-v6:pigment-qa")).slots.pigment === node, id);
     selections.push({ id, persisted: true });
   }
   await page.getByRole("button", { name: "K–M 광학 층 실험 열기", exact: true }).click();
@@ -49,11 +49,11 @@ try {
   const layerLabels = ["미리 섞은 도막", "주 색을 위에 덧칠", "보조 색을 위에 덧칠"];
   const initialLayers = await Promise.all(layerLabels.map((label) => page.getByLabel(label, { exact: true }).textContent()));
   assert.equal(new Set(initialLayers).size, 3);
-  const programBeforeOptics = await page.evaluate(() => localStorage.getItem("toonspectrum.brush-program-v6:pigment-qa"));
+  const programBeforeOptics = await page.evaluate(() => localStorage.getItem("toonstudio.brush-program-v6:pigment-qa"));
   await page.getByLabel(/주 색 도막 두께/).fill("0");
   await page.getByLabel(/보조 색 도막 두께/).fill("0");
   for (const label of layerLabels) assert.equal(await page.getByLabel(label, { exact: true }).textContent(), "#ffffff");
-  assert.equal(await page.evaluate(() => localStorage.getItem("toonspectrum.brush-program-v6:pigment-qa")), programBeforeOptics);
+  assert.equal(await page.evaluate(() => localStorage.getItem("toonstudio.brush-program-v6:pigment-qa")), programBeforeOptics);
   await page.getByLabel(/주 색 도막 두께/).fill("0.5");
   await page.getByLabel(/보조 색 도막 두께/).fill("0.5");
   await page.getByRole("region", { name: "KM 혼합과 겹칠 비교", exact: true }).screenshot({ path: resolve(output, "km-layers.png") });

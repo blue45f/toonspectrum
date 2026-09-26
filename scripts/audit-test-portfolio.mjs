@@ -63,7 +63,7 @@ export function inspectTestSource(file, text) {
     && forwarding.moduleSpecifier && ts.isStringLiteral(forwarding.moduleSpecifier)
     && /\.(?:test|spec)(?:\.[cm]?[jt]sx?)?$/u.test(forwarding.moduleSpecifier.text)
     ? forwarding.moduleSpecifier.text : null;
-  const localImports = imports.filter((name) => name.startsWith(".") || name.startsWith("@/") || name.startsWith("@toonspectrum/"));
+  const localImports = imports.filter((name) => name.startsWith(".") || name.startsWith("@/") || name.startsWith("@toonstudio/"));
   return { file, lines: text.split("\n").length, bytes: Buffer.byteLength(text),
     fileHash: sha256(text), imports, localImports, forwardedTestModule, caseDeclarations: cases.length,
     skippedDeclarations, exclusiveDeclarations, conditionalDeclarations, sourceReads, matchers: [...matchers].sort(), cases,

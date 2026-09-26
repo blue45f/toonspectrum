@@ -307,7 +307,7 @@ describe("studio reference-board document", () => {
           sha256: HASH_A,
           assetId: `${assetIdPrefix}${"a".repeat(160 - assetIdPrefix.length)}`,
           name: "가".repeat(512),
-          mimeType: "image/vnd.toonspectrum-reference-board+png",
+          mimeType: "image/vnd.toonstudio-reference-board+png",
           width: 10_000,
           height: 10_000,
         },

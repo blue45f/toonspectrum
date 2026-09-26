@@ -1,8 +1,8 @@
 import { z } from "zod";
 import type { PoolClient } from "pg";
-import { canonicalJson, validateStudioReviewSpatialAnchor, type StudioReviewSourceReference } from "@toonspectrum/studio-project-model";
+import { canonicalJson, validateStudioReviewSpatialAnchor, type StudioReviewSourceReference } from "@toonstudio/studio-project-model";
 import { studioSessionResourcesSchema, type StudioSessionResources, type StudioSessionMaterialAsset, type StudioWorkSession,
-  type StudioWorkSessionCommand } from "@toonspectrum/studio-project-model/work-session";
+  type StudioWorkSessionCommand } from "@toonstudio/studio-project-model/work-session";
 
 import { loadStudioReviewResolutionCaptures } from "./studio-review-capture-attestation";
 import { studioReviewMappingsFromOperation, studioReviewPageRasterSchema } from "./studio-review-source-map";

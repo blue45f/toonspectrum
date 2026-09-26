@@ -139,7 +139,7 @@ export function createStudioFirstPartyRasterCodecModuleWorker():
     ),
     {
       type: "module",
-      name: "toonspectrum-first-party-raster-codec",
+      name: "toonstudio-first-party-raster-codec",
     },
   ) as unknown as StudioFirstPartyRasterCodecWorkerLike;
 }

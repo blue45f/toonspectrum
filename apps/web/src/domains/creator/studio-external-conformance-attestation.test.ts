@@ -486,7 +486,7 @@ describe("provider adapter and assurance separation", () => {
   it("keeps public-spec self-validation distinct from external attestation acceptance", () => {
     const receipt = createStudioPublicSpecificationSelfValidationReceipt({
       standard: "W3C-InkML",
-      profile: "ToonSpectrum-safe-profile",
+      profile: "ToonStudio-safe-profile",
       standardVersion: "2011",
       documentDigest: `sha256:${"3c".repeat(32)}`,
       evidenceDigest: `sha256:${"4d".repeat(32)}`,
@@ -500,7 +500,7 @@ describe("provider adapter and assurance separation", () => {
       trademarkApprovalIssuedByProduct: false,
     });
     expect(STUDIO_CONFORMANCE_ASSURANCE_BOUNDARY).toEqual({
-      publicSpecificationSelfValidation: "toonspectrum-self-validation",
+      publicSpecificationSelfValidation: "toonstudio-self-validation",
       externalAttestation: "external-provider-attestation-accepted",
       productIssuedOfficialCertification: false,
       productIssuedTrademarkApproval: false,

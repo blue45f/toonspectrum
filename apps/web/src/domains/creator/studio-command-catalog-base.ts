@@ -46,7 +46,7 @@ import type {
   LocalizedLabel,
   TerminologyAlias,
   TerminologyVendor,
-} from "@toonspectrum/studio-command-registry";
+} from "@toonstudio/studio-command-registry";
 
 /* ------------------------------------------------------------------ types */
 

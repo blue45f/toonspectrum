@@ -81,7 +81,7 @@ const harness = {
       if (index > 1) timings.push(performance.now() - start);
     }
     const previewHash = await hash(pixels(preview));
-    const saved = JSON.parse(JSON.stringify({ kind: "toonspectrum.brush-program-v6", program: currentProgram })) as { program: unknown };
+    const saved = JSON.parse(JSON.stringify({ kind: "toonstudio.brush-program-v6", program: currentProgram })) as { program: unknown };
     renderBrushStudioV6Preview(preview, normalizeBrushStudioV6Program(saved.program));
     const roundtripHash = await hash(pixels(preview));
     if (previewHash !== roundtripHash) failures.push(`${id}: JSON roundtrip changed reference pixels`);

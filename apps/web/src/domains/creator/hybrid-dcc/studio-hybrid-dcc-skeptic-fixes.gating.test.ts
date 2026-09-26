@@ -408,7 +408,7 @@ describe("CHR-001 real GLB/VRM + OBJ import pipeline", () => {
     expect(imported.report.counts.meshes).toBeGreaterThan(0);
     expect(imported.report.counts.nodes).toBeGreaterThan(0);
     expect(imported.report.unsupportedEntities).toBeDefined();
-    expect(imported.commit.documentKind).toBe("toonspectrum.scene-ir");
+    expect(imported.commit.documentKind).toBe("toonstudio.scene-ir");
     expect(imported.commit.report.committed).toBe(true);
     expect(imported.scene.nodes.length).toBeGreaterThan(0);
     expect(imported.commit.scene.nodes.length).toBe(imported.scene.nodes.length);

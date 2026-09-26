@@ -46,7 +46,7 @@ interface ScenarioReport {
   failure?: string;
 }
 
-const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-ai-image-references");
+const output = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonstudio-studio-ai-image-references");
 const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim().replace(/\/+$/u, "");
 const allowOptionalApi = !externalOrigin || process.env.TOONSPECTRUM_VERIFY_API_OPTIONAL === "1";
 const initialAutosaveKey = studioAutosaveKey({});

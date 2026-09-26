@@ -7,7 +7,7 @@ import {
 } from "./studio-unified-asset-catalog";
 
 export const STUDIO_UNIFIED_ASSET_LIBRARY_STORAGE_KEY =
-  "toonspectrum.studio.unified-asset-library.v1";
+  "toonstudio.studio.unified-asset-library.v1";
 
 export const STUDIO_UNIFIED_ASSET_LIBRARY_STATE_VERSION = 1 as const;
 

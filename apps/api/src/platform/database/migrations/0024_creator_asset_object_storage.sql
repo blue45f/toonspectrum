@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS "creator_asset_storage_object" (
   CONSTRAINT "creator_asset_storage_object_pkey"
     PRIMARY KEY ("purpose", "digest"),
   CONSTRAINT "creator_asset_storage_object_contract_check"
-    CHECK ("contractVersion" = 'toonspectrum.supabase-object-storage.v1'),
+    CHECK ("contractVersion" = 'toonstudio.supabase-object-storage.v1'),
   CONSTRAINT "creator_asset_storage_object_purpose_check"
     CHECK ("purpose" IN ('source', 'derived', 'export')),
   CONSTRAINT "creator_asset_storage_object_digest_path_check"

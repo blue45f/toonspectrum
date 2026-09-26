@@ -636,7 +636,7 @@ describe("BG3D shared SQLite/OPFS product authority", () => {
     await database.kvSet(
       STUDIO_BG3D_LIBRARIES_SQLITE_NAMESPACE,
       STUDIO_BG3D_LIBRARY_MANIFEST_KEYS.models,
-      '{"kind":"toonspectrum-studio-bg3d-model-library-v12"',
+      '{"kind":"toonstudio-studio-bg3d-model-library-v12"',
     );
     await expect(listStoredBg3dModelsV12({ authority }))
       .rejects.toMatchObject({ code: "stored-metadata-mismatch" });

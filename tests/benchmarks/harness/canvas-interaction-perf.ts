@@ -79,9 +79,9 @@ const SELECTED_GROUPS: ReadonlySet<ScenarioGroup> = (() => {
   return new Set(requested as ScenarioGroup[]);
 })();
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 
 const VIEWPORT = { width: 1440, height: 1100 } as const;
 /** rAF interval above this counts as at least one dropped 60Hz frame. */

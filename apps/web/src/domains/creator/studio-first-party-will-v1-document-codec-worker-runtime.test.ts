@@ -38,7 +38,7 @@ async function input(): Promise<Uint8Array> {
     height: 439,
     title: "Worker runtime",
     createdAt: "2026-07-30T12:34:56Z",
-    application: "ToonSpectrum Studio",
+    application: "ToonStudio Studio",
     applicationVersion: "1.0.0",
     paths: [{
       points: [

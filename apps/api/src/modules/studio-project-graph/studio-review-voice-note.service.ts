@@ -21,7 +21,7 @@ import {
   type StudioReviewVoiceNoteCreate,
   type StudioReviewVoiceNoteDelete,
   type StudioReviewVoiceNoteSubject,
-} from "@toonspectrum/studio-project-model/review-voice-note";
+} from "@toonstudio/studio-project-model/review-voice-note";
 import {
   LocatedPrivateObjectReferenceSchema,
   PrivateSignedReadUrlSchema,

@@ -141,7 +141,7 @@ function defaultWorkerFactory(): StudioVrmTextureGeometryWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-vrm-texture-geometry.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-vrm-texture-geometry",
+    name: "toonstudio-vrm-texture-geometry",
   });
 }
 

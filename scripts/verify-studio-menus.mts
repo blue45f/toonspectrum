@@ -30,7 +30,7 @@ import type { StudioRailToolId } from "../apps/web/src/domains/creator/studio-ap
 import type { StudioMainMenuCompositeGroupId } from "../apps/web/src/domains/creator/studio-main-menu-presentation";
 import type { ChildProcess } from "node:child_process";
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
 
 interface CatalogueGroup {
   /** §15.3 catalogue group id — the key the presentation folds on. */
@@ -1355,12 +1355,12 @@ async function main() {
         // The assertions below intentionally use Korean product labels. Chromium's CI locale is
         // commonly en-US, so pin the persisted app locale instead of depending on the host.
         window.localStorage.setItem(
-          "toonspectrum-lang",
+          "toonstudio-lang",
           JSON.stringify({ state: { lang: "ko" }, version: 0 })
         );
         // Full density so every main-menu → toolbar popover host is mounted.
         window.localStorage.setItem(
-          "toonspectrum-studio-ui-density:v1",
+          "toonstudio-studio-ui-density:v1",
           JSON.stringify({ mode: "full" })
         );
       } catch {

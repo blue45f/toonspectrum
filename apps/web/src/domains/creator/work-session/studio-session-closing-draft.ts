@@ -1,4 +1,4 @@
-import type { StudioWorkSession } from "@toonspectrum/studio-project-model/work-session";
+import type { StudioWorkSession } from "@toonstudio/studio-project-model/work-session";
 
 type Translate = (ko: string, en: string) => string;
 /** A literal projection of authorized records, not AI synthesis, approval or a new server command. */

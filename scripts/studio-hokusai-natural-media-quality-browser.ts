@@ -176,7 +176,7 @@ function baselinePresetJson(
   })();
   return JSON.stringify({
     version: 3,
-    group: "ToonSpectrum natural media QA baseline",
+    group: "ToonStudio natural media QA baseline",
     parent_brush_name: "",
     comment: `Frozen before-quality-v2 ${presetId}`,
     settings,

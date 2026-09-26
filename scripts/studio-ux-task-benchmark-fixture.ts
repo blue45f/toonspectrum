@@ -26,7 +26,7 @@ export interface StudioUxReferenceTaskRoute {
   /**
    * A conservative minimum reconstructed from the cited public route. It is not represented as a
    * timed usability test. A real browser trace must use the observation schema before it can be
-   * compared with ToonSpectrum timing.
+   * compared with ToonStudio timing.
    */
   readonly documentedMinimumPointerTaps: number | null;
   readonly documentedMinimumPointerDrags: number | null;

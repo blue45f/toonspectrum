@@ -33,7 +33,7 @@ describe("the public affiliate route with the production API prefix", () => {
 
   it.each([
     ["naver", "https://series.naver.com/comic/123", "https://series.naver.com/comic/123"],
-    ["ridi", "https://ridibooks.com/books/123", "https://ridibooks.com/books/123?ridi_affiliate=toonspectrum"],
+    ["ridi", "https://ridibooks.com/books/123", "https://ridibooks.com/books/123?ridi_affiliate=toonstudio"],
   ])("redirects the shipped /api/go/%s link without a second API prefix", async (platform, to, expected) => {
     const response = await fetch(`${origin}/api/go/${platform}?${new URLSearchParams({ to })}`, {
       redirect: "manual",

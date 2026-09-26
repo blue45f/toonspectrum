@@ -8,7 +8,7 @@ import {
 
 import type { LocalMusicTrack } from "./studio-music-client";
 
-import { defaultMusicBrief, MUSIC_TERMS_URL } from "@toonspectrum/core/studio-music";
+import { defaultMusicBrief, MUSIC_TERMS_URL } from "@toonstudio/core/studio-music";
 
 function track(patch: Partial<ReturnType<typeof defaultMusicBrief>> = {}): LocalMusicTrack {
   return {

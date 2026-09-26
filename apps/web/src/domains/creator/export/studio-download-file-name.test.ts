@@ -34,7 +34,7 @@ describe("createStudioDownloadFileName", () => {
     expect(
       createStudioDownloadFileName({
         title: "달빛 탐정",
-        fallbackTitle: "toonspectrum-webtoon",
+        fallbackTitle: "toonstudio-webtoon",
         suffix: "strip-1of3",
         extension: ".PNG",
       }),

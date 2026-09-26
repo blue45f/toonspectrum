@@ -1,7 +1,7 @@
 /**
  * Read-only benchmark runner for the pinned InkWash audit checkout.
  *
- * The competitor source is never bundled or copied into ToonSpectrum. This runner only drives the
+ * The competitor source is never bundled or copied into ToonStudio. This runner only drives the
  * locally pinned original in Chromium, captures evidence and emits neutral image/performance
  * metrics that our independent implementation can compare against.
  */
@@ -15,7 +15,7 @@ const WIDTH = 512;
 const HEIGHT = 384;
 const URL = process.env.TOONSPECTRUM_INKWASH_ORACLE_URL ?? "http://127.0.0.1:53987/";
 const EVIDENCE = process.env.TOONSPECTRUM_INKWASH_ORACLE_DIR
-  ?? join(tmpdir(), `toonspectrum-inkwash-oracle-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-inkwash-oracle-${Date.now()}`);
 
 function imageFromBottomUp(raw) {
   const output = new Uint8Array(raw.length);
@@ -142,7 +142,7 @@ async function main() {
     const lineBounds = darkBounds(linePixels, paper);
     const bloomBounds = darkBounds(bloomPixels, paper);
     const metrics = {
-      kind: "toonspectrum/inkwash-read-only-oracle",
+      kind: "toonstudio/inkwash-read-only-oracle",
       pinnedCommit: "48b7cf0f4f2afaa8c4256460e696c1b46cfab985",
       viewport: { width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 },
       lineBounds,

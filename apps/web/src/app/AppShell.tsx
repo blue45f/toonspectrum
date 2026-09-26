@@ -27,7 +27,7 @@ import { workspaceTaskRoute } from "@/shared/components/workspace/workspace-task
 import { recordCreatorDestination } from "@/shared/lib/creator-continuity";
 import { recordSiteRouteVisit } from "@/shared/lib/site-route-history";
 
-import "@toonspectrum/core/fx/fx.css";
+import "@toonstudio/core/fx/fx.css";
 
 const AccessibleTooltipLayer = lazy(() =>
   import("@/shared/components/AccessibleTooltipLayer").then((mod) => ({

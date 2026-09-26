@@ -1,5 +1,5 @@
 export const CLOUDFLARE_STATIC_MAX_FILE_BYTES = 25 * 1024 * 1024;
-export const CLOUDFLARE_R2_LARGE_ASSET_BUCKET = "toonspectrum-public-assets";
+export const CLOUDFLARE_R2_LARGE_ASSET_BUCKET = "toonstudio-public-assets";
 export const CLOUDFLARE_R2_LARGE_ASSET_BINDING = "LARGE_ASSETS";
 export const CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL =
   "public, max-age=31536000, immutable";

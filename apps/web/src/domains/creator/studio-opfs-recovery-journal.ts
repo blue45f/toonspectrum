@@ -1174,7 +1174,7 @@ export class StudioOpfsRecoveryJournal {
         `rootPath와 documentId 조합은 OPFS 경로 ${OPFS_FILESYSTEM_MAX_PATH_CHARS}자 한도를 넘을 수 없습니다.`,
       );
     }
-    this.#lockName = `toonspectrum-opfs-recovery:${this.#identity.documentId}`;
+    this.#lockName = `toonstudio-opfs-recovery:${this.#identity.documentId}`;
     this.#now = options.now ?? (() => Date.now());
     this.#randomToken = options.randomToken ?? defaultRandomToken;
   }

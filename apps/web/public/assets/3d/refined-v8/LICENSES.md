@@ -1,7 +1,7 @@
 # ToonStudio refined prop pack v8
 
 These original Blender models are released under CC0 1.0, consistent with the
-first-party source pack. Author: ToonSpectrum.
+first-party source pack. Author: ToonStudio.
 
 Source generator: `scripts/blender/generate_studio_refined_props_v8.py`.
 Editable Blender sources and comparison renders are retained outside the web

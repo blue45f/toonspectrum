@@ -309,7 +309,7 @@ export function commitStudioImportToDocument(
   report: StudioImportCompatibilityReport,
   scene: StudioImportSceneIR,
 ): {
-  readonly documentKind: "toonspectrum.scene-ir";
+  readonly documentKind: "toonstudio.scene-ir";
   readonly version: 1;
   readonly report: StudioImportCompatibilityReport;
   readonly scene: StudioImportSceneIR;
@@ -322,7 +322,7 @@ export function commitStudioImportToDocument(
     String(scene.meshes.length),
   ]);
   return {
-    documentKind: "toonspectrum.scene-ir",
+    documentKind: "toonstudio.scene-ir",
     version: 1,
     report: { ...report, committed: true },
     scene,

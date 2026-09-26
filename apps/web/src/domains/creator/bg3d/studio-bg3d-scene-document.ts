@@ -24,7 +24,7 @@ import {
 import { normalizeStudioBg3dCaptureAspectRatio } from "./studio-bg3d-capture-frame-geometry";
 import { normalizeStudioBg3dHierarchyParents } from "./studio-bg3d-hierarchy";
 
-export const STUDIO_BG3D_SCENE_DOCUMENT_KIND = "toonspectrum.bg3d-scene" as const;
+export const STUDIO_BG3D_SCENE_DOCUMENT_KIND = "toonstudio.bg3d-scene" as const;
 export const STUDIO_BG3D_SCENE_DOCUMENT_VERSION = 3 as const;
 const STUDIO_BG3D_SCHEMA_V2_SCENE_DOCUMENT_VERSION = 2 as const;
 const STUDIO_BG3D_LEGACY_SCENE_DOCUMENT_VERSION = 1 as const;

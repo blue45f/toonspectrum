@@ -20,7 +20,7 @@ import type { StudioQuickAccessState } from "./studio-quick-access";
  */
 
 export const STUDIO_WORKSPACE_INTERCHANGE_KIND =
-  "toonspectrum.studio-workspaces.interchange" as const;
+  "toonstudio.studio-workspaces.interchange" as const;
 export const STUDIO_WORKSPACE_INTERCHANGE_VERSION = 1 as const;
 export const STUDIO_WORKSPACE_INTERCHANGE_MAX_BYTES = 64 * 1024;
 export const STUDIO_WORKSPACE_INTERCHANGE_MAX_WORKSPACES = 24;

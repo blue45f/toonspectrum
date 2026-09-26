@@ -283,8 +283,8 @@ try {
         return Reflect.apply(fill, this, args);
       };
       if (!/^https?:$/u.test(location.protocol)) return;
-      localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-      localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
+      localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
+      localStorage.setItem("toonstudio-studio-mobile-hint-dismissed", "1");
     });
   });
   await stage("open-brush-studio", async () => {

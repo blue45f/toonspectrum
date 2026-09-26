@@ -31,7 +31,7 @@ export function resolveStudioMarketplaceAssetPreview(runtimeRef: string): Studio
   if (generated) return {
     src: generated.src,
     name: generated.title,
-    caption: `${generated.width}×${generated.height}px · 전체 프레임 시각 검수 완료 · ToonSpectrum 1차 AI 생성 배경`,
+    caption: `${generated.width}×${generated.height}px · 전체 프레임 시각 검수 완료 · ToonStudio 1차 AI 생성 배경`,
   };
   const cc0 = findStudioMarketplaceCc0Asset(id);
   return cc0 && cc0.kind !== "model" ? {

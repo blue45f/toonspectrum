@@ -164,7 +164,7 @@ export function summarizeStudioAutoColorHintPlan(
   }
 
   const copyText = [
-    "ToonSpectrum 자동 채색 힌트 계획",
+    "ToonStudio 자동 채색 힌트 계획",
     headline,
     ...detailLines,
     "",

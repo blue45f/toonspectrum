@@ -18,9 +18,9 @@ import type { StudioWorkspaceThreeWayMergeResult } from "./studio-workspace-thre
 
 export const STUDIO_WORKSPACE_SQLITE_NAMESPACE = "studio-workspaces-v12" as const;
 export const STUDIO_WORKSPACE_INVALIDATION_CHANNEL =
-  "toonspectrum.studio.workspaces.invalidate.v1" as const;
+  "toonstudio.studio.workspaces.invalidate.v1" as const;
 
-const SNAPSHOT_KIND = "toonspectrum.studio.workspace.sqlite" as const;
+const SNAPSHOT_KIND = "toonstudio.studio.workspace.sqlite" as const;
 const SNAPSHOT_VERSION = 1 as const;
 const INVALIDATION_TYPE = "studio-workspace-invalidated" as const;
 const OWNER_SCOPE_PATTERN = /^(?:guest|owner-[0-9a-f]{16})$/u;

@@ -15,7 +15,7 @@ import type {
   StudioLocalDatabase,
 } from "../studio-local-database";
 
-const LEGACY_DATABASE_NAME = "toonspectrum-studio-crdt-outbox";
+const LEGACY_DATABASE_NAME = "toonstudio-studio-crdt-outbox";
 const LEGACY_DATABASE_VERSION = 1;
 const LEGACY_STORE_NAME = "pending-updates";
 const LEGACY_SCOPE_WORK_INDEX = "scope-work";

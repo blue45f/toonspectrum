@@ -32,7 +32,7 @@ function envelopeInput(
 ) {
   return {
     format: {
-      id: "toonspectrum.studio-project",
+      id: "toonstudio.studio-project",
       version,
     },
     document: {
@@ -85,7 +85,7 @@ function versionedDefinition(
   } = {}
 ): StudioDocumentFormatDefinition {
   return {
-    formatId: "toonspectrum.studio-project",
+    formatId: "toonstudio.studio-project",
     payloadType: "project",
     minimumVersion: options.minimumVersion ?? 1,
     currentVersion: options.currentVersion ?? 3,
@@ -259,14 +259,14 @@ describe("canonical Studio document envelope", () => {
       },
       format: {
         version: 1,
-        id: "toonspectrum.studio-project",
+        id: "toonstudio.studio-project",
       },
     });
 
     const serialized = serializeCanonicalStudioDocumentEnvelope(left);
     expect(serialized).toBe(serializeCanonicalStudioDocumentEnvelope(right));
     expect(serialized).toBe(
-      `{"document":{"createdAt":"${CREATED_AT}","id":"doc:01J0TEST","revision":7,"updatedAt":"${UPDATED_AT}"},"extensions":{"vendor.future":{"enabled":true,"nested":{"a":1,"z":3}}},"format":{"id":"toonspectrum.studio-project","version":1},"payload":{"data":{"a":{"first":1,"second":2},"z":0},"type":"project"}}`
+      `{"document":{"createdAt":"${CREATED_AT}","id":"doc:01J0TEST","revision":7,"updatedAt":"${UPDATED_AT}"},"extensions":{"vendor.future":{"enabled":true,"nested":{"a":1,"z":3}}},"format":{"id":"toonstudio.studio-project","version":1},"payload":{"data":{"a":{"first":1,"second":2},"z":0},"type":"project"}}`
     );
   });
 
@@ -337,7 +337,7 @@ describe("Studio document migrator registry topology", () => {
     const formats = registry.list();
     expect(formats).toEqual([
       {
-        formatId: "toonspectrum.studio-project",
+        formatId: "toonstudio.studio-project",
         payloadType: "project",
         minimumVersion: 1,
         currentVersion: 3,
@@ -453,7 +453,7 @@ describe("Studio document migration execution", () => {
     });
     expect(result.receipt).toMatchObject({
       receiptVersion: 1,
-      formatId: "toonspectrum.studio-project",
+      formatId: "toonstudio.studio-project",
       payloadType: "project",
       documentId: "doc:01J0TEST",
       documentRevision: 7,
@@ -560,7 +560,7 @@ describe("Studio document migration execution", () => {
         code: "UNKNOWN_FUTURE_VERSION",
         recoverable: true,
         recovery: "upgrade-client",
-        formatId: "toonspectrum.studio-project",
+        formatId: "toonstudio.studio-project",
         payloadType: "project",
         actualVersion: 4,
         currentVersion: 3,

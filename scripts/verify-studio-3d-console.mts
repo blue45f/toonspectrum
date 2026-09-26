@@ -41,9 +41,9 @@ import { runStudioBg3dTextureGpuProof } from "./lib/studio-bg3d-texture-gpu-proo
 import { isStaticPreviewReadinessUnavailable as isStudio3dStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
-const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
+const QUICK_START_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const UI_DENSITY_KEY = "toonstudio-studio-ui-density:v1";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
   "/api/kmas/merge-on-access",
@@ -459,7 +459,7 @@ function createKtx2SmokeGlb(): Buffer {
   ktx2.copy(binary, ktx2Offset);
 
   const gltf = {
-    asset: { generator: "ToonSpectrum KTX2 production verifier", version: "2.0" },
+    asset: { generator: "ToonStudio KTX2 production verifier", version: "2.0" },
     extensionsRequired: ["KHR_texture_basisu"],
     extensionsUsed: ["KHR_texture_basisu"],
     scene: 0,

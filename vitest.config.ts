@@ -46,7 +46,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(root, "apps/web/src"),
-      "@toonspectrum/core/creator-role": path.resolve(root, "packages/core/src/creator-role.ts"),
+      "@toonstudio/core/creator-role": path.resolve(root, "packages/core/src/creator-role.ts"),
     },
   },
   test: {

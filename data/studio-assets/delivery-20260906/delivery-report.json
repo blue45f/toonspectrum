@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.asset-delivery.v1",
+  "schema": "toonstudio.asset-delivery.v1",
   "sourceRevision": "90ab3c778d1e66cd0cbc1b5446b343b4507fd5f2",
   "deliveredOriginals": 1097,
   "byKind": {

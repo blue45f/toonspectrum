@@ -69,13 +69,13 @@ describe("Studio watermark SQLite/OPFS repository", () => {
     const sqlite = createStudioWatermarkPreferencesRepository(fixture.store);
 
     await sqlite.save({
-      ...settings("© ToonSpectrum"),
+      ...settings("© ToonStudio"),
       opacity: 4,
       size: 1,
     });
 
     await expect(sqlite.load()).resolves.toEqual({
-      ...settings("© ToonSpectrum"),
+      ...settings("© ToonStudio"),
       opacity: 1,
       size: 0.08,
     });
@@ -356,7 +356,7 @@ describe("Studio watermark and OPFS product authority boundary", () => {
     expect(watermarkBoundary).toContain("await runtime.awaitReady()");
     expect(watermarkBoundary).toContain("runtime.update(next)");
     expect(watermarkBoundary).not.toContain("localStorage");
-    expect(studioPageSource).not.toContain("toonspectrum-studio-watermark");
+    expect(studioPageSource).not.toContain("toonstudio-studio-watermark");
     expect(studioPageSource).toContain('data-studio-watermark-persistence-warning="memory-only"');
   });
 

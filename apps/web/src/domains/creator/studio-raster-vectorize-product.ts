@@ -24,7 +24,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function splitPathIntoPolylines(verbs: readonly import("@toonspectrum/studio-project-model").PathVerbIR[]): number[][] {
+function splitPathIntoPolylines(verbs: readonly import("@toonstudio/studio-project-model").PathVerbIR[]): number[][] {
   const paths: number[][] = [];
   let points: number[] | null = null;
   for (const verb of verbs) {

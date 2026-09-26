@@ -25,7 +25,7 @@
 증거 원본은 `tests/benchmarks/results/custom-font-sqlite-opfs-browser.json`, 고정 계약은
 `tests/visual/custom-font-sqlite-opfs-browser-contract.test.ts`다. Vite production build에서
 module Dedicated Worker가 무옵션 `createStudioCustomFontSqliteOpfsRepository()`를 호출했고,
-`/studio-local-v12.db`의 OPFS SAH-pool과 `toonspectrum-studio-assets` native OPFS CAS를 사용했다.
+`/studio-local-v12.db`의 OPFS SAH-pool과 `toonstudio-studio-assets` native OPFS CAS를 사용했다.
 
 | 로컬 입력 | 크기 | SHA-256 | warm save p50/p95/p99 | verified load p50/p95/p99 |
 |---|---:|---|---:|---:|

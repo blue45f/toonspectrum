@@ -1,4 +1,4 @@
-# ToonSpectrum Studio — 웹 드로잉·협업 도구 벤치마크
+# ToonStudio Studio — 웹 드로잉·협업 도구 벤치마크
 
 조사일: 2026-07-12
 
@@ -6,11 +6,11 @@
 
 원칙: 공식 제품 문서와 공식 도움말에서 확인되는 동작만 기능 근거로 사용한다. 경쟁사의 화면이나 명칭을
 복제하지 않고, 웹툰 작가의 반복 작업·입력 품질·모바일 조작성·협업·파일 호환성 문제를 해결하는 방향으로
-ToonSpectrum의 문서 모델과 UI에 번역한다.
+ToonStudio의 문서 모델과 UI에 번역한다.
 
 ## 제품별로 가져올 장점
 
-| 제품 | 공식 문서에서 확인한 장점 | ToonSpectrum 적용 방향 |
+| 제품 | 공식 문서에서 확인한 장점 | ToonStudio 적용 방향 |
 | --- | --- | --- |
 | Clip Studio Paint | 설치형 본 앱의 pressure/tilt/velocity 브러시 입력, Simple/Studio 모드, Companion의 Quick Access·색상환·제스처·참조·세로 웹툰 미리보기, 페이지 단위 Teamwork | 실제 펜 입력을 마우스 폴백보다 우선하고, Simple/Full/Focus UI와 향후 제한 권한의 휴대폰 보조 세션으로 확장 |
 | Photopea | 브라우저 로컬 처리, PSD 중심 문서, 중첩 레이어·래스터/벡터 마스크·조정 레이어·클리핑·스마트 필터·레이어 스타일 | PSD 구조 보존도를 높이고 현재 이미지별 보정 엔진을 재정렬 가능한 조정 레이어/스마트 필터 스택으로 승격 |
@@ -20,7 +20,7 @@ ToonSpectrum의 문서 모델과 UI에 번역한다.
 
 > Clip Studio Companion은 독립 브라우저 편집기가 아니라 설치형 Clip Studio Paint를 스마트폰에서
 > 보조 조작하는 연결 모드라는 것이 공식 연결 절차와 지원 플랫폼을 종합한 결론이다. 따라서 브라우저
-> 엔진으로 모사하기보다 ToonSpectrum의 향후 협업 세션 transport 위에 제한 권한 controller로 설계한다.
+> 엔진으로 모사하기보다 ToonStudio의 향후 협업 세션 transport 위에 제한 권한 controller로 설계한다.
 
 ## 공식 근거
 
@@ -60,7 +60,7 @@ Pixlr의 필압 근거는 2022년 공식 게시물이므로 현재 브라우저�
 Photopea·Kleki·Pixlr의 tilt 및 실시간 역할 기반 협업은 조사한 공식 문서에서 확인하지 못했으며, 기능이
 절대 없다고 단정하지 않는다.
 
-## 현재 ToonSpectrum의 강점과 확인된 격차
+## 현재 ToonStudio의 강점과 확인된 격차
 
 이미 제공하는 강점:
 
@@ -112,7 +112,7 @@ Krita의 [Freehand Brush Tool](https://docs.krita.org/en/reference_manual/tools/
 Procreate의 [Brush Studio 안정화 설정](https://help.procreate.com/procreate/handbook/5.4/brushes/brush-studio-settings),
 Photoshop의 [Stroke smoothing](https://helpx.adobe.com/sg/photoshop/desktop/repair-retouch/clean-restore-images/create-smoother-more-polished-brush-strokes-with-stroke-smoothing.html)을
 공식 동작 근거로 대조했다. 경쟁사의 명칭·화면·알고리즘을 복제하지 않고, 브라우저의 coalesced/predicted
-PointerEvent 경계와 ToonSpectrum의 결정적 문서 모델에 맞게 다음 기능으로 번역했다.
+PointerEvent 경계와 ToonStudio의 결정적 문서 모델에 맞게 다음 기능으로 번역했다.
 
 - **세 가지 라이브 보정 방식**: 기존 고정 응답인 `표준`, 느린 디테일에서는 보정을 강화하고 빠른 플릭에서는
   지연을 줄이는 `속도 적응`, 원형 데드존을 가진 가상 가이드 끈 방식의 `정밀 추적`을 제공한다. 표준/적응
@@ -135,7 +135,7 @@ PointerEvent 경계와 ToonSpectrum의 결정적 문서 모델에 맞게 다음 
 
 다음 브러시 엔진 우선순위는 압력·기울기·속도·진행률 센서를 크기/불투명도/유량/간격/각도에 독립 연결하는
 다이내믹 매트릭스, 공통 시작·끝 테이퍼, PNG 알파 팁·간격·산포·질감 스탬프 엔진 순이다. ABR은 비공개
-포맷 호환으로 분리하고, 먼저 ToonSpectrum 자체 브러시 문서 모델과 PNG 팁 저작을 완성한다.
+포맷 호환으로 분리하고, 먼저 ToonStudio 자체 브러시 문서 모델과 PNG 팁 저작을 완성한다.
 
 ## 2026-07-12 팀 역할·초대 기반 체크포인트
 
@@ -169,7 +169,7 @@ Magma의 역할·권한 장점을 그대로 이름만 복제하지 않고, 이�
 ## 2026-07-12 팀 초대함·감사 활동 체크포인트
 
 Magma의 협업은 캔버스 안의 커서뿐 아니라 초대 수락, 역할 변경, 변경 이력까지 하나의 운영 흐름으로
-이어진다. ToonSpectrum도 실시간 편집을 성급히 표시하지 않고, 먼저 초대 대상이 직접 동의하고 관리자가
+이어진다. ToonStudio도 실시간 편집을 성급히 표시하지 않고, 먼저 초대 대상이 직접 동의하고 관리자가
 권한 변경을 추적할 수 있는 서버 기반을 연결했다.
 
 - 저장 전 원고에서도 다른 작품의 `pending` 초대를 확인하는 **내 팀 초대** 인박스 제공
@@ -206,7 +206,7 @@ Magma의 협업은 캔버스 안의 커서뿐 아니라 초대 수락, 역할 �
 ## 2026-07-12 공유 작품·원본 문서 ACL 체크포인트
 
 Clip Studio Teamwork의 **참여 작품을 별도 목록에서 찾아 여는 흐름**과 Magma Artspace의
-**프로젝트 단위 역할 접근**을 ToonSpectrum의 서버 revision 모델에 연결했다. 경쟁 제품의 배타 페이지
+**프로젝트 단위 역할 접근**을 ToonStudio의 서버 revision 모델에 연결했다. 경쟁 제품의 배타 페이지
 편집이나 공유 캔버스를 곧바로 CRDT 실시간 편집으로 과장하지 않고, 먼저 모든 원본 읽기·저장 경로가
 같은 ACL과 충돌 규칙을 강제하도록 만들었다.
 

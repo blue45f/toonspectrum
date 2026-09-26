@@ -1,9 +1,9 @@
 /**
- * Deterministic release/runtime conformance evidence for ToonSpectrum-owned ink codecs.
+ * Deterministic release/runtime conformance evidence for ToonStudio-owned ink codecs.
  *
  * The evidence binds a public-clean-room provider manifest, canonical source transport,
  * encoded wire bytes, decoded transport, and both provider execution receipts. It is the
- * testable input to ToonSpectrum's own product certificate program and never represents a
+ * testable input to ToonStudio's own product certificate program and never represents a
  * standards-body or codec-vendor certification.
  */
 
@@ -28,7 +28,7 @@ import {
 import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_FIRST_PARTY_INK_CONFORMANCE_SCHEMA =
-  "toonspectrum.first-party-ink-codec-conformance" as const;
+  "toonstudio.first-party-ink-codec-conformance" as const;
 export const STUDIO_FIRST_PARTY_INK_CONFORMANCE_SCHEMA_VERSION = 1 as const;
 
 export type StudioFirstPartyInkCodecFormat = "inkml" | "toonink";
@@ -47,7 +47,7 @@ export interface StudioFirstPartyInkConformanceEvidence {
   readonly schema: typeof STUDIO_FIRST_PARTY_INK_CONFORMANCE_SCHEMA;
   readonly schemaVersion:
     typeof STUDIO_FIRST_PARTY_INK_CONFORMANCE_SCHEMA_VERSION;
-  readonly implementation: "toonspectrum-first-party-ink-codecs";
+  readonly implementation: "toonstudio-first-party-ink-codecs";
   readonly implementationVersion:
     typeof STUDIO_FIRST_PARTY_INK_CODEC_VERSION;
   readonly format: StudioFirstPartyInkCodecFormat;
@@ -178,7 +178,7 @@ function sourceVector(format: StudioFirstPartyInkCodecFormat): Uint8Array {
   }
   return encodeStudioInkEnvelopeDocumentTransport({
     format: {
-      id: "toonspectrum.ink-document",
+      id: "toonstudio.ink-document",
       version: 1,
     },
     document: {
@@ -190,7 +190,7 @@ function sourceVector(format: StudioFirstPartyInkCodecFormat): Uint8Array {
     payload: {
       type: "ink-document",
       data: {
-        title: "ToonSpectrum ink codec conformance",
+        title: "ToonStudio ink codec conformance",
         strokes: [
           {
             id: "stroke-1",
@@ -202,7 +202,7 @@ function sourceVector(format: StudioFirstPartyInkCodecFormat): Uint8Array {
       },
     },
     extensions: {
-      "toonspectrum.engine": {
+      "toonstudio.engine": {
         renderer: "hybrid-vnext",
       },
     },
@@ -254,7 +254,7 @@ export async function createStudioFirstPartyInkConformanceEvidence(
   const evidence: StudioFirstPartyInkConformanceEvidence = Object.freeze({
     schema: STUDIO_FIRST_PARTY_INK_CONFORMANCE_SCHEMA,
     schemaVersion: STUDIO_FIRST_PARTY_INK_CONFORMANCE_SCHEMA_VERSION,
-    implementation: "toonspectrum-first-party-ink-codecs",
+    implementation: "toonstudio-first-party-ink-codecs",
     implementationVersion: STUDIO_FIRST_PARTY_INK_CODEC_VERSION,
     format,
     profile,

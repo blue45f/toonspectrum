@@ -14,7 +14,7 @@ import {
  * oversized records and non-finite timing values before any document mutation is attempted.
  */
 
-export const STUDIO_DIALOGUE_INTERCHANGE_SCHEMA = "toonspectrum.dialogue-script" as const;
+export const STUDIO_DIALOGUE_INTERCHANGE_SCHEMA = "toonstudio.dialogue-script" as const;
 export const STUDIO_DIALOGUE_INTERCHANGE_VERSION = 1 as const;
 
 export const STUDIO_DIALOGUE_INTERCHANGE_LIMITS = Object.freeze({
@@ -266,7 +266,7 @@ function parseJson(text: string): StudioDialogueInterchangeResult {
   }
   const record = value as Record<string, unknown>;
   if (record.schema !== STUDIO_DIALOGUE_INTERCHANGE_SCHEMA) {
-    return fail("INVALID_FORMAT", "ToonSpectrum 대사 JSON 스키마가 아닙니다.");
+    return fail("INVALID_FORMAT", "ToonStudio 대사 JSON 스키마가 아닙니다.");
   }
   if (record.version !== STUDIO_DIALOGUE_INTERCHANGE_VERSION) {
     return fail("UNSUPPORTED_VERSION", "지원하지 않는 대사 JSON 버전입니다.");
@@ -986,7 +986,7 @@ function parseFdx(text: string): StudioDialogueInterchangeResult {
         page,
         panel,
         detail: explicitPage
-          ? "ToonSpectrum 페이지 marker로 복원했습니다."
+          ? "ToonStudio 페이지 marker로 복원했습니다."
           : "장면 순서를 1-based 페이지로 매핑했으며 장면 제목 본문은 cue에 저장하지 않습니다.",
       });
       continue;
@@ -1009,7 +1009,7 @@ function parseFdx(text: string): StudioDialogueInterchangeResult {
         page,
         panel,
         detail: explicitPanel
-          ? "ToonSpectrum 컷 marker로 복원했습니다."
+          ? "ToonStudio 컷 marker로 복원했습니다."
           : "Action 순서를 현재 장면의 1-based 컷으로 매핑했으며 본문은 cue에 저장하지 않습니다.",
       });
       continue;
@@ -1422,7 +1422,7 @@ export function serializeStudioDialogueInterchange(
         "FDX 출력은 공개 정식 스키마가 아닌 FinalDraft/Content/Paragraph/Text 안전 부분집합입니다."
       );
       warnings.push(
-        "페이지·컷은 ToonSpectrum 전용 Scene Heading/Action marker로 보존하며 FDX 서식·좌표·제작 메타데이터는 포함하지 않습니다."
+        "페이지·컷은 ToonStudio 전용 Scene Heading/Action marker로 보존하며 FDX 서식·좌표·제작 메타데이터는 포함하지 않습니다."
       );
       if (document.cues.some((cue) => !cue.speaker)) {
         warnings.push("화자가 없는 cue는 FDX Character 값 DIALOGUE로 출력했습니다.");

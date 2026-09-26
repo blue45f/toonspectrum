@@ -233,7 +233,7 @@ function failActiveGeneration(
 function ensureWorkerGeneration(): SharedWorkerGeneration {
   if (workerGeneration) return workerGeneration;
   const next = new Worker(new URL("./studio-occt.worker.ts", import.meta.url), {
-    name: "toonspectrum-occt",
+    name: "toonstudio-occt",
     type: "module",
   });
   const generation: SharedWorkerGeneration = {
@@ -344,7 +344,7 @@ function runInOneShotBrowserWorker(
   },
 ): Promise<StudioOcctSolidResult> {
   const isolatedWorker = new Worker(new URL("./studio-occt.worker.ts", import.meta.url), {
-    name: `toonspectrum-occt-isolated-${id}`,
+    name: `toonstudio-occt-isolated-${id}`,
     type: "module",
   });
   return new Promise<StudioOcctSolidResult>((resolve, reject) => {

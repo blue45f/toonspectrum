@@ -1,4 +1,4 @@
-import type { MusicBrief, MusicProviderId as StoredMusicProviderId } from "@toonspectrum/core/studio-music";
+import type { MusicBrief, MusicProviderId as StoredMusicProviderId } from "@toonstudio/core/studio-music";
 
 export type MusicProviderCapability = "browser" | "api" | "cli" | "mcp" | "local";
 export type MusicProviderPublicationPolicy =

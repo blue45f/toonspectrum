@@ -1,4 +1,4 @@
-"""Generate all remaining ToonSpectrum mapped Blender prop GLBs at v3 quality.
+"""Generate all remaining ToonStudio mapped Blender prop GLBs at v3 quality.
 
 This source is safe to execute from Blender 5.2 CLI or Blender MCP.  It never
 calls ``read_factory_settings``: persistent MCP preferences and the blend-ai
@@ -303,7 +303,7 @@ def root_and_export(asset_id, filename, origin, dimensions, quality_class):
     root = bpy.data.objects.new(f"TS_{asset_id}_Root", None)
     root.empty_display_type = "PLAIN_AXES"
     root["asset_id"] = asset_id
-    root["asset_author"] = "ToonSpectrum"
+    root["asset_author"] = "ToonStudio"
     root["asset_generator"] = GENERATOR
     root["asset_license"] = "CC0-1.0"
     root["asset_license_url"] = CC0_LICENSE_URL
@@ -1121,7 +1121,7 @@ def generate_mapped_props_pack_v3():
     }
     for asset_id, _filename in ASSETS:
         builders[asset_id]()
-    print("Generated all 21 ToonSpectrum mapped prop v3 assets.")
+    print("Generated all 21 ToonStudio mapped prop v3 assets.")
 
 
 def render_preview(filename, output_path, view_direction=(1.6, -2.2, 1.4)):

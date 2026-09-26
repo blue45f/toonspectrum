@@ -50,12 +50,12 @@ import type { ChildProcess } from "node:child_process";
 const SCRATCH =
   process.env.TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-filter-dialog");
+  ?? join(tmpdir(), "toonstudio-studio-filter-dialog");
 const LOG_PATH = join(SCRATCH, "studio-filter-dialog-preview.log");
 const REPORT_PATH = join(SCRATCH, "studio-filter-dialog-report.json");
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 
 /** One representative kind per catalog group; labels are the top-menu entries. */
 const FILTER_CASES = [
@@ -503,11 +503,11 @@ async function main(): Promise<void> {
           window.localStorage.setItem(quickstartKey, "1");
           window.localStorage.setItem(betaNoticeStorageKey, betaNoticeRevision);
           window.localStorage.setItem(
-            "toonspectrum-lang",
+            "toonstudio-lang",
             JSON.stringify({ state: { lang: "ko" }, version: 0 }),
           );
           window.localStorage.setItem(
-            "toonspectrum-studio-ui-density:v1",
+            "toonstudio-studio-ui-density:v1",
             JSON.stringify({ mode: "full" }),
           );
           for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {

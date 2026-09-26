@@ -52,7 +52,7 @@ export function MarketVerifiedAssetPreview({ reference, compact = false }: {
         width: generated.width,
         height: generated.height,
         fileName: `${generated.id}.png`,
-        note: `${generated.width}×${generated.height}px · 전체 프레임 시각 검수 완료 · ToonSpectrum 1차 AI 생성 배경`,
+        note: `${generated.width}×${generated.height}px · 전체 프레임 시각 검수 완료 · ToonStudio 1차 AI 생성 배경`,
       });
       return () => { current = false; };
     }

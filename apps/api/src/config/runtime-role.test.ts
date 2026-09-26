@@ -48,13 +48,13 @@ describe("API runtime role", () => {
     expect(
       isApiRuntimeRolePathAllowed(
         "capability-worker",
-        "/.well-known/toonspectrum/backend-capabilities/v1/health",
+        "/.well-known/toonstudio/backend-capabilities/v1/health",
       ),
     ).toBe(true);
     expect(
       isApiRuntimeRolePathAllowed(
         "capability-worker",
-        "/.well-known/toonspectrum/backend-capabilities/v1/execute",
+        "/.well-known/toonstudio/backend-capabilities/v1/execute",
       ),
     ).toBe(true);
     expect(
@@ -73,7 +73,7 @@ describe("API runtime role", () => {
     expect(
       isApiRuntimeRolePathAllowed(
         "capability-worker",
-        "/.well-known/toonspectrum/backend-capabilities/v1/execute",
+        "/.well-known/toonstudio/backend-capabilities/v1/execute",
         "GET",
       ),
     ).toBe(false);

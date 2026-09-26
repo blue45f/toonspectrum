@@ -1,4 +1,4 @@
-// @toonspectrum/core/fx — 공용 fx(오디오 + 파티클 + 키프레임 + React 훅) 배럴.
+// @toonstudio/core/fx — 공용 fx(오디오 + 파티클 + 키프레임 + React 훅) 배럴.
 //
 // 구성
 //  - audio.ts     : lazy AudioContext 싱글톤 · 합성 SFX(tick/pop/success/error) ·
@@ -9,7 +9,7 @@
 //  - hooks.ts     : useClickSfx · useAmbientBgm · useAudioState · useFx. (React peer)
 //
 // 전부 isomorphic — 브라우저에서 동작하고, SSR/비브라우저에서는 graceful no-op입니다.
-// fx.css 는 CSS 라 JS 배럴로 재노출하지 않습니다(앱이 직접 import: `@toonspectrum/core/fx/fx.css`).
+// fx.css 는 CSS 라 JS 배럴로 재노출하지 않습니다(앱이 직접 import: `@toonstudio/core/fx/fx.css`).
 
 export * from "./audio";
 export * from "./particles";

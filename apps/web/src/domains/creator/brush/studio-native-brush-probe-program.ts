@@ -3,7 +3,7 @@ import { getStroke } from "perfect-freehand";
 import { NATIVE_BRUSH_PROBE_SURFACE } from "./studio-native-brush-probe-contract";
 
 import type { NativeBrushProbeConfig, NativeBrushProbeSample, NativeBrushSurface } from "./studio-native-brush-probe-contract";
-import type { PathIR, SceneIR } from "@toonspectrum/studio-project-model";
+import type { PathIR, SceneIR } from "@toonstudio/studio-project-model";
 
 function color(colorHex: string) {
   return [1, 3, 5].map((at) => Number.parseInt(colorHex.slice(at, at + 2), 16) / 255);

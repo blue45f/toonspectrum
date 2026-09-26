@@ -20,56 +20,56 @@ export const STUDIO_DATA_RESET_CONFIRMATION_PHRASE =
  */
 export const STUDIO_OPFS_ROOTS: readonly string[] = Object.freeze([
   // studio-autosave-opfs-session.ts AUTOSAVE_ROOT_NAME
-  "toonspectrum-studio-autosave-v3",
+  "toonstudio-studio-autosave-v3",
   // studio-engine-tile-storage-opfs-v2-backend.ts product root
-  "toonspectrum-studio-engine-storage-v2",
+  "toonstudio-studio-engine-storage-v2",
   // StudioPage.tsx hybrid DCC recovery-journal rootName
-  "toonspectrum-hybrid-dcc-v1",
+  "toonstudio-hybrid-dcc-v1",
   // studio-hybrid-dcc-workspace-persistence.ts STUDIO_HYBRID_DCC_WORKSPACE_PERSISTENCE_ROOT
   "dcc-workspaces",
   // packages/studio-project-model OpfsJournalStore root (+ pre-V11.1 name)
-  "toonspectrum-studio-projects",
+  "toonstudio-studio-projects",
   "toonstudio-v11",
   // studio-local-database.ts STUDIO_SQLITE_OPFS_DIRECTORY (opfs-sahpool VFS root)
-  "toonspectrum-studio-sqlite",
+  "toonstudio-studio-sqlite",
   // studio-local-database.ts STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY (locked-SAH fallback)
-  "toonspectrum-studio-sqlite-r1",
+  "toonstudio-studio-sqlite-r1",
   // studio-opfs-filesystem.ts default + asset/BG3D shot SHA-256 CAS
-  "toonspectrum-studio-assets",
+  "toonstudio-studio-assets",
   // studio-opfs-sync-access-store.ts large-document binary authority
-  "toonspectrum-studio-large-documents",
+  "toonstudio-studio-large-documents",
   // studio-pages-history-durable-runtime.ts history recovery snapshots
-  "toonspectrum-studio-history-recovery",
+  "toonstudio-studio-history-recovery",
   // studio-vrm-asset-sqlite-opfs-repository.ts model/texture SHA-256 CAS
-  "toonspectrum-studio-vrm-assets-v12",
+  "toonstudio-studio-vrm-assets-v12",
   // studio-bg3d-libraries-sqlite-opfs-authority.ts model/thumbnail SHA-256 CAS
-  "toonspectrum-studio-bg3d-libraries-v12",
+  "toonstudio-studio-bg3d-libraries-v12",
   // studio-storage-recovery-runtime.ts quota/save-failure recovery journal
   "studio-recovery",
 ]);
 
 export const STUDIO_INDEXED_DB_DATABASES: readonly string[] = Object.freeze([
-  "toonspectrum-studio-vrm-library",
-  "toonspectrum-studio-crdt-outbox",
-  "toonspectrum-studio-checkpoints",
-  "toonspectrum-studio-crdt-recovery-vault",
-  "toonspectrum-studio-bg3d-model-library",
-  "toonspectrum-studio-bg3d-template-library",
-  "toonspectrum-studio-asset-library",
-  "toonspectrum-studio-scene-snapshot-library",
-  "toonspectrum-studio-production-bible",
-  "toonspectrum-studio-bg3d-asset-metadata",
-  "toonspectrum-studio-bg3d-shot-batch-recovery",
-  "toonspectrum-studio-vrm-texture-paint-library",
+  "toonstudio-studio-vrm-library",
+  "toonstudio-studio-crdt-outbox",
+  "toonstudio-studio-checkpoints",
+  "toonstudio-studio-crdt-recovery-vault",
+  "toonstudio-studio-bg3d-model-library",
+  "toonstudio-studio-bg3d-template-library",
+  "toonstudio-studio-asset-library",
+  "toonstudio-studio-scene-snapshot-library",
+  "toonstudio-studio-production-bible",
+  "toonstudio-studio-bg3d-asset-metadata",
+  "toonstudio-studio-bg3d-shot-batch-recovery",
+  "toonstudio-studio-vrm-texture-paint-library",
 ]);
 
 export const STUDIO_LOCAL_STORAGE_PREFIXES: readonly string[] = Object.freeze([
   // V12 fallback, Studio preferences, libraries, and legacy creative state.
   // This deliberately excludes account/auth/billing keys, which do not use this prefix.
-  "toonspectrum-studio-",
+  "toonstudio-studio-",
   // studio-workspaces.ts / studio-autosave.ts / VRM poser 등 이전 Studio 창작 상태.
   "toonspectrum:studio:",
-  "toonspectrum-studio-autosave",
+  "toonstudio-studio-autosave",
   "studio:",
   "studio_",
 ]);
@@ -77,16 +77,16 @@ export const STUDIO_LOCAL_STORAGE_PREFIXES: readonly string[] = Object.freeze([
 /**
  * Studio creative keys that deliberately use a dotted namespace and therefore
  * do not match the hyphen/colon prefixes above. Keep these exact: a broad
- * `toonspectrum.studio` prefix could erase account/platform data that is outside
+ * `toonstudio.studio` prefix could erase account/platform data that is outside
  * the destructive cutover boundary.
  */
 export const STUDIO_LOCAL_STORAGE_EXACT_KEYS: readonly string[] = Object.freeze([
-  "toonspectrum.studio-marketplace-library.v1",
-  "toonspectrum.studio-creator-filter-presets.v1",
-  "toonspectrum.studio-filter-library.v12.fallback",
-  "toonspectrum.studio.bg3d.lt-presets.v1",
-  "toonspectrum.studio.bg3d.lt-presets.corrupt.v1",
-  "toonspectrum.studio.tutorialProgress.v1",
+  "toonstudio.studio-marketplace-library.v1",
+  "toonstudio.studio-creator-filter-presets.v1",
+  "toonstudio.studio-filter-library.v12.fallback",
+  "toonstudio.studio.bg3d.lt-presets.v1",
+  "toonstudio.studio.bg3d.lt-presets.corrupt.v1",
+  "toonstudio.studio.tutorialProgress.v1",
 ]);
 
 export interface StudioDataDestructionFlags {

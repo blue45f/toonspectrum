@@ -358,7 +358,7 @@ export function PlatformMark({
   );
 }
 
-export function ToonSpectrumMark({ className }: { className?: string }) {
+export function ToonStudioMark({ className }: { className?: string }) {
   return (
     <span
       className={cx(

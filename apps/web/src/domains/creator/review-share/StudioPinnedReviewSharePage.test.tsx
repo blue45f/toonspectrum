@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PinnedShareView } from "@toonspectrum/studio-project-model/pinned-review-share";
+import type { PinnedShareView } from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { StudioPinnedReviewSharePage } from "./StudioPinnedReviewSharePage";
 

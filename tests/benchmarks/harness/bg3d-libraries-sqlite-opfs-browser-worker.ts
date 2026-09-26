@@ -13,7 +13,7 @@ const TEMPLATE_OPERATION_SAMPLE_COUNT = 100;
 const METADATA_OPERATION_SAMPLE_COUNT = 100;
 const MIB = 1024 * 1024;
 const BASE_EPOCH = 1_700_000_000_000;
-const PRODUCT_LOCK_NAME = "toonspectrum-studio-bg3d-libraries-v12-write";
+const PRODUCT_LOCK_NAME = "toonstudio-studio-bg3d-libraries-v12-write";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -265,7 +265,7 @@ function deterministicGlb(totalBytes: number, marker: string): Uint8Array {
   let json = new Uint8Array();
   for (let attempt = 0; attempt < 16; attempt += 1) {
     const encoded = new TextEncoder().encode(JSON.stringify({
-      asset: { version: "2.0", generator: "ToonSpectrum BG3D OPFS benchmark" },
+      asset: { version: "2.0", generator: "ToonStudio BG3D OPFS benchmark" },
       scene: 0,
       scenes: [{}],
       buffers: [{ byteLength: binBytes }],

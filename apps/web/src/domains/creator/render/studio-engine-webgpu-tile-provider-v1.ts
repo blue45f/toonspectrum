@@ -1,5 +1,5 @@
 /**
- * ToonSpectrum-owned WebGPU RGBA16F tile execution provider.
+ * ToonStudio-owned WebGPU RGBA16F tile execution provider.
  *
  * The provider is deliberately stateless with respect to document pixels. Every request uploads
  * the exact authority-owned base tile (or starts from transparent), replays one complete canonical

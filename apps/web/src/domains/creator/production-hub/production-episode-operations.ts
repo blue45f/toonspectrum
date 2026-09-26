@@ -7,7 +7,7 @@ import {
   type ProductionTask,
   type ProductionTaskStatus,
   type RevisionRef,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 const DAY_MS = 86_400_000;
 const COMPLETE_TASK_STATUSES = new Set<ProductionTaskStatus>([

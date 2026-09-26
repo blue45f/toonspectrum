@@ -2,7 +2,7 @@
 
 ## Decision
 
-ToonSpectrum Studio will migrate from a DOM/main-thread scene authority to a browser-native,
+ToonStudio Studio will migrate from a DOM/main-thread scene authority to a browser-native,
 worker-owned drawing engine.
 
 The target is not “use WebGPU where convenient.” The target is:
@@ -28,7 +28,7 @@ delay an engine capability because the legacy scene cannot represent it.
 
 ## Previous-engine compatibility boundary
 
-The new authority does not preserve the previous ToonSpectrum engine's internal contracts:
+The new authority does not preserve the previous ToonStudio engine's internal contracts:
 
 - legacy brush IDs, Canvas/Konva nodes, scene serialization, caches, history snapshots, and
   renderer-owned objects are not valid vNext document state;
@@ -77,7 +77,7 @@ Engine and library selection is now optimized only for:
 1. observable output quality and editing fidelity;
 2. input-to-visible latency, sustained frame time, and large-document throughput;
 3. professional feature breadth and the speed at which new high-quality tools can be added; and
-4. long-term replaceability of execution providers behind ToonSpectrum-owned document schemas.
+4. long-term replaceability of execution providers behind ToonStudio-owned document schemas.
 
 The following are deliberately **not** selection gates: aggregate bundle bytes, dependency count,
 install footprint, cold download size, duplicate implementation code, support for old browsers, and
@@ -182,15 +182,15 @@ engines are allowed when each owns a different bounded responsibility and all du
 crosses the canonical document protocol. Two libraries must not independently own the same layer,
 history entry, text run, or live frame.
 
-The overall document authority is always ToonSpectrum's versioned document kernel. Raster tiles,
+The overall document authority is always ToonStudio's versioned document kernel. Raster tiles,
 editable paths, text content/style/font hashes, 3D asset references/transforms, animation tracks,
-and command order use ToonSpectrum-owned schemas. CanvasKit, PixiJS, Paper.js, HarfBuzz, Three.js,
+and command order use ToonStudio-owned schemas. CanvasKit, PixiJS, Paper.js, HarfBuzz, Three.js,
 and every future vendor library are replaceable execution providers; their class instances, scene
 graphs, caches, and opaque serialization are never durable document state.
 
 | Responsibility | Preferred engine | Secondary/specialist use | Boundary |
 | --- | --- | --- | --- |
-| Live raster ink and tile composition | ToonSpectrum raw WebGPU | CPU/Skia diagnostic oracle only | One worker-owned tile/frame authority |
+| Live raster ink and tile composition | ToonStudio raw WebGPU | CPU/Skia diagnostic oracle only | One worker-owned tile/frame authority |
 | GPU effect prototypes and animated assets | PixiJS v8 WebGL | WebGPU only in an isolated experiment until its production gate passes | Emits textures/tile commands; never owns document history |
 | High-quality vector/text rasterization and export oracle | CanvasKit/Skia WASM | software surface for deterministic export | Separate Quality/Export Worker consumes canonical paths/glyph runs |
 | Editable Bézier/path geometry | `polygon-clipping`, `flatten-js`, `bezier-js`, Earcut | Paper.js only after a headless geometry PoC | Geometry Worker returns versioned paths/meshes; no Paper scene authority |
@@ -213,10 +213,10 @@ canonical shaping; CanvasKit Paragraph must not independently reshape editable t
 ### Commercial-product behavior references
 
 Commercial applications and restricted libraries are quality references, not code suppliers.
-ToonSpectrum may reproduce a documented user-facing capability or independently derive an
+ToonStudio may reproduce a documented user-facing capability or independently derive an
 algorithm from public standards and measured input/output behavior, but it must not translate,
-rename, decompile, or paste proprietary implementation code. The result must use a ToonSpectrum
-schema, ToonSpectrum tests, and a clean implementation history.
+rename, decompile, or paste proprietary implementation code. The result must use a ToonStudio
+schema, ToonStudio tests, and a clean implementation history.
 
 | Public behavior reference | Independently owned implementation status |
 | --- | --- |
@@ -251,7 +251,7 @@ same canonical recipe.
 
 ### Adoption rules
 
-1. Every engine gets an adapter implementing a ToonSpectrum-owned protocol; vendor objects never
+1. Every engine gets an adapter implementing a ToonStudio-owned protocol; vendor objects never
    enter the saved document, CRDT operations, or public component props.
 2. Engines are loaded as feature Worker chunks. Large WASM and shader packages may be prewarmed,
    but they do not increase main-thread parse or React commit work.

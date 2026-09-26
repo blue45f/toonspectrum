@@ -4,7 +4,7 @@
  * This module deliberately separates three claims:
  *
  * 1. `scanStudioPdfConformanceEvidence` reads the bounded, classic-xref PDF subset produced by
- *    ToonSpectrum's deterministic writer.
+ *    ToonStudio's deterministic writer.
  * 2. `preflightStudioPdfConformance` applies a conservative, machine-checkable candidate profile.
  * 3. `importStudioVeraPdfResult` accepts a strictly normalized veraPDF result for PDF/A-2b.
  *
@@ -25,10 +25,10 @@ import {
 import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_PDF_CONFORMANCE_SCANNER_ID =
-  "toonspectrum.studio.pdf-classic-xref-scanner" as const;
+  "toonstudio.studio.pdf-classic-xref-scanner" as const;
 export const STUDIO_PDF_CONFORMANCE_SCANNER_VERSION = 1 as const;
 export const STUDIO_PDF_CONFORMANCE_RECEIPT_SCHEMA =
-  "toonspectrum.studio.pdf-conformance-receipt" as const;
+  "toonstudio.studio.pdf-conformance-receipt" as const;
 export const STUDIO_PDF_CONFORMANCE_RECEIPT_VERSION = 1 as const;
 
 export const STUDIO_PDF_CONFORMANCE_PROFILE_IDS = [
@@ -96,7 +96,7 @@ export interface StudioPdfConformanceProfile {
   readonly standard: "ISO 15930-7:2010" | "ISO 19005-2:2011" | "ISO 32000-1:2008";
   readonly requiredPdfVersion: "1.6" | "1.7";
   /**
-   * These checks define ToonSpectrum's conservative generated-file subset. Passing them does not
+   * These checks define ToonStudio's conservative generated-file subset. Passing them does not
    * claim that every requirement in the referenced ISO standard has been independently checked.
    */
   readonly claim: "local-candidate-only";
@@ -772,7 +772,7 @@ function scannerCanInspectCompletely(
 }
 
 /**
- * Scans the deterministic classic-xref subset used by ToonSpectrum's PDF writer.
+ * Scans the deterministic classic-xref subset used by ToonStudio's PDF writer.
  *
  * Unsupported PDF mechanisms do not silently disappear from evidence. A parser failure returns
  * `ok:false`; a mechanism the reader can parse but cannot inspect completely produces
@@ -835,7 +835,7 @@ export function scanStudioPdfConformanceEvidence(
 }
 
 export const STUDIO_VERAPDF_RESULT_SCHEMA =
-  "toonspectrum.external.verapdf-result" as const;
+  "toonstudio.external.verapdf-result" as const;
 export const STUDIO_VERAPDF_RESULT_VERSION = 1 as const;
 export const STUDIO_VERAPDF_RULE_IDS = [
   "verapdf.parser",
@@ -1070,7 +1070,7 @@ export interface StudioPdfConformancePreflightInput {
 }
 
 const RECEIPT_LIMITATIONS = deepFreeze([
-  "The local scanner covers ToonSpectrum's classic-xref, non-object-stream writer subset; it is not a complete ISO validator.",
+  "The local scanner covers ToonStudio's classic-xref, non-object-stream writer subset; it is not a complete ISO validator.",
   "A local pass is a generated-file candidate result, not PDF Association, ISO, print-provider, or archival certification.",
   "An imported veraPDF pass records an external validator result for the exact SHA-256 source only; third-party certification remains not claimed.",
 ] as const);
@@ -1507,7 +1507,7 @@ function receiptVerificationFailure(
 /**
  * Verifies the strict receipt schema and its canonical SHA-256 fingerprint.
  *
- * This is an integrity check for ToonSpectrum's deterministic receipt, not a digital signature.
+ * This is an integrity check for ToonStudio's deterministic receipt, not a digital signature.
  * Trust in an imported external result still belongs to the adapter/process that produced it.
  */
 export function verifyStudioPdfConformanceReceipt(

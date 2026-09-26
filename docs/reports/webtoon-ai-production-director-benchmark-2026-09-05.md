@@ -1,7 +1,7 @@
 # 웹툰 AI 프로덕션 디렉터 경쟁 분석 및 구현 보고서
 
 - 기준일: 2026-09-05
-- 대상: ToonStudio / `blue45f/toonspectrum`
+- 대상: ToonStudio / `blue45f/toonstudio`
 - 구현 브랜치: `feat/studio-webtoon-ai-production-director-20260905`
 - 범위: 이미지 모델 자체의 벤치마크가 아니라 **웹툰 회차 제작 품질, 기능 연결성, UI/UX, 생성 전 검수**
 

@@ -29,7 +29,7 @@ async function archiveWithManifest(manifest: unknown, path = "shots/001.png"): P
 
 function legacyManifest() {
   return {
-    kind: "toonspectrum-bg3d-shot-batch",
+    kind: "toonstudio-bg3d-shot-batch",
     version: 1,
     files: [{
       shotId: "shot-a",
@@ -145,7 +145,7 @@ async function validPublicPlan(options: { readonly contactSheet?: boolean } = {}
 
 function publicManifest(plan: ReturnType<typeof forgedPublicPlan>) {
   return {
-    kind: "toonspectrum-bg3d-shot-batch",
+    kind: "toonstudio-bg3d-shot-batch",
     version: 3,
     publicRenderPlan: plan,
     producedPasses: ["beauty"],

@@ -1,4 +1,4 @@
-ToonSpectrum shipped Rust/WASM third-party license bundle
+ToonStudio shipped Rust/WASM third-party license bundle
 
 Artifact: pkg
 Target: wasm32-unknown-unknown
@@ -8,7 +8,7 @@ External crates: 85
 The text between every BEGIN/END marker is copied verbatim from the locally
 resolved crate archive or reviewed vendored source after CRLF-to-LF and final
 whitespace normalization. The SHA-256 in the marker covers that normalized
-license text only. Package/source lines are ToonSpectrum inventory metadata
+license text only. Package/source lines are ToonStudio inventory metadata
 and do not alter the upstream license terms.
 
 Packages: guillotiere@0.7.0

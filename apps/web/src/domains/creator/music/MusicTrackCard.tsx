@@ -5,7 +5,7 @@ import type { LocalMusicTrack } from "./studio-music-client";
 
 import { musicProviderLabel } from "./studio-music-provider-catalog";
 
-import { MUSIC_ARCS, MUSIC_INTENSITIES, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_SONG_STRUCTURES, MUSIC_VOCAL_STYLES, musicFileExtension, musicFilename } from "@toonspectrum/core/studio-music";
+import { MUSIC_ARCS, MUSIC_INTENSITIES, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_SONG_STRUCTURES, MUSIC_VOCAL_STYLES, musicFileExtension, musicFilename } from "@toonstudio/core/studio-music";
 
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);

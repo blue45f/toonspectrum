@@ -1,6 +1,6 @@
 # Studio live session chat — 2026-07-16
 
-Magma의 협업 커뮤니케이션 3축(통화 · 채팅 · 댓글) 중 ToonSpectrum Studio에는 댓글(작품 단위,
+Magma의 협업 커뮤니케이션 3축(통화 · 채팅 · 댓글) 중 ToonStudio Studio에는 댓글(작품 단위,
 영속)과 화면 공유(WebRTC)만 있었고 **세션 채팅이 없었다**. 이 슬라이스는 실시간 작업실에
 텍스트 채팅을 추가한다.
 

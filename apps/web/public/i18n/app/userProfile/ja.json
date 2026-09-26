@@ -17,7 +17,7 @@
   "userProfile.fetchError": "プロファイルをロードできません。",
   "userProfile.stat.works": "制作した作品",
   "userProfile.eyebrow": "読者プロフィール",
-  "userProfile.metaTemplate": "{author} プロフィール · {reviews} レビュー · {works} 作品 · 平均評価 {avg} — ToonSpectrum。",
+  "userProfile.metaTemplate": "{author} プロフィール · {reviews} レビュー · {works} 作品 · 平均評価 {avg} — ToonStudio。",
   "userProfile.tabsLabel": "プロフィールの内容",
   "userProfile.tabs.works": "制作した作品"
 }

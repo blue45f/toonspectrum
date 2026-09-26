@@ -15,7 +15,7 @@ const collection = z.object({
   titleIds: z.array(key).max(50_000), createdAt: timestamp,
 });
 const backup = z.object({
-  _app: z.literal("toonspectrum-library"), version: z.literal(1),
+  _app: z.literal("toonstudio-library"), version: z.literal(1),
   ratings: z.record(key, rating),
   reads: z.record(key, z.enum(["want", "reading", "paused", "done", "dropped"])),
   subscriptions: z.record(key, z.boolean()),

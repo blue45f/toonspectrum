@@ -23,7 +23,7 @@
  */
 
 /** Shared prefix so the kill-switch can find *every* cache this app owns. */
-export const STUDIO_SERVICE_WORKER_CACHE_PREFIX = "toonspectrum-sw-";
+export const STUDIO_SERVICE_WORKER_CACHE_PREFIX = "toonstudio-sw-";
 
 /**
  * Bump ONLY when the shape of a cached *response* stops being replayable —
@@ -252,8 +252,8 @@ export function staleStudioServiceWorkerCacheNames(
 }
 
 /**
- * Legacy caches from the previous hand-written worker (`toonspectrum-pwa-v*`,
- * `toonspectrum-covers-v*`). Cleared once on activate so an upgrading client
+ * Legacy caches from the previous hand-written worker (`toonstudio-pwa-v*`,
+ * `toonstudio-covers-v*`). Cleared once on activate so an upgrading client
  * does not carry forward entries stored under the old, unversioned contract.
  */
 export function legacyStudioServiceWorkerCacheNames(
@@ -262,8 +262,8 @@ export function legacyStudioServiceWorkerCacheNames(
   return existingCacheNames.filter(
     (name) =>
       !name.startsWith(STUDIO_SERVICE_WORKER_CACHE_PREFIX)
-      && (name.startsWith("toonspectrum-pwa-")
-        || name.startsWith("toonspectrum-covers-")),
+      && (name.startsWith("toonstudio-pwa-")
+        || name.startsWith("toonstudio-covers-")),
   );
 }
 
@@ -370,11 +370,11 @@ export function studioServiceWorkerOfflineShellUrl(pathname: string): string {
 
 export const STUDIO_SERVICE_WORKER_MESSAGE = Object.freeze({
   /** Page → waiting worker: the artist accepted the update. */
-  applyUpdate: "toonspectrum-sw:apply-update",
+  applyUpdate: "toonstudio-sw:apply-update",
   /** Page → active worker: purge everything and stand down. */
-  kill: "toonspectrum-sw:kill",
+  kill: "toonstudio-sw:kill",
   /** Page → active worker: report what is installed (verifier + DevTools). */
-  inspect: "toonspectrum-sw:inspect",
+  inspect: "toonstudio-sw:inspect",
 } as const);
 
 export type StudioServiceWorkerMessageType =

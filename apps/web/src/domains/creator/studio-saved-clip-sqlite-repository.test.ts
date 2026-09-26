@@ -61,12 +61,12 @@ describe("saved clip SQLite repository", () => {
     const database = await memoryDatabase();
     const repository = createStudioSavedClipSqliteRepository({ acquireDatabase: async () => database });
     const duplicate = {
-      schema: "toonspectrum.studio.saved-clips",
+      schema: "toonstudio.studio.saved-clips",
       version: 1,
       items: [clip("same"), clip("same", 2)],
     };
     const extra = {
-      schema: "toonspectrum.studio.saved-clips",
+      schema: "toonstudio.studio.saved-clips",
       version: 1,
       items: [{ ...clip("extra"), future: true }],
     };

@@ -2,7 +2,7 @@ import {
   UnsupportedSceneFeatureError,
   pathIRSchema,
   sceneIRSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 
 import init, {
@@ -12,7 +12,7 @@ import init, {
 } from "../../../crates/studio-engine-vello/pkg/studio_engine_vello.js";
 
 import type { InitInput } from "../../../crates/studio-engine-vello/pkg/studio_engine_vello.js";
-import type { PathIR, SceneIR } from "@toonspectrum/studio-project-model";
+import type { PathIR, SceneIR } from "@toonstudio/studio-project-model";
 
 /**
  * JS boundary of the Vello CPU provider. The wasm module is the crate at

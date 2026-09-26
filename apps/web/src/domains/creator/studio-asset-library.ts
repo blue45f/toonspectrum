@@ -6,7 +6,7 @@ import { STUDIO_ASSET_DATA_URL_MAX_CHARS } from "./studio-upload-image-safety";
 
 export { STUDIO_ASSET_DATA_URL_MAX_CHARS } from "./studio-upload-image-safety";
 
-const DB_NAME = "toonspectrum-studio-asset-library";
+const DB_NAME = "toonstudio-studio-asset-library";
 export const STUDIO_ASSET_LIBRARY_DB_VERSION = 2;
 const STORE = "assets";
 const CONTENT_HASH_INDEX = "contentHash";

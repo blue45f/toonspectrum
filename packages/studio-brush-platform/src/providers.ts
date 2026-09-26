@@ -1,12 +1,12 @@
 import {
   declareTrustedBootstrapProvider,
   providerDescriptorSchema,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 import type {
   EngineCapabilityRegistry,
   ProviderDescriptor,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 /**
  * Brush-platform provider descriptors (Phase 2 baseline + V19 §2.3).
@@ -60,7 +60,7 @@ export const googleInkMeshProviderDescriptor: ProviderDescriptor =
     // descriptor-pure; __tests__/providers.test.ts asserts they never drift.
     commit: "1d0daba661f3035f42f3649b8e6a0061b47aa759",
     license: "Apache-2.0",
-    attribution: "Google — ink; ToonSpectrum wasm bridge",
+    attribution: "Google — ink; ToonStudio wasm bridge",
     maturity: "production-baseline",
     runtime: "wasm",
     capabilities: [
@@ -93,7 +93,7 @@ export const hokusaiProviderDescriptor: ProviderDescriptor =
     displayName: "Hokusai natural media (studio-hokusai-wasm)",
     version: "hokusai 0.3.0 / crate 0.1.0",
     license: "MIT / Apache-2.0",
-    attribution: "Re:Earth Hokusai; ToonSpectrum wasm wrapper",
+    attribution: "Re:Earth Hokusai; ToonStudio wasm wrapper",
     maturity: "production-baseline",
     runtime: "wasm-worker",
     capabilities: [

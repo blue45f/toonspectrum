@@ -197,7 +197,7 @@ class FakeAutosaveJournal implements StudioAutosaveOpfsJournalPort {
 
 function session(
   journal: FakeAutosaveJournal,
-  key = "toonspectrum-studio-autosave:v12:guest:new",
+  key = "toonstudio-studio-autosave:v12:guest:new",
 ): StudioAutosaveOpfsSession {
   return new StudioAutosaveOpfsSession({
     autosaveKey: key,
@@ -215,7 +215,7 @@ describe("StudioAutosaveOpfsSession", () => {
 
     const reopened = await reopenStudioAutosaveDocumentSessionForLeadership({
       session: original,
-      autosaveKey: "toonspectrum-studio-autosave:v12:guest:new",
+      autosaveKey: "toonstudio-studio-autosave:v12:guest:new",
     });
     if (reopened !== null) {
       expect(reopened).toHaveProperty("dispose");
@@ -229,7 +229,7 @@ describe("StudioAutosaveOpfsSession", () => {
     await expect(
       reopenStudioAutosaveDocumentSessionForLeadership({
         session: null,
-        autosaveKey: "toonspectrum-studio-autosave:v12:guest:new",
+        autosaveKey: "toonstudio-studio-autosave:v12:guest:new",
       }),
     ).resolves.toBeNull();
   });

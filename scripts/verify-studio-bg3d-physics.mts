@@ -31,10 +31,10 @@ const ARTIFACT_DIR = process.env.TOONSPECTRUM_BG3D_PHYSICS_VERIFY_DIR ??
   process.env.TOONSPECTRUM_BG3D_VERIFY_DIR ??
   join(process.cwd(), "artifacts", "browser", "studio-bg3d-physics");
 const LOG_PATH = join(ARTIFACT_DIR, "verify.log");
-const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
-const LANGUAGE_KEY = "toonspectrum-lang";
+const QUICK_START_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const UI_DENSITY_KEY = "toonstudio-studio-ui-density:v1";
+const LANGUAGE_KEY = "toonstudio-lang";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
   "/api/health/ready",

@@ -60,14 +60,14 @@ function capabilityRows(value: BrushRuntimeCapabilities) {
   ] as const;
 }
 function download(program: ReturnType<typeof compileBrushRuntimeProgram>) {
-  const url = URL.createObjectURL(new Blob([JSON.stringify({ kind: "toonspectrum.brush-runtime-program-v2", program }, null, 2)], { type: "application/json" }));
+  const url = URL.createObjectURL(new Blob([JSON.stringify({ kind: "toonstudio.brush-runtime-program-v2", program }, null, 2)], { type: "application/json" }));
   const link = document.createElement("a"); link.href = url; link.download = `${program.programKey}.json`; document.body.append(link); link.click(); link.remove();
   globalThis.setTimeout(() => URL.revokeObjectURL(url), 2_000);
 }
 
 export function StudioBrushV5RuntimeWorkbench({ scope }: { readonly scope: string }) {
-  const policyKey = `toonspectrum.brush-quality-v1:${encodeURIComponent(scope)}`;
-  const receiptKey = `toonspectrum.brush-runtime-benchmark-v1:${encodeURIComponent(scope)}`;
+  const policyKey = `toonstudio.brush-quality-v1:${encodeURIComponent(scope)}`;
+  const receiptKey = `toonstudio.brush-runtime-benchmark-v1:${encodeURIComponent(scope)}`;
   const [policy, setPolicy] = useState<BrushQualityPolicy>(() => loadPolicy(policyKey));
   const [capabilities, setCapabilities] = useState<BrushRuntimeCapabilities>(() => detectSynchronousBrushRuntimeCapabilities());
   const [receipt, setReceipt] = useState<BrushRuntimeBenchmarkReceipt | null>(() => loadReceipt(receiptKey));

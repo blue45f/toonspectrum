@@ -284,7 +284,7 @@ describe("recommendVideoBitsPerSecond / motionExportFileName", () => {
 
   it("파일명 — 제목 기반 -motion.webm, 빈 제목은 기본값", () => {
     expect(motionExportFileName("나의 만화")).toBe("나의 만화-motion.webm");
-    expect(motionExportFileName("  ")).toBe("toonspectrum-motion-motion.webm");
+    expect(motionExportFileName("  ")).toBe("toonstudio-motion-motion.webm");
   });
 
   it("패널 프리셋 데이터가 유효하다", () => {

@@ -142,7 +142,7 @@ describe("Studio voice ICE credential issuance", () => {
     });
     const turn = policy.iceServers[1];
     const opaqueIdentity = createHmac("sha256", TURN_SECRET)
-      .update("toonspectrum-studio-voice-identity-v1\0")
+      .update("toonstudio-studio-voice-identity-v1\0")
       .update("private-work-id")
       .update("\0")
       .update("private-user-id")

@@ -5,7 +5,7 @@ import {
   type ProductionTask,
   type ProductionTaskStatus,
   type RoleAssignment,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import { deriveProductionOperationsOverview } from "./production-episode-operations";
 import {

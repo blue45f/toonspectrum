@@ -91,8 +91,8 @@ jobs:
           scripts/verify-studio-collaboration-sync.mts
       - name: Resolve collaboration evidence directories
         run: |
-          mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/production"
-          mkdir -p "$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/branch"
+          mkdir -p "$RUNNER_TEMP/toonstudio-verification/studio-collaboration-sync/production"
+          mkdir -p "$RUNNER_TEMP/toonstudio-verification/studio-collaboration-sync/branch"
       - name: Cache Playwright Chromium
         id: playwright-cache
         uses: actions/cache@v4
@@ -109,7 +109,7 @@ jobs:
         continue-on-error: true
         env:
           TOONSPECTRUM_VERIFY_ORIGIN: https://www.toonstudio.cloud
-          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonspectrum-verification/studio-collaboration-sync/production
+          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonstudio-verification/studio-collaboration-sync/production
         run: pnpm exec tsx scripts/verify-studio-collaboration-sync.mts
       - name: Build production Studio assets without repeating the core typecheck
         run: pnpm run build:bundle
@@ -117,7 +117,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          evidence_root="$RUNNER_TEMP/toonspectrum-verification/studio-collaboration-sync/branch"
+          evidence_root="$RUNNER_TEMP/toonstudio-verification/studio-collaboration-sync/branch"
           mkdir -p "$evidence_root"
 
           for attempt in 1 2 3; do
@@ -148,6 +148,6 @@ jobs:
         uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action
         with:
           name: studio-collaboration-sync-${{ github.run_id }}
-          path: ${{ runner.temp }}/toonspectrum-verification/studio-collaboration-sync
+          path: ${{ runner.temp }}/toonstudio-verification/studio-collaboration-sync
           if-no-files-found: warn
           retention-days: 14

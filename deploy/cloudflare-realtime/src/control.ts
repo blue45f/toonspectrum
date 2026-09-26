@@ -1,22 +1,22 @@
 import { isRealtimeId } from "./protocol";
 
 export const REALTIME_CONTROL_VERSION =
-  "toonspectrum.realtime-control.v1" as const;
+  "toonstudio.realtime-control.v1" as const;
 export const REALTIME_CONTROL_PATH = "/v1/control/revocations" as const;
 export const REALTIME_CONTROL_CONTENT_TYPE =
-  "application/vnd.toonspectrum.realtime-revocation+json; version=1" as const;
+  "application/vnd.toonstudio.realtime-revocation+json; version=1" as const;
 export const REALTIME_CONTROL_MAX_BODY_BYTES = 2_048;
 export const REALTIME_CONTROL_MAX_AGE_MS = 30_000;
 export const REALTIME_CONTROL_FUTURE_SKEW_MS = 5_000;
 export const REALTIME_CONTROL_NONCE_HEADER =
-  "X-ToonSpectrum-Realtime-Control-Nonce" as const;
+  "X-ToonStudio-Realtime-Control-Nonce" as const;
 export const REALTIME_CONTROL_TIMESTAMP_HEADER =
-  "X-ToonSpectrum-Realtime-Control-Timestamp" as const;
+  "X-ToonStudio-Realtime-Control-Timestamp" as const;
 export const REALTIME_CONTROL_SIGNATURE_HEADER =
-  "X-ToonSpectrum-Realtime-Control-Signature" as const;
+  "X-ToonStudio-Realtime-Control-Signature" as const;
 
 const CONTROL_HMAC_CONTEXT =
-  "toonspectrum/realtime-control/hmac-sha256/v1\n";
+  "toonstudio/realtime-control/hmac-sha256/v1\n";
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/u;
 const NONCE_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 

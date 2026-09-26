@@ -62,7 +62,7 @@ export const STUDIO_FILE_CONTROL_ACTIONS: readonly StudioFileControlActionSpec[]
     Object.freeze({
       id: "project-json-import",
       label: "JSON 백업 가져오기",
-      description: "가벼운 ToonSpectrum 프로젝트 JSON 백업을 엽니다.",
+      description: "가벼운 ToonStudio 프로젝트 JSON 백업을 엽니다.",
       buttonMatchers: Object.freeze([
         Object.freeze(["프로젝트", "가져오기"]),
         Object.freeze(["JSON", "가져오기"]),
@@ -128,7 +128,7 @@ export interface StudioFileCompatibilityReport {
 const UNSUPPORTED_BRIDGES: Readonly<Record<string, readonly string[]>> = Object.freeze({
   ".clip": Object.freeze([
     "CLIP STUDIO PAINT에서 편집 구조가 필요하면 PSD/PSB 사본, 범용 레이어 교환은 ORA로 내보낸 뒤 가져오세요.",
-    "원본 .clip 문서는 별도로 보관하세요. ToonSpectrum은 .clip 완전 왕복을 주장하지 않습니다.",
+    "원본 .clip 문서는 별도로 보관하세요. ToonStudio은 .clip 완전 왕복을 주장하지 않습니다.",
   ]),
   ".cmc": Object.freeze([
     "CLIP STUDIO의 다중 페이지 프로젝트를 페이지별 PSD/ORA와 원본 .cmc 폴더로 함께 보관하세요.",
@@ -242,7 +242,7 @@ function summaryFor(
   extension: string,
 ): string {
   if (extension === ".zip" && !capability) {
-    return "일반 ZIP은 프로젝트 형식으로 식별할 수 없습니다. ToonSpectrum이 만든 .toonproject.zip만 복구하세요.";
+    return "일반 ZIP은 프로젝트 형식으로 식별할 수 없습니다. ToonStudio이 만든 .toonproject.zip만 복구하세요.";
   }
   if (!capability) {
     return `${extension || "확장자 없는 파일"} 형식은 현재 감사된 가져오기 레지스트리에 없습니다.`;

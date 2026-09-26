@@ -1,5 +1,5 @@
 import type { V13RenderFeature } from "./feature-contract";
-import type { RenderNodeIR, RenderSceneIR } from "@toonspectrum/studio-project-model";
+import type { RenderNodeIR, RenderSceneIR } from "@toonstudio/studio-project-model";
 
 
 /**

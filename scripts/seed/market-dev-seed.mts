@@ -63,13 +63,13 @@ import type {
 import type { ChildProcess } from "node:child_process";
 
 const MEDIA_TYPE_BY_KIND = {
-  asset: "application/vnd.toonspectrum.asset+json",
-  brush: "application/vnd.toonspectrum.brush+json",
-  filter: "application/vnd.toonspectrum.filter+json",
-  palette: "application/vnd.toonspectrum.palette+json",
-  template: "application/vnd.toonspectrum.template+json",
-  "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
-  "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
+  asset: "application/vnd.toonstudio.asset+json",
+  brush: "application/vnd.toonstudio.brush+json",
+  filter: "application/vnd.toonstudio.filter+json",
+  palette: "application/vnd.toonstudio.palette+json",
+  template: "application/vnd.toonstudio.template+json",
+  "3d-preset": "application/vnd.toonstudio.3d-preset+json",
+  "3d-asset": "application/vnd.toonstudio.3d-asset+json",
 } as const;
 
 function sha256(value: string): string {
@@ -112,7 +112,7 @@ const SEEDS: readonly SeedSpec[] = [
       "웹툰 선화 작업에 바로 쓰는 압력 반응 G펜. 가는 복선과 굵은 주선을 하나의 필악 커브로 처리합니다.",
     kind: "brush",
     tags: ["브러시", "선화", "gpen", "ink"],
-    license: "toonspectrum-standard",
+    license: "toonstudio-standard",
     engines: ["canvas2d"],
     entryName: "정석 G펜 파인",
     definition: {
@@ -165,7 +165,7 @@ const SEEDS: readonly SeedSpec[] = [
     kind: "filter",
     tags: ["필터", "색보정", "야간"],
     license: "cc-by-4.0",
-    attributionText: "ToonSpectrum Market Seed (qa)",
+    attributionText: "ToonStudio Market Seed (qa)",
     engines: ["canvas2d"],
     entryName: "두톤 던스크",
     definition: {
@@ -182,7 +182,7 @@ const SEEDS: readonly SeedSpec[] = [
     description: "색상 단계를 5단계로 줄이고 경계를 강조해 강한 그래픽 외곽을 만드는 필터입니다.",
     kind: "filter",
     tags: ["필터", "포스터", "윤곽선", "색면"],
-    license: "toonspectrum-standard",
+    license: "toonstudio-standard",
     engines: ["canvas2d"],
     entryName: "포스터 엣지 팝",
     definition: {
@@ -220,7 +220,7 @@ const SEEDS: readonly SeedSpec[] = [
     kind: "palette",
     tags: ["팔레트", "일상", "pastel"],
     license: "cc-by-nc-4.0",
-    attributionText: "ToonSpectrum Market Seed (qa) — CC BY-NC",
+    attributionText: "ToonStudio Market Seed (qa) — CC BY-NC",
     engines: ["canvas2d"],
     entryName: "파스텔 카페 모닝 8색",
     definition: {
@@ -242,7 +242,7 @@ const SEEDS: readonly SeedSpec[] = [
     description: "Studio 내장 ‘액션 컷’의 집중선·외침 말풍선·효과음을 불러오는 시작 템플릿입니다.",
     kind: "template",
     tags: ["템플릿", "액션", "구도"],
-    license: "toonspectrum-standard",
+    license: "toonstudio-standard",
     engines: ["canvas2d"],
     entryName: "액션 임팩트 컷",
     definition: { templateId: "action-impact" },
@@ -258,7 +258,7 @@ const SEEDS: readonly SeedSpec[] = [
     kind: "template",
     tags: ["템플릿", "대화", "로맨스"],
     license: "cc-by-4.0",
-    attributionText: "ToonSpectrum Market Seed (qa)",
+    attributionText: "ToonStudio Market Seed (qa)",
     engines: ["canvas2d"],
     entryName: "고백 장면",
     definition: { templateId: "confession" },
@@ -448,7 +448,7 @@ function parseArgs(argv: string[]): Record<string, string> {
   return args;
 }
 
-const CSRF_HEADERS = { "x-toonspectrum-csrf": "1" } as const;
+const CSRF_HEADERS = { "x-toonstudio-csrf": "1" } as const;
 const TERMINATION_SIGNAL_EXIT_CODE = {
   SIGINT: 130,
   SIGTERM: 143,

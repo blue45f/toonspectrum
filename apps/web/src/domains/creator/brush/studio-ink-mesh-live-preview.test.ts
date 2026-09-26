@@ -9,7 +9,7 @@ import {
   type InkStrokeMesh,
   type InkStrokeMeshDelta,
   type InkStrokeMeshReplica,
-} from "@toonspectrum/studio-brush-platform";
+} from "@toonstudio/studio-brush-platform";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
@@ -241,7 +241,7 @@ describe("Studio Google Ink live product coordinator", () => {
     expect(finish.status).toBe("finished");
     if (finish.status !== "finished") throw new Error("expected finish receipt");
     const reference = generator.generateInkStrokeMesh(
-      source.points.reduce<import("@toonspectrum/studio-brush-platform").InkMeshInputPoint[]>(
+      source.points.reduce<import("@toonstudio/studio-brush-platform").InkMeshInputPoint[]>(
         (points, _coordinate, flatIndex) => {
           if (flatIndex % 2 !== 0) return points;
           const index = flatIndex / 2;
@@ -569,7 +569,7 @@ describe("Studio Google Ink GPU retained buffers", () => {
 
 /* -------------------------------------------------------------------------- *
  * Shared-derivation parity. The runtime delegates its input/param derivation
- * to @toonspectrum/studio-brush-platform (ink-mesh-derivation — the pure
+ * to @toonstudio/studio-brush-platform (ink-mesh-derivation — the pure
  * module compileMeshBrush also uses). The reference functions below are a
  * verbatim copy of the pre-rebase local derivation; the fixtures lock the
  * rebase to byte-identical mesh output across every pose branch.
@@ -743,7 +743,7 @@ describe("Studio Google Ink shared-derivation parity", () => {
     expect(source).toContain("inkMeshOrientationRadFromStudioLivePose");
     expect(source).toContain("inkMeshBrushParamsFromStudioBrushTip");
     // The pressureToSize response, tilt clamp, and azimuth wrap now live only
-    // in @toonspectrum/studio-brush-platform's ink-mesh-derivation module.
+    // in @toonstudio/studio-brush-platform's ink-mesh-derivation module.
     expect(source).not.toMatch(/minMultiplier|maxMultiplier|Math\.hypot|Math\.atan2|TWO_PI/u);
   });
 

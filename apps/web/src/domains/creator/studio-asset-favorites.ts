@@ -22,7 +22,7 @@ export interface StudioAssetFavoriteState {
   readonly ids: readonly StudioAssetFavoriteId[];
 }
 
-const STUDIO_ASSET_FAVORITE_STORAGE_PREFIX = "toonspectrum-studio-asset-favorites:v1";
+const STUDIO_ASSET_FAVORITE_STORAGE_PREFIX = "toonstudio-studio-asset-favorites:v1";
 const STUDIO_ASSET_FAVORITE_STORAGE_KEY_MAX_LENGTH = 160;
 const STORAGE_OWNER_PREVIEW_MAX_LENGTH = 72;
 const SAFE_RAW_ID = /^[A-Za-z0-9._~-]+$/u;

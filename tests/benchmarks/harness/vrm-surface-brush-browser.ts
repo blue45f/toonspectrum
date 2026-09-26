@@ -609,7 +609,7 @@ export async function runVrmSurfaceBrushBrowserBenchmark(
   options: { scratchDirectory?: string; resultPath?: string } = {},
 ): Promise<VrmSurfaceBrushBrowserArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-vrm-surface-brush-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-vrm-surface-brush-"));
   const sourcePath = join(scratch, "production-source");
   const distributionPath = join(scratch, "production-dist");
   mkdirSync(sourcePath, { recursive: true });

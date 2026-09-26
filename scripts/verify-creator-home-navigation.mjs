@@ -25,8 +25,8 @@ try {
     currentCase = name;
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" });
     await context.addInitScript(({ lang, theme }) => {
-      localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang }, version: 0 }));
-      localStorage.setItem("toonspectrum-theme", JSON.stringify({ state: { theme }, version: 0 }));
+      localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang }, version: 0 }));
+      localStorage.setItem("toonstudio-theme", JSON.stringify({ state: { theme }, version: 0 }));
     }, { lang, theme });
     const page = await context.newPage();
     // A slow shared hero/card image must not move an already focused section.

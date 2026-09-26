@@ -5,7 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { chromium } from "playwright";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 
 const origin = new URL(process.env.STUDIO_QA_BASE_URL ?? "");
 assert(["localhost", "127.0.0.1"].includes(origin.hostname) && !origin.username && !origin.password);

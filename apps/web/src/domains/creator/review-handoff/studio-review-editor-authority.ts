@@ -1,4 +1,4 @@
-import { studioReviewPageMappingSchema } from "@toonspectrum/studio-project-model";
+import { studioReviewPageMappingSchema } from "@toonstudio/studio-project-model";
 
 import { verifyStudioVirtualSpaceReviewSubject } from "../virtual-space/studio-virtual-space-review-invitation";
 import { getStudioVirtualSpaceReviewPreview } from "../virtual-space/studio-virtual-space-review-preview";

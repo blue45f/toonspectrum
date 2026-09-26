@@ -86,7 +86,7 @@ for (const pack of packs) {
     }
   }
 }
-const report = { schema: 'toonspectrum.character-source-acquisition.v1', sources: records, failures,
+const report = { schema: 'toonstudio.character-source-acquisition.v1', sources: records, failures,
   actualHumanoidSourceFiles: records.length, downloadedBytes: total,
   completedStudioCharacters: 0, productionPublished: false };
 await writeFile(path.join(output, 'source-receipts.json'), JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });

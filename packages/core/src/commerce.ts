@@ -30,7 +30,7 @@ export const COMMERCE_ORDER_STATUSES = Object.freeze([
 export type CommerceOrderStatus = (typeof COMMERCE_ORDER_STATUSES)[number];
 
 export const DEFAULT_COMMERCE_FREE_POLICY_NOTICE =
-  "현재 사이트는 무료 운영 모드입니다. 서비스 이용료는 받지 않으며, 마켓 리소스의 GPL·CC·ToonSpectrum 등 개별 라이선스 조건은 각 리소스 표기를 따릅니다.";
+  "현재 사이트는 무료 운영 모드입니다. 서비스 이용료는 받지 않으며, 마켓 리소스의 GPL·CC·ToonStudio 등 개별 라이선스 조건은 각 리소스 표기를 따릅니다.";
 export const DEFAULT_COMMERCE_PAID_POLICY_NOTICE =
   "현재 사이트는 유료 운영 모드입니다. 유료 마켓 리소스는 결제 후 계정 이용 권한이 부여되며, 결제 여부와 별개로 각 리소스의 라이선스·출처 조건은 계속 적용됩니다.";
 export const DEFAULT_COMMERCE_TERMS_VERSION = "commerce-2026-09-18";

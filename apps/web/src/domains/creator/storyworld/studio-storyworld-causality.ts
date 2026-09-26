@@ -1,5 +1,5 @@
 /**
- * ToonSpectrum Storyworld Causality Lab
+ * ToonStudio Storyworld Causality Lab
  *
  * A deterministic, provider-neutral narrative digital twin. It does not generate prose or images;
  * it makes the assumptions behind a long-form story explicit, simulates them in scene order, and

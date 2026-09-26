@@ -6,7 +6,7 @@ import {
 } from "../backend-capabilities/backend-capability-gateway-contract";
 
 export const UPSTASH_QSTASH_CONTRACT_VERSION =
-  "toonspectrum.backend-durable-queue.v1" as const;
+  "toonstudio.backend-durable-queue.v1" as const;
 
 const OpaqueWorkIdSchema = z
   .string()
@@ -45,7 +45,7 @@ const DeliveryBaseSchema = z.object({
   createdAt: z.iso.datetime({ offset: true }),
 });
 
-/** The only two queue messages the ToonSpectrum QStash worker is authorized to execute. */
+/** The only two queue messages the ToonStudio QStash worker is authorized to execute. */
 export const UpstashQStashDeliverySchema = z.discriminatedUnion("workload", [
   DeliveryBaseSchema.extend({
     workload: z.literal("cleanup"),

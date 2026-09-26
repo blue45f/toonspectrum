@@ -1,4 +1,4 @@
-# ToonSpectrum coturn 데이터 plane
+# ToonStudio coturn 데이터 plane
 
 - 상태: **선택형 단일 Linux node 배포 scaffold**
 - 최종 갱신: **2026-09-26**

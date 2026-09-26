@@ -47,13 +47,13 @@ import {
 } from "@/shared/lib/creator-marketplace-resource-contract";
 
 const MEDIA_TYPE_BY_KIND = {
-  asset: "application/vnd.toonspectrum.asset+json",
-  brush: "application/vnd.toonspectrum.brush+json",
-  filter: "application/vnd.toonspectrum.filter+json",
-  palette: "application/vnd.toonspectrum.palette+json",
-  template: "application/vnd.toonspectrum.template+json",
-  "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
-  "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
+  asset: "application/vnd.toonstudio.asset+json",
+  brush: "application/vnd.toonstudio.brush+json",
+  filter: "application/vnd.toonstudio.filter+json",
+  palette: "application/vnd.toonstudio.palette+json",
+  template: "application/vnd.toonstudio.template+json",
+  "3d-preset": "application/vnd.toonstudio.3d-preset+json",
+  "3d-asset": "application/vnd.toonstudio.3d-asset+json",
 } as const;
 
 export interface CreatorMarketplaceListParams {

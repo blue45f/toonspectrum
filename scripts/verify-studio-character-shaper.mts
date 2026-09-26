@@ -29,8 +29,8 @@ const OUT_DIR =
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
   ?? join(process.cwd(), "docs", "screenshots", "character-shaper");
 const RESULT_PATH = join(OUT_DIR, "character-shaper-evidence.json");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
 const DIALOG = '[data-character-shaper="true"]';
 const RAIL = `${DIALOG} [data-character-shaper-rail] button`;
 const GRID = `${DIALOG} [data-character-shaper-grid] [data-character-slot-card]`;

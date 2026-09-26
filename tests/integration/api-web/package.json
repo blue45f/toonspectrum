@@ -1,10 +1,10 @@
 {
-  "name": "@toonspectrum/api-web-integration-tests",
+  "name": "@toonstudio/api-web-integration-tests",
   "private": true,
   "type": "module",
   "devDependencies": {
     "@nestjs/common": "^11.1.24",
-    "@toonspectrum/core": "workspace:*",
+    "@toonstudio/core": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "image-js": "^1.7.0",
     "js-base64": "^3.9.0",

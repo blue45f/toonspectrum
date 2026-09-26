@@ -1,4 +1,4 @@
-# ADR — ToonSpectrum Studio의 Babylon.js 도입 평가
+# ADR — ToonStudio Studio의 Babylon.js 도입 평가
 
 - 결정일: 2026-07-11
 - 상태: **기본 3D 편집 엔진 교체 보류 / 격리 Webtoon FX specialist 기반 구현**
@@ -191,7 +191,7 @@ Babylon 문서의 VRM 통합은 [community extension과 외부 `babylon-vrm-load
 
 ## 공식 기능 적합성
 
-| 요구 | Babylon.js 강점 | ToonSpectrum에서의 실제 의미 |
+| 요구 | Babylon.js 강점 | ToonStudio에서의 실제 의미 |
 | --- | --- | --- |
 | WebGPU | WebGPU와 WebGL을 나란히 지원하고 WebGPU 초기화는 `await engine.initAsync()`를 사용한다. [공식 WebGPU 문서](https://doc.babylonjs.com/setup/support/webGPU/) | 큰 씬·고급 셰이더에는 잠재력이 있다. 현재 선화/블록아웃/PNG 캡처 워크로드에서 우위는 아직 측정되지 않았다. 모바일에서는 WebGL fallback이 필수다. |
 | 기즈모·씬 그래프 | 카메라, picking, gizmo, 재질, 애니메이션, PBR, WebGPU 등을 한 엔진에서 제공한다. [공식 사양](https://www.babylonjs.com/specifications/) | 현재 OrbitControls/TransformControls와 기능이 겹친다. 새 기능보다 기존 편집/undo/캡처 코드를 재작성하는 비용이 먼저 발생한다. |
@@ -204,7 +204,7 @@ Babylon 문서의 VRM 통합은 [community extension과 외부 `babylon-vrm-load
 
 ## 격리 Vite PoC
 
-PoC는 저장소를 수정하지 않고 `/tmp/toonspectrum-babylon-poc`에서 실행했다. 저장소와 동일한 Vite `8.0.16`을 고정했고, Babylon 패키지는 평가일의 npm 버전 `9.16.1`을 고정했다. Babylon의 전체 barrel 대신 ESM deep import를 사용해 tree-shaking에 유리한 조건을 줬다.
+PoC는 저장소를 수정하지 않고 `/tmp/toonstudio-babylon-poc`에서 실행했다. 저장소와 동일한 Vite `8.0.16`을 고정했고, Babylon 패키지는 평가일의 npm 버전 `9.16.1`을 고정했다. Babylon의 전체 barrel 대신 ESM deep import를 사용해 tree-shaking에 유리한 조건을 줬다.
 
 세 가지 변형을 별도 Vite root로 빌드했다.
 
@@ -337,7 +337,7 @@ VRM 포저까지 이전하려면 아래 추가 조건이 필요하다.
 
 ## 재현 명령
 
-아래 수치의 원본 PoC는 저장소 밖 `/tmp/toonspectrum-babylon-poc`에서 수행했으며 당시 앱 코드와
+아래 수치의 원본 PoC는 저장소 밖 `/tmp/toonstudio-babylon-poc`에서 수행했으며 당시 앱 코드와
 `package.json`은 수정하지 않았다. 이후 2026-07-31 격리 specialist 기반을 위해 저장소에는
 Babylon `9.19.0` exact 의존성을 설치했다.
 
@@ -353,4 +353,4 @@ pnpm exec vite build variants/webgpu --config vite.config.ts --outDir ../../dist
 node measure.mjs
 ```
 
-`measure.mjs`는 Vite manifest의 정적 import graph와 동적 glTF/OBJ entry graph를 따라 고유 chunk를 합산하고, 각 chunk에 gzip level 9를 적용했다. 현재 ToonSpectrum chunk도 같은 스크립트/압축 방식으로 비교했다.
+`measure.mjs`는 Vite manifest의 정적 import graph와 동적 glTF/OBJ entry graph를 따라 고유 chunk를 합산하고, 각 chunk에 gzip level 9를 적용했다. 현재 ToonStudio chunk도 같은 스크립트/압축 방식으로 비교했다.

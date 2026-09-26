@@ -100,7 +100,7 @@ function createSettingsDownload(raw: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `toonspectrum-settings-${new Date().toISOString().slice(0, 10)}.json`;
+  anchor.download = `toonstudio-settings-${new Date().toISOString().slice(0, 10)}.json`;
   anchor.rel = "noopener";
   anchor.hidden = true;
   document.body.append(anchor);

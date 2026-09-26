@@ -3,7 +3,7 @@
 - 상태: **역사적 참조 자산, 제품 wardrobe 아님**
 - 최종 갱신: **2026-09-26**
 
-이 디렉터리의 `outfit_*.glb` 18개는 과거 Blender 참조 산출물이다. ToonSpectrum Studio에 표시되는
+이 디렉터리의 `outfit_*.glb` 18개는 과거 Blender 참조 산출물이다. ToonStudio Studio에 표시되는
 wardrobe 자산이 아니다.
 
 2026년 8월 binary/source 감사 결과 모든 파일은 rigid mesh node 1~2개만 포함하며 `skins`, animation,

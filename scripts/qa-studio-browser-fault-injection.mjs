@@ -86,8 +86,8 @@ async function stopTree(child) {
 
 async function installWebGlFailure(page, introShown) {
   await page.addInitScript(({ shown }) => {
-    if (shown) sessionStorage.setItem("toonspectrum-intro-shown", "true");
-    else sessionStorage.removeItem("toonspectrum-intro-shown");
+    if (shown) sessionStorage.setItem("toonstudio-intro-shown", "true");
+    else sessionStorage.removeItem("toonstudio-intro-shown");
 
     const original = HTMLCanvasElement.prototype.getContext;
     Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {

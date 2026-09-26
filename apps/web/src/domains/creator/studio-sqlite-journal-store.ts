@@ -1,7 +1,7 @@
 import {
   journalEntryIRSchema,
   snapshotIRSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import type { StudioLocalDatabase } from "./studio-local-database";
 import type {
@@ -9,7 +9,7 @@ import type {
   JournalStore,
   SnapshotIR,
   SnapshotSlot,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * V12 E25 — SQLite(OPFS) 기반 JournalStore.

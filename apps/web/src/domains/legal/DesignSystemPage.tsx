@@ -83,7 +83,7 @@ const NAV = [
 ] as const;
 
 const TYPE_SCALE = [
-  { cls: "text-5xl font-display font-bold tracking-[-0.04em]", label: "Display / 3rem · Space Grotesk", sample: "ToonSpectrum 042" },
+  { cls: "text-5xl font-display font-bold tracking-[-0.04em]", label: "Display / 3rem · Space Grotesk", sample: "ToonStudio 042" },
   { cls: "text-3xl font-bold tracking-tight", label: "Heading 1 / 1.875rem · Pretendard", sample: "통합 인덱스" },
   { cls: "text-2xl font-bold tracking-tight", label: "Heading 2 / 1.5rem", sample: "오늘의 정주행" },
   { cls: "text-base font-semibold", label: "Heading 3 / 1rem", sample: "어디서 봐" },
@@ -115,7 +115,7 @@ export function DesignSystemPage() {
   const [tag, setTag] = useState(true);
 
   useEffect(() => {
-    document.title = "디자인 시스템 · 툰스펙트럼";
+    document.title = "디자인 시스템 · 툰스튜디오";
   }, []);
 
   return (
@@ -123,7 +123,7 @@ export function DesignSystemPage() {
       {/* ── 헤더 ── */}
       <header className="flex flex-col gap-5 border-b border-line pb-8 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-[60ch]">
-          <p className="eyebrow text-accent">툰스펙트럼 · DESIGN SYSTEM</p>
+          <p className="eyebrow text-accent">툰스튜디오 · DESIGN SYSTEM</p>
           <h1 className="mt-2 text-balance font-display text-4xl font-bold tracking-[-0.04em] text-fg sm:text-5xl">
             활자와 스펙트럼
           </h1>
@@ -255,7 +255,7 @@ export function DesignSystemPage() {
         <figure className="mt-6 rounded-2xl border border-line bg-panel/40 p-5 sm:p-6">
           <figcaption className="eyebrow text-fg-3">본문 행폭 65–75ch</figcaption>
           <p className="mt-2 max-w-[68ch] text-sm leading-relaxed text-fg-2">
-            툰스펙트럼은 작품을 직접 서비스하지 않습니다. 대신 네이버·카카오·리디를 비롯한 국내
+            툰스튜디오은 작품을 직접 서비스하지 않습니다. 대신 네이버·카카오·리디를 비롯한 국내
             웹툰·웹소설 플랫폼을 가로질러 고르는 단계를 책임지는 통합 인덱스입니다. 흩어진 작품을
             하나로 묶고, 어디서 가장 좋게 볼 수 있는지 알려주며, 믿을 수 있는 데이터로 순위를
             매깁니다. 본문은 한 줄에 65–75자 사이를 유지해 눈의 회귀 부담을 줄입니다.

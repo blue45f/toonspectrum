@@ -1,7 +1,7 @@
 export const STUDIO_BG3D_PROFESSIONAL_WORKSPACE_LEGACY_STORAGE_KEY =
-  "toonspectrum.studio.bg3d.workspace-layout.v1";
+  "toonstudio.studio.bg3d.workspace-layout.v1";
 export const STUDIO_BG3D_PROFESSIONAL_WORKSPACE_STORAGE_KEY =
-  "toonspectrum.studio.bg3d.workspace-layout.v2";
+  "toonstudio.studio.bg3d.workspace-layout.v2";
 
 export const STUDIO_BG3D_OUTLINER_WIDTH_MIN = 240;
 export const STUDIO_BG3D_OUTLINER_WIDTH_MAX = 420;

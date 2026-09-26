@@ -24,7 +24,7 @@ const enabledEnvironment = {
     "test-rest-token-with-sufficient-length",
   UPSTASH_COORDINATION_KEY_HASH_SECRET:
     "test-key-hash-secret-with-at-least-thirty-two-characters",
-  UPSTASH_COORDINATION_NAMESPACE: "toonspectrum-test",
+  UPSTASH_COORDINATION_NAMESPACE: "toonstudio-test",
 } as const;
 
 describe("Upstash coordination contracts", () => {
@@ -187,7 +187,7 @@ describe("Upstash coordination configuration seam", () => {
     expect(resolveUpstashCoordinationConfig(enabledEnvironment)).toEqual(
       expect.objectContaining({
         restUrl: "https://coordination.example",
-        namespace: "toonspectrum-test",
+        namespace: "toonstudio-test",
         timeoutMs: 2_500,
       })
     );

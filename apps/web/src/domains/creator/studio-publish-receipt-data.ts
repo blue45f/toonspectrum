@@ -1,4 +1,4 @@
-import type { CreatorPublicationSourceLink } from "@toonspectrum/contracts/creator-publication-integrity";
+import type { CreatorPublicationSourceLink } from "@toonstudio/contracts/creator-publication-integrity";
 
 import type { StudioPublishEnvironment } from "./studio-publish-review-safety";
 import type { StudioPublishResultKind } from "./studio-publish-result";

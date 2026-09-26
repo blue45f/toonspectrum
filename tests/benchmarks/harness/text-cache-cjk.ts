@@ -4,7 +4,7 @@ import { cpus, platform, release } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { solidPaint } from "@toonspectrum/studio-project-model";
+import { solidPaint } from "@toonstudio/studio-project-model";
 
 import { loadVelloNode } from "../../../packages/studio-engine-vello/src/node/index";
 import { renderSceneToPixels } from "../../../packages/studio-engine-vello/src/render";
@@ -15,7 +15,7 @@ import {
 } from "../../../packages/studio-engine-vello/src/text-cache";
 
 import type { ShapedText } from "../../../packages/studio-engine-vello/src/text";
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const RESULT_PATH = resolve(ROOT, "tests/benchmarks/results/text-cache-cjk.json");

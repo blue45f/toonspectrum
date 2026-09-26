@@ -23,12 +23,12 @@ import { preview, type PreviewServer } from "vite";
 
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
-const LANGUAGE_KEY = "toonspectrum-lang";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const UI_DENSITY_KEY = "toonstudio-studio-ui-density:v1";
+const LANGUAGE_KEY = "toonstudio-lang";
 const SCRATCH =
   process.env.TOONSPECTRUM_COMPANION_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-companion");
+  ?? join(tmpdir(), "toonstudio-studio-companion");
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/auth/session",
   "/api/kmas/merge-on-access",

@@ -1,5 +1,5 @@
 benchmark:
-  topic: ToonSpectrum creator asset marketplace competitive benchmark
+  topic: ToonStudio creator asset marketplace competitive benchmark
   as_of: 2026-08-31
   evidence_mode: official_documentation_review
   source_policy: Use current first-party product, help, developer, policy, or terms pages. Do not infer undocumented behavior from marketing labels.
@@ -76,7 +76,7 @@ results:
     verified_finding: >-
       Purchases are downloadable from the product or purchases page, including many delisted products; purchased usage rights do not expire, but a seller can remove files and thereby end future redownload availability.
     toonspectrum_implication: >-
-      Model license survival separately from hosted-file availability, and show buyers when they must preserve a local copy or when ToonSpectrum guarantees retained delivery.
+      Model license survival separately from hosted-file availability, and show buyers when they must preserve a local copy or when ToonStudio guarantees retained delivery.
 
   - name: Envato Elements and Envato Market
     lane: subscription and transactional creative assets

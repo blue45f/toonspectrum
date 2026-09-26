@@ -21,8 +21,8 @@ describe("VRM character quality closure", () => {
 
   it("renders authored clumps as one merged buffer plus one expanded outline", () => {
     expect(forge).toContain("mergeStudioVrmAuthoredHairGeometry(");
-    expect(forge).toContain("ToonSpectrumAvatarForgeHair_AuthoredMerged");
-    expect(forge).toContain("ToonSpectrumAvatarForgeHairOutline_AuthoredMerged");
+    expect(forge).toContain("ToonStudioAvatarForgeHair_AuthoredMerged");
+    expect(forge).toContain("ToonStudioAvatarForgeHairOutline_AuthoredMerged");
     expect(forge).not.toContain("for (const part of buildAvatarForgeHairParts(state))");
     expect(authoredHair).toContain("CLUMP_CROSS_SEGMENTS = 8");
     expect(authoredHair).toContain("clipCapForehead");

@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ProductionRiskResponse } from "@toonspectrum/core/production";
+import type { ProductionRiskResponse } from "@toonstudio/core/production";
 
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionRiskResponseCard } from "./ProductionRiskResponseCard";

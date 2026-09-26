@@ -1,4 +1,4 @@
-# ToonSpectrum Copilot 지침
+# ToonStudio Copilot 지침
 
 정책의 단일 기준은 저장소 루트 `AGENTS.md`다.
 

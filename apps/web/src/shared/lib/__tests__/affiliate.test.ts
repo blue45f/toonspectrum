@@ -40,22 +40,22 @@ describe("Affiliate utilities", () => {
     it("appends affiliate parameter using searchParams if valid URL", () => {
       const original = "https://ridibooks.com/books/123456";
       const decorated = buildAffiliateUrl("ridi", original);
-      expect(decorated).toBe("https://ridibooks.com/books/123456?ridi_affiliate=toonspectrum");
+      expect(decorated).toBe("https://ridibooks.com/books/123456?ridi_affiliate=toonstudio");
     });
 
     it("updates existing affiliate parameter", () => {
       const original = "https://ridibooks.com/books/123456?ridi_affiliate=old_value&other=1";
       const decorated = buildAffiliateUrl("ridi", original);
-      expect(decorated).toContain("ridi_affiliate=toonspectrum");
+      expect(decorated).toContain("ridi_affiliate=toonstudio");
       expect(decorated).toContain("other=1");
     });
 
     it("appends affiliate parameter with string fallback for relative/malformed URLs", () => {
       const relative = "/books/123456";
-      expect(buildAffiliateUrl("ridi", relative)).toBe("/books/123456?ridi_affiliate=toonspectrum");
+      expect(buildAffiliateUrl("ridi", relative)).toBe("/books/123456?ridi_affiliate=toonstudio");
 
       const relativeWithQuery = "/books/123456?page=2";
-      expect(buildAffiliateUrl("ridi", relativeWithQuery)).toBe("/books/123456?page=2&ridi_affiliate=toonspectrum");
+      expect(buildAffiliateUrl("ridi", relativeWithQuery)).toBe("/books/123456?page=2&ridi_affiliate=toonstudio");
     });
   });
 });

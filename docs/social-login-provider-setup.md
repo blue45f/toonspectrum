@@ -1,6 +1,6 @@
 # 소셜 로그인 공급자 신청·운영 설정
 
-이 문서는 ToonSpectrum의 사용자 로그인용 OAuth 애플리케이션을 카카오·네이버·GitHub에 등록하고,
+이 문서는 ToonStudio의 사용자 로그인용 OAuth 애플리케이션을 카카오·네이버·GitHub에 등록하고,
 Core API 환경변수와 운영 콜백을 연결하는 정본 절차다. 로그인 자격 증명은 모두 서버 전용이며
 저장소, 브라우저 번들, `VITE_` 환경변수에 넣지 않는다.
 
@@ -8,7 +8,7 @@ Core API 환경변수와 운영 콜백을 연결하는 정본 절차다. 로그�
 
 | 항목 | 값 |
 | --- | --- |
-| 서비스 이름 | `ToonSpectrum` |
+| 서비스 이름 | `ToonStudio` |
 | 홈페이지 | `https://www.toonstudio.cloud` |
 | OAuth/API 기준 URL | `https://www.toonstudio.cloud` |
 | 로그인 완료 복귀 URL | `https://www.toonstudio.cloud/auth/callback` |
@@ -24,7 +24,7 @@ AUTH_SESSION_SECRET=<앞뒤 공백 없는 32바이트 이상 무작위 값>
 
 `AUTH_STATE_SECRET`은 인가 코드 탈취·CSRF 방어용 서명 권한이고, 발급된 `state`는 공급자별
 HttpOnly·SameSite=Lax 임시 쿠키와도 일치해야 한다. 따라서 다른 브라우저에서 시작한 로그인
-콜백을 주입할 수 없다. `AUTH_SESSION_SECRET`은 ToonSpectrum HttpOnly 세션의 서명 권한이다.
+콜백을 주입할 수 없다. `AUTH_SESSION_SECRET`은 ToonStudio HttpOnly 세션의 서명 권한이다.
 기존 운영 값을 자동으로 덮어쓰거나 회전하지 않는다.
 
 운영 앱과 로컬 개발 앱은 분리한다. 특히 GitHub OAuth App은 운영 callback을 고정하고,
@@ -53,7 +53,7 @@ production에서는 데모 계정을 발급하지 않는다.
 
 ### 콘솔 신청
 
-1. Kakao Developers의 **앱**에서 `ToonSpectrum` 앱을 만든다.
+1. Kakao Developers의 **앱**에서 `ToonStudio` 앱을 만든다.
 2. 앱 대표 도메인을 `https://www.toonstudio.cloud`로 설정한다.
 3. **제품 설정 → 카카오 로그인 → 일반**에서 카카오 로그인을 활성화한다.
 4. **앱 설정 → 플랫폼 키 → REST API 키 수정**의 카카오 로그인 Redirect URI에 아래 값을
@@ -93,7 +93,7 @@ https://www.toonstudio.cloud/api/webhooks/kakao/unlink
 
 기본 요청 범위는 `profile_nickname,profile_image`다. 이메일 권한 승인을 받은 뒤
 `KAKAO_ACCOUNT_EMAIL_SCOPE_ENABLED=true`로 바꾸면 `account_email`을 추가한다. 카카오가 이메일을
-유효·검증 완료로 표시한 경우에만 기존 ToonSpectrum 계정과 이메일로 연결하고, 그렇지 않으면
+유효·검증 완료로 표시한 경우에만 기존 ToonStudio 계정과 이메일로 연결하고, 그렇지 않으면
 카카오 사용자 ID 기반 별도 계정을 만든다.
 
 ## 네이버 로그인
@@ -132,9 +132,9 @@ NAVER_OAUTH_CLIENT_ID=<Client ID>
 NAVER_OAUTH_CLIENT_SECRET=<Client Secret>
 ```
 
-ToonSpectrum은 콜백에서 검증한 `state`를 네이버 토큰 발급 요청에도 그대로 전달한다.
+ToonStudio은 콜백에서 검증한 `state`를 네이버 토큰 발급 요청에도 그대로 전달한다.
 네이버 프로필 응답은 애플리케이션별 사용자 ID를 정본으로 사용한다. 이메일은 요청하지 않으며,
-기존 ToonSpectrum 계정과 자동 병합하지 않는다. 기존 계정 연결은 로그인된 사용자에게 두 계정의
+기존 ToonStudio 계정과 자동 병합하지 않는다. 기존 계정 연결은 로그인된 사용자에게 두 계정의
 재인증을 요구하는 명시적 계정 연결 흐름에서만 허용한다.
 
 연결 해제 콜백은 `application/x-www-form-urlencoded` 요청의 앱 ID와 10분 이내 timestamp를 확인하고,
@@ -151,7 +151,7 @@ ToonSpectrum은 콜백에서 검증한 `state`를 네이버 토큰 발급 요청
 
 | 필드 | 값 |
 | --- | --- |
-| Application name | `ToonSpectrum` |
+| Application name | `ToonStudio` |
 | Homepage URL | `https://www.toonstudio.cloud` |
 | Application description | `웹툰 탐색·리뷰·창작 스튜디오 로그인` |
 | Authorization callback URL | `https://www.toonstudio.cloud/api/auth/oauth/github/callback` |
@@ -164,7 +164,7 @@ GITHUB_OAUTH_CLIENT_ID=<Client ID>
 GITHUB_OAUTH_CLIENT_SECRET=<Client Secret>
 ```
 
-ToonSpectrum은 비공개 이메일 조회에 필요한 `user:email`만 요청하고, 인가 코드 흐름에는 S256 PKCE를 적용한다. 공개 프로필 이메일이 비어 있을 수 있으므로
+ToonStudio은 비공개 이메일 조회에 필요한 `user:email`만 요청하고, 인가 코드 흐름에는 S256 PKCE를 적용한다. 공개 프로필 이메일이 비어 있을 수 있으므로
 `/user/emails`에서 `verified=true`인 주소만 사용하고, 그중 `primary=true`를 우선한다.
 검증 이메일이 없으면 GitHub 사용자 ID 기반 별도 계정을 만든다. 로그인 완료 후 access/refresh token은 저장하지 않는다.
 
@@ -191,7 +191,7 @@ APPLE_KEY_ID=<10-character Key ID>
 APPLE_PRIVATE_KEY=<PKCS8 .p8 PEM; vault에서는 줄바꿈을 \n으로 이스케이프 가능>
 ```
 
-ToonSpectrum은 Apple 웹 authorize 요청에 `scope=name email`, `response_mode=form_post`, 브라우저 세션에서
+ToonStudio은 Apple 웹 authorize 요청에 `scope=name email`, `response_mode=form_post`, 브라우저 세션에서
 파생한 SHA-256 nonce를 사용한다. Apple의 cross-site POST가 상태 쿠키를 전달할 수 있도록 **Apple provider의
 OAuth state 쿠키에만** `SameSite=None; Secure; HttpOnly`를 적용하고 일반 인증 세션은 기존
 `SameSite=Lax`를 유지한다. 기존 계정에 Apple 로그인을 추가 연결할 때만 같은 provider 경로의
@@ -202,9 +202,9 @@ authorization code를 Apple token endpoint에서 교환한다. 반환된 ID toke
 서명을 검증하고 `iss`, `aud`, `iat`, `exp`, `nonce`를 모두 확인한다. 사용자 정본은
 변경 가능한 이메일이 아니라 **Apple `sub`** 이며, `privaterelay.appleid.com` 주소도 연락 속성으로만
 취급한다. 이름은 최초 승인 시 form payload에만 올 수 있으므로 제어문자를 제거하고 길이를 제한한 뒤
-프로필 초기값에만 사용한다. 동일 이메일이라는 이유로 기존 ToonSpectrum 계정과 자동 병합하지 않는다.
+프로필 초기값에만 사용한다. 동일 이메일이라는 이유로 기존 ToonStudio 계정과 자동 병합하지 않는다.
 
-현재 로그인과 ToonSpectrum 내부 provider 연결/해제에서는 Apple access/refresh token을 DB에 평문으로
+현재 로그인과 ToonStudio 내부 provider 연결/해제에서는 Apple access/refresh token을 DB에 평문으로
 저장하지 않는다. Apple 서버 측 authorization revocation까지 지원하려면 별도의 암호화 refresh-token 저장소와
 revoke 운영 경계를 추가해야 한다.
 
@@ -224,7 +224,7 @@ https://www.toonstudio.cloud/api/auth/oauth/google/callback
 - Client Secret, `AUTH_STATE_SECRET`, `AUTH_SESSION_SECRET`은 Core API의 encrypted secret store에만 둔다.
 - Client ID도 서버 설정으로 관리하며, Google GIS에 필요한 Client ID만 `/api/auth/providers` 응답에 공개한다.
 - 카카오·네이버·GitHub의 access/refresh token과 Apple token-exchange 결과는 로그인 후 DB에 저장하지 않는다.
-- 공급자 토큰으로 신원을 확인한 뒤 ToonSpectrum이 자체 HttpOnly, Secure, SameSite=Lax 세션을 발급한다.
+- 공급자 토큰으로 신원을 확인한 뒤 ToonStudio이 자체 HttpOnly, Secure, SameSite=Lax 세션을 발급한다.
 - 설정 변경은 운영 배포가 아니다. 검토된 SHA의 별도 수동 배포와 canary 승인이 필요하다.
 
 ## 로컬 자격증명 정본과 재발급 정책

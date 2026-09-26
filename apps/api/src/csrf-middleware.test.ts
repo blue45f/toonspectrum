@@ -9,55 +9,55 @@ import {
 
 const PRODUCTION_ENV: NodeJS.ProcessEnv = {
   NODE_ENV: "production",
-  API_CORS_ALLOWED_ORIGINS: "https://app.toonspectrum.example",
+  API_CORS_ALLOWED_ORIGINS: "https://app.toonstudio.example",
 };
 
 describe("CSRF Origin policy", () => {
   it("accepts the exact request Origin or an explicitly configured Origin", () => {
-    const request = { headers: { host: "api.toonspectrum.example" } } as never;
+    const request = { headers: { host: "api.toonstudio.example" } } as never;
 
     expect(
       isSameRequestOrigin(
-        "https://api.toonspectrum.example",
+        "https://api.toonstudio.example",
         request,
         PRODUCTION_ENV,
       ),
     ).toBe(true);
     expect(
       isAllowedCsrfOrigin(
-        "https://app.toonspectrum.example",
+        "https://app.toonstudio.example",
         PRODUCTION_ENV,
       ),
     ).toBe(true);
   });
 
   it("rejects lookalikes, noncanonical values, and production HTTP", () => {
-    const request = { headers: { host: "api.toonspectrum.example" } } as never;
+    const request = { headers: { host: "api.toonstudio.example" } } as never;
 
     expect(
       isSameRequestOrigin(
-        "https://api.toonspectrum.example.evil.test",
+        "https://api.toonstudio.example.evil.test",
         request,
         PRODUCTION_ENV,
       ),
     ).toBe(false);
     expect(
       isSameRequestOrigin(
-        "https://api.toonspectrum.example/path",
+        "https://api.toonstudio.example/path",
         request,
         PRODUCTION_ENV,
       ),
     ).toBe(false);
     expect(
       isSameRequestOrigin(
-        "http://api.toonspectrum.example",
+        "http://api.toonstudio.example",
         request,
         PRODUCTION_ENV,
       ),
     ).toBe(false);
     expect(
       isAllowedCsrfOrigin(
-        "https://app.toonspectrum.example/",
+        "https://app.toonstudio.example/",
         PRODUCTION_ENV,
       ),
     ).toBe(false);

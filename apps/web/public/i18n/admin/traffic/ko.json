@@ -8,7 +8,7 @@
   "admin.traffic.countries": "국가",
   "admin.traffic.country": "국가",
   "admin.traffic.coverage": "수집 시작",
-  "admin.traffic.desc": "외부 스크립트 없이 ToonSpectrum이 직접 수집한 실제 페이지 방문과 세션 흐름입니다.",
+  "admin.traffic.desc": "외부 스크립트 없이 ToonStudio이 직접 수집한 실제 페이지 방문과 세션 흐름입니다.",
   "admin.traffic.device": "기기",
   "admin.traffic.devices": "기기",
   "admin.traffic.emptyValue": "—",

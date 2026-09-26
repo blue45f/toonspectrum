@@ -230,7 +230,7 @@ describe("VRM asset SQLite/OPFS repository", () => {
       STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
       STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
       JSON.stringify({
-        kind: "toonspectrum.studio-vrm-model-asset-manifest",
+        kind: "toonstudio.studio-vrm-model-asset-manifest",
         version: 1,
         generation: 0,
         models: [],
@@ -899,14 +899,14 @@ describe("VRM asset SQLite/OPFS repository", () => {
     const invalidRows = [
       "{",
       JSON.stringify({
-        kind: "toonspectrum.studio-vrm-model-asset-manifest",
+        kind: "toonstudio.studio-vrm-model-asset-manifest",
         version: 2,
         generation: 0,
         models: [],
         sampleThumbnails: [],
       }),
       JSON.stringify({
-        kind: "toonspectrum.studio-vrm-model-asset-manifest",
+        kind: "toonstudio.studio-vrm-model-asset-manifest",
         version: 1,
         generation: 0,
         models: [],
@@ -915,7 +915,7 @@ describe("VRM asset SQLite/OPFS repository", () => {
       }),
       JSON.stringify({
         version: 1,
-        kind: "toonspectrum.studio-vrm-model-asset-manifest",
+        kind: "toonstudio.studio-vrm-model-asset-manifest",
         generation: 0,
         models: [],
         sampleThumbnails: [],
@@ -1010,7 +1010,7 @@ describe("VRM asset SQLite/OPFS repository", () => {
       STUDIO_VRM_MODEL_SQLITE_NAMESPACE,
       STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY,
       JSON.stringify({
-        kind: "toonspectrum.studio-vrm-model-asset-manifest",
+        kind: "toonstudio.studio-vrm-model-asset-manifest",
         version: 1,
         generation: 0,
         models,

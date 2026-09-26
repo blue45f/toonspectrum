@@ -7,7 +7,7 @@
 | SQLite core | 3.53.0 through the existing repository pin | Public domain upstream | Shared manifest database and KV transaction engine |
 | `@sqlite.org/sqlite-wasm` | 3.53.0-build1, existing install | Package declares Apache-2.0; preserve packaged license/notice and existing SBOM pin | Browser WASM bridge and OPFS SAH-pool backing for `studio-local-v12.db` |
 | OPFS and File System Access primitives | Browser Web Platform | No bundled third-party license | Immutable content-addressed model/PNG bytes and commit markers |
-| ToonSpectrum OPFS asset store and VRM repository | Repository source | Project license | SHA-256 CAS index, owner references, canonical schemas, validation and lifecycle fencing |
+| ToonStudio OPFS asset store and VRM repository | Repository source | Project license | SHA-256 CAS index, owner references, canonical schemas, validation and lifecycle fencing |
 
 No package, lockfile, native binary, model, texture corpus, external renderer or copyleft dependency
 is added by this change. Runtime Three.js/VRM objects are not stored.
@@ -17,13 +17,13 @@ is added by this change. Runtime Three.js/VRM objects are not stored.
 ```text
 /studio creator chunk
   -> existing acquireStudioLocalDatabase()
-  -> toonspectrum-studio-sqlite/studio-local-v12.db
+  -> toonstudio-studio-sqlite/studio-local-v12.db
        ├─ studio-vrm-model-assets-v12 / manifest-v1
        └─ studio-vrm-texture-paint-assets-v12 / manifest-v1
 
 /studio creator chunk
   -> native navigator.storage OPFS
-  -> toonspectrum-studio-vrm-assets-v12
+  -> toonstudio-studio-vrm-assets-v12
        ├─ content-addressed blobs
        ├─ strict commit markers
        └─ CAS index/owner references

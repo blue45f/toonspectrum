@@ -41,7 +41,7 @@ export const STUDIO_OUTLINE_STROKE_CONTRACT_VERSION = 1 as const;
 export const STUDIO_OUTLINE_STROKE_ENGINE =
   "perfect-freehand-outline" as const;
 export const STUDIO_OUTLINE_STROKE_ADAPTER_VERSION =
-  "toonspectrum-perfect-freehand-adapter-v1" as const;
+  "toonstudio-perfect-freehand-adapter-v1" as const;
 export const STUDIO_OUTLINE_STROKE_PACKAGE_ALGORITHM =
   "perfect-freehand@1.2.3:getStroke" as const;
 /**

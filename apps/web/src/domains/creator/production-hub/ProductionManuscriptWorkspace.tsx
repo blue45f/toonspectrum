@@ -42,7 +42,7 @@ import {
 } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import { getApiErrorMessage, httpStatus } from "@/platform/api";
 import { buttonClass } from "@/shared/components/ui/button-utils";

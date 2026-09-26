@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.scene3d-specialist-orchestration-evidence",
+  "schema": "toonstudio.scene3d-specialist-orchestration-evidence",
   "version": 1,
   "recordedAt": "2026-09-19T21:25:43.648040+00:00",
   "scope": "specialist-JS-realm-queue-and-review-fix; not whole-platform completion, cross-tab scheduling, physical GPU-memory measurement, or all-CI certification",

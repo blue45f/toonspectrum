@@ -21,14 +21,14 @@ import type {
 } from "../studio-freehand-input-binary-spool-opfs-store";
 
 export const STUDIO_DRY_MEDIA_UNION_CAS_ROOT_NAME =
-  "toonspectrum-studio-dry-media-union-v1";
+  "toonstudio-studio-dry-media-union-v1";
 const MAX_BLOB_BYTES = 8 * 1024 * 1024;
 const MAX_STAGING_BYTES = 1024 * 1024;
 const SHA256_HEX = /^[a-f0-9]{64}$/u;
 const PENDING_FILE = /^([a-f0-9]{64})\.pending$/u;
 const SAFE_STROKE_ID = /^[a-zA-Z0-9._-]{1,192}$/u;
 const LIFECYCLE_RECORD_NAME = /^[a-z0-9-]{1,96}\.json$/u;
-const LIFECYCLE_RECORD_DOMAIN = "toonspectrum/studio-dry-media-union/lifecycle-record-v1";
+const LIFECYCLE_RECORD_DOMAIN = "toonstudio/studio-dry-media-union/lifecycle-record-v1";
 const LIFECYCLE_RECORD_MAX_BYTES = 8 * 1024 * 1024;
 const LIFECYCLE_TRANSACTIONS_FILE = "lifecycle-transaction.json";
 const LIFECYCLE_PENDING_REFERENCES_FILE = "lifecycle-pending-references.json";

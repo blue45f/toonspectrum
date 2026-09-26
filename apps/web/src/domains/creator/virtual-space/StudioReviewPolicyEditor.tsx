@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { reviewPolicyDefinitionSchema, type ReviewPolicyDefinition } from "@toonspectrum/studio-project-model";
+import { reviewPolicyDefinitionSchema, type ReviewPolicyDefinition } from "@toonstudio/studio-project-model";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 const field = "min-h-11 max-w-full rounded-lg border border-line bg-panel px-3 text-sm";

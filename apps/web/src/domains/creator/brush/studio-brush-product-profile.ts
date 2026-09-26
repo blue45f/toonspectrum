@@ -125,7 +125,7 @@ function nodeLabel(id: string): string {
 }
 
 function nodeProvider(id: string): string {
-  if (brushStudioV6Topology(id)) return "ToonSpectrum CPU Topology";
+  if (brushStudioV6Topology(id)) return "ToonStudio CPU Topology";
   if (id.includes("google")) return "Google Ink";
   if (id.includes("perfect")) return "Perfect Freehand";
   if (id.includes("libmypaint")) return "libmypaint";
@@ -137,9 +137,9 @@ function nodeProvider(id: string): string {
   if (id.includes("painter")) return "Pigment.Painter";
   if (id.includes("inkwash")) return "Inkwash";
   if (id.includes("webgpu") || /^(tip|surface|deposit|physics|pattern|finish)-/u.test(id)) {
-    return "ToonSpectrum WebGPU";
+    return "ToonStudio WebGPU";
   }
-  return "ToonSpectrum";
+  return "ToonStudio";
 }
 
 function engineStage(role: StudioBrushEngineStageRole, id: string): StudioBrushEngineStage {
@@ -168,16 +168,16 @@ function resolveV6Stages(seed: BrushStudioV6RecipeSeed): readonly StudioBrushEng
 
 function v6Family(carrierId: string): readonly [id: string, label: string, provider: string] {
   const topology = brushStudioV6Topology(carrierId);
-  if (topology) return ["cpu-topology", "CPU 위상·물리", "ToonSpectrum CPU Topology"];
+  if (topology) return ["cpu-topology", "CPU 위상·물리", "ToonStudio CPU Topology"];
   if (carrierId.includes("perfect")) return ["perfect-freehand", "Perfect Freehand", "Perfect Freehand"];
   if (carrierId.includes("google")) return ["google-ink", "Google Ink", "Google Ink"];
   if (carrierId.includes("libmypaint")) return ["libmypaint", "libmypaint", "libmypaint"];
   if (carrierId.includes("hokusai")) return ["hokusai", "Hokusai", "Hokusai"];
   if (carrierId.includes("krita")) return ["krita-hairy", "Krita 강모", "Krita"];
   if (carrierId.includes("p5-")) return ["p5-brush", "p5.brush", "p5.brush"];
-  if (carrierId.includes("particles")) return ["webgpu-particles", "WebGPU 파티클", "ToonSpectrum WebGPU"];
-  if (carrierId.includes("ribbon")) return ["webgpu-ribbon", "WebGPU 리본", "ToonSpectrum WebGPU"];
-  return ["webgpu-ink", "WebGPU 잉크", "ToonSpectrum WebGPU"];
+  if (carrierId.includes("particles")) return ["webgpu-particles", "WebGPU 파티클", "ToonStudio WebGPU"];
+  if (carrierId.includes("ribbon")) return ["webgpu-ribbon", "WebGPU 리본", "ToonStudio WebGPU"];
+  return ["webgpu-ink", "WebGPU 잉크", "ToonStudio WebGPU"];
 }
 
 function v6Traits(seed: BrushStudioV6RecipeSeed, stages: readonly StudioBrushEngineStage[]): readonly string[] {
@@ -246,7 +246,7 @@ function makeV6Profile(item: ProductProfileItem, seed: BrushStudioV6RecipeSeed):
   const carrier = stages.find((stage) => stage.role === "carrier")!;
   const [engineFamilyId, baseFamilyLabel, primaryProvider] = v6Family(carrier.id);
   const secondaryProvider = stages.map((stage) => stage.provider)
-    .find((provider) => provider !== primaryProvider && !provider.startsWith("ToonSpectrum"));
+    .find((provider) => provider !== primaryProvider && !provider.startsWith("ToonStudio"));
   const engineFamilyLabel = secondaryProvider ? `${baseFamilyLabel} + ${secondaryProvider}` : baseFamilyLabel;
   const traits = v6Traits(seed, stages);
   const authoredWidth = seed.delta.tuning?.size ?? 18;
@@ -277,7 +277,7 @@ function classicProvider(item: ProductProfileItem, engine: string, variant: stri
   if (signature.includes("mypaint")) return "libmypaint";
   if (signature.includes("krita")) return "Krita";
   if (signature.includes("klecks")) return "Klecks";
-  return "ToonSpectrum";
+  return "ToonStudio";
 }
 
 function makeClassicProfile(item: ProductProfileItem): StudioBrushProductProfile {

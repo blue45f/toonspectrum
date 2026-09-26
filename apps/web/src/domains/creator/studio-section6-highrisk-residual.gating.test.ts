@@ -8,7 +8,7 @@ import { exerciseStudioDccCatalogFeature } from "./hybrid-dcc/studio-dcc-catalog
 
 const CONFIGURED_SCRATCH = process.env.GROK_SCRATCH ?? process.env.SCRATCH;
 const SCRATCH = CONFIGURED_SCRATCH
-  ?? mkdtempSync(join(tmpdir(), "toonspectrum-section6-highrisk-"));
+  ?? mkdtempSync(join(tmpdir(), "toonstudio-section6-highrisk-"));
 
 afterAll(() => {
   if (!CONFIGURED_SCRATCH) rmSync(SCRATCH, { force: true, recursive: true });

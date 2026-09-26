@@ -42,7 +42,7 @@ interface MarketSocialStore {
 }
 
 interface MarketSocialBroadcastMessage {
-  readonly source: "toonspectrum-market-social";
+  readonly source: "toonstudio-market-social";
   readonly resourceId: string;
   readonly publisherId: string;
   readonly packageId: string;
@@ -190,7 +190,7 @@ async function loadStore(
 function isBroadcastMessage(value: unknown): value is MarketSocialBroadcastMessage {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<MarketSocialBroadcastMessage>;
-  return candidate.source === "toonspectrum-market-social"
+  return candidate.source === "toonstudio-market-social"
     && typeof candidate.resourceId === "string"
     && typeof candidate.publisherId === "string"
     && typeof candidate.packageId === "string";
@@ -240,7 +240,7 @@ function announceChange(
     }
   }
   channel()?.postMessage({
-    source: "toonspectrum-market-social",
+    source: "toonstudio-market-social",
     resourceId: data.resourceId,
     publisherId: data.publisherId,
     packageId: data.packageId,

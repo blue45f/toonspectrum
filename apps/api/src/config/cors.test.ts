@@ -12,7 +12,7 @@ import {
 
 import type { AddressInfo } from "node:net";
 
-const CONFIGURED_ORIGIN = "https://app.toonspectrum.example";
+const CONFIGURED_ORIGIN = "https://app.toonstudio.example";
 
 @Controller("cors-probe")
 class CorsProbeController {
@@ -52,7 +52,7 @@ describe("API CORS", () => {
         Origin: CONFIGURED_ORIGIN,
         "Access-Control-Request-Method": "POST",
         "Access-Control-Request-Headers":
-          "content-type,x-user-id,idempotency-key,x-toonspectrum-csrf",
+          "content-type,x-user-id,idempotency-key,x-toonstudio-csrf",
       },
     });
 
@@ -62,7 +62,7 @@ describe("API CORS", () => {
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("content-type");
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("x-user-id");
     expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("idempotency-key");
-    expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("x-toonspectrum-csrf");
+    expect(response.headers.get("access-control-allow-headers")?.toLowerCase()).toContain("x-toonstudio-csrf");
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   });
 

@@ -34,7 +34,7 @@ import type {
 } from "./studio-vrm-export-vrm-extension";
 
 export const STUDIO_VRM_GENERATE_RECIPE_VERSION = 1 as const;
-export const STUDIO_VRM_GENERATE_GENERATOR = "ToonSpectrum Studio VRM Generate";
+export const STUDIO_VRM_GENERATE_GENERATOR = "ToonStudio Studio VRM Generate";
 
 /**
  * 아무것도 고르지 않고 생성했을 때 대신 쓰는 스타일.
@@ -528,7 +528,7 @@ export function buildStudioVrmGenerateAuthoringSnapshot(
       name: label,
       authors: [STUDIO_VRM_GENERATE_GENERATOR],
       version: `generate-${recipe.presetId ?? "custom"}-v${STUDIO_VRM_GENERATE_RECIPE_VERSION}`,
-      copyrightInformation: "Generated in ToonSpectrum Studio",
+      copyrightInformation: "Generated in ToonStudio Studio",
       avatarPermission: "onlyAuthor",
       commercialUsage: "personalNonProfit",
       creditNotation: "required",

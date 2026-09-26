@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { FeedbackEntry, FeedbackKind, FeedbackProgress } from "@toonspectrum/core/feedback";
+import type { FeedbackEntry, FeedbackKind, FeedbackProgress } from "@toonstudio/core/feedback";
 
-import { assertFeedbackPage } from "@toonspectrum/core/feedback-response";
+import { assertFeedbackPage } from "@toonstudio/core/feedback-response";
 import { api, getApiErrorMessage } from "@/platform/api";
 
 export interface FeedbackFilters { category: FeedbackKind | "all"; progress: FeedbackProgress | "all"; query: string; mine: boolean; tag: string }

@@ -317,7 +317,7 @@ describe("rankingItemListJsonLd", () => {
     const ranked = rankBy(pool, "popular", { period: "all" });
     const ld = rankingItemListJsonLd(ranked, "실시간 인기");
     expect(ld?.["@type"]).toBe("ItemList");
-    expect(ld?.name).toBe("툰스펙트럼 통합 랭킹 · 실시간 인기");
+    expect(ld?.name).toBe("툰스튜디오 통합 랭킹 · 실시간 인기");
     expect(ld?.numberOfItems).toBe(20);
     expect(ld?.itemListElement).toHaveLength(20);
     expect(ld?.itemListElement[0]).toEqual({

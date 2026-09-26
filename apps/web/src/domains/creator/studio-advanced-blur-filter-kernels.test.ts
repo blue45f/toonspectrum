@@ -317,7 +317,7 @@ describe("alpha, immutability, determinism, and distinctness", () => {
     const second = applied(applyStudioFieldIrisBlur(request));
     expect(first.image.data).toEqual(second.image.data);
     expect(first.transaction).toEqual(second.transaction);
-    expect(first.transaction.schema).toBe("toonspectrum.advanced-blur-filter/v1");
+    expect(first.transaction.schema).toBe("toonstudio.advanced-blur-filter/v1");
     expect(first.transaction.operationId).toMatch(/^advanced-blur-v1-[0-9a-f]{8}$/);
     expect(first.transaction.outputFingerprint).toMatch(/^[0-9a-f]{8}$/);
   });

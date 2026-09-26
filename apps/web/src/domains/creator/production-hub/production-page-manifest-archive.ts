@@ -9,7 +9,7 @@ import { manifestPageFromPreview, type ProductionManifestPage, type ProductionRe
 
 const encoder = new TextEncoder();
 
-export const PRODUCTION_PAGE_MANIFEST_SCHEMA = "toonspectrum.page-manifest.v1";
+export const PRODUCTION_PAGE_MANIFEST_SCHEMA = "toonstudio.page-manifest.v1";
 export const PRODUCTION_PAGE_MANIFEST_MIME = "application/vnd.comicbook+zip";
 
 export interface ProductionPageManifestArchiveInput {
@@ -256,7 +256,7 @@ export async function buildProductionPageManifestArchive(
   });
   const manifestBytes = encoder.encode(canonicalJson(manifest));
   const blob = await archiveBuilder([
-    { path: "toonspectrum-page-manifest.json", data: manifestBytes },
+    { path: "toonstudio-page-manifest.json", data: manifestBytes },
     ...pageEntries,
   ], {
     mimeType: PRODUCTION_PAGE_MANIFEST_MIME,

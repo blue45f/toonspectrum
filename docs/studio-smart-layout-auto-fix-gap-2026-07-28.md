@@ -4,7 +4,7 @@
 
 ## 결론
 
-기존 ToonSpectrum에는 `studio-selection.ts`의 기본 정렬/중심 분포 계산과
+기존 ToonStudio에는 `studio-selection.ts`의 기본 정렬/중심 분포 계산과
 `StudioPage`의 즉시 적용 명령이 있으나, 여러 편집 동작을 하나의 미리보기와
 원자적 커밋으로 묶는 자동 레이아웃 계약은 없었다.
 

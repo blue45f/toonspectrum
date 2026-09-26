@@ -36,7 +36,7 @@ const LEAKY = {
   // Provider-agnostic, low-entropy fixture: long enough to exercise LONG_TOKEN redaction.
   token: "REDACTION_FIXTURE_00000000000000000000000000000000",
   dataUri: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg",
-  href: "https://toonspectrum.app/studio/work-9f3a7c21?share=secret-token&user=artist",
+  href: "https://toonstudio.app/studio/work-9f3a7c21?share=secret-token&user=artist",
 } as const;
 
 function reliability(detail: string): StudioReliabilityStatusSnapshot {
@@ -99,7 +99,7 @@ describe("버그 리포트 마스킹 문", () => {
       LEAKY.filePath,
       LEAKY.token,
       LEAKY.dataUri,
-      "https://toonspectrum.app/studio/work-1",
+      "https://toonstudio.app/studio/work-1",
     ]) {
       const redacted = redactStudioDiagnosticText(`앞 ${secret} 뒤`);
       expect(redacted, secret).not.toContain(secret);
@@ -114,7 +114,7 @@ describe("버그 리포트 마스킹 문", () => {
   });
 
   it("주소는 도메인만 남긴다", () => {
-    expect(redactStudioLocation(LEAKY.href)).toBe("https://toonspectrum.app");
+    expect(redactStudioLocation(LEAKY.href)).toBe("https://toonstudio.app");
     expect(redactStudioLocation("not a url")).toBeNull();
     expect(redactStudioLocation(null)).toBeNull();
   });
@@ -172,7 +172,7 @@ describe("버그 리포트 패키지 — 개인정보 계약", () => {
       expect(surface).not.toContain(LEAKY.layerName);
       // 주소는 경로·질의 없이 도메인만.
       expect(surface).not.toContain("share=secret-token");
-      expect(surface).toContain("https://toonspectrum.app");
+      expect(surface).toContain("https://toonstudio.app");
     }
   });
 

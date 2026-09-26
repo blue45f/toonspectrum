@@ -4,7 +4,7 @@ import re
 
 
 def select_planned_assets(metadata: dict, plan: object, excluded: set[str]) -> list[tuple]:
-    if not isinstance(plan, dict) or plan.get('schema') != 'toonspectrum.asset-acquisition-plan.v1':
+    if not isinstance(plan, dict) or plan.get('schema') != 'toonstudio.asset-acquisition-plan.v1':
         raise ValueError('Unsupported acquisition plan schema')
     rows = plan.get('assets')
     if not isinstance(rows, list) or not 1 <= len(rows) <= 160:

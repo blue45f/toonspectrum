@@ -16,7 +16,7 @@ import {
 import type { StudioBg3dLibrariesAuthority } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 
 export const STUDIO_BG3D_ASSET_METADATA_DATABASE_NAME =
-  "toonspectrum-studio-bg3d-asset-metadata";
+  "toonstudio-studio-bg3d-asset-metadata";
 export const STUDIO_BG3D_ASSET_METADATA_DATABASE_VERSION = 1;
 export const STUDIO_BG3D_ASSET_METADATA_STORE_NAME = "metadata";
 
@@ -349,7 +349,7 @@ function validationFixture(patch: Record<string, unknown>): StudioBg3dAssetMetad
 }
 
 export const STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_KIND =
-  "toonspectrum-studio-bg3d-asset-metadata-v12";
+  "toonstudio-studio-bg3d-asset-metadata-v12";
 export const STUDIO_BG3D_ASSET_METADATA_V12_MANIFEST_VERSION = 1 as const;
 export const STUDIO_BG3D_ASSET_METADATA_V12_MAX_MANIFEST_BYTES = 16 * 1024 * 1024;
 

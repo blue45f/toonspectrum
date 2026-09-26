@@ -8,11 +8,11 @@ describe("Studio3DRightsBOM", () => {
     bom.addRecord({
       assetId: "asset-1",
       assetName: "학교 배경 3D 모델",
-      creator: "ToonSpectrum",
+      creator: "ToonStudio",
       license: "CC-BY-4.0",
       usageScope: ["commercial"],
       attributionRequired: true,
-      attributionText: "© ToonSpectrum Studios",
+      attributionText: "© ToonStudio Studios",
       modificationAllowed: true,
       redistributionAllowed: true,
       importDate: "2026-08-01",
@@ -148,6 +148,6 @@ describe("Studio3DRightsBOM", () => {
 
     expect(credits).toContain("## 🎨 3D 에셋");
     expect(credits).toContain("학교 배경 3D 모델");
-    expect(credits).toContain("© ToonSpectrum Studios");
+    expect(credits).toContain("© ToonStudio Studios");
   });
 });

@@ -245,7 +245,7 @@ async function verifyStudioLiveAttachmentRoundTrip(
   timeoutMs: number
 ): Promise<void> {
   const client = await pool.connect();
-  const expectedPayload = Buffer.from(`toonspectrum-studio-live-preflight:${nonce}`, "utf8");
+  const expectedPayload = Buffer.from(`toonstudio-studio-live-preflight:${nonce}`, "utf8");
   let failure: unknown;
   let transactionOpen = false;
   try {

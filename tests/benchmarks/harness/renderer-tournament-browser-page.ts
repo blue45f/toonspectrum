@@ -3,7 +3,7 @@ import {
   type PathVerbIR,
   type SceneIR,
   type SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import {
   computeSceneFingerprint,
@@ -597,7 +597,7 @@ async function loadProviderRuntime(
   providerId: RendererTournamentBrowserProviderId,
 ): Promise<ProviderRuntime> {
   if (providerId === "vello-gpu-browser") {
-    const engine = await import("@toonspectrum/studio-engine-vello");
+    const engine = await import("@toonstudio/studio-engine-vello");
     const module = await engine.loadVelloGpuBrowser();
     const initOutput = await module.default();
     return {
@@ -613,7 +613,7 @@ async function loadProviderRuntime(
   }
   if (providerId === "vello-cpu") {
     const [engine, rawModule] = await Promise.all([
-      import("@toonspectrum/studio-engine-vello"),
+      import("@toonstudio/studio-engine-vello"),
       import("../../../crates/studio-engine-vello/pkg/studio_engine_vello.js"),
     ]);
     await engine.loadVelloWasm();
@@ -632,7 +632,7 @@ async function loadProviderRuntime(
   const [canvasKitModule, wasmAsset, adapter] = await Promise.all([
     import("canvaskit-wasm"),
     import("canvaskit-wasm/bin/canvaskit.wasm?url"),
-    import("@toonspectrum/studio-engine-skia"),
+    import("@toonstudio/studio-engine-skia"),
   ]);
   const canvasKit = await canvasKitModule.default({
     locateFile(file: string) {
@@ -915,7 +915,7 @@ async function runProfile(): Promise<RendererTournamentBrowserProfileResult> {
   }
   let velloProbe: unknown;
   try {
-    const engine = await import("@toonspectrum/studio-engine-vello");
+    const engine = await import("@toonstudio/studio-engine-vello");
     velloProbe = await engine.probeWebGpu();
   } catch (error) {
     velloProbe = { supported: false, reason: errorMessage(error) };

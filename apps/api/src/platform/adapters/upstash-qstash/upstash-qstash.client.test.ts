@@ -13,7 +13,7 @@ import type { BackendCapabilityDurableQueueCommand } from "../backend-capabiliti
 const config: UpstashQStashConfig = {
   apiBaseUrl: "https://qstash.upstash.io",
   publishToken: "server-only-qstash-publish-token",
-  urlGroup: "toonspectrum-durable-v1",
+  urlGroup: "toonstudio-durable-v1",
   timeoutMs: 2_500,
   deliveryTimeoutSeconds: 30,
   retries: 3,
@@ -66,7 +66,7 @@ describe("Upstash QStash durable queue adapter", () => {
     expect(fetch).toHaveBeenCalledOnce();
     const [url, init] = fetch.mock.calls[0] ?? [];
     expect(url).toBe(
-      "https://qstash.upstash.io/v2/topics/toonspectrum-durable-v1"
+      "https://qstash.upstash.io/v2/topics/toonstudio-durable-v1"
     );
     expect(init?.redirect).toBe("error");
     expect(new Headers(init?.headers).get("authorization")).toBe(
@@ -100,7 +100,7 @@ describe("Upstash QStash durable queue adapter", () => {
     });
     const [url, init] = fetch.mock.calls[0] ?? [];
     expect(url).toBe(
-      "https://qstash.upstash.io/v2/publish/toonspectrum-durable-v1"
+      "https://qstash.upstash.io/v2/publish/toonstudio-durable-v1"
     );
     expect(init?.credentials).toBe("omit");
     expect(init?.redirect).toBe("error");

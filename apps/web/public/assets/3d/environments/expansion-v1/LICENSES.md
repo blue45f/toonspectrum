@@ -1,6 +1,6 @@
 # Studio environment expansion v1
 
-Original scene architecture, bespoke furniture, garments and equipment: ToonSpectrum, CC0-1.0.
+Original scene architecture, bespoke furniture, garments and equipment: ToonStudio, CC0-1.0.
 
 Generator: `scripts/blender/generate_studio_environment_expansion_v1.py`, Blender 5.2.
 

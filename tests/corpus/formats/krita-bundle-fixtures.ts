@@ -142,7 +142,7 @@ export interface KritaBundleFixtureOptions {
 export const authoredMyb = encoder.encode(
   JSON.stringify({
     version: 3,
-    group: "ToonSpectrum authored fixture",
+    group: "ToonStudio authored fixture",
     settings: {
       radius_logarithmic: {
         base_value: 2,
@@ -207,7 +207,7 @@ export function buildKritaBundleFixture(
     `<?xml version="1.0" encoding="UTF-8"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="${xml(options.manifestVersion ?? "1.2")}"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/x-krita-resourcebundle"/>${manifestEntries.join("")}</manifest:manifest>`,
   );
   const metadata = encoder.encode(
-    `<?xml version="1.0" encoding="UTF-8"?><meta:meta xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><meta:generator>Krita authored fixture</meta:generator><meta:version>${xml(options.bundleVersion ?? "1")}</meta:version><meta:author>ToonSpectrum QA</meta:author><dc:creator>ToonSpectrum Test Authors</dc:creator><dc:title>Authored Bundle</dc:title><dc:description>No third-party assets</dc:description><meta:creation-date>2026-08-09</meta:creation-date><dc:date>2026-08-09</dc:date><meta:meta-userdefined meta:name="license" meta:value="CC0-1.0"/><meta:meta-userdefined meta:name="website" meta:value="https://example.invalid/toonspectrum"/><meta:meta-userdefined meta:name="email" meta:value="qa@example.invalid"/><meta:meta-userdefined meta:name="tag" meta:value="authored"/>${options.metadataExtraXml ?? ""}</meta:meta>`,
+    `<?xml version="1.0" encoding="UTF-8"?><meta:meta xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><meta:generator>Krita authored fixture</meta:generator><meta:version>${xml(options.bundleVersion ?? "1")}</meta:version><meta:author>ToonStudio QA</meta:author><dc:creator>ToonStudio Test Authors</dc:creator><dc:title>Authored Bundle</dc:title><dc:description>No third-party assets</dc:description><meta:creation-date>2026-08-09</meta:creation-date><dc:date>2026-08-09</dc:date><meta:meta-userdefined meta:name="license" meta:value="CC0-1.0"/><meta:meta-userdefined meta:name="website" meta:value="https://example.invalid/toonstudio"/><meta:meta-userdefined meta:name="email" meta:value="qa@example.invalid"/><meta:meta-userdefined meta:name="tag" meta:value="authored"/>${options.metadataExtraXml ?? ""}</meta:meta>`,
   );
   const entries: ZipFixtureEntry[] = [];
   if (options.includeManifest !== false) {

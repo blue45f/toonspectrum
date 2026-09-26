@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
 const sourceDir = join(root, "apps/web/src/domains/creator/storyworld");
-const outDir = mkdtempSync(join(tmpdir(), "toonspectrum-storyworld-"));
+const outDir = mkdtempSync(join(tmpdir(), "toonstudio-storyworld-"));
 let checks = 0;
 
 function checkEqual(actual, expected, message) {

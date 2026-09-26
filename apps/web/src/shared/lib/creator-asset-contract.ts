@@ -1,12 +1,12 @@
 export const CREATOR_ASSET_LICENSES = [
   {
-    id: "toonspectrum-standard",
-    label: "ToonSpectrum 표준 사용권",
+    id: "toonstudio-standard",
+    label: "ToonStudio 표준 사용권",
     shortLabel: "표준 사용권",
     attributionRequired: false,
     commercialUse: true,
     url: null,
-    description: "ToonSpectrum에서 완성 작품의 일부로 편집·사용할 수 있고, 원본 에셋 자체의 재판매는 허용하지 않습니다.",
+    description: "ToonStudio에서 완성 작품의 일부로 편집·사용할 수 있고, 원본 에셋 자체의 재판매는 허용하지 않습니다.",
   },
   {
     id: "cc0-1.0",
@@ -91,7 +91,7 @@ export function isCreatorAssetLicenseId(value: unknown): value is CreatorAssetLi
 }
 
 export function creatorAssetLicenseOf(value: unknown) {
-  const id = isCreatorAssetLicenseId(value) ? value : "toonspectrum-standard";
+  const id = isCreatorAssetLicenseId(value) ? value : "toonstudio-standard";
   return CREATOR_ASSET_LICENSES.find((license) => license.id === id) ?? CREATOR_ASSET_LICENSES[0];
 }
 

@@ -311,7 +311,7 @@ function isStudioCoreIconModule(id: string) {
  */
 function preferImplementationOverTestModulePlugin(): Plugin {
   return {
-    name: "toonspectrum-prefer-implementation-over-test-module",
+    name: "toonstudio-prefer-implementation-over-test-module",
     apply: "serve",
     enforce: "pre",
     async resolveId(source, importer, options) {
@@ -374,7 +374,7 @@ function studioCrossOriginIsolationPlugin(): Plugin {
   };
 
   return {
-    name: "toonspectrum-studio-cross-origin-isolation",
+    name: "toonstudio-studio-cross-origin-isolation",
     configureServer(server) {
       server.middlewares.use((request, response, next) => {
         applyHeaders(request, response);
@@ -414,7 +414,7 @@ function studioServiceWorkerPlugin(): Plugin {
   let outDir = path.resolve(root, "dist");
 
   return {
-    name: "toonspectrum-service-worker",
+    name: "toonstudio-service-worker",
     apply: "build",
     configResolved(config) {
       root = config.root;
@@ -501,7 +501,7 @@ function studioServiceWorkerPlugin(): Plugin {
               "src/app/service-worker/studio-service-worker-entry.ts",
             ),
             formats: ["iife"],
-            name: "toonspectrumServiceWorker",
+            name: "toonstudioServiceWorker",
             fileName: () => "sw.js",
           },
         },
@@ -567,14 +567,14 @@ export default defineConfig(({ command, mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(webRoot, "src"),
-      "@toonspectrum/core/creator-role": path.resolve(repositoryRoot, "packages/core/src/creator-role.ts"),
+      "@toonstudio/core/creator-role": path.resolve(repositoryRoot, "packages/core/src/creator-role.ts"),
       ...(command === "serve"
         ? {
             // Vite 8.0.16 skips CommonJS named-import interop when React Compiler injects
             // react/compiler-runtime into an optimized dependency. Keep this dev-only shim
             // until Vite >=8.2.0 (vitejs/vite#23029) is the repository's locked version.
             "react/compiler-runtime": reactCompilerRuntimeInteropModule,
-            "@toonspectrum/react-compiler-runtime-cjs": reactCompilerRuntimeCommonJsModule,
+            "@toonstudio/react-compiler-runtime-cjs": reactCompilerRuntimeCommonJsModule,
           }
         : {}),
     },

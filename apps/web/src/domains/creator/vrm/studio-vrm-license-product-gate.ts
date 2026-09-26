@@ -39,7 +39,7 @@ export interface StudioVrmLicensePresentation {
 export type StudioVrmAttestedContentClassification = "absent" | "present" | "unknown";
 
 export interface StudioVrmRenderedPoseUseContextReceipt {
-  readonly schema: "toonspectrum.vrm-rendered-pose-use-context";
+  readonly schema: "toonstudio.vrm-rendered-pose-use-context";
   readonly version: 1;
   /** This receipt is created only after the user explicitly confirms every field in the share UI. */
   readonly confirmedByUser: true;
@@ -78,7 +78,7 @@ export interface StudioVrmRenderedPoseUseContextInput {
 }
 
 export interface StudioVrmProjectArchiveUseContextReceipt {
-  readonly schema: "toonspectrum.vrm-project-archive-use-context";
+  readonly schema: "toonstudio.vrm-project-archive-use-context";
   readonly version: 1;
   readonly confirmedByUser: true;
   readonly actorIdentity: {
@@ -112,7 +112,7 @@ export interface StudioVrmProjectArchiveUseContextInput {
 export type StudioVrmProjectArchiveAttestationPlan =
   | {
       readonly ok: true;
-      readonly schema: "toonspectrum.vrm-project-archive-attestation-plan";
+      readonly schema: "toonstudio.vrm-project-archive-attestation-plan";
       readonly version: 1;
       readonly modelCount: number;
       readonly exactAttributionTexts: readonly string[];
@@ -130,11 +130,11 @@ export type StudioVrmProjectArchiveAttestationPlan =
 export interface StudioVrmRenderedPoseMarketplaceShareContext {
   readonly useContextReceipt: StudioVrmRenderedPoseUseContextReceipt | null;
   /**
-   * Explicit structural grant for the ToonSpectrum platform license representation. It is valid
+   * Explicit structural grant for the ToonStudio platform license representation. It is valid
    * only for a rendered pose artifact that contains no original/modified VRM binary.
    */
-  readonly toonspectrumRenderedPoseGrant?: {
-    readonly schema: "toonspectrum.rendered-pose-platform-grant";
+  readonly toonstudioRenderedPoseGrant?: {
+    readonly schema: "toonstudio.rendered-pose-platform-grant";
     readonly version: 1;
     readonly renderedPoseOnly: true;
     readonly originalVrmBytesExcluded: true;
@@ -144,7 +144,7 @@ export interface StudioVrmRenderedPoseMarketplaceShareContext {
 export type StudioVrmRenderedPoseMarketplaceAttestationPlan =
   | {
       readonly ok: true;
-      readonly schema: "toonspectrum.vrm-rendered-pose-attestation-plan";
+      readonly schema: "toonstudio.vrm-rendered-pose-attestation-plan";
       readonly version: 1;
       /** Exact text the user must see and confirm before creating the use-context receipt. */
       readonly attributionText: string;
@@ -162,7 +162,7 @@ export type StudioVrmRenderedPoseMarketplaceAttestationPlan =
     };
 
 export const STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT = Object.freeze({
-  schema: "toonspectrum.rendered-pose-platform-grant" as const,
+  schema: "toonstudio.rendered-pose-platform-grant" as const,
   version: 1 as const,
   renderedPoseOnly: true as const,
   originalVrmBytesExcluded: true as const,
@@ -268,7 +268,7 @@ export function createStudioVrmRenderedPoseUseContextReceipt(
     throw new TypeError("VRM 포즈 공유 이용 맥락 확인값이 올바르지 않습니다.");
   }
   return deepFreeze({
-    schema: "toonspectrum.vrm-rendered-pose-use-context" as const,
+    schema: "toonstudio.vrm-rendered-pose-use-context" as const,
     version: 1 as const,
     confirmedByUser: true as const,
     actorIdentity: {
@@ -300,7 +300,7 @@ function isStudioVrmRenderedPoseUseContextReceipt(
   const actorIdentity = receipt.actorIdentity;
   const attribution = receipt.attribution;
   const content = receipt.content;
-  return receipt.schema === "toonspectrum.vrm-rendered-pose-use-context"
+  return receipt.schema === "toonstudio.vrm-rendered-pose-use-context"
     && receipt.version === 1
     && receipt.confirmedByUser === true
     && actorIdentity?.verification === "user-attested"
@@ -327,7 +327,7 @@ function isStudioVrmProjectArchiveUseContextReceipt(
   const receipt = value as Partial<StudioVrmProjectArchiveUseContextReceipt>;
   const actorIdentity = receipt.actorIdentity;
   const content = receipt.content;
-  return receipt.schema === "toonspectrum.vrm-project-archive-use-context"
+  return receipt.schema === "toonstudio.vrm-project-archive-use-context"
     && receipt.version === 1
     && receipt.confirmedByUser === true
     && actorIdentity?.verification === "user-attested"
@@ -357,7 +357,7 @@ export function createStudioVrmProjectArchiveUseContextReceipt(
     throw new TypeError("VRM archive 이용 맥락 확인값이 올바르지 않습니다.");
   }
   return deepFreeze({
-    schema: "toonspectrum.vrm-project-archive-use-context" as const,
+    schema: "toonstudio.vrm-project-archive-use-context" as const,
     version: 1 as const,
     confirmedByUser: true as const,
     actorIdentity: {
@@ -460,7 +460,7 @@ function unknownPolicy(
         };
   const decision = failClosed ? "block" as const : local ? "warn" as const : "unknown" as const;
   return deepFreeze({
-    schema: "toonspectrum.vrm-license-action-policy" as const,
+    schema: "toonstudio.vrm-license-action-policy" as const,
     version: 1 as const,
     action,
     decision,
@@ -518,13 +518,13 @@ function platformLicenseForRenderedPose(
   // that the shared artifact is a rendered pose and contains no VRM bytes.
   if (
     receipt.licenseIdentifier === "VRM-Public-License-1.0"
-    && context.toonspectrumRenderedPoseGrant?.schema
-      === "toonspectrum.rendered-pose-platform-grant"
-    && context.toonspectrumRenderedPoseGrant.version === 1
-    && context.toonspectrumRenderedPoseGrant.renderedPoseOnly === true
-    && context.toonspectrumRenderedPoseGrant.originalVrmBytesExcluded === true
+    && context.toonstudioRenderedPoseGrant?.schema
+      === "toonstudio.rendered-pose-platform-grant"
+    && context.toonstudioRenderedPoseGrant.version === 1
+    && context.toonstudioRenderedPoseGrant.renderedPoseOnly === true
+    && context.toonstudioRenderedPoseGrant.originalVrmBytesExcluded === true
   ) {
-    return "toonspectrum-standard";
+    return "toonstudio-standard";
   }
   return null;
 }
@@ -600,7 +600,7 @@ export function prepareStudioVrmProjectArchiveAttestation(
   }
   return deepFreeze({
     ok: true as const,
-    schema: "toonspectrum.vrm-project-archive-attestation-plan" as const,
+    schema: "toonstudio.vrm-project-archive-attestation-plan" as const,
     version: 1 as const,
     modelCount: authorities.length,
     exactAttributionTexts,
@@ -640,7 +640,7 @@ export function prepareStudioVrmRenderedPoseMarketplaceAttestation(
   }
   return deepFreeze({
     ok: true as const,
-    schema: "toonspectrum.vrm-rendered-pose-attestation-plan" as const,
+    schema: "toonstudio.vrm-rendered-pose-attestation-plan" as const,
     version: 1 as const,
     attributionText,
     creditRequired: authority.receipt.credit === "required",

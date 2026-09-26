@@ -25,7 +25,7 @@ import {
 import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_LIVING_INK_FIELD_VERSION = 1 as const;
-export const STUDIO_LIVING_INK_FIELD_KIND = "toonspectrum.living-ink-field" as const;
+export const STUDIO_LIVING_INK_FIELD_KIND = "toonstudio.living-ink-field" as const;
 /** Shared Beer-Lambert extinction used by both the CPU snapshot oracle and WebGL2 display/fix. */
 export const STUDIO_LIVING_INK_WHITE_GOUACHE_EXTINCTION = 2.35 as const;
 export const STUDIO_LIVING_INK_WHITE_GOUACHE_LOAD_GAIN = 2.4 as const;

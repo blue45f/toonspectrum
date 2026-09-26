@@ -36,10 +36,10 @@ import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness
 
 const SCRATCH = process.env.TOONSPECTRUM_MOBILE_TOP_VERIFY_DIR ??
   process.env.TOONSPECTRUM_VERIFY_DIR ??
-  join(tmpdir(), "toonspectrum-studio-mobile-top");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const IMMERSIVE_SESSION_KEY = "toonspectrum-studio-mobile-immersive:v1";
+  join(tmpdir(), "toonstudio-studio-mobile-top");
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const IMMERSIVE_SESSION_KEY = "toonstudio-studio-mobile-immersive:v1";
 const MOBILE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 " +
   "(KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -738,7 +738,7 @@ async function runMode(
       // headless Chromium host whose navigator.language is en-US does not translate the same
       // accessible navigation landmark to "Studio mobile toolbar" before we query it.
       window.localStorage.setItem(
-        "toonspectrum-lang",
+        "toonstudio-lang",
         JSON.stringify({ state: { lang: "ko" }, version: 0 }),
       );
       window.sessionStorage.setItem(immersiveKey, immersiveValue);

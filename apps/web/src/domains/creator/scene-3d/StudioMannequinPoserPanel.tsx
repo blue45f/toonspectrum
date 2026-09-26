@@ -1285,7 +1285,7 @@ export function StudioMannequinPoserPanel({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `toonspectrum-mannequin-${Date.now()}.mannequin`;
+    a.download = `toonstudio-mannequin-${Date.now()}.mannequin`;
     a.click();
     URL.revokeObjectURL(url);
   }, []);

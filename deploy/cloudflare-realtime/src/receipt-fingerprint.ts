@@ -4,9 +4,9 @@ import type {
 } from "./protocol";
 
 const IDEMPOTENCY_FINGERPRINT_CONTEXT =
-  "toonspectrum/realtime-receipt/idempotency/v1\n";
+  "toonstudio/realtime-receipt/idempotency/v1\n";
 const REQUEST_FINGERPRINT_CONTEXT =
-  "toonspectrum/realtime-receipt/request/v1\n";
+  "toonstudio/realtime-receipt/request/v1\n";
 
 export interface PublishReceiptFingerprintInput {
   readonly idempotencyKey: string;

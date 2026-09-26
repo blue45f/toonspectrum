@@ -99,7 +99,7 @@ WebGPU를 고른 아티스트라도 캐릭터를 조용히 다시 그레이딩�
 캐릭터가 없는 장면은 WebGPU로 돌 수 있다. 거기에 캐릭터를 넣으면 `vrmCharacters`가 래치되고,
 plan이 baseline으로 바뀌면서 **canvas가 remount된다.**
 
-이게 안전한 것은 [#43](https://github.com/blue45f/toonspectrum/pull/43)이 먼저 들어갔기 때문이다.
+이게 안전한 것은 [#43](https://github.com/blue45f/toonstudio/pull/43)이 먼저 들어갔기 때문이다.
 그 전이라면 remount가 초기 장면 복원을 다시 돌려 아티스트의 편집을 조용히 날렸을 것이다. 지금은
 모달 세션과 초기 장면이 그대로이므로 remount 분기를 타고 모델 캐시만 다시 채운다. 히스토리·
 프리미티브·문서는 유지된다.

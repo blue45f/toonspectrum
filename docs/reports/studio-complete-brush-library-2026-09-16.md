@@ -59,7 +59,7 @@ Those capabilities are the comparison axes, not a marketing-only brush count:
 - <https://help.clip-studio.com/en-us/manual_en/810_subtools/Number.htm>
 - <https://help.clip-studio.com/en-us/>
 
-ToonSpectrum's automated evidence currently gates texture fidelity, hand feel, live/committed stroke
+ToonStudio's automated evidence currently gates texture fidelity, hand feel, live/committed stroke
 consistency, geometry fidelity, performance, memory stability, runtime-route distinctness,
 deterministic output, and picker selectability. The change in this report proves breadth and
 reachability; it does not claim an independently verified absolute visual-quality win over another

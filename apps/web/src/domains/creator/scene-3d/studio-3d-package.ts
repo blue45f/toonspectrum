@@ -1,7 +1,7 @@
 /**
  * Native .toon3d Project Archive & Interchange Format
  *
- * ToonSpectrum의 공식 3D 웹툰 저작 프로젝트 포맷(.toon3d)입니다.
+ * ToonStudio의 공식 3D 웹툰 저작 프로젝트 포맷(.toon3d)입니다.
  * 3D 장면 그래프, 편집 가능 메시, B-Rep CAD 피처, VRM 캐릭터 포즈,
  * 다중 컷(Multi-Shot) 오버라이드, Live 2D↔3D Linked Ink, Rights BOM 및
  * NPR 툰 렌더 프로필을 완벽히 캡슐화합니다.
@@ -30,7 +30,7 @@ export interface Toon3DManifest {
     max: [number, number, number];
   };
   application: {
-    name: "ToonSpectrum";
+    name: "ToonStudio";
     engine: "Hybrid 3D DCC v2";
   };
 }
@@ -129,7 +129,7 @@ export function createEmptyToon3DPackage(
         max: [10, 5, 10],
       },
       application: {
-        name: "ToonSpectrum",
+        name: "ToonStudio",
         engine: "Hybrid 3D DCC v2",
       },
     },

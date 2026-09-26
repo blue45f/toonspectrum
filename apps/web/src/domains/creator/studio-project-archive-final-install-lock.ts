@@ -8,7 +8,7 @@
  */
 
 export const STUDIO_PROJECT_ARCHIVE_FINAL_INSTALL_LOCK_NAME =
-  "toonspectrum-studio-project-archive:final-install-v1";
+  "toonstudio-studio-project-archive:final-install-v1";
 
 export interface StudioProjectArchiveFinalInstallLockManagerLike {
   request<T>(

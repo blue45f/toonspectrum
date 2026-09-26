@@ -43,18 +43,18 @@ import { preview, type PreviewServer } from "vite";
 import { DIST_DIR } from "./lib/repo-paths.mjs";
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
-const LANGUAGE_KEY = "toonspectrum-lang";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const IMMERSIVE_SESSION_KEY = "toonspectrum-studio-mobile-immersive:v1";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const UI_DENSITY_KEY = "toonstudio-studio-ui-density:v1";
+const LANGUAGE_KEY = "toonstudio-lang";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const IMMERSIVE_SESSION_KEY = "toonstudio-studio-mobile-immersive:v1";
 const MOBILE_UA =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
 const SCRATCH =
   process.env.TOONSPECTRUM_INSPECTOR_WALKTHROUGH_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-inspector-walkthrough");
+  ?? join(tmpdir(), "toonstudio-studio-inspector-walkthrough");
 
 const PANEL = '[data-studio-sheet-id="props"]';
 const NAVIGATOR = '[data-testid="studio-inspector-navigator"]';

@@ -57,7 +57,7 @@ import {
   type SupporterTossPayment,
 } from "./supporter-toss.provider";
 
-const ORDER_NAME = "ToonSpectrum 운영비 후원";
+const ORDER_NAME = "ToonStudio 운영비 후원";
 const ORDER_WINDOW_MS = 10 * 60 * 1000;
 const MAX_ORDERS_PER_WINDOW = 300;
 const PUBLIC_WALL_LIMIT = 24;

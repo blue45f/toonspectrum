@@ -110,7 +110,7 @@ function makePackage(slug: string, name: string, summary: string, drawings: read
     category: slug === "architecture" ? "배경·건축" : "거리·생활 소품",
     tags: ["무료", "건축", "거리", "실내", "일상", "벡터"],
     kind: "vector-asset", access: "free", accessLabel: "무료", origin: "original-procedural",
-    creator: { id: "toonspectrum-lab", name: "ToonSpectrum Lab", verified: true },
+    creator: { id: "toonstudio-lab", name: "ToonStudio Lab", verified: true },
     version: "1.0.0", packageFingerprint: `original-pack:quality-20260913:${slug}:1.0.0`,
     compatibility: { studioVersion: ">=1.0.0", renderer: ["canvas2d", "svg"] as const, devices: ["desktop", "tablet", "mobile"] as const, formats: ["image/svg+xml"] },
     license: STUDIO_ORIGINAL_FREE_ASSET_LICENSE, includedItems,

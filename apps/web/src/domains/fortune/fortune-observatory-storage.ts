@@ -1,4 +1,4 @@
-import { FORTUNE_EXPERIENCES } from "@toonspectrum/core/fortune";
+import { FORTUNE_EXPERIENCES } from "@toonstudio/core/fortune";
 
 const KEY = "toonstudio-fortune-observatory-v1";
 function preferenceKey(accountId?: string | null): string {

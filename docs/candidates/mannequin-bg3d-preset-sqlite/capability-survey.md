@@ -45,7 +45,7 @@ quality gates remain owned by their engine lanes.
 ## Production browser verdict
 
 Chromium 140 loaded the minified Vite build in a module Dedicated Worker, opened only the shared
-`toonspectrum-studio-sqlite/studio-local-v12.db` SAH-pool authority, and completed 100 saves plus
+`toonstudio-studio-sqlite/studio-local-v12.db` SAH-pool authority, and completed 100 saves plus
 100 loads for each maximum canonical fixture. The 1,307-byte mannequin row and 28,447-byte LT row
 retained exact canonical SHA-256 values through graceful close/reopen and through forced Worker
 termination followed by a new Worker. Memory VFS opens and localStorage reads/writes/fallbacks were

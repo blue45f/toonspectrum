@@ -158,7 +158,7 @@ export function LearningClassroomPage() {
       setCurriculumWeek(1);
       setCurriculumContent("");
     } catch {
-      setWarning("수업 계획을 가져오지 못했습니다. ToonSpectrum Classroom JSON 형식을 확인하세요.");
+      setWarning("수업 계획을 가져오지 못했습니다. ToonStudio Classroom JSON 형식을 확인하세요.");
     }
   }
 
@@ -245,7 +245,7 @@ export function LearningClassroomPage() {
           <label htmlFor="academy-curriculum-content">강좌·자료
             <select id="academy-curriculum-content" required value={curriculumContent} onChange={(event) => setCurriculumContent(event.currentTarget.value)}>
               <option value="">추가할 항목 선택</option>
-              <optgroup label="ToonSpectrum 자체 강좌">
+              <optgroup label="ToonStudio 자체 강좌">
                 {LESSONS.map((lesson) => <option key={lesson.id} value={`lesson:${lesson.id}`}>{lesson.title}</option>)}
               </optgroup>
               <optgroup label="큐레이션 학습 자료">

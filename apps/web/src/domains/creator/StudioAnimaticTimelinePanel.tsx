@@ -545,7 +545,7 @@ export function StudioAnimaticTimelinePanel({
     );
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "toonspectrum-animatic-v1.json";
+    anchor.download = "toonstudio-animatic-v1.json";
     anchor.click();
     URL.revokeObjectURL(url);
     setNotice({

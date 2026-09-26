@@ -1,6 +1,6 @@
 import { renderSceneToCanvas, type RenderOptions } from "./render";
 
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 import type {
   CanvasKit,
   GrDirectContext,

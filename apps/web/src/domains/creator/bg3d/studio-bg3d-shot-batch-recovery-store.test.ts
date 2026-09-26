@@ -900,7 +900,7 @@ describe("Studio BG3D durable shot-batch recovery", () => {
     ) {
       if (rejectFirstArtifactAdd &&
         (value as { readonly kind?: unknown })?.kind ===
-          "toonspectrum-bg3d-shot-batch-shot-artifacts") {
+          "toonstudio-bg3d-shot-batch-shot-artifacts") {
         rejectFirstArtifactAdd = false;
         throw new DOMException("simulated quota boundary", "QuotaExceededError");
       }

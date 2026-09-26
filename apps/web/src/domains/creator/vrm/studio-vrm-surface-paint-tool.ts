@@ -11,7 +11,7 @@
  * alternate provider or tool can be selected only for a later operation by an explicit caller.
  */
 
-import { modelRawInput } from "@toonspectrum/studio-brush-platform";
+import { modelRawInput } from "@toonstudio/studio-brush-platform";
 
 import {
   executeStudioVrmSurfaceBrushStroke,
@@ -28,7 +28,7 @@ import type {
   DeviceCalibrationIR,
   RawInputSampleIR,
   StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 export const STUDIO_VRM_SURFACE_PAINT_TOOL_ID = "studio-vrm-surface-round-v12";
 export const STUDIO_VRM_SURFACE_PAINT_PROVIDER_ID = "three-vrm-texture-paint";

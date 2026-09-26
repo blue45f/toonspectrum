@@ -161,6 +161,6 @@ VALUES ('0017_creator_work_live_lock_revision', statement_timestamp())
 ON CONFLICT ("id") DO NOTHING;
 
 COMMENT ON COLUMN "creator_work_live_lock"."revision" IS
-  'ToonSpectrum live-lock revision v1 cutover complete';
+  'ToonStudio live-lock revision v1 cutover complete';
 
 COMMIT;

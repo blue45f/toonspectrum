@@ -1,5 +1,5 @@
 ---
-description: ToonSpectrum 저장소 정책을 따르는 기본 구현 에이전트
+description: ToonStudio 저장소 정책을 따르는 기본 구현 에이전트
 mode: primary
 temperature: 0.2
 ---

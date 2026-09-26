@@ -4,7 +4,7 @@
 
 V7의 목표는 브러시 수를 단순히 늘리는 것이 아니라 같은 획이라도 재료와 바탕의 물리적 상호작용이 달라지는 시스템을 만드는 것이다.
 Clip Studio Paint의 brush tip, spray, stroke, texture, dual brush, watercolor edge, input dynamics를 기본 경쟁선으로 둔다.
-ToonSpectrum은 다음 세 축을 핵심 차별점으로 사용한다.
+ToonStudio은 다음 세 축을 핵심 차별점으로 사용한다.
 
 1. 문서 좌표에 고정된 다채널 표면 미세구조(microstructure)
 2. 건식·습식·유화·마커가 동일 표면을 서로 다르게 해석하는 material-contact solver

@@ -1,4 +1,4 @@
-import { playSfx, triggerParticleBurst } from "@toonspectrum/core/fx";
+import { playSfx, triggerParticleBurst } from "@toonstudio/core/fx";
 
 import { AvailabilityDots, PlatformTags } from "./availability";
 import { bestPricing } from "./availability-utils";

@@ -430,7 +430,7 @@ export function StudioVirtualSpacePhaserCanvas({
       const Phaser = await import("phaser");
       if (cancelled || !mount.isConnected) return;
 
-      const scene = new Phaser.Scene("ToonSpectrumVirtualStudio") as import("phaser").Scene & {
+      const scene = new Phaser.Scene("ToonStudioVirtualStudio") as import("phaser").Scene & {
         preload: () => void;
         create: () => void;
         update: (time: number, deltaMs: number) => void;

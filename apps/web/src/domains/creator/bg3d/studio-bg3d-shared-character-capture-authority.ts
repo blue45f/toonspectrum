@@ -1,9 +1,9 @@
 import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_BG3D_SHARED_CHARACTER_CAPTURE_AUTHORITY_SNAPSHOT_KIND =
-  "toonspectrum.studio-bg3d-shared-character-capture-authority-snapshot" as const;
+  "toonstudio.studio-bg3d-shared-character-capture-authority-snapshot" as const;
 export const STUDIO_BG3D_SHARED_CHARACTER_CAPTURE_AUTHORITY_LEASE_KIND =
-  "toonspectrum.studio-bg3d-shared-character-capture-authority-lease" as const;
+  "toonstudio.studio-bg3d-shared-character-capture-authority-lease" as const;
 export const STUDIO_BG3D_SHARED_CHARACTER_CAPTURE_AUTHORITY_VERSION = 1 as const;
 export const STUDIO_BG3D_SHARED_CHARACTER_CAPTURE_AUTHORITY_MAX_CHARACTERS = 12;
 

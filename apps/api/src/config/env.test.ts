@@ -335,7 +335,7 @@ describe("Studio live cluster environment validation", () => {
         NODE_ENV: "test",
         STUDIO_LIVE_CLUSTER_ADAPTER: "postgres",
         STUDIO_LIVE_POSTGRES_URL:
-          "postgresql://artist:secret@ep-direct.example.net/toonspectrum?sslmode=require",
+          "postgresql://artist:secret@ep-direct.example.net/toonstudio?sslmode=require",
         STUDIO_LIVE_POSTGRES_POOL_MAX: "4",
         STUDIO_LIVE_POSTGRES_INLINE_BINARY_ENABLED: "false",
       },
@@ -401,9 +401,9 @@ describe("Studio realtime ticket environment validation", () => {
         STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID:
           "cloudflare-realtime-v1",
         STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER:
-          "toonspectrum-api",
+          "toonstudio-api",
         STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE:
-          "toonspectrum-realtime",
+          "toonstudio-realtime",
         STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET:
           "test-only-ticket-secret-with-at-least-32-bytes",
         STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS: "120",

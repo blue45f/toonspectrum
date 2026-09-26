@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "generatedAt": "2026-09-08T13:59:44.874131+00:00",
   "inventory": {
-    "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/initial-inventory.json",
+    "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/initial-inventory.json",
     "sha256": "59444624b06b20101d5eda7e5d7123e2a388bb100e37f6babec99cdca1581459",
     "capturedAt": "2026-09-08T13:40:19.231706+00:00",
     "expectedRecords": 55,
@@ -11,7 +11,7 @@
   },
   "frozenMain": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
   "reviewedIntegration": {
-    "repository": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908",
+    "repository": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908",
     "branch": "codex/integrate-unmerged-20260908",
     "head": "7b28f85965df3a50bd1304f34c7502061cadf68f",
     "tree": "2f813fa0d1275019ead396da609c5a2862f02114",
@@ -25,9 +25,9 @@
     "baseline": "Frozen main or prior integration ref at same exact main SHA."
   },
   "auditSources": {
-    "product": "/tmp/toonspectrum-all-unmerged-product-a1.json",
-    "backups": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
-    "remote": "/tmp/toonspectrum-all-unmerged-remote-a1.json"
+    "product": "/tmp/toonstudio-all-unmerged-product-a1.json",
+    "backups": "/tmp/toonstudio-all-unmerged-backups-a1.json",
+    "remote": "/tmp/toonstudio-all-unmerged-remote-a1.json"
   },
   "coverage": {
     "recordCount": 55,
@@ -385,7 +385,7 @@
       "audit": [
         {
           "id": "product",
-          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-product-a1.json",
           "pointer": "/branches/0",
           "auditedBranch": "codex/fix-dry-media-paper-admission-31d",
           "auditedSha": "4442e6f5b0f52ef9615cfea00b2168a166ad0c47",
@@ -421,7 +421,7 @@
       "audit": [
         {
           "id": "product",
-          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-product-a1.json",
           "pointer": "/branches/1",
           "auditedBranch": "codex/fix-released-autosave-lease-93cd716a",
           "auditedSha": "7855da93445cf64096d5941256b9f8ef2426d8ff",
@@ -468,7 +468,7 @@
       "audit": [
         {
           "id": "product",
-          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-product-a1.json",
           "pointer": "/branches/2",
           "auditedBranch": "codex/fix-salvage-crdt-bundle-20260908",
           "auditedSha": "0ef38c4440a507f5e1d3a11d878c935773f116a4",
@@ -501,7 +501,7 @@
       "audit": [
         {
           "id": "product",
-          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-product-a1.json",
           "pointer": "/branches/3",
           "auditedBranch": "codex/issues-smart-shape-20260908",
           "auditedSha": "11098a2f3f425e013df792606fb5d9e5b7d73a1a",
@@ -548,7 +548,7 @@
       "audit": [
         {
           "id": "product",
-          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-product-a1.json",
           "pointer": "/branches/4",
           "auditedBranch": "codex/local-first-reviewed-70742bc6",
           "auditedSha": "70742bc66b291bdbeb04794373254fb10a989b80",
@@ -590,7 +590,7 @@
       "audit": [
         {
           "id": "product",
-          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-product-a1.json",
           "pointer": "/branches/5",
           "auditedBranch": "codex/pr937-final-review-20260908",
           "auditedSha": "bb9ff8924552bcc4b5b9d4b7368c4bf37fdd5938",
@@ -623,7 +623,7 @@
       "audit": [
         {
           "id": "product",
-          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-product-a1.json",
           "pointer": "/branches/6",
           "auditedBranch": "codex/studio-asset-regression-proof-2751a059",
           "auditedSha": "2751a059bdac4a2d4f70bdac8d931b26f290bf09",
@@ -660,7 +660,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/25",
           "auditedBranch": "release/salvage-integration-20260908",
           "auditedSha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
@@ -688,7 +688,7 @@
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/0",
           "auditedBranch": "salvage/codex/cpu-poc314",
           "auditedSha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
@@ -730,7 +730,7 @@
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/1",
           "auditedBranch": "salvage/codex/issues-bg3d-viewport-origin-20260908",
           "auditedSha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
@@ -770,7 +770,7 @@
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/2",
           "auditedBranch": "salvage/codex/issues-smart-shape-20260908",
           "auditedSha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
@@ -810,7 +810,7 @@
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/3",
           "auditedBranch": "salvage/codex/pr944-painttube-ab315",
           "auditedSha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
@@ -841,20 +841,20 @@
     {
       "index": 13,
       "kind": "local",
-      "ref": "refs/heads/salvage/toonspectrum-arch",
+      "ref": "refs/heads/salvage/toonstudio-arch",
       "sha": "0a630760455ad6ddc70e038caf86224861d42b1c",
       "classification": "archived-experiment",
       "source": {
-        "branch": "salvage/toonspectrum-arch",
+        "branch": "salvage/toonstudio-arch",
         "sha": "0a630760455ad6ddc70e038caf86224861d42b1c",
         "snapshotParent": "b6ad9db34b9b1d5c2567095aa7294449f2099fdb"
       },
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/4",
-          "auditedBranch": "salvage/toonspectrum-arch",
+          "auditedBranch": "salvage/toonstudio-arch",
           "auditedSha": "0a630760455ad6ddc70e038caf86224861d42b1c",
           "exactShaMatch": true
         }
@@ -889,20 +889,20 @@
     {
       "index": 14,
       "kind": "local",
-      "ref": "refs/heads/salvage/toonspectrum-main-diag",
+      "ref": "refs/heads/salvage/toonstudio-main-diag",
       "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
       "classification": "archived-experiment",
       "source": {
-        "branch": "salvage/toonspectrum-main-diag",
+        "branch": "salvage/toonstudio-main-diag",
         "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
         "snapshotParent": "02fc857ce09af00f9ad1c4757e174ff4eb320e42"
       },
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/5",
-          "auditedBranch": "salvage/toonspectrum-main-diag",
+          "auditedBranch": "salvage/toonstudio-main-diag",
           "auditedSha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
           "exactShaMatch": true
         }
@@ -943,7 +943,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/0",
           "auditedBranch": "automation/final-dependency-remediation-20260908",
           "auditedSha": "d17dd5fcb8b3f9e8339f489a4115f9d28e36d420",
@@ -977,7 +977,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/1",
           "auditedBranch": "automation/finalize-pr931-20260908-v4",
           "auditedSha": "75308848b402f1449682713486e48dbfd7ac35cb",
@@ -1011,7 +1011,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/2",
           "auditedBranch": "automation/free-actions-for-pr931-20260908",
           "auditedSha": "2495556e9572e006bc97d5dde246a3a9ee3d6dc2",
@@ -1045,7 +1045,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/3",
           "auditedBranch": "automation/merge-pr931-after-core-20260908-v2",
           "auditedSha": "aecc041f9ad5f065d9e3ff9a7a7fdd840c2c2fda",
@@ -1079,7 +1079,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/4",
           "auditedBranch": "automation/verify-dependabot-main-20260908-v3",
           "auditedSha": "d2b07e11b97bd20463a56c3d40f44392124311db",
@@ -1113,7 +1113,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/5",
           "auditedBranch": "ci/actions-queue-dedupe-20260908",
           "auditedSha": "5e84ad99f11d6e72b33b9e5e68520dda8a323f75",
@@ -1150,7 +1150,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/6",
           "auditedBranch": "ci/diagnose-pr900-integration-20260908",
           "auditedSha": "1331875ea9a08afc60c2c4895602df61390bf7f2",
@@ -1184,7 +1184,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/7",
           "auditedBranch": "ci/isolate-pr917-runs-20260908",
           "auditedSha": "7477c652a5f1d332db1370b10751b7f378961c96",
@@ -1218,7 +1218,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/8",
           "auditedBranch": "ci/isolate-pr917-slim-20260908",
           "auditedSha": "52de7e5565d8f1d39400792ba742d57d5de2c141",
@@ -1252,7 +1252,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/9",
           "auditedBranch": "ci/repair-cancelled-verify-gate-20260908",
           "auditedSha": "193eff0193f720a9ed534b5ccada55277cb8ad8d",
@@ -1286,7 +1286,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/10",
           "auditedBranch": "codex/code-scanning-remediation-20260908",
           "auditedSha": "84353b01630f4ace7e832642a8e32d7891c87de4",
@@ -1344,7 +1344,7 @@
       "audit": [
         {
           "id": "product",
-          "file": "/tmp/toonspectrum-all-unmerged-product-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-product-a1.json",
           "pointer": "/branches/2",
           "auditedBranch": "codex/fix-salvage-crdt-bundle-20260908",
           "auditedSha": "0ef38c4440a507f5e1d3a11d878c935773f116a4",
@@ -1377,7 +1377,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/11",
           "auditedBranch": "diagnostics/codeql-pr919-20260908",
           "auditedSha": "35caeb41d7e12aad5965f4fa4050fe08df331e07",
@@ -1411,7 +1411,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/12",
           "auditedBranch": "fix/code-scanning-alerts-20260908",
           "auditedSha": "d779047b103e76220975954736f8412b8378b72a",
@@ -1445,7 +1445,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/13",
           "auditedBranch": "fix/lift3d-preview-tab-touch-targets-20260908",
           "auditedSha": "7f6901907eb6e7e9fe0faba4c5ff3420d745a14a",
@@ -1482,7 +1482,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/25",
           "auditedBranch": "release/salvage-integration-20260908",
           "auditedSha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
@@ -1510,7 +1510,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/14",
           "auditedBranch": "ops/finalize-all-open-prs-20260908",
           "auditedSha": "a7e231014885a787ca38661b5df49cb2b9ba6244",
@@ -1544,7 +1544,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/15",
           "auditedBranch": "ops/force-cancel-stale-ci-3522-20260908",
           "auditedSha": "6b2986c4de8d3555913a1d5b73c59646a911a151",
@@ -1578,7 +1578,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/16",
           "auditedBranch": "ops/pr900-priority-20260908",
           "auditedSha": "327c267641df98d14f64616f840af6154628f38f",
@@ -1612,7 +1612,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/17",
           "auditedBranch": "ops/pr907-apply-lint-20260908-v2",
           "auditedSha": "4f790925897d491496feccc8991839279a24401b",
@@ -1646,7 +1646,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/18",
           "auditedBranch": "ops/pr907-converge-20260908-v2",
           "auditedSha": "c746e2d8b3fcc5091fcc2f27957c7541c9e97426",
@@ -1680,7 +1680,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/19",
           "auditedBranch": "ops/pr917-priority-20260908",
           "auditedSha": "74c205ab01abc2cd08467fb4d32f7c57f1b6a88a",
@@ -1714,7 +1714,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/20",
           "auditedBranch": "qa/verify-and-close-open-soak-20260908",
           "auditedSha": "896b780b5ef2dd9570c4575b614fffb84f7e5f7e",
@@ -1748,7 +1748,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/21",
           "auditedBranch": "release/final-all-work-pr900-20260908",
           "auditedSha": "51922c7f2a0546f4bed8f2983a71bed90a4ae1b8",
@@ -1786,7 +1786,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/22",
           "auditedBranch": "release/final-df46fece-20260908-1908",
           "auditedSha": "f800880a47260f41985ad99ea2d8f87937d3a602",
@@ -1822,7 +1822,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/23",
           "auditedBranch": "release/final-main-merge-4888b061-immutable-20260908",
           "auditedSha": "7f25e172a0f3382b634916d1b043e12fd887bc8e",
@@ -1856,7 +1856,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/24",
           "auditedBranch": "release/final-pr911-df7fdd87-20260908",
           "auditedSha": "f4b5eaebba88c9514f180862ffef081efd18d181",
@@ -1890,7 +1890,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/25",
           "auditedBranch": "release/salvage-integration-20260908",
           "auditedSha": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
@@ -1918,7 +1918,7 @@
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/0",
           "auditedBranch": "salvage/codex/cpu-poc314",
           "auditedSha": "e2913a9105e39136c0a6192fb2889766d9008bd3",
@@ -1960,7 +1960,7 @@
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/1",
           "auditedBranch": "salvage/codex/issues-bg3d-viewport-origin-20260908",
           "auditedSha": "c4ad158a043905a57a3bbfaf0a0373c2fef6c43c",
@@ -2000,7 +2000,7 @@
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/2",
           "auditedBranch": "salvage/codex/issues-smart-shape-20260908",
           "auditedSha": "3fabba274b196440435efb0bb1d35f808ed78e1f",
@@ -2040,7 +2040,7 @@
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/3",
           "auditedBranch": "salvage/codex/pr944-painttube-ab315",
           "auditedSha": "ca48da2cb00c1a2ccaccbeb1ce80bfab2a619412",
@@ -2071,20 +2071,20 @@
     {
       "index": 48,
       "kind": "remote",
-      "ref": "refs/heads/salvage/toonspectrum-arch",
+      "ref": "refs/heads/salvage/toonstudio-arch",
       "sha": "0a630760455ad6ddc70e038caf86224861d42b1c",
       "classification": "archived-experiment",
       "source": {
-        "branch": "salvage/toonspectrum-arch",
+        "branch": "salvage/toonstudio-arch",
         "sha": "0a630760455ad6ddc70e038caf86224861d42b1c",
         "snapshotParent": "b6ad9db34b9b1d5c2567095aa7294449f2099fdb"
       },
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/4",
-          "auditedBranch": "salvage/toonspectrum-arch",
+          "auditedBranch": "salvage/toonstudio-arch",
           "auditedSha": "0a630760455ad6ddc70e038caf86224861d42b1c",
           "exactShaMatch": true
         }
@@ -2119,20 +2119,20 @@
     {
       "index": 49,
       "kind": "remote",
-      "ref": "refs/heads/salvage/toonspectrum-main-diag",
+      "ref": "refs/heads/salvage/toonstudio-main-diag",
       "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
       "classification": "archived-experiment",
       "source": {
-        "branch": "salvage/toonspectrum-main-diag",
+        "branch": "salvage/toonstudio-main-diag",
         "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
         "snapshotParent": "02fc857ce09af00f9ad1c4757e174ff4eb320e42"
       },
       "audit": [
         {
           "id": "backups",
-          "file": "/tmp/toonspectrum-all-unmerged-backups-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-backups-a1.json",
           "pointer": "/branches/5",
-          "auditedBranch": "salvage/toonspectrum-main-diag",
+          "auditedBranch": "salvage/toonstudio-main-diag",
           "auditedSha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b",
           "exactShaMatch": true
         }
@@ -2173,7 +2173,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/26",
           "auditedBranch": "security/audit-pr919-77c107e-20260908",
           "auditedSha": "1066c5d9d87fba565a1cecfc4d9ed95e0927abb1",
@@ -2207,7 +2207,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/27",
           "auditedBranch": "security/code-scanning-audit-20260908",
           "auditedSha": "cf7db9e34511bddde51b5f03b12a83203a3e0b20",
@@ -2245,7 +2245,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/28",
           "auditedBranch": "security/code-scanning-remediation-20260908",
           "auditedSha": "13fdbbfe9e16f319b92461d7471d6514c0524ff9",
@@ -2279,7 +2279,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/29",
           "auditedBranch": "security/dependabot-main-remediation-20260908-v2",
           "auditedSha": "46bc95a8898b8eeded3db8df885529c638493f5f",
@@ -2313,7 +2313,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/30",
           "auditedBranch": "security/final-dependabot-remediation-20260908-v3",
           "auditedSha": "d865f15b1b70f09ef1198d17845979a64471707a",
@@ -2349,7 +2349,7 @@
       "audit": [
         {
           "id": "remote",
-          "file": "/tmp/toonspectrum-all-unmerged-remote-a1.json",
+          "file": "/tmp/toonstudio-all-unmerged-remote-a1.json",
           "pointer": "/branches/31",
           "auditedBranch": "security/secret-scanning-remediation",
           "auditedSha": "dd5636b59c1cc39fa6c0c81a132bb331abec240d",

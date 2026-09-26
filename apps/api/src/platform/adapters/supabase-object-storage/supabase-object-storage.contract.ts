@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION =
-  "toonspectrum.supabase-object-storage.v1" as const;
+  "toonstudio.supabase-object-storage.v1" as const;
 
 export const SupabaseObjectPurposeSchema = z.enum([
   "source",

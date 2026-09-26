@@ -12,7 +12,7 @@ V12는 로컬 저장을 다음 두 책임으로 나눈다.
                  ▼
 물리·질의 권위
   @sqlite.org/sqlite-wasm 3.53.0-build1
-  OPFS SAH-pool /toonspectrum-studio-sqlite/studio-local-v12.db
+  OPFS SAH-pool /toonstudio-studio-sqlite/studio-local-v12.db
 ```
 
 SQLite는 단순 파생 인덱스가 아니라 V12 로컬 제품 데이터의 물리 권위다. 그러나 SQLite 행에

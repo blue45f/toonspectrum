@@ -666,7 +666,7 @@ function validatePointerRingDescriptor(
       "sampleFloat64s",
       "sampleBytes",
     ])
-    || value.kind !== "toonspectrum-studio-pointer-spsc"
+    || value.kind !== "toonstudio-studio-pointer-spsc"
     || value.version !== STUDIO_SHARED_POINTER_RING_VERSION
     || value.headerBytes !== STUDIO_SHARED_POINTER_RING_HEADER_BYTES
     || value.sampleFloat64s !== STUDIO_SHARED_POINTER_RING_SAMPLE_FLOAT64S

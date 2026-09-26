@@ -1,6 +1,6 @@
 // 창작 작품(웹툰/컷툰) CRUD — 목록/상세/생성/수정/삭제와 연결 자산 검증.
 import { and, asc, desc, eq, gt, inArray, lt, lte, or, sql } from "drizzle-orm";
-import { readCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
+import { readCreatorPublicationSource } from "@toonstudio/contracts/creator-publication-integrity";
 
 import {
   assertStudioLinked3dPassAssetRows,

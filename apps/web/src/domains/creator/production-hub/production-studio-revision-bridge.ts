@@ -6,7 +6,7 @@ import {
   type RevisionRef,
   type ScopeRef as ProductionScopeRef,
   type Submission,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type {
   StudioProjectArtifactRecord,

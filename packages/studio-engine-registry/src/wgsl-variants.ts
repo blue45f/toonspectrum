@@ -6,7 +6,7 @@ import type { EngineCapabilityRegistry } from "./registry";
 import type {
   EffectGraphIR,
   EffectNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * WGSL variant compiler (V12 lane 5 `WESL_SHADER_PLATFORM` 재개 조건 1단계).
@@ -217,7 +217,7 @@ export interface WgslVariantShaderManifest {
     readonly pixelEquivalent: true;
   };
   readonly licenseProvenance: {
-    readonly spdx: "LicenseRef-ToonSpectrum-Proprietary";
+    readonly spdx: "LicenseRef-ToonStudio-Proprietary";
     readonly source: "ToonStudio deterministic WGSL variant composer";
     readonly generatedFrom: "EffectGraphIR color-operation subsequence";
   };
@@ -362,7 +362,7 @@ function buildShaderManifest(input: {
       pixelEquivalent: true,
     }),
     licenseProvenance: Object.freeze({
-      spdx: "LicenseRef-ToonSpectrum-Proprietary",
+      spdx: "LicenseRef-ToonStudio-Proprietary",
       source: "ToonStudio deterministic WGSL variant composer",
       generatedFrom: "EffectGraphIR color-operation subsequence",
     }),

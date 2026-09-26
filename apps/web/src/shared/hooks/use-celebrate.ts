@@ -1,4 +1,4 @@
-import { useFx, type SfxName } from "@toonspectrum/core/fx";
+import { useFx, type SfxName } from "@toonstudio/core/fx";
 
 import { reducedMotion } from "@/shared/hooks/use-in-view";
 

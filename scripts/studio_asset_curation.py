@@ -17,7 +17,7 @@ import re
 import sys
 from typing import Any
 
-SCHEMA = "toonspectrum.asset-curation.v1"
+SCHEMA = "toonstudio.asset-curation.v1"
 TARGETS = {
     "scene-template": 120, "panel-layout": 80, "bubble": 80, "sfx": 100,
     "brush": 80, "effect": 120, "pattern": 100, "background-2d": 140,
@@ -45,7 +45,7 @@ KIND_CHECKS = {
     "pose": {"rigCompatibility", "jointLimits", "retarget", "noInterpenetration"},
     "cover-template": {"nativeElements", "textEditable", "koreanWrap", "safeArea"},
 }
-LICENSES = {"CC0-1.0", "CC-BY-4.0", "LicenseRef-ToonSpectrum-Commissioned"}
+LICENSES = {"CC0-1.0", "CC-BY-4.0", "LicenseRef-ToonStudio-Commissioned"}
 SHA = re.compile(r"^[a-f0-9]{64}$")
 FONT_EXTENSIONS = {".ttf", ".otf", ".woff", ".woff2", ".ttc", ".eot"}
 MAX_FILE_BYTES = 128 * 1024 * 1024
@@ -151,7 +151,7 @@ def inspect_asset(item: Any, root: Path) -> dict[str, Any]: # NOSONAR python:S37
         issues.append("missing-rights-review-date")
     if license_id == "CC-BY-4.0":
         require(nonempty(source.get("attribution")), "missing-attribution")
-    if license_id == "LicenseRef-ToonSpectrum-Commissioned":
+    if license_id == "LicenseRef-ToonStudio-Commissioned":
         require(source.get("serviceEmbedding") is True, "commission-missing-embedding-rights")
     try:
         rights_path = evidence(root, item.get("rightsEvidence"))

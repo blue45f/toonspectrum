@@ -52,10 +52,10 @@ function oauthCookie(provider, { includePkce = false } = {}) {
   const sameSite = provider === "apple" ? "None" : "Lax";
   const attributes = `Path=/api/auth/oauth/${provider}; HttpOnly; Secure; SameSite=${sameSite}`;
   const values = [
-    `toonspectrum-oauth-state-${provider}=signed-state; ${attributes}`,
+    `toonstudio-oauth-state-${provider}=signed-state; ${attributes}`,
   ];
   if (includePkce) {
-    values.push(`toonspectrum-oauth-pkce-${provider}=verifier; ${attributes}`);
+    values.push(`toonstudio-oauth-pkce-${provider}=verifier; ${attributes}`);
   }
   return values.join(", ");
 }
@@ -216,7 +216,7 @@ describe("social login production verification", () => {
       origin: ORIGIN,
       fetchImpl: missingCookie,
       timeoutMs: 5_000,
-    })).rejects.toThrow("missing toonspectrum-oauth-pkce-github");
+    })).rejects.toThrow("missing toonstudio-oauth-pkce-github");
   });
 
   it("keeps Kakao email scope disabled until provider approval", async () => {

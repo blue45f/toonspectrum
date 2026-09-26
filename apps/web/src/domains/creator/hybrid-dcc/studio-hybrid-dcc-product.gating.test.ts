@@ -864,7 +864,7 @@ describe("workspace expansion CAD/sculpt/cloth/collab/UV/mirror", () => {
     expect(bomRollupByMaterial(ws.bom).length).toBeGreaterThan(0);
     expect(bomEstimateMassKg(ws.bom)).toBeGreaterThan(0);
     const pkg = workspaceExportToon3d(ws);
-    expect(pkg.manifest.format).toBe("toonspectrum.toon3d");
+    expect(pkg.manifest.format).toBe("toonstudio.toon3d");
   });
 
   it("sniffs binary FBX without fabricating geometry", () => {

@@ -26264,7 +26264,7 @@ function clearSelectionForEdit() {
     const { downloadBlob } = await import("./export/studio-export");
     downloadBlob(
       new Blob([JSON.stringify(summary, null, 2)], { type: "application/json" }),
-      `${(title.trim() || "toonspectrum").replace(/[\\/:*?"<>|]+/g, "-")}-ai-public-summary.json`
+      `${(title.trim() || "toonstudio").replace(/[\\/:*?"<>|]+/g, "-")}-ai-public-summary.json`
     );
   }
 

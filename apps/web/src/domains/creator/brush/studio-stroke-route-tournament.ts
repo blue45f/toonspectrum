@@ -6,7 +6,7 @@ import {
   type StudioStrokeSurfaceRouteKind,
 } from "./studio-stroke-surface-route";
 
-import type { RemoteKillSwitch, WinnerCache } from "@toonspectrum/studio-engine-registry";
+import type { RemoteKillSwitch, WinnerCache } from "@toonstudio/studio-engine-registry";
 
 /**
  * V12 §5 tournament consumption, stroke-surface seam — pure selector only.

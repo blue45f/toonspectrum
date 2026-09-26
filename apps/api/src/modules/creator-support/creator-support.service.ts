@@ -61,7 +61,7 @@ function projectFromRow(row: {
   return {
     id: row.id,
     creatorId: row.creatorId,
-    creatorName: row.creatorName?.trim() || "ToonSpectrum Creator",
+    creatorName: row.creatorName?.trim() || "ToonStudio Creator",
     category: row.category,
     title: row.title,
     story: row.story,

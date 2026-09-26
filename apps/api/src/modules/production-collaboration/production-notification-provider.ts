@@ -38,10 +38,10 @@ async function sendGenericWebhook(
   const timestamp = String(Math.floor(Date.now() / 1000));
   const response = await post(url, {
     "Content-Type": "application/json",
-    "X-ToonSpectrum-Signature": webhookSignature(secret, serialized),
-    "X-ToonSpectrum-Delivery-Id": deliveryId,
-    "X-ToonSpectrum-Delivery-Timestamp": timestamp,
-    "X-ToonSpectrum-Delivery-Signature": webhookSignature(secret, `${timestamp}\n${deliveryId}\n${serialized}`),
+    "X-ToonStudio-Signature": webhookSignature(secret, serialized),
+    "X-ToonStudio-Delivery-Id": deliveryId,
+    "X-ToonStudio-Delivery-Timestamp": timestamp,
+    "X-ToonStudio-Delivery-Signature": webhookSignature(secret, `${timestamp}\n${deliveryId}\n${serialized}`),
   }, serialized, config.timeoutMs);
   return { sent: 1, removedEndpointHashes: [], providerResponse: response ?? {} };
 }
@@ -60,7 +60,7 @@ async function sendDiscord(
         content: `**${notification.title}**\n${notification.body}`.slice(0, 2_000),
         allowed_mentions: { parse: [] },
         embeds: notification.url
-          ? [{ title: "ToonSpectrum에서 열기", url: notification.url }]
+          ? [{ title: "ToonStudio에서 열기", url: notification.url }]
           : [],
       }),
     },
@@ -108,7 +108,7 @@ async function sendWebPush(
     title: notification.title,
     body: notification.body,
     url: notification.url ?? "/production",
-    tag: "toonspectrum-production",
+    tag: "toonstudio-production",
   });
   const results = await Promise.allSettled(
     subscriptions.map(async (subscription) => {

@@ -6,7 +6,7 @@
 
 ## 결정
 
-ToonSpectrum의 3D 저작 환경은 **브라우저를 기본·필수 실행 환경**으로 유지한다. WebAssembly는 네이티브 앱으로 이탈하기 위한 수단이 아니라 브라우저 안에서 메시·B-Rep·저장 커널을 실행하기 위한 구현 기술이다.
+ToonStudio의 3D 저작 환경은 **브라우저를 기본·필수 실행 환경**으로 유지한다. WebAssembly는 네이티브 앱으로 이탈하기 위한 수단이 아니라 브라우저 안에서 메시·B-Rep·저장 커널을 실행하기 위한 구현 기술이다.
 
 프로젝트 열기, 편집, 자동 저장, 복구, 3D 미리보기, Groom·Geometry Stroke 생성, CharacterDocument 편집 및 PNG·PSD 출력에 네이티브 호스트를 요구하지 않는다. 데스크톱 셸은 향후 투명 always-on-top 창이나 OS 파일 연결을 제공할 수 있지만 선택적 어댑터이며 문서 authority가 아니다.
 

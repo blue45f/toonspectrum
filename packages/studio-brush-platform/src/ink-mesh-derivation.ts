@@ -12,7 +12,7 @@
  */
 
 import type { InkMeshBrushParams, InkMeshInputPoint } from "./ink-mesh";
-import type { ModeledSampleIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR } from "@toonstudio/studio-project-model";
 
 const DEG_TO_RAD = Math.PI / 180;
 const HALF_PI = Math.PI / 2;

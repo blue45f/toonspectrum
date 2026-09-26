@@ -1,4 +1,4 @@
-# ToonSpectrum Desktop Sync
+# ToonStudio Desktop Sync
 
 `apps/desktop-sync`는 단일 desktop 동기화 애플리케이션이자 library다. 충돌 안전 양방향 동기화,
 cloud provider, credential, release packaging과 과거 별도 workspace였던 local folder polling을 소유한다.
@@ -18,12 +18,12 @@ src/
 ```
 
 package root는 canonical bidirectional sync API를 공개한다. local polling API는
-`@toonspectrum/desktop-sync/local-agent` subpath로 분리해 root 실행 transport와 타입이 충돌하지 않게 한다.
+`@toonstudio/desktop-sync/local-agent` subpath로 분리해 root 실행 transport와 타입이 충돌하지 않게 한다.
 
 ## 명령
 
 ```sh
-pnpm --filter @toonspectrum/desktop-sync typecheck
-pnpm --filter @toonspectrum/desktop-sync test
-pnpm --filter @toonspectrum/desktop-sync build
+pnpm --filter @toonstudio/desktop-sync typecheck
+pnpm --filter @toonstudio/desktop-sync test
+pnpm --filter @toonstudio/desktop-sync build
 ```

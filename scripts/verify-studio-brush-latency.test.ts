@@ -119,8 +119,8 @@ describe("studio brush latency verifier compositor boundary", () => {
       studioUrl,
     )).toBe(false);
     expect(expectedStudioBrushLatencyPreviewFailure(
-      "500 https://toonspectrum.example/api/auth/session",
-      "https://toonspectrum.example/studio",
+      "500 https://toonstudio.example/api/auth/session",
+      "https://toonstudio.example/studio",
     )).toBe(false);
   });
 });

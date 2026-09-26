@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { validateReleaseWorkflows } from "./release-workflow-policy.mjs";
 
 export const FREE_INFRASTRUCTURE_POLICY_VERSION =
-  "toonspectrum.free-infrastructure.v3";
+  "toonstudio.free-infrastructure.v3";
 
 const BILLING_BOUNDARIES = new Set([
   "hard-stop-free",

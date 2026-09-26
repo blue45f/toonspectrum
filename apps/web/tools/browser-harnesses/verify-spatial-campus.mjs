@@ -17,7 +17,7 @@ const manifest = {
   kind: "palette", resourceVersion: "1.0.0", minimumStudioVersion: "1.0.0", tags: ["팔레트"], license: "cc0-1.0",
   attributionText: "", containsAi: false, provenance: { origin: "original", authoredByPublisher: true }, compatibility: { engines: ["canvas2d"] },
   entries: [{ id: "palette/campus", kind: "palette", name: "QA palette", delivery: {
-    mode: "portable-json", mediaType: "application/vnd.toonspectrum.palette+json", payload, byteSize: Buffer.byteLength(canonical(payload)), sha256: digest(payload),
+    mode: "portable-json", mediaType: "application/vnd.toonstudio.palette+json", payload, byteSize: Buffer.byteLength(canonical(payload)), sha256: digest(payload),
   } }],
 };
 const resource = { ...manifest, id: "11111111-2222-4333-8444-555555555555", manifestHash: digest(manifest), manifestByteSize: Buffer.byteLength(canonical(manifest)),

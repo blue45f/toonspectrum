@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { ForbiddenException, HttpException } from "@nestjs/common";
 import type { Request } from "express";
-import { TOONSPECTRUM_CSRF_HEADER, TOONSPECTRUM_CSRF_HEADER_VALUE } from "@toonspectrum/contracts/security/csrf";
+import { TOONSPECTRUM_CSRF_HEADER, TOONSPECTRUM_CSRF_HEADER_VALUE } from "@toonstudio/contracts/security/csrf";
 
 import { isAllowedCsrfOrigin, isSameRequestOrigin } from "../../../csrf-middleware";
 import { LocalAuthRateLimiter } from "../../auth/auth-rate-limit";

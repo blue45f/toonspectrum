@@ -14,7 +14,7 @@ import {
 
 import type {
   ProductionProjectAggregate,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import { ProductionCollaborationService } from "./production-collaboration.service";
 import {
@@ -101,7 +101,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function appendQuery(path: string, values: Record<string, string>): string {
-  const url = new URL(path, "https://toonspectrum.invalid");
+  const url = new URL(path, "https://toonstudio.invalid");
   for (const [key, value] of Object.entries(values)) {
     url.searchParams.set(key, value);
   }

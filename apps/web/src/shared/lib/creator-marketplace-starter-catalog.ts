@@ -22,7 +22,7 @@ function sha256Hex(value: unknown): string {
 
 const OFFICIAL_PUBLISHER = {
   id: "00000000-0000-4000-8000-000000000001",
-  name: "ToonSpectrum 공식",
+  name: "ToonStudio 공식",
   avatar: "#b4532a",
 } as const;
 
@@ -616,7 +616,7 @@ function buildStarterRecord(def: StarterItemDef): CreatorMarketplaceResourceReco
         name: entry.name,
         delivery: {
           mode: "procedural-recipe" as const,
-          mediaType: `application/vnd.toonspectrum.${def.kind}+json`,
+          mediaType: `application/vnd.toonstudio.${def.kind}+json`,
           payload,
           byteSize: creatorMarketplaceJsonByteSize(payload),
           sha256: sha256Hex(payload),
@@ -636,7 +636,7 @@ function buildStarterRecord(def: StarterItemDef): CreatorMarketplaceResourceReco
       name: entry.name,
       delivery: {
         mode: "portable-json" as const,
-        mediaType: `application/vnd.toonspectrum.${def.kind}+json`,
+        mediaType: `application/vnd.toonstudio.${def.kind}+json`,
         payload,
         byteSize: creatorMarketplaceJsonByteSize(payload),
         sha256: sha256Hex(payload),
@@ -653,7 +653,7 @@ function buildStarterRecord(def: StarterItemDef): CreatorMarketplaceResourceReco
     resourceVersion: "1.0.0",
     minimumStudioVersion: "0.1.0",
     tags: def.tags,
-    license: "toonspectrum-standard" as const,
+    license: "toonstudio-standard" as const,
     attributionText: "",
     containsAi: false,
     rightsConfirmed: true as const,
@@ -672,7 +672,7 @@ function buildStarterRecord(def: StarterItemDef): CreatorMarketplaceResourceReco
     resourceVersion: "1.0.0",
     minimumStudioVersion: "0.1.0",
     tags: def.tags,
-    license: "toonspectrum-standard",
+    license: "toonstudio-standard",
     attributionText: "",
     containsAi: false,
     provenance: { origin: "original", authoredByPublisher: true },

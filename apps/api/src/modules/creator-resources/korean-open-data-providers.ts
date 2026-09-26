@@ -1,7 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 
-import { parseResource, recordOf, textOf } from "@toonspectrum/core/creator-resources";
-import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@toonspectrum/core/creator-resources";
+import { parseResource, recordOf, textOf } from "@toonstudio/core/creator-resources";
+import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@toonstudio/core/creator-resources";
 
 export type KoreanOpenDataProvider = "kheritage" | "neis" | "tourapi" | "korean";
 type Request = (url: URL, headers?: Record<string, string>, responseType?: "json" | "xml") => Promise<{ value: unknown; fetchedAt: string }>;

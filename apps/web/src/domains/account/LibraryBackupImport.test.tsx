@@ -6,7 +6,7 @@ import { useI18n } from "@/shared/lib/i18n-core";
 
 import { LibraryBackupImport } from "./LibraryBackupImport";
 
-const backup = { _app: "toonspectrum-library", version: 1, ratings: { work: 4.5 }, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
+const backup = { _app: "toonstudio-library", version: 1, ratings: { work: 4.5 }, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
 function file(data: unknown): File {
   const text = JSON.stringify(data);
   const result = new File([text], "library.json", { type: "application/json" });

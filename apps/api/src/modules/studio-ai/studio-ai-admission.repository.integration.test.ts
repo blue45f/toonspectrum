@@ -108,7 +108,7 @@ describeWithDirectPostgres("Studio AI admission PostgreSQL fencing", () => {
       transactionOpen = true;
       await client.query(
         "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended($1, 0))",
-        ["toonspectrum-schema-repair-0018"]
+        ["toonstudio-schema-repair-0018"]
       );
       await client.query("SAVEPOINT studio_ai_schema_repair");
       await client.query(`

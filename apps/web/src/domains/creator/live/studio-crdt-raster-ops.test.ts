@@ -23,8 +23,8 @@ const uuid = (value: number) => `00000000-0000-4000-8000-${String(value).padStar
 const persistedV1RasterMediaTypes = [
   "image/png",
   "image/webp",
-  "application/x-toonspectrum-rgba-zstd",
-  "application/x-toonspectrum-alpha-zstd",
+  "application/x-toonstudio-rgba-zstd",
+  "application/x-toonstudio-alpha-zstd",
 ] as const satisfies readonly StudioRasterAssetMediaType[];
 
 const surface = {

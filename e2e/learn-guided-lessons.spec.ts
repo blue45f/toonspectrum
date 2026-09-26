@@ -5,7 +5,7 @@ import { LEARNING_PATHS, getPathLessons } from "../apps/web/src/domains/learn/le
 import { expect, test } from "./fixtures/non-studio-test";
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
+  await page.addInitScript(() => sessionStorage.setItem("toonstudio-compat-dismissed", "true"));
 });
 
 test("lesson detail exposes an outcome, jump navigation, progress requirements and adjacent lessons", async ({ page }) => {

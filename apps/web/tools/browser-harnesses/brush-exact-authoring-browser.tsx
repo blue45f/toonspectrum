@@ -38,7 +38,7 @@ createRoot(root).render(<BrowserRouter><Routes><Route path="/" element={<Source 
 
 async function verifyExactBrush(pigment: string) {
   const id = location.pathname.split("/").at(-2)!;
-  const key = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${id}`)}`;
+  const key = `toonstudio.brush-program-v6:${encodeURIComponent(`brush:${id}`)}`;
   const raw = localStorage.getItem(key)!;
   const restored = parseBrushStudioV6Import(raw);
   const material = source(pigment);

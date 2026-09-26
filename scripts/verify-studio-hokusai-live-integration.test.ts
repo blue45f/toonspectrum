@@ -352,7 +352,7 @@ describe("Studio Hokusai production-preview integration evidence", () => {
     expect(source).toContain('"/studio/tools-companion?studio-hokusai-verifier-release=1"');
     expect(source).toContain('state: "detached"');
     expect(source).toContain('name === "writer-lease.bin"');
-    expect(source).toContain('name?.startsWith("toonspectrum-opfs-recovery:")');
+    expect(source).toContain('name?.startsWith("toonstudio-opfs-recovery:")');
     expect(source).toContain('Date.now() - leaseFreeSince >= 1_500');
     expect(source).toContain('page.goto(studioUrl, { waitUntil: "domcontentloaded"');
     expect(source).not.toContain('page.reload({ waitUntil: "domcontentloaded"');

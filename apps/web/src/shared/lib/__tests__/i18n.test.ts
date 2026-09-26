@@ -314,13 +314,13 @@ describe("runtime translation bundles", () => {
 
   it("uses cached runtime translation bundle without calling translator", async () => {
     return withLocalStorage(async () => {
-      const cacheKey = "toonspectrum-i18n-runtime:v3:ia";
+      const cacheKey = "toonstudio-i18n-runtime:v3:ia";
       localStorage.setItem(
         cacheKey,
         JSON.stringify(
           makeCachedLocalePayload("ia", {
             ...Object.fromEntries(getRuntimeTranslationPendingKeys("ia").map((key) => [key, `${key}-cached`])),
-            "app.name": "ToonSpectrum Cached",
+            "app.name": "ToonStudio Cached",
             "common.loading": "Cargando cached",
           })
         )
@@ -338,7 +338,7 @@ describe("runtime translation bundles", () => {
       await ensureRuntimeLocaleBundle("ia");
 
       expect(fetchSpy).not.toHaveBeenCalled();
-      expect(resolveI18nValue("ia", "app.name")).toBe("ToonSpectrum Cached");
+      expect(resolveI18nValue("ia", "app.name")).toBe("ToonStudio Cached");
       expect(resolveI18nValue("ia", "common.loading")).toBe("Cargando cached");
 
       fetchSpy.mockRestore();
@@ -351,7 +351,7 @@ describe("runtime translation bundles", () => {
         getRuntimeTranslationPendingKeys("ie").map((key) => [key, `${key}-cached`]),
       );
       delete dictionary["common.loading"];
-      localStorage.setItem("toonspectrum-i18n-runtime:v3:ie", JSON.stringify(makeCachedLocalePayload("ie", dictionary)));
+      localStorage.setItem("toonstudio-i18n-runtime:v3:ie", JSON.stringify(makeCachedLocalePayload("ie", dictionary)));
       const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation((url) =>
         Promise.resolve(mockTranslationResponseForRequest(url.toString())),
       );

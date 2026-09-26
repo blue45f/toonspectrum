@@ -18,7 +18,7 @@ export type Session = {
   token?: string | null;
 } | null;
 
-export const SESSION_KEY = "toonspectrum-auth-session";
+export const SESSION_KEY = "toonstudio-auth-session";
 export const CLIENT_SESSION_MAX_SERIALIZED_BYTES = 24_576;
 export const CLIENT_SESSION_TOKEN_MAX_LENGTH = 16_384;
 

@@ -1,10 +1,10 @@
-import { applyPressureCurve } from "@toonspectrum/studio-project-model";
+import { applyPressureCurve } from "@toonstudio/studio-project-model";
 
 import type {
   DeviceCalibrationIR,
   ModeledSampleIR,
   RawInputSampleIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * Input modeling stage (V11 §10.1): raw/coalesced samples become calibrated

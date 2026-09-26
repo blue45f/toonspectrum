@@ -22,12 +22,12 @@ import {
 //   - 서명 비교는 항상 timingSafeEqual(상수 시간).
 //   - exp/iat/iss/aud 를 모두 검증.
 
-const FALLBACK_SECRET = "toonspectrum-insecure-dev-session-secret";
+const FALLBACK_SECRET = "toonstudio-insecure-dev-session-secret";
 export const SESSION_HMAC_SECRET_MIN_BYTES = 32;
 export const SESSION_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-const JWT_ISSUER = "toonspectrum";
-const JWT_AUDIENCE = "toonspectrum-web";
+const JWT_ISSUER = "toonstudio";
+const JWT_AUDIENCE = "toonstudio-web";
 
 export interface VerifiedSessionToken {
   userId: string;
@@ -124,7 +124,7 @@ interface StudioLiveAdmissionTicketPayload extends JwtPayload {
   sexp: number;
 }
 
-const STUDIO_LIVE_JWT_AUDIENCE = "toonspectrum-studio-live";
+const STUDIO_LIVE_JWT_AUDIENCE = "toonstudio-studio-live";
 
 export interface SignedStudioLiveAdmissionTicket {
   readonly ticket: string;

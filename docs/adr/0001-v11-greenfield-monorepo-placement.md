@@ -1,4 +1,4 @@
-# ADR 0001 — V11 그린필드 트리를 기존 toonspectrum 모노레포의 *-v11 네임스페이스에 배치
+# ADR 0001 — V11 그린필드 트리를 기존 toonstudio 모노레포의 *-v11 네임스페이스에 배치
 
 ## 상태
 
@@ -35,7 +35,7 @@ V11 최종 아키텍처는 "기존 코드를 점진적으로 교체하지 않는
 
 ## 결정
 
-1. V11 트리를 **별도 저장소가 아니라 기존 toonspectrum 모노레포 안**에 만든다.
+1. V11 트리를 **별도 저장소가 아니라 기존 toonstudio 모노레포 안**에 만든다.
 2. 모든 V11 산출물은 `*-v11` 접미사 네임스페이스를 사용한다: `apps/studio-web-v11`, `apps/asset-market-v11`, `apps/benchmark-lab-v11`, `packages/ui-v11`, `packages/command-registry-v11`, `packages/provider-catalog-v11`, `crates/*-v11`, `tests/corpus`, `tests/benchmarks`, `tests/fault-injection`.
 3. 기존 앱·패키지(비-v11 트리)는 **read-only 참고**다. V11 작업이 기존 트리를 수정하지 않으며, V11 코드가 기존 런타임 코드를 import하지 않는다. 문서·테스트·화면은 요구사항 비교 자료로만 읽는다.
 4. **기존 내부 데이터 마이그레이션은 하지 않는다.** 기존 스토어·API·데이터는 Phase 8 컷오버 때 명시적 파괴 플래그로 폐기한다(§13 Phase 8). 외부 창작 포맷 호환은 FormatGateway에서 최대화한다.

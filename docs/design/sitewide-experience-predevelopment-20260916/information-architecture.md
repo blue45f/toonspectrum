@@ -341,6 +341,6 @@ Canonical은 다음 모든 소비자가 공유한다.
 - `/studio/ai-settings` URL 유지 여부
 - `desktop-only`를 허용할지, 모두 `desktop-first + mobile review`로 제공할지
 - 실험적 라우트를 일반 사이트맵에 기본 노출할지
-- BrowseShell의 ToonStudio·ToonSpectrum 브랜드 표시 관계
+- BrowseShell의 ToonStudio·ToonStudio 브랜드 표시 관계
 
 이 결정은 구현 중 임의로 확정하지 않고 제품 결정 기록에 남긴다.

@@ -1,4 +1,4 @@
-import { pathBounds, sceneIRSchema } from "@toonspectrum/studio-project-model";
+import { pathBounds, sceneIRSchema } from "@toonstudio/studio-project-model";
 
 import type {
   BlendModeIR,
@@ -9,7 +9,7 @@ import type {
   PathVerbIR,
   SceneIR,
   SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * SVG subset importer (V12 gate matrix, vello_svg-role lane).

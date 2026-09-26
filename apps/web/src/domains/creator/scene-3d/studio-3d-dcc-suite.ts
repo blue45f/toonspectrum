@@ -1,5 +1,5 @@
 /**
- * ToonSpectrum Hybrid 3D DCC Suite — Unified Master Gateway
+ * ToonStudio Hybrid 3D DCC Suite — Unified Master Gateway
  *
  * 2D 웹툰 작화와 3D DCC 저작을 완벽히 융합하는 3D 마스터 스위트 모듈입니다.
  */

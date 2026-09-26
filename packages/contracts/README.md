@@ -1,4 +1,4 @@
-# @toonspectrum/contracts
+# @toonstudio/contracts
 
 둘 이상의 배포 가능한 애플리케이션이 공유하는 좁고 실행 환경에 중립적인 계약 package다.
 

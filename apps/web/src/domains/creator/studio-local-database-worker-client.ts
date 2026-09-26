@@ -215,7 +215,7 @@ function defaultWorkerFactory(): StudioLocalDatabaseWorkerLike {
   }
   return new Worker(new URL("./studio-local-database.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-studio-local-database",
+    name: "toonstudio-studio-local-database",
   }) as unknown as StudioLocalDatabaseWorkerLike;
 }
 

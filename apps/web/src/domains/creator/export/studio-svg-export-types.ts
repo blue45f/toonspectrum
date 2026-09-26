@@ -265,7 +265,7 @@ export interface SvgExportResult {
 export const SVG_EXPORT_MIME = "image/svg+xml;charset=utf-8";
 
 export function svgExportFileName(title: string): string {
-  return `${title.trim() || "toonspectrum-comic"}.svg`;
+  return `${title.trim() || "toonstudio-comic"}.svg`;
 }
 
 export interface ExportCtx {

@@ -19,7 +19,7 @@ import type {
  * operations immediately, while the heavier source-authority bridge is prepared by its parent.
  */
 export const STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_KIND =
-  "toonspectrum.shared-3d-character-transform-receipt" as const;
+  "toonstudio.shared-3d-character-transform-receipt" as const;
 export const STUDIO_SHARED_3D_CHARACTER_TRANSFORM_RECEIPT_VERSION = 1 as const;
 
 /** Conservative VRM rest/pose envelope used only to fit a shared background shadow camera. */

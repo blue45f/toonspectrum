@@ -1,7 +1,7 @@
 import {
   brushProgramIRSchema,
   strokeIRSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -16,7 +16,7 @@ import type {
   BrushProgramIR,
   PathVerbIR,
   StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * Settled-phase centerline refit contracts (V12 §12.2 "Kurbo centerline"

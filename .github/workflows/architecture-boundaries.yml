@@ -47,8 +47,8 @@ jobs:
       - name: Validate application import ratchets
         run: node scripts/validate-app-boundaries.mjs
       - name: Type-check shared contracts
-        run: pnpm --filter @toonspectrum/contracts run typecheck
+        run: pnpm --filter @toonstudio/contracts run typecheck
       - name: Type-check Admin boundary
-        run: pnpm --filter @toonspectrum/admin-web typecheck
+        run: pnpm --filter @toonstudio/admin-web typecheck
       - name: Build Admin boundary
-        run: pnpm --filter @toonspectrum/admin-web build
+        run: pnpm --filter @toonstudio/admin-web build

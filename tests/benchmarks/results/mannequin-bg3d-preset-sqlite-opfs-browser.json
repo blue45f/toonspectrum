@@ -30,7 +30,7 @@
           "state-v1",
           "library-v1"
         ],
-        "opfsDirectory": "toonspectrum-studio-sqlite",
+        "opfsDirectory": "toonstudio-studio-sqlite",
         "logicalDatabaseFilename": "studio-local-v12.db",
         "expectedOpenFilename": "/studio-local-v12.db",
         "openedOpfsDatabaseFilenames": [
@@ -38,8 +38,8 @@
           "/studio-local-v12.db"
         ],
         "installedOpfsDirectories": [
-          "toonspectrum-studio-sqlite",
-          "toonspectrum-studio-sqlite"
+          "toonstudio-studio-sqlite",
+          "toonstudio-studio-sqlite"
         ],
         "memoryDatabaseOpenCount": 0,
         "openedMemoryDatabaseFilenames": [],
@@ -845,7 +845,7 @@
       "assets/sqlite3-worker1-N5XM9NUp.js.map",
       "index.html"
     ],
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-mannequin-bg3d-opfs-512GL3"
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-mannequin-bg3d-opfs-512GL3"
   },
   "validationIssues": []
 }

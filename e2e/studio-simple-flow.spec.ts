@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures/non-studio-test";
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
 
-const THEME_STORAGE_KEY = "toonspectrum-theme";
+const THEME_STORAGE_KEY = "toonstudio-theme";
 
 function themeEnvelope() {
   return JSON.stringify({
@@ -12,12 +12,12 @@ function themeEnvelope() {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(({ themeKey, theme }) => {
-    localStorage.setItem("toonspectrum-lang", JSON.stringify({
+    localStorage.setItem("toonstudio-lang", JSON.stringify({
       state: { lang: "ko" },
       version: 0,
     }));
     localStorage.setItem(themeKey, theme);
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
   }, { themeKey: THEME_STORAGE_KEY, theme: themeEnvelope() });
 
   await page.route("**/api/**", async (route) => {

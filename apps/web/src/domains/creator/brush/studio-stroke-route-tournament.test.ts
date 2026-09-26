@@ -1,4 +1,4 @@
-import { RemoteKillSwitch, WinnerCache } from "@toonspectrum/studio-engine-registry";
+import { RemoteKillSwitch, WinnerCache } from "@toonstudio/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
 import {

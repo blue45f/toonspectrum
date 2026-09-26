@@ -59,7 +59,7 @@ describe("creator-marketplace-starter-catalog", () => {
     expect(new Set(CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS.map((record) => record.packageId)).size).toBe(20);
     for (const record of CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS) {
       expect(record.kind).toBe("asset");
-      expect(record.license).toBe("toonspectrum-standard");
+      expect(record.license).toBe("toonstudio-standard");
       expect(record.containsAi).toBe(true);
       expect(record.tags).not.toEqual(expect.arrayContaining(["낮", "밤", "노을", "새벽", "흐림", "눈", "안개", "맑음", "비", "야간"]));
       expect(record.provenance).toEqual({ origin: "original", authoredByPublisher: true });

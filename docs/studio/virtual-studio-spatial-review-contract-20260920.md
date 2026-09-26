@@ -41,7 +41,7 @@ Only saved page frames become selectable cuts. Master elements retain `origin: "
 
 ## Annotation contract
 
-The public helpers and types are exported by `@toonspectrum/studio-project-model`:
+The public helpers and types are exported by `@toonstudio/studio-project-model`:
 
 - `StudioReviewPageMapping`, `StudioReviewMappedPage`, `StudioReviewSourceReference`.
 - `createStudioReviewSpatialAnchor(mapping, selection)` returns a validated spatial anchor or `null`.

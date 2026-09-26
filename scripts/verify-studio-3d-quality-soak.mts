@@ -96,7 +96,7 @@ try {
       private terminated = false;
       constructor(url: string | URL, options?: WorkerOptions) {
         super(url, options);
-        this.counted = options?.name === "toonspectrum-vrm-png";
+        this.counted = options?.name === "toonstudio-vrm-png";
         if (this.counted) { receipt.created += 1; receipt.active += 1; }
       }
       override terminate() {

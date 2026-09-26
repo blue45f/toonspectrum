@@ -175,7 +175,7 @@ export const STUDIO_RENDERER_ROLE_LEDGER: readonly RendererRoleEntry[] =
         "apps/web/src/domains/creator/render/studio-hokusai-natural-media.worker.ts",
         "apps/web/src/domains/creator/render/studio-hokusai-live-brush.worker.ts",
       ]),
-      moduleSpecifiers: Object.freeze(["@toonspectrum/studio-hokusai-wasm"]),
+      moduleSpecifiers: Object.freeze(["@toonstudio/studio-hokusai-wasm"]),
       candidateId: "E12",
       note:
         "자연매체(연필·목탄·유화·수채) 권위. `.myb` 페이로드가 provider-native 정본이며 "
@@ -300,7 +300,7 @@ export const STUDIO_RENDERER_ROLE_LEDGER: readonly RendererRoleEntry[] =
         "apps/web/src/domains/creator/StudioSvgAssetPreview.tsx",
       ]),
       moduleSpecifiers: Object.freeze([
-        "@toonspectrum/studio-engine-thorvg",
+        "@toonstudio/studio-engine-thorvg",
         "@thorvg/webcanvas",
       ]),
       candidateId: "E13",

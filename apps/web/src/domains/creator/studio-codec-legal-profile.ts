@@ -4,7 +4,7 @@
  * This is a machine-readable product record, not legal advice, patent clearance, a trademark
  * licence, or an official certification. It deliberately separates a codec/container being
  * technically usable from who supplies the implementation and whether that implementation is
- * included in ToonSpectrum's distribution.
+ * included in ToonStudio's distribution.
  */
 
 export const STUDIO_CODEC_LEGAL_PROFILE_VERSION = 1 as const;
@@ -22,14 +22,14 @@ export type StudioCodecDistributionStatus =
 
 export interface StudioCodecContainerDescriptor {
   readonly id: "webm";
-  readonly implementation: "toonspectrum-ebml-webm-muxer";
+  readonly implementation: "toonstudio-ebml-webm-muxer";
   readonly technicalAvailability: StudioCodecTechnicalAvailability;
   /**
    * Distribution status describes the implementation binary/source, not patent clearance or a
    * promise that every possible use of the produced file is licensed.
    */
   readonly distributionStatus: StudioCodecDistributionStatus;
-  readonly provider: "ToonSpectrum";
+  readonly provider: "ToonStudio";
 }
 
 export interface StudioCodecBitstreamDescriptor {
@@ -145,7 +145,7 @@ function validateContainer(value: unknown): StudioCodecContainerDescriptor {
   const container = record(value, "/container");
   exactKeys(container, CONTAINER_KEYS, "/container");
   if (container.id !== "webm") fail("Unsupported container profile.", "/container/id");
-  if (container.implementation !== "toonspectrum-ebml-webm-muxer") {
+  if (container.implementation !== "toonstudio-ebml-webm-muxer") {
     fail("Unsupported container implementation.", "/container/implementation");
   }
   if (
@@ -170,7 +170,7 @@ function validateContainer(value: unknown): StudioCodecContainerDescriptor {
       "/container/distributionStatus"
     );
   }
-  if (container.provider !== "ToonSpectrum") {
+  if (container.provider !== "ToonStudio") {
     fail("Unsupported container implementation provider.", "/container/provider");
   }
   return container as unknown as StudioCodecContainerDescriptor;
@@ -208,7 +208,7 @@ function validateCodec(value: unknown): StudioCodecBitstreamDescriptor {
   }
   if (codec.distributionStatus !== "runtime-implementation-not-bundled") {
     fail(
-      "The browser encoder must be recorded as a runtime implementation not bundled by ToonSpectrum.",
+      "The browser encoder must be recorded as a runtime implementation not bundled by ToonStudio.",
       "/codec/distributionStatus"
     );
   }
@@ -271,10 +271,10 @@ function createWebmProfile(
     profileVersion: STUDIO_CODEC_LEGAL_PROFILE_VERSION,
     container: {
       id: "webm",
-      implementation: "toonspectrum-ebml-webm-muxer",
+      implementation: "toonstudio-ebml-webm-muxer",
       technicalAvailability: "product-implemented",
       distributionStatus: "first-party-source-included",
-      provider: "ToonSpectrum",
+      provider: "ToonStudio",
     },
     codec: {
       id,

@@ -81,7 +81,7 @@ describe("Brush Studio V5 composition model", () => {
   it("normalizes imported programs and removes unknown modules", () => {
     const base = createDefaultBrushStudioV5Draft();
     const parsed = parseBrushStudioV5Draft(JSON.stringify({
-      kind: "toonspectrum.brush-studio-v5",
+      kind: "toonstudio.brush-studio-v5",
       program: {
         ...base,
         name: "  Imported Graph  ",

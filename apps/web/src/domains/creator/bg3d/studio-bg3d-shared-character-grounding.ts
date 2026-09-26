@@ -8,7 +8,7 @@
  */
 
 export const STUDIO_BG3D_SHARED_CHARACTER_GROUNDING_RECEIPT_KIND =
-  "toonspectrum.shared-character-grounding-receipt" as const;
+  "toonstudio.shared-character-grounding-receipt" as const;
 export const STUDIO_BG3D_SHARED_CHARACTER_GROUNDING_RECEIPT_VERSION = 1 as const;
 
 export const STUDIO_BG3D_SHARED_CHARACTER_GROUNDING_LIMITS = Object.freeze({

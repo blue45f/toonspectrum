@@ -34,7 +34,7 @@ apps/api/src/
 
 ## Core 경계
 
-`packages/core/src/server`는 서버 전용 계층이 아니라 브라우저/API가 공유하는 catalog read-model이었다. 현재 `packages/core/src/catalog`으로 통합했으며 소비자는 `@toonspectrum/core/catalog`을 사용한다.
+`packages/core/src/server`는 서버 전용 계층이 아니라 브라우저/API가 공유하는 catalog read-model이었다. 현재 `packages/core/src/catalog`으로 통합했으며 소비자는 `@toonstudio/core/catalog`을 사용한다.
 
 ## 검증
 

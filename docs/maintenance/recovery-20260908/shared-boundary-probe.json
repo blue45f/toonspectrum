@@ -4,7 +4,7 @@
   "errors": 21,
   "issues": [
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/command-palette.tsx",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/command-palette.tsx",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -18,7 +18,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/search-explorer.tsx",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/search-explorer.tsx",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -32,7 +32,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/site-header.tsx",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/site-header.tsx",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -55,7 +55,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/title-fan-works.tsx",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/components/title-fan-works.tsx",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -69,7 +69,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference-hardening.test.ts",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference-hardening.test.ts",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -101,7 +101,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference-merge-readiness.test.ts",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference-merge-readiness.test.ts",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -133,7 +133,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference-recovery.test.ts",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference-recovery.test.ts",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -174,7 +174,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference.test.ts",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/kmas-reference.test.ts",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -188,7 +188,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/pwa-manifest.test.ts",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -202,7 +202,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/vite-migration.test.ts",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/__tests__/vite-migration.test.ts",
       "messages": [
         {
           "ruleId": "boundaries/element-types",
@@ -234,7 +234,7 @@
       ]
     },
     {
-      "file": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/creator-marketplace-cloud-library-contract.test.ts",
+      "file": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908/apps/web/src/shared/lib/creator-marketplace-cloud-library-contract.test.ts",
       "messages": [
         {
           "ruleId": "boundaries/element-types",

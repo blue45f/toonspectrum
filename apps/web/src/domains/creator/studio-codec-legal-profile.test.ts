@@ -20,10 +20,10 @@ describe("Studio codec capability/distribution profile", () => {
       profileVersion: STUDIO_CODEC_LEGAL_PROFILE_VERSION,
       container: {
         id: "webm",
-        implementation: "toonspectrum-ebml-webm-muxer",
+        implementation: "toonstudio-ebml-webm-muxer",
         technicalAvailability: "product-implemented",
         distributionStatus: "first-party-source-included",
-        provider: "ToonSpectrum",
+        provider: "ToonStudio",
       },
       codec: {
         id,

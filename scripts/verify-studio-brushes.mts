@@ -130,13 +130,13 @@ const PRODUCT_BRUSH_CATALOG_COUNT = STUDIO_ALL_BRUSH_CATALOG_ITEMS.length;
 const SCRATCH =
   process.env.TOONSPECTRUM_BRUSH_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-brushes");
+  ?? join(tmpdir(), "toonstudio-studio-brushes");
 const LOG_PATH = join(SCRATCH, "studio-brush-verify.log");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 const AUTOSAVE_KEY = studioAutosaveKey({});
-const CLEAN_SESSION_KEY = "toonspectrum-brush-verifier-cleaned";
+const CLEAN_SESSION_KEY = "toonstudio-brush-verifier-cleaned";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/health/ready",
   "/api/auth/session",

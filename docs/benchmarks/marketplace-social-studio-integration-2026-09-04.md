@@ -15,7 +15,7 @@ This pass optimizes the complete creator-resource loop instead of adding another
 
 ## Competitive patterns
 
-| Service | Pattern | ToonSpectrum decision |
+| Service | Pattern | ToonStudio decision |
 | --- | --- | --- |
 | [CLIP STUDIO ASSETS](https://assets.clip-studio.com/) | Creator-tool-specific taxonomy, free/paid facets, compatible app/grade, publisher identity, newest/popular ordering and saved discovery state. | Keep resource-kind/license filters and make Studio compatibility, immutable versions and the next Studio action explicit on detail. |
 | [BlenderKit](https://www.blenderkit.com/docs/tutorials/ratings/) | Search, acquisition and insertion happen inside Blender. Ratings capture production value such as quality and work-hours saved, while creators receive comments and validation feedback. | Make actual Studio install confirmation the strongest reviewer qualification and preserve package-level discussion across releases. |

@@ -38,7 +38,7 @@ describe("first-party ink codec conformance evidence", () => {
 
       expect(first.evidence).toMatchObject({
         schema: STUDIO_FIRST_PARTY_INK_CONFORMANCE_SCHEMA,
-        implementation: "toonspectrum-first-party-ink-codecs",
+        implementation: "toonstudio-first-party-ink-codecs",
         format,
         decision: "passed",
       });

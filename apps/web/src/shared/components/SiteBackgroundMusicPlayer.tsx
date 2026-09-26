@@ -9,7 +9,7 @@ import {
   suspendBgmForContext,
   useAmbientBgm,
   useAudioState,
-} from "@toonspectrum/core/fx";
+} from "@toonstudio/core/fx";
 import {
   ChevronDown,
   ChevronUp,

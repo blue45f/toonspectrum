@@ -230,7 +230,7 @@ describe("복구 가이드", () => {
     expect(scan.autosaves).toHaveLength(1);
     expect(scan.autosaves[0]?.savedAt).toBe("2026-08-08T01:02:03.000Z");
     expect(scan.autosaves[0]?.pageCount).toBe(1);
-    expect(scan.checkpointKeys[0]).toContain("toonspectrum-studio-checkpoints:v12");
+    expect(scan.checkpointKeys[0]).toContain("toonstudio-studio-checkpoints:v12");
   });
 
   it("저장소를 못 읽는 것과 0건을 구분한다", () => {
@@ -326,9 +326,9 @@ describe("라이선스 · 서드파티 고지", () => {
 
   it("고지 머리말의 실제 수치를 파싱한다", async () => {
     const text = [
-      "# ToonSpectrum generated third-party notices",
+      "# ToonStudio generated third-party notices",
       "",
-      "- Application: `toonspectrum@0.1.0`",
+      "- Application: `toonstudio@0.1.0`",
       "- Production inventory entries: 580",
       "- Distinct collected license texts: 328",
       "",
@@ -336,7 +336,7 @@ describe("라이선스 · 서드파티 고지", () => {
       "- 이 줄은 요약이 아니다",
     ].join("\n");
     expect(parseStudioGeneratedNoticeSummary(text)).toEqual([
-      { label: "Application", value: "toonspectrum@0.1.0" },
+      { label: "Application", value: "toonstudio@0.1.0" },
       { label: "Production inventory entries", value: "580" },
       { label: "Distinct collected license texts", value: "328" },
     ]);

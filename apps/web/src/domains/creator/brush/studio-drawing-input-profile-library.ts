@@ -9,7 +9,7 @@ export const STUDIO_DRAWING_INPUT_PROFILE_LIBRARY_NAMESPACE =
   "studio-drawing-input-profile-library-v1";
 export const STUDIO_DRAWING_INPUT_PROFILE_LIBRARY_KEY = "profiles";
 export const STUDIO_DRAWING_INPUT_PROFILE_LIBRARY_LOCK =
-  "toonspectrum-studio-drawing-input-profile-library-v1";
+  "toonstudio-studio-drawing-input-profile-library-v1";
 export const STUDIO_DRAWING_INPUT_CUSTOM_PROFILE_LIMIT = 12;
 export const STUDIO_DRAWING_INPUT_CUSTOM_PROFILE_NAME_LIMIT = 40;
 

@@ -11,7 +11,7 @@
 - libmypaint(E11): "MyPaint와 여러 페인팅 프로그램이 사용한 brush dynamics, tiled surface, smudge, .myb 생태계를 제공한다." 위험 — "C 기반 WASM 포팅·메모리 경계·업데이트 정체를 관리해야 한다." 판정: **자연매체 기준선**.
 - Hokusai(E12): "libmypaint에서 영감을 받은 순수 Rust 브러시 엔진으로 WASM/native를 목표로 하고 .myb 호환을 지향한다." 권장 조합 — "libmypaint와 동일 입력·동일 preset corpus로 비교해 더 빠르거나 유지보수성이 좋은 경로를 선택한다." 위험 — "신규 프로젝트이므로 기능·픽셀 동등성과 장기 유지보수를 검증한다." 판정: **품질 게이트 후보**.
 
-결정적으로, 이 리포에는 이미 `packages/studio-hokusai-wasm` 크레이트가 존재한다: hokusai-brush/core/tile-mem `=0.3.0` 고정, MIT OR Apache-2.0, "Transparent deterministic Hokusai natural-media renderer for ToonSpectrum Studio", 릴리스 계약·품질 검증 스크립트(`scripts/studio-hokusai-wasm-release-contract.mjs`, `verify-studio-hokusai-natural-media-quality.mjs` 등) 동반. 이는 §12의 "기존 화면·기능·테스트는 요구사항과 비교 자료로 읽을 수 있다" 범위를 넘어 재사용 가능한 검증 자산이다.
+결정적으로, 이 리포에는 이미 `packages/studio-hokusai-wasm` 크레이트가 존재한다: hokusai-brush/core/tile-mem `=0.3.0` 고정, MIT OR Apache-2.0, "Transparent deterministic Hokusai natural-media renderer for ToonStudio Studio", 릴리스 계약·품질 검증 스크립트(`scripts/studio-hokusai-wasm-release-contract.mjs`, `verify-studio-hokusai-natural-media-quality.mjs` 등) 동반. 이는 §12의 "기존 화면·기능·테스트는 요구사항과 비교 자료로 읽을 수 있다" 범위를 넘어 재사용 가능한 검증 자산이다.
 
 아키텍처 §1.2 결합 유형 8이 "교차 검증: Hokusai와 libmypaint를 같은 corpus로 비교"를 명시하고, Phase 2가 "libmypaint/Hokusai parity"를 요구한다.
 

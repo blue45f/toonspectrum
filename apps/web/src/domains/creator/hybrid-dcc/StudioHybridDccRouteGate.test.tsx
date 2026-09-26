@@ -39,7 +39,7 @@ describe("StudioHybridDccRouteGate", () => {
       />,
     );
 
-    const dialog = screen.getByRole("dialog", { name: "ToonSpectrum 전문 3D 제작" });
+    const dialog = screen.getByRole("dialog", { name: "ToonStudio 전문 3D 제작" });
     const back = screen.getByRole("button", { name: "캔버스로 돌아가기" });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(main.hasAttribute("inert")).toBe(true);

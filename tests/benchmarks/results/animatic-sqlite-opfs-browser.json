@@ -15,7 +15,7 @@
       "productionPersistence": "createStudioAnimaticSqlitePersistence",
       "namespace": "studio-animatic-v12",
       "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
-      "opfsDirectory": "toonspectrum-studio-sqlite",
+      "opfsDirectory": "toonstudio-studio-sqlite",
       "logicalDatabaseFilename": "studio-local-v12.db",
       "expectedOpenFilename": "/studio-local-v12.db",
       "openedOpfsDatabaseFilenames": [
@@ -23,8 +23,8 @@
         "/studio-local-v12.db"
       ],
       "installedOpfsDirectories": [
-        "toonspectrum-studio-sqlite",
-        "toonspectrum-studio-sqlite"
+        "toonstudio-studio-sqlite",
+        "toonstudio-studio-sqlite"
       ],
       "opfsDatabaseOpenCount": 2,
       "nonV12DatabaseOpenCount": 0,
@@ -371,7 +371,7 @@
     },
     "corruption": {
       "separateScope": "v12-opfs-animatic-corruption-probe",
-      "separateStorageKey": "toonspectrum-studio-animatic:v12:198brgx:0ukkp9h",
+      "separateStorageKey": "toonstudio-studio-animatic:v12:198brgx:0ukkp9h",
       "status": "invalid",
       "documentIsNull": true,
       "error": "애니매틱 JSON을 해석하지 못했습니다.",
@@ -635,7 +635,7 @@
       "assets/sqlite3-worker1-N5XM9NUp.js.map",
       "index.html"
     ],
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-animatic-sqlite-opfs-La3CIA"
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-animatic-sqlite-opfs-La3CIA"
   },
   "validationIssues": []
 }

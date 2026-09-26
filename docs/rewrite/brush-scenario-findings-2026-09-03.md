@@ -80,7 +80,7 @@ pen · gpen · maru-pen · pencil · brush · watercolor · oil · airbrush · c
 더하기만 하므로, 손을 떼기 전에 화면의 잉크가 러닝맥스 대비 크게 줄었다가 다시 칠해지면 그것이
 사용자가 본 깜빡임이다.
 
-운영(`toonspectrum.vercel.app`)·로컬 빌드 동일 재현, 곡선 한 획:
+운영(`toonstudio.vercel.app`)·로컬 빌드 동일 재현, 곡선 한 획:
 
 | 브러시 | 깜빡임 | 비고 |
 | --- | --- | --- |

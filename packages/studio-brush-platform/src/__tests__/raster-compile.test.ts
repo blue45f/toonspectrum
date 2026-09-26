@@ -1,4 +1,4 @@
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import { BrushCompileError } from "../compile";
@@ -15,7 +15,7 @@ import type {
   HokusaiModuleLike,
   RasterStrokeSample,
 } from "../raster-compile";
-import type { BrushProgramIR } from "@toonspectrum/studio-project-model";
+import type { BrushProgramIR } from "@toonstudio/studio-project-model";
 
 function toBase64(value: unknown): string {
   const bytes = new TextEncoder().encode(JSON.stringify(value));

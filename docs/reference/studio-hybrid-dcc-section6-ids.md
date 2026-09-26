@@ -1,7 +1,7 @@
 # Studio Hybrid DCC architecture §6 ID snapshot
 
 This repository-owned snapshot is the reproducible test input for the §6 catalog gate.
-It was extracted from `ToonSpectrum_하이브리드_3D_DCC_엔진_라이브러리_포맷_아키텍처_2026-08-01.md`
+It was extracted from `ToonStudio_하이브리드_3D_DCC_엔진_라이브러리_포맷_아키텍처_2026-08-01.md`
 (SHA-256 `1e07ff796814004416f9affe8d69a7129b2fd328be1692ef4abcb73c020248bf`).
 
 The complete planning document can remain a product-research artifact; CI only needs its

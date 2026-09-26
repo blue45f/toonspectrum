@@ -167,7 +167,7 @@ export function parseStudioSelfHostExportCliContract(
     hasFormat,
     formatValue,
     outPath,
-    valid: words[0] === "toonspectrum" && hasFormat && outPath.length > 0,
+    valid: words[0] === "toonstudio" && hasFormat && outPath.length > 0,
   };
 }
 
@@ -758,7 +758,7 @@ export function exportStudioVrmLite(input: {
   ];
   const mapped = Math.min(bones, humanoid.length);
   const doc = {
-    asset: { version: "2.0", generator: "toonspectrum-vrm-lite" },
+    asset: { version: "2.0", generator: "toonstudio-vrm-lite" },
     extensionsUsed: ["VRMC_vrm"],
     extensions: {
       VRMC_vrm: {

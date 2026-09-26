@@ -14,7 +14,7 @@ function image(kind = 'background', changes: Record<string, unknown> = {}) {
     license: { id: 'CC0-1.0', commercialUse: true, redistributionAllowed: true,
       provider: 'Poly Haven', sourceUrl: 'https://polyhaven.com/a/test' }, ...changes };
 }
-const parse = (rows: unknown[]) => parseStudioCc0Catalog({ schema: 'toonspectrum.asset-delivery.v1', assets: rows });
+const parse = (rows: unknown[]) => parseStudioCc0Catalog({ schema: 'toonstudio.asset-delivery.v1', assets: rows });
 
 test('accepts real background dimensions without treating them as surface textures', () => {
   const [asset] = parse([image()]);

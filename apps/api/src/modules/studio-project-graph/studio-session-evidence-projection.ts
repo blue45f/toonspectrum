@@ -1,5 +1,5 @@
-import { type StudioReviewPageMapping, type StudioReviewSourceReference, validateStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
-import { studioSessionAiEvidenceSchema, studioSessionAssetEvidenceSchema, studioSessionEvidenceSchema, type StudioSessionEvidence } from "@toonspectrum/studio-project-model/work-session-evidence";
+import { type StudioReviewPageMapping, type StudioReviewSourceReference, validateStudioReviewSpatialAnchor } from "@toonstudio/studio-project-model";
+import { studioSessionAiEvidenceSchema, studioSessionAssetEvidenceSchema, studioSessionEvidenceSchema, type StudioSessionEvidence } from "@toonstudio/studio-project-model/work-session-evidence";
 
 const record = (value: unknown): Record<string, unknown> | null => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 const text = (value: unknown, max: number): string | null => typeof value === "string" && value.trim().length > 0 && value.length <= max ? value.trim() : null;

@@ -16,7 +16,7 @@ import {
 import type { StudioAutosavePayload } from "../../apps/web/src/domains/creator/studio-autosave";
 import type { Page } from "playwright";
 
-const key = "toonspectrum-studio-autosave:v2:verifier-regression";
+const key = "toonstudio-studio-autosave:v2:verifier-regression";
 const oldTime = "2026-09-07T00:00:01.000Z";
 const newTime = "2026-09-07T00:00:02.000Z";
 const disposals: Array<() => Promise<void>> = [];

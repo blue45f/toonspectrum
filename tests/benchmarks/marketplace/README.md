@@ -1,12 +1,12 @@
-# ToonSpectrum Creator Market benchmark
+# ToonStudio Creator Market benchmark
 
 Benchmark date: 2026-08-31
 
 Implementation snapshot: 2026-08-31 current working tree. This records implemented contracts and test coverage; it is not evidence that the changes have been deployed to production.
 
-This benchmark treats ToonSpectrum as an editor-integrated creator asset ecosystem, not as a generic download shop. The comparison set therefore spans illustration materials, webtoon-specific assets, 3D/VRM/Live2D content, editor-native libraries, motion and interactive files, executable add-ons, open-licensed catalogs, and direct creator storefronts.
+This benchmark treats ToonStudio as an editor-integrated creator asset ecosystem, not as a generic download shop. The comparison set therefore spans illustration materials, webtoon-specific assets, 3D/VRM/Live2D content, editor-native libraries, motion and interactive files, executable add-ons, open-licensed catalogs, and direct creator storefronts.
 
-The broad inventory in `outline.yaml` covers 38 comparison entries. `results.yaml` records an official-primary-source finding and a ToonSpectrum implication for all 38 entries using 55 distinct official URLs; these are documented observations, not claims of authenticated purchase, seller-console, or hands-on feature testing. The 13-row matrix below is a smaller decision summary. The comparison schema and priority definitions live in `fields.yaml`.
+The broad inventory in `outline.yaml` covers 38 comparison entries. `results.yaml` records an official-primary-source finding and a ToonStudio implication for all 38 entries using 55 distinct official URLs; these are documented observations, not claims of authenticated purchase, seller-console, or hands-on feature testing. The 13-row matrix below is a smaller decision summary. The comparison schema and priority definitions live in `fields.yaml`.
 
 Coverage status is 38/38 source-backed entries with no remaining unverifiable entry. Automated HTTP checks returned 200 for 35 URLs; the other 20 dynamic or anti-bot pages were retrieved through browser search, and no malformed or unresolved URL remains.
 
@@ -20,7 +20,7 @@ The strongest comparable products converge on five promises:
 4. Trust persists through publishing, updates, derivatives, moderation, and delisting.
 5. Discovery is supported by useful facets, ranking, curation, social proof, and a creator relationship.
 
-ToonSpectrum now has a materially stronger correctness core: bounded manifests and queries, hash validation, URL-addressable filters, search-aware relevance ordering, bounded stale-cache recovery, multi-entry preview selection, measured Studio compatibility, strict immutable SemVer releases, public/private release history and changelogs, owner delisting and relisting, package-scoped moderation, one-shot Studio deep links, same-browser local install receipts, an account-scoped cloud library, exact post-install confirmation, and crawler-safe market metadata. These changes close the current free JSON-package correctness loop. They do not close P0 gates for surfaces that remain disabled or incomplete: richer character/3D runtime previews, durable popularity and verified-review metrics, saved lists and creator relationships, nested provenance and rights, appeals, executable extensions, and quarantined binary delivery for user-created 2D/3D/VRM content remain separate product boundaries.
+ToonStudio now has a materially stronger correctness core: bounded manifests and queries, hash validation, URL-addressable filters, search-aware relevance ordering, bounded stale-cache recovery, multi-entry preview selection, measured Studio compatibility, strict immutable SemVer releases, public/private release history and changelogs, owner delisting and relisting, package-scoped moderation, one-shot Studio deep links, same-browser local install receipts, an account-scoped cloud library, exact post-install confirmation, and crawler-safe market metadata. These changes close the current free JSON-package correctness loop. They do not close P0 gates for surfaces that remain disabled or incomplete: richer character/3D runtime previews, durable popularity and verified-review metrics, saved lists and creator relationships, nested provenance and rights, appeals, executable extensions, and quarantined binary delivery for user-created 2D/3D/VRM content remain separate product boundaries.
 
 ## Coverage map
 
@@ -39,7 +39,7 @@ Sketchfab is retained as an interactive-preview/community benchmark. Its Store c
 
 ## High-signal evidence matrix
 
-| Product | Verified behavior from official documentation | ToonSpectrum implication | Priority |
+| Product | Verified behavior from official documentation | ToonStudio implication | Priority |
 |---|---|---|---|
 | [Clip Studio Assets](https://help.clip-studio.com/en-us/manual_en/630_material/How_to_download_materials_from_Assets.htm) | Search and filters cover brushes, images, 3D models and workspaces; detail pages expose compatible software; downloads flow back into the app and supported material types can auto-install into their palettes. | The market detail must state actual Studio compatibility before action, and activation should finish with a visible installed-library receipt. | P0 — current free-pack gate |
 | [BlenderKit](https://www.blenderkit.com/addons) | Search, download, purchase state and installation happen inside Blender; the catalog exposes free/full/paid availability, bookmarks and several ranking orders. | Studio should expose the same market facets and installed/update state without forcing a browser round trip. | P0 — current free-pack gate |
@@ -47,7 +47,7 @@ Sketchfab is retained as an interactive-preview/community benchmark. Its Store c
 | [nizima](https://docs.nizima.com/guide/preview-guide/) | Buyers can interact with Live2D models before purchase, including playback and model-specific motion behavior; [official upload guidance](https://docs.nizima.com/en/guide/item-upload/live2d/) separately distinguishes preview, export and original packages. | Character listings need expression/motion/part sandboxing plus a conformance report rather than a static cover. | P0 — Live2D surface gate |
 | [VS Code Marketplace](https://code.visualstudio.com/docs/configure/extensions/extension-marketplace) | Listings expose publisher, downloads, rating, repository and license; install state becomes manage state; specific versions can be installed. Published extensions are signed and scanned, publishers can be verified, suspicious packages can be blocklisted and automatically removed. | Any future executable Studio add-on requires signatures, verified publishers, static/dynamic scanning, permissions, version pinning and emergency revocation before commerce. | P0 — executable surface gate |
 | [Blender Extensions Platform](https://docs.blender.org/manual/en/5.1/editors/preferences/extensions.html) | Blender installs, disables, removes and updates extensions in-editor. The official schema carries SemVer, Blender-version bounds, platform, SPDX license and explained permissions; listing metadata includes SHA-256 hashes and a blocklist. | Use a signed or content-addressed repository manifest, explicit capabilities, compatibility bounds, review and emergency disablement before enabling executable Studio extensions. | P0 — executable surface gate |
-| [Godot Asset Store](https://docs.godotengine.org/en/stable/community/asset_store/submitting_to_asset_store.html) | Asset submission records compatible engine versions and releases; management exposes downloads, page visits and library additions. | ToonSpectrum now has immutable releases, changelogs, relisting, local receipts and account-library confirmation. Latest-compatible selection and activation analytics remain. | P0 — current package-lifecycle gate |
+| [Godot Asset Store](https://docs.godotengine.org/en/stable/community/asset_store/submitting_to_asset_store.html) | Asset submission records compatible engine versions and releases; management exposes downloads, page visits and library additions. | ToonStudio now has immutable releases, changelogs, relisting, local receipts and account-library confirmation. Latest-compatible selection and activation analytics remain. | P0 — current package-lifecycle gate |
 | [KitBash3D Cargo](https://kitbash3d.com/pages/cargo) | The product is organized around finding production assets and bringing them into DCC workflows, with a strong emphasis on import readiness rather than a bare download. | Measure acquisition-to-first-use and transformation fidelity; the successful unit is a usable Studio scene item, not a completed HTTP transfer. | P1 |
 | [Rive Marketplace](https://rive.app/docs/community/marketplace-overview) | Interactive files can be opened and remixed in the editor with creator attribution. | Model interactive behavior, remix ancestry and credit as first-class lineage. | P1 |
 | [Spline Community](https://docs.spline.design/sharing-collaboration-and-workspaces/community-platform) | Interactive 3D scenes are published, explored and remixed from a browser-native creation environment with community relationships. | Interactive preview and one-action editor activation should share the same runtime contract. | P1 |
@@ -55,7 +55,7 @@ Sketchfab is retained as an interactive-preview/community benchmark. Its Store c
 | [Poly Haven](https://docs.polyhaven.com/en/technical-standards/models) | CC0 assets follow technical standards and expose a public API, making automated ingestion and provenance verification practical. | Build a safe open-license ingestion lane with standardized validation and hashes before accepting arbitrary uploads. | P1 |
 | [Creative Fabrica](https://www.creativefabrica.com/subscription-license/) | Subscription licensing differentiates extractable standalone files, end products and rights after subscription cancellation. | Entitlements must state what remains usable in existing and new projects after cancellation, delisting or refund. | P1 |
 
-## Current ToonSpectrum capability baseline
+## Current ToonStudio capability baseline
 
 | Capability | Current state | Competitive assessment |
 |---|---|---|

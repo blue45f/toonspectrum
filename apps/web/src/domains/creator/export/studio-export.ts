@@ -118,7 +118,7 @@ export function pageExportFileName(
 ): string {
   return createStudioDownloadFileName({
     title,
-    fallbackTitle: "toonspectrum-comic",
+    fallbackTitle: "toonstudio-comic",
     suffix: appendStudioDownloadSuffix(
       transparent ? "transparent" : "",
       studioDownloadVersionSuffix(version),
@@ -139,7 +139,7 @@ export function stripExportFileName(
     : "strip";
   return createStudioDownloadFileName({
     title,
-    fallbackTitle: "toonspectrum-webtoon",
+    fallbackTitle: "toonstudio-webtoon",
     suffix: appendStudioDownloadSuffix(
       stripSuffix,
       studioDownloadVersionSuffix(version),

@@ -1,12 +1,12 @@
-import { providerDescriptorSchema } from "@toonspectrum/studio-engine-registry";
-import { UnsupportedSceneFeatureError } from "@toonspectrum/studio-project-model";
+import { providerDescriptorSchema } from "@toonstudio/studio-engine-registry";
+import { UnsupportedSceneFeatureError } from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { canvasKitProviderDescriptor } from "../descriptor";
 import { loadCanvasKitNode } from "../node/index";
 import { encodeRgbaToPng, renderSceneToPixels, renderSceneToPng } from "../render";
 
-import type { ColorIR, PathIR, SceneIR, SceneNodeIR } from "@toonspectrum/studio-project-model";
+import type { ColorIR, PathIR, SceneIR, SceneNodeIR } from "@toonstudio/studio-project-model";
 import type { CanvasKit } from "canvaskit-wasm";
 
 const SIZE = 64;

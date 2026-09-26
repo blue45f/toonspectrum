@@ -16,9 +16,9 @@ export interface CachedMarketResource {
   readonly record: CreatorMarketplaceResourceRecord;
 }
 
-const PAGE_KEY_PREFIX = "toonspectrum.market.page.v1:";
-const RESOURCE_KEY_PREFIX = "toonspectrum.resource.v1:";
-const AUTHORITATIVE_RESOURCE_KEY_PREFIX = "toonspectrum.resource.authority.v2:";
+const PAGE_KEY_PREFIX = "toonstudio.market.page.v1:";
+const RESOURCE_KEY_PREFIX = "toonstudio.resource.v1:";
+const AUTHORITATIVE_RESOURCE_KEY_PREFIX = "toonstudio.resource.authority.v2:";
 const MAX_STORED_CHARACTERS = 300_000;
 export const MARKET_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1_000;
 export const MARKET_CACHE_MAX_ENTRIES = 24;

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import { studioReviewEditorHref, studioReviewEditorRequestFromLocation } from "./studio-review-editor-route";

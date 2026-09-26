@@ -21,7 +21,7 @@ The UI is integrated into the existing review export surface. It supports keyboa
 
 `0088_studio_review_delivery.sql` is an additive managed migration. It is source only in this change and was not applied to production. The API fails closed if the schema, review policy authority, private storage contract or persisted manifest is unavailable or invalid.
 
-The `@toonspectrum/studio-project-model/review-delivery` subpath is part of the explicit API compile and staged runtime export map. Production API packaging checks resolve the emitted subpath instead of relying on monorepo-only source resolution.
+The `@toonstudio/studio-project-model/review-delivery` subpath is part of the explicit API compile and staged runtime export map. Production API packaging checks resolve the emitted subpath instead of relying on monorepo-only source resolution.
 
 ## Verification performed
 

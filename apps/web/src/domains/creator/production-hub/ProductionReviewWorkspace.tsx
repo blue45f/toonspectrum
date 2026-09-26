@@ -25,7 +25,7 @@ import {
   type ReviewLane,
   type RoleAssignment,
   type ScopeRef,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
 

@@ -69,7 +69,7 @@ __pycache__/
 /.cursor/*
 !/.cursor/rules/
 /.cursor/rules/*
-!/.cursor/rules/toonspectrum.mdc
+!/.cursor/rules/toonstudio.mdc
 
 # opencode loop/goal 플러그인 상태 및 로컬 의존성 (커맨드·에이전트 정의 및 설정은 추적)
 /.opencode/goals/

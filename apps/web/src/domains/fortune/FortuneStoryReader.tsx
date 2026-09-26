@@ -6,7 +6,7 @@ import "./fortune-character.css";
 import { useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
-import type { FortuneReading } from "@toonspectrum/core/fortune";
+import type { FortuneReading } from "@toonstudio/core/fortune";
 import { TarotCardFace } from "./TarotCardFace";
 import { fortuneSceneTheme, fortuneStoryScenes } from "./fortune-cinematic-model";
 

@@ -11,7 +11,7 @@ import {
   deriveProductionAutomationExecutionPlan,
   episodeScope,
   type ProductionProjectAggregate,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import {
   ProductionProjectRevisionConflictError,

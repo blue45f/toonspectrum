@@ -1,5 +1,5 @@
 import type { RasterStrokeSample } from "./raster-compile";
-import type { ModeledSampleIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR } from "@toonstudio/studio-project-model";
 
 /**
  * Bristle-level brush model (손맛·질감 최우선 웨이브).

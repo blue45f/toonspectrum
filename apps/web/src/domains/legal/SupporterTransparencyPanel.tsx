@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import type {
   PublicSupporterWallEntry,
   SupporterFundingSummary,
-} from "@toonspectrum/core/supporter-payment";
+} from "@toonstudio/core/supporter-payment";
 
 import {
   getPublicSupporters,

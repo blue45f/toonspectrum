@@ -1,7 +1,7 @@
 /**
- * First-party ToonSpectrum product conformance certificates for codec executions.
+ * First-party ToonStudio product conformance certificates for codec executions.
  *
- * This boundary certifies only that ToonSpectrum verified an exact provider execution receipt,
+ * This boundary certifies only that ToonStudio verified an exact provider execution receipt,
  * output byte sequence, and evidence byte sequence against its own product conformance program.
  * It is deliberately not a codec-vendor certification, a third-party certification, an
  * "official codec" claim, or a trademark authorization.
@@ -25,7 +25,7 @@ import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_PRODUCT_CODEC_CERTIFICATE_VERSION = 1 as const;
 export const STUDIO_PRODUCT_CODEC_CERTIFICATE_KIND =
-  "toonspectrum-product-codec-conformance-certificate" as const;
+  "toonstudio-product-codec-conformance-certificate" as const;
 export const STUDIO_PRODUCT_CODEC_CERTIFICATE_DOMAIN =
   "toonspectrum:product-codec-conformance-certificate:v1" as const;
 export const STUDIO_PRODUCT_CODEC_CERTIFICATE_ID_DOMAIN =
@@ -50,9 +50,9 @@ export const STUDIO_PRODUCT_CODEC_CERTIFICATION_LIMITS = Object.freeze({
 } as const);
 
 export const STUDIO_PRODUCT_CODEC_CERTIFICATION_CLAIMS = Object.freeze({
-  authority: "ToonSpectrum" as const,
-  program: "ToonSpectrum Product Codec Conformance" as const,
-  officialToonSpectrumProductCertification: true as const,
+  authority: "ToonStudio" as const,
+  program: "ToonStudio Product Codec Conformance" as const,
+  officialToonStudioProductCertification: true as const,
   thirdPartyCodecCertification: false as const,
   codecVendorCertification: false as const,
   officialCodecVendorClaim: false as const,
@@ -113,7 +113,7 @@ export type StudioProductCodecExecutionProvider = "direct" | "worker";
  */
 export interface StudioProductCodecExecutionProviderReceipt {
   readonly schemaVersion: 1;
-  readonly kind: "toonspectrum-codec-execution-provider-selection";
+  readonly kind: "toonstudio-codec-execution-provider-selection";
   readonly selectedProvider: StudioProductCodecExecutionProvider;
   readonly attemptedProviders: readonly [StudioProductCodecExecutionProvider];
 }
@@ -239,7 +239,7 @@ const ROOT_KEYS_WITH_EXECUTION_PROVIDER_RECEIPT = [
 const CERTIFICATION_KEYS = [
   "authority",
   "program",
-  "officialToonSpectrumProductCertification",
+  "officialToonStudioProductCertification",
   "thirdPartyCodecCertification",
   "codecVendorCertification",
   "officialCodecVendorClaim",
@@ -556,7 +556,7 @@ function parseReceipt(value: unknown): StudioCodecExecutionReceipt | null {
   if (
     !record
     || record.schemaVersion !== STUDIO_CODEC_PROVIDER_CONTRACT_VERSION
-    || record.kind !== "toonspectrum-codec-provider-execution"
+    || record.kind !== "toonstudio-codec-provider-execution"
     || !safeIdentifier(record.providerId)
     || typeof record.mode !== "string"
     || !MODES.has(record.mode as StudioCodecProviderMode)
@@ -585,7 +585,7 @@ function parseReceipt(value: unknown): StudioCodecExecutionReceipt | null {
   }
   return Object.freeze({
     schemaVersion: STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
-    kind: "toonspectrum-codec-provider-execution",
+    kind: "toonstudio-codec-provider-execution",
     providerId: record.providerId,
     mode: record.mode as StudioCodecProviderMode,
     direction: record.direction as StudioCodecDirection,
@@ -618,7 +618,7 @@ function parseExecutionProviderReceipt(
   if (
     !record
     || record.schemaVersion !== 1
-    || record.kind !== "toonspectrum-codec-execution-provider-selection"
+    || record.kind !== "toonstudio-codec-execution-provider-selection"
     || typeof record.selectedProvider !== "string"
     || !EXECUTION_PROVIDERS.has(
       record.selectedProvider as StudioProductCodecExecutionProvider,
@@ -633,7 +633,7 @@ function parseExecutionProviderReceipt(
     record.selectedProvider as StudioProductCodecExecutionProvider;
   return Object.freeze({
     schemaVersion: 1,
-    kind: "toonspectrum-codec-execution-provider-selection",
+    kind: "toonstudio-codec-execution-provider-selection",
     selectedProvider,
     attemptedProviders: Object.freeze([
       selectedProvider,
@@ -712,7 +712,7 @@ function normalizeCertification(
     !record
     || record.authority !== STUDIO_PRODUCT_CODEC_CERTIFICATION_CLAIMS.authority
     || record.program !== STUDIO_PRODUCT_CODEC_CERTIFICATION_CLAIMS.program
-    || record.officialToonSpectrumProductCertification !== true
+    || record.officialToonStudioProductCertification !== true
     || record.thirdPartyCodecCertification !== false
     || record.codecVendorCertification !== false
     || record.officialCodecVendorClaim !== false

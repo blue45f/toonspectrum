@@ -16,7 +16,7 @@
  * when EVERY member's authoritative element matches.
  */
 
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 
 import type { DrawEl, El } from "./studio-element-model";
 import type { StudioLiveTransformClipRect } from "./studio-live-transform-clip-tracking";

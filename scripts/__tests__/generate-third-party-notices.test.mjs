@@ -313,7 +313,7 @@ describe("generated third-party notice inventory", () => {
   it("fails when a hash-pinned opaque WASM artifact file is omitted", () => {
     const policy = OPAQUE_WASM_POLICIES[0];
     const directory = mkdtempSync(
-      join(tmpdir(), "toonspectrum-opaque-engine-artifact-test-"),
+      join(tmpdir(), "toonstudio-opaque-engine-artifact-test-"),
     );
     try {
       for (const path of [
@@ -345,7 +345,7 @@ describe("generated third-party notice inventory", () => {
 
   it("fails when a hash-locked shipped license copy is omitted or changed", () => {
     const directory = mkdtempSync(
-      join(tmpdir(), "toonspectrum-engine-notice-lock-test-"),
+      join(tmpdir(), "toonstudio-engine-notice-lock-test-"),
     );
     const requiredFiles = ["LICENSE", "NOTICE", "THIRD_PARTY_INVENTORY.json"];
     try {
@@ -418,7 +418,7 @@ describe("generated third-party notice inventory", () => {
     expect(documents[3].text).toContain("bitbof");
 
     const directory = mkdtempSync(
-      join(tmpdir(), "toonspectrum-embedded-port-license-test-"),
+      join(tmpdir(), "toonstudio-embedded-port-license-test-"),
     );
     try {
       const missing = [
@@ -466,7 +466,7 @@ describe("generated third-party notice inventory", () => {
 
   it("writes complete pnpm, Hokusai, Vello, and opaque WASM notices", () => {
     const directory = mkdtempSync(
-      join(tmpdir(), "toonspectrum-third-party-notice-test-"),
+      join(tmpdir(), "toonstudio-third-party-notice-test-"),
     );
     const outputPath = join(directory, "THIRD_PARTY_NOTICES.generated.md");
     try {

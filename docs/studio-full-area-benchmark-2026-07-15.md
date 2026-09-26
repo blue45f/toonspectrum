@@ -17,7 +17,7 @@ Sources: public Magma help, CSP/Photopea/Canva/Krita/Procreate/Ibis/MediBang/Pix
 
 ## Area matrix
 
-| Area | Magma | CSP | Photopea | Canva/Express | Krita | Procreate | Ibis/MediBang | Pixlr/Sketchbook | Concepts | ToonSpectrum status |
+| Area | Magma | CSP | Photopea | Canva/Express | Krita | Procreate | Ibis/MediBang | Pixlr/Sketchbook | Concepts | ToonStudio status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | App menubar | Top menus | Full | Classic | Minimal | — | — | — | Light | — | **shipped** body portal + File/Edit IA |
 | Left tool rail | Yes | Yes | Dock | — | Docker | — | Side tools | Side | — | **shipped** Magma rail + glyphs |

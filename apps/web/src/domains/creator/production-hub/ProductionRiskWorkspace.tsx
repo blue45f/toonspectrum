@@ -29,7 +29,7 @@ import {
   type ProductionRiskSeverity,
   type ProductionRiskSignal,
   type ProductionRiskStatus,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
 import { ProductionRiskEditorDialog } from "./ProductionRiskEditorDialog";

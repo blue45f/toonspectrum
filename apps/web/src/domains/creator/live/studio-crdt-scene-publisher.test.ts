@@ -268,7 +268,7 @@ describe("studio CRDT scene publisher", () => {
   it("rejects a malformed Shared Stage before creating a page or scene element", () => {
     const document = new StudioCrdtDocument();
     const invalid = {
-      kind: "toonspectrum.studio-shared-3d-stage-collection",
+      kind: "toonstudio.studio-shared-3d-stage-collection",
       version: 3,
       authority: "page-shared-3d-stage-collection",
       stages: [],

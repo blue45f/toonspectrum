@@ -1,6 +1,6 @@
 import { webcrypto } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { studioWorldManifestSchema } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema } from "@toonstudio/studio-project-model/world-publication";
 import { studioWorldTemplatePackageSchema } from "./studio-world-template-contract";
 
 import { DEFAULT_STUDIO_WORLD_MANIFEST, validateStudioWorldManifest } from "./studio-virtual-space-world-manifest";

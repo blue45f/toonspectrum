@@ -192,7 +192,7 @@ export function SettingsPage() {
   const doExport = () => {
     const s = useApp.getState();
     const payload = {
-      _app: "toonspectrum-library",
+      _app: "toonstudio-library",
       version: 1,
       exportedAt: new Date().toISOString(),
       ratings: s.ratings,
@@ -206,7 +206,7 @@ export function SettingsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `toonspectrum-library-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `toonstudio-library-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.append(a);
     a.click();
     a.remove();

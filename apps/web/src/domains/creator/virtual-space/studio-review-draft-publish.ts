@@ -1,4 +1,4 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import { createStudioReviewComment } from "../project-graph/studio-project-graph-client";
 import type { StudioReviewComment } from "../project-graph/studio-project-graph-contract";
 import { verifyStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewVerification } from "./studio-virtual-space-review-invitation";

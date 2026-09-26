@@ -98,7 +98,7 @@ export interface StudioBg3dShotBatchCaptureOwner {
   readonly engineId: StudioBg3dCaptureEngineId;
   /** Upstream engine/library revision. */
   readonly engineRevision: string;
-  /** ToonSpectrum-owned adapter/shader/readback revision. */
+  /** ToonStudio-owned adapter/shader/readback revision. */
   readonly implementationRevision: string;
   readonly graphicsApi: StudioBg3dCaptureGraphicsApi;
   /** Versioned color/depth/readback contract, independent of a transient renderer instance. */
@@ -168,7 +168,7 @@ export interface StudioBg3dShotBatchPlannedShot {
 }
 
 export interface StudioBg3dShotBatchPlan {
-  readonly kind: "toonspectrum-bg3d-shot-batch-plan";
+  readonly kind: "toonstudio-bg3d-shot-batch-plan";
   readonly version: 2;
   /** SHA-256 over the canonical scene serialization supplied by the caller. */
   readonly sourceDigest: string;
@@ -499,7 +499,7 @@ function copyCanonicalPlan(plan: StudioBg3dShotBatchPlan): StudioBg3dShotBatchPl
   }));
   const files = shots.flatMap((shot) => shot.files);
   return {
-    kind: "toonspectrum-bg3d-shot-batch-plan",
+    kind: "toonstudio-bg3d-shot-batch-plan",
     version: 2,
     sourceDigest: plan.sourceDigest,
     scopeDigest: plan.scopeDigest,
@@ -545,7 +545,7 @@ function canonicalRenderIdentity(input: Pick<
   | "includeContactSheet"
 >): string {
   return JSON.stringify({
-    kind: "toonspectrum-bg3d-shot-batch-plan",
+    kind: "toonstudio-bg3d-shot-batch-plan",
     version: 2,
     sourceDigest: input.sourceDigest,
     captureOwner: input.captureOwner,
@@ -587,7 +587,7 @@ export async function computeStudioBg3dShotBatchRenderDigest(input: Pick<
 
 function canonicalRecoveryIdentity(scopeDigest: string, planDigest: string): string {
   return JSON.stringify({
-    kind: "toonspectrum-bg3d-shot-batch-recovery",
+    kind: "toonstudio-bg3d-shot-batch-recovery",
     version: 2,
     scopeDigest,
     planDigest,
@@ -631,7 +631,7 @@ export function isStudioBg3dShotBatchPlan(value: unknown): value is StudioBg3dSh
       "shots",
       "files",
     ]) ||
-    plan.kind !== "toonspectrum-bg3d-shot-batch-plan" ||
+    plan.kind !== "toonstudio-bg3d-shot-batch-plan" ||
     plan.version !== 2 ||
     typeof plan.sourceDigest !== "string" || !SHA256_HEX_PATTERN.test(plan.sourceDigest) ||
     typeof plan.scopeDigest !== "string" || !SHA256_HEX_PATTERN.test(plan.scopeDigest) ||
@@ -991,7 +991,7 @@ export async function createStudioBg3dShotBatchPlan(
   return {
     ok: true,
     plan: freezePlan({
-      kind: "toonspectrum-bg3d-shot-batch-plan",
+      kind: "toonstudio-bg3d-shot-batch-plan",
       version: 2,
       sourceDigest,
       scopeDigest,

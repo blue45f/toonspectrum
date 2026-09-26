@@ -43,7 +43,7 @@ describe("Shaper-inspired character workshop product boundary", () => {
     expect(renderer).toContain("THREE.BackSide");
     expect(renderer).toContain("createExpandedOutlineGeometry");
     expect(renderer).toContain("normal.getX(index) * thickness");
-    expect(renderer).toContain("ToonSpectrumAvatarForgeHair_AuthoredMerged");
+    expect(renderer).toContain("ToonStudioAvatarForgeHair_AuthoredMerged");
     expect(renderer).toContain("mergeStudioVrmAuthoredHairGeometry(");
     expect(dialog).toContain("max-w-[1480px]");
     expect(dialog).toContain("_460px");

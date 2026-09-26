@@ -2,7 +2,7 @@ import {
   validateEffectGraph,
   type EffectGraphIR,
   type EffectNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import type { ProviderBenchmarkRegistry } from "./benchmark-registry";
 import type { EngineCapabilityRegistry, RegisteredProvider } from "./registry";

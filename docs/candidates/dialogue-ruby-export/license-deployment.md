@@ -6,7 +6,7 @@
 |---|---:|---|---|---|
 | ag-psd | 31.0.1 (workspace lock) | MIT | Existing browser PSD writer | Keep MIT attribution in the repository's generated notices; no new package added |
 | canvaskit-wasm | 0.41.1 | BSD-3-Clause | Existing renderer, not selected for browser PDF because no SkPDF API is exposed | Keep existing BSD notice; reconsider only with a separately audited PDF-capable build |
-| ToonSpectrum vector PDF/ruby bridge | Repository source | Project distribution terms | Existing Vite application | No new external code or asset |
+| ToonStudio vector PDF/ruby bridge | Repository source | Project distribution terms | Existing Vite application | No new external code or asset |
 | User/CJK font bytes | Per asset | Font-specific embedding rights | Embedded only through existing sfnt license gate | `fsType` policy remains authoritative; restricted fonts fail closed |
 
 No dependency, package manifest or lockfile changed in this slice.

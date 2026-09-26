@@ -455,7 +455,7 @@ export function StudioPublicationOperationsPanel({
   function handleExportCalendar() {
     try {
       const exported = exportStudioReleaseScheduleIcalendar(schedule, {
-        calendarName: "ToonSpectrum 릴리스 일정",
+        calendarName: "ToonStudio 릴리스 일정",
         generatedAt: new Date(),
         includeNotes: calendarIncludeNotes,
       });
@@ -840,7 +840,7 @@ export function StudioPublicationOperationsPanel({
                 <HardDrive size={16} className="mt-0.5 shrink-0" aria-hidden />
                 <div>
                   <p className="text-xs font-semibold">사용자가 제공한 로컬 데이터만 계산합니다</p>
-                  <p className="mt-0.5 text-[0.68rem] leading-relaxed">CSV와 수동 기록은 이 브라우저에서 정규화합니다. ToonSpectrum은 외부 분석 API를 호출하거나 원격 텔레메트리를 수집하지 않습니다.</p>
+                  <p className="mt-0.5 text-[0.68rem] leading-relaxed">CSV와 수동 기록은 이 브라우저에서 정규화합니다. ToonStudio은 외부 분석 API를 호출하거나 원격 텔레메트리를 수집하지 않습니다.</p>
                 </div>
               </div>
 

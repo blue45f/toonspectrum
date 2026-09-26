@@ -15,8 +15,8 @@ import { chromium, type BrowserContext, type Page } from "playwright";
 
 import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
-const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-collab");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
+const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonstudio-studio-collab");
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
 const EXISTING_ORIGIN = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.replace(/\/$/u, "") ?? "";
 
 async function waitForOrigin(origin: string): Promise<void> {
@@ -37,11 +37,11 @@ async function pinStudioLocale(page: Page): Promise<void> {
     try {
       localStorage.setItem(key, "1");
       localStorage.setItem(
-        "toonspectrum-lang",
+        "toonstudio-lang",
         JSON.stringify({ state: { lang: "ko" }, version: 0 }),
       );
       localStorage.setItem(
-        "toonspectrum-studio-ui-density:v1",
+        "toonstudio-studio-ui-density:v1",
         JSON.stringify({ mode: "full" }),
       );
     } catch {

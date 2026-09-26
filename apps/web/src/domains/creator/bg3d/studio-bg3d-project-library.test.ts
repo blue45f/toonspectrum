@@ -153,7 +153,7 @@ function exportDependencies(records: ReadonlyMap<string, Bg3dVerifiedStoredRecor
 
 function manifestForProject(): StudioProjectArchiveManifest {
   return {
-    schema: "toonspectrum.studio-project-archive",
+    schema: "toonstudio.studio-project-archive",
     version: 2,
     project: {
       path: "project.json",
@@ -446,7 +446,7 @@ describe("studio BG3D project-library bridge", () => {
       const result = importedResultFor(projectWithHashes([HASH_A]));
       const created = storedRecord(HASH_A, "created-bg3d-row");
       const disposition: Bg3dModelAtomicImportDispositionV12 = Object.freeze({
-        kind: "toonspectrum-bg3d-model-atomic-import",
+        kind: "toonstudio-bg3d-model-atomic-import",
         version: 1,
         manifestRevision: 7,
         records: Object.freeze([created]),
@@ -492,7 +492,7 @@ describe("studio BG3D project-library bridge", () => {
     const result = importedResultFor(projectWithHashes([HASH_A]));
     const reused = storedRecord(HASH_A, "shared-bg3d-row");
     const disposition: Bg3dModelAtomicImportDispositionV12 = Object.freeze({
-      kind: "toonspectrum-bg3d-model-atomic-import",
+      kind: "toonstudio-bg3d-model-atomic-import",
       version: 1,
       manifestRevision: 9,
       records: Object.freeze([reused]),

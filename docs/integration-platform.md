@@ -57,7 +57,7 @@ must be reconciled before retrying an operation that may create a duplicate.
 Official API channels can become directly executable only after OAuth/API configuration
 and provider approval. Platforms without an approved creator API remain a validated
 package flow: export files, copy metadata, open the provider console and store a human
-confirmation receipt. ToonSpectrum does not accept third-party passwords or use a
+confirmation receipt. ToonStudio does not accept third-party passwords or use a
 headless browser to bypass upload controls.
 
 The package builder records selected channel mode, configuration state, notices and a

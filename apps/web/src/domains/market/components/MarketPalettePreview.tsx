@@ -35,7 +35,7 @@ export function MarketPalettePreview({
       name: paletteName,
       colors,
       exportedAt: new Date().toISOString(),
-      generator: "ToonSpectrum Creator Market",
+      generator: "ToonStudio Creator Market",
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);

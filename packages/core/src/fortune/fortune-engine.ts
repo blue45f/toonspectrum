@@ -51,7 +51,7 @@ export interface TodayFortuneResult {
 // 웹툰 컷(패널) 한 줄: 나레이션(speaker="") 혹은 캐릭터 대사
 export interface FortunePanelLine {
   speaker: string; // 화자 이름. 나레이션이면 빈 문자열
-  characterId: string | null; // 매칭된 ToonSpectrum 캐릭터 id (없으면 null)
+  characterId: string | null; // 매칭된 ToonStudio 캐릭터 id (없으면 null)
   text: string;
   sfx?: string; // 효과음(있으면 컷에 스티커로 표시)
 }
@@ -88,28 +88,28 @@ export const CHARACTERS: FortuneCharacter[] = [
   {
     id: "ara",
     name: "사서 아라",
-    origin: "ToonSpectrum",
+    origin: "ToonStudio",
     greeting: "어서 오세요. 당신의 운명이 적힌 기록을 찾고 계셨나요? 차분하게 한 장씩 읽어드릴게요.",
     avatarUrl: "/images/characters/ara.jpg",
   },
   {
     id: "danwoo",
     name: "도깨비 단우",
-    origin: "ToonSpectrum",
+    origin: "ToonStudio",
     greeting: "오호라, 인간이 내 소문을 듣고 찾아왔나? 오늘 네 운이 대박인지 쪽박인지 내가 한번 봐주지!",
     avatarUrl: "/images/characters/danwoo.jpg",
   },
   {
     id: "leona",
     name: "점술가 레오나",
-    origin: "ToonSpectrum",
+    origin: "ToonStudio",
     greeting: "별들이 오늘 밤 유난히 반짝이네요. 당신의 별자리가 가리키는 미래를 엿볼 준비가 되셨나요?",
     avatarUrl: "/images/characters/leona.jpg",
   },
   {
     id: "gaon",
     name: "검객 가온",
-    origin: "ToonSpectrum",
+    origin: "ToonStudio",
     greeting: "운명 따위, 칼 한 자루로 베어버릴 뿐. 하지만 굳이 길을 묻겠다면 검끝이 가리키는 곳을 말해주지.",
     avatarUrl: "/images/characters/gaon.jpg",
   },

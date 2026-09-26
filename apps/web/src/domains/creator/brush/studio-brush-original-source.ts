@@ -14,7 +14,7 @@ export type StudioBrushOriginalSource = OriginalMetadata & (
   | { readonly encoding: "base64"; readonly base64: string }
   | { readonly encoding: "opfs-cas" }
 );
-export const BRUSH_SOURCE_ARCHIVE_KIND = "toonspectrum-studio-brush-source-archive";
+export const BRUSH_SOURCE_ARCHIVE_KIND = "toonstudio-studio-brush-source-archive";
 export const BRUSH_SOURCE_SETTINGS_MAX_CHARACTERS = 2 * 1024 * 1024;
 export const BRUSH_SOURCE_ARCHIVE_MAX_CHARACTERS =
   Math.ceil(STUDIO_BRUSH_PROGRAM_MAX_BYTES / 3) * 4 + BRUSH_SOURCE_SETTINGS_MAX_CHARACTERS + 4096;

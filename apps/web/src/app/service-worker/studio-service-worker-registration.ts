@@ -86,8 +86,8 @@ async function purgeOwnedCaches(): Promise<void> {
       .filter(
         (key) =>
           key.startsWith(STUDIO_SERVICE_WORKER_CACHE_PREFIX)
-          || key.startsWith("toonspectrum-pwa-")
-          || key.startsWith("toonspectrum-covers-"),
+          || key.startsWith("toonstudio-pwa-")
+          || key.startsWith("toonstudio-covers-"),
       )
       .map((key) => caches.delete(key)),
   );
@@ -178,10 +178,10 @@ function updatePromptCopy(): UpdatePromptCopy {
 }
 
 export function renderStudioServiceWorkerUpdatePrompt(onApply: () => Promise<void>): void {
-  if (document.getElementById("toonspectrum-sw-update")) return;
+  if (document.getElementById("toonstudio-sw-update")) return;
   const copy = updatePromptCopy();
   const host = document.createElement("div");
-  host.id = "toonspectrum-sw-update";
+  host.id = "toonstudio-sw-update";
   // A shadow root keeps this prompt out of reach of the app's cascade — and
   // keeps it from perturbing Studio's own layout.
   const root = host.attachShadow({ mode: "open" });
@@ -249,10 +249,10 @@ export function renderStudioServiceWorkerUpdatePrompt(onApply: () => Promise<voi
         .apply { flex: 1; }
       }
     </style>
-    <div class="card" data-state="ready" role="region" aria-labelledby="toonspectrum-sw-update-title">
+    <div class="card" data-state="ready" role="region" aria-labelledby="toonstudio-sw-update-title">
       <span class="status-dot" aria-hidden="true"></span>
       <span class="copy" role="status" aria-live="polite" aria-atomic="true">
-        <strong class="title" id="toonspectrum-sw-update-title"></strong>
+        <strong class="title" id="toonstudio-sw-update-title"></strong>
         <span class="description"></span>
       </span>
       <span class="actions">

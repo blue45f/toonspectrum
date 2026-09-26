@@ -193,7 +193,7 @@ describe("BG3D template library persistence", () => {
     );
     const raw = await getRawTemplate(database, "template-a");
     expect(raw).toMatchObject({
-      kind: "toonspectrum-studio-bg3d-template",
+      kind: "toonstudio-studio-bg3d-template",
       version: 1,
       id: "template-a",
     });
@@ -301,7 +301,7 @@ describe("BG3D template library persistence", () => {
     });
     const validJson = serializeStudioBg3dSceneDocument(canonicalScene()) ?? "";
     await putRawTemplate(database, {
-      kind: "toonspectrum-studio-bg3d-template",
+      kind: "toonstudio-studio-bg3d-template",
       version: 1,
       id: "corrupt-template",
       name: "Corrupt",

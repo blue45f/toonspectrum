@@ -288,12 +288,12 @@ function addHairParts(group: THREE.Group, state: AvatarForgeState, fit: HeadFit)
     createExpandedOutlineGeometry(merged),
     createHairOutlineMaterial(state),
   );
-  mesh.name = "ToonSpectrumAvatarForgeHair_AuthoredMerged";
+  mesh.name = "ToonStudioAvatarForgeHair_AuthoredMerged";
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.renderOrder = 6;
   mesh.userData.partCount = parts.length;
-  outline.name = "ToonSpectrumAvatarForgeHairOutline_AuthoredMerged";
+  outline.name = "ToonStudioAvatarForgeHairOutline_AuthoredMerged";
   outline.renderOrder = 5;
   outline.userData.partCount = parts.length;
   group.userData[AVATAR_FORGE_OWNED_TEXTURES] = [gradientMap];
@@ -334,7 +334,7 @@ function addFaceDisc(
   const geometry = new THREE.CircleGeometry(radius, 18);
   const material = createAccentMaterial(accent, opacityMultiplier);
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.name = `ToonSpectrumAvatarForgeFaceAccent_${id}`;
+  mesh.name = `ToonStudioAvatarForgeFaceAccent_${id}`;
   mesh.position.set(x, y, faceSurfaceZ(fit, x, y, radius * 0.06));
   mesh.scale.x = scaleX;
   if (fit.frontSign < 0) mesh.rotation.y = Math.PI;
@@ -394,7 +394,7 @@ function addFaceAccents(group: THREE.Group, state: AvatarForgeState, fit: HeadFi
 
 function buildAvatarForgeObject(state: AvatarForgeState, fit: HeadFit) {
   const group = new THREE.Group();
-  group.name = "ToonSpectrumAvatarForge";
+  group.name = "ToonStudioAvatarForge";
   group.userData[AVATAR_FORGE_MARKER] = true;
   addHairParts(group, state, fit);
   addFaceAccents(group, state, fit);

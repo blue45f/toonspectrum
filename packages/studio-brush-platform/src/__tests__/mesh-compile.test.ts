@@ -3,7 +3,7 @@ import {
   canonicalJson,
   fnv1a64Hex,
   pathBounds,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -21,7 +21,7 @@ import {
   type InkStrokeMesh,
 } from "../ink-mesh";
 
-import type { ModeledSampleIR, StrokeIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR, StrokeIR } from "@toonstudio/studio-project-model";
 
 const meshProgram = brushProgramIRSchema.parse({
   id: "v19-ink-mesh-pen",

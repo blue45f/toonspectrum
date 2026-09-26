@@ -24,7 +24,7 @@ function validMetadata(overrides: Partial<AssetMetadataIR> = {}): AssetMetadataI
     version: "1.2.0",
     engineRequirements: ["brush.natural-media.myb", "stroke.geometry.pressure-outline"],
     sourceFormat: "myb",
-    license: { spdx: "CC0-1.0", attribution: "ToonSpectrum corpus" },
+    license: { spdx: "CC0-1.0", attribution: "ToonStudio corpus" },
     contentDigest: computeAssetContentDigest("payload"),
     createdAt: 1_754_000_000_000,
     provenance: {
@@ -102,9 +102,9 @@ describe("assetMetadataIRSchema", () => {
     const evidenceDigest = computeAssetContentDigest("evidence");
     const normalizedIrRef = {
       digest: normalizedDigest,
-      schema: "toonspectrum.brush-program-ir",
+      schema: "toonstudio.brush-program-ir",
       schemaVersion: 11,
-      mediaType: "application/vnd.toonspectrum.brush-program+json",
+      mediaType: "application/vnd.toonstudio.brush-program+json",
       locator: "opfs://assets/normalized/brush.json",
     };
     const metadata = assetMetadataIRSchema.parse({
@@ -217,7 +217,7 @@ describe("assetMetadataIRSchema", () => {
         },
         notes: [],
       },
-      license: { spdx: "CC0-1.0", attribution: "ToonSpectrum corpus" },
+      license: { spdx: "CC0-1.0", attribution: "ToonStudio corpus" },
       contentDigest: originalDigest,
       createdAt: 1_754_000_000_000,
       provenance: {
@@ -281,7 +281,7 @@ describe("assetMetadataIRSchema", () => {
       marketplace: {
         status: "published",
         listingId: "listing-complete",
-        publisherId: "publisher-toonspectrum",
+        publisherId: "publisher-toonstudio",
         access: "free",
         category: "inking",
         tags: ["myb", "ink"],
@@ -326,9 +326,9 @@ describe("assetMetadataIRSchema", () => {
   it("rejects new automatic renderer-substitution metadata but migrates retained legacy cards to unavailable", () => {
     const normalizedIrRef = {
       digest: computeAssetStructuredDigest({ kind: "brush", value: 1 }),
-      schema: "toonspectrum.brush-program-ir",
+      schema: "toonstudio.brush-program-ir",
       schemaVersion: 11,
-      mediaType: "application/vnd.toonspectrum.brush-program+json",
+      mediaType: "application/vnd.toonstudio.brush-program+json",
       locator: null,
     };
     const legacyCard = {
@@ -381,9 +381,9 @@ describe("assetMetadataIRSchema", () => {
     // `fallback` instruction next to `requiredEvidence` that still names the retired gate.
     const normalizedIrRef = {
       digest: computeAssetStructuredDigest({ kind: "brush", value: 2 }),
-      schema: "toonspectrum.brush-program-ir",
+      schema: "toonstudio.brush-program-ir",
       schemaVersion: 11,
-      mediaType: "application/vnd.toonspectrum.brush-program+json",
+      mediaType: "application/vnd.toonstudio.brush-program+json",
       locator: null,
     };
     const legacyEvidence = [

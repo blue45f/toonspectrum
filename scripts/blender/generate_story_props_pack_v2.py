@@ -1,4 +1,4 @@
-"""Generate ToonSpectrum's second-generation story prop GLB pack.
+"""Generate ToonStudio's second-generation story prop GLB pack.
 
 The source is deliberately self-contained so it can run either from Blender's
 command line or through Blender MCP ``execute_blender_code``.  It uses no
@@ -270,7 +270,7 @@ def add_asset_root(asset_id, attachment_origin, nominal_dimensions):
     root = bpy.data.objects.new(f"TS_{asset_id}_Root", None)
     root.empty_display_type = "PLAIN_AXES"
     root["asset_id"] = asset_id
-    root["asset_author"] = "ToonSpectrum"
+    root["asset_author"] = "ToonStudio"
     root["asset_generator"] = GENERATOR
     root["asset_license"] = "CC0-1.0"
     root["asset_license_url"] = CC0_LICENSE_URL
@@ -587,7 +587,7 @@ def generate_story_props_pack_v2():
     }
     for asset_id, _filename in ASSETS:
         builders[asset_id]()
-    print("Generated all six ToonSpectrum story prop v2 assets.")
+    print("Generated all six ToonStudio story prop v2 assets.")
 
 
 if __name__ == "__main__":

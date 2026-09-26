@@ -166,7 +166,7 @@ export const STUDIO_COMMERCIAL_OPEN_ENGINE_CATALOG = Object.freeze([
       "studio-spectral-pigment-mix-approx (public KM theory, not Mixbox code)",
     ]),
     recommendation:
-      "Do not vendor mixbox.js into production ToonSpectrum without commercial license. "
+      "Do not vendor mixbox.js into production ToonStudio without commercial license. "
       + "Use public-domain Kubelka–Munk approximation or Hokusai paint_mode until licensed.",
   }),
   Object.freeze({

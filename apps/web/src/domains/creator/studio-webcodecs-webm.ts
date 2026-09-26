@@ -99,7 +99,7 @@ export const WEBM_MAX_BLOCK_RELATIVE_TICKS = 32_767;
 /** Cluster 하나가 덮는 기본 최대 길이(ms) — 탐색 입도와 오버헤드의 절충. */
 export const WEBM_DEFAULT_MAX_CLUSTER_MS = 5_000;
 /** MuxingApp/WritingApp 문자열 — 결정성을 위해 버전 문자열을 박지 않는다. */
-export const WEBM_WRITING_APP = "ToonSpectrum Studio";
+export const WEBM_WRITING_APP = "ToonStudio Studio";
 
 const SEEK_POSITION_BYTES = 8; // 고정 폭 → SeekHead 크기 상수화
 const TRACK_TYPE_VIDEO = 1;

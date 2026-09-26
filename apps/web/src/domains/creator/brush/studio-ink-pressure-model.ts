@@ -1,7 +1,7 @@
 /**
  * Versioned pressure-to-diameter semantics for persisted ink.
  *
- * An omitted model is intentionally the historical ToonSpectrum contract. Never reinterpret an
+ * An omitted model is intentionally the historical ToonStudio contract. Never reinterpret an
  * existing stroke as a newer model merely because a renderer learned about one: old documents
  * depend on the 0.3 + 1.4p width factor and the quarter-pixel minimum radius.
  */

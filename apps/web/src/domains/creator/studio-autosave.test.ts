@@ -55,7 +55,7 @@ function retainedAiProvenance() {
 
 describe("studio autosave", () => {
   it("사용자와 문서 문맥별로 키를 격리한다", () => {
-    expect(studioAutosaveKey({})).toBe("toonspectrum-studio-autosave:v12:guest:new");
+    expect(studioAutosaveKey({})).toBe("toonstudio-studio-autosave:v12:guest:new");
     expect(studioAutosaveKey({ userId: "u1", workId: "w1" })).not.toBe(
       studioAutosaveKey({ userId: "u1", workId: "w2" })
     );
@@ -91,7 +91,7 @@ describe("studio autosave", () => {
 
   it("공유 3D Stage는 엄격하게 보존하고 손상된 링크만 제거해 원고 복구를 지킨다", () => {
     const shared3dStage = {
-      kind: "toonspectrum.studio-shared-3d-stage",
+      kind: "toonstudio.studio-shared-3d-stage",
       version: 1,
       authority: "page-background-with-linked-character-sources",
       capturePolicy: "require-all-linked",

@@ -75,22 +75,22 @@
         "repositoryAuthority": "sqlite-opfs",
         "runtimeAcquire": "acquireStudioLocalDatabase",
         "requestedVfs": "opfs",
-        "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+        "sqliteOpfsDirectory": "toonstudio-studio-sqlite",
         "sqliteDatabaseFilename": "studio-local-v12.db",
         "expectedOpenFilename": "/studio-local-v12.db",
         "openedOpfsDatabaseFilenames": [
           "/studio-local-v12.db"
         ],
         "installedOpfsDirectories": [
-          "toonspectrum-studio-sqlite"
+          "toonstudio-studio-sqlite"
         ],
         "openedMemoryDatabaseFilenames": [],
-        "casOpfsRoot": "toonspectrum-studio-assets",
+        "casOpfsRoot": "toonstudio-studio-assets",
         "casKind": "opfs",
         "namespace": "studio-custom-font-library-v12",
         "manifestKey": "manifest-v1",
         "owner": "studio-custom-font-library-v12",
-        "webLockName": "toonspectrum-studio-custom-font-library-v12",
+        "webLockName": "toonstudio-studio-custom-font-library-v12",
         "normalCloseCompleted": true
       },
       "support": {
@@ -412,7 +412,7 @@
       },
       "opfs": {
         "sqlite": {
-          "root": "toonspectrum-studio-sqlite",
+          "root": "toonstudio-studio-sqlite",
           "exists": true,
           "entries": [
             {
@@ -455,7 +455,7 @@
           "totalFileBytes": 253952
         },
         "cas": {
-          "root": "toonspectrum-studio-assets",
+          "root": "toonstudio-studio-assets",
           "exists": true,
           "entries": [
             {
@@ -2262,7 +2262,7 @@
       }
     ],
     "fontBytesBundled": false,
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-custom-font-opfs-qFNNNO"
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-custom-font-opfs-qFNNNO"
   },
   "validationIssues": []
 }

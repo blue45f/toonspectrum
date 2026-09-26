@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FORTUNE_EXPERIENCES } from "@toonspectrum/core/fortune";
+import { FORTUNE_EXPERIENCES } from "@toonstudio/core/fortune";
 import { FORTUNE_CAMPUS_ROOMS, fortuneCampusHref, fortuneCampusRoom } from "./fortune-campus-map";
 
 describe("complete observatory binding", () => {

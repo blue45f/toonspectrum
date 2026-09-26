@@ -23,7 +23,7 @@ import {
  */
 
 export const STUDIO_OPFS_SYNC_DEFAULT_ROOT_NAME =
-  "toonspectrum-studio-large-documents";
+  "toonstudio-studio-large-documents";
 export const STUDIO_OPFS_SYNC_MAX_TRANSFER_BYTES = 64 * 1024 * 1024;
 
 const DOCUMENT_ID_RE = /^[a-z0-9][a-z0-9._-]{0,127}$/u;

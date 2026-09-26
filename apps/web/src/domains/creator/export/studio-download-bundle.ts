@@ -157,7 +157,7 @@ export async function buildStudioDownloadBundle(
     blob,
     fileName: createStudioDownloadFileName({
       title: input.title,
-      fallbackTitle: "toonspectrum-webtoon",
+      fallbackTitle: "toonstudio-webtoon",
       suffix: appendStudioDownloadSuffix(
         "strip-bundle",
         studioDownloadVersionSuffix(input.versionContext),

@@ -186,12 +186,12 @@ function expectRejected(
 describe("Studio Scene Layer Lift contract", () => {
   it("publishes stable, product-owned names and explicit resource budgets", () => {
     expect(STUDIO_SCENE_LAYER_LIFT_CONTRACT_KIND)
-      .toBe("toonspectrum.scene-layer-lift");
+      .toBe("toonstudio.scene-layer-lift");
     expect(STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION).toBe(1);
     expect(STUDIO_SCENE_LAYER_LIFT_REQUEST_KIND)
-      .toBe("toonspectrum.scene-layer-lift/request");
+      .toBe("toonstudio.scene-layer-lift/request");
     expect(STUDIO_SCENE_LAYER_LIFT_RESULT_KIND)
-      .toBe("toonspectrum.scene-layer-lift/result");
+      .toBe("toonstudio.scene-layer-lift/result");
     expect(STUDIO_SCENE_LAYER_LIFT_SEMANTIC_LAYER_ROLES).toEqual(
       expect.arrayContaining([
         "background",

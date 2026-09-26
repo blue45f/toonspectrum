@@ -9,8 +9,8 @@ for (const language of ["ko", "en"] as const) {
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.addInitScript((lang) => {
-      localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang }, version: 0 }));
-      sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+      localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang }, version: 0 }));
+      sessionStorage.setItem("toonstudio-compat-dismissed", "true");
     }, language);
     await page.route("**/api/**", async (route) => {
       const session = new URL(route.request().url()).pathname.endsWith("/auth/session");

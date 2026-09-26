@@ -203,7 +203,7 @@ function manifestFor(
   }));
   const attachmentBytes = attachments.reduce((total, item) => total + item.byteSize, 0);
   return {
-    schema: "toonspectrum.studio-project-archive",
+    schema: "toonstudio.studio-project-archive",
     version: 2,
     project: {
       path: "project.json",
@@ -805,7 +805,7 @@ describe("studio VRM texture-paint project library bridge", () => {
         return {
           disposition: "installed" as const,
           creationReceipt: {
-            schema: "toonspectrum.vrm-texture-paint-library-creation" as const,
+            schema: "toonstudio.vrm-texture-paint-library-creation" as const,
             version: 1 as const,
             authority: "legacy-indexeddb" as const,
             contentHash: candidate.metadata.contentHash,
@@ -889,7 +889,7 @@ describe("studio VRM texture-paint project library bridge", () => {
         return {
           disposition: "installed",
           creationReceipt: {
-            schema: "toonspectrum.vrm-texture-paint-library-creation",
+            schema: "toonstudio.vrm-texture-paint-library-creation",
             version: 1,
             authority: "legacy-indexeddb",
             contentHash: candidate.metadata.contentHash,
@@ -972,7 +972,7 @@ describe("studio VRM texture-paint project library bridge", () => {
       return {
         disposition: "installed" as const,
         creationReceipt: {
-          schema: "toonspectrum.vrm-texture-paint-library-creation" as const,
+          schema: "toonstudio.vrm-texture-paint-library-creation" as const,
           version: 1 as const,
           authority: "legacy-indexeddb" as const,
           contentHash: candidate.metadata.contentHash,

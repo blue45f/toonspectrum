@@ -1,4 +1,4 @@
-import type { FortuneGroup } from "@toonspectrum/core/fortune";
+import type { FortuneGroup } from "@toonstudio/core/fortune";
 import { useI18n } from "@/shared/lib/i18n";
 import { FORTUNE_CAMPUS_ROOMS } from "./fortune-campus-map";
 

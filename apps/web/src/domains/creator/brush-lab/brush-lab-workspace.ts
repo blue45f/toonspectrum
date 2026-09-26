@@ -2,7 +2,7 @@ import { parseBrushLabRecipe } from "./brush-lab-recipe";
 
 import type { BrushLabRecipe } from "./brush-lab-recipe";
 
-export const BRUSH_LAB_WORKSPACE_KIND = "toonspectrum-brush-lab-workspace";
+export const BRUSH_LAB_WORKSPACE_KIND = "toonstudio-brush-lab-workspace";
 export const BRUSH_LAB_WORKSPACE_VERSION = 1;
 /** Changes when the deterministic variant algorithm changes, independently of slot schema. */
 export const BRUSH_LAB_GENERATOR_REVISION = 2;

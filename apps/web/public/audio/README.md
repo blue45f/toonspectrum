@@ -1,9 +1,9 @@
-# ToonSpectrum 오리지널 OST 자산
+# ToonStudio 오리지널 OST 자산
 
 - 상태: **검토된 오리지널 음원 release**
 - 최종 갱신: **2026-09-26**
 
-이 디렉터리는 ToonSpectrum 자체 제작 soundtrack만 보관한다.
+이 디렉터리는 ToonStudio 자체 제작 soundtrack만 보관한다.
 
 - `playlist.json`에는 provenance가 확인되고 승인된 원곡만 등록한다.
 - 최종 master는 `original/`에 48 kHz stereo, 192 kbps MP3와 provenance JSON sidecar로 둔다.

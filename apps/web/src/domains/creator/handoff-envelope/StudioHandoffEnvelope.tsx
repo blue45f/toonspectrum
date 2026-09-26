@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useState } from "react";
-import type { StudioHandoffEnvelopeView } from "@toonspectrum/studio-project-model";
+import type { StudioHandoffEnvelopeView } from "@toonstudio/studio-project-model";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import Link from "@/shared/navigation/router-link";
 import { Button } from "@/shared/components/ui/button";

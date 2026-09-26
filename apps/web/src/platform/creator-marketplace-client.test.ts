@@ -88,7 +88,7 @@ async function manifest(): Promise<CreatorMarketplaceResourceManifest> {
     resourceVersion: "1.0.0",
     minimumStudioVersion: "0.1.0",
     tags: ["마감"],
-    license: "toonspectrum-standard",
+    license: "toonstudio-standard",
     attributionText: "",
     containsAi: false,
     rightsConfirmed: true,
@@ -211,7 +211,7 @@ describe("creator marketplace client", () => {
       })
     ).resolves.toMatchObject({
       mode: "procedural-recipe",
-      mediaType: "application/vnd.toonspectrum.asset+json",
+      mediaType: "application/vnd.toonstudio.asset+json",
     });
   });
 
@@ -471,7 +471,7 @@ describe("creator marketplace client", () => {
           name: "검수 브러시",
           kind: "brush",
           resourceVersion: "1.0.0",
-          license: "toonspectrum-standard",
+          license: "toonstudio-standard",
           manifestHash: "a".repeat(64),
           manifestByteSize: 512,
           releaseCreatedAt: "2026-08-30T01:00:00.000Z",

@@ -17,7 +17,7 @@ export interface StudioLocalDatabaseWorkerSqliteLoaderOptions {
  * Initializes sqlite-wasm for the single SAH-pool authority owned by our DedicatedWorker.
  *
  * sqlite-wasm otherwise attempts to install its separate `opfs` and `opfs-wl` VFSes, each of
- * which launches an additional async proxy Worker. ToonSpectrum never uses those VFSes and Vite
+ * which launches an additional async proxy Worker. ToonStudio never uses those VFSes and Vite
  * cannot infer their package-internal runtime URL from the prebundled module. Disable only those
  * optional installers while leaving `opfs-sahpool` enabled for openStudioLocalDatabase().
  */

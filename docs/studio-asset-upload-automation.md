@@ -277,7 +277,7 @@ pnpm run studio:toolchain:setup -- --check
 로컬 `batch_source`를 기반으로 운영 배포까지:
 
 ```bash
-export TOONSTUDIO_HOME="/path/to/toonspectrum"
+export TOONSTUDIO_HOME="/path/to/toonstudio"
 pnpm --dir "$TOONSTUDIO_HOME" run studio:asset:release -- \
   --source-dir "$TOONSTUDIO_HOME/batch_source" \
   --manifest "$TOONSTUDIO_HOME/batch_generated/manifest.json" \
@@ -415,7 +415,7 @@ pnpm run studio:upload-assets -- --manifest batch_generated/manifest.json --type
 ### 어디서나 동일하게 실행하는 전역 템플릿 (요약)
 
 ```bash
-export TOONSTUDIO_HOME="/path/to/toonspectrum"
+export TOONSTUDIO_HOME="/path/to/toonstudio"
 pnpm --dir "$TOONSTUDIO_HOME" run studio:manifest:generate -- \
   --source-dir "$TOONSTUDIO_HOME/batch_source" \
   --output "$TOONSTUDIO_HOME/batch_generated/manifest.json" \
@@ -431,12 +431,12 @@ pnpm --dir "$TOONSTUDIO_HOME" run studio:upload-assets -- \
 ### 어디서나 동일하게 실행하는 전역 가이드
 
 ```bash
-cd /path/to/toonspectrum
+cd /path/to/toonstudio
 pnpm install
 pnpm run studio:upload-assets -- --auto-demo-login --dry-run --max-items 20
 pnpm run studio:upload-assets -- --manifest batch_generated/manifest.json --type auto --max-items 20 --work-title "toonbatch-$(date +%Y%m%d)"
 # 다른 경로에서 실행할 땐 manifest를 절대경로로 넣으면 됩니다.
-pnpm run studio:upload-assets -- --manifest /path/to/toonspectrum/batch_generated/manifest.json --type auto --work-title "global-run"
+pnpm run studio:upload-assets -- --manifest /path/to/toonstudio/batch_generated/manifest.json --type auto --work-title "global-run"
 ```
 
 리포지토리 경로만 동일하면 macOS/Windows/Linux에서 같은 방식으로 재현할 수 있습니다.  

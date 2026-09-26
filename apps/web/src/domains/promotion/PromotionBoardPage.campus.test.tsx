@@ -2,7 +2,7 @@
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { PromotionPost } from "@toonspectrum/core/promotion";
+import type { PromotionPost } from "@toonstudio/core/promotion";
 import {
   CampusObjectPublisherContext,
   type CampusObjectPublisher,

@@ -205,7 +205,7 @@ export function presetsForAssistTool(tool: StudioAiAssistToolId): readonly Studi
 
 // ── Recent prompts ─────────────────────────────────────────────────────────
 
-export const STUDIO_AI_RECENT_PROMPTS_KEY = "toonspectrum-studio-ai-recent-prompts:v1";
+export const STUDIO_AI_RECENT_PROMPTS_KEY = "toonstudio-studio-ai-recent-prompts:v1";
 export const STUDIO_AI_RECENT_PROMPTS_MAX = 12;
 export const STUDIO_AI_RECENT_PROMPTS_VERSION = 1 as const;
 
