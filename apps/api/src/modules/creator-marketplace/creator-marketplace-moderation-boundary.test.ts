@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   creatorMarketplaceResourceReportGates,
   creatorMarketplaceResourceReports,
-} from "../../db/creator-marketplace-report.schema";
+} from "../../platform/database/creator-marketplace-report.schema";
 
 const repositorySource = readFileSync(
   new URL("./creator-marketplace.repository.ts", import.meta.url),
@@ -18,14 +18,14 @@ const controllerSource = readFileSync(
 );
 const migration = readFileSync(
   new URL(
-    "../../db/migrations/0031_creator_marketplace_moderation.sql",
+    "../../platform/database/migrations/0031_creator_marketplace_moderation.sql",
     import.meta.url
   ),
   "utf8"
 );
 const packageMigration = readFileSync(
   new URL(
-    "../../db/migrations/0034_creator_marketplace_package_moderation.sql",
+    "../../platform/database/migrations/0034_creator_marketplace_package_moderation.sql",
     import.meta.url
   ),
   "utf8"

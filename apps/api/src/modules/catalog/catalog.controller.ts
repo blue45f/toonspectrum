@@ -15,7 +15,7 @@ import {
 } from "@nestjs/common";
 
 import { buildAffiliateUrl } from "../../../../web/src/shared/lib/affiliate";
-import { coverImagePolicy } from "../../../../../packages/core/src/server";
+import { coverImagePolicy } from "../../../../../packages/core/src/catalog";
 import { getAppConfig } from "../../server/app-config";
 
 import { searchParamsFromBody } from "../../../../../packages/core/src/search-pagination";

@@ -14,7 +14,7 @@ import {
   Query,
 } from "@nestjs/common";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import { StudioTeamCommentLivePublisher } from "./studio-team-comment-live.publisher";
 import {

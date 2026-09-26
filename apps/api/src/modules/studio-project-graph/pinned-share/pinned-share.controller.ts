@@ -6,7 +6,7 @@ import { z } from "zod";
 import { studioWorkSessionId } from "@toonspectrum/studio-project-model/work-session";
 import { pinnedShareId, pinnedShareSubject, pinnedShareCreateSchema, pinnedShareAccessSchema, pinnedShareFeedbackInputSchema } from "@toonspectrum/studio-project-model/pinned-review-share";
 
-import { ZodValidationPipe } from "../../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../../platform/http/zod-validation.pipe";
 import { authenticatedStudioUserId } from "../studio-project-graph.controller";
 import { PinnedReviewShareService } from "./pinned-share.service";
 import { limitPinnedShareRequest, requirePinnedShareBrowserOrigin } from "./pinned-share-request";

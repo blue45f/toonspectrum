@@ -6,7 +6,7 @@ import { LocalAuthRateLimiter } from "../auth/auth-rate-limit";
 import {
   UPSTASH_COORDINATION_PORT,
   type UpstashCoordinationPort,
-} from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+} from "../../platform/adapters/upstash-coordination/upstash-coordination.port";
 
 export const CREATOR_INTELLIGENCE_PAID_OPERATIONS = [
   "voice",

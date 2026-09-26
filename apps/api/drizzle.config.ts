@@ -1,6 +1,6 @@
 import { defineConfig } from "drizzle-kit";
 
-import { normalizePgConnectionStringForTls } from "./src/db/pg-connection";
+import { normalizePgConnectionStringForTls } from "./src/platform/database/pg-connection";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -11,16 +11,16 @@ const normalizedDatabaseUrl = normalizePgConnectionStringForTls(databaseUrl);
 // PostgreSQL(Neon). 로컬 검증은 docker postgres(:55432), 원격은 Neon(DATABASE_URL, sslmode=verify-full).
 export default defineConfig({
   schema: [
-    "./apps/api/src/db/schema.ts",
-    "./apps/api/src/db/creator-marketplace-resource.schema.ts",
-    "./apps/api/src/db/creator-marketplace-report.schema.ts",
-    "./apps/api/src/db/creator-marketplace-library.schema.ts",
-    "./apps/api/src/db/creator-marketplace-package-moderation.schema.ts",
-    "./apps/api/src/db/creator-asset-object-storage.schema.ts",
-    "./apps/api/src/db/studio-crdt-raster-checkpoint.schema.ts",
-    "./apps/api/src/db/studio-raster-asset.schema.ts",
+    "./apps/api/src/platform/database/schema.ts",
+    "./apps/api/src/platform/database/creator-marketplace-resource.schema.ts",
+    "./apps/api/src/platform/database/creator-marketplace-report.schema.ts",
+    "./apps/api/src/platform/database/creator-marketplace-library.schema.ts",
+    "./apps/api/src/platform/database/creator-marketplace-package-moderation.schema.ts",
+    "./apps/api/src/platform/database/creator-asset-object-storage.schema.ts",
+    "./apps/api/src/platform/database/studio-crdt-raster-checkpoint.schema.ts",
+    "./apps/api/src/platform/database/studio-raster-asset.schema.ts",
   ],
-  out: "./apps/api/src/db/migrations",
+  out: "./apps/api/src/platform/database/migrations",
   dialect: "postgresql",
   dbCredentials: {
     url: normalizedDatabaseUrl,

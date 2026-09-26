@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import {
   preflightStudioAiAdmissionSchema,
@@ -11,7 +11,7 @@ import {
   studioAiAdmissionSchemaPreflightProvider,
 } from "./studio-ai-admission-schema-preflight";
 
-vi.mock("../../db", () => ({ dbPool: { query: vi.fn() } }));
+vi.mock("../../platform/database", () => ({ dbPool: { query: vi.fn() } }));
 
 function completeSchema(overrides: Record<string, unknown> = {}) {
   return {
@@ -139,7 +139,7 @@ describe("Studio AI admission schema preflight", () => {
   it("ships a transactional canonical replacement for every owned CHECK", () => {
     const migration = readFileSync(
       new URL(
-        "../../db/migrations/0018_studio_ai_request_gate.sql",
+        "../../platform/database/migrations/0018_studio_ai_request_gate.sql",
         import.meta.url
       ),
       "utf8"

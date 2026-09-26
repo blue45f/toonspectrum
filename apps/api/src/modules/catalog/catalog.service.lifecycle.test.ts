@@ -10,8 +10,8 @@ import { CatalogService } from "./catalog.service";
 
 import type { INestApplicationContext } from "@nestjs/common";
 
-vi.mock("../../db", async () => ({
-  ...await import("../../db/schema"),
+vi.mock("../../platform/database", async () => ({
+  ...await import("../../platform/database/schema"),
   db: {},
   dbClient: {},
 }));

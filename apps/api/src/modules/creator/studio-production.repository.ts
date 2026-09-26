@@ -20,7 +20,7 @@ import {
   studioReviewCommentAssignees,
   studioReviews,
   users,
-} from "../../db";
+} from "../../platform/database";
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
 import {
   StudioPersonalKitDocumentSchema,

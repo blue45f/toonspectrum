@@ -2,8 +2,8 @@ import { createHash } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
-import type { PrivateObjectReference } from "../../infrastructure/private-object-storage/private-object-storage.contract";
+import type { PrivateObjectStoragePort } from "../../platform/adapters/private-object-storage/private-object-storage.port";
+import type { PrivateObjectReference } from "../../platform/adapters/private-object-storage/private-object-storage.contract";
 import type {
   StudioRemoteReferenceDnsResolver,
   StudioRemoteReferenceHttpRequester,

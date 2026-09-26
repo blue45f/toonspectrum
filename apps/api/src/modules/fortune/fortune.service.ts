@@ -10,7 +10,7 @@ import {
   getCharacters,
   type FortuneCharacter,
 } from "../../../../../packages/core/src/fortune";
-import { TITLES } from "../../../../../packages/core/src/server";
+import { TITLES } from "../../../../../packages/core/src/catalog";
 
 /**
  * Fortune calculations and character comic scripts are deterministic local content.

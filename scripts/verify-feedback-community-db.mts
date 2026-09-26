@@ -13,7 +13,7 @@ if (!["localhost", "127.0.0.1", "[::1]"].includes(target.hostname) || target.pat
   throw new Error("Refusing to modify anything except loopback /feedback_community_test.");
 }
 process.env.DATABASE_URL = rawUrl;
-const { dbPool } = await import("../apps/api/src/db/index");
+const { dbPool } = await import("../apps/api/src/platform/database/index");
 const feedback = await import("../apps/api/src/server/feedback");
 const { validateFeedbackInput } = await import("../packages/core/src/feedback");
 const checks: string[] = [];
@@ -38,7 +38,7 @@ try {
   await dbPool.query(`INSERT INTO feedback_post(id,"userId",title,text,status) VALUES ('legacy','member','기존 이용 질문','기존 답변을 보존해야 합니다.','answered')`);
   await check("additive migration preserves legacy questions and reply state", async () => {
     await assert.rejects(feedback.ensureFeedbackTables(), { statusCode: 503 });
-    const migration = await readFile(new URL("../apps/api/src/db/migrations/0038_feedback_community.sql", import.meta.url), "utf8");
+    const migration = await readFile(new URL("../apps/api/src/platform/database/migrations/0038_feedback_community.sql", import.meta.url), "utf8");
     // Execute twice through the owner, never through the runtime API connection.
     for (let index = 0; index < 2; index++) await dbPool.query(`BEGIN; ${migration} COMMIT;`);
     await Promise.all([feedback.ensureFeedbackTables(), feedback.ensureFeedbackTables()]);
@@ -127,7 +127,7 @@ try {
     // Install their real managed schemas in this isolated fixture; never weaken that authority.
     for (const file of ["0068_business_inquiries.sql", "0071_supporter_payments.sql",
       "0072_creator_support_program.sql", "0073_commerce_payments.sql"]) {
-      const migration = await readFile(new URL(`../apps/api/src/db/migrations/${file}`, import.meta.url), "utf8");
+      const migration = await readFile(new URL(`../apps/api/src/platform/database/migrations/${file}`, import.meta.url), "utf8");
       for (let index = 0; index < 2; index++) await dbPool.query(migration);
     }
   });
@@ -142,7 +142,7 @@ try {
     runtimeUrl.searchParams.set("options", `-c role=${runtimeRole}`);
     const script = `
       const assert = (await import('node:assert/strict')).default;
-      const { dbPool } = await import('./apps/api/src/db/index.ts');
+      const { dbPool } = await import('./apps/api/src/platform/database/index.ts');
       const feedback = await import('./apps/api/src/server/feedback.ts');
       try {
         const { rows } = await dbPool.query("SELECT current_user AS name, has_schema_privilege(current_user, 'public', 'CREATE') AS ddl");

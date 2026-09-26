@@ -2,7 +2,7 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 import { studioWorkSessionId as id, studioWorkSessionCreateSchema, studioWorkSessionCommandSchema, StudioWorkSessionCommandError, type StudioWorkSessionCommand } from "@toonspectrum/studio-project-model/work-session";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { StudioWorkSessionRepository, StudioWorkSessionRepositoryError } from "./studio-work-session.repository";
 
 class WorkParams extends createZodDto(z.object({ workId: id }).strict()) {}

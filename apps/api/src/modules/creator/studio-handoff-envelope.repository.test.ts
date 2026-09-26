@@ -6,7 +6,7 @@ import { StudioHandoffEnvelopeRepository } from "./studio-handoff-envelope.repos
 import { studioHandoffChangedBriefs, studioHandoffChangedRoles } from "./studio-handoff-envelope-basis";
 
 const io = vi.hoisted(() => ({ connect: vi.fn(), inspect: vi.fn() }));
-vi.mock("../../db", () => ({ dbPool: { connect: io.connect } }));
+vi.mock("../../platform/database", () => ({ dbPool: { connect: io.connect } }));
 vi.mock("./studio-review-task-completion.repository", async (original) => ({ ...await original<object>(), inspectStudioReviewTaskCompletion: io.inspect }));
 function fixture() {
   const pin = { schemaVersion: 1 as const, workId: "work", projectId: "project", artifactId: "artifact", reviewId: "review", revisionId: "snapshot", rootGraphHash: "a".repeat(64) };

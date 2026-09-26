@@ -7,7 +7,7 @@ import {
   monetizationPlans,
   revenueLedger,
   users,
-} from "../../db";
+} from "../../platform/database";
 
 import {
   type CampaignPayload,

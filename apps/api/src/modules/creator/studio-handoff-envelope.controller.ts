@@ -2,7 +2,7 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 import { studioHandoffEnvelopeCreateSchema, studioHandoffEnvelopeActionSchema, studioHandoffEnvelopeAcceptSchema, studioReviewCompletionTaskIdSchema, studioReviewTaskReferenceSchema } from "@toonspectrum/studio-project-model";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { StudioHandoffEnvelopeRepository, StudioHandoffEnvelopeError } from "./studio-handoff-envelope.repository";
 import { StudioReviewTaskCompletionError } from "./studio-review-task-completion.repository";
 

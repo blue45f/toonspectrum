@@ -4,7 +4,7 @@ import { Pool } from "pg";
 import {
   normalizePgConnectionStringForTls,
   observePgPoolIdleErrors,
-} from "../../db/pg-connection";
+} from "../../platform/database/pg-connection";
 
 export interface Studio3dGenerationProviderIdentityStore {
   put(jobId: string, sealedIdentity: string, updatedAtMs: number): Promise<void>;

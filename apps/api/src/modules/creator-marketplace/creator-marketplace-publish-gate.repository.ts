@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import {
   CREATOR_MARKETPLACE_PUBLISH_GATE,

@@ -67,7 +67,7 @@ test("production CSP permits only fixed video and payment frame hosts while pres
   assert.ok(csp.includes("frame-ancestors 'none'")); assert.ok(csp.includes("object-src 'none'"));
 });
 test("migration is additive and present in deployment manifest", () => {
-  const migration = "apps/api/src/db/migrations/0046_creator_promotion_community.sql";
+  const migration = "apps/api/src/platform/database/migrations/0046_creator_promotion_community.sql";
   const sql = readFileSync(new URL(`../${migration}`, import.meta.url), "utf8");
   assert.doesNotMatch(sql, /\b(?:DROP|TRUNCATE|DELETE\s+FROM)\b/iu);
   assert.equal((sql.match(/CREATE TABLE IF NOT EXISTS/gu) ?? []).length, 4);

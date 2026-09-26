@@ -6,13 +6,13 @@ import {
   creatorWorkPublicationMedia,
   creatorWorks,
   db,
-} from "../../db";
+} from "../../platform/database";
 import {
   PrivateObjectReferenceSchema,
   isLocatedPrivateObjectReference,
   samePrivateObjectContent,
   type PrivateObjectReference,
-} from "../../infrastructure/private-object-storage/private-object-storage.contract";
+} from "../../platform/adapters/private-object-storage/private-object-storage.contract";
 import type { CreatorWorkMediaTarget } from "../../server/creator-work-media";
 import {
   creatorPublicationMediaPageIndex,

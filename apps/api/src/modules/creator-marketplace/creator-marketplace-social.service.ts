@@ -38,8 +38,8 @@ import {
   reviewReplies,
   reviews,
   users,
-} from "../../db";
-import { creatorMarketplaceLibraryItems } from "../../db/creator-marketplace-library.schema";
+} from "../../platform/database";
+import { creatorMarketplaceLibraryItems } from "../../platform/database/creator-marketplace-library.schema";
 import { isAdminUser } from "../../server/app-config";
 
 import { CreatorMarketplaceService } from "./creator-marketplace.service";

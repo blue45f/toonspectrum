@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { creatorMarketplaceResources } from "../../db/creator-marketplace-resource.schema";
+import { creatorMarketplaceResources } from "../../platform/database/creator-marketplace-resource.schema";
 
 const repositorySource = readFileSync(
   new URL("./creator-marketplace.repository.ts", import.meta.url),
@@ -19,14 +19,14 @@ const controllerSource = readFileSync(
 );
 const lifecycleMigration = readFileSync(
   new URL(
-    "../../db/migrations/0032_creator_marketplace_release_lifecycle.sql",
+    "../../platform/database/migrations/0032_creator_marketplace_release_lifecycle.sql",
     import.meta.url
   ),
   "utf8"
 );
 const packageModerationMigration = readFileSync(
   new URL(
-    "../../db/migrations/0034_creator_marketplace_package_moderation.sql",
+    "../../platform/database/migrations/0034_creator_marketplace_package_moderation.sql",
     import.meta.url
   ),
   "utf8"

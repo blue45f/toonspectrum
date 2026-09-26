@@ -9,7 +9,7 @@ import {
   shouldTransferUserReference,
 } from "./account-merge";
 
-vi.mock("../db", () => ({ dbPool: {} }));
+vi.mock("../platform/database", () => ({ dbPool: {} }));
 
 describe("account merge policy", () => {
   it("accepts only bounded base64url merge codes", () => {

@@ -329,12 +329,12 @@ apps/web/src/shared/lib/creator-role-workspace-contract.test.ts
 apps/web/tests/vite-react-compiler-runtime-interop.test.ts
 apps/web/tools/browser-harnesses/studio-p2p-direct-diagnostics.test.ts
 deploy/cloudflare-analytics/src/index.test.ts
+packages/core/src/catalog/home.cpu-cache.test.ts
 packages/core/src/fortune/fortune-engine.security.test.ts
 packages/core/src/fortune/fortune-observatory.test.ts
 packages/core/src/production/notification-digest.test.ts
 packages/core/src/production/operations-control.test.ts
 packages/core/src/search-normalization.test.ts
-packages/core/src/server/home.cpu-cache.test.ts
 packages/studio-project-model/src/__tests__/pinned-review-share.test.ts
 packages/studio-project-model/src/__tests__/review-policy-history.test.ts
 packages/studio-project-model/src/__tests__/review-policy.test.ts

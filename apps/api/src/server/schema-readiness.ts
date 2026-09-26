@@ -1,5 +1,5 @@
-import { isDatabaseAvailabilityError } from "../common/database-availability";
-import { dbClient } from "../db";
+import { isDatabaseAvailabilityError } from "../platform/http/database-availability";
+import { dbClient } from "../platform/database";
 
 export interface SchemaReadinessOptions {
   readonly failureBackoffMs?: number;

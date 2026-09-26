@@ -6,7 +6,7 @@ import { StudioProjectGraphRepository } from "./studio-project-graph.repository"
 import { studioReviewResolutionCaptureFromRows } from "./studio-review-capture-attestation";
 
 const db = vi.hoisted(() => ({ query: vi.fn(), release: vi.fn(), connect: vi.fn() }));
-vi.mock("../../db", () => ({ dbPool: { connect: db.connect } }));
+vi.mock("../../platform/database", () => ({ dbPool: { connect: db.connect } }));
 const doc = { width: 800, pagesList: [{ id: "page-one", canvasH: 1200, elements: [{ id: "frame-one", type: "frame", x: 20, y: 30, width: 200, height: 100 }] },
   { id: "page-two", canvasH: 1200, elements: [] }] };
 const digest = studioReviewPreviewDigest(doc), hash = "a".repeat(64), secondHash = "b".repeat(64);

@@ -1,8 +1,8 @@
 // 챌린지 — 시드 보장/목록/상세와 참여 가능 검증.
 import { and, asc, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
 
-import { withDatabaseCapability } from "../../common/service-availability";
-import { creatorChallenges, creatorWorks, db } from "../../db";
+import { withDatabaseCapability } from "../../platform/http/service-availability";
+import { creatorChallenges, creatorWorks, db } from "../../platform/database";
 
 import {
   challengeStateOf,

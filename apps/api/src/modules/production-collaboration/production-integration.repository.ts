@@ -7,7 +7,7 @@ import {
   productionIntegrationOauthStates,
   productionIntegrationReceipts,
   productionPushSubscriptions,
-} from "../../db";
+} from "../../platform/database";
 
 export type ProductionIntegrationProvider =
   | "google-calendar"

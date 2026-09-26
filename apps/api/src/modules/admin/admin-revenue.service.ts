@@ -5,7 +5,7 @@ import {
   db,
   monetizationPlans,
   revenueLedger,
-} from "../../db";
+} from "../../platform/database";
 
 import {
   DAY_MS,

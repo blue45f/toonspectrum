@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Injectable } from "@nestjs/common";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 const SUPPORTED_REWARD_ACTIVITIES = new Set([
   "creator.work.created",

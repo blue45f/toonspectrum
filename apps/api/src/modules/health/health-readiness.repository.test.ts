@@ -321,7 +321,7 @@ describe("PostgresHealthReadinessRepository", () => {
   });
 
   it("requires only real legacy cutovers while retaining every managed migration checksum", () => {
-    const directory = new URL("../../db/migrations/", import.meta.url);
+    const directory = new URL("../../platform/database/migrations/", import.meta.url);
     const markerPattern = /INSERT INTO (?:public\.)?"?toonspectrum_schema_migration"?\s*\([^;]+?VALUES\s*\(\s*'([^']+)'/giu;
     const emittedMarkers = new Set(readdirSync(directory).filter((name) => name.endsWith(".sql"))
       .flatMap((name) => [...readFileSync(new URL(name, directory), "utf8").matchAll(markerPattern)])
@@ -329,7 +329,7 @@ describe("PostgresHealthReadinessRepository", () => {
     for (const id of REQUIRED_DATABASE_MIGRATIONS) expect(emittedMarkers.has(id), id).toBe(true);
     const manifest = readFileSync(new URL("../../../../../scripts/production-database-migrations.manifest", import.meta.url), "utf8");
     for (const id of ["0065_creator_series_lifecycle", "0066_share_analytics_events", "0067_creator_role_workspace_personalization"]) {
-      expect(manifest).toContain(`apps/api/src/db/migrations/${id}.sql`);
+      expect(manifest).toContain(`apps/api/src/platform/database/migrations/${id}.sql`);
       expect(emittedMarkers.has(id), "managed migration must not masquerade as a legacy cutover").toBe(false);
     }
   });
@@ -365,20 +365,20 @@ describe("PostgresHealthReadinessRepository", () => {
 
   it("tracks every relation declared across Drizzle and raw-SQL product migrations", () => {
     // db/schema.ts 는 db/schema/ 도메인 모듈들의 배럴이다 — pgTable 선언은 그 디렉터리에 있다.
-    const schemaDir = new URL("../../db/schema/", import.meta.url);
+    const schemaDir = new URL("../../platform/database/schema/", import.meta.url);
     const schemaFiles = [
       ...readdirSync(schemaDir)
         .filter((name) => name.endsWith(".ts"))
         .sort()
-        .map((name) => `../../db/schema/${name}`),
-      "../../db/creator-asset-object-storage.schema.ts",
-      "../../db/creator-asset-platform.schema.ts",
-      "../../db/creator-marketplace-report.schema.ts",
-      "../../db/creator-marketplace-library.schema.ts",
-      "../../db/creator-marketplace-package-moderation.schema.ts",
-      "../../db/creator-marketplace-resource.schema.ts",
-      "../../db/studio-crdt-raster-checkpoint.schema.ts",
-      "../../db/studio-raster-asset.schema.ts",
+        .map((name) => `../../platform/database/schema/${name}`),
+      "../../platform/database/creator-asset-object-storage.schema.ts",
+      "../../platform/database/creator-asset-platform.schema.ts",
+      "../../platform/database/creator-marketplace-report.schema.ts",
+      "../../platform/database/creator-marketplace-library.schema.ts",
+      "../../platform/database/creator-marketplace-package-moderation.schema.ts",
+      "../../platform/database/creator-marketplace-resource.schema.ts",
+      "../../platform/database/studio-crdt-raster-checkpoint.schema.ts",
+      "../../platform/database/studio-raster-asset.schema.ts",
     ];
     const schemaRelations = schemaFiles
       .flatMap((path) => [
@@ -388,17 +388,17 @@ describe("PostgresHealthReadinessRepository", () => {
       ])
       .map((match) => match[1]!);
     const quotedMigrationRelations = [
-      "../../db/migrations/0039_creator_asset_platform_foundation.sql",
-      "../../db/migrations/0067_creator_role_workspace_personalization.sql",
+      "../../platform/database/migrations/0039_creator_asset_platform_foundation.sql",
+      "../../platform/database/migrations/0067_creator_role_workspace_personalization.sql",
     ].flatMap((path) => [
       ...readFileSync(new URL(path, import.meta.url), "utf8").matchAll(
         /\bCREATE TABLE(?: IF NOT EXISTS)? public\."([^"]+)"/gu,
       ),
     ]).map((match) => match[1]!);
     const unquotedMigrationRelations = [
-      "../../db/migrations/0036_traffic_analytics_relations.sql",
-      "../../db/migrations/0066_share_analytics_events.sql",
-      "../../db/migrations/0077_membership_operations.sql",
+      "../../platform/database/migrations/0036_traffic_analytics_relations.sql",
+      "../../platform/database/migrations/0066_share_analytics_events.sql",
+      "../../platform/database/migrations/0077_membership_operations.sql",
     ].flatMap((path) => [
       ...readFileSync(new URL(path, import.meta.url), "utf8").matchAll(
         /\bCREATE TABLE(?: IF NOT EXISTS)? public\.([a-z_]+)/gu,

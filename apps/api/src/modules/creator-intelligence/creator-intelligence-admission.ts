@@ -16,7 +16,7 @@ import {
 
 import { LocalAuthRateLimiter } from "../auth/auth-rate-limit";
 
-import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import type { UpstashCoordinationPort } from "../../platform/adapters/upstash-coordination/upstash-coordination.port";
 
 export type CreatorIntelligenceProtectedOperation =
   | "voice-synthesize"

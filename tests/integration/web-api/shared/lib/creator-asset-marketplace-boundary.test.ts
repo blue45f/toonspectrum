@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migrationSource = readFileSync(
-  new URL("../../../../../apps/api/src/db/migrations/0013_creator_asset_marketplace.sql", import.meta.url),
+  new URL("../../../../../apps/api/src/platform/database/migrations/0013_creator_asset_marketplace.sql", import.meta.url),
   "utf8"
 );
 // creator 서버 로직은 server/creator/ 도메인 모듈로 분할됐다 — 배럴과 모듈 전체를 이어
@@ -23,7 +23,7 @@ const preflightSource = readFileSync(
   "utf8"
 );
 const checkFingerprintSource = readFileSync(
-  new URL("../../../../../apps/api/src/common/postgres-check-definition.ts",
+  new URL("../../../../../apps/api/src/platform/http/postgres-check-definition.ts",
     import.meta.url
   ),
   "utf8"
@@ -89,7 +89,7 @@ describe("creator asset marketplace persistence boundary", () => {
     expect(preflightSource).toContain("to_regclass('public.creator_asset')");
     expect(preflightSource).toContain("to_regclass('public.creator_asset_report')");
     expect(productionMigrationManifestSource).toContain(
-      "apps/api/src/db/migrations/0013_creator_asset_marketplace.sql"
+      "apps/api/src/platform/database/migrations/0013_creator_asset_marketplace.sql"
     );
     expect(migrationRunnerSource).toContain('"production-database-migrations.manifest"');
     expect(migrationWorkflowSource).toContain("node scripts/run-production-database-migrations.mjs");

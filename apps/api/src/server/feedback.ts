@@ -5,7 +5,7 @@ import {
   cleanFeedbackTags, feedbackPageLimit, feedbackText, FEEDBACK_PROGRESS_LABELS,
   isFeedbackKind, isFeedbackProgress, parseFeedbackCursor, validateFeedbackInput,
 } from "../../../../packages/core/src/feedback";
-import { db, feedbackPosts, feedbackReplies, feedbackVotes, users } from "../db";
+import { db, feedbackPosts, feedbackReplies, feedbackVotes, users } from "../platform/database";
 
 import type {
   FeedbackComment, FeedbackEntry, FeedbackInput, FeedbackKind, FeedbackPageResult,

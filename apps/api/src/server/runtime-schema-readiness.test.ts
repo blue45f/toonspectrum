@@ -6,8 +6,8 @@ const doubles = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
 }));
 
-vi.mock("../db", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../db")>(),
+vi.mock("../platform/database", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../platform/database")>(),
   dbClient: { execute: doubles.execute },
   db: { select: doubles.select },
 }));

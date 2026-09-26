@@ -4,7 +4,7 @@ import { StudioWorkSessionService } from "./studio-work-session.controller";
 import { StudioWorkSessionRepositoryError, type StudioWorkSessionRepository } from "./studio-work-session.repository";
 
 const mocks = vi.hoisted(() => ({ connect: vi.fn(), query: vi.fn(), release: vi.fn(), captures: vi.fn() }));
-vi.mock("../../db", () => ({ dbPool: { connect: mocks.connect } }));
+vi.mock("../../platform/database", () => ({ dbPool: { connect: mocks.connect } }));
 vi.mock("./studio-review-capture-attestation", () => ({ loadStudioReviewResolutionCaptures: mocks.captures }));
 const pin = { schemaVersion: 1, workId: "work", projectId: "project", artifactId: "artifact", reviewId: "review", revisionId: "revision", rootGraphHash: "a".repeat(64) };
 const current = vi.fn();

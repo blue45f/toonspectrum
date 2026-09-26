@@ -35,7 +35,7 @@ import {
   type RewardMilestoneKey,
   type WalletAsset,
 } from "../../../../../packages/core/src/membership-wallet";
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import { isAdminUser } from "../../server/app-config";
 import { logAuditAction } from "../admin/admin-types";
 

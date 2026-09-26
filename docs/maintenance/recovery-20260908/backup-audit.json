@@ -7354,7 +7354,7 @@
             "      // The move created apps/web/src/shared/; without this the whole tree stayed unclassified",
             "      // and boundaries/element-types silently allowed every import into and out of it.",
             "      { type: 'shared', pattern: 'apps/web/src/shared/**/*', mode: 'full' },",
-            "  // \uc11c\ubc84/\uc2a4\ud06c\ub9bd\ud2b8 \uc720\ud2f8\uc740 Node \ub7f0\ud0c0\uc784. (\uad6c lib/db \ub294 apps/api/src/db \ub85c \uc62e\uaca8\uc838 \uc774 \ubaa9\ub85d\uc5d0\uc11c \ube60\uc84c\uace0,",
+            "  // \uc11c\ubc84/\uc2a4\ud06c\ub9bd\ud2b8 \uc720\ud2f8\uc740 Node \ub7f0\ud0c0\uc784. (\uad6c lib/db \ub294 apps/api/src/platform/database \ub85c \uc62e\uaca8\uc838 \uc774 \ubaa9\ub85d\uc5d0\uc11c \ube60\uc84c\uace0,",
             "  // \uad6c lib/server \ub294 \uc6f9 \uc571\uacfc \ud568\uaed8 apps/web/src/shared/lib/server \ub85c \uc774\ub3d9\ud588\ub2e4.)",
             "    files: ['apps/web/src/shared/lib/server/**/*.ts', 'scripts/**/*.{ts,tsx,mts,cts}'],"
           ],

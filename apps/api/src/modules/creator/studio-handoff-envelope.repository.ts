@@ -4,7 +4,7 @@ import { studioHandoffEnvelopeCreateSchema, studioHandoffEnvelopeAcceptSchema, s
   type StudioHandoffEnvelopeList } from "@toonspectrum/studio-project-model";
 import { z } from "zod";
 import type { PoolClient } from "pg";
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
 import { type StudioProductionWorkspaceDocument } from "./studio-production.dto";
 import { StudioReviewTaskCompletionError, inspectStudioReviewTaskCompletion } from "./studio-review-task-completion.repository";

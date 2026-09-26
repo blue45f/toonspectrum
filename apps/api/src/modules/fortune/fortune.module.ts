@@ -3,7 +3,7 @@
 import { Module } from "@nestjs/common";
 
 import { MembershipWalletModule } from "../membership-wallet/membership-wallet.module";
-import { UpstashCoordinationModule } from "../../infrastructure/upstash-coordination/upstash-coordination.module";
+import { UpstashCoordinationModule } from "../../platform/adapters/upstash-coordination/upstash-coordination.module";
 import { FortuneEnrichmentController } from "./fortune-enrichment.controller";
 import { FortuneEnrichmentService } from "./fortune-enrichment.service";
 import { fortuneEnrichmentConfig, FORTUNE_ENRICHMENT_CONFIG, FORTUNE_ENRICHMENT_RUNTIME } from "./fortune-enrichment.provider";
@@ -26,7 +26,7 @@ const coordination = enrichmentConfig.kasiEnabled || enrichmentConfig.specialDay
   providers: [FortuneService, FortuneEnrichmentService,
     { provide: FORTUNE_SNAPSHOT_PORT, useFactory: async () => {
       if (!enrichmentConfig.snapshotsEnabled) return null;
-      const { dbPool } = await import("../../db/index");
+      const { dbPool } = await import("../../platform/database/index");
       return new PostgresFortuneSnapshotRepository((text, values) => {
         const query = { text, values, query_timeout: 2000 };
         return dbPool.query(query);

@@ -15,7 +15,7 @@ import {
 import {
   capabilityUnavailableException,
   withDatabaseCapability,
-} from "../../common/service-availability";
+} from "../../platform/http/service-availability";
 import {
   creatorChallenges,
   creatorDraftCollaborationRooms,
@@ -32,7 +32,7 @@ import {
   creatorWorks,
   db,
   users,
-} from "../../db";
+} from "../../platform/database";
 import { toPublicCreatorDoc } from "../creator-doc-visibility";
 import { jsonStringLikePattern } from "../sql-like";
 import { assertCreatorDraftCollaborationStatusMutationAllowed } from "../creator-provisional-work-status";

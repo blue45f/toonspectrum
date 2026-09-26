@@ -6,7 +6,7 @@ import { AdminMembersService } from "./admin-members.service";
 const doubles = vi.hoisted(() => ({
   update: vi.fn(), lifecycle: vi.fn(), invalidate: vi.fn(), audit: vi.fn(),
 }));
-vi.mock("../../db", () => ({
+vi.mock("../../platform/database", () => ({
   db:{update:doubles.update},users:{},fanPosts:{},ratings:{},reviews:{},revenueLedger:{},
 }));
 vi.mock("../../server/session", () => ({ invalidateSessionUser:doubles.invalidate }));

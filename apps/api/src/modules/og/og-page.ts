@@ -1,4 +1,4 @@
-import { getTitle } from "../../../../../packages/core/src/server";
+import { getTitle } from "../../../../../packages/core/src/catalog";
 
 import {
   resolvePublicShareOg,

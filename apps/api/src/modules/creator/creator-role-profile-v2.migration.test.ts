@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
-  new URL("../../db/migrations/0076_creator_role_profile_v2.sql", import.meta.url),
+  new URL("../../platform/database/migrations/0076_creator_role_profile_v2.sql", import.meta.url),
   "utf8",
 );
 const manifest = readFileSync(
@@ -41,9 +41,9 @@ describe("creator role profile v2 production migration", () => {
 
   it("remains ordered between the wallet policy and membership operations migrations", () => {
     expect(manifest).toContain(
-      "apps/api/src/db/migrations/0075_membership_wallet_policy.sql\n"
-      + "apps/api/src/db/migrations/0076_creator_role_profile_v2.sql\n"
-      + "apps/api/src/db/migrations/0077_membership_operations.sql\n",
+      "apps/api/src/platform/database/migrations/0075_membership_wallet_policy.sql\n"
+      + "apps/api/src/platform/database/migrations/0076_creator_role_profile_v2.sql\n"
+      + "apps/api/src/platform/database/migrations/0077_membership_operations.sql\n",
     );
   });
 });

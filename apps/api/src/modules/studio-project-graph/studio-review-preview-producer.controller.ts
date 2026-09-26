@@ -2,7 +2,7 @@ import { Body, Controller, Header, Headers, Inject, Param, Post, Put, Req, Uploa
 import { FileInterceptor } from "@nestjs/platform-express";
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { StudioWorkAssetUploadGuard } from "../creator/studio-asset-upload.guard";
 import type { StudioWorkAssetUploadFile } from "../creator/studio-work-asset.service";
 import { authenticatedStudioUserId } from "./studio-project-graph.controller";

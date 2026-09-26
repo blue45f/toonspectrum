@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync(join(process.cwd(), "apps/api/src/db/migrations/0090_studio_review_voice_note.sql"), "utf8");
+const sql = readFileSync(join(process.cwd(), "apps/api/src/platform/database/migrations/0090_studio_review_voice_note.sql"), "utf8");
 
 describe("studio review voice note migration", () => {
   it("pins notes to exact review revisions with bounded retention and idempotent authorship", () => {

@@ -6,12 +6,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StudioExternalFileBindingRepository } from "./studio-external-file-binding.repository";
 import { StudioProjectGraphRepository } from "./studio-project-graph.repository";
 import { StudioProjectGraphService } from "./studio-project-graph.service";
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import type { INestApplication } from "@nestjs/common";
 
-vi.mock("../../db", async (original) => {
-  const actual = await original<typeof import("../../db")>();
+vi.mock("../../platform/database", async (original) => {
+  const actual = await original<typeof import("../../platform/database")>();
   // Keep real schema objects used by Creator's Drizzle aliases, while failing
   // immediately if provider construction attempts any database operation.
   const denied = () => { throw new Error("DI construction must not access a database"); };

@@ -11,7 +11,7 @@ import { Pool } from "pg";
 
 import { validatePostgresIntegrationUrl } from "../../../scripts/run-postgres-integration-tests.mjs";
 
-import type { PrivateObjectStoragePort } from "../src/infrastructure/private-object-storage/private-object-storage.port";
+import type { PrivateObjectStoragePort } from "../src/platform/adapters/private-object-storage/private-object-storage.port";
 
 // Never inherits a production connection or tests an arbitrary remote origin.
 const connection = process.env.TEST_DATABASE_URL;
@@ -24,7 +24,7 @@ assert(new URL(origin).protocol === "http:" && new URL(origin).hostname === "127
 process.env.DATABASE_URL = connection; process.env.NODE_ENV = "test";
 process.env.STUDIO_WORK_ASSET_ADMISSION = "enable-immutable-readonly-work-assets-v1";
 const out = process.env.STUDIO_SESSION_QA_OUT ?? "/tmp/toon-session-purpose-browser"; await mkdir(out, { recursive: true });
-const database = await import("../src/db");
+const database = await import("../src/platform/database");
 const { StudioProjectGraphRepository } = await import("../src/modules/studio-project-graph/studio-project-graph.repository");
 const { StudioWorkSessionRepository } = await import("../src/modules/studio-project-graph/studio-work-session.repository");
 const { StudioWorkSessionService } = await import("../src/modules/studio-project-graph/studio-work-session.controller");

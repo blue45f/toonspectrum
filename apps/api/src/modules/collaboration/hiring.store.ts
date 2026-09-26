@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { ConflictException, ForbiddenException, HttpException, NotFoundException, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import type { Pool, PoolClient } from "pg";
 

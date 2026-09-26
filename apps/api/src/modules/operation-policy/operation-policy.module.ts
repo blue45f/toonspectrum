@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import { OperationPolicyController } from "./operation-policy.controller";
 import { OPERATION_POLICY_POOL, OperationPolicyRepository } from "./operation-policy.repository";
 

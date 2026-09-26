@@ -7,7 +7,7 @@ import { loadArtifactAccess, StudioProjectGraphRepository } from "./studio-proje
 import type { PoolClient } from "pg";
 
 const { connect } = vi.hoisted(() => ({ connect: vi.fn() }));
-vi.mock("../../db", () => ({ dbPool: { connect } }));
+vi.mock("../../platform/database", () => ({ dbPool: { connect } }));
 beforeEach(() => { connect.mockClear(); });
 describe("work-session API boundary", () => {
   it("requires an authenticated actor before any operation", async () => {

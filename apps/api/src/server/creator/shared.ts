@@ -1,7 +1,7 @@
 // creator 서버 모듈 공통 내부 헬퍼 — 텍스트/태그/페이지 정규화, QA 계정 격리, DB 유틸.
 import { sql } from "drizzle-orm";
 
-import { db } from "../../db";
+import { db } from "../../platform/database";
 
 import type { CreatorAuthor } from "./works-contract";
 import type { SQL, SQLWrapper } from "drizzle-orm";

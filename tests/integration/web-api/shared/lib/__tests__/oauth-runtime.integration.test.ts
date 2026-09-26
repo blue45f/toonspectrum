@@ -9,7 +9,7 @@ import {
   buildAuthRuntimeAclViolationSql,
 } from "../../../../../../scripts/run-production-database-migrations.mjs";
 
-import type * as DatabaseRuntime from "../../../../../../apps/api/src/db";
+import type * as DatabaseRuntime from "../../../../../../apps/api/src/platform/database";
 import type * as OAuthRuntime from "../../../../../../apps/api/src/server/oauth";
 
 const INTEGRATION_URL =
@@ -58,7 +58,7 @@ describeWithDirectPostgres("OAuth PostgreSQL DML-only runtime", () => {
     process.env.DATABASE_URL = runtimeUrl.toString();
     process.env.GOOGLE_OAUTH_CLIENT_ID =
       "oauth-runtime-integration.apps.googleusercontent.com";
-    databaseRuntime = await import("../../../../../../apps/api/src/db");
+    databaseRuntime = await import("../../../../../../apps/api/src/platform/database");
     oauthRuntime = await import("../../../../../../apps/api/src/server/oauth");
   });
 

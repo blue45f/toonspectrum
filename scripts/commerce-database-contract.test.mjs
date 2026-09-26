@@ -8,7 +8,7 @@ import {
 } from "./feedback-database-contract.mjs";
 
 const migration = readFileSync(
-  new URL("../apps/api/src/db/migrations/0073_commerce_payments.sql", import.meta.url),
+  new URL("../apps/api/src/platform/database/migrations/0073_commerce_payments.sql", import.meta.url),
   "utf8",
 );
 

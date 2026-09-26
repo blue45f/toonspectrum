@@ -38,13 +38,13 @@ import {
   resolveSignupAvatar,
   resolveSignupAvatarImage,
 } from "../../../../web/src/shared/lib/avatar";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
-import { accounts, db, sessions, users } from "../../db";
-import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
+import { accounts, db, sessions, users } from "../../platform/database";
+import { StudioRealtimeRevocationService } from "../../platform/adapters/studio-realtime-revocation/studio-realtime-revocation.client";
 import {
   UPSTASH_COORDINATION_PORT,
   type UpstashCoordinationPort,
-} from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+} from "../../platform/adapters/upstash-coordination/upstash-coordination.port";
 import { normalizePersistedAuthRole } from "../../server/admin-roles";
 import {
   AuthEmailConfigurationError,

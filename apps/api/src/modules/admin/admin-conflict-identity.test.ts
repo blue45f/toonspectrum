@@ -5,7 +5,7 @@ import { AdminMetricsService } from "./admin-metrics.service";
 import { AdminModerationService } from "./admin-moderation.service";
 
 const mocks = vi.hoisted(() => ({ execute: vi.fn(), requireAdmin: vi.fn(), audit: vi.fn(), ready: vi.fn() }));
-vi.mock("../../db", async (original) => ({ ...await original<typeof import("../../db")>(), dbClient: { execute: mocks.execute } }));
+vi.mock("../../platform/database", async (original) => ({ ...await original<typeof import("../../platform/database")>(), dbClient: { execute: mocks.execute } }));
 vi.mock("./admin-types", async (original) => ({
   ...await original<typeof import("./admin-types")>(),
   requireAdminUser: mocks.requireAdmin, logAuditAction: mocks.audit, ensureAdminSchema: mocks.ready,

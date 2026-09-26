@@ -142,7 +142,7 @@ async function main() {
     { DrizzleCreatorMarketplaceCloudLibraryRepository },
     { PostgresCreatorMarketplacePublishGate },
   ] = await Promise.all([
-    import("../apps/api/src/db/index"),
+    import("../apps/api/src/platform/database/index"),
     import("../apps/api/src/modules/creator-marketplace/creator-marketplace.repository"),
     import("../apps/api/src/modules/creator-marketplace/creator-marketplace-library.repository"),
     import("../apps/api/src/modules/creator-marketplace/creator-marketplace-publish-gate.repository"),
@@ -197,7 +197,7 @@ async function main() {
           "0035_creator_marketplace_3d_asset_kind.sql",
           "0037_creator_marketplace_3d_asset_parity.sql",
         ].map((name) =>
-          readFile(new URL(`../apps/api/src/db/migrations/${name}`, import.meta.url), "utf8")
+          readFile(new URL(`../apps/api/src/platform/database/migrations/${name}`, import.meta.url), "utf8")
         )
       );
       for (const migration of migrations) await dbPool.query(migration);

@@ -7,9 +7,9 @@ import {
   creatorWorkCrdtUpdateReceipts,
   creatorWorkCrdtUpdates,
   db,
-} from "../../db";
-import { creatorWorkCrdtRasterCheckpointJobs } from "../../db/studio-crdt-raster-checkpoint.schema";
-import { creatorWorkRasterAssets } from "../../db/studio-raster-asset.schema";
+} from "../../platform/database";
+import { creatorWorkCrdtRasterCheckpointJobs } from "../../platform/database/studio-crdt-raster-checkpoint.schema";
+import { creatorWorkRasterAssets } from "../../platform/database/studio-raster-asset.schema";
 
 import {
   STUDIO_CRDT_UPDATE_MAX_BYTES,

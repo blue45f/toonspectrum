@@ -32,7 +32,7 @@ describe.skipIf(!database)("automatic hiring on the real 0078/0079/0080 runtime 
     owner = new Pool({ connectionString: database!, max: 2, options: `-c search_path=${schema} -c statement_timeout=10000 -c lock_timeout=3000` });
     await owner.query(`CREATE TABLE "user"(id text PRIMARY KEY,name text NOT NULL,status text NOT NULL DEFAULT 'active',role text NOT NULL DEFAULT 'user');
       CREATE TABLE member_message_block("blockerId" text NOT NULL,"blockedUserId" text NOT NULL,PRIMARY KEY("blockerId","blockedUserId"))`);
-    for (const file of ["0047_creator_collaboration_board.sql", "0078_creator_hiring_workspace.sql", "0079_creator_hiring_automation.sql", "0080_creator_career_confirmation.sql"]) await owner.query(await readFile(new URL(`../../db/migrations/${file}`, import.meta.url), "utf8"));
+    for (const file of ["0047_creator_collaboration_board.sql", "0078_creator_hiring_workspace.sql", "0079_creator_hiring_automation.sql", "0080_creator_career_confirmation.sql"]) await owner.query(await readFile(new URL(`../../platform/database/migrations/${file}`, import.meta.url), "utf8"));
     await owner.query(buildHiringRuntimeAclSql(role, schema));
     await owner.query(buildHiringAutomationRuntimeAclSql(role, schema));
     await owner.query(buildCareerConfirmationRuntimeAclSql(role, schema));

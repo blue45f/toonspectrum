@@ -13,7 +13,7 @@ import {
   type CreatorRoleId,
   type CreatorSpecialtyId,
 } from "../../../../web/src/shared/lib/creator-role-contract";
-import { dbClient } from "../../db";
+import { dbClient } from "../../platform/database";
 
 export interface CreatorRoleWorkspaceRecord {
   readonly projectKey: string;

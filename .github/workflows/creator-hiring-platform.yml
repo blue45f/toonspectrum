@@ -7,7 +7,7 @@ on:
       - 'apps/api/src/modules/collaboration/**'
       - 'apps/api/src/modules/recruitment/**'
       - 'apps/api/src/modules/meeting/**'
-      - 'apps/api/src/db/migrations/**'
+      - 'apps/api/src/platform/database/migrations/**'
       - 'apps/web/src/domains/collaboration/**'
       - 'packages/contracts/src/creator-*'
       - 'scripts/creator-*'

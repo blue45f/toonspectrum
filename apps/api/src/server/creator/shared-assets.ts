@@ -13,7 +13,7 @@ import {
   normalizeCreatorAssetTags,
   parseCreatorAssetCatalogSort,
 } from "../../../../web/src/shared/lib/creator-asset-contract";
-import { creatorAssetReports, creatorAssets, db, users } from "../../db";
+import { creatorAssetReports, creatorAssets, db, users } from "../../platform/database";
 import {
   assertCreatorAssetPersistedIntegrity,
   inspectCreatorAssetPayload,

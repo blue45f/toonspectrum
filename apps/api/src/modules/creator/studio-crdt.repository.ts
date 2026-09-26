@@ -7,7 +7,7 @@ import {
   creatorWorkCrdtUpdateReceipts,
   creatorWorkCrdtUpdates,
   db,
-} from "../../db";
+} from "../../platform/database";
 
 export const STUDIO_CRDT_REPOSITORY = Symbol("STUDIO_CRDT_REPOSITORY");
 export const STUDIO_CRDT_UPDATE_MAX_BYTES = 48 * 1_024;

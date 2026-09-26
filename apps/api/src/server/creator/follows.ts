@@ -8,8 +8,8 @@ import {
   type CreatorSpecialtyId,
   type PublicCreatorRoleProfile,
 } from "@toonspectrum/core/creator-role";
-import { creatorFollows, creatorSeries, creatorWorks, db, users } from "../../db";
-import { withDatabaseCapability } from "../../common/service-availability";
+import { creatorFollows, creatorSeries, creatorWorks, db, users } from "../../platform/database";
+import { withDatabaseCapability } from "../../platform/http/service-availability";
 
 import { validateFollowPair } from "./community-contract";
 import { requireCreatorCommunitySchema } from "./community-schema";

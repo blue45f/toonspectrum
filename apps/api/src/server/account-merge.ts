@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 
 import type { PoolClient } from "pg";
 
-import { dbPool } from "../db";
+import { dbPool } from "../platform/database";
 
 export const ACCOUNT_MERGE_TOKEN_TTL_MS = 10 * 60_000;
 const ACCOUNT_MERGE_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/u;

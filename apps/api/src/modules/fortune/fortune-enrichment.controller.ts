@@ -2,7 +2,7 @@ import { Controller, Get, Header, Inject, Optional, Query } from "@nestjs/common
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 import { FORTUNE_ZODIAC_IDS, FORTUNE_SPECIAL_DAY_CATEGORIES, resolveFortuneBirth } from "../../../../../packages/core/src/fortune";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { FortuneRefreshWorker } from "./fortune-refresh.worker";
 import { FortuneEnrichmentService } from "./fortune-enrichment.service";
 

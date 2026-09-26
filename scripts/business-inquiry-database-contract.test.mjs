@@ -8,7 +8,7 @@ import {
 } from "./feedback-database-contract.mjs";
 
 const migration = readFileSync(
-  new URL("../apps/api/src/db/migrations/0068_business_inquiries.sql", import.meta.url),
+  new URL("../apps/api/src/platform/database/migrations/0068_business_inquiries.sql", import.meta.url),
   "utf8",
 );
 const manifest = readFileSync(
@@ -33,8 +33,8 @@ test("business inquiry migration is forward-only, private, and bounded", () => {
 });
 
 test("business inquiry migration remains registered exactly once", () => {
-  const inquiry = "apps/api/src/db/migrations/0068_business_inquiries.sql";
-  const consolidation = "apps/api/src/db/migrations/0069_account_consolidation.sql";
+  const inquiry = "apps/api/src/platform/database/migrations/0068_business_inquiries.sql";
+  const consolidation = "apps/api/src/platform/database/migrations/0069_account_consolidation.sql";
   expect(manifest.filter((entry) => entry === inquiry)).toHaveLength(1);
   expect(manifest.indexOf(inquiry)).toBeGreaterThanOrEqual(0);
   expect(manifest.indexOf(consolidation)).toBeGreaterThan(manifest.indexOf(inquiry));

@@ -1,5 +1,5 @@
-import { runSchemaPreflightToleratingDbUnavailability } from "../../common/database-availability";
-import { dbPool } from "../../db";
+import { runSchemaPreflightToleratingDbUnavailability } from "../../platform/http/database-availability";
+import { dbPool } from "../../platform/database";
 
 import type { Pool } from "pg";
 

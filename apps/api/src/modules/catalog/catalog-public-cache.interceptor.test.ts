@@ -6,7 +6,7 @@ import { catalogPublicCacheSeconds, CatalogPublicCacheInterceptor } from "./cata
 import type { ExecutionContext } from "@nestjs/common";
 
 const state = vi.hoisted(() => ({ titleCount: 100 }));
-vi.mock("../../../../../packages/core/src/server/catalog-store", () => ({ getCatalogState: () => state }));
+vi.mock("../../../../../packages/core/src/catalog/catalog-store", () => ({ getCatalogState: () => state }));
 
 function harness(path = "/api/home", headers: Record<string, string> = {}, statusCode = 200, method = "GET") {
   const responseHeaders = new Map<string, unknown>([["vary", "Origin"], ["cache-control", "no-store"]]);

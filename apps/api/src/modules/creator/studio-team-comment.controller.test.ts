@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import { StudioTeamCommentLivePublisher } from "./studio-team-comment-live.publisher";
 import { StudioTeamCommentController } from "./studio-team-comment.controller";

@@ -209,7 +209,7 @@ Confidence is disclosure metadata, not another ranking factor.
 - `apps/api/data/catalog.json.gz`: reviewed catalog source bundled with deployments
 - `apps/web/public/data/*.json`: generated CDN catalog and ranking surfaces
 - `apps/web/src/shared/catalog/catalog-static.ts`: browser-side static query boundary
-- `packages/core/src/server/catalog-store.ts`: in-memory snapshot used by server read models
+- `packages/core/src/catalog/catalog-store.ts`: in-memory snapshot used by server read models
 - `apps/api/src/server/catalog-file.ts`: read-only bundled-file parser
 - `apps/api/src/server/catalog-loader.ts`: one-time API startup loader
 - `apps/api/src/modules/catalog/*`: external API boundary

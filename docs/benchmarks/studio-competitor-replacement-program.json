@@ -83,7 +83,7 @@
       "track": "storage",
       "state": "implemented",
       "evidence": [
-        "apps/api/src/db/schema/studio-project-graph.schema.ts",
+        "apps/api/src/platform/database/schema/studio-project-graph.schema.ts",
         "tests/visual/recovery-package-cas-contract.test.ts"
       ]
     },

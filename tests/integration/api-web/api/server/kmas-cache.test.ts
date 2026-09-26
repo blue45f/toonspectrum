@@ -6,7 +6,7 @@ import {
   KMAS_LOOKUP_CACHE_MAX_ENTRIES,
   kmasLookupCacheStats,
 } from "../../../../../apps/api/src/server/kmas";
-import { TITLES } from "../../../../../packages/core/src/server/catalog-store";
+import { TITLES } from "../../../../../packages/core/src/catalog/catalog-store";
 
 
 import type { Title } from "../../../../../apps/web/src/shared/lib/types";

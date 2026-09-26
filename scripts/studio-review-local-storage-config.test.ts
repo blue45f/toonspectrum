@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { resolvePrivateObjectStoragePlan } from "../apps/api/src/infrastructure/private-object-storage/private-object-storage.config";
+import { resolvePrivateObjectStoragePlan } from "../apps/api/src/platform/adapters/private-object-storage/private-object-storage.config";
 
 import { createIsolatedMarketApiEnvironment } from "./isolated-market-api.mjs";
 import { createStudioReviewLocalStorageEnvironment } from "./studio-review-local-storage-config.mjs";

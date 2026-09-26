@@ -1,4 +1,4 @@
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import type {
   TrafficShareChannel,

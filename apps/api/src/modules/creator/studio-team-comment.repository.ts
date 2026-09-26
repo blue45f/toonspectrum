@@ -24,7 +24,7 @@ import {
   creatorWorkTeamCommentThreads,
   db,
   users,
-} from "../../db";
+} from "../../platform/database";
 
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
 

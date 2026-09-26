@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import { GoogleIdTokenDto } from "./auth.dto";
 

@@ -13,7 +13,7 @@ import {
   creatorWorkRevisions,
   creatorWorks,
   db,
-} from "../../db";
+} from "../../platform/database";
 import { createCreatorWorkRevisionSnapshot } from "../../server/creator-work-revisions";
 
 import {

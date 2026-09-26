@@ -8,7 +8,7 @@ import { WorkspaceCommandSchema, WorkspaceCreateSchema } from "./team-workspace.
 
 const url = process.env.TEST_DATABASE_URL;
 const schema = `creco_free_${randomUUID().replaceAll("-", "")}`;
-const migration = (name: string): string => readFileSync(new URL(`../../db/migrations/${name}`, import.meta.url), "utf8").replaceAll("public.", `"${schema}".`);
+const migration = (name: string): string => readFileSync(new URL(`../../platform/database/migrations/${name}`, import.meta.url), "utf8").replaceAll("public.", `"${schema}".`);
 const create = (name: string) => ({ name, mutationId: randomUUID() });
 const versioned = (expectedRevision: number) => ({ expectedRevision, mutationId: randomUUID() });
 describe.skipIf(!url)("free team workspace actual Postgres", () => {

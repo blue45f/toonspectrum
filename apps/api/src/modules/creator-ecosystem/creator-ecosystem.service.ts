@@ -24,7 +24,7 @@ import {
   creatorIpProposals,
   db,
   users,
-} from "../../db";
+} from "../../platform/database";
 import { isOfficialUser } from "../../server/feedback";
 
 import {

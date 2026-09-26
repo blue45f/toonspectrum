@@ -7,8 +7,8 @@ on:
     paths:
       - 'apps/web/src/domains/market/**'
       - 'apps/web/src/shared/lib/creator-marketplace*'
-      - 'apps/api/src/db/creator-marketplace*'
-      - 'apps/api/src/db/migrations/*creator_marketplace*'
+      - 'apps/api/src/platform/database/creator-marketplace*'
+      - 'apps/api/src/platform/database/migrations/*creator_marketplace*'
       - 'apps/api/src/modules/creator-marketplace/**'
       - 'scripts/*marketplace*'
       - 'scripts/*production-database*'
@@ -18,8 +18,8 @@ on:
     paths:
       - 'apps/web/src/domains/market/**'
       - 'apps/web/src/shared/lib/creator-marketplace*'
-      - 'apps/api/src/db/creator-marketplace*'
-      - 'apps/api/src/db/migrations/*creator_marketplace*'
+      - 'apps/api/src/platform/database/creator-marketplace*'
+      - 'apps/api/src/platform/database/migrations/*creator_marketplace*'
       - 'apps/api/src/modules/creator-marketplace/**'
       - 'scripts/*marketplace*'
       - 'scripts/*production-database*'
@@ -68,8 +68,8 @@ jobs:
         run: >-
           pnpm exec eslint --max-warnings=0
           apps/web/src/domains/market
-          apps/api/src/db/creator-marketplace-library.schema.ts
-          apps/api/src/db/creator-marketplace-report.schema.ts
+          apps/api/src/platform/database/creator-marketplace-library.schema.ts
+          apps/api/src/platform/database/creator-marketplace-report.schema.ts
           apps/api/src/modules/creator-marketplace/creator-marketplace-3d-asset-parity.test.ts
           scripts/verify-marketplace-3d-parity.mjs
       - name: Actual marketplace, API and migration unit regressions

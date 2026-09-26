@@ -42,7 +42,7 @@ async function run() { // NOSONAR javascript:S3776
   let rejected = 0;
 
   async function migration(name) {
-    const sql = await readFile(new URL(`../apps/api/src/db/migrations/${name}`, import.meta.url), "utf8");
+    const sql = await readFile(new URL(`../apps/api/src/platform/database/migrations/${name}`, import.meta.url), "utf8");
     await client.query(sql);
   }
 

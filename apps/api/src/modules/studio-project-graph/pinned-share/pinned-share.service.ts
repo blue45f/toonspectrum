@@ -3,8 +3,8 @@ import { BadRequestException, ConflictException, ForbiddenException, GoneExcepti
 import { canonicalJson } from "@toonspectrum/studio-project-model";
 import type { PinnedShareAccess, PinnedShareCreate } from "@toonspectrum/studio-project-model/pinned-review-share";
 
-import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../../infrastructure/private-object-storage/private-object-storage.port";
-import { PrivateSignedReadUrlSchema } from "../../../infrastructure/private-object-storage/private-object-storage.contract";
+import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../../platform/adapters/private-object-storage/private-object-storage.port";
+import { PrivateSignedReadUrlSchema } from "../../../platform/adapters/private-object-storage/private-object-storage.contract";
 import { PinnedReviewShareRepository } from "./pinned-share.repository";
 import { failShare, PinnedShareError } from "./pinned-share-storage";
 

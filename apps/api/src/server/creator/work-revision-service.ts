@@ -1,8 +1,8 @@
 // 작품 리비전 이력 — 목록/조회/비교/복원(낙관적 동시성 포함).
 import { and, desc, eq, lte, sql } from "drizzle-orm";
 
-import { withDatabaseCapability } from "../../common/service-availability";
-import { creatorWorkRevisions, creatorWorks, db } from "../../db";
+import { withDatabaseCapability } from "../../platform/http/service-availability";
+import { creatorWorkRevisions, creatorWorks, db } from "../../platform/database";
 import {
   CREATOR_WORK_REVISION_MAX,
   CREATOR_WORK_REVISION_RETENTION,

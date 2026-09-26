@@ -4,7 +4,7 @@ import { PostgresStudioAiUsageStore } from "./studio-ai-usage.repository";
 
 import type { StudioAiSqlPool } from "./studio-ai-usage.repository";
 
-vi.mock("../../db", () => ({ dbPool: {} }));
+vi.mock("../../platform/database", () => ({ dbPool: {} }));
 
 function createPool(input?: {
   clockRows?: Array<{ usageDay: string }>;

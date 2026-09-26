@@ -1,7 +1,7 @@
 import { and, eq, ne, sql } from "drizzle-orm";
 
 import { EMPTY_CREATOR_ROLE_PROFILE } from "../../../web/src/shared/lib/creator-role-contract";
-import { accounts, db, dbClient, sessions, users } from "../db";
+import { accounts, db, dbClient, sessions, users } from "../platform/database";
 
 import { getSessionUserCached, invalidateSessionUser } from "./session";
 

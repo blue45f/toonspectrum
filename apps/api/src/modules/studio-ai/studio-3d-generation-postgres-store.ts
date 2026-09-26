@@ -6,7 +6,7 @@ import { Pool, type PoolClient } from "pg";
 import {
   normalizePgConnectionStringForTls,
   observePgPoolIdleErrors,
-} from "../../db/pg-connection";
+} from "../../platform/database/pg-connection";
 import type {
   Studio3dGenerationArtifactRevision,
   Studio3dGenerationJobRecord,

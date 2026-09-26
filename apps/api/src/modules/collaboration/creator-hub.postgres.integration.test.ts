@@ -6,7 +6,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import * as schema from "../../db/schema";
+import * as schema from "../../platform/database/schema";
 import { PromotionService } from "../promotion/promotion.service";
 
 import { CollaborationRepository } from "./collaboration.repository";
@@ -21,8 +21,8 @@ const context = vi.hoisted(() => ({
   pool: undefined as Pool | undefined,
   database: undefined as NodePgDatabase<typeof schema> | undefined,
 }));
-vi.mock("../../db", async () => ({
-  ...await import("../../db/schema"),
+vi.mock("../../platform/database", async () => ({
+  ...await import("../../platform/database/schema"),
   get dbPool() { return context.pool; },
   get db() { return context.database; },
 }));
@@ -64,7 +64,7 @@ integration("Creator hub real PostgreSQL migrations, privacy and concurrency", (
 
   async function migrate() {
     for (const migration of migrations) {
-      await pool.query(await readFile(resolve("apps/api/src/db/migrations", migration), "utf8"));
+      await pool.query(await readFile(resolve("apps/api/src/platform/database/migrations", migration), "utf8"));
     }
   }
   beforeAll(async () => {

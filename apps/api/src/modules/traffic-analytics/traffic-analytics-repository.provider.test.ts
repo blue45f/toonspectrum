@@ -5,7 +5,7 @@ import { D1TrafficAnalyticsRepository } from "./traffic-analytics-d1.repository"
 import { PostgresTrafficAnalyticsRepository } from "./traffic-analytics-postgres.repository";
 
 const query = vi.hoisted(() => vi.fn());
-vi.mock("../../db", () => ({ dbPool: { query } }));
+vi.mock("../../platform/database", () => ({ dbPool: { query } }));
 
 describe("트래픽 저장소 선택", () => {
   it("기본 PostgreSQL을 유지하며 D1 선택은 같은 repository의 쓰기·조회·정리에 적용된다", () => {

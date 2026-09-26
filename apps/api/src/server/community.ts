@@ -10,7 +10,7 @@ import {
   fanPosts,
   reviewReplies,
   users,
-} from "../db";
+} from "../platform/database";
 
 import type {
   CommunityCafe,

@@ -11,8 +11,8 @@ import {
   creatorWorkCollaborators,
   creatorWorks,
   db,
-} from "../../db";
-import { creatorWorkRasterAssets } from "../../db/studio-raster-asset.schema";
+} from "../../platform/database";
+import { creatorWorkRasterAssets } from "../../platform/database/studio-raster-asset.schema";
 
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
 import {

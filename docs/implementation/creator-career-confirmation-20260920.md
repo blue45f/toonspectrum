@@ -46,7 +46,7 @@
 
 ## DB 통합 게이트
 
-SQL은 `apps/api/src/db/migrations/pending/0080_creator_career_confirmation.sql`에 준비되어 있다.
+SQL은 `apps/api/src/platform/database/migrations/pending/0080_creator_career_confirmation.sql`에 준비되어 있다.
 자동 급구의 0079가 다른 세션에서 통합 중이므로 번호 공백이나 가짜 0079를 만들지 않았다. 기존 0078의 내용을 변경하지 않았고, 정식 마이그레이션 목록은 이 브랜치에서 기존 78개를 유지한다.
 
 0079 통합 후 0080을 정식 경로로 이동하고, 승인된 실행기의 목록·권한·준비 상태 검증을 함께 연결해야 한다. 현재 pending SQL을 운영 적용된 것으로 해석하지 않는다.

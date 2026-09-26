@@ -19,8 +19,8 @@ import {
   membershipGrants,
   membershipPolicyOverrides,
   walletLots,
-} from "../../db";
-import { creatorWorkRasterAssets } from "../../db/studio-raster-asset.schema";
+} from "../../platform/database";
+import { creatorWorkRasterAssets } from "../../platform/database/studio-raster-asset.schema";
 import {
   deriveMembershipResourceState,
   evaluateMembershipUploadQuota,

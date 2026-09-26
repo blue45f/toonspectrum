@@ -33,7 +33,7 @@ import {
   creatorWorks,
   db,
   users,
-} from "../../db";
+} from "../../platform/database";
 
 import {
   parseFormat,

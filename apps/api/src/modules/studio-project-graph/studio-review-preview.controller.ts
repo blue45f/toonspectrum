@@ -3,7 +3,7 @@ import { studioEntityIdSchema } from "@toonspectrum/studio-project-model";
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { authenticatedStudioUserId } from "./studio-project-graph.controller";
 import { studioReviewPreviewCursorSchema, studioReviewPreviewSubjectSchema } from "./studio-review-preview";
 import { StudioReviewPreviewService } from "./studio-review-preview.service";

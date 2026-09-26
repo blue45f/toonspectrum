@@ -10,7 +10,7 @@ import {
 } from "@nestjs/common";
 
 import { parseCommunitySort } from "../../../../web/src/shared/lib/community-ui";
-import { rethrowDatabaseCapabilityError, withDatabaseCapability } from "../../common/service-availability";
+import { rethrowDatabaseCapabilityError, withDatabaseCapability } from "../../platform/http/service-availability";
 import { GENRES } from "../../../../web/src/shared/lib/taxonomy";
 import {
   createFanPost,

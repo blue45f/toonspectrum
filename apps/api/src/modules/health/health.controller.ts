@@ -17,7 +17,7 @@ import {
 } from "./health.dto";
 import { HealthService } from "./health.service";
 import { createReadinessFailureReporter } from "./health-readiness-diagnostic";
-import { capabilityUnavailableException } from "../../common/service-availability";
+import { capabilityUnavailableException } from "../../platform/http/service-availability";
 
 @Controller("health")
 export class HealthController {

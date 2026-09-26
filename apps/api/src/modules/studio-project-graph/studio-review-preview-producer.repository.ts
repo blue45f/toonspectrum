@@ -3,8 +3,8 @@ import { Inject, Injectable } from "@nestjs/common";
 import { canonicalJson } from "@toonspectrum/studio-project-model";
 import type { PoolClient } from "pg";
 
-import { dbPool } from "../../db";
-import type { LocatedPrivateObjectReference } from "../../infrastructure/private-object-storage/private-object-storage.contract";
+import { dbPool } from "../../platform/database";
+import type { LocatedPrivateObjectReference } from "../../platform/adapters/private-object-storage/private-object-storage.contract";
 import {
   assertAccess, loadArtifactAccess, projectAccess, StudioProjectGraphRepository,
   StudioProjectNotFoundError, StudioRepositoryInvariantError, StudioIdempotencyConflictError,

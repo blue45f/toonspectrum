@@ -11,7 +11,7 @@ import {
   type CommercePaymentMethod,
   type CommerceProvider,
 } from "../../../../packages/core/src/commerce";
-import { appSettings, db } from "../db";
+import { appSettings, db } from "../platform/database";
 import { createSchemaReadinessCheck } from "./schema-readiness";
 
 export interface CommerceConfig {

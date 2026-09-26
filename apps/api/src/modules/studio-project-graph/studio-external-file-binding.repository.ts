@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import type { PoolClient } from "pg";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import {
   resolveCreatorCollaborationAccess,
   type CreatorCollaborationAccess,

@@ -1,6 +1,6 @@
 import { canonicalJson } from "@toonspectrum/studio-project-model";
 import type { PoolClient } from "pg";
-import { LocatedPrivateObjectReferenceSchema, type LocatedPrivateObjectReference } from "../../infrastructure/private-object-storage/private-object-storage.contract";
+import { LocatedPrivateObjectReferenceSchema, type LocatedPrivateObjectReference } from "../../platform/adapters/private-object-storage/private-object-storage.contract";
 
 /** Same object-row lock as generated-object deletion, acquired in hash order by batch callers. */
 export async function lockStudioReviewPreviewStorage(

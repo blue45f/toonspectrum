@@ -12,7 +12,7 @@ import {
   creatorWorks,
   db,
   users,
-} from "../../db";
+} from "../../platform/database";
 import { CREATOR_WORK_REVISION_MAX } from "../../server/creator-work-revisions";
 
 import { studioCrdtWorkAdvisoryLockQuery } from "./studio-crdt.repository";

@@ -4,11 +4,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(fileURLToPath(new URL(
-  "../../db/migrations/0064_studio_project_graph_v3.sql",
+  "../../platform/database/migrations/0064_studio_project_graph_v3.sql",
   import.meta.url,
 )), "utf8");
 const schemaIndex = readFileSync(fileURLToPath(new URL(
-  "../../db/schema/index.ts",
+  "../../platform/database/schema/index.ts",
   import.meta.url,
 )), "utf8");
 const appModule = readFileSync(fileURLToPath(new URL(
