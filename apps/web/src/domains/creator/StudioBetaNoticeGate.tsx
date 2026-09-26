@@ -166,7 +166,7 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
             <p className="rounded-xl bg-raised/70 px-3 py-2 text-[0.7rem] font-bold leading-5 text-fg">
               {copy.acknowledgement}
             </p>
-            <p className="text-center text-[0.62rem] leading-4 text-fg-3">{copy.revision}</p>
+            <p className="text-center text-[0.68rem] leading-4 text-fg-2">{copy.revision}</p>
           </div>
         ) : null}
 
@@ -176,7 +176,7 @@ export function StudioBetaNoticeGate({ pathname }: StudioBetaNoticeGateProps) {
             aria-expanded={detailsOpen}
             aria-controls={detailsId}
             onClick={() => setDetailsOpen((current) => !current)}
-            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-bold text-fg-2 transition hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border border-line bg-card px-3 text-xs font-bold text-fg-2 transition hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             {detailsOpen ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
             <span className="sr-only sm:not-sr-only">{detailsOpen ? copy.hideDetails : copy.showDetails}</span>
