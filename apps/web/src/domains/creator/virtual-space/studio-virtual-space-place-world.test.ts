@@ -11,6 +11,7 @@ import {
   studioVirtualPlaceWorldScope,
 } from "./studio-virtual-space-place-world";
 import { validateStudioWorldManifest } from "./studio-virtual-space-world-manifest";
+import { studioNpcInteraction } from "./studio-virtual-space-npc-director";
 
 describe("Virtual Studio independent place worlds", () => {
   it("builds one valid, tiled and portal-connected world per place", () => {
@@ -26,6 +27,7 @@ describe("Virtual Studio independent place worlds", () => {
       expect(manifest.tilemap?.layers).toHaveLength(3);
       expect(manifest.rooms.map((room) => room.id)).toEqual([place.id]);
       expect(manifest.portals).toHaveLength(3);
+      expect(studioNpcInteraction(manifest, manifest.npcs[0]!)).not.toBeNull();
       expect(manifest.npcs).toHaveLength(1);
       expect(manifest.props.length).toBeGreaterThanOrEqual(5);
       expect(ids.has(manifest.id)).toBe(false);

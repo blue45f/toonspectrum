@@ -6,9 +6,12 @@ import {
   type StudioVirtualPlaceDefinition,
 } from "./studio-virtual-space-place-catalog";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import { studioNpcToolAction } from "./studio-virtual-space-npc-director";
 import type {
   StudioVirtualSpaceWorldManifest,
+  StudioWorldInteractionDefinition,
   StudioWorldInteractionSlotDefinition,
+  StudioWorldNpcDefinition,
   StudioWorldPropDefinition,
   StudioWorldRect,
 } from "./studio-virtual-space-world-manifest";
@@ -265,7 +268,42 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
   const npcPoint: StudioVirtualSpacePoint = { x: 322, y: 338 };
   const npcId = `place-npc-${place.id}`;
   const anchorId = `${npcId}-work`;
+  const npcDefinition: StudioWorldNpcDefinition = Object.freeze({
+    id: npcId,
+    activityAnchorIds: Object.freeze([anchorId]),
+    skinKey: spec.npcSkinKey,
+    roomId: place.id,
+    point: npcPoint,
+    facing: "right",
+    scale: 0.92,
+    speed: 58,
+    behavior: "patrol",
+    patrol: Object.freeze([
+      { x: 250, y: 338 },
+      { x: 322, y: 430 },
+      { x: 366, y: 338 },
+    ]),
+  });
   const mainAction = place.action ?? "community";
+  const npcAction = studioNpcToolAction(npcDefinition) ?? mainAction;
+  const interactions: StudioWorldInteractionDefinition[] = [{
+    id: `${place.id}-primary-action`,
+    zoneId: place.id,
+    point: { x: 480, y: 302 },
+    radius: 74,
+    labelKo: `${place.labelKo} 기능`,
+    labelEn: `${place.labelEn} tool`,
+    action: mainAction,
+  }];
+  if (npcAction !== mainAction) interactions.push({
+    id: `${place.id}-npc-action`,
+    zoneId: place.id,
+    point: npcPoint,
+    radius: 64,
+    labelKo: `${place.labelKo} 도우미`,
+    labelEn: `${place.labelEn} helper`,
+    action: npcAction,
+  });
   const portals = Object.freeze([
     { id: "portal-home", point: { x: 480, y: 604 }, radius: 28, href: portalHref(DEFAULT_STUDIO_VIRTUAL_PLACE_ID) },
     { id: "portal-previous", point: { x: 58, y: 320 }, radius: 26, href: portalHref(previous.id) },
@@ -310,15 +348,7 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
     rooms: Object.freeze([room]),
     props: placeProps(place, spec),
     colliders: Object.freeze([...boundaries, ...spec.obstacles]),
-    interactions: Object.freeze([{
-      id: `${place.id}-primary-action`,
-      zoneId: place.id,
-      point: { x: 480, y: 302 },
-      radius: 74,
-      labelKo: `${place.labelKo} 기능`,
-      labelEn: `${place.labelEn} tool`,
-      action: mainAction,
-    }]),
+    interactions: Object.freeze(interactions),
     portals,
     spawns: Object.freeze([
       { id: "main", point: { x: 480, y: 540 }, facing: "up" },
@@ -363,21 +393,6 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
       minDurationMs: 12_000,
       maxDurationMs: 28_000,
     }]),
-    npcs: Object.freeze([{
-      id: npcId,
-      activityAnchorIds: Object.freeze([anchorId]),
-      skinKey: spec.npcSkinKey,
-      roomId: place.id,
-      point: npcPoint,
-      facing: "right",
-      scale: 0.92,
-      speed: 58,
-      behavior: "patrol",
-      patrol: Object.freeze([
-        { x: 250, y: 338 },
-        { x: 322, y: 430 },
-        { x: 366, y: 338 },
-      ]),
-    }]),
+    npcs: Object.freeze([npcDefinition]),
   }) as unknown as StudioVirtualSpaceWorldManifest;
 }

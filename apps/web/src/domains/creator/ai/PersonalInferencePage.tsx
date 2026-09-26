@@ -1,10 +1,11 @@
-import { Box, Cloud, Download, EyeOff, Film, Loader2, PackageCheck, RefreshCw, Server, Square, WalletCards, X } from "lucide-react";
+import { Box, Cloud, Download, EyeOff, Film, Loader2, PackageCheck, RefreshCw, Server, Sparkles, Square, WalletCards, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { useDocumentTitle } from "@/shared/seo/use-document-title";
+import { ActionableEmptyState } from "@/shared/components/ActionableEmptyState";
 import { Container } from "@/shared/components/section";
 import { useUnifiedAiAuxSettings } from "@/shared/ai/unified-ai-settings";
+import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
 import {
   cancelPersonalInferenceJob,
@@ -36,7 +37,7 @@ function saveBlob(blob: Blob, name: string): void {
 }
 
 export function PersonalInferencePage() {
-  useDocumentTitle("외부 AI Runtime · 개발자 프리뷰 · ToonStudio");
+  useDocumentTitle("개인 AI 변환실 · ToonStudio");
   const aux = useUnifiedAiAuxSettings();
   const configured = Boolean(aux.settings.creatorRuntimeBaseUrl && aux.settings.creatorRuntimeToken);
   const [mode, setMode] = useState<PersonalInferenceMode>("image-to-video");
@@ -52,7 +53,7 @@ export function PersonalInferencePage() {
   const [jobs, setJobs] = useState<PersonalInferenceJob[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [notice, setNotice] = useState("개발자 프리뷰입니다. 직접 운영하는 외부 Creator Runtime만 사용하며 ToonSpectrum이 GPU나 모델을 제공하지 않습니다.");
+  const [notice, setNotice] = useState("통합 AI 설정의 관리형 클라우드 런타임만 사용합니다. 다른 GPU·모델·키로 자동 전환하지 않습니다.");
   const [error, setError] = useState("");
   const operation = useRef<AbortController | null>(null);
 
@@ -96,7 +97,7 @@ export function PersonalInferencePage() {
     setProgress(0);
     setError("");
     try {
-      setNotice("원본을 외부 Creator Runtime으로 분할 업로드하고 SHA-256으로 확인하는 중입니다.");
+      setNotice("원본을 관리형 클라우드 런타임으로 분할 업로드하고 SHA-256으로 확인하는 중입니다.");
       const assetId = await uploadPersonalInferenceAsset(file, controller.signal, setProgress);
       const job = await submitPersonalInferenceJob({
         mode,
@@ -111,7 +112,7 @@ export function PersonalInferencePage() {
         yaw,
       }, crypto.randomUUID(), controller.signal);
       setJobs((current) => [job, ...current.filter((item) => item.id !== job.id)]);
-      setNotice("외부 Runtime이 작업을 접수했습니다. 같은 요청을 자동 재전송하지 않습니다.");
+      setNotice("클라우드 런타임이 작업을 접수했습니다. 같은 요청을 자동 재전송하지 않습니다.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "클라우드 추론 작업을 시작하지 못했습니다.");
     } finally {
@@ -150,11 +151,11 @@ export function PersonalInferencePage() {
   return (
     <Container size="wide" className="py-7 sm:py-10">
       <header className="rounded-3xl border border-line bg-panel/60 p-6 sm:p-8">
-        <p className="eyebrow text-accent">DEVELOPER PREVIEW · EXTERNAL CREATOR RUNTIME</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-5xl">외부 Creator Runtime 실험실</h1>
-        <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">영상·2D↔3D 생성은 사용자가 별도로 배포하고 운영하는 공개 HTTPS Creator Runtime으로 브라우저가 직접 요청합니다. 일반 사용자용 관리형 기능이 아니며 GPU 비용·모델·보안·CORS 운영 책임은 Runtime 소유자에게 있습니다.</p>
+        <p className="eyebrow text-accent">PERSONAL CREATOR RUNTIME</p>
+        <h1 className="mt-2 text-3xl font-black tracking-tight text-fg sm:text-5xl">내 GPU·내 모델로 만드는 변환실</h1>
+        <p className="mt-4 max-w-4xl text-sm leading-7 text-fg-2">영상·2D↔3D 생성은 통합 설정에 등록한 관리형 클라우드 Creator Runtime으로 브라우저가 직접 요청합니다. 운영측 AI 비용·자동 유료 폴백·숨은 재시도는 없습니다.</p>
         <div className="mt-5 flex flex-wrap gap-2">
-          <Link to="/settings/ai" className={`${BUTTON} bg-accent text-on-accent`}><Server size={16} /> 외부 Runtime 설정</Link>
+          <Link to="/settings/ai" className={`${BUTTON} bg-accent text-on-accent`}><Server size={16} /> 클라우드 런타임 설정</Link>
           <Link to="/studio/ecosystem" className={BUTTON}>창작 생태계 작업대</Link>
           <Link to="/studio" className={BUTTON}>Studio</Link>
         </div>
@@ -169,9 +170,9 @@ export function PersonalInferencePage() {
         ].map(({ icon: Icon, label, value, detail }) => (
           <article key={label} className="rounded-2xl border border-line bg-card/75 p-4">
             <Icon size={17} className="text-accent" aria-hidden="true" />
-            <p className="mt-3 text-[0.64rem] font-black uppercase tracking-[0.13em] text-fg-3">{label}</p>
+            <p className="mt-3 text-[0.68rem] font-black uppercase tracking-[0.13em] text-fg-2">{label}</p>
             <strong className="mt-1 block text-sm text-fg">{value}</strong>
-            <span className="mt-1 block text-xs leading-5 text-fg-3">{detail}</span>
+            <span className="mt-1 block text-xs leading-5 text-fg-2">{detail}</span>
           </article>
         ))}
       </section>
@@ -180,7 +181,7 @@ export function PersonalInferencePage() {
       {error ? <p className="mb-5 rounded-xl border border-bad/40 bg-bad/10 px-4 py-3 text-sm text-bad" role="alert">{error}</p> : null}
       {!configured ? (
         <section className="rounded-2xl border border-warn/40 bg-warn/10 p-5">
-          <h2 className="font-black text-fg">외부 Creator Runtime 연결이 필요합니다.</h2>
+          <h2 className="font-black text-fg">클라우드 런타임 연결이 필요합니다.</h2>
           <p className="mt-2 text-sm leading-6 text-fg-2">Creator Runtime 주소와 32자 이상의 토큰을 통합 AI 설정에 등록하세요. CORS는 ToonStudio origin만 명시적으로 허용하세요.</p>
         </section>
       ) : null}
@@ -193,15 +194,15 @@ export function PersonalInferencePage() {
             <button key={item.id} type="button" aria-pressed={mode === item.id} onClick={() => { setMode(item.id); setFile(null); }} className={`rounded-2xl border p-4 text-left ${mode === item.id ? "border-accent bg-accent-soft" : "border-line bg-card"}`}>
               <Icon size={20} className="text-accent" />
               <strong className="mt-3 block text-fg">{item.title}</strong>
-              <span className="mt-1 block text-xs leading-5 text-fg-3">{item.description}</span>
-              <small className={ready ? "mt-3 block text-good" : "mt-3 block font-semibold text-fg-2"}>{ready ? capabilities?.engines[item.id]?.model : "외부 Runtime 모델 준비 필요"}</small>
+              <span className="mt-1 block text-xs leading-5 text-fg-2">{item.description}</span>
+              <small className={ready ? "mt-3 block text-good" : "mt-3 block font-semibold text-fg-2"}>{ready ? capabilities?.engines[item.id]?.model : "클라우드 모델 준비 필요"}</small>
             </button>
           );
         })}
       </section>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-        <section className="rounded-2xl border border-line bg-card p-5">
+        <section id="ai-generation-settings" className="scroll-mt-24 rounded-2xl border border-line bg-card p-5">
           <h2 className="text-lg font-black text-fg">생성 설정</h2>
           <div className="mt-4 grid gap-3">
             <label className="grid gap-1 text-sm font-bold text-fg">원본 파일
@@ -232,14 +233,27 @@ export function PersonalInferencePage() {
 
         <section className="rounded-2xl border border-line bg-card p-5">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-black text-fg">외부 Runtime 작업</h2>
+            <h2 className="text-lg font-black text-fg">클라우드 런타임 작업</h2>
             <button type="button" className={BUTTON} onClick={() => void refresh().catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "새로고침 실패"))}><RefreshCw size={15} /> 새로고침</button>
           </div>
-          {!jobs.length ? <p className="mt-4 text-sm text-fg-3">아직 작업이 없습니다.</p> : (
+          {!jobs.length ? (
+            <ActionableEmptyState
+              className="mt-4 p-4 sm:p-5"
+              icon={configured ? Sparkles : Server}
+              title={configured ? "첫 변환 작업을 시작하세요" : "런타임을 연결하면 작업 기록이 여기에 모입니다"}
+              description={configured
+                ? "생성 설정에서 원본 파일과 설명을 선택하면 모델·시드·처리 단계와 결과 파일을 이 목록에서 확인할 수 있습니다."
+                : "통합 AI 설정에 Creator Runtime 주소와 토큰을 등록한 뒤 이 화면으로 돌아오세요. 자동 유료 폴백이나 다른 공급자로의 숨은 전환은 없습니다."}
+              primary={configured
+                ? { href: "#ai-generation-settings", label: "생성 설정으로 이동" }
+                : { href: "/settings/ai", label: "클라우드 런타임 연결" }}
+              secondary={{ href: "/help", label: "연결 문제 진단" }}
+            />
+          ) : (
             <div className="mt-4 grid gap-3">{jobs.map((job) => (
               <article key={job.id} className="rounded-xl border border-line bg-panel p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div><strong className="text-sm text-fg">{MODES.find((item) => item.id === job.mode)?.title}</strong><p className="mt-1 text-xs text-fg-3">{job.state} · {job.progress}% · {job.stage}</p></div>
+                  <div><strong className="text-sm text-fg">{MODES.find((item) => item.id === job.mode)?.title}</strong><p className="mt-1 text-xs text-fg-2">{job.state} · {job.progress}% · {job.stage}</p></div>
                   {!(["succeeded", "failed", "cancelled", "interrupted"] as string[]).includes(job.state) ? <button type="button" className={BUTTON} onClick={() => void cancel(job)}>취소</button> : null}
                 </div>
                 {job.error ? <p className="mt-2 text-xs text-bad">{job.error}</p> : null}

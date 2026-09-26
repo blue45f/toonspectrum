@@ -130,6 +130,12 @@ export function studioNpcRole(definition: StudioWorldNpcDefinition): StudioNpcRo
   return "resident";
 }
 
+export function studioNpcToolAction(
+  definition: StudioWorldNpcDefinition,
+): StudioWorldInteractionDefinition["action"] | undefined {
+  return roles[studioNpcRole(definition)].action;
+}
+
 export function studioNpcLabel(definition: StudioWorldNpcDefinition): { ko: string; en: string } {
   const role = roles[studioNpcRole(definition)];
   return { ko: `NPC · ${role.ko}`, en: `NPC · ${role.en}` };
@@ -151,7 +157,7 @@ export function studioNpcInteraction(
   manifest: StudioVirtualSpaceWorldManifest,
   definition: StudioWorldNpcDefinition,
 ): StudioWorldInteractionDefinition | null {
-  const action = roles[studioNpcRole(definition)].action;
+  const action = studioNpcToolAction(definition);
   if (!action) return null;
   return studioWorldInteractions(manifest).find((interaction) => interaction.zoneId === definition.roomId && interaction.action === action) ?? null;
 }

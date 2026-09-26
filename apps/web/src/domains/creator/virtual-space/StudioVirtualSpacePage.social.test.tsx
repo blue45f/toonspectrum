@@ -439,7 +439,7 @@ describe("Virtual Studio social activity ownership", () => {
   it("keeps world movement, room actions and NPC tool access unavailable until the world is ready", async () => {
     let finishLoad!: (world: StudioVirtualSpaceWorldManifest) => void;
     f.worldLoad = new Promise((resolve) => { finishLoad = resolve; });
-    render(<MemoryRouter initialEntries={["/studio/project-social/virtual"]}>
+    render(<MemoryRouter initialEntries={["/studio/project-social/virtual?worldEdit=1"]}>
       <Routes><Route path="/studio/:projectId/virtual" element={<StudioVirtualSpacePage />} /></Routes>
     </MemoryRouter>);
     expect(screen.getByText("공간 데이터 불러오는 중…")).toBeTruthy();
@@ -612,17 +612,30 @@ describe("Virtual Studio atmosphere preference storage", () => {
 
 describe("published world Page transition", () => {
   it("uses the authored room name and queues a reachable walk without moving the avatar or opening admission", async () => {
+    const { EMPTY_WORLD_PUBLICATION } = await import("./world-publication/studio-world-publication-controller");
+    const { studioWorldPublishManifest } = await import("./world-publication/studio-world-publication-client");
     const room = DEFAULT_STUDIO_WORLD_MANIFEST.rooms[0]!;
-    f.worldLoad = Promise.resolve({...DEFAULT_STUDIO_WORLD_MANIFEST,colliders:[],props:[],
-      acousticZones:[{id:"private-zone",roomId:room.id,x:100,y:100,width:80,height:80,policy:"private",doorId:"door"}]});
+    const manifest = { ...DEFAULT_STUDIO_WORLD_MANIFEST, colliders: [], props: [],
+      acousticZones: [{ id: "private-zone", roomId: room.id, x: 100, y: 100, width: 80, height: 80,
+        policy: "private" as const, doorId: "door" }] };
+    const active = { publication: { contract: "studio-world-publication-v1" as const, workId: "project-social",
+      projectId: "graph-1", artifactId: "world-room-test", revisionId: "published-room-test",
+      previousPublishedRevisionId: null, contentHash: "c".repeat(64), sequence: 1, publishedBy: "alice",
+      publishedAt: "2026-09-20T00:00:00.000Z", manifest: studioWorldPublishManifest(manifest) },
+      scope: "d".repeat(64), assetUrls: new Map([[manifest.backgroundUrl, "blob:published-room-test"]]), dispose: vi.fn() };
+    f.worldPublication = { enabled: true, refresh: vi.fn(async () => true), publish: vi.fn(async () => true),
+      reviewDraftBase: vi.fn(async () => null), snapshot: { ...EMPTY_WORLD_PUBLICATION, phase: "ready",
+        viewVerified: true, hasPublishedWorld: true, active,
+        authority: { publication: active.publication, canPublish: true, expiresAt: Date.now() + 15_000 } } };
     await mount("space");
-    expect(screen.getByRole("option",{name:room.labelKo})).toBeTruthy();
-    const before = {...f.engine!.snapshot.self};
-    fireEvent.click(screen.getByRole("button",{name:"이 방으로 걸어가기"}));
-    expect(f.engine!.bridge.consumeMoveTarget()).toEqual({x:140,y:140});
+    expect(screen.getByRole("option", { name: room.labelKo })).toBeTruthy();
+    const before = { ...f.engine!.snapshot.self };
+    fireEvent.click(screen.getByRole("button", { name: "이 방으로 걸어가기" }));
+    expect(f.engine!.bridge.consumeMoveTarget()).toEqual({ x: 140, y: 140 });
     expect(f.engine!.snapshot.self).toEqual(before);
-    expect(f.privateOptions?.world).toBeNull();
-    expect(screen.getByRole("button",{name:"이 구역에서 입장 확인"})).toHaveProperty("disabled",true);
+    expect(f.privateOptions?.world).toEqual({ worldId: active.publication.manifest.id,
+      revisionId: active.publication.revisionId, contentHash: active.publication.contentHash });
+    expect(screen.getByRole("button", { name: "이 구역에서 입장 확인" })).toHaveProperty("disabled", true);
   });
   it("retains accepted ownership on unchanged renewal, then closes it and safely spawns on a new exact revision", async () => {
     const { EMPTY_WORLD_PUBLICATION } = await import("./world-publication/studio-world-publication-controller");

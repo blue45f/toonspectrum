@@ -26,6 +26,9 @@ export function ActiveProjectContextBridge() {
   const locale = korean ? "ko" : "en";
   const library = useStudioProjectLibrary(locale, "active");
   const [dismissed, setDismissed] = useState(false);
+  const routeKey = `${pathname}${search}`;
+  const [manualSelection, setManualSelection] = useState<{ routeKey: string; projectId: string } | null>(null);
+  const manualProjectId = manualSelection?.routeKey === routeKey ? manualSelection.projectId : null;
 
   const explicitProjectId = useMemo(
     () => activeProjectIdFromLocation(pathname, search),
@@ -34,10 +37,12 @@ export function ActiveProjectContextBridge() {
   const storedProjectId = typeof window === "undefined"
     ? null
     : readActiveProjectContext(window.sessionStorage);
-  const recentProject = useMemo(() => [...library.projects]
-    .sort((left, right) => Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt))[0] ?? null, [library.projects]);
-  const selectedProject = library.projects.find((project) => project.id === explicitProjectId)
-    ?? library.projects.find((project) => project.id === storedProjectId)
+  const projectOptions = useMemo(() => [...library.projects]
+    .sort((left, right) => Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt)), [library.projects]);
+  const recentProject = projectOptions[0] ?? null;
+  const selectedProject = projectOptions.find((project) => project.id === manualProjectId)
+    ?? projectOptions.find((project) => project.id === explicitProjectId)
+    ?? projectOptions.find((project) => project.id === storedProjectId)
     ?? recentProject;
 
   useEffect(() => {
@@ -71,6 +76,13 @@ export function ActiveProjectContextBridge() {
     }
     setDismissed(true);
   };
+  const selectProject = (projectId: string) => {
+    setManualSelection({ routeKey, projectId });
+    setDismissed(false);
+    if (typeof window !== "undefined") {
+      writeActiveProjectContext(window.sessionStorage, projectId);
+    }
+  };
 
   return (
     <aside
@@ -83,12 +95,28 @@ export function ActiveProjectContextBridge() {
         <Link2 size={18} aria-hidden="true" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[0.62rem] font-black uppercase tracking-[0.15em] text-accent">
-          {korean ? "CURRENT WORK" : "CURRENT WORK"}
+        <p className="text-[0.68rem] font-black uppercase tracking-[0.15em] text-accent">
+          CURRENT WORK
         </p>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <strong className="truncate text-sm font-black text-fg">{selectedProject.title}</strong>
-          <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.62rem] font-bold text-fg-3">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {projectOptions.length > 1 ? (
+            <label className="min-w-0 flex-1 sm:max-w-sm">
+              <span className="sr-only">{korean ? "현재 작품 선택" : "Choose current work"}</span>
+              <select
+                data-active-project-selector="true"
+                value={selectedProject.id}
+                onChange={(event) => selectProject(event.target.value)}
+                className="min-h-10 w-full min-w-0 rounded-xl border border-line bg-card px-3 text-sm font-black text-fg outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
+              >
+                {projectOptions.map((project) => (
+                  <option key={project.id} value={project.id}>{project.title}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <strong className="truncate text-sm font-black text-fg">{selectedProject.title}</strong>
+          )}
+          <span className="rounded-full border border-line bg-card px-2 py-0.5 text-[0.68rem] font-bold text-fg-2">
             {korean ? "작품 문맥 연결됨" : "Work context connected"}
           </span>
         </div>
