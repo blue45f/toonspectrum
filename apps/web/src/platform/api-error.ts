@@ -1,4 +1,6 @@
 import { HTTPError, TimeoutError } from "ky";
+import { getLang, FALLBACK_CHAIN, resolveTranslationForDisplay } from "@/shared/lib/i18n-core";
+import { defineStaticSourceText, resolveUiLocale } from "@/shared/lib/i18n-bilingual-copy";
 
 export const SERVICE_CAPABILITY_ERROR_EVENT =
   "toonspectrum:service-capability-error";
@@ -119,41 +121,34 @@ function kindForStatus(
   return "unknown";
 }
 
+function localizeAuthoredMessage(source: string): string {
+  const locale = resolveUiLocale(getLang());
+  if (locale.split("-")[0] === "ko") return source;
+  const key = defineStaticSourceText("platform.apiError", "ko", source);
+  return resolveTranslationForDisplay(locale, key, FALLBACK_CHAIN, source);
+}
+
 function messageFor(
   kind: AppApiErrorKind,
   fallback: string,
   retrySeconds: number | null,
   serverMessage: string | null,
 ): string {
-  if (kind === "offline") {
-    return "인터넷 연결이 끊겼습니다. 입력한 내용은 그대로 유지됩니다.";
-  }
-  if (kind === "timeout") {
-    return "서버 응답이 지연되고 있습니다. 입력한 내용은 그대로 유지됩니다.";
-  }
-  if (kind === "unreachable") {
-    return "서버에 연결할 수 없습니다. 같은 화면에서 다시 시도해 주세요.";
-  }
-  if (kind === "capability_unavailable") {
-    return "일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.";
-  }
+  if (kind === "offline") return localizeAuthoredMessage("인터넷 연결이 끊겼습니다. 입력한 내용은 그대로 유지됩니다.");
+  if (kind === "timeout") return localizeAuthoredMessage("서버 응답이 지연되고 있습니다. 입력한 내용은 그대로 유지됩니다.");
+  if (kind === "unreachable") return localizeAuthoredMessage("서버에 연결할 수 없습니다. 같은 화면에서 다시 시도해 주세요.");
+  if (kind === "capability_unavailable") return localizeAuthoredMessage("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.");
   if (kind === "rate_limited") {
     return retrySeconds
-      ? `요청이 많아 잠시 제한되었습니다. 약 ${retrySeconds}초 후 다시 시도해 주세요.`
-      : "요청이 많아 잠시 제한되었습니다. 잠시 후 다시 시도해 주세요.";
+      ? localizeAuthoredMessage(`요청이 많아 잠시 제한되었습니다. 약 ${retrySeconds}초 후 다시 시도해 주세요.`)
+      : localizeAuthoredMessage("요청이 많아 잠시 제한되었습니다. 잠시 후 다시 시도해 주세요.");
   }
-  if (kind === "unauthorized") {
-    return "로그인이 만료되었습니다. 작성 중인 내용은 유지됩니다.";
-  }
-  if (kind === "forbidden") return "이 작업을 수행할 권한이 없습니다.";
-  if (kind === "conflict") {
-    return "다른 곳에서 내용이 변경되었습니다. 최신 상태를 확인해 주세요.";
-  }
-  if (kind === "not_found") {
-    return serverMessage ?? "요청한 항목을 찾을 수 없습니다.";
-  }
-  if (kind === "validation") return serverMessage ?? fallback;
-  return fallback;
+  if (kind === "unauthorized") return localizeAuthoredMessage("로그인이 만료되었습니다. 작성 중인 내용은 유지됩니다.");
+  if (kind === "forbidden") return localizeAuthoredMessage("이 작업을 수행할 권한이 없습니다.");
+  if (kind === "conflict") return localizeAuthoredMessage("다른 곳에서 내용이 변경되었습니다. 최신 상태를 확인해 주세요.");
+  if (kind === "not_found") return serverMessage ?? localizeAuthoredMessage("요청한 항목을 찾을 수 없습니다.");
+  if (kind === "validation") return serverMessage ?? localizeAuthoredMessage(fallback);
+  return localizeAuthoredMessage(fallback);
 }
 
 function emitCapabilityFailure(error: AppApiError): void {

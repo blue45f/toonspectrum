@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   formatI18nTemplate,
+  translateAuthoredSourceText,
   translateBilingualText,
   translateParallelBilingualCopy,
 } from "../i18n-bilingual-copy";
@@ -22,6 +23,12 @@ describe("legacy bilingual copy bridge", () => {
     expect(copy.format).toBe("PSD");
     expect(copy.title).toMatch(/^translated:legacyUi\./u);
     expect(t).toHaveBeenCalledTimes(1);
+  });
+
+
+  it("registers source-only UI copy for the active locale", () => {
+    const result = translateAuthoredSourceText("fr", "ko", "testSourceOnly", "필터 관리");
+    expect(result).toBe("필터 관리");
   });
 
   it("keeps placeholders explicit until runtime interpolation", () => {

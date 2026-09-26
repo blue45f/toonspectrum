@@ -8,6 +8,7 @@ import {
   triggerTranslationBundleUpdate,
   useI18n,
   useT,
+  FALLBACK_CHAIN,
 } from "./i18n-core";
 import { normalizeLocaleCode } from "./i18n-intl-utils";
 import { loadRuntimeTranslationBundle } from "./i18n-runtime-translation";
@@ -104,6 +105,25 @@ export function defineStaticSourceText(
   if (sourceRoot === "en") registerI18nEnglishSourceEntries({ [key]: source });
   else registerI18nLocaleEntries(normalizedSourceLocale, { [key]: source });
   return key;
+}
+
+/**
+ * Registers an authored UI string (typically a legacy Korean literal) without requiring an
+ * English sibling. The runtime translator uses the authored source locale for automatic
+ * translation and keeps the original source as the safe fallback.
+ */
+export function translateAuthoredSourceText(
+  locale: string,
+  sourceLocale: string,
+  scope: string,
+  source: string,
+): string {
+  const normalized = resolveUiLocale(locale);
+  const normalizedSource = resolveUiLocale(sourceLocale);
+  if (normalized.split("-")[0] === normalizedSource.split("-")[0]) return source;
+  const key = defineStaticSourceText(scope, normalizedSource, source);
+  scheduleRuntimeLocaleTranslation(normalized);
+  return resolveTranslationForDisplay(normalized, key, FALLBACK_CHAIN, source);
 }
 
 export function translateStaticSourceTextForLocale(

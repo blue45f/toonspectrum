@@ -45,6 +45,11 @@ import { StudioToolHintTarget } from "./StudioToolHint";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
+import {
+  getCurrentUiLocale,
+  translateAuthoredSourceText,
+  useBilingualI18nRevision,
+} from "@/shared/lib/i18n-bilingual-copy";
 
 type SmartFilterParams = StudioAdjustmentEntry["params"];
 
@@ -639,6 +644,9 @@ export function StudioSmartFiltersPanel({
   validateStack?: (next: StudioAdjustmentStack) => string | null;
 }): React.ReactElement {
   const searchId = useId();
+  useBilingualI18nRevision();
+  const locale = getCurrentUiLocale();
+  const tx = (source: string) => translateAuthoredSourceText(locale, "ko", "StudioSmartFiltersPanel", source);
   const [query, setQuery] = useState("");
   const [mutationError, setMutationError] = useState<string | null>(null);
   const current = normalizeStudioAdjustmentStack(stack);
@@ -695,14 +703,14 @@ export function StudioSmartFiltersPanel({
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="필터 이름·효과 검색"
+            placeholder={tx("필터 이름·효과 검색")}
             className="min-w-0 flex-1 bg-transparent text-xs text-fg outline-none placeholder:text-fg-3"
           />
           {query ? (
             <button
               type="button"
               onClick={() => setQuery("")}
-              aria-label="필터 검색어 지우기"
+              aria-label={tx("필터 검색어 지우기")}
               className="grid size-9 shrink-0 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg pointer-coarse:size-11"
             >
               <X className="size-3.5" aria-hidden />
@@ -711,7 +719,7 @@ export function StudioSmartFiltersPanel({
         </div>
 
         <p className="mt-2 text-[0.58rem] text-fg-3" role="status" aria-live="polite">
-          {query ? `검색 결과 ${visibleCatalog.length}개` : `사용 가능한 필터 ${visibleCatalog.length}개`}
+          {query ? `${tx("검색 결과")} ${visibleCatalog.length}개` : `${tx("사용 가능한 필터")} ${visibleCatalog.length}개`}
         </p>
 
         <div className="mt-2 max-h-72 space-y-2.5 overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:thin]">
@@ -721,7 +729,7 @@ export function StudioSmartFiltersPanel({
             return (
               <section key={group} aria-labelledby={`${searchId}-${group}`}>
                 <h3 id={`${searchId}-${group}`} className="mb-1 text-[0.58rem] font-bold uppercase tracking-wider text-fg-3">
-                  {studioFilterGroupLabel(group)} · {items.length}
+                  {tx(studioFilterGroupLabel(group))} · {items.length}
                 </h3>
                 <div className="flex flex-wrap gap-1.5">
                   {items.map((entry) => (
@@ -730,9 +738,9 @@ export function StudioSmartFiltersPanel({
                       hint={{
                         id: `smart-filter-${entry.engine}`,
                         title: entry.title,
-                        description: entry.description,
+                        description: tx(entry.description),
                         preview: "filter",
-                        tip: "모든 계산은 브라우저의 로컬 Worker에서 우선 실행됩니다. 원본을 보존한 채 스택에 추가되며 나중에 값을 다시 바꿀 수 있어요.",
+                        tip: tx("모든 계산은 브라우저의 로컬 Worker에서 우선 실행됩니다. 원본을 보존한 채 스택에 추가되며 나중에 값을 다시 바꿀 수 있어요."),
                       }}
                     >
                       <button
@@ -746,7 +754,7 @@ export function StudioSmartFiltersPanel({
                         )}
                       >
                         <Plus className="size-3" aria-hidden />
-                        {entry.title}
+                        {tx(entry.title)}
                       </button>
                     </StudioToolHintTarget>
                   ))}
@@ -756,8 +764,8 @@ export function StudioSmartFiltersPanel({
           })}
           {visibleCatalog.length === 0 ? (
             <div className="rounded-lg border border-dashed border-line px-3 py-4 text-center">
-              <p className="text-xs font-semibold text-fg-2">일치하는 필터가 없습니다</p>
-              <p className="mt-1 text-[0.62rem] text-fg-3">‘선명’, ‘구름’, ‘감마’처럼 효과 이름으로 찾아보세요.</p>
+              <p className="text-xs font-semibold text-fg-2">{tx("일치하는 필터가 없습니다")}</p>
+              <p className="mt-1 text-[0.62rem] text-fg-3">{tx("‘선명’, ‘구름’, ‘감마’처럼 효과 이름으로 찾아보세요.")}</p>
             </div>
           ) : null}
         </div>
@@ -765,10 +773,10 @@ export function StudioSmartFiltersPanel({
 
       {current.entries.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line bg-card/40 px-3 py-4 text-center text-[0.68rem] text-fg-3">
-          스택이 비어 있어요. 위 카탈로그에서 필터를 추가하면 여기에 조절값이 나타납니다.
+          {tx("스택이 비어 있어요. 위 카탈로그에서 필터를 추가하면 여기에 조절값이 나타납니다.")}
         </p>
       ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label="스마트 필터 목록">
+        <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line" aria-label={tx("스마트 필터 목록")}>
           {current.entries.map((entry, index) => {
             const catalog = studioFilterCatalogEntry(entry.engine);
             return (
@@ -779,17 +787,17 @@ export function StudioSmartFiltersPanel({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[0.72rem] font-semibold text-fg">
-                      {studioAdjustmentEngineLabel(entry.engine)}
+                      {tx(studioAdjustmentEngineLabel(entry.engine))}
                     </p>
                     <p className="line-clamp-2 text-[0.58rem] leading-relaxed text-fg-3">
-                      {catalog?.description ?? entry.engine}
+                      {tx(catalog?.description ?? entry.engine)}
                     </p>
                   </div>
                   <button
                     type="button"
-                    aria-label={entry.enabled ? `${studioAdjustmentEngineLabel(entry.engine)} 끄기` : `${studioAdjustmentEngineLabel(entry.engine)} 켜기`}
+                    aria-label={entry.enabled ? `${tx(studioAdjustmentEngineLabel(entry.engine))} ${tx("끄기")}` : `${tx(studioAdjustmentEngineLabel(entry.engine))} ${tx("켜기")}`}
                     aria-pressed={entry.enabled}
-                    title={entry.enabled ? "미리보기 끄기" : "미리보기 켜기"}
+                    title={entry.enabled ? tx("미리보기 끄기") : tx("미리보기 켜기")}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     onClick={() => patch(setStudioAdjustmentEntryEnabled(current, entry.id, !entry.enabled))}
                   >
@@ -797,7 +805,7 @@ export function StudioSmartFiltersPanel({
                   </button>
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 위로 이동`}
+                    aria-label={`${tx(studioAdjustmentEngineLabel(entry.engine))} 위로 이동`}
                     disabled={index === 0}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     onClick={() => patch(reorderStudioAdjustmentEntry(current, index, index - 1))}
@@ -806,7 +814,7 @@ export function StudioSmartFiltersPanel({
                   </button>
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 아래로 이동`}
+                    aria-label={`${tx(studioAdjustmentEngineLabel(entry.engine))} 아래로 이동`}
                     disabled={index >= current.entries.length - 1}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     onClick={() => patch(reorderStudioAdjustmentEntry(current, index, index + 1))}
@@ -815,7 +823,7 @@ export function StudioSmartFiltersPanel({
                   </button>
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 복제`}
+                    aria-label={`${tx(studioAdjustmentEngineLabel(entry.engine))} 복제`}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     disabled={maxEntries !== undefined && current.entries.length >= maxEntries}
                     onClick={() => patch(duplicateStudioEffectEntry(current, entry.id))}
@@ -824,7 +832,7 @@ export function StudioSmartFiltersPanel({
                   </button>
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 삭제`}
+                    aria-label={`${tx(studioAdjustmentEngineLabel(entry.engine))} 삭제`}
                     className={buttonClass({ size: "sm", variant: "quiet", className: "min-h-10 min-w-10 text-bad pointer-coarse:min-h-11 pointer-coarse:min-w-11" })}
                     onClick={() => patch(removeStudioAdjustmentEntry(current, entry.id))}
                   >
@@ -840,7 +848,7 @@ export function StudioSmartFiltersPanel({
                       max={100}
                       step={1}
                       value={Number(((entry.opacity ?? 1) * 100).toFixed(2))}
-                      aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 필터 ${index + 1} 불투명도`}
+                      aria-label={`${tx(studioAdjustmentEngineLabel(entry.engine))} 필터 ${index + 1} 불투명도`}
                       className="min-h-11 w-20 rounded border border-line bg-card px-2 text-right tabular-nums text-fg"
                       onChange={(event) => patch({
                         ...current,
@@ -855,8 +863,8 @@ export function StudioSmartFiltersPanel({
                 <div className="flex justify-end">
                   <button
                     type="button"
-                    aria-label={`${studioAdjustmentEngineLabel(entry.engine)} 초기값으로 재설정`}
-                    title="파라미터와 불투명도를 기본값으로 재설정"
+                    aria-label={`${tx(studioAdjustmentEngineLabel(entry.engine))} 초기값으로 재설정`}
+                    title={tx("파라미터와 불투명도를 기본값으로 재설정")}
                     className={buttonClass({
                       size: "sm",
                       variant: "quiet",
@@ -865,7 +873,7 @@ export function StudioSmartFiltersPanel({
                     onClick={() => patch(resetStudioEffectEntry(current, entry.id))}
                   >
                     <RotateCcw className="size-3.5" aria-hidden />
-                    초기값
+                    {tx("초기값")}
                   </button>
                 </div>
                 {entry.enabled ? (
