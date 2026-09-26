@@ -324,6 +324,25 @@ describe("StudioQuickStartPanel", () => {
     outside.remove();
   });
 
+  it("lets the beta acknowledgement finish before first-run coaching", async () => {
+    const betaHost = document.createElement("div");
+    betaHost.setAttribute("data-studio-beta-notice-host", "true");
+    const acknowledge = document.createElement("button");
+    acknowledge.setAttribute("data-studio-beta-notice-acknowledge", "true");
+    betaHost.append(acknowledge);
+    document.body.append(betaHost);
+
+    const handlers = createHandlers();
+    try {
+      render(<StudioQuickStartPanel {...handlers} />);
+      fireEvent.click(acknowledge);
+      await Promise.resolve();
+      expect(handlers.onDismiss).not.toHaveBeenCalled();
+    } finally {
+      betaHost.remove();
+    }
+  });
+
   it("does not treat a click inside the coach as an outside dismissal", async () => {
     const handlers = createHandlers();
     render(<StudioQuickStartPanel {...handlers} />);

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   collectStudioCanvasSurfaceContractFailures,
+  isStudioCanvasDocumentShadowSurface,
   isStudioCanvasVelloSurfaceReady,
   resolveStudioCanvasSurfaceBudget,
   STUDIO_CANVAS_RECLAIMED_SURFACES,
@@ -37,6 +38,9 @@ function snapshot(input: {
   cursorCount?: number;
   cursorWidth?: number;
   cursorHeight?: number;
+  adaptiveCount?: number;
+  adaptiveInsideKonva?: boolean;
+  adaptivePrimaryDataKey?: string;
 } = {}) {
   const cursorCount = input.cursorCount ?? 0;
   return {
@@ -50,6 +54,15 @@ function snapshot(input: {
       backingHeight: input.cursorHeight ?? 2_448,
       nominalRgba8Bytes: CURSOR_NOMINAL_BYTES,
       insideKonvaContent: true,
+    })),
+    adaptiveLiveTransformCanvases: Array.from({ length: input.adaptiveCount ?? 1 }, () => ({
+      primaryDataKey:
+        input.adaptivePrimaryDataKey
+        ?? "data-studio-live-transform-surface=adaptive-preview",
+      backingWidth: 1_400,
+      backingHeight: 2_100,
+      nominalRgba8Bytes: 12 * 1_048_576,
+      insideKonvaContent: input.adaptiveInsideKonva ?? true,
     })),
     canonicalDocumentBackingSizes: ["1632x2448"],
   } as const;
@@ -176,6 +189,38 @@ describe("Studio canvas surface production-preview gate", () => {
     });
   });
 
+  it("keeps the adaptive drag preview out of the canonical document-shadow set", () => {
+    const base = { insideKonvaContent: true, dataAttributes: {} };
+    expect(isStudioCanvasDocumentShadowSurface(base)).toBe(true);
+    expect(isStudioCanvasDocumentShadowSurface({
+      ...base,
+      dataAttributes: { "data-studio-brush-cursor-canvas": "true" },
+    })).toBe(false);
+    expect(isStudioCanvasDocumentShadowSurface({
+      ...base,
+      dataAttributes: { "data-studio-live-transform-surface": "adaptive-preview" },
+    })).toBe(false);
+    expect(isStudioCanvasDocumentShadowSurface({
+      ...base,
+      insideKonvaContent: false,
+    })).toBe(false);
+  });
+
+  it("requires one explicit adaptive live-transform surface throughout the gate", () => {
+    const failures = collectStudioCanvasSurfaceContractFailures({
+      ...passingContract(),
+      initialSnapshot: snapshot({ adaptiveCount: 0 }),
+      finalSnapshot: snapshot({ adaptiveInsideKonva: false }),
+    });
+
+    expect(failures.some((failure) => failure.includes(
+      "initial expected exactly one tagged adaptive live-transform canvas",
+    ))).toBe(true);
+    expect(failures.some((failure) => failure.includes(
+      "final adaptive live-transform canvas was outside the Konva Stage",
+    ))).toBe(true);
+  });
+
   it("fails independently for count growth, unparked surfaces, pressure, and loss evidence", () => {
     expect(collectStudioCanvasSurfaceContractFailures(passingContract())).toEqual([]);
 
@@ -249,6 +294,25 @@ describe("Studio canvas surface production-preview gate", () => {
     expect(failures.some((failure) => failure.includes("WebGL context-loss"))).toBe(true);
     expect(failures.some((failure) => failure.includes("GPU device-loss"))).toBe(true);
     expect(failures.some((failure) => failure.includes("unhandled device/context-loss"))).toBe(true);
+  });
+
+
+  it("acknowledges the beta notice before dismissing overlapping first-run chrome", () => {
+    const helperIndex = verifierSource.indexOf(
+      "async function acknowledgeStudioBetaNoticeIfPresent",
+    );
+    const acknowledgeIndex = verifierSource.indexOf(
+      "await acknowledgeStudioBetaNoticeIfPresent(page)",
+    );
+    const quickStartIndex = verifierSource.indexOf(
+      "const quickStart = page.locator('[data-studio-creative-starter=\"true\"]')",
+    );
+
+    expect(helperIndex).toBeGreaterThanOrEqual(0);
+    expect(verifierSource).toContain('data-studio-beta-notice-acknowledge="true"');
+    expect(verifierSource).not.toContain("force: true");
+    expect(acknowledgeIndex).toBeGreaterThan(helperIndex);
+    expect(quickStartIndex).toBeGreaterThan(acknowledgeIndex);
   });
 
   it("keeps crash/loss instrumentation and every reclaimed selector in the real browser path", () => {

@@ -230,6 +230,10 @@ export function StudioQuickStartPanel({
     const onClick = (event: Event) => {
       const target = event.target as Node | null;
       if (target && root.contains(target)) return;
+      const targetElement = target instanceof Element ? target : target?.parentElement;
+      // The beta notice owns the same desktop corner and intentionally precedes first-run coaching.
+      // Acknowledging it must reveal the coach, not count as the outside action that dismisses it.
+      if (targetElement?.closest('[data-studio-beta-notice-host="true"]')) return;
       queueMicrotask(dismissFromOutsideClick);
     };
     ownerDocument.addEventListener("click", onClick, true);

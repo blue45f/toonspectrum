@@ -566,6 +566,12 @@ export default defineConfig(({ command, mode }) => ({
   },
   // Industrial OCCT: allow Vite to emit wasm asset URLs for browser fetch/locateFile.
   assetsInclude: ["**/*.wasm"],
+  // Studio workers use route- and engine-level dynamic imports. Vite defaults workers to IIFE,
+  // but Rolldown cannot code-split an IIFE bundle; emit native module workers so their lazy graph
+  // remains valid instead of failing the production build with INVALID_OPTION.
+  worker: {
+    format: "es",
+  },
   optimizeDeps: {
     // Browser acceptance needs only the exercised route graph. Disabling discovery there avoids
     // prebundling every heavyweight 2D/3D engine before the manuscript checks can start.
