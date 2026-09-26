@@ -33,7 +33,6 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
       "./creator-resources": "./creator-resources.js",
       "./infrastructure-fabric": "./infrastructure-fabric.js",
       "./production": "./production/index.js",
-      "./infrastructure-fabric": "./infrastructure-fabric.js",
     },
     subpathEntries: [
       {
