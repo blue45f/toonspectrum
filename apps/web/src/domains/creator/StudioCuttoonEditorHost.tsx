@@ -23405,6 +23405,7 @@ const beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({
     onStageUp,
     onStageDragMove,
     onStageDragEnd,
+    finishDrawingPointer: stageFinishDrawingPointer,
     hideStrokeGuide,
     hideBrushCursor,
     hideFilterMaskCursor,

@@ -9,8 +9,6 @@ import type { DrawEl } from "../studio-element-model";
 type StudioLiveSurfaceHost = Record<string, unknown>;
 
 export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
-  // This seam deliberately bridges a large mutable React host while the extraction is staged.
-  // Keep the dynamic typing local rather than leaking it into the editor surface API.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const host = h as Record<string, any>;
   const {
@@ -36,6 +34,8 @@ export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
     currentPageId,
     currentPageIdRef,
     decideStudioLiveInkBackend,
+    beginStudioHokusaiLiveStroke,
+    beginStudioLivingInkStroke,
     discardStudioHokusaiLiveStroke,
     discardStudioLivingInkStroke,
     draftPreviewStoreRef,
@@ -44,7 +44,7 @@ export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
     drawingPointerTransportRef,
     drawingRef,
     endLiveResourceEdit,
-    finishQueuedStudioDrawingPointer,
+    getFinishQueuedStudioDrawingPointer,
     flushDirectLiveDraft,
     flushDirectLiveDraftNow,
     flushPendingStrokeCommitsRef,
@@ -147,9 +147,9 @@ export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
       pendingStrokeAdmission().defer({
         stroke: next,
         scope: capturedScope,
-        checkpoint: (stroke) => checkpointPendingStroke(stroke, capturedScope.pageId, capturedScope.generation),
-        settled: (stroke, accepted) => releasePendingStrokeCheckpoint(stroke.id, accepted),
-        recover: (stroke, reason) => {
+        checkpoint: (stroke: DrawEl) => checkpointPendingStroke(stroke, capturedScope.pageId, capturedScope.generation),
+        settled: (stroke: DrawEl, accepted: boolean) => releasePendingStrokeCheckpoint(stroke.id, accepted),
+        recover: (stroke: DrawEl, reason: string) => {
           salvageRejectedStroke(stroke, "선택한 렌더러 입력 준비", reason, capturedScope.pageId, capturedScope.generation);
           if (drawingRef.current?.id !== stroke.id) return;
           // 이 획의 샘플러만 종료한다. 앞선 GPU 확정 표면과 Worker handoff는 건드리지 않는다.
@@ -161,7 +161,7 @@ export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
           scheduleLiveDrawPressure(null);
           endLiveResourceEdit();
         },
-        admit: (stroke, complete, finish) => {
+        admit: (stroke: DrawEl, complete: boolean, finish?: () => void) => {
           const providerState = selectedMedia.kind === "hokusai"
             ? hokusaiLiveProviderRef.current.state
             : selectedMedia.kind === "living-ink" ? livingInkAdmissionReadinessRef.current.state : null;
@@ -197,7 +197,7 @@ export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
           admission.onAdmitted?.(stroke);
           if (complete) {
             if (finish) finish();
-            else finishQueuedStudioDrawingPointer(stageRef.current, pointerSample, { consumeReleaseSample: false });
+            else getFinishQueuedStudioDrawingPointer()?.(stageRef.current, pointerSample, { consumeReleaseSample: false });
           } else flushDirectLiveDraftNow(stroke);
           return true;
         },
