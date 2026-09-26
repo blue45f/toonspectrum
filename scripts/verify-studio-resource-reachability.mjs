@@ -59,7 +59,7 @@ const siteMusicSource = readFileSync(
   resolve(root, "apps/web/src/shared/lib/site-background-music.ts"),
   "utf8",
 );
-if (!siteMusicSource.includes('fetch("/audio/playlist.json"')) {
+if (!/fetch\(\s*["']\/audio\/playlist\.json(?:\?|["'])/.test(siteMusicSource)) {
   fail("site background music no longer consumes /audio/playlist.json");
 }
 
