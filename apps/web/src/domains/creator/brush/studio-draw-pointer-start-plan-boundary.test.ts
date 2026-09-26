@@ -13,9 +13,11 @@ interface ModuleFacts {
 function moduleFacts(fileName: string): ModuleFacts {
   const fileUrl = new URL(fileName, import.meta.url);
   const rawSource = readFileSync(fileUrl, "utf8");
-  const source = fileName.endsWith("StudioPage.tsx") || fileName.endsWith("StudioCuttoonEditorHost.tsx")
+  const source = fileName.endsWith("StudioPage.tsx")
     ? readStudioCuttoonEditorSource()
-    : rawSource;
+    : fileName.endsWith("StudioCuttoonEditorHost.tsx")
+      ? `${readFileSync(new URL("../studio-cuttoon-editor/studio-live-surface-start.ts", import.meta.url), "utf8")}\n${readStudioCuttoonEditorSource()}`
+      : rawSource;
   const file = ts.createSourceFile(
     fileUrl.pathname,
     rawSource,

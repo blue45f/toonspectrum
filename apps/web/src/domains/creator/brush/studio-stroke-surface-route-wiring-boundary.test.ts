@@ -4,7 +4,11 @@ import { describe, expect, it } from "vitest";
 
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
-const PAGE_SOURCE = readStudioCuttoonEditorSource();
+const PAGE_SOURCE = `${readFileSync(
+  new URL("../studio-cuttoon-editor/studio-live-surface-start.ts", import.meta.url),
+  "utf8",
+)}
+${readStudioCuttoonEditorSource()}`;
 const ROUTE_SOURCE = readFileSync(
   new URL("./studio-stroke-surface-route.ts", import.meta.url),
   "utf8",

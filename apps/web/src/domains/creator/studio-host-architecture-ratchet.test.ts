@@ -35,7 +35,12 @@ const SESSION_FILES = {
   ),
 } as const;
 
-const HOST_MAX_LINES = 29877;
+const HOST_MAX_LINES = 29650;
+const LIVE_SURFACE_START_MAX_LINES = 560;
+const LIVE_SURFACE_START_FILE = path.join(
+  CREATOR_DIR,
+  "studio-cuttoon-editor/studio-live-surface-start.ts",
+);
 const ROUTER_SEAM_MAX_LINES = 100;
 const STUDIO_RUNTIME_MODULE_MAX_LINES = 300;
 const APP_ROUTE_GROUP_MAX_LINES = 120;
@@ -217,9 +222,17 @@ describe("studio host architecture ratchet", () => {
     expect(host).toContain("export function StudioCuttoonEditor");
   });
 
-  it("holds the editor host under the exact post-PSD-stability ceiling", () => {
-    expect(readFileSync(HOST_FILE, "utf8").split("\n").length)
-      .toBeLessThanOrEqual(HOST_MAX_LINES);
+  it("keeps the editor host under the reduced live-surface decomposition ceiling", () => {
+    const host = readFileSync(HOST_FILE, "utf8");
+    expect(host.split("\n").length).toBeLessThanOrEqual(HOST_MAX_LINES);
+    expect(host).not.toContain("function beginStudioDrawLiveSurfaces(");
+  });
+
+  it("keeps the extracted live-surface admission seam focused", () => {
+    const source = readFileSync(LIVE_SURFACE_START_FILE, "utf8");
+    expect(source.split("\n").length).toBeLessThanOrEqual(LIVE_SURFACE_START_MAX_LINES);
+    expect(source).toContain("export function bindStudioDrawLiveSurfaces");
+    expect(source).toContain("return function beginStudioDrawLiveSurfaces(");
   });
 
   it("keeps application and Studio routers as small composition seams", () => {

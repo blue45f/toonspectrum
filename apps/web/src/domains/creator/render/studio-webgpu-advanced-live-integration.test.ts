@@ -6,7 +6,15 @@ import { readStudioCanvasViewportStack } from "../canvas/read-studio-canvas-view
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 function source(fileName: string): string {
-  if (fileName.endsWith("StudioPage.tsx") || fileName.endsWith("StudioCuttoonEditorHost.tsx")) return readStudioCuttoonEditorSource();
+  if (fileName.endsWith("StudioPage.tsx")) return readStudioCuttoonEditorSource();
+  if (fileName.endsWith("StudioCuttoonEditorHost.tsx")) {
+    const host = readStudioCuttoonEditorSource();
+    const liveSurface = readFileSync(
+      new URL("../studio-cuttoon-editor/studio-live-surface-start.ts", import.meta.url),
+      "utf8",
+    );
+    return `${liveSurface}\n${host}`;
+  }
   return readFileSync(new URL(fileName, import.meta.url), "utf8");
 }
 
