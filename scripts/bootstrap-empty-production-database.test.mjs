@@ -449,6 +449,7 @@ describe("bootstrap SQL and repository contract", () => {
       "0089_creator_series_spatial_showcase",
       "0090_studio_review_voice_note",
       "0091_creator_work_publication_media",
+      "0092_collaboration_application_selection",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
     expect(contract.fingerprintPaths).toEqual(expect.arrayContaining([
