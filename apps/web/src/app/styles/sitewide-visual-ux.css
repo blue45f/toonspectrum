@@ -39,6 +39,21 @@ html {
   overflow-wrap: anywhere;
 }
 
+/* Long localized labels must wrap instead of colliding with adjacent controls.
+   Keep this at the shared page shell so individual pages do not need ad-hoc fixes. */
+#main-content :where(button, [role="button"], [role="tab"], [role="option"]) {
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+@media (min-width: 768px) {
+  #main-content :where(button, [role="button"], [role="tab"], [role="option"]) {
+    min-block-size: 2.5rem;
+  }
+}
+
 :is([data-route-device-guidance], [data-route-recovery-guidance], [data-route-recovery]) {
   width: min(var(--site-content-max), calc(100% - (var(--site-page-gutter) * 2)));
   min-width: 0;

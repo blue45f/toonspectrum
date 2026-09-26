@@ -16,7 +16,7 @@ const themeIds = [...themeSource.matchAll(/\bid:\s*"([a-z-]+)"/gu)]
 
 describe("unified theme contract", () => {
   it("loads after the palette and sitewide interaction contracts", () => {
-    expect(entrySource).toContain('import "../styles/unified-theme-contract.css"');
+    expect(entrySource).toContain('import "./styles/unified-theme-contract.css"');
     expect(entrySource.indexOf("design-themes.css"))
       .toBeLessThan(entrySource.indexOf("unified-theme-contract.css"));
     expect(entrySource.indexOf("sitewide-visual-ux.css"))
