@@ -54,8 +54,13 @@ function importsFrom(source) {
 
 function normalizeTarget(file, specifier) {
   const clean = specifier.split(/[?#]/, 1)[0];
-  if (clean.startsWith("@/")) return path.posix.join("apps/web/src", clean.slice(2));
   if (clean.startsWith("@admin/")) return path.posix.join("apps/admin-web/src", clean.slice(7));
+  if (clean.startsWith("@/")) {
+    const owner = applicationOwner(file);
+    if (owner === "admin") return path.posix.join("apps/admin-web/src", clean.slice(2));
+    if (owner === "api") return path.posix.join("apps/api/src", clean.slice(2));
+    return path.posix.join("apps/web/src", clean.slice(2));
+  }
   if (clean.startsWith("apps/")) return clean;
   if (!clean.startsWith(".")) return null;
   const absolute = path.resolve(ROOT, path.dirname(file), clean);
