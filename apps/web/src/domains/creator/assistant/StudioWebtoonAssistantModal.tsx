@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
+
 import { studioWebtoonAssistantLoader } from "./studio-webtoon-assistant-loader";
 
 import type { StudioWebtoonAssistantModalProps } from "./StudioWebtoonAssistantContent";
@@ -14,6 +16,7 @@ type AssistantModule = typeof import("./StudioWebtoonAssistantContent");
  */
 export function StudioWebtoonAssistantModal(props: StudioWebtoonAssistantModalProps) {
   const { open, onClose } = props;
+  const tx = (source: string) => translateCurrentStaticSourceText("StudioWebtoonAssistantModal", "ko", source);
   const [loaded, setLoaded] = useState<AssistantModule | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -44,13 +47,13 @@ export function StudioWebtoonAssistantModal(props: StudioWebtoonAssistantModalPr
   if (!open) return null;
   return (
     <aside className="fixed bottom-4 right-4 z-[190] max-w-[calc(100vw-2rem)] rounded-xl border border-line bg-panel p-4 text-sm text-fg shadow-xl"
-      aria-label="웹툰 창작 보조 센터 불러오기">
+      aria-label={tx("웹툰 창작 보조 센터 불러오기")}>
       <p role={failed ? "alert" : "status"}>{failed
-        ? "보조 센터를 불러오지 못했습니다. 캔버스는 그대로 유지됩니다."
-        : "웹툰 창작 보조 센터를 여는 중…"}</p>
+        ? tx("보조 센터를 불러오지 못했습니다. 캔버스는 그대로 유지됩니다.")
+        : tx("웹툰 창작 보조 센터를 여는 중…")}</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        {failed ? <button type="button" className="min-h-11 rounded-lg border border-line px-3" onClick={() => setAttempt((value) => value + 1)}>다시 시도</button> : null}
-        <button type="button" className="min-h-11 rounded-lg border border-line px-3" onClick={onClose}>열기 취소</button>
+        {failed ? <button type="button" className="min-h-11 rounded-lg border border-line px-3" onClick={() => setAttempt((value) => value + 1)}>{tx("다시 시도")}</button> : null}
+        <button type="button" className="min-h-11 rounded-lg border border-line px-3" onClick={onClose}>{tx("열기 취소")}</button>
       </div>
     </aside>
   );
