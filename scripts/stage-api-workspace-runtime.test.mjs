@@ -37,6 +37,11 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     );
     await compiledPackage(
       root,
+      "packages/core/src/infrastructure-fabric.js",
+      '"use strict"; module.exports = { fabric: "federated" };\n',
+    );
+    await compiledPackage(
+      root,
       "packages/core/src/creator-role.js",
       '"use strict"; module.exports = { creatorRole: "artist" };\n',
     );
@@ -92,6 +97,9 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     assert.deepEqual(requireFromApi("@toonspectrum/core"), {
       core: "ready",
     });
+    assert.deepEqual(requireFromApi("@toonspectrum/core/infrastructure-fabric"), {
+      fabric: "federated",
+    });
     assert.deepEqual(requireFromApi("@toonspectrum/core/production"), {
       production: "risk-v2",
     });
@@ -127,6 +135,10 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       resolve(root, "node_modules", "@toonspectrum", "core", "package.json"),
       "utf8",
     ));
+    assert.equal(
+      corePackageJson.exports["./infrastructure-fabric"],
+      "./infrastructure-fabric.js",
+    );
     assert.equal(corePackageJson.exports["./creator-role"], "./creator-role.js");
     assert.equal(corePackageJson.exports["./creator-resources"], "./creator-resources.js");
     assert.equal(corePackageJson.exports["./production"], "./production/index.js");
@@ -158,6 +170,11 @@ test("fails when an exported workspace subpath was not compiled", async () => {
       root,
       "packages/core/src/index.js",
       '"use strict"; module.exports = { core: "ready" };\n',
+    );
+    await compiledPackage(
+      root,
+      "packages/core/src/infrastructure-fabric.js",
+      '"use strict"; module.exports = { fabric: "federated" };\n',
     );
     await compiledPackage(
       root,
