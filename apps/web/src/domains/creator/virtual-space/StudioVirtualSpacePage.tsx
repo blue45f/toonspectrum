@@ -2217,7 +2217,7 @@ export function VirtualSpaceExperience({
               <Settings size={18} aria-hidden />{bt("공간·꾸미기", "Space & settings")}
             </button>
             <Link data-workspace-primary-action="true" href={personal ? "/studio/new" : `/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{personal ? bt("새 작품 만들기", "Create a work") : bt("원고 목록", "Manuscript list")}<ExternalLink size={16} aria-hidden /></Link>
-            {!personal ? <Suspense fallback={null}><StudioP2pHuddleLauncher placement="inline" /></Suspense> : null}
+            {!personal ? <Suspense fallback={null}><StudioP2pHuddleLauncher /></Suspense> : null}
           </div>
         </footer>
       </Container>

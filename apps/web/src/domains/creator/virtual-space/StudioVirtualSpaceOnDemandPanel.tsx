@@ -5,7 +5,7 @@ import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { useStudioOnDemandModule } from "../useStudioOnDemandModule";
 
 /** 선택 패널의 실패는 열린 월드에 영향을 주지 않고 사용자가 명시적으로 다시 불러온다. */
-export function createStudioVirtualSpacePanel<Props extends object>(load: () => Promise<{ default: ComponentType<Props> }>) {
+export function createStudioVirtualSpacePanel<Props extends object>(load: () => Promise<{ default: ComponentType<Props> | ComponentType<never> }>) {
   return function StudioVirtualSpaceOnDemandPanel(props: Props) {
     const bt = useBilingual("StudioVirtualSpacePage");
     const { module, failed, retry } = useStudioOnDemandModule(load, true);
@@ -14,7 +14,7 @@ export function createStudioVirtualSpacePanel<Props extends object>(load: () => 
       <button type="button" onClick={retry}>{bt("패널 다시 불러오기", "Retry loading panel")}</button>
     </section>;
     if (!module) return <p role="status">{bt("패널 불러오는 중…", "Loading panel…")}</p>;
-    const Panel = module.default;
+    const Panel = module.default as ComponentType<Props>;
     return <Panel {...props} />;
   };
 }

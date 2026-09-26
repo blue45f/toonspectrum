@@ -379,5 +379,5 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
         { x: 366, y: 338 },
       ]),
     }]),
-  });
+  }) as unknown as StudioVirtualSpaceWorldManifest;
 }

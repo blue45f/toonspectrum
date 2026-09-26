@@ -43,12 +43,18 @@ class Layer implements LayerPort {
 function harness(mapWorld = world()) {
   const textures = new Map<string, { width: number; height: number }>();
   const calls: string[] = [];
-  const maps: ReturnType<typeof makeMap>[] = [];
+  type FakeMap = {
+    layer: Layer;
+    addTilesetImage: ReturnType<typeof vi.fn<MapPort["addTilesetImage"]>>;
+    createBlankLayer: ReturnType<typeof vi.fn<MapPort["createBlankLayer"]>>;
+    destroy: ReturnType<typeof vi.fn<() => void>>;
+  };
+  const maps: FakeMap[] = [];
   const load = new Loader();
   const events = new EventEmitter();
   const textureEvents = new EventEmitter();
   let rejectLayer = false;
-  function makeMap() {
+  function makeMap(): FakeMap {
     const layer = new Layer();
     const map = {
       layer,
