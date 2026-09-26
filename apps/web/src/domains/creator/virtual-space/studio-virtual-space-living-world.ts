@@ -1,8 +1,10 @@
-import type * as Phaser from "phaser";
-
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioVirtualEnvironmentEffect } from "./studio-virtual-space-engine-bridge";
 import type { StudioVirtualEffectLevel } from "./studio-virtual-space-experience-preference";
+import {
+  DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
+  type StudioVirtualEnvironmentPreference,
+} from "./studio-virtual-space-environment-preference";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type { StudioVirtualQualityProfile } from "./studio-virtual-space-quality";
 import { studioSemanticSurfaceAt, studioSemanticWorldGraph } from "./studio-virtual-space-semantic-world";
@@ -40,9 +42,11 @@ function inRect(point: StudioVirtualSpacePoint, rect: { readonly x: number; read
 }
 
 export function studioVirtualTerrainAt(
-  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "width" | "height" | "rooms">,
+  manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "width" | "height" | "rooms" | "tilemap">,
   point: StudioVirtualSpacePoint,
 ): StudioVirtualTerrainProfile {
+  // 타일맵의 충돌 권위는 manifest.colliders다. 예전 월드의 숨은 물/풀 감속을 적용하지 않는다.
+  if (manifest.tilemap) return TERRAIN.path;
   if (WATER_PATCHES.some((patch) => inRect(point, patch))) return TERRAIN["shallow-water"];
   const surface = studioSemanticSurfaceAt(manifest, point);
   if (surface.kind === "room") return TERRAIN.stone;
@@ -69,44 +73,97 @@ export interface StudioLivingWorldTextureKeys {
   readonly foliage: string;
   readonly lights: string;
   readonly weather: string;
+  readonly terrain: string;
   readonly pathOverlay: string;
   readonly waterfall: string;
   readonly waterfallSplash: string;
   readonly interactionFx: string;
 }
 
+interface LivingVisual {
+  x: number;
+  y: number;
+  setDepth(value: number): this;
+  setAlpha(value: number): this;
+  setScale(x: number, y?: number): this;
+  setPosition(x: number, y: number): this;
+  setVisible(value: boolean): this;
+  setOrigin(x: number, y?: number): this;
+  setScrollFactor(x: number, y?: number): this;
+  setBlendMode(value: string): this;
+  destroy(): void;
+}
+interface LivingImage extends LivingVisual { setDisplaySize(width: number, height: number): this }
+interface LivingTileSprite extends LivingImage { tilePositionX: number; tilePositionY: number }
+interface LivingSprite extends LivingImage {
+  setFrame(frame: number): this;
+  setTint(color: number): this;
+  setData(key: string, value: number): this;
+  getData(key: string): unknown;
+}
+interface LivingShape extends LivingVisual {
+  setFillStyle(color: number, alpha: number): this;
+  setStrokeStyle(width: number, color: number, alpha: number): this;
+}
+interface LivingGraphics {
+  setDepth(depth: number): this;
+  lineStyle(width: number, color: number, alpha: number): this;
+  lineBetween(x1: number, y1: number, x2: number, y2: number): this;
+  destroy(): void;
+}
+/** 실제 Scene의 사용 표면만 요구하므로 자원 생성·해제를 작은 adapter에서도 검증할 수 있다. */
+export interface StudioLivingWorldScenePort {
+  readonly add: {
+    ellipse(x: number, y: number, width: number, height: number, color: number, alpha: number): LivingShape;
+    circle(x: number, y: number, radius: number, color: number, alpha: number): LivingShape;
+    rectangle(x: number, y: number, width: number, height: number, color: number, alpha: number): LivingShape;
+    tileSprite(x: number, y: number, width: number, height: number, key: string): LivingTileSprite;
+    image(x: number, y: number, key: string, frame?: number): LivingImage;
+    sprite(x: number, y: number, key: string, frame: number): LivingSprite;
+    graphics(): LivingGraphics;
+  };
+  readonly tweens: { add(config: {
+    targets: LivingShape; x: number; y: number; alpha: number; scale: number; duration: number; ease: string; onComplete: () => void;
+  }): unknown };
+  readonly cameras: { readonly main: {
+    flash(duration: number, red: number, green: number, blue: number, force: boolean): unknown;
+    shake(duration: number, intensity: number): unknown;
+  } };
+}
+
 interface AmbientActor {
-  readonly body: Phaser.GameObjects.Ellipse;
-  readonly shadow: Phaser.GameObjects.Ellipse;
+  readonly body: LivingShape;
+  readonly shadow: LivingShape;
   readonly baseY: number;
   readonly speed: number;
   readonly amplitude: number;
 }
 
 interface FootstepMark {
-  readonly shape: Phaser.GameObjects.Arc;
+  readonly shape: LivingShape;
   bornAt: number;
   lifetime: number;
 }
 
 export class StudioLivingWorldRuntime {
-  private readonly cloudBack: Phaser.GameObjects.TileSprite;
-  private readonly cloudFront: Phaser.GameObjects.TileSprite;
-  private readonly water: readonly Phaser.GameObjects.Sprite[];
-  private readonly foliage: readonly Phaser.GameObjects.Sprite[];
-  private readonly lights: readonly Phaser.GameObjects.Sprite[];
-  private readonly weather: readonly Phaser.GameObjects.Sprite[];
-  private readonly pathOverlay: Phaser.GameObjects.Image;
-  private readonly elevationGraphics: Phaser.GameObjects.Graphics;
-  private readonly waterfalls: readonly Phaser.GameObjects.Sprite[];
-  private readonly waterfallSplashes: readonly Phaser.GameObjects.Sprite[];
-  private readonly activeEffects: Phaser.GameObjects.Sprite[] = [];
+  private readonly cloudBack: LivingTileSprite;
+  private readonly cloudFront: LivingTileSprite;
+  private readonly water: readonly LivingSprite[];
+  private readonly foliage: readonly LivingSprite[];
+  private readonly lights: readonly LivingSprite[];
+  private readonly weather: readonly LivingSprite[];
+  private readonly terrainTiles: readonly LivingImage[];
+  private readonly pathOverlay: LivingImage | null;
+  private readonly elevationGraphics: LivingGraphics | null;
+  private readonly waterfalls: readonly LivingSprite[];
+  private readonly waterfallSplashes: readonly LivingSprite[];
+  private readonly activeEffects: LivingSprite[] = [];
   private readonly interactionFxKey: string;
-  private readonly fountainAura: Phaser.GameObjects.Ellipse;
-  private readonly portalAura: Phaser.GameObjects.Ellipse;
-  private readonly treeAura: Phaser.GameObjects.Ellipse;
+  private readonly fountainAura: LivingShape | null;
+  private readonly portalAura: LivingShape | null;
+  private readonly treeAura: LivingShape | null;
   private environmentState: StudioEnvironmentObjectState = DEFAULT_STUDIO_ENVIRONMENT_STATE;
-  private readonly dayNight: Phaser.GameObjects.Rectangle;
+  private readonly dayNight: LivingShape;
   private readonly ambientActors: readonly AmbientActor[];
   private readonly footsteps: FootstepMark[] = [];
   private lastFootstepAt = -Infinity;
@@ -115,12 +172,13 @@ export class StudioLivingWorldRuntime {
   private effectLevel: StudioVirtualEffectLevel = "balanced";
 
   constructor(
-    private readonly scene: Phaser.Scene,
+    private readonly scene: StudioLivingWorldScenePort,
     private readonly manifest: StudioVirtualSpaceWorldManifest,
     private readonly style: StudioVirtualArtStyleKey,
     keys: StudioLivingWorldTextureKeys,
   ) {
     this.interactionFxKey = keys.interactionFx;
+    const legacyScenery = !manifest.tilemap;
     const liveRoom = manifest.rooms.find((room) => room.id === "live");
     const lobbyRoom = manifest.rooms.find((room) => room.id === "lobby");
     const loungeRoom = manifest.rooms.find((room) => room.id === "lounge");
@@ -129,21 +187,49 @@ export class StudioLivingWorldRuntime {
     const fountain = roomPoint(liveRoom, { x: 780, y: 490 });
     const portal = roomPoint(lobbyRoom, { x: 780, y: 880 });
     const tree = roomPoint(loungeRoom, { x: 1120, y: 470 });
-    this.fountainAura = scene.add.ellipse(fountain.x, fountain.y, 100, 46, 0x9deaff, .05).setDepth(fountain.y + 830).setBlendMode("ADD");
-    this.portalAura = scene.add.ellipse(portal.x, portal.y, 92, 42, 0xc8a8ff, .04).setDepth(portal.y + 830).setBlendMode("ADD");
-    this.treeAura = scene.add.ellipse(tree.x, tree.y, 112, 48, 0xffb5d0, .03).setDepth(tree.y + 830).setBlendMode("ADD");
+    this.fountainAura = legacyScenery ? scene.add.ellipse(fountain.x, fountain.y, 100, 46, 0x9deaff, .05).setDepth(fountain.y + 830).setBlendMode("ADD") : null;
+    this.portalAura = legacyScenery ? scene.add.ellipse(portal.x, portal.y, 92, 42, 0xc8a8ff, .04).setDepth(portal.y + 830).setBlendMode("ADD") : null;
+    this.treeAura = legacyScenery ? scene.add.ellipse(tree.x, tree.y, 112, 48, 0xffb5d0, .03).setDepth(tree.y + 830).setBlendMode("ADD") : null;
     this.cloudBack = scene.add.tileSprite(0, 0, manifest.width, manifest.height, keys.cloudBack)
       .setOrigin(0).setScrollFactor(0.76).setDepth(-998).setAlpha(style === "neon" ? 0.26 : 0.52);
     this.cloudFront = scene.add.tileSprite(0, 0, manifest.width, manifest.height, keys.cloudFront)
       .setOrigin(0).setScrollFactor(1.08).setDepth(39_500).setAlpha(style === "ink" ? 0.2 : 0.18);
-    this.pathOverlay = scene.add.image(0, 0, keys.pathOverlay).setOrigin(0).setDisplaySize(manifest.width, manifest.height)
-      .setDepth(-889).setAlpha(style === "neon" ? .72 : .88);
-    this.elevationGraphics = scene.add.graphics().setDepth(-872);
-    const semantic = studioSemanticWorldGraph(manifest);
-    const edgeById = new Map(semantic.edges.map((edge) => [edge.id, edge] as const));
-    for (const segment of studioTownPathSegments(manifest)) {
+
+    const frameSets: Readonly<Record<StudioVirtualTerrainKind, readonly number[]>> = Object.freeze({
+      grass: [0, 9],
+      path: [3, 6, 12, 14],
+      stone: [1, 5, 8, 10, 15],
+      bridge: [2, 11],
+      boardwalk: [2, 11],
+      "shallow-water": [4, 7, 13],
+    });
+    const tileSize = 128;
+    const tileAlpha = style === "retro" ? .62
+      : style === "neon" ? .38 : style === "ink" ? .34 : style === "sky-island" ? .24 : .22;
+    const terrainTiles: LivingImage[] = [];
+    for (let row = 0, y = 0; !manifest.tilemap && y < manifest.height; row += 1, y += tileSize) {
+      for (let column = 0, x = 0; x < manifest.width; column += 1, x += tileSize) {
+        const point = { x: Math.min(manifest.width - 1, x + tileSize / 2), y: Math.min(manifest.height - 1, y + tileSize / 2) };
+        const terrain = studioVirtualTerrainAt(manifest, point);
+        if (!terrain.walkable) continue;
+        const frames = frameSets[terrain.kind];
+        const hash = ((column * 73856093) ^ (row * 19349663)) >>> 0;
+        const frame = frames[hash % frames.length] ?? frames[0] ?? 0;
+        terrainTiles.push(scene.add.image(point.x, point.y, keys.terrain, frame)
+          .setDisplaySize(tileSize + 2, tileSize + 2)
+          .setDepth(-914)
+          .setAlpha(terrain.kind === "shallow-water" ? tileAlpha * .72 : tileAlpha));
+      }
+    }
+    this.terrainTiles = Object.freeze(terrainTiles);
+    this.pathOverlay = legacyScenery ? scene.add.image(0, 0, keys.pathOverlay).setOrigin(0).setDisplaySize(manifest.width, manifest.height)
+      .setDepth(-889).setAlpha(style === "neon" ? .62 : style === "sky-island" ? .68 : .8) : null;
+    this.elevationGraphics = legacyScenery ? scene.add.graphics().setDepth(-872) : null;
+    const semantic = legacyScenery ? studioSemanticWorldGraph(manifest) : null;
+    const edgeById = new Map(semantic?.edges.map((edge) => [edge.id, edge] as const) ?? []);
+    for (const segment of legacyScenery ? studioTownPathSegments(manifest) : []) {
       const edge = edgeById.get(segment.id);
-      if (!edge || (edge.kind !== "bridge" && edge.kind !== "stairs")) continue;
+      if (!edge || !this.elevationGraphics || (edge.kind !== "bridge" && edge.kind !== "stairs")) continue;
       const shadowWidth = segment.width + (edge.kind === "bridge" ? 16 : 8);
       this.elevationGraphics.lineStyle(shadowWidth, 0x101827, edge.kind === "bridge" ? .38 : .22)
         .lineBetween(segment.from.x + 5, segment.from.y + 9, segment.to.x + 5, segment.to.y + 9);
@@ -162,13 +248,13 @@ export class StudioLivingWorldRuntime {
         }
       }
     }
-    this.waterfalls = STUDIO_TOWN_WATERFALLS.map((waterfall) => scene.add.sprite(
+    this.waterfalls = (legacyScenery ? STUDIO_TOWN_WATERFALLS : []).map((waterfall) => scene.add.sprite(
       waterfall.top.x, waterfall.top.y + waterfall.height / 2, keys.waterfall, 0,
     ).setDisplaySize(waterfall.width * 1.65, waterfall.height).setDepth(-860).setAlpha(.96));
-    this.waterfallSplashes = STUDIO_TOWN_WATERFALLS.map((waterfall) => scene.add.sprite(
+    this.waterfallSplashes = (legacyScenery ? STUDIO_TOWN_WATERFALLS : []).map((waterfall) => scene.add.sprite(
       waterfall.bottom.x, waterfall.bottom.y, keys.waterfallSplash, 0,
     ).setDisplaySize(waterfall.width * 2.2, 42).setDepth(waterfall.bottom.y + 840).setAlpha(.9));
-    this.water = WATER_PATCHES.map((patch, index) => scene.add.sprite(
+    this.water = (legacyScenery ? WATER_PATCHES : []).map((patch, index) => scene.add.sprite(
       patch.x + patch.width / 2,
       patch.y + patch.height / 2,
       keys.water,
@@ -180,7 +266,7 @@ export class StudioLivingWorldRuntime {
       [318, 816], [640, 812], [936, 820],
     ] as const;
     const season = studioTownSeasonAt();
-    this.foliage = foliagePoints.map(([x, y], index) => {
+    this.foliage = (legacyScenery ? foliagePoints : []).map(([x, y], index) => {
       const sprite = scene.add.sprite(x, y, keys.foliage, index % 4)
         .setDisplaySize(92, 46).setDepth(y + 850).setAlpha(style === "ink" ? 0.66 : 0.84);
       if (style !== "ink" && style !== "neon") sprite.setTint(season.foliageTint);
@@ -190,7 +276,7 @@ export class StudioLivingWorldRuntime {
       [315, 230], [625, 230], [935, 230], [315, 540], [625, 540], [935, 540],
       [315, 820], [625, 820], [935, 820], [780, 835],
     ] as const;
-    this.lights = lightPoints.map(([x, y], index) => scene.add.sprite(x, y, keys.lights, index % 4)
+    this.lights = (legacyScenery ? lightPoints : []).map(([x, y], index) => scene.add.sprite(x, y, keys.lights, index % 4)
       .setDisplaySize(64, 32).setDepth(y + 920).setBlendMode("ADD"));
     this.weather = Array.from({ length: 12 }, (_, index) => {
       const sprite = scene.add.sprite(
@@ -205,7 +291,9 @@ export class StudioLivingWorldRuntime {
     this.dayNight = scene.add.rectangle(0, 0, manifest.width, manifest.height, 0x111b3b, 0)
       .setOrigin(0).setDepth(41_000).setBlendMode("MULTIPLY").setScrollFactor(1);
     this.ambientActors = Array.from({ length: style === "sky-island" ? 10 : 6 }, (_, index) => {
-      const body = scene.add.ellipse(80 + index * 119, 145 + (index % 4) * 173, 9, 5,
+      const x = legacyScenery ? 80 + index * 119 : manifest.width * (index + 0.5) / (style === "sky-island" ? 10 : 6);
+      const y = legacyScenery ? 145 + (index % 4) * 173 : manifest.height * (0.15 + (index % 4) * 0.2);
+      const body = scene.add.ellipse(x, y, 9, 5,
         style === "neon" ? 0x3ce6ff : style === "ink" ? 0x303039 : 0xffffff, 0.8).setDepth(30_000);
       const shadow = scene.add.ellipse(body.x, body.y + 20, 13, 4, 0x111827, 0.16).setDepth(29_999);
       return { body, shadow, baseY: body.y, speed: 0.018 + index * 0.0018, amplitude: 5 + index % 4 };
@@ -220,6 +308,7 @@ export class StudioLivingWorldRuntime {
     reducedMotion = false,
     qualityProfile?: StudioVirtualQualityProfile,
     effectLevel: StudioVirtualEffectLevel = "balanced",
+    environmentPreference: StudioVirtualEnvironmentPreference = DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
   ): void {
     this.qualityProfile = qualityProfile ?? null;
     this.effectLevel = effectLevel;
@@ -235,7 +324,7 @@ export class StudioLivingWorldRuntime {
     const motionTime = motionSuppressed ? 0 : time;
     const frame = motionSuppressed ? 0 : Math.floor(time / 170) % 4;
     const waterfallFrame = motionSuppressed ? 0 : Math.floor(time / Math.max(44, 92 / flowMultiplier)) % 8;
-    this.pathOverlay.setAlpha(this.style === "neon" ? .72 : .84 + Math.sin(motionTime * .0008) * (motionSuppressed ? 0 : .04));
+    this.pathOverlay?.setAlpha(this.style === "neon" ? .72 : .84 + Math.sin(motionTime * .0008) * (motionSuppressed ? 0 : .04));
     this.waterfalls.forEach((sprite, index) => sprite.setFrame((waterfallFrame + index) % 8)
       .setAlpha(Math.min(1, .82 + this.environmentState.waterfallEnergy * .018)));
     this.waterfallSplashes.forEach((sprite, index) => sprite.setFrame((waterfallFrame + index * 2) % 8)
@@ -248,26 +337,33 @@ export class StudioLivingWorldRuntime {
       .setFrame((frame + index) % 4)
       .setAlpha(Math.min(1, (motionSuppressed ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost)));
     this.weather.forEach((sprite, index) => {
-      sprite.setVisible(qualityProfile?.weather !== false && effectLevel !== "low");
+      const weather = environmentPreference.weather;
+      sprite.setVisible(weather !== "clear" && qualityProfile?.weather !== false && effectLevel !== "low");
       sprite.setFrame((frame + index) % 4);
-      sprite.x -= dt * (this.style === "neon" || this.style === "ink" ? 0.045 : 0.015);
-      sprite.y += dt * (this.style === "neon" || this.style === "ink" ? 0.11 : 0.025);
+      if (weather === "rain") sprite.setTint(0xaedcff).setAlpha(.34);
+      else if (weather === "petals") sprite.setTint(0xffa9cb).setAlpha(.32);
+      else if (weather === "snow") sprite.setTint(0xffffff).setAlpha(.42);
+      const horizontal = weather === "petals" ? .025 : weather === "snow" ? .008 : .045;
+      const vertical = weather === "rain" ? .18 : weather === "snow" ? .035 : .055;
+      sprite.x -= dt * horizontal;
+      sprite.y += dt * vertical;
       if (sprite.x < -128) sprite.x = this.manifest.width + 128;
       if (sprite.y > this.manifest.height + 128) sprite.y = -128;
     });
-    const phase = studioVirtualDayPhase(time);
+    const phase = environmentPreference.dayPhase === "auto"
+      ? studioVirtualDayPhase(time) : environmentPreference.dayPhase;
     const alpha = phase === "night" ? 0.32 : phase === "dusk" ? 0.17 : phase === "dawn" ? 0.08 : 0;
     this.dayNight.setAlpha(this.style === "neon" ? alpha * 0.25 : alpha);
     this.dayNight.setFillStyle(phase === "dusk" ? 0x4e204d : 0x101a3c, 1);
     const pulse = reducedMotion ? 0 : Math.sin(time * .003) * .025;
-    this.fountainAura.setAlpha(.04 + Math.min(.32, this.environmentState.fountainWishes * .018) + pulse);
-    this.portalAura.setAlpha(.03 + this.environmentState.portalCharge * .025 + pulse).setScale(1 + this.environmentState.portalCharge * .008);
-    this.treeAura.setAlpha(.025 + this.environmentState.treeBloom * .022 + pulse).setScale(1 + this.environmentState.treeBloom * .006);
+    this.fountainAura?.setAlpha(.04 + Math.min(.32, this.environmentState.fountainWishes * .018) + pulse);
+    this.portalAura?.setAlpha(.03 + this.environmentState.portalCharge * .025 + pulse).setScale(1 + this.environmentState.portalCharge * .008);
+    this.treeAura?.setAlpha(.025 + this.environmentState.treeBloom * .022 + pulse).setScale(1 + this.environmentState.treeBloom * .006);
     this.ambientActors.forEach((actor, index) => {
       const ambientVisible = qualityProfile?.ambientActors !== false && effectLevel !== "low";
       actor.body.setVisible(ambientVisible);
       actor.shadow.setVisible(ambientVisible);
-      actor.body.x = (actor.body.x + dt * actor.speed * (18 + index)) % (this.manifest.width + 30);
+      actor.body.x = (actor.body.x + dt * actor.speed * (18 + index)) % (this.manifest.width + (this.manifest.tilemap ? 0 : 30));
       actor.body.y = actor.baseY + Math.sin(motionTime * 0.0017 + index) * (motionSuppressed ? 0 : actor.amplitude);
       actor.shadow.setPosition(actor.body.x, actor.baseY + 20);
       const distance = Math.hypot(actor.body.x - focus.x, actor.body.y - focus.y);
@@ -348,11 +444,12 @@ export class StudioLivingWorldRuntime {
   destroy(): void {
     this.cloudBack.destroy();
     this.cloudFront.destroy();
-    this.pathOverlay.destroy();
-    this.elevationGraphics.destroy();
-    this.fountainAura.destroy();
-    this.portalAura.destroy();
-    this.treeAura.destroy();
+    this.terrainTiles.forEach((item) => item.destroy());
+    this.pathOverlay?.destroy();
+    this.elevationGraphics?.destroy();
+    this.fountainAura?.destroy();
+    this.portalAura?.destroy();
+    this.treeAura?.destroy();
     this.waterfalls.forEach((item) => item.destroy());
     this.waterfallSplashes.forEach((item) => item.destroy());
     this.activeEffects.forEach((item) => item.destroy());

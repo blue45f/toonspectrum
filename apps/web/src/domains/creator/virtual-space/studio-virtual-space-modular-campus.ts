@@ -34,7 +34,7 @@ export function drawStudioModularCampus(
   const bounds = add(scene.add.graphics().setDepth(-885));
   manifest.rooms.forEach((room, index) => {
     const isHub = room.id === "live" || room.id === "lobby";
-    bounds.lineStyle(isHub ? 3 : 2, isHub ? palette.accent : palette.gate, isHub ? 0.25 : 0.095)
+    bounds.lineStyle(isHub ? 1.5 : 1, isHub ? palette.accent : palette.gate, isHub ? 0.08 : 0.025)
       .strokeRoundedRect(room.x + 4, room.y + 4, room.width - 8, room.height - 8, isHub ? 26 : 16);
     const label = add(scene.add.text(room.x + room.width / 2, room.y + 12, room.labelEn.toUpperCase(), {
       fontFamily: profile.pixelated ? "ui-monospace, SFMono-Regular, Menlo, monospace" : "Inter, Pretendard, sans-serif",
@@ -48,10 +48,10 @@ export function drawStudioModularCampus(
   });
 
   const detail = add(scene.add.graphics().setDepth(-870));
-  // Central creator portal and the four explicit modular expansion gates.
-  detail.lineStyle(5, palette.gate, 0.62).strokeCircle(780, 700, 38);
-  detail.lineStyle(2, 0xffffff, dark ? 0.5 : 0.72).strokeCircle(780, 700, 22);
-  detail.fillStyle(palette.accent, 0.62).fillCircle(780, 700, 8);
+  // A compact landmark keeps the central plaza readable without covering the generated art.
+  detail.lineStyle(2, palette.gate, 0.32).strokeCircle(780, 700, 22);
+  detail.lineStyle(1, 0xffffff, dark ? 0.24 : 0.34).strokeCircle(780, 700, 12);
+  detail.fillStyle(palette.accent, 0.42).fillCircle(780, 700, 4);
 
   const gate = (x: number, y: number, vertical: boolean, labelText: string) => {
     detail.lineStyle(5, palette.gate, 0.72);

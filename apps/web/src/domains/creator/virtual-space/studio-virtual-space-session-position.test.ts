@@ -136,6 +136,22 @@ describe("virtual studio session positions", () => {
     expect(studioWorldCanOccupy(world, resolved!)).toBe(true);
   });
 
+  it("keeps remembered positions isolated per independent place", () => {
+    const storage = storageFixture();
+    const world = worldFixture();
+    const plaza = studioVirtualSpacePositionScope("project-7", false, "creator-plaza");
+    const cafe = studioVirtualSpacePositionScope("project-7", false, "creator-cafe");
+    writeStudioVirtualSpaceSessionPoint(plaza, { x: 80, y: 90 }, storage);
+    writeStudioVirtualSpaceSessionPoint(cafe, { x: 120, y: 110 }, storage);
+
+    expect(studioVirtualSpacePositionStorageKey(plaza))
+      .not.toBe(studioVirtualSpacePositionStorageKey(cafe));
+    expect(readStudioVirtualSpaceSessionPoint(plaza, { x: 40, y: 40 }, world, storage))
+      .toEqual({ x: 80, y: 90 });
+    expect(readStudioVirtualSpaceSessionPoint(cafe, { x: 40, y: 40 }, world, storage))
+      .toEqual({ x: 120, y: 110 });
+  });
+
   it("fails closed when the authored world has no occupiable floor", () => {
     const storage = storageFixture();
     const world = worldFixture([{ x: 0, y: 0, width: 200, height: 160 }]);

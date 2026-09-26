@@ -1,0 +1,367 @@
+{
+  "version": 7,
+  "generatedAt": "2026-09-26",
+  "generator": "OpenAI Image Generation 2.5 runtime place and background extraction",
+  "sourceTechnique": "Deterministic crops from committed Image Generation 2.5 source boards; no CSS recolour or cross-theme filter derivation.",
+  "sourceFiles": [
+    {
+      "file": "apps/web/public/assets/virtual-studio/living-town-v6/source/imagegen25-design-board.png",
+      "fileId": "file_000000001c9081fdbfb6bcbe9e715172",
+      "sha256": "5dd17833b338dfb0ccd30b1495b97a7e6114be7c15f30048da4764a5cd2f4598",
+      "bytes": 2730524
+    },
+    {
+      "file": "apps/web/public/assets/virtual-studio/living-town-v6/source/imagegen25-world-concept.png",
+      "fileId": "file_00000000854881f482a2bd88a6ed7433",
+      "sha256": "65971949b87b6fd1820a685ffc6c05360dc895707ff017f7bf490e85142e9722",
+      "bytes": 3026660
+    }
+  ],
+  "sessionGenerationIds": [
+    "66b20001-32fd-4d90-9a6f-14b676399191",
+    "9ffa2971-6d20-49bd-a8b3-aaa3da97d83f",
+    "22beabfc-ecd4-47a7-8925-1c83b56003c2"
+  ],
+  "tile": {
+    "frameWidth": 128,
+    "frameHeight": 128,
+    "columns": 4,
+    "rows": 4,
+    "asset": "tiles/terrain-atlas.webp"
+  },
+  "backdrops": {
+    "sky": "backgrounds/sky.webp",
+    "coast": "backgrounds/coast.webp",
+    "forest": "backgrounds/forest.webp",
+    "city": "backgrounds/city.webp"
+  },
+  "places": [
+    {
+      "id": "skyport",
+      "labelKo": "스카이 포트",
+      "labelEn": "Sky Port",
+      "roomId": "lobby",
+      "category": "arrival",
+      "descriptionKo": "입장 부두와 월드 이동 게이트가 있는 시작 장소.",
+      "descriptionEn": "The arrival dock and gateway to every studio district.",
+      "projectOnly": false,
+      "preview": "places/skyport.webp"
+    },
+    {
+      "id": "creator-plaza",
+      "labelKo": "창작자 광장",
+      "labelEn": "Creator Plaza",
+      "roomId": "live",
+      "category": "community",
+      "descriptionKo": "이벤트와 공지가 모이는 가상스튜디오의 중심 광장.",
+      "descriptionEn": "The central plaza for announcements, events and meetups.",
+      "projectOnly": false,
+      "preview": "places/creator-plaza.webp"
+    },
+    {
+      "id": "personal-atelier",
+      "labelKo": "개인 아틀리에",
+      "labelEn": "Personal Atelier",
+      "roomId": "drawing",
+      "category": "creation",
+      "descriptionKo": "드로잉과 캐릭터 제작을 이어가는 개인 작업실.",
+      "descriptionEn": "A private atelier for drawing and character production.",
+      "projectOnly": false,
+      "preview": "places/personal-atelier.webp"
+    },
+    {
+      "id": "story-lab",
+      "labelKo": "스토리 랩",
+      "labelEn": "Story Lab",
+      "roomId": "writers",
+      "category": "creation",
+      "descriptionKo": "대본과 아이디어를 함께 정리하는 공동 집필 공간.",
+      "descriptionEn": "A collaborative writing room for scripts and story ideas.",
+      "projectOnly": false,
+      "preview": "places/story-lab.webp"
+    },
+    {
+      "id": "creator-cafe",
+      "labelKo": "크리에이터 카페",
+      "labelEn": "Creator Cafe",
+      "roomId": "lounge",
+      "category": "social",
+      "descriptionKo": "짧은 대화와 휴식을 위한 정원형 카페.",
+      "descriptionEn": "A garden cafe for brief conversations and breaks.",
+      "projectOnly": false,
+      "preview": "places/creator-cafe.webp"
+    },
+    {
+      "id": "team-meeting",
+      "labelKo": "팀 미팅 로프트",
+      "labelEn": "Team Meeting Loft",
+      "roomId": "meeting",
+      "category": "collaboration",
+      "descriptionKo": "팀 회의와 화면 공유를 위한 비공개 협업실.",
+      "descriptionEn": "A private team room for meetings and screen sharing.",
+      "projectOnly": true,
+      "preview": "places/team-meeting.webp"
+    },
+    {
+      "id": "tree-library",
+      "labelKo": "트리 라이브러리",
+      "labelEn": "Tree Library",
+      "roomId": "assets",
+      "category": "archive",
+      "descriptionKo": "레퍼런스와 제작 에셋을 보관하는 수목 도서관.",
+      "descriptionEn": "A tree-top library for references and production assets.",
+      "projectOnly": false,
+      "preview": "places/tree-library.webp"
+    },
+    {
+      "id": "review-gallery",
+      "labelKo": "리뷰 갤러리",
+      "labelEn": "Review Gallery",
+      "roomId": "review",
+      "category": "review",
+      "descriptionKo": "버전 비교와 공동 검수를 진행하는 전시형 공간.",
+      "descriptionEn": "A gallery for version comparison and collaborative review.",
+      "projectOnly": false,
+      "preview": "places/review-gallery.webp"
+    },
+    {
+      "id": "garden",
+      "labelKo": "창작 정원",
+      "labelEn": "Creator Garden",
+      "roomId": "assistant",
+      "category": "rest",
+      "descriptionKo": "아이디어를 정리하고 잠시 쉬어가는 폭포 정원.",
+      "descriptionEn": "A waterfall garden for reflection and quiet breaks.",
+      "projectOnly": false,
+      "preview": "places/garden.webp"
+    },
+    {
+      "id": "observatory",
+      "labelKo": "스토리 관측소",
+      "labelEn": "Story Observatory",
+      "roomId": "quality",
+      "category": "review",
+      "descriptionKo": "프로젝트 흐름과 품질 상태를 멀리서 조망하는 곳.",
+      "descriptionEn": "An observatory for project flow and quality signals.",
+      "projectOnly": false,
+      "preview": "places/observatory.webp"
+    },
+    {
+      "id": "arcade",
+      "labelKo": "크리에이터 아케이드",
+      "labelEn": "Creator Arcade",
+      "roomId": "storyboard",
+      "category": "play",
+      "descriptionKo": "작업 데이터와 분리된 짧은 놀이와 영감 공간.",
+      "descriptionEn": "A lightweight play space kept separate from production data.",
+      "projectOnly": false,
+      "preview": "places/arcade.webp"
+    },
+    {
+      "id": "beach",
+      "labelKo": "해변 아틀리에",
+      "labelEn": "Beach Atelier",
+      "roomId": "lounge",
+      "category": "rest",
+      "descriptionKo": "파도와 석양을 보며 쉬는 해변 작업 공간.",
+      "descriptionEn": "A seaside work-and-rest space with waves and sunset views.",
+      "projectOnly": false,
+      "preview": "places/beach.webp"
+    },
+    {
+      "id": "event-stage",
+      "labelKo": "이벤트 스테이지",
+      "labelEn": "Event Stage",
+      "roomId": "live",
+      "category": "community",
+      "descriptionKo": "발표와 라이브 행사를 진행하는 공개 무대.",
+      "descriptionEn": "A public stage for presentations and live events.",
+      "projectOnly": false,
+      "preview": "places/event-stage.webp"
+    },
+    {
+      "id": "production-control",
+      "labelKo": "프로덕션 관제실",
+      "labelEn": "Production Control",
+      "roomId": "production",
+      "category": "production",
+      "descriptionKo": "일정, 작업 배정과 병목을 확인하는 제작 관제실.",
+      "descriptionEn": "A production room for schedules, assignments and bottlenecks.",
+      "projectOnly": true,
+      "preview": "places/production-control.webp"
+    }
+  ],
+  "files": [
+    {
+      "file": "backgrounds/city.webp",
+      "bytes": 144482,
+      "sha256": "cc23de5cb4b65d341d7049b85f1bf987b58080172bbd842f4047d3b04b274c25",
+      "size": [
+        1280,
+        720
+      ]
+    },
+    {
+      "file": "backgrounds/coast.webp",
+      "bytes": 204164,
+      "sha256": "1f83b28810f2e90e0f283cc806b1360e7535a3146d6baf582875a4e223a7beb6",
+      "size": [
+        1280,
+        720
+      ]
+    },
+    {
+      "file": "backgrounds/forest.webp",
+      "bytes": 211952,
+      "sha256": "860609360388bd468ecdda9e11ad5ac514cc145819689f6d3c096d855dd449aa",
+      "size": [
+        1280,
+        720
+      ]
+    },
+    {
+      "file": "backgrounds/sky.webp",
+      "bytes": 163750,
+      "sha256": "40ee87715b33be0ad5260f081abbb9c94cfc2a40b10382dc3a54839e2a0618b9",
+      "size": [
+        1280,
+        720
+      ]
+    },
+    {
+      "file": "places/arcade.webp",
+      "bytes": 87640,
+      "sha256": "15aafcd832cecfd840779b6eabc382f531c6016df36aec857e046d31905a6c0a",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/beach.webp",
+      "bytes": 91890,
+      "sha256": "865e6f453d2ed5303ee2ed04680eace9c1d6c381bca5b596632b2ac12755722f",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/creator-cafe.webp",
+      "bytes": 89998,
+      "sha256": "a17c975e72963e0c70b96514987ed1a444fb9b9a256901ec01799013900318cd",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/creator-plaza.webp",
+      "bytes": 130838,
+      "sha256": "2e54a430c49fc59d247f72edfa5585e442a3a5dce561b66f0701e5bf1d91bf53",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/event-stage.webp",
+      "bytes": 94518,
+      "sha256": "dfed1268a274fe60ba9a6d5d2f6f171226e5dcd439b5650ea021049a1e166939",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/garden.webp",
+      "bytes": 110804,
+      "sha256": "b62404ecddf7e57e190545b7deab70e3861fed523ba6a4f0ce8d20c86a7c5a09",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/observatory.webp",
+      "bytes": 79552,
+      "sha256": "b316636a92474e23ffb5260e5f65ec6cbeebcf97cafc6e880fb082d4e489b980",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/personal-atelier.webp",
+      "bytes": 84236,
+      "sha256": "db9f3592d1a65770511c17f8162a2807c970d09d167307fc9c0f7cb98ce56772",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/production-control.webp",
+      "bytes": 91868,
+      "sha256": "32ffdb0dba15e781eaa828bc8896a083c5d3b7b6393828d83c578b5e05de80a2",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/review-gallery.webp",
+      "bytes": 83878,
+      "sha256": "1b8c8805e77b6c2d2d58d34f9b5fcdc0c6d936aca4b172ace8f0d8e6a0711501",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/skyport.webp",
+      "bytes": 72500,
+      "sha256": "ff111f2c9da5104acc07fa8ed6ba1b322d75b523f37548f756a2205f9b4ea89c",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/story-lab.webp",
+      "bytes": 89496,
+      "sha256": "0ed982c15dad6ec0eef039c4c38bbf47ff6047c814bb4126db8bf43b6732a89b",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/team-meeting.webp",
+      "bytes": 87176,
+      "sha256": "2159a1c7e4f7c3c875f91a4275720ecab5c3a72a8b97e209cfe3bf0513af8326",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "places/tree-library.webp",
+      "bytes": 108086,
+      "sha256": "5a1ee76dcc67b83774f83ac7b9fc2a2abe14ef2809321afca69e4617af6989aa",
+      "size": [
+        640,
+        360
+      ]
+    },
+    {
+      "file": "tiles/terrain-atlas.webp",
+      "bytes": 204250,
+      "sha256": "461c74c5c2fcb70bdae40146ec9adcb0041a302824d21649a39f5b12433ce902",
+      "size": [
+        512,
+        512
+      ]
+    }
+  ]
+}

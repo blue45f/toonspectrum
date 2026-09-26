@@ -29,6 +29,7 @@ const TABS = ["quests", "events", "activities", "rewards", "desks", "blueprints"
 type Tab = typeof TABS[number];
 
 export function StudioVirtualSpaceTownProgramPanel({
+  personal = false,
   operations,
   manifest,
   decorations,
@@ -44,6 +45,7 @@ export function StudioVirtualSpaceTownProgramPanel({
   onStartSpotlight,
   onStopSpotlight,
 }: {
+  readonly personal?: boolean;
   readonly operations: StudioVirtualOperationsSnapshot;
   readonly manifest: StudioVirtualSpaceWorldManifest;
   readonly decorations: StudioVirtualDecorationState;
@@ -60,20 +62,25 @@ export function StudioVirtualSpaceTownProgramPanel({
   readonly onStopSpotlight: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceTownProgramPanel");
-  const [tab, setTab] = useState<Tab>("quests");
+  const [requestedTab, setTab] = useState<Tab>("quests");
+  const tabs: readonly Tab[] = personal ? TABS.filter((item) => item !== "desks" && item !== "companion") : TABS;
+  const tab = tabs.includes(requestedTab) ? requestedTab : "quests";
   const [round, setRound] = useState<StudioMiniGameRound | null>(null);
   const [result, setResult] = useState<StudioMiniGameResult | null>(null);
-  const quests = useMemo(() => studioTownQuests(operations, manifest, decorations.placements.length), [decorations.placements.length, manifest, operations]);
+  const quests = useMemo(() => studioTownQuests(operations, manifest, decorations.placements.length)
+    .filter((quest) => !personal || quest.kind === "exploration" || quest.kind === "customization"), [decorations.placements.length, manifest, operations, personal]);
   const events = useMemo(() => studioTownEvents(), []);
   const companion = useMemo(() => studioTownCompanionSnapshot(operations), [operations]);
 
   return <section className="vs2-panel studio-vspace-town-program" data-space-interactive="true">
     <header>
       <div><Sparkles size={17} aria-hidden /><h2>{bt("살아 있는 제작 마을", "Living production town")}</h2></div>
-      <p>{bt("업무 동선, 이벤트, 소규모 대화, 미니게임, 팀 자리와 공간 블루프린트를 한곳에서 관리합니다.", "Manage work routes, events, bubbles, mini-games, desk pods and space blueprints in one place.")}</p>
+      <p>{personal
+        ? bt("마을을 둘러보고 미니게임, 꾸미기 보상과 공간 블루프린트를 즐겨 보세요.", "Explore the town, play mini-games and enjoy cosmetic rewards and space blueprints.")
+        : bt("업무 동선, 이벤트, 소규모 대화, 미니게임, 팀 자리와 공간 블루프린트를 한곳에서 관리합니다.", "Manage work routes, events, bubbles, mini-games, desk pods and space blueprints in one place.")}</p>
     </header>
     <div className="studio-vspace-town-tabs" role="tablist" aria-label={bt("마을 기능", "Town features")}>
-      {TABS.map((item) => <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)}>{bt({ quests: "퀘스트", events: "이벤트", activities: "활동", rewards: "보상", desks: "팀 자리", blueprints: "블루프린트", companion: "모바일" }[item], { quests: "Quests", events: "Events", activities: "Activities", rewards: "Rewards", desks: "Desk pods", blueprints: "Blueprints", companion: "Companion" }[item])}</button>)}
+      {tabs.map((item) => <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)}>{bt({ quests: "퀘스트", events: "이벤트", activities: "활동", rewards: "보상", desks: "팀 자리", blueprints: "블루프린트", companion: "모바일" }[item], { quests: "Quests", events: "Events", activities: "Activities", rewards: "Rewards", desks: "Desk pods", blueprints: "Blueprints", companion: "Companion" }[item])}</button>)}
     </div>
     {tab === "quests" ? <div className="studio-vspace-town-cards">
       {quests.map((quest) => {
@@ -99,12 +106,12 @@ export function StudioVirtualSpaceTownProgramPanel({
         <p>{new Date(event.startsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}–{new Date(event.endsAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
         <div className="studio-vspace-town-actions">
           <button type="button" onClick={() => onMoveToRoom(event.roomId)}>{bt("장소로 이동", "Walk to venue")}</button>
-          {event.spotlight ? spotlightActive
+          {!personal && event.spotlight ? spotlightActive
             ? <button type="button" onClick={onStopSpotlight}>{bt("Spotlight 종료", "Stop spotlight")}</button>
             : <button type="button" onClick={() => onStartSpotlight(event)}><Presentation size={14} aria-hidden />{bt("발표 준비", "Prepare spotlight")}</button> : null}
         </div>
       </article>)}
-      <article className="studio-vspace-town-feature-card">
+      {!personal ? <><article className="studio-vspace-town-feature-card">
         <strong>{bt("소규모 Bubble", "Conversation bubble")}</strong>
         <p>{bt("근처 팀원을 최대 세 명 선택하면 전체 명단 동의 후 임시 대화 그룹이 열리고, 공간 범위를 벗어나면 종료됩니다.", "Choose up to three nearby teammates. The temporary bubble opens after full-roster consent and closes when the spatial scope ends.")}</p>
         <button type="button" onClick={onOpenPeople}><UsersRound size={14} aria-hidden />{bt("Bubble 만들기", "Create a bubble")}</button>
@@ -113,7 +120,7 @@ export function StudioVirtualSpaceTownProgramPanel({
         <strong>{bt("공유 화면 주석", "Shared-screen annotation")}</strong>
         <p>{bt("레이저·펜·메모를 P2P 보드에 표시하고 영구 검수 의견은 별도 검수 흐름으로 남깁니다.", "Use laser, pen and notes on the P2P board; durable review comments remain in the review workflow.")}</p>
         <button type="button" onClick={onOpenAnnotation}><MessageCircle size={14} aria-hidden />{bt("주석 보드 열기", "Open annotation board")}</button>
-      </article>
+      </article></> : null}
     </div> : null}
 
     {tab === "activities" ? <div className="studio-vspace-town-cards">

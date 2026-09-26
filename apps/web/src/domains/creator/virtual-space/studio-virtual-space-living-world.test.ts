@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { studioVirtualDayPhase, studioVirtualTerrainAt } from "./studio-virtual-space-living-world";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
+import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
 
 describe("Virtual Studio living world", () => {
   it("applies physical terrain profiles instead of treating the world as one flat surface", () => {
@@ -9,6 +10,12 @@ describe("Virtual Studio living world", () => {
     expect(studioVirtualTerrainAt(DEFAULT_STUDIO_WORLD_MANIFEST, { x: 175, y: 412 }).kind).toBe("stone");
     expect(studioVirtualTerrainAt(DEFAULT_STUDIO_WORLD_MANIFEST, { x: 20, y: 260 }).speedMultiplier).toBeLessThan(1);
     expect(studioVirtualTerrainAt(DEFAULT_STUDIO_WORLD_MANIFEST, { x: 585, y: 550 }).speedMultiplier).toBeLessThan(0.7);
+  });
+
+  it("does not leak legacy water and grass slowdown into tiled place worlds", () => {
+    const place = studioVirtualPlaceWorldManifest("review-gallery");
+    expect(studioVirtualTerrainAt(place, { x: 585, y: 550 }).kind).toBe("path");
+    expect(studioVirtualTerrainAt(place, { x: 20, y: 260 }).walkable).toBe(true);
   });
 
   it("cycles through day phases deterministically", () => {

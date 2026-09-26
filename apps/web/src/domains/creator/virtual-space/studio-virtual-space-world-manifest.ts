@@ -1,4 +1,4 @@
-import { studioWorldManifestSchema, type StudioWorldAssetIntegrity, type StudioWorldInteractionRule } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema, type StudioWorldAssetIntegrity, type StudioWorldInteractionRule, type StudioWorldTilemap } from "@toonspectrum/studio-project-model/world-publication";
 import { studioWorldOcclusionPolygonValid } from "./studio-virtual-space-occlusion";
 import { parseStudioVirtualSpaceAppearance } from "./studio-virtual-space-appearance";
 import { validateStudioNpcActivityAnchors, type StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
@@ -136,6 +136,7 @@ export interface StudioVirtualSpaceWorldManifest {
   readonly height: number;
   readonly backgroundAssetKey: string;
   readonly backgroundUrl: string;
+  readonly tilemap?: StudioWorldTilemap;
   readonly assetIntegrity?: readonly StudioWorldAssetIntegrity[];
   readonly interactionRules?: readonly StudioWorldInteractionRule[];
   readonly rooms: readonly StudioWorldRoomDefinition[];
@@ -229,6 +230,24 @@ const acousticZones = STUDIO_VIRTUAL_SPACE_ZONES.map(({ id, x, y, width, height 
   ...(id === "meeting" || id === "review" ? { doorId: `${id}-door` } : {}),
 }));
 
+const DEFAULT_OCCLUSION_LAYERS: readonly StudioWorldOcclusionLayer[] = Object.freeze([
+  { id: "assets-roof", polygon: [{ x: 40, y: 40 }, { x: 310, y: 40 }, { x: 310, y: 135 }, { x: 40, y: 135 }], depth: 1_350 },
+  { id: "storyboard-roof", polygon: [{ x: 340, y: 40 }, { x: 610, y: 40 }, { x: 610, y: 135 }, { x: 340, y: 135 }], depth: 1_350 },
+  { id: "production-roof", polygon: [{ x: 670, y: 40 }, { x: 940, y: 40 }, { x: 940, y: 135 }, { x: 670, y: 135 }], depth: 1_350 },
+  { id: "release-roof", polygon: [{ x: 970, y: 40 }, { x: 1240, y: 40 }, { x: 1240, y: 135 }, { x: 970, y: 135 }], depth: 1_350 },
+  { id: "writers-roof", polygon: [{ x: 40, y: 300 }, { x: 310, y: 300 }, { x: 310, y: 395 }, { x: 40, y: 395 }], depth: 1_510 },
+  { id: "drawing-roof", polygon: [{ x: 340, y: 300 }, { x: 630, y: 300 }, { x: 630, y: 395 }, { x: 340, y: 395 }], depth: 1_510 },
+  { id: "review-roof", polygon: [{ x: 670, y: 300 }, { x: 960, y: 300 }, { x: 960, y: 395 }, { x: 670, y: 395 }], depth: 1_510 },
+  { id: "quality-roof", polygon: [{ x: 990, y: 300 }, { x: 1240, y: 300 }, { x: 1240, y: 395 }, { x: 990, y: 395 }], depth: 1_510 },
+]);
+
+const DEFAULT_DISTRICT_PORTALS: readonly StudioWorldPortalDefinition[] = Object.freeze([
+  { id: "story-gate", point: { x: 720, y: 900 }, radius: 18, targetRoomId: "writers", targetPoint: { x: 290, y: 485 } },
+  { id: "atelier-gate", point: { x: 840, y: 900 }, radius: 18, targetRoomId: "drawing", targetPoint: { x: 610, y: 485 } },
+  { id: "review-gate", point: { x: 760, y: 850 }, radius: 18, targetRoomId: "review", targetPoint: { x: 935, y: 485 } },
+  { id: "production-gate", point: { x: 780, y: 760 }, radius: 18, targetRoomId: "production", targetPoint: { x: 920, y: 205 } },
+]);
+
 export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Object.freeze<StudioVirtualSpaceWorldManifest>({
   id: "toonspectrum-master-studio",
   version: 8,
@@ -249,7 +268,7 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
     id: item.id, zoneId: item.zoneId, point: { x: item.x, y: item.y }, radius: item.radius,
     labelKo: item.labelKo, labelEn: item.labelEn, action: item.action,
   })),
-  portals: [],
+  portals: DEFAULT_DISTRICT_PORTALS,
   spawns: [
     { id: "main", point: { x: 780, y: 918 }, facing: "up" },
     { id: "lobby", point: { x: 780, y: 900 }, facing: "up" },
@@ -267,7 +286,7 @@ export const DEFAULT_STUDIO_WORLD_MANIFEST: StudioVirtualSpaceWorldManifest = Ob
     { id: "production", point: { x: 920, y: 205 }, facing: "left" },
     { id: "release", point: { x: 1210, y: 205 }, facing: "left" },
   ],
-  occlusionLayers: [],
+  occlusionLayers: DEFAULT_OCCLUSION_LAYERS,
   interactionSlots: [
     { id: "review-left", roomId: "review", labelKo: "리뷰 테이블 왼쪽", labelEn: "Review table · left",
       approachPoint: { x: 770, y: 500 }, anchorPoint: { x: 770, y: 500 }, seatAttachmentPoint: { x: 785, y: 452 }, exitPoint: { x: 730, y: 505 }, facing: "up", radius: 10 },

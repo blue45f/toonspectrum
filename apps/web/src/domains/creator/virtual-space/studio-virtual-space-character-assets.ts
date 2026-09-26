@@ -16,6 +16,17 @@ export interface StudioCharacterTextureAsset {
   readonly frameWidth?: number;
   readonly frameHeight?: number;
   readonly animationKey?: string;
+  /** 정지 자세도 원본 atlas의 한 셀과 동일한 기하 정보를 사용한다. */
+  readonly frame?: number;
+  readonly presentation?: StudioCharacterFramePresentation;
+  readonly atlas?: StudioCharacterAtlasClip["atlas"];
+}
+
+function idleAtlas(skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing) {
+  const clip = studioCharacterWalkClip(skin, facing);
+  const frame = skin.idleFrames?.[facing];
+  return clip && frame !== undefined && Number.isSafeInteger(frame) && frame >= clip.start && frame <= clip.end
+    ? { clip, frame } : undefined;
 }
 
 export function studioCharacterStaticTextureKey(
@@ -23,9 +34,10 @@ export function studioCharacterStaticTextureKey(
   facing: StudioVirtualSpaceFacing,
   state: StudioCharacterMotionState = "idle",
 ): string {
-  return (state === "talk" || state === "draw" || state === "review") && skin.state?.[state]
-    ? `studio-player-${skin.key}-state-${state}`
-    : `studio-player-${skin.key}-direction-${facing}`;
+  if ((state === "talk" || state === "draw" || state === "review") && skin.state?.[state]) {
+    return `studio-player-${skin.key}-state-${state}`;
+  }
+  return idleAtlas(skin, facing) ? studioCharacterWalkTextureKey(skin, facing) : `studio-player-${skin.key}-direction-${facing}`;
 }
 
 export const studioCharacterWalkTextureKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing) =>
@@ -70,12 +82,26 @@ export function studioCharacterFrameGeometry(
     originY: seatAttached && frame.seatOriginY !== undefined ? frame.seatOriginY : frame.originY };
 }
 
+/** 원본 atlas 크기가 달라지면 전체 시트나 잘못된 셀을 정지 자세로 표시하지 않는다. */
+export function studioCharacterStaticSheetMatches(asset: StudioCharacterTextureAsset, width: number, height: number): boolean {
+  return asset.frame === undefined || (asset.type === "spritesheet" && asset.atlas !== undefined
+    && width === asset.atlas.width && height === asset.atlas.height);
+}
+
 export function studioCharacterStaticAsset(
   skin: StudioCharacterSkin,
   facing: StudioVirtualSpaceFacing,
   state: StudioCharacterMotionState = "idle",
 ): StudioCharacterTextureAsset {
   const stateUrl = state === "talk" || state === "draw" || state === "review" ? skin.state?.[state] : undefined;
+  const idle = stateUrl ? undefined : idleAtlas(skin, facing);
+  if (idle) return {
+    key: studioCharacterWalkTextureKey(skin, facing), url: idle.clip.textureUrl, type: "spritesheet",
+    frameWidth: idle.clip.frameWidth, frameHeight: idle.clip.frameHeight,
+    animationKey: studioCharacterWalkAnimationKey(skin, facing), frame: idle.frame,
+    presentation: idle.clip.frames?.[idle.frame - idle.clip.start],
+    atlas: idle.clip.atlas,
+  };
   return { key: studioCharacterStaticTextureKey(skin, facing, state), url: stateUrl ?? skin.directional[facing], type: "image" };
 }
 
@@ -89,7 +115,7 @@ export function studioCharacterVisualAssets(
   const current = studioCharacterStaticAsset(skin, facing, state);
   const assets = current.key === idle.key ? [idle] : [idle, current];
   const clip = state === "walk" ? studioCharacterWalkClip(skin, facing) : undefined;
-  if (clip) assets.push({ key: studioCharacterWalkTextureKey(skin, facing), url: clip.textureUrl,
+  if (clip && !assets.some((asset) => asset.key === studioCharacterWalkTextureKey(skin, facing))) assets.push({ key: studioCharacterWalkTextureKey(skin, facing), url: clip.textureUrl,
     type: "spritesheet", frameWidth: clip.frameWidth, frameHeight: clip.frameHeight,
     animationKey: studioCharacterWalkAnimationKey(skin, facing) });
   const action = studioCharacterActionClip(skin, facing, state);

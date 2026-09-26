@@ -38,7 +38,8 @@ export async function pinStudioWorldAssets(world: World, signal: AbortSignal,
   deps: StudioWorldAssetDependencies = STUDIO_WORLD_BROWSER_ASSETS): Promise<World> {
   const structural = studioWorldManifestSchema.safeParse(world);
   if (!structural.success || validateStudioWorldManifest(world).length) throw new Error("Validate the world before packaging");
-  const sources = [...new Set([world.backgroundUrl, ...world.props.flatMap((prop) => prop.assetUrl ? [prop.assetUrl] : [])])];
+  const sources = [...new Set([world.backgroundUrl, ...world.props.flatMap((prop) => prop.assetUrl ? [prop.assetUrl] : []),
+    ...(world.tilemap?.tilesets.map((set) => set.imageUrl) ?? [])])];
   if (sources.length > 64) throw new Error("A package may contain at most 64 referenced images");
   const pins: StudioWorldAssetIntegrity[] = [], budget = { bytes: 0 };
   for (const url of sources) {

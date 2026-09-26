@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { STUDIO_CHARACTER_SKINS, studioCharacterAppearanceForAvatarIndex, resolveStudioCharacterAppearance, studioCharacterActionClip } from "./studio-virtual-space-character-skins";
 import {
   StudioCharacterAssetResidency, studioCharacterStaticAsset, studioCharacterVisualAssets,
   studioCharacterFrameGeometry,
   studioCharacterActionFrame,
   studioCharacterActionSheetMatches,
+  studioCharacterStaticSheetMatches,
   type StudioCharacterTextureAsset,
 } from "./studio-virtual-space-character-assets";
 
@@ -26,6 +29,69 @@ function harness(initial: readonly StudioCharacterTextureAsset[] = []) {
 }
 
 describe("Virtual Studio character texture residency", () => {
+  it("네이티브 걷기와 정지는 한 원본 시트를 공유하고 이전 저해상도 방향 이미지를 요청하지 않는다", () => {
+    const native = STUDIO_CHARACTER_SKINS.find((item) => item.key === "imagegen25")!;
+    const h = harness();
+    for (const direction of ["down", "left", "right", "up"] as const) {
+      const idle = studioCharacterStaticAsset(native, direction);
+      const walk = studioCharacterVisualAssets(native, direction, "walk");
+      expect(studioCharacterVisualAssets(native, direction, "idle")).toEqual([idle]);
+      expect(walk).toEqual([idle]);
+      expect(idle).toMatchObject({ type: "spritesheet", frameWidth: 627, frameHeight: 627, frame: 0 });
+      expect(idle.url).toBe(`/assets/virtual-studio/world-v2/characters/pixel-maker/walk-${direction}.png`);
+      expect(studioCharacterStaticSheetMatches(idle, 1254, 1254)).toBe(true);
+      expect(studioCharacterStaticSheetMatches(idle, 1253, 1254)).toBe(false);
+      expect(studioCharacterStaticSheetMatches(idle, 2508, 627)).toBe(false);
+      h.residency.use("self", [idle]);
+      h.pending.get(idle.key)!(true);
+      h.residency.use("self", walk);
+      h.residency.use("self", [idle]);
+    }
+    expect(h.load).toHaveBeenCalledTimes(4);
+    expect(h.load.mock.calls.every(([asset]) => !asset.url.includes("living-town-v6"))).toBe(true);
+    expect(studioCharacterStaticAsset({ ...native, idleFrames: { down: 4 } }, "down").type).toBe("image");
+  });
+  it("네이티브 PNG 원본과 프레임 경계를 보존하고 실제 머리 높이와 발 기준을 정렬한다", () => {
+    const native = STUDIO_CHARACTER_SKINS.find((item) => item.key === "imagegen25")!;
+    const root = new URL("../../../../public/assets/virtual-studio/world-v2/characters/pixel-maker/", import.meta.url);
+    const manifest = JSON.parse(readFileSync(new URL("manifest.json", root), "utf8")) as {
+      directions: Record<string, { sha256: string; bytes: number; frames: { bounds: number[]; hash: string }[] }>;
+    };
+    for (const direction of ["down", "left", "right", "up"] as const) {
+      const png = readFileSync(new URL(`walk-${direction}.png`, root));
+      const record = manifest.directions[direction]!;
+      expect(createHash("sha256").update(png).digest("hex")).toBe(record.sha256);
+      expect(png.byteLength).toBe(record.bytes);
+      expect(png.readUInt32BE(16)).toBe(1254);
+      expect(png.readUInt32BE(20)).toBe(1254);
+      expect(png[25]).toBe(6); // PNG RGBA 형식을 유지한다.
+      expect(png.includes(Buffer.from("caBX"))).toBe(true);
+      expect(new Set(record.frames.map((frame) => frame.hash)).size).toBe(4);
+      const clip = native.clips![`walk-${direction}`]!;
+      expect(studioCharacterActionSheetMatches(clip, 1254, 1254)).toBe(true);
+      for (const [index, presentation] of clip.frames!.entries()) {
+        const bounds = record.frames[index]!.bounds;
+        const geometry = studioCharacterFrameGeometry(presentation, 627, 627, 98, 131);
+        expect(geometry.width).toBe(geometry.height);
+        expect((bounds[3]! / 627 - geometry.originY) * geometry.height).toBeCloseTo(0);
+        expect((bounds[1]! / 627 - geometry.originY) * geometry.height).toBeCloseTo(-131 * 0.82);
+      }
+    }
+  });
+  it("보존한 정지 그림 이동 행동을 실제 작화 걷기와 구분한다", () => {
+    const native = STUDIO_CHARACTER_SKINS.find((item) => item.key === "imagegen25")!;
+    for (const direction of ["down", "left", "right", "up"] as const) {
+      expect(native.clips![`walk-${direction}`]!.technique).toBe("drawn");
+      for (const action of ["talk", "draw", "review"] as const) {
+        const clip = studioCharacterActionClip(native, direction, action)!;
+        expect(clip.technique).toBe("translated-still");
+        expect(clip.textureUrl).toContain("/living-town-v6/imagegen25-character/");
+        expect(studioCharacterVisualAssets(native, direction, action).some((asset) => asset.url === clip.textureUrl)).toBe(true);
+      }
+    }
+    expect(native.poses?.sit).toBeDefined();
+    expect(native.poses?.wave).toBeDefined();
+  });
   it("advertises actual local poses and resolves stable identity independently of legacy index", () => {
     for (let index = 0; index < STUDIO_CHARACTER_SKINS.length; index++) {
       const appearance = studioCharacterAppearanceForAvatarIndex(index);

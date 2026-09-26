@@ -42,11 +42,12 @@ export function StudioVirtualSpaceRoomCatalog({
   const [query, setQuery] = useState("");
   const normalized = query.trim().normalize("NFKC").toLocaleLowerCase();
   const modules = useMemo(() => STUDIO_SPACE_MODULES.filter((module) => {
+    if (module.requiresProject && !projectAvailable) return false;
     if (category !== "all" && module.category !== category) return false;
     if (!normalized) return true;
     return `${module.labelKo} ${module.labelEn} ${module.descriptionKo} ${module.descriptionEn}`
       .normalize("NFKC").toLocaleLowerCase().includes(normalized);
-  }), [category, normalized]);
+  }), [category, normalized, projectAvailable]);
 
   return <section className="studio-space-module-catalog" aria-labelledby="studio-space-module-title">
     <header>
@@ -83,7 +84,7 @@ export function StudioVirtualSpaceRoomCatalog({
       {modules.map((module) => <ModuleCard
         key={module.id}
         module={module}
-        disabled={module.requiresProject && !projectAvailable}
+        disabled={false}
         onPanel={onPanel}
         onZone={onZone}
       />)}

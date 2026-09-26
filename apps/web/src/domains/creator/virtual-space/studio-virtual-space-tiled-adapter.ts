@@ -1,6 +1,7 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type { StudioWorldNpcActivityAnchor } from "./studio-virtual-space-npc-activity";
 import type { StudioWorldAcousticZoneDefinition } from "./studio-virtual-space-acoustics";
+import { studioWorldTilemapFromTiled, type StudioTiledVisualLayer, type StudioTiledVisualMap } from "./studio-virtual-space-tiled-tiles";
 import type {
   StudioVirtualSpaceWorldManifest,
   StudioWorldInteractionDefinition,
@@ -33,7 +34,7 @@ interface TiledObject {
   readonly visible?: boolean;
   readonly properties?: readonly TiledProperty[];
 }
-interface TiledObjectLayer {
+interface TiledObjectLayer extends StudioTiledVisualLayer {
   readonly type: "objectgroup" | "group" | "imagelayer" | "tilelayer";
   readonly name: string;
   readonly visible?: boolean;
@@ -43,7 +44,7 @@ interface TiledObjectLayer {
   readonly offsety?: number;
   readonly properties?: readonly TiledProperty[];
 }
-export interface StudioTiledMapLike {
+export interface StudioTiledMapLike extends StudioTiledVisualMap {
   readonly width: number;
   readonly height: number;
   readonly tilewidth: number;
@@ -137,6 +138,7 @@ export function studioWorldManifestFromTiled(
   map: StudioTiledMapLike,
   base: StudioVirtualSpaceWorldManifest,
 ): StudioVirtualSpaceWorldManifest {
+  const tilemap = studioWorldTilemapFromTiled(map);
   const layers = new Map(["rooms", "colliders", "props", "interactions", "portals", "spawns", "npcs", "interaction-slots", "occlusion-layers", "npc-activity-anchors", "acoustic-zones"]
     .map((name) => [name, layerObjects(map, name)] as const));
   const objects = (name: string) => layers.get(name) ?? [];
@@ -279,6 +281,8 @@ export function studioWorldManifestFromTiled(
     version: optionalNumber(mapProperty(map, "manifestVersion")) ?? base.version,
     width: worldWidth,
     height: worldHeight,
+    // 새 배경 가져오기에 이전 월드의 타일을 상속하지 않는다.
+    tilemap,
     backgroundUrl: optionalString(mapProperty(map, "backgroundUrl")) ?? base.backgroundUrl,
     backgroundAssetKey: optionalString(mapProperty(map, "backgroundAssetKey")) ?? base.backgroundAssetKey,
     // A different image layer cannot inherit the previous draft's digest claims.

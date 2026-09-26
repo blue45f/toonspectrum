@@ -104,7 +104,7 @@ describe("Virtual Studio editable world boundaries", () => {
         ] },
       ] },
     ]), DEFAULT_STUDIO_WORLD_MANIFEST);
-    expect(studioWorldPortals(next)[0]).toMatchObject({ id: "gate", targetPoint: { x: 425, y: 700 } });
+    expect(studioWorldPortals(next).find((portal) => portal.id === "gate")).toMatchObject({ id: "gate", targetPoint: { x: 425, y: 700 } });
     expect(next.props[1]?.collider).toEqual({ x: 410, y: 590, width: 80, height: 20 });
   });
 

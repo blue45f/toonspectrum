@@ -27,7 +27,7 @@ describe("Virtual Studio art and presentation", () => {
       expect(clip?.end).toBe(clip?.technique === "drawn" ? 3 : 7);
       expect(["drawn", "cutout-rig"]).toContain(clip?.technique);
       expect(clip?.distancePerCycle).toBeGreaterThan(0);
-      const expectedRoot = skin.key === "imagegen25" ? "/living-town-v6/imagegen25-character/"
+      const expectedRoot = skin.key === "imagegen25" ? "/world-v2/characters/pixel-maker/"
         : clip?.technique === "drawn" ? "/drawn-characters-v1/" : "/production-v2/";
       expect(clip?.textureUrl).toContain(expectedRoot);
       expect(skin.directional[direction]).toContain(
