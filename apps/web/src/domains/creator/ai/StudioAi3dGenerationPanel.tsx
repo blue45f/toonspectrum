@@ -5,6 +5,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  STUDIO_3D_INLINE_INPUT_MAX_BYTES,
   Studio3dGenerationHttpClient,
   studioFileToGenerationInput,
   type Studio3dGenerationCreateInput,
@@ -87,7 +88,10 @@ export function StudioAi3dGenerationPanel({
   }, [advanced, preset, seed, targetFaceCount]);
 
   const expectedFileCount = mode === "image-to-3d" ? 1 : mode === "multiview-to-3d" ? 2 : mode === "texture-only" ? 1 : 0;
+  const inputBytes = files.reduce((total, file) => total + file.size, modelFile?.size ?? 0);
+  const inputWithinBudget = inputBytes <= STUDIO_3D_INLINE_INPUT_MAX_BYTES;
   const inputValid =
+    inputWithinBudget &&
     (mode !== "text-to-3d" || prompt.trim().length > 0) &&
     (mode === "text-to-3d" || files.length >= expectedFileCount) &&
     (mode !== "multiview-to-3d" || files.length <= 5) &&
@@ -137,10 +141,10 @@ export function StudioAi3dGenerationPanel({
     abortRef.current = controller;
     try {
       const encodedImages = await Promise.all(
-        files.map((file, index) => studioFileToGenerationInput(file, 25 * 1024 * 1024, `view-${index + 1}`)),
+        files.map((file, index) => studioFileToGenerationInput(file, STUDIO_3D_INLINE_INPUT_MAX_BYTES, `view-${index + 1}`)),
       );
       const encodedModel = modelFile
-        ? await studioFileToGenerationInput(modelFile, 200 * 1024 * 1024)
+        ? await studioFileToGenerationInput(modelFile, STUDIO_3D_INLINE_INPUT_MAX_BYTES)
         : undefined;
       const next = await client.create(
         {
@@ -263,6 +267,13 @@ export function StudioAi3dGenerationPanel({
             className="min-h-11 rounded-lg border border-line bg-panel p-2"
           />
         </label>
+      ) : null}
+
+      {mode !== "text-to-3d" ? (
+        <p className={`rounded-lg border px-2.5 py-2 text-[0.63rem] leading-relaxed ${inputWithinBudget ? "border-line bg-panel/50 text-fg-3" : "border-bad/35 bg-bad/10 text-bad"}`}>
+          현재 전송 방식은 선택한 이미지와 모델 합계 10MB까지 지원합니다. 선택됨 {(inputBytes / 1024 / 1024).toFixed(1)}MB / 10MB.
+          더 큰 자산은 객체 저장소 업로드 경로가 제공되기 전까지 전송하지 않습니다.
+        </p>
       ) : null}
 
       <div className="grid gap-2 sm:grid-cols-2">

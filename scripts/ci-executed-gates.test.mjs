@@ -245,6 +245,16 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "apps/web/public/assets/virtual-studio/living-town-v6/art-v6-manifest.json",
     "apps/web/public/assets/virtual-studio/living-town-v6/sky-island/path-overlay.webp",
     "apps/web/public/assets/virtual-studio/living-town-v6/retro/waterfall-sheet.webp",
+    "apps/web/public/assets/virtual-studio/imagegen25-v7/manifest.json",
+    "apps/web/public/assets/virtual-studio/imagegen25-v7/places/personal-atelier.webp",
+    "apps/web/public/assets/virtual-studio/imagegen25-v7/backgrounds/sky.webp",
+    "apps/web/public/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp",
+    "apps/web/public/assets/virtual-studio/world-v2/manifest.json",
+    "apps/web/public/assets/virtual-studio/world-v2/tiles/limestone-native.png",
+    "apps/web/public/assets/virtual-studio/world-v2/tiles/grass-native.png",
+    "apps/web/public/assets/virtual-studio/world-v2/characters/pixel-maker/manifest.json",
+    ...["down", "up", "left", "right"].map((direction) =>
+      `apps/web/public/assets/virtual-studio/world-v2/characters/pixel-maker/walk-${direction}.png`),
     "apps/web/public/assets/virtual-studio/drawn-characters-v1/art-manifest.json",
     ...["gentle-window-rain.ogg", "window-rain.ogg", "provenance.json", "CC0-1.0.txt"].map((name) =>
       `apps/web/public/assets/virtual-studio/ambient-audio/${name}`),
@@ -259,7 +269,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
   const excluded = [...requiredArt, ...unrelatedArt];
   const staticJob = job("static");
   const restoreStep = staticJob.split(/(?=^ {6}- )/mu)
-    .find((step) => step.includes("git sparse-checkout add"));
+    .find((step) => step.includes("Restore Virtual Studio art for foundation regressions"));
   assert.ok(restoreStep, "foundation must restore the real artwork its required tests read");
   assert.match(restoreStep, /^ {8}if: matrix\.shard == 'studio-foundation'$/mu);
   const restoreArgs = restoreStep.match(/^ {8}run: git (.+)$/mu)?.[1].split(/\s+/u);
@@ -278,6 +288,8 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/style-packs/",
     "/apps/web/public/assets/virtual-studio/style-packs-v5/",
     "/apps/web/public/assets/virtual-studio/living-town-v6/",
+    "/apps/web/public/assets/virtual-studio/imagegen25-v7/",
+    "/apps/web/public/assets/virtual-studio/world-v2/",
   ]);
   assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
     "artwork must be present before the required foundation tests execute");
@@ -292,6 +304,10 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "the production art gate must execute the independent v5 RPG art integrity test");
   assert.match(artTestScript, /verify-virtual-studio-living-town-v6\.test\.mjs/u,
     "the production art gate must execute the Image Generation 2.5-directed living town integrity test");
+  assert.match(artTestScript, /verify-virtual-studio-imagegen25-v7\.test\.mjs/u,
+    "the production art gate must execute the Image Generation 2.5 place and environment integrity test");
+  assert.match(artTestScript, /verify-virtual-studio-world-v2-art\.test\.mjs/u,
+    "원본 타일과 캐릭터의 무결성 검사를 실행해야 합니다.");
   const scratch = mkdtempSync(join(tmpdir(), "virtual-studio-ci-inputs-"));
   const git = (...args) => {
     const result = spawnSync("git", args, { cwd: scratch, encoding: "utf8" });
@@ -326,6 +342,31 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
+});
+
+test("product regression restores the source-controlled documentation authority without large artwork", () => {
+  const staticJob = job("static");
+  const restoreStep = staticJob.split(/(?=^ {6}- )/mu)
+    .find((step) => step.includes("Restore documentation authority for product regressions"));
+  assert.ok(restoreStep, "product must restore the documentation authority hidden by sparse checkout");
+  assert.match(restoreStep, /^ {8}if: matrix\.shard == 'product'$/mu);
+  for (const path of [
+    "/docs/",
+    "/apps/web/public/assets/3d/outfits/README.md",
+    "/apps/web/public/assets/studio/cc0-20260906/README.md",
+    "/apps/web/public/assets/3d/LICENSES.md",
+    "/apps/web/public/assets/3d/environments/expansion-v1/LICENSES.md",
+    "/apps/web/public/assets/3d/environments/mcp-free-v1/LICENSES.md",
+    "/apps/web/public/assets/3d/environments/refined-v6/LICENSES.md",
+    "/apps/web/public/assets/3d/environments/webtoon-v7/LICENSES.md",
+    "/apps/web/public/assets/3d/refined-v8/LICENSES.md",
+    "/apps/web/public/vrm/LICENSES.md",
+    "/tests/benchmarks/results/app-startup-perf.json",
+    "/tests/benchmarks/results/i18n-fix.json",
+  ]) assert.ok(restoreStep.includes(path), `documentation restore is missing ${path}`);
+  assert.doesNotMatch(restoreStep, /\.(?:glb|png|webp|vrm)(?:\s|$)/u);
+  assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("pnpm install --frozen-lockfile"),
+    "documentation authority must be materialized before product validation runs");
 });
 
 test("static regression checkout retains all imported 3D manifests but excludes their model payloads", () => {

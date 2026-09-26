@@ -1,0 +1,280 @@
+{
+  "version": 1,
+  "status": "migration",
+  "descriptionKo": "원본 PNG를 재인코딩 없이 보존한 네 방향 걷기. 서 있기는 같은 atlas의 접지 프레임을 멈춰 표시하며 별도 standing 작화가 아니다. legacy talk/draw/review/sit/wave는 이 산출물에 포함하지 않는다.",
+  "sourcePreservation": "byte-identical-copy",
+  "width": 1254,
+  "height": 1254,
+  "frameWidth": 627,
+  "frameHeight": 627,
+  "columns": 2,
+  "rows": 2,
+  "alphaBoundsThreshold": 32,
+  "frameOrder": "row-major",
+  "directions": {
+    "down": {
+      "bytes": 713642,
+      "sha256": "143b053381967b90a252c9495c9392e80f29cc889a05954237014d213b72fc1e",
+      "frames": [
+        {
+          "bounds": [
+            185,
+            78,
+            473,
+            563
+          ],
+          "headBounds": [
+            185,
+            78,
+            473,
+            320
+          ],
+          "hash": "e550547344599ace0026936bf93be369ff090c2f3d09e637194febc007a42f69"
+        },
+        {
+          "bounds": [
+            185,
+            78,
+            473,
+            551
+          ],
+          "headBounds": [
+            185,
+            78,
+            473,
+            320
+          ],
+          "hash": "12ce23f43d73deedf402605c1ffc2776fea6081f7acd2e364f7e29201195cd86"
+        },
+        {
+          "bounds": [
+            185,
+            78,
+            473,
+            560
+          ],
+          "headBounds": [
+            185,
+            78,
+            473,
+            320
+          ],
+          "hash": "0c5a78e42da251978abf88cf6e3f3120e662a9791bd0c5f1e1f5eaa22d2c4469"
+        },
+        {
+          "bounds": [
+            185,
+            78,
+            473,
+            549
+          ],
+          "headBounds": [
+            185,
+            78,
+            473,
+            320
+          ],
+          "hash": "4e0757c6848b3b90ec22aa76cab1eb752454a7719936215add2383fa5f8696f9"
+        }
+      ]
+    },
+    "up": {
+      "bytes": 715390,
+      "sha256": "0fd1618d18d5565c2fa50e1f607bb55d2d48301ab8925a4501fa604f263ca09e",
+      "frames": [
+        {
+          "bounds": [
+            177,
+            76,
+            471,
+            568
+          ],
+          "headBounds": [
+            177,
+            76,
+            471,
+            320
+          ],
+          "hash": "46023f9a2d4445d4cd84897b50a7b3a6758b0d99f5a5a6173440172c61749643"
+        },
+        {
+          "bounds": [
+            177,
+            76,
+            470,
+            560
+          ],
+          "headBounds": [
+            177,
+            76,
+            470,
+            320
+          ],
+          "hash": "b02e444bbc89547871efa7e85b64951baf3f9670f5ede8f87c819de14061e17c"
+        },
+        {
+          "bounds": [
+            177,
+            78,
+            471,
+            563
+          ],
+          "headBounds": [
+            177,
+            78,
+            471,
+            320
+          ],
+          "hash": "9ff471b3870140209d33cb9feeab958d024f5fa9a96f696db53b7a4e6bb5b743"
+        },
+        {
+          "bounds": [
+            177,
+            78,
+            470,
+            560
+          ],
+          "headBounds": [
+            177,
+            78,
+            470,
+            320
+          ],
+          "hash": "b28e82b10a3411ac190cd9601eaeba4009aa5529e7f4da884a9eb092718d0808"
+        }
+      ]
+    },
+    "left": {
+      "bytes": 755300,
+      "sha256": "62a6e8eb3688e93c78fbc769f0d478c1b9d49346e8bd277651339768473874a1",
+      "frames": [
+        {
+          "bounds": [
+            180,
+            77,
+            482,
+            589
+          ],
+          "headBounds": [
+            180,
+            77,
+            482,
+            320
+          ],
+          "hash": "af614843c00a6bafe571b6a140adc1408c4bf0e5d0d5e45dea516f9ecf922f38"
+        },
+        {
+          "bounds": [
+            168,
+            80,
+            473,
+            589
+          ],
+          "headBounds": [
+            168,
+            80,
+            473,
+            320
+          ],
+          "hash": "93c16f6123dda36ab5e0323a639b0dc9759731d03938e44442558e0c08476fe6"
+        },
+        {
+          "bounds": [
+            180,
+            72,
+            482,
+            568
+          ],
+          "headBounds": [
+            180,
+            72,
+            482,
+            320
+          ],
+          "hash": "705f8855164d56eaa03d0e8c4f8c6c5a5f44ab48e3afd2aa543352ed325726e1"
+        },
+        {
+          "bounds": [
+            163,
+            68,
+            470,
+            565
+          ],
+          "headBounds": [
+            163,
+            68,
+            470,
+            320
+          ],
+          "hash": "3764a8b38cc63151646ef4278def357fe0b8b22a707b4cea6f4b074a38b77b5a"
+        }
+      ]
+    },
+    "right": {
+      "bytes": 751474,
+      "sha256": "d125ae921b4932fc2e80174da656cdbe104c4d76a8a644706ce33b32fb485ffc",
+      "frames": [
+        {
+          "bounds": [
+            192,
+            81,
+            483,
+            581
+          ],
+          "headBounds": [
+            192,
+            81,
+            478,
+            320
+          ],
+          "hash": "dcff0eff2fbe0173bf65a22d53b546a868d9ee577fb8500fa3920be2de7413ea"
+        },
+        {
+          "bounds": [
+            165,
+            81,
+            451,
+            586
+          ],
+          "headBounds": [
+            165,
+            81,
+            451,
+            320
+          ],
+          "hash": "2d74f013be72e7f4154c64741d735ebc4eae75b74eef35789c6c7d9225ddc2b5"
+        },
+        {
+          "bounds": [
+            192,
+            68,
+            488,
+            564
+          ],
+          "headBounds": [
+            192,
+            68,
+            477,
+            320
+          ],
+          "hash": "d4c50000cab7eb948fd07df3604a23fcab0f8ce9e69a66c9ae3445013891f8d9"
+        },
+        {
+          "bounds": [
+            165,
+            68,
+            451,
+            564
+          ],
+          "headBounds": [
+            165,
+            68,
+            451,
+            320
+          ],
+          "hash": "77b43efb66f44ef0df81a07cceb4182f6e866f51e98f9d2899575c65af00779f"
+        }
+      ]
+    }
+  }
+}

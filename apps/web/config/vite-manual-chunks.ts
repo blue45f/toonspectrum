@@ -122,8 +122,6 @@ export function createStudioManualChunks(predicates: {
       || id.endsWith("/src/domains/creator/studio-background-gradient-color-stops.ts")
       || id.endsWith("/src/domains/creator/studio-characters.ts")
       || id.endsWith("/src/domains/creator/brush/studio-brush-pack-format.ts")
-      || id.endsWith("/src/domains/creator/brush/studio-brush-pack-id.ts")
-      || id.endsWith("/src/domains/creator/brush/studio-brush-selection.ts")
       || id.endsWith("/src/domains/creator/studio-help-center-channel.ts")
       || id.endsWith("/src/domains/creator/studio-inspector-focus.ts")
       || id.endsWith("/src/domains/creator/studio-liquify-contract.ts")
@@ -132,7 +130,6 @@ export function createStudioManualChunks(predicates: {
       || id.endsWith("/src/domains/creator/studio-story-beats.ts")
       || id.endsWith("/src/domains/creator/studio-element-model.ts")
       || id.endsWith("/src/domains/creator/render/studio-raster-image-presentation.ts")
-      || id.endsWith("/src/domains/creator/brush/studio-brush-engine-program-set.ts")
       || id.endsWith("/src/domains/creator/contracts/studio-adjustment-engine-ids.ts")
       || id.endsWith("/src/domains/creator/studio-live-adjustment-status.ts")
       || id.endsWith("/src/domains/creator/render/studio-raster-presentation-cache.ts")
@@ -143,11 +140,11 @@ export function createStudioManualChunks(predicates: {
       // and story-beat helpers are also synchronously needed by StudioPage, so leaving their
       // tiny bodies as separate shared chunks costs launch requests without preserving lazy
       // bytes. Element-model and raster-presentation are dependency-free linked-surface
-      // contracts, and the program-set leaf's owners are a subset of this chunk's owners, so
-      // co-locating them also avoids recursive dependency capture. ColorProofContext keeps its
-      // dialog behind React.lazy, so only the tiny already-eager provider joins this chunk. The
-      // procedural descriptor index is deliberately excluded so its 160 labels/previews stay
-      // behind the full-library and saved-pro-brush dynamic boundaries.
+      // contracts. ColorProofContext keeps its dialog behind React.lazy, so only the tiny
+      // already-eager provider joins this chunk. Connected brush modules such as selection,
+      // pack-id and engine-program-set are deliberately excluded: each owns a substantial
+      // catalogue or material-runtime graph, and naming them here would color that lazy graph
+      // into the app entry's critical precache closure.
       return "studio-core-micro-contracts";
     }
     if (

@@ -1,5 +1,5 @@
 import { CameraOff, MicOff, Network, ShieldCheck, Sparkles, UserRound } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 import Link from "@/shared/navigation/router-link";
 import { Container } from "@/shared/components/section";
@@ -10,6 +10,7 @@ import { cn } from "@/shared/lib/utils";
 import {
   DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
   STUDIO_VIRTUAL_ART_STYLES,
+  studioVirtualArtTextureUrl,
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
 import { STUDIO_CHARACTER_SKINS, studioCharacterSkinForArtStyle } from "./studio-virtual-space-character-skins";
@@ -17,8 +18,10 @@ import {
   STUDIO_VIRTUAL_SPACE_NICKNAME_MAX_GRAPHEMES,
   normalizeStudioVirtualSpaceNickname,
 } from "./studio-virtual-space-entry-preference";
-import { StudioVirtualSpaceRtcPanel } from "./StudioVirtualSpaceRtcPanel";
 import "./studio-virtual-space.css";
+import { createStudioVirtualSpacePanel } from "./StudioVirtualSpaceOnDemandPanel";
+
+const StudioVirtualSpaceRtcPanel = createStudioVirtualSpacePanel(() => import("./StudioVirtualSpaceRtcPanel").then((module) => ({ default: module.StudioVirtualSpaceRtcPanel })));
 
 export type StudioVirtualSpaceEntryVariant = "entry" | "character-onboarding";
 
@@ -28,6 +31,7 @@ export function StudioVirtualSpaceEntryLobby({
   nickname,
   returning,
   projectName,
+  personal = false,
   variant = "entry",
   backHref = "/studio",
   backLabel,
@@ -41,6 +45,7 @@ export function StudioVirtualSpaceEntryLobby({
   readonly nickname: string;
   readonly returning: boolean;
   readonly projectName: string;
+  readonly personal?: boolean;
   readonly variant?: StudioVirtualSpaceEntryVariant;
   readonly backHref?: string;
   readonly backLabel?: string;
@@ -58,11 +63,7 @@ export function StudioVirtualSpaceEntryLobby({
   const selectedCharacter = characterSelected
     ? studioCharacterSkinForArtStyle(STUDIO_CHARACTER_SKINS[avatarIndex]!, artStyle)
     : null;
-  const [advancedOpen, setAdvancedOpen] = useState(() => (
-    typeof window !== "undefined"
-    && typeof window.matchMedia === "function"
-    && window.matchMedia("(min-width: 901px)").matches
-  ));
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const resolvedBackLabel = backLabel ?? (onboarding
     ? bt("홈으로 돌아가기", "Back to home")
     : bt("작업 목록으로", "Back to work list"));
@@ -84,11 +85,14 @@ export function StudioVirtualSpaceEntryLobby({
               "직접 고른 캐릭터는 홈, 프로필, 방문자 목록과 가상스튜디오에서 나를 이어 주는 모습이 됩니다. 나중에도 언제든 변경할 수 있어요.",
               "The character you choose connects your identity across home, profile, visitor lists and the virtual studio. You can change it later.",
             )
-            : bt(
+            : personal ? bt(
+              "나의 아틀리에를 자유롭게 둘러보고 캐릭터와 분위기를 꾸며 보세요. 작품은 준비됐을 때 시작할 수 있어요.",
+              "Explore your atelier and personalize your character and atmosphere. Start a work whenever you are ready.",
+            ) : bt(
               `${projectName} 공간에서 팀원과 이동하고, 대화·검수·화이트보드를 P2P로 함께 사용할 수 있어요.`,
               `Move through ${projectName}, meet teammates and use conversations, reviews and whiteboards over P2P.`,
             )}</p>
-          {!onboarding ? <ul className="studio-vspace-entry-privacy" aria-label={bt("입장 시 기본 상태", "Default state on entry")}>
+          {!onboarding && !personal ? <ul className="studio-vspace-entry-privacy" aria-label={bt("입장 시 기본 상태", "Default state on entry")}>
             <li><MicOff size={16} aria-hidden />{bt("마이크 꺼짐", "Microphone off")}</li>
             <li><CameraOff size={16} aria-hidden />{bt("카메라 꺼짐", "Camera off")}</li>
             <li><Network size={16} aria-hidden />{bt("소규모 협업은 P2P 우선", "Small-group collaboration is P2P-first")}</li>
@@ -143,8 +147,8 @@ export function StudioVirtualSpaceEntryLobby({
 
         {!onboarding ? <details className="studio-vspace-entry-advanced" open={advancedOpen}
           onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}>
-          <summary>{bt("아트 스타일·연결 고급 설정", "Advanced art and connection settings")}</summary>
-          <div className="studio-vspace-entry-advanced-body">
+          <summary>{personal ? bt("아트 스타일 설정", "Art style settings") : bt("아트 스타일·연결 고급 설정", "Advanced art and connection settings")}</summary>
+          {advancedOpen ? <div className="studio-vspace-entry-advanced-body">
             <fieldset className="studio-vspace-entry-art-styles">
               <legend>{bt("아트 스타일", "Art direction")}</legend>
               <p>{bt(
@@ -163,7 +167,8 @@ export function StudioVirtualSpaceEntryLobby({
                     onClick={() => onArtStyle?.(style.key)}
                   >
                     <span className="studio-vspace-entry-art-style-preview" aria-hidden>
-                      <img src={stylePreview.directional.down} alt="" draggable={false} />
+                      <img className="studio-vspace-entry-art-style-world" src={studioVirtualArtTextureUrl(style.key, "world-base")} alt="" draggable={false} />
+                      <img className="studio-vspace-entry-art-style-character" src={stylePreview.directional.down} alt="" draggable={false} />
                       <i />
                     </span>
                     <strong>{bt(style.labelKo, style.labelEn)}</strong>
@@ -172,8 +177,8 @@ export function StudioVirtualSpaceEntryLobby({
                 })}
               </div>
             </fieldset>
-            <StudioVirtualSpaceRtcPanel entryOnly />
-          </div>
+            {!personal ? <Suspense fallback={<p role="status">{bt("연결 설정 불러오는 중…", "Loading connection settings…")}</p>}><StudioVirtualSpaceRtcPanel entryOnly /></Suspense> : null}
+          </div> : null}
         </details> : null}
 
         <div className="studio-vspace-entry-actions">

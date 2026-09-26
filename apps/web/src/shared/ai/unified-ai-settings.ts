@@ -37,6 +37,12 @@ export const DEFAULT_UNIFIED_AI_AUX_SETTINGS: UnifiedAiAuxSettings = Object.free
   creatorRuntimeOwner: "toonstudio-browser",
 });
 
+let volatileLegacyApiKey = "";
+const volatileAuxSecrets = Object.seal({
+  hyper3dApiKey: "",
+  creatorRuntimeToken: "",
+});
+
 /**
  * Legacy settings are retained only for explicit migration. The default no longer points at a
  * paid provider, and all live text completion is delegated to the guarded free-only store.
@@ -95,78 +101,95 @@ export function validateUserAiPath(value: string): string {
 
 export function loadOpenAiCompatibleSettings(): OpenAiCompatibleSettings {
   const storage = sessionStorageOrNull();
-  if (!storage) return { ...DEFAULT_OPENAI_COMPATIBLE_SETTINGS };
+  if (!storage) {
+    return { ...DEFAULT_OPENAI_COMPATIBLE_SETTINGS, apiKey: volatileLegacyApiKey };
+  }
   try {
     const parsed = JSON.parse(
       storage.getItem(STUDIO_AI_SETTINGS_STORAGE_KEY) ?? "null",
     ) as Record<string, unknown> | null;
-    if (!parsed) return { ...DEFAULT_OPENAI_COMPATIBLE_SETTINGS };
+    if (!parsed) {
+      return { ...DEFAULT_OPENAI_COMPATIBLE_SETTINGS, apiKey: volatileLegacyApiKey };
+    }
     const text = (key: keyof OpenAiCompatibleSettings, fallback: string) => (
-      typeof parsed[key] === "string"
-        ? String(parsed[key]).slice(0, key === "apiKey" ? 4096 : 300)
-        : fallback
+      typeof parsed[key] === "string" ? String(parsed[key]).slice(0, 300) : fallback
     );
-    return {
+    volatileLegacyApiKey ||= cleanSecret(parsed.apiKey);
+    const next = {
       baseUrl: text("baseUrl", DEFAULT_OPENAI_COMPATIBLE_SETTINGS.baseUrl),
-      apiKey: cleanSecret(parsed.apiKey),
+      apiKey: volatileLegacyApiKey,
       imageModel: text("imageModel", DEFAULT_OPENAI_COMPATIBLE_SETTINGS.imageModel),
       textModel: text("textModel", DEFAULT_OPENAI_COMPATIBLE_SETTINGS.textModel),
-      imageGenerationPath: text(
-        "imageGenerationPath",
-        DEFAULT_OPENAI_COMPATIBLE_SETTINGS.imageGenerationPath,
-      ),
-      imageEditPath: text(
-        "imageEditPath",
-        DEFAULT_OPENAI_COMPATIBLE_SETTINGS.imageEditPath,
-      ),
-      chatCompletionsPath: text(
-        "chatCompletionsPath",
-        DEFAULT_OPENAI_COMPATIBLE_SETTINGS.chatCompletionsPath,
-      ),
+      imageGenerationPath: text("imageGenerationPath", DEFAULT_OPENAI_COMPATIBLE_SETTINGS.imageGenerationPath),
+      imageEditPath: text("imageEditPath", DEFAULT_OPENAI_COMPATIBLE_SETTINGS.imageEditPath),
+      chatCompletionsPath: text("chatCompletionsPath", DEFAULT_OPENAI_COMPATIBLE_SETTINGS.chatCompletionsPath),
     };
+    storage.setItem(STUDIO_AI_SETTINGS_STORAGE_KEY, JSON.stringify({ ...next, apiKey: "" }));
+    return next;
   } catch {
-    return { ...DEFAULT_OPENAI_COMPATIBLE_SETTINGS };
+    return { ...DEFAULT_OPENAI_COMPATIBLE_SETTINGS, apiKey: volatileLegacyApiKey };
   }
 }
 
 export function saveOpenAiCompatibleSettings(value: OpenAiCompatibleSettings): void {
-  const storage = sessionStorageOrNull();
-  if (!storage) return;
-  const normalized = {
+  volatileLegacyApiKey = cleanSecret(value.apiKey);
+  const normalized: OpenAiCompatibleSettings = {
     ...value,
     baseUrl: validateUserAiBaseUrl(value.baseUrl),
-    apiKey: cleanSecret(value.apiKey),
+    apiKey: volatileLegacyApiKey,
     imageGenerationPath: validateUserAiPath(value.imageGenerationPath),
     imageEditPath: validateUserAiPath(value.imageEditPath),
     chatCompletionsPath: validateUserAiPath(value.chatCompletionsPath),
   };
-  storage.setItem(STUDIO_AI_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
+  sessionStorageOrNull()?.setItem(
+    STUDIO_AI_SETTINGS_STORAGE_KEY,
+    JSON.stringify({ ...normalized, apiKey: "" }),
+  );
 }
 
 function readAux(): UnifiedAiAuxSettings {
   const storage = sessionStorageOrNull();
-  if (!storage) return { ...DEFAULT_UNIFIED_AI_AUX_SETTINGS };
+  if (!storage) {
+    return {
+      ...DEFAULT_UNIFIED_AI_AUX_SETTINGS,
+      ...volatileAuxSecrets,
+    };
+  }
   try {
     const value = JSON.parse(
       storage.getItem(UNIFIED_AI_AUX_STORAGE_KEY) ?? "null",
     ) as Record<string, unknown> | null;
     if (!value || value.version !== 1) {
-      return { ...DEFAULT_UNIFIED_AI_AUX_SETTINGS };
+      return {
+        ...DEFAULT_UNIFIED_AI_AUX_SETTINGS,
+        ...volatileAuxSecrets,
+      };
     }
+    volatileAuxSecrets.hyper3dApiKey ||= cleanSecret(value.hyper3dApiKey);
+    volatileAuxSecrets.creatorRuntimeToken ||= cleanSecret(value.creatorRuntimeToken);
+    const creatorRuntimeBaseUrl = typeof value.creatorRuntimeBaseUrl === "string"
+      ? value.creatorRuntimeBaseUrl.slice(0, 300)
+      : "";
+    const creatorRuntimeOwner = typeof value.creatorRuntimeOwner === "string"
+      && /^[A-Za-z0-9_:@.-]{1,128}$/u.test(value.creatorRuntimeOwner)
+      ? value.creatorRuntimeOwner
+      : DEFAULT_UNIFIED_AI_AUX_SETTINGS.creatorRuntimeOwner;
+    storage.setItem(UNIFIED_AI_AUX_STORAGE_KEY, JSON.stringify({
+      version: 1,
+      creatorRuntimeBaseUrl,
+      creatorRuntimeOwner,
+    }));
     return {
       version: 1,
-      hyper3dApiKey: cleanSecret(value.hyper3dApiKey),
-      creatorRuntimeBaseUrl: typeof value.creatorRuntimeBaseUrl === "string"
-        ? value.creatorRuntimeBaseUrl.slice(0, 300)
-        : "",
-      creatorRuntimeToken: cleanSecret(value.creatorRuntimeToken),
-      creatorRuntimeOwner: typeof value.creatorRuntimeOwner === "string"
-        && /^[A-Za-z0-9_:@.-]{1,128}$/u.test(value.creatorRuntimeOwner)
-        ? value.creatorRuntimeOwner
-        : DEFAULT_UNIFIED_AI_AUX_SETTINGS.creatorRuntimeOwner,
+      ...volatileAuxSecrets,
+      creatorRuntimeBaseUrl,
+      creatorRuntimeOwner,
     };
   } catch {
-    return { ...DEFAULT_UNIFIED_AI_AUX_SETTINGS };
+    return {
+      ...DEFAULT_UNIFIED_AI_AUX_SETTINGS,
+      ...volatileAuxSecrets,
+    };
   }
 }
 
@@ -197,36 +220,65 @@ export function useUnifiedAiAuxSettings(): AuxSnapshot {
   );
 }
 
+function publishAux(settings: UnifiedAiAuxSettings): void {
+  snapshot = Object.freeze({
+    revision: snapshot.revision + 1,
+    settings: Object.freeze(settings),
+  });
+  listeners.forEach((listener) => listener());
+}
+
 export function saveUnifiedAiAuxSettings(value: UnifiedAiAuxSettings): void {
+  volatileAuxSecrets.hyper3dApiKey = cleanSecret(value.hyper3dApiKey);
+  volatileAuxSecrets.creatorRuntimeToken = cleanSecret(value.creatorRuntimeToken);
   const next: UnifiedAiAuxSettings = {
     version: 1,
-    hyper3dApiKey: cleanSecret(value.hyper3dApiKey),
+    ...volatileAuxSecrets,
     creatorRuntimeBaseUrl: value.creatorRuntimeBaseUrl.trim()
       ? validateUserAiBaseUrl(value.creatorRuntimeBaseUrl, false)
       : "",
-    creatorRuntimeToken: cleanSecret(value.creatorRuntimeToken),
     creatorRuntimeOwner: /^[A-Za-z0-9_:@.-]{1,128}$/u.test(
       value.creatorRuntimeOwner.trim(),
     )
       ? value.creatorRuntimeOwner.trim()
       : DEFAULT_UNIFIED_AI_AUX_SETTINGS.creatorRuntimeOwner,
   };
-  sessionStorageOrNull()?.setItem(UNIFIED_AI_AUX_STORAGE_KEY, JSON.stringify(next));
-  snapshot = Object.freeze({
-    revision: snapshot.revision + 1,
-    settings: Object.freeze(next),
+  sessionStorageOrNull()?.setItem(UNIFIED_AI_AUX_STORAGE_KEY, JSON.stringify({
+    version: 1,
+    creatorRuntimeBaseUrl: next.creatorRuntimeBaseUrl,
+    creatorRuntimeOwner: next.creatorRuntimeOwner,
+  }));
+  publishAux(next);
+}
+
+export function lockUnifiedAiAuxSecrets(): void {
+  volatileLegacyApiKey = "";
+  volatileAuxSecrets.hyper3dApiKey = "";
+  volatileAuxSecrets.creatorRuntimeToken = "";
+  const current = snapshot.settings;
+  sessionStorageOrNull()?.setItem(STUDIO_AI_SETTINGS_STORAGE_KEY, JSON.stringify({
+    ...loadOpenAiCompatibleSettings(),
+    apiKey: "",
+  }));
+  publishAux({
+    ...current,
+    hyper3dApiKey: "",
+    creatorRuntimeToken: "",
   });
-  listeners.forEach((listener) => listener());
 }
 
 export function clearUnifiedAiSecrets(): void {
+  volatileLegacyApiKey = "";
+  volatileAuxSecrets.hyper3dApiKey = "";
+  volatileAuxSecrets.creatorRuntimeToken = "";
   sessionStorageOrNull()?.removeItem(STUDIO_AI_SETTINGS_STORAGE_KEY);
   sessionStorageOrNull()?.removeItem(UNIFIED_AI_AUX_STORAGE_KEY);
-  snapshot = Object.freeze({
-    revision: snapshot.revision + 1,
-    settings: Object.freeze({ ...DEFAULT_UNIFIED_AI_AUX_SETTINGS }),
-  });
-  listeners.forEach((listener) => listener());
+  publishAux({ ...DEFAULT_UNIFIED_AI_AUX_SETTINGS });
+}
+
+if (typeof globalThis.addEventListener === "function") {
+  globalThis.addEventListener("pagehide", lockUnifiedAiAuxSecrets);
+  globalThis.addEventListener("toonspectrum:session-ended", lockUnifiedAiAuxSecrets);
 }
 
 export type UserTextResult =

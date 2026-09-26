@@ -50,6 +50,9 @@ export interface Studio3dGenerationStatus {
   readonly provider: string;
   readonly modes: readonly Studio3dGenerationMode[];
   readonly apiKeyExposedToClient: false;
+  readonly inputTransport: "inline-json";
+  readonly maxInlineInputBytes: number;
+  readonly largerInputsRequireObjectStorage: true;
 }
 export interface Studio3dGenerationClientOptions {
   readonly baseUrl?: string;
@@ -57,6 +60,7 @@ export interface Studio3dGenerationClientOptions {
   readonly fetchImpl?: typeof fetch;
   readonly providerApiKey?: () => string | undefined;
 }
+export const STUDIO_3D_INLINE_INPUT_MAX_BYTES = 10 * 1024 * 1024;
 const MAX_ARTIFACT_BYTES = 200 * 1024 * 1024;
 const MAX_JSON_BYTES = 4 * 1024 * 1024;
 const MODES = new Set(["text-to-3d", "image-to-3d", "multiview-to-3d", "texture-only"]);
@@ -185,12 +189,21 @@ export class Studio3dGenerationHttpClient {
     const response = await this.#fetch(`${this.#baseUrl}/status`, { headers: requestHeaders(this.options), credentials: "include", signal });
     const status = await responseJson(response, signal);
     if (!object(status) || typeof status.configured !== "boolean" || typeof status.durable !== "boolean"
-      || typeof status.provider !== "string" || status.apiKeyExposedToClient !== false || !Array.isArray(status.modes)
+      || typeof status.provider !== "string" || status.apiKeyExposedToClient !== false
+      || status.inputTransport !== "inline-json" || status.maxInlineInputBytes !== STUDIO_3D_INLINE_INPUT_MAX_BYTES
+      || status.largerInputsRequireObjectStorage !== true || !Array.isArray(status.modes)
       || !status.modes.every((mode) => typeof mode === "string" && MODES.has(mode))) invalidResponse();
     return status as unknown as Studio3dGenerationStatus;
   }
   async create(input: Studio3dGenerationCreateInput, idempotencyKey: string, signal?: AbortSignal): Promise<Studio3dGenerationJob> {
     if (!idempotencyKey.trim()) throw new TypeError("중복 생성을 막기 위한 요청 ID가 필요해요.");
+    const encodedCharacters = (input.images ?? []).reduce(
+      (total, item) => total + item.dataBase64.length,
+      input.model?.dataBase64.length ?? 0,
+    );
+    if (encodedCharacters > Math.ceil(STUDIO_3D_INLINE_INPUT_MAX_BYTES * 4 / 3) + 128) {
+      throw new RangeError("현재 3D 요청은 입력 파일 합계 10MB까지 지원해요. 더 큰 자산은 객체 저장소 업로드가 필요합니다.");
+    }
     const response = await this.#fetch(`${this.#baseUrl}/jobs`, { method: "POST", headers: requestHeaders(this.options, idempotencyKey), credentials: "include", body: JSON.stringify(input), signal });
     return this.#remember(await responseJson(response, signal));
   }

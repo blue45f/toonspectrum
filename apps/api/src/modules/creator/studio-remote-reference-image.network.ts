@@ -113,6 +113,8 @@ export interface StudioRemoteReferenceHttpRequester {
     readonly url: URL;
     readonly endpoint: StudioRemoteReferenceResolvedAddress;
     readonly signal: AbortSignal;
+    readonly accept?: string;
+    readonly userAgent?: string;
   }): Promise<StudioRemoteReferenceHttpResponse>;
 }
 
@@ -242,10 +244,14 @@ implements StudioRemoteReferenceHttpRequester {
     url,
     endpoint,
     signal,
+    accept,
+    userAgent,
   }: {
     readonly url: URL;
     readonly endpoint: StudioRemoteReferenceResolvedAddress;
     readonly signal: AbortSignal;
+    readonly accept?: string;
+    readonly userAgent?: string;
   }): Promise<StudioRemoteReferenceHttpResponse> {
     return new Promise<StudioRemoteReferenceHttpResponse>((resolve, reject) => {
       const request = url.protocol === "https:" ? requestHttps : requestHttp;
@@ -261,10 +267,10 @@ implements StudioRemoteReferenceHttpRequester {
         setHost: true,
         signal,
         headers: {
-          Accept: "image/png,image/jpeg,image/webp,image/gif;q=0.9",
+          Accept: accept ?? "image/png,image/jpeg,image/webp,image/gif;q=0.9",
           "Accept-Encoding": "identity",
           Connection: "close",
-          "User-Agent": "ToonSpectrum-RemoteReference/1.0",
+          "User-Agent": userAgent ?? "ToonSpectrum-RemoteReference/1.0",
         },
       }, (response) => {
         resolve({

@@ -38,7 +38,7 @@ const STATES = new Set(["queued", "running", "succeeded", "failed", "cancelled",
 function object(value: unknown): value is Record<string, unknown> { return Boolean(value && typeof value === "object" && !Array.isArray(value)); }
 function connection() {
   const settings = getUnifiedAiAuxSettings();
-  if (!settings.creatorRuntimeBaseUrl || !settings.creatorRuntimeToken) throw new Error("통합 AI 설정에서 관리형 클라우드 Creator Runtime 주소와 토큰을 등록하세요.");
+  if (!settings.creatorRuntimeBaseUrl || !settings.creatorRuntimeToken) throw new Error("통합 AI 설정에서 외부 Creator Runtime 주소와 토큰을 등록하세요.");
   return { base: validateUserAiBaseUrl(settings.creatorRuntimeBaseUrl, false), token: settings.creatorRuntimeToken, owner: settings.creatorRuntimeOwner };
 }
 async function boundedBytes(response: Response, maximum: number): Promise<Uint8Array> {

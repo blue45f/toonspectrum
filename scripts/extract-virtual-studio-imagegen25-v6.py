@@ -117,8 +117,13 @@ def build_district_previews(world: Image.Image) -> Image.Image:
     return sheet
 
 
-def character_frame(board: Image.Image, center: tuple[int, int]) -> Image.Image:
-    return fit(crop(board, center, 43, 48), (160, 160), 8, pixel=True)
+def character_frame(
+    board: Image.Image,
+    center: tuple[int, int],
+    width: int = 43,
+    height: int = 48,
+) -> Image.Image:
+    return fit(crop(board, center, width, height), (160, 160), 8, pixel=True)
 
 
 def animated_strip(frame: Image.Image, action: str) -> Image.Image:
@@ -137,30 +142,42 @@ def animated_strip(frame: Image.Image, action: str) -> Image.Image:
 
 
 def build_character_pack(board: Image.Image) -> list[Path]:
-    # The concept sheet contains several identities beside a direction legend. Runtime movement
-    # must never swap identities, so one generated character remains stable in every direction.
-    base = character_frame(board, (47, 854))
-    frames = {
-        "down": base,
-        "left": ImageOps.mirror(base),
-        "right": base,
-        "up": base,
+    # The ImageGen board includes a labelled four-direction example. Earlier extraction reused
+    # one front frame for three directions, which made movement look like a sliding sticker.
+    # Use the authored direction cells and the matching seated/action row instead.
+    direction_centers = {
+        "down": (210, 916),
+        "left": (246, 854),
+        "right": (282, 854),
+        "up": (316, 854),
     }
+    action_centers = {
+        "down": (210, 916),
+        "left": (246, 916),
+        "right": (282, 916),
+        "up": (316, 854),
+    }
+    frames = {facing: character_frame(board, center, 34, 48) for facing, center in direction_centers.items()}
+    action_frames = {facing: character_frame(board, center, 34, 48) for facing, center in action_centers.items()}
     files: list[Path] = []
     for facing, frame in frames.items():
         target = CHARACTER / f"player-imagegen25-direction-{facing}.webp"
         save(frame, target, lossless=True); files.append(target)
         for action in ("walk", "talk", "draw", "review"):
+            action_frame = action_frames[facing] if action in {"draw", "review"} else frame
             target = CHARACTER / f"player-imagegen25-{action}-{facing}.webp"
-            strip = animated_strip(frame, action)
+            strip = animated_strip(action_frame, action)
             save(strip, target, lossless=True); files.append(target)
             if facing == "down" and action != "walk":
                 state = CHARACTER / f"player-imagegen25-state-{action}.webp"
                 save(strip.crop((0, 0, 160, 160)), state, lossless=True); files.append(state)
-    pose = Image.new("RGBA", (640, 160), (0, 0, 0, 0))
+
+    wave = Image.new("RGBA", (640, 160), (0, 0, 0, 0))
+    sit = Image.new("RGBA", (640, 160), (0, 0, 0, 0))
     for index, facing in enumerate(("down", "right", "left", "up")):
-        pose.alpha_composite(frames[facing], (index * 160, 0))
-    for name in ("wave", "sit"):
+        wave.alpha_composite(frames[facing], (index * 160, -2 if index % 2 else 0))
+        sit.alpha_composite(action_frames[facing], (index * 160, 2))
+    for name, pose in (("wave", wave), ("sit", sit)):
         target = CHARACTER / f"player-imagegen25-{name}.webp"
         save(pose, target, lossless=True); files.append(target)
 

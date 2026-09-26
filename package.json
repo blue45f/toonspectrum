@@ -241,8 +241,10 @@
     "studio:virtual-art-v6:generate": "python3 scripts/generate-virtual-studio-living-town-v6.py",
     "studio:scene-assistant-art:generate": "python3 scripts/generate-studio-scene-assistant-art.py",
     "verify:studio-scene-assistant-art": "python3 scripts/generate-studio-scene-assistant-art.py --check",
-    "test:studio-virtual-art": "node --test scripts/verify-virtual-studio-art-manifest.test.mjs scripts/verify-virtual-studio-v3-art.test.mjs scripts/verify-virtual-studio-v4-art.test.mjs scripts/verify-virtual-studio-v5-art.test.mjs scripts/verify-virtual-studio-living-town-v6.test.mjs",
-    "verify:studio-virtual-art": "node scripts/verify-virtual-studio-art-manifest.mjs && node scripts/verify-virtual-studio-v3-art.mjs && node scripts/verify-virtual-studio-v4-art.mjs && node scripts/verify-virtual-studio-v5-art.mjs && node scripts/verify-virtual-studio-living-town-v6.mjs",
+    "studio:virtual-art-v7:generate": "python3 scripts/generate-virtual-studio-imagegen25-v7.py",
+    "test:studio-virtual-art": "node --test scripts/verify-virtual-studio-art-manifest.test.mjs scripts/verify-virtual-studio-v3-art.test.mjs scripts/verify-virtual-studio-v4-art.test.mjs scripts/verify-virtual-studio-v5-art.test.mjs scripts/verify-virtual-studio-living-town-v6.test.mjs scripts/verify-virtual-studio-imagegen25-v7.test.mjs scripts/verify-virtual-studio-world-v2-art.test.mjs",
+    "verify:studio-virtual-art": "node scripts/verify-virtual-studio-art-manifest.mjs && node scripts/verify-virtual-studio-v3-art.mjs && node scripts/verify-virtual-studio-v4-art.mjs && node scripts/verify-virtual-studio-v5-art.mjs && node scripts/verify-virtual-studio-living-town-v6.mjs && node scripts/verify-virtual-studio-imagegen25-v7.mjs && node scripts/verify-virtual-studio-world-v2-art.mjs",
+    "verify:studio-virtual-tiles": "node scripts/verify-virtual-studio-tile-world.mjs",
     "verify:studio-3d-specialists": "vitest run apps/web/src/domains/creator/scene3d/specialists",
     "verify:studio-3d-specialists:browser": "node scripts/verify-studio-scene3d-specialists.mjs",
     "verify:studio-3d-inplace": "vitest run apps/web/src/domains/creator/bg3d/StudioBg3dProSuitePanel.test.tsx apps/web/src/domains/creator/scene3d/integration/scene3d-derivative-admission.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-meshopt.test.ts apps/web/src/domains/creator/scene3d/integration/scene3d-inplace-controller.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-inplace-storage.test.ts apps/web/src/domains/creator/scene3d/specialists/StudioScene3dAssetToolsPanel.test.tsx apps/web/src/domains/creator/bg3d/studio-bg3d-libraries-sqlite-opfs.test.ts apps/web/src/domains/creator/bg3d/studio-bg3d-history-command-adapter.test.ts apps/web/src/domains/creator/bg3d/useStudioBg3dCanonicalDocumentState.test.tsx",
@@ -270,7 +272,8 @@
     "typecheck:cloudflare-analytics": "tsc -p deploy/cloudflare-analytics/tsconfig.json",
     "verify:cloudflare-analytics": "pnpm run typecheck:cloudflare-analytics && pnpm run test:cloudflare-analytics && node scripts/deploy-cloudflare-analytics.mjs --dry-run",
     "cloudflare:analytics:dry-run": "node scripts/deploy-cloudflare-analytics.mjs --dry-run",
-    "cloudflare:analytics:deploy": "node scripts/deploy-cloudflare-analytics.mjs --production"
+    "cloudflare:analytics:deploy": "node scripts/deploy-cloudflare-analytics.mjs --production",
+    "verify:ai-provider-status-canary": "tsx scripts/verify-ai-provider-status-canary.mts"
   },
   "dependencies": {
     "@automerge/automerge": "3.5.0",

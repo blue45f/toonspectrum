@@ -41,7 +41,8 @@ export async function prepareStudioWorldAssets(publication: StudioWorldPublicati
   const urls = new Map<string, string>(); let disposed = false;
   const budget = { bytes: 0 };
   const dispose = () => { if (!disposed) { disposed = true; for (const url of urls.values()) deps.revokeUrl(url); } };
-  const queue = [...new Set([publication.manifest.backgroundUrl, ...publication.manifest.props.flatMap((prop) => prop.assetUrl ? [prop.assetUrl] : [])])];
+  const queue = [...new Set([publication.manifest.backgroundUrl, ...publication.manifest.props.flatMap((prop) => prop.assetUrl ? [prop.assetUrl] : []),
+    ...(publication.manifest.tilemap?.tilesets.map((set) => set.imageUrl) ?? [])])];
   try {
     if (!studioWorldManifestSchema.safeParse(publication.manifest).success) throw new StudioWorldPublicationError("invalid-world");
     // Bound concurrent decoders, without lowering source resolution or skipping props.

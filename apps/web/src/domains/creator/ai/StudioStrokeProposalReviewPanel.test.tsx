@@ -68,7 +68,7 @@ describe("StudioStrokeProposalReviewPanel", () => {
         onCancel={vi.fn()}
       />,
     );
-    expect(screen.getByRole("region", { name: "AI 획 제안 검토" })).not.toBeNull();
+    expect(screen.getByRole("region", { name: "스마트 획 보정 검토" })).not.toBeNull();
     expect(screen.getByRole("img", { name: /1개 제안 획/u })).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "선택 획 적용" }));
     expect(onApply).toHaveBeenCalledTimes(1);

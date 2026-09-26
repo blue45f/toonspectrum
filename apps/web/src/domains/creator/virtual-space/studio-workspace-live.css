@@ -107,3 +107,25 @@
  .studio-vspace-stage[data-control-mode=tap] .studio-vspace-touch-action{left:50%!important;right:auto!important;bottom:5.25rem!important;translate:-50% 0;max-width:13rem}
  .studio-vspace-joystick[data-mode=floating]{width:8rem;height:8rem;border-style:dashed;background:color-mix(in srgb,var(--color-panel) 62%,transparent)}
 }
+
+/* ImageGen 2.5 art-direction cards replace palette-only chips. */
+.studio-vspace-art-style-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:.5rem!important}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button{position:relative;display:grid;min-width:0;min-height:5.3rem;align-content:end;overflow:hidden;border:1px solid var(--color-line);border-radius:.85rem;padding:0;background:#121722;color:#fff;text-align:left}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(.9) brightness(.78);transition:transform .25s,filter .25s}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button:hover>img,.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button[aria-pressed=true]>img{transform:scale(1.05);filter:saturate(1.08) brightness(.9)}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button>small{position:relative;z-index:1;display:block;width:100%;padding:.75rem .55rem .48rem;background:linear-gradient(180deg,transparent,rgb(4 7 14/.88));color:#fff;font-size:.6rem;font-weight:900;text-shadow:0 1px 4px rgb(0 0 0/.8)}
+.studio-vspace-art-style-picker .studio-vspace-art-style-grid>button[aria-pressed=true]{border-color:var(--color-accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--color-accent) 18%,transparent)}
+@media(max-width:520px){.studio-vspace-art-style-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+
+/* Entry cards show each complete world pack rather than a character-only swatch. */
+.studio-vspace-entry-art-style-preview .studio-vspace-entry-art-style-world{position:absolute;inset:0;z-index:0;width:100%;height:100%;max-width:none;object-fit:cover;object-position:center;filter:saturate(.94) brightness(.84);transform:none}
+.studio-vspace-entry-art-style-preview .studio-vspace-entry-art-style-character{position:relative;z-index:2;height:88%;max-width:58%;margin-inline:auto;object-fit:contain;object-position:bottom;filter:drop-shadow(0 7px 7px rgb(0 0 0/.48))}
+.studio-vspace-entry-art-style-preview::after{content:"";position:absolute;inset:35% 0 0;z-index:1;background:linear-gradient(180deg,transparent,rgb(4 7 16/.34));pointer-events:none}
+
+/* The former all-in-one customization drawer is split into four focused work areas. */
+.studio-space-section-tabs{position:sticky;top:-1px;z-index:8;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 14px;padding:8px;border:1px solid color-mix(in srgb,var(--color-line) 82%,transparent);border-radius:14px;background:color-mix(in srgb,var(--color-panel) 92%,transparent);box-shadow:0 10px 26px rgb(0 0 0/.2);backdrop-filter:blur(16px)}
+.studio-space-section-tabs button{display:flex;align-items:center;justify-content:center;min-width:0;min-height:38px;padding:7px 8px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--color-fg-3);font-size:11px;font-weight:900;white-space:nowrap;transition:border-color .18s,background .18s,color .18s,transform .18s}
+.studio-space-section-tabs button:hover{border-color:color-mix(in srgb,var(--color-accent) 28%,var(--color-line));color:var(--color-fg);transform:translateY(-1px)}
+.studio-space-section-tabs button[aria-pressed=true]{border-color:color-mix(in srgb,var(--color-accent) 58%,white);background:var(--color-accent-soft);color:var(--color-accent);box-shadow:inset 0 1px rgb(255 255 255/.08)}
+@media(max-width:520px){.studio-space-section-tabs{gap:4px;padding:6px}.studio-space-section-tabs button{min-height:40px;padding:6px 4px;font-size:10px}}
+@media(prefers-reduced-motion:reduce){.studio-space-section-tabs button{transition:none}}

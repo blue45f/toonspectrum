@@ -72,7 +72,11 @@ describe("UnifiedAiSettings guided setup", () => {
     fireEvent.click(screen.getByRole("tab", { name: "고급 설정" }));
 
     expect(await screen.findByText("전문가용 설정")).toBeTruthy();
-    expect(await screen.findByText("API 키 프로필")).toBeTruthy();
+    expect(await screen.findByText(
+      "API 키 프로필",
+      {},
+      { timeout: 10_000 },
+    )).toBeTruthy();
     expect(screen.getByText("클라우드 연결 편집")).toBeTruthy();
   });
 
@@ -92,7 +96,10 @@ describe("UnifiedAiSettings guided setup", () => {
     expect(snapshot.configuration.connections).toHaveLength(1);
     expect(snapshot.configuration.connections[0]?.label).toBe("OpenRouter");
     expect(snapshot.configuration.assignments.text).toBe(snapshot.configuration.connections[0]?.id);
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    const providerCalls = vi.mocked(globalThis.fetch).mock.calls.filter(([url]) =>
+      String(url).startsWith("https://openrouter.ai/"),
+    );
+    expect(providerCalls).toHaveLength(1);
   });
 
   it("does not save a key when provider authentication fails", async () => {

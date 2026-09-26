@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import { studioWorldTilemapSchema } from "./world-tilemap";
+
+export { studioWorldTilemapSchema, studioWorldTilesetSchema, studioWorldTileLayerSchema, studioWorldWangSetSchema, studioWorldWangColorSchema, decodeStudioWorldTileGid, STUDIO_WORLD_TILEMAP_MAX_CELLS, STUDIO_WORLD_TILEMAP_MAX_TEXTURE_PIXELS, STUDIO_WORLD_TILE_GID_MASK, STUDIO_WORLD_TILEMAP_MAX_WANG_TILES } from "./world-tilemap";
+export type { StudioWorldTilemap, StudioWorldTileset, StudioWorldTileLayer, StudioWorldWangSet, StudioWorldWangColor } from "./world-tilemap";
+
 /** This graph-asset namespace is written only by the authenticated publication endpoint. */
 export const STUDIO_WORLD_ARTIFACT_PREFIX = "studio-world-";
 
@@ -58,6 +63,7 @@ export type StudioWorldInteractionRule = z.infer<typeof studioWorldInteractionRu
 export const studioWorldManifestSchema = z.object({
   id, version: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), width: z.number().int().min(32).max(10000), height: z.number().int().min(32).max(10000),
   backgroundAssetKey: id, backgroundUrl: assetUrl,
+  tilemap: studioWorldTilemapSchema.optional(),
   assetIntegrity: z.array(studioWorldAssetIntegritySchema).min(1).max(64).optional(),
   interactionRules: z.array(studioWorldInteractionRuleSchema).max(32).optional(),
   rooms: z.array(room).min(1).max(4096), props: z.array(prop).max(4096), colliders: z.array(rect).max(4096),
@@ -72,8 +78,9 @@ export const studioWorldManifestSchema = z.object({
   acousticZones: z.array(acousticZone).max(64).optional(),
 }).strict().superRefine((world, ctx) => {
   const fail = (message: string) => ctx.addIssue({ code: "custom", message });
+  if (world.tilemap && (world.tilemap.width * world.tilemap.tileWidth !== world.width || world.tilemap.height * world.tilemap.tileHeight !== world.height)) fail("Tilemap dimensions must match world bounds");
   if (world.assetIntegrity) {
-    const required = new Set([world.backgroundUrl, ...world.props.flatMap((item) => item.assetUrl ? [item.assetUrl] : [])]);
+    const required = new Set([world.backgroundUrl, ...world.props.flatMap((item) => item.assetUrl ? [item.assetUrl] : []), ...(world.tilemap?.tilesets.map((set) => set.imageUrl) ?? [])]);
     const received = new Set(world.assetIntegrity.map((item) => item.url));
     if (required.size !== received.size || received.size !== world.assetIntegrity.length
       || [...required].some((url) => !received.has(url))) fail("Asset integrity must cover each referenced image exactly once");

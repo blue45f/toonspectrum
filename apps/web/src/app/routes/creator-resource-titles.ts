@@ -64,7 +64,7 @@ export const CREATOR_RESOURCE_TITLES: Record<string, string> = {
   "/studio/3d/dcc/model": "3D 모델링",
   "/studio/3d/dcc/sculpt": "3D 조형",
   "/studio/3d/dcc/shot": "컷·선화",
-  "/studio/ai-lab": "AI 실험실",
+  "/studio/ai-lab": "외부 AI Runtime · 개발자 프리뷰",
   "/insights/resources": "공식 자료·API 안내",
   "/about/data": "데이터 출처·상업 이용 준비",
   "/about/crawler": "공개 데이터 수집 정책",

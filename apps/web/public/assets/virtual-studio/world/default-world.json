@@ -11,7 +11,7 @@
   "version": "1.10",
   "tiledversion": "1.11.2",
   "nextlayerid": 13,
-  "nextobjectid": 211,
+  "nextobjectid": 223,
   "properties": [
     {
       "name": "backgroundUrl",
@@ -2884,7 +2884,140 @@
       "draworder": "topdown",
       "x": 0,
       "y": 0,
-      "objects": []
+      "objects": [
+        {
+          "id": 130,
+          "name": "story-gate",
+          "type": "",
+          "x": 720,
+          "y": 900,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "targetRoomId",
+              "type": "string",
+              "value": "writers"
+            },
+            {
+              "name": "targetX",
+              "type": "float",
+              "value": 290
+            },
+            {
+              "name": "targetY",
+              "type": "float",
+              "value": 485
+            }
+          ]
+        },
+        {
+          "id": 131,
+          "name": "atelier-gate",
+          "type": "",
+          "x": 840,
+          "y": 900,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "targetRoomId",
+              "type": "string",
+              "value": "drawing"
+            },
+            {
+              "name": "targetX",
+              "type": "float",
+              "value": 610
+            },
+            {
+              "name": "targetY",
+              "type": "float",
+              "value": 485
+            }
+          ]
+        },
+        {
+          "id": 132,
+          "name": "review-gate",
+          "type": "",
+          "x": 760,
+          "y": 850,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "targetRoomId",
+              "type": "string",
+              "value": "review"
+            },
+            {
+              "name": "targetX",
+              "type": "float",
+              "value": 935
+            },
+            {
+              "name": "targetY",
+              "type": "float",
+              "value": 485
+            }
+          ]
+        },
+        {
+          "id": 133,
+          "name": "production-gate",
+          "type": "",
+          "x": 780,
+          "y": 760,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "radius",
+              "type": "float",
+              "value": 18
+            },
+            {
+              "name": "targetRoomId",
+              "type": "string",
+              "value": "production"
+            },
+            {
+              "name": "targetX",
+              "type": "float",
+              "value": 920
+            },
+            {
+              "name": "targetY",
+              "type": "float",
+              "value": 205
+            }
+          ]
+        }
+      ]
     },
     {
       "id": 7,
@@ -2897,7 +3030,7 @@
       "y": 0,
       "objects": [
         {
-          "id": 130,
+          "id": 134,
           "name": "main",
           "type": "",
           "x": 780,
@@ -2915,7 +3048,7 @@
           ]
         },
         {
-          "id": 131,
+          "id": 135,
           "name": "lobby",
           "type": "",
           "x": 780,
@@ -2933,7 +3066,7 @@
           ]
         },
         {
-          "id": 132,
+          "id": 136,
           "name": "teams",
           "type": "",
           "x": 300,
@@ -2951,7 +3084,7 @@
           ]
         },
         {
-          "id": 133,
+          "id": 137,
           "name": "lounge",
           "type": "",
           "x": 590,
@@ -2969,7 +3102,7 @@
           ]
         },
         {
-          "id": 134,
+          "id": 138,
           "name": "live",
           "type": "",
           "x": 900,
@@ -2987,7 +3120,7 @@
           ]
         },
         {
-          "id": 135,
+          "id": 139,
           "name": "meeting",
           "type": "",
           "x": 1200,
@@ -3005,7 +3138,7 @@
           ]
         },
         {
-          "id": 136,
+          "id": 140,
           "name": "assistant",
           "type": "",
           "x": 590,
@@ -3023,7 +3156,7 @@
           ]
         },
         {
-          "id": 137,
+          "id": 141,
           "name": "writers",
           "type": "",
           "x": 290,
@@ -3041,7 +3174,7 @@
           ]
         },
         {
-          "id": 138,
+          "id": 142,
           "name": "drawing",
           "type": "",
           "x": 610,
@@ -3059,7 +3192,7 @@
           ]
         },
         {
-          "id": 139,
+          "id": 143,
           "name": "review",
           "type": "",
           "x": 935,
@@ -3077,7 +3210,7 @@
           ]
         },
         {
-          "id": 140,
+          "id": 144,
           "name": "quality",
           "type": "",
           "x": 1210,
@@ -3095,7 +3228,7 @@
           ]
         },
         {
-          "id": 141,
+          "id": 145,
           "name": "assets",
           "type": "",
           "x": 290,
@@ -3113,7 +3246,7 @@
           ]
         },
         {
-          "id": 142,
+          "id": 146,
           "name": "storyboard",
           "type": "",
           "x": 590,
@@ -3131,7 +3264,7 @@
           ]
         },
         {
-          "id": 143,
+          "id": 147,
           "name": "production",
           "type": "",
           "x": 920,
@@ -3149,7 +3282,7 @@
           ]
         },
         {
-          "id": 144,
+          "id": 148,
           "name": "release",
           "type": "",
           "x": 1210,
@@ -3177,7 +3310,296 @@
       "draworder": "topdown",
       "x": 0,
       "y": 0,
-      "objects": []
+      "objects": [
+        {
+          "id": 149,
+          "name": "assets-roof",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "depth",
+              "type": "float",
+              "value": 1350
+            }
+          ],
+          "polygon": [
+            {
+              "x": 40,
+              "y": 40
+            },
+            {
+              "x": 310,
+              "y": 40
+            },
+            {
+              "x": 310,
+              "y": 135
+            },
+            {
+              "x": 40,
+              "y": 135
+            }
+          ]
+        },
+        {
+          "id": 150,
+          "name": "storyboard-roof",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "depth",
+              "type": "float",
+              "value": 1350
+            }
+          ],
+          "polygon": [
+            {
+              "x": 340,
+              "y": 40
+            },
+            {
+              "x": 610,
+              "y": 40
+            },
+            {
+              "x": 610,
+              "y": 135
+            },
+            {
+              "x": 340,
+              "y": 135
+            }
+          ]
+        },
+        {
+          "id": 151,
+          "name": "production-roof",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "depth",
+              "type": "float",
+              "value": 1350
+            }
+          ],
+          "polygon": [
+            {
+              "x": 670,
+              "y": 40
+            },
+            {
+              "x": 940,
+              "y": 40
+            },
+            {
+              "x": 940,
+              "y": 135
+            },
+            {
+              "x": 670,
+              "y": 135
+            }
+          ]
+        },
+        {
+          "id": 152,
+          "name": "release-roof",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "depth",
+              "type": "float",
+              "value": 1350
+            }
+          ],
+          "polygon": [
+            {
+              "x": 970,
+              "y": 40
+            },
+            {
+              "x": 1240,
+              "y": 40
+            },
+            {
+              "x": 1240,
+              "y": 135
+            },
+            {
+              "x": 970,
+              "y": 135
+            }
+          ]
+        },
+        {
+          "id": 153,
+          "name": "writers-roof",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "depth",
+              "type": "float",
+              "value": 1510
+            }
+          ],
+          "polygon": [
+            {
+              "x": 40,
+              "y": 300
+            },
+            {
+              "x": 310,
+              "y": 300
+            },
+            {
+              "x": 310,
+              "y": 395
+            },
+            {
+              "x": 40,
+              "y": 395
+            }
+          ]
+        },
+        {
+          "id": 154,
+          "name": "drawing-roof",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "depth",
+              "type": "float",
+              "value": 1510
+            }
+          ],
+          "polygon": [
+            {
+              "x": 340,
+              "y": 300
+            },
+            {
+              "x": 630,
+              "y": 300
+            },
+            {
+              "x": 630,
+              "y": 395
+            },
+            {
+              "x": 340,
+              "y": 395
+            }
+          ]
+        },
+        {
+          "id": 155,
+          "name": "review-roof",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "depth",
+              "type": "float",
+              "value": 1510
+            }
+          ],
+          "polygon": [
+            {
+              "x": 670,
+              "y": 300
+            },
+            {
+              "x": 960,
+              "y": 300
+            },
+            {
+              "x": 960,
+              "y": 395
+            },
+            {
+              "x": 670,
+              "y": 395
+            }
+          ]
+        },
+        {
+          "id": 156,
+          "name": "quality-roof",
+          "type": "",
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0,
+          "rotation": 0,
+          "visible": true,
+          "properties": [
+            {
+              "name": "depth",
+              "type": "float",
+              "value": 1510
+            }
+          ],
+          "polygon": [
+            {
+              "x": 990,
+              "y": 300
+            },
+            {
+              "x": 1240,
+              "y": 300
+            },
+            {
+              "x": 1240,
+              "y": 395
+            },
+            {
+              "x": 990,
+              "y": 395
+            }
+          ]
+        }
+      ]
     },
     {
       "id": 9,
@@ -3190,7 +3612,7 @@
       "y": 0,
       "objects": [
         {
-          "id": 145,
+          "id": 157,
           "name": "review-left",
           "type": "",
           "x": 770,
@@ -3258,7 +3680,7 @@
           ]
         },
         {
-          "id": 146,
+          "id": 158,
           "name": "review-right",
           "type": "",
           "x": 860,
@@ -3326,7 +3748,7 @@
           ]
         },
         {
-          "id": 147,
+          "id": 159,
           "name": "meeting-one",
           "type": "",
           "x": 1060,
@@ -3394,7 +3816,7 @@
           ]
         },
         {
-          "id": 148,
+          "id": 160,
           "name": "meeting-two",
           "type": "",
           "x": 1140,
@@ -3474,7 +3896,7 @@
       "y": 0,
       "objects": [
         {
-          "id": 149,
+          "id": 161,
           "name": "assets-audio",
           "type": "",
           "x": 40,
@@ -3497,7 +3919,7 @@
           ]
         },
         {
-          "id": 150,
+          "id": 162,
           "name": "storyboard-audio",
           "type": "",
           "x": 340,
@@ -3520,7 +3942,7 @@
           ]
         },
         {
-          "id": 151,
+          "id": 163,
           "name": "production-audio",
           "type": "",
           "x": 670,
@@ -3543,7 +3965,7 @@
           ]
         },
         {
-          "id": 152,
+          "id": 164,
           "name": "release-audio",
           "type": "",
           "x": 970,
@@ -3566,7 +3988,7 @@
           ]
         },
         {
-          "id": 153,
+          "id": 165,
           "name": "writers-audio",
           "type": "",
           "x": 40,
@@ -3589,7 +4011,7 @@
           ]
         },
         {
-          "id": 154,
+          "id": 166,
           "name": "drawing-audio",
           "type": "",
           "x": 340,
@@ -3612,7 +4034,7 @@
           ]
         },
         {
-          "id": 155,
+          "id": 167,
           "name": "review-audio",
           "type": "",
           "x": 670,
@@ -3640,7 +4062,7 @@
           ]
         },
         {
-          "id": 156,
+          "id": 168,
           "name": "quality-audio",
           "type": "",
           "x": 990,
@@ -3663,7 +4085,7 @@
           ]
         },
         {
-          "id": 157,
+          "id": 169,
           "name": "teams-audio",
           "type": "",
           "x": 40,
@@ -3686,7 +4108,7 @@
           ]
         },
         {
-          "id": 158,
+          "id": 170,
           "name": "lounge-audio",
           "type": "",
           "x": 370,
@@ -3709,7 +4131,7 @@
           ]
         },
         {
-          "id": 159,
+          "id": 171,
           "name": "live-audio",
           "type": "",
           "x": 640,
@@ -3732,7 +4154,7 @@
           ]
         },
         {
-          "id": 160,
+          "id": 172,
           "name": "meeting-audio",
           "type": "",
           "x": 950,
@@ -3760,7 +4182,7 @@
           ]
         },
         {
-          "id": 161,
+          "id": 173,
           "name": "assistant-audio",
           "type": "",
           "x": 370,
@@ -3783,7 +4205,7 @@
           ]
         },
         {
-          "id": 162,
+          "id": 174,
           "name": "lobby-audio",
           "type": "",
           "x": 640,
@@ -3818,7 +4240,7 @@
       "y": 0,
       "objects": [
         {
-          "id": 163,
+          "id": 175,
           "name": "studio-guide-0",
           "type": "",
           "x": 682,
@@ -3881,7 +4303,7 @@
           ]
         },
         {
-          "id": 164,
+          "id": 176,
           "name": "studio-guide-1",
           "type": "",
           "x": 847,
@@ -3944,7 +4366,7 @@
           ]
         },
         {
-          "id": 165,
+          "id": 177,
           "name": "studio-guide-2",
           "type": "",
           "x": 762,
@@ -4007,7 +4429,7 @@
           ]
         },
         {
-          "id": 166,
+          "id": 178,
           "name": "studio-producer-0",
           "type": "",
           "x": 882,
@@ -4070,7 +4492,7 @@
           ]
         },
         {
-          "id": 167,
+          "id": 179,
           "name": "studio-producer-1",
           "type": "",
           "x": 712,
@@ -4133,7 +4555,7 @@
           ]
         },
         {
-          "id": 168,
+          "id": 180,
           "name": "studio-producer-2",
           "type": "",
           "x": 882,
@@ -4196,7 +4618,7 @@
           ]
         },
         {
-          "id": 169,
+          "id": 181,
           "name": "studio-editor-0",
           "type": "",
           "x": 887,
@@ -4259,7 +4681,7 @@
           ]
         },
         {
-          "id": 170,
+          "id": 182,
           "name": "studio-editor-1",
           "type": "",
           "x": 707,
@@ -4322,7 +4744,7 @@
           ]
         },
         {
-          "id": 171,
+          "id": 183,
           "name": "studio-editor-2",
           "type": "",
           "x": 887,
@@ -4385,7 +4807,7 @@
           ]
         },
         {
-          "id": 172,
+          "id": 184,
           "name": "studio-artist-0",
           "type": "",
           "x": 567,
@@ -4448,7 +4870,7 @@
           ]
         },
         {
-          "id": 173,
+          "id": 185,
           "name": "studio-artist-1",
           "type": "",
           "x": 377,
@@ -4511,7 +4933,7 @@
           ]
         },
         {
-          "id": 174,
+          "id": 186,
           "name": "studio-artist-2",
           "type": "",
           "x": 567,
@@ -4574,7 +4996,7 @@
           ]
         },
         {
-          "id": 175,
+          "id": 187,
           "name": "studio-archivist-0",
           "type": "",
           "x": 252,
@@ -4637,7 +5059,7 @@
           ]
         },
         {
-          "id": 176,
+          "id": 188,
           "name": "studio-archivist-1",
           "type": "",
           "x": 92,
@@ -4700,7 +5122,7 @@
           ]
         },
         {
-          "id": 177,
+          "id": 189,
           "name": "studio-archivist-2",
           "type": "",
           "x": 252,
@@ -4763,7 +5185,7 @@
           ]
         },
         {
-          "id": 178,
+          "id": 190,
           "name": "studio-cafe-0",
           "type": "",
           "x": 552,
@@ -4826,7 +5248,7 @@
           ]
         },
         {
-          "id": 179,
+          "id": 191,
           "name": "studio-cafe-1",
           "type": "",
           "x": 372,
@@ -4889,7 +5311,7 @@
           ]
         },
         {
-          "id": 180,
+          "id": 192,
           "name": "studio-cafe-2",
           "type": "",
           "x": 552,
@@ -4952,7 +5374,7 @@
           ]
         },
         {
-          "id": 181,
+          "id": 193,
           "name": "studio-security-0",
           "type": "",
           "x": 1182,
@@ -5015,7 +5437,7 @@
           ]
         },
         {
-          "id": 182,
+          "id": 194,
           "name": "studio-security-1",
           "type": "",
           "x": 992,
@@ -5078,7 +5500,7 @@
           ]
         },
         {
-          "id": 183,
+          "id": 195,
           "name": "studio-security-2",
           "type": "",
           "x": 1182,
@@ -5141,7 +5563,7 @@
           ]
         },
         {
-          "id": 184,
+          "id": 196,
           "name": "studio-host-0",
           "type": "",
           "x": 862,
@@ -5204,7 +5626,7 @@
           ]
         },
         {
-          "id": 185,
+          "id": 197,
           "name": "studio-host-1",
           "type": "",
           "x": 642,
@@ -5267,7 +5689,7 @@
           ]
         },
         {
-          "id": 186,
+          "id": 198,
           "name": "studio-host-2",
           "type": "",
           "x": 862,
@@ -5330,7 +5752,7 @@
           ]
         },
         {
-          "id": 187,
+          "id": 199,
           "name": "studio-guide-3",
           "type": "",
           "x": 288,
@@ -5358,7 +5780,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -5393,7 +5815,7 @@
           ]
         },
         {
-          "id": 188,
+          "id": 200,
           "name": "studio-guide-4",
           "type": "",
           "x": 1188,
@@ -5421,7 +5843,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "talk"
             },
             {
               "name": "minDurationMs",
@@ -5456,7 +5878,7 @@
           ]
         },
         {
-          "id": 189,
+          "id": 201,
           "name": "studio-producer-3",
           "type": "",
           "x": 1210,
@@ -5484,7 +5906,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -5519,7 +5941,7 @@
           ]
         },
         {
-          "id": 190,
+          "id": 202,
           "name": "studio-producer-4",
           "type": "",
           "x": 935,
@@ -5547,7 +5969,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -5582,7 +6004,7 @@
           ]
         },
         {
-          "id": 191,
+          "id": 203,
           "name": "studio-editor-3",
           "type": "",
           "x": 610,
@@ -5610,7 +6032,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -5645,7 +6067,7 @@
           ]
         },
         {
-          "id": 192,
+          "id": 204,
           "name": "studio-editor-4",
           "type": "",
           "x": 1210,
@@ -5708,7 +6130,7 @@
           ]
         },
         {
-          "id": 193,
+          "id": 205,
           "name": "studio-artist-3",
           "type": "",
           "x": 290,
@@ -5736,7 +6158,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -5771,7 +6193,7 @@
           ]
         },
         {
-          "id": 194,
+          "id": 206,
           "name": "studio-artist-4",
           "type": "",
           "x": 888,
@@ -5799,7 +6221,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "draw"
             },
             {
               "name": "minDurationMs",
@@ -5834,7 +6256,7 @@
           ]
         },
         {
-          "id": 195,
+          "id": 207,
           "name": "studio-archivist-3",
           "type": "",
           "x": 610,
@@ -5862,7 +6284,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -5897,7 +6319,7 @@
           ]
         },
         {
-          "id": 196,
+          "id": 208,
           "name": "studio-archivist-4",
           "type": "",
           "x": 935,
@@ -5925,7 +6347,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -5960,7 +6382,7 @@
           ]
         },
         {
-          "id": 197,
+          "id": 209,
           "name": "studio-cafe-3",
           "type": "",
           "x": 288,
@@ -5988,7 +6410,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "talk"
             },
             {
               "name": "minDurationMs",
@@ -6023,7 +6445,7 @@
           ]
         },
         {
-          "id": 198,
+          "id": 210,
           "name": "studio-cafe-4",
           "type": "",
           "x": 1188,
@@ -6051,7 +6473,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "talk"
             },
             {
               "name": "minDurationMs",
@@ -6086,7 +6508,7 @@
           ]
         },
         {
-          "id": 199,
+          "id": 211,
           "name": "studio-security-3",
           "type": "",
           "x": 1210,
@@ -6114,7 +6536,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -6149,7 +6571,7 @@
           ]
         },
         {
-          "id": 200,
+          "id": 212,
           "name": "studio-security-4",
           "type": "",
           "x": 920,
@@ -6177,7 +6599,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "review"
             },
             {
               "name": "minDurationMs",
@@ -6212,7 +6634,7 @@
           ]
         },
         {
-          "id": 201,
+          "id": 213,
           "name": "studio-host-3",
           "type": "",
           "x": 688,
@@ -6240,7 +6662,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "talk"
             },
             {
               "name": "minDurationMs",
@@ -6275,7 +6697,7 @@
           ]
         },
         {
-          "id": 202,
+          "id": 214,
           "name": "studio-host-4",
           "type": "",
           "x": 1210,
@@ -6303,7 +6725,7 @@
             {
               "name": "animation",
               "type": "string",
-              "value": "idle"
+              "value": "draw"
             },
             {
               "name": "minDurationMs",
@@ -6350,7 +6772,7 @@
       "y": 0,
       "objects": [
         {
-          "id": 203,
+          "id": 215,
           "name": "studio-guide",
           "type": "",
           "x": 700,
@@ -6403,7 +6825,7 @@
           ]
         },
         {
-          "id": 204,
+          "id": 216,
           "name": "studio-producer",
           "type": "",
           "x": 900,
@@ -6456,7 +6878,7 @@
           ]
         },
         {
-          "id": 205,
+          "id": 217,
           "name": "studio-editor",
           "type": "",
           "x": 905,
@@ -6509,7 +6931,7 @@
           ]
         },
         {
-          "id": 206,
+          "id": 218,
           "name": "studio-artist",
           "type": "",
           "x": 585,
@@ -6562,7 +6984,7 @@
           ]
         },
         {
-          "id": 207,
+          "id": 219,
           "name": "studio-archivist",
           "type": "",
           "x": 270,
@@ -6615,7 +7037,7 @@
           ]
         },
         {
-          "id": 208,
+          "id": 220,
           "name": "studio-cafe",
           "type": "",
           "x": 570,
@@ -6668,7 +7090,7 @@
           ]
         },
         {
-          "id": 209,
+          "id": 221,
           "name": "studio-security",
           "type": "",
           "x": 1200,
@@ -6721,7 +7143,7 @@
           ]
         },
         {
-          "id": 210,
+          "id": 222,
           "name": "studio-host",
           "type": "",
           "x": 880,

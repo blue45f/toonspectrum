@@ -95,7 +95,7 @@ describe("StudioAiSuperSuiteModal — 모달 셸", () => {
     const labelledBy = dialog.getAttribute("aria-labelledby");
     expect(labelledBy).toBeTruthy();
     const title = document.getElementById(labelledBy ?? "");
-    expect(title?.textContent).toContain("AI 웹툰 생성 슈퍼 스위트");
+    expect(title?.textContent).toContain("AI + 스마트 웹툰 제작 스위트");
     expect(dialog.contains(title)).toBe(true);
   });
 
@@ -147,7 +147,7 @@ describe("StudioAiSuperSuiteModal — 탭 시맨틱", () => {
   it("5개 도구를 tablist/tab 으로 노출하고 활성 탭만 tabbable 로 둔다", () => {
     render(<StudioAiSuperSuiteModal open onClose={() => {}} />);
 
-    expect(screen.getByRole("tablist", { name: "AI 슈퍼 스위트 도구" })).toBeTruthy();
+    expect(screen.getByRole("tablist", { name: "AI와 스마트 제작 도구" })).toBeTruthy();
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((tab) => tab.textContent)).toEqual([
       "화풍 변환 툰필터",

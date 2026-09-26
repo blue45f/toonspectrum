@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "createdAt": "2026-09-26",
+  "tool": "image_gen.imagegen",
+  "modelVersion": "unreported-by-tool",
+  "requestedModel": "ImageGen 2.5",
+  "preservation": "원본 PNG 바이트, 크기, 알파를 보존하며 격자 오류를 크롭으로 덮지 않음",
+  "assets": [
+    {
+      "id": "limestone",
+      "prompt": "Use case: stylized-concept. Create ONE production game seamless texture tile, an edge-to-edge square warm ivory limestone courtyard floor for an elegant cozy creative-office MMORPG village. Pure overhead orthographic view, zero perspective, opaque rectangular image filled completely by the same ground material. Precisely aligned small square and subtly rounded rectangular limestone pavers, low-contrast cream and sand tones, thin beige mortar, refined hand-painted fine mineral texture and soft upper-left micro-light. Beautiful clean authored game material, detailed but quiet enough under small chibi characters. Exactly1024x1024 PNG. This is ONE CONTINUOUS REPEATABLE MATERIAL, not an atlas, sheet, grid of different textures or a scene. Opposite outer edges MUST tile seamlessly both left/right and top/bottom, with matching stone-joint positions and identical edge colors, no perimeter bevel, no border or fade. Keep stone block rhythm consistent across edges; irregularities only inside blocks. No building, furniture, props, grass, water, text, logo, human, character, symbols or directional cast shadow. No large focal features. The entire image is the floor material.",
+      "file": "limestone-native.png",
+      "status": "candidate",
+      "reason": "원본 1254×1254. 반복 경계 및 브라우저 시각 검수 대기."
+    },
+    {
+      "id": "terrain-atlas-concept",
+      "prompt": "Use case: stylized-concept.\nProduction game TERRAIN TILE ATLAS for an original premium painterly 2.5D top-down creative office village, warm contemporary Korean atelier meets cozy MMO town, compatible with small chibi characters. This is an actual reusable tileset, not a concept board or a scene.\nOUTPUT exactly1024x1024 opaque PNG, precisely FOUR COLUMNS and FOUR ROWS, sixteen equal256x256 cells, no gutters and no borders. Every cell is a flat top-down repeatable material texture filling all256x256pixels. No perspective trapezoids. No furniture, buildings, people, characters, lettering, symbols, logos, frames or labels.\nROW1: four carefully distinct variations of the SAME fine warm ivory limestone courtyard paving material, same scale, low contrast small square stone blocks with narrow grey-beige joints. Each tile's outer16px must match the other limestone tiles' corresponding edges so they join without visible lines.\nROW2: four variations of the SAME lush but tidy sage-green lawn, rich fine grass blades with tiny tonal irregularity, no large flowers/rocks/objects, identical matching low-contrast green outer16px across all four tiles.\nROW3: four variations of the SAME honey-colored straight oak plank indoor floor, horizontal boards of consistent64px width, joints at fixed positions at cell boundaries, delicate woodgrain, warm and professional, seamless against other row3tiles.\nROW4: four variations of the SAME cool slate-blue shallow water surface, fine translucent gentle ripple texture only, low contrast, no foam outlines, no shoreline, no stones, seamless against other row4tiles.\nStyle: polished hand-painted 2D game material art, subtle physically believable surface texture, crisp small-scale readability without pixel-art blocks, consistent soft upper-left light with no directional cast shadows. Balanced muted palette, fine detail intended for high-quality game rendering. All material cells square, uniform scale, strict exact grid alignment. No visible grid dividers added; only material-to-material transitions at row boundaries. Entire PNG fully opaque with edge-to-edge material, no transparent space.",
+      "file": "terrain-atlas-candidate.png",
+      "status": "rejected-for-runtime",
+      "reason": "원본 1254×1254가 요청한 4×4 셀 크기로 나누어지지 않으므로 런타임 atlas로 사용하지 않음."
+    }
+  ]
+}

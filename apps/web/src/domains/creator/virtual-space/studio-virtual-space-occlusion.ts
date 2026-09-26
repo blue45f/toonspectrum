@@ -23,3 +23,24 @@ export function studioWorldOcclusionPolygonValid(points: unknown, width: number,
   }
   return Math.abs(area) > 1;
 }
+
+/** Boundary-inclusive ray casting used by both Canvas and WebGL roof fading. */
+export function studioWorldPointInsideOcclusionPolygon(
+  point: StudioVirtualSpacePoint,
+  polygon: readonly StudioVirtualSpacePoint[],
+): boolean {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index, index += 1) {
+    const a = polygon[previous]!;
+    const b = polygon[index]!;
+    const cross = (b.x - a.x) * (point.y - a.y) - (b.y - a.y) * (point.x - a.x);
+    const onBoundary = Math.abs(cross) < 0.0001
+      && point.x >= Math.min(a.x, b.x) && point.x <= Math.max(a.x, b.x)
+      && point.y >= Math.min(a.y, b.y) && point.y <= Math.max(a.y, b.y);
+    if (onBoundary) return true;
+    const crosses = (a.y > point.y) !== (b.y > point.y)
+      && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}

@@ -43,7 +43,7 @@ export const DEFAULT_STUDIO_VIRTUAL_EXPERIENCE: StudioVirtualExperiencePreferenc
   startLocation: "last",
   effectLevel: "balanced",
   ttsEnabled: false,
-  interactionRings: true,
+  interactionRings: false,
 });
 
 function oneOf<T extends readonly string[]>(values: T, value: unknown): value is T[number] {

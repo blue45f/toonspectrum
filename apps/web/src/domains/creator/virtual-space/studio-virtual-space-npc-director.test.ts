@@ -74,6 +74,22 @@ describe("living studio NPC director", () => {
     }
   });
 
+  it("같은 월드의 미세 이동마다 collider 목록을 재구성하지 않고 새 revision의 장애물을 반영한다", () => {
+    let colliderReads = 0;
+    const colliders = Object.freeze([{ x: 113, y: 45, width: 38, height: 35 }]);
+    const definition = { ...npc, point: { x: 55, y: 150 }, patrol: [{ x: 205, y: 150 }] };
+    const base = fixture([definition]);
+    const manifest = { ...base, get colliders() { colliderReads++; return colliders; } };
+    const director = new StudioNpcDirector(manifest);
+    const [view] = run(director, 35);
+    expect(view!.distance).toBeGreaterThan(100);
+    // 생성·경로 계획 횟수 수준의 접근만 허용한다. 60Hz 이동에 비례하는 재구성은 회귀다.
+    expect(colliderReads).toBeLessThan(20);
+    expect(colliders).toEqual([{ x: 113, y: 45, width: 38, height: 35 }]);
+    const blockedRevision = { ...base, colliders: [{ x: 40, y: 130, width: 40, height: 40 }] };
+    expect(new StudioNpcDirector(blockedRevision).views).toEqual([]);
+  });
+
   it("steps aside for a player's predicted route before starting its own routine", () => {
     const definition = { ...npc, point: { x: 80, y: 100 }, patrol: [] };
     const director = new StudioNpcDirector(fixture([definition]));
