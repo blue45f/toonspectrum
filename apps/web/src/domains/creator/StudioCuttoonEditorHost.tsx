@@ -23475,6 +23475,8 @@ const beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({
     webGpuBackendRef,
     webGpuCanvasHandleRef,
   });
+  // The extracted stage API is intentionally bridged through a ref so the live-surface adapter can
+  // be bound before the stage pointer callbacks are initialized.
   const {
     onStageDown,
     onStageMove,
@@ -23495,7 +23497,6 @@ const beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({
     queueStudioBg3dMagicFilterMaskPublication,
     studioPageElementsFromHistory,
     replayPendingCatalogGesture,
-    finishDrawingPointer: stageFinishDrawingPointer,
   } = bindStudioCuttoonStagePointers({
     capturePendingCatalogInput,
     activeCatalogBrush,
