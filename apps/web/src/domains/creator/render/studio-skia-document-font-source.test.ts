@@ -28,8 +28,11 @@ describe("Skia document font sources", () => {
     const css = "@font-face{font-family:'T';src:url(https://fonts.gstatic.com/s/t/v1/a.woff2) format('woff2')}";
     const bytes = new Uint8Array([1, 2, 3, 4]);
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      return url.includes("fonts.googleapis.com")
+      const href = typeof input === "string" || input instanceof URL
+        ? String(input)
+        : input.url;
+      const url = new URL(href);
+      return url.origin === "https://fonts.googleapis.com"
         ? new Response(css, { status: 200 })
         : new Response(bytes.slice().buffer, { status: 200 });
     });

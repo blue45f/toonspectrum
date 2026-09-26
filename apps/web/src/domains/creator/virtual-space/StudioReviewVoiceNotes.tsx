@@ -47,8 +47,18 @@ function uploadMime(file: File): string {
           : extension === "wav" ? "audio/wav" : "";
 }
 
+function createAudioObjectUrl(file: Blob): string {
+  const objectUrl = URL.createObjectURL(file);
+  const encodedUrl = encodeURI(objectUrl);
+  if (encodedUrl !== objectUrl || !encodedUrl.startsWith("blob:")) {
+    URL.revokeObjectURL(objectUrl);
+    throw new Error("audio_object_url_invalid");
+  }
+  return encodedUrl;
+}
+
 async function audioDuration(file: Blob): Promise<number> {
-  const url = URL.createObjectURL(file);
+  const url = createAudioObjectUrl(file);
   try {
     const audio = document.createElement("audio");
     audio.preload = "metadata";
@@ -161,7 +171,7 @@ export function StudioReviewVoiceNotes({ subject, canComment }: {
       || durationMs <= 0 || durationMs > STUDIO_REVIEW_VOICE_NOTE_MAX_DURATION_MS) {
       setPhase("idle"); setNotice(bt("녹음 길이 또는 파일 형식을 확인해 주세요.", "Check the recording length and format.")); return;
     }
-    const url = URL.createObjectURL(blob);
+    const url = createAudioObjectUrl(blob);
     setDraft({ blob: new Blob([blob], { type: normalized }), url, durationMs, noteId: newIdentity("review-voice"), operationId: newIdentity("review-voice-op") });
     setTitle((current) => current || bt("검수 설명", "Review explanation"));
     setPhase("ready"); setElapsed(durationMs);

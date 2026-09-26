@@ -133,7 +133,10 @@ describe("long-form product tour contracts", () => {
 
     for (const locale of ["ko", "en"] as const) {
       const captions = readFileSync(`${PUBLIC_BRAND}/toonstudio-product-tour.${locale}.vtt`, "utf8");
-      expect(captions.match(/-->/gu)).toHaveLength(27);
+      const cueLines = captions
+        .split(/\r?\n/u)
+        .filter((line) => line.includes(" --> "));
+      expect(cueLines).toHaveLength(27);
       expect(captions).toContain("00:08:16.000");
     }
   });
