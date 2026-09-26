@@ -18119,6 +18119,41 @@ const puppetWarpArmed =
     announceDrawingShortcut,
   });
   // 마스터 편집 모드에서는 페이지 히스토리 이동을 잠근다 — 마스터 편집은 히스토리 미포함이라 화면과 어긋난다.
+  /**
+   * History transitions must never leave a pre-receipt live surface above the new canonical snapshot.
+   * Undo/redo is a document-authority change, so rebuild the transient ink presentation from history
+   * instead of waiting for an older surface handoff queue to discover the tombstone on a later frame.
+   */
+  function resetTransientInkPresentationForHistoryTransition(): void {
+    liveInkOverlayClearGenRef.current += 1;
+    liveInkOverlayRendererRef.current.clear();
+    liveRetainedMediaOverlayRendererRef.current.clear();
+    liveDynamicBrushOverlayRendererRef.current.clear();
+    liveWetInkOverlayRendererRef.current.clear();
+    draftPreviewStoreRef.current.clearSettled();
+    liveDraftPendingRef.current = null;
+    liveDraftVisualRef.current = null;
+    liveDraftDirectRef.current = false;
+    pendingGpuStrokesRef.current = [];
+    pendingGpuDrawAuthoritiesRef.current = [];
+    gpuFinalReceiptRequestIdsRef.current.clear();
+    gpuFinalCrdtPublishedRequestIdsRef.current.clear();
+    committedInkSurfaceHandoffsRef.current = [];
+    committedInkRetainedRetryRef.current = null;
+    skiaCommittedInkRuntime.clear();
+    if (committedInkSurfaceHandoffRafRef.current) {
+      globalThis.cancelAnimationFrame(committedInkSurfaceHandoffRafRef.current);
+      committedInkSurfaceHandoffRafRef.current = 0;
+    }
+    if (!gpuLiveInkPinnedRef.current) {
+      webGpuCanvasHandleRef.current?.setPinnedPresentationVisible(false);
+      webGpuCanvasHandleRef.current?.syncPinnedStrokes(EMPTY_STUDIO_GPU_STROKES);
+      webGpuCanvasHandleRef.current?.setPinnedVisible(false);
+    }
+    liveDraftLayerRef.current?.batchDraw();
+    mainLayerRef.current?.batchDraw();
+  }
+
   function undo() {
     if (masterEditMode || collaborationDocumentLocked) return;
     const pendingLivingInkHandoff = livingInkCanonicalHandoffRef.current;
@@ -18174,6 +18209,23 @@ const puppetWarpArmed =
           const ids = taken.strokes.map((stroke) => stroke.id);
           abortDeferredStrokePostprocess(ids);
           liveRetainedMediaOverlayRendererRef.current.hideSettledPixels(ids);
+          // The retained-stroke path intentionally lives outside page history, but the CRDT
+          // publication can already have echoed the pending element into the current page before
+          // Undo. Replace only the current snapshot with the authoritative pre-stroke projection
+          // so Konva cannot keep a stale committed shape visible while the retained overlay is
+          // hidden. This does not create a history entry; Redo restores the same current snapshot.
+          const currentHistory = pagesHistoryRef.current;
+          const currentIndex = pagesHiRef.current;
+          const currentPages = currentHistory[currentIndex] ?? pages;
+          const pendingIds = new Set(ids);
+          const withoutPending = currentPages.map((page) => ({
+            ...page,
+            elements: page.elements.filter((element) => !pendingIds.has(element.id)),
+          }));
+          currentHistory[currentIndex] = withoutPending;
+          pagesHistoryRef.current = currentHistory;
+          setPagesHistoryState([...currentHistory]);
+          mainLayerRef.current?.batchDraw();
           if (liveDraftVisualRef.current?.mode === "eraser") {
             liveDraftVisualRef.current = null;
             liveDraftDirectRef.current = false;
@@ -18231,6 +18283,7 @@ const puppetWarpArmed =
       offlineRealtimeStrokeIds,
     )) return;
     if (nextIndex !== undoIndex && nextSnapshot) {
+      resetTransientInkPresentationForHistoryTransition();
       recordStudioHistoryUndoRedo("undo", nextSnapshot, nextIndex);
     }
     // `setPagesHi` 는 저장 중이면 거절한다. 거절될 갱신으로 ref 를 앞세우면 렌더 없이
@@ -18279,6 +18332,27 @@ const puppetWarpArmed =
         flushPending: () => flushPendingStrokeCommitsRef.current(),
         publish: publishStudioCrdtHistoryTransition,
         onResumed: () => {
+          // Redo of a retained stroke is also outside page-history navigation. If Undo had to
+          // remove an already-echoed pending element from the current snapshot, restore that same
+          // snapshot projection immediately instead of waiting for another CRDT round trip.
+          const currentHistory = pagesHistoryRef.current;
+          const currentIndex = pagesHiRef.current;
+          const currentPages = currentHistory[currentIndex] ?? pages;
+          const restored = currentPages.map((page) => {
+            if (page.id !== undoneRetained.pageId) return page;
+            const existing = new Set(page.elements.map((element) => element.id));
+            return {
+              ...page,
+              elements: [
+                ...page.elements,
+                ...undoneRetained.strokes.filter((stroke) => !existing.has(stroke.id)),
+              ],
+            };
+          });
+          currentHistory[currentIndex] = restored;
+          pagesHistoryRef.current = currentHistory;
+          setPagesHistoryState([...currentHistory]);
+          mainLayerRef.current?.batchDraw();
           setHasUndonePendingOverlay(false);
           setHasPendingOverlayCommit(true);
           setUnloadGuardArmed(true);
@@ -18327,6 +18401,7 @@ const puppetWarpArmed =
       offlineRealtimeStrokeIds,
     )) return;
     if (nextIndex !== pagesHi && nextSnapshot) {
+      resetTransientInkPresentationForHistoryTransition();
       recordStudioHistoryUndoRedo("redo", nextSnapshot, nextIndex);
       commitStudioHistoryJournal(stepStudioHistoryJournal(historyJournalRef.current, "redo"));
     }

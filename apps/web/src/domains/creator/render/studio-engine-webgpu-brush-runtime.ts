@@ -92,9 +92,11 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4f {
   let metric = select(radial_metric, square_metric, input.tip.x > 1.5);
   let hardness = clamp(input.tip.y, 0.0, 1.0);
   let edge_softness = clamp(input.tip.z, 0.0, 1.0);
-  // Edge softness remains meaningful across the full hardness range instead of being collapsed
-  // by a max/min shortcut: hardness controls the firm core and softness expands its feather.
-  let feather = clamp((1.0 - hardness) + edge_softness * hardness, 0.0, 1.0);
+  // Keep the canonical CPU/WebGPU lowering contract: hardness defines the firm core,
+  // while edge softness adds directly to the feather width. Do not scale softness by hardness;
+  // doing so makes soft tips materially harder at intermediate hardness values and diverges from
+  // the canonical oracle at the edge band.
+  let feather = clamp((1.0 - hardness) + edge_softness, 0.0, 1.0);
   let inner_edge = 1.0 - feather;
   let antialias = max(fwidth(metric) * 0.5, 0.00025);
   let coverage = 1.0 - smoothstep(

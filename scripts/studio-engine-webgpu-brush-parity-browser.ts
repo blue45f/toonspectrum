@@ -336,8 +336,10 @@ function evaluateMetric(
     + gradientLocalY * (xx / determinant);
   const fwidth = Math.abs(gradientDocumentX) + Math.abs(gradientDocumentY);
   const antialias = Math.max(fwidth * 0.5, 0.00025);
+  // Match the production shader's canonical lowering contract: edge softness widens the
+  // feather directly rather than being attenuated by hardness.
   const feather = clamp01(
-    (1 - dab.tip.hardness) + dab.tip.edgeSoftness * dab.tip.hardness,
+    (1 - dab.tip.hardness) + dab.tip.edgeSoftness,
   );
   const innerEdge = 1 - feather;
   return {

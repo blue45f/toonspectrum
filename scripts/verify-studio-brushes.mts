@@ -1392,7 +1392,79 @@ function sanitizeEvidenceClip(
   };
 }
 
-async function compareScreenshotPixels(
+async function _compareScreenshotPixelsWithinReferenceDelta(
+  page: Page,
+  baseline: Buffer,
+  candidate: Buffer,
+  reference: Buffer,
+  channelTolerance = 2,
+): Promise<PixelDiff> {
+  return page.evaluate(async ({ baselineBase64, candidateBase64, referenceBase64, tolerance }) => {
+    const [baselineResponse, candidateResponse, referenceResponse] = await Promise.all([
+      fetch(`data:image/png;base64,${baselineBase64}`),
+      fetch(`data:image/png;base64,${candidateBase64}`),
+      fetch(`data:image/png;base64,${referenceBase64}`),
+    ]);
+    const [baselineBitmap, candidateBitmap, referenceBitmap] = await Promise.all([
+      createImageBitmap(await baselineResponse.blob()),
+      createImageBitmap(await candidateResponse.blob()),
+      createImageBitmap(await referenceResponse.blob()),
+    ]);
+    const width = Math.min(baselineBitmap.width, candidateBitmap.width, referenceBitmap.width);
+    const height = Math.min(baselineBitmap.height, candidateBitmap.height, referenceBitmap.height);
+    const baselineCanvas = new OffscreenCanvas(width, height);
+    const candidateCanvas = new OffscreenCanvas(width, height);
+    const referenceCanvas = new OffscreenCanvas(width, height);
+    const baselineContext = baselineCanvas.getContext("2d", { willReadFrequently: true });
+    const candidateContext = candidateCanvas.getContext("2d", { willReadFrequently: true });
+    const referenceContext = referenceCanvas.getContext("2d", { willReadFrequently: true });
+    if (!baselineContext || !candidateContext || !referenceContext) {
+      throw new Error("could not decode reference-masked screenshot pixels");
+    }
+    baselineContext.drawImage(baselineBitmap, 0, 0);
+    candidateContext.drawImage(candidateBitmap, 0, 0);
+    referenceContext.drawImage(referenceBitmap, 0, 0);
+    const baselinePixels = baselineContext.getImageData(0, 0, width, height).data;
+    const candidatePixels = candidateContext.getImageData(0, 0, width, height).data;
+    const referencePixels = referenceContext.getImageData(0, 0, width, height).data;
+    baselineBitmap.close();
+    candidateBitmap.close();
+    referenceBitmap.close();
+    let changedPixels = 0;
+    let maxChannelDelta = 0;
+    let referenceChangedPixels = 0;
+    for (let offset = 0; offset < baselinePixels.length; offset += 4) {
+      let referenceDelta = 0;
+      let candidateDelta = 0;
+      for (let channel = 0; channel < 4; channel += 1) {
+        referenceDelta = Math.max(
+          referenceDelta,
+          Math.abs(referencePixels[offset + channel]! - baselinePixels[offset + channel]!),
+        );
+        candidateDelta = Math.max(
+          candidateDelta,
+          Math.abs(candidatePixels[offset + channel]! - baselinePixels[offset + channel]!),
+        );
+      }
+      if (referenceDelta <= tolerance) continue;
+      referenceChangedPixels += 1;
+      maxChannelDelta = Math.max(maxChannelDelta, candidateDelta);
+      if (candidateDelta > tolerance) changedPixels += 1;
+    }
+    return {
+      changedPixels,
+      totalPixels: referenceChangedPixels,
+      maxChannelDelta,
+    };
+  }, {
+    baselineBase64: baseline.toString("base64"),
+    candidateBase64: candidate.toString("base64"),
+    referenceBase64: reference.toString("base64"),
+    tolerance: channelTolerance,
+  });
+}
+
+function compareScreenshotPixels(
   page: Page,
   first: Buffer,
   second: Buffer,
