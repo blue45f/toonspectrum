@@ -246,8 +246,8 @@ const ASSET_CATEGORIES: readonly FrontDoorCard[] = [
   {
     href: "/studio/bg3d",
     icon: Boxes,
-    title: { ko: "3D 장면 연출", en: "3D scene direction" },
-    description: { ko: "배경·포즈·구도를 먼저 잡고 선화·톤 가이드로 작화에 적용합니다.", en: "Block backgrounds, poses and composition, then apply line and tone guides to artwork." },
+    title: { ko: "장면 도우미", en: "Scene assistant" },
+    description: { ko: "장소·인물·소품을 고르고 구도와 작화 스타일을 정해 현재 컷에 적용합니다.", en: "Choose a place, character or prop, frame the shot, and apply it to the current panel." },
   },
   {
     href: "/studio/assets/audio",

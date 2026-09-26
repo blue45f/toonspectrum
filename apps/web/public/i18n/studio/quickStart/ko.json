@@ -18,8 +18,8 @@
   "studio.quickStart.step.collab-focus.hint": "패널 접고 집중 모드",
   "studio.quickStart.step.character.label": "캐릭터",
   "studio.quickStart.step.character.hint": "2D / 3D 포즈",
-  "studio.quickStart.step.background3d.label": "3D 배경",
-  "studio.quickStart.step.background3d.hint": "장면 배치 · 물리 낙하",
+  "studio.quickStart.step.background3d.label": "장면 도우미",
+  "studio.quickStart.step.background3d.hint": "장소 선택부터 현재 컷 적용까지",
   "studio.quickStart.step.bubble.label": "말풍선",
   "studio.quickStart.step.bubble.hint": "대사 넣기"
 }

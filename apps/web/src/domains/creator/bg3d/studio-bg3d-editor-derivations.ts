@@ -62,6 +62,11 @@ export const CAMERA_PRESETS: Record<string, { label: string; position: [number, 
   front: { label: "정면", position: [0, 1.6, 9], target: [0, 0.9, 0] },
   top: { label: "위에서", position: [0, 10, 0.001], target: [0, 0, 0] },
   side: { label: "측면", position: [9, 1.6, 0], target: [0, 0.9, 0] },
+  threeQuarter: { label: "3/4 시점", position: [5.8, 3.1, 6.8], target: [0, 1.05, 0] },
+  low: { label: "로우앵글", position: [5.2, 0.85, 7.2], target: [0, 1.35, 0] },
+  high: { label: "하이앵글", position: [4.8, 7.4, 6.2], target: [0, 0.65, 0] },
+  wide: { label: "와이드", position: [8.6, 4.5, 11.5], target: [0, 1, 0] },
+  close: { label: "클로즈업", position: [2.8, 2.25, 4.2], target: [0, 1.2, 0] },
 };
 
 export function formatBg3dSunTime(hours: number): string {

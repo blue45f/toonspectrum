@@ -143,10 +143,10 @@ export const SITE_ROUTE_UX_OVERRIDES: readonly SiteRouteUxOverride[] = [
   },
   {
     matches: exact("/studio/bg3d"),
-    pagePurpose: text("웹툰 컷에 사용할 3D 배경·소품·카메라 구도를 직접 만듭니다.", "Build 3D backgrounds, props and camera compositions for webtoon panels."),
-    primaryAction: text("3D 장면 만들기", "Create a 3D scene"),
+    pagePurpose: text("장소·인물·소품을 고르고 구도와 작화 스타일을 정해 현재 컷에 적용합니다.", "Choose places, characters and props, frame the shot, and apply it to the current panel."),
+    primaryAction: text("장면 만들기", "Create a scene"),
     contextLevel: "scene",
-    mobilePolicy: "desktop-required",
+    mobilePolicy: "full",
     helpPath: "/help?topic=3d-background",
     recoveryPolicy: "preserve-draft",
     audiences: ["solo-creator", "team", "specialist"],

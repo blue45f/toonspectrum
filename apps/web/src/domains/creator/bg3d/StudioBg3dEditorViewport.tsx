@@ -24,7 +24,7 @@ const StudioBg3dTurntableMotion = lazyRetry(
   "StudioBg3dTurntableMotion",
 );
 
-export function StudioBg3dEditorViewport({ h }) {
+export function StudioBg3dEditorViewport({ h, simplified = false }) {
   const {
     THREE, OrbitControls, OrthographicCamera, PerspectiveCamera, TransformControls, View,
     Canvas, useThree, Aperture, Boxes, Camera, ChevronDown, CircleDashed, Copy, Crosshair, Eye,
@@ -354,7 +354,10 @@ export function StudioBg3dEditorViewport({ h }) {
   const turntablePaused = isCapturing || isTransforming || physicsInteractionLocked
     || placementActive || measurementActive || immersiveSceneActive;
   return (
-          <section className="relative flex min-h-0 scroll-pt-11 flex-col overflow-x-hidden overflow-y-auto bg-[oklch(0.98_0_0)] lg:scroll-pt-0">
+          <section
+            data-bg3d-simplified={simplified || undefined}
+            className="relative flex min-h-0 scroll-pt-11 flex-col overflow-x-hidden overflow-y-auto bg-[oklch(0.98_0_0)] lg:scroll-pt-0"
+          >
             {/* Keep a finger-sized scroll surface outside the canvas's touch-action:none region. */}
             <div
               data-testid="bg3d-scroll-handle"
@@ -363,7 +366,7 @@ export function StudioBg3dEditorViewport({ h }) {
               위아래로 밀어 도구와 안내 보기
             </div>
             {/* Mobile rows need 304+34px; the tablet rail needs 650+62px including padding. */}
-            <div className="relative mx-auto flex h-full max-h-full min-h-[338px] w-full max-w-[min(92vw,960px)] shrink-0 items-center justify-center p-2 sm:min-h-[712px] sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
+            <div data-bg3d-viewport-frame="true" className="relative mx-auto flex h-full max-h-full min-h-[338px] w-full max-w-[min(92vw,960px)] shrink-0 items-center justify-center p-2 sm:min-h-[712px] sm:p-5 lg:max-h-[calc(100dvh-12rem)] lg:min-h-[420px]">
               <div
                 ref={viewportHostRef}
                 data-testid="studio-bg3d-viewport"
@@ -1071,7 +1074,7 @@ export function StudioBg3dEditorViewport({ h }) {
               </div>
             </div>
             {/* Notices need their own space: small viewports already fit five rows of controls. */}
-            <div className="mx-auto flex w-full max-w-[min(92vw,960px)] shrink-0 flex-col gap-2 px-2 pb-2 sm:px-5 sm:pb-5">
+            <div data-bg3d-viewport-notices="true" className="mx-auto flex w-full max-w-[min(92vw,960px)] shrink-0 flex-col gap-2 px-2 pb-2 sm:px-5 sm:pb-5">
                 {sharedCharacters.length > 0 && !isCapturing && !immersiveSceneActive ? (
                   <div className="[&>div]:static [&>div]:max-w-none">
                     <StudioBg3dSharedCharacterStatusOverlay

@@ -27,9 +27,9 @@ describe("site route experience", () => {
     expect(experience.terminologyScope).toBe("public");
   });
 
-  it("keeps precision 3D editing explicit on narrow devices", () => {
+  it("keeps the guided scene workflow available on narrow devices", () => {
     const experience = resolveSiteRouteExperience("/studio/bg3d");
-    expect(experience.mobilePolicy).toBe("desktop-required");
+    expect(experience.mobilePolicy).toBe("full");
     expect(experience.saveTrustRequired).toBe(true);
     expect(experience.nextActionId).toBe("create-scene");
   });

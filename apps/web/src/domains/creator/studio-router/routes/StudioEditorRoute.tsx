@@ -86,7 +86,7 @@ export function StudioEditorRoute({ resolution }: {
         draftSessionEpoch={draftScope.epoch}
         studioRoute={route}
       >
-        {route.surface === "bg3d" || route.surface === "poser" || route.surface === "character" ? (
+        {route.surface === "poser" ? (
           <Suspense fallback={null}>
             <StudioWorkspaceContextCoach surface={route.surface} />
           </Suspense>
