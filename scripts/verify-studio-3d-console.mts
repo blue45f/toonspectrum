@@ -1075,7 +1075,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   );
 
   const characterMenu = await openThreeDMenu(page);
-  await characterMenu.getByRole("menuitem", { name: "3D 캐릭터", exact: true }).click();
+  await characterMenu.getByRole("menuitem", { name: "인물·포즈 편집", exact: true }).click();
   const characterDialog = page.locator('[data-studio-vrm-dialog="true"]');
   await characterDialog.waitFor({ state: "visible", timeout: 25_000 });
   const insertCharacterButton = characterDialog.getByRole("button", {
@@ -1166,7 +1166,7 @@ async function run(page: Page, studioUrl: string): Promise<void> {
   );
 
   const liveLossMenu = await openThreeDMenu(page);
-  await liveLossMenu.getByRole("menuitem", { name: "3D 캐릭터", exact: true }).click();
+  await liveLossMenu.getByRole("menuitem", { name: "인물·포즈 편집", exact: true }).click();
   const liveLossDialog = page.locator('[data-studio-vrm-dialog="true"]');
   await liveLossDialog.waitFor({ state: "visible", timeout: 25_000 });
   await page.waitForTimeout(1_000);

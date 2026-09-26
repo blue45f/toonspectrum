@@ -8,9 +8,20 @@ function localPreviewOrigin(studioUrl: string): string | null {
 }
 export function isStaticPreviewReadinessUnavailable(message: string, studioUrl: string): boolean {
   const origin = localPreviewOrigin(studioUrl);
-  return origin !== null && message === `Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ ${origin}/api/health/ready`;
+  if (origin === null) return false;
+  const optionalPaths = [
+    "/api/health/ready",
+    "/api/health/capabilities",
+    "/api/studio-realtime/tickets",
+  ];
+  return optionalPaths.some((path) => message === `Failed to load resource: the server responded with a status of 502 (Bad Gateway) @ ${origin}${path}`);
 }
 export function isStaticPreviewReadinessResponse(status: number, responseUrl: string, studioUrl: string): boolean {
   const origin = localPreviewOrigin(studioUrl);
-  return origin !== null && status === 502 && responseUrl === `${origin}/api/health/ready`;
+  if (origin === null || status !== 502) return false;
+  return [
+    `${origin}/api/health/ready`,
+    `${origin}/api/health/capabilities`,
+    `${origin}/api/studio-realtime/tickets`,
+  ].includes(responseUrl);
 }
