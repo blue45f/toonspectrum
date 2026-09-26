@@ -23,6 +23,8 @@ import {
   getTitle,
   TITLES,
 } from "../../../../../packages/core/src/server";
+import { isDatabaseAvailabilityError } from "../../common/database-availability";
+import { withDatabaseCapability } from "../../common/service-availability";
 import { db, reviewLikes, reviews, users } from "../../db";
 import { loadBundledCatalog } from "../../server/catalog-loader";
 import {
@@ -192,8 +194,20 @@ export class CatalogService implements OnModuleInit {
 
   async getHomeData() {
     void this.mergeKmasOnSiteAccess().catch(() => {});
-    // 리뷰 총계는 DB read-model 이라 API(앱 레이어)가 core 홈 read-model 에 주입한다.
-    return this.withKmasImages(await getHomeData({ loadReviewStats: getReviewGlobalStats }));
+    // Keep the static catalog available when review storage is down, but name the partial state.
+    let reviewsStatus: "available" | "unavailable" = "available";
+    const data = await getHomeData({
+      loadReviewStats: async () => {
+        try {
+          return await getReviewGlobalStats();
+        } catch (error) {
+          if (!isDatabaseAvailabilityError(error)) throw error;
+          reviewsStatus = "unavailable";
+          return { total: 0 };
+        }
+      },
+    });
+    return this.withKmasImages({ ...data, reviewsStatus });
   }
 
   async getCalendarData() {
@@ -382,50 +396,52 @@ export class CatalogService implements OnModuleInit {
   }
 
   async getTitleReviews(titleId: string) {
-    try {
-    const rows = await db
-      .select({
-        id: reviews.id,
-        userId: reviews.userId,
-        rating: reviews.rating,
-        text: reviews.text,
-        tags: reviews.tags,
-        spoiler: reviews.spoiler,
-        createdAt: reviews.createdAt,
-        author: users.name,
-        avatar: users.avatar,
-      })
-      .from(reviews)
-      .innerJoin(users, eq(reviews.userId, users.id))
-      .where(eq(reviews.titleId, titleId))
-      .orderBy(desc(reviews.createdAt));
+    return withDatabaseCapability("catalog.reviews.read", async () => {
+      const rows = await db
+        .select({
+          id: reviews.id,
+          userId: reviews.userId,
+          rating: reviews.rating,
+          text: reviews.text,
+          tags: reviews.tags,
+          spoiler: reviews.spoiler,
+          createdAt: reviews.createdAt,
+          author: users.name,
+          avatar: users.avatar,
+        })
+        .from(reviews)
+        .innerJoin(users, eq(reviews.userId, users.id))
+        .where(eq(reviews.titleId, titleId))
+        .orderBy(desc(reviews.createdAt));
 
-    const ids = rows.map((row) => row.id);
-    const counts = ids.length
-      ? await db
-          .select({ reviewId: reviewLikes.reviewId, c: sql<number>`count(*)`.as("c") })
-          .from(reviewLikes)
-          .where(inArray(reviewLikes.reviewId, ids))
-          .groupBy(reviewLikes.reviewId)
-      : [];
-    const likesById = Object.fromEntries(counts.map((row) => [row.reviewId, Number(row.c)]));
+      const ids = rows.map((row) => row.id);
+      const counts = ids.length
+        ? await db
+            .select({
+              reviewId: reviewLikes.reviewId,
+              c: sql<number>`count(*)`.as("c"),
+            })
+            .from(reviewLikes)
+            .where(inArray(reviewLikes.reviewId, ids))
+            .groupBy(reviewLikes.reviewId)
+        : [];
+      const likesById = Object.fromEntries(
+        counts.map((row) => [row.reviewId, Number(row.c)]),
+      );
 
-    return rows.map((row) => ({
-      id: row.id,
-      userId: row.userId,
-      author: row.author ?? "익명",
-      avatar: row.avatar ?? "#7c5cfc",
-      rating: fromDb(row.rating),
-      text: row.text,
-      tags: row.tags ?? [],
-      spoiler: row.spoiler,
-      likes: likesById[row.id] ?? 0,
-      createdAt: new Date(row.createdAt ?? Date.now()).toISOString(),
-    }));
-    } catch {
-      // 리뷰 DB(Neon) 불가(쿼터/장애) 시 빈 목록 폴백 — 상세 페이지/리뷰 탭이 깨지지 않게.
-      return [];
-    }
+      return rows.map((row) => ({
+        id: row.id,
+        userId: row.userId,
+        author: row.author ?? "익명",
+        avatar: row.avatar ?? "#7c5cfc",
+        rating: fromDb(row.rating),
+        text: row.text,
+        tags: row.tags ?? [],
+        spoiler: row.spoiler,
+        likes: likesById[row.id] ?? 0,
+        createdAt: new Date(row.createdAt ?? Date.now()).toISOString(),
+      }));
+    });
   }
 
   async getAuthorData(name: string) {

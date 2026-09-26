@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { playSfx } from "@toonspectrum/core/fx";
 import { Command } from "cmdk";
 import {
@@ -170,7 +171,7 @@ export function CommandPalette({
     }
     let alive = true;
     const controller = new AbortController();
-    fetch(`/api/titles?ids=${encodeURIComponent(recentKey)}`, {
+    apiFetch(`/api/titles?ids=${encodeURIComponent(recentKey)}`, {
       cache: "no-store",
       signal: controller.signal,
     })

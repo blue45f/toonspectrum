@@ -5,7 +5,7 @@ export const DISCOVER_PURPOSE_PREFIXES = [
 ] as const;
 
 const PUBLIC_PAGES = new Set([
-  "/", "/brand-film", "/product-tour", "/events", "/membership", "/references", "/collaborate", "/creators", "/about", "/about/studio", "/about/workflow", "/about/technology", "/about/technology/story", "/about/technology/guides", "/about/technology/references", "/about/technology/field-notes", "/about/technology/deck", "/about/technology/videos", "/about/technology/licenses", "/about/principles", "/about/data", "/about/crawler", "/contact", "/business", "/support-us", "/support-creators", "/support", "/help", "/sitemap",
+  "/", "/brand-film", "/product-tour", "/events", "/membership", "/references", "/collaborate", "/creators", "/about", "/about/studio", "/about/workflow", "/about/technology", "/about/technology/story", "/about/technology/guides", "/about/technology/references", "/about/technology/field-notes", "/about/technology/deck", "/about/technology/videos", "/about/technology/licenses", "/about/principles", "/about/data", "/about/crawler", "/contact", "/business", "/support-us", "/support-creators", "/support", "/help", "/status", "/sitemap",
   "/discover", "/discover/works", "/search", "/explore", "/ranking", "/recommend",
   "/calendar", "/compare", "/random", "/tags", "/authors", "/insights", "/insights/resources", "/news", "/guide",
   "/research", "/research/assets", "/research/books", "/research/3d-assets", "/research/material-assets", "/research/space-assets", "/research/vam", "/research/rijksmuseum", "/research/fonts", "/research/creatures", "/research/music-metadata", "/research/archive", "/research/weather-light", "/research/open-data", "/references", "/now", "/opportunities", "/story-lab",

@@ -1,4 +1,4 @@
-import { apiPath } from "@/platform/api";
+import { apiFetch, apiPath } from "@/platform/api";
 
 import { buildYouTubeLearningSearchUrl } from "./learning-resources";
 
@@ -31,7 +31,7 @@ export async function searchYouTubeLearningResources(
   }
 
   const params = new URLSearchParams({ q: normalized, limit: "8" });
-  const response = await fetch(apiPath(`/api/learning/youtube/search?${params.toString()}`), {
+  const response = await apiFetch(apiPath(`/api/learning/youtube/search?${params.toString()}`), {
     method: "GET",
     cache: "no-store",
     signal,

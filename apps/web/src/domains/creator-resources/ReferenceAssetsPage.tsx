@@ -37,7 +37,7 @@ import { downloadText, useCreatorWorkspace } from "./workspace";
 import type { CreatorResource, ResourceSearchResult } from "@/shared/lib/creator-resources";
 import type { ReferenceSearchState, ReferenceViewState } from "@/shared/lib/reference-assets";
 
-import { apiPath } from "@/platform/api";
+import { apiFetch, apiPath } from "@/platform/api";
 import { attributionMarkdown, parseSearchResult } from "@/shared/lib/creator-resources";
 import {
   buildReferenceApiParams,
@@ -162,7 +162,7 @@ export function ReferenceAssetsPage() {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort("timeout"), 30000);
     let disposed = false;
-    void fetch(apiPath(`/api/creator-resources/search?${buildReferenceApiParams(requestSearch)}`), {
+    void apiFetch(apiPath(`/api/creator-resources/search?${buildReferenceApiParams(requestSearch)}`), {
       signal: controller.signal,
       headers: { Accept: "application/json" },
     }).then(async (response) => {

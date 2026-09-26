@@ -1,120 +1,238 @@
 import {
+  AlertTriangle,
   CheckCircle2,
-  CircleAlert,
+  Clock3,
+  CloudOff,
   RefreshCw,
 } from "lucide-react";
 
 import {
   requestServiceCapabilityRefresh,
+  type ServiceCapabilitiesReport,
   useServiceCapabilityState,
 } from "@/platform/service-capability-state";
 import { Container } from "@/shared/components/section";
+import { buttonClass } from "@/shared/components/ui/button-utils";
+import { cn } from "@/shared/lib/utils";
 import { useDocumentTitle } from "@/shared/seo/use-document-title";
 
-const CAPABILITIES = [
-  ["publicCatalog", "작품 탐색", "정적 카탈로그와 공개 작품 정보를 확인합니다."],
-  ["authSession", "로그인 상태", "기존 로그인 상태를 안전하게 유지합니다."],
-  ["communityRead", "커뮤니티 조회", "글·댓글·커뮤니티 목록을 불러옵니다."],
-  ["communityWrite", "커뮤니티 작성", "글·댓글·커뮤니티 변경을 저장합니다."],
-  ["marketplaceRead", "마켓 리소스", "공유 리소스와 소유 내역을 확인합니다."],
-  ["studioLocalEditing", "로컬 편집", "드로잉·레이어·로컬 자동 저장을 사용합니다."],
-  ["studioProjectRead", "서버 프로젝트", "서버 프로젝트와 revision을 불러옵니다."],
-  ["studioCloudSave", "클라우드 저장", "원고를 서버에 저장하고 동기화합니다."],
-  ["realtimeCollaboration", "실시간 협업", "공동 편집과 팀 연결을 사용합니다."],
-  ["publishing", "게시", "작품과 리소스를 공개합니다."],
-  ["serverAi", "서버 AI", "서버 기반 AI 도구를 사용합니다."],
-] as const;
+type CapabilityKey = keyof ServiceCapabilitiesReport["capabilities"];
 
+const CAPABILITY_COPY: Record<
+  CapabilityKey,
+  { readonly label: string; readonly description: string }
+> = {
+  publicCatalog: {
+    label: "작품 탐색·공개 콘텐츠",
+    description: "정적 카탈로그와 공개 안내 페이지",
+  },
+  authSession: {
+    label: "로그인 세션",
+    description: "현재 로그인 확인과 계정 상태",
+  },
+  communityRead: {
+    label: "커뮤니티 조회",
+    description: "게시글·댓글·카페 목록 읽기",
+  },
+  communityWrite: {
+    label: "커뮤니티 작성",
+    description: "게시글·댓글·카페 작성과 운영",
+  },
+  marketplaceRead: {
+    label: "마켓 리소스",
+    description: "공유 리소스·라이선스·소유 상태 조회",
+  },
+  studioLocalEditing: {
+    label: "Studio 로컬 편집",
+    description: "드로잉·레이어·로컬 자동 저장·파일 내보내기",
+  },
+  studioProjectRead: {
+    label: "서버 프로젝트 불러오기",
+    description: "서버에 저장된 프로젝트와 버전 조회",
+  },
+  studioCloudSave: {
+    label: "클라우드 저장",
+    description: "초안·버전·에셋의 서버 반영",
+  },
+  realtimeCollaboration: {
+    label: "실시간 협업",
+    description: "공동 편집·댓글·통화 연결",
+  },
+  publishing: {
+    label: "게시·배포",
+    description: "작품 공개와 예약 게시",
+  },
+  serverAi: {
+    label: "서버 AI",
+    description: "서버 기반 생성·분석 작업",
+  },
+};
+
+const STATE_COPY = {
+  available: {
+    label: "정상",
+    className: "border-good/35 bg-good/10 text-good",
+  },
+  degraded: {
+    label: "일부 제한",
+    className: "border-warn/40 bg-warn/10 text-warn",
+  },
+  unavailable: {
+    label: "일시 중지",
+    className: "border-bad/35 bg-bad/10 text-bad",
+  },
+} as const;
+
+function formatCheckedAt(value: string | undefined): string {
+  if (!value) return "아직 확인하지 못했습니다.";
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return value;
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(timestamp);
+}
 export function ServiceStatusPage() {
   useDocumentTitle("서비스 상태");
   const state = useServiceCapabilityState();
   const report = state.report;
+  const unknown = state.status === "unknown";
+  const degraded = state.status === "degraded";
+  const entries = report
+    ? Object.entries(report.capabilities) as Array<[
+        CapabilityKey,
+        ServiceCapabilitiesReport["capabilities"][CapabilityKey],
+      ]>
+    : [];
 
   return (
-    <Container size="wide" className="py-10 sm:py-14">
-      <header className="max-w-3xl">
+    <Container size="wide" className="py-8 sm:py-12">
+      <header className="rounded-3xl border border-line bg-card/80 p-6 shadow-sm sm:p-8">
         <p className="eyebrow text-accent">SERVICE STATUS</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">
-          서비스 상태
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-fg-2 sm:text-base">
-          전체 서비스가 아니라 기능별 상태를 표시합니다. 제한된 기능이 있어도 작품 탐색과 로컬 편집은 계속 사용할 수 있습니다.
-        </p>
-      </header>
-
-      <section className="mt-8 rounded-3xl border border-line bg-card p-5 sm:p-7">
-        <div className="flex flex-wrap items-center gap-3">
-          {state.status === "degraded" ? (
-            <CircleAlert className="size-6 text-warn" aria-hidden="true" />
-          ) : (
-            <CheckCircle2 className="size-6 text-good" aria-hidden="true" />
-          )}
+        <div className="mt-3 flex flex-wrap items-start gap-4">
+          <span
+            className={cn(
+              "grid size-12 shrink-0 place-items-center rounded-2xl border",
+              unknown
+                ? "border-line bg-panel text-fg-3"
+                : degraded
+                  ? "border-warn/40 bg-warn/10 text-warn"
+                  : "border-good/35 bg-good/10 text-good",
+            )}
+          >
+            {unknown
+              ? <CloudOff className="size-6" aria-hidden="true" />
+              : degraded
+                ? <AlertTriangle className="size-6" aria-hidden="true" />
+                : <CheckCircle2 className="size-6" aria-hidden="true" />}
+          </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-bold">
-              {state.status === "degraded"
-                ? "일부 온라인 기능 제한"
-                : state.status === "available"
-                  ? "주요 기능 정상"
-                  : "상태 확인 중"}
-            </h2>
-            <p className="mt-0.5 text-xs text-fg-3">
-              {report?.checkedAt
-                ? `마지막 확인 ${new Date(report.checkedAt).toLocaleString("ko-KR")}`
-                : "아직 서버 상태를 확인하지 못했습니다."}
-              {report?.incidentId ? ` · 장애 참조 ${report.incidentId}` : ""}
+            <h1 className="text-2xl font-black tracking-tight text-fg sm:text-4xl">
+              {unknown
+                ? state.checking
+                  ? "서비스 상태를 확인하고 있습니다."
+                  : "서비스 상태를 아직 확인하지 못했습니다."
+                : degraded
+                  ? "일부 온라인 기능이 제한되어 있습니다."
+                  : "현재 주요 기능이 정상입니다."}
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-fg-2">
+              {unknown
+                ? "상태를 확인하는 동안 현재 입력과 Studio 로컬 작업은 그대로 유지됩니다."
+                : degraded
+                  ? "탐색과 Studio 로컬 편집은 계속 사용할 수 있습니다. 제한된 온라인 기능은 복구 전까지 읽기 또는 쓰기가 중지될 수 있습니다."
+                  : "이 페이지는 사용자가 실제로 이용하는 기능별 상태를 표시합니다. 배포 인프라의 내부 상세 정보는 공개하지 않습니다."}
             </p>
           </div>
           <button
             type="button"
             onClick={requestServiceCapabilityRefresh}
             disabled={state.checking}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line px-4 text-sm font-semibold disabled:opacity-60"
+            className={buttonClass({
+              variant: "outline",
+              size: "sm",
+              className: "min-h-11 gap-2",
+            })}
           >
-            <RefreshCw className={`size-4 ${state.checking ? "animate-spin" : ""}`} aria-hidden="true" />
-            다시 확인
+            <RefreshCw
+              className={cn("size-4", state.checking && "animate-spin")}
+              aria-hidden="true"
+            />
+            {state.checking ? "상태 확인 중" : "지금 다시 확인"}
           </button>
         </div>
+
+        <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-4 text-xs text-fg-3">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock3 className="size-3.5" aria-hidden="true" />
+            최근 확인 {formatCheckedAt(report?.checkedAt)}
+          </span>
+          {report?.incidentId ? (
+            <span className="font-mono">장애 ID {report.incidentId}</span>
+          ) : null}
+        </div>
+      </header>
+      <section className="mt-8" aria-labelledby="capability-status-title">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="eyebrow text-accent">CAPABILITY STATUS</p>
+            <h2 id="capability-status-title" className="mt-2 text-2xl font-bold text-fg">
+              기능별 상태
+            </h2>
+          </div>
+          <p className="text-xs text-fg-3">빈 데이터와 장애를 구분해 표시합니다.</p>
+        </div>
+
+        {entries.length > 0 ? (
+          <ul className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {entries.map(([key, capabilityState]) => {
+              const copy = CAPABILITY_COPY[key];
+              const statusCopy = STATE_COPY[capabilityState];
+              return (
+                <li key={key} className="rounded-2xl border border-line bg-card/70 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-fg">{copy.label}</h3>
+                      <p className="mt-1 text-xs leading-5 text-fg-3">{copy.description}</p>
+                    </div>
+                    <span className={cn(
+                      "shrink-0 rounded-full border px-2.5 py-1 text-[0.68rem] font-bold",
+                      statusCopy.className,
+                    )}>
+                      {statusCopy.label}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="mt-5 rounded-2xl border border-dashed border-line bg-panel/50 p-8 text-center">
+            <CloudOff className="mx-auto size-6 text-fg-3" aria-hidden="true" />
+            <p className="mt-3 text-sm font-bold text-fg">
+              기능 상태를 아직 확인하지 못했습니다.
+            </p>
+            <p className="mt-1 text-xs leading-5 text-fg-3">
+              인터넷 연결을 확인한 뒤 다시 시도해 주세요. 현재 입력이나 로컬 작업은 유지됩니다.
+            </p>
+          </div>
+        )}
       </section>
 
-      <section className="mt-6" aria-labelledby="capability-status-title">
-        <h2 id="capability-status-title" className="text-xl font-bold">
-          기능별 상태
-        </h2>
-        <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {CAPABILITIES.map(([key, label, description]) => {
-            const value = report?.capabilities[key] ?? "available";
-            const available = value === "available";
-            return (
-              <li
-                key={key}
-                className={`rounded-2xl border p-4 ${available ? "border-line bg-card" : "border-warn/40 bg-warn/10"}`}
-              >
-                <div className="flex items-center gap-2">
-                  {available ? (
-                    <CheckCircle2 className="size-4 text-good" aria-hidden="true" />
-                  ) : (
-                    <CircleAlert className="size-4 text-warn" aria-hidden="true" />
-                  )}
-                  <h3 className="font-bold">{label}</h3>
-                  <span className={`ml-auto text-xs font-semibold ${available ? "text-good" : "text-warn"}`}>
-                    {available ? "사용 가능" : "일시 제한"}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs leading-relaxed text-fg-2">{description}</p>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-
-      <section className="mt-8 rounded-2xl border border-line bg-panel p-5 text-sm leading-relaxed text-fg-2">
-        <h2 className="font-bold text-fg">장애 중 데이터 보호 원칙</h2>
-        <p className="mt-2">
-          목록을 조회하지 못한 경우 0건으로 표시하지 않습니다. 작성 중인 입력은 유지하고, 스튜디오는 로컬 자동 저장과 파일 내보내기를 계속 제공합니다. 결제·게시·삭제처럼 중복 실행 위험이 있는 작업은 자동으로 다시 실행하지 않습니다.
-        </p>
-      </section>
+      {state.lastError ? (
+        <section
+          role="alert"
+          className="mt-8 rounded-2xl border border-warn/40 bg-warn/10 p-4"
+        >
+          <h2 className="text-sm font-bold text-fg">마지막 상태 확인에 실패했습니다.</h2>
+          <p className="mt-1 text-xs leading-5 text-fg-2">{state.lastError.message}</p>
+          {state.lastError.requestId ? (
+            <p className="mt-2 font-mono text-[0.68rem] text-fg-3">
+              요청 ID {state.lastError.requestId}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
     </Container>
   );
 }
-
-export default ServiceStatusPage;

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { normalizeCollectionClientId } from "./collection-contract";
 import {
   CollectionWriteThroughCoordinator,
@@ -95,7 +96,7 @@ export async function sendCollectionCommand(
       }, COLLECTION_REQUEST_TIMEOUT_MS);
     });
     response = await Promise.race([
-      fetch("/api/me/collection", withCsrfProtection({
+      apiFetch("/api/me/collection", withCsrfProtection({
         method: "POST",
         headers: {
           "Content-Type": "application/json",

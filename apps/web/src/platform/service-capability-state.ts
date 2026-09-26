@@ -1,291 +1,104 @@
 import { useSyncExternalStore } from "react";
+import { z } from "zod";
 
-import { apiPath } from "@/platform/api";
-import { SERVICE_CAPABILITY_ERROR_EVENT } from "@/platform/api-error";
+import {
+  SERVICE_CAPABILITY_ERROR_EVENT,
+  type AppApiError,
+  isAbortError,
+  toAppApiError,
+} from "@/platform/api-error";
+import { api } from "@/platform/api";
 
-export type ServiceCapabilityState = "available" | "unavailable";
+const CAPABILITY_STATE_SCHEMA = z.enum([
+  "available",
+  "degraded",
+  "unavailable",
+]);
 
-export interface ServiceCapabilityReport {
-  readonly status: "available" | "degraded";
-  readonly incidentId: string | null;
-  readonly capabilities: Readonly<{
-    publicCatalog: ServiceCapabilityState;
-    authSession: ServiceCapabilityState;
-    communityRead: ServiceCapabilityState;
-    communityWrite: ServiceCapabilityState;
-    marketplaceRead: ServiceCapabilityState;
-    studioLocalEditing: ServiceCapabilityState;
-    studioProjectRead: ServiceCapabilityState;
-    studioCloudSave: ServiceCapabilityState;
-    realtimeCollaboration: ServiceCapabilityState;
-    publishing: ServiceCapabilityState;
-    serverAi: ServiceCapabilityState;
-  }>;
-  readonly failedChecks: readonly string[];
-  readonly checkedAt: string;
-}
+const SERVICE_CAPABILITIES_SCHEMA = z.object({
+  status: z.enum(["available", "degraded"]),
+  incidentId: z.string().nullable(),
+  retryAfterSeconds: z.number().int().min(1).max(3_600).nullable(),
+  checkedAt: z.string().datetime(),
+  capabilities: z.object({
+    publicCatalog: CAPABILITY_STATE_SCHEMA,
+    authSession: CAPABILITY_STATE_SCHEMA,
+    communityRead: CAPABILITY_STATE_SCHEMA,
+    communityWrite: CAPABILITY_STATE_SCHEMA,
+    marketplaceRead: CAPABILITY_STATE_SCHEMA,
+    studioLocalEditing: CAPABILITY_STATE_SCHEMA,
+    studioProjectRead: CAPABILITY_STATE_SCHEMA,
+    studioCloudSave: CAPABILITY_STATE_SCHEMA,
+    realtimeCollaboration: CAPABILITY_STATE_SCHEMA,
+    publishing: CAPABILITY_STATE_SCHEMA,
+    serverAi: CAPABILITY_STATE_SCHEMA,
+  }).strict(),
+}).strict();
+
+export type ServiceCapabilityState = z.infer<typeof CAPABILITY_STATE_SCHEMA>;
+export type ServiceCapabilitiesReport = z.infer<typeof SERVICE_CAPABILITIES_SCHEMA>;
 
 export interface ServiceCapabilitySnapshot {
   readonly status: "unknown" | "available" | "degraded";
   readonly checking: boolean;
-  readonly report: ServiceCapabilityReport | null;
-  readonly detectedAt: string | null;
+  readonly report: ServiceCapabilitiesReport | null;
+  readonly lastError: AppApiError | null;
+  readonly nextProbeAt: number | null;
   readonly recoveredAt: number | null;
-  readonly error: string | null;
 }
 
-const POLL_INTERVAL_MS = 60_000;
-const REQUEST_TIMEOUT_MS = 5_000;
-const CHANNEL_NAME = "toonspectrum:service-capabilities:v1";
+interface CapabilityErrorEventDetail {
+  readonly capability?: unknown;
+  readonly retryAfterSeconds?: unknown;
+  readonly requestId?: unknown;
+  readonly incidentId?: unknown;
+  readonly detectedAt?: unknown;
+}
 
-const AVAILABLE_CAPABILITIES: ServiceCapabilityReport["capabilities"] = {
-  publicCatalog: "available",
-  authSession: "available",
-  communityRead: "available",
-  communityWrite: "available",
-  marketplaceRead: "available",
-  studioLocalEditing: "available",
-  studioProjectRead: "available",
-  studioCloudSave: "available",
-  realtimeCollaboration: "available",
-  publishing: "available",
-  serverAi: "available",
-};
+const STORAGE_KEY = "toonspectrum:service-capabilities:v1";
+const CHECK_INTERVAL_MS = 60_000;
+const DEFAULT_RETRY_MS = 30_000;
+function readStoredReport(): ServiceCapabilitiesReport | null {
+  try {
+    if (typeof localStorage === "undefined") return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = SERVICE_CAPABILITIES_SCHEMA.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
 
+function persistReport(report: ServiceCapabilitiesReport): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(report));
+  } catch {
+    // 상태 캐시는 편의 기능이며 브라우저 저장 제한이 앱 렌더링을 막아서는 안 된다.
+  }
+}
+
+const storedReport = readStoredReport();
 let snapshot: ServiceCapabilitySnapshot = Object.freeze({
-  status: "unknown",
+  status: storedReport?.status ?? "unknown",
   checking: false,
-  report: null,
-  detectedAt: null,
+  report: storedReport,
+  lastError: null,
+  nextProbeAt: null,
   recoveredAt: null,
-  error: null,
 });
 const listeners = new Set<() => void>();
 let runtimeUsers = 0;
-let timer: ReturnType<typeof setInterval> | null = null;
-let requestController: AbortController | null = null;
-let removeListeners: (() => void) | null = null;
-let channel: BroadcastChannel | null = null;
-
-function publish(next: ServiceCapabilitySnapshot, broadcast = true): void {
+let activeProbe: Promise<ServiceCapabilitySnapshot> | null = null;
+let removeRuntimeListeners: (() => void) | null = null;
+let intervalId: ReturnType<typeof setInterval> | null = null;
+function publish(next: ServiceCapabilitySnapshot): ServiceCapabilitySnapshot {
   snapshot = Object.freeze(next);
+  if (typeof document !== "undefined") {
+    document.documentElement.dataset.serviceCapabilityState = next.status;
+  }
   for (const listener of listeners) listener();
-  if (broadcast) {
-    try {
-      channel?.postMessage({
-        type: "capabilities",
-        status: next.status,
-        report: next.report,
-        detectedAt: next.detectedAt,
-        recoveredAt: next.recoveredAt,
-      });
-    } catch {
-      // Cross-tab synchronization is optional; the local poll remains authoritative.
-    }
-  }
-}
-
-function isCapabilityState(value: unknown): value is ServiceCapabilityState {
-  return value === "available" || value === "unavailable";
-}
-
-function parseReport(value: unknown): ServiceCapabilityReport | null {
-  if (!value || typeof value !== "object") return null;
-  const source = value as Partial<ServiceCapabilityReport>;
-  const capabilities = source.capabilities;
-  if (!capabilities || typeof capabilities !== "object") return null;
-  const keys = Object.keys(AVAILABLE_CAPABILITIES) as Array<
-    keyof ServiceCapabilityReport["capabilities"]
-  >;
-  if (!keys.every((key) => isCapabilityState(capabilities[key]))) return null;
-  if (source.status !== "available" && source.status !== "degraded") return null;
-  if (typeof source.checkedAt !== "string" || !source.checkedAt) return null;
-  return {
-    status: source.status,
-    incidentId: typeof source.incidentId === "string"
-      ? source.incidentId
-      : null,
-    capabilities: capabilities as ServiceCapabilityReport["capabilities"],
-    failedChecks: Array.isArray(source.failedChecks)
-      ? source.failedChecks.filter((item): item is string => typeof item === "string")
-      : [],
-    checkedAt: source.checkedAt,
-  };
-}
-
-function capabilityKey(value: unknown): keyof ServiceCapabilityReport["capabilities"] | null {
-  if (typeof value !== "string") return null;
-  const map: Record<string, keyof ServiceCapabilityReport["capabilities"]> = {
-    "community.read": "communityRead",
-    "community.write": "communityWrite",
-    "community.reviews.read": "communityRead",
-    "marketplace.read": "marketplaceRead",
-    "creator.marketplace.read": "marketplaceRead",
-    "studio.project.read": "studioProjectRead",
-    "studio.cloud.save": "studioCloudSave",
-    "studio.collaboration": "realtimeCollaboration",
-    "studio.publish": "publishing",
-    "server.ai": "serverAi",
-  };
-  return map[value] ?? null;
-}
-
-function publishObservedFailure(event: Event): void {
-  const detail = event instanceof CustomEvent && event.detail
-    && typeof event.detail === "object"
-    ? event.detail as Record<string, unknown>
-    : {};
-  const key = capabilityKey(detail.capability);
-  const capabilities = { ...AVAILABLE_CAPABILITIES };
-  if (key) capabilities[key] = "unavailable";
-  else {
-    capabilities.communityRead = "unavailable";
-    capabilities.communityWrite = "unavailable";
-    capabilities.marketplaceRead = "unavailable";
-    capabilities.studioProjectRead = "unavailable";
-    capabilities.studioCloudSave = "unavailable";
-    capabilities.publishing = "unavailable";
-  }
-  const detectedAt = typeof detail.detectedAt === "string"
-    ? detail.detectedAt
-    : new Date().toISOString();
-  publish({
-    status: "degraded",
-    checking: false,
-    report: {
-      status: "degraded",
-      incidentId: typeof detail.incidentId === "string"
-        ? detail.incidentId
-        : null,
-      capabilities,
-      failedChecks: ["observed_request_failure"],
-      checkedAt: detectedAt,
-    },
-    detectedAt,
-    recoveredAt: null,
-    error: null,
-  });
-}
-
-export async function refreshServiceCapabilityState(): Promise<void> {
-  if (typeof fetch !== "function") return;
-  requestController?.abort();
-  const controller = new AbortController();
-  requestController = controller;
-  publish({ ...snapshot, checking: true, error: null }, false);
-  const timeout = globalThis.setTimeout(
-    () => controller.abort(),
-    REQUEST_TIMEOUT_MS,
-  );
-  try {
-    const response = await fetch(apiPath("/health/capabilities"), {
-      cache: "no-store",
-      credentials: "include",
-      headers: { Accept: "application/json" },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`capability probe failed (${response.status})`);
-    const report = parseReport(await response.json());
-    if (!report) throw new Error("capability response is invalid");
-    const wasDegraded = snapshot.status === "degraded";
-    publish({
-      status: report.status,
-      checking: false,
-      report,
-      detectedAt: report.status === "degraded"
-        ? snapshot.detectedAt ?? report.checkedAt
-        : null,
-      recoveredAt: wasDegraded && report.status === "available"
-        ? Date.now()
-        : snapshot.recoveredAt,
-      error: null,
-    });
-  } catch (error) {
-    if (controller.signal.aborted && requestController !== controller) return;
-    publish({
-      ...snapshot,
-      checking: false,
-      error: error instanceof Error ? error.message : "상태를 확인하지 못했습니다.",
-    }, false);
-  } finally {
-    globalThis.clearTimeout(timeout);
-    if (requestController === controller) requestController = null;
-  }
-}
-
-export function requestServiceCapabilityRefresh(): void {
-  void refreshServiceCapabilityState();
-}
-
-export function startServiceCapabilityRuntime(): () => void {
-  runtimeUsers += 1;
-  if (runtimeUsers > 1) return stopServiceCapabilityRuntime;
-  if (typeof window === "undefined") return stopServiceCapabilityRuntime;
-
-  try {
-    channel = typeof BroadcastChannel === "function"
-      ? new BroadcastChannel(CHANNEL_NAME)
-      : null;
-    if (channel) {
-      channel.onmessage = (event: MessageEvent<unknown>) => {
-        const value = event.data;
-        if (!value || typeof value !== "object") return;
-        const message = value as Record<string, unknown>;
-        if (message.type !== "capabilities") return;
-        const report = parseReport(message.report);
-        if (!report) return;
-        publish({
-          status: report.status,
-          checking: false,
-          report,
-          detectedAt: typeof message.detectedAt === "string"
-            ? message.detectedAt
-            : null,
-          recoveredAt: typeof message.recoveredAt === "number"
-            ? message.recoveredAt
-            : null,
-          error: null,
-        }, false);
-      };
-    }
-  } catch {
-    channel = null;
-  }
-
-  const onFocus = () => requestServiceCapabilityRefresh();
-  const onOnline = () => requestServiceCapabilityRefresh();
-  const onVisibility = () => {
-    if (document.visibilityState === "visible") requestServiceCapabilityRefresh();
-  };
-  window.addEventListener("focus", onFocus, { passive: true });
-  window.addEventListener("online", onOnline, { passive: true });
-  window.addEventListener(SERVICE_CAPABILITY_ERROR_EVENT, publishObservedFailure);
-  document.addEventListener("visibilitychange", onVisibility, { passive: true });
-  removeListeners = () => {
-    window.removeEventListener("focus", onFocus);
-    window.removeEventListener("online", onOnline);
-    window.removeEventListener(SERVICE_CAPABILITY_ERROR_EVENT, publishObservedFailure);
-    document.removeEventListener("visibilitychange", onVisibility);
-  };
-  timer = globalThis.setInterval(
-    requestServiceCapabilityRefresh,
-    POLL_INTERVAL_MS,
-  );
-  requestServiceCapabilityRefresh();
-  return stopServiceCapabilityRuntime;
-}
-
-function stopServiceCapabilityRuntime(): void {
-  runtimeUsers = Math.max(0, runtimeUsers - 1);
-  if (runtimeUsers > 0) return;
-  requestController?.abort();
-  requestController = null;
-  if (timer) globalThis.clearInterval(timer);
-  timer = null;
-  removeListeners?.();
-  removeListeners = null;
-  channel?.close();
-  channel = null;
+  return snapshot;
 }
 
 export function getServiceCapabilitySnapshot(): ServiceCapabilitySnapshot {
@@ -297,9 +110,9 @@ export function getServiceCapabilityServerSnapshot(): ServiceCapabilitySnapshot 
     status: "unknown",
     checking: false,
     report: null,
-    detectedAt: null,
+    lastError: null,
+    nextProbeAt: null,
     recoveredAt: null,
-    error: null,
   };
 }
 
@@ -308,10 +121,207 @@ export function subscribeServiceCapabilityState(listener: () => void): () => voi
   return () => listeners.delete(listener);
 }
 
+function online(): boolean {
+  try {
+    return typeof navigator === "undefined" || navigator.onLine !== false;
+  } catch {
+    return true;
+  }
+}
+
+function retryAt(seconds: number | null): number {
+  return Date.now() + (seconds ? seconds * 1_000 : DEFAULT_RETRY_MS);
+}
+export async function probeServiceCapabilities(
+  force = false,
+): Promise<ServiceCapabilitySnapshot> {
+  if (activeProbe) return activeProbe;
+  if (!online()) return snapshot;
+  if (!force && snapshot.nextProbeAt && Date.now() < snapshot.nextProbeAt) {
+    return snapshot;
+  }
+
+  publish({ ...snapshot, checking: true });
+  activeProbe = api.get<unknown>("/health/capabilities", {
+    timeout: 5_000,
+    totalTimeout: 10_000,
+    retry: {
+      limit: 1,
+      methods: ["get"],
+      statusCodes: [408, 429, 502, 503, 504],
+      afterStatusCodes: [429, 503],
+      maxRetryAfter: 5_000,
+      jitter: true,
+      retryOnTimeout: true,
+    },
+    errorMessage: "서비스 상태를 확인하지 못했습니다.",
+  }).then((payload) => {
+    const report = SERVICE_CAPABILITIES_SCHEMA.parse(payload);
+    const recoveredAt = snapshot.status === "degraded" && report.status === "available"
+      ? Date.now()
+      : snapshot.recoveredAt;
+    persistReport(report);
+    return publish({
+      status: report.status,
+      checking: false,
+      report,
+      lastError: null,
+      nextProbeAt: report.status === "degraded"
+        ? retryAt(report.retryAfterSeconds)
+        : null,
+      recoveredAt,
+    });
+  }).catch((error: unknown) => {
+    if (isAbortError(error)) return snapshot;
+    const appError = toAppApiError(error, "서비스 상태를 확인하지 못했습니다.");
+    const degraded = appError.kind === "capability_unavailable"
+      || appError.kind === "server"
+      || appError.kind === "unreachable"
+      || appError.kind === "timeout";
+    return publish({
+      ...snapshot,
+      status: degraded ? "degraded" : snapshot.status,
+      checking: false,
+      lastError: appError,
+      nextProbeAt: retryAt(appError.retryAfterSeconds),
+    });
+  }).finally(() => {
+    activeProbe = null;
+  });
+  return activeProbe;
+}
+
+export function requestServiceCapabilityRefresh(): void {
+  void probeServiceCapabilities(true);
+}
+
+function boundedRetrySeconds(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.min(3_600, Math.max(1, Math.trunc(value)));
+}
+type CapabilityKey = keyof ServiceCapabilitiesReport["capabilities"];
+
+function capabilityKey(value: unknown): CapabilityKey | null {
+  if (typeof value !== "string") return null;
+  if (value.startsWith("community.")) {
+    return value.includes("write") ? "communityWrite" : "communityRead";
+  }
+  if (value.startsWith("creator.marketplace")) return "marketplaceRead";
+  if (value.startsWith("creator.publication")) return "publishing";
+  if (
+    value.startsWith("creator.directory")
+    || value.startsWith("creator.follows")
+    || value.startsWith("creator.profile")
+  ) return "communityRead";
+  if (value.startsWith("creator.challenges")) return "studioProjectRead";
+  if (value.startsWith("creator.work") || value.startsWith("creator.series")) {
+    return value.includes("write") ? "studioCloudSave" : "studioProjectRead";
+  }
+  if (value.startsWith("studio.collaboration")) return "realtimeCollaboration";
+  if (value.startsWith("studio.ai")) return "serverAi";
+  return null;
+}
+
+function onCapabilityFailure(event: Event): void {
+  const detail = event instanceof CustomEvent
+    ? event.detail as CapabilityErrorEventDetail
+    : null;
+  const seconds = boundedRetrySeconds(detail?.retryAfterSeconds);
+  const key = capabilityKey(detail?.capability);
+  let report = snapshot.report;
+  if (report && key) {
+    report = {
+      ...report,
+      status: "degraded",
+      incidentId: typeof detail?.incidentId === "string"
+        ? detail.incidentId
+        : report.incidentId,
+      retryAfterSeconds: seconds ?? report.retryAfterSeconds,
+      checkedAt: typeof detail?.detectedAt === "string"
+        ? detail.detectedAt
+        : new Date().toISOString(),
+      capabilities: { ...report.capabilities, [key]: "unavailable" },
+    };
+    persistReport(report);
+  }
+  publish({
+    ...snapshot,
+    status: "degraded",
+    checking: false,
+    report,
+    nextProbeAt: retryAt(seconds),
+  });
+}
+
+function onStorage(event: StorageEvent): void {
+  if (event.key !== STORAGE_KEY || !event.newValue) return;
+  try {
+    const parsed = SERVICE_CAPABILITIES_SCHEMA.safeParse(JSON.parse(event.newValue));
+    if (!parsed.success) return;
+    publish({
+      ...snapshot,
+      status: parsed.data.status,
+      report: parsed.data,
+      lastError: null,
+      nextProbeAt: parsed.data.status === "degraded"
+        ? retryAt(parsed.data.retryAfterSeconds)
+        : null,
+    });
+  } catch {
+    // 다른 탭의 손상된 상태 캐시는 무시하고 현재 상태를 유지한다.
+  }
+}
+export function startServiceCapabilityRuntime(): () => void {
+  runtimeUsers += 1;
+  if (runtimeUsers > 1) return stopServiceCapabilityRuntime;
+
+  const refresh = () => { void probeServiceCapabilities(); };
+  const onVisibility = () => {
+    if (document.visibilityState === "visible") refresh();
+  };
+  globalThis.addEventListener("online", refresh, { passive: true });
+  globalThis.addEventListener("focus", refresh, { passive: true });
+  globalThis.addEventListener(
+    SERVICE_CAPABILITY_ERROR_EVENT,
+    onCapabilityFailure,
+  );
+  globalThis.addEventListener("storage", onStorage);
+  document.addEventListener("visibilitychange", onVisibility, { passive: true });
+  intervalId = globalThis.setInterval(refresh, CHECK_INTERVAL_MS);
+  removeRuntimeListeners = () => {
+    globalThis.removeEventListener("online", refresh);
+    globalThis.removeEventListener("focus", refresh);
+    globalThis.removeEventListener(
+      SERVICE_CAPABILITY_ERROR_EVENT,
+      onCapabilityFailure,
+    );
+    globalThis.removeEventListener("storage", onStorage);
+    document.removeEventListener("visibilitychange", onVisibility);
+  };
+  void probeServiceCapabilities();
+  return stopServiceCapabilityRuntime;
+}
+
+function stopServiceCapabilityRuntime(): void {
+  runtimeUsers = Math.max(0, runtimeUsers - 1);
+  if (runtimeUsers > 0) return;
+  removeRuntimeListeners?.();
+  removeRuntimeListeners = null;
+  if (intervalId) globalThis.clearInterval(intervalId);
+  intervalId = null;
+}
+
 export function useServiceCapabilityState(): ServiceCapabilitySnapshot {
   return useSyncExternalStore(
     subscribeServiceCapabilityState,
     getServiceCapabilitySnapshot,
     getServiceCapabilityServerSnapshot,
   );
+}
+
+export function capabilityAvailable(
+  key: CapabilityKey,
+  state: ServiceCapabilitySnapshot = snapshot,
+): boolean {
+  return state.report?.capabilities[key] !== "unavailable";
 }

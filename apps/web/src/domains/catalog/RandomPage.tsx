@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { ArrowRight, RefreshCw, Shuffle, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -35,12 +36,12 @@ export function RandomPage() {
     setTitle(null);
 
     const randomUrl = query ? `/api/random?${query}` : "/api/random";
-    fetch(randomUrl, { cache: "no-store", signal: controller.signal })
+    apiFetch(randomUrl, { cache: "no-store", signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("random failed");
         const random = (await response.json()) as RandomResponse;
         if (!random.slug) throw new Error("empty random result");
-        const detail = await fetch(`/api/titles/${encodeURIComponent(random.slug)}`, {
+        const detail = await apiFetch(`/api/titles/${encodeURIComponent(random.slug)}`, {
           cache: "no-store",
           signal: controller.signal,
         });

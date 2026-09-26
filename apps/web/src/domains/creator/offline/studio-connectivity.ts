@@ -1,4 +1,4 @@
-import { apiPath } from "@/platform/api";
+import { apiFetch } from "@/platform/api";
 
 export const STUDIO_CONNECTIVITY_EVENT = "toonspectrum:studio-connectivity";
 
@@ -165,10 +165,22 @@ function update(input: Partial<StudioConnectivityInput>): void {
   }));
 }
 
-function healthUrl(): string {
-  // Follow the exact API-base contract used by the rest of the application.
-  // This avoids probing a different origin than Studio saves use.
-  return apiPath("/health/ready");
+export async function isStudioServerCapabilityAvailable(
+  response: Response,
+): Promise<boolean> {
+  if (!response.ok) return false;
+  try {
+    const payload = await response.json() as {
+      readonly capabilities?: {
+        readonly studioProjectRead?: unknown;
+        readonly studioCloudSave?: unknown;
+      };
+    };
+    return payload.capabilities?.studioProjectRead !== "unavailable"
+      && payload.capabilities?.studioCloudSave !== "unavailable";
+  } catch {
+    return false;
+  }
 }
 
 async function probeStudioServer(): Promise<void> {
@@ -189,14 +201,14 @@ async function probeStudioServer(): Promise<void> {
   update({ browserOnline: true, checking: true });
   const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
   try {
-    const response = await fetch(healthUrl(), {
+    const response = await apiFetch("/health/capabilities", {
       cache: "no-store",
       credentials: "include",
       headers: { Accept: "application/json" },
       signal: controller.signal,
     });
     if (probeController !== controller) return;
-    const reachable = response.ok;
+    const reachable = await isStudioServerCapabilityAvailable(response);
     update({
       browserOnline: true,
       serverReachable: reachable,

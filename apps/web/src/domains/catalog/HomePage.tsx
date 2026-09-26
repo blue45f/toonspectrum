@@ -100,6 +100,7 @@ interface HomeResponse {
     genres: number;
     reviews: number;
   };
+  reviewsStatus?: "available" | "unavailable";
   generatedAt: string;
 }
 
@@ -295,6 +296,11 @@ export function HomePage() {
             {/* 시그니처 인덱스 넘버럴 — 대형 tabular grotesque. ledger 격자 패널(데이터 대장 느낌).
                 작은 화면(320~360px)에선 4칼럼이 천 단위 숫자를 넘치게 만들어 2칼럼으로 떨어뜨리고,
                 sm 이상에선 stat 개수(--stat-cols)만큼 한 줄로 편다(가로 스크롤·숫자 절단 방지). */}
+            {data.reviewsStatus === "unavailable" ? (
+              <p role="status" className="rounded-xl border border-warn/30 bg-warn/10 px-3 py-2 text-xs leading-relaxed text-fg-2">
+                리뷰 수는 현재 확인할 수 없어 통계에서 제외했습니다. 작품 탐색은 계속 사용할 수 있습니다.
+              </p>
+            ) : null}
             <dl
               className="sheen-sweep grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line/80 bg-line/40 surface-hl sm:[grid-template-columns:repeat(var(--stat-cols),minmax(0,1fr))]"
               style={

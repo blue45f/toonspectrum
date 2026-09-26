@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -27,7 +28,7 @@ export function Picker({
     if (!query) return;
 
     const controller = new AbortController();
-    fetch(`/api/titles?q=${encodeURIComponent(query)}&limit=6`, {
+    apiFetch(`/api/titles?q=${encodeURIComponent(query)}&limit=6`, {
       cache: "no-store",
       signal: controller.signal,
     })

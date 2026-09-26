@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { api, apiPath } from "@/platform/api";
+import { api, httpStatus, toAppApiError, type AppApiError } from "@/platform/api";
+import { isAbortError } from "@/platform/api-error";
 
 // 404 를 흐름 제어(notFound)로 다루기 위한 센티넬 에러. 일반 에러와 구분한다.
 export class NotFoundError extends Error {
@@ -10,55 +11,71 @@ export class NotFoundError extends Error {
   }
 }
 
-type ResourceState<T> = {
+export type RemoteDataPhase =
+  | "idle"
+  | "loading"
+  | "success"
+  | "empty"
+  | "stale"
+  | "error"
+  | "not-found";
+
+export type ResourceState<T> = {
   url: string | null;
+  phase: RemoteDataPhase;
   data: T | null;
   loading: boolean;
   error: string | null;
+  appError: AppApiError | null;
   notFound: boolean;
+  fetchedAt: number | null;
+  staleSavedAt: number | null;
 };
 
 function initialState<T>(url: string | null): ResourceState<T> {
   return {
     url,
+    phase: url ? "loading" : "idle",
     data: null,
     loading: Boolean(url),
     error: null,
+    appError: null,
     notFound: false,
+    fetchedAt: null,
+    staleSavedAt: null,
   };
 }
 
-export async function fetchApiResource<T>(url: string, errorMessage: string, signal?: AbortSignal): Promise<T> {
-  // Public snapshots belong to the web origin, even when the API is hosted separately.
-  const requestUrl = url.startsWith("/data/") ? url : apiPath(url);
-  const response = await api.raw(requestUrl, {
+export async function fetchApiResource<T>(
+  url: string,
+  errorMessage: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (!url.startsWith("/data/")) {
+    try {
+      return await api.get<T>(url, { signal, errorMessage });
+    } catch (error) {
+      if (httpStatus(error) === 404) throw new NotFoundError();
+      throw error;
+    }
+  }
+
+  // Public build-time snapshots belong to the web origin and do not use the API prefix.
+  const response = await api.raw(url, {
     cache: "no-store",
     signal,
     throwHttpErrors: false,
   });
   if (response.status === 404) throw new NotFoundError();
-  if (!response.ok) {
-    let resolvedMessage = errorMessage;
-    try {
-      const parsed = await response.json();
-      if (
-        parsed
-        && typeof parsed === "object"
-        && "message" in parsed
-        && typeof (parsed as { message: unknown }).message === "string"
-      ) {
-        resolvedMessage = (parsed as { message: string }).message;
-      }
-    } catch {
-      // JSON 본문이 아니면 기존 errorMessage 폴백 유지
-    }
-    throw new Error(resolvedMessage);
-  }
+  if (!response.ok) throw new Error(errorMessage);
   return (await response.json()) as T;
 }
 
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
+function emptyPayload(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length === 0;
+  if (!value || typeof value !== "object") return false;
+  const items = (value as { readonly items?: unknown }).items;
+  return Array.isArray(items) && items.length === 0;
 }
 
 /**
@@ -87,22 +104,33 @@ export function useApiResource<T>(url: string | null, errorMessage: string) {
     const requestUrl = url;
     const controller = new AbortController();
 
-    setState((previous) => ({
-      url: requestUrl,
-      data: previous.url === requestUrl ? previous.data : null,
-      loading: true,
-      error: null,
-      notFound: false,
-    }));
+    setState((previous) => {
+      const sameResource = previous.url === requestUrl;
+      return {
+        url: requestUrl,
+        phase: "loading",
+        data: sameResource ? previous.data : null,
+        loading: true,
+        error: null,
+        appError: null,
+        notFound: false,
+        fetchedAt: sameResource ? previous.fetchedAt : null,
+        staleSavedAt: null,
+      };
+    });
 
     fetchApiResource<T>(requestUrl, errorMessage, controller.signal)
       .then((data) => {
         setState({
           url: requestUrl,
+          phase: emptyPayload(data) ? "empty" : "success",
           data,
           loading: false,
           error: null,
+          appError: null,
           notFound: false,
+          fetchedAt: Date.now(),
+          staleSavedAt: null,
         });
       })
       .catch((error: unknown) => {
@@ -110,21 +138,32 @@ export function useApiResource<T>(url: string | null, errorMessage: string) {
         if (error instanceof NotFoundError) {
           setState({
             url: requestUrl,
+            phase: "not-found",
             data: null,
             loading: false,
             error: null,
+            appError: null,
             notFound: true,
+            fetchedAt: null,
+            staleSavedAt: null,
           });
           return;
         }
-        const errMessage = error instanceof Error && error.message ? error.message : errorMessage;
-        setState((previous) => ({
-          url: requestUrl,
-          data: previous.url === requestUrl ? previous.data : null,
-          loading: false,
-          error: errMessage,
-          notFound: false,
-        }));
+        const appError = toAppApiError(error, errorMessage);
+        setState((previous) => {
+          const hasStaleData = previous.url === requestUrl && previous.data !== null;
+          return {
+            url: requestUrl,
+            phase: hasStaleData ? "stale" : "error",
+            data: hasStaleData ? previous.data : null,
+            loading: false,
+            error: hasStaleData ? null : appError.message,
+            appError,
+            notFound: false,
+            fetchedAt: hasStaleData ? previous.fetchedAt : null,
+            staleSavedAt: hasStaleData ? previous.fetchedAt ?? Date.now() : null,
+          };
+        });
       });
 
     return () => {
@@ -134,9 +173,14 @@ export function useApiResource<T>(url: string | null, errorMessage: string) {
 
   return {
     data: state.data,
+    state: state.phase,
     loading: state.loading,
     error: state.error,
+    appError: state.appError,
     notFound: state.notFound,
+    stale: state.phase === "stale",
+    staleSavedAt: state.staleSavedAt,
+    staleError: state.phase === "stale" ? state.appError?.message ?? null : null,
     reload: () => {
       setReloadToken((value) => value + 1);
     },

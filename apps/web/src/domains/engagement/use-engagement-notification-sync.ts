@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { useEffect, useMemo } from "react";
 
 import type { EngagementNotification } from "./engagement-model";
@@ -19,7 +20,7 @@ async function fetchTitles(ids: readonly string[], signal: AbortSignal): Promise
     chunks.push(ids.slice(index, index + TITLE_CHUNK_SIZE));
   }
   const responses = await Promise.all(chunks.map(async (chunk) => {
-    const response = await fetch(`/api/titles?ids=${encodeURIComponent(chunk.join(","))}`, {
+    const response = await apiFetch(`/api/titles?ids=${encodeURIComponent(chunk.join(","))}`, {
       cache: "no-store",
       signal,
     });

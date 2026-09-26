@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { EyeOff, MessageCircle, Send, AlertTriangle, ShieldCheck, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -59,7 +60,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, { cache: "no-store" });
+      const res = await apiFetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, { cache: "no-store" });
       const data = await safeParseJson<unknown>(res);
       if (!res.ok) {
         setError(resolveApiError(data, `답글 목록을 불러오지 못했습니다. (${res.status})`));
@@ -86,7 +87,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
     };
 
     setError(null);
-    const res = await fetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, withCsrfProtection({
+    const res = await apiFetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, withCsrfProtection({
       method: "POST",
       cache: "no-store",
       headers: {
@@ -137,7 +138,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
     if (!globalThis.confirm("이 답글을 삭제할까요?")) return;
     setError(null);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/reviews/${encodeURIComponent(reviewId)}/replies/${encodeURIComponent(replyId)}`,
         withCsrfProtection({
           method: "DELETE",

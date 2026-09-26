@@ -3,7 +3,7 @@ import type { PlatformId, Title } from "@/shared/lib/types";
 
 import { withCsrfProtection } from "@/shared/lib/csrf";
 
-import { apiPath } from "@/platform/api";
+import { apiFetch, apiPath } from "@/platform/api";
 
 export type SearchCatalogMeta = {
   source: string;
@@ -99,7 +99,7 @@ export async function fetchSearchResponse(
       method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.fromEntries(params)),
     }) : { cache: "no-store" };
-    request = fetch(apiPath(savedQuery ? "/search" : `/search?${key}`), init)
+    request = apiFetch(apiPath(savedQuery ? "/search" : `/search?${key}`), init)
       .then((response) => {
         if (!response.ok) throw new Error("search_request_failed");
         return response.json() as Promise<SearchResponse>;

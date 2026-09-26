@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { useEffect, useState } from "react";
 
 import { Section, Rail } from "./section";
@@ -29,7 +30,7 @@ export function HomePersonal() {
     if (!hydrated || !hasEngagement) return;
     let alive = true;
     const controller = new AbortController();
-    fetch("/api/recommend", withCsrfProtection({
+    apiFetch("/api/recommend", withCsrfProtection({
       method: "POST",
       body: JSON.stringify({ picked: [], ratings, reads }),
       headers: { "Content-Type": "application/json" },
@@ -62,7 +63,7 @@ export function HomePersonal() {
     }
     let alive = true;
     const controller = new AbortController();
-    fetch(`/api/titles?ids=${encodeURIComponent(browseKey)}`, {
+    apiFetch(`/api/titles?ids=${encodeURIComponent(browseKey)}`, {
       cache: "no-store",
       signal: controller.signal,
     })
