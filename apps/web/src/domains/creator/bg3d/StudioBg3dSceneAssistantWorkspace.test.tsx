@@ -116,7 +116,10 @@ describe("StudioBg3dSceneAssistantWorkspace", () => {
 
   it("frames a newly inserted scene after its selectable objects are mounted", async () => {
     const host = createHost();
-    host.addSceneTemplate = vi.fn(() => {
+    const mutableHost = host as unknown as {
+      addSceneTemplate: (templateId: string) => boolean;
+    };
+    mutableHost.addSceneTemplate = vi.fn(() => {
       (host as { primitives: readonly { id: string }[] }).primitives = [
         { id: "classroom-floor" },
         { id: "classroom-wall" },
