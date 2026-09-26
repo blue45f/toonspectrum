@@ -315,6 +315,7 @@ export function serializeStudioR8DynamicCoverageMarks(
     throw error;
   }
   if (!streamed.ok) return rollbackAssets();
+  if (streamed.totalMarks === 0) return rollbackAssets();
   ctx.r8EmbeddedRgbaBytes =
     initialR8EmbeddedRgbaBytes + streamed.embeddedRgbaBytes;
   return markupByVariation.map((markup) => (

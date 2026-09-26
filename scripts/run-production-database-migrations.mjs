@@ -2925,7 +2925,7 @@ export function loadMigrationManifest({
   }
 
   const manifest = paths.map((relativePath) => {
-    if (!/^apps\/api\/src\/db\/migrations\/\d{4}_[a-z0-9_]+\.sql$/u.test(relativePath)) {
+    if (!/^apps\/api\/src\/platform\/database\/migrations\/\d{4}_[a-z0-9_]+\.sql$/u.test(relativePath)) {
       fail(`Invalid production migration manifest path: ${relativePath}`);
     }
     const absolutePath = resolve(repositoryRoot, relativePath);

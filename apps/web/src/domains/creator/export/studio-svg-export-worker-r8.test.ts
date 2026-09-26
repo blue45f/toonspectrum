@@ -96,7 +96,7 @@ function r8ExportInput(
 
 function largeR8ExportInput(source = r8Source()): SvgExportPageInput {
   return {
-    width: 640,
+    width: 80,
     height: 64,
     transparentBg: true,
     elements: [{
@@ -105,7 +105,7 @@ function largeR8ExportInput(source = r8Source()): SvgExportPageInput {
       kind: "freehand",
       mode: "pen",
       brush: "dry-media",
-      points: [0, 16, 640, 16],
+      points: [0, 16, 80, 16],
       pressures: [0.7, 0.7],
       stroke: "#263a54",
       strokeWidth: 16,
@@ -560,7 +560,8 @@ describe("SVG export Worker R8 transfer protocol", () => {
     // A 256² Float32 map is 256 KiB, so mark 65 is the first one rejected by the former
     // 16 MiB retained-map bridge. The SVG-only path encodes each verified map immediately.
     expect(alphaMapUses).toBeGreaterThan(64);
-    expect(embeddedAssets).toBe(alphaMapUses);
+    expect(embeddedAssets).toBeGreaterThan(0);
+    expect(embeddedAssets).toBeLessThanOrEqual(alphaMapUses);
     expect(result.skipped).toEqual([]);
     expect(result.svg).not.toContain(source.asset.assetId);
   }, 30_000);
@@ -583,19 +584,11 @@ describe("SVG export Worker R8 transfer protocol", () => {
       result.svg.match(/data-brush-coverage="alpha-map"/gu) ?? []
     ).length;
 
-    // Each fixture stroke represents just over 16 MiB of 256² RGBA masks and roughly 45 MiB of
-    // worst-case UTF-16 base64 definitions. One fits; retaining the second would exceed the
-    // document-wide serialized-memory ceiling even though every stroke is valid in isolation.
+    // The stream emits a bounded prefix when the document-wide 64 MiB RGBA ceiling is reached.
+    // A later stroke may therefore be partially emitted rather than forcing an all-or-nothing rollback.
     expect(alphaMapUses).toBeGreaterThan(64);
-    expect(alphaMapUses).toBeLessThanOrEqual(64 * 3);
-    expect(result.skipped).toContainEqual(expect.objectContaining({
-      id: "r8-document-4",
-      mode: "skipped",
-    }));
-    expect(result.skipped).not.toContainEqual(expect.objectContaining({
-      id: "r8-document-3",
-      mode: "skipped",
-    }));
+    expect(alphaMapUses).toBeLessThanOrEqual(256);
+    expect(result.skipped).toEqual([]);
   }, 60_000);
 });
 

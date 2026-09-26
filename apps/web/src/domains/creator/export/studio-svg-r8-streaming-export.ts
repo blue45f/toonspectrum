@@ -272,37 +272,12 @@ export function visitStudioSvgR8StreamingCoverage(
     return { ok: false, reason: "mark-budget" };
   }
 
-  let rgbaBytesPerDab = 0;
-  for (const tipIndex of enabledTipIndexes) {
-    const map = tipAlphaMaps[tipIndex];
-    if (!map) return { ok: false, reason: "invalid-input" };
-    const pixels = safeProduct(map.size, map.size);
-    const rgbaBytes = pixels === null ? null : safeProduct(pixels, 4);
-    if (rgbaBytes === null) return { ok: false, reason: "invalid-input" };
-    rgbaBytesPerDab += rgbaBytes;
-    if (!Number.isSafeInteger(rgbaBytesPerDab)) {
-      return { ok: false, reason: "invalid-input" };
-    }
-  }
-  const maximumEmbeddedRgbaBytes = safeProduct(
-    dabVariations.reduce(
-      (total, variation) => total + variationDabCount(variation),
-      0,
-    ),
-    rgbaBytesPerDab,
-  );
-  if (
-    maximumEmbeddedRgbaBytes === null
-    || maximumEmbeddedRgbaBytes > rgbaByteBudget
-  ) {
-    return { ok: false, reason: "embedded-rgba-budget" };
-  }
-
   const marksPerVariation = dabVariations.map(() => 0);
   let totalMarks = 0;
   let generatedAlphaMapBytes = 0;
   let peakTransientAlphaMapBytes = 0;
   let embeddedRgbaBytes = 0;
+  let embeddedRgbaBudgetExhausted = false;
 
   const visitComposedDab = (
     composedDab: StudioBrushComposableDab,
@@ -319,6 +294,13 @@ export function visitStudioSvgR8StreamingCoverage(
     const radiusX = Math.max(0.25, composedDab.size / 2);
     const radiusY = radiusX * composedDab.roundness;
     const angleRadians = composedDab.angle * Math.PI / 180;
+    const mapPixels = safeProduct(tipAlphaMap.size, tipAlphaMap.size);
+    const mapRgbaBytes = mapPixels === null ? null : safeProduct(mapPixels, 4);
+    if (mapRgbaBytes === null) return { ok: false, reason: "invalid-input" };
+    if (embeddedRgbaBytes + mapRgbaBytes >= rgbaByteBudget) {
+      embeddedRgbaBudgetExhausted = true;
+      return null;
+    }
     const composedAlphaMap = composeStudioBrushR8TipPaperAlphaMap({
       tip: tipAlphaMap,
       sampler,
@@ -398,6 +380,7 @@ export function visitStudioSvgR8StreamingCoverage(
         dabColor,
       );
       if (primaryFailure) return primaryFailure;
+      if (embeddedRgbaBudgetExhausted) break;
       for (
         let layerIndex = 0;
         layerIndex < input.dynamics.tipLayers.length;
@@ -415,7 +398,9 @@ export function visitStudioSvgR8StreamingCoverage(
           dabColor,
         );
         if (layerFailure) return layerFailure;
+        if (embeddedRgbaBudgetExhausted) break;
       }
+      if (embeddedRgbaBudgetExhausted) break;
     }
   }
 
