@@ -1,6 +1,7 @@
 // 작품 리비전 이력 — 목록/조회/비교/복원(낙관적 동시성 포함).
 import { and, desc, eq, lte, sql } from "drizzle-orm";
 
+import { withDatabaseCapability } from "../../common/service-availability";
 import { creatorWorkRevisions, creatorWorks, db } from "../../db";
 import {
   CREATOR_WORK_REVISION_MAX,
@@ -13,7 +14,7 @@ import {
   parseCreatorWorkRevision,
 } from "../creator-work-revisions";
 
-import { ensureCreatorCommunitySchema } from "./community-schema";
+import { requireCreatorCommunitySchema } from "./community-schema";
 import { safeDate } from "./shared";
 import {
   assertCreatorWorkLinked3dPassAssetsInTransaction,
@@ -28,6 +29,16 @@ import type {
   CreatorWorkRevisionSummary,
 } from "./works-contract";
 import type { CreatorWorkRevisionSnapshotSource } from "../creator-work-revisions";
+
+async function withWorkRevisionCapability<T>(
+  capability: "creator.work-revisions.read" | "creator.work-revisions.write",
+  action: () => Promise<T>,
+): Promise<T> {
+  return withDatabaseCapability(capability, async () => {
+    await requireCreatorCommunitySchema(capability);
+    return action();
+  });
+}
 
 async function assertRevisionOwner(userId: string, workId: string): Promise<void> {
   const [work] = await db
@@ -44,8 +55,8 @@ export async function listWorkRevisions(
   workId: string,
   limit = CREATOR_WORK_REVISION_RETENTION
 ): Promise<CreatorWorkRevisionSummary[]> {
-  if (!(await ensureCreatorCommunitySchema())) throw new CreatorWorkRevisionNotFoundError();
-  await assertRevisionOwner(userId, workId);
+  return withWorkRevisionCapability("creator.work-revisions.read", async () => {
+    await assertRevisionOwner(userId, workId);
   const parsedLimit = Number.isFinite(limit) ? Math.floor(limit) : CREATOR_WORK_REVISION_RETENTION;
   const safeLimit = Math.max(1, Math.min(CREATOR_WORK_REVISION_RETENTION, parsedLimit));
   const rows = await db
@@ -58,11 +69,12 @@ export async function listWorkRevisions(
     .where(eq(creatorWorkRevisions.workId, workId))
     .orderBy(desc(creatorWorkRevisions.revision))
     .limit(safeLimit);
-  return rows.map((row) => ({
-    revision: row.revision,
-    restoredFromRevision: row.restoredFromRevision ?? null,
-    createdAt: safeDate(row.createdAt),
-  }));
+    return rows.map((row) => ({
+      revision: row.revision,
+      restoredFromRevision: row.restoredFromRevision ?? null,
+      createdAt: safeDate(row.createdAt),
+    }));
+  });
 }
 
 export async function getWorkRevision(
@@ -70,8 +82,8 @@ export async function getWorkRevision(
   workId: string,
   revisionValue: unknown
 ): Promise<CreatorWorkRevisionDetail> {
-  if (!(await ensureCreatorCommunitySchema())) throw new CreatorWorkRevisionNotFoundError();
-  await assertRevisionOwner(userId, workId);
+  return withWorkRevisionCapability("creator.work-revisions.read", async () => {
+    await assertRevisionOwner(userId, workId);
   const revision = parseCreatorWorkRevision(revisionValue);
   const [row] = await db
     .select({
@@ -84,12 +96,15 @@ export async function getWorkRevision(
     .where(and(eq(creatorWorkRevisions.workId, workId), eq(creatorWorkRevisions.revision, revision)))
     .limit(1);
   if (!row) throw new CreatorWorkRevisionNotFoundError();
-  return {
-    revision: row.revision,
-    restoredFromRevision: row.restoredFromRevision ?? null,
-    createdAt: safeDate(row.createdAt),
-    snapshot: createCreatorWorkRevisionSnapshot(row.snapshot as CreatorWorkRevisionSnapshotSource),
-  };
+    return {
+      revision: row.revision,
+      restoredFromRevision: row.restoredFromRevision ?? null,
+      createdAt: safeDate(row.createdAt),
+      snapshot: createCreatorWorkRevisionSnapshot(
+        row.snapshot as CreatorWorkRevisionSnapshotSource,
+      ),
+    };
+  });
 }
 
 /**
@@ -101,8 +116,8 @@ export async function getWorkRevisionComparison(
   workId: string,
   revisionValue: unknown
 ): Promise<CreatorWorkRevisionComparisonDetail> {
-  if (!(await ensureCreatorCommunitySchema())) throw new CreatorWorkRevisionNotFoundError();
-  await assertRevisionOwner(userId, workId);
+  return withWorkRevisionCapability("creator.work-revisions.read", async () => {
+    await assertRevisionOwner(userId, workId);
   const revision = parseCreatorWorkRevision(revisionValue);
   const [row] = await db
     .select({
@@ -116,12 +131,13 @@ export async function getWorkRevisionComparison(
     .where(and(eq(creatorWorkRevisions.workId, workId), eq(creatorWorkRevisions.revision, revision)))
     .limit(1);
   if (!row) throw new CreatorWorkRevisionNotFoundError();
-  return {
-    revision: row.revision,
-    restoredFromRevision: row.restoredFromRevision ?? null,
-    createdAt: safeDate(row.createdAt),
-    snapshot: await createCreatorWorkRevisionComparisonSnapshot(row.snapshot),
-  };
+    return {
+      revision: row.revision,
+      restoredFromRevision: row.restoredFromRevision ?? null,
+      createdAt: safeDate(row.createdAt),
+      snapshot: await createCreatorWorkRevisionComparisonSnapshot(row.snapshot),
+    };
+  });
 }
 
 export async function restoreWorkRevision(
@@ -130,8 +146,8 @@ export async function restoreWorkRevision(
   revisionValue: unknown,
   baseRevisionValue: unknown
 ): Promise<CreatorWorkMutationResult> {
-  if (!(await ensureCreatorCommunitySchema())) throw new CreatorWorkRevisionNotFoundError();
-  const targetRevision = parseCreatorWorkRevision(revisionValue);
+  return withWorkRevisionCapability("creator.work-revisions.write", async () => {
+    const targetRevision = parseCreatorWorkRevision(revisionValue);
   const baseRevision = parseCreatorWorkRevision(baseRevisionValue, "baseRevision");
   const now = new Date();
 
@@ -209,6 +225,7 @@ export async function restoreWorkRevision(
     return row;
   });
 
-  return mutationResultForWork(userId, workId, restored.revision);
+    return mutationResultForWork(userId, workId, restored.revision);
+  });
 }
 

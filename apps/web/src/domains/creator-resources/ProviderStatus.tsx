@@ -8,7 +8,7 @@ import type { ResourceProvider } from "@/shared/lib/creator-resources";
 
 import { parseProviderAvailability } from "@/shared/lib/creator-resource-workflow";
 import { RESOURCE_LABELS } from "@/shared/lib/creator-resources";
-import { apiPath } from "@/platform/api";
+import { apiFetch, apiPath } from "@/platform/api";
 
 export function ProviderStatus({ provider }: { provider?: ResourceProvider }) {
   const inRouter = useInRouterContext();
@@ -18,7 +18,7 @@ export function ProviderStatus({ provider }: { provider?: ResourceProvider }) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 8000);
     let disposed = false;
-    void fetch(apiPath("/api/creator-resources/providers"), { signal: controller.signal, headers: { Accept: "application/json" } })
+    void apiFetch(apiPath("/api/creator-resources/providers"), { signal: controller.signal, headers: { Accept: "application/json" } })
       .then(async (response) => {
         if (!response.ok) throw new Error("configuration_unavailable");
         const value = parseProviderAvailability(await response.json());

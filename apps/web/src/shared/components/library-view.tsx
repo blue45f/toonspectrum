@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { Sparkles, BookHeart, Star, Compass, BellRing } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -77,12 +78,12 @@ export function LibraryView({ initialTab = "shelf" }: { initialTab?: Tab }) {
     async function loadLibraryData() {
       const [catalog, recommendation] = await Promise.all([
         titleIdsKey
-          ? fetch(`/api/titles?ids=${encodeURIComponent(titleIdsKey)}`, {
+          ? apiFetch(`/api/titles?ids=${encodeURIComponent(titleIdsKey)}`, {
               cache: "no-store",
               signal: controller.signal,
             }).then((res) => (res.ok ? res.json() : { items: [] }))
           : Promise.resolve({ items: [] }),
-        fetch("/api/recommend", withCsrfProtection({
+        apiFetch("/api/recommend", withCsrfProtection({
           method: "POST",
           cache: "no-store",
           signal: controller.signal,

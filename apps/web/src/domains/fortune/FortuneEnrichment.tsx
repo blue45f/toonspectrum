@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { readFortuneResponse, validatedFortuneExpiry } from "./fortune-response-lifetime";
@@ -39,7 +40,7 @@ function FortuneEnrichmentContent({ reading }: { reading: FortuneReading }) {
     timeout.current = timer;
     try {
       const query = month ? new URLSearchParams({ month }) : new URLSearchParams({ sign: reading.zodiacSign!, period, date: reading.generatedFor });
-      const response = await fetch(`/api/fortune/${month ? "calendar" : "horoscope"}?${query}`, { signal: controller.signal, cache: "no-store", credentials: "omit", redirect: "error" });
+      const response = await apiFetch(`/api/fortune/${month ? "calendar" : "horoscope"}?${query}`, { signal: controller.signal, cache: "no-store", credentials: "omit", redirect: "error" });
       const payload = await readFortuneResponse(response, controller.signal);
       if (request !== sequence.current || controller.signal.aborted) return;
       if (month) {

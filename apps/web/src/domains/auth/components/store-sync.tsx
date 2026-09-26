@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 
+import { apiFetch } from "@/platform/api";
+
 import type { CollectionMergeHandle } from "@/shared/lib/collection-write-through";
 import type { HydratePayload } from "@/shared/lib/store";
 
@@ -9,7 +11,6 @@ import {
   completeCollectionMerge,
   failCollectionMerge,
 } from "@/shared/lib/collection-write-through";
-import { withCsrfProtection } from "@/shared/lib/csrf";
 import {
   captureCollectionHydrationFence,
   claimGuestCollectionsForOwner,
@@ -48,7 +49,7 @@ export function StoreSync() {
       | { ok: false; response: Response; data: null };
 
     async function fetchSyncJson<T>(
-      input: RequestInfo | URL,
+      input: string,
       init: RequestInit
     ): Promise<SyncJsonResult<T>> {
       const attemptController = new AbortController();
@@ -73,10 +74,10 @@ export function StoreSync() {
           if (controller.signal.aborted) abortAttempt();
         });
         const request = (async (): Promise<SyncJsonResult<T>> => {
-          const response = await fetch(input, withCsrfProtection({
+          const response = await apiFetch(input, {
             ...init,
             signal: attemptController.signal,
-          }));
+          });
           if (!response.ok) return { ok: false, response, data: null };
           const data = await response.json() as T;
           return { ok: true, response, data };

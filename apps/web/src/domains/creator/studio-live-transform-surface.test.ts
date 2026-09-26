@@ -3,7 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { studioKonvaRuntime } from "./render/studio-konva-runtime";
 import { STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS } from "./studio-live-transform-exact-draft-admission";
-import { attachStudioLiveTransformSurface, studioLiveTransformSurfacePixelRatio } from "./studio-live-transform-surface";
+import {
+  attachStudioLiveTransformSurface,
+  STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE,
+  STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE_VALUE,
+  studioLiveTransformSurfacePixelRatio,
+} from "./studio-live-transform-surface";
 
 import type Konva from "konva";
 
@@ -59,6 +64,9 @@ describe("attachStudioLiveTransformSurface", () => {
     const hitRatio = previewLayer.getHitCanvas().getPixelRatio();
     detach = attachStudioLiveTransformSurface(previewLayer);
     const canvas = previewLayer.getNativeCanvasElement();
+    expect(canvas.getAttribute(STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE)).toBe(
+      STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE_VALUE,
+    );
     expect(canvas.width * canvas.height).toBeLessThanOrEqual(STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS);
     expect(previewLayer.getCanvas().getPixelRatio()).toBeLessThan(2);
     expect(documentLayer.getCanvas().getPixelRatio()).toBe(2);
@@ -77,6 +85,10 @@ describe("attachStudioLiveTransformSurface", () => {
     expect(previewLayer.getNativeCanvasElement().width * previewLayer.getNativeCanvasElement().height)
       .toBeLessThanOrEqual(STUDIO_LIVE_TRANSFORM_EXACT_MAX_BACKING_PIXELS);
     detach();
+    detach = undefined;
+    expect(
+      previewLayer.getNativeCanvasElement().hasAttribute(STUDIO_LIVE_TRANSFORM_SURFACE_ATTRIBUTE),
+    ).toBe(false);
     stage.size({ width: 800, height: 600 });
     expect(previewLayer.getCanvas().getPixelRatio()).toBe(ratio);
   });

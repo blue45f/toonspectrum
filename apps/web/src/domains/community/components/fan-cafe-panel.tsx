@@ -26,6 +26,7 @@ import {
   KIND_ITEMS,
 } from "./fan-cafe-constants";
 import FanPostCard from "./fan-cafe-post-card";
+import { ErrorState } from "@/shared/components/feedback/error-state";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import Link from "@/shared/navigation/router-link";
 
@@ -38,8 +39,8 @@ import {
   COMMUNITY_SCOPE_LABEL_WITH_ALL,
   FAN_CAFE_SCOPE_COPY,
 } from "@/shared/lib/community-ui";
-import { withCsrfProtection } from "@/shared/lib/csrf";
-import { ensureArray, resolveApiError, safeParseJson } from "@/shared/lib/http-safe";
+import { api, getApiErrorMessage } from "@/platform/api";
+import { ensureArray } from "@/shared/lib/http-safe";
 import {
   ATTACHMENT_MAX_COUNT,
   fileToAttachmentDataUrl,
@@ -75,6 +76,7 @@ export function FanCafePanel({
   const sessionToken = useApp((s) => s.sessionToken);
   const [posts, setPosts] = useState<FanCafePost[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filterKind, setFilterKind] = useState<FanCafeKindFilter>(initialKind);
   const [composeKind, setComposeKind] = useState<FanCafePostKind>(initialKind === "all" ? "talk" : initialKind);
@@ -147,6 +149,7 @@ export function FanCafePanel({
 
   function setSelectedTagFilter(tag: string | null) {
     setLoading(true);
+    setLoadError(null);
     setError(null);
     setSelectedTagState({ context: selectedTagContext, tag });
   }
@@ -195,6 +198,7 @@ export function FanCafePanel({
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(true);
+      setLoadError(null);
       setError(null);
       setQueryText(searchText.trim().toLowerCase());
     }, 220);
@@ -206,6 +210,7 @@ export function FanCafePanel({
     const refresh = () => {
       if (document.visibilityState === "visible") {
         setLoading(true);
+        setLoadError(null);
         setError(null);
         setRefreshTick((current) => current + 1);
       }
@@ -254,7 +259,7 @@ export function FanCafePanel({
     const resetTimer = globalThis.setTimeout(() => {
       if (controller.signal.aborted) return;
       setLoading(true);
-      setError(null);
+      setLoadError(null);
       if (isContextChanged) {
         setPostPulse(0);
         setPosts([]);
@@ -265,18 +270,16 @@ export function FanCafePanel({
     const params = new URLSearchParams(apiQuery);
     if (queryText) params.set("q", queryText);
     params.set("limit", "20");
-    fetch(`/api/community/posts?${params.toString()}`, { cache: "no-store", signal: controller.signal, headers: authHeaders })
-      .then(async (res) => {
-        const payload = await safeParseJson<unknown>(res);
-        if (!res.ok) {
-          throw new Error(resolveApiError(payload, `posts load failed (${res.status})`));
-        }
-        if (!payload || typeof payload !== "object" || !Array.isArray((payload as { items?: unknown }).items)) {
-          throw new Error("invalid payload");
-        }
-        return payload as { items: unknown[]; nextCursor?: string | null; hasMore?: boolean };
-      })
+    api.get<{ items?: unknown; nextCursor?: string | null; hasMore?: boolean }>(
+      `/community/posts?${params.toString()}`,
+      {
+        signal: controller.signal,
+        headers: authHeaders,
+        errorMessage: "팬카페 글을 불러오지 못했습니다.",
+      },
+    )
       .then((data) => {
+        if (!Array.isArray(data.items)) throw new Error("invalid payload");
         const nextItems = ensureArray(data.items) as FanCafePost[];
         let incomingPosts = 0;
 
@@ -297,9 +300,12 @@ export function FanCafePanel({
         setNextCursor(data.nextCursor ?? null);
         setHasMore(Boolean(data.hasMore));
         setLastSyncedAt(new Date().toISOString());
+        setLoadError(null);
       })
-      .catch((err) => {
-        if ((err as Error).name !== "AbortError") setError("팬카페 글을 불러오지 못했습니다.");
+      .catch(async (caught) => {
+        if ((caught as Error).name === "AbortError") return;
+        const message = await getApiErrorMessage(caught, "팬카페 글을 불러오지 못했습니다.");
+        if (!controller.signal.aborted) setLoadError(message);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -319,21 +325,21 @@ export function FanCafePanel({
     params.set("limit", "20");
     params.set("cursor", nextCursor);
     try {
-      const res = await fetch(`/api/community/posts?${params.toString()}`, { cache: "no-store", headers: authHeaders });
-      const data = await safeParseJson<unknown>(res);
-      if (!res.ok) {
-        throw new Error(resolveApiError(data, `load more failed (${res.status})`));
-      }
-      if (!data || typeof data !== "object" || !Array.isArray((data as { items?: unknown }).items)) {
-        throw new Error("invalid payload");
-      }
-      const parsedData = data as { items: unknown[]; nextCursor?: string | null; hasMore?: boolean };
-      const nextItems = ensureArray<FanCafePost>(parsedData.items);
+      const data = await api.get<{
+        items?: unknown;
+        nextCursor?: string | null;
+        hasMore?: boolean;
+      }>(`/community/posts?${params.toString()}`, {
+        headers: authHeaders,
+        errorMessage: "추가 게시글을 불러오지 못했습니다.",
+      });
+      if (!Array.isArray(data.items)) throw new Error("invalid payload");
+      const nextItems = ensureArray<FanCafePost>(data.items);
       setPosts((current) => [...current, ...nextItems]);
-      setNextCursor(parsedData.nextCursor ?? null);
-      setHasMore(Boolean(parsedData.hasMore));
-    } catch {
-      setError("추가 게시글을 불러오지 못했습니다.");
+      setNextCursor(data.nextCursor ?? null);
+      setHasMore(Boolean(data.hasMore));
+    } catch (caught) {
+      setError(await getApiErrorMessage(caught, "추가 게시글을 불러오지 못했습니다."));
     } finally {
       setLoadingMore(false);
     }
@@ -371,11 +377,9 @@ export function FanCafePanel({
     setIsSubmittingPost(true);
     setError(null);
     try {
-      const res = await fetch("/api/community/posts", withCsrfProtection({
-        method: "POST",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json", ...(authHeaders ?? {}) },
-        body: JSON.stringify({
+      const created = await api.post<FanCafePost>(
+        "/community/posts",
+        {
           scope,
           targetId,
           targetLabel,
@@ -387,18 +391,15 @@ export function FanCafePanel({
             .split(/[,\s#]+/)
             .map((tag) => tag.trim().toLowerCase())
             .filter(Boolean),
-        }),
-      }));
-      const data = await safeParseJson<unknown>(res);
-      if (!res.ok) {
-        setError(resolveApiError(data, "팬카페 글을 저장하지 못했습니다."));
-        return;
+        },
+        {
+          headers: authHeaders,
+          errorMessage: "팬카페 글을 저장하지 못했습니다. 입력한 내용은 유지됩니다.",
+        },
+      );
+      if (!created || typeof created !== "object") {
+        throw new Error("팬카페 글 응답이 유효하지 않습니다.");
       }
-      if (!data || typeof data !== "object") {
-        setError("팬카페 글 응답이 유효하지 않습니다.");
-        return;
-      }
-      const created = data as FanCafePost;
       // 게시 성공 축하 — 등록 버튼에서 파티클 팡 + success 효과음 + 햅틱(모션 최소화 시 파티클 생략).
       celebrate(sourceEl, { chars: ["🎉", "✨", "💬"], count: 18 });
       onTopLevelPostCreated?.(created);
@@ -428,8 +429,11 @@ export function FanCafePanel({
       setTags("");
       setImages([]);
       setRefreshTick((current) => current + 1);
-    } catch {
-      setError("팬카페 글을 저장하지 못했습니다.");
+    } catch (caught) {
+      setError(await getApiErrorMessage(
+        caught,
+        "팬카페 글을 저장하지 못했습니다. 입력한 내용은 유지됩니다.",
+      ));
     } finally {
       setIsSubmittingPost(false);
     }
@@ -437,6 +441,7 @@ export function FanCafePanel({
 
   function refreshNow() {
     setLoading(true);
+    setLoadError(null);
     setError(null);
     setRefreshTick((current) => current + 1);
   }
@@ -527,6 +532,7 @@ export function FanCafePanel({
               type="button"
               onClick={() => {
                 setLoading(true);
+                setLoadError(null);
                 setError(null);
                 setSort(option.value);
               }}
@@ -573,6 +579,7 @@ export function FanCafePanel({
                     checked={showOnlyMine}
                     onChange={(event) => {
                       setLoading(true);
+                      setLoadError(null);
                       setError(null);
                       setShowMyPostsOnly(event.target.checked);
                     }}
@@ -588,6 +595,7 @@ export function FanCafePanel({
                 type="button"
                 onClick={() => {
                   setLoading(true);
+                  setLoadError(null);
                   setError(null);
                   setFilterKind(item.value);
                 }}
@@ -768,11 +776,33 @@ export function FanCafePanel({
         </div>
 
         <div className="flex flex-col gap-3">
+          {!loading && loadError && posts.length > 0 ? (
+            <div
+              role="status"
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-warn/35 bg-warn/10 px-3 py-2 text-xs text-fg-2"
+            >
+              <span className="min-w-0 flex-1">최신 글을 확인하지 못해 마지막으로 불러온 목록을 표시합니다.</span>
+              <button
+                type="button"
+                onClick={refreshNow}
+                className="min-h-9 rounded-lg border border-warn/35 px-2.5 font-semibold text-warn"
+              >
+                다시 확인
+              </button>
+            </div>
+          ) : null}
           {loading ? (
             <>
               <div className="skeleton h-28 w-full rounded-xl" />
               <div className="skeleton h-28 w-full rounded-xl" />
             </>
+          ) : loadError ? (
+            <ErrorState
+              title="팬카페 글을 불러오지 못했습니다."
+              message={`${loadError} 현재 글이 없다는 뜻은 아닙니다.`}
+              onRetry={refreshNow}
+              className="py-10"
+            />
           ) : posts.length === 0 ? (
             scope === "all" && filterKind === "all" && !selectedTag && !queryText && !showOnlyMine ? (
               <div className="rounded-2xl border border-dashed border-line bg-gradient-to-br from-card/70 to-panel/45 px-5 py-7">

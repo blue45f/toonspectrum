@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import {
   AlertCircle,
   BookOpen,
@@ -151,7 +152,7 @@ export function RankingBoard({
       }
 
       try {
-        const res = await fetch(`/api/ranking?${url.toString()}`, {
+        const res = await apiFetch(`/api/ranking?${url.toString()}`, {
           cache: "no-store",
           signal: controller.signal,
         });

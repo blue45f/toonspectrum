@@ -14,7 +14,7 @@ import {
   parseSearchResult,
   RESOURCE_LABELS,
 } from "@/shared/lib/creator-resources";
-import { apiPath } from "@/platform/api";
+import { apiFetch, apiPath } from "@/platform/api";
 
 const EXAMPLES = ["webtoon drawing", "manga art", "graphic novel", "9784088820118"] as const;
 const SEARCH_PROVIDERS: ResourceProvider[] = ["openlibrary", "googlebooks", "openbd"];
@@ -95,7 +95,7 @@ async function requestProvider(
   signal: AbortSignal,
 ): Promise<ResourceSearchResult> {
   const search = new URLSearchParams({ provider, q: query, page: String(page) });
-  const response = await fetch(apiPath(`/api/creator-resources/search?${search}`), {
+  const response = await apiFetch(apiPath(`/api/creator-resources/search?${search}`), {
     signal,
     headers: { Accept: "application/json" },
   });

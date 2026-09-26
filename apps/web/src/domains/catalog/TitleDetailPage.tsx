@@ -57,6 +57,7 @@ import { NOINDEX_PRIVATE_ROBOTS } from "@/shared/lib/seo-route-policy";
 interface TitleDetailResponse {
   title: Title;
   reviews: SeedReview[];
+  reviewsStatus?: "available" | "unavailable";
   similar: Title[];
   byAuthor?: Title[];
   original: Title;
@@ -178,6 +179,7 @@ export function TitleDetailPage() {
   }
 
   const { title, reviews, similar, original, adaptations, hasFamily } = data;
+  const reviewsAvailable = data.reviewsStatus !== "unavailable";
   const byAuthor = data.byAuthor ?? [];
   // 영상화(드라마·영화·애니·OTT)는 통합 유니버스 데이터에서 조회(원작+현재작 합산).
   // 웹툰화 패밀리가 없어도(독립 작품) 영상화가 있으면 그래프를 노출한다.
@@ -380,8 +382,13 @@ export function TitleDetailPage() {
         eyebrow="REVIEWS"
         title={
           <span className="flex items-baseline gap-3">
-            {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "리뷰")}<span className="numeral text-lg text-fg-3">{reviews.length}</span>
-            {reviews.length > 0 && (
+            {translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "리뷰")}
+            {reviewsAvailable ? (
+              <span className="numeral text-lg text-fg-3">{reviews.length}</span>
+            ) : (
+              <Badge tone="warn">현재 확인 불가</Badge>
+            )}
+            {reviewsAvailable && reviews.length > 0 && (
               <span className="flex items-center gap-1.5 text-sm font-normal text-fg-3">
                 <Stars value={reviewAvg} size="sm" /> {reviewAvg.toFixed(1)}
               </span>
@@ -389,21 +396,31 @@ export function TitleDetailPage() {
           </span>
         }
       >
-        <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr] lg:items-start">
-          <div className="lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)]">
-            <ReviewForm titleId={title.id} />
+        {!reviewsAvailable ? (
+          <div role="status" className="rounded-2xl border border-warn/35 bg-warn/10 p-6 text-sm text-fg-2">
+            <p className="font-semibold text-fg">리뷰 기능을 일시적으로 사용할 수 없습니다.</p>
+            <p className="mt-1 leading-relaxed">리뷰 목록이 비어 있다는 뜻은 아닙니다. 작품 정보와 다른 탐색 기능은 계속 사용할 수 있습니다.</p>
+            <Link href="/status" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-accent hover:text-accent-2">
+              서비스 상태 확인
+            </Link>
           </div>
-          <div className="flex flex-col gap-3">
-            {reviews.length === 0 ? (
+        ) : (
+          <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr] lg:items-start">
+            <div className="lg:sticky lg:top-[var(--site-header-sticky-offset,5rem)]">
+              <ReviewForm titleId={title.id} />
+            </div>
+            <div className="flex flex-col gap-3">
+              {reviews.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-line bg-card/50 p-10 text-center">
                 <p className="text-sm text-fg-2">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "아직 리뷰가 없어요.")}</p>
                 <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "첫 리뷰를 남기면 취향 분석에도 반영됩니다.")}</p>
               </div>
             ) : (
               reviews.map((review) => <ReviewCard key={review.id} review={review} enableReplies />)
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </Section>
 
       {byAuthor.length > 0 && (

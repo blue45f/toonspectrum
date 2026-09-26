@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiPath } from "@/platform/api";
+import { apiFetch, apiPath } from "@/platform/api";
 import { parseSearchResult } from "@/shared/lib/creator-resources";
 import type { ResourceSearchResult } from "@/shared/lib/creator-resources";
 
@@ -19,7 +19,7 @@ export function usePackResourceSearch(provider: PackProvider, query: string, pag
     const timeout = window.setTimeout(() => controller.abort(), 30000);
     setLoading(true);
     const params = new URLSearchParams({ provider, q: query, page: String(page) });
-    void fetch(apiPath(`/api/creator-resources/search?${params}`), { headers: { Accept: "application/json" }, signal: controller.signal })
+    void apiFetch(apiPath(`/api/creator-resources/search?${params}`), { headers: { Accept: "application/json" }, signal: controller.signal })
       .then(async (response) => {
         if (response.status === 429) throw new Error("요청이 많습니다. 1분 후 다시 검색하세요.");
         if (!response.ok) throw new Error("자료 검색에 연결하지 못했습니다. 저장 보드와 브리프는 계속 이용할 수 있습니다.");

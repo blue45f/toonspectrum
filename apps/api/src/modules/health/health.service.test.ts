@@ -370,4 +370,38 @@ describe("HealthService", () => {
     });
     expect(coordination.ping).not.toHaveBeenCalled();
   });
+  it("maps infrastructure checks to a user-facing partial capability matrix", async () => {
+    const { service } = dependencies({ database: false });
+
+    await expect(service.checkCapabilities()).resolves.toMatchObject({
+      status: "degraded",
+      incidentId: expect.stringMatching(/^inc_/u),
+      retryAfterSeconds: 30,
+      capabilities: {
+        publicCatalog: "available",
+        authSession: "degraded",
+        communityRead: "unavailable",
+        marketplaceRead: "unavailable",
+        studioLocalEditing: "available",
+        studioCloudSave: "unavailable",
+      },
+    });
+  });
+
+  it("reports all user capabilities available after every dependency recovers", async () => {
+    const { service } = dependencies();
+
+    await expect(service.checkCapabilities()).resolves.toMatchObject({
+      status: "available",
+      incidentId: null,
+      retryAfterSeconds: null,
+      capabilities: {
+        publicCatalog: "available",
+        communityRead: "available",
+        studioLocalEditing: "available",
+        publishing: "available",
+      },
+    });
+  });
+
 });

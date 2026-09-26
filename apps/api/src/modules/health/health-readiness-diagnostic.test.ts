@@ -81,8 +81,16 @@ describe("private readiness diagnostics", () => {
     const controller = new HealthController({ checkReadiness: async () => unready() } as never);
     const error: unknown = await controller.ready().catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ServiceUnavailableException);
-    expect((error as ServiceUnavailableException).getResponse()).toEqual({
-      statusCode: 503, status: "not_ready", error: "service_not_ready", message: "Service is not ready",
+    expect((error as ServiceUnavailableException).getResponse()).toMatchObject({
+      statusCode: 503,
+      code: "SERVICE_NOT_READY",
+      status: "not_ready",
+      error: "service_not_ready",
+      capability: "service.readiness",
+      retryable: true,
+      retryAfterSeconds: 30,
+      incidentId: expect.stringMatching(/^inc_/u),
+      message: "This feature is temporarily unavailable",
     });
     expect(write).toHaveBeenCalledTimes(1);
     expect(String(write.mock.calls[0]?.[0])).not.toContain("DO_NOT_LOG_PASSWORD");

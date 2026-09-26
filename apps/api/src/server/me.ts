@@ -8,6 +8,7 @@ import {
 } from "../../../web/src/shared/lib/creator-role-contract";
 import { parseRegionSettings, type RegionSettings } from "../../../web/src/shared/lib/region-settings";
 import { findCreatorMarketplaceSocialInteractionIds } from "../common/creator-marketplace-social-boundary";
+import { withDatabaseCapability } from "../common/service-availability";
 import {
   db,
   users,
@@ -27,7 +28,7 @@ const MARKET_THREAD_PATTERN = `${CREATOR_MARKETPLACE_SOCIAL_THREAD_PREFIX}%`;
 
 // 로그인 사용자의 전체 데이터를 클라이언트 하이드레이션 형태로 반환 (GET /api/me · POST /api/me/merge 공용)
 export async function loadMe(uid: string) {
-  try {
+  return withDatabaseCapability("account.library.read", async () => {
     await ensureUserLifecycleSchema();
     const [me] = await db.select().from(users).where(eq(users.id, uid)).limit(1);
     if (me && normalizeUserAccountStatus(me.status) !== "active") {
@@ -125,10 +126,7 @@ export async function loadMe(uid: string) {
         createdAt: new Date(collection.createdAt ?? Date.now()).toISOString(),
       })),
     };
-  } catch {
-    // DB(Neon) 불가(쿼터/장애) 시 빈 데이터로 폴백 — 로그인 세션은 유지되고 클라 로컬 데이터를 사용.
-    return { profile: { id: uid }, ratings: {}, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
-  }
+  });
 }
 
 export async function deleteMyAccount(uid: string): Promise<{ ok: true; deletedAt: string } | ProfileUpdateError> {

@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import {
   RotateCcw,
   Sparkles,
@@ -171,7 +172,7 @@ export function RecommendView({
     const controller = new AbortController();
     setLoading(true);
     setError(false);
-    fetch(
+    apiFetch(
       "/api/recommend",
       withCsrfProtection({
         method: "POST",

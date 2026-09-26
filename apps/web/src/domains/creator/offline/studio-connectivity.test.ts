@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isStudioServerCapabilityAvailable,
   isStudioServerUnavailableError,
   resolveStudioConnectivitySnapshot,
 } from "./studio-connectivity";
@@ -62,5 +63,37 @@ describe("Studio server outage classification", () => {
       new TypeError("Cannot read properties of undefined"),
     )).toBe(false);
     expect(isStudioServerUnavailableError({ response: { status: 409 } })).toBe(false);
+  });
+});
+
+describe("Studio capability probe", () => {
+  it("keeps Studio online when unrelated dependencies are degraded", async () => {
+    await expect(isStudioServerCapabilityAvailable(new Response(JSON.stringify({
+      status: "degraded",
+      capabilities: {
+        studioProjectRead: "available",
+        studioCloudSave: "available",
+        marketplaceRead: "unavailable",
+      },
+    }), { status: 200 }))).resolves.toBe(true);
+  });
+
+  it("enters local-only mode when project read or cloud save is unavailable", async () => {
+    await expect(isStudioServerCapabilityAvailable(new Response(JSON.stringify({
+      status: "degraded",
+      capabilities: {
+        studioProjectRead: "unavailable",
+        studioCloudSave: "available",
+      },
+    }), { status: 200 }))).resolves.toBe(false);
+  });
+
+  it("fails closed on invalid or non-success capability responses", async () => {
+    await expect(isStudioServerCapabilityAvailable(
+      new Response("not-json", { status: 200 }),
+    )).resolves.toBe(false);
+    await expect(isStudioServerCapabilityAvailable(
+      new Response(null, { status: 503 }),
+    )).resolves.toBe(false);
   });
 });

@@ -1,8 +1,11 @@
-import { createHash } from "node:crypto";
-
 import { Inject, Injectable, Optional } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 
+import {
+  capabilityIncidentId,
+  clearCapabilityIncident,
+  DEFAULT_SERVICE_RETRY_AFTER_SECONDS,
+} from "../../common/service-availability";
 import { BackendCapabilityGatewayExecutor } from "../../infrastructure/backend-capabilities/backend-capability-gateway-executor";
 import {
   PRIVATE_OBJECT_STORAGE_PORT,
@@ -66,11 +69,16 @@ export interface HealthReadinessReport {
   readonly durableQueueExecutor: boolean;
 }
 
-export type HealthCapabilityState = "available" | "unavailable";
+export type HealthCapabilityState =
+  | "available"
+  | "degraded"
+  | "unavailable";
 
-export interface HealthCapabilityReport {
+export interface HealthCapabilitiesReport {
   readonly status: "available" | "degraded";
   readonly incidentId: string | null;
+  readonly retryAfterSeconds: number | null;
+  readonly checkedAt: string;
   readonly capabilities: {
     readonly publicCatalog: HealthCapabilityState;
     readonly authSession: HealthCapabilityState;
@@ -84,29 +92,6 @@ export interface HealthCapabilityReport {
     readonly publishing: HealthCapabilityState;
     readonly serverAi: HealthCapabilityState;
   };
-  readonly failedChecks: readonly string[];
-  readonly checkedAt: string;
-}
-
-const READINESS_CHECKS = [
-  "database",
-  "schema",
-  "realtime",
-  "objectStorage",
-  "coordination",
-  "durableQueueExecutor",
-] as const;
-
-function state(value: boolean): HealthCapabilityState {
-  return value ? "available" : "unavailable";
-}
-
-function incidentId(failedChecks: readonly string[]): string | null {
-  if (failedChecks.length === 0) return null;
-  return `svc-${createHash("sha256")
-    .update(JSON.stringify(failedChecks))
-    .digest("hex")
-    .slice(0, 16)}`;
 }
 
 @Injectable()
@@ -161,35 +146,45 @@ export class HealthService {
     };
   }
 
-  async checkCapabilities(): Promise<HealthCapabilityReport> {
-    const readiness = await this.checkReadiness();
-    const databaseFeatures = readiness.database && readiness.schema;
-    const objectBackedFeatures = databaseFeatures && readiness.objectStorage;
-    const failedChecks = READINESS_CHECKS.filter(
-      (key) => readiness[key] !== true,
-    );
-    const capabilities = {
+  async checkCapabilities(): Promise<HealthCapabilitiesReport> {
+    const report = await this.checkReadiness();
+    const databaseReady = report.database && report.schema;
+    const capabilities: HealthCapabilitiesReport["capabilities"] = {
       publicCatalog: "available",
-      authSession: "available",
-      communityRead: state(databaseFeatures),
-      communityWrite: state(databaseFeatures),
-      marketplaceRead: state(objectBackedFeatures),
+      authSession: databaseReady ? "available" : "degraded",
+      communityRead: databaseReady ? "available" : "unavailable",
+      communityWrite: databaseReady ? "available" : "unavailable",
+      marketplaceRead:
+        databaseReady && report.objectStorage ? "available" : "unavailable",
       studioLocalEditing: "available",
-      studioProjectRead: state(databaseFeatures),
-      studioCloudSave: state(objectBackedFeatures),
-      realtimeCollaboration: state(readiness.realtime),
-      publishing: state(objectBackedFeatures),
-      serverAi: "available",
-    } as const;
+      studioProjectRead: databaseReady ? "available" : "unavailable",
+      studioCloudSave:
+        databaseReady && report.objectStorage ? "available" : "unavailable",
+      realtimeCollaboration:
+        databaseReady && report.realtime && report.coordination
+          ? "available"
+          : "unavailable",
+      publishing:
+        databaseReady && report.objectStorage ? "available" : "unavailable",
+      serverAi:
+        databaseReady && report.durableQueueExecutor
+          ? "available"
+          : "degraded",
+    };
     const degraded = Object.values(capabilities).some(
-      (value) => value === "unavailable",
+      (capability) => capability !== "available",
     );
+    if (!degraded) clearCapabilityIncident("service.readiness");
     return {
       status: degraded ? "degraded" : "available",
-      incidentId: incidentId(failedChecks),
-      capabilities,
-      failedChecks,
+      incidentId: degraded
+        ? capabilityIncidentId("service.readiness")
+        : null,
+      retryAfterSeconds: degraded
+        ? DEFAULT_SERVICE_RETRY_AFTER_SECONDS
+        : null,
       checkedAt: new Date().toISOString(),
+      capabilities,
     };
   }
 

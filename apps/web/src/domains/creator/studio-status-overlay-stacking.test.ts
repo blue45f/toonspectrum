@@ -8,9 +8,18 @@ const overlayCss = readFileSync(new URL("../../app/styles/studio-overlay-stackin
 
 describe("Studio global status overlay stacking", () => {
   it("loads the narrowly scoped Studio overlay boundary", () => {
-    expect(appEntry).toContain('import "../styles/studio-overlay-stacking.css";');
+    expect(appEntry).toContain('import "./styles/studio-overlay-stacking.css";');
     expect(overlayCss).toContain('[data-studio-status-notice-dismiss="true"]');
     expect(overlayCss).toContain('[role="status"]:has(>');
+  });
+
+  it("sequences the beta notice before the quick-start coach", () => {
+    expect(overlayCss).toContain(
+      'html:has([data-studio-beta-notice-host="true"]) [data-studio-creative-starter="true"]',
+    );
+    expect(overlayCss).toMatch(
+      /data-studio-creative-starter="true"\]\s*\{\s*display:\s*none\s*!important;/u,
+    );
   });
 
   it("keeps a dismissible notice above the fixed Draft Save Center", () => {

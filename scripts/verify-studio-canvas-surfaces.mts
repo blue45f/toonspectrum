@@ -232,6 +232,14 @@ export interface StudioBrushCursorSurfaceEvidence {
   readonly insideKonvaContent: boolean;
 }
 
+export interface StudioAdaptiveLiveTransformSurfaceEvidence {
+  readonly primaryDataKey: string;
+  readonly backingWidth: number;
+  readonly backingHeight: number;
+  readonly nominalRgba8Bytes: number;
+  readonly insideKonvaContent: boolean;
+}
+
 export interface StudioCanvasSurfaceSnapshotEvidence {
   readonly canvasCount: number;
   readonly totalNominalRgba8Bytes: number;
@@ -242,6 +250,7 @@ export interface StudioCanvasSurfaceSnapshotEvidence {
    */
   readonly nonCursorSignatures: readonly string[];
   readonly brushCursorCanvases: readonly StudioBrushCursorSurfaceEvidence[];
+  readonly adaptiveLiveTransformCanvases: readonly StudioAdaptiveLiveTransformSurfaceEvidence[];
   readonly canonicalDocumentBackingSizes: readonly string[];
 }
 
@@ -336,6 +345,29 @@ export function collectStudioCanvasSurfaceContractFailures(
     );
   }
 
+  const checkAdaptiveLiveTransformSurface = (
+    phase: string,
+    snapshot: StudioCanvasSurfaceSnapshotEvidence,
+  ): void => {
+    const surfaces = snapshot.adaptiveLiveTransformCanvases;
+    if (surfaces.length !== 1) {
+      failures.push(
+        `${input.label}: ${phase} expected exactly one tagged adaptive live-transform canvas, `
+          + `found ${surfaces.length}`,
+      );
+      return;
+    }
+    const surface = surfaces[0]!;
+    if (surface.primaryDataKey !== "data-studio-live-transform-surface=adaptive-preview") {
+      failures.push(`${input.label}: ${phase} adaptive live-transform canvas lacked explicit identity`);
+    }
+    if (!surface.insideKonvaContent) {
+      failures.push(`${input.label}: ${phase} adaptive live-transform canvas was outside the Konva Stage`);
+    }
+  };
+  checkAdaptiveLiveTransformSurface("initial", input.initialSnapshot);
+  checkAdaptiveLiveTransformSurface("final", input.finalSnapshot);
+
   const normalizedSignatures = (signatures: readonly string[]): string =>
     JSON.stringify([...signatures].sort());
   const initialNonCursorSignatures = normalizedSignatures(
@@ -371,6 +403,7 @@ export function collectStudioCanvasSurfaceContractFailures(
     if (!transition.selected) {
       failures.push(`${input.label}: tool transition ${index + 1} did not select ${transition.toolId}`);
     }
+    checkAdaptiveLiveTransformSurface(transition.label, transition.snapshot);
     const expectedCursorCount = transition.toolId === "pen" ? 1 : 0;
     const actualCursorCount = transition.snapshot.brushCursorCanvases.length;
     if (actualCursorCount !== expectedCursorCount) {
@@ -716,6 +749,29 @@ async function seedStudioContext(context: BrowserContext): Promise<void> {
   );
 }
 
+async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean> {
+  const notice = page.locator('[data-studio-beta-notice="true"]');
+  const visible = await notice
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!visible) return false;
+
+  const acknowledge = notice.locator(
+    '[data-studio-beta-notice-acknowledge="true"]',
+  );
+  try {
+    await acknowledge.click({ timeout: 30_000, noWaitAfter: true });
+  } catch (error) {
+    const alreadyHidden = await notice
+      .isHidden({ timeout: 1_000 })
+      .catch(() => false);
+    if (!alreadyHidden) throw error;
+  }
+  await notice.waitFor({ state: "hidden", timeout: 30_000 });
+  return true;
+}
+
 async function waitForStableHydratedEditor(page: Page): Promise<void> {
   await page.locator('[data-route-stage-key="/studio/draft/editor"]').waitFor({
     state: "attached",
@@ -763,6 +819,11 @@ async function waitForStableHydratedEditor(page: Page): Promise<void> {
       )
       && velloCanvasCount === 0;
   }, undefined, { timeout: 60_000 });
+
+  // The beta notice and the first-run coach share the desktop status corner. Exercise the
+  // intended acknowledgement first so the following click measures the coach instead of racing
+  // an overlay that legitimately owns the pointer.
+  await acknowledgeStudioBetaNoticeIfPresent(page);
 
   const quickStart = page.locator('[data-studio-creative-starter="true"]');
   if (await quickStart.isVisible({ timeout: 500 }).catch(() => false)) {
@@ -909,11 +970,22 @@ async function captureCanvasInventory(page: Page): Promise<CanvasInventoryEviden
   });
 }
 
+export function isStudioCanvasDocumentShadowSurface(canvas: {
+  readonly insideKonvaContent: boolean;
+  readonly dataAttributes: Readonly<Record<string, string>>;
+}): boolean {
+  return canvas.insideKonvaContent
+    && canvas.dataAttributes["data-studio-brush-cursor-canvas"] !== "true"
+    && canvas.dataAttributes["data-studio-live-transform-surface"] !== "adaptive-preview";
+}
+
 function snapshotCanvasSurfaceInventory(
   inventory: CanvasInventoryEvidence,
 ): StudioCanvasSurfaceSnapshotEvidence {
   const isBrushCursor = (canvas: CanvasElementEvidence): boolean =>
     canvas.dataAttributes["data-studio-brush-cursor-canvas"] === "true";
+  const isAdaptiveLiveTransformSurface = (canvas: CanvasElementEvidence): boolean =>
+    canvas.dataAttributes["data-studio-live-transform-surface"] === "adaptive-preview";
   const signature = (canvas: CanvasElementEvidence): string => JSON.stringify({
     primaryDataKey: canvas.primaryDataKey,
     dataAttributes: canvas.dataAttributes,
@@ -939,9 +1011,18 @@ function snapshotCanvasSurfaceInventory(
         nominalRgba8Bytes: canvas.nominalRgba8Bytes,
         insideKonvaContent: canvas.insideKonvaContent,
       })),
+    adaptiveLiveTransformCanvases: inventory.canvases
+      .filter(isAdaptiveLiveTransformSurface)
+      .map((canvas) => ({
+        primaryDataKey: canvas.primaryDataKey,
+        backingWidth: canvas.backingWidth,
+        backingHeight: canvas.backingHeight,
+        nominalRgba8Bytes: canvas.nominalRgba8Bytes,
+        insideKonvaContent: canvas.insideKonvaContent,
+      })),
     canonicalDocumentBackingSizes: [...new Set(
       inventory.canvases
-        .filter((canvas) => canvas.insideKonvaContent && !isBrushCursor(canvas))
+        .filter(isStudioCanvasDocumentShadowSurface)
         .map((canvas) => `${canvas.backingWidth}x${canvas.backingHeight}`),
     )].sort(),
   };

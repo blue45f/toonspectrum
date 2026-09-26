@@ -218,7 +218,7 @@ export function AppShell({
         ) : null}
         {immersiveVirtualExperience ? null : header}
         <Suspense fallback={null}>
-          <ServiceDegradedBanner />
+          <ServiceDegradedBanner immersive={immersiveVirtualExperience} />
         </Suspense>
         {enhancedSite ? <SiteConnectionNotice /> : null}
         {immersiveVirtualExperience ? null : <PwaInstallNudge />}

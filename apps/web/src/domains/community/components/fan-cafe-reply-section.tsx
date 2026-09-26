@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { CornerDownRight, MessageCircle, RefreshCw, Send, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -75,7 +76,7 @@ export function FanPostReplySection({
       const controller = new AbortController();
       replyRefreshControllerRef.current = controller;
 
-      fetch(`/api/community/posts/${encodeURIComponent(postId)}/replies`, {
+      apiFetch(`/api/community/posts/${encodeURIComponent(postId)}/replies`, {
         cache: "no-store",
         signal: controller.signal,
       })
@@ -159,7 +160,7 @@ export function FanPostReplySection({
     setError(null);
 
     try {
-      const res = await fetch(`/api/community/posts/${encodeURIComponent(postId)}/replies`, withCsrfProtection({
+      const res = await apiFetch(`/api/community/posts/${encodeURIComponent(postId)}/replies`, withCsrfProtection({
         method: "POST",
         cache: "no-store",
         headers: { "Content-Type": "application/json", ...(sessionToken ? { "x-user-id": sessionToken } : {}) },
@@ -200,7 +201,7 @@ export function FanPostReplySection({
     if (!globalThis.confirm("이 댓글을 삭제할까요?")) return;
     setError(null);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/community/posts/${encodeURIComponent(postId)}/replies/${encodeURIComponent(replyId)}`,
         withCsrfProtection({
           method: "DELETE",

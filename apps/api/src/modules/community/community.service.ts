@@ -10,6 +10,7 @@ import {
 } from "@nestjs/common";
 
 import { parseCommunitySort } from "../../../../web/src/shared/lib/community-ui";
+import { rethrowDatabaseCapabilityError, withDatabaseCapability } from "../../common/service-availability";
 import { GENRES } from "../../../../web/src/shared/lib/taxonomy";
 import {
   createFanPost,
@@ -140,11 +141,15 @@ function rethrowGovernance(error: unknown): never {
   }
 }
 
-async function governed<T>(action: () => Promise<T>): Promise<T> {
+async function governed<T>(
+  action: () => Promise<T>,
+  capability = "community.write",
+): Promise<T> {
   try {
     return await action();
   } catch (error) {
-    rethrowGovernance(error);
+    if (error instanceof CommunityGovernanceError) rethrowGovernance(error);
+    rethrowDatabaseCapabilityError(error, capability);
   }
 }
 
@@ -215,40 +220,53 @@ export class CommunityService {
     limitValue: number | null,
     viewerId: string | null,
   ) {
-    const scope = parseCommunityScopeFilter(scopeValue) ?? "all";
-    const sort = parseCommunitySort(sortValue);
-    const safeLimit = parseLimit(limitValue);
-    let boards: Awaited<ReturnType<typeof listCommunityBoards>>;
-    try {
-      boards = await listCommunityBoards(scope, String(query ?? "").trim(), sort, safeLimit);
-    } catch {
-      boards = [];
-    }
-    const visibleBoards = await filterAccessibleCafeBoards(boards, viewerId);
-    return {
-      items: visibleBoards,
-      meta: { scope, sort, limit: safeLimit, total: visibleBoards.length, generatedAt: new Date().toISOString() },
-    };
+    return withDatabaseCapability("community.boards.read", async () => {
+      const scope = parseCommunityScopeFilter(scopeValue) ?? "all";
+      const sort = parseCommunitySort(sortValue);
+      const safeLimit = parseLimit(limitValue);
+      const boards = await listCommunityBoards(
+        scope,
+        String(query ?? "").trim(),
+        sort,
+        safeLimit,
+      );
+      const visibleBoards = await filterAccessibleCafeBoards(boards, viewerId);
+      return {
+        items: visibleBoards,
+        meta: {
+          scope,
+          sort,
+          limit: safeLimit,
+          total: visibleBoards.length,
+          generatedAt: new Date().toISOString(),
+        },
+      };
+    });
   }
 
   async listPosts(query: PostQuery) {
-    const scope = parseCommunityScopeFilter(query.scope ?? null) ?? "all";
-    const targetId = String(query.targetId ?? "").trim() || null;
-    const kind = parsePostKindOrNull(query.kind);
-    const sort = parsePostSort(query.sort);
-    const safeLimit = parseLimit(query.limit ?? 20);
-    const search = String(query.query ?? "").trim();
-    const tag = String(query.tag ?? "").trim();
-    const cursor = query.cursor ? String(query.cursor) : null;
-    const mineUserId = parseBool(query.mineOnly) ? query.viewerId ?? null : null;
-    if (query.mineOnly && !mineUserId) throw new UnauthorizedException("로그인이 필요해요.");
-    if (scope !== "all" && !targetId) {
-      throw new BadRequestException("scope가 all이 아니면 targetId가 필요합니다.");
-    }
-    if (scope === "cafe" && targetId) {
-      await governed(() => assertCafePostAccessBySlug(targetId, query.viewerId ?? null));
-    }
-    try {
+    return withDatabaseCapability("community.posts.read", async () => {
+      const scope = parseCommunityScopeFilter(query.scope ?? null) ?? "all";
+      const targetId = String(query.targetId ?? "").trim() || null;
+      const kind = parsePostKindOrNull(query.kind);
+      const sort = parsePostSort(query.sort);
+      const safeLimit = parseLimit(query.limit ?? 20);
+      const search = String(query.query ?? "").trim();
+      const tag = String(query.tag ?? "").trim();
+      const cursor = query.cursor ? String(query.cursor) : null;
+      const mineUserId = parseBool(query.mineOnly) ? query.viewerId ?? null : null;
+      if (query.mineOnly && !mineUserId) {
+        throw new UnauthorizedException("로그인이 필요해요.");
+      }
+      if (scope !== "all" && !targetId) {
+        throw new BadRequestException("scope가 all이 아니면 targetId가 필요합니다.");
+      }
+      if (scope === "cafe" && targetId) {
+        await governed(
+          () => assertCafePostAccessBySlug(targetId, query.viewerId ?? null),
+          "community.posts.read",
+        );
+      }
       const result = await listFanPosts(
         scope,
         targetId,
@@ -264,108 +282,122 @@ export class CommunityService {
         ...result,
         items: await filterAccessibleCafePosts(result.items, query.viewerId ?? null),
       };
-    } catch (error) {
-      if (error instanceof ForbiddenException || error instanceof NotFoundException) throw error;
-      return { items: [], hasMore: false, nextCursor: null };
-    }
+    });
   }
 
   async createPost(body: PostPayload, userId: string) {
-    const parsed = validatePostInput(body);
-    if (parsed.error || !parsed.value) {
-      throw new BadRequestException(parsed.error ?? "잘못된 요청");
-    }
-    if (parsed.value.scope === "cafe") {
-      const cafe = await governed(() => assertCommunityPostingAccess(parsed.value!.targetId, userId));
-      parsed.value.targetLabel = cafe.name;
-    }
-    const post = await createFanPost(userId, parsed.value);
-    await this.awardActivity(userId, "community.post.created", post.id, {
-      scope: parsed.value.scope,
-      kind: parsed.value.kind,
+    return withDatabaseCapability("community.posts.write", async () => {
+      const parsed = validatePostInput(body);
+      if (parsed.error || !parsed.value) {
+        throw new BadRequestException(parsed.error ?? "잘못된 요청");
+      }
+      if (parsed.value.scope === "cafe") {
+        const cafe = await governed(
+          () => assertCommunityPostingAccess(parsed.value!.targetId, userId),
+          "community.posts.write",
+        );
+        parsed.value.targetLabel = cafe.name;
+      }
+      const post = await createFanPost(userId, parsed.value);
+      await this.awardActivity(userId, "community.post.created", post.id, {
+        scope: parsed.value.scope,
+        kind: parsed.value.kind,
+      });
+      return post;
     });
-    return post;
   }
 
   async getPost(postId: string, viewerId: string | null): Promise<FanCafePost> {
-    if (!postId) throw new BadRequestException("postId 필요");
-    await governed(() => assertCafePostAccess(postId, viewerId));
-    let post: FanCafePost | null;
-    try {
-      post = await getFanPost(postId);
-    } catch {
-      throw new BadRequestException("토론 글을 불러오지 못했습니다.");
-    }
-    if (!post) throw new NotFoundException("토론 글을 찾을 수 없어요.");
-    return post;
+    return withDatabaseCapability("community.posts.read", async () => {
+      if (!postId) throw new BadRequestException("postId 필요");
+      await governed(
+        () => assertCafePostAccess(postId, viewerId),
+        "community.posts.read",
+      );
+      const post = await getFanPost(postId);
+      if (!post) throw new NotFoundException("토론 글을 찾을 수 없어요.");
+      return post;
+    });
   }
 
   async deletePost(postId: string, userId: string) {
-    if (!postId) throw new BadRequestException("postId 필요");
-    let replyIds: string[];
-    try {
-      replyIds = this.replyIds(await listFanPostReplies(postId));
-    } catch {
-      replyIds = [];
-    }
-    const result = await governed(() => deleteGovernedCommunityPost(postId, userId));
-    if (result.deleted) {
-      await this.reverseActivity(
-        "community.post.created",
-        postId,
-        userId,
-        "게시글 삭제 또는 운영 조치에 따른 활동 포인트 회수",
+    return withDatabaseCapability("community.posts.write", async () => {
+      if (!postId) throw new BadRequestException("postId 필요");
+      const replyIds = this.replyIds(await listFanPostReplies(postId));
+      const result = await governed(
+        () => deleteGovernedCommunityPost(postId, userId),
+        "community.posts.write",
       );
-      await Promise.allSettled(
-        replyIds.map((replyId) =>
-          this.reverseActivity(
-            "community.comment.created",
-            replyId,
-            userId,
-            "게시글 삭제로 함께 제거된 댓글 활동 포인트 회수",
+      if (result.deleted) {
+        await this.reverseActivity(
+          "community.post.created",
+          postId,
+          userId,
+          "게시글 삭제 또는 운영 조치에 따른 활동 포인트 회수",
+        );
+        await Promise.allSettled(
+          replyIds.map((replyId) =>
+            this.reverseActivity(
+              "community.comment.created",
+              replyId,
+              userId,
+              "게시글 삭제로 함께 제거된 댓글 활동 포인트 회수",
+            ),
           ),
-        ),
-      );
-    }
-    return result;
+        );
+      }
+      return result;
+    });
   }
 
   async deletePostReply(postId: string, replyId: string, userId: string) {
-    if (!postId || !replyId) throw new BadRequestException("postId/replyId 필요");
-    const result = await governed(() =>
-      deleteGovernedCommunityReply(postId, replyId, userId)
-    );
-    if (result.deleted) {
-      await this.reverseActivity(
-        "community.comment.created",
-        replyId,
-        userId,
-        "댓글 삭제 또는 운영 조치에 따른 활동 포인트 회수",
+    return withDatabaseCapability("community.posts.write", async () => {
+      if (!postId || !replyId) {
+        throw new BadRequestException("postId/replyId 필요");
+      }
+      const result = await governed(
+        () => deleteGovernedCommunityReply(postId, replyId, userId),
+        "community.posts.write",
       );
-    }
-    return result;
+      if (result.deleted) {
+        await this.reverseActivity(
+          "community.comment.created",
+          replyId,
+          userId,
+          "댓글 삭제 또는 운영 조치에 따른 활동 포인트 회수",
+        );
+      }
+      return result;
+    });
   }
 
   async listPostReplies(postId: string, viewerId: string | null): Promise<FanCafeReply[]> {
-    if (!postId) throw new BadRequestException("postId 필요");
-    await governed(() => assertCafePostAccess(postId, viewerId));
-    try {
-      return await listFanPostReplies(postId);
-    } catch {
-      return [];
-    }
+    return withDatabaseCapability("community.posts.read", async () => {
+      if (!postId) throw new BadRequestException("postId 필요");
+      await governed(
+        () => assertCafePostAccess(postId, viewerId),
+        "community.posts.read",
+      );
+      return listFanPostReplies(postId);
+    });
   }
 
   async createPostReply(postId: string, userId: string, body: ReplyPayload) {
-    const parsed = validateReplyPayload(body);
-    if (parsed.error || !parsed.text) {
-      throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
-    }
-    const post = await governed(() => assertCafePostAccess(postId, userId));
-    if (post.scope === "cafe") {
-      await governed(() => assertCommunityPostingAccess(post.targetId, userId));
-    }
-    try {
+    return withDatabaseCapability("community.posts.write", async () => {
+      const parsed = validateReplyPayload(body);
+      if (parsed.error || !parsed.text) {
+        throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
+      }
+      const post = await governed(
+        () => assertCafePostAccess(postId, userId),
+        "community.posts.write",
+      );
+      if (post.scope === "cafe") {
+        await governed(
+          () => assertCommunityPostingAccess(post.targetId, userId),
+          "community.posts.write",
+        );
+      }
       const reply = await createFanPostReply({
         postId,
         userId,
@@ -379,9 +411,7 @@ export class CommunityService {
         { postId },
       );
       return reply;
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "답글을 저장하지 못했습니다.");
-    }
+    });
   }
 
   async listCafes(
@@ -393,15 +423,22 @@ export class CommunityService {
     viewerId: string | null,
   ) {
     const sort = parseCommunitySort(sortValue) === "recent" ? "recent" : "popular";
-    const items = await governed(() =>
-      listGovernedCafes({ genre, kind, query, sort, mineOnly, viewerId }),
+    const items = await governed(
+      () => listGovernedCafes({ genre, kind, query, sort, mineOnly, viewerId }),
+      "community.cafes.read",
     );
-    return { items, meta: { sort, total: items.length, generatedAt: new Date().toISOString() } };
+    return {
+      items,
+      meta: { sort, total: items.length, generatedAt: new Date().toISOString() },
+    };
   }
 
   async getCafe(slug: string, viewerId: string | null) {
     if (!slug) throw new BadRequestException("slug 필요");
-    const cafe = await governed(() => getGovernedCafeBySlug(slug, viewerId));
+    const cafe = await governed(
+      () => getGovernedCafeBySlug(slug, viewerId),
+      "community.cafes.read",
+    );
     if (!cafe) throw new NotFoundException("커뮤니티를 찾을 수 없어요.");
     return cafe;
   }
@@ -427,7 +464,10 @@ export class CommunityService {
   }
 
   async listCafeMembers(slug: string, userId: string) {
-    return governed(() => listGovernedCafeMembers(slug, userId));
+    return governed(
+      () => listGovernedCafeMembers(slug, userId),
+      "community.cafes.read",
+    );
   }
 
   async updateCafeMemberRole(slug: string, targetUserId: string, role: unknown, userId: string) {
@@ -439,7 +479,10 @@ export class CommunityService {
   }
 
   async listCafeJoinRequests(slug: string, userId: string) {
-    return governed(() => listGovernedCafeJoinRequests(slug, userId));
+    return governed(
+      () => listGovernedCafeJoinRequests(slug, userId),
+      "community.cafes.read",
+    );
   }
 
   async reviewCafeJoinRequest(
@@ -455,7 +498,10 @@ export class CommunityService {
   }
 
   async listCafeInvites(slug: string, userId: string) {
-    return governed(() => listGovernedCafeInvites(slug, userId));
+    return governed(
+      () => listGovernedCafeInvites(slug, userId),
+      "community.cafes.read",
+    );
   }
 
   async createCafeInvite(slug: string, body: { maxUses?: unknown; expiresInDays?: unknown }, userId: string) {
@@ -467,7 +513,10 @@ export class CommunityService {
   }
 
   async listCafeBans(slug: string, userId: string) {
-    return governed(() => listGovernedCafeBans(slug, userId));
+    return governed(
+      () => listGovernedCafeBans(slug, userId),
+      "community.cafes.read",
+    );
   }
 
   async banCafeMember(
@@ -484,12 +533,17 @@ export class CommunityService {
   }
 
   async listCafeModerationLogs(slug: string, limit: number | null, userId: string) {
-    return governed(() => listGovernedCafeModerationLogs(slug, userId, parseLimit(limit)));
+    return governed(
+      () => listGovernedCafeModerationLogs(slug, userId, parseLimit(limit)),
+      "community.cafes.read",
+    );
   }
 
   async deleteReviewReply(reviewId: string, replyId: string, userId: string) {
-    if (!reviewId || !replyId) throw new BadRequestException("reviewId/replyId 필요");
-    try {
+    return withDatabaseCapability("community.reviews.write", async () => {
+      if (!reviewId || !replyId) {
+        throw new BadRequestException("reviewId/replyId 필요");
+      }
       const result = await deleteReviewReply(userId, reviewId, replyId, false);
       if (result.deleted) {
         await this.reverseActivity(
@@ -500,32 +554,28 @@ export class CommunityService {
         );
       }
       return result;
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "답글을 삭제하지 못했습니다.");
-    }
+    });
   }
 
   async listReviewReplies(reviewId: string): Promise<ReviewReply[]> {
-    if (!reviewId) throw new BadRequestException("reviewId 필요");
-    try {
-      return await listReviewReplies(reviewId);
-    } catch {
-      return [];
-    }
+    return withDatabaseCapability("community.reviews.read", async () => {
+      if (!reviewId) throw new BadRequestException("reviewId 필요");
+      return listReviewReplies(reviewId);
+    });
   }
 
   async createReviewReply(reviewId: string, userId: string, body: ReplyPayload) {
-    const parsed = validateReplyPayload(body);
-    if (parsed.error || !parsed.text) {
-      throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
-    }
-    try {
+    return withDatabaseCapability("community.reviews.write", async () => {
+      const parsed = validateReplyPayload(body);
+      if (parsed.error || !parsed.text) {
+        throw new BadRequestException(parsed.error ?? "답글의 상위 항목이 유효하지 않습니다.");
+      }
       const reply = await createReviewReply({
         reviewId,
         parentId: parsed.parentId,
         userId,
         text: parsed.text,
-        spoiler: !!body.spoiler,
+        spoiler: Boolean(body.spoiler),
       });
       await this.awardActivity(
         userId,
@@ -534,18 +584,18 @@ export class CommunityService {
         { reviewId },
       );
       return reply;
-    } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : "답글을 저장하지 못했습니다.");
-    }
+    });
   }
 
   async getReviewsData(query: ReviewPayload) {
-    return getReviewsData({
-      sort: query.sort ?? undefined,
-      spoiler: query.spoiler ?? undefined,
-      rating: query.rating ?? undefined,
-      userId: query.userId ?? undefined,
-    });
+    return withDatabaseCapability("community.reviews.read", () =>
+      getReviewsData({
+        sort: query.sort ?? undefined,
+        spoiler: query.spoiler ?? undefined,
+        rating: query.rating ?? undefined,
+        userId: query.userId ?? undefined,
+      }),
+    );
   }
 }
 

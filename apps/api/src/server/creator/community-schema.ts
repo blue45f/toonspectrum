@@ -1,5 +1,11 @@
 // 커뮤니티 확장 스키마: 마이그레이션 상태를 먼저 검증하고 레거시 DB만 멱등 보정한다.
 import { dbPool } from "../../db";
+import { isDatabaseAvailabilityError } from "../../common/database-availability";
+import {
+  capabilityUnavailableException,
+  DATABASE_UNAVAILABLE_CODE,
+  DEFAULT_SERVICE_RETRY_AFTER_SECONDS,
+} from "../../common/service-availability";
 
 const VERIFY_COMMUNITY_SCHEMA_SQL = `
   WITH
@@ -495,8 +501,18 @@ const CREATE_COMMUNITY_SCHEMA_SQL = `
   );
 `;
 
+const COMMUNITY_SCHEMA_RETRY_BACKOFF_MS = DEFAULT_SERVICE_RETRY_AFTER_SECONDS * 1_000;
+
+type CommunitySchemaFailureKind = "database" | "schema";
+
+interface CommunitySchemaFailure {
+  readonly kind: CommunitySchemaFailureKind;
+  readonly retryAt: number;
+}
+
 let communitySchemaReady = false;
 let communitySchemaEnsurePromise: Promise<boolean> | null = null;
+let communitySchemaFailure: CommunitySchemaFailure | null = null;
 
 function isRepairableCommunitySchemaShapeError(error: unknown): boolean {
   if (!error || typeof error !== "object" || !("code" in error)) return false;
@@ -540,9 +556,15 @@ async function ensureCreatorCommunitySchemaUncached(): Promise<boolean> {
     }
 
     communitySchemaReady = true;
+    communitySchemaFailure = null;
     return true;
   } catch (error) {
     const e = error as { code?: string; message?: string };
+    const databaseUnavailable = isDatabaseAvailabilityError(error);
+    communitySchemaFailure = {
+      kind: databaseUnavailable ? "database" : "schema",
+      retryAt: databaseUnavailable ? Date.now() + COMMUNITY_SCHEMA_RETRY_BACKOFF_MS : 0,
+    };
     console.error(
       `[creator_community] ensure schema failed (code=${e?.code ?? "?"}): ${e?.message ?? error}`
     );
@@ -552,10 +574,41 @@ async function ensureCreatorCommunitySchemaUncached(): Promise<boolean> {
 
 export async function ensureCreatorCommunitySchema(): Promise<boolean> {
   if (communitySchemaReady) return true;
+  if (
+    communitySchemaFailure?.kind === "database"
+    && Date.now() < communitySchemaFailure.retryAt
+  ) {
+    return false;
+  }
   if (communitySchemaEnsurePromise) return communitySchemaEnsurePromise;
 
   communitySchemaEnsurePromise = ensureCreatorCommunitySchemaUncached().finally(() => {
     communitySchemaEnsurePromise = null;
   });
   return communitySchemaEnsurePromise;
+}
+
+export async function ensureCreatorCommunitySchemaForCapability(
+  capability: string,
+): Promise<boolean> {
+  const ready = await ensureCreatorCommunitySchema();
+  if (ready) return true;
+  if (communitySchemaFailure?.kind !== "database") return false;
+  const remainingSeconds = Math.max(
+    1,
+    Math.ceil((communitySchemaFailure.retryAt - Date.now()) / 1_000),
+  );
+  throw capabilityUnavailableException(capability, {
+    code: DATABASE_UNAVAILABLE_CODE,
+    retryAfterSeconds: remainingSeconds,
+  });
+}
+
+export async function requireCreatorCommunitySchema(
+  capability: string,
+): Promise<void> {
+  if (await ensureCreatorCommunitySchemaForCapability(capability)) return;
+  throw capabilityUnavailableException(capability, {
+    code: "SCHEMA_NOT_READY",
+  });
 }

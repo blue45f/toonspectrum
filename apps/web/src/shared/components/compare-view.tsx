@@ -1,3 +1,4 @@
+import { apiFetch } from "@/platform/api";
 import { Swords, ArrowRight } from "lucide-react";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
@@ -23,7 +24,7 @@ function useHydratedPick(set: Dispatch<SetStateAction<Title | null>>) {
     (picked: Title | null) => {
       set(picked);
       if (!picked) return;
-      fetch(`/api/titles/${encodeURIComponent(picked.slug)}`, { cache: "no-store" })
+      apiFetch(`/api/titles/${encodeURIComponent(picked.slug)}`, { cache: "no-store" })
         .then((res) => (res.ok ? (res.json() as Promise<{ title?: Title }>) : null))
         .then((detail) => {
           if (!detail?.title) return;
@@ -53,12 +54,12 @@ export function CompareView({ initialA, initialB }: { initialA?: string; initial
       const ids = [initialA, initialB].filter(Boolean).join(",");
       const [exact, popular] = await Promise.all([
         ids
-          ? fetch(`/api/titles?ids=${encodeURIComponent(ids)}`, {
+          ? apiFetch(`/api/titles?ids=${encodeURIComponent(ids)}`, {
               cache: "no-store",
               signal: controller.signal,
             }).then((res) => (res.ok ? res.json() : { items: [] }))
           : Promise.resolve({ items: [] }),
-        fetch("/api/titles?sort=popular&limit=8", {
+        apiFetch("/api/titles?sort=popular&limit=8", {
           cache: "no-store",
           signal: controller.signal,
         }).then((res) => (res.ok ? res.json() : { items: [] })),

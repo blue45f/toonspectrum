@@ -25,6 +25,10 @@ import {
   promoteDueCreatorCommunityPublications,
   resolvePublishedCreatorWorkIdBySlug,
 } from "./community-publishing";
+import {
+  rethrowIfDatabaseCapabilityUnavailable,
+  withDatabaseCapability,
+} from "../../common/service-availability";
 import { creatorWorks, db } from "../../db";
 import {
   CREATOR_WORK_REVISION_MAX,
@@ -37,7 +41,7 @@ import {
   type CreatorChallengeDetail,
   type CreatorChallengeSummary,
 } from "./challenges";
-import { ensureCreatorCommunitySchema } from "./community-schema";
+import { requireCreatorCommunitySchema } from "./community-schema";
 import {
   getSeries as rawGetSeries,
   listSeries as rawListSeries,
@@ -287,8 +291,9 @@ export async function listWorks(
   try {
     const visible = await listableWorkSummaries(works);
     return await projectCreatorWorkListWithReleases(visible);
-  } catch {
-    // Discovery fails closed so a transient metadata read cannot leak an unlisted work.
+  } catch (error) {
+    rethrowIfDatabaseCapabilityUnavailable(error, "creator.publication.read");
+    // Discovery fails closed so a non-availability metadata defect cannot leak an unlisted work.
     return [];
   }
 }
@@ -364,7 +369,8 @@ export async function resolveCreatorWorkReference(
   try {
     const workId = await resolvePublishedCreatorWorkIdBySlug(reference);
     return workId && workId !== reference ? rawGetWork(workId, viewerId) : null;
-  } catch {
+  } catch (error) {
+    rethrowIfDatabaseCapabilityUnavailable(error, "creator.publication.read");
     return null;
   }
 }
@@ -387,8 +393,10 @@ export async function getWork(
       ...neighbors,
       ...remixRelations,
     });
-  } catch {
-    // Exact-link access remains available, but related discovery fails closed.
+  } catch (error) {
+    rethrowIfDatabaseCapabilityUnavailable(error, "creator.publication.read");
+    // Exact-link access remains available for non-availability projection defects, while related
+    // discovery fails closed.
     return projectCreatorWorkDetailWithRelease({
       ...work,
       prevEpisode: null,
@@ -460,7 +468,8 @@ export async function getSeries(
   await promoteDueCreatorPublicationsSafely();
   try {
     return await getPublicSeries(id, viewerId);
-  } catch {
+  } catch (error) {
+    rethrowIfDatabaseCapabilityUnavailable(error, "creator.series.read");
     return null;
   }
 }
@@ -522,7 +531,8 @@ export async function getChallenge(
       detail,
       await listableWorkSummaries(detail.works),
     );
-  } catch {
+  } catch (error) {
+    rethrowIfDatabaseCapabilityUnavailable(error, "creator.challenges.read");
     return { ...detail, works: [], entries: 0 };
   }
 }
@@ -586,67 +596,68 @@ export async function promoteDueCreatorPublications(
     limit?: number;
   } = {},
 ): Promise<PromoteDueCreatorPublicationsResult> {
-  if (!(await ensureCreatorCommunitySchema())) {
-    return { promoted: 0, workIds: [], skipped: 0 };
-  }
-  const now = options.now ?? new Date();
-  const nowIso = now.toISOString();
-  const limit = Math.max(1, Math.min(100, Math.floor(options.limit ?? 50)));
-  const explicitlyPromoted = await promoteDueCreatorCommunityPublications(now, limit);
-  const candidates = await db
-    .select({
-      id: creatorWorks.id,
-      ownerId: creatorWorks.userId,
-      doc: creatorWorks.doc,
-      revision: creatorWorks.revision,
-      seriesId: creatorWorks.seriesId,
-    })
-    .from(creatorWorks)
-    .where(
-      and(
-        eq(creatorWorks.status, "draft"),
-        eq(creatorWorks.hidden, false),
-        lt(creatorWorks.revision, CREATOR_WORK_REVISION_MAX),
-        sql`${creatorWorks.doc} -> 'publication' ->> 'mode' = 'scheduled'`,
-        sql`${creatorWorks.doc} -> 'publication' ->> 'publishedAt' is null`,
-        sql`${creatorWorks.doc} -> 'publication' ->> 'scheduledAt' <= ${nowIso}`,
-      ),
-    )
-    .orderBy(
-      sql`${creatorWorks.doc} -> 'publication' ->> 'scheduledAt' ASC`,
-      creatorWorks.id,
-    )
-    .limit(limit);
-
-  const workIds: string[] = [...explicitlyPromoted];
-  let skipped = 0;
-  for (const candidate of candidates) {
-    const directive = readCreatorPublicationDirective(candidate.doc);
-    if (!directive || !isCreatorPublicationDue(directive, now)) {
-      skipped += 1;
-      continue;
-    }
-    const publishedDirective = markCreatorPublicationPublished(directive, now);
-    try {
-      await rawUpdateWork(candidate.ownerId, candidate.id, {
-        baseRevision: candidate.revision,
-        doc: writeCreatorPublicationDirective(
-          candidate.doc,
-          publishedDirective,
+  return withDatabaseCapability("creator.publication.write", async () => {
+    await requireCreatorCommunitySchema("creator.publication.write");
+    const now = options.now ?? new Date();
+    const nowIso = now.toISOString();
+    const limit = Math.max(1, Math.min(100, Math.floor(options.limit ?? 50)));
+    const explicitlyPromoted = await promoteDueCreatorCommunityPublications(now, limit);
+    const candidates = await db
+      .select({
+        id: creatorWorks.id,
+        ownerId: creatorWorks.userId,
+        doc: creatorWorks.doc,
+        revision: creatorWorks.revision,
+        seriesId: creatorWorks.seriesId,
+      })
+      .from(creatorWorks)
+      .where(
+        and(
+          eq(creatorWorks.status, "draft"),
+          eq(creatorWorks.hidden, false),
+          lt(creatorWorks.revision, CREATOR_WORK_REVISION_MAX),
+          sql`${creatorWorks.doc} -> 'publication' ->> 'mode' = 'scheduled'`,
+          sql`${creatorWorks.doc} -> 'publication' ->> 'publishedAt' is null`,
+          sql`${creatorWorks.doc} -> 'publication' ->> 'scheduledAt' <= ${nowIso}`,
         ),
-        status: "published",
-      });
-      workIds.push(candidate.id);
-      if (candidate.seriesId) await touchSeries(candidate.seriesId);
-    } catch (error) {
-      skipped += 1;
-      if (!(error instanceof CreatorWorkRevisionConflictError)) {
-        // Invalid or removed candidates are intentionally skipped. A future edit/request sweep can
-        // make them eligible again without blocking unrelated scheduled works.
+      )
+      .orderBy(
+        sql`${creatorWorks.doc} -> 'publication' ->> 'scheduledAt' ASC`,
+        creatorWorks.id,
+      )
+      .limit(limit);
+
+    const workIds: string[] = [...explicitlyPromoted];
+    let skipped = 0;
+    for (const candidate of candidates) {
+      const directive = readCreatorPublicationDirective(candidate.doc);
+      if (!directive || !isCreatorPublicationDue(directive, now)) {
+        skipped += 1;
+        continue;
+      }
+      const publishedDirective = markCreatorPublicationPublished(directive, now);
+      try {
+        await rawUpdateWork(candidate.ownerId, candidate.id, {
+          baseRevision: candidate.revision,
+          doc: writeCreatorPublicationDirective(
+            candidate.doc,
+            publishedDirective,
+          ),
+          status: "published",
+        });
+        workIds.push(candidate.id);
+        if (candidate.seriesId) await touchSeries(candidate.seriesId);
+      } catch (error) {
+        rethrowIfDatabaseCapabilityUnavailable(error, "creator.publication.write");
+        skipped += 1;
+        if (!(error instanceof CreatorWorkRevisionConflictError)) {
+          // Invalid or removed candidates are intentionally skipped. A future edit/request sweep can
+          // make them eligible again without blocking unrelated scheduled works.
+        }
       }
     }
-  }
-  return { promoted: workIds.length, workIds, skipped };
+    return { promoted: workIds.length, workIds, skipped };
+  });
 }
 
 export const bumpViews = rawBumpViews;
