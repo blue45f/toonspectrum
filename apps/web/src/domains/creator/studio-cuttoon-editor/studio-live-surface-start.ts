@@ -2,13 +2,17 @@
  * Live drawing surface admission/controller extracted from StudioCuttoonEditorHost.
  * The host owns state; this module owns the renderer-selection and live-surface transition seam.
  */
+import { flushSync } from "react-dom";
 import type { DrawEl } from "../studio-element-model";
 
 // The host is a mutable runtime bag by design; keep the dynamic seam isolated to this adapter.
 type StudioLiveSurfaceHost = Record<string, unknown>;
 
 export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
-  const host = h as Record<string, never>;
+  // This seam deliberately bridges a large mutable React host while the extraction is staged.
+  // Keep the dynamic typing local rather than leaking it into the editor surface API.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const host = h as Record<string, any>;
   const {
     STUDIO_POINTER_PREDICTION_ENABLED,
     STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
