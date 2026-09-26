@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "ഈ ഉപകരണത്തിൽ മാറ്റങ്ങൾ സ്വയമേവ സംരക്ഷിക്കപ്പെടും.",
   "studio.settings.state.hide": "മറഞ്ഞിരിക്കുന്നു",
   "studio.settings.state.show": "അടയാളം",
-  "studio.settings.state.open": "തുറക്കുക"
+  "studio.settings.state.open": "തുറക്കുക",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

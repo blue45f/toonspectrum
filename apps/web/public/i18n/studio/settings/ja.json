@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "変更はこのデバイスに自動的に保存されます。",
   "studio.settings.state.hide": "隠れた",
   "studio.settings.state.show": "見える",
-  "studio.settings.state.open": "開ける"
+  "studio.settings.state.open": "開ける",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

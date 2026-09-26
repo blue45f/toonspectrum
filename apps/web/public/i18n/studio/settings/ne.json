@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "परिवर्तनहरू स्वचालित रूपमा यस यन्त्रमा सुरक्षित हुन्छन्।",
   "studio.settings.state.hide": "लुकेको",
   "studio.settings.state.show": "चिन्ह",
-  "studio.settings.state.open": "खोल्नुहोस्"
+  "studio.settings.state.open": "खोल्नुहोस्",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

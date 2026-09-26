@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Muudatused salvestatakse sellesse seadmesse automaatselt.",
   "studio.settings.state.hide": "peidetud",
   "studio.settings.state.show": "märk",
-  "studio.settings.state.open": "avatud"
+  "studio.settings.state.open": "avatud",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

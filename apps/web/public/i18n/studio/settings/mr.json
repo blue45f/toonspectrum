@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "बदल या डिव्हाइसवर स्वयंचलितपणे जतन केले जातात.",
   "studio.settings.state.hide": "लपलेले",
   "studio.settings.state.show": "चिन्ह",
-  "studio.settings.state.open": "उघडा"
+  "studio.settings.state.open": "उघडा",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

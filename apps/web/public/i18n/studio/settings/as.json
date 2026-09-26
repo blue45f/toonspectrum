@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "পৰিবৰ্তনসমূহ স্বয়ংক্ৰিয়ভাৱে এই ডিভাইচত সংৰক্ষণ কৰা হয়।",
   "studio.settings.state.hide": "লুকাই থকা",
   "studio.settings.state.show": "চিন",
-  "studio.settings.state.open": "খোলা"
+  "studio.settings.state.open": "খোলা",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

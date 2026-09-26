@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "การเปลี่ยนแปลงจะถูกบันทึกลงในอุปกรณ์นี้โดยอัตโนมัติ",
   "studio.settings.state.hide": "ซ่อนเร้น",
   "studio.settings.state.show": "ลงชื่อ",
-  "studio.settings.state.open": "เปิด"
+  "studio.settings.state.open": "เปิด",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

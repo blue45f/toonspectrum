@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "ການປ່ຽນແປງຈະຖືກບັນທຶກໄວ້ໃນອຸປະກອນນີ້ໂດຍອັດຕະໂນມັດ.",
   "studio.settings.state.hide": "ເຊື່ອງໄວ້",
   "studio.settings.state.show": "ເຊັນ",
-  "studio.settings.state.open": "ເປີດ"
+  "studio.settings.state.open": "ເປີດ",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

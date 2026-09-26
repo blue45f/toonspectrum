@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "يتم حفظ التغييرات تلقائيًا على هذا الجهاز.",
   "studio.settings.state.hide": "مخفي",
   "studio.settings.state.show": "علامة",
-  "studio.settings.state.open": "مفتوح"
+  "studio.settings.state.open": "مفتوح",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Awtomatikong nase-save ang mga pagbabago sa device na ito.",
   "studio.settings.state.hide": "nakatago",
   "studio.settings.state.show": "tanda",
-  "studio.settings.state.open": "bukas"
+  "studio.settings.state.open": "bukas",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

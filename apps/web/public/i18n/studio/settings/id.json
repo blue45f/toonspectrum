@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Perubahan secara otomatis disimpan ke perangkat ini.",
   "studio.settings.state.hide": "tersembunyi",
   "studio.settings.state.show": "tanda tangan",
-  "studio.settings.state.open": "terbuka"
+  "studio.settings.state.open": "terbuka",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

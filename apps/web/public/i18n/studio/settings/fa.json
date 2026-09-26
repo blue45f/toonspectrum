@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "تغییرات به طور خودکار در این دستگاه ذخیره می شود.",
   "studio.settings.state.hide": "پنهان شده است",
   "studio.settings.state.show": "علامت بزنید",
-  "studio.settings.state.open": "باز کردن"
+  "studio.settings.state.open": "باز کردن",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

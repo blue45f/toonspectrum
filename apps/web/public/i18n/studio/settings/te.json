@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "మార్పులు స్వయంచాలకంగా ఈ పరికరంలో సేవ్ చేయబడతాయి.",
   "studio.settings.state.hide": "దాచబడింది",
   "studio.settings.state.show": "సంకేతం",
-  "studio.settings.state.open": "తెరవండి"
+  "studio.settings.state.open": "తెరవండి",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "ለውጦች በራስ ሰር ወደዚህ መሣሪያ ይቀመጣሉ።",
   "studio.settings.state.hide": "ተደብቋል",
   "studio.settings.state.show": "ምልክት",
-  "studio.settings.state.open": "ክፍት"
+  "studio.settings.state.open": "ክፍት",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

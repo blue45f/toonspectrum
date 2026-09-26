@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Breytingar eru sjálfkrafa vistaðar á þessu tæki.",
   "studio.settings.state.hide": "falinn",
   "studio.settings.state.show": "merki",
-  "studio.settings.state.open": "opið"
+  "studio.settings.state.open": "opið",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

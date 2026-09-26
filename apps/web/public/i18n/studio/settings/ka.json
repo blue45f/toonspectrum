@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "ცვლილებები ავტომატურად შეინახება ამ მოწყობილობაზე.",
   "studio.settings.state.hide": "დამალული",
   "studio.settings.state.show": "ნიშანი",
-  "studio.settings.state.open": "გახსნა"
+  "studio.settings.state.open": "გახსნა",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

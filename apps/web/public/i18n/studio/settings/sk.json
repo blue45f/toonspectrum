@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Zmeny sa automaticky uložia do tohto zariadenia.",
   "studio.settings.state.hide": "skryté",
   "studio.settings.state.show": "znamenie",
-  "studio.settings.state.open": "otvorené"
+  "studio.settings.state.open": "otvorené",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

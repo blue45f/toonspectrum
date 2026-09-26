@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Өзгерістер осы құрылғыға автоматты түрде сақталады.",
   "studio.settings.state.hide": "жасырын",
   "studio.settings.state.show": "белгісі",
-  "studio.settings.state.open": "ашық"
+  "studio.settings.state.open": "ашық",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

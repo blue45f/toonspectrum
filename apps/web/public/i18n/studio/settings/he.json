@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "השינויים נשמרים אוטומטית במכשיר זה.",
   "studio.settings.state.hide": "מוסתרים",
   "studio.settings.state.show": "לחתום",
-  "studio.settings.state.open": "פתוח"
+  "studio.settings.state.open": "פתוח",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

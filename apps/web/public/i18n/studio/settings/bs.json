@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Promjene se automatski spremaju na ovaj uređaj.",
   "studio.settings.state.hide": "skriveno",
   "studio.settings.state.show": "sign",
-  "studio.settings.state.open": "otvoren"
+  "studio.settings.state.open": "otvoren",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

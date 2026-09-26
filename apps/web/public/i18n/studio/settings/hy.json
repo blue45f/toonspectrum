@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Փոփոխությունները ավտոմատ կերպով պահվում են այս սարքում:",
   "studio.settings.state.hide": "թաքնված",
   "studio.settings.state.show": "նշան",
-  "studio.settings.state.open": "բացել"
+  "studio.settings.state.open": "բացել",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

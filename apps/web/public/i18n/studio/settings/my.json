@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "အပြောင်းအလဲများကို ဤစက်တွင် အလိုအလျောက် သိမ်းဆည်းပါသည်။",
   "studio.settings.state.hide": "ဝှက်ထားသည်။",
   "studio.settings.state.show": "လက္ခဏာ",
-  "studio.settings.state.open": "ဖွင့်သည်။"
+  "studio.settings.state.open": "ဖွင့်သည်။",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

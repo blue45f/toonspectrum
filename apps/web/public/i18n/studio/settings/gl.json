@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Os cambios gárdanse automaticamente neste dispositivo.",
   "studio.settings.state.hide": "agochado",
   "studio.settings.state.show": "asinar",
-  "studio.settings.state.open": "aberto"
+  "studio.settings.state.open": "aberto",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

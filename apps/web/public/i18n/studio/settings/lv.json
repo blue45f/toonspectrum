@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Izmaiņas tiek automātiski saglabātas šajā ierīcē.",
   "studio.settings.state.hide": "paslēptas",
   "studio.settings.state.show": "zīme",
-  "studio.settings.state.open": "atvērts"
+  "studio.settings.state.open": "atvērts",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

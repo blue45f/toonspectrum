@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "ಬದಲಾವಣೆಗಳನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಈ ಸಾಧನದಲ್ಲಿ ಉಳಿಸಲಾಗುತ್ತದೆ.",
   "studio.settings.state.hide": "ಮರೆಮಾಡಲಾಗಿದೆ",
   "studio.settings.state.show": "ಚಿಹ್ನೆ",
-  "studio.settings.state.open": "ತೆರೆದ"
+  "studio.settings.state.open": "ತೆರೆದ",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

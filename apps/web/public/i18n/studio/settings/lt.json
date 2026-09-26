@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Pakeitimai automatiškai išsaugomi šiame įrenginyje.",
   "studio.settings.state.hide": "paslėptas",
   "studio.settings.state.show": "ženklas",
-  "studio.settings.state.open": "atidaryti"
+  "studio.settings.state.open": "atidaryti",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

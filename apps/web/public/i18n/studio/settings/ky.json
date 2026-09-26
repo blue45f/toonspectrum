@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Өзгөртүүлөр бул түзмөккө автоматтык түрдө сакталат.",
   "studio.settings.state.hide": "жашырылган",
   "studio.settings.state.show": "белги",
-  "studio.settings.state.open": "ачык"
+  "studio.settings.state.open": "ачык",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

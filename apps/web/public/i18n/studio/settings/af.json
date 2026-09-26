@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Veranderinge word outomaties op hierdie toestel gestoor.",
   "studio.settings.state.hide": "versteek",
   "studio.settings.state.show": "teken",
-  "studio.settings.state.open": "oopmaak"
+  "studio.settings.state.open": "oopmaak",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

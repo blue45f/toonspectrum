@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Ndryshimet ruhen automatikisht në këtë pajisje.",
   "studio.settings.state.hide": "të fshehura",
   "studio.settings.state.show": "shenjë",
-  "studio.settings.state.open": "hapur"
+  "studio.settings.state.open": "hapur",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

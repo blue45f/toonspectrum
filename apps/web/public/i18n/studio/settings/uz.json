@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "O'zgarishlar avtomatik ravishda ushbu qurilmaga saqlanadi.",
   "studio.settings.state.hide": "yashirin",
   "studio.settings.state.show": "belgisi",
-  "studio.settings.state.open": "ochiq"
+  "studio.settings.state.open": "ochiq",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

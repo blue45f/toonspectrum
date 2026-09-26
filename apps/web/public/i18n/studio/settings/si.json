@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "වෙනස්කම් ස්වයංක්‍රීයව මෙම උපාංගයට සුරැකේ.",
   "studio.settings.state.hide": "සැඟවී ඇත",
   "studio.settings.state.show": "ලකුණ",
-  "studio.settings.state.open": "විවෘත"
+  "studio.settings.state.open": "විවෘත",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

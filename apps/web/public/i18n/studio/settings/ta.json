@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "மாற்றங்கள் தானாகவே இந்தச் சாதனத்தில் சேமிக்கப்படும்.",
   "studio.settings.state.hide": "மறைக்கப்பட்டுள்ளது",
   "studio.settings.state.show": "அடையாளம்",
-  "studio.settings.state.open": "திறந்த"
+  "studio.settings.state.open": "திறந்த",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

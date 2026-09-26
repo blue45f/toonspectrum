@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Промените автоматски се зачувуваат на овој уред.",
   "studio.settings.state.hide": "скриени",
   "studio.settings.state.show": "знак",
-  "studio.settings.state.open": "отворени"
+  "studio.settings.state.open": "отворени",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

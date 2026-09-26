@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "變更會自動儲存到該裝置。",
   "studio.settings.state.hide": "隱藏的",
   "studio.settings.state.show": "標誌",
-  "studio.settings.state.open": "打開"
+  "studio.settings.state.open": "打開",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

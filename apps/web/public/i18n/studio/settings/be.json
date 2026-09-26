@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Змены аўтаматычна захоўваюцца на гэтай прыладзе.",
   "studio.settings.state.hide": "схаваны",
   "studio.settings.state.show": "знак",
-  "studio.settings.state.open": "адкрыты"
+  "studio.settings.state.open": "адкрыты",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

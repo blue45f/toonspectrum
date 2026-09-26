@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Wijzigingen worden automatisch op dit apparaat opgeslagen.",
   "studio.settings.state.hide": "verborgen",
   "studio.settings.state.show": "teken",
-  "studio.settings.state.open": "geopend"
+  "studio.settings.state.open": "geopend",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

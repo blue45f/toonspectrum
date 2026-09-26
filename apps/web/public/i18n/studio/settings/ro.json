@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Modificările sunt salvate automat pe acest dispozitiv.",
   "studio.settings.state.hide": "ascuns",
   "studio.settings.state.show": "semn",
-  "studio.settings.state.open": "deschis"
+  "studio.settings.state.open": "deschis",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

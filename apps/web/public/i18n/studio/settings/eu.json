@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Aldaketak automatikoki gordetzen dira gailu honetan.",
   "studio.settings.state.hide": "ezkutuan",
   "studio.settings.state.show": "sinatu",
-  "studio.settings.state.open": "irekita"
+  "studio.settings.state.open": "irekita",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

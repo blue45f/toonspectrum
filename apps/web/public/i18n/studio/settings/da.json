@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Ændringer gemmes automatisk på denne enhed.",
   "studio.settings.state.hide": "skjult",
   "studio.settings.state.show": "underskrive",
-  "studio.settings.state.open": "åben"
+  "studio.settings.state.open": "åben",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

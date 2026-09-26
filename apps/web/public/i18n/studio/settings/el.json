@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Οι αλλαγές αποθηκεύονται αυτόματα σε αυτήν τη συσκευή.",
   "studio.settings.state.hide": "κρυμμένο",
   "studio.settings.state.show": "σημάδι",
-  "studio.settings.state.open": "ανοιχτό"
+  "studio.settings.state.open": "ανοιχτό",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

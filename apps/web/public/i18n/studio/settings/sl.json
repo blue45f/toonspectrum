@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Spremembe se samodejno shranijo v to napravo.",
   "studio.settings.state.hide": "skrit",
   "studio.settings.state.show": "znak",
-  "studio.settings.state.open": "odprto"
+  "studio.settings.state.open": "odprto",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

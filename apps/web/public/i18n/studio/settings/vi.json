@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Các thay đổi sẽ được tự động lưu vào thiết bị này.",
   "studio.settings.state.hide": "ẩn giấu",
   "studio.settings.state.show": "ký tên",
-  "studio.settings.state.open": "mở"
+  "studio.settings.state.open": "mở",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

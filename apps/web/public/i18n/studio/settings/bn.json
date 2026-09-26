@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "পরিবর্তনগুলি স্বয়ংক্রিয়ভাবে এই ডিভাইসে সংরক্ষিত হয়৷",
   "studio.settings.state.hide": "লুকানো",
   "studio.settings.state.show": "চিহ্ন",
-  "studio.settings.state.open": "খোলা"
+  "studio.settings.state.open": "খোলা",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

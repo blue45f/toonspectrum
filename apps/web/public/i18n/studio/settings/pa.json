@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "ਤਬਦੀਲੀਆਂ ਨੂੰ ਇਸ ਡੀਵਾਈਸ ਵਿੱਚ ਸਵੈਚਲਿਤ ਤੌਰ 'ਤੇ ਰੱਖਿਅਤ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
   "studio.settings.state.hide": "ਲੁਕਿਆ ਹੋਇਆ",
   "studio.settings.state.show": "ਚਿੰਨ੍ਹ",
-  "studio.settings.state.open": "ਖੁੱਲਾ"
+  "studio.settings.state.open": "ਖੁੱਲਾ",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

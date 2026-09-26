@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Endringer lagres automatisk på denne enheten.",
   "studio.settings.state.hide": "skjult",
   "studio.settings.state.show": "tegn",
-  "studio.settings.state.open": "åpne"
+  "studio.settings.state.open": "åpne",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Değişiklikler otomatik olarak bu cihaza kaydedilir.",
   "studio.settings.state.hide": "gizli",
   "studio.settings.state.show": "işaret",
-  "studio.settings.state.open": "açık"
+  "studio.settings.state.open": "açık",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

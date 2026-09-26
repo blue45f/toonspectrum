@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Els canvis es desen automàticament en aquest dispositiu.",
   "studio.settings.state.hide": "amagat",
   "studio.settings.state.show": "signe",
-  "studio.settings.state.open": "obert"
+  "studio.settings.state.open": "obert",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

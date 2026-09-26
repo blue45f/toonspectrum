@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Muutokset tallennetaan automaattisesti tälle laitteelle.",
   "studio.settings.state.hide": "piilotettu",
   "studio.settings.state.show": "merkki",
-  "studio.settings.state.open": "auki"
+  "studio.settings.state.open": "auki",
+  "studio.settings.tool.characterShaper": "Create a character"
 }

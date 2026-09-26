@@ -183,5 +183,6 @@
   "studio.settings.other.persistenceSaved": "Өөрчлөлтүүдийг энэ төхөөрөмжид автоматаар хадгална.",
   "studio.settings.state.hide": "далд",
   "studio.settings.state.show": "тэмдэг",
-  "studio.settings.state.open": "нээлттэй"
+  "studio.settings.state.open": "нээлттэй",
+  "studio.settings.tool.characterShaper": "Create a character"
 }
