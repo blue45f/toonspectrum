@@ -69,7 +69,7 @@ describe("StudioStrokeProposalReviewPanel", () => {
       />,
     );
     expect(screen.getByRole("region", { name: "스마트 획 보정 검토" })).not.toBeNull();
-    expect(screen.getByRole("img", { name: /1개 제안 획/u })).not.toBeNull();
+    expect(screen.getByRole("img", { name: /1개 보정 획 미리보기/u })).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "선택 획 적용" }));
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply.mock.calls[0]?.[0].addedStrokes[0]?.id).toBe("stroke-1");

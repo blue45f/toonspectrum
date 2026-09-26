@@ -76,7 +76,7 @@ describe("StudioAi3dGenerationPanel", () => {
       target: { files: [oversized] },
     });
 
-    expect((await screen.findByRole("alert")).textContent).toMatch(/10 MB/u);
+    expect(await screen.findByText(/10MB까지 지원합니다/u)).not.toBeNull();
     expect(screen.getByRole("button", { name: "3D 생성 시작" }).hasAttribute("disabled")).toBe(true);
     expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
