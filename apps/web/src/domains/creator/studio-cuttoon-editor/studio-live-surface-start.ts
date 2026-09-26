@@ -9,6 +9,7 @@ import type { DrawEl } from "../studio-element-model";
 type StudioLiveSurfaceHost = Record<string, unknown>;
 
 export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
+  // This adapter intentionally preserves the host's runtime bag typing across the extraction seam.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const host = h as Record<string, any>;
   const {

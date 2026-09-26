@@ -23368,6 +23368,8 @@ const puppetWarpArmed =
   current: ReturnType<typeof bindStudioCuttoonStagePointers>["finishDrawingPointer"] | undefined;
 } = { current: undefined };
 
+type StudioFinishQueuedDrawingPointer = NonNullable<ReturnType<typeof bindStudioCuttoonStagePointers>["finishDrawingPointer"]>;
+
 const beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({
     STUDIO_POINTER_PREDICTION_ENABLED,
     STUDIO_VISIBLE_LIVE_INK_PREFERENCE,
@@ -23401,7 +23403,7 @@ const beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({
     drawingPointerTransportRef,
     drawingRef,
     endLiveResourceEdit,
-    getFinishQueuedStudioDrawingPointer: () => finishQueuedStudioDrawingPointerRef.current,
+    finishQueuedStudioDrawingPointer: (...args: Parameters<StudioFinishQueuedDrawingPointer>) => finishQueuedStudioDrawingPointerRef.current?.(...args),
     flushDirectLiveDraft,
     flushDirectLiveDraftNow,
     flushPendingStrokeCommitsRef,
@@ -23493,6 +23495,7 @@ const beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({
     queueStudioBg3dMagicFilterMaskPublication,
     studioPageElementsFromHistory,
     replayPendingCatalogGesture,
+    finishDrawingPointer: stageFinishDrawingPointer,
   } = bindStudioCuttoonStagePointers({
     capturePendingCatalogInput,
     activeCatalogBrush,
