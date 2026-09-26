@@ -37,11 +37,6 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     );
     await compiledPackage(
       root,
-      "packages/core/src/infrastructure-fabric.js",
-      '"use strict"; module.exports = { fabric: "federated" };\n',
-    );
-    await compiledPackage(
-      root,
       "packages/core/src/creator-role.js",
       '"use strict"; module.exports = { creatorRole: "artist" };\n',
     );
@@ -101,9 +96,6 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     });
     assert.deepEqual(requireFromApi("@toonspectrum/core"), {
       core: "ready",
-    });
-    assert.deepEqual(requireFromApi("@toonspectrum/core/infrastructure-fabric"), {
-      fabric: "federated",
     });
     assert.deepEqual(requireFromApi("@toonspectrum/core/production"), {
       production: "risk-v2",
