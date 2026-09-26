@@ -216,6 +216,8 @@ function serializeDrawMarkup(ctx: ExportCtx, el: SvgDrawElLike): string {
           dynamics,
         );
         let usesCausalDepositPlan = false;
+        const streamsR8Grain = dynamics.grain.amount > 0
+          && dynamics.grain.source !== undefined;
         const usesContinuation =
           studioDynamicBrushDepositPipelineUsesContinuation(dynamics.depositPipeline);
         let causalDepositPlan:
@@ -259,8 +261,16 @@ function serializeDrawMarkup(ctx: ExportCtx, el: SvgDrawElLike): string {
           (causalDepositPlan && !causalDepositPlan.ok)
           || (continuationPlan && !continuationPlan.ok)
         ) {
-          dynamicPlanFailed = true;
-          return null;
+          // Exact R8 SVG streaming is independently bounded by its transient-map and serialized
+          // RGBA budgets. If the causal planner rejects a pathological long stroke before it can
+          // produce dabs, let the bounded generic dab planner provide the prefix for that R8 path
+          // instead of dropping the whole export. Non-R8 paths keep the existing fail-closed rule.
+          if (streamsR8Grain && causalDepositPlan && !causalDepositPlan.ok && !usesContinuation) {
+            causalDepositPlan = null;
+          } else {
+            dynamicPlanFailed = true;
+            return null;
+          }
         }
         let continuationSegments:
           | readonly (readonly StudioDynamicBrushDab[])[]
@@ -347,8 +357,6 @@ function serializeDrawMarkup(ctx: ExportCtx, el: SvgDrawElLike): string {
         let causalCoverageMarksByVariation:
           readonly (readonly StudioDynamicBrushCoverageMark[])[] | null = null;
         let r8CoverageMarkupByVariation: readonly string[] | null = null;
-        const streamsR8Grain = dynamics.grain.amount > 0
-          && dynamics.grain.source !== undefined;
         if (streamsR8Grain) {
           r8CoverageMarkupByVariation = serializeStudioR8DynamicCoverageMarks(
             ctx,
