@@ -21,6 +21,8 @@ describe("webtoon production collaboration UI", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("흩어진 웹툰 제작");
     expect(screen.getByRole("link", { name: /기능 미리 보기/u }).getAttribute("href"))
       .toBe("/production/projects/sample-project/overview");
+    expect(screen.getByRole("link", { name: "사람·권한" }).getAttribute("href"))
+      .toBe("/team/people");
     expect(screen.getAllByText("작업 넘기기").length).toBeGreaterThan(0);
   });
 

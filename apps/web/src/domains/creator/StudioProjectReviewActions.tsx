@@ -34,11 +34,11 @@ import { cn } from "@/shared/lib/utils";
 export interface StudioProjectReviewActionsProps {
   /** 마스터 편집 중에는 히스토리 스크러빙 기반 표면을 열 수 없다. */
   masterEditMode: boolean;
-  /** 현재 페이지가 검토 잠금 상태인지 — 라벨과 강조 상태에 쓰인다. */
+  /** 현재 페이지가 검토 중 편집 제한 상태인지 — 라벨과 강조 상태에 쓰인다. */
   pageEditLocked: boolean;
   /** 공동 문서가 잠겨 댓글조차 읽을 수 없는 상태. */
   commentsLocked: boolean;
-  /** 잠금 사유 카피. `commentsLocked`일 때만 노출된다. */
+  /** 편집 제한 사유 카피. `commentsLocked`일 때만 노출된다. */
   commentsLockedReason: string;
   /** 미해결 댓글 수 — 0이면 배지를 숨긴다. */
   openCommentCount: number;
@@ -136,10 +136,10 @@ export function StudioProjectReviewActions({
     },
     {
       id: "page-review",
-      label: pageEditLocked ? "페이지 검토 (편집 잠김)" : "페이지 검토",
+      label: pageEditLocked ? "페이지 검토 (편집 제한)" : "페이지 검토",
       ariaLabel: pageEditLocked
-        ? "페이지 검토, 현재 편집 잠금"
-        : "페이지 검토와 편집 잠금",
+        ? "페이지 검토, 현재 검토 중 편집 제한"
+        : "페이지 검토와 편집 제한",
       title: "페이지별 승인 상태·담당자·메모를 관리하고 검토 중 편집을 잠급니다.",
       icon: ClipboardCheck,
       disabled: false,

@@ -195,6 +195,11 @@ export interface CreatorCollaborationUnitOfWork {
   getStudioCrdtServerSequence(workId: string): Promise<bigint>;
   findWork(workId: string, lock?: boolean): Promise<CreatorCollaborationWorkRecord | null>;
   findUser(userId: string, lock?: boolean): Promise<CreatorCollaborationUserRecord | null>;
+  /** Production adapters resolve an exact user id, a verified email, or one unambiguous exact display name. */
+  findUserByIdentity?(
+    identity: string,
+    lock?: boolean
+  ): Promise<CreatorCollaborationUserRecord | null>;
   findMembership(
     workId: string,
     userId: string

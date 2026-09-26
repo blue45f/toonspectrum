@@ -398,7 +398,7 @@ export function StudioLiveCollaborationProvider({
     if (transportPreference === "server" && !transportFactory) {
       setAvailability("error");
       setMode("server");
-      setError("인증된 팀 연결 정보가 없어 로컬 모드로 자동 전환하지 않았습니다. 다시 로그인해 주세요.");
+      setError("인증된 팀 연결 정보가 없어 이 기기 테스트 모드로 자동 전환하지 않았습니다. 다시 로그인해 주세요.");
       onRoomChange?.(null);
       return;
     }

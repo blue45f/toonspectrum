@@ -195,7 +195,7 @@ function defaultBroadcastChannelFactory(name: string): StudioBroadcastChannelLik
   } catch (cause) {
     // createStudioLocalLiveTransport 가 지원되지 않을 때 던지는 것과 같은 모양으로 맞춘다.
     // 호출부는 이미 그 문장을 처리하고 있고, 여기서 raw DOMException 이 새면 처리하지 못한다.
-    throw new Error("이 브라우저는 로컬 탭 공동작업 채널을 지원하지 않습니다.", { cause });
+    throw new Error("이 브라우저는 이 기기 탭 테스트 채널을 지원하지 않습니다.", { cause });
   }
 }
 
@@ -471,7 +471,7 @@ export const createStudioLocalLiveTransport: StudioLiveTransportFactory = ({
   participant,
 }) => {
   if (!isStudioLocalLiveTransportSupported()) {
-    throw new Error("이 브라우저는 로컬 탭 공동작업 채널을 지원하지 않습니다.");
+    throw new Error("이 브라우저는 이 기기 탭 테스트 채널을 지원하지 않습니다.");
   }
   return new StudioBroadcastChannelTransport(roomName, defaultBroadcastChannelFactory, {
     workId,

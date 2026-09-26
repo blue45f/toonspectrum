@@ -57,7 +57,10 @@ export interface StudioTeamSnapshot {
 }
 
 export interface InviteStudioTeamMemberInput {
-  userId: string;
+  /** Exact account id or verified account email. */
+  identity?: string;
+  /** Backward-compatible id field for older callers. */
+  userId?: string;
   role: StudioTeamAssignableRole;
 }
 
@@ -610,7 +613,10 @@ export function inviteStudioTeamMember(
 ): Promise<StudioTeamSnapshot> {
   return requestSnapshot(
     workId,
-    () => api.post<unknown>(teamPath(workId), input),
+    () => api.post<unknown>(teamPath(workId), {
+      identity: input.identity ?? input.userId,
+      role: input.role,
+    }),
     "팀원을 초대하지 못했습니다."
   );
 }

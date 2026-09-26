@@ -141,7 +141,7 @@ export function ProductionLandingPage() {
                   </>
                 ) : (
                   <>
-                    <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/production/workspaces">팀 워크스페이스</Link>
+                    <Link className={buttonClass({ variant: "outline", size: "lg" })} to="/team/people">사람·권한</Link>
                     <Link className={buttonClass({ size: "lg" })} to="/production/projects/sample-project/overview">
                       기능 미리 보기 <ArrowRight className="size-4" aria-hidden="true" />
                     </Link>

@@ -1153,7 +1153,7 @@ export class StudioCrdtRoomBinding {
     } catch (error) {
       this.emitStatus({
         state: "error",
-        message: messageFrom(error, "로컬 탭에 원고 상태를 전달하지 못했습니다."),
+        message: messageFrom(error, "이 기기 테스트 탭에 원고 상태를 전달하지 못했습니다."),
       });
     }
   }

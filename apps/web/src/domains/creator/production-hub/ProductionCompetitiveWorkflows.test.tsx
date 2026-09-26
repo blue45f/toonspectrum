@@ -345,7 +345,8 @@ describe("CRECO competitive production workflows", () => {
     fireEvent.click(screen.getByRole("tab", { name: "외부 검토자" }));
     expect(screen.getByText("원본 다운로드")).toBeTruthy();
     const link = screen.getByRole("link", { name: "팀 초대에서 사용" });
-    expect(link.getAttribute("href")).toContain("rolePreset=external-reviewer");
+    expect(link.getAttribute("href"))
+      .toBe("/team/people?rolePreset=external-reviewer");
   });
 
   it("prepares a bounded, non-destructive AI shading handoff without starting generation", async () => {

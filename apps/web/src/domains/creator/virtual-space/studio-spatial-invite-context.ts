@@ -67,7 +67,7 @@ export function studioSpatialInviteDestination(
   if (normalized.kind === "interview-waiting") {
     const query = new URLSearchParams({ panel: "rooms", waiting: "1" });
     if (safeWorkspace) query.set("workspace", safeWorkspace);
-    return `/collaborate/workspace?${query.toString()}`;
+    return `/team/recruiting?${query.toString()}`;
   }
   const query = safeWorkspace ? `?workspace=${encodeURIComponent(safeWorkspace)}&lobby=1` : "?lobby=1";
   return `/team${query}`;

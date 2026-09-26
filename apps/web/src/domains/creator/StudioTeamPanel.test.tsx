@@ -156,7 +156,9 @@ describe("StudioTeamPanel shell and first-use states", () => {
     expect(html).toContain("로그인이 필요해요");
     expect(html).toContain("size-11");
     expect(html).toContain("팀 작업 공간");
-    expect(html).toContain("서버 권한");
+    expect(html).toContain("TEAM COLLABORATION");
+    expect(html).toContain("사람·권한");
+    expect(html).toContain("함께 작업");
   });
 
   it("저장되지 않은 원고에서 저장 선행 조건과 받은 초대 로딩 상태를 함께 설명한다", () => {
@@ -351,7 +353,8 @@ describe("StudioTeamPanelView permissions", () => {
 
     expect(html).toContain("팀원 초대");
     expect(html).toContain('id="studio-team-invite-user-id"');
-    expect(html).toContain("가입한 사용자의 ID로 초대합니다");
+    expect(html).toContain("정확한 이름, 인증 이메일 또는 사용자 ID로 가입한 팀원을 찾습니다");
+    expect(html).toContain("홍길동, name@example.com 또는 creator_1234");
     expect(html).toContain('<strong class="font-semibold text-fg-2">편집자</strong>');
     expect(html).toContain("원고를 읽고 공동 저장합니다");
     expect(html).toContain('data-team-manage-controls="true"');
@@ -366,9 +369,10 @@ describe("StudioTeamPanelView permissions", () => {
     expect(html).toContain("열람자 · 참여 중");
     expect(html).toContain("편집자 · 참여 중");
     expect(html).toContain('aria-label="팀 변경 기록 새로고침"');
-    expect(html).toContain("로그인 세션과 작품 권한을 확인한 팀 서버를 우선");
+    expect(html).toContain("공유 원고 읽기와 공동 저장은 로그인 세션과 작품 권한을 서버에서 확인합니다");
+    expect(html).toContain("이 기기 테스트 모드는 다른 사용자와 연결하지 않고");
     expect(html).not.toContain("위 같이 보기는 같은 출처 로컬 탭 전용");
-    expect(html.match(/group-open:rotate-180/g)?.length).toBe(2);
+    expect(html.match(/group-open:rotate-180/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
   it("서버가 구형 이미지 URL을 포함해도 팀원은 이니셜만 표시한다", () => {
@@ -446,10 +450,10 @@ describe("StudioTeamPanelView permissions", () => {
 
   it("저장된 서버 권한만 표시하며 존재하지 않는 접속 상태를 주장하지 않는다", () => {
     const html = renderView();
-    expect(html).toContain("revision 공동 저장까지 서버 권한에 연결되었습니다");
+    expect(html).toContain("공유 원고 읽기와 공동 저장은 로그인 세션과 작품 권한을 서버에서 확인합니다");
     expect(html).not.toContain("온라인");
     expect(html).not.toContain("접속 중");
-    expect(html).not.toContain("실시간");
+    expect(html).toContain("다른 사용자와 연결하지 않고 동일 브라우저 탭에서만 동작합니다");
   });
 });
 

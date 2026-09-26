@@ -128,10 +128,10 @@ describe("StudioLiveCollaborationPanelView", () => {
     const html = renderView();
 
     expect(html).toContain('data-studio-live-mode="local"');
-    expect(html).toContain("로컬 탭 미리보기");
-    expect(html).toContain("같은 출처 탭 연결");
-    expect(html).toContain("같은 브라우저에서 이 주소로 탭을 하나 더 열면");
-    expect(html).toContain("서버 없이 이 기기 안에서만 동기화합니다");
+    expect(html).toContain("동일 브라우저 테스트");
+    expect(html).toContain("이 기기 테스트 연결");
+    expect(html).toContain("다른 사용자와 연결되지 않습니다");
+    expect(html).toContain("이 기기 안에서만 테스트합니다");
   });
 
   it("renders an injected authenticated server transport as a separate mode", () => {
@@ -141,7 +141,7 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(html).toContain("서버 팀 세션");
     expect(html).toContain("팀 서버 연결");
     expect(html).toContain("로그인 세션과 작품 권한을 확인한 팀 연결");
-    expect(html).not.toContain("로컬 탭 미리보기");
+    expect(html).not.toContain("동일 브라우저 테스트");
   });
 
   it("explains server, local durability, pending operations, and ACK recency without protocol ids", () => {
@@ -175,7 +175,7 @@ describe("StudioLiveCollaborationPanelView", () => {
       error: "팀 서버에 연결하지 못했습니다.",
     });
     expect(failed).toContain("팀 서버 다시 연결");
-    expect(failed).toContain("로컬 탭 모드");
+    expect(failed).toContain("이 기기 테스트 모드");
     expect(failed.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
 
     const terminalFailure = renderView({
@@ -191,7 +191,7 @@ describe("StudioLiveCollaborationPanelView", () => {
       }),
     });
     expect(terminalFailure).not.toContain("팀 서버 다시 연결");
-    expect(terminalFailure).not.toContain("로컬 탭 모드");
+    expect(terminalFailure).not.toContain("이 기기 테스트 모드");
 
     const operationFailure = renderView({
       availability: "ready",
@@ -201,16 +201,16 @@ describe("StudioLiveCollaborationPanelView", () => {
     });
     expect(operationFailure).toContain("다른 팀원이 이 항목을 편집하고 있습니다.");
     expect(operationFailure).not.toContain("팀 서버 다시 연결");
-    expect(operationFailure).not.toContain("로컬 탭 모드");
+    expect(operationFailure).not.toContain("이 기기 테스트 모드");
 
     const fallback = renderView({
       mode: "local",
       serverAvailable: true,
       usingLocalFallback: true,
     });
-    expect(fallback).toContain("현재 같은 출처 로컬 탭 모드");
+    expect(fallback).toContain("현재 이 기기 테스트 모드");
     expect(fallback).toContain("팀 서버 다시 연결");
-    expect(fallback).not.toContain("> 로컬 탭 모드<");
+    expect(fallback).not.toContain("> 이 기기 테스트 모드<");
   });
 
   it("replaces retry and local-fallback bypasses with an explicit export/reload boundary", () => {
@@ -239,7 +239,7 @@ describe("StudioLiveCollaborationPanelView", () => {
     expect(recoveryRequired).toContain("복구 파일 내보내기");
     expect(recoveryRequired).toContain("서버 원고 다시 열기");
     expect(recoveryRequired).not.toContain("팀 서버 다시 연결");
-    expect(recoveryRequired).not.toContain("로컬 탭 모드");
+    expect(recoveryRequired).not.toContain("이 기기 테스트 모드");
     expect(recoveryRequired).not.toContain("private-vault-id");
     expect(recoveryRequired).toMatch(
       /<button[^>]*disabled=""[^>]*title="복구 파일을 먼저 내보내야 서버 원고를 다시 열 수 있습니다\."[^>]*>[\s\S]*?서버 원고 다시 열기/

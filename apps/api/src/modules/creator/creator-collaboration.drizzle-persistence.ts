@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, lt, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import {
@@ -422,6 +422,47 @@ export class DrizzleCreatorCollaborationUnitOfWork implements CreatorCollaborati
 
     const rows = lock ? await selectUser().for("update") : await selectUser();
     return rows[0] ?? null;
+  }
+
+  async findUserByIdentity(
+    identity: string,
+    lock = false
+  ): Promise<CreatorCollaborationUserRecord | null> {
+    const normalized = identity.trim();
+    if (!normalized) return null;
+    const normalizedCaseFolded = normalized.toLocaleLowerCase("en-US");
+    const selection = {
+      userId: users.id,
+      name: users.name,
+      status: users.status,
+      creatorRoleProfile: users.creatorRoleProfile,
+    };
+    const selectUsers = async (identityFilter: SQL, limit: number) => {
+      const query = this.executor
+        .select(selection)
+        .from(users)
+        .where(and(eq(users.status, "active"), identityFilter))
+        .limit(limit);
+      return lock ? query.for("update") : query;
+    };
+
+    const exactId = await selectUsers(eq(users.id, normalized), 1);
+    if (exactId[0]) return exactId[0];
+
+    const verifiedEmail = await selectUsers(
+      and(
+        sql`lower(${users.email}) = ${normalizedCaseFolded}`,
+        isNotNull(users.emailVerified),
+      )!,
+      1,
+    );
+    if (verifiedEmail[0]) return verifiedEmail[0];
+
+    const exactName = await selectUsers(
+      sql`lower(${users.name}) = ${normalizedCaseFolded}`,
+      2,
+    );
+    return exactName.length === 1 ? exactName[0] : null;
   }
 
   async findMembership(

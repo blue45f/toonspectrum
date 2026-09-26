@@ -180,12 +180,12 @@ describe("studio team client", () => {
     apiPatch.mockResolvedValue(snapshot("work 1"));
     apiDelete.mockResolvedValue(snapshot("work 1"));
 
-    await inviteStudioTeamMember("work 1", { userId: "member/한글", role: "editor" });
+    await inviteStudioTeamMember("work 1", { identity: "artist@example.com", role: "editor" });
     await updateStudioTeamMemberRole("work 1", "member/한글", "commenter");
     await removeStudioTeamMember("work 1", "member/한글");
 
     expect(apiPost).toHaveBeenCalledWith("/creator/works/work%201/team", {
-      userId: "member/한글",
+      identity: "artist@example.com",
       role: "editor",
     });
     expect(apiPatch).toHaveBeenCalledWith(

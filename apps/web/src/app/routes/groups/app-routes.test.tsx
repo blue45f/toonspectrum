@@ -100,6 +100,15 @@ describe("application route registry", () => {
     );
   });
 
+  it("keeps the unified team recruiting surface alongside the legacy collaboration workspace", () => {
+    expect(appRoutes).toContainEqual(
+      expect.objectContaining({ id: "team-recruiting", path: "/team/recruiting" }),
+    );
+    expect(appRoutes).toContainEqual(
+      expect.objectContaining({ id: "collaboration-workspace", path: "/collaborate/workspace" }),
+    );
+  });
+
   it("routes legacy creator hubs to canonical Studio destinations", () => {
     expect(appRoutes).toContainEqual(
       expect.objectContaining({ id: "resources-make", path: "/make" }),

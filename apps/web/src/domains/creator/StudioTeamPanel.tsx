@@ -870,21 +870,21 @@ export function StudioTeamPanelView({
               <h3 id="studio-team-invite-title" className="text-sm font-bold text-fg">
                 팀원 초대
               </h3>
-              <p className="mt-0.5 text-xs text-fg-3">가입한 사용자의 ID로 초대합니다.</p>
+              <p className="mt-0.5 text-xs text-fg-3">정확한 이름, 인증 이메일 또는 사용자 ID로 가입한 팀원을 찾습니다. 같은 이름이 여러 명이면 이메일이나 ID를 사용하세요.</p>
             </div>
             <ShieldCheck className="shrink-0 text-accent" size={18} aria-hidden="true" />
           </div>
           <form className="mt-3 space-y-2" onSubmit={onInvite}>
             <label className="block text-xs font-semibold text-fg-2" htmlFor="studio-team-invite-user-id">
-              사용자 ID
+              이름, 이메일 또는 사용자 ID
             </label>
             <input
               autoComplete="off"
               className={cn(CONTROL_CLASS, "w-full")}
               disabled={busyAction != null}
               id="studio-team-invite-user-id"
-              maxLength={160}
-              placeholder="예: creator_1234"
+              maxLength={320}
+              placeholder="홍길동, name@example.com 또는 creator_1234"
               spellCheck={false}
               type="text"
               value={inviteUserId}
@@ -1117,13 +1117,17 @@ export function StudioTeamPanelView({
         </dl>
       </details>
 
-      <p className="border-t border-line pt-3 text-xs leading-relaxed text-fg-3">
-        공유 원고 읽기와 소유자·관리자·편집자의 revision 공동 저장까지 서버 권한에 연결되었습니다.
-        위 같이 보기는 로그인 세션과 작품 권한을 확인한 팀 서버를 우선하며, 패널을 닫아도 캔버스
-        커서·접속 상태·페이지 따라가기는 유지됩니다. 연결 실패 때 사용자가 직접 선택한 경우에만 같은
-        출처 로컬 탭 모드로 전환됩니다. 서버 저장형 검토 댓글과 원격 페이지·요소 잠금의 실제 편집
-        강제는 다음 안전성 단계에서 연결합니다.
-      </p>
+      <details className="group rounded-xl border border-line bg-card/35 px-3 py-2.5">
+        <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-xs font-semibold text-fg-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 [&::-webkit-details-marker]:hidden">
+          <span>연결·저장 상세</span>
+          <ChevronDown className="shrink-0 transition-transform duration-150 group-open:rotate-180 motion-reduce:transition-none" size={15} aria-hidden="true" />
+        </summary>
+        <p className="border-t border-line pt-3 text-xs leading-relaxed text-fg-3">
+          공유 원고 읽기와 공동 저장은 로그인 세션과 작품 권한을 서버에서 확인합니다. 패널을 닫아도
+          커서·접속 상태·페이지 따라가기는 유지됩니다. 이 기기 테스트 모드는 다른 사용자와 연결하지
+          않고 동일 브라우저 탭에서만 동작합니다. 검토 중 편집 제한은 실시간 요소 점유와 별도입니다.
+        </p>
+      </details>
     </div>
   );
 }
@@ -1185,6 +1189,7 @@ export function StudioTeamPanel({
   const [activityRequestScope, setActivityRequestScope] = useState<StudioTeamRequestScope | null>(null);
   const [activityReloadKey, setActivityReloadKey] = useState(0);
   const [sharedWorksRefreshKey, setSharedWorksRefreshKey] = useState(0);
+  const [panelSection, setPanelSection] = useState<"people" | "live">("people");
   const closeFromEffect = useEffectEvent(onClose);
   const authReady = loggedIn && authScopeKey !== null;
   const scopedSnapshot =
@@ -1214,6 +1219,7 @@ export function StudioTeamPanel({
     setActivityScope(null);
     setActivityRequestScope(null);
     setSharedWorksRefreshKey(0);
+    setPanelSection("people");
   }, [authScopeKey, loggedIn]);
 
   useEffect(() => {
@@ -1663,13 +1669,13 @@ export function StudioTeamPanel({
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-accent">
               <UsersRound size={17} aria-hidden="true" />
-              <span className="text-xs font-semibold">서버 권한</span>
+              <span className="text-xs font-semibold">TEAM COLLABORATION</span>
             </div>
             <h2 className="mt-1 text-base font-bold tracking-tight text-fg" id={titleId}>
               팀 작업 공간
             </h2>
             <p className="mt-0.5 text-xs leading-relaxed text-fg-3" id={descriptionId}>
-              참여 작품을 열고, 받은 초대를 확인하며 멤버 역할을 관리합니다.
+              사람과 권한을 관리하거나 필요한 실시간 세션을 시작합니다.
             </p>
           </div>
           <button
@@ -1684,12 +1690,27 @@ export function StudioTeamPanel({
           </button>
         </header>
 
+        <nav aria-label="팀 작업 공간 보기" className="grid shrink-0 grid-cols-2 gap-2 border-b border-line bg-card/35 px-4 py-2 sm:px-5">
+          <button type="button" aria-pressed={panelSection === "people"}
+            className={cn("min-h-11 rounded-lg border px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70", panelSection === "people" ? "border-accent bg-accent-soft text-accent" : "border-line bg-panel text-fg-2 hover:bg-raised")}
+            onClick={() => setPanelSection("people")}>
+            사람·권한
+          </button>
+          <button type="button" aria-pressed={panelSection === "live"} disabled={!workId}
+            className={cn("min-h-11 rounded-lg border px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-45", panelSection === "live" ? "border-accent bg-accent-soft text-accent" : "border-line bg-panel text-fg-2 hover:bg-raised")}
+            onClick={() => setPanelSection("live")}>
+            함께 작업
+          </button>
+        </nav>
+
         <div
           aria-busy={
             busyAction != null || visibleLoading || visibleInvitationsLoading || visibleActivityLoading
           }
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))] [scrollbar-gutter:stable]"
         >
+          {panelSection === "live" ? (
+            <>
           <StudioSharedWorksPanel
             authScopeKey={authScopeKey}
             currentWorkId={workId}
@@ -1706,7 +1727,14 @@ export function StudioTeamPanel({
               onToggleFollow={onToggleFollow}
               workId={workId}
             />
+          ) : workId ? (
+            <div className="mx-4 mt-4 rounded-xl border border-line bg-card/55 p-4 text-sm leading-7 text-fg-2 sm:mx-5">
+              {visibleLoading ? "실시간 세션 권한을 확인하고 있어요." : "이 작품의 열람 권한을 수락하면 공동 편집·채팅·화면 공유를 시작할 수 있어요."}
+            </div>
           ) : null}
+            </>
+          ) : null}
+          {panelSection === "people" ? (
           <StudioTeamPanelView
             activity={visibleActivity}
             activityError={visibleActivityError}
@@ -1747,6 +1775,7 @@ export function StudioTeamPanel({
             onRetry={() => setReloadKey((value) => value + 1)}
             onRoleChange={handleRoleChange}
           />
+          ) : null}
         </div>
       </div>
     </div>

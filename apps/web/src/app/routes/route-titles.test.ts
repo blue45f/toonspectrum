@@ -37,6 +37,13 @@ describe("route title resolution", () => {
     expect(resolveRouteTitle("/studio/assets", translate)).toBe("route.studioAssets");
   });
 
+  it("uses specific titles for the unified team surfaces", () => {
+    expect(resolveRouteTitle("/team", translate)).toBe("협업 홈");
+    expect(resolveRouteTitle("/team/people", translate)).toBe("사람·권한 관리");
+    expect(resolveRouteTitle("/team/people/workspace-a", translate)).toBe("사람·권한 관리");
+    expect(resolveRouteTitle("/team/recruiting", translate)).toBe("인재·지원 관리");
+  });
+
   it("provides specific accessible labels for canvas-first studio workspaces", () => {
     expect(resolveRouteTitle("/studio/3d/dcc/build", translate)).toBe("3D 공간 제작");
     expect(resolveRouteTitle("/studio/3d/dcc/model", translate)).toBe("3D 모델링");

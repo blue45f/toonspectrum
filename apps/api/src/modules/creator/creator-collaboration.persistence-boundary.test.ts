@@ -88,6 +88,12 @@ describe("creator collaboration persistence boundary", () => {
     expect(adapter.source).toContain("class DrizzleCreatorCollaborationPersistence");
     expect(adapter.source).toContain("const creatorSharedDocumentSelection");
     expect(adapter.source).toContain("const validCollaborationEventPredicate");
+    expect(adapter.source).toContain("findUserByIdentity");
+    expect(adapter.source).toContain("lower(${users.email})");
+    expect(adapter.source).toContain("isNotNull(users.emailVerified)");
+    expect(adapter.source).toContain('eq(users.status, "active")');
+    expect(adapter.source).toContain("lower(${users.name})");
+    expect(adapter.source).toContain("exactName.length === 1");
 
     expect(repository.allImports).toContain("./creator-collaboration.persistence-contract");
     expect(repository.source).not.toContain("class DrizzleCreatorCollaborationUnitOfWork");

@@ -8,7 +8,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { COLLABORATION_MODES, COLLABORATION_PAY, COLLABORATION_ROLES, COLLABORATION_STATUS, COLLABORATION_TYPES, collaborationBudget } from "../../../../../packages/core/src/collaboration";
 import { ApplicationPanel, ApplicationsPanel } from "./collaboration-application-panel";
 import { ReportForm } from "./collaboration-report-form";
-import { CollabField, CollabLogin, CollabNotice, CollaborationSafety, PortfolioLink, collabButton, collabInput } from "./collaboration-ui";
+import { CollabField, CollabLogin, CollabNotice, CollaborationSafety, PortfolioLink, collabButton, collabInput, collabPrimary } from "./collaboration-ui";
 import type { CollaborationDetail } from "../../../../../packages/core/src/collaboration";
 import type { CollaborationAction } from "./collaboration-application-panel";
 import Link from "@/shared/navigation/router-link";
@@ -105,7 +105,9 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
         </header>
         {userId ? <HiringPostPanel key={`${id}:${reload}`} postId={id} postVersion={post.version} canManage={data.canManage} /> : <HiringPublicPositions postId={id} />}
         {[["작품과 작업 소개", post.details.description], ["작업 분량·납품물·일정", post.details.deliverables], ["보수·지급 조건", post.details.compensation], ["저작권·크레딧·수정 범위", post.details.terms]].map(([label, text]) => <section key={label} className="rounded-2xl border border-line bg-panel p-6"><h2 className="text-lg font-bold text-fg">{label}</h2><p className="mt-4 whitespace-pre-wrap break-words text-sm leading-8 text-fg-2">{text}</p></section>)}
-        {data.canManage ? <ApplicationsPanel key={reload} id={id} busy={busy} act={act} /> : <ApplicationPanel data={data} userId={userId} busy={busy} act={act} />}
+        <div id="collaboration-application" className="scroll-mt-24">
+          {data.canManage ? <ApplicationsPanel key={reload} id={id} busy={busy} act={act} /> : <ApplicationPanel data={data} userId={userId} busy={busy} act={act} />}
+        </div>
         {userId && <ReportForm id={id} busy={busy} act={act} />}
       </div>
       <aside className="min-w-0 space-y-5">
@@ -142,6 +144,13 @@ function PostContent({ id, userId }: { id: string; userId: string | null }) {
         <CollaborationSafety />
         <Link href="/studio" className={formatI18nTemplate(translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "en", "{v0} w-full"), { v0: String(collabButton) })}>{translateCurrentStaticSourceText("domains.collaboration.CollaborationPostPage", "ko", "합의 후 내 작업으로 이동")}</Link>
       </aside>
+      {!data.canManage && ((data.application && data.application.status !== "withdrawn") || (post.status === "open" && !post.expired && !post.hidden)) ? (
+        <div className="fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-[55] rounded-2xl border border-line bg-panel/95 p-2 shadow-2xl backdrop-blur md:hidden">
+          <a href="#collaboration-application" className={`${collabPrimary} w-full`}>
+            {data.application && data.application.status !== "withdrawn" ? "내 지원 확인" : userId ? "이 공고에 지원하기" : "로그인 후 지원하기"}
+          </a>
+        </div>
+      ) : null}
     </div>}
   </Container>;
 }

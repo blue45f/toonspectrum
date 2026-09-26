@@ -740,7 +740,7 @@ export class CreatorService {
   async inviteWorkTeamMember(
     userId: string,
     workId: string,
-    targetUserId: string,
+    targetIdentity: string,
     role: CreatorCollaborationRole
   ) {
     if (!rateLimit(`creator-team-invite:${userId}:${workId}`, 30, 60 * 60_000)) {
@@ -753,7 +753,7 @@ export class CreatorService {
       );
     }
     return this.runCreatorCollaborationOperation("invite_member", workId, () =>
-      this.creatorCollaborationRepository.invite(userId, workId, targetUserId, role)
+      this.creatorCollaborationRepository.invite(userId, workId, targetIdentity, role)
     );
   }
 

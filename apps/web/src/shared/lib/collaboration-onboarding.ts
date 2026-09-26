@@ -10,6 +10,14 @@ export interface CollaborationOnboardingContext {
   readonly createdAt: number;
 }
 
+export interface CollaborationOnboardingCandidate {
+  readonly applicationId: string;
+  readonly postId: string;
+  readonly userId: string;
+  readonly name: string;
+  readonly email: string;
+}
+
 type StorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 function text(value: unknown, maximum: number): string | null {
@@ -71,4 +79,42 @@ export function readCollaborationOnboarding(
 
 export function clearCollaborationOnboarding(storage: StorageLike): void {
   storage.removeItem(COLLABORATION_ONBOARDING_KEY);
+}
+
+export function collaborationContactEmail(contact: string): string {
+  return collaborationOnboardingEmail(contact)?.toLocaleLowerCase("en-US") ?? "";
+}
+
+export function normalizeCollaborationOnboardingCandidate(
+  value: unknown,
+): CollaborationOnboardingCandidate | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const applicationId = text(record.applicationId, 160);
+  const postId = text(record.postId, 160);
+  const userId = text(record.userId ?? record.candidateUserId, 160);
+  const name = text(record.name ?? record.candidateName, 120) ?? "지원자";
+  const contact = typeof (record.email ?? record.candidateContact) === "string"
+    ? String(record.email ?? record.candidateContact)
+    : "";
+  if (!applicationId || !postId || !userId) return null;
+  return {
+    applicationId,
+    postId,
+    userId,
+    name,
+    email: collaborationContactEmail(contact),
+  };
+}
+
+export function readCollaborationOnboardingCandidate(
+  storage: StorageLike,
+  applicationId: string,
+  now = Date.now(),
+): CollaborationOnboardingCandidate | null {
+  const expectedApplicationId = text(applicationId, 160);
+  if (!expectedApplicationId) return null;
+  const context = readCollaborationOnboarding(storage, now);
+  if (!context || context.applicationId !== expectedApplicationId) return null;
+  return normalizeCollaborationOnboardingCandidate(context);
 }

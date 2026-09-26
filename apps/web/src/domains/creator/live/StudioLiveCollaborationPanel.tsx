@@ -1,6 +1,7 @@
 import {
   AlertCircle,
   Check,
+  ChevronDown,
   Download,
   Eye,
   EyeOff,
@@ -164,7 +165,7 @@ function statusCopy(availability: StudioLiveAvailability, mode: StudioLiveTransp
   if (availability === "connecting") return "연결 준비 중";
   if (availability === "unsupported") return "브라우저 미지원";
   if (availability === "error") return "연결 오류";
-  return mode === "server" ? "팀 서버 연결" : "같은 출처 탭 연결";
+  return mode === "server" ? "팀 서버 연결" : "이 기기 테스트 연결";
 }
 
 function syncStatusToneClass(
@@ -289,10 +290,10 @@ export function StudioLiveCollaborationPanelView({
             </span>
             <div className="min-w-0">
               <h3 className="truncate text-sm font-bold text-fg" id="studio-live-collaboration-title">
-                같이 보기
+                실시간 세션
               </h3>
               <p className="mt-0.5 text-xs text-fg-3">
-                {mode === "server" ? "서버 팀 세션" : "로컬 탭 미리보기"}
+                {mode === "server" ? "서버 팀 세션" : "동일 브라우저 테스트"}
               </p>
             </div>
           </div>
@@ -350,7 +351,7 @@ export function StudioLiveCollaborationPanelView({
       <p className="mt-3 text-xs leading-relaxed text-fg-2">
         {mode === "server"
           ? "로그인 세션과 작품 권한을 확인한 팀 연결입니다. 화면은 보기를 직접 요청한 피어에게만 전달됩니다."
-          : "같은 브라우저에서 이 주소로 탭을 하나 더 열면 커서와 획이 바로 같이 움직입니다. 서버 없이 이 기기 안에서만 동기화합니다."}
+          : "다른 사용자와 연결되지 않습니다. 같은 브라우저에서 이 주소를 연 탭끼리 커서와 획의 동작을 이 기기 안에서만 테스트합니다."}
       </p>
 
       <StudioLiveCollaborationCommandCenter
@@ -399,20 +400,17 @@ export function StudioLiveCollaborationPanelView({
             </button>
           </div>
           {cursorQuality && cursorQualityPresentation ? (
-            <div
-              className="mt-2.5 border-t border-line/80 pt-2.5"
-              data-studio-cursor-quality-detail={cursorQuality.tier}
-            >
-              <div className="flex items-center justify-between gap-3 text-[0.7rem]">
+            <details className="group mt-2.5 border-t border-line/80 pt-2.5" data-studio-cursor-quality-detail={cursorQuality.tier}>
+              <summary className="flex min-h-9 cursor-pointer items-center justify-between gap-3 text-[0.7rem] font-semibold text-fg-2 [&::-webkit-details-marker]:hidden">
+                <span>커서 연결 상세</span>
+                <ChevronDown className="transition-transform group-open:rotate-180 motion-reduce:transition-none" size={14} aria-hidden />
+              </summary>
+              <div className="flex items-center justify-between gap-3 border-t border-line/70 pt-2 text-[0.7rem]">
                 <span className="font-semibold text-fg-2">{cursorQualityPresentation.shortLabel}</span>
-                <span className="shrink-0 font-semibold tabular-nums text-fg-3">
-                  {cursorQuality.cadenceMs}ms · 팀원 {cursorQuality.peerCount}명
-                </span>
+                <span className="shrink-0 font-semibold tabular-nums text-fg-3">{cursorQuality.cadenceMs}ms · 팀원 {cursorQuality.peerCount}명</span>
               </div>
-              <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">
-                {cursorQualityPresentation.detail}
-              </p>
-            </div>
+              <p className="mt-1 text-[0.68rem] leading-relaxed text-fg-3">{cursorQualityPresentation.detail}</p>
+            </details>
           ) : null}
         </div>
       ) : null}
@@ -439,6 +437,12 @@ export function StudioLiveCollaborationPanelView({
             )}
             <p className="text-xs leading-relaxed text-fg-2">{syncPresentation.detail}</p>
           </div>
+          <details className="group mt-2 rounded-lg border border-line/70 bg-card/40 px-2.5 py-1.5">
+            <summary className="flex min-h-9 cursor-pointer items-center justify-between gap-3 text-[0.7rem] font-semibold text-fg-2 [&::-webkit-details-marker]:hidden">
+              <span>동기화 상세</span>
+              <ChevronDown className="transition-transform group-open:rotate-180 motion-reduce:transition-none" size={14} aria-hidden />
+            </summary>
+            <div className="border-t border-line/70 pt-2">
           <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 text-[0.7rem] sm:grid-cols-3">
             <div className="flex min-w-0 items-center justify-between gap-2 sm:block">
               <dt className="text-fg-3">서버 경로</dt>
@@ -470,6 +474,8 @@ export function StudioLiveCollaborationPanelView({
               아직 서버 승인을 기다리는 변경 {syncSnapshot.pendingCount.toLocaleString("ko-KR")}개
             </p>
           ) : null}
+            </div>
+          </details>
         </div>
       ) : null}
 
@@ -543,8 +549,8 @@ export function StudioLiveCollaborationPanelView({
         <div className="mt-3 rounded-xl border border-line bg-card/55 p-3">
           <p className="text-xs leading-relaxed text-fg-2">
             {usingLocalFallback
-              ? "현재 같은 출처 로컬 탭 모드입니다. 서버가 복구되면 팀 세션을 다시 확인할 수 있습니다."
-              : "서버 연결을 다시 시도하거나, 이 기기의 같은 출처 탭끼리만 사용하는 로컬 모드로 전환할 수 있습니다."}
+              ? "현재 이 기기 테스트 모드입니다. 다른 사용자와 연결되지 않으며, 서버가 복구되면 팀 세션을 다시 확인할 수 있습니다."
+              : "서버 연결을 다시 시도하거나, 같은 브라우저 탭끼리만 사용하는 이 기기 테스트 모드로 전환할 수 있습니다."}
           </p>
           <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Button className="min-h-11" type="button" variant="outline" onClick={onRetryServer}>
@@ -557,13 +563,13 @@ export function StudioLiveCollaborationPanelView({
                 title={
                   localFallbackAllowed
                     ? undefined
-                    : "권한 회수 또는 인증 실패 뒤에는 로컬 모드로 우회할 수 없습니다."
+                    : "권한 회수 또는 인증 실패 뒤에는 이 기기 테스트 모드로 우회할 수 없습니다."
                 }
                 type="button"
                 variant="quiet"
                 onClick={onUseLocalFallback}
               >
-                <UsersRound size={15} aria-hidden="true" /> 로컬 탭 모드
+                <UsersRound size={15} aria-hidden="true" /> 이 기기 테스트 모드
               </Button>
             ) : null}
           </div>
@@ -655,7 +661,7 @@ export function StudioLiveCollaborationPanelView({
           </ul>
         ) : ready ? (
           <p className="mt-2 text-xs leading-relaxed text-fg-3">
-            같은 작품을 다른 탭에서 열고 팀 패널의 같이 보기를 켜 보세요.
+            같은 작품을 다른 탭에서 열고 팀 패널에서 함께 작업을 열어 보세요.
           </p>
         ) : null}
       </div>
