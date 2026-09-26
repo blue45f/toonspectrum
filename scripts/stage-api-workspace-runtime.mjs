@@ -31,6 +31,7 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
       ".": "./index.js",
       "./creator-role": "./creator-role.js",
       "./creator-resources": "./creator-resources.js",
+      "./infrastructure-fabric": "./infrastructure-fabric.js",
       "./production": "./production/index.js",
       "./infrastructure-fabric": "./infrastructure-fabric.js",
     },
@@ -38,6 +39,10 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
       {
         target: "creator-role.js",
         compiledEntry: "packages/core/src/creator-role.js",
+      },
+      {
+        target: "infrastructure-fabric.js",
+        compiledEntry: "packages/core/src/infrastructure-fabric.js",
       },
       {
         target: "production/index.js",
