@@ -1,134 +1,104 @@
-import { HttpException } from "@nestjs/common";
+import { HttpException, UnauthorizedException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 
-import { CreatorIntelligenceAdmissionGuard } from "./creator-intelligence-admission";
-import { CreatorIntelligenceController } from "./creator-intelligence.module";
+import type { Request } from "express";
+import type { CreatorIntelligenceCore } from "./creator-intelligence-core";
+import {
+  CreatorIntelligenceController,
+} from "./creator-intelligence.module";
+import { CreatorIntelligenceMeshArtifactService } from "./creator-intelligence-mesh-artifact.service";
+import { CreatorIntelligencePaidAdmission } from "./creator-intelligence-paid-admission";
 
-async function statusOf(run: () => unknown | Promise<unknown>): Promise<number> {
-  try {
-    await run();
-  } catch (error) {
-    if (error instanceof HttpException) return error.getStatus();
-    throw error;
-  }
-  throw new Error("expected controller to reject");
-}
-
-function createCore(overrides: Record<string, unknown> = {}) {
+function request(): Request {
   return {
-    describe: vi.fn(() => ({
-      schema: "toonspectrum.creator-intelligence.status.v1" as const,
-      references: {
-        openverse: { status: "ready", reason: "public discovery" },
-        pexels: { status: "disabled", reason: "not configured" },
-        pixabay: { status: "disabled", reason: "not configured" },
-      },
-      translation: {
-        deepl: { status: "ready", reason: "configured" },
-        libretranslate: { status: "disabled", reason: "not configured" },
-      },
-      voice: {
-        gemini: { status: "ready", reason: "configured" },
-        deepgram: { status: "disabled", reason: "not configured" },
-      },
-      scene: { status: "disabled", reason: "not configured" },
-      anilist: { status: "disabled", reason: "not enabled" },
-      freesound: { status: "disabled", reason: "not enabled" },
-      soundEffects: { status: "ready", reason: "configured" },
-      meshy: { status: "ready", reason: "configured" },
-      safeSearch: { status: "ready", reason: "configured" },
-    })),
-    searchReferences: vi.fn(),
-    sceneReference: vi.fn(),
-    searchAniList: vi.fn(),
-    searchSoundEffects: vi.fn(),
-    synthesizeVoice: vi.fn(),
-    generateSoundEffect: vi.fn(async () => ({ status: "ready" as const })),
-    translate: vi.fn(),
-    createMeshyJob: vi.fn(async () => ({
-      status: "ready" as const,
-      provider: "meshy" as const,
-      jobId: "provider_job_123",
-    })),
-    getMeshyJob: vi.fn(async (jobId: string) => ({
-      status: "ready" as const,
-      provider: "meshy" as const,
-      jobId,
-      jobStatus: "IN_PROGRESS",
-    })),
-    safeSearch: vi.fn(),
-    ...overrides,
-  } as unknown as ConstructorParameters<typeof CreatorIntelligenceController>[0];
+    aborted: false,
+    once: vi.fn(),
+    off: vi.fn(),
+  } as unknown as Request;
 }
 
-describe("CreatorIntelligenceController paid route protection", () => {
-  it("rejects an unauthenticated paid request before invoking a provider", async () => {
-    const core = createCore();
-    const guard = new CreatorIntelligenceAdmissionGuard({
-      env: () => ({ NODE_ENV: "development" }),
-    });
-    const controller = new CreatorIntelligenceController(core, guard);
+function controller(overrides: Partial<CreatorIntelligenceCore> = {}) {
+  const core = {
+    describe: vi.fn(() => ({ voice: {}, soundEffects: { status: "ready" } })),
+    synthesizeVoice: vi.fn(async () => ({ status: "ready", audioBase64: "AAAA" })),
+    generateSoundEffect: vi.fn(async () => ({ status: "ready", audioBase64: "AAAA" })),
+    translate: vi.fn(async () => ({ status: "ready", text: "번역" })),
+    createMeshyJob: vi.fn(async () => ({ status: "ready", provider: "meshy", jobId: "mesh_job_123" })),
+    getMeshyJob: vi.fn(async (jobId: string) => ({ status: "ready", provider: "meshy", jobId })),
+    safeSearch: vi.fn(async () => ({ status: "ready", reviewRequired: false })),
+    ...overrides,
+  } as unknown as CreatorIntelligenceCore;
+  return {
+    core,
+    controller: new CreatorIntelligenceController(
+      core,
+      new CreatorIntelligencePaidAdmission(null),
+      new CreatorIntelligenceMeshArtifactService(),
+    ),
+  };
+}
 
-    await expect(statusOf(() => controller.soundGenerate(
+describe("CreatorIntelligenceController paid boundaries", () => {
+  it("requires an authenticated session identity", async () => {
+    const { controller: subject } = controller();
+    await expect(subject.soundGenerate(
       undefined,
-      "sfx:12345678",
-      { prompt: "door slam" },
-    ))).resolves.toBe(401);
-    expect(core.generateSoundEffect).not.toHaveBeenCalled();
+      `request-${crypto.randomUUID()}`,
+      { prompt: "rain" },
+      request(),
+    )).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
-  it("wraps provider Meshy ids and unwraps only for the creating user", async () => {
-    const core = createCore();
-    const guard = new CreatorIntelligenceAdmissionGuard({
-      env: () => ({ NODE_ENV: "development" }),
-      now: () => 10_000,
-    });
-    const controller = new CreatorIntelligenceController(core, guard);
+  it("requires an idempotency key before provider dispatch", async () => {
+    const { controller: subject, core } = controller();
+    let error: unknown;
+    try {
+      await subject.translate(
+        "user-1",
+        undefined,
+        { provider: "deepl", text: "hello", targetLanguage: "KO" },
+        request(),
+      );
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(HttpException);
+    expect((error as HttpException).getStatus()).toBe(400);
+    expect(core.translate).not.toHaveBeenCalled();
+  });
 
-    const created = await controller.meshCreate(
+  it("returns an owner-bound opaque Meshy job token", async () => {
+    const { controller: subject, core } = controller();
+    const created = await subject.meshCreate(
       "user-1",
-      "mesh:12345678",
-      { imageUrl: "https://example.com/reference.png" },
+      `request-${crypto.randomUUID()}`,
+      { imageUrl: "https://example.com/input.png" },
+      request(),
     );
-    expect(created.status).toBe("ready");
-    expect(created.jobId).not.toBe("provider_job_123");
+    expect(created).toMatchObject({ status: "ready", provider: "meshy" });
+    expect(created.jobId).not.toBe("mesh_job_123");
 
-    const status = await controller.meshStatus("user-1", created.jobId);
-    expect(status.jobId).toBe("provider_job_123");
-    expect(core.getMeshyJob).toHaveBeenCalledWith("provider_job_123");
+    const own = await subject.meshStatus("user-1", created.jobId, request());
+    expect(own).toMatchObject({ status: "ready", jobId: created.jobId });
+    expect(core.getMeshyJob).toHaveBeenCalledWith("mesh_job_123");
 
-    await expect(statusOf(() => controller.meshStatus(
-      "user-2",
-      created.jobId,
-    ))).resolves.toBe(403);
-    expect(core.getMeshyJob).toHaveBeenCalledTimes(1);
+    await expect(subject.meshStatus("user-2", created.jobId, request())).rejects.toThrow(
+      "현재 계정과 일치하지 않아요",
+    );
   });
 
-  it("reports paid providers disabled when production coordination is absent", () => {
-    const core = createCore();
-    const guard = new CreatorIntelligenceAdmissionGuard({
-      env: () => ({
-        NODE_ENV: "production",
-        CREATOR_INTELLIGENCE_PAID_ROUTES_ENABLED: "true",
-      }),
-    });
-    const controller = new CreatorIntelligenceController(core, guard);
-
-    expect(controller.status()).toMatchObject({
-      admission: {
-        paidRoutesEnabled: false,
-        enforcement: "unavailable",
+  it("publishes whether paid execution is guarded and enabled", () => {
+    const { controller: subject } = controller();
+    expect(subject.status()).toMatchObject({
+      paidExecution: {
+        requiresAuthentication: true,
+        requiresIdempotencyKey: true,
+        failClosedInProduction: true,
       },
-      soundEffects: { status: "disabled" },
-      meshy: { status: "disabled" },
-      safeSearch: { status: "disabled" },
-      translation: {
-        deepl: { status: "disabled" },
-        libretranslate: { status: "disabled" },
-      },
-      voice: {
-        gemini: { status: "disabled" },
-        deepgram: { status: "disabled" },
+      meshArtifacts: {
+        configured: false,
+        requiredInProduction: true,
+        providerUrlsReturnedInProduction: false,
       },
     });
   });

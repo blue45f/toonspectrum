@@ -2,109 +2,76 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const LEGACY_KEY = "toonspectrum-studio-ai-settings";
 const AUX_KEY = "toonspectrum-unified-ai-aux-v1";
+const LEGACY_KEY = "toonspectrum-studio-ai-settings";
+const HYPER3D_FIXTURE = "fixture-hyper3d-value";
+const RUNTIME_FIXTURE = "fixture-runtime-value";
 
 beforeEach(() => {
-  vi.resetModules();
   sessionStorage.clear();
+  vi.resetModules();
 });
 
 describe("unified AI secret storage", () => {
-  it("migrates legacy session secrets into memory and scrubs storage", async () => {
-    sessionStorage.setItem(LEGACY_KEY, JSON.stringify({
-      baseUrl: "https://openrouter.ai/api/v1",
-      apiKey: "legacy-openai-secret",
-      imageModel: "image-model",
-      textModel: "text-model",
-      imageGenerationPath: "/images/generations",
-      imageEditPath: "/images/edits",
-      chatCompletionsPath: "/chat/completions",
-    }));
-    sessionStorage.setItem(AUX_KEY, JSON.stringify({
+  it("keeps auxiliary credentials in memory only", async () => {
+    const module = await import("./unified-ai-settings");
+    module.saveUnifiedAiAuxSettings({
       version: 1,
-      hyper3dApiKey: "legacy-hyper3d-secret",
+      hyper3dApiKey: HYPER3D_FIXTURE,
       creatorRuntimeBaseUrl: "https://runtime.example.com",
-      creatorRuntimeToken: "legacy-runtime-secret",
-      creatorRuntimeOwner: "artist-1",
-    }));
-
-    const settings = await import("./unified-ai-settings");
-
-    expect(settings.loadOpenAiCompatibleSettings().apiKey).toBe(
-      "legacy-openai-secret",
-    );
-    expect(settings.getUnifiedAiAuxSettings()).toMatchObject({
-      hyper3dApiKey: "legacy-hyper3d-secret",
-      creatorRuntimeToken: "legacy-runtime-secret",
+      creatorRuntimeToken: RUNTIME_FIXTURE,
+      creatorRuntimeOwner: "creator-device",
     });
-    expect(sessionStorage.getItem(LEGACY_KEY)).not.toContain(
-      "legacy-openai-secret",
-    );
-    expect(sessionStorage.getItem(AUX_KEY)).not.toContain(
-      "legacy-hyper3d-secret",
-    );
-    expect(sessionStorage.getItem(AUX_KEY)).not.toContain(
-      "legacy-runtime-secret",
-    );
+
+    expect(module.getUnifiedAiAuxSettings()).toMatchObject({
+      hyper3dApiKey: HYPER3D_FIXTURE,
+      creatorRuntimeToken: RUNTIME_FIXTURE,
+    });
+    const persisted = sessionStorage.getItem(AUX_KEY) ?? "";
+    expect(persisted).toContain("https://runtime.example.com");
+    expect(persisted).not.toContain(HYPER3D_FIXTURE);
+    expect(persisted).not.toContain(RUNTIME_FIXTURE);
   });
 
-  it("persists only non-secret connection metadata", async () => {
-    const settings = await import("./unified-ai-settings");
-
-    settings.saveOpenAiCompatibleSettings({
-      ...settings.DEFAULT_OPENAI_COMPATIBLE_SETTINGS,
-      apiKey: "new-openai-secret",
-      imageModel: "image-model",
-    });
-    settings.saveUnifiedAiAuxSettings({
+  it("locks volatile credentials on page lifecycle boundaries", async () => {
+    const module = await import("./unified-ai-settings");
+    module.saveUnifiedAiAuxSettings({
       version: 1,
-      hyper3dApiKey: "new-hyper3d-secret",
+      hyper3dApiKey: HYPER3D_FIXTURE,
       creatorRuntimeBaseUrl: "https://runtime.example.com",
-      creatorRuntimeToken: "new-runtime-secret",
-      creatorRuntimeOwner: "artist-2",
+      creatorRuntimeToken: RUNTIME_FIXTURE,
+      creatorRuntimeOwner: "creator-device",
     });
 
-    expect(settings.loadOpenAiCompatibleSettings().apiKey).toBe(
-      "new-openai-secret",
-    );
-    expect(settings.getUnifiedAiAuxSettings()).toMatchObject({
-      hyper3dApiKey: "new-hyper3d-secret",
-      creatorRuntimeToken: "new-runtime-secret",
-      creatorRuntimeBaseUrl: "https://runtime.example.com",
-      creatorRuntimeOwner: "artist-2",
-    });
-    expect(JSON.parse(sessionStorage.getItem(LEGACY_KEY) ?? "null")).toMatchObject({
-      apiKey: "",
-      imageModel: "image-model",
-    });
-    expect(JSON.parse(sessionStorage.getItem(AUX_KEY) ?? "null")).toMatchObject({
+    globalThis.dispatchEvent(new Event("pagehide"));
+
+    expect(module.getUnifiedAiAuxSettings()).toMatchObject({
       hyper3dApiKey: "",
       creatorRuntimeToken: "",
       creatorRuntimeBaseUrl: "https://runtime.example.com",
-      creatorRuntimeOwner: "artist-2",
+      creatorRuntimeOwner: "creator-device",
     });
   });
 
-  it("clears both memory-only and persisted connection state", async () => {
-    const settings = await import("./unified-ai-settings");
-    settings.saveOpenAiCompatibleSettings({
-      ...settings.DEFAULT_OPENAI_COMPATIBLE_SETTINGS,
-      apiKey: "temporary-openai-secret",
-    });
-    settings.saveUnifiedAiAuxSettings({
-      ...settings.DEFAULT_UNIFIED_AI_AUX_SETTINGS,
-      hyper3dApiKey: "temporary-hyper3d-secret",
-      creatorRuntimeToken: "temporary-runtime-secret",
-    });
+  it("migrates previously persisted credentials into memory and scrubs storage", async () => {
+    sessionStorage.setItem(AUX_KEY, JSON.stringify({
+      version: 1,
+      hyper3dApiKey: HYPER3D_FIXTURE,
+      creatorRuntimeBaseUrl: "https://runtime.example.com",
+      creatorRuntimeToken: RUNTIME_FIXTURE,
+      creatorRuntimeOwner: "creator-device",
+    }));
+    sessionStorage.setItem(LEGACY_KEY, JSON.stringify({
+      apiKey: "fixture-legacy-value",
+      baseUrl: "https://openrouter.ai/api/v1",
+    }));
 
-    settings.clearUnifiedAiSecrets();
+    const module = await import("./unified-ai-settings");
 
-    expect(settings.loadOpenAiCompatibleSettings().apiKey).toBe("");
-    expect(settings.getUnifiedAiAuxSettings()).toEqual(
-      settings.DEFAULT_UNIFIED_AI_AUX_SETTINGS,
-    );
-    expect(sessionStorage.getItem(LEGACY_KEY)).toBeNull();
-    expect(sessionStorage.getItem(AUX_KEY)).toBeNull();
+    expect(module.getUnifiedAiAuxSettings().hyper3dApiKey).toBe(HYPER3D_FIXTURE);
+    expect(module.loadOpenAiCompatibleSettings().apiKey).toBe("fixture-legacy-value");
+    expect(sessionStorage.getItem(AUX_KEY)).not.toContain(HYPER3D_FIXTURE);
+    expect(sessionStorage.getItem(AUX_KEY)).not.toContain(RUNTIME_FIXTURE);
+    expect(sessionStorage.getItem(LEGACY_KEY)).not.toContain("fixture-legacy-value");
   });
 });

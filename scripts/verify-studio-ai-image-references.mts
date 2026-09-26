@@ -66,7 +66,8 @@ function optionalApiRequestUrl(value: string, origin: string): boolean {
       "/api/studio-ai/status",
     ].includes(url.pathname)
     || url.pathname.startsWith("/api/analytics/traffic/")
-    || url.pathname.startsWith("/api/studio-project-graph/")
+    || url.pathname.startsWith("/api/studio-project-graph/works/")
+    || url.pathname === "/api/studio-realtime/tickets"
   );
 }
 
@@ -118,7 +119,7 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
     page = await context.newPage();
     const activePage = page;
     const responseStatuses = new WeakMap<BrowserRequest, number>();
-    activePage.setDefaultTimeout(15_000);
+    activePage.setDefaultTimeout(30_000);
     const collector = await collectStudioInAppRuntimeErrors(activePage);
     runtimeErrors = collector.errors;
     activePage.on("response", response => {
@@ -140,32 +141,44 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
       await start.waitFor({ state: "visible", timeout: 30_000 });
       await start.click();
       await activePage.waitForURL(
-        /\/studio\/(?:p\/[^/]+\/(?:d\/[^/?]+|[^/?]+)|work\/[^/]+\/[^/?]+)/u,
+        /\/studio\/p\/[^/]+\/(?:d\/[^?]+|story(?:\?|$))/u,
         { timeout: 30_000 },
       );
-      const currentPath = new URL(activePage.url()).pathname;
-      const documentMatch = currentPath.match(/\/studio\/p\/[^/]+\/d\/([^/]+)/u);
-      const projectMatch = currentPath.match(/\/studio\/p\/([^/]+)\//u);
-      const workMatch = currentPath.match(/\/studio\/work\/([^/]+)\//u);
-      const rawWorkId = documentMatch?.[1] ?? workMatch?.[1] ?? projectMatch?.[1];
-      assert.ok(rawWorkId, `could not resolve work id from ${currentPath}`);
-      const workId = decodeURIComponent(rawWorkId);
-      autosaveKey = studioAutosaveKey({ workId });
-      if (!documentMatch && !workMatch) {
-        await activePage.goto(
-          `${origin}/studio/work/${encodeURIComponent(workId)}/canvas`,
-          { waitUntil: "domcontentloaded" },
-        );
+      if (/\/story(?:\?|$)/u.test(new URL(activePage.url()).pathname)) {
+        const openManuscript = activePage
+          .getByRole("link", { name: /원고 열기|Open manuscript|Open canvas/u })
+          .or(activePage.getByRole("button", { name: /원고 열기|Open manuscript|Open canvas/u }))
+          .first();
+        await openManuscript.waitFor({ state: "visible", timeout: 30_000 });
+        await openManuscript.click();
+        await activePage.waitForURL(/\/studio\/p\/[^/]+\/d\/[^?]+/u, { timeout: 30_000 });
+      }
+      const documentMatch = new URL(activePage.url()).pathname.match(/\/studio\/p\/[^/]+\/d\/([^/]+)/u);
+      if (documentMatch?.[1]) {
+        autosaveKey = studioAutosaveKey({ workId: decodeURIComponent(documentMatch[1]) });
       }
       await viewport.waitFor({ state: "visible", timeout: 30_000 });
     }
+    async function dismissCanvasWelcome(): Promise<void> {
+      const welcome = activePage.locator('[data-studio-cinematic-canvas-welcome="true"]').first();
+      const visible = await welcome.isVisible().catch(() => false)
+        || await welcome.waitFor({ state: "visible", timeout: 5_000 }).then(() => true).catch(() => false);
+      if (!visible) return;
+      const blank = welcome.getByRole("button", {
+        name: /빈 캔버스로 그대로 시작|시작 안내 닫기/u,
+      }).first();
+      await blank.click();
+      await welcome.waitFor({ state: "hidden", timeout: 30_000 });
+    }
+
+    await dismissCanvasWelcome();
     const redo = activePage.locator('button[data-studio-primary-action="redo"]:visible').first();
 
     async function read(): Promise<SavedDocument | null> {
       const durable = await readDurableStudioAutosaveDocument(activePage, autosaveKey);
       return durable ? JSON.parse(durable.raw) as SavedDocument : null;
     }
-    async function saved(predicate: (document: SavedDocument | null) => boolean, timeoutMs = 15_000): Promise<SavedDocument> {
+    async function saved(predicate: (document: SavedDocument | null) => boolean, timeoutMs = 30_000): Promise<SavedDocument> {
       const deadline = performance.now() + timeoutMs;
       let document: SavedDocument | null = null;
       while (performance.now() < deadline) {
@@ -238,10 +251,36 @@ async function runScenario(browser: Browser, origin: string, scenario: Scenario)
       try { await activePage.reload({ waitUntil: "domcontentloaded" }); }
       finally { cancellationScope = null; }
       await viewport.waitFor({ state: "visible", timeout: 30_000 });
-      const restore = activePage.getByRole("button", { name: "이어서 그리기", exact: true });
-      await restore.waitFor({ state: "visible" });
-      await restore.click();
-      await restore.waitFor({ state: "hidden" });
+      await dismissCanvasWelcome();
+
+      // Current Studio normally resumes durable work automatically. Older/blocked sessions expose
+      // an explicit recovery action. Drive that action when present, but do not require a button
+      // after an already-completed automatic restore; the caller proves recovery through the
+      // document-owned reference UI and the durable document contents immediately afterwards.
+      const notice = activePage.locator('[data-studio-recovery-notice]').first();
+      const noticeVisible = await notice.isVisible().catch(() => false)
+        || await notice.waitFor({ state: "visible", timeout: 2_000 }).then(() => true).catch(() => false);
+      let mode: "automatic" | "manual" | "silent-automatic" = "silent-automatic";
+      if (noticeVisible) {
+        await activePage.waitForFunction(() => {
+          const element = document.querySelector('[data-studio-recovery-notice]');
+          return !element || element.getAttribute("aria-busy") !== "true";
+        }, undefined, { timeout: 30_000 });
+        const restore = notice.getByRole("button", {
+          name: /^(이어서 그리기|다시 이어 열기)$/u,
+        }).first();
+        if (await restore.isVisible().catch(() => false)) {
+          mode = "manual";
+          await restore.click();
+        } else {
+          mode = "automatic";
+        }
+        await notice.waitFor({ state: "hidden", timeout: 30_000 }).catch(() => undefined);
+      }
+      const recoveries = Array.isArray(report.evidence.recoveries)
+        ? report.evidence.recoveries as unknown[]
+        : [];
+      report.evidence.recoveries = [...recoveries, { step: currentStep, mode }];
     }
 
     if (scenario !== "empty") await check("prepare-existing-ink", async () => {

@@ -244,6 +244,16 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
   }, []);
 
   const capabilities = useMemo(() => capabilityLinks(projectId), [projectId]);
+  const paidExecutionReady = providerStatus?.paidExecution?.enabled === true;
+  const paidExecutionChecking = providerStatus === null;
+  const meshArtifactStorageReady = providerStatus?.meshArtifacts?.configured === true;
+  const requirePaidExecution = (): boolean => {
+    if (paidExecutionReady) return true;
+    setError(locale === "ko"
+      ? "유료 AI 실행이 비용 보호 정책으로 비활성화되어 있습니다. 운영자가 분산 한도와 예산을 활성화해야 합니다."
+      : "Paid AI execution is disabled by cost protection. The operator must enable distributed limits and budgets.");
+    return false;
+  };
 
   const persist = (
     patch: Partial<Pick<StudioCreatorIntelligenceStore, "references" | "scenes" | "catalog" | "sounds" | "meshJobs">>,
@@ -328,40 +338,49 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
     },
   );
 
-  const generateSound = () => run(
-    "sound-generate",
-    () => creatorIntelligenceClient.soundGenerate(soundPrompt, soundDuration, false),
-    (value) => {
-      if (value.status !== "ready" || !value.audioBase64 || !value.mimeType) {
-        setGeneratedAudio("");
-        setError(stateLabel(value.status, locale));
-        return;
-      }
-      setGeneratedAudio(`data:${value.mimeType};base64,${value.audioBase64}`);
-    },
-  );
+  const generateSound = () => {
+    if (!requirePaidExecution()) return;
+    void run(
+      "sound-generate",
+      () => creatorIntelligenceClient.soundGenerate(soundPrompt, soundDuration, false),
+      (value) => {
+        if (value.status !== "ready" || !value.audioBase64 || !value.mimeType) {
+          setGeneratedAudio("");
+          setError(stateLabel(value.status, locale));
+          return;
+        }
+        setGeneratedAudio(`data:${value.mimeType};base64,${value.audioBase64}`);
+      },
+    );
+  };
 
-  const translate = () => run(
-    "translation",
-    () => creatorIntelligenceClient.translate({
-      provider: translationProvider,
-      text: translationText,
-      targetLanguage: translationTarget,
-    }),
-    (value) => {
-      setTranslatedText(value.text ?? "");
-      if (value.status !== "ready") setError(stateLabel(value.status, locale));
-    },
-  );
+  const translate = () => {
+    if (!requirePaidExecution()) return;
+    void run(
+      "translation",
+      () => creatorIntelligenceClient.translate({
+        provider: translationProvider,
+        text: translationText,
+        targetLanguage: translationTarget,
+      }),
+      (value) => {
+        setTranslatedText(value.text ?? "");
+        if (value.status !== "ready") setError(stateLabel(value.status, locale));
+      },
+    );
+  };
 
-  const createMesh = () => run(
-    "mesh-create",
-    () => creatorIntelligenceClient.meshCreate(meshImageUrl),
-    (value) => {
-      setMeshJob(value);
-      if (value.status !== "ready") setError(stateLabel(value.status, locale));
-    },
-  );
+  const createMesh = () => {
+    if (!requirePaidExecution()) return;
+    void run(
+      "mesh-create",
+      () => creatorIntelligenceClient.meshCreate(meshImageUrl),
+      (value) => {
+        setMeshJob(value);
+        if (value.status !== "ready") setError(stateLabel(value.status, locale));
+      },
+    );
+  };
 
   const refreshMesh = () => {
     if (!meshJob?.jobId) return;
@@ -376,7 +395,7 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
   };
 
   const runSafeSearch = (file: File | null) => {
-    if (!file) return;
+    if (!file || !requirePaidExecution()) return;
     if (!/^image\/(?:png|jpeg|webp)$/u.test(file.type) || file.size > 2 * 1024 * 1024) {
       setError(locale === "ko" ? "PNG/JPEG/WebP 2MB 이하 파일을 선택하세요." : "Choose a PNG/JPEG/WebP file up to 2MB.");
       return;
@@ -403,7 +422,9 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
     ["AniList", projectStore.catalog.length],
     [locale === "ko" ? "효과음" : "SFX", projectStore.sounds.length],
     ["3D jobs", projectStore.meshJobs.length],
-  ] as const;  return (
+  ] as const;
+
+  return (
     <section className="space-y-5" aria-label="Creator Intelligence">
       <div className={`${CARD} overflow-hidden bg-gradient-to-br from-accent-soft/50 via-panel to-panel`}>
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -431,6 +452,34 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
       </div>
 
       {error ? <div role="alert" className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-fg">{error}</div> : null}
+      {providerStatus && !paidExecutionReady ? (
+        <div
+          data-creator-paid-ai-disabled="true"
+          className="rounded-2xl border border-warn/35 bg-warn/10 p-4 text-sm leading-6 text-fg-2"
+          role="status"
+        >
+          <strong className="block text-fg">
+            {locale === "ko" ? "유료 AI 실행은 현재 비활성입니다." : "Paid AI execution is currently disabled."}
+          </strong>
+          {locale === "ko"
+            ? "무료 레퍼런스 검색은 계속 사용할 수 있습니다. 번역·효과음 생성·Meshy·외부 SafeSearch는 분산 한도와 일일 비용 예산이 활성화될 때만 열립니다."
+            : "Free reference search remains available. Translation, sound generation, Meshy, and external SafeSearch unlock only after distributed limits and daily cost budgets are enabled."}
+        </div>
+      ) : null}
+      {providerStatus && paidExecutionReady && !meshArtifactStorageReady ? (
+        <div
+          data-creator-mesh-storage-disabled="true"
+          className="rounded-2xl border border-warn/35 bg-warn/10 p-4 text-sm leading-6 text-fg-2"
+          role="status"
+        >
+          <strong className="block text-fg">
+            {locale === "ko" ? "Meshy 결과 저장소 연결이 필요합니다." : "Meshy result storage is required."}
+          </strong>
+          {locale === "ko"
+            ? "공급자 임시 URL이 만료되어 작품이 깨지는 것을 막기 위해 내부 비공개 객체 저장소가 준비될 때까지 새 Meshy 작업을 차단합니다."
+            : "New Meshy jobs remain blocked until private object storage is ready, preventing provider URLs from expiring inside projects."}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {capabilities.map(([id, title, href, detail]) => {
@@ -447,6 +496,7 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
         <div className="mt-4 flex flex-wrap gap-2">
           {providerStatus ? (
             <>
+              <span className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-xs">Paid AI <ProviderBadge state={paidExecutionReady ? "ready" : "disabled"} locale={locale} /></span>
               <span className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-xs">Openverse <ProviderBadge state={providerStatus.references.openverse.status} locale={locale} /></span>
               <span className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-xs">Pexels <ProviderBadge state={providerStatus.references.pexels.status} locale={locale} /></span>
               <span className="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-xs">Pixabay <ProviderBadge state={providerStatus.references.pixabay.status} locale={locale} /></span>
@@ -726,7 +776,7 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
           <div className="mt-4 grid gap-2 sm:grid-cols-[10rem_7rem_1fr]">
             <select className={INPUT} value={translationProvider} onChange={(event) => setTranslationProvider(event.target.value as CreatorIntelligenceTranslationProvider)}><option value="deepl">DeepL</option><option value="libretranslate">LibreTranslate</option></select>
             <input className={INPUT} value={translationTarget} onChange={(event) => setTranslationTarget(event.target.value.toUpperCase())} placeholder="EN" aria-label="target language" />
-            <button type="button" className={PRIMARY} disabled={busy === "translation" || translationText.trim().length < 2} onClick={translate}>{busy === "translation" ? <Loader2 className="size-4 animate-spin" /> : <Languages size={15} />} {locale === "ko" ? "번역" : "Translate"}</button>
+            <button type="button" className={PRIMARY} disabled={paidExecutionChecking || !paidExecutionReady || busy === "translation" || translationText.trim().length < 2} onClick={translate}>{busy === "translation" ? <Loader2 className="size-4 animate-spin" /> : <Languages size={15} />} {locale === "ko" ? "번역" : "Translate"}</button>
           </div>
           <textarea className={`${INPUT} mt-2 min-h-28 resize-y`} value={translationText} onChange={(event) => setTranslationText(event.target.value)} placeholder={locale === "ko" ? "번역할 대사를 입력하세요." : "Enter dialogue to translate."} />
           {translatedText ? <div className="mt-3 whitespace-pre-wrap rounded-2xl border border-line bg-canvas p-4 text-sm leading-6 text-fg">{translatedText}</div> : null}
@@ -772,13 +822,13 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
           </div>
           <div className="mt-5 border-t border-line pt-4">
             <p className="text-xs font-bold uppercase tracking-wide text-fg-3">Generate · paid provider</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_6rem_auto]"><input className={INPUT} value={soundPrompt} onChange={(event) => setSoundPrompt(event.target.value)} placeholder={locale === "ko" ? "철문이 창고에서 세게 닫히는 소리" : "Heavy metal warehouse door slam"} /><input className={INPUT} type="number" min={0.5} max={15} step={0.5} value={soundDuration} onChange={(event) => setSoundDuration(Number(event.target.value))} /><button type="button" className={PRIMARY} disabled={busy === "sound-generate" || soundPrompt.trim().length < 2} onClick={generateSound}>{busy === "sound-generate" ? <Loader2 className="size-4 animate-spin" /> : <WandSparkles size={15} />} {locale === "ko" ? "생성" : "Generate"}</button></div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_6rem_auto]"><input className={INPUT} value={soundPrompt} onChange={(event) => setSoundPrompt(event.target.value)} placeholder={locale === "ko" ? "철문이 창고에서 세게 닫히는 소리" : "Heavy metal warehouse door slam"} /><input className={INPUT} type="number" min={0.5} max={15} step={0.5} value={soundDuration} onChange={(event) => setSoundDuration(Number(event.target.value))} /><button type="button" className={PRIMARY} disabled={paidExecutionChecking || !paidExecutionReady || busy === "sound-generate" || soundPrompt.trim().length < 2} onClick={generateSound}>{busy === "sound-generate" ? <Loader2 className="size-4 animate-spin" /> : <WandSparkles size={15} />} {locale === "ko" ? "생성" : "Generate"}</button></div>
             {generatedAudio ? <div className="mt-3 flex flex-wrap items-center gap-3"><audio controls src={generatedAudio}><track kind="captions" src={EMPTY_SOUND_CAPTIONS} srcLang="zxx" label="No speech" /></audio><a className={BUTTON} download="toonspectrum-sfx.mp3" href={generatedAudio}>{locale === "ko" ? "음원 저장" : "Download"}</a></div> : null}
           </div>
         </section>        <section className={`${CARD} space-y-5`}>
           <div>
             <ToolHeader icon={Box} title="2D → 3D Provider Bridge" detail={locale === "ko" ? "로컬 이미지는 기존 기기 내 Lift3D가 기본입니다. 공개 HTTPS 레퍼런스만 명시적으로 Meshy 작업으로 보낼 수 있습니다." : "Local images default to on-device Lift3D. Only an explicit public HTTPS reference can be sent to Meshy."} />
-            <div className="mt-4 flex gap-2"><input className={INPUT} value={meshImageUrl} onChange={(event) => setMeshImageUrl(event.target.value)} placeholder="https://…" /><button type="button" className={PRIMARY} disabled={busy === "mesh-create" || !meshImageUrl.startsWith("https://")} onClick={createMesh}>{busy === "mesh-create" ? <Loader2 className="size-4 animate-spin" /> : <Box size={15} />} Meshy</button></div>
+            <div className="mt-4 flex gap-2"><input className={INPUT} value={meshImageUrl} onChange={(event) => setMeshImageUrl(event.target.value)} placeholder="https://…" /><button type="button" className={PRIMARY} disabled={paidExecutionChecking || !paidExecutionReady || !meshArtifactStorageReady || busy === "mesh-create" || !meshImageUrl.startsWith("https://")} onClick={createMesh}>{busy === "mesh-create" ? <Loader2 className="size-4 animate-spin" /> : <Box size={15} />} Meshy</button></div>
             <Link className={`${BUTTON} mt-2`} to="/studio/lift3d">{locale === "ko" ? "기기 내 Lift3D 열기" : "Open on-device Lift3D"}</Link>
             {meshJob?.jobId ? (
               <div className="mt-3 rounded-2xl border border-line bg-canvas p-3 text-sm text-fg-2">
@@ -790,7 +840,7 @@ export function StudioCreatorIntelligencePanel({ projectId, locale }: Props) {
 
           <div className="border-t border-line pt-5">
             <ToolHeader icon={ShieldCheck} title="Optional SafeSearch" detail={locale === "ko" ? "기본 Publish Preflight는 로컬 검사입니다. 사용자가 파일을 선택한 경우에만 2MB 이하 이미지를 외부 SafeSearch로 보내며 결과는 차단이 아니라 사람 검토 플래그입니다." : "Publish Preflight stays local by default. Only a user-selected image up to 2MB is sent to optional SafeSearch, and results are human-review flags rather than automatic blocks."} />
-            <input className={`${INPUT} mt-4`} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy === "safe-search"} onChange={(event) => runSafeSearch(event.target.files?.[0] ?? null)} />
+            <input className={`${INPUT} mt-4`} type="file" accept="image/png,image/jpeg,image/webp" disabled={paidExecutionChecking || !paidExecutionReady || busy === "safe-search"} onChange={(event) => runSafeSearch(event.target.files?.[0] ?? null)} />
             {busy === "safe-search" ? <p className="mt-2 inline-flex items-center gap-2 text-sm text-fg-3"><Loader2 className="size-4 animate-spin" /> checking…</p> : null}
             {safeSearchResult?.status === "ready" && safeSearchResult.values ? <div className="mt-3 rounded-2xl border border-line bg-canvas p-3 text-sm"><p className="font-bold text-fg">{safeSearchResult.reviewRequired ? (locale === "ko" ? "사람 검토 권장" : "Human review recommended") : (locale === "ko" ? "외부 플래그 없음" : "No external review flag")}</p><p className="mt-1 text-fg-3">adult {safeSearchResult.values.adult} · violence {safeSearchResult.values.violence} · racy {safeSearchResult.values.racy}</p></div> : null}
           </div>

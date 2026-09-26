@@ -47,7 +47,7 @@ describe("route title resolution", () => {
   it("provides specific accessible labels for canvas-first studio workspaces", () => {
     expect(resolveRouteTitle("/studio/3d/dcc/build", translate)).toBe("3D 공간 제작");
     expect(resolveRouteTitle("/studio/3d/dcc/model", translate)).toBe("3D 모델링");
-    expect(resolveRouteTitle("/studio/ai-lab", translate)).toBe("AI 실험실");
+    expect(resolveRouteTitle("/studio/ai-lab", translate)).toBe("외부 AI Runtime · 개발자 프리뷰");
   });
 
   it("retains useful dynamic labels for creator pages", () => {

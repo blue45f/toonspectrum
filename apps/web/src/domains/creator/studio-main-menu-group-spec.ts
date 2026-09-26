@@ -504,7 +504,7 @@ export const STUDIO_MENU_GROUP_SPEC: readonly StudioMenuGroupSpec[] = Object.fre
     ],
     extras: [
       ours("comic/webtoon-assistant", "웹툰 어시스턴트 도구"),
-      ours("comic/ai-super-suite", "AI 슈퍼 스위트 도구"),
+      ours("comic/ai-super-suite", "AI와 스마트 제작 도구"),
     ],
   },
   {

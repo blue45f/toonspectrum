@@ -400,7 +400,7 @@ export function StudioAiSuperSuiteModal({
             />
             <div className="min-w-0">
               <h2 id={titleId} className="text-sm font-bold tracking-tight text-fg">
-                AI 웹툰 생성 슈퍼 스위트 (Webtoon AI Super Suite)
+                AI + 스마트 웹툰 제작 스위트
               </h2>
               <p id={descriptionId} className="text-[0.68rem] leading-relaxed text-fg-3">
                 네이버 툰필터 화풍 변환 · CSP 음영 어시스트 · 프롬프트 증강 · TooNat 콘티 디렉터 ·
@@ -433,7 +433,7 @@ export function StudioAiSuperSuiteModal({
             onSelect={(id) =>
               setActiveTab(pickStudioWorkbenchOption(id, AI_SUPER_SUITE_TAB_IDS, "style-filter"))
             }
-            ariaLabel="AI 슈퍼 스위트 도구"
+            ariaLabel="AI와 스마트 제작 도구"
             idPrefix={idPrefix}
           />
         </div>

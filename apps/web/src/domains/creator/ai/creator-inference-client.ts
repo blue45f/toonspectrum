@@ -52,7 +52,7 @@ export async function uploadInferenceAsset(file: File, signal: AbortSignal, onPr
   }
 }
 export async function inferenceCapabilities(signal?: AbortSignal): Promise<InferenceCapabilities> {
-  if (!userAiConnection("inference")) return { enabled: false, engines: {}, reason: "통합 AI 설정에서 관리형 클라우드 Creator Runtime 주소와 토큰을 등록하세요." };
+  if (!userAiConnection("inference")) return { enabled: false, engines: {}, reason: "통합 AI 설정에서 외부 Creator Runtime 주소와 토큰을 등록하세요." };
   const api = createUserInferenceApi();
   const value = await api.get<InferenceCapabilities>(`${BASE}/status`, { signal, timeout: 15_000 });
   if (!value || typeof value.enabled !== "boolean" || !value.engines || typeof value.engines !== "object") throw new Error("추론 서버 설정 응답이 올바르지 않습니다.");

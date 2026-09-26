@@ -31,6 +31,8 @@ export interface Studio3dGenerationBinaryInput {
   readonly label?: string;
 }
 
+export const STUDIO_3D_INLINE_INPUT_MAX_BYTES = 10 * 1024 * 1024;
+
 export interface Studio3dGenerationCreateInput {
   readonly mode: "text-to-3d" | "image-to-3d" | "multiview-to-3d" | "texture-only";
   readonly prompt?: string;
@@ -223,6 +225,9 @@ export class Studio3dGenerationService {
       provider: "hyper3d-rodin",
       modes: Object.freeze(["text-to-3d", "image-to-3d", "multiview-to-3d", "texture-only"]),
       apiKeyExposedToClient: false,
+      inputTransport: "inline-json",
+      maxInlineInputBytes: STUDIO_3D_INLINE_INPUT_MAX_BYTES,
+      largerInputsRequireObjectStorage: true,
     });
   }
 
@@ -239,17 +244,22 @@ export class Studio3dGenerationService {
     readonly providerRequest: unknown;
     readonly summary: Studio3dGenerationJobRequestSummary;
   } {
+    const encodedInputCharacters = (input.images ?? []).reduce((total, item) => total + (typeof item.dataBase64 === "string" ? item.dataBase64.length : 0), 0)
+      + (typeof input.model?.dataBase64 === "string" ? input.model.dataBase64.length : 0);
+    if (encodedInputCharacters > Math.ceil(STUDIO_3D_INLINE_INPUT_MAX_BYTES * 4 / 3) + 128) {
+      throw new RangeError("3D inline input exceeds the 10MB request budget. Use object storage for larger assets.");
+    }
     const images = (input.images ?? []).map((image, index) => ({
       filename: boundedString(image.filename, `images[${index}].filename`, 180),
       mimeType: boundedString(image.mimeType, `images[${index}].mimeType`, 120),
-      bytes: base64Bytes(image, `images[${index}]`, 25 * 1024 * 1024),
+      bytes: base64Bytes(image, `images[${index}]`, STUDIO_3D_INLINE_INPUT_MAX_BYTES),
       ...(image.label ? { label: image.label.trim().slice(0, 80) } : {}),
     }));
     const model = input.model
       ? {
           filename: boundedString(input.model.filename, "model.filename", 180),
           mimeType: boundedString(input.model.mimeType, "model.mimeType", 120),
-          bytes: base64Bytes(input.model, "model", 200 * 1024 * 1024),
+          bytes: base64Bytes(input.model, "model", STUDIO_3D_INLINE_INPUT_MAX_BYTES),
         }
       : undefined;
     const prompt = input.prompt?.trim();

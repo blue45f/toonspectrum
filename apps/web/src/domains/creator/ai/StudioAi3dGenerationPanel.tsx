@@ -5,18 +5,13 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  STUDIO_3D_INLINE_INPUT_MAX_BYTES,
   Studio3dGenerationHttpClient,
   studioFileToGenerationInput,
   type Studio3dGenerationCreateInput,
   type Studio3dGenerationJob,
   type Studio3dGenerationMode,
 } from "./studio-3d-generation-client";
-import {
-  assertStudio3dInlineInputBudget,
-  formatStudio3dInlineBudget,
-  STUDIO_3D_INLINE_RAW_INPUT_MAX_BYTES,
-  studio3dInlineInputBytes,
-} from "./studio-3d-inline-budget";
 
 const TERMINAL = new Set(["ready", "failed", "cancelled", "expired"]);
 
@@ -43,25 +38,14 @@ const STATE_LABELS: Readonly<Record<Studio3dGenerationJob["state"], string>> = O
 
 export interface StudioAi3dGenerationPanelProps {
   readonly client: Studio3dGenerationHttpClient;
-  readonly onInsertArtifact?: (
-    job: Studio3dGenerationJob,
-    blob: Blob,
-  ) => Promise<void> | void;
-  readonly onSaveArtifact?: (
-    job: Studio3dGenerationJob,
-    blob: Blob,
-  ) => Promise<void> | void;
-  readonly onOpenTextureEditor?: (
-    job: Studio3dGenerationJob,
-    blob: Blob,
-  ) => Promise<void> | void;
+  readonly onInsertArtifact?: (job: Studio3dGenerationJob, blob: Blob) => Promise<void> | void;
+  readonly onSaveArtifact?: (job: Studio3dGenerationJob, blob: Blob) => Promise<void> | void;
+  readonly onOpenTextureEditor?: (job: Studio3dGenerationJob, blob: Blob) => Promise<void> | void;
   readonly className?: string;
 }
 
 function uniqueRequestKey(): string {
-  return `studio-3d-${Date.now()}-${
-    crypto.getRandomValues(new Uint32Array(1))[0]?.toString(36) ?? "0"
-  }`;
+  return `studio-3d-${Date.now()}-${crypto.getRandomValues(new Uint32Array(1))[0]?.toString(36) ?? "0"}`;
 }
 
 export function StudioAi3dGenerationPanel({
@@ -75,9 +59,7 @@ export function StudioAi3dGenerationPanel({
   const [prompt, setPrompt] = useState("");
   const [files, setFiles] = useState<readonly File[]>([]);
   const [modelFile, setModelFile] = useState<File | null>(null);
-  const [preset, setPreset] = useState<
-    "blockout" | "webtoon" | "line-tone" | "character" | "quality"
-  >("webtoon");
+  const [preset, setPreset] = useState<"blockout" | "webtoon" | "line-tone" | "character" | "quality">("webtoon");
   const [advanced, setAdvanced] = useState(false);
   const [seed, setSeed] = useState(73);
   const [targetFaceCount, setTargetFaceCount] = useState(20_000);
@@ -90,42 +72,11 @@ export function StudioAi3dGenerationPanel({
 
   const options = useMemo<Studio3dGenerationCreateInput["options"]>(() => {
     const presets = {
-      blockout: {
-        tier: "Gen-2.5-Medium",
-        meshMode: "Raw",
-        material: "None",
-        textureResolution: 2048,
-        targetFaceCount: 5_000,
-      },
-      webtoon: {
-        tier: "Gen-2.5-Medium",
-        meshMode: "Raw",
-        material: "PBR",
-        textureResolution: 2048,
-        targetFaceCount: 20_000,
-      },
-      "line-tone": {
-        tier: "Gen-2.5-Medium",
-        meshMode: "Quad",
-        material: "Shaded",
-        textureResolution: 2048,
-        targetFaceCount: 30_000,
-      },
-      character: {
-        tier: "Gen-2.5-Medium",
-        meshMode: "Quad",
-        material: "PBR",
-        textureResolution: 4096,
-        targetFaceCount: 60_000,
-        pose: "T-pose",
-      },
-      quality: {
-        tier: "Gen-2.5-High",
-        meshMode: "Quad",
-        material: "PBR",
-        textureResolution: 4096,
-        targetFaceCount: 100_000,
-      },
+      blockout: { tier: "Gen-2.5-Medium", meshMode: "Raw", material: "None", textureResolution: 2048, targetFaceCount: 5_000 },
+      webtoon: { tier: "Gen-2.5-Medium", meshMode: "Raw", material: "PBR", textureResolution: 2048, targetFaceCount: 20_000 },
+      "line-tone": { tier: "Gen-2.5-Medium", meshMode: "Quad", material: "Shaded", textureResolution: 2048, targetFaceCount: 30_000 },
+      character: { tier: "Gen-2.5-Medium", meshMode: "Quad", material: "PBR", textureResolution: 4096, targetFaceCount: 60_000, pose: "T-pose" },
+      quality: { tier: "Gen-2.5-High", meshMode: "Quad", material: "PBR", textureResolution: 4096, targetFaceCount: 100_000 },
     } as const;
     return Object.freeze({
       ...presets[preset],
@@ -136,28 +87,15 @@ export function StudioAi3dGenerationPanel({
     });
   }, [advanced, preset, seed, targetFaceCount]);
 
-  const selectedInputFiles = useMemo(
-    () => [...files, ...(modelFile ? [modelFile] : [])],
-    [files, modelFile],
-  );
-  const inputBytes = useMemo(
-    () => studio3dInlineInputBytes(selectedInputFiles),
-    [selectedInputFiles],
-  );
-  const inputWithinBudget = inputBytes <= STUDIO_3D_INLINE_RAW_INPUT_MAX_BYTES;
-  const expectedFileCount = mode === "image-to-3d"
-    ? 1
-    : mode === "multiview-to-3d"
-      ? 2
-      : mode === "texture-only"
-        ? 1
-        : 0;
+  const expectedFileCount = mode === "image-to-3d" ? 1 : mode === "multiview-to-3d" ? 2 : mode === "texture-only" ? 1 : 0;
+  const inputBytes = files.reduce((total, file) => total + file.size, modelFile?.size ?? 0);
+  const inputWithinBudget = inputBytes <= STUDIO_3D_INLINE_INPUT_MAX_BYTES;
   const inputValid =
-    inputWithinBudget
-    && (mode !== "text-to-3d" || prompt.trim().length > 0)
-    && (mode === "text-to-3d" || files.length >= expectedFileCount)
-    && (mode !== "multiview-to-3d" || files.length <= 5)
-    && (mode !== "texture-only" || modelFile !== null);
+    inputWithinBudget &&
+    (mode !== "text-to-3d" || prompt.trim().length > 0) &&
+    (mode === "text-to-3d" || files.length >= expectedFileCount) &&
+    (mode !== "multiview-to-3d" || files.length <= 5) &&
+    (mode !== "texture-only" || modelFile !== null);
 
   useEffect(() => {
     let alive = true;
@@ -182,15 +120,10 @@ export function StudioAi3dGenerationPanel({
     const timer = window.setTimeout(() => {
       void client.advance(job.id, controller.signal).then((next) => {
         setJob(next);
-        setHistory((current) => [
-          next,
-          ...current.filter((item) => item.id !== next.id),
-        ]);
+        setHistory((current) => [next, ...current.filter((item) => item.id !== next.id)]);
         setStatusMessage(STATE_LABELS[next.state]);
       }).catch((caught: unknown) => {
-        if (!controller.signal.aborted) {
-          setError(caught instanceof Error ? caught.message : String(caught));
-        }
+        if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : String(caught));
       });
     }, 4_000);
     return () => {
@@ -207,22 +140,11 @@ export function StudioAi3dGenerationPanel({
     const controller = new AbortController();
     abortRef.current = controller;
     try {
-      assertStudio3dInlineInputBudget(selectedInputFiles);
       const encodedImages = await Promise.all(
-        files.map((file, index) => studioFileToGenerationInput(
-          file,
-          STUDIO_3D_INLINE_RAW_INPUT_MAX_BYTES,
-          `view-${index + 1}`,
-          controller.signal,
-        )),
+        files.map((file, index) => studioFileToGenerationInput(file, STUDIO_3D_INLINE_INPUT_MAX_BYTES, `view-${index + 1}`)),
       );
       const encodedModel = modelFile
-        ? await studioFileToGenerationInput(
-          modelFile,
-          STUDIO_3D_INLINE_RAW_INPUT_MAX_BYTES,
-          undefined,
-          controller.signal,
-        )
+        ? await studioFileToGenerationInput(modelFile, STUDIO_3D_INLINE_INPUT_MAX_BYTES)
         : undefined;
       const next = await client.create(
         {
@@ -232,27 +154,16 @@ export function StudioAi3dGenerationPanel({
           ...(encodedModel ? { model: encodedModel } : {}),
           transport: "byok",
           options,
-          estimatedCredits: preset === "quality"
-            ? 4
-            : preset === "character"
-              ? 3
-              : preset === "blockout"
-                ? 1
-                : 2,
+          estimatedCredits: preset === "quality" ? 4 : preset === "character" ? 3 : preset === "blockout" ? 1 : 2,
         },
         uniqueRequestKey(),
         controller.signal,
       );
       setJob(next);
-      setHistory((current) => [
-        next,
-        ...current.filter((item) => item.id !== next.id),
-      ]);
+      setHistory((current) => [next, ...current.filter((item) => item.id !== next.id)]);
       setStatusMessage(STATE_LABELS[next.state]);
     } catch (caught) {
-      if (!controller.signal.aborted) {
-        setError(caught instanceof Error ? caught.message : String(caught));
-      }
+      if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setBusy(false);
     }
@@ -265,10 +176,7 @@ export function StudioAi3dGenerationPanel({
     try {
       const next = await client.cancel(job.id);
       setJob(next);
-      setHistory((current) => [
-        next,
-        ...current.filter((item) => item.id !== next.id),
-      ]);
+      setHistory((current) => [next, ...current.filter((item) => item.id !== next.id)]);
       setStatusMessage("3D 생성 작업을 취소했습니다.");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -278,10 +186,7 @@ export function StudioAi3dGenerationPanel({
   };
 
   const withArtifact = async (
-    action: ((
-      job: Studio3dGenerationJob,
-      blob: Blob,
-    ) => Promise<void> | void) | undefined,
+    action: ((job: Studio3dGenerationJob, blob: Blob) => Promise<void> | void) | undefined,
   ) => {
     if (!job?.artifactRevision || !action) return;
     setBusy(true);
@@ -298,47 +203,17 @@ export function StudioAi3dGenerationPanel({
 
   return (
     <section
-      aria-label={translateCurrentStaticSourceText(
-        "domains.creator.ai.StudioAi3dGenerationPanel",
-        "ko",
-        "AI 3D 생성",
-      )}
-      className={formatI18nTemplate(
-        translateCurrentStaticSourceText(
-          "domains.creator.ai.StudioAi3dGenerationPanel",
-          "en",
-          "flex min-h-0 flex-col gap-3 rounded-xl border border-line bg-card p-3 text-fg {v0}",
-        ),
-        { v0: String(className) },
-      )}
+      aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "AI 3D 생성")}
+      className={formatI18nTemplate(translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "en", "flex min-h-0 flex-col gap-3 rounded-xl border border-line bg-card p-3 text-fg {v0}"), { v0: String(className) })}
       data-studio-ai-3d-generation-panel="true"
     >
       <header>
-        <h3 className="text-sm font-bold">
-          {translateCurrentStaticSourceText(
-            "domains.creator.ai.StudioAi3dGenerationPanel",
-            "ko",
-            "AI 3D 생성",
-          )}
-        </h3>
+        <h3 className="text-sm font-bold">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "AI 3D 생성")}</h3>
         <p className="mt-1 text-[0.63rem] leading-relaxed text-fg-3">
-          {translateCurrentStaticSourceText(
-            "domains.creator.ai.StudioAi3dGenerationPanel",
-            "ko",
-            "입력은 실행 전 확인 후 Hyper3D/Rodin으로 전송됩니다. 통합 AI 설정의 개인 키만 요청 단위로 사용하며 브라우저 번들·작업 기록·오류 로그에 저장하지 않습니다.",
-          )}
-        </p>
+          {translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "입력은 실행 전 확인 후 Hyper3D/Rodin으로 전송됩니다. 통합 AI 설정의 개인 키만 요청 단위로 사용하며 브라우저 번들·작업 기록·오류 로그에 저장하지 않습니다.")}</p>
       </header>
 
-      <div
-        className="flex gap-1 overflow-x-auto"
-        role="tablist"
-        aria-label={translateCurrentStaticSourceText(
-          "domains.creator.ai.StudioAi3dGenerationPanel",
-          "ko",
-          "3D 생성 입력 방식",
-        )}
-      >
+      <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label={translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "3D 생성 입력 방식")}>
         {(Object.keys(MODE_LABELS) as Studio3dGenerationMode[]).map((item) => (
           <button
             key={item}
@@ -360,27 +235,11 @@ export function StudioAi3dGenerationPanel({
 
       {mode === "text-to-3d" || mode === "texture-only" ? (
         <label className="grid gap-1 text-xs font-semibold">
-          {translateCurrentStaticSourceText(
-            "domains.creator.ai.StudioAi3dGenerationPanel",
-            "ko",
-            "생성 설명",
-          )}
-          <textarea
+          {translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "생성 설명")}<textarea
             value={prompt}
-            onChange={(event) =>
-              setPrompt(event.currentTarget.value.slice(0, 1_024))}
+            onChange={(event) => setPrompt(event.currentTarget.value.slice(0, 1_024))}
             rows={3}
-            placeholder={mode === "texture-only"
-              ? translateCurrentStaticSourceText(
-                "domains.creator.ai.StudioAi3dGenerationPanel",
-                "ko",
-                "예: 따뜻한 목재와 황동 장식",
-              )
-              : translateCurrentStaticSourceText(
-                "domains.creator.ai.StudioAi3dGenerationPanel",
-                "ko",
-                "예: 웹툰 교실 배경용 단정한 학생 책상",
-              )}
+            placeholder={mode === "texture-only" ? translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "예: 따뜻한 목재와 황동 장식") : translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "예: 웹툰 교실 배경용 단정한 학생 책상")}
             className="min-h-24 rounded-lg border border-line bg-panel p-2 font-normal"
           />
         </label>
@@ -388,30 +247,12 @@ export function StudioAi3dGenerationPanel({
 
       {mode !== "text-to-3d" ? (
         <label className="grid gap-1 text-xs font-semibold">
-          {mode === "multiview-to-3d"
-            ? translateCurrentStaticSourceText(
-              "domains.creator.ai.StudioAi3dGenerationPanel",
-              "ko",
-              "참조 이미지 2–5장",
-            )
-            : translateCurrentStaticSourceText(
-              "domains.creator.ai.StudioAi3dGenerationPanel",
-              "ko",
-              "참조 이미지 1장",
-            )}
+          {mode === "multiview-to-3d" ? translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "참조 이미지 2–5장") : translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "참조 이미지 1장")}
           <input
             type="file"
             accept="image/*"
             multiple={mode === "multiview-to-3d"}
-            onChange={(event) => {
-              setFiles(
-                Array.from(event.currentTarget.files ?? []).slice(
-                  0,
-                  mode === "multiview-to-3d" ? 5 : 1,
-                ),
-              );
-              setError(null);
-            }}
+            onChange={(event) => setFiles(Array.from(event.currentTarget.files ?? []).slice(0, mode === "multiview-to-3d" ? 5 : 1))}
             className="min-h-11 rounded-lg border border-line bg-panel p-2"
           />
         </label>
@@ -419,135 +260,55 @@ export function StudioAi3dGenerationPanel({
 
       {mode === "texture-only" ? (
         <label className="grid gap-1 text-xs font-semibold">
-          {translateCurrentStaticSourceText(
-            "domains.creator.ai.StudioAi3dGenerationPanel",
-            "ko",
-            "원본 3D 모델",
-          )}
-          <input
+          {translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "원본 3D 모델")}<input
             type="file"
             accept=".glb,.gltf,model/gltf-binary,model/gltf+json"
-            onChange={(event) => {
-              setModelFile(event.currentTarget.files?.[0] ?? null);
-              setError(null);
-            }}
+            onChange={(event) => setModelFile(event.currentTarget.files?.[0] ?? null)}
             className="min-h-11 rounded-lg border border-line bg-panel p-2"
           />
         </label>
       ) : null}
 
-      {selectedInputFiles.length > 0 ? (
-        <div
-          role={inputWithinBudget ? "status" : "alert"}
-          className={`rounded-lg border p-2 text-[0.63rem] leading-relaxed ${
-            inputWithinBudget
-              ? "border-line bg-panel/50 text-fg-2"
-              : "border-bad/35 bg-bad/10 text-bad"
-          }`}
-        >
-          입력 파일 합계 {formatStudio3dInlineBudget(inputBytes)} / 10 MB
-          {!inputWithinBudget
-            ? " · 현재 JSON 전송 한도를 초과해 생성할 수 없습니다."
-            : " · Base64 변환 후에도 API 16MB 경계 안에서 전송됩니다."}
-        </div>
+      {mode !== "text-to-3d" ? (
+        <p className={`rounded-lg border px-2.5 py-2 text-[0.63rem] leading-relaxed ${inputWithinBudget ? "border-line bg-panel/50 text-fg-3" : "border-bad/35 bg-bad/10 text-bad"}`}>
+          현재 전송 방식은 선택한 이미지와 모델 합계 10MB까지 지원합니다. 선택됨 {(inputBytes / 1024 / 1024).toFixed(1)}MB / 10MB.
+          더 큰 자산은 객체 저장소 업로드 경로가 제공되기 전까지 전송하지 않습니다.
+        </p>
       ) : null}
 
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="grid gap-1 text-xs font-semibold">
-          {translateCurrentStaticSourceText(
-            "domains.creator.ai.StudioAi3dGenerationPanel",
-            "ko",
-            "품질 프리셋",
-          )}
-          <select
-            value={preset}
-            onChange={(event) =>
-              setPreset(event.currentTarget.value as typeof preset)}
-            className="min-h-11 rounded-lg border border-line bg-panel px-2"
-          >
-            <option value="blockout">빠른 블록아웃</option>
-            <option value="webtoon">웹툰 기본</option>
-            <option value="line-tone">선화·톤용</option>
-            <option value="character">캐릭터·포즈용</option>
-            <option value="quality">고품질 소재</option>
+          {translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "품질 프리셋")}<select value={preset} onChange={(event) => setPreset(event.currentTarget.value as typeof preset)} className="min-h-11 rounded-lg border border-line bg-panel px-2">
+            <option value="blockout">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "빠른 블록아웃")}</option>
+            <option value="webtoon">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "웹툰 기본")}</option>
+            <option value="line-tone">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "선화·톤용")}</option>
+            <option value="character">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "캐릭터·포즈용")}</option>
+            <option value="quality">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "고품질 소재")}</option>
           </select>
         </label>
         <div className="grid gap-1 text-xs font-semibold">
-          처리 경로
-          <div className="flex min-h-11 items-center rounded-lg border border-line bg-panel px-2 font-normal text-fg-2">
-            통합 AI 설정의 내 Hyper3D/Rodin 키
-          </div>
+          {translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "처리 경로")}<div className="flex min-h-11 items-center rounded-lg border border-line bg-panel px-2 font-normal text-fg-2">
+            {translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "통합 AI 설정의 내 Hyper3D/Rodin 키")}</div>
         </div>
       </div>
 
-      <details
-        onToggle={(event) => setAdvanced(event.currentTarget.open)}
-        className="rounded-lg border border-line bg-panel/50"
-      >
-        <summary className="flex min-h-11 cursor-pointer items-center px-3 text-xs font-bold">
-          고급 형상 설정
-        </summary>
+      <details onToggle={(event) => setAdvanced(event.currentTarget.open)} className="rounded-lg border border-line bg-panel/50">
+        <summary className="flex min-h-11 cursor-pointer items-center px-3 text-xs font-bold">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "고급 형상 설정")}</summary>
         <div className="grid gap-3 border-t border-line p-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-xs">
-            Seed
-            <input
-              type="number"
-              min={0}
-              max={65535}
-              value={seed}
-              onChange={(event) => setSeed(Math.max(
-                0,
-                Math.min(65_535, Number(event.currentTarget.value)),
-              ))}
-              className="min-h-11 rounded-lg border border-line bg-card px-2"
-            />
-          </label>
-          <label className="grid gap-1 text-xs">
-            목표 face 수
-            <input
-              type="number"
-              min={500}
-              max={2000000}
-              value={targetFaceCount}
-              onChange={(event) => setTargetFaceCount(Math.max(
-                500,
-                Math.min(2_000_000, Number(event.currentTarget.value)),
-              ))}
-              className="min-h-11 rounded-lg border border-line bg-card px-2"
-            />
-          </label>
+          <label className="grid gap-1 text-xs">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "en", "Seed")}<input type="number" min={0} max={65535} value={seed} onChange={(event) => setSeed(Math.max(0, Math.min(65_535, Number(event.currentTarget.value))))} className="min-h-11 rounded-lg border border-line bg-card px-2" /></label>
+          <label className="grid gap-1 text-xs">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "목표 face 수")}<input type="number" min={500} max={2000000} value={targetFaceCount} onChange={(event) => setTargetFaceCount(Math.max(500, Math.min(2_000_000, Number(event.currentTarget.value))))} className="min-h-11 rounded-lg border border-line bg-card px-2" /></label>
         </div>
       </details>
 
       <div className="rounded-lg border border-warn/30 bg-warn/10 p-2 text-[0.63rem] leading-relaxed text-fg-2">
-        <strong>실행 전 확인</strong> · 외부 전송 있음 · 예상 비용 {preset === "quality"
-          ? "높음"
-          : preset === "blockout"
-            ? "낮음"
-            : "보통"} · 결과 URL은 장기 저장하지 않고 서버가 즉시 내부 자산 revision으로 수집합니다.
-      </div>
+        <strong>{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "실행 전 확인")}</strong> {translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "· 외부 전송 있음 · 예상 비용 ")}{preset === "quality" ? translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "높음") : preset === "blockout" ? translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "낮음") : translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "보통")} {translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "· 결과 URL은 장기 저장하지 않고 서버가 즉시 내부 자산 revision으로 수집합니다.")}</div>
 
       <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => void create()}
-          disabled={
-            !inputValid
-            || busy
-            || Boolean(job && !TERMINAL.has(job.state))
-          }
-          className="min-h-11 flex-1 rounded-lg bg-accent px-4 text-xs font-bold text-on-accent disabled:opacity-50"
-        >
-          {busy ? "처리 중…" : "3D 생성 시작"}
+        <button type="button" onClick={() => void create()} disabled={!inputValid || busy || Boolean(job && !TERMINAL.has(job.state))} className="min-h-11 flex-1 rounded-lg bg-accent px-4 text-xs font-bold text-on-accent disabled:opacity-50">
+          {busy ? translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "처리 중…") : translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "3D 생성 시작")}
         </button>
         {job && !TERMINAL.has(job.state) ? (
-          <button
-            type="button"
-            onClick={() => void cancel()}
-            className="min-h-11 rounded-lg border border-bad/40 px-4 text-xs font-bold text-bad"
-          >
-            취소
-          </button>
+          <button type="button" onClick={() => void cancel()} className="min-h-11 rounded-lg border border-bad/40 px-4 text-xs font-bold text-bad">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "취소")}</button>
         ) : null}
       </div>
 
@@ -558,80 +319,30 @@ export function StudioAi3dGenerationPanel({
         role="status"
         className="rounded-lg border border-line/70 bg-panel/45 px-2.5 py-2 text-xs text-fg-2"
       >
-        {job
-          ? `${STATE_LABELS[job.state]} · ${job.request.tier} · 예상 ${job.estimatedCredits} credit`
-          : statusMessage}
+        {job ? `${STATE_LABELS[job.state]} · ${job.request.tier} · 예상 ${job.estimatedCredits} credit` : statusMessage}
       </div>
-      {error ? (
-        <p
-          role="alert"
-          className="rounded-lg border border-bad/30 bg-bad/10 p-2 text-xs text-bad"
-        >
-          {error}
-        </p>
-      ) : null}
+      {error ? <p role="alert" className="rounded-lg border border-bad/30 bg-bad/10 p-2 text-xs text-bad">{error}</p> : null}
 
       {job?.state === "ready" && job.artifactRevision ? (
         <div className="grid gap-2 rounded-xl border border-good/35 bg-good/10 p-3">
-          <strong className="text-xs text-good">
-            검증된 GLB revision 준비 완료
-          </strong>
-          <span className="break-all font-mono text-[0.58rem] text-fg-3">
-            {job.artifactRevision.contentHashSha256}
-          </span>
+          <strong className="text-xs text-good">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "검증된 GLB revision 준비 완료")}</strong>
+          <span className="break-all font-mono text-[0.58rem] text-fg-3">{job.artifactRevision.contentHashSha256}</span>
           <div className="flex flex-wrap gap-2">
-            {onInsertArtifact ? (
-              <button
-                type="button"
-                onClick={() => void withArtifact(onInsertArtifact)}
-                className="min-h-11 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent"
-              >
-                장면에 삽입
-              </button>
-            ) : null}
-            {onSaveArtifact ? (
-              <button
-                type="button"
-                onClick={() => void withArtifact(onSaveArtifact)}
-                className="min-h-11 rounded-lg border border-line px-3 text-xs font-bold"
-              >
-                소재로 저장
-              </button>
-            ) : null}
-            {onOpenTextureEditor ? (
-              <button
-                type="button"
-                onClick={() => void withArtifact(onOpenTextureEditor)}
-                className="min-h-11 rounded-lg border border-line px-3 text-xs font-bold"
-              >
-                텍스처 편집
-              </button>
-            ) : null}
+            {onInsertArtifact ? <button type="button" onClick={() => void withArtifact(onInsertArtifact)} className="min-h-11 rounded-lg bg-accent px-3 text-xs font-bold text-on-accent">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "장면에 삽입")}</button> : null}
+            {onSaveArtifact ? <button type="button" onClick={() => void withArtifact(onSaveArtifact)} className="min-h-11 rounded-lg border border-line px-3 text-xs font-bold">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "소재로 저장")}</button> : null}
+            {onOpenTextureEditor ? <button type="button" onClick={() => void withArtifact(onOpenTextureEditor)} className="min-h-11 rounded-lg border border-line px-3 text-xs font-bold">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "텍스처 편집")}</button> : null}
           </div>
         </div>
       ) : null}
 
       {history.length > 0 ? (
         <details className="rounded-lg border border-line">
-          <summary className="flex min-h-11 cursor-pointer items-center px-3 text-xs font-bold">
-            생성 작업 내역 {history.length}건
-          </summary>
+          <summary className="flex min-h-11 cursor-pointer items-center px-3 text-xs font-bold">{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "생성 작업 내역 ")}{history.length}{translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "ko", "건")}</summary>
           <ul className="max-h-48 overflow-y-auto border-t border-line p-2 text-xs">
             {history.slice(0, 20).map((item) => (
-              <li
-                key={item.id}
-                className="flex min-h-11 items-center justify-between gap-2 border-b border-line/50 last:border-0"
-              >
-                <button
-                  type="button"
-                  onClick={() => setJob(item)}
-                  className="min-h-11 min-w-0 flex-1 truncate text-left"
-                >
-                  {MODE_LABELS[item.request.mode]} · {STATE_LABELS[item.state]}
-                </button>
-                <span className="shrink-0 text-fg-3">
-                  {item.actualCredits ?? item.estimatedCredits} cr
-                </span>
+              <li key={item.id} className="flex min-h-11 items-center justify-between gap-2 border-b border-line/50 last:border-0">
+                <button type="button" onClick={() => setJob(item)} className="min-h-11 min-w-0 flex-1 truncate text-left">{MODE_LABELS[item.request.mode]} · {STATE_LABELS[item.state]}</button>
+                <span className="shrink-0 text-fg-3">{item.actualCredits ?? item.estimatedCredits} {translateCurrentStaticSourceText("domains.creator.ai.StudioAi3dGenerationPanel", "en", "cr")}</span>
               </li>
             ))}
           </ul>

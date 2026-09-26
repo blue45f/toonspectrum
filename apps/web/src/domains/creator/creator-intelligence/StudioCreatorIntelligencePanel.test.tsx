@@ -24,11 +24,18 @@ const providerStatus: CreatorIntelligenceStatus = {
   soundEffects: disabled,
   meshy: disabled,
   safeSearch: disabled,
-  admission: {
-    paidRoutesEnabled: false,
-    enforcement: "single-instance-local",
-    meshJobOwnership: "signed-user-bound-token",
-    operations: {},
+  paidExecution: {
+    enabled: false,
+    distributed: false,
+    requiresAuthentication: true,
+    requiresIdempotencyKey: true,
+    failClosedInProduction: true,
+    reason: "disabled",
+  },
+  meshArtifacts: {
+    configured: false,
+    requiredInProduction: true,
+    providerUrlsReturnedInProduction: false,
   },
 };
 function renderPanel() {
@@ -62,8 +69,7 @@ beforeEach(() => {
       license: "Pexels License",
       licenseUrl: "https://www.pexels.com/license/",
       width: 1200,
-      height: 800,
-      rightsStatus: "provider-license",
+      height: 800,      rightsStatus: "provider-license",
       importable: false,
       fetchedAt: "2026-09-25T00:00:00.000Z",
     }],
@@ -90,12 +96,25 @@ describe("StudioCreatorIntelligencePanel free reference APIs", () => {
     expect(screen.getByRole("button", { name: "영상" })).toBeTruthy();
   });
 
+
+  it("keeps free discovery available while paid execution is disabled", async () => {
+    const { container } = renderPanel();
+    await waitFor(() => expect(creatorIntelligenceClient.status).toHaveBeenCalledTimes(1));
+
+    expect(screen.getByText("유료 AI 실행은 현재 비활성입니다.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "번역" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Meshy" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((container.querySelector('input[type="file"][accept="image/png,image/jpeg,image/webp"]') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getAllByRole("button", { name: "검색" })[0] as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("레퍼런스 검색어"), { target: { value: "rain alley" } });
+    expect((screen.getAllByRole("button", { name: "검색" })[0] as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("searches Pexels, shows provenance, and saves the reference", async () => {
     renderPanel();
     await waitFor(() => expect(creatorIntelligenceClient.status).toHaveBeenCalledTimes(1));
 
-    fireEvent.change(screen.getByLabelText("reference provider"), {
-      target: { value: "pexels" },
+    fireEvent.change(screen.getByLabelText("reference provider"), {      target: { value: "pexels" },
     });
     fireEvent.click(screen.getByRole("button", { name: "배경" }));
 
@@ -165,4 +184,5 @@ describe("StudioCreatorIntelligencePanel free reference APIs", () => {
     expect(screen.getAllByText(/영상 레퍼런스/u).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/8s/u).length).toBeGreaterThan(0);
   });
+
 });
