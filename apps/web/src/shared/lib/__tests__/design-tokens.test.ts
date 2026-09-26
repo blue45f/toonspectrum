@@ -34,4 +34,14 @@ describe("design token discipline", () => {
     expect(shell).toContain("focus:bg-fg");
     expect(shell).toContain("focus:text-canvas");
   });
+
+  it("keeps browser-compatibility recovery UI on semantic theme tokens", () => {
+    const boundary = read("apps/web/src/app/errors/error-boundary.tsx");
+
+    expect(boundary).not.toContain("text-black");
+    expect(boundary).not.toContain("border-white/20");
+    expect(boundary).not.toContain("bg-white/5");
+    expect(boundary).toContain("bg-warn");
+    expect(boundary).toContain("border-line-strong");
+  });
 });

@@ -91,17 +91,17 @@ export class ErrorBoundary extends Component<Props, State> {
           <>
             <div className="mx-auto w-full max-w-[1320px] px-4 py-16 sm:px-6">
               <div
-                className="mx-auto max-w-xl rounded-3xl border border-amber-500/30 bg-amber-500/10 p-8 sm:p-10 text-center shadow-2xl backdrop-blur-md"
+                className="mx-auto max-w-xl rounded-3xl border border-warn/35 bg-warn/10 p-8 text-center shadow-2xl backdrop-blur-md sm:p-10"
                 role="alert"
               >
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-warn/40 bg-warn/15 text-warn">
                   <Monitor size={28} />
                 </div>
                 <h3 className="text-xl font-bold text-fg sm:text-2xl">{analysis.title}</h3>
                 <p className="mt-2 text-sm text-fg-2 leading-relaxed">{analysis.message}</p>
 
                 {analysis.details && (
-                  <p className="mt-3 rounded-xl bg-black/30 p-3 text-xs text-amber-300/90 font-mono break-all">
+                  <p className="mt-3 rounded-xl border border-line bg-canvas/80 p-3 text-xs font-mono text-fg-2 break-all">
                     {analysis.details}
                   </p>
                 )}
@@ -110,7 +110,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   <button
                     type="button"
                     onClick={() => this.setState({ showModal: true })}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 text-xs font-semibold text-black hover:bg-amber-400 transition-colors shadow-lg"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-warn bg-warn px-4 text-xs font-semibold text-[var(--color-canvas)] shadow-lg transition-colors hover:brightness-110"
                   >
                     <Download size={16} />
                     브라우저 업데이트 안내 보기
@@ -118,7 +118,7 @@ export class ErrorBoundary extends Component<Props, State> {
                   <button
                     type="button"
                     onClick={() => window.location.reload()}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 text-xs font-medium text-fg hover:bg-white/10 transition-colors"
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-line-strong bg-panel px-4 text-xs font-medium text-fg hover:bg-raised transition-colors"
                   >
                     <RefreshCw size={14} />
                     새로고침

@@ -129,14 +129,14 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
       className="pointer-events-auto fixed inset-x-3 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] z-[175] ml-auto w-auto max-w-[30rem] overflow-hidden rounded-3xl border border-white/15 bg-[oklch(0.15_0.03_270/0.97)] text-white shadow-2xl shadow-black/50 backdrop-blur-2xl sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-[min(30rem,calc(100vw-2.5rem))]"
     >
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,oklch(0.8_0.17_75/0.20),transparent_38%),radial-gradient(circle_at_100%_20%,oklch(0.72_0.19_320/0.16),transparent_42%)]" />
-      <div className="relative flex items-start gap-3 p-4 sm:p-5">
-        <span className="grid size-10 shrink-0 place-items-center rounded-2xl border border-amber-100/20 bg-amber-100/10 text-amber-100">
+      <div data-beta-open-header className="relative flex items-start gap-3 p-4 sm:p-5">
+        <span data-beta-open-icon className="grid size-10 shrink-0 place-items-center rounded-2xl border border-amber-100/20 bg-amber-100/10 text-amber-100">
           <Sparkles size={18} aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[0.62rem] font-black uppercase tracking-[0.16em] text-amber-100/80">BETA OPEN</p>
           <h2 className="mt-1 text-base font-black leading-6 sm:text-lg">{text(BETA_OPEN_EVENT.title)}</h2>
-          <p className="mt-1.5 text-xs leading-5 text-white/65">
+          <p data-beta-open-copy className="mt-1.5 text-xs leading-5 text-white/65">
             {text({
               ko: "먼저 둘러본 뒤 필요할 때 가입하세요. 혜택과 조건은 한 화면에서 확인할 수 있습니다.",
               en: "Explore first, then join when it is useful. Review every benefit and condition in one place.",
@@ -175,7 +175,7 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
         </div>
       ) : null}
 
-      <div className="relative grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t border-white/10 bg-black/10 p-3 sm:flex sm:flex-wrap sm:justify-end sm:px-5">
+      <div data-beta-open-footer className="relative grid grid-cols-[minmax(0,1fr)_auto] gap-2 border-t border-white/10 bg-black/10 p-3 sm:flex sm:flex-wrap sm:justify-end sm:px-5">
         <button
           type="button"
           aria-expanded={detailsOpen}

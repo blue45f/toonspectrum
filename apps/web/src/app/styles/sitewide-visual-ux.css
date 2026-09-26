@@ -255,8 +255,52 @@ html {
   }
 }
 
+/* Keep public-page content clear of the fixed mobile navigation and floating utilities.
+   The bottom rail is rendered outside #main-content, so reserve its occupied space explicitly. */
+@media (max-width: 767px) {
+  body:has(nav[data-site-product]) #main-content {
+    padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
+  }
+}
+
 @media (max-width: 390px) {
   :root { --site-page-gutter: 0.875rem; }
+  body:has(nav[data-site-product]) #main-content {
+    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Engaged marketing prompts stay compact on phones so they do not cover the primary page heading or controls. */
+@media (max-width: 767px) {
+  [data-beta-open-prompt="engaged"] {
+    max-height: min(6.25rem, calc(100dvh - 11rem));
+    overflow-y: auto;
+    border-radius: 1.25rem;
+  }
+  [data-beta-open-prompt="engaged"] [data-beta-open-header] {
+    gap: 0.625rem;
+    padding: 0.5rem 0.625rem;
+  }
+  [data-beta-open-prompt="engaged"] [data-beta-open-icon] {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.75rem;
+  }
+  [data-beta-open-prompt="engaged"] [data-beta-open-copy] {
+    display: none;
+  }
+  [data-beta-open-prompt="engaged"] [data-beta-open-footer] {
+    padding: 0.35rem 0.625rem;
+  }
+  [data-beta-open-prompt="engaged"] [data-beta-open-footer] button:last-of-type {
+    min-height: 2.5rem;
+  }
+  [data-beta-open-prompt="engaged"] [data-beta-open-footer] > button:first-child,
+  [data-beta-open-prompt="engaged"] [data-beta-open-footer] > a:last-child {
+    display: none;
+  }
 }
 
 /* Document-window controls stay operable without making the editor canvas itself less dense. */
