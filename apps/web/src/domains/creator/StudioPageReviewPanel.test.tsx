@@ -75,13 +75,13 @@ describe("StudioPageReviewPanel", () => {
     );
 
     const dialog = screen.getByRole("dialog", {
-      name: "페이지 검토와 잠금",
+      name: "페이지 검토와 편집 제한",
     });
     expect(dialog.getAttribute("aria-modal")).toBeNull();
     expect(dialog.getAttribute("data-studio-floating-surface")).toBe("true");
     expect(dialog.getAttribute("data-studio-page-review-surface")).toBe("desktop");
     expect(screen.getByRole("button", {
-      name: "페이지 검토와 잠금 이동",
+      name: "페이지 검토와 편집 제한 이동",
     })).toBeTruthy();
     expect(document.body.style.overflow).toBe("");
 
@@ -153,7 +153,7 @@ describe("StudioPageReviewPanel", () => {
     );
 
     const dialog = screen.getByRole("dialog", {
-      name: "페이지 검토와 잠금",
+      name: "페이지 검토와 편집 제한",
     });
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(dialog.getAttribute("data-studio-floating-surface")).toBeNull();

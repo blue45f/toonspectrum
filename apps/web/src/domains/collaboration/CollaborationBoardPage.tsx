@@ -39,11 +39,20 @@ export function CollaborationBoardPage() {
       <p className="eyebrow text-accent">TOONSTUDIO COLLABORATE</p>
       <h1 className="mt-4 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-fg sm:text-5xl">다음 회차,<br />함께 완성할 사람을 찾으세요.</h1>
       <p className="mt-5 max-w-2xl text-base leading-8 text-fg-2">콘티부터 선화·채색·배경·3D까지. 팀원 모집, 보조 작업 의뢰, 작업자 포트폴리오를 한곳에서 연결합니다. 공고 등록과 지원은 무료예요.</p>
-      <div className="mt-6 flex flex-wrap gap-3"><Link href="/collaborate/new" className={collabPrimary}><Plus size={17} aria-hidden="true" />공고 등록하기</Link><Link href="/collaborate/positions" className={collabButton}>모집 조건으로 찾기</Link><Link href="/team/recruiting" className={collabButton}>내 지원·인재 관리</Link><Link href="/collaborate/gallery" className={collabButton}>포트폴리오 링크 전시</Link><Link href="/showcase" className={collabButton}>창작 갤러리<ArrowRight size={16} aria-hidden="true" /></Link></div>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <a href="#collaboration-results" className={collabPrimary}><Search size={17} aria-hidden="true" />사람 찾기</a>
+        <Link href="/collaborate/new" className={collabButton}><Plus size={17} aria-hidden="true" />모집 글 올리기</Link>
+      </div>
+      <nav aria-label="구인·의뢰 보조 메뉴" className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+        <Link href="/collaborate/positions" className="min-h-11 content-center font-semibold text-accent underline-offset-4 hover:underline">조건 상세 검색</Link>
+        <Link href="/team/recruiting" className="min-h-11 content-center font-semibold text-fg-2 underline-offset-4 hover:text-accent hover:underline">인재·지원 관리</Link>
+        <Link href="/collaborate/gallery" className="min-h-11 content-center font-semibold text-fg-2 underline-offset-4 hover:text-accent hover:underline">포트폴리오 전시</Link>
+        <Link href="/showcase" className="inline-flex min-h-11 items-center gap-1 font-semibold text-fg-2 underline-offset-4 hover:text-accent hover:underline">창작 갤러리<ArrowRight size={16} aria-hidden="true" /></Link>
+      </nav>
       <p className="mt-5 flex items-center gap-2 text-xs text-fg-3"><ShieldCheck size={15} aria-hidden="true" />지원 연락처 비공개 · 보수 조건 명시 · 결제 중개 없음</p>
     </header>
     <div className="mt-6 grid gap-3 sm:grid-cols-3">{categories.map(({ type: category, label, description, icon: Icon }) => <button key={category} type="button" aria-pressed={type === category} onClick={() => change("type", type === category ? "all" : category)} className={`flex min-h-24 items-center gap-4 rounded-2xl border p-5 text-left transition-colors ${type === category ? "border-accent bg-accent/10" : "border-line bg-panel hover:border-accent/50"}`}><Icon size={25} className="shrink-0 text-accent" aria-hidden="true" /><span className="font-bold text-fg">{label}<span className="mt-1 block text-xs font-normal text-fg-3">{description}</span></span></button>)}</div>
-    <section className="mt-8" aria-label="공고 검색과 필터">
+    <section id="collaboration-results" className="mt-8 scroll-mt-24" aria-label="공고 검색과 필터">
       <div className="flex flex-wrap gap-2">{Object.entries(views).map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => change("view", key)} className={`${collabButton} ${view === key ? "border-accent text-accent" : ""}`}>{label}</button>)}</div>
       <form className="mt-5 flex gap-2" onSubmit={(event) => { event.preventDefault(); change("q", String(new FormData(event.currentTarget).get("q") || "").trim()); }}>
         <label className="min-w-0 flex-1"><span className="sr-only">공고 검색어</span><input key={params.get("q") || ""} name="q" type="search" maxLength={100} defaultValue={params.get("q") || ""} placeholder="제목·작업 소개를 한글로 검색하세요" className={`${collabInput} mt-0`} /></label><button className={collabButton} type="submit"><Search size={17} aria-hidden="true" />검색</button>

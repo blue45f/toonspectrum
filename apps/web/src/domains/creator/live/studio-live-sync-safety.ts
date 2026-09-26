@@ -260,7 +260,7 @@ export function presentStudioLiveSyncSnapshot(
         shortLabel: "안전하게 동기화됨",
         detail:
           snapshot.mode === "local"
-            ? "같은 출처 탭끼리 연결되었습니다. 팀 서버 승인이 필요한 변경은 이 기기의 복구 저장소에 남겨 둡니다."
+            ? "같은 브라우저의 테스트 탭끼리 연결되었습니다. 팀 서버 승인이 필요한 변경은 이 기기의 복구 저장소에 남겨 둡니다."
             : snapshot.persistenceDurability === "durable"
             ? "팀 서버와 이 기기의 복구 저장소에 원고를 보호합니다."
             : "팀 서버가 새 원고 연산을 승인하고 있습니다.",

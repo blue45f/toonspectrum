@@ -124,7 +124,7 @@ describe("local-only Studio transport admission", () => {
       dependencies: { transportFactory: hook.result.current },
     });
     try {
-      await expect(room.start()).rejects.toThrow("로컬 탭 공동작업 채널");
+      await expect(room.start()).rejects.toThrow("이 기기 탭 테스트 채널");
       expect(room.ready).toBe(false);
       expect(socketModule.imports).toBe(0);
     } finally {

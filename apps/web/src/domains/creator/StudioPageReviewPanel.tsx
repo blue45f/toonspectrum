@@ -310,13 +310,13 @@ export function StudioPageReviewPanel({
   const statusSummary = (
     <div
       className="flex flex-wrap items-center gap-1.5 text-[0.68rem] text-fg-3"
-      aria-label={`승인 ${approvedCount}/${pages.length}, 잠금 ${lockedCount}`}
+      aria-label={`승인 ${approvedCount}/${pages.length}, 편집 제한 ${lockedCount}`}
     >
       <span className="rounded-full border border-line bg-card px-2 py-1">
         승인 {approvedCount}/{pages.length}
       </span>
       <span className="rounded-full border border-line bg-card px-2 py-1">
-        잠금 {lockedCount}
+        편집 제한 {lockedCount}
       </span>
     </div>
   );
@@ -456,17 +456,17 @@ export function StudioPageReviewPanel({
         <div className="flex gap-1.5">
           <button
             type="button"
-            onClick={() => applyBulkOperation({ type: "lock", locked: true }, "편집 잠금")}
+            onClick={() => applyBulkOperation({ type: "lock", locked: true }, "편집 제한")}
             className="inline-flex items-center gap-1.5 rounded-lg border border-warning/35 bg-warning-soft/20 px-3 py-2 text-xs font-bold text-warning hover:bg-warning-soft/35"
           >
-            <Lock size={12} aria-hidden /> 잠금
+            <Lock size={12} aria-hidden /> 편집 제한
           </button>
           <button
             type="button"
-            onClick={() => applyBulkOperation({ type: "lock", locked: false }, "편집 잠금 해제")}
+            onClick={() => applyBulkOperation({ type: "lock", locked: false }, "편집 제한 해제")}
             className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-2 text-xs font-bold text-fg-3 hover:bg-raised hover:text-fg"
           >
-            <LockOpen size={12} aria-hidden /> 잠금 해제
+            <LockOpen size={12} aria-hidden /> 제한 해제
           </button>
         </div>
       </fieldset>
@@ -486,9 +486,9 @@ export function StudioPageReviewPanel({
   const reviewList: ReactNode = (
     <>
       <p className="mb-3 rounded-lg border border-warning/30 bg-warning-soft/20 px-3 py-2 text-[0.7rem] leading-relaxed text-warning">
-        이 잠금은 현재 문서의 편집 사고를 막는 워크플로 기능이며, 서버 권한이나
-        실시간 공동편집 잠금은 아닙니다. 일괄 변경도 기존 문서 히스토리와 저장 경로를
-        그대로 사용합니다.
+        검토 중 편집 제한은 이 문서에서 실수로 수정하는 것을 막는 워크플로 상태입니다.
+        서버 접근 권한이나 다른 팀원이 점유한 요소의 실시간 편집 제어와는 별도로 적용됩니다.
+        일괄 변경도 기존 문서 히스토리와 저장 경로를 그대로 사용합니다.
       </p>
       {bulkReviewControls}
       {filteredRows.length > 0 ? (
@@ -549,7 +549,7 @@ export function StudioPageReviewPanel({
                     {review.locked
                       ? <Lock size={12} aria-hidden />
                       : <LockOpen size={12} aria-hidden />}
-                    {review.locked ? "편집 잠김" : "편집 가능"}
+                    {review.locked ? "검토 중 편집 제한" : "편집 가능"}
                   </button>
                 </div>
 
@@ -628,7 +628,7 @@ export function StudioPageReviewPanel({
     return createPortal(
       <StudioFloatingSurface
         surfaceId="page-review"
-        label="페이지 검토와 잠금"
+        label="페이지 검토와 편집 제한"
         layout={layout}
         defaultLayout={DEFAULT_STUDIO_PAGE_REVIEW_FLOATING_LAYOUT}
         minWidth={560}
@@ -673,7 +673,7 @@ export function StudioPageReviewPanel({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="페이지 검토와 잠금"
+      aria-label="페이지 검토와 편집 제한"
       data-studio-page-review-surface="mobile"
       className="fixed inset-0 z-[80] bg-[oklch(0.08_0.01_70/0.82)] p-2 text-fg backdrop-blur-sm sm:p-4"
     >
@@ -684,10 +684,10 @@ export function StudioPageReviewPanel({
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold tracking-tight text-fg">
-              페이지 검토와 잠금
+              페이지 검토와 편집 제한
             </h2>
             <p className="mt-0.5 text-xs leading-relaxed text-fg-3">
-              검색·다중 선택·일괄 편집으로 승인 상태와 담당, 잠금을 빠르게 정리합니다.
+              검색·다중 선택·일괄 편집으로 승인 상태와 담당, 편집 제한을 빠르게 정리합니다.
             </p>
           </div>
           <div className="hidden sm:block">{statusSummary}</div>

@@ -122,6 +122,12 @@ describe("CreatorController collaboration collection endpoints", () => {
       )
     ).toEqual({ userId: "editor", role: "editor" });
     expect(
+      new ZodValidationPipe(InviteCreatorTeamMemberDto).transform(
+        { identity: " editor@example.com ", role: "commenter" },
+        bodyMetadata
+      )
+    ).toEqual({ identity: "editor@example.com", role: "commenter" });
+    expect(
       new ZodValidationPipe(UpdateCreatorTeamMemberDto).transform(
         { role: "viewer" },
         bodyMetadata

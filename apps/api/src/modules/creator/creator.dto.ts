@@ -318,12 +318,18 @@ export const CreatorTeamMemberParamsSchema = CreatorTeamWorkParamsSchema.extend(
 
 export const InviteCreatorTeamMemberSchema = z
   .object({
-    userId: CreatorCollaborationUserIdSchema,
+    userId: CreatorCollaborationUserIdSchema.optional(),
+    identity: z.string().trim().min(1).max(320).optional(),
     role: CreatorCollaborationRoleSchema,
   })
-  .strict();
+  .strict()
+  .refine((value) => Boolean(value.identity || value.userId), {
+    message: "초대할 이름, 인증 이메일 또는 사용자 ID를 입력해 주세요.",
+  });
 
-export const UpdateCreatorTeamMemberSchema = InviteCreatorTeamMemberSchema.pick({ role: true }).strict();
+export const UpdateCreatorTeamMemberSchema = z
+  .object({ role: CreatorCollaborationRoleSchema })
+  .strict();
 
 export const RespondCreatorTeamInvitationSchema = z
   .object({

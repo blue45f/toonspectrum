@@ -57,6 +57,12 @@ const LEGACY_REDIRECT_ALIASES = new Map([
   ["/publishing", "/studio/publish"],
 ]);
 
+const LEGACY_CROSS_DOMAIN_ALIASES = new Map([
+  ["/collaborate/workspace", "/team/recruiting"],
+  ["/production/workspaces", "/team/people"],
+  ["/production/workspaces/join", "/team/people/join"],
+]);
+
 const NESTED_USER_FACING_DESTINATIONS = [
   "/learn",
   "/learn/glossary",
@@ -106,6 +112,7 @@ const extendedDestinationHrefs = SITEMAP_EXTENDED_DESTINATION_GROUPS
 const canonicalDirectoryPath = (href: string) => (
   LEGACY_SHARED_PAGE_ALIASES.get(href)
   ?? LEGACY_REDIRECT_ALIASES.get(href)
+  ?? LEGACY_CROSS_DOMAIN_ALIASES.get(href)
   ?? canonicalSitePath(href)
 );
 
@@ -166,6 +173,12 @@ describe("site directory experience contracts", () => {
     ]);
   });
 
+  it("uses the canonical team recruiting destination instead of the legacy collaboration workspace", () => {
+    expect(directoryPaths).toContain("/team/recruiting");
+    expect(extendedDestinationHrefs).toContain("/team/recruiting");
+    expect(extendedDestinationHrefs).not.toContain("/collaborate/workspace");
+  });
+
   it("keeps creator entry points and the product tour visible before the long directory", () => {
     expect(sitemapSource).toContain('href="/studio/new"');
     expect(sitemapSource).toContain('href="/studio"');
@@ -184,6 +197,18 @@ describe("site directory experience contracts", () => {
     for (const [legacy, canonical] of LEGACY_SHARED_PAGE_ALIASES) {
       expect(pageByPath.get(legacy)).toBeTruthy();
       expect(pageByPath.get(legacy)).toBe(pageByPath.get(canonical));
+      expect(directoryPaths).toContain(canonical);
+      expect(extendedDestinationHrefs).not.toContain(legacy);
+    }
+  });
+
+  it("keeps cross-domain team aliases out while preserving canonical targets", () => {
+    const routes = PUBLIC_ROUTE_SOURCE_FILES
+      .map((sourcePath) => readFileSync(sourcePath, "utf8"))
+      .join("\n");
+
+    for (const [legacy, canonical] of LEGACY_CROSS_DOMAIN_ALIASES) {
+      expect(routes).toContain(`path: "${legacy}"`);
       expect(directoryPaths).toContain(canonical);
       expect(extendedDestinationHrefs).not.toContain(legacy);
     }

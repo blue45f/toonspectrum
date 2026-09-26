@@ -34,7 +34,7 @@ describe("StudioVirtualSpaceRoomCatalog", () => {
   it("links interview waiting to the existing hiring room authority", () => {
     mount(false);
     const link = screen.getByRole("link", { name: /면접·협업 대기실/u });
-    expect(link.getAttribute("href")).toBe("/collaborate/workspace?panel=rooms");
+    expect(link.getAttribute("href")).toBe("/team/recruiting?panel=rooms");
   });
 
   it("walks to the authored lounge rather than changing presence authority", () => {

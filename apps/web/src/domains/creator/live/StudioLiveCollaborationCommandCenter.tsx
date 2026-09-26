@@ -142,7 +142,7 @@ function modeLabel(
   mode: StudioLiveTransportMode | null
 ): string {
   if (availability === "ready") {
-    return mode === "server" ? "팀 서버 연결" : "같은 출처 로컬 탭 연결";
+    return mode === "server" ? "팀 서버 연결" : "이 기기 테스트 연결";
   }
   if (availability === "connecting") return "연결 준비 중";
   if (availability === "unsupported") return "브라우저 미지원";

@@ -166,12 +166,22 @@ describe("creator work zod contracts", () => {
     ).toBe(false);
   });
 
-  it("팀 초대는 정규화된 사용자 ID와 할당 가능한 역할만 허용한다", () => {
+  it("팀 초대는 정규화된 이름·이메일·사용자 ID와 할당 가능한 역할만 허용한다", () => {
     expect(InviteCreatorTeamMemberSchema.parse({ userId: "  artist-2  ", role: "editor" })).toEqual({
       userId: "artist-2",
       role: "editor",
     });
+    expect(InviteCreatorTeamMemberSchema.parse({ identity: "  Artist@Example.com  ", role: "commenter" })).toEqual({
+      identity: "Artist@Example.com",
+      role: "commenter",
+    });
+    expect(InviteCreatorTeamMemberSchema.parse({ identity: "  홍길동  ", role: "viewer" })).toEqual({
+      identity: "홍길동",
+      role: "viewer",
+    });
     expect(InviteCreatorTeamMemberSchema.safeParse({ userId: "", role: "viewer" }).success).toBe(false);
+    expect(InviteCreatorTeamMemberSchema.safeParse({ role: "viewer" }).success).toBe(false);
+    expect(InviteCreatorTeamMemberSchema.safeParse({ identity: "x".repeat(321), role: "viewer" }).success).toBe(false);
     expect(InviteCreatorTeamMemberSchema.safeParse({ userId: "a".repeat(161), role: "viewer" }).success).toBe(
       false
     );

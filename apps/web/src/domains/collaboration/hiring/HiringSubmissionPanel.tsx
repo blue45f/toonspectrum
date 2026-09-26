@@ -38,7 +38,7 @@ export function HiringSubmissionPanel({ postId, postVersion, busy, act }: { post
     if (retry.current?.digest !== digest) retry.current = { digest, mutationId: crypto.randomUUID() };
     await act(() => hiringClient.submit(postId, { ...value, mutationId: retry.current!.mutationId }), "선택한 버전으로 지원했어요. 이력서를 수정해도 제출 내용은 유지됩니다.");
   }
-  return <section className="mb-6 space-y-4 rounded-2xl border border-accent/30 bg-panel p-6"><h2 className="text-xl font-bold">저장한 이력서로 지원하기</h2><Link href="/collaborate/workspace" className={collabButton}>이력서 작성·관리</Link>
+  return <section className="mb-6 space-y-4 rounded-2xl border border-accent/30 bg-panel p-6"><h2 className="text-xl font-bold">저장한 이력서로 지원하기</h2><Link href="/team/recruiting" className={collabButton}>이력서 작성·관리</Link>
     {error && <CollabNotice error>{error}<button className={collabButton} onClick={() => setRefresh((v) => v + 1)}>다시 불러오기</button></CollabNotice>}
     {!resumes && !error && <p role="status">이력서를 불러오고 있어요.</p>}{resumes?.length === 0 && <p>저장한 이력서가 없어요. 이력서를 작성하거나 아래의 간단 지원을 이용하세요.</p>}
     {!!resumes?.length && <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); void submit(); }}><fieldset disabled={busy} className="space-y-4">

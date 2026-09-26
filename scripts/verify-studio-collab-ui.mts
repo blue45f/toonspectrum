@@ -142,7 +142,7 @@ async function dismissOverlays(page: Page): Promise<void> {
     await dismiss.click({ timeout: 2_000 }).catch(() => undefined);
     await page.waitForTimeout(200);
   }
-  for (const text of ["빠른 시작 닫기 (Esc)", "나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
+  for (const text of ["시작 안내 닫기", "빈 캔버스로 그대로 시작", "빠른 시작 닫기 (Esc)", "나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
     const el = page.getByRole("button", { name: text }).first();
     if (await el.isVisible().catch(() => false)) {
       await el.click({ timeout: 800 }).catch(() => undefined);
@@ -171,13 +171,13 @@ async function waitForRoomUrl(page: Page): Promise<string> {
 }
 
 async function enableLocalTabMode(page: Page): Promise<string> {
-  const fallback = page.getByRole("button", { name: "로컬 탭 모드" });
+  const fallback = page.getByRole("button", { name: "이 기기 테스트 모드" });
   if (await fallback.isVisible().catch(() => false)) {
     await fallback.click({ timeout: 5_000 });
     await page.waitForTimeout(500);
     return "clicked";
   }
-  if (await visibleText(page, "같은 출처 탭 연결") || await visibleText(page, "로컬 탭 미리보기")) {
+  if (await visibleText(page, "이 기기 테스트 연결") || await visibleText(page, "동일 브라우저 테스트")) {
     return "already-local";
   }
   return "unavailable";
@@ -187,7 +187,7 @@ async function liveStatus(page: Page): Promise<string> {
   const mode = await page.locator("[data-studio-live-mode]").first().getAttribute("data-studio-live-mode", { timeout: 800 }).catch(() => null);
   const draft = await page.locator("[data-studio-draft-collaboration-state]").first().getAttribute("data-studio-draft-collaboration-state", { timeout: 800 }).catch(() => null);
   const copies = [
-    "같은 출처 탭 연결",
+    "이 기기 테스트 연결",
     "팀 서버 연결",
     "연결 대기",
     "연결 준비 중",

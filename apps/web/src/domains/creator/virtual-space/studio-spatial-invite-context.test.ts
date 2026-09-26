@@ -41,6 +41,6 @@ describe("spatial invitation context", () => {
     expect(parseStudioSpatialInviteFragment(hash).context)
       .toEqual({ kind: "interview-waiting" });
     expect(studioSpatialInviteDestination({ kind: "interview-waiting" }, "workspace-1"))
-      .toBe("/collaborate/workspace?panel=rooms&waiting=1&workspace=workspace-1");
+      .toBe("/team/recruiting?panel=rooms&waiting=1&workspace=workspace-1");
   });
 });

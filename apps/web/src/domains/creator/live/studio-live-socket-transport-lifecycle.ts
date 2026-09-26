@@ -73,7 +73,7 @@ export function connect(this: StudioLiveSocketTransportHost): Promise<void> {
   });
   this.connectPromise = promise;
   this.connectTimeout = this.scheduleTimeout(() => {
-    this.failInitialConnect("팀 서버 연결 시간이 초과되었습니다. 다시 연결하거나 로컬 모드를 사용해 주세요.");
+    this.failInitialConnect("팀 서버 연결 시간이 초과되었습니다. 다시 연결하거나 이 기기 테스트 모드를 사용해 주세요.");
   }, CONNECT_TIMEOUT_MS);
   if (this.socket.connected) this.beginJoin();
   else this.socket.connect();

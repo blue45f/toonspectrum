@@ -20,6 +20,10 @@ describe("production route ownership", () => {
       "/production/projects/:projectId/rights",
       "/production/projects/:projectId/settings",
       "/production/projects/:projectId/episodes/:episodeId",
+      "/team/people",
+      "/team/people/join",
+      "/team/people/:workspaceId",
+      "/team/people/:workspaceId/usage",
     ]));
     expect(new Set(productionRoutes.map((route) => route.id)).size).toBe(productionRoutes.length);
   });

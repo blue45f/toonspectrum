@@ -1,11 +1,14 @@
 import type { EffectiveOperationPolicy } from "@toonspectrum/contracts/operation-policy";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { isWorkspaceManager, type InvitableWorkspaceRole, type TeamWorkspaceCommandInput,
   type TeamWorkspaceDetail, type TeamWorkspaceSummary, type WorkspaceUsageResponse } from "@toonspectrum/contracts/production-workspace";
 import { useApp } from "@/shared/lib/store";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { getApiErrorMessage } from "@/platform/api";
+import { TeamAreaNavigation } from "@/shared/components/TeamAreaNavigation";
+import { normalizeCollaborationOnboardingCandidate, readCollaborationOnboardingCandidate, type CollaborationOnboardingCandidate } from "@/shared/lib/collaboration-onboarding";
+import { inviteStudioTeamMember, type StudioTeamAssignableRole } from "../studio-team-client";
 import { listProductionProjects, type ProductionProjectSummary } from "./production-dashboard-api";
 import { getEffectiveOperationPolicy, acceptTeamInvite, commandTeamWorkspace, createTeamWorkspace, getTeamUsage, getTeamWorkspace, listTeamWorkspaces } from "./team-workspace-api";
 import { PRODUCTION_ROLE_PRESETS, productionRolePreset, type ProductionRolePreset } from "./production-manuscript-competitive-model";
@@ -34,12 +37,22 @@ function UsageCard({ usage }: { usage: WorkspaceUsageResponse }) {
 export function TeamWorkspacePage() {
   const userId = useApp((state) => state.userId);
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  return <TeamWorkspaceConsole key={`${userId ?? "signed-out"}:${workspaceId ?? "list"}`} userId={userId} />;
+  const { search } = useLocation();
+  return <TeamWorkspaceConsole key={`${userId ?? "signed-out"}:${workspaceId ?? "list"}:${search}`} userId={userId} />;
 }
 function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const onboardingId = searchParams.get("onboard") ?? "";
+  const [onboarding] = useState<CollaborationOnboardingCandidate | null>(() => {
+    const state = location.state as { collaborationOnboarding?: unknown } | null;
+    const fromState = normalizeCollaborationOnboardingCandidate(state?.collaborationOnboarding);
+    if (fromState?.applicationId === onboardingId) return fromState;
+    try { return readCollaborationOnboardingCandidate(sessionStorage, onboardingId); }
+    catch { return null; }
+  });
   const requestedPreset = searchParams.get("rolePreset") as ProductionRolePreset["id"] | null;
   const invitePreset = productionRolePreset(PRODUCTION_ROLE_PRESETS.some((preset) => preset.id === requestedPreset) ? requestedPreset! : "writer");
   const [operationPolicy, setOperationPolicy] = useState<EffectiveOperationPolicy | null>(null);
@@ -52,6 +65,8 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
   const [inviteRole, setInviteRole] = useState<InvitableWorkspaceRole>(invitePreset.workspaceRole);
   const [inviteEntryKind, setInviteEntryKind] = useState<StudioSpatialInviteContext["kind"]>("team-lobby");
   const [inviteProjectId, setInviteProjectId] = useState("");
+  const [onboardingProjectRole, setOnboardingProjectRole] = useState<StudioTeamAssignableRole>("editor");
+  const [onboardingProjectInvited, setOnboardingProjectInvited] = useState(false);
   const [invitationLink, setInvitationLink] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -71,6 +86,14 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
         const data = await getTeamWorkspace(workspaceId);
         if (!active) return;
         setDetail(data); setName(data.workspace.name);
+        if (onboarding) {
+          setEmail((current) => current || onboarding.email);
+          const firstProject = data.projects[0];
+          if (firstProject) {
+            setInviteProjectId((current) => current || firstProject.workId);
+            setInviteEntryKind("project-space");
+          }
+        }
         if (isWorkspaceManager(data.workspace.role)) {
           const [quota, projects] = await Promise.all([getTeamUsage(workspaceId), listProductionProjects()]);
           if (active) { setUsage(quota); setAvailable(projects.projects.filter((project) => project.access.owner)); }
@@ -79,34 +102,49 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
     })().catch(async (cause: unknown) => { const message = await getApiErrorMessage(cause, "워크스페이스를 불러오지 못했습니다."); if (active) setError(message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [userId, workspaceId, refresh]);
+  }, [onboarding, userId, workspaceId, refresh]);
   async function run(action: () => Promise<void>) {
     setBusy(true); setError(""); setNotice("");
     try { await action(); setRefresh((value) => value + 1); }
     catch (cause) { setError(await getApiErrorMessage(cause, "저장하지 못했습니다. 새로고침 후 다시 확인해주세요.")); }
     finally { setBusy(false); }
   }
-  async function command(input: TeamWorkspaceCommandInput) {
+  async function command(
+    input: TeamWorkspaceCommandInput,
+    entryOverride?: StudioSpatialInviteContext,
+  ) {
     if (!detail) return;
     const result = await commandTeamWorkspace(detail.workspace.id, detail.workspace.revision, input);
     if (result.token) {
-      const entryContext: StudioSpatialInviteContext = inviteEntryKind === "project-space"
+      const entryContext: StudioSpatialInviteContext = entryOverride ?? (inviteEntryKind === "project-space"
         ? { kind: "project-space", projectId: inviteProjectId }
         : inviteEntryKind === "interview-waiting"
           ? { kind: "interview-waiting" }
-          : { kind: "team-lobby" };
+          : { kind: "team-lobby" });
       const fragment = createStudioSpatialInviteFragment(result.token, entryContext);
-      setInvitationLink(`${window.location.origin}/production/workspaces/join${fragment}`);
+      setInvitationLink(`${window.location.origin}/team/people/join${fragment}`);
       setEmail("");
     } else if (result.invitationId) setNotice("초대는 만들어졌지만 비밀 링크는 재표시하지 않습니다. 같은 이메일로 재발행해주세요.");
     else setNotice("변경 내용이 저장되었습니다.");
-    if (input.type === "remove-member" && input.userId === userId) navigate("/production/workspaces");
+    if (input.type === "remove-member" && input.userId === userId) navigate("/team/people");
   }
   const manager = detail && isWorkspaceManager(detail.workspace.role);
+  const onboardingProject = detail?.projects.find((project) => project.workId === inviteProjectId) ?? null;
+  async function inviteOnboardingProjectAccess() {
+    if (!onboarding || !onboardingProject) return;
+    await inviteStudioTeamMember(onboardingProject.workId, {
+      identity: onboarding.userId,
+      role: onboardingProjectRole,
+    });
+    setOnboardingProjectInvited(true);
+    setNotice(`${onboarding.name} 님에게 ${onboardingProject.title} 작품 권한 초대를 보냈습니다.`);
+  }
+  const onboardingRouteState = onboarding ? { collaborationOnboarding: onboarding } : undefined;
   return <div data-route-ready="team-workspace" className="min-h-dvh bg-canvas px-4 py-6 text-fg">
-    <div className="mx-auto max-w-6xl space-y-5"><header className="flex flex-wrap items-center justify-between gap-3">
-      <div><h1 className="text-2xl font-black">팀 워크스페이스</h1><p className="mt-2 text-sm text-fg-2">{operationPolicy?.notice ?? "팀을 구성하고 기존 제작 프로젝트를 연결합니다."}</p></div>
-      <nav aria-label="제작 탐색" className="flex gap-3"><Link to="/production">제작 홈</Link><Link to="/production/workspaces">전체 팀</Link><Link to="/production/workspaces/join">초대 수락</Link></nav>
+    <div className="mx-auto max-w-6xl space-y-5"><TeamAreaNavigation />
+    <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-line bg-panel p-5 sm:p-6">
+      <div><p className="eyebrow text-accent">TEAM · PEOPLE & ACCESS</p><h1 className="mt-2 text-2xl font-black">사람·권한 관리</h1><p className="mt-2 text-sm text-fg-2">{operationPolicy?.notice ?? "팀 소속과 프로젝트 접근 권한을 한 흐름에서 관리합니다."}</p></div>
+      <nav aria-label="팀 관리" className="flex flex-wrap gap-3"><Link to="/team">협업 홈</Link><Link to="/team/people">전체 팀</Link><Link to="/team/people/join">초대 수락</Link></nav>
     </header>{error && <div role="alert" className="rounded-xl border border-bad p-4">{error}<button className="ml-3 underline" onClick={() => setRefresh((value) => value + 1)}>새로고침</button></div>}
     {notice && <p role="status">{notice}</p>}
     {operationPolicy && !operationPolicy.features["team-workspace"].enabled && <p role="status">{operationPolicy.features["team-workspace"].reason} 기존 자료 조회와 접근 회수는 유지됩니다.</p>}
@@ -116,18 +154,38 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
       <button className={`${buttonClass({ variant: "outline" })} mt-3`} onClick={() => { void navigator.clipboard.writeText(invitationLink).then(() => setNotice("초대 링크를 복사했습니다.")).catch(() => setError("복사 권한이 없습니다. 링크를 선택해 직접 복사해주세요.")); }}>초대 링크 복사</button>
       <button className="ml-4 underline" onClick={() => setInvitationLink("")}>링크 숨기기</button></Card>}
     {loading && <p role="status">워크스페이스를 불러오는 중입니다.</p>}
+    {onboarding && !workspaceId && <Card title={`${onboarding.name} 님 합류 설정`}>
+      <p className="text-sm leading-7 text-fg-2">합류를 확정한 지원자입니다. 아래에서 소속시킬 팀을 선택하거나 새 워크스페이스를 만든 뒤, 팀 초대와 작품 권한을 같은 화면에서 설정하세요.</p>
+      <p className="mt-2 text-xs text-fg-3">지원서 {onboarding.applicationId} · 계정 {onboarding.userId}</p>
+    </Card>}
     {!workspaceId && <Card title="내 워크스페이스"><div className="grid gap-3 sm:grid-cols-2">
-      {items.map((item) => <Link key={item.id} className="rounded-xl border border-line p-4 hover:bg-raised" to={`/production/workspaces/${item.id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`}>
+      {items.map((item) => <Link key={item.id} className="rounded-xl border border-line p-4 hover:bg-raised" to={`/team/people/${item.id}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`} state={onboardingRouteState}>
         <strong>{item.name}</strong><p className="mt-2 text-sm">{roles[item.role]} · 접근 가능한 작품 {item.projectCount}개 · 구성원 {item.memberCount}명</p></Link>)}
       {!loading && items.length === 0 && <p>아직 참여한 팀이 없습니다. 새 팀을 만들거나 초대를 수락해주세요.</p>}</div>
-      <form className="mt-5 flex flex-wrap gap-3" onSubmit={(event: FormEvent) => { event.preventDefault(); void run(async () => { const result = await createTeamWorkspace(name); navigate(`/production/workspaces/${result.workspaceId}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`); }); }}>
+      <form className="mt-5 flex flex-wrap gap-3" onSubmit={(event: FormEvent) => { event.preventDefault(); void run(async () => { const result = await createTeamWorkspace(name); navigate(`/team/people/${result.workspaceId}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`, { state: onboardingRouteState }); }); }}>
         <label className="flex flex-col gap-2">새 워크스페이스 이름<input required maxLength={20} value={name} onChange={(event) => setName(event.target.value)} className={fieldClass} /></label>
         <button disabled={busy || !name.trim() || !operationPolicy?.features["team-workspace"].enabled} className={`${buttonClass()} self-end`} type="submit">워크스페이스 만들기</button></form></Card>}
     {detail && <><Card title={detail.workspace.name}><p className="text-sm text-fg-2">현재 역할: {roles[detail.workspace.role]}</p>
       {manager && <form className="mt-4 flex flex-wrap gap-3" onSubmit={(event) => { event.preventDefault(); void run(() => command({ type: "rename", name })); }}>
         <label className="flex flex-col gap-2">팀 이름<input required maxLength={20} value={name} onChange={(event) => setName(event.target.value)} className={fieldClass} /></label>
         <button type="submit" disabled={busy || !name.trim()} className={`${buttonClass({ variant: "outline" })} self-end`}>이름 저장</button>
-        <Link className="self-end underline" to={`/production/workspaces/${detail.workspace.id}/usage`}>사용량 확인</Link></form>}</Card>
+        <Link className="self-end underline" to={`/team/people/${detail.workspace.id}/usage`}>사용량 확인</Link></form>}</Card>
+    {manager && onboarding && <Card title={`${onboarding.name} 님 프로젝트 합류`}>
+      <p className="text-sm leading-7 text-fg-2">채용 결과를 팀 소속, 작품 접근, 첫 작업으로 이어갑니다. 각 권한은 별도로 적용되며 이 화면에서 순서대로 완료할 수 있습니다.</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="flex flex-col gap-2 text-sm font-semibold">초대 이메일<input type="email" className={fieldClass} value={email} maxLength={320} placeholder="지원자 이메일" onChange={(event) => setEmail(event.target.value)} /></label>
+        <label className="flex flex-col gap-2 text-sm font-semibold">팀 역할<select className={fieldClass} value={inviteRole} onChange={(event) => setInviteRole(roleValue(event.target.value))}><option value="member">구성원</option><option value="guest">게스트</option>{detail.workspace.role === "owner" && <option value="admin">관리자</option>}</select></label>
+        <label className="flex flex-col gap-2 text-sm font-semibold">대상 작품<select className={fieldClass} value={inviteProjectId} onChange={(event) => setInviteProjectId(event.target.value)}><option value="">작품 선택</option>{detail.projects.map((project) => <option key={project.id} value={project.workId}>{project.title}</option>)}</select></label>
+        <label className="flex flex-col gap-2 text-sm font-semibold">작품 권한<select className={fieldClass} value={onboardingProjectRole} onChange={(event) => setOnboardingProjectRole(event.target.value as StudioTeamAssignableRole)}><option value="editor">편집자</option><option value="commenter">검토자</option><option value="viewer">열람자</option><option value="admin">관리자</option></select></label>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" disabled={busy || !email.trim()} className={buttonClass()} onClick={() => { void run(() => command({ type: "invite", email, role: inviteRole }, onboardingProject ? { kind: "project-space", projectId: onboardingProject.workId } : { kind: "team-lobby" })); }}>1. 팀 초대 링크 만들기</button>
+        <button type="button" disabled={busy || !onboardingProject || onboardingProjectInvited} className={buttonClass({ variant: "outline" })} onClick={() => { void run(inviteOnboardingProjectAccess); }}>{onboardingProjectInvited ? "2. 작품 권한 초대 완료" : "2. 작품 권한 초대"}</button>
+        {onboardingProject && <Link className={buttonClass({ variant: "outline" })} to={`/production/projects/${onboardingProject.id}/production`}>3. 첫 작업 배정</Link>}
+      </div>
+      {!onboarding.email && <p className="mt-3 text-xs text-warn">지원 연락처가 이메일 형식이 아닙니다. 팀 초대 이메일을 확인해 입력해 주세요. 작품 권한 초대는 계정 ID로 보낼 수 있습니다.</p>}
+      <p className="mt-3 text-xs leading-6 text-fg-3">팀 소속만으로 원고 접근 권한이 생기지 않습니다. 작품 권한 초대를 수락한 뒤 제작 보드에서 실제 담당 역할과 작업을 배정하세요.</p>
+    </Card>}
     <Card title="연결한 제작 프로젝트"><p className="mb-3 text-sm text-fg-2">팀 연결은 작품 열람 권한을 자동으로 부여하지 않습니다. 작품별 기존 구성원·비공개 원고 권한을 유지합니다.</p>
       <ul className="space-y-3">{detail.projects.map((project) => <li key={project.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line p-3">
         <Link className="font-semibold underline" to={`/production/projects/${project.id}/overview`}>{project.title}</Link>
@@ -156,7 +214,7 @@ function TeamWorkspaceConsole({ userId }: { userId: string | null }) {
         {detail.workspace.role === "owner" && <option value="admin">관리자</option>}<option value="member">구성원</option><option value="guest">게스트</option></select></label>
       <label className="flex flex-col gap-2">수락 후 입장 안내<select className={fieldClass} value={inviteEntryKind}
         onChange={(event) => setInviteEntryKind(event.target.value === "project-space" || event.target.value === "interview-waiting" ? event.target.value : "team-lobby")}>
-        <option value="team-lobby">팀 로비</option><option value="project-space">프로젝트 가상 스튜디오</option><option value="interview-waiting">면접·협업 대기실</option>
+        <option value="team-lobby">팀 로비</option><option value="project-space">프로젝트 협업 공간</option><option value="interview-waiting">면접·협업 대기실</option>
       </select></label>
       {inviteEntryKind === "project-space" && <label className="flex flex-col gap-2">입장할 프로젝트<select required className={fieldClass} value={inviteProjectId} onChange={(event) => setInviteProjectId(event.target.value)}>
         <option value="">프로젝트 선택</option>{detail.projects.map((project) => <option key={project.id} value={project.workId}>{project.title}</option>)}
@@ -197,6 +255,6 @@ export function TeamWorkspaceJoinPage() {
         .catch(async (cause: unknown) => setError(await getApiErrorMessage(cause, "초대를 수락하지 못했습니다."))).finally(() => setBusy(false)); }}>
       <label className="flex flex-col gap-2">초대 코드<input className={fieldClass} value={token} onChange={(event) => setToken(event.target.value)} autoComplete="off" spellCheck={false} maxLength={43} /></label>
       <button disabled={!userId || busy || !/^[A-Za-z0-9_-]{43}$/u.test(token.trim())} className={buttonClass()} type="submit">초대 수락하기</button></form>
-    <Link to="/production/workspaces" className="inline-block underline">팀 목록으로</Link>
+    <Link to="/team/people" className="inline-block underline">팀 목록으로</Link>
   </div></div>;
 }

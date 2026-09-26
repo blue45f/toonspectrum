@@ -310,7 +310,7 @@ export class CreatorController {
     @Headers("x-user-id") userId?: string
   ) {
     const uid = enforceUserOrError(userId);
-    return this.creatorService.inviteWorkTeamMember(uid, params.id, body.userId, body.role);
+    return this.creatorService.inviteWorkTeamMember(uid, params.id, body.identity ?? body.userId ?? "", body.role);
   }
 
   @Patch("/creator/works/:id/team/members/:userId")

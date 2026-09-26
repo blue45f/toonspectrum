@@ -92,6 +92,9 @@ export function resolveRouteTitle(pathname: string, t: Translator, productLocale
   if (canonicalPath.startsWith("/lists/")) return t("route.library");
   if (canonicalPath.startsWith("/author/")) return decodePathSegment(canonicalPath.slice(8));
   if (canonicalPath.startsWith("/pencafe/")) return `${decodePathSegment(canonicalPath.slice(9))} ${t("route.pencafeSuffix")}`;
+  if (canonicalPath.startsWith("/team/people")) return "사람·권한 관리";
+  if (canonicalPath.startsWith("/team/recruiting")) return "인재·지원 관리";
+  if (canonicalPath.startsWith("/collaborate/")) return "구인·의뢰";
   if (canonicalPath.startsWith("/community/")) return t("route.community");
   if (canonicalPath.startsWith("/market/resource/")) return t("route.market");
   if (canonicalPath.startsWith("/showcase/reviews/")) return t("route.create");

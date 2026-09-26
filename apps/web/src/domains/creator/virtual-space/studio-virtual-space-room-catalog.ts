@@ -79,7 +79,7 @@ export const STUDIO_SPACE_MODULES: readonly StudioSpaceModule[] = Object.freeze(
     transport: "none",
     capacity: null,
     requiresProject: false,
-    entry: { type: "route", href: "/collaborate/workspace?panel=rooms" },
+    entry: { type: "route", href: "/team/recruiting?panel=rooms" },
   },
   {
     id: "interview-room",

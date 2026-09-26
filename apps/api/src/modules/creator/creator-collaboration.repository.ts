@@ -982,7 +982,7 @@ export class CreatorCollaborationRepository {
   async invite(
     actorUserId: string,
     workId: string,
-    targetUserId: string,
+    targetIdentity: string,
     requestedRole: CreatorCollaborationRole
   ): Promise<CreatorCollaborationTeamSnapshot> {
     return this.persistence.transaction(async (unit) => {
@@ -991,13 +991,15 @@ export class CreatorCollaborationRepository {
 
       const role = normalizeCreatorCollaborationRole(requestedRole);
       if (!role) throw new CreatorCollaborationInvalidTargetError("invalid_role");
-      if (targetUserId === context.work.ownerUserId || targetUserId === actorUserId) {
-        throw new CreatorCollaborationInvalidTargetError("owner_or_self_target");
-      }
-
-      const target = await unit.findUser(targetUserId);
+      const target = unit.findUserByIdentity
+        ? await unit.findUserByIdentity(targetIdentity)
+        : await unit.findUser(targetIdentity);
       if (!target || target.status !== "active") {
         throw new CreatorCollaborationInvalidTargetError("target_user_unavailable");
+      }
+      const targetUserId = target.userId;
+      if (targetUserId === context.work.ownerUserId || targetUserId === actorUserId) {
+        throw new CreatorCollaborationInvalidTargetError("owner_or_self_target");
       }
 
       const existing = await unit.findMembership(workId, targetUserId);

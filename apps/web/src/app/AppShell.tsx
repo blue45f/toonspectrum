@@ -171,14 +171,17 @@ export function AppShell({
     ? null
     : workspaceTaskRoute(pathname, search) ?? campusTaskRoute(campus);
   const normalizedPath = pathname.replace(/\/+$/u, "") || "/";
-  const immersiveVirtualHome = [
-    "/home",
-    "/team",
-    "/hub",
-    "/studio",
-    "/studio/space",
-    "/onboarding/character",
-  ].includes(normalizedPath);
+  const immersiveTeamExperience =
+    normalizedPath === "/team" || normalizedPath.startsWith("/team/");
+  const immersiveVirtualHome =
+    immersiveTeamExperience
+    || [
+      "/home",
+      "/hub",
+      "/studio",
+      "/studio/space",
+      "/onboarding/character",
+    ].includes(normalizedPath);
   const immersiveVirtualProject = /^\/studio\/p\/[^/]+\/space\/?$/u.test(pathname);
   const immersiveVirtualExperience =
     immersiveVirtualHome
