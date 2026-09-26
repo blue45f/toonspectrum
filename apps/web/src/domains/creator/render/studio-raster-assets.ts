@@ -14,7 +14,7 @@ export type StudioRasterAssetPlacement = (typeof STUDIO_RASTER_ASSET_PLACEMENTS)
 export const STUDIO_RASTER_ASSET_BLEND_MODES = ["source-over", "multiply", "screen", "overlay"] as const;
 export type StudioRasterAssetBlendMode = (typeof STUDIO_RASTER_ASSET_BLEND_MODES)[number];
 
-export const STUDIO_RASTER_INTERNAL_LICENSE_REF = "LicenseRef-ToonSpectrum-BuiltIn-AI-Raster-v1" as const;
+export const STUDIO_RASTER_INTERNAL_LICENSE_REF = "LicenseRef-ToonStudio-BuiltIn-AI-Raster-v1" as const;
 
 declare const promptSha256Brand: unique symbol;
 export type StudioRasterPromptSha256 = string & {

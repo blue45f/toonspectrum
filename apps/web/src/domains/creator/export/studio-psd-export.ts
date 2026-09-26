@@ -377,7 +377,7 @@ function assertPsdOutputBudget(buffer: ArrayBuffer): void {
 
 /** 단일 페이지 PSD 파일명 — 다른 내보내기 형식(svgExportFileName 등)과 같은 제목 규칙. */
 export function psdExportFileName(title: string): string {
-  return `${title.trim() || "toonspectrum-comic"}.psd`;
+  return `${title.trim() || "toonstudio-comic"}.psd`;
 }
 
 /** 내보내기 결과 요약 문구(패널 상태 배너용) — svgExportResultMessage 와 같은 톤. */
@@ -1178,7 +1178,7 @@ function exportAdjustmentGraphPsd(input: {
     }
   }
   const metadata = JSON.stringify({
-    schema: "toonspectrum-psd-adjustment-graph/v1",
+    schema: "toonstudio-psd-adjustment-graph/v1",
     sourceLayerOrder: elements.map((element) => element.id),
     adjustments: adjustments.map((element) => ({
       id: element.id,

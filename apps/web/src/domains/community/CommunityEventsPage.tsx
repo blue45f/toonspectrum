@@ -10,7 +10,7 @@ const EVENT_GUIDE = [
   {
     icon: Megaphone,
     title: "공식 이벤트와 구분",
-    text: "ToonSpectrum이 직접 운영하는 프로모션은 공식 이벤트 허브에서 확인하고, 이곳에서는 창작자·팬·행사 주최자가 정보를 나눕니다.",
+    text: "ToonStudio이 직접 운영하는 프로모션은 공식 이벤트 허브에서 확인하고, 이곳에서는 창작자·팬·행사 주최자가 정보를 나눕니다.",
   },
   {
     icon: CalendarDays,

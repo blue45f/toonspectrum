@@ -16,7 +16,7 @@ function documentInput() {
   const timestamp = "2026-07-30T00:00:00.000Z";
   return {
     format: {
-      id: "toonspectrum.ink-document",
+      id: "toonstudio.ink-document",
       version: 1,
     },
     document: {
@@ -64,7 +64,7 @@ describe("ToonInk self-certification", () => {
     expect(Object.isFrozen(receipt)).toBe(true);
   });
 
-  it("awards the ToonSpectrum badge only after a configured verifier accepts the signature", async () => {
+  it("awards the ToonStudio badge only after a configured verifier accepts the signature", async () => {
     const encoded = await encodeStudioInkEnvelope(documentInput(), {
       attester: {
         algorithm: "ed25519",

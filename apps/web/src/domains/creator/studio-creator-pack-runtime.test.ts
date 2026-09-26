@@ -308,7 +308,7 @@ describe("Studio Creator Pack runtime", () => {
       status: "supported",
       target: {
         kind: "bg3d-procedural-catalog",
-        runtimeRef: "toonspectrum-bg3d-procedural-starter-v1",
+        runtimeRef: "toonstudio-bg3d-procedural-starter-v1",
       },
     });
   });

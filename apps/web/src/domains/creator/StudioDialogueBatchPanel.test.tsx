@@ -145,7 +145,7 @@ describe("StudioDialogueBatchPanel read-aloud progressive enhancement", () => {
 
     expect(html).toContain('aria-label="온라인 시스템 음성 허용"');
     expect(html).toContain("대사가 운영체제·브라우저의 음성 서비스로 전송될 수 있어요.");
-    expect(html).toContain("ToonSpectrum 서버와 AI에는 보내지 않습니다.");
+    expect(html).toContain("ToonStudio 서버와 AI에는 보내지 않습니다.");
     expect(playTag).toContain('disabled=""');
     expect(voiceTag).toContain('disabled=""');
     expect(html).toContain("기기 내 음성 없음");
@@ -602,7 +602,7 @@ describe("StudioDialogueBatchPanel file interchange", () => {
       target: { value: "id" },
     });
     const payload = JSON.stringify({
-      schema: "toonspectrum.dialogue-script",
+      schema: "toonstudio.dialogue-script",
       version: 1,
       cues: [{ id: "bubble-1", page: 1, text: "번역" }],
     });

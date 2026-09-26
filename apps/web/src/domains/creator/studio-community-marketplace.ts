@@ -53,9 +53,9 @@ import {
 const LICENSE_METADATA: Readonly<
   Record<CreatorMarketplaceResourceLicense, Omit<StudioMarketplaceLicense, "sourceVerifiedAt">>
 > = Object.freeze({
-  "toonspectrum-standard": {
-    id: "toonspectrum-standard",
-    label: "ToonSpectrum 표준 사용권",
+  "toonstudio-standard": {
+    id: "toonstudio-standard",
+    label: "ToonStudio 표준 사용권",
     url: null,
     commercialUse: true,
     attributionRequired: false,
@@ -106,12 +106,12 @@ const COMMUNITY_INSTALLABLE_KINDS = new Set<StudioCreatorPackKind>([
 
 const FORMAT_BY_KIND: Readonly<Record<StudioCreatorPackKind, string>> =
   Object.freeze({
-    brush: "application/vnd.toonspectrum.brush+json",
-    filter: "application/vnd.toonspectrum.filter+json",
-    palette: "application/vnd.toonspectrum.palette+json",
-    template: "application/vnd.toonspectrum.template+json",
-    "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
-    "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
+    brush: "application/vnd.toonstudio.brush+json",
+    filter: "application/vnd.toonstudio.filter+json",
+    palette: "application/vnd.toonstudio.palette+json",
+    template: "application/vnd.toonstudio.template+json",
+    "3d-preset": "application/vnd.toonstudio.3d-preset+json",
+    "3d-asset": "application/vnd.toonstudio.3d-asset+json",
   });
 
 export type StudioCommunityPackProjection =

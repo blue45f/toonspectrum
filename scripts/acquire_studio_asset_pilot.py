@@ -46,7 +46,7 @@ def download(url: str, destination: Path, budget: dict[str, int]) -> dict: # NOS
     opener = urllib.request.build_opener(SourceRedirects())
     for attempt in range(3):
         try:
-            request = urllib.request.Request(url, headers={"User-Agent": "ToonSpectrum-curation-pilot/1.0", "Accept-Encoding": "identity"})
+            request = urllib.request.Request(url, headers={"User-Agent": "ToonStudio-curation-pilot/1.0", "Accept-Encoding": "identity"})
             h = hashlib.sha256()
             size = 0
             with opener.open(request, timeout=30) as response, destination.open("wb") as out:
@@ -125,7 +125,7 @@ def extract_assets(archive: Path, destination: Path, budget: dict[str, int]) -> 
 
 
 def acquire(plan: dict, output: Path) -> dict:
-    if plan.get("schema") != "toonspectrum.asset-acquisition-plan.v1":
+    if plan.get("schema") != "toonstudio.asset-acquisition-plan.v1":
         raise ValueError("unsupported plan")
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         raise ValueError("output must be a new or empty directory")
@@ -165,7 +165,7 @@ def acquire(plan: dict, output: Path) -> dict:
     report["expandedBytesIncludingFailedAttempts"] = budget["expanded"]
     report["completedAt"] = datetime.now(timezone.utc).isoformat()
     (output / "quarantine-index.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (output / "curation-manifest.json").write_text(json.dumps({"schema": "toonspectrum.asset-curation.v1", "assets": []}, indent=2) + "\n", encoding="utf-8")
+    (output / "curation-manifest.json").write_text(json.dumps({"schema": "toonstudio.asset-curation.v1", "assets": []}, indent=2) + "\n", encoding="utf-8")
     return report
 
 

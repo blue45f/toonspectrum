@@ -1,5 +1,5 @@
 /**
- * Deterministic conformance boundary for ToonSpectrum's bounded W3C InkML profile.
+ * Deterministic conformance boundary for ToonStudio's bounded W3C InkML profile.
  *
  * This module validates only the public W3C InkML subset implemented by
  * `studio-inkml-codec.ts`. It does not parse or certify Wacom WILL/UIM payloads, and a receipt from
@@ -21,10 +21,10 @@ import {
 } from "./studio-inkml-codec";
 
 export const STUDIO_INKML_CONFORMANCE_PROFILE_ID =
-  "toonspectrum.inkml.w3c-safe-profile" as const;
+  "toonstudio.inkml.w3c-safe-profile" as const;
 export const STUDIO_INKML_CONFORMANCE_PROFILE_VERSION = 1 as const;
 export const STUDIO_INKML_CONFORMANCE_RECEIPT_ID =
-  "toonspectrum.inkml.conformance-receipt" as const;
+  "toonstudio.inkml.conformance-receipt" as const;
 export const STUDIO_INKML_CONFORMANCE_RECEIPT_VERSION = 1 as const;
 
 export const STUDIO_INKML_CONFORMANCE_CAPABILITIES = Object.freeze([
@@ -74,7 +74,7 @@ export interface StudioInkMlConformanceManifest {
   readonly documentProfiles: readonly Readonly<{
     id: StudioInkMlDocumentProfile;
     import: "supported";
-    export: "supported" | "normalize-to-toonspectrum-v1";
+    export: "supported" | "normalize-to-toonstudio-v1";
   }>[];
   readonly capabilities: readonly StudioInkMlConformanceCapability[];
   readonly channels: readonly StudioInkMlChannelCapability[];
@@ -188,7 +188,7 @@ export const STUDIO_INKML_CONFORMANCE_MANIFEST: StudioInkMlConformanceManifest =
       Object.freeze({
         id: "inkml-basic",
         import: "supported",
-        export: "normalize-to-toonspectrum-v1",
+        export: "normalize-to-toonstudio-v1",
       }),
     ]),
     capabilities: STUDIO_INKML_CONFORMANCE_CAPABILITIES,
@@ -391,7 +391,7 @@ const BLOCKED_XML_CONSTRUCTS = Object.freeze([
   "processing-instruction",
 ] as const);
 const LIMITATIONS = Object.freeze([
-  "This receipt validates ToonSpectrum's bounded public W3C InkML subset, not every W3C InkML processor feature.",
+  "This receipt validates ToonStudio's bounded public W3C InkML subset, not every W3C InkML processor feature.",
   "This receipt is not Wacom WILL/UIM compatibility, licensing, trademark approval, or third-party certification.",
   "A separately licensed provider adapter must make and verify any proprietary SDK compatibility claim.",
 ] as const);

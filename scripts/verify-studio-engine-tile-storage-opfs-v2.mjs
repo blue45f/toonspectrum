@@ -27,7 +27,7 @@ import { WEB_ROOT } from "./lib/repo-paths.mjs";
 const SCRATCH =
   process.env.TOONSPECTRUM_OPFS_V2_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-opfs-v2-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-opfs-v2-${Date.now()}`);
 const HARNESS_PATH = "/__studio_engine_tile_storage_opfs_v2__";
 const HARNESS_ENTRY =
   "/scripts/studio-engine-tile-storage-opfs-v2-browser.ts";

@@ -1,5 +1,5 @@
 /**
- * @toonspectrum/core/carousel — embla 기반 가로 캐러셀의 헤드리스 로직.
+ * @toonstudio/core/carousel — embla 기반 가로 캐러셀의 헤드리스 로직.
  *
  * 렌더링은 얇은 뷰가 담당하고, 캐러셀 행동
  * (스냅·관성 드래그·free-scroll·다음 카드 peek·화살표 활성/비활성·닷·키보드)은 전부 이 훅이

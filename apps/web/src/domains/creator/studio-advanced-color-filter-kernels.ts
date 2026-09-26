@@ -135,7 +135,7 @@ export interface StudioAdvancedColorChangedBounds {
 }
 
 export interface StudioAdvancedColorTransactionReceipt {
-  readonly schema: "toonspectrum.advanced-color-filter/v1";
+  readonly schema: "toonstudio.advanced-color-filter/v1";
   readonly operationId: string;
   readonly kernel: StudioAdvancedColorKernelId;
   readonly width: number;
@@ -1082,7 +1082,7 @@ function createReceipt(input: {
     optionsKey(prepared.options),
   ].join("|");
   return {
-    schema: "toonspectrum.advanced-color-filter/v1",
+    schema: "toonstudio.advanced-color-filter/v1",
     operationId: `advanced-color-v1-${textFingerprint(identity)}`,
     kernel: prepared.kernel,
     width: prepared.source.width,

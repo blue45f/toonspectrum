@@ -4,7 +4,7 @@ import {
   isCorrect,
   ROUND_COUNT,
   type QuizQuestion,
-} from "@toonspectrum/play-core";
+} from "@toonstudio/play-core";
 import { Check, RotateCcw, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 

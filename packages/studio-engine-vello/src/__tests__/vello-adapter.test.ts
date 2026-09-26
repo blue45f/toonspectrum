@@ -1,17 +1,17 @@
 
-import { providerDescriptorSchema } from "@toonspectrum/studio-engine-registry";
+import { providerDescriptorSchema } from "@toonstudio/studio-engine-registry";
 import {
   UnsupportedSceneFeatureError,
   polylineToPath,
   solidPaint,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { velloCpuProviderDescriptor } from "../descriptor";
 import { loadVelloNode } from "../node";
 import { adapterVersion, renderSceneToPixels } from "../render";
 
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 function squareScene(): SceneIR {
   return {
@@ -221,9 +221,9 @@ describe("parley text lane (wasm)", () => {
         })),
     };
     const velloPixels = renderSceneToPixels(scene);
-    const { loadCanvasKitNode } = await import("@toonspectrum/studio-engine-skia/node");
+    const { loadCanvasKitNode } = await import("@toonstudio/studio-engine-skia/node");
     const { renderSceneToPixels: renderWithSkia } = await import(
-      "@toonspectrum/studio-engine-skia"
+      "@toonstudio/studio-engine-skia"
     );
     const ck = await loadCanvasKitNode();
     const skiaPixels = renderWithSkia(ck, scene);

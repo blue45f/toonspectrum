@@ -5,7 +5,7 @@ import { googleFontsUrl } from "./google-fonts-provider";
 import { referenceMediaUrl } from "./reference-media-providers";
 import { rijksmuseumSearchUrl } from "./rijksmuseum-provider";
 import { createResourceEngine } from "./resource-engine";
-import { parseResource, parseSearchResult } from "@toonspectrum/core/creator-resources";
+import { parseResource, parseSearchResult } from "@toonstudio/core/creator-resources";
 
 const stamp = "2026-09-25T02:00:00.000Z";
 const engine = (fetcher: typeof fetch) => createResourceEngine({

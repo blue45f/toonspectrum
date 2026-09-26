@@ -113,7 +113,7 @@ function approvedCorpusManifest() {
 
 function validReport() {
   return {
-    kind: "toonspectrum.bg3d-engine-benchmark",
+    kind: "toonstudio.bg3d-engine-benchmark",
     version: 1,
     benchmarkId: "iphone16-session-003",
     baseline: run("three-webgl", "webgl2", false),

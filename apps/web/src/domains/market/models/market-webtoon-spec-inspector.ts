@@ -151,7 +151,7 @@ export class MarketWebtoonSpecInspector {
       case "clip-sut":
         return "SUT (클립스튜디오 브러시)";
       case "portable-json":
-        return "Portable JSON (툰스펙트럼 규격)";
+        return "Portable JSON (툰스튜디오 규격)";
       default:
         return format;
     }

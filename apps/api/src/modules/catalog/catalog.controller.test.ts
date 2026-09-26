@@ -43,7 +43,7 @@ describe("CatalogController affiliate redirection", () => {
     const controller = createController();
     const req = {
       headers: {
-        referer: "https://toonspectrum.com/detail",
+        referer: "https://toonstudio.com/detail",
         "user-agent": "Mozilla/5.0",
       },
     } as unknown as Request;
@@ -64,7 +64,7 @@ describe("CatalogController affiliate redirection", () => {
 
     expect(redirectFn).toHaveBeenCalledWith(
       302,
-      "https://ridibooks.com/books/123?ridi_affiliate=toonspectrum"
+      "https://ridibooks.com/books/123?ridi_affiliate=toonstudio"
     );
     expect(logSpy).toHaveBeenCalled();
     logSpy.mockRestore();

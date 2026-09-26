@@ -250,12 +250,12 @@ def configure_meta_and_humanoid(armature):
     meta.version = "2.0.0-vrm1-repair"
     meta.authors.clear()
     meta.authors.add().value = "Polygonal Mind"
-    meta.copyright_information = "Original avatar by Polygonal Mind; VRM 1.0 repair by ToonSpectrum"
+    meta.copyright_information = "Original avatar by Polygonal Mind; VRM 1.0 repair by ToonStudio"
     meta.contact_information = "www.PolygonalMind.com"
     meta.references.clear()
     meta.references.add().value = "Immutable source SHA-256: efa262d131a6bd919c1a776f0707c2d358bfb3bf0b82e6886b43d873969574f5"
     meta.references.add().value = "Source VRM0 embedded meta: author=Polygonal Mind; licenseName=CC0"
-    meta.references.add().value = "VRM 1.0 rig and expressions repaired by ToonSpectrum with the official Blender VRM Add-on"
+    meta.references.add().value = "VRM 1.0 rig and expressions repaired by ToonStudio with the official Blender VRM Add-on"
     meta.avatar_permission = "everyone"
     meta.commercial_usage = "corporation"
     meta.credit_notation = "unnecessary"

@@ -1,5 +1,5 @@
-import { strokeOutlinePath } from "@toonspectrum/studio-brush-platform";
-import { brushProgramIRSchema, type StrokeIR } from "@toonspectrum/studio-project-model";
+import { strokeOutlinePath } from "@toonstudio/studio-brush-platform";
+import { brushProgramIRSchema, type StrokeIR } from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {

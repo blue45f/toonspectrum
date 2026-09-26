@@ -1,16 +1,16 @@
 import { Reply as ReplyIcon, Send, ShieldCheck, X } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import type { FeedbackComment } from "@toonspectrum/core/feedback";
+import type { FeedbackComment } from "@toonstudio/core/feedback";
 import type { FormEvent, KeyboardEvent } from "react";
 
 import { api, getApiErrorMessage } from "@/platform/api";
 import { useApp } from "@/shared/lib/store";
-import { feedbackTimeLabel } from "@toonspectrum/core/feedback";
+import { feedbackTimeLabel } from "@toonstudio/core/feedback";
 import {
   assertFeedbackComments,
   isFeedbackComment,
-} from "@toonspectrum/core/feedback-response";
+} from "@toonstudio/core/feedback-response";
 
 const ROOT_DRAFT = "root";
 const MAX_REPLY_DEPTH = 4;

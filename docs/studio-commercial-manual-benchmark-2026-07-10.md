@@ -1,13 +1,13 @@
-# ToonSpectrum Studio — 상용 창작 도구 공식 매뉴얼 벤치마크
+# ToonStudio Studio — 상용 창작 도구 공식 매뉴얼 벤치마크
 
 조사일: 2026-07-10
 원칙: 마케팅 문구보다 공식 매뉴얼·도움말에 실제 사용 절차가 적힌 기능을 우선한다. 기능 이름을 복제하는
 것이 아니라 웹툰 작가가 반복 작업, 오조작, 파일 손실, 검수 누락, 플랫폼 정책 위반을 줄이는 데 주는
-가치를 ToonSpectrum의 Vite/React/Nest/Postgres 구조로 번역한다.
+가치를 ToonStudio의 Vite/React/Nest/Postgres 구조로 번역한다.
 
 ## 조사 제품과 검증된 작업 패턴
 
-| 제품 | 공식 매뉴얼에서 확인한 핵심 | ToonSpectrum에 주는 설계 원칙 |
+| 제품 | 공식 매뉴얼에서 확인한 핵심 | ToonStudio에 주는 설계 원칙 |
 | --- | --- | --- |
 | Clip Studio Paint EX | 다중 페이지 작품, Cloud Teamwork, 스마트폰까지 포함한 페이지 단위 분업. Companion Mode는 스마트폰을 Quick Access·색상환·제스처 패드·서브뷰·색 혼합·세로 웹툰 미리보기·modifier 원격으로 사용 | 작품 전체를 페이지/컷 단위로 배정·검토하고, 모바일에는 전체 데스크톱 UI 대신 빠른 명령·색상·미리보기 중심 역할 제공 |
 | MediBang Paint | 모바일 Comic 프로젝트/페이지 목록, WEB용 진행 방향, draft layer, 패널 분할, 말풍선·cloud material, comic guide/crop mark. Cloud annotation은 버전과 연결되고 PC/iOS/Android 간 공유 | 콘티→밑그림→선화→톤/채색 단계를 문서 메타로 보존하고, 댓글은 정확한 문서 버전·페이지·컷에 연결 |
@@ -116,7 +116,7 @@ SFX, 검토 상태, 권리/출처, AI 사용 이력을 한 번 입력해 이후 
   인프라가 준비된 뒤 추가한다.
 - 외부 댓글은 명시적 동의로만 가져오고 원 댓글 ID를 유지한다. AI 요약은 질문/칭찬/혼란/요청 분류의
   제안일 뿐 원문을 대체하지 않는다.
-- ToonSpectrum 자체 예약 공개는 UTC `scheduledAt`과 고정 revision을 사용한다.
+- ToonStudio 자체 예약 공개는 UTC `scheduledAt`과 고정 revision을 사용한다.
 
 ## 구현하지 않았다고 명확히 표시할 것
 

@@ -342,7 +342,7 @@ describe("studio hybrid vector geometry — neutral serialization and clean-room
       executionAdmission: "permissive-oss-only",
       restrictedImplementationClassification: "clean-room-spec-only",
       directPortClassification: "prohibited-direct-port",
-      goldenCorpusOwnership: "toonspectrum-independent-behavior-corpus",
+      goldenCorpusOwnership: "toonstudio-independent-behavior-corpus",
     });
 
     const rendered = artifact(await renderStudioHybridVectorGeometry(request(

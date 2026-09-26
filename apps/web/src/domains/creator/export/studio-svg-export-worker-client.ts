@@ -152,7 +152,7 @@ export function createStudioSvgExportModuleWorker(): StudioSvgExportWorkerLike |
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-svg-export.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-svg-export",
+    name: "toonstudio-svg-export",
   }) as unknown as StudioSvgExportWorkerLike;
 }
 

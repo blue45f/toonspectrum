@@ -37,7 +37,7 @@ describeWithDirectPostgres("Studio team comment mutation message-state PostgreSQ
     if (!INTEGRATION_URL) throw new Error("integration URL was not provided");
     pool = new Pool({
       connectionString: INTEGRATION_URL,
-      application_name: `toonspectrum-comment-message-state-${randomUUID()}`,
+      application_name: `toonstudio-comment-message-state-${randomUUID()}`,
       max: 2,
     });
   });

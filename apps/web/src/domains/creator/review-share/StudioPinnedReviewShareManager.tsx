@@ -10,7 +10,7 @@ import type {
   PinnedShareCreate,
   PinnedShareOwnerView,
   PinnedSharePage,
-} from "@toonspectrum/studio-project-model/pinned-review-share";
+} from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpaceVerifiedReview } from "../virtual-space/studio-virtual-space-review-invitation";

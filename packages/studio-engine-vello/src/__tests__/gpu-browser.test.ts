@@ -1,4 +1,4 @@
-import { providerDescriptorSchema } from "@toonspectrum/studio-engine-registry";
+import { providerDescriptorSchema } from "@toonstudio/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
 import { velloGpuBrowserProviderDescriptor } from "../descriptor";
@@ -10,7 +10,7 @@ import {
   renderSceneToPixelsGpu,
 } from "../gpu-browser";
 
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 /**
  * Node-side contract of the browser WebGPU lane (ADR-0011 lane 2): without

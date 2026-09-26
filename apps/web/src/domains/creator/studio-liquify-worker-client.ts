@@ -52,7 +52,7 @@ export function createStudioLiquifyModuleWorker(): StudioLiquifyWorkerLike | nul
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-liquify.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-liquify",
+    name: "toonstudio-liquify",
   }) as unknown as StudioLiquifyWorkerLike;
 }
 

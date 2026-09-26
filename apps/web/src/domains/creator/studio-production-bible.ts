@@ -228,10 +228,10 @@ const PATCH_FIELDS = new Set<string>([
   "linkedPropIds",
   "referenceAssetIds",
 ]);
-const PRODUCTION_BIBLE_STORAGE_PREFIX = "toonspectrum-studio-production-bible:v12";
+const PRODUCTION_BIBLE_STORAGE_PREFIX = "toonstudio-studio-production-bible:v12";
 const PRODUCTION_BIBLE_LEGACY_STORAGE_PREFIX =
-  "toonspectrum-studio-production-bible:v1";
-const PRODUCTION_BIBLE_DB_NAME = "toonspectrum-studio-production-bible";
+  "toonstudio-studio-production-bible:v1";
+const PRODUCTION_BIBLE_DB_NAME = "toonstudio-studio-production-bible";
 const PRODUCTION_BIBLE_DB_VERSION = 1;
 const PRODUCTION_BIBLE_STORE_NAME = "documents";
 

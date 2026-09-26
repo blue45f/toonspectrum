@@ -95,7 +95,7 @@ describe("collection store write-through", () => {
       new Headers(init?.headers).get("x-user-id") === "session-1"
     )).toBe(true);
     expect(fetchMock.mock.calls.every(([, init]) =>
-      new Headers(init?.headers).get("x-toonspectrum-csrf") === "1"
+      new Headers(init?.headers).get("x-toonstudio-csrf") === "1"
     )).toBe(true);
     expect(useApp.getState().collections).toEqual([]);
   });

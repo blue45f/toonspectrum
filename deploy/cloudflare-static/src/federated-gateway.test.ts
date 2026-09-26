@@ -54,8 +54,8 @@ describe("federated Cloudflare gateway", () => {
     );
 
     expect(await response.text()).toBe("core");
-    expect(response.headers.get("x-toonspectrum-edge-route")).toBe("social");
-    expect(response.headers.get("x-toonspectrum-edge-routing")).toBe(
+    expect(response.headers.get("x-toonstudio-edge-route")).toBe("social");
+    expect(response.headers.get("x-toonstudio-edge-routing")).toBe(
       "legacy-core-authority",
     );
     expect(baseFetch).toHaveBeenCalledOnce();
@@ -109,7 +109,7 @@ describe("federated Cloudflare gateway", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ items: ["snapshot"] });
-    expect(response.headers.get("x-toonspectrum-edge-routing")).toBe(
+    expect(response.headers.get("x-toonstudio-edge-routing")).toBe(
       "static-read-model",
     );
     expect(baseFetch).toHaveBeenCalledOnce();
@@ -216,8 +216,8 @@ describe("federated Cloudflare gateway", () => {
     await gateway(
       new Request("https://www.toonstudio.cloud/api/community/posts", {
         headers: {
-          "x-toonspectrum-edge-route": "core",
-          "x-toonspectrum-edge-routing": "spoofed",
+          "x-toonstudio-edge-route": "core",
+          "x-toonstudio-edge-routing": "spoofed",
         },
       }),
       environment({ SOCIAL_API_ORIGIN: "https://social.example.test" }),
@@ -225,8 +225,8 @@ describe("federated Cloudflare gateway", () => {
 
     const proxied = forwarded.request;
     if (!proxied) throw new Error("base gateway was not called");
-    expect(proxied.headers.get("x-toonspectrum-edge-route")).toBeNull();
-    expect(proxied.headers.get("x-toonspectrum-edge-routing")).toBeNull();
+    expect(proxied.headers.get("x-toonstudio-edge-route")).toBeNull();
+    expect(proxied.headers.get("x-toonstudio-edge-routing")).toBeNull();
   });
 
   it("reports strict readiness without exposing origin URLs", async () => {
@@ -275,7 +275,7 @@ describe("federated Cloudflare gateway", () => {
     );
 
     expect(response).toBe(upstreamResponse);
-    expect(response.headers.get("x-toonspectrum-edge-routing")).toBeNull();
+    expect(response.headers.get("x-toonstudio-edge-routing")).toBeNull();
   });
 
   it("creates snapshots only for query-free GET/HEAD API reads", () => {

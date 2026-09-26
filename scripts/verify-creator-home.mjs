@@ -67,8 +67,8 @@ try {
     currentName = name;
     const context = await browser.newContext({ viewport: { width, height }, locale: locale === "ko" ? "ko-KR" : "en-US", reducedMotion: "reduce" });
     await context.addInitScript(({ locale, theme }) => {
-      localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: locale }, version: 0 }));
-      localStorage.setItem("toonspectrum-theme", JSON.stringify({ state: { theme }, version: 0 }));
+      localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: locale }, version: 0 }));
+      localStorage.setItem("toonstudio-theme", JSON.stringify({ state: { theme }, version: 0 }));
     }, { locale, theme });
     const page = await context.newPage();
     currentPage = page;
@@ -111,7 +111,7 @@ try {
     assert.equal(await footer.getByRole("heading", { name: brand, exact: true }).count(), 1);
     const creationEntry = footer.locator('.public-footer-invitation a[href="/studio/new"]');
     await expect(creationEntry).toBeVisible();
-    assert.equal(/툰스펙트럼|ToonSpectrum/i.test(await footer.innerText()), false, `Legacy footer brand: ${name}`);
+    assert.equal(/툰스튜디오|ToonStudio/i.test(await footer.innerText()), false, `Legacy footer brand: ${name}`);
     assert.equal(
       await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
       false,

@@ -1,5 +1,5 @@
-export const STUDIO_OFFLINE_PREPARE_MESSAGE = "toonspectrum-sw:prepare-offline";
-export const STUDIO_OFFLINE_STATUS_MESSAGE = "toonspectrum-sw:offline-status";
+export const STUDIO_OFFLINE_PREPARE_MESSAGE = "toonstudio-sw:prepare-offline";
+export const STUDIO_OFFLINE_STATUS_MESSAGE = "toonstudio-sw:offline-status";
 export const STUDIO_OFFLINE_MAX_RESOURCES = 1024;
 
 export interface StudioOfflinePreparationReport {

@@ -8,14 +8,14 @@ import {
 } from "./protocol";
 
 export const REALTIME_TICKET_VERSION =
-  "toonspectrum.realtime-ticket.v1" as const;
+  "toonstudio.realtime-ticket.v1" as const;
 export const REALTIME_TICKET_MAX_AGE_MS = 2 * 60 * 1000;
 export const REALTIME_SESSION_MAX_AGE_MS = 5 * 60 * 1000;
 export const REALTIME_TICKET_CLOCK_SKEW_MS = 15 * 1000;
 export const REALTIME_TICKET_MAX_BYTES = 4096;
 
 const REALTIME_TICKET_HMAC_CONTEXT =
-  "toonspectrum/realtime-ticket/hmac-sha256/v1\n";
+  "toonstudio/realtime-ticket/hmac-sha256/v1\n";
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/;
 const NONCE_PATTERN = /^[A-Za-z0-9_-]{16,96}$/;
 

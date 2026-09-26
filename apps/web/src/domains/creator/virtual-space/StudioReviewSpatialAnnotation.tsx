@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode, type PointerEvent } from "react";
 import { createStudioReviewSpatialAnchor, validateStudioReviewSpatialAnchor, type ReviewAnchor, type StudioReviewMappedPage, type StudioReviewSpatialAnchor,
-  type StudioReviewSpatialSelection } from "@toonspectrum/studio-project-model";
+  type StudioReviewSpatialSelection } from "@toonstudio/studio-project-model";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 export interface StudioReviewAnnotationSelection {

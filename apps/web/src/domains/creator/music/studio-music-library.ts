@@ -4,7 +4,7 @@ import type { LocalMusicTrack } from "./studio-music-client";
 import type {
   MusicProviderId,
   MusicTrackMetadata,
-} from "@toonspectrum/core/studio-music";
+} from "@toonstudio/core/studio-music";
 
 import {
   isMp3,
@@ -18,7 +18,7 @@ import {
   MUSIC_TERMS_URL,
   musicMimeType,
   parseMusicBrief,
-} from "@toonspectrum/core/studio-music";
+} from "@toonstudio/core/studio-music";
 
 export const MUSIC_LIBRARY_NAMESPACE = "studio-music-library-v1";
 const MAX_TRACKS = 20;

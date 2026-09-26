@@ -19,7 +19,7 @@
 ## 빌드
 
 ```bash
-pnpm --filter @toonspectrum/desktop-sync build
+pnpm --filter @toonstudio/desktop-sync build
 ```
 
 빌드 결과의 실행 파일은 다음과 같다.

@@ -3,7 +3,7 @@
 - 담당: 로컬 SQL 권위, 명령 저널, 스냅샷, 카탈로그, 제품별 로컬 문서
 - 권위: `IN_PLACE_GREENFIELD_REWRITE=TRUE`, `LEGACY_DATA_MIGRATION=FALSE`,
   `DISCARD_EXISTING_STUDIO_DATA=TRUE`
-- 제품 파일: OPFS `toonspectrum-studio-sqlite` / SQLite `studio-local-v12.db`
+- 제품 파일: OPFS `toonstudio-studio-sqlite` / SQLite `studio-local-v12.db`
 - SQLite 핀: `@sqlite.org/sqlite-wasm` 3.53.0-build1
 
 ## 후보 비교

@@ -1,13 +1,13 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { pathToFileURL } from "node:url";
 
-const VERSION = "toonspectrum.backend-capability.v1";
+const VERSION = "toonstudio.backend-capability.v1";
 const HEALTH_PATH =
-  "/.well-known/toonspectrum/backend-capabilities/v1/health";
+  "/.well-known/toonstudio/backend-capabilities/v1/health";
 const EXECUTE_PATH =
-  "/.well-known/toonspectrum/backend-capabilities/v1/execute";
+  "/.well-known/toonstudio/backend-capabilities/v1/execute";
 const CONTENT_TYPE =
-  "application/vnd.toonspectrum.backend-capability+json;version=1";
+  "application/vnd.toonstudio.backend-capability+json;version=1";
 const MAXIMUM_RESPONSE_BYTES = 65_536;
 
 export function isGatewayResponseContentType(value) {
@@ -15,7 +15,7 @@ export function isGatewayResponseContentType(value) {
   const [mediaType, ...parameters] = value.split(";");
   if (
     mediaType?.trim().toLowerCase()
-    !== "application/vnd.toonspectrum.backend-capability+json"
+    !== "application/vnd.toonstudio.backend-capability+json"
   ) return false;
   const version = parameters
     .map((parameter) => parameter.split("=", 2).map((part) => part.trim()))
@@ -115,9 +115,9 @@ export async function runBackendCapabilityWorkerCanary(
       method: "GET",
       headers: {
         accept: "application/json",
-        "x-toonspectrum-health-provider": provider,
-        "x-toonspectrum-health-timestamp": timestamp,
-        "x-toonspectrum-health-signature": createHealthSignature(
+        "x-toonstudio-health-provider": provider,
+        "x-toonstudio-health-timestamp": timestamp,
+        "x-toonstudio-health-signature": createHealthSignature(
           token,
           provider,
           timestamp,
@@ -194,8 +194,8 @@ export async function runBackendCapabilityWorkerCanary(
       headers: {
         accept: CONTENT_TYPE,
         "content-type": CONTENT_TYPE,
-        "x-toonspectrum-gateway-token": token,
-        "x-toonspectrum-idempotency-key": idempotencyKey,
+        "x-toonstudio-gateway-token": token,
+        "x-toonstudio-idempotency-key": idempotencyKey,
       },
       body: JSON.stringify(envelope),
       cache: "no-store",

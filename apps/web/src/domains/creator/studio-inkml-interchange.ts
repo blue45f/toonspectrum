@@ -188,5 +188,5 @@ export function studioInkMlFileName(title: string): string {
     .join("")
     .trim()
     .slice(0, 120);
-  return `${safe || "toonspectrum-ink"}.inkml`;
+  return `${safe || "toonstudio-ink"}.inkml`;
 }

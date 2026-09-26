@@ -3992,7 +3992,7 @@ describe("결과 메타·헬퍼", () => {
   });
 
   it("svgExportFileName — 래스터 내보내기와 같은 제목 규칙(.svg)", () => {
-    expect(svgExportFileName("  ")).toBe("toonspectrum-comic.svg");
+    expect(svgExportFileName("  ")).toBe("toonstudio-comic.svg");
     expect(svgExportFileName(" 나의 웹툰 ")).toBe("나의 웹툰.svg");
   });
 

@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { getStudioSessionEvidence } from "./studio-session-evidence-client";
 import { studioSessionEvidenceNote } from "./studio-session-evidence-note";
-import type { StudioSessionEvidenceResponse } from "@toonspectrum/studio-project-model/work-session-evidence";
+import type { StudioSessionEvidenceResponse } from "@toonstudio/studio-project-model/work-session-evidence";
 
 const get = vi.hoisted(() => vi.fn());
 vi.mock("@/platform/api", () => ({ api: { get } }));

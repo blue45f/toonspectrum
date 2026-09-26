@@ -2,7 +2,7 @@ import { lazy, Suspense, useState } from "react";
 
 import { SplashScreen } from "./SplashScreen";
 
-const INTRO_SESSION_KEY = "toonspectrum-intro-shown";
+const INTRO_SESSION_KEY = "toonstudio-intro-shown";
 
 function shouldShowIntro(once: boolean | undefined): boolean {
   if (once === false) return true;

@@ -162,11 +162,11 @@ const PAGE_INSTRUMENTATION_SOURCE = String.raw`
 const STORAGE_PRIMING_SOURCE = String.raw`
 (() => {
   try {
-    localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-    localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
+    localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
+    localStorage.setItem("toonstudio-studio-mobile-hint-dismissed", "1");
     const keys = Object.keys(localStorage);
     for (let i = 0; i < keys.length; i += 1) {
-      if (keys[i].indexOf("toonspectrum-studio-autosave") === 0) localStorage.removeItem(keys[i]);
+      if (keys[i].indexOf("toonstudio-studio-autosave") === 0) localStorage.removeItem(keys[i]);
     }
   } catch (error) {
     // Private mode: the studio still boots, just without the primed flags.

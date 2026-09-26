@@ -2,7 +2,7 @@ import { StudioReviewDraftShelf } from "./StudioReviewDraftShelf";
 import { StudioReviewNoteFilters } from "./StudioReviewNoteFilters";
 import { nextReviewNoteId, reviewNoteMatches, type ReviewNoteView } from "./studio-review-note-query";
 import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { validateStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
+import { validateStudioReviewSpatialAnchor } from "@toonstudio/studio-project-model";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import { getAuthSessionRevision, listeners as sessionListeners, type Session } from "@/domains/auth/public/session/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";

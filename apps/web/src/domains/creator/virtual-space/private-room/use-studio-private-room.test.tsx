@@ -3,7 +3,7 @@ import { act,cleanup,fireEvent,render,screen,waitFor } from "@testing-library/re
 import { afterEach,beforeEach,describe,expect,it,vi } from "vitest";
 import type { StudioLiveRoom } from "../../live/studio-live-collaboration-room";
 import type { StudioLiveParticipant } from "../../live/studio-live-collaboration-protocol";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import { STUDIO_P2P_HUDDLE_OPEN_EVENT } from "../../live/huddle/studio-p2p-huddle-events";
 import { studioVirtualSpaceState } from "../studio-virtual-space-model";
 import { StudioPrivateRoomPanel } from "./StudioPrivateRoomPanel";

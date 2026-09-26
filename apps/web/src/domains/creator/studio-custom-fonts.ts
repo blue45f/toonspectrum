@@ -295,7 +295,7 @@ export function renameCustomFont(
 
 // ── 직렬화 / 방어적 파싱 ─────────────────────────────────────────────────
 
-export const CUSTOM_FONT_LIBRARY_KEY = "toonspectrum-studio-custom-fonts";
+export const CUSTOM_FONT_LIBRARY_KEY = "toonstudio-studio-custom-fonts";
 export const CUSTOM_FONT_LIBRARY_STORAGE_VERSION = 1;
 
 const DATA_URL_RE = /^data:[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+;base64,([A-Za-z0-9+/]+={0,2})$/u;

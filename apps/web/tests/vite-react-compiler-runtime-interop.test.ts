@@ -47,13 +47,13 @@ describe("Vite React Compiler development policy", () => {
     const serveAliases = aliases(await load("serve"));
     expect(serveAliases["react/compiler-runtime"]).toBe(interopModule);
     expect(
-      path.normalize(serveAliases["@toonspectrum/react-compiler-runtime-cjs"])
+      path.normalize(serveAliases["@toonstudio/react-compiler-runtime-cjs"])
         .endsWith(path.join("react", "compiler-runtime.js")),
     ).toBe(true);
 
     const buildAliases = aliases(await load("build"));
     expect(buildAliases).not.toHaveProperty("react/compiler-runtime");
-    expect(buildAliases).not.toHaveProperty("@toonspectrum/react-compiler-runtime-cjs");
+    expect(buildAliases).not.toHaveProperty("@toonstudio/react-compiler-runtime-cjs");
 
     await expect(readFile(interopModule, "utf8")).resolves.toContain(
       "export const c = runtime.c;",

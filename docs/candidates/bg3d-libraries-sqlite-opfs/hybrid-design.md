@@ -8,7 +8,7 @@ StudioBackground3D / project archive / canonical GLB download / DCC handoff
   -> acquireStudioLocalDatabase()
   -> /studio-local-v12.db
   -> kv[studio-bg3d-libraries-v12, models|templates|asset-metadata-manifest-v1]
-  -> dedicated OPFS root toonspectrum-studio-bg3d-libraries-v12
+  -> dedicated OPFS root toonstudio-studio-bg3d-libraries-v12
        blobs/<sha256>.<codec>
 ```
 

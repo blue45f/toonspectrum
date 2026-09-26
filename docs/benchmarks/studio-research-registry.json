@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-09-02",
-  "purpose": "Primary-source research registry for rendering, brush simulation, differentiable 2D graphics, co-creative painting, animation, and 3D authoring ideas that can be turned into measured ToonSpectrum Studio prototypes. Seed papers provide stable anchors and arXiv queries keep the intake open during the saturation campaign.",
+  "purpose": "Primary-source research registry for rendering, brush simulation, differentiable 2D graphics, co-creative painting, animation, and 3D authoring ideas that can be turned into measured ToonStudio Studio prototypes. Seed papers provide stable anchors and arXiv queries keep the intake open during the saturation campaign.",
   "papers": [
     {
       "id": "dripping-thin-films-2026",

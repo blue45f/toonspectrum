@@ -21,7 +21,7 @@ const VALID_ROLES = new Set(["opening", "creator", "story", "action", "romance",
 const VALID_VARIANTS = new Set(["vocal", "instrumental"]);
 
 function usage() {
-  console.log(`ToonSpectrum site OST production\n\nUsage:\n  node scripts/generate-site-original-ost.mjs [options]\n\nOptions:\n  --dry-run              Print provider requests without spending credits (default)\n  --generate             Call Eleven Music v2.5 and write audio + provenance sidecars\n  --track <id>           Generate one track (defaults to all tracks in dry-run)\n  --variant <name>       vocal | instrumental; defaults to each track's primaryVariant\n  --with-variants        Generate every declared variant instead of only primary variants\n  --confirm-batch        Required when --generate would create more than one audio file\n  --force                Replace an existing generated audio file\n  --publish              Rebuild playlist.json from reviewed/generated sidecars on disk\n  --help                 Show this help\n\nExamples:\n  node scripts/generate-site-original-ost.mjs --track draw-your-world --dry-run\n  ELEVENLABS_API_KEY=... node scripts/generate-site-original-ost.mjs --track draw-your-world --generate --publish\n  ELEVENLABS_API_KEY=... node scripts/generate-site-original-ost.mjs --all --generate --confirm-batch --publish\n`);
+  console.log(`ToonStudio site OST production\n\nUsage:\n  node scripts/generate-site-original-ost.mjs [options]\n\nOptions:\n  --dry-run              Print provider requests without spending credits (default)\n  --generate             Call Eleven Music v2.5 and write audio + provenance sidecars\n  --track <id>           Generate one track (defaults to all tracks in dry-run)\n  --variant <name>       vocal | instrumental; defaults to each track's primaryVariant\n  --with-variants        Generate every declared variant instead of only primary variants\n  --confirm-batch        Required when --generate would create more than one audio file\n  --force                Replace an existing generated audio file\n  --publish              Rebuild playlist.json from reviewed/generated sidecars on disk\n  --help                 Show this help\n\nExamples:\n  node scripts/generate-site-original-ost.mjs --track draw-your-world --dry-run\n  ELEVENLABS_API_KEY=... node scripts/generate-site-original-ost.mjs --track draw-your-world --generate --publish\n  ELEVENLABS_API_KEY=... node scripts/generate-site-original-ost.mjs --all --generate --confirm-batch --publish\n`);
 }
 
 function parseArgs(argv) {
@@ -98,7 +98,7 @@ function globalPositive(config, track) {
     ...config.sonicIdentity.principles,
     track.direction,
     `${track.bpm} BPM`,
-    `ToonSpectrum sonic identity; recurring creation motif should feel related across the album while this composition remains fully original`,
+    `ToonStudio sonic identity; recurring creation motif should feel related across the album while this composition remains fully original`,
     "high-fidelity studio-grade production, wide but mono-compatible image, controlled sub bass, natural transients, clear midrange, expressive dynamics",
   ];
 }
@@ -279,8 +279,8 @@ async function publishManifest(config) {
       language: metadata.variant === "vocal" ? track.language : "none",
       summary: track.summary,
       license: elevenLabs
-        ? "Eleven Music original generation; commercial use subject to the active ToonSpectrum subscription and Music Terms review"
-        : "ToonSpectrum original generation using the MIT-licensed ACE-Step 1.5 software; generation provenance is recorded in the adjacent sidecar",
+        ? "Eleven Music original generation; commercial use subject to the active ToonStudio subscription and Music Terms review"
+        : "ToonStudio original generation using the MIT-licensed ACE-Step 1.5 software; generation provenance is recorded in the adjacent sidecar",
       creditUrl: elevenLabs ? TERMS_URL : "https://github.com/ace-step/ACE-Step-1.5",
       profiles: track.profiles,
       intensity: track.intensity,

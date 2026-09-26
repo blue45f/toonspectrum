@@ -137,7 +137,7 @@ function createStudioBg3dObjPreflightModuleWorker(): StudioBg3dObjPreflightWorke
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-bg3d-obj-preflight.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-bg3d-obj-preflight",
+    name: "toonstudio-bg3d-obj-preflight",
   });
 }
 

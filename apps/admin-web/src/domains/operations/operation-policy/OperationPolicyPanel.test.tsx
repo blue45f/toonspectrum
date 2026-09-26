@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { initialOperationPolicy, resolveOperationPolicy } from "@toonspectrum/contracts/operation-policy";
+import { initialOperationPolicy, resolveOperationPolicy } from "@toonstudio/contracts/operation-policy";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OperationPolicyPanel } from "./OperationPolicyPanel";

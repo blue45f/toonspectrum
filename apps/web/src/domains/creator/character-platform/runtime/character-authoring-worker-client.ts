@@ -69,7 +69,7 @@ function createModuleWorker(): CharacterAuthoringWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./character-authoring.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-character-authoring",
+    name: "toonstudio-character-authoring",
   });
 }
 

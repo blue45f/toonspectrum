@@ -105,7 +105,7 @@ describe("first-party raster codec provider registry", () => {
       if (!encoded.ok) return;
       expect(encoded.bytes.byteLength).toBeGreaterThan(0);
       expect(encoded.receipt.providerId).toBe(
-        `toonspectrum.raster.${format}.v1`,
+        `toonstudio.raster.${format}.v1`,
       );
       expect(encoded.receipt.officialClaims).toEqual({
         externalAttestationAccepted: false,
@@ -159,7 +159,7 @@ describe("first-party raster codec provider registry", () => {
         ok: false,
         code: "provider-runtime-error",
         stage: "execution",
-        providerId: `toonspectrum.raster.${format}.v1`,
+        providerId: `toonstudio.raster.${format}.v1`,
       });
 
       const acknowledged = await executeStudioCodecProvider(
@@ -220,7 +220,7 @@ describe("first-party RGBA codec envelope", () => {
       ok: false,
       code: "provider-runtime-error",
       stage: "execution",
-      providerId: "toonspectrum.raster.bmp.v1",
+      providerId: "toonstudio.raster.bmp.v1",
     });
   });
 });

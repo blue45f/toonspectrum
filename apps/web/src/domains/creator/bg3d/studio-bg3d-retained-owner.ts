@@ -18,7 +18,7 @@ export type StudioBg3dRetainedElement = ReactElement<StudioBg3dRetainedElementPr
  */
 
 export interface StudioBg3dRetainedOwnerLease {
-  readonly kind: "toonspectrum.studio-bg3d-retained-owner-lease";
+  readonly kind: "toonstudio.studio-bg3d-retained-owner-lease";
   readonly version: 1;
   readonly generation: number;
   readonly element: StudioBg3dRetainedElement | null;
@@ -33,7 +33,7 @@ export interface StudioBg3dRetainedOwnerSource {
 }
 
 let snapshot: StudioBg3dRetainedOwnerLease = Object.freeze({
-  kind: "toonspectrum.studio-bg3d-retained-owner-lease",
+  kind: "toonstudio.studio-bg3d-retained-owner-lease",
   version: 1,
   generation: 0,
   element: null,
@@ -45,7 +45,7 @@ const listeners = new Set<() => void>();
 
 function publish(next: Omit<StudioBg3dRetainedOwnerLease, "kind" | "version">): void {
   snapshot = Object.freeze({
-    kind: "toonspectrum.studio-bg3d-retained-owner-lease",
+    kind: "toonstudio.studio-bg3d-retained-owner-lease",
     version: 1,
     ...next,
   });

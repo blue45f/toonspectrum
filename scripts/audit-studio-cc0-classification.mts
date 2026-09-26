@@ -58,7 +58,7 @@ const counts = Object.fromEntries(
 ) as Record<Bucket, number>;
 const classified = Object.values(counts).reduce((sum, value) => sum + value, 0);
 const report = {
-  schema: "toonspectrum.studio-cc0-classification.v1",
+  schema: "toonstudio.studio-cc0-classification.v1",
   total: catalog.length,
   classified,
   counts,

@@ -1,4 +1,4 @@
-import { parsePublicSharePath } from "@toonspectrum/core/public-share-path";
+import { parsePublicSharePath } from "@toonstudio/core/public-share-path";
 
 import { canonicalSitePath } from "./site-route-authority";
 

@@ -1,10 +1,10 @@
 import {
   UnsupportedSceneFeatureError,
   sceneIRSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import type { InitInput } from "../../../crates/studio-engine-vello/pkg-gpu/studio_engine_vello.js";
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 /**
  * Browser WebGPU lane of the Vello provider (ADR-0011 lane 2, V12 §4.1).

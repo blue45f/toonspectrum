@@ -44,15 +44,15 @@ async function bundledRequest(
     requestedUse,
     manifest: {
       schemaVersion: 1,
-      profileKey: "toonspectrum-srgb-v2",
+      profileKey: "toonstudio-srgb-v2",
       source: {
         kind: "bundled",
-        providerId: "toonspectrum",
+        providerId: "toonstudio",
         provenance: "project-generated:studio-canvaskit-icc-profile",
       },
       rights: {
         licenseClass: "project-generated",
-        licenseId: "ToonSpectrum-generated-profile-v1",
+        licenseId: "ToonStudio-generated-profile-v1",
         redistribution: "allowed",
         embedding: "allowed",
         commercialUse: "allowed",
@@ -206,12 +206,12 @@ describe("Studio ICC provider/license policy", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.receipt).toMatchObject({
-      schema: "toonspectrum-icc-profile-policy/v1",
+      schema: "toonstudio-icc-profile-policy/v1",
       policyVersion: 1,
       verdict: "accepted",
       rejectionCode: null,
       requestedUse: "transform",
-      profileKey: "toonspectrum-srgb-v2",
+      profileKey: "toonstudio-srgb-v2",
       checksum: {
         algorithm: "SHA-256",
         expected: request.manifest.expected.sha256,
@@ -333,7 +333,7 @@ describe("Studio ICC provider/license policy", () => {
   it("ICC v4는 non-zero profile ID와 manifest 일치를 요구한다", async () => {
     const bytes = buildMatrixTrcIccProfile({
       ...SRGB_ICC_BUILD_OPTIONS,
-      description: "ToonSpectrum v4 test",
+      description: "ToonStudio v4 test",
     });
     bytes[8] = 4;
     bytes[9] = 0x30;

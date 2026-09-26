@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { z } from "zod";
-import type { StudioSessionAgendaItem } from "@toonspectrum/studio-project-model/work-session";
+import type { StudioSessionAgendaItem } from "@toonstudio/studio-project-model/work-session";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioWorkSessionController } from "./studio-work-session-controller";

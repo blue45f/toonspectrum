@@ -5,7 +5,7 @@
 
 ## 사이트 soundtrack 원칙
 
-사이트 전역 soundtrack에는 **ToonSpectrum 자체 제작 음원만** 허용한다. 과거 Pixabay reference track은
+사이트 전역 soundtrack에는 **ToonStudio 자체 제작 음원만** 허용한다. 과거 Pixabay reference track은
 2026-09-18 제거했으며 master가 없을 때 license demo나 browser 합성 placeholder를 대체 재생하지 않는다.
 
 ## 저장소의 오리지널 OST

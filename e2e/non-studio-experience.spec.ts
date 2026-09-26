@@ -17,8 +17,8 @@ const routes = [...new Set([...readdirSync(routeDirectory)
 // Actual production UI; anonymous API outage fixtures are not live-backend success.
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
   });
   await page.route("**/api/**", async (route) => {
     const pathname = new URL(route.request().url()).pathname;
@@ -122,7 +122,7 @@ test("account pages never receive promotional onward cards", async ({ page }) =>
 
 test("all-in-one home keeps contrast surfaces, reduced motion and responsive bounds", async ({ page }, testInfo) => {
   await page.addInitScript(() => {
-    localStorage.setItem("toonspectrum-theme", JSON.stringify({
+    localStorage.setItem("toonstudio-theme", JSON.stringify({
       state: { preference: "light", studioPreference: "inherit", theme: "light" },
       version: 0,
     }));
@@ -148,9 +148,9 @@ test("all-in-one home keeps contrast surfaces, reduced motion and responsive bou
     version: 0,
   });
   await page.evaluate((value) => {
-    localStorage.setItem("toonspectrum-theme", value);
+    localStorage.setItem("toonstudio-theme", value);
     window.dispatchEvent(new StorageEvent("storage", {
-      key: "toonspectrum-theme",
+      key: "toonstudio-theme",
       newValue: value,
       storageArea: localStorage,
     }));

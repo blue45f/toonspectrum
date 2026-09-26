@@ -333,7 +333,7 @@ export const useEngagement = create<EngagementState>()(
       resetEngagementData: () => set({ ...EMPTY_STATE }),
     }),
     {
-      name: "toonspectrum-engagement-v1",
+      name: "toonstudio-engagement-v1",
       version: 1,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({

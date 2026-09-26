@@ -73,7 +73,7 @@ function readPolicy(key: string): BrushQualityPolicy {
 }
 
 function downloadPolicy(policy: BrushQualityPolicy): void {
-  const blob = new Blob([JSON.stringify({ kind: "toonspectrum.brush-quality-v1", policy }, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify({ kind: "toonstudio.brush-quality-v1", policy }, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -108,7 +108,7 @@ function Metric({ label, value }: { readonly label: string; readonly value: numb
 }
 
 export function StudioBrushV5QualityWorkbench({ scope }: { readonly scope: string }) {
-  const storageKey = `toonspectrum.brush-quality-v1:${encodeURIComponent(scope)}`;
+  const storageKey = `toonstudio.brush-quality-v1:${encodeURIComponent(scope)}`;
   const [policy, setPolicy] = useState<BrushQualityPolicy>(() => readPolicy(storageKey));
   const [tab, setTab] = useState<Tab>("compose");
   const [query, setQuery] = useState("");

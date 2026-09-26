@@ -41,7 +41,7 @@ function normalizeKind(value: unknown): CreatorMarketplaceAuthoringKind {
 function findAuthoringEnvelope(value: unknown, depth = 0): Record<string, unknown> | null {
   if (!isRecord(value) || depth > 6) return null;
   if (
-    value.format === "toonspectrum.creator-marketplace-authoring"
+    value.format === "toonstudio.creator-marketplace-authoring"
     || (isRecord(value.brush) && (
       Array.isArray(value.brush.enginePrograms)
       || Array.isArray(value.brush.engineNodes)

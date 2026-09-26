@@ -117,14 +117,14 @@ verifyPkgIntegrity(
 );
 
 const STUDIO_ENGINE_PACKAGES = [
-  "@toonspectrum/studio-project-model",
-  "@toonspectrum/studio-engine-registry",
-  "@toonspectrum/studio-command-registry",
-  "@toonspectrum/studio-engine-skia",
-  "@toonspectrum/studio-engine-thorvg",
-  "@toonspectrum/studio-engine-vello",
-  "@toonspectrum/studio-brush-platform",
-  "@toonspectrum/studio-format-gateway",
+  "@toonstudio/studio-project-model",
+  "@toonstudio/studio-engine-registry",
+  "@toonstudio/studio-command-registry",
+  "@toonstudio/studio-engine-skia",
+  "@toonstudio/studio-engine-thorvg",
+  "@toonstudio/studio-engine-vello",
+  "@toonstudio/studio-brush-platform",
+  "@toonstudio/studio-format-gateway",
 ];
 
 // 2. package + benchmark-harness typechecks

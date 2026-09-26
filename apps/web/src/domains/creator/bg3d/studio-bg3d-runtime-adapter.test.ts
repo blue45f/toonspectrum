@@ -70,7 +70,7 @@ describe("Studio BG3D runtime adapter boundary", () => {
     expect(snapshot.assets).toEqual([]);
     expect(snapshot.totalAssetBytes).toBe(0);
     expect(JSON.parse(snapshot.canonicalDocumentJson)).toMatchObject({
-      kind: "toonspectrum.bg3d-scene",
+      kind: "toonstudio.bg3d-scene",
       version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
     });
     expect(Object.isFrozen(snapshot)).toBe(true);

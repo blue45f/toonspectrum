@@ -1,4 +1,4 @@
-"""Generate ToonSpectrum's first-party core furniture pack as self-contained GLBs.
+"""Generate ToonStudio's first-party core furniture pack as self-contained GLBs.
 
 Run this file from the repository root in Blender 5.2 or execute its contents through
 the Blender MCP sandbox. It intentionally uses only Blender's Python API for paths so
@@ -97,7 +97,7 @@ def add_asset_root(asset_id):
     root = bpy.data.objects.new(f"TS_{asset_id}_Root", None)
     root.empty_display_type = "PLAIN_AXES"
     root["asset_id"] = asset_id
-    root["asset_author"] = "ToonSpectrum"
+    root["asset_author"] = "ToonStudio"
     root["asset_source"] = "first-party procedural Blender geometry"
     root["units"] = "metres"
     root["floor_z"] = 0.0
@@ -328,7 +328,7 @@ def generate_core_furniture_pack():
     }
     for asset_id, _filename in ASSET_BUILDERS:
         builders[asset_id]()
-    print("Generated all five ToonSpectrum core furniture assets.")
+    print("Generated all five ToonStudio core furniture assets.")
 
 
 if __name__ == "__main__":

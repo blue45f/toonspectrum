@@ -15,7 +15,7 @@ if (process.env.CI && !INTEGRATION_URL) {
   );
 }
 const describeWithDirectPostgres = INTEGRATION_URL ? describe : describe.skip;
-const CREATOR_ASSET_SCHEMA_ADVISORY_LOCK = "toonspectrum-schema-repair-0013";
+const CREATOR_ASSET_SCHEMA_ADVISORY_LOCK = "toonstudio-schema-repair-0013";
 const ADVISORY_LOCK_ACQUIRE_TIMEOUT_MS = 20_000;
 const ADVISORY_LOCK_RETRY_INTERVAL_MS = 100;
 const POSTGRES_CONNECTION_TIMEOUT_MS = 15_000;
@@ -69,7 +69,7 @@ describeWithDirectPostgres("Creator Asset PostgreSQL runtime", () => {
     try {
       process.env.DATABASE_URL = INTEGRATION_URL;
       observerPool = new Pool({
-        application_name: "toonspectrum-creator-asset-runtime-test",
+        application_name: "toonstudio-creator-asset-runtime-test",
         connectionString: INTEGRATION_URL,
         max: 4,
         connectionTimeoutMillis: POSTGRES_CONNECTION_TIMEOUT_MS,

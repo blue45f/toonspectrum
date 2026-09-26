@@ -28,7 +28,7 @@ function stableUuid(seed: string): string {
 }
 const publisher = Object.freeze({
   id: "00000000-0000-4000-8000-0000000000c0",
-  name: "ToonSpectrum 검수 CC0",
+  name: "ToonStudio 검수 CC0",
   avatar: "#3b82f6",
 });
 const timestamp = "2026-09-18T00:00:00.000Z";

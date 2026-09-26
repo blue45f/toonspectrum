@@ -1,4 +1,4 @@
-# ToonSpectrum Studio 3D 웹툰 제작 도구 벤치마크 및 적용안
+# ToonStudio Studio 3D 웹툰 제작 도구 벤치마크 및 적용안
 
 - 기준일: 2026-07-19
 - 범위: 캐릭터 생성·포즈, 배경 배치·연출, 표준 3D 파일 반입, 선화·톤·레이어 출력,
@@ -34,7 +34,7 @@
 6. SketchUp의 건축·공간 authoring과 scene/tag/component 메타데이터.
 7. Blender의 모델링·스컬프·UV·리깅·툰 셰이딩·Line Art/Freestyle·배치 렌더 품질.
 
-ToonSpectrum의 방향은 다음과 같이 정리한다.
+ToonStudio의 방향은 다음과 같이 정리한다.
 
 - **프로덕션 대화형 편집기:** Three.js + React Three Fiber + WebGL2.
 - **차세대 GPU 실험:** 같은 Three 계열의 격리 WebGPU lab을 먼저 검증한다. WebGPU 도입은
@@ -53,14 +53,14 @@ ToonSpectrum의 방향은 다음과 같이 정리한다.
 
 ## 2. 표기와 판정 규칙
 
-이 문서에서는 벤더의 공식 기능과 ToonSpectrum의 판단을 섞지 않는다.
+이 문서에서는 벤더의 공식 기능과 ToonStudio의 판단을 섞지 않는다.
 
 | 표기 | 의미 |
 | --- | --- |
 | **[공식 사실]** | 제품 공식 사이트·매뉴얼·라이선스 문서에서 직접 확인한 기능 |
 | **[현재 기준선]** | 현재 저장소 문서와 기존 구현에 이미 존재하는 기능 |
 | **[이번 반영]** | 이 문서와 함께 반영되는 변경에서 production UI/runtime 경로에 구현·연결된 기능. 배포·실기기 release gate는 별도 |
-| **[추론/설계]** | 공식 사실을 바탕으로 한 ToonSpectrum의 기술 판단이며 벤더 보장이 아님 |
+| **[추론/설계]** | 공식 사실을 바탕으로 한 ToonStudio의 기술 판단이며 벤더 보장이 아님 |
 | **[로드맵]** | 아직 제품 기능으로 확정되지 않은 구현 후보 |
 
 외부 제품의 UI, 모델, 프리셋, pose corpus, 상용 자산을 복제한다는 뜻은 아니다. 기능 아이디어와
@@ -125,7 +125,7 @@ SKP 장면, 카메라, 조명·선·재질, 다중 scene와 render pass를 웹�
 **[정정]** Snaptoon의 일반적인 “날씨 효과”를 현재 공식 페이지에서 상세 사양으로 확인하지 못했으므로
 이 문서에서는 공식 기능으로 단정하지 않는다. 추후 공식 매뉴얼로 확인한 뒤 비교표를 갱신한다.
 
-## 4. ToonSpectrum 현재 구현 기준선
+## 4. ToonStudio 현재 구현 기준선
 
 ### 4.1 이미 저장소 기준선에 있는 기능
 
@@ -150,7 +150,7 @@ SKP 장면, 카메라, 조명·선·재질, 다중 scene와 render pass를 웹�
   단위 테스트는 구현돼 있지만, 등록된 두 번째 엔진 adapter와 production 호출 경로는 아직 없다.
 - **[이번 반영]** capture adapter는 Three/Babylon/PlayCanvas/Filament/Cesium의 엔진·graphics API 조합을
   표현하는 엔진 중립 identity를 가지며, 현재 Three WebGL adapter도 `engineId`, 실제 Three revision,
-  ToonSpectrum adapter 구현 revision, backend, graphics API, capture profile을 함께 보고한다. Shot Batch
+  ToonStudio adapter 구현 revision, backend, graphics API, capture profile을 함께 보고한다. Shot Batch
   Plan v2는 이 identity와 source viewport·기기 품질·capture budget·LT/PNG/PSD profile을 동결하고, 컷마다
   같은 adapter identity와 viewport인지 다시 확인한다. 이는 두 번째 엔진을 이미 production에 채택했다는
   뜻이 아니라, 나중에 specialist를 추가해도 서로 다른 엔진의 artifact가 같은 계획에 섞이지 않게 하는 계약이다.
@@ -231,7 +231,7 @@ main-thread inference boundary다. 따라서 “모든 포즈 추론이 Worker�
 
 - [SHAPER 사용 가이드](https://shaper.webtoons.com/how-to/)
 
-#### ToonSpectrum과의 비교
+#### ToonStudio과의 비교
 
 - **[현재 기준선]** VRM 캐릭터, pose/morph, aim/IK, costume·material 관련 모듈은 있으나 SHAPER처럼
   눈·코·체형·헤어·의상을 하나의 검증된 parametric catalog로 조립하는 workflow는 아니다.
@@ -275,7 +275,7 @@ frequency를 조정한다.
 - [All Sides View](https://help.clip-studio.com/en-us/manual_en/660_3d/All_Sides_View_palette.htm)
 - [Convert to lines and tones](https://help.clip-studio.com/en-us/manual_en/390_filters/Convert_to_lines_and_tones_%28EX_only%29.htm)
 
-#### ToonSpectrum과의 비교
+#### ToonStudio과의 비교
 
 - **[현재 기준선]** 표준 형식 반입의 폭은 넓고, 모든 형식을 canonical GLB 검증 경계로 통일한 점은
   웹 보안 측면의 강점이다. hierarchy, multi-select, All Sides View, ortho, pose/morph/IK와 raster LT pass도
@@ -337,7 +337,7 @@ face puppet/key, look-at, video/webcam face tracking과 lip-sync를 제공한다
 - [iClone character animation](https://www.reallusion.com/iclone/3d-character-animation.html)
 - [iClone facial animation](https://www.reallusion.com/iclone/3d-facial-expression.html)
 
-#### ToonSpectrum과의 비교
+#### ToonStudio과의 비교
 
 - **[현재 기준선]** pose/morph, aim, two-bone IK, pose bake, VRM normalized bones, animation sampling이 있다.
 - **[이번 반영]** joint limit, mirror, 사진 pose apply와 VRM 1.0 55본 semantic pose 소재에 더해,
@@ -372,7 +372,7 @@ Reallusion asset을 application/service 자체에 embed하는 항목과 AI train
 표시한다. CC Component의 대량 character 배포에는 Extended license와 개별 SKU 조건이 추가될 수 있다.
 
 **[설계]** Reallusion의 기능 아이디어를 독립 구현하는 것과 Reallusion model/profile/pose/content를
-ToonSpectrum 서비스에 포함하는 것은 별개다. 완성된 game/app 결과물에 asset을 배포하는 것과 사용자가
+ToonStudio 서비스에 포함하는 것은 별개다. 완성된 game/app 결과물에 asset을 배포하는 것과 사용자가
 asset을 재사용·추출·조합할 수 있는 editor/service embedding도 구분한다. 후자는 개별 content SKU와 최신
 EULA를 법무 검토하고 서면 허가가 없으면 bundle·학습·marketplace 재배포하지 않는다.
 
@@ -395,7 +395,7 @@ selected-only render를 제공한다.
 - [ABLUR Features Overview](https://ablur.io/features-overview)
 - [ABLUR 가격·체험](https://ablur.acon3d.com/ko/order)
 
-#### ToonSpectrum과의 비교
+#### ToonStudio과의 비교
 
 - **[현재 기준선]** hierarchy, camera, fog·panorama, line/tone layer, transparent capture와
   engine-neutral scene document가 있다.
@@ -441,7 +441,7 @@ reflection/lighting, saved scene workflow를 확인할 수 있다. 이것은 제
 - [Toon shading 안내](https://www.snaptoon.co.kr/bbs/board.php?bo_table=gallery&wr_id=100)
 - [공식 marketplace 제품의 배경 투명화·객체 추출·재질·장면 저장 예시](https://snaptoonwarehouse.com/shop/item.php?it_id=1685684950)
 
-#### ToonSpectrum과의 비교
+#### ToonStudio과의 비교
 
 - **[현재 기준선]** 실시간 Three 렌더, 툰/LT 출력, model library와 rights metadata, scene 저장이 있다.
 - **[이번 반영]** 분위기 rig와 shot board로 반복 컷 연출이 빨라졌다.
@@ -481,7 +481,7 @@ SDK download 페이지는 현재 공개 즉시 다운로드 대신 access reques
 - [SketchUp SDK access](https://extensions.sketchup.com/sketchup-sdk)
 - [Scene flags](https://extensions.sketchup.com/developers/sketchup_c_api/sketchup/scene_8h.html)
 
-#### ToonSpectrum과의 비교 및 결론
+#### ToonStudio과의 비교 및 결론
 
 - **[현재 기준선]** SketchUp에서 공식 GLB로 export한 결과는 기존 canonical GLB admission과 가장 잘
   맞는다.
@@ -489,7 +489,7 @@ SDK download 페이지는 현재 공개 즉시 다운로드 대신 access reques
   뜻이 아니다. 이 조사에서는 공식 browser-direct parser를 확인하지 못했다.
 - **[격차]** plain GLB에는 SketchUp scene의 camera/render/shadow, tag visibility, component identity를
   동일 의미로 보존할 표준 필드가 충분하지 않다. 별도 sidecar mapping이 필요하다.
-- **[결론]** P0/P1은 **SketchUp → official GLB export → ToonSpectrum import**가 기본이다. direct SKP는
+- **[결론]** P0/P1은 **SketchUp → official GLB export → ToonStudio import**가 기본이다. direct SKP는
   SDK·라이선스·보안 승인을 통과한 native/server specialist로만 검토한다.
 
 ### 5.7 Blender
@@ -525,9 +525,9 @@ Blender로 만든 artwork 자체에는 적용되지 않는다고 설명한다.
 - [Blender application license](https://developer.blender.org/docs/license)
 - [GPL과 생성 artwork의 범위](https://docs.blender.org/manual/en/latest/getting_started/about/license.html)
 
-#### ToonSpectrum과의 비교
+#### ToonStudio과의 비교
 
-- **[현재 기준선]** ToonSpectrum은 배치·구도·간단 material override·pose·capture에 집중해 Blender보다
+- **[현재 기준선]** ToonStudio은 배치·구도·간단 material override·pose·capture에 집중해 Blender보다
   빠르게 웹툰 컷에 도달하지만, topology 편집·sculpt·UV·weight paint·복잡한 rig/timeline은 제공하지 않는다.
 - **[현재 기준선]** raster LT는 즉시성이 강점이지만 Blender Line Art/Freestyle 수준의 line selection,
   vector/stroke editing과 offline render quality는 아직 없다.
@@ -539,7 +539,7 @@ Blender로 만든 artwork 자체에는 적용되지 않는다고 설명한다.
 1. **[P0] 공식 GLB authoring profile**: Blender export preset, unit/axis, animation bake, material allowlist,
    texture size, Meshopt/KTX2, custom property namespace를 문서와 sample `.blend`로 제공한다.
 2. **[P1] line golden corpus**: Blender Line Art/Freestyle 결과를 정답 이미지·stroke reference로 삼아
-   ToonSpectrum의 depth/normal/material-ID line을 회귀 비교한다. Blender 코드를 브라우저에 복사한다는
+   ToonStudio의 depth/normal/material-ID line을 회귀 비교한다. Blender 코드를 브라우저에 복사한다는
    뜻은 아니다.
 3. **[P2] DCC round-trip manifest**: attachment hash, logical node id, material slot, skeleton/morph ordinal을
    glTF `extras`의 namespaced metadata와 별도 manifest로 왕복한다.
@@ -559,7 +559,7 @@ process/output-byte/triangle/texture budget, cancellation과 강제 종료, outp
 
 ## 6. 기능 비교 매트릭스
 
-| 제품 | 공식 강점 | ToonSpectrum 현재 parity | 가장 큰 격차 | 채택 방식 | 우선순위 |
+| 제품 | 공식 강점 | ToonStudio 현재 parity | 가장 큰 격차 | 채택 방식 | 우선순위 |
 | --- | --- | --- | --- | --- | --- |
 | SHAPER | 캐릭터·의상·포즈 preset, AI preset 추천, pose scan, surface draw, PSD | VRM pose/morph/IK, 이번 반영 local photo pose·mirror·joint limit | parametric character recipe, surface paint, character pass | workflow 독립 구현 | P1~P2 |
 | CLIP STUDIO 3D | 폭넓은 import, pose material/controller/lock, photo pose, hand scanner, BVH, LT | canonical multi-format, hierarchy/All Sides, pose/IK, raster LT + semantic pose material/library·손발 handle·static foot contact | persistent end-effector pin, hand scanner, BVH retarget, vector line | production UI에 직접 구현 | P1~P2 |
@@ -688,7 +688,7 @@ native/server decoder나 WASM parser에 넘기지 않는다.
 **[공식 사실]** 3D Warehouse 약관은 model을 판매가 아닌 license로 제공하며 combined work 이용과
 stand-alone 재배포 제한 등을 포함한다. asset마다 creator 권리와 별도 조건이 다를 수 있다.
 
-**[설계]** ToonSpectrum이 Warehouse를 자동 mirror하거나 원본 SKP/GLB를 자체 marketplace에서 재배포하지
+**[설계]** ToonStudio이 Warehouse를 자동 mirror하거나 원본 SKP/GLB를 자체 marketplace에서 재배포하지
 않는다. 사용자가 직접 가져온 asset은 source, license snapshot, attribution, allowed use, standalone export
 여부를 project rights metadata에 기록한다. 팀 공유·공개 template·AI training은 별도 권리로 판정한다.
 
@@ -917,7 +917,7 @@ job은 malicious corpus, timeout, memory bomb, cancel과 temp deletion audit을 
 
 ## 13. 제품 결정 요약
 
-ToonSpectrum은 한 제품을 그대로 모사하지 않는다. SHAPER에서 캐릭터 recipe와 pose 접근성,
+ToonStudio은 한 제품을 그대로 모사하지 않는다. SHAPER에서 캐릭터 recipe와 pose 접근성,
 CLIP STUDIO에서 drawing-reference UX와 LT, Reallusion에서 rig/motion 제약, ABLUR에서 shot·pass 중심
 workflow, Snaptoon에서 asset discovery, SketchUp에서 공간 authoring, Blender에서 품질 기준과 DCC bridge를
 가져온다.

@@ -12,7 +12,7 @@
     "dabPath": "src/domains/creator/studio-brush-dynamics.ts -> studio-dynamic-brush-coverage-renderer.ts (planStudioDynamicBrushCoverageMarks + renderStudioDynamicBrushCoverageMark)",
     "paperKernel": "src/domains/creator/studio-paper-texture.ts (createPaperHeightField + createPaperGranulationGain) via studio-paper-granulation-runtime.ts",
     "policy": "src/domains/creator/studio-paper-brush-response.ts",
-    "rasteriser": "canvaskit-wasm 2-D canvas via @toonspectrum/studio-engine-skia/node",
+    "rasteriser": "canvaskit-wasm 2-D canvas via @toonstudio/studio-engine-skia/node",
     "paperSurface": {
       "kind": "cold-press",
       "seed": 41

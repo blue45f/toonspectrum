@@ -21,7 +21,7 @@ method was caught by the real-browser check and removed.
 ## Reproduction
 
 ```sh
-pnpm --filter @toonspectrum/studio-engine-skia typecheck
+pnpm --filter @toonstudio/studio-engine-skia typecheck
 pnpm exec vitest run packages/studio-engine-skia --maxWorkers=1
 node scripts/verify-studio-canvaskit-gpu-island.mjs
 ```

@@ -1,4 +1,4 @@
-// Copyright 2026 ToonSpectrum Studio.
+// Copyright 2026 ToonStudio Studio.
 //
 // C bridge for google/ink brush-geometry (mesh) generation
 // (ADR-0011 lane 3, V12 codex section 11.2).

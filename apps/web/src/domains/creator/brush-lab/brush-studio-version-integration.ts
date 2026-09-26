@@ -97,7 +97,7 @@ export function resolveBrushStudioRequestedRecipe(
 }
 
 export function brushStudioV6StorageKey(scope: string): string {
-  return `toonspectrum.brush-program-v6:${encodeURIComponent(scope)}`;
+  return `toonstudio.brush-program-v6:${encodeURIComponent(scope)}`;
 }
 
 export function auditBrushStudioVersionIntegration(): readonly string[] {

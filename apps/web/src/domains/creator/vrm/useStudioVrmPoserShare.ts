@@ -213,7 +213,7 @@ export function useStudioVrmPoserShare(h: StudioVrmPoserHost): void {
       shareLicenseAuthority,
       {
         useContextReceipt: shareUseContextReceipt,
-        toonspectrumRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+        toonstudioRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
       },
     );
     if (!sharePlan.ok) {

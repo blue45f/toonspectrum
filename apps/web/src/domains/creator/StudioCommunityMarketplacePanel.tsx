@@ -298,14 +298,14 @@ const KIND_LABEL_FALLBACK: Readonly<Record<CreatorMarketplaceResourceKind, strin
 
 const LICENSE_LABEL: Readonly<Record<CreatorMarketplaceResourceLicense, string>> =
   Object.freeze({
-    "toonspectrum-standard": "studio.community.license.toonspectrumStandard",
+    "toonstudio-standard": "studio.community.license.toonstudioStandard",
     "cc0-1.0": "studio.community.license.cc0",
     "cc-by-4.0": "studio.community.license.ccBy4",
     "cc-by-nc-4.0": "studio.community.license.ccByNc4",
   });
 const LICENSE_LABEL_FALLBACK: Readonly<Record<CreatorMarketplaceResourceLicense, string>> =
   Object.freeze({
-    "toonspectrum-standard": "표준 · 파일 재배포 금지",
+    "toonstudio-standard": "표준 · 파일 재배포 금지",
     "cc0-1.0": "CC0 · 제한 없이 허용",
     "cc-by-4.0": "CC BY · 출처 표시",
     "cc-by-nc-4.0": "CC BY-NC · 비상업",
@@ -317,8 +317,8 @@ const LICENSE_OPTIONS: readonly {
   labelFallback: string;
 }[] = [
   {
-    value: "toonspectrum-standard",
-    labelKey: "studio.community.license.toonspectrumStandard",
+    value: "toonstudio-standard",
+    labelKey: "studio.community.license.toonstudioStandard",
     labelFallback: "표준 · 파일 재배포 금지",
   },
   {
@@ -1295,7 +1295,7 @@ export function ShareResourceForm({
   const [releaseNotes, setReleaseNotes] = useState("");
   const [resourceVersion, setResourceVersion] = useState("1.0.0");
   const [license, setLicense] =
-    useState<CreatorMarketplaceResourceLicense>("toonspectrum-standard");
+    useState<CreatorMarketplaceResourceLicense>("toonstudio-standard");
   const [attributionText, setAttributionText] = useState("");
   const [containsAi, setContainsAi] = useState(false);
   const [ownsRights, setOwnsRights] = useState(false);

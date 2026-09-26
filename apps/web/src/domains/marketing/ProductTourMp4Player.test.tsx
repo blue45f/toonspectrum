@@ -10,7 +10,7 @@ const { suspendBgmForContext, resumeBgmForContext } = vi.hoisted(() => ({
   resumeBgmForContext: vi.fn(),
 }));
 
-vi.mock("@toonspectrum/core/fx", () => ({
+vi.mock("@toonstudio/core/fx", () => ({
   suspendBgmForContext,
   resumeBgmForContext,
 }));

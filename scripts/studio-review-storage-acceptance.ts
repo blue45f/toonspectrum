@@ -47,9 +47,9 @@ export async function readBackStudioReviewStorage(input: {
     assert.equal(object.headers["access-control-allow-origin"], origin.origin);
     assert.equal(object.bytes.byteLength, preview.byteLength); assert.equal(sha256(object.bytes), receipt.sha256);
     assert.equal(object.headers["cache-control"], "private, max-age=31536000, immutable");
-    assert.equal(object.headers["x-amz-meta-toonspectrum-purpose"], "derived");
-    assert.equal(object.headers["x-amz-meta-toonspectrum-digest"], `sha256:${receipt.sha256}`);
-    assert.equal(object.headers["x-amz-meta-toonspectrum-byte-length"], String(object.bytes.byteLength));
+    assert.equal(object.headers["x-amz-meta-toonstudio-purpose"], "derived");
+    assert.equal(object.headers["x-amz-meta-toonstudio-digest"], `sha256:${receipt.sha256}`);
+    assert.equal(object.headers["x-amz-meta-toonstudio-byte-length"], String(object.bytes.byteLength));
     const foreignOrigin = await readStudioReviewQaObject(signed, storage.ca, { origin: "https://unrelated-studio-qa.invalid" });
     assert.equal(foreignOrigin.status, 200, "CORS header evidence must come from a successful signed object response");
     assert.equal(foreignOrigin.headers["access-control-allow-origin"], undefined, "Unrelated origins cannot read QA object bytes through browser CORS");
@@ -76,7 +76,7 @@ export async function rejectCompletedStudioReviewReplacement(input: {
   const originalInput = await readFile(path.join(output, "input-page-0.png"));
   const changedInput = await readFile(path.join(output, "input-page-1.png"));
   assert.notEqual(sha256(originalInput), sha256(changedInput));
-  const headers = { "x-toonspectrum-csrf": "1", Origin: origin.origin, Referer: `${origin.origin}/studio` };
+  const headers = { "x-toonstudio-csrf": "1", Origin: origin.origin, Referer: `${origin.origin}/studio` };
   const replacement = await context.request.put(`${origin.origin}/api/studio-project-graph/review-captures/pages/0`, {
     headers, multipart: { intent: JSON.stringify(intent), file: { name: "changed-page.png", mimeType: "image/png", buffer: changedInput } },
   });

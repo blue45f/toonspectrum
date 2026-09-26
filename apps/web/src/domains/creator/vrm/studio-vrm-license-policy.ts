@@ -79,7 +79,7 @@ export interface StudioVrmLicensePolicyReason {
 }
 
 export interface StudioVrmLicenseActionPolicy {
-  readonly schema: "toonspectrum.vrm-license-action-policy";
+  readonly schema: "toonstudio.vrm-license-action-policy";
   readonly version: 1;
   readonly action: StudioVrmLicenseAction;
   readonly decision: StudioVrmLicenseDecision;
@@ -565,7 +565,7 @@ export function evaluateStudioVrmLicenseAction(
 
   const decision = evaluateDecision(reasons);
   return deepFreeze({
-    schema: "toonspectrum.vrm-license-action-policy" as const,
+    schema: "toonstudio.vrm-license-action-policy" as const,
     version: 1 as const,
     action,
     decision,

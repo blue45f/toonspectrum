@@ -47,7 +47,7 @@ const record: CreatorMarketplaceResourceRecord = {
   resourceVersion: "1.0.0",
   minimumStudioVersion: "0.1.0",
   tags: ["잉킹", "테스트"],
-  license: "toonspectrum-standard",
+  license: "toonstudio-standard",
   attributionText: "",
   containsAi: false,
   provenance: { origin: "original", authoredByPublisher: true },

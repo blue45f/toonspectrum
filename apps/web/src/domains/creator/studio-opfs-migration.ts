@@ -208,7 +208,7 @@ export function createStudioOpfsJsonDataUrlSource(
 
 // ── 저널 ────────────────────────────────────────────────────────────────
 
-export const STUDIO_OPFS_MIGRATION_JOURNAL_KEY = "toonspectrum-studio-opfs-migration:v1";
+export const STUDIO_OPFS_MIGRATION_JOURNAL_KEY = "toonstudio-studio-opfs-migration:v1";
 
 export type StudioOpfsMigrationPhase = "copied" | "done";
 

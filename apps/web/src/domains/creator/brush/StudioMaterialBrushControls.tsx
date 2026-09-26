@@ -69,7 +69,7 @@ export function StudioMaterialBrushControls({ material, programSet, currentSnaps
     try {
       const editorId = `material-${crypto.randomUUID()}`;
       const program = createBrushStudioV6ExactEditorProgram(material, editorId, label, currentSnapshot);
-      const key = `toonspectrum.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
+      const key = `toonstudio.brush-program-v6:${encodeURIComponent(`brush:${editorId}`)}`;
       const serialized = serializeBrushStudioV6Authoring(program);
       window.localStorage.setItem(key, serialized);
       if (window.localStorage.getItem(key) !== serialized) throw new Error("편집 설정의 저장 결과가 일치하지 않습니다.");

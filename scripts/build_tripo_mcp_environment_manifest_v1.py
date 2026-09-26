@@ -307,7 +307,7 @@ def main() -> None:
         })
 
     payload = {
-        "schema": "toonspectrum.bg3d-environment-pack.mcp-free-v1",
+        "schema": "toonstudio.bg3d-environment-pack.mcp-free-v1",
         "version": "mcp-free-v1",
         "generatedAt": registry.get("generatedAt") or registry.get("updatedAt") or "2026-09-25T00:00:00Z",
         "provider": "Tripo",

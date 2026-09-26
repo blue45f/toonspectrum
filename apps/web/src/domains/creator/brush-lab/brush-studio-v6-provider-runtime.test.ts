@@ -32,7 +32,7 @@ describe("Brush Studio V6 provider runtime", () => {
       "mixbox-js-v2",
       "krita-contact-adapter-gpl-v1",
       "pigment-painter-contact-adapter-v1",
-      "toonspectrum-cpu-contact-v2",
+      "toonstudio-cpu-contact-v2",
     ]));
   });
 

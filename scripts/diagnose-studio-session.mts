@@ -39,9 +39,9 @@ try {
     page.on("pageerror", (error) => errors.push(String(error)));
     await page.addInitScript(() => {
       (globalThis as Record<string, unknown>).__name = (value: unknown) => value;
-      localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-      localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
-      localStorage.setItem("toonspectrum-studio-app-settings:v1", JSON.stringify({ general: { brushCursorStyle: "none" } }));
+      localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
+      localStorage.setItem("toonstudio-studio-mobile-hint-dismissed", "1");
+      localStorage.setItem("toonstudio-studio-app-settings:v1", JSON.stringify({ general: { brushCursorStyle: "none" } }));
     });
     try {
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });

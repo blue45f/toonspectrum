@@ -2,7 +2,7 @@ import type { StudioLiveParticipant } from "../live/studio-live-collaboration-pr
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 import { studioAcousticScope, type StudioAcousticPolicyPort } from "./studio-virtual-space-acoustics";
 
-export const STUDIO_CONVERSATION_WIRE = "toonspectrum-space-conversation-v1";
+export const STUDIO_CONVERSATION_WIRE = "toonstudio-space-conversation-v1";
 export const STUDIO_CONVERSATION_PROPOSAL_TTL = 20_000;
 export const STUDIO_CONVERSATION_LIVENESS_TTL = 6_500;
 const PULSE_MS = 2_000;

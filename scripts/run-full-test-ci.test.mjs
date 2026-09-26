@@ -34,7 +34,7 @@ describe("complete CI root and performance execution", () => {
   });
 
   it("collects the exact original root union with no missing or duplicate test files", async () => {
-    const temporary = await mkdtemp(join(tmpdir(), "toonspectrum-full-test-collection-"));
+    const temporary = await mkdtemp(join(tmpdir(), "toonstudio-full-test-collection-"));
     const serial = createVitestArguments();
     const collect = async (name, args) => {
       const output = join(temporary, `${name}.json`);

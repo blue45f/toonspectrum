@@ -16,9 +16,9 @@ import {
 } from "./studio-bg3d-lt-presets";
 
 export const STUDIO_BG3D_LT_USER_PRESET_STORAGE_KEY =
-  "toonspectrum.studio.bg3d.lt-presets.v1" as const;
+  "toonstudio.studio.bg3d.lt-presets.v1" as const;
 export const STUDIO_BG3D_LT_USER_PRESET_QUARANTINE_KEY =
-  "toonspectrum.studio.bg3d.lt-presets.corrupt.v1" as const;
+  "toonstudio.studio.bg3d.lt-presets.corrupt.v1" as const;
 
 export interface StudioBg3dLtPresetStorage {
   getItem(key: string): string | null;

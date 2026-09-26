@@ -25,7 +25,7 @@ import {
 export function MarketLibraryPage() {
   useDocumentTitle("내 보관함 · 창작 마켓");
   useMetaDescription(
-    "소장한 창작 마켓 리소스를 한눈에 확인하고, ToonSpectrum Studio 캔버스에 즉시 적용하세요.",
+    "소장한 창작 마켓 리소스를 한눈에 확인하고, ToonStudio Studio 캔버스에 즉시 적용하세요.",
   );
 
   const { activeItems, removeItem } = useMarketLibrary();

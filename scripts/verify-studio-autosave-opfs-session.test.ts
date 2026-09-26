@@ -12,8 +12,8 @@ import {
 
 const DOCUMENT_ID = `autosave-${"a".repeat(48)}`;
 const DOCUMENT_KEY =
-  "toonspectrum-studio-autosave:v2:browser-opfs-test-run";
-const EXPECTED_LOCK = `toonspectrum-opfs-recovery:${DOCUMENT_ID}`;
+  "toonstudio-studio-autosave:v2:browser-opfs-test-run";
+const EXPECTED_LOCK = `toonstudio-opfs-recovery:${DOCUMENT_ID}`;
 
 function payload(savedAt: string, id: string) {
   return {
@@ -267,7 +267,7 @@ describe("Studio autosave native OPFS production-preview verifier", () => {
 
   it("builds an isolated production harness around public product contracts and real browser APIs", () => {
     const source = createStudioAutosaveOpfsBrowserHarnessSource(
-      "/Users/example/toonspectrum",
+      "/Users/example/toonstudio",
     );
     expect(source).toContain("createStudioAutosaveOpfsSession");
     expect(source).toContain("persistStudioAutosaveWithOpfsPrimary");
@@ -293,29 +293,29 @@ describe("Studio autosave native OPFS production-preview verifier", () => {
 
   it("isolates all generated and result files under the selected evidence root", () => {
     const plan = createStudioAutosaveOpfsBrowserRunPlan(
-      "/tmp/toonspectrum-opfs-proof",
+      "/tmp/toonstudio-opfs-proof",
     );
     expect(plan).toMatchObject({
-      scratch: "/tmp/toonspectrum-opfs-proof",
+      scratch: "/tmp/toonstudio-opfs-proof",
       sourceDirectory:
-        "/tmp/toonspectrum-opfs-proof/production-source",
+        "/tmp/toonstudio-opfs-proof/production-source",
       distributionDirectory:
-        "/tmp/toonspectrum-opfs-proof/production-dist",
+        "/tmp/toonstudio-opfs-proof/production-dist",
       browserHarness:
-        "/tmp/toonspectrum-opfs-proof/production-source/browser-harness.js",
+        "/tmp/toonstudio-opfs-proof/production-source/browser-harness.js",
       htmlEntry:
-        "/tmp/toonspectrum-opfs-proof/production-source/index.html",
+        "/tmp/toonstudio-opfs-proof/production-source/index.html",
       evidence: {
         browserResult:
-          "/tmp/toonspectrum-opfs-proof/browser-result.json",
+          "/tmp/toonstudio-opfs-proof/browser-result.json",
         diagnostics:
-          "/tmp/toonspectrum-opfs-proof/diagnostics.json",
+          "/tmp/toonstudio-opfs-proof/diagnostics.json",
         productionBuild:
-          "/tmp/toonspectrum-opfs-proof/production-build.json",
+          "/tmp/toonstudio-opfs-proof/production-build.json",
         observations:
-          "/tmp/toonspectrum-opfs-proof/observations.json",
+          "/tmp/toonstudio-opfs-proof/observations.json",
         summary:
-          "/tmp/toonspectrum-opfs-proof/summary.json",
+          "/tmp/toonstudio-opfs-proof/summary.json",
       },
     });
   });

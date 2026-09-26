@@ -1,6 +1,6 @@
 # OSS hybrid brush references
 
-Upstream settings used to derive ToonSpectrum hybrid recipes in
+Upstream settings used to derive ToonStudio hybrid recipes in
 `studio-oss-brush-kernels.ts`. Product presets are transparent-safe adaptations
 (smudge forced off when the destination alpha is empty).
 

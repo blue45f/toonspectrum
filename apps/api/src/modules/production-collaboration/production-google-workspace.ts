@@ -171,8 +171,8 @@ interface GoogleCalendarEventResponse {
     end: { dateTime: input.event.endsAt, timeZone: "UTC" },
     extendedProperties: {
       private: {
-        toonspectrumProjectId: input.projectId,
-        toonspectrumEventKey: input.event.key,
+        toonstudioProjectId: input.projectId,
+        toonstudioEventKey: input.event.key,
       },
     },
   };
@@ -278,13 +278,13 @@ function googleDriveFileQuery(input: {
   const artifact = escapeGoogleDriveQueryValue(input.artifact);
   const predicates = [
     "trashed = false",
-    `appProperties has { key='toonspectrumProjectId' and value='${projectId}' }`,
-    `appProperties has { key='toonspectrumArtifact' and value='${artifact}' }`,
+    `appProperties has { key='toonstudioProjectId' and value='${projectId}' }`,
+    `appProperties has { key='toonstudioArtifact' and value='${artifact}' }`,
   ];
   if (input.contentDigest) {
     const contentDigest = escapeGoogleDriveQueryValue(input.contentDigest);
     predicates.push(
-      `appProperties has { key='toonspectrumContentDigest' and value='${contentDigest}' }`,
+      `appProperties has { key='toonstudioContentDigest' and value='${contentDigest}' }`,
     );
   }
   if (input.folderId) {
@@ -373,9 +373,9 @@ export async function uploadGoogleDriveArtifact(input: {
     name: input.fileName,
     mimeType: input.googleMimeType ?? input.sourceMimeType,
     appProperties: {
-      toonspectrumProjectId: input.projectId,
-      toonspectrumArtifact: input.artifact,
-      toonspectrumContentDigest: contentDigest,
+      toonstudioProjectId: input.projectId,
+      toonstudioArtifact: input.artifact,
+      toonstudioContentDigest: contentDigest,
     },
   };
   if (input.folderId && !existing) metadata.parents = [input.folderId];

@@ -22,7 +22,7 @@ import {
 } from "./studio-vrm-texture-paint-artifact";
 
 export const STUDIO_VRM_TEXTURE_PAINT_LIBRARY_DATABASE_NAME =
-  "toonspectrum-studio-vrm-texture-paint-library";
+  "toonstudio-studio-vrm-texture-paint-library";
 export const STUDIO_VRM_TEXTURE_PAINT_LIBRARY_DATABASE_VERSION = 1;
 export const STUDIO_VRM_TEXTURE_PAINT_LIBRARY_STORE_NAME = "png-artifacts";
 
@@ -63,14 +63,14 @@ export interface StudioVrmTexturePaintLibrarySaveResult {
 
 export type StudioVrmTexturePaintLibraryCreationReceipt =
   | {
-      readonly schema: "toonspectrum.vrm-texture-paint-library-creation";
+      readonly schema: "toonstudio.vrm-texture-paint-library-creation";
       readonly version: 1;
       readonly authority: "sqlite-opfs";
       readonly contentHash: StudioVrmTexturePaintArtifactHash;
       readonly generation: number;
     }
   | {
-      readonly schema: "toonspectrum.vrm-texture-paint-library-creation";
+      readonly schema: "toonstudio.vrm-texture-paint-library-creation";
       readonly version: 1;
       readonly authority: "legacy-indexeddb";
       readonly contentHash: StudioVrmTexturePaintArtifactHash;
@@ -610,7 +610,7 @@ export async function saveStudioVrmTexturePaintLibraryArtifact(
         deduplicated: result.deduplicated,
         creationReceipt: result.created
           ? registerCreationReceipt({
-              schema: "toonspectrum.vrm-texture-paint-library-creation",
+              schema: "toonstudio.vrm-texture-paint-library-creation",
               version: 1,
               authority: "sqlite-opfs",
               contentHash: result.receipt.contentHash,
@@ -648,7 +648,7 @@ export async function saveStudioVrmTexturePaintLibraryArtifact(
   const creationReceipt = result.deduplicated
     ? null
     : registerCreationReceipt({
-        schema: "toonspectrum.vrm-texture-paint-library-creation",
+        schema: "toonstudio.vrm-texture-paint-library-creation",
         version: 1,
         authority: "legacy-indexeddb",
         contentHash: artifact.metadata.contentHash,

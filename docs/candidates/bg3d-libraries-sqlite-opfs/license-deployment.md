@@ -5,7 +5,7 @@
 | Component | Role | License handling | Deployment note |
 | --- | --- | --- | --- |
 | `@sqlite.org/sqlite-wasm` | Shared V12 canonical manifest authority | Retain the repository's pinned version, notices, SBOM, and audit policy | Existing dynamic import only; no new dependency or eager bundle |
-| OPFS | SHA-256 CAS for validated GLB and thumbnail bytes | Web Platform API | Dedicated root `toonspectrum-studio-bg3d-libraries-v12`; no network permission |
+| OPFS | SHA-256 CAS for validated GLB and thumbnail bytes | Web Platform API | Dedicated root `toonstudio-studio-bg3d-libraries-v12`; no network permission |
 | Web Locks | Cross-tab read/modify/write fence | Web Platform API | Required for durable mutation; absence is an explicit product failure |
 | Studio OPFS asset store | Hashing, byte/MIME receipts, owner refs, mark-and-sweep | Project code plus existing compression notices | Uses identity codec for model/image evidence; full hash verification on reads |
 | Former IndexedDB stores | Controlled legacy import and regression seam | Web Platform API | Never selected from ambient IndexedDB on product boot |

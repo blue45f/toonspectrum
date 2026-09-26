@@ -26,7 +26,7 @@ try {
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: "reduce" });
   await context.addInitScript(() => {
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
   });
   await context.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user: null, items: [], data: [] }) }));
   const page = await context.newPage();

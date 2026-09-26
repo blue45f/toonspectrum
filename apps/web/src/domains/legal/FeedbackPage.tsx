@@ -8,11 +8,11 @@ import { feedbackRouteState } from "./feedback/feedback-route-state";
 import "./feedback/feedback-community.css";
 
 import type { FeedbackFilters } from "./feedback/use-feedback-feed";
-import type { FeedbackEntry, FeedbackKind } from "@toonspectrum/core/feedback";
+import type { FeedbackEntry, FeedbackKind } from "@toonstudio/core/feedback";
 
 import { Container } from "@/shared/components/container";
 import { useApp, useHydrated } from "@/shared/lib/store";
-import { FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, FEEDBACK_PROGRESS, FEEDBACK_PROGRESS_LABELS } from "@toonspectrum/core/feedback";
+import { FEEDBACK_KINDS, FEEDBACK_KIND_LABELS, FEEDBACK_PROGRESS, FEEDBACK_PROGRESS_LABELS } from "@toonstudio/core/feedback";
 
 const EMPTY_FILTERS: FeedbackFilters = { category: "all", progress: "all", query: "", mine: false, tag: "" };
 const INTAKES = [

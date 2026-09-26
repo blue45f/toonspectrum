@@ -8,7 +8,7 @@ export const READINGS: Readonly<Record<string, { title: string; url: string }>> 
   masks: { title: "CLIP STUDIO 공식 매뉴얼 · 레이어 마스크", url: "https://help.clip-studio.com/en-us/manual_en/180_layers/Layer_masks.htm" },
   clipping: { title: "CLIP STUDIO 공식 지원 · 클리핑과 레이어 폴더", url: "https://support.clip-studio.com/en-us/faq/articles/20190046" },
   publish: { title: "WEBTOON · 게시와 회차 운영 강좌", url: "https://www.webtoons.com/en/creators101/webtoon-academy/resource-list?resourceType=PUBLISH_CANVAS" },
-  studio: { title: "툰스튜디오 저장소 · 사용자 매뉴얼 (구현 기준 문서)", url: "https://github.com/blue45f/toonspectrum/blob/dbd5e75a207950b00360516a4353af872ff67e60/STUDIO_MANUAL.md" },
+  studio: { title: "툰스튜디오 저장소 · 사용자 매뉴얼 (구현 기준 문서)", url: "https://github.com/blue45f/toonstudio/blob/dbd5e75a207950b00360516a4353af872ff67e60/STUDIO_MANUAL.md" },
 };
 
 /** Original lessons and schematic exercises, not copies of the linked tutorials. */

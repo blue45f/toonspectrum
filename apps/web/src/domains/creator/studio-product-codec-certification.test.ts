@@ -16,9 +16,9 @@ import { sha256HexPortable } from "./studio-sha256";
 import type { StudioInkEnvelopeWebCryptoAlgorithm } from "./brush/studio-ink-envelope-webcrypto-attestation";
 import type { StudioCodecExecutionReceipt } from "./studio-codec-provider-contract";
 
-const SCOPE = "toonspectrum.product.codec-conformance.png-encode";
+const SCOPE = "toonstudio.product.codec-conformance.png-encode";
 const EVIDENCE_MEDIA_TYPE =
-  "application/vnd.toonspectrum.codec-conformance-evidence+json";
+  "application/vnd.toonstudio.codec-conformance-evidence+json";
 const ISSUED_AT = "2026-07-30T00:00:00.000Z";
 const NOT_BEFORE = "2026-07-30T00:01:00.000Z";
 const EXPIRES_AT = "2026-07-31T00:00:00.000Z";
@@ -41,8 +41,8 @@ function receipt(
 ): StudioCodecExecutionReceipt {
   return {
     schemaVersion: 1,
-    kind: "toonspectrum-codec-provider-execution",
-    providerId: "toonspectrum.codec.png.clean-room",
+    kind: "toonstudio-codec-provider-execution",
+    providerId: "toonstudio.codec.png.clean-room",
     mode: "public-clean-room",
     direction: "encode",
     format: "png",
@@ -60,7 +60,7 @@ function receipt(
       sha256: digest(output),
     },
     licenseGrant: {
-      id: "spdx.mit.toonspectrum.codec.png",
+      id: "spdx.mit.toonstudio.codec.png",
       scope: [
         "public-clean-room",
         "encode",
@@ -102,7 +102,7 @@ function signer(
 ): StudioProductCodecCertificationSigner {
   return {
     algorithm,
-    keyId: `toonspectrum.product.release.${algorithm}.2026-07`,
+    keyId: `toonstudio.product.release.${algorithm}.2026-07`,
     privateKey,
     scopes: [SCOPE],
     validFrom: ROOT_VALID_FROM,
@@ -118,7 +118,7 @@ function trustRoot(
 ): StudioProductCodecCertificationTrustRoot {
   return {
     algorithm,
-    keyId: `toonspectrum.product.release.${algorithm}.2026-07`,
+    keyId: `toonstudio.product.release.${algorithm}.2026-07`,
     publicKey,
     scopes: [SCOPE],
     validFrom: ROOT_VALID_FROM,
@@ -165,7 +165,7 @@ function verifyOptions(
   };
 }
 
-describe("ToonSpectrum product codec conformance certification", () => {
+describe("ToonStudio product codec conformance certification", () => {
   it.each<StudioInkEnvelopeWebCryptoAlgorithm>([
     "ed25519",
     "ecdsa-p256-sha256",
@@ -187,7 +187,7 @@ describe("ToonSpectrum product codec conformance certification", () => {
         STUDIO_PRODUCT_CODEC_CERTIFICATION_CLAIMS
       );
       expect(result.certificate.certification).toMatchObject({
-        officialToonSpectrumProductCertification: true,
+        officialToonStudioProductCertification: true,
         thirdPartyCodecCertification: false,
         codecVendorCertification: false,
         officialCodecVendorClaim: false,
@@ -240,8 +240,8 @@ describe("ToonSpectrum product codec conformance certification", () => {
     const serialized = new TextDecoder().decode(source);
     const scopeTamper = new TextEncoder().encode(
       serialized.replace(
-        "toonspectrum.product.codec-conformance.png-encode",
-        "toonspectrum.product.codec-conformance.png-decode"
+        "toonstudio.product.codec-conformance.png-encode",
+        "toonstudio.product.codec-conformance.png-decode"
       )
     );
     const structuralResult = await verifyStudioProductCodecCertificate(
@@ -332,7 +332,7 @@ describe("ToonSpectrum product codec conformance certification", () => {
       verifyStudioProductCodecCertificate(
         source,
         verifyOptions(root, {
-          expectedScope: "toonspectrum.product.codec-conformance.webp-encode",
+          expectedScope: "toonstudio.product.codec-conformance.webp-encode",
         })
       )
     ).resolves.toMatchObject({ ok: false, code: "SCOPE_MISMATCH" });
@@ -342,7 +342,7 @@ describe("ToonSpectrum product codec conformance certification", () => {
         verifyOptions({
           ...root,
           scopes: [
-            "toonspectrum.product.codec-conformance.webp-encode",
+            "toonstudio.product.codec-conformance.webp-encode",
           ],
         })
       )
@@ -368,12 +368,12 @@ describe("ToonSpectrum product codec conformance certification", () => {
     const oldKeys = await keyPair("ecdsa-p256-sha256");
     const newKeys = await keyPair("ecdsa-p256-sha256");
     const oldSigner = signer("ecdsa-p256-sha256", oldKeys.privateKey, {
-      keyId: "toonspectrum.product.release.p256.2026-h1",
+      keyId: "toonstudio.product.release.p256.2026-h1",
       validFrom: "2026-01-01T00:00:00.000Z",
       validUntil: "2026-08-01T00:00:00.000Z",
     });
     const newSigner = signer("ecdsa-p256-sha256", newKeys.privateKey, {
-      keyId: "toonspectrum.product.release.p256.2026-h2",
+      keyId: "toonstudio.product.release.p256.2026-h2",
       validFrom: "2026-08-01T00:00:00.000Z",
       validUntil: "2027-01-01T00:00:00.000Z",
     });

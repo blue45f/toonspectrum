@@ -1,6 +1,6 @@
 # Cloud-only free-first AI runtime
 
-ToonSpectrum can provide text AI without requiring every user to paste a key. The runtime combines a billing-disabled shared free pool with user-configured cloud API routes and fails closed when no permitted cloud route is available. Local LLMs, localhost gateways, private-network endpoints, browser model downloads, and self-hosted GPU inference are not supported AI execution paths.
+ToonStudio can provide text AI without requiring every user to paste a key. The runtime combines a billing-disabled shared free pool with user-configured cloud API routes and fails closed when no permitted cloud route is available. Local LLMs, localhost gateways, private-network endpoints, browser model downloads, and self-hosted GPU inference are not supported AI execution paths.
 
 ## Default shared free pool
 

@@ -304,7 +304,7 @@ const envSchema = z.object({
     1_024,
     256 * 1_024
   ).optional(),
-  // The QStash REST API origin/publish credentials are distinct from the ToonSpectrum provider
+  // The QStash REST API origin/publish credentials are distinct from the ToonStudio provider
   // facade BASE_URL/admission token. The provider module enforces the official API-host boundary.
   BACKEND_UPSTASH_QSTASH_API_BASE_URL: z
     .url({ protocol: /^https$/u })
@@ -534,7 +534,7 @@ export type ValidatedEnv = z.infer<typeof envSchema>;
 
 // 코드베이스 곳곳의 개발용 폴백/플레이스홀더 시크릿 — production 에서 쓰이면 안 된다.
 const UNSAFE_DEFAULTS: ReadonlyArray<string> = [
-  "toonspectrum-insecure-dev-session-secret",
+  "toonstudio-insecure-dev-session-secret",
   "dev-only-change-me-please",
   "dev-secret-change-me",
   "change-me-in-production",

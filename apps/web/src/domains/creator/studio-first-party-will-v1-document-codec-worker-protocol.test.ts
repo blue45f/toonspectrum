@@ -43,7 +43,7 @@ async function transport(): Promise<Uint8Array> {
     height: 439,
     title: "Worker protocol",
     createdAt: "2026-07-30T12:34:56Z",
-    application: "ToonSpectrum Studio",
+    application: "ToonStudio Studio",
     applicationVersion: "1.0.0",
     paths: [{
       points: [
@@ -163,7 +163,7 @@ describe("first-party WILL v1 document Worker protocol", () => {
     expect(result).toMatchObject({
       receipt: {
         providerId:
-          "toonspectrum.will-v1-annex-b-document.v1",
+          "toonstudio.will-v1-annex-b-document.v1",
         direction: "encode",
         input: { byteLength: input.byteLength },
       },

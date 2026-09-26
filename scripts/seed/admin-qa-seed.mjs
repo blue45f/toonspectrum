@@ -75,7 +75,7 @@ export async function insertAdminQaAccounts({client,target,plan,hashPassword,wri
   await client.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
   try {
     await client.query('SET LOCAL search_path = public, pg_catalog');
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('toonspectrum-admin-qa-seed'))");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('toonstudio-admin-qa-seed'))");
     const result=await client.query('SELECT current_database() AS name, (SELECT count(*)::int FROM "user") AS users');
     if (result.rows[0]?.name !== target.databaseName || Number(result.rows[0]?.users) !== 0) {
       throw new Error('The dedicated QA database must exist, match the requested name, and have no users. No existing users were modified.');
@@ -97,7 +97,7 @@ export async function insertAdminQaAccounts({client,target,plan,hashPassword,wri
 export async function writePrivateManifest(filename, manifest) {
   const file=await open(filename,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
   try {
-    await file.writeFile(JSON.stringify({kind:'toonspectrum-admin-qa-credentials-v1',...manifest},null,2)+'\n');
+    await file.writeFile(JSON.stringify({kind:'toonstudio-admin-qa-credentials-v1',...manifest},null,2)+'\n');
     await file.sync();
   } finally { await file.close(); }
 }

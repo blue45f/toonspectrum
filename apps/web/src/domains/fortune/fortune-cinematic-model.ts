@@ -1,5 +1,5 @@
-import { FORTUNE_EXPERIENCES, fortuneReadingText } from "@toonspectrum/core/fortune";
-import type { FortuneReading } from "@toonspectrum/core/fortune";
+import { FORTUNE_EXPERIENCES, fortuneReadingText } from "@toonstudio/core/fortune";
+import type { FortuneReading } from "@toonstudio/core/fortune";
 
 export type FortuneSceneTheme = "violet" | "rose" | "mint" | "gold";
 export const FORTUNE_INTENTS = [

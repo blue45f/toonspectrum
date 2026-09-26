@@ -30,7 +30,7 @@ const PREFLIGHT_DEFAULT_LAYOUT: StudioFloatingSurfaceLayout = {
 };
 
 const PROFILE_LABELS: Record<StudioPublishProfile, string> = {
-  generic: "일반 / ToonSpectrum",
+  generic: "일반 / ToonStudio",
   webtoon: "WEBTOON CANVAS",
   tapas: "Tapas",
 };

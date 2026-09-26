@@ -154,5 +154,5 @@ export function personalCloudRuntimeConfig(
 }
 
 export function personalCloudOAuthCookieName(): string {
-  return "toonspectrum.personal-cloud-oauth.v1";
+  return "toonstudio.personal-cloud-oauth.v1";
 }

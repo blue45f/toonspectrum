@@ -4,7 +4,7 @@ import {
   type ProductionProjectAggregate,
   type ProductionTask,
   type ProductionTaskStatus,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { CreatorRoleId } from "@/shared/lib/creator-role-contract";
 import {

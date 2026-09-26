@@ -47,7 +47,7 @@ function finish(
 
 export function exportStudioMeshStlAscii(
   mesh: StudioEditableMesh,
-  solidName = "toonspectrum",
+  solidName = "toonstudio",
 ): StudioMeshExportResult {
   const { soup, vertexCount, triangleCount } = soupStats(mesh);
   const lines = [`solid ${solidName}`];
@@ -94,7 +94,7 @@ export function exportStudioMeshObj(
   objectName = "mesh",
 ): StudioMeshExportResult {
   const { soup, vertexCount, triangleCount } = soupStats(mesh);
-  const lines = [`# ToonSpectrum OBJ export`, `o ${objectName}`];
+  const lines = [`# ToonStudio OBJ export`, `o ${objectName}`];
   for (let i = 0; i < soup.positions.length; i += 3) {
     lines.push(
       `v ${soup.positions[i]!} ${soup.positions[i + 1]!} ${soup.positions[i + 2]!}`,

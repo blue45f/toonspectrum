@@ -13,7 +13,7 @@
  * tutorials or React.
  */
 
-import { normalizeTerminologyTerm } from "@toonspectrum/studio-command-registry";
+import { normalizeTerminologyTerm } from "@toonstudio/studio-command-registry";
 
 /**
  * Fold a term to its lookup key. Reuses the registry's folding so a query typed

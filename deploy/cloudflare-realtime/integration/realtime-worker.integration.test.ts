@@ -42,9 +42,9 @@ import {
 
 const TEST_ORIGIN = "https://toonstudio.cloud";
 const TEST_SECRET =
-  "toonspectrum-cloudflare-test-secret-32-bytes-minimum";
+  "toonstudio-cloudflare-test-secret-32-bytes-minimum";
 const TEST_CONTROL_SECRET =
-  "toonspectrum-cloudflare-control-test-secret-32-bytes-minimum";
+  "toonstudio-cloudflare-control-test-secret-32-bytes-minimum";
 
 interface UpgradeResponse extends Response {
   readonly webSocket?: WebSocket;
@@ -166,8 +166,8 @@ function buildClaims(
 ): RealtimeTicketClaims {
   return {
     version: REALTIME_TICKET_VERSION,
-    issuer: "toonspectrum-api",
-    audience: "toonspectrum-realtime",
+    issuer: "toonstudio-api",
+    audience: "toonstudio-realtime",
     subject: "artist.integration",
     sessionVersion: 1,
     authorizationEpochMs: nowMs - 5_000,

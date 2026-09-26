@@ -965,7 +965,7 @@ export function StudioHybridDccPanel({
     {
       label: ".toon3d 작업 파일",
       technical: "Authoring package",
-      description: "메시·컷·권리 정보를 다시 편집 가능한 ToonSpectrum 패키지로 묶습니다.",
+      description: "메시·컷·권리 정보를 다시 편집 가능한 ToonStudio 패키지로 묶습니다.",
       onClick: () => {
         const pkg = workspaceExportToon3d(ws);
         setLog(`.toon3d 준비 완료 · ${Object.keys(pkg.files).length}개 파일 · ${pkg.manifest.packageHash.slice(0, 18)}…`);

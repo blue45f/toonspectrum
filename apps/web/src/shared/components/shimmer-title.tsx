@@ -1,4 +1,4 @@
-import { playSfx, resumeAudio, triggerParticleBurst } from "@toonspectrum/core/fx";
+import { playSfx, resumeAudio, triggerParticleBurst } from "@toonstudio/core/fx";
 
 import { cn } from "@/shared/lib/utils";
 

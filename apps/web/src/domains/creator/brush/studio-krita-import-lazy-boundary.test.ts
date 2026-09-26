@@ -11,8 +11,8 @@ describe("optional Krita bundle parser admission", () => {
   });
   it("imports project-graph compatibility data through the focused gateway contract", () => {
     const source = readFileSync(new URL("../project-graph/studio-project-graph-contract.ts", import.meta.url), "utf8");
-    expect(source).toContain('from "@toonspectrum/studio-format-gateway/compatibility-report"');
-    expect(source).not.toContain('from "@toonspectrum/studio-format-gateway"');
+    expect(source).toContain('from "@toonstudio/studio-format-gateway/compatibility-report"');
+    expect(source).not.toContain('from "@toonstudio/studio-format-gateway"');
   });
   it("rejects an already cancelled direct bundle request without reading corrupt bytes", async () => {
     const controller = new AbortController(); controller.abort();

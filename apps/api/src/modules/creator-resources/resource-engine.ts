@@ -1,13 +1,13 @@
 import { providerAvailability, upstreamRetrySeconds } from "../../../../web/src/shared/lib/creator-resource-workflow";
 import {
   httpsUrl, isProvider, parseDeadline, parseResource, recordOf, textOf,
-} from "@toonspectrum/core/creator-resources";
+} from "@toonstudio/core/creator-resources";
 import {
   isReferenceSearchField,
   MET_DEPARTMENT_IDS,
 } from "../../../../web/src/shared/lib/reference-assets";
 
-import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@toonspectrum/core/creator-resources";
+import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@toonstudio/core/creator-resources";
 import type { ReferenceSearchField } from "../../../../web/src/shared/lib/reference-assets";
 
 import { ambientCgSearch, validAmbientCgShape } from "./ambientcg-provider";
@@ -35,7 +35,7 @@ const PAGE_SIZE = 12;
 const MAX_BODY = 2 * 1024 * 1024;
 const MAX_CACHE = 256;
 const LIMIT = 20;
-const USER_AGENT = "ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler)";
+const USER_AGENT = "ToonStudio/1.0 (+https://www.toonstudio.cloud/about/crawler)";
 const PROVIDER_KEY: Record<ResourceProvider, string> = {
   met: "",
   aic: "",

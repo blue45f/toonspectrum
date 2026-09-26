@@ -103,7 +103,7 @@ function failureMessage(reason: StudioPoseMaterialLibraryFailureReason): string 
     "library-corrupt": "기존 포즈 소재 데이터가 손상되어 원문 보호를 위해 변경을 막았습니다.",
     "library-future": "더 최신 버전의 포즈 소재 데이터라 현재 버전에서는 읽기 전용입니다.",
     "replace-requires-force": "기존 라이브러리를 교체하려면 명시적인 확인이 필요합니다.",
-    "invalid-library": "ToonSpectrum 포즈 소재 라이브러리 JSON 형식이 아닙니다.",
+    "invalid-library": "ToonStudio 포즈 소재 라이브러리 JSON 형식이 아닙니다.",
     "invalid-material": "유효하지 않은 포즈 소재입니다.",
     "invalid-id": "포즈 소재 식별자가 올바르지 않습니다.",
     "duplicate-id": "같은 식별자의 포즈 소재가 중복되어 있습니다.",
@@ -427,7 +427,7 @@ export function StudioVrmPoseMaterialPanel({
       const url = URL.createObjectURL(new Blob([result.json], { type: "application/json" }));
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = "toonspectrum-pose-materials-v1.json";
+      anchor.download = "toonstudio-pose-materials-v1.json";
       anchor.click();
       URL.revokeObjectURL(url);
       setPanelState((current) => ({

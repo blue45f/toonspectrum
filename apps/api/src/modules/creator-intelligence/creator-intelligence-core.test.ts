@@ -347,7 +347,7 @@ describe("creator intelligence voice providers", () => {
     }));
     const core = createCreatorIntelligenceCore({ fetch: fetcher, env: () => voiceEnv, now: () => stamp });
     const result = await core.synthesizeVoice("deepgram", {
-      text: "Welcome to ToonSpectrum Voice Studio.",
+      text: "Welcome to ToonStudio Voice Studio.",
       language: "en",
     });
 
@@ -367,7 +367,7 @@ describe("creator intelligence voice providers", () => {
   it.each([
     { text: "이 자막은 한국어입니다.", language: "ko" },
     { text: "この字幕は日本語です。", language: "ja" },
-    { text: "Bonjour, ToonSpectrum.", language: "fr" },
+    { text: "Bonjour, ToonStudio.", language: "fr" },
   ])("rejects non-English Deepgram requests before spending provider credit", async ({ text, language }) => {
     const fetcher = vi.fn<typeof fetch>();
     const core = createCreatorIntelligenceCore({ fetch: fetcher, env: () => voiceEnv });

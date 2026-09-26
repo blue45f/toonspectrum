@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MAX_LIBRARY_BACKUP_BYTES, parseLibraryBackup } from "./library-backup";
 
 export const validLibraryBackup = {
-  _app: "toonspectrum-library", version: 1, exportedAt: "2026-09-12T00:00:00Z",
+  _app: "toonstudio-library", version: 1, exportedAt: "2026-09-12T00:00:00Z",
   ratings: { work: 4.5 }, reads: { work: "reading" }, subscriptions: { work: true }, likedReviews: {},
   reviews: { work: { titleId: "work", rating: 4.5, text: "좋아요", tags: ["연출"], spoiler: false, createdAt: "2026-09-12T00:00:00Z" } },
   collections: [{ id: "old-collection", name: "참고 작품", emoji: "📚", titleIds: ["work"], createdAt: "2026-09-12T00:00:00Z" }],

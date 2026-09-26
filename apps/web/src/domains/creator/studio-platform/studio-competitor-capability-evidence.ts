@@ -5,7 +5,7 @@ import {
   type StudioCapabilityEvidenceDimension,
   type StudioCapabilityRecord,
   type StudioCompetitorCapabilityId,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 interface StudioCapabilityEvidenceSpec {
   readonly id: StudioCompetitorCapabilityId;

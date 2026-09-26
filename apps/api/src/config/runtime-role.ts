@@ -17,9 +17,9 @@ const STUDIO_LIVE_HTTP_PATHS = new Set([
   "/api/health/ready",
 ]);
 const CAPABILITY_WORKER_GATEWAY_PATH =
-  "/.well-known/toonspectrum/backend-capabilities/v1/execute";
+  "/.well-known/toonstudio/backend-capabilities/v1/execute";
 const CAPABILITY_WORKER_HEALTH_PATH =
-  "/.well-known/toonspectrum/backend-capabilities/v1/health";
+  "/.well-known/toonstudio/backend-capabilities/v1/health";
 
 export function resolveApiRuntimeRole(
   environment: RuntimeRoleEnvironment = process.env,

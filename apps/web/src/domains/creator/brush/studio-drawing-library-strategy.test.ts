@@ -313,9 +313,9 @@ describe("studio drawing library strategy", () => {
 
 describe("studio drawing source adoption audit", () => {
   const candidateIds = [
-    "toonspectrum-canonical-core",
+    "toonstudio-canonical-core",
     "pointer-events-l3",
-    "toonspectrum-adaptive-stabilizer",
+    "toonstudio-adaptive-stabilizer",
     "worker-offscreen-canvas",
     "raw-webgl2",
     "raw-webgpu",
@@ -376,7 +376,7 @@ describe("studio drawing source adoption audit", () => {
   it("records active, opt-in, reference and excluded sources without creating a second authority", () => {
     for (const id of [
       "pointer-events-l3",
-      "toonspectrum-adaptive-stabilizer",
+      "toonstudio-adaptive-stabilizer",
       "worker-offscreen-canvas",
       "raw-webgl2",
       "perfect-freehand",
@@ -570,7 +570,7 @@ describe("studio drawing source adoption audit", () => {
   });
 
   it("resolves the first-party canonical owner and rejects unknown audit ids", () => {
-    expect(resolveStudioDrawingSourceAudit("toonspectrum-canonical-core"))
+    expect(resolveStudioDrawingSourceAudit("toonstudio-canonical-core"))
       .toMatchObject({
         sourceKind: "first-party",
         disposition: "adopted-active",

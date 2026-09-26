@@ -35,9 +35,9 @@ function enabledEnvironment(
     STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID:
       "cloudflare-realtime-v1",
     STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER:
-      "toonspectrum-api",
+      "toonstudio-api",
     STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE:
-      "toonspectrum-realtime",
+      "toonstudio-realtime",
     STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET: TEST_SECRET,
     STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS: "120",
     STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS: "300",
@@ -67,8 +67,8 @@ describe("Studio realtime ticket deployment configuration", () => {
     expect(deployment.signer).toMatchObject({
       providerId: "cloudflare-realtime-v1",
       provider: "cloudflare",
-      issuer: "toonspectrum-api",
-      audience: "toonspectrum-realtime",
+      issuer: "toonstudio-api",
+      audience: "toonstudio-realtime",
       ticketTtlSeconds: 120,
       sessionTtlSeconds: 300,
       workloads: [
@@ -169,8 +169,8 @@ describe("Studio realtime ticket deployment configuration", () => {
       response.ticket,
       TEST_SECRET,
       {
-        issuer: "toonspectrum-api",
-        audience: "toonspectrum-realtime",
+        issuer: "toonstudio-api",
+        audience: "toonstudio-realtime",
         workId: "work-1",
         roomId: "work-1",
         origin: "https://www.toonstudio.cloud",

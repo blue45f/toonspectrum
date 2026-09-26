@@ -21,7 +21,7 @@ import {
   type StudioVrmTexturePaintRuntimeResult,
 } from "./studio-vrm-texture-paint-runtime";
 
-import type { BrushProgramIR, StrokeIR } from "@toonspectrum/studio-project-model";
+import type { BrushProgramIR, StrokeIR } from "@toonstudio/studio-project-model";
 
 class MemoryCanvas {
   width: number;

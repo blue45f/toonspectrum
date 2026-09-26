@@ -7,7 +7,7 @@
 | SQLite | Local relational/KV authority | Public domain upstream |
 | `@sqlite.org/sqlite-wasm` | Browser WASM and OPFS SAH-pool bridge | Existing repository pin and notices apply; no dependency change in this slice |
 | Web OPFS | Durable origin-private file backing | Web Platform API |
-| ToonSpectrum canonical schemas/repositories | Validation, queueing and product UX | Repository-owned code |
+| ToonStudio canonical schemas/repositories | Validation, queueing and product UX | Repository-owned code |
 
 No package, lockfile, native binary, network provider or copyleft engine was introduced. The four
 namespaces contain only stable engine-neutral JSON; Three.js/VRM runtime objects are rejected at the
@@ -17,7 +17,7 @@ engine or package dependency.
 ## Deployment behavior
 
 - Product code acquires the existing app-lifetime handle through `acquireStudioLocalDatabase()`.
-- The database remains `studio-local-v12.db` under the existing `toonspectrum-studio-sqlite` OPFS
+- The database remains `studio-local-v12.db` under the existing `toonstudio-studio-sqlite` OPFS
   root.
 - Lazy panels do not independently install an OPFS VFS or close the shared handle.
 - Database-open or write failure does not silently switch product authority to a legacy browser KV

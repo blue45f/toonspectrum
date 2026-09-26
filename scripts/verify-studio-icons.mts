@@ -11,7 +11,7 @@ import { chromium, type Page } from "playwright";
 
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
 
 function log(msg: string) {
   console.log(`[verify-icons] ${msg}`);
@@ -154,10 +154,10 @@ async function main() {
         localStorage.setItem(key, "1");
         // Icon assertions address Korean menu labels; make the harness deterministic across hosts.
         localStorage.setItem(
-          "toonspectrum-lang",
+          "toonstudio-lang",
           JSON.stringify({ state: { lang: "ko" }, version: 0 })
         );
-        localStorage.setItem("toonspectrum-studio-ui-density:v1", JSON.stringify({ mode: "full" }));
+        localStorage.setItem("toonstudio-studio-ui-density:v1", JSON.stringify({ mode: "full" }));
       } catch {
         /* ignore */
       }

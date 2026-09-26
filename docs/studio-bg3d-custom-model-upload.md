@@ -12,7 +12,7 @@
 
 | 파일 | 역할 |
 | --- | --- |
-| `src/domains/creator/bg3d-model-library.ts` | 업로드된 3D 배경 모델의 IndexedDB CRUD. `vrm-library.ts`와 구조 동일(스토어 2개: `models`/`thumbnails`), DB명만 `toonspectrum-studio-bg3d-model-library`로 분리. |
+| `src/domains/creator/bg3d-model-library.ts` | 업로드된 3D 배경 모델의 IndexedDB CRUD. `vrm-library.ts`와 구조 동일(스토어 2개: `models`/`thumbnails`), DB명만 `toonstudio-studio-bg3d-model-library`로 분리. |
 | `src/domains/creator/studio-background-3d-model.ts` | `BgCustomModelInstance` 타입 + 스폰/복제/클론 헬퍼 + 오토핏 스케일 계산 + blob 로더(`loadBg3dCustomModelFromBlob`) + 씬 해시 직렬화 확장(`encodeBg3dSceneWithModelsHash`/`parseBg3dSceneWithModelsFromDataUrl`). `studio-background-3d-primitives.ts`는 무변경. |
 | `*.test.ts` (위 두 파일) | 순수 함수만 유닛 테스트(이 레포의 `vitest.config.ts`가 `environment: "node"`라 `indexedDB`/DOM이 없다 — `vrm-library.test.ts`와 동일한 스코프 제약). blob 로더 자체(`loadBg3dCustomModelFromBlob`)는 `URL.createObjectURL`+three.js 로더의 실제 네트워크/파싱 경로라 여기서 테스트하지 않는다 — 통합 패스에서 브라우저로 수동 검증(`/verify` 스킬 등) 필요. |
 

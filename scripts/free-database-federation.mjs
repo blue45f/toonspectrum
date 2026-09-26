@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 export const FREE_DATABASE_FEDERATION_ROOT = fileURLToPath(new URL("../", import.meta.url));
 
 export const FREE_DATABASE_FEDERATION_VERSION =
-  "toonspectrum.free-database-federation.v1";
+  "toonstudio.free-database-federation.v1";
 
 const OPERATIONS = new Set(["read", "write"]);
 const CONSISTENCY = new Set(["authoritative", "replicated", "derived", "ephemeral"]);

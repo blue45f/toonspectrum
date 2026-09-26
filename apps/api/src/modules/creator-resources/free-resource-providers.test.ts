@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { googleBooksUrl } from "./google-books-provider";
 import { polyHavenUrl } from "./polyhaven-provider";
 import { createResourceEngine } from "./resource-engine";
-import { parseResource, parseSearchResult } from "@toonspectrum/core/creator-resources";
+import { parseResource, parseSearchResult } from "@toonstudio/core/creator-resources";
 
 const stamp = "2026-09-15T12:00:00.000Z";
 
@@ -62,7 +62,7 @@ describe("Poly Haven provider", () => {
   it("searches cached CC0 metadata and preserves mandatory attribution", async () => {
     const fetcher = vi.fn<typeof fetch>().mockImplementation(async (raw, init) => {
       const url = new URL(String(raw));
-      expect(new Headers(init?.headers).get("user-agent")).toContain("ToonSpectrum/1.0");
+      expect(new Headers(init?.headers).get("user-agent")).toContain("ToonStudio/1.0");
       const type = url.searchParams.get("type");
       if (type === "models") return Response.json({
         wooden_chair: {

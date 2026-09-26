@@ -1,8 +1,8 @@
-# ToonSpectrum Webtoon Production Co-Creation v3
+# ToonStudio Webtoon Production Co-Creation v3
 
 ## Delivery metadata
 
-- Source pull request: `blue45f/toonspectrum#1427`
+- Source pull request: `blue45f/toonstudio#1427`
 - Source branch: `consolidation/all-unmerged-20260914`
 - Source commit: `923e5155ad199a62d680596cad44133b36a02189`
 - Implementation branch: `feat/webtoon-production-cocreator-v3`

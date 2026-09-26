@@ -101,13 +101,13 @@ describe("Avatar Forge reference catalogue generator", () => {
 
   it("serializes compact canonical JSON with one trailing LF and enforces both caps", () => {
     const bytes = serializeStudioVrmAvatarReferenceCatalogue({
-      authority: { sourceAssetId: "toonspectrum-minseo-campus" },
+      authority: { sourceAssetId: "toonstudio-minseo-campus" },
       renders: [],
       catalogue: { entries: [] },
     });
     const text = new TextDecoder().decode(bytes);
     expect(text).toBe(
-      '{"authority":{"sourceAssetId":"toonspectrum-minseo-campus"},"renders":[],"catalogue":{"entries":[]}}\n',
+      '{"authority":{"sourceAssetId":"toonstudio-minseo-campus"},"renders":[],"catalogue":{"entries":[]}}\n',
     );
     expect(text).not.toContain("  ");
     expect(assertStudioVrmAvatarReferenceArtifactSize(bytes)).toEqual({

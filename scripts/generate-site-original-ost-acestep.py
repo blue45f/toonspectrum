@@ -5,10 +5,10 @@ from datetime import datetime, timezone
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 BASE=os.environ.get('ACESTEP_API_URL','http://127.0.0.1:8001').rstrip('/')
-ACE_ROOT=pathlib.Path(os.environ.get('ACESTEP_ROOT', pathlib.Path.home()/'.cache/toonspectrum-ace-step-1.5'))
+ACE_ROOT=pathlib.Path(os.environ.get('ACESTEP_ROOT', pathlib.Path.home()/'.cache/toonstudio-ace-step-1.5'))
 CONFIG=ROOT/'config/site-original-ost.production.json'
 OUT=ROOT/'apps/web/public/audio/original'
-RAW=pathlib.Path(os.environ.get('ACESTEP_RAW_DIR','/tmp/toonspectrum-ost-raw'))
+RAW=pathlib.Path(os.environ.get('ACESTEP_RAW_DIR','/tmp/toonstudio-ost-raw'))
 OUT.mkdir(parents=True,exist_ok=True); RAW.mkdir(parents=True,exist_ok=True)
 config=json.loads(CONFIG.read_text())
 config_sha=hashlib.sha256(CONFIG.read_bytes()).hexdigest()
@@ -45,11 +45,11 @@ def lyrics_for(track):
     return '\n'.join(lines)
 
 def seed_for(track_id):
-    return int(hashlib.sha256(('ToonSpectrum Original OST:'+track_id).encode()).hexdigest()[:8],16) & 0x7fffffff
+    return int(hashlib.sha256(('ToonStudio Original OST:'+track_id).encode()).hexdigest()[:8],16) & 0x7fffffff
 
 def prompt_for(track):
     principles='; '.join(config['sonicIdentity']['principles'])
-    base=(f"{track['direction']}; {principles}; ToonSpectrum original sonic identity; recurring four-note creation motif when musically appropriate; "
+    base=(f"{track['direction']}; {principles}; ToonStudio original sonic identity; recurring four-note creation motif when musically appropriate; "
           "fully original melody and harmony; do not imitate any existing artist, song, franchise theme or identifiable voice; "
           "high-fidelity studio production, cinematic depth, clean midrange, natural transients, wide but mono-compatible stereo image, controlled sub bass")
     if track['primaryVariant']=='instrumental':
@@ -118,7 +118,7 @@ def master(raw,out,track):
     cmd=['ffmpeg','-y','-hide_banner','-nostats','-i',str(raw),'-af',filt,
          '-ar','48000','-ac','2','-codec:a','libmp3lame','-b:a',f'{bitrate}k','-id3v2_version','3',
          '-metadata',f"title={track['title']}",'-metadata',f"artist={config['artist']}",'-metadata',f"album={config['collection']}",
-         '-metadata','comment=Original ToonSpectrum soundtrack generated locally with ACE-Step 1.5; see provenance sidecar.',str(out)]
+         '-metadata','comment=Original ToonStudio soundtrack generated locally with ACE-Step 1.5; see provenance sidecar.',str(out)]
     encoded=subprocess.run(cmd,text=True,capture_output=True,check=True)
     final_blocks=re.findall(r'\{\s*"input_i".*?\}',encoded.stderr,re.S)
     normalized=json.loads(final_blocks[-1]) if final_blocks else {}
@@ -174,7 +174,7 @@ def generate(track, force=False, approve=False, keep_source=False, resume_task=N
     print(f"DONE {track['id']} {info['durationSeconds']:.1f}s {loud['integratedLufs']:.1f} LUFS peak {loud['truePeakDbfs']:.1f} dBFS {meta['sha256'][:12]}",flush=True)
 
 def main():
-    parser=argparse.ArgumentParser(description='Generate ToonSpectrum OST masters with a local ACE-Step 1.5 API server.')
+    parser=argparse.ArgumentParser(description='Generate ToonStudio OST masters with a local ACE-Step 1.5 API server.')
     parser.add_argument('--track', action='append', default=[], help='Track id to generate; repeat for multiple tracks.')
     parser.add_argument('--all', action='store_true', help='Generate all primary masters.')
     parser.add_argument('--keep-source', action='store_true', help='Keep the original 48 kHz FLAC outside the repository for archival and editing.')

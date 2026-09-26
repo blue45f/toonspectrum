@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * ToonSpectrum Studio — GPT Image 2.5 background atlas generator.
+ * ToonStudio Studio — GPT Image 2.5 background atlas generator.
  *
  * Secrets stay local. This script never writes the API key to logs, manifests, source files,
  * or the application server. It is intentionally BYOK-only and defaults to a dry run.
@@ -74,7 +74,7 @@ function parseArgs(argv) {
 
 function help() {
   console.log(`
-ToonSpectrum Studio GPT Image 2.5 background atlas generator
+ToonStudio Studio GPT Image 2.5 background atlas generator
 
 Default mode is DRY RUN and prints the selected recipes without spending credits.
 

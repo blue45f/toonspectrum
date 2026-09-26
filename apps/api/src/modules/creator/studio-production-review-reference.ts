@@ -1,4 +1,4 @@
-import { canonicalJson, studioReviewRoleAssignmentCoversTask, type StudioReviewTaskReference } from "@toonspectrum/studio-project-model";
+import { canonicalJson, studioReviewRoleAssignmentCoversTask, type StudioReviewTaskReference } from "@toonstudio/studio-project-model";
 import type { StudioProductionWorkspaceDocument } from "./studio-production.dto";
 
 type Task = StudioProductionWorkspaceDocument["tasks"][number];

@@ -3,7 +3,7 @@ index 9cc58029925f119613483b23760270ab7dbfd234..1f3005bc90cd9c20064e25905c4f7027
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,9 +1,14 @@
-+// ToonSpectrum compatibility: geometry-only transforms must not eagerly initialize
++// ToonStudio compatibility: geometry-only transforms must not eagerly initialize
 +// optional ndarray image kernels (which use Function()). Texture APIs load their
 +// original dependencies when invoked; no CSP weakening or mock implementation.
 +async function getPixels(...args) { return (await import("ndarray-pixels")).getPixels(...args); }

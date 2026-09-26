@@ -80,6 +80,6 @@ describe("V6 reversible material experiments", () => {
     }
     const program = createBrushStudioV6Program("wax-resist");
     expect(parseBrushStudioV6Import(JSON.stringify(program))).toEqual(program);
-    expect(parseBrushStudioV6Import(JSON.stringify({ kind: "toonspectrum.brush-program-v6", program }))).toEqual(program);
+    expect(parseBrushStudioV6Import(JSON.stringify({ kind: "toonstudio.brush-program-v6", program }))).toEqual(program);
   });
 });

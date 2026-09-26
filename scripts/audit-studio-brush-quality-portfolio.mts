@@ -153,7 +153,7 @@ if (Math.abs(qualityWeight - 0.85) > 1e-9) failures.push("quality weight is not 
 if (Math.abs(performanceWeight - 0.15) > 1e-9) failures.push("performance weight is not 15%");
 
 const report = {
-  kind: "toonspectrum-studio-brush-product-catalogue-audit-v3",
+  kind: "toonstudio-studio-brush-product-catalogue-audit-v3",
   generatedAt: new Date().toISOString(),
   counts: {
     internalRegistry: STUDIO_ALL_BRUSH_CATALOG_ITEMS.length,

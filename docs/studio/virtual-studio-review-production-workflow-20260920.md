@@ -94,7 +94,7 @@ editor-handoff contract for the exact limits.
 ## Production reference contract
 
 The Web workspace parser and API DTO now consume the same optional `reviewRef` schema from
-`@toonspectrum/studio-project-model`. It contains the exact saved subject, comment ID and
+`@toonstudio/studio-project-model`. It contains the exact saved subject, comment ID and
 optional existing handoff ID. It contains no signed URLs, comment body, approval or permission
 claim. Both current tasks and recorded workspace versions preserve the reference through
 serialization. A reference to another work, a missing/duplicate handoff, a different production

@@ -46,7 +46,7 @@ export function SwitchIndicator({ checked, className }: SwitchIndicatorProps): R
 }
 
 /**
- * Canonical binary switch for ToonSpectrum UI.
+ * Canonical binary switch for ToonStudio UI.
  *
  * Geometry is intentionally fixed: 44×24px track, 20px thumb, 2px origin,
  * and 20px travel. Keep the explicit left/top origin; relying on an absolutely

@@ -4,7 +4,7 @@ import type { Pool, PoolClient } from "pg";
 import {
   operationTransitionBlockers, resolveOperationPolicy,
   type OperationPolicyRecord, type OperationPolicyPreview, type OperationPolicyAdminView,
-} from "@toonspectrum/contracts/operation-policy";
+} from "@toonstudio/contracts/operation-policy";
 import { OperationPolicyDraftSchema, type OperationPolicyProposal, type OperationPolicyApply } from "./operation-policy.dto";
 
 export const OPERATION_POLICY_POOL = Symbol("OPERATION_POLICY_POOL");

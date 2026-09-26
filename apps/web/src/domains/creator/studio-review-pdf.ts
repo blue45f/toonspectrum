@@ -457,7 +457,7 @@ export function createStudioReviewPdfPageCanvas(
   let y = pad;
   context.font = font(small, 700);
   context.fillStyle = REVIEW_PDF_COLORS.accent;
-  context.fillText("ToonSpectrum · 내부 검수", pad, y);
+  context.fillText("ToonStudio · 내부 검수", pad, y);
   y += Math.round(small * 2.15);
 
   if (metadata.pageNumber !== undefined) {

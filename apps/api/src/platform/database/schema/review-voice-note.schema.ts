@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, jsonb, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
-import type { StudioReviewVoiceNoteSubject } from "@toonspectrum/studio-project-model/review-voice-note";
+import type { StudioReviewVoiceNoteSubject } from "@toonstudio/studio-project-model/review-voice-note";
 
 import type { LocatedPrivateObjectReference } from "../../adapters/private-object-storage/private-object-storage.contract";
 import { users } from "./auth.schema";

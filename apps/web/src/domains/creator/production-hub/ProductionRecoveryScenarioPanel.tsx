@@ -1,4 +1,4 @@
-import { stableProductionFingerprint } from "@toonspectrum/core/production";
+import { stableProductionFingerprint } from "@toonstudio/core/production";
 import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import {
   AlertTriangle,
@@ -22,7 +22,7 @@ import { Link } from "react-router-dom";
 import type {
   ProductionProjectAggregate,
   ProductionTask,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
 import type { ProductionRiskIntelligence } from "./production-risk-intelligence";

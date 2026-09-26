@@ -17,7 +17,7 @@ function writeU32(bytes: Uint8Array, offset: number, value: number): void {
 
 export function createStudioBg3dMeshoptCompressedTriangleGlbFixture(): Uint8Array {
   const root = {
-    asset: { version: "2.0", generator: "ToonSpectrum Meshopt integration fixture" },
+    asset: { version: "2.0", generator: "ToonStudio Meshopt integration fixture" },
     extensionsUsed: ["EXT_meshopt_compression"],
     extensionsRequired: ["EXT_meshopt_compression"],
     buffers: [

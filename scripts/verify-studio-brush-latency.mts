@@ -62,12 +62,12 @@ import {
 const SCRATCH =
   process.env.TOONSPECTRUM_BRUSH_LATENCY_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-brush-latency");
+  ?? join(tmpdir(), "toonstudio-studio-brush-latency");
 const LOG_PATH = join(SCRATCH, "studio-brush-latency-verify.log");
 const REPORT_PATH = join(SCRATCH, "studio-brush-latency-report.json");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 const INPUT_TIMEOUT_MS = 360;
 const SETTLE_OBSERVATION_MS = 360;
 const OPTIONAL_LOOPBACK_PREVIEW_PATHS = new Set([
@@ -984,7 +984,7 @@ async function main(): Promise<void> {
       ...result.browserErrors.responses,
     ]);
     const report = {
-      kind: "toonspectrum-studio-brush-latency-browser-v3",
+      kind: "toonstudio-studio-brush-latency-browser-v3",
       generatedAt: new Date().toISOString(),
       mode: competitiveLongStroke ? "competitive-long-stroke" : "smoke",
       route: studioUrl,

@@ -18,7 +18,7 @@ describe("studio verified download package", () => {
       "작가-원고-1화",
     );
     expect(sanitizeStudioDownloadFileStem("CON")).toBe(
-      "toonspectrum-comic",
+      "toonstudio-comic",
     );
     expect(studioDownloadPackageFileName(" 1화 ")).toBe(
       "1화-verified-pages.zip",

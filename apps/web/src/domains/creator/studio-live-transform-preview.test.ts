@@ -7,7 +7,7 @@
  * same affine, so a non-Konva document lane previews identical geometry, and (c) degenerate
  * frames are rejected as `null`, never as a partial projection.
  */
-import { applyMat2d } from "@toonspectrum/studio-project-model";
+import { applyMat2d } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import { planStudioDrawObjectTransform } from "./brush/studio-draw-object-transform";

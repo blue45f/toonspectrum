@@ -1,5 +1,5 @@
 {
-  "version": "toonspectrum.free-infrastructure.v3",
+  "version": "toonstudio.free-infrastructure.v3",
   "mode": "free-strict",
   "automaticDeployments": false,
   "automaticPaidFailover": false,

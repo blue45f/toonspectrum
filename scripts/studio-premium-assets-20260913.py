@@ -217,7 +217,7 @@ def main() -> None:
     if not stage.is_relative_to(ROOT / 'artifacts'):
         raise ValueError('Use an acquisition directory under artifacts, never public assets')
     manifest = json.loads((stage / 'manifest.json').read_text(encoding='utf-8'))
-    if manifest.get('schema') != 'toonspectrum.asset-delivery.v1' or not isinstance(manifest.get('assets'), list):
+    if manifest.get('schema') != 'toonstudio.asset-delivery.v1' or not isinstance(manifest.get('assets'), list):
         raise ValueError('Unsupported candidate manifest')
     acquire_backgrounds(stage, manifest)
     localize_and_review(stage, manifest)

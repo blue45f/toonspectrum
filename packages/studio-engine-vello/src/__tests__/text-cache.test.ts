@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { solidPaint } from "@toonspectrum/studio-project-model";
+import { solidPaint } from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { loadVelloNode } from "../node/index";
@@ -15,7 +15,7 @@ import {
 } from "../text-cache";
 
 import type { ShapeTextOptions, ShapedText } from "../text";
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 const BASE_OPTIONS: ShapeTextOptions = { fontSizePx: 48, maxWidthPx: 400 };
 const MB = 1024 * 1024;

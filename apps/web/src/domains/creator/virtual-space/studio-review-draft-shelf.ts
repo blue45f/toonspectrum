@@ -1,4 +1,4 @@
-import { canonicalJson, reviewAnchorSchema, studioEntityIdSchema } from "@toonspectrum/studio-project-model";
+import { canonicalJson, reviewAnchorSchema, studioEntityIdSchema } from "@toonstudio/studio-project-model";
 import { z } from "zod";
 import type { StudioAsyncKeyValueStore } from "../studio-local-database";
 import { parseStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-subject";

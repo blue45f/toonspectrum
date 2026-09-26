@@ -17,7 +17,7 @@ import {
   type CreatorSupportNeed,
   type CreatorSupportOfferType,
   type CreatorSupportProject,
-} from "@toonspectrum/core/creator-support";
+} from "@toonstudio/core/creator-support";
 
 import "./creator-support-i18n";
 import {

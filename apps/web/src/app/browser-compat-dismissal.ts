@@ -1,4 +1,4 @@
-const KEY = "toonspectrum-compat-dismissed";
+const KEY = "toonstudio-compat-dismissed";
 type SessionStore = Pick<Storage, "getItem" | "setItem">;
 
 /** Storage getters themselves can throw in private or embedded browser contexts. */

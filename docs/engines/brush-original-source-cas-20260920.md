@@ -24,7 +24,7 @@ CAS 또는 SQL 실패 시 부분 row를 정상 저장으로 게시하지 않는�
 
 ## 내보내기와 지원 범위
 
-원본 없는 브러시는 기존 `toonspectrum-studio-brush` JSON을 유지한다. 원본이 있는 경우 새로운 `toonspectrum-studio-brush-source-archive` envelope에 현재 Studio 설정과 원본 base64를 함께 담는다. 구형 클라이언트가 새 보존 형식을 알지 못하면 가져오기를 거부하며, 원본을 조용히 버리고 설정만 복원하지 않는다. 로컬 OPFS 참조만 있는 휴대 파일은 거부한다.
+원본 없는 브러시는 기존 `toonstudio-studio-brush` JSON을 유지한다. 원본이 있는 경우 새로운 `toonstudio-studio-brush-source-archive` envelope에 현재 Studio 설정과 원본 base64를 함께 담는다. 구형 클라이언트가 새 보존 형식을 알지 못하면 가져오기를 거부하며, 원본을 조용히 버리고 설정만 복원하지 않는다. 로컬 OPFS 참조만 있는 휴대 파일은 거부한다.
 
 일반 설정 파일의 기존 2MiB 한도와 MYB/KPP 원본 8MiB 한도를 유지한다. 원본을 포함한 JSON은 base64·UTF-8 팽창을 고려한 별도 유한 한도를 사용한다. 해시는 우발적 손상을 검출하는 값이며 저작권·작성자의 증명이나 디지털 서명이 아니다.
 

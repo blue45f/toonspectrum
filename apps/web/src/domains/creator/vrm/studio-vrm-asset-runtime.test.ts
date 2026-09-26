@@ -42,7 +42,7 @@ describe("studio VRM asset runtime", () => {
           specVersion: "1.0",
           meta: {
             name: "CC0 avatar",
-            authors: ["ToonSpectrum"],
+            authors: ["ToonStudio"],
             licenseUrl: "https://vrm.dev/licenses/1.0/",
             avatarPermission: "everyone",
             commercialUsage: "corporation",

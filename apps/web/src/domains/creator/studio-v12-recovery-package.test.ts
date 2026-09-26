@@ -4,7 +4,7 @@ import {
   createEmptyScene,
   projectDigest,
   recoverProject,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { openStudioLocalDatabase } from "./studio-local-database";

@@ -1,4 +1,4 @@
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 
 import {
   FormatZipReaderError,
@@ -19,7 +19,7 @@ import {
 import { parseKppPreset } from "./kpp";
 import { importMybBrush } from "./myb";
 
-import type { BrushProgramIR } from "@toonspectrum/studio-project-model";
+import type { BrushProgramIR } from "@toonstudio/studio-project-model";
 
 const KRITA_MANIFEST_NAMESPACE = "urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 const KRITA_BUNDLE_MIME = "application/x-krita-resourcebundle";

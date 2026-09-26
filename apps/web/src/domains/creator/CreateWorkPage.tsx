@@ -59,7 +59,7 @@ import {
   compactPublicShareDescription,
   publicShareImageUrl,
 } from "@/shared/lib/public-share-policy";
-import { readCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
+import { readCreatorPublicationSource } from "@toonstudio/contracts/creator-publication-integrity";
 import { useApp } from "@/shared/lib/store";
 import { cn, formatCount, relativeDate } from "@/shared/lib/utils";
 import Link from "@/shared/navigation/router-link";

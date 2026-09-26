@@ -12,12 +12,12 @@
       "kind": "shared-sqlite-opfs-crdt-recovery-v6",
       "requestedVfs": "opfs",
       "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
-      "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+      "sqliteOpfsDirectory": "toonstudio-studio-sqlite",
       "sqliteFilename": "studio-local-v12.db",
       "schemaVersion": 6,
       "table": "crdt_recovery_v12_rows",
       "installedOpfsDirectories": [
-        "toonspectrum-studio-sqlite"
+        "toonstudio-studio-sqlite"
       ],
       "openedOpfsDatabaseFilenames": [
         "/studio-local-v12.db"
@@ -37,12 +37,12 @@
           "kind": "shared-sqlite-opfs-crdt-recovery-v6",
           "requestedVfs": "opfs",
           "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
-          "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+          "sqliteOpfsDirectory": "toonstudio-studio-sqlite",
           "sqliteFilename": "studio-local-v12.db",
           "schemaVersion": 6,
           "table": "crdt_recovery_v12_rows",
           "installedOpfsDirectories": [
-            "toonspectrum-studio-sqlite"
+            "toonstudio-studio-sqlite"
           ],
           "openedOpfsDatabaseFilenames": [
             "/studio-local-v12.db"
@@ -135,42 +135,42 @@
         "opfs": {
           "entries": [
             {
-              "path": "toonspectrum-studio-sqlite",
+              "path": "toonstudio-studio-sqlite",
               "kind": "directory",
               "bytes": null
             },
             {
-              "path": "toonspectrum-studio-sqlite/.opaque",
+              "path": "toonstudio-studio-sqlite/.opaque",
               "kind": "directory",
               "bytes": null
             },
             {
-              "path": "toonspectrum-studio-sqlite/.opaque/238uu9dwxieh",
+              "path": "toonstudio-studio-sqlite/.opaque/238uu9dwxieh",
               "kind": "file",
               "bytes": 4096
             },
             {
-              "path": "toonspectrum-studio-sqlite/.opaque/25j0i7gl4at",
+              "path": "toonstudio-studio-sqlite/.opaque/25j0i7gl4at",
               "kind": "file",
               "bytes": 2240512
             },
             {
-              "path": "toonspectrum-studio-sqlite/.opaque/4dlp23lthc",
+              "path": "toonstudio-studio-sqlite/.opaque/4dlp23lthc",
               "kind": "file",
               "bytes": 4096
             },
             {
-              "path": "toonspectrum-studio-sqlite/.opaque/6umcf5jwyvs",
+              "path": "toonstudio-studio-sqlite/.opaque/6umcf5jwyvs",
               "kind": "file",
               "bytes": 4096
             },
             {
-              "path": "toonspectrum-studio-sqlite/.opaque/hzcd3989dc5",
+              "path": "toonstudio-studio-sqlite/.opaque/hzcd3989dc5",
               "kind": "file",
               "bytes": 4096
             },
             {
-              "path": "toonspectrum-studio-sqlite/.opaque/wi1pa8cnn7m",
+              "path": "toonstudio-studio-sqlite/.opaque/wi1pa8cnn7m",
               "kind": "file",
               "bytes": 4096
             }
@@ -225,12 +225,12 @@
           "kind": "shared-sqlite-opfs-crdt-recovery-v6",
           "requestedVfs": "opfs",
           "sqlitePackage": "@sqlite.org/sqlite-wasm 3.53.0-build1",
-          "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+          "sqliteOpfsDirectory": "toonstudio-studio-sqlite",
           "sqliteFilename": "studio-local-v12.db",
           "schemaVersion": 6,
           "table": "crdt_recovery_v12_rows",
           "installedOpfsDirectories": [
-            "toonspectrum-studio-sqlite"
+            "toonstudio-studio-sqlite"
           ],
           "openedOpfsDatabaseFilenames": [
             "/studio-local-v12.db"
@@ -1671,7 +1671,7 @@
       "index.html": 263
     },
     "totalBytes": 3422321,
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-crdt-recovery-sqlite-opfs-dSiasz",
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-crdt-recovery-sqlite-opfs-dSiasz",
     "buildMs": 385.2879
   },
   "validationIssues": []

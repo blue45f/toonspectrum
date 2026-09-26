@@ -4019,7 +4019,7 @@
       "assets/tournament-SqpSWdou.js.map",
       "index.html"
     ],
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-renderer-tournament-ur6sty",
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-renderer-tournament-ur6sty",
     "manifestReceipt": {
       "manifestPath": ".vite/manifest.json",
       "htmlEntryKey": "index.html",
@@ -4044,11 +4044,11 @@
       ],
       "pageDynamicImports": [
         "_core-CvQjQp2D.js",
-        "../../../../../../../../Users/hjunkim/WebstormProjects/toonspectrum/packages/studio-engine-vello/src/index.ts",
+        "../../../../../../../../Users/hjunkim/WebstormProjects/toonstudio/packages/studio-engine-vello/src/index.ts",
         "_studio_engine_vello-DefwjhnU.js",
-        "../../../../../../../../Users/hjunkim/WebstormProjects/toonspectrum/node_modules/.pnpm/canvaskit-wasm@0.41.1/node_modules/canvaskit-wasm/bin/canvaskit.js",
-        "../../../../../../../../Users/hjunkim/WebstormProjects/toonspectrum/node_modules/.pnpm/canvaskit-wasm@0.41.1/node_modules/canvaskit-wasm/bin/canvaskit.wasm?url",
-        "../../../../../../../../Users/hjunkim/WebstormProjects/toonspectrum/packages/studio-engine-skia/src/index.ts"
+        "../../../../../../../../Users/hjunkim/WebstormProjects/toonstudio/node_modules/.pnpm/canvaskit-wasm@0.41.1/node_modules/canvaskit-wasm/bin/canvaskit.js",
+        "../../../../../../../../Users/hjunkim/WebstormProjects/toonstudio/node_modules/.pnpm/canvaskit-wasm@0.41.1/node_modules/canvaskit-wasm/bin/canvaskit.wasm?url",
+        "../../../../../../../../Users/hjunkim/WebstormProjects/toonstudio/packages/studio-engine-skia/src/index.ts"
       ],
       "bootstrapSourceSha256": "971383d454720cb64224676fe5d6a0547d3fcd41fb14772e45e42025a4be1a0c",
       "bootstrapBundleFile": "assets/index-BDQ10yC3.js",

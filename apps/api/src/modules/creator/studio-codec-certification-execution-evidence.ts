@@ -42,7 +42,7 @@ const MAX_STREAM_CHUNKS = 1_000_000;
 
 export const STUDIO_CODEC_CERTIFICATION_EXECUTION_EVIDENCE_VERSION = 1 as const;
 export const STUDIO_CODEC_CERTIFICATION_EXECUTION_EVIDENCE_KIND =
-  "toonspectrum-codec-certification-execution-evidence" as const;
+  "toonstudio-codec-certification-execution-evidence" as const;
 
 const IdentifierSchema = z
   .string()

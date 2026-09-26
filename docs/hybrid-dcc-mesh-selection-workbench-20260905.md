@@ -1,6 +1,6 @@
 # 전문 3D 제작: 메시 선택 작업대
 
-기준 PR: blue45f/toonspectrum #747
+기준 PR: blue45f/toonstudio #747
 기준 head: 873ff98b712fa0e3dde2a26f4c0512141c19387a
 
 ## 실제 추가한 기능

@@ -26,7 +26,7 @@ import type {
 } from "../project-graph/studio-project-graph-contract";
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 interface BridgeData {
   readonly project: StudioProjectRecord;

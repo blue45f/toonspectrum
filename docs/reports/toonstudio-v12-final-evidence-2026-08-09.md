@@ -157,7 +157,7 @@
 ### 로컬 데이터 권위
 
 - `@sqlite.org/sqlite-wasm` 3.53.0-build1 + OPFS SAH-pool
-  `toonspectrum-studio-sqlite` + `/studio-local-v12.db`를 앱 수명 공유 권위로 승격했다.
+  `toonstudio-studio-sqlite` + `/studio-local-v12.db`를 앱 수명 공유 권위로 승격했다.
 - 제품 기본 DB factory는 Window에서 sqlite-wasm을 초기화하지 않는다. 단일 module Dedicated Worker가
   SAH-pool과 DB connection을 소유하고, allowlist RPC를 통해서만 37개 구조화 저장 연산을 실행한다.
   sqlite-wasm의 SharedArrayBuffer proxy VFS(`opfs`, `opfs-wl`) 자동 설치는 bootstrap에서 끄고
@@ -211,7 +211,7 @@
   제품 무인자 API는 ambient IndexedDB를 열지 않고, missing/tampered blob·MIME/size drift·torn
   manifest를 부분 복구 없이 거부한다.
 - 사용자 글꼴 manifest는 `studio-custom-font-library-v12`/`manifest-v1`, 실제 font bytes는
-  `toonspectrum-studio-assets` SHA-256 CAS가 소유한다. 실제 제품 factory를 module Dedicated
+  `toonstudio-studio-assets` SHA-256 CAS가 소유한다. 실제 제품 factory를 module Dedicated
   Worker에서 무인자로 열었고 localStorage·IndexedDB·memory DB·memory CAS fallback은 모두 0이었다.
   missing/corrupt CAS와 metadata mismatch는 부분 목록이나 대체 글꼴 없이 fail-closed한다.
 
@@ -244,12 +244,12 @@
   사용하지 않는다. autosave lifecycle sidecar는 별도 영구 권위가 아니라 더 최신일 때만 검증 후
   OPFS로 승격되는 current-version reconciliation 입력이다.
 - 파괴 인벤토리에 OPFS root `studio-recovery`와 dotted namespace exact key
-  `toonspectrum.studio-marketplace-library.v1`,
-  `toonspectrum.studio-creator-filter-presets.v1`,
-  `toonspectrum.studio-filter-library.v12.fallback`,
-  `toonspectrum.studio.bg3d.lt-presets.v1`,
-  `toonspectrum.studio.bg3d.lt-presets.corrupt.v1`을 추가했다. account/platform 데이터까지 지울 수
-  있는 광범위한 `toonspectrum.studio` prefix는 사용하지 않는다.
+  `toonstudio.studio-marketplace-library.v1`,
+  `toonstudio.studio-creator-filter-presets.v1`,
+  `toonstudio.studio-filter-library.v12.fallback`,
+  `toonstudio.studio.bg3d.lt-presets.v1`,
+  `toonstudio.studio.bg3d.lt-presets.corrupt.v1`을 추가했다. account/platform 데이터까지 지울 수
+  있는 광범위한 `toonstudio.studio` prefix는 사용하지 않는다.
 - CPU readback 기반 제품 WebGPU 표시는 shared-device texture copy와 retained GPUCanvas presentation으로
   교체했다. filter drag 중 GPU→CPU readback은 0이고 settle canonical readback만 1회 허용한다.
 - Living Ink의 pointer-contact material readback을 retained vector shadow + simulation-only acknowledgement로

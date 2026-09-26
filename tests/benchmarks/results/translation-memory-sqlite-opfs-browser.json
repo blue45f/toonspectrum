@@ -14,7 +14,7 @@
       "productPersistence": "createStudioTranslationMemorySqlitePersistence",
       "namespace": "studio-translation-memory-v12",
       "key": "library-v1",
-      "opfsDirectory": "toonspectrum-studio-sqlite",
+      "opfsDirectory": "toonstudio-studio-sqlite",
       "logicalDatabaseFilename": "studio-local-v12.db",
       "expectedOpenFilename": "/studio-local-v12.db",
       "openedOpfsDatabaseFilenames": [
@@ -22,8 +22,8 @@
         "/studio-local-v12.db"
       ],
       "installedOpfsDirectories": [
-        "toonspectrum-studio-sqlite",
-        "toonspectrum-studio-sqlite"
+        "toonstudio-studio-sqlite",
+        "toonstudio-studio-sqlite"
       ],
       "opfsDatabaseOpenCount": 2,
       "nonV12DatabaseOpenCount": 0,
@@ -379,7 +379,7 @@
       "assets/translation-memory-sqlite-opfs-browser-client-CiBKr01y.js.map",
       "index.html"
     ],
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-translation-memory-opfs-kpoq8u"
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-translation-memory-opfs-kpoq8u"
   },
   "validationIssues": []
 }

@@ -2,7 +2,7 @@
   "capturedAt": "2026-09-08T13:40:19.231706+00:00",
   "main": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
   "integrationBranch": "codex/integrate-unmerged-20260908",
-  "integrationRepo": "/private/tmp/toonspectrum-cleanup-active-pr-base-isolated-20260908",
+  "integrationRepo": "/private/tmp/toonstudio-cleanup-active-pr-base-isolated-20260908",
   "refs": [
     {
       "kind": "local",
@@ -66,12 +66,12 @@
     },
     {
       "kind": "local",
-      "ref": "refs/heads/salvage/toonspectrum-arch",
+      "ref": "refs/heads/salvage/toonstudio-arch",
       "sha": "0a630760455ad6ddc70e038caf86224861d42b1c"
     },
     {
       "kind": "local",
-      "ref": "refs/heads/salvage/toonspectrum-main-diag",
+      "ref": "refs/heads/salvage/toonstudio-main-diag",
       "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b"
     },
     {
@@ -241,12 +241,12 @@
     },
     {
       "kind": "remote",
-      "ref": "refs/heads/salvage/toonspectrum-arch",
+      "ref": "refs/heads/salvage/toonstudio-arch",
       "sha": "0a630760455ad6ddc70e038caf86224861d42b1c"
     },
     {
       "kind": "remote",
-      "ref": "refs/heads/salvage/toonspectrum-main-diag",
+      "ref": "refs/heads/salvage/toonstudio-main-diag",
       "sha": "cdbf3e2b9fa4f8b4b27ebbc2b43066eb5718d18b"
     },
     {
@@ -280,5 +280,5 @@
       "sha": "dd5636b59c1cc39fa6c0c81a132bb331abec240d"
     }
   ],
-  "registeredWorktrees": "worktree /Users/hjunkim/WebstormProjects/toonspectrum\nHEAD a1c08fa111cc79efdaaed73ab71cdcff4d3c490c\nbranch refs/heads/main\n\nworktree /private/tmp/toonspectrum-pr919-ci-current\nHEAD 4442e6f5b0f52ef9615cfea00b2168a166ad0c47\nbranch refs/heads/codex/fix-dry-media-paper-admission-31d\n\n"
+  "registeredWorktrees": "worktree /Users/hjunkim/WebstormProjects/toonstudio\nHEAD a1c08fa111cc79efdaaed73ab71cdcff4d3c490c\nbranch refs/heads/main\n\nworktree /private/tmp/toonstudio-pr919-ci-current\nHEAD 4442e6f5b0f52ef9615cfea00b2168a166ad0c47\nbranch refs/heads/codex/fix-dry-media-paper-admission-31d\n\n"
 }

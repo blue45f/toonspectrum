@@ -9,7 +9,7 @@ import { EXPERIENCE_DESTINATIONS, experienceDestinationForHref, nextExperienceDe
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
-const backup = () => ({ _app: "toonspectrum-library", version: 1, ratings: { a: 4.5 }, reads: { a: "reading" }, subscriptions: { a: true }, likedReviews: { r: false }, reviews: { a: { titleId: "a", rating: 4.5, text: "좋은 작품", tags: ["추천"], spoiler: false, createdAt: "2026-09-13T00:00:00Z" } }, collections: [{ id: "collection-1", name: "즐겨찾기", emoji: "📚", titleIds: ["a"], createdAt: "2026-09-13T00:00:00Z" }] });
+const backup = () => ({ _app: "toonstudio-library", version: 1, ratings: { a: 4.5 }, reads: { a: "reading" }, subscriptions: { a: true }, likedReviews: { r: false }, reviews: { a: { titleId: "a", rating: 4.5, text: "좋은 작품", tags: ["추천"], spoiler: false, createdAt: "2026-09-13T00:00:00Z" } }, collections: [{ id: "collection-1", name: "즐겨찾기", emoji: "📚", titleIds: ["a"], createdAt: "2026-09-13T00:00:00Z" }] });
 
 test("blocked storage getters and methods never break navigation", () => {
   const blocked = () => { throw new Error("SecurityError"); };

@@ -136,11 +136,11 @@ async function createStudioGeneratedImageRecord(
     rights: {
       sourceKind: "ai-generated",
       sourceId: asset.id,
-      licenseId: "toonspectrum-first-party-generated",
-      licenseLabel: "ToonSpectrum 1차 AI 생성 소재",
+      licenseId: "toonstudio-first-party-generated",
+      licenseLabel: "ToonStudio 1차 AI 생성 소재",
       licenseUrl: null,
       attributionRequired: false,
-      attributionText: `ToonSpectrum · ${asset.provenance.provider} · ${asset.provenance.model}`,
+      attributionText: `ToonStudio · ${asset.provenance.provider} · ${asset.provenance.model}`,
       rightsConfirmed: true,
     },
   };

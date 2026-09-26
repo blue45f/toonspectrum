@@ -65,7 +65,7 @@ export function createStudioVrmPngModuleWorker(): StudioVrmPngWorkerLike | null 
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-vrm-png.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-vrm-png",
+    name: "toonstudio-vrm-png",
   });
 }
 

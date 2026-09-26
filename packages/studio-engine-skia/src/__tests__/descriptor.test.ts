@@ -2,7 +2,7 @@ import {
   providerDescriptorSchema,
   SKIA_CPU_REFERENCE_EXECUTION,
   SKIA_GPU_EXECUTION,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -1,6 +1,6 @@
 # Refined Studio environments v6
 
-Original scene layout and refinement: ToonSpectrum. Licensed CC0 1.0.
+Original scene layout and refinement: ToonStudio. Licensed CC0 1.0.
 Embedded source models and PBR textures: Poly Haven, CC0 1.0.
 License: https://creativecommons.org/publicdomain/zero/1.0/
 

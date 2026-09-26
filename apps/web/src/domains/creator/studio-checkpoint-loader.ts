@@ -4,7 +4,7 @@ export type StudioCheckpoint = import("./studio-checkpoints").StudioCheckpoint;
 export type StudioCheckpointInput = import("./studio-checkpoints").StudioCheckpointInput;
 export type StudioCheckpointStorage = import("./studio-checkpoints").StudioCheckpointStorage;
 
-const STUDIO_CHECKPOINT_PREFIX = "toonspectrum-studio-checkpoints:v12";
+const STUDIO_CHECKPOINT_PREFIX = "toonstudio-studio-checkpoints:v12";
 
 let studioCheckpointsModulePromise: Promise<StudioCheckpointsModule> | null = null;
 

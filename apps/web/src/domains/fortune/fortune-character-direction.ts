@@ -1,4 +1,4 @@
-import type { FortuneReading } from "@toonspectrum/core/fortune";
+import type { FortuneReading } from "@toonstudio/core/fortune";
 import { comicCast } from "@/shared/components/comic/comic-cast";
 import type { ComicCastId, ComicMood } from "@/shared/components/comic/comic-cast";
 

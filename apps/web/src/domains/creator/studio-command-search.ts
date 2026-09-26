@@ -5,7 +5,7 @@
  * but always describe the location that is actually visible in ToonStudio's composite menu.
  */
 
-import { TerminologyIndex } from "@toonspectrum/studio-command-registry";
+import { TerminologyIndex } from "@toonstudio/studio-command-registry";
 
 import { STUDIO_COMMAND_CATALOG } from "./studio-command-catalog";
 import { STUDIO_FEATURE_TUTORIALS } from "./studio-feature-tutorials";
@@ -24,7 +24,7 @@ import type {
   StudioSearchKind,
   StudioSearchTarget,
 } from "./studio-search-corpus";
-import type { TerminologyAlias } from "@toonspectrum/studio-command-registry";
+import type { TerminologyAlias } from "@toonstudio/studio-command-registry";
 
 export type { StudioSearchKind, StudioSearchTarget } from "./studio-search-corpus";
 export {

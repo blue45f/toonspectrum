@@ -651,7 +651,7 @@ export function StudioDialogueBatchPanel({
       );
       downloadBlob(
         new Blob([file.text], { type: file.mimeType }),
-        `toonspectrum-dialogue${file.extension}`
+        `toonstudio-dialogue${file.extension}`
       );
       setInterchangeStatus({
         tone: file.lossy ? "warn" : "good",
@@ -1344,7 +1344,7 @@ export function StudioDialogueBatchPanel({
                 <span>
                   <span className="font-semibold">온라인 음성 허용</span>
                   <span className="mt-0.5 block text-fg-3">
-                    선택하면 대사가 운영체제·브라우저의 음성 서비스로 전송될 수 있어요. ToonSpectrum 서버와 AI에는 보내지 않습니다.
+                    선택하면 대사가 운영체제·브라우저의 음성 서비스로 전송될 수 있어요. ToonStudio 서버와 AI에는 보내지 않습니다.
                   </span>
                 </span>
               </label>

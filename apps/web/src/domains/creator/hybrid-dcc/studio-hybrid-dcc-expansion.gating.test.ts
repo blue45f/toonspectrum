@@ -76,7 +76,7 @@ describe("hybrid DCC workspace API", () => {
     ws = workspaceLoadRoomPreset(ws, "cafe");
     expect(ws.bridge.set.objects.some((o) => o.id === "room-shell")).toBe(true);
     const pkg = workspaceExportToon3d(ws);
-    expect(pkg.manifest.format).toBe("toonspectrum.toon3d");
+    expect(pkg.manifest.format).toBe("toonstudio.toon3d");
     expect(pkg.files["document/document.json"]).toContain("hero-prop");
     const unpacked = unpackStudioToon3dPackage(pkg);
     expect(unpacked.shotCount).toBe(8);

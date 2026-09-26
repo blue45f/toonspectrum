@@ -7,7 +7,7 @@ export const FAN_CAFE_REPLY_MAX_LENGTH = 700;
 export const FAN_CAFE_POST_TITLE_MAX_LENGTH = 80;
 export const FAN_CAFE_POST_TEXT_MAX_LENGTH = 1200;
 export const FAN_CAFE_POST_TAGS_MAX_LENGTH = 80;
-export const FAN_CAFE_ACTIVITY_STORAGE_KEY = "toonspectrum-fan-cafe-activity-log-v1";
+export const FAN_CAFE_ACTIVITY_STORAGE_KEY = "toonstudio-fan-cafe-activity-log-v1";
 
 export type FanCafeKindFilter = FanCafePostKind | "all";
 

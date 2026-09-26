@@ -481,7 +481,7 @@ describe("studio-vrm-texture-paint-artifact", () => {
     const resolve = vi.fn(() => artifact.archiveEntry.data);
     const duplicateManifest = {
       schemaVersion: 1,
-      kind: "toonspectrum/vrm-texture-paint-artifact-manifest",
+      kind: "toonstudio/vrm-texture-paint-artifact-manifest",
       bindings: [artifact.metadata, artifact.metadata],
     };
     await expect(rehydrateStudioVrmTexturePaintArtifactManifest(
@@ -493,7 +493,7 @@ describe("studio-vrm-texture-paint-artifact", () => {
     const conflictingHash = `sha256:${"a".repeat(64)}` as const;
     const conflictingManifest = {
       schemaVersion: 1,
-      kind: "toonspectrum/vrm-texture-paint-artifact-manifest",
+      kind: "toonstudio/vrm-texture-paint-artifact-manifest",
       bindings: [
         artifact.metadata,
         cloneMetadata(artifact.metadata, {
@@ -521,7 +521,7 @@ describe("studio-vrm-texture-paint-artifact", () => {
     });
     const manifest = {
       schemaVersion: 1,
-      kind: "toonspectrum/vrm-texture-paint-artifact-manifest",
+      kind: "toonstudio/vrm-texture-paint-artifact-manifest",
       bindings: [artifact.metadata],
     };
     await expect(rehydrateStudioVrmTexturePaintArtifactManifest(
@@ -556,7 +556,7 @@ describe("studio-vrm-texture-paint-artifact", () => {
     const pending = rehydrateStudioVrmTexturePaintArtifactManifest(
       {
         schemaVersion: 1,
-        kind: "toonspectrum/vrm-texture-paint-artifact-manifest",
+        kind: "toonstudio/vrm-texture-paint-artifact-manifest",
         bindings: [artifact.metadata],
       },
       { resolve: () => pendingSource },

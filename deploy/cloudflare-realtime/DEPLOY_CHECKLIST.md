@@ -43,7 +43,7 @@ scaffold와 production routing은 별개다. 모든 항목을 확인하기 전 p
 - [ ] ticket/token/jwt/authorization/access_token query 거부
 - [ ] Origin 필수·exact match
 - [ ] proxy가 Upgrade, Connection, Origin, Sec-WebSocket-Protocol 보존
-- [ ] response protocol은 `toonspectrum-realtime-v1`만 선택
+- [ ] response protocol은 `toonstudio-realtime-v1`만 선택
 - [ ] byte limit 대신 permessage-deflate/미검토 compression을 사용하지 않음
 
 ## 4. Log·관측

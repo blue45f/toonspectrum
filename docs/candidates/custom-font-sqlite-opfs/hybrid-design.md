@@ -63,7 +63,7 @@ Vite production page
   │    → @sqlite.org/sqlite-wasm 3.53.0-build1
   │    → OPFS SAH pool /studio-local-v12.db
   └─ acquireProductStudioAssetCasStore()
-       → native OPFS toonspectrum-studio-assets
+       → native OPFS toonstudio-studio-assets
        → identity blobs/<sha256>.bin
   → Worker close / forced terminate
   → 새 Worker repository.list()의 stat + SHA-256 + magic 검증

@@ -34,7 +34,7 @@ import type {
   PlanningDocumentStatus,
   ProductionProjectAggregate,
   ScenePlan,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
 

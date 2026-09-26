@@ -22,7 +22,7 @@ import { studioLivingInkChromaBleedMultipliers } from "../studio-living-ink-fiel
 
 import type { WatercolorBrushDab } from "./studio-watercolor-brush";
 
-const FIELD_KIND = "toonspectrum.wet-ink-field" as const;
+const FIELD_KIND = "toonstudio.wet-ink-field" as const;
 const FIELD_VERSION = 1 as const;
 const FIELD_EPSILON = 1 / 65_536;
 const FIELD_VALUE_MAX = 4;

@@ -120,7 +120,7 @@ commonRatio 1.004, 공통 픽셀 세기비 1.001 — **합성 계약은 패리�
    검증기 제스처 재사용으로 확장하는 것이 가장 빠르다(마운트 비용만 추가).
 
 프로브 실행: `pnpm exec tsx scripts/verify-studio-dry-media-parity-probe.mts`
-(결과 JSON: $(tmpdir)/toonspectrum-dry-media-parity/parity-probe-result.json)
+(결과 JSON: $(tmpdir)/toonstudio-dry-media-parity/parity-probe-result.json)
 
 ### 3차 세션: 관찰 재해석과 접두사 안정성 실험
 
@@ -162,7 +162,7 @@ paintedSourceSegments − 1 세그먼트까지 겹쳐 칠함" 패턴의 dry-medi
 ```bash
 pnpm run build
 TOONSPECTRUM_BRUSH_VERIFY_IDS=dry-media pnpm verify:studio-brushes
-# 리포트: $(tmpdir)/toonspectrum-studio-brushes/long-brush-matrix-focused-1-*/long-brush-quality-report.json
+# 리포트: $(tmpdir)/toonstudio-studio-brushes/long-brush-matrix-focused-1-*/long-brush-quality-report.json
 ```
 
 측정 스크립트(프레임 PNG 4장 대조)는 이 문서의 표를 만든 PIL/numpy 코드 그대로

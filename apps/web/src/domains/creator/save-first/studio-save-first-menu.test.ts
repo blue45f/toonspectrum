@@ -25,7 +25,7 @@ describe("applyStudioSaveFirstFileMenu", () => {
       "publish",
     ]);
     expect(result[0]).toMatchObject({ label: "저장하기", separatorAfter: true });
-    expect(result.at(-1)).toMatchObject({ label: "ToonSpectrum에 게시…" });
+    expect(result.at(-1)).toMatchObject({ label: "ToonStudio에 게시…" });
   });
 
   it("preserves collaborative save wording", () => {

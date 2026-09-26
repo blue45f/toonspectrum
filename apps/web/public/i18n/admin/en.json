@@ -340,7 +340,7 @@
   "admin.traffic.countries": "Countries",
   "admin.traffic.country": "Country",
   "admin.traffic.coverage": "Coverage starts",
-  "admin.traffic.desc": "First-party page visits and session activity measured directly by ToonSpectrum without an external analytics script.",
+  "admin.traffic.desc": "First-party page visits and session activity measured directly by ToonStudio without an external analytics script.",
   "admin.traffic.device": "Device",
   "admin.traffic.devices": "Devices",
   "admin.traffic.emptyValue": "—",

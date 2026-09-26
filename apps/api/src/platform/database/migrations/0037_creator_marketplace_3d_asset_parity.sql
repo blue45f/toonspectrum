@@ -46,7 +46,7 @@ ALTER TABLE public."creator_marketplace_resource_report"
       '3d-asset'
     )
     AND "evidence"->>'license' IN (
-      'toonspectrum-standard',
+      'toonstudio-standard',
       'cc0-1.0',
       'cc-by-4.0',
       'cc-by-nc-4.0'

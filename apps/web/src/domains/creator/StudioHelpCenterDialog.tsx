@@ -202,7 +202,7 @@ function useStudioDiagnostics(active: boolean) {
 
   const probeAdapter = useCallback(() => {
     setAdapterBusy(true);
-    void import("@toonspectrum/studio-engine-vello")
+    void import("@toonstudio/studio-engine-vello")
       .then((module) => module.probeWebGpu())
       .then((result) => {
         setAdapter(

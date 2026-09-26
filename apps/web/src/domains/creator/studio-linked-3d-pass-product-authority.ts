@@ -18,9 +18,9 @@ import {
 } from "./studio-opfs-filesystem";
 
 export const STUDIO_LINKED_3D_PASS_CAS_INDEX_LOCK_NAME =
-  "toonspectrum-studio-linked-3d-passes:cas-index";
+  "toonstudio-studio-linked-3d-passes:cas-index";
 export const STUDIO_LINKED_3D_PASS_OWNER_LOCK_PREFIX =
-  "toonspectrum-studio-linked-3d-passes:owner:";
+  "toonstudio-studio-linked-3d-passes:owner:";
 
 interface BrowserLockManagerLike {
   request<T>(

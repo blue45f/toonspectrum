@@ -127,7 +127,7 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
       );
       expect(asset.normalization).toBe("authored-metres");
       expect(asset.provenance).toMatchObject({
-        author: "ToonSpectrum",
+        author: "ToonStudio",
         license: "CC0-1.0",
         attributionRequired: false,
         commercialUse: true,
@@ -168,7 +168,7 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
       expect(root?.extras).toMatchObject({
         asset_id: asset.id,
         asset_type: "studio-bg3d-environment",
-        asset_author: "ToonSpectrum",
+        asset_author: "ToonStudio",
         asset_generator: "scripts/blender/generate_environment_pack_v3.py",
         asset_generator_version: "3.0.0-blender-5.2",
         asset_license: "CC0-1.0",

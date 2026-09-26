@@ -15,6 +15,6 @@
 - 기존 `/studio` lazy marketplace chunk와 공유 app-lifetime SQLite handle을 사용한다.
 - 새 route, 별도 앱, 별도 DB 파일을 만들지 않는다.
 - OPFS SAH-pool을 열 수 없으면 내구성 저장 완료를 표시하지 않고 오류를 표면화한다.
-- V12 boot는 `toonspectrum.studio-marketplace-library.v1` localStorage key를 자동 읽거나 복사하지
+- V12 boot는 `toonstudio.studio-marketplace-library.v1` localStorage key를 자동 읽거나 복사하지
   않는다(`LEGACY_DATA_MIGRATION=FALSE`).
 - 운영 파괴는 기존 V12 triple gate를 통과할 때만 실행한다.

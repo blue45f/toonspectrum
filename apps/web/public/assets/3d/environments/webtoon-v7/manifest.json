@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.bg3d-environment-pack.v7",
+  "schema": "toonstudio.bg3d-environment-pack.v7",
   "version": "webtoon-v7",
   "assets": [
     {
@@ -14,7 +14,7 @@
         "mode": "free-generator-preview-reviewed-original-procedural-rebuild",
         "embeddedThirdPartyModelBytes": false,
         "embeddedThirdPartyImageBytes": false,
-        "note": "A free web-generator preview informed scene coverage; all delivered geometry, materials and textures were authored procedurally in Blender by ToonSpectrum."
+        "note": "A free web-generator preview informed scene coverage; all delivered geometry, materials and textures were authored procedurally in Blender by ToonStudio."
       },
       "semanticParts": [
         "rooftop slab",
@@ -83,7 +83,7 @@
       "rootMetadata": {
         "asset_id": "ts-bg3d-webtoon_rooftop_utility_platform-v7",
         "asset_type": "studio-bg3d-environment",
-        "asset_author": "ToonSpectrum",
+        "asset_author": "ToonStudio",
         "asset_generator": "scripts/blender/generate_environment_pack_v7.py",
         "asset_generator_version": "7.0.0-blender-5.2",
         "asset_license": "CC0-1.0",
@@ -120,7 +120,7 @@
         "mode": "free-generator-preview-reviewed-original-procedural-rebuild",
         "embeddedThirdPartyModelBytes": false,
         "embeddedThirdPartyImageBytes": false,
-        "note": "A free web-generator preview informed scene coverage; all delivered geometry, materials and textures were authored procedurally in Blender by ToonSpectrum."
+        "note": "A free web-generator preview informed scene coverage; all delivered geometry, materials and textures were authored procedurally in Blender by ToonStudio."
       },
       "semanticParts": [
         "corner facade shell",
@@ -192,7 +192,7 @@
       "rootMetadata": {
         "asset_id": "ts-bg3d-webtoon_corner_store_facade-v7",
         "asset_type": "studio-bg3d-environment",
-        "asset_author": "ToonSpectrum",
+        "asset_author": "ToonStudio",
         "asset_generator": "scripts/blender/generate_environment_pack_v7.py",
         "asset_generator_version": "7.0.0-blender-5.2",
         "asset_license": "CC0-1.0",
@@ -229,7 +229,7 @@
         "mode": "free-generator-preview-reviewed-original-procedural-rebuild",
         "embeddedThirdPartyModelBytes": false,
         "embeddedThirdPartyImageBytes": false,
-        "note": "A free web-generator preview informed scene coverage; all delivered geometry, materials and textures were authored procedurally in Blender by ToonSpectrum."
+        "note": "A free web-generator preview informed scene coverage; all delivered geometry, materials and textures were authored procedurally in Blender by ToonStudio."
       },
       "semanticParts": [
         "utility pole",
@@ -303,7 +303,7 @@
       "rootMetadata": {
         "asset_id": "ts-bg3d-webtoon_street_prop_pack-v7",
         "asset_type": "studio-bg3d-environment",
-        "asset_author": "ToonSpectrum",
+        "asset_author": "ToonStudio",
         "asset_generator": "scripts/blender/generate_environment_pack_v7.py",
         "asset_generator_version": "7.0.0-blender-5.2",
         "asset_license": "CC0-1.0",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultMusicBrief } from "@toonspectrum/core/studio-music";
+import { defaultMusicBrief } from "@toonstudio/core/studio-music";
 
 import {
   buildMusicLyricsUserPrompt,

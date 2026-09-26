@@ -7,7 +7,7 @@
  * packed command stream resolves every stochastic choice for future GPU/WASM consumers.
  */
 
-export const STUDIO_DUAL_TIP_CONTRACT_ID = "toonspectrum.dual-tip-alpha";
+export const STUDIO_DUAL_TIP_CONTRACT_ID = "toonstudio.dual-tip-alpha";
 export const STUDIO_DUAL_TIP_CONTRACT_VERSION = 1 as const;
 export const STUDIO_DUAL_TIP_PACKED_STRIDE = 24 as const;
 
@@ -183,9 +183,9 @@ export interface StudioDualTipReceipt {
   readonly contractVersion: typeof STUDIO_DUAL_TIP_CONTRACT_VERSION;
   readonly algorithmVersion: string;
   readonly provenance: "clean-room-public-behavior";
-  readonly executionSource: "toonspectrum-independent-core";
+  readonly executionSource: "toonstudio-independent-core";
   readonly restrictedSourcePolicy: "prohibited-direct-port";
-  readonly goldenCorpusOwnership: "toonspectrum-independent-behavior-corpus";
+  readonly goldenCorpusOwnership: "toonstudio-independent-behavior-corpus";
   readonly alphaContract: "premultiplied-linear-rgba-f32";
   readonly authority: "cpu-f32-oracle";
   readonly packedCommandContract: "gpu-wasm-ready-f32-v1";
@@ -206,9 +206,9 @@ export const STUDIO_DUAL_TIP_RECEIPT: StudioDualTipReceipt = Object.freeze({
   contractVersion: STUDIO_DUAL_TIP_CONTRACT_VERSION,
   algorithmVersion: "2026.07.27.1",
   provenance: "clean-room-public-behavior",
-  executionSource: "toonspectrum-independent-core",
+  executionSource: "toonstudio-independent-core",
   restrictedSourcePolicy: "prohibited-direct-port",
-  goldenCorpusOwnership: "toonspectrum-independent-behavior-corpus",
+  goldenCorpusOwnership: "toonstudio-independent-behavior-corpus",
   alphaContract: "premultiplied-linear-rgba-f32",
   authority: "cpu-f32-oracle",
   packedCommandContract: "gpu-wasm-ready-f32-v1",

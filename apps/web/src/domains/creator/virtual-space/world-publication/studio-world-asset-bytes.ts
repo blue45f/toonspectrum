@@ -1,7 +1,7 @@
 import { inspectStrictJpegDimensions, inspectStrictStaticWebpDimensions } from "@/shared/lib/strict-raster-image-inspector";
 import { parseStudioUploadImageDimensions } from "../../studio-upload-image-safety";
 import { STUDIO_WORLD_ASSET_FILE_MAX_BYTES, STUDIO_WORLD_ASSET_TOTAL_MAX_BYTES,
-  type StudioWorldAssetIntegrity } from "@toonspectrum/studio-project-model/world-publication";
+  type StudioWorldAssetIntegrity } from "@toonstudio/studio-project-model/world-publication";
 
 export interface WorldAssetBudget { bytes: number; pixels?: number }
 export class StudioWorldAssetBytesError extends Error {}

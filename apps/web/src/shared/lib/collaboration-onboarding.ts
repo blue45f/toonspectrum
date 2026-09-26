@@ -1,4 +1,4 @@
-const COLLABORATION_ONBOARDING_KEY = "toonspectrum-collaboration-onboarding:v1";
+const COLLABORATION_ONBOARDING_KEY = "toonstudio-collaboration-onboarding:v1";
 const COLLABORATION_ONBOARDING_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 
 export interface CollaborationOnboardingContext {

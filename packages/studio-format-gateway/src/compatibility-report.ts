@@ -2,7 +2,7 @@ import {
   isoTimestampSchema,
   sha256Schema,
   studioEntityIdSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { z } from "zod";
 
 

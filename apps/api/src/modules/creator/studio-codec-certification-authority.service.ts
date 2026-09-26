@@ -57,10 +57,10 @@ export const STUDIO_CODEC_CERTIFICATION_AUTHORITY_CLOCK = Symbol(
 
 export const STUDIO_CODEC_CERTIFICATION_AUTHORITY_REQUEST_VERSION = 1 as const;
 export const STUDIO_CODEC_CERTIFICATION_AUTHORITY_REQUEST_KIND =
-  "toonspectrum-product-codec-authority-signing-request" as const;
+  "toonstudio-product-codec-authority-signing-request" as const;
 export const STUDIO_CODEC_CERTIFICATION_AUTHORITY_SIGNATURE_VERSION = 1 as const;
 export const STUDIO_CODEC_CERTIFICATION_AUTHORITY_SIGNATURE_KIND =
-  "toonspectrum-product-codec-authority-signature" as const;
+  "toonstudio-product-codec-authority-signature" as const;
 
 const IdentifierSchema = z
   .string()
@@ -177,7 +177,7 @@ const LicenseGrantSchema = z
 const ReceiptSchema = z
   .object({
     schemaVersion: z.literal(STUDIO_CODEC_PROVIDER_CONTRACT_VERSION),
-    kind: z.literal("toonspectrum-codec-provider-execution"),
+    kind: z.literal("toonstudio-codec-provider-execution"),
     providerId: IdentifierSchema,
     mode: ProviderModeSchema,
     direction: DirectionSchema,
@@ -220,7 +220,7 @@ const ExactCertificationClaimsSchema = z
   .object({
     authority: z.literal(STUDIO_PRODUCT_CODEC_CERTIFICATION_CLAIMS.authority),
     program: z.literal(STUDIO_PRODUCT_CODEC_CERTIFICATION_CLAIMS.program),
-    officialToonSpectrumProductCertification: z.literal(true),
+    officialToonStudioProductCertification: z.literal(true),
     thirdPartyCodecCertification: z.literal(false),
     codecVendorCertification: z.literal(false),
     officialCodecVendorClaim: z.literal(false),

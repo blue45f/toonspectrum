@@ -12,7 +12,7 @@ import {
 } from "./studio-vello-hub";
 import { createStudioVelloHubCanvasTarget } from "./studio-vello-hub-canvas-target";
 
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 const island: StudioVelloSceneIsland = {
   id: "selection:a",

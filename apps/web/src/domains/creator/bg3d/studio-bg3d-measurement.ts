@@ -17,7 +17,7 @@ export type StudioBg3dMeasurementUnit = "mm" | "cm" | "m";
 export type StudioBg3dMeasurementAxis = "x" | "y" | "z";
 
 export const STUDIO_BG3D_MEASUREMENT_DOCUMENT_KIND =
-  "toonspectrum.bg3d-measurements" as const;
+  "toonstudio.bg3d-measurements" as const;
 export const STUDIO_BG3D_MEASUREMENT_DOCUMENT_VERSION = 1 as const;
 export const STUDIO_BG3D_MEASUREMENT_MAX_WORLD_COORDINATE =
   STUDIO_BG3D_TRANSFORM_SNAP_MAX_WORLD_COORDINATE;

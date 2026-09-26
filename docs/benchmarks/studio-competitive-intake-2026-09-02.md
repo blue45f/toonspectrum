@@ -1,9 +1,9 @@
-# ToonSpectrum Studio 경쟁 기능 흡수 프로그램 — 2026-09-02
+# ToonStudio Studio 경쟁 기능 흡수 프로그램 — 2026-09-02
 
 ## 0. 목적
 
 이 문서는 `docs/benchmarks/studio-competitor-registry.json`에 등록된 경쟁·인접 제품을 단순 나열하지
-않고, ToonSpectrum Studio가 실제로 구현할 **제품 능력(capability)** 으로 변환한다.
+않고, ToonStudio Studio가 실제로 구현할 **제품 능력(capability)** 으로 변환한다.
 
 벤치마크는 결과와 작업 흐름을 이해하기 위한 것이다. 다음은 흡수 대상이 아니다.
 
@@ -398,7 +398,7 @@
 ```text
 official evidence
 → capability specification
-→ original ToonSpectrum design
+→ original ToonStudio design
 → engine implementation
 → UI wiring
 → persistence + Undo/Redo

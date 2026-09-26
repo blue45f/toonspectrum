@@ -1,10 +1,10 @@
-import { useCarousel } from "@toonspectrum/core/carousel";
+import { useCarousel } from "@toonstudio/core/carousel";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/shared/lib/utils";
 
 /**
- * 공유 가로 캐러셀(웹) — embla 헤드리스 로직(@toonspectrum/core/carousel)을 Tailwind 로 입힌 뷰.
+ * 공유 가로 캐러셀(웹) — embla 헤드리스 로직(@toonstudio/core/carousel)을 Tailwind 로 입힌 뷰.
  * 렌더링은 이 컴포넌트가 맡고, 동작은 공용 헤드리스 훅을 재사용합니다.
  *
  * 제공: 스냅 · 관성 드래그(dragFree) · free-scroll · 다음 카드 peek · 데스크톱 화살표 · 닷 인디케이터

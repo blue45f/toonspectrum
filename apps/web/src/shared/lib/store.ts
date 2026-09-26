@@ -353,7 +353,7 @@ export const useApp = (create<AppState>()(
         }),
     }),
     {
-      name: "toonspectrum-store",
+      name: "toonstudio-store",
       storage: createJSONStorage(() => localStorage),
       version: 1,
       partialize: (state) => ({

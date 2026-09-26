@@ -65,7 +65,7 @@ def license_record(provider: str, source_url: str) -> dict:
 
 def direct_kenney_pack(identifier: str, page: str, category: str) -> dict:
     page_url = 'https://kenney.nl/assets/' + page
-    request = urllib.request.Request(page_url, headers={'User-Agent': 'ToonSpectrum-AssetDelivery/1.0'})
+    request = urllib.request.Request(page_url, headers={'User-Agent': 'ToonStudio-AssetDelivery/1.0'})
     with urllib.request.build_opener(SourceRedirects()).open(request, timeout=30) as response:
         checked_url(response.url)
         document = response.read(2_000_001)
@@ -223,7 +223,7 @@ def write_gallery(output: Path, assets: list[dict]) -> None:
         else:
             preview = f'<img loading="lazy" src="{safe_path}" alt="{title}">'
         cards.append(f'<article data-kind="{asset["kind"]}"><a href="{safe_path}" download>{preview}<strong>{title}</strong></a><small>{html.escape(asset["category"])} · CC0</small></article>')
-    document = '<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ToonSpectrum CC0 asset delivery</title><style>body{font:16px system-ui;margin:24px;background:#f7f7f8;color:#17171b}main{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}article{border:1px solid #ddd;background:white;border-radius:12px;padding:12px}img,.model{width:100%;height:150px;object-fit:contain}.model{display:grid;place-items:center;background:#f2f2f4}a{color:inherit;text-decoration:none}strong,small{display:block;padding-top:8px}small{color:#555}input{font:inherit;padding:12px;width:min(90%,600px);margin:12px 0 24px}</style><h1>CC0 원본 에셋</h1><p>기술 검사 통과 파일. 3D 미리보기·스튜디오 실사용 검증과 예술 품질 승인은 별도입니다. 다운로드하여 스튜디오의 파일 가져오기로 사용할 수 있습니다.</p><label>에셋 검색 <input id="q" type="search" placeholder="furniture, food, nature, wood"></label><main>' + ''.join(cards) + '</main><script>document.getElementById("q").addEventListener("input",event=>{const terms=event.target.value.toLowerCase().split(/\\s+/).filter(Boolean);document.querySelectorAll("article").forEach(card=>{card.hidden=!terms.every(term=>card.textContent.toLowerCase().includes(term));});});</script></html>'
+    document = '<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>ToonStudio CC0 asset delivery</title><style>body{font:16px system-ui;margin:24px;background:#f7f7f8;color:#17171b}main{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}article{border:1px solid #ddd;background:white;border-radius:12px;padding:12px}img,.model{width:100%;height:150px;object-fit:contain}.model{display:grid;place-items:center;background:#f2f2f4}a{color:inherit;text-decoration:none}strong,small{display:block;padding-top:8px}small{color:#555}input{font:inherit;padding:12px;width:min(90%,600px);margin:12px 0 24px}</style><h1>CC0 원본 에셋</h1><p>기술 검사 통과 파일. 3D 미리보기·스튜디오 실사용 검증과 예술 품질 승인은 별도입니다. 다운로드하여 스튜디오의 파일 가져오기로 사용할 수 있습니다.</p><label>에셋 검색 <input id="q" type="search" placeholder="furniture, food, nature, wood"></label><main>' + ''.join(cards) + '</main><script>document.getElementById("q").addEventListener("input",event=>{const terms=event.target.value.toLowerCase().split(/\\s+/).filter(Boolean);document.querySelectorAll("article").forEach(card=>{card.hidden=!terms.every(term=>card.textContent.toLowerCase().includes(term));});});</script></html>'
     (output / 'index.html').write_text(document, encoding='utf-8')
 
 
@@ -349,7 +349,7 @@ def acquire_delivery(output: Path) -> dict: # NOSONAR python:S3776
                 errors.append({'pack': pack_id, 'error': str(error)})
                 print('PACK ERROR', pack_id, str(error), flush=True)
             time.sleep(1)
-    report = {'schema': 'toonspectrum.asset-delivery.v1', 'sourceRevision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+    report = {'schema': 'toonstudio.asset-delivery.v1', 'sourceRevision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
               'deliveredOriginals': len(assets), 'byKind': dict(Counter(a['kind'] for a in assets)),
               'byCategory': dict(Counter(a['category'] for a in assets)), 'deduplicatedVariants': len(variants),
               'excludedCandidates': len(rejected), 'approvedVisualOriginals': 0, 'productionPublished': 0,
@@ -359,7 +359,7 @@ def acquire_delivery(output: Path) -> dict: # NOSONAR python:S3776
     save_json(output / 'delivery-report.json', report)
     save_json(output / 'excluded-and-variants.json', {'excluded': rejected, 'variants': variants})
     write_gallery(output, assets)
-    (output / 'README.md').write_text('# ToonSpectrum CC0 asset delivery\n\nActual original files are in assets/. Open index.html for search and downloads.\n\nGLB files have embedded textures and can be imported with Studio 3D model import. Surface images can be used as material base-color textures; companion PBR maps are not separate assets. Effect masks are small 512px-or-better native masks, not full-panel art.\n\nAll source and license records travel with files. No fonts, paid assets, user uploads or user works are included. Technical checks, exclusions and duplicates are recorded. Artistic review and Studio runtime round-trip remain separate gates.\n', encoding='utf-8')
+    (output / 'README.md').write_text('# ToonStudio CC0 asset delivery\n\nActual original files are in assets/. Open index.html for search and downloads.\n\nGLB files have embedded textures and can be imported with Studio 3D model import. Surface images can be used as material base-color textures; companion PBR maps are not separate assets. Effect masks are small 512px-or-better native masks, not full-panel art.\n\nAll source and license records travel with files. No fonts, paid assets, user uploads or user works are included. Technical checks, exclusions and duplicates are recorded. Artistic review and Studio runtime round-trip remain separate gates.\n', encoding='utf-8')
     print('DELIVERY SUMMARY', json.dumps(report, ensure_ascii=False), flush=True)
     return report
 

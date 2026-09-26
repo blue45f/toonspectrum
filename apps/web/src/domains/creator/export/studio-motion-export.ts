@@ -420,7 +420,7 @@ export function recommendVideoBitsPerSecond(width: number, height: number, fps: 
 
 /** 내보내기 파일명 — 기존 이미지 내보내기 규칙(`<제목>-strip` 등)과 나란한 `-motion.webm`. */
 export function motionExportFileName(title: string): string {
-  return `${title.trim() || "toonspectrum-motion"}-motion.webm`;
+  return `${title.trim() || "toonstudio-motion"}-motion.webm`;
 }
 
 // ── BGM 신스 스케줄러(주입형 오디오 그래프) ──────────────────────────

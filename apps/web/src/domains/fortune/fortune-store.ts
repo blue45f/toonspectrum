@@ -84,7 +84,7 @@ export const useFortuneStore = create<FortuneStore>()(
       clearHistory: () => set({ history: [] }),
     }),
     {
-      name: "toonspectrum-fortune",
+      name: "toonstudio-fortune",
       version: 1, // history는 추가 필드라 기본 merge로 처리됨(버전 범프·migrate 불필요)
     }
   )

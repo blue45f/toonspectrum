@@ -20,7 +20,7 @@
  */
 
 import type { InkStrokeMesh } from "./ink-mesh";
-import type { PathIR, PathVerbIR } from "@toonspectrum/studio-project-model";
+import type { PathIR, PathVerbIR } from "@toonstudio/studio-project-model";
 
 
 export interface InkMeshPathConversion {

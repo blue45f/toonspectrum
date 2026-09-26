@@ -183,7 +183,7 @@ export function createStudioBg3dLtRenderModuleWorker(): StudioBg3dLtRenderWorker
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-bg3d-lt-render.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-bg3d-lt-render",
+    name: "toonstudio-bg3d-lt-render",
   });
 }
 

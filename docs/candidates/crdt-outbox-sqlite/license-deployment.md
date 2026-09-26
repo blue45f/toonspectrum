@@ -7,8 +7,8 @@
 | SQLite core | 3.53.0 through the existing repository lock | Public domain | Transactions, constraints, ordering and local database format |
 | `@sqlite.org/sqlite-wasm` | 3.53.0-build1, existing dependency | Package declares Apache-2.0; retain package LICENSE/NOTICE and exact SBOM pin | Browser WASM API and OPFS SAH-pool VFS |
 | OPFS / SyncAccessHandle | Browser platform | Web standard | Durable same-origin file backing for `studio-local-v12.db` |
-| V12 outbox schema/adapter | ToonSpectrum source | Project license | Canonical request validation, bounds, ACK and retry semantics |
-| Legacy IndexedDB seam | Browser platform plus ToonSpectrum adapter | Web standard / project license | Explicit import or test only; absent from product boot |
+| V12 outbox schema/adapter | ToonStudio source | Project license | Canonical request validation, bounds, ACK and retry semantics |
+| Legacy IndexedDB seam | Browser platform plus ToonStudio adapter | Web standard / project license | Explicit import or test only; absent from product boot |
 
 No dependency, native binary, package manifest or lockfile changes are required.
 
@@ -21,7 +21,7 @@ No dependency, native binary, package manifest or lockfile changes are required.
   -> SqliteStudioCrdtOutbox
   -> acquireStudioLocalDatabase()       (one app-lifetime handle)
   -> dynamic @sqlite.org/sqlite-wasm
-  -> OPFS SAH-pool/toonspectrum-studio-sqlite
+  -> OPFS SAH-pool/toonstudio-studio-sqlite
   -> studio-local-v12.db
        ├─ crdt_outbox_v12_entries
        └─ crdt_outbox_v12_acknowledgements
@@ -36,7 +36,7 @@ silent browser fallback, or read the former IndexedDB on startup.
   uploaded by the storage adapter; only the existing collaboration transport publishes them.
 - Scope includes the authenticated user and work ID so a later account cannot list another user's
   unsent updates through the product API.
-- `LEGACY_DATA_MIGRATION=FALSE`: the old `toonspectrum-studio-crdt-outbox` database is neither read
+- `LEGACY_DATA_MIGRATION=FALSE`: the old `toonstudio-studio-crdt-outbox` database is neither read
   nor imported automatically. The existing cutover destruction inventory remains the owner of its
   eventual deletion.
 - OPFS is local durability, not backup or cross-device recovery. Product copy must not imply cloud

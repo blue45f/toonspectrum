@@ -26,7 +26,7 @@ Creator Intelligence is a project-scoped bridge over Studio capabilities that al
 ## Security and privacy rules
 
 1. Provider secrets are server-only environment variables. They are never returned by `/api/creator-intelligence/status` and are never stored in project localStorage.
-2. Browser requests go only to ToonSpectrum's own `/api/creator-intelligence/*` routes. Production CSP does not need new external `connect-src` origins.
+2. Browser requests go only to ToonStudio's own `/api/creator-intelligence/*` routes. Production CSP does not need new external `connect-src` origins.
 3. External moderation is opt-in per file. SafeSearch accepts only PNG/JPEG/WebP data URLs up to 2 MB and returns a human-review flag; it never auto-blocks publication.
 4. Meshy only accepts a public HTTPS image URL. Local/private images should use on-device Lift3D instead of silently uploading bytes.
 5. Project research persistence stores normalized metadata/provenance only. Generated audio base64 and API credentials are not persisted.
@@ -43,11 +43,11 @@ Creator Intelligence is a project-scoped bridge over Studio capabilities that al
 - **ElevenLabs SFX** and **Meshy** are paid-provider calls and require explicit provider flags, API keys, and the global paid-execution switch.
 - Per-user and service-wide daily limits are reserved before dispatch. An uncertain network/provider outcome retains the original idempotency receipt so browser retries cannot create a second charge.
 - Production Meshy dispatch additionally requires configured private object storage; temporary provider URLs are never returned as durable project assets.
-- **Google Vision SafeSearch** is optional and disabled by default because selected image bytes leave the ToonSpectrum environment.
+- **Google Vision SafeSearch** is optional and disabled by default because selected image bytes leave the ToonStudio environment.
 
 ## Project persistence
 
-The browser store schema is `toonspectrum.creator-intelligence.project.v1`. Keys are namespaced by project id and retain bounded collections for references, scene cards, AniList metadata, Freesound metadata, and Meshy job records. Reference Vault entries also keep an explicit `project` / `episode` / `scene` target so the same source can belong to different moodboards without losing provenance. Existing Studio project data remains authoritative for story, canvas, review, export, and local media workflows.
+The browser store schema is `toonstudio.creator-intelligence.project.v1`. Keys are namespaced by project id and retain bounded collections for references, scene cards, AniList metadata, Freesound metadata, and Meshy job records. Reference Vault entries also keep an explicit `project` / `episode` / `scene` target so the same source can belong to different moodboards without losing provenance. Existing Studio project data remains authoritative for story, canvas, review, export, and local media workflows.
 
 ## Runtime readiness
 

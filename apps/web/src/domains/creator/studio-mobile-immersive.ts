@@ -1,5 +1,5 @@
 export const STUDIO_MOBILE_IMMERSIVE_SESSION_KEY =
-  "toonspectrum-studio-mobile-immersive:v1";
+  "toonstudio-studio-mobile-immersive:v1";
 
 type StudioMobileImmersiveStorage = Pick<Storage, "getItem" | "setItem">;
 

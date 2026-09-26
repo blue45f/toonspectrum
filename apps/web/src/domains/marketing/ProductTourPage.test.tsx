@@ -62,7 +62,7 @@ describe("long-form product tour contracts", () => {
     const filmSource = readFileSync(SHARED_REMOTION_SOURCE, "utf8");
     const rootSource = readFileSync(REMOTION_ROOT, "utf8");
 
-    expect(bridgeSource).toContain("@toonspectrum/product-tour-film");
+    expect(bridgeSource).toContain("@toonstudio/product-tour-film");
     expect(filmSource).toContain("PRODUCT_TOUR_DURATION_SECONDS = 504");
     expect(filmSource).toContain("PRODUCT_TOUR_FPS = 30");
     expect(rootSource).toContain('id="ToonStudioProductTour"');

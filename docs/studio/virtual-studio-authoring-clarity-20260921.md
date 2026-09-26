@@ -10,7 +10,7 @@ Base: merged and deployed main `9ad829011d3cdf71fa2d1ff4239de1156f17418e`. Prior
 
 ## Reproduced nightly blocker
 
-Scheduled exhaustive run `35538992321` failed six lanes on the base main. One concrete failure was reproduced locally: `pnpm --filter @toonspectrum/studio-engine-vello typecheck` returned TS2307 for `canvaskit-wasm/bin/canvaskit.wasm?url` imported through Skia source.
+Scheduled exhaustive run `35538992321` failed six lanes on the base main. One concrete failure was reproduced locally: `pnpm --filter @toonstudio/studio-engine-vello typecheck` returned TS2307 for `canvaskit-wasm/bin/canvaskit.wasm?url` imported through Skia source.
 Vello's standalone tsconfig now explicitly includes the existing, exact Skia asset-URL declaration. No new ambient wildcard, ignored compiler error, relaxed compiler option, dependency or runtime import was introduced.
 
 ## Executed validation

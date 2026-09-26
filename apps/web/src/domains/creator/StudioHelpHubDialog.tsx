@@ -29,11 +29,11 @@ export interface StudioHelpHubDialogProps {
 }
 
 const STORAGE_KEYS = {
-  bookmarks: "toonspectrum-studio-help:bookmarks:v1",
-  recentSearches: "toonspectrum-studio-help:recent-searches:v1",
-  guideProgress: "toonspectrum-studio-help:guide-progress:v1",
-  feedback: "toonspectrum-studio-help:feedback:v1",
-  updatesSeen: "toonspectrum-studio-help:updates-seen:v1",
+  bookmarks: "toonstudio-studio-help:bookmarks:v1",
+  recentSearches: "toonstudio-studio-help:recent-searches:v1",
+  guideProgress: "toonstudio-studio-help:guide-progress:v1",
+  feedback: "toonstudio-studio-help:feedback:v1",
+  updatesSeen: "toonstudio-studio-help:updates-seen:v1",
 } as const;
 
 interface HelpHubCopy {

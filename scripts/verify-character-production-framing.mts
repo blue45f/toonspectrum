@@ -21,8 +21,8 @@ const browser = await chromium.launch({
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: "ko-KR", acceptDownloads: true });
 await context.addInitScript({ content: "globalThis.__name ??= (value) => value;" });
 await context.addInitScript(() => {
-  localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-  localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
+  localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
+  localStorage.setItem("toonstudio-studio-mobile-hint-dismissed", "1");
 });
 const page = await context.newPage();
 const errors: string[] = [];

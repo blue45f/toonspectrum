@@ -79,7 +79,7 @@ registerI18nLocaleEntries("ko", {
   "studio.settings.center.import.error.empty": "가져올 설정 파일이 비어 있습니다.",
   "studio.settings.center.import.error.too-large": "설정 파일이 허용 크기(128KB)를 초과했습니다.",
   "studio.settings.center.import.error.invalid-json": "올바른 JSON 설정 파일이 아닙니다.",
-  "studio.settings.center.import.error.unsupported-kind": "ToonSpectrum 설정 파일 형식이 아닙니다.",
+  "studio.settings.center.import.error.unsupported-kind": "ToonStudio 설정 파일 형식이 아닙니다.",
   "studio.settings.center.import.error.unsupported-version": "지원하지 않는 설정 파일 버전입니다.",
   "studio.settings.center.import.error.invalid-settings": "설정 데이터가 손상되었습니다.",
 
@@ -189,7 +189,7 @@ registerI18nLocaleEntries("en", {
   "studio.settings.center.import.error.empty": "The settings file is empty.",
   "studio.settings.center.import.error.too-large": "The settings file exceeds the 128 KB limit.",
   "studio.settings.center.import.error.invalid-json": "This is not valid JSON.",
-  "studio.settings.center.import.error.unsupported-kind": "This is not a ToonSpectrum settings file.",
+  "studio.settings.center.import.error.unsupported-kind": "This is not a ToonStudio settings file.",
   "studio.settings.center.import.error.unsupported-version": "This settings file version is not supported.",
   "studio.settings.center.import.error.invalid-settings": "The settings data is damaged.",
 

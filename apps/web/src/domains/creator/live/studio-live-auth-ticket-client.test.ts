@@ -30,7 +30,7 @@ describe("Studio live auth ticket client", () => {
     expect(url).toBe("/api/creator/studio-live/auth-ticket");
     expect(init?.credentials).toBe("include");
     const headers = new Headers(init?.headers);
-    expect(headers.get("x-toonspectrum-csrf")).toBe("1");
+    expect(headers.get("x-toonstudio-csrf")).toBe("1");
     expect(headers.has("x-user-id")).toBe(false);
     expect(JSON.parse(String(init?.body))).toEqual({ version: 1 });
   });

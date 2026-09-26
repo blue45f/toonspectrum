@@ -258,7 +258,7 @@ describe("studio pro draw prefs", () => {
       },
     };
     map.set(
-      "toonspectrum-studio-pro-draw-prefs:v1",
+      "toonstudio-studio-pro-draw-prefs:v1",
       JSON.stringify(normalizeStudioProDrawPrefs({ favoriteBrushIds: ["watercolor"] })),
     );
 

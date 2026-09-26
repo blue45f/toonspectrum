@@ -27,7 +27,7 @@ Use the existing workspace dependencies and run from the repository root:
 ```sh
 node --import tsx scripts/experiments/recovered-20260908/run.mts --help
 node --import tsx scripts/experiments/recovered-20260908/run.mts --run cpu
-node --import tsx scripts/experiments/recovered-20260908/run.mts --run painttube-ab --output /tmp/toonspectrum-painttube-recovered
+node --import tsx scripts/experiments/recovered-20260908/run.mts --run painttube-ab --output /tmp/toonstudio-painttube-recovered
 node --import tsx scripts/experiments/recovered-20260908/run.mts --run inkwash-parity
 node --import tsx scripts/experiments/recovered-20260908/run.mts --run ink-field
 ```

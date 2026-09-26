@@ -45,7 +45,7 @@ import {
   type ProductionTaskGate,
   type ProductionTaskStatus,
   type RoleAssignment,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
 

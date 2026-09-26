@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import type { StudioProjectRecord, StudioReviewSummary, StudioRevisionRecord } from "../project-graph/studio-project-graph-contract";
 import type { StudioVirtualSpaceReviewPreview } from "../virtual-space/studio-virtual-space-review-preview";
@@ -203,7 +203,7 @@ beforeEach(() => {
     blob: new Blob(["archive"], { type: "application/vnd.comicbook+zip" }),
     fileName: "manuscript.cbz",
     manifest: {
-      schema: "toonspectrum.page-manifest.v1",
+      schema: "toonstudio.page-manifest.v1",
       projectId: "graph",
       workId: "work",
       artifactId: "art-a",

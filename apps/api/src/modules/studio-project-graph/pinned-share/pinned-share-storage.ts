@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { PoolClient } from "pg";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
-import { pinnedSharePageSchema, type PinnedShareCreate, type PinnedSharePage } from "@toonspectrum/studio-project-model/pinned-review-share";
+import { canonicalJson } from "@toonstudio/studio-project-model";
+import { pinnedSharePageSchema, type PinnedShareCreate, type PinnedSharePage } from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { resolveCreatorCollaborationAccess } from "../../creator/creator-collaboration.policy";
 import { loadStudioReviewResolutionCaptures } from "../studio-review-capture-attestation";

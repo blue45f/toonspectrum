@@ -97,7 +97,7 @@ describe("studio-pages (pure, real exports)", () => {
   it("remaps Shared Stage character links while retaining the page-local LT bundle", () => {
     const sourceHash = `sha256:${"a".repeat(64)}`;
     const stage = {
-      kind: "toonspectrum.studio-shared-3d-stage",
+      kind: "toonstudio.studio-shared-3d-stage",
       version: 1,
       authority: "page-background-with-linked-character-sources",
       capturePolicy: "require-all-linked",
@@ -121,7 +121,7 @@ describe("studio-pages (pure, real exports)", () => {
     resetIds();
     const duplicate = duplicatePageState(source, makeId);
     expect(duplicate.shared3dStage).toMatchObject({
-      kind: "toonspectrum.studio-shared-3d-stage-collection",
+      kind: "toonstudio.studio-shared-3d-stage-collection",
       version: 3,
       stages: [{
         background: { bundleId: "bundle-1", sourceHash },
@@ -197,7 +197,7 @@ describe("studio-pages (pure, real exports)", () => {
     const sourceHash = `sha256:${"a".repeat(64)}`;
     const missingId = "missing-character";
     const stage = {
-      kind: "toonspectrum.studio-shared-3d-stage",
+      kind: "toonstudio.studio-shared-3d-stage",
       version: 1,
       authority: "page-background-with-linked-character-sources",
       capturePolicy: "require-all-linked",
@@ -241,7 +241,7 @@ describe("studio-pages (pure, real exports)", () => {
   it("keeps an ambiguous duplicate character link as a fresh missing tombstone", () => {
     const sourceHash = `sha256:${"a".repeat(64)}`;
     const stage = {
-      kind: "toonspectrum.studio-shared-3d-stage",
+      kind: "toonstudio.studio-shared-3d-stage",
       version: 1,
       authority: "page-background-with-linked-character-sources",
       capturePolicy: "require-all-linked",

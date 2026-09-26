@@ -13,7 +13,7 @@ const VRM_FRAGMENT_MAX_DECODED_BYTES = 192 * 1024;
 const VRM_FRAGMENT_MAX_DEPTH = 32;
 const VRM_FRAGMENT_MAX_NODES = 20_000;
 const ASSET_LICENSES = new Set([
-  "toonspectrum-standard",
+  "toonstudio-standard",
   "cc0-1.0",
   "cc-by-4.0",
   "cc-by-nc-4.0",

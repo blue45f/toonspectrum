@@ -28,7 +28,7 @@ export function SupportUsPage() {
         title={t("supportUs.hero.title")}
         description={t("supportUs.hero.description")}
         image="materials"
-        imageAlt="ToonSpectrum creator workspace materials"
+        imageAlt="ToonStudio creator workspace materials"
         caption="SUPPORTER · SPONSORSHIP · CLEAR BOUNDARIES"
       >
         <a

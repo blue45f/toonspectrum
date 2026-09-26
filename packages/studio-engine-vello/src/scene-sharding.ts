@@ -3,7 +3,7 @@ import {
   composeShardPixels,
   encodeSceneToRenderJson,
   extractShardRectPixels,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import { render_scene_json } from "../../../crates/studio-engine-vello/pkg/studio_engine_vello.js";
 
@@ -14,7 +14,7 @@ import type {
   SceneIR,
   SceneShardingPlanIR,
   ShardPixels,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * Render access for V12 §3.4 scene sharding and §3.5 fragment recordings.

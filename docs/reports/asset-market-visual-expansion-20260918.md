@@ -26,7 +26,7 @@ Marketplace admission is no longer a fixed hand-picked ID list. It is derived fr
 ## Marketplace card quality
 
 - Brushes render multiple strokes from the actual brush preview data rather than a generic placeholder stroke.
-- Filters use a real high-resolution ToonSpectrum scene in a before/after split with the actual filter values.
+- Filters use a real high-resolution ToonStudio scene in a before/after split with the actual filter values.
 - Templates render layout-aware 4-cut, vertical-scroll or panel-grid previews.
 - Procedural 3D recipes use differentiated technical illustrations and are explicitly labeled as recipes.
 - 3D scene presets use real in-repository environment reference thumbnails and are explicitly labeled as scene references.

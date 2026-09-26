@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      RENDER_CORE_API_ORIGIN: https://toonspectrum-core-api.onrender.com
+      RENDER_CORE_API_ORIGIN: https://toonstudio-core-api.onrender.com
       PUBLIC_APP_ORIGIN: https://www.toonstudio.cloud
     steps:
       - uses: actions/checkout@v6

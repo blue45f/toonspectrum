@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.app-startup-perf/1",
+  "schema": "toonstudio.app-startup-perf/1",
   "generatedAt": "2026-08-08T05:58:05.134Z",
   "baseUrl": "http://localhost:4199",
   "iterationsPerScenario": 3,

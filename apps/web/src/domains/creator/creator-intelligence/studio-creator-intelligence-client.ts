@@ -12,7 +12,7 @@ export interface CreatorIntelligenceProviderStatus {
 }
 
 export interface CreatorIntelligenceStatus {
-  readonly schema: "toonspectrum.creator-intelligence.status.v1";
+  readonly schema: "toonstudio.creator-intelligence.status.v1";
   readonly references: Readonly<Record<CreatorIntelligenceReferenceProvider, CreatorIntelligenceProviderStatus>>;
   readonly translation: Readonly<Record<CreatorIntelligenceTranslationProvider, CreatorIntelligenceProviderStatus>>;
   readonly voice: Readonly<Record<CreatorIntelligenceVoiceProvider, CreatorIntelligenceProviderStatus>>;

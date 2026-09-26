@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createStudioWorkSession, type StudioSessionResources } from "@toonspectrum/studio-project-model/work-session";
+import { createStudioWorkSession, type StudioSessionResources } from "@toonstudio/studio-project-model/work-session";
 import { useSessionResourceMetadata } from "./use-session-resource-metadata";
 
 const load = vi.hoisted(() => vi.fn());

@@ -29,7 +29,7 @@ import type { StudioBrushRenderFamily } from "../studio-brush";
 
 export const DEFAULT_BRUSH_LIBRARY_PAGE_SIZE = 64;
 export const BRUSH_LIBRARY_CURSOR_VERSION = 1 as const;
-const BRUSH_LIBRARY_CURSOR_PREFIX = "toonspectrum-brush-page-v1:";
+const BRUSH_LIBRARY_CURSOR_PREFIX = "toonstudio-brush-page-v1:";
 
 export type BrushLibraryCategory = StudioBrushRenderFamily | "all";
 

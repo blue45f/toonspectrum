@@ -81,7 +81,7 @@ describe("Studio document interchange UI boundary", () => {
     expect(menuItem).toContain("ui.requestInterchangeImport()");
     expect(studioPage).toContain("interchangeImportInputRef.current.click()");
     expect(input).toContain(
-      'accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonspectrum.will-v1-bounded+zip"',
+      'accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonstudio.will-v1-bounded+zip"',
     );
     expect(input).toContain("handleImportInterchangeArchive(event)");
     expect(input).toContain('aria-label="OpenRaster, CBZ 또는 WILL v1 가져오기"');

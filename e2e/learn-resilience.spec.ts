@@ -5,7 +5,7 @@ import { EMPTY_LESSON, STORAGE_KEY } from "../apps/web/src/domains/learn/learnin
 import { expect, test, installBetaEventDismissal } from "./fixtures/non-studio-test";
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
+  await page.addInitScript(() => sessionStorage.setItem("toonstudio-compat-dismissed", "true"));
 });
 
 function backup(notes: string) {
@@ -29,7 +29,7 @@ test("exports a real file and restores only after preview and explicit confirmat
   expect(JSON.parse(raw).progress.lessons["story-board"].notes).toBe("내 컷의 호흡 🖋");
   const fresh = await browser.newContext();
   try {
-    await fresh.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
+    await fresh.addInitScript(() => sessionStorage.setItem("toonstudio-compat-dismissed", "true"));
     const destination = await fresh.newPage();
     await installBetaEventDismissal(destination);
     await destination.goto(new URL("/learn/records", page.url()).href);
@@ -117,7 +117,7 @@ test("failed writes survive real other-tab edits and SPA navigation to record ma
   const other = await context.newPage();
   await installBetaEventDismissal(other);
   try {
-    await other.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
+    await other.addInitScript(() => sessionStorage.setItem("toonstudio-compat-dismissed", "true"));
     await other.goto(new URL("/learn/lessons/story-board", page.url()).href);
     await page.evaluate(() => {
       const original = Storage.prototype.setItem;

@@ -16,7 +16,7 @@ const browser = await chromium.launch({ headless: true });
 try {
   for (const width of widths) {
     const context = await browser.newContext({ viewport: { width, height: 960 }, locale: "ko-KR", reducedMotion: "reduce", serviceWorkers: "block" });
-    await context.addInitScript(() => localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
+    await context.addInitScript(() => localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
     for (const route of routes) {
       const page = await context.newPage();
     await installBetaEventDismissal(page);

@@ -186,7 +186,7 @@ function authoredVrmLikeBytes(byteLength: number, seed: number): Uint8Array<Arra
     throw new RangeError(`VRM-like byte length must be aligned and >=256, got ${byteLength}`);
   }
   const json = new TextEncoder().encode(JSON.stringify({
-    asset: { generator: "ToonSpectrum V12 browser promotion gate", version: "2.0" },
+    asset: { generator: "ToonStudio V12 browser promotion gate", version: "2.0" },
     extensionsUsed: ["VRMC_vrm"],
     extensions: { VRMC_vrm: { specVersion: "1.0" } },
     extras: { authored: true, deterministicSeed: seed },

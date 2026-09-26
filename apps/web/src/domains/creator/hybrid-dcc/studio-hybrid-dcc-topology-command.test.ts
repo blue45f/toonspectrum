@@ -19,7 +19,7 @@ import {
 
 const RIGHTS = {
   source: "primitive",
-  creator: "toonspectrum",
+  creator: "toonstudio",
   license: "CC0-1.0",
   useScope: "commercial",
   derivative: "original",

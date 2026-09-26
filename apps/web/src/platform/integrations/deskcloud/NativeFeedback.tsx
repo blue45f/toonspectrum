@@ -22,7 +22,7 @@ import { Button } from "@/shared/components/ui/button";
 import { useApp } from "@/shared/lib/store";
 import { cn } from "@/shared/lib/utils";
 
-const APP_ID = "toonspectrum";
+const APP_ID = "toonstudio";
 const NPS_MIN = 0;
 const NPS_MAX = 10;
 const TEXT_MAX = { short: 280, long: 4000 } as const;

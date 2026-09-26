@@ -49,7 +49,7 @@ import type {
   Submission,
   StoryToArtHandoffPackage,
   CollaborationParty,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { ProductionProjectAccess } from "./production-dashboard-api";
 
@@ -133,7 +133,7 @@ export interface ProductionMutationResponse {
 
 export type ProductionClientCommand =
   | { readonly type: "upsert-planning-record"; readonly record: ProductionPlanningRecord }
-  | { readonly type: "create-planning-snapshot"; readonly snapshot: Omit<import("@toonspectrum/core/production").PlanningSnapshot, "digest"> }
+  | { readonly type: "create-planning-snapshot"; readonly snapshot: Omit<import("@toonstudio/core/production").PlanningSnapshot, "digest"> }
   | { readonly type: "upsert-commercial-record"; readonly record: ProductionCommercialRecord }
   | {
       readonly type: "configure-collaboration";
@@ -158,7 +158,7 @@ export type ProductionClientCommand =
       readonly tasks: readonly ProductionTask[];
       readonly expectedTasks?: readonly ProductionTask[];
     }
-  | { readonly type: "upsert-operations-record"; readonly record: ProductionOperationsRecord; readonly expectedNotificationPolicy?: import("@toonspectrum/core/production").ProductionNotificationPolicy | null }
+  | { readonly type: "upsert-operations-record"; readonly record: ProductionOperationsRecord; readonly expectedNotificationPolicy?: import("@toonstudio/core/production").ProductionNotificationPolicy | null }
   | {
       readonly type: "apply-automation-execution";
       readonly tasks: readonly ProductionTask[];

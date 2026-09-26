@@ -1,5 +1,5 @@
 /**
- * Evaluation of public wet-ink / fluid demos for ToonSpectrum texture-first hybrid pins.
+ * Evaluation of public wet-ink / fluid demos for ToonStudio texture-first hybrid pins.
  *
  * Demos reviewed:
  * - WebGL Fluid Simulation (PavelDoGreat) — MIT

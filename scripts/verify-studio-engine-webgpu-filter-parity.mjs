@@ -27,7 +27,7 @@ import { WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 const SCRATCH =
   process.env.TOONSPECTRUM_ENGINE_WEBGPU_FILTER_PARITY_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-engine-webgpu-filter-parity-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-engine-webgpu-filter-parity-${Date.now()}`);
 const HARNESS_PATH = "/__studio_engine_webgpu_filter_parity__";
 const HARNESS_ENTRY = "/scripts/studio-engine-webgpu-filter-parity-browser.ts";
 const RESULT_TIMEOUT_MS = 60_000;

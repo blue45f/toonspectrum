@@ -1,8 +1,8 @@
 /**
- * End-to-end WILL v1 Annex A provider execution + ToonSpectrum product certification.
+ * End-to-end WILL v1 Annex A provider execution + ToonStudio product certification.
  *
  * The certificate binds exact Path-stream bytes and bounded conformance evidence. It remains a
- * ToonSpectrum product certificate, not Wacom certification or an Annex B `.will` claim.
+ * ToonStudio product certificate, not Wacom certification or an Annex B `.will` claim.
  */
 
 import {
@@ -36,7 +36,7 @@ import {
 } from "./studio-will-v1-interchange";
 
 export const STUDIO_FIRST_PARTY_WILL_V1_CONFORMANCE_EVIDENCE_MEDIA_TYPE =
-  "application/vnd.toonspectrum.will-v1-annex-a-conformance+json" as const;
+  "application/vnd.toonstudio.will-v1-annex-a-conformance+json" as const;
 
 export interface ExecuteAndCertifyStudioFirstPartyWillV1CodecInput {
   readonly direction: StudioCodecDirection;
@@ -48,7 +48,7 @@ export interface ExecuteAndCertifyStudioFirstPartyWillV1CodecInput {
 }
 
 export interface StudioFirstPartyWillV1CertifiedExecution {
-  readonly kind: "toonspectrum-first-party-will-v1-certified-execution";
+  readonly kind: "toonstudio-first-party-will-v1-certified-execution";
   readonly direction: StudioCodecDirection;
   readonly scope: string;
   readonly bytes: Uint8Array;
@@ -98,7 +98,7 @@ export class StudioFirstPartyWillV1CodecCertificationError extends Error {
 export function studioFirstPartyWillV1CodecCertificationScope(
   direction: StudioCodecDirection,
 ): string {
-  return `toonspectrum.product.codec-conformance.will-v1-path-stream-${direction}`;
+  return `toonstudio.product.codec-conformance.will-v1-path-stream-${direction}`;
 }
 
 function providerFor(
@@ -227,7 +227,7 @@ export async function executeAndCertifyStudioFirstPartyWillV1Codec(
     signer,
   );
   return Object.freeze({
-    kind: "toonspectrum-first-party-will-v1-certified-execution",
+    kind: "toonstudio-first-party-will-v1-certified-execution",
     direction: input.direction,
     scope,
     bytes: execution.bytes,
@@ -268,7 +268,7 @@ export async function verifyStudioFirstPartyWillV1CertifiedExecution(
   const receipt = verified.certificate.receipt;
   if (
     execution.kind
-      !== "toonspectrum-first-party-will-v1-certified-execution"
+      !== "toonstudio-first-party-will-v1-certified-execution"
     || execution.scope !== expectedScope
     || verified.certificate.evidence.mediaType
       !== STUDIO_FIRST_PARTY_WILL_V1_CONFORMANCE_EVIDENCE_MEDIA_TYPE

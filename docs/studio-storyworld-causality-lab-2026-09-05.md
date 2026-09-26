@@ -1,6 +1,6 @@
-# ToonSpectrum Studio — Storyworld Causality Lab
+# ToonStudio Studio — Storyworld Causality Lab
 
-기준 저장소: `blue45f/toonspectrum`
+기준 저장소: `blue45f/toonstudio`
 기준 리비전: `843794a8a1c3de67d9c84b6e3116175d77e4b17b`
 설계·구현일: 2026-09-05
 

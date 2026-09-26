@@ -23,7 +23,7 @@ const EXT = 0.3; // 편 손가락
 const CURL = 2.7; // 접은 손가락
 
 // 순수 엔진(beats/resolveRound/pickAiHand/scoreReducer/matchOver/mukjjippaStep)은
-// @toonspectrum/play-core 의 rps-engine.test.ts 가 검증한다. 여기서는 MediaPipe
+// @toonstudio/play-core 의 rps-engine.test.ts 가 검증한다. 여기서는 MediaPipe
 // FingerEulerMap 에 종속된 웹 전용 제스처 분류부만 테스트한다.
 describe("rps-logic (gesture classification)", () => {
   it("classifyGesture: 보/바위/가위를 컬에서 분류", () => {

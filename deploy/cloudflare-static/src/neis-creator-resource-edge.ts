@@ -41,7 +41,7 @@ const MAX_CACHE = 128;
 const CLIENT_LIMIT = 5;
 const GLOBAL_LIMIT = 30;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
-const SOURCE_HEADER = "x-toonspectrum-creator-resource-source";
+const SOURCE_HEADER = "x-toonstudio-creator-resource-source";
 const SOURCE_VALUE = "cloudflare-neis-edge";
 
 const rows = (value: unknown): readonly unknown[] =>
@@ -318,7 +318,7 @@ export function createNeisCreatorResourceEdge(runtime: Runtime) {
         const hit = cache.get(cacheKey(query, page, keyed));
         if (hit && hit.until > now) {
           return json(hit.result, 200, {
-            "x-toonspectrum-edge-cache": "hit",
+            "x-toonstudio-edge-cache": "hit",
           }, method === "HEAD");
         }
       }
@@ -365,8 +365,8 @@ export function createNeisCreatorResourceEdge(runtime: Runtime) {
         result,
       });
       return json(result, 200, {
-        "x-toonspectrum-edge-cache": "miss",
-        "x-toonspectrum-neis-mode": keyed ? "keyed" : "sample",
+        "x-toonstudio-edge-cache": "miss",
+        "x-toonstudio-neis-mode": keyed ? "keyed" : "sample",
       }, method === "HEAD");
     },
 

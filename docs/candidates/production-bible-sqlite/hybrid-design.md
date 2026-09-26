@@ -7,7 +7,7 @@ StudioProductionBibleWorkspace
   -> createStudioProductionBibleSqlitePersistence()
   -> acquireStudioLocalDatabase()
   -> openStudioLocalDatabase({ vfs: "opfs" })
-  -> toonspectrum-studio-sqlite/.opaque/*
+  -> toonstudio-studio-sqlite/.opaque/*
   -> /studio-local-v12.db
   -> kv(namespace="studio-production-bible-v12", key=v12 owner/work scope)
 ```
@@ -60,8 +60,8 @@ misreported as SQLite latency.
 
 ## Legacy and fallback policy
 
-- Product key: `toonspectrum-studio-production-bible:v12:<owner>:<document>`.
-- Legacy key: `toonspectrum-studio-production-bible:v1:<owner>:<document>`.
+- Product key: `toonstudio-studio-production-bible:v12:<owner>:<document>`.
+- Legacy key: `toonstudio-studio-production-bible:v1:<owner>:<document>`.
 - Product code never calls `load(legacyKey)`.
 - Legacy IndexedDB/localStorage adapters require both explicit injection and
   `legacyDataPolicy="import-explicit"`.

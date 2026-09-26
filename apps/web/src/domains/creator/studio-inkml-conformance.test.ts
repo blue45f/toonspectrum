@@ -194,7 +194,7 @@ describe("Studio InkML conformance", () => {
       error: { code: "INVALID_CONFORMANCE_REQUEST" },
     });
     expect(negotiateStudioInkMlConformance(request({
-      acceptedDocumentProfiles: ["toonspectrum-inkml-v2"],
+      acceptedDocumentProfiles: ["toonstudio-inkml-v2"],
     }))).toMatchObject({
       status: "rejected",
       error: { code: "UNSUPPORTED_PROFILE" },
@@ -266,7 +266,7 @@ describe("Studio InkML conformance", () => {
       "<ink xmlns=\"http://www.w3.org/2003/InkML\"><brush xml:id=\"unused\"/><trace>1 2</trace></ink>",
       "<ink xmlns=\"http://www.w3.org/2003/InkML\"><brush xml:id=\"b\"/><trace brushRef=\"#b\">1 2</trace></ink>",
       "<ink xmlns=\"http://www.w3.org/2003/InkML\"><traceGroup><trace>1 2</trace></traceGroup></ink>",
-      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonspectrum.inkml-profile\">toonspectrum-inkml-v2</annotation><trace>1 2</trace></ink>",
+      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonstudio.inkml-profile\">toonstudio-inkml-v2</annotation><trace>1 2</trace></ink>",
     ];
     for (const source of cases) {
       const receipt = await validateStudioInkMlConformance(source);

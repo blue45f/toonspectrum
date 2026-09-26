@@ -1,10 +1,10 @@
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 import { z } from "zod";
 
 import type {
   BrushProgramIR,
   DynamicMappingIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * libmypaint `.myb` v3 importer (matrix E11, V11.1 §10.4).

@@ -62,7 +62,7 @@ describe("browser-check in-app browser awareness", () => {
         "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 " +
         "(KHTML, like Gecko) Mobile/21E236 Instagram 320.0.0.0.0 (iPhone15,3; iOS 17_4; ko_KR)",
     });
-    vi.stubGlobal("location", { href: "https://toonspectrum.app/studio" });
+    vi.stubGlobal("location", { href: "https://toonstudio.app/studio" });
     try {
       const fresh = await import("../browser-check");
       const analysis = fresh.classifyError(

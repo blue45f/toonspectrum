@@ -232,7 +232,7 @@ export class StudioPagesHistorySqliteRecovery implements StudioPagesHistoryRecov
   }
 
   async #withExclusiveLock<T>(operation: () => Promise<T>): Promise<T> {
-    const lockName = `toonspectrum-studio-history-sqlite:${this.#identity.documentId}`;
+    const lockName = `toonstudio-studio-history-sqlite:${this.#identity.documentId}`;
     if (this.#lockManager) {
       return this.#lockManager.request(lockName, { mode: "exclusive" }, operation);
     }

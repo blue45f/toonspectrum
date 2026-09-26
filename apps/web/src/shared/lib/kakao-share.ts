@@ -5,7 +5,7 @@ import {
   withShareAttribution,
 } from "./share";
 
-const KAKAO_SDK_ID = "toonspectrum-kakao-javascript-sdk";
+const KAKAO_SDK_ID = "toonstudio-kakao-javascript-sdk";
 const KAKAO_SDK_URL =
   "https://t1.kakaocdn.net/kakao_js_sdk/2.8.3/kakao.min.js";
 const KAKAO_SDK_INTEGRITY =

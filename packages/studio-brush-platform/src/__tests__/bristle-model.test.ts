@@ -25,7 +25,7 @@ import type {
   BristlePresetId,
   BristleSample,
 } from "../bristle-model";
-import type { ModeledSampleIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR } from "@toonstudio/studio-project-model";
 
 /**
  * Bristle model contracts (손맛·질감 웨이브). Physics-level invariants live

@@ -1,7 +1,7 @@
 /** Product capability map for the Storyworld Causality Lab.
  *
  * `engine` means the included deterministic core already supplies a usable result.
- * `adapter` means the feature composes that core with an existing ToonSpectrum subsystem.
+ * `adapter` means the feature composes that core with an existing ToonStudio subsystem.
  * `experimental` means the contract is defined but must remain opt-in until its benchmark gate passes.
  */
 

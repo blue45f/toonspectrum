@@ -72,7 +72,7 @@ the original `client_sequence`, `created_at`, and `update_id`.
 ## Legacy and emergency seams
 
 - `LegacyIndexedDbStudioCrdtOutbox` is an explicit import/test seam. Product construction never
-  creates it and never opens `toonspectrum-studio-crdt-outbox`.
+  creates it and never opens `toonstudio-studio-crdt-outbox`.
 - No automatic copy, merge, salvage or deletion of old IndexedDB rows occurs.
 - The emergency map is same-page only, bounded, and always accompanied by a degraded durability
   status when SQL did not commit.

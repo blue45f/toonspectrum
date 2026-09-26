@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
-import { evaluateReviewPolicy, reviewPolicyCommandSchema } from "@toonspectrum/studio-project-model";
+import { evaluateReviewPolicy, reviewPolicyCommandSchema } from "@toonstudio/studio-project-model";
 
 const origin = process.env.STUDIO_QA_BASE_URL ?? "http://127.0.0.1:4486";
 assert(["127.0.0.1", "localhost"].includes(new URL(origin).hostname), "Loopback fixture only");
@@ -40,7 +40,7 @@ try {
       }
       unexpected.push(`${request.method()} ${path}`); return route.fulfill({ status: 403, json: { error: "unexpected fixture API" } });
     });
-    await context.addInitScript(() => localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
+    await context.addInitScript(() => localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
     const page = await context.newPage(); page.on("pageerror", (error) => errors.push(error.message));
     try {
       await page.goto(`${origin}/tools/browser-harnesses/blueprint-continuation.html`);

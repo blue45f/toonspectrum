@@ -8,7 +8,7 @@ import {
   createEmptyScene,
   projectDigest,
   recoverProject,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import { openStudioLocalDatabase } from "../../../apps/web/src/domains/creator/studio-local-database";
 import { createSqliteJournalStore } from "../../../apps/web/src/domains/creator/studio-sqlite-journal-store";
@@ -204,7 +204,7 @@ async function main(): Promise<void> {
       memoryAtEnd.arrayBuffers,
     );
     const result = {
-      schema: "toonspectrum.studio-v12-recovery-package-benchmark",
+      schema: "toonstudio.studio-v12-recovery-package-benchmark",
       version: 1,
       measuredAt: new Date().toISOString(),
       runtime: {

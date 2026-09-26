@@ -11,7 +11,7 @@ const results = [];
 try {
   for (const width of [1440, 820, 390, 320]) {
     const context = await browser.newContext({ viewport: { width, height: 1000 }, locale: "ko-KR", reducedMotion: "reduce" });
-    await context.addInitScript(() => localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
+    await context.addInitScript(() => localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 })));
     const page = await context.newPage(), errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
     try {

@@ -36,7 +36,7 @@ test("Commons search sends the browser API user agent", async () => {
   await waitFor(() => expect(request).toHaveBeenCalledTimes(1));
   const [rawUrl, init] = request.mock.calls[0];
   expect(new URL(String(rawUrl)).hostname).toBe("commons.wikimedia.org");
-  expect(new Headers(init?.headers).get("Api-User-Agent")).toContain("ToonSpectrum/1.0");
+  expect(new Headers(init?.headers).get("Api-User-Agent")).toContain("ToonStudio/1.0");
 });
 
 test("429 imposes a cooldown without automatic retries or paid fallback", async () => {

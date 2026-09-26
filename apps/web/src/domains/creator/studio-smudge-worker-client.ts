@@ -46,7 +46,7 @@ export function createStudioSmudgeModuleWorker(): StudioSmudgeWorkerLike | null 
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-smudge.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-smudge",
+    name: "toonstudio-smudge",
   }) as unknown as StudioSmudgeWorkerLike;
 }
 

@@ -33,8 +33,8 @@ function marketplacePackage(
     accessLabel: "무료",
     origin: "original-procedural",
     creator: {
-      id: "toonspectrum-lab",
-      name: "ToonSpectrum Lab",
+      id: "toonstudio-lab",
+      name: "ToonStudio Lab",
       verified: true,
     },
     version: "1.2.0",
@@ -132,7 +132,7 @@ describe("studio marketplace package filter", () => {
   it("searches package, creator, tags, formats and included item names", () => {
     expect(filterStudioMarketplacePackages(packages, { query: "햇살 교실" }))
       .toEqual([packages[0]]);
-    expect(filterStudioMarketplacePackages(packages, { query: "ToonSpectrum" }))
+    expect(filterStudioMarketplacePackages(packages, { query: "ToonStudio" }))
       .toHaveLength(3);
     expect(filterStudioMarketplacePackages(packages, { query: "image/svg+xml" }))
       .toHaveLength(3);

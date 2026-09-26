@@ -14,7 +14,7 @@ import {
 } from "../ink-modeler";
 import { applyStabilizer, pathJitterEnergy } from "../stabilizer";
 
-import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR, StabilizerGraphIR } from "@toonstudio/studio-project-model";
 
 /**
  * ADR-0009 / ADR-0011 lane 3 PoC contracts + measured comparison probe.

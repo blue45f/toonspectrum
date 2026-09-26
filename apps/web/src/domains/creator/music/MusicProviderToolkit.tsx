@@ -15,7 +15,7 @@ import {
   type MusicProviderId,
 } from "./studio-music-provider-catalog";
 
-import type { MusicBrief } from "@toonspectrum/core/studio-music";
+import type { MusicBrief } from "@toonstudio/core/studio-music";
 
 interface MusicProviderToolkitProps {
   readonly brief: MusicBrief;

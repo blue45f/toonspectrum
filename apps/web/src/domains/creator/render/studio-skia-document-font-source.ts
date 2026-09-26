@@ -1,4 +1,4 @@
-import type { SkiaDocumentFontSource } from "@toonspectrum/studio-engine-skia";
+import type { SkiaDocumentFontSource } from "@toonstudio/studio-engine-skia";
 import {
   getProductStudioCustomFontRepository,
   STUDIO_CUSTOM_FONT_MAX_COMPATIBILITY_ENTRIES,

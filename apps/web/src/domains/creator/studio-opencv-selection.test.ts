@@ -11,17 +11,17 @@ import {
 
 import type { StudioSelectionPathArtifact } from "./studio-opencv-selection";
 import type { CV } from "@techstark/opencv-js";
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 /**
  * The skia engine is loaded through a runtime-resolved specifier on purpose:
  * the root app tsconfig maps `canvaskit-wasm` to a narrow type shim, so a
- * statically analyzable import of "@toonspectrum/studio-engine-skia" would
+ * statically analyzable import of "@toonstudio/studio-engine-skia" would
  * pull the engine sources (typed against the full canvaskit-wasm API) into
  * the root program and break `tsc --noEmit`. Runtime resolution keeps the
  * type universes separate while the test still drives the real engine.
  */
-const SKIA_PACKAGE = "@toonspectrum/studio-engine-skia";
+const SKIA_PACKAGE = "@toonstudio/studio-engine-skia";
 
 interface SkiaRenderModule {
   renderSceneToPixels(ck: unknown, scene: SceneIR): Uint8Array;

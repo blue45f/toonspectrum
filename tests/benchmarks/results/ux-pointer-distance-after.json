@@ -1,5 +1,5 @@
 {
-  "$schema": "https://toonspectrum.local/schemas/ux-pointer-distance.json",
+  "$schema": "https://toonstudio.local/schemas/ux-pointer-distance.json",
   "gate": "V5 §15 포인터 거리 — on-canvas command surfaces",
   "generatedAt": "2026-08-08T11:49:40.810Z",
   "route": "/studio (guest, no auth session)",

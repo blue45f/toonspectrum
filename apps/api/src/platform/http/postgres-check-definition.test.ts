@@ -8,7 +8,7 @@ import {
 const CANONICAL_ENUM = `CHECK (
   "license" = ANY (
     ARRAY[
-      'toonspectrum-standard'::text,
+      'toonstudio-standard'::text,
       'cc0-1.0'::text,
       'cc-by-4.0'::text,
       'cc-by-nc-4.0'::text
@@ -20,7 +20,7 @@ describe("PostgreSQL CHECK definition fingerprint", () => {
   it("accepts harmless pretty-print, identifier quote, and implicit literal-cast differences", () => {
     expect(matchesPostgresCheckDefinition(
       `CHECK (((license = ANY(ARRAY[
-        'toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0'
+        'toonstudio-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0'
       ]))))`,
       CANONICAL_ENUM
     )).toBe(true);

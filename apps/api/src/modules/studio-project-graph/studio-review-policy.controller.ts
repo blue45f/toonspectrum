@@ -1,7 +1,7 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, Header, Headers, HttpCode, Inject, Injectable, NotFoundException, Param, Post, Query, ServiceUnavailableException } from "@nestjs/common";
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
-import { reviewPolicyCommandSchema, reviewPolicyHistoryQuerySchema, type ReviewPolicyHistoryQuery, studioEntityIdSchema, type ReviewPolicyCommand } from "@toonspectrum/studio-project-model";
+import { reviewPolicyCommandSchema, reviewPolicyHistoryQuerySchema, type ReviewPolicyHistoryQuery, studioEntityIdSchema, type ReviewPolicyCommand } from "@toonstudio/studio-project-model";
 import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { StudioProjectForbiddenError, StudioProjectNotFoundError } from "./studio-project-graph.repository";
 import { StudioReviewPolicyRepository } from "./studio-review-policy.repository";

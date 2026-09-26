@@ -1,4 +1,4 @@
-import { canonicalJson, isoTimestampSchema, sha256Schema, studioEntityIdSchema } from "@toonspectrum/studio-project-model";
+import { canonicalJson, isoTimestampSchema, sha256Schema, studioEntityIdSchema } from "@toonstudio/studio-project-model";
 import { z } from "zod";
 import { api, apiPath, httpStatus } from "@/platform/api";
 import { parseStudioVirtualSpaceReviewSubject, type StudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-subject";

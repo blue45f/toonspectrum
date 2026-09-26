@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import { StudioProductionWorkspaceDocumentSchema } from "./studio-production.dto";
 import { StudioReviewTaskCompletionRepository } from "./studio-review-task-completion.repository";
 

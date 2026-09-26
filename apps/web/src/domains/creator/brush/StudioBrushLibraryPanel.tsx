@@ -879,8 +879,8 @@ export function StudioBrushLibraryPanel({
       return;
     }
       await navigator.share({
-        title: `${brush.name} · ToonSpectrum 브러시`,
-        text: "이 브러시 설정을 ToonSpectrum에서 가져올 수 있어요.",
+        title: `${brush.name} · ToonStudio 브러시`,
+        text: "이 브러시 설정을 ToonStudio에서 가져올 수 있어요.",
         files: [file],
       });
       setDoneMsg(`"${brush.name}" 브러시를 공유했어요.`);

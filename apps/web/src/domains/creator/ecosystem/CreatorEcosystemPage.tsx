@@ -225,7 +225,7 @@ export function CreatorEcosystemPage() {
           icon={Sparkles}
           eyebrow="CURATED ILLUSTRATIONS"
           title={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "검수 완료 샘플 일러스트")}
-          description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "재사용 소재라기보다 한 장면의 분위기·원근·광원 예시로 가치가 큰 결과물을 샘플 작품으로 큐레이션했습니다. 모두 1152×2048 원본 전체를 검수한 ToonSpectrum 1차 AI 생성 이미지이며, 같은 원본을 마켓 배경으로도 사용할 수 있습니다.")}
+          description={translateCurrentStaticSourceText("domains.creator.ecosystem.CreatorEcosystemPage", "ko", "재사용 소재라기보다 한 장면의 분위기·원근·광원 예시로 가치가 큰 결과물을 샘플 작품으로 큐레이션했습니다. 모두 1152×2048 원본 전체를 검수한 ToonStudio 1차 AI 생성 이미지이며, 같은 원본을 마켓 배경으로도 사용할 수 있습니다.")}
         />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {SAMPLE_ILLUSTRATIONS.map((work) => (

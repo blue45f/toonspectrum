@@ -273,7 +273,7 @@ function createContactSheetCanvas(width: number, height: number): HTMLCanvasElem
 
 /** 콘택트시트 파일명 — `<제목>-contact-sheet.pdf`(빈 제목은 기본 파일명, studio-export 의 "-strip" 접미사 관례와 동일). */
 export function contactSheetFileName(title: string): string {
-  return `${title.trim() || "toonspectrum-webtoon"}-contact-sheet.pdf`;
+  return `${title.trim() || "toonstudio-webtoon"}-contact-sheet.pdf`;
 }
 
 /** 실행 결과 한 줄 한글 안내. */

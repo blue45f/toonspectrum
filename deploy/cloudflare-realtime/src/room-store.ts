@@ -1459,7 +1459,7 @@ export class RealtimeRoomStore {
       throw new Error("Realtime channel sequence is exhausted");
     }
     const event: ServerEventMessage = {
-      version: "toonspectrum.realtime.v1",
+      version: "toonstudio.realtime.v1",
       type: "event",
       sequence: nextSequence,
       idempotencyKey: input.idempotencyKey,

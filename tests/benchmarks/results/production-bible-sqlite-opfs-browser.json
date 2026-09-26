@@ -20,7 +20,7 @@
         "runtimeAcquire": "acquireStudioLocalDatabase",
         "requestedVfs": "opfs",
         "namespace": "studio-production-bible-v12",
-        "opfsDirectory": "toonspectrum-studio-sqlite",
+        "opfsDirectory": "toonstudio-studio-sqlite",
         "logicalDatabaseFilename": "studio-local-v12.db",
         "expectedOpenFilename": "/studio-local-v12.db",
         "openedOpfsDatabaseFilenames": [
@@ -28,8 +28,8 @@
           "/studio-local-v12.db"
         ],
         "installedOpfsDirectories": [
-          "toonspectrum-studio-sqlite",
-          "toonspectrum-studio-sqlite"
+          "toonstudio-studio-sqlite",
+          "toonstudio-studio-sqlite"
         ],
         "memoryDatabaseOpenCount": 0,
         "localStorageApiPresent": false,
@@ -39,8 +39,8 @@
       "policy": {
         "legacyDataMigration": false,
         "discardExistingStudioData": true,
-        "legacyStorageKey": "toonspectrum-studio-production-bible:v1:legacy-artist:work:legacy-episode",
-        "v12StorageKey": "toonspectrum-studio-production-bible:v12:legacy-artist:work:legacy-episode",
+        "legacyStorageKey": "toonstudio-studio-production-bible:v1:legacy-artist:work:legacy-episode",
+        "v12StorageKey": "toonstudio-studio-production-bible:v12:legacy-artist:work:legacy-episode",
         "legacyKeyReadByProduct": false,
         "legacyPayloadRemainedUntouched": true
       },
@@ -224,9 +224,9 @@
         "strictRoundTrip": true
       },
       "isolation": {
-        "ownerKey": "toonspectrum-studio-production-bible:v12:artist-other:work:episode-main",
-        "workKey": "toonspectrum-studio-production-bible:v12:artist-main:work:episode-other",
-        "mainKey": "toonspectrum-studio-production-bible:v12:artist-main:work:episode-main",
+        "ownerKey": "toonstudio-studio-production-bible:v12:artist-other:work:episode-main",
+        "workKey": "toonstudio-studio-production-bible:v12:artist-main:work:episode-other",
+        "mainKey": "toonstudio-studio-production-bible:v12:artist-main:work:episode-main",
         "pass": true
       },
       "corruption": {
@@ -308,7 +308,7 @@
         "phase": "termination-seed",
         "status": "ready",
         "pass": true,
-        "key": "toonspectrum-studio-production-bible:v12:artist-crash:work:episode-crash",
+        "key": "toonstudio-studio-production-bible:v12:artist-crash:work:episode-crash",
         "canonical": "{\"version\":1,\"entries\":[{\"id\":\"scene-reunion\",\"kind\":\"scene\",\"name\":\"강제 종료 직전 문서\",\"aliases\":[],\"description\":\"윤이 잃어버린 열쇠를 돌려받는다.\",\"visualKeywords\":[],\"colors\":[],\"timeOfDay\":\"\",\"linkedCharacterIds\":[\"character-yun\"],\"linkedLocationIds\":[\"location-rooftop\"],\"linkedPropIds\":[\"prop-key\"],\"referenceAssetIds\":[]},{\"id\":\"location-rooftop\",\"kind\":\"location\",\"name\":\"학교 옥상\",\"aliases\":[\"옥상\"],\"description\":\"낡은 철망과 물탱크가 있는 반복 장소\",\"visualKeywords\":[\"역광\",\"철망\"],\"colors\":[\"남색\",\"주황\"],\"timeOfDay\":\"해질녘\",\"linkedCharacterIds\":[],\"linkedLocationIds\":[],\"linkedPropIds\":[],\"referenceAssetIds\":[\"asset-rooftop\"]},{\"id\":\"prop-key\",\"kind\":\"prop\",\"name\":\"은색 열쇠\",\"aliases\":[],\"description\":\"\",\"visualKeywords\":[],\"colors\":[],\"timeOfDay\":\"\",\"linkedCharacterIds\":[\"character-yun\"],\"linkedLocationIds\":[],\"linkedPropIds\":[],\"referenceAssetIds\":[\"asset-key\"]}],\"promisePayoffLedger\":{\"version\":1,\"currentEpisode\":1,\"entries\":[]}}",
         "digestSha256": "3beb69f5a45bac269c9a1d10f2ccab134f54f7dd536b605993d256090f63df8d",
         "openedOpfsDatabaseFilenames": [
@@ -320,7 +320,7 @@
         "phase": "termination-verify",
         "status": "ok",
         "pass": true,
-        "key": "toonspectrum-studio-production-bible:v12:artist-crash:work:episode-crash",
+        "key": "toonstudio-studio-production-bible:v12:artist-crash:work:episode-crash",
         "reopenedCanonicalExact": true,
         "digestSha256": "3beb69f5a45bac269c9a1d10f2ccab134f54f7dd536b605993d256090f63df8d",
         "reopenAfterTerminateMs": 9.215,
@@ -492,7 +492,7 @@
       "assets/sqlite3-worker1-N5XM9NUp.js.map",
       "index.html"
     ],
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-production-bible-opfs-rkm0EC"
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-production-bible-opfs-rkm0EC"
   },
   "validationIssues": []
 }

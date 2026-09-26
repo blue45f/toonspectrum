@@ -1,5 +1,5 @@
 import { useId, useLayoutEffect, useRef } from "react";
-import type { StudioWorldInteractionRule } from "@toonspectrum/studio-project-model/world-publication";
+import type { StudioWorldInteractionRule } from "@toonstudio/studio-project-model/world-publication";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 export function StudioWorldRuleDialog({ rule, onCancel, onConfirm }: { readonly rule: StudioWorldInteractionRule; readonly onCancel: () => void; readonly onConfirm: () => void }) {

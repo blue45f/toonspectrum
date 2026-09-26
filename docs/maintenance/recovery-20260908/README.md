@@ -62,7 +62,7 @@ MR #959가 감사 도중 main `dce667137fca4849ecd5536fb4e8e9e3e54f4fa3`에 병�
 
 한계도 남깁니다. 정리된 빌드·캐시 경로 7개(당시 9,238파일)는 과거 파일별 해시가 없어 내부 모든 바이트의 동일 복구를 증명할 수 없습니다. 또한 후속 변경된 모든 기능을 다시 실행해 과거와의 완전한 의미 동일성을 확인한 것은 아닙니다. 의도적으로 보관한 운영/구조 제안과 benchmark를 현재 제품 기능으로 모두 활성화했다고 주장하지 않습니다.
 
-사용자가 마지막 두 소스 브랜치의 통합도 요청한 뒤 `ci-salvage-followup`의 9cdd7b96와 `issues-parallel-fixes`의 a4a7dd1b가 release 2797e837의 조상임을 확인했습니다. 두 원격 이름도 정확한 SHA를 archive에 보존하고 lease가 일치하는 경우에만 삭제했습니다. 확인 시점 원격에는 main과 release/salvage-integration-20260908만 남았습니다. main 병합용 MR은 [#961](https://github.com/blue45f/toonspectrum/pull/961)입니다.
+사용자가 마지막 두 소스 브랜치의 통합도 요청한 뒤 `ci-salvage-followup`의 9cdd7b96와 `issues-parallel-fixes`의 a4a7dd1b가 release 2797e837의 조상임을 확인했습니다. 두 원격 이름도 정확한 SHA를 archive에 보존하고 lease가 일치하는 경우에만 삭제했습니다. 확인 시점 원격에는 main과 release/salvage-integration-20260908만 남았습니다. main 병합용 MR은 [#961](https://github.com/blue45f/toonstudio/pull/961)입니다.
 
 ## 최종 main 병합 준비
 

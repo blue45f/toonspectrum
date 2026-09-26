@@ -24,7 +24,7 @@ async function shareCollection(collection: ReturnType<typeof useApp.getState>["c
       version: 1,
       name: collection.name,
       emoji: collection.emoji,
-      description: `${collection.titleIds.length}편을 담은 ToonSpectrum 컬렉션`,
+      description: `${collection.titleIds.length}편을 담은 ToonStudio 컬렉션`,
       titleIds: collection.titleIds,
       createdAt: collection.createdAt,
     });
@@ -34,7 +34,7 @@ async function shareCollection(collection: ReturnType<typeof useApp.getState>["c
   }
   const url = new URL(`/lists/${encodeURIComponent(publicCollectionSlug(collection.name))}`, window.location.origin);
   url.searchParams.set("snapshot", token);
-  const shareData = { title: collection.name, text: `${collection.name} · ToonSpectrum`, url: url.toString() };
+  const shareData = { title: collection.name, text: `${collection.name} · ToonStudio`, url: url.toString() };
   if (typeof navigator.share === "function") {
     try {
       await navigator.share(shareData);

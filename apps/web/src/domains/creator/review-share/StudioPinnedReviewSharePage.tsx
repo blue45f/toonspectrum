@@ -5,7 +5,7 @@ import {
   pinnedShareAccessSchema,
   type PinnedShareAccess,
   type PinnedShareView,
-} from "@toonspectrum/studio-project-model/pinned-review-share";
+} from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { getApiErrorMessage } from "@/platform/api";
 import { buttonClass } from "@/shared/components/ui/button-utils";

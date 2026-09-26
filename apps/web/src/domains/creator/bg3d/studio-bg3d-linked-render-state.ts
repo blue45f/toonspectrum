@@ -173,7 +173,7 @@ export interface StudioBg3dLinkedRenderOperation {
 }
 
 export interface StudioBg3dLinkedRenderPlan {
-  readonly kind: "toonspectrum.bg3d-linked-render-plan";
+  readonly kind: "toonstudio.bg3d-linked-render-plan";
   readonly version: 1;
   readonly linkId: string;
   readonly baseRevision: number;
@@ -566,7 +566,7 @@ export async function createStudioBg3dLinkedRenderPlan(
       })),
     ];
     const renderSignature = await sha256(JSON.stringify({
-      kind: "toonspectrum.bg3d-linked-render-pass",
+      kind: "toonstudio.bg3d-linked-render-pass",
       version: 1,
       pass,
       dependencies,
@@ -638,7 +638,7 @@ export async function createStudioBg3dLinkedRenderPlan(
   return Object.freeze({
     ok: true,
     plan: Object.freeze({
-      kind: "toonspectrum.bg3d-linked-render-plan" as const,
+      kind: "toonstudio.bg3d-linked-render-plan" as const,
       version: 1 as const,
       linkId,
       baseRevision,

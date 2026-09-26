@@ -14,7 +14,7 @@ const ready = { status: "ready", reason: "configured" } as const;
 const disabled = { status: "disabled", reason: "not enabled" } as const;
 
 const providerStatus: CreatorIntelligenceStatus = {
-  schema: "toonspectrum.creator-intelligence.status.v1",
+  schema: "toonstudio.creator-intelligence.status.v1",
   references: { openverse: ready, pexels: ready, pixabay: ready },
   translation: { deepl: disabled, libretranslate: disabled },
   voice: { gemini: ready, deepgram: ready },

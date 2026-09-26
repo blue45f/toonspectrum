@@ -167,7 +167,7 @@ USAGE가 차단된 것을 확인했고, 해당 4개 함수는 trigger 반환형�
 
 ### Cloudflare D1 분석 DB — 생성·단독 검증 완료, 운영 미연결
 
-현재 실제 생성한 D1 DB는 `toonspectrum-analytics-buffer` 1개다. 분석 테이블과 migration checkpoint를
+현재 실제 생성한 D1 DB는 `toonstudio-analytics-buffer` 1개다. 분석 테이블과 migration checkpoint를
 적용한 뒤 `analytics-buffer-v2`로 원격 upgrade를 완료했다. v2는 검토한 미사용 인덱스 6개를
 제거해 쓰기 행 비용을 줄인다. 적용 후 schema SHA256은
 `e7beb58add8f451fd08336b92752590f5d8750178e23891ed840f8fd0a9e2120`다.
@@ -185,7 +185,7 @@ D1 `meta`에서 새 세션과 page view의 쓴 행 수는 v1의 12행에서 v2�
 
 분석 repository와 인증 Worker는 이 변경에서 구현·검증하는 연결 코드다. Worker 운영 배포와
 Core의 `TRAFFIC_ANALYTICS_STORE=d1` 전환이 끝나기 전까지 현재 운영 트래픽의 분산 완료로
-계산하지 않는다. `toonspectrum-edge-index`와 manifest의 다른 후보 자원은 이 분석 DB 생성
+계산하지 않는다. `toonstudio-edge-index`와 manifest의 다른 후보 자원은 이 분석 DB 생성
 기록만으로 생성 완료라고 판단하지 않는다. 계정의 D1 무료 할당량은 DB 사이에서 공유한다.
 
 ### GCP/Firebase
@@ -316,7 +316,7 @@ readiness·인가·가입·저장을 확인해야 성공이다. 실패 시 원�
 
 ```dotenv
 FEDERATED_DATA_PLANE_ENABLED=true
-FEDERATED_DATA_PLANE_QUOTA_SNAPSHOTS_JSON={"version":"toonspectrum.federated-data-plane-quota.v1","shards":{}}
+FEDERATED_DATA_PLANE_QUOTA_SNAPSHOTS_JSON={"version":"toonstudio.federated-data-plane-quota.v1","shards":{}}
 ```
 
 빈 snapshot으로는 어떤 shard도 활성화되지 않는다. 각 snapshot에는 health, usage ratio,

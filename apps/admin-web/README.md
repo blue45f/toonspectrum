@@ -1,16 +1,16 @@
-# ToonSpectrum Admin Web
+# ToonStudio Admin Web
 
 `apps/admin-web`은 독립 빌드 가능한 관리자 브라우저 애플리케이션이다. pnpm workspace 이름은
-`@toonspectrum/admin-web`이며 source와 빌드 설정을 이 디렉터리가 소유한다.
+`@toonstudio/admin-web`이며 source와 빌드 설정을 이 디렉터리가 소유한다.
 
 ## 명령
 
 ```sh
-pnpm --filter @toonspectrum/admin-web dev
-pnpm --filter @toonspectrum/admin-web typecheck
-pnpm --filter @toonspectrum/admin-web test
-pnpm --filter @toonspectrum/admin-web build
-pnpm --filter @toonspectrum/admin-web test:e2e
+pnpm --filter @toonstudio/admin-web dev
+pnpm --filter @toonstudio/admin-web typecheck
+pnpm --filter @toonstudio/admin-web test
+pnpm --filter @toonstudio/admin-web build
+pnpm --filter @toonstudio/admin-web test:e2e
 ```
 
 생성물은 `apps/admin-web/dist/`에 쓴다. 빌드와 머지는 운영 배포 승인이 아니다.

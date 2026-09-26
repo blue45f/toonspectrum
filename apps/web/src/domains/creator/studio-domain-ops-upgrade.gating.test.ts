@@ -17,7 +17,7 @@ import {
 
 const CONFIGURED_SCRATCH = process.env.GROK_SCRATCH ?? process.env.SCRATCH;
 const SCRATCH = CONFIGURED_SCRATCH
-  ?? mkdtempSync(join(tmpdir(), "toonspectrum-domain-ops-upgrade-"));
+  ?? mkdtempSync(join(tmpdir(), "toonstudio-domain-ops-upgrade-"));
 
 afterAll(() => {
   if (!CONFIGURED_SCRATCH) rmSync(SCRATCH, { force: true, recursive: true });

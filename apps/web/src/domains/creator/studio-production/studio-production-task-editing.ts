@@ -1,4 +1,4 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import type { ProductionTask, ProductionWorkspace, ProductionStage, ProductionRole, ProductionPriority, ProductionTaskStatus } from "./studio-production-workspace-runtime";
 
 export interface TaskDraft {

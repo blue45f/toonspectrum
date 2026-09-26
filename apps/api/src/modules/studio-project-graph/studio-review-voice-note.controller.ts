@@ -18,7 +18,7 @@ import {
   studioReviewVoiceNoteCreateSchema,
   studioReviewVoiceNoteDeleteSchema,
   studioReviewVoiceNoteSubjectSchema,
-} from "@toonspectrum/studio-project-model/review-voice-note";
+} from "@toonstudio/studio-project-model/review-voice-note";
 import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import type { StudioWorkAssetUploadFile } from "../creator/studio-work-asset.service";
 import { authenticatedStudioUserId } from "./studio-project-graph.controller";

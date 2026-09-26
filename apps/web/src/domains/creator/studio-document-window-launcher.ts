@@ -49,7 +49,7 @@ export function studioDocumentWindowName(
   documentKey: string,
   workspace: StudioDocumentWorkspaceId,
 ): string {
-  return `toonspectrum-studio-${studioDocumentWindowScopeToken(documentKey)}-${workspace}`;
+  return `toonstudio-studio-${studioDocumentWindowScopeToken(documentKey)}-${workspace}`;
 }
 export function studioDocumentWindowFeatures(input: {
   readonly index?: number;

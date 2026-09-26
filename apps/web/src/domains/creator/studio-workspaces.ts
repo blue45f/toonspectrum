@@ -431,8 +431,8 @@ export interface StudioWorkspaceSaveOptions {
   readonly sourceOwnerScope?: string;
 }
 
-const LEGACY_V1_STORAGE_PREFIX = "toonspectrum-studio-workspaces:v1";
-const WORKSPACE_ENVELOPE_KIND = "toonspectrum.studio-workspaces";
+const LEGACY_V1_STORAGE_PREFIX = "toonstudio-studio-workspaces:v1";
+const WORKSPACE_ENVELOPE_KIND = "toonstudio.studio-workspaces";
 const STORAGE_KEY_MAX_LENGTH = 160;
 const CUSTOM_ID_MAX_LENGTH = 80;
 const CUSTOM_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]*$/u;

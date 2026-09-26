@@ -372,7 +372,7 @@ export function createStudioToonHatchToneMaterial(
 // ---------------------------------------------------------------------------
 
 export type StudioPublishPackageLite = {
-  readonly format: "toonspectrum.publish-package-lite";
+  readonly format: "toonstudio.publish-package-lite";
   readonly images: readonly string[];
   readonly metadata: Readonly<Record<string, string>>;
   readonly fonts: readonly string[];
@@ -393,7 +393,7 @@ export function buildStudioPublishPackageLite(input: {
   const rights = input.rights ?? [];
   const metadata = input.metadata ?? {};
   return {
-    format: "toonspectrum.publish-package-lite",
+    format: "toonstudio.publish-package-lite",
     images,
     metadata,
     fonts,

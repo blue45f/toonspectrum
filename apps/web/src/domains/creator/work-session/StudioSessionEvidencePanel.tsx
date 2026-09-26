@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
-import type { StudioReviewSourceReference } from "@toonspectrum/studio-project-model";
-import type { StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
+import type { StudioReviewSourceReference } from "@toonstudio/studio-project-model";
+import type { StudioWorkSessionView } from "@toonstudio/studio-project-model/work-session";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioWorkSessionController } from "./studio-work-session-controller";
 import { useSessionEvidence } from "./use-session-evidence";

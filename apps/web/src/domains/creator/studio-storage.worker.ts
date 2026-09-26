@@ -143,8 +143,8 @@ implements StudioStorageWorkerRuntime {
         documentId: input.documentId,
         shardBytes: input.shardBytes,
         rootName: input.role === "document"
-          ? "toonspectrum-studio-document-data"
-          : "toonspectrum-studio-command-journal",
+          ? "toonstudio-studio-document-data"
+          : "toonstudio-studio-command-journal",
         scope: input.scope,
       })
     ));

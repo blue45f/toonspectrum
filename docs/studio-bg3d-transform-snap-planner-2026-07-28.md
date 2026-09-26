@@ -6,7 +6,7 @@
 
 ## 공식 문서에서 채택한 계약
 
-| 공식 제품 계약 | ToonSpectrum 엔진 중립 계약 |
+| 공식 제품 계약 | ToonStudio 엔진 중립 계약 |
 | --- | --- |
 | Blender는 X/Y/Z 단일 축과 Shift+축 평면 제약을 제공하고, 변형 방향을 Global 또는 Local orientation으로 해석한다. | `free`, `axis`, `plane` 제약과 검증된 오른손 직교 Global/Local basis |
 | Blender increment는 변형 시작점 기준 상대 이동과 absolute grid를 구분하며, 변형 중 임시로 스냅 상태를 반전할 수 있다. | `relative`/`absolute` increment와 `invertSnapping` semantic override |

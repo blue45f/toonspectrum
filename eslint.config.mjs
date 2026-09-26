@@ -81,7 +81,7 @@ export default defineConfig(
   },
 
   // heejun 개인 테스트/목 컨벤션 규칙은 비활성 — 횡단 일관성 대상이 아니라
-  // ToonSpectrum 자체 테스트 스타일과 충돌한다(shared base 의 일반 규칙만 채택).
+  // ToonStudio 자체 테스트 스타일과 충돌한다(shared base 의 일반 규칙만 채택).
   {
     plugins: { '@heejun': plugin },
     rules: {
@@ -152,7 +152,7 @@ export default defineConfig(
   },
 
   // apps/web/src/ 계층 경계 — 개발가이드의 app/domains/shared/infrastructure 4계층.
-  // ToonSpectrum 은 Vite 앱이 apps/web 에 있어 계층은 apps/web/src/ 아래에만 둔다(루트 components/·lib/ 는
+  // ToonStudio 은 Vite 앱이 apps/web 에 있어 계층은 apps/web/src/ 아래에만 둔다(루트 components/·lib/ 는
   // 대규모 공용 트리이며 apps/web 경계 안에서 함께 관리한다
   // = 분류되지 않으므로 강제 대상 아님). apps/web/src/ 안의 compat/components/hooks/styles 와
   // 횡단 카탈로그 엔진(catalog-static*)은 shared 로 매핑한다.

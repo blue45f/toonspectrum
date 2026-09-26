@@ -23,7 +23,7 @@ const SAMPLE_INPUT = {
   height: 480,
   title: "Packed 압력선",
   createdAt: "2026-07-30T00:00:00Z",
-  application: "ToonSpectrum",
+  application: "ToonStudio",
   applicationVersion: "2.0",
   paths: [
     {

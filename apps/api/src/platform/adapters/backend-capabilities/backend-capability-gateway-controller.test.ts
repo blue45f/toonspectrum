@@ -99,7 +99,7 @@ function gatewayEnvelope(
   };
 
   const envelope = {
-    version: "toonspectrum.backend-capability.v1",
+    version: "toonstudio.backend-capability.v1",
     provider: "cloudflare",
     tenantId: "tenant-001",
     capability: "async-job",
@@ -132,7 +132,7 @@ function gatewayEnvelopeWithPayload(
   payload: Record<string, unknown>
 ) {
   const envelope = {
-    version: "toonspectrum.backend-capability.v1",
+    version: "toonstudio.backend-capability.v1",
     provider: "cloudflare",
     tenantId: "tenant-001",
     capability: "async-job",
@@ -166,7 +166,7 @@ function durableQueueEnvelope(
   payloadOverride: Record<string, unknown> = {}
 ) {
   return BackendCapabilityGatewayEnvelopeSchema.parse({
-    version: "toonspectrum.backend-capability.v1",
+    version: "toonstudio.backend-capability.v1",
     provider: "cloudflare",
     tenantId: "tenant-001",
     capability: "async-job",
@@ -291,14 +291,14 @@ describe("BackendCapabilityGatewayController", () => {
     });
     expect(result.status).toBe(200);
     expect(result.headers.get("content-type")).toBe(
-      "application/vnd.toonspectrum.backend-capability+json; charset=utf-8; version=1",
+      "application/vnd.toonstudio.backend-capability+json; charset=utf-8; version=1",
     );
     expect(result.headers.get("cache-control")).toBe(
       "private, no-store, max-age=0",
     );
     const body = await result.json();
     expect(body).toMatchObject({
-      version: "toonspectrum.backend-capability.v1",
+      version: "toonstudio.backend-capability.v1",
       outcome: "completed",
       provider: "cloudflare",
       idempotencyKey: validGatewayIdempotencyKey,
@@ -509,7 +509,7 @@ describe("BackendCapabilityGatewayController", () => {
 
       expect(result.status).toBe(200);
       await expect(result.json()).resolves.toMatchObject({
-        version: "toonspectrum.backend-capability.v1",
+        version: "toonstudio.backend-capability.v1",
         provider: "cloudflare",
         idempotencyKey,
         outcome: "accepted",

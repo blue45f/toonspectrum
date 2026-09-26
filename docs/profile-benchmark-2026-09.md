@@ -6,7 +6,7 @@ Turn `/u/:userId` from a passive account page into a creator identity and discov
 
 ## Patterns worth adopting
 
-| Pattern | Common in | ToonSpectrum decision |
+| Pattern | Common in | ToonStudio decision |
 | --- | --- | --- |
 | Featured portfolio | Behance, ArtStation, creator platforms | Adopt: derive up to three featured public works from engagement until explicit pinning is added. |
 | Skills / specialties | Behance, LinkedIn, ArtStation | Adopt: derive specialty chips from recurring public-work tags. This avoids a new profile schema and cold-start form burden. |

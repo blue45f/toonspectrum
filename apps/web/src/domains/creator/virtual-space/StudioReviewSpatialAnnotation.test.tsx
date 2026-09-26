@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createStudioReviewSpatialAnchor, deriveStudioReviewPageMapping, type StudioReviewMappedPage } from "@toonspectrum/studio-project-model";
+import { createStudioReviewSpatialAnchor, deriveStudioReviewPageMapping, type StudioReviewMappedPage } from "@toonstudio/studio-project-model";
 import { StudioReviewSpatialAnnotation, type StudioReviewAnnotationSelection } from "./StudioReviewSpatialAnnotation";
 
 const mapping = deriveStudioReviewPageMapping({ width: 800, pagesList: [{ id: "page-a", canvasH: 1200,

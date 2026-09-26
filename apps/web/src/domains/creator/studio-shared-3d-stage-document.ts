@@ -8,7 +8,7 @@ import {
 import type { StudioVrmSceneDocument } from "./vrm/studio-vrm-scene-document";
 
 export const STUDIO_SHARED_3D_STAGE_DOCUMENT_KIND =
-  "toonspectrum.studio-shared-3d-stage" as const;
+  "toonstudio.studio-shared-3d-stage" as const;
 export const STUDIO_SHARED_3D_STAGE_DOCUMENT_VERSION = 1 as const;
 export const STUDIO_SHARED_3D_STAGE_DOCUMENT_MAX_BYTES = 8 * 1024;
 

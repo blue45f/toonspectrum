@@ -215,8 +215,8 @@ function routingHeaders(
   mode: FederatedRoutingMode,
 ): Record<string, string> {
   return {
-    "x-toonspectrum-edge-route": route,
-    "x-toonspectrum-edge-routing": mode,
+    "x-toonstudio-edge-route": route,
+    "x-toonstudio-edge-routing": mode,
   };
 }
 
@@ -258,10 +258,10 @@ function withRoutingHeaders(
 
 function sanitizedRequest(request: Request): Request {
   const headers = new Headers(request.headers);
-  headers.delete("x-toonspectrum-edge");
-  headers.delete("x-toonspectrum-edge-route");
-  headers.delete("x-toonspectrum-edge-attempt");
-  headers.delete("x-toonspectrum-edge-routing");
+  headers.delete("x-toonstudio-edge");
+  headers.delete("x-toonstudio-edge-route");
+  headers.delete("x-toonstudio-edge-attempt");
+  headers.delete("x-toonstudio-edge-routing");
   return new Request(request, { headers });
 }
 

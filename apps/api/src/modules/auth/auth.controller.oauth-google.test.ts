@@ -189,7 +189,7 @@ describe("AuthController Google GIS/code-flow boundary", () => {
       expect.objectContaining({ sameSite: "none", secure: true }),
     );
     expect(oauthLinkSessionCookieName("apple")).toBe(
-      "toonspectrum-oauth-link-session-apple",
+      "toonstudio-oauth-link-session-apple",
     );
   });
 
@@ -293,7 +293,7 @@ describe("AuthController Google GIS/code-flow boundary", () => {
     controller().oauthStart("github", res);
 
     const oauthCookies = vi.mocked(res.cookie).mock.calls.filter(
-      ([name]) => String(name).startsWith("toonspectrum-oauth-"),
+      ([name]) => String(name).startsWith("toonstudio-oauth-"),
     );
     expect(oauthCookies).toHaveLength(2);
     for (const [, , options] of oauthCookies) {

@@ -4,7 +4,7 @@
 
 
 - 감사 일자: 2026-08-08
-- 감사 대상 워크트리: `/Users/hjunkim/WebstormProjects/toonspectrum/.claude/worktrees/toonstudio-v11-codex-master-23fdef`, 브랜치 `claude/toonstudio-v11-codex-master-23fdef`
+- 감사 대상 워크트리: `/Users/hjunkim/WebstormProjects/toonstudio/.claude/worktrees/toonstudio-v11-codex-master-23fdef`, 브랜치 `claude/toonstudio-v11-codex-master-23fdef`
 - 기준 문서: `docs/architecture/ToonStudio_최종공유본_초확장_멀티엔진_제품기능_UIUX_성능품질_아키텍처_V5_2026-08-07.md:533-660`
   (§15 표 12기준 · §15.1 레이아웃 · §15.2 Workspace Profiles 12종 · §15.3 메뉴 · §15.4 CommandRegistry)
 - 정량 측정치: `tests/benchmarks/results/ux-audit.json`

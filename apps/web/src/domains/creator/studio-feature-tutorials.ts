@@ -838,7 +838,7 @@ export function groupStudioFeatureTutorials(
 
 // ── 진행 상태 ─────────────────────────────────────────────────────────────
 
-export const STUDIO_TUTORIAL_PROGRESS_KEY = "toonspectrum.studio.tutorialProgress.v1";
+export const STUDIO_TUTORIAL_PROGRESS_KEY = "toonstudio.studio.tutorialProgress.v1";
 
 export type StudioTutorialProgress = {
   /** 마지막 단계까지 본 튜토리얼 id. */

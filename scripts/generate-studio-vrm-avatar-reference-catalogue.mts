@@ -421,7 +421,7 @@ async function startHarnessServer(modelBytes: Uint8Array): Promise<Readonly<{
             "<head>",
             '<meta charset="utf-8">',
             '<meta name="viewport" content="width=512,height=512,initial-scale=1">',
-            "<title>ToonSpectrum Avatar Forge reference catalogue</title>",
+            "<title>ToonStudio Avatar Forge reference catalogue</title>",
             "</head>",
             "<body>",
             `<script type="module" src="${HARNESS_ENTRY}"></script>`,
@@ -641,11 +641,11 @@ async function generateEnvelope(): Promise<Readonly<{
       playwrightVersion,
     ] = packageVersions;
     const authority = {
-      sourceAssetId: "toonspectrum-minseo-campus",
+      sourceAssetId: "toonstudio-minseo-campus",
       sourceUrl: SOURCE_URL,
       sourceByteLength: SOURCE_BYTE_LENGTH,
       sourceSha256: SOURCE_SHA256,
-      rendererId: "toonspectrum-avatar-forge-front",
+      rendererId: "toonstudio-avatar-forge-front",
       rendererRevision: "2",
       rendererModuleSha256: rendererModuleHash.sha256,
       avatarForgeStateModuleSha256: avatarForgeStateModuleHash.sha256,

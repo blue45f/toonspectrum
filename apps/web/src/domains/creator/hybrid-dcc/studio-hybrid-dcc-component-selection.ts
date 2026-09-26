@@ -21,7 +21,7 @@ import {
 export const STUDIO_HYBRID_DCC_COMPONENT_SELECTION_REVISION = 1 as const;
 export const STUDIO_HYBRID_DCC_COMPONENT_SELECTION_SNAPSHOT_VERSION = 1 as const;
 export const STUDIO_HYBRID_DCC_COMPONENT_SELECTION_FORMAT =
-  "toonspectrum.hybrid-dcc.component-selection" as const;
+  "toonstudio.hybrid-dcc.component-selection" as const;
 
 export const STUDIO_HYBRID_DCC_COMPONENT_SELECTION_LIMITS = Object.freeze({
   maxSelectedObjects: 1_024,

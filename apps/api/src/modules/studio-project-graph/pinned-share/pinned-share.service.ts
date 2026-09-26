@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { BadRequestException, ConflictException, ForbiddenException, GoneException, HttpException, Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException } from "@nestjs/common";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
-import type { PinnedShareAccess, PinnedShareCreate } from "@toonspectrum/studio-project-model/pinned-review-share";
+import { canonicalJson } from "@toonstudio/studio-project-model";
+import type { PinnedShareAccess, PinnedShareCreate } from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../../platform/adapters/private-object-storage/private-object-storage.port";
 import { PrivateSignedReadUrlSchema } from "../../../platform/adapters/private-object-storage/private-object-storage.contract";

@@ -5,7 +5,7 @@ import type {
   InfrastructureProviderHealth,
   InfrastructureQuotaDimensionSnapshot,
   InfrastructureTrafficDistribution,
-} from "@toonspectrum/core/infrastructure-fabric";
+} from "@toonstudio/core/infrastructure-fabric";
 
 export interface FederatedDataPlaneProviderDefinition {
   readonly billingBoundary: Extract<

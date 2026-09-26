@@ -23,7 +23,7 @@ export const STUDIO_WILL_V1_PUBLIC_PATENT_LICENSE_URL =
 export const STUDIO_WILL_V1_PATH_MEDIA_TYPE =
   "application/vnd.willfileformat.path+protobuf" as const;
 export const STUDIO_WILL_V1_PROFILE =
-  "will-data-format-v1.0/annex-a-protobuf/toonspectrum-clean-room-1" as const;
+  "will-data-format-v1.0/annex-a-protobuf/toonstudio-clean-room-1" as const;
 
 export const STUDIO_WILL_V1_LIMITS = Object.freeze({
   maxStrokesBytes: 32 * 1024 * 1024,

@@ -442,7 +442,7 @@ function linkedPassEnvelope(linkCount = 1) {
         id: "page-1",
         elements,
         linked3dRender: {
-          kind: "toonspectrum.studio-linked-3d-render",
+          kind: "toonstudio.studio-linked-3d-render",
           version: 2,
           authority: "studio-project-linked-3d-pass-index",
           links,

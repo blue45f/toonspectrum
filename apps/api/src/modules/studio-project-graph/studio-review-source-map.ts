@@ -1,4 +1,4 @@
-import { deriveStudioReviewPageMapping, type StudioReviewPageMapping } from "@toonspectrum/studio-project-model";
+import { deriveStudioReviewPageMapping, type StudioReviewPageMapping } from "@toonstudio/studio-project-model";
 import { z } from "zod";
 
 import { studioReviewCaptureFromOperation, type StudioReviewSourcePin } from "./studio-review-capture-attestation";

@@ -4,7 +4,7 @@
  * The public WILL v1 specification documents the seven-part OPC shape, content types, root
  * relationships, SVG section, and Annex A stroke stream. It lists
  * `sections/_rels/section0.svg.rels`, but does not publish that part's relationship XML or Type
- * URI. This implementation therefore uses an explicitly ToonSpectrum-owned relationship Type and
+ * URI. This implementation therefore uses an explicitly ToonStudio-owned relationship Type and
  * validates its `strokes0` relationship against the SVG `r:id` one-to-one. It is not a Wacom SDK,
  * Wacom certification, trademark authorization, or a claim that arbitrary vendor `.will` files
  * are interoperable.
@@ -38,7 +38,7 @@ import type { StudioCrc32ExecutionMode } from "./studio-crc32-worker-client";
 
 export const STUDIO_WILL_V1_OPC_EXTENSION = ".will" as const;
 export const STUDIO_WILL_V1_OPC_MEDIA_TYPE =
-  "application/vnd.toonspectrum.will-v1-bounded+zip" as const;
+  "application/vnd.toonstudio.will-v1-bounded+zip" as const;
 export const STUDIO_WILL_V1_OPC_PROFILE =
   "will-data-format-v1.0/annex-b-opc/toonstudio-bounded-clean-room-1" as const;
 export const STUDIO_WILL_V1_OPC_STROKE_RELATIONSHIP_TYPE =
@@ -114,13 +114,13 @@ export interface StudioWillV1OpcImportOptions extends StudioWillV1OpcOptions {
 
 export const STUDIO_WILL_V1_OPC_ASSURANCE = Object.freeze({
   profile: STUDIO_WILL_V1_OPC_PROFILE,
-  implementation: "ToonSpectrum clean-room bounded profile",
+  implementation: "ToonStudio clean-room bounded profile",
   publicSpecification: STUDIO_WILL_V1_SPECIFICATION_URL,
   publicPatentLicense: STUDIO_WILL_V1_PUBLIC_PATENT_LICENSE_URL,
   annexAPathStream: true,
   annexBOpcSevenPartContainer: true,
   publicSpecificationDefinesTopLevelMediaType: false,
-  canonicalTopLevelMediaTypeOwner: "ToonSpectrum",
+  canonicalTopLevelMediaTypeOwner: "ToonStudio",
   sectionRelationshipNormativeInPublicSpecification: false,
   vendorCertified: false,
   vendorTrademarkAuthorized: false,
@@ -212,7 +212,7 @@ const XSI_NAMESPACE = "http://www.w3.org/2001/XMLSchema-instance";
 const STROKE_RELATIONSHIP_ID = "strokes0";
 const DEFAULT_CREATED_AT = "1980-01-01T00:00:00Z";
 const DEFAULT_TITLE = "Untitled";
-const DEFAULT_APPLICATION = "ToonSpectrum";
+const DEFAULT_APPLICATION = "ToonStudio";
 const DEFAULT_APPLICATION_VERSION = "1.0";
 const XML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>';
 const textEncoder = new TextEncoder();
@@ -969,7 +969,7 @@ function archiveLimits(limits: StudioWillV1OpcLimits) {
 }
 
 /**
- * Builds deterministic ZIP32 bytes for the ToonSpectrum bounded WILL v1 Annex B profile.
+ * Builds deterministic ZIP32 bytes for the ToonStudio bounded WILL v1 Annex B profile.
  *
  * Every entry uses the ZIP writer's deterministic DOS epoch, stored method, fixed physical order,
  * normalized path, and CRC-32. No clock, random ID, or host metadata enters the byte stream.
@@ -1064,7 +1064,7 @@ function assertExactPartSet(paths: readonly string[]): void {
 }
 
 /**
- * Imports only the explicit ToonSpectrum bounded seven-part profile.
+ * Imports only the explicit ToonStudio bounded seven-part profile.
  *
  * This intentionally fails closed for extra media, paints, extra sections, external relationships,
  * scripts, arbitrary SVG, and vendor-specific extensions. Those require separate profiled codecs

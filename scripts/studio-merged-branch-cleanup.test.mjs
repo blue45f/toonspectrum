@@ -9,7 +9,7 @@ import {
   selectMergedStudioBranchCleanupCandidates,
 } from "./studio-merged-branch-cleanup.mjs";
 
-const repository = "blue45f/toonspectrum";
+const repository = "blue45f/toonstudio";
 const branch = (name, sha, protectedBranch = false) => ({
   name,
   commit: { sha },

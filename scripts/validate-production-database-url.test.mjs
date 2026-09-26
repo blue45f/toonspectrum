@@ -6,14 +6,14 @@ import {
 } from "./validate-production-database-url.mjs";
 
 const DIRECT_URL =
-  "postgresql://artist:secret@ep-direct.ap-southeast-1.aws.neon.tech/toonspectrum?sslmode=verify-full&channel_binding=require";
+  "postgresql://artist:secret@ep-direct.ap-southeast-1.aws.neon.tech/toonstudio?sslmode=verify-full&channel_binding=require";
 
 test("accepts the exact direct PostgreSQL production contract", () => {
   expect(validateProductionDatabaseUrl(DIRECT_URL)).toEqual({
     protocol: "postgresql:",
     hostname: "ep-direct.ap-southeast-1.aws.neon.tech",
     port: "5432",
-    databaseName: "toonspectrum",
+    databaseName: "toonstudio",
     tlsVerified: true,
   });
 });
@@ -124,7 +124,7 @@ for (const [name, value, pattern] of [
   ],
   [
     "multiple database path segments",
-    DIRECT_URL.replace("/toonspectrum?", "/one/two?"),
+    DIRECT_URL.replace("/toonstudio?", "/one/two?"),
     /exactly one/u,
   ],
   [
@@ -216,7 +216,7 @@ test("builds an override-resistant libpq environment without putting the URL in 
     PGPORT: "5432",
     PGUSER: "artist",
     PGPASSWORD: "secret",
-    PGDATABASE: "toonspectrum",
+    PGDATABASE: "toonstudio",
     PGSSLMODE: "verify-full",
     PGCHANNELBINDING: "require",
     PGSSLROOTCERT: "system",

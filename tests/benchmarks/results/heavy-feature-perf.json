@@ -733,7 +733,7 @@
         "strokesDrawnBeforeExport": 14,
         "downloadFired": true,
         "timeToDownloadMs": 97.4,
-        "suggestedFilename": "toonspectrum-comic.png",
+        "suggestedFilename": "toonstudio-comic.png",
         "savedBytes": 179328,
         "phaseNote": "openMs = 클릭→다운로드 이벤트(캡처+인코딩+저장 완료), codeDeliveryMs = 내보내기 청크·워커 코드 도착까지"
       }
@@ -772,7 +772,7 @@
         "strokesDrawnBeforeExport": 14,
         "downloadFired": true,
         "timeToDownloadMs": 137.1,
-        "suggestedFilename": "toonspectrum-comic.psd",
+        "suggestedFilename": "toonstudio-comic.psd",
         "savedBytes": 393296,
         "phaseNote": "openMs = 클릭→다운로드 이벤트(캡처+인코딩+저장 완료), codeDeliveryMs = 내보내기 청크·워커 코드 도착까지"
       }
@@ -803,7 +803,7 @@
         "strokesDrawnBeforeExport": 14,
         "downloadFired": true,
         "timeToDownloadMs": 85.1,
-        "suggestedFilename": "toonspectrum-webtoon-naver-challenge.jpg",
+        "suggestedFilename": "toonstudio-webtoon-naver-challenge.jpg",
         "savedBytes": 31262,
         "phaseNote": "openMs = 클릭→다운로드 이벤트(캡처+인코딩+저장 완료), codeDeliveryMs = 내보내기 청크·워커 코드 도착까지"
       }
@@ -834,7 +834,7 @@
         "strokesDrawnBeforeExport": 14,
         "downloadFired": true,
         "timeToDownloadMs": 50.2,
-        "suggestedFilename": "toonspectrum-comic.svg",
+        "suggestedFilename": "toonstudio-comic.svg",
         "savedBytes": 182424,
         "phaseNote": "openMs = 클릭→다운로드 이벤트(캡처+인코딩+저장 완료), codeDeliveryMs = 내보내기 청크·워커 코드 도착까지"
       }

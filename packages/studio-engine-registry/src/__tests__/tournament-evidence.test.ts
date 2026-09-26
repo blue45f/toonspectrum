@@ -1,4 +1,4 @@
-import { sceneIRSchema } from "@toonspectrum/studio-project-model";
+import { sceneIRSchema } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -19,7 +19,7 @@ import type {
   TournamentCandidate,
   VisualGateResult,
 } from "../tournament";
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 function scene(width = 32, height = 16): SceneIR {
   return sceneIRSchema.parse({

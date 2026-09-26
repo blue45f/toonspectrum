@@ -155,7 +155,7 @@ function linkedPassCreatorDoc(linkCount = 1): Record<string, unknown> {
       id: "page-linked",
       elements,
       linked3dRender: {
-        kind: "toonspectrum.studio-linked-3d-render",
+        kind: "toonstudio.studio-linked-3d-render",
         version: 2,
         authority: "studio-project-linked-3d-pass-index",
         links,

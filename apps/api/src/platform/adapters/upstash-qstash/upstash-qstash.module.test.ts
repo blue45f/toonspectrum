@@ -18,7 +18,7 @@ describe("UpstashQStashModule", () => {
       {
         apiBaseUrl: "https://qstash.upstash.io",
         publishToken: "server-only-qstash-publish-token",
-        urlGroup: "toonspectrum-durable-v1",
+        urlGroup: "toonstudio-durable-v1",
         timeoutMs: 2_500,
         deliveryTimeoutSeconds: 30,
         retries: 3,
@@ -45,7 +45,7 @@ describe("UpstashQStashModule", () => {
         {
           apiBaseUrl: "https://qstash.upstash.io",
           publishToken: "server-only-qstash-publish-token",
-          urlGroup: "toonspectrum-durable-v1",
+          urlGroup: "toonstudio-durable-v1",
           timeoutMs: 2_500,
           deliveryTimeoutSeconds: 30,
           retries: 3,
@@ -71,7 +71,7 @@ describe("UpstashQStashModule", () => {
       UpstashQStashModule.register({
         apiBaseUrl: "https://attacker.example",
         publishToken: "server-only-qstash-publish-token",
-        urlGroup: "toonspectrum-durable-v1",
+        urlGroup: "toonstudio-durable-v1",
         timeoutMs: 2_500,
         deliveryTimeoutSeconds: 30,
         retries: 3,
@@ -85,7 +85,7 @@ describe("UpstashQStashModule", () => {
     const fetch = vi.fn(async () =>
       new Response(
         JSON.stringify({
-          name: "toonspectrum-durable-v1",
+          name: "toonstudio-durable-v1",
           endpoints: [
             { name: "worker", url: "https://worker.example/queues/qstash/v1" },
           ],
@@ -103,7 +103,7 @@ describe("UpstashQStashModule", () => {
         "gateway-admission-token-32-characters-minimum",
       BACKEND_UPSTASH_QSTASH_PUBLISH_TOKEN:
         "qstash-publish-token-32-characters-minimum",
-      BACKEND_UPSTASH_QSTASH_URL_GROUP: "toonspectrum-durable-v1",
+      BACKEND_UPSTASH_QSTASH_URL_GROUP: "toonstudio-durable-v1",
       BACKEND_UPSTASH_QSTASH_DAILY_REQUEST_BUDGET: "1000",
       BACKEND_UPSTASH_QSTASH_DAILY_COST_BUDGET: "1000",
       BACKEND_UPSTASH_QSTASH_MAX_EXECUTION_MS: "30000",
@@ -141,7 +141,7 @@ describe("UpstashQStashModule", () => {
         ready: true,
       });
       expect(fetch).toHaveBeenCalledWith(
-        "https://qstash.upstash.io/v2/topics/toonspectrum-durable-v1",
+        "https://qstash.upstash.io/v2/topics/toonstudio-durable-v1",
         expect.any(Object)
       );
       expect(

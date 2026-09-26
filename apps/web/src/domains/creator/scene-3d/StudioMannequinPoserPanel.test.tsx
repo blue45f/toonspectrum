@@ -632,7 +632,7 @@ describe("StudioMannequinPoserPanel", () => {
       params: STUDIO_MANNEQUIN_DEFAULT_BODY_PARAMS,
       pose: { joints: {}, pelvisOffset: [0, 0, 0] },
     });
-    expect(localStorage.getItem("toonspectrum-studio-mannequin-state:v1")).toBeNull();
+    expect(localStorage.getItem("toonstudio-studio-mannequin-state:v1")).toBeNull();
   });
 
   it("SQLite 저장 실패 시 닫지 않고 memory-only 경고와 JSON 탈출구를 유지한다", async () => {

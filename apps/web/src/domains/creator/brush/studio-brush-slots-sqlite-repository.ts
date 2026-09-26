@@ -19,7 +19,7 @@ import type { StudioLocalDatabase } from "../studio-local-database";
 export const STUDIO_BRUSH_QUICK_SLOTS_SQLITE_NAMESPACE =
   "studio-brush-quick-slots-v12";
 export const STUDIO_BRUSH_QUICK_SLOTS_SCHEMA =
-  "toonspectrum.studio.brush-quick-slots";
+  "toonstudio.studio.brush-quick-slots";
 export const STUDIO_BRUSH_QUICK_SLOTS_SCHEMA_VERSION = 1 as const;
 export const STUDIO_BRUSH_QUICK_SLOTS_LEGACY_MIGRATION =
   STUDIO_BRUSH_SLOTS_LEGACY_AUTO_MIGRATION;

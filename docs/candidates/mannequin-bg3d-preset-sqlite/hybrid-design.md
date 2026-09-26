@@ -29,7 +29,7 @@ The split is payload-driven:
 
 ### BG3D LT preset library
 
-- Existing strict `toonspectrum.bg3d-lt-presets` version-1 payload.
+- Existing strict `toonstudio.bg3d-lt-presets` version-1 payload.
 - Maximum 32 entries and 64 KiB UTF-8.
 - Exact preset fields, stable IDs, NFKC text limits, unique IDs and built-in-ID exclusion.
 - Line and tone values reuse the strict scene-document serializer; camera, model, light and runtime

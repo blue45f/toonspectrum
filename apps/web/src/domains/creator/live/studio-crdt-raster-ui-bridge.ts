@@ -235,7 +235,7 @@ export function planStudioRasterDrawPromotion(input: {
   const semanticParameters = canonicalStudioRasterJson({
     version: STUDIO_RASTER_CRDT_VERSION,
     tool: "round-pen",
-    kernel: "toonspectrum-raster-v1",
+    kernel: "toonstudio-raster-v1",
     sourceOperationId: element.id,
     stroke: {
       points: stroke.points,
@@ -325,7 +325,7 @@ export function planStudioRasterOverlayHandoff(input: {
   if (operations.some((operation) => (
     operation.pageId !== input.pageId ||
     operation.intent !== "paint" ||
-    operation.kernel !== "toonspectrum-raster-v1" ||
+    operation.kernel !== "toonstudio-raster-v1" ||
     operation.patches.length === 0 ||
     operation.patches.some((patch) => (
       patch.effect.kind !== "composite" || patch.effect.blendMode !== "source-over"

@@ -78,7 +78,7 @@ function makePackage(input: {
     access: "free",
     accessLabel: "무료",
     origin: "original-procedural",
-    creator: { id: "toonspectrum-lab", name: "ToonSpectrum Lab", verified: true },
+    creator: { id: "toonstudio-lab", name: "ToonStudio Lab", verified: true },
     version: "2.0.0",
     packageFingerprint: `original-pack:v2:${input.id}:2.0.0`,
     compatibility: {

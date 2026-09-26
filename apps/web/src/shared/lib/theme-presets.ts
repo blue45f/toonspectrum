@@ -29,7 +29,7 @@ export interface ThemePreset {
 }
 
 export const DEFAULT_APPEARANCE: AppearancePreferences = { preference: "dark", studioPreference: "inherit" };
-export const THEME_STORAGE_KEY = "toonspectrum-theme";
+export const THEME_STORAGE_KEY = "toonstudio-theme";
 export const THEME_PRESETS = [
   { id: "aurora", ko: "오로라", en: "Aurora", descriptionKo: "민트·라일락·핑크가 흐르는 밝은 창작 테마", descriptionEn: "A bright creative palette flowing through mint, lilac and pink", mode: "light", chrome: "#f4f2ff", group: "signature", motif: "ribbon" },
   { id: "blossom", ko: "블로섬", en: "Blossom", descriptionKo: "복숭아빛 종이와 꽃잎 모션의 포근한 테마", descriptionEn: "A warm peach-paper theme with gentle petal motion", mode: "light", chrome: "#fff1ed", group: "signature", motif: "petal" },

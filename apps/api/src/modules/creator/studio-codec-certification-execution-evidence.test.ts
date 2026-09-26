@@ -38,7 +38,7 @@ function durableSignature() {
     schemaVersion: 1 as const,
     kind: STUDIO_CODEC_CERTIFICATION_AUTHORITY_SIGNATURE_KIND,
     algorithm: "ed25519" as const,
-    keyId: "kms/toonspectrum/product-codec/2026-01",
+    keyId: "kms/toonstudio/product-codec/2026-01",
     scope: "codec.qoi.encode",
     executionId: "execution-1",
     canonicalByteLength: blobs.canonical.byteLength,
@@ -74,7 +74,7 @@ function evidenceRecord(overrides: Record<string, unknown> = {}) {
       evidence: objectReference("evidence"),
     },
     provenance: {
-      providerId: "toonspectrum.raster.qoi.v1",
+      providerId: "toonstudio.raster.qoi.v1",
       mode: "public-clean-room",
       direction: "encode",
       format: "qoi",
@@ -84,7 +84,7 @@ function evidenceRecord(overrides: Record<string, unknown> = {}) {
       extension: ".qoi",
       deterministic: true,
       evidenceMediaType: "application/json",
-      licenseGrantId: "toonspectrum-public-clean-room-raster-v1",
+      licenseGrantId: "toonstudio-public-clean-room-raster-v1",
       licenseGrantScopes: [
         "public-clean-room",
         "commercial-use",
@@ -100,7 +100,7 @@ function verificationRequest(signal = new AbortController().signal) {
   return {
     executionId: "execution-1",
     scope: "codec.qoi.encode",
-    providerId: "toonspectrum.raster.qoi.v1",
+    providerId: "toonstudio.raster.qoi.v1",
     mode: "public-clean-room" as const,
     direction: "encode" as const,
     format: "qoi",
@@ -272,7 +272,7 @@ describe("StudioCodecCertificationExecutionEvidenceVerifier", () => {
       inputSha256: sha256(blobs.input),
       outputSha256: sha256(blobs.output),
       evidenceSha256: sha256(blobs.evidence),
-      providerId: "toonspectrum.raster.qoi.v1",
+      providerId: "toonstudio.raster.qoi.v1",
       authorization: {
         status: "reserved",
         reservationId: "reservation-1",

@@ -25,7 +25,7 @@ const DOCUMENT = {
   height: 439,
   title: "Annex B 검증",
   createdAt: "2026-07-30T12:34:56Z",
-  application: "ToonSpectrum Studio",
+  application: "ToonStudio Studio",
   applicationVersion: "1.0.0",
   paths: [
     {
@@ -79,7 +79,7 @@ describe("first-party WILL v1 Annex B document codec provider", () => {
       deterministic: true,
     });
     expect(STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CLAIM_BOUNDARY).toEqual({
-      implementationOwner: "ToonSpectrum",
+      implementationOwner: "ToonStudio",
       annexAPathStreamImplemented: true,
       annexBOpcSevenPartDocumentImplemented: true,
       boundedSevenPartProfileOnly: true,

@@ -1,7 +1,7 @@
 import { studioHandoffEnvelopeCreateSchema, studioHandoffEnvelopeAcceptSchema, studioHandoffEnvelopeActionSchema, studioHandoffEnvelopeSchema, studioHandoffEnvelopeViewSchema,
   studioHandoffEnvelopePrepareSchema, studioReviewRoleAssignmentCoversTask,
   type StudioHandoffEnvelopeCreate, type StudioHandoffEnvelopeView, type StudioHandoffEnvelopeAction,
-  type StudioHandoffEnvelopeList } from "@toonspectrum/studio-project-model";
+  type StudioHandoffEnvelopeList } from "@toonstudio/studio-project-model";
 import { z } from "zod";
 import type { PoolClient } from "pg";
 import { dbPool } from "../../platform/database";

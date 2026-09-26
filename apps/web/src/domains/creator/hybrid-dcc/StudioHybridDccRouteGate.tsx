@@ -82,7 +82,7 @@ export function StudioHybridDccRouteGate({
               id="studio-hybrid-dcc-route-gate-title"
               className="truncate text-sm font-semibold tracking-tight"
             >
-              ToonSpectrum 전문 3D 제작
+              ToonStudio 전문 3D 제작
             </h2>
             <p className="truncate text-[11px] text-fg-3">
               편집 가능한 원본 메시 · 정밀 CAD·솔리드 · 웹툰 컷·선화 전달

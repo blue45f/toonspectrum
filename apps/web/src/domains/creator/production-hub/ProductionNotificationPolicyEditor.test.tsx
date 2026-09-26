@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionNotificationPolicyEditor } from "./ProductionNotificationPolicyEditor";
 import type { ProductionClientCommand } from "./production-api";
-import type { ProductionNotificationPolicy } from "@toonspectrum/core/production";
+import type { ProductionNotificationPolicy } from "@toonstudio/core/production";
 
 const session = vi.hoisted(() => ({ revision: 0 }));
 vi.mock("@/domains/auth/public/session/auth-session-state", () => ({ getAuthSessionRevision: () => session.revision }));

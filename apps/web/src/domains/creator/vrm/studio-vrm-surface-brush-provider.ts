@@ -30,7 +30,7 @@ import type {
   StudioVrmTexturePaintSurfaceProjection,
   StudioVrmTexturePaintSurfaceSession,
 } from "./studio-vrm-texture-paint-runtime";
-import type { BrushProgramIR, ModeledSampleIR, StrokeIR } from "@toonspectrum/studio-project-model";
+import type { BrushProgramIR, ModeledSampleIR, StrokeIR } from "@toonstudio/studio-project-model";
 import type { Intersection } from "three";
 
 export type StudioVrmSurfaceBrushBridgeErrorCode =

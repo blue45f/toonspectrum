@@ -1,6 +1,6 @@
 import { useId } from "react";
 import type { CSSProperties } from "react";
-import type { FortuneExperience, FortuneGroup, SajuResult } from "@toonspectrum/core/fortune";
+import type { FortuneExperience, FortuneGroup, SajuResult } from "@toonstudio/core/fortune";
 
 const GROUP_PALETTES: Record<FortuneGroup, [string, string, string]> = {
   "전체": ["#21182f", "#c8a7ef", "#f0d18d"],

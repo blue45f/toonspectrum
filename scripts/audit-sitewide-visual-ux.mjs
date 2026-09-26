@@ -150,12 +150,12 @@ for (const [viewportName, viewport] of viewports) {
         isMobile: viewport.isMobile,
       });
       await context.addInitScript(({ themeName }) => {
-        localStorage.setItem("toonspectrum-theme", JSON.stringify({
+        localStorage.setItem("toonstudio-theme", JSON.stringify({
           state: { preference: themeName, studioPreference: themeName }, version: 0,
         }));
         localStorage.setItem("toonstudio:site-experience:v1", "vivid");
-        localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
-        sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+        localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+        sessionStorage.setItem("toonstudio-compat-dismissed", "true");
       }, { themeName: theme });
       await context.route("**/api/**", async (route) => {
         const pathname = new URL(route.request().url()).pathname;

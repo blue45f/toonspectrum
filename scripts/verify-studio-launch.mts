@@ -33,8 +33,8 @@ import {
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
 
-const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonspectrum-studio-launch");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
+const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR ?? join(tmpdir(), "toonstudio-studio-launch");
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
 // 이 검증기는 `vite preview`만 띄우므로 Nest API를 의도적으로 기동하지 않는다. 아래 요청과
 // 정확히 일치하는 로컬 세션 재수화/API 요청과 Socket.IO handshake 종료는 UI 부트에 필수가 아닌
 // best-effort 작업이고,
@@ -691,7 +691,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
     } catch {}
   }, {
     quickStartKey: QUICKSTART_KEY,
-    mobileHintKey: "toonspectrum-studio-mobile-hint-dismissed",
+    mobileHintKey: "toonstudio-studio-mobile-hint-dismissed",
   });
 
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });
@@ -782,12 +782,12 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
 
   const mobileImmersiveValue = await editorRoot.getAttribute("data-studio-mobile-immersive");
   const mobileImmersivePreference = await page.evaluate(() =>
-    window.sessionStorage.getItem("toonspectrum-studio-mobile-immersive:v1")
+    window.sessionStorage.getItem("toonstudio-studio-mobile-immersive:v1")
   );
   const immersiveRootReady = mobileImmersiveValue === "true";
   const siteBrandVisible = await page
     .locator('header a[href="/"]')
-    .filter({ hasText: "툰스펙트럼" })
+    .filter({ hasText: "툰스튜디오" })
     .isVisible()
     .catch(() => false);
   const siteFooterVisible = await page.getByRole("contentinfo").isVisible().catch(() => false);
@@ -1276,7 +1276,7 @@ async function runMobileDockLayout(
     } catch {}
   }, {
     quickStartKey: QUICKSTART_KEY,
-    mobileHintKey: "toonspectrum-studio-mobile-hint-dismissed",
+    mobileHintKey: "toonstudio-studio-mobile-hint-dismissed",
   });
 
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15000 });

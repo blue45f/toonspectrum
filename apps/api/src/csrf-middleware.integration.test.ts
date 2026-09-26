@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   TOONSPECTRUM_CSRF_HEADER,
   TOONSPECTRUM_CSRF_HEADER_VALUE,
-} from "@toonspectrum/contracts/security/csrf";
+} from "@toonstudio/contracts/security/csrf";
 
 
 import { configureCors } from "./config/cors";
@@ -26,7 +26,7 @@ import { sessionAuth } from "./session-middleware";
 
 import type { AddressInfo } from "node:net";
 
-const ALLOWED_ORIGIN = "https://app.toonspectrum.example";
+const ALLOWED_ORIGIN = "https://app.toonstudio.example";
 const CSRF_TEST_ENV: NodeJS.ProcessEnv = {
   NODE_ENV: "production",
   API_CORS_ALLOWED_ORIGINS: ALLOWED_ORIGIN,

@@ -1,5 +1,5 @@
 /**
- * Deterministic conformance evidence for the ToonSpectrum WILL v1 Annex A provider.
+ * Deterministic conformance evidence for the ToonStudio WILL v1 Annex A provider.
  *
  * This proves the bounded Path-stream profile only. It is not Wacom certification and does not
  * cover the Annex B OPC/ZIP `.will` document container.
@@ -24,14 +24,14 @@ import {
 } from "./studio-will-v1-interchange";
 
 export const STUDIO_FIRST_PARTY_WILL_V1_CONFORMANCE_SCHEMA =
-  "toonspectrum.first-party-will-v1-annex-a-conformance" as const;
+  "toonstudio.first-party-will-v1-annex-a-conformance" as const;
 export const STUDIO_FIRST_PARTY_WILL_V1_CONFORMANCE_SCHEMA_VERSION = 1 as const;
 
 export interface StudioFirstPartyWillV1ConformanceEvidence {
   readonly schema: typeof STUDIO_FIRST_PARTY_WILL_V1_CONFORMANCE_SCHEMA;
   readonly schemaVersion:
     typeof STUDIO_FIRST_PARTY_WILL_V1_CONFORMANCE_SCHEMA_VERSION;
-  readonly implementation: "toonspectrum-first-party-will-v1-annex-a";
+  readonly implementation: "toonstudio-first-party-will-v1-annex-a";
   readonly implementationVersion:
     typeof STUDIO_FIRST_PARTY_WILL_V1_CODEC_VERSION;
   readonly format: typeof STUDIO_FIRST_PARTY_WILL_V1_FORMAT;
@@ -191,7 +191,7 @@ export async function createStudioFirstPartyWillV1ConformanceEvidence(
   const evidence: StudioFirstPartyWillV1ConformanceEvidence = Object.freeze({
     schema: STUDIO_FIRST_PARTY_WILL_V1_CONFORMANCE_SCHEMA,
     schemaVersion: STUDIO_FIRST_PARTY_WILL_V1_CONFORMANCE_SCHEMA_VERSION,
-    implementation: "toonspectrum-first-party-will-v1-annex-a",
+    implementation: "toonstudio-first-party-will-v1-annex-a",
     implementationVersion: STUDIO_FIRST_PARTY_WILL_V1_CODEC_VERSION,
     format: STUDIO_FIRST_PARTY_WILL_V1_FORMAT,
     profile: STUDIO_WILL_V1_PROFILE,

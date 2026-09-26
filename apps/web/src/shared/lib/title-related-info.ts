@@ -1,6 +1,6 @@
-import type { RelatedInfoItem, Title } from "@toonspectrum/core";
+import type { RelatedInfoItem, Title } from "@toonstudio/core";
 
-// RelatedInfoItem 은 @toonspectrum/core 단일 출처(크롤러·detail 샤드·프론트 공용). 여기선 재노출만.
+// RelatedInfoItem 은 @toonstudio/core 단일 출처(크롤러·detail 샤드·프론트 공용). 여기선 재노출만.
 export type { RelatedInfoItem };
 
 export type RelatedCategory = "all" | RelatedInfoItem["category"];

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { canonicalJson, studioReviewTaskCompletionReceiptSchema } from "@toonspectrum/studio-project-model";
+import { canonicalJson, studioReviewTaskCompletionReceiptSchema } from "@toonstudio/studio-project-model";
 import type { StudioProductionWorkspaceDocument } from "./studio-production.dto";
 
 export const studioReviewTaskCompletionFingerprint = (value: unknown) => createHash("sha256").update(canonicalJson(value)).digest("hex");

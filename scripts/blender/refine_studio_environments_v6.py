@@ -568,12 +568,12 @@ def write_delivery_manifest():
             "refinedSurfaces": len(report["surfaces"]), "reviewLevel": "single-view-blender-preview",
             "allAnglesArtisticallyApproved": False, "studioRuntimeVerified": False})
     (OUTPUT / "manifest.json").write_text(json.dumps({
-        "schema": "toonspectrum.environment-refinement.v6", "records": records,
+        "schema": "toonstudio.environment-refinement.v6", "records": records,
     }, indent=2) + "\n")
     sources = sorted({source for record in records for source in record["sources"]})
     (OUTPUT / "LICENSES.md").write_text(
         "# Refined Studio environments v6\n\n"
-        "Original scene layout and refinement: ToonSpectrum. Licensed CC0 1.0.\n"
+        "Original scene layout and refinement: ToonStudio. Licensed CC0 1.0.\n"
         "Embedded source models and PBR textures: Poly Haven, CC0 1.0.\n"
         "License: https://creativecommons.org/publicdomain/zero/1.0/\n\n"
         "Source assets remain available under their original immutable URLs.\n"

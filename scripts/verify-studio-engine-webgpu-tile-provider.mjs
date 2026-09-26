@@ -27,7 +27,7 @@ import { WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 const SCRATCH =
   process.env.TOONSPECTRUM_WEBGPU_TILE_PROVIDER_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-webgpu-tile-provider-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-webgpu-tile-provider-${Date.now()}`);
 const HARNESS_PATH = "/__studio_engine_webgpu_tile_provider__";
 const HARNESS_ENTRY = "/scripts/studio-engine-webgpu-tile-provider-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;

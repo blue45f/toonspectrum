@@ -117,7 +117,7 @@ async function credentials(
     true,
     ["sign", "verify"],
   ) as CryptoKeyPair;
-  const keyId = "toonspectrum.product.release.raster.2026-07";
+  const keyId = "toonstudio.product.release.raster.2026-07";
   return Object.freeze({
     signer: {
       algorithm: "ecdsa-p256-sha256",
@@ -158,7 +158,7 @@ describe("first-party raster codec product certification", () => {
       signer,
     );
     expect(certified.receipt.providerId).toBe(
-      "toonspectrum.raster.qoi.v1",
+      "toonstudio.raster.qoi.v1",
     );
     expect(certified.conformance.decision).toBe("passed");
     expect(certified.conformance.cases).toHaveLength(2);
@@ -172,7 +172,7 @@ describe("first-party raster codec product certification", () => {
     if (!verified.ok) return;
     expect(
       verified.certificate.certification
-        .officialToonSpectrumProductCertification,
+        .officialToonStudioProductCertification,
     ).toBe(true);
     expect(
       verified.certificate.certification.thirdPartyCodecCertification,
@@ -301,7 +301,7 @@ describe("first-party raster codec product certification", () => {
         receipt: certified.receipt,
         outputBytes: certified.bytes,
         evidenceBytes: certified.conformanceBytes,
-        evidenceMediaType: "application/vnd.toonspectrum.cross-protocol+json",
+        evidenceMediaType: "application/vnd.toonstudio.cross-protocol+json",
         scope,
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
@@ -350,7 +350,7 @@ describe("first-party raster codec product certification", () => {
         outputBytes: certified.bytes,
         evidenceBytes: substitutedBytes,
         evidenceMediaType:
-          "application/vnd.toonspectrum.raster-codec-conformance+json",
+          "application/vnd.toonstudio.raster-codec-conformance+json",
         scope,
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
@@ -489,13 +489,13 @@ describe("first-party raster codec product certification", () => {
     expect(worker.transfers[0]).toHaveLength(1);
     expect(worker.terminateCount).toBe(1);
     expect(certified.receipt).toMatchObject({
-      providerId: "toonspectrum.raster.qoi.v1",
+      providerId: "toonstudio.raster.qoi.v1",
       input: { byteLength: INPUT.byteLength },
       output: { byteLength: certified.bytes.byteLength },
     });
     expect(certified.executionProviderReceipt).toEqual({
       schemaVersion: 1,
-      kind: "toonspectrum-codec-execution-provider-selection",
+      kind: "toonstudio-codec-execution-provider-selection",
       selectedProvider: "worker",
       attemptedProviders: ["worker"],
     });
@@ -518,7 +518,7 @@ describe("first-party raster codec product certification", () => {
           ...certified,
           executionProviderReceipt: {
             schemaVersion: 1,
-            kind: "toonspectrum-codec-execution-provider-selection",
+            kind: "toonstudio-codec-execution-provider-selection",
             selectedProvider: "direct",
             attemptedProviders: ["direct"],
           },
@@ -661,7 +661,7 @@ describe("first-party raster codec product certification", () => {
       ),
     ).resolves.toMatchObject({
       receipt: {
-        providerId: "toonspectrum.raster.qoi.v1",
+        providerId: "toonstudio.raster.qoi.v1",
       },
       executionProviderReceipt: {
         selectedProvider: "direct",

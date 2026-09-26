@@ -3,7 +3,7 @@ import { comicCast } from "@/shared/components/comic/comic-cast";
 import type { ComicCastId } from "@/shared/components/comic/comic-cast";
 import { useState } from "react";
 import { ArrowRight, BookOpen, ShieldCheck, Sparkles } from "lucide-react";
-import { FORTUNE_EXPERIENCES, fortuneKstDate } from "@toonspectrum/core/fortune";
+import { FORTUNE_EXPERIENCES, fortuneKstDate } from "@toonstudio/core/fortune";
 import { FortuneSceneArt } from "./FortuneSceneArt";
 import { FORTUNE_INTENTS } from "./fortune-cinematic-model";
 

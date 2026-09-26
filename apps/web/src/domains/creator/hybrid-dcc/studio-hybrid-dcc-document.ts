@@ -60,7 +60,7 @@ export const STUDIO_HYBRID_DCC_DOCUMENT_VERSION = 3 as const;
 export const STUDIO_HYBRID_DCC_PREVIOUS_DOCUMENT_VERSION = 2 as const;
 export const STUDIO_HYBRID_DCC_LEGACY_DOCUMENT_VERSION = 1 as const;
 export const STUDIO_HYBRID_DCC_DOCUMENT_FORMAT =
-  "toonspectrum.hybrid-dcc-document" as const;
+  "toonstudio.hybrid-dcc-document" as const;
 export const STUDIO_HYBRID_DCC_ENGINE_VERSION = "hybrid-dcc-engine-1" as const;
 
 export interface StudioRightsBomRecord {

@@ -35,7 +35,7 @@ import {
 } from "./studio-vrm-export-vrm-extension";
 
 /** Stable, version-free generator string. A timestamp here would break byte determinism. */
-export const STUDIO_VRM_EXPORT_GENERATOR = "ToonSpectrum Studio VRM Exporter";
+export const STUDIO_VRM_EXPORT_GENERATOR = "ToonStudio Studio VRM Exporter";
 
 export const STUDIO_VRM_EXPORT_MAX_NODES = 4_096;
 export const STUDIO_VRM_EXPORT_MAX_MESH_PRIMITIVES = 2_048;

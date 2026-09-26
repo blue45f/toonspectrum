@@ -297,7 +297,7 @@ export async function buildCreatorMarketplaceSourcePackage({
   const manifestWithInventory = {
     ...manifest,
     package: {
-      format: "toonspectrum-marketplace-package",
+      format: "toonstudio-marketplace-package",
       version: 1,
       archive: "zip-store",
       inventory,
@@ -329,7 +329,7 @@ export async function buildCreatorMarketplaceSourcePackage({
   const ownedArchive = Uint8Array.from(archive);
   return {
     file: new File([ownedArchive.buffer], fileName, {
-      type: "application/vnd.toonspectrum.marketplace+zip",
+      type: "application/vnd.toonstudio.marketplace+zip",
     }),
     inventory,
     manifest: manifestWithInventory,

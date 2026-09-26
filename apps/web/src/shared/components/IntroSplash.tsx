@@ -3,7 +3,7 @@ import * as THREE from "three";
 
 import styles from "./IntroSplash.module.css";
 
-const SESSION_KEY = "toonspectrum-intro-shown";
+const SESSION_KEY = "toonstudio-intro-shown";
 
 export interface IntroSplashProps {
   /**

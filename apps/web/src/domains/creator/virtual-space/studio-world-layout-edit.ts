@@ -1,4 +1,4 @@
-import { studioWorldManifestSchema } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldManifestSchema } from "@toonstudio/studio-project-model/world-publication";
 import { patchStudioWorldProp } from "./studio-virtual-space-world-edit-history";
 import { studioWorldRoomAt, type StudioVirtualSpaceWorldManifest as World, type StudioWorldPropDefinition, type StudioWorldRect } from "./studio-virtual-space-world-manifest";
 

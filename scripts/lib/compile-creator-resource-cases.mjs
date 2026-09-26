@@ -23,7 +23,7 @@ export function compileCreatorResourceCases(output) {
     compilerOptions: {
       strict: true, skipLibCheck: true, target: "es2022", module: "commonjs",
       paths: {
-        "@toonspectrum/core/creator-resources": [
+        "@toonstudio/core/creator-resources": [
           path.join(root, "packages/core/src/creator-resources.ts"),
         ],
       },
@@ -39,10 +39,10 @@ export function compileCreatorResourceCases(output) {
     "--project", project], { cwd: root, stdio: "inherit" });
   if (result.status !== 0) throw new Error("Creator resource cases failed strict compilation");
 
-  const coreRuntime = path.join(output, "node_modules/@toonspectrum/core");
+  const coreRuntime = path.join(output, "node_modules/@toonstudio/core");
   mkdirSync(coreRuntime, { recursive: true });
   writeFileSync(path.join(coreRuntime, "package.json"), JSON.stringify({
-    name: "@toonspectrum/core",
+    name: "@toonstudio/core",
     private: true,
     exports: { "./creator-resources": "./creator-resources.cjs" },
   }));

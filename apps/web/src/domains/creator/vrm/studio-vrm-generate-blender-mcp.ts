@@ -55,7 +55,7 @@ export function probeBlenderVrmGenerateMcp(
     mcpCommand,
     available: false,
     reason:
-      "blender-mcp는 Blender 씬 제어만 하고 프리셋에서 VRM 바이트를 만들지 않습니다. toonspectrum-vrm-generate 호스트를 사용하세요.",
+      "blender-mcp는 Blender 씬 제어만 하고 프리셋에서 VRM 바이트를 만들지 않습니다. toonstudio-vrm-generate 호스트를 사용하세요.",
   };
 }
 

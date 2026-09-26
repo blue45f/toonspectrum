@@ -110,7 +110,7 @@ async function inputBytes(): Promise<Uint8Array> {
     height: 439,
     title: "Certified bounded WILL",
     createdAt: "2026-07-30T12:34:56Z",
-    application: "ToonSpectrum Studio",
+    application: "ToonStudio Studio",
     applicationVersion: "1.0.0",
     paths: [
       {
@@ -139,7 +139,7 @@ async function credentials(
     true,
     ["sign", "verify"],
   ) as CryptoKeyPair;
-  const keyId = "toonspectrum.product.release.will-v1-document.2026-07";
+  const keyId = "toonstudio.product.release.will-v1-document.2026-07";
   return Object.freeze({
     signer: {
       algorithm: "ecdsa-p256-sha256",
@@ -194,7 +194,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
     if (!verified.ok) return;
     expect(
       verified.certificate.certification
-        .officialToonSpectrumProductCertification,
+        .officialToonStudioProductCertification,
     ).toBe(true);
     expect(
       verified.certificate.certification.codecVendorCertification,
@@ -246,7 +246,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
         receipt: certified.receipt,
         outputBytes: certified.bytes,
         evidenceBytes: certified.conformanceBytes,
-        evidenceMediaType: "application/vnd.toonspectrum.cross-protocol+json",
+        evidenceMediaType: "application/vnd.toonstudio.cross-protocol+json",
         scope,
         issuedAt: ISSUED_AT,
         expiresAt: EXPIRES_AT,
@@ -255,7 +255,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
     );
     expect(
       STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CONFORMANCE_EVIDENCE_MEDIA_TYPE,
-    ).not.toBe("application/vnd.toonspectrum.cross-protocol+json");
+    ).not.toBe("application/vnd.toonstudio.cross-protocol+json");
     await expect(
       verifyStudioFirstPartyWillV1DocumentCertifiedExecution(
         { ...certified, certificateBytes: mislabeled },
@@ -360,13 +360,13 @@ describe("first-party WILL v1 Annex B document product certification", () => {
     expect(worker.transfers[0]).toHaveLength(1);
     expect(worker.terminateCount).toBe(1);
     expect(certified.receipt).toMatchObject({
-      providerId: "toonspectrum.will-v1-annex-b-document.v1",
+      providerId: "toonstudio.will-v1-annex-b-document.v1",
       input: { byteLength: source.byteLength },
       output: { byteLength: certified.bytes.byteLength },
     });
     expect(certified.executionProviderReceipt).toEqual({
       schemaVersion: 1,
-      kind: "toonspectrum-codec-execution-provider-selection",
+      kind: "toonstudio-codec-execution-provider-selection",
       selectedProvider: "worker",
       attemptedProviders: ["worker"],
     });
@@ -390,7 +390,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
           ...certified,
           executionProviderReceipt: {
             schemaVersion: 1,
-            kind: "toonspectrum-codec-execution-provider-selection",
+            kind: "toonstudio-codec-execution-provider-selection",
             selectedProvider: "direct",
             attemptedProviders: ["direct"],
           },
@@ -508,7 +508,7 @@ describe("first-party WILL v1 Annex B document product certification", () => {
       ),
     ).resolves.toMatchObject({
       receipt: {
-        providerId: "toonspectrum.will-v1-annex-b-document.v1",
+        providerId: "toonstudio.will-v1-annex-b-document.v1",
       },
       executionProviderReceipt: {
         selectedProvider: "direct",

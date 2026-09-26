@@ -1,8 +1,8 @@
-# ToonSpectrum Studio × Clip Studio Paint 기능 패리티 프로그램
+# ToonStudio Studio × Clip Studio Paint 기능 패리티 프로그램
 
 - 기준일: 2026-09-02
 - Clip Studio Paint 기준: Ver. 5.1.2 (2026-08-06 공개)
-- 제품 기준: `blue45f/toonspectrum`의 `/studio`
+- 제품 기준: `blue45f/toonstudio`의 `/studio`
 - 목표: 기능 이름 복제가 아니라 웹 기반 창작 도구로서 동등하거나 더 나은 작업 결과와 사용자 여정을 제공
 
 ## 1. 기준 자료
@@ -71,7 +71,7 @@
 
 아래 항목은 최신 버전 기준으로 반드시 현재 구현을 다시 확인한다. 초기 상태는 의도적으로 `감사 필요`로 둔다.
 
-| 기능군 | Clip Studio 기준 동작 | 초기 판정 | ToonSpectrum 완료 조건 |
+| 기능군 | Clip Studio 기준 동작 | 초기 판정 | ToonStudio 완료 조건 |
 | --- | --- | --- | --- |
 | Smart Shape | 브러시 스트로크 끝을 길게 눌러 직선·곡선·도형으로 보정하고 이후 편집 | 감사 필요 | 일반 브러시에서 hold 감지, 도형 후보 선택, 제어점 편집, raster/vector 출력, Undo/Redo, zoom/rotation 좌표 검증 |
 | Smart Shape 명령 | 최근 stroke 보정, edit mode 진입, Command Bar/단축키 실행 | 감사 필요 | 메뉴·명령 registry·단축키·최근 stroke transaction 연결 |

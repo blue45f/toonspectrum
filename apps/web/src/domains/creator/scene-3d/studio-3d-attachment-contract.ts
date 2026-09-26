@@ -7,7 +7,7 @@
  */
 
 export const STUDIO_3D_ATTACHMENT_DOCUMENT_KIND =
-  "toonspectrum.3d-attachment-document" as const;
+  "toonstudio.3d-attachment-document" as const;
 export const STUDIO_3D_ATTACHMENT_DOCUMENT_VERSION = 1 as const;
 
 export const STUDIO_3D_ATTACHMENT_MAX_DOCUMENT_BYTES = 128 * 1024;

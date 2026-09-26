@@ -1,4 +1,4 @@
-import { evaluateDynamicMapping } from "@toonspectrum/studio-project-model";
+import { evaluateDynamicMapping } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -95,9 +95,9 @@ describe("SUT/SUTG preserve-first importer", () => {
     expect(program.flowDynamics).toHaveLength(2);
     expect(program.sizeDynamics[1]?.curve).toEqual([0.05, 0.18, 0.42, 0.72, 1]);
     expect(result.rights).toEqual({
-      authors: ["ToonSpectrum QA"],
+      authors: ["ToonStudio QA"],
       licenses: ["CC0-1.0"],
-      websites: ["https://example.invalid/toonspectrum"],
+      websites: ["https://example.invalid/toonstudio"],
       emails: ["qa@example.invalid"],
     });
     expect(result.unsupported).toEqual(

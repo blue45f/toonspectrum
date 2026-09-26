@@ -10,7 +10,7 @@ import {
 } from "../stabilizer-provider";
 
 import type { InkStrokeModeler } from "../ink-modeler";
-import type { ModeledSampleIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR } from "@toonstudio/studio-project-model";
 
 /**
  * Stabilizer provider seam contracts (ADR-0011 lane 3 promotion prep):

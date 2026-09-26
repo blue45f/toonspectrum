@@ -130,7 +130,7 @@ const decisions = manifest.assets.map(asset => {
 assert.equal(decisions.filter(row => row.decision === 'admit').length, 69);
 await writeFile(path.join(directory, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 await writeFile(path.join(directory, 'visual-decisions.json'), JSON.stringify({
-  schema: 'toonspectrum.asset-visual-decisions.v1', reviewedOn: '2026-09-08',
+  schema: 'toonstudio.asset-visual-decisions.v1', reviewedOn: '2026-09-08',
   reviewLevel: 'contact-sheet-visual-triage', allAnglesArtisticallyApproved: false,
   modelSetCounting: 'One source file or set counts as one original, not one per displayed variation.',
   assets: decisions,

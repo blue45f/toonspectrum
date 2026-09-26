@@ -11,7 +11,7 @@
 
 import { studioSearchIndex } from "./studio-command-search";
 
-import type { TerminologyVendor } from "@toonspectrum/studio-command-registry";
+import type { TerminologyVendor } from "@toonstudio/studio-command-registry";
 
 export interface StudioTerminologyRow {
   readonly vendor: TerminologyVendor;

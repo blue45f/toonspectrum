@@ -11,7 +11,7 @@ import { useSearchParams } from "react-router-dom";
 import type {
   SupporterPaymentPublicEntry,
   SupporterVisibility,
-} from "@toonspectrum/core/supporter-payment";
+} from "@toonstudio/core/supporter-payment";
 
 import {
   confirmSupporterPayment,

@@ -57,15 +57,15 @@ const FIXED_PIGMENT_INVARIANT_GATE =
 const SCRATCH =
   process.env.TOONSPECTRUM_LIVING_INK_INTEGRATION_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-living-ink-integration");
+  ?? join(tmpdir(), "toonstudio-studio-living-ink-integration");
 const LOG_PATH = join(SCRATCH, "studio-living-ink-integration.log");
 const REPORT_PATH = join(SCRATCH, "studio-living-ink-integration.json");
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
-const CLEAN_SESSION_KEY = "toonspectrum-living-ink-integration-cleaned";
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
+const CLEAN_SESSION_KEY = "toonstudio-living-ink-integration-cleaned";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
 const MOBILE_DRAW_SETTINGS_ID = "studio-mobile-draw-settings";
-const APP_SETTINGS_KEY = "toonspectrum-studio-app-settings";
+const APP_SETTINGS_KEY = "toonstudio-studio-app-settings";
 const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const ROUTE_PATTERN = /^studio-stroke-surface-route-v1:\d+:\d+:[^:]+:living-ink$/u;
 const MINIMUM_AUTHORITATIVE_SAMPLES = 65;
@@ -1521,7 +1521,7 @@ async function reloadStudioAfterDurableWriterRelease(
       ...(lockSnapshot?.held ?? []),
       ...(lockSnapshot?.pending ?? []),
     ].filter(
-      ({ name }) => name?.startsWith("toonspectrum-opfs-recovery:") === true,
+      ({ name }) => name?.startsWith("toonstudio-opfs-recovery:") === true,
     ).length;
     const opfsRoot = await navigator.storage.getDirectory();
     const writerPaths: string[] = [];

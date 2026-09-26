@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { StudioWorkSession } from "@toonspectrum/studio-project-model/work-session";
-import type { StudioSessionEvidenceResponse } from "@toonspectrum/studio-project-model/work-session-evidence";
+import type { StudioWorkSession } from "@toonstudio/studio-project-model/work-session";
+import type { StudioSessionEvidenceResponse } from "@toonstudio/studio-project-model/work-session-evidence";
 import { httpStatus } from "@/platform/api";
 import { getAuthSessionRevision, listeners, type Session } from "@/domains/auth/public/session/auth-session-state";
 import { getStudioSessionEvidence } from "./studio-session-evidence-client";

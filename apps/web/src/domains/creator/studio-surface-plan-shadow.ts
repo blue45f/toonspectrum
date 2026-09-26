@@ -12,7 +12,7 @@ import {
   type ProviderRuntime,
   type SurfaceCostShadowReceipt,
   type SurfacePlan,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 import {
   selectStudioStrokeRoute,

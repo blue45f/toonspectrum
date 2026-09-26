@@ -10,7 +10,7 @@
  * (엔진 카탈로그를 여기서 복제하면 항목이 늘 때마다 조용히 낡는다.)
  */
 
-export const STUDIO_WORKBENCH_PREFS_STORAGE_KEY = "toonspectrum-studio-workbench-prefs:v1";
+export const STUDIO_WORKBENCH_PREFS_STORAGE_KEY = "toonstudio-studio-workbench-prefs:v1";
 
 export type StudioWorkbenchPrefsStorage = {
   getItem(key: string): string | null;

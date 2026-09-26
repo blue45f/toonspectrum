@@ -4,10 +4,10 @@
 Run with Blender 5.2 LTS, for example:
 
     blender --factory-startup --background --python scripts/blender/process_tripo_mcp_environment_pack_v1.py -- \
-      --input-dir ~/.cache/toonspectrum-3d-generation/tripo-mcp-20260925/raw \
-      --registry ~/.cache/toonspectrum-3d-generation/tripo-mcp-20260925/tasks.json \
+      --input-dir ~/.cache/toonstudio-3d-generation/tripo-mcp-20260925/raw \
+      --registry ~/.cache/toonstudio-3d-generation/tripo-mcp-20260925/tasks.json \
       --output-dir apps/web/public/assets/3d/environments/mcp-free-v1 \
-      --qa-dir ~/.cache/toonspectrum-3d-generation/tripo-mcp-20260925/qa
+      --qa-dir ~/.cache/toonstudio-3d-generation/tripo-mcp-20260925/qa
 
 The script never reads an API key. It only processes already-downloaded GLB files.
 """
@@ -357,7 +357,7 @@ def main() -> None:
         metrics.append(process_asset(spec, source, output_dir, qa_dir, task))
     metrics_file = args.metrics_file.expanduser().resolve() if args.metrics_file else output_dir / ".work/processing-metrics.json"
     metrics_file.parent.mkdir(parents=True, exist_ok=True)
-    metrics_file.write_text(json.dumps({"schema": "toonspectrum.tripo-mcp-processing.v1", "assets": metrics}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    metrics_file.write_text(json.dumps({"schema": "toonstudio.tripo-mcp-processing.v1", "assets": metrics}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"processed": len(metrics), "metrics": str(metrics_file)}, ensure_ascii=False))
 
 

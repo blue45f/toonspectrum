@@ -147,7 +147,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
       <input
         ref={projectArchiveImportInputRef}
         type="file"
-        accept=".toonproject.zip,.zip,application/zip,application/vnd.toonspectrum.project+zip"
+        accept=".toonproject.zip,.zip,application/zip,application/vnd.toonstudio.project+zip"
         className="hidden"
         disabled={projectArchiveBusy || collaborationDocumentLocked}
         onChange={(event) => void handleImportProjectArchive(event)}
@@ -174,7 +174,7 @@ export function StudioCuttoonEditorHosts(s: StudioCuttoonEditorViewSession) {
       <input
         ref={interchangeImportInputRef}
         type="file"
-        accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonspectrum.will-v1-bounded+zip"
+        accept=".ora,.cbz,.will,image/openraster,application/vnd.comicbook+zip,application/vnd.toonstudio.will-v1-bounded+zip"
         className="hidden"
         disabled={interchangeImportBusy || psdImportBusy || collaborationDocumentLocked}
         onChange={(event) => void handleImportInterchangeArchive(event)}

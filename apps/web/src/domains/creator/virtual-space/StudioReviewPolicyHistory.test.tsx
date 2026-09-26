@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReviewPolicyHistoryResponse } from "@toonspectrum/studio-project-model";
+import type { ReviewPolicyHistoryResponse } from "@toonstudio/studio-project-model";
 import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { StudioReviewPolicyHistory } from "./StudioReviewPolicyHistory";
 

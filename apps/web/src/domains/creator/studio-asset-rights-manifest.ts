@@ -7,9 +7,9 @@ import {
 } from "@/shared/lib/creator-asset-contract";
 
 export const STUDIO_ASSET_RIGHTS_MANIFEST_SCHEMA =
-  "toonspectrum.studio-asset-rights-manifest" as const;
+  "toonstudio.studio-asset-rights-manifest" as const;
 export const STUDIO_ASSET_RIGHTS_MANIFEST_EXPORT_SCHEMA =
-  "toonspectrum.studio-asset-rights-manifest-export" as const;
+  "toonstudio.studio-asset-rights-manifest-export" as const;
 export const STUDIO_ASSET_RIGHTS_MANIFEST_VERSION = 1 as const;
 
 export const STUDIO_ASSET_RIGHTS_MANIFEST_DISCLAIMER =
@@ -294,7 +294,7 @@ const AttributionRequirementSchema = z.enum([
 const SourceKindSchema = z.enum(STUDIO_ASSET_RIGHTS_SOURCE_KINDS);
 const RightsScopeSchema = z.enum(STUDIO_ASSET_RIGHTS_SCOPES);
 const LicenseIdSchema = z.enum([
-  "toonspectrum-standard",
+  "toonstudio-standard",
   "cc0-1.0",
   "cc-by-4.0",
   "cc-by-nc-4.0",
@@ -557,7 +557,7 @@ function knownLicensePolicy(
       commercialUse: license.commercialUse ? "allowed" : "prohibited",
       aiTraining: "unknown",
       redistribution:
-        license.id === "toonspectrum-standard" ? "prohibited" : "allowed",
+        license.id === "toonstudio-standard" ? "prohibited" : "allowed",
     };
   }
   if (licenseId === "creator-owned") {

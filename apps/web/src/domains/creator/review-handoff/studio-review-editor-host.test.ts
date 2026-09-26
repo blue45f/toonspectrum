@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { canonicalJson, createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
+import { canonicalJson, createStudioReviewSpatialAnchor } from "@toonstudio/studio-project-model";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { persistSession } from "@/domains/auth/public/session/auth-session-state";

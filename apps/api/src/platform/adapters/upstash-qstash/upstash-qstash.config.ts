@@ -126,7 +126,7 @@ type EnvLike =
 /**
  * QStash is installed only for an explicitly enabled distributed provider. The QStash REST API
  * origin and publish token are deliberately separate from BACKEND_UPSTASH_QSTASH_BASE_URL and
- * BACKEND_UPSTASH_QSTASH_AUTH_TOKEN: those identify/authenticate the ToonSpectrum provider facade,
+ * BACKEND_UPSTASH_QSTASH_AUTH_TOKEN: those identify/authenticate the ToonStudio provider facade,
  * while these credentials can publish paid QStash messages and must never reach a worker/browser.
  */
 export function resolveUpstashQStashConfig(

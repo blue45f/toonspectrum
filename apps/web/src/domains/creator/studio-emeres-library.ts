@@ -32,7 +32,7 @@ export interface EmeresLibraryStorage {
   setItem(key: string, value: string): void;
 }
 
-export const EMERES_LIBRARY_KEY = "toonspectrum-studio-emeres-library";
+export const EMERES_LIBRARY_KEY = "toonstudio-studio-emeres-library";
 export const MAX_EMERES_LIBRARY_ITEMS = 30; // studio-palette-library.ts의 MAX_PALETTES(40)보다 낮음 — 이미지라 항목당 용량이 더 큼.
 export const DEFAULT_EMERES_LIBRARY_ITEM_NAME = "이름 없는 틀";
 export const MAX_EMERES_LIBRARY_SERIALIZED_BYTES = 64 * 1024 * 1024;

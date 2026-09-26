@@ -5,8 +5,8 @@ const seenKey = "toonspectrum:marketing-event-seen:v1:beta-open-2026:guest";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((key) => {
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
-    localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
+    localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
     localStorage.removeItem(key);
   }, seenKey);
   await page.route("**/api/**", async (route) => {

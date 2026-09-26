@@ -8,13 +8,13 @@ import {
   type ShadowComparisonReport,
   type VisualEquivalenceGate,
   type WinnerCacheEntry,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 /**
  * V12 §5 runtime wiring — RUNTIME_RENDERER_TOURNAMENT + SHADOW_RENDERING.
  *
  * The tournament primitives (WinnerCache, ProviderCostModel, RemoteKillSwitch,
- * runShadowComparison) live in @toonspectrum/studio-engine-registry as pure
+ * runShadowComparison) live in @toonstudio/studio-engine-registry as pure
  * mechanisms. This module gives them a browser runtime without touching React:
  *
  * - winner decisions persist through an async TournamentPersistencePort.
@@ -44,7 +44,7 @@ import {
 
 /** Legacy key used only inside SQLite's kv table during structured-row migration. */
 export const STUDIO_TOURNAMENT_WINNER_STORAGE_KEY =
-  "toonspectrum-studio-v12-tournament-winners-v1";
+  "toonstudio-studio-v12-tournament-winners-v1";
 export const STUDIO_TOURNAMENT_WINNER_SCHEMA_VERSION = 1;
 
 export interface PersistedWinnerEntry extends WinnerCacheEntry {

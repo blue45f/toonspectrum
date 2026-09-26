@@ -4,7 +4,7 @@
  * The editable half-edge mesh is the only geometry authority accepted here. Three.js and its
  * BufferGeometry are intentionally absent: a render cache must never become an authoring source.
  * Polygon faces are validated and ear-clipped in stable-ID order, then encoded as a self-contained
- * GLB with POSITION, NORMAL, and uint32 indices. ToonSpectrum stable IDs and provenance survive in
+ * GLB with POSITION, NORMAL, and uint32 indices. ToonStudio stable IDs and provenance survive in
  * glTF `extras`, so an imported derivative can be related back to its authoring revision.
  */
 
@@ -38,9 +38,9 @@ import type { StudioGeometryAuthorityRecord } from "../studio-geometry-authority
 
 export const STUDIO_HYBRID_DCC_GLB_EXPORT_REVISION = 1 as const;
 export const STUDIO_HYBRID_DCC_GLB_EXPORT_FORMAT =
-  "toonspectrum.hybrid-dcc-glb-export" as const;
+  "toonstudio.hybrid-dcc-glb-export" as const;
 export const STUDIO_HYBRID_DCC_GLB_EXPORT_GENERATOR =
-  "ToonSpectrum Hybrid DCC deterministic editable-mesh exporter/1" as const;
+  "ToonStudio Hybrid DCC deterministic editable-mesh exporter/1" as const;
 export const STUDIO_HYBRID_DCC_GLB_MIME_TYPE = STUDIO_VRM_EXPORT_MIME_TYPE;
 /** Bounds the synchronous deterministic n-gon checks before this path moves to a Worker. */
 export const STUDIO_HYBRID_DCC_GLB_MAX_FACE_CORNERS = 256;

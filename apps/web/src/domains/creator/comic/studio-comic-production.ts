@@ -2,14 +2,14 @@ import {
   comicPageIRSchema,
   lowerComicPageToScene,
   polylineToPath,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import type {
   ColorIR,
   ComicPageIR,
   ComicPanelIR,
   SceneIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * V12 §13 comic-lane production utilities: page presets that materialize valid
@@ -18,7 +18,7 @@ import type {
  * Pure module — no React, no engine import. The PNG step is a port
  * (`renderSceneToPng` is injected, not imported): the root app program maps
  * `canvaskit-wasm` to a narrow type shim, so statically importing
- * "@toonspectrum/studio-engine-skia" sources here would break the root
+ * "@toonstudio/studio-engine-skia" sources here would break the root
  * typecheck. Callers pass the engine's `renderSceneToPng` (and the CanvasKit
  * instance from `loadCanvasKitNode` / the browser loader) at the boundary.
  */
@@ -208,7 +208,7 @@ export interface ComicSceneToPngRenderer<Ck> {
 }
 
 export interface RenderComicPagePngOptions<Ck> {
-  /** Engine port — pass `renderSceneToPng` from "@toonspectrum/studio-engine-skia". */
+  /** Engine port — pass `renderSceneToPng` from "@toonstudio/studio-engine-skia". */
   renderSceneToPng: ComicSceneToPngRenderer<Ck>;
   /** Page background; defaults to the lowering's opaque white. */
   background?: ColorIR;

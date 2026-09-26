@@ -261,13 +261,13 @@ async function verifyRedirectProvider(fetchImpl, origin, provider, timeoutMs) {
   requireCookieAttributes(
     setCookie,
     provider,
-    `toonspectrum-oauth-state-${provider}`,
+    `toonstudio-oauth-state-${provider}`,
   );
   if (provider === "github") {
     requireCookieAttributes(
       setCookie,
       provider,
-      "toonspectrum-oauth-pkce-github",
+      "toonstudio-oauth-pkce-github",
     );
   }
 

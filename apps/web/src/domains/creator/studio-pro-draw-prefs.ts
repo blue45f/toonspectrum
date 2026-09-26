@@ -15,7 +15,7 @@ import {
 } from "./brush/studio-brush-pack-id";
 import { BRUSH_PRESETS } from "./studio-brush";
 
-export const STUDIO_PRO_DRAW_PREFS_KEY = "toonspectrum-studio-pro-draw-prefs:v1";
+export const STUDIO_PRO_DRAW_PREFS_KEY = "toonstudio-studio-pro-draw-prefs:v1";
 export const STUDIO_RECENT_BRUSH_LIMIT = 6;
 /**
  * A professional brush catalogue must not silently stop accepting favorites after a single

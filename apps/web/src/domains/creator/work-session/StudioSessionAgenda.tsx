@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { StudioSessionResources, StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
-import type { StudioReviewSourceReference } from "@toonspectrum/studio-project-model";
+import type { StudioSessionResources, StudioWorkSessionView } from "@toonstudio/studio-project-model/work-session";
+import type { StudioReviewSourceReference } from "@toonstudio/studio-project-model";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { newStudioProjectGraphId } from "../project-graph/studio-project-graph-client";

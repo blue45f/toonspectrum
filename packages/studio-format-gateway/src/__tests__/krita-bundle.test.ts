@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -84,10 +84,10 @@ describe("Krita resource bundle importer", () => {
       expect(brush.program.sourcePayload).toBeDefined();
     }
     expect(result.rights).toMatchObject({
-      author: "ToonSpectrum QA",
-      creator: "ToonSpectrum Test Authors",
+      author: "ToonStudio QA",
+      creator: "ToonStudio Test Authors",
       license: "CC0-1.0",
-      website: "https://example.invalid/toonspectrum",
+      website: "https://example.invalid/toonstudio",
       email: "qa@example.invalid",
       tags: ["authored"],
     });

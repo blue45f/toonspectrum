@@ -522,7 +522,7 @@ export interface StudioIccBuildOptions {
  * 관례) — 정확한 조각별 곡선이 필요하면 `para` 타입 4 를 쓰도록 확장해야 한다.
  */
 export const SRGB_ICC_BUILD_OPTIONS: StudioIccBuildOptions = {
-  description: "ToonSpectrum sRGB",
+  description: "ToonStudio sRGB",
   copyright: "Public domain sRGB primaries (IEC 61966-2-1)",
   matrix: [
     [0.4360747, 0.3850649, 0.1430804],

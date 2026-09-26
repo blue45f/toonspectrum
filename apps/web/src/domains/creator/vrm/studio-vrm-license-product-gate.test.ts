@@ -54,7 +54,7 @@ function shareContext(
       shareAlike: "not-satisfied",
       ...overrides,
     }),
-    toonspectrumRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+    toonstudioRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
   };
 }
 
@@ -334,8 +334,8 @@ describe("studio VRM license product gate", () => {
 
   it("projects an exact official CC0 grant from a first-party VRM 1.0 receipt", () => {
     const firstParty = inspectStudioVrmLicenseAuthority(vrm1({
-      name: "ToonSpectrum first-party character",
-      authors: ["ToonSpectrum"],
+      name: "ToonStudio first-party character",
+      authors: ["ToonStudio"],
       licenseUrl: STUDIO_VRM_1_PUBLIC_LICENSE_URL,
       otherLicenseUrl: STUDIO_VRM_CC0_1_LICENSE_URL,
       avatarPermission: "everyone",
@@ -355,7 +355,7 @@ describe("studio VRM license product gate", () => {
     });
   });
 
-  it("uses ToonSpectrum standard only for a permissive VRM 1.0 rendered-only grant", () => {
+  it("uses ToonStudio standard only for a permissive VRM 1.0 rendered-only grant", () => {
     const authority = inspectStudioVrmLicenseAuthority(vrm1({
       name: "VRM 1 rendered pose",
       authors: ["Creator"],
@@ -368,7 +368,7 @@ describe("studio VRM license product gate", () => {
     }));
     const withoutGrant = planStudioVrmRenderedPoseMarketplaceShare(authority, {
       ...shareContext(authority),
-      toonspectrumRenderedPoseGrant: undefined,
+      toonstudioRenderedPoseGrant: undefined,
     });
     expect(withoutGrant).toMatchObject({ ok: false, code: "license-unrepresentable" });
 
@@ -376,7 +376,7 @@ describe("studio VRM license product gate", () => {
     expect(plan).toMatchObject({
       ok: true,
       rightsConfirmed: true,
-      license: "toonspectrum-standard",
+      license: "toonstudio-standard",
     });
   });
 
@@ -407,7 +407,7 @@ describe("studio VRM license product gate", () => {
     expect(planStudioVrmRenderedPoseMarketplaceShare(
       corporate,
       shareContext(corporate, { publisherKind: "unknown" }),
-    )).toMatchObject({ ok: true, license: "toonspectrum-standard" });
+    )).toMatchObject({ ok: true, license: "toonstudio-standard" });
   });
 
   it("requires a valid typed attestation receipt and enforces the official avatar scope", () => {
@@ -429,11 +429,11 @@ describe("studio VRM license product gate", () => {
 
     expect(planStudioVrmRenderedPoseMarketplaceShare(authorOnly, {
       useContextReceipt: null,
-      toonspectrumRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+      toonstudioRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
     })).toMatchObject({ ok: false, code: "use-context-missing" });
     expect(planStudioVrmRenderedPoseMarketplaceShare(authorOnly, {
       useContextReceipt: { confirmedByUser: true } as never,
-      toonspectrumRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
+      toonstudioRenderedPoseGrant: STUDIO_VRM_RENDERED_POSE_PLATFORM_GRANT,
     })).toMatchObject({ ok: false, code: "use-context-invalid" });
     expect(planStudioVrmRenderedPoseMarketplaceShare(
       authorOnly,

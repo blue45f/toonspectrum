@@ -55,7 +55,7 @@ export function CrawlerPolicyPage() {
           공개 데이터를 정직하게 연결합니다
         </h1>
         <p className="mt-4 text-base leading-8 text-fg-2">
-          ToonSpectrum은 작품 본문을 복제하는 서비스가 아닙니다. 공식 API·오픈데이터·소유자가 직접 제공한 피드를 우선하고,
+          ToonStudio은 작품 본문을 복제하는 서비스가 아닙니다. 공식 API·오픈데이터·소유자가 직접 제공한 피드를 우선하고,
           공개 웹을 확인할 때에도 접근 가능성, 저장 가능성, 표시·상업 이용 가능성을 서로 다른 기준으로 검토합니다.
           배포된 서비스는 외부 사이트를 실시간 또는 주기적으로 수집하지 않으며, 갱신이 필요할 때 운영자가 별도 환경에서 수동으로 실행·검토합니다.
         </p>
@@ -70,7 +70,7 @@ export function CrawlerPolicyPage() {
             <h2 className="text-lg font-bold text-fg">수집 봇 식별 정보</h2>
             <p className="mt-2 text-sm leading-7 text-fg-2">자동 요청은 일반 브라우저로 가장하지 않고 아래 User-Agent로 식별합니다.</p>
             <code className="mt-3 block overflow-x-auto rounded-xl border border-line bg-canvas p-3 text-xs leading-6 text-fg">
-              ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler)
+              ToonStudio/1.0 (+https://www.toonstudio.cloud/about/crawler)
             </code>
           </div>
         </div>

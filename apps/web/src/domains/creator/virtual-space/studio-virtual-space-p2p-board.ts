@@ -1,7 +1,7 @@
 import type { StudioLiveParticipant } from "../live/studio-live-collaboration-protocol";
 import type { StudioLiveDirectPort } from "../live/studio-live-direct-port";
 
-export const STUDIO_P2P_BOARD_WIRE = "toonspectrum-space-board-v1";
+export const STUDIO_P2P_BOARD_WIRE = "toonstudio-space-board-v1";
 export const STUDIO_P2P_BOARD_MAX_BYTES = 32 * 1024;
 export const STUDIO_P2P_BOARD_MAX_OWN_ENTITIES = 20;
 export const STUDIO_P2P_BOARD_MAX_ENTITIES = 512;

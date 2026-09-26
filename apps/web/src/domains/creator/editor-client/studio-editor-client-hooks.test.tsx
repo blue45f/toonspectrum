@@ -7,7 +7,7 @@ import {
   createEditorClient,
   createEditorSnapshotStore,
   EDITOR_REQUEST_SERVICE_KEY,
-} from "@toonspectrum/studio-command-registry";
+} from "@toonstudio/studio-command-registry";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { StudioEditorClientProvider } from "./StudioEditorClientContext";
@@ -19,7 +19,7 @@ import type {
   EditorClient,
   EditorCommandRequest,
   EditorSnapshotStore,
-} from "@toonspectrum/studio-command-registry";
+} from "@toonstudio/studio-command-registry";
 import type { ReactNode } from "react";
 
 afterEach(cleanup);

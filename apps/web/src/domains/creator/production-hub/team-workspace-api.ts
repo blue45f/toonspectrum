@@ -1,8 +1,8 @@
-import type { EffectiveOperationPolicy } from "@toonspectrum/contracts/operation-policy";
+import type { EffectiveOperationPolicy } from "@toonstudio/contracts/operation-policy";
 import type {
   TeamWorkspaceSummary, TeamWorkspaceDetail, TeamWorkspaceCommandInput,
   WorkspaceMutationResult, WorkspaceUsageResponse,
-} from "@toonspectrum/contracts/production-workspace";
+} from "@toonstudio/contracts/production-workspace";
 import { api } from "@/platform/api";
 
 const root = "/production/workspaces";

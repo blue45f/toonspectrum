@@ -4,7 +4,7 @@ IA and interaction patterns only — **no brand clones**, no proprietary asset f
 
 ## Product set
 
-| Product | Class | UI/UX takeaways for ToonSpectrum |
+| Product | Class | UI/UX takeaways for ToonStudio |
 | --- | --- | --- |
 | **Magma** | Browser collab draw | Top app menu + left tool rail + Super Simple/Full density; hover-switch menus; presence HUD |
 | **Clip Studio Paint** | Pro comic/webtoon | Dual color well + X swap; tool options strip; subtool tray; page/export-centric file IA |

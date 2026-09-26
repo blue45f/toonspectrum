@@ -14,11 +14,11 @@ import {
   sha256Schema,
   studioEntityIdSchema,
   studioReviewTaskReferenceSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import {
   compatibilityItemSchema,
   sourceCreativeFormatSchema,
-} from "@toonspectrum/studio-format-gateway";
+} from "@toonstudio/studio-format-gateway";
 
 const HumanTextSchema = z.string().trim().min(1).max(4_096);
 const CommandTypeSchema = z

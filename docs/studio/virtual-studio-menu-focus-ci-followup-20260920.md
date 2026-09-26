@@ -9,7 +9,7 @@ The failing PR head, `6b3a6de16ac2d201e6c499caf08d1e24a25c1537`, has the same Gi
 The follow-up uses a separate checkout and the original CI production preview artifact;
 no product rebuild is needed for a test-only change.
 
-[Non-studio experience quality, run 35485825361](https://github.com/blue45f/toonspectrum/actions/runs/35485825361/job/106011891557)
+[Non-studio experience quality, run 35485825361](https://github.com/blue45f/toonstudio/actions/runs/35485825361/job/106011891557)
 reported **282 passed, 1 failed**. The only failure was the mobile menu's final
 `toBeFocused()` assertion in `e2e/non-studio-controls.spec.ts`.
 

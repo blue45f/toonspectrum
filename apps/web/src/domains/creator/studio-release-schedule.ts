@@ -10,7 +10,7 @@ export const STUDIO_RELEASE_SCHEDULE_MAX_TIME_ZONE_LENGTH = 100;
 export const STUDIO_RELEASE_SCHEDULE_MAX_SERIALIZED_BYTES = 1_500_000;
 export const STUDIO_RELEASE_SCHEDULE_MAX_ICALENDAR_BYTES = 2_000_000;
 export const STUDIO_RELEASE_LOCAL_ONLY_NOTICE =
-  "ToonSpectrum의 로컬 일정 기록이며 외부 플랫폼에 자동 게시하지 않습니다.";
+  "ToonStudio의 로컬 일정 기록이며 외부 플랫폼에 자동 게시하지 않습니다.";
 
 export const STUDIO_RELEASE_ITEM_KINDS = ["episode", "milestone"] as const;
 export const STUDIO_RELEASE_DESTINATIONS = ["generic", "webtoon", "tapas"] as const;
@@ -129,7 +129,7 @@ export interface StudioReleaseIcalendarOptions {
 
 export interface StudioReleaseIcalendarExport {
   content: string;
-  filename: "toonspectrum-release-schedule.ics";
+  filename: "toonstudio-release-schedule.ics";
   mimeType: "text/calendar;charset=utf-8";
   eventCount: number;
   exportedItemIds: string[];
@@ -716,13 +716,13 @@ export function exportStudioReleaseScheduleIcalendar(
   const selectedStatuses = options.statuses
     ? new Set(options.statuses.filter((status) => STUDIO_RELEASE_STATUSES.includes(status)))
     : null;
-  const calendarName = normalizeText(options.calendarName, 120) || "ToonSpectrum 릴리스 일정";
+  const calendarName = normalizeText(options.calendarName, 120) || "ToonStudio 릴리스 일정";
   const exportedItemIds: string[] = [];
   const skippedItemIds: string[] = [];
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//ToonSpectrum//Studio Release Schedule 1.0//KO",
+    "PRODID:-//ToonStudio//Studio Release Schedule 1.0//KO",
     "CALSCALE:GREGORIAN",
     `X-WR-CALNAME:${escapeIcalendarText(calendarName)}`,
   ];
@@ -743,7 +743,7 @@ export function exportStudioReleaseScheduleIcalendar(
     ].join("\n");
     lines.push(
       "BEGIN:VEVENT",
-      `UID:ts-${opaqueStableItemId(item)}@local.toonspectrum`,
+      `UID:ts-${opaqueStableItemId(item)}@local.toonstudio`,
       `DTSTAMP:${formatIcalendarUtc(generatedAtMs)}`,
       `DTSTART:${formatIcalendarUtc(resolution.utcMs)}`,
       "DURATION:PT30M",
@@ -767,7 +767,7 @@ export function exportStudioReleaseScheduleIcalendar(
   }
   return {
     content,
-    filename: "toonspectrum-release-schedule.ics",
+    filename: "toonstudio-release-schedule.ics",
     mimeType: "text/calendar;charset=utf-8",
     eventCount: exportedItemIds.length,
     exportedItemIds,

@@ -1,5 +1,5 @@
 <!-- agent-harness:canonical -->
-# ToonSpectrum 에이전트 하네스 및 작업 정책
+# ToonStudio 에이전트 하네스 및 작업 정책
 
 이 파일은 저장소 전역의 **공통 작업 계약이자 단일 기준 문서**다. Claude, Codex, Copilot,
 Cursor, Gemini, OpenCode용 어댑터는 이 문서를 다시 복제하지 않고 반드시 이 문서를 참조한다.

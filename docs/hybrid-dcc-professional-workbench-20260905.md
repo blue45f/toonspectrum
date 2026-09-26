@@ -2,7 +2,7 @@
 
 ## 범위와 반영 원칙
 
-저장소: blue45f/toonspectrum. 대상 PR: #747.
+저장소: blue45f/toonstudio. 대상 PR: #747.
 기존 정밀 작업대 커밋: `51e66c67343c6e22cdd497901678df824d661ace`.
 선행 소스 검사 경로 수정: `440de586277ff7a2aee558a3e2e7f3fcb3a0630c`.
 

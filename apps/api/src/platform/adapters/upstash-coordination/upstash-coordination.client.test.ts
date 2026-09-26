@@ -13,7 +13,7 @@ const config: UpstashCoordinationConfig = {
   restToken: "test-rest-token-with-sufficient-length",
   keyHashSecret:
     "test-key-hash-secret-with-at-least-thirty-two-characters",
-  namespace: "toonspectrum-test",
+  namespace: "toonstudio-test",
   timeoutMs: 100,
   maximumRequestBytes: 16 * 1_024,
   maximumResponseBytes: 32 * 1_024,

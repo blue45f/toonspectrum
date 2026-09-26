@@ -2,7 +2,7 @@ import type {
   ProductionRiskCategory,
   ProductionRiskSeverity,
   ProductionRiskStatus,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 export type ProductionRiskViewMode = "priority" | "episode" | "matrix";
 export type ProductionRiskDetailTab = "overview" | "evidence" | "impact" | "response" | "history";

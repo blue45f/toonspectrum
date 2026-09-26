@@ -22,7 +22,7 @@ const policy = resolveBackendCapabilityPolicy({
 const digest = "a".repeat(64);
 const idempotencyKey = "thumbnail-command-00000001";
 const envelope = BackendCapabilityGatewayEnvelopeSchema.parse({
-  version: "toonspectrum.backend-capability.v1",
+  version: "toonstudio.backend-capability.v1",
   provider: "render",
   tenantId: "tenant-1",
   capability: "async-job",
@@ -47,7 +47,7 @@ const envelope = BackendCapabilityGatewayEnvelopeSchema.parse({
     requestKey: idempotencyKey,
     sourceAssetId: "asset-1",
     sourceObject: {
-      contractVersion: "toonspectrum.private-object-storage.v2",
+      contractVersion: "toonstudio.private-object-storage.v2",
       providerId: "cloudflare-r2",
       purpose: "source",
       digest: `sha256:${digest}`,

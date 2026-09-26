@@ -36,7 +36,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: toonspectrum-production-database-ddl
+  group: toonstudio-production-database-ddl
   cancel-in-progress: false
 
 jobs:

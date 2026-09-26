@@ -23,8 +23,8 @@ import {
 } from "./studio-reference-board";
 import { migrateStudioShared3dStageCollectionDocument } from "./studio-shared-3d-stage-collection";
 
-export const LEGACY_STUDIO_AUTOSAVE_KEY = "toonspectrum-studio-autosave";
-const STUDIO_AUTOSAVE_PREFIX = "toonspectrum-studio-autosave:v12";
+export const LEGACY_STUDIO_AUTOSAVE_KEY = "toonstudio-studio-autosave";
+const STUDIO_AUTOSAVE_PREFIX = "toonstudio-studio-autosave:v12";
 const TAPER_SPACING_AUTOSAVE_KIND = "studio-taper-spacing-autosave";
 
 export interface StudioAutosaveStorage {
@@ -521,7 +521,7 @@ export type StudioLifecycleAutosaveWriteResult = {
   disposition: "primary" | "preserved-primary-sidecar";
 };
 
-const STUDIO_LIFECYCLE_AUTOSAVE_JOURNAL_KIND = "toonspectrum-lifecycle-recovery-journal";
+const STUDIO_LIFECYCLE_AUTOSAVE_JOURNAL_KIND = "toonstudio-lifecycle-recovery-journal";
 
 function parseStudioLifecycleAutosaveJournal(raw: string | null): StudioAutosavePayload[] {
   if (!raw) return [];

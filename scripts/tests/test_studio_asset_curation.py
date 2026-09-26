@@ -117,7 +117,7 @@ class CurationTests(unittest.TestCase):
                 self.assertBlocked("license-needs-separate-review")
 
     def test_commission_requires_service_embedding_rights(self):
-        self.item["source"]["license"] = "LicenseRef-ToonSpectrum-Commissioned"
+        self.item["source"]["license"] = "LicenseRef-ToonStudio-Commissioned"
         self.assertBlocked("commission-missing")
 
     def test_rights_report_bound_to_source(self):
@@ -271,7 +271,7 @@ class AcquisitionTests(unittest.TestCase):
     def test_existing_output_never_overwritten(self):
         (self.root / "existing.txt").write_text("keep")
         with self.assertRaises(ValueError):
-            a.acquire({"schema": "toonspectrum.asset-acquisition-plan.v1", "pilot": []}, self.root)
+            a.acquire({"schema": "toonstudio.asset-acquisition-plan.v1", "pilot": []}, self.root)
         self.assertEqual((self.root / "existing.txt").read_text(), "keep")
 
 

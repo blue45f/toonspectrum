@@ -4,12 +4,12 @@
 
 ## 0. 범위와 현재 확인한 사실
 
-프로젝트 이름은 Codex의 `toonstudio`, 저장소는 `blue45f/toonspectrum`이다. 조사한 worktree는 `/Users/hjunkim/.chatgpt-worktrees/toonspectrum-vs-polish-reviewed-20260920`, branch는 `feat/virtual-studio-polish-reviewed-20260920`, HEAD는 `ed116cd47`이며 미커밋 변경이 있다. 다른 세션의 소스·Git index를 덮어쓰지 않는다.
+프로젝트 이름은 Codex의 `toonstudio`, 저장소는 `blue45f/toonstudio`이다. 조사한 worktree는 `/Users/hjunkim/.chatgpt-worktrees/toonstudio-vs-polish-reviewed-20260920`, branch는 `feat/virtual-studio-polish-reviewed-20260920`, HEAD는 `ed116cd47`이며 미커밋 변경이 있다. 다른 세션의 소스·Git index를 덮어쓰지 않는다.
 `docs/studio-p2p-virtual-studio-2026-09-18.md`, `docs/studio/virtual-studio-world-authoring.md`, 실제 Virtual Space/Phaser/Huddle source를 비교했다. 예전 문서의 좌표·heartbeat 수치와 실제 source가 다를 때 source를 현재 사실로 취급한다.
 현재 플레이어에는 가속·감속, fixed-step 표시 보간, 이동거리 기반 atlas, 포커스 차단, A*와 충돌 등이 있다. 하지만 이것만으로 완성된 게임 조작감이 입증되는 것은 아니다.
 현재 NPC는 `idle/talk/draw/review/patrol`과 waypoint 추적 정도다. 순찰은 sprite 좌표를 일정 속도로 변경하며 플레이어와 동일한 가감속·회피 체계를 사용하지 않는다. 기본 manifest의 `npcs: []`도 확인했다. 배경 그림의 인물들은 독립 NPC가 아니다.
 현재 peer 클릭은 가까우면 Huddle 열기, 아니면 follow다. 초대 수락·동시 행동·상호작용 자리 예약 등은 별도 설계가 필요하다. 현재 media 제한은 원격 3명, 즉 본인 포함 4명이다. 공간 상한 24는 상수이지 24명 실네트워크 성능 검증 결과가 아니다.
-현재 source의 presence는 `toonspectrum-space-v1`, 최소 송신 간격 90ms, heartbeat 2500ms, stale 10000ms, 패킷 상한 1024B다. 새 social event를 이 presence 패킷에 무분별하게 추가하지 않는다.
+현재 source의 presence는 `toonstudio-space-v1`, 최소 송신 간격 90ms, heartbeat 2500ms, stale 10000ms, 패킷 상한 1024B다. 새 social event를 이 presence 패킷에 무분별하게 추가하지 않는다.
 현재 4종·4방향·8프레임은 `technique: cutout-rig`다. 원화 변형 atlas를 개별 작화 프레임이라고 부르지 않는다. 엔진 선택만으로 새로운 관절 동작·가려진 배경 픽셀이 생기지 않는다.
 
 ## 1. 최초 기획을 유지하는 제품 목표

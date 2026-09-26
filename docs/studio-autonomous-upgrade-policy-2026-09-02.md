@@ -1,4 +1,4 @@
-# ToonSpectrum Studio 자율 고도화 운영 정책
+# ToonStudio Studio 자율 고도화 운영 정책
 
 - 시행일: 2026-09-02
 - 범위: `/studio`와 연결된 캔버스, 브러시, 저장/복원, Undo/Redo, WebGPU/WebGL2/WASM, 3D, 애니메이션, 협업, 소재, AI 보조, 배포

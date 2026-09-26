@@ -17,7 +17,7 @@
 
 ## 경쟁 제품 패턴의 번역
 
-| 참고 패턴 | 확인한 제품군 | ToonSpectrum 적용 |
+| 참고 패턴 | 확인한 제품군 | ToonStudio 적용 |
 | --- | --- | --- |
 | 시퀀스 전체의 제작 상태를 한눈에 보는 보드 | Toon Boom Storyboard Pro, Boords, StudioBinder | 페이지별 준비도 점수와 차단/확인/준비 우선순위 |
 | 리뷰 요청과 승인 전 상태를 명확히 분리 | Boords, KROCK.io, StudioBinder | 검토 미요청·검토 대기·수정 요청을 서로 다른 가중치로 진단 |

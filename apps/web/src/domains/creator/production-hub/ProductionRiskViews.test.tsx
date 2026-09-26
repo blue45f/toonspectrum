@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { evaluateProductionRisks } from "@toonspectrum/core/production";
+import { evaluateProductionRisks } from "@toonstudio/core/production";
 
 import { createProductionDemoProject } from "./production-demo";
 import { ProductionRiskMatrixView } from "./ProductionRiskViews";

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { canonicalJson, studioReviewTaskCompletionContextSchema, studioReviewTaskCompletionInputSchema,
   studioReviewTaskCompletionReceiptSchema, type StudioReviewTaskCompletionContext,
-  type StudioReviewTaskCompletionInput } from "@toonspectrum/studio-project-model";
+  type StudioReviewTaskCompletionInput } from "@toonstudio/studio-project-model";
 import type { PoolClient } from "pg";
 
 import { dbPool } from "../../platform/database";

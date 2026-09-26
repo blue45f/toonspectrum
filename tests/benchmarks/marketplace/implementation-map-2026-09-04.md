@@ -1,8 +1,8 @@
-# Marketplace benchmark → ToonSpectrum implementation map
+# Marketplace benchmark → ToonStudio implementation map
 
 This map turns the existing benchmark registry and results into auditable product boundaries. It intentionally separates implemented behavior from future commerce work.
 
-| Product job | Benchmark patterns reviewed | ToonSpectrum implementation | Status |
+| Product job | Benchmark patterns reviewed | ToonStudio implementation | Status |
 | --- | --- | --- | --- |
 | Find production-ready material | Clip Studio Assets, BlenderKit, Fab, Unity Asset Store, VS Code Marketplace | `/market/browse`, typed kind/license/tag/search facets, relevance/newest order, cached fallback | Implemented |
 | Judge quality before acquisition | Clip Studio Assets, Sketchfab, ACON3D, KitBash3D | brush/filter/palette/template previews, interactive 3D viewer, package entry list, webtoon quality matrix | Implemented |

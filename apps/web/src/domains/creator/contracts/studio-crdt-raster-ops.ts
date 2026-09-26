@@ -10,7 +10,7 @@
  */
 
 export const STUDIO_RASTER_CRDT_VERSION = 1 as const;
-export const STUDIO_RASTER_KERNEL = "toonspectrum-raster-v1" as const;
+export const STUDIO_RASTER_KERNEL = "toonstudio-raster-v1" as const;
 
 export const STUDIO_RASTER_MIN_TILE_SIZE = 128;
 export const STUDIO_RASTER_MAX_TILE_SIZE = 1_024;
@@ -59,8 +59,8 @@ export type StudioRasterIntent = (typeof STUDIO_RASTER_INTENTS)[number];
 export const STUDIO_RASTER_ASSET_MEDIA_TYPES = [
   "image/png",
   "image/webp",
-  "application/x-toonspectrum-rgba-zstd",
-  "application/x-toonspectrum-alpha-zstd",
+  "application/x-toonstudio-rgba-zstd",
+  "application/x-toonstudio-alpha-zstd",
 ] as const;
 
 export type StudioRasterAssetMediaType = (typeof STUDIO_RASTER_ASSET_MEDIA_TYPES)[number];

@@ -39,7 +39,7 @@
     "sourceHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
     "mode": "build",
     "startedAt": "2026-09-08T15:24:22.784828+00:00",
-    "distPath": "/private/tmp/toonspectrum-main-final-build-20260909/0df3201b390f/dist",
+    "distPath": "/private/tmp/toonstudio-main-final-build-20260909/0df3201b390f/dist",
     "distManifestSha256": "54f05571e2c2f3dec5d16ab07bf184a854a75f38acf124051f683f316ec144a7",
     "files": 10615,
     "endHead": "0df3201b390f2d885bea9832ede0bd1593d682e6",
@@ -53,7 +53,7 @@
       "packages/core"
     ],
     "changedPaths": [],
-    "additionalOwnerReceipt": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/ci448-handoff.json"
+    "additionalOwnerReceipt": "/Users/hjunkim/.codex/artifacts/toonstudio-final413/ci448-handoff.json"
   },
   "cpuExperiments": {
     "tests": 27,
@@ -61,7 +61,7 @@
     "pixelEquivalence": "Inkwash direct/tile is not pixel equivalent; see experiment-verification.json."
   },
   "distManifest": {
-    "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/dist-manifest.json",
+    "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/dist-manifest.json",
     "sha256": "54f05571e2c2f3dec5d16ab07bf184a854a75f38acf124051f683f316ec144a7"
   },
   "browserGpu": {
@@ -109,7 +109,7 @@
             }
           }
         ],
-        "report": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/json450-after-results/report.json",
+        "report": "/Users/hjunkim/.codex/artifacts/toonstudio-final413/json450-after-results/report.json",
         "reportSha256": "439caa0621eddb52c4ff365b8eca9474d91202cc5dbf1bffd99c0d969053f4e6",
         "diagnostics": {
           "result": "PASS",
@@ -126,7 +126,7 @@
           "before": {
             "elements": 0,
             "elapsedAfterPointerUpMs": 68,
-            "path": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/json450-before-results/report.json"
+            "path": "/Users/hjunkim/.codex/artifacts/toonstudio-final413/json450-before-results/report.json"
           },
           "after": {
             "elapsedAfterPointerUpMs": 112,
@@ -229,7 +229,7 @@
             }
           }
         ],
-        "report": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/authclip452-results/report.json",
+        "report": "/Users/hjunkim/.codex/artifacts/toonstudio-final413/authclip452-results/report.json",
         "reportSha256": "58de93efdd095e4bb67bff39a779135b1465b205e0c81de69cf06f2b76231861",
         "diagnostics": {
           "result": "FUNCTIONAL_PASS_WITH_RECORDED_STORAGE_WARNING",
@@ -252,12 +252,12 @@
       }
     },
     "gatewayLimit": "This immutable build does not set VITE_STUDIO_LIVE_ORIGIN; realtime gateway acceptance is separate from the verified REST save/reopen paths.",
-    "previousNativeEvidence": "/Users/hjunkim/.codex/artifacts/toonspectrum-final413/auth444-results",
+    "previousNativeEvidence": "/Users/hjunkim/.codex/artifacts/toonstudio-final413/auth444-results",
     "supersededHarnessFailure": "authclip451 missed the delayed recovery banner. authclip452 explicitly awaited the recovery decision and retained all durable data, geometry and pixel assertions."
   },
   "mainPullRequest": {
     "number": 961,
-    "url": "https://github.com/blue45f/toonspectrum/pull/961",
+    "url": "https://github.com/blue45f/toonstudio/pull/961",
     "headBranch": "release/salvage-integration-20260908",
     "baseBranch": "main",
     "status": "Ready for exact-head main merge under explicit user CI bypass authorization; actual merge recorded separately."
@@ -292,63 +292,63 @@
   },
   "logs": {
     "build-receipt.json": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/build-receipt.json",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/build-receipt.json",
       "sha256": "8e74910156ee0c4f6bf75c4ef40949f4287b0a3a74c5ef91714f7d5bcffbf711"
     },
     "build.log": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/build.log",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/build.log",
       "sha256": "e9f859a80c00f183c1937554a7aaf9affe1230ac976d9d4e54e38009da5de331"
     },
     "bundle.log": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/bundle.log",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/bundle.log",
       "sha256": "1bb4d0278c2d23d08dbda6b558def1095635cce61f993c2adbee1d5b3b29ccb4"
     },
     "csp.log": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/csp.log",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/csp.log",
       "sha256": "2e8f082d12d4786679499a6fd66e9f8a04a04129aeacdd0ee84488e21b5ffe8d"
     },
     "dist-manifest.json": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/dist-manifest.json",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/dist-manifest.json",
       "sha256": "54f05571e2c2f3dec5d16ab07bf184a854a75f38acf124051f683f316ec144a7"
     },
     "eslint.log": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/eslint.log",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/eslint.log",
       "sha256": "b77aa8c5ca50d43297909a3fee5369104844045f98da48b8d06af992e23c5257"
     },
     "lint-files.json": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/lint-files.json",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/lint-files.json",
       "sha256": "42a19b2fb35b1d6c8395b51eceb404c296fe73b6bccbcb2c9936f6bb7e38ad82"
     },
     "lint-receipt.json": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/lint-receipt.json",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/lint-receipt.json",
       "sha256": "bd529402d6b3c6106265a671c28f3bd8a2e82f6b172178969df3366218cc514b"
     },
     "notices.log": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/notices.log",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/notices.log",
       "sha256": "21189617ff82fbe2026511ef8e877ce13ed57602d219dbde55ab81097bf56507"
     },
     "test-files.json": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/test-files.json",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/test-files.json",
       "sha256": "23bbf9ac29eee446c6f64f33f5edcb159f66e687e673da83e1f05c929795c88e"
     },
     "tests-receipt.json": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/tests-receipt.json",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/tests-receipt.json",
       "sha256": "401cef004f78240e98caa42c0e61188b63a8038940404806970659e025138e97"
     },
     "tests.json": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/tests.json",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/tests.json",
       "sha256": "0a1bd04cba9c5e024a697f4d037f0990c65ba27f5c0194de5fc075f120fac056"
     },
     "tests.log": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/tests.log",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/tests.log",
       "sha256": "8bbdede6b84eb7015d5fd3949882a1d0454295ecb9603a376bd5da221bd59096"
     },
     "types-receipt.json": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/types-receipt.json",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/types-receipt.json",
       "sha256": "e26f69316f44526d358096f18deebe9413f39a5ebd24b26ce79a6fd4aa1687fc"
     },
     "web-types.log": {
-      "path": "/Users/hjunkim/WebstormProjects/toonspectrum/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/web-types.log",
+      "path": "/Users/hjunkim/WebstormProjects/toonstudio/artifacts/all-unmerged-integration-20260908/verification/main-final-0df3201b390f/web-types.log",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   }

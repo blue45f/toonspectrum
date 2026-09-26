@@ -1,4 +1,4 @@
-import type { SkiaDocumentFrame } from "@toonspectrum/studio-engine-skia";
+import type { SkiaDocumentFrame } from "@toonstudio/studio-engine-skia";
 
 export type StudioSkiaDocumentCamera = SkiaDocumentFrame["camera"];
 

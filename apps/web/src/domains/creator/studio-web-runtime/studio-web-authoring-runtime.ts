@@ -1,5 +1,5 @@
 /**
- * Browser-first execution policy for ToonSpectrum 3D authoring.
+ * Browser-first execution policy for ToonStudio 3D authoring.
  *
  * WebAssembly is an implementation detail, not a reason to leave the web runtime. Every admitted
  * provider executes in the browser main realm, a module Worker, or a browser GPU queue. Native

@@ -13,10 +13,10 @@ ALTER TABLE public.creator_asset_storage_object
 UPDATE public.creator_asset_storage_object
 SET
   "providerId" = coalesce("providerId", 'supabase'),
-  "contractVersion" = 'toonspectrum.private-object-storage.v2'
+  "contractVersion" = 'toonstudio.private-object-storage.v2'
 WHERE
   "providerId" IS NULL
-  OR "contractVersion" = 'toonspectrum.supabase-object-storage.v1';
+  OR "contractVersion" = 'toonstudio.supabase-object-storage.v1';
 
 ALTER TABLE public.creator_asset_storage_object
   ALTER COLUMN "providerId" SET NOT NULL;
@@ -25,7 +25,7 @@ ALTER TABLE public.creator_asset_storage_object
   DROP CONSTRAINT IF EXISTS creator_asset_storage_object_provider_check;
 ALTER TABLE public.creator_asset_storage_object
   ADD CONSTRAINT creator_asset_storage_object_contract_check
-  CHECK ("contractVersion" = 'toonspectrum.private-object-storage.v2')
+  CHECK ("contractVersion" = 'toonstudio.private-object-storage.v2')
   NOT VALID;
 
 ALTER TABLE public.creator_asset_storage_object
@@ -166,7 +166,7 @@ BEGIN
     SELECT 1
     FROM public.creator_asset_storage_object
     WHERE "providerId" IS NULL
-      OR "contractVersion" <> 'toonspectrum.private-object-storage.v2'
+      OR "contractVersion" <> 'toonstudio.private-object-storage.v2'
   ) THEN
     RAISE EXCEPTION 'creator asset primary storage locations are incomplete';
   END IF;

@@ -69,7 +69,7 @@ describe("Hybrid DCC editable room authority", () => {
       expect(asset.color).toBe(part.color);
       expect(asset.rights).toMatchObject({
         source: "studio-room-preset:cafe",
-        creator: "ToonSpectrum Studio",
+        creator: "ToonStudio Studio",
         license: "CC0-1.0",
         useScope: "commercial",
       });

@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 /**
- * ToonSpectrum Service Worker runtime. Updates wait for explicit consent;
+ * ToonStudio Service Worker runtime. Updates wait for explicit consent;
  * only GET assets are cached. Manuscripts and writes remain owned by the app.
  */
 import { emergencyDrawingPath, readEmergencyDrawing } from "./emergency-drawing";
@@ -310,12 +310,12 @@ function productionPushUrl(value: string | undefined): string {
 scope.addEventListener("push", (event) => {
   const payload = productionPushPayload(event);
   event.waitUntil(scope.registration.showNotification(
-    payload.title?.trim() || "ToonSpectrum 제작 알림",
+    payload.title?.trim() || "ToonStudio 제작 알림",
     {
       body: payload.body?.trim() || "제작 프로젝트에 새 소식이 있습니다.",
       icon: "/icon-192.png",
       badge: "/favicon-96.png",
-      tag: payload.tag?.trim() || "toonspectrum-production",
+      tag: payload.tag?.trim() || "toonstudio-production",
       data: { url: productionPushUrl(payload.url) },
     },
   ));

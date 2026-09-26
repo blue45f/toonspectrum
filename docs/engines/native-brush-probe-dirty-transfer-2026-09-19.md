@@ -82,7 +82,7 @@ pixel identity is not asserted.
 
 ```sh
 bash packages/studio-brush-platform/src/libmypaint/bridge/build.sh
-pnpm --filter @toonspectrum/studio-brush-platform typecheck
+pnpm --filter @toonstudio/studio-brush-platform typecheck
 pnpm exec tsc -p tests/benchmarks/harness/tsconfig.json
 pnpm exec vitest run packages/studio-brush-platform packages/studio-engine-skia \
   apps/web/src/domains/creator/brush/studio-native-brush-probe.test.ts --maxWorkers=1

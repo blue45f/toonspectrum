@@ -28,8 +28,8 @@ const originalBytes = await readFile(path.join(publicRoot, 'manifest.json'));
 const original = JSON.parse(originalBytes.toString('utf8'));
 const candidates = await readJson(path.join(candidateRoot, 'manifest.json'));
 const decisions = await readJson(decisionsPath);
-if (original.schema !== 'toonspectrum.asset-delivery.v1' || candidates.schema !== original.schema
-    || decisions.schema !== 'toonspectrum.asset-visual-decisions.v1' || !Array.isArray(decisions.assets)) {
+if (original.schema !== 'toonstudio.asset-delivery.v1' || candidates.schema !== original.schema
+    || decisions.schema !== 'toonstudio.asset-visual-decisions.v1' || !Array.isArray(decisions.assets)) {
   throw new Error('Unsupported acquisition or visual-review schema');
 }
 const decisionById = new Map(decisions.assets.map(row => [row.id, row]));
@@ -131,7 +131,7 @@ const temporaryManifest = path.join(publicRoot, 'manifest.expansion-pending.json
 await writeFile(temporaryManifest, manifestText, { flag: 'wx' });
 await rename(temporaryManifest, path.join(publicRoot, 'manifest.json'));
 const report = {
-  schema: 'toonspectrum.asset-expansion-publication.v1',
+  schema: 'toonstudio.asset-expansion-publication.v1',
   previousCatalogCount: original.assets.length,
   addedOriginals: additions.length,
   catalogCount: next.assets.length,

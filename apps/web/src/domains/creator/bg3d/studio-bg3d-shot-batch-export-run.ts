@@ -886,7 +886,7 @@ export function createStudioBg3dShotBatchExportRunner(
       try {
         const anchor = document.createElement("a");
         anchor.href = downloadUrl;
-        anchor.download = "toonspectrum-3d-shot-passes.zip";
+        anchor.download = "toonstudio-3d-shot-passes.zip";
         anchor.rel = "noopener";
         document.body.append(anchor);
         try {

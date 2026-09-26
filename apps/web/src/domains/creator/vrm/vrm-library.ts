@@ -25,7 +25,7 @@ import {
 } from "./studio-vrm-model-technical-denylist.generated";
 import { isStudioVrmProductionModelUrl } from "./studio-vrm-model-quality";
 
-const DB_NAME = "toonspectrum-studio-vrm-library";
+const DB_NAME = "toonstudio-studio-vrm-library";
 const DB_VERSION = 1;
 const MODEL_STORE = "models";
 const THUMBNAIL_STORE = "thumbnails";

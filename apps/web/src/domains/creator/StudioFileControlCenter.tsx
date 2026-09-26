@@ -45,7 +45,7 @@ import {
 import { cn } from "@/shared/lib/utils";
 
 const RECENT_LOCAL_FILES_STORAGE_KEY =
-  "toonspectrum-studio-file-control-center:recent-files:v1";
+  "toonstudio-studio-file-control-center:recent-files:v1";
 
 interface BrowserStorageHealth {
   readonly status: "error" | "loading" | "ready" | "unsupported";

@@ -13,7 +13,7 @@ import { useMemo, useState } from "react";
 import type {
   ProductionProjectAggregate,
   ProductionTaskStatus,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { cn } from "@/shared/lib/utils";

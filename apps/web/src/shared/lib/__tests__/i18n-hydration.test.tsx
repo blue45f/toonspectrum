@@ -7,15 +7,15 @@ import { useI18n, useT } from "../i18n";
 import * as runtimeTranslations from "../i18n-runtime-translation";
 
 const initial = useI18n.getState();
-const savedLanguage = localStorage.getItem("toonspectrum-lang");
+const savedLanguage = localStorage.getItem("toonstudio-lang");
 const documentLanguage = document.documentElement.lang;
 const documentDirection = document.documentElement.dir;
 
 afterEach(() => {
   cleanup();
   useI18n.setState(initial);
-  if (savedLanguage === null) localStorage.removeItem("toonspectrum-lang");
-  else localStorage.setItem("toonspectrum-lang", savedLanguage);
+  if (savedLanguage === null) localStorage.removeItem("toonstudio-lang");
+  else localStorage.setItem("toonstudio-lang", savedLanguage);
   document.documentElement.lang = documentLanguage;
   document.documentElement.dir = documentDirection;
   vi.restoreAllMocks();
@@ -24,7 +24,7 @@ afterEach(() => {
 it("restores the saved locale before loading its translations on first use", async () => {
   const load = vi.spyOn(runtimeTranslations, "loadRuntimeTranslationBundle")
     .mockResolvedValue(undefined);
-  localStorage.setItem("toonspectrum-lang", JSON.stringify({
+  localStorage.setItem("toonstudio-lang", JSON.stringify({
     state: { lang: "ja" }, version: 0,
   }));
 

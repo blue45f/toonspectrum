@@ -8,7 +8,7 @@ import {
   siteNavigationLocale,
   siteNavigationText,
 } from "./site-navigation";
-import { ToonSpectrumMark } from "./visual-marks";
+import { ToonStudioMark } from "./visual-marks";
 
 import Link from "@/shared/navigation/router-link";
 import { usePathname } from "@/shared/navigation/navigation";
@@ -50,7 +50,7 @@ export function SiteFooter() {
   // Older translations can still include the former product name. Navigation labels
   // always resolve to the canonical brand without touching user or policy content.
   const navigationLabel = (key: string) =>
-    t(key).replaceAll(/ToonSpectrum|툰스펙트럼/g, () => siteBrand);
+    t(key).replaceAll(/ToonStudio|툰스튜디오/g, () => siteBrand);
 
   return (
     <footer
@@ -123,7 +123,7 @@ export function SiteFooter() {
           <div className="max-w-sm sm:col-span-2 lg:col-span-1">
             <Link href="/" className="group inline-flex items-center gap-3">
               <span className="grid size-10 place-items-center rounded-xl border border-line bg-card shadow-sm transition-transform duration-200 ease-out-expo group-hover:-rotate-3 group-hover:scale-105">
-                <ToonSpectrumMark className="size-7" />
+                <ToonStudioMark className="size-7" />
               </span>
               <span>
                 <h2 className="font-display text-lg font-bold text-fg transition-colors group-hover:text-accent">

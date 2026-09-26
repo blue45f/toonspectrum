@@ -262,7 +262,7 @@ describe("presetSliceFileName", () => {
 
   it("빈 제목은 기본 파일명으로", () => {
     expect(presetSliceFileName("  ", "webtoon-canvas", "png", { index: 0, total: 1 })).toBe(
-      "toonspectrum-webtoon-webtoon-canvas.png"
+      "toonstudio-webtoon-webtoon-canvas.png"
     );
   });
 });
@@ -415,7 +415,7 @@ describe("exportPresetSlices", () => {
       preset: naver,
       format: "jpg",
       title: "",
-      watermark: { enabled: true, text: "© 툰스펙트럼", position: "br", opacity: 0.5, size: 0.028 },
+      watermark: { enabled: true, text: "© 툰스튜디오", position: "br", opacity: 0.5, size: 0.028 },
       delayMs: 0,
       createCanvas: (w, h) => {
         const fake = new FakeCanvas(w, h);
@@ -426,8 +426,8 @@ describe("exportPresetSlices", () => {
     });
     expect(created).toHaveLength(2);
     for (const slice of created) {
-      expect(slice.ctx.strokeTexts).toEqual(["© 툰스펙트럼"]);
-      expect(slice.ctx.fillTexts).toEqual(["© 툰스펙트럼"]);
+      expect(slice.ctx.strokeTexts).toEqual(["© 툰스튜디오"]);
+      expect(slice.ctx.fillTexts).toEqual(["© 툰스튜디오"]);
     }
   });
 

@@ -3,7 +3,7 @@ import type { StudioNamedPalette } from "./studio-palette-library";
 import type { SceneSeed } from "./studio-scene-templates";
 
 /**
- * ToonSpectrum Webtoon Design Tokens
+ * ToonStudio Webtoon Design Tokens
  *
  * A persistence- and UI-agnostic design-system core for reusable webtoon
  * styles. The model deliberately owns no browser globals, storage, React, or

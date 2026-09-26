@@ -13,10 +13,10 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 TEMPLATE="$ROOT/.gitmessage.ko"
 
 [ -n "$ROOT" ] && [ -f "$TEMPLATE" ] || exit 0
-if grep -q "ToonSpectrum 커밋 작성 가이드" "$MESSAGE_FILE" 2>/dev/null; then
+if grep -q "ToonStudio 커밋 작성 가이드" "$MESSAGE_FILE" 2>/dev/null; then
   exit 0
 fi
 
-TEMP_FILE="${MESSAGE_FILE}.toonspectrum-template"
+TEMP_FILE="${MESSAGE_FILE}.toonstudio-template"
 cat "$TEMPLATE" "$MESSAGE_FILE" > "$TEMP_FILE"
 mv "$TEMP_FILE" "$MESSAGE_FILE"

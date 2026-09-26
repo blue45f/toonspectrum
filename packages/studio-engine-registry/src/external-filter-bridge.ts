@@ -8,7 +8,7 @@
  * provider id, license, descriptor fingerprint, capabilities and quotas.
  */
 
-export const EXTERNAL_FILTER_PROTOCOL = "toonspectrum.external-filter" as const;
+export const EXTERNAL_FILTER_PROTOCOL = "toonstudio.external-filter" as const;
 export const EXTERNAL_FILTER_PROTOCOL_VERSION = 1 as const;
 
 export type ExternalFilterJsonValue =

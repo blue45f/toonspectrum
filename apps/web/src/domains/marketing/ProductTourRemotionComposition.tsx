@@ -1,4 +1,4 @@
-import { ToonStudioProductTour } from "@toonspectrum/product-tour-film";
+import { ToonStudioProductTour } from "@toonstudio/product-tour-film";
 import { useCallback } from "react";
 import { AbsoluteFill, Html5Audio, useCurrentFrame, useVideoConfig } from "remotion";
 

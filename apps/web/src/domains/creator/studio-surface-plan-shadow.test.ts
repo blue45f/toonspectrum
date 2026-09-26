@@ -2,7 +2,7 @@ import {
   RemoteKillSwitch,
   WinnerCache,
   evaluateLicenseGate,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import { beforeEach, describe, expect, it } from "vitest";
 
 

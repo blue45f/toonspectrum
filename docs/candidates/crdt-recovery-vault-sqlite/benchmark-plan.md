@@ -73,7 +73,7 @@ Raw evidence is retained in
 production Vite bundle, serves it with COOP `same-origin`, COEP `require-corp`, CORP `same-origin`,
 and a `worker-src 'self'`/`wasm-unsafe-eval` CSP, then runs Chromium 140.0.7339.186 against a fresh
 origin. It imports the actual product `createStudioCrdtRecoveryVault()` factory and shared local
-database runtime. The constructor receipt proves `toonspectrum-studio-sqlite` plus
+database runtime. The constructor receipt proves `toonstudio-studio-sqlite` plus
 `/studio-local-v12.db`; memory DB constructor calls were zero.
 
 ### Exact recovery receipts

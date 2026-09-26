@@ -3,7 +3,7 @@ import {
   type StudioCompatibilityItemV1,
   type StudioCompatibilityOutcome,
   type StudioCompatibilityReportV1,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import type {
   StudioImportCompatibilityReport,

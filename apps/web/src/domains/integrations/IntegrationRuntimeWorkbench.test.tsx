@@ -63,8 +63,8 @@ describe("IntegrationRuntimeWorkbench", () => {
     mocks.runtimeReceipts.mockResolvedValue({ generatedAt: "now", receipts: [] });
     mocks.executeRuntime.mockImplementation(async (request: { dryRun: boolean; mutationId: string }) => ({
       schema: request.dryRun
-        ? "toonspectrum.integration-runtime-plan/1"
-        : "toonspectrum.integration-runtime-receipt/1",
+        ? "toonstudio.integration-runtime-plan/1"
+        : "toonstudio.integration-runtime-receipt/1",
       state: request.dryRun ? "planned" : "succeeded",
       projectId: "project-1",
       mutationId: request.mutationId,

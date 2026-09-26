@@ -50,7 +50,7 @@ async function probe(fetchImpl, origin, path, expectedStatus, expectedBody, time
     redirect: "manual",
     headers: {
       accept: "application/json",
-      "user-agent": "toonspectrum-render-core-verifier/1",
+      "user-agent": "toonstudio-render-core-verifier/1",
     },
     signal: AbortSignal.timeout(timeoutMs),
   });

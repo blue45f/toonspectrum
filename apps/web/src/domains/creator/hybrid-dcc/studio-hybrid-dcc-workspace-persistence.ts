@@ -73,7 +73,7 @@ import type { StudioOpfsFileSystem } from "../studio-opfs-filesystem";
 import type { StudioUvMap } from "../studio-uv-unwrap-lite";
 
 export const STUDIO_HYBRID_DCC_WORKSPACE_PERSISTENCE_FORMAT =
-  "toonspectrum.hybrid-dcc-workspace-persistence" as const;
+  "toonstudio.hybrid-dcc-workspace-persistence" as const;
 export const STUDIO_HYBRID_DCC_WORKSPACE_PERSISTENCE_VERSION = 1 as const;
 export const STUDIO_HYBRID_DCC_WORKSPACE_PERSISTENCE_ENGINE_VERSION =
   "hybrid-dcc-workspace-persistence-1" as const;

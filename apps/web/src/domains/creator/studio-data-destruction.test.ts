@@ -18,7 +18,7 @@ import type { StudioDataDestructionAdapter } from "./studio-data-destruction";
 
 /** V11.1 §12.5 gate: 3중 플래그가 전부 정확해야만 파괴가 실행된다. */
 
-const DEPLOYMENT = "toonspectrum-prod-render";
+const DEPLOYMENT = "toonstudio-prod-render";
 
 const VALID_FLAGS = {
   RESET_EXISTING_STUDIO_DATA: "YES",
@@ -114,102 +114,102 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
 
   it("OPFS roots match the storage modules", () => {
     expect(read("./studio-autosave-opfs-session.ts")).toContain(
-      '"toonspectrum-studio-autosave-v3"',
+      '"toonstudio-studio-autosave-v3"',
     );
     expect(read("./render/studio-engine-tile-storage-opfs-v2-backend.ts")).toContain(
-      '"toonspectrum-studio-engine-storage-v2"',
+      '"toonstudio-studio-engine-storage-v2"',
     );
     expect(read("./hybrid-dcc/studio-hybrid-dcc-workspace-persistence.ts")).toContain(
       'STUDIO_HYBRID_DCC_WORKSPACE_PERSISTENCE_ROOT = "dcc-workspaces"',
     );
     expect(
       read("../../../../../packages/studio-project-model/src/browser/opfs-journal-store.ts"),
-    ).toContain('"toonspectrum-studio-projects"');
+    ).toContain('"toonstudio-studio-projects"');
     expect(read("./studio-local-database.ts")).toContain(
-      'STUDIO_SQLITE_OPFS_DIRECTORY = "toonspectrum-studio-sqlite"',
+      'STUDIO_SQLITE_OPFS_DIRECTORY = "toonstudio-studio-sqlite"',
     );
     expect(read("./studio-local-database.ts")).toContain(
-      'STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY = "toonspectrum-studio-sqlite-r1"',
+      'STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY = "toonstudio-studio-sqlite-r1"',
     );
-    expect(STUDIO_OPFS_ROOTS).toContain("toonspectrum-studio-sqlite");
-    expect(STUDIO_OPFS_ROOTS).toContain("toonspectrum-studio-sqlite-r1");
+    expect(STUDIO_OPFS_ROOTS).toContain("toonstudio-studio-sqlite");
+    expect(STUDIO_OPFS_ROOTS).toContain("toonstudio-studio-sqlite-r1");
     expect(read("./studio-opfs-filesystem.ts")).toContain(
-      'rootName = "toonspectrum-studio-assets"',
+      'rootName = "toonstudio-studio-assets"',
     );
     expect(read("./studio-opfs-sync-access-store.ts")).toContain(
-      '"toonspectrum-studio-large-documents"',
+      '"toonstudio-studio-large-documents"',
     );
     expect(read("./studio-pages-history-durable-runtime.ts")).toContain(
-      'rootName: "toonspectrum-studio-history-recovery"',
+      'rootName: "toonstudio-studio-history-recovery"',
     );
     expect(read("./vrm/studio-vrm-asset-sqlite-opfs-repository.ts")).toContain(
-      'STUDIO_VRM_ASSET_OPFS_ROOT = "toonspectrum-studio-vrm-assets-v12"',
+      'STUDIO_VRM_ASSET_OPFS_ROOT = "toonstudio-studio-vrm-assets-v12"',
     );
     expect(read("./bg3d/studio-bg3d-libraries-sqlite-opfs-authority.ts")).toContain(
-      '"toonspectrum-studio-bg3d-libraries-v12"',
+      '"toonstudio-studio-bg3d-libraries-v12"',
     );
     expect(read("./studio-storage-recovery-runtime.ts")).toContain(
       'rootName: "studio-recovery"',
     );
     expect(STUDIO_OPFS_ROOTS).toEqual(expect.arrayContaining([
-      "toonspectrum-studio-assets",
-      "toonspectrum-studio-large-documents",
-      "toonspectrum-studio-history-recovery",
-      "toonspectrum-studio-vrm-assets-v12",
-      "toonspectrum-studio-bg3d-libraries-v12",
+      "toonstudio-studio-assets",
+      "toonstudio-studio-large-documents",
+      "toonstudio-studio-history-recovery",
+      "toonstudio-studio-vrm-assets-v12",
+      "toonstudio-studio-bg3d-libraries-v12",
       "studio-recovery",
     ]));
   });
 
   it("IndexedDB names match the library modules", () => {
-    expect(read("./vrm/vrm-library.ts")).toContain('"toonspectrum-studio-vrm-library"');
-    expect(read("./live/studio-crdt-outbox.ts")).toContain("toonspectrum-studio-crdt-outbox");
-    expect(read("./studio-checkpoints.ts")).toContain("toonspectrum-studio-checkpoints");
+    expect(read("./vrm/vrm-library.ts")).toContain('"toonstudio-studio-vrm-library"');
+    expect(read("./live/studio-crdt-outbox.ts")).toContain("toonstudio-studio-crdt-outbox");
+    expect(read("./studio-checkpoints.ts")).toContain("toonstudio-studio-checkpoints");
     expect(read("./live/studio-crdt-recovery-vault.ts")).toContain(
       "createStudioCrdtRecoverySqlitePersistence",
     );
     // The old IndexedDB authority is no longer opened by product code, but its
     // exact name remains in the destructive cutover inventory.
     expect(STUDIO_INDEXED_DB_DATABASES).toContain(
-      "toonspectrum-studio-crdt-recovery-vault",
+      "toonstudio-studio-crdt-recovery-vault",
     );
     expect(read("./bg3d/bg3d-model-library.ts")).toContain(
-      '"toonspectrum-studio-bg3d-model-library"',
+      '"toonstudio-studio-bg3d-model-library"',
     );
     expect(read("./studio-asset-library.ts")).toContain(
-      '"toonspectrum-studio-asset-library"',
+      '"toonstudio-studio-asset-library"',
     );
     expect(read("./studio-scene-snapshot-library.ts")).toContain(
-      '"toonspectrum-studio-scene-snapshot-library"',
+      '"toonstudio-studio-scene-snapshot-library"',
     );
     expect(read("./bg3d/bg3d-template-library.ts")).toContain(
-      '"toonspectrum-studio-bg3d-template-library"',
+      '"toonstudio-studio-bg3d-template-library"',
     );
     expect(read("./studio-production-bible.ts")).toContain(
-      '"toonspectrum-studio-production-bible"',
+      '"toonstudio-studio-production-bible"',
     );
     expect(read("./bg3d/studio-bg3d-asset-metadata-store.ts")).toContain(
-      '"toonspectrum-studio-bg3d-asset-metadata"',
+      '"toonstudio-studio-bg3d-asset-metadata"',
     );
     expect(read("./bg3d/studio-bg3d-shot-batch-recovery-store.ts")).toContain(
-      '"toonspectrum-studio-bg3d-shot-batch-recovery"',
+      '"toonstudio-studio-bg3d-shot-batch-recovery"',
     );
     expect(read("./vrm/studio-vrm-texture-paint-library.ts")).toContain(
-      '"toonspectrum-studio-vrm-texture-paint-library"',
+      '"toonstudio-studio-vrm-texture-paint-library"',
     );
     expect(STUDIO_INDEXED_DB_DATABASES).toEqual(
       expect.arrayContaining([
-        "toonspectrum-studio-production-bible",
-        "toonspectrum-studio-bg3d-asset-metadata",
-        "toonspectrum-studio-bg3d-shot-batch-recovery",
-        "toonspectrum-studio-vrm-texture-paint-library",
+        "toonstudio-studio-production-bible",
+        "toonstudio-studio-bg3d-asset-metadata",
+        "toonstudio-studio-bg3d-shot-batch-recovery",
+        "toonstudio-studio-vrm-texture-paint-library",
       ]),
     );
   });
 
   it("covers the V12 localStorage fallback without reopening legacy data", () => {
     const brushRepository = read("./brush/studio-brush-library-sqlite-repository.ts");
-    const fallbackKey = "toonspectrum-studio-v12-brush-library-fallback";
+    const fallbackKey = "toonstudio-studio-v12-brush-library-fallback";
     expect(brushRepository).toContain(`"${fallbackKey}"`);
     expect(STUDIO_LOCAL_STORAGE_PREFIXES.some((prefix) => fallbackKey.startsWith(prefix)))
       .toBe(true);
@@ -217,13 +217,13 @@ describe("inventory stays in sync with the owning modules (drift contract)", () 
   });
 
   it("covers dotted Studio creative keys without using a broad platform prefix", () => {
-    expect(STUDIO_LOCAL_STORAGE_PREFIXES).not.toContain("toonspectrum.studio");
+    expect(STUDIO_LOCAL_STORAGE_PREFIXES).not.toContain("toonstudio.studio");
     expect(STUDIO_LOCAL_STORAGE_EXACT_KEYS).toEqual(expect.arrayContaining([
-      "toonspectrum.studio-marketplace-library.v1",
-      "toonspectrum.studio-creator-filter-presets.v1",
-      "toonspectrum.studio-filter-library.v12.fallback",
-      "toonspectrum.studio.bg3d.lt-presets.v1",
-      "toonspectrum.studio.bg3d.lt-presets.corrupt.v1",
+      "toonstudio.studio-marketplace-library.v1",
+      "toonstudio.studio-creator-filter-presets.v1",
+      "toonstudio.studio-filter-library.v12.fallback",
+      "toonstudio.studio.bg3d.lt-presets.v1",
+      "toonstudio.studio.bg3d.lt-presets.corrupt.v1",
     ]));
   });
 });

@@ -1,4 +1,4 @@
-# ToonSpectrum Studio API-free 30레인 고도화 캠페인
+# ToonStudio Studio API-free 30레인 고도화 캠페인
 
 - 캠페인 ID: `studio-saturation-2026-09-03`
 - 시작: 2026-09-03 09:00 KST (`2026-09-03T00:00:00Z`)
@@ -116,7 +116,7 @@ GitHub-hosted runner 안에서 OpenAI 모델을 호출하거나 코드를 자동
 - 반영 경로
 - 필요한 NOTICE와 출처
 
-원본 통합이 어렵거나 현재 아키텍처와 맞지 않으면 기능·알고리즘·데이터 모델·작업 흐름·품질 기준을 분석하여 ToonSpectrum 방식으로 구현한다.
+원본 통합이 어렵거나 현재 아키텍처와 맞지 않으면 기능·알고리즘·데이터 모델·작업 흐름·품질 기준을 분석하여 ToonStudio 방식으로 구현한다.
 
 ## 7. 패치 제한
 

@@ -85,7 +85,7 @@ test("owner candidate discovery pages and recovers without automatic offers", as
     await expect(onboarding).toBeHidden();
   });
   // Explicit UI fixtures, not real authentication or production candidate data.
-  await page.addInitScript((user) => sessionStorage.setItem("toonspectrum-auth-session", JSON.stringify({ user })), owner);
+  await page.addInitScript((user) => sessionStorage.setItem("toonstudio-auth-session", JSON.stringify({ user })), owner);
   await page.route("**/api/auth/session", (route) => route.fulfill({ json: { authenticated: true, user: owner } }));
   await page.route(/\/api\/me(?:\?.*)?$/u, (route) => route.fulfill({ json: { profile: { ...owner, avatar: null, bio: null, regionSettings: null } } }));
   await page.route(`**/api/collaborations/posts/${ID}`, (route) => route.fulfill({ json: { post, application: null, canManage: true, canModerate: false } }));

@@ -16,8 +16,8 @@ const context = await browser.newContext({ viewport: { width: 1600, height: 1000
 // No server fixture is involved in visual inspection. Local authored changes are never published.
 await context.route('**/api/auth/session', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: false, user: null }) }));
 await context.addInitScript(() => {
-  localStorage.setItem('toonspectrum-studio-quick-start-dismissed', '1');
-  localStorage.setItem('toonspectrum-studio-mobile-hint-dismissed', '1');
+  localStorage.setItem('toonstudio-studio-quick-start-dismissed', '1');
+  localStorage.setItem('toonstudio-studio-mobile-hint-dismissed', '1');
 });
 const page = await context.newPage();
 page.setDefaultTimeout(30000);

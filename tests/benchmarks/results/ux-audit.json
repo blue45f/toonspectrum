@@ -1,8 +1,8 @@
 {
-  "$schema": "https://toonspectrum.local/schemas/ux-audit-v5.json",
+  "$schema": "https://toonstudio.local/schemas/ux-audit-v5.json",
   "audit": "ToonStudio UI/UX 동선 감사 — V5 §15 정량 수용 기준 대비",
   "generatedAt": "2026-08-08T05:55:00.000Z",
-  "worktree": "/Users/hjunkim/WebstormProjects/toonspectrum/.claude/worktrees/toonstudio-v11-codex-master-23fdef",
+  "worktree": "/Users/hjunkim/WebstormProjects/toonstudio/.claude/worktrees/toonstudio-v11-codex-master-23fdef",
   "branch": "claude/toonstudio-v11-codex-master-23fdef",
   "specSource": "docs/architecture/ToonStudio_최종공유본_초확장_멀티엔진_제품기능_UIUX_성능품질_아키텍처_V5_2026-08-07.md:533-660",
   "method": {

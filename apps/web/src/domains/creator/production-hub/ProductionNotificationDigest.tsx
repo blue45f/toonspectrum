@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { groupProductionNotifications, safeProductionNotificationHref, type ProductionNotification, type ProductionProjectAggregate } from "@toonspectrum/core/production";
+import { groupProductionNotifications, safeProductionNotificationHref, type ProductionNotification, type ProductionProjectAggregate } from "@toonstudio/core/production";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 
 export function ProductionNotificationDigest({ aggregate, assignmentId, disabled, onRead }: {

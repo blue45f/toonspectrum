@@ -2,7 +2,7 @@ import {
   canonicalJson,
   fnv1a64Hex,
   sceneDigest,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { openStudioLocalDatabase } from "./studio-local-database";

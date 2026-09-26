@@ -1,10 +1,10 @@
-import { SITE_URL } from "@toonspectrum/core/business";
+import { SITE_URL } from "@toonstudio/core/business";
 import { useEffect } from "react";
 
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { resolveSeoRoutePolicy } from "@/shared/lib/seo-route-policy";
 
-const LEGACY_PRODUCT_NAMES = ["툰스펙트럼", "ToonSpectrum"] as const;
+const LEGACY_PRODUCT_NAMES = ["툰스튜디오", "ToonStudio"] as const;
 
 /**
  * Page callers historically supplied a full title with the legacy product suffix.

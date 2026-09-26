@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createSkiaGpuIslandBackend } from "../gpu-island";
 
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 import type { CanvasKit } from "canvaskit-wasm";
 
 const scene: SceneIR = {

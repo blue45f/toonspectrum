@@ -71,7 +71,7 @@ async function model(parts: Part[], name: string): Promise<Uint8Array> {
     if (item.rotation) node.setRotation(item.rotation);
     scene.addChild(node);
   }
-  document.getRoot().setExtras({ license: "CC0-1.0", generator: "ToonSpectrum creator essentials v1", units: "meters", upAxis: "Y", rigged: false, purpose: "Editable construction reference, not a skinned character" });
+  document.getRoot().setExtras({ license: "CC0-1.0", generator: "ToonStudio creator essentials v1", units: "meters", upAxis: "Y", rigged: false, purpose: "Editable construction reference, not a skinned character" });
   return new NodeIO().writeBinary(document);
 }
 function thumbnail(parts: Part[], label: string, azimuth = 0.62, elevation = 0.42): string {

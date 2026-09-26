@@ -6,7 +6,7 @@ import SpatialWebtoonReader from "./SpatialWebtoonReader";
 const runtime = vi.hoisted(() => ({ inspectSupport: vi.fn(), update: vi.fn(), start: vi.fn(), end: vi.fn(), recenter: vi.fn(), dispose: vi.fn() }));
 const createRuntime = vi.hoisted(() => vi.fn());
 vi.mock("./spatial-reader-runtime", () => ({ createSpatialReaderRuntime: createRuntime }));
-const capabilities = { kind: "toonspectrum.studio-webxr-support", version: 1, secureContext: true, immersiveAr: "supported", immersiveVr: "supported" };
+const capabilities = { kind: "toonstudio.studio-webxr-support", version: 1, secureContext: true, immersiveAr: "supported", immersiveVr: "supported" };
 const originalShowModal = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal");
 const originalClose = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "close");
 const originalXr = Object.getOwnPropertyDescriptor(navigator, "xr");

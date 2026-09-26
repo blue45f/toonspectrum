@@ -707,8 +707,8 @@ describe("probeSqliteSupport", () => {
 
 describe("opfs naming contract", () => {
   it("pins the destruction-inventory directory and database filename", () => {
-    expect(STUDIO_SQLITE_OPFS_DIRECTORY).toBe("toonspectrum-studio-sqlite");
-    expect(STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY).toBe("toonspectrum-studio-sqlite-r1");
+    expect(STUDIO_SQLITE_OPFS_DIRECTORY).toBe("toonstudio-studio-sqlite");
+    expect(STUDIO_SQLITE_OPFS_RECOVERY_DIRECTORY).toBe("toonstudio-studio-sqlite-r1");
     expect(STUDIO_SQLITE_DATABASE_FILENAME).toBe("studio-local-v12.db");
   });
 });

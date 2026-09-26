@@ -27,7 +27,7 @@ import {
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import {
   deriveProductionManagementOverview,

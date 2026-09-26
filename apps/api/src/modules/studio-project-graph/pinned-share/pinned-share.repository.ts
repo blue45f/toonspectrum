@@ -2,11 +2,11 @@ import { randomBytes } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { z } from "zod";
 import type { PoolClient } from "pg";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import { pinnedShareAccessSchema, pinnedShareCreateSchema, pinnedShareCreatedSchema, pinnedShareFeedbackInputSchema,
   pinnedShareFeedbackSchema, pinnedShareOwnerViewSchema, pinnedShareSnapshotSchema, pinnedShareSourcesSchema, pinnedShareViewSchema,
   pinnedSharePublicListSchema, type PinnedShareAccess, type PinnedShareCreate, type PinnedShareFeedbackInput, type PinnedShareOwnerView,
-  type PinnedShareSnapshot } from "@toonspectrum/studio-project-model/pinned-review-share";
+  type PinnedShareSnapshot } from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { dbPool } from "../../../platform/database";
 import { PinnedShareError, failShare, pinnedShareCapture, pinnedShareImages, requireShareManager, shareHash, tokenHash } from "./pinned-share-storage";

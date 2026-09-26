@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FeedbackThread } from "./FeedbackThread";
 
-import type { FeedbackComment } from "@toonspectrum/core/feedback";
+import type { FeedbackComment } from "@toonstudio/core/feedback";
 
 const mocks = vi.hoisted(() => ({
   state: { userId: "reader-1" as string | null },

@@ -137,7 +137,7 @@ function triangleCount(json: JsonRecord): number {
   return triangles;
 }
 
-describe("ToonSpectrum mapped Blender prop pack v3", () => {
+describe("ToonStudio mapped Blender prop pack v3", () => {
   it("covers exactly the 21 mappings not already replaced by the v2 pack", () => {
     expect(Object.keys(BLENDER_PROP_GLTF_URLS)).toHaveLength(64);
     expect(WAVE3_PROPS).toHaveLength(21);
@@ -187,7 +187,7 @@ describe("ToonSpectrum mapped Blender prop pack v3", () => {
     expect(gate.requiredNodes.every((name) => nodeNames.has(name))).toBe(true);
     expect(root?.extras).toMatchObject({
       asset_id: gate.assetId,
-      asset_author: "ToonSpectrum",
+      asset_author: "ToonStudio",
       asset_generator: GENERATOR,
       asset_license: "CC0-1.0",
       asset_license_url: CC0_LICENSE_URL,

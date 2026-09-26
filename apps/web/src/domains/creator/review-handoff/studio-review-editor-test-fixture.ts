@@ -1,4 +1,4 @@
-import { createStudioReviewSpatialAnchor, deriveStudioReviewPageMapping } from "@toonspectrum/studio-project-model";
+import { createStudioReviewSpatialAnchor, deriveStudioReviewPageMapping } from "@toonstudio/studio-project-model";
 
 import { createEmptyStudioAiImageReferenceDocument } from "../ai/studio-ai-image-reference-roles";
 import { createEmptyStudioAiProvenanceDocument } from "../ai/studio-ai-provenance";

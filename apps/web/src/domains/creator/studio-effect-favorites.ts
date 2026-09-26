@@ -30,7 +30,7 @@ export interface StudioEffectStorage {
   setItem(key: string, value: string): void;
 }
 
-const STORAGE_KEY = "toonspectrum-studio-effect-favorites:v1";
+const STORAGE_KEY = "toonstudio-studio-effect-favorites:v1";
 const NAMESPACE_SET = new Set<string>(STUDIO_EFFECT_NAMESPACES);
 const SAFE_RAW = /^[A-Za-z0-9._~-]+$/u;
 

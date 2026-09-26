@@ -70,7 +70,7 @@ import type { FormatIssue } from "../../../../../../packages/studio-format-gatew
 import type {
   BrushProgramIR,
   DynamicMappingIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 export {
   STUDIO_BRUSH_PACK_ACCEPT,

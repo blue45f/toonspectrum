@@ -23,7 +23,7 @@ export function createStudioReviewLocalStorageEnvironment(options, reservedPorts
   if (url.protocol !== "https:" || url.hostname !== "127.0.0.1" || url.username || url.password
     || url.pathname !== "/" || url.search || url.hash || !Number.isInteger(port) || port < 1024 || port > 65535
     || reservedPorts.includes(port) || endpoint !== url.origin) fail();
-  if (!path.isAbsolute(ownedDirectory) || !/^toonspectrum-review-storage-qa-[A-Za-z0-9]+$/u.test(path.basename(ownedDirectory))) fail();
+  if (!path.isAbsolute(ownedDirectory) || !/^toonstudio-review-storage-qa-[A-Za-z0-9]+$/u.test(path.basename(ownedDirectory))) fail();
   const root = realpathSync(ownedDirectory), tempRoot = realpathSync(tmpdir());
   if (lstatSync(ownedDirectory).isSymbolicLink() || path.dirname(root) !== tempRoot) fail();
   const certificatePath = path.join(root, "ca.crt"), serverPath = path.join(root, "public.crt");

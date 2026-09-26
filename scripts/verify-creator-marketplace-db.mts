@@ -70,7 +70,7 @@ function manifestFor(
     resourceVersion: "1.0.0",
     minimumStudioVersion: "0.1.0",
     tags: ["integration", kind],
-    license: "toonspectrum-standard",
+    license: "toonstudio-standard",
     attributionText: "",
     containsAi: false,
     rightsConfirmed: true,
@@ -84,8 +84,8 @@ function manifestFor(
         mode: "portable-json",
         mediaType:
           kind === "brush"
-            ? "application/vnd.toonspectrum.brush+json"
-            : "application/vnd.toonspectrum.palette+json",
+            ? "application/vnd.toonstudio.brush+json"
+            : "application/vnd.toonstudio.palette+json",
         payload,
         byteSize: creatorMarketplaceJsonByteSize(payload),
         sha256: sha256(payload),

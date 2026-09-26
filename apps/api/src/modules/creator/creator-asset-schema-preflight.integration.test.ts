@@ -208,7 +208,7 @@ describeWithDirectPostgres("Creator Asset PostgreSQL schema contract", () => {
       // transaction advisory lock also serializes another copy of this destructive repair audit.
       await client.query(
         "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended($1, 0))",
-        ["toonspectrum-schema-repair-0013"]
+        ["toonstudio-schema-repair-0013"]
       );
       await client.query("SAVEPOINT creator_asset_schema_repair");
       await client.query(`
@@ -218,7 +218,7 @@ describeWithDirectPostgres("Creator Asset PostgreSQL schema contract", () => {
           ADD CONSTRAINT "creator_asset_license_check"
           CHECK (
             "license" IN (
-              'toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0'
+              'toonstudio-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0'
             ) OR true
           );
         DROP INDEX "idx_creator_asset_catalog";

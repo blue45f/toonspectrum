@@ -556,7 +556,7 @@ export function StudioToolsCompanionPage({
             ? "studio.toolsCompanion.surface.review"
             : "studio.toolsCompanion.surface.reference"
     );
-    document.title = `${surfaceTitle} · ToonSpectrum Studio`;
+    document.title = `${surfaceTitle} · ToonStudio Studio`;
   }, [effectiveSurface, t]);
 
   useEffect(() => {

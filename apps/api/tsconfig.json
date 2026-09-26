@@ -12,52 +12,52 @@
     "verbatimModuleSyntax": false,
     "baseUrl": ".",
     "paths": {
-      "@toonspectrum/core": [
+      "@toonstudio/core": [
         "../../packages/core/src/index.ts"
       ],
-      "@toonspectrum/core/*": [
+      "@toonstudio/core/*": [
         "../../packages/core/src/*"
       ],
-      "@toonspectrum/studio-project-model": [
+      "@toonstudio/studio-project-model": [
         "../../packages/studio-project-model/src/index.ts"
       ],
-      "@toonspectrum/studio-project-model/*": [
+      "@toonstudio/studio-project-model/*": [
         "../../packages/studio-project-model/src/*"
       ],
-      "@toonspectrum/studio-format-gateway": [
+      "@toonstudio/studio-format-gateway": [
         "../../packages/studio-format-gateway/src/index.ts"
       ],
-      "@toonspectrum/studio-format-gateway/*": [
+      "@toonstudio/studio-format-gateway/*": [
         "../../packages/studio-format-gateway/src/*"
       ],
-      "@toonspectrum/contracts": [
+      "@toonstudio/contracts": [
         "../../packages/contracts/src/index.ts"
       ],
-      "@toonspectrum/contracts/*": [
+      "@toonstudio/contracts/*": [
         "../../packages/contracts/src/*"
       ],
-      "@toonspectrum/studio-project-model/work-session": [
+      "@toonstudio/studio-project-model/work-session": [
         "../../packages/studio-project-model/src/graph/work-session.ts"
       ],
-      "@toonspectrum/studio-project-model/world-publication": [
+      "@toonstudio/studio-project-model/world-publication": [
         "../../packages/studio-project-model/src/graph/world-publication.ts"
       ],
-      "@toonspectrum/studio-project-model/world-acoustic": [
+      "@toonstudio/studio-project-model/world-acoustic": [
         "../../packages/studio-project-model/src/graph/world-acoustic.ts"
       ],
-      "@toonspectrum/studio-project-model/world-conversation": [
+      "@toonstudio/studio-project-model/world-conversation": [
         "../../packages/studio-project-model/src/graph/world-conversation.ts"
       ],
-      "@toonspectrum/studio-project-model/work-session-evidence": [
+      "@toonstudio/studio-project-model/work-session-evidence": [
         "../../packages/studio-project-model/src/graph/work-session-evidence.ts"
       ],
-      "@toonspectrum/studio-project-model/pinned-review-share": [
+      "@toonstudio/studio-project-model/pinned-review-share": [
         "../../packages/studio-project-model/src/graph/pinned-review-share.ts"
       ],
-      "@toonspectrum/studio-project-model/review-delivery": [
+      "@toonstudio/studio-project-model/review-delivery": [
         "../../packages/studio-project-model/src/graph/review-delivery.ts"
       ],
-      "@toonspectrum/studio-project-model/review-voice-note": [
+      "@toonstudio/studio-project-model/review-voice-note": [
         "../../packages/studio-project-model/src/graph/review-voice-note.ts"
       ]
     },

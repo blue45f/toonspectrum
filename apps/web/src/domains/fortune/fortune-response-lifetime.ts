@@ -1,4 +1,4 @@
-import { fortuneKstDate } from "@toonspectrum/core/fortune";
+import { fortuneKstDate } from "@toonstudio/core/fortune";
 
 interface ExternalLifetime {
   kind: "calendar" | "horoscope" | "special-days";

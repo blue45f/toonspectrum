@@ -1,7 +1,7 @@
 import { Download, Grid2X2, LayoutGrid, LibraryBig, ListFilter, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
 import { useId, useRef } from "react";
 import { Link } from "react-router-dom";
-import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
+import { resolveReferenceQuery } from "@toonstudio/core/reference-query-language";
 
 import { RESOURCE_BUTTON, RESOURCE_INPUT } from "./navigation";
 

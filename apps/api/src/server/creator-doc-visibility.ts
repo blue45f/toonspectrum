@@ -1,5 +1,5 @@
 import { projectStudioAiProvenanceForPublish } from "../../../web/src/domains/creator/ai/studio-ai-provenance";
-import { toPublicCreatorPublicationSource } from "@toonspectrum/contracts/creator-publication-integrity";
+import { toPublicCreatorPublicationSource } from "@toonstudio/contracts/creator-publication-integrity";
 import { toPublicCreatorPublicationDirective } from "../../../web/src/shared/lib/creator-publication-contract";
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -5,7 +5,7 @@
 The V12 product recovery vault uses the existing shared `studio-local-v12.db` SQLite/OPFS
 authority. Permanent rejection markers, frontier chunks, and manifest/export state live in the
 structured `crdt_recovery_v12_rows` table. Product construction does not read or open the former
-`toonspectrum-studio-crdt-recovery-vault` IndexedDB database and does not write a localStorage
+`toonstudio-studio-crdt-recovery-vault` IndexedDB database and does not write a localStorage
 marker. `LEGACY_DATA_MIGRATION=FALSE`: old browser-KV data remains only in the explicit destruction
 inventory; there is no automatic discovery, merge, or migration.
 

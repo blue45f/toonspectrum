@@ -114,11 +114,11 @@ const FORMAT_OPTIONS: readonly {
   },
   {
     id: "json",
-    label: "ToonSpectrum JSON (.palette.json)",
+    label: "ToonStudio JSON (.palette.json)",
     shortLabel: "JSON",
     extension: ".palette.json",
     mimeType: "application/json;charset=utf-8",
-    description: "버전이 명시된 ToonSpectrum 팔레트 교환 형식",
+    description: "버전이 명시된 ToonStudio 팔레트 교환 형식",
   },
 ] as const;
 

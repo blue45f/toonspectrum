@@ -56,7 +56,7 @@ try {
   });
   await page.waitForFunction("window.__probeDone === true", null, { timeout: 60_000 });
   const result = await page.evaluate("window.__probeResult");
-  const outDir = join(tmpdir(), "toonspectrum-dry-media-parity");
+  const outDir = join(tmpdir(), "toonstudio-dry-media-parity");
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, "parity-probe-result.json"), JSON.stringify({ result, errors }, null, 2));
   console.log(JSON.stringify(result, null, 2));

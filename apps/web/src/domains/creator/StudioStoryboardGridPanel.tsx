@@ -140,7 +140,7 @@ function downloadStoryboardReviewCsv(
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `toonspectrum-storyboard-review-${new Date().toISOString().slice(0, 10)}.csv`;
+  anchor.download = `toonstudio-storyboard-review-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

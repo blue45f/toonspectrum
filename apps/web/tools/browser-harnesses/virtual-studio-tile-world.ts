@@ -1,4 +1,4 @@
-import { studioWorldTilemapSchema, type StudioWorldTilemap } from "@toonspectrum/studio-project-model/world-publication";
+import { studioWorldTilemapSchema, type StudioWorldTilemap } from "@toonstudio/studio-project-model/world-publication";
 import Phaser from "phaser";
 
 import { createStudioWorldTileRuntime, type StudioWorldTileRuntime } from "../../src/domains/creator/virtual-space/studio-virtual-space-tile-runtime";

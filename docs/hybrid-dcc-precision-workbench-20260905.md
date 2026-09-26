@@ -1,6 +1,6 @@
 # 전문 3D 제작: 정밀 변환 작업대
 
-기준: `blue45f/toonspectrum` main `7dc70b9cd3a492325355141fbd662ae84bd67f7d`.
+기준: `blue45f/toonstudio` main `7dc70b9cd3a492325355141fbd662ae84bd67f7d`.
 이 변경은 Blender 전체 기능 동등성 달성이 아니라, 전문 편집에 필요한 좌표 정확성과 정밀 배치 작업 흐름의 구현이다.
 
 ## 구현

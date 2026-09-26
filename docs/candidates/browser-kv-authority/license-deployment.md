@@ -37,7 +37,7 @@ durability는 `none`이고 UI에 새로고침 손실 가능성을 표시한다. 
 ## 데이터 배치
 
 ```text
-OPFS SAH-pool directory: toonspectrum-studio-sqlite
+OPFS SAH-pool directory: toonstudio-studio-sqlite
 SQLite logical file:     /studio-local-v12.db
 Large immutable bytes:   feature-specific OPFS SHA-256 CAS roots
 Autosave recovery:       native OPFS journal roots

@@ -240,7 +240,7 @@ const INK_BRUSH_DEFINITION =
 export function buildInkBasicKpp(): Uint8Array {
   return buildKppFile({
     presetXml: serializeKppPresetXml({
-      name: "ToonSpectrum Ink Crisp",
+      name: "ToonStudio Ink Crisp",
       paintopid: "paintbrush",
       params: [
         { name: "brush_definition", type: "string", value: INK_BRUSH_DEFINITION },
@@ -262,7 +262,7 @@ const PRESSURE_OPACITY_SENSOR =
 export function buildPressureCurveKpp(): Uint8Array {
   return buildKppFile({
     presetXml: serializeKppPresetXml({
-      name: "ToonSpectrum Pressure Sketch",
+      name: "ToonStudio Pressure Sketch",
       paintopid: "paintbrush",
       params: [
         { name: "brush_definition", type: "string", value: INK_BRUSH_DEFINITION },
@@ -279,7 +279,7 @@ export function buildPressureCurveKpp(): Uint8Array {
 /** The `.myb` v3 JSON Krita's MyPaint engine embeds as `mypaint_json`. */
 export const MYPAINT_WASH_JSON = JSON.stringify({
   version: 3,
-  group: "ToonSpectrum KPP Corpus",
+  group: "ToonStudio KPP Corpus",
   comment: "Soft wash delegated through the myb lane",
   settings: {
     radius_logarithmic: {
@@ -296,7 +296,7 @@ export const MYPAINT_WASH_JSON = JSON.stringify({
 export function buildMypaintWashKpp(): Uint8Array {
   return buildKppFile({
     presetXml: serializeKppPresetXml({
-      name: "ToonSpectrum MyPaint Wash",
+      name: "ToonStudio MyPaint Wash",
       paintopid: "mypaintbrush",
       params: [
         { name: "mypaint_json", type: "string", value: MYPAINT_WASH_JSON },

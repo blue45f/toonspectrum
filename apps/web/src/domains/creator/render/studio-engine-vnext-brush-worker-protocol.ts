@@ -25,7 +25,7 @@ import type {
 
 export const STUDIO_ENGINE_VNEXT_BRUSH_WORKER_PROTOCOL_REVISION = 1 as const;
 export const STUDIO_ENGINE_VNEXT_BRUSH_WORKER_PROFILE =
-  "toonspectrum-webgpu-rgba16f-opfs-v2" as const;
+  "toonstudio-webgpu-rgba16f-opfs-v2" as const;
 
 export const STUDIO_ENGINE_VNEXT_BRUSH_WORKER_BUDGETS = Object.freeze({
   maxQueuedRequests: 16,

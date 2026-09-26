@@ -77,7 +77,7 @@ const REQUIRED_PACKAGE_JSON_FILES = Object.freeze([
 const FORBIDDEN_WASM_PATH_MARKERS = Object.freeze([
   "/Users/",
   "/home/",
-  "/toonspectrum-build/tmp-root/toonspectrum-hokusai-wasm-",
+  "/toonstudio-build/tmp-root/toonstudio-hokusai-wasm-",
   "\\Users\\",
 ]);
 
@@ -115,7 +115,7 @@ function collectIntegrityRecords({
 
 export function renderIntegrityManifest(options = {}) {
   const records = collectIntegrityRecords(options);
-  return `# ToonSpectrum Studio Hokusai WASM reproducible release manifest
+  return `# ToonStudio Studio Hokusai WASM reproducible release manifest
 # rustc ${HOKUSAI_RELEASE_TOOLCHAIN.rustc}
 # cargo ${HOKUSAI_RELEASE_TOOLCHAIN.cargo}
 # wasm-pack ${HOKUSAI_RELEASE_TOOLCHAIN.wasmPack}
@@ -257,11 +257,11 @@ export function verifyCheckedInHokusaiArtifacts({ // NOSONAR javascript:S3776
     "utf8",
   );
   if (
-    !mitNotice.includes("Copyright (c) 2026 ToonSpectrum contributors")
+    !mitNotice.includes("Copyright (c) 2026 ToonStudio contributors")
     || !mitNotice.includes("Copyright (c) 2026 Re:Earth and contributors")
   ) {
     throw new Error(
-      "Hokusai WASM MIT notice must retain ToonSpectrum and Re:Earth attribution.",
+      "Hokusai WASM MIT notice must retain ToonStudio and Re:Earth attribution.",
     );
   }
   assertSafeHokusaiWasmBinary(
@@ -409,27 +409,27 @@ export function createHokusaiReleaseBuildEnvironment({
   const remapRoots = [
     {
       source: REPOSITORY_ROOT,
-      destination: "/toonspectrum-build/repository",
+      destination: "/toonstudio-build/repository",
     },
     {
       source: sourceEnvironment.CARGO_HOME ?? join(home, ".cargo"),
-      destination: "/toonspectrum-build/cargo-home",
+      destination: "/toonstudio-build/cargo-home",
     },
     {
       source: cargoHome,
-      destination: "/toonspectrum-build/cargo-home",
+      destination: "/toonstudio-build/cargo-home",
     },
     {
       source: buildDirectory,
-      destination: "/toonspectrum-build/session",
+      destination: "/toonstudio-build/session",
     },
     {
       source: home,
-      destination: "/toonspectrum-build/home",
+      destination: "/toonstudio-build/home",
     },
     {
       source: tmpdir(),
-      destination: "/toonspectrum-build/tmp-root",
+      destination: "/toonstudio-build/tmp-root",
     },
   ]
     .filter(({ source }) => Boolean(source))
@@ -467,7 +467,7 @@ export function createHokusaiReleaseBuildEnvironment({
 function buildIntoTemporaryDirectory() {
   const { cargo, rustc, wasmPack } = resolvePinnedToolchain();
   const buildDirectory = mkdtempSync(
-    join(tmpdir(), "toonspectrum-hokusai-wasm-"),
+    join(tmpdir(), "toonstudio-hokusai-wasm-"),
   );
   const packageDirectory = join(buildDirectory, "pkg");
   const environment = createHokusaiReleaseBuildEnvironment({
@@ -537,7 +537,7 @@ function compareGeneratedPackage(generatedPackageDirectory, expectedDirectory) {
 function runCargoTests() {
   const { cargo, rustc } = resolvePinnedToolchain();
   const buildDirectory = mkdtempSync(
-    join(tmpdir(), "toonspectrum-hokusai-test-"),
+    join(tmpdir(), "toonstudio-hokusai-test-"),
   );
   const environment = createHokusaiReleaseBuildEnvironment({
     buildDirectory,

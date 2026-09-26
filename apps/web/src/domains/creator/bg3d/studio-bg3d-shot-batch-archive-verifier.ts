@@ -482,7 +482,7 @@ async function validateManifest(
     return false;
   }
   if (!isRecord(value) || JSON.stringify(value, null, 2) !== text || containsPrivateManifestKey(value) ||
-    value.kind !== "toonspectrum-bg3d-shot-batch") return false;
+    value.kind !== "toonstudio-bg3d-shot-batch") return false;
 
   let paths: Set<string>;
   if (value.version === 1) {

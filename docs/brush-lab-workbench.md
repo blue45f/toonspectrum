@@ -1,6 +1,6 @@
 # Brush Lab — 독립 조합형 브러시 제작실
 
-검토일: 2026-09-06 (Asia/Seoul). 저장소: `blue45f/toonspectrum`, PR #786.
+검토일: 2026-09-06 (Asia/Seoul). 저장소: `blue45f/toonstudio`, PR #786.
 구현 기준: `bbcc48d542ca1fa11658ff277861181946d9d097`.
 이 문서는 구현된 기능, 기존 기능의 재사용, 아직 구현되지 않은 확장을 구분한다.
 

@@ -1,5 +1,5 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
-import { studioWorldManifestSchema, studioWorldPublicationSchema, type StudioWorldPublication, type StudioWorldPublish } from "@toonspectrum/studio-project-model/world-publication";
+import { canonicalJson } from "@toonstudio/studio-project-model";
+import { studioWorldManifestSchema, studioWorldPublicationSchema, type StudioWorldPublication, type StudioWorldPublish } from "@toonstudio/studio-project-model/world-publication";
 import { z } from "zod";
 import { api, httpStatus } from "@/platform/api";
 import { getStudioTeam } from "../../studio-team-client";

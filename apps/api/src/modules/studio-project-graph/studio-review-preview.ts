@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sha256Schema, studioEntityIdSchema, type StudioReviewPageMapping } from "@toonspectrum/studio-project-model";
+import { sha256Schema, studioEntityIdSchema, type StudioReviewPageMapping } from "@toonstudio/studio-project-model";
 
 import {
   LocatedPrivateObjectReferenceSchema, type LocatedPrivateObjectReference,

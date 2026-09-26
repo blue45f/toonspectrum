@@ -6,7 +6,7 @@
 
 ## Question
 
-Should ToonSpectrum Studio replace the Konva/react-konva editor body with a ready-made whiteboard (Excalidraw, tldraw) or another canvas stack (Fabric, p5, Pixi)?
+Should ToonStudio Studio replace the Konva/react-konva editor body with a ready-made whiteboard (Excalidraw, tldraw) or another canvas stack (Fabric, p5, Pixi)?
 
 ## Short answer
 

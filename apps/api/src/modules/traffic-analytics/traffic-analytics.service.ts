@@ -67,7 +67,7 @@ function analyticsSecret(): string {
       "트래픽 분석 수집 키가 설정되지 않았습니다.",
     );
   }
-  return "traffic-v1:toonspectrum-local-development";
+  return "traffic-v1:toonstudio-local-development";
 }
 
 function hashIdentifier(kind: "visitor" | "session", value: string): string {

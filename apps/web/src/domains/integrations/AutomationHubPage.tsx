@@ -90,7 +90,7 @@ export function AutomationHubPage() {
             <button type="button" onClick={save} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-accent px-4 text-sm font-bold text-on-accent">
               <Save size={16} aria-hidden /> {ko ? "구성 저장" : "Save recipes"}
             </button>
-            <button type="button" onClick={() => downloadIntegrationJson("toonspectrum-automation-recipes.json", recipes)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2">
+            <button type="button" onClick={() => downloadIntegrationJson("toonstudio-automation-recipes.json", recipes)} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2">
               <Download size={16} aria-hidden /> {ko ? "JSON 내보내기" : "Export JSON"}
             </button>
           </div>

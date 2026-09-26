@@ -1,5 +1,5 @@
-import { encodeRgbaToPng } from "@toonspectrum/studio-engine-skia";
-import { loadCanvasKitNode } from "@toonspectrum/studio-engine-skia/node";
+import { encodeRgbaToPng } from "@toonstudio/studio-engine-skia";
+import { loadCanvasKitNode } from "@toonstudio/studio-engine-skia/node";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {

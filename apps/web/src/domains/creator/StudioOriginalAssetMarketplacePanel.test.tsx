@@ -48,7 +48,7 @@ describe("StudioOriginalAssetMarketplacePanel", () => {
     expect(html).toContain("자연·계절 장식 키트");
     expect(html).toContain("아키텍처 장면 컬렉션");
     expect(html).toContain("거리와 생활 디테일 소품");
-    expect(html).toContain("ToonSpectrum Lab");
+    expect(html).toContain("ToonStudio Lab");
     expect(html).toContain("original-procedural · CC0");
     expect(html).toContain("Canvas 2D · SVG · 모든 기기");
     expect(html).toContain("기기 로컬 · 클라우드 미지원");

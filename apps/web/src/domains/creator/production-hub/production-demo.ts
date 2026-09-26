@@ -9,7 +9,7 @@ import {
   type ProductionStudioRevisionLink,
   type RevisionRef,
   type ScopeRef,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 const AT = "2026-09-15T12:00:00.000Z";
 const PROJECT_ID = "sample-project";

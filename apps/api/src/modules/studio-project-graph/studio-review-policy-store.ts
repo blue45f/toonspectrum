@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { PoolClient } from "pg";
-import { canonicalJson, evaluateReviewPolicy, reviewPolicyDefinitionSchema, reviewPolicyRecordSchema, type ReviewPolicyExpectation, type ReviewPolicyRecord, type ReviewPolicyVoteRecord } from "@toonspectrum/studio-project-model";
+import { canonicalJson, evaluateReviewPolicy, reviewPolicyDefinitionSchema, reviewPolicyRecordSchema, type ReviewPolicyExpectation, type ReviewPolicyRecord, type ReviewPolicyVoteRecord } from "@toonstudio/studio-project-model";
 import { resolveCreatorCollaborationAccess } from "../creator/creator-collaboration.policy";
 
 export class StudioReviewPolicyError extends Error {

@@ -849,7 +849,7 @@ export function solveStudioCadAssemblyMates(
 /** CAD-015: export a simple faceted STEP AP203-ish ASCII from a solid mesh. */
 export function exportStudioCadStepAscii(
   solid: StudioCadSolidMesh,
-  productName = "ToonSpectrumSolid",
+  productName = "ToonStudioSolid",
 ): {
   readonly text: string;
   readonly pointCount: number;
@@ -868,8 +868,8 @@ export function exportStudioCadStepAscii(
   const body = [
     "ISO-10303-21;",
     "HEADER;",
-    "FILE_DESCRIPTION(('ToonSpectrum CAD-015 lite export'),'2;1');",
-    `FILE_NAME('${productName}.step','',('toonspectrum'),(''),'','','');`,
+    "FILE_DESCRIPTION(('ToonStudio CAD-015 lite export'),'2;1');",
+    `FILE_NAME('${productName}.step','',('toonstudio'),(''),'','','');`,
     "FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));",
     "ENDSEC;",
     "DATA;",

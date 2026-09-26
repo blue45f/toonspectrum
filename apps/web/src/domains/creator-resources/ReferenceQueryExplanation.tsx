@@ -1,4 +1,4 @@
-import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
+import { resolveReferenceQuery } from "@toonstudio/core/reference-query-language";
 import { useSearchParams } from "react-router-dom";
 
 

@@ -1,6 +1,6 @@
 # 최소 비용·수동 전용 배포 정책
 
-결정일: 2026-09-15 · 결정자: 저장소 소유자 · 범위: ToonSpectrum 운영 인프라 전체.
+결정일: 2026-09-15 · 결정자: 저장소 소유자 · 범위: ToonStudio 운영 인프라 전체.
 이 문서는 과거의 main 자동 배포, `[deploy]` 예외, Vercel 중심 릴리스 지침을 대체한다.
 
 ## 운영 권위
@@ -10,7 +10,7 @@
 | SPA·정적 카탈로그·일반 에셋 | Cloudflare Static Assets | 정적 요청은 Worker 실행량을 사용하지 않는다. |
 | 동적 경로 게이트웨이·edge liveness | Cloudflare Worker | `/api/health/live`는 Core API를 깨우지 않는다. |
 | 대형 불변 파일 | 압축 Static Assets + R2 | Range 요청만 R2 원본을 사용한다. |
-| Core API | Render `toonspectrum-core-api` | `API_RUNTIME_ROLE=full`, 수동 release, scale-to-zero. |
+| Core API | Render `toonstudio-core-api` | `API_RUNTIME_ROLE=full`, 수동 release, scale-to-zero. |
 | 임시 실시간 조정 | Cloudflare Durable Objects | presence·cursor·comment·signaling. |
 | PostgreSQL 원장 | Neon/호환 PostgreSQL | migration은 별도 승인형 single writer. |
 
@@ -30,7 +30,7 @@ PR 생성·병합·브랜치 정리는 배포 승인이 아니다. 사용자가 
 5. 다음 검증을 통과해야 Core API 권위를 전환할 수 있다.
 
 ```bash
-RENDER_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com \
+RENDER_CORE_API_ORIGIN=https://toonstudio-core-api.onrender.com \
   pnpm run verify:render-core-origin
 ```
 
@@ -45,7 +45,7 @@ pnpm run verify:free-infrastructure
 pnpm run verify:cloudflare-static
 pnpm run cloudflare:static:dry-run
 
-export CLOUDFLARE_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com
+export CLOUDFLARE_CORE_API_ORIGIN=https://toonstudio-core-api.onrender.com
 export TOONSPECTRUM_MANUAL_DEPLOY_APPROVAL=cloudflare-static-production
 pnpm run cloudflare:static:deploy
 ```
@@ -56,7 +56,7 @@ pnpm run cloudflare:static:deploy
 
 ## Render Core API 경계
 
-- `render.yaml`의 `toonspectrum-core-api`는 `autoDeployTrigger: off`를 유지한다.
+- `render.yaml`의 `toonstudio-core-api`는 `autoDeployTrigger: off`를 유지한다.
 - build/start에서 migration이나 `drizzle-kit push`를 실행하지 않는다.
 - 운영 비밀은 Render encrypted environment 또는 root `.env.local` Secret File에 저장한다.
 - 비밀값은 터미널, PR, 로그, GitHub summary에 출력하지 않는다.

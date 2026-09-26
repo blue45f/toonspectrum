@@ -743,7 +743,7 @@ export function buildCreatorMarketplaceAuthoringManifest(
 ): Readonly<Record<string, unknown>> {
   const draft = normalizeCreatorMarketplaceAuthoringDraft(draftInput);
   return canonicalize({
-    format: "toonspectrum.creator-marketplace-authoring",
+    format: "toonstudio.creator-marketplace-authoring",
     schemaVersion: CREATOR_MARKETPLACE_AUTHORING_SCHEMA_VERSION,
     generatedAt: draft.updatedAt,
     resource: {

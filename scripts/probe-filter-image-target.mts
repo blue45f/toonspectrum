@@ -20,8 +20,8 @@ import {
 
 import type { ChildProcess } from "node:child_process";
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 
 function log(message: string): void {
   console.log(`[probe-filter-target] ${message}`);
@@ -50,8 +50,8 @@ async function main(): Promise<void> {
     await page.addInitScript(
       ({ quickstartKey, autosavePrefix }) => {
         window.localStorage.setItem(quickstartKey, "1");
-        window.localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
-        window.localStorage.setItem("toonspectrum-studio-ui-density:v1", JSON.stringify({ mode: "full" }));
+        window.localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+        window.localStorage.setItem("toonstudio-studio-ui-density:v1", JSON.stringify({ mode: "full" }));
         for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
           const k = window.localStorage.key(i);
           if (k?.startsWith(autosavePrefix)) window.localStorage.removeItem(k);

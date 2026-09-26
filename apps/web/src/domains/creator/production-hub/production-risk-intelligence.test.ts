@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ProductionProjectAggregate, ProductionTask } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate, ProductionTask } from "@toonstudio/core/production";
 
 import { createProductionDemoProject } from "./production-demo";
 import { deriveProductionOperationsOverview } from "./production-episode-operations";

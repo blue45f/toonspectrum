@@ -32,7 +32,7 @@ import {
 export const STUDIO_SHARED_3D_MAX_CHARACTERS = 12;
 
 export const STUDIO_SHARED_3D_SCENE_SESSION_KIND =
-  "toonspectrum.shared-3d-scene-session" as const;
+  "toonstudio.shared-3d-scene-session" as const;
 export const STUDIO_SHARED_3D_SCENE_SESSION_VERSION = 2 as const;
 
 export {

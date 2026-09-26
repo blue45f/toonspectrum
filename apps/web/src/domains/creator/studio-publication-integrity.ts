@@ -7,7 +7,7 @@ import {
   writeCreatorPublicationSource,
   type CreatorPublicationActorMode,
   type CreatorPublicationSourceKind,
-} from "@toonspectrum/contracts/creator-publication-integrity";
+} from "@toonstudio/contracts/creator-publication-integrity";
 
 import { hashStudioAssetDataUrl } from "./studio-asset-library";
 

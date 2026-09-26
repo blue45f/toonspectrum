@@ -14,17 +14,17 @@ import { performance } from "node:perf_hooks";
 
 import {
   compileVectorBrush,
-} from "@toonspectrum/studio-brush-platform";
-import { renderSceneToPixels as renderWithSkia } from "@toonspectrum/studio-engine-skia";
-import { loadCanvasKitNode } from "@toonspectrum/studio-engine-skia/node";
-import { renderSceneToPixels as renderWithVello } from "@toonspectrum/studio-engine-vello";
-import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
+} from "@toonstudio/studio-brush-platform";
+import { renderSceneToPixels as renderWithSkia } from "@toonstudio/studio-engine-skia";
+import { loadCanvasKitNode } from "@toonstudio/studio-engine-skia/node";
+import { renderSceneToPixels as renderWithVello } from "@toonstudio/studio-engine-vello";
+import { loadVelloNode } from "@toonstudio/studio-engine-vello/node";
 import {
   brushProgramIRSchema,
   sceneIRSchema,
   type SceneIR,
   type StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 const REPO_ROOT = new URL("../../..", import.meta.url).pathname;
 const CORPUS_DIR = join(REPO_ROOT, "tests", "corpus", "vector");

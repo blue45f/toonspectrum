@@ -222,7 +222,7 @@ const unanchoredExclusions = STUDIO_CC0_MARKETPLACE_PERCEPTUAL_DUPLICATE_IDS.fil
 );
 
 const report = {
-  schema: "toonspectrum.marketplace-asset-similarity.v1",
+  schema: "toonstudio.marketplace-asset-similarity.v1",
   candidates: fingerprints.length,
   marketplaceReady: marketplaceReadyIds.size,
   threshold: { dHashDistance: 2, aHashDistance: 4, signatureDistance: 0.001 },

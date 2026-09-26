@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { PAGE_GRADE_PRESETS, type PageGrade } from "./studio-page-grade";
 
-export const STUDIO_AUTO_ACTION_SET_KIND = "toonspectrum-studio-auto-actions" as const;
+export const STUDIO_AUTO_ACTION_SET_KIND = "toonstudio-studio-auto-actions" as const;
 export const STUDIO_AUTO_ACTION_SET_VERSION = 1 as const;
 
 export const STUDIO_AUTO_ACTION_LIMITS = {

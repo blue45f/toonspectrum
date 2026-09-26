@@ -23,8 +23,8 @@ async function createContext(viewport, mobile = false) {
   });
   await context.addInitScript(() => {
     if (window.top !== window || location.hostname !== "127.0.0.1") return;
-    localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-    localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
+    localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
+    localStorage.setItem("toonstudio-studio-mobile-hint-dismissed", "1");
   });
   context.on("page", (page) => page.on("pageerror", (error) => errors.push(error.message)));
   return context;

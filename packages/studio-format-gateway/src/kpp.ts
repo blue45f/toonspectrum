@@ -1,11 +1,11 @@
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 
 import { MybParseError, importMybBrush } from "./myb";
 
 import type {
   BrushProgramIR,
   DynamicMappingIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * Krita `.kpp` brush-preset importer (ADR-0011 lane 15: the Krita ENGINE is

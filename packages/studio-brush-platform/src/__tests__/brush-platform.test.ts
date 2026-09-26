@@ -2,14 +2,14 @@
 import {
   EngineCapabilityRegistry,
   HybridExecutionPlanner,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import {
   brushProgramIRSchema,
   deviceCalibrationIRSchema,
   fnv1a64Hex,
   canonicalJson,
   pathBounds,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import { BrushCompileError, compileVectorBrush } from "../compile";
@@ -22,7 +22,7 @@ import type {
   ModeledSampleIR,
   RawInputSampleIR,
   StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 const calibration = deviceCalibrationIRSchema.parse({
   deviceId: "test-pen",

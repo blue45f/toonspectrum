@@ -107,7 +107,7 @@ describe("StudioOutlineStrokeContractV1 capture / normalization", () => {
     });
     expect(resolveStudioOutlineStrokeContract({
       ...contract,
-      adapterVersion: "toonspectrum-perfect-freehand-adapter-v2",
+      adapterVersion: "toonstudio-perfect-freehand-adapter-v2",
     })).toMatchObject({
       status: "unsupported",
       issue: {

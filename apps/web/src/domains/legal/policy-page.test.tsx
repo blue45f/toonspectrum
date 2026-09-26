@@ -157,7 +157,7 @@ describe("PolicyArticle", () => {
     expect(html).toContain("<strong");
     expect(html).toContain("<li>항목 하나</li>");
     expect(html).toContain("v1");
-    expect(html).toContain("툰스펙트럼 게시 정책");
+    expect(html).toContain("툰스튜디오 게시 정책");
     expect(html).toContain("746985ca8410");
     expect(html).not.toContain(HASH);
     expect(html).toContain("2026년 6월 8일");
@@ -173,7 +173,7 @@ describe("PolicyArticle", () => {
     expect(html).toContain("1. 수집하는 항목");
     expect(html).toContain("기기 내 AI 기능과 MediaPipe");
     expect(html).toContain("이용·성능 메타데이터");
-    expect(html).toContain("툰스펙트럼 게시 정책");
+    expect(html).toContain("툰스튜디오 게시 정책");
     expect(html).not.toContain("TermsDesk");
   });
 });

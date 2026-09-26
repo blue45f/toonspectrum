@@ -1,9 +1,9 @@
 ---
-description: ToonSpectrum 저장소 공통 에이전트 정책
+description: ToonStudio 저장소 공통 에이전트 정책
 alwaysApply: true
 ---
 
-# ToonSpectrum 작업 규칙
+# ToonStudio 작업 규칙
 
 - 루트 `AGENTS.md`를 공통 단일 기준으로 읽는다.
 - 수정 대상의 상위 경로에 더 가까운 `AGENTS.md`가 있으면 추가 적용한다.

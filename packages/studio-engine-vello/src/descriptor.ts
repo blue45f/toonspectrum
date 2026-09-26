@@ -1,6 +1,6 @@
-import { providerDescriptorSchema } from "@toonspectrum/studio-engine-registry";
+import { providerDescriptorSchema } from "@toonstudio/studio-engine-registry";
 
-import type { ProviderDescriptor } from "@toonspectrum/studio-engine-registry";
+import type { ProviderDescriptor } from "@toonstudio/studio-engine-registry";
 
 /**
  * Vello CPU provider descriptor (matrix E04, ADR 0004).

@@ -27,7 +27,7 @@ import Link from "@/shared/navigation/router-link";
 import "./admin-shell.css";
 import "./admin-visual-v2.css";
 
-const SIDEBAR_STORAGE_KEY = "toonspectrum.admin.sidebar.collapsed.v1";
+const SIDEBAR_STORAGE_KEY = "toonstudio.admin.sidebar.collapsed.v1";
 
 interface AdminShellProps {
   actor: AdminMe;

@@ -7,14 +7,14 @@
 import { sha256HexPortable } from "../studio-sha256";
 
 export const STUDIO_SCENE_LAYER_LIFT_CONTRACT_KIND =
-  "toonspectrum.scene-layer-lift" as const;
+  "toonstudio.scene-layer-lift" as const;
 export const STUDIO_SCENE_LAYER_LIFT_CONTRACT_VERSION = 1 as const;
 export const STUDIO_SCENE_LAYER_LIFT_REQUEST_KIND =
-  "toonspectrum.scene-layer-lift/request" as const;
+  "toonstudio.scene-layer-lift/request" as const;
 export const STUDIO_SCENE_LAYER_LIFT_RESULT_KIND =
-  "toonspectrum.scene-layer-lift/result" as const;
+  "toonstudio.scene-layer-lift/result" as const;
 export const STUDIO_SCENE_LAYER_LIFT_LOCAL_PROVIDER_RECEIPT_KIND =
-  "toonspectrum.scene-layer-lift/local-provider-receipt" as const;
+  "toonstudio.scene-layer-lift/local-provider-receipt" as const;
 
 export const STUDIO_SCENE_LAYER_LIFT_BUDGETS = Object.freeze({
   maximumAxisPixels: 8_192,

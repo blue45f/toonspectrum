@@ -57,7 +57,7 @@ function sha256(bytes: Uint8Array): string {
 function buildColorsmudgeKpp(): Uint8Array {
   return buildKppFile({
     presetXml: serializeKppPresetXml({
-      name: "ToonSpectrum Smudge Probe",
+      name: "ToonStudio Smudge Probe",
       paintopid: "colorsmudge",
       params: [{ name: "SmudgeRate", type: "internal", value: "0.5" }],
     }),

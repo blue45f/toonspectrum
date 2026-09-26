@@ -1,4 +1,4 @@
-import { RemoteKillSwitch } from "@toonspectrum/studio-engine-registry";
+import { RemoteKillSwitch } from "@toonstudio/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
 import { INK_DEFAULT_PARAMS } from "../../../../../../packages/studio-brush-platform/src/ink-modeler";
@@ -28,7 +28,7 @@ import {
   type StudioLiveInkStabilizerPlanInput,
 } from "./studio-live-ink-stabilizer-plan";
 
-import type { ModeledSampleIR, StabilizerGraphIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR, StabilizerGraphIR } from "@toonstudio/studio-project-model";
 
 /* ------------------------------------------------------------------ */
 /* Fixtures                                                            */

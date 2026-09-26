@@ -5,13 +5,13 @@ import {
   scaleMat2d,
   transformPathIR,
   translateMat2d,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import type {
   ModeledSampleIR,
   PathIR,
   PathVerbIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * Composition geometry providers — V12 §12.2 rows 9–12 (장식·패턴 / 파티클 /

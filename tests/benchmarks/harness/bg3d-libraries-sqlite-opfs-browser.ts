@@ -172,9 +172,9 @@ export function validateBg3dLibrariesSqliteOpfsBrowserEvidence(
   if (
     nested(primary, "authority", "kind") !== "sqlite-opfs-sha256-cas"
     || nested(primary, "authority", "requestedVfs") !== "opfs"
-    || nested(primary, "authority", "sqliteOpfsDirectory") !== "toonspectrum-studio-sqlite"
+    || nested(primary, "authority", "sqliteOpfsDirectory") !== "toonstudio-studio-sqlite"
     || nested(primary, "authority", "sqliteFilename") !== "studio-local-v12.db"
-    || nested(primary, "authority", "casOpfsRoot") !== "toonspectrum-studio-bg3d-libraries-v12"
+    || nested(primary, "authority", "casOpfsRoot") !== "toonstudio-studio-bg3d-libraries-v12"
     || nested(primary, "authority", "manifestNamespace") !== "studio-bg3d-libraries-v12"
     || nested(primary, "authority", "normalCloseCompletedBeforeReopen") !== true
     || numberValue(nested(primary, "authority", "coldOpenMs")) === null
@@ -388,7 +388,7 @@ function createHtml(): string {
     "<head>",
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width,initial-scale=1">',
-    "<title>ToonSpectrum BG3D SQLite OPFS browser benchmark</title>",
+    "<title>ToonStudio BG3D SQLite OPFS browser benchmark</title>",
     "</head>",
     "<body>",
     "<main>",
@@ -459,7 +459,7 @@ export async function runBg3dLibrariesSqliteOpfsBrowserBenchmark(
   options: { readonly scratchDirectory?: string; readonly resultPath?: string } = {},
 ): Promise<Bg3dLibrariesSqliteOpfsBrowserArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-bg3d-sqlite-opfs-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-bg3d-sqlite-opfs-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

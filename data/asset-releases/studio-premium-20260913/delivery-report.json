@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.asset-delivery.v1",
+  "schema": "toonstudio.asset-delivery.v1",
   "selectedCandidates": 60,
   "acquisitionProfile": "expansion",
   "existingOriginalsExcluded": 1212,

@@ -82,7 +82,7 @@ describe("summarizeStudioAutoColorHintPlan", () => {
     expect(summary.detailLines.some((line) => line.includes("픽셀을 자동으로 덮어쓰지 않습니다"))).toBe(
       true,
     );
-    expect(summary.copyText).toContain("ToonSpectrum 자동 채색 힌트 계획");
+    expect(summary.copyText).toContain("ToonStudio 자동 채색 힌트 계획");
     expect(summary.copyText).toContain("고급 채우기");
     expect(summary.copyText).not.toContain("자동 적용 완료");
   });

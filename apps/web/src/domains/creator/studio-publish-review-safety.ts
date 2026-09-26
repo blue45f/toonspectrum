@@ -30,8 +30,8 @@ export interface StudioPublishAudienceReview {
 const PRODUCTION_HOSTS = new Set([
   "toonstudio.cloud",
   "www.toonstudio.cloud",
-  "toonspectrum.com",
-  "www.toonspectrum.com",
+  "toonstudio.com",
+  "www.toonstudio.com",
 ]);
 
 function normalizedText(value: string | null | undefined): string | null {

@@ -16,7 +16,7 @@ import type { StudioBackground3DLtLayer } from "./scene-3d/studio-3d-insert-cont
 import type { StudioOpfsAssetStore } from "./studio-opfs-asset-store";
 
 export const STUDIO_LINKED_3D_PASS_CAS_ROOT =
-  "toonspectrum-studio-linked-3d-passes" as const;
+  "toonstudio-studio-linked-3d-passes" as const;
 export const STUDIO_LINKED_3D_PASS_LOCATOR_PREFIX = "studio-opfs-cas:sha256:" as const;
 export const STUDIO_LINKED_3D_PASS_MAX_PNG_BYTES = 64 * 1024 * 1024;
 

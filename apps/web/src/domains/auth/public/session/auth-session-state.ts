@@ -15,8 +15,8 @@ export const listeners = new Set<(session: Session) => void>();
 export type SessionSyncReason = "startup" | "focus" | "unauthorized" | "manual";
 const sessionSyncListeners = new Set<(reason: SessionSyncReason) => void>();
 let sessionExpiryTimer: ReturnType<typeof setTimeout> | undefined;
-const SESSION_LOGOUT_CHANNEL_NAME = "toonspectrum-auth-session-v1";
-const SESSION_LOGOUT_SIGNAL_KEY = "toonspectrum-auth-session-logout-v1";
+const SESSION_LOGOUT_CHANNEL_NAME = "toonstudio-auth-session-v1";
+const SESSION_LOGOUT_SIGNAL_KEY = "toonstudio-auth-session-logout-v1";
 let sessionLogoutChannel: BroadcastChannel | null = null;
 
 function clearSessionExpiryTimer(): void {

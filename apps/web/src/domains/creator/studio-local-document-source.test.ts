@@ -50,7 +50,7 @@ describe("local manuscript source identity", () => {
 
   it("reopens the same stored document without mutating its saved metadata or recovery bytes", () => {
     const { storage, document, href } = fixture();
-    storage.setItem(`toonspectrum-studio-autosave:v12:owner:work:${document.id}`, "original ink");
+    storage.setItem(`toonstudio-studio-autosave:v12:owner:work:${document.id}`, "original ink");
     const before = [...storage.values];
     for (let attempt = 0; attempt < 3; attempt += 1) {
       expect(resolveStudioLocalDocumentSource(route(href), storage).route.workId).toBeNull();

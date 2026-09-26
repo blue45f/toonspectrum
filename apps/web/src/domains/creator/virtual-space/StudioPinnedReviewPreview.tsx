@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { validateStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
+import { validateStudioReviewSpatialAnchor } from "@toonstudio/studio-project-model";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpaceReviewPreview } from "./studio-virtual-space-review-preview";
 import type { StudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-subject";

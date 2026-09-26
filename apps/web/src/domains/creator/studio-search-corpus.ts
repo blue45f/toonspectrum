@@ -23,7 +23,7 @@ import type {
   StudioImageInspectorSection,
   StudioInspectorPrimarySection,
 } from "./studio-inspector-layout";
-import type { TerminologyAlias } from "@toonspectrum/studio-command-registry";
+import type { TerminologyAlias } from "@toonstudio/studio-command-registry";
 
 /* ------------------------------------------------------------------ types */
 

@@ -276,7 +276,7 @@ export function createStudioProjectArchiveOrchestration({
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${title.trim() || "toonspectrum-studio-project"}.json`;
+      link.download = `${title.trim() || "toonstudio-studio-project"}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -505,7 +505,7 @@ export function createStudioProjectArchiveOrchestration({
         (item) => item.severity === "warning"
       ).length;
       const fileName = `${sanitizeStudioPublishFileStem(title, {
-        fallback: "toonspectrum-studio-project",
+        fallback: "toonstudio-studio-project",
       })}.toonproject.zip`;
       downloadBlob(result.blob, fileName);
       setProjectArchiveStatus(

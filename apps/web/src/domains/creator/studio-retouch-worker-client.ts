@@ -53,7 +53,7 @@ export function createStudioRetouchModuleWorker(): StudioRetouchWorkerLike | nul
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-retouch.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-retouch",
+    name: "toonstudio-retouch",
   }) as unknown as StudioRetouchWorkerLike;
 }
 

@@ -130,7 +130,7 @@ const ascii = (bytes: Uint8Array, start: number, length: number): string =>
 describe("studio-frame-anim-media-export", () => {
   it("파일명은 WebM 규칙과 나란한 -frames.gif/-frames.apng를 만든다", () => {
     expect(frameAnimMediaFileName("겨울 단편  ", "gif")).toBe("겨울 단편-frames.gif");
-    expect(frameAnimMediaFileName("", "apng")).toBe("toonspectrum-frame-anim-frames.apng");
+    expect(frameAnimMediaFileName("", "apng")).toBe("toonstudio-frame-anim-frames.apng");
   });
 
   it("GIF 경로는 렌더→인코딩 진행률과 함께 GIF89a Blob을 만든다", async () => {

@@ -134,7 +134,7 @@ async function browserJson(page, pathname, options = {}) {
         headers: {
           Accept: "application/json",
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-          "x-toonspectrum-csrf": "1",
+          "x-toonstudio-csrf": "1",
           ...headers,
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -518,7 +518,7 @@ async function main() { // NOSONAR javascript:S3776
     );
 
     const cookies = await context.cookies(WEB_ORIGIN);
-    const authCookie = cookies.find((cookie) => cookie.name === "toonspectrum-auth-session");
+    const authCookie = cookies.find((cookie) => cookie.name === "toonstudio-auth-session");
     record(
       "session-cookie-contract",
       Boolean(
@@ -632,7 +632,7 @@ async function main() { // NOSONAR javascript:S3776
 
     await page.evaluate(() => {
       sessionStorage.setItem(
-        "toonspectrum-auth-session",
+        "toonstudio-auth-session",
         JSON.stringify({
           user: {
             id: "00000000-0000-4000-8000-000000000000",

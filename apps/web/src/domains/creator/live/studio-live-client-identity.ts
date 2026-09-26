@@ -7,9 +7,9 @@ import {
 } from "./studio-live-page-lifecycle";
 
 export const STUDIO_LIVE_GUEST_CREDENTIAL_STORAGE_KEY =
-  "toonspectrum-studio-live-guest-credential-v1";
+  "toonstudio-studio-live-guest-credential-v1";
 export const STUDIO_LIVE_CLIENT_INSTANCE_STORAGE_PREFIX =
-  "toonspectrum-studio-live-client-instance:";
+  "toonstudio-studio-live-client-instance:";
 
 export interface StudioLiveIdentityStorage {
   getItem(key: string): string | null;

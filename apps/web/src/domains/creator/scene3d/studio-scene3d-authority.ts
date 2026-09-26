@@ -25,7 +25,7 @@ import {
   type StudioScene3dTransform,
 } from "./studio-scene3d-document";
 
-export const STUDIO_SCENE3D_AUTHORITY_KIND = "toonspectrum.scene3d-authority" as const;
+export const STUDIO_SCENE3D_AUTHORITY_KIND = "toonstudio.scene3d-authority" as const;
 export const STUDIO_SCENE3D_AUTHORITY_VERSION = 1 as const;
 
 export type StudioScene3dAuthorityBinding =

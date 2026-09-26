@@ -26,7 +26,7 @@ export function marketHomeJsonLd(items: readonly CreatorMarketplaceResourceRecor
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "툰스펙트럼 창작 마켓",
+    name: "툰스튜디오 창작 마켓",
     url: `${MARKET_SITE_URL}/market`,
     mainEntity: {
       "@context": "https://schema.org",
@@ -48,7 +48,7 @@ export function marketBrowseJsonLd(
   return {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: `툰스펙트럼 창작 마켓 · ${label}탐색`,
+    name: `툰스튜디오 창작 마켓 · ${label}탐색`,
     numberOfItems: Math.min(items.length, ITEMLIST_TOP),
     itemListElement: itemListElements(items),
   };

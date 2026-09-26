@@ -140,7 +140,7 @@ export async function createProductStudioOfflineBranchStorage(): Promise<StudioO
   const [database, selection] = await Promise.all([
     acquireStudioLocalDatabase(),
     selectStudioOpfsFileSystem(globalThis, {
-      rootName: "toonspectrum-studio-offline-branch",
+      rootName: "toonstudio-studio-offline-branch",
     }),
   ]);
   const assets = createAssetStore(selection);

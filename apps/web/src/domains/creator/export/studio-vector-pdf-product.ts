@@ -128,7 +128,7 @@ export async function exportStudioCurrentPageVectorPdf(
     ...vector.ops,
   ];
   const bytes = buildVectorPdf({
-    title: input.title.trim() || "ToonSpectrum Studio",
+    title: input.title.trim() || "ToonStudio Studio",
     pages: [{ widthPt, heightPt, ops }],
     images: [{
       name: backdropName,

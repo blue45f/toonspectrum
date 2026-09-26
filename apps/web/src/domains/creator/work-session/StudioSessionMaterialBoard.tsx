@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { StudioSessionResources, StudioWorkSessionView } from "@toonspectrum/studio-project-model/work-session";
+import type { StudioSessionResources, StudioWorkSessionView } from "@toonstudio/studio-project-model/work-session";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { newStudioProjectGraphId } from "../project-graph/studio-project-graph-client";

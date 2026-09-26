@@ -224,7 +224,7 @@ export function projectStudioBg3dDocumentToScene3d(input: {
       : "procedural-sky";
 
   const document: StudioScene3dDocumentV1 = Object.freeze({
-    kind: "toonspectrum.scene3d",
+    kind: "toonstudio.scene3d",
     version: 1,
     documentId: input.documentId,
     revision: input.revision ?? 0,

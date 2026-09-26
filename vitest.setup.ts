@@ -35,8 +35,8 @@ setAppI18nAssetSource(async (assetLocale) => {
 // which is exactly how the first attempt at this hung StudioCompanionReferenceDisplay for 30s.
 const scheduleRealMacrotask = globalThis.setTimeout;
 const PROJECT_CENTER_TEST_STORAGE_KEYS = Object.freeze([
-  "toonspectrum-studio-project-center:favorites:v1",
-  "toonspectrum-studio-project-center:recent-actions:v1",
+  "toonstudio-studio-project-center:favorites:v1",
+  "toonstudio-studio-project-center:recent-actions:v1",
 ]);
 
 function isStudioMenubarContentTest(testPath: unknown): testPath is string {

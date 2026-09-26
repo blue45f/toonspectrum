@@ -4,7 +4,7 @@ import type { ReadState, UserReview } from "./types";
 export const MAX_LIBRARY_BACKUP_BYTES = 5 * 1024 * 1024;
 const MAX_ENTRIES = 50_000;
 const unsafeKeys = new Set(["__proto__", "prototype", "constructor"]);
-function invalid(): never { throw new Error("Invalid ToonSpectrum library backup"); }
+function invalid(): never { throw new Error("Invalid ToonStudio library backup"); }
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return invalid();
   return value as Record<string, unknown>;
@@ -55,7 +55,7 @@ function collection(value: unknown): Collection {
 export function parseLibraryBackup(source: string): HydratePayload {
   if (new TextEncoder().encode(source).byteLength > MAX_LIBRARY_BACKUP_BYTES) return invalid();
   const data = record(JSON.parse(source) as unknown);
-  if (data._app !== "toonspectrum-library" || data.version !== 1) return invalid();
+  if (data._app !== "toonstudio-library" || data.version !== 1) return invalid();
   if (!Array.isArray(data.collections) || data.collections.length > 1000) return invalid();
   const collections = data.collections.map(collection);
   if (new Set(collections.map((item) => item.id)).size !== collections.length) return invalid();

@@ -6,7 +6,7 @@ import {
   pathIRSchema,
   strokeIRSchema,
   tipGraphIRSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { z } from "zod";
 
 import { BRUSH_PREVIEW_DEFAULTS } from "./brush-preview";
@@ -38,7 +38,7 @@ import type {
   PathIR,
   SceneIR,
   StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * Composition brush program executor — V12 §12.2 "대표 공격적 조합".

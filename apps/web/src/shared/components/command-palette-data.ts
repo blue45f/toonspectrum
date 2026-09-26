@@ -2,7 +2,7 @@ import {
   getAudioState,
   setBgmEnabled,
   setSfxEnabled,
-} from "@toonspectrum/core/fx";
+} from "@toonstudio/core/fx";
 import {
   SlidersHorizontal,
   Volume2,
@@ -68,7 +68,7 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
     icon: Volume2,
     shortcut: ["⌥", "S"],
     keywords: ["소리", "사운드", "효과음", "음향", "sfx", "sound", "audio", "volume", "mute"],
-    description: "ToonSpectrum 전역의 상호작용 피드백 효과음(SFX)을 활성화하거나 음소거합니다.",
+    description: "ToonStudio 전역의 상호작용 피드백 효과음(SFX)을 활성화하거나 음소거합니다.",
     getState: () => {
       const state = getAudioState();
       return {

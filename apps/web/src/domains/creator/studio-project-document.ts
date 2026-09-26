@@ -16,7 +16,7 @@ import {
 } from "./studio-project-file";
 
 export const STUDIO_PROJECT_DOCUMENT_FORMAT_ID =
-  "toonspectrum.studio-project" as const;
+  "toonstudio.studio-project" as const;
 export const STUDIO_PROJECT_DOCUMENT_PAYLOAD_TYPE = "project" as const;
 export const STUDIO_PROJECT_DOCUMENT_CURRENT_VERSION = 3 as const;
 const LEGACY_PROJECT_DOCUMENT_VERSION = 2;

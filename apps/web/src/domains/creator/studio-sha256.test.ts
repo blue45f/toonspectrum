@@ -40,7 +40,7 @@ describe("portable Studio SHA-256", () => {
 
   it("matches the preferred native Web Crypto implementation byte-for-byte", async () => {
     const bytes = TEXT_ENCODER.encode(
-      "ToonSpectrum portable checksum parity — 한글과 🎨"
+      "ToonStudio portable checksum parity — 한글과 🎨"
     );
     const subtle = globalThis.crypto?.subtle;
     expect(subtle).toBeDefined();

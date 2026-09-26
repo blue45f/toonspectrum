@@ -7,7 +7,7 @@ import {
 
 import type { StudioOpfsAssetRef } from "../studio-opfs-asset-store";
 
-export const ANIMATIC_WORKSPACE_KIND = "toonspectrum.storyboard-workspace";
+export const ANIMATIC_WORKSPACE_KIND = "toonstudio.storyboard-workspace";
 export const ANIMATIC_WORKSPACE_LIMITS = Object.freeze({
   audioTracks: 8,
   audioFileBytes: 32 * 1024 * 1024,
@@ -141,7 +141,7 @@ function validateSnapshot(value: unknown, workScope: string): StudioAnimaticWork
 
 export function validateStudioAnimaticWorkspace(value: unknown): StudioAnimaticWorkspaceDocument {
   if (!record(value) || value.kind !== ANIMATIC_WORKSPACE_KIND || value.version !== 1 || !id(value.workScope)) {
-    throw new Error("지원하는 ToonSpectrum 스토리보드 작업 파일이 아닙니다.");
+    throw new Error("지원하는 ToonStudio 스토리보드 작업 파일이 아닙니다.");
   }
   const snapshot = validateSnapshot(value, value.workScope);
   if (!Array.isArray(value.variants) || value.variants.length > ANIMATIC_WORKSPACE_LIMITS.variants) throw new Error("버전은 최대 12개까지 보관할 수 있습니다.");

@@ -118,7 +118,7 @@ const autosave = serializeStudioAutosave({
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(({ payload, restoredEvent }) => {
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
     if (sessionStorage.getItem("exact-resume-fixture-seeded") !== "true") {
       localStorage.clear();
       localStorage.setItem(payload.projectLibraryKey, JSON.stringify(payload.projectLibrary));

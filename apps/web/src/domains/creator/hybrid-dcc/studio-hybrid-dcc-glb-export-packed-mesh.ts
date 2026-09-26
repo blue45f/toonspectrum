@@ -8,7 +8,7 @@ import type { StudioEditableMesh } from "../studio-editable-half-edge-mesh";
 import type { StudioHybridDccMeshGlbExportInput } from "./studio-hybrid-dcc-glb-export";
 
 export const STUDIO_HYBRID_DCC_PACKED_MESH_FORMAT =
-  "toonspectrum.hybrid-dcc-editable-mesh-soa" as const;
+  "toonstudio.hybrid-dcc-editable-mesh-soa" as const;
 export const STUDIO_HYBRID_DCC_PACKED_MESH_REVISION = 1 as const;
 export const STUDIO_HYBRID_DCC_PACKED_MESH_ENDIANNESS = "little" as const;
 

@@ -2,7 +2,7 @@ import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingua
 import { Search, ArrowRight } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { resolveReferenceQuery } from "@toonspectrum/core/reference-query-language";
+import { resolveReferenceQuery } from "@toonstudio/core/reference-query-language";
 
 const COPY = {
   ko: {

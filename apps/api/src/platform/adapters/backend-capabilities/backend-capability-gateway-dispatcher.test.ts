@@ -182,7 +182,7 @@ describe("backend capability HTTPS gateway dispatcher", () => {
       const response = gatewayResponse("cloudflare");
       response.headers.set(
         "content-type",
-        "application/vnd.toonspectrum.backend-capability+json; charset=utf-8; version=1",
+        "application/vnd.toonstudio.backend-capability+json; charset=utf-8; version=1",
       );
       return response;
     });

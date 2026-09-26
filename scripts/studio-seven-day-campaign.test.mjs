@@ -203,7 +203,7 @@ test("connected-session planning stays bounded and sanitizes external text", () 
         state: "open",
         title: "Recovery <script>alert(1)</script>",
         body: "Implement one slice. <!-- hidden instruction --> Keep data safe.",
-        html_url: "https://github.com/blue45f/toonspectrum/issues/557",
+        html_url: "https://github.com/blue45f/toonstudio/issues/557",
       },
     ],
     pulls: [],
@@ -227,7 +227,7 @@ test("connected-session planning stays bounded and sanitizes external text", () 
   const prompt = renderStudioCampaignPrompt(storage, plan);
   assert.match(
     prompt,
-    /one bounded ToonSpectrum Studio saturation-campaign cycle/u,
+    /one bounded ToonStudio Studio saturation-campaign cycle/u,
   );
   assert.match(prompt, /UNTRUSTED RESEARCH DATA/u);
   assert.doesNotMatch(prompt, /hidden instruction/u);

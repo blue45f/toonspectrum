@@ -5,12 +5,12 @@ import { StudioSkiaDocumentSurface } from "./StudioSkiaDocumentSurface";
 import { createStudioLiveTransformDraftStore } from "../studio-live-transform-draft-store";
 import type { StudioRenderSurfaceAuthority } from "./StudioRenderSurface";
 import type { DrawEl, El } from "../studio-element-model";
-import type { SkiaDocumentFrame, SkiaDocumentReceipt } from "@toonspectrum/studio-engine-skia";
+import type { SkiaDocumentFrame, SkiaDocumentReceipt } from "@toonstudio/studio-engine-skia";
 
 const mocked = vi.hoisted(() => ({
   create: vi.fn(), present: vi.fn(), snapshotPng: vi.fn(), dispose: vi.fn(),
 }));
-vi.mock("@toonspectrum/studio-engine-skia", () => ({ createSkiaDocumentRenderer: mocked.create }));
+vi.mock("@toonstudio/studio-engine-skia", () => ({ createSkiaDocumentRenderer: mocked.create }));
 const requests: Array<{ frame: SkiaDocumentFrame; finish: (result: SkiaDocumentReceipt) => void }> = [];
 beforeEach(() => {
   requests.length = 0; mocked.create.mockReset(); mocked.present.mockReset(); mocked.dispose.mockReset();

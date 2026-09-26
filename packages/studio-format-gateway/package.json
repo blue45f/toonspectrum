@@ -1,5 +1,5 @@
 {
-  "name": "@toonspectrum/studio-format-gateway",
+  "name": "@toonstudio/studio-format-gateway",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -24,7 +24,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@toonspectrum/studio-project-model": "workspace:*",
+    "@toonstudio/studio-project-model": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

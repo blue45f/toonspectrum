@@ -50,7 +50,7 @@ describe("market license metadata", () => {
 
   it("외부 출처 라이선스는 라이선스 전문 링크를 제공한다", () => {
     for (const meta of MARKET_LICENSES) {
-      if (meta.license === "toonspectrum-standard") {
+      if (meta.license === "toonstudio-standard") {
         expect(meta.url).toBeNull();
       } else {
         expect(meta.url?.startsWith("https://")).toBe(true);

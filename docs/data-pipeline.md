@@ -1,6 +1,6 @@
 # 데이터 파이프라인 — 수동 수집 → 검토된 스냅샷 → 배포
 
-ToonSpectrum의 작품 데이터는 검토 후 커밋된 `apps/api/data/catalog.json.gz`를 단일 운영
+ToonStudio의 작품 데이터는 검토 후 커밋된 `apps/api/data/catalog.json.gz`를 단일 운영
 스냅샷으로 사용합니다. 크롤링은 로컬 운영자가 필요할 때만 실행하며, 배포된 웹·API·GitHub
 Actions에는 크롤러 실행이나 주기 갱신 기능이 없습니다.
 
@@ -18,7 +18,7 @@ Actions에는 크롤러 실행이나 주기 갱신 기능이 없습니다.
 ```mermaid
 flowchart TD
   O["운영자 수동 실행<br/>pnpm catalog:update:manual"] --> C["scripts/crawl.mjs<br/>공개 메타데이터 수집·정규화"]
-  C --> F["fresh JSON<br/>/tmp/toonspectrum-catalog.json"]
+  C --> F["fresh JSON<br/>/tmp/toonstudio-catalog.json"]
   B[("기존 catalog.json.gz")] --> M["scripts/merge-catalog.mjs<br/>upsert + 미수집 기존 작품 유지"]
   F --> M
   M --> V["scripts/validate-catalog.mjs<br/>형태·전체 수·플랫폼별 회귀 검사"]
@@ -40,7 +40,7 @@ flowchart TD
 
 ```bash
 # 원시 JSON만 확인. 저장소 파일은 수정하지 않음.
-pnpm --silent catalog:crawl:manual > /tmp/toonspectrum-catalog.json
+pnpm --silent catalog:crawl:manual > /tmp/toonstudio-catalog.json
 
 # 수집 → 임시 병합 → 최종 스냅샷 검증 → catalog.json.gz 교체 → 정적 파일 생성
 pnpm catalog:update:manual

@@ -16,7 +16,7 @@ import {
   DEFAULT_LICENSE_POLICY,
   evaluateLicenseGate,
   loadCandidateManifest,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 /** `package.json` 의 `postbuild` 가 쓰는 경로와 같아야 한다. */
 export const STUDIO_GENERATED_NOTICE_PATH = "legal/THIRD_PARTY_NOTICES.generated.md";

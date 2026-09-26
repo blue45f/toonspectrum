@@ -20,7 +20,7 @@ const MODE = process.env.TOONSPECTRUM_ALL_BRUSH_MODE === "gpu" ? "gpu" : "baseli
 const SHARD_INDEX = Number(process.env.TOONSPECTRUM_ALL_BRUSH_SHARD_INDEX ?? "0");
 const SHARD_COUNT = Number(process.env.TOONSPECTRUM_ALL_BRUSH_SHARD_COUNT ?? "1");
 const OUTPUT_ROOT = process.env.TOONSPECTRUM_ALL_BRUSH_OUTPUT_DIR
-  ?? join(tmpdir(), "toonspectrum-all-brush-long-stroke");
+  ?? join(tmpdir(), "toonstudio-all-brush-long-stroke");
 const CASE_TIMEOUT_MS = Number(process.env.TOONSPECTRUM_ALL_BRUSH_CASE_TIMEOUT_MS ?? "480000");
 const REQUESTED_IDS = new Set(
   (process.env.TOONSPECTRUM_ALL_BRUSH_IDS ?? "")
@@ -173,7 +173,7 @@ async function main(): Promise<void> {
       const result = await runCase(item, caseRoot, preview.studioUrl);
       results.push(result);
       writeFileSync(join(shardRoot, "shard-report.json"), `${JSON.stringify({
-        kind: "toonspectrum-all-brush-long-stroke-shard-v1",
+        kind: "toonstudio-all-brush-long-stroke-shard-v1",
         generatedAt: new Date().toISOString(),
         sourceCommit: process.env.GITHUB_SHA ?? null,
         mode: MODE,

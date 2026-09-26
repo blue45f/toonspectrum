@@ -11,7 +11,7 @@ import { normalizeStudioReviewPdfProfileId } from "./studio-review-pdf-profile";
 
 import type { StudioReviewPdfProfileId } from "./studio-review-pdf-profile";
 
-export const STUDIO_PUBLISH_PACKAGE_SCHEMA = "toonspectrum.publish-package" as const;
+export const STUDIO_PUBLISH_PACKAGE_SCHEMA = "toonstudio.publish-package" as const;
 export const STUDIO_PUBLISH_PACKAGE_VERSION = 1 as const;
 export const STUDIO_PUBLISH_PACKAGE_POLICY_SNAPSHOT = "2026-07-10" as const;
 
@@ -89,7 +89,7 @@ const PORTABLE_RENDER_DIMENSION = 16_384;
  * A dated workflow snapshot, not a promise that third-party rules will never change.
  *
  * Tapas sizes come from its official File Size Guide. WEBTOON thumbnail sizes come from its
- * March 2026 official CANVAS help article. WEBTOON episode slicing follows ToonSpectrum's
+ * March 2026 official CANVAS help article. WEBTOON episode slicing follows ToonStudio's
  * existing 800x1280 export workflow and intentionally leaves byte limits unset when the official
  * benchmark source does not establish them.
  */
@@ -670,7 +670,7 @@ export function sanitizeStudioPublishFileStem(
       Math.floor(options.maxCodeUnits ?? STUDIO_PUBLISH_PACKAGE_LIMITS.maxFileNameCodeUnits)
     )
   );
-  const fallback = normalizeText(options.fallback, maxCodeUnits) || "toonspectrum";
+  const fallback = normalizeText(options.fallback, maxCodeUnits) || "toonstudio";
   const prepare = (candidate: string): string => {
     let result = normalizeText(candidate, maxCodeUnits * 2)
       .replace(/[\\/:*?"<>|%#&{}$!'@+=`~;,()[\]]+/gu, "-")
@@ -688,7 +688,7 @@ export function sanitizeStudioPublishFileStem(
     if (!result || WINDOWS_RESERVED_NAMES.test(result)) return "";
     return result;
   };
-  return prepare(normalizeText(value, maxCodeUnits * 2)) || prepare(fallback) || "toonspectrum";
+  return prepare(normalizeText(value, maxCodeUnits * 2)) || prepare(fallback) || "toonstudio";
 }
 
 function normalizeMimeType(value: unknown): StudioPublishPackageImageMimeType | null {
@@ -755,7 +755,7 @@ function plannedContentBaseName(
     return `episode-${episode}-${destination}-${String(index + 1).padStart(3, "0")}`;
   }
   const title = sanitizeStudioPublishFileStem(seriesTitle, {
-    fallback: "toonspectrum",
+    fallback: "toonstudio",
     maxCodeUnits: 90,
   });
   return `${title}-episode-${episode}-${String(index + 1).padStart(3, "0")}`;
@@ -786,7 +786,7 @@ function thumbnailBaseName(
   if (spec.asciiAlphanumericFileStem) return `episode${episode}thumbnail`;
   if (destination !== "generic") return `${destination}-${spec.slot}`;
   const title = sanitizeStudioPublishFileStem(seriesTitle, {
-    fallback: "toonspectrum",
+    fallback: "toonstudio",
     maxCodeUnits: 90,
   });
   return `${title}-${spec.slot}`;

@@ -1,6 +1,6 @@
-# 🎨 ToonSpectrum Creator Studio — 사용자 종합 매뉴얼 & 튜토리얼 Guide
+# 🎨 ToonStudio Creator Studio — 사용자 종합 매뉴얼 & 튜토리얼 Guide
 
-ToonSpectrum 스튜디오는 2D 드로잉, 3D 마네킹/CAD 배경 선화 추출, VRM 포즈 트레이싱 및 웹캠 모션 캡처를 한곳에서 처리하는 웹 기반 전문 웹툰 저작 환경입니다.
+ToonStudio 스튜디오는 2D 드로잉, 3D 마네킹/CAD 배경 선화 추출, VRM 포즈 트레이싱 및 웹캠 모션 캡처를 한곳에서 처리하는 웹 기반 전문 웹툰 저작 환경입니다.
 
 > 📘 **상세 3D DCC 하이브리드 아키텍처 매뉴얼**: [STUDIO_3D_DCC_MANUAL.md](STUDIO_3D_DCC_MANUAL.md) 문서에서 다중 기하 커널, SketchUp 추론 스냅, Shot Override 및 포맷 매니페스트를 확인할 수 있습니다.
 
@@ -21,7 +21,7 @@ ToonSpectrum 스튜디오는 2D 드로잉, 3D 마네킹/CAD 배경 선화 추출
 
 ## 1. 스튜디오 개요 및 워크스페이스 레이아웃
 
-ToonSpectrum 스튜디오는 크게 4개의 핵심 영역으로 구성되어 있습니다:
+ToonStudio 스튜디오는 크게 4개의 핵심 영역으로 구성되어 있습니다:
 
 - **좌측 툴바 (Tool Rail)**: 브러시, 지우개, 채우기(Fill), 3D 카메라, 레이소(Lasso) 선택, 텍스트 및 3D 씬 삽입 도구.
 - **중앙 캔버스 (Canvas)**: 문서 표시와 포인터 입력은 Konva Stage가, 획 픽셀 커밋은 그 위의 Canvas2D 종단 경로가 소유합니다. WebGPU/WASM 엔진은 게이트된 island에서만 동작합니다 — 전용 WebGPU 브러시 레인, Hokusai 자연매체(WASM), Vello 문서 벡터 island, Pixi 선택 오버레이. 무제한 줌 및 회전, R8 알파 맵 브러시 스트로크 렌더링을 지원합니다. 어떤 엔진이 무엇을 소유하는지는 생성 문서 [docs/engines/renderer-roles.md](docs/engines/renderer-roles.md)가 단일 진실 원천입니다.

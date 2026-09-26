@@ -4,7 +4,7 @@
 
 The shipped collaboration outbox now uses the existing shared V12
 `studio-local-v12.db` SQLite/OPFS authority. Product boot does not open
-`toonspectrum-studio-crdt-outbox` IndexedDB. That database remains reachable only through the
+`toonstudio-studio-crdt-outbox` IndexedDB. That database remains reachable only through the
 explicit `LegacyIndexedDbStudioCrdtOutbox` import/test seam; there is no automatic read or
 migration (`LEGACY_DATA_MIGRATION=FALSE`).
 

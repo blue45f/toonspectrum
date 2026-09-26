@@ -36,7 +36,7 @@ import {
 
 const SCRATCH = process.env.TOONSPECTRUM_INAPP_VERIFY_DIR ??
   process.env.TOONSPECTRUM_VERIFY_DIR ??
-  join(tmpdir(), "toonspectrum-studio-inapp");
+  join(tmpdir(), "toonstudio-studio-inapp");
 
 /** 44px 계약. 반올림 오차를 흡수하려고 0.5px 만 완화한다. */
 const MIN_TAP_PX = 43.5;

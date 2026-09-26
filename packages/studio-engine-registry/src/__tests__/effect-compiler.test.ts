@@ -9,7 +9,7 @@ import {
 } from "../filter-providers";
 import { EngineCapabilityRegistry } from "../registry";
 
-import type { EffectGraphIR } from "@toonspectrum/studio-project-model";
+import type { EffectGraphIR } from "@toonstudio/studio-project-model";
 
 function filterRegistry(): EngineCapabilityRegistry {
   const registry = EngineCapabilityRegistry.forTestFixtures();

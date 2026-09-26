@@ -1691,7 +1691,7 @@ function roleDecisions(
     },
     {
       role: "canonical document, layers, history, CRDT",
-      selected: "ToonSpectrum first-party tile/layer/history model",
+      selected: "ToonStudio first-party tile/layer/history model",
       status: "first-party-only",
       reason: "Renderer libraries are replaceable providers and must not own persisted document semantics.",
     },
@@ -1847,7 +1847,7 @@ export function renderStudioBrushEngineSelectionMarkdown(
     decision.reason,
   ]);
   return [
-    "# ToonSpectrum brush-engine role selection gate",
+    "# ToonStudio brush-engine role selection gate",
     "",
     `Generated: ${report.generatedAt}`,
     "",

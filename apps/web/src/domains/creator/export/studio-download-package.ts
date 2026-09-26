@@ -72,7 +72,7 @@ export interface StudioDownloadPackageManifest {
   schema: typeof STUDIO_DOWNLOAD_PACKAGE_SCHEMA;
   schemaVersion: 1;
   generator: {
-    name: "ToonSpectrum Studio";
+    name: "ToonStudio Studio";
     feature: "verified-page-download-package";
   };
   createdAt: string;
@@ -158,7 +158,7 @@ function truncateUnicode(value: string, maximum: number): string {
 
 export function sanitizeStudioDownloadFileStem(
   value: string,
-  fallback = "toonspectrum-comic",
+  fallback = "toonstudio-comic",
 ): string {
   const normalized = value
     .normalize("NFKC")
@@ -293,7 +293,7 @@ function preparePages(
 
 function readmeText(manifest: StudioDownloadPackageManifest): string {
   return [
-    "ToonSpectrum Studio verified page download package",
+    "ToonStudio Studio verified page download package",
     "",
     `Title: ${manifest.title}`,
     `Created: ${manifest.createdAt}`,
@@ -387,7 +387,7 @@ export async function buildStudioDownloadPackage(
     schema: STUDIO_DOWNLOAD_PACKAGE_SCHEMA,
     schemaVersion: 1,
     generator: {
-      name: "ToonSpectrum Studio",
+      name: "ToonStudio Studio",
       feature: "verified-page-download-package",
     },
     createdAt: createdAt.toISOString(),

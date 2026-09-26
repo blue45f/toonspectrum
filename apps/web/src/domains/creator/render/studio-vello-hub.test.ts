@@ -16,7 +16,7 @@ import {
   type StudioVelloHubPresentationTarget,
 } from "./studio-vello-hub";
 
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;

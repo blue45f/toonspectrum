@@ -1,8 +1,8 @@
 /**
  * Versioned paper-substrate semantics for persisted strokes.
  *
- * An omitted model is intentionally the historical ToonSpectrum contract. Never reinterpret an
- * existing stroke as a newer model merely because a renderer learned about one: ToonSpectrum
+ * An omitted model is intentionally the historical ToonStudio contract. Never reinterpret an
+ * existing stroke as a newer model merely because a renderer learned about one: ToonStudio
  * strokes are **re-planned from stored points and pressures on every render**, not rasterized at
  * commit time, so a substrate change without a key is a retroactive repaint of finished artwork.
  *

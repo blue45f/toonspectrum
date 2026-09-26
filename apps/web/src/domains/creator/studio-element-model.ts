@@ -481,7 +481,7 @@ export interface DrawEl extends StudioBrushCatalogIdentityMetadata, StudioElemen
    * valley-multiply substrate — every coupled family depositing into the valleys, with no pressure
    * input and an exact 128-texel tile repeat.
    *
-   * This key is load-bearing for finished artwork: ToonSpectrum strokes are re-planned from their
+   * This key is load-bearing for finished artwork: ToonStudio strokes are re-planned from their
    * stored points and pressures on every render rather than rasterized at commit time, so a
    * substrate correction without a key would silently repaint every existing page.
    */

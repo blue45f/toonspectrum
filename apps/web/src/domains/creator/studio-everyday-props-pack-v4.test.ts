@@ -168,7 +168,7 @@ function anchorById(id: VrmPropId, anchorId: string): PropAnchorDef {
   return anchor!;
 }
 
-describe("ToonSpectrum everyday prop pack v4", () => {
+describe("ToonStudio everyday prop pack v4", () => {
   it.each(EVERYDAY_PROPS)("$filename meets the strict mobile GLB gate", (gate) => {
     const bytes = bundledBytes(gate.filename);
     expect(bytes.byteLength).toBeGreaterThanOrEqual(150 * 1024);
@@ -201,7 +201,7 @@ describe("ToonSpectrum everyday prop pack v4", () => {
     expect(gate.requiredNodes.every((name) => nodeNames.has(name))).toBe(true);
     expect(root?.extras).toMatchObject({
       asset_id: gate.assetId,
-      asset_author: "ToonSpectrum",
+      asset_author: "ToonStudio",
       asset_generator: GENERATOR,
       asset_license: "CC0-1.0",
       asset_license_url: CC0_LICENSE_URL,

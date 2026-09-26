@@ -27,11 +27,11 @@ const PINNED_SPKI_SHA256 =
   `sha256:${createHash("sha256").update(PINNED_SPKI).digest("hex")}` as const;
 const CONFIG = {
   schemaVersion: 1,
-  kind: "toonspectrum-codec-certification-signer-config",
+  kind: "toonstudio-codec-certification-signer-config",
   adapterKind: "hsm",
   provider: "pkcs11-hsm",
   algorithm: "ed25519",
-  keyId: "toonspectrum-codec-key-2026-01",
+  keyId: "toonstudio-codec-key-2026-01",
   keyResourceId: "hsm/cluster-a/slot-4/key-22",
   immutableKeyVersion: "version-22",
   publicKeySpkiSha256: PINNED_SPKI_SHA256,
@@ -222,7 +222,7 @@ describe("verifyStudioCodecCertificationSignerReadiness", () => {
     );
     const config = {
       schemaVersion: 1,
-      kind: "toonspectrum-codec-certification-signer-config",
+      kind: "toonstudio-codec-certification-signer-config",
       adapterKind: "kms",
       provider: "aws-kms",
       algorithm: "ecdsa-p256-sha256",

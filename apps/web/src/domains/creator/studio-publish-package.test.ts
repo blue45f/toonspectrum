@@ -178,7 +178,7 @@ describe("publish package settings and file names", () => {
 
   it("sanitizes traversal, controls, bidi marks, punctuation, and reserved device names", () => {
     expect(sanitizeStudioPublishFileStem(" ../비밀/회차:*?\u202e.exe ")).toBe("비밀-회차-exe");
-    expect(sanitizeStudioPublishFileStem("CON")).toBe("toonspectrum");
+    expect(sanitizeStudioPublishFileStem("CON")).toBe("toonstudio");
     expect(sanitizeStudioPublishFileStem("  A---B...  ")).toBe("A-B");
     expect(sanitizeStudioPublishFileStem("café와 별", { asciiOnly: true })).toBe("cafe");
     expect(

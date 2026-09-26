@@ -14,7 +14,7 @@ import {
 
 export const STUDIO_ICC_PROFILE_POLICY_VERSION = 1 as const;
 export const STUDIO_ICC_PROFILE_POLICY_SCHEMA =
-  "toonspectrum-icc-profile-policy/v1" as const;
+  "toonstudio-icc-profile-policy/v1" as const;
 export const STUDIO_ICC_MAX_PROFILE_BYTES = 16 * 1024 * 1024;
 
 export interface StudioBundledIccProfileGrant {
@@ -33,12 +33,12 @@ export interface StudioBundledIccProfileGrant {
 export const STUDIO_BUNDLED_ICC_PROFILE_ALLOWLIST: Readonly<
   Record<string, StudioBundledIccProfileGrant>
 > = Object.freeze({
-  "toonspectrum-srgb-v2": Object.freeze({
+  "toonstudio-srgb-v2": Object.freeze({
     sha256: "320e97fb94f085925d825687024459249524fcc5d8308ec3764295b957d6a8cd",
-    providerId: "toonspectrum",
+    providerId: "toonstudio",
     provenance: "project-generated:studio-canvaskit-icc-profile",
     licenseClass: "project-generated",
-    licenseId: "ToonSpectrum-generated-profile-v1",
+    licenseId: "ToonStudio-generated-profile-v1",
   }),
 });
 
@@ -108,21 +108,21 @@ export interface StudioIccProviderManifest {
 export const STUDIO_BUNDLED_SRGB_ICC_MANIFEST: StudioIccProviderManifest =
   Object.freeze({
     schemaVersion: 1,
-    profileKey: "toonspectrum-srgb-v2",
+    profileKey: "toonstudio-srgb-v2",
     source: Object.freeze({
       kind: "bundled",
-      providerId: "toonspectrum",
+      providerId: "toonstudio",
       provenance: "project-generated:studio-canvaskit-icc-profile",
     }),
     rights: Object.freeze({
       licenseClass: "project-generated",
-      licenseId: "ToonSpectrum-generated-profile-v1",
+      licenseId: "ToonStudio-generated-profile-v1",
       redistribution: "allowed",
       embedding: "allowed",
       commercialUse: "allowed",
     }),
     expected: Object.freeze({
-      sha256: STUDIO_BUNDLED_ICC_PROFILE_ALLOWLIST["toonspectrum-srgb-v2"]!.sha256,
+      sha256: STUDIO_BUNDLED_ICC_PROFILE_ALLOWLIST["toonstudio-srgb-v2"]!.sha256,
       versionMajor: 2,
       profileId: null,
       deviceClass: "mntr",
@@ -199,7 +199,7 @@ export interface StudioIccProfilePolicyReceipt {
   readonly capabilities: StudioIccDetectedCapabilities | null;
   readonly certification: {
     readonly thirdParty: "not-claimed";
-    readonly note: "ToonSpectrum policy acceptance is not an ICC, vendor, printer, or trademark certification.";
+    readonly note: "ToonStudio policy acceptance is not an ICC, vendor, printer, or trademark certification.";
   };
 }
 
@@ -488,7 +488,7 @@ function emptyReceipt(
     capabilities: null,
     certification: {
       thirdParty: "not-claimed",
-      note: "ToonSpectrum policy acceptance is not an ICC, vendor, printer, or trademark certification.",
+      note: "ToonStudio policy acceptance is not an ICC, vendor, printer, or trademark certification.",
     },
   };
 }
@@ -547,7 +547,7 @@ function acceptedReceipt(
     capabilities,
     certification: {
       thirdParty: "not-claimed",
-      note: "ToonSpectrum policy acceptance is not an ICC, vendor, printer, or trademark certification.",
+      note: "ToonStudio policy acceptance is not an ICC, vendor, printer, or trademark certification.",
     },
   };
 }

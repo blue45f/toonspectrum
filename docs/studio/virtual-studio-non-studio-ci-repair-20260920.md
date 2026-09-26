@@ -4,7 +4,7 @@ Status: product and test repairs implemented; the complete local production-brow
 
 ## Failure attribution
 
-The complete log from [Non-studio experience quality job 105993507296](https://github.com/blue45f/toonspectrum/actions/runs/35479103099/job/105993507296) reported 42 failed and 237 passed browser tests. The failures were not all caused by one overlay:
+The complete log from [Non-studio experience quality job 105993507296](https://github.com/blue45f/toonstudio/actions/runs/35479103099/job/105993507296) reported 42 failed and 237 passed browser tests. The failures were not all caused by one overlay:
 
 | Original failures | Concrete cause | Repair and retained evidence |
 | --- | --- | --- |

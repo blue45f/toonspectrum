@@ -2,7 +2,7 @@
 """Original, reproducible scene/prop pack. Run only in a disposable Blender process.
 
 Blender --background --python-exit-code 1 --python this.py -- --shard 0
-Geometry: ToonSpectrum CC0. Embedded material sources retain Poly Haven provenance.
+Geometry: ToonStudio CC0. Embedded material sources retain Poly Haven provenance.
 Preview generation is NOT visual approval; publication requires a hash-bound review.
 """
 import argparse
@@ -21,7 +21,7 @@ import generate_studio_environment_expansion_v1 as g
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "artifacts/studio-premium-world-v1"
 GENERATOR = "scripts/blender/generate_studio_premium_world_v1.py"
-SOURCE_URL = "https://github.com/blue45f/toonspectrum/blob/main/" + GENERATOR
+SOURCE_URL = "https://github.com/blue45f/toonstudio/blob/main/" + GENERATOR
 B, C, T, L, R = g.box, g.cyl, g.tube, g.lathe, g.ring
 PI = math.pi
 

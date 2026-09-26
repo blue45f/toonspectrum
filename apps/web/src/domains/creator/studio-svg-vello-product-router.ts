@@ -328,12 +328,12 @@ export class StudioSvgProductTournament {
 
 export const STUDIO_SVG_PRODUCT_ENGINES: StudioSvgProductEngines = {
   async auditVello(svg) {
-    const engine = await import("@toonspectrum/studio-engine-vello");
+    const engine = await import("@toonstudio/studio-engine-vello");
     await engine.loadVelloSvgNative();
     return engine.auditSvgNative(svg);
   },
   async renderVelloCpu(svg, width, height) {
-    const engine = await import("@toonspectrum/studio-engine-vello");
+    const engine = await import("@toonstudio/studio-engine-vello");
     await engine.loadVelloSvgNative();
     return engine.renderSvgToPixelsVelloCpu(svg, width, height);
   },

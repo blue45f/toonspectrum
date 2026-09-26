@@ -5,8 +5,8 @@ for (const width of [320, 390, 820, 1440]) {
   test(`search view controls remain pointer-reachable at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await page.addInitScript(() => {
-      localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
-      sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+      localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+      sessionStorage.setItem("toonstudio-compat-dismissed", "true");
     });
     await page.route("**/api/**", async (route) => {
       if (new URL(route.request().url()).pathname.endsWith("/auth/session")) {

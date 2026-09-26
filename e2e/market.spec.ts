@@ -304,7 +304,7 @@ test("리소스 상세 페이지에서 브러시 인터랙티브 캔버스를 �
         name: "먹물 G펜",
         delivery: {
           mode: "portable-json",
-          mediaType: "application/vnd.toonspectrum.brush+json",
+          mediaType: "application/vnd.toonstudio.brush+json",
           payload,
           byteSize,
           sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -375,7 +375,7 @@ test("리소스 상세 페이지에서 팔레트 스와치와 색상 복사 인�
         name: "노을빛 세트",
         delivery: {
           mode: "portable-json",
-          mediaType: "application/vnd.toonspectrum.palette+json",
+          mediaType: "application/vnd.toonstudio.palette+json",
           payload,
           byteSize,
           sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -433,7 +433,7 @@ test("리소스 상세 페이지에서 필터 전후 슬라이더를 렌더링�
     kind: "filter",
     resourceVersion: "1.0.0",
     minimumStudioVersion: "1.0.0",
-    license: "toonspectrum-standard",
+    license: "toonstudio-standard",
     attributionText: "",
     containsAi: false,
     provenance: { origin: "original", authoredByPublisher: true },
@@ -445,7 +445,7 @@ test("리소스 상세 페이지에서 필터 전후 슬라이더를 렌더링�
         name: "시네마틱 필름",
         delivery: {
           mode: "portable-json",
-          mediaType: "application/vnd.toonspectrum.filter+json",
+          mediaType: "application/vnd.toonstudio.filter+json",
           payload,
           byteSize,
           sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",

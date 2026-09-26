@@ -3,7 +3,7 @@ import {
   resolveStrokeDabCapacity,
   STUDIO_CAUSAL_WATERCOLOR_DAB_RESIDENT_BYTES,
   STUDIO_DYNAMIC_BRUSH_DAB_RESIDENT_BYTES,
-} from "@toonspectrum/studio-brush-platform";
+} from "@toonstudio/studio-brush-platform";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -60,7 +60,7 @@ describe("isolated market API target", () => {
   it("rejects non-test, remote, or production database targets", () => {
     expect(() => validateIsolatedMarketApiTarget({
       rawApiUrl: "http://127.0.0.1:43117",
-      rawDatabaseUrl: "postgresql://tester:secret@127.0.0.1:5432/toonspectrum",
+      rawDatabaseUrl: "postgresql://tester:secret@127.0.0.1:5432/toonstudio",
       environment: { NODE_ENV: "test" },
     })).toThrow(/test- or QA-scoped/u);
     expect(() => validateIsolatedMarketApiTarget({
@@ -126,7 +126,7 @@ describe("isolated market API target", () => {
     expect(isolatedEnvironment).toMatchObject({
       API_LOCAL_ENV_FILE_ENABLED: "false",
       API_RUNTIME_ROLE: "full",
-      AUTH_SESSION_SECRET: "toonspectrum-isolated-market-qa-session-v1",
+      AUTH_SESSION_SECRET: "toonstudio-isolated-market-qa-session-v1",
       AUTH_DISTRIBUTED_RATE_LIMIT_ENABLED: "false",
       AUTH_RATE_LIMIT_MODE: "single-instance-local",
       BACKEND_CAPABILITY_WORKER_ENABLED: "false",

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS "creator_marketplace_resource" (
   CONSTRAINT "creator_marketplace_resource_kind_check"
     CHECK ("kind" IN ('asset', 'brush', 'filter', 'palette', 'template', '3d-preset')),
   CONSTRAINT "creator_marketplace_resource_license_check"
-    CHECK ("license" IN ('toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')),
+    CHECK ("license" IN ('toonstudio-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')),
   CONSTRAINT "creator_marketplace_resource_origin_check"
     CHECK ("provenanceOrigin" IN ('original', 'permissive')),
   CONSTRAINT "creator_marketplace_resource_package_id_check"

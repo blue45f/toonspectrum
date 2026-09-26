@@ -2,7 +2,7 @@ import {
   DEFAULT_STUDIO_STROKE_BUDGET,
   resolveStrokeDabCapacity,
   STUDIO_DYNAMIC_BRUSH_DAB_RESIDENT_BYTES,
-} from "@toonspectrum/studio-brush-platform";
+} from "@toonstudio/studio-brush-platform";
 
 import {
   STUDIO_DYNAMIC_BRUSH_DEPOSIT_PIPELINE_CAUSAL_V3,

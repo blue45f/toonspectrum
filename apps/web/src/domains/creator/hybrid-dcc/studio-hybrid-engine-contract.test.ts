@@ -96,33 +96,33 @@ function provider(input: {
 function validProviders(): StudioHybridEngineProvider[] {
   return [
     provider({
-      id: "toonspectrum-tiledoc",
+      id: "toonstudio-tiledoc",
       authorityRoles: ["raster-document"],
       formats: ["raster-tiles-v1"],
       dependencies: ["raw-webgpu"],
     }),
     provider({
-      id: "toonspectrum-vector-schema",
+      id: "toonstudio-vector-schema",
       authorityRoles: ["vector-document"],
       formats: ["vector-scene-v1"],
       dependencies: ["canvaskit-wasm", "geometry-kernel"],
       colorPrecision: "vector-exact",
     }),
     provider({
-      id: "toonspectrum-text-layout",
+      id: "toonstudio-text-layout",
       authorityRoles: ["text-layout"],
       formats: ["text-runs-v1"],
       dependencies: ["harfbuzz-wasm"],
       colorPrecision: "vector-exact",
     }),
     provider({
-      id: "toonspectrum-scene-schema",
+      id: "toonstudio-scene-schema",
       authorityRoles: ["3d-scene"],
       formats: ["scene3d-v1"],
       dependencies: ["three-scene", "rapier-wasm"],
     }),
     provider({
-      id: "toonspectrum-journal",
+      id: "toonstudio-journal",
       authorityRoles: ["history/persistence"],
       formats: ["history-log-v1", "asset-reference-v1"],
       locality: "storage-worker",
@@ -254,11 +254,11 @@ describe("Studio hybrid engine authority and provider contract", () => {
     expect(validated).toMatchObject({
       ok: true,
       authorityProviderIds: {
-        "raster-document": "toonspectrum-tiledoc",
-        "vector-document": "toonspectrum-vector-schema",
-        "text-layout": "toonspectrum-text-layout",
-        "3d-scene": "toonspectrum-scene-schema",
-        "history/persistence": "toonspectrum-journal",
+        "raster-document": "toonstudio-tiledoc",
+        "vector-document": "toonstudio-vector-schema",
+        "text-layout": "toonstudio-text-layout",
+        "3d-scene": "toonstudio-scene-schema",
+        "history/persistence": "toonstudio-journal",
       },
     });
     if (!validated.ok) return;
@@ -270,7 +270,7 @@ describe("Studio hybrid engine authority and provider contract", () => {
     expect(
       validated.dependencyOrder.indexOf("three-scene"),
     ).toBeLessThan(
-      validated.dependencyOrder.indexOf("toonspectrum-scene-schema"),
+      validated.dependencyOrder.indexOf("toonstudio-scene-schema"),
     );
   });
 
@@ -302,7 +302,7 @@ describe("Studio hybrid engine authority and provider contract", () => {
       validateStudioHybridEnginePlan(
         validPlan(
           validProviders().filter(
-            (entry) => entry.id !== "toonspectrum-journal",
+            (entry) => entry.id !== "toonstudio-journal",
           ),
         ),
       ),
@@ -313,7 +313,7 @@ describe("Studio hybrid engine authority and provider contract", () => {
     });
 
     const duplicate = provider({
-      id: "toonspectrum-second-raster-authority",
+      id: "toonstudio-second-raster-authority",
       authorityRoles: ["raster-document"],
       formats: ["raster-tiles-v1"],
     });
@@ -354,7 +354,7 @@ describe("Studio hybrid engine authority and provider contract", () => {
     ).toMatchObject({
       ok: false,
       reason: "provider-unavailable",
-      detail: "toonspectrum-tiledoc",
+      detail: "toonstudio-tiledoc",
     });
   });
 
@@ -373,13 +373,13 @@ describe("Studio hybrid engine authority and provider contract", () => {
       ok: false,
       reason: "invalid-provider",
       detail:
-        "canonical authority must be a ToonSpectrum application-core or storage-adapter provider",
+        "canonical authority must be a ToonStudio application-core or storage-adapter provider",
     });
   });
 
   it("requires every authority to emit its vendor-neutral canonical format", () => {
     const providers = validProviders().map((entry) =>
-      entry.id === "toonspectrum-vector-schema"
+      entry.id === "toonstudio-vector-schema"
         ? {
             ...entry,
             canonicalBoundary: canonicalBoundary([
@@ -502,7 +502,7 @@ describe("Studio hybrid dependency and surface safety", () => {
 
   it("rejects authority providers that cannot satisfy replay requirements", () => {
     const providers = validProviders().map((entry) =>
-      entry.id === "toonspectrum-scene-schema"
+      entry.id === "toonstudio-scene-schema"
         ? {
             ...entry,
             determinism: {
@@ -518,7 +518,7 @@ describe("Studio hybrid dependency and surface safety", () => {
     ).toMatchObject({
       ok: false,
       reason: "determinism-requirement-unsatisfied",
-      path: "providers.toonspectrum-scene-schema.determinism",
+      path: "providers.toonstudio-scene-schema.determinism",
     });
   });
 });

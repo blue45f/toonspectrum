@@ -112,7 +112,7 @@ function createStudioBg3dGeometryModuleWorker(): StudioBg3dGeometryWorkerLike | 
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-bg3d-geometry.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-bg3d-geometry",
+    name: "toonstudio-bg3d-geometry",
   });
 }
 

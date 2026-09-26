@@ -30,8 +30,8 @@ export function applyStudioSaveFirstFileMenu(
     result.push({
       ...publish,
       label: publish.label === "수정 게시"
-        ? "ToonSpectrum 게시 수정…"
-        : "ToonSpectrum에 게시…",
+        ? "ToonStudio 게시 수정…"
+        : "ToonStudio에 게시…",
       separatorAfter: false,
     });
   }

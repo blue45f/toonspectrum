@@ -4,7 +4,7 @@ import {
   polylineToPath,
   sceneIRSchema,
   validateAnimationGraph,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,7 +17,7 @@ import type {
   AnimationKeyframeIR,
   SceneIR,
   SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 function constantTrack(value: number): AnimationKeyframeIR[] {
   return [{ frame: 0, value, easing: "hold" }];

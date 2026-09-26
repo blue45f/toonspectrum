@@ -9,7 +9,7 @@ import {
   sceneIRSchema,
   solidPaint,
   type SceneIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { fuzzyMismatchPct } from "../gpu-browser";

@@ -1,4 +1,4 @@
-import { TOONSPECTRUM_CSRF_HEADER } from "@toonspectrum/contracts/security/csrf";
+import { TOONSPECTRUM_CSRF_HEADER } from "@toonstudio/contracts/security/csrf";
 
 import type { INestApplication } from "@nestjs/common";
 import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
@@ -13,7 +13,7 @@ const LOCAL_CORS_ORIGINS = [
 ] as const;
 
 /**
- * ToonSpectrum의 공개 웹 앱 Origin.
+ * ToonStudio의 공개 웹 앱 Origin.
  *
  * `www`가 정본이고 apex도 같은 Cloudflare 엣지에서 제공된다. 기존 apex 클라이언트의
  * preflight/Socket.IO 전환을 보존하기 위해 두 Origin을 모두 정확히 허용하며,

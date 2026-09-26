@@ -23,7 +23,7 @@ let skia: Skia;
 const disposals: (() => void)[] = [];
 
 beforeAll(async () => {
-  const specifier = "@toonspectrum/studio-engine-skia/node";
+  const specifier = "@toonstudio/studio-engine-skia/node";
   const loader = await import(/* @vite-ignore */ specifier) as { loadCanvasKitNode(): Promise<Skia> };
   skia = await loader.loadCanvasKitNode();
 });

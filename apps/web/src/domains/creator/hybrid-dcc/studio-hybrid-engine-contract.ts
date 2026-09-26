@@ -891,13 +891,13 @@ export function validateStudioHybridEnginePlan(
           candidate.implementation !== "application-core"
           && candidate.implementation !== "storage-adapter"
         )
-        || !candidate.id.startsWith("toonspectrum-")
+        || !candidate.id.startsWith("toonstudio-")
       )
     ) {
       return failure(
         "invalid-provider",
         `providers[${index}].authorityRoles`,
-        "canonical authority must be a ToonSpectrum application-core or storage-adapter provider",
+        "canonical authority must be a ToonStudio application-core or storage-adapter provider",
       );
     }
     for (const authorityRole of candidate.authorityRoles) {

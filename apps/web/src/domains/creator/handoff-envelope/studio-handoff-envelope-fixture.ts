@@ -1,4 +1,4 @@
-import { studioHandoffEnvelopePrepareSchema, studioHandoffEnvelopeViewSchema } from "@toonspectrum/studio-project-model";
+import { studioHandoffEnvelopePrepareSchema, studioHandoffEnvelopeViewSchema } from "@toonstudio/studio-project-model";
 import { completionFixture } from "../review-task-completion/studio-review-task-completion-fixture";
 
 export function handoffFixture() {

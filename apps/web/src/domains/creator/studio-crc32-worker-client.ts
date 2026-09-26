@@ -85,7 +85,7 @@ export function createStudioCrc32ModuleWorker(): StudioCrc32WorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-crc32.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-crc32",
+    name: "toonstudio-crc32",
   }) as unknown as StudioCrc32WorkerLike;
 }
 

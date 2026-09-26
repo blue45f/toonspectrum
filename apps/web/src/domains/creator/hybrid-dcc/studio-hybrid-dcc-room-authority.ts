@@ -29,7 +29,7 @@ import type { StudioRightsBomRecord } from "./studio-hybrid-dcc-document";
 
 export const STUDIO_HYBRID_DCC_ROOM_AUTHORITY_REVISION = 1 as const;
 export const STUDIO_HYBRID_DCC_ROOM_PART_METADATA_REVISION = 1 as const;
-const STUDIO_HYBRID_DCC_ROOM_PART_METADATA_PREFIX = "toonspectrum-room-part:";
+const STUDIO_HYBRID_DCC_ROOM_PART_METADATA_PREFIX = "toonstudio-room-part:";
 
 export const STUDIO_HYBRID_DCC_ROOM_AUTHORITY_LIMITS = Object.freeze({
   maxParts: 256,
@@ -392,7 +392,7 @@ function buildFromSpec(
       color,
       rights: {
         source: presetId ? `studio-room-preset:${presetId}` : "studio-room-recipe",
-        creator: "ToonSpectrum Studio",
+        creator: "ToonStudio Studio",
         license: "CC0-1.0",
         useScope: "commercial",
         derivative: serializeRoomPartMetadata(metadata),

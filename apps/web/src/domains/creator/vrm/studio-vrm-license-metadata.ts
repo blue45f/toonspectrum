@@ -89,7 +89,7 @@ export interface StudioVrmLicenseRawIntent {
  * No `undefined`, Date, URL, Map, Set, class instance, or mutable nested value is admitted.
  */
 export interface StudioVrmLicenseMetadataReceipt {
-  readonly schema: "toonspectrum.vrm-license-metadata";
+  readonly schema: "toonstudio.vrm-license-metadata";
   readonly version: 1;
   readonly spec: StudioVrmLicenseSpec;
   readonly sourcePath: "extensions.VRM.meta" | "extensions.VRMC_vrm.meta";
@@ -665,7 +665,7 @@ function buildVrm0Receipt(meta: JsonRecord, metadataJsonBytes: number): StudioVr
 
   const diagnostics = Object.freeze(writer.diagnostics.map((entry) => Object.freeze(entry)));
   return deepFreeze({
-    schema: "toonspectrum.vrm-license-metadata" as const,
+    schema: "toonstudio.vrm-license-metadata" as const,
     version: 1 as const,
     spec: "vrm0" as const,
     sourcePath: basePath,
@@ -877,7 +877,7 @@ function buildVrm1Receipt(
 
   const diagnostics = Object.freeze(writer.diagnostics.map((entry) => Object.freeze(entry)));
   return deepFreeze({
-    schema: "toonspectrum.vrm-license-metadata" as const,
+    schema: "toonstudio.vrm-license-metadata" as const,
     version: 1 as const,
     spec: "vrm1" as const,
     sourcePath: basePath,

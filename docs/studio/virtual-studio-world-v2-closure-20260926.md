@@ -148,14 +148,14 @@ Place(동선·충돌·portal·앵커), Theme(재사용 가능한 아트/재질),
 아래는 발견한 실행 경로이며 이번 문서 작업에서 실행하지 않았다. 의존성과 Playwright Chromium이 준비되어 있고, 다른 세션이 쓰지 않는 로컬 포트를 사용해야 한다. 같은 worktree 루트에서 실행한다. 스크립트가 로컬 서버 PID의 cwd와 실행 cwd를 대조한다.
 
 ```sh
-cd /Users/hjunkim/.codex/worktrees/virtual-studio-world-v2/toonspectrum
+cd /Users/hjunkim/.codex/worktrees/virtual-studio-world-v2/toonstudio
 pnpm dev --port 5248
 ```
 
 5248이 비어 있는지 확인한 뒤 선택해야 하며, 사용 중이면 자신의 다른 전용 포트로 두 명령을 함께 바꾼다. 별도 터미널에서 기존 runtime harness를 실행한다.
 
 ```sh
-cd /Users/hjunkim/.codex/worktrees/virtual-studio-world-v2/toonspectrum
+cd /Users/hjunkim/.codex/worktrees/virtual-studio-world-v2/toonstudio
 STUDIO_QA_BASE_URL=http://127.0.0.1:5248 node scripts/validate-virtual-studio-runtime.mjs
 ```
 
@@ -184,7 +184,7 @@ STUDIO_QA_BASE_URL=http://127.0.0.1:5248 node scripts/validate-virtual-studio-ru
 검사 당시 `living-town-v6/imagegen25-source-manifest.json`의 SHA-256은 `8855530d117829db06afe6a1685e2dda50cfb98107b00e530f7cea7b469bcf25`다. 상세 로컬 관찰 파일은 `/tmp/virtual-studio-legacy-wip-motion-audit.json`이며 임시 파일이므로 영구 보존 증거로 의존하지 않는다. 다음 명령으로 같은 검사를 재현할 수 있다. Python과 Pillow가 필요하며 이미지나 저장소 파일을 쓰지 않는다.
 
 ```sh
-cd /Users/hjunkim/.codex/worktrees/virtual-studio-world-v2/toonspectrum
+cd /Users/hjunkim/.codex/worktrees/virtual-studio-world-v2/toonstudio
 python3 - <<'PY'
 from hashlib import sha256
 from pathlib import Path

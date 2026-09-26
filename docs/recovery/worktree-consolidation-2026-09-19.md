@@ -16,11 +16,11 @@ The stale Virtual Studio, P2P, mobile regression, i18n, production-validation, a
 
 ## Active-session exclusions
 
-- `toonspectrum-full-mobile-sweep-resume-20260918`
-- `toonspectrum-mobile-bg3d-sweep-final-20260919`
-- `toonspectrum-mobile-final-followup-20260918`
-- `toonspectrum-mobile-regression-followup-20260918`
-- `toonspectrum-virtual-studio-rpg-20260919`
+- `toonstudio-full-mobile-sweep-resume-20260918`
+- `toonstudio-mobile-bg3d-sweep-final-20260919`
+- `toonstudio-mobile-final-followup-20260918`
+- `toonstudio-mobile-regression-followup-20260918`
+- `toonstudio-virtual-studio-rpg-20260919`
 - `prod-deploy-9d6d84cda099b86a3c1d25e65c1c23ec546e89d9`
 - `prod-deploy-f4eceed2fd6033660111a5ffefd770ea5f2d11ac`
 - primary `main` worktree

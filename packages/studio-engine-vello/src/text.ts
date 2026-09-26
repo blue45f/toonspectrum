@@ -1,4 +1,4 @@
-import { pathIRSchema } from "@toonspectrum/studio-project-model";
+import { pathIRSchema } from "@toonstudio/studio-project-model";
 import { z } from "zod";
 
 import { shape_text_json } from "../../../crates/studio-engine-vello/pkg/studio_engine_vello.js";

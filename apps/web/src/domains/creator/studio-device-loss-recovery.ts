@@ -5,7 +5,7 @@ import {
   type StudioRendererTournamentRuntime,
 } from "./studio-renderer-tournament-runtime";
 
-import type { WinnerCacheEntry } from "@toonspectrum/studio-engine-registry";
+import type { WinnerCacheEntry } from "@toonstudio/studio-engine-registry";
 
 /**
  * V12 §17.3 Device Loss — pure, injection-only recovery state machine.

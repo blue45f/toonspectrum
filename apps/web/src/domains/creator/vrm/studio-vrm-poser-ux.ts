@@ -3,8 +3,8 @@
  * No DOM/Three imports; safe for unit tests and localStorage round-trips.
  */
 
-export const STUDIO_VRM_RECENT_POSES_KEY = "toonspectrum-studio-vrm-recent-poses:v1";
-export const STUDIO_VRM_RECENT_CHARACTERS_KEY = "toonspectrum-studio-vrm-recent-characters:v1";
+export const STUDIO_VRM_RECENT_POSES_KEY = "toonstudio-studio-vrm-recent-poses:v1";
+export const STUDIO_VRM_RECENT_CHARACTERS_KEY = "toonstudio-studio-vrm-recent-characters:v1";
 export const STUDIO_VRM_RECENT_MAX = 12;
 export const STUDIO_VRM_RECENT_VERSION = 1 as const;
 

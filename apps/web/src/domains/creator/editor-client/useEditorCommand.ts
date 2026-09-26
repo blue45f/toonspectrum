@@ -7,7 +7,7 @@ import type {
   CommandReceipt,
   DispatchOptions,
   EditorCommandSource,
-} from "@toonspectrum/studio-command-registry";
+} from "@toonstudio/studio-command-registry";
 
 export type EditorCommandDispatcher = (
   payload?: unknown,

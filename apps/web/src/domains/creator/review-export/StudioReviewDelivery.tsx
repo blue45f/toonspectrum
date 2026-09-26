@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import {
   DEFAULT_REVIEW_DELIVERY_PROFILE,
   reviewDeliveryListSchema,
   type ReviewDeliveryJob,
-} from "@toonspectrum/studio-project-model/review-delivery";
+} from "@toonstudio/studio-project-model/review-delivery";
 
 import {
   getAuthSessionRevision,

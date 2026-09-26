@@ -5,8 +5,8 @@ import {
 
 import { expect, test } from "./fixtures/non-studio-test";
 
-const LANGUAGE_STORAGE_KEY = "toonspectrum-lang";
-const COMPAT_DISMISSAL_KEY = "toonspectrum-compat-dismissed";
+const LANGUAGE_STORAGE_KEY = "toonstudio-lang";
+const COMPAT_DISMISSAL_KEY = "toonstudio-compat-dismissed";
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(({

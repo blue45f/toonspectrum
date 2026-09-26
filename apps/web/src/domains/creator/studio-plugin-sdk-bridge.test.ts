@@ -26,7 +26,7 @@ describe("Studio Plugin Extension SDK & Runtime Bridge", () => {
     contributedPanels: [
       { id: "panel_speedline_opt", title: "속도선 옵션", location: "right-inspector" },
     ],
-    entrypointUri: "https://plugins.toonspectrum.com/speedline-pro/index.js",
+    entrypointUri: "https://plugins.toonstudio.com/speedline-pro/index.js",
   };
 
   it("registers, activates, and deactivates plugins", () => {

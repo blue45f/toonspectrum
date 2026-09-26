@@ -3,7 +3,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import type { FortuneReading } from "@toonspectrum/core/fortune";
+import type { FortuneReading } from "@toonstudio/core/fortune";
 import { FortuneInteractiveDeck } from "./FortuneInteractiveDeck";
 import { FortuneReadingTools, FortuneCreativeMission } from "./FortuneReadingTools";
 import { FortuneStoryReader } from "./FortuneStoryReader";

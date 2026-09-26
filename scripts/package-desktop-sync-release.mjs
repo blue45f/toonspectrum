@@ -298,7 +298,7 @@ async function buildSbom(bundleRoot, metadata) {
       component: {
         type: "application",
         "bom-ref": applicationRef,
-        name: "@toonspectrum/desktop-sync",
+        name: "@toonstudio/desktop-sync",
         version: metadata.version,
         purl: applicationRef,
       },

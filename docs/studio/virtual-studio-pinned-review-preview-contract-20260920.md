@@ -27,7 +27,7 @@ The reader accepts only a **located v2 PrivateObjectReference** serialized in `s
 
 ```json
 {
-  "contractVersion": "toonspectrum.private-object-storage.v2",
+  "contractVersion": "toonstudio.private-object-storage.v2",
   "providerId": "cloudflare-r2",
   "purpose": "derived",
   "digest": "sha256:<64 lowercase hexadecimal characters>",

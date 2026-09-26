@@ -7,7 +7,7 @@ import {
   type CreatorRoleId,
   type CreatorSpecialtyId,
   type PublicCreatorRoleProfile,
-} from "@toonspectrum/core/creator-role";
+} from "@toonstudio/core/creator-role";
 import { creatorFollows, creatorSeries, creatorWorks, db, users } from "../../platform/database";
 import { withDatabaseCapability } from "../../platform/http/service-availability";
 

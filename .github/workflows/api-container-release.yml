@@ -23,7 +23,7 @@ jobs:
     env:
       CI: "1"
       NODE_OPTIONS: --max-old-space-size=8192
-      IMAGE_NAME: ghcr.io/blue45f/toonspectrum-core-api
+      IMAGE_NAME: ghcr.io/blue45f/toonstudio-core-api
       RELEASE_SHA: ${{ inputs.ref }}
     steps:
       - uses: actions/checkout@v6
@@ -99,11 +99,11 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_NAME }}:${{ env.RELEASE_SHA }}
           labels: |
-            org.opencontainers.image.source=https://github.com/blue45f/toonspectrum
+            org.opencontainers.image.source=https://github.com/blue45f/toonstudio
             org.opencontainers.image.revision=${{ env.RELEASE_SHA }}
-            org.opencontainers.image.title=ToonSpectrum Core API
-          cache-from: type=gha,scope=toonspectrum-core-api
-          cache-to: type=gha,mode=max,scope=toonspectrum-core-api
+            org.opencontainers.image.title=ToonStudio Core API
+          cache-from: type=gha,scope=toonstudio-core-api
+          cache-to: type=gha,mode=max,scope=toonstudio-core-api
 
       - name: Record immutable image identity
         shell: bash

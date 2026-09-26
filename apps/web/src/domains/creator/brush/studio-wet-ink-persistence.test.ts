@@ -76,7 +76,7 @@ describe("Studio wet-ink physical-state persistence", () => {
     expect(decoded.value.field.dirtyBounds).toEqual(field.dirtyBounds);
     expect(decoded.value.receipt).toMatchObject({
       kind: "studio-wet-ink-snapshot-receipt",
-      snapshotKind: "toonspectrum.wet-ink-snapshot",
+      snapshotKind: "toonstudio.wet-ink-snapshot",
       snapshotVersion: 1,
       fieldVersion: 1,
       byteLength: encoded.value.bytes.byteLength,

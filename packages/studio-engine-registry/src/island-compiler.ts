@@ -4,7 +4,7 @@ import {
   type IsolationContextIR,
   type RenderNodeIR,
   type RenderSceneIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import {
   skiaMustCompleteFeature,

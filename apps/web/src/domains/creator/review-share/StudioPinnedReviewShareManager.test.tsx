@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { PinnedShareCreate, PinnedShareOwnerView } from "@toonspectrum/studio-project-model/pinned-review-share";
+import type { PinnedShareCreate, PinnedShareOwnerView } from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { reviewProductionFixture } from "../review-production/studio-review-production-test-fixture";

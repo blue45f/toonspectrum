@@ -1,5 +1,5 @@
 /**
- * Korean Hangul Chosung (초성) and fuzzy search utility for the ToonSpectrum Command Palette.
+ * Korean Hangul Chosung (초성) and fuzzy search utility for the ToonStudio Command Palette.
  * Supports Korean consonant decomposition, prefix matching, and multi-keyword synonyms.
  */
 

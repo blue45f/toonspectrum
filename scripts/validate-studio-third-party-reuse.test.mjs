@@ -14,7 +14,7 @@ const baseRegistry = () => ({
   schemaVersion: 1,
   updatedAt: "2026-09-02",
   purpose:
-    "Evidence-gated registry for exact third-party reuse; when rights are absent or unclear, ToonSpectrum independently reimplements only the capability and workflow.",
+    "Evidence-gated registry for exact third-party reuse; when rights are absent or unclear, ToonStudio independently reimplements only the capability and workflow.",
   entries: [],
 });
 

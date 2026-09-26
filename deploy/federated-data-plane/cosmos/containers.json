@@ -1,5 +1,5 @@
 {
-  "databaseId": "toonspectrum-free",
+  "databaseId": "toonstudio-free",
   "freeTierRequired": true,
   "sharedManualThroughput": 400,
   "containers": [

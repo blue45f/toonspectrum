@@ -88,17 +88,17 @@ describeWithDirectPostgres("Studio live lock repository PostgreSQL fencing", () 
 
     observerPool = new Pool({
       connectionString: INTEGRATION_URL,
-      application_name: `toonspectrum-lock-observer-${RUN_ID}`,
+      application_name: `toonstudio-lock-observer-${RUN_ID}`,
       max: 2,
     });
     poolA = new Pool({
       connectionString: INTEGRATION_URL,
-      application_name: `toonspectrum-lock-a-${RUN_ID}`,
+      application_name: `toonstudio-lock-a-${RUN_ID}`,
       max: 1,
     });
     poolB = new Pool({
       connectionString: INTEGRATION_URL,
-      application_name: `toonspectrum-lock-b-${RUN_ID}`,
+      application_name: `toonstudio-lock-b-${RUN_ID}`,
       max: 1,
     });
     pools.push(observerPool, poolA, poolB);

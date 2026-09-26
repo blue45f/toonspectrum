@@ -8,8 +8,8 @@ import {
   fitPolylineToPath,
   renderSceneToPixels,
   shapeTextCached,
-} from "@toonspectrum/studio-engine-vello";
-import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
+} from "@toonstudio/studio-engine-vello";
+import { loadVelloNode } from "@toonstudio/studio-engine-vello/node";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -32,7 +32,7 @@ import type {
   ExecuteCompositionResult,
 } from "../../packages/studio-brush-platform/src/brush-composition";
 import type { HokusaiModuleLike } from "../../packages/studio-brush-platform/src/raster-compile";
-import type { ModeledSampleIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR } from "@toonstudio/studio-project-model";
 
 /**
  * Composition brush program gate (V12 §12.2 "대표 공격적 조합") — every

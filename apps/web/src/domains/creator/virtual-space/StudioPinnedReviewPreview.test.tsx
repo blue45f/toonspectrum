@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { deriveStudioReviewPageMapping } from "@toonspectrum/studio-project-model";
+import { deriveStudioReviewPageMapping } from "@toonstudio/studio-project-model";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StudioPinnedReviewPreview } from "./StudioPinnedReviewPreview";
 import type { StudioVirtualSpaceReviewPreviews } from "./studio-virtual-space-review-preview";

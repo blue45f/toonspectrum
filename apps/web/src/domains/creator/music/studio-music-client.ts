@@ -1,6 +1,6 @@
-import type { MusicBrief, MusicStatus, MusicTrackMetadata } from "@toonspectrum/core/studio-music";
+import type { MusicBrief, MusicStatus, MusicTrackMetadata } from "@toonstudio/core/studio-music";
 
-import { isMp3, MUSIC_MAX_BYTES, MUSIC_OUTPUT_FORMAT, MUSIC_TERMS_URL, parseMusicBrief } from "@toonspectrum/core/studio-music";
+import { isMp3, MUSIC_MAX_BYTES, MUSIC_OUTPUT_FORMAT, MUSIC_TERMS_URL, parseMusicBrief } from "@toonstudio/core/studio-music";
 import { api } from "@/platform/api";
 
 

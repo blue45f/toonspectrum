@@ -103,7 +103,7 @@
       "episodeTitle": "첫 번째 단서",
       "seriesTitle": "별빛 탐정단"
     },
-    "schema": "toonspectrum.publish-package",
+    "schema": "toonstudio.publish-package",
     "totals": {
       "episodeImageCount": 2,
       "knownEpisodeBytes": 1900000,

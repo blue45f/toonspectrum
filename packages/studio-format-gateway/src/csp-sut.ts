@@ -1,4 +1,4 @@
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 
 import {
   bytesToBase64,
@@ -7,7 +7,7 @@ import {
   type FormatIssue,
 } from "./format-common";
 
-import type { BrushProgramIR, DynamicMappingIR } from "@toonspectrum/studio-project-model";
+import type { BrushProgramIR, DynamicMappingIR } from "@toonstudio/studio-project-model";
 
 const SQLITE_SIGNATURE = new TextEncoder().encode("SQLite format 3\0");
 const PNG_SIGNATURE = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);

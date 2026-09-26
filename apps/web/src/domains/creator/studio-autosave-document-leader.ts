@@ -60,13 +60,13 @@ export interface StudioAutosaveDocumentLease {
 
 export type StudioAutosaveDocumentLeadershipRegistry = Map<string, LeadershipRecord>;
 
-const LOCK_NAME_PREFIX = "toonspectrum-studio-autosave-document";
+const LOCK_NAME_PREFIX = "toonstudio-studio-autosave-document";
 const TEXT_ENCODER = new TextEncoder();
 
 /**
  * The lock name is derived from a digest so the manuscript identity (user id, work id) never
  * appears in an origin-wide, enumerable Web Locks name. It is deliberately distinct from the
- * journal's `toonspectrum-opfs-recovery:` lock: this one is held for the whole tab lifetime, the
+ * journal's `toonstudio-opfs-recovery:` lock: this one is held for the whole tab lifetime, the
  * journal lock is short-lived, and they are always acquired in that order (document then journal),
  * so the nesting cannot deadlock.
  */

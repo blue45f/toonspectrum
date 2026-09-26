@@ -1,8 +1,8 @@
-# 🧊 ToonSpectrum 하이브리드 3D DCC 엔진 — 종합 가이드 & 매뉴얼
+# 🧊 ToonStudio 하이브리드 3D DCC 엔진 — 종합 가이드 & 매뉴얼
 
-ToonSpectrum 스튜디오는 2D 디지탈 작화와 3D 모델링, VRM 캐릭터 포징, CAD 배경 선화 추출 및 다중 컷(Multi-Shot) 카메라 연출을 통합 제공하는 **하이브리드 2D·3D DCC(Digital Content Creation) 전용 저작 엔진**입니다.
+ToonStudio 스튜디오는 2D 디지탈 작화와 3D 모델링, VRM 캐릭터 포징, CAD 배경 선화 추출 및 다중 컷(Multi-Shot) 카메라 연출을 통합 제공하는 **하이브리드 2D·3D DCC(Digital Content Creation) 전용 저작 엔진**입니다.
 
-> 📘 **참고**: 이 문서는 ToonSpectrum의 3D DCC 기능에 대한 종합 사용자 매뉴얼입니다. 2D 드로잉, 브러시, 채색 등의 기본 스튜디오 기능은 [STUDIO_MANUAL.md](./STUDIO_MANUAL.md)를 참고하세요.
+> 📘 **참고**: 이 문서는 ToonStudio의 3D DCC 기능에 대한 종합 사용자 매뉴얼입니다. 2D 드로잉, 브러시, 채색 등의 기본 스튜디오 기능은 [STUDIO_MANUAL.md](./STUDIO_MANUAL.md)를 참고하세요.
 
 ---
 
@@ -28,7 +28,7 @@ ToonSpectrum 스튜디오는 2D 디지탈 작화와 3D 모델링, VRM 캐릭터 
 
 ## 1. 하이브리드 3D DCC 엔진 개요
 
-ToonSpectrum Studio의 3D DCC 엔진은 단순히 외부 3D 파일을 불러와 보여주는 뷰어가 아닌, **웹툰 세트장 구축(Build Mode)부터 컷별 구도 조작(Shot Mode), 인체/소품 배치, 2D 만화 선화/톤 자동 추출(Toon Output)**까지 한 화면에서 처리합니다.
+ToonStudio Studio의 3D DCC 엔진은 단순히 외부 3D 파일을 불러와 보여주는 뷰어가 아닌, **웹툰 세트장 구축(Build Mode)부터 컷별 구도 조작(Shot Mode), 인체/소품 배치, 2D 만화 선화/톤 자동 추출(Toon Output)**까지 한 화면에서 처리합니다.
 
 ### 핵심 설계 원칙
 
@@ -482,5 +482,5 @@ WebGPU와 WebGL2를 동일 기능으로 가장하지 않고, `RenderCapabilityPr
 
 ---
 
-*ToonSpectrum Studio Hybrid 3D DCC Documentation v2.0*
+*ToonStudio Studio Hybrid 3D DCC Documentation v2.0*
 *Last Updated: 2026-08-02*

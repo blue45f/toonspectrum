@@ -684,7 +684,7 @@ describe("Studio workspace owner-scoped persistence", () => {
     const key = studioWorkspaceStorageKey(userId);
     const storage = memoryStorage({
       [key]: JSON.stringify({
-        kind: "toonspectrum.studio-workspaces",
+        kind: "toonstudio.studio-workspaces",
         payloadVersion: STUDIO_WORKSPACE_PAYLOAD_VERSION,
         ownerScope: studioWorkspaceOwnerScope("owner-b"),
         state: DEFAULT_STUDIO_WORKSPACE_STATE,
@@ -700,7 +700,7 @@ describe("Studio workspace owner-scoped persistence", () => {
   });
 
   it("starts V12 clean and ignores every pre-V12 workspace key by default", () => {
-    const legacyKey = "toonspectrum-studio-workspaces:v1:guest";
+    const legacyKey = "toonstudio-studio-workspaces:v1:guest";
     const storage = memoryStorage({
       [legacyKey]: JSON.stringify({
         ...DEFAULT_STUDIO_WORKSPACE_STATE,
@@ -709,7 +709,7 @@ describe("Studio workspace owner-scoped persistence", () => {
       }),
       [STUDIO_INSPECTOR_LAYOUT_STORAGE_KEY]: JSON.stringify({ primary: "layers" }),
       "toonspectrum:studio:workspaces:guest": JSON.stringify({
-        kind: "toonspectrum.studio-workspaces",
+        kind: "toonstudio.studio-workspaces",
         payloadVersion: STUDIO_WORKSPACE_PAYLOAD_VERSION,
         ownerScope: "guest",
         state: DEFAULT_STUDIO_WORKSPACE_STATE,
@@ -744,7 +744,7 @@ describe("Studio workspace owner-scoped persistence", () => {
     const storage: StudioWorkspaceStorage = {
       getItem: (key) => {
         if (values.has(key)) return values.get(key) ?? null;
-        if (key.startsWith("toonspectrum-studio-workspaces:v1:user:")) {
+        if (key.startsWith("toonstudio-studio-workspaces:v1:user:")) {
           requestedLegacyKey = key;
           return JSON.stringify(legacyState);
         }
@@ -778,7 +778,7 @@ describe("Studio workspace owner-scoped persistence", () => {
   });
 
   it("falls back to the matching v1 key when the stable guest payload is malformed", () => {
-    const legacyKey = "toonspectrum-studio-workspaces:v1:guest";
+    const legacyKey = "toonstudio-studio-workspaces:v1:guest";
     const storage = memoryStorage({
       [studioWorkspaceStorageKey(null)]: "{interrupted-write",
       [legacyKey]: JSON.stringify({
@@ -802,7 +802,7 @@ describe("Studio workspace owner-scoped persistence", () => {
   });
 
   it("retains legacy keys when quota or silent-write verification prevents migration", () => {
-    const legacyKey = "toonspectrum-studio-workspaces:v1:guest";
+    const legacyKey = "toonstudio-studio-workspaces:v1:guest";
     const removed: string[] = [];
     const storage: StudioWorkspaceStorage = {
       getItem: (key) =>
@@ -882,7 +882,7 @@ describe("Studio workspace owner-scoped persistence", () => {
     const key = studioWorkspaceStorageKey(userId);
     const storage = memoryStorage({
       [key]: JSON.stringify({
-        kind: "toonspectrum.studio-workspaces",
+        kind: "toonstudio.studio-workspaces",
         payloadVersion: 1,
         ownerScope: studioWorkspaceOwnerScope(userId),
         state: { ...DEFAULT_STUDIO_WORKSPACE_STATE, version: 1 },
@@ -914,7 +914,7 @@ describe("Studio workspace owner-scoped persistence", () => {
     } = DEFAULT_STUDIO_WORKSPACE_STATE.liveLayout;
     const storage = memoryStorage({
       [key]: JSON.stringify({
-        kind: "toonspectrum.studio-workspaces",
+        kind: "toonstudio.studio-workspaces",
         payloadVersion: 2,
         ownerScope: studioWorkspaceOwnerScope(userId),
         state: {
@@ -1650,7 +1650,7 @@ describe("Studio workspace v3 to v4 migration", () => {
     };
     const storage = memoryStorage({
       [studioWorkspaceStorageKey(null)]: JSON.stringify({
-        kind: "toonspectrum.studio-workspaces",
+        kind: "toonstudio.studio-workspaces",
         payloadVersion: 3,
         ownerScope: OWNER,
         state: v3State,

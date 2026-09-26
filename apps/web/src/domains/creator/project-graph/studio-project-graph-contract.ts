@@ -12,7 +12,7 @@ import {
   type BlobRole,
   type ReviewAnchor,
   type ScopeRef,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import {
   compatibilityItemSchema,
   compatibilityReportSchema,
@@ -20,7 +20,7 @@ import {
   type CompatibilityItem,
   type CompatibilityReport,
   type SourceCreativeFormat,
-} from "@toonspectrum/studio-format-gateway/compatibility-report";
+} from "@toonstudio/studio-format-gateway/compatibility-report";
 import { z } from "zod";
 
 export const studioProjectAccessSchema = z

@@ -1,7 +1,7 @@
 import {
   brushProgramIRSchema,
   strokeIRSchema,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -18,7 +18,7 @@ import type {
   BrushProgramIR,
   ModeledSampleIR,
   StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * V19 §2.2/§5 — sensor passthrough through the composition stage. The

@@ -1,4 +1,4 @@
-# ToonSpectrum 커밋 작성 가이드
+# ToonStudio 커밋 작성 가이드
 #
 # 형식: <type>(<scope>): <한글 요약>
 # 예시: feat(studio): 레이어 그룹 기능 추가

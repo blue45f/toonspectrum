@@ -65,7 +65,7 @@ const REGULAR_UA = {
     "Version/17.5 Safari/605.1.15",
 } as const;
 
-const HREF = "https://toonspectrum.app/studio/work/abc?surface=canvas#top";
+const HREF = "https://toonstudio.app/studio/work/abc?surface=canvas#top";
 
 describe("diagnoseStudioInAppBrowser", () => {
   it.each(Object.entries(IN_APP_UA))("detects %s as an in-app browser", (_name, userAgent) => {
@@ -131,7 +131,7 @@ describe("diagnoseStudioInAppBrowser", () => {
     });
     expect(result.escape).toBe("link");
     expect(result.escapeHref).toBe(
-      "intent://toonspectrum.app/studio/work/abc?surface=canvas#top" +
+      "intent://toonstudio.app/studio/work/abc?surface=canvas#top" +
       "#Intent;scheme=https;action=android.intent.action.VIEW;end;",
     );
   });

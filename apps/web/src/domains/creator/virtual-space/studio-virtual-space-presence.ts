@@ -16,7 +16,7 @@ import {
   type StudioVirtualSpaceZoneId,
 } from "./studio-virtual-space-model";
 
-export const STUDIO_VIRTUAL_SPACE_WIRE = "toonspectrum-space-v1";
+export const STUDIO_VIRTUAL_SPACE_WIRE = "toonstudio-space-v1";
 export const STUDIO_VIRTUAL_SPACE_PRESENCE_INTERVAL_MS = 90;
 export const STUDIO_VIRTUAL_SPACE_HEARTBEAT_MS = 2_500;
 export const STUDIO_VIRTUAL_SPACE_STALE_MS = 10_000;

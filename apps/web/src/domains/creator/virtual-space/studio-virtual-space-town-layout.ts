@@ -81,7 +81,7 @@ function edgeKey(left: string, right: string): string {
 export function studioTownUsesLivingLayout(
   manifest: Pick<StudioVirtualSpaceWorldManifest, "id" | "backgroundAssetKey" | "width" | "height" | "tilemap">,
 ): boolean {
-  return !manifest.tilemap && manifest.id === "toonspectrum-master-studio"
+  return !manifest.tilemap && manifest.id === "toonstudio-master-studio"
     && /^studio-modular-campus-v3/u.test(manifest.backgroundAssetKey)
     && manifest.width === 1280
     && manifest.height === 960;

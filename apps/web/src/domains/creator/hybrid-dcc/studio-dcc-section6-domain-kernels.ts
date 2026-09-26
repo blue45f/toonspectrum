@@ -221,7 +221,7 @@ export function runDoc011AuditLogRolePermission(): StudioDccKernelResult {
 
 export function runDoc013SelfHostExportCliContract(): StudioDccKernelResult {
   const r = parseStudioSelfHostExportCliContract(
-    "toonspectrum export --format toon3d --out out.toon3d --document d1",
+    "toonstudio export --format toon3d --out out.toon3d --document d1",
   );
   return ok("DOC-013", {
     flagCount: r.flagCount,

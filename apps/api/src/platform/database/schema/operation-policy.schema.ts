@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import type { OperationPolicyDraft } from "@toonspectrum/contracts/operation-policy";
+import type { OperationPolicyDraft } from "@toonstudio/contracts/operation-policy";
 import { users } from "./auth.schema";
 
 const instant = (name: string) => timestamp(name, { mode: "date", withTimezone: true });

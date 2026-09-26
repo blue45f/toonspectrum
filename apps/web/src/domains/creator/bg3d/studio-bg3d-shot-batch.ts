@@ -89,10 +89,10 @@ export type StudioBg3dShotBatchContactSheetFallback =
   | "worker-failed";
 
 export const STUDIO_BG3D_SHOT_BATCH_PUBLIC_RENDER_PLAN_KIND =
-  "toonspectrum-bg3d-shot-batch-public-render-plan";
+  "toonstudio-bg3d-shot-batch-public-render-plan";
 export const STUDIO_BG3D_SHOT_BATCH_PUBLIC_RENDER_PLAN_VERSION = 1;
 export const STUDIO_BG3D_SHOT_BATCH_APP_IMPLEMENTATION_PROFILE_V1 =
-  "toonspectrum-studio-bg3d-shot-batch-plan-v2";
+  "toonstudio-studio-bg3d-shot-batch-plan-v2";
 export const STUDIO_BG3D_SHOT_BATCH_DEPTH_ENCODING_V1 =
   "normalized-device-depth-u8-near-black-far-white-v1";
 export const STUDIO_BG3D_SHOT_BATCH_PSD_PROFILE_V1 =
@@ -1469,13 +1469,13 @@ export async function buildStudioBg3dShotBatchArchive(
   ];
   const manifestPayload = legacyV1
     ? {
-        kind: "toonspectrum-bg3d-shot-batch",
+        kind: "toonstudio-bg3d-shot-batch",
         version: 1,
         files,
       }
     : publicRenderPlan
       ? {
-          kind: "toonspectrum-bg3d-shot-batch",
+          kind: "toonstudio-bg3d-shot-batch",
           version: 3,
           publicRenderPlan,
           producedPasses,
@@ -1484,7 +1484,7 @@ export async function buildStudioBg3dShotBatchArchive(
           contactSheetFallback: manifestContext.contactSheetFallback ?? null,
         }
       : {
-        kind: "toonspectrum-bg3d-shot-batch",
+        kind: "toonstudio-bg3d-shot-batch",
         version: 2,
         ...(manifestContext.resumeKey ? { resumeKey: manifestContext.resumeKey } : {}),
         requestedPasses,

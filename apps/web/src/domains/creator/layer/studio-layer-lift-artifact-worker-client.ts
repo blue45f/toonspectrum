@@ -129,7 +129,7 @@ function createModuleWorker(): StudioLayerLiftArtifactWorkerLike | null {
     new URL("./studio-layer-lift-artifact.worker.ts", import.meta.url),
     {
       type: "module",
-      name: "toonspectrum-layer-lift-artifact",
+      name: "toonstudio-layer-lift-artifact",
     },
   );
 }

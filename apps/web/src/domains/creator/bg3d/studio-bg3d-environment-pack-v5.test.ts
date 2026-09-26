@@ -257,7 +257,7 @@ describe("Studio BG3D Blender 5.2 Wave 5 environment pack", () => {
       expect(asset.normalization).toBe("authored-metres");
       expect(asset.provenance).toEqual(expect.objectContaining({
         origin: "original-procedural",
-        author: "ToonSpectrum",
+        author: "ToonStudio",
         generator: "scripts/blender/generate_environment_pack_v5.py",
         blenderVersion: "5.2",
         license: "CC0-1.0",
@@ -336,7 +336,7 @@ describe("Studio BG3D Blender 5.2 Wave 5 environment pack", () => {
       expect(root?.extras).toMatchObject({
         asset_id: asset.id,
         asset_type: "studio-bg3d-environment",
-        asset_author: "ToonSpectrum",
+        asset_author: "ToonStudio",
         asset_generator: "scripts/blender/generate_environment_pack_v5.py",
         asset_generator_version: "5.0.0-blender-5.2",
         asset_license: "CC0-1.0",

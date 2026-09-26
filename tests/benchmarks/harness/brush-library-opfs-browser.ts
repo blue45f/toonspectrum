@@ -165,7 +165,7 @@ export function validateBrushLibraryOpfsBrowserEvidence(
     || nested(result, "authority", "memoryVfsUsed") !== false
     || nested(result, "authority", "localStorageFallbackUsed") !== false
     || nested(result, "authority", "closeCompletedBeforeReopen") !== true
-    || nested(result, "authority", "opfsDirectory") !== "toonspectrum-studio-sqlite"
+    || nested(result, "authority", "opfsDirectory") !== "toonstudio-studio-sqlite"
     || nested(result, "authority", "logicalDatabaseFilename") !== "studio-local-v12.db"
   ) {
     issues.push("authority receipt does not prove product SQLite OPFS SAH-pool without fallback");
@@ -407,7 +407,7 @@ export async function runBrushLibraryOpfsBrowserBenchmark(
   options: { scratchDirectory?: string; resultPath?: string } = {},
 ): Promise<BrushLibraryOpfsBrowserArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-brush-library-opfs-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-brush-library-opfs-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

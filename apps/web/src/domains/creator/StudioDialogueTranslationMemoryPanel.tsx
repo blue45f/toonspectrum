@@ -578,7 +578,7 @@ export function StudioDialogueTranslationMemoryPanel({
     );
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = "toonspectrum-translation-memory-v1.json";
+    anchor.download = "toonstudio-translation-memory-v1.json";
     anchor.click();
     URL.revokeObjectURL(url);
     setNotice({

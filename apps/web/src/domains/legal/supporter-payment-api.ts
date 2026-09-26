@@ -4,7 +4,7 @@ import type {
   SupporterPaymentMode,
   SupporterPaymentPublicEntry,
   SupporterVisibility,
-} from "@toonspectrum/core/supporter-payment";
+} from "@toonstudio/core/supporter-payment";
 
 import { api } from "@/platform/api";
 

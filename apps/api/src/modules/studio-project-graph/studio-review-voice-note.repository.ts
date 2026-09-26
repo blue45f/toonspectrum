@@ -10,7 +10,7 @@ import {
   type StudioReviewVoiceNoteDelete,
   type StudioReviewVoiceNoteSubject,
   type StudioReviewVoiceNoteView,
-} from "@toonspectrum/studio-project-model/review-voice-note";
+} from "@toonstudio/studio-project-model/review-voice-note";
 import {
   LocatedPrivateObjectReferenceSchema,
   type LocatedPrivateObjectReference,

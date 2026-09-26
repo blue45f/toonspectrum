@@ -292,7 +292,7 @@ async function runScenario(
   origin: string,
   mode: "legacy" | "leader-aware",
 ): Promise<ScenarioReport> {
-  const documentKey = `toonspectrum-studio-autosave:v12:two-tab-${mode}-${randomUUID()}`;
+  const documentKey = `toonstudio-studio-autosave:v12:two-tab-${mode}-${randomUUID()}`;
   const baseEpoch = Date.now();
   const openMethod = mode === "legacy" ? "openLegacy" : "openLeaderAware";
 
@@ -504,7 +504,7 @@ async function execute(scratch: string): Promise<void> {
 export async function runStudioTwoTabLeaderVerifier(): Promise<void> {
   const scratch =
     process.env.TOONSPECTRUM_TWO_TAB_VERIFY_DIR
-    ?? join(tmpdir(), `toonspectrum-studio-two-tab-${Date.now()}-${randomUUID().slice(0, 8)}`);
+    ?? join(tmpdir(), `toonstudio-studio-two-tab-${Date.now()}-${randomUUID().slice(0, 8)}`);
   mkdirSync(scratch, { recursive: true });
   try {
     await execute(scratch);

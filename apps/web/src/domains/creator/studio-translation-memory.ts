@@ -46,9 +46,9 @@ export type {
 
 export const STUDIO_TRANSLATION_MEMORY_VERSION = 1;
 export const STUDIO_TRANSLATION_MEMORY_KIND =
-  "toonspectrum.translation-memory";
+  "toonstudio.translation-memory";
 export const STUDIO_TRANSLATION_MEMORY_STORAGE_KEY =
-  "toonspectrum-studio-translation-memory:v1";
+  "toonstudio-studio-translation-memory:v1";
 
 export const STUDIO_TRANSLATION_MEMORY_MAX_ENTRIES = 2_000;
 export const STUDIO_TRANSLATION_MEMORY_MAX_TOTAL_CHARS = 1_000_000;
@@ -809,7 +809,7 @@ export function importStudioTranslationMemory(
   ) {
     return {
       ok: false,
-      error: "지원하는 ToonSpectrum 번역 메모리 v1 문서가 아닙니다.",
+      error: "지원하는 ToonStudio 번역 메모리 v1 문서가 아닙니다.",
     };
   }
   if (

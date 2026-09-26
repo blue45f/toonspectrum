@@ -173,7 +173,7 @@ export class IntegrationPlatformService {
       };
     });
     const manifest = {
-      schema: "toonspectrum.publish-package/1",
+      schema: "toonstudio.publish-package/1",
       createdAt: new Date().toISOString(),
       projectId: input.projectId,
       title: input.title,
@@ -251,7 +251,7 @@ export class IntegrationPlatformService {
 
   developerManifest() {
     return {
-      schema: "toonspectrum.integration-developer-manifest/1",
+      schema: "toonstudio.integration-developer-manifest/1",
       events: INTEGRATION_EVENTS,
       actions: INTEGRATION_ACTIONS,
       scopes: [
@@ -267,8 +267,8 @@ export class IntegrationPlatformService {
         "automation.write",
       ],
       webhook: {
-        signatureHeader: "x-toonspectrum-signature",
-        timestampHeader: "x-toonspectrum-timestamp",
+        signatureHeader: "x-toonstudio-signature",
+        timestampHeader: "x-toonstudio-timestamp",
         algorithm: "HMAC-SHA256",
         replayWindowSeconds: 300,
         deliveryStates: ["succeeded", "failed", "uncertain"],

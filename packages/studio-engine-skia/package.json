@@ -1,5 +1,5 @@
 {
-  "name": "@toonspectrum/studio-engine-skia",
+  "name": "@toonstudio/studio-engine-skia",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -24,8 +24,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@toonspectrum/studio-engine-registry": "workspace:*",
-    "@toonspectrum/studio-project-model": "workspace:*",
+    "@toonstudio/studio-engine-registry": "workspace:*",
+    "@toonstudio/studio-project-model": "workspace:*",
     "canvaskit-wasm": "0.41.1"
   },
   "devDependencies": {

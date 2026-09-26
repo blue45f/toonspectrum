@@ -2,13 +2,13 @@
  * Vendor-neutral acceptance boundary for an external conformance validator.
  *
  * This module does not contain vendor SDK code, private keys, bundled trust roots, certification
- * marks, or a way for ToonSpectrum to issue a third-party certification. A caller-owned adapter may
+ * marks, or a way for ToonStudio to issue a third-party certification. A caller-owned adapter may
  * project a validator response into this bounded envelope, and a caller-owned trust policy may then
  * accept the provider's signed assertion.
  */
 
 export const STUDIO_EXTERNAL_CONFORMANCE_ATTESTATION_SCHEMA =
-  "toonspectrum.external-conformance-attestation" as const;
+  "toonstudio.external-conformance-attestation" as const;
 export const STUDIO_EXTERNAL_CONFORMANCE_ATTESTATION_SCHEMA_VERSION = 1 as const;
 
 export type StudioExternalConformanceSignatureAlgorithm =
@@ -64,7 +64,7 @@ export interface StudioExternalConformanceTrustRoot {
 }
 
 /**
- * ToonSpectrum ships no vendor root by default. Deployments must supply reviewed, rotatable keys.
+ * ToonStudio ships no vendor root by default. Deployments must supply reviewed, rotatable keys.
  */
 export const STUDIO_EXTERNAL_CONFORMANCE_DEFAULT_TRUST_ROOTS:
   readonly StudioExternalConformanceTrustRoot[] = Object.freeze([]);
@@ -107,7 +107,7 @@ export interface StudioExternalConformanceVerificationOptions {
 }
 
 export const STUDIO_CONFORMANCE_ASSURANCE_BOUNDARY = Object.freeze({
-  publicSpecificationSelfValidation: "toonspectrum-self-validation",
+  publicSpecificationSelfValidation: "toonstudio-self-validation",
   externalAttestation: "external-provider-attestation-accepted",
   productIssuedOfficialCertification: false,
   productIssuedTrademarkApproval: false,
@@ -192,7 +192,7 @@ export interface StudioExternalConformanceProviderBundle {
 
 /**
  * Provider-specific parsing stays outside this module. Adapters only normalize external output to
- * bytes plus the public envelope; they do not expand ToonSpectrum's trust policy.
+ * bytes plus the public envelope; they do not expand ToonStudio's trust policy.
  */
 export interface StudioExternalConformanceProviderAdapter<TSource> {
   readonly adapterId: string;
@@ -266,7 +266,7 @@ const BIGINT_ZERO = BigInt(0);
 const BIGINT_ONE = BigInt(1);
 const BIGINT_EIGHT = BigInt(8);
 const ECDSA_P256_HALF_ORDER = ECDSA_P256_ORDER >> BIGINT_ONE;
-const SIGNING_DOMAIN = "ToonSpectrum external conformance attestation\nv1\n";
+const SIGNING_DOMAIN = "ToonStudio external conformance attestation\nv1\n";
 const SAFE_IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9._:/+@~-]*$/u;
 const SHA256_DIGEST = /^sha256:[0-9a-f]{64}$/u;
 const CANONICAL_UTC =

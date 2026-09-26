@@ -66,7 +66,7 @@
 
 ### 설정 이동·복구
 
-- `toonspectrum.studio-app-settings` kind와 명시적 version을 가진 JSON 포맷
+- `toonstudio.studio-app-settings` kind와 명시적 version을 가진 JSON 포맷
 - export 시 기존 정규화기를 통과한 설정만 기록
 - import 최대 128KB
 - JSON, kind, version, payload shape 검증

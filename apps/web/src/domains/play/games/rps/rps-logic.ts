@@ -1,9 +1,9 @@
 // 웹툰 가위바위보 — 손가락 컬 분류부(MediaPipe FingerEulerMap 종속, 웹 전용).
-// 라운드 판정·점수·결정적 AI·묵찌빠 전이 등 순수 엔진은 @toonspectrum/play-core 로
+// 라운드 판정·점수·결정적 AI·묵찌빠 전이 등 순수 엔진은 @toonstudio/play-core 로
 // 이동했고, 여기서는 그것을 그대로 재-export 해 기존 import 경로를 유지한다.
 
 import type { FingerEulerMap } from "@/domains/creator/vrm/studio-vrm-hand-solver";
-import type { Hand } from "@toonspectrum/play-core";
+import type { Hand } from "@toonstudio/play-core";
 
 export {
   HAND_EMOJI,
@@ -21,7 +21,7 @@ export {
   type Score,
   type Initiative,
   type MukStep,
-} from "@toonspectrum/play-core";
+} from "@toonstudio/play-core";
 
 // 손가락 3마디 컬 합(rad) 임계 — 펴짐/접힘 판정.
 const EXTENDED_MAX = 1.2; // 합 < 이 값이면 편 손가락

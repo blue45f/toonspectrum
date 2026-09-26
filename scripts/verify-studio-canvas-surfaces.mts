@@ -38,9 +38,9 @@ import {
 
 const MEBIBYTE = 1_048_576;
 const RGBA8_BYTES_PER_PIXEL = 4;
-const QUICK_START_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
+const QUICK_START_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const UI_DENSITY_KEY = "toonstudio-studio-ui-density:v1";
 const RESULT_VERSION = 1;
 
 export const STUDIO_CANVAS_SURFACE_VIEWPORT = Object.freeze({
@@ -619,7 +619,7 @@ interface DprCaseEvidence {
 const SCRATCH =
   process.env.TOONSPECTRUM_CANVAS_SURFACES_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-canvas-surfaces");
+  ?? join(tmpdir(), "toonstudio-studio-canvas-surfaces");
 const RESULT_PATH = join(SCRATCH, "studio-canvas-surfaces-evidence.json");
 
 function errorMessage(cause: unknown): string {
@@ -733,7 +733,7 @@ async function seedStudioContext(context: BrowserContext): Promise<void> {
         localStorage.setItem(quickStartKey, "1");
         localStorage.setItem(mobileHintKey, "1");
         localStorage.setItem(
-          "toonspectrum-lang",
+          "toonstudio-lang",
           JSON.stringify({ state: { lang: "ko" }, version: 0 }),
         );
         localStorage.setItem(uiDensityKey, JSON.stringify({ mode: "full" }));

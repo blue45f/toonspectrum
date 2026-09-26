@@ -4,7 +4,7 @@ import {
   pickRandom,
   reasonFor,
   tierLabel,
-} from "@toonspectrum/play-core";
+} from "@toonstudio/play-core";
 import { Dices, RotateCcw, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 

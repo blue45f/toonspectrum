@@ -4,7 +4,7 @@
 
 Expand the Studio BG3D library with immediately usable, commercially safe characters, finished backgrounds, and props without adding network dependencies, marketplace identity, or opaque binary provenance.
 
-This slice adds **24 ToonSpectrum-authored procedural assets**:
+This slice adds **24 ToonStudio-authored procedural assets**:
 
 - 8 editable character pose mannequins
 - 8 finished scene/background modules
@@ -22,7 +22,7 @@ The implementation was shaped by three strong public-domain asset ecosystems:
 | [Kenney Assets](https://kenney.nl/assets) and [support guidance](https://kenney.nl/support) | Consistent modular packs, predictable silhouette language, CC0 commercial safety | Ship cohesive modular sets with no attribution requirement and no runtime network dependency. |
 | [Quaternius](https://quaternius.com/) | Stylized CC0 characters, environments, props, and reusable low-poly visual language | Add readable stylized silhouettes, action poses, fantasy/SF coverage, and reusable scene modules. |
 
-The repository already contains a large externally sourced CC0 delivery with source files, hashes, license records, previews, and PBR assets. This change deliberately avoids duplicating those downloads. The new pack fills the missing **editable composition layer**: all geometry is authored in ToonSpectrum code, every component can be selected and modified, and no third-party binary needs to be trusted at runtime.
+The repository already contains a large externally sourced CC0 delivery with source files, hashes, license records, previews, and PBR assets. This change deliberately avoids duplicating those downloads. The new pack fills the missing **editable composition layer**: all geometry is authored in ToonStudio code, every component can be selected and modified, and no third-party binary needs to be trusted at runtime.
 
 ## New character pose mannequins
 
@@ -65,7 +65,7 @@ Each scene is a single-click composition made of 16 or fewer named parts. Walls,
 
 ## Runtime and safety contract
 
-- Origin: ToonSpectrum-authored mathematical primitives
+- Origin: ToonStudio-authored mathematical primitives
 - License declaration: CC0-1.0
 - External files: 0
 - External textures: 0

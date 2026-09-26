@@ -8,13 +8,13 @@ describe("browser CSRF request helper", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-toonspectrum-csrf": "wrong",
+        "x-toonstudio-csrf": "wrong",
       },
     });
     const headers = new Headers(init.headers);
 
     expect(headers.get("content-type")).toBe("application/json");
-    expect(headers.get("x-toonspectrum-csrf")).toBe("1");
+    expect(headers.get("x-toonstudio-csrf")).toBe("1");
   });
 
   it("leaves safe methods unchanged", () => {

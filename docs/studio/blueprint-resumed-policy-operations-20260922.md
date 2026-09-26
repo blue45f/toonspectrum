@@ -1,7 +1,7 @@
 # Resumed blueprint: review groups and guarded operations
 
 Status: implementation and local verification; exact commit/CI/merge receipts belong in the PR.
-Resumed worktree: `toonspectrum-blueprint-completion-9a82d6`, branch `feat/blueprint-completion-9a82d6`.
+Resumed worktree: `toonstudio-blueprint-completion-9a82d6`, branch `feat/blueprint-completion-9a82d6`.
 Integrated baseline: `09aff47d91be4be8b1b3192d8898ad64e4883edf`.
 The previous uncommitted implementation was preserved. An incomplete notification-policy component was finished rather than starting a duplicate worktree.
 

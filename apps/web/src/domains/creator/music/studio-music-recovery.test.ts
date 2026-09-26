@@ -6,7 +6,7 @@ import { createMusicRecovery, type MusicRecoveryPort } from "./studio-music-reco
 
 import type { LocalMusicTrack } from "./studio-music-client";
 
-import { defaultMusicBrief } from "@toonspectrum/core/studio-music";
+import { defaultMusicBrief } from "@toonstudio/core/studio-music";
 
 function track(id = "one", ownerId = "owner-a"): LocalMusicTrack {
   return { ownerId, audio: new Blob(["ID3test-audio"], { type: "audio/mpeg" }), metadata: {

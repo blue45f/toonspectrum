@@ -1,5 +1,5 @@
 /**
- * End-to-end first-party ink codec execution + ToonSpectrum product certification.
+ * End-to-end first-party ink codec execution + ToonStudio product certification.
  *
  * The composed result proves the exact provider execution and the deterministic public-clean-room
  * conformance evidence under a deployment-owned trust root. It remains deliberately separate
@@ -35,7 +35,7 @@ import {
 } from "./studio-product-codec-certification";
 
 export const STUDIO_FIRST_PARTY_INK_CONFORMANCE_EVIDENCE_MEDIA_TYPE =
-  "application/vnd.toonspectrum.ink-codec-conformance+json" as const;
+  "application/vnd.toonstudio.ink-codec-conformance+json" as const;
 
 export interface ExecuteAndCertifyStudioFirstPartyInkCodecInput {
   readonly format: StudioFirstPartyInkCodecFormat;
@@ -48,7 +48,7 @@ export interface ExecuteAndCertifyStudioFirstPartyInkCodecInput {
 }
 
 export interface StudioFirstPartyInkCertifiedExecution {
-  readonly kind: "toonspectrum-first-party-ink-certified-execution";
+  readonly kind: "toonstudio-first-party-ink-certified-execution";
   readonly format: StudioFirstPartyInkCodecFormat;
   readonly direction: StudioCodecDirection;
   readonly scope: string;
@@ -103,7 +103,7 @@ export function studioFirstPartyInkCodecCertificationScope(
   format: StudioFirstPartyInkCodecFormat,
   direction: StudioCodecDirection,
 ): string {
-  return `toonspectrum.product.codec-conformance.${format}-${direction}`;
+  return `toonstudio.product.codec-conformance.${format}-${direction}`;
 }
 
 function expectedProfile(format: StudioFirstPartyInkCodecFormat): string {
@@ -251,7 +251,7 @@ export async function executeAndCertifyStudioFirstPartyInkCodec(
     signer,
   );
   return Object.freeze({
-    kind: "toonspectrum-first-party-ink-certified-execution",
+    kind: "toonstudio-first-party-ink-certified-execution",
     format: input.format,
     direction: input.direction,
     scope,
@@ -298,7 +298,7 @@ export async function verifyStudioFirstPartyInkCertifiedExecution(
     STUDIO_FIRST_PARTY_INK_CODEC_PROVIDERS,
   );
   if (
-    execution.kind !== "toonspectrum-first-party-ink-certified-execution"
+    execution.kind !== "toonstudio-first-party-ink-certified-execution"
     || execution.scope !== expectedScope
     || verified.certificate.evidence.mediaType
       !== STUDIO_FIRST_PARTY_INK_CONFORMANCE_EVIDENCE_MEDIA_TYPE

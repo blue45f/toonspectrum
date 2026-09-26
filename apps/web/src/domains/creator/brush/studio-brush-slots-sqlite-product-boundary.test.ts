@@ -17,8 +17,8 @@ describe("StudioPage brush quick slots SQLite product boundary", () => {
   it("removes localStorage v1/v2 from the live product call path", () => {
     expect(studioPage).not.toContain("loadStudioBrushSlotsState");
     expect(studioPage).not.toContain("saveStudioBrushSlotsState");
-    expect(studioPage).not.toContain("toonspectrum-studio-brush-slots:v1");
-    expect(studioPage).not.toContain("toonspectrum-studio-brush-slots:v2");
+    expect(studioPage).not.toContain("toonstudio-studio-brush-slots:v1");
+    expect(studioPage).not.toContain("toonstudio-studio-brush-slots:v2");
     expect(studioPage).toContain("state: emptyStudioBrushSlots()");
   });
 

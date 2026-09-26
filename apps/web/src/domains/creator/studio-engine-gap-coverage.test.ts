@@ -19,7 +19,7 @@
 import {
   planVelloCapabilityGaps,
   validateVelloCapabilityGapCoverage,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import { describe, expect, it } from "vitest";
 
 import { STUDIO_KNOWN_ENGINE_DESCRIPTORS } from "./studio-asset-metadata-registry";

@@ -1,5 +1,5 @@
 /**
- * Standards-only cryptographic attestation adapter for ToonSpectrum InkEnvelope.
+ * Standards-only cryptographic attestation adapter for ToonStudio InkEnvelope.
  *
  * Keys remain caller-owned: this module never exports, persists, identifies, or uploads key
  * material. Production trust policy (release keys, organization CAs, key rotation, revocation) is

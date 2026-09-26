@@ -14,7 +14,7 @@ async function loadWorker(): Promise<{ readonly skipWaiting: ReturnType<typeof v
       unregister: vi.fn(async () => true),
       navigationPreload: { enable: vi.fn(async () => undefined) },
     },
-    location: { origin: "https://toonspectrum.test" },
+    location: { origin: "https://toonstudio.test" },
   });
   vi.stubGlobal("__STUDIO_SERVICE_WORKER_MANIFEST__", {
     buildId: "update-test",
@@ -39,7 +39,7 @@ describe("service worker update acknowledgement", () => {
     let waited: Promise<unknown> = Promise.resolve();
 
     listeners.get("message")?.({
-      data: { type: "toonspectrum-sw:apply-update" },
+      data: { type: "toonstudio-sw:apply-update" },
       ports: [{ postMessage: (value: unknown) => replies.push(value) }],
       waitUntil: (value: Promise<unknown>) => { waited = value; },
     });

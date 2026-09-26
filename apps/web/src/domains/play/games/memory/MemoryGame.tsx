@@ -6,7 +6,7 @@ import {
   isSolved,
   type MemoryState,
   type Tile,
-} from "@toonspectrum/play-core";
+} from "@toonstudio/play-core";
 import { Clock, RotateCcw, Sparkles, Trophy } from "lucide-react";
 import { useEffect, useReducer, useRef, useState } from "react";
 
@@ -22,7 +22,7 @@ import { cn } from "@/shared/lib/utils";
 
 const PAIRS = 6; // 6쌍 = 12타일
 const MISMATCH_DELAY = 800; // 미스매치 후 다시 닫히기까지(ms)
-const BEST_KEY = "toonspectrum-play-memory";
+const BEST_KEY = "toonstudio-play-memory";
 
 function seededRng(seed: number): () => number {
   let a = seed >>> 0;

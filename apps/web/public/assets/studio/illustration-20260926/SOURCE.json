@@ -641,5 +641,5 @@
   ],
   "sourceManifest": "apps/web/src/domains/creator/catalog/studio-illustration-pack-manifest.json",
   "promptSource": "PROMPTS.json",
-  "licenseRef": "LicenseRef-ToonSpectrum-BuiltIn-AI-Raster-v1"
+  "licenseRef": "LicenseRef-ToonStudio-BuiltIn-AI-Raster-v1"
 }

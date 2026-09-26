@@ -4,7 +4,7 @@ import {
   sceneDigest,
   sceneIRSchema,
   validateComicGraph,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -14,17 +14,17 @@ import {
   renderComicPagePng,
 } from "./studio-comic-production";
 
-import type { ComicPageIR, SceneIR } from "@toonspectrum/studio-project-model";
+import type { ComicPageIR, SceneIR } from "@toonstudio/studio-project-model";
 
 /**
  * The skia engine is loaded through a runtime-resolved specifier on purpose:
  * the root app tsconfig maps `canvaskit-wasm` to a narrow type shim, so a
- * statically analyzable import of "@toonspectrum/studio-engine-skia" would
+ * statically analyzable import of "@toonstudio/studio-engine-skia" would
  * pull the engine sources (typed against the full canvaskit-wasm API) into
  * the root program and break `tsc --noEmit`. Runtime resolution keeps the
  * type universes separate while the test still drives the real engine.
  */
-const SKIA_PACKAGE = "@toonspectrum/studio-engine-skia";
+const SKIA_PACKAGE = "@toonstudio/studio-engine-skia";
 
 interface SkiaRenderModule {
   renderSceneToPng(

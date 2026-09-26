@@ -607,7 +607,7 @@ class GitHubClient {
           headers: {
             Accept: accept,
             Authorization: `Bearer ${this.token}`,
-            'User-Agent': 'toonspectrum-ci-failure-analytics',
+            'User-Agent': 'toonstudio-ci-failure-analytics',
             'X-GitHub-Api-Version': '2022-11-28',
           },
         });

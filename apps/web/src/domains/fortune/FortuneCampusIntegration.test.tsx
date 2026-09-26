@@ -2,7 +2,7 @@
 import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { FortuneReading } from "@toonspectrum/core/fortune";
+import type { FortuneReading } from "@toonstudio/core/fortune";
 import { CampusContext, type CampusContextValue } from "@/shared/components/spatial-campus/campus-context";
 import { campusDistrict } from "@/shared/lib/spatial-campus/campus-model";
 import { FortuneObservatory } from "./FortuneObservatory";

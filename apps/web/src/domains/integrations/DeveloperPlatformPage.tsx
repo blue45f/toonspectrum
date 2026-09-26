@@ -52,7 +52,7 @@ export function DeveloperPlatformPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-fg-3">{manifest.schema}</p>
               <p className="mt-1 text-sm text-fg-2">{ko ? `${manifest.providers}개 공급자 계약이 동일한 안전 경계를 사용합니다.` : `${manifest.providers} providers share the same safety boundary.`}</p>
             </div>
-            <button type="button" onClick={() => downloadIntegrationJson("toonspectrum-developer-manifest.json", manifest)} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line px-3 text-sm font-semibold text-fg">
+            <button type="button" onClick={() => downloadIntegrationJson("toonstudio-developer-manifest.json", manifest)} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-line px-3 text-sm font-semibold text-fg">
               <Download size={15} aria-hidden /> {ko ? "Manifest 다운로드" : "Download manifest"}
             </button>
           </div>

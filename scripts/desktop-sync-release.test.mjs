@@ -68,13 +68,13 @@ test("rejects Windows shell expansion and command injection", () => {
 test("lists Windows archives from their directory without a drive-letter argument", () => {
   assert.deepEqual(
     resolveArchiveListingInvocation(
-      "D:\\a\\toonspectrum\\release\\toonstudio-sync-windows-x64.tar.gz",
+      "D:\\a\\toonstudio\\release\\toonstudio-sync-windows-x64.tar.gz",
       win32,
     ),
     {
       command: "tar",
       args: ["-tzf", "toonstudio-sync-windows-x64.tar.gz"],
-      cwd: "D:\\a\\toonspectrum\\release",
+      cwd: "D:\\a\\toonstudio\\release",
     },
   );
 });

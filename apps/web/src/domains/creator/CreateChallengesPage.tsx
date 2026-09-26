@@ -1,5 +1,5 @@
 // 창작 챌린지 — 진행중 주제 카드(D-day) + 챌린지별 참여작 그리드 (툰스푼 창작 작업실 스타일).
-import { useFx } from "@toonspectrum/core/fx";
+import { useFx } from "@toonstudio/core/fx";
 import { ArrowLeft, CalendarClock, PenLine, Sparkles, Trophy, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";

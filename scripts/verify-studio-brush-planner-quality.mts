@@ -20,7 +20,7 @@ import {
 
 const OUTPUT_ROOT = resolve(
   process.env.TOONSPECTRUM_BRUSH_QUALITY_VERIFY_DIR?.trim()
-    || join(tmpdir(), `toonspectrum-brush-planner-quality-${Date.now()}`),
+    || join(tmpdir(), `toonstudio-brush-planner-quality-${Date.now()}`),
 );
 const REPORT_PATH = join(OUTPUT_ROOT, "studio-brush-planner-quality-report.json");
 
@@ -72,7 +72,7 @@ function main(): void {
     })),
   });
   const report = {
-    kind: "toonspectrum-studio-brush-planner-quality-v1",
+    kind: "toonstudio-studio-brush-planner-quality-v1",
     generatedAt: new Date().toISOString(),
     runtimeMs: performance.now() - started,
     outputRoot: OUTPUT_ROOT,

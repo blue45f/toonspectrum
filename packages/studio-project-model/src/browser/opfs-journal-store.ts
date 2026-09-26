@@ -6,7 +6,7 @@ import type { JournalEntryIR, SnapshotIR } from "../ir/journal";
 /**
  * OPFS-backed JournalStore (browser, V11 §10.5).
  *
- * Layout: <root>/toonspectrum-studio-projects/<projectId>/journal.jsonl + snapshot-{a,b}.json.
+ * Layout: <root>/toonstudio-studio-projects/<projectId>/journal.jsonl + snapshot-{a,b}.json.
  * Appends are serialized through a single promise chain — OPFS writable
  * streams do not support concurrent writers, and command order must match
  * journal order for recovery to reason about gaps.
@@ -30,7 +30,7 @@ export class OpfsJournalStore implements JournalStore {
       throw new Error("OPFS is not available in this environment");
     }
     const root = await navigator.storage.getDirectory();
-    const app = await root.getDirectoryHandle("toonspectrum-studio-projects", { create: true });
+    const app = await root.getDirectoryHandle("toonstudio-studio-projects", { create: true });
     const project = await app.getDirectoryHandle(projectId, { create: true });
     return new OpfsJournalStore(project);
   }

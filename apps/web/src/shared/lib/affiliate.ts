@@ -9,27 +9,27 @@ export const AFFILIATE_REGISTRY: Record<string, AffiliateConfig> = {
   ridi: {
     platformId: "ridi",
     trackingParam: "ridi_affiliate",
-    trackingValue: "toonspectrum",
+    trackingValue: "toonstudio",
   },
   yes24: {
     platformId: "yes24",
     trackingParam: "yes_aff",
-    trackingValue: "toonspectrum",
+    trackingValue: "toonstudio",
   },
   kyobo: {
     platformId: "kyobo",
     trackingParam: "kb_aff",
-    trackingValue: "toonspectrum",
+    trackingValue: "toonstudio",
   },
   munpia: {
     platformId: "munpia",
     trackingParam: "munpia_aff",
-    trackingValue: "toonspectrum",
+    trackingValue: "toonstudio",
   },
   novelpia: {
     platformId: "novelpia",
     trackingParam: "novelpia_aff",
-    trackingValue: "toonspectrum",
+    trackingValue: "toonstudio",
   },
 };
 

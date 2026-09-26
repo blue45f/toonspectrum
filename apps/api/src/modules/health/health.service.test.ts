@@ -7,7 +7,7 @@ import type { SupabaseObjectStoragePort } from "../../platform/adapters/supabase
 import type { UpstashCoordinationPort } from "../../platform/adapters/upstash-coordination/upstash-coordination.port";
 
 const DIRECT_POSTGRES_URL =
-  "postgresql://artist:secret@ep-direct.example.net/toonspectrum?sslmode=require";
+  "postgresql://artist:secret@ep-direct.example.net/toonstudio?sslmode=require";
 const VALID_COORDINATION_ENVIRONMENT = {
   UPSTASH_COORDINATION_ENABLED: "true",
   UPSTASH_COORDINATION_REST_URL: "https://upstash.example",

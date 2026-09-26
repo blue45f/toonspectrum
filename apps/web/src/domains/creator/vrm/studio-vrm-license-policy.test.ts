@@ -325,7 +325,7 @@ describe("studio VRM license action policy", () => {
     const result = policy(receiptFor({ creditNotation: "unnecessary" }), "local-preview");
 
     expect(result).toMatchObject({
-      schema: "toonspectrum.vrm-license-action-policy",
+      schema: "toonstudio.vrm-license-action-policy",
       version: 1,
       decision: "allow",
       authorized: true,

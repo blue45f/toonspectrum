@@ -2,7 +2,7 @@
 
 ## 연결 상태
 
-| 공급자 | 공식 자동화 경로 | 로컬 연결 | 무료 생성 판단 | ToonSpectrum 반영 |
+| 공급자 | 공식 자동화 경로 | 로컬 연결 | 무료 생성 판단 | ToonStudio 반영 |
 |---|---|---|---|---|
 | Tripo | 공식 MCP, 공식 Blender add-on, Python SDK/API | Codex·Claude Desktop MCP와 Blender 5.2 add-on 연결 | 결제수단 없는 600-credit API wallet에서 가능 | v3 detailed/PBR 환경 에셋 10종 생성·검수·번들링 |
 | Meshy | 공식 `meshy-cli`, 공식 MCP/API | CLI OAuth 연결 완료 | 계정 잔액은 표시되지만 API/CLI task 생성은 free plan에서 `NoMorePendingTasks`로 거부 | 모델 생성·크레딧 소비 없음 |
@@ -19,8 +19,8 @@
 
 - MCP source: `~/.local/share/toonstudio-tools/tripo-mcp`
 - Blender add-on source: `~/.local/share/toonstudio-tools/tripo-blender-addon`
-- credential-safe launcher: `~/.local/bin/toonspectrum-tripo-mcp`
-- ignored credential: `~/WebstormProjects/toonspectrum/.env.local`의 `TRIPO_API_KEY`
+- credential-safe launcher: `~/.local/bin/toonstudio-tripo-mcp`
+- ignored credential: `~/WebstormProjects/toonstudio/.env.local`의 `TRIPO_API_KEY`
 - Blender encrypted credential: Blender 5.2 add-on의 `api_key.enc`
 
 Codex와 Claude Desktop에는 `tripo3d` stdio 서버가 등록되어 있다. 설정 파일에는 키를 직접 넣지 않고 launcher가 mode `0600`인 `.env.local`을 읽는다. launcher 자체는 mode `0700`이다.
@@ -62,7 +62,7 @@ MCP Free Environment Pack v1은 다음 프로필을 사용했다.
 
 ## 권리 경계
 
-이 팩은 CC0가 아니다. 생성 시점의 Tripo Terms of Service에 따른 free-user output이며 상업 이용 가능, 비독점, 공급자 권리 보유 조건을 manifest와 GLB root extras에 보존한다. 기존 ToonSpectrum 원본 CC0 팩의 권리를 생성형 공급자 출력에 확장하지 않는다.
+이 팩은 CC0가 아니다. 생성 시점의 Tripo Terms of Service에 따른 free-user output이며 상업 이용 가능, 비독점, 공급자 권리 보유 조건을 manifest와 GLB root extras에 보존한다. 기존 ToonStudio 원본 CC0 팩의 권리를 생성형 공급자 출력에 확장하지 않는다.
 
 - Terms: https://www.tripo3d.ai/terms
 - Official MCP: https://github.com/VAST-AI-Research/tripo-mcp

@@ -218,7 +218,7 @@ async function fetchArtifact(
       endpoint,
       signal: requestSignal,
       accept: MESH_ARTIFACT_ACCEPT,
-      userAgent: "ToonSpectrum-MeshArtifact/1.0",
+      userAgent: "ToonStudio-MeshArtifact/1.0",
     });
 
     if (response.statusCode >= 300 && response.statusCode < 400) {

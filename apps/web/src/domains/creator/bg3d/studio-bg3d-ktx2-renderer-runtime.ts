@@ -9,7 +9,7 @@ import {
 import type { StudioBg3dKtx2TranscoderAssets } from "./studio-bg3d-ktx2-transcoder-contract";
 import type { KTX2Loader } from "three/examples/jsm/loaders/KTX2Loader.js";
 
-const TRANSCODER_RUNTIME_PATH = "toonspectrum-verified-basis/";
+const TRANSCODER_RUNTIME_PATH = "toonstudio-verified-basis/";
 const TRANSCODER_JAVASCRIPT_URL =
   `${TRANSCODER_RUNTIME_PATH}${STUDIO_BG3D_KTX2_TRANSCODER_ASSET_MANIFEST.javascript.fileName}`;
 const TRANSCODER_WASM_URL =

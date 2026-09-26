@@ -346,7 +346,7 @@ export function isTimelapseExportCancelled(err: unknown): boolean {
 }
 
 export function timelapseExportFileName(title: string): string {
-  return `${title.trim() || "toonspectrum-timelapse"}-timelapse.webm`;
+  return `${title.trim() || "toonstudio-timelapse"}-timelapse.webm`;
 }
 
 interface TimelapseRunState {

@@ -1,6 +1,6 @@
 {
   "auditAt": "2026-09-08T13:43:31.237086+00:00",
-  "repository": "/Users/hjunkim/WebstormProjects/toonspectrum",
+  "repository": "/Users/hjunkim/WebstormProjects/toonstudio",
   "pinnedMain": "a1c08fa111cc79efdaaed73ab71cdcff4d3c490c",
   "scope": "Exactly seven ordinary local source branches; no source/ref/worktree mutation performed during this audit. Subsequent two-file AI fix separately authorized by root.",
   "method": [
@@ -276,7 +276,7 @@
       },
       "classification": "already-integrated-patch-equivalent",
       "deleteRecommendation": "root may clean exact SHA after active worktree check",
-      "activeDependency": "Registered /private/tmp/toonspectrum-pr919-ci-current worktree at same SHA; root must classify worktree state before removal.",
+      "activeDependency": "Registered /private/tmp/toonstudio-pr919-ci-current worktree at same SHA; root must classify worktree state before removal.",
       "actualUncoveredChanges": [],
       "preserveMainChanges": [
         "main adds candidate quality rejection handling without ordinary-selection alerts; do not resolve its 2 textual conflicts by restoring source canvas files. All 10 original commit file blobs match main ancestor 356ca14c exactly."

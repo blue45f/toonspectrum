@@ -21,8 +21,8 @@ import { cpus, platform, arch } from "node:os";
 import { join } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { encodeRgbaToPng } from "@toonspectrum/studio-engine-skia";
-import { loadCanvasKitNode } from "@toonspectrum/studio-engine-skia/node";
+import { encodeRgbaToPng } from "@toonstudio/studio-engine-skia";
+import { loadCanvasKitNode } from "@toonstudio/studio-engine-skia/node";
 
 const REPO_ROOT = new URL("../../..", import.meta.url).pathname;
 const RESULTS_DIR = join(REPO_ROOT, "tests", "benchmarks", "results");

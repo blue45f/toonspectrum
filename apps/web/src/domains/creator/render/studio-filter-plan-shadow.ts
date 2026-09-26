@@ -4,7 +4,7 @@ import {
   HybridExecutionPlanner,
   providerDescriptorSchema,
   type SurfacePlan,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 import type { StudioFilterLane } from "../filter/studio-filter-lane-cost-model";
 

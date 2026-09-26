@@ -49,7 +49,7 @@ const artifact = JSON.parse(
 describe("V12 recovery package CAS benchmark artifact", () => {
   it("pins deterministic SQLite recovery quality and complete latency samples", () => {
     expect(artifact).toMatchObject({
-      schema: "toonspectrum.studio-v12-recovery-package-benchmark",
+      schema: "toonstudio.studio-v12-recovery-package-benchmark",
       version: 1,
       quality: {
         deterministicExportBytes: true,

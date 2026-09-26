@@ -102,7 +102,7 @@ jobs:
           if (( build_status != 0 )); then
             echo "::group::Source-mapped Studio prerender diagnostic"
             rm -rf apps/web/.next
-            pnpm --filter @toonspectrum/web exec next build --webpack --no-lint --debug-prerender || true
+            pnpm --filter @toonstudio/web exec next build --webpack --no-lint --debug-prerender || true
             echo "::endgroup::"
             exit "$build_status"
           fi

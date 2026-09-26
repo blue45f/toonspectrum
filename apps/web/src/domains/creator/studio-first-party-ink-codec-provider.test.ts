@@ -51,7 +51,7 @@ afterEach(() => {
 function documentInput(title = "First-party ink provider") {
   return {
     format: {
-      id: "toonspectrum.ink-document",
+      id: "toonstudio.ink-document",
       version: 1,
     },
     document: {
@@ -68,7 +68,7 @@ function documentInput(title = "First-party ink provider") {
       },
     },
     extensions: {
-      "toonspectrum.engine": {
+      "toonstudio.engine": {
         renderer: "hybrid-vnext",
       },
     },
@@ -157,7 +157,7 @@ describe("first-party ink provider manifests", () => {
       STUDIO_FIRST_PARTY_INKML_CODEC_PROFILE,
     );
     expect(STUDIO_FIRST_PARTY_INK_CODEC_CLAIM_BOUNDARY).toEqual({
-      implementationOwner: "ToonSpectrum",
+      implementationOwner: "ToonStudio",
       productConformanceCertificateBindable: true,
       thirdPartyCodecCertification: false,
       vendorTrademarkAuthorization: false,
@@ -254,7 +254,7 @@ describe("first-party InkEnvelope provider", () => {
     expect(invalidEncode).toMatchObject({
       ok: false,
       code: "provider-runtime-error",
-      providerId: "toonspectrum.ink-envelope.v1",
+      providerId: "toonstudio.ink-envelope.v1",
     });
 
     const encoded = await executeStudioCodecProvider(
@@ -279,7 +279,7 @@ describe("first-party InkEnvelope provider", () => {
     expect(invalidDecode).toMatchObject({
       ok: false,
       code: "provider-runtime-error",
-      providerId: "toonspectrum.ink-envelope.v1",
+      providerId: "toonstudio.ink-envelope.v1",
     });
   });
 });
@@ -354,7 +354,7 @@ describe("first-party bounded InkML provider", () => {
     expect(invalidEncode).toMatchObject({
       ok: false,
       code: "provider-runtime-error",
-      providerId: "toonspectrum.public-inkml-subset.v1",
+      providerId: "toonstudio.public-inkml-subset.v1",
     });
 
     const unsafe = new TextEncoder().encode(
@@ -368,7 +368,7 @@ describe("first-party bounded InkML provider", () => {
     expect(invalidDecode).toMatchObject({
       ok: false,
       code: "provider-runtime-error",
-      providerId: "toonspectrum.public-inkml-subset.v1",
+      providerId: "toonstudio.public-inkml-subset.v1",
     });
   });
 
@@ -387,7 +387,7 @@ describe("first-party bounded InkML provider", () => {
       ok: false,
       code: "provider-runtime-error",
       stage: "execution",
-      providerId: "toonspectrum.public-inkml-subset.v1",
+      providerId: "toonstudio.public-inkml-subset.v1",
     });
   });
 
@@ -419,7 +419,7 @@ describe("first-party bounded InkML provider", () => {
       ok: false,
       code: "output-budget-exceeded",
       stage: "output",
-      providerId: "toonspectrum.public-inkml-subset.v1",
+      providerId: "toonstudio.public-inkml-subset.v1",
     });
   });
 });

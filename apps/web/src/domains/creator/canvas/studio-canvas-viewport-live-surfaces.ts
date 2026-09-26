@@ -1,4 +1,4 @@
-import { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "@toonspectrum/studio-engine-skia";
+import { SKIA_DOCUMENT_MAX_BACKING_DIMENSION, SKIA_DOCUMENT_MAX_BACKING_PIXELS } from "@toonstudio/studio-engine-skia";
 import { isStudioSkiaDocumentFrontierReady } from "../render/studio-skia-document-frontier";
 import { isStudioSkiaDocumentElement } from "../render/studio-skia-document-plan";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";

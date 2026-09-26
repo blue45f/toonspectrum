@@ -574,7 +574,7 @@ function CreatorAdaptiveOnboardingDialog({ userId }: { readonly userId: string }
           {step === 2 ? (
             <section aria-labelledby="creator-goal-title">
               <h2 id="creator-goal-title" className="text-lg font-black text-fg">
-                {localized(locale, "ToonSpectrum에서 무엇을 하고 싶나요?", "What do you want to do in ToonSpectrum?")}
+                {localized(locale, "ToonStudio에서 무엇을 하고 싶나요?", "What do you want to do in ToonStudio?")}
               </h2>
               <p className="mt-1 text-sm text-fg-2">
                 {localized(locale, "복수 선택할 수 있으며 홈의 추천 카드와 빠른 실행 순서에 반영됩니다.", "Choose multiple goals. They tune recommendation cards and quick actions.")}

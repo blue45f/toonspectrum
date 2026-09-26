@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cameraTransform, cleanMotionCaption, motionCaptionLines, motionImageType, motionMoodDefaults, motionPreset, motionProgress, MOTION_PRESETS } from "./motion-panel-model";
 import { comicCast, comicMood, comicPlayLink, comicPortrait, COMIC_CAST } from "@/shared/components/comic/comic-cast";
-import { CHARACTERS } from "@toonspectrum/core/fortune";
+import { CHARACTERS } from "@toonstudio/core/fortune";
 import { playDirectorLines } from "./play-director";
 
 describe("shared original cast and private handoff", () => {

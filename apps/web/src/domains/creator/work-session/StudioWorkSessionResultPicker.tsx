@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { StudioWorkSession, StudioWorkSessionResult } from "@toonspectrum/studio-project-model/work-session";
+import type { StudioWorkSession, StudioWorkSessionResult } from "@toonstudio/studio-project-model/work-session";
 import { getAuthSessionRevision, listeners } from "@/domains/auth/public/session/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { loadStudioServerProductionWorkspace } from "../studio-production/studio-production-server-client";

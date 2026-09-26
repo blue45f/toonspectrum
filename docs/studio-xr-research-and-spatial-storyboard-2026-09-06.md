@@ -8,7 +8,7 @@
 
 현재 저장소에는 WebXR 세션 관리자, Three 렌더러 연결, AR 미니어처와 VR 장면 미리보기, 저장 샷, 멀티패스·PSD·콘택트시트 출력이 이미 있다. 이번 변경은 그 구현을 대체하지 않는다.
 
-기준 저장소: `blue45f/toonspectrum`, 기준 커밋 `a81db1dda72a744248dfbdb0a74baf27ab4a4dcd`.
+기준 저장소: `blue45f/toonstudio`, 기준 커밋 `a81db1dda72a744248dfbdb0a74baf27ab4a4dcd`.
 검토한 핵심 파일:
 - `src/domains/creator/studio-webxr-session.ts`
 - `src/domains/creator/bg3d/StudioBg3dWebXrSessionBridge.tsx`

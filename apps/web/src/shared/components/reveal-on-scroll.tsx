@@ -1,4 +1,4 @@
-import { useReveal } from "@toonspectrum/core/fx";
+import { useReveal } from "@toonstudio/core/fx";
 import { createElement } from "react";
 
 import { cn } from "@/shared/lib/utils";

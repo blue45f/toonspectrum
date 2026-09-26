@@ -24,7 +24,7 @@ export function StudioBg3dDirectionalShadowLight({
   const lightRef = useRef<THREE.DirectionalLight>(null);
   const [target] = useState(() => {
     const object = new THREE.Object3D();
-    object.name = "ToonSpectrumDirectionalShadowTarget";
+    object.name = "ToonStudioDirectionalShadowTarget";
     return object;
   });
 

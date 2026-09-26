@@ -278,7 +278,7 @@ export function parseStudioProjectFile(value: unknown): StudioProjectFile {
   const current = CurrentProjectSchema.safeParse(value);
   if (current.success) return canonicalizeProjectBg3dScenes(current.data);
   const legacy = LegacyProjectSchema.safeParse(value);
-  if (!legacy.success) throw new Error("올바르지 않은 ToonSpectrum 프로젝트 파일입니다.");
+  if (!legacy.success) throw new Error("올바르지 않은 ToonStudio 프로젝트 파일입니다.");
   return canonicalizeProjectBg3dScenes({
     version: 2,
     title: legacy.data.title,

@@ -4,7 +4,7 @@ import { normalizeBrushStudioV6MaterialConfig, type BrushStudioV6MaterialConfig 
 import { createBrushStudioV6MaterialReceipt } from "./brush-studio-v6-material-receipt";
 import { sameBrushStudioData } from "./brush-studio-data-equality";
 
-export const BRUSH_AUTHORING_FORMAT = "toonspectrum-brush-authoring";
+export const BRUSH_AUTHORING_FORMAT = "toonstudio-brush-authoring";
 export const BRUSH_AUTHORING_MAX_CHARACTERS = 262_144;
 
 /** New drafts keep execution receipts; a null receipt explicitly denotes authoring-only data. */

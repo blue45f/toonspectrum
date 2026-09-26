@@ -1,4 +1,4 @@
-# ToonSpectrum Studio 아키텍처·성능 개선 외부 검토 (2026-09-02)
+# ToonStudio Studio 아키텍처·성능 개선 외부 검토 (2026-09-02)
 
 > **역사 자료:** 2026-09-02 시점의 외부 검토 기록이다. 현재 구조와 엔진 역할은 `ARCHITECTURE.md`, `docs/architecture/studio-current-boundaries.md`, `docs/engines/renderer-roles.md`가 우선한다.
 
@@ -76,7 +76,7 @@ compositor, OPFS command journal + tile shard, BrushGraph V2, Konva 권위 제�
 
 ## C. 검토 원문
 
-## ToonSpectrum Studio 소스·UI/UX·렌더링 엔진 고도화 검토
+## ToonStudio Studio 소스·UI/UX·렌더링 엔진 고도화 검토
 
 분석 기준은 **2026년 9월 2일**, 저장소 `main`의 확인 시점 최신 커밋 `e90aad…`입니다. 최신 커밋에서도 긴 연필 스트로크를 위해 `StudioDrawNode`의 Canvas2D 패스 호출을 묶고, 브러시 dab 상한을 최대 32,768개까지 올리는 최적화가 이루어졌습니다. 이는 현재 제품의 병목이 여전히 Konva/Canvas2D 커밋 렌더링 경로에 존재한다는 직접적인 증거입니다.
 
@@ -119,7 +119,7 @@ UI 평가는 현행 소스, 사용자 매뉴얼, 저장소의 Playwright UX 감�
 
 더 심각한 증거는 `StudioCuttoonEditorViewSessionCore`입니다. 이 타입은 AI, 캔버스, 브러시, 협업, 애니메이션, 3D, 저장, UI 상태 등 수백 개 필드를 전부 `any`로 전달하는 “원래 closure bag” 역할을 합니다. 컴포넌트 분리는 이루어졌지만 아키텍처 분리는 이루어지지 않은 상태입니다.
 
-#### 4. 공격적인 브러시 엔진 고도화는 가능하며, 오히려 ToonSpectrum의 가장 강한 차별화 지점이 될 수 있습니다
+#### 4. 공격적인 브러시 엔진 고도화는 가능하며, 오히려 ToonStudio의 가장 강한 차별화 지점이 될 수 있습니다
 
 하지만 Hokusai, libmypaint, Krita, p5.brush, 자체 WebGPU 브러시를 각각 별도 기능처럼 계속 붙이는 방식은 유지비가 폭발합니다. 모든 브러시를 하나의 얕은 공통 포맷으로 억지 변환해서도 안 됩니다.
 
@@ -1452,7 +1452,7 @@ interface GpuResourceHandle<T> {
 
 ### 최종 판단
 
-ToonSpectrum은 WebGPU 편집기로 고도화할 수 있는 준비가 상당히 되어 있습니다. 현재의 문제는 기술 난이도보다 **제품 경로의 권위가 Konva, Canvas2D, WebGPU island, 여러 WASM provider 사이에 분산돼 있다는 것**입니다.
+ToonStudio은 WebGPU 편집기로 고도화할 수 있는 준비가 상당히 되어 있습니다. 현재의 문제는 기술 난이도보다 **제품 경로의 권위가 Konva, Canvas2D, WebGPU island, 여러 WASM provider 사이에 분산돼 있다는 것**입니다.
 
 가장 공격적이면서도 성공 가능성이 높은 방향은 다음 한 문장으로 정리됩니다.
 

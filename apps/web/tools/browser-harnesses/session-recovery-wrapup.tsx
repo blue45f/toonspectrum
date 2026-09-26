@@ -1,4 +1,4 @@
-import { createStudioWorkSession } from "@toonspectrum/studio-project-model/work-session";
+import { createStudioWorkSession } from "@toonstudio/studio-project-model/work-session";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 

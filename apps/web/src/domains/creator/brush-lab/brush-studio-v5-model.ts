@@ -157,7 +157,7 @@ export const BRUSH_STUDIO_V5_MOTIONS: readonly BrushStudioV5Option<BrushStudioV5
 ]);
 
 export const BRUSH_STUDIO_V5_STROKE_ENGINES: readonly BrushStudioV5Option<BrushStudioV5StrokeEngineId>[] = Object.freeze([
-  option("native-webgpu", "Native WebGPU", "ToonSpectrum WebGPU", "다브·리본·입자·타일을 단일 GPU 그래프로 실행합니다.", 1, 4, ["고성능"]),
+  option("native-webgpu", "Native WebGPU", "ToonStudio WebGPU", "다브·리본·입자·타일을 단일 GPU 그래프로 실행합니다.", 1, 4, ["고성능"]),
   option("perfect-freehand", "Perfect Freehand", "perfect-freehand + WebGPU", "필압 외곽선과 매끈한 테이퍼를 생성합니다.", 1, 4, ["G펜"]),
   option("google-ink", "Google Ink", "Google Ink WASM + WebGPU", "모델링된 경로와 삼각 메시를 사용합니다.", 3, 5, ["메시"]),
   option("libmypaint", "libmypaint", "libmypaint WASM", "MYB 다브·스머지·자연매체 동역학을 사용합니다.", 3, 5, ["MYB"]),

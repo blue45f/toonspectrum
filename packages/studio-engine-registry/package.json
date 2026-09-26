@@ -1,5 +1,5 @@
 {
-  "name": "@toonspectrum/studio-engine-registry",
+  "name": "@toonstudio/studio-engine-registry",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -30,6 +30,6 @@
   },
   "dependencies": {
     "zod": "^4.4.3",
-    "@toonspectrum/studio-project-model": "workspace:*"
+    "@toonstudio/studio-project-model": "workspace:*"
   }
 }

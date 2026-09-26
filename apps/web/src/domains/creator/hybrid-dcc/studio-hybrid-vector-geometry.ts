@@ -1,5 +1,5 @@
 /**
- * ToonSpectrum-owned hybrid vector geometry boundary.
+ * ToonStudio-owned hybrid vector geometry boundary.
  *
  * History, collaboration, save and replay see only the serializable contracts in this file.
  * Vendor modules stay behind lazy, private ports:
@@ -15,7 +15,7 @@ import { loadStudioGeometryNodesPlanarBooleanBackend } from "../studio-geometry-
 import { loadStudioPerfectFreehandStroker } from "../studio-perfect-freehand";
 import { loadStudioRoughGenerator } from "../studio-rough-shape";
 
-export const STUDIO_HYBRID_VECTOR_CONTRACT_ID = "toonspectrum.hybrid-vector-geometry";
+export const STUDIO_HYBRID_VECTOR_CONTRACT_ID = "toonstudio.hybrid-vector-geometry";
 export const STUDIO_HYBRID_VECTOR_CONTRACT_VERSION = 1 as const;
 
 export type StudioHybridVectorCapabilityId =
@@ -63,7 +63,7 @@ export interface StudioHybridVectorCleanRoomPolicy {
   readonly proprietaryReplacement: "independent-implementation-through-owned-contract";
   readonly restrictedImplementationClassification: "clean-room-spec-only";
   readonly directPortClassification: "prohibited-direct-port";
-  readonly goldenCorpusOwnership: "toonspectrum-independent-behavior-corpus";
+  readonly goldenCorpusOwnership: "toonstudio-independent-behavior-corpus";
 }
 
 export interface StudioHybridVectorCapabilityReceipt {
@@ -91,7 +91,7 @@ const STUDIO_HYBRID_VECTOR_CLEAN_ROOM_POLICY: StudioHybridVectorCleanRoomPolicy 
   proprietaryReplacement: "independent-implementation-through-owned-contract",
   restrictedImplementationClassification: "clean-room-spec-only",
   directPortClassification: "prohibited-direct-port",
-  goldenCorpusOwnership: "toonspectrum-independent-behavior-corpus",
+  goldenCorpusOwnership: "toonstudio-independent-behavior-corpus",
 });
 
 const STUDIO_HYBRID_VECTOR_BACKENDS: readonly StudioHybridVectorBackendReceipt[] = Object.freeze([

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STUDIO_REVIEW_VOICE_NOTE_MAX_BYTES } from "@toonspectrum/studio-project-model/review-voice-note";
+import { STUDIO_REVIEW_VOICE_NOTE_MAX_BYTES } from "@toonstudio/studio-project-model/review-voice-note";
 import { STUDIO_REVIEW_VOICE_NOTE_UPLOAD_LIMITS } from "./studio-review-voice-note.controller";
 
 describe("review voice-note multipart limits", () => {

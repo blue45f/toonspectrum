@@ -1,4 +1,4 @@
-import { studioReviewTaskReferenceSchema, studioReviewTaskReferencesAreValid, type StudioReviewTaskReference } from "@toonspectrum/studio-project-model";
+import { studioReviewTaskReferenceSchema, studioReviewTaskReferencesAreValid, type StudioReviewTaskReference } from "@toonstudio/studio-project-model";
 import type { StudioLocalDatabase } from "../studio-local-database";
 
 export const STUDIO_PRODUCTION_NAMESPACE = "studio-production-command-center-v1";

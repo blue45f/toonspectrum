@@ -578,7 +578,7 @@ export class SupabaseRestObjectStoragePort
             apikey: this.config.serviceRoleKey,
             authorization: `Bearer ${this.config.serviceRoleKey}`,
             "x-client-info":
-              "toonspectrum-supabase-object-storage/1",
+              "toonstudio-supabase-object-storage/1",
             ...request.headers,
           },
           body: request.body,

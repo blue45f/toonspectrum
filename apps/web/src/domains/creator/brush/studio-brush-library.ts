@@ -4,7 +4,7 @@
 // 기존 localStorage envelope와 동기 API는 이전 호출부를 위해 계속 읽고 쓴다. 권위 계약은 브러시 수에
 // 상한을 두지 않으며, 대규모 라이브러리는 studio-brush-library-repository.ts의 비동기 페이지 포트로
 // SQLite/OPFS 같은 저장소에 연결한다. 브러시 설정(강도·필압 곡선 등)에는 단일 표준 포맷이 없으므로
-// 내보내기/가져오기는 이 앱 전용 JSON 포맷(kind: "toonspectrum-studio-brush")을 쓴다.
+// 내보내기/가져오기는 이 앱 전용 JSON 포맷(kind: "toonstudio-studio-brush")을 쓴다.
 //
 // 저장소(localStorage 호환 인터페이스)를 주입받아 순수하게 동작한다(studio-palette-library.ts와 동일).
 
@@ -51,7 +51,7 @@ export const BRUSH_SOURCE_PRESET_ID_MAX_LENGTH = 160;
 export const BRUSH_SOURCE_PRESET_NAME_MAX_LENGTH = 120;
 
 /**
- * 원본 카탈로그 프리셋의 안정적인 식별 정보다. `brushId`는 언제나 ToonSpectrum의 실제 렌더링
+ * 원본 카탈로그 프리셋의 안정적인 식별 정보다. `brushId`는 언제나 ToonStudio의 실제 렌더링
  * 엔진(BRUSH_PRESETS)을 가리키고, 이 메타데이터만 팩 안의 세부 프리셋을 구분한다.
  */
 export interface StudioBrushSourcePresetMetadata {
@@ -136,7 +136,7 @@ export function browserBrushLibraryStorage(): BrushLibraryStorage | null {
   }
 }
 
-export const BRUSH_LIBRARY_KEY = "toonspectrum-studio-brush-library";
+export const BRUSH_LIBRARY_KEY = "toonstudio-studio-brush-library";
 export const BRUSH_LIBRARY_STORAGE_VERSION = 1;
 export const BRUSH_LIBRARY_CAPACITY = "unbounded" as const;
 /**
@@ -1078,7 +1078,7 @@ export function brushMatchesSnapshot(
 
 // ── JSON 내보내기/가져오기(이 앱 전용 포맷 — 브러시 설정엔 GPL 같은 표준이 없다) ──────
 
-export const BRUSH_EXPORT_KIND = "toonspectrum-studio-brush";
+export const BRUSH_EXPORT_KIND = "toonstudio-studio-brush";
 export const BRUSH_EXPORT_VERSION = 6;
 
 /** StudioSavedBrush → JSON 텍스트(들여쓰기 2칸, 사람이 읽을 수 있게). */
@@ -1137,7 +1137,7 @@ export function brushFileName(brush: { name: string }): string {
 
 /**
  * writeBrushJson이 만든(또는 호환되는) JSON 텍스트 → StudioSavedBrush.
- * kind가 "toonspectrum-studio-brush"가 아니면 던진다(parseGplPalette의 매직 헤더 체크와 동일 역할).
+ * kind가 "toonstudio-studio-brush"가 아니면 던진다(parseGplPalette의 매직 헤더 체크와 동일 역할).
  * 엔진 설정을 손실 없이 복원할 수 없으면 다른 브러시로 바꾸지 않고 가져오기를 거부한다.
  * 그 외 필드 누락·범위 이탈은 sanitizeBrushSnapshot이 기본값으로 보정하고 adjustedFields로 알린다.
  */

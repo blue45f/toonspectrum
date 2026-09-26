@@ -35,11 +35,11 @@ describe("saved material editor routing", () => {
     expect(localStorage.length).toBe(0);
   });
   it("leaves existing draft validation to the guarded editor", () => {
-    localStorage.setItem("toonspectrum.brush-program-v6:brush%3Aexisting", "corrupt-original");
+    localStorage.setItem("toonstudio.brush-program-v6:brush%3Aexisting", "corrupt-original");
     render(view("brush:existing"));
     expect(load).not.toHaveBeenCalled();
     expect(screen.getByTestId("editor")).toBeTruthy();
-    expect(localStorage.getItem("toonspectrum.brush-program-v6:brush%3Aexisting")).toBe("corrupt-original");
+    expect(localStorage.getItem("toonstudio.brush-program-v6:brush%3Aexisting")).toBe("corrupt-original");
   });
   it("ignores a late original after navigating to a different editor", async () => {
     let finish!: (value: { program: BrushStudioV6Program; persistent: boolean }) => void;
@@ -53,9 +53,9 @@ describe("saved material editor routing", () => {
     let finish!: (value: { program: BrushStudioV6Program; persistent: boolean }) => void;
     load.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     render(view("brush:saved"));
-    localStorage.setItem("toonspectrum.brush-program-v6:brush%3Asaved", "new-draft");
+    localStorage.setItem("toonstudio.brush-program-v6:brush%3Asaved", "new-draft");
     await act(async () => { finish({ program: createBrushStudioV6Program(), persistent: true }); });
     expect(screen.getByTestId("editor").textContent).toBe("brush:saved · stored-draft");
-    expect(localStorage.getItem("toonspectrum.brush-program-v6:brush%3Asaved")).toBe("new-draft");
+    expect(localStorage.getItem("toonstudio.brush-program-v6:brush%3Asaved")).toBe("new-draft");
   });
 });

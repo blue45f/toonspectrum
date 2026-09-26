@@ -1,4 +1,4 @@
-import type { StudioReviewTaskCompletionContext, StudioReviewTaskCompletionInput } from "@toonspectrum/studio-project-model";
+import type { StudioReviewTaskCompletionContext, StudioReviewTaskCompletionInput } from "@toonstudio/studio-project-model";
 import type { StudioReviewTaskCompletionRequest } from "./studio-review-task-completion-client";
 
 export function completionFixture() {

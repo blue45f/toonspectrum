@@ -1,4 +1,4 @@
-import { FORTUNE_EXPERIENCES, type FortuneGroup } from "@toonspectrum/core/fortune";
+import { FORTUNE_EXPERIENCES, type FortuneGroup } from "@toonstudio/core/fortune";
 
 export const FORTUNE_CAMPUS_ROOMS = [
   { id: "calendar", title: "역법 서가·오행 정원", en: "Calendar & elements", group: "사주·역법", experiences: ["saju", "almanac", "elements", "ten-gods", "cycles", "terms"] },

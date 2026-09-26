@@ -18,7 +18,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   CommercePaymentMethod,
   MarketplaceCommerceQuote,
-} from "@toonspectrum/core/commerce";
+} from "@toonstudio/core/commerce";
 import type { TossWidgets } from "@/platform/toss-payments-sdk";
 
 import {
@@ -90,7 +90,7 @@ export function MarketCheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const callbackRef = useRef<string | null>(null);
 
-  useDocumentTitle("마켓 결제 · ToonSpectrum");
+  useDocumentTitle("마켓 결제 · ToonStudio");
   useMetaDescription("마켓 리소스의 가격과 라이선스를 확인하고 안전하게 결제합니다.");
 
   const authenticated = ready && status === "authenticated" && Boolean(session.user.id);

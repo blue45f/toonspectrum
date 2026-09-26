@@ -29,7 +29,7 @@ function deepFreeze<T>(value: T): T {
 }
 
 /**
- * The ToonSpectrum-owned CC0 VRM the shipped preset render catalogue was built from.
+ * The ToonStudio-owned CC0 VRM the shipped preset render catalogue was built from.
  *
  * This is deliberately an exact content authority rather than a mutable URL. A catalogue build
  * must hash the source bytes before rendering and must use the fixed camera/lighting contract
@@ -42,11 +42,11 @@ function deepFreeze<T>(value: T): T {
  * candidate (CosmicBot, Eugenia, Devil, Bloody, LadyFawn, Robert) failed them.
  */
 export const STUDIO_VRM_AVATAR_REFERENCE_CANONICAL_RENDER_AUTHORITY = deepFreeze({
-  sourceAssetId: "toonspectrum-minseo-campus",
+  sourceAssetId: "toonstudio-minseo-campus",
   sourceUrl: "/vrm/TS_Minseo_Campus.vrm",
   sourceByteLength: 1_325_288,
   sourceSha256: "903601a5ffa71383188a3885509653283fb842e9a3f0025dca222b1c9b78ebea",
-  rendererId: "toonspectrum-avatar-forge-front",
+  rendererId: "toonstudio-avatar-forge-front",
   rendererRevision: "2",
   rendererModuleSha256: "12e7dd19fdf4d2372b5f0ac345cc4371f75d7154f01a6480bb46d3f08b21c672",
   avatarForgeStateModuleSha256: "c2b747da77a3fa2ace3635462dabc2a62cead54b74d5988a4baa02f8c3fb91cd",

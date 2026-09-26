@@ -100,10 +100,10 @@ function analyticsUpgrade(definition) {
 export function loadCloudflareFreeDataPlaneManifest() {
   const manifest = JSON.parse(readFileSync(resolve(D1_DIRECTORY, "databases.json"), "utf8"));
   const expected = [
-    ["d1-edge-index", "toonspectrum-edge-index", ["edge-index.sql"], "edge-index-v1"],
-    ["d1-analytics-buffer", "toonspectrum-analytics-buffer", ["analytics-buffer.sql", "traffic-analytics.sql"], "analytics-buffer-v2"],
+    ["d1-edge-index", "toonstudio-edge-index", ["edge-index.sql"], "edge-index-v1"],
+    ["d1-analytics-buffer", "toonstudio-analytics-buffer", ["analytics-buffer.sql", "traffic-analytics.sql"], "analytics-buffer-v2"],
   ];
-  if (manifest.version !== "toonspectrum.cloudflare-free-data-plane.v1"
+  if (manifest.version !== "toonstudio.cloudflare-free-data-plane.v1"
     || manifest.quotaScope !== "cloudflare-account"
     || manifest.primaryLocationHint !== "apac"
     || JSON.stringify(manifest.databases?.map((entry) => [

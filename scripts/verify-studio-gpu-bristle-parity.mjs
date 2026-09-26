@@ -28,7 +28,7 @@ import { WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 const SCRATCH =
   process.env.TOONSPECTRUM_GPU_BRISTLE_PARITY_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-gpu-bristle-parity");
+  ?? join(tmpdir(), "toonstudio-studio-gpu-bristle-parity");
 const HARNESS_PATH = "/__studio_gpu_bristle_parity__";
 const HARNESS_ENTRY = "/scripts/studio-gpu-bristle-parity-browser.ts";
 const RESULT_TIMEOUT_MS = 180_000;

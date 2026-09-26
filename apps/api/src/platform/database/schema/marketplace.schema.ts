@@ -29,7 +29,7 @@ export const creatorAssets = pgTable(
     previewMimeType: text("previewMimeType"),
     previewByteSize: integer("previewByteSize"),
     previewContentHash: text("previewContentHash"),
-    license: text("license").notNull().default("toonspectrum-standard"),
+    license: text("license").notNull().default("toonstudio-standard"),
     attributionText: text("attributionText").notNull().default(""),
     containsAi: boolean("containsAi").notNull().default(false),
     rightsConfirmedAt: timestamp("rightsConfirmedAt", { mode: "date", withTimezone: true }),
@@ -59,7 +59,7 @@ export const creatorAssets = pgTable(
       .where(sql`${t.contentHash} is not null`),
     check(
       "creator_asset_license_check",
-      sql`${t.license} in ('toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')`
+      sql`${t.license} in ('toonstudio-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')`
     ),
     check(
       "creator_asset_moderation_status_check",

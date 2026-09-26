@@ -38,7 +38,7 @@ function marketRecord(kind: Extract<
     : kind === "template"
       ? "studio-scene-template:vertical-story"
       : kind === "3d-preset"
-        ? "toonspectrum-bg3d-procedural-starter-v1"
+        ? "toonstudio-bg3d-procedural-starter-v1"
         : "studio-brush:starter-ink";
   return {
     schemaVersion: 1,
@@ -55,7 +55,7 @@ function marketRecord(kind: Extract<
     resourceVersion: "1.0.0",
     minimumStudioVersion: "0.1.0",
     tags: ["스타터", "테스트"],
-    license: "toonspectrum-standard",
+    license: "toonstudio-standard",
     attributionText: "",
     containsAi: false,
     provenance: { origin: "original", authoredByPublisher: true },
@@ -125,7 +125,7 @@ describe("MarketResourceDetailArticle actions and metadata", () => {
       .toBe(`/market/browse?publisher=${record.publisher.id}`);
     expect(screen.getByRole("link", { name: "같은 종류의 리소스 더 보기" }).getAttribute("href"))
       .toBe("/market/browse?kind=asset");
-    expect(screen.getByRole("link", { name: "ToonSpectrum 표준 사용권" }).getAttribute("href"))
+    expect(screen.getByRole("link", { name: "ToonStudio 표준 사용권" }).getAttribute("href"))
       .toBe("/terms");
     expect(screen.getByRole("heading", { name: "게시 manifest 기반 권리·호환성 확인" }))
       .toBeTruthy();

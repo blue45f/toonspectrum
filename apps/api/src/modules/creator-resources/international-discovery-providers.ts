@@ -1,6 +1,6 @@
-import { parseResource, recordOf, textOf } from "@toonspectrum/core/creator-resources";
+import { parseResource, recordOf, textOf } from "@toonstudio/core/creator-resources";
 
-import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@toonspectrum/core/creator-resources";
+import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@toonstudio/core/creator-resources";
 
 type Request = (url: URL) => Promise<{ value: unknown; fetchedAt: string }>;
 export type InternationalDiscoveryProvider = "smithsonian" | "wikimedia" | "europeana" | "dpla";

@@ -61,7 +61,7 @@ const HOUR_MS = 60 * 60 * 1_000;
 const PEXELS_REFERENCE_CACHE_TTL_MS = 6 * HOUR_MS;
 const PIXABAY_REFERENCE_CACHE_TTL_MS = 24 * HOUR_MS;
 const MAX_REFERENCE_CACHE_ENTRIES = 120;
-const USER_AGENT = "ToonSpectrum/1.0 (+https://www.toonstudio.cloud/about/crawler)";
+const USER_AGENT = "ToonStudio/1.0 (+https://www.toonstudio.cloud/about/crawler)";
 
 const GEMINI_TTS_MODELS = new Set([
   "gemini-3.8-flash-lite-tts",
@@ -404,7 +404,7 @@ export function createCreatorIntelligenceCore(options: CreatorIntelligenceCoreOp
       || configuredEndpoint(key(env, "OPEN_METEO_GEOCODING_BASE_URL")),
     );
     return {
-      schema: "toonspectrum.creator-intelligence.status.v1",
+      schema: "toonstudio.creator-intelligence.status.v1",
       references: {
         openverse: status("ready", "discovery-only; verify source rights before reuse"),
         pexels: key(env, "PEXELS_API_KEY")

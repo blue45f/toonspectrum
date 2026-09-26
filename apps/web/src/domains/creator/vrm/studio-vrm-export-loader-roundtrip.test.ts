@@ -57,7 +57,7 @@ function characterSnapshot(): StudioVrmExportSceneSnapshot {
   return {
     meta: {
       name: "루미",
-      authors: ["ToonSpectrum"],
+      authors: ["ToonStudio"],
       avatarPermission: "onlyAuthor",
       commercialUsage: "personalNonProfit",
     },
@@ -137,7 +137,7 @@ describe("exported VRM loads in @pixiv/three-vrm", () => {
     const vrm = await loadExportedVrm(characterSnapshot());
     expect(vrm.meta?.metaVersion).toBe("1");
     expect(vrm.meta?.name).toBe("루미");
-    expect(vrm.meta?.authors).toEqual(["ToonSpectrum"]);
+    expect(vrm.meta?.authors).toEqual(["ToonStudio"]);
     expect(vrm.meta?.licenseUrl).toBe(STUDIO_VRM_EXPORT_LICENSE_URL);
     expect(vrm.meta?.avatarPermission).toBe("onlyAuthor");
   });
@@ -158,7 +158,7 @@ describe("exported VRM loads in @pixiv/three-vrm", () => {
 
   it("loads a skeleton-only export that carries no BIN chunk at all", async () => {
     const vrm = await loadExportedVrm({
-      meta: { name: "Probe", authors: ["ToonSpectrum"] },
+      meta: { name: "Probe", authors: ["ToonStudio"] },
       humanoidBones: humanoidBones(),
       nodes: nodes(false),
     });

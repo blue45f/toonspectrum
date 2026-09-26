@@ -2,7 +2,7 @@
 //!
 //! This crate deliberately composes `hokusai-core`, `hokusai-brush`, and
 //! `hokusai-tile-mem` directly. Hokusai's upstream wasm wrapper flattens onto
-//! white; ToonSpectrum instead reads the original premultiplied-linear fix15
+//! white; ToonStudio instead reads the original premultiplied-linear fix15
 //! tiles and exports straight-alpha sRGB RGBA8.
 
 #![forbid(unsafe_code)]
@@ -21,7 +21,7 @@ const SAMPLE_OVERSCAN: f32 = 4_096.0;
 
 const NATURAL_MEDIA_BRUSH: &str = r#"{
   "version": 3,
-  "group": "ToonSpectrum",
+  "group": "ToonStudio",
   "comment": "Seeded transparent natural-media brush",
   "settings": {
     "opaque": {

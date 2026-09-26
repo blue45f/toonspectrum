@@ -28,7 +28,7 @@ describe("studio VRM broadcast preview planner", () => {
     if (!plan.ok) return;
 
     expect(plan.receipt).toEqual({
-      kind: "toonspectrum.studio-vrm-broadcast-preview",
+      kind: "toonstudio.studio-vrm-broadcast-preview",
       version: 1,
       background: { id: "green", label: "크로마 그린", hex: "#00b140" },
       authority: "runtime-only",

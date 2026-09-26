@@ -37,7 +37,7 @@ describe("collaboration onboarding", () => {
     const target = storage();
     saveCollaborationOnboarding(target, input, 1_000);
     expect(readCollaborationOnboarding(target, 8 * 24 * 60 * 60 * 1_000)).toBeNull();
-    expect(target.getItem("toonspectrum-collaboration-onboarding:v1")).toBeNull();
+    expect(target.getItem("toonstudio-collaboration-onboarding:v1")).toBeNull();
   });
 
   it("recognizes only direct email contacts and supports explicit clearing", () => {

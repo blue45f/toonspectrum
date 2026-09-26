@@ -1,5 +1,5 @@
 import { Controller, Get, Header, Headers, Inject, Param, Query } from "@nestjs/common";
-import { studioEntityIdSchema } from "@toonspectrum/studio-project-model";
+import { studioEntityIdSchema } from "@toonstudio/studio-project-model";
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 

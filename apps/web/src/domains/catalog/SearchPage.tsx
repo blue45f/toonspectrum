@@ -36,7 +36,7 @@ export function SearchPage() {
         </p>
         <div className="mt-4 flex flex-wrap gap-2 sm:mt-6">
           <a
-            href="#toonspectrum-search-explorer-top"
+            href="#toonstudio-search-explorer-top"
             className={buttonClass({
               size: "sm",
               variant: "solid",
@@ -75,7 +75,7 @@ export function SearchPage() {
       <DiscoveryWorkspaceNav current="search" className="mb-6 sm:mb-8" />
 
       <div
-        id="toonspectrum-search-explorer-top"
+        id="toonstudio-search-explorer-top"
         tabIndex={-1}
         className="search-page-results [scroll-margin-top:var(--site-header-sticky-offset)] outline-none"
       >

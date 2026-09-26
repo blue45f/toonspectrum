@@ -440,7 +440,7 @@ async function verifyMerkleIndexes(
     const children = node ? denseDataArray(node.children, MERKLE_FANOUT) : null;
     if (
       !node
-      || node.domain !== "toonspectrum/studio-dry-media-union/index-v1"
+      || node.domain !== "toonstudio/studio-dry-media-union/index-v1"
       || node.programDigest !== STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST
       || !validNonNegativeSafeInteger(node.level)
       || node.level > MAX_MERKLE_DEPTH
@@ -530,7 +530,7 @@ async function buildMerkleIndexes(
     for (let cursor = 0; cursor < nodes.length; cursor += MERKLE_FANOUT) {
       const children = nodes.slice(cursor, cursor + MERKLE_FANOUT);
       const encoded = await putCanonical(store, "index", {
-        domain: "toonspectrum/studio-dry-media-union/index-v1",
+        domain: "toonstudio/studio-dry-media-union/index-v1",
         programDigest: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
         level,
         children,
@@ -607,7 +607,7 @@ export function createStudioDryMediaUnionContinuationStore(
         || input.rgba.length !== input.width * input.height * 4
       ) throw new TypeError("Invalid dry-media bitmap tile page.");
       const header = canonicalBytes({
-        domain: "toonspectrum/studio-dry-media-union/bitmap-page-v1",
+        domain: "toonstudio/studio-dry-media-union/bitmap-page-v1",
         programDigest: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
         tileX: input.tileX,
         tileY: input.tileY,
@@ -698,7 +698,7 @@ export function createStudioDryMediaUnionContinuationStore(
       ]);
       if (
         !metadata
-        || metadata.domain !== "toonspectrum/studio-dry-media-union/bitmap-page-v1"
+        || metadata.domain !== "toonstudio/studio-dry-media-union/bitmap-page-v1"
         || metadata.programDigest !== STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST
         || metadata.tileX !== page.tileX
         || metadata.tileY !== page.tileY
@@ -806,7 +806,7 @@ export function createStudioDryMediaUnionContinuationStore(
       ];
       const content = await buildMerkleIndexes(cas, leaves);
       const metadata = await putCanonical(cas, "metadata", {
-        domain: "toonspectrum/studio-dry-media-union/metadata-v1",
+        domain: "toonstudio/studio-dry-media-union/metadata-v1",
         programVersion: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION,
         programDigest: STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST,
         strokeId: input.strokeId,
@@ -860,7 +860,7 @@ export function createStudioDryMediaUnionContinuationStore(
         presentationGeneration: input.presentationGeneration,
       };
       const rootPayload = {
-        domain: "toonspectrum/studio-dry-media-union/root-v1",
+        domain: "toonstudio/studio-dry-media-union/root-v1",
         receipt: rootWithoutDigest,
       };
       const persistedRoot = await putCanonical(cas, "root", rootPayload, MAX_ROOT_BYTES);
@@ -884,7 +884,7 @@ export function createStudioDryMediaUnionContinuationStore(
       const persistedReceipt = envelope ? dataRecord(envelope.receipt) : null;
       if (
         !envelope
-        || envelope.domain !== "toonspectrum/studio-dry-media-union/root-v1"
+        || envelope.domain !== "toonstudio/studio-dry-media-union/root-v1"
         || !persistedReceipt
         || Object.prototype.hasOwnProperty.call(persistedReceipt, "rootDigest")
       ) return null;
@@ -933,7 +933,7 @@ export function createStudioDryMediaUnionContinuationStore(
         : null;
       if (
         !metadataEnvelope
-        || metadataEnvelope.domain !== "toonspectrum/studio-dry-media-union/metadata-v1"
+        || metadataEnvelope.domain !== "toonstudio/studio-dry-media-union/metadata-v1"
         || metadataEnvelope.programVersion
           !== STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_VERSION
         || metadataEnvelope.programDigest !== STUDIO_DRY_MEDIA_UNION_COMPOSABLE_PROGRAM_DIGEST

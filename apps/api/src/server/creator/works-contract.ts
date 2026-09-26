@@ -1,7 +1,7 @@
 // 창작 작품(웹툰/컷툰) 공개 계약 — 타입과 순수 파서. feedback.ts 패턴을 따른다.
 import { clampText } from "./shared";
 
-import type { CreatorPublicationSourceKind } from "@toonspectrum/contracts/creator-publication-integrity";
+import type { CreatorPublicationSourceKind } from "@toonstudio/contracts/creator-publication-integrity";
 import type { CreatorCommunityMetadata } from "../../../../web/src/shared/lib/creator-community-publication-contract";
 import type { CreatorSeriesStatus } from "./community-contract";
 import type { CreatorWorkRevisionComparisonSnapshot, CreatorWorkRevisionSnapshot } from "../creator-work-revisions";

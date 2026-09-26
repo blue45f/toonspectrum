@@ -1,6 +1,6 @@
 /** Origin-wide ownership gate for the OPFS SQLite SAH pool. */
 export const STUDIO_LOCAL_DATABASE_WORKER_LOCK_NAME =
-  "toonspectrum-studio-local-v12-opfs-worker-owner";
+  "toonstudio-studio-local-v12-opfs-worker-owner";
 
 export type StudioLocalDatabaseWorkerLockErrorCode =
   | "web-locks-unavailable"

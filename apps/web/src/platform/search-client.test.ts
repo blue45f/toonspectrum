@@ -98,7 +98,7 @@ describe("search-client", () => {
     const [url, init] = mockFetch.mock.calls[0];
     expect(url).toBe("/api/search");
     expect(init?.method).toBe("POST");
-    expect(new Headers(init?.headers).get("x-toonspectrum-csrf")).toBe("1");
+    expect(new Headers(init?.headers).get("x-toonstudio-csrf")).toBe("1");
     expect(JSON.parse(String(init?.body))).toEqual({ ids: "work-159", page: "1", pageSize: "24" });
   });
 

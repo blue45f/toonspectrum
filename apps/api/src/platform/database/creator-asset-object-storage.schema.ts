@@ -45,7 +45,7 @@ export const creatorAssetStorageObjects = pgTable(
     ),
     check(
       "creator_asset_storage_object_contract_check",
-      sql`${table.contractVersion} = 'toonspectrum.private-object-storage.v2'`,
+      sql`${table.contractVersion} = 'toonstudio.private-object-storage.v2'`,
     ),
     check(
       "creator_asset_storage_object_purpose_check",

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { initialOperationPolicy, resolveOperationPolicy } from "@toonspectrum/contracts/operation-policy";
+import { initialOperationPolicy, resolveOperationPolicy } from "@toonstudio/contracts/operation-policy";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FREE_USAGE_POLICY } from "@toonspectrum/contracts/production-workspace";
+import { FREE_USAGE_POLICY } from "@toonstudio/contracts/production-workspace";
 import { TeamWorkspacePage, TeamWorkspaceJoinPage } from "./TeamWorkspacePage";
 import { saveCollaborationOnboarding } from "@/shared/lib/collaboration-onboarding";
 

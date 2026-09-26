@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { providerDescriptorSchema } from "@toonspectrum/studio-engine-registry";
+import { providerDescriptorSchema } from "@toonstudio/studio-engine-registry";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { velloSvgNativeProviderDescriptor } from "../descriptor";

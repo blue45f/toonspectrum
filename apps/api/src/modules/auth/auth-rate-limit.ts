@@ -140,7 +140,7 @@ export function createAuthRateLimitSubjectFingerprint(
   const digest = createHash("sha256")
     .update(
       JSON.stringify([
-        "toonspectrum-auth-rate-limit-v2",
+        "toonstudio-auth-rate-limit-v2",
         action,
         kind,
         subject,

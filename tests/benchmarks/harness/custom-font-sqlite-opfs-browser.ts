@@ -257,13 +257,13 @@ export function validateCustomFontSqliteOpfsEvidence(
       !== "acquireStudioLocalDatabase"
     || nested(benchmark, "primary", "authority", "requestedVfs") !== "opfs"
     || nested(benchmark, "primary", "authority", "sqliteOpfsDirectory")
-      !== "toonspectrum-studio-sqlite"
+      !== "toonstudio-studio-sqlite"
     || nested(benchmark, "primary", "authority", "sqliteDatabaseFilename")
       !== "studio-local-v12.db"
     || nested(benchmark, "primary", "authority", "expectedOpenFilename")
       !== "/studio-local-v12.db"
     || nested(benchmark, "primary", "authority", "casOpfsRoot")
-      !== "toonspectrum-studio-assets"
+      !== "toonstudio-studio-assets"
     || nested(benchmark, "primary", "authority", "casKind") !== "opfs"
     || nested(benchmark, "primary", "authority", "namespace")
       !== "studio-custom-font-library-v12"
@@ -274,7 +274,7 @@ export function validateCustomFontSqliteOpfsEvidence(
     || opened[0] !== "/studio-local-v12.db"
     || !Array.isArray(installed)
     || installed.length !== 1
-    || installed[0] !== "toonspectrum-studio-sqlite"
+    || installed[0] !== "toonstudio-studio-sqlite"
   ) {
     issues.push("authority receipt does not prove the real shared SQLite/OPFS product repository");
   }
@@ -583,7 +583,7 @@ async function selectFontFixtures(): Promise<readonly SelectedFontFixture[]> {
 function createFontFixturePlugin(fixtures: readonly SelectedFontFixture[]): Plugin {
   const byRoute = new Map(fixtures.map((fixture) => [fixture.url, fixture]));
   return {
-    name: "toonspectrum-custom-font-system-fixtures",
+    name: "toonstudio-custom-font-system-fixtures",
     configurePreviewServer(server) {
       server.middlewares.use((request, response, next) => {
         const requestUrl = request.url
@@ -741,7 +741,7 @@ export async function runCustomFontSqliteOpfsBrowserEvidence(
 ): Promise<CustomFontSqliteOpfsArtifact> {
   const fixtures = await selectFontFixtures();
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-custom-font-opfs-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-custom-font-opfs-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

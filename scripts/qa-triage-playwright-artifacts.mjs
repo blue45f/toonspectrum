@@ -47,7 +47,7 @@ function redact(value) {
   return String(value)
     .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s"']+/giu, "$1[REDACTED]")
     .replace(/((?:password|secret|token|cookie|session(?:Id|Token)?)\s*["'=:\s]+)[^\s,"'}]+/giu, "$1[REDACTED]")
-    .replace(/(toonspectrum-auth-session=)[^;\s]+/giu, "$1[REDACTED]")
+    .replace(/(toonstudio-auth-session=)[^;\s]+/giu, "$1[REDACTED]")
     .replace(/\b[A-Za-z0-9_-]{45,}\b/gu, (match) => `[LONG_VALUE:${match.length}]`);
 }
 

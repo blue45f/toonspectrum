@@ -1,9 +1,9 @@
 /**
  * Product-owned provider for the bounded WILL Data Format v1 Annex B OPC document profile.
  *
- * `.will` and ToonSpectrum's top-level container media type are used only for the exact seven-part
+ * `.will` and ToonStudio's top-level container media type are used only for the exact seven-part
  * document implemented by `studio-will-v1-opc-interchange`. The public v1 specification does not
- * define a top-level container media type. This is a ToonSpectrum clean-room codec, not a Wacom
+ * define a top-level container media type. This is a ToonStudio clean-room codec, not a Wacom
  * SDK, vendor certification, trademark grant, or proof that arbitrary vendor files work.
  */
 
@@ -44,7 +44,7 @@ export const STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CODEC_VERSION =
 export const STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_FORMAT =
   "will-v1-annex-b-document" as const;
 export const STUDIO_WILL_V1_DOCUMENT_TRANSPORT_KIND =
-  "toonspectrum-will-v1-document-transport" as const;
+  "toonstudio-will-v1-document-transport" as const;
 export const STUDIO_WILL_V1_DOCUMENT_TRANSPORT_VERSION = 1 as const;
 
 const MAX_TRANSPORT_BYTES = 64 * 1024 * 1024;
@@ -63,7 +63,7 @@ const LICENSE_SCOPE = Object.freeze([
 
 export const STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_CLAIM_BOUNDARY =
   Object.freeze({
-    implementationOwner: "ToonSpectrum" as const,
+    implementationOwner: "ToonStudio" as const,
     annexAPathStreamImplemented: true as const,
     annexBOpcSevenPartDocumentImplemented: true as const,
     boundedSevenPartProfileOnly: true as const,
@@ -427,7 +427,7 @@ export function decodeStudioWillV1DocumentTransport(
 
 const manifest: StudioCodecProviderManifest = Object.freeze({
   schemaVersion: STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
-  providerId: "toonspectrum.will-v1-annex-b-document.v1",
+  providerId: "toonstudio.will-v1-annex-b-document.v1",
   mode: "public-clean-room",
   format: STUDIO_FIRST_PARTY_WILL_V1_DOCUMENT_FORMAT,
   profile: STUDIO_WILL_V1_OPC_PROFILE,
@@ -440,7 +440,7 @@ const manifest: StudioCodecProviderManifest = Object.freeze({
   maxOutputBytes: MAX_TRANSPORT_BYTES,
   deterministic: true,
   licenseGrant: Object.freeze({
-    id: "toonspectrum.first-party.will-v1-annex-b-document.v1",
+    id: "toonstudio.first-party.will-v1-annex-b-document.v1",
     scope: LICENSE_SCOPE,
     expiresAt: null,
   }),

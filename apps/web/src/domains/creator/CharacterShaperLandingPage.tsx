@@ -1,4 +1,4 @@
-import { SITE_URL } from "@toonspectrum/core/business";
+import { SITE_URL } from "@toonstudio/core/business";
 import {
   ArrowRight,
   Box,
@@ -243,11 +243,11 @@ const HERO_FACTS = [
 const SHAPER_JSON_LD = {
   "@context": "https://schema.org",
   "@type": "WebPage",
-  name: `${SHAPER_TITLE} · 툰스펙트럼`,
+  name: `${SHAPER_TITLE} · 툰스튜디오`,
   url: `${SITE_URL}${SHAPER_PATH}`,
   description: SHAPER_DESCRIPTION,
   inLanguage: "ko",
-  isPartOf: { "@type": "WebSite", name: "툰스펙트럼", url: SITE_URL },
+  isPartOf: { "@type": "WebSite", name: "툰스튜디오", url: SITE_URL },
   mainEntity: {
     "@type": "SoftwareApplication",
     name: SHAPER_TITLE,
@@ -280,7 +280,7 @@ export function CharacterShaperLandingPage() {
   useMetaDescription(SHAPER_DESCRIPTION);
   usePageSocialMeta({
     canonicalPath: SHAPER_PATH,
-    title: `${SHAPER_TITLE} · 툰스펙트럼`,
+    title: `${SHAPER_TITLE} · 툰스튜디오`,
     description: SHAPER_DESCRIPTION,
   });
   useJsonLd(SHAPER_JSON_LD);

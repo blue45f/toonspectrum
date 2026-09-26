@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type {
   ProductionProjectAggregate,
   RevisionRef,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 export interface ProductionCalendarEvent {
   readonly key: string;
@@ -182,7 +182,7 @@ export function buildProductionCalendarIcs(
     "VERSION:2.0",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    "PRODID:-//ToonSpectrum//Production Co-Creator//KO",
+    "PRODID:-//ToonStudio//Production Co-Creator//KO",
     `X-WR-CALNAME:${icsEscape(aggregate.title)} 제작 일정`,
   ];  for (const event of buildProductionCalendarEvents(
     aggregate,
@@ -193,7 +193,7 @@ export function buildProductionCalendarIcs(
     ).slice(7, 39);
     lines.push(
       "BEGIN:VEVENT",
-      `UID:${uidHash}@toonspectrum.production`,
+      `UID:${uidHash}@toonstudio.production`,
       `DTSTAMP:${stamp}`,
       `DTSTART:${compactUtcDate(event.startsAt)}`,
       `DTEND:${compactUtcDate(event.endsAt)}`,
@@ -251,7 +251,7 @@ function revisionIngredient(reference: RevisionRef) {
     trust: "hash-only",
     warning:
       "X.509 인증서로 서명되기 전에는 공개 신뢰 체인의 C2PA 서명이 아닙니다.",
-    claimGenerator: "ToonSpectrum Production Co-Creator",
+    claimGenerator: "ToonStudio Production Co-Creator",
     claimGeneratorVersion: "1",
     projectId: aggregate.projectId,
     workId: aggregate.workId,
@@ -270,16 +270,16 @@ function revisionIngredient(reference: RevisionRef) {
       ),
     }),
     c2paDraft: Object.freeze({
-      claim_generator: "ToonSpectrum Production Co-Creator/1",
+      claim_generator: "ToonStudio Production Co-Creator/1",
       title: aggregate.title,
       format: "application/json",
       ingredients: uniqueIngredients,
       assertions: [
         {
-          label: "toonspectrum.production.aggregate",
+          label: "toonstudio.production.aggregate",
           data: { digest: aggregateDigest },
         },        {
-          label: "toonspectrum.production.rights",
+          label: "toonstudio.production.rights",
           data: rights,
         },
       ],
@@ -388,7 +388,7 @@ export function buildProductionProjectBackup(
   const aggregateContent = canonicalJson(aggregate);
   return Object.freeze({
     version: 1,
-    kind: "toonspectrum.production.project-backup",
+    kind: "toonstudio.production.project-backup",
     generatedAt: new Date().toISOString(),
     projectId: aggregate.projectId,
     workId: aggregate.workId,
@@ -404,7 +404,7 @@ export function buildProductionSigningPackage(
   const aggregateDigest = sha256Digest(canonicalJson(aggregate));
   const payload = {
     version: 1,
-    kind: "toonspectrum.production.manual-signing-package",
+    kind: "toonstudio.production.manual-signing-package",
     legalSignatureApplied: false,
     warning:
       "이 파일은 서명 대상과 해시를 정리한 수동 서명 보조 자료이며 전자서명 완료 증명이 아닙니다.",
@@ -442,7 +442,7 @@ function driveFileName(
   suffix: string,
 ): string {
   const projectId = aggregate.projectId.replace(/[^A-Za-z0-9._-]+/gu, "-");
-  return `toonspectrum-production-${projectId}-${suffix}`;
+  return `toonstudio-production-${projectId}-${suffix}`;
 }
 
 export function buildProductionGoogleDriveArtifact(

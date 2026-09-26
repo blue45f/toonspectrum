@@ -1,10 +1,10 @@
-import { CenterlineRefitError } from "@toonspectrum/studio-brush-platform";
+import { CenterlineRefitError } from "@toonstudio/studio-brush-platform";
 import { describe, expect, it, vi } from "vitest";
 
 import { refitSettledStudioStrokeCenterline } from "./studio-page-vector-ops";
 
 import type { DrawEl } from "./studio-element-model";
-import type { CenterlineFitEngine } from "@toonspectrum/studio-brush-platform";
+import type { CenterlineFitEngine } from "@toonstudio/studio-brush-platform";
 
 /**
  * Settled-stroke centerline refit seam (studio-page-vector-ops):

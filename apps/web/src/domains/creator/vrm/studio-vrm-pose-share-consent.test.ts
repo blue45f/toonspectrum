@@ -22,7 +22,7 @@ describe("studio VRM rendered-pose use-context consent", () => {
     const request = studioVrmPoseShareUseContextConsentRequest(PRODUCT_DISCLOSURE);
 
     expect(request.intro).toContain("저작자도, 별도 이용 허락을 받은 사람도 아닙니다");
-    expect(request.intro).toContain("ToonSpectrum 플랫폼 게시");
+    expect(request.intro).toContain("ToonStudio 플랫폼 게시");
     expect(request.intro).toContain("게시 주체는 법인(corporation)");
     expect(request.intro).toContain("개조된 모델 표현이 포함됩니다");
     expect(request.intro).toContain("과도한 폭력: 해당하지 않음");

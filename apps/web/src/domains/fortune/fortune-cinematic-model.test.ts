@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FORTUNE_EXPERIENCES, buildFortuneReading } from "@toonspectrum/core/fortune";
+import { FORTUNE_EXPERIENCES, buildFortuneReading } from "@toonstudio/core/fortune";
 import { FORTUNE_INTENTS, fortuneCreativeMission, fortunePublicShare, fortuneSceneTheme, fortuneStoryScenes, shuffleFortuneDeck } from "./fortune-cinematic-model";
 
 describe("fortune cinematic model", () => {

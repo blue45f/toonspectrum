@@ -1,4 +1,4 @@
-# ToonSpectrum 기여 가이드
+# ToonStudio 기여 가이드
 
 모든 사람과 코딩 에이전트는 먼저 루트 `AGENTS.md`를 읽는다. 수정 대상 경로에 더 가까운
 `AGENTS.md`가 있으면 해당 규칙도 함께 적용한다.

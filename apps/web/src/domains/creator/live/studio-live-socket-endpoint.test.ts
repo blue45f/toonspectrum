@@ -13,34 +13,34 @@ describe("Studio live Socket.IO endpoint resolver", () => {
   it("reuses only the Vite API origin for a cross-origin long-running Nest endpoint", () => {
     expect(
       resolveStudioLiveSocketEndpoint({
-        viteApiBase: "https://api.toonspectrum.example/base/api?token=never#fragment",
+        viteApiBase: "https://api.toonstudio.example/base/api?token=never#fragment",
         runtimeApiBase: "https://runtime-ignored.example",
       })
-    ).toBe("https://api.toonspectrum.example/studio-live");
+    ).toBe("https://api.toonstudio.example/studio-live");
   });
 
   it("prioritizes the explicit long-running realtime origin over every HTTP API base", () => {
     expect(
       resolveStudioLiveSocketEndpoint({
-        explicitOrigin: "https://realtime.toonspectrum.example/socket-host?ignored=yes",
-        viteApiBase: "https://api.toonspectrum.example/api",
-        runtimeApiBase: "https://runtime-api.toonspectrum.example/api",
+        explicitOrigin: "https://realtime.toonstudio.example/socket-host?ignored=yes",
+        viteApiBase: "https://api.toonstudio.example/api",
+        runtimeApiBase: "https://runtime-api.toonstudio.example/api",
       })
-    ).toBe("https://realtime.toonspectrum.example/studio-live");
+    ).toBe("https://realtime.toonstudio.example/studio-live");
   });
 
   it("falls back to the runtime API base and resolves a relative shell base safely", () => {
     expect(
       resolveStudioLiveSocketEndpoint({
-        runtimeApiBase: "https://runtime.toonspectrum.example/api",
+        runtimeApiBase: "https://runtime.toonstudio.example/api",
       })
-    ).toBe("https://runtime.toonspectrum.example/studio-live");
+    ).toBe("https://runtime.toonstudio.example/studio-live");
     expect(
       resolveStudioLiveSocketEndpoint({
         runtimeApiBase: "/api",
-        locationOrigin: "https://shell.toonspectrum.example",
+        locationOrigin: "https://shell.toonstudio.example",
       })
-    ).toBe("https://shell.toonspectrum.example/studio-live");
+    ).toBe("https://shell.toonstudio.example/studio-live");
   });
 
   it("never inherits the production API origin from a local dev or preview shell", () => {
@@ -95,21 +95,21 @@ describe("Studio live Socket.IO endpoint resolver", () => {
     ).toBeNull();
     expect(
       resolveStudioLiveSocketEndpoint({
-        explicitOrigin: "https://realtime.toonspectrum.example",
+        explicitOrigin: "https://realtime.toonstudio.example",
         locationOrigin: "https://www.toonstudio.cloud",
       })
-    ).toBe("https://realtime.toonspectrum.example/studio-live");
+    ).toBe("https://realtime.toonstudio.example/studio-live");
   });
 
   it("allows a deliberate realtime env origin in local development", () => {
     expect(
       resolveStudioLiveSocketEndpoint({
-        explicitOrigin: "https://realtime.toonspectrum.example/base",
+        explicitOrigin: "https://realtime.toonstudio.example/base",
         viteApiBase: "https://api.toonstudio.cloud/api",
         locationOrigin: "http://localhost:5199",
         localDevelopment: true,
       })
-    ).toBe("https://realtime.toonspectrum.example/studio-live");
+    ).toBe("https://realtime.toonstudio.example/studio-live");
   });
 
   it("allows insecure Socket.IO only on loopback in development", () => {
@@ -127,7 +127,7 @@ describe("Studio live Socket.IO endpoint resolver", () => {
     ).toBeNull();
     expect(
       resolveStudioLiveSocketEndpoint({
-        explicitOrigin: "http://realtime.toonspectrum.example",
+        explicitOrigin: "http://realtime.toonstudio.example",
         allowInsecureLoopback: true,
       })
     ).toBeNull();
@@ -136,8 +136,8 @@ describe("Studio live Socket.IO endpoint resolver", () => {
   it.each([
     "javascript:alert(1)",
     "file:///tmp/socket",
-    "http://api.toonspectrum.example",
-    "https://user:secret@api.toonspectrum.example/api",
+    "http://api.toonstudio.example",
+    "https://user:secret@api.toonstudio.example/api",
     "not a valid URL",
   ])("rejects an unsafe or malformed configured base: %s", (viteApiBase) => {
     expect(resolveStudioLiveSocketEndpoint({ viteApiBase })).toBeNull();

@@ -1,4 +1,4 @@
-# ToonSpectrum — 디자인 가이드
+# ToonStudio — 디자인 가이드
 
 시그니처 디자인 언어: **"활자와 스펙트럼"**. 따뜻한 잉크-블랙 위의 편집적 다크. 콘텐츠 아트와 데이터가 주인공.
 
@@ -43,7 +43,7 @@
 
 개념: **grotesque = 데이터/인덱스 voice, serif = 소설/문학 voice, sans = UI/한국어**.
 
-- `--font-display` Space Grotesk → 로고 ToonSpectrum, 대형 인덱스 넘버럴(랭킹), 통계 수치, 섹션 영문 라벨. 라틴/숫자 전용. tabular-nums.
+- `--font-display` Space Grotesk → 로고 ToonStudio, 대형 인덱스 넘버럴(랭킹), 통계 수치, 섹션 영문 라벨. 라틴/숫자 전용. tabular-nums.
 - `--font-sans` Pretendard → 모든 한국어 본문·UI·라벨. 기본 패밀리.
 - `--font-serif` Nanum Myeongjo → 에디토리얼 순간에만(웹소설 인용·hero 문학 라인·리뷰 풀쿼트). 절제.
 

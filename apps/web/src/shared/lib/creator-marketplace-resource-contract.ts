@@ -17,7 +17,7 @@ export const CREATOR_MARKETPLACE_RESOURCE_KINDS = [
 ] as const;
 
 export const CREATOR_MARKETPLACE_RESOURCE_LICENSES = [
-  "toonspectrum-standard",
+  "toonstudio-standard",
   "cc0-1.0",
   "cc-by-4.0",
   "cc-by-nc-4.0",
@@ -311,13 +311,13 @@ const CreatorMarketplacePortableDeliverySchema = z
   .object({
     mode: z.enum(["portable-json", "procedural-recipe"]),
     mediaType: z.enum([
-      "application/vnd.toonspectrum.asset+json",
-      "application/vnd.toonspectrum.brush+json",
-      "application/vnd.toonspectrum.filter+json",
-      "application/vnd.toonspectrum.palette+json",
-      "application/vnd.toonspectrum.template+json",
-      "application/vnd.toonspectrum.3d-preset+json",
-      "application/vnd.toonspectrum.3d-asset+json",
+      "application/vnd.toonstudio.asset+json",
+      "application/vnd.toonstudio.brush+json",
+      "application/vnd.toonstudio.filter+json",
+      "application/vnd.toonstudio.palette+json",
+      "application/vnd.toonstudio.template+json",
+      "application/vnd.toonstudio.3d-preset+json",
+      "application/vnd.toonstudio.3d-asset+json",
     ]),
     payload: CreatorMarketplacePortablePayloadSchema,
     byteSize: z.number().int().min(2).max(CREATOR_MARKETPLACE_RESOURCE_MAX_ENTRY_BYTES),
@@ -341,13 +341,13 @@ const CREATOR_MARKETPLACE_MEDIA_TYPE_BY_KIND: Record<
   CreatorMarketplaceResourceKind,
   string
 > = {
-  asset: "application/vnd.toonspectrum.asset+json",
-  brush: "application/vnd.toonspectrum.brush+json",
-  filter: "application/vnd.toonspectrum.filter+json",
-  palette: "application/vnd.toonspectrum.palette+json",
-  template: "application/vnd.toonspectrum.template+json",
-  "3d-preset": "application/vnd.toonspectrum.3d-preset+json",
-  "3d-asset": "application/vnd.toonspectrum.3d-asset+json",
+  asset: "application/vnd.toonstudio.asset+json",
+  brush: "application/vnd.toonstudio.brush+json",
+  filter: "application/vnd.toonstudio.filter+json",
+  palette: "application/vnd.toonstudio.palette+json",
+  template: "application/vnd.toonstudio.template+json",
+  "3d-preset": "application/vnd.toonstudio.3d-preset+json",
+  "3d-asset": "application/vnd.toonstudio.3d-asset+json",
 };
 
 const CreatorMarketplaceResourceManifestBaseSchema = z
@@ -422,12 +422,12 @@ function refineCreatorMarketplaceManifest(
     }
     if (
       manifest.provenance.origin === "permissive" &&
-      manifest.license === "toonspectrum-standard"
+      manifest.license === "toonstudio-standard"
     ) {
       context.addIssue({
         code: "custom",
         path: ["license"],
-        message: "외부 허용 리소스를 ToonSpectrum 표준 사용권으로 재라이선스할 수 없습니다.",
+        message: "외부 허용 리소스를 ToonStudio 표준 사용권으로 재라이선스할 수 없습니다.",
       });
     }
 

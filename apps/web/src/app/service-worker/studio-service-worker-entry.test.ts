@@ -1,9 +1,9 @@
 /** Runs the real worker against in-memory ServiceWorker globals. */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const ORIGIN = "https://toonspectrum.test";
+const ORIGIN = "https://toonstudio.test";
 const BUILD_ID = "testbuild001";
-const PRECACHE = `toonspectrum-sw-precache-v5-${BUILD_ID}`;
+const PRECACHE = `toonstudio-sw-precache-v5-${BUILD_ID}`;
 const MANIFEST = {
   buildId: BUILD_ID, shellUrls: ["/", "/studio"],
   criticalUrls: [
@@ -143,13 +143,13 @@ describe("install", () => {
 
 describe("activate", () => {
   it("purges stale and legacy caches, keeps foreign ones, and claims clients", async () => {
-    harness.caches.seed("toonspectrum-sw-precache-v5-oldbuild0000", "/", new Response("old"));
-    harness.caches.seed("toonspectrum-sw-immutable-v5", "/assets/keep.js", new Response("keep"));
-    harness.caches.seed("toonspectrum-pwa-v4", "/assets/legacy.js", new Response("legacy"));
-    harness.caches.seed("toonspectrum-covers-v1", "/api/cover", new Response("cover"));
+    harness.caches.seed("toonstudio-sw-precache-v5-oldbuild0000", "/", new Response("old"));
+    harness.caches.seed("toonstudio-sw-immutable-v5", "/assets/keep.js", new Response("keep"));
+    harness.caches.seed("toonstudio-pwa-v4", "/assets/legacy.js", new Response("legacy"));
+    harness.caches.seed("toonstudio-covers-v1", "/api/cover", new Response("cover"));
     harness.caches.seed("some-other-app", "/x", new Response("theirs"));
     await loadWorker(); await harness.dispatch("activate");
-    expect([...harness.caches.stores.keys()].sort()).toEqual(["some-other-app", "toonspectrum-sw-immutable-v5"]);
+    expect([...harness.caches.stores.keys()].sort()).toEqual(["some-other-app", "toonstudio-sw-immutable-v5"]);
     expect(harness.counters.claim).toBe(1); expect(harness.counters.preload).toBe(1);
   });
 });
@@ -162,7 +162,7 @@ describe("fetch routing", () => {
     expect(post.response).toBeUndefined(); expect(search.response).toBeUndefined(); expect(harness.fetchCalls).toEqual([]);
   });
   it("serves hashed assets cache-first without touching the network", async () => {
-    harness.caches.seed("toonspectrum-sw-immutable-v5", "/assets/index-abc.js", new Response("cached bundle"));
+    harness.caches.seed("toonstudio-sw-immutable-v5", "/assets/index-abc.js", new Response("cached bundle"));
     await loadWorker();
     const { response } = await harness.dispatch("fetch", { request: new Request(`${ORIGIN}/assets/index-abc.js`) });
     expect(await response?.text()).toBe("cached bundle"); expect(harness.fetchCalls).toEqual([]);
@@ -200,7 +200,7 @@ describe("fetch routing", () => {
   });
 
   it("re-fetches a worker asset cached without CORP instead of replaying it", async () => {
-    harness.caches.seed("toonspectrum-sw-immutable-v5", "/assets/studio-engine.worker-abc123.js", new Response("stale worker without CORP"));
+    harness.caches.seed("toonstudio-sw-immutable-v5", "/assets/studio-engine.worker-abc123.js", new Response("stale worker without CORP"));
     harness.setNetwork(async () => new Response("repaired", { headers: { "cross-origin-resource-policy": "same-origin" } }));
     await loadWorker();
     const { response } = await harness.dispatch("fetch", { request: new Request(`${ORIGIN}/assets/studio-engine.worker-abc123.js`) });
@@ -269,7 +269,7 @@ describe("fetch routing", () => {
     harness.setNetwork(async (url) => url.includes("/i18n/") ? new Response("{}", { headers: { "content-type": "application/json" } }) : shell("online", true));
     await harness.dispatch("fetch", navigationEvent("/studio"));
     expect(harness.fetchCalls.filter((url) => url.includes("/i18n/"))).toHaveLength(2);
-    expect(harness.caches.entries("toonspectrum-sw-data-v5")).toContain(`${ORIGIN}/i18n/studio/mainMenu/ko.json`);
+    expect(harness.caches.entries("toonstudio-sw-data-v5")).toContain(`${ORIGIN}/i18n/studio/mainMenu/ko.json`);
   });
 });
 
@@ -277,22 +277,22 @@ describe("messages", () => {
   it("skips waiting only on an explicit apply-update", async () => {
     await loadWorker(); await harness.dispatch("message", { data: { type: "SKIP_WAITING" }, ports: [] });
     expect(harness.counters.skipWaiting).toBe(0);
-    await harness.dispatch("message", { data: { type: "toonspectrum-sw:apply-update" }, ports: [] });
+    await harness.dispatch("message", { data: { type: "toonstudio-sw:apply-update" }, ports: [] });
     expect(harness.counters.skipWaiting).toBe(1);
   });
   it("kill switch purges every owned cache and unregisters", async () => {
-    harness.caches.seed("toonspectrum-sw-immutable-v5", "/assets/a.js", new Response("a"));
-    harness.caches.seed("toonspectrum-pwa-v4", "/", new Response("legacy"));
+    harness.caches.seed("toonstudio-sw-immutable-v5", "/assets/a.js", new Response("a"));
+    harness.caches.seed("toonstudio-pwa-v4", "/", new Response("legacy"));
     harness.caches.seed("some-other-app", "/x", new Response("theirs")); await loadWorker();
     const replies: unknown[] = [];
-    await harness.dispatch("message", { data: { type: "toonspectrum-sw:kill" }, ports: [{ postMessage: (value: unknown) => replies.push(value) }] });
+    await harness.dispatch("message", { data: { type: "toonstudio-sw:kill" }, ports: [{ postMessage: (value: unknown) => replies.push(value) }] });
     expect([...harness.caches.stores.keys()]).toEqual(["some-other-app"]);
     expect(harness.counters.unregister).toBe(1); expect(replies).toEqual([{ ok: true }]);
   });
   it("does not accept preparation requests from foreign or non-studio pages", async () => {
     await loadWorker();
     for (const url of ["https://foreign.test/studio", `${ORIGIN}/market`]) {
-      await harness.dispatch("message", { source: { url }, data: { type: "toonspectrum-sw:prepare-offline", urls: ["/assets/a.js"] }, ports: [] });
+      await harness.dispatch("message", { source: { url }, data: { type: "toonstudio-sw:prepare-offline", urls: ["/assets/a.js"] }, ports: [] });
     }
     expect(harness.fetchCalls).toEqual([]);
   });
@@ -321,7 +321,7 @@ describe("prepared full editor and rescue coexistence", () => {
     await (await harness.dispatch("install")).waited;
     harness.caches.seed(PRECACHE, "/studio", shell("prepared editor", true));
     harness.caches.seed(PRECACHE, "/assets/pen-def.js", assetResponse("pen.js"));
-    harness.caches.seed("toonspectrum-sw-data-v5", MANIFEST.warmUrls[0], new Response("{}", { headers: { "content-type": "application/json" } }));
+    harness.caches.seed("toonstudio-sw-data-v5", MANIFEST.warmUrls[0], new Response("{}", { headers: { "content-type": "application/json" } }));
     harness.setNetwork(async () => new Response("origin unavailable", { status: 503 }));
   }
   it("serves the fully prepared isolated editor before the installed rescue", async () => {
@@ -335,7 +335,7 @@ describe("prepared full editor and rescue coexistence", () => {
     const replies: unknown[] = [];
     await harness.dispatch("message", {
       source: { url: `${ORIGIN}/studio/canvas` },
-      data: { type: "toonspectrum-sw:offline-status" },
+      data: { type: "toonstudio-sw:offline-status" },
       ports: [{ postMessage: (value: unknown) => replies.push(value) }],
     });
     expect(replies).toEqual([{ schema: 1, buildId: BUILD_ID, ready: true }]);
@@ -348,7 +348,7 @@ describe("prepared full editor and rescue coexistence", () => {
   });
   it("keeps the same cached Studio if a dictionary needs recovery", async () => {
     await preparedWorker();
-    harness.caches.seed("toonspectrum-sw-data-v5", MANIFEST.warmUrls[0], shell("error page"));
+    harness.caches.seed("toonstudio-sw-data-v5", MANIFEST.warmUrls[0], shell("error page"));
     const { response } = await harness.dispatch("fetch", navigationEvent("/studio/canvas"));
     expect(await response?.text()).toBe("prepared editor");
   });

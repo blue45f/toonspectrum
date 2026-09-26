@@ -299,8 +299,8 @@ async function runCase(browser, profile, route) { // NOSONAR javascript:S3776
   const page = await context.newPage();
   await page.addInitScript(() => {
     try {
-      localStorage.setItem("toonspectrum-intro-shown", "true");
-      localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "true");
+      localStorage.setItem("toonstudio-intro-shown", "true");
+      localStorage.setItem("toonstudio-studio-quick-start-dismissed", "true");
     } catch {
       // The test also covers storage-restricted states elsewhere.
     }

@@ -36,7 +36,7 @@ import type { PageState } from "../studio-page-state";
 
 const SAVED_AT = "2026-08-10T09:00:00.000Z";
 const LEGACY_REFERENCE_STORAGE_PREFIX =
-  "toonspectrum-studio-ai-image-references:v1";
+  "toonstudio-studio-ai-image-references:v1";
 
 // 984251d8c 가 참조 문서 state 를 useStudioDocumentAccessRuntime 으로 빼냈다. 추출본을 앞에 둬야
 // 거기서 시작한 슬라이스가 호스트 쪽 끝 토큰까지 나아간다.
@@ -305,7 +305,7 @@ describe("AI image reference project authority", () => {
 
   it("keeps the legacy browser key as an unreferenced compatibility module with zero automatic import", () => {
     expect(legacyStorageSource).toMatch(
-      /toonspectrum-studio-ai-image-references:v\$\{STUDIO_AI_IMAGE_REFERENCE_STORAGE_VERSION\}/u,
+      /toonstudio-studio-ai-image-references:v\$\{STUDIO_AI_IMAGE_REFERENCE_STORAGE_VERSION\}/u,
     );
     expect(studioPageSource).not.toContain(LEGACY_REFERENCE_STORAGE_PREFIX);
     expect(studioPageSource.match(/studio-ai-image-reference-storage/gu) ?? []).toHaveLength(0);

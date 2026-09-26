@@ -20,7 +20,7 @@ import {
   type StudioUiDensityMode,
 } from "./studio-ui-density";
 
-export const STUDIO_APP_SETTINGS_STORAGE_KEY = "toonspectrum-studio-app-settings:v1";
+export const STUDIO_APP_SETTINGS_STORAGE_KEY = "toonstudio-studio-app-settings:v1";
 
 export const STUDIO_APP_SETTINGS_TABS = [
   "general",

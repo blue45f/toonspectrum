@@ -82,7 +82,7 @@ export function createStudioBg3dPhysicsTimelineModuleWorker():
   if (typeof Worker !== "function") return null;
   return new Worker(
     new URL("./studio-bg3d-physics.worker.ts", import.meta.url),
-    { name: "toonspectrum-bg3d-physics-timeline", type: "module" },
+    { name: "toonstudio-bg3d-physics-timeline", type: "module" },
   );
 }
 

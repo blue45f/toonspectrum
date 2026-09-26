@@ -11,7 +11,7 @@ type ReadyPlan = Extract<StudioVrmProjectArchiveAttestationPlan, { readonly ok: 
 
 const PLAN: ReadyPlan = Object.freeze({
   ok: true,
-  schema: "toonspectrum.vrm-project-archive-attestation-plan",
+  schema: "toonstudio.vrm-project-archive-attestation-plan",
   version: 1,
   modelCount: 2,
   exactAttributionTexts: Object.freeze(["작가 A · CC BY 4.0", ""] as const),

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "updatedAt": "2026-09-02",
-  "purpose": "Official-source registry for ongoing ToonSpectrum Studio competitive benchmarking. Product capabilities, algorithms, workflows, quality targets, accessible source code, assets, model weights, trademark materials, and UI resources may be analyzed or reused under the repository owner's campaign-wide attestation; every exact integration must still pin the real source, immutable version, SHA-256, destination, and required notices in the third-party reuse registry.",
+  "purpose": "Official-source registry for ongoing ToonStudio Studio competitive benchmarking. Product capabilities, algorithms, workflows, quality targets, accessible source code, assets, model weights, trademark materials, and UI resources may be analyzed or reused under the repository owner's campaign-wide attestation; every exact integration must still pin the real source, immutable version, SHA-256, destination, and required notices in the third-party reuse registry.",
   "priorities": {
     "P0": "Audit every release and convert material gaps into implementation-ready issues.",
     "P1": "Audit quarterly or when a major release lands.",

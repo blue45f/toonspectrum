@@ -1,4 +1,4 @@
-import type { BgmPlaylistEntry } from "@toonspectrum/core/fx";
+import type { BgmPlaylistEntry } from "@toonstudio/core/fx";
 
 export type SiteOstRole = "opening" | "creator" | "story" | "action" | "romance" | "ending";
 export type SiteOstVocalMode = "vocal" | "instrumental";
@@ -69,7 +69,7 @@ const INTENSITIES: readonly SiteOstIntensity[] = ["chill", "normal", "epic"];
 const VOCAL_PREFERENCES: readonly SiteOstVocalPreference[] = ["auto", "vocal", "instrumental"];
 
 const THEMES = {
-  home: theme("home", "pop", "툰스펙트럼 오프닝", "ToonSpectrum opening", "첫 화면에서 창작의 세계가 열리는 대표 오프닝", "The flagship opening that starts the creative world", "opening", 0),
+  home: theme("home", "pop", "툰스튜디오 오프닝", "ToonStudio opening", "첫 화면에서 창작의 세계가 열리는 대표 오프닝", "The flagship opening that starts the creative world", "opening", 0),
   creator: theme("creator", "atelier_focus", "창작자 테마", "Creator theme", "긴 작업 흐름을 해치지 않는 창작자 중심 테마", "A creator-first theme that stays out of the way during long work", "creator", 0),
   story: theme("story", "worldbuilding", "세계관 메인 테마", "Story-world theme", "인물과 세계가 확장되는 시네마틱 메인 테마", "A cinematic main theme for expanding characters and worlds", "story", 0),
   production: theme("production", "synthwave", "클라이맥스 드라이브", "Climax drive", "제작·리뷰·게시의 추진력을 높이는 액션 테마", "A driving action theme for production, review and publishing", "action", 0),

@@ -98,7 +98,7 @@ export function createStudioStrokePostprocessModuleWorker(): StudioStrokePostpro
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-stroke-postprocess-worker-entry.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-stroke-postprocess",
+    name: "toonstudio-stroke-postprocess",
   }) as unknown as StudioStrokePostprocessWorkerLike;
 }
 

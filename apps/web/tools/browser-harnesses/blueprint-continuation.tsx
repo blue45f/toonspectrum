@@ -11,7 +11,7 @@ import { StudioReviewPolicyPanel } from "../../src/domains/creator/virtual-space
 
 import type { ProductionClientCommand } from "../../src/domains/creator/production-hub/production-api";
 import type { StudioVirtualSpaceVerifiedReview } from "../../src/domains/creator/virtual-space/studio-virtual-space-review-invitation";
-import type { ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionProjectAggregate } from "@toonstudio/core/production";
 import "../../src/app/styles/globals.css";
 
 persistSession({ user: { id: "fixture-artist" }, token: null });

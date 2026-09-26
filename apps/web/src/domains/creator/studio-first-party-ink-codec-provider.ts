@@ -1,5 +1,5 @@
 /**
- * Product-owned provider adapters for ToonSpectrum InkEnvelope and the bounded public InkML
+ * Product-owned provider adapters for ToonStudio InkEnvelope and the bounded public InkML
  * subset.
  *
  * The generic codec provider contract is byte-only. These adapters therefore make both internal
@@ -10,7 +10,7 @@
  *
  * The encoded sides remain the native `.toonink` and bounded `.inkml` wire bytes. No commercial
  * SDK, vendor codec, hardware identity, trademark permission, or third-party certification is
- * implied. The provider receipts can be bound to ToonSpectrum's separately owned product
+ * implied. The provider receipts can be bound to ToonStudio's separately owned product
  * conformance certificate boundary.
  */
 
@@ -48,11 +48,11 @@ import { sha256HexPortable } from "./studio-sha256";
 
 export const STUDIO_FIRST_PARTY_INK_CODEC_VERSION = "1.0.0" as const;
 export const STUDIO_FIRST_PARTY_INK_ENVELOPE_CODEC_PROFILE =
-  "toonspectrum-ink-envelope-v1" as const;
+  "toonstudio-ink-envelope-v1" as const;
 export const STUDIO_FIRST_PARTY_INKML_CODEC_PROFILE =
-  "toonspectrum-public-inkml-subset-v1" as const;
+  "toonstudio-public-inkml-subset-v1" as const;
 export const STUDIO_INKML_TRACE_TRANSPORT_KIND =
-  "toonspectrum-inkml-trace-transport" as const;
+  "toonstudio-inkml-trace-transport" as const;
 export const STUDIO_INKML_TRACE_TRANSPORT_VERSION = 1 as const;
 
 const TEXT_ENCODER = new TextEncoder();
@@ -88,7 +88,7 @@ export const STUDIO_FIRST_PARTY_INK_CODEC_LIMITS = Object.freeze({
  * These are product-boundary facts, not claims about an external organization.
  */
 export const STUDIO_FIRST_PARTY_INK_CODEC_CLAIM_BOUNDARY = Object.freeze({
-  implementationOwner: "ToonSpectrum" as const,
+  implementationOwner: "ToonStudio" as const,
   productConformanceCertificateBindable: true as const,
   thirdPartyCodecCertification: false as const,
   vendorTrademarkAuthorization: false as const,
@@ -703,25 +703,25 @@ function result(
 }
 
 const inkEnvelopeManifest = manifest({
-  providerId: "toonspectrum.ink-envelope.v1",
+  providerId: "toonstudio.ink-envelope.v1",
   format: "toonink",
   profile: STUDIO_FIRST_PARTY_INK_ENVELOPE_CODEC_PROFILE,
-  mimeType: "application/vnd.toonspectrum.ink+json",
+  mimeType: "application/vnd.toonstudio.ink+json",
   extension: ".toonink",
   maxInputBytes: STUDIO_INK_ENVELOPE_LIMITS.maxWireBytes,
   maxOutputBytes: STUDIO_INK_ENVELOPE_LIMITS.maxWireBytes,
-  licenseId: "toonspectrum.first-party.ink-envelope.v1",
+  licenseId: "toonstudio.first-party.ink-envelope.v1",
 });
 
 const inkMlManifest = manifest({
-  providerId: "toonspectrum.public-inkml-subset.v1",
+  providerId: "toonstudio.public-inkml-subset.v1",
   format: "inkml",
   profile: STUDIO_FIRST_PARTY_INKML_CODEC_PROFILE,
   mimeType: STUDIO_INKML_MEDIA_TYPE,
   extension: ".inkml",
   maxInputBytes: INKML_TRACE_TRANSPORT_MAX_BYTES,
   maxOutputBytes: INKML_TRACE_TRANSPORT_MAX_BYTES,
-  licenseId: "toonspectrum.first-party.public-inkml-subset.v1",
+  licenseId: "toonstudio.first-party.public-inkml-subset.v1",
 });
 
 export const STUDIO_FIRST_PARTY_INK_ENVELOPE_CODEC_PROVIDER: StudioCodecProvider =

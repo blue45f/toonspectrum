@@ -517,6 +517,6 @@ describe("startTimelapseExport", () => {
 describe("timelapseExportFileName", () => {
   it("제목 기반 -timelapse.webm, 빈 제목은 기본값", () => {
     expect(timelapseExportFileName("나의 만화")).toBe("나의 만화-timelapse.webm");
-    expect(timelapseExportFileName("  ")).toBe("toonspectrum-timelapse-timelapse.webm");
+    expect(timelapseExportFileName("  ")).toBe("toonstudio-timelapse-timelapse.webm");
   });
 });

@@ -4,7 +4,7 @@
 Run in a disposable headless Blender process, not an artist's open session:
   Blender --background --python-exit-code 1 --python this.py -- --only library_reading_room
 Original architecture, furniture construction, garments and scientific equipment
-are dedicated to CC0 by ToonSpectrum. Existing scanned CC0 props retain source URLs.
+are dedicated to CC0 by ToonStudio. Existing scanned CC0 props retain source URLs.
 Review lights and cameras are deliberately excluded from exported GLBs.
 """
 import argparse
@@ -750,7 +750,7 @@ def main():
     reports=[json.loads((ARTIFACTS/(name+".json")).read_text()) for name in CATALOG if (ARTIFACTS/(name+".json")).exists()]
     (OUT/"manifest.json").write_text(json.dumps({"version":"expansion-v1","assets":reports},indent=2,ensure_ascii=False)+"\n")
     sources=sorted({s["sourceUrl"] for r in reports for s in r["sourceModels"]+r["sourceMaterials"]})
-    (OUT/"LICENSES.md").write_text("# Studio environment expansion v1\n\nOriginal scene architecture, bespoke furniture, garments and equipment: ToonSpectrum, CC0-1.0.\n\nGenerator: `scripts/blender/generate_studio_environment_expansion_v1.py`, Blender 5.2.\n\nScanned models and PBR image sources: Poly Haven, CC0-1.0. Embedded images are reduced to at most 1024px; shared material images and model meshes are reused within each GLB. No external runtime resource requests.\n\nLicense: https://creativecommons.org/publicdomain/zero/1.0/\n\n"+"\n".join("- "+url for url in sources)+"\n\nReview status is recorded separately from source licensing and mobile admission. A generated preview is not an all-angle quality approval.\n")
+    (OUT/"LICENSES.md").write_text("# Studio environment expansion v1\n\nOriginal scene architecture, bespoke furniture, garments and equipment: ToonStudio, CC0-1.0.\n\nGenerator: `scripts/blender/generate_studio_environment_expansion_v1.py`, Blender 5.2.\n\nScanned models and PBR image sources: Poly Haven, CC0-1.0. Embedded images are reduced to at most 1024px; shared material images and model meshes are reused within each GLB. No external runtime resource requests.\n\nLicense: https://creativecommons.org/publicdomain/zero/1.0/\n\n"+"\n".join("- "+url for url in sources)+"\n\nReview status is recorded separately from source licensing and mobile admission. A generated preview is not an all-angle quality approval.\n")
 
 
 if __name__=="__main__": main()

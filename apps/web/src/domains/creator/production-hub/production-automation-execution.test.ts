@@ -4,7 +4,7 @@ import type {
   ProductionAutomationRule,
   ProductionProjectAggregate,
   ProductionTask,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import { createProductionDemoProject } from "./production-demo";
 import { deriveProductionAutomationExecutionPlan } from "./production-automation-execution";

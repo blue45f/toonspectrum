@@ -78,7 +78,7 @@ function emitReady(worker: FakeWorker): void {
 
 async function validLegacyArchive(): Promise<Blob> {
   const manifest = {
-    kind: "toonspectrum-bg3d-shot-batch",
+    kind: "toonstudio-bg3d-shot-batch",
     version: 1,
     files: [{
       shotId: "shot-a",

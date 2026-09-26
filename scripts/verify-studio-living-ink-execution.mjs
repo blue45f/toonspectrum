@@ -1,5 +1,5 @@
 /**
- * Actual Chromium gate for the independent ToonSpectrum Living Ink execution provider.
+ * Actual Chromium gate for the independent ToonStudio Living Ink execution provider.
  *
  * Each lane passes an explicit provider id into every Worker epoch. Browser capabilities can make
  * that provider unavailable, but cannot select or substitute the other backend. The same visual
@@ -17,7 +17,7 @@ import { createServer as createViteServer, normalizePath } from "vite";
 import { WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 
 const EVIDENCE_ROOT = process.env.TOONSPECTRUM_LIVING_INK_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-living-ink-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-living-ink-${Date.now()}`);
 const PROBE_RESULTS_PATH = process.env.TOONSPECTRUM_LIVING_INK_PROBE_RESULTS_PATH
   ?? new URL("../tests/benchmarks/results/living-ink-probe.json", import.meta.url);
 const HARNESS_PATH = "/__studio_living_ink_execution__";
@@ -143,7 +143,7 @@ function html() {
 h1{margin:0 0 16px;font-size:20px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .card{padding:10px;border:1px solid #374151;border-radius:12px;background:#1f2937}h2{margin:0 0 8px;font-size:13px}
 canvas{display:block;width:100%;height:auto;border-radius:8px;background:#f7f3ea;image-rendering:auto}
-</style></head><body><h1>ToonSpectrum Living Ink · actual Worker GPU gate (WebGL2 and WebGPU lanes)</h1><main class="grid">${cards}</main>
+</style></head><body><h1>ToonStudio Living Ink · actual Worker GPU gate (WebGL2 and WebGPU lanes)</h1><main class="grid">${cards}</main>
 <script type="module" src="${ENTRY}"></script></body></html>`;
 }
 

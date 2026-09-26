@@ -53,8 +53,8 @@ const SLOW_4G = {
   uploadThroughput: (750 * 1024) / 8,
 } as const;
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
 
 interface ThrottleProfile {
   readonly id: string;
@@ -738,7 +738,7 @@ async function main(): Promise<void> {
 
   const distStat = statSync(join(DIST_DIR, "index.html"));
   const payload = {
-    schema: "toonspectrum.app-startup-perf/1",
+    schema: "toonstudio.app-startup-perf/1",
     generatedAt: new Date().toISOString(),
     baseUrl: BASE_URL,
     iterationsPerScenario: ITERATIONS,

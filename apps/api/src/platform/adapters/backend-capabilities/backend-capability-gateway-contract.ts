@@ -8,15 +8,15 @@ import {
 } from "./backend-capability-policy";
 
 export const BACKEND_CAPABILITY_GATEWAY_VERSION =
-  "toonspectrum.backend-capability.v1" as const;
+  "toonstudio.backend-capability.v1" as const;
 export const BACKEND_CAPABILITY_GATEWAY_PATH =
-  "/.well-known/toonspectrum/backend-capabilities/v1/execute" as const;
+  "/.well-known/toonstudio/backend-capabilities/v1/execute" as const;
 export const BACKEND_CAPABILITY_GATEWAY_CONTENT_TYPE =
-  "application/vnd.toonspectrum.backend-capability+json;version=1" as const;
+  "application/vnd.toonstudio.backend-capability+json;version=1" as const;
 export const BACKEND_CAPABILITY_GATEWAY_TOKEN_HEADER =
-  "x-toonspectrum-gateway-token" as const;
+  "x-toonstudio-gateway-token" as const;
 export const BACKEND_CAPABILITY_IDEMPOTENCY_HEADER =
-  "x-toonspectrum-idempotency-key" as const;
+  "x-toonstudio-idempotency-key" as const;
 
 export type CanonicalJsonValue =
   | null

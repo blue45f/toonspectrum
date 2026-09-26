@@ -571,7 +571,7 @@ function canonicalReceipt(
     || !officialClaims
     || !scope
     || receipt.schemaVersion !== STUDIO_CODEC_PROVIDER_CONTRACT_VERSION
-    || receipt.kind !== "toonspectrum-codec-provider-execution"
+    || receipt.kind !== "toonstudio-codec-provider-execution"
     || receipt.providerId !== PROVIDER.manifest.providerId
     || receipt.mode !== PROVIDER.manifest.mode
     || receipt.direction !== expected.request.direction
@@ -608,7 +608,7 @@ function canonicalReceipt(
   }
   return Object.freeze({
     schemaVersion: STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
-    kind: "toonspectrum-codec-provider-execution",
+    kind: "toonstudio-codec-provider-execution",
     providerId: PROVIDER.manifest.providerId,
     mode: PROVIDER.manifest.mode,
     direction: expected.request.direction,

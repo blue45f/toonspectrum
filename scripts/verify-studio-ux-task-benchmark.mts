@@ -52,7 +52,7 @@ function observationArray(value: unknown): readonly StudioUxTaskObservation[] {
 const observationPath = argumentValue("--observations");
 const reportDirectory = resolve(
   process.env.TOONSPECTRUM_UX_BENCHMARK_DIR
-    ?? join(tmpdir(), "toonspectrum-studio-ux-task-benchmark"),
+    ?? join(tmpdir(), "toonstudio-studio-ux-task-benchmark"),
 );
 mkdirSync(reportDirectory, { recursive: true });
 

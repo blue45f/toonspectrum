@@ -18,13 +18,13 @@ import {
 import type { StudioBg3dLibrariesAuthority } from "./studio-bg3d-libraries-sqlite-opfs-authority";
 
 export const BG3D_TEMPLATE_LIBRARY_DATABASE_NAME =
-  "toonspectrum-studio-bg3d-template-library";
+  "toonstudio-studio-bg3d-template-library";
 export const BG3D_TEMPLATE_LIBRARY_DATABASE_VERSION = 2;
 export const BG3D_TEMPLATE_LIBRARY_MAX_ENTRIES = 128;
 export const BG3D_TEMPLATE_LIBRARY_MAX_NAME_LENGTH = 80;
 
 const STORE_NAME = "templates";
-const TEMPLATE_RECORD_KIND = "toonspectrum-studio-bg3d-template";
+const TEMPLATE_RECORD_KIND = "toonstudio-studio-bg3d-template";
 const TEMPLATE_RECORD_VERSION = 1;
 const TEMPLATE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,79}$/u;
 const FORBIDDEN_ID_SET = new Set(["constructor", "prototype", "__proto__"]);
@@ -534,7 +534,7 @@ export async function legacyDeleteBg3dTemplate(
 // ── V12 shared SQLite product authority ──────────────────────────────────
 
 export const BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_KIND =
-  "toonspectrum-studio-bg3d-template-library-v12";
+  "toonstudio-studio-bg3d-template-library-v12";
 export const BG3D_TEMPLATE_LIBRARY_V12_MANIFEST_VERSION = 1 as const;
 export const BG3D_TEMPLATE_LIBRARY_V12_MAX_TOTAL_BYTES = 48 * 1024 * 1024;
 export const BG3D_TEMPLATE_LIBRARY_V12_MAX_MANIFEST_BYTES = 50 * 1024 * 1024;

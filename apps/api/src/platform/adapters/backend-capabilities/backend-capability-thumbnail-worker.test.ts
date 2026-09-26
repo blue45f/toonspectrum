@@ -40,7 +40,7 @@ describe("Supabase thumbnail capability worker", () => {
   );
   const sourceDigest = sha256(sourceBytes);
   const sourceObject = {
-    contractVersion: "toonspectrum.private-object-storage.v2" as const,
+    contractVersion: "toonstudio.private-object-storage.v2" as const,
     providerId: "cloudflare-r2" as const,
     purpose: "source" as const,
     digest: `sha256:${sourceDigest}` as const,
@@ -80,7 +80,7 @@ describe("Supabase thumbnail capability worker", () => {
     storage.uploadImmutable.mockImplementation(async (input: { bytes: Uint8Array }) => {
       const digest = sha256(input.bytes);
       return {
-        contractVersion: "toonspectrum.private-object-storage.v2",
+        contractVersion: "toonstudio.private-object-storage.v2",
         providerId: "supabase",
         purpose: "derived",
         digest: `sha256:${digest}`,

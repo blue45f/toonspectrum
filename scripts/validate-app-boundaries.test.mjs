@@ -26,7 +26,7 @@ const emptyBudgets = {
 };
 
 function fixture(files) {
-  const root = mkdtempSync(path.join(tmpdir(), "toonspectrum-app-boundary-"));
+  const root = mkdtempSync(path.join(tmpdir(), "toonstudio-app-boundary-"));
   mkdirSync(path.join(root, "config"), { recursive: true });
   writeFileSync(
     path.join(root, "config/architecture-boundary-ratchet.json"),

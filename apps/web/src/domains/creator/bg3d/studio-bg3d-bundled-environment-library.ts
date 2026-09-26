@@ -19,7 +19,7 @@ export const STUDIO_BG3D_BUNDLED_ENVIRONMENT_LIBRARY_ENTRIES = Object.freeze(
     status: "verified",
     canUse: true,
     statusMessage: asset.provenance.license === "CC0-1.0"
-      ? "ToonSpectrum CC0 번들 · GLB 안전 검사 후 원본 미터 크기로 배치됩니다."
+      ? "ToonStudio CC0 번들 · GLB 안전 검사 후 원본 미터 크기로 배치됩니다."
       : "Tripo 무료 API 지갑 생성물 · 비독점 상업 이용 조건과 GLB 안전 검사를 확인했습니다.",
     contentHash: asset.sha256,
     byteSize: asset.byteSize,

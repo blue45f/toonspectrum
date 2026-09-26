@@ -154,7 +154,7 @@ OAuth 2.0 Security Best Current Practice는 authorization server가 redirect URI
 ```mermaid
 sequenceDiagram
   participant U as User browser
-  participant A as ToonSpectrum API
+  participant A as ToonStudio API
   participant P as OAuth provider
   participant D as Account store
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { STUDIO_COMPETITOR_CAPABILITY_CATALOG } from "@toonspectrum/studio-project-model";
+import { STUDIO_COMPETITOR_CAPABILITY_CATALOG } from "@toonstudio/studio-project-model";
 
 import {
   STUDIO_COMPETITOR_CAPABILITY_EVALUATION,

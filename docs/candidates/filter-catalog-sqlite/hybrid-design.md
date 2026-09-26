@@ -16,7 +16,7 @@ only when open throws SqliteUnavailableError
 ```
 
 There is no automatic path from the old
-`toonspectrum.studio-creator-filter-presets.v1` key into product state. V12 starts with
+`toonstudio.studio-creator-filter-presets.v1` key into product state. V12 starts with
 an empty filter table even when the old key exists. The old reader is reachable only
 through `importLegacyFilterLibraryToSqlite(..., { explicit: true })` for test/developer
 recovery. This enforces `LEGACY_DATA_MIGRATION=FALSE` and

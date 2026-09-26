@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { buildProductionOperationCapabilitySql, buildProductionOperationRuntimeAclSql } from "../../../../../scripts/production-operation-database-contract.mjs";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { initialOperationPolicy, type OperationPolicyDraft } from "@toonspectrum/contracts/operation-policy";
+import { initialOperationPolicy, type OperationPolicyDraft } from "@toonstudio/contracts/operation-policy";
 import { TeamWorkspaceRepository } from "../production-collaboration/team-workspace.repository";
 import { OperationPolicyRepository } from "./operation-policy.repository";
 

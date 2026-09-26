@@ -14,7 +14,7 @@ import {
 import { STUDIO_BRUSH_LABELS } from "./brush/studio-brush-product-model";
 
 import type { StudioCommandCatalogEntry, StudioCommandSource } from "./studio-command-catalog-base";
-import type { CommandId } from "@toonspectrum/studio-command-registry";
+import type { CommandId } from "@toonstudio/studio-command-registry";
 
 export {
   COMMAND_CONFLICTS,

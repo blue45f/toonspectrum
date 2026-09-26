@@ -180,7 +180,7 @@ function indexed<T>(items: readonly T[], hash: number, shift: number): T {
 }
 
 export function studioVirtualAvatarProfile(identity: string): StudioVirtualAvatarProfile {
-  const hash = stableHash(identity || "toonspectrum-creator");
+  const hash = stableHash(identity || "toonstudio-creator");
   return Object.freeze({
     skin: indexed(SKIN, hash, 0),
     hair: indexed(HAIR, hash, 3),

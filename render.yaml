@@ -1,9 +1,9 @@
-# Render Blueprint — ToonSpectrum platform-neutral NestJS runtimes.
+# Render Blueprint — ToonStudio platform-neutral NestJS runtimes.
 # The production web authority is Cloudflare Static Assets + Worker. The full Core API
 # runs as an independent HTTPS origin. Retired Vercel runtimes are not part of the release path.
 services:
   - type: web
-    name: toonspectrum-core-api
+    name: toonstudio-core-api
     runtime: node
     region: singapore
     # Free instances can sleep after inactivity and therefore do not provide an SLA.
@@ -208,7 +208,7 @@ services:
         sync: false
 
   - type: web
-    name: toonspectrum-studio-live
+    name: toonstudio-studio-live
     runtime: node
     region: singapore
     # Optional native Socket.IO fallback. Durable Objects remain the default ephemeral

@@ -1,4 +1,4 @@
-import { useFx } from "@toonspectrum/core/fx";
+import { useFx } from "@toonstudio/core/fx";
 import {
   Compass,
   RefreshCw,

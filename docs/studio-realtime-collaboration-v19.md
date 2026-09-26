@@ -1,18 +1,18 @@
 # Studio real-time collaboration V19 benchmark
 
 - Date: 2026-09-04
-- Scope: ToonSpectrum Studio live presence, following, cursor rendering, session communication, screen sharing, and collaboration safety
+- Scope: ToonStudio Studio live presence, following, cursor rendering, session communication, screen sharing, and collaboration safety
 - Principle: durable drawing/document changes remain on the existing CRDT and authoritative-lock paths; attention and cursor preferences remain ephemeral presentation state.
 
 ## Competitive patterns reviewed
 
-| Product / source | Product pattern | ToonSpectrum decision |
+| Product / source | Product pattern | ToonStudio decision |
 | --- | --- | --- |
 | [Figma Spotlight](https://help.figma.com/hc/en-us/articles/360040322673-Present-to-collaborators-using-spotlight) | Follow another participant across canvas movement and page changes; make following and stopping conspicuous without replacing the canvas with a video stream | Keep the existing participant follow path and expose it as a one-tap **focused follow** control beside the always-visible presence dock |
 | [Figma multiplayer cursor visibility](https://help.figma.com/hc/en-us/articles/360041065034-Adjust-your-zoom-and-view-options) | Users can hide multiplayer cursors when they become distracting | Add `all`, `followed`, and `hidden` cursor scopes as a local viewport preference |
 | [Miro attention management](https://help.miro.com/hc/en-us/articles/360013358479-Attention-management) | Follow a collaborator, bring a participant or everyone to the facilitator, and let direct canvas interaction end attention capture | Use explicit focused follow now; reserve forced/opt-out presenter broadcast for a protocol revision because it needs remote consent, viewport payloads, and server authorization |
 | [Miro People bar](https://help.miro.com/hc/en-us/articles/20967864443410-Miro-s-new-simplified-user-interface) | Central participant list combines follow/search/bring-to-me and cursor visibility | Put the most frequent attention controls in a compact canvas popover and retain the full Team panel for role, chat, screen, and recovery operations |
-| [tldraw collaboration](https://tldraw.dev/sdk-features/collaboration) | Live cursors, viewport following, custom presence, connection status, offline queuing | Preserve ToonSpectrum's split between ephemeral presence and durable CRDT operations; prioritize viewport-only controls without widening document state |
+| [tldraw collaboration](https://tldraw.dev/sdk-features/collaboration) | Live cursors, viewport following, custom presence, connection status, offline queuing | Preserve ToonStudio's split between ephemeral presence and durable CRDT operations; prioritize viewport-only controls without widening document state |
 | [tldraw cursor chat](https://tldraw.dev/sdk-features/cursor-chat) | Very short messages follow the pointer and expire automatically | Keep the existing bounded session chat in V19; cursor-anchored chat is a subsequent protocol/UI lane so it cannot accidentally become durable document content |
 | [Yjs awareness](https://docs.yjs.dev/getting-started/adding-awareness) | Presence and cursors are awareness data, not persisted document data; excessive awareness can distract users | Cursor scope, focused peer, and trail choices remain local presentation preferences and never enter the Yjs document |
 | [Canva Whiteboards](https://www.canva.com/online-whiteboard/) | Colorful live cursors and comments make collaborator activity legible | Retain participant colors, canvas comment pins, and team comments while adding user-controlled cursor density |

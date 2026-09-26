@@ -4,8 +4,8 @@
 
 - 정본(canonical): `https://www.toonstudio.cloud`
 - apex: `https://toonstudio.cloud` → 정본으로 영구 `308`
-- 정적 웹: Cloudflare Static Assets Worker `toonspectrum-web`
-- 동적 API와 crawler OG: Cloudflare gateway → Render `toonspectrum-core-api`
+- 정적 웹: Cloudflare Static Assets Worker `toonstudio-web`
+- 동적 API와 crawler OG: Cloudflare gateway → Render `toonstudio-core-api`
 
 Cloudflare의 `toonstudio-apex-redirect` Worker가 `toonstudio.cloud/*`만 담당하고 경로와 query를
 유지한 `308`을 반환한다. `www.toonstudio.cloud/*`는 Static Assets Worker가 담당한다. 사람의
@@ -49,7 +49,7 @@ apex는 애플리케이션 실행 전에 정본으로 리다이렉트하므로 c
 임시 realtime 권위는 Cloudflare Durable Objects의 `realtime.toonstudio.cloud`이고,
 `workers.dev` origin은 독립 canary·rollback 확인용으로 유지한다. 두 경로 모두 작품 원장이나
 raster pixel 저장소가 아니다. 영속 CRDT Socket.IO가 필요한 기능은 `render.yaml`의 별도
-`toonspectrum-studio-live` 장기 실행 runtime을 사용한다.
+`toonstudio-studio-live` 장기 실행 runtime을 사용한다.
 
 ```dotenv
 VITE_STUDIO_REALTIME_ORIGIN=https://realtime.toonstudio.cloud

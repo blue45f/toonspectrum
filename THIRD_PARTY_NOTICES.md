@@ -1,9 +1,9 @@
-# ToonSpectrum third-party notices
+# ToonStudio third-party notices
 
 This repository notice records the libraries introduced by the Studio
 hybrid-provider wave on 2026-07-28. The versions below are pinned in
 `package.json` and resolved identically in `pnpm-lock.yaml`. Their copyright
-remains with their respective authors. ToonSpectrum does not relicense,
+remains with their respective authors. ToonStudio does not relicense,
 obscure, or claim ownership of these libraries.
 
 | Package | Resolved version | License | Upstream source |
@@ -57,7 +57,7 @@ shipped beside xatlas, and records the exact MPL-2.0 source location for the
 unmodified resvg executable.
 
 
-`mixbox@2.0.0` is included only for ToonSpectrum's explicitly free,
+`mixbox@2.0.0` is included only for ToonStudio's explicitly free,
 non-commercial distribution profile. Its CC BY-NC 4.0 terms do not permit a
 commercial product build. Any commercial deployment, paid distribution, or
 commercially licensed fork must disable/remove the Mixbox provider or obtain a
@@ -82,7 +82,7 @@ metadata shape, and verifies the exact Remotion License text SHA-256
 Any package, version, metadata, or license-text change fails the production
 notice build for fresh review.
 
-ToonSpectrum imports `p5.brush/standalone`; that entry is self-contained and
+ToonStudio imports `p5.brush/standalone`; that entry is self-contained and
 does not statically import the resolved `p5` peer. The production dependency
 inventory nevertheless includes pnpm's automatically resolved `p5` peer and
 its `libtess` dependency, so their upstream LGPL-2.1 and SGI-B-2.0 notices
@@ -191,12 +191,12 @@ opaque JavaScript/WASM SHA-256 values, so omitting a component, artifact, or
 license copy fails `pnpm run audit:licenses`.
 
 The OCCT integration loads `opencascade.js` as an independently emitted,
-lazy browser module and WASM asset. ToonSpectrum does not modify or statically
+lazy browser module and WASM asset. ToonStudio does not modify or statically
 link that package. Its exact corresponding source, license, replacement/rebuild
 procedure, and binary boundary are documented in
 `docs/third-party/opencascade-lgpl.md`. A recipient can replace the package with
 a compatible modified build and rebuild the application without changing the
-ToonSpectrum document format. The generated release notice includes the package's
+ToonStudio document format. The generated release notice includes the package's
 LGPL-2.1 text and resolved source metadata. Any future modification to OCCT or
 `opencascade.js` must add a dated modification notice and publish corresponding
 source before release.

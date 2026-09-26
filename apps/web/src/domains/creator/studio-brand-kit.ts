@@ -70,7 +70,7 @@ export interface BrandKitStorage {
   setItem(key: string, value: string): void;
 }
 
-export const BRAND_KIT_KEY = "toonspectrum-studio-brand-kits";
+export const BRAND_KIT_KEY = "toonstudio-studio-brand-kits";
 export const MAX_BRAND_KITS = 40; // studio-clips.ts MAX_CLIPS / studio-palette-library.ts MAX_PALETTES 와 동일 상한 정책.
 export const DEFAULT_BRAND_KIT_NAME = "이름 없는 브랜드 킷";
 export const MAX_BRAND_KIT_NAME_LENGTH = 160;
@@ -78,7 +78,7 @@ export const MAX_BRAND_KIT_ID_LENGTH = 160;
 export const MAX_BRAND_KIT_FONT_LENGTH = 512;
 export const MAX_BRAND_KIT_LOGO_DATA_URL_BYTES = 4 * 1024 * 1024;
 export const MAX_BRAND_KIT_LIBRARY_SERIALIZED_BYTES = 64 * 1024 * 1024;
-export const STUDIO_BRAND_KIT_LIBRARY_SCHEMA = "toonspectrum.studio.brand-kits";
+export const STUDIO_BRAND_KIT_LIBRARY_SCHEMA = "toonstudio.studio.brand-kits";
 
 export type StudioBrandKitLibraryErrorCode =
   | "corrupt-data"

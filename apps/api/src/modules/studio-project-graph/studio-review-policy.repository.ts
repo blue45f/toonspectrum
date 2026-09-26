@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { canonicalJson, reviewPolicyCommandSchema, reviewPolicyHistoryQuerySchema, reviewPolicyHistoryResponseSchema, type ReviewPolicyHistoryQuery, type ReviewPolicyHistoryResponse, type ReviewPolicyCommand, type ReviewPolicyPin, type ReviewPolicyResponse } from "@toonspectrum/studio-project-model";
+import { canonicalJson, reviewPolicyCommandSchema, reviewPolicyHistoryQuerySchema, reviewPolicyHistoryResponseSchema, type ReviewPolicyHistoryQuery, type ReviewPolicyHistoryResponse, type ReviewPolicyCommand, type ReviewPolicyPin, type ReviewPolicyResponse } from "@toonstudio/studio-project-model";
 import type { PoolClient } from "pg";
 import { dbPool } from "../../platform/database";
 import { loadArtifactAccess, assertAccess } from "./studio-project-graph.repository";

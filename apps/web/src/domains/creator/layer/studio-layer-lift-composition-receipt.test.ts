@@ -44,7 +44,7 @@ function input(): StudioLayerLiftCompositionReceiptInput {
       },
     ],
     compositor: {
-      id: "toonspectrum.layer-lift-compositor",
+      id: "toonstudio.layer-lift-compositor",
       version: "1.0.0",
     },
     background: {
@@ -70,7 +70,7 @@ describe("Scene Layer Lift composition provenance receipt", () => {
   it("creates and parses the exact canonical receipt", () => {
     const created = createStudioLayerLiftCompositionReceipt(input());
     expect(created).toEqual({
-      kind: "toonspectrum.scene-layer-lift/composition-receipt",
+      kind: "toonstudio.scene-layer-lift/composition-receipt",
       version: 1,
       ...input(),
       receiptSha256:

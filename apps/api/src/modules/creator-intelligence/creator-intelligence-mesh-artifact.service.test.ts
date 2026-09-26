@@ -30,7 +30,7 @@ function reference(
 ): PrivateObjectReference {
   const digest = createHash("sha256").update(bytes).digest("hex");
   return {
-    contractVersion: "toonspectrum.private-object-storage.v2",
+    contractVersion: "toonstudio.private-object-storage.v2",
     providerId: "supabase",
     purpose: "derived",
     digest: `sha256:${digest}`,

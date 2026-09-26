@@ -30,7 +30,7 @@ import {
 
 import type { StudioLocalDatabase } from "../studio-local-database";
 
-export const STUDIO_VRM_ASSET_OPFS_ROOT = "toonspectrum-studio-vrm-assets-v12";
+export const STUDIO_VRM_ASSET_OPFS_ROOT = "toonstudio-studio-vrm-assets-v12";
 export const STUDIO_VRM_MODEL_SQLITE_NAMESPACE = "studio-vrm-model-assets-v12";
 export const STUDIO_VRM_TEXTURE_SQLITE_NAMESPACE = "studio-vrm-texture-paint-assets-v12";
 export const STUDIO_VRM_ASSET_SQLITE_MANIFEST_KEY = "manifest-v1";
@@ -54,11 +54,11 @@ export const STUDIO_VRM_TEXTURE_ASSET_LIMITS = Object.freeze({
   maxManifestBytes: 4 * 1024 * 1024,
 });
 
-const MODEL_MANIFEST_KIND = "toonspectrum.studio-vrm-model-asset-manifest" as const;
-const TEXTURE_MANIFEST_KIND = "toonspectrum.studio-vrm-texture-asset-manifest" as const;
-const MODEL_PAGE_KIND = "toonspectrum.studio-vrm-model-asset-page" as const;
-const TEXTURE_PAGE_KIND = "toonspectrum.studio-vrm-texture-asset-page" as const;
-const COMMIT_KIND = "toonspectrum.studio-vrm-asset-cas-commit" as const;
+const MODEL_MANIFEST_KIND = "toonstudio.studio-vrm-model-asset-manifest" as const;
+const TEXTURE_MANIFEST_KIND = "toonstudio.studio-vrm-texture-asset-manifest" as const;
+const MODEL_PAGE_KIND = "toonstudio.studio-vrm-model-asset-page" as const;
+const TEXTURE_PAGE_KIND = "toonstudio.studio-vrm-texture-asset-page" as const;
+const COMMIT_KIND = "toonstudio.studio-vrm-asset-cas-commit" as const;
 const MANIFEST_VERSION = 1 as const;
 const PAGED_MANIFEST_VERSION = 2 as const;
 const PAGED_MANIFEST_MAX_PAGES = 16_384;

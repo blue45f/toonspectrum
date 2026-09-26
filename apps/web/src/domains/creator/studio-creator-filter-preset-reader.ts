@@ -7,7 +7,7 @@ import {
 } from "./filter/studio-filter-pack";
 
 export const STUDIO_CREATOR_FILTER_PRESET_LIBRARY_KEY =
-  "toonspectrum.studio-creator-filter-presets.v1" as const;
+  "toonstudio.studio-creator-filter-presets.v1" as const;
 
 export interface StudioCreatorPackStorage {
   getItem(key: string): string | null;

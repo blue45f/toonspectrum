@@ -17,7 +17,7 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_CONCURRENCY = 4;
 const MAX_BODY_BYTES = 2_000_000;
 const USER_AGENT =
-  "ToonSpectrum-Studio-Competitor-Watch/1.0 (+https://github.com/blue45f/toonspectrum)";
+  "ToonStudio-Studio-Competitor-Watch/1.0 (+https://github.com/blue45f/toonstudio)";
 
 export function normalizeCompetitorBody(input) {
   return htmlToText(input, { separator: " " })

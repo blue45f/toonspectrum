@@ -19,7 +19,7 @@ all repositories
 ```
 
 SQLite objects, statements, Worker handles, and OPFS handles never enter creative model
-objects. Stable palette, Brand Kit, and clip values remain ordinary ToonSpectrum types.
+objects. Stable palette, Brand Kit, and clip values remain ordinary ToonStudio types.
 Brand logos and clip element payloads are bounded canonical JSON in the shared KV table
 for this slice; moving large binary assets to a blob table is a future optimization, not
 a hidden behavior in the current implementation.

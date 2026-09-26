@@ -673,7 +673,7 @@ export function StudioSaveFirstProjectLibraryPage({
         ) : null}
 
         <footer className="mt-10 border-t border-line pt-5 text-xs leading-5 text-fg-3">
-          {bt("저장, 백업, 내보내기, 외부 제출, ToonSpectrum 게시는 서로 독립적으로 관리됩니다.", "Saving, backup, export, external submission and ToonSpectrum publishing are managed independently.")}
+          {bt("저장, 백업, 내보내기, 외부 제출, ToonStudio 게시는 서로 독립적으로 관리됩니다.", "Saving, backup, export, external submission and ToonStudio publishing are managed independently.")}
         </footer>
       </Container>
     </div>

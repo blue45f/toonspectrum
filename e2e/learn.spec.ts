@@ -4,7 +4,7 @@ import { STORAGE_KEY } from "../apps/web/src/domains/learn/learning-model";
 import { expect, test } from "./fixtures/non-studio-test";
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => sessionStorage.setItem("toonspectrum-compat-dismissed", "true"));
+  await page.addInitScript(() => sessionStorage.setItem("toonstudio-compat-dismissed", "true"));
   await page.route("**/api/auth/session**", async (route) => {
     await route.fulfill({
       status: 200,

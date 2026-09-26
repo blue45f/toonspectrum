@@ -13,7 +13,7 @@ const enabledEnvironment = {
   BACKEND_UPSTASH_QSTASH_API_BASE_URL: "https://qstash.upstash.io",
   BACKEND_UPSTASH_QSTASH_PUBLISH_TOKEN:
     "qstash-publish-token-that-is-server-only",
-  BACKEND_UPSTASH_QSTASH_URL_GROUP: "toonspectrum-durable-v1",
+  BACKEND_UPSTASH_QSTASH_URL_GROUP: "toonstudio-durable-v1",
 };
 
 describe("Upstash QStash durable queue configuration", () => {
@@ -37,7 +37,7 @@ describe("Upstash QStash durable queue configuration", () => {
     expect(resolveUpstashQStashConfig(enabledEnvironment)).toEqual({
       apiBaseUrl: "https://qstash.upstash.io",
       publishToken: "qstash-publish-token-that-is-server-only",
-      urlGroup: "toonspectrum-durable-v1",
+      urlGroup: "toonstudio-durable-v1",
       timeoutMs: 2_500,
       deliveryTimeoutSeconds: 30,
       retries: 3,
@@ -123,7 +123,7 @@ describe("Upstash QStash durable queue configuration", () => {
       validateUpstashQStashConfig({
         apiBaseUrl: "https://attacker.example",
         publishToken: "qstash-publish-token-that-is-server-only",
-        urlGroup: "toonspectrum-durable-v1",
+        urlGroup: "toonstudio-durable-v1",
         timeoutMs: 2_500,
         deliveryTimeoutSeconds: 30,
         retries: 3,

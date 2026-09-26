@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
-import type { StudioWorldPublish } from "@toonspectrum/studio-project-model/world-publication";
+import type { StudioWorldPublish } from "@toonstudio/studio-project-model/world-publication";
 import { StudioIdempotencyConflictError, StudioProjectForbiddenError, StudioProjectNotFoundError, StudioRepositoryInvariantError } from "./studio-project-graph.repository";
 import { StudioWorldPublicationConflictError, StudioWorldPublicationRepository } from "./studio-world-publication.repository";
 

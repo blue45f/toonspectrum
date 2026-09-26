@@ -134,7 +134,7 @@ describe("Cloudflare 무료 D1 구성", () => {
     const manifest = loadCloudflareFreeDataPlaneManifest();
     expect(manifest.quotaScope).toBe("cloudflare-account");
     expect(manifest.databases.map((database) => database.name)).toEqual([
-      "toonspectrum-edge-index", "toonspectrum-analytics-buffer",
+      "toonstudio-edge-index", "toonstudio-analytics-buffer",
     ]);
     expect(manifest.databases[0].expectedSchema.some((entry) => entry.name === "edge_catalog_sort_idx")).toBe(true);
   });
@@ -160,7 +160,7 @@ describe("Cloudflare 무료 D1 구성", () => {
     const api = fakeCloudflare();
     const options = { environment, fetchImpl: api.fetchImpl, database: "analytics-buffer" };
     const result = await provisionCloudflareFreeDataPlane("apply", options);
-    expect(result.databases.map((entry) => entry.name)).toEqual(["toonspectrum-analytics-buffer"]);
+    expect(result.databases.map((entry) => entry.name)).toEqual(["toonstudio-analytics-buffer"]);
     expect(api.databases.size).toBe(1);
     const sqlite = [...api.databases.values()][0].sqlite;
     expect(sqlite.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name LIKE 'traffic_%'")
@@ -325,7 +325,7 @@ describe("Cloudflare 무료 D1 구성", () => {
 
   it("뒤쪽 DB에 이름 충돌이 있어도 앞쪽 DB를 먼저 생성하지 않는다", async () => {
     const api = fakeCloudflare();
-    api.addDatabase("toonspectrum-analytics-buffer", "CREATE TABLE private_data (value TEXT)");
+    api.addDatabase("toonstudio-analytics-buffer", "CREATE TABLE private_data (value TEXT)");
     await expect(provisionCloudflareFreeDataPlane("apply", {
       environment, fetchImpl: api.fetchImpl,
     })).rejects.toThrow("소유권 checkpoint 없는 동명 DB");
@@ -334,7 +334,7 @@ describe("Cloudflare 무료 D1 구성", () => {
 
   it("빈 동명 DB도 소유권 증거 없이 인수하지 않는다", async () => {
     const api = fakeCloudflare();
-    api.addDatabase("toonspectrum-edge-index");
+    api.addDatabase("toonstudio-edge-index");
     await expect(provisionCloudflareFreeDataPlane("apply", {
       environment, fetchImpl: api.fetchImpl,
     })).rejects.toThrow("소유권 checkpoint 없는 동명 DB");

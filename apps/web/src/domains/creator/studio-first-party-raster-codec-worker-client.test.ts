@@ -177,7 +177,7 @@ describe("first-party raster codec Worker client success", () => {
     expect(input.byteLength).toBeGreaterThan(0);
     expect(result.bytes.byteLength).toBeGreaterThan(0);
     expect(result.receipt).toMatchObject({
-      providerId: "toonspectrum.raster.qoi.v1",
+      providerId: "toonstudio.raster.qoi.v1",
       direction: "encode",
       format: "qoi",
       output: { byteLength: result.bytes.byteLength },

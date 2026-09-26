@@ -65,7 +65,7 @@ export function createStudioBg3dShotPngModuleWorker(): StudioBg3dShotPngWorkerLi
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-bg3d-shot-png.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-bg3d-shot-png",
+    name: "toonstudio-bg3d-shot-png",
   });
 }
 

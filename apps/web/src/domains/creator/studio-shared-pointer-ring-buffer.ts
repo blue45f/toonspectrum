@@ -144,7 +144,7 @@ export type StudioSharedPointerSampleVisitor = (
  * objects.
  */
 export interface StudioSharedPointerRingDescriptor {
-  readonly kind: "toonspectrum-studio-pointer-spsc";
+  readonly kind: "toonstudio-studio-pointer-spsc";
   readonly version: typeof STUDIO_SHARED_POINTER_RING_VERSION;
   readonly buffer: SharedArrayBuffer;
   readonly byteLength: number;
@@ -341,7 +341,7 @@ function attachCommon(
   }
   const candidate = descriptor as Partial<StudioSharedPointerRingDescriptor>;
   if (
-    candidate.kind !== "toonspectrum-studio-pointer-spsc"
+    candidate.kind !== "toonstudio-studio-pointer-spsc"
     || candidate.version !== STUDIO_SHARED_POINTER_RING_VERSION
     || candidate.headerBytes !== STUDIO_SHARED_POINTER_RING_HEADER_BYTES
     || candidate.sampleFloat64s
@@ -1100,7 +1100,7 @@ export function createStudioSharedPointerRingBuffer(
   );
 
   const descriptor: StudioSharedPointerRingDescriptor = Object.freeze({
-    kind: "toonspectrum-studio-pointer-spsc",
+    kind: "toonstudio-studio-pointer-spsc",
     version: STUDIO_SHARED_POINTER_RING_VERSION,
     buffer,
     byteLength: buffer.byteLength,

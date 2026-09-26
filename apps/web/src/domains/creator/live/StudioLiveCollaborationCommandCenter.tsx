@@ -308,7 +308,7 @@ export function buildStudioLiveHandoffSummary({
   }).format(generatedAt);
 
   const lines = [
-    "ToonSpectrum Studio 협업 인계 요약",
+    "ToonStudio Studio 협업 인계 요약",
     `생성: ${generatedLabel}`,
     `연결: ${modeLabel(availability, mode)}`,
     `참여: 나 포함 ${(peers.length + 1).toLocaleString("ko-KR")}개 작업 탭 · 활성 ${activeCount.toLocaleString("ko-KR")}개${roleSummary ? ` · ${roleSummary}` : ""}`,

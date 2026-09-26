@@ -326,7 +326,7 @@ function parsePageReceipts(
     if (
       !isRecord(linked)
       || !hasExactKeys(linked, ["kind", "version", "authority", "links"])
-      || linked.kind !== "toonspectrum.studio-linked-3d-render"
+      || linked.kind !== "toonstudio.studio-linked-3d-render"
       || linked.version !== 2
       || linked.authority !== "studio-project-linked-3d-pass-index"
       || !Array.isArray(linked.links)

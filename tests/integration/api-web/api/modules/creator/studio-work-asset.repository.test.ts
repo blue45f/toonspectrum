@@ -64,7 +64,7 @@ function linkedPassEnvelope() {
         id: "page-1",
         elements: [{ id: "line-1", type: "image", src: LINKED_PASS_LOCATOR }],
         linked3dRender: {
-          kind: "toonspectrum.studio-linked-3d-render",
+          kind: "toonstudio.studio-linked-3d-render",
           version: 2,
           authority: "studio-project-linked-3d-pass-index",
           links: [{
@@ -126,7 +126,7 @@ function batchWrite(assetId: string, fill: number): StudioWorkAssetWrite {
     sha256,
     intrinsicImage: { width: 1, height: 1, decodedRgbaBytes: 4 },
     storageObject: {
-      contractVersion: "toonspectrum.private-object-storage.v2",
+      contractVersion: "toonstudio.private-object-storage.v2",
       providerId: "cloudflare-r2",
       purpose: "source",
       digest: `sha256:${sha256}`,

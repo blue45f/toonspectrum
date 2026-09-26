@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-import { solidPaint } from "@toonspectrum/studio-project-model";
+import { solidPaint } from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { velloCpuProviderDescriptor } from "../descriptor";
@@ -12,7 +12,7 @@ import {
 } from "../text-vertical";
 
 import type { VerticalShapedText } from "../text-vertical";
-import type { PathIR, SceneIR } from "@toonspectrum/studio-project-model";
+import type { PathIR, SceneIR } from "@toonstudio/studio-project-model";
 
 /**
  * Vertical writing lane (세로쓰기, V12 Text row) TS-boundary contracts:
@@ -311,10 +311,10 @@ describe("vertical text lane (wasm)", () => {
     const scene = glyphScene(shaped, 96, 144);
     const velloPixels = renderSceneToPixels(scene);
     const { loadCanvasKitNode } = await import(
-      "@toonspectrum/studio-engine-skia/node"
+      "@toonstudio/studio-engine-skia/node"
     );
     const { renderSceneToPixels: renderWithSkia } = await import(
-      "@toonspectrum/studio-engine-skia"
+      "@toonstudio/studio-engine-skia"
     );
     const ck = await loadCanvasKitNode();
     const skiaPixels = renderWithSkia(ck, scene);

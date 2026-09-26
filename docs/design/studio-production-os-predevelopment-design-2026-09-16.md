@@ -1,4 +1,4 @@
-# ToonSpectrum Studio Production OS — 개발 전 상세 설계
+# ToonStudio Studio Production OS — 개발 전 상세 설계
 
 - 상태: **Implementation Review Ready**
 - 기준일: 2026-09-16
@@ -9,7 +9,7 @@
 
 ## 1. 제품 결정
 
-ToonSpectrum Studio의 목표는 Clip Studio Paint, MediBang Paint, ibisPaint의 기능을 화면 단위로 복제하는 것이 아니다.
+ToonStudio Studio의 목표는 Clip Studio Paint, MediBang Paint, ibisPaint의 기능을 화면 단위로 복제하는 것이 아니다.
 다음 하나의 제작 흐름을 끊김 없이 연결하는 것이 제품 우위다.
 
 ```text
@@ -22,7 +22,7 @@ ToonSpectrum Studio의 목표는 Clip Studio Paint, MediBang Paint, ibisPaint의
 
 경쟁 기준은 다음과 같다.
 
-| 제품군의 강점 | ToonSpectrum이 흡수할 능력 | ToonSpectrum의 차별화 지점 |
+| 제품군의 강점 | ToonStudio이 흡수할 능력 | ToonStudio의 차별화 지점 |
 | --- | --- | --- |
 | Clip Studio Paint의 만화 편집, 다중 페이지, 웹툰 출력, 3D·소재 | 컷·말풍선·특수 자·효과선·페이지·출력·3D를 하나의 작품 문서에서 유지 | 동일 페이지 공동 작업, 직군별 인계·검수, 자동 저장과 플랫폼 게시 파이프라인 |
 | MediBang의 클라우드 프로젝트와 팀 제작 | 역할·담당·작업 단계·검수·공유 | 파일 공유가 아니라 같은 원고의 구조적 실시간 공동 편집 |
@@ -890,5 +890,5 @@ Rollback은 schema를 되돌리는 것이 아니라 새 mutation 입구를 닫�
 - MediBang Group Project: https://medibangpaint.com/en/team/
 - ibisPaint Cloud Storage: https://ibispaint.com/lecture/index.jsp?no=77&lang=en
 
-타사의 화면, 명칭, 소스, 소재를 복제하지 않는다. 공개된 작업 개념을 ToonSpectrum의 기존 문서·권한·저장 구조에
+타사의 화면, 명칭, 소스, 소재를 복제하지 않는다. 공개된 작업 개념을 ToonStudio의 기존 문서·권한·저장 구조에
 맞게 독자 구현한다.

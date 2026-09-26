@@ -8,12 +8,12 @@ import {
 } from "./creator-marketplace-resource-contract";
 
 export const CREATOR_ASSET_PLATFORM_SCHEMA =
-  "toonspectrum.creator-asset-platform" as const;
+  "toonstudio.creator-asset-platform" as const;
 export const CREATOR_ASSET_PLATFORM_VERSION = 1 as const;
 export const CREATOR_ASSET_ARTIFACT_SET_SCHEMA =
-  "toonspectrum.creator-asset-artifact-set" as const;
+  "toonstudio.creator-asset-artifact-set" as const;
 export const CREATOR_WORK_CATALOG_BINDING_SCHEMA =
-  "toonspectrum.creator-work-catalog-asset-binding" as const;
+  "toonstudio.creator-work-catalog-asset-binding" as const;
 
 const SAFE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{0,159}$/u;
 const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/u;

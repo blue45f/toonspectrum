@@ -20,7 +20,7 @@ function assert(condition, message) {
 
 const manifest = JSON.parse(await readFile(PLAYLIST, "utf8"));
 assert(manifest?.version === 3, "Expected provenance-aware playlist schema version 3.");
-assert(manifest?.collection === "ToonSpectrum Original OST", "Unexpected OST collection.");
+assert(manifest?.collection === "ToonStudio Original OST", "Unexpected OST collection.");
 assert(Array.isArray(manifest?.tracks), "playlist.json must contain tracks.");
 assert(manifest.tracks.length === EXPECTED_TRACKS, `Expected ${EXPECTED_TRACKS} published masters, found ${manifest.tracks.length}.`);
 
@@ -59,4 +59,4 @@ for (const id of ["spectrum-breaker-vocal", "wings-of-the-unwritten-vocal", "oat
   assert(ids.has(id), `Missing Prism Awakening master: ${id}`);
 }
 
-console.log(`Verified ${manifest.tracks.length} ToonSpectrum original OST masters and provenance sidecars.`);
+console.log(`Verified ${manifest.tracks.length} ToonStudio original OST masters and provenance sidecars.`);

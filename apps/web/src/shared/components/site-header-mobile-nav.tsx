@@ -14,7 +14,7 @@ import {
   siteNavigationLocale,
   siteNavigationText,
 } from "./site-navigation";
-import { ToonSpectrumMark } from "./visual-marks";
+import { ToonStudioMark } from "./visual-marks";
 
 import { usePathname } from "@/shared/navigation/navigation";
 import Link from "@/shared/navigation/router-link";
@@ -217,7 +217,7 @@ export function MobileHeaderNavigation({
             <div className="sticky top-0 z-10 border-b border-line/60 bg-canvas/92 backdrop-blur-2xl">
               <div className="mx-auto flex min-h-[4.5rem] max-w-[1320px] items-center justify-between gap-4 px-4 sm:px-6">
                 <div className="flex min-w-0 items-center gap-3">
-                  <ToonSpectrumMark className="size-10 rounded-[0.85rem]" />
+                  <ToonStudioMark className="size-10 rounded-[0.85rem]" />
                   <div className="min-w-0">
                     <span className="block truncate font-display text-sm font-bold text-fg">
                       {navigationContext === "studio"

@@ -1,16 +1,16 @@
 /**
- * Bounded W3C InkML interchange for ToonSpectrum digital ink.
+ * Bounded W3C InkML interchange for ToonStudio digital ink.
  *
  * This is an independent implementation of a small, documented InkML profile. It does not use a
  * commercial SDK, a proprietary `.will` codec, or a hardware identifier. The profile intentionally
- * carries only renderer-relevant sample channels; the richer ToonSpectrum document/brush contract
+ * carries only renderer-relevant sample channels; the richer ToonStudio document/brush contract
  * remains authoritative in the native project envelope.
  */
 
 import type { DrawEl } from "./studio-element-model";
 
 export const STUDIO_INKML_NAMESPACE = "http://www.w3.org/2003/InkML";
-export const STUDIO_INKML_PROFILE = "toonspectrum-inkml-v1" as const;
+export const STUDIO_INKML_PROFILE = "toonstudio-inkml-v1" as const;
 export const STUDIO_INKML_MEDIA_TYPE = "application/inkml+xml" as const;
 
 export const STUDIO_INKML_LIMITS = Object.freeze({
@@ -30,9 +30,9 @@ export const STUDIO_INKML_LIMITS = Object.freeze({
 const XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
 const XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
 const PROFILE_ANNOTATION_TYPE =
-  "application/vnd.toonspectrum.inkml-profile";
-const TRACE_FORMAT_ID = "toonspectrum-trace-format-v1";
-const CONTEXT_ID = "toonspectrum-context-v1";
+  "application/vnd.toonstudio.inkml-profile";
+const TRACE_FORMAT_ID = "toonstudio-trace-format-v1";
+const CONTEXT_ID = "toonstudio-context-v1";
 const ID_PATTERN = /^[A-Za-z_][A-Za-z0-9._-]{0,127}$/u;
 const INTEGER_NUMBER_PATTERN = /^[+-]?\d+$/u;
 const DECIMAL_NUMBER_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u;
@@ -389,7 +389,7 @@ function assertOutputBudget(value: string, limits: ResolvedLimits): void {
   }
 }
 
-/** Encodes the deterministic ToonSpectrum InkML profile. */
+/** Encodes the deterministic ToonStudio InkML profile. */
 export function encodeStudioInkMl(
   traces: readonly StudioInkMlTraceInput[],
   options: StudioInkMlCodecOptions = {},
@@ -1025,7 +1025,7 @@ function assertDeclaredProfileContract(
   contexts: ReadonlyMap<string, string>,
   traces: readonly Element[],
 ): void {
-  const profileError = "선언된 ToonSpectrum InkML v1 구조가 정확한 프로필 계약과 다릅니다.";
+  const profileError = "선언된 ToonStudio InkML v1 구조가 정확한 프로필 계약과 다릅니다.";
   const rootChildren = Array.from(root.children);
   const definitions = directChildren(root, "definitions");
   const annotations = directChildren(root, "annotation");
@@ -1133,7 +1133,7 @@ function assertDeclaredProfileContract(
 }
 
 /**
- * Decodes the ToonSpectrum profile and a bounded basic InkML subset. Unknown channels are reported
+ * Decodes the ToonStudio profile and a bounded basic InkML subset. Unknown channels are reported
  * and ignored; relative/differential compression, intermittent channels, and unsafe XML constructs
  * fail closed.
  */
@@ -1173,7 +1173,7 @@ export function decodeStudioInkMl(
   if (profileAnnotations.length > 1) {
     return fail(
       "invalid-document",
-      "ToonSpectrum InkML 프로필 선언이 중복되었습니다.",
+      "ToonStudio InkML 프로필 선언이 중복되었습니다.",
     );
   }
   const profileAnnotation = profileAnnotations[0];
@@ -1188,7 +1188,7 @@ export function decodeStudioInkMl(
   ) {
     return fail(
       "unsupported-profile",
-      "ToonSpectrum InkML 프로필 선언은 확장 요소 없는 정확한 텍스트여야 합니다.",
+      "ToonStudio InkML 프로필 선언은 확장 요소 없는 정확한 텍스트여야 합니다.",
     );
   }
   const declaredProfile = profileAnnotation?.textContent ?? undefined;
@@ -1198,7 +1198,7 @@ export function decodeStudioInkMl(
   ) {
     return fail(
       "unsupported-profile",
-      `지원하지 않는 ToonSpectrum InkML 프로필입니다: ${declaredProfile}`,
+      `지원하지 않는 ToonStudio InkML 프로필입니다: ${declaredProfile}`,
     );
   }
 

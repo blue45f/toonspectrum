@@ -51,7 +51,7 @@ function createFakeStorage(initial: Record<string, string> = {}): FakeStorage {
   return storage;
 }
 
-const CUSTOM_FONT_LIBRARY_KEY = "toonspectrum-studio-custom-fonts";
+const CUSTOM_FONT_LIBRARY_KEY = "toonstudio-studio-custom-fonts";
 
 /** 결정적 고엔트로피 바이트 — 실제 WOFF2처럼 압축이 듣지 않는 payload. */
 function fontBytes(seed: number, count = 40_000): Uint8Array {
@@ -401,7 +401,7 @@ describe("studio-opfs-migration · 중단 안전성", () => {
   });
 
   it("여러 소스 중 하나가 실패해도 나머지는 완주한다", async () => {
-    const otherKey = "toonspectrum-studio-emeres-library";
+    const otherKey = "toonstudio-studio-emeres-library";
     const storage = createFakeStorage({
       [CUSTOM_FONT_LIBRARY_KEY]: TWO_FONTS,
       [otherKey]: JSON.stringify([

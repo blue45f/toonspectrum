@@ -1,6 +1,6 @@
 # 창작 스튜디오(/studio) — 경쟁사 기능 분석 & 구현 현황
 
-> `docs/competitor-analysis.md`(툰스펙트럼 본체: 웹툰 검색/랭킹/리뷰 서비스)와는 다른 문서다. 이 문서는
+> `docs/competitor-analysis.md`(툰스튜디오 본체: 웹툰 검색/랭킹/리뷰 서비스)와는 다른 문서다. 이 문서는
 > **창작 스튜디오(`src/domains/creator/StudioPage.tsx`, 컷툰 제작 캔버스 에디터)** 가 벤치마킹하는
 > 드로잉/만화 제작 소프트웨어 대상이다.
 >
@@ -80,7 +80,7 @@
 ### 2026-07-13 모바일 전용 집중 드로잉 셸 (현재 작업 트리 통합 완료)
 
 Procreate의 최소 인터페이스, Clip Studio Paint의 태블릿 작업공간, MediBang의 모바일 명령 바처럼
-작은 화면에서는 사이트 탐색보다 캔버스를 우선하되, ToonSpectrum의 프로젝트/내보내기·긴 세로 원고·
+작은 화면에서는 사이트 탐색보다 캔버스를 우선하되, ToonStudio의 프로젝트/내보내기·긴 세로 원고·
 2단 엄지 도크를 보존하는 자체 구조로 구현했다.
 
 - **컷툰 편집기 전용 앱 셸**: 1024px 미만의 `/studio` 컷툰 편집기는 기본적으로 사이트 헤더·푸터·
@@ -167,7 +167,7 @@ Procreate의 [최소 인터페이스](https://help.procreate.com/procreate/handb
 ibisPaint의 [도구 선택 바](https://ibispaint.com/lecture/index.jsp?no=4)와
 [크기 조절형 Layer Window](https://ibispaint.com/lecture/index.jsp?no=156), MediBang의
 [모바일 도구·서브도구·명령 바 분리](https://medibangpaint.com/en/manual/android/screen-description-and/)로
-교차 확인했다. 경쟁 제품의 화면을 복제하지 않고 ToonSpectrum의 긴 세로 원고·모바일 하단 도크·기존
+교차 확인했다. 경쟁 제품의 화면을 복제하지 않고 ToonStudio의 긴 세로 원고·모바일 하단 도크·기존
 도구 상태 모델에 맞춰 자체 구현했다.
 
 - **4개 기본 작업 탭**: 우측에 직렬로 쌓이던 캔버스, 색보정, 선택 속성, 그리기 도구, 레이어, 미니맵,
@@ -291,7 +291,7 @@ Procreate의 [QuickMenu](https://help.procreate.com/procreate/handbook/interface
 작업을 사용자별로 바꾸고 캔버스 문맥에서 즉시 실행하게 한다. Pixton의
 [Read Aloud](https://help.pixton.com/read-aloud)는 완성 전 대사를 귀로 검수하는 흐름을 제공하며, Canva의
 [Text to Speech](https://www.canva.com/features/text-to-speech/)도 텍스트 기반 창작물의 음성 미리보기를
-핵심 접근성 기능으로 제공한다. ToonSpectrum은 경쟁사의 화면·아이콘을 복제하지 않고 웹툰 모바일 편집과
+핵심 접근성 기능으로 제공한다. ToonStudio은 경쟁사의 화면·아이콘을 복제하지 않고 웹툰 모바일 편집과
 비공개 원고 검수에 맞춰 자체 구현했다.
 
 - **엄지 영역 6방향 퀵 액션**: 모바일 도크에서 열리는 방사형 메뉴에 되돌리기·다시 실행·선택·펜·지우개·
@@ -309,7 +309,7 @@ Procreate의 [QuickMenu](https://help.procreate.com/procreate/handbook/interface
   전체 재생·일시 정지·계속·중지, 진행 상태, 행별 44px 재생+캔버스 이동을 제공한다.
 - **프라이버시·점진 향상**: 브라우저 `speechSynthesis` 중 `localService === true`로 확인된 기기 내 음성을
   기본값으로 제한한다. 원격·출처 불명 음성은 대사가 운영체제·브라우저 음성 서비스로 전송될 수 있음을
-  표시하고 작가가 체크박스로 명시 허용한 뒤에만 쓴다. 어느 경우에도 ToonSpectrum 서버·AI·스토리지·
+  표시하고 작가가 체크박스로 명시 허용한 뒤에만 쓴다. 어느 경우에도 ToonStudio 서버·AI·스토리지·
   로그로 원문을 보내지 않는다. 미지원 브라우저에서는 편집을 유지하고 안내만 보이며, 시작 전 이전 큐,
   stale callback·브라우저 예외·React StrictMode effect replay·닫기/언마운트를 안전하게 처리한다.
 - **모바일 패널 재배치**: 기존 캔버스 높이에 갇히던 대사 패널을 도크 위 전체 높이 시트로 바꾸고 찾기·
@@ -329,7 +329,7 @@ Toon Boom Storyboard Pro는 [PDF Profile](https://docs.toonboom.com/help/storybo
 [Panel PDF Options](https://docs.toonboom.com/help/storyboard-pro-25/storyboard/reference/dialogs/panel-pdf-options-window.html)로
 페이지/패널 배치와 캡션 포함 범위를 저장하고, 기본 패널 캡션에
 [Dialogue·Action Notes·Slugging Notes·Notes](https://docs.toonboom.com/help/storyboard-pro-25/storyboard/caption/about-default-panel-caption.html)를
-구분한다. ToonSpectrum의 기존 `review.pdf`는 완성 페이지 이미지만 담아 담당자·승인 상태·콘티 메모·컷
+구분한다. ToonStudio의 기존 `review.pdf`는 완성 페이지 이미지만 담아 담당자·승인 상태·콘티 메모·컷
 대사를 별도 문서와 대조해야 했으므로, 내부 회람 경계를 유지하면서 프로필형 주석 레일을 추가했다.
 
 - **호환 기본값 + 4개 프로필**: `image-only`는 기존 PDF 렌더러와 페이지 크기를 그대로 유지한다.
@@ -424,7 +424,7 @@ TypeScript, warning 0 엄격 ESLint, Vite 프로덕션 빌드까지 모두 통�
 [모든 콘텐츠 썸네일의 별표와 다음 진입 시 즐겨찾기 우선 배치](https://help.pixton.com/how-to-bookmark-your-favorite-content)를,
 Clip Studio Paint는 [소재 하트와 Favorites 폴더·태그](https://help.clip-studio.com/en-us/manual_en/630_material/Organizing_materials.htm)를,
 Adobe Fresco는 [통합 브러시 패널의 별표와 즐겨찾기 순서 관리](https://helpx.adobe.com/fresco/desktop/draw-paint-animate-and-share/brushes.html)를
-제공한다. ToonSpectrum은 이 흐름을 현재 보유한 세 에셋 표면에 맞게 자체 구현했다.
+제공한다. ToonStudio은 이 흐름을 현재 보유한 세 에셋 표면에 맞게 자체 구현했다.
 
 - **한 저장 규칙, 세 출처**: `local:`, `community:`, `raster:` 네임스페이스로 같은 원본 ID의 충돌을
   막고 내 에셋·커뮤니티 에셋·검수형 투명 소품이 하나의 즐겨찾기 상태를 공유한다. 프로젝트 콘텐츠가
@@ -873,7 +873,7 @@ API 키를 등록해야 하는 곳이 AI 어시스트(baseURL/API키/모델)와 
 - 검증: tsc / `eslint --max-warnings=0` / vitest(201 files·3791 tests, 신규 3파일 28개 테스트 포함)
   전부 클린. 브라우저 검증(데스크톱 1440x900 + 모바일 390x844, `window.fetch`를 팔레트 JSON으로
   모킹)으로 미설정 안내 → 생성 → 스와치·용도 렌더 → "내 팔레트에 저장" → localStorage
-  `toonspectrum-studio-palette-library`에 `StudioNamedPalette`와 완전히 같은 구조로 반영 → "스타일 →
+  `toonstudio-studio-palette-library`에 `StudioNamedPalette`와 완전히 같은 구조로 반영 → "스타일 →
   팔레트" 탭에서 5개 스와치 그대로 노출까지 왕복 확인. 콘솔 에러 없음.
 
 ### 전체 스위트 최종 검증(2026-07-05) 중 발견 & 수정 — "AI 어시스트" 5섹션 팝오버가 데스크톱에서 푸터와

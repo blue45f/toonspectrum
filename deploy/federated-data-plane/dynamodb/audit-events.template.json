@@ -1,11 +1,11 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "ToonSpectrum free-tier guarded append-only audit events",
+  "Description": "ToonStudio free-tier guarded append-only audit events",
   "Resources": {
     "AuditEvents": {
       "Type": "AWS::DynamoDB::Table",
       "Properties": {
-        "TableName": "toonspectrum-audit-events",
+        "TableName": "toonstudio-audit-events",
         "BillingMode": "PROVISIONED",
         "ProvisionedThroughput": {
           "ReadCapacityUnits": 1,

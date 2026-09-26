@@ -2,7 +2,7 @@ import {
   canvasKitImageFilterDescriptor,
   openCvImageWorkerDescriptor,
   wasmVipsPipelineDescriptor,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import {
   assertAssetCapabilitiesKnown,
   canonicalJson,
@@ -11,7 +11,7 @@ import {
   computeAssetStructuredDigest,
   parseAssetMetadata,
   sceneFeatureCapabilityVocabulary,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 // Descriptor-only modules are imported by file path (same precedent as
 // studio-live-ink-stabilizer-plan.ts): the package INDEX of the skia/vello
@@ -41,7 +41,7 @@ import type { SvgImportResult } from "../../../../../packages/studio-format-gate
 import type {
   EngineCapabilityRegistry,
   ProviderDescriptor,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 import type {
   AssetKindIR,
   AssetLicenseIR,
@@ -50,7 +50,7 @@ import type {
   AssetProviderRequirementIR,
   AssetRendererVariantIR,
   BrushProgramIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * V12 §15 — asset ecosystem engine metadata registry.
@@ -370,7 +370,7 @@ function originalBlobRef(
 
 function normalizedIrRef(
   value: unknown,
-  schema: "toonspectrum.brush-program-ir" | "toonspectrum.scene-ir",
+  schema: "toonstudio.brush-program-ir" | "toonstudio.scene-ir",
   mediaType: string,
 ): AssetNormalizedIrReference {
   return {
@@ -483,8 +483,8 @@ export function deriveAssetMetadata(
       const engineRequirements = deriveBrushEngineRequirements(preset, "myb");
       const normalizedReference = normalizedIrRef(
         preset,
-        "toonspectrum.brush-program-ir",
-        "application/vnd.toonspectrum.brush-program+json",
+        "toonstudio.brush-program-ir",
+        "application/vnd.toonstudio.brush-program+json",
       );
       const hokusaiCapabilities = engineRequirements.filter((capability) =>
         descriptorById("hokusai-natural-media").capabilities.includes(capability),
@@ -572,8 +572,8 @@ export function deriveAssetMetadata(
       const engineRequirements = deriveBrushEngineRequirements(program, "kpp");
       const normalizedReference = normalizedIrRef(
         program,
-        "toonspectrum.brush-program-ir",
-        "application/vnd.toonspectrum.brush-program+json",
+        "toonstudio.brush-program-ir",
+        "application/vnd.toonstudio.brush-program+json",
       );
       const hokusaiCapabilities = engineRequirements.filter((capability) =>
         descriptorById("hokusai-natural-media").capabilities.includes(capability),
@@ -688,8 +688,8 @@ export function deriveAssetMetadata(
       const engineRequirements = collectSceneFeatures(scene);
       const normalizedReference = normalizedIrRef(
         scene,
-        "toonspectrum.scene-ir",
-        "application/vnd.toonspectrum.scene+json",
+        "toonstudio.scene-ir",
+        "application/vnd.toonstudio.scene+json",
       );
       candidate = {
         ...base,

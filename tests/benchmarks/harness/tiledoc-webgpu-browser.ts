@@ -485,7 +485,7 @@ export async function runTiledocWebGpuBrowserBenchmark(
   options: { scratchDirectory?: string; resultPath?: string } = {}
 ): Promise<TiledocWebGpuBrowserArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-tiledoc-webgpu-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-tiledoc-webgpu-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

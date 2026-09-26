@@ -8,7 +8,7 @@ export const STUDIO_VIRTUAL_SPACE_NICKNAME_MIN_GRAPHEMES = 2;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 const NICKNAME_PATTERN = /^[\p{L}\p{N}_\- ]+$/u;
 const RESERVED_NICKNAMES = new Set([
-  "admin", "administrator", "moderator", "npc", "system", "toonspectrum", "toonstudio",
+  "admin", "administrator", "moderator", "npc", "system", "toonstudio", "toonstudio",
   "관리자", "운영자", "시스템", "스태프", "엔피시",
 ]);
 

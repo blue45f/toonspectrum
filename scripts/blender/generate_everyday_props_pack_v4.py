@@ -1,4 +1,4 @@
-"""Generate ToonSpectrum's production everyday prop pack v4.
+"""Generate ToonStudio's production everyday prop pack v4.
 
 The six assets in this pack replace the primitive geometry behind the stable
 ``mug``, ``book``, ``cap``, ``glasses``, ``backpack`` and ``stethoscope`` IDs.
@@ -293,7 +293,7 @@ def root_and_export(asset_id, filename, attachment_origin, dimensions, quality_c
     root = bpy.data.objects.new(f"TS_{asset_id}_Root", None)
     root.empty_display_type = "PLAIN_AXES"
     root["asset_id"] = asset_id
-    root["asset_author"] = "ToonSpectrum"
+    root["asset_author"] = "ToonStudio"
     root["asset_generator"] = GENERATOR
     root["asset_license"] = "CC0-1.0"
     root["asset_license_url"] = CC0_LICENSE_URL
@@ -584,7 +584,7 @@ def generate_everyday_props_pack_v4():
     }
     for asset_id, _filename in ASSETS:
         builders[asset_id]()
-    print("Generated all 6 ToonSpectrum everyday prop v4 assets.")
+    print("Generated all 6 ToonStudio everyday prop v4 assets.")
 
 
 if __name__ == "__main__":

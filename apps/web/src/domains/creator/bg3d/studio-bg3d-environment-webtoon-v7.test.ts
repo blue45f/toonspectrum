@@ -49,7 +49,7 @@ function parseJsonChunk(bytes: Uint8Array): GltfDocument {
 
 describe("Studio original webtoon environment pack v7", () => {
   it("publishes three original procedural scenes after the refined and expansion packs", () => {
-    expect(webtoonManifest.schema).toBe("toonspectrum.bg3d-environment-pack.v7");
+    expect(webtoonManifest.schema).toBe("toonstudio.bg3d-environment-pack.v7");
     expect(STUDIO_BG3D_ENVIRONMENT_ASSETS_WEBTOON_V7).toHaveLength(3);
     expect(STUDIO_BG3D_ENVIRONMENT_ASSETS).toEqual([
       ...STUDIO_BG3D_ENVIRONMENT_ASSETS_V6,
@@ -114,7 +114,7 @@ describe("Studio original webtoon environment pack v7", () => {
       expect(root?.extras).toMatchObject({
         asset_id: asset.id,
         asset_type: "studio-bg3d-environment",
-        asset_author: "ToonSpectrum",
+        asset_author: "ToonStudio",
         asset_generator: "scripts/blender/generate_environment_pack_v7.py",
         asset_generator_version: "7.0.0-blender-5.2",
         asset_license: "CC0-1.0",

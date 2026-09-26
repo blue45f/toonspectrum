@@ -36,8 +36,8 @@ export const STUDIO_VRM_FULL_STATE_LIBRARY_MAX_BYTES = 16 * 1024 * 1024;
 export const STUDIO_VRM_FULL_STATE_MAX_BYTES = 2 * 1024 * 1024;
 export const STUDIO_VRM_FULL_STATE_MAX_NAME_LENGTH = 24;
 
-const CUSTOM_POSE_LIBRARY_KIND = "toonspectrum.studio-vrm-custom-pose-library" as const;
-const FULL_STATE_LIBRARY_KIND = "toonspectrum.studio-vrm-full-state-library" as const;
+const CUSTOM_POSE_LIBRARY_KIND = "toonstudio.studio-vrm-custom-pose-library" as const;
+const FULL_STATE_LIBRARY_KIND = "toonstudio.studio-vrm-full-state-library" as const;
 const LIBRARY_VERSION = 1 as const;
 const CUSTOM_POSE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,127}$/u;
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);

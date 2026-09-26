@@ -1,4 +1,4 @@
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 import type { StudioProductionWorkspaceDocument } from "./studio-production.dto";
 
 export function studioHandoffRoleBasis(document: StudioProductionWorkspaceDocument, roleId: string) {

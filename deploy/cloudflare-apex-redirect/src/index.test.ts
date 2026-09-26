@@ -14,7 +14,7 @@ describe("toonstudio apex canonical redirect", () => {
     expect(response.headers.get("location")).toBe(
       "https://www.toonstudio.cloud/production/projects/demo%20one?tab=review&mode=full",
     );
-    expect(response.headers.get("x-toonspectrum-canonical-origin")).toBe(
+    expect(response.headers.get("x-toonstudio-canonical-origin")).toBe(
       CANONICAL_ORIGIN,
     );
     expect(response.headers.get("cache-control")).toBe(

@@ -5,7 +5,7 @@ User request: configure the existing realtime infrastructure so P2P chat, voice 
 
 ## Existing production authority, not a new service
 
-Render CLI's configured workspace resolves the existing `toonspectrum-core-api` service (`srv-dakljs1594qs73egeq30`), owned by the project workspace and linked to `blue45f/toonspectrum`. It remains on the free plan, with automatic deployment off. No service, database, membership or paid plan is deleted or created.
+Render CLI's configured workspace resolves the existing `toonstudio-core-api` service (`srv-dakljs1594qs73egeq30`), owned by the project workspace and linked to `blue45f/toonstudio`. It remains on the free plan, with automatic deployment off. No service, database, membership or paid plan is deleted or created.
 
 The existing `https://www.toonstudio.cloud/socket.io` gateway already forwards WebSocket requests to that Render service. A native Socket.IO WebSocket probe reaches the server and an unauthenticated attempt is rejected with the expected login-session error. This proves reachability and an active authentication boundary, not authorized room admission.
 

@@ -72,9 +72,9 @@ function StudioProjectCenterFileControlHost({
 }
 
 const FAVORITE_STORAGE_KEY =
-  "toonspectrum-studio-project-center:favorites:v1";
+  "toonstudio-studio-project-center:favorites:v1";
 const RECENT_STORAGE_KEY =
-  "toonspectrum-studio-project-center:recent-actions:v1";
+  "toonstudio-studio-project-center:recent-actions:v1";
 const FAVORITE_LIMIT = 24;
 const RECENT_LIMIT = 8;
 const RESULT_LIMIT = 18;

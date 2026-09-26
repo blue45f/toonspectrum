@@ -32,7 +32,7 @@ function mergedPull(overrides: Record<string, unknown> = {}) {
     head: {
       ref: "feat/completed-work",
       sha: SHA,
-      repo: { full_name: "blue45f/toonspectrum" },
+      repo: { full_name: "blue45f/toonstudio" },
     },
     ...overrides,
   };
@@ -55,14 +55,14 @@ describe("merged branch cleanup safety", () => {
   it("recognizes the exact head of a PR squash-merged into the default branch", () => {
     expect(mergedPullRequestProvesHead(
       mergedPull(),
-      "blue45f/toonspectrum",
+      "blue45f/toonstudio",
       "main",
       "feat/completed-work",
       SHA,
     )).toBe(true);
     expect(mergedPullRequestProvesHead(
       mergedPull({ base: { ref: "release" } }),
-      "blue45f/toonspectrum",
+      "blue45f/toonstudio",
       "main",
       "feat/completed-work",
       SHA,
@@ -72,17 +72,17 @@ describe("merged branch cleanup safety", () => {
         head: {
           ref: "feat/completed-work",
           sha: "f".repeat(40),
-          repo: { full_name: "blue45f/toonspectrum" },
+          repo: { full_name: "blue45f/toonstudio" },
         },
       }),
-      "blue45f/toonspectrum",
+      "blue45f/toonstudio",
       "main",
       "feat/completed-work",
       SHA,
     )).toBe(false);
     expect(mergedPullRequestProvesHead(
       mergedPull({ merged_at: null }),
-      "blue45f/toonspectrum",
+      "blue45f/toonstudio",
       "main",
       "feat/completed-work",
       SHA,
@@ -120,7 +120,7 @@ describe("merged branch cleanup safety", () => {
 
 });
 
-const REPOSITORY = "blue45f/toonspectrum";
+const REPOSITORY = "blue45f/toonstudio";
 const BRANCH = "topic/기반+candidate";
 const REPOSITORY_PATH = `/repos/${REPOSITORY}`;
 const ENV = {

@@ -154,7 +154,7 @@ export interface StudioCrdtRecoveryVaultPersistence {
 }
 
 export interface StudioCrdtRecoveryBundle {
-  format: "toonspectrum-crdt-recovery";
+  format: "toonstudio-crdt-recovery";
   version: typeof STUDIO_CRDT_RECOVERY_BUNDLE_VERSION;
   workId: string;
   exportedAt: string;
@@ -713,7 +713,7 @@ export function createStudioCrdtRecoveryBundle(
     throw new Error("서로 다른 작품의 CRDT 복구 frontier는 한 파일로 내보낼 수 없습니다.");
   }
   return {
-    format: "toonspectrum-crdt-recovery",
+    format: "toonstudio-crdt-recovery",
     version: STUDIO_CRDT_RECOVERY_BUNDLE_VERSION,
     workId,
     exportedAt: new Date(exportedAt).toISOString(),
@@ -731,7 +731,7 @@ export function createStudioCrdtRecoveryBundle(
 export function studioCrdtRecoveryBundleFileName(workId: string, now = Date.now()): string {
   const date = new Date(now).toISOString().replaceAll(":", "-").replace(".000Z", "Z");
   const safeWorkId = workId.replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 64) || "work";
-  return `toonspectrum-${safeWorkId}-crdt-recovery-${date}.json`;
+  return `toonstudio-${safeWorkId}-crdt-recovery-${date}.json`;
 }
 
 /**

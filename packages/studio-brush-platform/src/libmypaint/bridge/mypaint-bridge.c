@@ -1,5 +1,5 @@
 /*
- * ToonSpectrum libmypaint wasm bridge (ADR-0011 lane 11).
+ * ToonStudio libmypaint wasm bridge (ADR-0011 lane 11).
  *
  * Thin C shims over libmypaint v1.6.1 so the TypeScript loader can:
  *   (a) create a brush and program it through the injection API

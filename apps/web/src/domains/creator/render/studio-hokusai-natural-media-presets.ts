@@ -186,10 +186,10 @@ export function studioHokusaiNaturalMediaPresetJson(
 ): string {
   return JSON.stringify({
     version: 3,
-    group: "ToonSpectrum natural media",
+    group: "ToonStudio natural media",
     parent_brush_name: "",
     comment:
-      `ToonSpectrum ${presetId} preset for Hokusai 0.3.0 · deterministic texture v2`,
+      `ToonStudio ${presetId} preset for Hokusai 0.3.0 · deterministic texture v2`,
     settings: studioHokusaiNaturalMediaPresetSettings(presetId),
   });
 }

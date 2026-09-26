@@ -17,7 +17,7 @@ import {
   type ProductionStudioDocumentRole,
   type ProductionStudioRevisionLink,
   type RoleAssignment,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { ProductionClientCommand } from "./production-api";
 

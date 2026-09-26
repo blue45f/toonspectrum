@@ -83,7 +83,7 @@ export function createStudioRasterInterchangeModuleWorker(): StudioRasterInterch
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-raster-interchange.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-raster-interchange",
+    name: "toonstudio-raster-interchange",
   }) as unknown as StudioRasterInterchangeWorkerLike;
 }
 

@@ -157,7 +157,7 @@ function sessionPayload(session: StudioAiComicDirectorSessionDocument) {
 }
 
 export function createStudioAiComicDirectorApiClient(input: {
-  /** Signed ToonSpectrum session token accepted through x-user-id. */
+  /** Signed ToonStudio session token accepted through x-user-id. */
   readonly sessionToken?: string | null;
   readonly baseUrl?: string;
   readonly fetchImpl?: typeof fetch;

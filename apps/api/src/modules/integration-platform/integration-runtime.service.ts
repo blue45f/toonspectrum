@@ -140,7 +140,7 @@ export class IntegrationRuntimeService {
     });
     if (input.dryRun) {
       return {
-        schema: "toonspectrum.integration-runtime-plan/1",
+        schema: "toonstudio.integration-runtime-plan/1",
         state: "planned",
         generatedAt: new Date().toISOString(),
         projectId: input.projectId,
@@ -186,7 +186,7 @@ export class IntegrationRuntimeService {
       providerResult = await this.engine.execute(input.request);
       const completedAt = new Date().toISOString();
       const response = {
-        schema: "toonspectrum.integration-runtime-receipt/1",
+        schema: "toonstudio.integration-runtime-receipt/1",
         state: "succeeded",
         replayed: false,
         completedAt,

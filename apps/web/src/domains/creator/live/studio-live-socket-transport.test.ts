@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonspectrum/studio-project-model/world-conversation";
+import { STUDIO_ACOUSTIC_CONVERSATION_EVENT } from "@toonstudio/studio-project-model/world-conversation";
 import { STUDIO_LIVE_UNSUPPORTED_JAM_MESSAGE } from "./studio-live-admission-support";
 import { presentStudioLiveSyncSnapshot, projectStudioLiveSyncSnapshot } from "./studio-live-sync-safety";
 
@@ -579,7 +579,7 @@ describe("StudioLiveSocketTransport", () => {
     vi.stubEnv("VITE_STUDIO_LIVE_ORIGIN", "");
     vi.stubEnv(
       "VITE_STUDIO_REALTIME_ORIGIN",
-      "https://toonspectrum-realtime.toonstudio-realtime.workers.dev",
+      "https://toonstudio-realtime.toonstudio-realtime.workers.dev",
     );
     vi.stubEnv("VITE_STUDIO_REALTIME_PROVIDER_ID", "cloudflare-realtime-v1");
     vi.stubEnv("VITE_API_BASE", "");

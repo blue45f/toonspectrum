@@ -64,7 +64,7 @@ function hokusaiOptIn(): StudioHokusaiMybProviderOptIn {
     mode: "settled",
     engineVersion: "0.3.0",
     adapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
-    customBinding: "toonspectrum-packed-dirty-frame",
+    customBinding: "toonstudio-packed-dirty-frame",
     surfaceContract: "packed-dirty-rgba8",
   };
 }
@@ -361,7 +361,7 @@ describe("Hokusai .myb provider admission", () => {
       brushFormat: ".myb/libmypaint-v3",
       execution: "dedicated-worker-wasm-packed-dirty-frame",
       adapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
-      customBinding: "toonspectrum-packed-dirty-frame",
+      customBinding: "toonstudio-packed-dirty-frame",
       surface: {
         internalTileSize: 64,
         internalFormat: "premultiplied-linear-rgba-fix15",
@@ -528,7 +528,7 @@ describe("Hokusai .myb provider admission", () => {
       mode: "settled",
       engineVersion: "0.3.0",
       adapterVersion: "0.3.0-transparent-dirty-tile-adapter.1",
-      customBinding: "toonspectrum-transparent-dirty-tile",
+      customBinding: "toonstudio-transparent-dirty-tile",
       surfaceContract: "transparent-straight-rgba8-dirty-tiles",
     } as unknown as StudioHokusaiMybProviderOptIn;
 

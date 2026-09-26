@@ -19,10 +19,10 @@
         "repositoryFactory": "createStudioVrmAssetSqliteOpfsRepository-no-options",
         "runtimeAcquire": "acquireStudioLocalDatabase",
         "requestedVfs": "opfs",
-        "sqliteOpfsDirectory": "toonspectrum-studio-sqlite",
+        "sqliteOpfsDirectory": "toonstudio-studio-sqlite",
         "sqliteDatabaseFilename": "studio-local-v12.db",
         "expectedOpenFilename": "/studio-local-v12.db",
-        "casOpfsRoot": "toonspectrum-studio-vrm-assets-v12",
+        "casOpfsRoot": "toonstudio-studio-vrm-assets-v12",
         "modelNamespace": "studio-vrm-model-assets-v12",
         "textureNamespace": "studio-vrm-texture-paint-assets-v12",
         "manifestKey": "manifest-v1",
@@ -32,8 +32,8 @@
           "/studio-local-v12.db"
         ],
         "installedOpfsDirectories": [
-          "toonspectrum-studio-sqlite",
-          "toonspectrum-studio-sqlite"
+          "toonstudio-studio-sqlite",
+          "toonstudio-studio-sqlite"
         ],
         "closeCompletedBeforeReopen": true
       },
@@ -5139,7 +5139,7 @@
         "sha256": "0ba9da62f4c9fed263185eea79dcddfb8f39b31ed57d4f52150826c60bc42c6d"
       }
     ],
-    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonspectrum-vrm-asset-opfs-VYfKrg"
+    "scratchDirectory": "/var/folders/xp/79glmmbj6970d74hvkgd4pg00000gp/T/toonstudio-vrm-asset-opfs-VYfKrg"
   },
   "validationIssues": []
 }

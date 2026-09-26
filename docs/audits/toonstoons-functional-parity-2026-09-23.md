@@ -56,7 +56,7 @@ ToonStudio에는 이미 다음 네이티브 엔진이 존재한다.
 | 프롬프트 파일 | TXT 다운로드 | 공급자 중립 프롬프트 번들을 UTF-8 TXT로 다운로드 | `studioToonAutomationPromptBundle` | 완료 |
 | 프로젝트 백업 | 설정·작업 결과 보존 | 설정/자산 참조/프롬프트를 JSON manifest로 다운로드 | `studioToonAutomationManifest` | 완료 |
 | 계정·사용량 | 로그인, 토큰/사용량, 결제·추천 | 제작 보드에서 기존 `/membership`의 잔액·Studio 크레딧·최근 원장으로 바로 이동한다. 경쟁 서비스의 고정 토큰 단가·추천 보상 경제는 복제하지 않고 ToonStudio wallet/admission 정책을 단일 진실원으로 유지 | `MembershipPolicyPage.tsx`, `apps/api/src/modules/membership-wallet`, `studio-ai` | 기존 플랫폼 재사용 |
-| 설치·업데이트 | PWA 설치·업데이트 | ToonSpectrum 기존 웹앱/PWA와 배포 체계 유지 | `apps/web/public/manifest.webmanifest`, 서비스 워커 검증 | 기존 플랫폼 재사용 |
+| 설치·업데이트 | PWA 설치·업데이트 | ToonStudio 기존 웹앱/PWA와 배포 체계 유지 | `apps/web/public/manifest.webmanifest`, 서비스 워커 검증 | 기존 플랫폼 재사용 |
 
 ## 3. 상태 모델
 

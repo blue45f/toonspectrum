@@ -169,7 +169,7 @@ export function validateProductionBibleSqliteOpfsEvidence(
     || opened.some((name) => name !== "/studio-local-v12.db")
     || !Array.isArray(directories)
     || directories.length !== 2
-    || directories.some((name) => name !== "toonspectrum-studio-sqlite")
+    || directories.some((name) => name !== "toonstudio-studio-sqlite")
   ) {
     issues.push("authority receipt does not prove two product V12 OPFS opens without fallback");
   }
@@ -371,7 +371,7 @@ export async function runProductionBibleSqliteOpfsBrowserEvidence(
   options: { scratchDirectory?: string; resultPath?: string } = {},
 ): Promise<ProductionBibleSqliteOpfsArtifact> {
   const scratch = options.scratchDirectory
-    ?? mkdtempSync(join(tmpdir(), "toonspectrum-production-bible-opfs-"));
+    ?? mkdtempSync(join(tmpdir(), "toonstudio-production-bible-opfs-"));
   const sourceDirectory = join(scratch, "production-source");
   const distributionDirectory = join(scratch, "production-dist");
   mkdirSync(sourceDirectory, { recursive: true });

@@ -21,9 +21,9 @@ function latin1(bytes: Uint8Array): string {
 function outputIntent() {
   return {
     profileBytes: buildMatrixTrcIccProfile(),
-    identifier: "ToonSpectrum-sRGB",
+    identifier: "ToonStudio-sRGB",
     condition: "sRGB IEC 61966-2-1",
-    info: "ToonSpectrum deterministic public profile",
+    info: "ToonStudio deterministic public profile",
     components: 3 as const,
   };
 }
@@ -48,7 +48,7 @@ function candidate(
     ],
     title: "검증 <원고>",
     author: "Toon & Team",
-    producer: "ToonSpectrum Studio",
+    producer: "ToonStudio Studio",
     outputIntent: outputIntent(),
     conformance: {
       target,

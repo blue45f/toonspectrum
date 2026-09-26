@@ -46,7 +46,7 @@ async function run() { // NOSONAR javascript:S3776
     await client.query(sql);
   }
 
-  async function publish(kind, license = "toonspectrum-standard") {
+  async function publish(kind, license = "toonstudio-standard") {
     const seed = CREATOR_MARKETPLACE_STARTER_RECORDS.find((record) => record.kind === kind);
     assert.ok(seed, `A validated starter fixture is required for ${kind}`);
     const id = randomUUID();

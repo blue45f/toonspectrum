@@ -2,7 +2,7 @@ import {
   TOONSPECTRUM_CSRF_HEADER,
   TOONSPECTRUM_CSRF_HEADER_VALUE,
   isCsrfProtectedMethod,
-} from "@toonspectrum/contracts/security/csrf";
+} from "@toonstudio/contracts/security/csrf";
 
 export {
   TOONSPECTRUM_CSRF_HEADER,
@@ -11,7 +11,7 @@ export {
 };
 
 /**
- * Browser CSRF helpers for ToonSpectrum API clients.
+ * Browser CSRF helpers for ToonStudio API clients.
  *
  * Public constants and unsafe-method classification live in the contracts package
  * so the API never imports browser application source.
@@ -22,7 +22,7 @@ export function withCsrfHeader(headers?: HeadersInit): Headers {
   return next;
 }
 
-/** Protect a known ToonSpectrum API mutation while preserving the full fetch init. */
+/** Protect a known ToonStudio API mutation while preserving the full fetch init. */
 export function withCsrfProtection(init: RequestInit): RequestInit {
   if (!isCsrfProtectedMethod(init.method)) return init;
   return { ...init, headers: withCsrfHeader(init.headers) };

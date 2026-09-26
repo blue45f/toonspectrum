@@ -30,7 +30,7 @@ function healthyObservation(
     : null;
   return {
     schemaVersion: STUDIO_UX_TASK_BENCHMARK_SCHEMA_VERSION,
-    productId: "toonspectrum",
+    productId: "toonstudio",
     taskId: task.id,
     surface: task.requireMobileEvidence ? "mobile" : "desktop",
     completed: true,
@@ -90,7 +90,7 @@ function healthyObservation(
       kind: "automated-browser",
       observedAt: "2026-08-03T00:00:00.000Z",
       sourceUrls: [],
-      artifactPaths: [`/tmp/toonspectrum-ux/${task.id}.json`],
+      artifactPaths: [`/tmp/toonstudio-ux/${task.id}.json`],
       notes: [],
     },
   };

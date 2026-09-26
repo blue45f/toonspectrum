@@ -51,7 +51,7 @@ function parseJsonChunk(bytes: Uint8Array): GltfDocument {
 
 describe("Studio Tripo MCP free-wallet environment pack v1", () => {
   it("adds ten audited webtoon modules after all original environment packs", () => {
-    expect(mcpManifest.schema).toBe("toonspectrum.bg3d-environment-pack.mcp-free-v1");
+    expect(mcpManifest.schema).toBe("toonstudio.bg3d-environment-pack.mcp-free-v1");
     expect(mcpManifest.generation).toMatchObject({
       providerModelVersion: "v3.0-20250812",
       geometryQuality: "detailed",
@@ -153,7 +153,7 @@ describe("Studio Tripo MCP free-wallet environment pack v1", () => {
       expect(asset.normalization).toBe("authored-metres");
       expect(asset.provenance).toMatchObject({
         origin: "ai-generated-free-wallet",
-        author: "ToonSpectrum",
+        author: "ToonStudio",
         provider: "Tripo",
         generator: "official-tripo-mcp",
         providerModelVersion: "v3.0-20250812",

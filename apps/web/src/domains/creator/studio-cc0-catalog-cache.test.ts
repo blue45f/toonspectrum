@@ -9,7 +9,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("mutable CC0 catalog cache recovery", () => {
   it("revalidates the versioned manifest instead of reusing a year-long HTTP entry", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      schema: "toonspectrum.asset-delivery.v1", assets: [],
+      schema: "toonstudio.asset-delivery.v1", assets: [],
     })));
     vi.stubGlobal("fetch", fetch);
     expect(await loadStudioCc0Catalog()).toEqual([]);

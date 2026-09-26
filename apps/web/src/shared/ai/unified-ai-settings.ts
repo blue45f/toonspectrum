@@ -8,8 +8,8 @@ import {
   type UserAiTransportErrorCode,
 } from "./user-ai-transport";
 
-export const STUDIO_AI_SETTINGS_STORAGE_KEY = "toonspectrum-studio-ai-settings";
-const UNIFIED_AI_AUX_STORAGE_KEY = "toonspectrum-unified-ai-aux-v1";
+export const STUDIO_AI_SETTINGS_STORAGE_KEY = "toonstudio-studio-ai-settings";
+const UNIFIED_AI_AUX_STORAGE_KEY = "toonstudio-unified-ai-aux-v1";
 
 export interface OpenAiCompatibleSettings {
   baseUrl: string;

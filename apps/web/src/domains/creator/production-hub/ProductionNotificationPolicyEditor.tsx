@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import type { ProductionNotificationPolicy, ProductionProjectAggregate } from "@toonspectrum/core/production";
+import type { ProductionNotificationPolicy, ProductionProjectAggregate } from "@toonstudio/core/production";
 import { getAuthSessionRevision } from "@/domains/auth/public/session/auth-session-state";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { ProductionClientCommand } from "./production-api";

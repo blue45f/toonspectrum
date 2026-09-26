@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * toonspectrum-vrm-generate MCP/CLI host.
+ * toonstudio-vrm-generate MCP/CLI host.
  * Emits a real VRM from a Studio generation recipe. Does not talk to Blender.
  *
  *   pnpm exec tsx scripts/studio-vrm-generate-mcp-host.mts generate --preset natural-short --out ./out.vrm

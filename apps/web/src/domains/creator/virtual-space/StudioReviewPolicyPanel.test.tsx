@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { evaluateReviewPolicy, type ReviewPolicyResponse, type ReviewPolicyVoteRecord } from "@toonspectrum/studio-project-model";
+import { evaluateReviewPolicy, type ReviewPolicyResponse, type ReviewPolicyVoteRecord } from "@toonstudio/studio-project-model";
 import { persistSession } from "@/domains/auth/public/session/auth-session-state";
 import { StudioReviewPolicyPanel } from "./StudioReviewPolicyPanel";
 import type { StudioVirtualSpaceVerifiedReview } from "./studio-virtual-space-review-invitation";

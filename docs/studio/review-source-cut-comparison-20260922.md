@@ -4,7 +4,7 @@ Status: implemented; final exact-head CI and merge receipts belong to the PR.
 
 ## Resumed work
 
-Reused `/Users/hjunkim/.chatgpt-worktrees/toonspectrum-review-workflow-continuity-20260921` instead of creating another checkout. Its previous clean branch and commit were preserved. The new continuation branch is `feat/review-source-frame-navigation-20260922`, initially based on main `5dc180e8fedb2ac57cbcd22367ddd8fea707ed01`.
+Reused `/Users/hjunkim/.chatgpt-worktrees/toonstudio-review-workflow-continuity-20260921` instead of creating another checkout. Its previous clean branch and commit were preserved. The new continuation branch is `feat/review-source-frame-navigation-20260922`, initially based on main `5dc180e8fedb2ac57cbcd22367ddd8fea707ed01`.
 
 This is a bounded F09 increment after the existing page comparison, viewport continuity, personal drafts, review groups and approval-history work. It does not recreate those features.
 

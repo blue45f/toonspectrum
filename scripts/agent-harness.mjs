@@ -19,8 +19,8 @@ const REQUIRED_FILES = [
   "CLAUDE.md",
   "GEMINI.md",
   ".github/copilot-instructions.md",
-  ".cursor/rules/toonspectrum.mdc",
-  ".opencode/agent/toonspectrum.md",
+  ".cursor/rules/toonstudio.mdc",
+  ".opencode/agent/toonstudio.md",
   ".gitmessage.ko",
   ".husky/prepare-commit-msg",
   ".github/pull_request_template.md",
@@ -31,8 +31,8 @@ const ADAPTER_FILES = [
   "CLAUDE.md",
   "GEMINI.md",
   ".github/copilot-instructions.md",
-  ".cursor/rules/toonspectrum.mdc",
-  ".opencode/agent/toonspectrum.md",
+  ".cursor/rules/toonstudio.mdc",
+  ".opencode/agent/toonstudio.md",
 ];
 
 const REQUIRED_PACKAGE_SCRIPTS = {
@@ -146,7 +146,7 @@ export function inspectHarness(root = ROOT) {
       "!/CLAUDE.md",
       "!/**/AGENTS.md",
       "!/.github/copilot-instructions.md",
-      "!/.cursor/rules/toonspectrum.mdc",
+      "!/.cursor/rules/toonstudio.mdc",
     ]) {
       if (!gitignore.includes(marker)) problems.push(`하네스 추적 예외 누락: ${marker}`);
     }

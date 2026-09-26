@@ -16,7 +16,7 @@ import type {
 export const REALTIME_ACTOR_REGISTER_PATH = "/internal/actor/register";
 export const REALTIME_ACTOR_REVOKE_PATH = "/internal/actor/revoke";
 export const REALTIME_INTERNAL_CONTROL_HEADER =
-  "X-ToonSpectrum-Realtime-Internal-Control";
+  "X-ToonStudio-Realtime-Internal-Control";
 export const REALTIME_INTERNAL_CONTROL_VALUE = "v1";
 
 const MAX_CONTROL_ROOMS_PER_REQUEST = 32;

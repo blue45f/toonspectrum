@@ -61,7 +61,7 @@ PRODUCTION_INTEGRATION_ENCRYPTION_KEY=...
 - OpenID와 이메일: 연결 계정 식별
 - `calendar.events`: 사용자의 기본 캘린더에 제작 일정 쓰기
 - `gmail.compose`: 메일 전송이 아닌 초안 생성
-- `drive.file`: ToonSpectrum이 만든 파일만 조회·갱신
+- `drive.file`: ToonStudio이 만든 파일만 조회·갱신
 
 일반 JSON·ICS·CSV는 app properties로 찾은 기존 앱 생성 파일을 갱신합니다.
 Google Sheet 변환은 기존 문서를 덮어쓰지 않으며, 같은 content digest의 문서가 있을 때만 재사용합니다.
@@ -75,7 +75,7 @@ OAuth refresh token과 access token은 AES-256-GCM으로 암호화해 DB에 저�
 아래 채널은 각각 독립적으로 설정하며, 미설정 채널은 UI에 나타나지 않습니다.
 
 ```dotenv
-PRODUCTION_GENERIC_WEBHOOK_URL=https://automation.example.com/toonspectrum
+PRODUCTION_GENERIC_WEBHOOK_URL=https://automation.example.com/toonstudio
 PRODUCTION_GENERIC_WEBHOOK_SECRET=...
 PRODUCTION_DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 PRODUCTION_NTFY_BASE_URL=https://ntfy.example.com

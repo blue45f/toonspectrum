@@ -4,9 +4,9 @@ AuthorDate: Tue Sep 8 21:24:01 2026 +0900
 Commit:     hjunkim <blue45f@gmail.com>
 CommitDate: Tue Sep 8 21:24:01 2026 +0900
 
-    chore: salvage unique uncommitted work from toonspectrum-arch
+    chore: salvage unique uncommitted work from toonstudio-arch
     
-    Source worktree: /Users/hjunkim/WebstormProjects/toonspectrum-arch
+    Source worktree: /Users/hjunkim/WebstormProjects/toonstudio-arch
     Source SHA: b6ad9db34b9b1d5c2567095aa7294449f2099fdb
     Files: 110
 
@@ -193,7 +193,7 @@ index 51ff454de..b45322f64 100644
 +} from "@/domains/creator/studio-workspace-route";
  
  // 공용 fx 키프레임/유틸(.pf-* + --ts-fx-* 토큰). 전역에서 한 번만 import 합니다.
- import "@toonspectrum/core/fx/fx.css";
+ import "@toonstudio/core/fx/fx.css";
 diff --git a/apps/web/src/app/app-shell-splash.ts b/apps/web/src/app/app-shell-splash.ts
 index 8f90cb9ba..4d1d7ba1e 100644
 --- a/apps/web/src/app/app-shell-splash.ts
@@ -907,7 +907,7 @@ index 76ba262c8..eada1d8ff 100644
 @@ -11,8 +11,8 @@ import { readMusicWorkId, scopeMusicBrief } from "./studio-music-work-scope";
  import type { LocalMusicTrack } from "./studio-music-client";
  
- import { buildMusicPrompt, defaultMusicBrief, MUSIC_DURATIONS, MUSIC_INSTRUMENTS, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_TERMS_URL, parseMusicBrief, type MusicBrief, type MusicStatus } from "@toonspectrum/core/studio-music";
+ import { buildMusicPrompt, defaultMusicBrief, MUSIC_DURATIONS, MUSIC_INSTRUMENTS, MUSIC_MOODS, MUSIC_PURPOSES, MUSIC_TERMS_URL, parseMusicBrief, type MusicBrief, type MusicStatus } from "@toonstudio/core/studio-music";
 -import { useSession } from "@/src/compat/auth-session-store";
 -import { getApiErrorMessage } from "@/src/infrastructure/api";
 +import { useSession } from "@/compat/auth-session-store";
@@ -1460,7 +1460,7 @@ index 54250beaf..513cb797f 100644
 --- a/apps/web/src/domains/creator/studio-renderer-role-boundary.test.ts
 +++ b/apps/web/src/domains/creator/studio-renderer-role-boundary.test.ts
 @@ -18,13 +18,19 @@ import {
- } from "@toonspectrum/studio-engine-registry/renderer-roles";
+ } from "@toonstudio/studio-engine-registry/renderer-roles";
  import { describe, expect, it } from "vitest";
  
 -// src/domains/creator -> repo root
@@ -3285,7 +3285,7 @@ index ef7dcf9e5..d648c13e7 100644
 +      "@/*": ["./apps/web/src/*"],
        "canvaskit-wasm": ["./apps/web/src/types/canvaskit-wasm-shim.d.ts"],
        "canvaskit-wasm/bin/canvaskit.wasm?url": ["./apps/web/src/types/canvaskit-wasm-url-shim.d.ts"],
-       "@toonspectrum/studio-engine-skia": ["./apps/web/src/types/studio-engine-skia-shim.d.ts"]
+       "@toonstudio/studio-engine-skia": ["./apps/web/src/types/studio-engine-skia-shim.d.ts"]
 @@ -26,12 +24,10 @@
    "include": [
      "apps/web/src/**/*.ts",

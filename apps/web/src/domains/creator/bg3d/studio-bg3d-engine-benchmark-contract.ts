@@ -89,7 +89,7 @@ export interface StudioBg3dEngineCaptureDiff {
 }
 
 export interface StudioBg3dEngineBenchmarkReport {
-  readonly kind: "toonspectrum.bg3d-engine-benchmark";
+  readonly kind: "toonstudio.bg3d-engine-benchmark";
   readonly version: typeof STUDIO_BG3D_ENGINE_BENCHMARK_VERSION;
   readonly benchmarkId: string;
   readonly baseline: StudioBg3dEngineBenchmarkRun;
@@ -561,7 +561,7 @@ export function normalizeStudioBg3dEngineBenchmarkReport(
     const input = snapshotPlainRecord(value);
     if (!input) return null;
     if (
-      input.kind !== "toonspectrum.bg3d-engine-benchmark" ||
+      input.kind !== "toonstudio.bg3d-engine-benchmark" ||
       input.version !== STUDIO_BG3D_ENGINE_BENCHMARK_VERSION
     ) {
       return null;
@@ -600,7 +600,7 @@ export function normalizeStudioBg3dEngineBenchmarkReport(
     }
 
     return Object.freeze({
-      kind: "toonspectrum.bg3d-engine-benchmark",
+      kind: "toonstudio.bg3d-engine-benchmark",
       version: STUDIO_BG3D_ENGINE_BENCHMARK_VERSION,
       benchmarkId,
       baseline,

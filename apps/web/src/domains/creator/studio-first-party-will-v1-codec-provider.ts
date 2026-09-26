@@ -1,7 +1,7 @@
 /**
  * Product-owned provider adapter for the bounded WILL Data Format v1 Annex A Path stream.
  *
- * The public provider transport is canonical ToonSpectrum JSON. The encoded side is the Annex A
+ * The public provider transport is canonical ToonStudio JSON. The encoded side is the Annex A
  * protobuf Path sequence, not the Annex B OPC/ZIP `.will` document. No Wacom SDK code, vendor
  * certification, trademark authorization, WILL 3, or UIM compatibility is implied.
  */
@@ -33,7 +33,7 @@ export const STUDIO_FIRST_PARTY_WILL_V1_FORMAT =
   "will-v1-path-stream" as const;
 export const STUDIO_FIRST_PARTY_WILL_V1_EXTENSION = ".willpb" as const;
 export const STUDIO_WILL_V1_PATH_TRANSPORT_KIND =
-  "toonspectrum-will-v1-path-transport" as const;
+  "toonstudio-will-v1-path-transport" as const;
 export const STUDIO_WILL_V1_PATH_TRANSPORT_VERSION = 1 as const;
 
 const MAX_TRANSPORT_BYTES = 64 * 1024 * 1024;
@@ -51,7 +51,7 @@ const LICENSE_SCOPE = Object.freeze([
 ] as const satisfies readonly StudioCodecLicenseScope[]);
 
 export const STUDIO_FIRST_PARTY_WILL_V1_CLAIM_BOUNDARY = Object.freeze({
-  implementationOwner: "ToonSpectrum" as const,
+  implementationOwner: "ToonStudio" as const,
   publicSpecification: STUDIO_WILL_V1_SPECIFICATION_URL,
   publicPatentLicense: STUDIO_WILL_V1_PUBLIC_PATENT_LICENSE_URL,
   annexAPathStreamImplemented: true as const,
@@ -373,7 +373,7 @@ export function decodeStudioWillV1PathTransport(
 
 const manifest: StudioCodecProviderManifest = Object.freeze({
   schemaVersion: STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
-  providerId: "toonspectrum.will-v1-annex-a.v1",
+  providerId: "toonstudio.will-v1-annex-a.v1",
   mode: "public-clean-room",
   format: STUDIO_FIRST_PARTY_WILL_V1_FORMAT,
   profile: STUDIO_WILL_V1_PROFILE,
@@ -386,7 +386,7 @@ const manifest: StudioCodecProviderManifest = Object.freeze({
   maxOutputBytes: MAX_TRANSPORT_BYTES,
   deterministic: true,
   licenseGrant: Object.freeze({
-    id: "toonspectrum.first-party.will-v1-annex-a.v1",
+    id: "toonstudio.first-party.will-v1-annex-a.v1",
     scope: LICENSE_SCOPE,
     expiresAt: null,
   }),

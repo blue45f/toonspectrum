@@ -117,7 +117,7 @@ describe("StudioFileControlCenter", () => {
     expect(psd).toHaveBeenCalledTimes(1);
 
     const stored = window.localStorage.getItem(
-      "toonspectrum-studio-file-control-center:recent-files:v1",
+      "toonstudio-studio-file-control-center:recent-files:v1",
     );
     expect(stored).toContain("episode.psd");
     expect(screen.getByRole("button", {

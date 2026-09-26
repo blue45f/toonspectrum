@@ -1,7 +1,7 @@
 import { vi } from "vitest";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
-import { type StudioAcousticSessionLease } from "@toonspectrum/studio-project-model/world-acoustic";
-import { type StudioConversationSnapshot } from "@toonspectrum/studio-project-model/world-conversation";
+import { canonicalJson } from "@toonstudio/studio-project-model";
+import { type StudioAcousticSessionLease } from "@toonstudio/studio-project-model/world-acoustic";
+import { type StudioConversationSnapshot } from "@toonstudio/studio-project-model/world-conversation";
 import type { StudioLiveParticipant } from "../../live/studio-live-collaboration-protocol";
 import type { StudioPrivateRoomApi } from "./studio-private-room-client";
 import { StudioPrivateRoomController } from "./studio-private-room-controller";

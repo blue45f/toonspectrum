@@ -3,7 +3,7 @@
 import type { FederatedDataPlanePolicyDefinition } from "./federated-data-plane.contract";
 
 export const FEDERATED_DATA_PLANE_POLICY = {
-  "version": "toonspectrum.free-database-federation.v1",
+  "version": "toonstudio.free-database-federation.v1",
   "quotaSnapshotMaxAgeSeconds": 900,
   "providers": {
     "cloudflare-d1": {

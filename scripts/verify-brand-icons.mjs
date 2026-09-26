@@ -116,7 +116,7 @@ for (const name of ["favicon.svg", "icon-maskable.svg", "safari-pinned-tab.svg"]
     const svg = read(name).toString("utf8");
     assert.ok(Buffer.byteLength(svg) < 4096);
     assert.match(svg, /viewBox="0 0 64 64"/u);
-    assert.doesNotMatch(svg, /<(?:image|script|style|filter|animate|foreignObject)\b|(?:href|onload)=|data:|ToonSpectrum/iu);
+    assert.doesNotMatch(svg, /<(?:image|script|style|filter|animate|foreignObject)\b|(?:href|onload)=|data:|ToonStudio/iu);
     assert.match(svg, /<path\b/u);
     if (name !== "safari-pinned-tab.svg") assert.match(svg, /ToonStudio/u);
     else assert.doesNotMatch(svg, /<rect\b|linearGradient|#66e7ef|#d879f2/iu);

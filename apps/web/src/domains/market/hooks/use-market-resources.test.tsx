@@ -21,7 +21,7 @@ vi.mock("@/domains/market/remotes/market-resource-remote", () => ({
 
 const listResources = vi.mocked(listCreatorMarketplaceResources);
 const PUBLISHER_ID = randomUUID();
-const STORAGE_PREFIX = "toonspectrum.market.page.v1:";
+const STORAGE_PREFIX = "toonstudio.market.page.v1:";
 
 function resource(id: string, name = id): CreatorMarketplaceResourceRecord {
   return { id, name } as CreatorMarketplaceResourceRecord;
@@ -64,7 +64,7 @@ function cachedResource(id: string): CreatorMarketplaceResourceRecord {
       name: "캐시 브러시 항목",
       delivery: {
         mode: "portable-json",
-        mediaType: "application/vnd.toonspectrum.brush+json",
+        mediaType: "application/vnd.toonstudio.brush+json",
         payload,
         byteSize: creatorMarketplaceJsonByteSize(payload),
         sha256: "a".repeat(64),

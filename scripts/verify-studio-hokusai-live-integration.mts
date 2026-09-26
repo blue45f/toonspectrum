@@ -48,14 +48,14 @@ export const STUDIO_HOKUSAI_LIVE_INTEGRATION_REPORT_SCHEMA_VERSION = 3 as const;
 const SCRATCH =
   process.env.TOONSPECTRUM_HOKUSAI_LIVE_INTEGRATION_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-hokusai-live-integration");
+  ?? join(tmpdir(), "toonstudio-studio-hokusai-live-integration");
 const LOG_PATH = join(SCRATCH, "studio-hokusai-live-integration.log");
 const REPORT_PATH = join(SCRATCH, "studio-hokusai-live-integration.json");
-const AUTOSAVE_PREFIX = "toonspectrum-studio-autosave";
-const CLEAN_SESSION_KEY = "toonspectrum-hokusai-live-integration-cleaned";
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const APP_SETTINGS_KEY = "toonspectrum-studio-app-settings";
+const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
+const CLEAN_SESSION_KEY = "toonstudio-hokusai-live-integration-cleaned";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const APP_SETTINGS_KEY = "toonstudio-studio-app-settings";
 const OPTIONAL_STATIC_PREVIEW_API_PATHS = [
   "/api/health/ready",
   "/api/auth/session",
@@ -1144,7 +1144,7 @@ async function reopenStudioAfterDurableWriterRelease(
     const recoveryLockCount = [
       ...(lockSnapshot?.held ?? []),
       ...(lockSnapshot?.pending ?? []),
-    ].filter(({ name }) => name?.startsWith("toonspectrum-opfs-recovery:") === true).length;
+    ].filter(({ name }) => name?.startsWith("toonstudio-opfs-recovery:") === true).length;
     const opfsRoot = await navigator.storage.getDirectory();
     const writerPaths: string[] = [];
     const pending: Array<{ directory: FileSystemDirectoryHandle; prefix: string }> = [{

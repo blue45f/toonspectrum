@@ -61,7 +61,7 @@ describe("signed capability worker health", () => {
     await expect(
       subject.ready("render", timestamp, signature),
     ).resolves.toEqual({
-      version: "toonspectrum.backend-capability.v1",
+      version: "toonstudio.backend-capability.v1",
       role: "capability-worker",
       ready: true,
       operations: ["thumbnail.render"],

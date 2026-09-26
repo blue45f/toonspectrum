@@ -12,10 +12,10 @@ describe("browser focused core entrypoints", () => {
   it("does not import runtime values from the side-effectful core barrel", () => {
     for (const file of files("apps/web/src")) {
       const source = readFileSync(file, "utf8");
-      if (!source.includes('"@toonspectrum/core"')) continue;
+      if (!source.includes('"@toonstudio/core"')) continue;
       const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
       for (const node of ast.statements) {
-        if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier) || node.moduleSpecifier.text !== "@toonspectrum/core") continue;
+        if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier) || node.moduleSpecifier.text !== "@toonstudio/core") continue;
         const clause = node.importClause, bindings = clause?.namedBindings;
         const typesOnly = clause?.isTypeOnly || (!clause?.name && bindings && ts.isNamedImports(bindings) && bindings.elements.every((value) => value.isTypeOnly));
         expect(typesOnly, file).toBeTruthy();

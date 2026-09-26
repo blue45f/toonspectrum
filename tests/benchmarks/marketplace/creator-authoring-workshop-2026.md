@@ -1,10 +1,10 @@
 # Creator Marketplace authoring benchmark and product target — 2026
 
-This document records the product model used for ToonSpectrum's marketplace authoring overhaul. It intentionally compares **authoring, packaging, review, discovery, installation, and update lifecycle** rather than copying isolated upload forms.
+This document records the product model used for ToonStudio's marketplace authoring overhaul. It intentionally compares **authoring, packaging, review, discovery, installation, and update lifecycle** rather than copying isolated upload forms.
 
 ## Services reviewed
 
-| Product / marketplace | Strong pattern used as a benchmark | ToonSpectrum adoption |
+| Product / marketplace | Strong pattern used as a benchmark | ToonStudio adoption |
 | --- | --- | --- |
 | Clip Studio Assets | Materials are created and registered in the drawing application before publishing; brush/tool materials remain editable and are distributed as reusable assets | Brush Studio is the source of truth; the marketplace receives the exact native snapshot plus a normalized compatibility graph |
 | Procreate Brush Studio | One brush exposes multiple rendering systems and input dynamics; brushes can be combined into dual brushes and organized into sets | Multi-engine pipelines, input-channel mappings, layered tips/grains, deterministic seeds, dual-brush validation, and brush-set bundles |

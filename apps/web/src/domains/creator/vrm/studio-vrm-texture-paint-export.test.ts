@@ -22,7 +22,7 @@ describe("portable surface texture export", () => {
     const archive = await readStudioZipArchive(zip);
     expect(archive.entries).toHaveLength(2);
     const manifest = JSON.parse(new TextDecoder().decode(await archive.readEntry("manifest.json")));
-    expect(manifest).toMatchObject({ kind: "toonspectrum/surface-textures", version: 1 });
+    expect(manifest).toMatchObject({ kind: "toonstudio/surface-textures", version: 1 });
     expect(manifest.textures).toHaveLength(5);
     for (const channel of STUDIO_VRM_TEXTURE_PAINT_CHANNELS) {
       const texture = manifest.textures.find((entry: { textureSlot: string }) => entry.textureSlot === channel);

@@ -37,7 +37,7 @@ export function pushRecentColor(list: string[], color: string, max = 12): string
 }
 
 // 최근 사용 색 localStorage 키.
-export const RECENT_COLORS_KEY = "toonspectrum-studio-recent-colors";
+export const RECENT_COLORS_KEY = "toonstudio-studio-recent-colors";
 
 /** Normalizes untrusted persisted data to the bounded recent-color list. */
 export function normalizeRecentColors(value: unknown, max = 12): string[] {

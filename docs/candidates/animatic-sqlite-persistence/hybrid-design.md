@@ -27,7 +27,7 @@ schema, 총 duration/frame/text/export 한도를 통과하지 못한 값은 `doc
 ## 권위와 폐기 경계
 
 - 논리 파일명은 오직 `/studio-local-v12.db`다.
-- OPFS SAH-pool directory는 `toonspectrum-studio-sqlite`다.
+- OPFS SAH-pool directory는 `toonstudio-studio-sqlite`다.
 - 애니매틱 namespace는 `studio-animatic-v12`다.
 - `LEGACY_DATA_MIGRATION=FALSE`: `/studio-local.db`나 옛 localStorage 애니매틱을 자동으로
   읽지 않는다.

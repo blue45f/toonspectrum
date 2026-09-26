@@ -22,7 +22,7 @@ export interface ClipStorage {
   setItem(key: string, value: string): void;
 }
 
-export const CLIPS_KEY = "toonspectrum-studio-clips";
+export const CLIPS_KEY = "toonstudio-studio-clips";
 export const MAX_CLIPS = 40;
 export const MAX_CLIP_NAME_LENGTH = 160;
 export const MAX_CLIP_ID_LENGTH = 160;
@@ -31,7 +31,7 @@ export const MAX_CLIP_JSON_DEPTH = 64;
 export const MAX_CLIP_JSON_NODES = 250_000;
 export const MAX_CLIP_SERIALIZED_BYTES = 16 * 1024 * 1024;
 export const MAX_CLIP_LIBRARY_SERIALIZED_BYTES = 64 * 1024 * 1024;
-export const STUDIO_SAVED_CLIP_LIBRARY_SCHEMA = "toonspectrum.studio.saved-clips";
+export const STUDIO_SAVED_CLIP_LIBRARY_SCHEMA = "toonstudio.studio.saved-clips";
 
 export type StudioSavedClipLibraryErrorCode =
   | "corrupt-data"

@@ -185,7 +185,7 @@ describe("first-party raster codec Worker execution host", () => {
       type: "studio-first-party-raster-codec/success",
       requestId: 11,
       receipt: {
-        providerId: "toonspectrum.raster.qoi.v1",
+        providerId: "toonstudio.raster.qoi.v1",
         direction: "encode",
         format: "qoi",
       },

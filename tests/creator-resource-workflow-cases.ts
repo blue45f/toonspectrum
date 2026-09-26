@@ -156,7 +156,7 @@ export const creatorResourceWorkflowCases: WorkflowCase[] = [
     equal(result.status, "ready"); equal(result.items.length, 1);
     equal(result.items[0].id, "openlibrary:OL123W"); equal(result.items[0].license, "metadata-only");
     equal(result.items[0].sourceUrl, "https://openlibrary.org/works/OL123W");
-    ok(userAgent.includes("ToonSpectrum/1.0")); ok(userAgent.includes("/about/crawler"));
+    ok(userAgent.includes("ToonStudio/1.0")); ok(userAgent.includes("/about/crawler"));
   } },
   { name: "Open Library rejects malformed result shapes without caching them", async run() {
     let calls = 0;

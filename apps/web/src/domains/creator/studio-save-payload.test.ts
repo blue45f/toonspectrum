@@ -206,7 +206,7 @@ describe("buildStudioSavePayload", () => {
 
   it("round-trips the canonical Shared Stage through save-payload to creator-work projection", () => {
     const shared3dStage = {
-      kind: "toonspectrum.studio-shared-3d-stage" as const,
+      kind: "toonstudio.studio-shared-3d-stage" as const,
       version: 1 as const,
       authority: "page-background-with-linked-character-sources" as const,
       capturePolicy: "require-all-linked" as const,

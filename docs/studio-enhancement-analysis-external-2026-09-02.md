@@ -337,7 +337,7 @@ type StudioOperation = {
 
 ### 7.10 브랜드 일관성
 
-서비스/제품명 ToonStudio, 플랫폼·회사 브랜드 ToonSpectrum으로 통일. 대상: 브라우저 제목·파비콘,
+서비스/제품명 ToonStudio, 플랫폼·회사 브랜드 ToonStudio으로 통일. 대상: 브라우저 제목·파비콘,
 로그인·대시보드·편집기, 도움말, 프로젝트 파일 메타데이터, 출력 ZIP·PDF 생성자, 오류 리포트, 공유 URL,
 GitHub 및 개발자 문서.
 

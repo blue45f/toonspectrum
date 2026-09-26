@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.asset-integration-quarantine.v1",
+  "schema": "toonstudio.asset-integration-quarantine.v1",
   "sourceHead": "28af0a0a7b59539bb2b807e581d53aa55c187d74",
   "activeCatalogCount": 1305,
   "uniqueActiveCc0Additions": [

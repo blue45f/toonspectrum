@@ -1,7 +1,7 @@
 import { releasePlaylistMedia } from "./playlist-media-release";
 
 /**
- * @toonspectrum/core/fx/audio — 브라우저용 isomorphic 오디오 엔진.
+ * @toonstudio/core/fx/audio — 브라우저용 isomorphic 오디오 엔진.
  *
  * 설계 원칙
  * - **하이브리드 오디오**: SFX와 폴백 BGM은 Web Audio로 합성하고, 앱이 등록한 라이선스 음원은

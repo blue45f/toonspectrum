@@ -75,7 +75,7 @@ function imageWrite(
       decodedRgbaBytes: 4,
     },
     storageObject: {
-      contractVersion: "toonspectrum.private-object-storage.v2",
+      contractVersion: "toonstudio.private-object-storage.v2",
       providerId: "cloudflare-r2",
       purpose: "source",
       digest: `sha256:${sha256}`,
@@ -92,7 +92,7 @@ function generatedObject(
 ) {
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   return {
-    contractVersion: "toonspectrum.private-object-storage.v2" as const,
+    contractVersion: "toonstudio.private-object-storage.v2" as const,
     providerId: "supabase" as const,
     purpose,
     digest: `sha256:${sha256}` as const,
@@ -119,7 +119,7 @@ describeWithDirectPostgres(
       previousDatabaseUrl = process.env.DATABASE_URL;
       process.env.DATABASE_URL = INTEGRATION_URL;
       observerPool = new Pool({
-        application_name: "toonspectrum-studio-work-asset-batch-test",
+        application_name: "toonstudio-studio-work-asset-batch-test",
         connectionString: INTEGRATION_URL,
         max: 2,
       });

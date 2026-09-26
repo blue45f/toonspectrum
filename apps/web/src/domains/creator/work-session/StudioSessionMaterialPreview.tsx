@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { StudioSessionMaterialAsset } from "@toonspectrum/studio-project-model/work-session";
+import type { StudioSessionMaterialAsset } from "@toonstudio/studio-project-model/work-session";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 

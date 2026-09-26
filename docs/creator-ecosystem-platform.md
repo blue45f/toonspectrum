@@ -2,7 +2,7 @@
 
 ## 목적
 
-ToonSpectrum의 창작 기능을 교육 → 창작 → 협업/사업화 → 팬덤 → 소장·열람의 흐름으로 연결한다.
+ToonStudio의 창작 기능을 교육 → 창작 → 협업/사업화 → 팬덤 → 소장·열람의 흐름으로 연결한다.
 기존 creator-resources, community, creator-support, business 기능을 재사용하고,
 계정 동기화가 필요한 데이터만 새 creator-ecosystem 모듈이 소유한다.
 

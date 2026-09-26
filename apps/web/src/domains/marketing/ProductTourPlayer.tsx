@@ -1,5 +1,5 @@
 import { Player, type PlayerRef } from "@remotion/player";
-import { resumeBgmForContext, suspendBgmForContext } from "@toonspectrum/core/fx";
+import { resumeBgmForContext, suspendBgmForContext } from "@toonstudio/core/fx";
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,

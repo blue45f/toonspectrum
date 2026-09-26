@@ -1,9 +1,9 @@
 import { Controller, Get, Header, Headers, Inject, Injectable, Param, Query } from "@nestjs/common";
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
-import { studioWorkSessionId } from "@toonspectrum/studio-project-model/work-session";
-import { studioSessionEvidenceResponseSchema, type StudioSessionEvidence } from "@toonspectrum/studio-project-model/work-session-evidence";
+import { canonicalJson } from "@toonstudio/studio-project-model";
+import { studioWorkSessionId } from "@toonstudio/studio-project-model/work-session";
+import { studioSessionEvidenceResponseSchema, type StudioSessionEvidence } from "@toonstudio/studio-project-model/work-session-evidence";
 import { dbPool } from "../../platform/database";
 import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { StudioWorkSessionService } from "./studio-work-session.controller";

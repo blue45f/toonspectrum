@@ -101,7 +101,7 @@ describe("studio VRM license authority store", () => {
     expect((await store.get(HASH))?.status).toBe("unknown");
 
     state.values.set(key, JSON.stringify({
-      schema: "toonspectrum.vrm-license-authority-source",
+      schema: "toonstudio.vrm-license-authority-source",
       version: 1,
       contentHash: `sha256:${"b".repeat(64)}`,
       source: { kind: "unknown", code: "missing-metadata", message: "missing" },

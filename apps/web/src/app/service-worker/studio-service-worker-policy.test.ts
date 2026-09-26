@@ -181,12 +181,12 @@ describe("cache naming and invalidation", () => {
   it("clears the previous hand-written worker's caches exactly once", () => {
     expect(
       legacyStudioServiceWorkerCacheNames([
-        "toonspectrum-pwa-v4",
-        "toonspectrum-covers-v1",
+        "toonstudio-pwa-v4",
+        "toonstudio-covers-v1",
         `${STUDIO_SERVICE_WORKER_CACHE_PREFIX}immutable-v5`,
         "unrelated",
       ]),
-    ).toEqual(["toonspectrum-pwa-v4", "toonspectrum-covers-v1"]);
+    ).toEqual(["toonstudio-pwa-v4", "toonstudio-covers-v1"]);
   });
 });
 

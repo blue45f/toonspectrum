@@ -15,7 +15,7 @@ import {
   type StudioPoseScope,
 } from "./studio-humanoid-bones";
 
-export const STUDIO_POSE_MATERIAL_KIND = "toonspectrum.studio-pose-material" as const;
+export const STUDIO_POSE_MATERIAL_KIND = "toonstudio.studio-pose-material" as const;
 export const STUDIO_POSE_MATERIAL_VERSION = 1 as const;
 export const STUDIO_POSE_MATERIAL_MAX_BYTES = 96 * 1024;
 export const STUDIO_POSE_MATERIAL_MAX_NAME_LENGTH = 80;

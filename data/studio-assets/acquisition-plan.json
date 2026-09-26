@@ -1,5 +1,5 @@
 {
-  "schema": "toonspectrum.asset-acquisition-plan.v1",
+  "schema": "toonstudio.asset-acquisition-plan.v1",
   "checkedAt": "2026-09-06",
   "status": "pilot-only-not-production",
   "countingRule": "A source pack, file format, resolution, color variant or PBR component map is not an approved independent asset.",

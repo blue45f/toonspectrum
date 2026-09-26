@@ -66,7 +66,7 @@ export interface StudioQuickActionsClampOptions {
   bottomInset?: number;
 }
 
-export const STUDIO_QUICK_ACTIONS_STORAGE_KEY = "toonspectrum-studio-quick-actions:v1";
+export const STUDIO_QUICK_ACTIONS_STORAGE_KEY = "toonstudio-studio-quick-actions:v1";
 
 export const DEFAULT_STUDIO_QUICK_ACTIONS: StudioQuickActionsPreferences = {
   version: 1,

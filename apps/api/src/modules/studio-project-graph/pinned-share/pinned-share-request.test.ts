@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import type { Request } from "express";
-import { TOONSPECTRUM_CSRF_HEADER, TOONSPECTRUM_CSRF_HEADER_VALUE } from "@toonspectrum/contracts/security/csrf";
+import { TOONSPECTRUM_CSRF_HEADER, TOONSPECTRUM_CSRF_HEADER_VALUE } from "@toonstudio/contracts/security/csrf";
 import { requirePinnedShareBrowserOrigin, limitPinnedShareRequest } from "./pinned-share-request";
 
 function request(headers: Record<string, string> = {}, ip = "192.0.2.1") { return { headers, ip } as unknown as Request; }

@@ -109,7 +109,7 @@ export function createStudioOffscreenRasterModuleWorker(): StudioOffscreenRaster
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-offscreen-raster.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-offscreen-raster",
+    name: "toonstudio-offscreen-raster",
   });
 }
 

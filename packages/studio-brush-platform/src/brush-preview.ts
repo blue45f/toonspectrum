@@ -11,7 +11,7 @@ import { compileRasterBrush, renderCompiledBrushStroke } from "./raster-compile"
 import type { LibMypaintBrushDocument } from "./libmypaint";
 import type { LibMypaintRaw } from "./libmypaint/index";
 import type { HokusaiModuleLike } from "./raster-compile";
-import type { BrushProgramIR } from "@toonspectrum/studio-project-model";
+import type { BrushProgramIR } from "@toonstudio/studio-project-model";
 
 /**
  * Unified brush preview lab — one API that renders a parsed external brush

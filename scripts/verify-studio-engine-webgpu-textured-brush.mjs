@@ -27,7 +27,7 @@ import { WEB_ROOT, WEB_VITE_CONFIG } from "./lib/repo-paths.mjs";
 const SCRATCH =
   process.env.TOONSPECTRUM_WEBGPU_TEXTURED_BRUSH_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-webgpu-textured-brush-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-webgpu-textured-brush-${Date.now()}`);
 const HARNESS_PATH = "/__studio_engine_webgpu_textured_brush__";
 const HARNESS_ENTRY = "/scripts/studio-engine-webgpu-textured-brush-browser.ts";
 const RESULT_TIMEOUT_MS = 120_000;

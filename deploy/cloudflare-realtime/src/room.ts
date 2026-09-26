@@ -77,7 +77,7 @@ import {
 } from "./ticket";
 
 const CONNECTION_ATTACHMENT_VERSION =
-  "toonspectrum.realtime-connection.v3" as const;
+  "toonstudio.realtime-connection.v3" as const;
 const MAX_PROTOCOL_VIOLATIONS = 3;
 
 type ResumeFrontiers = Readonly<Record<RealtimeChannel, number | null>>;

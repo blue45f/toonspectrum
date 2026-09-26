@@ -6,7 +6,7 @@
 
 | Component | Role | Distribution | License / policy |
 | --- | --- | --- | --- |
-| ToonStudio tiledoc store/planner/bridge/compositor/fabric | 제품 sparse tile authority와 WebGPU presentation | 기존 application JS bundle | ToonSpectrum 내부 코드 |
+| ToonStudio tiledoc store/planner/bridge/compositor/fabric | 제품 sparse tile authority와 WebGPU presentation | 기존 application JS bundle | ToonStudio 내부 코드 |
 | Browser WebGPU API / WGSL | GPU upload, RGBA16F composite, Canvas presentation | 브라우저 구현; 별도 library 배포 없음 | Web platform API |
 | Vite 8 | 독립 production evidence bundle | 개발·빌드 전용 | MIT |
 | Playwright 1.55.1 + bundled Chromium 140 | Metal 브라우저 자동화·진단 | 테스트 전용, 제품 번들 제외 | Apache-2.0; Chromium notices는 Playwright 배포 규율 따름 |

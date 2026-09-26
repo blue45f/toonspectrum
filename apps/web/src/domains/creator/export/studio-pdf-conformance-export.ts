@@ -2,7 +2,7 @@
  * Fail-closed publication pipeline for PDF/A-2b and PDF/X-4 candidates.
  *
  * The writer, ICC policy, independent PDF scanner, and optional external validator are deliberately
- * separate. A successful result means that the exact returned bytes passed ToonSpectrum's bounded
+ * separate. A successful result means that the exact returned bytes passed ToonStudio's bounded
  * publication checks. It does not manufacture an ISO, PDF Association, printer, or vendor
  * certification.
  */
@@ -59,7 +59,7 @@ export type StudioPdfConformanceExportResult =
       conformance: StudioPdfConformanceReceipt;
       certification: Readonly<{
         thirdParty: "not-claimed";
-        note: "The receipt verifies ToonSpectrum's bounded pipeline and any imported exact-source validator result; it does not issue official certification.";
+        note: "The receipt verifies ToonStudio's bounded pipeline and any imported exact-source validator result; it does not issue official certification.";
       }>;
     }>
   | Readonly<{
@@ -182,7 +182,7 @@ export async function exportStudioPdfConformanceCandidate(
     conformance,
     certification: Object.freeze({
       thirdParty: "not-claimed",
-      note: "The receipt verifies ToonSpectrum's bounded pipeline and any imported exact-source validator result; it does not issue official certification.",
+      note: "The receipt verifies ToonStudio's bounded pipeline and any imported exact-source validator result; it does not issue official certification.",
     }),
   });
 }

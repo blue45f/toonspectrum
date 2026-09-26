@@ -27,7 +27,7 @@ describe("Studio checkpoint lazy product boundary", () => {
   });
 
   it.each([
-    [{}, "toonspectrum-studio-checkpoints:v12:guest:new"],
+    [{}, "toonstudio-studio-checkpoints:v12:guest:new"],
     [{ userId: "  artist  ", workId: "work/1" }, null],
     [{ userId: "artist", remixId: "remix 1" }, null],
     [{ userId: "artist", workId: "", remixId: "remix" }, null],

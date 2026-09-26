@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { type StudioAcousticSessionLease } from "@toonspectrum/studio-project-model/world-acoustic";
-import { type StudioConversationSnapshot } from "@toonspectrum/studio-project-model/world-conversation";
+import { type StudioAcousticSessionLease } from "@toonstudio/studio-project-model/world-acoustic";
+import { type StudioConversationSnapshot } from "@toonstudio/studio-project-model/world-conversation";
 
 import { fixture,ids,flush,world } from "./studio-private-room-controller.fixture";
-import { canonicalJson } from "@toonspectrum/studio-project-model";
+import { canonicalJson } from "@toonstudio/studio-project-model";
 
 afterEach(()=>vi.restoreAllMocks());
 describe("server-authorized private-room controller",()=>{

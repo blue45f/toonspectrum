@@ -1,4 +1,4 @@
-import type { SceneIR, SceneNodeIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR, SceneNodeIR } from "@toonstudio/studio-project-model";
 
 /**
  * Renderer Tournament (V12 §5).

@@ -3,7 +3,7 @@ import type {
   IntegrationRecipeTemplate,
 } from "./integration-platform-types";
 
-const RECIPE_STORAGE_KEY = "toonspectrum.integration.recipes.v1";
+const RECIPE_STORAGE_KEY = "toonstudio.integration.recipes.v1";
 
 const DEFAULT_PROVIDER_BY_ACTION: Readonly<Record<string, string>> = {
   "calendar.create": "google-workspace",

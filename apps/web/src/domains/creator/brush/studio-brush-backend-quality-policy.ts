@@ -244,7 +244,7 @@ export const STUDIO_HOKUSAI_MYB_PROVIDER_POLICY = Object.freeze({
   brushFormat: ".myb/libmypaint-v3" as const,
   execution: "dedicated-worker-wasm-packed-dirty-frame" as const,
   adapterVersion: STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION,
-  customBinding: "toonspectrum-packed-dirty-frame" as const,
+  customBinding: "toonstudio-packed-dirty-frame" as const,
   eligibleFamilies: Object.freeze([
     "continuous-ink",
     "dry-media",
@@ -298,7 +298,7 @@ interface StudioHokusaiMybProviderOptInBase {
   readonly backendId: "hokusai-myb-worker";
   readonly engineVersion: "0.3.0";
   readonly adapterVersion: typeof STUDIO_HOKUSAI_WORKER_ADAPTER_VERSION;
-  readonly customBinding: "toonspectrum-packed-dirty-frame";
+  readonly customBinding: "toonstudio-packed-dirty-frame";
   readonly surfaceContract: "packed-dirty-rgba8";
 }
 

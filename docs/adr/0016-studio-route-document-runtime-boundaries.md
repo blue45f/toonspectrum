@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-08-16
-**Deciders:** ToonSpectrum Studio maintainers
+**Deciders:** ToonStudio Studio maintainers
 
 ## Context
 

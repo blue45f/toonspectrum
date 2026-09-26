@@ -1,4 +1,4 @@
-import { sceneIRSchema } from "@toonspectrum/studio-project-model";
+import { sceneIRSchema } from "@toonstudio/studio-project-model";
 import { describe, expect, it } from "vitest";
 
 import { SvgParseError, parsePathData, parseSvgToScene } from "../svg";
@@ -8,7 +8,7 @@ import type {
   PathVerbIR,
   SceneNodeIR,
   StrokePathNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 function flatten(nodes: SceneNodeIR[]): SceneNodeIR[] {
   return nodes.flatMap((node) =>

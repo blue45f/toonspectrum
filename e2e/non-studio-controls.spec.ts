@@ -2,7 +2,7 @@ import { expect, test } from "./fixtures/non-studio-test";
 
 import type { Locator } from "@playwright/test";
 
-const backup = { _app: "toonspectrum-library", version: 1, ratings: { "isolated-work": 4.5 }, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
+const backup = { _app: "toonstudio-library", version: 1, ratings: { "isolated-work": 4.5 }, reads: {}, subscriptions: {}, reviews: {}, likedReviews: {}, collections: [] };
 const reference = { id: 'kmas:["id","non-studio-control-fixture"]', title: "검증용 가상 작품", subtitle: "테스트 데이터", writer: "검증용 작가", illustrator: "검증용 작가", publisher: "검증용 출판사", platform: "", genre: "테스트", age: "전체연령", isbn: "", outline: "테스트용 줄거리" };
 
 async function expectReadableSolidControl(locator: Locator): Promise<void> {
@@ -18,8 +18,8 @@ async function expectReadableSolidControl(locator: Locator): Promise<void> {
 test.beforeEach(async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 900 });
   await page.addInitScript(() => {
-    localStorage.setItem("toonspectrum-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
   });
   await page.route("**/api/**", async (route) => {
     if (new URL(route.request().url()).pathname.endsWith("/auth/session")) {
@@ -100,23 +100,23 @@ test("settings preserve preferences and require explicit valid backup replacemen
   await page.reload();
   await expect(hundred).toHaveAttribute("aria-pressed", "true");
   const files = page.getByLabel("서재 백업 파일");
-  const initial = await page.evaluate(() => JSON.parse(localStorage.getItem("toonspectrum-store") ?? "{}").state?.ratings);
+  const initial = await page.evaluate(() => JSON.parse(localStorage.getItem("toonstudio-store") ?? "{}").state?.ratings);
   await files.setInputFiles({ name: "unrelated.json", mimeType: "application/json", buffer: Buffer.from("{}") });
   await expect(page.locator("[data-library-import]").getByRole("alert")).toContainText("기존 기록은 변경하지 않았습니다");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("toonspectrum-store") ?? "{}").state?.ratings)).toEqual(initial);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("toonstudio-store") ?? "{}").state?.ratings)).toEqual(initial);
   await files.setInputFiles({ name: "library.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(backup)) });
   await expect(page.getByRole("region", { name: "백업 복원 미리보기" })).toBeVisible();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("toonspectrum-store") ?? "{}").state?.ratings)).toEqual(initial);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("toonstudio-store") ?? "{}").state?.ratings)).toEqual(initial);
   await page.getByRole("button", { name: "취소", exact: true }).click();
   await files.setInputFiles({ name: "library.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(backup)) });
   await page.getByRole("button", { name: "기존 기록 교체 확인" }).click();
   await expect(page.locator("[data-library-import]").getByRole("status")).toContainText("복원했습니다");
   await page.reload();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("toonspectrum-store") ?? "{}").state?.ratings)).toEqual(backup.ratings);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("toonstudio-store") ?? "{}").state?.ratings)).toEqual(backup.ratings);
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "내 서재 백업 내보내기", exact: true }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/^toonspectrum-library-.*\.json$/u);
+  expect(download.suggestedFilename()).toMatch(/^toonstudio-library-.*\.json$/u);
   await download.saveAs(testInfo.outputPath("isolated-library-backup.json"));
   await page.screenshot({ path: testInfo.outputPath("settings-390.png"), fullPage: true, animations: "disabled", timeout: 30_000 });
 });

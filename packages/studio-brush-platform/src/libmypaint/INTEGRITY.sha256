@@ -1,4 +1,4 @@
-# ToonSpectrum libmypaint wasm reproducible release manifest (ADR-0011 lane 11)
+# ToonStudio libmypaint wasm reproducible release manifest (ADR-0011 lane 11)
 # libmypaint v1.6.1 (2768251dacce3939136c839aeca413f4aa4241d0), json-c bypassed
 # emcc 6.0.6
 a6fbdeca5ae15671c47f8c8d65fae598f7b9275e1f8387bbc9dd652a5a7a2a8a  mypaint-wasm.mjs

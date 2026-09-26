@@ -30,9 +30,9 @@ function candidate(
     title: "Publication candidate",
     outputIntent: {
       profileBytes: buildMatrixTrcIccProfile(),
-      identifier: "ToonSpectrum-sRGB",
+      identifier: "ToonStudio-sRGB",
       condition: "sRGB IEC 61966-2-1",
-      info: "ToonSpectrum deterministic public profile",
+      info: "ToonStudio deterministic public profile",
       components: 3,
     },
     conformance: {
@@ -81,7 +81,7 @@ describe("Studio PDF conformance publication pipeline", () => {
       document: candidate("pdf-a-2b"),
       iccManifest: STUDIO_BUNDLED_SRGB_ICC_MANIFEST,
       veraPdf: {
-        schema: "toonspectrum.external.verapdf-result",
+        schema: "toonstudio.external.verapdf-result",
         version: 1,
         provider: "veraPDF",
         providerVersion: "1.28.2",
@@ -171,7 +171,7 @@ describe("Studio PDF conformance publication pipeline", () => {
       document: candidate("pdf-a-2b"),
       iccManifest: STUDIO_BUNDLED_SRGB_ICC_MANIFEST,
       veraPdf: {
-        schema: "toonspectrum.external.verapdf-result",
+        schema: "toonstudio.external.verapdf-result",
         version: 1,
         provider: "veraPDF",
         providerVersion: "1.28.2",

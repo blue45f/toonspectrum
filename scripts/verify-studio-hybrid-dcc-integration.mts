@@ -44,13 +44,13 @@ export const STUDIO_HYBRID_DCC_INTEGRATION_REPORT_SCHEMA_VERSION = 3 as const;
 const SCRATCH =
   process.env.TOONSPECTRUM_HYBRID_DCC_VERIFY_DIR
   ?? process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-hybrid-dcc-integration");
+  ?? join(tmpdir(), "toonstudio-studio-hybrid-dcc-integration");
 const LOG_PATH = join(SCRATCH, "studio-hybrid-dcc-integration.log");
 const REPORT_PATH = join(SCRATCH, "studio-hybrid-dcc-integration.json");
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
-const MOBILE_HINT_KEY = "toonspectrum-studio-mobile-hint-dismissed";
-const UI_DENSITY_KEY = "toonspectrum-studio-ui-density:v1";
-const HYBRID_DCC_OPFS_ROOT = "toonspectrum-hybrid-dcc-v1";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+const MOBILE_HINT_KEY = "toonstudio-studio-mobile-hint-dismissed";
+const UI_DENSITY_KEY = "toonstudio-studio-ui-density:v1";
+const HYBRID_DCC_OPFS_ROOT = "toonstudio-hybrid-dcc-v1";
 const GLB_MAGIC = 0x46546c67;
 const GLB_VERSION = 2;
 const GLB_MINIMUM_BYTES = 20;

@@ -180,11 +180,11 @@ describe("readStudioZipArchive", () => {
           { path: "data/2.txt", data: encoder.encode("two") },
           { path: "data/1.txt", data: encoder.encode("one") },
         ],
-        "ToonSpectrum"
+        "ToonStudio"
       )
     );
 
-    expect(archive.comment).toBe("ToonSpectrum");
+    expect(archive.comment).toBe("ToonStudio");
     expect(archive.entries.map((entry) => entry.path)).toEqual([
       "data/",
       "data/2.txt",

@@ -35,7 +35,7 @@ import type {
   StudioAutosaveSqliteReadResult,
 } from "./studio-autosave-sqlite-store";
 
-const AUTOSAVE_KEY = "toonspectrum-studio-autosave:v12:guest:new";
+const AUTOSAVE_KEY = "toonstudio-studio-autosave:v12:guest:new";
 const DOCUMENT_ID = "autosave-two-tab-document";
 const ENGINE_VERSION = "studio-autosave-v2";
 
@@ -268,10 +268,10 @@ describe("studioAutosaveDocumentLockName", () => {
   it("derives a stable, digest-scoped name that never leaks the manuscript identity", () => {
     const name = studioAutosaveDocumentLockName(AUTOSAVE_KEY);
     expect(name).toBe(studioAutosaveDocumentLockName(AUTOSAVE_KEY));
-    expect(name.startsWith("toonspectrum-studio-autosave-document:")).toBe(true);
+    expect(name.startsWith("toonstudio-studio-autosave-document:")).toBe(true);
     expect(name).not.toContain("guest");
     expect(name).not.toBe(
-      studioAutosaveDocumentLockName("toonspectrum-studio-autosave:v12:guest:work:1"),
+      studioAutosaveDocumentLockName("toonstudio-studio-autosave:v12:guest:work:1"),
     );
   });
 });

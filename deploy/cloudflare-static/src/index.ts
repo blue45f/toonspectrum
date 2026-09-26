@@ -79,7 +79,7 @@ const DEFAULT_RUNTIME: GatewayRuntime = {
 const RETRYABLE_READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const RETRYABLE_UPSTREAM_STATUSES = new Set([502, 503, 504]);
 const MAX_PUBLIC_READ_ORIGINS = 8;
-const CORE_ORIGIN_AUTH_HEADER = "x-toonspectrum-origin-secret";
+const CORE_ORIGIN_AUTH_HEADER = "x-toonstudio-origin-secret";
 const MINIMUM_CORE_ORIGIN_SECRET_BYTES = 32;
 const CRAWLER_USER_AGENT_PATTERN =
   /bot|crawl|spider|facebookexternalhit|kakaotalk|slack|twitter|discord|whatsapp|telegram|line|pinterest|embedly|preview|naver|daum|skype|vkshare/iu;
@@ -88,7 +88,7 @@ export const COMMON_SECURITY_HEADERS = Object.freeze({
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://sharer.kakao.com https://*.tosspayments.com; script-src 'self' 'sha256-IOP7wTtt9D3HpCkohTmfkH+ucqsTcH2YSDgerWQ41YU=' 'wasm-unsafe-eval' https://accounts.google.com https://t1.kakaocdn.net https://static.cloudflareinsights.com https://js.tosspayments.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' blob: https://api.artic.edu https://openaccess-api.clevelandart.org https://commons.wikimedia.org https://ko.wikipedia.org https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://storage.googleapis.com https://api.unsplash.com https://images.unsplash.com https://api.openai.com https://openrouter.ai https://api.z.ai https://api.deepseek.com https://ybsgfhofuvkhywbpytnl.supabase.co https://cdn.jsdelivr.net https://kapi.kakao.com https://cloudflareinsights.com https://toonspectrum-realtime.toonstudio-realtime.workers.dev wss://toonspectrum-realtime.toonstudio-realtime.workers.dev https://realtime.toonstudio.cloud wss://realtime.toonstudio.cloud https://*.tosspayments.com; frame-src https://accounts.google.com https://www.youtube-nocookie.com https://player.vimeo.com https://*.tosspayments.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests; block-all-mixed-content",
+  "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self' https://sharer.kakao.com https://*.tosspayments.com; script-src 'self' 'sha256-IOP7wTtt9D3HpCkohTmfkH+ucqsTcH2YSDgerWQ41YU=' 'wasm-unsafe-eval' https://accounts.google.com https://t1.kakaocdn.net https://static.cloudflareinsights.com https://js.tosspayments.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' blob: https://api.artic.edu https://openaccess-api.clevelandart.org https://commons.wikimedia.org https://ko.wikipedia.org https://accounts.google.com https://www.googleapis.com https://graph.microsoft.com https://storage.googleapis.com https://api.unsplash.com https://images.unsplash.com https://api.openai.com https://openrouter.ai https://api.z.ai https://api.deepseek.com https://ybsgfhofuvkhywbpytnl.supabase.co https://cdn.jsdelivr.net https://kapi.kakao.com https://cloudflareinsights.com https://toonstudio-realtime.toonstudio-realtime.workers.dev wss://toonstudio-realtime.toonstudio-realtime.workers.dev https://realtime.toonstudio.cloud wss://realtime.toonstudio.cloud https://*.tosspayments.com; frame-src https://accounts.google.com https://www.youtube-nocookie.com https://player.vimeo.com https://*.tosspayments.com; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests; block-all-mixed-content",
   "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(), cross-origin-isolated=(self)",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains",
 } as const);
@@ -120,7 +120,7 @@ function edgeLivenessResponse(request: Request): Response {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store, max-age=0",
       pragma: "no-cache",
-      "x-toonspectrum-health-source": "cloudflare-edge",
+      "x-toonstudio-health-source": "cloudflare-edge",
       ...COMMON_SECURITY_HEADERS,
     },
   });
@@ -146,7 +146,7 @@ function edgePolicyResponse(request: Request, requestUrl: URL): Response | null 
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "public, max-age=300, s-maxage=86400",
-      "x-toonspectrum-policy-source": "first-party-release",
+      "x-toonstudio-policy-source": "first-party-release",
     },
   }));
 }
@@ -568,9 +568,9 @@ export function createUpstreamApiRequest(
   }
   headers.set("x-forwarded-host", incoming.host);
   headers.set("x-forwarded-proto", "https");
-  headers.set("x-toonspectrum-edge", "cloudflare-static-gateway-v2");
-  headers.set("x-toonspectrum-edge-route", route);
-  headers.set("x-toonspectrum-edge-attempt", String(attempt));
+  headers.set("x-toonstudio-edge", "cloudflare-static-gateway-v2");
+  headers.set("x-toonstudio-edge-route", route);
+  headers.set("x-toonstudio-edge-attempt", String(attempt));
   if (coreOriginSecret) {
     headers.set(CORE_ORIGIN_AUTH_HEADER, coreOriginSecret);
   }
@@ -693,7 +693,7 @@ async function serveCompressedLargeAsset(
   responseHeaders.set("cache-control", CLOUDFLARE_LARGE_ASSET_CACHE_CONTROL);
   responseHeaders.set("accept-ranges", "none");
   responseHeaders.set(
-    "x-toonspectrum-large-asset-source",
+    "x-toonstudio-large-asset-source",
     `static-${encoding}`,
   );
   responseHeaders.delete("content-range");
@@ -737,7 +737,7 @@ function r2LargeAssetHeaders(
     "access-control-expose-headers",
     "Accept-Ranges, Content-Length, Content-Range, ETag",
   );
-  headers.set("x-toonspectrum-large-asset-source", "r2");
+  headers.set("x-toonstudio-large-asset-source", "r2");
   if (partial && object.range) {
     const end = object.range.offset + object.range.length - 1;
     headers.set(

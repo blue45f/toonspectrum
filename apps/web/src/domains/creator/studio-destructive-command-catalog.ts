@@ -499,7 +499,7 @@ function studioVrmPoseSharePublisherStatement(
   publisherKind: StudioVrmPoseShareUseContextDisclosure["publisherKind"],
 ): string {
   if (publisherKind === "corporation") {
-    return "이 공유는 ToonSpectrum 플랫폼 게시이며 게시 주체는 법인(corporation)으로 평가됩니다.";
+    return "이 공유는 ToonStudio 플랫폼 게시이며 게시 주체는 법인(corporation)으로 평가됩니다.";
   }
   if (publisherKind === "individual") return "이 공유의 게시 주체는 개인(individual)입니다.";
   return "이 공유의 개인·법인 게시 주체는 확인되지 않았습니다.";

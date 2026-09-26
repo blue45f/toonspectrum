@@ -14,8 +14,8 @@ const storageKey = "toonstudio:kmas-reference-notes:v1";
 async function prepare(page: Page) {
   await installBetaEventDismissal(page);
   await page.addInitScript(() => {
-    sessionStorage.setItem("toonspectrum-intro-shown", "1");
-    sessionStorage.setItem("toonspectrum-compat-dismissed", "true");
+    sessionStorage.setItem("toonstudio-intro-shown", "1");
+    sessionStorage.setItem("toonstudio-compat-dismissed", "true");
   });
   await page.route("**/api/kmas/references?*", async (route) => {
     const url = new URL(route.request().url());

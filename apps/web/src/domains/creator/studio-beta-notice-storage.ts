@@ -1,5 +1,5 @@
 export const STUDIO_BETA_NOTICE_STORAGE_KEY =
-  "toonspectrum-studio-beta-notice-acknowledged";
+  "toonstudio-studio-beta-notice-acknowledged";
 
 /**
  * Bump this value whenever the beta operating notice materially changes.

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { renderBrushPreview } from "@toonspectrum/studio-brush-platform";
+import { renderBrushPreview } from "@toonstudio/studio-brush-platform";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { loadLibMypaint } from "../../packages/studio-brush-platform/src/libmypaint/index";
@@ -24,7 +24,7 @@ import type {
   BrushPreviewResult,
   BrushPreviewSource,
   HokusaiModuleLike,
-} from "@toonspectrum/studio-brush-platform";
+} from "@toonstudio/studio-brush-platform";
 
 /**
  * Unified brush preview lab — pixel-identity gate. Every corpus fixture

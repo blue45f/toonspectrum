@@ -47,11 +47,11 @@ const IMMUTABLE_CACHE_CONTROL = "private, max-age=31536000, immutable";
 const SERVICE = "s3";
 const MAXIMUM_SIGNED_URL_SECONDS = 86_400;
 const METADATA_HEADERS = Object.freeze({
-  contract: "x-amz-meta-toonspectrum-contract",
-  purpose: "x-amz-meta-toonspectrum-purpose",
-  digest: "x-amz-meta-toonspectrum-digest",
-  byteLength: "x-amz-meta-toonspectrum-byte-length",
-  control: "x-amz-meta-toonspectrum-control",
+  contract: "x-amz-meta-toonstudio-contract",
+  purpose: "x-amz-meta-toonstudio-purpose",
+  digest: "x-amz-meta-toonstudio-digest",
+  byteLength: "x-amz-meta-toonstudio-byte-length",
+  control: "x-amz-meta-toonstudio-control",
 });
 
 function sha256Hex(value: string | Uint8Array): string {

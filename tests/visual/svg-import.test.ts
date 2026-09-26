@@ -1,12 +1,12 @@
-import { renderSceneToPixels as renderWithSkia } from "@toonspectrum/studio-engine-skia";
-import { loadCanvasKitNode } from "@toonspectrum/studio-engine-skia/node";
-import { renderSceneToPixels as renderWithVello } from "@toonspectrum/studio-engine-vello";
-import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
+import { renderSceneToPixels as renderWithSkia } from "@toonstudio/studio-engine-skia";
+import { loadCanvasKitNode } from "@toonstudio/studio-engine-skia/node";
+import { renderSceneToPixels as renderWithVello } from "@toonstudio/studio-engine-vello";
+import { loadVelloNode } from "@toonstudio/studio-engine-vello/node";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { parseSvgToScene } from "../../packages/studio-format-gateway/src/svg";
 
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 import type { CanvasKit } from "canvaskit-wasm";
 
 /**

@@ -18,7 +18,7 @@
  */
 
 import type { CV, Mat } from "@techstark/opencv-js";
-import type { PathIR, PathVerbIR } from "@toonspectrum/studio-project-model";
+import type { PathIR, PathVerbIR } from "@toonstudio/studio-project-model";
 
 export const STUDIO_OPENCV_SELECTION_VERSION = 1 as const;
 

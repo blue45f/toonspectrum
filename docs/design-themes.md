@@ -11,7 +11,7 @@
 ## 경계와 호환성
 
 - UI의 의미 색상 토큰만 변경한다. 원고 데이터, 브러시 색상, 캔버스 렌더러 및 내보내기 경로는 수정하지 않는다.
-- 기존 `data-theme=dark|light` 계약과 `toonspectrum-theme`의 `state.theme`/`version:0` envelope를 유지한다. 새 필드는 검증된 `preference`, `studioPreference`뿐이다.
+- 기존 `data-theme=dark|light` 계약과 `toonstudio-theme`의 `state.theme`/`version:0` envelope를 유지한다. 새 필드는 검증된 `preference`, `studioPreference`뿐이다.
 - `data-design-theme`가 팔레트이고 `data-theme`는 밝기 모드다. 경로에 따라 문서 루트에 적용되어 body에 포털로 렌더되는 메뉴도 같은 색상을 상속한다.
 - 초기 부트스트랩은 기존 CSP의 self-hosted script를 재사용한다. 시스템 변경·storage 이벤트 구독은 해제 가능하고 storage 이벤트를 다시 저장하지 않는다.
 - 테마 모달은 앱 소유의 lazy host에서 열어 모바일 부모 메뉴가 사라져도 유지한다. Escape·포커스 트랩·닫은 후 호출 버튼으로 포커스 복귀는 Radix Dialog로 제공한다.

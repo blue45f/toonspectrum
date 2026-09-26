@@ -1,5 +1,5 @@
 /*
- * Minimal config.h for the ToonSpectrum emscripten build of libmypaint.
+ * Minimal config.h for the ToonStudio emscripten build of libmypaint.
  *
  * ADR-0011 lane 11: libmypaint v1.6.1 (2768251dacce3939136c839aeca413f4aa4241d0)
  * is compiled directly with emcc instead of running autogen.sh/configure —

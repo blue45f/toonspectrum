@@ -15,7 +15,7 @@ import {
 } from "../share";
 
 const payload: SharePayload = {
-  title: "테스트 작품 · 툰스펙트럼",
+  title: "테스트 작품 · 툰스튜디오",
   text: "  여러   줄의\n소개  ",
   url: "https://www.toonstudio.cloud/title/test-work?tab=reviews#top",
   imageUrl: "/covers/test.jpg",

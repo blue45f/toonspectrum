@@ -4,7 +4,7 @@ import { check, index, jsonb, pgTable, primaryKey, text, timestamp, unique } fro
 import { users } from "./auth.schema";
 import { creatorWorks } from "./creator.schema";
 import { studioReviews } from "./studio-project-graph.schema";
-import type { PinnedShareSnapshot } from "@toonspectrum/studio-project-model/pinned-review-share";
+import type { PinnedShareSnapshot } from "@toonstudio/studio-project-model/pinned-review-share";
 
 /** Separate from legacy live-document links: an older API can never resolve this bearer. */
 export const studioPinnedReviewShares = pgTable("studio_pinned_review_share", {

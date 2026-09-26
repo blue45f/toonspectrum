@@ -6,7 +6,7 @@ import { tryCopyFortuneText } from "./fortune-sharing";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Copy, Share2, PencilLine } from "lucide-react";
-import type { FortuneReading } from "@toonspectrum/core/fortune";
+import type { FortuneReading } from "@toonstudio/core/fortune";
 import { fortuneCreativeMission, fortunePublicShare } from "./fortune-cinematic-model";
 
 export function FortuneReadingTools({ reading }: { reading: FortuneReading }) {

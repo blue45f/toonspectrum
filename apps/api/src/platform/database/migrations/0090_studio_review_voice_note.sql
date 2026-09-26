@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS studio_review_voice_note (
   ),
   CONSTRAINT studio_review_voice_note_object CHECK (
     jsonb_typeof("objectReference") = 'object'
-    AND "objectReference"->>'contractVersion' = 'toonspectrum.private-object-storage.v2'
+    AND "objectReference"->>'contractVersion' = 'toonstudio.private-object-storage.v2'
     AND "objectReference"->>'purpose' = 'derived'
     AND "objectReference"->>'contentType' = "contentType"
     AND ("objectReference"->>'byteLength')::integer = "byteLength"

@@ -528,7 +528,7 @@ test("creator storage location migration pins primaries and inventories verified
   for (const requiredFragment of [
     'ADD COLUMN IF NOT EXISTS "providerId" text',
     "coalesce(\"providerId\", 'supabase')",
-    "toonspectrum.private-object-storage.v2",
+    "toonstudio.private-object-storage.v2",
     "creator_asset_storage_object_provider_check",
     "CREATE TABLE IF NOT EXISTS public.creator_asset_storage_replica",
     "creator_asset_storage_replica_object_fkey",

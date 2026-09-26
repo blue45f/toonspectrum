@@ -30,7 +30,7 @@ else:
 
     bl_info = {
         "name": "ToonStudio Character Pipeline",
-        "author": "ToonSpectrum",
+        "author": "ToonStudio",
         "version": (1, 0, 0),
         "blender": (5, 2, 0),
         "location": "View3D > Sidebar > ToonStudio",

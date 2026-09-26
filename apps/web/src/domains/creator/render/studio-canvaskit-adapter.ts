@@ -110,7 +110,7 @@ export interface StudioPortablePathGeometryContour {
  * Vendor-neutral, bounded geometry extracted while the CanvasKit Path is still alive.
  *
  * This is a settled-operation suggestion only. CanvasKit verbs, Embind objects and WASM
- * pointers never cross the Worker boundary, and the saved document remains ToonSpectrum-owned.
+ * pointers never cross the Worker boundary, and the saved document remains ToonStudio-owned.
  */
 export interface StudioPortablePathGeometry {
   readonly kind: "studio-portable-path-geometry";

@@ -7,7 +7,7 @@ import {
   translateMat2d,
   type SceneIR,
   type SceneNodeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 import {
   STUDIO_SCENE_IDENTITY_DOCUMENT_TRANSFORM,

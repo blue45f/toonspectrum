@@ -1015,7 +1015,7 @@ function PublishAssetDialog({
 }) {
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
-  const [license, setLicense] = useState<StudioAssetShareOptions["license"]>("toonspectrum-standard");
+  const [license, setLicense] = useState<StudioAssetShareOptions["license"]>("toonstudio-standard");
   const [attributionText, setAttributionText] = useState("");
   const [containsAi, setContainsAi] = useState(asset.kind === "ai");
   const [rightsConfirmed, setRightsConfirmed] = useState(false);

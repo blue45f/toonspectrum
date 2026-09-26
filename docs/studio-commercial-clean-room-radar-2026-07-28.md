@@ -2,10 +2,10 @@
 
 ## 목적
 
-ToonSpectrum Studio가 무료·오픈소스 라이브러리의 공통분모에 머물지 않도록, 상용 창작 도구가
+ToonStudio Studio가 무료·오픈소스 라이브러리의 공통분모에 머물지 않도록, 상용 창작 도구가
 제공하는 고유한 작업 흐름을 정기적으로 재감사한다. 이 문서는 상용 소스 코드·프리셋·에셋·UI를
 복제하기 위한 목록이 아니다. 공식 매뉴얼과 공개된 제품 동작에서 **사용자가 해결하려는 문제와
-검증 가능한 결과**만 추출하고, ToonSpectrum의 canonical document와 provider 계약 위에 독립적으로
+검증 가능한 결과**만 추출하고, ToonStudio의 canonical document와 provider 계약 위에 독립적으로
 구현한다.
 
 ## Clean-room 규칙
@@ -31,7 +31,7 @@ ToonSpectrum Studio가 무료·오픈소스 라이브러리의 공통분모에 �
 
 ## 2026-07-28 공식 근거와 독립 구현 목표
 
-| 제품군 / 공개 근거 | 관찰한 사용자 가치 | ToonSpectrum 독립 구현 계약 | 현재 단계 |
+| 제품군 / 공개 근거 | 관찰한 사용자 가치 | ToonStudio 독립 구현 계약 | 현재 단계 |
 | --- | --- | --- | --- |
 | [Clip Studio Paint — Dual brush](https://help.clip-studio.com/en-us/manual_en/810_subtools/Number.htm) | 두 팁의 크기·간격·텍스처·분사와 결합 모드를 한 획에서 조절 | 두 팁의 독립 station schedule, 8개 mask family, **deposition별 flow/opacity 합성**, CPU↔WebGPU 픽셀 기준 | 상위 exact v2 brush-pack provider 단위 검증과 하위 v2 runtime의 실제 Chromium RGBA16F readback 동등성 검증 완료. production/UI 연결은 다음 수직 통합 단계 |
 | [Clip Studio Paint — Color mixing](https://help.clip-studio.com/en-us/manual_en/240_brushes/Blending_tools.htm) | 기존 안료를 끌고 새 안료를 더하는 Blend/Running color/Smear | stroke-local pickup well, optical-density pigment, 색 끌기 거리, blur radius, 결정적 타일 replay | 코어 구현, GPU/Studio 연결 확대 중 |

@@ -27,8 +27,8 @@ export const ENGINEERING_ADVANCED_CHAPTERS = [
       en: "Social login is an account lifecycle, not a row of buttons",
     },
     thesis: {
-      ko: "공급자 인증, ToonSpectrum 세션, 계정 연결·해제와 탈퇴를 분리해 한 공급자의 장애나 정책 변경이 제품 계정 전체를 소유하지 않게 합니다.",
-      en: "Provider authentication, the ToonSpectrum session, account linking, unlinking and deletion stay separate so one provider never owns the whole product account.",
+      ko: "공급자 인증, ToonStudio 세션, 계정 연결·해제와 탈퇴를 분리해 한 공급자의 장애나 정책 변경이 제품 계정 전체를 소유하지 않게 합니다.",
+      en: "Provider authentication, the ToonStudio session, account linking, unlinking and deletion stay separate so one provider never owns the whole product account.",
     },
     problem: {
       ko: "인가 코드 성공만 구현하면 중복 callback, state 재사용, 검증되지 않은 이메일 병합, 공급자 연결 해제와 탈퇴 웹훅에서 계정 일관성이 깨집니다.",

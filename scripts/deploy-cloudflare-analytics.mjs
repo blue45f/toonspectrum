@@ -30,13 +30,13 @@ export function analyticsDeploymentConfig(environment, production, gitState) {
     }
   }
   return {
-    name: "toonspectrum-analytics",
+    name: "toonstudio-analytics",
     main: resolve(ROOT, "deploy/cloudflare-analytics/src/index.ts"),
     compatibility_date: "2026-07-30",
     workers_dev: true,
     preview_urls: false,
     observability: { enabled: false },
-    d1_databases: [{ binding: "ANALYTICS_DB", database_name: "toonspectrum-analytics-buffer", database_id: databaseId }],
+    d1_databases: [{ binding: "ANALYTICS_DB", database_name: "toonstudio-analytics-buffer", database_id: databaseId }],
     secrets: { required: ["ANALYTICS_RPC_TOKEN"] },
     ...(accountId ? { account_id: accountId } : {}),
     ...(production ? { vars: { RELEASE_SHA: environment.TOONSPECTRUM_APPROVED_MAIN_SHA } } : {}),
@@ -53,7 +53,7 @@ export function analyticsDeploymentSecrets(environment) {
 
 export function deployAnalyticsWorker(config, environment, production, runner = spawnSync) {
   const secrets = production ? analyticsDeploymentSecrets(environment) : undefined;
-  const directory = mkdtempSync(resolve(tmpdir(), "toonspectrum-analytics-deploy-"));
+  const directory = mkdtempSync(resolve(tmpdir(), "toonstudio-analytics-deploy-"));
   try {
     const path = resolve(directory, "wrangler.json");
     writeFileSync(path, JSON.stringify(config), { mode: 0o600 });

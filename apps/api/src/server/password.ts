@@ -16,7 +16,7 @@ const COMMON_PASSWORDS = new Set([
   "passwordpassword",
   "password123456",
   "qwertyuiopasdfgh",
-  "toonspectrum123",
+  "toonstudio123",
 ]);
 
 export interface PasswordVerificationResult {
@@ -194,7 +194,7 @@ export async function verifyPassword(
   if (!stored) {
     // Run the same expensive primitive for missing/social-only users so account
     // enumeration cannot rely on a cheap failure path.
-    await scryptAsync(password, "toonspectrum-missing-credential-v2");
+    await scryptAsync(password, "toonstudio-missing-credential-v2");
     return { valid: false, needsRehash: false };
   }
   if (stored.startsWith("scrypt$")) {

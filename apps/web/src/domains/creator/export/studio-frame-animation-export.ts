@@ -119,7 +119,7 @@ export function planFrameAnimationExport(
 }
 
 export function frameAnimationExportFileName(title: string): string {
-  return `${title.trim() || "toonspectrum-frame-anim"}-frames.webm`;
+  return `${title.trim() || "toonstudio-frame-anim"}-frames.webm`;
 }
 
 export interface FrameAnimationExportRequest {

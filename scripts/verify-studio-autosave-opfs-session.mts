@@ -51,7 +51,7 @@ import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 export const STUDIO_AUTOSAVE_OPFS_BROWSER_REPORT_SCHEMA_VERSION = 1 as const;
 
 const RESULT_GLOBAL = "__studioAutosaveOpfsSessionBrowserResult";
-const ROOT_NAME = "toonspectrum-studio-autosave-v3";
+const ROOT_NAME = "toonstudio-studio-autosave-v3";
 const RECOVERY_ROOT_NAME = "recovery-journals";
 const RESULT_TIMEOUT_MS = 120_000;
 const CSP = [
@@ -191,7 +191,7 @@ export function validateStudioAutosaveOpfsBrowserResult(
   const documentId = document?.journalDocumentId;
   if (
     typeof documentKey !== "string"
-    || !documentKey.startsWith("toonspectrum-studio-autosave:v2:browser-opfs-")
+    || !documentKey.startsWith("toonstudio-studio-autosave:v2:browser-opfs-")
     || typeof documentId !== "string"
     || !/^autosave-[0-9a-f]{48}$/u.test(documentId)
   ) {
@@ -384,7 +384,7 @@ const params = new URLSearchParams(window.location.search);
 const documentKey = params.get("documentKey");
 const runId = params.get("runId");
 const baseEpoch = Number(params.get("baseEpoch"));
-const phaseKey = runId ? "toonspectrum-opfs-verifier-phase:" + runId : "";
+const phaseKey = runId ? "toonstudio-opfs-verifier-phase:" + runId : "";
 const securityPolicyViolations = [];
 
 window.addEventListener("securitypolicyviolation", event => {
@@ -550,7 +550,7 @@ async function run() {
 
   const digest = await sha256Hex(documentKey);
   const journalDocumentId = "autosave-" + digest.slice(0, 48);
-  const expectedLockName = "toonspectrum-opfs-recovery:" + journalDocumentId;
+  const expectedLockName = "toonstudio-opfs-recovery:" + journalDocumentId;
   const sidecarKey = studioLifecycleAutosaveSidecarKey(documentKey);
   const checkpointSavedAt = new Date(baseEpoch).toISOString();
   const migrationSavedAt = new Date(baseEpoch + 10_000).toISOString();
@@ -1029,7 +1029,7 @@ async function executeProductionBrowser(
 
     const runId = randomUUID();
     const documentKey =
-      `toonspectrum-studio-autosave:v2:browser-opfs-${runId}`;
+      `toonstudio-studio-autosave:v2:browser-opfs-${runId}`;
     const url = new URL("/", origin);
     url.searchParams.set("documentKey", documentKey);
     url.searchParams.set("runId", runId);
@@ -1068,7 +1068,7 @@ export async function runStudioAutosaveOpfsBrowserVerifier(): Promise<void> {
     ?? process.env.TOONSPECTRUM_VERIFY_DIR
     ?? join(
       tmpdir(),
-      `toonspectrum-studio-autosave-opfs-${Date.now()}-${randomUUID().slice(0, 8)}`,
+      `toonstudio-studio-autosave-opfs-${Date.now()}-${randomUUID().slice(0, 8)}`,
     );
   const plan = createStudioAutosaveOpfsBrowserRunPlan(scratch);
   mkdirSync(plan.scratch, { recursive: true });

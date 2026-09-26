@@ -28,7 +28,7 @@ function completeSchema(overrides: Record<string, unknown> = {}) {
       description: "''::text",
       tags: "'[]'::jsonb",
       kind: "'image'::text",
-      license: "'toonspectrum-standard'::text",
+      license: "'toonstudio-standard'::text",
       attributionText: "''::text",
       containsAi: "false",
       moderationStatus: "'under_review'::text",

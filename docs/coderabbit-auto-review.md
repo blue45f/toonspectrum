@@ -60,7 +60,7 @@ star 임계값과 관련된 키 자체가 없다. 참고로 `enable_free_tier` �
 > "There's no application or approval queue: every public repository gets
 > CodeRabbit Review free the moment you install it."
 
-즉 문서상으로는 star 요건이 없다. `blue45f/toonspectrum` 은 public 이므로 문서 기준으로는
+즉 문서상으로는 star 요건이 없다. `blue45f/toonstudio` 은 public 이므로 문서 기준으로는
 자동 리뷰 대상이어야 한다. 봇의 실제 동작과 문서가 어긋나므로, 다음 중 하나다:
 
 - 최근 정책 변경이 문서에 반영되지 않았다

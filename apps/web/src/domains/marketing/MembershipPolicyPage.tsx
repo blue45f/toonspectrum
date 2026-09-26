@@ -69,7 +69,7 @@ export function MembershipPolicyPage() {
 
   const title = "멤버십 · 포인트 · 용량 정책";
   const description =
-    "ToonSpectrum의 활동 포인트, 멤버십 등급, 저장공간·업로드·협업 한도를 한곳에서 확인하세요.";
+    "ToonStudio의 활동 포인트, 멤버십 등급, 저장공간·업로드·협업 한도를 한곳에서 확인하세요.";
 
   useDocumentTitle(title);
   useMetaDescription(description);
@@ -128,7 +128,7 @@ export function MembershipPolicyPage() {
             </h1>
             <p className="mt-5 max-w-3xl text-base leading-7 text-fg-2 sm:text-lg">
               현재는 실제 결제를 받지 않습니다. 활동 보상은 Reward Point로,
-              향후 ToonSpectrum이 비용을 부담하는 AI·서버 렌더에는 Studio Credit을 사용합니다.
+              향후 ToonStudio이 비용을 부담하는 AI·서버 렌더에는 Studio Credit을 사용합니다.
               개인 API 키·Creator Runtime·브라우저 로컬 작업에는 Credit을 차감하지 않습니다.
             </p>
             <div className="mt-6 flex flex-wrap gap-2 text-xs font-bold">

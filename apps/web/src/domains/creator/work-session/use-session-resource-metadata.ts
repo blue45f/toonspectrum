@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { StudioSessionResources, StudioWorkSession } from "@toonspectrum/studio-project-model/work-session";
+import type { StudioSessionResources, StudioWorkSession } from "@toonstudio/studio-project-model/work-session";
 
 import { httpStatus } from "@/platform/api";
 import { getStudioSessionResources } from "./studio-work-session-client";

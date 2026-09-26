@@ -3,7 +3,7 @@
  *
  * Combines README “Studio 하이브리드 엔진 정책” strengths for those roles into callable entry
  * points that import and exercise the real provider modules — not a second document engine.
- * Canonical history, persistence and brush pixel authority remain ToonSpectrum-owned.
+ * Canonical history, persistence and brush pixel authority remain ToonStudio-owned.
  */
 
 import { LazyBrush } from "lazy-brush";

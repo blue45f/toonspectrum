@@ -19,7 +19,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import type { PaintIR, PathIR } from "@toonspectrum/studio-project-model";
+import type { PaintIR, PathIR } from "@toonstudio/studio-project-model";
 
 const MIB = 1024 * 1024;
 const HOUR_MS = 60 * 60 * 1_000;

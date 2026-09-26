@@ -1,4 +1,4 @@
-# ToonSpectrum 3D benchmark → productization wave — 2026-09-04
+# ToonStudio 3D benchmark → productization wave — 2026-09-04
 
 ## 1. Goal
 
@@ -44,7 +44,7 @@ Mixamo’s custom-character flow uses a small set of anatomical markers, automat
 - Upload and rig custom characters: https://helpx.adobe.com/creative-cloud/help/mixamo-rigging-animation.html
 - Mixamo FAQ and auto-rig constraints: https://helpx.adobe.com/creative-cloud/faq/mixamo-faq.html
 
-### Existing ToonSpectrum benchmark corpus
+### Existing ToonStudio benchmark corpus
 
 The repository’s prior benchmark already covers ABLER/CartoonTech, Snaptoon, SHAPER, Plask, Tooning, Clip Studio, Spline, Womp, Reallusion, SketchUp, Vectary and Mixamo. This wave concentrates on the remaining product gap: connecting those capabilities to canonical scene state and verifiable outputs rather than adding more disconnected controls.
 

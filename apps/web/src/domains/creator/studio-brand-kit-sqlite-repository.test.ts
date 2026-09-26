@@ -79,17 +79,17 @@ describe("Brand Kit SQLite repository", () => {
     const cases = [
       "{broken",
       JSON.stringify({
-        schema: "toonspectrum.studio.brand-kits",
+        schema: "toonstudio.studio.brand-kits",
         version: 1,
         items: [kit("same"), kit("same", 2)],
       }),
       JSON.stringify({
-        schema: "toonspectrum.studio.brand-kits",
+        schema: "toonstudio.studio.brand-kits",
         version: 1,
         items: [{ ...kit("bad-logo"), logo: { dataUrl: "javascript:1", width: 1, height: 1 } }],
       }),
       JSON.stringify({
-        schema: "toonspectrum.studio.brand-kits",
+        schema: "toonstudio.studio.brand-kits",
         version: 1,
         items: [{ ...kit("extra"), future: true }],
       }),

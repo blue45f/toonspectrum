@@ -9,7 +9,7 @@ import {
 import {
   readCreatorPublicationAudit,
   readCreatorPublicationSource,
-} from "@toonspectrum/contracts/creator-publication-integrity";
+} from "@toonstudio/contracts/creator-publication-integrity";
 
 beforeEach(() => {
   if (!globalThis.crypto?.subtle) {

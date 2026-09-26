@@ -2,8 +2,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { FORTUNE_EXPERIENCES } from "@toonspectrum/core/fortune";
-import type { FortuneReading } from "@toonspectrum/core/fortune";
+import { FORTUNE_EXPERIENCES } from "@toonstudio/core/fortune";
+import type { FortuneReading } from "@toonstudio/core/fortune";
 import { COMIC_CAST } from "@/shared/components/comic/comic-cast";
 import { FortuneStoryReader } from "./FortuneStoryReader";
 import { FortuneReadingView } from "./FortuneReadingView";

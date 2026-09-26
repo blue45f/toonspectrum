@@ -404,6 +404,6 @@ describe("진행률과 결정성", () => {
 
   it("파일명 규칙이 기존 내보내기와 나란하다", () => {
     expect(webCodecsVideoFileName("내 웹툰", "motion")).toBe("내 웹툰-motion.webm");
-    expect(webCodecsVideoFileName("   ", "frames")).toBe("toonspectrum-frames.webm");
+    expect(webCodecsVideoFileName("   ", "frames")).toBe("toonstudio-frames.webm");
   });
 });

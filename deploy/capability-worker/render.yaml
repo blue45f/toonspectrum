@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: toonspectrum-thumbnail-worker
+    name: toonstudio-thumbnail-worker
     runtime: docker
     plan: free
     region: singapore

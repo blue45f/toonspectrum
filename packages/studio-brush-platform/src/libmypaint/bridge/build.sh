@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ToonSpectrum libmypaint wasm build (ADR-0011 lane 11).
+# ToonStudio libmypaint wasm build (ADR-0011 lane 11).
 #
 # Reproducible-build contract (same idea as packages/studio-hokusai-wasm):
 #   source   : libmypaint v1.6.1, commit 2768251dacce3939136c839aeca413f4aa4241d0
@@ -114,7 +114,7 @@ PYINVENTORY
 (
   cd "$OUT_DIR"
   {
-    echo "# ToonSpectrum libmypaint wasm reproducible release manifest (ADR-0011 lane 11)"
+    echo "# ToonStudio libmypaint wasm reproducible release manifest (ADR-0011 lane 11)"
     echo "# libmypaint v1.6.1 (2768251dacce3939136c839aeca413f4aa4241d0), json-c bypassed"
     echo "# emcc $(emcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
     shasum -a 256 \

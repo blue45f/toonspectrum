@@ -104,7 +104,7 @@ function composeFileName(stem: string, extension: string): string {
     STUDIO_DOWNLOAD_FILE_NAME_MAX_CODE_POINTS - Array.from(extensionSuffix).length,
   );
   const boundedStem = truncateCodePoints(stem, maximumStemLength).replace(/[. ]+$/gu, "");
-  return `${boundedStem || "toonspectrum-download"}${extensionSuffix}`;
+  return `${boundedStem || "toonstudio-download"}${extensionSuffix}`;
 }
 
 /**
@@ -114,12 +114,12 @@ function composeFileName(stem: string, extension: string): string {
  */
 export function sanitizeStudioDownloadFileName(
   value: string,
-  fallback = "toonspectrum-download",
+  fallback = "toonstudio-download",
 ): string {
   const source = splitFileName(value.normalize("NFKC").trim());
   const fallbackSource = splitFileName(fallback.normalize("NFKC").trim());
   const extension = normalizeExtension(source.extension || fallbackSource.extension);
-  const fallbackStem = normalizeStem(fallbackSource.stem) || "toonspectrum-download";
+  const fallbackStem = normalizeStem(fallbackSource.stem) || "toonstudio-download";
   const stem = normalizeStem(source.stem) || fallbackStem;
   return composeFileName(stem, extension);
 }
@@ -131,7 +131,7 @@ export function createStudioDownloadFileName({
   extension,
   suffix = "",
 }: StudioDownloadFileNameInput): string {
-  const safeTitle = normalizeStem(title) || normalizeStem(fallbackTitle) || "toonspectrum-download";
+  const safeTitle = normalizeStem(title) || normalizeStem(fallbackTitle) || "toonstudio-download";
   const safeSuffix = normalizeStem(suffix);
   const safeExtension = normalizeExtension(extension);
   const stem = safeSuffix ? `${safeTitle}-${safeSuffix}` : safeTitle;

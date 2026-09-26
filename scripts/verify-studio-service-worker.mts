@@ -194,7 +194,7 @@ async function inspectWorker(page: Page): Promise<Record<string, unknown> | null
         clearTimeout(timer);
         done(event.data as Record<string, unknown>);
       };
-      worker.postMessage({ type: "toonspectrum-sw:inspect" }, [channel.port2]);
+      worker.postMessage({ type: "toonstudio-sw:inspect" }, [channel.port2]);
     });
   });
 }
@@ -314,7 +314,7 @@ async function main(): Promise<void> {
         channel.port1.onmessage = (event) => {
           clearTimeout(timer); channel.port1.close(); resolve(event.data?.complete === true);
         };
-        controller.postMessage({ type: "toonspectrum-sw:prepare-offline", urls: [] }, [channel.port2]);
+        controller.postMessage({ type: "toonstudio-sw:prepare-offline", urls: [] }, [channel.port2]);
       });
     });
     check("complete editor pack is prepared before checking full Studio offline boot", prepared);
@@ -414,7 +414,7 @@ async function main(): Promise<void> {
 
     const promptShown = await page
       .waitForFunction(
-        () => Boolean(document.getElementById("toonspectrum-sw-update")),
+        () => Boolean(document.getElementById("toonstudio-sw-update")),
         undefined,
         { timeout: 15_000 },
       )
@@ -435,7 +435,7 @@ async function main(): Promise<void> {
         setTimeout(() => done(false), 10_000);
       });
       const registration = await navigator.serviceWorker.getRegistration();
-      registration?.waiting?.postMessage({ type: "toonspectrum-sw:apply-update" });
+      registration?.waiting?.postMessage({ type: "toonstudio-sw:apply-update" });
       return changed;
     });
     check("explicit apply hands control to the new worker", applied);
@@ -453,7 +453,7 @@ async function main(): Promise<void> {
           const keys = await caches.keys();
           return (
             registrations.length === 0
-            && keys.every((key) => !key.startsWith("toonspectrum-sw-"))
+            && keys.every((key) => !key.startsWith("toonstudio-sw-"))
           );
         },
         undefined,

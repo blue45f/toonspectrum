@@ -41,7 +41,7 @@ node scripts/verify-studio-psd-original-quality.mjs
 외부 API 없이 로컬 합성 원고를 실제 Canvas와 ag-psd로 생성·인코딩·가져오기·PNG 재인코딩한다.
 2560×128 가로 원고, 96×2560 세로 원고, 128×64 작은 원고를 비교했다.
 앞의 두 원고는 전체 래스터 마스크도 비교한다. 픽셀 채널 및 마스크 알파 차이는 모두 0이었다.
-실제 브라우저 PNG 인코딩 취소도 통과했다. 기본 결과 위치는 `/tmp/toonspectrum-psd-original-quality`이며
+실제 브라우저 PNG 인코딩 취소도 통과했다. 기본 결과 위치는 `/tmp/toonstudio-psd-original-quality`이며
 `TOONSPECTRUM_VERIFY_DIR`로 바꿀 수 있다. 검사 스크립트는 자기 서버·브라우저를 종료한다.
 검사 보고서에는 소스 해시를 기록한다. 결과는 `validation/studio-psd-original-quality-2026-09-14.json`에도 보관한다. 소요 시간은 참고 관측값이며 경쟁 제품과의 성능 비교가 아니다.
 

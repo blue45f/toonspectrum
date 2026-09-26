@@ -16,7 +16,7 @@ const STUDIO_VRM_BROADCAST_FRAMEBUFFER_MAX_INPUT_DPR = 8;
 const STUDIO_VRM_BROADCAST_FRAMEBUFFER_DPR_STEPS_PER_UNIT = 64;
 
 export type StudioVrmBroadcastFramebufferReceipt = Readonly<{
-  kind: "toonspectrum.studio-vrm-broadcast-framebuffer";
+  kind: "toonstudio.studio-vrm-broadcast-framebuffer";
   version: 1;
   cssWidth: number;
   cssHeight: number;
@@ -65,7 +65,7 @@ export type StudioVrmBroadcastBlocker =
   | "tracking-transition";
 
 export type StudioVrmBroadcastPreviewReceipt = Readonly<{
-  kind: "toonspectrum.studio-vrm-broadcast-preview";
+  kind: "toonstudio.studio-vrm-broadcast-preview";
   version: 1;
   background: Readonly<{
     id: StudioVrmBroadcastBackgroundId;
@@ -220,7 +220,7 @@ export function planStudioVrmBroadcastFramebuffer(input: Readonly<{
     return Object.freeze({
       ok: true,
       receipt: Object.freeze({
-        kind: "toonspectrum.studio-vrm-broadcast-framebuffer",
+        kind: "toonstudio.studio-vrm-broadcast-framebuffer",
         version: 1,
         cssWidth: input.cssWidth,
         cssHeight: input.cssHeight,
@@ -276,7 +276,7 @@ export function createStudioVrmBroadcastPreviewPlan(input: Readonly<{
   return Object.freeze({
     ok: true,
     receipt: Object.freeze({
-      kind: "toonspectrum.studio-vrm-broadcast-preview",
+      kind: "toonstudio.studio-vrm-broadcast-preview",
       version: 1,
       background: Object.freeze({ ...background }),
       authority: "runtime-only",

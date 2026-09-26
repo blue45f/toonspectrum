@@ -3,7 +3,7 @@ import {
   type ProviderDescriptor,
   type ProviderKind,
   type ProviderRuntime,
-} from "@toonspectrum/studio-engine-registry";
+} from "@toonstudio/studio-engine-registry";
 
 import {
   STUDIO_BRUSH_BACKEND_INTEGRATION_AUDIT,

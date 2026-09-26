@@ -133,7 +133,7 @@ const ENVIRONMENTS: readonly QaEnvironment[] = Object.freeze([
 ]);
 
 const AUTHENTICATED_USER = Object.freeze({
-  email: "qa-matrix@toonspectrum.invalid",
+  email: "qa-matrix@toonstudio.invalid",
   id: "11111111-2222-4333-8444-555555555555",
   image: null,
   name: "QA 매트릭스",
@@ -169,15 +169,15 @@ async function installEnvironmentState(
 ): Promise<void> {
   await context.addInitScript((state) => {
     if (state.returning) {
-      localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-      localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
-      sessionStorage.setItem("toonspectrum-studio-mobile-immersive:v1", "0");
+      localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
+      localStorage.setItem("toonstudio-studio-mobile-hint-dismissed", "1");
+      sessionStorage.setItem("toonstudio-studio-mobile-immersive:v1", "0");
     }
 
     if (state.corruptStorage) {
-      localStorage.setItem("toonspectrum-studio-app-settings", "{broken-json");
-      localStorage.setItem("toonspectrum-studio-mobile-immersive:v1", "{broken-json");
-      sessionStorage.setItem("toonspectrum-auth-session", "{broken-json");
+      localStorage.setItem("toonstudio-studio-app-settings", "{broken-json");
+      localStorage.setItem("toonstudio-studio-mobile-immersive:v1", "{broken-json");
+      sessionStorage.setItem("toonstudio-auth-session", "{broken-json");
     }
 
     if (state.storageWriteDenied) {

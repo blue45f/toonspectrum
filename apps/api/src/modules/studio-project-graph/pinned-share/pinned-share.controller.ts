@@ -3,8 +3,8 @@ import { applyDecorators, Body, Controller, Get, Header, Headers, HttpCode, Inje
 import { createZodDto } from "nestjs-zod";
 import type { Request } from "express";
 import { z } from "zod";
-import { studioWorkSessionId } from "@toonspectrum/studio-project-model/work-session";
-import { pinnedShareId, pinnedShareSubject, pinnedShareCreateSchema, pinnedShareAccessSchema, pinnedShareFeedbackInputSchema } from "@toonspectrum/studio-project-model/pinned-review-share";
+import { studioWorkSessionId } from "@toonstudio/studio-project-model/work-session";
+import { pinnedShareId, pinnedShareSubject, pinnedShareCreateSchema, pinnedShareAccessSchema, pinnedShareFeedbackInputSchema } from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { ZodValidationPipe } from "../../../platform/http/zod-validation.pipe";
 import { authenticatedStudioUserId } from "../studio-project-graph.controller";

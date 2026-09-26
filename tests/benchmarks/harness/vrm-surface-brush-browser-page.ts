@@ -19,7 +19,7 @@ import {
 } from "../../../apps/web/src/domains/creator/vrm/studio-vrm-texture-paint-runtime";
 
 import type { VRM } from "@pixiv/three-vrm";
-import type { BrushProgramIR, StrokeIR } from "@toonspectrum/studio-project-model";
+import type { BrushProgramIR, StrokeIR } from "@toonstudio/studio-project-model";
 
 export const VRM_SURFACE_BRUSH_BROWSER_RESULT_GLOBAL =
   "__TOONSPECTRUM_VRM_SURFACE_BRUSH_BROWSER_RESULT__";

@@ -73,7 +73,7 @@ export function studioMacroSessionToAutoActionSet(session: StudioMacroSession): 
     });
   }
   return normalizeStudioAutoActionSet({
-    kind: "toonspectrum-studio-auto-actions",
+    kind: "toonstudio-studio-auto-actions",
     version: 1,
     id: `macro-set-${session.startedAt ?? 0}`,
     name: session.name,

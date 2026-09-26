@@ -24,7 +24,7 @@ export function RankingMethod() {
       </div>
 
       <p className="mb-6 max-w-2xl text-sm leading-relaxed text-fg-2">
-        툰스펙트럼의 순위는 사람이 손으로 매기지 않습니다. 랭킹 화면은 정적 카탈로그 스냅샷 또는{" "}
+        툰스튜디오의 순위는 사람이 손으로 매기지 않습니다. 랭킹 화면은 정적 카탈로그 스냅샷 또는{" "}
         <span className="text-fg">/api/ranking</span>에서 검증된 작품 DB에 산식을 적용해 계산합니다.
         기본 운영 경로는 외부 실시간 호출 없이 결정적인 스냅샷 산식 순위를 사용합니다.
       </p>

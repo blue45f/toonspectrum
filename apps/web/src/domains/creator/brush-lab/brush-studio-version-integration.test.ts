@@ -47,7 +47,7 @@ describe("Brush Studio product integration", () => {
 
   it("keeps document/remix scopes isolated in V6 persistence", () => {
     expect(brushStudioV6StorageKey("work:series/한글")).toBe(
-      "toonspectrum.brush-program-v6:work%3Aseries%2F%ED%95%9C%EA%B8%80",
+      "toonstudio.brush-program-v6:work%3Aseries%2F%ED%95%9C%EA%B8%80",
     );
   });
 });

@@ -330,7 +330,7 @@ function AssetPreviewDialog({
             <dl className="mt-3 grid gap-2 text-[0.65rem]">
               <div>
                 <dt className="font-semibold text-fg-3">제작·출처</dt>
-                <dd className="mt-0.5 text-fg-2">ToonSpectrum Lab · original-procedural</dd>
+                <dd className="mt-0.5 text-fg-2">ToonStudio Lab · original-procedural</dd>
               </div>
               <div>
                 <dt className="font-semibold text-fg-3">사용권</dt>
@@ -537,7 +537,7 @@ export function StudioOriginalAssetMarketplacePanel({
   return (
     <section
       ref={marketplaceRootRef}
-      aria-label="ToonSpectrum 독자 무료 스타터 마켓"
+      aria-label="ToonStudio 독자 무료 스타터 마켓"
       data-studio-original-marketplace="local-phase-1"
       className="mb-3 overflow-hidden rounded-lg border border-line bg-panel"
     >
@@ -562,7 +562,7 @@ export function StudioOriginalAssetMarketplacePanel({
               </span>
             </span>
             <span className="mt-0.5 block truncate text-[0.58rem] text-fg-3">
-              ToonSpectrum 원본 SVG · 기기 로컬
+              ToonStudio 원본 SVG · 기기 로컬
             </span>
           </span>
           <ChevronDown
@@ -587,7 +587,7 @@ export function StudioOriginalAssetMarketplacePanel({
               </span>
             </div>
             <p className="mt-1 text-[0.62rem] leading-relaxed text-fg-3">
-              선택 가능한 원본 SVG는 외부 마켓 상품을 복제하지 않은 ToonSpectrum 자체 에셋입니다. 결제·클라우드 동기화 없이 이 기기에서 즉시 배치합니다.
+              선택 가능한 원본 SVG는 외부 마켓 상품을 복제하지 않은 ToonStudio 자체 에셋입니다. 결제·클라우드 동기화 없이 이 기기에서 즉시 배치합니다.
             </p>
           </div>
         </div>
@@ -805,7 +805,7 @@ export function StudioOriginalAssetMarketplacePanel({
                     ) : null}
                   </span>
                   <span className="mt-0.5 block truncate text-[0.55rem] text-fg-3">
-                    ToonSpectrum Lab · v{pkg.version} · {pkg.includedItems.length}개
+                    ToonStudio Lab · v{pkg.version} · {pkg.includedItems.length}개
                   </span>
                 </span>
                 <ChevronDown

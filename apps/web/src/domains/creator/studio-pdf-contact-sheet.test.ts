@@ -280,7 +280,7 @@ describe("drawContactSheet", () => {
 describe("contactSheetFileName · contactSheetResultMessage", () => {
   it("파일명은 `<제목>-contact-sheet.pdf`, 빈 제목은 기본 파일명", () => {
     expect(contactSheetFileName("내 만화")).toBe("내 만화-contact-sheet.pdf");
-    expect(contactSheetFileName("   ")).toBe("toonspectrum-webtoon-contact-sheet.pdf");
+    expect(contactSheetFileName("   ")).toBe("toonstudio-webtoon-contact-sheet.pdf");
   });
 
   it("결과 안내는 페이지 수·격자·시트 수를 담는다", () => {
@@ -472,6 +472,6 @@ describe("exportContactSheetPdf", () => {
       toJpeg,
       download: (blob, name) => downloads.push({ blob, name }),
     });
-    expect(downloads[0].name).toBe("toonspectrum-webtoon-contact-sheet.pdf");
+    expect(downloads[0].name).toBe("toonstudio-webtoon-contact-sheet.pdf");
   });
 });

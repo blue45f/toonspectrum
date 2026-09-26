@@ -47,7 +47,7 @@ async function transport(): Promise<Uint8Array> {
     height: 439,
     title: "Worker client",
     createdAt: "2026-07-30T12:34:56Z",
-    application: "ToonSpectrum Studio",
+    application: "ToonStudio Studio",
     applicationVersion: "1.0.0",
     paths: [{
       points: [
@@ -156,7 +156,7 @@ describe("first-party WILL v1 document Worker client", () => {
     expect(worker.requests).toHaveLength(1);
     expect(worker.transfers[0]).toHaveLength(1);
     expect(result.receipt).toMatchObject({
-      providerId: "toonspectrum.will-v1-annex-b-document.v1",
+      providerId: "toonstudio.will-v1-annex-b-document.v1",
       direction: "encode",
       input: { byteLength: input.byteLength },
       output: { byteLength: result.bytes.byteLength },

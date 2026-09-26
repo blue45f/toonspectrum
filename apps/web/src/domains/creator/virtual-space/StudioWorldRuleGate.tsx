@@ -1,6 +1,6 @@
 import { StudioWorldRuleDialog } from "./StudioWorldRuleDialog";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import type { StudioWorldInteractionRule } from "@toonspectrum/studio-project-model/world-publication";
+import type { StudioWorldInteractionRule } from "@toonstudio/studio-project-model/world-publication";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpaceActivity } from "./studio-virtual-space-model";

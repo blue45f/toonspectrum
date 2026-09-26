@@ -77,7 +77,7 @@ describe("provider-neutral static security headers", () => {
     // Pretendard CSS ships a sourceMappingURL on jsDelivr; DevTools fetches it via connect-src.
     expect(connections).toContain("https://cdn.jsdelivr.net");
     expect(connections).toContain(
-      "wss://toonspectrum-realtime.toonstudio-realtime.workers.dev",
+      "wss://toonstudio-realtime.toonstudio-realtime.workers.dev",
     );
     expect(connections).toContain("wss://realtime.toonstudio.cloud");
   });

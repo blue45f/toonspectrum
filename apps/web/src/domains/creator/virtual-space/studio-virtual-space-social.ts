@@ -6,9 +6,9 @@ import {
   type StudioVirtualSpaceReviewSubject,
 } from "./studio-virtual-space-review-subject";
 
-export const STUDIO_VIRTUAL_SPACE_SOCIAL_WIRE = "toonspectrum-space-social-v1";
-export const STUDIO_VIRTUAL_SPACE_SOCIAL_REVIEW_WIRE = "toonspectrum-space-social-v2";
-export const STUDIO_VIRTUAL_SPACE_SOCIAL_GREETING_WIRE = "toonspectrum-space-social-v3";
+export const STUDIO_VIRTUAL_SPACE_SOCIAL_WIRE = "toonstudio-space-social-v1";
+export const STUDIO_VIRTUAL_SPACE_SOCIAL_REVIEW_WIRE = "toonstudio-space-social-v2";
+export const STUDIO_VIRTUAL_SPACE_SOCIAL_GREETING_WIRE = "toonstudio-space-social-v3";
 export const STUDIO_VIRTUAL_SPACE_SOCIAL_TTL_MS = 20_000;
 export const STUDIO_VIRTUAL_SPACE_SOCIAL_MAX_PENDING = 4;
 export const STUDIO_VIRTUAL_SPACE_SOCIAL_MAX_BYTES = 4_096;

@@ -19,7 +19,7 @@ CC0 = PUBLIC / "assets/studio/cc0-20260906"
 ENV = PUBLIC / "assets/3d/environments/premium-world-v1"
 DOMAIN = ROOT / "apps/web/src/domains/creator"
 GENERATOR = "scripts/blender/generate_studio_premium_world_v1.py"
-SOURCE = "https://github.com/blue45f/toonspectrum/blob/main/" + GENERATOR
+SOURCE = "https://github.com/blue45f/toonstudio/blob/main/" + GENERATOR
 
 
 def digest(data):
@@ -56,7 +56,7 @@ def integrate():
     # Original architectural renders must not be described as reference photographs.
     patch(DOMAIN / "studio-cc0-curation.ts",
         '  if (asset.kind === "background") return "실사 레퍼런스 배경";',
-        '  if (asset.kind === "background") return asset.provider === "ToonSpectrum"\n    ? "건축 장면 배경 · 3D 원본의 렌더" : "실사 레퍼런스 배경";')
+        '  if (asset.kind === "background") return asset.provider === "ToonStudio"\n    ? "건축 장면 배경 · 3D 원본의 렌더" : "실사 레퍼런스 배경";')
     catalog = DOMAIN / "bg3d/studio-bg3d-environment-catalog.ts"
     patch(catalog, 'import refinedV6Manifest', 'import premiumWorldManifest from "../../../../public/assets/3d/environments/premium-world-v1/manifest.json";\nimport refinedV6Manifest')
     patch(catalog, '    | "scripts/blender/generate_studio_environment_expansion_v1.py";', '    | "scripts/blender/generate_studio_environment_expansion_v1.py"\n    | "scripts/blender/generate_studio_premium_world_v1.py";')
@@ -97,7 +97,7 @@ def main():
     if not stage.is_relative_to(ROOT / "artifacts"):
         raise ValueError("Candidates must remain in isolated artifacts")
     decisions = load(Path(sys.argv[2]).resolve())
-    if decisions.get("schema") != "toonspectrum.premium-world-review.v1":
+    if decisions.get("schema") != "toonstudio.premium-world-review.v1":
         raise ValueError("Unsupported visual review schema")
     runtime = load(stage / "runtime-review/report.json")
     assert not runtime["failures"] and len(runtime["results"]) == 24
@@ -153,7 +153,7 @@ def main():
             "style": "detailed-pbr", "role": "finished-asset", "visualReviewed": True,
             "visualReviewLevel": "contact-sheet-visual-triage", "visualReviewSource": review_path,
             "curationStatus": "selected-after-visual-triage", "allAnglesArtisticallyApproved": False,
-            "license": {"id": "CC0-1.0", "provider": "ToonSpectrum", "sourceUrl": SOURCE,
+            "license": {"id": "CC0-1.0", "provider": "ToonStudio", "sourceUrl": SOURCE,
                 "commercialUse": True, "redistributionAllowed": True, "attributionRequired": False}}
         raw_image = image_path.read_bytes()
         assert len(raw_image) <= 16 * 1024 * 1024
@@ -193,7 +193,7 @@ def main():
     save(ENV/"manifest.json", {"version": "premium-world-v1", "assets": environments})
     save(PUBLIC/"assets/studio/premium-world-v1/manifest.json", {"version": 1, "originalModelCount": 24, "derivedImageCount": 24, "assets": resources})
     sources = sorted({s["sourceUrl"] for r in records for s in r["sourceMaterials"]})
-    licenses = "# Studio premium world v1\n\nOriginal architecture, fixtures, furniture, geometry and renders: ToonSpectrum, CC0-1.0.\n\nGenerator: `"+GENERATOR+"`.\nLicense: https://creativecommons.org/publicdomain/zero/1.0/\n\nEmbedded PBR surfaces: Poly Haven, CC0-1.0.\n\n" + "\n".join("- "+source for source in sources) + "\n\n24 original 3D models and 24 matching 2D render derivatives; derivatives are not additional original models.\nNo runtime external resources. Preview review is not an all-angle artistic or real-device performance approval.\n"
+    licenses = "# Studio premium world v1\n\nOriginal architecture, fixtures, furniture, geometry and renders: ToonStudio, CC0-1.0.\n\nGenerator: `"+GENERATOR+"`.\nLicense: https://creativecommons.org/publicdomain/zero/1.0/\n\nEmbedded PBR surfaces: Poly Haven, CC0-1.0.\n\n" + "\n".join("- "+source for source in sources) + "\n\n24 original 3D models and 24 matching 2D render derivatives; derivatives are not additional original models.\nNo runtime external resources. Preview review is not an all-angle artistic or real-device performance approval.\n"
     (ENV/"LICENSES.md").write_text(licenses)
     (PUBLIC/"assets/studio/premium-world-v1/LICENSES.md").write_text(licenses)
     report_root = ROOT/"docs/reports/studio-premium-world-v1"

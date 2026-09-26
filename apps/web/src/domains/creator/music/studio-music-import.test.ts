@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { importExternalMusicTrack } from "./studio-music-import";
 
-import { defaultMusicBrief } from "@toonspectrum/core/studio-music";
+import { defaultMusicBrief } from "@toonstudio/core/studio-music";
 
 function brief() {
   return {

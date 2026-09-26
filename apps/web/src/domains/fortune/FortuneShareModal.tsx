@@ -45,7 +45,7 @@ export function FortuneShareModal({
     month: "long",
     day: "numeric",
   });
-  const fileName = `toonspectrum-fortune-${character.id}-${tab}.png`;
+  const fileName = `toonstudio-fortune-${character.id}-${tab}.png`;
   const shareUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/fortune`
@@ -103,7 +103,7 @@ export function FortuneShareModal({
         const blob = await (await fetch(dataUrl)).blob();
         const file = new File([blob], fileName, { type: "image/png" });
         const data: ShareData & { files?: File[] } = {
-          title: "ToonSpectrum 캐릭터 운세",
+          title: "ToonStudio 캐릭터 운세",
           text: `${character.name}가 본 나의 ${TAB_LABEL[tab]} 🔮`,
           url: shareUrl,
         };

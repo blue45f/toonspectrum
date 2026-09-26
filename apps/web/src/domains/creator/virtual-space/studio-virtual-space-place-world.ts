@@ -310,7 +310,7 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
     { id: "portal-next", point: { x: 902, y: 320 }, radius: 26, href: portalHref(next.id) },
   ]);
   return Object.freeze({
-    id: `toonspectrum-place-${place.id}`,
+    id: `toonstudio-place-${place.id}`,
     version: 100 + index,
     width: WORLD_WIDTH,
     height: WORLD_HEIGHT,

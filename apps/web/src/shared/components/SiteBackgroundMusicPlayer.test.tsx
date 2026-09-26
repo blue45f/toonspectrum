@@ -20,7 +20,7 @@ const mocks = vi.hoisted(() => ({
   setMuted: vi.fn(),
 }));
 
-vi.mock("@toonspectrum/core/fx", () => ({
+vi.mock("@toonstudio/core/fx", () => ({
   registerBgmPlaylist: mocks.register,
   isBgmEnabled: () => mocks.enabled,
   resumeAudio: mocks.resumeAudio,
@@ -63,14 +63,14 @@ const APPROVED_TRACK_FIXTURE = {
   id: "fixture-original-opening",
   src: "/audio/original/fixture-original-opening.mp3",
   title: "Fixture original opening",
-  artist: "ToonSpectrum test fixture",
+  artist: "ToonStudio test fixture",
   role: "opening",
   origin: "original",
   vocalMode: "vocal",
   language: "ko",
   summary: "Deterministic metadata fixture for the approved-catalog UI path.",
   license: "Test fixture only; no media is published by this test.",
-  creditUrl: "https://example.invalid/toonspectrum-ost-fixture",
+  creditUrl: "https://example.invalid/toonstudio-ost-fixture",
   profiles: ["animation", "citypop"],
   intensity: "normal",
   durationMs: 210_000,
@@ -141,7 +141,7 @@ describe("SiteBackgroundMusicPlayer", () => {
 
   it("keeps both compact controls at the 44px touch-target minimum", async () => {
     renderAt("/");
-    expect(await screen.findByText("툰스펙트럼 오프닝")).toBeTruthy();
+    expect(await screen.findByText("툰스튜디오 오프닝")).toBeTruthy();
     expect(screen.getByRole("button", { name: "OST 재생" }).className).toContain("size-11");
     expect(screen.getByRole("button", { name: /오리지널 애니·웹툰 OST/u }).className).toContain("min-h-11");
   });
@@ -169,8 +169,8 @@ describe("SiteBackgroundMusicPlayer", () => {
       {
         url: "/audio/original/fixture-original-opening.mp3",
         label: "Fixture original opening",
-        artist: "ToonSpectrum test fixture",
-        creditUrl: "https://example.invalid/toonspectrum-ost-fixture",
+        artist: "ToonStudio test fixture",
+        creditUrl: "https://example.invalid/toonstudio-ost-fixture",
       },
     ]));
     await waitFor(() => expect(mocks.setMood).toHaveBeenCalledWith("playlist:0"));

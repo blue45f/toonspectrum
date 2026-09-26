@@ -1,4 +1,4 @@
-// ToonSpectrum 로컬 수동 카탈로그 수집기 — 배포 런타임에서는 import하거나 실행하지 않는다.
+// ToonStudio 로컬 수동 카탈로그 수집기 — 배포 런타임에서는 import하거나 실행하지 않는다.
 // 원시 결과만 확인하려면 `pnpm --silent catalog:crawl:manual > out.json`, 검토 가능한 스냅샷과 정적 산출물을
 // 함께 갱신하려면 `pnpm catalog:update:manual`을 사용한다. 결과는 커밋·재배포 전 반드시 검토한다.
 // 웹툰: 제목·작가·별점·조회·관심·장르·시놉시스·태그·연재요일·연령등급·연재시작연도·표지썸네일 (실수집)

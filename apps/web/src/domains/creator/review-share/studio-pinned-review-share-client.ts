@@ -12,7 +12,7 @@ import {
   type PinnedShareAccess,
   type PinnedShareCreate,
   type PinnedShareFeedbackInput,
-} from "@toonspectrum/studio-project-model/pinned-review-share";
+} from "@toonstudio/studio-project-model/pinned-review-share";
 
 import { api, apiPath } from "@/platform/api";
 

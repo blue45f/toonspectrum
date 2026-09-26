@@ -103,7 +103,7 @@ export interface StudioCodecProvider {
 
 export interface StudioCodecExecutionReceipt {
   readonly schemaVersion: typeof STUDIO_CODEC_PROVIDER_CONTRACT_VERSION;
-  readonly kind: "toonspectrum-codec-provider-execution";
+  readonly kind: "toonstudio-codec-provider-execution";
   readonly providerId: string;
   readonly mode: StudioCodecProviderMode;
   readonly direction: StudioCodecDirection;
@@ -808,7 +808,7 @@ export async function executeStudioCodecProvider(
 
   const receipt: StudioCodecExecutionReceipt = Object.freeze({
     schemaVersion: STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
-    kind: "toonspectrum-codec-provider-execution",
+    kind: "toonstudio-codec-provider-execution",
     providerId: manifest.providerId,
     mode: manifest.mode,
     direction: request.direction,

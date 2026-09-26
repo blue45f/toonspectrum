@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createProductionProjectAggregate, type ProductionProjectAggregate } from "@toonspectrum/core/production";
+import { createProductionProjectAggregate, type ProductionProjectAggregate } from "@toonstudio/core/production";
 import type { ProductionCollaborationRepository } from "./production-collaboration.repository";
 import { ProductionCollaborationService } from "./production-collaboration.service";
 import { ExecuteProductionCommandSchema } from "./production-collaboration.dto";

@@ -22,7 +22,7 @@ import type {
 } from "../brush-composition";
 import type { LibMypaintRaw } from "../libmypaint/index";
 import type { HokusaiModuleLike } from "../raster-compile";
-import type { ModeledSampleIR, SceneIR } from "@toonspectrum/studio-project-model";
+import type { ModeledSampleIR, SceneIR } from "@toonstudio/studio-project-model";
 
 /**
  * Composition brush program contracts (V12 §12.2): IR schema invariants,

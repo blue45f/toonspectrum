@@ -100,7 +100,7 @@ describe("pageExportFileName", () => {
   it("keeps the legacy naming rule including the transparent suffix", () => {
     expect(pageExportFileName("내 컷툰", "png", false)).toBe("내 컷툰.png");
     expect(pageExportFileName("내 컷툰", "png", true)).toBe("내 컷툰-transparent.png");
-    expect(pageExportFileName("  ", "jpg", false)).toBe("toonspectrum-comic.jpg");
+    expect(pageExportFileName("  ", "jpg", false)).toBe("toonstudio-comic.jpg");
     expect(pageExportFileName("내 컷툰", "webp", false)).toBe("내 컷툰.webp");
   });
   it("adds a revision and one UTC export timestamp when provided", () => {
@@ -117,7 +117,7 @@ describe("pageExportFileName", () => {
 describe("stripExportFileName", () => {
   it("keeps the legacy strip name for a single file", () => {
     expect(stripExportFileName("내 웹툰", "png")).toBe("내 웹툰-strip.png");
-    expect(stripExportFileName("", "png", { index: 0, total: 1 })).toBe("toonspectrum-webtoon-strip.png");
+    expect(stripExportFileName("", "png", { index: 0, total: 1 })).toBe("toonstudio-webtoon-strip.png");
   });
 
   it("appends a part suffix when split into multiple files", () => {

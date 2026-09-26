@@ -544,7 +544,7 @@ export function downloadStudioAutosaveBackup(ctx: StudioAutosaveBackupContext): 
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `${(saved.payload.title?.trim() || title.trim() || "toonspectrum-autosave").replace(/[\\/:*?"<>|]+/g, "-")}-autosave.json`;
+      link.download = `${(saved.payload.title?.trim() || title.trim() || "toonstudio-autosave").replace(/[\\/:*?"<>|]+/g, "-")}-autosave.json`;
       document.body.appendChild(link);
       link.click();
       link.remove();

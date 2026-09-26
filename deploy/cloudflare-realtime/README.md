@@ -1,4 +1,4 @@
-# ToonSpectrum Cloudflare 실시간 조정자
+# ToonStudio Cloudflare 실시간 조정자
 
 - 상태: **선택형 배포 scaffold**
 - 최종 갱신: **2026-09-26**
@@ -19,7 +19,7 @@ asset byte field가 없으며 모든 frame에 byte 상한을 둔다. 화면 medi
 ```text
 Browser
   -> Sec-WebSocket-Protocol:
-     toonspectrum-realtime-v1, ts-ticket.<short-lived-HMAC-ticket>
+     toonstudio-realtime-v1, ts-ticket.<short-lived-HMAC-ticket>
   -> Cloudflare Worker
        - exact HTTPS Origin allowlist
        - query credential 금지
@@ -51,17 +51,17 @@ latency-sensitive room coordination만 소유한다. provider 장애가 나면 �
 GET /v1/rooms/<workId>/<roomId>
 Upgrade: websocket
 Origin: https://toonstudio.cloud
-Sec-WebSocket-Protocol: toonspectrum-realtime-v1, ts-ticket.<ticket>
+Sec-WebSocket-Protocol: toonstudio-realtime-v1, ts-ticket.<ticket>
 ```
 
 ```ts
 const socket = new WebSocket(
   `wss://realtime.toonstudio.cloud/v1/rooms/${encodeURIComponent(workId)}/${encodeURIComponent(roomId)}`,
-  ["toonspectrum-realtime-v1", `ts-ticket.${ticket}`],
+  ["toonstudio-realtime-v1", `ts-ticket.${ticket}`],
 );
 ```
 
-응답은 `toonspectrum-realtime-v1`만 선택하고 ticket-bearing subprotocol은 echo하지 않는다. Worker와
+응답은 `toonstudio-realtime-v1`만 선택하고 ticket-bearing subprotocol은 echo하지 않는다. Worker와
 Durable Object는 request/header/ticket/exception/payload를 log하지 않는다. Logpush, Tail Worker,
 trace와 third-party observability에서도 `Sec-WebSocket-Protocol`을 제거한다. ticket을 URL, cookie log,
 metric label, exception, analytics event에 넣지 않는다.
@@ -84,7 +84,7 @@ issue/expiry/session-expiry가 포함된다.
 - secret은 UTF-8 32 byte 이상
 - unknown claim/scope 거부, recursive key-sorted canonical JSON 사용
 - 형식: `base64url(claims) + "." + base64url(HMAC-SHA256(...))`
-- signed input: `toonspectrum/realtime-ticket/hmac-sha256/v1\n<payloadSegment>`
+- signed input: `toonstudio/realtime-ticket/hmac-sha256/v1\n<payloadSegment>`
 
 reference issuer는 `src/ticket.ts`의 `signRealtimeTicket`이다. production 발급은 인증된 NestJS 권한 검사
 뒤에만 수행한다. browser에 `REALTIME_TICKET_SECRET`을 노출하지 않는다.
@@ -94,8 +94,8 @@ API 설정 예:
 ```dotenv
 STUDIO_REALTIME_TICKET_ENABLED=true
 STUDIO_REALTIME_CLOUDFLARE_PROVIDER_ID=cloudflare-realtime-v1
-STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER=toonspectrum-api
-STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE=toonspectrum-realtime
+STUDIO_REALTIME_CLOUDFLARE_TICKET_ISSUER=toonstudio-api
+STUDIO_REALTIME_CLOUDFLARE_TICKET_AUDIENCE=toonstudio-realtime
 STUDIO_REALTIME_CLOUDFLARE_TICKET_SECRET=<REALTIME_TICKET_SECRET와 같은 값>
 STUDIO_REALTIME_CLOUDFLARE_TICKET_TTL_SECONDS=120
 STUDIO_REALTIME_CLOUDFLARE_SESSION_TTL_SECONDS=300
@@ -130,7 +130,7 @@ protocol v1은 `{ workId, roomId: workId }`만 허용하고 Nest ACL adapter가 
 모든 JSON frame:
 
 ```json
-{ "version": "toonspectrum.realtime.v1", "type": "..." }
+{ "version": "toonstudio.realtime.v1", "type": "..." }
 ```
 
 unknown envelope/payload key, channel mismatch, unsafe identifier, non-finite coordinate, oversized text,
@@ -209,7 +209,7 @@ pnpm exec eslint --max-warnings=0 deploy/cloudflare-realtime
 pnpm test:cloudflare-realtime
 pnpm exec wrangler deploy --dry-run \
   --config deploy/cloudflare-realtime/wrangler.jsonc \
-  --outdir /tmp/toonspectrum-realtime-dry
+  --outdir /tmp/toonstudio-realtime-dry
 ```
 
 `wrangler.jsonc`는 `realtime.toonstudio.cloud` custom domain, 독립 canary/rollback용 `workers.dev`, preview

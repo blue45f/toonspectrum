@@ -53,7 +53,7 @@ describe("StudioHelpHubDialog", () => {
     renderHub();
     fireEvent.click(screen.getByRole("button", { name: "따라 배우기" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "기본 조작 확인" }));
-    expect(window.localStorage.getItem("toonspectrum-studio-help:guide-progress:v1")).toContain(
+    expect(window.localStorage.getItem("toonstudio-studio-help:guide-progress:v1")).toContain(
       '"canvas"',
     );
   });

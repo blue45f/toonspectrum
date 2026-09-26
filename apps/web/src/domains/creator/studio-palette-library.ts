@@ -128,14 +128,14 @@ export interface PaletteStorage {
   setItem(key: string, value: string): void;
 }
 
-export const PALETTE_LIBRARY_KEY = "toonspectrum-studio-palette-library";
+export const PALETTE_LIBRARY_KEY = "toonstudio-studio-palette-library";
 export const MAX_PALETTES = 40; // studio-clips.ts의 MAX_CLIPS와 동일한 상한 정책을 따른다.
 export const MAX_COLORS_PER_PALETTE = 1000; // localStorage 용량 보호용 — 대형 브랜드 스와치북까지 여유 있게 수용.
 export const DEFAULT_PALETTE_NAME = "이름 없는 팔레트";
 export const MAX_PALETTE_NAME_LENGTH = 160;
 export const MAX_PALETTE_ID_LENGTH = 160;
 export const MAX_PALETTE_LIBRARY_SERIALIZED_BYTES = 2 * 1024 * 1024;
-export const STUDIO_PALETTE_LIBRARY_SCHEMA = "toonspectrum.studio.named-palettes";
+export const STUDIO_PALETTE_LIBRARY_SCHEMA = "toonstudio.studio.named-palettes";
 
 export type StudioPaletteLibraryErrorCode =
   | "corrupt-data"

@@ -32,7 +32,7 @@ export interface SavedMeshJob {
 }
 
 export interface StudioCreatorIntelligenceStore {
-  readonly schema: "toonspectrum.creator-intelligence.project.v1";
+  readonly schema: "toonstudio.creator-intelligence.project.v1";
   readonly projectId: string;
   readonly updatedAt: string;
   readonly references: readonly StudioProjectReference[];
@@ -62,7 +62,7 @@ function storageKey(projectId: string): string {
 
 function empty(projectId: string): StudioCreatorIntelligenceStore {
   return {
-    schema: "toonspectrum.creator-intelligence.project.v1",
+    schema: "toonstudio.creator-intelligence.project.v1",
     projectId,
     updatedAt: new Date(0).toISOString(),
     references: [],
@@ -160,7 +160,7 @@ export function loadStudioCreatorIntelligenceStore(
     if (!raw || raw.length > 750_000) return empty(projectId);
     const parsed = object(JSON.parse(raw) as unknown);
     if (
-      parsed.schema !== "toonspectrum.creator-intelligence.project.v1"
+      parsed.schema !== "toonstudio.creator-intelligence.project.v1"
       || parsed.projectId !== projectId
     ) return empty(projectId);
     const updatedAt = typeof parsed.updatedAt === "string"
@@ -168,7 +168,7 @@ export function loadStudioCreatorIntelligenceStore(
       ? parsed.updatedAt
       : new Date(0).toISOString();
     return {
-      schema: "toonspectrum.creator-intelligence.project.v1",
+      schema: "toonstudio.creator-intelligence.project.v1",
       projectId,
       updatedAt,
       references: boundedArray(parsed.references, LIMITS.references)

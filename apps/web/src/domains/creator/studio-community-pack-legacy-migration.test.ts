@@ -114,9 +114,9 @@ function resource(
     palette: "studio-palette-v1",
   } as const;
   const mediaType = {
-    brush: "application/vnd.toonspectrum.brush+json",
-    filter: "application/vnd.toonspectrum.filter+json",
-    palette: "application/vnd.toonspectrum.palette+json",
+    brush: "application/vnd.toonstudio.brush+json",
+    filter: "application/vnd.toonstudio.filter+json",
+    palette: "application/vnd.toonstudio.palette+json",
   } as const;
   const count = options.entries ?? 1;
   return {

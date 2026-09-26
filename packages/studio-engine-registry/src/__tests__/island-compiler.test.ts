@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { compileRenderIslands } from "../island-compiler";
 import { chooseProviderHint, fingerprintRenderScene } from "../workload-fingerprint";
 
-import type { RenderSceneIR } from "@toonspectrum/studio-project-model";
+import type { RenderSceneIR } from "@toonstudio/studio-project-model";
 
 function rect(id: string, x: number): RenderSceneIR["nodes"][number] {
   return {

@@ -51,7 +51,7 @@ export function createStudioHealCloneModuleWorker(): StudioHealCloneWorkerLike |
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("./studio-heal-clone.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-heal-clone",
+    name: "toonstudio-heal-clone",
   }) as unknown as StudioHealCloneWorkerLike;
 }
 

@@ -20,7 +20,7 @@ const REMOTE_TEST_URL =
   "postgresql://ci:remote-secret@db.example.test/toonspectrum_integration?sslmode=verify-full&channel_binding=require";
 const REMOTE_PRODUCTION_URL =
 // secretlint-disable-next-line @secretlint/secretlint-rule-database-connection-string -- synthetic production-target rejection fixture
-  "postgresql://app:production-secret@db.example.com/toonspectrum?sslmode=verify-full";
+  "postgresql://app:production-secret@db.example.com/toonstudio?sslmode=verify-full";
 const RUNTIME_ROLE = "webdex_runtime";
 
 describe("PostgreSQL integration test runner", () => {

@@ -189,10 +189,10 @@ describe("studio-stock-image-client network calls (fetch mocked)", () => {
       expect(photo.downloadLocationUrl).toBe("https://api.unsplash.com/photos/photo-1/download");
       expect(photo.credit.photographerName).toBe("Jane Doe");
       expect(photo.credit.photographerProfileUrl).toBe(
-        "https://unsplash.com/@janedoe?utm_source=toonspectrum&utm_medium=referral"
+        "https://unsplash.com/@janedoe?utm_source=toonstudio&utm_medium=referral"
       );
       expect(photo.credit.unsplashPhotoPageUrl).toBe(
-        "https://unsplash.com/photos/photo-1?utm_source=toonspectrum&utm_medium=referral"
+        "https://unsplash.com/photos/photo-1?utm_source=toonstudio&utm_medium=referral"
       );
     });
 

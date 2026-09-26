@@ -24,7 +24,7 @@ export const STUDIO_REVIEW_HOST_TITLE = "검수 캡처 실편집기 검증";
 /** Synthetic empty source/account setup; auth and source writes use actual Core endpoints. */
 export async function createStudioReviewHostFixture(context: BrowserContext, pool: Pool, origin: URL) {
   const title = STUDIO_REVIEW_HOST_TITLE;
-  const headers = { "x-toonspectrum-csrf": "1", Origin: origin.origin, Referer: `${origin.origin}/studio` };
+  const headers = { "x-toonstudio-csrf": "1", Origin: origin.origin, Referer: `${origin.origin}/studio` };
 const snapshot = {
   title, description: "Synthetic full Host capture fixture", tagsText: "", linkedTitleId: null,
   linkedSeriesId: null, linkedChallengeId: null,

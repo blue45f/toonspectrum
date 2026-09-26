@@ -1,5 +1,5 @@
 /**
- * Real Chromium quality gate for ToonSpectrum's selected-stroke Hokusai
+ * Real Chromium quality gate for ToonStudio's selected-stroke Hokusai
  * natural-media provider. Evidence is always written outside the repository.
  */
 
@@ -14,7 +14,7 @@ import { createServer as createViteServer, normalizePath } from "vite";
 
 const EVIDENCE_ROOT =
   process.env.TOONSPECTRUM_HOKUSAI_QUALITY_VERIFY_DIR
-  ?? join(tmpdir(), `toonspectrum-hokusai-natural-media-quality-v2-${Date.now()}`);
+  ?? join(tmpdir(), `toonstudio-hokusai-natural-media-quality-v2-${Date.now()}`);
 const HARNESS_PATH = "/__studio_hokusai_natural_media_quality_v2__";
 // Vite owns apps/web, while this harness lives in the workspace scripts directory.
 const HARNESS_ENTRY = `/@fs/${normalizePath(fileURLToPath(

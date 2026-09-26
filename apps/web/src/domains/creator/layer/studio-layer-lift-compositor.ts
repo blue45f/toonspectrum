@@ -34,7 +34,7 @@ import type {
 } from "./studio-layer-lift-contract";
 
 export const STUDIO_LAYER_LIFT_COMPOSITOR_ID =
-  "toonspectrum.layer-lift-compositor" as const;
+  "toonstudio.layer-lift-compositor" as const;
 export const STUDIO_LAYER_LIFT_COMPOSITOR_VERSION = "1.0.0-beta.1" as const;
 export const STUDIO_LAYER_LIFT_COMPOSITOR_ALGORITHM =
   "source-mask-foreground+bounded-tile-background-v1" as const;

@@ -7,7 +7,7 @@ import {
   recoverProject,
   sceneDigest,
   solidPaint,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { openStudioLocalDatabase } from "./studio-local-database";
@@ -17,7 +17,7 @@ import type {
   StudioLocalDatabase,
   StudioSqliteApiHandle,
 } from "./studio-local-database";
-import type { SceneNodeIR } from "@toonspectrum/studio-project-model";
+import type { SceneNodeIR } from "@toonstudio/studio-project-model";
 
 /**
  * 이 스위트는 node 에서 실 sqlite-wasm(:memory: DB)로 실제 SQL 을 실행하며,

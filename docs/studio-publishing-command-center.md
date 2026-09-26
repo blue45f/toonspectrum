@@ -14,14 +14,14 @@ The implementation reuses the existing upload image safety limits, shared-docume
 
 ## Benchmark signals
 
-| Service / source | Product signal used | ToonSpectrum response |
+| Service / source | Product signal used | ToonStudio response |
 | --- | --- | --- |
 | [WEBTOON CANVAS — Scheduling Episodes](https://www.webtoons.com/en/creators101/webtoon-canvas/scheduling-episodes) | Creator-controlled episode scheduling is part of the publishing workflow, alongside creator analytics and comment-management guidance. | A future wall-clock release is converted from an IANA timezone to canonical UTC, saved with the work revision, and promoted by the API scheduler. |
 | [GlobalComix — Publish](https://globalcomix.com/publish) | Immediate or date/time scheduled publishing, follower-facing releases, and support for both vertical-scroll and traditional layouts. | Immediate/scheduled modes and vertical/paged reader metadata are first-class publication settings. |
 | Existing `studio-publish-package.ts` and `studio-publish-preflight.ts` | Destination packaging, AI disclosure, audience/rights checks, and structural validation already existed in the editor. | The command center keeps those contracts intact and adds site-distribution policy rather than creating a competing export-package model. |
 | Existing `studio-release-schedule.ts` | DST-safe IANA timezone resolution and explicit rejection of nonexistent/ambiguous wall-clock values. | The same resolver is reused for actual site release scheduling. The older release-planning calendar remains an editorial planning tool. |
 
-External WEBTOON or Tapas auto-publishing is deliberately not implied. Their profiles continue to be packaging/preflight targets; this change automates publication only on ToonSpectrum.
+External WEBTOON or Tapas auto-publishing is deliberately not implied. Their profiles continue to be packaging/preflight targets; this change automates publication only on ToonStudio.
 
 ## Publication contract
 

@@ -314,10 +314,10 @@ export async function installStudioInAppFirstRunState(page: Page): Promise<void>
   await page.addInitScript("globalThis.__name ??= (target) => target;");
   await page.addInitScript(() => {
     try {
-      window.localStorage.setItem("toonspectrum-studio-quick-start-dismissed", "1");
-      window.localStorage.setItem("toonspectrum-studio-mobile-hint-dismissed", "1");
+      window.localStorage.setItem("toonstudio-studio-quick-start-dismissed", "1");
+      window.localStorage.setItem("toonstudio-studio-mobile-hint-dismissed", "1");
       window.localStorage.setItem(
-        "toonspectrum-lang",
+        "toonstudio-lang",
         JSON.stringify({ state: { lang: "ko" }, version: 0 }),
       );
     } catch {

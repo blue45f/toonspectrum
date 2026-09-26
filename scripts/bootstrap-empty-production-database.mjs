@@ -916,7 +916,7 @@ function printPlan({ assessment, contract, databaseContract, options }) {
   const state = assessment.state;
   const applicationState = assessment.nonempty ? `nonempty (${state.applicationObjectCount} object(s))` : "empty";
   const lines = [
-    "ToonSpectrum disposable PostgreSQL bootstrap plan",
+    "ToonStudio disposable PostgreSQL bootstrap plan",
     `Target: ${databaseContract.hostname}:${databaseContract.port}/${databaseContract.databaseName}`,
     `Transport: ${databaseContract.tlsVerified ? "direct TLS verify-full + channel binding" : "explicit loopback test override"}`,
     `Release: ${options.releaseSha}`,

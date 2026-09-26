@@ -33,7 +33,7 @@ const TEXT_ENCODER = new TextEncoder();
 
 export const STUDIO_CODEC_CERTIFICATION_SIGNER_CONFIG_VERSION = 1 as const;
 export const STUDIO_CODEC_CERTIFICATION_SIGNER_CONFIG_KIND =
-  "toonspectrum-codec-certification-signer-config" as const;
+  "toonstudio-codec-certification-signer-config" as const;
 
 const IdentifierSchema = z
   .string()

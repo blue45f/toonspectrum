@@ -145,7 +145,7 @@ describe("IntegrationRuntimeService", () => {
       response: expect.objectContaining({ state: "succeeded" }),
     }));
 
-    const replay = { schema: "toonspectrum.integration-runtime-receipt/1", state: "succeeded" };
+    const replay = { schema: "toonstudio.integration-runtime-receipt/1", state: "succeeded" };
     test.repository.beginMutation.mockResolvedValueOnce({ replay });
     const replayed = await test.service.execute("user-1", request);
     expect(replayed).toEqual({ ...replay, replayed: true });

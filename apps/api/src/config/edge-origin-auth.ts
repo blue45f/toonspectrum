@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import type { NextFunction, Request, Response } from "express";
 
-export const EDGE_ORIGIN_AUTH_HEADER = "x-toonspectrum-origin-secret";
+export const EDGE_ORIGIN_AUTH_HEADER = "x-toonstudio-origin-secret";
 const MINIMUM_SECRET_BYTES = 32;
 
 export type EdgeOriginAuthEnvironment = Partial<

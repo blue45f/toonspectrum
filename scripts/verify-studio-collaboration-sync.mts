@@ -11,7 +11,7 @@
  *   pnpm exec tsx scripts/verify-studio-collaboration-sync.mts
  * Optional:
  *   TOONSPECTRUM_VERIFY_ORIGIN=https://www.toonstudio.cloud
- *   TOONSPECTRUM_VERIFY_DIR=/tmp/toonspectrum-studio-collaboration-sync
+ *   TOONSPECTRUM_VERIFY_DIR=/tmp/toonstudio-studio-collaboration-sync
  */
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
@@ -40,10 +40,10 @@ import {
 } from "./lib/studio-composited-canvas-fingerprint";
 import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
-const QUICKSTART_KEY = "toonspectrum-studio-quick-start-dismissed";
+const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
 const EXISTING_ORIGIN = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.replace(/\/$/u, "") ?? "";
 const SCRATCH = process.env.TOONSPECTRUM_VERIFY_DIR
-  ?? join(tmpdir(), "toonspectrum-studio-collaboration-sync");
+  ?? join(tmpdir(), "toonstudio-studio-collaboration-sync");
 const READY_PHASES = new Set(["synced", "read-only-follower", "syncing", "offline-queued"]);
 const SETTLED_PHASES = new Set(["synced", "read-only-follower", "offline-queued"]);
 
@@ -78,11 +78,11 @@ async function installStudioFirstRunState(page: Page): Promise<void> {
       localStorage.setItem(quickstartKey, "1");
       localStorage.setItem(betaStorageKey, betaRevision);
       localStorage.setItem(
-        "toonspectrum-lang",
+        "toonstudio-lang",
         JSON.stringify({ state: { lang: "ko" }, version: 0 }),
       );
       localStorage.setItem(
-        "toonspectrum-studio-ui-density:v1",
+        "toonstudio-studio-ui-density:v1",
         JSON.stringify({ mode: "full" }),
       );
     } catch {

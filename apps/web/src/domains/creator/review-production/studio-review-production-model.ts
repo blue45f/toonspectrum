@@ -1,5 +1,5 @@
 import { canonicalJson, resolveStudioReviewTaskRoleSelections, studioReviewRoleAssignmentCoversTask,
-  studioReviewTaskReferenceSchema, type StudioReviewTaskReference } from "@toonspectrum/studio-project-model";
+  studioReviewTaskReferenceSchema, type StudioReviewTaskReference } from "@toonstudio/studio-project-model";
 
 import type { StudioReviewComment } from "../project-graph/studio-project-graph-contract";
 import type { ProductionWorkspace } from "../studio-production/studio-production-workspace-runtime";

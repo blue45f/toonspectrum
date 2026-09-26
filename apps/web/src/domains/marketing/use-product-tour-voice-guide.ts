@@ -1,4 +1,4 @@
-import { resumeBgmForContext, suspendBgmForContext } from "@toonspectrum/core/fx";
+import { resumeBgmForContext, suspendBgmForContext } from "@toonstudio/core/fx";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {

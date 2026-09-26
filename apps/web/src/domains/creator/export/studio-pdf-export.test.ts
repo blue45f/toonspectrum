@@ -221,14 +221,14 @@ describe("buildPdfFromJpegPages — docinfo·결정성", () => {
     const { text } = parseXref(buildPdfFromJpegPages([pageA], { title: "웹툰A" }));
     // 웹 U+C6F9 · 툰 U+D230 · A U+0041
     expect(text).toContain("/Title <FEFFC6F9D2300041>");
-    expect(text).toContain("/Producer (ToonSpectrum Studio)");
+    expect(text).toContain("/Producer (ToonStudio Studio)");
   });
 
   it("제목이 없거나 공백이면 /Title을 생략하고 /Producer만 남긴다", () => {
     for (const opts of [undefined, { title: "   " }]) {
       const { text } = parseXref(buildPdfFromJpegPages([pageA], opts));
       expect(text).not.toContain("/Title");
-      expect(text).toContain("/Producer (ToonSpectrum Studio)");
+      expect(text).toContain("/Producer (ToonStudio Studio)");
     }
   });
 
@@ -347,7 +347,7 @@ describe("canvasToJpegBytes", () => {
 describe("pdfExportFileName · formatPdfFileSize · pdfExportResultMessage", () => {
   it("파일명은 `<제목>.pdf`, 빈 제목은 기본 파일명", () => {
     expect(pdfExportFileName("내 만화")).toBe("내 만화.pdf");
-    expect(pdfExportFileName("  ")).toBe("toonspectrum-webtoon.pdf");
+    expect(pdfExportFileName("  ")).toBe("toonstudio-webtoon.pdf");
   });
 
   it("1MB 미만은 KB(최소 1KB), 이상은 소수 1자리 MB로 표기한다", () => {
@@ -414,7 +414,7 @@ describe("renderPagesToPdf · exportPagesToPdf", () => {
       quality: 0.73,
       watermark: {
         enabled: true,
-        text: "© 툰스펙트럼",
+        text: "© 툰스튜디오",
         position: "br",
         opacity: 0.5,
         size: 0.028,
@@ -440,8 +440,8 @@ describe("renderPagesToPdf · exportPagesToPdf", () => {
     expect(released).toEqual(created);
     expect(created.map(({ width, height }) => [width, height])).toEqual([[0, 0], [0, 0]]);
     for (const canvas of created) {
-      expect(canvas.ctx.strokeTexts).toEqual(["© 툰스펙트럼"]);
-      expect(canvas.ctx.fillTexts).toEqual(["© 툰스펙트럼"]);
+      expect(canvas.ctx.strokeTexts).toEqual(["© 툰스튜디오"]);
+      expect(canvas.ctx.fillTexts).toEqual(["© 툰스튜디오"]);
     }
   });
 
@@ -676,7 +676,7 @@ describe("renderPagesToPdf · exportPagesToPdf", () => {
     await exportPagesToPdf({
       pages: [asCanvas(new FakeCanvas(690, 1280)), asCanvas(new FakeCanvas(690, 900))],
       title: "x",
-      watermark: { enabled: true, text: "© 툰스펙트럼", position: "br", opacity: 0.5, size: 0.028 },
+      watermark: { enabled: true, text: "© 툰스튜디오", position: "br", opacity: 0.5, size: 0.028 },
       createCanvas: (w, h) => {
         const fake = new FakeCanvas(w, h);
         created.push(fake);
@@ -686,8 +686,8 @@ describe("renderPagesToPdf · exportPagesToPdf", () => {
       download: () => {},
     });
     for (const canvas of created) {
-      expect(canvas.ctx.strokeTexts).toEqual(["© 툰스펙트럼"]);
-      expect(canvas.ctx.fillTexts).toEqual(["© 툰스펙트럼"]);
+      expect(canvas.ctx.strokeTexts).toEqual(["© 툰스튜디오"]);
+      expect(canvas.ctx.fillTexts).toEqual(["© 툰스튜디오"]);
     }
   });
 
@@ -755,7 +755,7 @@ describe("renderPagesToPdf · exportPagesToPdf", () => {
       toJpeg,
       download: (blob, name) => downloads.push({ blob, name }),
     });
-    expect(downloads[0].name).toBe("toonspectrum-webtoon.pdf");
+    expect(downloads[0].name).toBe("toonstudio-webtoon.pdf");
     const text = latin1(new Uint8Array(await downloads[0].blob.arrayBuffer()));
     expect(text).not.toContain("/Title");
   });

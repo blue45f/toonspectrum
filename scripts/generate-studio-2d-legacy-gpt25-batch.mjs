@@ -40,7 +40,7 @@ const apiKey = process.env.TOONSTUDIO_IMAGE_API_KEY || process.env.OPENAI_API_KE
 if (!apiKey) {
   throw new Error("TOONSTUDIO_IMAGE_API_KEY or OPENAI_API_KEY is required");
 }
-const tempDir = await mkdtemp(path.join(tmpdir(), "toonspectrum-gpt25-legacy-"));
+const tempDir = await mkdtemp(path.join(tmpdir(), "toonstudio-gpt25-legacy-"));
 const catalogPath = path.join(tempDir, "catalog.json");
 await writeFile(catalogPath, `${JSON.stringify({ version: 1, model: "gpt-image-2.5-sunburst", quality: "max", recipes }, null, 2)}\n`);
 try {

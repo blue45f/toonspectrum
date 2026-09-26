@@ -19,7 +19,7 @@ vi.mock("@/shared/navigation/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-vi.mock("@toonspectrum/core/fx", () => ({
+vi.mock("@toonstudio/core/fx", () => ({
   playSfx: vi.fn(),
   getAudioState: () => ({
     sfxEnabled: true,

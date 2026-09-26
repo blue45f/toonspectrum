@@ -24,7 +24,7 @@ export interface WeeklyIcsEvent {
   url?: string;
 }
 
-const PRODID = "-//ToonSpectrum//Release Calendar//KO";
+const PRODID = "-//ToonStudio//Release Calendar//KO";
 const CRLF = "\r\n";
 const DAY_MS = 24 * 60 * 60 * 1000;
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -118,12 +118,12 @@ export function titleToWeeklyIcsEvent(title: Title, days?: readonly string[]): W
     (id) => PLATFORMS[id]?.short ?? id
   );
   return {
-    uid: `${title.slug}@toonspectrum`,
+    uid: `${title.slug}@toonstudio`,
     summary: `${title.title} 새 회차`,
     days: updateDays,
     description: `매주 ${updateDays.join("·")} 연재${
       platformNames.length ? ` · ${platformNames.join(", ")}` : ""
-    } — 툰스펙트럼 연재 캘린더`,
+    } — 툰스튜디오 연재 캘린더`,
     url: `${SITE_BASE}/title/${encodeURIComponent(title.slug)}`,
   };
 }

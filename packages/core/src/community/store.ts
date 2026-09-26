@@ -67,7 +67,7 @@ export interface CommunityState {
 
 /** 스토어 생성 설정 — 앱별 네임스페이스·시드·카페 기본 멤버수·기본 닉네임. */
 export interface CommunityStoreConfig {
-  /** localStorage 키 접두(앱 고유). 예: "toonspectrum.community". */
+  /** localStorage 키 접두(앱 고유). 예: "toonstudio.community". */
   storageKeyPrefix: string;
   /** 시드 상태(빈 채널/카페면 시드로 복구). */
   seed: CommunityState;

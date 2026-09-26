@@ -56,7 +56,7 @@ import type {
 import type { StudioCrc32ExecutionMode } from "./studio-crc32-worker-client";
 
 /**
- * Self-contained ToonSpectrum project archive.
+ * Self-contained ToonStudio project archive.
  *
  * Privacy and integrity boundary:
  * - project input always passes through studio-project-file, which redacts raw AI prompts;
@@ -66,11 +66,11 @@ import type { StudioCrc32ExecutionMode } from "./studio-crc32-worker-client";
  * - every document and attachment byte is CRC-32, SHA-256, size, MIME-signature, and reference checked.
  */
 
-export const STUDIO_PROJECT_ARCHIVE_SCHEMA = "toonspectrum.studio-project-archive" as const;
+export const STUDIO_PROJECT_ARCHIVE_SCHEMA = "toonstudio.studio-project-archive" as const;
 /** Current writer version. Import remains compatible with the original version-1 manifest. */
 export const STUDIO_PROJECT_ARCHIVE_VERSION = 2 as const;
-export const STUDIO_PROJECT_ARCHIVE_ASSET_URI_PREFIX = "toonspectrum-asset://sha256/" as const;
-export const STUDIO_PROJECT_ARCHIVE_MIME = "application/vnd.toonspectrum.project+zip" as const;
+export const STUDIO_PROJECT_ARCHIVE_ASSET_URI_PREFIX = "toonstudio-asset://sha256/" as const;
+export const STUDIO_PROJECT_ARCHIVE_MIME = "application/vnd.toonstudio.project+zip" as const;
 
 export const STUDIO_PROJECT_ARCHIVE_ATTACHMENT_KINDS = [
   "raster",
@@ -288,7 +288,7 @@ export interface ImportStudioProjectArchiveResult {
 }
 
 const SHA256_PATTERN = /^[a-f0-9]{64}$/u;
-const ASSET_URI_PATTERN = /^toonspectrum-asset:\/\/sha256\/([a-f0-9]{64})$/u;
+const ASSET_URI_PATTERN = /^toonstudio-asset:\/\/sha256\/([a-f0-9]{64})$/u;
 const SAFE_ARCHIVE_PATH_PATTERN = /^[A-Za-z0-9._/-]+$/u;
 const MIME_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/u;
 const ZIP_LOCAL_SIGNATURE = 0x04034b50;
@@ -1121,7 +1121,7 @@ function inspectGltfExternalDependencies(
     const collection = document[collectionName];
     if (!Array.isArray(collection)) continue;
     for (const candidate of collection) {
-      // A nested data URI carries its own bytes. A toonspectrum-asset URI is not self-contained
+      // A nested data URI carries its own bytes. A toonstudio-asset URI is not self-contained
       // until a future glTF resource manifest explicitly binds that hash to an archive attachment.
       if (!isRecord(candidate) || typeof candidate.uri !== "string" || candidate.uri.startsWith("data:")) continue;
       warning(
@@ -2136,7 +2136,7 @@ export async function buildStudioProjectArchive(
   } catch (cause) {
     throw new StudioProjectArchiveError(
       "PROJECT_INVALID",
-      "올바르지 않은 ToonSpectrum 프로젝트라 archive를 만들 수 없습니다.",
+      "올바르지 않은 ToonStudio 프로젝트라 archive를 만들 수 없습니다.",
       {},
       cause,
     );
@@ -2712,7 +2712,7 @@ function parseCanonicalProject(
   try {
     stored = parseStudioProjectFile(sanitized);
   } catch {
-    fail("PROJECT_INVALID", "project.json이 ToonSpectrum 프로젝트 schema와 맞지 않습니다.");
+    fail("PROJECT_INVALID", "project.json이 ToonStudio 프로젝트 schema와 맞지 않습니다.");
   }
   const writerCanonical = canonicalizeProjectValue(stored, "", 0, {
     seen: new WeakSet(),

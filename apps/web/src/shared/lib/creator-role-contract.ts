@@ -8,7 +8,7 @@ import {
   CREATOR_ROLE_MAX_SPECIALTIES,
   CREATOR_ROLE_PROFILE_VERSION as CREATOR_PUBLIC_ROLE_PROFILE_VERSION,
   CREATOR_ROLE_PROJECT_KEY_MAX_LENGTH,
-} from "@toonspectrum/core/creator-role";
+} from "@toonstudio/core/creator-role";
 
 // Keep the web's v1 write contract while adopting the core's public v2 projection.
 export {

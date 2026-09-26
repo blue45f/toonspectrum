@@ -236,7 +236,7 @@ function waterMarks(y = HEIGHT / 2): Extract<StudioLivingInkOperation, { kind: "
     x: 88 + index * 5,
     y: y + Math.sin(index * 0.46) * 7,
     // InkWash's default brush is roughly 17-23 display pixels at this pressure; use the same
-    // physical brush/pen size ratio instead of benchmarking ToonSpectrum with an undersized wash.
+    // physical brush/pen size ratio instead of benchmarking ToonStudio with an undersized wash.
     radius: 18,
     pressure: 0.3 + Math.sin(index / 16 * Math.PI) * 0.58,
     speed: 95,

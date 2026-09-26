@@ -147,7 +147,7 @@ export function normalizeStudioPublishPackSettings(value: unknown): StudioPublis
   };
 }
 
-/** Formats accepted by the existing ToonSpectrum image-upload publishing flow. */
+/** Formats accepted by the existing ToonStudio image-upload publishing flow. */
 export const STUDIO_PUBLISH_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 
 const SUPPORTED_IMAGE_TYPES = new Set<string>(STUDIO_PUBLISH_IMAGE_MIME_TYPES);
@@ -343,7 +343,7 @@ export function validateStudioPublishPreflight(
           issue(
             "error",
             "IMAGE_TYPE_UNSUPPORTED",
-            "ToonSpectrum 게시용 이미지는 PNG, JPEG 또는 WebP 형식이어야 합니다.",
+            "ToonStudio 게시용 이미지는 PNG, JPEG 또는 WebP 형식이어야 합니다.",
             `${imagePath}.mimeType`
           )
         );

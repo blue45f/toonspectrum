@@ -89,20 +89,20 @@ describe("Studio interchange capability registry", () => {
     }
   });
 
-  it("자체 codec provider와 ToonSpectrum 제품 인증을 외부 공급사 인증과 분리한다", () => {
+  it("자체 codec provider와 ToonStudio 제품 인증을 외부 공급사 인증과 분리한다", () => {
     const exactByteCertifiedProviders = new Map([
-      ["bmp", ["toonspectrum.raster.bmp.v1"]],
-      ["tga", ["toonspectrum.raster.tga.v1"]],
+      ["bmp", ["toonstudio.raster.bmp.v1"]],
+      ["tga", ["toonstudio.raster.tga.v1"]],
       [
         "netpbm",
-        ["toonspectrum.raster.ppm.v1", "toonspectrum.raster.pam.v1"],
+        ["toonstudio.raster.ppm.v1", "toonstudio.raster.pam.v1"],
       ],
-      ["qoi", ["toonspectrum.raster.qoi.v1"]],
-      ["tiff", ["toonspectrum.raster.tiff.v1"]],
-      ["will-v1-path-stream", ["toonspectrum.will-v1-annex-a.v1"]],
+      ["qoi", ["toonstudio.raster.qoi.v1"]],
+      ["tiff", ["toonstudio.raster.tiff.v1"]],
+      ["will-v1-path-stream", ["toonstudio.will-v1-annex-a.v1"]],
       [
         "will-v1-document",
-        ["toonspectrum.will-v1-annex-b-document.v1"],
+        ["toonstudio.will-v1-annex-b-document.v1"],
       ],
     ] as const);
 
@@ -129,7 +129,7 @@ describe("Studio interchange capability registry", () => {
     expect(studioInterchangeCapability("toonink")?.productAssurance).toEqual(
       expect.objectContaining({
         firstPartyCodecProvider: "implemented",
-        firstPartyProviderIds: ["toonspectrum.ink-envelope.v1"],
+        firstPartyProviderIds: ["toonstudio.ink-envelope.v1"],
         toonSpectrumProductCertification: "exact-byte-execution-tested",
         officialThirdPartyCertification: false,
         vendorTrademarkAuthorization: false,
@@ -138,7 +138,7 @@ describe("Studio interchange capability registry", () => {
     expect(studioInterchangeCapability("inkml")?.productAssurance).toEqual(
       expect.objectContaining({
         firstPartyCodecProvider: "implemented",
-        firstPartyProviderIds: ["toonspectrum.public-inkml-subset.v1"],
+        firstPartyProviderIds: ["toonstudio.public-inkml-subset.v1"],
         toonSpectrumProductCertification: "exact-byte-execution-tested",
         officialThirdPartyCertification: false,
         vendorTrademarkAuthorization: false,
@@ -157,8 +157,8 @@ describe("Studio interchange capability registry", () => {
     expect(registeredProviderIds).toEqual(implementedProviderIds);
 
     expect(STUDIO_PRODUCT_CODEC_CERTIFICATION_CLAIMS).toMatchObject({
-      authority: "ToonSpectrum",
-      officialToonSpectrumProductCertification: true,
+      authority: "ToonStudio",
+      officialToonStudioProductCertification: true,
       thirdPartyCodecCertification: false,
       codecVendorCertification: false,
       officialCodecVendorClaim: false,
@@ -602,7 +602,7 @@ describe("Studio interchange capability registry", () => {
   it("known hard limits match the audited runtime boundaries", () => {
     expect(studioInterchangeCapability("toonproject-archive")?.sizeBudget.maxFileBytes).toBe(280_000_000);
     expect(studioInterchangeCapability("inkml")).toMatchObject({
-      label: "InkML (ToonSpectrum 안전 부분집합)",
+      label: "InkML (ToonStudio 안전 부분집합)",
       import: "available",
       export: "partial",
       status: "engine-ready",
@@ -621,7 +621,7 @@ describe("Studio interchange capability registry", () => {
       roundTrip: "lossless",
       status: "engine-ready",
       extensions: [".toonink"],
-      mime: ["application/vnd.toonspectrum.ink+json"],
+      mime: ["application/vnd.toonstudio.ink+json"],
       sizeBudget: {
         maxFileBytes: 32 * 1024 * 1024 + 32 * 1024,
       },
@@ -647,7 +647,7 @@ describe("Studio interchange capability registry", () => {
       roundTrip: "partial",
       status: "partial",
       extensions: [".will"],
-      mime: ["application/vnd.toonspectrum.will-v1-bounded+zip"],
+      mime: ["application/vnd.toonstudio.will-v1-bounded+zip"],
       sizeBudget: {
         maxFileBytes: 40 * 1024 * 1024,
         maxFiles: 7,

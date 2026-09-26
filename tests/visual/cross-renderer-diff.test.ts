@@ -5,14 +5,14 @@ import { join } from "node:path";
 import {
   encodeRgbaToPng,
   renderSceneToPixels as renderWithSkia,
-} from "@toonspectrum/studio-engine-skia";
-import { loadCanvasKitNode } from "@toonspectrum/studio-engine-skia/node";
-import { renderSceneToPixels as renderWithVello } from "@toonspectrum/studio-engine-vello";
-import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
-import { sceneIRSchema } from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-engine-skia";
+import { loadCanvasKitNode } from "@toonstudio/studio-engine-skia/node";
+import { renderSceneToPixels as renderWithVello } from "@toonstudio/studio-engine-vello";
+import { loadVelloNode } from "@toonstudio/studio-engine-vello/node";
+import { sceneIRSchema } from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import type { SceneIR } from "@toonspectrum/studio-project-model";
+import type { SceneIR } from "@toonstudio/studio-project-model";
 import type { CanvasKit } from "canvaskit-wasm";
 
 /**

@@ -4,7 +4,7 @@ import {
   type ProductionProjectAggregate,
   type ProductionTask,
   type ProductionTaskStatus,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { StudioProjectRecord, StudioReviewSummary } from "../project-graph/studio-project-graph-contract";
 import type { StudioVirtualSpaceReviewPreview } from "../virtual-space/studio-virtual-space-review-preview";

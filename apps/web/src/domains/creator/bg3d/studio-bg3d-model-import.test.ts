@@ -2013,7 +2013,7 @@ describe("convertStudioBg3dModelFilesToGlb", () => {
     ]);
     const jpeg = minimalJpegFixture();
     const gltf = sourceFile("scene.gltf", JSON.stringify({
-      asset: { generator: "ToonSpectrum deterministic fixture", version: "2.0" },
+      asset: { generator: "ToonStudio deterministic fixture", version: "2.0" },
       buffers: [{ byteLength: geometryBytes.byteLength, uri: "scene.bin" }],
       bufferViews: [
         { buffer: 0, byteLength: positions.byteLength, byteOffset: 0 },

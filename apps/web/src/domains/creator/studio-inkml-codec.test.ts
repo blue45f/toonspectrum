@@ -106,7 +106,7 @@ describe("Studio InkML codec", () => {
     ],
     [
       "future profile",
-      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonspectrum.inkml-profile\">toonspectrum-inkml-v2</annotation><trace>1 2</trace></ink>",
+      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonstudio.inkml-profile\">toonstudio-inkml-v2</annotation><trace>1 2</trace></ink>",
       "unsupported-profile",
     ],
     [
@@ -121,7 +121,7 @@ describe("Studio InkML codec", () => {
     ],
     [
       "empty declared profile",
-      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonspectrum.inkml-profile\"> </annotation><trace>1 2</trace></ink>",
+      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonstudio.inkml-profile\"> </annotation><trace>1 2</trace></ink>",
       "unsupported-profile",
     ],
   ] as const)("fails closed for %s", (_, source, code) => {
@@ -312,7 +312,7 @@ describe("Studio InkML codec", () => {
     expect(decoded.traces[0]?.pressures).toEqual([0.5]);
   });
 
-  it("requires units and normalizes ToonSpectrum speed and barrel-pressure channels", () => {
+  it("requires units and normalizes ToonStudio speed and barrel-pressure channels", () => {
     for (const source of [
       "<ink xmlns=\"http://www.w3.org/2003/InkML\"><definitions><traceFormat xml:id=\"f\"><channel name=\"X\"/><channel name=\"Y\"/><channel name=\"TS.S\"/></traceFormat></definitions><trace>1 2 3</trace></ink>",
       "<ink xmlns=\"http://www.w3.org/2003/InkML\"><definitions><traceFormat xml:id=\"f\"><channel name=\"X\"/><channel name=\"Y\"/><channel name=\"TS.TP\" units=\"dev\"/></traceFormat></definitions><trace>1 2 0.5</trace></ink>",
@@ -333,9 +333,9 @@ describe("Studio InkML codec", () => {
     });
   });
 
-  it("rejects foreign markup inside the declared ToonSpectrum profile", () => {
+  it("rejects foreign markup inside the declared ToonStudio profile", () => {
     expect(() => decodeStudioInkMl(
-      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonspectrum.inkml-profile\"><foreign xmlns=\"urn:foreign\">toonspectrum-inkml-v1</foreign></annotation><trace>1 2</trace></ink>",
+      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonstudio.inkml-profile\"><foreign xmlns=\"urn:foreign\">toonstudio-inkml-v1</foreign></annotation><trace>1 2</trace></ink>",
     )).toThrow(
       expect.objectContaining<Partial<StudioInkMlCodecError>>({
         code: "unsupported-profile",
@@ -345,7 +345,7 @@ describe("Studio InkML codec", () => {
 
   it("does not promote a profile annotation without the exact v1 format and context", () => {
     expect(() => decodeStudioInkMl(
-      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonspectrum.inkml-profile\">toonspectrum-inkml-v1</annotation><trace>1 2</trace></ink>",
+      "<ink xmlns=\"http://www.w3.org/2003/InkML\"><annotation type=\"application/vnd.toonstudio.inkml-profile\">toonstudio-inkml-v1</annotation><trace>1 2</trace></ink>",
     )).toThrow(
       expect.objectContaining<Partial<StudioInkMlCodecError>>({
         code: "unsupported-profile",
@@ -461,8 +461,8 @@ describe("Studio InkML codec", () => {
     for (const mutated of [
       encoded.replace("<definitions>", "<definitions>junk"),
       encoded.replace(
-        "<traceFormat xml:id=\"toonspectrum-trace-format-v1\">",
-        "<traceFormat xml:id=\"toonspectrum-trace-format-v1\">junk",
+        "<traceFormat xml:id=\"toonstudio-trace-format-v1\">",
+        "<traceFormat xml:id=\"toonstudio-trace-format-v1\">junk",
       ),
       encoded.replace(
         "<channel name=\"X\" type=\"decimal\" units=\"px\"/>",

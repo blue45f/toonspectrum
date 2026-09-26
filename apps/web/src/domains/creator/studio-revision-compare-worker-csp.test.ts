@@ -243,7 +243,7 @@ describe("revision comparison Worker strict-CSP bootstrap", () => {
     expect(harness.constructedUrl).toBe(CAPTURED_BOOTSTRAP_URL);
     expect(harness.constructedOptions).toEqual({
       type: "module",
-      name: "toonspectrum-revision-compare",
+      name: "toonstudio-revision-compare",
     });
     expect(harness.createdBlobs).toHaveLength(1);
     expect(harness.revokedUrls).toEqual([]);
@@ -382,7 +382,7 @@ describe("revision comparison Worker strict-CSP bootstrap", () => {
 
   it("emits a production-mode Worker asset that is reachable only through the bootstrap", async () => {
     const temporaryDirectory = mkdtempSync(
-      join(tmpdir(), "toonspectrum-revision-worker-csp-")
+      join(tmpdir(), "toonstudio-revision-worker-csp-")
     );
     const rootPath = join(temporaryDirectory, "root");
     const outputPath = join(temporaryDirectory, "dist");

@@ -45,7 +45,7 @@ describe("Studio Scene3D character performance plan", () => {
 
   it("enables IK, grounding, contact, and one atomic bake for a ready character", () => {
     const grounding = Object.freeze({
-      kind: "toonspectrum.bg3d-shared-character-grounding-receipt",
+      kind: "toonstudio.bg3d-shared-character-grounding-receipt",
       version: 1,
     }) as unknown as StudioBg3dSharedCharacterGroundingReceipt;
     const plan = planStudioScene3dCharacterPerformance({

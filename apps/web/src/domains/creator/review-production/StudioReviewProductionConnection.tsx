@@ -1,4 +1,4 @@
-import { canonicalJson, studioReviewTaskAssignmentChoices } from "@toonspectrum/studio-project-model";
+import { canonicalJson, studioReviewTaskAssignmentChoices } from "@toonstudio/studio-project-model";
 import { useId, useMemo, useRef, useState } from "react";
 
 import { useSession } from "@/domains/auth/public/session/auth-session-store";

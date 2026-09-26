@@ -138,7 +138,7 @@ describe("filter-library SQLite benchmark contract", () => {
     expect(productOpen).not.toContain("localStorage");
     // The retired key remains available only to the explicit legacy/test adapter below.
     expect(repositorySource).toContain(
-      '"toonspectrum.studio-filter-library.v12.fallback"',
+      '"toonstudio.studio-filter-library.v12.fallback"',
     );
   });
 

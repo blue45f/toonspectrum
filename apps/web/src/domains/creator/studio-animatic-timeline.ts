@@ -8,9 +8,9 @@
  */
 
 export const STUDIO_ANIMATIC_VERSION = 1;
-export const STUDIO_ANIMATIC_KIND = "toonspectrum.webtoon-animatic";
+export const STUDIO_ANIMATIC_KIND = "toonstudio.webtoon-animatic";
 export const STUDIO_ANIMATIC_STORAGE_PREFIX =
-  "toonspectrum-studio-animatic:v12";
+  "toonstudio-studio-animatic:v12";
 
 export const STUDIO_ANIMATIC_DEFAULT_FPS = 12;
 export const STUDIO_ANIMATIC_MIN_FPS = 1;
@@ -480,7 +480,7 @@ export function validateStudioAnimaticDocument(
   ) {
     return {
       ok: false,
-      error: "지원하는 ToonSpectrum 애니매틱 v1 문서가 아닙니다.",
+      error: "지원하는 ToonStudio 애니매틱 v1 문서가 아닙니다.",
     };
   }
   if (

@@ -6,7 +6,7 @@ CommitDate: Tue Sep 8 21:23:57 2026 +0900
 
     chore: salvage unique uncommitted work from codex/issues-bg3d-viewport-origin-20260908
     
-    Source worktree: /private/tmp/toonspectrum-issues-bg3d-viewport-origin-20260908
+    Source worktree: /private/tmp/toonstudio-issues-bg3d-viewport-origin-20260908
     Source SHA: fdf8ddab086c57a55e4c7c43582270edcb2ac63e
     Files: 2
 
@@ -60,7 +60,7 @@ index 000000000..c6cc53c0f
 +import { resolve } from "node:path";
 +import { createServer } from "vite";
 +import { chromium } from "playwright";
-+const scratch="/private/tmp/toonspectrum-all-issues-20260908/bg3d-origin-probe-cold";
++const scratch="/private/tmp/toonstudio-all-issues-20260908/bg3d-origin-probe-cold";
 +mkdirSync(scratch,{recursive:true});
 +const vite=await createServer({root:resolve("apps/web"),configFile:resolve("vite.config.ts"),server:{host:"127.0.0.1",port:52931,strictPort:true},appType:"custom",logLevel:"warn"});
 +vite.middlewares.use(async(req,res,next)=>{if(req.url!=="/probe"){next();return;}res.setHeader("Content-Type","text/html");res.end(await vite.transformIndexHtml("/probe",`<!doctype html><div id="root"></div><script type="module" src="/tools/browser-harnesses/.bg3d-origin-probe.tsx"></script>`));});

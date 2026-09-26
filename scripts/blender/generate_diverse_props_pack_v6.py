@@ -1,4 +1,4 @@
-"""Generate ToonSpectrum's diverse prop pack v6 + furniture quality upgrades.
+"""Generate ToonStudio's diverse prop pack v6 + furniture quality upgrades.
 
 Adds 16 new first-party GLB props across food/nature/urban/interior/fantasy/
 sci-fi themes and rebuilds the five legacy core-furniture assets (blackboard,

@@ -57,7 +57,7 @@ describe("useStudioProDrawPrefs", () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem");
     const setItem = vi.spyOn(Storage.prototype, "setItem");
     window.localStorage.setItem(
-      "toonspectrum-studio-pro-draw-prefs:v1",
+      "toonstudio-studio-pro-draw-prefs:v1",
       JSON.stringify({ favoriteBrushIds: ["watercolor"] }),
     );
     getItem.mockClear();

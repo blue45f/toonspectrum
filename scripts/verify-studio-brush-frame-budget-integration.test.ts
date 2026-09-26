@@ -25,7 +25,7 @@ describe("Studio brush latency and continuous frame-budget gate integration", ()
       "&& results.every((result) => result.frameBudgetEvaluation.ok)",
     );
     expect(verifierSource).toContain(
-      'kind: "toonspectrum-studio-brush-latency-browser-v3"',
+      'kind: "toonstudio-studio-brush-latency-browser-v3"',
     );
   });
 

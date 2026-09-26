@@ -1,7 +1,7 @@
 import type {
   ModeledSampleIR,
   StabilizerGraphIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * Custom stabilizer stage (ADR 0005): the first-party lane that ships before

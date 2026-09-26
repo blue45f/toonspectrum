@@ -9,7 +9,7 @@ import { verifySecurityAdvisoryExceptions } from "./verify-security-advisory-exc
 const roots = [];
 
 function fixture(auditConfig) {
-  const root = mkdtempSync(join(tmpdir(), "toonspectrum-advisory-"));
+  const root = mkdtempSync(join(tmpdir(), "toonstudio-advisory-"));
   roots.push(root);
   writeFileSync(join(root, "pnpm-workspace.yaml"), JSON.stringify({ packages: ["."], auditConfig }));
   return root;

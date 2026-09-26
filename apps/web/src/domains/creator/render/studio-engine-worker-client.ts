@@ -123,7 +123,7 @@ function defaultWorkerFactory(): StudioEngineWorkerLike | null {
   if (typeof Worker !== "function") return null;
   return new Worker(new URL("../studio-engine.worker.ts", import.meta.url), {
     type: "module",
-    name: "toonspectrum-studio-engine",
+    name: "toonstudio-studio-engine",
   });
 }
 

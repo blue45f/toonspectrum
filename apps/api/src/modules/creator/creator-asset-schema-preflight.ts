@@ -90,7 +90,7 @@ const REQUIRED_INDEX_COUNT =
 export const CREATOR_ASSET_CANONICAL_CHECK_DEFINITIONS: Readonly<Record<string, string>> = {
   creator_asset_license_check: `CHECK (
     "license" = ANY (ARRAY[
-      'toonspectrum-standard'::text, 'cc0-1.0'::text,
+      'toonstudio-standard'::text, 'cc0-1.0'::text,
       'cc-by-4.0'::text, 'cc-by-nc-4.0'::text
     ]::text[])
   )`,
@@ -163,7 +163,7 @@ const EXPECTED_ASSET_DEFAULTS: Readonly<Record<string, readonly string[]>> = {
   description: ["''::text"],
   tags: ["'[]'::jsonb"],
   kind: ["'image'::text"],
-  license: ["'toonspectrum-standard'::text"],
+  license: ["'toonstudio-standard'::text"],
   attributionText: ["''::text"],
   containsAi: ["false", "'false'::boolean"],
   moderationStatus: ["'under_review'::text"],

@@ -86,7 +86,7 @@ describe("Studio Hokusai WASM checked-in artifact gate", () => {
 
   it("rejects a modified checked-in package artifact", () => {
     const directory = mkdtempSync(
-      join(tmpdir(), "toonspectrum-hokusai-integrity-test-"),
+      join(tmpdir(), "toonstudio-hokusai-integrity-test-"),
     );
     temporaryDirectories.push(directory);
     const pkgDirectory = join(directory, "pkg");
@@ -111,7 +111,7 @@ describe("Studio Hokusai WASM checked-in artifact gate", () => {
 
   it("rejects unreviewed nested package entries before sealing", () => {
     const directory = mkdtempSync(
-      join(tmpdir(), "toonspectrum-hokusai-file-set-test-"),
+      join(tmpdir(), "toonstudio-hokusai-file-set-test-"),
     );
     temporaryDirectories.push(directory);
     const pkgDirectory = join(directory, "pkg");
@@ -132,7 +132,7 @@ describe("Studio Hokusai WASM checked-in artifact gate", () => {
 
   it("rejects a valid WASM module that exposes a local build path", () => {
     const directory = mkdtempSync(
-      join(tmpdir(), "toonspectrum-hokusai-path-test-"),
+      join(tmpdir(), "toonstudio-hokusai-path-test-"),
     );
     temporaryDirectories.push(directory);
     const wasmPath = join(directory, "path-leak.wasm");
@@ -148,7 +148,7 @@ describe("Studio Hokusai WASM checked-in artifact gate", () => {
 
   it("builds from an allowlisted, offline and path-remapped environment", () => {
     const buildDirectory = mkdtempSync(
-      join(tmpdir(), "toonspectrum-hokusai-env-test-"),
+      join(tmpdir(), "toonstudio-hokusai-env-test-"),
     );
     temporaryDirectories.push(buildDirectory);
     const environment = createHokusaiReleaseBuildEnvironment({
@@ -171,13 +171,13 @@ describe("Studio Hokusai WASM checked-in artifact gate", () => {
     expect(environment.CARGO_TARGET_DIR).toBe(join(buildDirectory, "target"));
     expect(environment.TMPDIR).toBe(join(buildDirectory, "tmp"));
     expect(environment.CARGO_ENCODED_RUSTFLAGS).toContain(
-      `${buildDirectory}=/toonspectrum-build/session`,
+      `${buildDirectory}=/toonstudio-build/session`,
     );
     expect(environment.CARGO_ENCODED_RUSTFLAGS).toContain(
-      "/home/release-user/.cargo=/toonspectrum-build/cargo-home",
+      "/home/release-user/.cargo=/toonstudio-build/cargo-home",
     );
     expect(environment.CARGO_ENCODED_RUSTFLAGS).not.toContain(
-      "/toonspectrum-build/source-",
+      "/toonstudio-build/source-",
     );
   });
 });

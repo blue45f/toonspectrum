@@ -291,7 +291,7 @@ describe("왕복 — 직접 만든 리더로 되읽기", () => {
     expect(document.pages[0]!.mediaBox).toEqual([0, 0, 420, 594]);
     expect(document.pages[1]!.mediaBox).toEqual([0, 0, 300, 300]);
     expect(document.info).toContain(pdfHexText("웹툰 원고"));
-    expect(document.info).toContain("/Producer (ToonSpectrum Studio)");
+    expect(document.info).toContain("/Producer (ToonStudio Studio)");
   });
 
   it("xref가 선언한 오브젝트 수와 실제로 읽힌 오브젝트 수가 일치한다", () => {

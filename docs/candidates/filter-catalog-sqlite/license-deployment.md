@@ -6,8 +6,8 @@
 |---|---|---|---|
 | `@sqlite.org/sqlite-wasm` | 3.53.0-build1, installed package manifest | Apache-2.0 | Lazy browser SQLite runtime and Node evidence harness |
 | SQLite core | Bundled by the official wasm package | Public domain | SQL engine |
-| OPFS SAH-pool VFS | Official sqlite-wasm API | Apache-2.0 package distribution | V12-only durable browser file `/studio-local-v12.db` under `toonspectrum-studio-sqlite`; the legacy `/studio-local.db` is never reopened |
-| V12 fallback adapter | ToonSpectrum source | Project license | Compatibility only when SQLite is unavailable |
+| OPFS SAH-pool VFS | Official sqlite-wasm API | Apache-2.0 package distribution | V12-only durable browser file `/studio-local-v12.db` under `toonstudio-studio-sqlite`; the legacy `/studio-local.db` is never reopened |
+| V12 fallback adapter | ToonStudio source | Project license | Compatibility only when SQLite is unavailable |
 
 No dependency or lockfile change is required; the pinned sqlite-wasm package already
 serves history, tournament, brush, autosave, and recovery lanes. Filter catalog v4

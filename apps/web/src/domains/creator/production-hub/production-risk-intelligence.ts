@@ -5,7 +5,7 @@ import {
   type ProductionTask,
   type ProductionTaskStatus,
   type ScopeRef,
-} from "@toonspectrum/core/production";
+} from "@toonstudio/core/production";
 
 import type { ProductionOperationsOverview } from "./production-episode-operations";
 

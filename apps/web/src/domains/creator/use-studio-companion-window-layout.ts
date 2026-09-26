@@ -21,7 +21,7 @@ export const STUDIO_COMPANION_WINDOW_LAYOUT_MAXIMIZED_TOLERANCE_PX = 16;
 export const STUDIO_COMPANION_WINDOW_LAYOUT_RESTORE_TOLERANCE_PX = 24;
 /** Pre-V12 key identifier retained only for explicit tests/destruction inventories. */
 export const STUDIO_COMPANION_WINDOW_LAYOUT_REMEMBER_STORAGE_PREFIX =
-  "toonspectrum.studio.companion-window-layout.remember.v1";
+  "toonstudio.studio.companion-window-layout.remember.v1";
 
 export function studioCompanionWindowLayoutRememberStorageKey(
   surface: StudioCompanionWindowLayoutSurface,

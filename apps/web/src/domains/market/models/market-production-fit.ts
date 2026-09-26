@@ -11,7 +11,7 @@ import {
 } from "@/shared/lib/creator-marketplace-semver";
 
 export const MARKET_PRODUCTION_PROFILE_STORAGE_KEY =
-  "toonspectrum.market.production-fit.v1" as const;
+  "toonstudio.market.production-fit.v1" as const;
 export const MARKET_PRODUCTION_PROFILE_VERSION = 1 as const;
 export const MARKET_PRODUCTION_PROFILE_MAX_STUDIO_VERSION_CHARACTERS = 40;
 
@@ -168,7 +168,7 @@ const LICENSE_CAPABILITIES: Readonly<
     readonly attributionRequired: boolean;
   }>
 > = {
-  "toonspectrum-standard": {
+  "toonstudio-standard": {
     commercialUse: true,
     attributionRequired: false,
   },
@@ -187,7 +187,7 @@ const LICENSE_CAPABILITIES: Readonly<
 };
 
 const LICENSE_LABELS: Readonly<Record<CreatorMarketplaceResourceLicense, string>> = {
-  "toonspectrum-standard": "ToonSpectrum 표준 사용권",
+  "toonstudio-standard": "ToonStudio 표준 사용권",
   "cc0-1.0": "CC0 1.0",
   "cc-by-4.0": "CC BY 4.0",
   "cc-by-nc-4.0": "CC BY-NC 4.0",

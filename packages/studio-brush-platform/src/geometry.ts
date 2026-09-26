@@ -1,4 +1,4 @@
-import { evaluateDynamicMapping } from "@toonspectrum/studio-project-model";
+import { evaluateDynamicMapping } from "@toonstudio/studio-project-model";
 import { getStroke } from "perfect-freehand";
 
 import type {
@@ -6,7 +6,7 @@ import type {
   ModeledSampleIR,
   PathIR,
   StrokeIR,
-} from "@toonspectrum/studio-project-model";
+} from "@toonstudio/studio-project-model";
 
 /**
  * Stroke geometry stage (matrix E10, ADR 0005): perfect-freehand converts

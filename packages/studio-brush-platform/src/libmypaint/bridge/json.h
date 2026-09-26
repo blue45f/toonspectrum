@@ -1,5 +1,5 @@
 /*
- * json-c bypass for the ToonSpectrum emscripten build of libmypaint v1.6.1.
+ * json-c bypass for the ToonStudio emscripten build of libmypaint v1.6.1.
  *
  * mypaint-brush.c hard-includes <json.h> and uses json-c for exactly two
  * things: (1) an empty json_object owned by every MyPaintBrush, and (2)

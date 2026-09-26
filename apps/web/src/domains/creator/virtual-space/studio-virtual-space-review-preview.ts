@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { studioReviewPageMappingSchema, type StudioReviewPageMapping } from "@toonspectrum/studio-project-model";
+import { studioReviewPageMappingSchema, type StudioReviewPageMapping } from "@toonstudio/studio-project-model";
 
 import { api, httpStatus } from "@/platform/api";
 

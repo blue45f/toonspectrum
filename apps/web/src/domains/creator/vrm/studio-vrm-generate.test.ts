@@ -231,7 +231,7 @@ describe("generateStudioVrmCharacter MCP adapter", () => {
     const result = await generateStudioVrmCharacter({ presetId: PRESET_A });
     expect(result.status).toBe("ok");
     if (result.status !== "ok") throw new Error("expected generated VRM");
-    expect(result.hostId).toBe("toonspectrum-vrm-generate");
+    expect(result.hostId).toBe("toonstudio-vrm-generate");
     expect(result.vrmVersion).toBe(1);
     expect(result.isCompleteHumanoid).toBe(true);
     expect(validateVrmGlbBytes(result.bytes)).toEqual({ vrmVersion: 1 });

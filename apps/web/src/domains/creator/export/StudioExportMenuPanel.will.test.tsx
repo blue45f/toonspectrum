@@ -33,7 +33,7 @@ describe("StudioExportMenuPanel WILL v1 public-spec profile", () => {
     const exportCurrentPageToWillV1 = vi.fn(async () => ({
       bytes: Uint8Array.from([0x50, 0x4b, 0x03, 0x04]),
       extension: ".will" as const,
-      mediaType: "application/vnd.toonspectrum.will-v1-bounded+zip" as const,
+      mediaType: "application/vnd.toonstudio.will-v1-bounded+zip" as const,
       profileLabel: STUDIO_WILL_V1_EXPORT_PROFILE_LABEL,
       disclaimer: STUDIO_WILL_V1_EXPORT_DISCLAIMER,
       exportedStrokeIds: ["stroke-1", "stroke-2"],
@@ -87,7 +87,7 @@ describe("StudioExportMenuPanel WILL v1 public-spec profile", () => {
     await waitFor(() => expect(exportCurrentPageToWillV1).toHaveBeenCalledTimes(1));
     expect(URL.createObjectURL).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: "application/vnd.toonspectrum.will-v1-bounded+zip",
+        type: "application/vnd.toonstudio.will-v1-bounded+zip",
       }),
     );
     expect(click).toHaveBeenCalledTimes(1);

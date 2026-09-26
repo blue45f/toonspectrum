@@ -8,7 +8,7 @@ import { StudioReferenceCanvasCard } from "./StudioReferenceCanvasCard";
 describe("StudioReferenceCanvasCard", () => {
   afterEach(() => cleanup());
 
-  it("presents ToonSpectrum's reference canvas identity without competitor branding", () => {
+  it("presents ToonStudio's reference canvas identity without competitor branding", () => {
     render(
       <StudioReferenceCanvasCard
         itemCount={3}

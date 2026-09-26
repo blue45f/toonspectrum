@@ -2,13 +2,13 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 
-import { compileVectorBrush } from "@toonspectrum/studio-brush-platform";
-import { renderSceneToPixels as renderWithVello } from "@toonspectrum/studio-engine-vello";
-import { loadVelloNode } from "@toonspectrum/studio-engine-vello/node";
-import { brushProgramIRSchema } from "@toonspectrum/studio-project-model";
+import { compileVectorBrush } from "@toonstudio/studio-brush-platform";
+import { renderSceneToPixels as renderWithVello } from "@toonstudio/studio-engine-vello";
+import { loadVelloNode } from "@toonstudio/studio-engine-vello/node";
+import { brushProgramIRSchema } from "@toonstudio/studio-project-model";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import type { StrokeIR } from "@toonspectrum/studio-project-model";
+import type { StrokeIR } from "@toonstudio/studio-project-model";
 
 /**
  * 필압 정밀함 게이트 (제품 오너 지시 2026-08-07: 품질·손맛·필압 정밀함이
