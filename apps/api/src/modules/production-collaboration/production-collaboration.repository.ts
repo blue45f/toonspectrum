@@ -10,7 +10,7 @@ import {
   productionProjectEvents,
   productionProjectMutationReceipts,
   productionProjects,
-} from "../../db";
+} from "../../platform/database";
 import { resolveCreatorCollaborationAccess } from "../creator/creator-collaboration.policy";
 
 export interface ProductionProjectAccess {

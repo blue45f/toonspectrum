@@ -1,4 +1,4 @@
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import { ADMIN_TRAFFIC_OVERVIEW_QUERY, ADMIN_TRAFFIC_PULSE_QUERY } from "../admin/admin-traffic-query";
 import {
   cleanupExpiredTrafficData,

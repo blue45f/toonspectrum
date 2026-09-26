@@ -18,7 +18,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import type { Response } from "express";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import {
   ProductionDocumensoEnvelopeMetadataSchema,

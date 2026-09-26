@@ -3,7 +3,7 @@ import { Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { describe, expect, it, vi } from "vitest";
 import { fortuneMonthDays } from "../../../../../packages/core/src/fortune";
-import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import type { UpstashCoordinationPort } from "../../platform/adapters/upstash-coordination/upstash-coordination.port";
 import { FortuneCalendarQuery, FortuneHoroscopeQuery, FortuneEnrichmentController } from "./fortune-enrichment.controller";
 import { FortuneRefreshWorker } from "./fortune-refresh.worker";
 import { FortuneEnrichmentService } from "./fortune-enrichment.service";

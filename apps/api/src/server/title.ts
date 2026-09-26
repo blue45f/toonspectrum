@@ -7,9 +7,9 @@ import {
   adaptationsOf,
   getTitle,
   originalOf,
-} from "../../../../packages/core/src/server/catalog-store";
-import { isDatabaseAvailabilityError } from "../common/database-availability";
-import { db, reviewLikes, reviews, users } from "../db";
+} from "../../../../packages/core/src/catalog/catalog-store";
+import { isDatabaseAvailabilityError } from "../platform/http/database-availability";
+import { db, reviewLikes, reviews, users } from "../platform/database";
 
 import type { SeedReview, Title } from "../../../web/src/shared/lib/types";
 

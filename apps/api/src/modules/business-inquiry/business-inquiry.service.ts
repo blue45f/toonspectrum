@@ -18,7 +18,7 @@ import {
   validateBusinessInquiryInput,
 } from "../../../../../packages/core/src/business-inquiry";
 
-import { businessInquiries, db } from "../../db";
+import { businessInquiries, db } from "../../platform/database";
 import { isOfficialUser } from "../../server/feedback";
 
 const CONSENT_VERSION = "business-inquiry-2026-09-18";

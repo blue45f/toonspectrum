@@ -43,8 +43,8 @@ describe.skipIf(!database)("real disposable PostgreSQL hiring invariants (requir
     pool = new Pool({ connectionString: database!, max: 2, connectionTimeoutMillis: 3000, options: `-c search_path=${schema} -c statement_timeout=10000 -c lock_timeout=5000` });
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY,name text NOT NULL,status text NOT NULL DEFAULT 'active',role text NOT NULL DEFAULT 'user');
       CREATE TABLE member_message_block("blockerId" text NOT NULL,"blockedUserId" text NOT NULL,PRIMARY KEY("blockerId","blockedUserId"))`);
-    await pool.query(await readFile(new URL("../../db/migrations/0047_creator_collaboration_board.sql", import.meta.url), "utf8"));
-    await pool.query(await readFile(new URL("../../db/migrations/0078_creator_hiring_workspace.sql", import.meta.url), "utf8"));
+    await pool.query(await readFile(new URL("../../platform/database/migrations/0047_creator_collaboration_board.sql", import.meta.url), "utf8"));
+    await pool.query(await readFile(new URL("../../platform/database/migrations/0078_creator_hiring_workspace.sql", import.meta.url), "utf8"));
     store = new HiringStore(pool); resumes = new HiringResumeRepository(store); slots = new HiringSlotRepository(store);
     available = new HiringAvailabilityRepository(store); offers = new HiringOfferRepository(store, available); legacy = new CollaborationRepository(pool);
   });

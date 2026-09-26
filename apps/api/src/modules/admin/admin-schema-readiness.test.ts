@@ -2,7 +2,7 @@ import { ServiceUnavailableException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ execute: vi.fn(), lifecycle: vi.fn() }));
-vi.mock("../../db", () => ({
+vi.mock("../../platform/database", () => ({
   dbClient: { execute: mocks.execute }, db: {}, users: {},
   creatorProfiles: {}, monetizationPlans: {},
 }));

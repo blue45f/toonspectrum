@@ -456,6 +456,6 @@ docs/                        현재 문서, ADR, 역사 자료
 ### 런타임 소스 지도
 
 Web과 Admin은 `app/domains/platform/shared` 소유권을 사용합니다. API 기능은
-`apps/api/src/modules`, 외부 adapter는 `apps/api/src/infrastructure`, schema·migration은
-`apps/api/src/db`가 소유합니다. `apps/api/src/server`와 `common`은 점진적으로 축소하는 레거시
+`apps/api/src/modules`, 외부 adapter는 `apps/api/src/platform/adapters`, schema·migration은
+`apps/api/src/platform/database`가 소유합니다. `apps/api/src/server`와 `common`은 점진적으로 축소하는 레거시
 경계입니다. 운영 HTTP 진입점은 `apps/api/src/main.ts`입니다.

@@ -2,7 +2,7 @@ import { BadRequestException, Body, ConflictException, Controller, ForbiddenExce
 import { createZodDto } from "nestjs-zod";
 import { studioReviewCompletionTaskIdSchema, studioReviewTaskCompletionInputSchema, studioReviewTaskReferenceSchema } from "@toonspectrum/studio-project-model";
 import { z } from "zod";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { StudioReviewTaskCompletionError, StudioReviewTaskCompletionRepository } from "./studio-review-task-completion.repository";
 
 class ParamsDto extends createZodDto(z.object({ id: studioReviewTaskReferenceSchema.shape.commentId, taskId: studioReviewCompletionTaskIdSchema }).strict()) {}

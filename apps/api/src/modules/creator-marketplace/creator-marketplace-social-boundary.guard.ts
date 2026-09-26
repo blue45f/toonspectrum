@@ -9,7 +9,7 @@ import {
   isCreatorMarketplaceSocialNamespaceValue,
   isCreatorMarketplaceSocialThreadId,
 } from "../../../../web/src/shared/lib/creator-marketplace-social-namespace";
-import { findCreatorMarketplaceSocialInteractionIds } from "../../common/creator-marketplace-social-boundary";
+import { findCreatorMarketplaceSocialInteractionIds } from "../../platform/http/creator-marketplace-social-boundary";
 
 interface BoundaryRequest {
   readonly originalUrl?: unknown;

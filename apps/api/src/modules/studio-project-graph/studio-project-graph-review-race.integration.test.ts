@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import type * as DatabaseRuntime from "../../db";
+import type * as DatabaseRuntime from "../../platform/database";
 import type { CreateStudioReviewComment } from "./studio-project-graph.dto";
 import { CreateStudioReviewCommentSchema } from "./studio-project-graph.dto";
 import type { StudioProjectGraphRepository } from "./studio-project-graph.repository";
@@ -28,7 +28,7 @@ withPostgres("PostgreSQL review decision and comment serialization", () => {
     connection.searchParams.set("application_name", applicationName);
     process.env.DATABASE_URL = connection.toString();
     pool = new Pool({ connectionString: databaseUrl, max: 3, application_name: `${applicationName}-probe` });
-    database = await import("../../db");
+    database = await import("../../platform/database");
     const module = await import("./studio-project-graph.repository");
     graph = new module.StudioProjectGraphRepository();
     production = new (await import("../creator/studio-production.repository")).DrizzleStudioProductionRepository();

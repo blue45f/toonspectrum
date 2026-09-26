@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import {
   CREATOR_ASSET_CANONICAL_CHECK_DEFINITIONS,
@@ -10,7 +10,7 @@ import {
   preflightCreatorAssetSchema,
 } from "./creator-asset-schema-preflight";
 
-vi.mock("../../db", () => ({ dbPool: { query: vi.fn() } }));
+vi.mock("../../platform/database", () => ({ dbPool: { query: vi.fn() } }));
 
 function completeSchema(overrides: Record<string, unknown> = {}) {
   return {

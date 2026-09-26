@@ -1,5 +1,5 @@
-import { dbPool } from "../../db";
-import { ADMIN_SCHEMA_COLUMNS_SQL } from "../../db/admin-schema-contract";
+import { dbPool } from "../../platform/database";
+import { ADMIN_SCHEMA_COLUMNS_SQL } from "../../platform/database/admin-schema-contract";
 
 import type { Pool, QueryConfig } from "pg";
 

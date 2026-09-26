@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { searchFixture } from "../../../../../packages/core/src/__tests__/search-fixture";
-import { replaceCatalogData, resetCatalogToEmpty } from "../../../../../packages/core/src/server/catalog-store";
+import { replaceCatalogData, resetCatalogToEmpty } from "../../../../../packages/core/src/catalog/catalog-store";
 import { CatalogController } from "./catalog.controller";
 import { CatalogService } from "./catalog.service";
 

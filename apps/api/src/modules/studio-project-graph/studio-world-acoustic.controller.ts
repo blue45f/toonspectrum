@@ -5,7 +5,7 @@ import { studioAcousticDoorChangeSchema, studioAcousticSessionOpenSchema, studio
 import { studioEntityIdSchema } from "@toonspectrum/studio-project-model";
 import type { Request } from "express";
 import { getSessionAuthenticationPrincipal, getSessionAuthenticationSource } from "../../session-middleware";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { StudioWorkParamsDto } from "./studio-project-graph.dto";
 import { requireStudioIdempotencyKey } from "./studio-project-graph.controller";
 import { StudioWorldAcousticService } from "./studio-world-acoustic.service";

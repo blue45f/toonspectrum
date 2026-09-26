@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 
-import { dbClient } from "../../db";
+import { dbClient } from "../../platform/database";
 
 import type {
   PersonalCloudConnectionRecord,

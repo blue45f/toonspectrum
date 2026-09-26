@@ -4,7 +4,7 @@ import { Module } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import {
   STUDIO_REMOTE_REFERENCE_MAX_ACTIVE_DELIVERIES,

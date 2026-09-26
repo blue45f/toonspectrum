@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Header, Headers, Inject, Param, Post } from "@nestjs/common";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { AcceptTeamWorkspaceDto, CreateTeamWorkspaceDto, TeamWorkspaceParamsDto, WorkspaceCommandSchema } from "./team-workspace.dto";
 import { TeamWorkspaceRepository } from "./team-workspace.repository";
 

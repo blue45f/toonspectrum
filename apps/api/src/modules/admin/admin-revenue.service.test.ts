@@ -3,14 +3,14 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import type { SQL } from "drizzle-orm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { monetizationPlans, revenueLedger, users } from "../../db/schema";
+import { monetizationPlans, revenueLedger, users } from "../../platform/database/schema";
 import { AdminRevenueService } from "./admin-revenue.service";
 
 const doubles = vi.hoisted(() => ({
   db: { select: vi.fn(), update: vi.fn(), insert: vi.fn() },
   audit: vi.fn().mockResolvedValue(undefined), schema: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock("../../db", async () => ({ ...await import("../../db/schema"), db: doubles.db, dbClient: {} }));
+vi.mock("../../platform/database", async () => ({ ...await import("../../platform/database/schema"), db: doubles.db, dbClient: {} }));
 vi.mock("../../server/session", () => ({ invalidateSessionUser: vi.fn(), getSessionUserCached: vi.fn() }));
 vi.mock("../../server/user-lifecycle", async (original) => ({
   ...await original<typeof import("../../server/user-lifecycle")>(), ensureUserLifecycleSchema: vi.fn().mockResolvedValue(undefined),

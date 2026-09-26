@@ -5,7 +5,7 @@ import { z } from "zod";
 import { reviewDeliveryAcceptSchema, reviewDeliveryActionSchema, reviewDeliveryId, reviewDeliveryPrepareSchema } from "@toonspectrum/studio-project-model/review-delivery";
 import { studioWorkSessionId } from "@toonspectrum/studio-project-model/work-session";
 
-import { ZodValidationPipe } from "../../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../../platform/http/zod-validation.pipe";
 import { authenticatedStudioUserId } from "../studio-project-graph.controller";
 import { StudioReviewDeliveryService } from "./review-delivery.service";
 

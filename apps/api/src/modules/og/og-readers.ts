@@ -1,4 +1,4 @@
-import { getAuthorData } from "../../../../../packages/core/src/server/author";
+import { getAuthorData } from "../../../../../packages/core/src/catalog/author";
 import {
   getCreatorPublicProfile,
 } from "../../server/creator/follows";

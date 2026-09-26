@@ -26,7 +26,7 @@ describe.skipIf(!target)("actual non-owner runtime grants for production operati
       CREATE TABLE creator_work_collaborator("workId" text REFERENCES creator_work(id),"userId" text REFERENCES "user"(id),role text,status text);
       INSERT INTO "user" VALUES('owner','Owner','owner@example.test',now(),'active','user'),('admin','Admin','admin@example.test',now(),'active','admin');`);
     for (const name of ['0053_production_collaboration_core.sql','0084_production_model_v2_compatibility.sql','0085_production_team_workspace.sql','0086_production_operation_policy.sql']) {
-      await owner.query(redirect(readFileSync(new URL(`../apps/api/src/db/migrations/${name}`,import.meta.url),'utf8')));
+      await owner.query(redirect(readFileSync(new URL(`../apps/api/src/platform/database/migrations/${name}`,import.meta.url),'utf8')));
     }
     await owner.query(`GRANT USAGE ON SCHEMA ${schema} TO ${role};
       GRANT SELECT ON "user",creator_work,creator_work_collaborator,production_project TO ${role};

@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Headers, Inject, Patch, Post, UnauthorizedException } from "@nestjs/common";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import { CollectionMutationDto, CollectionMutationSchema } from "./me.dto";
 import { MeService } from "./me.service";

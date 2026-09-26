@@ -6,15 +6,15 @@ import { describe, expect, it } from "vitest";
 const root = process.cwd();
 const migration = readFileSync(resolve(
   root,
-  "apps/api/src/db/migrations/0033_creator_marketplace_cloud_library.sql",
+  "apps/api/src/platform/database/migrations/0033_creator_marketplace_cloud_library.sql",
 ), "utf8");
 const packageModerationMigration = readFileSync(resolve(
   root,
-  "apps/api/src/db/migrations/0034_creator_marketplace_package_moderation.sql",
+  "apps/api/src/platform/database/migrations/0034_creator_marketplace_package_moderation.sql",
 ), "utf8");
 const schema = readFileSync(resolve(
   root,
-  "apps/api/src/db/creator-marketplace-library.schema.ts",
+  "apps/api/src/platform/database/creator-marketplace-library.schema.ts",
 ), "utf8");
 const repository = readFileSync(resolve(
   root,

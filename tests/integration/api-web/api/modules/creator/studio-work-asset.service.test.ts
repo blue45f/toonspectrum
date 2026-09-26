@@ -33,9 +33,9 @@ import {
 } from "../../../../../../apps/web/src/shared/lib/studio-work-asset-contract";
 
 
-import type { SupabaseObjectStoragePort } from "../../../../../../apps/api/src/infrastructure/supabase-object-storage/supabase-object-storage.port";
 import type { DrizzleStudioCrdtTransaction } from "../../../../../../apps/api/src/modules/creator/studio-crdt.repository";
 import type { StudioWorkAssetRepository } from "../../../../../../apps/api/src/modules/creator/studio-work-asset.repository";
+import type { SupabaseObjectStoragePort } from "../../../../../../apps/api/src/platform/adapters/supabase-object-storage/supabase-object-storage.port";
 
 const manifest: StudioWorkAssetManifest = {
   version: 1,

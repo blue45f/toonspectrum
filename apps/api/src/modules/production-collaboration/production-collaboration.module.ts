@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import { TeamWorkspaceController } from "./team-workspace.controller";
 import { PRODUCTION_TEAM_POOL, TeamWorkspaceRepository } from "./team-workspace.repository";
 import { ProductionCollaborationController } from "./production-collaboration.controller";

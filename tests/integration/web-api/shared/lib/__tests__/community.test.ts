@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { db, dbClient, fanPostReplies, fanPosts, users } from "../../../../../../apps/api/src/db";
+import { db, dbClient, fanPostReplies, fanPosts, users } from "../../../../../../apps/api/src/platform/database";
 import {
   createFanPost,
   createFanPostReply,

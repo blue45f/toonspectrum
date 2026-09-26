@@ -7,8 +7,8 @@ import {
   type CreatorRoleProfile,
 } from "../../../web/src/shared/lib/creator-role-contract";
 import { parseRegionSettings, type RegionSettings } from "../../../web/src/shared/lib/region-settings";
-import { findCreatorMarketplaceSocialInteractionIds } from "../common/creator-marketplace-social-boundary";
-import { withDatabaseCapability } from "../common/service-availability";
+import { findCreatorMarketplaceSocialInteractionIds } from "../platform/http/creator-marketplace-social-boundary";
+import { withDatabaseCapability } from "../platform/http/service-availability";
 import {
   db,
   users,
@@ -19,7 +19,7 @@ import {
   reviewLikes,
   collections,
   collectionItems,
-} from "../db";
+} from "../platform/database";
 
 import { invalidateSessionUser } from "./session";
 import { ensureUserLifecycleSchema, normalizeUserAccountStatus, softDeleteUserAccount } from "./user-lifecycle";

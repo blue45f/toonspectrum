@@ -1,4 +1,4 @@
-import { normalizeSafeHttpPathname } from "../common/http-request-path";
+import { normalizeSafeHttpPathname } from "../platform/http/http-request-path";
 
 const MAXIMUM_LOGGED_METHOD_LENGTH = 32;
 

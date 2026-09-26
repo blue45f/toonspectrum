@@ -53,8 +53,8 @@ test("rejects workflow, dependency, lockfile, environment, deployment, and datab
     change("pnpm-lock.yaml"),
     change(".env.production"),
     change("deploy/cloudflare-static/service.sh"),
-    change("apps/api/src/db/migrations/9999_campaign.sql"),
-    change("apps/api/src/db/schema.ts"),
+    change("apps/api/src/platform/database/migrations/9999_campaign.sql"),
+    change("apps/api/src/platform/database/schema.ts"),
     change("scripts/run-production-database-migrations.mjs"),
   ]);
 
@@ -65,8 +65,8 @@ test("rejects workflow, dependency, lockfile, environment, deployment, and datab
     "pnpm-lock.yaml",
     ".env.production",
     "deploy/cloudflare-static/service.sh",
-    "apps/api/src/db/migrations/9999_campaign.sql",
-    "apps/api/src/db/schema.ts",
+    "apps/api/src/platform/database/migrations/9999_campaign.sql",
+    "apps/api/src/platform/database/schema.ts",
     "scripts/run-production-database-migrations.mjs",
   ]) {
     assert.ok(result.issues.some((issue) => issue.includes(pathname)));

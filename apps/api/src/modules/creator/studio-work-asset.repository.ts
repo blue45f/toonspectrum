@@ -28,7 +28,7 @@ import {
   creatorWorkRevisions,
   creatorWorks,
   db,
-} from "../../db";
+} from "../../platform/database";
 import {
   PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
   PrivateObjectReferenceSchema,
@@ -36,7 +36,7 @@ import {
   samePrivateObjectContent,
   type PrivateObjectPurpose,
   type PrivateObjectReference,
-} from "../../infrastructure/private-object-storage/private-object-storage.contract";
+} from "../../platform/adapters/private-object-storage/private-object-storage.contract";
 
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
 import {

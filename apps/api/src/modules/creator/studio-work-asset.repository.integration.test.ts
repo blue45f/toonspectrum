@@ -7,7 +7,7 @@ import type {
   DrizzleStudioWorkAssetRepository,
   StudioWorkAssetWrite,
 } from "./studio-work-asset.repository";
-import type * as DatabaseRuntime from "../../db";
+import type * as DatabaseRuntime from "../../platform/database";
 import type { deleteWork as DeleteCreatorWork } from "../../server/creator";
 
 const INTEGRATION_URL =
@@ -123,7 +123,7 @@ describeWithDirectPostgres(
         connectionString: INTEGRATION_URL,
         max: 2,
       });
-      databaseRuntime = await import("../../db");
+      databaseRuntime = await import("../../platform/database");
       ({ deleteWork: deleteCreatorWork } = await import(
         "../../server/creator"
       ));

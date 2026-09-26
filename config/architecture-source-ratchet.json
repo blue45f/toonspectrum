@@ -2,9 +2,6 @@
   "creatorRootFiles": 3440,
   "webAdminFiles": 71,
   "apiServerFiles": 65,
-  "apiCommonFiles": 13,
-  "apiInfrastructureFiles": 78,
-  "apiDbFiles": 139,
   "packagesCoreFiles": 124,
   "desktopSyncAgentFiles": 0,
   "trackedQaFiles": 0,
@@ -25,5 +22,8 @@
   "rootAutomationFiles": 0,
   "rootMarketplaceBenchmarkFiles": 0,
   "rootViteConfigFiles": 0,
-  "rootDrizzleConfigFiles": 0
+  "rootDrizzleConfigFiles": 0,
+  "apiHttpFiles": 13,
+  "apiAdapterFiles": 78,
+  "apiDatabaseFiles": 139
 }

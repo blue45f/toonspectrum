@@ -24,8 +24,8 @@ on:
       - "apps/web/src/domains/creator/studio-router/studio-route-manifest*.ts"
       - "apps/api/src/modules/studio-ai/studio-ai-comic-director*.ts"
       - "apps/api/src/modules/studio-ai/studio-ai.module.ts"
-      - "apps/api/src/db/schema/studio-ai-comic-director.schema.ts"
-      - "apps/api/src/db/schema/index.ts"
+      - "apps/api/src/platform/database/schema/studio-ai-comic-director.schema.ts"
+      - "apps/api/src/platform/database/schema/index.ts"
       - ".github/workflows/studio-ai-comic-director-complete.yml"
   push:
     branches: ["main"]
@@ -49,8 +49,8 @@ on:
       - "apps/web/src/domains/creator/studio-router/studio-route-manifest*.ts"
       - "apps/api/src/modules/studio-ai/studio-ai-comic-director*.ts"
       - "apps/api/src/modules/studio-ai/studio-ai.module.ts"
-      - "apps/api/src/db/schema/studio-ai-comic-director.schema.ts"
-      - "apps/api/src/db/schema/index.ts"
+      - "apps/api/src/platform/database/schema/studio-ai-comic-director.schema.ts"
+      - "apps/api/src/platform/database/schema/index.ts"
       - ".github/workflows/studio-ai-comic-director-complete.yml"
   workflow_dispatch:
 

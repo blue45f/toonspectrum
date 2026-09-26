@@ -18,7 +18,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 
 import { STUDIO_RASTER_ASSET_MAX_BYTES } from "../../../../web/src/shared/lib/studio-raster-asset-contract";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import { StudioRasterAssetUploadGuard } from "./studio-asset-upload.guard";
 import {

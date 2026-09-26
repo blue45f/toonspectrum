@@ -5,15 +5,6 @@ import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
 
 import {
-  creatorAssetStorageObjects,
-  creatorAssetStorageReplicas,
-  creatorWorkAssetStorageReferences,
-} from "../../../../../../apps/api/src/db/creator-asset-object-storage.schema";
-import {
-  creatorWorkAssets,
-  creatorWorkAssetTombstones,
-} from "../../../../../../apps/api/src/db/schema";
-import {
   assertStudioWorkAssetIdNotReserved,
   assertStudioWorkAssetSourceStorageObject,
   DrizzleStudioWorkAssetRepository,
@@ -35,6 +26,15 @@ import {
   StudioWorkAssetTypeConflictError,
   studioWorkAssetRepositoryProvider,
 } from "../../../../../../apps/api/src/modules/creator/studio-work-asset.repository";
+import {
+  creatorAssetStorageObjects,
+  creatorAssetStorageReplicas,
+  creatorWorkAssetStorageReferences,
+} from "../../../../../../apps/api/src/platform/database/creator-asset-object-storage.schema";
+import {
+  creatorWorkAssets,
+  creatorWorkAssetTombstones,
+} from "../../../../../../apps/api/src/platform/database/schema";
 import {
   STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
   STUDIO_WORK_ASSET_MAX_TOMBSTONES_PER_WORK,

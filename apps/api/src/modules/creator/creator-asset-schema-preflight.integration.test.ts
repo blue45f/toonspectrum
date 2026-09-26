@@ -192,7 +192,7 @@ describeWithDirectPostgres("Creator Asset PostgreSQL schema contract", () => {
     const migration = forwardMigrationBody(
       await readFile(
         new URL(
-          "../../db/migrations/0013_creator_asset_marketplace.sql",
+          "../../platform/database/migrations/0013_creator_asset_marketplace.sql",
           import.meta.url
         ),
         "utf8"

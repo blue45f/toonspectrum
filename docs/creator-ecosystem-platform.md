@@ -72,6 +72,6 @@ DATA4LIBRARY_AUTH_KEY가 설정된 경우 libSrchByBook을 호출한다.
 
 ## 마이그레이션
 
-apps/api/src/db/migrations/0074_creator_ecosystem.sql
+apps/api/src/platform/database/migrations/0074_creator_ecosystem.sql
 
 기존 테이블 수정 없이 신규 테이블/인덱스만 추가하는 additive migration이다.

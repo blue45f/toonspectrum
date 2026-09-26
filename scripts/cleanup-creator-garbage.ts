@@ -90,7 +90,7 @@ export async function runCreatorQaCleanup(args: readonly string[] = process.argv
     );
   }
 
-  // apps/api/src/db는 모듈 로드 시 DATABASE_URL을 읽으므로 환경 주입과 안전 검증 뒤에만 동적 import한다.
+  // apps/api/src/platform/database는 모듈 로드 시 DATABASE_URL을 읽으므로 환경 주입과 안전 검증 뒤에만 동적 import한다.
   const {
     creatorAssets,
     creatorFollows,
@@ -102,7 +102,7 @@ export async function runCreatorQaCleanup(args: readonly string[] = process.argv
     db,
     dbPool,
     users,
-  } = await import("../apps/api/src/db");
+  } = await import("../apps/api/src/platform/database");
 
   try {
     const [

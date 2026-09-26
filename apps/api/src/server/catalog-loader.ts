@@ -2,7 +2,7 @@ import {
   getCatalogState,
   replaceCatalogData,
   resetCatalogToEmpty,
-} from "../../../../packages/core/src/server/catalog-store";
+} from "../../../../packages/core/src/catalog/catalog-store";
 
 import { loadCatalogTitlesFromFile } from "./catalog-file";
 

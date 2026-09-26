@@ -44,7 +44,7 @@ import {
   db,
   supporterFundingSettings,
   supporterPayments,
-} from "../../db";
+} from "../../platform/database";
 import { isOfficialUser } from "../../server/feedback";
 import { ProductionExternalHttpError } from "../production-collaboration/production-integration-http";
 

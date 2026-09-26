@@ -3,7 +3,7 @@ import { sha256Schema, studioEntityIdSchema, type StudioReviewPageMapping } from
 
 import {
   LocatedPrivateObjectReferenceSchema, type LocatedPrivateObjectReference,
-} from "../../infrastructure/private-object-storage/private-object-storage.contract";
+} from "../../platform/adapters/private-object-storage/private-object-storage.contract";
 
 export const STUDIO_REVIEW_PREVIEW_PAGE_SIZE = 32;
 export const STUDIO_REVIEW_PREVIEW_URL_SECONDS = 30;

@@ -7,7 +7,7 @@ import {
   studioAiRequestGates,
   studioAiRequestReceipts,
   studioAiUsageLedger,
-} from "../../db/schema";
+} from "../../platform/database/schema";
 
 import { STUDIO_AI_ADMISSION_GATE } from "./studio-ai-admission";
 import {
@@ -19,7 +19,7 @@ import { STUDIO_AI_IDEMPOTENCY_RECEIPT_RETENTION_MS } from "./studio-ai-idempote
 
 import type { StudioAiAdmissionSqlPool } from "./studio-ai-admission.repository";
 
-vi.mock("../../db", () => ({ dbPool: {} }));
+vi.mock("../../platform/database", () => ({ dbPool: {} }));
 
 const RAW_TOKEN = "raw-lease-token-that-must-never-be-stored-0001";
 const EXPIRES_AT = new Date("2026-07-22T12:00:30.000Z");
@@ -365,7 +365,7 @@ describe("PostgresStudioAiAdmissionRepository", () => {
     ]);
 
     const migration = readFileSync(
-      new URL("../../db/migrations/0018_studio_ai_request_gate.sql", import.meta.url),
+      new URL("../../platform/database/migrations/0018_studio_ai_request_gate.sql", import.meta.url),
       "utf8"
     );
     expect(migration).toContain('CREATE TABLE IF NOT EXISTS "studio_ai_request_gate"');
@@ -409,7 +409,7 @@ describe("PostgresStudioAiAdmissionRepository", () => {
 
     const migration = readFileSync(
       new URL(
-        "../../db/migrations/0019_studio_ai_request_receipt.sql",
+        "../../platform/database/migrations/0019_studio_ai_request_receipt.sql",
         import.meta.url
       ),
       "utf8"
@@ -449,7 +449,7 @@ describe("PostgresStudioAiAdmissionRepository", () => {
 
     const migration = readFileSync(
       new URL(
-        "../../db/migrations/0060_studio_ai_free_provider_expansion.sql",
+        "../../platform/database/migrations/0060_studio_ai_free_provider_expansion.sql",
         import.meta.url
       ),
       "utf8"

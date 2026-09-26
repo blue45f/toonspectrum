@@ -8,7 +8,7 @@ import {
   readCreatorPublicationDirective,
   type CreatorPublicationValidationIssue,
 } from "../../../../web/src/shared/lib/creator-publication-contract";
-import { creatorWorks, db } from "../../db";
+import { creatorWorks, db } from "../../platform/database";
 
 import {
   CreatorPublicationValidationError,

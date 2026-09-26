@@ -24,7 +24,7 @@ describe.runIf(process.env.TRAFFIC_ANALYTICS_COMPARE_POSTGRES === "true")("Postg
       || target.pathname !== "/traffic_analytics_d1_compare") throw new Error("전용 로컬 분석 비교 DB가 필요합니다.");
     postgres = new Pool({ connectionString: target.href });
     for (const name of ["0036_traffic_analytics_relations.sql", "0066_share_analytics_events.sql"]) {
-      await postgres.query(readFileSync(new URL(`../../db/migrations/${name}`, import.meta.url), "utf8"));
+      await postgres.query(readFileSync(new URL(`../../platform/database/migrations/${name}`, import.meta.url), "utf8"));
     }
     sqlite = new DatabaseSync(":memory:");
     sqlite.exec(readFileSync(new URL("../../../../../deploy/federated-data-plane/d1/traffic-analytics.sql", import.meta.url), "utf8"));

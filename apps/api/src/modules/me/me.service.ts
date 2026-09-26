@@ -8,7 +8,7 @@ import {
 } from "../../../../web/src/shared/lib/collection-contract";
 import { parseCreatorRoleProfileInput } from "../../../../web/src/shared/lib/creator-role-contract";
 import { parseRegionSettings } from "../../../../web/src/shared/lib/region-settings";
-import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../db";
+import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../platform/database";
 import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../server/me";
 import type { MembershipRewardService } from "../membership-wallet/membership-wallet.tokens";
 

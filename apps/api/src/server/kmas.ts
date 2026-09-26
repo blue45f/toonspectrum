@@ -1,4 +1,4 @@
-import { activeTags, TITLES } from "../../../../packages/core/src/server/catalog-store";
+import { activeTags, TITLES } from "../../../../packages/core/src/catalog/catalog-store";
 
 import type { PlatformId, Title } from "../../../web/src/shared/lib/types";
 

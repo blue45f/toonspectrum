@@ -29,7 +29,7 @@ const MANIFEST_PATH = resolve(
   SCRIPT_DIRECTORY,
   "production-database-migrations.manifest",
 );
-const MIGRATION_DIRECTORY = resolve(REPOSITORY_ROOT, "apps/api/src/db/migrations");
+const MIGRATION_DIRECTORY = resolve(REPOSITORY_ROOT, "apps/api/src/platform/database/migrations");
 const HEALTH_READINESS_SOURCE = resolve(
   REPOSITORY_ROOT,
   "apps/api/src/modules/health/health-readiness.repository.ts",
@@ -2914,7 +2914,7 @@ export function loadMigrationManifest({
   const expectedPaths = readdirSync(migrationDirectory)
     .filter((name) => /^\d{4}_[a-z0-9_]+\.sql$/u.test(name))
     .sort()
-    .map((name) => `apps/api/src/db/migrations/${name}`);
+    .map((name) => `apps/api/src/platform/database/migrations/${name}`);
   if (
     paths.length !== expectedPaths.length ||
     paths.some((entry, index) => entry !== expectedPaths[index])
@@ -2931,7 +2931,7 @@ export function loadMigrationManifest({
     const absolutePath = resolve(repositoryRoot, relativePath);
     if (
       !absolutePath.startsWith(
-        `${resolve(repositoryRoot, "apps/api/src/db/migrations")}/`,
+        `${resolve(repositoryRoot, "apps/api/src/platform/database/migrations")}/`,
       )
     ) {
       fail(`Migration path escapes the migration directory: ${relativePath}`);

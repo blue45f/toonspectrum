@@ -19,7 +19,7 @@ import type {
   CreatorMarketplacePublishGateSqlPool,
 } from "./creator-marketplace-publish-gate.repository";
 
-vi.mock("../../db", () => ({ dbPool: {} }));
+vi.mock("../../platform/database", () => ({ dbPool: {} }));
 
 const RAW_PUBLISHER_ID = "publisher-private-identity";
 const RAW_LEASE_TOKEN = "test-creator-marketplace-lease-token-0000000001";

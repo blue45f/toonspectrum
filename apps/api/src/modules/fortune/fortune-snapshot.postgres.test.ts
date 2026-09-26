@@ -20,7 +20,7 @@ describe.skipIf(!database)("fortune real PostgreSQL migration and non-owning run
   beforeAll(async () => {
     validateTarget(database!); owner = new Pool({ connectionString: database!, max: 1, connectionTimeoutMillis: 3000, options: `-c search_path=${schema} -c statement_timeout=5000` });
     await owner.query(`CREATE SCHEMA "${schema}"; CREATE ROLE "${role}" LOGIN; GRANT USAGE ON SCHEMA "${schema}" TO "${role}"`);
-    await owner.query(await readFile(new URL("../../db/migrations/0081_fortune_public_snapshot.sql", import.meta.url), "utf8"));
+    await owner.query(await readFile(new URL("../../platform/database/migrations/0081_fortune_public_snapshot.sql", import.meta.url), "utf8"));
     await owner.query(buildFortuneSnapshotRuntimeAclSql(role, schema));
     const url = new URL(database!); url.username = role; url.password = "";
     runtime = new Pool({ connectionString: url.toString(), max: 2, connectionTimeoutMillis: 3000, options: `-c search_path=${schema} -c statement_timeout=5000` });

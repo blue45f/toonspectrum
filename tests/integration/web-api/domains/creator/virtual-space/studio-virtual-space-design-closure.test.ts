@@ -48,7 +48,7 @@ describe("Virtual Studio all-pages design closure", () => {
     const note = text("apps/web/src/domains/creator/virtual-space/StudioReviewVoiceNotes.tsx");
     expect(note).toContain("This is not call recording");
     expect(note).toContain("getUserMedia");
-    const migration = text("apps/api/src/db/migrations/0090_studio_review_voice_note.sql");
+    const migration = text("apps/api/src/platform/database/migrations/0090_studio_review_voice_note.sql");
     expect(migration).toContain("studio_review_voice_note_guard_update");
     expect(migration).toContain("REVOKE ALL ON TABLE studio_review_voice_note FROM PUBLIC");
   });

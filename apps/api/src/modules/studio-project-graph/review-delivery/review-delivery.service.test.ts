@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { ConflictException, ServiceUnavailableException } from "@nestjs/common";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_REVIEW_DELIVERY_PROFILE, createReviewDeliveryManifest } from "@toonspectrum/studio-project-model/review-delivery";
-import { PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION } from "../../../infrastructure/private-object-storage/private-object-storage.contract";
+import { PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION } from "../../../platform/adapters/private-object-storage/private-object-storage.contract";
 import { StudioReviewDeliveryService } from "./review-delivery.service";
 
 const pageBytes = Buffer.from([137, 80, 78, 71]);

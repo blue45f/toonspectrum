@@ -27,10 +27,10 @@ test("finds emitted require calls, including lazy calls, without matching commen
     const example = 'require("@toonspectrum/example")';
     const first = require("./shared");
     const second = require("./shared");
-    const lazy = () => require('@toonspectrum/core/server');
+    const lazy = () => require('@toonspectrum/core/catalog');
     object.require("./unrelated-method");
     require(variable);
-  `), ["./shared", "@toonspectrum/core/server"]);
+  `), ["./shared", "@toonspectrum/core/catalog"]);
 });
 
 test("accepts emitted relative shared modules and resolvable third-party packages", (t) => {

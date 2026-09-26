@@ -20,10 +20,10 @@ import {
   CreatorMarketplacePackageModerationStateSchema,
   CreatorMarketplaceResourceKindSchema,
 } from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
-import { db, users } from "../../db";
-import { creatorMarketplaceLibraryItems } from "../../db/creator-marketplace-library.schema";
-import { creatorMarketplacePackageModeration } from "../../db/creator-marketplace-package-moderation.schema";
-import { creatorMarketplaceResources } from "../../db/creator-marketplace-resource.schema";
+import { db, users } from "../../platform/database";
+import { creatorMarketplaceLibraryItems } from "../../platform/database/creator-marketplace-library.schema";
+import { creatorMarketplacePackageModeration } from "../../platform/database/creator-marketplace-package-moderation.schema";
+import { creatorMarketplaceResources } from "../../platform/database/creator-marketplace-resource.schema";
 
 import {
   CREATOR_MARKETPLACE_LIBRARY_REPOSITORY,

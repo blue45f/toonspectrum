@@ -24,7 +24,7 @@ afterEach(() => {
 describe("authentication runtime schema assertions", () => {
   it("checks the user lifecycle schema read-only, caches success, and retries after failure", async () => {
     vi.resetModules();
-    const { dbClient } = await import("../../../../../../apps/api/src/db");
+    const { dbClient } = await import("../../../../../../apps/api/src/platform/database");
     const failure = new Error("user schema unavailable");
     const execute = vi
       .spyOn(dbClient, "execute")
@@ -55,7 +55,7 @@ describe("authentication runtime schema assertions", () => {
 
   it("checks OAuth tables read-only, caches success, and retries only the failed assertion", async () => {
     vi.resetModules();
-    const { dbClient } = await import("../../../../../../apps/api/src/db");
+    const { dbClient } = await import("../../../../../../apps/api/src/platform/database");
     const failure = new Error("account schema unavailable");
     const execute = vi
       .spyOn(dbClient, "execute")

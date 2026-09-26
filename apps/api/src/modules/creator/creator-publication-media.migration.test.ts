@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 const sql = readFileSync(
   join(
     process.cwd(),
-    "apps/api/src/db/migrations/0091_creator_work_publication_media.sql",
+    "apps/api/src/platform/database/migrations/0091_creator_work_publication_media.sql",
   ),
   "utf8",
 );

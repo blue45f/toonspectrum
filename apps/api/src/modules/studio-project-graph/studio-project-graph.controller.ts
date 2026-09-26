@@ -16,7 +16,7 @@ import {
 
 import { studioEntityIdSchema } from "@toonspectrum/studio-project-model";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import {
   CommitStudioRevisionDto,

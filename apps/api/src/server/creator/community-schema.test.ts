@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   query: vi.fn(),
 }));
 
-vi.mock("../../db", () => ({ dbPool: { query: mocks.query } }));
+vi.mock("../../platform/database", () => ({ dbPool: { query: mocks.query } }));
 
 async function loadSubject() {
   return import("./community-schema");

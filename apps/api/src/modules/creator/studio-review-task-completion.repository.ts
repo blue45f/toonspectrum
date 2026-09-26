@@ -4,7 +4,7 @@ import { canonicalJson, studioReviewTaskCompletionContextSchema, studioReviewTas
   type StudioReviewTaskCompletionInput } from "@toonspectrum/studio-project-model";
 import type { PoolClient } from "pg";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import { loadStudioReviewResolutionCaptures } from "../studio-project-graph/studio-review-capture-attestation";
 import { resolveCreatorCollaborationAccess } from "./creator-collaboration.policy";
 import { studioReviewTaskCompletionBasis, studioReviewTaskCompletionFingerprint } from "./studio-review-task-completion-invalidation";

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import type { Pool, PoolClient, QueryResultRow } from "pg";
 import type {

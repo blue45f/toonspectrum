@@ -13,7 +13,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { OAuth2Client } from "google-auth-library";
 
-import { accounts, db, dbClient, users } from "../db";
+import { accounts, db, dbClient, users } from "../platform/database";
 
 import { normalizePersistedAuthRole } from "./admin-roles";
 import { ensureUserLifecycleSchema, getUserAuthBlock, normalizeSessionVersion } from "./user-lifecycle";

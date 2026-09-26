@@ -3,8 +3,8 @@ import { ConflictException, ForbiddenException, HttpException, Inject, Injectabl
 import { canonicalJson } from "@toonspectrum/studio-project-model";
 import { reviewDeliveryManifestSchema, type ReviewDeliveryAction, type ReviewDeliveryAccept, type ReviewDeliveryPrepare } from "@toonspectrum/studio-project-model/review-delivery";
 
-import { PrivateSignedReadUrlSchema, type LocatedPrivateObjectReference } from "../../../infrastructure/private-object-storage/private-object-storage.contract";
-import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../../infrastructure/private-object-storage/private-object-storage.port";
+import { PrivateSignedReadUrlSchema, type LocatedPrivateObjectReference } from "../../../platform/adapters/private-object-storage/private-object-storage.contract";
+import { PRIVATE_OBJECT_STORAGE_PORT, type PrivateObjectStoragePort } from "../../../platform/adapters/private-object-storage/private-object-storage.port";
 import { PinnedShareError } from "../pinned-share/pinned-share-storage";
 import { StudioReviewDeliveryRepository } from "./review-delivery.repository";
 import { buildReviewDeliveryZip } from "./review-delivery-zip";

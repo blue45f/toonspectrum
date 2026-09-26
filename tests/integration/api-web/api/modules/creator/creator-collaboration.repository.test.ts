@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { db } from "../../../../../../apps/api/src/db";
 import {
   buildCreatorCollaborationWorkQuery,
   buildCreatorCrdtServerSequenceQuery,
@@ -19,6 +18,7 @@ import {
   decodeCreatorSharedWorksCursor,
   encodeCreatorSharedWorksCursor,
 } from "../../../../../../apps/api/src/modules/creator/creator-collaboration.repository";
+import { db } from "../../../../../../apps/api/src/platform/database";
 import { CreatorDraftCollaborationStatusLockedError } from "../../../../../../apps/api/src/server/creator-provisional-work-status";
 import {
   StudioLinked3dPassAssetFenceError,

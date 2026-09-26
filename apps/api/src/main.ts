@@ -1,11 +1,11 @@
-import "./load-env"; // 반드시 첫 import — apps/api/src/db가 DATABASE_URL을 읽기 전에 .env.local 주입
+import "./load-env"; // 반드시 첫 import — apps/api/src/platform/database가 DATABASE_URL을 읽기 전에 .env.local 주입
 import "reflect-metadata";
 import { RequestMethod } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { Logger } from "nestjs-pino";
 
 import { CapabilityWorkerAppModule } from "./capability-worker-app.module";
-import { ZodValidationPipe } from "./common/zod-validation.pipe";
+import { ZodValidationPipe } from "./platform/http/zod-validation.pipe";
 import { configureApiBodyParserBoundary } from "./config/api-body-parser-boundary";
 import { configureCors } from "./config/cors";
 import { validateEnv } from "./config/env";
@@ -17,9 +17,9 @@ import {
 } from "./config/runtime-role";
 import { createApiSecurityHeadersMiddleware } from "./config/security-headers";
 import { createCsrfProtectionMiddleware } from "./csrf-middleware";
-import { BACKEND_CAPABILITY_GATEWAY_PATH } from "./infrastructure/backend-capabilities/backend-capability-gateway-contract";
-import { resolveBackendCapabilityPolicy } from "./infrastructure/backend-capabilities/backend-capability-policy";
-import { BACKEND_CAPABILITY_WORKER_HEALTH_PATH } from "./infrastructure/backend-capabilities/backend-capability-worker-health.controller";
+import { BACKEND_CAPABILITY_GATEWAY_PATH } from "./platform/adapters/backend-capabilities/backend-capability-gateway-contract";
+import { resolveBackendCapabilityPolicy } from "./platform/adapters/backend-capabilities/backend-capability-policy";
+import { BACKEND_CAPABILITY_WORKER_HEALTH_PATH } from "./platform/adapters/backend-capabilities/backend-capability-worker-health.controller";
 import {
   createStudioLivePostgresIoAdapter,
   type StudioLivePostgresIoAdapter,

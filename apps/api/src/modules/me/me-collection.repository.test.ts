@@ -1,7 +1,7 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { collectionItems, collections } from "../../db/schema";
+import { collectionItems, collections } from "../../platform/database/schema";
 
 import { DrizzleMeCollectionRepository } from "./me-collection.repository";
 

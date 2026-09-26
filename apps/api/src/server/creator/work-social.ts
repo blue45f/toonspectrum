@@ -4,7 +4,7 @@ import { and, eq, sql } from "drizzle-orm";
 import {
   exceedsThreadedCommentReplyDepth,
   MAX_THREADED_COMMENT_REPLY_DEPTH,
-} from "../../common/threaded-comment-depth";
+} from "../../platform/http/threaded-comment-depth";
 
 import {
   creatorWorkCommentLikes,
@@ -12,7 +12,7 @@ import {
   creatorWorkLikes,
   db,
   users,
-} from "../../db";
+} from "../../platform/database";
 
 import {
   authorOf,

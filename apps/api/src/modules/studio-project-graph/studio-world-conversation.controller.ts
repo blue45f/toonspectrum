@@ -3,7 +3,7 @@ import { createZodDto } from "nestjs-zod";
 import { studioConversationChangeSchema, studioConversationProposeSchema, studioConversationReadSchema, studioConversationRenewSchema } from "@toonspectrum/studio-project-model/world-conversation";
 import type { Request } from "express";
 import { getSessionAuthenticationPrincipal, getSessionAuthenticationSource } from "../../session-middleware";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { StudioWorkParamsDto } from "./studio-project-graph.dto";
 import { requireStudioIdempotencyKey } from "./studio-project-graph.controller";
 import { StudioWorldConversationService } from "./studio-world-conversation.service";

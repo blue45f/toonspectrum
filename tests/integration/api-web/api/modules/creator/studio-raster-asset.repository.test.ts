@@ -2,7 +2,6 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 
-import { creatorWorkRasterAssets } from "../../../../../../apps/api/src/db/studio-raster-asset.schema";
 import {
   DrizzleStudioRasterAssetRepository,
   STUDIO_RASTER_ASSET_REPOSITORY,
@@ -16,6 +15,7 @@ import {
   studioRasterAssetRepositoryProvider,
   studioCrdtHydrationReferencesRasterAsset,
 } from "../../../../../../apps/api/src/modules/creator/studio-raster-asset.repository";
+import { creatorWorkRasterAssets } from "../../../../../../apps/api/src/platform/database/studio-raster-asset.schema";
 import {
   STUDIO_CRDT_RASTER_CHECKPOINTS_ROOT,
   STUDIO_CRDT_RASTER_OPERATIONS_ROOT,

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 const migrationName = "0089_creator_series_spatial_showcase.sql";
 const migration = readFileSync(
-  new URL(`../../db/migrations/${migrationName}`, import.meta.url),
+  new URL(`../../platform/database/migrations/${migrationName}`, import.meta.url),
   "utf8",
 );
 const manifest = readFileSync(
@@ -21,6 +21,6 @@ describe("creator series spatial showcase migration", () => {
   });
 
   it("is part of the reviewed production migration manifest", () => {
-    expect(manifest).toContain(`apps/api/src/db/migrations/${migrationName}`);
+    expect(manifest).toContain(`apps/api/src/platform/database/migrations/${migrationName}`);
   });
 });

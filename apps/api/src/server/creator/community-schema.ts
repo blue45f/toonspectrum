@@ -1,11 +1,11 @@
 // 커뮤니티 확장 스키마: 마이그레이션 상태를 먼저 검증하고 레거시 DB만 멱등 보정한다.
-import { dbPool } from "../../db";
-import { isDatabaseAvailabilityError } from "../../common/database-availability";
+import { dbPool } from "../../platform/database";
+import { isDatabaseAvailabilityError } from "../../platform/http/database-availability";
 import {
   capabilityUnavailableException,
   DATABASE_UNAVAILABLE_CODE,
   DEFAULT_SERVICE_RETRY_AFTER_SECONDS,
-} from "../../common/service-availability";
+} from "../../platform/http/service-availability";
 
 const VERIFY_COMMUNITY_SCHEMA_SQL = `
   WITH

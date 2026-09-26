@@ -53,7 +53,7 @@ test("manifest lists every numbered SQL migration exactly once in order", () => 
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
-  const files = readdirSync(new URL("../apps/api/src/db/migrations/", import.meta.url))
+  const files = readdirSync(new URL("../apps/api/src/platform/database/migrations/", import.meta.url))
     .filter((name) => /^\d{4}_.+\.sql$/u.test(name))
     .sort();
   const manifestFiles = loadMigrationManifest().map(({ id }) => id + ".sql");
@@ -693,7 +693,7 @@ test("creator community migration aligns canonical runtime indexes and records r
   }
 
   const drizzleSchema = readFileSync(
-    new URL("../apps/api/src/db/schema/creator.schema.ts", import.meta.url),
+    new URL("../apps/api/src/platform/database/schema/creator.schema.ts", import.meta.url),
     "utf8",
   );
   for (const canonicalIndex of [
@@ -732,7 +732,7 @@ test("auth lifecycle migration owns schema repair and a durable readiness marker
 
   // db/schema.ts 는 배럴이다 — user/account 테이블 선언은 schema/auth.schema.ts 가 소유한다.
   const drizzleSchema = readFileSync(
-    new URL("../apps/api/src/db/schema/auth.schema.ts", import.meta.url),
+    new URL("../apps/api/src/platform/database/schema/auth.schema.ts", import.meta.url),
     "utf8",
   );
   expect(drizzleSchema).toContain(

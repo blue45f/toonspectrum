@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Header, Headers, HttpCode, HttpStatus, Inject, Param, Post } from "@nestjs/common";
 import { createZodDto } from "nestjs-zod";
 import { studioWorldPublishSchema } from "@toonspectrum/studio-project-model/world-publication";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { authenticatedStudioUserId, requireStudioIdempotencyKey } from "./studio-project-graph.controller";
 import { StudioWorkParamsDto } from "./studio-project-graph.dto";
 import { StudioWorldPublicationService } from "./studio-world-publication.service";

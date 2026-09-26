@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const migration = readFileSync(
   new URL(
-    "../../db/migrations/0067_creator_role_workspace_personalization.sql",
+    "../../platform/database/migrations/0067_creator_role_workspace_personalization.sql",
     import.meta.url,
   ),
   "utf8",
@@ -26,9 +26,9 @@ describe("creator role workspace production migration", () => {
 
   it("is registered after the share analytics migration", () => {
     expect(manifest).toContain(
-      "apps/api/src/db/migrations/0065_creator_series_lifecycle.sql\n"
-      + "apps/api/src/db/migrations/0066_share_analytics_events.sql\n"
-      + "apps/api/src/db/migrations/0067_creator_role_workspace_personalization.sql\n",
+      "apps/api/src/platform/database/migrations/0065_creator_series_lifecycle.sql\n"
+      + "apps/api/src/platform/database/migrations/0066_share_analytics_events.sql\n"
+      + "apps/api/src/platform/database/migrations/0067_creator_role_workspace_personalization.sql\n",
     );
   });
 });

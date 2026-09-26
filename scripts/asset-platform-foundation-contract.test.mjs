@@ -7,10 +7,10 @@ const root = process.cwd();
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 
 const migrationPath =
-  "apps/api/src/db/migrations/0039_creator_asset_platform_foundation.sql";
-const drizzlePath = "apps/api/src/db/creator-asset-platform.schema.ts";
-const processingPath = "apps/api/src/db/creator-asset-processing.schema.ts";
-const rightsPath = "apps/api/src/db/creator-asset-rights-evidence.schema.ts";
+  "apps/api/src/platform/database/migrations/0039_creator_asset_platform_foundation.sql";
+const drizzlePath = "apps/api/src/platform/database/creator-asset-platform.schema.ts";
+const processingPath = "apps/api/src/platform/database/creator-asset-processing.schema.ts";
+const rightsPath = "apps/api/src/platform/database/creator-asset-rights-evidence.schema.ts";
 const sharedContractPath =
   "apps/web/src/shared/lib/creator-asset-platform-contract.ts";
 const publishPagePath =
@@ -40,11 +40,11 @@ describe("asset platform production migration", () => {
       .split("\n");
     expect(manifest.slice(38, 42)).toEqual([
       migrationPath,
-      "apps/api/src/db/migrations/0040_creator_asset_platform_integrity.sql",
-      "apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql",
-      "apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql",
+      "apps/api/src/platform/database/migrations/0040_creator_asset_platform_integrity.sql",
+      "apps/api/src/platform/database/migrations/0041_creator_asset_evidence_lineage.sql",
+      "apps/api/src/platform/database/migrations/0042_creator_asset_publication_retention.sql",
     ]);
-    expect(manifest[43]).toBe("apps/api/src/db/migrations/0044_creator_work_entitlement_authorization.sql");
+    expect(manifest[43]).toBe("apps/api/src/platform/database/migrations/0044_creator_work_entitlement_authorization.sql");
     expect(new Set(manifest).size).toBe(manifest.length);
   });
 
@@ -94,7 +94,7 @@ describe("asset platform production migration", () => {
 
 describe("asset platform code contracts", () => {
   it("exports every Drizzle schema from the API database boundary", () => {
-    const index = read("apps/api/src/db/index.ts");
+    const index = read("apps/api/src/platform/database/index.ts");
     expect(index).toContain('export * from "./creator-asset-platform.schema";');
     expect(index).toContain('export * from "./creator-asset-processing.schema";');
     expect(index).toContain(

@@ -15,9 +15,9 @@ import {
   commerceEntitlements,
   commerceProductPrices,
   db,
-} from "../../db";
-import { creatorMarketplaceLibraryItems } from "../../db/creator-marketplace-library.schema";
-import { creatorMarketplaceResources } from "../../db/creator-marketplace-resource.schema";
+} from "../../platform/database";
+import { creatorMarketplaceLibraryItems } from "../../platform/database/creator-marketplace-library.schema";
+import { creatorMarketplaceResources } from "../../platform/database/creator-marketplace-resource.schema";
 import { getCommerceConfig } from "../../server/commerce-config";
 
 export interface MarketplaceCommerceProduct {

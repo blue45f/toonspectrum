@@ -21,7 +21,7 @@ import {
 } from "../../../../web/src/shared/lib/creator-community-publication-contract";
 import { rateLimit } from "../../../../web/src/shared/lib/rate-limit";
 import { StudioLinked3dPassAssetFenceError } from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
-import { StudioRealtimeRevocationService } from "../../infrastructure/studio-realtime-revocation/studio-realtime-revocation.client";
+import { StudioRealtimeRevocationService } from "../../platform/adapters/studio-realtime-revocation/studio-realtime-revocation.client";
 import {
   MEMBERSHIP_REWARD_SERVICE,
   type MembershipRewardService,

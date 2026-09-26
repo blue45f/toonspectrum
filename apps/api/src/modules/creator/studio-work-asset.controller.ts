@@ -19,7 +19,7 @@ import {
 } from "@nestjs/common";
 import { FileFieldsInterceptor, FileInterceptor } from "@nestjs/platform-express";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import { StudioWorkAssetUploadGuard } from "./studio-asset-upload.guard";
 import {

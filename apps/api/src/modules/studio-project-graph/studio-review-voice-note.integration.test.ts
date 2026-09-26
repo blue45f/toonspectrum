@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type * as DatabaseRuntime from "../../db";
+import type * as DatabaseRuntime from "../../platform/database";
 import type { StudioReviewVoiceNoteRepository } from "./studio-review-voice-note.repository";
 
 vi.mock("./pinned-share/pinned-share-storage", async (importOriginal) => {
@@ -16,7 +16,7 @@ if (process.env.CI && !connection) throw new Error("CI must provide real Postgre
   const works: string[] = [], users: string[] = [], previous = process.env.DATABASE_URL;
   beforeAll(async () => {
     process.env.DATABASE_URL = connection!; pool = new Pool({ connectionString: connection, max: 4 });
-    database = await import("../../db");
+    database = await import("../../platform/database");
     repository = new (await import("./studio-review-voice-note.repository")).StudioReviewVoiceNoteRepository();
     const table = await pool.query("SELECT to_regclass('public.studio_review_voice_note') AS name");
     expect(table.rows[0]?.name).toBe("studio_review_voice_note");

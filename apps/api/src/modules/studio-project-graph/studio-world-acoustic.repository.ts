@@ -5,7 +5,7 @@ import { canonicalJson } from "@toonspectrum/studio-project-model";
 import { STUDIO_WORLD_ARTIFACT_PREFIX, type StudioWorldPublication } from "@toonspectrum/studio-project-model/world-publication";
 import { STUDIO_ACOUSTIC_MAX_SESSIONS, STUDIO_ACOUSTIC_RESOURCE_PREFIX as PREFIX, STUDIO_ACOUSTIC_SESSION_MS, studioAcousticCoreBindingSchema, studioAcousticDoorChangeSchema, studioAcousticSessionOpenSchema, studioAcousticSessionLeaseSchema, type StudioAcousticCoreBinding, type StudioAcousticDoorChange, type StudioAcousticSessionOpen, type StudioAcousticSessionLease, type StudioAcousticWorldPin } from "@toonspectrum/studio-project-model/world-acoustic";
 import type { PoolClient } from "pg";
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import type { VerifiedSessionToken } from "../../server/session";
 import { assertAccess, projectAccess, studioRequestHash as hash, StudioIdempotencyConflictError, StudioProjectNotFoundError, StudioProjectForbiddenError } from "./studio-project-graph.repository";
 import { loadStudioWorldPublication } from "./studio-world-publication.repository";

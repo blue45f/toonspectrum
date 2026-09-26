@@ -18,7 +18,7 @@ import {
   reviews,
   revenueLedger,
   users,
-} from "../../db";
+} from "../../platform/database";
 import { invalidateSessionUser } from "../../server/session";
 import {
   ensureUserLifecycleSchema,

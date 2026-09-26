@@ -13,7 +13,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import {
   bindStudioRemoteReferenceImageDeliveryLease,

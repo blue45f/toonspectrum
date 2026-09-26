@@ -14,7 +14,7 @@ import {
 import {
   db,
   membershipGrants,
-} from "../../db";
+} from "../../platform/database";
 import { isAdminUser } from "../../server/app-config";
 
 import {

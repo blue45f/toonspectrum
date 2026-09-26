@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { and, eq } from "drizzle-orm";
 
-import { accounts, db, users } from "../../db";
+import { accounts, db, users } from "../../platform/database";
 import { ensureOAuthTables } from "../../server/oauth";
 import {
   revokeUserSessions,

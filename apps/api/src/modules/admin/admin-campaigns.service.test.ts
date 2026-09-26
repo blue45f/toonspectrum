@@ -12,10 +12,10 @@ const boundary = vi.hoisted(() => ({
   audit: vi.fn(),
 }));
 
-vi.mock("../../db", async () => {
+vi.mock("../../platform/database", async () => {
   const { drizzle } = await import("drizzle-orm/pg-proxy");
-  const { creatorCampaigns, monetizationPlans, revenueLedger } = await import("../../db/schema/admin.schema");
-  const { users } = await import("../../db/schema/auth.schema");
+  const { creatorCampaigns, monetizationPlans, revenueLedger } = await import("../../platform/database/schema/admin.schema");
+  const { users } = await import("../../platform/database/schema/auth.schema");
   return {
     creatorCampaigns,
     monetizationPlans,

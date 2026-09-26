@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { UpstashCoordinationPort } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import type { UpstashCoordinationPort } from "../../platform/adapters/upstash-coordination/upstash-coordination.port";
 import {
   CreatorIntelligenceAdmissionError,
   CreatorIntelligencePaidAdmission,

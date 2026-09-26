@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { studioWorldPublishSchema, type StudioWorldPublish } from "@toonspectrum/studio-project-model/world-publication";
-import type * as DatabaseRuntime from "../../db";
+import type * as DatabaseRuntime from "../../platform/database";
 import type { StudioProjectGraphRepository } from "./studio-project-graph.repository";
 import type { StudioWorldPublicationRepository } from "./studio-world-publication.repository";
 import type { StudioWorldAcousticRepository } from "./studio-world-acoustic.repository";
@@ -31,7 +31,7 @@ const input = (expectedPublishedRevisionId: string | null = null, label = "Room"
   beforeAll(async () => {
     process.env.DATABASE_URL = connection!;
     pool = new Pool({ connectionString: connection, max: 4 });
-    database = await import("../../db");
+    database = await import("../../platform/database");
     repository = new (await import("./studio-world-publication.repository")).StudioWorldPublicationRepository();
     graph = new (await import("./studio-project-graph.repository")).StudioProjectGraphRepository();
     acoustic = new (await import("./studio-world-acoustic.repository")).StudioWorldAcousticRepository();

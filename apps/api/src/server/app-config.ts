@@ -2,7 +2,7 @@
 // 기본값은 전부 비활성(초반엔 전 기능 무료·광고 없음). 관리자만 켤 수 있다.
 import { eq } from "drizzle-orm";
 
-import { appSettings, db, users } from "../db";
+import { appSettings, db, users } from "../platform/database";
 
 import { isPersistedAdminRole } from "./admin-roles";
 import { getSessionUserCached } from "./session";

@@ -6,7 +6,7 @@ import {
   creatorWorkLiveLockClocks,
   creatorWorkLiveLocks,
   db,
-} from "../../db";
+} from "../../platform/database";
 
 export const STUDIO_LIVE_LOCK_REPOSITORY = Symbol("STUDIO_LIVE_LOCK_REPOSITORY");
 export const STUDIO_LIVE_LOCK_LIMIT_PER_WORK = 200;

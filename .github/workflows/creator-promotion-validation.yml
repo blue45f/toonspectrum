@@ -6,15 +6,15 @@ on:
       - 'packages/core/src/promotion.ts'
       - 'packages/core/src/collaboration*'
       - 'apps/api/src/modules/collaboration/**'
-      - 'apps/api/src/db/schema/collaboration.schema.ts'
-      - 'apps/api/src/db/migrations/0047_creator_collaboration_board.sql'
+      - 'apps/api/src/platform/database/schema/collaboration.schema.ts'
+      - 'apps/api/src/platform/database/migrations/0047_creator_collaboration_board.sql'
       - 'apps/web/src/domains/collaboration/**'
       - 'apps/web/src/platform/collaboration-client.ts'
       - 'e2e/creator-hub.spec.ts'
       - 'playwright.creator-hub.config.ts'
       - 'apps/api/src/modules/promotion/**'
-      - 'apps/api/src/db/schema/promotion.schema.ts'
-      - 'apps/api/src/db/migrations/0046_creator_promotion_community.sql'
+      - 'apps/api/src/platform/database/schema/promotion.schema.ts'
+      - 'apps/api/src/platform/database/migrations/0046_creator_promotion_community.sql'
       - 'apps/web/src/domains/promotion/**'
       - 'apps/web/src/platform/promotion-client.ts'
       - 'scripts/verify-promotion-contract.mjs'
@@ -39,7 +39,7 @@ jobs:
             scripts/verify-promotion-contract.mjs
             scripts/production-database-migrations.manifest
             apps/web/src/app/routes/groups/community.routes.tsx
-            apps/api/src/db/migrations/0046_creator_promotion_community.sql
+            apps/api/src/platform/database/migrations/0046_creator_promotion_community.sql
             config/http-response-headers.json
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v6

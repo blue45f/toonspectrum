@@ -43,7 +43,7 @@ try {
     "0090_studio_review_voice_note.sql",
     "0091_creator_work_publication_media.sql",
   ]) {
-    await pool.query(await readFile(new URL(`../apps/api/src/db/migrations/${migration}`, import.meta.url), "utf8"));
+    await pool.query(await readFile(new URL(`../apps/api/src/platform/database/migrations/${migration}`, import.meta.url), "utf8"));
   }
   const triggers = await pool.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgname LIKE 'studio_%'");
   for (const required of ["studio_revision_immutable_update", "studio_revision_topology_revision", "studio_revision_topology_parent", "studio_artifact_revision_pointer_check", "studio_review_snapshot_check", "studio_review_reviewer_check", "studio_review_comment_anchor_check", "studio_review_policy_guard_trigger", "studio_review_policy_event_guard_trigger", "studio_review_group_approval_check", "studio_pinned_review_share_immutable_update", "studio_pinned_review_feedback_immutable_update", "studio_review_delivery_guard_update", "studio_review_delivery_event_immutable_update", "studio_review_voice_note_guard_update"]) {

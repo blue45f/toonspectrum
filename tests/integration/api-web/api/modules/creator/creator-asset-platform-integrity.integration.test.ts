@@ -421,7 +421,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
       const accepted = await workBinding(connection, selected, { entitlement, insertedAt: "2000-06-01T00:00:00Z" });
       const snapshot = async () => (await connection.query('SELECT * FROM creator_work_catalog_asset_binding WHERE "workId"=$1', [accepted.work])).rows[0];
       const before = await snapshot();
-      const migration = await readFile(new URL("../../../../../../apps/api/src/db/migrations/0044_creator_work_entitlement_authorization.sql", import.meta.url), "utf8");
+      const migration = await readFile(new URL("../../../../../../apps/api/src/platform/database/migrations/0044_creator_work_entitlement_authorization.sql", import.meta.url), "utf8");
       await connection.query(migration.replaceAll("public.", `"${legacy}".`));
       expect(await snapshot()).toEqual(before);
       await connection.query('UPDATE creator_work_catalog_asset_binding SET "qualityProfile"=\'mobile\',state=\'revoked-warning\' WHERE "workId"=$1', [accepted.work]);
@@ -703,7 +703,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
           return rows;
         };
         const before = await snapshot();
-        const sql = await readFile(new URL("../../../../../../apps/api/src/db/migrations/0041_creator_asset_evidence_lineage.sql", import.meta.url), "utf8");
+        const sql = await readFile(new URL("../../../../../../apps/api/src/platform/database/migrations/0041_creator_asset_evidence_lineage.sql", import.meta.url), "utf8");
         const constraint = {
           lineage: "creator_asset_artifact_set_seal_lineage", entitlement: "creator_work_catalog_asset_binding_entitlement_release",
           dangling: "creator_marketplace_draft_artifact_set_fkey", review: "creator_marketplace_draft_review_evidence",
@@ -912,7 +912,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
         return rows;
       };
       const before = await snapshot();
-      const sql = (await readFile(new URL("../../../../../../apps/api/src/db/migrations/0042_creator_asset_publication_retention.sql", import.meta.url), "utf8"))
+      const sql = (await readFile(new URL("../../../../../../apps/api/src/platform/database/migrations/0042_creator_asset_publication_retention.sql", import.meta.url), "utf8"))
         .replaceAll("public.", `"${legacy}".`);
       if (kind === "valid") {
         await connection.query(sql);

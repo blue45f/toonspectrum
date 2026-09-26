@@ -4,7 +4,7 @@ import { StudioProductionWorkspaceDocumentSchema } from "./studio-production.dto
 import { StudioReviewTaskCompletionRepository } from "./studio-review-task-completion.repository";
 
 const mock = vi.hoisted(() => ({ connect: vi.fn(), captures: vi.fn() }));
-vi.mock("../../db", () => ({ dbPool: { connect: mock.connect } }));
+vi.mock("../../platform/database", () => ({ dbPool: { connect: mock.connect } }));
 vi.mock("../studio-project-graph/studio-review-capture-attestation", () => ({ loadStudioReviewResolutionCaptures: mock.captures }));
 
 function fixture() {

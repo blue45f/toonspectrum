@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { creatorMarketplaceResources } from "../../db/creator-marketplace-resource.schema";
+import { creatorMarketplaceResources } from "../../platform/database/creator-marketplace-resource.schema";
 
 const repositorySource = readFileSync(
   new URL("./creator-marketplace.repository.ts", import.meta.url),
@@ -11,7 +11,7 @@ const repositorySource = readFileSync(
 );
 const migration = readFileSync(
   new URL(
-    "../../db/migrations/0030_creator_marketplace_immutable_releases.sql",
+    "../../platform/database/migrations/0030_creator_marketplace_immutable_releases.sql",
     import.meta.url,
   ),
   "utf8",

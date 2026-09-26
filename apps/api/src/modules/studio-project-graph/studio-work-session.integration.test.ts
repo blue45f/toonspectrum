@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import type * as DatabaseRuntime from "../../db";
+import type * as DatabaseRuntime from "../../platform/database";
 import type { StudioProjectGraphRepository } from "./studio-project-graph.repository";
 import type { StudioWorkSessionRepository } from "./studio-work-session.repository";
 
@@ -12,7 +12,7 @@ if (process.env.CI && !connection) throw new Error("CI must provide real Postgre
   const works: string[] = [], users: string[] = [], previous = process.env.DATABASE_URL;
   beforeAll(async () => {
     process.env.DATABASE_URL = connection!; pool = new Pool({ connectionString: connection, max: 4 });
-    database = await import("../../db");
+    database = await import("../../platform/database");
     graph = new (await import("./studio-project-graph.repository")).StudioProjectGraphRepository();
     sessions = new (await import("./studio-work-session.repository")).StudioWorkSessionRepository();
     const result = await pool.query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal AND tgenabled <> 'D'");

@@ -1,6 +1,6 @@
-import { runSchemaPreflightToleratingDbUnavailability } from "../../common/database-availability";
-import { matchesPostgresCheckDefinition } from "../../common/postgres-check-definition";
-import { dbPool } from "../../db";
+import { runSchemaPreflightToleratingDbUnavailability } from "../../platform/http/database-availability";
+import { matchesPostgresCheckDefinition } from "../../platform/http/postgres-check-definition";
+import { dbPool } from "../../platform/database";
 
 import type { Pool } from "pg";
 

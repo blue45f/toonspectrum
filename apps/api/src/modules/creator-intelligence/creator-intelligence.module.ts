@@ -16,9 +16,9 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 
-import { PrivateObjectStorageModule } from "../../infrastructure/private-object-storage/private-object-storage.module";
-import { UpstashCoordinationModule } from "../../infrastructure/upstash-coordination/upstash-coordination.module";
-import { UPSTASH_COORDINATION_PORT } from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+import { PrivateObjectStorageModule } from "../../platform/adapters/private-object-storage/private-object-storage.module";
+import { UpstashCoordinationModule } from "../../platform/adapters/upstash-coordination/upstash-coordination.module";
+import { UPSTASH_COORDINATION_PORT } from "../../platform/adapters/upstash-coordination/upstash-coordination.port";
 import {
   studioRemoteReferenceDnsResolverProvider,
   studioRemoteReferenceHttpRequesterProvider,

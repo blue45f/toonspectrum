@@ -9,7 +9,7 @@ const connectionString = process.env.TEST_DATABASE_URL;
 const target = validatePostgresIntegrationUrl(connectionString);
 assert.equal(target.databaseName, "promotion_test", "Use the dedicated disposable promotion_test database only");
 process.env.DATABASE_URL = connectionString;
-const { dbPool } = await import("../apps/api/src/db/index.ts");
+const { dbPool } = await import("../apps/api/src/platform/database/index.ts");
 const { PromotionService } = await import("../apps/api/src/modules/promotion/promotion.service.ts");
 const service = new PromotionService();
 const prefix = `promotion-test-${randomUUID()}`;
@@ -24,7 +24,7 @@ const status = (expected) => (error) => error?.getStatus?.() === expected;
 await test("promotion PostgreSQL integration", async (t) => {
   try {
     await dbPool.query('CREATE TABLE IF NOT EXISTS "user" (id text PRIMARY KEY, name text, role text NOT NULL DEFAULT \'user\')');
-    const migration = await readFile(new URL("../apps/api/src/db/migrations/0046_creator_promotion_community.sql", import.meta.url), "utf8");
+    const migration = await readFile(new URL("../apps/api/src/platform/database/migrations/0046_creator_promotion_community.sql", import.meta.url), "utf8");
     for (const id of actors) await dbPool.query('INSERT INTO "user" (id, name, role) VALUES ($1, $2, $3)', [id, id, id === moderator ? "admin" : "user"]);
     await t.test("additive migration is repeatable and creates all four tables", async () => {
       await dbPool.query(migration); await dbPool.query(migration);

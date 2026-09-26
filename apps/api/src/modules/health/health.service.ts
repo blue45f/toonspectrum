@@ -5,17 +5,17 @@ import {
   capabilityIncidentId,
   clearCapabilityIncident,
   DEFAULT_SERVICE_RETRY_AFTER_SECONDS,
-} from "../../common/service-availability";
-import { BackendCapabilityGatewayExecutor } from "../../infrastructure/backend-capabilities/backend-capability-gateway-executor";
+} from "../../platform/http/service-availability";
+import { BackendCapabilityGatewayExecutor } from "../../platform/adapters/backend-capabilities/backend-capability-gateway-executor";
 import {
   PRIVATE_OBJECT_STORAGE_PORT,
   type PrivateObjectStoragePort,
-} from "../../infrastructure/private-object-storage/private-object-storage.port";
-import { resolveUpstashCoordinationConfig } from "../../infrastructure/upstash-coordination/upstash-coordination.config";
+} from "../../platform/adapters/private-object-storage/private-object-storage.port";
+import { resolveUpstashCoordinationConfig } from "../../platform/adapters/upstash-coordination/upstash-coordination.config";
 import {
   UPSTASH_COORDINATION_PORT,
   type UpstashCoordinationPort,
-} from "../../infrastructure/upstash-coordination/upstash-coordination.port";
+} from "../../platform/adapters/upstash-coordination/upstash-coordination.port";
 import { resolveStudioLiveClusterAdapterConfig } from "../../realtime/studio-postgres-io.adapter";
 import { resolveAuthRateLimitConfig } from "../auth/auth-rate-limit.config";
 import {

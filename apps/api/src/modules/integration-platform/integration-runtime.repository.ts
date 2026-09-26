@@ -1,7 +1,7 @@
 import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { Inject, Injectable } from "@nestjs/common";
 
-import { db, productionIntegrationReceipts } from "../../db";
+import { db, productionIntegrationReceipts } from "../../platform/database";
 import {
   INTEGRATION_RUNTIME_PROVIDER_IDS,
   type IntegrationRuntimeProviderId,

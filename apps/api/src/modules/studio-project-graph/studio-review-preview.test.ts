@@ -1,15 +1,15 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION } from "../../infrastructure/private-object-storage/private-object-storage.contract";
-import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
+import { PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION } from "../../platform/adapters/private-object-storage/private-object-storage.contract";
+import type { PrivateObjectStoragePort } from "../../platform/adapters/private-object-storage/private-object-storage.port";
 import { StudioProjectForbiddenError, StudioProjectGraphRepository, StudioProjectNotFoundError, StudioRepositoryInvariantError } from "./studio-project-graph.repository";
 import { studioReviewPreviewObject, type StudioReviewPreviewBlobRow } from "./studio-review-preview";
 import { StudioReviewPreviewController, StudioReviewPreviewQueryDto } from "./studio-review-preview.controller";
 import { StudioReviewPreviewService } from "./studio-review-preview.service";
 
 const db = vi.hoisted(() => ({ query: vi.fn(), release: vi.fn(), connect: vi.fn() }));
-vi.mock("../../db", () => ({ dbPool: { connect: db.connect } }));
+vi.mock("../../platform/database", () => ({ dbPool: { connect: db.connect } }));
 const HASH = "a".repeat(64);
 const subject = { schemaVersion: 1 as const, projectId: "project-1", workId: "work-1", artifactId: "artifact-1",
   reviewId: "review-1", revisionId: "revision-1", rootGraphHash: "b".repeat(64) };

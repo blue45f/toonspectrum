@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const root = resolve(import.meta.dirname, "..");
 const migration = readFileSync(
-  resolve(root, "apps/api/src/db/migrations/0077_membership_operations.sql"),
+  resolve(root, "apps/api/src/platform/database/migrations/0077_membership_operations.sql"),
   "utf8",
 );
 

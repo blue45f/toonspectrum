@@ -1,8 +1,8 @@
 // 연재 시리즈 — 목록/상세/생성/수정/삭제와 회차 부여 헬퍼.
 import { and, desc, eq, sql } from "drizzle-orm";
 
-import { creatorSeries, creatorWorkLikes, creatorWorks, db, users } from "../../db";
-import { withDatabaseCapability } from "../../common/service-availability";
+import { creatorSeries, creatorWorkLikes, creatorWorks, db, users } from "../../platform/database";
+import { withDatabaseCapability } from "../../platform/http/service-availability";
 
 import {
   MAX_SERIES_TITLE,

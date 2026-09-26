@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ConflictException, ForbiddenException, HttpException, NotFoundException } from "@nestjs/common";
 
 import { collaborationDeadline } from "../../../../../packages/core/src/collaboration";
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import { escapeLikePattern } from "../../server/sql-like";
 
 import type {

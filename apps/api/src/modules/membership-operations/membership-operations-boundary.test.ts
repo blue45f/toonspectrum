@@ -90,7 +90,7 @@ describe("membership operations integration boundaries", () => {
 
   it("keeps recovery and policy history append-only at the database boundary", () => {
     const migration = source(
-      "apps/api/src/db/migrations/0077_membership_operations.sql",
+      "apps/api/src/platform/database/migrations/0077_membership_operations.sql",
     );
     expect(migration).toContain("membership_reward_reversal");
     expect(migration).toContain("'reversal'");

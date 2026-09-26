@@ -1,7 +1,7 @@
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { db } from "../../db";
+import { db } from "../../platform/database";
 import {
   creatorWorkCollaborators,
   creatorWorks,
@@ -11,7 +11,7 @@ import {
   creatorWorkTeamCommentReads,
   creatorWorkTeamCommentThreads,
   users,
-} from "../../db/schema";
+} from "../../platform/database/schema";
 
 import {
   decodeStudioTeamCommentCursor,

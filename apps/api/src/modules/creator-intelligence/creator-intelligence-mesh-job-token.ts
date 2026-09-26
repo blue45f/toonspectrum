@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import {
   PrivateObjectReferenceSchema,
   type PrivateObjectReference,
-} from "../../infrastructure/private-object-storage/private-object-storage.contract";
+} from "../../platform/adapters/private-object-storage/private-object-storage.contract";
 
 const TOKEN_VERSION = "v1";
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60_000;

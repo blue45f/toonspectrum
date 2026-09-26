@@ -12,7 +12,7 @@ import {
   db,
   dbClient,
   users,
-} from "../../../../../../apps/api/src/db";
+} from "../../../../../../apps/api/src/platform/database";
 import {
   SEED_CHALLENGES,
   challengeStateOf,

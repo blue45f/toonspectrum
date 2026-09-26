@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import type {
   CreateStudioAiComicArtifactInput,

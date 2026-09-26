@@ -5,17 +5,17 @@ import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
 const librarySchema = readFileSync(
-  resolve(root, "apps/api/src/db/creator-marketplace-library.schema.ts"),
+  resolve(root, "apps/api/src/platform/database/creator-marketplace-library.schema.ts"),
   "utf8",
 );
 const reportSchema = readFileSync(
-  resolve(root, "apps/api/src/db/creator-marketplace-report.schema.ts"),
+  resolve(root, "apps/api/src/platform/database/creator-marketplace-report.schema.ts"),
   "utf8",
 );
 const migration = readFileSync(
   resolve(
     root,
-    "apps/api/src/db/migrations/0037_creator_marketplace_3d_asset_parity.sql",
+    "apps/api/src/platform/database/migrations/0037_creator_marketplace_3d_asset_parity.sql",
   ),
   "utf8",
 );

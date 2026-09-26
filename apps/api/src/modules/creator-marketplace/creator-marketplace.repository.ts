@@ -17,13 +17,13 @@ import {
   CreatorMarketplaceResourceKindSchema,
   CreatorMarketplaceResourceReportEvidenceSchema,
 } from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
-import { db, users } from "../../db";
+import { db, users } from "../../platform/database";
 import {
   creatorMarketplacePackageModeration,
   creatorMarketplacePackageModerationDecisions,
-} from "../../db/creator-marketplace-package-moderation.schema";
-import { creatorMarketplaceResourceReports } from "../../db/creator-marketplace-report.schema";
-import { creatorMarketplaceResources } from "../../db/creator-marketplace-resource.schema";
+} from "../../platform/database/creator-marketplace-package-moderation.schema";
+import { creatorMarketplaceResourceReports } from "../../platform/database/creator-marketplace-report.schema";
+import { creatorMarketplaceResources } from "../../platform/database/creator-marketplace-resource.schema";
 
 import { admitCreatorMarketplaceRelease } from "./creator-marketplace-release";
 import {

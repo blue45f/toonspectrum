@@ -6,8 +6,8 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { studioHandoffReceiptQuery } from "../creator/studio-handoff-receipt-query";
 import { canonicalJson, createStudioReviewSpatialAnchor } from "@toonspectrum/studio-project-model";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type * as DatabaseRuntime from "../../db";
-import type { PrivateObjectStoragePort } from "../../infrastructure/private-object-storage/private-object-storage.port";
+import type * as DatabaseRuntime from "../../platform/database";
+import type { PrivateObjectStoragePort } from "../../platform/adapters/private-object-storage/private-object-storage.port";
 import type { DrizzleStudioWorkAssetRepository } from "../creator/studio-work-asset.repository";
 import type { StudioWorkAssetService } from "../creator/studio-work-asset.service";
 import type { StudioProjectGraphRepository } from "./studio-project-graph.repository";
@@ -43,7 +43,7 @@ withPostgres("review capture PostgreSQL ownership, immutable history and object 
   beforeAll(async () => {
     process.env.DATABASE_URL = URL!;
     pool = new Pool({ connectionString: URL, max: 3, application_name: "studio-review-preview-integration" });
-    database = await import("../../db");
+    database = await import("../../platform/database");
     const assetModule = await import("../creator/studio-work-asset.repository");
     const assetServiceModule = await import("../creator/studio-work-asset.service");
     const graphModule = await import("./studio-project-graph.repository");

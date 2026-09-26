@@ -18,7 +18,7 @@ import { lockStudioReviewPreviewStorage } from "./studio-review-preview-storage"
 import { studioReviewMappingFromOperation, studioReviewMappingsFromOperation } from "./studio-review-source-map";
 import { loadStudioReviewResolutionCaptures } from "./studio-review-capture-attestation";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 import {
   resolveCreatorCollaborationAccess,
   type CreatorCollaborationAccess,

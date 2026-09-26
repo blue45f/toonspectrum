@@ -14,7 +14,7 @@ const guardSource = readFileSync(resolve(
 ), "utf8");
 const lookupSource = readFileSync(resolve(
   root,
-  "apps/api/src/common/creator-marketplace-social-boundary.ts",
+  "apps/api/src/platform/http/creator-marketplace-social-boundary.ts",
 ), "utf8");
 const meSource = readFileSync(resolve(
   root,

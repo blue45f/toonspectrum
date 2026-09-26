@@ -12,7 +12,7 @@ const target = process.env.TEST_DATABASE_URL;
 const suite = describe.skipIf(!target);
 const fingerprint = `sha256:${"c".repeat(64)}`;
 const schema = `operation_policy_${randomUUID().replaceAll('-', '')}`;
-const migration = (name: string) => readFileSync(new URL(`../../db/migrations/${name}`, import.meta.url), "utf8").replaceAll("public.", `"${schema}".`);
+const migration = (name: string) => readFileSync(new URL(`../../platform/database/migrations/${name}`, import.meta.url), "utf8").replaceAll("public.", `"${schema}".`);
 suite("real Postgres: workspace + operating mode", () => {
   let root: Pool;
   let pool: Pool;

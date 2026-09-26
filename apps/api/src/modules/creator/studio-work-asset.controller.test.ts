@@ -6,7 +6,7 @@ import {
 import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ZodValidationPipe } from "../../common/zod-validation.pipe";
+import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 
 import { StudioWorkAssetController } from "./studio-work-asset.controller";
 import {

@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { tap } from "rxjs";
 
-import { getCatalogState } from "../../../../../packages/core/src/server/catalog-store";
+import { getCatalogState } from "../../../../../packages/core/src/catalog/catalog-store";
 
 import type { CallHandler, ExecutionContext, NestInterceptor } from "@nestjs/common";
 import type { Request, Response } from "express";

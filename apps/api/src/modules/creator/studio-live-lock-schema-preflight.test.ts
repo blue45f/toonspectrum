@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import {
   preflightStudioLiveLockSchema,
@@ -8,7 +8,7 @@ import {
   studioLiveLockSchemaPreflightProvider,
 } from "./studio-live-lock-schema-preflight";
 
-vi.mock("../../db", () => ({ dbPool: { query: vi.fn() } }));
+vi.mock("../../platform/database", () => ({ dbPool: { query: vi.fn() } }));
 
 function completeSchema(overrides: Record<string, unknown> = {}) {
   return {

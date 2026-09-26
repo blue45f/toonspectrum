@@ -11,7 +11,7 @@ import {
   feedbackPosts,
   reviews,
   users,
-} from "../../db";
+} from "../../platform/database";
 import { deleteFanPost, ensureCommunityTables } from "../../server/community";
 
 import { 

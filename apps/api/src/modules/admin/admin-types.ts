@@ -10,7 +10,7 @@ import {
   dbClient,
   monetizationPlans,
   users,
-} from "../../db";
+} from "../../platform/database";
 import {
   ensureUserLifecycleSchema,
   normalizeUserAccountStatus,

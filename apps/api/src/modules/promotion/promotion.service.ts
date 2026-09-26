@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { and, desc, eq, or, sql } from "drizzle-orm";
 import { PROMOTION_KINDS, PROMOTION_STAGES, PROMOTION_GENRES, promotionCursor, promotionKey, promotionRecord, promotionText, validatePromotion } from "../../../../../packages/core/src/promotion";
-import { db, promotionBookmarks, promotionPosts, promotionReports, users } from "../../db";
+import { db, promotionBookmarks, promotionPosts, promotionReports, users } from "../../platform/database";
 import { isOfficialUser } from "../../server/feedback";
 import { escapeLikePattern } from "../../server/sql-like";
 import type { PromotionPost } from "../../../../../packages/core/src/promotion";

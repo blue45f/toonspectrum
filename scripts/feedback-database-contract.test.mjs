@@ -28,7 +28,7 @@ test("the API capability probe never runs migration DDL", () => {
   expect(code).toContain("503");
 });
 test("managed migration is additive and wired to migration and readiness commands", () => {
-  const sql = readFileSync(new URL("../apps/api/src/db/migrations/0038_feedback_community.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../apps/api/src/platform/database/migrations/0038_feedback_community.sql", import.meta.url), "utf8");
   expect(sql).toContain("ADD COLUMN IF NOT EXISTS progress");
   expect(sql).toContain('PRIMARY KEY ("postId", "userId")');
   expect(sql).not.toMatch(/DROP TABLE|DELETE FROM|TRUNCATE/u);

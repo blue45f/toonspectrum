@@ -140,7 +140,7 @@ test("review database invariants execute with real PostgreSQL and the accepted g
   assert.ok(!migrationFiles.includes("0084_studio_pinned_review_share.sql"));
   for (const migration of migrationFiles) {
     assert.ok(
-      existsSync(join(repoRoot, "apps/api/src/db/migrations", migration)),
+      existsSync(join(repoRoot, "apps/api/src/platform/database/migrations", migration)),
       `Review DB preparation references a missing migration: ${migration}`,
     );
   }

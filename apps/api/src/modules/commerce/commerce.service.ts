@@ -27,7 +27,7 @@ import {
   commercePaymentEvents,
   commerceProductPrices,
   db,
-} from "../../db";
+} from "../../platform/database";
 import { isAdminUser } from "../../server/app-config";
 import {
   getCommerceConfig,

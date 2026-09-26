@@ -6,11 +6,11 @@ import { describe, expect, it } from "vitest";
 import {
   creatorMarketplacePackageModeration,
   creatorMarketplacePackageModerationDecisions,
-} from "../../db/creator-marketplace-package-moderation.schema";
+} from "../../platform/database/creator-marketplace-package-moderation.schema";
 
 const migration = readFileSync(
   new URL(
-    "../../db/migrations/0034_creator_marketplace_package_moderation.sql",
+    "../../platform/database/migrations/0034_creator_marketplace_package_moderation.sql",
     import.meta.url,
   ),
   "utf8",

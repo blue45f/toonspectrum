@@ -33,7 +33,7 @@ import {
   fanPostReplies,
   fanPosts,
   users,
-} from "../db";
+} from "../platform/database";
 import { createSchemaReadinessCheck } from "./schema-readiness";
 import { escapeLikePattern } from "./sql-like";
 

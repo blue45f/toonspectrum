@@ -8,7 +8,7 @@ import { pinnedShareAccessSchema, pinnedShareCreateSchema, pinnedShareCreatedSch
   pinnedSharePublicListSchema, type PinnedShareAccess, type PinnedShareCreate, type PinnedShareFeedbackInput, type PinnedShareOwnerView,
   type PinnedShareSnapshot } from "@toonspectrum/studio-project-model/pinned-review-share";
 
-import { dbPool } from "../../../db";
+import { dbPool } from "../../../platform/database";
 import { PinnedShareError, failShare, pinnedShareCapture, pinnedShareImages, requireShareManager, shareHash, tokenHash } from "./pinned-share-storage";
 
 async function transact<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {

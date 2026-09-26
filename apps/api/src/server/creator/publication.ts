@@ -28,8 +28,8 @@ import {
 import {
   rethrowIfDatabaseCapabilityUnavailable,
   withDatabaseCapability,
-} from "../../common/service-availability";
-import { creatorWorks, db } from "../../db";
+} from "../../platform/http/service-availability";
+import { creatorWorks, db } from "../../platform/database";
 import {
   CREATOR_WORK_REVISION_MAX,
   CreatorWorkRevisionConflictError,

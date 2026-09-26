@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 
 import { and, eq, gt, like } from "drizzle-orm";
 
-import { db, verificationTokens } from "../db";
+import { db, verificationTokens } from "../platform/database";
 
 import type { AuthEmailPurpose } from "./auth-email";
 

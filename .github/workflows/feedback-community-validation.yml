@@ -63,7 +63,7 @@ jobs:
           mkdir -p artifacts/feedback
           git rev-parse HEAD > artifacts/feedback/source-commit.txt
           cat > /tmp/feedback-lint-files <<'EOF'
-          apps/api/src/db/schema/community.schema.ts
+          apps/api/src/platform/database/schema/community.schema.ts
           apps/api/src/modules/feedback/feedback.controller.ts
           apps/api/src/modules/feedback/feedback.service.ts
           apps/api/src/server/feedback.ts

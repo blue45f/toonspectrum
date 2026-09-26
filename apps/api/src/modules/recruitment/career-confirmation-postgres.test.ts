@@ -36,7 +36,7 @@ describe.skipIf(!database)("career confirmation actual 0078 + managed 0080 runti
     pool = new Pool({ connectionString: database!, max: 2, connectionTimeoutMillis: 3000, options: `-c search_path=${schema} -c statement_timeout=10000 -c lock_timeout=5000` });
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY,name text NOT NULL,status text NOT NULL DEFAULT 'active',role text NOT NULL DEFAULT 'user');
       CREATE TABLE member_message_block("blockerId" text NOT NULL,"blockedUserId" text NOT NULL,PRIMARY KEY("blockerId","blockedUserId"))`);
-    for (const file of ["0047_creator_collaboration_board.sql", "0078_creator_hiring_workspace.sql", "0080_creator_career_confirmation.sql"]) await pool.query(await readFile(new URL(`../../db/migrations/${file}`, import.meta.url), "utf8"));
+    for (const file of ["0047_creator_collaboration_board.sql", "0078_creator_hiring_workspace.sql", "0080_creator_career_confirmation.sql"]) await pool.query(await readFile(new URL(`../../platform/database/migrations/${file}`, import.meta.url), "utf8"));
     await pool.query(buildHiringRuntimeAclSql(role, schema));
     await pool.query(buildCareerConfirmationRuntimeAclSql(role, schema));
     // Existing auth permission, needed for row locks; not granted by confirmation ACL.

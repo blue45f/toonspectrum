@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { dbPool } from "../../db";
+import { dbPool } from "../../platform/database";
 
 import {
   preflightStudioAiIdempotencySchema,
@@ -9,7 +9,7 @@ import {
   STUDIO_AI_IDEMPOTENCY_SCHEMA_PREFLIGHT,
 } from "./studio-ai-idempotency-schema-preflight";
 
-vi.mock("../../db", () => ({ dbPool: { query: vi.fn() } }));
+vi.mock("../../platform/database", () => ({ dbPool: { query: vi.fn() } }));
 
 function healthyRow() {
   return {
