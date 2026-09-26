@@ -23326,7 +23326,7 @@ const beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({
     drawingPointerTransportRef,
     drawingRef,
     endLiveResourceEdit,
-    getFinishQueuedStudioDrawingPointer: () => finishQueuedStudioDrawingPointer,
+    getFinishQueuedStudioDrawingPointer: () => finishQueuedStudioDrawingPointerRef.current,
     flushDirectLiveDraft,
     flushDirectLiveDraftNow,
     flushPendingStrokeCommitsRef,
