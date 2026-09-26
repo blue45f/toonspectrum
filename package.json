@@ -239,6 +239,8 @@
     "test:a11y": "PLAYWRIGHT_CHANNEL='' playwright test e2e/a11y-smoke.spec.ts",
     "studio:virtual-space-world:generate": "tsx scripts/generate-virtual-studio-default-world.mts",
     "studio:virtual-art-v6:generate": "python3 scripts/generate-virtual-studio-living-town-v6.py",
+    "studio:scene-assistant-art:generate": "python3 scripts/generate-studio-scene-assistant-art.py",
+    "verify:studio-scene-assistant-art": "python3 scripts/generate-studio-scene-assistant-art.py --check",
     "test:studio-virtual-art": "node --test scripts/verify-virtual-studio-art-manifest.test.mjs scripts/verify-virtual-studio-v3-art.test.mjs scripts/verify-virtual-studio-v4-art.test.mjs scripts/verify-virtual-studio-v5-art.test.mjs scripts/verify-virtual-studio-living-town-v6.test.mjs",
     "verify:studio-virtual-art": "node scripts/verify-virtual-studio-art-manifest.mjs && node scripts/verify-virtual-studio-v3-art.mjs && node scripts/verify-virtual-studio-v4-art.mjs && node scripts/verify-virtual-studio-v5-art.mjs && node scripts/verify-virtual-studio-living-town-v6.mjs",
     "verify:studio-3d-specialists": "vitest run apps/web/src/domains/creator/scene3d/specialists",

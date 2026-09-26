@@ -662,30 +662,30 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
   {
     id: "bg3d",
     category: "threed",
-    title: "3D 배경",
-    summary: "방·거리·세트 템플릿으로 배경 공간을 빠르게 깔아요.",
+    title: "장면 도우미",
+    summary: "장소·인물·소품을 고르고 구도와 작화 스타일을 정해 현재 컷에 적용해요.",
     badge: "배경",
     tryAction: "bg3d",
-    tryLabel: "3D 배경",
+    tryLabel: "장면 도우미",
     steps: [
       {
-        title: "장면 템플릿",
-        body: "3D 배경에서 방·거리 등 템플릿을 골라 한 번에 배치해요.",
+        title: "시작점 고르기",
+        body: "교실·카페·거리 같은 완성된 장소나 인물·소품을 골라 바로 시작해요.",
       },
       {
-        title: "오브젝트 배치",
-        body: "가구·소품을 옮기고 바닥 스냅으로 정렬해요. 숨김·잠금으로 정리할 수 있습니다.",
+        title: "배치·포즈",
+        body: "화면에서 물체를 누르고 위치·방향·크기만 조정해요. 바닥과 표면은 자동으로 맞춥니다.",
       },
       {
-        title: "카메라 감각",
-        body: "시점과 조명을 살짝 바꿔 컷의 분위기를 잡아 보세요.",
+        title: "구도와 작화 적용",
+        body: "로우앵글·와이드 같은 구도를 고르고 컬러·선화·톤 중 원하는 모습으로 현재 컷에 적용해요.",
       },
     ],
   },
   {
     id: "mannequin",
     category: "threed",
-    title: "3D 데생 인형",
+    title: "기본 데생 인형",
     summary: "관절 인형으로 포즈를 잡아 인체 밑그림으로 넣어요.",
     badge: "인",
     tryAction: "mannequin",
@@ -693,7 +693,7 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
     steps: [
       {
         title: "데생 인형 열기",
-        body: "도구 모음에서 3D 데생 인형을 열어요. 회전·확대는 3D 캐릭터와 같은 조작이에요.",
+        body: "장면 도우미의 인물·포즈 또는 도구 모음에서 기본 데생 인형을 열어요.",
       },
       {
         title: "포즈 잡기",
@@ -713,11 +713,11 @@ export const STUDIO_FEATURE_TUTORIALS: StudioFeatureTutorial[] = [
     summary: "치수를 바꿔 가며 방 구조를 빠르게 블로킹해요.",
     badge: "방",
     tryAction: "bg3d",
-    tryLabel: "3D 배경 열기",
+    tryLabel: "정밀 편집 열기",
     steps: [
       {
         title: "방 만들기 열기",
-        body: "3D 배경에서 방 만들기를 골라요. 바닥·벽이 있는 기본 방이 준비됩니다.",
+        body: "장면 도우미의 정밀 편집에서 방 만들기를 골라요. 바닥·벽이 있는 기본 방이 준비됩니다.",
       },
       {
         title: "치수와 개구부",

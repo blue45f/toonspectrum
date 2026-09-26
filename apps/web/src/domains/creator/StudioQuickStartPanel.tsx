@@ -304,8 +304,8 @@ export function StudioQuickStartPanel({
     },
     {
       id: "background-3d",
-      label: localizeText(t, "3D로 장면 잡기", "studio.quickStart.step.background3d.label"),
-      hint: localizeText(t, "배경·포즈·구도를 먼저 구성", "studio.quickStart.step.background3d.hint"),
+      label: localizeText(t, "장면 도우미", "studio.quickStart.step.background3d.label"),
+      hint: localizeText(t, "장소 선택부터 현재 컷 적용까지", "studio.quickStart.step.background3d.hint"),
       icon: Boxes,
       onClick: onOpenBackground3d,
     },

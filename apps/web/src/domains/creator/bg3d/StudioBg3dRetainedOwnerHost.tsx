@@ -43,7 +43,7 @@ function Bg3DRetainedLoadingOverlay() {
           <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-accent/25 bg-accent-soft text-accent"><Loader2 className="animate-spin motion-reduce:animate-none" size={19} aria-hidden /></span>
           <div className="min-w-0">
             <p className="text-[0.64rem] font-black uppercase tracking-[0.15em] text-accent">3D SCENE STARTUP</p>
-            <h2 className="mt-1 text-base font-black text-fg sm:text-lg">3D 배경 도구를 여는 중</h2>
+            <h2 className="mt-1 text-base font-black text-fg sm:text-lg">장면 도우미를 여는 중</h2>
             <p className="mt-1 text-xs leading-5 text-fg-2">빈 장면과 기본 카메라를 먼저 준비하고, 무거운 엔진과 에셋은 단계적으로 연결합니다.</p>
           </div>
         </div>
@@ -55,7 +55,7 @@ function Bg3DRetainedLoadingOverlay() {
             </li>
           ))}
         </ol>
-        {stage >= 2 ? <p className="relative mt-4 rounded-xl border border-warning/25 bg-warning-soft px-3 py-2 text-[0.68rem] leading-5 text-fg-2">첫 실행은 브라우저와 그래픽 장치에 따라 조금 더 걸릴 수 있습니다. 화면이 열리면 간편 모드에서 샘플 장소를 바로 선택할 수 있습니다.</p> : null}
+        {stage >= 2 ? <p className="relative mt-4 rounded-xl border border-warning/25 bg-warning-soft px-3 py-2 text-[0.68rem] leading-5 text-fg-2">첫 실행은 브라우저와 그래픽 장치에 따라 조금 더 걸릴 수 있습니다. 화면이 열리면 장면 프리셋을 바로 선택할 수 있습니다.</p> : null}
       </section>
     </div>
   );

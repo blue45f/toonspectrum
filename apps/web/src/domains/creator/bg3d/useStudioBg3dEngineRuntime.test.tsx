@@ -87,6 +87,29 @@ describe("useStudioBg3dEngineRuntime", () => {
     expect(result.current.plan.backend).toBe("webgpu");
   });
 
+  it("continues with WebGPU when preference storage exceeds its response deadline", async () => {
+    let resolvePreference: (value: StudioBg3dEnginePreference) => void = () => undefined;
+    const loadPreference = vi.fn(() => new Promise<StudioBg3dEnginePreference>((resolve) => {
+      resolvePreference = resolve;
+    }));
+    const { result } = renderHook(() => useStudioBg3dEngineRuntime(options({
+      loadPreference,
+      preferenceLoadTimeoutMs: 50,
+    })));
+
+    await waitFor(() => expect(result.current.phase).toBe("ready"));
+    expect(result.current.preference).toBe("webgpu");
+    expect(result.current.plan).toMatchObject({ backend: "webgpu", status: "available" });
+    expect(loadPreference).toHaveBeenCalledOnce();
+
+    await act(async () => {
+      resolvePreference("webgl2");
+      await Promise.resolve();
+    });
+    expect(result.current.preference).toBe("webgpu");
+    expect(result.current.canvasKey).toBe("webgpu#0");
+  });
+
   it("never probes or exposes a renderer while the editor is closed", async () => {
     const probe = vi.fn(async () => SUPPORTED_PROBE);
     const { result } = renderHook(() =>

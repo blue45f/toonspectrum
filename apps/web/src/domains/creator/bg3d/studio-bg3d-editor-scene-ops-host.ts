@@ -548,10 +548,10 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
   h.addProceduralStarterAsset = addProceduralStarterAsset;
   const addSceneTemplate = (templateId: string) => {
     const template = BG_SCENE_TEMPLATES.find((t) => t.id === templateId);
-    if (!template) return;
+    if (!template) return false;
     const live = physicsRuntimeSourceRef.current;
     const rawParts = instantiateSceneTemplate(template, live.primitives.length);
-    if (rawParts.length === 0 || !canAdmitSceneNodes(rawParts.length)) return;
+    if (rawParts.length === 0 || !canAdmitSceneNodes(rawParts.length)) return false;
     const allocation = allocateStudioBg3dTemplateInstanceNodeIds({
       sourceKind: "catalog",
       sourceId: template.id,
@@ -565,7 +565,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     });
     if (!allocation) {
       setError("템플릿을 한 묶음으로 추적할 안전한 식별자를 만들지 못해 장면을 변경하지 않았습니다.");
-      return;
+      return false;
     }
     const parts = rawParts.map((part, index) => ({
       ...part,
@@ -575,6 +575,7 @@ export function attachStudioBg3dEditorSceneOpsHost(h) {
     replaceCanonicalDocumentState({ primitives: nextPrimitives });
     setSelectedIds(new Set(allocation.nodeIds));
     setError(null);
+    return true;
   };
   h.addSceneTemplate = addSceneTemplate;
   const addRoomBuild = () => {
