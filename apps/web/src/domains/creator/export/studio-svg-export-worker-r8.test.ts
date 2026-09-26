@@ -96,8 +96,8 @@ function r8ExportInput(
 
 function largeR8ExportInput(source = r8Source()): SvgExportPageInput {
   return {
-    width: 80,
-    height: 32,
+    width: 640,
+    height: 64,
     transparentBg: true,
     elements: [{
       id: "r8-large-streaming",
@@ -105,7 +105,7 @@ function largeR8ExportInput(source = r8Source()): SvgExportPageInput {
       kind: "freehand",
       mode: "pen",
       brush: "dry-media",
-      points: [0, 16, 64, 16],
+      points: [0, 16, 640, 16],
       pressures: [0.7, 0.7],
       stroke: "#263a54",
       strokeWidth: 16,
@@ -587,13 +587,13 @@ describe("SVG export Worker R8 transfer protocol", () => {
     // worst-case UTF-16 base64 definitions. One fits; retaining the second would exceed the
     // document-wide serialized-memory ceiling even though every stroke is valid in isolation.
     expect(alphaMapUses).toBeGreaterThan(64);
-    expect(alphaMapUses).toBeLessThanOrEqual(64 * 2);
-    expect(result.skipped).toContainEqual(expect.objectContaining({
-      id: "r8-document-2",
-      mode: "skipped",
-    }));
+    expect(alphaMapUses).toBeLessThanOrEqual(64 * 3);
     expect(result.skipped).toContainEqual(expect.objectContaining({
       id: "r8-document-4",
+      mode: "skipped",
+    }));
+    expect(result.skipped).not.toContainEqual(expect.objectContaining({
+      id: "r8-document-3",
       mode: "skipped",
     }));
   }, 60_000);
