@@ -39,6 +39,7 @@ import { TitleCard } from "@/shared/components/title-card";
 // 배포 환경에서도 root-relative 이미지 경로가 올바른 오리진을 가리키도록 정규화한다.
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
+import { getCurrentUiLocale, translateAuthoredSourceText, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 
 interface Character {
   id: string;
@@ -194,6 +195,10 @@ const ELEMENT_COLORS: Record<string, { bg: string; text: string; dot: string }> 
 };
 
 function CharacterFortunePage() {
+  useBilingualI18nRevision();
+  const locale = getCurrentUiLocale();
+  const tx = (source: string) => translateAuthoredSourceText(locale, "ko", "FortunePage", source);
+
   // 재방문 영속화 — 저장된 프로필로 입력 초기값을 채운다(재입력 제거)
   const savedProfile = useFortuneStore.getState();
   const setProfile = useFortuneStore((s) => s.setProfile);
@@ -234,7 +239,7 @@ function CharacterFortunePage() {
   const setActiveTabResult = (tab: FortuneTab, data: FortuneResult | null) =>
     setResultsByTab((prev) => ({ ...prev, [tab]: data ?? undefined }));
 
-  // 운세 웹툰 재생 오케스트레이터 — 음성(Web Speech) + 컷 애니메이션 동기
+  // 운세 {tx("웹툰 재생")} 오케스트레이터 — 음성(Web Speech) + 컷 애니메이션 동기
   const playback = useFortunePlayback(fortuneResult?.panels);
 
   // 결과 공유/저장 모달
@@ -361,7 +366,7 @@ function CharacterFortunePage() {
     setResultsByTab({ [saved.tab]: saved.result }); // 복원은 단일 결과로 교체(이전 캐시 제거)
   };
 
-  // 재생/일시정지/이어듣기 토글
+  // 재생/{tx("일시정지")}/이어듣기 토글
   const handleTogglePlay = () => {
     if (playback.status === "playing") playback.pause();
     else if (playback.status === "paused") playback.resume();
@@ -473,7 +478,7 @@ function CharacterFortunePage() {
       <header className="mb-7 text-center sm:mb-10">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent-soft px-3.5 py-1 text-xs font-semibold text-accent">
           <Sparkles className="h-3 w-3" />
-          <span>페르소나 캐릭터 운세 레이어</span>
+          <span>{tx("페르소나 캐릭터 운세 레이어")}</span>
         </div>
         <h1 className="font-display text-[clamp(1.6rem,8vw,1.875rem)] font-extrabold tracking-tight text-fg sm:text-4xl">
           CHARACTER FORTUNE
@@ -486,14 +491,14 @@ function CharacterFortunePage() {
       {/* 1단계: 캐릭터 에이전트 선택 */}
       {!selectedChar ? (
         <section className="mt-8">
-          {/* 최근 본 운세 보관함 — 클릭 시 그 결과로 복원 */}
+          {/* {tx("최근 본 운세")} 보관함 — 클릭 시 그 결과로 복원 */}
           {history.length > 0 && (
             <div className="mx-auto mb-8 max-w-3xl rounded-2xl border border-line bg-panel/30 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-fg-3">
-                  <Sparkles className="h-3.5 w-3.5 text-accent" /> 최근 본 운세
+                  <Sparkles className="h-3.5 w-3.5 text-accent" /> {tx("최근 본 운세")}
                 </h2>
-                <button onClick={clearHistory} className="text-[11px] text-fg-3 hover:text-fg">전체 지우기</button>
+                <button onClick={clearHistory} className="text-[11px] text-fg-3 hover:text-fg">{tx("전체 지우기")}</button>
               </div>
               <div className="rail flex gap-2.5 overflow-x-auto pb-1">
                 {history.map((h) => (
@@ -516,7 +521,7 @@ function CharacterFortunePage() {
                     <button
                       type="button"
                       onClick={() => removeFromHistory(h.id)}
-                      aria-label="이 운세 기록 삭제"
+                      aria-label={tx("이 운세 기록 삭제")}
                       className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full text-fg-3 opacity-0 transition-opacity hover:bg-raised hover:text-fg focus-visible:opacity-100 group-hover:opacity-100"
                     >
                       <X className="h-3 w-3" />
@@ -532,7 +537,7 @@ function CharacterFortunePage() {
           </h2>
           {charLoadFailed && characters.length === 0 && (
             <div role="alert" className="mx-auto mb-6 max-w-md rounded-xl border border-bad/30 bg-bad/10 p-4 text-center">
-              <p className="text-sm text-fg-2">캐릭터를 불러오지 못했어요.</p>
+              <p className="text-sm text-fg-2">{tx("캐릭터를 불러오지 못했어요.")}</p>
               <button
                 type="button"
                 onClick={loadCharacters}
@@ -627,7 +632,7 @@ function CharacterFortunePage() {
                 }}
                 className="mt-4 flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs text-fg-2 hover:bg-card transition-colors"
               >
-                <RotateCcw className="h-3 w-3" /> 다른 캐릭터 선택
+                <RotateCcw className="h-3 w-3" /> {tx("다른 캐릭터 선택")}
               </button>
             </div>
 
@@ -640,10 +645,10 @@ function CharacterFortunePage() {
                 </p>
               </div>
 
-              {/* 웹툰 재생 상태 — 결과가 있을 때만 노출 */}
+              {/* {tx("웹툰 재생")} 상태 — 결과가 있을 때만 노출 */}
               {fortuneResult?.panels?.length ? (
                 <div className="mt-auto rounded-xl border border-line/70 bg-panel/40 p-3 space-y-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-3">웹툰 음성 재생</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-fg-3">{tx("웹툰 음성 재생")}</span>
                   {playback.supported ? (
                     <button
                       type="button"
@@ -651,11 +656,11 @@ function CharacterFortunePage() {
                       className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent py-2 text-xs font-bold text-on-accent transition-colors hover:bg-accent-2"
                     >
                       {playback.status === "playing" ? (
-                        <><Pause className="h-3.5 w-3.5" /> 일시정지</>
+                        <><Pause className="h-3.5 w-3.5" /> {tx("일시정지")}</>
                       ) : playback.status === "paused" ? (
-                        <><Play className="h-3.5 w-3.5" /> 이어 보기</>
+                        <><Play className="h-3.5 w-3.5" /> {tx("이어 보기")}</>
                       ) : (
-                        <><Play className="h-3.5 w-3.5" /> 웹툰 재생</>
+                        <><Play className="h-3.5 w-3.5" /> {tx("웹툰 재생")}</>
                       )}
                     </button>
                   ) : (
@@ -683,7 +688,7 @@ function CharacterFortunePage() {
             {/* 탭 네비게이션 — 항상 노출(결과를 보면서도 전환, 탭별 결과 유지) · 모바일 가로 스크롤 + ARIA */}
             <div
               role="tablist"
-              aria-label="운세 종류"
+              aria-label={tx("운세 종류")}
               className="rail flex gap-1 overflow-x-auto rounded-xl border border-line bg-panel/30 p-1"
             >
               {([
@@ -763,13 +768,13 @@ function CharacterFortunePage() {
                         onClick={() => setShareOpen(true)}
                         className="flex items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-3 py-1.5 text-xs font-bold text-accent transition-colors hover:bg-accent hover:text-on-accent"
                       >
-                        <Share2 className="h-3 w-3" /> 공유·저장
+                        <Share2 className="h-3 w-3" /> {tx("공유·저장")}
                       </button>
                       <button
                         onClick={handleReset}
                         className="flex items-center gap-1 text-xs text-fg-3 hover:text-fg"
                       >
-                        <RotateCcw className="h-3 w-3" /> 다시 보기
+                        <RotateCcw className="h-3 w-3" /> {tx("다시 보기")}
                       </button>
                     </div>
                   </div>
@@ -820,10 +825,10 @@ function CharacterFortunePage() {
                       {/* 행운의 요소 그리드 */}
                       <div className="md:col-span-8 grid grid-cols-2 gap-3.5">
                         {[
-                          { label: "행운의 컬러", value: fortuneResult.today.color, desc: "의상이나 소품으로 챙겨보세요" },
-                          { label: "행운의 방향", value: fortuneResult.today.direction, desc: "이 방향으로 이동해 보세요" },
-                          { label: "행운의 시간대", value: fortuneResult.today.time, desc: "가장 좋은 일이 생길 타이밍" },
-                          { label: "행운의 숫자", value: fortuneResult.today.luckyNumber, desc: "오늘 당신의 수호 숫자" },
+                          { label: tx("행운의 컬러"), value: fortuneResult.today.color, desc: tx("의상이나 소품으로 챙겨보세요") },
+                          { label: tx("행운의 방향"), value: fortuneResult.today.direction, desc: tx("이 방향으로 이동해 보세요") },
+                          { label: tx("행운의 시간대"), value: fortuneResult.today.time, desc: tx("가장 좋은 일이 생길 타이밍") },
+                          { label: tx("행운의 숫자"), value: fortuneResult.today.luckyNumber, desc: tx("오늘 당신의 수호 숫자") },
                         ].map((item, idx) => (
                           <div key={idx} className="p-3 border border-line/45 bg-card/20 rounded-xl flex flex-col">
                             <span className="text-[10px] font-bold text-accent uppercase tracking-wider">{item.label}</span>
@@ -836,7 +841,7 @@ function CharacterFortunePage() {
                       {/* 사주 기반 개인화 안내 — 생년월일 입력 시 노출 */}
                       {fortuneResult.luckyElement && fortuneResult.saju && (
                         <div className="md:col-span-12 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-accent/20 bg-accent-soft/40 px-4 py-3">
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-accent">내 사주 연동</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-accent">{tx("내 사주 연동")}</span>
                           <span className="text-xs text-fg-2">
                             일주 <strong className="text-fg">{fortuneResult.saju.dayPillar.kanKorean}{fortuneResult.saju.dayPillar.jiKorean}</strong>
                           </span>
@@ -944,7 +949,7 @@ function CharacterFortunePage() {
                       
                       {/* 복약 가이드 / 연출 문구 */}
                       <div className="space-y-2">
-                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">복약 처방전 가이드</span>
+                        <span className="text-[10px] font-bold text-amber-500/60 uppercase tracking-wider block">{tx("복약 처방전 가이드")}</span>
                         <p className="text-xs leading-relaxed text-fg-3 italic">
                           * 아래 추천된 책(웹툰)을 하루 1회, 3화 이상 읽으며 마음에 평온을 부어넣으세요. 부작용으로 몰입 과다에 따른 수면 부족이 생길 수 있으니 주의 바랍니다.
                         </p>
@@ -965,7 +970,7 @@ function CharacterFortunePage() {
                         </div>
                         <div className="flex items-center gap-3.5 bg-card px-5 py-3.5 rounded-xl border border-line/40">
                           <div className="text-right">
-                            <span className="text-[10px] font-bold text-fg-3 block">궁합 지수</span>
+                            <span className="text-[10px] font-bold text-fg-3 block">{tx("궁합 지수")}</span>
                             <span className="text-2xl font-extrabold text-accent font-display">
                               <CountUp value={fortuneResult.score} />%
                             </span>
@@ -1007,7 +1012,7 @@ function CharacterFortunePage() {
                           {fortuneResult.compat.elementComplement != null && (
                             <div className="rounded-xl border border-line/45 bg-card/20 p-3">
                               <div className="flex items-center justify-between text-xs">
-                                <span className="font-semibold text-fg-2">오행 보완도</span>
+                                <span className="font-semibold text-fg-2">{tx("오행 보완도")}</span>
                                 <span className="font-display font-bold text-accent">{fortuneResult.compat.elementComplement}</span>
                               </div>
                               <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-card">
@@ -1044,7 +1049,7 @@ function CharacterFortunePage() {
                       <div className="space-y-3">
                         <h4 className="text-xs font-bold text-fg-3 uppercase tracking-wider">사주 원판 (四柱八字)</h4>
                         {fortuneResult.saju.birthTimeKnown === false && <p className="text-xs text-fg-3">출생시간 미상 · 시주를 제외한 6글자 분석입니다.</p>}
-                        {fortuneResult.saju.calculationNotes && <details className="text-xs text-fg-3"><summary>계산 기준과 한계</summary>{fortuneResult.saju.calculationNotes.map((note) => <p key={note}>{note}</p>)}</details>}
+                        {fortuneResult.saju.calculationNotes && <details className="text-xs text-fg-3"><summary>{tx("계산 기준과 한계")}</summary>{fortuneResult.saju.calculationNotes.map((note) => <p key={note}>{note}</p>)}</details>}
                         <div className="grid grid-cols-4 gap-2 text-center">
                           {/* 열 헤더: 시, 일, 월, 년 */}
                           {["시주", "일주", "월주", "년주"].map((h, i) => (
@@ -1215,7 +1220,7 @@ function CharacterFortunePage() {
                       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <h4 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-fg-3">
                           <Sparkle className="h-3.5 w-3.5 text-accent" />
-                          <span>{selectedChar.name}의 운세 웹툰</span>
+                          <span>{tx("운세 웹툰")} · {selectedChar.name}</span>
                         </h4>
 
                         {/* 재생 컨트롤바 */}
@@ -1224,7 +1229,7 @@ function CharacterFortunePage() {
                             <button
                               type="button"
                               onClick={playback.prev}
-                              aria-label="이전 컷"
+                              aria-label={tx("이전 컷")}
                               disabled={playback.status === "idle"}
                               className="flex items-center justify-center rounded-full border border-line px-2 py-1.5 text-fg-2 transition-colors hover:bg-card disabled:opacity-40"
                             >
@@ -1236,17 +1241,17 @@ function CharacterFortunePage() {
                               className="flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent-soft px-3 py-1.5 text-[11px] font-bold text-accent transition-colors hover:bg-accent hover:text-on-accent"
                             >
                               {playback.status === "playing" ? (
-                                <><Pause className="h-3 w-3" /> 일시정지</>
+                                <><Pause className="h-3 w-3" /> {tx("일시정지")}</>
                               ) : playback.status === "paused" ? (
-                                <><Play className="h-3 w-3" /> 이어 보기</>
+                                <><Play className="h-3 w-3" /> {tx("이어 보기")}</>
                               ) : (
-                                <><Play className="h-3 w-3" /> 웹툰 재생</>
+                                <><Play className="h-3 w-3" /> {tx("웹툰 재생")}</>
                               )}
                             </button>
                             <button
                               type="button"
                               onClick={playback.next}
-                              aria-label="다음 컷"
+                              aria-label={tx("다음 컷")}
                               disabled={playback.status === "idle"}
                               className="flex items-center justify-center rounded-full border border-line px-2 py-1.5 text-fg-2 transition-colors hover:bg-card disabled:opacity-40"
                             >
@@ -1256,7 +1261,7 @@ function CharacterFortunePage() {
                               <button
                                 type="button"
                                 onClick={playback.stop}
-                                aria-label="정지"
+                                aria-label={tx("정지")}
                                 className="flex items-center justify-center rounded-full border border-line px-2 py-1.5 text-fg-2 transition-colors hover:bg-card"
                               >
                                 <Square className="h-3 w-3" />
@@ -1311,7 +1316,7 @@ function CharacterFortunePage() {
                   <div className="border-t border-line/80 pt-6">
                     <h4 className="text-xs font-bold text-fg-3 uppercase tracking-wider mb-4 flex items-center gap-2">
                       <Sparkles className="h-3.5 w-3.5 text-accent" />
-                      <span>{selectedChar.name}가 당신에게 제안하는 행운의 타이틀</span>
+                      <span>{tx("행운의 타이틀")} · {selectedChar.name}</span>
                     </h4>
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                       {fortuneResult.recommendations.map((title) => (
@@ -1327,7 +1332,7 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "today" && (
                 <div className="space-y-6 text-center max-w-md mx-auto w-full py-4">
                   <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-fg">오늘 하루는 어떨까요?</h3>
+                    <h3 className="text-lg font-bold text-fg">{tx("오늘 하루는 어떨까요?")}</h3>
                     <p className="text-xs text-fg-2 leading-relaxed">
                       생년월일을 입력하면 {selectedChar.name}가 당신의 사주 오행으로 <strong className="text-fg-2">개인화된</strong> 오늘의 운세를 풀어드려요. 같은 날에는 결과가 바뀌지 않아요.
                     </p>
@@ -1340,7 +1345,7 @@ function CharacterFortunePage() {
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label htmlFor="today-birth-date" className="text-[11px] font-semibold text-fg-2">생년월일 (양력)</label>
+                        <label htmlFor="today-birth-date" className="text-[11px] font-semibold text-fg-2">{tx("생년월일 (양력)")}</label>
                         <input
                           id="today-birth-date"
                           type="date"
@@ -1350,7 +1355,7 @@ function CharacterFortunePage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label htmlFor="today-birth-time" className="text-[11px] font-semibold text-fg-2">태어난 시간</label>
+                        <label htmlFor="today-birth-time" className="text-[11px] font-semibold text-fg-2">{tx("태어난 시간")}</label>
                         <input
                           id="today-birth-time"
                           type="time"
@@ -1384,7 +1389,7 @@ function CharacterFortunePage() {
                     onClick={handleAnalyzeToday}
                     className="w-full rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{birthDate ? "내 사주로 오늘의 운세 보기" : "오늘의 운세 확인하기"}</span>
+                    <span>{birthDate ? tx("내 사주로 오늘의 운세 보기") : tx("오늘의 운세 확인하기")}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -1394,7 +1399,7 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "zodiac" && (
                 <div className="space-y-6 text-center max-w-md mx-auto w-full py-4">
                   <div className="space-y-2">
-                    <h3 className="text-lg font-bold text-fg">생일로 보는 별자리 운세</h3>
+                    <h3 className="text-lg font-bold text-fg">{tx("생일로 보는 별자리 운세")}</h3>
                     <p className="text-xs text-fg-2 leading-relaxed">
                       생년월일만 입력하면 {selectedChar.name}가 당신의 별자리와 오늘의 별빛 흐름을 풀어드려요. (월·일만 사용)
                     </p>
@@ -1417,7 +1422,7 @@ function CharacterFortunePage() {
                     disabled={!birthDate}
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent transition-colors hover:bg-accent-2 disabled:opacity-50"
                   >
-                    <span>{selectedChar.name}에게 별자리 운세 보기</span>
+                    <span>{selectedChar.name}{tx("에게 별자리 운세 보기")}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -1427,7 +1432,7 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "prescription" && (
                 <form onSubmit={handleAnalyzePrescription} className="space-y-5 max-w-md mx-auto w-full text-left">
                   <div className="text-center mb-6">
-                    <h3 className="text-lg font-bold text-fg">아라의 가상 서재: AI 독서 처방전</h3>
+                    <h3 className="text-lg font-bold text-fg">{tx("아라의 가상 서재: AI 독서 처방전")}</h3>
                     <p className="text-xs text-fg-3 mt-1">오늘 당신의 지친 마음이나 보고 싶은 분위기를 적어보세요.</p>
                   </div>
                   
@@ -1441,7 +1446,7 @@ function CharacterFortunePage() {
                       rows={4}
                       value={prescriptionQuery}
                       onChange={(e) => setPrescriptionQuery(e.target.value)}
-                      placeholder="예: 오늘 회사에서 너무 힘든 일이 있어서 완전 시원하고 통쾌한 사이다 웹툰을 읽으며 스트레스 날려버리고 싶어!"
+                      placeholder={tx("예: 오늘 회사에서 너무 힘든 일이 있어서 완전 시원하고 통쾌한 사이다 웹툰을 읽으며 스트레스 날려버리고 싶어!")}
                       className="w-full rounded-xl border border-line bg-card px-3 py-2.5 text-xs text-fg placeholder:text-fg-4 focus:border-accent focus:outline-none resize-none leading-relaxed"
                     />
                   </div>
@@ -1450,7 +1455,7 @@ function CharacterFortunePage() {
                     type="submit"
                     className="w-full mt-4 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{selectedChar.name}에게 도서 처방받기</span>
+                    <span>{selectedChar.name}{tx("에게 도서 처방받기")}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </form>
@@ -1460,7 +1465,7 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "compatibility" && (
                 <form onSubmit={handleAnalyzeCompatibility} className="space-y-5 max-w-md mx-auto w-full text-left">
                   <div className="text-center mb-6">
-                    <h3 className="text-lg font-bold text-fg">두 사람의 궁합 분석 정보 입력</h3>
+                    <h3 className="text-lg font-bold text-fg">{tx("두 사람의 궁합 분석 정보 입력")}</h3>
                     <p className="text-xs text-fg-3 mt-1">상대방과의 궁합을 웹툰 콘티 연출 형태로 보여 드립니다.</p>
                   </div>
                   
@@ -1469,7 +1474,7 @@ function CharacterFortunePage() {
                     <span className="text-[10px] font-bold text-accent uppercase tracking-wider">나의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label htmlFor="my-birth-date" className="text-[11px] font-semibold text-fg-2">생년월일 *</label>
+                        <label htmlFor="my-birth-date" className="text-[11px] font-semibold text-fg-2">{tx("생년월일")} *</label>
                         <input
                           id="my-birth-date"
                           type="date"
@@ -1480,7 +1485,7 @@ function CharacterFortunePage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label htmlFor="my-birth-time" className="text-[11px] font-semibold text-fg-2">태어난 시간</label>
+                        <label htmlFor="my-birth-time" className="text-[11px] font-semibold text-fg-2">{tx("태어난 시간")}</label>
                         <input
                           id="my-birth-time"
                           type="time"
@@ -1497,7 +1502,7 @@ function CharacterFortunePage() {
                     <span className="text-[10px] font-bold text-accent uppercase tracking-wider">상대방의 생년월일시</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label htmlFor="partner-birth-date" className="text-[11px] font-semibold text-fg-2">생년월일 *</label>
+                        <label htmlFor="partner-birth-date" className="text-[11px] font-semibold text-fg-2">{tx("생년월일")} *</label>
                         <input
                           id="partner-birth-date"
                           type="date"
@@ -1508,7 +1513,7 @@ function CharacterFortunePage() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label htmlFor="partner-birth-time" className="text-[11px] font-semibold text-fg-2">태어난 시간</label>
+                        <label htmlFor="partner-birth-time" className="text-[11px] font-semibold text-fg-2">{tx("태어난 시간")}</label>
                         <input
                           id="partner-birth-time"
                           type="time"
@@ -1524,7 +1529,7 @@ function CharacterFortunePage() {
                     type="submit"
                     className="w-full mt-6 rounded-lg bg-accent py-3.5 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{selectedChar.name}에게 궁합 풀이받기 (웹툰 연출형)</span>
+                    <span>{selectedChar.name}{tx("에게 궁합 풀이받기 (웹툰 연출형)")}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </form>
@@ -1534,7 +1539,7 @@ function CharacterFortunePage() {
               {!isLoading && !fortuneResult && activeTab === "saju" && (
                 <form onSubmit={handleAnalyzeSaju} className="space-y-5 max-w-md mx-auto w-full text-left">
                   <div className="text-center mb-6">
-                    <h3 className="text-lg font-bold text-fg">사주팔자 분석 정보 입력</h3>
+                    <h3 className="text-lg font-bold text-fg">{tx("사주팔자 분석 정보 입력")}</h3>
                     <p className="text-xs text-fg-3 mt-1">정확한 연산을 위해 생년월일시를 입력하세요.</p>
                   </div>
                   
@@ -1554,7 +1559,7 @@ function CharacterFortunePage() {
 
                   <div className="space-y-1.5">
                     <label htmlFor="birth-time" className="text-xs font-semibold text-fg-2 flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5 text-fg-3" /> 태어난 시간 (선택사항)
+                      <Clock className="h-3.5 w-3.5 text-fg-3" /> {tx("태어난 시간")} (선택사항)
                     </label>
                     <input
                       id="birth-time"
@@ -1592,7 +1597,7 @@ function CharacterFortunePage() {
                     type="submit"
                     className="w-full mt-6 rounded-lg bg-accent py-3 text-xs font-bold text-on-accent hover:bg-accent-2 transition-colors flex items-center justify-center gap-2"
                   >
-                    <span>{selectedChar.name}에게 사주 풀이받기</span>
+                    <span>{selectedChar.name}{tx("에게 사주 풀이받기")}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </form>
@@ -1603,7 +1608,7 @@ function CharacterFortunePage() {
                 <div className="space-y-6 text-center max-w-lg mx-auto w-full">
                   {tarotStep === "idle" && (
                     <div className="py-10 space-y-4">
-                      <h3 className="text-lg font-bold text-fg">오늘의 타로 리딩</h3>
+                      <h3 className="text-lg font-bold text-fg">{tx("오늘의 타로 리딩")}</h3>
                       <p className="text-xs text-fg-3 max-w-sm mx-auto leading-relaxed">
                         정신을 집중하고 카드를 섞은 뒤, 오늘의 조언을 줄 카드를 직접 뽑아보세요.
                       </p>
@@ -1692,7 +1697,7 @@ function CharacterFortunePage() {
         </div>
       )}
 
-      {/* 결과 공유·저장 모달 */}
+      {/* 결과 {tx("공유·저장")} 모달 */}
       {shareOpen && fortuneResult && selectedChar && (
         <FortuneShareModal
           result={fortuneResult}
@@ -1718,4 +1723,6 @@ function CharacterFortunePage() {
   );
 }
 
-export function FortunePage() { return <FortuneObservatory characterContent={<CharacterFortunePage />} />; }
+export function FortunePage() {
+  return <FortuneObservatory characterContent={<CharacterFortunePage />} />;
+}

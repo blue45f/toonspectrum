@@ -12,6 +12,7 @@ import {
   getRuntimeTranslationPendingKeys,
   protectRuntimeTranslationPlaceholders,
 } from "@/shared/lib/i18n-runtime-translation";
+import { translateAuthoredSourceText } from "@/shared/lib/i18n-bilingual-copy";
 
 describe("sitewide i18n integrity", () => {
   it("keeps raw missing keys available to diagnostics but never returns them to UI translators", () => {
@@ -56,6 +57,11 @@ describe("sitewide i18n integrity", () => {
     registerI18nLocaleEntries("fr", { [key]: english });
 
     expect(getRuntimeTranslationPendingKeys("fr")).not.toContain(key);
+  });
+
+  it("registers Korean-authored UI copy as a runtime source for non-Korean locales", () => {
+    const value = translateAuthoredSourceText("fr", "ko", "uniqueSourceOnly", "저장 기록 전용 테스트 문구");
+    expect(value).toBe("저장 기록 전용 테스트 문구");
   });
 
   it("does not translate a runtime source back into its own authored locale", () => {
