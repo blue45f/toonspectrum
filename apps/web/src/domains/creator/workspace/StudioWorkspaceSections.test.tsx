@@ -21,21 +21,21 @@ describe("workspace exposes one purpose-led collaboration journey without granti
 
   it("separates team membership from project access", () => {
     team("people");
-    expect(screen.getByRole("link", { name: /팀 워크스페이스와 구성원/u }).getAttribute("href")).toBe("/team/people");
-    expect(screen.getByRole("link", { name: /권한을 관리할 작품 선택/u }).getAttribute("href")).toBe("/studio");
-    expect(screen.getByText(/팀 소속, 작품 접근, 제작 역할은 서로 다릅니다/u)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /팀을 관리할 작품 선택/u }).getAttribute("href")).toBe("/studio");
+    expect(screen.getByRole("link", { name: /진행·담당·일정 확인/u }).getAttribute("href")).toBe("/production");
+    expect(screen.getByText(/팀 소속과 접근 권한/u)).toBeTruthy();
   });
   it("connects public recruiting with the private hiring pipeline", () => {
     team("recruit");
-    expect(screen.getByRole("link", { name: /모집·의뢰 작성/u }).getAttribute("href")).toBe("/collaborate/new");
-    expect(screen.getByRole("link", { name: /공개 구인·의뢰/u }).getAttribute("href")).toBe("/collaborate");
-    expect(screen.getByRole("link", { name: /인재·지원 관리/u }).getAttribute("href")).toBe("/team/recruiting");
+    expect(screen.getByRole("link", { name: /어시스트 모집·의뢰 작성/u }).getAttribute("href")).toBe("/collaborate/new");
+    expect(screen.getByRole("link", { name: /구인·의뢰 게시판/u }).getAttribute("href")).toBe("/collaborate");
+    expect(screen.getByRole("link", { name: /역할·도구·보수로 인력 찾기/u }).getAttribute("href")).toBe("/collaborate/positions");
   });
   it("opens only the invitation-based meeting surface without copying private project IDs", () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     team("sessions");
-    expect(screen.getByRole("link", { name: /면접·회의/u }).getAttribute("href")).toBe("/team/recruiting?panel=rooms");
-    expect(screen.getByText(/공동 편집, 검토, 화면 공유 또는 가상 공간/u)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /면접 대기실·회의 관리/u }).getAttribute("href")).toBe("/collaborate/workspace?panel=rooms");
+    expect(screen.getByText(/프로젝트 공간에서 참여자를 확인하고 대화를 요청합니다/u)).toBeTruthy();
     expect(document.body.innerHTML).not.toContain("private-project");
     expect(errors).not.toHaveBeenCalled();
   });
