@@ -275,6 +275,14 @@ async function dismissQuickStart(page: Page): Promise<void> {
   if (await quickstart.waitFor({ state: "visible", timeout: 2_000 }).then(() => true, () => false)) {
     await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
   }
+  // A fresh /studio/canvas page also exposes the shipped scene-start welcome. It owns the same
+  // canvas hit area, so lifecycle input must explicitly close it through its real control before
+  // testing pointer routing. Do not force-click the canvas or hide the welcome with CSS.
+  const cinematicWelcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
+  if (await cinematicWelcome.waitFor({ state: "visible", timeout: 2_000 }).then(() => true, () => false)) {
+    await cinematicWelcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click();
+    await cinematicWelcome.waitFor({ state: "detached", timeout: 3_000 });
+  }
 }
 
 async function prepareStudio(page: Page, studioUrl: string): Promise<void> {
