@@ -58,6 +58,29 @@ describe("StudioAi3dGenerationPanel", () => {
     expect(String(createCall?.[1]?.body)).toContain("웹툰 교실용 학생 책상");
   });
 
+  it("blocks selected files whose aggregate size would exceed the API JSON boundary", async () => {
+    const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(response([])));
+    const client = new Studio3dGenerationHttpClient({
+      userId: "user-1",
+      fetchImpl: fetchMock,
+    });
+    render(<StudioAi3dGenerationPanel client={client} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "이미지 → 3D" }));
+    const oversized = new File(
+      [new Uint8Array(11 * 1024 * 1024)],
+      "oversized.png",
+      { type: "image/png" },
+    );
+    fireEvent.change(screen.getByLabelText("참조 이미지 1장"), {
+      target: { files: [oversized] },
+    });
+
+    expect((await screen.findByRole("alert")).textContent).toMatch(/10 MB/u);
+    expect(screen.getByRole("button", { name: "3D 생성 시작" }).hasAttribute("disabled")).toBe(true);
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+  });
+
   it("cancels an active job and clears the action state", async () => {
     let calls = 0;
     const cancelled = { ...job, state: "cancelled" as const, generation: 3 };
