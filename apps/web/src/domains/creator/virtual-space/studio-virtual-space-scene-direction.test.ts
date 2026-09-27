@@ -19,22 +19,24 @@ describe("장소 환경 연출", () => {
     expect(studioSceneDensity("decorated").weatherRatio).toBeLessThan(studioSceneDensity("festival").weatherRatio);
     expect(studioSceneDensity("festival").ambientRatio).toBeLessThanOrEqual(1);
   });
-  it("새 지형 아트는 논리 타일·사용자 맵·다른 스타일을 보존한다", () => {
+  it("새 지형 아트는 논리 타일·사용자 맵을 보존하고 테마마다 다른 원본을 사용한다", () => {
     const tilemap = studioVirtualPlaceWorldManifest("skyport").tilemap;
     if (!tilemap) throw new Error("내장 장소 타일맵이 없습니다.");
     const rendered = studioRenderedTileWorld(tilemap, "sky-island");
     expect(rendered.layers).toBe(tilemap.layers);
     expect(rendered.tileWidth).toBe(64);
     expect(rendered.tilesets[0]).toMatchObject({ imageWidth: 1254, tileWidth: 313.5 });
-    expect(studioRenderedTileWorld(tilemap, "retro")).toBe(tilemap);
+    expect(studioRenderedTileWorld(tilemap, "retro").tilesets[0]?.imageUrl).toBe("/assets/virtual-studio/experience-v8/terrain-retro.png");
+    expect(studioRenderedTileWorld(tilemap, "neon").tilesets[0]?.imageUrl).toBe("/assets/virtual-studio/experience-v8/terrain-neon.png");
+    expect(tilemap.tilesets[0]?.imageUrl).toContain("{style}/terrain-tile-atlas.webp");
     const custom = { ...tilemap, tilesets: tilemap.tilesets.map((entry) => ({ ...entry, imageUrl: "/custom.png" })) };
     expect(studioRenderedTileWorld(custom, "sky-island")).toBe(custom);
   });
-  it("내장 소품의 작화를 통일하면서 사용자 자산과 다른 스타일을 보존한다", () => {
+  it("내장 소품은 모든 테마의 같은 의미 프레임에 연결하고 사용자 자산은 보존한다", () => {
     const bench = "/assets/virtual-studio/style-packs-v5/{style}/objects/bench.webp";
     expect(studioIllustratedPropFrame(bench, "sky-island")).toBe(2);
     expect(studioIllustratedPropFrame(bench.replace("bench", "lantern"), "sky-island")).toBe(3);
-    expect(studioIllustratedPropFrame(bench, "retro")).toBeUndefined();
+    expect(studioIllustratedPropFrame(bench, "retro")).toBe(2);
     expect(studioIllustratedPropFrame("/custom/bench.webp", "sky-island")).toBeUndefined();
   });
 });

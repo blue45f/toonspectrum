@@ -93,7 +93,6 @@ import {
 import {
   STUDIO_VIRTUAL_ART_STYLES,
   readStudioVirtualArtStyle,
-  studioVirtualArtTextureUrl,
   writeStudioVirtualArtStyle,
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
@@ -201,6 +200,9 @@ import {
   writeStudioVirtualSpaceAvatarIndex,
   writeStudioVirtualSpaceEntryPreference,
 } from "./studio-virtual-space-entry-preference";
+import { StudioVirtualCharacterPreview } from "./StudioVirtualCharacterPreview";
+import { StudioVirtualThemeCharacterPicker } from "./StudioVirtualThemeCharacterPicker";
+import { StudioVirtualExperienceArtPreview } from "./StudioVirtualExperienceArtPreview";
 import { StudioVirtualSpaceDirectory } from "./StudioVirtualSpaceDirectory";
 
 import { verifyStudioVirtualSpaceReviewSubject } from "./studio-virtual-space-review-invitation";
@@ -444,11 +446,7 @@ function ChibiAvatar({
           : "idle";
   const { skin, clip } = resolveStudioCharacterAppearance({ avatarIndex, appearance }, identity,
     requestedMotion === "walk" ? `walk-${facing}` : requestedMotion);
-  const motion = clip.startsWith("walk-") ? "walk" : clip;
-  const stateTexture = motion === "talk" || motion === "draw" || motion === "review"
-    ? skin.state?.[motion]
-    : undefined;
-  const avatarTexture = stateTexture ?? skin.directional[facing];
+  const motion = clip === "walk-down" || clip === "walk-up" || clip === "walk-left" || clip === "walk-right" ? "walk" : clip;
 
   if (compact) {
     return (
@@ -459,12 +457,8 @@ function ChibiAvatar({
         )}
         aria-hidden
       >
-        <img
-          src={avatarTexture}
-          alt=""
-          draggable={false}
-          className="studio-vspace-reference-compact-player"
-        />
+        <StudioVirtualCharacterPreview skin={skin} facing={facing} motion={motion}
+          className="studio-vspace-reference-compact-player" />
       </span>
     );
   }
@@ -488,11 +482,7 @@ function ChibiAvatar({
         data-skin={skin.key}
         aria-hidden="true"
       >
-        <img
-          src={avatarTexture}
-          alt=""
-          draggable={false}
-        />
+        <StudioVirtualCharacterPreview skin={skin} facing={facing} motion={motion} />
         <i
           className={cn(
             "studio-vspace-reference-online",
@@ -1953,7 +1943,7 @@ export function VirtualSpaceExperience({
                   {bt("아트 스타일", "Art direction")}
                 </legend>
                 <p className="mt-1 text-[0.62rem] leading-5 text-fg-3">
-                  {bt("같은 캐릭터·공간을 다른 작화로 즉시 전환합니다.", "Switch the same cast and space into another art direction instantly.")}
+                  {bt("건물·가구·바닥의 작화를 선택해요. 내 캐릭터는 직접 고른 모습을 유지해요.", "Choose the art for buildings, furniture and floors. Your character keeps the look you chose.")}
                 </p>
                 <div className="studio-vspace-art-style-grid mt-2">
                   {STUDIO_VIRTUAL_ART_STYLES.map((style) => (
@@ -1965,7 +1955,7 @@ export function VirtualSpaceExperience({
                       title={bt(style.descriptionKo, style.descriptionEn)}
                       onClick={() => selectArtStyle(style.key)}
                     >
-                      <img src={studioVirtualArtTextureUrl(style.key, "world-base")} alt="" loading="lazy" decoding="async" draggable={false} />
+                      <StudioVirtualExperienceArtPreview kind="landmarks" artStyle={style.key} frame={0} />
                       <small>{bt(style.labelKo, style.labelEn)}</small>
                     </button>
                   ))}
@@ -1974,7 +1964,7 @@ export function VirtualSpaceExperience({
             </StudioVirtualSpacePanelGate>
             <StudioVirtualSpacePanelGate active={workspacePanel === "space" && spacePanelSection === "environment"}>
             <Suspense fallback={<p role="status">{bt("환경 설정 불러오는 중…", "Loading environment controls…")}</p>}>
-              <StudioVirtualSpaceEnvironmentPanel value={environmentPreference} onChange={selectEnvironmentPreference} />
+              <StudioVirtualSpaceEnvironmentPanel value={environmentPreference} artStyle={artStyle} onChange={selectEnvironmentPreference} />
             </Suspense>
             </StudioVirtualSpacePanelGate>
             <StudioVirtualSpacePanelGate active={workspacePanel === "space" && spacePanelSection === "settings"}>
@@ -1988,7 +1978,7 @@ export function VirtualSpaceExperience({
             />
             </StudioVirtualSpacePanelGate>
             <StudioVirtualSpacePanelGate active={workspacePanel === "space" && spacePanelSection === "appearance"} preserveAfterOpen>
-            <StudioVirtualSpaceCustomizationPanel
+            <StudioVirtualSpaceCustomizationPanel artStyle={artStyle}
               key={decorationScope}
               world={worldManifest}
               nickname={nickname}
@@ -2060,7 +2050,7 @@ export function VirtualSpaceExperience({
           </div>
           <StudioVirtualSpacePanelGate active={workspacePanel === "people"}>
 
-            {!personal ? <StudioVirtualSpaceSocialPanel
+            {!personal ? <StudioVirtualSpaceSocialPanel manifest={worldManifest}
               renderPeerAvatar={(peer) => <ChibiAvatar identity={peer.participant.sessionId} name={peer.participant.displayName} activity={peer.state.activity} avatarIndex={peer.state.avatarIndex} appearance={peer.state.appearance} compact />}
               selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}
               peers={snapshot.peers} social={socialSnapshot}
@@ -2143,6 +2133,7 @@ export function VirtualSpaceExperience({
                     personal ? "Your character choice is saved in this browser." : "This choice stays in this browser and is shared with teammates over P2P.",
                   )}
                 </p>
+                <StudioVirtualThemeCharacterPicker artStyle={artStyle} avatarIndex={avatarIndex} onSelect={selectAvatar} />
                 <div className="mt-2 grid grid-cols-4 gap-1.5">
                   <button
                     type="button"
@@ -2159,7 +2150,7 @@ export function VirtualSpaceExperience({
                     <Sparkles size={17} aria-hidden />
                     <span>{bt("자동", "Auto")}</span>
                   </button>
-                  {VIRTUAL_AVATARS.map((avatar, index) => (
+                  {VIRTUAL_AVATARS.map((avatar, index) => avatar.selectionOnly && avatar.nativeArtStyle ? null : (
                     <button
                       key={avatar.labelEn}
                       type="button"
@@ -2174,10 +2165,8 @@ export function VirtualSpaceExperience({
                       aria-label={bt(`${avatar.labelKo} 캐릭터 선택`, `Select ${avatar.labelEn} character`)}
                       onClick={() => selectAvatar(index)}
                     >
-                      <img
-                        src={studioCharacterSkinForArtStyle(avatar, artStyle).directional.down}
-                        alt=""
-                        draggable={false}
+                      <StudioVirtualCharacterPreview
+                        skin={studioCharacterSkinForArtStyle(avatar, artStyle)}
                         className={cn(
                           "h-[92%] w-[92%] object-contain object-bottom transition-transform duration-200",
                           avatarIndex === index ? "scale-105" : "group-hover:scale-105",

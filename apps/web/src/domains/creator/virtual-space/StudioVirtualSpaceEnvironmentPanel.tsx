@@ -3,6 +3,7 @@ import { CloudRain, Flower2, MoonStar, Snowflake, Sparkles, SunMedium, Sunrise, 
 import "./studio-virtual-space-environment-panel.css";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { DEFAULT_STUDIO_VIRTUAL_ART_STYLE, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import {
   STUDIO_VIRTUAL_BACKDROPS,
   STUDIO_VIRTUAL_DAY_PHASES,
@@ -15,6 +16,7 @@ import {
 } from "./studio-virtual-space-environment-preference";
 
 export interface StudioVirtualSpaceEnvironmentPanelProps {
+  readonly artStyle?: StudioVirtualArtStyleKey;
   readonly value: StudioVirtualEnvironmentPreference;
   readonly onChange: (value: StudioVirtualEnvironmentPreference) => void;
 }
@@ -48,7 +50,7 @@ function WeatherIcon({ weather }: { readonly weather: StudioVirtualWeather }) {
   return <SunMedium size={15} aria-hidden />;
 }
 
-export function StudioVirtualSpaceEnvironmentPanel({ value, onChange }: StudioVirtualSpaceEnvironmentPanelProps) {
+export function StudioVirtualSpaceEnvironmentPanel({ value, onChange, artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE }: StudioVirtualSpaceEnvironmentPanelProps) {
   const bt = useBilingual("domains.creator.virtual-space.StudioVirtualSpaceEnvironmentPanel");
   const patch = (next: Partial<Omit<StudioVirtualEnvironmentPreference, "version">>) => onChange({ ...value, ...next, version: 1 });
   return (
@@ -65,7 +67,7 @@ export function StudioVirtualSpaceEnvironmentPanel({ value, onChange }: StudioVi
             const [ko, en, detailKo, detailEn] = BACKDROP_COPY[backdrop];
             return (
               <button key={backdrop} type="button" aria-pressed={value.backdrop === backdrop} onClick={() => patch({ backdrop })}>
-                <img src={studioVirtualBackdropUrl(backdrop)} alt="" loading="lazy" decoding="async" draggable={false} />
+                <img src={studioVirtualBackdropUrl(backdrop, artStyle)} alt="" loading="lazy" decoding="async" draggable={false} />
                 <span><strong>{bt(ko, en)}</strong><small>{bt(detailKo, detailEn)}</small></span>
               </button>
             );

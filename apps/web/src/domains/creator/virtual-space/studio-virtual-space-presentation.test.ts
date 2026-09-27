@@ -34,16 +34,23 @@ describe("Virtual Studio art and presentation", () => {
   it("keeps explicit gait technique, frame count and source paths for every skin/direction", () => {
     for (const skin of STUDIO_CHARACTER_SKINS) for (const direction of ["down", "left", "right", "up"] as const) {
       const clip = skin.clips?.[`walk-${direction}`];
-      expect(clip?.start).toBe(0);
-      expect(clip?.end).toBe(clip?.technique === "drawn" ? 3 : 7);
+      const start = skin.nativeArtStyle ? ({ down: 0, right: 8, left: 16, up: 24 } as const)[direction] : 0;
+      expect(clip?.start).toBe(start);
+      expect(clip?.end).toBe(start + (clip?.technique === "drawn" ? 3 : 7));
       expect(["drawn", "cutout-rig"]).toContain(clip?.technique);
       expect(clip?.distancePerCycle).toBeGreaterThan(0);
-      const expectedRoot = skin.key === "imagegen25" ? "/world-v2/characters/pixel-maker/"
-        : clip?.technique === "drawn" ? "/drawn-characters-v1/" : "/production-v2/";
-      expect(clip?.textureUrl).toContain(expectedRoot);
-      expect(skin.directional[direction]).toContain(
-        skin.key === "imagegen25" ? "/living-town-v6/imagegen25-character/" : "/production-v2/",
-      );
+      if (skin.nativeArtStyle) {
+        const source = `/assets/virtual-studio/experience-v8/avatar-${skin.nativeArtStyle}.png`;
+        expect(clip?.textureUrl).toBe(source);
+        expect(skin.directional[direction]).toBe(source);
+      } else {
+        const expectedRoot = skin.key === "imagegen25" ? "/world-v2/characters/pixel-maker/"
+          : clip?.technique === "drawn" ? "/drawn-characters-v1/" : "/production-v2/";
+        expect(clip?.textureUrl).toContain(expectedRoot);
+        expect(skin.directional[direction]).toContain(
+          skin.key === "imagegen25" ? "/living-town-v6/imagegen25-character/" : "/production-v2/",
+        );
+      }
     }
   });
   it("uses the occupant-free generated sky-island base for live actors", () => {

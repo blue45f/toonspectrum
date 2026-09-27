@@ -71,6 +71,26 @@ describe("Virtual Studio appearance compatibility", () => {
     expect(resolveStudioVirtualSpaceAppearance(reordered, { avatarIndex: -1, appearance: automatic }, "creator-identity").skinKey).toBe(automatic.skinKey);
   });
 
+  it("선택 전용 테마 캐릭터가 늘어나도 기존 자동 identity 배정을 보존한다", () => {
+    const expanded: StudioVirtualSpaceAppearanceRegistry = { ...registry, skins: [...registry.skins,
+      { key: "theme-avatar-retro", capabilities: ["idle", "walk-down"], selectionOnly: true },
+      { key: "theme-avatar-ink", capabilities: ["idle", "walk-down"], selectionOnly: true },
+    ] };
+    for (let index = 0; index < 100; index++) {
+      const identity = `creator-${index}`;
+      expect(createStudioVirtualSpaceAppearance(expanded, -1, identity).skinKey)
+        .toBe(createStudioVirtualSpaceAppearance(registry, -1, identity).skinKey);
+      expect(resolveStudioVirtualSpaceAppearance(expanded, { avatarIndex: -1 }, identity).skinKey)
+        .toBe(resolveStudioVirtualSpaceAppearance(registry, { avatarIndex: -1 }, identity).skinKey);
+    }
+    expect(createStudioVirtualSpaceAppearance(expanded, 0).skinKey).toBe("pink");
+    expect(createStudioVirtualSpaceAppearance(expanded, 1).skinKey).toBe("silver");
+    const selected = createStudioVirtualSpaceAppearance(expanded, 2);
+    expect(selected.skinKey).toBe("theme-avatar-retro");
+    expect(resolveStudioVirtualSpaceAppearance(expanded, { avatarIndex: 0, appearance: selected }).skinKey).toBe("theme-avatar-retro");
+    expect(selected).not.toHaveProperty("selectionOnly");
+  });
+
   it("uses the configured fallback for unknown skins regardless of remote index or local order", () => {
     const appearance = { ...createStudioVirtualSpaceAppearance(registry, 1), skinKey: "future-skin" };
     expect(resolveStudioVirtualSpaceAppearance(reordered, { avatarIndex: 0, appearance })).toMatchObject({

@@ -3,6 +3,7 @@ import type { StudioVirtualEnvironmentPreference } from "./studio-virtual-space-
 import type { StudioTownDistrictId } from "./studio-virtual-space-town-layout";
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioTileWorld } from "./studio-virtual-space-tile-chunks";
+import { studioExperienceAssetUrl } from "./studio-virtual-space-experience-art";
 
 const DISTRICT_ENVIRONMENTS: Readonly<Record<StudioTownDistrictId, Omit<StudioVirtualEnvironmentPreference, "version">>> = {
   "archive-grove": { backdrop: "forest", dayPhase: "day", weather: "clear" },
@@ -26,19 +27,17 @@ export function studioSceneDensity(mode: StudioVirtualBackgroundPresentationMode
 }
 
 /** 내장 벤치·조명도 배치 가구와 같은 작화로 표시한다. 사용자 자산은 우선한다. */
-export function studioIllustratedPropFrame(assetUrl: string, style: StudioVirtualArtStyleKey): number | undefined {
-  if (style !== "sky-island") return undefined;
+export function studioIllustratedPropFrame(assetUrl: string, _style: StudioVirtualArtStyleKey): number | undefined {
   const root = "/assets/virtual-studio/style-packs-v5/{style}/objects/";
   return assetUrl === `${root}bench.webp` ? 2 : assetUrl === `${root}lantern.webp` ? 3 : undefined;
 }
 
-/** 내장 공중섬의 표시 자산만 교체한다. 사용자 타일맵과 저장된 논리 좌표는 그대로 보존한다. */
+/** 내장 장소의 표시 자산만 테마별 원본으로 교체한다. 사용자 타일맵과 저장된 논리 좌표는 보존한다. */
 export function studioRenderedTileWorld(world: StudioTileWorld, style: StudioVirtualArtStyleKey): StudioTileWorld {
-  if (style !== "sky-island") return world;
   const source = "/assets/virtual-studio/living-town-v6/{style}/terrain-tile-atlas.webp";
   if (!world.tilesets.some((entry) => entry.imageUrl === source)) return world;
   return { ...world, tilesets: world.tilesets.map((entry) => entry.imageUrl === source ? {
-    ...entry, imageUrl: "/assets/virtual-studio/experience-v8/terrain.png", imageWidth: 1254, imageHeight: 1254,
+    ...entry, imageUrl: studioExperienceAssetUrl("terrain", style), imageWidth: 1254, imageHeight: 1254,
     // 생성 원본은 1254px다. 표시 전용 반 픽셀 경계를 유지해 이웃 재질이 섞이지 않게 한다.
     tileWidth: 313.5, tileHeight: 313.5,
   } : entry) };

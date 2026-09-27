@@ -25,6 +25,8 @@ import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-wor
 import { addStudioVirtualDecorationSafely, studioVirtualDecorationNavigationWorld, studioVirtualDecorationPresetForWorld, type StudioDecorationLayoutResult } from "./studio-virtual-space-decoration-layout";
 import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 import { StudioVirtualSpaceDecorationEditor } from "./StudioVirtualSpaceDecorationEditor";
+import { DEFAULT_STUDIO_VIRTUAL_ART_STYLE, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import { StudioVirtualExperienceArtPreview } from "./StudioVirtualExperienceArtPreview";
 import "./studio-virtual-space-decoration-editor.css";
 
 const ACCESSORY_LABELS = {
@@ -54,7 +56,6 @@ const PRESENTATION_LABELS = {
   minimal: ["미니멀", "Minimal"], decorated: ["데코레이션", "Decorated"], festival: ["페스티벌", "Festival"],
 } as const;
 const DISTRICT_PREVIEW_URL = "/assets/virtual-studio/living-town-v6/sky-island/district-preview-sheet.webp";
-const DECOR_PREVIEW_URL = "/assets/virtual-studio/experience-v8/furniture.png";
 const DECOR_LABELS = {
   tree: ["나무", "Tree"], "flower-bed": ["화단", "Flower bed"], bench: ["벤치", "Bench"],
   lamp: ["조명", "Lamp"], banner: ["배너", "Banner"], "market-stall": ["마켓 부스", "Market stall"],
@@ -65,8 +66,9 @@ const DECOR_LABELS = {
 } as const;
 
 export function StudioVirtualSpaceCustomizationPanel({
-  nickname, character, decorations, selfPoint, onNickname, onCharacter, onDecorations, onSelectDistrict, world,
+  nickname, character, decorations, selfPoint, onNickname, onCharacter, onDecorations, onSelectDistrict, world, artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
 }: {
+  readonly artStyle?: StudioVirtualArtStyleKey;
   readonly nickname: string;
   readonly character: StudioVirtualCharacterCustomization;
   readonly decorations: StudioVirtualDecorationState;
@@ -228,11 +230,7 @@ export function StudioVirtualSpaceCustomizationPanel({
           return <button key={type} type="button" disabled={decorations.placements.length >= 36}
             onClick={() => commit(world ? addStudioVirtualDecorationSafely(decorations, type, selfPoint, world)
               : { ok: true, state: addStudioVirtualDecoration(decorations, type, selfPoint) })}>
-            <span className="studio-vspace-customization-decor-preview" aria-hidden style={{
-              backgroundImage: `url(${DECOR_PREVIEW_URL})`,
-              backgroundSize: "400% 400%",
-              backgroundPosition: `${frame % 4 / 3 * 100}% ${Math.floor(frame / 4) / 3 * 100}%`,
-            }} />
+            <StudioVirtualExperienceArtPreview kind="furniture" artStyle={artStyle} frame={frame} className="studio-vspace-customization-decor-preview" />
             <span>{bt(DECOR_LABELS[type][0], DECOR_LABELS[type][1])}</span>
           </button>;
         })}
@@ -244,7 +242,7 @@ export function StudioVirtualSpaceCustomizationPanel({
       <button type="button" disabled={!history.future.length} onClick={() => restore("redo")}>{bt("배치 다시 실행", "Redo layout")}</button>
     </div>
     {notice ? <p className="studio-decoration-notice" role="status">{notice}</p> : null}
-    {world ? <StudioVirtualSpaceDecorationEditor world={world} decorations={decorations} selfPoint={selfPoint} onChange={commit} /> : null}
+    {world ? <StudioVirtualSpaceDecorationEditor artStyle={artStyle} world={world} decorations={decorations} selfPoint={selfPoint} onChange={commit} /> : null}
     {!world && decorations.placements.length > 0 ? <details>
       <summary>{bt("배치한 오브젝트 관리", "Manage placed objects")}</summary>
       <div className="studio-vspace-customization-placed">

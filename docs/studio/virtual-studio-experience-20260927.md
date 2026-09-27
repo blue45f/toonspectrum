@@ -44,17 +44,31 @@
 
 ### 생성 아트와 출처
 
-내장 `image_gen` 도구로 PNG 6개를 생성해 실제 화면에 연결했다. [아트 원장](../../apps/web/public/assets/virtual-studio/experience-v8/art-manifest.json)에 프롬프트, 파일명, 바이트 수, SHA-256과 생성 출처를 남겼다.
+첫 생성 묶음으로 내장 `image_gen` 도구의 PNG 6개를 실제 화면에 연결했다. 이후 추가한 테마 캐릭터와 NPC는 아래에 구분한다. [아트 원장](../../apps/web/public/assets/virtual-studio/experience-v8/art-manifest.json)에 프롬프트, 파일명, 바이트 수, SHA-256과 생성 출처를 남겼다.
 
 | 자산 | 실제 파일·규격 | 연결 범위 |
 | --- | --- | --- |
 | 공중섬·숲·해안·야경 원경 | `sky.png`, `forest.png`, `coast.png`, `city.png`; 각 1536×1024 | 네 가지 배경 환경 |
-| 가구 16종 | `furniture.png`; 1254×1254, 투명 4×4 atlas | 기존 장식과 드로잉 데스크·책장·원고 리뷰 보드·소파. 공중섬 스타일은 전체, 다른 스타일은 새 가구를 사용한다. |
+| 초기 가구 16종 | `furniture.png`; 1254×1254, 투명 4×4 atlas | 기존 장식과 드로잉 데스크·책장·원고 리뷰 보드·소파의 초기 연결. 이후 스타일별 원본 자산을 추가했다. |
 | 지형 재질 16종 | `terrain.png`; 1254×1254, 4×4 atlas | 내장 공중섬 타일맵의 표시 재질. 사용자 타일맵과 논리 좌표를 보존한다. |
 
 생성 도구가 모델 버전을 노출하지 않아 **ImageGen 2.5 사용 여부를 확인하거나 인증할 수 없다**. 원장의 `modelVersion`은 `null`로 유지한다. 배경·환경과 장소 선택 화면에 노출되던 모델 기술명은 각각 나만의 공간 연출, 다양한 작업 공간으로 바꿔 특정 버전을 보증하는 UI 표현을 제거했다. 요청 해상도와 실제 출력 크기를 구분하고 가구 프레임은 실제 1254px 크기를 기준으로 분할한다. 지형은 313.5px 셀을 표시용으로 사용한다.
 
 원장에 보존한 외부 이미지 생성 프롬프트는 재현 근거이므로 영어 원문을 유지하는 언어 정책 예외다. 사용자 UI와 이 문서의 설명은 한글을 기본으로 한다. 생성 여부와 파일 무결성 확인은 모든 타일 경계가 시각적으로 완전하게 이어진다는 증명과 다르다.
+
+후속으로 웹툰·파스텔·레트로·먹선·네온마다 하늘·숲·해안·야경 원경 4개를 별도 생성해 PNG 20개를 추가했다. 기존 공중섬 원경 4개와 합쳐 **6개 스타일 × 4개 배경의 24개 독립 원본**이며 모두 실제 1536×1024다. 환경 선택 URL은 현재 스타일의 원본을 가리킨다. 가구·랜드마크·바닥과 함께 원경도 스타일별 작화를 사용한다.
+
+현재 일반 아트 원장에는 PNG 50개, 별도 NPC 원장에는 4개가 등록되어 있다. [전체 자산 무결성 테스트](../../apps/web/src/domains/creator/virtual-space/studio-virtual-space-experience-integrity.test.ts)는 디렉터리의 PNG 54개와 두 원장의 목록이 일치하는지, 모든 파일의 SHA-256·바이트 수·PNG 형식·치수가 일치하는지 확인한다. 원경 URL 도우미를 직접 사용해 24개 URL의 실제 파일과 원장 연결, 서로 다른 원본 해시도 검사했다. 이번 게이트는 PNG를 압축하거나 편집하지 않았다.
+
+### 테마 캐릭터와 전용 NPC
+
+- 공중섬·웹툰·파스텔·레트로·먹선·네온에 서로 다른 원본 플레이어 PNG 6개를 등록했다. 다섯 원본은 1536×1024, 네온은 1774×887이다. 각 원본은 아래·오른쪽·왼쪽·위의 네 방향과 걷기 4장, 대화, 인사, 앉기, 작화·검수 동작을 담은 32개 프레임을 제공한다.
+- 테마 대표 캐릭터는 명시적으로 선택해야 적용된다. 테마 전환으로 기존 사용자의 캐릭터 정체성을 자동 교체하지 않으며 전용 원본을 다른 테마 색으로 다시 칠하지 않는다.
+- 실제 생성 위치가 균등 격자와 일치하지 않는 원본은 알파 영역을 읽어 측정한 정수 사각형으로 표시한다. PNG를 재가공하지 않고 프레임별 폭·높이, 발 기준, 머리 상부 중심을 메타데이터로 기록한다. 팔 동작이 넓어져도 전체 외곽 너비가 캐릭터 가로 기준을 끌고 가지 않도록 했다.
+- 안내 로봇·검수 코디네이터·자료 사서·카페 직원에 전용 NPC 원본 4개를 연결했다. 각각 1774×887의 32프레임이며 합계 6,989,292바이트다. 기존 8개 NPC의 식별자와 업무 목적·동선을 보존하고, 신규 네 캐릭터는 플레이어 선택 목록에 노출하지 않는다. 한 NPC의 걷기와 업무 동작은 동일 텍스처 하나를 공유한다.
+- 플레이어 6개 원본은 SHA-256·크기·RGBA, 32개 정수 프레임의 비중첩, `alpha > 100`인 원본 픽셀 누락 0, 네 방향 걷기 프레임의 상이성, 발 기준과 머리 중심을 자동 검사했다. NPC도 원본 해시·크기와 32개 영역·동작 연결을 검사하고 알파 분석에서 누락 0을 확인했다. 이는 모든 행동의 예술적 완성도나 실기기 성능 검증을 대신하지 않는다.
+
+핵심 근거는 [플레이어 원본 좌표](../../apps/web/src/domains/creator/virtual-space/studio-virtual-space-theme-character-sources.ts), [플레이어 무결성 테스트](../../apps/web/src/domains/creator/virtual-space/studio-virtual-space-theme-character-integrity.test.ts), [NPC 등록](../../apps/web/src/domains/creator/virtual-space/studio-virtual-space-npc-native-art.ts), [NPC 원장](../../apps/web/public/assets/virtual-studio/experience-v8/npc-art-manifest.json)이다. NPC 원장도 실제 모델 버전은 확인할 수 없어 `actualModelVersion: null`, `modelVersionVerified: false`로 기록한다.
 
 ### 웹툰 업무와 접근성
 
@@ -64,6 +78,18 @@
 - 가까이 가는 행동만으로 도구나 미디어를 자동 실행하지 않는다. 기존 협업 요청 수락과 마이크·카메라의 명시적 선택 경계를 유지한다.
 
 핵심 소스는 [업무 목적지 계약](../../apps/web/src/domains/creator/virtual-space/studio-virtual-space-production-route.ts), [오늘의 업무](../../apps/web/src/domains/creator/virtual-space/StudioVirtualSpaceTodayBoard.tsx), [동작 선택 창](../../apps/web/src/domains/creator/virtual-space/StudioVirtualSpaceActionSheet.tsx)이다.
+
+### 서버 상태 표시와 재연결
+
+2026-09-27 19:05~19:06 KST에 운영 상태를 인증 정보 없이 읽기 전용으로 확인했다. `/api/health/live`와 실시간 coordinator의 `/health`, `/api/auth/session`, `/api/health/capabilities`는 모두 HTTP 200을 반환했다. capabilities 응답의 프로젝트 읽기·클라우드 저장·실시간 협업은 `available`이었다. Edge liveness는 Core API·DB 성공을 뜻하지 않으며, 이 응답들은 인증된 참여·다중 사용자 동기화·저장 내구성 검증이 아니다. 사용자 내용·쿠키를 기록하거나 운영 데이터를 변경하지 않았다.
+
+클라이언트 테스트에서는 다음 오류를 재현하고 수정했다.
+
+- capabilities 본문이 비어 있거나 잘못된 형태인데도 사용 가능으로 받아들이던 판단을 수정했다. 프로젝트 읽기와 클라우드 저장이 각각 `available` 또는 `degraded`인지 확인한다.
+- 이전 상태 점검의 JSON 처리가 늦게 끝나면 새로운 상태나 실제 API 성공·실패를 덮어쓸 수 있었다. JSON 처리 후에도 현재 요청인지 확인하고, 실제 API 결과가 들어오면 대기 중인 상태 점검을 취소한다. 중단·시간 초과 이후의 늦은 응답도 상태를 되돌리지 못한다.
+- 연결 후 네트워크가 끊어진 상황에서 재접속이 권한 거부 또는 복구 불가능한 이력 상태로 끝나도 재시도 타이머가 이어질 수 있었다. 종료 상태인 `revoked`에서는 예약과 실행을 모두 차단한다. 일시적 오류의 기존 재연결 동작은 유지한다.
+
+회귀 테스트로 느린 본문 응답과 실제 요청 결과의 순서 역전, 중단·시간 초과, 재연결 뒤 권한 거부·이력 복구 불가 상태를 검증했다. 핵심 소스는 [연결 상태 판단](../../apps/web/src/domains/creator/offline/studio-connectivity.ts), [순서 역전 회귀](../../apps/web/src/domains/creator/offline/studio-connectivity.runtime.test.ts), [실시간 재연결](../../apps/web/src/domains/creator/studio-realtime-provider-runtime.ts)이다. 이 변경은 클라이언트 오류 수정이며 운영 서버 설정·환경변수·DB·배포를 변경하지 않았다.
 
 ## 공식 서비스 벤치마크와 적용
 
@@ -93,6 +119,8 @@
 | 검증 | 확인한 결과 | 근거 |
 | --- | --- | --- |
 | 가상 스튜디오 회귀 suite | 132파일, 1,100테스트 통과 | `virtual-tests-final.log` |
+| 최종 동결 가상 스튜디오 회귀 suite | 2026-09-27 20:22:47 KST 시작, 144파일·1,309테스트 통과 | `virtual-suite-final-frozen.log` |
+| 확장 가상 스튜디오 회귀 suite | 2026-09-27 20:10:15 KST 시작 실행에서 142파일, 1,242테스트 통과 | `virtual-suite-expanded.log` |
 | 공통 core·서명·요청 제한 소비자 | 10파일, 132테스트 통과 | `contracts-core-tests.log` |
 | Studio 원본 계약 | 11파일, 78테스트 통과 | `studio-contracts-tests.log` |
 | API/Web 계약 소비자 | 5파일, 134테스트 통과 | `studio-contract-consumers-tests.log` |
@@ -103,16 +131,28 @@
 | 보안 감사 | advisory 제외 없음, 알려진 취약점 없음 | `security.log` |
 | 라이선스 감사 | 저장소 감사 도구 통과 | `licenses.log` |
 | 생성 자산 | PNG 서명·바이트·해시, 배경 URL·16개 가구 frame 연결 테스트 통과 | `studio-virtual-space-experience-art.test.ts`, 위 가상 스튜디오 suite |
+| 연결 상태와 상태 점검 회귀 | 5파일, 55테스트 통과 | `connectivity-sync-tests.log` |
+| 실시간 재연결과 관련 계약 | 5파일, 77테스트 통과 | `realtime-sync-tests.log` |
+| 동기화 최종 집중 회귀 | 2026-09-27 20:10:17 KST 시작 실행에서 3파일, 32테스트 통과 | `sync-suite-final.log` |
+| NPC 기존 동선·업무와 원본 등록 | 6파일, 40테스트 통과 | `npc-native-tests.log` |
+| NPC 원본 무결성·캐릭터 asset 계약 | 2파일, 22테스트 통과 | `npc-native-integrity-tests.log` |
+| 6종 플레이어 원본 무결성·테마·asset 계약 | 3파일, 30테스트 통과 | `avatar-native-integrity-tests.log` |
+| 전체 PNG와 스타일별 원경 통합 무결성 | 2026-09-27 20:15:22 KST 시작 실행에서 1파일, 62테스트 통과; 일반 아트 50개+NPC 4개, 원경 URL 24개 확인 | `experience-full-integrity.log` |
+| 변경 범위 하네스와 Web·API 타입 검사 | 해당 실행 시점의 변경 범위 검증 통과; 새 전체 자산 테스트는 별도 대상 타입 검사·ESLint·Secretlint 통과 | `harness-verify-final-expanded.log`, `experience-full-integrity-typecheck.log`, `experience-full-integrity-lint.log`, `experience-full-integrity-secretlint.log` |
+| 확장 정적 빌드 | 5분 28초, 라이선스 고지와 CSP 검사 통과 | `build-final-expanded.log`, `static-csp-final-frozen.log` |
+| 빌드 자산 복사 무결성 | PNG 54개 142,925,381바이트와 원장 JSON 2개가 원본과 SHA-256·크기 일치 | `asset-copy-final-frozen.json` |
+| 번들 구조 게이트 | 기준 27개 범위 내, 회귀 0개; 비차단 관찰 13개. startup 수치는 기존 2026-09-14 기록으로 이번 측정 아님 | `studio-bundle-final-frozen.log` |
+| 운영 상태 읽기 전용 확인 | 2026-09-27 19:05~19:06 KST의 네 경로 HTTP 200; 인증된 협업 검증 아님 | `sync-readonly-probes.json` |
 
-후속 district 재적용·현재 위치를 보호하는 Undo 수정은 1,100테스트 실행 뒤 추가되었다. 해당 수정의 최종 통합 검증은 별도로 확인해야 하며 위 수치를 그대로 최종 HEAD 보증으로 사용하지 않는다.
+후속 district 재적용·현재 위치를 보호하는 Undo, 동기화 오류, 새 캐릭터·NPC 수정은 초기 1,100테스트 실행 뒤 추가되었다. 20:10의 확장 suite와 동기화 집중 회귀는 그 시점의 소스에 대한 결과다. 원경 20개와 전체 원장 게이트는 별도 62테스트 결과로 확인했다. 이 수치를 이후 수정이나 최종 PR HEAD의 통합 CI 보증으로 사용하지 않는다.
 
 로컬 4173 포트의 `/studio/space` 경로를 390×844 브라우저 화면에서 열어 가구 수 7→8로 데스크 추가, SVG 지도 가구 선택, 90도 회전, Undo로 0도 복귀를 확인했다. 동작 창의 화면 폭, 44px 터치 영역과 고정 닫기 영역도 확인했다. 화면 근거는 `mobile-furniture-editor.png`다. 844×390 가로 화면에서는 패널 표시, 가로 overflow 없음, Escape로 닫기와 공간·꾸미기 버튼으로의 포커스 복귀를 확인했다. 이 확인은 실제 휴대폰이나 인증된 다중 사용자 검증이 아니다.
 
-초기 통합 검사에서 기존 계약 오류와 lint 오류가 실제로 발생했고 복구했다. 최초 실패 로그를 통과 결과로 숨기지 않는다. `pnpm harness:verify`의 최종 완료, 전체 빌드와 원격 CI 상태는 이 문서 작성 시 아직 미확정이다.
+초기 통합 검사에서 기존 계약 오류와 lint 오류가 실제로 발생했고 복구했다. 최초 실패 로그를 통과 결과로 숨기지 않는다. 후속 `pnpm harness:verify` 실행은 변경 범위 하네스와 Web·API 타입 검사까지 통과했다. 확장 정적 빌드는 통과했으며 원격 CI 상태는 이 문서 작성 시 아직 미확정이다.  하네스 통과를 운영 인증·권한·다중 사용자 검증 완료로 해석하지 않는다.
 
 ## 남은 검증과 목표 — target
 
-- 후속 수정까지 포함한 최종 통합 게이트와 빌드, 정확한 PR HEAD의 필수 CI 결과를 확인한다.
+- 2026-09-27 20:26 KST의 개발 탭은 테마 변경 뒤 초기화 실패와 HMR 미반영·브라우저 응답 지연을 보였다. 같은 확장 정적 빌드(5180)에서는 파스텔·픽셀·흑백·네온 전환이 모두 ready로 완료됐다. 제품 결함으로 단정하지 않았으며, 원인·부팅 단계·취소된 초기화의 격리를 진단하는 회귀 2개를 보강했다. 정확한 PR HEAD의 필수 CI는 추가 확인한다.
 - 데스크톱 화면, 작은 세로 화면의 장시간 이동, 실제 휴대폰의 메모리·프레임·터치·스크린리더, 동작 창의 키보드 순환·포커스 복원을 확인한다. 뷰포트 에뮬레이션 결과를 실기기 성능으로 보고하지 않는다.
 - 새 atlas의 경계·축척·투명 여백·타일 반복 품질을 모든 장소와 스타일에서 시각 검수한다. 입자·배경 연출이 원고 업무 가독성을 방해하지 않는지도 확인한다.
 - 로컬 가구와 서버가 게시한 공유 월드의 범위 차이, 실제 팀 참여자 간 이동·권한·협업 수락·미디어 흐름을 인증된 다중 사용자 환경에서 확인한다.

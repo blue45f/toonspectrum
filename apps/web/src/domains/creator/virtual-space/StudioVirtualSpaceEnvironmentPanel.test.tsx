@@ -8,6 +8,18 @@ import { DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT } from "./studio-virtual-space-envir
 afterEach(() => cleanup());
 
 describe("StudioVirtualSpaceEnvironmentPanel", () => {
+  it("선택한 테마의 배경 원본을 보여주며 날씨·시간대 선택은 유지한다", () => {
+    const onChange = vi.fn();
+    const value = { ...DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT, backdrop: "forest" as const, weather: "petals" as const, dayPhase: "dusk" as const };
+    const view = render(<StudioVirtualSpaceEnvironmentPanel value={value} artStyle="pastel" onChange={onChange} />);
+    expect(screen.getByRole("button", { name: /정원 숲/ }).querySelector("img")?.getAttribute("src")).toContain("backdrop-pastel-forest.png");
+    view.rerender(<StudioVirtualSpaceEnvironmentPanel value={value} artStyle="ink" onChange={onChange} />);
+    expect(screen.getByRole("button", { name: /정원 숲/ }).querySelector("img")?.getAttribute("src")).toContain("backdrop-ink-forest.png");
+    expect(screen.getByRole("button", { name: "꽃잎" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "노을" }).getAttribute("aria-pressed")).toBe("true");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("changes backdrop, day phase and weather without carrying arbitrary data", () => {
     const onChange = vi.fn();
     const { rerender } = render(<StudioVirtualSpaceEnvironmentPanel value={DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT} onChange={onChange} />);

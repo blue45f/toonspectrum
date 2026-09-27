@@ -25,6 +25,7 @@ import { WorkspaceAccountAction, WorkspaceBrand, WorkspaceSidebar } from "@/shar
 import { WorkspaceContextPanel } from "@/shared/components/workspace/WorkspaceContextPanel";
 import { useStudioProjectLibrary } from "../studio-shell/useStudioProjectLibrary";
 import { readStudioVirtualArtStyle } from "../virtual-space/studio-virtual-space-art-style";
+import { StudioVirtualCharacterPreview } from "../virtual-space/StudioVirtualCharacterPreview";
 import { STUDIO_CHARACTER_SKINS, studioCharacterSkinForArtStyle } from "../virtual-space/studio-virtual-space-character-skins";
 import { readStudioVirtualSpaceEntryPreference } from "../virtual-space/studio-virtual-space-entry-preference";
 import { useStudioWorkspaceResume } from "./useStudioWorkspaceResume";
@@ -316,7 +317,7 @@ export function StudioWorkspacePage({ surface = "home" }: { readonly surface?: W
                   <img className="workspace-personal-studio-scene" src="/brand/atelier-world-640.webp" alt="" decoding="async" />
                   <span className="workspace-personal-studio-glow" />
                   {selectedCharacter
-                    ? <img className="workspace-personal-studio-character" src={selectedCharacter.directional.down} alt="" decoding="async" />
+                    ? <StudioVirtualCharacterPreview className="workspace-personal-studio-character" skin={selectedCharacter} />
                     : <span className="workspace-personal-studio-placeholder"><UserRound size={48} /></span>}
                   <span className="workspace-personal-studio-state">{selectedCharacter
                     ? bt("입장 준비됨", "Ready to enter")

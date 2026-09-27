@@ -12,6 +12,7 @@ import {
   studioNpcCastTextureUrls,
 } from "./studio-virtual-space-npc-cast";
 import { STUDIO_VIRTUAL_ART_STYLE_KEYS } from "./studio-virtual-space-art-style";
+import { STUDIO_NATIVE_NPC_KEYS } from "./studio-virtual-space-npc-native-art";
 
 interface V5ManifestFile {
   readonly file: string;
@@ -49,7 +50,7 @@ function diskPath(url: string): string {
   return resolve(process.cwd(), "apps/web/public", url.replace(/^\//u, ""));
 }
 
-describe("studio NPC cast v5", () => {
+describe("studio NPC 역할별 전용 작화", () => {
   it("uses eight stable NPC identities and never reuses selectable-player URLs", () => {
     expect(STUDIO_NPC_CAST).toHaveLength(8);
     expect(new Set(STUDIO_NPC_CAST.map((skin) => skin.key)).size).toBe(8);
@@ -57,7 +58,7 @@ describe("studio NPC cast v5", () => {
     expect([...studioNpcCastTextureUrls()].filter((url) => playerUrls().has(url))).toEqual([]);
   });
 
-  it("loads every independently rendered v5 runtime texture from the integrity manifest", () => {
+  it("기존 테마 원본과 신규 NPC 원본을 각각의 무결성 manifest로 검증한다", () => {
     const manifest = JSON.parse(readFileSync(resolve(root, "style-packs-v5/art-v5-manifest.json"), "utf8")) as V5Manifest;
     expect(manifest.version).toBe(5);
     expect(manifest.independentSource).toBe(true);
@@ -69,12 +70,16 @@ describe("studio NPC cast v5", () => {
       `/assets/virtual-studio/style-packs-v5/${item.file}`,
       item,
     ]));
+    const nativeManifest = JSON.parse(readFileSync(resolve(root, "experience-v8/npc-art-manifest.json"), "utf8")) as {
+      readonly files: readonly { readonly file: string; readonly bytes: number; readonly sha256: string }[];
+    };
+    const nativeRecords = new Map(nativeManifest.files.map((item) => [`/assets/virtual-studio/experience-v8/${item.file}`, item]));
 
     for (const style of STUDIO_VIRTUAL_ART_STYLE_KEYS) {
       const urls = studioNpcCastTextureUrls(style);
-      expect(urls.size).toBe(200);
+      expect(urls.size).toBe(104); // 기존 4종×25파일 + 방향·행동이 한 원본을 공유하는 신규 4종.
       for (const url of urls) {
-        const record = records.get(url);
+        const record = records.get(url) ?? nativeRecords.get(url);
         expect(record, `${style}: ${url}`).toBeDefined();
         const path = diskPath(url);
         expect(existsSync(path), path).toBe(true);
@@ -82,6 +87,15 @@ describe("studio NPC cast v5", () => {
         expect(data.byteLength).toBe(record?.bytes);
         expect(sha256(data)).toBe(record?.sha256);
       }
+    }
+  });
+
+  it("독립 NPC 4종은 플레이어 선택과 분리하고 공간 테마가 달라도 원본 역할 작화를 유지한다", () => {
+    for (const key of STUDIO_NATIVE_NPC_KEYS) {
+      expect(STUDIO_CHARACTER_SKINS.some((skin) => skin.key === key)).toBe(false);
+      const original = studioNpcCastSkinByKey(key, "webtoon");
+      for (const style of STUDIO_VIRTUAL_ART_STYLE_KEYS) expect(studioNpcCastSkinByKey(key, style)).toBe(original);
+      expect(original).toMatchObject({ key, sharedAtlas: true, nativeArtStyle: "webtoon" });
     }
   });
 

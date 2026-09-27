@@ -13,6 +13,28 @@ import { useState } from "react";
 import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
 
 describe("StudioVirtualSpaceCustomizationPanel", () => {
+  it("현재 테마의 가구 원본을 목록과 지도에 함께 반영하며 기존 배치를 유지한다", () => {
+    const world = { ...studioVirtualPlaceWorldManifest("skyport", true), colliders: [], props: [], portals: [], npcs: [], interactions: [], interactionSlots: [] };
+    const decorations: StudioVirtualDecorationState = { ...studioVirtualDecorationPreset("minimal"), layoutWidth: 960, layoutHeight: 640,
+      placements: [{ id: "bench-a", type: "bench", x: 400, y: 320, rotation: 0, scale: 1 }] };
+    const props = { nickname: "작가 이름", character: DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION, decorations, world,
+      selfPoint: { x: 80, y: 100 }, onNickname: vi.fn(), onCharacter: vi.fn(), onDecorations: vi.fn() };
+    const view = render(<StudioVirtualSpaceCustomizationPanel {...props} artStyle="neon" />);
+    const assertTheme = (theme: string) => {
+      const preview = screen.getByRole("button", { name: /분수/ }).querySelector(".studio-vspace-customization-decor-preview image");
+      expect(preview?.getAttribute("href")).toContain(`experience-v8/furniture-${theme}.png`);
+      const image = screen.getByRole("group", { name: "가구 배치 지도" }).querySelector("image");
+      expect(image?.getAttribute("href")).toContain(`experience-v8/furniture-${theme}.png`);
+      expect(image?.closest("svg")?.getAttribute("preserveAspectRatio")).toBe("none");
+    };
+    assertTheme("neon");
+    fireEvent.change(screen.getByRole("combobox", { name: "편집할 가구" }), { target: { value: "bench-a" } });
+    view.rerender(<StudioVirtualSpaceCustomizationPanel {...props} artStyle="ink" />);
+    assertTheme("ink");
+    expect(screen.getByText(/X 400 \/ Y 320 · 0°/)).toBeTruthy();
+    expect(props.onDecorations).not.toHaveBeenCalled();
+  });
+
   it("shows ImageGen-backed district and decor previews and updates the selected district", () => {
     const onDecorations = vi.fn();
     render(<StudioVirtualSpaceCustomizationPanel
@@ -32,7 +54,7 @@ describe("StudioVirtualSpaceCustomizationPanel", () => {
     expect(onDecorations).toHaveBeenCalledWith(expect.objectContaining({ districtKey: "review-falls" }));
 
     const fountain = screen.getByRole("button", { name: /분수/ });
-    expect((fountain.querySelector(".studio-vspace-customization-decor-preview") as HTMLElement).style.backgroundImage)
+    expect(fountain.querySelector(".studio-vspace-customization-decor-preview image")?.getAttribute("href"))
       .toContain("experience-v8/furniture.png");
     fireEvent.click(fountain);
     expect(onDecorations).toHaveBeenLastCalledWith(expect.objectContaining({

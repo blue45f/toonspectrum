@@ -593,7 +593,8 @@ describe("Virtual Studio social activity ownership", () => {
     expect(within(panel).getByRole("status").textContent).toContain("Cleo");
     expect(within(panel).getByRole("status").textContent).toContain("거절됨");
     const picker = panel.querySelector(".studio-vspace-peer-picker")!;
-    expect(within(picker as HTMLElement).getAllByRole("button").map((button) => button.textContent)).toEqual(["Bob", "Cleo"]);
+    expect(within(picker as HTMLElement).getAllByRole("button").filter((button) => button.hasAttribute("aria-pressed"))
+      .map((button) => button.getAttribute("aria-label"))).toEqual(["Bob", "Cleo"]);
   });
 });
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -39,7 +39,7 @@ describe("StudioVirtualSpaceEntryLobby", () => {
     expect(screen.getByRole("button", { name: "선택하고 입장" }).hasAttribute("disabled")).toBe(false);
 
     fireEvent.click(screen.getByText("아트 스타일·연결 고급 설정"));
-    fireEvent.click(await screen.findByRole("button", { name: /레트로/ }));
+    fireEvent.click(within(await screen.findByRole("group", { name: "아트 스타일" })).getByRole("button", { name: /픽셀 아틀리에/ }));
     expect(chooseStyle).toHaveBeenCalledWith("retro");
     fireEvent.click(screen.getByRole("button", { name: "선택하고 입장" }));
     expect(enter).toHaveBeenCalledTimes(1);
@@ -48,10 +48,10 @@ describe("StudioVirtualSpaceEntryLobby", () => {
     render(<MemoryRouter><StudioVirtualSpaceEntryLobby personal avatarIndex={0} nickname="작가" returning
       projectName="나의 아틀리에" onAvatarIndex={vi.fn()} onNickname={vi.fn()} onEnter={vi.fn()} /></MemoryRouter>);
     expect(screen.queryByText("소규모 협업은 P2P 우선")).toBeNull();
-    expect(screen.queryByRole("button", { name: /레트로/ })).toBeNull();
+    expect(screen.queryByRole("group", { name: "아트 스타일" })).toBeNull();
     expect(document.querySelector(".studio-vspace-entry-advanced-body")).toBeNull();
     fireEvent.click(screen.getByText("아트 스타일 설정"));
-    expect(await screen.findByRole("button", { name: /레트로/ })).toBeTruthy();
+    expect(within(await screen.findByRole("group", { name: "아트 스타일" })).getByRole("button", { name: /픽셀 아틀리에/ })).toBeTruthy();
     expect(document.querySelector(".studio-vspace-rtc-panel")).toBeNull();
   });
 });

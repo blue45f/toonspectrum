@@ -1,3 +1,5 @@
+import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+
 export const STUDIO_VIRTUAL_ENVIRONMENT_STORAGE_KEY = "toonspectrum:virtual-space-environment:v1";
 
 export const STUDIO_VIRTUAL_BACKDROPS = ["sky", "coast", "forest", "city"] as const;
@@ -70,6 +72,7 @@ export function patchStudioVirtualEnvironmentPreference(
   return parseStudioVirtualEnvironmentPreference({ ...current, ...patch, version: 1 }) ?? current;
 }
 
-export function studioVirtualBackdropUrl(backdrop: StudioVirtualBackdrop): string {
-  return `/assets/virtual-studio/experience-v8/${backdrop}.png`;
+export function studioVirtualBackdropUrl(backdrop: StudioVirtualBackdrop, artStyle: StudioVirtualArtStyleKey = "sky-island"): string {
+  const file = artStyle === "sky-island" ? backdrop : `backdrop-${artStyle}-${backdrop}`;
+  return `/assets/virtual-studio/experience-v8/${file}.png`;
 }

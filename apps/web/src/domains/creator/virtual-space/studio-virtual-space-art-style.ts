@@ -96,8 +96,8 @@ export const STUDIO_VIRTUAL_ART_STYLES: readonly StudioVirtualArtStyle[] = Objec
   },
   {
     key: "retro",
-    labelKo: "레트로 RPG",
-    labelEn: "Retro RPG",
+    labelKo: "픽셀 아틀리에",
+    labelEn: "Pixel Atelier",
     descriptionKo: "동일한 팀과 기능을 제한 팔레트·도트 타일·고전 RPG 건축으로 완전히 재해석.",
     descriptionEn: "The same team and tools reimagined as a limited-palette, tile-based classic RPG world.",
     architectureKo: "16비트 RPG 제작 도시",

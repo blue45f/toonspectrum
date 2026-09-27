@@ -5,6 +5,9 @@ import { editStudioVirtualDecoration, studioVirtualDecorBounds, studioVirtualDec
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { studioWorldCollisionRects, type StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import { studioWorldLayoutPointer } from "./studio-world-layout-edit";
+import { DEFAULT_STUDIO_VIRTUAL_ART_STYLE, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import { studioExperienceFrameGeometry } from "./studio-virtual-space-experience-art";
+import { StudioVirtualExperienceArtPreview } from "./StudioVirtualExperienceArtPreview";
 
 const LABELS: Readonly<Record<StudioVirtualDecorType, readonly [string, string]>> = {
   tree: ["나무", "Tree"], "flower-bed": ["화단", "Flower bed"], bench: ["벤치", "Bench"], lamp: ["조명", "Lamp"],
@@ -13,7 +16,8 @@ const LABELS: Readonly<Record<StudioVirtualDecorType, readonly [string, string]>
   "drawing-desk": ["드로잉 데스크", "Drawing desk"], bookshelf: ["책장", "Bookshelf"], "review-board": ["원고 리뷰 보드", "Review board"], sofa: ["소파", "Sofa"],
 };
 
-export function StudioVirtualSpaceDecorationEditor({ world, decorations, selfPoint, onChange }: {
+export function StudioVirtualSpaceDecorationEditor({ world, decorations, selfPoint, onChange, artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE }: {
+  readonly artStyle?: StudioVirtualArtStyleKey;
   readonly world: StudioVirtualSpaceWorldManifest;
   readonly decorations: StudioVirtualDecorationState;
   readonly selfPoint: StudioVirtualSpacePoint;
@@ -51,19 +55,23 @@ export function StudioVirtualSpaceDecorationEditor({ world, decorations, selfPoi
       <rect width={world.width} height={world.height} fill={`url(#${id}-grid)`} />
       <g pointerEvents="none" fill="currentColor" opacity=".18">{studioWorldCollisionRects(world).map((rect, index) => <rect key={index} {...rect} />)}</g>
       <g pointerEvents="none" fill="none" stroke="#7fe0ce" strokeOpacity=".45">{world.portals.map((portal) => <circle key={portal.id} cx={portal.point.x} cy={portal.point.y} r={portal.radius} />)}</g>
-      {state.placements.map((item, index) => <g key={item.id} role="button" tabIndex={0} aria-pressed={selected?.id === item.id}
+      {state.placements.map((item, index) => {
+        const frame = STUDIO_VIRTUAL_DECOR_FRAME[item.type];
+        const geometry = studioExperienceFrameGeometry("furniture", artStyle, frame, 82 * item.scale, 82 * item.scale, .5, .9);
+        return <g key={item.id} role="button" tabIndex={0} aria-pressed={selected?.id === item.id}
         aria-label={bt(`${index + 1}번 ${LABELS[item.type][0]} 선택`, `Select ${LABELS[item.type][1]} ${index + 1}`)}
         className="studio-decoration-editor__object" onClick={(event) => { event.stopPropagation(); choose(item.id); }}
         onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); choose(item.id); } }}>
         <rect {...studioVirtualDecorBounds(item)} rx="8" fill={selected?.id === item.id ? "#ad89ff" : "#72b6ca"} fillOpacity=".35" stroke={selected?.id === item.id ? "#f8e5ff" : "#83cfe2"} strokeWidth={selected?.id === item.id ? 4 : 2} />
         <g transform={`translate(${item.x} ${item.y}) rotate(${item.rotation})`} pointerEvents="none">
-          <svg x={-41 * item.scale} y={-73.8 * item.scale} width={82 * item.scale} height={82 * item.scale} viewBox="0 0 1 1" overflow="hidden">
-            <image href="/assets/virtual-studio/experience-v8/furniture.png" x={-(STUDIO_VIRTUAL_DECOR_FRAME[item.type] % 4)} y={-Math.floor(STUDIO_VIRTUAL_DECOR_FRAME[item.type] / 4)} width="4" height="4" />
-          </svg>
+          <StudioVirtualExperienceArtPreview kind="furniture" artStyle={artStyle} frame={frame}
+            x={-geometry.width * geometry.originX} y={-geometry.height * geometry.originY}
+            width={geometry.width} height={geometry.height} preserveAspectRatio="none" />
         </g>
         <circle cx={item.x} cy={item.y} r="6" fill="#f8e5ff" />
         <text x={item.x} y={item.y - 30} textAnchor="middle" fill="#fff" fontSize="22" pointerEvents="none">{index + 1}</text>
-      </g>)}
+      </g>;
+      })}
       <g pointerEvents="none"><circle cx={selfPoint.x} cy={selfPoint.y} r="12" fill="#ffce67" stroke="#152431" strokeWidth="4" /><text x={selfPoint.x} y={selfPoint.y + 30} fill="#ffdf90" fontSize="20" textAnchor="middle">{bt("나", "You")}</text></g>
     </svg>
     <label className="studio-decoration-editor__select">{bt("편집할 가구", "Furniture to edit")}
