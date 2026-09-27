@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import test from "node:test";
 import { JSDOM } from "jsdom";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 import {
   auditReadinessFindings,

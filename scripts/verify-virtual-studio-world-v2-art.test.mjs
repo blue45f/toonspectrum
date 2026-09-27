@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { after, before, test } from "node:test";
 import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Image, encodePng } from "image-js";
 import { verifyVirtualStudioWorldV2Art } from "./verify-virtual-studio-world-v2-art.mjs";
+
+const runner = process.env.VITEST ? await import("vitest") : await import("node:test");
+const { test } = runner;
+const before = runner.beforeAll ?? runner.before;
+const after = runner.afterAll ?? runner.after;
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const directions = ["down", "up", "left", "right"];
@@ -40,7 +44,7 @@ async function replaceWalk(root, direction, bytes, frames) {
 async function fixture(t) {
   const path = await mkdtemp(join(temporary, "case-"));
   await cp(base, path, { recursive: true });
-  t.after(() => rm(path, { recursive: true, force: true }));
+  (t.onTestFinished ?? t.after.bind(t))(() => rm(path, { recursive: true, force: true }));
   return path;
 }
 
