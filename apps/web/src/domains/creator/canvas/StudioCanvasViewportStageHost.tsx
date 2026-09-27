@@ -41,6 +41,7 @@ import { StudioCanvasGuideUnderlay } from "./StudioCanvasGuideLayers";
 import { StudioDrawingPracticeGuide } from "./StudioDrawingPracticeGuide";
 import { renderStudioCanvasSelectionDecorations } from "./StudioCanvasSelectionDecorations";
 import { StudioSkiaDocumentHitLayer } from "./StudioSkiaDocumentHitLayer";
+import { studioCanvasDocumentSelectionEnabled } from "./studio-canvas-selection-authority";
 import {
   StudioCanvasViewportDocumentLayer,
   type StudioCanvasViewportDocumentLayerProps,
@@ -751,6 +752,7 @@ export function StudioCanvasViewportStageHost({
                 <StudioSkiaDocumentHitLayer
                   elements={live.velloDocumentElements}
                   effectiveScale={effScale}
+                  selectionEnabled={studioCanvasDocumentSelectionEnabled(viewport)}
                   onSelect={documentLayerProps.selectElementFromCanvas}
                 />
               ) : null}

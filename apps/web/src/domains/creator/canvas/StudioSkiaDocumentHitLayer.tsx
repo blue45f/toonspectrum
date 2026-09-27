@@ -9,6 +9,7 @@ import type Konva from "konva";
 export interface StudioSkiaDocumentHitLayerProps {
   readonly elements: readonly El[];
   readonly effectiveScale: number;
+  readonly selectionEnabled: boolean;
   readonly onSelect: (
     id: string,
     event?: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
@@ -28,6 +29,7 @@ function localPointer(
 export function StudioSkiaDocumentHitLayer({
   elements,
   effectiveScale,
+  selectionEnabled,
   onSelect,
 }: StudioSkiaDocumentHitLayerProps) {
   const runtimeRef = useRef<
@@ -55,7 +57,7 @@ export function StudioSkiaDocumentHitLayer({
       // The existing Stage background path owns empty-click deselection and marquee start.
       name: element ? "skia-document-hit-proxy" : "bg",
     });
-    if (element && select) onSelect(element.id, event);
+    if (element && select && selectionEnabled) onSelect(element.id, event);
   };
 
   return (
