@@ -40,6 +40,19 @@ async function verifyRecord(path, record, errors) {
   return data.length;
 }
 
+export function verifyVirtualStudioNavigationBindings(runtime) {
+  // 바닥 타일·가구·NPC가 사용하는 실제 world 경로 판정을 같은 권위로 유지한다.
+  for (const binding of [
+    "studioVirtualDecorationNavigationWorld(manifest,",
+    "findStudioWorldPath(navigationWorld,",
+    "studioWorldCanOccupy(navigationWorld, currentPoint)",
+    "resolveStudioWorldSpawn(navigationWorld, currentPoint)",
+    "npcDirector.updateNavigationWorld(navigationWorld)",
+  ]) {
+    if (!runtime.includes(binding)) throw new Error("runtime navigation authority is disconnected: " + binding);
+  }
+}
+
 export async function verifyVirtualStudioLivingTownV6() {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const errors = [];
@@ -111,7 +124,7 @@ export async function verifyVirtualStudioLivingTownV6() {
 
   const runtime = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas.tsx"), "utf8");
   if (!runtime.includes("studioVirtualLivingTownAssetUrl")) errors.push("runtime does not load living-town v6 assets");
-  if (!runtime.includes("studioTownTraversalProfile")) errors.push("runtime does not enforce authored paths");
+  verifyVirtualStudioNavigationBindings(runtime);
   if (!runtime.includes("triggerEnvironmentEffect")) errors.push("runtime does not trigger environment interaction effects");
   const skins = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/studio-virtual-space-character-skins.ts"), "utf8");
   if (!skins.includes('key: "imagegen25"') || !skins.includes("living-town-v6/imagegen25-character")) {

@@ -214,6 +214,15 @@ async function activatePenAndDraw(page: Page): Promise<void> {
 
   const centerX = box.x + box.width * 0.42;
   const centerY = box.y + box.height * 0.42;
+  const hitEvidence = await page.evaluate(({ points }) => points.map(([x, y]) => {
+    const target = document.elementFromPoint(x, y);
+    const stage = document.querySelector(".konvajs-content")?.getBoundingClientRect();
+    return { x, y, target: target?.tagName, className: target?.getAttribute("class"),
+      canvas: Boolean(target?.closest(".konvajs-content")),
+      stage: stage ? { x: stage.x, y: stage.y, width: stage.width, height: stage.height } : null };
+  }), { points: [[centerX, centerY], [centerX + 230, centerY + 130], [centerX + 110, centerY - 20], [centerX - 190, centerY + 170]] });
+  log("INITIAL_STROKE_HIT_EVIDENCE " + JSON.stringify(hitEvidence));
+  await page.screenshot({ path: join(SCRATCH, "studio-filter-initial-hit-state.png") });
   await page.mouse.move(centerX, centerY);
   await page.mouse.down();
   await page.mouse.move(centerX + 230, centerY + 130, { steps: 18 });

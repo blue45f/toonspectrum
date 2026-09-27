@@ -257,7 +257,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
       data-testid="site-background-music-player"
       data-site-ost="mounted"
       data-site-ost-expanded={expanded || undefined}
-      className={dock ? "relative z-50" : "fixed bottom-4 left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[calc(4.75rem+env(safe-area-inset-bottom))] max-md:left-3"}
+      className={dock ? "relative z-50" : "fixed bottom-[max(1rem,var(--service-status-overlay-clearance,0px))] left-4 z-50 max-w-[calc(100vw-2rem)] max-md:bottom-[max(calc(4.75rem+env(safe-area-inset-bottom)),var(--service-status-overlay-clearance,0px))] max-md:left-3"}
       aria-label={korean ? "툰스튜디오 오리지널 OST" : "ToonStudio original OST"}
     >
       {expanded ? (
@@ -275,7 +275,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
             </button>
           </div>
 
-          <div className="max-h-[min(65dvh,38rem)] space-y-4 overflow-y-auto overscroll-contain p-4">
+          <div className="max-h-[min(65dvh,38rem,calc(100dvh-var(--service-status-overlay-clearance,0px)-12rem))] space-y-4 overflow-y-auto overscroll-contain p-4">
             <div className="rounded-xl border border-accent/25 bg-accent/5 px-3 py-2 text-xs leading-5 text-fg-2">
               <span className="font-black text-accent">{korean ? "오리지널 전용" : "Original only"}</span>
               <span>{korean ? " · 레퍼런스/스톡/브라우저 합성 BGM으로 자동 대체하지 않습니다." : " · No automatic fallback to reference, stock, or browser-synthesized music."}</span>
@@ -361,7 +361,7 @@ export function SiteBackgroundMusicPlayer({ suspended: externallySuspended = fal
         </div>
       ) : null}
 
-      {dock ? <button ref={dockToggle} type="button" onClick={toggleExpanded} className="grid size-11 place-items-center rounded-lg border border-line bg-panel text-fg-2" aria-expanded={expanded} aria-label={korean ? "OST 설정" : "OST settings"}><Music2 size={18} aria-hidden="true" /></button> : <div className="flex max-w-[min(26rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl max-md:w-[6.25rem] max-md:max-w-none">
+      {dock ? <button ref={dockToggle} type="button" onClick={toggleExpanded} className="grid size-11 place-items-center rounded-lg border border-line bg-panel text-fg-2" aria-expanded={expanded} aria-label={korean ? "OST 설정" : "OST settings"}><Music2 size={18} aria-hidden="true" /></button> : <div className="flex max-w-[min(26rem,calc(100vw-2rem))] items-center gap-1 rounded-full border border-line bg-panel/95 p-1.5 shadow-xl backdrop-blur-xl max-md:w-[6.625rem] max-md:max-w-none">
         <button type="button" onClick={() => void togglePlayback()} disabled={!hasPublishedOst} className={cn("grid size-11 shrink-0 place-items-center rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent", !hasPublishedOst ? "cursor-not-allowed bg-raised text-fg-3" : playing ? "bg-accent text-on-accent" : "bg-raised text-fg-2 hover:text-fg")} aria-label={playing ? (korean ? "OST 일시정지" : "Pause OST") : (korean ? "OST 재생" : "Play OST")} aria-pressed={playing}>
           {playing ? <Pause className="size-4" aria-hidden="true" /> : <Play className="size-4" aria-hidden="true" />}
         </button>

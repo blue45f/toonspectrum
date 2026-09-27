@@ -121,6 +121,34 @@ test.describe("mobile shell accessibility", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
+  test("서비스 장애 알림과 OST는 펼친 상태에서도 서로 터치를 가리지 않는다", async ({ page }) => {
+    await assertNoBlockingViolations(page, "/studio");
+    const banner = page.locator("[data-service-degraded-banner]");
+    const player = page.getByTestId("site-background-music-player");
+    await expect(banner).toBeVisible();
+    await expect(player).toBeVisible();
+    for (const width of [390, 320, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const expanded of [false, true]) {
+        if (expanded) await banner.getByRole("button", { name: "서비스 상태 알림 펼치기" }).click();
+        await expect.poll(async () => player.locator("button").evaluateAll((buttons) => buttons.every((button) => {
+          const r = button.getBoundingClientRect();
+          return r.width >= 44 && r.height >= 44 && r.left >= 0 && r.right <= innerWidth
+            && [0.2, 0.5, 0.8].every((x) => [0.2, 0.5, 0.8].every((y) =>
+              button.contains(document.elementFromPoint(r.x + r.width * x, r.y + r.height * y))));
+        }))).toBe(true);
+        if (expanded) await banner.getByRole("button", { name: "서비스 상태 알림 접기" }).click();
+      }
+    }
+    await player.getByRole("button", { name: /오리지널 애니·웹툰 OST/u }).click();
+    const settings = player.locator(":scope > div").first();
+    const bounds = await settings.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds?.y).toBeGreaterThanOrEqual(0);
+    const bannerBounds = await banner.boundingBox();
+    expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBeLessThan(bannerBounds?.y ?? 0);
+  });
+
   for (const route of MOBILE_A11Y_ROUTES) {
     test(`${route} mobile has no serious or critical automated accessibility violations`, async ({ page }) => {
       await assertNoBlockingViolations(page, route);

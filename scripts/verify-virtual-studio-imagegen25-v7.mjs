@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+
+import { STUDIO_VIRTUAL_BACKDROPS, studioVirtualBackdropUrl } from "../apps/web/src/domains/creator/virtual-space/studio-virtual-space-environment-preference.ts";
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pack = resolve(repo, "apps/web/public/assets/virtual-studio/imagegen25-v7");
@@ -33,6 +35,40 @@ function safeRelativePath(value) {
     && /^[a-z0-9][a-z0-9/_-]*\.webp$/u.test(value)
     && !value.includes("..")
     && !value.startsWith("/");
+}
+
+// 배경은 v8로 이관됐지만 실제 선택 경로와 파일의 무결성은 계속 검증한다.
+export async function verifyVirtualStudioRuntimeBackdrops(resolveBackdrop = studioVirtualBackdropUrl) {
+  const root = resolve(repo, "apps/web/public/assets/virtual-studio/experience-v8");
+  const manifest = JSON.parse(await readFile(resolve(root, "art-manifest.json"), "utf8"));
+  const records = new Map(manifest.assets.map((record) => [record.file, record]));
+  const seen = new Set();
+  const hashes = new Set();
+  for (const style of ["sky-island", "webtoon", "pastel", "retro", "ink", "neon"]) {
+    for (const backdrop of STUDIO_VIRTUAL_BACKDROPS) {
+      const url = resolveBackdrop(backdrop, style);
+      const prefix = "/assets/virtual-studio/experience-v8/";
+      if (typeof url !== "string" || !url.startsWith(prefix)) throw new Error("runtime backdrop must use the declared v8 pack");
+      const file = url.slice(prefix.length);
+      if (!/^[a-z0-9-]+[.]png$/u.test(file)) throw new Error("unsafe runtime backdrop path");
+      if (seen.has(file)) throw new Error("runtime backdrop styles must retain independent assets");
+      seen.add(file);
+      const record = records.get(file);
+      if (!record) throw new Error("runtime backdrop is absent from the source manifest: " + file);
+      const path = resolve(root, file);
+      if ((await lstat(path)).isSymbolicLink()) throw new Error("runtime backdrop symlink is forbidden");
+      const data = await readFile(path);
+      const hash = sha256(data);
+      if (record.bytes !== data.length || record.sha256 !== hash) throw new Error("runtime backdrop integrity mismatch: " + file);
+      if (hashes.has(hash)) throw new Error("runtime backdrop styles must not duplicate the same pixels");
+      hashes.add(hash);
+      if (data.readUInt32BE(0) !== 0x89504e47 || data.toString("ascii", 12, 16) !== "IHDR"
+        || data.readUInt32BE(16) < 1024 || data.readUInt32BE(20) < 768) {
+        throw new Error("runtime backdrop must preserve its production PNG dimensions: " + file);
+      }
+    }
+  }
+  return { backdrops: seen.size };
 }
 
 export async function verifyVirtualStudioImagegen25V7() {
@@ -95,8 +131,7 @@ export async function verifyVirtualStudioImagegen25V7() {
 
   const catalog = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/studio-virtual-space-place-catalog.ts"), "utf8");
   if (!catalog.includes("/assets/virtual-studio/imagegen25-v7/places")) errors.push("runtime place catalog is not connected");
-  const environment = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/studio-virtual-space-environment-preference.ts"), "utf8");
-  if (!environment.includes("/assets/virtual-studio/imagegen25-v7/backgrounds")) errors.push("runtime backdrops are not connected");
+  const runtimeBackdrops = await verifyVirtualStudioRuntimeBackdrops();
   const canvas = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas.tsx"), "utf8");
   if (!canvas.includes("studioVirtualBackdropUrl") || !canvas.includes("livingTextureKeys.terrain")
     || !canvas.includes("/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp")) {
@@ -104,7 +139,7 @@ export async function verifyVirtualStudioImagegen25V7() {
   }
 
   if (errors.length) throw new Error(errors.join("\n"));
-  return { files: fileRecords.size, places: places.length, bytes: totalBytes };
+  return { files: fileRecords.size, places: places.length, bytes: totalBytes, runtimeBackdrops: runtimeBackdrops.backdrops };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
