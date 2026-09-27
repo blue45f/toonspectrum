@@ -13,9 +13,10 @@ function source(path: string): string {
 describe("Studio live dynamic brush integration boundary", () => {
   it("arms the suffix renderer at pointer-down and routes pointer frames through appendFrom", () => {
     const page = source("../StudioCuttoonEditorHost.tsx");
-    const pointerStart = page.slice(
-      page.indexOf("const dynamicBrushDirect ="),
-      page.indexOf("const predictionTailEligible =", page.indexOf("const dynamicBrushDirect =")),
+    const surfaceStart = source("../studio-cuttoon-editor/studio-live-surface-start.ts");
+    const pointerStart = surfaceStart.slice(
+      surfaceStart.indexOf("const wetInkOverlayStarted ="),
+      surfaceStart.indexOf("liveRetainedMediaDraftDirectRef.current = retainedMediaDirect"),
     );
     expect(pointerStart).toContain(
       "liveDynamicBrushOverlayRendererRef.current.begin(next).status === \"started\"",
@@ -24,11 +25,9 @@ describe("Studio live dynamic brush integration boundary", () => {
     expect(pointerStart).toContain(
       'liveDynamicBrushDraftDirectRef.current = strokeSurfaceRoute.kind === "dynamic"',
     );
-    expect(pointerStart).toContain("selectedMaterialProviderOwnsHiddenDraft");
     expect(pointerStart).toContain("|| dynamicBrushDirect");
     expect(pointerStart).toContain("|| wetInkOverlayStarted");
     expect(pointerStart).toContain("|| retainedMediaDirect");
-    expect(pointerStart).toContain("liveDraftLayerRef.current?.drawScene()");
 
     const flush = page.slice(
       page.indexOf("const flushDirectLiveDraft ="),
@@ -51,7 +50,7 @@ describe("Studio live dynamic brush integration boundary", () => {
       seal,
     );
     const deferredCommit = finish.indexOf("queueDeferredStrokeCommit(finished)", seal);
-    const immediateCommit = finish.indexOf("commit([...baseElements, finished])", seal);
+    const immediateCommit = finish.indexOf("const committed = commit(committedElements, undefined, activePage.id)", seal);
     expect(seal).toBeGreaterThan(0);
     expect(reject).toBeGreaterThan(seal);
     expect(deferredCommit).toBeGreaterThan(reject);
@@ -94,7 +93,7 @@ describe("Studio live dynamic brush integration boundary", () => {
       page.indexOf("discardPendingStrokeCommitsRef.current = () => {"),
     );
     const commit = flush.indexOf(
-      "committed = commit([...baseElements, ...batch.strokes]",
+      "committed = commitStudioDeferredStrokeBatch({",
     );
     expect(commit).toBeGreaterThan(-1);
     expect(flush.slice(0, commit)).not.toContain("suppressSettledPrefix(");
