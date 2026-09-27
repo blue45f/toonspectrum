@@ -1,10 +1,12 @@
 import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, ArrowRight, BadgeCheck, BookOpenText, Boxes, BriefcaseBusiness, CalendarClock, ChevronRight, ClipboardCheck, Coins, FileKey2, GitBranch, Handshake, Layers3, LayoutDashboard, LockKeyhole, MessagesSquare, PanelTopOpen, Scale, ScrollText, ShieldCheck, Users, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 
 import { applyProductionStudioRevisionLink, createPlanningSnapshot, evaluateHandoffReadiness, evaluateProductionRisks, evaluateReviewApproval, preflightCreditManifest, transitionProductionRisk, transitionProductionRiskResponse, type ClarificationThread, type EpisodeCollaboration, type ProductionProjectAggregate, type ProductionTask, type ReviewDecision, type StoryToArtHandoffPackage } from "@toonstudio/core/production";
 
+import { ProductionWorkBoard } from "./ProductionWorkBoard";
+import { buildProductionWorkflowTasks, transitionProductionTaskBatch, validateProductionWorkflowMutation, validateProductionWorkflowProfile } from "@toonstudio/core/production";
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
 import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
@@ -306,9 +308,25 @@ function reduceDemoCommand(
       return { ...base, reviewDecisions: replaceById(aggregate.reviewDecisions, command.decision) };
     case "upsert-episode":
       return { ...base, episodes: replaceById(aggregate.episodes, command.episode) };
+    case "configure-workflow": {
+      if ((aggregate.workflowProfile?.revision ?? 0) !== command.expectedWorkflowRevision) throw new Error("공정 설정이 변경되었습니다.");
+      const issues = validateProductionWorkflowProfile(aggregate, command.profile);
+      if (issues.length) throw new Error(issues.join("\n"));
+      return { ...base, workflowProfile: command.profile };
+    }
+    case "instantiate-workflow": {
+      if (aggregate.workflowProfile?.revision !== command.workflowRevision) throw new Error("공정 설정이 변경되었습니다.");
+      const tasks = buildProductionWorkflowTasks(aggregate, command.episodeId, command.instanceId, base.updatedAt);
+      return { ...base, tasks: [...aggregate.tasks, ...tasks] };
+    }
+    case "transition-task-batch": {
+      const tasks = transitionProductionTaskBatch(aggregate, command.transitions, base.updatedAt);
+      return { ...base, tasks: tasks.reduce<readonly ProductionTask[]>((current, task) => replaceById(current, task), aggregate.tasks) };
+    }
     case "upsert-task":
       return { ...base, tasks: replaceById(aggregate.tasks, command.task) };
     case "upsert-task-batch": {
+      if ((command.expectedAbsentTaskIds ?? []).some((id) => aggregate.tasks.some((task) => task.id === id))) throw new Error("같은 작업이 이미 저장되었습니다. 최신 작업을 확인하세요.");
       for (const expected of command.expectedTasks ?? []) {
         const current = aggregate.tasks.find((task) => task.id === expected.id);
         if (!current || JSON.stringify(current) !== JSON.stringify(expected)) {
@@ -322,6 +340,7 @@ function reduceDemoCommand(
       return { ...base, tasks };
     }
     case "upsert-episode-operations": {
+      if ((aggregate.workflowProfile || command.expectedWorkflowRevision !== undefined) && (aggregate.workflowProfile?.revision ?? 0) !== command.expectedWorkflowRevision) throw new Error("제작 공정이 변경되었습니다. 최신 설정에서 일정을 다시 확인하세요.");
       const episodes = command.episode
         ? replaceById(aggregate.episodes, command.episode)
         : aggregate.episodes;
@@ -527,6 +546,10 @@ function useProductionProject(projectId: string | undefined) {
         const next = isDemo
           ? evaluateDemoRiskState(reduceDemoCommand(current, command))
           : (await executeProductionCommand(current.projectId, current.revision, command)).aggregate;
+        if (isDemo) {
+          const issues = validateProductionWorkflowMutation(current, next);
+          if (issues.length) throw new Error(issues.join("\n"));
+        }
         aggregateRef.current = next;
         setAggregate(next);
         setSaveState("saved");
@@ -962,25 +985,22 @@ function PlanningSurface({
     </div>
   );
 }
-function ProductionSurface({
-  aggregate,
-  execute,
-  canEdit,
-  roleLens,
-}: {
+function ProductionSurface({ aggregate, execute, executeStrict, canEdit, canManage, roleLens }: {
   readonly aggregate: ProductionProjectAggregate;
   readonly execute: (command: ProductionClientCommand, message: string) => Promise<void>;
+  readonly executeStrict: (command: ProductionClientCommand, message: string) => Promise<void>;
   readonly canEdit: boolean;
+  readonly canManage: boolean;
   readonly roleLens: RoleLens;
 }) {
-  return (
-    <ProductionRoleWorkspace
-      aggregate={aggregate}
-      execute={execute}
-      canEdit={canEdit}
-      roleLens={roleLens}
-    />
-  );
+  const [params, setParams] = useSearchParams();
+  const roleView = params.get("productionView") === "roles" || (params.has("task") && params.get("productionView") !== "board");
+  return <div className="min-w-0 space-y-4">
+    <div className="flex flex-wrap gap-2" aria-label="제작 작업 공간 선택">
+      {(["board", "roles"] as const).map((view) => <button key={view} type="button" aria-pressed={view === "roles" ? roleView : !roleView} className={cn(buttonClass({ variant: (view === "roles" ? roleView : !roleView) ? "solid" : "outline" }), "min-h-11")} onClick={() => setParams((previous) => { const next = new URLSearchParams(previous); next.set("productionView", view); return next; })}>{view === "board" ? "팀 작업 보드" : "역할별 작업실"}</button>)}
+    </div>
+    {roleView ? <ProductionRoleWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} /> : <ProductionWorkBoard key={aggregate.projectId} aggregate={aggregate} execute={executeStrict} canEdit={canEdit} canManage={canManage} />}
+  </div>;
 }
 function ScheduleSurface({
   aggregate,
@@ -1314,7 +1334,7 @@ function SurfaceContent({
     case "planning": return <PlanningSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "episodes": return <ProductionEpisodeOperationsWorkspace aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "manuscripts": return <ProductionManuscriptWorkspace aggregate={aggregate} canEdit={canEdit} isDemo={isDemo} execute={execute} />;
-    case "production": return <ProductionSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
+    case "production": return <ProductionSurface aggregate={aggregate} execute={execute} executeStrict={executeStrict} canEdit={canEdit} canManage={canManage} roleLens={roleLens} />;
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={executeStrict} canEdit={canEdit} canManage={canManage} />;
     case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
@@ -1342,7 +1362,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
         <div className="min-w-0 p-4 sm:p-6">
           {project.notice ? <div className={cn("mb-4 rounded-xl border px-3 py-2 text-xs", project.saveState === "error" ? "border-bad/30 bg-bad/10 text-fg" : "border-good/30 bg-good/10 text-fg")} role="status">{project.notice}</div> : null}
-          {project.isDemo ? <ProductionSampleJourneyGuide /> : null}
+          {project.isDemo ? surface === "production" ? <details className="mb-3 rounded-xl border border-line bg-card px-4"><summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-fg-2">샘플 프로젝트 안내 · 변경은 실제 프로젝트에 반영되지 않습니다</summary><ProductionSampleJourneyGuide /></details> : <ProductionSampleJourneyGuide /> : null}
           <SurfaceContent
             surface={surface}
             aggregate={project.aggregate}

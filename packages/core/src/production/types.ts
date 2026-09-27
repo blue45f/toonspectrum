@@ -381,6 +381,8 @@ export interface EpisodeCollaboration {
   readonly jointProofApproved: boolean;
   readonly creditPreflightPassed: boolean;
   readonly publicationPreflightPassed: boolean;
+  /** 실제 게시 상태와 분리된 제작 목표 마감이다. */
+  readonly plannedReleaseAt?: string | null;
   readonly updatedAt: string;
 }
 
@@ -518,12 +520,21 @@ export type ProductionTaskStatus =
   | "cancelled"
   | "out-of-scope";
 
+export interface ProductionTaskBriefBlock {
+  readonly id: string;
+  readonly kind: "paragraph" | "heading" | "checklist" | "quote";
+  readonly text: string;
+  readonly checked?: boolean;
+}
+
 export interface ProductionTask {
   readonly id: string;
   readonly projectId: string;
   readonly scope: ScopeRef;
   readonly processKey: string;
   readonly title: string;
+  readonly priority?: "low" | "normal" | "high" | "urgent";
+  readonly briefBlocks?: readonly ProductionTaskBriefBlock[];
   readonly status: ProductionTaskStatus;
   readonly assignmentIds: readonly string[];
   readonly reviewerAssignmentIds: readonly string[];
@@ -1640,6 +1651,7 @@ export interface ProductionProjectAggregate {
   readonly notificationPolicies?: readonly ProductionNotificationPolicy[];
   readonly notifications?: readonly ProductionNotification[];
   readonly savedViews?: readonly ProductionSavedView[];
+  readonly workflowProfile?: import("./workflow-profile").ProductionWorkflowProfile | null;
   readonly auditEvents: readonly ProductionAuditEvent[];
   readonly createdAt: string;
   readonly updatedAt: string;

@@ -1,5 +1,7 @@
+import { buildWorkflowEpisodePlan, workflowEpisodePipeline } from "./production-workflow-episode-plan";
 import {
   episodeScope,
+  canonicalProductionProcessKey,
   type EpisodeCollaboration,
   type EpisodePlan,
   type ProductionProjectAggregate,
@@ -276,7 +278,7 @@ export function deriveEpisodeOperationsRow(
   const plan = latestEpisodePlan(aggregate, episode.episodeId);
   const tasks = episodeTasks(aggregate, episode.episodeId);
   const releaseTask = publicationTask(tasks);
-  const releaseAt = releaseTask?.dueAt ?? null;
+  const releaseAt = episode.plannedReleaseAt ?? releaseTask?.dueAt ?? null;
   const nowMs = now.getTime();
   const daysUntilRelease = releaseAt ? daysUntil(releaseAt, nowMs) : null;
   const completedTasks = tasks.filter((task) => COMPLETE_TASK_STATUSES.has(task.status)).length;
@@ -292,7 +294,14 @@ export function deriveEpisodeOperationsRow(
   const overdueTasks = remainingTasks.filter((task) =>
     Boolean(task.dueAt && Date.parse(task.dueAt) < nowMs));
   const riskyTasks = remainingTasks.filter((task) => ACTIVE_RISK_STATUSES.has(task.status));
-  const progress = progressPercent(episode, tasks);
+  const configuredSteps = aggregate.workflowProfile?.steps;
+  const configuredComplete = configuredSteps?.filter((step) => {
+    const phaseTasks = tasks.filter((task) => canonicalProductionProcessKey(task.processKey) === canonicalProductionProcessKey(step.key) && !["cancelled", "out-of-scope"].includes(task.status));
+    return phaseTasks.length > 0 && phaseTasks.every((task) => ["approved", "done"].includes(task.status));
+  }).length ?? 0;
+  const progress = episode.state === "published" ? 100 : configuredSteps?.length
+    ? Math.round(configuredComplete / configuredSteps.length * 100)
+    : progressPercent(episode, tasks);
   const health = healthFor({
     episode,
     releaseAt,
@@ -325,8 +334,8 @@ export function deriveEpisodeOperationsRow(
     completedTasks,
     overdueTasks,
     riskyTasks,
-    missingProcessKeys: WEBTOON_EPISODE_PIPELINE
-      .filter((step) => !existingKeys.has(step.processKey))
+    missingProcessKeys: (workflowEpisodePipeline(aggregate) ?? WEBTOON_EPISODE_PIPELINE)
+      .filter((step) => ![...existingKeys].some((key) => canonicalProductionProcessKey(key) === canonicalProductionProcessKey(step.processKey)))
       .map((step) => step.processKey),
     health: health.health,
     healthReasons: health.reasons,
@@ -466,6 +475,8 @@ export interface BuildEpisodePipelineInput {
 }
 
 export interface EpisodePipelinePlan {
+  readonly plannedReleaseAt?: string;
+  readonly workflowRevision?: number;
   readonly tasks: readonly ProductionTask[];
   readonly createdCount: number;
   readonly updatedCount: number;
@@ -473,6 +484,8 @@ export interface EpisodePipelinePlan {
 }
 
 export function buildEpisodePipelinePlan(input: BuildEpisodePipelineInput): EpisodePipelinePlan {
+  const customized = buildWorkflowEpisodePlan(input);
+  if (customized) return customized;
   const plan = input.episodePlan ?? latestEpisodePlan(input.aggregate, input.episode.episodeId);
   const existingTasks = episodeTasks(input.aggregate, input.episode.episodeId);
   const existingByProcess = new Map(existingTasks
@@ -508,6 +521,7 @@ export function buildEpisodePipelinePlan(input: BuildEpisodePipelineInput): Epis
         .filter((value, index, all) => all.indexOf(value) === index && !assignmentIds.includes(value));
     const likely = existing?.estimateHours?.likely ?? step.likelyHours;
     const task: ProductionTask = {
+      ...existing,
       id: existing?.id ?? idByProcess.get(step.processKey)!,
       projectId: input.aggregate.projectId,
       scope: existing?.scope ?? episodeScope(input.aggregate.projectId, input.episode.episodeId),
