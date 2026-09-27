@@ -188,18 +188,19 @@ for (const [viewportName, viewport] of viewports) {
       await Promise.all(Array.from({ length: workers }, async () => {
         while (cursor < routes.length) {
           const route = routes[cursor++];
-          const page = await context.newPage();
           const pageErrors = [];
           const failedRequests = [];
-          page.on("pageerror", (error) => pageErrors.push(error.message.slice(0, 300)));
-          page.on("requestfailed", (request) => {
-            const url = new URL(request.url());
-            if (url.origin === base.origin && failedRequests.length < 12) {
-              failedRequests.push({ path: url.pathname, reason: request.failure()?.errorText });
-            }
-          });
           const result = { route, theme, viewport: viewportName, pageErrors, failedRequests };
+          let page;
           try {
+            page = await context.newPage();
+            page.on("pageerror", (error) => pageErrors.push(error.message.slice(0, 300)));
+            page.on("requestfailed", (request) => {
+              const url = new URL(request.url());
+              if (url.origin === base.origin && failedRequests.length < 12) {
+                failedRequests.push({ path: url.pathname, reason: request.failure()?.errorText });
+              }
+            });
             let response;
             let navigationError;
             for (let attempt = 0; attempt <= auditNavigationRetries; attempt += 1) {
@@ -544,6 +545,10 @@ for (const [viewportName, viewport] of viewports) {
           } catch (error) {
             result.issues = ["navigation-failed"];
             result.failure = String(error).slice(0, 700);
+            // If Chromium closed the context/browser, this worker cannot safely create
+            // another page. Let the sibling worker drain the remaining routes instead of
+            // crashing the whole audit process or looping on a dead context.
+            if (!page) return;
           } finally {
             results.push(result);
             console.log(JSON.stringify({
@@ -552,7 +557,7 @@ for (const [viewportName, viewport] of viewports) {
               warnings: result.warnings,
               finalPath: result.finalPath,
             }));
-            await page.close();
+            await page?.close().catch(() => undefined);
           }
         }
       }));
