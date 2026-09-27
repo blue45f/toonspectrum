@@ -188,7 +188,14 @@ describe("Studio tournament persistence bootstrap", () => {
   });
 
   it("keeps search indexing out of the active-tool and pen-down startup paths", () => {
-    const page = readStudioCuttoonEditorSource();
+    const editor = readStudioCuttoonEditorSource();
+    // 펜 입력의 매체 선택이 별도 실행 파일로 추출되어 연결과 본문을 함께 읽는다.
+    expect(editor).toContain("bindStudioDrawLiveSurfaces({");
+    const liveSurface = readFileSync(
+      new URL("./studio-cuttoon-editor/studio-live-surface-start.ts", import.meta.url),
+      "utf8",
+    );
+    const page = `${editor}\n${liveSurface}`;
 
     expect(page).toContain(
       'from "./studio-active-tool-command"',

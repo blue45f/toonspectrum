@@ -1,4 +1,5 @@
 import type * as Phaser from "phaser";
+import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 
 import {
   STUDIO_VIRTUAL_ACCESSORY_FRAME,
@@ -7,11 +8,18 @@ import {
   type StudioVirtualDecorationState,
   type StudioVirtualDecorType,
 } from "./studio-virtual-space-customization";
+import { studioVirtualDecorCollider } from "./studio-virtual-space-decoration-layout";
+import { stepStudioCatExpression, type StudioCatExpressionState } from "./studio-virtual-space-expressions";
+import { studioExperienceFrameGeometry } from "./studio-virtual-space-experience-art";
 import type { StudioVirtualSpaceFacing, StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 
 export interface StudioDecorationTextureKeys {
   readonly decor: string;
   readonly accessory: string;
+  readonly furniture?: string;
+  readonly cat?: string;
+  readonly illustratedFurniture?: boolean;
+  readonly artStyle?: StudioVirtualArtStyleKey;
 }
 
 interface ActorCosmeticVisual {
@@ -21,14 +29,15 @@ interface ActorCosmeticVisual {
   lastTrailAt: number;
 }
 
-const SOLID_DECOR = new Set<StudioVirtualDecorType>(["tree", "bench", "market-stall", "fountain", "portal"]);
 const DIRECTION_FRAME: Readonly<Record<StudioVirtualSpaceFacing, number>> = Object.freeze({ down: 0, right: 1, left: 2, up: 3 });
 const AURA_COLOR = Object.freeze({ none: 0, sparkle: 0xffe58a, focus: 0x72ddc6, neon: 0x57e8ff });
 const NAMEPLATE_COLOR = Object.freeze({ violet: "#d7c8ff", rose: "#ffc2db", sky: "#bde8ff", amber: "#ffe09a" });
 export class StudioVirtualDecorationRuntime {
   private readonly decorationSprites = new Map<string, Phaser.GameObjects.Sprite>();
   private readonly decorationColliders: Phaser.Physics.Arcade.Collider[] = [];
+  private readonly decorationBodies: Phaser.GameObjects.Zone[] = [];
   private readonly actorVisuals = new Map<string, ActorCosmeticVisual>();
+  private readonly catExpressions = new Map<string, StudioCatExpressionState>();
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -36,35 +45,78 @@ export class StudioVirtualDecorationRuntime {
     private readonly keys: StudioDecorationTextureKeys,
   ) {}
 
+  private textureFor(type: StudioVirtualDecorType) {
+    const cat = type === "pet" && this.keys.cat && this.scene.textures.exists(this.keys.cat) ? this.keys.cat : null;
+    const requestedFrame = STUDIO_VIRTUAL_DECOR_FRAME[type];
+    const furniture = this.keys.furniture && this.scene.textures.exists(this.keys.furniture)
+      && (this.keys.illustratedFurniture || requestedFrame >= 12) ? this.keys.furniture : null;
+    const frame = cat ? 0 : furniture || requestedFrame < 12 ? requestedFrame
+      : requestedFrame === 15 ? 2 : requestedFrame === 12 ? 5 : 9;
+    return { frame, texture: cat ?? furniture ?? this.keys.decor, cat: Boolean(cat), furniture: Boolean(furniture && !cat) };
+  }
+
+  private geometryFor(visual: ReturnType<StudioVirtualDecorationRuntime["textureFor"]>, size: number) {
+    return visual.furniture && this.keys.artStyle
+      ? studioExperienceFrameGeometry("furniture", this.keys.artStyle, visual.frame, size, size, .5, .9)
+      : { width: size, height: size, originX: .5, originY: .9 };
+  }
+
+  /** 늦게 도착한 선택 아트만 교체한다. 배치·각도·크기·물리 body는 다시 만들지 않는다. */
+  refreshTextures(): void {
+    for (const sprite of this.decorationSprites.values()) {
+      const visual = this.textureFor(sprite.getData("decorType") as StudioVirtualDecorType);
+      if (sprite.texture.key === visual.texture) continue;
+      const geometry = this.geometryFor(visual, Number(sprite.getData("decorNominalSize")));
+      sprite.setTexture(visual.texture, visual.frame).setDisplaySize(geometry.width, geometry.height)
+        .setOrigin(geometry.originX, geometry.originY).setData("catExpressionAtlas", visual.cat);
+      sprite.setData("baseScaleX", sprite.scaleX).setData("baseScaleY", sprite.scaleY);
+    }
+  }
+
   syncDecorations(state: StudioVirtualDecorationState): void {
     this.decorationColliders.splice(0).forEach((collider) => collider.destroy());
+    this.decorationBodies.splice(0).forEach((body) => body.destroy());
     this.decorationSprites.forEach((sprite) => sprite.destroy());
     this.decorationSprites.clear();
+    const catIds = new Set(state.placements.filter((item) => item.type === "pet").map((item) => item.id));
+    for (const id of this.catExpressions.keys()) if (!catIds.has(id)) this.catExpressions.delete(id);
     for (const placement of state.placements) {
-      const sprite = this.scene.add.sprite(placement.x, placement.y, this.keys.decor, STUDIO_VIRTUAL_DECOR_FRAME[placement.type])
-        .setDisplaySize(82 * placement.scale, 82 * placement.scale)
+      const visual = this.textureFor(placement.type);
+      const geometry = this.geometryFor(visual, 82 * placement.scale);
+      const sprite = this.scene.add.sprite(placement.x, placement.y, visual.texture, visual.frame)
+        .setDisplaySize(geometry.width, geometry.height)
         .setAngle(placement.rotation)
-        .setOrigin(.5, .9)
+        .setOrigin(geometry.originX, geometry.originY)
         .setDepth(Math.round(placement.y) + 948)
-        .setData("decorType", placement.type);
+        .setData("decorType", placement.type)
+        .setData("decorNominalSize", 82 * placement.scale)
+        .setData("catExpressionAtlas", visual.cat);
       sprite.setData("baseScaleX", sprite.scaleX).setData("baseScaleY", sprite.scaleY);
-      if (SOLID_DECOR.has(placement.type)) {
-        this.scene.physics.add.existing(sprite, true);
-        const body = sprite.body as Phaser.Physics.Arcade.StaticBody;
-        body.setSize(sprite.displayWidth * .62, sprite.displayHeight * .36).setOffset(sprite.displayWidth * .19, sprite.displayHeight * .57);
-        this.decorationColliders.push(this.scene.physics.add.collider(this.player, sprite));
+      const collider = studioVirtualDecorCollider(placement);
+      if (collider) {
+        // 연출용 회전·펄스와 분리한 발밑 충돌 면적을 길찾기와 공유한다.
+        const body = this.scene.add.zone(collider.x, collider.y, collider.width, collider.height).setOrigin(0);
+        this.scene.physics.add.existing(body, true);
+        this.decorationBodies.push(body);
+        this.decorationColliders.push(this.scene.physics.add.collider(this.player, body));
       }
       this.decorationSprites.set(placement.id, sprite);
     }
   }
-  update(time: number, playerPoint: StudioVirtualSpacePoint, reducedMotion: boolean): void {
+  update(time: number, playerPoint: StudioVirtualSpacePoint, reducedMotion: boolean, playerSpeed = 0): void {
     let visualIndex = 0;
-    for (const sprite of this.decorationSprites.values()) {
+    for (const [id, sprite] of this.decorationSprites) {
       const index = visualIndex++;
       const distance = Math.hypot(sprite.x - playerPoint.x, sprite.y - playerPoint.y);
       const near = distance < 92;
       const type = String(sprite.getData("decorType"));
-      const pulse = reducedMotion ? 1 : 1 + Math.sin(time * .002 + index) * (near ? .035 : .012);
+      const animatedCat = type === "pet" && Boolean(sprite.getData("catExpressionAtlas"));
+      if (animatedCat) {
+        const next = stepStudioCatExpression(this.catExpressions.get(id) ?? null, { time, distance, playerSpeed, reducedMotion, identity: id });
+        this.catExpressions.set(id, next.state);
+        sprite.setFrame(next.frame);
+      }
+      const pulse = reducedMotion || animatedCat ? 1 : 1 + Math.sin(time * .002 + index) * (near ? .035 : .012);
       const baseScaleX = Number(sprite.getData("baseScaleX") ?? sprite.scaleX);
       const baseScaleY = Number(sprite.getData("baseScaleY") ?? sprite.scaleY);
       sprite.setScale(baseScaleX * pulse, baseScaleY * pulse).setAlpha(near ? 1 : .92);
@@ -104,10 +156,12 @@ export class StudioVirtualDecorationRuntime {
       this.actorVisuals.set(id, visual);
     }
     const accessory = STUDIO_VIRTUAL_ACCESSORY_FRAME[customization.accessoryKey];
+    const headY = point.y - sprite.displayHeight * sprite.originY;
+    const accessorySize = Math.max(24, Math.min(48, sprite.displayHeight * .39));
     visual.accessory
       .setFrame(accessory * 4 + DIRECTION_FRAME[facing])
-      .setPosition(point.x, point.y - sprite.displayHeight * .62)
-      .setDisplaySize(48, 48)
+      .setPosition(point.x, headY + sprite.displayHeight * .22)
+      .setDisplaySize(accessorySize, accessorySize)
       .setDepth(sprite.depth + 2)
       .setVisible(accessory > 0);
     const auraColor = AURA_COLOR[customization.auraKey];
@@ -142,8 +196,10 @@ export class StudioVirtualDecorationRuntime {
 
   destroy(): void {
     this.decorationColliders.splice(0).forEach((collider) => collider.destroy());
+    this.decorationBodies.splice(0).forEach((body) => body.destroy());
     this.decorationSprites.forEach((sprite) => sprite.destroy());
     this.decorationSprites.clear();
+    this.catExpressions.clear();
     for (const id of [...this.actorVisuals.keys()]) this.removeActor(id);
   }
 }

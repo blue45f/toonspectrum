@@ -1,9 +1,12 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { Hand, MessageCircle, Footprints, ClipboardCheck, PartyPopper, X, ShieldBan } from "lucide-react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpacePeer } from "./studio-virtual-space-model";
 import type { StudioVirtualSpaceSocialController } from "./studio-virtual-space-social";
 import { resolveStudioCharacterAppearance } from "./studio-virtual-space-character-skins";
+import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
+import { studioTeammateInvitationReason, studioTeammateMatches, studioTeammatePresentation } from "./studio-virtual-space-teammates";
+import "./studio-virtual-space-teammates.css";
 
 export type StudioSpaceSocialSnapshot = ReturnType<StudioVirtualSpaceSocialController["snapshot"]>;
 export type StudioSpaceSocialRequest = StudioSpaceSocialSnapshot["requests"][number];
@@ -17,8 +20,9 @@ const ACTIONS = [
 ] as const;
 
 export function StudioVirtualSpaceSocialPanel({
-  selectedPeer, peers, social, disabled, focused, onSelect, onWave, onRequest, onRespond, onCancel, onBlock, nearbyPeerIds = [], conversationPeerIds = [], renderPeerAvatar,
+  selectedPeer, peers, social, disabled, focused, onSelect, onWave, onRequest, onRespond, onCancel, onBlock, nearbyPeerIds = [], conversationPeerIds = [], renderPeerAvatar, manifest,
 }: {
+  readonly manifest?: StudioVirtualSpaceWorldManifest;
   readonly renderPeerAvatar?: (peer: StudioVirtualSpacePeer) => ReactNode;
   readonly nearbyPeerIds?: readonly string[];
   readonly conversationPeerIds?: readonly string[];
@@ -35,47 +39,73 @@ export function StudioVirtualSpaceSocialPanel({
   readonly onBlock: (id: string, blocked: boolean) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceSocialPanel");
-  const [filter, setFilter] = useState<"all" | "nearby" | "conversation">("all");
+  const reasonId = useId();
+  const [filter, setFilter] = useState<"all" | "nearby" | "conversation" | "available">("all");
   const [query, setQuery] = useState("");
-  const normalizedQuery = query.trim().normalize("NFKC").toLocaleLowerCase();
-  const shownPeers = peers.filter((peer) => peer.participant.displayName.normalize("NFKC").toLocaleLowerCase().includes(normalizedQuery)
-    && (filter === "all" || (filter === "nearby" ? nearbyPeerIds : conversationPeerIds).includes(peer.participant.sessionId)));
+  const inviteReason = (peer: StudioVirtualSpacePeer, review = false) => studioTeammateInvitationReason(peer, social, { disabled, focused, review });
+  const availablePeers = peers.filter((peer) => !inviteReason(peer));
+  const shownPeers = peers.filter((peer) => studioTeammateMatches(peer, query, manifest)
+    && (filter === "all" || (filter === "available" ? !inviteReason(peer)
+      : (filter === "nearby" ? nearbyPeerIds : conversationPeerIds).includes(peer.participant.sessionId))));
   const activeRequests = social.requests.filter((request) =>
     ["offered", "accepting", "accepted"].includes(request.status),
   );
   const latestResult = social.requests.find((request) =>
     !["offered", "accepting", "accepted"].includes(request.status),
   );
-  const hasPending = selectedPeer && activeRequests.some((request) =>
-    request.peer.sessionId === selectedPeer.participant.sessionId,
-  );
   const blocked = selectedPeer ? social.blockedPeerIds.includes(selectedPeer.participant.sessionId) : false;
   const appearance = selectedPeer ? resolveStudioCharacterAppearance(selectedPeer.state, selectedPeer.participant.sessionId) : null;
+  const selectedReason = selectedPeer ? inviteReason(selectedPeer) : null;
+  const selectedPresentation = selectedPeer ? studioTeammatePresentation(selectedPeer, manifest) : null;
   return <section className="vs2-panel studio-vspace-social" aria-label={bt("팀원과 상호작용", "Teammate interactions")} data-space-interactive="true">
     <header><h2>{bt("함께 작업하기", "Work together")}</h2><UsersMark /></header>
     <p>{focused
       ? bt("집중 중에는 새 요청을 받거나 보내지 않아요.", "New invitations are paused while focusing.")
       : bt("팀원을 선택해 인사하거나 함께할 작업을 제안하세요. 상대가 수락하면 시작됩니다.", "Select a teammate to say hello or invite them to an activity. It starts when they accept.")}</p>
-    <label className="block text-sm">{bt("팀원 이름 찾기", "Find a teammate")}
+    <div className="studio-vspace-team-summary" aria-label={bt("팀원 현황", "Teammate overview")}>
+      <span>{bt("접속", "Connected")} <strong>{peers.length}</strong></span>
+      <span>{bt("초대 가능", "Ready for invitations")} <strong>{availablePeers.length}</strong></span>
+      <span>{bt("집중·자리비움", "Focusing or away")} <strong>{peers.filter((peer) => peer.state.activity === "focused" || peer.state.activity === "away").length}</strong></span>
+    </div>
+    <label className="block text-sm">{bt("이름·위치·작업 상태 찾기", "Find by name, place or work status")}
       <input type="search" className="mt-1 min-h-11 w-full rounded-lg border border-line bg-card px-3" maxLength={120} value={query}
+        placeholder={bt("리뷰 갤러리, 검토 중, 편집 참여자…", "Review gallery, reviewing, editor…")}
         onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key !== "Escape") event.stopPropagation(); }} />
     </label>
     <div className="my-2 flex flex-wrap gap-2" role="group" aria-label={bt("팀원 범위", "Teammate scope")}>
-      {([["all", "전체", "All"], ["nearby", "근처", "Nearby"], ["conversation", "대화 중", "In conversation"]] as const).map(([value, ko, en]) =>
+      {([["all", "전체", "All"], ["available", "초대 가능", "Ready to invite"], ["nearby", "근처", "Nearby"], ["conversation", "대화 중", "In conversation"]] as const).map(([value, ko, en]) =>
         <button type="button" key={value} aria-pressed={filter === value} onClick={() => setFilter(value)}>{bt(ko, en)}</button>)}
     </div>
     {peers.length && !shownPeers.length ? <p role="status">{bt("이 범위에서 일치하는 팀원이 없어요.", "No matching teammates in this scope.")}</p> : null}
-    {peers.length ? <div className="studio-vspace-peer-picker" aria-label={bt("팀원 선택", "Choose teammate")}>
-      {shownPeers.map((peer) => <button key={peer.participant.sessionId} type="button"
+    {peers.length ? <div className="studio-vspace-peer-picker studio-vspace-team-list" aria-label={bt("팀원 선택", "Choose teammate")}>
+      {shownPeers.map((peer, index) => {
+        const presentation = studioTeammatePresentation(peer, manifest);
+        const reviewReason = inviteReason(peer, true);
+        const peerReasonId = `${reasonId}-${index}`;
+        return <div className="studio-vspace-team-card" key={peer.participant.sessionId} data-activity={peer.state.activity}>
+        <button type="button" className="studio-vspace-team-select" aria-label={peer.participant.displayName} aria-describedby={`${peerReasonId}-info`}
         aria-pressed={selectedPeer?.participant.sessionId === peer.participant.sessionId}
         onClick={() => onSelect(peer.participant.sessionId)}>
-        {renderPeerAvatar?.(peer)}<span className="studio-vspace-presence-dot" aria-hidden />{peer.participant.displayName}
-      </button>)}
+          {renderPeerAvatar?.(peer)}<span className="studio-vspace-team-copy" id={`${peerReasonId}-info`}><strong>{peer.participant.displayName}</strong>
+            <span><span className="studio-vspace-presence-dot" aria-hidden />{bt(presentation.activity.ko, presentation.activity.en)}</span>
+            <small>{bt(presentation.location.ko, presentation.location.en)} · {bt(presentation.role.ko, presentation.role.en)}</small>
+          </span>
+        </button>
+        <button className="studio-vspace-team-review" type="button" disabled={Boolean(reviewReason)}
+          aria-label={bt(`${peer.participant.displayName} 님에게 검수 초대`, `Invite ${peer.participant.displayName} to review`)}
+          aria-describedby={reviewReason ? peerReasonId : undefined}
+          onClick={() => { if (!inviteReason(peer, true)) { onSelect(peer.participant.sessionId); onRequest(peer.participant.sessionId, "review"); } }}>
+          <ClipboardCheck size={16} aria-hidden />{bt("검수 초대", "Review invite")}
+        </button>
+        {reviewReason ? <small className="studio-vspace-team-reason" id={peerReasonId}>{bt(reviewReason.ko, reviewReason.en)}</small> : null}
+      </div>; })}
     </div> : <p className="studio-vspace-social-empty">{bt("같은 프로젝트에 접속한 팀원이 여기에 표시됩니다. NPC는 접속 인원에 포함되지 않아요.", "Teammates in this project appear here. NPCs are not counted as online members.")}</p>}
     {selectedPeer ? <div className="studio-vspace-peer-actions">
       <div className="studio-vspace-peer-heading"><strong>{selectedPeer.participant.displayName}</strong>
         <button type="button" onClick={() => onSelect(null)} aria-label={bt("팀원 선택 닫기", "Close teammate selection")}><X size={16} aria-hidden /></button>
       </div>
+      {selectedPresentation ? <p className="studio-vspace-team-detail">{bt(selectedPresentation.location.ko, selectedPresentation.location.en)} · {bt(selectedPresentation.role.ko, selectedPresentation.role.en)} · {bt(selectedPresentation.activity.ko, selectedPresentation.activity.en)}</p> : null}
+      {selectedReason ? <p className="studio-vspace-team-detail" role="status">{bt(selectedReason.ko, selectedReason.en)}</p> : null}
       {appearance?.issues.length ? <p className="text-xs text-fg-3">
         {appearance.issues.includes("unknown-skin") || appearance.issues.includes("invalid-appearance")
           ? bt("상대 캐릭터가 아직 지원되지 않아 기본 캐릭터로 표시합니다.", "This character is not supported here yet, so a default character is shown.")
@@ -86,9 +116,7 @@ export function StudioVirtualSpaceSocialPanel({
       <button type="button" disabled={disabled || focused || blocked || !social.greetingReadyPeerIds.includes(selectedPeer.participant.sessionId)
         || selectedPeer.state.activity === "focused" || selectedPeer.state.activity === "away"} onClick={onWave}><Hand size={16} aria-hidden />{bt("인사하기", "Wave hello")}</button>
       {ACTIONS.map(({ id, ko, en, icon: Icon }) => <button key={id} type="button"
-        disabled={disabled || focused || blocked || Boolean(hasPending) || !social.readyPeerIds.includes(selectedPeer.participant.sessionId)
-          || (id === "review" && !social.reviewReadyPeerIds.includes(selectedPeer.participant.sessionId))
-          || selectedPeer.state.activity === "focused" || selectedPeer.state.activity === "away"}
+        disabled={Boolean(inviteReason(selectedPeer, id === "review"))}
         onClick={() => onRequest(selectedPeer.participant.sessionId, id)}>
         <Icon size={16} aria-hidden />{bt(ko, en)}
       </button>)}

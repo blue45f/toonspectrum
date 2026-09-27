@@ -266,6 +266,8 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "apps/web/public/assets/virtual-studio/imagegen25-v7/places/personal-atelier.webp",
     "apps/web/public/assets/virtual-studio/imagegen25-v7/backgrounds/sky.webp",
     "apps/web/public/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp",
+    ...["art-manifest.json", "sky.png", "forest.png", "coast.png", "city.png", "furniture.png", "terrain.png"]
+      .map((file) => `apps/web/public/assets/virtual-studio/experience-v8/${file}`),
     "apps/web/public/assets/virtual-studio/world-v2/manifest.json",
     "apps/web/public/assets/virtual-studio/world-v2/tiles/limestone-native.png",
     "apps/web/public/assets/virtual-studio/world-v2/tiles/grass-native.png",
@@ -307,6 +309,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/style-packs-v5/",
     "/apps/web/public/assets/virtual-studio/living-town-v6/",
     "/apps/web/public/assets/virtual-studio/imagegen25-v7/",
+    "/apps/web/public/assets/virtual-studio/experience-v8/",
     "/apps/web/public/assets/virtual-studio/world-v2/",
     "/apps/web/public/assets/studio/props/",
   ]);

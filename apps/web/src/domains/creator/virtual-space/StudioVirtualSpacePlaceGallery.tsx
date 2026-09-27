@@ -55,7 +55,7 @@ export function StudioVirtualSpacePlaceGallery({
     <section className="studio-place-gallery" aria-labelledby="studio-place-gallery-title">
       <div className="studio-place-gallery__heading">
         <div>
-          <p><Sparkles size={14} aria-hidden />ImageGen 2.5 place collection</p>
+          <p><Sparkles size={14} aria-hidden />{bt("다양한 작업 공간", "A variety of workspaces")}</p>
           <h2 id="studio-place-gallery-title">{bt("장소 선택", "Choose a place")}</h2>
           <span>{bt(
             "각 장소는 이동 동선, 제작 기능, NPC와 환경음이 연결된 독립 작업 구역입니다.",

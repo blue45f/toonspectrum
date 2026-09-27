@@ -3,6 +3,12 @@ import { CalendarClock, CheckCircle2, ClipboardList, RefreshCw, Route, TriangleA
 import Link from "@/shared/navigation/router-link";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
+import {
+  STUDIO_VIRTUAL_PRODUCTION_DESTINATIONS,
+  STUDIO_VIRTUAL_TASK_STATUS_LABELS,
+  studioVirtualProductionDestination,
+  type StudioVirtualProductionDestination,
+} from "./studio-virtual-space-production-route";
 
 const ACTIVE_REVIEW = new Set(["internal-review", "external-review", "changes-requested", "conditionally-approved"]);
 const CLOSED = new Set(["approved", "done", "cancelled", "out-of-scope"]);
@@ -17,7 +23,7 @@ export function StudioVirtualSpaceTodayBoard({ snapshot, workId, onRefresh, onGu
   readonly snapshot: StudioVirtualOperationsSnapshot;
   readonly workId: string;
   readonly onRefresh: () => void;
-  readonly onGuide?: (destination: "story" | "drawing" | "review" | "production") => void;
+  readonly onGuide?: (destination: StudioVirtualProductionDestination) => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceTodayBoard");
   const locale = bt("ko-KR", "en-US");
@@ -38,10 +44,17 @@ export function StudioVirtualSpaceTodayBoard({ snapshot, workId, onRefresh, onGu
         <span><CalendarClock size={15} aria-hidden /><b>{calendar.length}</b>{bt("예정 일정", "events")}</span>
       </div>
       <h3>{bt("다음 작업", "Next work")}</h3>
-      <div className="studio-vspace-today-list">{nextTasks.length ? nextTasks.map((task) => <article key={task.id}>
-        <div><strong>{task.title}</strong><small>{task.status} · {when(task.dueAt, locale)}</small></div>
-        <button type="button" onClick={() => onGuide?.(ACTIVE_REVIEW.has(task.status) ? "review" : task.processKey.includes("story") ? "story" : "drawing")}><Route size={14} aria-hidden />{bt("공간 안내", "Guide me")}</button>
-      </article>) : <p>{bt("열린 작업이 없습니다.", "No open tasks.")}</p>}</div>
+      <div className="studio-vspace-today-list">{nextTasks.length ? nextTasks.map((task) => {
+        const destination = studioVirtualProductionDestination(task);
+        const destinationLabel = bt(...STUDIO_VIRTUAL_PRODUCTION_DESTINATIONS[destination]);
+        return <article key={task.id}>
+          <div><strong>{task.title}</strong><small>{bt(...STUDIO_VIRTUAL_TASK_STATUS_LABELS[task.status])} · {when(task.dueAt, locale)}</small></div>
+          <button type="button" disabled={!onGuide} onClick={() => onGuide?.(destination)}
+            aria-label={bt(`${task.title}: ${destinationLabel}로 안내`, `${task.title}: guide to ${destinationLabel}`)}>
+            <Route size={14} aria-hidden />{destinationLabel}
+          </button>
+        </article>;
+      }) : <p>{bt("열린 작업이 없습니다.", "No open tasks.")}</p>}</div>
       {calendar.length ? <><h3>{bt("다가오는 일정", "Upcoming")}</h3><div className="studio-vspace-today-list">{calendar.map((event) => <article key={event.key}><div><strong>{event.title}</strong><small>{when(event.startsAt, locale)}–{when(event.endsAt, locale)}</small></div><a href={event.url}>{bt("열기", "Open")}</a></article>)}</div></> : null}
       <footer>
         <Link href={`/production/projects/${encodeURIComponent(aggregate.projectId)}/schedule`}>{bt("전체 일정", "Full schedule")}</Link>

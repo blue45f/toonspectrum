@@ -24,6 +24,7 @@ import {
 } from "./studio-virtual-space-rewards";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
+import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 
 const TABS = ["quests", "events", "activities", "rewards", "desks", "blueprints", "companion"] as const;
 type Tab = typeof TABS[number];
@@ -32,6 +33,7 @@ export function StudioVirtualSpaceTownProgramPanel({
   personal = false,
   operations,
   manifest,
+  selfPoint,
   decorations,
   rewards,
   spotlightActive,
@@ -48,6 +50,7 @@ export function StudioVirtualSpaceTownProgramPanel({
   readonly personal?: boolean;
   readonly operations: StudioVirtualOperationsSnapshot;
   readonly manifest: StudioVirtualSpaceWorldManifest;
+  readonly selfPoint?: StudioVirtualSpacePoint;
   readonly decorations: StudioVirtualDecorationState;
   readonly rewards: StudioVirtualRewardInventory;
   readonly spotlightActive: boolean;
@@ -67,6 +70,7 @@ export function StudioVirtualSpaceTownProgramPanel({
   const tab = tabs.includes(requestedTab) ? requestedTab : "quests";
   const [round, setRound] = useState<StudioMiniGameRound | null>(null);
   const [result, setResult] = useState<StudioMiniGameResult | null>(null);
+  const [blueprintNotice, setBlueprintNotice] = useState("");
   const quests = useMemo(() => studioTownQuests(operations, manifest, decorations.placements.length)
     .filter((quest) => !personal || quest.kind === "exploration" || quest.kind === "customization"), [decorations.placements.length, manifest, operations, personal]);
   const events = useMemo(() => studioTownEvents(), []);
@@ -170,10 +174,19 @@ export function StudioVirtualSpaceTownProgramPanel({
     </div> : null}
 
     {tab === "blueprints" ? <div className="studio-vspace-town-cards">
+      {blueprintNotice ? <p role="status">{blueprintNotice}</p> : null}
       {STUDIO_TOWN_BLUEPRINTS.map((blueprint) => <article key={blueprint.id}>
         <div><Wrench size={15} aria-hidden /><strong>{bt(blueprint.labelKo, blueprint.labelEn)}</strong><span>{blueprint.decor.length}</span></div>
-        <p>{bt("가구, 조명과 상호작용 배치를 한 번에 추가합니다. 배치 후 개별 제거할 수 있어요.", "Place bundled furniture, lighting and interaction-ready decor together; remove items individually afterward.")}</p>
-        <button type="button" disabled={decorations.placements.length >= 36} onClick={() => onDecorations(applyStudioTownBlueprint(decorations, manifest, blueprint))}>{bt("블루프린트 배치", "Place blueprint")}</button>
+        <p>{bt("현재 장소에 업무 테마 가구와 조명을 배치합니다. 출입구와 이동 동선을 보호하며 꾸미기에서 개별 편집할 수 있어요.", "Arrange work-themed furniture and lighting in this place. Entrances and walking routes stay clear; edit individual items in customization.")}</p>
+        <button type="button" disabled={decorations.placements.length >= 36} onClick={() => {
+          const placement = applyStudioTownBlueprint(decorations, manifest, blueprint, selfPoint);
+          if (placement.ok) {
+            onDecorations(placement.state);
+            setBlueprintNotice(bt(`${blueprint.labelKo} 가구 ${blueprint.decor.length}개를 배치했어요. 꾸미기에서 이동·회전·삭제할 수 있어요.`, `Placed ${blueprint.decor.length} objects for ${blueprint.labelEn}. Move, rotate or remove them in customization.`));
+          } else setBlueprintNotice(placement.reason === "limit"
+            ? bt(`이 배치에는 빈 자리 ${blueprint.decor.length}개가 필요해요. 최대 36개까지 배치할 수 있어요.`, `This layout needs ${blueprint.decor.length} free object slots. The limit is 36.`)
+            : bt("이 장소에서는 안전한 배치 공간을 찾지 못했어요. 다른 장소로 이동하거나 기존 가구를 옮겨 주세요. 기존 배치는 유지했어요.", "No safe layout space was found here. Try another place or move existing furniture. Your layout was preserved."));
+        }}>{bt("블루프린트 배치", "Place blueprint")}</button>
       </article>)}
     </div> : null}
 

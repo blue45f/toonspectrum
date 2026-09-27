@@ -10,9 +10,11 @@ import { cn } from "@/shared/lib/utils";
 import {
   DEFAULT_STUDIO_VIRTUAL_ART_STYLE,
   STUDIO_VIRTUAL_ART_STYLES,
-  studioVirtualArtTextureUrl,
   type StudioVirtualArtStyleKey,
 } from "./studio-virtual-space-art-style";
+import { StudioVirtualCharacterPreview } from "./StudioVirtualCharacterPreview";
+import { StudioVirtualThemeCharacterPicker } from "./StudioVirtualThemeCharacterPicker";
+import { StudioVirtualExperienceArtPreview } from "./StudioVirtualExperienceArtPreview";
 import { STUDIO_CHARACTER_SKINS, studioCharacterSkinForArtStyle } from "./studio-virtual-space-character-skins";
 import {
   STUDIO_VIRTUAL_SPACE_NICKNAME_MAX_GRAPHEMES,
@@ -121,14 +123,16 @@ export function StudioVirtualSpaceEntryLobby({
             </small>
           </label>
           <div className="studio-vspace-entry-identity-preview" data-empty={!selectedCharacter || undefined} aria-live="polite">
-            {selectedCharacter ? <img src={selectedCharacter.directional.down} alt="" draggable={false} /> : <UserRound size={34} aria-hidden />}
+            {selectedCharacter ? <StudioVirtualCharacterPreview skin={selectedCharacter} /> : <UserRound size={34} aria-hidden />}
             <span><small>{bt("공개 이름표", "Public nameplate")}</small><strong>{normalizedNickname ?? bt("닉네임을 입력하세요", "Enter a nickname")}</strong></span>
           </div>
         </div>
 
+        <StudioVirtualThemeCharacterPicker artStyle={artStyle} avatarIndex={avatarIndex} onSelect={onAvatarIndex} />
         <fieldset className="studio-vspace-entry-avatars">
           <legend>{bt("내 캐릭터", "My character")}</legend>
           {STUDIO_CHARACTER_SKINS.map((sourceCharacter, index) => {
+            if (sourceCharacter.selectionOnly && sourceCharacter.nativeArtStyle) return null;
             const character = studioCharacterSkinForArtStyle(sourceCharacter, artStyle);
             return <button key={sourceCharacter.key} type="button"
               className={cn("studio-vspace-entry-avatar", avatarIndex === index && "is-selected")}
@@ -136,7 +140,7 @@ export function StudioVirtualSpaceEntryLobby({
               aria-pressed={avatarIndex === index}
               onClick={() => onAvatarIndex(index)}>
               <span className="studio-vspace-entry-avatar-preview">
-                <img src={character.directional.down} alt="" draggable={false} />
+                <StudioVirtualCharacterPreview skin={character} />
               </span>
               <strong>{bt(character.labelKo, character.labelEn)}</strong>
               <span>{bt("걷기·앉기·인사 지원", "Walk, sit and wave")}</span>
@@ -152,12 +156,11 @@ export function StudioVirtualSpaceEntryLobby({
             <fieldset className="studio-vspace-entry-art-styles">
               <legend>{bt("아트 스타일", "Art direction")}</legend>
               <p>{bt(
-                "팀과 기능은 유지하면서 캐릭터·NPC·건물·타일·환경 애니메이션을 독립 아트팩으로 전환합니다.",
-                "Keep the same team and tools while switching characters, NPCs, architecture, tiles and environment animation as an independent art pack.",
+                "건물·가구·바닥의 작화를 선택해요. 내 캐릭터는 직접 고른 모습을 유지해요.",
+                "Choose the art for buildings, furniture and floors. Your character keeps the look you chose.",
               )}</p>
               <div>
                 {STUDIO_VIRTUAL_ART_STYLES.map((style) => {
-                  const stylePreview = studioCharacterSkinForArtStyle(STUDIO_CHARACTER_SKINS[0]!, style.key);
                   return <button
                     key={style.key}
                     type="button"
@@ -167,8 +170,7 @@ export function StudioVirtualSpaceEntryLobby({
                     onClick={() => onArtStyle?.(style.key)}
                   >
                     <span className="studio-vspace-entry-art-style-preview" aria-hidden>
-                      <img className="studio-vspace-entry-art-style-world" src={studioVirtualArtTextureUrl(style.key, "world-base")} alt="" draggable={false} />
-                      <img className="studio-vspace-entry-art-style-character" src={stylePreview.directional.down} alt="" draggable={false} />
+                      <StudioVirtualExperienceArtPreview className="studio-vspace-entry-art-style-world" kind="landmarks" artStyle={style.key} frame={0} />
                       <i />
                     </span>
                     <strong>{bt(style.labelKo, style.labelEn)}</strong>

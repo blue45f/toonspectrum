@@ -170,14 +170,13 @@ export async function isStudioServerCapabilityAvailable(
 ): Promise<boolean> {
   if (!response.ok) return false;
   try {
-    const payload = await response.json() as {
-      readonly capabilities?: {
-        readonly studioProjectRead?: unknown;
-        readonly studioCloudSave?: unknown;
-      };
-    };
-    return payload.capabilities?.studioProjectRead !== "unavailable"
-      && payload.capabilities?.studioCloudSave !== "unavailable";
+    const payload: unknown = await response.json();
+    if (!payload || typeof payload !== "object" || !("capabilities" in payload)) return false;
+    const capabilities = payload.capabilities;
+    if (!capabilities || typeof capabilities !== "object") return false;
+    const usable = (value: unknown): boolean => value === "available" || value === "degraded";
+    return "studioProjectRead" in capabilities && usable(capabilities.studioProjectRead)
+      && "studioCloudSave" in capabilities && usable(capabilities.studioCloudSave);
   } catch {
     return false;
   }
@@ -208,7 +207,10 @@ async function probeStudioServer(): Promise<void> {
       signal: controller.signal,
     });
     if (probeController !== controller) return;
-    const reachable = await isStudioServerCapabilityAvailable(response);
+    const capabilityAvailable = await isStudioServerCapabilityAvailable(response);
+    // 본문을 읽는 동안 새 검사·실제 요청·화면 종료가 이 검사를 대체할 수 있다.
+    if (probeController !== controller) return;
+    const reachable = !controller.signal.aborted && capabilityAvailable;
     update({
       browserOnline: true,
       serverReachable: reachable,
@@ -260,6 +262,8 @@ export function isStudioServerUnavailableError(error: unknown): boolean {
 
 export function reportStudioServerRequestSuccess(): void {
   if (!onlineFromNavigator()) return;
+  probeController?.abort();
+  probeController = null;
   update({
     browserOnline: true,
     serverReachable: true,
@@ -271,6 +275,8 @@ export function reportStudioServerRequestSuccess(): void {
 
 export function reportStudioServerRequestFailure(error: unknown): boolean {
   if (!isStudioServerUnavailableError(error)) return false;
+  probeController?.abort();
+  probeController = null;
   update({
     browserOnline: onlineFromNavigator(),
     serverReachable: false,

@@ -11,7 +11,7 @@ import {
   studioWorldFloorFocusTarget,
   studioWorldPromptInteractGate,
 } from "./studio-virtual-space-runtime-policy";
-import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
+import { findStudioWorldPath, studioWorldCanOccupy, studioWorldCanTraverse } from "./studio-virtual-space-world-pathfinding";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
 
 const openWorld = { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 600, height: 600, props: [], colliders: [] };
@@ -155,6 +155,31 @@ describe("Virtual Studio control polish", () => {
       velocity = stepped.velocity;
       path = stepped.path;
     }
+  });
+
+  it.each([30, 60, 120])("%i Hz에서 광장으로 가는 경유점을 보존하고 통행 가능한 바닥으로 도착한다", (hz) => {
+    const manifest = DEFAULT_STUDIO_WORLD_MANIFEST;
+    const destination = { x: 840, y: 735 };
+    let point = { x: 780, y: 918 };
+    let velocity = { x: 0, y: 0 };
+    let path = findStudioWorldPath(manifest, point, destination);
+    expect(path.length).toBeGreaterThan(1);
+    expect(studioWorldCanTraverse(manifest, point, destination)).toBe(false);
+
+    for (let frame = 0; frame < hz * 4; frame += 1) {
+      const next = stepStudioWorldCruise({
+        manifest, point, velocity, path, direct: { x: 0, y: 0 },
+        deltaSeconds: 1 / hz, config: DEFAULT_STUDIO_MOTION_CONFIG,
+      });
+      expect(studioWorldCanTraverse(manifest, point, next.point)).toBe(true);
+      point = next.point;
+      velocity = next.velocity;
+      path = next.path;
+    }
+
+    expect(Math.hypot(point.x - destination.x, point.y - destination.y)).toBeLessThanOrEqual(3);
+    expect(velocity).toEqual({ x: 0, y: 0 });
+    expect(path).toEqual([]);
   });
 });
 

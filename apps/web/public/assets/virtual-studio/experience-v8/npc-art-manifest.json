@@ -1,0 +1,1137 @@
+{
+  "version": 1,
+  "createdAt": "2026-09-27",
+  "generationTool": "built-in image_gen",
+  "requestedModelVersion": "2.5",
+  "actualModelVersion": null,
+  "modelVersionVerified": false,
+  "sourceTechnique": "원본 RGBA PNG 보존, read-only alpha 연결성분 측정, 정수 frame rectangles와 머리 중심/발 기준 좌표로 런타임 표시",
+  "languageExceptionKo": "외부 이미지 생성 도구의 방향과 격자 지시를 일관되게 전달하기 위해 영어 프롬프트 원문을 보존합니다.",
+  "layout": {
+    "columns": 8,
+    "rows": 4,
+    "directions": [
+      "down",
+      "right",
+      "left",
+      "up"
+    ],
+    "columnsByAction": [
+      "walk-contact",
+      "walk-pass-left",
+      "walk-contact-opposite",
+      "walk-pass-right",
+      "talk",
+      "wave",
+      "sit",
+      "work"
+    ]
+  },
+  "files": [
+    {
+      "key": "npc-concierge",
+      "file": "npc-concierge.png",
+      "sha256": "577ea0e80eba55d10c0d18f4162d7d03bb76fc738171c8e039dc078f8b09aa9f",
+      "bytes": 1513322,
+      "width": 1774,
+      "height": 887,
+      "mode": "RGBA",
+      "frameCount": 32,
+      "framePixelHashes": [
+        "be5a0c5513823a4c00d9e9ef5226682724601ffe52bba5984449d09db8d97fa8",
+        "11522d9ed64710833da2bb548347bc59fc447bfb176d92193cb721077c52a454",
+        "23ddbcec0392f83058cab7e61b576eb097838e742b1be9b95a70b4096f0f6e3b",
+        "e1cd594a2ff682abed51bc2e6533c4881bff620d2a94cf0de2362ba8627c45e4",
+        "76967e351ac75feeac393b121fcae16014eb8f8ae89214da88836cb089fe9280",
+        "33e52918f37602fab4ab9c8bff7dafb3e2f4c63694b39e4d98fd7b40f2f341e8",
+        "0fa6b8b8d3f61fe02b3e8eb6a103e1834f9fae06fc139baf1cdad0ca53fcb2d7",
+        "c016659986709663bf3dc2c21deb35802b63d922b224fc2062d764cd4493ecbf",
+        "7f007e24698d89329ebc8fd79ace2fc41a8f667c401ef04cf3010d0d30e55697",
+        "219b5af743c968cbdd1ab714f95a3eefdeea0798a710ea0e543822837c07dd01",
+        "8d2d487cc46909d855c239f88c0ecb17b48e2d91df1eafa6fb79ccc201e58470",
+        "b52fc8f9f3e53082a44f6ca61fc57f428720b99ac4b81df593e3e824b80c462f",
+        "f973654f8418c0a78b470f95ff11119cd3bf52ed28bed64ea60d47f4e0e27c02",
+        "27c95b2f5dbec26db7ea55f698434525ca81084a925b4e7e4f7b2653c4f70298",
+        "305100e5b39aacbdc85ea414790e53891e0de0daca5c6a81116d45de8f26f791",
+        "c5635853b177f56e617c25f9a629141964708a21c99a4c7890ec4ed48a8d2f50",
+        "bed0e8ebe7bbe756960b7f1055643d93e5fe37199a2e6bfa4a2aad1f02cbbd8b",
+        "45e4f888acd120cbeeb382959a21924f8ab616246297b54e4350eebe9638eab6",
+        "67d59b453290f0ed6976211c077c692978d239559ae9071306562286ffc5dbaf",
+        "f2e3e0bdd318c2eaa7fa0cd5b19de6255d42f4ab48a8dc530b199828b90edc03",
+        "c0fcb5360e826a884097806bb4bc56d23a154fe090392e4b2f75451b28906548",
+        "709873971d72e1a16b270d2a6130f825de8f9dc033eb8ed58011575a1221f2a3",
+        "e46abf9e48ea4bac55e078a2ee3a171e586e33a64c3d54c3c28cfd8e0f64214f",
+        "76b10f9366ec30127b0c7ced3684c4e8aeb0c3cbcc19bf905c03a3a3465104c0",
+        "3f073c36648a4c975d226a3c39e1c436255e706727a34ca17a7e6b8a9e0f68c3",
+        "e1869c50a7d21261378807053c38e63232f6b768ffa6fc40be53809144541f92",
+        "d75b627dc31dec3296d40800c4a5f033112eb84f745613a9667e4d40d07931c4",
+        "2eaa32b99fde041a0af3f12a1085a784fd05c1349b49c5455b358905ae312482",
+        "5093556f70043578650c51789a4dd6c141b2293b4fb6b5485010f61737e2e4b5",
+        "4a2add561bdda972c6cb9f35e7adf595301b8f77a1658062641f00385c0f729a",
+        "13eb30d104390ce2bca8afb71cd8088dea1b184b9761bc87a065c93b6552495b",
+        "33ee3b7590c8d1561fc2332a9ea4dfde4b68227f0c2e88334cfa5f02952ed403"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "x": 78,
+          "y": 13,
+          "width": 134,
+          "height": 204
+        },
+        {
+          "index": 1,
+          "x": 289,
+          "y": 14,
+          "width": 137,
+          "height": 203
+        },
+        {
+          "index": 2,
+          "x": 493,
+          "y": 14,
+          "width": 143,
+          "height": 203
+        },
+        {
+          "index": 3,
+          "x": 712,
+          "y": 15,
+          "width": 133,
+          "height": 203
+        },
+        {
+          "index": 4,
+          "x": 926,
+          "y": 13,
+          "width": 174,
+          "height": 205
+        },
+        {
+          "index": 5,
+          "x": 1144,
+          "y": 13,
+          "width": 157,
+          "height": 205
+        },
+        {
+          "index": 6,
+          "x": 1358,
+          "y": 37,
+          "width": 126,
+          "height": 181
+        },
+        {
+          "index": 7,
+          "x": 1578,
+          "y": 14,
+          "width": 128,
+          "height": 206
+        },
+        {
+          "index": 8,
+          "x": 82,
+          "y": 225,
+          "width": 101,
+          "height": 210
+        },
+        {
+          "index": 9,
+          "x": 297,
+          "y": 225,
+          "width": 112,
+          "height": 207
+        },
+        {
+          "index": 10,
+          "x": 504,
+          "y": 225,
+          "width": 126,
+          "height": 207
+        },
+        {
+          "index": 11,
+          "x": 716,
+          "y": 226,
+          "width": 119,
+          "height": 207
+        },
+        {
+          "index": 12,
+          "x": 951,
+          "y": 225,
+          "width": 141,
+          "height": 210
+        },
+        {
+          "index": 13,
+          "x": 1163,
+          "y": 226,
+          "width": 136,
+          "height": 209
+        },
+        {
+          "index": 14,
+          "x": 1378,
+          "y": 249,
+          "width": 109,
+          "height": 186
+        },
+        {
+          "index": 15,
+          "x": 1590,
+          "y": 230,
+          "width": 134,
+          "height": 206
+        },
+        {
+          "index": 16,
+          "x": 94,
+          "y": 438,
+          "width": 103,
+          "height": 214
+        },
+        {
+          "index": 17,
+          "x": 298,
+          "y": 441,
+          "width": 114,
+          "height": 210
+        },
+        {
+          "index": 18,
+          "x": 507,
+          "y": 441,
+          "width": 119,
+          "height": 211
+        },
+        {
+          "index": 19,
+          "x": 724,
+          "y": 444,
+          "width": 111,
+          "height": 208
+        },
+        {
+          "index": 20,
+          "x": 906,
+          "y": 440,
+          "width": 145,
+          "height": 214
+        },
+        {
+          "index": 21,
+          "x": 1138,
+          "y": 441,
+          "width": 140,
+          "height": 213
+        },
+        {
+          "index": 22,
+          "x": 1370,
+          "y": 466,
+          "width": 116,
+          "height": 187
+        },
+        {
+          "index": 23,
+          "x": 1569,
+          "y": 443,
+          "width": 131,
+          "height": 211
+        },
+        {
+          "index": 24,
+          "x": 84,
+          "y": 656,
+          "width": 129,
+          "height": 207
+        },
+        {
+          "index": 25,
+          "x": 287,
+          "y": 656,
+          "width": 125,
+          "height": 207
+        },
+        {
+          "index": 26,
+          "x": 502,
+          "y": 657,
+          "width": 126,
+          "height": 206
+        },
+        {
+          "index": 27,
+          "x": 717,
+          "y": 658,
+          "width": 128,
+          "height": 205
+        },
+        {
+          "index": 28,
+          "x": 897,
+          "y": 656,
+          "width": 167,
+          "height": 207
+        },
+        {
+          "index": 29,
+          "x": 1123,
+          "y": 658,
+          "width": 155,
+          "height": 209
+        },
+        {
+          "index": 30,
+          "x": 1367,
+          "y": 689,
+          "width": 123,
+          "height": 172
+        },
+        {
+          "index": 31,
+          "x": 1577,
+          "y": 658,
+          "width": 132,
+          "height": 209
+        }
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "generationFile": "exec-d4c9305a-3fb4-4587-a712-fa5430b691ab.png",
+      "prompt": "Use case: stylized-concept. Asset type: production-ready transparent 2D virtual-office NPC sprite atlas, not a poster or character portrait. Draw ONE consistent character in a STRICT regular 8-column by 4-row grid, exactly 32 separate full-body sprites. Wide landscape canvas. Every cell has identical dimensions, consistent body size, feet anchored to the same baseline within each cell, generous transparent margins, no overlap or bleed. Row 1 faces FRONT/down toward camera; row 2 faces RIGHT in true side profile; row 3 faces LEFT in true side profile; row 4 faces BACK/up away from camera. Each row's columns: 1 balanced idle/first walk contact, 2 left-foot passing walk, 3 opposite contact, 4 right-foot passing walk, 5 friendly talk/happy expression with a small hand gesture, 6 welcoming hand wave, 7 seated posture with no chair, 8 doing role-specific office work. The four walking drawings must have genuinely different limb poses, not translated copies. Clear professional hand-drawn Korean webtoon/chibi game illustration, crisp expressive line art, subtle painted shading, highly readable at 100px tall, believable joints and clean hands. Friendly creative webtoon production office, work oriented, no fantasy battles or weapons. Absolutely no lettering, numbers, labels, cell borders, sheets of opaque background, colored backdrop, checkerboard pattern, watermark, logo, scenic environment, ground shadow extending outside a cell. Real alpha transparency around every sprite. Preserve visual identity, outfit and props in all directions and poses. Subject: A delightful small dedicated wayfinding robot, distinct from any human player avatar. A softly squared cream-white display head with two teal expressive LED eyes, navy side panels, a tiny teal antenna, compact teal office utility vest over a cream rounded body, short articulated arms, sturdy orange ankle boots, and a discreet blank circular visitor-services badge. Design reads as a helpful office robot, not armor. Column8 uses both hands to consult a small glowing cyan floorplan tablet with no readable text. The robot bends knees in column7 seated pose and waves naturally in column6."
+    },
+    {
+      "key": "npc-editor",
+      "file": "npc-editor.png",
+      "sha256": "47da13eaa6f33082d2dd9358fef655fc70cec0a10793b91b657bfde7b3c2c678",
+      "bytes": 1656332,
+      "width": 1774,
+      "height": 887,
+      "mode": "RGBA",
+      "frameCount": 32,
+      "framePixelHashes": [
+        "847131b76f44d9883776578b049e041aa9fa8c2c733655bae02026f20c5cf215",
+        "d252e0c293c788c71bd66287df4f047aa98fc357e9aaebadf2e7876e6b5d0ad8",
+        "820e2885ebc53c7050c7919c2d98cbdc411a10afaef082395cf314698514c7bc",
+        "0e3c39f4a4d8a1e43cc3c096f1c875deb1b46890ce5121a29ba8bfdadd3bc6a6",
+        "7fabc75c082a691941e5c80409d4d64dc6cbe4a80b57b45aaf2af76c7ca7ac95",
+        "253c088cee56985429c8c7b7194550be12b1fdd9509140dae4095fc146a33d64",
+        "705c769fba65d4df6948c052f3d05362715c297ad4b9ea3456b82d6a1c527432",
+        "8ab02c8c12decf35d61a371b74ae837cdda094e4dcfc4a519d20909bea9424d8",
+        "b64ceee4e808e75c667f9206d4980ebe990eaac978ee407f07f79a674f493581",
+        "eb0a210f04c2b53570ac51d53b859d4001649b44517a4c7e4a107a4851d145d1",
+        "19dac10b9bfd483d43b22e0f8b706f3b6c68c894c77f767f4fc937e0367dad2e",
+        "a100b9148fc80b41b5dd76b93dab1247b0e1d909c7c5c140ce3b66b34d9ea3aa",
+        "e41c9abb9288aa585f0c6345dc620f2138db9bf15d777523f4d24ecfd70bae04",
+        "b438dc3a359e0e593931f2037ecae9d3623c7958756cd2ca3664aac94f41c93a",
+        "a14cb2a69feb347f5f59b5ef4d466cde9426224997305e76a443bfb4d2212870",
+        "b818f04cf2deeca1d276dafd3989f2762247962129609cb60e87c0d1fa3a06fc",
+        "a66a16d49bee6db19ab542ae12ef2b565544602993919608f17496c0b3ae3932",
+        "00a35c0d65c5a7591def3cee6424c90fdb16ec571331de4f4e0738525c2cbb1a",
+        "16bec13e50ead4c860b4501f6cc81129c1a1819408d422ec7a7db01601a09b02",
+        "02a30eb92be33c6718d8eaf8d0edb3ea32a8060fe10368d044de547e67915192",
+        "e98f0e5e3195bc67d1c211bcd953c046d071ed34f9f39c10c65bf066369c024e",
+        "6e35c4cf13970459afa059d8032499fbd8d9dfffb4fd67fe80de82014e93a56d",
+        "ee9d864a987a7244204df598f77b5c977413f7bb5f350863663fdaa270894d7d",
+        "2b9be82c23950e97b83d063d6e512552a796e79b8ce74540f77b549dded1d4b8",
+        "6784aaf777b3bd002f73f09dd827b9b0f3c8d1cadf58d40a2d1cfe2fa4657749",
+        "4ed73efc38054fb8310553a5b5f461559467fefffed2832b68c7e9749ff88d53",
+        "2903d1047dad558d52cf5905f6381bdc6e0de5c739096b86edeb68eec4f34383",
+        "9dea5a09c0f3676200cc5c4d87a6ede44663ba2c185c7fe7664f51b359f4d08c",
+        "26b0392b777bb49d30e584fceada4bd22b8649ecb7f99c223101f7991e3a7510",
+        "36b0f199da7a833556ba40051e648dfb29ebefb8e0ef03608a8eeaf777768db9",
+        "0ad5849a576b275dac51ce4b5227d9bb93e83c8cb46b8fda5951666826c51cad",
+        "346eb79fe82f49c0fdf1cee3fc099847d88233e08ee92db3a7040c31a128561c"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "x": 82,
+          "y": 2,
+          "width": 111,
+          "height": 226
+        },
+        {
+          "index": 1,
+          "x": 302,
+          "y": 2,
+          "width": 118,
+          "height": 226
+        },
+        {
+          "index": 2,
+          "x": 524,
+          "y": 3,
+          "width": 118,
+          "height": 225
+        },
+        {
+          "index": 3,
+          "x": 753,
+          "y": 3,
+          "width": 120,
+          "height": 225
+        },
+        {
+          "index": 4,
+          "x": 954,
+          "y": 3,
+          "width": 131,
+          "height": 225
+        },
+        {
+          "index": 5,
+          "x": 1184,
+          "y": 4,
+          "width": 121,
+          "height": 224
+        },
+        {
+          "index": 6,
+          "x": 1405,
+          "y": 20,
+          "width": 117,
+          "height": 208
+        },
+        {
+          "index": 7,
+          "x": 1618,
+          "y": 4,
+          "width": 114,
+          "height": 224
+        },
+        {
+          "index": 8,
+          "x": 71,
+          "y": 230,
+          "width": 133,
+          "height": 219
+        },
+        {
+          "index": 9,
+          "x": 297,
+          "y": 230,
+          "width": 133,
+          "height": 220
+        },
+        {
+          "index": 10,
+          "x": 516,
+          "y": 230,
+          "width": 133,
+          "height": 219
+        },
+        {
+          "index": 11,
+          "x": 742,
+          "y": 230,
+          "width": 131,
+          "height": 220
+        },
+        {
+          "index": 12,
+          "x": 954,
+          "y": 231,
+          "width": 151,
+          "height": 218
+        },
+        {
+          "index": 13,
+          "x": 1186,
+          "y": 230,
+          "width": 148,
+          "height": 219
+        },
+        {
+          "index": 14,
+          "x": 1400,
+          "y": 235,
+          "width": 143,
+          "height": 216
+        },
+        {
+          "index": 15,
+          "x": 1605,
+          "y": 229,
+          "width": 141,
+          "height": 220
+        },
+        {
+          "index": 16,
+          "x": 74,
+          "y": 451,
+          "width": 137,
+          "height": 219
+        },
+        {
+          "index": 17,
+          "x": 298,
+          "y": 451,
+          "width": 142,
+          "height": 219
+        },
+        {
+          "index": 18,
+          "x": 522,
+          "y": 451,
+          "width": 140,
+          "height": 219
+        },
+        {
+          "index": 19,
+          "x": 745,
+          "y": 451,
+          "width": 138,
+          "height": 219
+        },
+        {
+          "index": 20,
+          "x": 952,
+          "y": 452,
+          "width": 153,
+          "height": 218
+        },
+        {
+          "index": 21,
+          "x": 1176,
+          "y": 451,
+          "width": 150,
+          "height": 219
+        },
+        {
+          "index": 22,
+          "x": 1399,
+          "y": 460,
+          "width": 143,
+          "height": 214
+        },
+        {
+          "index": 23,
+          "x": 1608,
+          "y": 451,
+          "width": 138,
+          "height": 218
+        },
+        {
+          "index": 24,
+          "x": 80,
+          "y": 670,
+          "width": 107,
+          "height": 217
+        },
+        {
+          "index": 25,
+          "x": 304,
+          "y": 670,
+          "width": 112,
+          "height": 216
+        },
+        {
+          "index": 26,
+          "x": 529,
+          "y": 670,
+          "width": 109,
+          "height": 216
+        },
+        {
+          "index": 27,
+          "x": 756,
+          "y": 670,
+          "width": 109,
+          "height": 217
+        },
+        {
+          "index": 28,
+          "x": 966,
+          "y": 670,
+          "width": 130,
+          "height": 217
+        },
+        {
+          "index": 29,
+          "x": 1196,
+          "y": 670,
+          "width": 124,
+          "height": 217
+        },
+        {
+          "index": 30,
+          "x": 1411,
+          "y": 696,
+          "width": 107,
+          "height": 182
+        },
+        {
+          "index": 31,
+          "x": 1621,
+          "y": 670,
+          "width": 108,
+          "height": 216
+        }
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "generationFile": "exec-367e5af1-d39b-42df-948a-eba74e81c104.png",
+      "prompt": "Use case: stylized-concept. Asset type: production-ready transparent 2D virtual-office NPC sprite atlas, not a poster or character portrait. Draw ONE consistent character in a STRICT regular 8-column by 4-row grid, exactly 32 separate full-body sprites. Wide landscape canvas. Every cell has identical dimensions, consistent body size, feet anchored to the same baseline within each cell, generous transparent margins, no overlap or bleed. Row 1 faces FRONT/down toward camera; row 2 faces RIGHT in true side profile; row 3 faces LEFT in true side profile; row 4 faces BACK/up away from camera. Each row's columns: 1 balanced idle/first walk contact, 2 left-foot passing walk, 3 opposite contact, 4 right-foot passing walk, 5 friendly talk/happy expression with a small hand gesture, 6 welcoming hand wave, 7 seated posture with no chair, 8 doing role-specific office work. The four walking drawings must have genuinely different limb poses, not translated copies. Clear professional hand-drawn Korean webtoon/chibi game illustration, crisp expressive line art, subtle painted shading, highly readable at 100px tall, believable joints and clean hands. Friendly creative webtoon production office, work oriented, no fantasy battles or weapons. Absolutely no lettering, numbers, labels, cell borders, sheets of opaque background, colored backdrop, checkerboard pattern, watermark, logo, scenic environment, ground shadow extending outside a cell. Real alpha transparency around every sprite. Preserve visual identity, outfit and props in all directions and poses. Subject: A personable adult woman editorial review coordinator, clearly a staff professional rather than a youthful player avatar. Silver-gray hair tied into a neat round low bun, dark round glasses, warm medium skin, confident kind eyes, a mustard cardigan over a white collared blouse, deep navy wide-leg office trousers, low brown loafers, blank small lapel staff badge. A coral clipboard and red pencil are recognizable occupational tools; column8 reviews a page on the clipboard. Balanced adult chibi proportions, slightly taller and less baby-faced than a typical game avatar. No military or school uniform.",
+      "correctionPrompt": "Use case: precise-object-edit. Edit the supplied NPC sprite atlas. Preserve the same adult editorial coordinator identity, silver-gray low bun, round black glasses, mustard cardigan, white blouse, navy trousers, brown loafers, coral clipboard, art style and true alpha transparency. Preserve STRICT 8 columns by 4 rows, 32 full-body cells, and columns 1-4 walking, 5 talking, 6 waving, 7 seated without chair, 8 reviewing clipboard. CRITICAL correction: ALL EIGHT figures in ROW TWO must face SCREEN RIGHT (nose and toes point toward the right edge of the image), including every walking frame and sitting/work. ALL EIGHT figures in ROW THREE must face SCREEN LEFT (nose and toes point toward the left edge). Absolutely no mixed-facing characters in these rows. Row one ALL face camera. Row four ALL show back of head and body facing away. Preserve distinct walking poses but never flip a character's facing within a row. Keep whole head, shoes, props inside each equal cell with transparent padding and consistent ground line. No text, no grid outlines, no extra character, no opaque backdrop."
+    },
+    {
+      "key": "npc-archivist",
+      "file": "npc-archivist.png",
+      "sha256": "d38fe28ecb218059a6800087e7226da7b85b6ca161dd690c4ec9b1d19d94916a",
+      "bytes": 2132590,
+      "width": 1774,
+      "height": 887,
+      "mode": "RGBA",
+      "frameCount": 32,
+      "framePixelHashes": [
+        "93e818b540757b16745894205ea6d1a4631817b6b140fdcab70151bab09eacae",
+        "461f6f7d099df7935738e2deede3f5a2388728cc74bc014ef647e1a5404c894f",
+        "72939f2dac39bf9015b189bfea53ec0f2870b5f0a89e4c809ca08866c74fcda1",
+        "000b473c2348a93251d6dea5e745f8c1eaaa0a9958cf16de38e4b4ef086543f1",
+        "378f96492a7025de764de72c39cc3d5e5f669120387fdc943887a9d5c0aae360",
+        "07f0a1fea052ef6d3c3f405d6c9ce4f8b0355ce3067f9798e3e07062e2ae48d8",
+        "8a6675e824ca24056178537ba6225a599be6182a1f317cb8dc1dd46e56f3868f",
+        "94526145b9ac4383f33a366feecc6d8c498f6ab18ad49e9b4d8a47e4b3882902",
+        "a7a832f4338213f457da02f7f864289471a56f1dbce2dce97141a2caa55e38ba",
+        "8f3a58c2e68319e4133e188e4b6adffc57cb992bedb94f489e9e49f0768a0d0f",
+        "0846619a50c4c632d672fb8a9a9535a0a9169c5174357a842baa5df00b77942e",
+        "7805bd99b26bd55c677a3c7c5878dca87098aeccf4249a0e742cc0bcd9f9816a",
+        "16aa5ff2522601691742769662100b93b2385c80de6aad0f25ea304bdc12317f",
+        "b15a63e921c5b809ea216d17de6280097700bcb66ba569001a339de3e4298f77",
+        "3f8b4f724181754741800931a636391e83b31e8a7b071c9fe5a4f59b6eeaf3d4",
+        "85d116b3ccf685a7c90f75ebf2128e63a0c59520b1c2cb793e20e6f7cff91135",
+        "0fc8ef950dd11ab71720d37d9f9ef14d019809ed8b6c451ee156d965d504acdc",
+        "b9027dbe47059e1bfa44bebc543062aa14b02734fa840a2838880937f9aa14b4",
+        "aa289483b6b172bf00a0f8ed456f1b98155bb2bb9de3e717fa0f98f5380c8c91",
+        "d824226e4c1d92feb8a3f818a5e25c06ed6ab60e4ac074ff81bbdbc6ff7963bd",
+        "4825bce434a68520c6b40a9fc9b5594331360bba13ff44a6db4b912d145f19d9",
+        "7e45bbbf15b0505a90a8c6ff05b368bf0330c1b43e833170d47681b31a8b4911",
+        "fdf0203658d95cda5703dcb20c0b1db2b2c6eccb032913549fa4432d2c9c2312",
+        "34e3b8b16005b0d23d782aaefc7fa6ad7b697293b489f8d285b4eb1b0828fca6",
+        "c4fa57d928e2a38d1ab751319410e18d412a4b7bff05a295cb101d020c18bec5",
+        "94fd23f9139be92498436febe578ee4693e676c99a9f2c668f56647768d517fa",
+        "4a1f5cbc712a7888a113f03c1027927f765042c1025f9017cd3ec4ffaac1d63e",
+        "798dd70efe085ea68082c763bfa8d540bf4dbe149bdd199c06c63272b133c35a",
+        "36b462421be0a638d86fd46a9b54531f2388e1cc6310c9c75768a434fe9e7fb4",
+        "5cc8d9d980d6c96cb388266ea606e5bb81ed170cce027929849e3f18f8c5bb8a",
+        "a6bf217cd1abcf0170ecb6a1c368041525a304e94efafaec397c4de4aa40e269",
+        "f1819b02050fe5847bf8f782225b458136a22dc812c9117ed9fd0d91917fd8b2"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "x": 33,
+          "y": 10,
+          "width": 168,
+          "height": 213
+        },
+        {
+          "index": 1,
+          "x": 255,
+          "y": 10,
+          "width": 164,
+          "height": 212
+        },
+        {
+          "index": 2,
+          "x": 476,
+          "y": 10,
+          "width": 164,
+          "height": 213
+        },
+        {
+          "index": 3,
+          "x": 695,
+          "y": 10,
+          "width": 166,
+          "height": 213
+        },
+        {
+          "index": 4,
+          "x": 896,
+          "y": 10,
+          "width": 189,
+          "height": 213
+        },
+        {
+          "index": 5,
+          "x": 1124,
+          "y": 9,
+          "width": 185,
+          "height": 214
+        },
+        {
+          "index": 6,
+          "x": 1363,
+          "y": 45,
+          "width": 156,
+          "height": 179
+        },
+        {
+          "index": 7,
+          "x": 1583,
+          "y": 15,
+          "width": 160,
+          "height": 208
+        },
+        {
+          "index": 8,
+          "x": 32,
+          "y": 233,
+          "width": 156,
+          "height": 210
+        },
+        {
+          "index": 9,
+          "x": 255,
+          "y": 232,
+          "width": 161,
+          "height": 209
+        },
+        {
+          "index": 10,
+          "x": 473,
+          "y": 231,
+          "width": 159,
+          "height": 211
+        },
+        {
+          "index": 11,
+          "x": 694,
+          "y": 231,
+          "width": 156,
+          "height": 210
+        },
+        {
+          "index": 12,
+          "x": 910,
+          "y": 235,
+          "width": 190,
+          "height": 208
+        },
+        {
+          "index": 13,
+          "x": 1139,
+          "y": 234,
+          "width": 186,
+          "height": 209
+        },
+        {
+          "index": 14,
+          "x": 1356,
+          "y": 269,
+          "width": 162,
+          "height": 174
+        },
+        {
+          "index": 15,
+          "x": 1573,
+          "y": 235,
+          "width": 182,
+          "height": 208
+        },
+        {
+          "index": 16,
+          "x": 42,
+          "y": 453,
+          "width": 153,
+          "height": 210
+        },
+        {
+          "index": 17,
+          "x": 260,
+          "y": 453,
+          "width": 158,
+          "height": 209
+        },
+        {
+          "index": 18,
+          "x": 485,
+          "y": 453,
+          "width": 154,
+          "height": 208
+        },
+        {
+          "index": 19,
+          "x": 704,
+          "y": 453,
+          "width": 157,
+          "height": 208
+        },
+        {
+          "index": 20,
+          "x": 896,
+          "y": 455,
+          "width": 190,
+          "height": 208
+        },
+        {
+          "index": 21,
+          "x": 1132,
+          "y": 454,
+          "width": 185,
+          "height": 209
+        },
+        {
+          "index": 22,
+          "x": 1362,
+          "y": 488,
+          "width": 163,
+          "height": 176
+        },
+        {
+          "index": 23,
+          "x": 1569,
+          "y": 456,
+          "width": 183,
+          "height": 207
+        },
+        {
+          "index": 24,
+          "x": 33,
+          "y": 666,
+          "width": 169,
+          "height": 210
+        },
+        {
+          "index": 25,
+          "x": 255,
+          "y": 666,
+          "width": 165,
+          "height": 210
+        },
+        {
+          "index": 26,
+          "x": 473,
+          "y": 666,
+          "width": 166,
+          "height": 210
+        },
+        {
+          "index": 27,
+          "x": 696,
+          "y": 666,
+          "width": 165,
+          "height": 210
+        },
+        {
+          "index": 28,
+          "x": 919,
+          "y": 665,
+          "width": 191,
+          "height": 211
+        },
+        {
+          "index": 29,
+          "x": 1138,
+          "y": 665,
+          "width": 194,
+          "height": 211
+        },
+        {
+          "index": 30,
+          "x": 1359,
+          "y": 693,
+          "width": 163,
+          "height": 184
+        },
+        {
+          "index": 31,
+          "x": 1580,
+          "y": 669,
+          "width": 164,
+          "height": 207
+        }
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "generationFile": "exec-7d72cde6-70b3-44e8-82b5-f762d9bf6566.png",
+      "prompt": "Use case: stylized-concept. Asset type: production-ready transparent 2D virtual-office NPC sprite atlas, not a poster or portrait. ONE consistent character repeated in a STRICT regular 8-column by 4-row grid, exactly 32 full-body sprites. Wide landscape image, all cells identical size, no gaps between logical grid cells, generous transparent padding inside each cell. Feet always share the same baseline within each cell. Row 1 faces FRONT/down; row 2 faces RIGHT in true profile; row 3 faces LEFT in true profile; row 4 faces BACK/up, with the back of head visible. Columns within EVERY row: 1 idle/first walk contact, 2 left-foot passing, 3 opposite-foot contact, 4 right-foot passing, 5 friendly talk and happy expression, 6 welcoming hand/paw wave, 7 seated posture with no chair, 8 doing role-specific office work. Walking must have genuinely different limb drawings, not translated stills. Crisp premium hand-drawn webtoon storybook chibi game art, dimensional painted shading, careful fur/feather edges, clean professional sprite quality, readable at 100px tall. Friendly webtoon creative production office; no combat, weapons, armor, magic battle props. Real transparent alpha around each sprite. No text, letters, digits, logos, labels, frame borders, checkerboard pattern, background, scenery, portrait crop, watermark. No limb may touch or cross a cell boundary. Exactly the same outfit, anatomy and body scale throughout. Subject: An endearing upright owl librarian staff member, unmistakably distinct from a human player character: compact round tawny owl body, cream facial disk, intelligent dark eyes behind small round gold glasses, feather ear tufts, sage-green knitted waistcoat, a small burgundy bowtie, brown satchel strap across the body, short sturdy legs with soft brown office shoes. Two articulate wing-like arms with feather fingers hold and organize books. The librarian carries one closed indigo reference book tucked under a wing while walking, consults and opens it in column8, and waves the free wing in column6. Keep the true owl silhouette, broad head and compact torso; no human face."
+    },
+    {
+      "key": "npc-cafe",
+      "file": "npc-cafe.png",
+      "sha256": "c2947b26a9dcf43ef8be234de6d223de7374aad93fe3a89747758eee7c348e99",
+      "bytes": 1687048,
+      "width": 1774,
+      "height": 887,
+      "mode": "RGBA",
+      "frameCount": 32,
+      "framePixelHashes": [
+        "d4cc0a6d008da6f7a63c7dfc3551047b923917fa4d681d117b8d731ddce695af",
+        "b7ddb2e1e684373e780de53084fa7c3c5c722fc7293a634a095b745b57f5680b",
+        "f8cfb1e7df8d895cc28068113046ff286027d6c2931904014c7ddadfa60e00e2",
+        "182811287400c3bd43778dbdff088c21b226ca6935a8249acdd2e2ed7a513c9f",
+        "ecbf1ab0218b332b69a6e64b848e9a4d43fe2ce38011fea20b59ec4a594f848f",
+        "dcc9c4c733293475478efc1a29a3d052cf895fef8b6b2194f152787c688d0a35",
+        "939dac509ac8de665b28da655585a7fb56916786561122c531bf82c2772cf988",
+        "4405bf10f5fea997e88c157539eb30f8f08bdcc144e62798f0939bc07e662450",
+        "06f34960384410c0f7bbd7e0480f1be10518cbc4eddd6e8d67a18f60cc604ac1",
+        "dce2d1e7b7031b81e21434babe70568a3815dec064c517d80bcb0efd970b4509",
+        "db95f7897c684db283fca12843167595d8eb564b67989f2a2084c48cb6b022c6",
+        "90face381b297aa348124bf38cf6b936f799207aad6d4bdf470935535753d994",
+        "9ec373e92ef278a48e2da4e1c59d2f2959aaa7ec9c2457c8a862a84f5bbcb4e7",
+        "14e6d7498dd1402fd4be016d2e4af68e6f9e1433a38f032b5d69d6c12f646d5e",
+        "fe21c9f30947e74490fc9e5583f07713666733694198fa8c410bca873ebf597f",
+        "5feda1c6dada6da8e58c9d79b92582cbb7820470de3b79466ac1c6d118659e8c",
+        "39a95912e1f987ab0c680affc5c8b0bea7b41bdf6f2596926c237d69b041eb09",
+        "b6834438e3a2830716204f73698a6bc55de098aaeff6da766df39c89b86cd078",
+        "b3f746c791609d1ea95454de71530f668857c2186cf80af711bc3e0db79f8bad",
+        "ae975ba63dcc57c9f4b34de51ef2b72c9752f0d8777c8d9279bc55e7d5954b62",
+        "bbc41156d05a17d3b9d25eed6a05972732e0754f3188ce19ec7d15e54e76c698",
+        "4b86150d24b4b2b097b25236772c8cc260759723e0c7b97d7b0c0342135e6e10",
+        "5771fce31e371d86d11149c9013b6b35ea7d9095acccca0f4582815ee4dab6e2",
+        "25d17f415fb33a7b46ea1feb783348a25257cbc912fd6749d0c27467cf8343a3",
+        "1c9f7d6ac4f277fe161d266b9e46f09e008c5fc8421f5299faf6e8939d5341e5",
+        "0c8bf712c4a58939bc8c2151a2f250272de9332b8564b815e9bdf5c823ee8f50",
+        "f683be5cca99f7d00f1a97134ca0a99bdadb5921bc61b135934ca6677d5e5517",
+        "e4158a348aec9f63794b740a990de47cf6902e19382572d0647aa0185f15ae35",
+        "dff83a18381a6be1110497b5d9a06747be7b0242eb1a0df60cf3c57217010033",
+        "a3f1fd0cd63069bb0059ccd82642f83612c1e3ed45cc839a334c45ecaba4687a",
+        "7086aa08dab825480317db6b2671d52b6d43d99732cf55ea09785ac3b8c6d8a5",
+        "0f6ad5b8d83617b9423242492cd4b08024c3d455cc6d10d2785c6081e9f65ddb"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "x": 51,
+          "y": 2,
+          "width": 130,
+          "height": 213
+        },
+        {
+          "index": 1,
+          "x": 279,
+          "y": 1,
+          "width": 135,
+          "height": 217
+        },
+        {
+          "index": 2,
+          "x": 503,
+          "y": 1,
+          "width": 123,
+          "height": 216
+        },
+        {
+          "index": 3,
+          "x": 726,
+          "y": 2,
+          "width": 127,
+          "height": 216
+        },
+        {
+          "index": 4,
+          "x": 932,
+          "y": 2,
+          "width": 138,
+          "height": 213
+        },
+        {
+          "index": 5,
+          "x": 1147,
+          "y": 2,
+          "width": 145,
+          "height": 214
+        },
+        {
+          "index": 6,
+          "x": 1384,
+          "y": 28,
+          "width": 137,
+          "height": 188
+        },
+        {
+          "index": 7,
+          "x": 1610,
+          "y": 2,
+          "width": 128,
+          "height": 215
+        },
+        {
+          "index": 8,
+          "x": 42,
+          "y": 223,
+          "width": 122,
+          "height": 216
+        },
+        {
+          "index": 9,
+          "x": 258,
+          "y": 224,
+          "width": 149,
+          "height": 214
+        },
+        {
+          "index": 10,
+          "x": 487,
+          "y": 223,
+          "width": 147,
+          "height": 220
+        },
+        {
+          "index": 11,
+          "x": 715,
+          "y": 223,
+          "width": 134,
+          "height": 217
+        },
+        {
+          "index": 12,
+          "x": 939,
+          "y": 224,
+          "width": 151,
+          "height": 215
+        },
+        {
+          "index": 13,
+          "x": 1165,
+          "y": 225,
+          "width": 123,
+          "height": 215
+        },
+        {
+          "index": 14,
+          "x": 1384,
+          "y": 249,
+          "width": 154,
+          "height": 183
+        },
+        {
+          "index": 15,
+          "x": 1606,
+          "y": 223,
+          "width": 133,
+          "height": 215
+        },
+        {
+          "index": 16,
+          "x": 52,
+          "y": 445,
+          "width": 132,
+          "height": 216
+        },
+        {
+          "index": 17,
+          "x": 271,
+          "y": 446,
+          "width": 149,
+          "height": 215
+        },
+        {
+          "index": 18,
+          "x": 493,
+          "y": 444,
+          "width": 150,
+          "height": 218
+        },
+        {
+          "index": 19,
+          "x": 732,
+          "y": 444,
+          "width": 143,
+          "height": 217
+        },
+        {
+          "index": 20,
+          "x": 933,
+          "y": 446,
+          "width": 149,
+          "height": 215
+        },
+        {
+          "index": 21,
+          "x": 1172,
+          "y": 441,
+          "width": 130,
+          "height": 221
+        },
+        {
+          "index": 22,
+          "x": 1391,
+          "y": 472,
+          "width": 158,
+          "height": 183
+        },
+        {
+          "index": 23,
+          "x": 1611,
+          "y": 440,
+          "width": 130,
+          "height": 221
+        },
+        {
+          "index": 24,
+          "x": 58,
+          "y": 664,
+          "width": 128,
+          "height": 215
+        },
+        {
+          "index": 25,
+          "x": 256,
+          "y": 663,
+          "width": 134,
+          "height": 218
+        },
+        {
+          "index": 26,
+          "x": 493,
+          "y": 665,
+          "width": 122,
+          "height": 217
+        },
+        {
+          "index": 27,
+          "x": 719,
+          "y": 664,
+          "width": 124,
+          "height": 215
+        },
+        {
+          "index": 28,
+          "x": 935,
+          "y": 663,
+          "width": 144,
+          "height": 216
+        },
+        {
+          "index": 29,
+          "x": 1162,
+          "y": 662,
+          "width": 145,
+          "height": 217
+        },
+        {
+          "index": 30,
+          "x": 1383,
+          "y": 683,
+          "width": 133,
+          "height": 190
+        },
+        {
+          "index": 31,
+          "x": 1606,
+          "y": 663,
+          "width": 114,
+          "height": 216
+        }
+      ],
+      "alphaExtrema": [
+        0,
+        255
+      ],
+      "generationFile": "exec-41f8f19a-285d-4b7d-afa4-e1093b03bdcf.png",
+      "prompt": "Use case: stylized-concept. Asset type: production-ready transparent 2D virtual-office NPC sprite atlas, not a poster or portrait. ONE consistent character repeated in a STRICT regular 8-column by 4-row grid, exactly 32 full-body sprites. Wide landscape image, all cells identical size, no gaps between logical grid cells, generous transparent padding inside each cell. Feet always share the same baseline within each cell. Row 1 faces FRONT/down; row 2 faces RIGHT in true profile; row 3 faces LEFT in true profile; row 4 faces BACK/up, with the back of head visible. Columns within EVERY row: 1 idle/first walk contact, 2 left-foot passing, 3 opposite-foot contact, 4 right-foot passing, 5 friendly talk and happy expression, 6 welcoming hand/paw wave, 7 seated posture with no chair, 8 doing role-specific office work. Walking must have genuinely different limb drawings, not translated stills. Crisp premium hand-drawn webtoon storybook chibi game art, dimensional painted shading, careful fur/feather edges, clean professional sprite quality, readable at 100px tall. Friendly webtoon creative production office; no combat, weapons, armor, magic battle props. Real transparent alpha around each sprite. No text, letters, digits, logos, labels, frame borders, checkerboard pattern, background, scenery, portrait crop, watermark. No limb may touch or cross a cell boundary. Exactly the same outfit, anatomy and body scale throughout. Subject: An upright friendly orange tabby cat cafe manager, unmistakably feline and different from human player avatars: pointed ears, orange and cream fur, expressive amber eyes, short whiskers, ringed tail curving close to the body, white muzzle, a teal barista apron with one blank pocket over a cream short-sleeved shirt, dark brown cropped trousers and little canvas shoes. Warm welcoming smile, lively but anatomically consistent paw hands. Hold a small white coffee mug close to the torso in work pose column8, gently cleaning/presenting it with both paws; otherwise paws free for true walking motion and wave. Keep tail within every cell. No hat, no costume, no weapons; a practical cozy studio cafe employee."
+    }
+  ]
+}

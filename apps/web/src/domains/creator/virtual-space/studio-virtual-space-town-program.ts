@@ -1,7 +1,8 @@
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type { StudioVirtualRewardId } from "./studio-virtual-space-rewards";
-import type { StudioVirtualDecorationState, StudioVirtualDecorPlacement, StudioVirtualDecorType } from "./studio-virtual-space-customization";
+import type { StudioVirtualDecorationState, StudioVirtualDecorType } from "./studio-virtual-space-customization";
+import { placeStudioVirtualDecorationGroup, type StudioDecorationLayoutResult } from "./studio-virtual-space-decoration-layout";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import { studioSemanticWorldInterestKey } from "./studio-virtual-space-semantic-world";
 
@@ -74,16 +75,16 @@ export const STUDIO_TOWN_MINI_GAMES: readonly StudioTownMiniGame[] = Object.free
 
 export const STUDIO_TOWN_BLUEPRINTS: readonly StudioTownBlueprint[] = Object.freeze([
   { id: "meeting-four", labelKo: "4인 회의실", labelEn: "Four-person meeting", roomId: "meeting", decor: [
-    { type: "rug", offsetX: 0, offsetY: 8, scale: .9 }, { type: "bench", offsetX: -42, offsetY: 0, scale: .78 },
+    { type: "rug", offsetX: 0, offsetY: 8, scale: .9 }, { type: "sofa", offsetX: -60, offsetY: 0, scale: .78 },
     { type: "bench", offsetX: 42, offsetY: 0, scale: .78 }, { type: "lamp", offsetX: 0, offsetY: -44, scale: .8 },
   ] },
   { id: "review-theater", labelKo: "리뷰 극장", labelEn: "Review theater", roomId: "review", decor: [
-    { type: "sign", offsetX: 0, offsetY: -42, scale: .9 }, { type: "bench", offsetX: -48, offsetY: 16 },
+    { type: "review-board", offsetX: 0, offsetY: -60, scale: .9 }, { type: "bench", offsetX: -48, offsetY: 16 },
     { type: "bench", offsetX: 48, offsetY: 16 }, { type: "banner", offsetX: 0, offsetY: 54, scale: .82 },
   ] },
   { id: "drawing-pod", labelKo: "작화 데스크 팟", labelEn: "Drawing desk pod", roomId: "drawing", decor: [
-    { type: "rug", offsetX: 0, offsetY: 0 }, { type: "lamp", offsetX: -38, offsetY: -30, scale: .75 },
-    { type: "lamp", offsetX: 38, offsetY: -30, scale: .75 }, { type: "pet", offsetX: 48, offsetY: 34, scale: .7 },
+    { type: "drawing-desk", offsetX: 0, offsetY: 0 }, { type: "bookshelf", offsetX: -64, offsetY: -30, scale: .75 },
+    { type: "lamp", offsetX: 48, offsetY: -30, scale: .75 }, { type: "pet", offsetX: 48, offsetY: 34, scale: .7 },
   ] },
   { id: "gallery-booth", labelKo: "전시 부스", labelEn: "Gallery booth", roomId: "live", decor: [
     { type: "banner", offsetX: 0, offsetY: -42 }, { type: "flower-bed", offsetX: -45, offsetY: 24, scale: .8 },
@@ -250,26 +251,21 @@ export function studioRuntimeBudget(viewportWidth: number, reducedMotion: boolea
 
 export function applyStudioTownBlueprint(
   state: StudioVirtualDecorationState,
-  manifest: Pick<StudioVirtualSpaceWorldManifest, "width" | "height" | "rooms">,
+  manifest: StudioVirtualSpaceWorldManifest,
   blueprint: StudioTownBlueprint,
-): StudioVirtualDecorationState {
-  const room = manifest.rooms.find((candidate) => candidate.id === blueprint.roomId);
-  if (!room || state.placements.length >= 36) return state;
+  selfPoint?: StudioVirtualSpacePoint,
+): StudioDecorationLayoutResult {
+  const room = manifest.rooms.find((candidate) => candidate.id === blueprint.roomId)
+    ?? (manifest.rooms.length === 1 ? manifest.rooms[0] : undefined);
+  if (!room) return { ok: false, reason: "invalid" };
   const center = { x: room.x + room.width / 2, y: room.y + room.height / 2 };
-  const remaining = Math.max(0, 36 - state.placements.length);
-  const additions = blueprint.decor.slice(0, remaining).map((item, index): StudioVirtualDecorPlacement => Object.freeze({
-    id: `blueprint-${blueprint.id}-${state.revision.toString(36)}-${index}`,
+  return placeStudioVirtualDecorationGroup(state, blueprint.decor.map((item) => ({
     type: item.type,
-    x: Math.max(24, Math.min(manifest.width - 24, Math.round(center.x + item.offsetX))),
-    y: Math.max(24, Math.min(manifest.height - 24, Math.round(center.y + item.offsetY))),
-    rotation: 0,
+    x: Math.round(center.x + item.offsetX),
+    y: Math.round(center.y + item.offsetY),
+    rotation: 0 as const,
     scale: item.scale ?? 1,
-  }));
-  return Object.freeze({
-    ...state,
-    placements: Object.freeze([...state.placements, ...additions]),
-    revision: state.revision + 1,
-  });
+  })), manifest, selfPoint);
 }
 
 export type StudioTownSeason = "spring" | "summer" | "autumn" | "winter";

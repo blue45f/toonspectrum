@@ -20,4 +20,3 @@ export interface StudioInkEnvelopeAttestationVerifier {
     signature: string;
   }>) => boolean | Promise<boolean>;
 }
-

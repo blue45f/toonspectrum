@@ -1,4 +1,6 @@
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import type { StudioVirtualBackgroundPresentationMode } from "./studio-virtual-space-customization";
+import { studioSceneDensity } from "./studio-virtual-space-scene-direction";
 import type { StudioVirtualEnvironmentEffect } from "./studio-virtual-space-engine-bridge";
 import type { StudioVirtualEffectLevel } from "./studio-virtual-space-experience-preference";
 import {
@@ -309,10 +311,12 @@ export class StudioLivingWorldRuntime {
     qualityProfile?: StudioVirtualQualityProfile,
     effectLevel: StudioVirtualEffectLevel = "balanced",
     environmentPreference: StudioVirtualEnvironmentPreference = DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
+    presentationMode: StudioVirtualBackgroundPresentationMode = "festival",
   ): void {
     this.qualityProfile = qualityProfile ?? null;
     this.effectLevel = effectLevel;
     const motionSuppressed = reducedMotion || qualityProfile?.tier === "accessibility";
+    const density = studioSceneDensity(presentationMode);
     const effectMultiplier = effectLevel === "low" ? .55 : effectLevel === "high" ? 1.25 : 1;
     const dt = motionSuppressed ? 0 : Math.min(48, Math.max(0, deltaMs)) * effectMultiplier;
     this.environmentState = decayStudioEnvironmentState(this.environmentState, time);
@@ -335,10 +339,11 @@ export class StudioLivingWorldRuntime {
     const lightBoost = time < this.lanternBoostUntil ? .28 : 0;
     this.lights.forEach((sprite, index) => sprite.setVisible(qualityProfile?.dynamicLights !== false)
       .setFrame((frame + index) % 4)
-      .setAlpha(Math.min(1, (motionSuppressed ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost)));
+      .setAlpha(Math.min(1, ((motionSuppressed ? 0.58 : 0.48 + Math.sin(time * 0.002 + index * 1.7) * 0.24) + lightBoost) * density.lightAlpha)));
     this.weather.forEach((sprite, index) => {
       const weather = environmentPreference.weather;
-      sprite.setVisible(weather !== "clear" && qualityProfile?.weather !== false && effectLevel !== "low");
+      sprite.setVisible(weather !== "clear" && qualityProfile?.weather !== false && effectLevel !== "low"
+        && index < Math.ceil(this.weather.length * density.weatherRatio));
       sprite.setFrame((frame + index) % 4);
       if (weather === "rain") sprite.setTint(0xaedcff).setAlpha(.34);
       else if (weather === "petals") sprite.setTint(0xffa9cb).setAlpha(.32);
@@ -360,7 +365,8 @@ export class StudioLivingWorldRuntime {
     this.portalAura?.setAlpha(.03 + this.environmentState.portalCharge * .025 + pulse).setScale(1 + this.environmentState.portalCharge * .008);
     this.treeAura?.setAlpha(.025 + this.environmentState.treeBloom * .022 + pulse).setScale(1 + this.environmentState.treeBloom * .006);
     this.ambientActors.forEach((actor, index) => {
-      const ambientVisible = qualityProfile?.ambientActors !== false && effectLevel !== "low";
+      const ambientVisible = qualityProfile?.ambientActors !== false && effectLevel !== "low"
+        && index < Math.ceil(this.ambientActors.length * density.ambientRatio);
       actor.body.setVisible(ambientVisible);
       actor.shadow.setVisible(ambientVisible);
       actor.body.x = (actor.body.x + dt * actor.speed * (18 + index)) % (this.manifest.width + (this.manifest.tilemap ? 0 : 30));

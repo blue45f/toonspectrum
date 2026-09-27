@@ -96,4 +96,17 @@ describe("Studio capability probe", () => {
       new Response(null, { status: 503 }),
     )).resolves.toBe(false);
   });
+
+  it.each([{}, [], { status: "ok" }, { capabilities: {} },
+    { capabilities: { studioProjectRead: "available" } },
+    { capabilities: { studioProjectRead: "available", studioCloudSave: "unknown" } },
+  ])("기능 근거가 없는 응답을 서버 동기화 가능으로 표시하지 않는다: %j", async (payload) => {
+    await expect(isStudioServerCapabilityAvailable(new Response(JSON.stringify(payload)))).resolves.toBe(false);
+  });
+
+  it("서버 계약의 degraded 상태는 사용 가능한 기능으로 유지한다", async () => {
+    await expect(isStudioServerCapabilityAvailable(new Response(JSON.stringify({
+      capabilities: { studioProjectRead: "degraded", studioCloudSave: "available" },
+    })))).resolves.toBe(true);
+  });
 });

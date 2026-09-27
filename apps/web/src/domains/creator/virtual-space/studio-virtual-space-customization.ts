@@ -27,6 +27,7 @@ export const DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION: StudioVirtualCharac
 export const STUDIO_VIRTUAL_DECOR_TYPES = [
   "tree", "flower-bed", "bench", "lamp", "banner", "market-stall",
   "fountain", "portal", "rug", "sign", "parasol", "pet",
+  "drawing-desk", "bookshelf", "review-board", "sofa",
 ] as const;
 export type StudioVirtualDecorType = typeof STUDIO_VIRTUAL_DECOR_TYPES[number];
 export type StudioVirtualDecorPresetKey = "minimal" | "creator-garden" | "festival" | "night-market";
@@ -45,6 +46,9 @@ export interface StudioVirtualDecorationState {
   readonly presentationMode: StudioVirtualBackgroundPresentationMode;
   readonly placements: readonly StudioVirtualDecorPlacement[];
   readonly revision: number;
+  /** 이전 저장본은 1280×960 좌표이며, 새 배치는 실제 월드 크기를 함께 저장한다. */
+  readonly layoutWidth?: number;
+  readonly layoutHeight?: number;
 }
 
 const CHARACTER_STORAGE_KEY = "toonspectrum:virtual-space-character-customization:v1";
@@ -73,17 +77,17 @@ export function parseStudioVirtualCharacterCustomization(value: unknown): Studio
   });
 }
 
-function parsePlacement(value: unknown): StudioVirtualDecorPlacement | null {
+function parsePlacement(value: unknown, width: number, height: number): StudioVirtualDecorPlacement | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const candidate = value as Record<string, unknown>;
   if (typeof candidate.id !== "string" || !TOKEN.test(candidate.id)
     || !oneOf(STUDIO_VIRTUAL_DECOR_TYPES, candidate.type)
     || typeof candidate.x !== "number" || !Number.isFinite(candidate.x)
     || typeof candidate.y !== "number" || !Number.isFinite(candidate.y)
-    || candidate.x < 16 || candidate.x > WORLD_WIDTH - 16
-    || candidate.y < 16 || candidate.y > WORLD_HEIGHT - 16
-    || ![0, 90, 180, 270].includes(Number(candidate.rotation))
-    || typeof candidate.scale !== "number" || candidate.scale < .65 || candidate.scale > 1.35) return null;
+    || candidate.x < 0 || candidate.x > width
+    || candidate.y < 0 || candidate.y > height
+    || typeof candidate.rotation !== "number" || ![0, 90, 180, 270].includes(candidate.rotation)
+    || typeof candidate.scale !== "number" || !Number.isFinite(candidate.scale) || candidate.scale < .65 || candidate.scale > 1.35) return null;
   return Object.freeze({
     id: candidate.id,
     type: candidate.type,
@@ -106,7 +110,13 @@ export function parseStudioVirtualDecorationState(value: unknown): StudioVirtual
     : presetKey === "festival" || presetKey === "night-market" ? "festival" : "decorated";
   const presentationMode = oneOf(["minimal", "decorated", "festival"] as const, candidate.presentationMode)
     ? candidate.presentationMode : fallbackMode;
-  const placements = candidate.placements.map(parsePlacement);
+  const hasDimensions = candidate.layoutWidth !== undefined || candidate.layoutHeight !== undefined;
+  const dimension = (value: unknown): value is number => typeof value === "number"
+    && Number.isSafeInteger(value) && value >= 32 && value <= 10000;
+  if (hasDimensions && (!dimension(candidate.layoutWidth) || !dimension(candidate.layoutHeight))) return null;
+  const width = dimension(candidate.layoutWidth) ? candidate.layoutWidth : WORLD_WIDTH;
+  const height = dimension(candidate.layoutHeight) ? candidate.layoutHeight : WORLD_HEIGHT;
+  const placements = candidate.placements.map((item) => parsePlacement(item, width, height));
   if (placements.some((item) => !item)) return null;
   const valid = placements as StudioVirtualDecorPlacement[];
   if (new Set(valid.map((item) => item.id)).size !== valid.length) return null;
@@ -116,6 +126,7 @@ export function parseStudioVirtualDecorationState(value: unknown): StudioVirtual
     presentationMode,
     placements: Object.freeze(valid),
     revision: candidate.revision,
+    ...(hasDimensions ? { layoutWidth: width, layoutHeight: height } : {}),
   });
 }
 
@@ -134,10 +145,14 @@ function writeCharacterCustomization(value: StudioVirtualCharacterCustomization)
   }
 }
 
-function writeDecorationState(value: StudioVirtualDecorationState): boolean {
+function decorationStorageKey(scope?: string): string {
+  return scope ? `${DECOR_STORAGE_KEY}:${encodeURIComponent(scope)}` : DECOR_STORAGE_KEY;
+}
+
+function writeDecorationState(value: StudioVirtualDecorationState, scope?: string): boolean {
   if (typeof window === "undefined") return false;
   try {
-    window.localStorage.setItem(DECOR_STORAGE_KEY, JSON.stringify(value));
+    window.localStorage.setItem(decorationStorageKey(scope), JSON.stringify(value));
     return true;
   } catch {
     return false;
@@ -192,13 +207,19 @@ export function studioVirtualDecorationPreset(key: StudioVirtualDecorPresetKey):
   return Object.freeze({ presetKey: key, districtKey, presentationMode, placements: Object.freeze(placements), revision: Date.now() });
 }
 
-export function readStudioVirtualDecorationState(): StudioVirtualDecorationState {
+export function readStudioVirtualDecorationState(scope?: string): StudioVirtualDecorationState {
+  if (scope && typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem(decorationStorageKey(scope));
+      if (raw !== null) return parseStudioVirtualDecorationState(JSON.parse(raw)) ?? studioVirtualDecorationPreset("creator-garden");
+    } catch { return studioVirtualDecorationPreset("creator-garden"); }
+  }
   return parseStudioVirtualDecorationState(safeRead(DECOR_STORAGE_KEY)) ?? studioVirtualDecorationPreset("creator-garden");
 }
 
-export function writeStudioVirtualDecorationState(value: StudioVirtualDecorationState): boolean {
+export function writeStudioVirtualDecorationState(value: StudioVirtualDecorationState, scope?: string): boolean {
   const parsed = parseStudioVirtualDecorationState(value);
-  return parsed ? writeDecorationState(parsed) : false;
+  return parsed ? writeDecorationState(parsed, scope) : false;
 }
 
 export function addStudioVirtualDecoration(
@@ -206,20 +227,21 @@ export function addStudioVirtualDecoration(
   type: StudioVirtualDecorType,
   point: StudioVirtualSpacePoint,
 ): StudioVirtualDecorationState {
-  if (current.placements.length >= MAX_DECORATIONS) return current;
+  if (current.placements.length >= MAX_DECORATIONS || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return current;
   const offset = current.placements.length % 6;
+  let suffix = current.placements.length;
+  const prefix = `decor-${Date.now().toString(36)}`;
+  while (current.placements.some((item) => item.id === `${prefix}-${suffix}`)) suffix += 1;
   const candidate = placement(
-    `decor-${Date.now().toString(36)}-${offset}`,
+    `${prefix}-${suffix}`,
     type,
-    Math.max(24, Math.min(WORLD_WIDTH - 24, Math.round(point.x + 38 + offset * 7))),
-    Math.max(24, Math.min(WORLD_HEIGHT - 24, Math.round(point.y + 25 + offset * 5))),
+    Math.max(24, Math.min((current.layoutWidth ?? WORLD_WIDTH) - 24, Math.round(point.x + 38 + offset * 7))),
+    Math.max(24, Math.min((current.layoutHeight ?? WORLD_HEIGHT) - 24, Math.round(point.y + 25 + offset * 5))),
     0,
     1,
   );
   return Object.freeze({
-    presetKey: current.presetKey,
-    districtKey: current.districtKey,
-    presentationMode: current.presentationMode,
+    ...current,
     placements: Object.freeze([...current.placements, candidate]),
     revision: current.revision + 1,
   });
@@ -228,9 +250,7 @@ export function addStudioVirtualDecoration(
 export function removeStudioVirtualDecoration(current: StudioVirtualDecorationState, id: string): StudioVirtualDecorationState {
   if (!TOKEN.test(id)) return current;
   return Object.freeze({
-    presetKey: current.presetKey,
-    districtKey: current.districtKey,
-    presentationMode: current.presentationMode,
+    ...current,
     placements: Object.freeze(current.placements.filter((item) => item.id !== id)),
     revision: current.revision + 1,
   });
@@ -239,6 +259,7 @@ export function removeStudioVirtualDecoration(current: StudioVirtualDecorationSt
 export const STUDIO_VIRTUAL_DECOR_FRAME: Readonly<Record<StudioVirtualDecorType, number>> = Object.freeze({
   tree: 0, "flower-bed": 1, bench: 2, lamp: 3, banner: 4, "market-stall": 5,
   fountain: 6, portal: 7, rug: 8, sign: 9, parasol: 10, pet: 11,
+  "drawing-desk": 12, bookshelf: 13, "review-board": 14, sofa: 15,
 });
 
 export const STUDIO_VIRTUAL_ACCESSORY_FRAME: Readonly<Record<StudioVirtualAccessoryKey, number>> = Object.freeze({
