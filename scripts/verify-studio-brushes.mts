@@ -1408,7 +1408,7 @@ async function reanchorEvidenceClip(
   }, viewport);
 }
 
-async function _compareScreenshotPixelsWithinReferenceDelta(
+async function compareScreenshotPixelsWithinReferenceDelta(
   page: Page,
   baseline: Buffer,
   candidate: Buffer,
@@ -2495,7 +2495,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       }
       // Konva may re-rasterize the untouched paper by a few channel values after a history jump.
       // Ignore imperceptible antialias noise while still rejecting any residual ink above Δ20.
-      const undoDiff = await compareScreenshotPixels(page, before, undone, 20);
+      const undoDiff = await compareScreenshotPixelsWithinReferenceDelta(page, before, undone, after, 20);
       // Eraser Undo may cross the Canvas2D live surface → CanvasKit/WebGL document surface
       // boundary. Both consume the same causal dab plan, but round-cap edge coverage can differ by
       // a handful of antialias pixels after the destructive surface is rebuilt. Keep the ordinary
@@ -2554,7 +2554,7 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       await page.waitForTimeout(40);
       const cleanupClip = await reanchorEvidenceClip(page.locator(".konvajs-content").first(), stageBox, usedClip, viewport);
       const cleaned = await page.screenshot({ animations: "disabled", clip: cleanupClip });
-      const cleanupDiff = await compareScreenshotPixels(page, before, cleaned, 20);
+      const cleanupDiff = await compareScreenshotPixelsWithinReferenceDelta(page, before, cleaned, after, 20);
       const cleanupCrossSurfaceAntialiasOnly = operation === "erase"
         && cleanupDiff.changedPixels <= 16
         && cleanupDiff.maxChannelDelta <= 32;
