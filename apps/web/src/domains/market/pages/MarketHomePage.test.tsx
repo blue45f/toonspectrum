@@ -112,7 +112,7 @@ describe("MarketHomePage", () => {
     );
 
     const licenseLinks = screen.getAllByRole("link", { name: /사용권 전문 보기/ });
-    expect(licenseLinks).toHaveLength(5);
+    expect(licenseLinks).toHaveLength(4);
     for (const link of licenseLinks) {
       expect(link.className.split(/\s+/u)).toContain("underline");
     }

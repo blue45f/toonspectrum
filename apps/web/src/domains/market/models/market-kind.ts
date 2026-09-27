@@ -135,8 +135,6 @@ export const MARKET_LICENSES: readonly MarketLicenseMeta[] = Object.freeze([
   },
 ]);
 
-export const MARKET_LICENSE_GUIDE: readonly MarketLicenseMeta[] = MARKET_LICENSES;
-
 const MARKET_LICENSE_BY_LICENSE = new Map(MARKET_LICENSES.map((meta) => [meta.license, meta]));
 
 // 표준 사용권은 toonspectrum-standard로 승격했지만 이전에 발행된 리소스가 toonstudio-standard를
