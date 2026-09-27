@@ -99,11 +99,10 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, header
       </div>
       <div
         id={contentId}
+        data-character-shaper-sheet-safe-area="true"
         hidden={collapsed}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]"
       >
-        {/* 마지막 조작 행이 홈 인디케이터에 깔리지 않게 안전영역을 존중한다. */}
-        <div data-character-shaper-sheet-safe-area="true" className="shrink-0" aria-hidden />
         {children}
       </div>
     </section>

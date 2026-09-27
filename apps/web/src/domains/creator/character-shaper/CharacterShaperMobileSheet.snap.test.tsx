@@ -59,10 +59,12 @@ describe("모바일 시트 스냅 상태 표시", () => {
     expect(toggle.className).toContain("shrink-0");
   });
 
-  it("안전영역 스페이콘텐츠를 렌더해 홈 인디케이터 여백을 확보한다", () => {
+  it("안전영역을 아래쪽 패딩으로 확보해 마지막 조작 행이 홈 인디케이터에 깔리지 않게 한다", () => {
     renderSheet("half");
-    const spacer = document.querySelector('[data-character-shaper-sheet-safe-area="true"]');
-    expect(spacer).not.toBeNull();
-    expect(spacer?.getAttribute("aria-hidden")).toBe("true");
+    const content = document.querySelector('[data-character-shaper-sheet-safe-area="true"]');
+    expect(content).not.toBeNull();
+    // 간격 요소가 아니라 아래 패딩이어야 한다. 내용 패널이 flex-1이라 위쪽 간격은 흡수된다.
+    expect(content?.querySelector('[data-character-shaper-sheet-safe-area]')).toBeNull();
+    expect(content?.className).toContain("pb-[env(safe-area-inset-bottom)]");
   });
 });

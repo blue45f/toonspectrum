@@ -42,7 +42,9 @@
   height: calc(56px + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-[data-character-shaper-sheet-safe-area] { height: env(safe-area-inset-bottom, 0px); }
+/* 안전영역은 반드시 아래쪽에 확보한다. 내용 패널이 `flex-1`이라 위쪽에 간격 요소를 두면
+   남은 높이를 전부 흡수해 마지막 조작 행이 홈 인디케이터에 그대로 깔린다. */
+[data-character-shaper-sheet-safe-area] { padding-bottom: env(safe-area-inset-bottom, 0px); }
 [data-character-shaper-sheet-snap="on"] { background-color: var(--color-accent); }
 [data-character-shaper-sheet-header="true"] {
   display: flex;
