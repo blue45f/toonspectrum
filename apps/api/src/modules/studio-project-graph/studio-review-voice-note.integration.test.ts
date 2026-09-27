@@ -40,7 +40,7 @@ if (process.env.CI && !connection) throw new Error("CI must provide real Postgre
     const commenter = await member(workId), viewer = await member(workId, "viewer"), outsider = await user("Outsider");
     const subject = { schemaVersion: 1 as const, workId, projectId: randomUUID(), artifactId: randomUUID(), reviewId: randomUUID(), revisionId: randomUUID(), rootGraphHash: "a".repeat(64) };
     const bytes = Buffer.from([0x1a, 0x45, 0xdf, 0xa3]); const sha256 = createHash("sha256").update(bytes).digest("hex");
-    const object = { contractVersion: "toonstudio.private-object-storage.v2" as const, providerId: "cloudflare-r2" as const, purpose: "derived" as const,
+    const object = { contractVersion: "toonspectrum.private-object-storage.v2" as const, providerId: "cloudflare-r2" as const, purpose: "derived" as const,
       digest: `sha256:${sha256}`, objectPath: `sha256/${sha256.slice(0, 2)}/${sha256}`, byteLength: bytes.length, contentType: "audio/webm" };
     const input = { operationId: randomUUID(), noteId: randomUUID(), subject, title: "Panel context", transcript: "Raise the eye line.", durationMs: 1_200, retentionDays: 14 };
     return { owner, commenter, viewer, outsider, workId, subject, sha256, object, input, file: { contentType: "audio/webm", byteLength: bytes.length, sha256, object } };

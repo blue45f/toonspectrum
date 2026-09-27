@@ -126,7 +126,7 @@ function batchWrite(assetId: string, fill: number): StudioWorkAssetWrite {
     sha256,
     intrinsicImage: { width: 1, height: 1, decodedRgbaBytes: 4 },
     storageObject: {
-      contractVersion: "toonstudio.private-object-storage.v2",
+      contractVersion: "toonspectrum.private-object-storage.v2",
       providerId: "cloudflare-r2",
       purpose: "source",
       digest: `sha256:${sha256}`,

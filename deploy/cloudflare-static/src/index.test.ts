@@ -70,6 +70,7 @@ describe("Cloudflare static gateway", () => {
     const wrangler = JSON.parse(
       readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"),
     ) as {
+      keep_vars?: boolean;
       assets?: { run_worker_first?: string[] };
       r2_buckets?: Array<{
         binding?: string;
@@ -79,6 +80,7 @@ describe("Cloudflare static gateway", () => {
     };
 
     expect((wrangler as { workers_dev?: boolean }).workers_dev).toBe(true);
+    expect(wrangler.keep_vars).toBe(true);
     expect(wrangler.assets?.run_worker_first).toEqual([
       "/api",
       "/api/*",

@@ -220,7 +220,7 @@ describe("Studio VRM visual pose bone boundary", () => {
     expect(uploadSource).toContain("license: sharePlan.license");
     expect(uploadSource).toContain("attributionText: sharePlan.attributionText");
     expect(uploadSource).toContain("rightsConfirmed: sharePlan.rightsConfirmed");
-    expect(uploadSource).not.toContain('license: "toonstudio-standard"');
+    expect(uploadSource).not.toContain('license: "toonspectrum-standard"');
     expect(uploadSource).not.toContain("rightsConfirmed: true");
     expect(shareSource).toContain('containsAi: false');
     expect(shareSource).toContain('tags: ["VRM", "3D 데생 인형", "포즈"]');

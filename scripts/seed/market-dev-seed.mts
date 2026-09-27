@@ -112,7 +112,7 @@ const SEEDS: readonly SeedSpec[] = [
       "웹툰 선화 작업에 바로 쓰는 압력 반응 G펜. 가는 복선과 굵은 주선을 하나의 필악 커브로 처리합니다.",
     kind: "brush",
     tags: ["브러시", "선화", "gpen", "ink"],
-    license: "toonstudio-standard",
+    license: "toonspectrum-standard",
     engines: ["canvas2d"],
     entryName: "정석 G펜 파인",
     definition: {
@@ -182,7 +182,7 @@ const SEEDS: readonly SeedSpec[] = [
     description: "색상 단계를 5단계로 줄이고 경계를 강조해 강한 그래픽 외곽을 만드는 필터입니다.",
     kind: "filter",
     tags: ["필터", "포스터", "윤곽선", "색면"],
-    license: "toonstudio-standard",
+    license: "toonspectrum-standard",
     engines: ["canvas2d"],
     entryName: "포스터 엣지 팝",
     definition: {
@@ -242,7 +242,7 @@ const SEEDS: readonly SeedSpec[] = [
     description: "Studio 내장 ‘액션 컷’의 집중선·외침 말풍선·효과음을 불러오는 시작 템플릿입니다.",
     kind: "template",
     tags: ["템플릿", "액션", "구도"],
-    license: "toonstudio-standard",
+    license: "toonspectrum-standard",
     engines: ["canvas2d"],
     entryName: "액션 임팩트 컷",
     definition: { templateId: "action-impact" },

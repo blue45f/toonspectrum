@@ -28,7 +28,7 @@ Cloudflare/Render 배포 단위의 검증된 version으로 수행합니다.
 | 개인 프로젝트 | OPFS/로컬/BYOS | 사용자 기기·저장소 | 운영자 중앙 저장 최소화 |
 
 `render.yaml`은 두 런타임을 정의합니다. `toonspectrum-core-api`는
-`API_RUNTIME_ROLE=full`인 동적 HTTP 권위이고, `toonstudio-studio-live`는 선택형 Socket.IO
+`API_RUNTIME_ROLE=full`인 동적 HTTP 권위이고, `toonspectrum-studio-live`는 선택형 Socket.IO
 폴백입니다. 정적 gateway의 `CORE_API_ORIGIN`은 readiness를 통과한 Core 서비스만 가리켜야 하며,
 실시간 전용 origin이나 정적 사이트 자신을 지정하면 안 됩니다.
 
@@ -154,7 +154,7 @@ Cloudflare 권위를 자동으로 바꾸거나 저장 확인을 생략하지 않
 - `/socket.io`: Studio 실시간 협업 연결
 - 그 밖의 `/api/*`: 일반 API로 처리하지 않음
 
-`toonspectrum-core-api`는 일반 HTTP 권위이고 `toonstudio-studio-live`는 Socket.IO 전용입니다.
+`toonspectrum-core-api`는 일반 HTTP 권위이고 `toonspectrum-studio-live`는 Socket.IO 전용입니다.
 Cloudflare의 `CORE_API_ORIGIN`은 전자를, 선택적인 `REALTIME_API_ORIGIN` 또는 프런트의
 `VITE_STUDIO_LIVE_ORIGIN`은 후자를 가리킵니다. 두 runtime role을 서로 바꾸거나 하나의 무료
 인스턴스에 이중 권위로 합치지 않습니다.

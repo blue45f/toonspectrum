@@ -75,7 +75,7 @@ function imageWrite(
       decodedRgbaBytes: 4,
     },
     storageObject: {
-      contractVersion: "toonstudio.private-object-storage.v2",
+      contractVersion: "toonspectrum.private-object-storage.v2",
       providerId: "cloudflare-r2",
       purpose: "source",
       digest: `sha256:${sha256}`,
@@ -92,7 +92,7 @@ function generatedObject(
 ) {
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   return {
-    contractVersion: "toonstudio.private-object-storage.v2" as const,
+    contractVersion: "toonspectrum.private-object-storage.v2" as const,
     providerId: "supabase" as const,
     purpose,
     digest: `sha256:${sha256}` as const,

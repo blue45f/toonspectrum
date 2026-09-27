@@ -341,7 +341,7 @@
   "dependencies": {
     "@toonstudio/core": "workspace:*",
     "yjs": "^13.6.31",
-    "zod": "^4.4.3"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.13.2"

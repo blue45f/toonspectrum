@@ -47,7 +47,7 @@ const envelope = BackendCapabilityGatewayEnvelopeSchema.parse({
     requestKey: idempotencyKey,
     sourceAssetId: "asset-1",
     sourceObject: {
-      contractVersion: "toonstudio.private-object-storage.v2",
+      contractVersion: "toonspectrum.private-object-storage.v2",
       providerId: "cloudflare-r2",
       purpose: "source",
       digest: `sha256:${digest}`,

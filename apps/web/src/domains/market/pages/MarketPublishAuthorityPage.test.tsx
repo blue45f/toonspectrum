@@ -59,7 +59,7 @@ describe("MarketPublishPage authoring release identity", () => {
     fireEvent.click(submit());
     await screen.findByRole("heading", { name: "서버 게시가 완료되었습니다" });
     expect(mocks.publish).toHaveBeenCalledWith(expect.objectContaining({
-      packageId: parent().packageId, name: "이름을 바꾼 브러시", license: "toonstudio-standard",
+      packageId: parent().packageId, name: "이름을 바꾼 브러시", license: "toonspectrum-standard",
     }), expect.any(AbortSignal));
   });
 

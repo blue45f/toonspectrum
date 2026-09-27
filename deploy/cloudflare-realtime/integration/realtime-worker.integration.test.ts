@@ -166,8 +166,8 @@ function buildClaims(
 ): RealtimeTicketClaims {
   return {
     version: REALTIME_TICKET_VERSION,
-    issuer: "toonstudio-api",
-    audience: "toonstudio-realtime",
+    issuer: "toonspectrum-api",
+    audience: "toonspectrum-realtime",
     subject: "artist.integration",
     sessionVersion: 1,
     authorizationEpochMs: nowMs - 5_000,

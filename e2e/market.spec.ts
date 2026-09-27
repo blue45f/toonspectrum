@@ -433,7 +433,7 @@ test("리소스 상세 페이지에서 필터 전후 슬라이더를 렌더링�
     kind: "filter",
     resourceVersion: "1.0.0",
     minimumStudioVersion: "1.0.0",
-    license: "toonstudio-standard",
+    license: "toonspectrum-standard",
     attributionText: "",
     containsAi: false,
     provenance: { origin: "original", authoredByPublisher: true },

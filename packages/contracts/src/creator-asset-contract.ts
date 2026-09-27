@@ -1,6 +1,6 @@
 export const CREATOR_ASSET_LICENSES = [
   {
-    id: "toonstudio-standard",
+    id: "toonspectrum-standard",
     label: "ToonStudio 표준 사용권",
     shortLabel: "표준 사용권",
     attributionRequired: false,
@@ -37,7 +37,7 @@ export const CREATOR_ASSET_LICENSES = [
   },
 ] as const;
 
-export type CreatorAssetLicenseId = (typeof CREATOR_ASSET_LICENSES)[number]["id"] | "toonspectrum-standard";
+export type CreatorAssetLicenseId = (typeof CREATOR_ASSET_LICENSES)[number]["id"];
 export type CreatorAssetCatalogSort = "newest" | "popular" | "name";
 export type CreatorAssetModerationStatus = "published" | "under_review" | "rejected";
 export type CreatorAssetReportReason = "copyright" | "unsafe" | "spam" | "misleading" | "other";
@@ -87,11 +87,11 @@ export function assertCreatorAssetListResponseBudget(value: unknown): void {
 }
 
 export function isCreatorAssetLicenseId(value: unknown): value is CreatorAssetLicenseId {
-  return typeof value === "string" && (LICENSE_IDS.has(value) || value === "toonspectrum-standard");
+  return typeof value === "string" && LICENSE_IDS.has(value);
 }
 
 export function creatorAssetLicenseOf(value: unknown) {
-  const id = isCreatorAssetLicenseId(value) ? value : "toonstudio-standard";
+  const id = isCreatorAssetLicenseId(value) ? value : "toonspectrum-standard";
   return CREATOR_ASSET_LICENSES.find((license) => license.id === id) ?? CREATOR_ASSET_LICENSES[0];
 }
 

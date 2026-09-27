@@ -21,6 +21,22 @@ const legacy = {
 };
 
 describe("private object storage location contract", () => {
+  it("운영에 저장된 v1·v2 참조의 식별자와 파일 경로를 브랜드 변경 후에도 보존한다", () => {
+    const deployedV1 = {
+      ...legacy,
+      contractVersion: "toonspectrum.supabase-object-storage.v1",
+    };
+    const deployedV2 = {
+      ...deployedV1,
+      contractVersion: "toonspectrum.private-object-storage.v2",
+      providerId: "cloudflare-r2",
+    };
+    expect(PrivateObjectReferenceSchema.parse(deployedV1)).toEqual(deployedV1);
+    expect(PrivateObjectReferenceSchema.parse(deployedV2)).toEqual(deployedV2);
+    expect(unlocatePrivateObjectReference(PrivateObjectReferenceSchema.parse(deployedV2)))
+      .toEqual(deployedV1);
+  });
+
   it("accepts legacy references throughout the additive migration", () => {
     const parsed = PrivateObjectReferenceSchema.parse(legacy);
     expect(isLocatedPrivateObjectReference(parsed)).toBe(false);

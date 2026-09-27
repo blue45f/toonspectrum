@@ -80,7 +80,7 @@ describe("market json-ld", () => {
   });
 
   it("표준 사용권은 사이트 약관 URL로 폴백한다", () => {
-    const ld = marketResourceJsonLd(record({ license: "toonstudio-standard" }));
+    const ld = marketResourceJsonLd(record({ license: "toonspectrum-standard" }));
     expect(ld.license).toBe("https://www.toonstudio.cloud/terms");
   });
 });

@@ -90,4 +90,4 @@ apps/api/src/platform/database/migrations/0089_creator_series_spatial_showcase.s
 apps/api/src/platform/database/migrations/0090_studio_review_voice_note.sql
 apps/api/src/platform/database/migrations/0091_creator_work_publication_media.sql
 apps/api/src/platform/database/migrations/0092_collaboration_application_selection.sql
-apps/api/src/platform/database/migrations/0093_release_brand_compatibility.sql
+apps/api/src/platform/database/migrations/0093_review_voice_note_constraints_repair.sql
