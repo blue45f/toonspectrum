@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -257,4 +258,13 @@ test("list mode validates the manifest without installing dependencies", () => {
   const invalid = spawnSync(process.execPath, [script, "not-a-shard"], { encoding: "utf8" });
   assert.equal(invalid.status, 1);
   assert.match(invalid.stderr, /Unknown CI regression shard/);
+});
+
+
+test("foundation sparse checkout은 전체 기본 래스터 소품 입력을 복원한다", () => {
+  const workflow = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const restore = workflow.match(/- name: Restore Virtual Studio art for foundation regressions\n([\s\S]*?)(?=\n {6}- name:)/u)?.[1];
+  assert.ok(restore, "foundation 입력 복원 단계를 유지해야 합니다.");
+  assert.match(restore, /if: matrix.shard == 'studio-foundation'/u);
+  assert.match(restore, /(?:^|\s)\/apps\/web\/public\/assets\/studio\/props\/(?:\s|$)/u);
 });
