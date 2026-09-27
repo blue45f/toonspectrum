@@ -291,6 +291,15 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
       - name: Run serious and critical accessibility smoke
         run: pnpm run test:a11y
+      - name: 제작 작업 보드 실제 흐름과 반응형 접근성 검증
+        run: pnpm exec playwright test --config playwright.production-workflows.config.ts
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: core-production-workflows-attempt-${{ github.run_attempt }}
+          path: .qa/production-workflows
+          retention-days: 7
+          if-no-files-found: warn
 
   build:
     name: Core production build
