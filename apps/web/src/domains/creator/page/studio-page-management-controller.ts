@@ -55,7 +55,8 @@ export function useStudioPageManagement({
 
   function addPage() {
     const baseH = activePage.canvasH || 1080;
-    const { nextPages, newPageId } = appendPageState(pages, uid, baseH);
+    // 렌더 갱신 전 다시 실행돼도 앞서 커밋한 페이지를 덮어쓰지 않는다.
+    const { nextPages, newPageId } = appendPageState(latestStudioPagesSnapshot(), uid, baseH);
     if (!commitPages(nextPages)) return;
     setCurrentPageId(newPageId);
   }

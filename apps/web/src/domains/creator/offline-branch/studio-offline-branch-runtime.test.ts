@@ -3,8 +3,8 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { StudioCrdtDocument } from "../live/studio-crdt-document";
 import { reconcileStudioCrdtSceneGraphPages } from "../live/studio-crdt-page-bridge";
 import { publishStudioCrdtSceneGraphDiff } from "../live/studio-crdt-scene-publisher";
-import { createStudioDeferredStrokeCommitEngine } from "../studio-cuttoon-editor/studio-deferred-stroke-commit";
 import { createStudioCrdtTransitionPublisher } from "../studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher";
+import { createStudioDeferredStrokeCommitEngine, type StudioDeferredStrokeCommitEngineContext } from "../studio-cuttoon-editor/studio-deferred-stroke-commit";
 import {
   StudioOfflineBranchAutomergeEngine,
   initializeStudioOfflineBranchAutomerge,
@@ -13,7 +13,6 @@ import { StudioOfflineBranchRuntime } from "./studio-offline-branch-runtime";
 
 import type { DrawEl } from "../studio-element-model";
 import type { StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaborationProvider";
-import type { StudioDeferredStrokeCommitEngineContext } from "../studio-cuttoon-editor/studio-deferred-stroke-commit";
 import type { PageState } from "../studio-page-state";
 import type {
   CreateStudioOfflineBranchInput,
@@ -231,6 +230,90 @@ function offlineCommitEditor(
 }
 
 describe("StudioOfflineBranchRuntime", () => {
+  it("정본 병합 뒤에도 기기에 수락한 도형 교정을 히스토리에 보존하고 원격 획을 지우지 않는다", async () => {
+    const original = { ...stroke("local-shape", 10), points: [10, 10, 20, 11, 30, 9, 40, 10] };
+    const initial = page("선화", [original]);
+    const remote = stroke("remote-stroke", 50);
+    const document = new StudioCrdtDocument();
+    const offlineBranch = await StudioOfflineBranchRuntime.create(runtimeOptions(new MemoryStorage()));
+    publishStudioCrdtSceneGraphDiff(document, [], [initial]);
+    offlineBranch.observeCanonicalPages([initial]);
+    // 마지막 로컬 히스토리 이후 도착한 원격 획도 정본 병합에 포함되어야 한다.
+    publishStudioCrdtSceneGraphDiff(document, [initial], [{ ...initial, elements: [original, remote] }]);
+    const canonicalBefore = document.encodeStateAsUpdate();
+    const canonicalRemote = reconcileStudioCrdtSceneGraphPages([initial], document.getStrokes({ includeDeleted: true }),
+      document.getSceneElements({ includeDeleted: true }), document.getPages(true),
+      document.getLayerGroups({ includeDeleted: true })).pages[0]!.elements.find(({ id }) => id === remote.id);
+    expect(canonicalRemote).toMatchObject(remote);
+    const runtime = { offlineBranch, reconcilePages: reconcileStudioCrdtSceneGraphPages } as unknown as StudioCrdtSceneGraphRuntime;
+    const reportError = vi.fn();
+    const publisher = createStudioCrdtTransitionPublisher({
+      actorId: "user-1", automaticRasterPublicationEnabled: false,
+      getDocument: () => document, getRuntime: () => runtime,
+      reportError, reportNotice: vi.fn(),
+    });
+    const pagesHistoryRef = { current: [[initial]] };
+    const pagesHiRef = { current: 0 };
+    const context = {
+      activePage: initial, pages: [initial], elements: initial.elements,
+      editorMountedRef: { current: true }, documentSaveInFlightRef: { current: false },
+      collaborationAccessRef: { current: { locked: false } }, collaborationLockMessage: () => "locked",
+      bg3dDccSourceRef: { current: null }, masterEditMode: false, pageEditLocked: false,
+      advancedFillApplyingRef: { current: false }, invalidateAdvancedFillWork: () => true,
+      coalesceKeyRef: { current: null }, currentPageIdRef: { current: initial.id }, pagesHiRef, pagesHistoryRef,
+      studioCrdtDocumentRef: { current: document }, studioCrdtSceneRuntimeRef: { current: runtime },
+      publishStudioCrdtSceneTransition: publisher.publishSceneTransition,
+      onHistoryBranch: vi.fn(), recordStudioHistoryTransition: vi.fn(), recordStudioHistoryJournalPages: vi.fn(),
+      noteStudioHistoryRetention: vi.fn(), setPagesHistory: vi.fn(), setPagesHi: vi.fn(),
+      setError: reportError, setSharedDocumentNotice: vi.fn(),
+      drawingRef: { current: null }, drawingPointerTransportRef: { current: { getSession: () => null } },
+      pendingStrokeCommitsRef: { current: null }, flushPendingStrokeCommitsRef: { current: () => true },
+    } as unknown as StudioDeferredStrokeCommitEngineContext;
+    const corrected: DrawEl = { ...original, points: [10, 10, 40, 10],
+      smartShape: { version: 1, kind: "line", original } };
+    try {
+      expect(createStudioDeferredStrokeCommitEngine(context).commit([corrected])).toBe(true);
+      const saved = pagesHistoryRef.current[pagesHiRef.current]![0]!;
+      expect(saved.elements.find(({ id }) => id === corrected.id)).toEqual(corrected);
+      expect(saved.elements.find(({ id }) => id === remote.id)).toEqual(canonicalRemote);
+      expect(offlineBranch.status.pendingOperations).toBeGreaterThan(0);
+      expect(document.encodeStateAsUpdate()).toEqual(canonicalBefore);
+      expect(reportError).not.toHaveBeenCalled();
+    } finally {
+      await offlineBranch.close();
+      document.destroy();
+    }
+  });
+  it("네이버와 카카오 규격 변경을 각각 거절하고 오프라인 페이지와 대기 작업을 보존한다", async () => {
+    const errors: string[] = [];
+    const runtime = await StudioOfflineBranchRuntime.create({
+      ...runtimeOptions(new MemoryStorage()), onError: (message) => errors.push(message),
+    });
+    const original = [page()];
+    const editorErrors: string[] = [];
+    const publisher = createStudioCrdtTransitionPublisher({
+      actorId: "user-1", automaticRasterPublicationEnabled: false,
+      getDocument: () => null,
+      getRuntime: () => ({ offlineBranch: runtime }) as StudioCrdtSceneGraphRuntime,
+      reportError: (message) => editorErrors.push(message), reportNotice: () => undefined,
+    });
+    try {
+      runtime.observeCanonicalPages(original);
+      for (const canvasH of [8348, 8000]) {
+        expect(publisher.publishSceneTransition(original, [{ ...original[0], canvasH }])).toBe(false);
+        expect(runtime.projectPages(original)).toEqual(original);
+        expect(runtime.canonicalPagesSnapshot()).toEqual(original);
+        expect(runtime.status.pendingOperations).toBe(0);
+      }
+      expect(errors).toEqual([
+        "page-1: 페이지 배경·크기 변경은 온라인 정본 연결이 필요합니다.",
+        "page-1: 페이지 배경·크기 변경은 온라인 정본 연결이 필요합니다.",
+      ]);
+      expect(editorErrors).toEqual(errors);
+    } finally {
+      await runtime.close();
+    }
+  });
   it.each(["elements", "pages"] as const)(
     "오프라인 %s 커밋에서 연속 그룹 편집과 실행 취소 제안을 보존한다",
     async (kind) => {

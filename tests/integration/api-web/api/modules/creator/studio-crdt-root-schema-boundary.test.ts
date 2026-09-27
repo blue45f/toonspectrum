@@ -63,6 +63,7 @@ describe("Studio CRDT root schema ownership boundary", () => {
     ]);
     expect(schema.valueImports).not.toContain("./studio-crdt.service");
     expect(schema.valueImports).not.toContain("./studio-crdt.repository");
+    expect(schema.valueImports.some((specifier) => specifier.includes("web/src"))).toBe(false);
     expect(schema.dynamicImports).toEqual([]);
     expect(schema.source).not.toMatch(/@Injectable|@Inject\(|\bLogger\b|\bOnModuleDestroy\b/u);
   });

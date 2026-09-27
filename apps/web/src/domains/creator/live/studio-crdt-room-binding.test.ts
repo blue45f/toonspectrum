@@ -4,6 +4,7 @@ import {
   StudioCrdtDocument,
   type StudioCrdtDrawStrokePayload,
 } from "./studio-crdt-document";
+import { resolveStudioLiveCanonicalAuthority } from "./studio-live-canonical-authority";
 import { createStudioCrdtServerAckError } from "./studio-crdt-operation-error";
 import {
   StudioCrdtOutboxCorruptionError,
@@ -1502,6 +1503,11 @@ describe("StudioCrdtRoomBinding", () => {
   });
 
   it.each(["mesh", "none"] as const)("preserves server %s requests without treating peer receipts as authoritative", async (crdtFanout) => {
+    // 준비된 P2P 정본의 편집 허용이 아래의 서버 저장 ACK 검사를 대신해서는 안 된다.
+    expect(resolveStudioLiveCanonicalAuthority({
+      bindingState: "ready", transportReady: true, transportMode: "server", crdtFanout,
+      previousAuthority: false,
+    })).toBe(crdtFanout === "mesh");
     vi.useFakeTimers();
     const peer = new StudioCrdtDocument();
     const client = new StudioCrdtDocument();
@@ -1516,7 +1522,10 @@ describe("StudioCrdtRoomBinding", () => {
     await binding.start();
     add(client, "unacknowledged-server-peer", 54);
     await vi.advanceTimersByTimeAsync(40);
-    expect(statuses.at(-1)).toMatchObject({ state: "retrying", pendingCount: 1, lastAckAt: null });
+    expect(statuses.at(-1)).toMatchObject({
+      state: "retrying", pendingCount: 1, lastAckAt: null,
+      nonAuthoritativeDeliveryPending: true,
+    });
     await expect(binding.flushAndWaitForAuthoritativeAck()).rejects.toThrow("서버 승인 전");
     await vi.advanceTimersByTimeAsync(20_000);
     expect(serverRoom.publications).toHaveLength(1);
@@ -1553,6 +1562,7 @@ describe("StudioCrdtRoomBinding", () => {
     const updateId = localRoom.publications[0]?.updateId;
     expect(statuses.at(-1)).toMatchObject({
       state: "retrying",
+      nonAuthoritativeDeliveryPending: true,
       pendingCount: 1,
       persistenceDurability: "durable",
       lastAckAt: null,
