@@ -60,9 +60,7 @@ export const UploadSupabaseObjectSchema = z
 
 export const SupabaseObjectReferenceSchema = z
   .object({
-    contractVersion: z.literal(
-      SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION
-    ),
+    contractVersion: z.enum([SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION, "toonstudio.supabase-object-storage.v1"]),
     purpose: SupabaseObjectPurposeSchema,
     digest: z
       .string()

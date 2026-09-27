@@ -242,9 +242,10 @@ describe("PostgreSQL integration test runner", () => {
     ).toBe("true");
   });
 
-  it("runs all twenty registered PostgreSQL suites without file parallelism", () => {
-    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(20);
-    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 20);
+  it("등록된 PostgreSQL 통합 스위트 21개를 직렬 실행한다", () => {
+    expect(POSTGRES_INTEGRATION_SUITES).toHaveLength(21);
+    expect(POSTGRES_INTEGRATION_SUITES).toContain("scripts/production-release-compatibility.integration.test.mjs");
+    expect(new Set(POSTGRES_INTEGRATION_SUITES)).toHaveProperty("size", 21);
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/platform/database/admin-schema.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-project-graph-review-race.integration.test.ts");
     expect(POSTGRES_INTEGRATION_SUITES).toContain("apps/api/src/modules/studio-project-graph/studio-review-preview-producer.integration.test.ts");

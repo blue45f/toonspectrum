@@ -42,7 +42,7 @@ export const LegacyPrivateObjectReferenceSchema =
 
 export const LocatedPrivateObjectReferenceSchema = z
   .object({
-    contractVersion: z.literal(PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION),
+    contractVersion: z.enum([PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION, "toonspectrum.private-object-storage.v2"]),
     providerId: PrivateObjectStorageProviderIdSchema,
     purpose: PrivateObjectPurposeSchema,
     digest: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
@@ -98,7 +98,8 @@ export type DeletePrivateObject = z.infer<
 export function isLocatedPrivateObjectReference(
   value: PrivateObjectReference,
 ): value is LocatedPrivateObjectReference {
-  return value.contractVersion === PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION;
+  return value.contractVersion === PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION
+    || value.contractVersion === "toonspectrum.private-object-storage.v2";
 }
 
 export function unlocatePrivateObjectReference(
