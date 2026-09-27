@@ -1460,11 +1460,9 @@ import { STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK } from "@/shared/lib/studio-work-
 import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
-
 import { loadStudioWriterRoomRuntime } from "./studio-cuttoon-editor/runtime/loadStudioWriterRoomRuntime";
 
 const bi = <T,>(ko: T, en: T): T => translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
-
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
 export function StudioCuttoonEditor({
   remixId,
@@ -1477,7 +1475,6 @@ export function StudioCuttoonEditor({
   const navigate = useNavigate();
   const location = useLocation();
   const t = useT();
-
   const studioSaveLocale = getActiveI18nLocale();
   const [params] = useSearchParams();
   const tracePracticeRequested = params.get("practice") === "trace";
@@ -2133,7 +2130,6 @@ export function StudioCuttoonEditor({
         areStudioWorkAssetSceneReferencesEqual(current, references) ? current : references
       );
     };
-
     if (!studioCrdtDocument || !authorizedWorkAssetScopeId) {
       studioWorkAssetHydrator.observe([]);
       setStudioWorkAssetReferences((current) => current.length === 0 ? current : []);
@@ -2160,7 +2156,6 @@ export function StudioCuttoonEditor({
     studioCrdtDocument,
     studioWorkAssetHydrator,
   ]);
-
   useLayoutEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
     const applyFrontier = (
@@ -2209,7 +2204,6 @@ export function StudioCuttoonEditor({
       );
       setPagesHistoryState(reconciled.history);
     };
-
     applyFrontier({
       strokes: studioCrdtDocument.getStrokes({ includeDeleted: true }),
       sceneElements: studioCrdtDocument.getSceneElements({ includeDeleted: true }),
@@ -2260,7 +2254,6 @@ export function StudioCuttoonEditor({
     studioRevisionProjectGenerationRef,
     studioWorkAssetHydrator,
   ]);
-
   useLayoutEffect(() => {
     if (!studioCrdtDocument || sourceHydrationPending) return;
     const referenceSources = readyStudioWorkAssetImageSources(studioWorkAssetHydrator);
@@ -2320,7 +2313,6 @@ export function StudioCuttoonEditor({
     studioWorkAssetHydrationRevision,
     studioWorkAssetReferences,
   ]);
-
   // useCallback: 렌더 중 호출되는 메시지 헬퍼 — memo 자식(메뉴바/툴벨트)의 prop 안정성 유지.
   const collaborationLockMessage = useCallback(
     () =>
@@ -2343,11 +2335,9 @@ export function StudioCuttoonEditor({
       workHydrationFailed,
     ],
   );
-
   function collaborationRoleLabel(): string {
     return labelStudioCollaborationRole(sharedDocument?.role);
   }
-
   function ensureSharedDocumentAvailableForExport(): boolean {
     if (!sourceHydrationPending && !collaborationDocumentUnavailable) return true;
     setError(
@@ -2361,7 +2351,6 @@ export function StudioCuttoonEditor({
     );
     return false;
   }
-
   // 마스터 편집 모드에서는 편집 대상(선택·레이어 패널·속성·commit)이 문서 마스터 요소로 바뀐다(studio-master-page 규약).
   const elements = masterEditMode ? master.elements : activePage.elements;
   useLayoutEffect(() => {
@@ -2551,23 +2540,19 @@ export function StudioCuttoonEditor({
   activeGroupsRef.current = groups;
   const activeSurfaceReviewLockedRef = useRef(activeSurfaceReviewLocked);
   activeSurfaceReviewLockedRef.current = activeSurfaceReviewLocked;
-
   function isLatestLayerContentMutationLocked(id: string): boolean {
     if (activeSurfaceReviewLockedRef.current) return true;
     const current = activeElementsRef.current.find((element) => element.id === id);
     return !current || isEffectivelyLocked(current, activeGroupsRef.current);
   }
-
   const hi = pagesHi;
   const history = pagesHistory;
-
   // 연속 동작(방향키 미세이동 등)을 한 번의 실행취소로 합치기 위한 키.
   const coalesceKeyRef = useRef<string | null>(null);
   const [webtoonTheme, setWebtoonThemeState] = useState<"classic" | "soft" | "vivid">("soft");
   const setWebtoonTheme = useStudioDocumentMutationSetter(webtoonTheme, setWebtoonThemeState, {
     markStudioDocumentChanged, onAcceptedMutation: invalidatePendingRetainedRedo,
   });
-
   // 페이지 단위 백그라운드 및 크기 수정 헬퍼
   const setBg = (newBg: string | ((prev: string) => string)) => {
     const val = typeof newBg === "function" ? newBg(activePage.bg) : newBg;
@@ -2581,7 +2566,6 @@ export function StudioCuttoonEditor({
     const raw = typeof newH === "function" ? newH(activePage.canvasH) : newH;
     updateActivePage({ canvasH: clampStudioCanvasHeight(raw) });
   };
-
   const setPaperGrainKind = (kind: PaperGrainKind) => {
     const plan = planStudioPaperSurfaceApply({
       kind,
@@ -2602,7 +2586,6 @@ export function StudioCuttoonEditor({
     const entry = getStudioPaperSurfaceCatalogEntry(paperGrainKind);
     updateActivePage({ bg: entry.tintBg, bgGrad: null });
   };
-
   function updateActivePage(patch: Partial<Omit<PageState, "id">>) {
     // 마스터 편집 모드의 요소 배열 쓰기(그룹 지정 등)가 페이지 요소를 덮어쓰는 사고를 차단한다(마스터는 그룹 미지원).
     if (masterEditMode && "elements" in patch) return;
@@ -2624,14 +2607,12 @@ export function StudioCuttoonEditor({
     if (!markStudioDocumentChanged()) return;
     updateActivePage({ grade: undefined });
   };
-
   // 줌/팬 드래그 상태
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   const isPanningRef = useRef(isPanning);
   isPanningRef.current = isPanning;
   const panStartRef = useRef({ scrollLeft: 0, scrollTop: 0, clientX: 0, clientY: 0 });
-
   // 색맹 시뮬레이션 미리보기 — Stage 에만 SVG feColorMatrix filter 로 라이브 근사(el 데이터 변경 없음).
   const [colorBlindPreview, setColorBlindPreview] = useState<CvdMode>("none");
   // Q 흑백 보기에서 빠져나갈 때 사용자가 보던 색각 미리보기로 복귀한다.
