@@ -100,6 +100,25 @@ test("실제 timeout 후에도 skeleton 상태를 성공으로 바꾸지 않는�
   assert.equal(result.timedOut, true);
 });
 
+test("문서 리다이렉트의 context 전환은 다시 관측하되 브라우저 종료는 숨기지 않는다", async () => {
+  const root = documentFor('<div class="route-stage" data-route-state="ready"><h1>AI 설정</h1></div>');
+  let calls = 0;
+  const page = {
+    evaluate: async (fn) => {
+      if (calls++ === 0) throw new Error("Execution context was destroyed, most likely because of a navigation");
+      return fn(root);
+    },
+    waitForTimeout: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  };
+  const result = await waitForAuditRouteReadiness(page, { timeoutMs: 300, stableMs: 5, pollMs: 5 });
+  assert.equal(result.timedOut, false);
+  assert.deepEqual(result.observedStates, ["navigation", "ready"]);
+  await assert.rejects(() => waitForAuditRouteReadiness({
+    ...page,
+    evaluate: async () => { throw new Error("Target page, context or browser has been closed"); },
+  }), /has been closed/u);
+});
+
 test("Studio 권위 패턴의 선택 문서와 surface를 펼치고 wildcard는 제외한다", () => {
   const paths = expandAuditRoutePattern("/studio/(work/:workId|remix/:sourceWorkId)?/:surface(canvas|comic)?");
   assert.equal(paths.length, 9);

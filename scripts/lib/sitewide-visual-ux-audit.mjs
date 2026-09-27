@@ -64,7 +64,17 @@ export async function waitForAuditRouteReadiness(page, {
   let stableSince = started;
   let snapshot;
   while (Date.now() - started < timeoutMs) {
-    snapshot = await page.evaluate(inspectAuditRouteReadiness);
+    try {
+      snapshot = await page.evaluate(inspectAuditRouteReadiness);
+    } catch (error) {
+      // 전체 문서 리다이렉트 중에만 관측을 다시 시작한다. 종료된 브라우저 등은 실패로 남긴다.
+      if (!(error instanceof Error) || !error.message.includes("Execution context was destroyed")) throw error;
+      observedStates.add("navigation");
+      lastSignature = "";
+      stableSince = Date.now();
+      await page.waitForTimeout(Math.min(pollMs, Math.max(1, timeoutMs - (Date.now() - started))));
+      continue;
+    }
     observedStates.add(snapshot.outcome);
     const signature = JSON.stringify([snapshot.pathname, snapshot.outcome, snapshot.state]);
     if (signature !== lastSignature) {

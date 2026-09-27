@@ -325,6 +325,12 @@ for (const [viewportName, viewport] of viewports) {
             }), undefined, { timeout: 5_000 }).then(() => true, () => false);
             result.metrics = await page.evaluate(({ expectedTheme, expectedScene }) => {
               const visible = (element) => {
+                for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+                  if (ancestor.tagName !== "DETAILS" || ancestor.open) continue;
+                  // 닫힌 details의 본문은 레이아웃 값이 남아 있어도 화면에 표시되지 않는다.
+                  const summary = ancestor.querySelector(":scope > summary");
+                  if (!summary?.contains(element)) return false;
+                }
                 const style = getComputedStyle(element);
                 const rect = element.getBoundingClientRect();
                 return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
