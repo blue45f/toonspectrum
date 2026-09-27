@@ -650,7 +650,7 @@ export function SearchExplorer({
                   hint: t("search.explorer.view.list"),
                 },
               ]}
-              className="ml-auto"
+              className="ml-auto [&>button]:grid [&>button]:size-11 [&>button]:place-items-center"
             />
 
             <button
