@@ -423,6 +423,36 @@ describe("StudioRealtimeProviderSession", () => {
     }
   });
 
+  it.each(["denied", "history-unavailable"] as const)("자동 재연결 중 확정된 %s 결과를 다시 재시도하지 않는다", async (failure) => {
+    vi.useFakeTimers();
+    let session: StudioRealtimeProviderSession | null = null;
+    try {
+      let connections = 0;
+      const provider = factory("cloudflare-realtime", "custom", (request) => {
+        connections += 1;
+        if (failure === "history-unavailable" && connections > 1) {
+          throw new StudioRealtimeProviderFallbackRequiredError("cloudflare-realtime");
+        }
+        return hello("cloudflare-realtime", request);
+      });
+      const issue = vi.fn(async (request: StudioRealtimeTicketRequest) => ticket(request));
+      session = new StudioRealtimeProviderSession(options([provider.factory], issue));
+      await session.connect();
+      if (failure === "denied") issue.mockRejectedValue(new StudioRealtimeTicketDeniedError());
+      const adapter = provider.adapters[0];
+      if (!adapter) throw new Error("첫 연결이 없습니다.");
+      adapter.disconnect();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(session.currentStatus.state).toBe("revoked");
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(issue).toHaveBeenCalledTimes(2);
+      expect(provider.adapters).toHaveLength(2);
+    } finally {
+      await session?.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it("stops reconnecting on ACL revocation and aborts cleanly on dispose", async () => {
     vi.useFakeTimers();
     try {
