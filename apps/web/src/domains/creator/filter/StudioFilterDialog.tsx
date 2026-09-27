@@ -831,7 +831,10 @@ export function StudioFilterDialog({
     setDialogOffset(clamped);
   };
   const startDialogDrag = (event: ReactPointerEvent<HTMLElement>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || event.isPrimary === false || dragRef.current) return;
+    // 닫기 버튼의 클릭 대상이 제목 영역으로 바뀌지 않도록 독립 컨트롤은 캡처하지 않는다.
+    if (event.target instanceof Element
+      && event.target.closest("button, a[href], input, select, textarea")) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
       pointerId: event.pointerId,
@@ -1049,6 +1052,7 @@ export function StudioFilterDialog({
           onPointerMove={moveDialogDrag}
           onPointerUp={endDialogDrag}
           onPointerCancel={endDialogDrag}
+          onLostPointerCapture={endDialogDrag}
           className="flex shrink-0 touch-none select-none items-center gap-3 border-b border-line px-4 py-3"
         >
           <span
@@ -1057,7 +1061,7 @@ export function StudioFilterDialog({
             aria-label="필터 창 옮기기 — 끌어서 이동, 방향키로 미세 이동, Enter로 가운데 정렬"
             onKeyDown={nudgeDialogWithKey}
             className={cn(
-              "grid size-9 shrink-0 cursor-grab place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent active:cursor-grabbing",
+              "grid size-11 shrink-0 cursor-grab place-items-center rounded-xl border border-accent/35 bg-accent-soft text-accent active:cursor-grabbing sm:size-9 pointer-coarse:size-11",
               STUDIO_FOCUS_RING,
             )}
           >
@@ -1087,7 +1091,7 @@ export function StudioFilterDialog({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-width:thin]">
+        <div data-studio-filter-scroll-region="true" className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-width:thin]">
           <div className="space-y-4">
             {effectPreferenceAuthority === "memory-only" ? (
               <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-2.5 py-1.5 text-[0.65rem] text-fg-2">
@@ -1563,13 +1567,11 @@ export function StudioFilterDialog({
               캔버스 미리보기
             </label>
           </div>
-        </div>
-
-        <footer className="shrink-0 border-t border-line bg-card/35 px-4 py-3">
+          {/* 낮은 가로 화면에서도 실행 버튼을 밀어내지 않도록 선택 범위와 안내는 본문에서 스크롤한다. */}
           {canUseSelectionScope ? (
             <fieldset
               disabled={mutationLocked || applying}
-              className="mb-3 min-w-0 space-y-1.5"
+              className="mb-3 mt-4 min-w-0 space-y-1.5"
               aria-describedby="studio-filter-selection-scope-note"
             >
               <legend className="text-[0.68rem] font-bold text-fg-2">적용 범위</legend>
@@ -1622,6 +1624,9 @@ export function StudioFilterDialog({
               {lockMessage}
             </p>
           ) : null}
+        </div>
+
+        <footer className="shrink-0 border-t border-line bg-card/35 px-4 py-3">
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"

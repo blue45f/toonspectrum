@@ -143,6 +143,26 @@ function renderInteractiveMotionFilterDialog(
 }
 
 describe("StudioFilterDialog", () => {
+  it("낮은 화면에서 선택 범위와 잠금 안내를 스크롤하고 취소·적용만 고정한다", () => {
+    const { container } = render(
+      <StudioFilterDialog
+        activeKey="landscape-selection" kind="motion-blur" image={{}}
+        rootRef={createRef<HTMLElement>()} selectionAvailable mutationLocked
+        mutationLockReason="동기화 중에는 적용할 수 없습니다."
+        onPreview={vi.fn()} onApply={vi.fn()} onClose={vi.fn()}
+      />,
+    );
+    const scrollRegion = container.querySelector('[data-studio-filter-scroll-region="true"]');
+    const footer = container.querySelector("footer");
+    expect(scrollRegion?.contains(screen.getByRole("group", { name: "적용 범위" }))).toBe(true);
+    expect(scrollRegion?.contains(screen.getByText("동기화 중에는 적용할 수 없습니다."))).toBe(true);
+    expect(footer?.querySelector("fieldset")).toBeNull();
+    expect(footer?.querySelector('[role="status"]')).toBeNull();
+    expect(footer?.querySelectorAll("button")).toHaveLength(2);
+    expect(footer?.contains(screen.getByRole("button", { name: "취소", exact: true }))).toBe(true);
+    expect(footer?.contains(screen.getByRole("button", { name: "선택 안에 적용", exact: true }))).toBe(true);
+  });
+
   it("renders a narrow-screen-safe number layout and keeps signed values visible", () => {
     const html = renderMotionFilterDialog();
 
