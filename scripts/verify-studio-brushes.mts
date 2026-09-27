@@ -95,6 +95,7 @@ import {
   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
 } from "../apps/web/src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 
+import { initializeStudioVerifierPageOnce, installStudioCanvasScaleDiagnostics } from "./lib/studio-brush-verifier-session";
 import {
   isStaticPreviewReadinessResponse,
   isStaticPreviewReadinessUnavailable,
@@ -716,6 +717,10 @@ function reportBrowserErrors(collector: BrowserErrorCollector): void {
 }
 
 async function installCleanStudioState(page: Page): Promise<void> {
+  return initializeStudioVerifierPageOnce(page, () => registerCleanStudioState(page));
+}
+
+async function registerCleanStudioState(page: Page): Promise<void> {
   // tsx가 keep-names로 트랜스파일한 함수를 page.evaluate 로 직렬화하면 esbuild 의 `__name`
   // 헬퍼 호출이 함수 본문에 남는다. 브라우저 컨텍스트에는 그 헬퍼가 없으므로 여기서
   // 항등 함수로 채운다(문자열 스크립트라 트랜스파일 대상이 아니다). 앱 코드는 번들이
@@ -2657,7 +2662,6 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         surveyFailures.push(message);
         log(`SURVEY FAILURE ${index + 1}/${DESKTOP_STABILITY_CASES.length} ${message}`);
         await clearStudioVerifierOriginStorage(page, studioUrl);
-        await installCleanStudioState(page);
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
       }
@@ -3276,37 +3280,8 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       "globalThis.__name ??= (fn) => fn;"
       + " globalThis.__studioDynamicSealDebugEnabled = true;",
   });
-  // 채널 2 진단: 모든 캔버스 2D 컨텍스트의 setTransform 스케일을 기록해 커밋 렌더가
-  // 실제 어떤 물리 배율에서 래스터되는지 덤프와 함께 확인한다.
-  await context.addInitScript(() => {
-    const w = globalThis as unknown as { __studioCtxScales?: Record<string, number[]> };
-    w.__studioCtxScales = {};
-    let canvasSeq = 0;
-    const original = CanvasRenderingContext2D.prototype.setTransform;
-    CanvasRenderingContext2D.prototype.setTransform = function patched(
-      this: CanvasRenderingContext2D,
-      ...args: unknown[]
-    ) {
-      try {
-        const canvas = this.canvas;
-        if (canvas) {
-          if (!canvas.dataset.__ctxId) {
-            canvas.dataset.__ctxId = `c${canvasSeq++}`;
-          }
-          const id = canvas.dataset.__ctxId;
-          const a = Number(args[0]);
-          const d = Number(args[3]);
-          if (Number.isFinite(a) && Number.isFinite(d) && args.length >= 6) {
-            const scale = Math.hypot(a, d);
-            (w.__studioCtxScales![id] ??= []).push(+scale.toFixed(4));
-          }
-        }
-      } catch {
-        // diagnostics must never break rendering
-      }
-      return original.apply(this, args as never);
-    } as typeof CanvasRenderingContext2D.prototype.setTransform;
-  });
+  // 현재·직전 커밋 배율과 전체 표본 수만 남겨 긴 검증의 진단 메모리를 제한한다.
+  await context.addInitScript(installStudioCanvasScaleDiagnostics);
   const page = await context.newPage();
   if (DEBUG_BRUSH_VERIFIER) {
     page.on("console", (entry) => {
@@ -3455,6 +3430,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           writeFileSync(join(SCRATCH, `canvas-dump-${preset.id}-live-manifest.json`), JSON.stringify({
             canvases: dump.map(({ url: _url, ...rest }) => rest),
             ctxScales,
+            ctxScaleSampleCounts: await page.evaluate(() => Reflect.get(globalThis, "__studioCtxScaleSampleCounts") ?? {}),
           }, null, 1));
           for (const entry of dump) {
             const base64 = entry.url.split(",")[1] ?? "";
