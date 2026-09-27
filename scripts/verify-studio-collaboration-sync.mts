@@ -141,8 +141,8 @@ async function dismissOverlays(page: Page): Promise<void> {
   }
   const cinematicWelcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
   if (await cinematicWelcome.isVisible().catch(() => false)) {
-    await cinematicWelcome.getByRole("button", { name: "시작 안내 닫기" }).click({ timeout: 2_000 }).catch(() => undefined);
-    await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
+    await cinematicWelcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click({ timeout: 2_000 });
+    await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 });
   }
   const explicitDismiss = page.locator('[data-studio-quickstart-dismiss="true"]');
   if (await explicitDismiss.isVisible().catch(() => false)) {
@@ -192,6 +192,12 @@ async function waitForDocumentLane(
   diagnostics: PageDiagnostics,
 ): Promise<string> {
   const dock = page.locator('[data-studio-presence-dock="true"]').first();
+  const cinematicWelcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]').first();
+  // 문서 복원이 끝난 뒤 안내가 늦게 나타나면 협업 HUD가 숨겨진다.
+  // 실제 표시된 진입 화면을 기다려 사용자용 닫기 동작을 완료한다.
+  await dock.or(cinematicWelcome).filter({ visible: true }).first()
+    .waitFor({ state: "visible", timeout: 30_000 });
+  await dismissOverlays(page);
   await dock.waitFor({ state: "visible", timeout: 30_000 });
   const readyPhaseHandle = await page.waitForFunction(
     (readyPhases) => {

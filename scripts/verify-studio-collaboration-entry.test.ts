@@ -51,6 +51,20 @@ describe("collaboration browser entry contract", () => {
     expect(source).toContain("page.locator('[data-studio-beta-notice=\"true\"]')");
   });
 
+  it("waits for late canvas guidance without weakening visible document readiness", () => {
+    const readiness = source.slice(source.indexOf("async function waitForDocumentLane("),
+      source.indexOf("async function enableBrushTool("));
+    const entrySurface = readiness.indexOf("dock.or(cinematicWelcome).filter({ visible: true })");
+    const dismiss = readiness.indexOf("await dismissOverlays(page)");
+    const visibleDock = readiness.indexOf('await dock.waitFor({ state: "visible", timeout: 30_000 })');
+    expect(entrySurface).toBeGreaterThan(0);
+    expect(dismiss).toBeGreaterThan(entrySurface);
+    expect(visibleDock).toBeGreaterThan(dismiss);
+    expect(readiness).toContain("READY_PHASES.has(phase)");
+    expect(source).toContain('name: "시작 안내 닫기", exact: true }).click({ timeout: 2_000 });');
+    expect(source).toContain('await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 });');
+  });
+
   it("captures the failed page location and screenshot for future navigation regressions", () => {
     expect(source).toContain("failure-tab-${index}.png");
     expect(source).toContain("url: page.url()");
