@@ -177,7 +177,7 @@ fallback → ready 전환을 관측했다. 홈 화면 PNG도 직접 확인하여
 관리자 기능 검증으로 볼 수 없다. 보고서는 guest/503 fixture, GPU 미사용,
 `authenticatedWorkflowsVerified: false` 조건을 함께 기록한다.
 
-`node --test scripts/lib/sitewide-visual-ux-audit.test.mjs`의 11개 테스트와 수정한
+`node --test scripts/lib/sitewide-visual-ux-audit.test.mjs`의 12개 테스트와 수정한
 감사 스크립트·helper·test의 ESLint를 통과했다. 전체 브라우저 결과는 이 네 경로의
 준비 판정 검증과 별도로 종합한다.
 
@@ -228,3 +228,79 @@ architecture·보안·라이선스 검증은 완료했다. 이 문서 작성 시
 완성된 전면 디자인, 모든 로그인 동선, 전체 typecheck/build, main 병합 또는 운영
 배포 완료를 이 문서만으로 주장하지 않는다. 운영 배포는 PR 병합과 별도의 명시적
 사용자 승인이 필요하다.
+
+
+## 5. 2026-09-27 정적 빌드 관측과 후속 수정
+
+다음 표는 실제 실행한 관측이며 정상 사용자 데이터의 기능 완주와 구분한다.
+
+| 실행 | 조건 | 결과 |
+| --- | --- | --- |
+| 전체 데스크톱 URL | 1440×1000, light, 336 URL, 스크롤 순회, axe 미실행 | 336/336 관측 완료. 원본 보고서에서 실패 25, 경고 102 |
+| 전체 모바일 URL | 390×844, light, 336 URL, 스크롤 순회, axe 미실행 | 336/336 관측 완료. raw 실패 24, 경고 66. ready 316, blocked 1, error 15, empty 4 |
+| 홈 테마·화면 폭 | 9개 테마 × 2 viewport | 18/18 ready, 실패 0. 색 대비 자동 판정은 18조건 모두 incomplete를 별도 기록 |
+| 학습·마켓 실제 동선 | 390/1440 × light/dark/contrast, 배너 닫기 없음 | 6조건 84단계 통과, pageerror·가로 overflow 0 |
+| 메뉴·검색·작품 목록 복귀 | 390/1440, light/dark/contrast, ko/en | 12조건 68검사 통과, pageerror 0 |
+| 실제 포인터 경합 회귀 | 1440×1100, 화면 하단의 학습 실습 링크 | 누르는 동안 배너 미노출, pointerdown/up/click 모두 원래 링크 유지, 해시 이동 후 배너 표시 |
+| 통합 하네스 | 전체 변경 범위 | `pnpm harness:verify` 통과. 영역별 브라우저·API 통합 검증을 대체하지 않음 |
+
+전체 데스크톱 관측의 실패 25개는 다음과 같이 후속 분류했다.
+
+- 카페 관리 1개: 비로그인 안내가 `stalled`로 오인되는 실제 결함. 명시적 blocked 상태와 실제 RouteStage 회귀 테스트로 수정했다.
+- 생태계 2개: 병렬 관측 중 lazy fallback 지연. 같은 API fixture의 단일 worker 재관측에서 ready, issue 0으로 회복했다.
+- AI 설정 1개: 전체 문서 리다이렉트 중 검사 context가 소멸했다. 직접 재관측에서 `/settings/ai?source=studio`와 본문 ready를 확인했고, 감사는 제한 시간 안에서 해당 전환만 다시 관측하도록 보완했다. 브라우저 종료 오류는 계속 실패로 처리한다.
+- Production 프로젝트 15개: 존재하지 않는 `visual-audit` ID와 503 API fixture에 대해 명시적 오류·제작 관리 홈 복귀가 표시됐다. 실제 프로젝트 화면의 성공 검증이 아니다.
+- 3D 계열 6개: GPU를 끈 조건에서 WebGL context 실패 4개, 포털 내부 WebGPU 오류가 route stage 밖에 표시되는 2개. GPU 렌더링 성공이나 정상 편집으로 인정하지 않는다.
+
+경고도 단순히 모두 제품 결함으로 해석하지 않았다. 닫힌 details의 자손은 실제 펼치면
+표시되므로 감사의 가시성 판정에서 제외했다. 화면 진입 전 Motion 콘텐츠는 실제 타깃으로
+스크롤해 표시되는지 재확인했다. 잘린 텍스트 경고는 `clip-path`·1px 크기의 스크린리더 전용
+설명·비포커스 skip link와 구분한다. 확인되지 않은 외부 이미지 로딩과 고밀도 Studio 조작부의
+작은 타깃 경고는 별도 검증 경계로 남긴다.
+
+공개 화면의 실제 작은 모바일 타깃은 발표 타이머 초기화 32×44, 제보 새로고침 36×44,
+검색 보기 전환 38×44로 실측하여 해당 인스턴스만 최소 44×44로 보완했다.
+공통 Segmented나 전문 편집기의 밀도를 일괄 변경하지 않았다.
+
+모바일 전수 관측의 실패 24개는 Production 15개 오류 fixture와 GPU 관련 9개(WebGL 5, 3D 포털 4)다.
+카페 관리는 recovery 없이 blocked이며 AI 설정은 실제 목적지로 이동해 ready를 확인했다.
+후속 빌드의 공개 조작부 실측과 PR CI는 별도의 최종 결과로 갱신한다.
+로컬 원본 증거는 `.qa/sitewide-final-light-desktop/report.json`,
+`.qa/sitewide-final-light-mobile/report.json`, `.qa/design-home-merge-candidate/`,
+`.qa/visual-ux/navigation-final/`, `.qa/design-review/`에 보존한다.
+
+## 6. current — 2026-09-27 고정 빌드의 최종 홈·동선 재검증
+
+부모 빌드 세션 `47923`의 `.qa/sitewide-merge-ready/dist`를 별도 로컬 preview
+`http://127.0.0.1:61096`에서 확인했다. 서빙된 HTML과 고정 산출물의 byte가 같으며,
+`index.html` SHA-256은 `4b7ede4b711026882f657fce8174e463fd28f6047b959872c5ac3fee8b6bd5db`,
+엔트리는 `/assets/index-DokCVtvM.js`다. 검증 중 제품 소스는 수정하지 않았다.
+이 빌드에는 후속 Campus URL 대소문자 분류, Studio 저장 안내 및 필터 오류 표시 수정이
+포함되지 않는다. 아래에서 검사한 소문자 홈·법적 경로는 해당 수정의 대상이 아니다.
+최종 전체 CI·병합 결과와 구분한다.
+
+| 재검증 | 실제 조건과 범위 | 결과 |
+| --- | --- | --- |
+| Flagship·open-creation | 기존 Playwright 2 spec, worker 1 | 20/20 통과, flaky 0, 110.5초 |
+| 공개 메인 | `/` 진입, 9개 테마 × 1440/390px | 18/18 통과. 이미지 로딩, 제목·가로 넘침, 창작 목적지 6개, 기존 홈 조작부 계약인 높이 44px 이상, 키보드 초점·본문 이동 확인 |
+| 개인 작업실 장애 상태 | `/home`, API 503, 1440/820/390px | 3/3 통과. 문서 흐름의 배너, 실제 메뉴 클릭, dialog 초점, Escape 후 실행 버튼 복귀, 주요 행동 높이 44px 이상 확인 |
+| 법적 읽기 | `/privacy`·`/terms`·`/copyright` × 1440/390px | 6/6 통과. 단일 제목, 공개 헤더·푸터, 홍보형 다음 단계 제외, 가로 넘침 없음 |
+| 정상 상태 대표 이미지 | `/` 재진입 직후 Aurora/Light × 1440/390px | 4개 캡처. health `available`·analytics `accepted` 응답 fixture 사용 |
+
+공개 메인 본문 바로가기의 기존 정책을 함께 확인했다. 인식된 `#creator-flow` 등의
+fragment는 `CreatorHomePage`가 `/about/studio#...`로 이동시키므로, 본문 이동과 초점 검증
+이후의 화면은 공개 소개 경로다. 소개 경로에서 `전체`의 `aria-current="page"`와 강조가
+적용되는 것은 현재 위치 분류에 따른다. 대표 이미지 4장은 `/`에 새로 진입한 뒤 캡처해
+실제 메인의 `홈`만 현재 페이지로 표시되는 것을 확인했다. 초기 본문 이동 이후의
+이미지는 별도 `merge-ready-public-home-post-anchor-*` 기록으로 보존한다.
+
+통합 로컬 증거는 `.qa/design-review/merge-ready-focused-evidence.json`이다. 상세 원본은
+`flagship-merge-ready-results.json`, `merge-ready-home-themes.json`,
+`merge-ready-home-degraded-built.json`, `merge-ready-legal.json`,
+`merge-ready-home-healthy-captures.json`에 보존했다. 최종 대표 이미지는 같은 디렉터리의
+`merge-ready-public-home-healthy-{aurora,light}-{1440,390}.png`다.
+
+일반 검증은 비로그인·503 API fixture, 외부 요청 차단, GPU 비활성화, reduced motion
+조건이다. 정상 상태 이미지만 별도로 실제 schema에 맞는 health·analytics 응답을 사용했으며
+DOM·CSS 숨김이나 화면 조작은 하지 않았다. 운영 API 정상 상태, 인증된 실제 데이터 저장,
+GPU 편집기 렌더링, 전체 색 대비 통과 또는 운영 배포를 이 결과로 주장하지 않는다.
