@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Lugha",
+  "control.sound.enable": "Kuwezesha athari za sauti",
+  "control.sound.disable": "Kulemaza athari za sauti",
+  "control.theme.dark": "Badilisha mode mwanga",
+  "control.theme.light": "Badilisha mode giza",
+  "control.settings.open": "Mipangilio ya wazi",
+  "control.settings.close": "Mipangilio ya karibu",
+  "control.cluster.settings": "Sauti, mandhari, udhibiti wa lugha",
+  "control.cluster.open": "Mipangilio ya wazi",
+  "control.cluster.tooltip": "Mipangilio ya sauti, mandhari, na lugha",
+  "control.language.group.translated": "Tafsiri zenye upatikanaji mkubwa",
+  "control.language.group.englishBase": "Tafsiri ya moja kwa moja · Kiingereza fallback"
 }

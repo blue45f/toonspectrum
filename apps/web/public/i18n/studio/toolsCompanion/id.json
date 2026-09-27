@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Lapisan {count}",
   "studio.toolsCompanion.review.section.comments": "Komentar {count}",
   "studio.toolsCompanion.review.section.history": "Rekam {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Halaman ZZLBRACELabel}· Pilihan ZZLBRACELabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "konsol inspeksi",
   "studio.toolsCompanion.review.truncatedComments": "dan {count} komentar",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lapisan",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Layar referensi",
   "studio.toolsCompanion.referenceLoading": "Memuat alat referensi...",
   "studio.toolsCompanion.footer": "Edit dokumen hanya memiliki tab default. Jendela ini hanya mentransmisikan pratinjau terkompresi dan maksud inspeksi/referensi ke BroadcastChannel dari browser yang sama, sehingga tidak ada biaya server terpisah.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Tidak terhubung ke studio utama.",
+  "studio.toolsCompanion.exit.editor": "Buka editor Studio"
 }

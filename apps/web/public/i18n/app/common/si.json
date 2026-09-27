@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "බර පැටවීම",
+  "common.loading.short": "බර පැටවීම",
   "common.close": "වසා දමන්න",
   "common.open": "විවෘත කරන්න",
   "common.search": "සොයන්න",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "නැවත උත්සාහ කරන්න",
+  "common.retry.short": "නැවත උත්සාහ කරන්න",
+  "common.backToTop": "ආපහු උඩට",
+  "common.backToHome": "ගෙදර යන්න",
+  "common.loading.search": "හොයනවා...",
+  "common.notFoundWithQuery": "' {query} ' සඳහා ප් රතිඵලයක් නොලැබුණි.",
+  "common.openSearch": "සොයන්න →",
+  "common.loading.empty": "කිසිම දත්තයක් ආපහු ලැබුනේ නෑ.",
+  "common.retry.all": "ආයෙත් උත්සහ කරන්න නැත්නම් ගෙදර යන්න."
 }

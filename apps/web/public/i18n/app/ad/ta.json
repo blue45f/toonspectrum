@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "ஆதரவு படங்கள்",
+  "ad.slotAriaLabel": "விளம்பர இடங்கள்",
+  "ad.slotLabel": "நிதியுதவி",
+  "ad.slotTitle": "ஆதரவு உள்ளடக்கம்",
+  "ad.ctaDetails": "விவரங்களை காண்க",
+  "ad.placeholderAriaLabel": "விளம்பர இடமளிப்பு",
+  "ad.placeholderText": "எந்த ஆதரவு உள்ளடக்கமும் கிடைக்கவில்லை.",
+  "ad.tag": "விளம்பரம்"
 }

@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "Mengunggah semula versi terkini...",
+  "error.chunkRetryFailed": "Berjaya sekali, tapi masalah masih berlaku.",
+  "error.reloadButton": "memuat semula halaman",
+  "error.goHome": "Kembali ke Rumah",
+  "error.retryDesc": "Sila cuba lagi atau kembali ke laman utama."
 }

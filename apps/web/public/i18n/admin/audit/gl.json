@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Registros de auditoría de administración",
+  "admin.audit.desc": "Seguir todas as accións administrativas, cambios de permiso e cambios de configuración.",
+  "admin.audit.searchPlaceholder": "Buscar (email/acción)...",
+  "admin.audit.loading": "Cargar os rexistros de auditoría...",
+  "admin.audit.empty": "Non hai rexistros de auditoría.",
+  "admin.audit.viewDetails": "Vista",
+  "admin.audit.modalTitle": "Detalles do rexistro de auditoría",
+  "admin.audit.close": "Próximo"
 }

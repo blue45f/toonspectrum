@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Göstərmə nəticələrinin bölünməsi",
+  "ranking.metric.views": "Görüşlər",
+  "ranking.why": "Niyə?",
+  "ranking.breakdownTitle": "Məqsədlərin bölüşdürülməsi",
+  "ranking.totalScore": "Ümumi nəticə",
+  "ranking.breakdownDescription": "Əks ağırlığı və başlıq xüsusi normalaşdırma ilə hesablanır."
 }

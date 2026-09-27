@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "Souhrn vyrovnání (posledních 30 dnů)",
+  "admin.revenue.loadError": "Neúplnění hlavního účtu příjmů",
+  "admin.revenue.filterAll": "Všichni.",
+  "admin.revenue.filterPending": "Čeká",
+  "admin.revenue.filterApproved": "Schváleno",
+  "admin.revenue.filterPaid": "Uzavřeno",
+  "admin.revenue.filterRejected": "Odmítnutí",
+  "admin.revenue.filterRevoked": "Zrušená",
+  "admin.revenue.empty": "Žádné urovnání, které by odpovídali tomuto stavu.",
+  "admin.revenue.approve": "Schválení",
+  "admin.revenue.reject": "Odmítnutí",
+  "admin.revenue.settle": "Kompletní vyrovnání",
+  "admin.revenue.revoke": "Zrušit"
 }

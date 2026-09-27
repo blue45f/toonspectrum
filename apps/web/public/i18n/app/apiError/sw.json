@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Kuingia ni lazima.",
+  "apiError.adminRequired": "ruhusa za admin haziwezi kuthibitishwa.",
+  "apiError.adminOnlyPage": "Ukurasa huu ni mdogo kwa watendaji.",
+  "apiError.notFound": "Kitu kilichotakiwa hakikuweza kupatikana.",
+  "apiError.unsupportedType": "Aina ya maudhui yasiyoungwa mkono.",
+  "apiError.inactiveAccount": "Akaunti zisizo na kazi haziwezi kutumia huduma za msimamizi.",
+  "apiError.settlementFailed": "Mchakato wa kushughulikia mahakama ulikosa."
 }

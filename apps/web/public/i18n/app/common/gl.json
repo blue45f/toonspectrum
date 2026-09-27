@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Carga",
+  "common.loading.short": "Carga",
   "common.close": "Pechar",
   "common.open": "Abrir",
   "common.search": "Buscar",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Intentar de novo",
+  "common.retry.short": "Intentar de novo",
+  "common.backToTop": "Volvemos á cima.",
+  "common.backToHome": "Vai a casa.",
+  "common.loading.search": "Buscando...",
+  "common.notFoundWithQuery": "Non houbo resultados para ' {query} '.",
+  "common.openSearch": "Buscalo en Busca",
+  "common.loading.empty": "Non se devolveron datos.",
+  "common.retry.all": "Intenta outra vez ou volve a casa."
 }

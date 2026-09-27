@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Sistema de salut",
+  "admin.stats.healthy": "Saludable",
+  "admin.stats.degraded": "Degradat",
+  "admin.stats.revenueEvents": "Total de transaccions / liquidacions",
+  "admin.stats.usersCommunity": "Total de membres / càrrecs",
+  "admin.stats.maintenance": "Mode de manteniment",
+  "admin.stats.maintenanceOn": "Manteniment d'urgència (ON)",
+  "admin.stats.maintenanceOff": "Operació normal (OFF)",
+  "admin.stats.activeVisitors": "Visitants actius de 5 minuts",
+  "admin.stats.views5m": "5 minuts de visites de pàgines"
 }

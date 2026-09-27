@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "ການໂຫຼດ ໃຫມ່ ລຸ້ນລ້າສຸດ...",
+  "error.chunkRetryFailed": "ລຸ້ນ ໃຫມ່ ເທື່ອ ຫນຶ່ງ ແຕ່ບັນຫາຍັງຄົງຢູ່ ກະລຸນາກວດເບິ່ງການເຊື່ອມຕໍ່ຂອງທ່ານແລະພະຍາຍາມອີກຄັ້ງ.",
+  "error.reloadButton": "ການໂຫຼດຫນ້າໃຫມ່",
+  "error.goHome": "ກັບຄືນບ້ານ",
+  "error.retryDesc": "ກະລຸນາພະຍາຍາມອີກຄັ້ງຫຼືກັບຄືນໄປບ່ອນ ຫນ້າ ທໍາ ອິດ."
 }

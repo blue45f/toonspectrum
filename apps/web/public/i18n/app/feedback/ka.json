@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "ნვ მჲდა ეა ოპვრთვქ ჟლსპვნარა.",
+  "feedback.thankYou": "მადლობას გიხდით თქვენი ფასეულობის გამო!",
+  "feedback.anonymousNote": "თქვენი პასუხები მკაცრად ანონიმურია.",
+  "feedback.notAtAll": "საერთოდ არა.",
+  "feedback.definitely": "ნამდვილად."
 }

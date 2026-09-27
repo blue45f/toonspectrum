@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "లోడింగ్",
+  "common.loading.short": "లోడింగ్",
   "common.close": "మూసివేయి",
   "common.open": "తెరువు",
   "common.search": "శోధించు",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "మళ్లీ ప్రయత్నించండి",
+  "common.retry.short": "మళ్లీ ప్రయత్నించండి",
+  "common.backToTop": "తిరిగి పైకి",
+  "common.backToHome": "ఇంటికి వెళ్ళండి",
+  "common.loading.search": "శోధన.",
+  "common.notFoundWithQuery": "' {query} ' కొరకు ఫలితాలు లేవు.",
+  "common.openSearch": "శోధనలో కనుగొనండి →",
+  "common.loading.empty": "ఏ డేటా తిరిగి లేదు.",
+  "common.retry.all": "మళ్ళీ ప్రయత్నించండి లేదా ఇంటికి తిరిగి వెళ్ళండి."
 }

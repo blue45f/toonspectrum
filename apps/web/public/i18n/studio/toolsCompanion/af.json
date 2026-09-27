@@ -19,7 +19,7 @@
   "studio.toolsCompanion.error.invalidSurface": "Daar is geen geldige metgeselaansigmodus nie. Heropen asseblief die venster in die verstekateljee.",
   "studio.toolsCompanion.error.unsupportedBroadcast": "Hierdie blaaier ondersteun nie BroadcastChannel nie.",
   "studio.toolsCompanion.mode.tools": "gereedskap",
-  "studio.toolsCompanion.mode.navigator": "Navigator",
+  "studio.toolsCompanion.mode.navigator": "Navigasie",
   "studio.toolsCompanion.mode.review": "inspeksie",
   "studio.toolsCompanion.mode.reference": "verwysing",
   "studio.toolsCompanion.review.current": "teenwoordig",
@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Laag {count}",
   "studio.toolsCompanion.review.section.comments": "Opmerking {count}",
   "studio.toolsCompanion.review.section.history": "Teken {count} op",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE bladsyEtiket}·{seleksieEtiket ZZ RBRACE",
   "studio.toolsCompanion.review.title": "inspeksie konsole",
   "studio.toolsCompanion.review.truncatedComments": "en {count} opmerkings",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lae",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Verwysingsskerm",
   "studio.toolsCompanion.referenceLoading": "Laai tans verwysingsnutsding...",
   "studio.toolsCompanion.footer": "Wysig dokumente besit slegs die verstekoortjie. Hierdie venster stuur slegs die saamgeperste voorskou en inspeksie/verwysing bedoeling na die Broadcast Channel van dieselfde blaaier, so daar is geen aparte bedienerkoste nie.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Nie gekoppel aan die hoofstudio.",
+  "studio.toolsCompanion.exit.editor": "Maak die Studio-redakteur oop"
 }

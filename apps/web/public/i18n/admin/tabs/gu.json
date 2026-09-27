@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "જાહેરાતો અને બેનરો",
+  "admin.tabs.audit": "ઓડિટ લોગ",
+  "admin.tabs.campaigns": "ઝુંબેશો",
+  "admin.tabs.creatorSupport": "સર્જક સહાય",
+  "admin.tabs.dashboard": "ડેશબોર્ડ",
+  "admin.tabs.ops": "કામગીરી",
+  "admin.tabs.plans": "યોજનાઓ",
+  "admin.tabs.promos": "પ્રમોશન",
+  "admin.tabs.reports": "અહેવાલો અને મધ્યસ્થતા",
+  "admin.tabs.revenue": "સમાધાન",
+  "admin.tabs.security": "સુરક્ષા અને આઈપી",
+  "admin.tabs.inquiries": "વ્યવસાયિક પૂછપરછ",
+  "admin.tabs.supporters": "ઓપરેટિંગ ખર્ચની સહાય",
+  "admin.tabs.traffic": "જીવંત ટ્રાફિક"
 }

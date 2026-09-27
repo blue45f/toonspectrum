@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ဘာသာစကား",
+  "control.sound.enable": "အသံအကျိုးဆက်တွေကို ခွင့်ပြုပေးပါ။",
+  "control.sound.disable": "အသံအကျိုးဆက်တွေကို ပိတ်လိုက်ပါ",
+  "control.theme.dark": "အလင်း mode ကိုပြောင်းပါ",
+  "control.theme.light": "Dark mode ကိုပြောင်းပါ",
+  "control.settings.open": "ဖွင့်ထားသော settings",
+  "control.settings.close": "Close Settings ကို",
+  "control.cluster.settings": "အသံ၊ အကြောင်းအရာ၊ ဘာသာစကား ထိန်းချုပ်မှု",
+  "control.cluster.open": "ဖွင့်ထားသော settings",
+  "control.cluster.tooltip": "အသံ၊ အကြောင်းအရာနဲ့ ဘာသာစကားဆိုင်ရာ ပြင်ဆင်ချက်များ",
+  "control.language.group.translated": "အများသုံး ဘာသာပြန်များ",
+  "control.language.group.englishBase": "အလိုအလျောက် ဘာသာပြန် · အင်္ဂလိပ်စကား fallback"
 }

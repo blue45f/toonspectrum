@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "ଦ୍ରୁତ ସନ୍ଧାନ ଏବଂ ନିର୍ଦ୍ଦେଶ...",
+  "admin.palette.placeholder": "ସର୍ଚ୍ଚ ଆଡମିନ ନିର୍ଦ୍ଦେଶ (ନാവിଗେସନ, CSV ରପ୍ତାନି, ରକ୍ଷଣାବେକ୍ଷଣ)...",
+  "admin.palette.empty": "କୌଣସି ଫଳ ମିଳିଲା ନାହିଁ ।",
+  "admin.palette.groupNav": "କନସୋଲ ନେଭିଗେସନ ଶର୍ଟକଟ୍",
+  "admin.palette.groupQuick": "ଦ୍ରୁତ କାର୍ଯ୍ୟାନୁଷ୍ଠାନ ଏବଂ ରପ୍ତାନି",
+  "admin.palette.exportUsers": "ସମସ୍ତ ସଦସ୍ୟ CSV ରପ୍ତାନି",
+  "admin.palette.exportRevenue": "ରପ୍ତାନି ରାଜସ୍ୱ ଲିଜର୍ ସିଏସଭି",
+  "admin.palette.maintenance": "ନିୟନ୍ତ୍ରଣ ବ୍ୟବସ୍ଥା ଜରୁରୀକାଳୀନ ରକ୍ଷଣାବେକ୍ଷଣ"
 }

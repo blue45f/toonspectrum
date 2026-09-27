@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Վարչապետական աուդիտների օրագրեր",
+  "admin.audit.desc": "Հետեւեք բոլոր վարչական գործողություններին, թույլտվությունների փոփոխություններին եւ կազմաձեւման փոփոխություններին:",
+  "admin.audit.searchPlaceholder": "Փնտրություն (էլ. փոստ/ գործողություն)...",
+  "admin.audit.loading": "Վարչապետական օրագրեր բեռնել...",
+  "admin.audit.empty": "Ոչ մի գրանցված աուդիտային օրագրեր:",
+  "admin.audit.viewDetails": "Տեսարան",
+  "admin.audit.modalTitle": "Հաշվետազոտական օրագրի մանրամասները",
+  "admin.audit.close": "Մոտակայքում"
 }

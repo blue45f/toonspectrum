@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "Podsumowanie rozliczeń (w ciągu ostatnich 30 dni)",
+  "admin.revenue.loadError": "Nie wpisany w księgę przychodów",
+  "admin.revenue.filterAll": "Wszystkie",
+  "admin.revenue.filterPending": "Wczekaj",
+  "admin.revenue.filterApproved": "Aprywacja",
+  "admin.revenue.filterPaid": "Rozliczone",
+  "admin.revenue.filterRejected": "Odmowa",
+  "admin.revenue.filterRevoked": "Odwołane",
+  "admin.revenue.empty": "Żadnych zdarzeń rozliczeniowych, które odpowiadałyby temu statusu.",
+  "admin.revenue.approve": "Zaprobowanie",
+  "admin.revenue.reject": "Odmowa",
+  "admin.revenue.settle": "Całkowita rozliczka",
+  "admin.revenue.revoke": "Odwołanie"
 }

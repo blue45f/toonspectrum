@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Gesondheidsorgstelsel",
+  "admin.stats.healthy": "Gesonde",
+  "admin.stats.degraded": "Verlaagde",
+  "admin.stats.revenueEvents": "Totale transaksies / afwikkelings",
+  "admin.stats.usersCommunity": "Totale lede / poste",
+  "admin.stats.maintenance": "Onderhoudsmodus",
+  "admin.stats.maintenanceOn": "Noodonderhoud (ON)",
+  "admin.stats.maintenanceOff": "Normale werking (OFF)",
+  "admin.stats.activeVisitors": "5 minute aktiewe besoekers",
+  "admin.stats.views5m": "5 minute bladsybeskouings"
 }

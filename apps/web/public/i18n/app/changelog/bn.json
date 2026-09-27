@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "আপডেট লোড করতে পারলাম না।",
+  "changelog.empty": "এখনো কোন আপডেট লগ পোস্ট করা হয়নি।"
 }

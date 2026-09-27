@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "சுகாதார அமைப்பு",
+  "admin.stats.healthy": "ஆரோக்கியமான",
+  "admin.stats.degraded": "குறைக்கப்பட்டது",
+  "admin.stats.revenueEvents": "மொத்த பரிவர்த்தனைகள் / கணக்குகள்",
+  "admin.stats.usersCommunity": "மொத்த உறுப்பினர்கள் / பதவிகள்",
+  "admin.stats.maintenance": "பராமரிப்பு முறை",
+  "admin.stats.maintenanceOn": "அவசர பராமரிப்பு (ON)",
+  "admin.stats.maintenanceOff": "இயல்பான செயல்பாடு (OFF)",
+  "admin.stats.activeVisitors": "5 நிமிட செயலில் உள்ள பார்வையாளர்கள்",
+  "admin.stats.views5m": "5 நிமிட பக்கக் காட்சிகள்"
 }

@@ -1,16 +1,16 @@
 {
   "common.loading": "Yükleniyor",
-  "common.loading.short": "Loading",
+  "common.loading.short": "Kargalama",
   "common.close": "Kapat",
   "common.open": "Aç",
   "common.search": "Ara",
   "common.retry": "Tekrar dene",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "Tekrar deneyin .",
+  "common.backToTop": "Yukarıdaki",
   "common.backToHome": "Ana sayfaya dön",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "Arıyorum...",
+  "common.notFoundWithQuery": "' {query} ' için sonuçlar verilmedi.",
+  "common.openSearch": "Arama yaparak bul",
+  "common.loading.empty": "Veriler geri verildi.",
+  "common.retry.all": "Tekrar dene ya da eve dön."
 }

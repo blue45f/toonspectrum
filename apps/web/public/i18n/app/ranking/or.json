@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "ସ୍କୋର ବର୍ଣ୍ଣନା",
+  "ranking.metric.views": "ମତାମତ",
+  "ranking.why": "କାହିଁକି ?",
+  "ranking.breakdownTitle": "ସ୍କୋର ବଣ୍ଟନ",
+  "ranking.totalScore": "ମୋଟ ସ୍କୋର",
+  "ranking.breakdownDescription": "ଅକ୍ଷର ଓଜନ ଏବଂ ନାମ ନିର୍ଦ୍ଦିଷ୍ଟ ମାନକକରଣ ସହିତ ଗଣନା କରାଯାଇଛି।"
 }

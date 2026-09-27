@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "ലോഡിംഗ്",
+  "common.loading.short": "ലോഡിംഗ്",
   "common.close": "അടയ്ക്കുക",
   "common.open": "തുറക്കുക",
   "common.search": "തിരയുക",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "വീണ്ടും ശ്രമിക്കുക",
+  "common.retry.short": "വീണ്ടും ശ്രമിക്കുക",
+  "common.backToTop": "മുകളിലേക്കു മടങ്ങി",
+  "common.backToHome": "വീട്ടിലേക്കു പോവുക.",
+  "common.loading.search": "തിരയുന്ന...",
+  "common.notFoundWithQuery": "' {query} ' എന്നതിന് ഫലങ്ങളൊന്നും ലഭിച്ചില്ല.",
+  "common.openSearch": "തിരയുന്നതിലൂടെ അത് കണ്ടെത്തുക →",
+  "common.loading.empty": "ഡാറ്റ ഒന്നും തിരികെ കിട്ടിയില്ല.",
+  "common.retry.all": "വീണ്ടും ശ്രമിക്കുക, അല്ലെങ്കിൽ വീട്ടിലേക്കു മടങ്ങുക."
 }

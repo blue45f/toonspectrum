@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "Nem támogatott képtípus.",
+  "avatar.error.processFailed": "Nem sikerült feldolgozni a képet.",
+  "avatar.processing": "A feldolgozás...",
+  "avatar.select": "Képváltoztatás",
+  "avatar.remove": "A kép eltávolítása",
+  "avatar.uploadHint": "Csak JPG, PNG és WEBP képeket támogatnak, majd előzetes előnézetre vágják.",
+  "avatar.changeAria": "Profilkép módosítása"
 }

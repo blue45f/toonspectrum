@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Permintaan Login",
+  "admin.gate.guestBody": "Konsol pentadbir memerlukan pengesahan. Sila masuk.",
+  "admin.gate.forbiddenTitle": "Permisi pentadbir diperlukan",
+  "admin.gate.forbiddenBody": "Akaun ini tidak mempunyai kebenaran pentadbir. Hubungi pengendali jika diperlukan.",
+  "admin.gate.errorTitle": "Gagal memuat konsol"
 }

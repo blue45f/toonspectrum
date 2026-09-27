@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "参考屏幕",
   "studio.toolsCompanion.referenceLoading": "正在加载参考工具...",
   "studio.toolsCompanion.footer": "编辑文档仅拥有默认选项卡。该窗口仅将压缩的预览和检查/参考意图传输到同一浏览器的BroadcastChannel，因此没有单独的服务器成本。",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "没有连接到主工作室.",
+  "studio.toolsCompanion.exit.editor": "打开工作室编辑器"
 }

@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Tölur",
+  "control.sound.enable": "Að leyfa hljóðvirkni",
+  "control.sound.disable": "Slökktu á hljóðvirkni",
+  "control.theme.dark": "Skipta yfir í ljósleiða",
+  "control.theme.light": "Skipta yfir í dökk stæði",
+  "control.settings.open": "Opið stillingar",
+  "control.settings.close": "Lögð upp",
+  "control.cluster.settings": "Hljóð, þema, tungumálstýringar",
+  "control.cluster.open": "Opið stillingar",
+  "control.cluster.tooltip": "Hljóð, þema og tungumál",
+  "control.language.group.translated": "Þýðingar með mikilli umfjöllun",
+  "control.language.group.englishBase": "Sjálfvirk þýðing · Íslenska fallback"
 }

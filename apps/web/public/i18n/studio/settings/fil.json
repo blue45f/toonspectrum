@@ -8,7 +8,7 @@
   "studio.settings.tool.blend": "Haluin (mantsa)",
   "studio.settings.tool.wetMix": "brush ng paghahalo ng kulay",
   "studio.settings.tool.dodgeBurn": "Dodge/Paso",
-  "studio.settings.tool.liquify": "Liquify",
+  "studio.settings.tool.liquify": "Liquids",
   "studio.settings.tool.fill": "balde ng pintura",
   "studio.settings.tool.lassoFill": "Punan ng Lasso",
   "studio.settings.tool.eyedropper": "patak",
@@ -49,7 +49,7 @@
   "studio.settings.shortcut.toolBlend": "Haluin (mantsa)",
   "studio.settings.shortcut.toolWetMix": "brush ng paghahalo ng kulay",
   "studio.settings.shortcut.toolDodgeBurn": "Dodge/Paso",
-  "studio.settings.shortcut.toolLiquify": "Liquify",
+  "studio.settings.shortcut.toolLiquify": "Liquids",
   "studio.settings.shortcut.toolLettering": "Lettering (text/speech balloon)",
   "studio.settings.shortcut.undo": "i-undo",
   "studio.settings.shortcut.redo": "tumakbo ulit",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "nakatago",
   "studio.settings.state.show": "tanda",
   "studio.settings.state.open": "bukas",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "Gumawa ng character"
 }

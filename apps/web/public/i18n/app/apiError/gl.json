@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "É necesario iniciar sesión.",
+  "apiError.adminRequired": "Non se verificaron os permisos do administrador.",
+  "apiError.adminOnlyPage": "Esta páxina está limitada aos administradores.",
+  "apiError.notFound": "O artigo solicitado non se atopou.",
+  "apiError.unsupportedType": "Tipo de contido non admitido.",
+  "apiError.inactiveAccount": "As contas inactivas non poden usar características de administrador.",
+  "apiError.settlementFailed": "O procesamento de liquidación fallou."
 }

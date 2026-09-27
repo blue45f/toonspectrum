@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ស្រទាប់ {count}",
   "studio.toolsCompanion.review.section.comments": "មតិ {count}",
   "studio.toolsCompanion.review.section.history": "កត់ត្រា {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ទំព័រ{ស្លាក}· ការជ្រើសរើស{ស្លាក ZZ RBRACE",
   "studio.toolsCompanion.review.title": "កុងសូលត្រួតពិនិត្យ",
   "studio.toolsCompanion.review.truncatedComments": "និង {count} មតិ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ស្រទាប់",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "អេក្រង់យោង",
   "studio.toolsCompanion.referenceLoading": "កំពុងផ្ទុកឧបករណ៍យោង...",
   "studio.toolsCompanion.footer": "កែសម្រួលឯកសារជាម្ចាស់ផ្ទាំងលំនាំដើមប៉ុណ្ណោះ។ វិនដូនេះបញ្ជូនតែការមើលជាមុន និងការត្រួតពិនិត្យ/សេចក្តីយោងដែលបានបង្ហាប់ទៅប៉ុស្តិ៍ផ្សព្វផ្សាយនៃកម្មវិធីរុករកដូចគ្នា ដូច្នេះមិនមានតម្លៃម៉ាស៊ីនមេដាច់ដោយឡែកទេ។",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "មិន ទាក់ទង នឹង វិទ្យុ មូលដ្ឋាន ទេ។",
+  "studio.toolsCompanion.exit.editor": "បើក Editor Studio"
 }

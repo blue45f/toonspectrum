@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Safu {count}",
   "studio.toolsCompanion.review.section.comments": "Maoni {count}",
   "studio.toolsCompanion.review.section.history": "Rekodi {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ukurasa wa ZZLBRACEWeka lebo}· uteuzi wa ZZLBRACELebo ZZ RBRACE",
   "studio.toolsCompanion.review.title": "console ya ukaguzi",
   "studio.toolsCompanion.review.truncatedComments": "na maoni {count}",
   "studio.toolsCompanion.review.truncatedLayers": "{count} safu",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Skrini ya marejeleo",
   "studio.toolsCompanion.referenceLoading": "Inapakia zana ya marejeleo...",
   "studio.toolsCompanion.footer": "Hariri hati unamiliki kichupo chaguo-msingi pekee. Dirisha hili hutuma tu onyesho la kukagua lililobanwa na dhamira ya ukaguzi/rejeleo kwa BroadcastChannel ya kivinjari sawa, kwa hivyo hakuna gharama tofauti ya seva.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Si kuunganishwa na studio kuu.",
+  "studio.toolsCompanion.exit.editor": "Fungua mhariri Studio"
 }

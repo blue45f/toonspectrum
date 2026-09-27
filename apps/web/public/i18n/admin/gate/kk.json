@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Тіркеуді жүргізу",
+  "admin.gate.guestBody": "Админ консолы аутентификацияны талап етеді.",
+  "admin.gate.forbiddenTitle": "Админ рұқсаты қажет",
+  "admin.gate.forbiddenBody": "Бұл тіркелгіде әкімші рұқсаттары жоқ. Қажет болса оператормен байланысыңыз.",
+  "admin.gate.errorTitle": "Консольді жүктеу сәтсіз"
 }

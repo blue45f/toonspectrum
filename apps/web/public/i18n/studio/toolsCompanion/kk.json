@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Қабат {count}",
   "studio.toolsCompanion.review.section.comments": "Пікір {count}",
   "studio.toolsCompanion.review.section.history": "Жазба {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE бетіЖапсырма}·{таңдауЖапсырма ZZ RBRACE",
   "studio.toolsCompanion.review.title": "тексеру консолі",
   "studio.toolsCompanion.review.truncatedComments": "және {count} пікірлер",
   "studio.toolsCompanion.review.truncatedLayers": "{count} қабаттар",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Анықтамалық экран",
   "studio.toolsCompanion.referenceLoading": "Анықтама құралы жүктелуде...",
   "studio.toolsCompanion.footer": "Құжаттарды өңдеу тек әдепкі қойындыға ие. Бұл терезе тек қана қысылған алдын ала қарауды және тексеру/анықтамалық ниетті бір шолғыштың BroadcastChannel арнасына жібереді, сондықтан бөлек сервер құны болмайды.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Негізгі студияға қосылмаған.",
+  "studio.toolsCompanion.exit.editor": "Студия редакторын ашу"
 }

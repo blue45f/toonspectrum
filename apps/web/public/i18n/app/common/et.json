@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Laadumine",
+  "common.loading.short": "Laadumine",
   "common.close": "Sule",
   "common.open": "Ava",
   "common.search": "Otsi",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Proovige uuesti.",
+  "common.retry.short": "Proovige uuesti.",
+  "common.backToTop": "Tagasi ülemusele.",
+  "common.backToHome": "Mine koju.",
+  "common.loading.search": "Otsime...",
+  "common.notFoundWithQuery": "{query} kohta ei ole tulemusi.",
+  "common.openSearch": "Leia otsingute kaudu →",
+  "common.loading.empty": "Ei ole andmeid tagastatud.",
+  "common.retry.all": "Proovi uuesti või mine koju."
 }

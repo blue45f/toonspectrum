@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
+  "admin.refresh.now": "এখন সতেজ হও",
+  "admin.refresh.auto": "অটোঃ",
   "admin.refresh.seconds": "{sec}s"
 }

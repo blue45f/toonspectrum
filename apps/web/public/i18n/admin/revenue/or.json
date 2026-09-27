@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "ବିନିମୟ ସମୟ (ଗତ 30 ଦିନ)",
+  "admin.revenue.loadError": "ରାଜସ୍ୱ ପୁସ୍ତକ ଲୋଡ କରିବାରେ ବିଫଳ",
+  "admin.revenue.filterAll": "ସମସ୍ତେ",
+  "admin.revenue.filterPending": "ଅପେକ୍ଷା",
+  "admin.revenue.filterApproved": "ଅନୁମୋଦନ",
+  "admin.revenue.filterPaid": "ସମାଧାନ",
+  "admin.revenue.filterRejected": "ପ୍ରତ୍ୟାଖ୍ୟାନ",
+  "admin.revenue.filterRevoked": "ବାତିଲ",
+  "admin.revenue.empty": "ଏହି ସ୍ଥିତି ସହିତ କୌଣସି ସମାଧାନର ଘଟଣା ନାହିଁ ।",
+  "admin.revenue.approve": "ଅନୁମୋଦନ କରନ୍ତୁ",
+  "admin.revenue.reject": "ପ୍ରତ୍ୟାଖ୍ୟାନ",
+  "admin.revenue.settle": "ସମ୍ପୂର୍ଣ୍ଣ ସମାଧାନ",
+  "admin.revenue.revoke": "ବାତିଲ୍ କରିବା"
 }

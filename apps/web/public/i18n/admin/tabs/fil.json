@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
+  "admin.tabs.announcements": "Mga Pananagamba & Banner",
+  "admin.tabs.audit": "Ang mga log ng audit",
+  "admin.tabs.campaigns": "Mga Kampanya",
+  "admin.tabs.creatorSupport": "Suporta ng Maylalang",
   "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.ops": "Operasyon",
+  "admin.tabs.plans": "Mga plano",
+  "admin.tabs.promos": "Mga promosyon",
+  "admin.tabs.reports": "Mga Reports & Moderation",
+  "admin.tabs.revenue": "Pag-aayos",
+  "admin.tabs.security": "Pagtatanggol & IP",
+  "admin.tabs.inquiries": "Mga imbestigasyon sa negosyo",
+  "admin.tabs.supporters": "Suporta sa operating cost",
+  "admin.tabs.traffic": "Live traffic"
 }

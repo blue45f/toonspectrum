@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Autorių teisių ir turinio pranešimas",
+  "copyright.section1.title": "Turinio šaltiniai ir principai",
+  "copyright.section1.body": "ToonSpectrum yra indeksas ir atradimo platforma, apibendrinanti viešą katalogą metadata (titulus, autorius, žanrus ir kt.) iš interneto serijų / interneto romanų platformos. Ji neostato ar perskirsto pagrindinio skyrių turinio; skaitymo yra skirta tik per oficialius nuorodas.",
+  "copyright.section2.title": "Aprašymo nuotraukos",
+  "copyright.section2.body": "Užrašų nuotraukos yra miniatūros, o pagrindinės platformos užrašos yra nuorodos į šaltinį, kai įmanoma.",
+  "copyright.section3.title": "Metrikos ir skaidrumas",
+  "copyright.section4.title": "Teisės pranešimas",
+  "copyright.section5.title": "Autorių teisių pažeidimo pranešimas ir panaikinimas",
+  "copyright.section5.body": "Jei manote, kad metadanai ar uždaviniai pažeidžia jūsų teises, prašome pateikti užklausą su pavadinimu, URL ir nuosavybės įrodymu.",
+  "copyright.leaveInquiry": "Paskelbti tyrimą →"
 }

@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "نتونستم نظرسنجی بازخورد رو بارگذاری کنم",
+  "feedback.thankYou": "ممنون از بازخورد ارزشمندتون!",
+  "feedback.anonymousNote": "پاسخاتتون کاملاً ناشناس نگهداري ميشه",
+  "feedback.notAtAll": "اصلاً",
+  "feedback.definitely": "قطعاً"
 }

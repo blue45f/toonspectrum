@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "Toʻlovning qisqacha maʼlumotlari (soʻnggi 30 kun)",
+  "admin.revenue.loadError": "Umumiy daromadlar daftarini yuklab bo'lmadi",
+  "admin.revenue.filterAll": "Hamma",
+  "admin.revenue.filterPending": "Bekatda",
+  "admin.revenue.filterApproved": "Ruxsat etilgan",
+  "admin.revenue.filterPaid": "Toʻxtatilgan",
+  "admin.revenue.filterRejected": "rad etilgan",
+  "admin.revenue.filterRevoked": "bekor qilingan",
+  "admin.revenue.empty": "Ushbu holatga mos kelishmovchiliklar yo'q.",
+  "admin.revenue.approve": "Ta'minlaning",
+  "admin.revenue.reject": "rad etish",
+  "admin.revenue.settle": "To'liq kelishuv",
+  "admin.revenue.revoke": "Toʻxtatish"
 }

@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "लॉगिन की आवश्यकता",
+  "admin.gate.guestBody": "व्यवस्थापक कंसोल प्रमाणीकरण की आवश्यकता है. कृपया साइन इन करें.",
+  "admin.gate.forbiddenTitle": "प्रशासनिक अनुमति की आवश्यकता",
+  "admin.gate.forbiddenBody": "इस खाते में व्यवस्थापक अनुमतियां नहीं हैं। यदि आवश्यक हो तो किसी ऑपरेटर से संपर्क करें।",
+  "admin.gate.errorTitle": "कंसोल लोड करने में विफल"
 }

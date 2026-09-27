@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Vpis v internet",
+  "admin.gate.guestBody": "Admin konzola zahteva preverjanje.",
+  "admin.gate.forbiddenTitle": "Zahtevano dovoljenje upravitelja",
+  "admin.gate.forbiddenBody": "Ta račun nima dovoljenj za upravljalce.",
+  "admin.gate.errorTitle": "Konzola ni bila naložena"
 }

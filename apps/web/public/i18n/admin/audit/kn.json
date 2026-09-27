@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "ನಿರ್ವಹಣೆ ಲೆಕ್ಕಪರಿಶೋಧನೆ ದಾಖಲೆಗಳು",
+  "admin.audit.desc": "ಎಲ್ಲಾ ಆಡಳಿತಾತ್ಮಕ ಕ್ರಿಯೆಗಳು, ಅನುಮತಿ ಬದಲಾವಣೆಗಳು ಮತ್ತು ಸಂರಚನಾ ಬದಲಾವಣೆಗಳನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ.",
+  "admin.audit.searchPlaceholder": "ಹುಡುಕಾಟ (ಇಮೇಲ್/ಕ್ರಿಯೆ)...",
+  "admin.audit.loading": "ಲೆಕ್ಕಪರಿಶೋಧನಾ ದಾಖಲೆಗಳನ್ನು ಲೋಡ್ ಮಾಡುವುದು.",
+  "admin.audit.empty": "ಯಾವುದೇ ದಾಖಲೆಗಳಿಲ್ಲ.",
+  "admin.audit.viewDetails": "ನೋಟ",
+  "admin.audit.modalTitle": "ಲೆಕ್ಕಪರಿಶೋಧನಾ ದಾಖಲೆ ವಿವರಗಳು",
+  "admin.audit.close": "ಮುಚ್ಚಿ"
 }

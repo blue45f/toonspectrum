@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Արագ որոնում եւ հրամաններ...",
+  "admin.palette.placeholder": "Փնտրման ադմինիստրատորի հրամանները (Նավիգացիա, CSV արտահանում, Պահպանում)...",
+  "admin.palette.empty": "Ոչ մի արդյունք չի հայտնաբերվել:",
+  "admin.palette.groupNav": "Կոնսոլի նավիգացիայի կարճատեւներ",
+  "admin.palette.groupQuick": "Արագ գործողություններ & արտահանման",
+  "admin.palette.exportUsers": "Արտահանման բոլոր անդամները CSV",
+  "admin.palette.exportRevenue": "Արտահանման եկամուտների հաշվետվության CSV",
+  "admin.palette.maintenance": "Կառավարման համակարգի շտապ պահպանություն"
 }

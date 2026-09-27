@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Авторлық құқық және мазмұн туралы хабарлама",
+  "copyright.section1.title": "Мазмұн көздері мен қағидаттары",
+  "copyright.section1.body": "ToonSpectrum - бұл веб-мультфильмдер / веб-роман платформаларынан қоғамдық каталог метамәліметтерін (бағаздар, авторлар, жанрлар және т.б.) жинақтаушы индекс және ашылу платформасы.",
+  "copyright.section2.title": "Жапқыш суреттер",
+  "copyright.section2.body": "Жаппа суреттері қос суреттер ретінде қызмет етеді және мүмкін болған жағдайда бастапқы платформаның шифрлық суреттерін бастапқы шифрлармен анықтауға болады. Құқық иелерінің өтініші немесе саясатты жаңарту арқылы дисплейлерді дереу өшіруге болады.",
+  "copyright.section3.title": "Өлшемдер & Ашықтандыру",
+  "copyright.section4.title": "Құқық туралы хабарлама",
+  "copyright.section5.title": "Авторлық құқық бұзушылық туралы хабарлама және оны жою",
+  "copyright.section5.body": "Егер метамәліметтер немесе тышқандар сіздің құқықтарыңызды бұзады деп ойласаңыз, атау, URL және меншік дәлелімен сұрау салуды тапсырыңыз.",
+  "copyright.leaveInquiry": "Сұраныс беру →"
 }

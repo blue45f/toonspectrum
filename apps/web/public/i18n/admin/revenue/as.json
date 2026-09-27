@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "নিষ্পত্তিৰ সংক্ষিপ্ত বিবৰণ (শেষ ৩০ দিন)",
+  "admin.revenue.loadError": "ৰাজহ পুথিভঁৰাল লোড কৰিব নোৱাৰিলে",
+  "admin.revenue.filterAll": "সকলো",
+  "admin.revenue.filterPending": "অপেক্ষা",
+  "admin.revenue.filterApproved": "অনুমোদিত",
+  "admin.revenue.filterPaid": "নিষ্পত্তি",
+  "admin.revenue.filterRejected": "প্ৰত্যাখ্যান কৰা",
+  "admin.revenue.filterRevoked": "বাতিল কৰা",
+  "admin.revenue.empty": "এই স্থিতিৰ সৈতে সমতুল্য কোনো নিষ্পত্তি অনুষ্ঠান নাই।",
+  "admin.revenue.approve": "অনুমোদন",
+  "admin.revenue.reject": "প্ৰত্যাখ্যান",
+  "admin.revenue.settle": "সম্পূৰ্ণ চুক্তি",
+  "admin.revenue.revoke": "বাতিল কৰা"
 }

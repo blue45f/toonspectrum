@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Sog'liqni saqlash tizimi",
+  "admin.stats.healthy": "Sog'lom",
+  "admin.stats.degraded": "Tasavvurga tushirilgan",
+  "admin.stats.revenueEvents": "Jami operatsiyalar / hisob-kitoblar",
+  "admin.stats.usersCommunity": "Umumiy a'zolar / lavozimlar",
+  "admin.stats.maintenance": "Qopish usuli",
+  "admin.stats.maintenanceOn": "Fursatdagi ta'mirlash (ON)",
+  "admin.stats.maintenanceOff": "Oddiy faoliyat (OFF)",
+  "admin.stats.activeVisitors": "5 daqiqalik faol tashrif buyuruvchilar",
+  "admin.stats.views5m": "5 daqiqalik sahifa koʻrinishlari"
 }

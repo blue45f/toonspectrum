@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Login diperlukan.",
+  "apiError.adminRequired": "Keizinan pentadbir tidak dapat disahkan.",
+  "apiError.adminOnlyPage": "Halaman ini terhad kepada pentadbir.",
+  "apiError.notFound": "Barang yang diminta tidak dapat ditemui.",
+  "apiError.unsupportedType": "Jenis kandungan yang tidak disokong.",
+  "apiError.inactiveAccount": "Akaun yang tidak aktif tidak boleh menggunakan ciri pentadbir.",
+  "apiError.settlementFailed": "Proses penyelesaian gagal."
 }

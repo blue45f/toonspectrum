@@ -1,17 +1,17 @@
 {
-  "admin.members.title": "Member Management",
-  "admin.members.eyebrow": "ADMIN · MEMBERS",
-  "admin.members.desc": "Search registered members and adjust roles (User, Creator, Operator, Admin).",
-  "admin.members.backToConsole": "Back to Console",
-  "admin.members.searchPlaceholder": "Search name or email",
-  "admin.members.countShowing": "Showing {count} members",
+  "admin.members.title": "Management Member",
+  "admin.members.eyebrow": "Admin · MEMBERS",
+  "admin.members.desc": "Search registered members and adjust roles (User, Creator, Operator, Admin)",
+  "admin.members.backToConsole": "Return to Console",
+  "admin.members.searchPlaceholder": "Нэр эсвэл имэйл хайх",
+  "admin.members.countShowing": "showing {count} members",
   "admin.members.refresh": "Refresh",
-  "admin.members.empty": "No members found matching the criteria.",
+  "admin.members.empty": "️️️️️️️️️️️️️️️️️️️️️️️️",
   "admin.members.colMember": "Member",
   "admin.members.colStatus": "Status",
   "admin.members.colRole": "Role",
   "admin.members.colActivity": "Activity",
-  "admin.members.colJoined": "Joined Date",
+  "admin.members.colJoined": "Date joined",
   "admin.members.colActions": "Manage",
   "admin.members.roleUser": "User",
   "admin.members.roleCreator": "Creator",
@@ -23,5 +23,6 @@
   "admin.members.selfTag": "(Me)",
   "admin.members.restore": "Restore",
   "admin.members.suspend": "Suspend",
-  "admin.members.delete": "Delete"
+  "admin.members.delete": "Delete",
+  "admin.members.statusMerged": "Merged"
 }

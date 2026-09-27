@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
-  "admin.refresh.seconds": "{sec}s"
+  "admin.refresh.now": "Réfléchissez maintenant",
+  "admin.refresh.auto": "Automoteur:",
+  "admin.refresh.seconds": "{sec} s"
 }

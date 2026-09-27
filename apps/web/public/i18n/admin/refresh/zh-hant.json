@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
+  "admin.refresh.now": "現在要放心",
+  "admin.refresh.auto": "自動:",
   "admin.refresh.seconds": "{sec}s"
 }

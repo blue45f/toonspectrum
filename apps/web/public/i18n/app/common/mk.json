@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Натоварување",
+  "common.loading.short": "Натоварување",
   "common.close": "Zatvori",
   "common.open": "Otvorii",
   "common.search": "Prebaraj",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Пробајте повторно.",
+  "common.retry.short": "Пробајте повторно.",
+  "common.backToTop": "На врвот.",
+  "common.backToHome": "Оди дома.",
+  "common.loading.search": "Тргувам...",
+  "common.notFoundWithQuery": "Нема резултати за \" {query} \".",
+  "common.openSearch": "Најдете го во пребарувањето →",
+  "common.loading.empty": "Нема враќање на податоци.",
+  "common.retry.all": "Пробај уште еднаш или си оди дома."
 }

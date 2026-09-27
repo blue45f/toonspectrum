@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "Oldalak nem találtak",
+  "page.notFound.message": "Ellenőrizze újra az URL-t, vagy keresse meg a címeket az otthoni oldaltól.",
+  "page.notFound.home": "Menj haza!"
 }

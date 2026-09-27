@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Þyngd",
+  "common.loading.short": "Þyngd",
   "common.close": "Loka",
   "common.open": "Opna",
   "common.search": "Leita",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Prófaðu aftur.",
+  "common.retry.short": "Prófaðu aftur.",
+  "common.backToTop": "Til baka á toppinn.",
+  "common.backToHome": "Farðu heim.",
+  "common.loading.search": "Leitađ eftir...",
+  "common.notFoundWithQuery": "Engar niðurstöður fyrir \" {query} \"",
+  "common.openSearch": "Finndu hana í leitarfræði",
+  "common.loading.empty": "Engar gögn komu aftur.",
+  "common.retry.all": "Prófaðu aftur eða farðu heim."
 }

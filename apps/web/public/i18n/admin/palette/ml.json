@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "പെട്ടെന്നുള്ള തിരയലും കമാൻഡുകളും...",
+  "admin.palette.placeholder": "തിരയൽ അഡ്മിൻ കമാൻഡുകൾ (നാവിഗേഷൻ, CSV എക്സ്പോർട്ട്, മെയിന്റനൻസ്)...",
+  "admin.palette.empty": "ഫലങ്ങള് ഒന്നും കണ്ടെത്തിയില്ല.",
+  "admin.palette.groupNav": "കൺസോൾ നാവിഗേഷൻ കുറുക്കുവഴികൾ",
+  "admin.palette.groupQuick": "ദ്രുത നടപടികളും കയറ്റുമതിയും",
+  "admin.palette.exportUsers": "എല്ലാ അംഗങ്ങളെയും കയറ്റുമതി ചെയ്യുക",
+  "admin.palette.exportRevenue": "കയറ്റുമതി വരുമാന ലേഡർ CSV",
+  "admin.palette.maintenance": "നിയന്ത്രണ സംവിധാനം അടിയന്തിര പരിപാലനം"
 }

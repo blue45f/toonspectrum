@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Pranešimai ir vėliavos",
+  "admin.tabs.audit": "Audito įrašai",
+  "admin.tabs.campaigns": "Kampanjos",
+  "admin.tabs.creatorSupport": "Kūrėjas palaiko",
+  "admin.tabs.dashboard": "Dašbordas",
+  "admin.tabs.ops": "Veiksmai",
+  "admin.tabs.plans": "Planai",
+  "admin.tabs.promos": "Pranešimas",
+  "admin.tabs.reports": "Ataskaitos ir nuosaikumas",
+  "admin.tabs.revenue": "Susirinkimas",
+  "admin.tabs.security": "Saugumo ir IP",
+  "admin.tabs.inquiries": "Verslo apklausos",
+  "admin.tabs.supporters": "Pagalbos veiklos sąnaudoms",
+  "admin.tabs.traffic": "Gyvas eismas"
 }

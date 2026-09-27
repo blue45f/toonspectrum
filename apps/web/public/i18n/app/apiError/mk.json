@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Потребен е влез.",
+  "apiError.adminRequired": "Дозволите на администраторите не можеа да се потврдат.",
+  "apiError.adminOnlyPage": "Оваа страница е ограничена на администраторите.",
+  "apiError.notFound": "Не може да се најде бараната стока.",
+  "apiError.unsupportedType": "Тип на содржина не поддржан.",
+  "apiError.inactiveAccount": "Неактивните сметки не можат да користат функции на администраторот.",
+  "apiError.settlementFailed": "Процесот на уредување не успеа."
 }

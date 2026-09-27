@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "ಆರೋಗ್ಯ ವ್ಯವಸ್ಥೆ",
+  "admin.stats.healthy": "ಆರೋಗ್ಯಕರ",
+  "admin.stats.degraded": "ಕಡಿಮೆಗೊಳಿಸಲಾಗಿದೆ",
+  "admin.stats.revenueEvents": "ಒಟ್ಟು ವಹಿವಾಟುಗಳು / ವಹಿವಾಟುಗಳು",
+  "admin.stats.usersCommunity": "ಒಟ್ಟು ಸದಸ್ಯರು / ಹುದ್ದೆಗಳು",
+  "admin.stats.maintenance": "ನಿರ್ವಹಣೆ ವಿಧಾನ",
+  "admin.stats.maintenanceOn": "ತುರ್ತು ನಿರ್ವಹಣೆ (ON)",
+  "admin.stats.maintenanceOff": "ಸಾಮಾನ್ಯ ಕಾರ್ಯಾಚರಣೆ (ಆಫ್)",
+  "admin.stats.activeVisitors": "5 ನಿಮಿಷಗಳ ಸಕ್ರಿಯ ಭೇಟಿ",
+  "admin.stats.views5m": "5 ನಿಮಿಷಗಳ ಪುಟ ವೀಕ್ಷಣೆಗಳು"
 }

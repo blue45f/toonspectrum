@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
-  "admin.refresh.seconds": "{sec}s"
+  "admin.refresh.now": "Hozir taskin toping",
+  "admin.refresh.auto": "Avtomatik:",
+  "admin.refresh.seconds": "{sec} s"
 }

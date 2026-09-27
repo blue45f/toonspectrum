@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "සෞඛ් ය පද්ධතිය",
+  "admin.stats.healthy": "සෞඛ් ය සම්පන්න",
+  "admin.stats.degraded": "පහත වැටීම",
+  "admin.stats.revenueEvents": "මුළු ගනුදෙනු / ගෙවීම්",
+  "admin.stats.usersCommunity": "සාමාජිකයින් / තනතුරු",
+  "admin.stats.maintenance": "නඩත්තු ක් රමය",
+  "admin.stats.maintenanceOn": "හදිසි නඩත්තු (ON)",
+  "admin.stats.maintenanceOff": "සාමාන් ය මෙහෙයුම (අවසාන)",
+  "admin.stats.activeVisitors": "මිනිත්තු 5 ක් ක් රියාකාරී අමුත්තන්",
+  "admin.stats.views5m": "මිනිත්තු 5ක පිටු දර්ශන"
 }

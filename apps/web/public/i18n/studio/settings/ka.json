@@ -7,7 +7,7 @@
   "studio.settings.tool.eraser": "საშლელი",
   "studio.settings.tool.blend": "შერევა (დაბინძურება)",
   "studio.settings.tool.wetMix": "ფერის შერევის ფუნჯი",
-  "studio.settings.tool.dodgeBurn": "Dodge/Burn",
+  "studio.settings.tool.dodgeBurn": "დოჯი/ბერნი",
   "studio.settings.tool.liquify": "გათხევადება",
   "studio.settings.tool.fill": "საღებავი bucket",
   "studio.settings.tool.lassoFill": "ლასოს შევსება",
@@ -48,7 +48,7 @@
   "studio.settings.shortcut.toolComment": "მდებარეობის კომენტარები",
   "studio.settings.shortcut.toolBlend": "შერევა (დაბინძურება)",
   "studio.settings.shortcut.toolWetMix": "ფერის შერევის ფუნჯი",
-  "studio.settings.shortcut.toolDodgeBurn": "Dodge/Burn",
+  "studio.settings.shortcut.toolDodgeBurn": "დოჯი/ბერნი",
   "studio.settings.shortcut.toolLiquify": "გათხევადება",
   "studio.settings.shortcut.toolLettering": "ასოების დაწერა (ტექსტი/მეტყველების ბუშტი)",
   "studio.settings.shortcut.undo": "გაუქმება",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "დამალული",
   "studio.settings.state.show": "ნიშანი",
   "studio.settings.state.open": "გახსნა",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "შექმნა პერსონაჟი"
 }

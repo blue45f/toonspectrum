@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "ສະຫຼຸບການຈັດສັນ (30 ມື້ສຸດທ້າຍ)",
+  "admin.revenue.loadError": "ບໍ່ສາມາດໂຫຼດບັນຊີລາຍຮັບໄດ້",
+  "admin.revenue.filterAll": "ທຸກຄົນ",
+  "admin.revenue.filterPending": "ລໍຖ້າ",
+  "admin.revenue.filterApproved": "ຮັບຮອງ",
+  "admin.revenue.filterPaid": "ການຈັດຕັ້ງ",
+  "admin.revenue.filterRejected": "ຖືກປະຕິເສດ",
+  "admin.revenue.filterRevoked": "ຍົກເລີກ",
+  "admin.revenue.empty": "ບໍ່ມີເຫດການຈັດສັນທີ່ສອດຄ່ອງກັບສະຖານະການນີ້.",
+  "admin.revenue.approve": "ຮັບຮອງ",
+  "admin.revenue.reject": "ປະຕິເສດ",
+  "admin.revenue.settle": "ການຈັດສັນຢ່າງສົມບູນ",
+  "admin.revenue.revoke": "ຍົກເລີກ"
 }

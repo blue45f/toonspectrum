@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Tervise- ja tervishoiusüsteem",
+  "admin.stats.healthy": "Tervislik",
+  "admin.stats.degraded": "Väärendatud",
+  "admin.stats.revenueEvents": "Kokku tehingud / arveldused",
+  "admin.stats.usersCommunity": "Kokku liikmed / ametikohad",
+  "admin.stats.maintenance": "Hooldusviis",
+  "admin.stats.maintenanceOn": "Hädaolukorra hooldus (ON)",
+  "admin.stats.maintenanceOff": "Tavaline käitamine (OFF)",
+  "admin.stats.activeVisitors": "5 minutit aktiivsed külastajad",
+  "admin.stats.views5m": "5 minutit lehekülje vaateid"
 }

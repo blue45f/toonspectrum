@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Szükséges bejelentkezése",
+  "admin.gate.guestBody": "Az admin konzol hitelesítést igényel.",
+  "admin.gate.forbiddenTitle": "Admin engedélye szükséges",
+  "admin.gate.forbiddenBody": "Ez a fiók nem rendelkezik admin engedélyeivel. Szükség esetén lépjen kapcsolatba egy operátorral.",
+  "admin.gate.errorTitle": "Nem sikerült töltenie a konzolot"
 }

@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Administrativni dnevnik revizije",
+  "admin.audit.desc": "Pratite sve administrativne akcije, promjene dozvola i promjene konfiguracije.",
+  "admin.audit.searchPlaceholder": "Pretraga (e-mail / akcija)...",
+  "admin.audit.loading": "Uplodavanje evidencije revizije...",
+  "admin.audit.empty": "Nema zabilježenih evidencija revizije.",
+  "admin.audit.viewDetails": "Pogled",
+  "admin.audit.modalTitle": "Podrobnosti o dnevniku revizije",
+  "admin.audit.close": "U blizini"
 }

@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "سجلات مراجعة الإدارة",
+  "admin.audit.desc": "تتبع جميع الإجراءات الإدارية، وتغييرات الإذن، وتغييرات التكوين.",
+  "admin.audit.searchPlaceholder": "البحث (بريد الإلكتروني / العمل)...",
+  "admin.audit.loading": "تحميل سجلات المراجعة...",
+  "admin.audit.empty": "لا توجد سجلات مراجعة",
+  "admin.audit.viewDetails": "المشهد",
+  "admin.audit.modalTitle": "تفاصيل سجل المراجعة",
+  "admin.audit.close": "قريباً"
 }

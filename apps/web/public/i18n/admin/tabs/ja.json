@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "広告とバナー",
+  "admin.tabs.audit": "監査日記",
+  "admin.tabs.campaigns": "キャンペーン",
+  "admin.tabs.creatorSupport": "創造主 の 支援",
+  "admin.tabs.dashboard": "デッシュボード",
+  "admin.tabs.ops": "業務",
+  "admin.tabs.plans": "計画",
+  "admin.tabs.promos": "昇進",
+  "admin.tabs.reports": "報告と適度",
+  "admin.tabs.revenue": "決済",
+  "admin.tabs.security": "セキュリティ & IP",
+  "admin.tabs.inquiries": "ビジネス調査",
+  "admin.tabs.supporters": "運営コストの支援",
+  "admin.tabs.traffic": "ライブトラフィック"
 }

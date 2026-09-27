@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "ดูการแยกสกอร์",
+  "ranking.metric.views": "ความเห็น",
+  "ranking.why": "ทําไม",
+  "ranking.breakdownTitle": "การแบ่งสกอร์",
+  "ranking.totalScore": "คะแนนรวม",
+  "ranking.breakdownDescription": "คลิกด้วยน้ําหนักแกนและการปกติตามหัวข้อ"
 }

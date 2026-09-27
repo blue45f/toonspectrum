@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Quick Search & amri...",
+  "admin.palette.placeholder": "Taarifa za Utafutaji wa Utawala (Kuendesha, kuagiza CSV, Matengenezo)...",
+  "admin.palette.empty": "Hakuna matokeo yaliyopatikana.",
+  "admin.palette.groupNav": "Njia za mkato za urambazaji wa konsole",
+  "admin.palette.groupQuick": "Hatua za Haraka & Usafirishaji",
+  "admin.palette.exportUsers": "Kupeleka nje Washirika wote CSV",
+  "admin.palette.exportRevenue": "CSV ya Revenue Ledger ya Uuzaji",
+  "admin.palette.maintenance": "Usimamizi wa dharura wa mfumo wa kudhibiti"
 }

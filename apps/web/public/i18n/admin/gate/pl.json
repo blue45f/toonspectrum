@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Wystarczy logowanie",
+  "admin.gate.guestBody": "Konsola administracyjna wymaga uwierzytelnienia.",
+  "admin.gate.forbiddenTitle": "Wymagane zezwolenie admin",
+  "admin.gate.forbiddenBody": "Ten konto nie posiada uprawnień admin.",
+  "admin.gate.errorTitle": "Nie udało się założyć konsoli"
 }

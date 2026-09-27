@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Επίπεδο {count}",
   "studio.toolsCompanion.review.section.comments": "Σχόλιο {count}",
   "studio.toolsCompanion.review.section.history": "Εγγραφή {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Σελίδα ZZLBRACEΕτικέτα}· Επιλογή ZZLBRACEΕτικέτα ZZ RBRACE",
   "studio.toolsCompanion.review.title": "κονσόλα επιθεώρησης",
   "studio.toolsCompanion.review.truncatedComments": "και {count} σχόλια",
   "studio.toolsCompanion.review.truncatedLayers": "{count} στρώματα",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Οθόνη αναφοράς",
   "studio.toolsCompanion.referenceLoading": "Φόρτωση εργαλείου αναφοράς...",
   "studio.toolsCompanion.footer": "Επεξεργασία εγγράφων ανήκει μόνο στην προεπιλεγμένη καρτέλα. Αυτό το παράθυρο μεταδίδει μόνο τη συμπιεσμένη πρόθεση προεπισκόπησης και επιθεώρησης/αναφοράς στο BroadcastChannel του ίδιου προγράμματος περιήγησης, επομένως δεν υπάρχει ξεχωριστό κόστος διακομιστή.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Δεν συνδέεται με το κύριο στούντιο.",
+  "studio.toolsCompanion.exit.editor": "Ανοίξτε τον επεξεργαστή Studio"
 }

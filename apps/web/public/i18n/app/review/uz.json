@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Bajarilgan",
+  "review.progress.binge": "Qichqiriq",
+  "review.progress.upcoming": "Rejalashtirilgan",
+  "review.progress.abandoned": "Chiqindi",
+  "review.progress.unknown": "Yashirin rivojlanish",
+  "review.spoilerRevealLabel": "Spoiler koʻrsatish"
 }

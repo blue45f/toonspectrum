@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Anonsy i sztandary",
+  "admin.tabs.audit": "Długopis audytu",
+  "admin.tabs.campaigns": "Kampania",
+  "admin.tabs.creatorSupport": "Wsparcie Stwórcy",
+  "admin.tabs.dashboard": "Płyta kontrolna",
+  "admin.tabs.ops": "Operacje",
+  "admin.tabs.plans": "Plany",
+  "admin.tabs.promos": "Promocje",
+  "admin.tabs.reports": "Raporty i umiarkowanie",
+  "admin.tabs.revenue": "Rozliczenie",
+  "admin.tabs.security": "Bezpieczeństwo i IP",
+  "admin.tabs.inquiries": "Wnioski biznesowe",
+  "admin.tabs.supporters": "Wsparcie kosztów operacyjnych",
+  "admin.tabs.traffic": "Traffic w żywo"
 }

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "الطبقة {count}",
   "studio.toolsCompanion.review.section.comments": "تعليق {count}",
   "studio.toolsCompanion.review.section.history": "سجل {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "صفحة ZZLBRACEالتسمية}· اختيار ZZLBRACEالتسمية ZZ RBRACE",
   "studio.toolsCompanion.review.title": "وحدة التفتيش",
   "studio.toolsCompanion.review.truncatedComments": "و {count} التعليقات",
   "studio.toolsCompanion.review.truncatedLayers": "{count} طبقات",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "شاشة مرجعية",
   "studio.toolsCompanion.referenceLoading": "جارٍ تحميل الأداة المرجعية...",
   "studio.toolsCompanion.footer": "تحرير المستندات يمتلك علامة التبويب الافتراضية فقط. تنقل هذه النافذة فقط المعاينة المضغوطة وهدف الفحص/المرجع إلى قناة البث للمتصفح نفسه، لذلك لا توجد تكلفة خادم منفصلة.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "ليس متصل بالستوديو الرئيسي",
+  "studio.toolsCompanion.exit.editor": "افتح محرر الاستوديو"
 }

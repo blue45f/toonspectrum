@@ -1,16 +1,16 @@
 {
   "common.loading": "Memuatkan",
-  "common.loading.short": "Loading",
+  "common.loading.short": "Pemuatan",
   "common.close": "Tutup",
   "common.open": "Buka",
   "common.search": "Cari",
   "common.retry": "Cuba lagi",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "Cuba lagi",
+  "common.backToTop": "Kembali ke atas",
   "common.backToHome": "Ke Utama",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "Mencari...",
+  "common.notFoundWithQuery": "Tiada hasil untuk ' {query} '.",
+  "common.openSearch": "Temui dalam Pencarian →",
+  "common.loading.empty": "Tiada data dikembalikan.",
+  "common.retry.all": "Cuba lagi atau pulang ke rumah."
 }

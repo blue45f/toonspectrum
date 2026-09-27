@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Завершено",
+  "review.progress.binge": "Зігнення",
+  "review.progress.upcoming": "Планується",
+  "review.progress.abandoned": "Випавши",
+  "review.progress.unknown": "Займаний прогрес",
+  "review.spoilerRevealLabel": "Покажіть спойлер"
 }

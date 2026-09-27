@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Անհրաժեշտ է մուտք գործել",
+  "admin.gate.guestBody": "Վարչապետի կոնսոլը պահանջում է հավաստիացում: Խնդրում ենք մուտք գործել:",
+  "admin.gate.forbiddenTitle": "Պահանջվում է կառավարիչի թույլտվություն",
+  "admin.gate.forbiddenBody": "Այս հաշիվը չունի կառավարման թույլտվություններ:",
+  "admin.gate.errorTitle": "Չկարողացա բեռնել կոնսոլը"
 }

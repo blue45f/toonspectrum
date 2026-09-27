@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Slānis {count}",
   "studio.toolsCompanion.review.section.comments": "komentēt {count}",
   "studio.toolsCompanion.review.section.history": "Ierakstīt {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE lapaEtiķete}·{izvēleEtiķete ZZ RBRACE",
   "studio.toolsCompanion.review.title": "pārbaudes konsole",
   "studio.toolsCompanion.review.truncatedComments": "un {count} komentāri",
   "studio.toolsCompanion.review.truncatedLayers": "{count} slāņi",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Atsauces ekrāns",
   "studio.toolsCompanion.referenceLoading": "Notiek atsauces rīka ielāde...",
   "studio.toolsCompanion.footer": "Rediģēt dokumentus pieder tikai noklusējuma cilne. Šis logs pārsūta tikai saspiestu priekšskatījumu un pārbaudes/atsauces nolūku uz tās pašas pārlūkprogrammas BroadcastChannel, tāpēc nav jāmaksā atsevišķi par serveri.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Nav savienota ar galveno studiju.",
+  "studio.toolsCompanion.exit.editor": "Atver Studio redaktoru"
 }

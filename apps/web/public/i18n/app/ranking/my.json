@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "အမှတ်ခွဲစိတ်ချက်များကို ကြည့်ရှု",
+  "ranking.metric.views": "အမြင်များ",
+  "ranking.why": "ဘာကြောင့်လဲ",
+  "ranking.breakdownTitle": "အမှတ်ခွဲစိတ်ချက်",
+  "ranking.totalScore": "စုစုပေါင်း အမှတ်",
+  "ranking.breakdownDescription": "အတန်းအလေးချိန်နဲ့ ခေါင်းစဉ်ဆိုင်ရာ ပုံမှန်ပြုပြင်ချက်တွေနဲ့ တွက်ချက်တာပါ။"
 }

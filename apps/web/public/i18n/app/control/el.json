@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Γλώσσα",
+  "control.sound.enable": "Επιτρέψτε ηχητικές επιδράσεις",
+  "control.sound.disable": "Αποσπάστε τις ακουστικές επιδράσεις",
+  "control.theme.dark": "Επενδύστε τη λειτουργία φωτός",
+  "control.theme.light": "Πάρτε στη σκοτεινή λειτουργία .",
+  "control.settings.open": "Άνοιξη ρυθμίσεων",
+  "control.settings.close": "Κλειστικές ρυθμίσεις",
+  "control.cluster.settings": "Ηχητικό, θεματικό, γλωσσικό έλεγχο",
+  "control.cluster.open": "Άνοιξη ρυθμίσεων",
+  "control.cluster.tooltip": "Ηχητικές, θεματικές και γλωσσικές ρυθμίσεις",
+  "control.language.group.translated": "Μεταφράσεις υψηλής κάλυψης",
+  "control.language.group.englishBase": "Ατομική μετάφραση · Αγγλικά fallback"
 }

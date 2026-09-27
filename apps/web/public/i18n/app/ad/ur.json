@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "سپانسر شدہ تصویر",
+  "ad.slotAriaLabel": "اشتہاری جگہ",
+  "ad.slotLabel": "سپانسر",
+  "ad.slotTitle": "سپانسر شدہ مواد",
+  "ad.ctaDetails": "تفصیلات دیکھیں",
+  "ad.placeholderAriaLabel": "اشتہار کی جگہ رکھنے والا",
+  "ad.placeholderText": "کوئی سپانسر شدہ مواد دستیاب نہیں ہے۔",
+  "ad.tag": "اشتہار"
 }

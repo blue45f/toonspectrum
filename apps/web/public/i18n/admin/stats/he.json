@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "מערכת הבריאות",
+  "admin.stats.healthy": "בריא",
+  "admin.stats.degraded": "מדרגה",
+  "admin.stats.revenueEvents": "סכום העסקאות / הסדרים",
+  "admin.stats.usersCommunity": "סך חבריה / משרדיה",
+  "admin.stats.maintenance": "מצב תחזוקה",
+  "admin.stats.maintenanceOn": "תחזוקה חירום (ON)",
+  "admin.stats.maintenanceOff": "פעילות נורמלית (נעלמת)",
+  "admin.stats.activeVisitors": "5 דקות מבקרים פעילים",
+  "admin.stats.views5m": "5 דקות צפיות בדף"
 }

@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Брза претрага и команде...",
+  "admin.palette.placeholder": "Команда за администратор претраге (навигација, извоз CSV, одржавање)...",
+  "admin.palette.empty": "Нису пронађени резултати.",
+  "admin.palette.groupNav": "Конзола навигација прескорце",
+  "admin.palette.groupQuick": "Брза акција и извоз",
+  "admin.palette.exportUsers": "Извоз свих чланова ЦСВ",
+  "admin.palette.exportRevenue": "У КГС-у за извозни приход",
+  "admin.palette.maintenance": "Контролни систем за хитно одржавање"
 }

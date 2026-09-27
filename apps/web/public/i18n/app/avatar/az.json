@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "Dəstəksiz şəkil tipli.",
+  "avatar.error.processFailed": "Görüntüyü işlədə bilmədim.",
+  "avatar.processing": "İşləmə...",
+  "avatar.select": "Görüntüyü dəyişdirin",
+  "avatar.remove": "Görüntüyü çıxarmaq",
+  "avatar.uploadHint": "Yalnız JPG, PNG və WEBP şəkillər dəstəklənir, sonra əvvəlcədən görmək üçün kəsilmişdir.",
+  "avatar.changeAria": "Profil görüntüsünü dəyişdirin"
 }

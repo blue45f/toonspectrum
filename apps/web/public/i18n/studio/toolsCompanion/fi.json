@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Taso {count}",
   "studio.toolsCompanion.review.section.comments": "Kommentti {count}",
   "studio.toolsCompanion.review.section.history": "Tallenna {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE-sivuEtiketti}· ZZLBRACE-valintaEtiketti ZZ RBRACE",
   "studio.toolsCompanion.review.title": "tarkastuskonsoli",
   "studio.toolsCompanion.review.truncatedComments": "ja {count} kommenttia",
   "studio.toolsCompanion.review.truncatedLayers": "{count} tasoa",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Viiteruutu",
   "studio.toolsCompanion.referenceLoading": "Ladataan viitetyökalua...",
   "studio.toolsCompanion.footer": "Muokkaa asiakirjat omistavat vain oletusvälilehden. Tämä ikkuna lähettää vain pakatun esikatselun ja tarkastus-/viittaustarkoituksen saman selaimen BroadcastChannelille, joten erillistä palvelinkulua ei ole.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Ei päästudioon.",
+  "studio.toolsCompanion.exit.editor": "Avaa Studio-editor"
 }

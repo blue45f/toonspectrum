@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Շերտ {count}",
   "studio.toolsCompanion.review.section.comments": "Մեկնաբանություն {count}",
   "studio.toolsCompanion.review.section.history": "Ձայնագրեք {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{ընտրությունՊիտակ ZZ RBRACE",
   "studio.toolsCompanion.review.title": "ստուգման վահանակ",
   "studio.toolsCompanion.review.truncatedComments": "և {count} մեկնաբանություններ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} շերտ",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Հղման էկրան",
   "studio.toolsCompanion.referenceLoading": "Հղման գործիքի բեռնում...",
   "studio.toolsCompanion.footer": "Փաստաթղթերի խմբագրումը պատկանում է միայն լռելյայն ներդիրին: Այս պատուհանը փոխանցում է միայն սեղմված նախադիտումը և ստուգման/հղման նպատակը նույն բրաուզերի BroadcastChannel-ին, ուստի առանձին սերվերի արժեք չկա:",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Ոչ մի կապ չունի գլխավոր ստուդիային:",
+  "studio.toolsCompanion.exit.editor": "Բացեք ստուդիո խմբագիր"
 }

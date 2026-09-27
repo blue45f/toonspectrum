@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "የተጠናቀቀ",
+  "review.progress.binge": "በንግንግ",
+  "review.progress.upcoming": "የታቀደ",
+  "review.progress.abandoned": "ተጥሏል",
+  "review.progress.unknown": "የተደበቀ እድገት",
+  "review.spoilerRevealLabel": "አሳይ ስፖይለር"
 }

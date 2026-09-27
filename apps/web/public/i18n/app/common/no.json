@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Lasting",
+  "common.loading.short": "Lasting",
   "common.close": "Lukk",
   "common.open": "Åpne",
   "common.search": "Søk",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Prøv igjen.",
+  "common.retry.short": "Prøv igjen.",
+  "common.backToTop": "Tilbake til toppen",
+  "common.backToHome": "Gå hjem.",
+  "common.loading.search": "- Jeg leter etter...",
+  "common.notFoundWithQuery": "Ingen resultater for \" {query} \".",
+  "common.openSearch": "Finn den i søket →",
+  "common.loading.empty": "Ingen data returnerte.",
+  "common.retry.all": "Prøv igjen eller gå hjem."
 }

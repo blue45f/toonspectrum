@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Vegeu despartiment de puntuacions",
+  "ranking.metric.views": "Visions",
+  "ranking.why": "Per què",
+  "ranking.breakdownTitle": "Divisió de puntuacions",
+  "ranking.totalScore": "Puntuació total",
+  "ranking.breakdownDescription": "Calculats amb pesos d'eix i normalització específica del títol."
 }

@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Teavitavad ja pankrottid",
+  "admin.tabs.audit": "Kontrolli päevikud",
+  "admin.tabs.campaigns": "Kampaaniad",
+  "admin.tabs.creatorSupport": "Looja toetus",
+  "admin.tabs.dashboard": "Kontrollitabord",
+  "admin.tabs.ops": "Operatsioonid",
+  "admin.tabs.plans": "Plaanid",
+  "admin.tabs.promos": "Eelnõud",
+  "admin.tabs.reports": "Aruanded ja mõõdupunktid",
+  "admin.tabs.revenue": "Kokkuvõtt",
+  "admin.tabs.security": "Turvalisus & IP",
+  "admin.tabs.inquiries": "Tööandjapidamised",
+  "admin.tabs.supporters": "Toetust tegevuskulude kohta",
+  "admin.tabs.traffic": "Eeliste liiklus"
 }

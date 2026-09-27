@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Snelle zoek- en commando's...",
+  "admin.palette.placeholder": "Zoekbeheerderscommando's (navigatie, CSV-export, onderhoud)...",
+  "admin.palette.empty": "Geen resultaten gevonden.",
+  "admin.palette.groupNav": "Console navigatie-navigatie-nauwwijzingen",
+  "admin.palette.groupQuick": "Snelle acties en export",
+  "admin.palette.exportUsers": "Export van alle leden CSV",
+  "admin.palette.exportRevenue": "Uitvoersinkomstenboek CSV",
+  "admin.palette.maintenance": "Noodonderhoud van het besturingssysteem"
 }

@@ -1,16 +1,16 @@
 {
-  "authors.eyebrow": "AUTHOR DIRECTORY",
-  "authors.title": "Authors",
-  "authors.desc": "Authors ranked by number of works. Tap an author to see their titles, ratings, and fan cafe in one place.",
-  "authors.search": "Search author name",
-  "authors.error": "Couldn't load the author list.",
-  "authors.empty": " — no matching author.",
-  "authors.allOf": "of",
+  "authors.eyebrow": "OUTHOR Gids",
+  "authors.title": "Skrywers",
+  "authors.desc": "Klik op 'n skrywer om hulle titels, graderings en fancafe op een plek te sien.",
+  "authors.search": "Soek skrywer naam",
+  "authors.error": "Ek kon nie die skrywerlys laai nie.",
+  "authors.empty": "Geen ooreenstemmende skrywer nie.",
+  "authors.allOf": "van",
   "authors.topOf": "· top",
   "authors.people": "",
-  "authors.works": " works",
-  "authors.views": "views",
-  "authors.pencafe": "Creator fan cafe",
-  "authors.stats": "Top {shown} out of {total} authors",
-  "authors.noName": "Creator"
+  "authors.works": "werke",
+  "authors.views": "uitsigte",
+  "authors.pencafe": "Skepper fan kafee",
+  "authors.stats": "Top {shown} uit {total} skrywers",
+  "authors.noName": "Skepper"
 }

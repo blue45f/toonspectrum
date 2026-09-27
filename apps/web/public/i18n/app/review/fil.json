@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Nakumpleto",
+  "review.progress.binge": "Ang pag-uusap",
+  "review.progress.upcoming": "Nagplano",
+  "review.progress.abandoned": "Nahulog",
+  "review.progress.unknown": "Ang pag-unlad ay nakatago",
+  "review.spoilerRevealLabel": "Ipakita spoiler"
 }

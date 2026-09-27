@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Авторські права & Зведомлення про зміст",
+  "copyright.section1.title": "Кунти і принципи контенту",
+  "copyright.section1.body": "ToonSpectrum - це платформа індексу та відкриття, яка підводять підсумок публічних метаданих каталогів (заголовки, автори, жанри і т.д.) з веб-тільників / веб-новидів.",
+  "copyright.section2.title": "Картини обкладу",
+  "copyright.section2.body": "Картини обкладу служать для ідентифікації міні-фільмів і посилання на оригінальні обклади платформи з посиланнями на джерело, коли це можливо.",
+  "copyright.section3.title": "Метрики та прозорості",
+  "copyright.section4.title": "Заява про права",
+  "copyright.section5.title": "Увідомлення про порушення авторських прав і виведення",
+  "copyright.section5.body": "Якщо ви вважаєте, що метадані або об'єкти порушують ваші права, будь ласка, подайте запит з назвою, URL і доказом власності.",
+  "copyright.leaveInquiry": "Задайте запит →"
 }

@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Tamamlandı",
+  "review.progress.binge": "Çıkış",
+  "review.progress.upcoming": "Planlı",
+  "review.progress.abandoned": "Düştü",
+  "review.progress.unknown": "Gizli ilerleme",
+  "review.spoilerRevealLabel": "Göster spoiler"
 }

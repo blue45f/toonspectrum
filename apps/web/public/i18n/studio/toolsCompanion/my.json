@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "အလွှာ {count}",
   "studio.toolsCompanion.review.section.comments": "မှတ်ချက် {count}",
   "studio.toolsCompanion.review.section.history": "မှတ်တမ်း {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE စာမျက်နှာLabel}·{ရွေးချယ်မှုLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "စစ်ဆေးရေးခလုတ်",
   "studio.toolsCompanion.review.truncatedComments": "နှင့် {count} မှတ်ချက်များ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} အလွှာများ",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "အကိုးအကား မျက်နှာပြင်",
   "studio.toolsCompanion.referenceLoading": "ရည်ညွှန်းကိရိယာကို ဖွင့်နေသည်...",
   "studio.toolsCompanion.footer": "စာရွက်စာတမ်းများကို တည်းဖြတ်ခြင်းသည် မူရင်းတက်ဘ်ကိုသာ ပိုင်ဆိုင်သည်။ ဤဝင်းဒိုးသည် တူညီသောဘရောက်ဆာ၏ BroadcastChannel သို့ ချုံ့ထားသော အစမ်းကြည့်ရှုခြင်းနှင့် စစ်ဆေးခြင်း/အကိုးအကားများကိုသာ ပေးပို့သည်ဖြစ်သောကြောင့် သီးခြားဆာဗာကုန်ကျစရိတ်မရှိပါ။",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "အဓိက စတူဒီယိုနဲ့ ဆက်သွယ်မှုမရှိဘူး။",
+  "studio.toolsCompanion.exit.editor": "Studio Editor ကို ဖွင့်ပါ"
 }

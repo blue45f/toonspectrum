@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Жүктөө",
+  "common.loading.short": "Жүктөө",
   "common.close": "Жабуу",
   "common.open": "Aчуу",
   "common.search": "Издөө",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Кайра аракет кыл",
+  "common.retry.short": "Кайра аракет кыл",
+  "common.backToTop": "Жогоруга кайтуу",
+  "common.backToHome": "Үйгө бар",
+  "common.loading.search": "Издеп...",
+  "common.notFoundWithQuery": "\" {query} \" деген дарылоонун жыйынтыгы жок.",
+  "common.openSearch": "Издөө аркылуу табыңыз →",
+  "common.loading.empty": "Эч кандай маалыматтар кайтарылбайт.",
+  "common.retry.all": "Дагы бир жолу аракет кыл, же үйүңө кайт."
 }

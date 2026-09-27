@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "မထောက်ပံ့တဲ့ ပုံတူအမျိုးအစား။",
+  "avatar.error.processFailed": "ပုံတွေကို မလုပ်နိုင်ခဲ့ဘူး။",
+  "avatar.processing": "စီမံကိန်း...",
+  "avatar.select": "ပုံပြင်ကို ပြောင်းလဲပါ",
+  "avatar.remove": "ပုံကို ဖယ်ရှားပါ",
+  "avatar.uploadHint": "JPG, PNG, နှင့် WEBP ပုံများသာ ထောက်ခံထားပြီး ကြိုတင်ကြည့်ရှုရန် ဖြတ်တောက်ထားသည်။",
+  "avatar.changeAria": "Profile ပုံကို ပြောင်းလဲပါ"
 }

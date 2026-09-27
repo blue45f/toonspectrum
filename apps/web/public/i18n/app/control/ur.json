@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "زبان",
+  "control.sound.enable": "صوتی اثرات کو فعال کریں",
+  "control.sound.disable": "صوتی اثرات کو غیر فعال کریں",
+  "control.theme.dark": "روشنی موڈ میں سوئچ کریں",
+  "control.theme.light": "اندھیرے موڈ میں سوئچ کریں",
+  "control.settings.open": "کھلی ترتیبات",
+  "control.settings.close": "بند سیٹنگز",
+  "control.cluster.settings": "آواز، موضوع، زبان کنٹرول",
+  "control.cluster.open": "کھلی ترتیبات",
+  "control.cluster.tooltip": "آواز، موضوع اور زبان کی ترتیبات",
+  "control.language.group.translated": "اعلی کوریج کے ترجمے",
+  "control.language.group.englishBase": "خودکار ترجمہ · انگریزی میں فال بیک"
 }

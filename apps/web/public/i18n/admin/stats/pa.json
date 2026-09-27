@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "ਸਿਹਤ ਪ੍ਰਣਾਲੀ",
+  "admin.stats.healthy": "ਸਿਹਤਮੰਦ",
+  "admin.stats.degraded": "ਘੱਟ ਕੀਤਾ ਗਿਆ",
+  "admin.stats.revenueEvents": "ਕੁੱਲ ਲੈਣ-ਦੇਣ / ਵਿਪੇਡ",
+  "admin.stats.usersCommunity": "ਕੁੱਲ ਮੈਂਬਰ / ਅਹੁਦੇ",
+  "admin.stats.maintenance": "ਰੱਖ ਰਖਾਵ ਦਾ ਢੰਗ",
+  "admin.stats.maintenanceOn": "ਐਮਰਜੈਂਸੀ ਰੱਖ ਰਖਾਵ (ON)",
+  "admin.stats.maintenanceOff": "ਆਮ ਕੰਮਕਾਜ (ਬੰਦ)",
+  "admin.stats.activeVisitors": "5 ਮਿੰਟ ਦੇ ਸਰਗਰਮ ਸੈਲਾਨੀ",
+  "admin.stats.views5m": "5 ਮਿੰਟ ਸਫ਼ੇ ਵੇਖਣ"
 }

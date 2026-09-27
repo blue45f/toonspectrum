@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "प्रतिक्रिया सर्वेक्षण लोड नहीं किया जा सका।",
+  "feedback.thankYou": "आपकी बहुमूल्य प्रतिक्रिया के लिए धन्यवाद!",
+  "feedback.anonymousNote": "आपकी प्रतिक्रियाओं को पूरी तरह से गुमनाम रखा गया है।",
+  "feedback.notAtAll": "बिल्कुल नहीं",
+  "feedback.definitely": "निश्चित रूप से"
 }

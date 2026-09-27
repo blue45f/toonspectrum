@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Livello {count}",
   "studio.toolsCompanion.review.section.comments": "Commenta {count}",
   "studio.toolsCompanion.review.section.history": "Registra {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZPLACEholder0ZZ · ZZPLACEholder1ZZ",
   "studio.toolsCompanion.review.title": "consolle di ispezione",
   "studio.toolsCompanion.review.truncatedComments": "e {count} commenti",
   "studio.toolsCompanion.review.truncatedLayers": "{count} livelli",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Schermata di riferimento",
   "studio.toolsCompanion.referenceLoading": "Caricamento strumento di riferimento...",
   "studio.toolsCompanion.footer": "Modifica i documenti possiedono solo la scheda predefinita. Questa finestra trasmette solo l'anteprima compressa e l'intento di ispezione/riferimento al BroadcastChannel dello stesso browser, quindi non vi è alcun costo del server separato.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Non è collegato allo studio principale.",
+  "studio.toolsCompanion.exit.editor": "Aprire l' editor Studio"
 }

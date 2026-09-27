@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "เลเยอร์ {count}",
   "studio.toolsCompanion.review.section.comments": "ความคิดเห็น {count}",
   "studio.toolsCompanion.review.section.history": "บันทึก {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE หน้าฉลาก}·{การเลือกฉลาก ZZ RBRACE",
   "studio.toolsCompanion.review.title": "คอนโซลการตรวจสอบ",
   "studio.toolsCompanion.review.truncatedComments": "และ {count} ความคิดเห็น",
   "studio.toolsCompanion.review.truncatedLayers": "{count} เลเยอร์",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "หน้าจออ้างอิง",
   "studio.toolsCompanion.referenceLoading": "กำลังโหลดเครื่องมืออ้างอิง...",
   "studio.toolsCompanion.footer": "แก้ไขเอกสารเป็นเจ้าของแท็บเริ่มต้นเท่านั้น หน้าต่างนี้จะส่งเฉพาะการแสดงตัวอย่างและการตรวจสอบ/การอ้างอิงที่บีบอัดไปยัง BroadcastChannel ของเบราว์เซอร์เดียวกัน ดังนั้นจึงไม่มีค่าใช้จ่ายเซิร์ฟเวอร์แยกต่างหาก",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "ไม่เชื่อมต่อกับสตูดิโอหลัก",
+  "studio.toolsCompanion.exit.editor": "เปิดโน้ตประกอบ Studio"
 }

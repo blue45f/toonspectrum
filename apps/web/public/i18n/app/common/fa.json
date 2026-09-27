@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "بارگیری",
+  "common.loading.short": "بارگیری",
   "common.close": "بستن",
   "common.open": "باز کردن",
   "common.search": "جستجو",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "دوباره امتحان کن",
+  "common.retry.short": "دوباره امتحان کن",
+  "common.backToTop": "برگرد به بالا",
+  "common.backToHome": "برو خونه",
+  "common.loading.search": "... دنبالش ميگردم",
+  "common.notFoundWithQuery": "هیچ نتیجه ای برای \" {query} \" دریافت نشد.",
+  "common.openSearch": "در جستجو پیدا کنید",
+  "common.loading.empty": "هیچ اطلاعاتی برگشت",
+  "common.retry.all": "دوباره امتحان کن يا برگرد خونه"
 }

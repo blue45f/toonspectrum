@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "ግብረመልስ ጥናት መጫን አልቻለም.",
+  "feedback.thankYou": "ስለሰጠኸው ጠቃሚ ግብረመልስ አመሰግናለሁ!",
+  "feedback.anonymousNote": "ምላሾችዎ በጥብቅ ስም አልባ ሆነው ይቆያሉ።",
+  "feedback.notAtAll": "በፍጹም አይደለም",
+  "feedback.definitely": "በእርግጠኝነት"
 }

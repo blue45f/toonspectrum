@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Тіл",
+  "control.sound.enable": "Дыбыс әсерін рұқсат ету",
+  "control.sound.disable": "Дыбыс эффекттерін өшіру",
+  "control.theme.dark": "Жарық режиміне ауысу",
+  "control.theme.light": "Қараңғы режимге ауысу",
+  "control.settings.open": "Ашық параметрлер",
+  "control.settings.close": "Жақын орнату",
+  "control.cluster.settings": "Дыбыс, тақырып, тілдік басқару",
+  "control.cluster.open": "Ашық параметрлер",
+  "control.cluster.tooltip": "Дыбыс, тақырып және тіл параметрлері",
+  "control.language.group.translated": "Көберек аудармалар",
+  "control.language.group.englishBase": "Автоматты аударма · ағылшынша аударма"
 }

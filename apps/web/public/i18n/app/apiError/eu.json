@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Sartu beharra dago.",
+  "apiError.adminRequired": "Admin baimena ezin da egiaztatu.",
+  "apiError.adminOnlyPage": "Orri hau administratzaileentzat da.",
+  "apiError.notFound": "Ez da aurkitu eskaera.",
+  "apiError.unsupportedType": "Ez da euskarri mota.",
+  "apiError.inactiveAccount": "Kontu ez aktiboek ezin dituzte administratzaileen funtzioak erabili.",
+  "apiError.settlementFailed": "Ez dabil."
 }

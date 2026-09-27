@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "స్పాన్సర్ చేసిన చిత్రం",
+  "ad.slotAriaLabel": "ప్రకటనల స్లాట్",
+  "ad.slotLabel": "స్పాన్సర్",
+  "ad.slotTitle": "స్పాన్సర్ చేసిన కంటెంట్",
+  "ad.ctaDetails": "వివరాలను వీక్షించండి",
+  "ad.placeholderAriaLabel": "ప్రకటన స్థానం",
+  "ad.placeholderText": "స్పాన్సర్ చేసిన కంటెంట్ అందుబాటులో లేదు.",
+  "ad.tag": "ప్రకటన"
 }

@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Kiire otsingud ja käskid...",
+  "admin.palette.placeholder": "Otsingute halduri käsk (Navigatsioon, CSV eksportimine, hooldus)...",
+  "admin.palette.empty": "Ei ole tulemusi.",
+  "admin.palette.groupNav": "Konsolli navigeerimisliidud",
+  "admin.palette.groupQuick": "Kiire tegevus ja ekspordi",
+  "admin.palette.exportUsers": "Ekspordi kõik liikmed CSV",
+  "admin.palette.exportRevenue": "Ekspordi tulusid käsitlev raamatupidamisregister",
+  "admin.palette.maintenance": "Kontrolli süsteem hädaolukorra hooldus"
 }

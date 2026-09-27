@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Oznámenia a bannery",
+  "admin.tabs.audit": "Údaje o audite",
+  "admin.tabs.campaigns": "Kampanie",
+  "admin.tabs.creatorSupport": "Podpora Stvoriteľa",
+  "admin.tabs.dashboard": "Vzorový panel",
+  "admin.tabs.ops": "Operácie",
+  "admin.tabs.plans": "Plány",
+  "admin.tabs.promos": "Výška povýšenia",
+  "admin.tabs.reports": "Správy a miernosť",
+  "admin.tabs.revenue": "Zúčtovanie",
+  "admin.tabs.security": "Bezpečnosť a IP",
+  "admin.tabs.inquiries": "Podnikové otázky",
+  "admin.tabs.supporters": "Podpora prevádzkových nákladov",
+  "admin.tabs.traffic": "Živo-živý dopyt"
 }

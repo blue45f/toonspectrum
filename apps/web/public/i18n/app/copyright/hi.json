@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "कॉपीराइट और सामग्री सूचना",
+  "copyright.section1.title": "सामग्री स्रोत और सिद्धांत",
+  "copyright.section1.body": "टूनस्पेक्ट्रम एक सूचकांक और खोज मंच है जो वेबटून / वेब उपन्यास प्लेटफार्मों से सार्वजनिक कैटलॉग मेटाडेटा (शीर्षक, लेखक, शैलियों, आदि) को सारांशित करता है। यह मुख्य अध्याय सामग्री की मेजबानी या पुनर्वितरण नहीं करता है; पढ़ना विशेष रूप से आधिकारिक लिंक के माध्यम से निर्देशित है।",
+  "copyright.section2.title": "कवर छवियां",
+  "copyright.section2.body": "कवर छवियां थंबनेल की पहचान के रूप में कार्य करती हैं और जहां भी संभव हो स्रोत लिंक के साथ संदर्भ मूल मंच कवर। अधिकार धारक के अनुरोध या नीति अपडेट पर प्रदर्शन को तुरंत अक्षम किया जा सकता है।",
+  "copyright.section3.title": "मेट्रिक्स और पारदर्शिता",
+  "copyright.section4.title": "अधिकार सूचना",
+  "copyright.section5.title": "प्रतिलिपि अधिकार उल्लंघन सूचना और निकासी",
+  "copyright.section5.body": "यदि आपको लगता है कि मेटाडेटा या कवर आपके अधिकारों का उल्लंघन करते हैं, तो कृपया शीर्षक, यूआरएल और स्वामित्व के प्रमाण के साथ एक पूछताछ प्रस्तुत करें।",
+  "copyright.leaveInquiry": "पूछताछ प्रस्तुत करें"
 }

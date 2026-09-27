@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Copyright & Content Taarifa",
+  "copyright.section1.title": "Chanzo cha Yaliyomo & Kanuni",
+  "copyright.section1.body": "ToonSpectrum ni faharisi na ugunduzi jukwaa muhtasari wa umma catalog metadata (jina, waandishi, aina, nk) kutoka webtoon / webnovel majukwaa.",
+  "copyright.section2.title": "Picha za Ufunikaji",
+  "copyright.section2.body": "Picha za kifuniko hutumika kama kutambua vifuniko na kumbukumbu ya kifuniko cha msingi cha jukwaa na viungo vya chanzo wakati wowote iwezekanavyo. Maonyesho yanaweza kufutwa mara moja kwa ombi la mmiliki wa haki au sasisho za sera.",
+  "copyright.section3.title": "Viwango na Uwazi",
+  "copyright.section4.title": "Tangazo la Haki",
+  "copyright.section5.title": "Uamuzi wa Ukiukaji wa Hati miliki & Kuondolewa",
+  "copyright.section5.body": "Ikiwa unaamini metadata au vifuniko vinavunja haki zako, tafadhali toa uchunguzi na jina, URL, na uthibitisho wa umiliki.",
+  "copyright.leaveInquiry": "Kuwasilisha uchunguzi →"
 }

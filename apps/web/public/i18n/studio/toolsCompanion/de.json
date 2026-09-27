@@ -8,8 +8,8 @@
   "studio.toolsCompanion.open.readyToOpen": "Vorbereiten eines Tool-Fensters · Es öffnet sich automatisch, nachdem die Verbindung hergestellt wurde",
   "studio.toolsCompanion.open.prepareTimeout": "Zeitüberschreitung bei der Vorbereitung des Werkzeugfensters. Bitte versuchen Sie es erneut.",
   "studio.toolsCompanion.open.unavailable": "Das Werkzeugfenster ist nicht verfügbar. Bitte versuchen Sie es erneut.",
-  "studio.toolsCompanion.title.default": "Studio",
-  "studio.toolsCompanion.title.studio": "Studio",
+  "studio.toolsCompanion.title.default": "Das Studio",
+  "studio.toolsCompanion.title.studio": "Das Studio",
   "studio.toolsCompanion.surface.workspace": "Werkzeugfenster",
   "studio.toolsCompanion.surface.navigator": "Canvas-Navigator",
   "studio.toolsCompanion.surface.review": "Inspektionskonsole",
@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Ebene {count}",
   "studio.toolsCompanion.review.section.comments": "Kommentar {count}",
   "studio.toolsCompanion.review.section.history": "Rekord {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{SelectionLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "Inspektionskonsole",
   "studio.toolsCompanion.review.truncatedComments": "und {count} Kommentare",
   "studio.toolsCompanion.review.truncatedLayers": "{count} Schichten",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referenzbildschirm",
   "studio.toolsCompanion.referenceLoading": "Referenztool wird geladen...",
   "studio.toolsCompanion.footer": "Bearbeitungsdokumente besitzen nur die Standardregisterkarte. Dieses Fenster überträgt nur die komprimierte Vorschau und die Inspektions-/Referenzabsicht an den BroadcastChannel desselben Browsers, sodass keine separaten Serverkosten anfallen.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Nicht mit dem Hauptstudio verbunden.",
+  "studio.toolsCompanion.exit.editor": "Öffnen Sie den Studio-Editor"
 }

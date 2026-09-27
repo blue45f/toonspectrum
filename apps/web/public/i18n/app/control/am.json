@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ቋንቋ",
+  "control.sound.enable": "የድምፅ ውጤቶችን ማስቻል",
+  "control.sound.disable": "የድምፅ ውጤቶችን ማሰናከል",
+  "control.theme.dark": "ወደ ብርሃን ሁነታ መቀየር",
+  "control.theme.light": "ወደ ጨለማ ሁነታ ይሂዱ",
+  "control.settings.open": "ክፍት ቅንብሮች",
+  "control.settings.close": "የቅርብ ቅንብሮች",
+  "control.cluster.settings": "የድምፅ፣ ጭብጥ፣ የቋንቋ መቆጣጠሪያዎች",
+  "control.cluster.open": "ክፍት ቅንብሮች",
+  "control.cluster.tooltip": "የድምፅ፣ የርዕስ እና የቋንቋ ቅንብሮች",
+  "control.language.group.translated": "ከፍተኛ ሽፋን ያላቸው ትርጉሞች",
+  "control.language.group.englishBase": "አውቶማቲክ ትርጉም · እንግሊዝኛ fallback"
 }

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Lager {count}",
   "studio.toolsCompanion.review.section.comments": "Kommentera {count}",
   "studio.toolsCompanion.review.section.history": "Spela in {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE sidaEtikett}·{urvalEtikett ZZ RBRACE",
   "studio.toolsCompanion.review.title": "inspektionskonsol",
   "studio.toolsCompanion.review.truncatedComments": "och {count} kommentarer",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lager",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referensskärm",
   "studio.toolsCompanion.referenceLoading": "Laddar referensverktyg...",
   "studio.toolsCompanion.footer": "Redigera dokument äger bara standardfliken. Detta fönster överför endast den komprimerade förhandsgranskningen och inspektions-/referensavsikten till BroadcastChannel i samma webbläsare, så det finns ingen separat serverkostnad.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Inte ansluten till huvudstudion.",
+  "studio.toolsCompanion.exit.editor": "Öppna Studio-redigeraren"
 }

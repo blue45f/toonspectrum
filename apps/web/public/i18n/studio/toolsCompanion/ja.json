@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "参考図",
   "studio.toolsCompanion.referenceLoading": "参照ツールを読み込み中…",
   "studio.toolsCompanion.footer": "編集可能なドキュメントを所有するのは主タブのみです。このウィンドウは、圧縮されたプレビューとレビュー/参照インテントのみを同じブラウザーのブロードキャスト チャネル経由で送信するため、別のサーバー コストは発生しません。",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "スタジオと繋がらない",
+  "studio.toolsCompanion.exit.editor": "スタジオエディタを開く"
 }

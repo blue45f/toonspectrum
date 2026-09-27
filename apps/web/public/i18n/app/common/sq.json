@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Po ngarkohet",
+  "common.loading.short": "Po ngarkohet",
   "common.close": "Mbyll",
   "common.open": "Hap",
   "common.search": "Kërko",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Provo sërish",
+  "common.retry.short": "Provo sërish",
+  "common.backToTop": "Kthehu në krye",
+  "common.backToHome": "Get home",
+  "common.loading.search": "Po kërkon…",
+  "common.notFoundWithQuery": "Nuk ka rezultate për '{query}'.",
+  "common.openSearch": "Gjeni atë në Search →",
+  "common.loading.empty": "️️️️️️️️️️️️️️️️",
+  "common.retry.all": "️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️"
 }

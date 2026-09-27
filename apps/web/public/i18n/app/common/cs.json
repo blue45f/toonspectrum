@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Náklad",
+  "common.loading.short": "Náklad",
   "common.close": "Zavřít",
   "common.open": "Otevřít",
   "common.search": "Hledat",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Zkuste to znovu.",
+  "common.retry.short": "Zkuste to znovu.",
+  "common.backToTop": "Zpět na vrchol.",
+  "common.backToHome": "Jdi domů.",
+  "common.loading.search": "Hledám...",
+  "common.notFoundWithQuery": "Žádné výsledky pro \" {query} \".",
+  "common.openSearch": "Najděte to ve vyhledávání",
+  "common.loading.empty": "Žádná data se nevrátila.",
+  "common.retry.all": "Zkus to znovu nebo se vrať domů."
 }

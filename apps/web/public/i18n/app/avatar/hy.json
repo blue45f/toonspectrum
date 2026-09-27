@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "Աջակցված չէ պատկերների տիպը:",
+  "avatar.error.processFailed": "Չկարողացա վերամշակել պատկերները:",
+  "avatar.processing": "Գործողություն...",
+  "avatar.select": "Լուսանկարը փոխել",
+  "avatar.remove": "Հեռացնել պատկեր",
+  "avatar.uploadHint": "Միայն JPG, PNG եւ WEBP պատկերները աջակցվում են, ապա կտրվում են նախօրոք դիտելու համար:",
+  "avatar.changeAria": "Փոխել պրոֆիլային պատկեր"
 }

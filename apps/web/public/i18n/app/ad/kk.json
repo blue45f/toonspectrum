@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Қолдалған сурет",
+  "ad.slotAriaLabel": "Жарнамалық орын",
+  "ad.slotLabel": "Қолдау",
+  "ad.slotTitle": "Қолданған мазмұн",
+  "ad.ctaDetails": "Толығырақ қарау",
+  "ad.placeholderAriaLabel": "Жарнамалық орындық",
+  "ad.placeholderText": "Қолда бар спонсорлық мазмұн жоқ.",
+  "ad.tag": "Жарнама"
 }

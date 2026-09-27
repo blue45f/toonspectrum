@@ -7,7 +7,7 @@
   "studio.settings.tool.eraser": "ຢາງລົບ",
   "studio.settings.tool.blend": "ປະສົມ (ຂີ້ຝຸ່ນ)",
   "studio.settings.tool.wetMix": "ແປງສີ",
-  "studio.settings.tool.dodgeBurn": "Dodge/Burn",
+  "studio.settings.tool.dodgeBurn": "Dodge / Burn",
   "studio.settings.tool.liquify": "ສະພາບຄ່ອງ",
   "studio.settings.tool.fill": "ຄຸທາສີ",
   "studio.settings.tool.lassoFill": "ຕື່ມ Lasso",
@@ -48,7 +48,7 @@
   "studio.settings.shortcut.toolComment": "ຄໍາ​ເຫັນ​ສະ​ຖານ​ທີ່​",
   "studio.settings.shortcut.toolBlend": "ປະສົມ (ຂີ້ຝຸ່ນ)",
   "studio.settings.shortcut.toolWetMix": "ແປງສີ",
-  "studio.settings.shortcut.toolDodgeBurn": "Dodge/Burn",
+  "studio.settings.shortcut.toolDodgeBurn": "Dodge / Burn",
   "studio.settings.shortcut.toolLiquify": "ສະພາບຄ່ອງ",
   "studio.settings.shortcut.toolLettering": "ຕົວອັກສອນ (ປູມເປົ້າຂໍ້ຄວາມ/ສຽງເວົ້າ)",
   "studio.settings.shortcut.undo": "ຍົກເລີກ",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "ເຊື່ອງໄວ້",
   "studio.settings.state.show": "ເຊັນ",
   "studio.settings.state.open": "ເປີດ",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "ສ້າງຕົວອັກສອນ"
 }

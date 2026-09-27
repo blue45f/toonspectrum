@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Oikeus- ja sisällön ilmoitus",
+  "copyright.section1.title": "Sisällönlähteet ja periaatteet",
+  "copyright.section1.body": "ToonSpectrum on indeksin ja löytöalan alusto, joka yhteenvetoi julkisia kataloogien metatietoja ( otsikot, tekijät, genrejä jne.) webtoon- ja webnovel-alustoista. Se ei toimi pääkirjojen sisällön vastaanottamiseksi tai jakelussa uudelleen; lukemista ohjattiin yksinomaan virallisten linkkien kautta.",
+  "copyright.section2.title": "Peitevalokuvat",
+  "copyright.section2.body": "Peitevalokuvat ovat tunnistuskuvia ja viittaus alkuperäiseen alustan peitevalokuviin, joissa on mahdollisuuksien mukaan lähteen linkit.",
+  "copyright.section3.title": "Metrikit ja läpinäkyvyys",
+  "copyright.section4.title": "Oikeuksien ilmoitus",
+  "copyright.section5.title": "Oikeusoikeuksien rikkomisesta ilmoitus ja poistaminen",
+  "copyright.section5.body": "Jos uskot, että metatiedot tai peitteet rikkoo oikeuksiasi, lähetä kysely, jossa on otsikko, URL ja omistuksen todistus.",
+  "copyright.leaveInquiry": "• Ehdotus:"
 }

@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Լեզու",
+  "control.sound.enable": "Աջակցել ձայնային ազդեցությունները",
+  "control.sound.disable": "Անջատեք ձայնային ազդեցությունները",
+  "control.theme.dark": "Սեղմեք լուսավորության ռեժիմը",
+  "control.theme.light": "Փոխել մութ ռեժիմ",
+  "control.settings.open": "Բաց կարգավորումներ",
+  "control.settings.close": "Հակառուցման կարգավորումները",
+  "control.cluster.settings": "Ձայն, թեման, լեզուային վերահսկողություն",
+  "control.cluster.open": "Բաց կարգավորումներ",
+  "control.cluster.tooltip": "Ձայնի, թեմաների եւ լեզվի կարգավորումները",
+  "control.language.group.translated": "Բարձր ծավալի թարգմանություններ",
+  "control.language.group.englishBase": "Ավտոմատ թարգմանություն"
 }

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Be kell lépni.",
+  "apiError.adminRequired": "Az admin jogosultságokat nem lehetett ellenőrizni.",
+  "apiError.adminOnlyPage": "Ez a oldal csak adminisztrátorokra vonatkozik.",
+  "apiError.notFound": "Nem találták meg a kért tételt.",
+  "apiError.unsupportedType": "Nem támogatott tartalomtípus.",
+  "apiError.inactiveAccount": "A nem aktív fiókok nem használhatnak adminisztrátor funkciókat.",
+  "apiError.settlementFailed": "A rendezés nem sikerült."
 }

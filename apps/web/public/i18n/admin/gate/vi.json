@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Đang nhập yêu cầu",
+  "admin.gate.guestBody": "Console quản trị cần xác thực.",
+  "admin.gate.forbiddenTitle": "Admin Permission cần thiết",
+  "admin.gate.forbiddenBody": "Tài khoản này không có quyền quản trị. Liên hệ với một nhà điều hành nếu cần thiết.",
+  "admin.gate.errorTitle": "Không tải console"
 }

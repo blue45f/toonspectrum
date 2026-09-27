@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "அடுக்கு {count}",
   "studio.toolsCompanion.review.section.comments": "கருத்து {count}",
   "studio.toolsCompanion.review.section.history": "பதிவு {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE பக்கலேபிள்}·{தேர்வுலேபிள் ZZ RBRACE",
   "studio.toolsCompanion.review.title": "ஆய்வு பணியகம்",
   "studio.toolsCompanion.review.truncatedComments": "மற்றும் {count} கருத்துகள்",
   "studio.toolsCompanion.review.truncatedLayers": "{count} அடுக்குகள்",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "குறிப்பு திரை",
   "studio.toolsCompanion.referenceLoading": "குறிப்பு கருவியை ஏற்றுகிறது...",
   "studio.toolsCompanion.footer": "ஆவணங்களைத் திருத்தவும் இயல்புநிலை தாவலுக்கு மட்டுமே சொந்தமானது. இந்த சாளரம் சுருக்கப்பட்ட முன்னோட்டம் மற்றும் ஆய்வு/குறிப்பு நோக்கத்தை மட்டுமே அதே உலாவியின் BroadcastChannelக்கு அனுப்புகிறது, எனவே தனி சேவையக செலவு இல்லை.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "பிரதான ஸ்டுடியோ இணைக்கப்படவில்லை.",
+  "studio.toolsCompanion.exit.editor": "ஸ்டுடியோ எடிட்டரைத் திறக்கவும்"
 }

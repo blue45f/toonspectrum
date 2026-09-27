@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "स्कोर का विभाजन देखें",
+  "ranking.metric.views": "विचार",
+  "ranking.why": "क्यों",
+  "ranking.breakdownTitle": "स्कोर का विखंडन",
+  "ranking.totalScore": "कुल स्कोर",
+  "ranking.breakdownDescription": "अक्ष भार और शीर्षक-विशिष्ट सामान्यीकरण के साथ गणना की गई।"
 }

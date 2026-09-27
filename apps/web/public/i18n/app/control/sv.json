@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Språk",
+  "control.sound.enable": "Släpp ljudeffekter",
+  "control.sound.disable": "Inaktiverar ljudeffekter",
+  "control.theme.dark": "Öppna till ljusläge",
+  "control.theme.light": "Skicka till mörkt läge",
+  "control.settings.open": "Öppna inställningar",
+  "control.settings.close": "Stängda inställningar",
+  "control.cluster.settings": "Ljud, tema, språkkontroll",
+  "control.cluster.open": "Öppna inställningar",
+  "control.cluster.tooltip": "Ljud, tema och språk inställningar",
+  "control.language.group.translated": "Översättningar med hög täckning",
+  "control.language.group.englishBase": "Automatisk översättning · Engelska fallback"
 }

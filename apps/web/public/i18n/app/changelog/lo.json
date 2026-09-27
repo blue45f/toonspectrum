@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "ບໍ່ສາມາດໂຫລດຂໍ້ມູນເພີ່ມເຕີມໄດ້.",
+  "changelog.empty": "ຍັງບໍ່ມີບັນທຶກການອັບເດດລົງເທື່ອ."
 }

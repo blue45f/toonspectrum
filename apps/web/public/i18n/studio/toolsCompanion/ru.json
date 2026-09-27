@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Слой {count}",
   "studio.toolsCompanion.review.section.comments": "Комментарий {count}",
   "studio.toolsCompanion.review.section.history": "Запись {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Страница ZZLBRACEМетка}· Выбор ZZLBRACEМетка ZZ RBRACE",
   "studio.toolsCompanion.review.title": "инспекционная консоль",
   "studio.toolsCompanion.review.truncatedComments": "и {count} комментариев",
   "studio.toolsCompanion.review.truncatedLayers": "{count} слоев",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Справочный экран",
   "studio.toolsCompanion.referenceLoading": "Загрузка справочного инструмента...",
   "studio.toolsCompanion.footer": "Редактировать документы принадлежит только вкладка по умолчанию. Это окно передает только сжатый предварительный просмотр и намерение проверки/ссылки на BroadcastChannel того же браузера, поэтому отдельная плата за сервер не взимается.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Не подключен к главной студии.",
+  "studio.toolsCompanion.exit.editor": "Откройте редактор студии"
 }

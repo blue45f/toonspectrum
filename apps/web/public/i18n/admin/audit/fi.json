@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Hallintarkastustiedot",
+  "admin.audit.desc": "Seuraa kaikki hallintotoimet, lupavaihdot ja konfiguraatiomuutokset.",
+  "admin.audit.searchPlaceholder": "Etsi (viesti/toiminta)...",
+  "admin.audit.loading": "-Lähdytään tarkastusluetteloita.",
+  "admin.audit.empty": "Ei havaittuja tarkastusluetteloita.",
+  "admin.audit.viewDetails": "Näytä",
+  "admin.audit.modalTitle": "Tarkastuspäiväkirjan yksityiskohdat",
+  "admin.audit.close": "Lähes"
 }

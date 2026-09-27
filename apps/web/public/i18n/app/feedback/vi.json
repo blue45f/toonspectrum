@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "Không thể tải được khảo sát phản hồi.",
+  "feedback.thankYou": "Cảm ơn bạn đã đưa ra những phản hồi quý giá!",
+  "feedback.anonymousNote": "Những câu trả lời của bạn được giữ kín.",
+  "feedback.notAtAll": "Chưa bao giờ",
+  "feedback.definitely": "Chắc chắn là"
 }

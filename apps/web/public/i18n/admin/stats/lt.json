@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Sveikatos sistema",
+  "admin.stats.healthy": "Sveikas",
+  "admin.stats.degraded": "Nustatyta",
+  "admin.stats.revenueEvents": "Bendras sandorius / atsiskaitymas",
+  "admin.stats.usersCommunity": "Bendras narių / pareigų skaičius",
+  "admin.stats.maintenance": "Prižiūrimo režimas",
+  "admin.stats.maintenanceOn": "Nagios techninė priežiūra (ON)",
+  "admin.stats.maintenanceOff": "Normalinė eksploatacija (išjungta)",
+  "admin.stats.activeVisitors": "5 minučių aktyvūs lankytojai",
+  "admin.stats.views5m": "5 min puslapių lankymai"
 }

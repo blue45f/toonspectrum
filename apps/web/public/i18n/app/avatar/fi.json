@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "Kuvan tyyppistä ei tueta.",
+  "avatar.error.processFailed": "- Ei käsitelty kuvaa.",
+  "avatar.processing": "- Käsitteleminen...",
+  "avatar.select": "Muuttaudu kuva",
+  "avatar.remove": "Poista kuva",
+  "avatar.uploadHint": "Vain JPG, PNG ja WEBP-kuvat tukevat, ja ne leikataan esiarvioon.",
+  "avatar.changeAria": "Muuttaudu profiilikuva"
 }

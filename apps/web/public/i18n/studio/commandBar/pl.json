@@ -6,7 +6,7 @@
   "studio.commandBar.settingsClose": "Zamknij ustawienia paska poleceń",
   "studio.commandBar.settingsStorageNote": "Układ slotów jest zapisywany w ustawieniach obszaru roboczego tej przeglądarki.",
   "studio.commandBar.showSlots": "Pokaż sloty poleceń",
-  "studio.commandBar.slot": "Slot {index}",
+  "studio.commandBar.slot": "Słotka {index}",
   "studio.commandBar.slotAria": "Slot polecenia {index}",
   "studio.commandBar.slotEmpty": "Pusty slot",
   "studio.commandBar.resetDefaults": "Przywróć domyślny układ",

@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "ആരോഗ്യ സംവിധാനം",
+  "admin.stats.healthy": "ആരോഗ്യകരമായ",
+  "admin.stats.degraded": "താഴ്ത്തി",
+  "admin.stats.revenueEvents": "മൊത്തം ഇടപാടുകൾ / സെറ്റിൽമെന്റുകൾ",
+  "admin.stats.usersCommunity": "അംഗങ്ങളുടെ എണ്ണം / സ്ഥാനം",
+  "admin.stats.maintenance": "അറ്റകുറ്റപ്പണിയുടെ രീതി",
+  "admin.stats.maintenanceOn": "അടിയന്തിര അറ്റകുറ്റപ്പണി (ON)",
+  "admin.stats.maintenanceOff": "സാധാരണ പ്രവർത്തനം (ഓഫ്)",
+  "admin.stats.activeVisitors": "5 മിനിറ്റ് സജീവ സന്ദർശകർ",
+  "admin.stats.views5m": "5 മിനിറ്റ് പേജ് കാഴ്ചകൾ"
 }

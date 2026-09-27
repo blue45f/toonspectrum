@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "နောက်ဆုံးဗားရှင်းကို ပြန်လည်တင်နေတာပါ။",
+  "error.chunkRetryFailed": "တစ်ကြိမ် ပြန်လည်ဆန်းသစ်ခဲ့ပေမဲ့ ပြဿနာက ဆက်ရှိနေပါသေးတယ်",
+  "error.reloadButton": "စာမျက်နှာကို ပြန်လည်တင်သွင်းခြင်း",
+  "error.goHome": "အိမ်ပြန်",
+  "error.retryDesc": "ထပ်ပြီး စမ်းကြည့်ပါ ဒါမှမဟုတ် အိမ်စာမျက်နှာကို ပြန်သွားပါ"
 }

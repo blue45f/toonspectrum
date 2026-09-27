@@ -7,7 +7,7 @@
   "studio.settings.tool.eraser": "гумичка",
   "studio.settings.tool.blend": "Смесете (размажете)",
   "studio.settings.tool.wetMix": "четка за смесване на цветовете",
-  "studio.settings.tool.dodgeBurn": "Dodge/Burn",
+  "studio.settings.tool.dodgeBurn": "Додж/Бърн",
   "studio.settings.tool.liquify": "Втечнявам",
   "studio.settings.tool.fill": "кофа за боя",
   "studio.settings.tool.lassoFill": "Запълване с ласо",
@@ -48,7 +48,7 @@
   "studio.settings.shortcut.toolComment": "коментари за местоположение",
   "studio.settings.shortcut.toolBlend": "Смесете (размажете)",
   "studio.settings.shortcut.toolWetMix": "четка за смесване на цветовете",
-  "studio.settings.shortcut.toolDodgeBurn": "Dodge/Burn",
+  "studio.settings.shortcut.toolDodgeBurn": "Додж/Бърн",
   "studio.settings.shortcut.toolLiquify": "Втечнявам",
   "studio.settings.shortcut.toolLettering": "Надпис (балон с текст/реч)",
   "studio.settings.shortcut.undo": "отмяна",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "скрит",
   "studio.settings.state.show": "знак",
   "studio.settings.state.open": "отворен",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "Създаване на персонаж"
 }

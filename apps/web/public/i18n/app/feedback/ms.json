@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "Tidak dapat memuat survei maklum balas.",
+  "feedback.thankYou": "Terima kasih atas maklum balas berharga anda!",
+  "feedback.anonymousNote": "Jawapan anda disimpan secara ketat tanpa nama.",
+  "feedback.notAtAll": "Tidak sama sekali.",
+  "feedback.definitely": "Sudah pasti."
 }

@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "प्रशासकीय लेखा नोंदी",
+  "admin.audit.desc": "सर्व प्रशासकीय क्रिया, परवानगी बदल आणि कॉन्फिगरेशन बदल यांचे मागोवा घ्या.",
+  "admin.audit.searchPlaceholder": "शोध (ईमेल/कारवाई)...",
+  "admin.audit.loading": "ऑडिट लॉग लोड करत आहे.",
+  "admin.audit.empty": "नोंदणीकृत लेखा नोंदी नाहीत.",
+  "admin.audit.viewDetails": "दृश्य",
+  "admin.audit.modalTitle": "ऑडिट लॉग तपशील",
+  "admin.audit.close": "जवळ"
 }

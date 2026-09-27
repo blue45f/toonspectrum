@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "განცხადებები და ბანერები",
+  "admin.tabs.audit": "აუდიტის დღიურები",
+  "admin.tabs.campaigns": "კამპანიები",
+  "admin.tabs.creatorSupport": "შემოქმედის მხარდაჭერა",
+  "admin.tabs.dashboard": "დაშბორდი",
+  "admin.tabs.ops": "ოპერაციები",
+  "admin.tabs.plans": "გეგმები",
+  "admin.tabs.promos": "წინასაარჩევნო რეჟიმი",
+  "admin.tabs.reports": "ანგარიშები და ზომიერება",
+  "admin.tabs.revenue": "დასახლება",
+  "admin.tabs.security": "უსაფრთხოება & IP",
+  "admin.tabs.inquiries": "ბიზნესის გამოკითხვები",
+  "admin.tabs.supporters": "ოპერაციული ხარჯების მხარდაჭერა",
+  "admin.tabs.traffic": "პირდაპირი მოძრაობა"
 }

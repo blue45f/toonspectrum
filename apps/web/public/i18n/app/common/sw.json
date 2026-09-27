@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Kubeba",
+  "common.loading.short": "Kubeba",
   "common.close": "Funga",
   "common.open": "Fungua",
   "common.search": "Tafuta",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Jaribu tena",
+  "common.retry.short": "Jaribu tena",
+  "common.backToTop": "Kurudi juu",
+  "common.backToHome": "Nenda nyumbani",
+  "common.loading.search": "Kutafuta...",
+  "common.notFoundWithQuery": "Hakuna matokeo ya ' {query} '.",
+  "common.openSearch": "Tafuta Katika Kutafuta →",
+  "common.loading.empty": "Hakuna data zilizorejeshwa.",
+  "common.retry.all": "Jaribu tena au urudi nyumbani."
 }

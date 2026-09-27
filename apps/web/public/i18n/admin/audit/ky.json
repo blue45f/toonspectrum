@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Админдик аудит журналдары",
+  "admin.audit.desc": "Бардык административдик иш-аракеттерди, уруксат алмашууларды жана конфигурациянын өзгөрүүлөрүн көзөмөлдөө.",
+  "admin.audit.searchPlaceholder": "Издөө (электрондук почта/аракет)...",
+  "admin.audit.loading": "Аудиттик журналдарды жүктөп...",
+  "admin.audit.empty": "Аудитордук эсептер жок.",
+  "admin.audit.viewDetails": "Көрсөтүү",
+  "admin.audit.modalTitle": "Текшерүү журналынын деталдуулугу",
+  "admin.audit.close": "Жакында"
 }

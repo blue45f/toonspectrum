@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "ប្រភេទរូបភាពដែលមិនគាំទ្រ",
+  "avatar.error.processFailed": "មិនអាចធ្វើរូបភាពបានទេ។",
+  "avatar.processing": "ការប្រតិបត្តិការ...",
+  "avatar.select": "ប្តូររូបភាព",
+  "avatar.remove": "លុបរូបភាព",
+  "avatar.uploadHint": "មានតែរូបភាព JPG, PNG, និង WEBP ប៉ុណ្ណោះដែលត្រូវបានគាំទ្រ, បន្ទាប់មកត្រូវបានកាត់សម្រាប់មើលមុន។",
+  "avatar.changeAria": "ប្តូរ រូបភាព ឯកសារ"
 }

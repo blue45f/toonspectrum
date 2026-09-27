@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "Resum de la liquidació (últim 30 dies)",
+  "admin.revenue.loadError": "No s'ha carregat el registre de ingressos",
+  "admin.revenue.filterAll": "Tots ells",
+  "admin.revenue.filterPending": "Esperant",
+  "admin.revenue.filterApproved": "Aprovat",
+  "admin.revenue.filterPaid": "Resoluta",
+  "admin.revenue.filterRejected": "Rejecte",
+  "admin.revenue.filterRevoked": "Cancel·lació",
+  "admin.revenue.empty": "No hi ha acords de liquidació corresponents a aquest estatus.",
+  "admin.revenue.approve": "Aprovació",
+  "admin.revenue.reject": "Rejecció",
+  "admin.revenue.settle": "Completament d'acord",
+  "admin.revenue.revoke": "Cancel·lar"
 }

@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "ប្រព័ន្ធ សុខភាព",
+  "admin.stats.healthy": "សុខភាព",
+  "admin.stats.degraded": "ធ្លាក់ចុះ",
+  "admin.stats.revenueEvents": "ការចាត់ការ / ការបន្ធូរបន្ថយប្រាក់",
+  "admin.stats.usersCommunity": "សមាជិក / តំណែង សរុប",
+  "admin.stats.maintenance": "Mode ការថែទាំ",
+  "admin.stats.maintenanceOn": "ការថែទាំបន្ទាន់ (ON)",
+  "admin.stats.maintenanceOff": "ការ ដំណើរការ ធម្មតា (OFF)",
+  "admin.stats.activeVisitors": "អ្នក ទស្សនា សកម្ម ៥ នាទី",
+  "admin.stats.views5m": "5 នាទី ការមើល ទំព័រ"
 }

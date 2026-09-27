@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Hindi ko na nai-load ang mga update.",
+  "changelog.empty": "Walang mga update log na nai-post pa."
 }

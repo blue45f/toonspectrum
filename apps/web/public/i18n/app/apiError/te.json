@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "లాగిన్ అవసరం.",
+  "apiError.adminRequired": "నిర్వాహక అనుమతులను ధృవీకరించలేకపోయాము.",
+  "apiError.adminOnlyPage": "ఈ పేజీ నిర్వాహకులకు మాత్రమే పరిమితం.",
+  "apiError.notFound": "అభ్యర్థించిన వస్తువును కనుగొనలేకపోయాము.",
+  "apiError.unsupportedType": "మద్దతు లేని కంటెంట్ రకం.",
+  "apiError.inactiveAccount": "క్రియాశీల ఖాతాల నిర్వాహక లక్షణాలను ఉపయోగించలేరు.",
+  "apiError.settlementFailed": "పరిష్కారం ప్రాసెసింగ్ విఫలమైంది."
 }

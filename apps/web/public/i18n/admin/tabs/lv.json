@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Piezīme un plakāti",
+  "admin.tabs.audit": "Revīzijas žurnāli",
+  "admin.tabs.campaigns": "Kampanjas",
+  "admin.tabs.creatorSupport": "Stāsts atbalsts",
+  "admin.tabs.dashboard": "Kontrolbords",
+  "admin.tabs.ops": "Operācijas",
+  "admin.tabs.plans": "Plāni",
+  "admin.tabs.promos": "Priekšlikumi",
+  "admin.tabs.reports": "Ziņojumi & Moderācija",
+  "admin.tabs.revenue": "Apmierinājums",
+  "admin.tabs.security": "Bezpečība & IP",
+  "admin.tabs.inquiries": "Uzņēmuma pieprasījumi",
+  "admin.tabs.supporters": "Operācijas izmaksu atbalsts",
+  "admin.tabs.traffic": "Reģistrācijas numurs"
 }

@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "දර්ශන ලකුණු බෙදීම",
+  "ranking.metric.views": "අදහස්",
+  "ranking.why": "ඇයි?",
+  "ranking.breakdownTitle": "ලකුණු බෙදීම",
+  "ranking.totalScore": "සමස්ත ලකුණු",
+  "ranking.breakdownDescription": "අක්ෂයේ බර සහ නාමයට අදාළ සාමාන් යකරණයන් සමඟ ගණනය කර ඇත."
 }

@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "அறிவிப்புகள் & பேனர்கள்",
+  "admin.tabs.audit": "தணிக்கை பதிவுகள்",
+  "admin.tabs.campaigns": "பிரச்சாரங்கள்",
+  "admin.tabs.creatorSupport": "படைப்பாளரின் ஆதரவு",
+  "admin.tabs.dashboard": "டாஷ்போர்டு",
+  "admin.tabs.ops": "செயல்பாடுகள்",
+  "admin.tabs.plans": "திட்டங்கள்",
+  "admin.tabs.promos": "பதவி உயர்வுகள்",
+  "admin.tabs.reports": "அறிக்கைகள் & மிதமான தன்மை",
+  "admin.tabs.revenue": "தீர்வு",
+  "admin.tabs.security": "பாதுகாப்பு & ஐபி",
+  "admin.tabs.inquiries": "வணிக விசாரணைகள்",
+  "admin.tabs.supporters": "செயல்பாட்டு செலவுகளுக்கான ஆதரவு",
+  "admin.tabs.traffic": "நேரடி போக்குவரத்து"
 }

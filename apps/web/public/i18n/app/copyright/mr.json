@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "कॉपीराइट आणि सामग्री सूचना",
+  "copyright.section1.title": "सामग्री स्त्रोत आणि तत्त्वे",
+  "copyright.section1.body": "ToonSpectrum हे एक इंडेक्स आणि डिस्कवरी प्लॅटफॉर्म आहे जे वेबटून / वेबनॉवेल प्लॅटफॉर्मवरील सार्वजनिक कॅटलॉग मेटाडेटा (शीर्षक, लेखक, शैली इ.) चे सारांश देते. हे मुख्य अध्याय सामग्री होस्ट किंवा पुनर्वितरण करत नाही; वाचन केवळ अधिकृत दुव्यांद्वारे निर्देशित केले जाते.",
+  "copyright.section2.title": "आवरण प्रतिमा",
+  "copyright.section2.body": "कव्हर प्रतिमा लघुप्रतिमा ओळखण्यासाठी आणि शक्य असल्यास स्रोत दुव्यांसह संदर्भ मूळ प्लॅटफॉर्म कव्हर म्हणून कार्य करतात. हक्कधारकांच्या विनंतीवर किंवा धोरण अद्यतनांवरून प्रदर्शन त्वरित अक्षम केले जाऊ शकते.",
+  "copyright.section3.title": "मेट्रिक्स आणि पारदर्शकता",
+  "copyright.section4.title": "अधिकार सूचना",
+  "copyright.section5.title": "कॉपीराइट उल्लंघनाची सूचना आणि काढून टाकणे",
+  "copyright.section5.body": "जर तुम्हाला वाटत असेल की मेटाडेटा किंवा कव्हर तुमच्या हक्कांचे उल्लंघन करतात तर कृपया शीर्षक, URL आणि मालकीचा पुरावा असलेले एक चौकशी सादर करा.",
+  "copyright.leaveInquiry": "चौकशी सादर करा"
 }

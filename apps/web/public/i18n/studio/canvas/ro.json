@@ -4,7 +4,7 @@
   "studio.canvas.background": "culoarea de fundal",
   "studio.canvas.backgroundPresetAria": "Fundal {label}",
   "studio.canvas.gradient": "fundal gradient",
-  "studio.canvas.gradientPresetAria": "Gradient {label}",
+  "studio.canvas.gradientPresetAria": "{label}",
   "studio.canvas.openBackgroundEditor": "Deschideți Editor de fundal/Redimensionare",
   "studio.canvas.height": "înălțime",
   "studio.canvas.heightDecrease": "Reduceți înălțimea {amount}px",

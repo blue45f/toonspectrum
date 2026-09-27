@@ -1,5 +1,5 @@
 {
-  "footer.brand": "ToonStudio",
+  "footer.brand": "該網站是\"ToonStudio\"",
   "footer.section.brand": "顯示光譜",
   "footer.community": "社群",
   "footer.section.browse": "探索",
@@ -46,7 +46,7 @@
   "footer.tagline": "From an idea to your first scene. A creative space for your story.",
   "footer.link.about": "關於ToonStudio",
   "footer.description.primary": "From an idea to your first scene. Explore drawing, comics and 3D scenes in your browser.",
-  "footer.logoTag": "CREATE YOUR NEXT STORY",
+  "footer.logoTag": "創建你的下一個故事",
   "footer.copyrightLine": "© {year} ToonStudio（測試版）。版權所有。",
   "footer.description.secondary": "Create your own story and discover inspiration from other creators."
 }

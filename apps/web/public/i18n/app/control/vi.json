@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Ngôn ngữ",
+  "control.sound.enable": "Khả năng hiệu ứng âm thanh",
+  "control.sound.disable": "Thiết lập hiệu ứng âm thanh",
+  "control.theme.dark": "Chuyển sang chế độ ánh sáng",
+  "control.theme.light": "Chuyển sang chế độ tối",
+  "control.settings.open": "Mở cài đặt",
+  "control.settings.close": "Thiết lập gần",
+  "control.cluster.settings": "Âm thanh, chủ đề, kiểm soát ngôn ngữ",
+  "control.cluster.open": "Mở cài đặt",
+  "control.cluster.tooltip": "Âm thanh, chủ đề và ngôn ngữ",
+  "control.language.group.translated": "Các bản dịch có sự bao phủ cao",
+  "control.language.group.englishBase": "Dịch tự động · tiếng Anh fallback"
 }

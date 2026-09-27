@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "စာမျက်နှာကို ရှာမတွေ့",
+  "page.notFound.message": "URL ကို ထပ်ပြီး စစ်ဆေးပါ (သို့) ပင်မစာမျက်နှာမှ ခေါင်းစဉ်များကို ရှာဖွေပါ။",
+  "page.notFound.home": "အိမ်ပြန်သွားပါ"
 }

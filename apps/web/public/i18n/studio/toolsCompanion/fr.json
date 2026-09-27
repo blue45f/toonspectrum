@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Couche {count}",
   "studio.toolsCompanion.review.section.comments": "Commentaire {count}",
   "studio.toolsCompanion.review.section.history": "Enregistrer {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Page ZZLBRACEÉtiquette}· Sélection ZZLBRACEÉtiquette ZZ RBRACE",
   "studio.toolsCompanion.review.title": "console d'inspection",
   "studio.toolsCompanion.review.truncatedComments": "et commentaires {count}",
   "studio.toolsCompanion.review.truncatedLayers": "{count} couches",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Écran de référence",
   "studio.toolsCompanion.referenceLoading": "Chargement de l'outil de référence...",
   "studio.toolsCompanion.footer": "Modifier les documents ne possède que l'onglet par défaut. Cette fenêtre transmet uniquement l'aperçu compressé et l'intention d'inspection/référence au BroadcastChannel du même navigateur, il n'y a donc pas de coût de serveur séparé.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Pas connecté au studio principal.",
+  "studio.toolsCompanion.exit.editor": "Ouvrez l' éditeur Studio"
 }

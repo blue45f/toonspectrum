@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "ಲೋಡ್",
+  "common.loading.short": "ಲೋಡ್",
   "common.close": "ಮುಚ್ಚಿ",
   "common.open": "ತೆರೆಯಿರಿ",
   "common.search": "ಹುಡುಕಿ",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+  "common.retry.short": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+  "common.backToTop": "ಮತ್ತೆ ಮೇಲಕ್ಕೆ",
+  "common.backToHome": "ಮನೆಗೆ ಹೋಗು",
+  "common.loading.search": "ಹುಡುಕುತ್ತಿರುವ.",
+  "common.notFoundWithQuery": "' {query} ' ಗೆ ಯಾವುದೇ ಫಲಿತಾಂಶಗಳು ಕಂಡುಬಂದಿಲ್ಲ.",
+  "common.openSearch": "ಹುಡುಕಾಟದಲ್ಲಿ ಹುಡುಕಿ →",
+  "common.loading.empty": "ಯಾವುದೇ ಡೇಟಾ ವಾಪಸ್ ಬಂದಿಲ್ಲ.",
+  "common.retry.all": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ ಮನೆಗೆ ಹೋಗಿ."
 }

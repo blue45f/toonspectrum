@@ -8,7 +8,7 @@
   "studio.settings.tool.blend": "Mix (smudge)",
   "studio.settings.tool.wetMix": "ibhulashi lokuxuba umbala",
   "studio.settings.tool.dodgeBurn": "Dodge/Shisa",
-  "studio.settings.tool.liquify": "Liquify",
+  "studio.settings.tool.liquify": "Ukuqhekeka",
   "studio.settings.tool.fill": "ibhakede likapende",
   "studio.settings.tool.lassoFill": "I-Lasso Gcwalisa",
   "studio.settings.tool.eyedropper": "i-dropper",
@@ -49,7 +49,7 @@
   "studio.settings.shortcut.toolBlend": "Mix (smudge)",
   "studio.settings.shortcut.toolWetMix": "ibhulashi lokuxuba umbala",
   "studio.settings.shortcut.toolDodgeBurn": "Dodge/Shisa",
-  "studio.settings.shortcut.toolLiquify": "Liquify",
+  "studio.settings.shortcut.toolLiquify": "Ukuqhekeka",
   "studio.settings.shortcut.toolLettering": "Ukubhala amagama (ibhaluni yombhalo/yenkulumo)",
   "studio.settings.shortcut.undo": "hlehlisa",
   "studio.settings.shortcut.redo": "gijima futhi",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "kufihliwe",
   "studio.settings.state.show": "uphawu",
   "studio.settings.state.open": "vula",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "Dala uhlamvu"
 }

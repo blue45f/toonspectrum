@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Ulimi",
+  "control.sound.enable": "Vumela imiphumela yomsindo",
+  "control.sound.disable": "Vimbela imiphumela yomsindo",
+  "control.theme.dark": "Shintsha kumodi yokukhanya",
+  "control.theme.light": "Shintsha kumodi emnyama",
+  "control.settings.open": "Izilungiselelo ezivulekile",
+  "control.settings.close": "Izilungiselelo zokuvala",
+  "control.cluster.settings": "Umsindo, isihloko, ukulawula ulimi",
+  "control.cluster.open": "Izilungiselelo ezivulekile",
+  "control.cluster.tooltip": "Izilungiselelo zomsindo, izingqikithi nolimi",
+  "control.language.group.translated": "Ukuhumusha okunemisebenzi eminingi",
+  "control.language.group.englishBase": "Ukuhumusha okuzenzakalelayo · IsiNgisi fallback"
 }

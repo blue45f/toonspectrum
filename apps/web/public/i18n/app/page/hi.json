@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "पृष्ठ नहीं मिला",
+  "page.notFound.message": "URL को फिर से जांचें या होम पेज से शीर्षक खोजें।",
+  "page.notFound.home": "घर जाओ"
 }

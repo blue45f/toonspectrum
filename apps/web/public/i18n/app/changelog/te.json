@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "నవీకరణలను లోడ్ చేయలేకపోయాను.",
+  "changelog.empty": "ఇంకా నవీకరణ లాగ్లు పోస్ట్ చేయలేదు."
 }

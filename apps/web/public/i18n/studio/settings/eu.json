@@ -117,9 +117,9 @@
   "studio.settings.mouse.wheel.pan": "mugitu",
   "studio.settings.mouse.wheel.brushSize": "eskuila tamaina",
   "studio.settings.mouse.reverseLabel": "Alderantzizko gurpilaren norabidea",
-  "studio.settings.state.enabled": "On",
+  "studio.settings.state.enabled": "-Hemen dago.",
   "studio.settings.state.disabled": "Desaktibatuta",
-  "studio.settings.state.on": "On",
+  "studio.settings.state.on": "-Hemen dago.",
   "studio.settings.state.off": "Desaktibatuta",
   "studio.settings.state.none": "Bat ere ez",
   "studio.settings.state.save": "eginda",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "ezkutuan",
   "studio.settings.state.show": "sinatu",
   "studio.settings.state.open": "irekita",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "Egon zaitez pertsonaia bat"
 }

@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "មិនអាចបំភ្លឺព័ត៌មានពត៌មានបានទេ។",
+  "feedback.thankYou": "អរគុណ ចំពោះ ការឆ្លើយតប ដ៏មានតម្លៃ របស់អ្នក!",
+  "feedback.anonymousNote": "ការ ឆ្លើយ តប របស់ អ្នក ត្រូវ បាន រក្សា ទុក ដោយ មិន មាន ឈ្មោះ ច្បាស់លាស់។",
+  "feedback.notAtAll": "មិន មែន ទេ",
+  "feedback.definitely": "ជាក់ស្តែង"
 }

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Stratul {count}",
   "studio.toolsCompanion.review.section.comments": "Comentariu {count}",
   "studio.toolsCompanion.review.section.history": "Înregistrează {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Pagina ZZLBRACEEtichetă}· selecție ZZLBRACEEtichetă ZZ RBRACE",
   "studio.toolsCompanion.review.title": "consola de inspecție",
   "studio.toolsCompanion.review.truncatedComments": "și {count} comentarii",
   "studio.toolsCompanion.review.truncatedLayers": "{count} straturi",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Ecran de referință",
   "studio.toolsCompanion.referenceLoading": "Se încarcă instrumentul de referință...",
   "studio.toolsCompanion.footer": "Editați documentele dețin numai fila implicită. Această fereastră transmite doar previzualizarea comprimată și intenția de inspecție/referință către BroadcastChannel al aceluiași browser, deci nu există costuri separate pentru server.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Nu e conectat la studioul principal.",
+  "studio.toolsCompanion.exit.editor": "Deschide editorul Studio"
 }

@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Саламаттык сактоо системасы",
+  "admin.stats.healthy": "Ден соолук",
+  "admin.stats.degraded": "Акысыз",
+  "admin.stats.revenueEvents": "Толук бүтүмдөр / эсептешүүлөр",
+  "admin.stats.usersCommunity": "Жалпы мүчөлөр / кызмат орундары",
+  "admin.stats.maintenance": "Курулуш режими",
+  "admin.stats.maintenanceOn": "Өзгөчө тейлөө (ON)",
+  "admin.stats.maintenanceOff": "Кадимки иштөө (БУУ)",
+  "admin.stats.activeVisitors": "5 мүнөт активдүү коноктор",
+  "admin.stats.views5m": "5 мүнөттүк баракча көрүү"
 }

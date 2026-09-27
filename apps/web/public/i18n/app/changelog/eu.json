@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Ezin izan ditut eguneratu.",
+  "changelog.empty": "Oraindik ez dago eguneratze-egunkaririk."
 }

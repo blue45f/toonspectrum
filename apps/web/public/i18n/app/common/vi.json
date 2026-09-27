@@ -1,16 +1,16 @@
 {
   "common.loading": "Đang tải",
-  "common.loading.short": "Loading",
+  "common.loading.short": "Lái",
   "common.close": "Đóng",
   "common.open": "Mở",
   "common.search": "Tìm kiếm",
   "common.retry": "Thử lại",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "Cố gắng lại",
+  "common.backToTop": "Trở về phía trên",
   "common.backToHome": "Về trang chủ",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "Tìm kiếm...",
+  "common.notFoundWithQuery": "Không có kết quả cho ' {query} '.",
+  "common.openSearch": "Tìm nó trong Tìm kiếm",
+  "common.loading.empty": "Không có dữ liệu nào được trả về.",
+  "common.retry.all": "Hãy thử lại hoặc về nhà."
 }

@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Amaitu da",
+  "review.progress.binge": "-Binging",
+  "review.progress.upcoming": "Planak",
+  "review.progress.abandoned": "Erori egin da.",
+  "review.progress.unknown": "Aurrerapena ezkutatuta",
+  "review.spoilerRevealLabel": "Erakutsi spoilerra"
 }

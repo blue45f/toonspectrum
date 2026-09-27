@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "የጤና ሥርዓት",
+  "admin.stats.healthy": "ጤናማ",
+  "admin.stats.degraded": "ዝቅተኛ ደረጃ",
+  "admin.stats.revenueEvents": "አጠቃላይ ግብይቶች / ክፍያዎች",
+  "admin.stats.usersCommunity": "ጠቅላላ አባላት / ቦታዎች",
+  "admin.stats.maintenance": "የጥገና ሁኔታ",
+  "admin.stats.maintenanceOn": "የአስቸኳይ ጊዜ ጥገና (ON)",
+  "admin.stats.maintenanceOff": "መደበኛ ሥራ (የተቋረጠ)",
+  "admin.stats.activeVisitors": "5 ደቂቃዎች ንቁ ጎብኝዎች",
+  "admin.stats.views5m": "5 ደቂቃ የገጽ እይታዎች"
 }

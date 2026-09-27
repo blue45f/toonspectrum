@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Administrativ revisjonslogg",
+  "admin.audit.desc": "Følg alle administrative handlinger, tillatelsesskiftninger og konfigurasjonsendringer.",
+  "admin.audit.searchPlaceholder": "Søk (e-post/handling)...",
+  "admin.audit.loading": "Lade revisjonslogger...",
+  "admin.audit.empty": "Ingen registrerte revisjonslogg.",
+  "admin.audit.viewDetails": "Utsikt",
+  "admin.audit.modalTitle": "Detaljer i revisjonsloggen",
+  "admin.audit.close": "Tilt"
 }

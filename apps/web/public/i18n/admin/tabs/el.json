@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Ανακοινώσεις & Banners",
+  "admin.tabs.audit": "Λογισμικές ελέγχου",
+  "admin.tabs.campaigns": "Εκστρατείες",
+  "admin.tabs.creatorSupport": "Υποστήριξη του Δημιουργού",
+  "admin.tabs.dashboard": "Πίνακας ελέγχου",
+  "admin.tabs.ops": "Επιχειρήσεις",
+  "admin.tabs.plans": "Σχέδια",
+  "admin.tabs.promos": "Προαγωγές",
+  "admin.tabs.reports": "Έκθεση & μέτρηση",
+  "admin.tabs.revenue": "Διακανονισμός",
+  "admin.tabs.security": "Ασφάλεια & ΙΠ",
+  "admin.tabs.inquiries": "Επιχειρηματικές έρευνες",
+  "admin.tabs.supporters": "Υποστήριξη για τα λειτουργικά έξοδα",
+  "admin.tabs.traffic": "Επικοινωνία"
 }

@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "מטען",
+  "common.loading.short": "מטען",
   "common.close": "סגור",
   "common.open": "פתח",
   "common.search": "חפש",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "נסה שוב.",
+  "common.retry.short": "נסה שוב.",
+  "common.backToTop": "בחזרה למעלה.",
+  "common.backToHome": "לך הביתה.",
+  "common.loading.search": "מחפש...",
+  "common.notFoundWithQuery": "אין תוצאות עבור ' {query} '.",
+  "common.openSearch": "מצא אותו בחיפוש →",
+  "common.loading.empty": "לא חזרו נתונים.",
+  "common.retry.all": "נסה שוב או תחזור הביתה."
 }

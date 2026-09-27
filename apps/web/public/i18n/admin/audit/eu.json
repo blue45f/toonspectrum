@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Admin-aren kontrol egunerokoa",
+  "admin.audit.desc": "Jarraitu administrazio ekintza guztiei, baimen aldaketak eta konfigurazio aldaketak.",
+  "admin.audit.searchPlaceholder": "Bilaketa (posta elektronikoa/ekintza)...",
+  "admin.audit.loading": "Audituren egunerokoak kargatzen...",
+  "admin.audit.empty": "Ez dago inolako auditorik.",
+  "admin.audit.viewDetails": "Ikuspegia",
+  "admin.audit.modalTitle": "Audituaren datuak",
+  "admin.audit.close": "Gertu"
 }

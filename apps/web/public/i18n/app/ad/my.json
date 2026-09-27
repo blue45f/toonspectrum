@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "ပံ့ပိုးပုံ",
+  "ad.slotAriaLabel": "ကြော်ငြာနေရာ",
+  "ad.slotLabel": "ထောက်ပံ့မှု",
+  "ad.slotTitle": "ပံ့ပိုးမှုရှိသော အကြောင်းအရာများ",
+  "ad.ctaDetails": "အသေးစိတ်ကို ကြည့်ရှု",
+  "ad.placeholderAriaLabel": "ကြော်ငြာနေရာထားသူ",
+  "ad.placeholderText": "ပံ့ပိုးထားတဲ့ အကြောင်းအရာမရှိဘူး။",
+  "ad.tag": "ကြော်ငြာ"
 }

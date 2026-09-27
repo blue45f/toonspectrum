@@ -8,5 +8,7 @@
   "control.settings.close": "關閉設定",
   "control.cluster.open": "開啟設定",
   "control.cluster.tooltip": "聲音、主題和語言設定",
-  "control.cluster.settings": "聲音、主題、語言控制"
+  "control.cluster.settings": "聲音、主題、語言控制",
+  "control.language.group.translated": "提供高覆蓋的翻譯",
+  "control.language.group.englishBase": "自動翻譯 · 英文回落"
 }

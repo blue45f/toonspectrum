@@ -6,7 +6,7 @@
   "studio.commandBar.settingsClose": "Zatvori postavke komandne trake",
   "studio.commandBar.settingsStorageNote": "Raspored slotova sprema se u postavke radnog prostora ovog preglednika.",
   "studio.commandBar.showSlots": "Prikaži slotove komandi",
-  "studio.commandBar.slot": "Slot {index}",
+  "studio.commandBar.slot": "Utor {index}",
   "studio.commandBar.slotAria": "Slot komande {index}",
   "studio.commandBar.slotEmpty": "Prazan slot",
   "studio.commandBar.resetDefaults": "Vrati na zadani raspored",

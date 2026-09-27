@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "সমৰ্থিত হোৱা নাই।",
+  "avatar.error.processFailed": "ছবি প্ৰক্ৰিয়া কৰাত ব্যৰ্থ।",
+  "avatar.processing": "প্ৰক্ৰিয়া কৰা...",
+  "avatar.select": "ছবি সলনি কৰক",
+  "avatar.remove": "ছবি আঁতৰাব",
+  "avatar.uploadHint": "কেৱল JPG, PNG, আৰু WEBP ছবি সমৰ্থন কৰা হয়, তাৰ পিছত প্ৰিভিউৰ বাবে ক্রপ কৰা হয়।",
+  "avatar.changeAria": "প্ৰফাইল ছবি সলনি কৰক"
 }

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "உள்நுழைவு தேவை.",
+  "apiError.adminRequired": "நிர்வாக அனுமதிகளை சரிபார்க்க முடியவில்லை.",
+  "apiError.adminOnlyPage": "இந்த பக்கம் நிர்வாகிகளுக்கு மட்டுமே.",
+  "apiError.notFound": "கோரப்பட்ட பொருள் காணப்படவில்லை.",
+  "apiError.unsupportedType": "ஆதரிக்கப்படாத உள்ளடக்க வகை.",
+  "apiError.inactiveAccount": "செயலற்ற கணக்குகள் நிர்வாகி அம்சங்களை பயன்படுத்த முடியாது.",
+  "apiError.settlementFailed": "சரிசெய்தல் செயலாக்கம் தோல்வியடைந்தது."
 }

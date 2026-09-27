@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Giriş Gerekli",
+  "admin.gate.guestBody": "Admin konsolu doğrulama gerektirir.",
+  "admin.gate.forbiddenTitle": "İzin İzleyicisi Gereklidir",
+  "admin.gate.forbiddenBody": "Bu hesap yöneticisi izinleri yok. Gerekirse bir operatörle iletişime geçin.",
+  "admin.gate.errorTitle": "Konsol yüklenemedi"
 }

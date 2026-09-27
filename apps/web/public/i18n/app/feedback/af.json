@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "Ek kon nie terugvoer oplaai nie.",
+  "feedback.thankYou": "Dankie vir julle waardevolle terugvoer!",
+  "feedback.anonymousNote": "Jou antwoorde word streng anoniem gehou.",
+  "feedback.notAtAll": "Nee, nie waar nie.",
+  "feedback.definitely": "Sekerlik."
 }

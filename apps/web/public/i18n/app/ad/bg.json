@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Спонсориран изображение",
+  "ad.slotAriaLabel": "Рекламно място",
+  "ad.slotLabel": "Спонсорирани",
+  "ad.slotTitle": "Съдържание, спонсорирано",
+  "ad.ctaDetails": "Вижте подробности",
+  "ad.placeholderAriaLabel": "Рекламно местоположение",
+  "ad.placeholderText": "Няма спонсорирано съдържание.",
+  "ad.tag": "Реклама"
 }

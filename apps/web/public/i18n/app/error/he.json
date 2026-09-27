@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "-מעלה מחדש את הגרסה האחרונה...",
+  "error.chunkRetryFailed": "הרענח פעם אחת, אבל הבעיה ממשיכה, אנא בדוק את החיבור שלך ותנסה שוב.",
+  "error.reloadButton": "להפעיל מחדש את הדף",
+  "error.goHome": "לך הביתה.",
+  "error.retryDesc": "אנא נסה שוב או תחזור לדף הבית."
 }

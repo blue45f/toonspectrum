@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "Не змагла загрузіць анкету зваротнай сувязі.",
+  "feedback.thankYou": "Дзякуй за вашу каштоўную зваротную сувязь!",
+  "feedback.anonymousNote": "Вашы адказы трымаюцца строга ананімнымі.",
+  "feedback.notAtAll": "Ні ў якім разе",
+  "feedback.definitely": "Абсалютна"
 }

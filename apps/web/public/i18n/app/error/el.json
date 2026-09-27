@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "Αναβάθμιση της τελευταίας έκδοσης...",
+  "error.chunkRetryFailed": "Ανανεώθηκε μια φορά, αλλά το πρόβλημα παραμένει.",
+  "error.reloadButton": "Επαναφορτώστε σελίδα",
+  "error.goHome": "Πήγαινε σπίτι .",
+  "error.retryDesc": "Παρακαλούμε προσπαθήστε ξανά ή επιστρέψτε στην αρχική σελίδα."
 }

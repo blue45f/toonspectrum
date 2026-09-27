@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "त्वरित खोज और आदेश...",
+  "admin.palette.placeholder": "खोज व्यवस्थापक कमांड (नेविगेशन, सीएसवी निर्यात, रखरखाव)...",
+  "admin.palette.empty": "कोई परिणाम नहीं मिला।",
+  "admin.palette.groupNav": "कंसोल नेविगेशन शॉर्टकट",
+  "admin.palette.groupQuick": "त्वरित कार्रवाई और निर्यात",
+  "admin.palette.exportUsers": "सभी सदस्यों का निर्यात सीएसवी",
+  "admin.palette.exportRevenue": "निर्यात राजस्व लेजर सीएसवी",
+  "admin.palette.maintenance": "नियंत्रण प्रणाली आपातकालीन रखरखाव"
 }

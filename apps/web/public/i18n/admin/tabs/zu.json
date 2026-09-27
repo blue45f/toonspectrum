@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Izimemezelo Nezikhangiso",
+  "admin.tabs.audit": "AmaLogi Okucwaninga",
+  "admin.tabs.campaigns": "Imikhankaso",
+  "admin.tabs.creatorSupport": "Ukusekelwa uMdali",
+  "admin.tabs.dashboard": "Ibhodi lokulinganisa",
+  "admin.tabs.ops": "Imisebenzi",
+  "admin.tabs.plans": "Izinhlelo",
+  "admin.tabs.promos": "Ukunyuswa",
+  "admin.tabs.reports": "Imibiko & Ukuzilawula",
+  "admin.tabs.revenue": "Ukuqedwa",
+  "admin.tabs.security": "Ukuphepha & IP",
+  "admin.tabs.inquiries": "Ukubuzwa kwebhizinisi",
+  "admin.tabs.supporters": "Ukusekelwa kwezindleko zokusebenza",
+  "admin.tabs.traffic": "Ukuhamba okuqondile"
 }

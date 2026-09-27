@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Sponsored Image",
+  "ad.slotAriaLabel": "Werbeplatz",
+  "ad.slotLabel": "Gefördert",
+  "ad.slotTitle": "Sponsorierte Inhalte",
+  "ad.ctaDetails": "Anzeige der Einzelheiten",
+  "ad.placeholderAriaLabel": "Anzeigenplatzbehalter",
+  "ad.placeholderText": "Keine sponserten Inhalte verfügbar.",
+  "ad.tag": "Anzeige"
 }

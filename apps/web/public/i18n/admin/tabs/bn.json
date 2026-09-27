@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "বিজ্ঞাপন ও ব্যানার",
+  "admin.tabs.audit": "অডিট লগ",
+  "admin.tabs.campaigns": "প্রচারণা",
+  "admin.tabs.creatorSupport": "সৃষ্টিকর্তার সমর্থন",
+  "admin.tabs.dashboard": "ড্যাশবোর্ড",
+  "admin.tabs.ops": "কার্যক্রম",
+  "admin.tabs.plans": "পরিকল্পনা",
+  "admin.tabs.promos": "প্রচার",
+  "admin.tabs.reports": "প্রতিবেদন ও পরিমাপ",
+  "admin.tabs.revenue": "নিষ্পত্তি",
+  "admin.tabs.security": "নিরাপত্তা ও আইপি",
+  "admin.tabs.inquiries": "ব্যবসায়িক অনুসন্ধান",
+  "admin.tabs.supporters": "অপারেটিং খরচ সমর্থন",
+  "admin.tabs.traffic": "লাইভ ট্রাফিক"
 }

@@ -1,4 +1,4 @@
 {
-  "notify.loadError": "Couldn't load notifications.",
-  "notify.empty": "No new notifications."
+  "notify.loadError": "Не можах да заредим уведомленията.",
+  "notify.empty": "Няма нови уведомления."
 }
