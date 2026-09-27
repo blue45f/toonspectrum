@@ -46,7 +46,7 @@ export const CREATOR_ASSET_LICENSES = [
   },
 ] as const;
 
-export type CreatorAssetLicenseId = (typeof CREATOR_ASSET_LICENSES)[number]["id"] | "toonspectrum-standard";
+export type CreatorAssetLicenseId = (typeof CREATOR_ASSET_LICENSES)[number]["id"];
 export type CreatorAssetCatalogSort = "newest" | "popular" | "name";
 export type CreatorAssetModerationStatus = "published" | "under_review" | "rejected";
 export type CreatorAssetReportReason = "copyright" | "unsafe" | "spam" | "misleading" | "other";
@@ -96,7 +96,7 @@ export function assertCreatorAssetListResponseBudget(value: unknown): void {
 }
 
 export function isCreatorAssetLicenseId(value: unknown): value is CreatorAssetLicenseId {
-  return typeof value === "string" && (LICENSE_IDS.has(value) || value === "toonspectrum-standard");
+  return typeof value === "string" && LICENSE_IDS.has(value);
 }
 
 export function creatorAssetLicenseOf(value: unknown) {

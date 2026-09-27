@@ -270,7 +270,7 @@ describe("studio live distributed lock persistence contract", () => {
     expect(migration).toContain(
       'INSERT INTO "toonspectrum_schema_migration" ("id", "appliedAt")'
     );
-    expect(migration).toContain("ToonStudio live-lock revision v1 cutover complete");
+    expect(migration).toContain("ToonSpectrum live-lock revision v1 cutover complete");
     expect(migration).toMatch(
       /DELETE FROM "creator_work_live_lock"\s+WHERE \(SELECT "required"/u
     );
