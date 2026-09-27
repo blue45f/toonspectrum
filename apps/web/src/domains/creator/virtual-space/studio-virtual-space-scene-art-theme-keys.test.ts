@@ -42,7 +42,8 @@ describe("테마별 장면 아트 텍스처 계약", () => {
     const rects = STUDIO_VIRTUAL_ART_STYLE_KEYS.map((style) => {
       const atlas = studioExperienceAtlas("furniture", style);
       expect(atlas.slicing).toBe("explicit-frames");
-      return JSON.stringify(atlas.frames ?? null);
+      if (atlas.slicing !== "explicit-frames") throw new Error("가구 테마 atlas는 explicit-frames여야 한다");
+      return JSON.stringify(atlas.frames);
     });
     expect(new Set(rects).size, "테마별 가구가 모두 같은 사각형이면 키를 나눌 이유가 사라진다").toBe(
       STUDIO_VIRTUAL_ART_STYLE_KEYS.length,
