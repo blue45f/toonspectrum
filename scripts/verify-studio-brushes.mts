@@ -95,6 +95,10 @@ import {
   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
 } from "../apps/web/src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 
+import {
+  isStaticPreviewReadinessResponse,
+  isStaticPreviewReadinessUnavailable,
+} from "./lib/studio-preview-readiness";
 import { meetsStudioMinimumTouchTarget } from "./lib/studio-touch-target-measurement.mjs";
 import {
   readDurableStudioAutosaveDocument,
@@ -222,6 +226,7 @@ type VerifierBrushOperation = "paint" | "erase";
 interface BrowserErrorCollector {
   messages: string[];
   failedResponses: string[];
+  optionalReadinessFailures: string[];
 }
 
 interface BrushStrokeEvidence {
@@ -645,11 +650,20 @@ function collectBrowserErrors(
   label: string,
   studioUrl: string,
 ): BrowserErrorCollector {
-  const collector: BrowserErrorCollector = { messages: [], failedResponses: [] };
+  const collector: BrowserErrorCollector = {
+    messages: [], failedResponses: [], optionalReadinessFailures: [],
+  };
+  // 검증기가 직접 실행한 정적 preview만 API 부재로 분류한다. 외부 서버는 그대로 검사한다.
+  const ownsStaticPreview = !process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
     const location = entry.location().url;
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
+    if (ownsStaticPreview && isStaticPreviewReadinessUnavailable(message, studioUrl)) {
+      collector.optionalReadinessFailures.push(`${label}: ${message}`);
+      log(`STATIC PREVIEW API UNAVAILABLE (not a live API pass): ${message}`);
+      return;
+    }
     if (
       !expectedStaticPreviewError(message, studioUrl)
       && !expectedExternalFontCdnError(message)
@@ -663,7 +677,10 @@ function collectBrowserErrors(
   page.on("response", (response) => {
     if (response.status() < 500) return;
     const message = `${response.status()} ${response.url()}`;
-    if (!expectedStaticPreviewError(message, studioUrl)) {
+    if (ownsStaticPreview && isStaticPreviewReadinessResponse(response.status(), response.url(), studioUrl)) {
+      collector.optionalReadinessFailures.push(`${label}: ${message}`);
+      log(`STATIC PREVIEW API UNAVAILABLE (not a live API pass): ${message}`);
+    } else if (!expectedStaticPreviewError(message, studioUrl)) {
       collector.failedResponses.push(`${label}: ${message}`);
     }
   });
@@ -792,7 +809,15 @@ async function installCleanStudioState(page: Page): Promise<void> {
  * control; modal wizards (quick comic) close on Escape, exactly as a person would dismiss them.
  * Both leave the editor in its normal state instead of forcing gestures through overlay chrome.
  */
+async function dismissCinematicCanvasWelcome(page: Page): Promise<void> {
+  const welcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
+  if (!(await welcome.isVisible())) return;
+  await welcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click();
+  await welcome.waitFor({ state: "hidden" });
+}
+
 async function dismissQuickStartOverlay(page: Page, appearTimeoutMs: number): Promise<void> {
+  await dismissCinematicCanvasWelcome(page);
   const modalOverlay = page.locator('[data-studio-quick-comic-overlay="true"]');
   if (
     await modalOverlay.first().isVisible().catch(() => false)
@@ -862,6 +887,9 @@ async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean
 
 async function dismissTransientChrome(page: Page, clearAutosave = true): Promise<void> {
   await acknowledgeStudioBetaNoticeIfPresent(page);
+  // 문서 hydration이 끝난 뒤 시작 안내를 닫아야 늦게 나타난 안내가 입력을 가로채지 않는다.
+  await page.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
+  await dismissCinematicCanvasWelcome(page);
   const quickstart = page.locator('[data-studio-creative-starter="true"]');
   if (await quickstart.isVisible({ timeout: 250 }).catch(() => false)) {
     await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
@@ -932,6 +960,13 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
     ].join("\n"),
   });
   await dismissTransientChrome(page);
+  // 초기 연결 상태 안내가 캔버스를 재배치하기 전에 그리기 좌표를 확정하지 않는다.
+  await page.waitForFunction(() => ["available", "degraded"].includes(
+    document.documentElement.dataset.serviceCapabilityState ?? ""
+  ), undefined, { timeout: 20_000 });
+  if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
+    await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible" });
+  }
   const shellState = await page.evaluate(() => ({
     bodyTextLength: document.body.innerText.trim().length,
     hasErrorOverlay: Boolean(
@@ -1901,9 +1936,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
 
     const stage = page.locator(".konvajs-content").first();
     await stage.waitFor({ state: "visible" });
-    const stageBox = await stage.boundingBox();
     const viewport = page.viewportSize();
-    invariant(stageBox && viewport, "could not measure the desktop canvas");
+    invariant(viewport, "could not measure the desktop viewport");
 
     const evidence: BrushStrokeEvidence[] = [];
     for (const [index, preset] of DESKTOP_STABILITY_CASES.entries()) {
@@ -1921,6 +1955,9 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         && isStudioBrushEraserAliasId(expectedSelection.runtimeBrushId);
       await selectDesktopBrush(page, preset, expectedSelection);
       await page.mouse.move(4, 4);
+      // 도구 전환·진단 복구 뒤에는 안내 배너와 작업 영역의 현재 좌표로 다시 측정한다.
+      const stageBox = await stage.boundingBox();
+      invariant(stageBox, `${preset.id}: could not measure the current desktop canvas`);
       const presetDescriptor = studioBrushPackDescriptorById(preset.id);
       const desktopDryMediaClassification = classifyStudioDryMediaCatalogIdV1(preset.id);
       // The continuity audit's own excuse list is consulted FIRST, because it is the product's
@@ -2191,6 +2228,11 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         }
       }
       await page.mouse.up();
+      const releasedStageBox = await stage.boundingBox();
+      invariant(releasedStageBox && (["x", "y", "width", "height"] as const).every((key) =>
+        Math.abs(releasedStageBox[key] - stageBox[key]) < 0.5
+      ), `${preset.id}: the canvas coordinate frame changed during the gesture; `
+        + `before=${JSON.stringify(stageBox)} after=${JSON.stringify(releasedStageBox)}`);
       const immediate = await page.screenshot({ animations: "disabled", clip: usedClip });
       await page.mouse.move(4, 4);
       const immediateDiff = await compareScreenshotPixels(page, before, immediate);
@@ -4104,6 +4146,8 @@ async function enableSmartShape(page: Page): Promise<void> {
   const railToggle = page.locator('button[data-studio-rail-tool-id="smart-shape"]');
   if (await railToggle.isVisible()) {
     if (await railToggle.getAttribute("aria-pressed") !== "true") await railToggle.click();
+    await page.locator('button[data-studio-rail-tool-id="smart-shape"][aria-pressed="true"]')
+      .waitFor({ state: "visible" });
     return;
   }
   const buttons = page.getByRole("button", { name: "스마트 도형", exact: true });
@@ -4112,6 +4156,7 @@ async function enableSmartShape(page: Page): Promise<void> {
     const button = buttons.nth(index);
     if (!await button.isVisible()) continue;
     if (await button.getAttribute("aria-pressed") !== "true") await button.click();
+    invariant(await button.getAttribute("aria-pressed") === "true", "Smart Shape toggle did not activate");
     return;
   }
   throw new Error("visible Smart Shape toggle was not found");
@@ -4173,12 +4218,21 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
     writeFileSync(join(SCRATCH, "studio-smart-shape-correction.json"), JSON.stringify({ before, corrected }, null, 2));
   }
   const handle = await toScreen(corrected.points[0]!, corrected.points[1]!);
+  const controlPointStage = page.locator(".konvajs-content").first();
+  const controlPointFrame = await controlPointStage.boundingBox();
+  invariant(controlPointFrame, "control-point gesture has no stage coordinate frame");
+  invariant(await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest(".konvajs-content")), handle),
+    "control-point gesture is covered by editor chrome");
   await page.mouse.move(handle.x, handle.y);
   await page.keyboard.down("Shift");
   await page.mouse.down();
   await page.mouse.move(handle.x + 24, handle.y + 16, { steps: 8 });
   await page.mouse.up();
   await page.keyboard.up("Shift");
+  const releasedControlPointFrame = await controlPointStage.boundingBox();
+  invariant(releasedControlPointFrame && (["x", "y", "width", "height"] as const).every((key) =>
+    Math.abs(releasedControlPointFrame[key] - controlPointFrame[key]) < 0.5
+  ), `the canvas coordinate frame changed during the control-point gesture: ${JSON.stringify({ before: controlPointFrame, after: releasedControlPointFrame })}`);
   const moved = (await waitForPersistedDrawElements(page, (draws) =>
     draws.at(-1)?.id === corrected.id && JSON.stringify(draws.at(-1)?.points) !== JSON.stringify(corrected.points),
   "canvas control-point drag did not change corrected shape")).at(-1)!;
@@ -4383,7 +4437,8 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
     const left = Math.max(stageBox.x + 65, viewport.width * 0.33);
     const right = Math.min(stageBox.x + stageBox.width - 65, viewport.width * 0.70);
     const top = Math.max(stageBox.y + 65, viewport.height * 0.16);
-    const bottom = Math.min(stageBox.y + stageBox.height - 65, viewport.height * 0.75);
+    // 상단 상태 배너 높이와 무관하게 실제 캔버스와 화면의 교집합에서 같은 65px 여백을 둔다.
+    const bottom = Math.min(stageBox.y + stageBox.height, viewport.height) - 65;
     invariant(right - left >= 480, "visible canvas is too narrow for Smart Shape fixtures");
     invariant(bottom - top >= 520, "visible canvas is too short for Smart Shape fixtures");
 
@@ -4458,7 +4513,17 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
     ];
 
     const evidence: SmartShapeEvidence[] = [];
+    const fixtureStageFrames: NonNullable<Awaited<ReturnType<Locator["boundingBox"]>>>[] = [];
     for (const fixture of fixtures) {
+      const blockedPoints = await page.evaluate((points) => points.flatMap(({ x, y }) => {
+        const target = document.elementFromPoint(x, y);
+        return target?.closest(".konvajs-content") ? [] : [{
+          x, y, tag: target?.tagName ?? null,
+          className: target?.getAttribute("class") ?? null,
+        }];
+      }), fixture.path);
+      invariant(blockedPoints.length === 0,
+        `${fixture.expectedKind}: ${blockedPoints.length} gesture points miss visible canvas: ${JSON.stringify(blockedPoints.slice(0, 8))}`);
       const clip = {
         x: Math.max(0, Math.floor(fixture.box.left - 20)),
         y: Math.max(0, Math.floor(fixture.box.top - 20)),
@@ -4466,8 +4531,15 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
         height: Math.ceil(fixture.box.bottom - fixture.box.top + 40),
       };
       const before = await captureStableEvidence(page, clip);
+      const gestureFrame = await stage.boundingBox();
+      invariant(gestureFrame, `${fixture.expectedKind}: Smart Shape has no stage coordinate frame`);
+      fixtureStageFrames.push(gestureFrame);
       if (fixture.penJitterHold) await drawPenPathWithJitterHold(page, fixture.path);
       else await drawMousePath(page, fixture.path);
+      const releasedFrame = await stage.boundingBox();
+      invariant(releasedFrame && (["x", "y", "width", "height"] as const).every((key) =>
+        Math.abs(releasedFrame[key] - gestureFrame[key]) < 0.5
+      ), `${fixture.expectedKind}: the canvas coordinate frame changed during the gesture: ${JSON.stringify({ before: gestureFrame, after: releasedFrame })}`);
       await page.waitForTimeout(300);
       const after = await page.screenshot({ animations: "disabled", clip });
       const coverage = await compareScreenshotCoverage(page, before, after, 1);
@@ -4526,6 +4598,7 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
     const xs = calibration.filter((_, index) => index % 2 === 0);
     const ys = calibration.filter((_, index) => index % 2 === 1);
     const box = fixtures[1]!.box;
+    const calibrationFrame = fixtureStageFrames[1]!;
     const docLeft = Math.min(...xs), docTop = Math.min(...ys);
     const scaleX = (box.right - box.left) / (Math.max(...xs) - docLeft);
     const scaleY = (box.bottom - box.top) / (Math.max(...ys) - docTop);
@@ -4535,8 +4608,8 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
       // Node-edit chrome can move or resize the stage after the pen fixture calibrated it.
       // Reproject its normalized stage position before hit testing the actual first endpoint.
       return {
-        x: liveStageBox.x + (box.left + (x - docLeft) * scaleX - stageBox.x) * liveStageBox.width / stageBox.width,
-        y: liveStageBox.y + (box.top + (y - docTop) * scaleY - stageBox.y) * liveStageBox.height / stageBox.height,
+        x: liveStageBox.x + (box.left + (x - docLeft) * scaleX - calibrationFrame.x) * liveStageBox.width / calibrationFrame.width,
+        y: liveStageBox.y + (box.top + (y - docTop) * scaleY - calibrationFrame.y) * liveStageBox.height / calibrationFrame.height,
       };
     });
     await page.screenshot({ path: screenshot, animations: "disabled" });
@@ -4559,6 +4632,20 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
   }
 }
 
+async function openMobileBrushSettings(page: Page, dock: Locator): Promise<void> {
+  const toggle = dock.locator('[data-studio-mobile-workspace-toggle="true"]');
+  if (await toggle.getAttribute("aria-expanded") !== "true") {
+    await clickPastTransientOverlays(page, toggle);
+  }
+  const tools = dock.locator('[data-studio-mobile-workspace-menu="true"]');
+  await tools.waitFor({ state: "visible" });
+  await clickPastTransientOverlays(
+    page,
+    tools.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])'),
+  );
+  await tools.waitFor({ state: "hidden" });
+}
+
 async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise<MobileTouchResult> {
   const context = await browser.newContext({
     hasTouch: true,
@@ -4574,10 +4661,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     const dock = page.locator('nav[data-studio-mobile-editing-dock="true"]');
     await dock.waitFor({ state: "visible", timeout: 10_000 });
     await dismissQuickStartOverlay(page, 4_000);
-    await clickPastTransientOverlays(
-      page,
-      dock.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])'),
-    );
+    await openMobileBrushSettings(page, dock);
     const drawSheet = page.locator('[data-studio-sheet-id="draw"][data-studio-mobile-sheet="draw"]');
     await drawSheet.waitFor({ state: "visible" });
     await clickPastTransientOverlays(
@@ -4632,7 +4716,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await eraserButton.click();
     await dock.locator('[data-studio-mobile-tool="eraser"][aria-pressed="true"]')
       .waitFor({ state: "visible" });
-    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])').click();
+    await openMobileBrushSettings(page, dock);
     await drawSheet.waitFor({ state: "visible" });
     const eraserQuickPicker = drawSheet.locator('[data-studio-eraser-quick-picker="true"]');
     await eraserQuickPicker.waitFor({ state: "visible" });
@@ -5232,7 +5316,10 @@ async function main(): Promise<void> {
   const studioUrl = `${origin}studio/canvas`;
   const server: ChildProcess | null = port === null
     ? null
-    : spawnVitePreview({ port, runner: "node-vite-bin", logPath: LOG_PATH });
+    : spawnVitePreview({
+      port, runner: "node-vite-bin", logPath: LOG_PATH,
+      outDir: process.env.TOONSPECTRUM_VERIFY_DIST?.trim() || undefined,
+    });
 
   let browser: Browser | null = null;
   try {

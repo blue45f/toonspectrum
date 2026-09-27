@@ -23,6 +23,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { deflateSync } from "node:zlib";
 
 
@@ -34,6 +35,7 @@ import {
   STUDIO_BETA_NOTICE_STORAGE_KEY,
 } from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 
+import { isStaticPreviewReadinessResponse, isStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import { readDurableStudioAutosaveDocument, type StudioDurableAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
 import { isOptionalStudioPreviewApiError } from "./lib/studio-verify-preview-errors.mjs";
@@ -154,21 +156,37 @@ function collectBrowserErrors(
   collector: { messages: string[]; failedResponses: string[] },
   previewUrl: string,
 ): void {
+  const ownsStaticPreview = !process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
     const location = entry.location().url;
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
+    if (ownsStaticPreview && isStaticPreviewReadinessUnavailable(message, previewUrl)) {
+      log(`STATIC PREVIEW API UNAVAILABLE (not a live API pass): ${message}`);
+      return;
+    }
     if (!isOptionalStudioPreviewApiError(message, previewUrl)) collector.messages.push(message);
   });
   page.on("pageerror", (error) => collector.messages.push(String(error)));
   page.on("response", (response) => {
     if (response.status() < 400) return;
     const message = `${response.status()} ${response.url()}`;
+    if (ownsStaticPreview && isStaticPreviewReadinessResponse(response.status(), response.url(), previewUrl)) {
+      log(`STATIC PREVIEW API UNAVAILABLE (not a live API pass): ${message}`);
+      return;
+    }
     if (!isOptionalStudioPreviewApiError(message, previewUrl)) collector.failedResponses.push(message);
   });
 }
 
 async function dismissTransientChrome(page: Page): Promise<void> {
+  // 캔버스 수화 뒤 나타나는 시작 안내를 실제 닫기 동작으로 해제한 뒤 획을 검증한다.
+  await page.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
+  const welcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
+  if (await welcome.isVisible()) {
+    await welcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click();
+    await welcome.waitFor({ state: "hidden" });
+  }
   for (const text of ["나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
     try {
       const el = page.getByRole("button", { name: text }).first();
@@ -480,6 +498,7 @@ async function main(): Promise<void> {
       port,
       runner: "pnpm-exec",
       logPath: LOG_PATH,
+      outDir: process.env.TOONSPECTRUM_VERIFY_DIST?.trim() || undefined,
     });
     await waitForServer(`${origin}/`, {
       timeoutMs: 20_000,
@@ -532,13 +551,20 @@ async function main(): Promise<void> {
       timeout: 30_000,
     });
     await dismissTransientChrome(page);
+    await page.waitForFunction(() => ["available", "degraded"].includes(
+      document.documentElement.dataset.serviceCapabilityState ?? ""
+    ), undefined, { timeout: 20_000 });
+    if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
+      await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible" });
+    }
 
     await activatePenAndDraw(page);
     const originalDocument = await waitForSavedPages(page, (document) =>
       document.pagesList.flatMap((item) => item.elements ?? []).filter((item) =>
         item && typeof item === "object" && "type" in item && item.type === "draw").length === 2,
     "The two original pen strokes were not saved");
-    const originalPages = JSON.stringify(originalDocument.pagesList);
+    // CRDT 직렬화의 키 삽입 순서와 무관하게 모든 필드·좌표·배열 순서를 정확히 비교한다.
+    const originalPages = originalDocument.pagesList;
     const clip = await canvasEvidenceClip(page);
     const liveBaseline = await screenshotClipped(page, clip);
     writeFileSync(join(SCRATCH, "studio-filter-dialog-live-baseline.png"), liveBaseline);
@@ -549,7 +575,7 @@ async function main(): Promise<void> {
     await (await enabledStudioHistoryControl(page, "redo", 10_000)).click();
     await page.waitForTimeout(900);
     await waitForSavedPages(page, (document) => document.savedAt > originalDocument.savedAt
-      && JSON.stringify(document.pagesList) === originalPages,
+      && isDeepStrictEqual(document.pagesList, originalPages),
     "History traversal changed the original saved strokes");
     const baseline = await screenshotClipped(page, clip);
     committedBaseline = { livePresentationDiff: await compareScreenshotPixels(page, liveBaseline, baseline),
@@ -627,7 +653,7 @@ async function main(): Promise<void> {
         }
 
         const appliedDocument = await waitForSavedPages(page,
-          (document) => JSON.stringify(document.pagesList) !== originalPages,
+          (document) => !isDeepStrictEqual(document.pagesList, originalPages),
           `${filterCase.label}: applied filter did not reach durable storage`);
         const undo = await enabledStudioHistoryControl(page, "undo", 10_000);
         await undo.click();
@@ -635,7 +661,7 @@ async function main(): Promise<void> {
         const restored = await screenshotClipped(page, clip);
         if (index === 0) writeFileSync(join(SCRATCH, "studio-filter-dialog-first-restored.png"), restored);
         await waitForSavedPages(page, (document) => document.savedAt > appliedDocument.savedAt
-          && JSON.stringify(document.pagesList) === originalPages,
+          && isDeepStrictEqual(document.pagesList, originalPages),
         `${filterCase.label}: undo changed the original saved page data`);
         result.persistedUndoRestored = true;
         result.undoDiff = await compareScreenshotPixels(page, baseline, restored);
