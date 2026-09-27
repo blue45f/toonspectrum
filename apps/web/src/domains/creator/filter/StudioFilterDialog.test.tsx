@@ -159,8 +159,8 @@ describe("StudioFilterDialog", () => {
     expect(footer?.querySelector("fieldset")).toBeNull();
     expect(footer?.querySelector('[role="status"]')).toBeNull();
     expect(footer?.querySelectorAll("button")).toHaveLength(2);
-    expect(footer?.contains(screen.getByRole("button", { name: "취소", exact: true }))).toBe(true);
-    expect(footer?.contains(screen.getByRole("button", { name: "선택 안에 적용", exact: true }))).toBe(true);
+    expect(footer?.contains(screen.getByRole("button", { name: /^취소$/u }))).toBe(true);
+    expect(footer?.contains(screen.getByRole("button", { name: /^선택 안에 적용$/u }))).toBe(true);
   });
 
   it("renders a narrow-screen-safe number layout and keeps signed values visible", () => {

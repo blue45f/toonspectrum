@@ -75,9 +75,15 @@ describe("public shell integration", () => {
     const campus = readFileSync(new URL("./spatial-campus/SpatialCampusFrame.tsx", import.meta.url), "utf8");
     expect(campus.match(/<WorkspaceTaskFrame route=/gu)).toHaveLength(1);
     expect(shell).toContain('immersiveVirtualExperience ? null : chromeOverlay');
-    expect(shell).toContain('["/home", "/team", "/hub", "/studio", "/studio/space", "/onboarding/character"].includes(');
-    expect(shell).not.toContain('["/", "/home",');
-    expect(shell).toContain('const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null || protectedCampus;');
+    const normalizedShell = shell.replace(/\s+/gu, " ");
+    const immersiveHomeRoutes = shell.match(
+      /const immersiveVirtualHome\s*=\s*immersiveTeamExperience\s*\|\|\s*(\[[\s\S]*?\])\.includes\(normalizedPath\)/u,
+    )?.[1];
+    expect(immersiveHomeRoutes).toBeDefined();
+    expect([...((immersiveHomeRoutes ?? "").matchAll(/"([^"]+)"/gu))].map((match) => match[1]))
+      .toEqual(["/home", "/hub", "/studio", "/studio/space", "/onboarding/character"]);
+    expect(normalizedShell).toContain('normalizedPath === "/team" || normalizedPath.startsWith("/team/")');
+    expect(normalizedShell).toContain('const immersiveVirtualExperience = immersiveVirtualHome || immersiveVirtualProject || taskRoute !== null || protectedCampus;');
     expect(shell).toMatch(/<ErrorBoundary resetKey=\{pathname\}>\s*<Suspense fallback=\{<Suspense fallback=\{null\}><PublicSiteWayfinder \/><\/Suspense>\}>\s*<PublicSiteNextSteps pathname=\{pathname\}\s*\/>/u);
   });
 });

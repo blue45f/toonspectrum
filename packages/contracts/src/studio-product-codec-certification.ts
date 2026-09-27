@@ -23,6 +23,9 @@ import {
   type StudioInkEnvelopeWebCryptoAlgorithm,
 } from "./studio-ink-envelope-webcrypto-attestation";
 
+type CryptoKey = InstanceType<typeof globalThis.CryptoKey>;
+type SubtleCrypto = typeof globalThis.crypto.subtle;
+
 export const STUDIO_PRODUCT_CODEC_CERTIFICATE_VERSION = 1 as const;
 export const STUDIO_PRODUCT_CODEC_CERTIFICATE_KIND =
   "toonstudio-product-codec-conformance-certificate" as const;

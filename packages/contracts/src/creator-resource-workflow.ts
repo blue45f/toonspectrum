@@ -1,6 +1,6 @@
-import { parseWorkspace, STORY_FIELDS } from "../../core/src/creator-resources";
+import { parseWorkspace, STORY_FIELDS } from "@toonstudio/core/creator-resources";
 
-import type { CreatorResource, CreatorWorkspace, ResourceProvider } from "../../core/src/creator-resources";
+import type { CreatorResource, CreatorWorkspace, ResourceProvider } from "@toonstudio/core/creator-resources";
 
 export interface ProviderAvailability {
   provider: ResourceProvider;

@@ -24,7 +24,13 @@ describe("release static chunk isolation", () => {
   });
   it("keeps grouped contracts free of runtime imports and dynamic dependencies", () => {
     for (const leaf of [...leaves, ...metadataLeaves, "render/studio-engine-failure-policy", "contracts/studio-live-lock-resource"]) {
-      const file = `apps/web/src/domains/creator/${leaf}.ts`;
+      const webFile = `apps/web/src/domains/creator/${leaf}.ts`;
+      const relocatedLockContract = leaf === "contracts/studio-live-lock-resource";
+      const file = relocatedLockContract ? "packages/contracts/src/studio-live-lock-resource.ts" : webFile;
+      if (relocatedLockContract) {
+        expect(readFileSync(webFile, "utf8").trim())
+          .toBe('export * from "@toonstudio/contracts/studio-live-lock-resource";');
+      }
       const output = ts.transpileModule(readFileSync(file, "utf8"), {
         compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
       }).outputText;

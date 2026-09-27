@@ -407,7 +407,12 @@ describe("revision comparison Worker strict-CSP bootstrap", () => {
       await build({
         root,
         configFile: false,
+        envDir: false,
         logLevel: "error",
+        // apps/web/vite.config.ts와 같은 모듈 형식으로 Worker의 동적 import를 보존한다.
+        worker: {
+          format: "es",
+        },
         resolve: {
           alias: [
             { find: "virtual:revision-client", replacement: CLIENT_PATH },

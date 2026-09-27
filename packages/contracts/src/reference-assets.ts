@@ -1,6 +1,6 @@
-import { resolveReferenceQuery } from "../../core/src/reference-query-language";
+import { resolveReferenceQuery } from "@toonstudio/core/reference-query-language";
 
-import type { CreatorResource } from "../../core/src/creator-resources";
+import type { CreatorResource } from "@toonstudio/core/creator-resources";
 
 export const REFERENCE_SEARCH_FIELDS = [
   { value: "all", label: "전체 메타데이터" },

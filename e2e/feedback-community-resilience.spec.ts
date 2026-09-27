@@ -12,38 +12,90 @@ const entry: FeedbackEntry = {
 const result = () => ({ contractVersion: 2, items: [entry], hasMore: false, nextCursor: null, canManage: false });
 
 test("failed refresh and recovery keep the same inline comment draft mounted", async ({ page }) => {
-  let calls = 0;
+  let refreshUnavailable = false;
+  let failedReads = 0;
+  let replyReads = 0;
+  const writes: string[] = [];
   await page.route("**/api/feedback/posts**", async (route) => {
-    if (new URL(route.request().url()).pathname.endsWith("/replies")) return route.fulfill({ json: [] });
-    calls++;
-    return calls === 2 ? route.fulfill({ status: 503, json: { message: "새로고침 일시 실패" } }) : route.fulfill({ json: result() });
+    if (route.request().method() !== "GET") {
+      writes.push(route.request().method());
+      return route.fulfill({ status: 403, json: { message: "준비 상태 미확인 쓰기" } });
+    }
+    if (new URL(route.request().url()).pathname.endsWith("/replies")) {
+      replyReads++;
+      return route.fulfill({ json: [] });
+    }
+    // 자동 읽기 재시도 전체에 장애를 유지한다.
+    if (refreshUnavailable) {
+      failedReads++;
+      return route.fulfill({ status: 503, json: { message: "새로고침 일시 실패" } });
+    }
+    return route.fulfill({ json: result() });
   });
   await page.goto("/e2e/feedback-community.html");
   await page.getByRole("button", { name: entry.title, exact: true }).click();
   const draft = page.getByRole("textbox", { name: "공개 댓글", exact: true });
   await draft.fill("작성 중인 댓글입니다.");
+  await expect(page.getByRole("button", { name: "댓글 등록", exact: true })).toBeEnabled();
+  await expect(page.getByText("아직 댓글이 없어요.", { exact: false })).toBeVisible();
+  refreshUnavailable = true;
   await page.getByRole("button", { name: "제보 목록 새로고침" }).click();
-  await expect(page.getByRole("alert")).toContainText("새로고침 일시 실패");
+  await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.");
+  await expect(page.getByRole("alert")).not.toContainText("새로고침 일시 실패");
+  expect(failedReads).toBe(3);
   await expect(page.locator(".fb-post")).toHaveCount(1);
   await expect(draft).toHaveValue("작성 중인 댓글입니다.");
   await expect(page.getByRole("button", { name: "댓글 등록", exact: true })).toBeDisabled();
   await draft.fill("오류가 나도 계속 작성할 수 있습니다.");
+  await draft.press("Control+Enter");
+  expect(writes).toEqual([]);
+  refreshUnavailable = false;
   await page.getByRole("button", { name: "다시 불러오기", exact: true }).click();
   await expect(page.getByRole("button", { name: "댓글 등록", exact: true })).toBeEnabled();
+  await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(draft).toHaveValue("오류가 나도 계속 작성할 수 있습니다.");
+  expect(replyReads).toBe(1);
+  expect(writes).toEqual([]);
 });
 
 test("failed new filters never display the preceding filter's rows", async ({ page }) => {
+  let searchUnavailable = true;
+  let failedReads = 0;
+  const writes: string[] = [];
+  const recovered = { ...entry, id: "recovered-filter-post", title: "새로운 조건에 맞는 제보" };
   await page.route("**/api/feedback/posts**", async (route) => {
-    return new URL(route.request().url()).searchParams.get("q")
-      ? route.fulfill({ status: 503, json: { message: "검색 실패" } }) : route.fulfill({ json: result() });
+    if (route.request().method() !== "GET") {
+      writes.push(route.request().method());
+      return route.fulfill({ status: 403, json: { message: "준비 상태 미확인 쓰기" } });
+    }
+    if (new URL(route.request().url()).searchParams.get("q")) {
+      if (searchUnavailable) {
+        failedReads++;
+        return route.fulfill({ status: 503, json: { message: "검색 실패" } });
+      }
+      return route.fulfill({ json: { ...result(), items: [recovered] } });
+    }
+    return route.fulfill({ json: result() });
   });
   await page.goto("/e2e/feedback-community.html");
   await expect(page.locator(".fb-post")).toHaveCount(1);
   await page.getByLabel("제보 검색").fill("새로운 조건");
   await page.getByRole("button", { name: "검색", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("검색 실패");
+  await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.");
+  await expect(page.getByRole("alert")).not.toContainText("검색 실패");
+  expect(failedReads).toBe(3);
   await expect(page.locator(".fb-post")).toHaveCount(0);
+  await expect(page.getByText("조건에 맞는 제보가 없어요")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "공개 제보 등록" })).toBeDisabled();
+  expect(writes).toEqual([]);
+  searchUnavailable = false;
+  await page.getByRole("button", { name: "다시 불러오기", exact: true }).click();
+  await expect(page.locator(".fb-post")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: recovered.title, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: entry.title, exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "공개 제보 등록" })).toBeEnabled();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(writes).toEqual([]);
 });
 
 test("malformed entry fields are reported without crashing React", async ({ page }) => {

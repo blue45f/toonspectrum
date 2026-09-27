@@ -30,6 +30,16 @@ import {
   type StudioDocumentEnvelopeOptions,
 } from "../studio-document-envelope";
 
+import type {
+  StudioInkEnvelopeAttestationVerifier,
+  StudioInkEnvelopeAttester,
+} from "@toonstudio/contracts/studio-ink-envelope-webcrypto-attestation";
+
+export type {
+  StudioInkEnvelopeAttestationVerifier,
+  StudioInkEnvelopeAttester,
+} from "@toonstudio/contracts/studio-ink-envelope-webcrypto-attestation";
+
 export const STUDIO_INK_ENVELOPE_CODEC_ID =
   "toonstudio.ink-envelope" as const;
 export const STUDIO_INK_ENVELOPE_CODEC_VERSION = 1 as const;
@@ -142,29 +152,6 @@ export interface StudioInkEnvelopeManifest {
   readonly canonicalByteLength: number;
   readonly contentDigest: `sha256:${string}`;
   readonly digestAlgorithm: typeof STUDIO_INK_ENVELOPE_DIGEST_ALGORITHM;
-}
-
-/**
- * Pluggable signer for organization-owned or audited key infrastructure.
- *
- * The callback receives an owned byte array containing only the v1 domain, attestation algorithm,
- * key id, canonical content byte length, and SHA-256 digest. The returned signature must be
- * unpadded base64url.
- */
-export interface StudioInkEnvelopeAttester {
-  readonly algorithm: string;
-  readonly keyId: string;
-  readonly sign: (message: Uint8Array) => string | Promise<string>;
-}
-
-/** Verification boundary for signatures issued by a selected trust domain. */
-export interface StudioInkEnvelopeAttestationVerifier {
-  readonly verify: (input: Readonly<{
-    algorithm: string;
-    keyId: string;
-    message: Uint8Array;
-    signature: string;
-  }>) => boolean | Promise<boolean>;
 }
 
 /**
