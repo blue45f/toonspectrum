@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Lapisan {count}",
   "studio.toolsCompanion.review.section.comments": "Komen {count}",
   "studio.toolsCompanion.review.section.history": "Rakam {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Halaman ZZLBRACELabel}· pilihan ZZLBRACELabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "konsol pemeriksaan",
   "studio.toolsCompanion.review.truncatedComments": "dan {count} ulasan",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lapisan",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Skrin rujukan",
   "studio.toolsCompanion.referenceLoading": "Memuatkan alat rujukan...",
   "studio.toolsCompanion.footer": "Edit dokumen hanya memiliki tab lalai. Tetingkap ini hanya menghantar pratonton termampat dan niat pemeriksaan/rujukan kepada Saluran Penyiaran penyemak imbas yang sama, jadi tiada kos pelayan yang berasingan.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Tidak disambungkan ke studio utama.",
+  "studio.toolsCompanion.exit.editor": "Buka editor Studio"
 }

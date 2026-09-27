@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "නිමකරන ලද්දේ",
+  "review.progress.binge": "බින්ග් කිරීම",
+  "review.progress.upcoming": "සැලසුම් කර ඇත",
+  "review.progress.abandoned": "බිම වැටී",
+  "review.progress.unknown": "සැඟවුණු ප් රගතිය",
+  "review.spoilerRevealLabel": "පෙන්වන්න ස්පෝයිලර්"
 }

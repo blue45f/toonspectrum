@@ -1,16 +1,16 @@
 {
   "common.loading": "Chargement",
-  "common.loading.short": "Loading",
+  "common.loading.short": "Chargement",
   "common.close": "Fermer",
   "common.open": "Ouvrir",
   "common.search": "Rechercher",
   "common.retry": "Réessayer",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "Retournez",
+  "common.backToTop": "Retour au sommet",
   "common.backToHome": "Accueil",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "Je suis à la recherche...",
+  "common.notFoundWithQuery": "Aucun résultat pour \" {query} \".",
+  "common.openSearch": "Trouvez-le dans la recherche →",
+  "common.loading.empty": "Aucune information n'a été renvoyée.",
+  "common.retry.all": "Essayez encore ou rentrez chez vous."
 }

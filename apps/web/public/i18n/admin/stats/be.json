@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Сацыяльная сістэма",
+  "admin.stats.healthy": "Здаровая",
+  "admin.stats.degraded": "Аслабленыя",
+  "admin.stats.revenueEvents": "Агульная колькасць транзакцый / разлікаў",
+  "admin.stats.usersCommunity": "Агульная колькасць членаў / пасадаў",
+  "admin.stats.maintenance": "Рэжым падтрымання",
+  "admin.stats.maintenanceOn": "Агульнае абслугоўванне (ON)",
+  "admin.stats.maintenanceOff": "Нармальная дзейнасць (выключана)",
+  "admin.stats.activeVisitors": "5 хвілін актыўных наведвальнікаў",
+  "admin.stats.views5m": "5 хвілін наведванняў старонкі"
 }

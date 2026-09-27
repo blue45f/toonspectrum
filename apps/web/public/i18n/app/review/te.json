@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "పూర్తి",
+  "review.progress.binge": "బంగీంగ్",
+  "review.progress.upcoming": "ప్రణాళిక",
+  "review.progress.abandoned": "వదలడం",
+  "review.progress.unknown": "దాచిన పురోగతి",
+  "review.spoilerRevealLabel": "ప్రదర్శించు స్పాయిలర్"
 }

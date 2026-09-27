@@ -1,7 +1,7 @@
 {
   "footer.explore": "探検する",
   "footer.community": "コミュニティ",
-  "footer.brand": "ToonStudio",
+  "footer.brand": "トーン・スタジオ",
   "footer.section.community": "コミュニティ",
   "footer.section.create": "創作",
   "footer.section.browse": "探検する",
@@ -47,6 +47,6 @@
   "footer.link.reviews": "レビューフィード",
   "footer.description.secondary": "Create your own story and discover inspiration from other creators.",
   "footer.description.primary": "From an idea to your first scene. Explore drawing, comics and 3D scenes in your browser.",
-  "footer.logoTag": "CREATE YOUR NEXT STORY",
+  "footer.logoTag": "次の物語を 作り出せ",
   "footer.copyrightLine": "© {year} ToonStudio (ベータ版)。無断転載を禁じます。"
 }

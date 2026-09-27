@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "E'lonlar va bayroqlar",
+  "admin.tabs.audit": "Auditlar jurnalida",
+  "admin.tabs.campaigns": "Kampanyalar",
+  "admin.tabs.creatorSupport": "Yaratuvchining yordami",
+  "admin.tabs.dashboard": "Ish stoli",
+  "admin.tabs.ops": "Operatsiyalar",
+  "admin.tabs.plans": "Rejalar",
+  "admin.tabs.promos": "Taraqqiyotlar",
+  "admin.tabs.reports": "Hisobotlar va oʻrtacha",
+  "admin.tabs.revenue": "Toʻlov",
+  "admin.tabs.security": "Xavfsizlik & IP",
+  "admin.tabs.inquiries": "Ishbilarmonlik so'rovlari",
+  "admin.tabs.supporters": "Operatsiya xarajatlari qo'llab-quvvatlash",
+  "admin.tabs.traffic": "Toʻgʻridan-toʻgʻri trafik"
 }

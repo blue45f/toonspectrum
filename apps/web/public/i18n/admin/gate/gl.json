@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Login requerido",
+  "admin.gate.guestBody": "A consola de administración require autenticación.",
+  "admin.gate.forbiddenTitle": "Permiso do administrador requerido",
+  "admin.gate.forbiddenBody": "Esta conta carece de permisos de administración.",
+  "admin.gate.errorTitle": "Non puido cargar consola"
 }

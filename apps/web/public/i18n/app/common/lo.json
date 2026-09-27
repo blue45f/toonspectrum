@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "ການໂຫຼດ",
+  "common.loading.short": "ການໂຫຼດ",
   "common.close": "ປິດ",
   "common.open": "ເປີດ",
   "common.search": "ຄົ້ນຫາ",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "ພະຍາຍາມອີກຄັ້ງ",
+  "common.retry.short": "ພະຍາຍາມອີກຄັ້ງ",
+  "common.backToTop": "ກັບຄືນໄປບ່ອນເທິງ",
+  "common.backToHome": "ກັບຄືນບ້ານ",
+  "common.loading.search": "ຊອກຫາ...",
+  "common.notFoundWithQuery": "ບໍ່ມີຜົນ ສໍາ ເລັດ ສໍາ ລັບ ' {query} '.",
+  "common.openSearch": "ຊອກຫາໃນ Search →",
+  "common.loading.empty": "ບໍ່ມີຂໍ້ມູນທີ່ສົ່ງຄືນ.",
+  "common.retry.all": "ພະຍາຍາມອີກຄັ້ງ ຫຼື ກັບຄືນບ້ານ."
 }

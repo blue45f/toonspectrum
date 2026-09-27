@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Copyright & ເນື້ອຫາແຈ້ງການ",
+  "copyright.section1.title": "ແຫຼ່ງຂ່າວ ແລະ ຫຼັກການ",
+  "copyright.section1.body": "ToonSpectrum ແມ່ນເວທີອິນເດຍແລະການຄົ້ນພົບທີ່ສະຫຼຸບຂໍ້ມູນແຖວທາດສາທາລະນະ (ຫົວຂໍ້, ຜູ້ຂຽນ, ປະເພດ, ແລະອື່ນໆ) ຈາກເວທີ webtoon / webnovel. ມັນບໍ່ເປັນເຈົ້າພາບຫຼືແຈກຢາຍເນື້ອຫາບົດຕົ້ນຕໍ; ການອ່ານແມ່ນແນະ ນໍາ ໂດຍສະເພາະຜ່ານລິ້ງທາງການ.",
+  "copyright.section2.title": "ຮູບພາບປົກຫຸ້ມ",
+  "copyright.section2.body": "ຮູບພາບ ຫນ້າ ປົກ ໃຊ້ເປັນຕົວ ກໍາ ນົດຮູບພາບນ້ອຍໆແລະອ້າງອີງ ຫນ້າ ປົກພື້ນຖານຕົ້ນສະບັບທີ່ມີລິ້ງແຫຼ່ງເມື່ອເປັນໄປໄດ້. ການສະແດງສາມາດຖືກປິດທັນທີຕາມ ຄໍາ ຮ້ອງຂໍຂອງຜູ້ຖືສິດຫຼືການປັບປຸງນະໂຍບາຍ.",
+  "copyright.section3.title": "ແມັດຕິກ & ຄວາມໂປ່ງໃສ",
+  "copyright.section4.title": "ຂໍ້ແຈ້ງການກ່ຽວກັບສິດທິ",
+  "copyright.section5.title": "ການແຈ້ງການກ່ຽວກັບການລະເມີດສິດທິບັດ ແລະ ການຖອນ",
+  "copyright.section5.body": "ຖ້າທ່ານເຊື່ອວ່າ metadata ຫຼືການປົກຫຸ້ມຫໍ່ລະເມີດສິດຂອງທ່ານ, ກະລຸນາສົ່ງ ຄໍາ ຖາມທີ່ມີຫົວຂໍ້, URL ແລະຫຼັກຖານຂອງເຈົ້າຂອງ.",
+  "copyright.leaveInquiry": "ສະ ເຫນີ ການສອບຖາມ →"
 }

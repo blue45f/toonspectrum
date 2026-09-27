@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "లాగిన్ అవసరం",
+  "admin.gate.guestBody": "అడ్మిన్ కన్సోల్ ప్రామాణీకరణ అవసరం. దయచేసి సైన్ ఇన్ చేయండి.",
+  "admin.gate.forbiddenTitle": "నిర్వాహక అనుమతి అవసరం",
+  "admin.gate.forbiddenBody": "ఈ ఖాతాలో నిర్వాహక అనుమతులు లేవు. అవసరమైతే ఆపరేటర్ను సంప్రదించండి.",
+  "admin.gate.errorTitle": "కన్సోల్ లోడ్ చేయలేకపోయింది"
 }

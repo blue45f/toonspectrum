@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Prawo autorskie i treść",
+  "copyright.section1.title": "Źródła i zasady treści",
+  "copyright.section1.body": "ToonSpectrum to platforma indeksów i odkryć, która podsumowuje metadany kataloga publicznego (tytuły, autorzy, gatunki itp.) z platform webtoonów / nowa internetowa.",
+  "copyright.section2.title": "Obrazy okładki",
+  "copyright.section2.body": "Obrazy okładki służą do identyfikacji miniatur, a odniesienie do oryginalnych okładek platform z linkami źródłowymi, gdy tylko to możliwe.",
+  "copyright.section3.title": "Metryka i przejrzystość",
+  "copyright.section4.title": "Powiadomienie o prawach",
+  "copyright.section5.title": "Powiadomienie o naruszaniu praw autorskich i usunięcie",
+  "copyright.section5.body": "Jeśli uważasz, że metadata lub okładki naruszają Twoje prawa, proszę złożyć zapytanie z tytułem, adresem URL i dowodem własności.",
+  "copyright.leaveInquiry": "Wniosek →"
 }

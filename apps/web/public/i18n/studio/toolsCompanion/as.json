@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "প্ৰসংগ পৰ্দা",
   "studio.toolsCompanion.referenceLoading": "ৰেফাৰেন্স সঁজুলি লোড কৰা হৈছে...",
   "studio.toolsCompanion.footer": "সম্পাদনা দস্তাবেজসমূহে কেৱল অবিকল্পিত টেবৰ মালিক। এই উইন্ডোৱে কেৱল সংকোচিত পূৰ্বদৰ্শন আৰু পৰিদৰ্শন/উল্লেখৰ উদ্দেশ্য একেটা ব্ৰাউজাৰৰ BroadcastChannel লৈ প্ৰেৰণ কৰে, গতিকে কোনো পৃথক চাৰ্ভাৰ খৰচ নাই।",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "মূল ষ্টুডিঅ'ৰ সৈতে সংযোগ নাই।",
+  "studio.toolsCompanion.exit.editor": "ষ্টুডিঅ' সম্পাদকটো খোলক"
 }

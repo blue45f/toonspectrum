@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Sloj {count}",
   "studio.toolsCompanion.review.section.comments": "Komentiraj {count}",
   "studio.toolsCompanion.review.section.history": "Snimi {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE stranicaOznaka}· Izbor ZZLBRACEOznaka ZZ RBRACE",
   "studio.toolsCompanion.review.title": "inspekcijska konzola",
   "studio.toolsCompanion.review.truncatedComments": "i {count} komentara",
   "studio.toolsCompanion.review.truncatedLayers": "{count} slojeva",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referentni ekran",
   "studio.toolsCompanion.referenceLoading": "Učitavanje referentnog alata...",
   "studio.toolsCompanion.footer": "Uređivanje dokumenata posjeduje samo zadanu karticu. Ovaj prozor prenosi samo komprimirani pregled i inspekciju/referencu na BroadcastChannel istog pretraživača, tako da nema odvojenih troškova servera.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Nije povezan sa glavnim studijem.",
+  "studio.toolsCompanion.exit.editor": "Otvori urednik studija"
 }

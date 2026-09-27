@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Copyright & Content Paalalahan",
+  "copyright.section1.title": "Mga Pinagmulan at Prinsipyo ng nilalaman",
+  "copyright.section1.body": "Ang ToonSpectrum ay isang index at discovery platform na summarizing sa publiko na katalóg metadata (titulo, mga may-akda, mga genre, atbp.) mula sa webtoon / webnovel platforms. Hindi ito nag-host o nag-redistribute ng pangunahing nilalaman ng kabanata; ang pagbabasa ay direktang eksklusibo sa pamamagitan ng mga opisyal na link.",
+  "copyright.section2.title": "Mga Imahe sa Cover",
+  "copyright.section2.body": "Ang mga imahe ng cover ay nagsisilbing pagkilala ng mga thumbnail at reference original platform covers na may mga link sa pinagmulan kung maaari. Ang mga display ay maaaring agad na hindi aktibo sa pag-uusap ng mga may-ari ng mga karapatan o mga update ng patakaran.",
+  "copyright.section3.title": "Mga Metrics & Transparency",
+  "copyright.section4.title": "Pakikinig ng mga Karapatan",
+  "copyright.section5.title": "Pagpahayag ng paglabag sa mga copyright at pag-aalis",
+  "copyright.section5.body": "Kung naniniwala ka na ang mga metadata o cover ay sumisira sa iyong mga karapatan, mangyaring mag-submit ng isang tanong na may titulo, URL, at patunay ng pagmamay-ari.",
+  "copyright.leaveInquiry": "Mag-submit ng Inquiry"
 }

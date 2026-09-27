@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "লোডিং",
+  "common.loading.short": "লোডিং",
   "common.close": "বন্ধ",
   "common.open": "খুলুন",
   "common.search": "অনুসন্ধান",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "আবার চেষ্টা করুন",
+  "common.retry.short": "আবার চেষ্টা করুন",
+  "common.backToTop": "শীর্ষে ফিরে",
+  "common.backToHome": "বাড়ি যাও",
+  "common.loading.search": "অনুসন্ধান...",
+  "common.notFoundWithQuery": "' {query} ' এর কোন ফলাফল পাওয়া যায়নি।",
+  "common.openSearch": "অনুসন্ধানে খুঁজে বের করুন →",
+  "common.loading.empty": "কোন তথ্য ফেরত আসেনি।",
+  "common.retry.all": "আবার চেষ্টা করো অথবা বাড়ি ফিরে যাও।"
 }

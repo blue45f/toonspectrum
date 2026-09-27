@@ -1,16 +1,16 @@
 {
   "common.loading": "Laden",
-  "common.loading.short": "Loading",
+  "common.loading.short": "Verpakking",
   "common.close": "Sluiten",
   "common.open": "Openen",
   "common.search": "Zoeken",
   "common.retry": "Opnieuw proberen",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "Weer proberen .",
+  "common.backToTop": "Terug naar de top .",
   "common.backToHome": "Naar home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "Op zoek naar...",
+  "common.notFoundWithQuery": "Geen resultaten voor ' {query} '.",
+  "common.openSearch": "Zoek het in de Zoek →",
+  "common.loading.empty": "Geen gegevens terug.",
+  "common.retry.all": "Probeer het nog eens of ga naar huis."
 }

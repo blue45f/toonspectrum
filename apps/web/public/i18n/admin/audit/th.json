@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "ลงทะเบียนการตรวจสอบผู้บริหาร",
+  "admin.audit.desc": "ติดตามการกระทําทางการบริหาร, การเปลี่ยนแปลงอนุญาต, และการเปลี่ยนแปลงการตั้งค่า",
+  "admin.audit.searchPlaceholder": "ค้นหา (อีเมล/การกระทํา)...",
+  "admin.audit.loading": "การบรรจุบันทึกการตรวจสอบ",
+  "admin.audit.empty": "ไม่มีบันทึกการตรวจสอบ",
+  "admin.audit.viewDetails": "ดู",
+  "admin.audit.modalTitle": "รายละเอียดบันทึกการตรวจสอบ",
+  "admin.audit.close": "ใกล้"
 }

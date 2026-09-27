@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ਪਰਤ {count}",
   "studio.toolsCompanion.review.section.comments": "ਟਿੱਪਣੀ {count}",
   "studio.toolsCompanion.review.section.history": "ਰਿਕਾਰਡ {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE ਪੇਜਲੇਬਲ}·{ਚੋਣਲੇਬਲ ZZ RBRACE",
   "studio.toolsCompanion.review.title": "ਨਿਰੀਖਣ ਕੰਸੋਲ",
   "studio.toolsCompanion.review.truncatedComments": "ਅਤੇ {count} ਟਿੱਪਣੀਆਂ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ਪਰਤਾਂ",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "ਹਵਾਲਾ ਸਕ੍ਰੀਨ",
   "studio.toolsCompanion.referenceLoading": "ਹਵਾਲਾ ਟੂਲ ਲੋਡ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
   "studio.toolsCompanion.footer": "ਦਸਤਾਵੇਜ਼ਾਂ ਨੂੰ ਸੰਪਾਦਿਤ ਕਰੋ ਸਿਰਫ ਡਿਫੌਲਟ ਟੈਬ ਦੇ ਮਾਲਕ ਹਨ। ਇਹ ਵਿੰਡੋ ਉਸੇ ਬ੍ਰਾਊਜ਼ਰ ਦੇ ਬ੍ਰੌਡਕਾਸਟਚੈਨਲ ਨੂੰ ਸਿਰਫ਼ ਕੰਪਰੈੱਸਡ ਪੂਰਵਦਰਸ਼ਨ ਅਤੇ ਨਿਰੀਖਣ/ਸੰਦਰਭ ਇਰਾਦੇ ਨੂੰ ਪ੍ਰਸਾਰਿਤ ਕਰਦੀ ਹੈ, ਇਸਲਈ ਕੋਈ ਵੱਖਰੀ ਸਰਵਰ ਲਾਗਤ ਨਹੀਂ ਹੈ।",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "ਮੁੱਖ ਸਟੂਡੀਓ ਨਾਲ ਜੁੜਿਆ ਨਹੀਂ ਹੈ।",
+  "studio.toolsCompanion.exit.editor": "ਸਟੂਡੀਓ ਐਡੀਟਰ ਖੋਲ੍ਹੋ"
 }

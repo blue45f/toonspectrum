@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "Type image non supported.",
+  "avatar.error.processFailed": "️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️",
+  "avatar.processing": "Processing...",
+  "avatar.select": "Ndrysho imazhin",
+  "avatar.remove": "Hiq imazhin",
+  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cut for preview.",
+  "avatar.changeAria": "Ndrysho imazhin e profilit"
 }

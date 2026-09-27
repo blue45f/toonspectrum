@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Telif Hakları ve İçerik İletişi",
+  "copyright.section1.title": "İçerik Kaynakları ve İlkeler",
+  "copyright.section1.body": "ToonSpectrum, webtoon/webnovel platformlarından yayınlanan kamu kataloğu metadatalarını (başlıklar, yazarlar, türler vb.) özetleyen bir indeks ve keşif platformu. Ana bölüm içeriğini barındırmaz veya yeniden dağıtmaz; okuma yalnızca resmi bağlantılar üzerinden yönlendirilir.",
+  "copyright.section2.title": "Kapak Resimleri",
+  "copyright.section2.body": "Kapak görüntüleri küçük görüntüleri tanımlamak ve mümkün olduğunda kaynak bağlantıları ile orijinal platform kapaklarını referans olarak kullanır.",
+  "copyright.section3.title": "Metrikler ve Şeffaflık",
+  "copyright.section4.title": "Haklar İletişi",
+  "copyright.section5.title": "Telif hakkı ihlal edilmesi ve kaldırılması",
+  "copyright.section5.body": "Metadata veya kapakların haklarınızı ihlal ettiğini düşünüyorsanız, lütfen başlık, URL ve sahiplik kanıtı ile bir soru gönderin.",
+  "copyright.leaveInquiry": "Soruşturma yapın"
 }

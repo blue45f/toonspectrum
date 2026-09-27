@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "{count} réteg",
   "studio.toolsCompanion.review.section.comments": "Megjegyzés {count}",
   "studio.toolsCompanion.review.section.history": "Felvétel {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE oldalCímke}·{kiválasztásCímke ZZ RBRACE",
   "studio.toolsCompanion.review.title": "ellenőrző konzol",
   "studio.toolsCompanion.review.truncatedComments": "és {count} megjegyzés",
   "studio.toolsCompanion.review.truncatedLayers": "{count} réteg",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referencia képernyő",
   "studio.toolsCompanion.referenceLoading": "Referenciaeszköz betöltése...",
   "studio.toolsCompanion.footer": "A szerkesztési dokumentumok csak az alapértelmezett lappal rendelkeznek. Ez az ablak csak a tömörített előnézetet és az ellenőrzési/referencia szándékot továbbítja ugyanazon böngésző BroadcastChannel-jének, így nincs külön szerverköltség.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Nem kapcsolódik a fő stúdióhoz.",
+  "studio.toolsCompanion.exit.editor": "Nyissa ki a Studio szerkesztőt"
 }

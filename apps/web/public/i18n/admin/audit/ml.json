@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "അഡ്മിൻ ഓഡിറ്റ് ലോഗ്",
+  "admin.audit.desc": "എല്ലാ അഡ്മിനിസ്ട്രേറ്റീവ് നടപടികളും അനുമതി മാറ്റങ്ങളും കോൺഫിഗറേഷൻ മാറ്റങ്ങളും ട്രാക്കുചെയ്യുക.",
+  "admin.audit.searchPlaceholder": "തിരയൽ (ഇമെയിൽ/പ്രവർത്തനം)...",
+  "admin.audit.loading": "ഓഡിറ്റ് രേഖകൾ ലോഡുചെയ്യുന്നു...",
+  "admin.audit.empty": "റെക്കോർഡ് ചെയ്ത ഓഡിറ്റ് രേഖകളില്ല.",
+  "admin.audit.viewDetails": "കാഴ്ച",
+  "admin.audit.modalTitle": "ഓഡിറ്റ് ലോഗ് വിശദാംശങ്ങൾ",
+  "admin.audit.close": "അടുത്ത്"
 }

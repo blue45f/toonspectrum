@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Преглед на поделба на резултатот",
+  "ranking.metric.views": "Видиња",
+  "ranking.why": "Зошто?",
+  "ranking.breakdownTitle": "Поделба на резултатот",
+  "ranking.totalScore": "Вкупниот резултат",
+  "ranking.breakdownDescription": "Изчислено со тежини на осите и нормализација специфична за насловот."
 }

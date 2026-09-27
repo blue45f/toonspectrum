@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "লোডিং",
+  "common.loading.short": "লোডিং",
   "common.close": "বন্ধ কৰক",
   "common.open": "খোলক",
   "common.search": "সন্ধান",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "পুনৰ চেষ্টা কৰক",
+  "common.retry.short": "পুনৰ চেষ্টা কৰক",
+  "common.backToTop": "ওপৰলৈ ঘূৰি যাওক",
+  "common.backToHome": "ঘৰলৈ যোৱা",
+  "common.loading.search": "অনুসন্ধান কৰা...",
+  "common.notFoundWithQuery": "' {query} ' ৰ কোনো ফলাফল পোৱা নগ'ল।",
+  "common.openSearch": "অনুসন্ধান কৰক →",
+  "common.loading.empty": "কোনো তথ্য ঘূৰাই দিয়া হোৱা নাই।",
+  "common.retry.all": "পুনৰ চেষ্টা কৰক অথবা ঘৰলৈ ঘূৰি যাওক।"
 }

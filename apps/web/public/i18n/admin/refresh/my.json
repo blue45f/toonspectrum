@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
+  "admin.refresh.now": "ယခု အားဖြည့်ပေးပါ",
+  "admin.refresh.auto": "ကား:",
   "admin.refresh.seconds": "{sec}s"
 }

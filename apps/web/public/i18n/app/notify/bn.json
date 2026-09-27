@@ -1,4 +1,4 @@
 {
-  "notify.loadError": "Couldn't load notifications.",
-  "notify.empty": "No new notifications."
+  "notify.loadError": "নোটিফিকেশন লোড করতে পারিনি।",
+  "notify.empty": "কোন নতুন বিজ্ঞপ্তি নেই।"
 }

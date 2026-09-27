@@ -1,16 +1,16 @@
 {
   "common.loading": "Naglo-load",
-  "common.loading.short": "Loading",
+  "common.loading.short": "Pagkarga",
   "common.close": "Isara",
   "common.open": "Buksan",
   "common.search": "Maghanap",
   "common.retry": "Subukan muli",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "Subukan muli",
+  "common.backToTop": "Muli sa tuktok",
   "common.backToHome": "Bumalik sa Tahanan",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "Naghahanap...",
+  "common.notFoundWithQuery": "Walang resulta para sa ' {query} '.",
+  "common.openSearch": "Hanapin ito sa Paghahanap →",
+  "common.loading.empty": "Walang data ang bumalik.",
+  "common.retry.all": "Subukan ulit o umuwi ka."
 }

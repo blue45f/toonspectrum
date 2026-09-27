@@ -8,7 +8,7 @@
   "studio.settings.tool.blend": "Mchanganyiko (uchafu)",
   "studio.settings.tool.wetMix": "brashi ya kuchanganya rangi",
   "studio.settings.tool.dodgeBurn": "Dodge/Kuchoma",
-  "studio.settings.tool.liquify": "Liquify",
+  "studio.settings.tool.liquify": "Kioevu",
   "studio.settings.tool.fill": "ndoo ya rangi",
   "studio.settings.tool.lassoFill": "Jaza Lasso",
   "studio.settings.tool.eyedropper": "dropper",
@@ -49,7 +49,7 @@
   "studio.settings.shortcut.toolBlend": "Mchanganyiko (uchafu)",
   "studio.settings.shortcut.toolWetMix": "brashi ya kuchanganya rangi",
   "studio.settings.shortcut.toolDodgeBurn": "Dodge/Kuchoma",
-  "studio.settings.shortcut.toolLiquify": "Liquify",
+  "studio.settings.shortcut.toolLiquify": "Kioevu",
   "studio.settings.shortcut.toolLettering": "Kuandika herufi (puto ya maandishi/hotuba)",
   "studio.settings.shortcut.undo": "tengua",
   "studio.settings.shortcut.redo": "kukimbia tena",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "siri",
   "studio.settings.state.show": "ishara",
   "studio.settings.state.open": "wazi",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "Kujenga tabia"
 }

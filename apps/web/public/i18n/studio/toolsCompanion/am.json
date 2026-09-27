@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ንብርብር {count}",
   "studio.toolsCompanion.review.section.comments": "አስተያየት {count}",
   "studio.toolsCompanion.review.section.history": "መዝገብ {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRAACE ገጽ መሰየሚያ}· የZZLBRACE ምርጫ መለያ ZZ RBRACE",
   "studio.toolsCompanion.review.title": "የፍተሻ ኮንሶል",
   "studio.toolsCompanion.review.truncatedComments": "እና {count} አስተያየቶች",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ንብርብሮች",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "የማጣቀሻ ማያ ገጽ",
   "studio.toolsCompanion.referenceLoading": "የማመሳከሪያ መሳሪያን በመጫን ላይ...",
   "studio.toolsCompanion.footer": "ሰነዶች የነባሪ ትር ብቻ ባለቤት ናቸው። ይህ መስኮት የተጨመቀውን ቅድመ እይታ እና ፍተሻ/ማጣቀሻ ሃሳብን ለተመሳሳይ አሳሽ ብሮድካስትቻናል ያስተላልፋል፣ ስለዚህ የተለየ የአገልጋይ ወጪ የለም።",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "ከዋናው ስቱዲዮ ጋር አልተገናኘም።",
+  "studio.toolsCompanion.exit.editor": "የስቱዲዮ አዘጋጅ ይክፈቱ"
 }

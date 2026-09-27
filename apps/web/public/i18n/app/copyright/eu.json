@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Eskubide-eskubideen jabetza eta edukien adierazpena",
+  "copyright.section1.title": "Eduki iturriek eta printzipioek",
+  "copyright.section1.body": "ToonSpectrum, webtoon/webnovel plataformetako katalogoko metadata publikoak (izenak, egileak, generoak, etab.) laburbiltzen dituen indize eta aurkikuntza plataforma bat da.",
+  "copyright.section2.title": "Bilduren estaldura",
+  "copyright.section2.body": "Azala irudiek laburpenak identifikatzen dituzte eta plataforma originalaren azalak erreferentzia egiten dituzte iturri-linkekin ahal bada.",
+  "copyright.section3.title": "Metrikak eta gardentasuna",
+  "copyright.section4.title": "Eskubideen adierazpena",
+  "copyright.section5.title": "Eskubide-hausteen urraketa jakinarazpena eta kentzea",
+  "copyright.section5.body": "Metadatak edo estaldurak zure eskubideak urratzen dituztela uste baduzu, mesedez, eskaera bat aurkeztu izenburua, URLa eta jabetza-agiria dituena.",
+  "copyright.leaveInquiry": "Galdetu egin behar da."
 }

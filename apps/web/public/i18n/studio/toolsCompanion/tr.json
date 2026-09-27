@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Katman {count}",
   "studio.toolsCompanion.review.section.comments": "Yorum {count}",
   "studio.toolsCompanion.review.section.history": "{count} kaydını yap",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE sayfasıEtiket}·{seçimiEtiket ZZ RBRACE",
   "studio.toolsCompanion.review.title": "muayene konsolu",
   "studio.toolsCompanion.review.truncatedComments": "ve {count} yorumları",
   "studio.toolsCompanion.review.truncatedLayers": "{count} katmanlar",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referans ekranı",
   "studio.toolsCompanion.referenceLoading": "Referans aracı yükleniyor...",
   "studio.toolsCompanion.footer": "Belgeleri düzenle yalnızca varsayılan sekmeye sahiptir. Bu pencere yalnızca sıkıştırılmış önizlemeyi ve inceleme/referans amacını aynı tarayıcının BroadcastChannel'ına iletir, dolayısıyla ayrı bir sunucu maliyeti yoktur.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Ana stüdyoya bağlanmamış.",
+  "studio.toolsCompanion.exit.editor": "Studio editörü aç"
 }

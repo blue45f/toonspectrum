@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "ನವೀಕರಣಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+  "changelog.empty": "ಇನ್ನೂ ಯಾವುದೇ ನವೀಕರಣ ದಾಖಲೆಗಳನ್ನು ಪೋಸ್ಟ್ ಮಾಡಿಲ್ಲ."
 }

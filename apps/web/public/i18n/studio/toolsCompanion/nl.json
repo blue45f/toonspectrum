@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Laag {count}",
   "studio.toolsCompanion.review.section.comments": "Commentaar {count}",
   "studio.toolsCompanion.review.section.history": "Record {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE paginaLabel}·{selectieLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "inspectie console",
   "studio.toolsCompanion.review.truncatedComments": "en {count} opmerkingen",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lagen",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referentiescherm",
   "studio.toolsCompanion.referenceLoading": "Referentietool laden...",
   "studio.toolsCompanion.footer": "Bewerkingsdocumenten hebben alleen het standaardtabblad. Dit venster verzendt alleen de gecomprimeerde preview en inspectie/referentie-intentie naar het BroadcastChannel van dezelfde browser, dus er zijn geen afzonderlijke serverkosten.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Niet verbonden met de studio.",
+  "studio.toolsCompanion.exit.editor": "Open de Studio-editor"
 }

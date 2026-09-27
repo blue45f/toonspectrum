@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
+  "review.progress.complete": "E përfunduar",
   "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.upcoming": "Plan",
+  "review.progress.abandoned": "I rënë",
+  "review.progress.unknown": "Progresi i fshehur",
+  "review.spoilerRevealLabel": "Shfaq spoilerin"
 }

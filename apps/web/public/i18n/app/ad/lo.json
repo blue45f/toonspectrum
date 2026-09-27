@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "ຮູບພາບທີ່ໄດ້ຮັບການສະ ຫນັບ ສະ ຫນູນ",
+  "ad.slotAriaLabel": "ຊ່ອງໂຄສະນາ",
+  "ad.slotLabel": "ສະຫນັບສະຫນູນ",
+  "ad.slotTitle": "ເນື້ອຫາທີ່ໄດ້ຮັບການສະ ຫນັບ ສະ ຫນູນ",
+  "ad.ctaDetails": "ເບິ່ງລາຍລະອຽດ",
+  "ad.placeholderAriaLabel": "ບ່ອນຈັດສັນໂຄສະນາ",
+  "ad.placeholderText": "ບໍ່ມີເນື້ອຫາທີ່ໄດ້ຮັບການສະ ຫນັບ ສະ ຫນູນ ທີ່ສາມາດໃຊ້ໄດ້.",
+  "ad.tag": "ການໂຄສະນາ"
 }

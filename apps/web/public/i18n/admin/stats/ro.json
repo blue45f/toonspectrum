@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Sistemul de sănătate",
+  "admin.stats.healthy": "Sănătos",
+  "admin.stats.degraded": "Degradați",
+  "admin.stats.revenueEvents": "Tranzacții / decontări totale",
+  "admin.stats.usersCommunity": "Total de membri / posturi",
+  "admin.stats.maintenance": "Modul de întreținere",
+  "admin.stats.maintenanceOn": "Servicii de întreținere în situații de urgență (ON)",
+  "admin.stats.maintenanceOff": "Operare normală (OFF)",
+  "admin.stats.activeVisitors": "Vizitatori activi de 5 minute",
+  "admin.stats.views5m": "5 minute de vizualizare a paginii"
 }

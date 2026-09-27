@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Τελείωσε",
+  "review.progress.binge": "Μπινγκ .",
+  "review.progress.upcoming": "Προγραμματισμένο",
+  "review.progress.abandoned": "Κατεβλήθηκε",
+  "review.progress.unknown": "Κρυμμένη πρόοδος",
+  "review.spoilerRevealLabel": "Εμφάνιση spoiler"
 }

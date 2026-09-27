@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "ログイン 必須",
+  "admin.gate.guestBody": "アドミンスコンソールには認証が必要です サインインしてください",
+  "admin.gate.forbiddenTitle": "管理者許可が必要",
+  "admin.gate.forbiddenBody": "このアカウントには管理者権限がない.必要に応じてオペレーターに連絡してください.",
+  "admin.gate.errorTitle": "コンソール 読み込み 失敗"
 }

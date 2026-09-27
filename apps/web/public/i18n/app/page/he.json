@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "דף לא נמצא",
+  "page.notFound.message": "בדוק שוב את URL או לחפש כותרות בעמוד הבית.",
+  "page.notFound.home": "תחזור הביתה."
 }

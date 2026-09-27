@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "પ્રાયોજિત છબી",
+  "ad.slotAriaLabel": "જાહેરાત સ્લોટ",
+  "ad.slotLabel": "પ્રાયોજિત",
+  "ad.slotTitle": "પ્રાયોજિત સામગ્રી",
+  "ad.ctaDetails": "વિગતો જુઓ",
+  "ad.placeholderAriaLabel": "જાહેરાત સ્થાન ધારક",
+  "ad.placeholderText": "કોઈ પ્રાયોજિત સામગ્રી ઉપલબ્ધ નથી.",
+  "ad.tag": "જાહેરાત"
 }

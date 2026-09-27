@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "Non puiden carregar a enquisa de retroalimentación.",
+  "feedback.thankYou": "Grazas polo teu valioso feedback!",
+  "feedback.anonymousNote": "As túas respostas quedan estrictamente anónimas.",
+  "feedback.notAtAll": "De nada.",
+  "feedback.definitely": "Definitivamente"
 }

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ସ୍ତର {count}",
   "studio.toolsCompanion.review.section.comments": "ମନ୍ତବ୍ୟ {count}",
   "studio.toolsCompanion.review.section.history": "ରେକର୍ଡ {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE ପୃଷ୍ଠା ଲେବଲ୍}·{ଚୟନ ଲେବଲ୍ ZZ RBRACE",
   "studio.toolsCompanion.review.title": "ଯାଞ୍ଚ କୋନସୋଲ",
   "studio.toolsCompanion.review.truncatedComments": "ଏବଂ {count} ମନ୍ତବ୍ୟଗୁଡିକ |",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ସ୍ତରଗୁଡିକ |",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "ସନ୍ଦର୍ଭ ପରଦା |",
   "studio.toolsCompanion.referenceLoading": "ରେଫରେନ୍ସ ଟୁଲ୍ ଲୋଡ୍ କରୁଛି ...",
   "studio.toolsCompanion.footer": "ଡକ୍ୟୁମେଣ୍ଟଗୁଡିକ ସଂପାଦନ କରନ୍ତୁ କେବଳ ଡିଫଲ୍ଟ ଟ୍ୟାବ୍ ର ମାଲିକ | ଏହି ୱିଣ୍ଡୋ ସମାନ ବ୍ରାଉଜରର ବ୍ରଡକାଷ୍ଟ ଚ୍ୟାନେଲକୁ କେବଳ ସଙ୍କୋଚିତ ପୂର୍ବାବଲୋକନ ଏବଂ ଯାଞ୍ଚ / ରେଫରେନ୍ସ ଉଦ୍ଦେଶ୍ୟ ପଠାଇଥାଏ, ତେଣୁ କ separate ଣସି ପୃଥକ ସର୍ଭର ମୂଲ୍ୟ ନାହିଁ |",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "ମୁଖ୍ୟ ଷ୍ଟୁଡିଓ ସହିତ ସଂଯୋଗ ହୋଇନାହିଁ ।",
+  "studio.toolsCompanion.exit.editor": "ଷ୍ଟୁଡିଓ ସମ୍ପାଦକକୁ ଖୋଲନ୍ତୁ"
 }

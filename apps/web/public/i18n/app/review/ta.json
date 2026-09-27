@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "நிறைவு",
+  "review.progress.binge": "பின்கிங்",
+  "review.progress.upcoming": "திட்டமிடப்பட்ட",
+  "review.progress.abandoned": "கைவிடப்பட்டது",
+  "review.progress.unknown": "மறைக்கப்பட்ட முன்னேற்றம்",
+  "review.spoilerRevealLabel": "காட்சி ஸ்பாய்லர்"
 }

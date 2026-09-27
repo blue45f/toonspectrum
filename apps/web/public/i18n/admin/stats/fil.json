@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Sistema ng Pangkalusugan",
+  "admin.stats.healthy": "Malusog",
+  "admin.stats.degraded": "Na-degrade",
+  "admin.stats.revenueEvents": "Total na mga transaksyon / pagbabayad",
+  "admin.stats.usersCommunity": "Total na mga miyembro / mga posisyon",
+  "admin.stats.maintenance": "Mode ng Maintenance",
+  "admin.stats.maintenanceOn": "Pag-aalaga ng emerhensiya (ON)",
+  "admin.stats.maintenanceOff": "Normal na Operasyon (OFF)",
+  "admin.stats.activeVisitors": "5 minuto na mga aktibong bisita",
+  "admin.stats.views5m": "5 minuto na mga pagtingin sa pahina"
 }

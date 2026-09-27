@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "പകർപ്പവകാശവും ഉള്ളടക്കവും അറിയിപ്പ്",
+  "copyright.section1.title": "ഉള്ളടക്ക സ്രോതസ്സുകളും തത്വങ്ങളും",
+  "copyright.section1.body": "ടൺസ്പെക്ട്രം ഒരു ഇൻഡെക്സ്, ഡിസ്കവറി പ്ലാറ്റ്ഫോമാണ്. വെബ്ടൂൺ / വെബ്നവൽ പ്ലാറ്റ്ഫോമുകളിൽ നിന്നുള്ള പൊതു കാറ്റലോഗ് മെറ്റാഡാറ്റ (ടൈറ്റിലുകൾ, രചയിതാക്കൾ, ജ്യാൻറുകൾ മുതലായവ) സംഗ്രഹിക്കുന്നു. പ്രധാന അധ്യായ ഉള്ളടക്കം ഹോസ്റ്റുചെയ്യുകയോ പുനർവിതരണം ചെയ്യുകയോ ചെയ്യുന്നില്ല; വായനയെക്കുറിച്ച് ഔദ്യോഗിക ലിങ്കുകൾ വഴി മാത്രം.",
+  "copyright.section2.title": "കവർ ഇമേജുകൾ",
+  "copyright.section2.body": "കവർ ഇമേജുകൾ ലഘുചിത്രങ്ങൾ തിരിച്ചറിയുന്നതിനും സാധ്യമാകുമ്പോഴെല്ലാം ഉറവിട ലിങ്കുകൾ ഉപയോഗിച്ച് റഫറൻസ് ഒറിജിനൽ പ്ലാറ്റ്ഫോം കവറുകളും ആയി പ്രവർത്തിക്കുന്നു. അവകാശ ഉടമയുടെ അഭ്യർത്ഥനയോ നയ അപ്ഡേറ്റുകളോ അനുസരിച്ച് പ്രദർശനങ്ങൾ തൽക്ഷണം പ്രവർത്തനരഹിതമാക്കാൻ കഴിയും.",
+  "copyright.section3.title": "മെട്രിക്സ് & സുതാര്യത",
+  "copyright.section4.title": "അവകാശ അറിയിപ്പ്",
+  "copyright.section5.title": "പകർപ്പവകാശ ലംഘന അറിയിപ്പ് & നീക്കം",
+  "copyright.section5.body": "മെറ്റാ ഡാറ്റയോ കവറുകളോ നിങ്ങളുടെ അവകാശങ്ങൾ ലംഘിക്കുമെന്ന് നിങ്ങൾ കരുതുന്നുവെങ്കിൽ, തലക്കെട്ട്, URL, ഉടമസ്ഥത തെളിവ് എന്നിവയുമായി ഒരു അന്വേഷണം സമർപ്പിക്കുക.",
+  "copyright.leaveInquiry": "അന്വേഷണം സമർപ്പിക്കുക"
 }

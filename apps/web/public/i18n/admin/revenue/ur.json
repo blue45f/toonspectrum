@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "معاہدے کا خلاصہ (پچھلے 30 دن)",
+  "admin.revenue.loadError": "آمدنی کی کتاب لگانے میں ناکام",
+  "admin.revenue.filterAll": "سب",
+  "admin.revenue.filterPending": "انتظار",
+  "admin.revenue.filterApproved": "منظور شدہ",
+  "admin.revenue.filterPaid": "حل",
+  "admin.revenue.filterRejected": "مسترد",
+  "admin.revenue.filterRevoked": "منسوخ",
+  "admin.revenue.empty": "اس حیثیت سے مطابقت رکھنے والے کوئی حل واقعات نہیں ہیں۔",
+  "admin.revenue.approve": "منظور کریں",
+  "admin.revenue.reject": "مسترد کرنا",
+  "admin.revenue.settle": "مکمل حل",
+  "admin.revenue.revoke": "منسوخ کرنا"
 }

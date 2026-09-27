@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Aðgangur er nauðsynlegur.",
+  "apiError.adminRequired": "Leyfi stjórnarmannsins var ekki hægt að staðfesta.",
+  "apiError.adminOnlyPage": "Þessi síða er takmarkað við stjórnendur.",
+  "apiError.notFound": "Óskað var ekki fundið.",
+  "apiError.unsupportedType": "Óstuðluð efni.",
+  "apiError.inactiveAccount": "Óvirkar reikningar geta ekki notað stjórnarfunktiónir.",
+  "apiError.settlementFailed": "Uppgjör um greiðsluna mislögð."
 }

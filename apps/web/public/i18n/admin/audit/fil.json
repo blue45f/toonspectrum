@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Mga log ng pag-audit ng administrador",
+  "admin.audit.desc": "Subaybayan ang lahat ng mga aksyon ng pamamahala, paglipat ng mga pahintulot, at mga pagbabago sa konfigurasyon.",
+  "admin.audit.searchPlaceholder": "Paghahanap (email/pagkilos)...",
+  "admin.audit.loading": "Pag-load ng mga log ng audit...",
+  "admin.audit.empty": "Walang nakalista na log ng audit.",
+  "admin.audit.viewDetails": "Pagtingin",
+  "admin.audit.modalTitle": "Mga detalye sa log ng audit",
+  "admin.audit.close": "Malapit"
 }

@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Zobraziť rozčlenenie skóre",
+  "ranking.metric.views": "Pozorovanie",
+  "ranking.why": "Prečo ?",
+  "ranking.breakdownTitle": "Rozloženie skóre",
+  "ranking.totalScore": "Celkový bod",
+  "ranking.breakdownDescription": "Vypočítala sa pomocou váhy osov a normalizácie špecifickej pre názov."
 }

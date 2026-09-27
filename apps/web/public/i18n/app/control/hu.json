@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Nyelv",
+  "control.sound.enable": "A hanghatás lehetővé tétele",
+  "control.sound.disable": "A hanghatások letiltása",
+  "control.theme.dark": "Átállás a fénymódba",
+  "control.theme.light": "Átálljon sötét üzemmódba",
+  "control.settings.open": "Nyitott beállítások",
+  "control.settings.close": "Közel beállítások",
+  "control.cluster.settings": "Hang, téma, nyelvi vezérlés",
+  "control.cluster.open": "Nyitott beállítások",
+  "control.cluster.tooltip": "Hang, téma és nyelvi beállítások",
+  "control.language.group.translated": "A nagy területtel rendelkező fordítások",
+  "control.language.group.englishBase": "Automatikus fordítás · angol fallback"
 }

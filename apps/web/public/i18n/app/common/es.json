@@ -1,16 +1,16 @@
 {
   "common.loading": "Cargando",
-  "common.loading.short": "Loading",
+  "common.loading.short": "Carga",
   "common.close": "Cerrar",
   "common.open": "Abrir",
   "common.search": "Buscar",
   "common.retry": "Reintentar",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "Intentar de nuevo.",
+  "common.backToTop": "De vuelta a la cima",
   "common.backToHome": "Ir al inicio",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "Buscando...",
+  "common.notFoundWithQuery": "No hubo resultados para ' {query} '.",
+  "common.openSearch": "Encuentra en la búsqueda →",
+  "common.loading.empty": "No hay datos devueltos.",
+  "common.retry.all": "Intenta otra vez o vuelve a casa."
 }

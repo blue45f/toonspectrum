@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Vrstva {count}",
   "studio.toolsCompanion.review.section.comments": "Komentár {count}",
   "studio.toolsCompanion.review.section.history": "Zaznamenať {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Strana{Označenie}· Výber{Označenie ZZ RBRACE",
   "studio.toolsCompanion.review.title": "kontrolná konzola",
   "studio.toolsCompanion.review.truncatedComments": "a {count} komentárov",
   "studio.toolsCompanion.review.truncatedLayers": "{count} vrstiev",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referenčná obrazovka",
   "studio.toolsCompanion.referenceLoading": "Načítava sa referenčný nástroj...",
   "studio.toolsCompanion.footer": "Úpravy dokumentov vlastnia iba predvolenú kartu. Toto okno prenáša iba komprimovaný náhľad a inšpekčný/referenčný zámer do BroadcastChannel toho istého prehliadača, takže neexistujú žiadne samostatné náklady na server.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Nie je pripojený k hlavnému štúdiu.",
+  "studio.toolsCompanion.exit.editor": "Otvorte editor štúdia"
 }

@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "நிர்வாக ஆவண பதிவுகள்",
+  "admin.audit.desc": "அனைத்து நிர்வாக நடவடிக்கைகளையும், அனுமதி மாற்றங்களையும், கட்டமைப்பு மாற்றங்களையும் கண்காணிக்கவும்.",
+  "admin.audit.searchPlaceholder": "தேடல் (மின்னஞ்சல்/செயல்)...",
+  "admin.audit.loading": "தணிக்கை பதிவுகளை ஏற்றும்...",
+  "admin.audit.empty": "பதிவு செய்யப்பட்ட தணிக்கை பதிவுகள் இல்லை.",
+  "admin.audit.viewDetails": "காட்சி",
+  "admin.audit.modalTitle": "தணிக்கை பதிவு விவரங்கள்",
+  "admin.audit.close": "நெருக்கமாக"
 }

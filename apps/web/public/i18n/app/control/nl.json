@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Taal",
+  "control.sound.enable": "Klankeffecten mogelijk maken",
+  "control.sound.disable": "De sound effects uitschakelen",
+  "control.theme.dark": "Schakel naar lichtmodus",
+  "control.theme.light": "Schakel naar donkere modus",
+  "control.settings.open": "Open instellingen",
+  "control.settings.close": "Sluiting van de instellingen",
+  "control.cluster.settings": "Klank, thema, taalcontroles",
+  "control.cluster.open": "Open instellingen",
+  "control.cluster.tooltip": "Klank, thema en taalinstellingen",
+  "control.language.group.translated": "Vertalingen met een hoge dekking",
+  "control.language.group.englishBase": "Automatische vertaling · Engels fallback"
 }

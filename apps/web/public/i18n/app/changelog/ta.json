@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "புதுப்பிப்புகளை ஏற்ற முடியவில்லை.",
+  "changelog.empty": "எந்த புதுப்பிப்பு பதிவுகள் பதிவேற்றப்படவில்லை."
 }

@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "பின்னூட்ட ஆய்வுகள் ஏற்ற முடியவில்லை.",
+  "feedback.thankYou": "உங்கள் மதிப்புமிக்க கருத்துக்களுக்கு நன்றி!",
+  "feedback.anonymousNote": "உங்கள் பதில்கள் முற்றிலும் அநாமதேயமாக வைக்கப்பட்டுள்ளன.",
+  "feedback.notAtAll": "இல்லை",
+  "feedback.definitely": "நிச்சயமாக"
 }

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "ಲಾಗಿನ್ ಅಗತ್ಯವಿದೆ.",
+  "apiError.adminRequired": "ನಿರ್ವಾಹಕರ ಅನುಮತಿಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+  "apiError.adminOnlyPage": "ಈ ಪುಟವನ್ನು ನಿರ್ವಾಹಕರಿಗೆ ಮಾತ್ರ ಸೀಮಿತಗೊಳಿಸಲಾಗಿದೆ.",
+  "apiError.notFound": "ಬೇಡಿಕೆಯ ವಸ್ತು ಕಂಡುಬಂದಿಲ್ಲ.",
+  "apiError.unsupportedType": "ಬೆಂಬಲಿಸದ ವಿಷಯ ಪ್ರಕಾರ.",
+  "apiError.inactiveAccount": "ನಿಷ್ಕ್ರಿಯ ಖಾತೆಗಳು ನಿರ್ವಾಹಕ ವೈಶಿಷ್ಟ್ಯಗಳನ್ನು ಬಳಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+  "apiError.settlementFailed": "ವಸಾಹತು ಪ್ರಕ್ರಿಯೆ ವಿಫಲವಾಗಿದೆ."
 }

@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "ಪೂರ್ಣಗೊಂಡ",
+  "review.progress.binge": "ಬಂಗಿಂಗ್",
+  "review.progress.upcoming": "ಯೋಜಿತ",
+  "review.progress.abandoned": "ಬಿದ್ದ",
+  "review.progress.unknown": "ಅಡಗಿರುವ ಪ್ರಗತಿ",
+  "review.spoilerRevealLabel": "ಪ್ರದರ್ಶನ ಸ್ಪಾಯ್ಲರ್"
 }

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Đang đăng nhập là cần thiết.",
+  "apiError.adminRequired": "Các quyền quản trị không thể xác minh được.",
+  "apiError.adminOnlyPage": "Trang này chỉ dành cho người quản trị.",
+  "apiError.notFound": "Điều kiện yêu cầu không thể được tìm thấy.",
+  "apiError.unsupportedType": "Loại nội dung không được hỗ trợ.",
+  "apiError.inactiveAccount": "Tài khoản không hoạt động không thể sử dụng các tính năng quản trị viên.",
+  "apiError.settlementFailed": "Việc xử lý giải pháp đã thất bại."
 }

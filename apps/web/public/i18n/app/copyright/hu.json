@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "szerzői jog és tartalom",
+  "copyright.section1.title": "Tartalomforrások és elvek",
+  "copyright.section1.body": "A ToonSpectrum egy index- és felfedezési platform, amely összefoglalja a nyilvános katalógus metadátait (címeket, szerzőket, műfajokat stb.) a webtoon/webnovel platformokból. Nem tárolja vagy továbbosztja a fő fejezet tartalmát; az olvasás kizárólag hivatalos linkek segítségével történik.",
+  "copyright.section2.title": "A fedélzeti képek",
+  "copyright.section2.body": "A fedélzeti képek azonosító miniatűrként szolgálnak, és a referencia eredeti platform fedélzetek forráskötvényekkel, amikor csak lehetséges. A kijelzők a jogosult kérésére vagy a szabályzat frissítésével azonnal le lehet kapcsolni.",
+  "copyright.section3.title": "Métrikák és átláthatóság",
+  "copyright.section4.title": "Jogokról szóló értesítés",
+  "copyright.section5.title": "A szerzői jogi jogsértésről szóló értesítés",
+  "copyright.section5.body": "Ha úgy gondolja, hogy a metadatok vagy a fedélzetek megsértik jogait, kérjük, kérdezze meg a címet, az URL-t és a tulajdonjogot.",
+  "copyright.leaveInquiry": "Küldje be a kérelmet"
 }

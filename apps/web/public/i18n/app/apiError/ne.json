@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "लगइन आवश्यक छ।",
+  "apiError.adminRequired": "प्रशासक अनुमतिहरू प्रमाणित गर्न सकिएन।",
+  "apiError.adminOnlyPage": "यो पृष्ठ प्रशासकहरूको लागि मात्र हो।",
+  "apiError.notFound": "अनुरोध गरिएको वस्तु भेटिएन।",
+  "apiError.unsupportedType": "असमर्थित सामग्री प्रकार।",
+  "apiError.inactiveAccount": "निष्क्रिय खाताहरूले प्रशासक सुविधाहरू प्रयोग गर्न सक्दैनन्।",
+  "apiError.settlementFailed": "सम्झौता प्रक्रिया असफल भयो।"
 }

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Kiht {count}",
   "studio.toolsCompanion.review.section.comments": "Kommentaar {count}",
   "studio.toolsCompanion.review.section.history": "Salvestus {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE lehtSilt}·{valikSilt ZZ RBRACE",
   "studio.toolsCompanion.review.title": "kontrollkonsool",
   "studio.toolsCompanion.review.truncatedComments": "ja {count} kommentaari",
   "studio.toolsCompanion.review.truncatedLayers": "{count} kihti",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Võrdlusekraan",
   "studio.toolsCompanion.referenceLoading": "Viitetööriista laadimine...",
   "studio.toolsCompanion.footer": "Redigeerimisdokumentidele kuulub ainult vaikevahekaart. See aken edastab sama brauseri BroadcastChannelile ainult kokkusurutud eelvaate ja ülevaatuse/viitekava, seega pole eraldi serverikulu.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Ei ole ühendatud peastuudioga.",
+  "studio.toolsCompanion.exit.editor": "Avatage Studio redigeerija"
 }

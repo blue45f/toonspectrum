@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Registri di controllo degli amministratori",
+  "admin.audit.desc": "Seguire tutte le azioni amministrative, i cambiamenti di autorizzazione e le modifiche di configurazione.",
+  "admin.audit.searchPlaceholder": "Ricerca (e-mail/azione)...",
+  "admin.audit.loading": "Caricamento dei registri di audit...",
+  "admin.audit.empty": "Nessun registro di revisione.",
+  "admin.audit.viewDetails": "Vista",
+  "admin.audit.modalTitle": "Dettagli del registro di revisione",
+  "admin.audit.close": "Chiuso"
 }

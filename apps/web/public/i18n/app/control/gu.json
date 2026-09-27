@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ભાષા",
+  "control.sound.enable": "ધ્વનિ અસરોને સક્ષમ કરો",
+  "control.sound.disable": "ધ્વનિ અસરોને અક્ષમ કરો",
+  "control.theme.dark": "પ્રકાશ સ્થિતિ પર સ્વિચ કરો",
+  "control.theme.light": "ડાર્ક મોડ પર સ્વિચ કરો",
+  "control.settings.open": "ઓપન સેટિંગ્સ",
+  "control.settings.close": "બંધ સેટિંગ્સ",
+  "control.cluster.settings": "ધ્વનિ, થીમ, ભાષા નિયંત્રણ",
+  "control.cluster.open": "ઓપન સેટિંગ્સ",
+  "control.cluster.tooltip": "ધ્વનિ, થીમ અને ભાષા સેટિંગ્સ",
+  "control.language.group.translated": "ઉચ્ચ કવરેજ અનુવાદ",
+  "control.language.group.englishBase": "સ્વયંસંચાલિત અનુવાદ · અંગ્રેજી fallback"
 }

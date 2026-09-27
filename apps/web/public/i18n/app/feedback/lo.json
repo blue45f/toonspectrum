@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "ບໍ່ສາມາດໂຫຼດການສໍາຫຼວດຄວາມຄິດເຫັນໄດ້.",
+  "feedback.thankYou": "ຂອບໃຈ ສໍາ ລັບ ຄໍາ ເຫັນທີ່ມີຄຸນຄ່າຂອງທ່ານ!",
+  "feedback.anonymousNote": "ຄໍາ ຕອບຂອງທ່ານແມ່ນຖືກຮັກສາໄວ້ຢ່າງບໍ່ຊື່ສຽງ.",
+  "feedback.notAtAll": "ບໍ່ ແມ່ນ ຫຍັງ",
+  "feedback.definitely": "ແນ່ນອນ"
 }

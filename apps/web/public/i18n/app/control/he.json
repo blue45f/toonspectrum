@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "שפה",
+  "control.sound.enable": "אפשרת אפקטים קוליים",
+  "control.sound.disable": "תבטל אפקטים קוליים",
+  "control.theme.dark": "מחליפים למצב אור",
+  "control.theme.light": "לעבור למצב אפל.",
+  "control.settings.open": "הגדרות פתוחות",
+  "control.settings.close": "הגדרות סמוכות",
+  "control.cluster.settings": "קול, נושא, שליטה בשפה",
+  "control.cluster.open": "הגדרות פתוחות",
+  "control.cluster.tooltip": "הגדרות הצליל, הנושא והשפה",
+  "control.language.group.translated": "תרגומים בעלי כמות גבוהה",
+  "control.language.group.englishBase": "תרגום אוטומטי"
 }

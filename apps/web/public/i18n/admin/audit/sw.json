@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Kuongoza rekodi za ukaguzi",
+  "admin.audit.desc": "Fuatilia hatua zote za utawala, mabadiliko ya ruhusa, na mabadiliko ya usanidi.",
+  "admin.audit.searchPlaceholder": "Tafuta (barua pepe/tendo)...",
+  "admin.audit.loading": "Kupakia rekodi za ukaguzi...",
+  "admin.audit.empty": "Hakuna rekodi za ukaguzi zilizopigwa rekodi.",
+  "admin.audit.viewDetails": "Maoni",
+  "admin.audit.modalTitle": "Maelezo ya rekodi ya ukaguzi",
+  "admin.audit.close": "Karibu"
 }

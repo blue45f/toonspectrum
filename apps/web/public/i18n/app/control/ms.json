@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Bahasa",
+  "control.sound.enable": "Membolehkan kesan bunyi",
+  "control.sound.disable": "Menyingkirkan kesan bunyi",
+  "control.theme.dark": "Pindah ke mod cahaya",
+  "control.theme.light": "Pindah ke mod gelap",
+  "control.settings.open": "Tetapan terbuka",
+  "control.settings.close": "Tetapan rapat",
+  "control.cluster.settings": "Suara, tema, kawalan bahasa",
+  "control.cluster.open": "Tetapan terbuka",
+  "control.cluster.tooltip": "Pengaturan bunyi, tema, dan bahasa",
+  "control.language.group.translated": "Terjemahan yang mempunyai liputan yang tinggi",
+  "control.language.group.englishBase": "Terjemahan automatik · Bahasa Inggeris fallback"
 }

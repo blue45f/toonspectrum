@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Završen",
+  "review.progress.binge": "Bingeing",
+  "review.progress.upcoming": "Planiran",
+  "review.progress.abandoned": "Odbačen",
+  "review.progress.unknown": "Progres skriven",
+  "review.spoilerRevealLabel": "Pokaži spoiler"
 }

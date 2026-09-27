@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Admin-auditlogs",
+  "admin.audit.desc": "Volg alle administratieve acties, vergunningsverschuivingen en configuratiewijzigingen.",
+  "admin.audit.searchPlaceholder": "Zoek (e-mail/actie)...",
+  "admin.audit.loading": "Audit logs laden...",
+  "admin.audit.empty": "Geen geregistreerde audit logs.",
+  "admin.audit.viewDetails": "Uitzicht",
+  "admin.audit.modalTitle": "Details van het auditlog",
+  "admin.audit.close": "- Niet meer ."
 }

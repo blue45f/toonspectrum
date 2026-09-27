@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Ավարտված",
+  "review.progress.binge": "Բինգում",
+  "review.progress.upcoming": "Նախատեսված",
+  "review.progress.abandoned": "Թողարկվել է",
+  "review.progress.unknown": "Գաղտնի առաջընթաց",
+  "review.spoilerRevealLabel": "Ցույց տալ spoiler"
 }

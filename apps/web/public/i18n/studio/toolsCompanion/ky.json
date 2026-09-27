@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Катмар {count}",
   "studio.toolsCompanion.review.section.comments": "Комментарий {count}",
   "studio.toolsCompanion.review.section.history": "Жаздыруу {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE бетЭбелги}·{тандооЭбелги ZZ RBRACE",
   "studio.toolsCompanion.review.title": "текшерүү консолу",
   "studio.toolsCompanion.review.truncatedComments": "жана {count} комментарийлер",
   "studio.toolsCompanion.review.truncatedLayers": "{count} катмарлар",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Маалымдама экраны",
   "studio.toolsCompanion.referenceLoading": "Маалымдама куралы жүктөлүүдө...",
   "studio.toolsCompanion.footer": "Документтерди түзөтүү демейки өтмөккө гана таандык. Бул терезе бир эле браузердин BroadcastChannel'ге кысылган алдын ала көрүү жана текшерүү/маалымат ниетин гана өткөрүп берет, ошондуктан өзүнчө сервердик чыгым жок.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Негизги студияга байланыш жок.",
+  "studio.toolsCompanion.exit.editor": "Студия редакторсун ачуу"
 }

@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "حق اشاعت و محتوای اطلاعیه",
+  "copyright.section1.title": "منابع محتوا و اصول",
+  "copyright.section1.body": "ToonSpectrum یک پلت فرم شاخص و کشف است که متاداتا کاتالوگ عمومی (ناوی، نویسندگان، ژانرها و غیره) را از سیستم عامل های وبتون / رمان وب خلاصه می کند. آن را میزبان یا توزیع مجدد محتوای فصل اصلی نیست. خواندن به طور انحصاری از طریق لینک های رسمی هدایت می شود.",
+  "copyright.section2.title": "تصاویر پوشش",
+  "copyright.section2.body": "تصاویر پوشش به عنوان تمنیل های شناسایی و پوشش های اصلی پلتفرم مرجع با لینک های منبع در هر زمان ممکن است. نمایشگرها می توانند بلافاصله بر اساس درخواست مالک حقوق یا بروزرسانی های سیاست غیرفعال شوند.",
+  "copyright.section3.title": "متریک ها و شفافیت",
+  "copyright.section4.title": "اطلاعیه حقوق",
+  "copyright.section5.title": "اطلاع رسانی از نقض حقوق چاپی و حذف",
+  "copyright.section5.body": "اگر شما معتقدید که متاداتا یا پوشش ها حقوق شما را نقض می کنند، لطفاً یک سوال با عنوان، URL و اثبات مالکیت ارسال کنید.",
+  "copyright.leaveInquiry": "ارسال درخواست"
 }

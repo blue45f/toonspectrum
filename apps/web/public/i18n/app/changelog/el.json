@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Δεν μπόρεσα να φορτώσω ενημερώσεις.",
+  "changelog.empty": "Δεν έχουν δημοσιευθεί ακόμα ενημερωτικά αρχεία."
 }

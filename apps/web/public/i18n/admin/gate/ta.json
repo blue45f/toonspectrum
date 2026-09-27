@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "உள்நுழைவு தேவை",
+  "admin.gate.guestBody": "நிர்வாகி கன்சோல் சரிபார்ப்பு தேவை. தயவு செய்து பதிவு.",
+  "admin.gate.forbiddenTitle": "நிர்வாகி அனுமதி தேவை",
+  "admin.gate.forbiddenBody": "இந்த கணக்கில் நிர்வாக அனுமதிகள் இல்லை. தேவைப்பட்டால் ஒரு ஆபரேட்டரை தொடர்பு கொள்ளவும்.",
+  "admin.gate.errorTitle": "கன்சோல் ஏற்றத் தவறிவிட்டது"
 }

@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Voltooi",
+  "review.progress.binge": "Binge",
+  "review.progress.upcoming": "Beplanning",
+  "review.progress.abandoned": "Gegooi",
+  "review.progress.unknown": "Verborge vordering",
+  "review.spoilerRevealLabel": "Wys spoiler"
 }

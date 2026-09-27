@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "დასრულებული",
+  "review.progress.binge": "ბინგინგი",
+  "review.progress.upcoming": "დაგეგმილი",
+  "review.progress.abandoned": "დათო",
+  "review.progress.unknown": "ფარული პროგრესი",
+  "review.spoilerRevealLabel": "სპოილერი"
 }

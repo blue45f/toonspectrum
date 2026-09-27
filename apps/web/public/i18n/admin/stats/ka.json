@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "ჯანდაცვის სისტემა",
+  "admin.stats.healthy": "ჯანმრთელობა",
+  "admin.stats.degraded": "დაქვეითებული",
+  "admin.stats.revenueEvents": "საგამოძიებო სისტემის სააგენტო",
+  "admin.stats.usersCommunity": "საერთო წევრები / თანამდებობები",
+  "admin.stats.maintenance": "შენარჩუნების რეჟიმი",
+  "admin.stats.maintenanceOn": "საგანგებო მომსახურება (ON)",
+  "admin.stats.maintenanceOff": "ნორმალური ოპერაცია (შეწყვეტილი)",
+  "admin.stats.activeVisitors": "5 წუთიანი აქტიური ვიზიტორები",
+  "admin.stats.views5m": "5 წუთი გვერდის ნახვა"
 }

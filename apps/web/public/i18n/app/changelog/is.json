@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Ég gat ekki hlaðið upp uppfærslum.",
+  "changelog.empty": "Engar dagskrár eru sendar."
 }

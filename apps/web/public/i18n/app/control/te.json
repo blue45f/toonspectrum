@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "భాష",
+  "control.sound.enable": "ధ్వని ప్రభావాలను ప్రారంభించండి",
+  "control.sound.disable": "ధ్వని ప్రభావాలను నిలిపివేయండి",
+  "control.theme.dark": "లైట్ మోడ్కు మారండి",
+  "control.theme.light": "డార్క్ మోడ్ కు మారండి",
+  "control.settings.open": "తెరిచిన సెట్టింగులు",
+  "control.settings.close": "సన్నిహిత సెట్టింగులు",
+  "control.cluster.settings": "ధ్వని, థీమ్, భాషా నియంత్రణలు",
+  "control.cluster.open": "తెరిచిన సెట్టింగులు",
+  "control.cluster.tooltip": "ధ్వని, థీమ్, భాషా అమర్పులు",
+  "control.language.group.translated": "అధిక కవరేజ్ కలిగిన అనువాదాలు",
+  "control.language.group.englishBase": "ఆటోమేటిక్ అనువాదం · ఇంగ్లీష్ ఫాల్బ్యాక్"
 }

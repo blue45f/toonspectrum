@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Pesquisa rápida e comandos...",
+  "admin.palette.placeholder": "Os comandos de busca do administrador (navegação, exportação de CSV, manutenção)...",
+  "admin.palette.empty": "Não encontrámos resultados.",
+  "admin.palette.groupNav": "Cortareta de navegação do console",
+  "admin.palette.groupQuick": "Ações rápidas e exportação",
+  "admin.palette.exportUsers": "Exportação de todos os membros CSV",
+  "admin.palette.exportRevenue": "CSV do Registo das Receitas de Exportação",
+  "admin.palette.maintenance": "Manutenção de emergência do sistema de controlo"
 }

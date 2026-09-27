@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Киришүү талап кылынат.",
+  "apiError.adminRequired": "Администратордун уруксаттары текшерилди.",
+  "apiError.adminOnlyPage": "Бул барак администраторлорго гана арналган.",
+  "apiError.notFound": "Суранган товар табылбай калды.",
+  "apiError.unsupportedType": "Колдонулбаган мазмун түрү.",
+  "apiError.inactiveAccount": "Активдүү эмес эсептер администратордун функцияларын колдоно албайт.",
+  "apiError.settlementFailed": "Төлөмдөрдү иштеп чыгуу ийгиликке жетпей калды."
 }

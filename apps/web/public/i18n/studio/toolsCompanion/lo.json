@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ຊັ້ນ {count}",
   "studio.toolsCompanion.review.section.comments": "ຄຳເຫັນ {count}",
   "studio.toolsCompanion.review.section.history": "ບັນທຶກ {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ໜ້າ{ປ້າຍກຳກັບ}· ການເລືອກ{ປ້າຍກຳກັບ ZZ RBRACE",
   "studio.toolsCompanion.review.title": "console ການ​ກວດ​ກາ​",
   "studio.toolsCompanion.review.truncatedComments": "ແລະ {count} ຄຳເຫັນ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ຊັ້ນ",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "ໜ້າຈໍອ້າງອີງ",
   "studio.toolsCompanion.referenceLoading": "ກຳລັງໂຫຼດເຄື່ອງມືອ້າງອີງ...",
   "studio.toolsCompanion.footer": "ແກ້ໄຂເອກະສານເປັນເຈົ້າຂອງແຖບເລີ່ມຕົ້ນເທົ່ານັ້ນ. ປ່ອງ​ຢ້ຽມ​ນີ້​ສົ່ງ​ພຽງ​ແຕ່​ການ​ສະ​ແດງ​ຕົວ​ຢ່າງ​ບີບ​ອັດ​ແລະ​ຄວາມ​ຕັ້ງ​ໃຈ​ການ​ກວດ​ກາ / ການ​ອ້າງ​ອີງ​ໄປ​ຫາ BroadcastChannel ຂອງ​ຕົວ​ທ່ອງ​ເວັບ​ດຽວ​ກັນ​, ສະ​ນັ້ນ​ບໍ່​ມີ​ຄ່າ​ໃຊ້​ຈ່າຍ​ຂອງ​ເຊີບ​ເວີ​ແຍກ​ຕ່າງ​ຫາກ​.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "ບໍ່ເຊື່ອມຕໍ່ກັບສະຕູດິໂອຫຼັກ.",
+  "studio.toolsCompanion.exit.editor": "ເປີດການແກ້ໄຂ Studio"
 }

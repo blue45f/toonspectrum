@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Ukuqedwa",
+  "review.progress.binge": "Ukubhoboza",
+  "review.progress.upcoming": "Ukuhlelwa",
+  "review.progress.abandoned": "Ukulahlwa",
+  "review.progress.unknown": "Intuthuko efihliwe",
+  "review.spoilerRevealLabel": "Bonisa spoiler"
 }

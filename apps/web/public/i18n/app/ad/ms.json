@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Imej yang disokong",
+  "ad.slotAriaLabel": "slot iklan",
+  "ad.slotLabel": "Dilengkapi",
+  "ad.slotTitle": "Kandungan yang ditaja",
+  "ad.ctaDetails": "Lihat butiran",
+  "ad.placeholderAriaLabel": "Pengendali tempat iklan",
+  "ad.placeholderText": "Tiada kandungan yang disponsori.",
+  "ad.tag": "Iklan"
 }

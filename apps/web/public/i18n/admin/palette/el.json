@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Γρήγορη αναζήτηση και εντολές...",
+  "admin.palette.placeholder": "Διαχειριστές εντολών αναζήτησης (ναυτιλία, εξαγωγή CSV, συντήρηση)...",
+  "admin.palette.empty": "Δεν βρέθηκαν αποτελέσματα.",
+  "admin.palette.groupNav": "Κονσόλες για ναύσιμα",
+  "admin.palette.groupQuick": "Γρήγορες ενέργειες και εξαγωγές",
+  "admin.palette.exportUsers": "Εξαγωγή όλων των μελών CSV",
+  "admin.palette.exportRevenue": "ΚΑΠ Εισοδηλώσεων για τις εξαγωγές",
+  "admin.palette.maintenance": "Συστήματα ελέγχου Διατήρηση έκτακτης ανάγκης"
 }

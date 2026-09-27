@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Oglasi in zastave",
+  "admin.tabs.audit": "Dnevni dnevnik revizije",
+  "admin.tabs.campaigns": "Kampanja",
+  "admin.tabs.creatorSupport": "Podpora Stvarnika",
+  "admin.tabs.dashboard": "Vmesna plošča",
+  "admin.tabs.ops": "Operacije",
+  "admin.tabs.plans": "Ponižbe",
+  "admin.tabs.promos": "Pridružitve",
+  "admin.tabs.reports": "Poročila in zmernost",
+  "admin.tabs.revenue": "Izravnava",
+  "admin.tabs.security": "Varnost in IP",
+  "admin.tabs.inquiries": "Poslovna spraševanja",
+  "admin.tabs.supporters": "Podpora za stroške poslovanja",
+  "admin.tabs.traffic": "Živ promet"
 }

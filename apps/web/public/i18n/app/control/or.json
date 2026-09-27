@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ଭାଷା",
+  "control.sound.enable": "ଧ୍ୱନି ପ୍ରଭାବକୁ ସକ୍ଷମ କରିବା",
+  "control.sound.disable": "ଧ୍ୱନି ପ୍ରଭାବକୁ ଅକ୍ଷମ କରନ୍ତୁ",
+  "control.theme.dark": "ଆଲୋକ ମୋଡକୁ ସୁଇଚ୍ କରନ୍ତୁ",
+  "control.theme.light": "ଅନ୍ଧାର ମୋଡକୁ ସୁଇଚ୍ କରନ୍ତୁ",
+  "control.settings.open": "ଖୋଲାଯାଇଥିବା ସେଟିଂସମୂହ",
+  "control.settings.close": "ବନ୍ଦ ସେଟିଂସମୂହ",
+  "control.cluster.settings": "ଧ୍ୱନି, ବିଷୟବସ୍ତୁ, ଭାଷା ନିୟନ୍ତ୍ରଣ",
+  "control.cluster.open": "ଖୋଲାଯାଇଥିବା ସେଟିଂସମୂହ",
+  "control.cluster.tooltip": "ଧ୍ୱନି, ବିଷୟବସ୍ତୁ ଏବଂ ଭାଷା ସେଟିଙ୍ଗ୍",
+  "control.language.group.translated": "ଉଚ୍ଚ ପ୍ରସାରଣର ଅନୁବାଦ",
+  "control.language.group.englishBase": "ସ୍ୱୟଂଚାଳିତ ଅନୁବାଦ · ଇଂରାଜୀ ଫଲବ୍ୟାକ୍"
 }

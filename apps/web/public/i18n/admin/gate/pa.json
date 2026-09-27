@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "ਲਾਗਇਨ ਦੀ ਲੋੜ",
+  "admin.gate.guestBody": "ਪ੍ਰਸ਼ਾਸਨ ਕਨਸੋਲ ਨੂੰ ਪ੍ਰਮਾਣਿਕਤਾ ਦੀ ਲੋੜ ਹੈ. ਕਿਰਪਾ ਕਰਕੇ ਸਾਈਨ ਇਨ ਕਰੋ.",
+  "admin.gate.forbiddenTitle": "ਪ੍ਰਸ਼ਾਸਨ ਦੀ ਇਜਾਜ਼ਤ ਦੀ ਲੋੜ ਹੈ",
+  "admin.gate.forbiddenBody": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਪ੍ਰਬੰਧਕ ਅਧਿਕਾਰਾਂ ਦੀ ਘਾਟ ਹੈ। ਲੋੜ ਪੈਣ 'ਤੇ ਇੱਕ ਓਪਰੇਟਰ ਨਾਲ ਸੰਪਰਕ ਕਰੋ।",
+  "admin.gate.errorTitle": "ਕੰਸੋਲ ਲੋਡ ਕਰਨ ਵਿੱਚ ਅਸਫਲ"
 }

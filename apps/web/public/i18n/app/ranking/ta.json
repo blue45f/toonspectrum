@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "பார்வை மதிப்பெண் விபரம்",
+  "ranking.metric.views": "பார்வைகள்",
+  "ranking.why": "ஏன்",
+  "ranking.breakdownTitle": "மதிப்பெண் விநியோகம்",
+  "ranking.totalScore": "மொத்த மதிப்பெண்",
+  "ranking.breakdownDescription": "அச்சு எடைகள் மற்றும் தலைப்பு-குறிப்பிட்ட இயல்புப்படுத்தல் மூலம் கணக்கிடப்பட்டது."
 }

@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "কপিরাইট ও বিষয়বস্তু বিজ্ঞপ্তি",
+  "copyright.section1.title": "বিষয়বস্তুর উৎস ও নীতি",
+  "copyright.section1.body": "টুনস্পেকট্রাম একটি সূচক এবং আবিষ্কার প্ল্যাটফর্ম যা ওয়েবটুন / ওয়েবনোভেল প্ল্যাটফর্ম থেকে পাবলিক ক্যাটালগ মেটাডেটা (শিরোনাম, লেখক, জেনার ইত্যাদি) সংক্ষিপ্ত করে। এটি মূল অধ্যায়ের সামগ্রী হোস্ট বা পুনর্বিন্যস্ত করে না; পাঠ্যটি কেবলমাত্র অফিসিয়াল লিঙ্কগুলির মাধ্যমে পরিচালিত হয়।",
+  "copyright.section2.title": "কভার চিত্র",
+  "copyright.section2.body": "কভার ইমেজগুলি থাম্বনেইল সনাক্তকরণের জন্য এবং যখনই সম্ভব উত্স লিঙ্ক সহ রেফারেন্স মূল প্ল্যাটফর্মের কভারগুলি হিসাবে কাজ করে। অধিকারধারী অনুরোধ বা নীতি আপডেটের পরে প্রদর্শনগুলি তাত্ক্ষণিকভাবে অক্ষম করা যেতে পারে।",
+  "copyright.section3.title": "মেট্রিক্স ও স্বচ্ছতা",
+  "copyright.section4.title": "অধিকার বিজ্ঞপ্তি",
+  "copyright.section5.title": "কপিরাইট লঙ্ঘনের বিজ্ঞপ্তি এবং অপসারণ",
+  "copyright.section5.body": "যদি আপনি মনে করেন যে মেটাডেটা বা কভার আপনার অধিকার লঙ্ঘন করে, তাহলে দয়া করে শিরোনাম, ইউআরএল এবং মালিকানার প্রমাণ সহ একটি অনুসন্ধান জমা দিন।",
+  "copyright.leaveInquiry": "অনুসন্ধান জমা দিন"
 }

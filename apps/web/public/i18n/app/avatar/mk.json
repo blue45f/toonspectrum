@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "Тип на сликата кој не се поддржува.",
+  "avatar.error.processFailed": "Не успеав да ја обработам сликата.",
+  "avatar.processing": "Процесување...",
+  "avatar.select": "Промените сликата",
+  "avatar.remove": "Избришете слики",
+  "avatar.uploadHint": "Само JPG, PNG, и WEBP слики се поддржани, а потоа пресечени за претгледување.",
+  "avatar.changeAria": "Промените сликата на профилот"
 }

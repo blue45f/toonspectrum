@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "ലോഗിൻ ആവശ്യകത",
+  "admin.gate.guestBody": "അഡ്മിൻ കൺസോളിന് ആധികാരികത ആവശ്യമുണ്ട്. ദയവായി ലോഗിൻ ചെയ്യുക.",
+  "admin.gate.forbiddenTitle": "അഡ്മിനിസ്ട്രേറ്ററുടെ അനുമതി ആവശ്യമാണ്",
+  "admin.gate.forbiddenBody": "ഈ അക്കൌണ്ടില് അഡ്മിനിസ്ട്രേറ്റര് അനുമതികളില്ല. ആവശ്യമെങ്കിൽ ഒരു ഓപ്പറേറ്ററുമായി ബന്ധപ്പെടുക.",
+  "admin.gate.errorTitle": "കൺസോൾ ലോഡ് ചെയ്യാൻ സാധിച്ചില്ല"
 }

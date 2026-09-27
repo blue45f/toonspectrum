@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Показатель показателей",
+  "ranking.metric.views": "Вид",
+  "ranking.why": "Почему ?",
+  "ranking.breakdownTitle": "Распределение баллов",
+  "ranking.totalScore": "Общий балл",
+  "ranking.breakdownDescription": "Расчет с помощью ваги оси и нормализации по специальному названию."
 }

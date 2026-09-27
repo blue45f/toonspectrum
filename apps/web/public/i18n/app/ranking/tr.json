@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Görüş puanları",
+  "ranking.metric.views": "Görüşler",
+  "ranking.why": "Neden ?",
+  "ranking.breakdownTitle": "Not bölümü",
+  "ranking.totalScore": "Toplam puan",
+  "ranking.breakdownDescription": "Aksa ağırlıkları ve başlık özel normallaştırma ile hesaplanmıştır."
 }

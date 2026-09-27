@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Capa {count}",
   "studio.toolsCompanion.review.section.comments": "Comentario {count}",
   "studio.toolsCompanion.review.section.history": "Gravar {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Etiqueta de páxina{ZZ RBRACE · Selección ZZLBRACEEtiqueta ZZ RBRACE",
   "studio.toolsCompanion.review.title": "consola de inspección",
   "studio.toolsCompanion.review.truncatedComments": "e {count} comentarios",
   "studio.toolsCompanion.review.truncatedLayers": "{count} capas",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Pantalla de referencia",
   "studio.toolsCompanion.referenceLoading": "Cargando ferramenta de referencia...",
   "studio.toolsCompanion.footer": "Editar documentos só posúe a pestana predeterminada. Esta xanela transmite só a vista previa comprimida e a intención de inspección/referencia ao BroadcastChannel do mesmo navegador, polo que non hai un custo de servidor separado.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Non está conectado ao estudio principal.",
+  "studio.toolsCompanion.exit.editor": "Abre o editor de Studio"
 }

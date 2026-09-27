@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "การเข้าใช้งาน",
+  "admin.gate.guestBody": "คอนโซลผู้บริหารต้องการการรับรองความเป็นจริง ขอลงทะเบียน",
+  "admin.gate.forbiddenTitle": "การอนุญาตผู้บริหาร จําเป็น",
+  "admin.gate.forbiddenBody": "บัญชีนี้ไม่มีอนุญาตผู้บริหาร ติดต่อผู้ประกอบการ หากจําเป็น",
+  "admin.gate.errorTitle": "ไม่สามารถบรรจุเครื่องปรับปรุง"
 }

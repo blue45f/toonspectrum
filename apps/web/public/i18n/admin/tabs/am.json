@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "ማስታወቂያዎች እና ባነሮች",
+  "admin.tabs.audit": "የኦዲት መዝገቦች",
+  "admin.tabs.campaigns": "ዘመቻዎች",
+  "admin.tabs.creatorSupport": "የፈጣሪ ድጋፍ",
+  "admin.tabs.dashboard": "ዳሽቦርድ",
+  "admin.tabs.ops": "ሥራዎች",
+  "admin.tabs.plans": "እቅዶች",
+  "admin.tabs.promos": "እድገት",
+  "admin.tabs.reports": "ሪፖርቶች እና መጠነኛነት",
+  "admin.tabs.revenue": "የመቋቋም ሂደት",
+  "admin.tabs.security": "ደህንነት እና IP",
+  "admin.tabs.inquiries": "የንግድ መጠይቆች",
+  "admin.tabs.supporters": "የአሠራር ወጪ ድጋፍ",
+  "admin.tabs.traffic": "የቀጥታ ትራፊክ"
 }

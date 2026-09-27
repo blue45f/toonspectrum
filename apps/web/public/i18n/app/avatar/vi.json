@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "Không hỗ trợ hình ảnh loại.",
+  "avatar.error.processFailed": "Không xử lý hình ảnh.",
+  "avatar.processing": "- Lấy lại...",
+  "avatar.select": "Thay đổi hình ảnh",
+  "avatar.remove": "Xóa hình ảnh",
+  "avatar.uploadHint": "Chỉ có hình ảnh JPG, PNG và WEBP được hỗ trợ, sau đó cắt để xem trước.",
+  "avatar.changeAria": "Thay đổi hình ảnh hồ sơ"
 }

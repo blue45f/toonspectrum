@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Copyright & Content ծանուցում",
+  "copyright.section1.title": "Բովանդակության աղբյուրներ եւ սկզբունքներ",
+  "copyright.section1.body": "ToonSpectrum-ը ինդեքս եւ բացահայտման հարթակ է, որը ամփոփում է վեբթյունների / վեբ նամակների հարթակներից հանրային կատալոգային մետադատա (անուններ, հեղինակներ, ժանրներ եւ այլն): Այն չի հյուրընկալում կամ վերաբաշխում գլխավոր գլուխների բովանդակությունը: Կարդալն ուղղված է բացառապես պաշտոնական հղումների միջոցով:",
+  "copyright.section2.title": "Գլխավոր նկարներ",
+  "copyright.section2.body": "Գլխավոր պատկերները ծառայում են որպես մանրամասներ ճանաչող պատկերներ, իսկ հղումային օրիգինալ պլատֆորմային ծածկույթները աղբյուրային հղումներով, երբ դա հնարավոր է: Ցուցադրությունները կարող են անհապաղ անջատվել իրավունքների սեփականատիրոջ խնդրանքով կամ քաղաքականության թարմացումներով:",
+  "copyright.section3.title": "Մետրիկներ եւ թափանցիկություն",
+  "copyright.section4.title": "Իրավունքների մասին ծանուցում",
+  "copyright.section5.title": "Copyright խախտման ծանուցում & Takedown",
+  "copyright.section5.body": "Եթե կարծում եք, որ մետադատները կամ ծածկագրերը խախտում են ձեր իրավունքները, խնդրում ենք ներկայացնել հարցում ՝ տիտղոսի, URL- ի եւ սեփականության ապացույցի հետ:",
+  "copyright.leaveInquiry": "Ներկայացնել հարցում →"
 }

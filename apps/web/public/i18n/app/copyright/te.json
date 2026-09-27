@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "కాపీరైట్ & కంటెంట్ నోటీసు",
+  "copyright.section1.title": "కంటెంట్ మూలాలు & సూత్రాలు",
+  "copyright.section1.body": "టూన్ స్పెక్ట్రమ్ అనేది వెబ్టూన్ / వెబ్ నవలల ప్లాట్ఫారమ్ల నుండి పబ్లిక్ కాటలాగ్ మెటాడేటాను (శీర్షికలు, రచయితలు, కళా ప్రక్రియలు మొదలైనవి) సంగ్రహించే ఇండెక్స్ మరియు డిస్కవరీ ప్లాట్ఫాం. ఇది ప్రధాన అధ్యాయ కంటెంట్ను హోస్ట్ చేయదు లేదా పునఃపంపిణీ చేయదు; పఠనం అధికారిక లింక్ల ద్వారా మాత్రమే దర్శకత్వం వహిస్తుంది.",
+  "copyright.section2.title": "కవర్ చిత్రాలు",
+  "copyright.section2.body": "మూలం చిత్రాలు సూక్ష్మచిత్రాలను గుర్తించడానికి ఉపయోగపడతాయి మరియు మూలం లింక్లతో రిఫరెన్స్ అసలు ప్లాట్ఫాం కవర్లు సాధ్యమైనప్పుడల్లా. హక్కుదారు అభ్యర్థన లేదా విధాన నవీకరణల ఆధారంగా ప్రదర్శనలను తక్షణమే నిలిపివేయవచ్చు.",
+  "copyright.section3.title": "మెట్రిక్స్ & పారదర్శకత",
+  "copyright.section4.title": "హక్కుల నోటీసు",
+  "copyright.section5.title": "కాపీరైట్ ఉల్లంఘన నోటీసు & టేకాడౌన్",
+  "copyright.section5.body": "మీ మెటాడేటా లేదా కవర్లు మీ హక్కులను ఉల్లంఘిస్తాయని మీరు భావిస్తే, దయచేసి శీర్షిక, URL మరియు యాజమాన్యం రుజువుతో ఒక విచారణను సమర్పించండి.",
+  "copyright.leaveInquiry": "విచారణను సమర్పించు"
 }

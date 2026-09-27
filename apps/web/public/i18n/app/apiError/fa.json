@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "ورود لازم است",
+  "apiError.adminRequired": "اجازه های مدیر نمی توانستند تایید شوند.",
+  "apiError.adminOnlyPage": "این صفحه فقط برای مدیران محدود شده است.",
+  "apiError.notFound": "ماده مورد نظر پیدا نشد.",
+  "apiError.unsupportedType": "نوع محتوای غیر پشتیبانی شده",
+  "apiError.inactiveAccount": "حساب های غیر فعال نمی توانند از ویژگی های مدیر استفاده کنند.",
+  "apiError.settlementFailed": "پردازش تصفیع شکست خورده"
 }

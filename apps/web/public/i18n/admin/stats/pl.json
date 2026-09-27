@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "System zdrowia",
+  "admin.stats.healthy": "Zdrowe",
+  "admin.stats.degraded": "Wyrzucone",
+  "admin.stats.revenueEvents": "Całkowita kwota transakcji / rozliczeń",
+  "admin.stats.usersCommunity": "Całkowita liczba członków / stanowiska",
+  "admin.stats.maintenance": "Metoda konserwacji",
+  "admin.stats.maintenanceOn": "Wydatność w nagłych przypadkach",
+  "admin.stats.maintenanceOff": "Normalna operacja (ZWYJEDNIE)",
+  "admin.stats.activeVisitors": "5 minut aktywnych odwiedzających",
+  "admin.stats.views5m": "5 minut przeglądania stron"
 }

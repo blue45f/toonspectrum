@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Sundhedssystem",
+  "admin.stats.healthy": "Sundt",
+  "admin.stats.degraded": "Afgrænset",
+  "admin.stats.revenueEvents": "Samlet antal transaktioner / afregninger",
+  "admin.stats.usersCommunity": "Totalt antal medlemmer / stillinger",
+  "admin.stats.maintenance": "Vedligeholdelsesmåde",
+  "admin.stats.maintenanceOn": "Hjælp i nødsituationer (ON)",
+  "admin.stats.maintenanceOff": "Normalt drift (UFF)",
+  "admin.stats.activeVisitors": "5 minutters aktive besøgende",
+  "admin.stats.views5m": "5 minutters sidevisninger"
 }

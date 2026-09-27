@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Nisam mogao da učinim ažuriranja.",
+  "changelog.empty": "Još nema dnevnika sa ažuriranim podacima."
 }

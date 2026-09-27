@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "សង្ខេប នៃ ការ ដោះស្រាយ (៣០ ថ្ងៃ ចុង ក្រោយ)",
+  "admin.revenue.loadError": "មិនបានបញ្ចូលបញ្ជីចំណូល",
+  "admin.revenue.filterAll": "ទាំងអស់",
+  "admin.revenue.filterPending": "រង់ចាំ",
+  "admin.revenue.filterApproved": "អនុញ្ញាត",
+  "admin.revenue.filterPaid": "លក់",
+  "admin.revenue.filterRejected": "ការដកស្រង់",
+  "admin.revenue.filterRevoked": "លុបចោល",
+  "admin.revenue.empty": "គ្មាន ការប្រព្រឹត្តទៅ នៃ ការដោះស្រាយ ដែល ស្រប នឹង ស្ថានភាព នេះ ទេ។",
+  "admin.revenue.approve": "អនុម័ត",
+  "admin.revenue.reject": "ការដកចេញ",
+  "admin.revenue.settle": "ការ ដោះស្រាយ ទាំងស្រុង",
+  "admin.revenue.revoke": "លុបចោល"
 }

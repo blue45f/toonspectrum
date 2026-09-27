@@ -1,6 +1,6 @@
 {
   "studio.hub.title": "Водич за функције",
-  "studio.hub.subtitle": "Take one feature at a time. {done}/{total} reviewed.",
+  "studio.hub.subtitle": "Узмите једну функцију у исто време. {done} / {total} прегледано.",
   "studio.hub.progressAriaLabel": "Напредак туторијала",
   "studio.hub.listAriaLabel": "Листа функција",
   "studio.hub.checked": "погледајте",

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "És necessari entrar.",
+  "apiError.adminRequired": "No es van verificar els permisos d'admin.",
+  "apiError.adminOnlyPage": "Aquesta pàgina està restringida als administradors.",
+  "apiError.notFound": "L'article sol·licitat no es va trobar.",
+  "apiError.unsupportedType": "Tip de contingut no suportat.",
+  "apiError.inactiveAccount": "Els comptes inactius no poden utilitzar funcions d'administrator.",
+  "apiError.settlementFailed": "El procés de liquidació ha fallat."
 }

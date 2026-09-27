@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "අනුග් රහය දක්වන රූපය",
+  "ad.slotAriaLabel": "ප් රචාරණ ස්ථානය",
+  "ad.slotLabel": "අනුග් රහය දක්වනවා",
+  "ad.slotTitle": "අනුග් රහය දක්වන අන්තර්ගතය",
+  "ad.ctaDetails": "විස්තර බලන්න",
+  "ad.placeholderAriaLabel": "ප් රචාරක ස්ථානගත කිරීම",
+  "ad.placeholderText": "අනුග් රහය දක්වන අන්තර්ගතයක් නැහැ.",
+  "ad.tag": "ප් රචාරක"
 }

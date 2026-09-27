@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "حقوقِ نسخہ اور مواد کا نوٹس",
+  "copyright.section1.title": "مواد کے ذرائع اور اصول",
+  "copyright.section1.body": "ٹون اسپیکٹرم ایک انڈیکس اور دریافت کا پلیٹ فارم ہے جو ویب ٹون / ویب ناول پلیٹ فارمز سے عوامی کیٹلاگ میٹا ڈیٹا (تاریخ ، مصنفین ، صنف وغیرہ) کا خلاصہ کرتا ہے۔ یہ مرکزی باب کا مواد نہیں رکھتا یا دوبارہ تقسیم نہیں کرتا ہے۔ پڑھنے کو خصوصی طور پر سرکاری لنکس کے ذریعہ ہدایت کی جاتی ہے۔",
+  "copyright.section2.title": "کور تصاویر",
+  "copyright.section2.body": "کور تصاویر کو معمولی تصاویر کی نشاندہی کرنے کے لئے کام کرتی ہیں اور جہاں ممکن ہو ماخذ کے لنکس کے ساتھ اصل پلیٹ فارم کا حوالہ دیتے ہیں۔ حقوق کے حاملین کی درخواست یا پالیسی اپ ڈیٹس پر ڈسپلے فوری طور پر غیر فعال کیا جاسکتا ہے۔",
+  "copyright.section3.title": "میٹرکس اور شفافیت",
+  "copyright.section4.title": "حقوق کا نوٹس",
+  "copyright.section5.title": "کاپی رائٹ کی خلاف ورزی کا نوٹس اور انخلا",
+  "copyright.section5.body": "اگر آپ کو لگتا ہے کہ میٹا ڈیٹا یا کور آپ کے حقوق کی خلاف ورزی کرتے ہیں تو، براہ کرم عنوان، یو آر ایل اور مالکیت کا ثبوت کے ساتھ ایک انکوائری جمع کروائیں.",
+  "copyright.leaveInquiry": "انکوائری درج کریں"
 }

@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Hizkuntza",
+  "control.sound.enable": "Soinu efektuak ahalbidetzen",
+  "control.sound.disable": "Soinu efektuak desaktibatu",
+  "control.theme.dark": "Argi modura pasatu.",
+  "control.theme.light": "Mugitu modu ilunera",
+  "control.settings.open": "Ireki jarduerak",
+  "control.settings.close": "Jarri itxiak",
+  "control.cluster.settings": "Soinu, gaia, hizkuntza kontrolak",
+  "control.cluster.open": "Ireki jarduerak",
+  "control.cluster.tooltip": "Soinuaren, gaia eta hizkuntzaren konfigurazioa",
+  "control.language.group.translated": "Itzulpenak, hedapen handikoak",
+  "control.language.group.englishBase": "Itzulpen automatikoa · Ingelesez fallback"
 }

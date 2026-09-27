@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Rapid Search and Commands...",
+  "admin.palette.placeholder": "Kërko komandat e administratorit (Navigimi, eksporti CSV, Mirëmbajtja)...",
+  "admin.palette.empty": "Nuk u gjet asnjë rezultat.",
+  "admin.palette.groupNav": "Shkurtoret e navigimit të konsolës",
+  "admin.palette.groupQuick": "Rapid Action & Export",
+  "admin.palette.exportUsers": "Eksporto të gjithë anëtarët CSV",
+  "admin.palette.exportRevenue": "Libri i të ardhurave të eksportit CSV",
+  "admin.palette.maintenance": "Mirëmbajtja Emergjente e Sistemit të Kontrollit"
 }

@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
+  "admin.audit.title": "Админ аудитын бүртгэл",
+  "admin.audit.desc": "Захиргааны бүх үйлдэл, зөвшөөрлийн шилжилт, тохиргооны өөрчлөлтийг хянах.",
   "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
+  "admin.audit.loading": "Аудитын бүртгэлийг ачаалж байна...",
+  "admin.audit.empty": "Бүртгэгдсэн аудитын бүртгэл байхгүй.",
   "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.modalTitle": "Аудитын бүртгэлийн дэлгэрэнгүй мэдээлэл",
+  "admin.audit.close": "Nearly"
 }

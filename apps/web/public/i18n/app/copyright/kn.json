@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "ಹಕ್ಕುಸ್ವಾಮ್ಯ ಮತ್ತು ವಿಷಯ ಸೂಚನೆ",
+  "copyright.section1.title": "ವಿಷಯ ಮೂಲಗಳು ಮತ್ತು ತತ್ವಗಳು",
+  "copyright.section1.body": "ಟೂನ್ಸ್ಪೆಕ್ಟ್ರಮ್ ಎನ್ನುವುದು ವೆಬ್ ಟೂನ್ / ವೆಬ್ ಕಾದಂಬರಿ ಪ್ಲಾಟ್ಫಾರ್ಮ್ಗಳಿಂದ ಸಾರ್ವಜನಿಕ ಕ್ಯಾಟಲಾಗ್ ಮೆಟಾಡೇಟಾವನ್ನು (ಶೀರ್ಷಿಕೆಗಳು, ಲೇಖಕರು, ಪ್ರಕಾರಗಳು, ಇತ್ಯಾದಿ) ಸಾರಾಂಶಗೊಳಿಸುವ ಸೂಚ್ಯಂಕ ಮತ್ತು ಪತ್ತೆ ವೇದಿಕೆಯಾಗಿದೆ. ಇದು ಮುಖ್ಯ ಅಧ್ಯಾಯ ವಿಷಯವನ್ನು ಹೋಸ್ಟ್ ಮಾಡುವುದಿಲ್ಲ ಅಥವಾ ಮರುವಿತರಿಸುವುದಿಲ್ಲ; ಓದುವಿಕೆಯನ್ನು ಅಧಿಕೃತ ಲಿಂಕ್ಗಳ ಮೂಲಕ ಮಾತ್ರ ನಿರ್ದೇಶಿಸಲಾಗುತ್ತದೆ.",
+  "copyright.section2.title": "ಕವರ್ ಚಿತ್ರಗಳು",
+  "copyright.section2.body": "ಕವರ್ ಚಿತ್ರಗಳು ಚಿಕ್ಕಚಿತ್ರಗಳನ್ನು ಗುರುತಿಸುವಂತೆ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತವೆ ಮತ್ತು ಮೂಲ ಲಿಂಕ್ಗಳೊಂದಿಗೆ ಮೂಲ ಪ್ಲಾಟ್ಫಾರ್ಮ್ ಕವರ್ಗಳನ್ನು ಉಲ್ಲೇಖಿಸುತ್ತವೆ. ಹಕ್ಕುಗಳ ಮಾಲೀಕರು ವಿನಂತಿಸಿದ ನಂತರ ಅಥವಾ ನೀತಿ ನವೀಕರಣಗಳ ನಂತರ ಪ್ರದರ್ಶನಗಳನ್ನು ತಕ್ಷಣ ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಬಹುದು.",
+  "copyright.section3.title": "ಮೆಟ್ರಿಕ್ಸ್ ಮತ್ತು ಪಾರದರ್ಶಕತೆ",
+  "copyright.section4.title": "ಹಕ್ಕುಗಳ ಸೂಚನೆ",
+  "copyright.section5.title": "ಹಕ್ಕುಸ್ವಾಮ್ಯ ಉಲ್ಲಂಘನೆ ಸೂಚನೆ ಮತ್ತು ತೆಗೆಯುವಿಕೆ",
+  "copyright.section5.body": "ಮೆಟಾಡೇಟಾ ಅಥವಾ ಕವರ್ಗಳು ನಿಮ್ಮ ಹಕ್ಕುಗಳನ್ನು ಉಲ್ಲಂಘಿಸುತ್ತವೆ ಎಂದು ನೀವು ಭಾವಿಸಿದರೆ, ದಯವಿಟ್ಟು ಶೀರ್ಷಿಕೆ, URL ಮತ್ತು ಮಾಲೀಕತ್ವದ ಪುರಾವೆಗಳೊಂದಿಗೆ ಪ್ರಶ್ನೆಯನ್ನು ಸಲ್ಲಿಸಿ.",
+  "copyright.leaveInquiry": "ವಿಚಾರಣೆ ಸಲ್ಲಿಸಿ"
 }

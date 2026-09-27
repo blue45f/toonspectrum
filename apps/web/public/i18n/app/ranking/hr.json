@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Prikazi razdjeljivanje rezultata",
+  "ranking.metric.views": "Pogled",
+  "ranking.why": "Zašto?",
+  "ranking.breakdownTitle": "Razloženost rezultata",
+  "ranking.totalScore": "Ukupna ocjena",
+  "ranking.breakdownDescription": "S obzirom na to da je u skladu s člankom 4. stavkom 1. stavkom 1. stavkom 1."
 }

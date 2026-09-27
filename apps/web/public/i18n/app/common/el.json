@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Εφοδιασμός",
+  "common.loading.short": "Εφοδιασμός",
   "common.close": "Κλείσιμο",
   "common.open": "Άνοιγμα",
   "common.search": "Αναζήτηση",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Δοκιμάστε ξανά.",
+  "common.retry.short": "Δοκιμάστε ξανά.",
+  "common.backToTop": "Πίσω στην κορυφή",
+  "common.backToHome": "Πήγαινε σπίτι.",
+  "common.loading.search": "Ψάχνω...",
+  "common.notFoundWithQuery": "Δεν υπάρχουν αποτελέσματα για το \" {query} \".",
+  "common.openSearch": "Βρείτε το στην Αναζήτηση",
+  "common.loading.empty": "Δεν επιστράφηκαν δεδομένα.",
+  "common.retry.all": "Προσπάθησε ξανά ή πήγαινε σπίτι."
 }

@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Натовар",
+  "common.loading.short": "Натовар",
   "common.close": "Затвори",
   "common.open": "Отвори",
   "common.search": "Претражи",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Поново покушај",
+  "common.retry.short": "Поново покушај",
+  "common.backToTop": "На врх.",
+  "common.backToHome": "Иди кући.",
+  "common.loading.search": "Трагајући...",
+  "common.notFoundWithQuery": "Нису резултати за \" {query} \".",
+  "common.openSearch": "Пронађите га у Трагедији →",
+  "common.loading.empty": "Ниједна информација није враћена.",
+  "common.retry.all": "Покушај поново или врати се кући."
 }

@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Inlog vereist",
+  "admin.gate.guestBody": "De admin console vereist authenticatie.",
+  "admin.gate.forbiddenTitle": "Admin-toestemming vereist",
+  "admin.gate.forbiddenBody": "Dit account ontbreekt aan administratiebevoegdheden. Neem contact op met een operator indien nodig.",
+  "admin.gate.errorTitle": "Console niet geladen"
 }

@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "عرض تقسيم النتيجة",
+  "ranking.metric.views": "الرؤى",
+  "ranking.why": "لماذا ؟",
+  "ranking.breakdownTitle": "تقسيم النتيجة",
+  "ranking.totalScore": "النتيجة الإجمالية",
+  "ranking.breakdownDescription": "يتم حسابها باستخدام أوزان المحور وتطبيعات محددة عن العنوان."
 }

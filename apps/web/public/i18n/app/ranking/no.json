@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Se resultatoppdeling",
+  "ranking.metric.views": "Synspunkter",
+  "ranking.why": "Hvorfor?",
+  "ranking.breakdownTitle": "Skillnadsskift",
+  "ranking.totalScore": "Totalt resultat",
+  "ranking.breakdownDescription": "Beregnet med aksespesifikk normalisering."
 }

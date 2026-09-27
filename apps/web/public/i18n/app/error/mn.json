@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
+  "error.reloading": "Reloading latest version...",
+  "error.chunkRetryFailed": "Нэг удаа шинэчилсэн боловч асуудал хэвээр байна.Холболтоо шалгаад дахин оролдоно уу.",
   "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.goHome": "Go Home",
+  "error.retryDesc": "Please try again or return to the homepage."
 }

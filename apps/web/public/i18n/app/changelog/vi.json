@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Không thể tải bản cập nhật.",
+  "changelog.empty": "Không có bản cập nhật đăng tải."
 }

@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Osasun sistema",
+  "admin.stats.healthy": "Osasuntsu",
+  "admin.stats.degraded": "Beheratua",
+  "admin.stats.revenueEvents": "Transakzioen / salmenten kopurua",
+  "admin.stats.usersCommunity": "Kideen kopurua / Postuak",
+  "admin.stats.maintenance": "Garbiketaren modua",
+  "admin.stats.maintenanceOn": "Larrialdietan mantentzea (ON)",
+  "admin.stats.maintenanceOff": "Operazio normala (BUK)",
+  "admin.stats.activeVisitors": "5 minutuko bisitari aktiboak",
+  "admin.stats.views5m": "5 minutuko orrialde ikusgarriak"
 }

@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "ਸਪਾਂਸਰ ਕੀਤੀ ਤਸਵੀਰ",
+  "ad.slotAriaLabel": "ਇਸ਼ਤਿਹਾਰਬਾਜ਼ੀ ਦਾ ਸਥਾਨ",
+  "ad.slotLabel": "ਸਪਾਂਸਰ",
+  "ad.slotTitle": "ਸਪਾਂਸਰ ਕੀਤੀ ਸਮੱਗਰੀ",
+  "ad.ctaDetails": "ਵੇਰਵੇ ਵੇਖੋ",
+  "ad.placeholderAriaLabel": "ਇਸ਼ਤਿਹਾਰਬਾਜ਼ੀ ਸਥਾਨ ਧਾਰਕ",
+  "ad.placeholderText": "ਕੋਈ ਸਪਾਂਸਰਡ ਸਮੱਗਰੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+  "ad.tag": "ਇਸ਼ਤਿਹਾਰਬਾਜ਼ੀ"
 }

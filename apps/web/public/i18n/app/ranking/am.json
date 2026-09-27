@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "የደረጃ ክፍፍል ይመልከቱ",
+  "ranking.metric.views": "እይታዎች",
+  "ranking.why": "ለምን?",
+  "ranking.breakdownTitle": "የደረጃ ክፍፍል",
+  "ranking.totalScore": "ጠቅላላ ውጤት",
+  "ranking.breakdownDescription": "በዘንግ ክብደት እና በስም-ተኮር መደበኛነት የተሰላ ነው።"
 }

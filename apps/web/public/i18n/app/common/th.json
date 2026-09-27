@@ -1,16 +1,16 @@
 {
   "common.loading": "กำลังโหลด",
-  "common.loading.short": "Loading",
+  "common.loading.short": "การบรรทุก",
   "common.close": "ปิด",
   "common.open": "เปิด",
   "common.search": "ค้นหา",
   "common.retry": "ลองใหม่",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "ลองอีกครั้ง",
+  "common.backToTop": "กลับมาบน",
   "common.backToHome": "กลับหน้าแรก",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "ค้นหา...",
+  "common.notFoundWithQuery": "ไม่มีผลสําหรับ ' {query} '",
+  "common.openSearch": "ค้นหาในการค้นหา",
+  "common.loading.empty": "ไม่มีข้อมูลคืน",
+  "common.retry.all": "ลองอีกที หรือกลับบ้าน"
 }

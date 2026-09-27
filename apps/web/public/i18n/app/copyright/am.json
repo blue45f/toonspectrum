@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "የቅጂ መብት እና ይዘት ማስታወቂያ",
+  "copyright.section1.title": "የይዘት ምንጮች እና መርሆዎች",
+  "copyright.section1.body": "ToonSpectrum ከዌብቱን / ዌብኖቨል መድረኮች (የመሳሪያ ርዕሶች ፣ ደራሲዎች ፣ ዘውጎች ፣ ወዘተ) የሕዝብ ካታሎግ ሜታዳታ (መሳሪያ ፣ ገጸ-ባህሪያት) የሚያጠቃልል መረጃ ማውጫ እና ግኝት መድረክ ነው። ዋናውን ምዕራፍ ይዘት አያስተናግድም ወይም አያሰራጭም ። ንባብ በባለስልጣን አገናኞች ብቻ ይመራል ።",
+  "copyright.section2.title": "የሽፋን ምስሎች",
+  "copyright.section2.body": "የሽፋኑ ምስሎች እንደ መታወቂያ ጥቃቅን ምስሎች እና በተቻለ መጠን የመረጃ ምንጭ አገናኞችን ያካተቱ የማጣቀሻ የመጀመሪያ መድረክ ሽፋኖች ሆነው ያገለግላሉ ። የማሳያዎቹ መብቶች ባለቤት ጥያቄ ወይም ፖሊሲ ዝመናዎች ላይ ወዲያውኑ ሊሰናከሉ ይችላሉ።",
+  "copyright.section3.title": "መለኪያዎች እና ግልፅነት",
+  "copyright.section4.title": "የመብት ማስታወቂያ",
+  "copyright.section5.title": "የቅጂ መብት ጥሰት ማሳወቂያ እና ማስወገድ",
+  "copyright.section5.body": "ሜታዳታ ወይም ሽፋኖች መብቶችዎን የሚጥሱ እንደሆኑ ካመኑ እባክዎን ርዕስ ፣ ዩአርኤል እና የባለቤትነት ማስረጃ ጋር ጥያቄ ያቅርቡ ።",
+  "copyright.leaveInquiry": "ጥያቄ ማስገባት →"
 }

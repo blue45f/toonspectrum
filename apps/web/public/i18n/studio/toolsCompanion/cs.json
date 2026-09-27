@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Vrstva {count}",
   "studio.toolsCompanion.review.section.comments": "Komentář {count}",
   "studio.toolsCompanion.review.section.history": "Záznam {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Stránka{Štítek}· Výběr{Štítek ZZ RBRACE",
   "studio.toolsCompanion.review.title": "inspekční konzole",
   "studio.toolsCompanion.review.truncatedComments": "a {count} komentářů",
   "studio.toolsCompanion.review.truncatedLayers": "{count} vrstev",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referenční obrazovka",
   "studio.toolsCompanion.referenceLoading": "Načítání referenčního nástroje...",
   "studio.toolsCompanion.footer": "Upravit dokumenty vlastní pouze výchozí kartu. Toto okno přenáší pouze komprimovaný náhled a inspekční/referenční záměr do BroadcastChannel stejného prohlížeče, takže neexistují žádné samostatné náklady na server.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Není připojen k hlavnímu studiu.",
+  "studio.toolsCompanion.exit.editor": "Otevřete editor Studio"
 }

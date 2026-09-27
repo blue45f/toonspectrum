@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ਭਾਸ਼ਾ",
+  "control.sound.enable": "ਆਵਾਜ਼ ਪ੍ਰਭਾਵ ਨੂੰ ਸਮਰੱਥ ਬਣਾਓ",
+  "control.sound.disable": "ਆਵਾਜ਼ ਪ੍ਰਭਾਵ ਨੂੰ ਅਯੋਗ ਕਰੋ",
+  "control.theme.dark": "ਲਾਈਟ ਮੋਡ ਵਿੱਚ ਬਦਲੋ",
+  "control.theme.light": "ਡਾਰਕ ਮੋਡ ਵਿੱਚ ਬਦਲੋ",
+  "control.settings.open": "ਖੁੱਲੀ ਸੈਟਿੰਗ",
+  "control.settings.close": "ਬੰਦ ਸੈਟਿੰਗਜ਼",
+  "control.cluster.settings": "ਆਵਾਜ਼, ਥੀਮ, ਭਾਸ਼ਾ ਕੰਟਰੋਲ",
+  "control.cluster.open": "ਖੁੱਲੀ ਸੈਟਿੰਗ",
+  "control.cluster.tooltip": "ਆਵਾਜ਼, ਥੀਮ ਅਤੇ ਭਾਸ਼ਾ ਸੈਟਿੰਗਜ਼",
+  "control.language.group.translated": "ਉੱਚ ਕਵਰੇਜ ਵਾਲੇ ਅਨੁਵਾਦ",
+  "control.language.group.englishBase": "ਆਟੋਮੈਟਿਕ ਅਨੁਵਾਦ · ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਫਾਲਬੈਕ"
 }

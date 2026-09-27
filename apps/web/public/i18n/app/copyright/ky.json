@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Автордук укук жана мазмун жөнүндө билдирүү",
+  "copyright.section1.title": "Мазмунунун булактары жана принциптери",
+  "copyright.section1.body": "ToonSpectrum - бул веб-мультфильмдер / веб-романдар платформаларынан коомдук каталогдун метаданмаларын (заңкы аталыштар, авторлор, жанрлар ж.б.) жыйынтыктоочу индекс жана ачылыш платформасы.",
+  "copyright.section2.title": "Капкактын сүрөтү",
+  "copyright.section2.body": "Капкак сүрөттөрү майда сүрөттөрдү аныктоо жана мүмкүн болгон учурда булак шилтемелери менен оригиналдуу платформанын капкактарын көрсөтүү катары кызмат кылышат.",
+  "copyright.section3.title": "Өлчөмдөр жана ачык-айкындуулук",
+  "copyright.section4.title": "Укук жөнүндө билдирүү",
+  "copyright.section5.title": "Автордук укуктун бузулушу жөнүндө билдирүү жана аны жок кылуу",
+  "copyright.section5.body": "Эгер метаданмалар же капкандар укуктарыңызды бузуп жатат деп ойлосоңуз, сураныч, аталышы, URL жана менчикке ээлик кылуунун далили менен суроо берсеңиз болот.",
+  "copyright.leaveInquiry": "Сурамжылоону тапшыр →"
 }

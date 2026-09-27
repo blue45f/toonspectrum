@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "ບັນຊີກວດສອບຜູ້ບໍລິຫານ",
+  "admin.audit.desc": "ຕິດຕາມການປະຕິບັດການບໍລິຫານທັງ ຫມົດ, ການປ່ຽນອະນຸຍາດ, ແລະການປ່ຽນແປງການຕັ້ງຄ່າ.",
+  "admin.audit.searchPlaceholder": "ຊອກຫາ (ອີເມວ / ການກະ ທໍາ)...",
+  "admin.audit.loading": "ການໂຫຼດບັນທຶກກວດກາ...",
+  "admin.audit.empty": "ບໍ່ມີບັນທຶກການກວດສອບທີ່ບັນທຶກໄວ້.",
+  "admin.audit.viewDetails": "ເບິ່ງ",
+  "admin.audit.modalTitle": "ລາຍລະອຽດຂອງບັນຊີກວດກາ",
+  "admin.audit.close": "ໃກ້ໆ"
 }

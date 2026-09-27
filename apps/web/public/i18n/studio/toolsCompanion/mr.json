@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "स्तर {count}",
   "studio.toolsCompanion.review.section.comments": "टिप्पणी {count}",
   "studio.toolsCompanion.review.section.history": "रेकॉर्ड {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE पृष्ठलेबल}·{निवडलेबल ZZ RBRACE",
   "studio.toolsCompanion.review.title": "तपासणी कन्सोल",
   "studio.toolsCompanion.review.truncatedComments": "आणि {count} टिप्पण्या",
   "studio.toolsCompanion.review.truncatedLayers": "{count} स्तर",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "संदर्भ स्क्रीन",
   "studio.toolsCompanion.referenceLoading": "संदर्भ साधन लोड करत आहे...",
   "studio.toolsCompanion.footer": "दस्तऐवज संपादित करा फक्त डीफॉल्ट टॅबच्या मालकीचे. ही विंडो एकाच ब्राउझरच्या ब्रॉडकास्ट चॅनेलवर फक्त संकुचित पूर्वावलोकन आणि तपासणी/संदर्भ हेतू प्रसारित करते, त्यामुळे कोणतीही वेगळी सर्व्हर किंमत नाही.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "मुख्य स्टुडिओशी जोडलेले नाही.",
+  "studio.toolsCompanion.exit.editor": "Studio संपादक उघडा"
 }

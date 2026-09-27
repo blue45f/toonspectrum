@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Lihat perpecahan skor",
+  "ranking.metric.views": "Pandangan",
+  "ranking.why": "Kenapa?",
+  "ranking.breakdownTitle": "Perbahagian skor",
+  "ranking.totalScore": "Skor keseluruhan",
+  "ranking.breakdownDescription": "Dihitung dengan berat sumbu dan normalisasi khusus tajuk."
 }

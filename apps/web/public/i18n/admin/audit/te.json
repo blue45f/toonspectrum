@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "అడ్మిన్ ఆడిట్ లాగ్స్",
+  "admin.audit.desc": "అన్ని పరిపాలనా చర్యలు, అనుమతుల మార్పు, మరియు ఆకృతీకరణ మార్పులను ట్రాక్ చేయండి.",
+  "admin.audit.searchPlaceholder": "శోధన (ఇమెయిల్/క్రియ)...",
+  "admin.audit.loading": "ఆడిట్ లాగ్లు లోడ్.",
+  "admin.audit.empty": "ఏ రికార్డు ఆడిట్ లాగ్లు లేవు.",
+  "admin.audit.viewDetails": "వీక్షణ",
+  "admin.audit.modalTitle": "ఆడిట్ లాగ్ వివరాలు",
+  "admin.audit.close": "దగ్గరగా"
 }

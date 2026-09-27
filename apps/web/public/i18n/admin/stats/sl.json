@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Zdravstveni sistem",
+  "admin.stats.healthy": "Zdrav",
+  "admin.stats.degraded": "Znižena",
+  "admin.stats.revenueEvents": "Skupna transakcija / poravnava",
+  "admin.stats.usersCommunity": "Skupni članovi / delovni mesti",
+  "admin.stats.maintenance": "Oblik vzdrževanja",
+  "admin.stats.maintenanceOn": "Nadzorniški vzdrževanje (ON)",
+  "admin.stats.maintenanceOff": "Normalna operacija (OFF)",
+  "admin.stats.activeVisitors": "5 minut aktivnih obiskovalcev",
+  "admin.stats.views5m": "5 minut ogled strani"
 }

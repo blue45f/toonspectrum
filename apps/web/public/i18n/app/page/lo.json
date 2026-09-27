@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "ຫນ້າທີ່ບໍ່ໄດ້ພົບ",
+  "page.notFound.message": "ກວດເບິ່ງ URL ອີກເທື່ອ ຫນຶ່ງ ຫຼືຄົ້ນຫາຫົວຂໍ້ຈາກ ຫນ້າ ຕົ້ນ.",
+  "page.notFound.home": "ກັບຄືນບ້ານ"
 }

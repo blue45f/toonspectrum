@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Завършено",
+  "review.progress.binge": "Бингинг",
+  "review.progress.upcoming": "Планирано",
+  "review.progress.abandoned": "Изпуснат",
+  "review.progress.unknown": "Прогрес скрит",
+  "review.spoilerRevealLabel": "Покажи спойлер"
 }

@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "ຮູບແບບທີ່ບໍ່ໄດ້ຮັບການສະ ຫນັບ ສະ ຫນູນ.",
+  "avatar.error.processFailed": "ບໍ່ສາມາດຈັດການພາບໄດ້.",
+  "avatar.processing": "ການປຸງແຕ່ງ ...",
+  "avatar.select": "ປ່ຽນຮູບພາບ",
+  "avatar.remove": "ລຶບຮູບພາບ",
+  "avatar.uploadHint": "ຮູບພາບ JPG, PNG, ແລະ WEBP ເທົ່ານັ້ນແມ່ນໄດ້ຮັບການສະ ຫນັບ ສະ ຫນູນ, ຫຼັງຈາກນັ້ນຖືກຕັດເພື່ອເບິ່ງກ່ອນ.",
+  "avatar.changeAria": "ປ່ຽນຮູບພາບໂປຣໄຟລ໌"
 }

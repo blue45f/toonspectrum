@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "Сурамжылоону жүктөп алчу эмесмин.",
+  "feedback.thankYou": "Сиздин баа жеткис пикирлериңиз үчүн рахмат!",
+  "feedback.anonymousNote": "Сиздин жоопторуңуз анонимдүү сакталат.",
+  "feedback.notAtAll": "Жок , такыр эмес",
+  "feedback.definitely": "Албетте , так ошондой ."
 }

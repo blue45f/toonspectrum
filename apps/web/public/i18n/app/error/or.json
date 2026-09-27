@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "ନବୀନତମ ସଂସ୍କରଣକୁ ପୁନଃ ଲୋଡ କରିବା...",
+  "error.chunkRetryFailed": "ଥରେ ରିଫ୍ରେସ୍ ହୋଇଛି, କିନ୍ତୁ ସମସ୍ୟା ଜାରି ରହିଛି. ଦୟାକରି ଆପଣଙ୍କର ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ ଏବଂ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ.",
+  "error.reloadButton": "ପୃଷ୍ଠା ପୁନଃ ଲୋଡ୍ କରନ୍ତୁ",
+  "error.goHome": "ଘରକୁ ଯାଅ",
+  "error.retryDesc": "ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ କିମ୍ବା ହୋମ ପେଜକୁ ଫେରିଯାନ୍ତୁ ।"
 }

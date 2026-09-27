@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "प्रतिलिपि अधिकार र सामग्री सूचना",
+  "copyright.section1.title": "सामग्री स्रोतहरू र सिद्धान्तहरू",
+  "copyright.section1.body": "टुनस्पेक्ट्रम एक सूचकांक र खोज प्लेटफर्म हो जुन वेबtoon / वेब उपन्यास प्लेटफर्मबाट सार्वजनिक क्याटलग मेटाडाटा (शीर्षक, लेखक, विधाहरू, आदि) को सारांश दिन्छ। यसले मुख्य अध्याय सामग्री होस्ट गर्दैन वा पुनः वितरण गर्दैन; पढाइ विशेष रूपमा आधिकारिक लिंकहरू मार्फत निर्देशित हुन्छ।",
+  "copyright.section2.title": "आवरण तस्विरहरू",
+  "copyright.section2.body": "कभर छविहरूले थम्बनेलहरूको पहिचानको रूपमा काम गर्दछ र जहाँ सम्भव छ स्रोत लिंकहरूको साथ सन्दर्भ मूल प्लेटफर्म कभरहरू। प्रदर्शनहरू अधिकार धारकको अनुरोध वा नीति अपडेटमा तत्काल अक्षम गर्न सकिन्छ।",
+  "copyright.section3.title": "मेट्रिक्स र पारदर्शिता",
+  "copyright.section4.title": "अधिकार सम्बन्धी सूचना",
+  "copyright.section5.title": "प्रतिलिपि अधिकार उल्लङ्घनको सूचना र हटाउने",
+  "copyright.section5.body": "यदि तपाइँको विश्वास छ कि मेटाडाटा वा कभरले तपाइँको अधिकार उल्लङ्घन गर्दछ भने, कृपया शीर्षक, URL, र स्वामित्व प्रमाण सहित एक सोधपुछ पठाउनुहोस्।",
+  "copyright.leaveInquiry": "सोधपुछ गर्नुहोस"
 }

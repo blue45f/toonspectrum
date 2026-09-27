@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Pengumuman & Banner",
+  "admin.tabs.audit": "Log Audit",
+  "admin.tabs.campaigns": "Kampanye",
+  "admin.tabs.creatorSupport": "Sokongan Pencipta",
+  "admin.tabs.dashboard": "Papan pindai",
+  "admin.tabs.ops": "Operasi",
+  "admin.tabs.plans": "Rancangan",
+  "admin.tabs.promos": "Promosi",
+  "admin.tabs.reports": "Laporan & Moderasi",
+  "admin.tabs.revenue": "Penghapusan",
+  "admin.tabs.security": "Keselamatan & IP",
+  "admin.tabs.inquiries": "Penyelidikan perniagaan",
+  "admin.tabs.supporters": "Sokongan kos operasi",
+  "admin.tabs.traffic": "Laluan langsung"
 }

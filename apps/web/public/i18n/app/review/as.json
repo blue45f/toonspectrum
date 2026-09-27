@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "সমাপ্ত",
+  "review.progress.binge": "বিংগিং",
+  "review.progress.upcoming": "পৰিকল্পিত",
+  "review.progress.abandoned": "পেলোৱা",
+  "review.progress.unknown": "লুকাই থকা প্ৰগতি",
+  "review.spoilerRevealLabel": "স্প'ইলাৰ প্ৰদৰ্শন"
 }

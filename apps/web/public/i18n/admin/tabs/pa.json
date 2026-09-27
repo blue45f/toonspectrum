@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "ਘੋਸ਼ਣਾਵਾਂ ਅਤੇ ਬੈਨਰ",
+  "admin.tabs.audit": "ਆਡਿਟ ਲੌਗ",
+  "admin.tabs.campaigns": "ਮੁਹਿੰਮਾਂ",
+  "admin.tabs.creatorSupport": "ਸਿਰਜਣਹਾਰ ਦਾ ਸਮਰਥਨ",
+  "admin.tabs.dashboard": "ਡੈਸ਼ਬੋਰਡ",
+  "admin.tabs.ops": "ਸੰਚਾਲਨ",
+  "admin.tabs.plans": "ਯੋਜਨਾਵਾਂ",
+  "admin.tabs.promos": "ਤਰੱਕੀ",
+  "admin.tabs.reports": "ਰਿਪੋਰਟਾਂ ਅਤੇ ਸੰਜਮ",
+  "admin.tabs.revenue": "ਵਿਵਸਥਾ",
+  "admin.tabs.security": "ਸੁਰੱਖਿਆ ਅਤੇ ਆਈ.ਪੀ.",
+  "admin.tabs.inquiries": "ਵਪਾਰਕ ਪੁੱਛਗਿੱਛ",
+  "admin.tabs.supporters": "ਓਪਰੇਟਿੰਗ ਲਾਗਤ ਸਹਾਇਤਾ",
+  "admin.tabs.traffic": "ਲਾਈਵ ਟ੍ਰੈਫਿਕ"
 }

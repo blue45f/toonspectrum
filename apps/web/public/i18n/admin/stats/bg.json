@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Здравна система",
+  "admin.stats.healthy": "Здравословен",
+  "admin.stats.degraded": "Снижен",
+  "admin.stats.revenueEvents": "Общо трансакции / разплащания",
+  "admin.stats.usersCommunity": "Общ брой членове / постове",
+  "admin.stats.maintenance": "Режим на поддръжка",
+  "admin.stats.maintenanceOn": "Осигуряване на извънредна поддръжка (ON)",
+  "admin.stats.maintenanceOff": "Нормална експлоатация (OFF)",
+  "admin.stats.activeVisitors": "5 минути активни посетители",
+  "admin.stats.views5m": "5 минути разглеждане на страници"
 }

@@ -1,16 +1,16 @@
 {
   "common.loading": "Загрузка",
-  "common.loading.short": "Loading",
+  "common.loading.short": "Загрузка",
   "common.close": "Закрыть",
   "common.open": "Открыть",
   "common.search": "Поиск",
   "common.retry": "Повторить",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "Попробуйте",
+  "common.backToTop": "Вернуться вверх.",
   "common.backToHome": "На главную",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "Поиск...",
+  "common.notFoundWithQuery": "Никаких результатов на \" {query} \".",
+  "common.openSearch": "Найти в поиске →",
+  "common.loading.empty": "Нет данных.",
+  "common.retry.all": "Попробуй еще раз или иди домой."
 }

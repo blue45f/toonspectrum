@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "घोषणा आणि बॅनर",
+  "admin.tabs.audit": "ऑडिट लॉग",
+  "admin.tabs.campaigns": "मोहिमे",
+  "admin.tabs.creatorSupport": "निर्मात्याचा पाठिंबा",
+  "admin.tabs.dashboard": "डॅशबोर्ड",
+  "admin.tabs.ops": "ऑपरेशन्स",
+  "admin.tabs.plans": "योजना",
+  "admin.tabs.promos": "पदोन्नती",
+  "admin.tabs.reports": "अहवाल आणि मोजणी",
+  "admin.tabs.revenue": "करार",
+  "admin.tabs.security": "सुरक्षा आणि आयपी",
+  "admin.tabs.inquiries": "व्यावसायिक चौकशी",
+  "admin.tabs.supporters": "ऑपरेटिंग खर्च समर्थन",
+  "admin.tabs.traffic": "थेट वाहतूक"
 }

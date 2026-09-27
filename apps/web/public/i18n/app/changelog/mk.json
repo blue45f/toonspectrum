@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Не можев да ги заредим ажурирациите.",
+  "changelog.empty": "Досега нема нови дневници."
 }

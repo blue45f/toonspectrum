@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Λογκ ελέγχου διαχειριστή",
+  "admin.audit.desc": "Παρακολουθήστε όλες τις διοικητικές ενέργειες, αλλαγές άδειας και αλλαγές διαμόρφωσης.",
+  "admin.audit.searchPlaceholder": "Αναζήτηση (επιστολή / δράση)...",
+  "admin.audit.loading": "Φορτώντας ημερολόγια ελέγχου...",
+  "admin.audit.empty": "Κανένα καταγεγραμμένο λογιστικό ημερολόγιο.",
+  "admin.audit.viewDetails": "Εικόνα",
+  "admin.audit.modalTitle": "Πληροφορίες του λογιστικού ημερολογίου",
+  "admin.audit.close": "Κοντά"
 }

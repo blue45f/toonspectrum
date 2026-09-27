@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Thông báo & Banner",
+  "admin.tabs.audit": "Các nhật ký kiểm toán",
+  "admin.tabs.campaigns": "Các chiến dịch",
+  "admin.tabs.creatorSupport": "Sự hỗ trợ của Đấng Tạo Hóa",
+  "admin.tabs.dashboard": "bảng điều khiển",
+  "admin.tabs.ops": "Các hoạt động",
+  "admin.tabs.plans": "Kế hoạch",
+  "admin.tabs.promos": "Tăng chức",
+  "admin.tabs.reports": "Báo cáo & Tự trọng",
+  "admin.tabs.revenue": "Thỏa thuận",
+  "admin.tabs.security": "An ninh & IP",
+  "admin.tabs.inquiries": "Các cuộc hỏi kinh doanh",
+  "admin.tabs.supporters": "Nỗ trợ chi phí vận hành",
+  "admin.tabs.traffic": "Truyền thông trực tiếp"
 }

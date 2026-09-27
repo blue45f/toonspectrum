@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "સ્કોર વિભાજન જુઓ",
+  "ranking.metric.views": "દૃશ્યો",
+  "ranking.why": "શા માટે",
+  "ranking.breakdownTitle": "સ્કોર વિભાજન",
+  "ranking.totalScore": "કુલ સ્કોર",
+  "ranking.breakdownDescription": "અક્ષ વજન અને શીર્ષક-વિશિષ્ટ સામાન્યકરણ સાથે ગણતરી."
 }

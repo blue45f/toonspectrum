@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "ไม่สามารถโหลดข้อมูลได้",
+  "changelog.empty": "ยังไม่มีบันทึกการอัพเดทที่โพสต์"
 }

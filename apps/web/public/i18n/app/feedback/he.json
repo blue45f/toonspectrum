@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "לא הצלחתי להעלות את סקר התגובה.",
+  "feedback.thankYou": "תודה על התגובה היקרה שלך!",
+  "feedback.anonymousNote": "התשובות שלך נשמרות אנונימיות לחלוטין.",
+  "feedback.notAtAll": "לא בכלל.",
+  "feedback.definitely": "בהחלט."
 }

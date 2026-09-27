@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Tez qidirish va buyruqlar...",
+  "admin.palette.placeholder": "Qidiruv admin buyruqlari (navigatsiya, CSV eksport, ta'mirlash)...",
+  "admin.palette.empty": "Natijalar topilmadi.",
+  "admin.palette.groupNav": "Konsol navigatsiya yoʻnalishlarining qisqartmalari",
+  "admin.palette.groupQuick": "Tezkor harakatlar va eksport",
+  "admin.palette.exportUsers": "Barcha a'zolarni eksport qilish CSV",
+  "admin.palette.exportRevenue": "Eksport daromadlari hisobvarag'i CSV",
+  "admin.palette.maintenance": "Boshqaruv tizimi favqulodda ta'minot"
 }

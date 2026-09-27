@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Dil",
+  "control.sound.enable": "Ses efektlerini etkinleştir",
+  "control.sound.disable": "Ses efektlerini devre dışı bırak",
+  "control.theme.dark": "Işığı moduna geç",
+  "control.theme.light": "Karanlık moduna geç",
+  "control.settings.open": "Açık ayarlar",
+  "control.settings.close": "Yakın ayarlar",
+  "control.cluster.settings": "Ses, tema, dil kontrolü",
+  "control.cluster.open": "Açık ayarlar",
+  "control.cluster.tooltip": "Ses, tema ve dil ayarları",
+  "control.language.group.translated": "Yüksek kapsamlı tercüme",
+  "control.language.group.englishBase": "Otomatik çevirisi · İngilizce fallback"
 }

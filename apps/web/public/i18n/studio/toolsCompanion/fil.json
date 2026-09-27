@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Layer {count}",
   "studio.toolsCompanion.review.section.comments": "Komento {count}",
   "studio.toolsCompanion.review.section.history": "Record {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{selectionLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "console ng inspeksyon",
   "studio.toolsCompanion.review.truncatedComments": "at {count} komento",
   "studio.toolsCompanion.review.truncatedLayers": "{count} layer",
@@ -48,7 +48,7 @@
   "studio.toolsCompanion.review.brushColor": "kulay ng brush",
   "studio.toolsCompanion.review.brushColorAria": "kulay ng remote na brush",
   "studio.toolsCompanion.review.brushLabel": "brush",
-  "studio.toolsCompanion.review.brushOpacity": "Opacity {opacity}%",
+  "studio.toolsCompanion.review.brushOpacity": "Opacity {opacity} %",
   "studio.toolsCompanion.review.brushOpacityAria": "malayuang brush opacity",
   "studio.toolsCompanion.review.brushRemoteTitle": "remote na kontrol ng brush",
   "studio.toolsCompanion.review.brushSelectAria": "malayong brush",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Screen ng sanggunian",
   "studio.toolsCompanion.referenceLoading": "Nilo-load ang reference tool...",
   "studio.toolsCompanion.footer": "Ang default na tab lang ang pagmamay-ari ng mga dokumento sa pag-edit. Ang window na ito ay nagpapadala lamang ng naka-compress na preview at inspeksyon/reference na layunin sa BroadcastChannel ng parehong browser, kaya walang hiwalay na gastos sa server.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Hindi konektado sa pangunahing studio.",
+  "studio.toolsCompanion.exit.editor": "Buksan ang editor ng Studio"
 }

@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "ລະບົບສຸຂະພາບ",
+  "admin.stats.healthy": "ສຸຂະພາບແຂງແຮງ",
+  "admin.stats.degraded": "ຖືກຫຼຸດລົງ",
+  "admin.stats.revenueEvents": "ການຈັດການທັງຫມົດ / ການຈັດການ",
+  "admin.stats.usersCommunity": "ສະມາຊິກທັງຫມົດ / ຕໍາແຫນ່ງ",
+  "admin.stats.maintenance": "ວິທີການຮັກສາ",
+  "admin.stats.maintenanceOn": "ການຮັກສາສຸກເສີນ (ON)",
+  "admin.stats.maintenanceOff": "ການປະຕິບັດງານປົກກະຕິ (OFF)",
+  "admin.stats.activeVisitors": "ຜູ້ມາຢ້ຽມຢາມທີ່ເຄື່ອນໄຫວ 5 ນາທີ",
+  "admin.stats.views5m": "5 ນາທີ ເບິ່ງຫນ້າ"
 }

@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Լեռնափոխադրում",
+  "common.loading.short": "Լեռնափոխադրում",
   "common.close": "Փակել",
   "common.open": "Բացել",
   "common.search": "Փնտրել",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Փորձեք նորից",
+  "common.retry.short": "Փորձեք նորից",
+  "common.backToTop": "Վերադարձ դեպի վերեւ",
+  "common.backToHome": "Գնացեք տուն:",
+  "common.loading.search": "Փնտրելով...",
+  "common.notFoundWithQuery": "\" {query} \" հետազոտության արդյունքներ չկան:",
+  "common.openSearch": "Գտեք այն որոնման միջոցով",
+  "common.loading.empty": "Ոչ մի տվյալ չի վերադարձվել:",
+  "common.retry.all": "Կրկին փորձեք կամ գնացեք տուն:"
 }

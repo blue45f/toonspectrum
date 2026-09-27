@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Nosec",
+  "common.loading.short": "Nosec",
   "common.close": "Zapri",
   "common.open": "Odpri",
   "common.search": "Išči",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Ponovno poskusite.",
+  "common.retry.short": "Ponovno poskusite.",
+  "common.backToTop": "Vrnite se gor.",
+  "common.backToHome": "Pojdi domov.",
+  "common.loading.search": "Iščem...",
+  "common.notFoundWithQuery": "Ni rezultatov za zdravilo ' {query} '.",
+  "common.openSearch": "Poiščite ga v iskanju",
+  "common.loading.empty": "Ni se vrnilo podatkov.",
+  "common.retry.all": "Poskusi še enkrat ali se vrni domov."
 }

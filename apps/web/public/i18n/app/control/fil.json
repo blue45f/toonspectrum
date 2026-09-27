@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "wika",
+  "control.sound.enable": "Pinapayagan ang mga epekto ng tunog",
+  "control.sound.disable": "I-deactivate ang mga sound effect",
+  "control.theme.dark": "I-switch sa mode ng liwanag",
+  "control.theme.light": "Mag- switch sa madilim na mode",
+  "control.settings.open": "Bukas na mga setting",
+  "control.settings.close": "Mga setting na malapit",
+  "control.cluster.settings": "Sound, tema, kontrol ng wika",
+  "control.cluster.open": "Bukas na mga setting",
+  "control.cluster.tooltip": "Mga setting ng tunog, tema, at wika",
+  "control.language.group.translated": "Mga pagsasalin na may mataas na coverage",
+  "control.language.group.englishBase": "Automatikong pagsasalin · English fallback"
 }

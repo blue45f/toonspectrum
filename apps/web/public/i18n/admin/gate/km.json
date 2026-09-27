@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "ការ ចូល ទាក់ទង ត្រូវ តម្រូវ",
+  "admin.gate.guestBody": "console Admin ត្រូវការ ការ បញ្ជាក់ អត្តសញ្ញាណ សូម ចូល ជា មួយ",
+  "admin.gate.forbiddenTitle": "ការអនុញ្ញាត Admin ត្រូវការ",
+  "admin.gate.forbiddenBody": "គណនីនេះគ្មានអនុញ្ញាតគ្រប់គ្រង។ សូមទំនាក់ទំនងជាមួយអ្នកគ្រប់គ្រង ប្រសិនបើមានតម្រូវការ។",
+  "admin.gate.errorTitle": "មិនអាចបញ្ចូល console បានទេ"
 }

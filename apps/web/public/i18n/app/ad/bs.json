@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Sponsorirana slika",
+  "ad.slotAriaLabel": "Reklamni slot",
+  "ad.slotLabel": "Sponsoriše",
+  "ad.slotTitle": "Sponsoran sadržaj",
+  "ad.ctaDetails": "Pogledajte detalje",
+  "ad.placeholderAriaLabel": "Plaćanje oglasa",
+  "ad.placeholderText": "Nema sponzorisanog sadržaja.",
+  "ad.tag": "Reklama"
 }

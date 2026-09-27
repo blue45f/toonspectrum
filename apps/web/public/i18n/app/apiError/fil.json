@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Kinakailangan ang pag-login.",
+  "apiError.adminRequired": "Ang mga pahintulot ng admin ay hindi maaaring suriin.",
+  "apiError.adminOnlyPage": "Ang pahinang ito ay limitado sa mga administrador.",
+  "apiError.notFound": "Hindi natagpuan ang hinihiling item.",
+  "apiError.unsupportedType": "Hindi suportadong uri ng nilalaman.",
+  "apiError.inactiveAccount": "Hindi maaaring gumamit ng mga tampok ng administrador ang mga hindi aktibong account.",
+  "apiError.settlementFailed": "Ang pagproseso ng pagbabayad ay nabigo."
 }

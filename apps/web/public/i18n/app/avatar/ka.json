@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "არარსებობის ტიპის სურათი.",
+  "avatar.error.processFailed": "ნვ ჟოპვქჳ ეა ოპვჟრთმ ჟრჟრჲ.",
+  "avatar.processing": "ოპვრთრთვნა...",
+  "avatar.select": "სურათის შეცვლა",
+  "avatar.remove": "სურათი ამოიღეთ",
+  "avatar.uploadHint": "მხოლოდ JPG, PNG და WEBP სურათები მხარდაჭერულია, შემდეგ გადაჭრილი წინასწარი ნახვა.",
+  "avatar.changeAria": "შეცვალეთ პროფილის სურათი"
 }

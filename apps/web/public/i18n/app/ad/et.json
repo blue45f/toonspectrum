@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Sponsoritud pilt",
+  "ad.slotAriaLabel": "Reklamitööaeg",
+  "ad.slotLabel": "Sponsoritud",
+  "ad.slotTitle": "Sponsoritud sisu",
+  "ad.ctaDetails": "Vaata üksikasju",
+  "ad.placeholderAriaLabel": "Reklamide kohtus",
+  "ad.placeholderText": "Sponsoritavat sisu pole olemas.",
+  "ad.tag": "Üldtöö"
 }

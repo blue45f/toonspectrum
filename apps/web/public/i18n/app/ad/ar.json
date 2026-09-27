@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "صورة برعاية",
+  "ad.slotAriaLabel": "مساحة الإعلانات",
+  "ad.slotLabel": "الرعاية",
+  "ad.slotTitle": "المحتوى الرعاسي",
+  "ad.ctaDetails": "عرض تفاصيل",
+  "ad.placeholderAriaLabel": "مكان الإعلان",
+  "ad.placeholderText": "لا توجد محتوى برعاية متاح.",
+  "ad.tag": "الإعلان"
 }

@@ -4,7 +4,7 @@
   "studio.canvas.background": "fon rangi",
   "studio.canvas.backgroundPresetAria": "Fon {label}",
   "studio.canvas.gradient": "gradient fon",
-  "studio.canvas.gradientPresetAria": "Gradient {label}",
+  "studio.canvas.gradientPresetAria": "{label}",
   "studio.canvas.openBackgroundEditor": "Fon muharriri/Resizer-ni oching",
   "studio.canvas.height": "balandligi",
   "studio.canvas.heightDecrease": "{amount}px balandligini kamaytiring",

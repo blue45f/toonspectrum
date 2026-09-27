@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "লগইন কৰিব লাগে",
+  "admin.gate.guestBody": "প্ৰশাসনিক কনচ'লৰ বাবে প্ৰমাণীকৰণৰ প্ৰয়োজন। অনুগ্ৰহ কৰি লগ ইন কৰক।",
+  "admin.gate.forbiddenTitle": "প্ৰশাসকৰ অনুমতিৰ প্ৰয়োজন",
+  "admin.gate.forbiddenBody": "এই একাউন্টটোত প্ৰশাসকৰ অনুমতি নাই। প্ৰয়োজন হ'লে কোনো অপাৰেটৰৰ সৈতে যোগাযোগ কৰক।",
+  "admin.gate.errorTitle": "কনচ'ল লোড কৰিব নোৱাৰিলে"
 }

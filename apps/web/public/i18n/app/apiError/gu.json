@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "લૉગિન જરૂરી છે.",
+  "apiError.adminRequired": "એડમિન પરવાનગીઓ ચકાસી શકાઈ ન હતી.",
+  "apiError.adminOnlyPage": "આ પાનું એડમિનિસ્ટ્રેટર્સ સુધી મર્યાદિત છે.",
+  "apiError.notFound": "વિનંતી કરેલી વસ્તુ મળી શકી નથી.",
+  "apiError.unsupportedType": "અસમર્થિત સામગ્રી પ્રકાર.",
+  "apiError.inactiveAccount": "નિષ્ક્રિય એકાઉન્ટ્સ એડમિનિસ્ટ્રેટર સુવિધાઓનો ઉપયોગ કરી શકતા નથી.",
+  "apiError.settlementFailed": "સમાધાન પ્રક્રિયા નિષ્ફળ ગઈ."
 }

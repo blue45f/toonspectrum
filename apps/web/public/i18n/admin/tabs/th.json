@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "ประกาศและธง",
+  "admin.tabs.audit": "รายงานการตรวจสอบ",
+  "admin.tabs.campaigns": "การ แข่งขัน",
+  "admin.tabs.creatorSupport": "การสนับสนุน ผู้ สร้าง",
+  "admin.tabs.dashboard": "แดชบอร์ด",
+  "admin.tabs.ops": "การดําเนินงาน",
+  "admin.tabs.plans": "แผน",
+  "admin.tabs.promos": "การส่งเสริม",
+  "admin.tabs.reports": "รายงาน & การปรับระดับ",
+  "admin.tabs.revenue": "การประสาน",
+  "admin.tabs.security": "ความปลอดภัย & IP",
+  "admin.tabs.inquiries": "การสอบถามทางธุรกิจ",
+  "admin.tabs.supporters": "การสนับสนุนค่าใช้จ่ายในการดําเนินงาน",
+  "admin.tabs.traffic": "การจราจรสด"
 }

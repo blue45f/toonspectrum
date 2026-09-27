@@ -4,7 +4,7 @@
   "studio.canvas.background": "barva ozadja",
   "studio.canvas.backgroundPresetAria": "Ozadje {label}",
   "studio.canvas.gradient": "gradientno ozadje",
-  "studio.canvas.gradientPresetAria": "Gradient {label}",
+  "studio.canvas.gradientPresetAria": "Stopnja {label}",
   "studio.canvas.openBackgroundEditor": "Odprite Urejevalnik/Sprememba velikosti ozadja",
   "studio.canvas.height": "višina",
   "studio.canvas.heightDecrease": "Zmanjšaj višino {amount}px",

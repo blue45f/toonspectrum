@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "မူပိုင်ခွင့် & အကြောင်းအရာ အသိပေးချက်",
+  "copyright.section1.title": "အကြောင်းအရာ အရင်းအမြစ်များနှင့် မူဝါဒများ",
+  "copyright.section1.body": "ToonSpectrum သည် webtoon/webnovel platform များမှ အများပြည်သူစာရင်းစာရင်း metadata (ခေါင်းစဉ်၊ စာရေးဆရာများ၊ အမျိုးအစားများ စသည်တို့ကို) ကိုစုစည်းသော index နှင့် discover platform တစ်ခုဖြစ်သည်။ ၎င်းသည် အဓိကအခန်းအပြည့်အဝကိုမလည်ပတ်၊ ပြန်လည်ဖြန့်ဝေခြင်းမရှိဘဲ၊ ဖတ်ရှုမှုကို တရားဝင်လင့်ခ်များမှတစ်ဆင့်သာ ဦးတည်သည်။",
+  "copyright.section2.title": "မျက်နှာဖုံးပုံများ",
+  "copyright.section2.body": "Cover ပုံတွေဟာ thumbnails တွေကို ဖော်ထုတ်ဖို့နဲ့ မူရင်းပလက်ဖောင်း Cover တွေကို reference လုပ်ဖို့ ဖြစ်နိုင်သမျှ source link တွေနဲ့ အသုံးပြုနိုင်ပါတယ်။ မူပိုင်ခွင့်ရှင်ရဲ့ တောင်းဆိုချက် (သို့) မူဝါဒကို update လုပ်တဲ့အခါမှာ display တွေကို ချက်ချင်း ပိတ်နိုင်ပါတယ်။",
+  "copyright.section3.title": "မက်ထရစ်များ & ပွင့်လင်းမြင်သာမှု",
+  "copyright.section4.title": "အခွင့်အရေး အသိပေးချက်",
+  "copyright.section5.title": "မူပိုင်ခွင့် ချိုးဖောက်မှု အသိပေးချက် & ထုတ်ပယ်ခြင်း",
+  "copyright.section5.body": "metadata သို့မဟုတ် cover တွေက သင့်အခွင့်အရေးတွေကို ချိုးဖောက်တယ်လို့ သင်ယုံကြည်ရင် ခေါင်းစဉ်၊ URL နဲ့ ပိုင်ဆိုင်မှု သက်သေခံနဲ့ မေးမြန်းမှုတစ်ခု တင်ပြပါ။",
+  "copyright.leaveInquiry": "မေးမြန်းမှုတင်သွင်းပါ"
 }

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Απαιτείται σύνδεση.",
+  "apiError.adminRequired": "Οι άδειες διαχειριστής δεν μπορούσαν να επαληθευτούν.",
+  "apiError.adminOnlyPage": "Αυτή η σελίδα περιορίζεται στους διαχειριστές.",
+  "apiError.notFound": "Το αιτούμενο στοιχείο δεν βρέθηκε.",
+  "apiError.unsupportedType": "Τύπος περιεχομένου που δεν υποστηρίζεται.",
+  "apiError.inactiveAccount": "Οι αδρανείς λογαριασμοί δεν μπορούν να χρησιμοποιήσουν λειτουργίες διαχειριστή.",
+  "apiError.settlementFailed": "Η διαδικασία διακανονισμού απέτυχε."
 }

@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Iragarkiak eta pankartak",
+  "admin.tabs.audit": "Audituen egunerokoa",
+  "admin.tabs.campaigns": "Kanpainak",
+  "admin.tabs.creatorSupport": "Sortzailearen laguntza",
+  "admin.tabs.dashboard": "Kontrol-taula",
+  "admin.tabs.ops": "Operazioak",
+  "admin.tabs.plans": "Planak",
+  "admin.tabs.promos": "Goraipenak",
+  "admin.tabs.reports": "Txostenak eta neurrizkoak",
+  "admin.tabs.revenue": "Konponketa",
+  "admin.tabs.security": "Segurtasuna eta IPa",
+  "admin.tabs.inquiries": "Negozio-azterketak",
+  "admin.tabs.supporters": "Operazio-kostuen laguntza",
+  "admin.tabs.traffic": "Trafiko zuzena"
 }

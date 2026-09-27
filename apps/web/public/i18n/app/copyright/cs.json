@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Autorská práva a obsah",
+  "copyright.section1.title": "Zdroje obsahu a zásady",
+  "copyright.section1.body": "ToonSpectrum je indexová a objevová platforma, která shrnuje metadat veřejného katalogu (tituly, autory, žánry atd.) z webtoonových platforem.",
+  "copyright.section2.title": "Obrázky na obálce",
+  "copyright.section2.body": "Obrázek na obálce slouží jako identifikační miniatury a referenční originální obálky platformy s zdrojovými odkazy, kdykoli je to možné. Displeje mohou být okamžitě deaktivovány na žádost nositele práv nebo aktualizace politiky.",
+  "copyright.section3.title": "Metriky a transparentnost",
+  "copyright.section4.title": "Oznámení o právech",
+  "copyright.section5.title": "Oznámení o porušení autorských práv a jejich odstranění",
+  "copyright.section5.body": "Pokud se domníváte, že metadata nebo obálky porušují vaše práva, podávejte prosím dotaz s názvem, adresou URL a dokladem vlastnictví.",
+  "copyright.leaveInquiry": "Podávejte dotazy →"
 }

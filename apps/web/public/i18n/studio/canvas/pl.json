@@ -4,7 +4,7 @@
   "studio.canvas.background": "kolor tła",
   "studio.canvas.backgroundPresetAria": "Tło {label}",
   "studio.canvas.gradient": "tło gradientowe",
-  "studio.canvas.gradientPresetAria": "Gradient {label}",
+  "studio.canvas.gradientPresetAria": "GRADYENT {label}",
   "studio.canvas.openBackgroundEditor": "Otwórz Edytor tła/Zmień rozmiar",
   "studio.canvas.height": "wysokość",
   "studio.canvas.heightDecrease": "Zmniejsz wysokość {amount}px",

@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "アドミンの監査日記",
+  "admin.audit.desc": "すべての管理行動,許可変更,設定変更を追跡する.",
+  "admin.audit.searchPlaceholder": "検索 (メール/アクション)...",
+  "admin.audit.loading": "監査記録を載せ...",
+  "admin.audit.empty": "監査記録はない",
+  "admin.audit.viewDetails": "ビュー",
+  "admin.audit.modalTitle": "監査記録の詳細",
+  "admin.audit.close": "近く"
 }

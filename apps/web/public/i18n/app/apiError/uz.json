@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Kirish kerak.",
+  "apiError.adminRequired": "Administrator huquqlarini tekshirish mumkin emas.",
+  "apiError.adminOnlyPage": "Ushbu sahifa faqat boshqaruvchilar uchun.",
+  "apiError.notFound": "So'ragan mahsulot topilmadi.",
+  "apiError.unsupportedType": "Qo'llab-quvvatlanmagan tarkib turi.",
+  "apiError.inactiveAccount": "Faoliyatsiz hisobvaraqlarda boshqaruvchining xususiyatlaridan foydalanish mumkin emas.",
+  "apiError.settlementFailed": "Qarzlarni qayta ishlash muvaffaqiyatsiz tugadi."
 }

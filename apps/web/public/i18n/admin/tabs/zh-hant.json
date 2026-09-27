@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "廣告與旗",
+  "admin.tabs.audit": "監控日志",
+  "admin.tabs.campaigns": "活動",
+  "admin.tabs.creatorSupport": "創世主支持",
+  "admin.tabs.dashboard": "顯示板",
+  "admin.tabs.ops": "活動",
+  "admin.tabs.plans": "計畫",
+  "admin.tabs.promos": "活動",
+  "admin.tabs.reports": "報告與適度",
+  "admin.tabs.revenue": "解決問題",
+  "admin.tabs.security": "安全與 IP",
+  "admin.tabs.inquiries": "商務查詢",
+  "admin.tabs.supporters": "經營成本的支持",
+  "admin.tabs.traffic": "直接通行"
 }

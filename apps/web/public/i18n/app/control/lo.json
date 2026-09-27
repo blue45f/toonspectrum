@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ພາສາ",
+  "control.sound.enable": "ເປີດໃຫ້ມີຜົນກະທົບສຽງ",
+  "control.sound.disable": "ປິດຜົນສຽງ",
+  "control.theme.dark": "ປ່ຽນໄປສູ່ຮູບແບບໄຟ",
+  "control.theme.light": "ປ່ຽນໄປສູ່ໂຫມດມືດ",
+  "control.settings.open": "ການຕັ້ງຄ່າເປີດ",
+  "control.settings.close": "ການຕັ້ງຄ່າປິດ",
+  "control.cluster.settings": "ສຽງ, ຫົວຂໍ້, ການຄວບຄຸມພາສາ",
+  "control.cluster.open": "ການຕັ້ງຄ່າເປີດ",
+  "control.cluster.tooltip": "ສຽງ, ຫົວຂໍ້, ແລະ ການຕັ້ງຄ່າພາສາ",
+  "control.language.group.translated": "ການແປພາສາທີ່ມີການໂຄສະນາສູງ",
+  "control.language.group.englishBase": "ແປພາສາອັດຕະໂນມັດ · ພາສາອັງກິດ fallback"
 }

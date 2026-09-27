@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "Recarregant la versió més recent...",
+  "error.chunkRetryFailed": "Una vegada actualitzat, però el problema persisteix.",
+  "error.reloadButton": "Torna a carregar la pàgina",
+  "error.goHome": "Torna a casa.",
+  "error.retryDesc": "Si us plau, torna a intentar-ho o torna a la pàgina inicial."
 }

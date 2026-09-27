@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "പേജ് കണ്ടെത്തിയില്ല",
+  "page.notFound.message": "URL വീണ്ടും പരിശോധിക്കുകയോ ഹോം പേജിൽ നിന്ന് ശീർഷകങ്ങൾ പരിശോധിക്കുകയോ ചെയ്യുക.",
+  "page.notFound.home": "വീട്ടിലേക്കു മടങ്ങുക."
 }

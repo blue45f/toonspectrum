@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "ត្រូវ ចូល ក្នុង គេហទំព័រ។",
+  "apiError.adminRequired": "ការអនុញ្ញាត Admin មិនអាចបញ្ជាក់បាន។",
+  "apiError.adminOnlyPage": "ទំព័រនេះត្រូវបានកំណត់សម្រាប់អ្នកគ្រប់គ្រង។",
+  "apiError.notFound": "ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណែក ចំណ",
+  "apiError.unsupportedType": "ប្រភេទអតិថិជនដែលមិនគាំទ្រ",
+  "apiError.inactiveAccount": "គណនី មិន សកម្ម មិន អាច ប្រើ ប្រាស់ មុខងារ អ្នក គ្រប់គ្រង បាន ទេ។",
+  "apiError.settlementFailed": "ការចាត់ការការលំអិតបានលេចធ្លោ។"
 }

@@ -8,5 +8,7 @@
   "control.cluster.settings": "声音、主题、语言控制",
   "control.cluster.tooltip": "声音、主题和语言设置",
   "control.sound.enable": "启用音效",
-  "control.sound.disable": "禁用音效"
+  "control.sound.disable": "禁用音效",
+  "control.language.group.translated": "广播量高的翻译",
+  "control.language.group.englishBase": "自动翻译 · 英语翻译"
 }

@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Completate",
+  "review.progress.binge": "Binge",
+  "review.progress.upcoming": "Planificate",
+  "review.progress.abandoned": "- A scăpat.",
+  "review.progress.unknown": "Progresul ascuns",
+  "review.spoilerRevealLabel": "Arată spoiler"
 }

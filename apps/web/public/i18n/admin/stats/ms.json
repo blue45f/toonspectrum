@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Sistem Kesihatan",
+  "admin.stats.healthy": "Sehat",
+  "admin.stats.degraded": "Dipendekkan",
+  "admin.stats.revenueEvents": "Jumlah transaksi / penyelesaian",
+  "admin.stats.usersCommunity": "Jumlah Ahli / Pos",
+  "admin.stats.maintenance": "Kaedah penyelenggaraan",
+  "admin.stats.maintenanceOn": "Pengurusan kecemasan (ON)",
+  "admin.stats.maintenanceOff": "Operasi Normal (OFF)",
+  "admin.stats.activeVisitors": "Pengunjung aktif 5 minit",
+  "admin.stats.views5m": "5 minit pandangan halaman"
 }

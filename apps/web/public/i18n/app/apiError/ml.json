@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "ലോഗിൻ ചെയ്യണം.",
+  "apiError.adminRequired": "അഡ്മിൻ അനുമതികൾ പരിശോധിക്കാനായില്ല.",
+  "apiError.adminOnlyPage": "ഈ പേജ് അഡ്മിനിസ്ട്രേറ്റർമാർക്കായി പരിമിതപ്പെടുത്തിയിരിക്കുന്നു.",
+  "apiError.notFound": "ആവശ്യപ്പെട്ട സാധനം കണ്ടെത്താനായില്ല.",
+  "apiError.unsupportedType": "പിന്തുണയ്ക്കാത്ത ഉള്ളടക്ക തരം.",
+  "apiError.inactiveAccount": "സജീവമല്ലാത്ത അക്കൌണ്ടുകൾക്ക് അഡ്മിനിസ്ട്രേറ്റർ സവിശേഷതകൾ ഉപയോഗിക്കാൻ കഴിയില്ല.",
+  "apiError.settlementFailed": "സെറ്റിൽമെന്റ് പ്രോസസ്സിംഗ് പരാജയപ്പെട്ടു."
 }

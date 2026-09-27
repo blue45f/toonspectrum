@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "အပြန်အလှန်လေ့လာမှုကို မတင်နိုင်ခဲ့ဘူး။",
+  "feedback.thankYou": "သင့်ရဲ့ တန်ဖိုးရှိတဲ့ ပြန်ကြားချက်အတွက် ကျေးဇူးတင်ပါတယ်။",
+  "feedback.anonymousNote": "သင့်ရဲ့ တုံ့ပြန်ချက်တွေဟာ အမည်မဲ့အဖြစ် ထိန်းသိမ်းထားတယ်။",
+  "feedback.notAtAll": "လုံးဝမဟုတ်ဘူး။",
+  "feedback.definitely": "သေချာပေါက်"
 }

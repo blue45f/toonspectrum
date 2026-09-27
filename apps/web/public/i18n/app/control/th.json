@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ภาษา",
+  "control.sound.enable": "อนุญาตให้มีประสิทธิภาพเสียง",
+  "control.sound.disable": "ปิดประสิทธิภาพเสียง",
+  "control.theme.dark": "เปลี่ยนไปสู่โหมดแสง",
+  "control.theme.light": "เปลี่ยนไปสู่โหมดที่มืด",
+  "control.settings.open": "เปิดการตั้งค่า",
+  "control.settings.close": "การตั้งค่าปิด",
+  "control.cluster.settings": "เสียง, ธีม, การควบคุมภาษา",
+  "control.cluster.open": "เปิดการตั้งค่า",
+  "control.cluster.tooltip": "การ ปรับ ภาพ เสียง ธีม และ ภาษา",
+  "control.language.group.translated": "รับแปลที่มีการแพร่ระดับสูง",
+  "control.language.group.englishBase": "รับแปลอัตโนมัติ · อังกฤษ fallback"
 }

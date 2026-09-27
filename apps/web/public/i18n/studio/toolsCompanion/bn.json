@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "স্তর {count}",
   "studio.toolsCompanion.review.section.comments": "মন্তব্য {count}",
   "studio.toolsCompanion.review.section.history": "রেকর্ড {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE পৃষ্ঠা লেবেল}·{নির্বাচন লেবেল ZZ RBRACE",
   "studio.toolsCompanion.review.title": "পরিদর্শন কনসোল",
   "studio.toolsCompanion.review.truncatedComments": "এবং {count} মন্তব্য",
   "studio.toolsCompanion.review.truncatedLayers": "{count} স্তর",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "রেফারেন্স স্ক্রীন",
   "studio.toolsCompanion.referenceLoading": "রেফারেন্স টুল লোড হচ্ছে...",
   "studio.toolsCompanion.footer": "নথি সম্পাদনা করুন শুধুমাত্র ডিফল্ট ট্যাবের মালিক। এই উইন্ডোটি একই ব্রাউজারের ব্রডকাস্টচ্যানেলে শুধুমাত্র সংকুচিত পূর্বরূপ এবং পরিদর্শন/রেফারেন্স প্রেরণ করে, তাই আলাদা সার্ভার খরচ নেই।",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "মূল স্টুডিওর সাথে সংযুক্ত নয়।",
+  "studio.toolsCompanion.exit.editor": "স্টুডিও সম্পাদক খুলুন"
 }

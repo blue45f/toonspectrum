@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "รูปที่ได้รับการสนับสนุน",
+  "ad.slotAriaLabel": "สล็อตโฆษณา",
+  "ad.slotLabel": "สปอนเซอร์",
+  "ad.slotTitle": "เนื้อหาที่ได้รับการสนับสนุน",
+  "ad.ctaDetails": "ดูรายละเอียด",
+  "ad.placeholderAriaLabel": "จัดที่ประกาศ",
+  "ad.placeholderText": "ไม่มีเนื้อหาที่ได้รับการสนับสนุน",
+  "ad.tag": "ประกาศ"
 }

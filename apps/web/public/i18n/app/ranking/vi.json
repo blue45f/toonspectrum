@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Xem phân chia điểm",
+  "ranking.metric.views": "Quan điểm",
+  "ranking.why": "Tại sao?",
+  "ranking.breakdownTitle": "Phân tích điểm",
+  "ranking.totalScore": "Điểm số tổng cộng",
+  "ranking.breakdownDescription": "Được tính toán bằng trọng lượng trục và bình thường hóa cụ thể về tiêu đề."
 }

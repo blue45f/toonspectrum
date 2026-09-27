@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Registrele de audit al administratorului",
+  "admin.audit.desc": "Urmariti toate actiunile administrative, modificarile de permise si modificarile de configurare.",
+  "admin.audit.searchPlaceholder": "Căutare (email/acţiune)...",
+  "admin.audit.loading": "Încărcarea jurnalului de audit...",
+  "admin.audit.empty": "Nu au fost înregistrate înregistrările de audit.",
+  "admin.audit.viewDetails": "Privirea",
+  "admin.audit.modalTitle": "Detalii din jurnalul auditului",
+  "admin.audit.close": "Închiderea"
 }

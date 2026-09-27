@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Завантаження",
+  "common.loading.short": "Завантаження",
   "common.close": "Закрити",
   "common.open": "Відкрити",
   "common.search": "Пошук",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Попробуйте знову",
+  "common.retry.short": "Попробуйте знову",
+  "common.backToTop": "Поверніться до вершини.",
+  "common.backToHome": "Поїжджайте додому.",
+  "common.loading.search": "Шукаю...",
+  "common.notFoundWithQuery": "Ніяких результатів на \" {query} \".",
+  "common.openSearch": "Знайдіть його в пошуку →",
+  "common.loading.empty": "Ніяких даних не повернулося.",
+  "common.retry.all": "Попробуй ще раз або поверніться додому."
 }

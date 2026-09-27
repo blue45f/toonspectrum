@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Egészségügyi rendszer",
+  "admin.stats.healthy": "Egészséges",
+  "admin.stats.degraded": "Átlátszott",
+  "admin.stats.revenueEvents": "Összes tranzakciók / rendezések",
+  "admin.stats.usersCommunity": "Összes tagok / pozíciók",
+  "admin.stats.maintenance": "Karbantartási mód",
+  "admin.stats.maintenanceOn": "Vészhelyzeti karbantartás (ON)",
+  "admin.stats.maintenanceOff": "Általános üzemeltetés (kiállás)",
+  "admin.stats.activeVisitors": "5 perces aktív látogatók",
+  "admin.stats.views5m": "5 perces oldalnézet"
 }

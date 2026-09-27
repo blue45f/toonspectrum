@@ -60,7 +60,7 @@
   "studio.assetMenu.publishDialog.attributionPlaceholder": "Эгер бош калтырылса, аккаунттун аты колдонулат",
   "studio.assetMenu.publishDialog.close": "Бөлүшүү жөндөөлөрүн жабуу",
   "studio.assetMenu.publishDialog.containsAi": "Генеративдик AI тарабынан түзүлгөн сүрөттөрдү же элементтерди камтыйт.",
-  "studio.assetMenu.publishDialog.descriptionLabel": "Description",
+  "studio.assetMenu.publishDialog.descriptionLabel": "Түшүндүрүү",
   "studio.assetMenu.publishDialog.descriptionPlaceholder": "Колдонуу үчүн мыкты көрүнүштөр, түзөтүү кеңештери жана камтыла турган элементтер",
   "studio.assetMenu.publishDialog.licenseCommercialUse": "Коммерциялык колдонуу үчүн жеткиликтүү",
   "studio.assetMenu.publishDialog.licenseLabel": "лицензия",

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "ການເຂົ້າສູ່ລະບົບແມ່ນ ຈໍາ ເປັນ.",
+  "apiError.adminRequired": "ການອະນຸຍາດຜູ້ບໍລິຫານບໍ່ສາມາດກວດສອບໄດ້.",
+  "apiError.adminOnlyPage": "ຫນ້າ ນີ້ຖືກ ຈໍາ ກັດ ສໍາ ລັບຜູ້ບໍລິຫານ.",
+  "apiError.notFound": "ລາຍການທີ່ຕ້ອງການບໍ່ໄດ້ພົບເຫັນ.",
+  "apiError.unsupportedType": "ປະເພດເນື້ອຫາທີ່ບໍ່ໄດ້ຮັບການສະ ຫນັບ ສະ ຫນູນ",
+  "apiError.inactiveAccount": "ບັນຊີທີ່ບໍ່ເຄື່ອນໄຫວບໍ່ສາມາດໃຊ້ຄຸນລັກສະນະຜູ້ບໍລິຫານໄດ້.",
+  "apiError.settlementFailed": "ການຈັດການຈັດການຕົກລົງໄດ້ລົ້ມເຫຼວ."
 }

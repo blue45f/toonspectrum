@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Праваабарончыя і кантэнт Паведамленне",
+  "copyright.section1.title": "Крыніцы зместу і прынцыпы",
+  "copyright.section1.body": "ToonSpectrum з'яўляецца індэкс і платформа адкрыцця, якая рэзюмэ публічных метададзеных каталога (загалоўкі, аўтары, жанры і г.д.) з вэб-стужкі / вэб-ноўл платформы.",
+  "copyright.section2.title": "Карціны на вокладцы",
+  "copyright.section2.body": "Карціны абароны служаць для ідэнтыфікацыі міні-фільмаў і спасылкі на арыгінальныя платформы абароны з крынічнымі спасылкамі, калі гэта магчыма.",
+  "copyright.section3.title": "Метрыкі і празрыстасць",
+  "copyright.section4.title": "Паведамленне пра правы",
+  "copyright.section5.title": "Паведамленне аб парушэнні аўтарскіх правоў і выдаленне",
+  "copyright.section5.body": "Калі вы лічыце, што метададзеныя або кавер парушаюць вашыя правы, калі ласка, падаць запыт з назвай, URL і даведкай пра ўласнасць.",
+  "copyright.leaveInquiry": "Падкладце даследаванне →"
 }

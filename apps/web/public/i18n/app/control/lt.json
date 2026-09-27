@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Kalba",
+  "control.sound.enable": "Įgalinti garso efektus",
+  "control.sound.disable": "Išjungti garso efektyvus",
+  "control.theme.dark": "Į šviesos režimą pereikite",
+  "control.theme.light": "Pasikeisti į tamsią režimą",
+  "control.settings.open": "Atviraus nustatymus",
+  "control.settings.close": "Uždaros nustatymas",
+  "control.cluster.settings": "Garsys, tema, kalbos valdymo įtaisys",
+  "control.cluster.open": "Atviraus nustatymus",
+  "control.cluster.tooltip": "Garsčio, temos ir kalbos nustatymai",
+  "control.language.group.translated": "Aukštos apimties vertimas",
+  "control.language.group.englishBase": "Automatinis vertimas"
 }

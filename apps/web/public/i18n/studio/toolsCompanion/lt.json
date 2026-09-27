@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Sluoksnis {count}",
   "studio.toolsCompanion.review.section.comments": "Komentuoti {count}",
   "studio.toolsCompanion.review.section.history": "Įrašas {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE puslapisEtiketė}·{pasirinkimasEtiketė ZZ RBRACE",
   "studio.toolsCompanion.review.title": "apžiūros konsolė",
   "studio.toolsCompanion.review.truncatedComments": "ir {count} komentarai",
   "studio.toolsCompanion.review.truncatedLayers": "{count} sluoksnių",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Atskaitos ekranas",
   "studio.toolsCompanion.referenceLoading": "Įkeliamas nuorodos įrankis...",
   "studio.toolsCompanion.footer": "Redaguoti dokumentus priklauso tik numatytasis skirtukas. Šis langas į tos pačios naršyklės BroadcastChannel perduoda tik suglaudintą peržiūrą ir patikrinimo / nuorodos tikslą, todėl nėra atskirų serverio išlaidų.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Neprijungtas prie pagrindinės studijos.",
+  "studio.toolsCompanion.exit.editor": "Atidarykite \"Studio\" redaktorių"
 }

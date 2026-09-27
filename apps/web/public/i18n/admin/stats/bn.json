@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "স্বাস্থ্য ব্যবস্থা",
+  "admin.stats.healthy": "স্বাস্থ্যকর",
+  "admin.stats.degraded": "অবনমিত",
+  "admin.stats.revenueEvents": "মোট লেনদেন / পেমেন্ট",
+  "admin.stats.usersCommunity": "মোট সদস্য / পোস্ট",
+  "admin.stats.maintenance": "রক্ষণাবেক্ষণ মোড",
+  "admin.stats.maintenanceOn": "জরুরী রক্ষণাবেক্ষণ (ON)",
+  "admin.stats.maintenanceOff": "স্বাভাবিক অপারেশন (OFF)",
+  "admin.stats.activeVisitors": "৫ মিনিটের সক্রিয় দর্শনার্থী",
+  "admin.stats.views5m": "৫ মিনিটের পেজ ভিউ"
 }

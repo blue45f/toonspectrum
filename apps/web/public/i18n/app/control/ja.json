@@ -8,5 +8,7 @@
   "control.sound.disable": "効果音を無効にする",
   "control.sound.enable": "効果音を有効にする",
   "control.cluster.tooltip": "サウンド、テーマ、言語の設定",
-  "control.cluster.settings": "サウンド、テーマ、言語コントロール"
+  "control.cluster.settings": "サウンド、テーマ、言語コントロール",
+  "control.language.group.translated": "広範囲の翻訳",
+  "control.language.group.englishBase": "自動翻訳 · 英語のフォールバック"
 }

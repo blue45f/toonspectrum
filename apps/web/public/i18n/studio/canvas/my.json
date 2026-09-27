@@ -4,7 +4,7 @@
   "studio.canvas.background": "နောက်ခံအရောင်",
   "studio.canvas.backgroundPresetAria": "နောက်ခံ {label}",
   "studio.canvas.gradient": "gradient နောက်ခံ",
-  "studio.canvas.gradientPresetAria": "Gradient {label}",
+  "studio.canvas.gradientPresetAria": "အရောင်ပြောင်း {label}",
   "studio.canvas.openBackgroundEditor": "Background Editor/Resizer ကိုဖွင့်ပါ။",
   "studio.canvas.height": "အမြင့်",
   "studio.canvas.heightDecrease": "အမြင့် {amount}px လျှော့ပါ။",

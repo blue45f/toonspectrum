@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "ဝင်ရောက်ရန် လိုအပ်သည်",
+  "admin.gate.guestBody": "Admin Console မှာ စစ်ဆေးမှု လိုအပ်ပါတယ်။ ဝင်ရောက်ကြည့်ပါ။",
+  "admin.gate.forbiddenTitle": "Admin ခွင့်ပြုချက်လိုအပ်သည်",
+  "admin.gate.forbiddenBody": "ဤစာရင်းတွင် admin ခွင့်ပြုချက်မရှိပါ။ လိုအပ်ပါက operator ကိုဆက်သွယ်ပါ။",
+  "admin.gate.errorTitle": "Console ကို မသွင်းနိုင်ခဲ့"
 }

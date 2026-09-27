@@ -19,7 +19,7 @@
   "studio.toolsCompanion.error.invalidSurface": "වලංගු සහකාර දර්ශන මාදිලියක් නොමැත. කරුණාකර පෙරනිමි චිත්‍රාගාරයේ කවුළුව නැවත විවෘත කරන්න.",
   "studio.toolsCompanion.error.unsupportedBroadcast": "මෙම බ්‍රවුසරය BroadcastChannel සඳහා සහය නොදක්වයි.",
   "studio.toolsCompanion.mode.tools": "මෙවලම්",
-  "studio.toolsCompanion.mode.navigator": "Navigator",
+  "studio.toolsCompanion.mode.navigator": "නාවිකයා",
   "studio.toolsCompanion.mode.review": "පරීක්ෂා කිරීම",
   "studio.toolsCompanion.mode.reference": "යොමු කිරීම",
   "studio.toolsCompanion.review.current": "වර්තමාන",
@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ස්ථරය {count}",
   "studio.toolsCompanion.review.section.comments": "අදහස {count}",
   "studio.toolsCompanion.review.section.history": "වාර්තා {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE පිටුවලේබලය}·{තේරීමලේබලය ZZ RBRACE",
   "studio.toolsCompanion.review.title": "පරීක්ෂණ කොන්සෝලය",
   "studio.toolsCompanion.review.truncatedComments": "සහ {count} අදහස්",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ස්ථර",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "යොමු තිරය",
   "studio.toolsCompanion.referenceLoading": "යොමු මෙවලම පූරණය කරමින්...",
   "studio.toolsCompanion.footer": "සංස්කරණ ලේඛනවලට හිමි වන්නේ පෙරනිමි ටැබය පමණි. මෙම කවුළුව එකම බ්‍රවුසරයේ BroadcastChannel වෙත සම්පීඩිත පෙරදසුන සහ පරීක්‍ෂණ/යොමු අභිප්‍රාය පමණක් සම්ප්‍රේෂණය කරයි, එබැවින් වෙනම සේවාදායක පිරිවැයක් නොමැත.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "ප් රධාන ස්ටුඩියෝ එකට සම්බන්ධ වෙලා නෑ.",
+  "studio.toolsCompanion.exit.editor": "ස්ටූඩියෝ සංස්කාරකය විවෘත කරන්න"
 }

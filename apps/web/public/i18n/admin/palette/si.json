@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "ඉක්මන් සෙවීම සහ අණ...",
+  "admin.palette.placeholder": "සෙවුම් පරිපාලක විධානයන් (සන්නිවේදනය, CSV අපනයනය, නඩත්තු)...",
+  "admin.palette.empty": "ප් රතිඵලයක් හොයාගන්න බැරිවුණා.",
+  "admin.palette.groupNav": "කොන්සෝලයේ නාවික කෙටිමං",
+  "admin.palette.groupQuick": "ඉක්මන් ක් රියාකාරකම් සහ අපනයන",
+  "admin.palette.exportUsers": "සියලුම සාමාජිකයින් CSV නිෂ්පාදනය කිරීම",
+  "admin.palette.exportRevenue": "අපනයන ආදායම් ලේඛන CSV",
+  "admin.palette.maintenance": "පාලන පද්ධතිය හදිසි නඩත්තු"
 }

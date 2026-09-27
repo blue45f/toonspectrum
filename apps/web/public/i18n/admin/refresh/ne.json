@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
-  "admin.refresh.seconds": "{sec}s"
+  "admin.refresh.now": "अहिले ताजा हुनुहोस्",
+  "admin.refresh.auto": "स्वचालित:",
+  "admin.refresh.seconds": "{sec} s"
 }

@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonSpectrum is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "பதிப்புரிமை & உள்ளடக்க அறிவிப்பு",
+  "copyright.section1.title": "உள்ளடக்க ஆதாரங்கள் மற்றும் கொள்கைகள்",
+  "copyright.section1.body": "ToonSpectrum என்பது ஒரு குறியீடு மற்றும் கண்டுபிடிப்பு தளமாகும், இது வலைப்பதிவு / வலைப்பதிவு தளங்களில் இருந்து பொதுவான பட்டியல் மெட்டாடேட்டாக்களை (தலைப்புகள், ஆசிரியர்கள், வகைகள் போன்றவை) சுருக்கமாகக் கூறுகிறது. இது முக்கிய அத்தியாய உள்ளடக்கத்தை ஹோஸ்ட் செய்யவோ அல்லது மறுபகிர்வு செய்யவோ இல்லை; வாசிப்பு அதிகாரப்பூர்வ இணைப்புகள் மூலம் மட்டுமே இயக்கப்படுகிறது.",
+  "copyright.section2.title": "முகப்பு படங்கள்",
+  "copyright.section2.body": "முகப்பு படங்கள் சிறு உருவங்களை அடையாளம் காட்டும் மற்றும் ஆதார இணைப்புகளுடன் மூல தள முகப்புகளை குறிக்கும். உரிமைகள் வைத்திருப்பவர் கோரிக்கை அல்லது கொள்கை புதுப்பிப்புகளின் அடிப்படையில் காட்சிகளை உடனடியாக முடக்கலாம்.",
+  "copyright.section3.title": "மெட்ரிக்ஸ் & வெளிப்படைத்தன்மை",
+  "copyright.section4.title": "உரிமைகள் அறிவிப்பு",
+  "copyright.section5.title": "பதிப்புரிமை மீறல் அறிவிப்பு & அகற்றுதல்",
+  "copyright.section5.body": "மெட்டாடேட்டாக்கள் அல்லது கவர்ஸ் உங்கள் உரிமைகளை மீறுவதாக நீங்கள் நம்பினால், தலைப்பு, URL மற்றும் உரிமையாளர் சான்றுகளுடன் ஒரு விசாரணையை சமர்ப்பிக்கவும்.",
+  "copyright.leaveInquiry": "விசாரணைகளை சமர்ப்பிக்கவும்"
 }
