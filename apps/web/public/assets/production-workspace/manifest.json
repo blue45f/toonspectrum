@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "createdAt": "2026-09-27",
+  "kind": "existing-repository-asset-derivative",
+  "newImageGeneration": false,
+  "source": "apps/web/public/assets/create/creator-board-hero.png",
+  "sourceSha256": "2ac5ecdc22990d11f63868f6ba5da8f01caa6fc9d96b54322d174eb9982c9317",
+  "file": "creator-workspace.webp",
+  "sha256": "a13c8aa1123eeec9c46255b70669b0e3ac4554f6a9177a7bcd07ab1e9fc80bd3",
+  "bytes": 80114,
+  "transform": {
+    "format": "webp",
+    "maxWidth": 1280,
+    "quality": 85
+  },
+  "modelProvenance": "원본 생성 모델은 이번 작업에서 검증하지 않았습니다. 새 이미지젠 2.5 생성 결과가 아닙니다."
+}

@@ -98,6 +98,16 @@ for (const width of [320, 390, 820, 1440]) {
       expect(actionBox?.height ?? 0).toBeGreaterThanOrEqual(44);
     }
 
+    // 지연 로드된 알림·인증 컨트롤이 나타나도 작은 화면의 헤더 액션이 잘리지 않아야 한다.
+    await page.getByRole("link", { name: "알림 센터", exact: true }).first().waitFor({ state: "visible" });
+    const header = page.locator('[data-site-chrome="header"]');
+    const headerActions = header.locator(':scope > div').first().locator('button:visible, a:visible');
+    for (const action of await headerActions.all()) {
+      const box = await action.boundingBox();
+      if (!box) continue;
+      expect(box.x, "헤더 액션이 왼쪽으로 넘치면 안 됩니다.").toBeGreaterThanOrEqual(-1);
+      expect(box.x + box.width, "헤더 액션이 오른쪽으로 넘치면 안 됩니다.").toBeLessThanOrEqual(width + 1);
+    }
     await capturePageEvidence(page, testInfo, `all-in-one-home-${width}`);
     expect(pageErrors).toEqual([]);
   });

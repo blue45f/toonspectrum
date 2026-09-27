@@ -11,6 +11,11 @@ export type MemberRole = (typeof MEMBER_ROLES)[number];
 export type MemberStatus = (typeof MEMBER_STATUSES)[number];
 export type MemberSort = (typeof MEMBER_SORTS)[number];
 
+/** 화면의 관리 동작 노출만 결정한다. 서버는 모든 변경 요청의 권한을 별도로 검증한다. */
+export function canManageAdminMembers(role: unknown): boolean {
+  return role === "admin";
+}
+
 export interface MemberListFilters {
   q: string;
   role: MemberRole | "all";

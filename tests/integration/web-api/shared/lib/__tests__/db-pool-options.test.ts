@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePgPoolOptions } from "../../../../../../apps/api/src/platform/database";
+import { resolvePgPoolOptions } from "../../../../../../apps/api/src/platform/database/pg-connection";
 
 // pg 풀 슬림화(Neon 비용 가드) 옵션 파서 — 유휴 연결을 빨리 닫아 Neon autosuspend 를 유도하는 설정.
 // (모듈 import 는 Pool 객체만 만들고 실제 연결은 하지 않는다 — 쿼리 전까지 lazy.)
@@ -11,6 +11,14 @@ describe("resolvePgPoolOptions", () => {
       idleTimeoutMillis: 10_000,
       connectionTimeoutMillis: 10_000,
       allowExitOnIdle: true,
+      query_timeout: 35_000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
+      maxLifetimeSeconds: 300,
+      application_name: "toonstudio-core-api",
+      statement_timeout: 30_000,
+      lock_timeout: 5_000,
+      idle_in_transaction_session_timeout: 15_000,
     });
   });
 

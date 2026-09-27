@@ -1,3 +1,6 @@
+import { validateProductionWorkflowMutation } from "@toonstudio/contracts/production-workflow";
+import { applyProductionWorkflowCommand } from "./production-workflow-command";
+
 import { isDeepStrictEqual } from "node:util";
 import { verifyProductionAutomationCommand } from "./production-automation-verification";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
@@ -198,6 +201,9 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
       return { type: "planning-snapshot", id: command.snapshot.id };
     case "upsert-commercial-record":
       return { type: `commercial-${command.record.kind}`, id: command.record.value.id };
+    case "configure-workflow": return { type: "workflow", id: command.profile.id };
+    case "instantiate-workflow": return { type: "workflow-instance", id: command.instanceId };
+    case "transition-task-batch": return { type: "task-transition-batch", id: command.transitions[0]?.taskId ?? "batch" };
     case "configure-collaboration":
       return { type: "collaboration", id: command.charter?.id ?? "collaboration-graph" };
     case "upsert-episode":
@@ -271,8 +277,9 @@ function eventTarget(command: ProductionCommand): { type: string; id: string } {
 function commandCapability(command: ProductionCommand): "comment" | "edit" | "manage" {
   if (command.type === "record-review-decision") return "comment";
   if (command.type === "transition-risk-response" && command.toStatus === "approved") return "manage";
-  if (command.type === "apply-automation-execution") return "manage";
+  if (command.type === "apply-automation-execution" || command.type === "configure-workflow") return "manage";
   if (command.type === "upsert-operations-record") {
+    if (command.record.kind === "saved-view" && command.record.value.shared && command.record.value.filters["board-kind"] === "workflow-board") return "manage";
     return [
       "resource-calendar",
       "external-review-access",
@@ -336,7 +343,7 @@ function applyEpisodeCommand(
       publicationPreflightPassed: episode.publicationPreflightPassed,
     });
   } else {
-    nextEpisode = Object.freeze({ ...episode, revision: current.revision + 1 });
+    nextEpisode = Object.freeze({ ...current, ...episode, revision: current.revision + 1 });
   }
   return { ...aggregate, episodes: upsertById(aggregate.episodes, nextEpisode) };
 }
@@ -1062,6 +1069,10 @@ function applyCommand(
         },
       };
     }
+    case "configure-workflow":
+    case "instantiate-workflow":
+    case "transition-task-batch":
+      return { aggregate: applyProductionWorkflowCommand(aggregate, command, at) };
     case "upsert-task": {
       assertProjectIdentity(aggregate, command.task);
       const task = normalizeTaskTiming(aggregate, command.task, at);
@@ -1074,6 +1085,9 @@ function applyCommand(
     }
     case "upsert-task-batch": {
       assertTaskBatchPreconditions(aggregate, command.tasks, command.expectedTasks);
+      const absentIds = command.expectedAbsentTaskIds ?? [];
+      if (new Set(absentIds).size !== absentIds.length || absentIds.some((id) => !command.tasks.some((task) => task.id === id))) throw new BadRequestException("새 작업 사전 조건이 올바르지 않습니다.");
+      if (absentIds.some((id) => aggregate.tasks.some((task) => task.id === id))) throw new ConflictException("같은 작업이 이미 저장되었습니다. 최신 작업을 확인하세요.");
       let tasks = aggregate.tasks;
       for (const task of command.tasks) {
         assertProjectIdentity(aggregate, task);
@@ -1089,6 +1103,7 @@ function applyCommand(
       };
     }
     case "upsert-episode-operations": {
+      if ((aggregate.workflowProfile || command.expectedWorkflowRevision !== undefined) && (aggregate.workflowProfile?.revision ?? 0) !== command.expectedWorkflowRevision) throw new ConflictException("제작 공정이 변경되었습니다. 최신 설정에서 일정을 다시 확인하세요.");
       if (!command.episode && !command.episodePlan && command.tasks.length === 0) {
         throw new BadRequestException("회차 운영 명령에 저장할 내용이 없습니다.");
       }
@@ -1126,7 +1141,7 @@ function applyCommand(
         derived: {
           episodeId: command.episodeId,
           taskCount: command.tasks.length,
-          releaseAt: command.tasks.find((task) => task.processKey === "publication")?.dueAt ?? null,
+          releaseAt: command.episode?.plannedReleaseAt ?? next.episodes.find((episode) => episode.episodeId === command.episodeId)?.plannedReleaseAt ?? command.tasks.find((task) => task.processKey === "publication")?.dueAt ?? null,
         },
       };
     }
@@ -1947,10 +1962,17 @@ export class ProductionCollaborationService {
       mutationId: input.mutationId,
       requestDigest,
       requiredCapability: commandCapability(input.command),
-      mutate: (current) => {
+      mutate: (current, access) => {
+        if (input.command.type === "upsert-operations-record" && input.command.record.kind === "saved-view") {
+          const id = input.command.record.value.id;
+          const previous = current.savedViews?.find((view) => view.id === id);
+          if (previous?.shared && previous.filters["board-kind"] === "workflow-board" && !access.manage) throw new ForbiddenException("팀 보기는 관리자만 변경할 수 있습니다.");
+        }
         const beforeDigest = stableProductionFingerprint(current);
         const at = new Date().toISOString();
         const mutation = applyCommand(current, input.command, actorUserId, at);
+        const workflowIssues = validateProductionWorkflowMutation(current, mutation.aggregate);
+        if (workflowIssues.length) throw new BadRequestException({ message: "공정 운영 조건을 충족하지 못했습니다.", issues: workflowIssues });
         const riskEvaluation = evaluateRiskAggregate(mutation.aggregate, at);
         const aggregate = commitProductionAggregate(current, {
           expectedRevision: input.expectedRevision,

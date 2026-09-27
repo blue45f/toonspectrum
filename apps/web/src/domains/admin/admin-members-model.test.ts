@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildMemberCsv,
   buildMemberQuery,
+  canManageAdminMembers,
   clampPage,
   getPageCount,
   toggleMemberSelection,
@@ -10,6 +11,15 @@ import {
 } from "./admin-members-model";
 
 describe("admin member model", () => {
+  it.each(["operator", "creator", "user", "Admin", " admin ", null, undefined, {}])(
+    "%j 권한에는 회원 관리 동작을 노출하지 않는다",
+    (role) => expect(canManageAdminMembers(role)).toBe(false),
+  );
+
+  it("정확한 admin 역할에만 회원 관리 동작을 허용한다", () => {
+    expect(canManageAdminMembers("admin")).toBe(true);
+  });
+
   it("builds a normalized server-side filter and paging query", () => {
     expect(
       buildMemberQuery({

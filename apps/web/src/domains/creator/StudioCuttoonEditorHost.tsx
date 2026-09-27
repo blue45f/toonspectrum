@@ -1460,11 +1460,8 @@ import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 
-type StudioWriterRoomRuntime = Pick<typeof import("./studio-writer-room"), "createEmptyStudioWriterRoomDocument" | "normalizeStudioWriterRoomDocument" | "replaceStudioWriterRoomStage">;
-let studioWriterRoomRuntimePromise: Promise<StudioWriterRoomRuntime> | null = null;
-function loadStudioWriterRoomRuntime(): Promise<StudioWriterRoomRuntime> {
-  return (studioWriterRoomRuntimePromise ??= import("./studio-writer-room"));
-}
+import { loadStudioWriterRoomRuntime } from "./studio-cuttoon-editor/runtime/loadStudioWriterRoomRuntime";
+
 const bi = <T,>(ko: T, en: T): T => translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
 
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");

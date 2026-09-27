@@ -7,7 +7,7 @@
   "studio.commandBar.settingsStorageNote": "Naka-save ang ayos ng slot sa workspace settings ng browser na ito.",
   "studio.commandBar.showSlots": "Ipakita ang mga command slot",
   "studio.commandBar.slot": "Slot {index}",
-  "studio.commandBar.slotAria": "Command slot{index ZZ RBRACE",
+  "studio.commandBar.slotAria": "Command slot {index}",
   "studio.commandBar.slotEmpty": "Walang laman na slot",
   "studio.commandBar.resetDefaults": "I-reset sa default na ayos",
   "studio.commandBar.command.undo": "I-undo",

@@ -34,6 +34,7 @@ import {
   STUDIO_BETA_NOTICE_STORAGE_KEY,
 } from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 
+import { waitForStudioDrawingReady } from "./lib/studio-drawing-readiness";
 import { readDurableStudioAutosaveDocument, type StudioDurableAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
 import { isOptionalStudioPreviewApiError } from "./lib/studio-verify-preview-errors.mjs";
@@ -166,20 +167,6 @@ function collectBrowserErrors(
     const message = `${response.status()} ${response.url()}`;
     if (!isOptionalStudioPreviewApiError(message, previewUrl)) collector.failedResponses.push(message);
   });
-}
-
-async function dismissTransientChrome(page: Page): Promise<void> {
-  for (const text of ["나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
-    try {
-      const el = page.getByRole("button", { name: text }).first();
-      if (await el.isVisible({ timeout: 250 })) {
-        await el.click({ timeout: 600 });
-        await page.waitForTimeout(150);
-      }
-    } catch {
-      /* optional chrome */
-    }
-  }
 }
 
 async function activatePenAndDraw(page: Page): Promise<void> {
@@ -531,7 +518,7 @@ async function main(): Promise<void> {
       state: "visible",
       timeout: 30_000,
     });
-    await dismissTransientChrome(page);
+    await waitForStudioDrawingReady(page, { requireWelcome: true });
 
     await activatePenAndDraw(page);
     const originalDocument = await waitForSavedPages(page, (document) =>

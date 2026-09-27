@@ -419,7 +419,7 @@ describe("StudioMenubarContent", () => {
       ["scroll-preview", "세로 스크롤 미리보기", stableHandlers.openScrollPreview],
       ["continuity", "마감·품질 검사", stableHandlers.openContinuityCheck],
       ["comments", "문서 댓글", stableHandlers.toggleDocumentComments],
-      ["page-review", "페이지 검토와 편집 잠금", stableHandlers.openPageReview],
+      ["page-review", "페이지 검토와 편집 제한", stableHandlers.openPageReview],
     ] as const;
 
     for (const [actionId, accessibleName, handler] of expectations) {
@@ -455,7 +455,7 @@ describe("StudioMenubarContent", () => {
     // 히스토리와 무관한 검수 표면은 마스터 편집 중에도 열려 있어야 한다.
     expect(disabledState("스토리보드 그리드 보기")).toBe(false);
     expect(disabledState("문서 댓글, 열림 3개")).toBe(false);
-    expect(disabledState("페이지 검토, 현재 편집 잠금")).toBe(false);
+    expect(disabledState("페이지 검토, 현재 검토 중 편집 제한")).toBe(false);
   });
 
   it("locks the comment entry point when the shared document forbids even viewing", () => {
