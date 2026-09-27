@@ -98,3 +98,18 @@ pnpm exec playwright test --config playwright.production-workflows.config.ts
 ```sh
 pnpm exec vitest run packages/contracts/src/production-workflow.test.ts --maxWorkers=1
 ```
+
+## 통합 검증 결과 — 2026-09-27
+
+공통 계약/API 런타임 복구 커밋 `3246e435fed65ae229c160587e9a93315ef28709`를 통합하고, 공유 공정 구현을 기존 contracts 패키지에 배치한 상태에서 확인했다.
+
+| 실행 | 결과 |
+| --- | --- |
+| `pnpm harness:verify` | 통과: 변경 파일 lint·Secretlint·lockfile·아키텍처·웹/API 및 도구 TypeScript 검사 |
+| 제작 도메인 Vitest | 53개 파일, 332개 테스트 통과 |
+| 기존 PostgreSQL 연결 의존 테스트 | 12개 미실행; 실제 DB 검증 완료로 간주하지 않음 |
+| 제작 보드 Playwright | 6개 통과; 3개 테마·4개 화면 폭·접근성·320px 대화상자·실제 작업 흐름 |
+| `pnpm audit:security` | 알려진 취약점 없음; 예외 목록 없이 검사 |
+| `pnpm audit:licenses` | 기존 공급망 인벤토리 기준 통과 |
+
+브라우저 테스트의 Vite 서버는 현재 제작 관리 워킹트리 소유임을 확인했다. 커밋·병합·운영 배포 상태는 위 테스트 결과와 별도로 기록한다.
