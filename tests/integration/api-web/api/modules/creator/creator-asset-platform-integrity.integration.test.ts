@@ -74,7 +74,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
     await connection.query(`INSERT INTO creator_asset_artifact_set
       (id, "processingRunId", "entryKind", "sourceDigest", "profileSchemaVersion", descriptor, "descriptorHash", "toolchainDigest")
       VALUES ($1, $2, 'raster-asset', $3, 1, $4, $5, $6)`,
-    [set, run, source, { schema: "toonstudio.creator-asset-artifact-set", version: 1, id: set }, digest(), toolchain]);
+    [set, run, source, { schema: "toonspectrum.creator-asset-artifact-set", version: 1, id: set }, digest(), toolchain]);
     const artifacts: unknown[] = [];
     for (const [artifactId, role, purpose] of [
       ["source", "source-original", "source"], ["runtime", "runtime-default", "derived"], ["thumb", "thumbnail", "derived"],
@@ -84,7 +84,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
         byteLength: 1, required: true, qualityProfile: "default", deviceProfile: "universal", width: null, height: null });
       await connection.query(`INSERT INTO creator_asset_storage_object
         (purpose, digest, "contractVersion", "providerId", "objectPath", "byteLength", "contentType")
-        VALUES ($1, $2, 'toonstudio.private-object-storage.v2', 'supabase', $3, 1, 'image/png')`,
+        VALUES ($1, $2, 'toonspectrum.private-object-storage.v2', 'supabase', $3, 1, 'image/png')`,
       [purpose, objectDigest, `sha256/${objectDigest.slice(7, 9)}/${objectDigest.slice(7)}`]);
       await connection.query(`INSERT INTO creator_asset_artifact
         ("artifactSetId", "artifactId", role, purpose, "objectDigest", "contentType", "byteLength", "qualityProfile", "deviceProfile")
@@ -94,7 +94,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
       (id, "artifactSetId", "profileId", "profileVersion", state, "blockerCount", "warningCount", report, "reportHash")
       VALUES ($1, $2, 'fixture', 1, 'passed', 0, 0, '{}', $3)`, [qa, set, digest()]);
     const descriptor = CreatorAssetArtifactSetDescriptorSchema.parse({
-      schema: "toonstudio.creator-asset-artifact-set", version: 1, id: set,
+      schema: "toonspectrum.creator-asset-artifact-set", version: 1, id: set,
       entryKind: "raster-asset", sourceDigest: source, toolchainDigest: toolchain,
       profileId: "fixture", profileVersion: 1, artifacts,
     });
@@ -170,7 +170,7 @@ postgres("Creator Asset platform PostgreSQL integrity", () => {
         VALUES ($1, $2, 'raster-asset', $3, 1, $4, $5, $6, $7,
           CASE WHEN $7='sealed' THEN statement_timestamp() ELSE NULL END)`,
       [source.set, source.run, source.source,
-        { schema: "toonstudio.creator-asset-artifact-set", version: 1, id: source.set }, digest(), digest(), state],
+        { schema: "toonspectrum.creator-asset-artifact-set", version: 1, id: source.set }, digest(), digest(), state],
       "creator_asset_artifact_set_initial_state");
     });
   });

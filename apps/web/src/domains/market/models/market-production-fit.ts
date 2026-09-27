@@ -172,6 +172,10 @@ const LICENSE_CAPABILITIES: Readonly<
     commercialUse: true,
     attributionRequired: false,
   },
+  "toonspectrum-standard": {
+    commercialUse: true,
+    attributionRequired: false,
+  },
   "cc0-1.0": {
     commercialUse: true,
     attributionRequired: false,
@@ -188,6 +192,7 @@ const LICENSE_CAPABILITIES: Readonly<
 
 const LICENSE_LABELS: Readonly<Record<CreatorMarketplaceResourceLicense, string>> = {
   "toonstudio-standard": "ToonStudio 표준 사용권",
+  "toonspectrum-standard": "ToonStudio 표준 사용권",
   "cc0-1.0": "CC0 1.0",
   "cc-by-4.0": "CC BY 4.0",
   "cc-by-nc-4.0": "CC BY-NC 4.0",

@@ -11,6 +11,7 @@ import {
 import { useStudioLiveAutoReconnect } from "./use-studio-live-auto-reconnect";
 import { studioAutomergeOfflineBranchEnabled } from "../offline-branch/studio-offline-branch-feature";
 
+import { resolveStudioLiveCanonicalAuthority } from "./studio-live-canonical-authority";
 import { readOrCreateStudioLiveClientInstanceId } from "./studio-live-client-identity";
 import {
   StudioLiveCollaborationContext,
@@ -480,6 +481,7 @@ export function StudioLiveCollaborationProvider({
       let crdtDocument: StudioCrdtDocument | null = null;
       let crdtBinding: StudioCrdtRoomBinding | null = null;
       let offlineBranchRuntime: StudioOfflineBranchRuntime | null = null;
+      let canonicalDocumentAuthority = false;
       let offlineBranchPeerSync: { announce(): void; close(): void } | null = null;
       let crdtDurabilityWarning: string | null = null;
       const exposeReadyRoom = (nextError?: string | null) => {
@@ -514,6 +516,12 @@ export function StudioLiveCollaborationProvider({
           return;
         }
         if (event.type !== "transport-status") return;
+        if (event.status.state === "connecting"
+          || event.status.state === "disconnected"
+          || !event.status.recoverable) {
+          canonicalDocumentAuthority = false;
+          offlineBranchRuntime?.setCanonicalAuthority(false);
+        }
 
         setMode(nextRoom.mode);
         if (event.status.state === "ready") {
@@ -635,13 +643,16 @@ export function StudioLiveCollaborationProvider({
             outboxScope,
             onStatus: (status) => {
               if (cancelled) return;
-              const hasCanonicalAuthority =
-                status.state === "ready"
-                && nextRoom.ready
-                && (
-                  nextRoom.mode !== "server"
-                  || nextRoom.crdtFanout === "authoritative"
-                );
+              const hasCanonicalAuthority = resolveStudioLiveCanonicalAuthority({
+                bindingState: status.state,
+                transportReady: nextRoom.ready,
+                transportMode: nextRoom.mode,
+                crdtFanout: nextRoom.crdtFanout,
+                previousAuthority: canonicalDocumentAuthority,
+                nonAuthoritativeDeliveryPending: status.state === "retrying"
+                  && status.nonAuthoritativeDeliveryPending === true,
+              });
+              canonicalDocumentAuthority = hasCanonicalAuthority;
               offlineBranchRuntime?.setCanonicalAuthority(hasCanonicalAuthority);
               if (
                 hasCanonicalAuthority
@@ -747,12 +758,7 @@ export function StudioLiveCollaborationProvider({
                   workId: nextRoom.workId,
                   scope: offlineScope,
                   actorId: offlineScope,
-                  canonicalAuthority:
-                    nextRoom.ready
-                    && (
-                      nextRoom.mode !== "server"
-                      || nextRoom.crdtFanout === "authoritative"
-                    ),
+                  canonicalAuthority: canonicalDocumentAuthority,
                   onError: (message) => {
                     if (!cancelled) setError(message);
                   },

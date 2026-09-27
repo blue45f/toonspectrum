@@ -89,7 +89,7 @@ describe("backend capability worker canary", () => {
       BACKEND_CAPABILITY_CANARY_PROVIDER: "render",
       BACKEND_CAPABILITY_CANARY_AUTH_TOKEN: token,
       BACKEND_CAPABILITY_CANARY_SOURCE_OBJECT_JSON: JSON.stringify({
-        contractVersion: "toonstudio.private-object-storage.v2",
+        contractVersion: "toonspectrum.private-object-storage.v2",
         providerId: "cloudflare-r2",
         purpose: "source",
         digest: `sha256:${"a".repeat(64)}`,

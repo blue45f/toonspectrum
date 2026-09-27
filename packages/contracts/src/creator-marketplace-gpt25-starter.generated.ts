@@ -355,7 +355,7 @@ function buildRecord(definition: (typeof DEFINITIONS)[number]): CreatorMarketpla
     resourceVersion: "1.0.0",
     minimumStudioVersion: "0.1.0",
     tags: [...definition.tags],
-    license: "toonstudio-standard" as const,
+    license: "toonspectrum-standard" as const,
     attributionText: "",
     containsAi: true,
     rightsConfirmed: true as const,

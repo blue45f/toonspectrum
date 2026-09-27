@@ -151,9 +151,9 @@ function authoringPackageId(draftId: string): string {
 
 function authoringLicense(rights: Record<string, unknown>): CreatorMarketplaceResourceLicense {
   const value = rights.license === "free" || rights.license === "commercial"
-    ? "toonstudio-standard" : rights.license;
+    ? "toonspectrum-standard" : rights.license;
   if (
-    value === "toonstudio-standard"
+    value === "toonspectrum-standard"
     || value === "cc0-1.0"
     || value === "cc-by-4.0"
     || value === "cc-by-nc-4.0"
@@ -161,7 +161,7 @@ function authoringLicense(rights: Record<string, unknown>): CreatorMarketplaceRe
     if (value !== "cc-by-nc-4.0" && rights.commercialUse !== true) {
       throw new Error("상업 이용을 허용하지 않은 초안을 상업 이용 가능한 사용권으로 게시할 수 없습니다. 선택한 권리에 맞는 공개 manifest를 내보내 주세요.");
     }
-    if (value !== "toonstudio-standard" && rights.redistribution !== true) {
+    if (value !== "toonspectrum-standard" && rights.redistribution !== true) {
       throw new Error("재배포를 허용하지 않은 초안을 재배포 가능한 사용권으로 게시할 수 없습니다. 선택한 권리에 맞는 공개 manifest를 내보내 주세요.");
     }
     return value;

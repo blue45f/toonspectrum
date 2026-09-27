@@ -226,7 +226,7 @@ CREATE TABLE public."creator_asset_artifact_set" (
     CHECK ("state" IN ('building', 'sealed', 'rejected')),
   CONSTRAINT "creator_asset_artifact_set_descriptor_check"
     CHECK (jsonb_typeof("descriptor") = 'object'
-      AND "descriptor"->>'schema' = 'toonstudio.creator-asset-artifact-set'
+      AND "descriptor"->>'schema' = 'toonspectrum.creator-asset-artifact-set'
       AND "descriptor"->>'version' = '1'
       AND "descriptor"->>'id' = "id"),
   CONSTRAINT "creator_asset_artifact_set_sealed_check"

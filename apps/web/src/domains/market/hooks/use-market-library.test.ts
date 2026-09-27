@@ -107,7 +107,7 @@ const dummyRecord: CreatorMarketplaceResourceRecord = {
   resourceVersion: "1.0.0",
   minimumStudioVersion: "0.1.0",
   tags: ["3D", "무기"],
-  license: "toonstudio-standard",
+  license: "toonspectrum-standard",
   attributionText: "",
   containsAi: false,
   provenance: { origin: "original", authoredByPublisher: true },

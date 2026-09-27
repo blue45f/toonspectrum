@@ -56,7 +56,7 @@ export function MarketPublishPage() {
   const [description, setDescription] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [license, setLicense] =
-    useState<CreatorMarketplaceResourceLicense>("toonstudio-standard");
+    useState<CreatorMarketplaceResourceLicense>("toonspectrum-standard");
   const [containsAi, setContainsAi] = useState(false);
   const [rightsConfirmed, setRightsConfirmed] = useState(true);
   const [releaseNotes, setReleaseNotes] = useState("최초 버전 공유");

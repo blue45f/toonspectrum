@@ -45,6 +45,18 @@ describe("Studio mobile top browser harness boundary", () => {
     );
   });
 
+  it("정적 미리보기 API 부재는 별도 증거로 남기고 서버 통합 통과로 표시하지 않는다", () => {
+    expect(harness).toContain("isStaticPreviewReadinessUnavailable(text, url)");
+    expect(harness).toContain("previewUnavailableResponses.push(text)");
+    expect(harness).toContain("static-preview-api-unavailable:");
+    expect(harness).toContain("serverIntegrationVerified: false");
+    expect(harness).toContain('page.on("pageerror", (error) => consoleErrors.push(String(error)));');
+  });
+
+  it("포커스 링 여백은 실제 스크롤 레인 내부 컨트롤에만 측정한다", () => {
+    expect(harness).toContain("item.container === menubar && lane.contains(item.element)");
+  });
+
   it("measures the canvas-sticky presence dock as top-chrome, not as canvas content", () => {
     // The immersive pill (absolute, shell-owned) and the presence dock (sticky, viewport-owned)
     // cannot see each other's width. Leaving the dock out of the container set is what let it

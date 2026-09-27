@@ -32,6 +32,7 @@ import { join } from "node:path";
 
 import { chromium, type Browser, type Page } from "playwright";
 
+import { isStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import { findFreePort, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 const SCRATCH = process.env.TOONSPECTRUM_MOBILE_TOP_VERIFY_DIR ??
@@ -197,6 +198,8 @@ interface ModeRunResult {
   expandedDock: DockExpansionProbeResult;
   menus: MenuProbeResult[];
   errCount: number;
+  previewUnavailableResponses: string[];
+  serverIntegrationVerified: false;
   shot: string;
 }
 
@@ -532,7 +535,8 @@ async function measureTopChrome(page: Page, mode: ShellMode): Promise<TopChromeM
     const edgeRingRisks: { label: string; detail: string }[] = [];
     if (lane) {
       const laneRect = lane.getBoundingClientRect();
-      const menubarItems = interactives.filter((item) => item.container === menubar);
+      const menubarItems = interactives.filter((item) =>
+        item.container === menubar && lane.contains(item.element));
       if (menubarItems.length > 0) {
         const first = menubarItems.reduce((low, item) => (item.rect.left < low.rect.left ? item : low));
         const last = menubarItems.reduce((high, item) => (item.rect.right > high.rect.right ? item : high));
@@ -714,10 +718,17 @@ async function runMode(
   });
   const page = await ctx.newPage();
   const consoleErrors: string[] = [];
+  const previewUnavailableResponses: string[] = [];
   page.on("console", (message) => {
     if (message.type() !== "error") return;
     const location = message.location().url;
     const text = location ? `${message.text()} @ ${location}` : message.text();
+    // 이 프로세스가 소유한 정적 미리보기에는 API가 없다. 알려진 502도 증거에 남기며
+    // 서버 통합 성공으로 집계하지 않는다. 다른 출처·상태·경로와 pageerror는 실패로 유지한다.
+    if (isStaticPreviewReadinessUnavailable(text, url)) {
+      previewUnavailableResponses.push(text);
+      return;
+    }
     if (isExpectedStaticPreviewError(text, url)) return;
     if (isExpectedExternalFontCdnError(text)) return;
     consoleErrors.push(text);
@@ -1038,13 +1049,15 @@ async function runMode(
     `expandedPad=${expandedDock.canvasViewportPaddingBottom?.toFixed(0) ?? "-"} ` +
     `workspaceToggleVisible=${workspaceToggleInitiallyVisible} ` +
     `menus=${menus.map((menu) => `${menu.id}:${menu.opened && menu.withinViewport && menu.closed}`).join(",") || "-"} ` +
-    `errs=${consoleErrors.length} ok=${ok}`,
+    `errs=${consoleErrors.length} previewUnavailable=${previewUnavailableResponses.length} ok=${ok}`,
   );
   for (const failure of hardFailures) log(`${mode}-${width} FAIL: ${failure}`);
   for (const warning of warnings) log(`${mode}-${width} warn: ${warning}`);
   for (const [index, message] of consoleErrors.slice(0, 8).entries()) {
     log(`${mode}-${width} consoleError[${index}]: ${message}`);
   }
+
+  for (const message of previewUnavailableResponses) log(`${mode}-${width} static-preview-api-unavailable: ${message}`);
 
   await ctx.close();
   return {
@@ -1058,6 +1071,8 @@ async function runMode(
     expandedDock,
     menus,
     errCount: consoleErrors.length,
+    previewUnavailableResponses,
+    serverIntegrationVerified: false,
     shot,
   };
 }

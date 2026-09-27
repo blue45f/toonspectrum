@@ -1,5 +1,5 @@
 -- Cross-instance Socket.IO packets that exceed PostgreSQL NOTIFY's payload budget (or contain
--- binary data) are stored here briefly by ToonStudio's lifecycle-safe PostgreSQL transport. This
+-- binary data) are stored here briefly by ToonSpectrum's lifecycle-safe PostgreSQL transport. This
 -- is transport scratch space, not authoritative collaboration state; the transport removes expired rows on its cleanup
 -- interval. The index keeps that cleanup bounded as the realtime workload grows.
 

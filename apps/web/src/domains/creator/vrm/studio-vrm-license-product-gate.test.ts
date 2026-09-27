@@ -376,7 +376,7 @@ describe("studio VRM license product gate", () => {
     expect(plan).toMatchObject({
       ok: true,
       rightsConfirmed: true,
-      license: "toonstudio-standard",
+      license: "toonspectrum-standard",
     });
   });
 
@@ -407,7 +407,7 @@ describe("studio VRM license product gate", () => {
     expect(planStudioVrmRenderedPoseMarketplaceShare(
       corporate,
       shareContext(corporate, { publisherKind: "unknown" }),
-    )).toMatchObject({ ok: true, license: "toonstudio-standard" });
+    )).toMatchObject({ ok: true, license: "toonspectrum-standard" });
   });
 
   it("requires a valid typed attestation receipt and enforces the official avatar scope", () => {
