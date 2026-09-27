@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Шар {count}",
   "studio.toolsCompanion.review.section.comments": "Коментар {count}",
   "studio.toolsCompanion.review.section.history": "Запис {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE PageLabel}·{selectionLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "оглядовий пульт",
   "studio.toolsCompanion.review.truncatedComments": "і {count} коментарів",
   "studio.toolsCompanion.review.truncatedLayers": "{count} шарів",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Довідковий екран",
   "studio.toolsCompanion.referenceLoading": "Завантаження довідкового інструменту...",
   "studio.toolsCompanion.footer": "Редагувати документи можна лише на вкладці за замовчуванням. Це вікно передає лише стислий попередній перегляд і намір перевірки/посилання на BroadcastChannel того самого браузера, тому немає окремої вартості сервера.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Не підключено до головного студії.",
+  "studio.toolsCompanion.exit.editor": "Відкрити редактор студії"
 }

@@ -1,16 +1,16 @@
 {
   "common.loading": "Laddar",
-  "common.loading.short": "Loading",
+  "common.loading.short": "Laddning",
   "common.close": "Stäng",
   "common.open": "Öppna",
   "common.search": "Sök",
   "common.retry": "Försök igen",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "Försök igen.",
+  "common.backToTop": "Tillbaka till toppen.",
   "common.backToHome": "Till startsidan",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "- Jag letar efter...",
+  "common.notFoundWithQuery": "Inga resultat för \" {query} \".",
+  "common.openSearch": "Hitta den i sökandet",
+  "common.loading.empty": "Ingen data returnerades.",
+  "common.retry.all": "Försök igen eller gå hem."
 }

@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Näytä pisteiden jakautuminen",
+  "ranking.metric.views": "Näytyksiä",
+  "ranking.why": "Miksi?",
+  "ranking.breakdownTitle": "Arvonlaskelu",
+  "ranking.totalScore": "Kokonaispiste",
+  "ranking.breakdownDescription": "Laskettu akselin painot ja otsikon erityinen normaalitointi."
 }

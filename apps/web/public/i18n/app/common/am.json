@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "ጭነት",
+  "common.loading.short": "ጭነት",
   "common.close": "ዝጋ",
   "common.open": "ክፈት",
   "common.search": "ፈልግ",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "ዳግም ሞክር",
+  "common.retry.short": "ዳግም ሞክር",
+  "common.backToTop": "ወደላይ ተመለስ",
+  "common.backToHome": "ወደ ቤት ሂድ",
+  "common.loading.search": "ፍለጋ...",
+  "common.notFoundWithQuery": "ለ ' {query} ' ምንም ውጤቶች አልነበሩም።",
+  "common.openSearch": "በፍለጋ ላይ ያግኙት",
+  "common.loading.empty": "ምንም መረጃ አልተመለሰም.",
+  "common.retry.all": "እንደገና ሞክር ወይም ወደ ቤት ተመለስ."
 }

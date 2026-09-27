@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Gjuha",
+  "control.sound.enable": "Aktivizo efektet zanore",
+  "control.sound.disable": "Çaktivizo efektet e zërit",
+  "control.theme.dark": "Kalo në modalitetin e dritës",
+  "control.theme.light": "Kalo në modalitetin e errët",
+  "control.settings.open": "️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️",
+  "control.settings.close": "Mbyll cilësimet",
+  "control.cluster.settings": "Tingulli, tema, kontrollet e gjuhës",
+  "control.cluster.open": "️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️",
+  "control.cluster.tooltip": "Cilësimet e zërit, temës dhe gjuhës",
+  "control.language.group.translated": "Përkthime me mbulim të lartë",
+  "control.language.group.englishBase": "Përkthim automatik · kthim në anglisht"
 }

@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "പൂർത്തിയായി",
+  "review.progress.binge": "ബിംഗിംഗ്",
+  "review.progress.upcoming": "ആസൂത്രണം",
+  "review.progress.abandoned": "അവശേഷിക്കുന്നു",
+  "review.progress.unknown": "മറഞ്ഞിരിക്കുന്ന പുരോഗതി",
+  "review.spoilerRevealLabel": "സ്പോയിലർ കാണിക്കുക"
 }

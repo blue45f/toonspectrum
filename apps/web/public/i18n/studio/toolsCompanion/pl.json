@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Warstwa {count}",
   "studio.toolsCompanion.review.section.comments": "Komentarz {count}",
   "studio.toolsCompanion.review.section.history": "Nagraj {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Strona{Etykieta}· Wybór{Etykieta ZZ RBRACE",
   "studio.toolsCompanion.review.title": "konsola inspekcyjna",
   "studio.toolsCompanion.review.truncatedComments": "i {count} komentarze",
   "studio.toolsCompanion.review.truncatedLayers": "{count} warstwy",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Ekran referencyjny",
   "studio.toolsCompanion.referenceLoading": "Ładowanie narzędzia referencyjnego...",
   "studio.toolsCompanion.footer": "Edytowane dokumenty posiadają tylko domyślną kartę. To okno przesyła tylko skompresowany podgląd i inspekcję/odniesienie do kanału BroadcastChannel tej samej przeglądarki, więc nie ma oddzielnego kosztu serwera.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Nie jest podłączony do głównej studiów.",
+  "studio.toolsCompanion.exit.editor": "Otwórz edytor Studio"
 }

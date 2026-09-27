@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "Jeg kunne ikke lade feedbackundersøgelse.",
+  "feedback.thankYou": "Tak for jeres værdifulde feedback!",
+  "feedback.anonymousNote": "Dine svar er anonymt.",
+  "feedback.notAtAll": "- Nej, slet ikke.",
+  "feedback.definitely": "Det er helt sikkert."
 }

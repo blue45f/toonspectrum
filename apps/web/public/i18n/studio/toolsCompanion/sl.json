@@ -19,7 +19,7 @@
   "studio.toolsCompanion.error.invalidSurface": "Ni veljavnega spremljevalnega načina pogleda. Ponovno odprite okno v privzetem studiu.",
   "studio.toolsCompanion.error.unsupportedBroadcast": "Ta brskalnik ne podpira BroadcastChannel.",
   "studio.toolsCompanion.mode.tools": "orodja",
-  "studio.toolsCompanion.mode.navigator": "Navigator",
+  "studio.toolsCompanion.mode.navigator": "Navigacijski sistem",
   "studio.toolsCompanion.mode.review": "pregled",
   "studio.toolsCompanion.mode.reference": "referenca",
   "studio.toolsCompanion.review.current": "prisoten",
@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Sloj {count}",
   "studio.toolsCompanion.review.section.comments": "Komentar {count}",
   "studio.toolsCompanion.review.section.history": "Zapis {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{selectionLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "inšpekcijska konzola",
   "studio.toolsCompanion.review.truncatedComments": "in {count} komentarjev",
   "studio.toolsCompanion.review.truncatedLayers": "{count} plasti",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referenčni zaslon",
   "studio.toolsCompanion.referenceLoading": "Nalaganje referenčnega orodja ...",
   "studio.toolsCompanion.footer": "Urejanje dokumentov ima samo privzeti zavihek. To okno prenaša samo stisnjen predogled in namero pregleda/sklicevanja na BroadcastChannel istega brskalnika, tako da ni ločenih stroškov strežnika.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Ni povezan z glavnim studijem.",
+  "studio.toolsCompanion.exit.editor": "Odpri urednik Studio"
 }

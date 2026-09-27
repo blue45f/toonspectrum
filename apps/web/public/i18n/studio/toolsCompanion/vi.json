@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Lớp {count}",
   "studio.toolsCompanion.review.section.comments": "Bình luận {count}",
   "studio.toolsCompanion.review.section.history": "Ghi {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Trang ZZLBRACENhãn}· Lựa chọn ZZLBRACENhãn ZZ RBRACE",
   "studio.toolsCompanion.review.title": "bảng điều khiển kiểm tra",
   "studio.toolsCompanion.review.truncatedComments": "và {count} bình luận",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lớp",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Màn hình tham khảo",
   "studio.toolsCompanion.referenceLoading": "Đang tải công cụ tham khảo...",
   "studio.toolsCompanion.footer": "Chỉnh sửa tài liệu chỉ sở hữu tab mặc định. Cửa sổ này chỉ truyền bản xem trước đã nén và mục đích kiểm tra/tham chiếu tới BroadcastChannel của cùng một trình duyệt, do đó không có chi phí máy chủ riêng.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Không liên kết với phòng tập chính.",
+  "studio.toolsCompanion.exit.editor": "Mở trình biên tập Studio"
 }

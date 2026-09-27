@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Completé",
+  "review.progress.binge": "Je suis en train de faire du bruit.",
+  "review.progress.upcoming": "Planifié",
+  "review.progress.abandoned": "J'ai été abandonné",
+  "review.progress.unknown": "Les progrès cachés",
+  "review.spoilerRevealLabel": "Afficher le spoiler"
 }

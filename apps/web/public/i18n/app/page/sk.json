@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "Stránka nenašla",
+  "page.notFound.message": "Opäť skontrolujte URL alebo preskúmajte názvy z domovskej stránky.",
+  "page.notFound.home": "Choď domov."
 }

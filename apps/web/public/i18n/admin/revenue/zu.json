@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "Isifinyezo Sokuhlaziywa (Izinsuku ezingu-30 Ezedlule)",
+  "admin.revenue.loadError": "Ukwehluleka ukulayisha i-ledger yemali engenayo",
+  "admin.revenue.filterAll": "Zonke",
+  "admin.revenue.filterPending": "Ukubamba",
+  "admin.revenue.filterApproved": "Ukuvunywa",
+  "admin.revenue.filterPaid": "Ukuqedwa",
+  "admin.revenue.filterRejected": "Ukulahlwa",
+  "admin.revenue.filterRevoked": "Ukucinywa",
+  "admin.revenue.empty": "Azikho izenzakalo zokuxazulula izinkinga ezihambisana nalesi simo.",
+  "admin.revenue.approve": "Vuma",
+  "admin.revenue.reject": "Ukuphika",
+  "admin.revenue.settle": "Ukuqedwa Okuphelele",
+  "admin.revenue.revoke": "Ukukhansela"
 }

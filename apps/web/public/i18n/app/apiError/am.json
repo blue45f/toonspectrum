@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "መግቢያ ያስፈልጋል።",
+  "apiError.adminRequired": "የአስተዳዳሪ ፍቃዶችን ማረጋገጥ አልተቻለም።",
+  "apiError.adminOnlyPage": "ይህ ገጽ ለአስተዳዳሪዎች ብቻ የተወሰነ ነው።",
+  "apiError.notFound": "የተጠየቀው ዕቃ አልተገኘም።",
+  "apiError.unsupportedType": "ያልተደገፈ ይዘት አይነት።",
+  "apiError.inactiveAccount": "የማይሰሩ መለያዎች የአስተዳዳሪ ባህሪያትን መጠቀም አይችሉም።",
+  "apiError.settlementFailed": "የፍርድ ሂደቱ አልተሳካም።"
 }

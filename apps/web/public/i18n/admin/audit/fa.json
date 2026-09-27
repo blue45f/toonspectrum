@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "دفترچه های اداری",
+  "admin.audit.desc": "تمام اقدامات اداری، تغییر مجوز و تغییرات پیکربندی را ردیابی کنید.",
+  "admin.audit.searchPlaceholder": "جستجو (برنامه/عمل)...",
+  "admin.audit.loading": "بارگذاری دفترچه های حسابرسی...",
+  "admin.audit.empty": "هیچ دفترچه حسابرسی ثبت نشده",
+  "admin.audit.viewDetails": "مشاهده",
+  "admin.audit.modalTitle": "جزئیات دفترچه بازرسی",
+  "admin.audit.close": "نزدیک"
 }

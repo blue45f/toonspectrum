@@ -19,7 +19,7 @@
   "studio.toolsCompanion.error.invalidSurface": "Það er engin gild fylgjandi skoðunarstilling. Vinsamlegast opnaðu gluggann aftur í sjálfgefna vinnustofunni.",
   "studio.toolsCompanion.error.unsupportedBroadcast": "Þessi vafri styður ekki BroadcastChannel.",
   "studio.toolsCompanion.mode.tools": "verkfæri",
-  "studio.toolsCompanion.mode.navigator": "Navigator",
+  "studio.toolsCompanion.mode.navigator": "Skipstjóri",
   "studio.toolsCompanion.mode.review": "skoðun",
   "studio.toolsCompanion.mode.reference": "tilvísun",
   "studio.toolsCompanion.review.current": "til staðar",
@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Lag {count}",
   "studio.toolsCompanion.review.section.comments": "Athugasemd {count}",
   "studio.toolsCompanion.review.section.history": "Taka upp {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE síðaLabel}·{valLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "skoðunarvél",
   "studio.toolsCompanion.review.truncatedComments": "og {count} athugasemdir",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lög",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Tilvísunarskjár",
   "studio.toolsCompanion.referenceLoading": "Hleður tilvísunartól...",
   "studio.toolsCompanion.footer": "Breyta skjölum eiga aðeins sjálfgefna flipann. Þessi gluggi sendir aðeins þjappað forskoðun og skoðun/tilvísun til útsendingarrásar sama vafra, þannig að það er enginn sérstakur netþjónskostnaður.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Ekki tengd aðalstúdíóinu.",
+  "studio.toolsCompanion.exit.editor": "Opnaðu stúdíó ritstjóra"
 }

@@ -1,12 +1,14 @@
 {
   "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
+  "control.sound.enable": "Activate sound effects",
+  "control.sound.disable": "Дууны эффектийг идэвхгүй болгох",
+  "control.theme.dark": "Гэрэлт горим руу шилжинэ",
+  "control.theme.light": "Харанхуй горимд шилжих",
+  "control.settings.open": "️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️",
   "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.cluster.settings": "Дуу, сэдэв, хэлний хяналт",
+  "control.cluster.open": "️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️",
+  "control.cluster.tooltip": "Дуу, сэдэв, хэлний тохиргоо",
+  "control.language.group.translated": "High-coverage translations",
+  "control.language.group.englishBase": "Автомат орчуулга · Англи хэлний нөөц"
 }

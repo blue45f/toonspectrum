@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "ලොග් වීම අවශ් යයි",
+  "admin.gate.guestBody": "පරිපාලක කොන්සෝලය සත් යාපනය අවශ් යයි.",
+  "admin.gate.forbiddenTitle": "පරිපාලක අවසරය අවශ් යයි",
+  "admin.gate.forbiddenBody": "මේ ගිණුමට පරිපාලක අවසර නැහැ. අවශ් ය නම් මෙහෙයුම්කරුට සම්බන්ධ වෙන්න.",
+  "admin.gate.errorTitle": "කොන්සෝලය පැටවීමේ අසමත් වීම"
 }

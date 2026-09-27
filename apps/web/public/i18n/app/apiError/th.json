@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "การเข้าใช้งานต้อง",
+  "apiError.adminRequired": "การอนุญาตผู้บริหารไม่สามารถตรวจสอบได้",
+  "apiError.adminOnlyPage": "หน้านี้มีส่วนจํากัดสําหรับผู้บริหาร",
+  "apiError.notFound": "สินค้าที่ต้องการไม่ได้พบ",
+  "apiError.unsupportedType": "ประเภทเนื้อหาที่ไม่ได้สนับสนุน",
+  "apiError.inactiveAccount": "บัญชีที่ไม่ทํางานไม่สามารถใช้คุณสมบัติผู้บริหารได้",
+  "apiError.settlementFailed": "การแก้ไขการเจอกันล้มเหลว"
 }

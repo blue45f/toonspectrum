@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "لایه {count}",
   "studio.toolsCompanion.review.section.comments": "نظر {count}",
   "studio.toolsCompanion.review.section.history": "ضبط {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{selectionLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "کنسول بازرسی",
   "studio.toolsCompanion.review.truncatedComments": "و {count} نظرات",
   "studio.toolsCompanion.review.truncatedLayers": "لایه های {count}",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "صفحه مرجع",
   "studio.toolsCompanion.referenceLoading": "در حال بارگیری ابزار مرجع...",
   "studio.toolsCompanion.footer": "اسناد ویرایش فقط دارای برگه پیش فرض است. این پنجره فقط پیش‌نمایش فشرده و هدف بازرسی/مرجع را به BroadcastChannel همان مرورگر منتقل می‌کند، بنابراین هیچ هزینه سرور جداگانه‌ای وجود ندارد.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "با استودیو اصلی متصل نیست",
+  "studio.toolsCompanion.exit.editor": "ویرایشگر استودیو را باز کنید"
 }

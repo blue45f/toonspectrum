@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Completat",
+  "review.progress.binge": "Binguant",
+  "review.progress.upcoming": "Planificat",
+  "review.progress.abandoned": "Caigut",
+  "review.progress.unknown": "Progress ocult",
+  "review.spoilerRevealLabel": "Mostra spoiler"
 }

@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
-  "admin.refresh.seconds": "{sec}s"
+  "admin.refresh.now": "מרעננים עכשיו",
+  "admin.refresh.auto": "אוטומטי:",
+  "admin.refresh.seconds": "{sec} ס"
 }

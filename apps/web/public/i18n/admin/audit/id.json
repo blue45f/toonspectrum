@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Administrasi Log Audit",
+  "admin.audit.desc": "Pelacakan semua tindakan administrasi, perubahan izin, dan perubahan konfigurasi.",
+  "admin.audit.searchPlaceholder": "Pencarian (email/aksi)...",
+  "admin.audit.loading": "Mengunggah catatan audit...",
+  "admin.audit.empty": "Tidak ada catatan audit.",
+  "admin.audit.viewDetails": "Tampilan",
+  "admin.audit.modalTitle": "Detil Log Audit",
+  "admin.audit.close": "Dekat"
 }

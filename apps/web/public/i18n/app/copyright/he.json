@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "זכויות יוצרים & תוכן הודעה",
+  "copyright.section1.title": "מקורות תוכן ומסמכים",
+  "copyright.section1.body": "טון ספקטרום הוא פלטפורמה של אינדקס וחשפייה המסכרת נתונים מטאטאלוגי ציבוריים (כותרות, מחברים, ז'אנרים וכו') מפלטפורמות סרטים וברשת/רומנים.",
+  "copyright.section2.title": "תמונות כיסוי",
+  "copyright.section2.body": "תמונות העגלה משמשות כזהות תמונות קטנות ומציגים מקורי של פלטפורמה עם קישורים מקורות בכל פעם שאפשר. הצגלים יכולים להיות מופכים באופן מיידי על פי בקשה של בעלי זכויות או עדכונים מדיניות.",
+  "copyright.section3.title": "מדדים & שקיפות",
+  "copyright.section4.title": "הודעה על זכויות",
+  "copyright.section5.title": "הודעה על הפרת זכויות היוצרים",
+  "copyright.section5.body": "אם אתה מאמין כי מטא-מדע או כיסוי פוגע בזכויותיך, אנא הגיש חקירה עם כותרת, כתובת כתובת כתובת וראיות של בעלות.",
+  "copyright.leaveInquiry": "להגיש חקירה"
 }

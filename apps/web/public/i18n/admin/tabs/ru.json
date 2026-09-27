@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Объявления и баннеры",
+  "admin.tabs.audit": "Журналы аудита",
+  "admin.tabs.campaigns": "Кампании",
+  "admin.tabs.creatorSupport": "Поддержка Создателя",
+  "admin.tabs.dashboard": "Дисбордная панель",
+  "admin.tabs.ops": "Операции",
+  "admin.tabs.plans": "Планы",
+  "admin.tabs.promos": "Повышения",
+  "admin.tabs.reports": "Отчеты и умеренность",
+  "admin.tabs.revenue": "Установка",
+  "admin.tabs.security": "Безопасность и ИП",
+  "admin.tabs.inquiries": "Проведение бизнес-запросов",
+  "admin.tabs.supporters": "Поддержка операционных затрат",
+  "admin.tabs.traffic": "Живой трафик"
 }

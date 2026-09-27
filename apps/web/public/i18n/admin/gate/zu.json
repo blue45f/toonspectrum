@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Ukufaka I-inthanethi Kuyadingeka",
+  "admin.gate.guestBody": "I-Admin console idinga ukuqinisekiswa.",
+  "admin.gate.forbiddenTitle": "Imvume yomlawuli edingekayo",
+  "admin.gate.forbiddenBody": "Le akhawunti ayinazo izimvume zokuphatha. Xhumana nomuntu osebenza kuyo uma kudingeka.",
+  "admin.gate.errorTitle": "Ukuhluleka Ukulayisha Ikhonsoli"
 }

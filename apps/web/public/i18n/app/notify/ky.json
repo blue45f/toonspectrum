@@ -1,4 +1,4 @@
 {
-  "notify.loadError": "Couldn't load notifications.",
-  "notify.empty": "No new notifications."
+  "notify.loadError": "Билдирүүлөрдү жүктөп алчу эмесмин.",
+  "notify.empty": "Жаңы билдирүүлөр жок."
 }

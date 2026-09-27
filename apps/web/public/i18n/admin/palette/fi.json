@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Vaikea etsintä ja käskyjä...",
+  "admin.palette.placeholder": "Hakemuksen hallintovirtoja (Navigointi, CSV-vienti, ylläpito)...",
+  "admin.palette.empty": "Ei mitään tuloksia.",
+  "admin.palette.groupNav": "Konsolin navigointipisteet",
+  "admin.palette.groupQuick": "Nopeat toimet ja vienti",
+  "admin.palette.exportUsers": "Kaikki jäsenet CSV",
+  "admin.palette.exportRevenue": "Vientiliikevaihto-päätöksen CSV",
+  "admin.palette.maintenance": "Valvontajärjestelmän hätähoito"
 }

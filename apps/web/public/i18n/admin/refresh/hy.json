@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
-  "admin.refresh.seconds": "{sec}s"
+  "admin.refresh.now": "Թարմացիր հիմա",
+  "admin.refresh.auto": "Ավտոմեքենայով.",
+  "admin.refresh.seconds": "{sec} ս"
 }

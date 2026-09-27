@@ -1,16 +1,16 @@
 {
   "common.loading": "تحميل",
-  "common.loading.short": "Loading",
+  "common.loading.short": "التحميل",
   "common.close": "إغلاق",
   "common.open": "فتح",
   "common.search": "بحث",
   "common.retry": "إعادة المحاولة",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
+  "common.retry.short": "حاول مرة أخرى",
+  "common.backToTop": "العودة إلى القمة",
   "common.backToHome": "العودة للرئيسية",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.loading.search": "أبحث...",
+  "common.notFoundWithQuery": "لا توجد نتائج لـ \" {query} \"",
+  "common.openSearch": "ابحث عنه في البحث",
+  "common.loading.empty": "لم يعود أي بيانات",
+  "common.retry.all": "حاول مرة أخرى أو عودي للمنزل"
 }

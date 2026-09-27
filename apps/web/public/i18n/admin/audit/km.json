@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Admin Logs Audit",
+  "admin.audit.desc": "តាមដាន រាល់ សកម្មភាព រដ្ឋបាល ការផ្លាស់ប្តូរ អនុញ្ញាត និង ការផ្លាស់ប្តូរ កម្រិត។",
+  "admin.audit.searchPlaceholder": "ការស្វែងរក (email/action)...",
+  "admin.audit.loading": "ការចាក់វ៉ាក់សាំង...",
+  "admin.audit.empty": "គ្មាន ឯកសារ សវនាការ ដែល ត្រូវ បាន ចុះ បញ្ជី។",
+  "admin.audit.viewDetails": "ការមើល",
+  "admin.audit.modalTitle": "ព័ត៌មានក្នុងប្រវត្តិ",
+  "admin.audit.close": "ជិត"
 }

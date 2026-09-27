@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Rychlé vyhledávání a příkazy...",
+  "admin.palette.placeholder": "Přikázání pro admin vyhledávání (navigace, export CSV, údržba)...",
+  "admin.palette.empty": "Žádné výsledky nebyly nalezeny.",
+  "admin.palette.groupNav": "Kontolní navigační zkratky",
+  "admin.palette.groupQuick": "Rychlé akce a vývoz",
+  "admin.palette.exportUsers": "Vývoz všech členů CSV",
+  "admin.palette.exportRevenue": "Účetní řádek vývozu CSV",
+  "admin.palette.maintenance": "Kontrolní systém nouzová údržba"
 }

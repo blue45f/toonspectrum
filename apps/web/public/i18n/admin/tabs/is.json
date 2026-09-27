@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Auglýsingar og spjöld",
+  "admin.tabs.audit": "Rannsóknarskrá",
+  "admin.tabs.campaigns": "Tilboðssviðir",
+  "admin.tabs.creatorSupport": "Stuðningur við skaparan",
+  "admin.tabs.dashboard": "Skjáborð",
+  "admin.tabs.ops": "Aðgerðir",
+  "admin.tabs.plans": "Áætlanir",
+  "admin.tabs.promos": "Framsóknir",
+  "admin.tabs.reports": "Fréttafréttir og hóf",
+  "admin.tabs.revenue": "Uppgjör",
+  "admin.tabs.security": "Öryggismál og IP",
+  "admin.tabs.inquiries": "Viðskiptaupplýsingar",
+  "admin.tabs.supporters": "Stuðningur við rekstrarkostnað",
+  "admin.tabs.traffic": "Lífrænt umferð"
 }

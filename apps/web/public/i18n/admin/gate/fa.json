@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "ورود لازم",
+  "admin.gate.guestBody": "کنسول ادمين به تصديق نياز داره لطفاً وارد شو",
+  "admin.gate.forbiddenTitle": "مجوز مدیر مورد نیاز",
+  "admin.gate.forbiddenBody": "اين حساب مجوز ادميني ندارد. در صورت لزوم با يک اپراتور تماس بگير.",
+  "admin.gate.errorTitle": "کار کنسول را انجام نداد"
 }

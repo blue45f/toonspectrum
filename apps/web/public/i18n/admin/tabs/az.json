@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Bəyannamələr və bayraqlar",
+  "admin.tabs.audit": "Audit günləri",
+  "admin.tabs.campaigns": "Kampaniyalar",
+  "admin.tabs.creatorSupport": "Yaradıcı tərəfindən dəstək",
+  "admin.tabs.dashboard": "Daşbord",
+  "admin.tabs.ops": "Əməliyyat",
+  "admin.tabs.plans": "Planlar",
+  "admin.tabs.promos": "Tərəflər",
+  "admin.tabs.reports": "Hesabatlar & Müvafiqlik",
+  "admin.tabs.revenue": "Hesablama",
+  "admin.tabs.security": "Təhlükəsizlik & IP",
+  "admin.tabs.inquiries": "Ticarət sorğuları",
+  "admin.tabs.supporters": "Əməliyyat xərcləri dəstəyi",
+  "admin.tabs.traffic": "Canlı trafik"
 }

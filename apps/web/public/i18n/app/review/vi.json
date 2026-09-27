@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
+  "review.progress.complete": "Kết thúc",
+  "review.progress.binge": "Bịng",
+  "review.progress.upcoming": "Kế hoạch",
+  "review.progress.abandoned": "Thả",
+  "review.progress.unknown": "Tiến bộ ẩn",
   "review.spoilerRevealLabel": "Show spoiler"
 }

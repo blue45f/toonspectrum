@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "หนังสือลิขสิทธิ์ & ข้อมูล",
+  "copyright.section1.title": "แหล่งรวมและหลักการ",
+  "copyright.section1.body": "ToonSpectrum เป็นเว็บไซต์แสดงผลและค้นหาที่สรุปข้อมูลเมทาตาลogu (หัวข้อ ผู้เขียน, กลอน เป็นต้น) จากเว็บไซต์ / เว็บนิยายเว็บไซต์.",
+  "copyright.section2.title": "รูปภาพหน้ากาก",
+  "copyright.section2.body": "รูปหน้าปกใช้เป็นตัวประกอบตัวเล็กและอ้างอิงหน้าปกต้นฐานด้วยลิ้งแหล่งเมื่อเป็นไปได้",
+  "copyright.section3.title": "เมตรติกส์ & ความโปร่งใส",
+  "copyright.section4.title": "ข่าวสารสิทธิ",
+  "copyright.section5.title": "ข่าวลอกสิทธิ์ & ถอน",
+  "copyright.section5.body": "หากคุณเชื่อว่าเมตาเดท่าหรือปกปิดละเมิดสิทธิของคุณ, โปรดส่งคําสอบถามพร้อมกับชื่อ, URL และหลักฐานของเจ้าของ.",
+  "copyright.leaveInquiry": "ส่งสอบถาม →"
 }

@@ -38,7 +38,7 @@
   "account.activity.stat.reviews": "書かれたレビュー",
   "account.profile.errorDelete": "アカウントの削除に失敗しました。",
   "account.profile.bioPlaceholder": "あなた自身について 1 行で教えてください。",
-  "account.profile.bioLength": "{length}/280",
+  "account.profile.bioLength": "{length} /280",
   "account.profile.confirmDelete": "アカウントを削除しますか?あなたのプロフィールとログイン情報は削除され、セッションは終了します。",
   "account.profile.errorSave": "プロファイルの保存に失敗しました。",
   "account.activity.recentNoText": "評価のみ",

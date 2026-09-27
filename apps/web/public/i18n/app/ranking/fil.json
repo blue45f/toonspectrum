@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Tingnan breakdown ng score",
+  "ranking.metric.views": "Mga pananaw",
+  "ranking.why": "Bakit?",
+  "ranking.breakdownTitle": "Pagbabago ng mga puntos",
+  "ranking.totalScore": "Total na score",
+  "ranking.breakdownDescription": "Pagkalkula gamit ang mga timbang sa axis at titulo-specific normalization."
 }

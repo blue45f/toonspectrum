@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
-  "admin.refresh.seconds": "{sec}s"
+  "admin.refresh.now": "Pasinaudokite dabar",
+  "admin.refresh.auto": "Automatinė:",
+  "admin.refresh.seconds": "{sec} s"
 }

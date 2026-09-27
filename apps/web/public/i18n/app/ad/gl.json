@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Imagen patrocinada",
+  "ad.slotAriaLabel": "O espazo de publicidade",
+  "ad.slotLabel": "Patrocinado",
+  "ad.slotTitle": "Contidos patrocinados",
+  "ad.ctaDetails": "Vista de detalles",
+  "ad.placeholderAriaLabel": "Titular de anúncios",
+  "ad.placeholderText": "Non hai contido patrocinado.",
+  "ad.tag": "Anuncios"
 }

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "ჟჲბჲჟრთვ ეა ჟვ გყპნვ.",
+  "apiError.adminRequired": "ადმინის ნებართვები ვერ შემოწმდა.",
+  "apiError.adminOnlyPage": "ეს გვერდი მხოლოდ ადმინისტრატორებისთვისაა შეზღუდული.",
+  "apiError.notFound": "მოთხოვნილი ნივთი ვერ იპოვეს.",
+  "apiError.unsupportedType": "არარსებობის შინაარსის ტიპი.",
+  "apiError.inactiveAccount": "არაკომპეტენტური ანგარიშები ვერ იყენებენ ადმინისტრატორის მახასიათებლებს.",
+  "apiError.settlementFailed": "ნვ ჟსმჲპგა ოპვრთრთნწრა."
 }

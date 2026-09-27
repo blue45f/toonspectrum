@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "اللغة",
+  "control.sound.enable": "تمكين الآثار الصوتية",
+  "control.sound.disable": "تعطيل الآثار الصوتية",
+  "control.theme.dark": "انقل إلى وضع الضوء",
+  "control.theme.light": "انقل إلى وضع الظلام",
+  "control.settings.open": "إعدادات مفتوحة",
+  "control.settings.close": "الإعدادات القريبة",
+  "control.cluster.settings": "السيطرة على الصوت والموضوع واللغة",
+  "control.cluster.open": "إعدادات مفتوحة",
+  "control.cluster.tooltip": "الإعدادات الصوتية والموضوعية واللغة",
+  "control.language.group.translated": "ترجمات ذات تغطية عالية",
+  "control.language.group.englishBase": "ترجمة آلية · إنجليزية fallback"
 }

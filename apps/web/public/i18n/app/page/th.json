@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "หน้าไม่พบ",
+  "page.notFound.message": "ตรวจสอบ URL อีกครั้ง หรือค้นหาหัวข้อจากหน้าแรก",
+  "page.notFound.home": "ไปกลับบ้าน"
 }

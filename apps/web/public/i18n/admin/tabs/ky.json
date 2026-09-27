@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
-  "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.announcements": "Жарнамалар жана баннерлер",
+  "admin.tabs.audit": "Текшерүү журналдары",
+  "admin.tabs.campaigns": "Акциялар",
+  "admin.tabs.creatorSupport": "Жараткандын колдоосу",
+  "admin.tabs.dashboard": "Темир панели",
+  "admin.tabs.ops": "Операциялар",
+  "admin.tabs.plans": "Пландар",
+  "admin.tabs.promos": "Өндүрүү",
+  "admin.tabs.reports": "Отчеттор жана орточолук",
+  "admin.tabs.revenue": "Төлөм",
+  "admin.tabs.security": "Коопсуздук & IP",
+  "admin.tabs.inquiries": "Ишкердик суроо-талаптар",
+  "admin.tabs.supporters": "Иштөө чыгымдары боюнча колдоо",
+  "admin.tabs.traffic": "Түз жүрүү"
 }

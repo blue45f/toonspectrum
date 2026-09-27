@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "زبان",
+  "control.sound.enable": "امکان ایجاد اثرات صوتی",
+  "control.sound.disable": "فعال کردن اثرات صوتی",
+  "control.theme.dark": "به حالت روشن شدن تغییر دهید",
+  "control.theme.light": "به حالت تاریک بريم",
+  "control.settings.open": "تنظیمات باز",
+  "control.settings.close": "تنظیمات نزدیک",
+  "control.cluster.settings": "کنترل صدا، موضوع، زبان",
+  "control.cluster.open": "تنظیمات باز",
+  "control.cluster.tooltip": "تنظیمات صدا، موضوع و زبان",
+  "control.language.group.translated": "ترجمه های با پوشش بالا",
+  "control.language.group.englishBase": "ترجمه خودکار · به زبان انگلیسی fallback"
 }

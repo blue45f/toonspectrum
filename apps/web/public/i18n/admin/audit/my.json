@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Admin Audit Log များ",
+  "admin.audit.desc": "စီမံခန့်ခွဲမှု လုပ်ဆောင်ချက်အားလုံး၊ ခွင့်ပြုချက် ပြောင်းခြင်းများ၊ ဖွဲ့စည်းမှု ပြောင်းလဲမှုများကို ခြေရာခံပါ။",
+  "admin.audit.searchPlaceholder": "ရှာဖွေ (email/action)...",
+  "admin.audit.loading": "စစ်ဆေးရေး မှတ်တမ်းတွေ တင်နေတာပါ။",
+  "admin.audit.empty": "မှတ်တမ်းတင်ထားတဲ့ စစ်ဆေးရေး မှတ်တမ်းတွေ မရှိဘူး။",
+  "admin.audit.viewDetails": "ကြည့်ရှုခြင်း",
+  "admin.audit.modalTitle": "စစ်ဆေးရေး မှတ်တမ်း အသေးစိတ်",
+  "admin.audit.close": "အနီးကပ်"
 }

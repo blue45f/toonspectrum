@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "管理監控日志",
+  "admin.audit.desc": "追蹤所有管理行動,許可變更和配置變更.",
+  "admin.audit.searchPlaceholder": "搜尋 (電子郵件/行動)...",
+  "admin.audit.loading": "收納監控日志...",
+  "admin.audit.empty": "沒有被記錄的監控日志.",
+  "admin.audit.viewDetails": "觀看",
+  "admin.audit.modalTitle": "監控日志的詳細",
+  "admin.audit.close": "接近"
 }

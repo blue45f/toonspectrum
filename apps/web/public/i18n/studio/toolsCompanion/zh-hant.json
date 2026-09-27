@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "參考螢幕",
   "studio.toolsCompanion.referenceLoading": "正在載入參考工具...",
   "studio.toolsCompanion.footer": "編輯文件僅擁有預設選項卡。此視窗僅將壓縮的預覽和檢查/參考意圖傳輸到相同瀏覽器的BroadcastChannel，因此沒有單獨的伺服器成本。",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "沒有連接到主工作室.",
+  "studio.toolsCompanion.exit.editor": "打開工作室編輯器"
 }

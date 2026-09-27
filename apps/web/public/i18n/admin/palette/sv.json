@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Snabbt söka och befallningar...",
+  "admin.palette.placeholder": "Sökadministrationskommandon (Navigering, CSV-export, Underhåll)...",
+  "admin.palette.empty": "Inga resultat hittades.",
+  "admin.palette.groupNav": "Konsolerna navigeringsväg",
+  "admin.palette.groupQuick": "Snabb åtgärder och export",
+  "admin.palette.exportUsers": "Export av alla medlemmar CSV",
+  "admin.palette.exportRevenue": "Exportintäkterbok CSV",
+  "admin.palette.maintenance": "Kontrollsystem: Underhåll av nödfall"
 }

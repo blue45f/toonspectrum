@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Lag {count}",
   "studio.toolsCompanion.review.section.comments": "Kommentar {count}",
   "studio.toolsCompanion.review.section.history": "Optag {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE sideEtiket}·{valgEtiket ZZ RBRACE",
   "studio.toolsCompanion.review.title": "inspektionskonsol",
   "studio.toolsCompanion.review.truncatedComments": "og {count} kommentarer",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lag",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referenceskærm",
   "studio.toolsCompanion.referenceLoading": "Indlæser referenceværktøj...",
   "studio.toolsCompanion.footer": "Rediger dokumenter ejer kun standardfanen. Dette vindue overfører kun den komprimerede forhåndsvisning og inspektions-/referencehensigten til BroadcastChannel i den samme browser, så der er ingen separat serveromkostning.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Ikke forbundet med hovedstudiet.",
+  "studio.toolsCompanion.exit.editor": "Åbn Studio-redigereren"
 }

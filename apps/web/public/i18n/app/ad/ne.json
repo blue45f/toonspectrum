@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "प्रायोजित छवि",
+  "ad.slotAriaLabel": "विज्ञापन स्लॉट",
+  "ad.slotLabel": "प्रायोजित",
+  "ad.slotTitle": "प्रायोजित सामग्री",
+  "ad.ctaDetails": "विवरणहरू हेर्नुहोस्",
+  "ad.placeholderAriaLabel": "विज्ञापन स्थान होल्डर",
+  "ad.placeholderText": "कुनै प्रायोजित सामग्री उपलब्ध छैन।",
+  "ad.tag": "विज्ञापन"
 }

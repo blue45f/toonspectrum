@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Замовлено ввійти",
+  "admin.gate.guestBody": "Консоль адміністраторів вимагає аутентифікації.",
+  "admin.gate.forbiddenTitle": "Вимога адміністратора",
+  "admin.gate.forbiddenBody": "У цьому рахунку немає дозволу адміністратора. Зверніться до оператора, якщо це необхідно.",
+  "admin.gate.errorTitle": "Не вдалося завантажити консоль"
 }

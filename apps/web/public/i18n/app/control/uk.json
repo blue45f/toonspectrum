@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Мова",
+  "control.sound.enable": "Отримати звукові ефекти",
+  "control.sound.disable": "Виключити звукові ефекти",
+  "control.theme.dark": "Перейти на світловий режим",
+  "control.theme.light": "Перейдіть на темний режим",
+  "control.settings.open": "Відкриті налаштування",
+  "control.settings.close": "Затверджені налаштування",
+  "control.cluster.settings": "Звук, тематика, мовний контроль",
+  "control.cluster.open": "Відкриті налаштування",
+  "control.cluster.tooltip": "Звук, тематика та налаштування мови",
+  "control.language.group.translated": "Переклади з високим покриттям",
+  "control.language.group.englishBase": "Автоматичний переклад · Англійська перехід"
 }

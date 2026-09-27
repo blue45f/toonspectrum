@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Sisäänlasku vaaditaan.",
+  "apiError.adminRequired": "Hallintovelvollisuuksia ei voitu tarkistaa.",
+  "apiError.adminOnlyPage": "Tämä sivu on vain hallinnoijoille.",
+  "apiError.notFound": "Pyynnön esittänyt esine ei löytynyt.",
+  "apiError.unsupportedType": "Tuettua sisältöä ei ole.",
+  "apiError.inactiveAccount": "Aktiiviset tiliet eivät voi käyttää hallinnoijan ominaisuuksia.",
+  "apiError.settlementFailed": "- Säätöprosessi epäonnistui."
 }

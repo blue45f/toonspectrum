@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Давхарга {count}",
   "studio.toolsCompanion.review.section.comments": "Сэтгэгдэл {count}",
   "studio.toolsCompanion.review.section.history": "Бичлэг {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE хуудас Шошго}·{сонголт Шошго ZZ RBRACE",
   "studio.toolsCompanion.review.title": "хяналтын консол",
   "studio.toolsCompanion.review.truncatedComments": "болон {count} сэтгэгдэл",
   "studio.toolsCompanion.review.truncatedLayers": "{count} давхаргууд",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Лавлах дэлгэц",
   "studio.toolsCompanion.referenceLoading": "Лавлах хэрэгслийг ачаалж байна...",
   "studio.toolsCompanion.footer": "Баримт бичгийг засварлах нь зөвхөн үндсэн табыг эзэмшдэг. Энэ цонх нь зөвхөн нэг хөтчийн BroadcastChannel руу шахсан урьдчилан харах, шалгах/лавлагаа дамжуулдаг тул тусдаа серверийн зардал гарахгүй.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "nntntntntntntntntntntntntntn",
+  "studio.toolsCompanion.exit.editor": "️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️️"
 }

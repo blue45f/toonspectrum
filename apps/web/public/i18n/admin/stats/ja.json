@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "健康システム",
+  "admin.stats.healthy": "健康",
+  "admin.stats.degraded": "劣化した",
+  "admin.stats.revenueEvents": "取引/決済総額",
+  "admin.stats.usersCommunity": "総会員 / 職務",
+  "admin.stats.maintenance": "メンテナンスモード",
+  "admin.stats.maintenanceOn": "緊急維持 (ON)",
+  "admin.stats.maintenanceOff": "通常の運用 (OFF)",
+  "admin.stats.activeVisitors": "5分 活発な訪問者",
+  "admin.stats.views5m": "5分 ページ閲覧"
 }

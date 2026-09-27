@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "סיום",
+  "review.progress.binge": "בינג",
+  "review.progress.upcoming": "מתוכננת",
+  "review.progress.abandoned": "נזרק",
+  "review.progress.unknown": "התקדמות מוסתרת",
+  "review.spoilerRevealLabel": "הראה ספוילר"
 }

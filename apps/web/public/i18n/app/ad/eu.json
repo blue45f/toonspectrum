@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Laguntzen den irudia",
+  "ad.slotAriaLabel": "Iragarki-lekuak",
+  "ad.slotLabel": "Babestuta",
+  "ad.slotTitle": "Babestuta dagoen edukiak",
+  "ad.ctaDetails": "Xehetasunak ikusi",
+  "ad.placeholderAriaLabel": "Iragarki-leku-jabea",
+  "ad.placeholderText": "Ez dago eduki babesik.",
+  "ad.tag": "Iragarkia"
 }

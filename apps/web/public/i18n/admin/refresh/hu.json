@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
-  "admin.refresh.seconds": "{sec}s"
+  "admin.refresh.now": "Frissítsd meg most",
+  "admin.refresh.auto": "Autó:",
+  "admin.refresh.seconds": "{sec} sz"
 }

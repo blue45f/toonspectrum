@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "ایڈمن آڈٹ لاگ",
+  "admin.audit.desc": "تمام انتظامی اقدامات، اجازت کی تبدیلیاں، اور ترتیب کی تبدیلیوں کا سراغ لگائیں.",
+  "admin.audit.searchPlaceholder": "تلاش (ای میل/عمل)...",
+  "admin.audit.loading": "آڈٹ کی نوشتہ جات لوڈ کرنا...",
+  "admin.audit.empty": "کوئی ریکارڈ شدہ آڈٹ ریکارڈ نہیں.",
+  "admin.audit.viewDetails": "نظارہ",
+  "admin.audit.modalTitle": "آڈٹ لاگ تفصیلات",
+  "admin.audit.close": "قریب"
 }

@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Kirish talab etiladi",
+  "admin.gate.guestBody": "Boshqaruv konsolining haqiqiyligi talab etiladi. Iltimos, kiring.",
+  "admin.gate.forbiddenTitle": "Administratorning ruxsatnomasi talab qilinadi",
+  "admin.gate.forbiddenBody": "Ushbu hisobda admin ruxsatlari yo'q. Agar kerak bo'lsa operator bilan bog'laning.",
+  "admin.gate.errorTitle": "Konsol yuklab boʻlmadi"
 }

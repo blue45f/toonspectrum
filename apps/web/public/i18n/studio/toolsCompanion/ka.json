@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ფენა {count}",
   "studio.toolsCompanion.review.section.comments": "კომენტარი {count}",
   "studio.toolsCompanion.review.section.history": "ჩანაწერი {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE გვერდიLabel}·{selectionLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "ინსპექტირების კონსოლი",
   "studio.toolsCompanion.review.truncatedComments": "და {count} კომენტარები",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ფენა",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "საცნობარო ეკრანი",
   "studio.toolsCompanion.referenceLoading": "საცნობარო ხელსაწყოს ჩატვირთვა...",
   "studio.toolsCompanion.footer": "დოკუმენტების რედაქტირება მხოლოდ ნაგულისხმევი ჩანართის მფლობელია. ეს ფანჯარა გადასცემს მხოლოდ შეკუმშულ გადახედვას და ინსპექტირების/მინიშნების განზრახვას იმავე ბრაუზერის BroadcastChannel-ზე, ამიტომ არ არის ცალკე სერვერის ღირებულება.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "ნვ ჟმჲბაჟმ ჟ ჟ ჟრჟრთნარა.",
+  "studio.toolsCompanion.exit.editor": "გახსენეთ Studio რედაქტორი"
 }

@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Sponsorlu şəkil",
+  "ad.slotAriaLabel": "Reklam sahəsi",
+  "ad.slotLabel": "Sponsorluq",
+  "ad.slotTitle": "Sponsorlaşdırılmış məzmun",
+  "ad.ctaDetails": "Xüsusiyyətləri görmək",
+  "ad.placeholderAriaLabel": "Reklam yerləşdiricisi",
+  "ad.placeholderText": "Heç bir sponsorlu məzmun mövcud deyil.",
+  "ad.tag": "Reklam"
 }

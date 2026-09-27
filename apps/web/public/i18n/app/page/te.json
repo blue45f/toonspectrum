@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "పేజీ దొరకలేదు",
+  "page.notFound.message": "URL ను మళ్లీ తనిఖీ చేయండి లేదా హోమ్ పేజీ నుండి శీర్షికలను అన్వేషించండి.",
+  "page.notFound.home": "ఇంటికి తిరిగి వెళ్ళు"
 }

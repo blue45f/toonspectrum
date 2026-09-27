@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Πληροφορίες για τα δικαιώματα πνευματικής ιδιοκτησίας και περιεχόμενο",
+  "copyright.section1.title": "Πηγές περιεχομένου και αρχές",
+  "copyright.section1.body": "Το ToonSpectrum είναι μια πλατφόρμα αναφοράς και ανακάλυψης που συνοψίζει τα δημόσια μεταδεδομένα καταλόγου (άριθμοι, συγγραφείς, είδη κλπ.) από πλατφόρμες webtoon / webnovel.",
+  "copyright.section2.title": "Εικόνες κάλυψης",
+  "copyright.section2.body": "Οι εικόνες εξώφυλλου χρησιμεύουν ως αναγνωριστικές μικρογραφίες και αναφορά στην αρχική εξώφυλλα πλατφόρμας με συνδέσμους πηγής όπου είναι δυνατόν.",
+  "copyright.section3.title": "Μέτρα & Διαφάνεια",
+  "copyright.section4.title": "Ανακοίνωση για τα δικαιώματα",
+  "copyright.section5.title": "Ανακοίνωση για παραβίαση δικαιωμάτων πνευματικής ιδιοκτησίας και απόσυρση",
+  "copyright.section5.body": "Εάν πιστεύετε ότι τα μεταδεδομένα ή τα εξώφυλλα παραβιάζουν τα δικαιώματά σας, παρακαλούμε υποβάλετε μια ερώτηση με τίτλο, URL και απόδειξη ιδιοκτησίας.",
+  "copyright.leaveInquiry": "Υποβολή Ερευνών →"
 }

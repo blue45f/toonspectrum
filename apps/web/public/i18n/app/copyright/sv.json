@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Upphovsrätt och innehåll",
+  "copyright.section1.title": "Innehållskällor och principer",
+  "copyright.section1.body": "ToonSpectrum är en index- och upptäcktsplattform som sammanfattar offentliga katalogmetadata (titlar, författare, genrer etc.) från webtoon/webnovel-plattformar.",
+  "copyright.section2.title": "Förpackningsbilder",
+  "copyright.section2.body": "Förstasbilder fungerar som identifierande miniatyr och referens originalplattformsomslag med källlänkar när det är möjligt.",
+  "copyright.section3.title": "Metriker och öppenhet",
+  "copyright.section4.title": "Upplysning om rättigheter",
+  "copyright.section5.title": "Upphovsrättsliga överträdelser",
+  "copyright.section5.body": "Om du tror att metadata eller omslag kränker dina rättigheter, skicka in en förfrågan med titel, URL och bevis på äganderätt.",
+  "copyright.leaveInquiry": "Inlämna en förfrågan"
 }

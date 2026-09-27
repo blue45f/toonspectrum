@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Admin audito įrašai",
+  "admin.audit.desc": "Sekite visus administracinius veiksmus, leidimų pakeitimus ir konfigūracijos pakeitimus.",
+  "admin.audit.searchPlaceholder": "Paieška (e-paštas/veikimas)...",
+  "admin.audit.loading": "Įkraunant audito įrašus...",
+  "admin.audit.empty": "Nėra registruotų audito įrašų.",
+  "admin.audit.viewDetails": "Žiūrėjimas",
+  "admin.audit.modalTitle": "Audito žurnalo duomenys",
+  "admin.audit.close": "Užsičiaupti"
 }

@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Система охорони здоров'я",
+  "admin.stats.healthy": "Здорове",
+  "admin.stats.degraded": "Зневажливлений",
+  "admin.stats.revenueEvents": "Загальні операції / розрахунки",
+  "admin.stats.usersCommunity": "Загальні члени / посади",
+  "admin.stats.maintenance": "Мод обслуговування",
+  "admin.stats.maintenanceOn": "Послуга аварійного обслуговування (ON)",
+  "admin.stats.maintenanceOff": "Нормальна експлуатація (ОFF)",
+  "admin.stats.activeVisitors": "5 хвилин активних відвідувачів",
+  "admin.stats.views5m": "5 хвилин перегляду сторінки"
 }

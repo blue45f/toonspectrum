@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Жаңартуларды жүктей алмадым.",
+  "changelog.empty": "Жаңартылған жазбалар әлі жоқ."
 }

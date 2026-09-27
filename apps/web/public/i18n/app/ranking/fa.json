@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "تقسیم امتیاز را مشاهده کنید",
+  "ranking.metric.views": "نظرات",
+  "ranking.why": "چرا",
+  "ranking.breakdownTitle": "تقسیم امتیاز",
+  "ranking.totalScore": "امتیاز کل",
+  "ranking.breakdownDescription": "با استفاده از وزن محور و نرمال سازی خاص عنوان محاسبه شده است."
 }

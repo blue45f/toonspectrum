@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Úplný",
+  "review.progress.binge": "Zvyčaľovanie",
+  "review.progress.upcoming": "Plánované",
+  "review.progress.abandoned": "Zhodil",
+  "review.progress.unknown": "Pokrok skrytý",
+  "review.spoilerRevealLabel": "Spolér zobraziť"
 }

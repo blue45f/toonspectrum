@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "ਲਾਗਇਨ ਦੀ ਲੋੜ ਹੈ।",
+  "apiError.adminRequired": "ਪ੍ਰਸ਼ਾਸਨ ਅਧਿਕਾਰਾਂ ਦੀ ਪੁਸ਼ਟੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
+  "apiError.adminOnlyPage": "ਇਹ ਸਫ਼ਾ ਪ੍ਰਸ਼ਾਸਕਾਂ ਤੱਕ ਸੀਮਿਤ ਹੈ।",
+  "apiError.notFound": "ਮੰਗ ਕੀਤੀ ਗਈ ਚੀਜ਼ ਨਹੀਂ ਲੱਭੀ।",
+  "apiError.unsupportedType": "ਸਹਿਯੋਗੀ ਨਹੀਂ ਸਮੱਗਰੀ ਦੀ ਕਿਸਮ.",
+  "apiError.inactiveAccount": "ਅਯੋਗ ਖਾਤੇ ਪ੍ਰਬੰਧਕ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਦੀ ਵਰਤੋਂ ਨਹੀਂ ਕਰ ਸਕਦੇ.",
+  "apiError.settlementFailed": "ਬੰਦੋਬਸਤ ਪ੍ਰਕਿਰਿਆ ਅਸਫਲ ਰਹੀ।"
 }

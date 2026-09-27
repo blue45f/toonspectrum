@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Copyright & Content Notificare",
+  "copyright.section1.title": "Surse de conținut și principii",
+  "copyright.section1.body": "ToonSpectrum este o platformă de indexare și descoperire care rezumă metadatele de catalog public (titluri, autori, genuri, etc.) din platformele de webtoon / webnovel.",
+  "copyright.section2.title": "Imagini de acoperire",
+  "copyright.section2.body": "Imaginile de acoperire sunt folosite ca miniature de identificare și de referință pentru acoperirea originală a platformei cu link-uri de sursă ori de câte ori este posibil.",
+  "copyright.section3.title": "Metrice & Transparență",
+  "copyright.section4.title": "Avisa privind drepturile",
+  "copyright.section5.title": "Notificarea și eliminarea încălcării drepturilor de autor",
+  "copyright.section5.body": "Dacă credeți că metadatele sau acoperirile violează drepturile dvs., vă rugăm să trimiteți o anchetă cu titlu, URL și dovadă de proprietate.",
+  "copyright.leaveInquiry": "Împlini cererea →"
 }

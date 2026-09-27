@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "មិនអាចដាក់ព័ត៌មានបានទេ។",
+  "changelog.empty": "មិនទាន់មានលិខិតបំភ្លឺនៅឡើយទេ"
 }

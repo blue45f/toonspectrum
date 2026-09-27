@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "پرت {count}",
   "studio.toolsCompanion.review.section.comments": "تبصرہ {count}",
   "studio.toolsCompanion.review.section.history": "ریکارڈ {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE صفحہ لیبل}·{انتخاب لیبل ZZ RBRACE",
   "studio.toolsCompanion.review.title": "معائنہ کنسول",
   "studio.toolsCompanion.review.truncatedComments": "اور {count} تبصرے",
   "studio.toolsCompanion.review.truncatedLayers": "{count} تہیں",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "حوالہ اسکرین",
   "studio.toolsCompanion.referenceLoading": "ریفرنس ٹول لوڈ ہو رہا ہے...",
   "studio.toolsCompanion.footer": "دستاویزات میں ترمیم کریں صرف ڈیفالٹ ٹیب کے مالک ہیں۔ یہ ونڈو صرف اسی براؤزر کے براڈکاسٹ چینل کو کمپریسڈ پیش نظارہ اور معائنہ/حوالہ کے ارادے کو منتقل کرتی ہے، لہذا سرور کی کوئی الگ قیمت نہیں ہے۔",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "مرکزی سٹوڈیو سے منسلک نہیں ہے.",
+  "studio.toolsCompanion.exit.editor": "اسٹوڈیو ایڈیٹر کھولیں"
 }

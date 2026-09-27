@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "Pag-reload ng pinakabagong bersyon...",
+  "error.chunkRetryFailed": "Isang beses na nag-refurbish, ngunit ang isyu ay nagpapatuloy.",
+  "error.reloadButton": "I-reload ang pahina",
+  "error.goHome": "Pumunta sa Balay",
+  "error.retryDesc": "Mangyaring subukan muli o bumalik sa home page."
 }

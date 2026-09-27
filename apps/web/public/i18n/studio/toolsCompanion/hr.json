@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Sloj {count}",
   "studio.toolsCompanion.review.section.comments": "Komentar {count}",
   "studio.toolsCompanion.review.section.history": "Snimanje {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{selectionLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "konzola za pregled",
   "studio.toolsCompanion.review.truncatedComments": "i {count} komentara",
   "studio.toolsCompanion.review.truncatedLayers": "{count} slojeva",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Referentni zaslon",
   "studio.toolsCompanion.referenceLoading": "Učitavanje referentnog alata...",
   "studio.toolsCompanion.footer": "Uređivanje dokumenata posjeduje samo zadanu karticu. Ovaj prozor prenosi samo komprimirani pregled i namjeru inspekcije/reference na BroadcastChannel istog preglednika, tako da nema zasebnog troška poslužitelja.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Nije povezan sa glavnim studijem.",
+  "studio.toolsCompanion.exit.editor": "Otvori urednik Studio"
 }

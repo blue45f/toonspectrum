@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "레이어 {count}",
   "studio.toolsCompanion.review.section.comments": "댓글 {count}",
   "studio.toolsCompanion.review.section.history": "기록 {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE 페이지라벨}·{선택라벨 ZZ RBRACE",
   "studio.toolsCompanion.review.title": "검수 콘솔",
   "studio.toolsCompanion.review.truncatedComments": "외 {count}개 댓글",
   "studio.toolsCompanion.review.truncatedLayers": "외 {count}개 레이어",

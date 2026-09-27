@@ -10,7 +10,7 @@
   "studio.settings.tool.dodgeBurn": "Dodge/Burn",
   "studio.settings.tool.liquify": "Հեղուկացնել",
   "studio.settings.tool.fill": "ներկի դույլ",
-  "studio.settings.tool.lassoFill": "Lasso Fill",
+  "studio.settings.tool.lassoFill": "Լասո լրիվ",
   "studio.settings.tool.eyedropper": "կաթոցիկ",
   "studio.settings.tool.marqueeRect": "քառակուսի ընտրություն",
   "studio.settings.tool.marqueeCircle": "շրջանաձև ընտրություն",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "թաքնված",
   "studio.settings.state.show": "նշան",
   "studio.settings.state.open": "բացել",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "Ստեղծեք կերպար"
 }

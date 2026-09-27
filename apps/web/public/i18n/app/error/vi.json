@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "Lại tải lại phiên bản mới nhất...",
+  "error.chunkRetryFailed": "Một lần làm mới, nhưng vấn đề vẫn tồn tại.",
+  "error.reloadButton": "Lắp lại trang",
+  "error.goHome": "Đi về nhà",
+  "error.retryDesc": "Xin hãy thử lại hoặc quay lại trang chủ."
 }

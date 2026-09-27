@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Hệ thống y tế",
+  "admin.stats.healthy": "Tốt lành",
+  "admin.stats.degraded": "Thất xuống",
+  "admin.stats.revenueEvents": "Tổng số giao dịch / thanh toán",
+  "admin.stats.usersCommunity": "Tổng số thành viên / vị trí",
+  "admin.stats.maintenance": "Phương thức bảo trì",
+  "admin.stats.maintenanceOn": "Bảo trì khẩn cấp (ON)",
+  "admin.stats.maintenanceOff": "Hoạt động bình thường (Bỏ hoạt động)",
+  "admin.stats.activeVisitors": "5 phút khách truy cập tích cực",
+  "admin.stats.views5m": "5 phút xem trang"
 }

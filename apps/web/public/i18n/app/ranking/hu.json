@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Lásd a pontszám felosztását",
+  "ranking.metric.views": "Nézetek",
+  "ranking.why": "Miért?",
+  "ranking.breakdownTitle": "A pontszám felosztása",
+  "ranking.totalScore": "Összes pont",
+  "ranking.breakdownDescription": "A tengelyi súlyokkal és a címre vonatkozó normalizációval kiszámított."
 }

@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Készült",
+  "review.progress.binge": "A csörgés",
+  "review.progress.upcoming": "Tervezett",
+  "review.progress.abandoned": "Eldobta.",
+  "review.progress.unknown": "Elrejtett előrelépés",
+  "review.spoilerRevealLabel": "Mutasd meg a spoilert"
 }

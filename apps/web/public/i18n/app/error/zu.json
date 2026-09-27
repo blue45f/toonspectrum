@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "Ukulayisha kabusha inguqulo yakamuva...",
+  "error.chunkRetryFailed": "Ngiphinde ngivuselele kodwa inkinga iyaqhubeka.",
+  "error.reloadButton": "Ukulayisha kabusha ikhasi",
+  "error.goHome": "Hamba uye Ekhaya",
+  "error.retryDesc": "Sicela uzame futhi noma ubuyele ekhasini eliyisiqalo."
 }

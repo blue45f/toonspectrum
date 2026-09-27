@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Admin auditi logid",
+  "admin.audit.desc": "Seejärel jälgida kõiki haldusmeetmeid, lubade muutusi ja konfigureerimiste muutusi.",
+  "admin.audit.searchPlaceholder": "Otsing (e-posti/tegevus)...",
+  "admin.audit.loading": "Laadime auditi logid...",
+  "admin.audit.empty": "Ei ole registreeritud auditi logid.",
+  "admin.audit.viewDetails": "Vaate",
+  "admin.audit.modalTitle": "Auditi logis üksikasjad",
+  "admin.audit.close": "Lähedalt"
 }

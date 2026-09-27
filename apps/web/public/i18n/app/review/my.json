@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "ပြီးစီး",
+  "review.progress.binge": "တီးခတ်ခြင်း",
+  "review.progress.upcoming": "စီမံကိန်း",
+  "review.progress.abandoned": "ပိတ်လိုက်",
+  "review.progress.unknown": "ပုန်းကွယ်နေတဲ့ တိုးတက်မှု",
+  "review.spoilerRevealLabel": "Spoiler ကို ပြပါ"
 }

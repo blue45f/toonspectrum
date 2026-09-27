@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "חיפוש מהיר ופיקוד...",
+  "admin.palette.placeholder": "פקודות מנהל חיפוש (ניווט, יצוא CSV, תחזוקה)...",
+  "admin.palette.empty": "לא נמצאו תוצאות.",
+  "admin.palette.groupNav": "קיצוצים לניווט לקונסול",
+  "admin.palette.groupQuick": "פעולות מהירות והיצוא",
+  "admin.palette.exportUsers": "יצוא כל חברי CSV",
+  "admin.palette.exportRevenue": "רישומי ההכנסה למשא ומתן",
+  "admin.palette.maintenance": "מערכת הבקרה תחזוקה חירום"
 }

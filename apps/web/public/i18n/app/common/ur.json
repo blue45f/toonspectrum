@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "لوڈنگ",
+  "common.loading.short": "لوڈنگ",
   "common.close": "بند کریں",
   "common.open": "کھولیں",
   "common.search": "تلاش کریں",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "دوبارہ کوشش کریں",
+  "common.retry.short": "دوبارہ کوشش کریں",
+  "common.backToTop": "اوپر واپس",
+  "common.backToHome": "گھر جاؤ",
+  "common.loading.search": "تلاش کر رہا ہے...",
+  "common.notFoundWithQuery": "' {query} ' کے نتائج نہیں ملے۔",
+  "common.openSearch": "تلاش میں تلاش کریں →",
+  "common.loading.empty": "کوئی ڈیٹا واپس نہیں کیا گیا.",
+  "common.retry.all": "دوبارہ کوشش کریں یا گھر واپس جائیں."
 }

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "E' necessario entrare.",
+  "apiError.adminRequired": "Le autorizzazioni degli amministratori non sono state verificate.",
+  "apiError.adminOnlyPage": "Questa pagina è limitata agli amministratori.",
+  "apiError.notFound": "L'articolo richiesto non è stato trovato.",
+  "apiError.unsupportedType": "Tipo di contenuto non supportato.",
+  "apiError.inactiveAccount": "Gli account inattivi non possono utilizzare le funzionalità di amministratore.",
+  "apiError.settlementFailed": "Il processo di liquidazione è fallito."
 }

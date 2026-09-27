@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Login is vereist.",
+  "apiError.adminRequired": "Admin-toestemmingen konden niet worden geverifieerd.",
+  "apiError.adminOnlyPage": "Deze pagina is beperkt tot beheerders.",
+  "apiError.notFound": "Het aangevraagde artikel kon niet worden gevonden.",
+  "apiError.unsupportedType": "Niet-ondersteunde inhoudstypen.",
+  "apiError.inactiveAccount": "Onwerkzame accounts kunnen geen administratieve functies gebruiken.",
+  "apiError.settlementFailed": "De afwikkeling is mislukt."
 }

@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Tazama ugawaji wa alama",
+  "ranking.metric.views": "Maoni",
+  "ranking.why": "Kwa Nini?",
+  "ranking.breakdownTitle": "Ugawaji wa alama",
+  "ranking.totalScore": "Pointi ya jumla",
+  "ranking.breakdownDescription": "Hesabiwa kwa uzito wa mhimili na kawaida ya kichwa maalum."
 }

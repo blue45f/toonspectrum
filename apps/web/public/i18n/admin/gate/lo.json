@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "ຈໍາ ເປັນການເຂົ້າສູ່ລະບົບ",
+  "admin.gate.guestBody": "Admin console ຕ້ອງການການຢັ້ງຢືນ. ກະລຸນາເຂົ້າສູ່ລະບົບ.",
+  "admin.gate.forbiddenTitle": "ການອະນຸຍາດຜູ້ບໍລິຫານທີ່ຕ້ອງການ",
+  "admin.gate.forbiddenBody": "ບັນຊີນີ້ບໍ່ມີສິດ ອໍາ ນາດຜູ້ບໍລິຫານ. ຕິດຕໍ່ຜູ້ປະຕິບັດການຖ້າຕ້ອງການ.",
+  "admin.gate.errorTitle": "ບໍ່ສາມາດໂຫຼດ console ໄດ້"
 }

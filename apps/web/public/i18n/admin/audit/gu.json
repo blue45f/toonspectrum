@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "એડમિન ઓડિટ લોગ",
+  "admin.audit.desc": "બધી વહીવટી ક્રિયાઓ, પરવાનગીઓ બદલવા અને ગોઠવણી ફેરફારોને ટ્રૅક કરો.",
+  "admin.audit.searchPlaceholder": "શોધ (ઇમેઇલ / ક્રિયા)...",
+  "admin.audit.loading": "ઓડિટ લોગ લોડિંગ.",
+  "admin.audit.empty": "કોઈ રેકોર્ડ કરેલ ઓડિટ લોગ નથી.",
+  "admin.audit.viewDetails": "દૃશ્ય",
+  "admin.audit.modalTitle": "ઓડિટ લોગ વિગતો",
+  "admin.audit.close": "બંધ"
 }

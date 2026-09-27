@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "స్కోరు విభాగాన్ని వీక్షించండి",
+  "ranking.metric.views": "వీక్షణలు",
+  "ranking.why": "ఎందుకు",
+  "ranking.breakdownTitle": "స్కోరు విభాగం",
+  "ranking.totalScore": "మొత్తం స్కోరు",
+  "ranking.breakdownDescription": "అక్షాల బరువు మరియు టైటిల్-ప్రత్యేక సాధారణీకరణతో లెక్కించబడింది."
 }

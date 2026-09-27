@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "تکمیل شده",
+  "review.progress.binge": "بینگینگ",
+  "review.progress.upcoming": "برنامه ریزی شده",
+  "review.progress.abandoned": "رد شد",
+  "review.progress.unknown": "پیشرفت پنهان",
+  "review.spoilerRevealLabel": "اسپولار نمایش"
 }

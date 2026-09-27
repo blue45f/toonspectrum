@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Účetní záznamy správce",
+  "admin.audit.desc": "Sledujte všechny správní akce, změny povolení a změny konfigurace.",
+  "admin.audit.searchPlaceholder": "Vyhledávání (e-mail/akce)...",
+  "admin.audit.loading": "Naložíme auditní záznamy...",
+  "admin.audit.empty": "Žádné zaznamenané záznamy o auditu.",
+  "admin.audit.viewDetails": "Výhled",
+  "admin.audit.modalTitle": "Podrobnosti v deníku auditu",
+  "admin.audit.close": "V blízkosti"
 }

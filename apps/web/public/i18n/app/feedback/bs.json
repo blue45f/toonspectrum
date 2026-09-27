@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "Nisam mogao da učinim anketu.",
+  "feedback.thankYou": "Hvala na važnoj povratnoj izjavi!",
+  "feedback.anonymousNote": "Vaše odgovore su strogo anonimne.",
+  "feedback.notAtAll": "Uopšte ne.",
+  "feedback.definitely": "Definitivno."
 }

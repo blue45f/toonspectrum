@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Mfumo wa Afya",
+  "admin.stats.healthy": "Afya",
+  "admin.stats.degraded": "Kuvunjwa",
+  "admin.stats.revenueEvents": "Jumla ya shughuli / mahesabu",
+  "admin.stats.usersCommunity": "Jumla ya Wajumbe / Majukumu",
+  "admin.stats.maintenance": "Njia ya Matengenezo",
+  "admin.stats.maintenanceOn": "Huduma za Matengenezo ya Dharura (ON)",
+  "admin.stats.maintenanceOff": "Kazi ya kawaida (KUPUZWA)",
+  "admin.stats.activeVisitors": "Wageni wenye shughuli nyingi kwa dakika 5",
+  "admin.stats.views5m": "Maoni ya ukurasa ya dakika 5"
 }

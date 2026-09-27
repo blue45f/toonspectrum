@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Nhật ký kiểm tra của quản trị viên",
+  "admin.audit.desc": "Theo dõi tất cả các hành động quản lý, thay đổi quyền và thay đổi cấu hình.",
+  "admin.audit.searchPlaceholder": "Tìm kiếm (e-mail/ hành động)...",
+  "admin.audit.loading": "Lắp tải hồ sơ kiểm toán...",
+  "admin.audit.empty": "Không có hồ sơ kiểm toán được ghi lại.",
+  "admin.audit.viewDetails": "Xem",
+  "admin.audit.modalTitle": "Thông tin chi tiết về nhật ký kiểm toán",
+  "admin.audit.close": "Gần"
 }

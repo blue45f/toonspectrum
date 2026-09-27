@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Príslušné práva a obsah",
+  "copyright.section1.title": "Zdroje obsahu a zásady",
+  "copyright.section1.body": "ToonSpectrum je indexová a objavová platforma, ktorá zhrnuje metadaty verejného katalógu (tituly, autory, žánry atď.) z webtoonových platforiem.",
+  "copyright.section2.title": "Obrázky na obálke",
+  "copyright.section2.body": "Obrázky na obálke slúžia ako identifikátor miniatúr a referenčné originálne platformy s zdrojovými odkazy, kedykoľvek je to možné.",
+  "copyright.section3.title": "Metriky a transparentnosť",
+  "copyright.section4.title": "Oznámenie o právach",
+  "copyright.section5.title": "Oznámenie o porušení autorských práv a odstránenie",
+  "copyright.section5.body": "Ak si myslíte, že metadata alebo obaly porušujú vaše práva, prosím, predložte žiadosť s názvom, adresou URL a dôkazom o vlastníctve.",
+  "copyright.leaveInquiry": "Podanie vyšetrovania →"
 }

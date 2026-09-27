@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "ወቅታዊ መረጃዎችን መጫን አልቻልኩም.",
+  "changelog.empty": "እስካሁን ድረስ የዘመኑ መዝገቦች አልተለጠፉም."
 }

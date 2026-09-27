@@ -1,5 +1,5 @@
 {
-  "page.notFound.title": "Page not found",
-  "page.notFound.message": "Check the URL again or explore titles from the home page.",
-  "page.notFound.home": "Go back home"
+  "page.notFound.title": "Σελίδα δεν βρέθηκε",
+  "page.notFound.message": "Ελέγξτε ξανά το URL ή αναζητήστε τίτλους από την αρχική σελίδα.",
+  "page.notFound.home": "Γύρνα σπίτι."
 }

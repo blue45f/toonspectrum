@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "Completado",
+  "review.progress.binge": "En la boca",
+  "review.progress.upcoming": "Planificado",
+  "review.progress.abandoned": "Caída",
+  "review.progress.unknown": "El progreso oculto",
+  "review.spoilerRevealLabel": "Muestra spoiler"
 }

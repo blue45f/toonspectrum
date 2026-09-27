@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "Konponketa laburpena (azken 30 egunetan)",
+  "admin.revenue.loadError": "Ez da sarrera-liburua kargatu",
+  "admin.revenue.filterAll": "Denak",
+  "admin.revenue.filterPending": "Zain",
+  "admin.revenue.filterApproved": "Onartuta",
+  "admin.revenue.filterPaid": "Konponduta",
+  "admin.revenue.filterRejected": "Ezetz esan dute.",
+  "admin.revenue.filterRevoked": "Bertan behera utzi dute.",
+  "admin.revenue.empty": "Ez dago egoera honetako akordiorik.",
+  "admin.revenue.approve": "Onartu",
+  "admin.revenue.reject": "Uko egin",
+  "admin.revenue.settle": "Konponketa osoa",
+  "admin.revenue.revoke": "Bertan behera utzita"
 }

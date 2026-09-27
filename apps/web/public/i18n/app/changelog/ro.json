@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Nu am putut încărca actualizările.",
+  "changelog.empty": "Nu au fost încă postate date actualizate."
 }

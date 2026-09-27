@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ភាសា",
+  "control.sound.enable": "អនុញ្ញាតឱ្យមានប្រសិទ្ធភាពនៃសំឡេង",
+  "control.sound.disable": "បិទ ផលិតផល សំឡេង",
+  "control.theme.dark": "ប្តូរ ទៅលើ mode ពន្លឺ",
+  "control.theme.light": "ប្តូរ ទៅ ក្នុង របៀប ងងឹត",
+  "control.settings.open": "ការកំណត់បើក",
+  "control.settings.close": "ការកំណត់ Close",
+  "control.cluster.settings": "Sound, Theme, Language Controls",
+  "control.cluster.open": "ការកំណត់បើក",
+  "control.cluster.tooltip": "ការកំណត់ សំឡេង, ប្រធានបទ និង ភាសា",
+  "control.language.group.translated": "ការបកប្រែ ដែលមាន ការបកស្រាយ ច្រើន",
+  "control.language.group.englishBase": "ការបកប្រែដោយចល័ត · English fallback"
 }

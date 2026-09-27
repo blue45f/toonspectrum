@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Limba",
+  "control.sound.enable": "Permiteți efecte sonore",
+  "control.sound.disable": "dezactivați efectele sonore",
+  "control.theme.dark": "Treci la modul lumină",
+  "control.theme.light": "Treci la modul întunecat",
+  "control.settings.open": "Setări deschise",
+  "control.settings.close": "Setări de închidere",
+  "control.cluster.settings": "Sunet, temă, controluri lingvistice",
+  "control.cluster.open": "Setări deschise",
+  "control.cluster.tooltip": "Setări de sunet, temă și limbaj",
+  "control.language.group.translated": "Traduceri cu acoperire mare",
+  "control.language.group.englishBase": "Traducere automată · Engleză fallback"
 }

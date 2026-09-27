@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Потребен влез",
+  "admin.gate.guestBody": "Административната конзола бара аутентификација.",
+  "admin.gate.forbiddenTitle": "Потребно е дозвола на администраторот",
+  "admin.gate.forbiddenBody": "Оваа сметка нема администраторски дозвола.",
+  "admin.gate.errorTitle": "Не успеа да ја зареди конзолата"
 }

@@ -1,4 +1,4 @@
 {
-  "notify.loadError": "Couldn't load notifications.",
-  "notify.empty": "No new notifications."
+  "notify.loadError": "មិនអាចបញ្ចូលការប្រកាសបានទេ។",
+  "notify.empty": "គ្មាន ការប្រកាស ថ្មី ទេ។"
 }

@@ -1,9 +1,9 @@
 {
-  "apiError.loginRequired": "Login is required.",
-  "apiError.adminRequired": "Admin permissions could not be verified.",
-  "apiError.adminOnlyPage": "This page is restricted to administrators.",
-  "apiError.notFound": "The requested item could not be found.",
-  "apiError.unsupportedType": "Unsupported content type.",
-  "apiError.inactiveAccount": "Inactive accounts cannot use administrator features.",
-  "apiError.settlementFailed": "Settlement processing failed."
+  "apiError.loginRequired": "Անհրաժեշտ է մուտք գործել:",
+  "apiError.adminRequired": "Admin- ի թույլտվությունները չեն կարող ստուգվել:",
+  "apiError.adminOnlyPage": "Այս էջը սահմանափակված է կառավարիչների համար:",
+  "apiError.notFound": "Հայցվող ապրանքը չի գտնվել:",
+  "apiError.unsupportedType": "Աջակցված բովանդակության տեսակ",
+  "apiError.inactiveAccount": "Անակտիվ հաշիվները չեն կարող օգտագործել կառավարիչի հատկանիշները:",
+  "apiError.settlementFailed": "Հաշվարկի մշակումը ձախողվել է:"
 }

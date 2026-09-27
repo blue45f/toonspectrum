@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Слој {count}",
   "studio.toolsCompanion.review.section.comments": "Коментар {count}",
   "studio.toolsCompanion.review.section.history": "Сними {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE страницаЕтикета}· Избор на{Етикета ZZ RBRACE",
   "studio.toolsCompanion.review.title": "инспекциска конзола",
   "studio.toolsCompanion.review.truncatedComments": "и {count} коментари",
   "studio.toolsCompanion.review.truncatedLayers": "{count} слоеви",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Референтен екран",
   "studio.toolsCompanion.referenceLoading": "Се вчитува референтната алатка...",
   "studio.toolsCompanion.footer": "Уредување документи го поседува само стандардниот таб. Овој прозорец ги пренесува само компресираниот преглед и намерата за проверка/референца до BroadcastChannel на истиот прелистувач, така што нема посебен трошок за серверот.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Не е поврзан со главниот студио.",
+  "studio.toolsCompanion.exit.editor": "Отворете уредник на студиото"
 }

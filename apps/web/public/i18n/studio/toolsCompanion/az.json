@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Qat {count}",
   "studio.toolsCompanion.review.section.comments": "Şərh {count}",
   "studio.toolsCompanion.review.section.history": "Qeyd {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE səhifəsiEtiket}·{seçimiEtiket ZZ RBRACE",
   "studio.toolsCompanion.review.title": "yoxlama konsolu",
   "studio.toolsCompanion.review.truncatedComments": "və {count} şərhlər",
   "studio.toolsCompanion.review.truncatedLayers": "{count} qat",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "İstinad ekranı",
   "studio.toolsCompanion.referenceLoading": "İstinad aləti yüklənir...",
   "studio.toolsCompanion.footer": "Sənədləri redaktə etmək yalnız standart tabın sahibidir. Bu pəncərə yalnız sıxılmış önizləmə və yoxlama/istinad niyyətini eyni brauzerin BroadcastChannel-ə ötürür, ona görə də ayrıca server xərci yoxdur.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Baş studiyaya bağlanmamış.",
+  "studio.toolsCompanion.exit.editor": "Studio redaktorunu açın"
 }

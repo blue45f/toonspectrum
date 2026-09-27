@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "ადმინის აუდიტის დღიურები",
+  "admin.audit.desc": "შეამოწმეთ ყველა ადმინისტრაციული ქმედება, ნებართვის ცვლილება და კონფიგურაციის ცვლილება.",
+  "admin.audit.searchPlaceholder": "ძებნა (email/action)...",
+  "admin.audit.loading": "ჟრჟრთნარაჲ ჟრჟრთნარაჲ...",
+  "admin.audit.empty": "არანაირი რეგისტრირებული აუდიტის დღიურები.",
+  "admin.audit.viewDetails": "ნახვა",
+  "admin.audit.modalTitle": "აუდიტის დღიური დეტალები",
+  "admin.audit.close": "ახლო"
 }

@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "Neatbalsta attēla tipa.",
+  "avatar.error.processFailed": "Nav iespējams apstrādāt attēlu.",
+  "avatar.processing": "Apstrādāšana...",
+  "avatar.select": "Izmainīt attēlu",
+  "avatar.remove": "Izņem attēlu",
+  "avatar.uploadHint": "Tikai JPG, PNG un WEBP attēli ir atbalstīti, tad izskats par priekšroku.",
+  "avatar.changeAria": "Izmainīt profilu attēlu"
 }

@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "Não consegui carregá-lo.",
+  "changelog.empty": "Ainda não há registos de atualizações."
 }

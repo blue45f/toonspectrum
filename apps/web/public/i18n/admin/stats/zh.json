@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "卫生系统",
+  "admin.stats.healthy": "健康",
+  "admin.stats.degraded": "降级",
+  "admin.stats.revenueEvents": "总交易/结算",
+  "admin.stats.usersCommunity": "总成员/职位",
+  "admin.stats.maintenance": "维护方式",
+  "admin.stats.maintenanceOn": "紧急维护 (ON)",
+  "admin.stats.maintenanceOff": "正常运行 (关闭)",
+  "admin.stats.activeVisitors": "5分钟的活动访问者",
+  "admin.stats.views5m": "5 分钟页面查看"
 }

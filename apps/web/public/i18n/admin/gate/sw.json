@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Kuingia Hatuhitajika",
+  "admin.gate.guestBody": "Admin Console inahitaji uthibitisho. Tafadhali kuingia.",
+  "admin.gate.forbiddenTitle": "Ruhusa ya Admin Inahitajika",
+  "admin.gate.forbiddenBody": "Akaunti hii haina ruhusa admin. Wasiliana na operator kama inahitajika.",
+  "admin.gate.errorTitle": "Haikuweza Kuweka Kifaa cha Kuwasha"
 }

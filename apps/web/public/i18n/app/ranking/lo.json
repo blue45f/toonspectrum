@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "ເບິ່ງການຈັດແບ່ງຄະແນນ",
+  "ranking.metric.views": "ຄວາມເຫັນ",
+  "ranking.why": "ເປັນຫຍັງ",
+  "ranking.breakdownTitle": "ການຈັດແບ່ງຄະແນນ",
+  "ranking.totalScore": "ຜົນລວມ",
+  "ranking.breakdownDescription": "ຄິດໄລ່ດ້ວຍນ້ ໍາ ຫນັກ axis ແລະການປົກກະຕິສະເພາະຫົວຂໍ້."
 }

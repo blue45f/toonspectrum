@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "કૉપિરાઇટ અને સામગ્રી સૂચના",
+  "copyright.section1.title": "સામગ્રી સ્ત્રોતો અને સિદ્ધાંતો",
+  "copyright.section1.body": "ટૂનસ્પેક્ટ્રમ એક ઇન્ડેક્સ અને ડિસ્કવરી પ્લેટફોર્મ છે જે વેબટૂન / વેબનૉવેલ પ્લેટફોર્મ્સમાંથી જાહેર કેટેગરી મેટાડેટા (ટાઇટલ્સ, લેખકો, શૈલીઓ, વગેરે) નું સારાંશ આપે છે. તે મુખ્ય પ્રકરણની સામગ્રીને હોસ્ટ અથવા ફરીથી વિતરિત કરતું નથી; વાંચન ફક્ત સત્તાવાર લિંક્સ દ્વારા નિર્દેશિત કરવામાં આવે છે.",
+  "copyright.section2.title": "કવર છબીઓ",
+  "copyright.section2.body": "કવર છબીઓ થંબનેલ્સને ઓળખવા માટે કાર્ય કરે છે અને શક્ય હોય ત્યારે સ્ત્રોત લિંક્સ સાથે મૂળ પ્લેટફોર્મ કવરનો સંદર્ભ આપે છે. અધિકાર ધારકની વિનંતી અથવા નીતિ અપડેટ્સ પર ડિસ્પ્લેને તરત જ અક્ષમ કરી શકાય છે.",
+  "copyright.section3.title": "મેટ્રિક્સ અને પારદર્શકતા",
+  "copyright.section4.title": "અધિકારોની સૂચના",
+  "copyright.section5.title": "કૉપિરાઇટ ઉલ્લંઘન નોટિસ & દૂર",
+  "copyright.section5.body": "જો તમને લાગે કે મેટાડેટા અથવા કવર તમારા અધિકારોનું ઉલ્લંઘન કરે છે, તો કૃપા કરીને શીર્ષક, URL અને માલિકીના પુરાવા સાથે પૂછપરછ મોકલો.",
+  "copyright.leaveInquiry": "તપાસ સબમિટ કરો"
 }

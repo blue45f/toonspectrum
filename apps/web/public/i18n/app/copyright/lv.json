@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Copyright & Content paziņojums",
+  "copyright.section1.title": "Saturs iegūts no \"WEB",
+  "copyright.section1.body": "ToonSpectrum ir indekss un atklāšanas platforma, kas apkopoda publisko katalogu metadatus (titulu, autori, žanri utt.) no webtūru/webnovēlu platformas.",
+  "copyright.section2.title": "Apvārsnis",
+  "copyright.section2.body": "Kopšbilds ir miniatūras identifikācijas līdzeklis, un atsauce uz oriģinālu platformu kopšveltu ar avotu saitiem, kad ir iespējams.",
+  "copyright.section3.title": "Metrikas un pārredzamība",
+  "copyright.section4.title": "Tiesības paziņojums",
+  "copyright.section5.title": "Copyright pārkāpuma paziņojums un atcelšana",
+  "copyright.section5.body": "Ja jūs domājat, ka metadati vai pārskati pārkāpj jūsu tiesības, lūdzam iesniegt pieprasījumu ar nosaukumu, URL un īpašumtiesību apliecinājumu.",
+  "copyright.leaveInquiry": "Apmeklēšana →"
 }

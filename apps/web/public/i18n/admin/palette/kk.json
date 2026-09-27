@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Тез іздеу және командалар...",
+  "admin.palette.placeholder": "Іздеу әкімшісінің командалары (навигация, CSV экспорттау, күтіп-ұстау)...",
+  "admin.palette.empty": "Нәтиже табылмады.",
+  "admin.palette.groupNav": "Консольдің навигациялық кіші жолдары",
+  "admin.palette.groupQuick": "Тез әрекет және экспорт",
+  "admin.palette.exportUsers": "Барлық мүшелерді экспорттау",
+  "admin.palette.exportRevenue": "Экспорттық кірістер кітабының CSV",
+  "admin.palette.maintenance": "Бақылау жүйесі төтенше күтім"
 }

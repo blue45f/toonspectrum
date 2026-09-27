@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "परत {count}",
   "studio.toolsCompanion.review.section.comments": "टिप्पणी {count}",
   "studio.toolsCompanion.review.section.history": "रिकॉर्ड {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE पेज लेबल}·{चयन लेबल ZZ RBRACE",
   "studio.toolsCompanion.review.title": "निरीक्षण कंसोल",
   "studio.toolsCompanion.review.truncatedComments": "और {count} टिप्पणियाँ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} परतें",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "संदर्भ स्क्रीन",
   "studio.toolsCompanion.referenceLoading": "संदर्भ उपकरण लोड हो रहा है...",
   "studio.toolsCompanion.footer": "दस्तावेज़ संपादित करें केवल डिफ़ॉल्ट टैब के स्वामी हैं। यह विंडो केवल संपीड़ित पूर्वावलोकन और निरीक्षण/संदर्भ आशय को उसी ब्राउज़र के ब्रॉडकास्ट चैनल पर प्रसारित करती है, इसलिए कोई अलग सर्वर लागत नहीं है।",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "मुख्य स्टूडियो से जुड़ा नहीं है।",
+  "studio.toolsCompanion.exit.editor": "स्टूडियो संपादक खोलें"
 }

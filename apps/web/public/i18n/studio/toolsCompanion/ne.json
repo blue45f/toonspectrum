@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "तह {count}",
   "studio.toolsCompanion.review.section.comments": "टिप्पणी {count}",
   "studio.toolsCompanion.review.section.history": "रेकर्ड {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE पृष्ठलेबल}·{चयनलेबल ZZ RBRACE",
   "studio.toolsCompanion.review.title": "निरीक्षण कन्सोल",
   "studio.toolsCompanion.review.truncatedComments": "र {count} टिप्पणीहरू",
   "studio.toolsCompanion.review.truncatedLayers": "{count} तहहरू",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "सन्दर्भ स्क्रिन",
   "studio.toolsCompanion.referenceLoading": "सन्दर्भ उपकरण लोड गर्दै...",
   "studio.toolsCompanion.footer": "कागजातहरू मात्र पूर्वनिर्धारित ट्याबको स्वामित्वमा सम्पादन गर्नुहोस्। यो सञ्झ्यालले एउटै ब्राउजरको BroadcastChannel मा संकुचित पूर्वावलोकन र निरीक्षण/संदर्भ अभिप्राय मात्र प्रसारण गर्दछ, त्यसैले त्यहाँ कुनै अलग सर्भर लागत छैन।",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "मुख्य स्टुडियोसँग जोडिएको छैन।",
+  "studio.toolsCompanion.exit.editor": "स्टुडियो सम्पादक खोल्नुहोस्"
 }

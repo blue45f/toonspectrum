@@ -1,9 +1,9 @@
 {
-  "avatar.error.invalidType": "Unsupported image type.",
-  "avatar.error.processFailed": "Failed to process image.",
-  "avatar.processing": "Processing…",
-  "avatar.select": "Change image",
-  "avatar.remove": "Remove image",
-  "avatar.uploadHint": "Only JPG, PNG, and WEBP images are supported, then cropped for preview.",
-  "avatar.changeAria": "Change profile image"
+  "avatar.error.invalidType": "Aina ya picha isiyoungwa mkono.",
+  "avatar.error.processFailed": "Alishindwa kusindika picha.",
+  "avatar.processing": "Kusindika...",
+  "avatar.select": "Badilisha picha",
+  "avatar.remove": "Ondoa picha",
+  "avatar.uploadHint": "Picha za JPG, PNG, na WEBP tu zinaungwa mkono, kisha kukatwa kwa ajili ya kutafakari.",
+  "avatar.changeAria": "Badilisha picha ya wasifu"
 }

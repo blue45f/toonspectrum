@@ -1,15 +1,15 @@
 {
-  "admin.revenue.summaryTitle": "Settlement Summary (Last 30 Days)",
-  "admin.revenue.loadError": "Failed to load revenue ledger",
-  "admin.revenue.filterAll": "All",
-  "admin.revenue.filterPending": "Pending",
-  "admin.revenue.filterApproved": "Approved",
-  "admin.revenue.filterPaid": "Settled",
-  "admin.revenue.filterRejected": "Rejected",
-  "admin.revenue.filterRevoked": "Cancelled",
-  "admin.revenue.empty": "No settlement events matching this status.",
-  "admin.revenue.approve": "Approve",
-  "admin.revenue.reject": "Reject",
-  "admin.revenue.settle": "Complete Settlement",
-  "admin.revenue.revoke": "Cancel"
+  "admin.revenue.summaryTitle": "Resumo da liquidação (últimos 30 dias)",
+  "admin.revenue.loadError": "Não foi possível carregar o livro de receitas",
+  "admin.revenue.filterAll": "Todos",
+  "admin.revenue.filterPending": "A espera",
+  "admin.revenue.filterApproved": "Approvado",
+  "admin.revenue.filterPaid": "Resolução",
+  "admin.revenue.filterRejected": "Rejeito",
+  "admin.revenue.filterRevoked": "Cancelação",
+  "admin.revenue.empty": "Não há eventos de liquidação correspondentes a este status.",
+  "admin.revenue.approve": "Aplicar",
+  "admin.revenue.reject": "Rejeitar",
+  "admin.revenue.settle": "A liquidação completa",
+  "admin.revenue.revoke": "Cancelar"
 }

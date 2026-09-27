@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Hrautt leit og fyrirskipanir...",
+  "admin.palette.placeholder": "Leitarstjórnarskipanir (Snúningur, CSV útflutningur, Viðhald)...",
+  "admin.palette.empty": "Engin niðurstaða fannst.",
+  "admin.palette.groupNav": "Fjarlægir í aðferð í tölvu",
+  "admin.palette.groupQuick": "Fljótar aðgerðir og útflutningur",
+  "admin.palette.exportUsers": "Útflutningur allra félagsmanna",
+  "admin.palette.exportRevenue": "Útflutningsskrá vegna útflutnings",
+  "admin.palette.maintenance": "Stjórnskerfi við bráðabirgðaþjónusta"
 }

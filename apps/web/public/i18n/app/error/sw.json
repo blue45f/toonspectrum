@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "Reloading toleo la karibuni...",
+  "error.chunkRetryFailed": "Mara moja updated, lakini tatizo bado. Tafadhali kuangalia uhusiano wako na kujaribu tena.",
+  "error.reloadButton": "Reload ukurasa",
+  "error.goHome": "Nenda Nyumbani",
+  "error.retryDesc": "Tafadhali jaribu tena au urudi kwenye ukurasa wa kwanza."
 }

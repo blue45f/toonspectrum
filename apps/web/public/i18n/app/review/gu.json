@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "પૂર્ણ",
+  "review.progress.binge": "બિંગિંગ",
+  "review.progress.upcoming": "આયોજિત",
+  "review.progress.abandoned": "છોડવામાં",
+  "review.progress.unknown": "પ્રગતિ છુપાયેલ",
+  "review.spoilerRevealLabel": "બતાવો સ્પોઇલર"
 }

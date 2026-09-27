@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "ကျန်းမာရေးစနစ်",
+  "admin.stats.healthy": "ကျန်းမာခြင်း",
+  "admin.stats.degraded": "အချိုးအစားချိုးနည်း",
+  "admin.stats.revenueEvents": "ငွေကြေးပမာဏ (၁)",
+  "admin.stats.usersCommunity": "စုစုပေါင်း အဖွဲ့ဝင်များ / တာဝန်များ",
+  "admin.stats.maintenance": "ထိန်းသိမ်းမှုပုံစံ",
+  "admin.stats.maintenanceOn": "အရေးပေါ် ထိန်းသိမ်းမှု (ON)",
+  "admin.stats.maintenanceOff": "ပုံမှန်လုပ်ဆောင်မှု (ပိတ်ထားခြင်း)",
+  "admin.stats.activeVisitors": "၅ မိနစ် တက်ကြွတဲ့ ခရီးသည်များ",
+  "admin.stats.views5m": "၅ မိနစ် စာမျက်နှာ ကြည့်ရှုမှု"
 }

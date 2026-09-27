@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Isimiso Senhlalakahle",
+  "admin.stats.healthy": "Impilo enhle",
+  "admin.stats.degraded": "Ukuhlaziywa",
+  "admin.stats.revenueEvents": "Ukuqhathaniswa Kokuthengiselana / Ukuhlaziywa",
+  "admin.stats.usersCommunity": "Amalungu / Izikhundla",
+  "admin.stats.maintenance": "Indlela Yokugcina",
+  "admin.stats.maintenanceOn": "Ukugcinwa Kwephutha (ON)",
+  "admin.stats.maintenanceOff": "Ukusebenza Okujwayelekile (OFF)",
+  "admin.stats.activeVisitors": "Izivakashi ezisebenzayo ezincane",
+  "admin.stats.views5m": "Ukubukwa kwamakhasi oku-5 min"
 }

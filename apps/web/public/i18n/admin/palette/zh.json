@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "快速搜索和命令...",
+  "admin.palette.placeholder": "搜索管理器命令 (导航, CSV 输出,维护)...",
+  "admin.palette.empty": "没有结果.",
+  "admin.palette.groupNav": "控制台导航快捷方式",
+  "admin.palette.groupQuick": "快速行动和出口",
+  "admin.palette.exportUsers": "出口所有成员 CSV",
+  "admin.palette.exportRevenue": "出口收入账本CSV",
+  "admin.palette.maintenance": "控制系统紧急维护"
 }

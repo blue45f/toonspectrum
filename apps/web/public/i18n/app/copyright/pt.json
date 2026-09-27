@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Direitos autorais e conteúdo",
+  "copyright.section1.title": "Fontes e Princípios de Conteúdo",
+  "copyright.section1.body": "ToonSpectrum é uma plataforma de índice e descoberta que resume metadados do catálogo público (títulos, autores, gêneros, etc.) de plataformas de webtoon / webnovel.",
+  "copyright.section2.title": "Imagens de capa",
+  "copyright.section2.body": "As imagens de capa servem como miniaturas de identificação e as portadas originais de referência da plataforma com links de origem sempre que possível.",
+  "copyright.section3.title": "Metricas e Transparência",
+  "copyright.section4.title": "Aviso de direitos",
+  "copyright.section5.title": "Aviso de violação de direitos autorais e eliminação",
+  "copyright.section5.body": "Se você acha que os metadados ou as capas infringem os seus direitos, por favor envie uma consulta com título, URL e prova de propriedade.",
+  "copyright.leaveInquiry": "Submeter uma investigação →"
 }

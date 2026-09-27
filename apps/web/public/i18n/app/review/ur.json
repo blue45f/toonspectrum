@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "مکمل",
+  "review.progress.binge": "بِنگنگ",
+  "review.progress.upcoming": "منصوبہ بندی",
+  "review.progress.abandoned": "گر گیا",
+  "review.progress.unknown": "ترقی پوشیدہ",
+  "review.spoilerRevealLabel": "شو سپویر"
 }

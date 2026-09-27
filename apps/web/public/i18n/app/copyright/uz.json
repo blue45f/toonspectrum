@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Mualliflik huquqi va tarkib xabari",
+  "copyright.section1.title": "Ma'lumotlar manbai va prinsiplari",
+  "copyright.section1.body": "ToonSpectrum - bu veb-toon/veb-novel platformalaridan ommaviy katalog metadatalarini (navozalari, mualliflari, janrlari va boshqalar) qisqartirish uchun indeks va kashfiyot platformasidir.",
+  "copyright.section2.title": "Qopishma rasmlari",
+  "copyright.section2.body": "Qopish rasmlari miniateriallarni aniqlash va iloji boricha manba havolalari bilan asl platform qoplamalarini ma'lumotlashtirish uchun ishlaydi.",
+  "copyright.section3.title": "Metriklar va shaffoflik",
+  "copyright.section4.title": "Huquqlar to'g'risidagi xabarnoma",
+  "copyright.section5.title": "Mualliflik huquqi buzilganligi haqida xabar berish va uni olib tashlash",
+  "copyright.section5.body": "Agar siz meta-ma'lumotlar yoki qoplamalar sizning huquqlaringizni buzadi deb hisoblasangiz, iltimos, mavzu, URL va mulkchilikni tasdiqlovchi so'rovni taqdim eting.",
+  "copyright.leaveInquiry": "Soʻrovni taqdim etish →"
 }

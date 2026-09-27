@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "שכבה {count}",
   "studio.toolsCompanion.review.section.comments": "תגובה {count}",
   "studio.toolsCompanion.review.section.history": "הקלט {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}· בחירת ZZLBRACELabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "קונסולת בדיקה",
   "studio.toolsCompanion.review.truncatedComments": "ו-{count} הערות",
   "studio.toolsCompanion.review.truncatedLayers": "{count} שכבות",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "מסך התייחסות",
   "studio.toolsCompanion.referenceLoading": "טוען כלי עזר...",
   "studio.toolsCompanion.footer": "עריכת מסמכים היא הבעלים של כרטיסיית ברירת המחדל בלבד. חלון זה משדר רק את התצוגה המקדימה הדחוסה ואת כוונת הבדיקה/הפניה ל-BroadcastChannel של אותו דפדפן, כך שאין עלות שרת נפרדת.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "לא מחובר לאולפן הראשי.",
+  "studio.toolsCompanion.exit.editor": "פתח את עורך הסטודיו"
 }

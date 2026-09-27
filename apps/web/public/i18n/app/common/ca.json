@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Carregament",
+  "common.loading.short": "Carregament",
   "common.close": "Tanca",
   "common.open": "Obre",
   "common.search": "Cerca",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Tornar a intentar-ho.",
+  "common.retry.short": "Tornar a intentar-ho.",
+  "common.backToTop": "Tornar a la part superior.",
+  "common.backToHome": "Torna a casa.",
+  "common.loading.search": "Buscant...",
+  "common.notFoundWithQuery": "No hi ha resultats per a ' {query} '.",
+  "common.openSearch": "Trobar-lo en Buscar",
+  "common.loading.empty": "No hi ha dades retornades.",
+  "common.retry.all": "Intentar de nou o tornar a casa."
 }

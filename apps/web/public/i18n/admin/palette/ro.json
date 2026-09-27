@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Căutare rapidă şi comenzi...",
+  "admin.palette.placeholder": "Comenzile de căutare (navizare, export CSV, întreținere)...",
+  "admin.palette.empty": "Nu s-au găsit rezultate.",
+  "admin.palette.groupNav": "Cărtășeale de navigare pentru console",
+  "admin.palette.groupQuick": "Acţiuni rapide şi export",
+  "admin.palette.exportUsers": "Exportul tuturor membrilor CSV",
+  "admin.palette.exportRevenue": "CSV pentru cartea de contabilitate a veniturilor de export",
+  "admin.palette.maintenance": "Sistemul de control întreținerea de urgență"
 }

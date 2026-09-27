@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Kinakailangan ang Pag-login",
+  "admin.gate.guestBody": "Ang admin console ay nangangailangan ng pag-authenticate.",
+  "admin.gate.forbiddenTitle": "Kinakailangan ang Permission ng Admin",
+  "admin.gate.forbiddenBody": "Ang account na ito ay walang mga pahintulot ng admin. Makipag-ugnay sa isang operator kung kinakailangan.",
+  "admin.gate.errorTitle": "Hindi Na Nag-load ng Console"
 }

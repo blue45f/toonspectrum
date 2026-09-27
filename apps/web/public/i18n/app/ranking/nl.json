@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Bekijk de scoreverdeling",
+  "ranking.metric.views": "Zicht",
+  "ranking.why": "Waarom?",
+  "ranking.breakdownTitle": "Verdeling van de scores",
+  "ranking.totalScore": "Totaal score",
+  "ranking.breakdownDescription": "Bereken met asgewicht en titel-specifieke normalisatie."
 }

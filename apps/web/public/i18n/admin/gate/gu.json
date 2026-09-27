@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "લૉગિન જરૂરી",
+  "admin.gate.guestBody": "એડમિન કન્સોલ અધિકૃતતા જરૂરી છે. કૃપા કરીને સાઇન ઇન કરો.",
+  "admin.gate.forbiddenTitle": "એડમિન પરવાનગી જરૂરી",
+  "admin.gate.forbiddenBody": "આ એકાઉન્ટમાં એડમિન પરવાનગીઓ નથી. જો જરૂરી હોય તો ઓપરેટરનો સંપર્ક કરો.",
+  "admin.gate.errorTitle": "કન્સોલ લોડ કરવામાં નિષ્ફળ"
 }

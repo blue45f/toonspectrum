@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "ការចាក់",
+  "common.loading.short": "ការចាក់",
   "common.close": "បិទ",
   "common.open": "បើក",
   "common.search": "ស្វែងរក",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "សាកល្បង ឡើងវិញ",
+  "common.retry.short": "សាកល្បង ឡើងវិញ",
+  "common.backToTop": "ត្រឡប់ ទៅ លើ វិញ",
+  "common.backToHome": "ទៅ ផ្ទះ",
+  "common.loading.search": "ស្វែងរក...",
+  "common.notFoundWithQuery": "គ្មាន លទ្ធផល សម្រាប់ ' {query} ' ។",
+  "common.openSearch": "រក វា ក្នុង ការ ស្វែងរក →",
+  "common.loading.empty": "គ្មាន ទិន្នន័យ ដែល បាន ត្រឡប់ មក វិញ ទេ។",
+  "common.retry.all": "ព្យាយាម ម្តងទៀត ឬ ត្រឡប់ ទៅផ្ទះ វិញ។"
 }

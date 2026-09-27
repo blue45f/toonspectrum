@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "ระบบสุขภาพ",
+  "admin.stats.healthy": "สุขภาพดี",
+  "admin.stats.degraded": "ลดลง",
+  "admin.stats.revenueEvents": "รายการการเงิน",
+  "admin.stats.usersCommunity": "สมาชิกทั้งหมด / ตําแหน่ง",
+  "admin.stats.maintenance": "รูปแบบการรักษา",
+  "admin.stats.maintenanceOn": "การดูแลฉุกเฉิน (ON)",
+  "admin.stats.maintenanceOff": "การดําเนินงานปกติ (OFF)",
+  "admin.stats.activeVisitors": "ผู้เข้าชมที่มีกิจกรรม 5 นาที",
+  "admin.stats.views5m": "5 นาทีดูหน้า"
 }

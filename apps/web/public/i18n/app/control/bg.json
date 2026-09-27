@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Език",
+  "control.sound.enable": "Осигуряване на звукови ефекти",
+  "control.sound.disable": "Отключване на звукови ефекти",
+  "control.theme.dark": "Превключете към режим на светлината",
+  "control.theme.light": "Преминаване в тъмен режим",
+  "control.settings.open": "Отворете настройките",
+  "control.settings.close": "Настройки за затваряне",
+  "control.cluster.settings": "Звук, тематика, езикови контрол",
+  "control.cluster.open": "Отворете настройките",
+  "control.cluster.tooltip": "Звук, тема и езикови настройки",
+  "control.language.group.translated": "Преводи с голямо обхващане",
+  "control.language.group.englishBase": "Автоматичен превод · Английски fallback"
 }

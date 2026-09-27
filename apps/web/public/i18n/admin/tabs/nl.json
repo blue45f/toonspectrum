@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
+  "admin.tabs.announcements": "Bekendmakingen en banners",
+  "admin.tabs.audit": "Auditlogs",
+  "admin.tabs.campaigns": "Campagnes",
+  "admin.tabs.creatorSupport": "Scheppersteun",
   "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.ops": "Operaties",
+  "admin.tabs.plans": "Plannen",
+  "admin.tabs.promos": "Promoties",
+  "admin.tabs.reports": "Verslagen en moderatie",
+  "admin.tabs.revenue": "Afwikkeling",
+  "admin.tabs.security": "Beveiliging & IP",
+  "admin.tabs.inquiries": "Bedrijfsonderzoeken",
+  "admin.tabs.supporters": "Ondersteuning van de exploitatiekosten",
+  "admin.tabs.traffic": "Live verkeer"
 }

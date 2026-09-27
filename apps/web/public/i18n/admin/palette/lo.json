@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "ການຄົ້ນຫາແລະ ຄໍາ ສັ່ງໄວ ...",
+  "admin.palette.placeholder": "ຄໍາສັ່ງການຄຸ້ມຄອງການຄົ້ນຫາ (ການ ນໍາ ທາງ, ການສົ່ງອອກ CSV, ການຮັກສາ)...",
+  "admin.palette.empty": "ບໍ່ມີຜົນໄດ້ຮັບພົບເຫັນ.",
+  "admin.palette.groupNav": "ການສັ້ນທາງໃນການ ນໍາ ທາງ console",
+  "admin.palette.groupQuick": "ການກະ ທໍາ ໄວ & ການສົ່ງອອກ",
+  "admin.palette.exportUsers": "ສົ່ງອອກ CSV ສະມາຊິກທັງຫມົດ",
+  "admin.palette.exportRevenue": "CSV ບັນຊີລາຍຮັບການສົ່ງອອກ",
+  "admin.palette.maintenance": "ລະບົບຄວບຄຸມການຮັກສາສຸກເສີນ"
 }

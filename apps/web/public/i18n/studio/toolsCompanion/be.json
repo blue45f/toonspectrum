@@ -17,7 +17,7 @@
   "studio.toolsCompanion.error.channelSend": "Не атрымалася перанесці канал. Пераканайцеся, што ваша ўкладка студыі па змаўчанні з таго ж паходжання.",
   "studio.toolsCompanion.error.invalidSession": "There is no valid detached session. Паўторна адкрыйце акно інструмента ў стандартнай студыі.",
   "studio.toolsCompanion.error.invalidSurface": "There is no valid companion view mode. Please reopen the window in the default studio.",
-  "studio.toolsCompanion.error.unsupportedBroadcast": "This browser does not support BroadcastChannel.",
+  "studio.toolsCompanion.error.unsupportedBroadcast": "Гэты браўзэр не падтрымлівае BroadcastChannel.",
   "studio.toolsCompanion.mode.tools": "інструменты",
   "studio.toolsCompanion.mode.navigator": "Навігатар",
   "studio.toolsCompanion.mode.review": "праверка",
@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Пласт {count}",
   "studio.toolsCompanion.review.section.comments": "Каментарый {count}",
   "studio.toolsCompanion.review.section.history": "Запіс {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{selectionLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "аглядная кансоль",
   "studio.toolsCompanion.review.truncatedComments": "і {count} каментарыяў",
   "studio.toolsCompanion.review.truncatedLayers": "{count} слаёў",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Даведачны экран",
   "studio.toolsCompanion.referenceLoading": "Загрузка даведачнага інструмента...",
   "studio.toolsCompanion.footer": "Рэдагаваць дакументы можна толькі на ўкладцы па змаўчанні. This window transmits only the compressed preview and inspection/reference intent to the BroadcastChannel of the same browser, so there is no separate server cost.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Не падлучаны да галоўнай студыі.",
+  "studio.toolsCompanion.exit.editor": "Адкрыйце рэдактар студыі"
 }

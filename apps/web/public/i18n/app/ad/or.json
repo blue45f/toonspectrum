@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "ସ୍ପୋନସ୍ଡ ଚିତ୍ର",
+  "ad.slotAriaLabel": "ବିଜ୍ଞାପନ ସ୍ଥାନ",
+  "ad.slotLabel": "ଅନୁଦାନ",
+  "ad.slotTitle": "ପ୍ରୋତ୍ସାହିତ ବିଷୟବସ୍ତୁ",
+  "ad.ctaDetails": "ବିବରଣୀ ଦେଖନ୍ତୁ",
+  "ad.placeholderAriaLabel": "ବିଜ୍ଞାପନ ସ୍ଥାନ ଧାରଣକାରୀ",
+  "ad.placeholderText": "କୌଣସି ସ୍ପନସରିତ ବିଷୟବସ୍ତୁ ଉପଲବ୍ଧ ନାହିଁ ।",
+  "ad.tag": "ବିଜ୍ଞାପନ"
 }

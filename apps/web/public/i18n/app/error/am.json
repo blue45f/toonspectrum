@@ -1,7 +1,7 @@
 {
-  "error.reloading": "Reloading latest version…",
-  "error.chunkRetryFailed": "Refreshed once, but the issue persists. Please check your connection and try again.",
-  "error.reloadButton": "Reload Page",
-  "error.goHome": "Go to Home",
-  "error.retryDesc": "Please try again or return to the home page."
+  "error.reloading": "የቅርብ ጊዜውን ስሪት እንደገና መጫን...",
+  "error.chunkRetryFailed": "አንድ ጊዜ ታድሰዋል, ነገር ግን ችግሩ ቀጣይነት ያለው ነው. እባክህ ግንኙነትዎን ይመልከቱ እና እንደገና ይሞክሩ.",
+  "error.reloadButton": "ገጹን ዳግም መጫን",
+  "error.goHome": "ወደ ቤት ሂድ",
+  "error.retryDesc": "እባክህ እንደገና ሞክር ወይም ወደ መነሻ ገጽ ተመልስ።"
 }

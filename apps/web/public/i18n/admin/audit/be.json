@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "Адміністрацыйныя рэгістрацыі аўдыту",
+  "admin.audit.desc": "Заследуйце ўсе адміністрацыйныя дзеянні, змены дазволаў і змены канфігурацыі.",
+  "admin.audit.searchPlaceholder": "Пошук (пошта / дзеянне)...",
+  "admin.audit.loading": "Загрузка аўдытных часопісаў...",
+  "admin.audit.empty": "Ніякіх зафіксаваных аўдытных часопісаў.",
+  "admin.audit.viewDetails": "Выгляд",
+  "admin.audit.modalTitle": "Падрабязнасці часопіса аўдыту",
+  "admin.audit.close": "Блізка"
 }

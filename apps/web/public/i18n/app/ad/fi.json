@@ -1,10 +1,10 @@
 {
-  "ad.creativeFallbackAlt": "Sponsored image",
-  "ad.slotAriaLabel": "Advertising slot",
-  "ad.slotLabel": "Sponsored",
-  "ad.slotTitle": "Sponsored content",
-  "ad.ctaDetails": "View details",
-  "ad.placeholderAriaLabel": "Ad placeholder",
-  "ad.placeholderText": "No sponsored content available.",
-  "ad.tag": "Ad"
+  "ad.creativeFallbackAlt": "Sponsoroitu kuva",
+  "ad.slotAriaLabel": "Mainospaikka",
+  "ad.slotLabel": "Tukea",
+  "ad.slotTitle": "Sponsoroitu sisältö",
+  "ad.ctaDetails": "Näytä yksityiskohdat",
+  "ad.placeholderAriaLabel": "Mainospaikka",
+  "ad.placeholderText": "Ei ole sponsoroitu sisältöä.",
+  "ad.tag": "Mainonta"
 }

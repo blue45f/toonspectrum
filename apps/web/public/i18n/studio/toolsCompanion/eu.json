@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "{count} geruza",
   "studio.toolsCompanion.review.section.comments": "Iruzkina {count}",
   "studio.toolsCompanion.review.section.history": "Grabatu {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE orriaLabel}·{hautaketaLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "ikuskapen kontsola",
   "studio.toolsCompanion.review.truncatedComments": "eta {count} iruzkinak",
   "studio.toolsCompanion.review.truncatedLayers": "{count} geruzak",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Erreferentzia pantaila",
   "studio.toolsCompanion.referenceLoading": "Erreferentzia tresna kargatzen...",
   "studio.toolsCompanion.footer": "Editatu dokumentuak fitxa lehenetsia soilik dauka. Leiho honek konprimitutako aurrebista eta ikuskapen/erreferentzia-asmoa soilik transmititzen ditu arakatzaile bereko BroadcastChannel-era, beraz, ez dago zerbitzariaren kostu bereizirik.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Ez dago estudio nagusira konektatuta.",
+  "studio.toolsCompanion.exit.editor": "Ireki Studio editorea"
 }

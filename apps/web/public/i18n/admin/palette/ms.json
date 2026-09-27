@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Perintah Cepat dan Pencarian...",
+  "admin.palette.placeholder": "Perintah pentadbir carian (Navigasi, eksport CSV, Pengurusan)...",
+  "admin.palette.empty": "Tiada hasil yang ditemui.",
+  "admin.palette.groupNav": "Pendekatan Navigasi Konsol",
+  "admin.palette.groupQuick": "Tindakan Cepat & Ekspor",
+  "admin.palette.exportUsers": "Eksport Semua Ahli CSV",
+  "admin.palette.exportRevenue": "CSV Ledger Pendapatan Ekspor",
+  "admin.palette.maintenance": "Pengurusan kecemasan Sistem Kawalan"
 }

@@ -6,7 +6,7 @@
   "studio.commandBar.settingsClose": "Zavřít nastavení panelu příkazů",
   "studio.commandBar.settingsStorageNote": "Rozložení slotů se ukládá do nastavení pracovního prostoru tohoto prohlížeče.",
   "studio.commandBar.showSlots": "Zobrazit sloty příkazů",
-  "studio.commandBar.slot": "Slot {index}",
+  "studio.commandBar.slot": "Slotu {index}",
   "studio.commandBar.slotAria": "Slot příkazu {index}",
   "studio.commandBar.slotEmpty": "Prázdný slot",
   "studio.commandBar.resetDefaults": "Obnovit výchozí rozložení",

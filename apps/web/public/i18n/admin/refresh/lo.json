@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
-  "admin.refresh.seconds": "{sec}s"
+  "admin.refresh.now": "ໃຫ້ ຟົດ ຟື້ນ ໃນ ເວລາ ນີ້",
+  "admin.refresh.auto": "ລົດ:",
+  "admin.refresh.seconds": "{sec} s"
 }

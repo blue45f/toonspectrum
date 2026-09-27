@@ -7,10 +7,10 @@
   "studio.settings.tool.eraser": "өчүргүч",
   "studio.settings.tool.blend": "Аралаштыруу (тазалоо)",
   "studio.settings.tool.wetMix": "түс аралаштыргыч щетка",
-  "studio.settings.tool.dodgeBurn": "Dodge/Burn",
+  "studio.settings.tool.dodgeBurn": "Додж/Бурн",
   "studio.settings.tool.liquify": "Суюлтуу",
   "studio.settings.tool.fill": "боёк чакасы",
-  "studio.settings.tool.lassoFill": "Lasso Fill",
+  "studio.settings.tool.lassoFill": "Ласо толтуруу",
   "studio.settings.tool.eyedropper": "тамчылаткыч",
   "studio.settings.tool.marqueeRect": "чарчы тандоо",
   "studio.settings.tool.marqueeCircle": "тегерек тандоо",
@@ -48,7 +48,7 @@
   "studio.settings.shortcut.toolComment": "жайгашкан комментарийлер",
   "studio.settings.shortcut.toolBlend": "Аралаштыруу (тазалоо)",
   "studio.settings.shortcut.toolWetMix": "түс аралаштыргыч щетка",
-  "studio.settings.shortcut.toolDodgeBurn": "Dodge/Burn",
+  "studio.settings.shortcut.toolDodgeBurn": "Додж/Бурн",
   "studio.settings.shortcut.toolLiquify": "Суюлтуу",
   "studio.settings.shortcut.toolLettering": "Тамга (текст/кеп шары)",
   "studio.settings.shortcut.undo": "жокко чыгаруу",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "жашырылган",
   "studio.settings.state.show": "белги",
   "studio.settings.state.open": "ачык",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "Каармандарды түзүү"
 }

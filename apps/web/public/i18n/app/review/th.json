@@ -1,8 +1,8 @@
 {
-  "review.progress.complete": "Completed",
-  "review.progress.binge": "Binging",
-  "review.progress.upcoming": "Planned",
-  "review.progress.abandoned": "Dropped",
-  "review.progress.unknown": "Progress hidden",
-  "review.spoilerRevealLabel": "Show spoiler"
+  "review.progress.complete": "สร้าง",
+  "review.progress.binge": "บิงกิ่ง",
+  "review.progress.upcoming": "แผน",
+  "review.progress.abandoned": "ลง",
+  "review.progress.unknown": "ความก้าวหน้าที่ซ่อน",
+  "review.spoilerRevealLabel": "แสดง spoiler"
 }

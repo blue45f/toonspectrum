@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Imininingwane Yokukopisha Nokuqukethwe",
+  "copyright.section1.title": "Imithombo Yokuqukethwe Nezimiso",
+  "copyright.section1.body": "ToonSpectrum iyinkomba kanye ne-discovery platform ehlanganisa imethadatha yomphakathi yekhathalogi (izihloko, ababhali, izinhlobo, njll.) kusuka kuma-webtoon / ama-webnovel platform. Ayibambi noma ihlukanise kabusha okuqukethwe kwesigaba esikhulu; ukufunda kuqondiswa kuphela ngezixhumanisi ezisemthethweni.",
+  "copyright.section2.title": "Izithombe Zesembozo",
+  "copyright.section2.body": "Izithombe zesembozo zisebenza njengezithonjana zokukhomba futhi zibhekisela ezembozweni zangempela zepulatifomu ngezixhumanisi zomthombo lapho kungenzeka. Izikrini zingavinjelwa ngokushesha ngesicelo somnikazi wamalungelo noma izibuyekezo zenqubomgomo.",
+  "copyright.section3.title": "Amamethrikhi Nokwenza Okucacile",
+  "copyright.section4.title": "Isaziso Samalungelo",
+  "copyright.section5.title": "Isaziso sokwephulwa kwe-copyright & ukuthathwa",
+  "copyright.section5.body": "Uma ukholelwa ukuthi imethadatha noma izihloko zokumboza ziphula amalungelo akho, sicela uthumele umbuzo onesihloko, i-URL nobufakazi bobunikazi.",
+  "copyright.leaveInquiry": "Faka isicelo"
 }

@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "প্ৰশাসনিক নিৰীক্ষণৰ লগসমূহ",
+  "admin.audit.desc": "সকলো প্ৰশাসনিক ক্ৰিয়া, অনুমতি পৰিৱৰ্তন, আৰু কনফিগাৰেশ্যন পৰিৱৰ্তনবোৰ অনুসৰণ কৰক।",
+  "admin.audit.searchPlaceholder": "অনুসন্ধান (ই-মেইল/কাৰ্য)...",
+  "admin.audit.loading": "নিৰীক্ষণৰ নথিসমূহ লোড কৰা...",
+  "admin.audit.empty": "কোনো ৰেকৰ্ড কৰা অডিট লগ নাই।",
+  "admin.audit.viewDetails": "দৃশ্য",
+  "admin.audit.modalTitle": "অডিট লগৰ সবিশেষ",
+  "admin.audit.close": "বন্ধ কৰা"
 }

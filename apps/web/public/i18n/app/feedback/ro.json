@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "Nu am putut încărca sondajul de feedback.",
+  "feedback.thankYou": "Vă mulţumesc pentru feedback-ul vostru valoros!",
+  "feedback.anonymousNote": "Răspunsurile tale sunt păstrate strict anonim.",
+  "feedback.notAtAll": "Nu, nu, nu.",
+  "feedback.definitely": "Cu siguranţă."
 }

@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
-  "admin.refresh.seconds": "{sec}s"
+  "admin.refresh.now": "พื้นฟู ใจ",
+  "admin.refresh.auto": "อัตโนมัติ",
+  "admin.refresh.seconds": "{sec} s"
 }

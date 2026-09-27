@@ -1,13 +1,16 @@
 {
-  "admin.tabs.announcements": "Announcements & Banners",
-  "admin.tabs.audit": "Audit Logs",
-  "admin.tabs.campaigns": "Campaigns",
-  "admin.tabs.creatorSupport": "Creator support",
+  "admin.tabs.announcements": "Anmeldelser og bannere",
+  "admin.tabs.audit": "Revisjonslogg",
+  "admin.tabs.campaigns": "Kampanjer",
+  "admin.tabs.creatorSupport": "Skaperens støtte",
   "admin.tabs.dashboard": "Dashboard",
-  "admin.tabs.ops": "Operations",
-  "admin.tabs.plans": "Plans",
-  "admin.tabs.promos": "Promotions",
-  "admin.tabs.reports": "Reports & Moderation",
-  "admin.tabs.revenue": "Settlement",
-  "admin.tabs.security": "Security & IP"
+  "admin.tabs.ops": "Operasjoner",
+  "admin.tabs.plans": "Planer",
+  "admin.tabs.promos": "Opptredener",
+  "admin.tabs.reports": "Rapporter og moderering",
+  "admin.tabs.revenue": "Avgjørelse",
+  "admin.tabs.security": "Sikkerhet & IP",
+  "admin.tabs.inquiries": "Bedriftsundersøkelser",
+  "admin.tabs.supporters": "Støtte til driftskostnader",
+  "admin.tabs.traffic": "Livtrafikk"
 }

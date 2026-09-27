@@ -19,8 +19,8 @@
   "nav.recommend": "ピック",
   "nav.allMenu": "全メニュー",
   "nav.searchOpen": "検索を開く (タイトル、著者、タグ)",
-  "nav.studio": "Studio",
-  "nav.assets": "Assets",
-  "nav.creators": "Creators",
-  "nav.discover": "Discover"
+  "nav.studio": "スタジオ",
+  "nav.assets": "資産",
+  "nav.creators": "作成者",
+  "nav.discover": "発見する"
 }

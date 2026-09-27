@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "דרישה להיכנס",
+  "admin.gate.guestBody": "קונסולת מנהל דורשת אימות, אנא הכניסה.",
+  "admin.gate.forbiddenTitle": "אישור מנהל נדרש",
+  "admin.gate.forbiddenBody": "לחשבון הזה אין רשיונות מנהל.",
+  "admin.gate.errorTitle": "לא הצלחתי להטען את הקונסולה"
 }

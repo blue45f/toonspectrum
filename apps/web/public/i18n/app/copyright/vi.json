@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "Bản quyền & Nội dung Thông báo",
+  "copyright.section1.title": "Nguồn và nguyên tắc nội dung",
+  "copyright.section1.body": "ToonSpectrum là một nền tảng chỉ mục và khám phá tóm tắt metadata danh mục công cộng (tựa, tác giả, thể loại, v.v.) từ các nền tảng webtoon / tiểu thuyết web.",
+  "copyright.section2.title": "Hình ảnh bìa",
+  "copyright.section2.body": "Hình ảnh bìa phục vụ như là xác định hình ảnh nhỏ và tham chiếu trang bìa nền tảng gốc với liên kết nguồn khi có thể.",
+  "copyright.section3.title": "Métrics & Transparency",
+  "copyright.section4.title": "Thông báo về quyền",
+  "copyright.section5.title": "Thông báo vi phạm bản quyền & loại bỏ",
+  "copyright.section5.body": "Nếu bạn tin rằng siêu dữ liệu hoặc trang bìa vi phạm quyền của bạn, vui lòng gửi một yêu cầu với tiêu đề, URL và bằng chứng sở hữu.",
+  "copyright.leaveInquiry": "Đưa ra điều tra →"
 }

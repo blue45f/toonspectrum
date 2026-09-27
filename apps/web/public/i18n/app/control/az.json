@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "Dillər",
+  "control.sound.enable": "Səs effektlərini təmin etmək",
+  "control.sound.disable": "Səs effektlərini söndürün",
+  "control.theme.dark": "İşıq rejiminə keçin",
+  "control.theme.light": "Qaranlıq rejimə keçin",
+  "control.settings.open": "Açıq parametrlər",
+  "control.settings.close": "Qapalı parametrlər",
+  "control.cluster.settings": "Səs, mövzu, dil nəzarəti",
+  "control.cluster.open": "Açıq parametrlər",
+  "control.cluster.tooltip": "Səs, mövzu və dil parametrləri",
+  "control.language.group.translated": "Yüksək məzmunlu tərcümələr",
+  "control.language.group.englishBase": "Avtomatik tərcümə · İngilis dili fallback"
 }

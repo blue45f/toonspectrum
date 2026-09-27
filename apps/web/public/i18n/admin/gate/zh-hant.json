@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "登入必須",
+  "admin.gate.guestBody": "管理器控制台需要認證.",
+  "admin.gate.forbiddenTitle": "需要管理員許可",
+  "admin.gate.forbiddenBody": "這份帳戶缺乏管理權限.",
+  "admin.gate.errorTitle": "沒有加載控制台"
 }

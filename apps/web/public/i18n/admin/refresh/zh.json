@@ -1,5 +1,5 @@
 {
-  "admin.refresh.now": "Refresh Now",
-  "admin.refresh.auto": "Auto:",
+  "admin.refresh.now": "现在要放心",
+  "admin.refresh.auto": "车辆:",
   "admin.refresh.seconds": "{sec}s"
 }

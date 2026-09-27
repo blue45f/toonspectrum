@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Camada {count}",
   "studio.toolsCompanion.review.section.comments": "Comente {count}",
   "studio.toolsCompanion.review.section.history": "Registro {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Página ZZLBRACEEtiqueta}· Seleção ZZLBRACEEtiqueta ZZ RBRACE",
   "studio.toolsCompanion.review.title": "console de inspeção",
   "studio.toolsCompanion.review.truncatedComments": "e comentários {count}",
   "studio.toolsCompanion.review.truncatedLayers": "{count} camadas",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Tela de referência",
   "studio.toolsCompanion.referenceLoading": "Carregando ferramenta de referência...",
   "studio.toolsCompanion.footer": "Editar documentos possui apenas a guia padrão. Esta janela transmite apenas a visualização compactada e a intenção de inspeção/referência para o BroadcastChannel do mesmo navegador, portanto, não há custo de servidor separado.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Não está ligado ao estúdio principal.",
+  "studio.toolsCompanion.exit.editor": "Abre o editor do Studio"
 }

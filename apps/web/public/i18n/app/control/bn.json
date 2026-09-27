@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ভাষা",
+  "control.sound.enable": "সাউন্ড এফেক্ট সক্ষম করুন",
+  "control.sound.disable": "সাউন্ড ইফেক্ট নিষ্ক্রিয় করুন",
+  "control.theme.dark": "হালকা মোডে স্যুইচ করুন",
+  "control.theme.light": "ডার্ক মোডে স্যুইচ করুন",
+  "control.settings.open": "খোলা সেটিংস",
+  "control.settings.close": "বন্ধ সেটিংস",
+  "control.cluster.settings": "সাউন্ড, থিম, ভাষা নিয়ন্ত্রণ",
+  "control.cluster.open": "খোলা সেটিংস",
+  "control.cluster.tooltip": "সাউন্ড, থিম এবং ভাষা সেটিংস",
+  "control.language.group.translated": "উচ্চ কভারেজ অনুবাদ",
+  "control.language.group.englishBase": "স্বয়ংক্রিয় অনুবাদ · ইংরেজি fallback"
 }

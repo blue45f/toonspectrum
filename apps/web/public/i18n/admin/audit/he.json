@@ -1,10 +1,10 @@
 {
-  "admin.audit.title": "Admin Audit Logs",
-  "admin.audit.desc": "Track all administrative actions, permission shifts, and configuration changes.",
-  "admin.audit.searchPlaceholder": "Search (email/action)...",
-  "admin.audit.loading": "Loading audit logs...",
-  "admin.audit.empty": "No recorded audit logs.",
-  "admin.audit.viewDetails": "View",
-  "admin.audit.modalTitle": "Audit Log Details",
-  "admin.audit.close": "Close"
+  "admin.audit.title": "רישומי הביקורת של מנהל",
+  "admin.audit.desc": "לעקוב אחר כל הפעולות הניהוליות, שינויים ברשיונות, ושינויים בהקנה.",
+  "admin.audit.searchPlaceholder": "חיפוש (מייל/פעולה)...",
+  "admin.audit.loading": "מטען רישומי בדיקה...",
+  "admin.audit.empty": "אין רשומות ביקורת.",
+  "admin.audit.viewDetails": "תצוגה",
+  "admin.audit.modalTitle": "פרטים על רישום הניתוח",
+  "admin.audit.close": "קרוב."
 }

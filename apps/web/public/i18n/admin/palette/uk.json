@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Крайний пошук і команди...",
+  "admin.palette.placeholder": "Пошукові команди адміністратора (навігація, експорт CSV, обслуговування)...",
+  "admin.palette.empty": "Ніяких результатів не знайдено.",
+  "admin.palette.groupNav": "Консольні навигаційні підхідні кістки",
+  "admin.palette.groupQuick": "Крайні дії та експорт",
+  "admin.palette.exportUsers": "Експорт усіх членів CSV",
+  "admin.palette.exportRevenue": "CSV експортного реєстру доходів",
+  "admin.palette.maintenance": "Система управління Аварийное обслуговування"
 }

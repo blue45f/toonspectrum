@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "Zdravotný systém",
+  "admin.stats.healthy": "Zdravé",
+  "admin.stats.degraded": "Znižované",
+  "admin.stats.revenueEvents": "Celkové transakcie / vyrovnania",
+  "admin.stats.usersCommunity": "Celkový počet členov / posty",
+  "admin.stats.maintenance": "Režim údržby",
+  "admin.stats.maintenanceOn": "Požiadavky na záchrannú údržbu (ON)",
+  "admin.stats.maintenanceOff": "Normálna prevádzka (ZAZ)",
+  "admin.stats.activeVisitors": "5 minút aktívnych návštevníkov",
+  "admin.stats.views5m": "5 minút zobrazenia stránok"
 }

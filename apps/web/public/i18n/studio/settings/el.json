@@ -7,10 +7,10 @@
   "studio.settings.tool.eraser": "γόμα",
   "studio.settings.tool.blend": "Ανάμειξη (μουτζούρα)",
   "studio.settings.tool.wetMix": "πινέλο ανάμειξης χρωμάτων",
-  "studio.settings.tool.dodgeBurn": "Dodge/Burn",
+  "studio.settings.tool.dodgeBurn": "Ντότζ/Μπέρν",
   "studio.settings.tool.liquify": "Ρευστοποιήστε",
   "studio.settings.tool.fill": "κουβάς μπογιάς",
-  "studio.settings.tool.lassoFill": "Lasso Fill",
+  "studio.settings.tool.lassoFill": "Λάσο Φιλ",
   "studio.settings.tool.eyedropper": "σταγονόμετρο",
   "studio.settings.tool.marqueeRect": "τετραγωνική επιλογή",
   "studio.settings.tool.marqueeCircle": "κυκλική επιλογή",
@@ -48,7 +48,7 @@
   "studio.settings.shortcut.toolComment": "σχόλια τοποθεσίας",
   "studio.settings.shortcut.toolBlend": "Ανάμειξη (μουτζούρα)",
   "studio.settings.shortcut.toolWetMix": "πινέλο ανάμειξης χρωμάτων",
-  "studio.settings.shortcut.toolDodgeBurn": "Dodge/Burn",
+  "studio.settings.shortcut.toolDodgeBurn": "Ντότζ/Μπέρν",
   "studio.settings.shortcut.toolLiquify": "Ρευστοποιήστε",
   "studio.settings.shortcut.toolLettering": "Γράμματα (κείμενο/μπαλόνι ομιλίας)",
   "studio.settings.shortcut.undo": "αναίρεση",
@@ -184,5 +184,5 @@
   "studio.settings.state.hide": "κρυμμένο",
   "studio.settings.state.show": "σημάδι",
   "studio.settings.state.open": "ανοιχτό",
-  "studio.settings.tool.characterShaper": "Create a character"
+  "studio.settings.tool.characterShaper": "Δημιουργία χαρακτήρα"
 }

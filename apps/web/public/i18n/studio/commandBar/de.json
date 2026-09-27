@@ -6,7 +6,7 @@
   "studio.commandBar.settingsClose": "Befehlsleisteneinstellungen schließen",
   "studio.commandBar.settingsStorageNote": "Die Slot-Belegung wird in den Arbeitsbereichseinstellungen dieses Browsers gespeichert.",
   "studio.commandBar.showSlots": "Befehlsslots anzeigen",
-  "studio.commandBar.slot": "Slot {index}",
+  "studio.commandBar.slot": "Spielautomaten {index}",
   "studio.commandBar.slotAria": "Befehlsslot {index}",
   "studio.commandBar.slotEmpty": "Leerer Slot",
   "studio.commandBar.resetDefaults": "Auf Standardbelegung zurücksetzen",

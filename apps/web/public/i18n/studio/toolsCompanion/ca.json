@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Capa {count}",
   "studio.toolsCompanion.review.section.comments": "Comentari {count}",
   "studio.toolsCompanion.review.section.history": "Grava {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "Pàgina ZZLBRACEEtiqueta}· Selecció ZZLBRACEEtiqueta ZZ RBRACE",
   "studio.toolsCompanion.review.title": "consola d'inspecció",
   "studio.toolsCompanion.review.truncatedComments": "i {count} comentaris",
   "studio.toolsCompanion.review.truncatedLayers": "{count} capes",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Pantalla de referència",
   "studio.toolsCompanion.referenceLoading": "S'està carregant l'eina de referència...",
   "studio.toolsCompanion.footer": "Edita documents només posseeix la pestanya predeterminada. Aquesta finestra només transmet la vista prèvia comprimida i la intenció d'inspecció/referència al BroadcastChannel del mateix navegador, de manera que no hi ha cap cost de servidor separat.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "No està connectat al estudi principal.",
+  "studio.toolsCompanion.exit.editor": "Abrir l'editor d'estudi"
 }

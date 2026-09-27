@@ -1,7 +1,7 @@
 {
-  "feedback.loadError": "Couldn't load feedback survey.",
-  "feedback.thankYou": "Thank you for your valuable feedback!",
-  "feedback.anonymousNote": "Your responses are kept strictly anonymous.",
-  "feedback.notAtAll": "Not at all",
-  "feedback.definitely": "Definitely"
+  "feedback.loadError": "ප් රතිපෝෂණ පර්යේෂණ පටවන්න බැරිවුණා.",
+  "feedback.thankYou": "ඔයාගේ වටිනා ප් රතිචාරයට ස්තූතියි!",
+  "feedback.anonymousNote": "ඔයාගේ ප් රතිචාර නිර්නාමිකව තබා ගන්න.",
+  "feedback.notAtAll": "කොහෙත්ම නෑ",
+  "feedback.definitely": "අනිවාර්යයෙන්ම"
 }

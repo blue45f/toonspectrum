@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Ukucinga Okusheshayo Neziyalezo...",
+  "admin.palette.placeholder": "Imiyalo yomlawuli wokusesha (Ukuhamba, ukuthekelisa i-CSV, Ukulondolozwa)...",
+  "admin.palette.empty": "Ayikho imiphumela etholakalayo.",
+  "admin.palette.groupNav": "Izindlela Zokuqondisa Okuqondene Ne-Console",
+  "admin.palette.groupQuick": "Izinyathelo Ezisheshayo & Ukuthekelisa",
+  "admin.palette.exportUsers": "Ukuthekelisa Wonke Amalungu CSV",
+  "admin.palette.exportRevenue": "I-CSV ye-Export Revenue Ledger",
+  "admin.palette.maintenance": "Ukugcinwa Kwesimo Esiphuthumayo Kohlelo Lokulawula"
 }

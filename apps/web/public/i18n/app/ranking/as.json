@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "দৰ্শন স্ক'ৰ বিভাজন",
+  "ranking.metric.views": "মতামত",
+  "ranking.why": "কিয়?",
+  "ranking.breakdownTitle": "স্ক'ৰ বিভাজন",
+  "ranking.totalScore": "মুঠ স্ক'ৰ",
+  "ranking.breakdownDescription": "অক্ষৰ ওজন আৰু শীৰ্ষক-নিৰ্দিষ্ট স্বাভাৱিকীকৰণৰে গণনা কৰা হয়।"
 }

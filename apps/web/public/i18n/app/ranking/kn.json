@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "ನೋಟ ಸ್ಕೋರ್ ವಿಭಜನೆ",
+  "ranking.metric.views": "ವೀಕ್ಷಣೆಗಳು",
+  "ranking.why": "ಏಕೆ",
+  "ranking.breakdownTitle": "ಅಂಕಗಳ ವಿಭಜನೆ",
+  "ranking.totalScore": "ಒಟ್ಟು ಅಂಕ",
+  "ranking.breakdownDescription": "ಅಕ್ಷದ ತೂಕ ಮತ್ತು ಶೀರ್ಷಿಕೆ-ನಿರ್ದಿಷ್ಟ ಪ್ರಮಾಣೀಕರಣದೊಂದಿಗೆ ಲೆಕ್ಕಾಚಾರ ಮಾಡಲಾಗಿದೆ."
 }

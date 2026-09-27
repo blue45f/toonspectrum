@@ -1,12 +1,14 @@
 {
-  "control.language.label": "Language",
-  "control.sound.enable": "Enable sound effects",
-  "control.sound.disable": "Disable sound effects",
-  "control.theme.dark": "Switch to light mode",
-  "control.theme.light": "Switch to dark mode",
-  "control.settings.open": "Open settings",
-  "control.settings.close": "Close settings",
-  "control.cluster.settings": "Sound, theme, language controls",
-  "control.cluster.open": "Open settings",
-  "control.cluster.tooltip": "Sound, theme, and language settings"
+  "control.language.label": "ენის გამოყენება",
+  "control.sound.enable": "ხმის ეფექტების შესაძლებლობა",
+  "control.sound.disable": "გამორთეთ ხმოვანი ეფექტები",
+  "control.theme.dark": "ღია სიახლეზე გადასვლა",
+  "control.theme.light": "გადასვლა მუქი რეჟიმზე",
+  "control.settings.open": "ღია პარამეტრები",
+  "control.settings.close": "დახურული პარამეტრები",
+  "control.cluster.settings": "ხმის, თემის, ენის კონტროლი",
+  "control.cluster.open": "ღია პარამეტრები",
+  "control.cluster.tooltip": "ხმის, თემის და ენის პარამეტრები",
+  "control.language.group.translated": "მაღალი ფართობის თარგმნები",
+  "control.language.group.englishBase": "ავტომატური თარგმნა · ინგლისური fallback"
 }

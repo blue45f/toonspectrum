@@ -1,12 +1,12 @@
 {
-  "copyright.title": "Copyright & Content Notice",
-  "copyright.section1.title": "Content Sources & Principles",
-  "copyright.section1.body": "ToonStudio is an index and discovery platform summarizing public catalog metadata (titles, authors, genres, etc.) from webtoon/webnovel platforms. It does not host or redistribute main chapter content; reading is directed exclusively through official links.",
-  "copyright.section2.title": "Cover Images",
-  "copyright.section2.body": "Cover images serve as identifying thumbnails and reference original platform covers with source links whenever possible. Displays can be instantly disabled upon rightsholder request or policy updates.",
-  "copyright.section3.title": "Metrics & Transparency",
-  "copyright.section4.title": "Rights Notice",
-  "copyright.section5.title": "Copyright Infringement Notice & Takedown",
-  "copyright.section5.body": "If you believe metadata or covers infringe your rights, please submit an inquiry with title, URL, and proof of ownership.",
-  "copyright.leaveInquiry": "Submit Inquiry →"
+  "copyright.title": "حقوق الطبع والنشر",
+  "copyright.section1.title": "مصادر المحتوى والمبادئ",
+  "copyright.section1.body": "توون سبيكتروم هو منصة مؤشر واكتشاف تلخص البيانات المعدنية العامة (الألقاب والمؤلفين والأنواع وما إلى ذلك) من منصات المسلسلات الإلكترونية / روايات الإنترنت. لا تستضيف أو تقوم بإعادة توزيع محتوى الفصول الرئيسية. يتم توجيه القراءة حصراً من خلال الروابط الرسمية.",
+  "copyright.section2.title": "صور الغطاء",
+  "copyright.section2.body": "تعتبر الصور المغطاة صورًا صغيرة تحديدًا وتشير إلى الأغطية الأصلية للمنصة مع روابط المصدر كلما أمكن ذلك. يمكن تعطيل الشاشات على الفور عند طلب أصحاب الحقوق أو تحديثات السياسة.",
+  "copyright.section3.title": "المقاييس والشفافية",
+  "copyright.section4.title": "إشعار عن الحقوق",
+  "copyright.section5.title": "إشعار عن انتهاك حقوق الطبع والنشر",
+  "copyright.section5.body": "إذا كنت تعتقد أن البيانات المعدنية أو الغلافات تنتهك حقوقك، يرجى إرسال استفسار مع عنوان، URL، ودليل على الملكية.",
+  "copyright.leaveInquiry": "إرسال التحقيقات"
 }

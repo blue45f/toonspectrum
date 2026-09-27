@@ -1,7 +1,7 @@
 {
-  "admin.gate.guestTitle": "Login Required",
-  "admin.gate.guestBody": "Admin console requires authentication. Please sign in.",
-  "admin.gate.forbiddenTitle": "Admin Permission Required",
-  "admin.gate.forbiddenBody": "This account lacks admin permissions. Contact an operator if required.",
-  "admin.gate.errorTitle": "Failed to Load Console"
+  "admin.gate.guestTitle": "Logg på",
+  "admin.gate.guestBody": "Admin konsol krever autentisering.",
+  "admin.gate.forbiddenTitle": "Administrasjonstillatelse kreves",
+  "admin.gate.forbiddenBody": "Denne kontoen mangler administrasjonstillatelser. Kontakt en operatør hvis nødvendig.",
+  "admin.gate.errorTitle": "Ikke klarte å laste konsol"
 }

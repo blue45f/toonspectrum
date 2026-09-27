@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "લોડ",
+  "common.loading.short": "લોડ",
   "common.close": "બંધ કરો",
   "common.open": "ખોલો",
   "common.search": "શોધો",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "ફરીથી પ્રયાસ કરો",
+  "common.retry.short": "ફરીથી પ્રયાસ કરો",
+  "common.backToTop": "ટોચ પર પાછા",
+  "common.backToHome": "ઘરે જા.",
+  "common.loading.search": "શોધ કરી રહ્યા છીએ.",
+  "common.notFoundWithQuery": "' {query} ' ના કોઈ પરિણામો મળ્યા નથી.",
+  "common.openSearch": "શોધમાં શોધો →",
+  "common.loading.empty": "કોઈ ડેટા પરત આવ્યો નથી.",
+  "common.retry.all": "ફરી પ્રયાસ કરો અથવા ઘરે પાછા જાઓ."
 }

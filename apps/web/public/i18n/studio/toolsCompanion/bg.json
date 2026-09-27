@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Слой {count}",
   "studio.toolsCompanion.review.section.comments": "Коментар {count}",
   "studio.toolsCompanion.review.section.history": "Запис {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{selectionLabel ZZ RBRACE",
   "studio.toolsCompanion.review.title": "ревизионна конзола",
   "studio.toolsCompanion.review.truncatedComments": "и {count} коментара",
   "studio.toolsCompanion.review.truncatedLayers": "{count} слоя",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "Референтен екран",
   "studio.toolsCompanion.referenceLoading": "Инструментът за справка се зарежда...",
   "studio.toolsCompanion.footer": "Редактирането на документи притежава само раздела по подразбиране. Този прозорец предава само компресирания преглед и намерението за инспекция/справка към BroadcastChannel на същия браузър, така че няма отделни разходи за сървъра.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "Не е свързан с главната студия.",
+  "studio.toolsCompanion.exit.editor": "Отворете редактора на студиото"
 }

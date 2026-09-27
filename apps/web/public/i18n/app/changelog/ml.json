@@ -1,4 +1,4 @@
 {
-  "changelog.loadError": "Couldn't load updates.",
-  "changelog.empty": "No update logs posted yet."
+  "changelog.loadError": "അപ്ഡേറ്റുകൾ ലോഡുചെയ്യാനായില്ല.",
+  "changelog.empty": "അപ്ഡേറ്റ് രേഖകളൊന്നും പോസ്റ്റുചെയ്തിട്ടില്ല."
 }

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "പാളി {count}",
   "studio.toolsCompanion.review.section.comments": "അഭിപ്രായം {count}",
   "studio.toolsCompanion.review.section.history": "റെക്കോർഡ് {count}",
-  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
+  "studio.toolsCompanion.review.subtitle": "ZZLBRACE പേജ്ലേബൽ}·{തിരഞ്ഞെടുക്കൽലേബൽ ZZ RBRACE",
   "studio.toolsCompanion.review.title": "പരിശോധന കൺസോൾ",
   "studio.toolsCompanion.review.truncatedComments": "ഒപ്പം {count} അഭിപ്രായങ്ങളും",
   "studio.toolsCompanion.review.truncatedLayers": "{count} പാളികൾ",
@@ -119,6 +119,6 @@
   "studio.toolsCompanion.referenceAria": "റഫറൻസ് സ്ക്രീൻ",
   "studio.toolsCompanion.referenceLoading": "റഫറൻസ് ടൂൾ ലോഡ് ചെയ്യുന്നു...",
   "studio.toolsCompanion.footer": "എഡിറ്റ് ഡോക്യുമെൻ്റുകൾക്ക് ഡിഫോൾട്ട് ടാബ് മാത്രമേ സ്വന്തമായുള്ളു. ഈ വിൻഡോ ഒരേ ബ്രൗസറിൻ്റെ ബ്രോഡ്‌കാസ്റ്റ് ചാനലിലേക്ക് കംപ്രസ് ചെയ്‌ത പ്രിവ്യൂവും പരിശോധന/റഫറൻസ് ഉദ്ദേശവും മാത്രമേ കൈമാറുകയുള്ളൂ, അതിനാൽ പ്രത്യേക സെർവർ വിലയില്ല.",
-  "studio.toolsCompanion.exit.disconnected": "Not connected to the main Studio.",
-  "studio.toolsCompanion.exit.editor": "Open the Studio editor"
+  "studio.toolsCompanion.exit.disconnected": "പ്രധാന സ്റ്റുഡിയോയുമായി ബന്ധമില്ല.",
+  "studio.toolsCompanion.exit.editor": "സ്റ്റുഡിയോ എഡിറ്റർ തുറക്കുക"
 }

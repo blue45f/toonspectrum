@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "Նայեք վարկանիշի բաժանում",
+  "ranking.metric.views": "Տեսարաններ",
+  "ranking.why": "Ինչո՞ւ",
+  "ranking.breakdownTitle": "Վիճակագրության բաժանում",
+  "ranking.totalScore": "Ամբողջական գնահատական",
+  "ranking.breakdownDescription": "Հաշվարկվել է առանցքի քաշի եւ տիտղոսի հատուկ կարգավորման միջոցով:"
 }

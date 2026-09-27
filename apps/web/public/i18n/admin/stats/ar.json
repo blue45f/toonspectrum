@@ -1,10 +1,12 @@
 {
-  "admin.stats.health": "System Health",
-  "admin.stats.healthy": "Healthy",
-  "admin.stats.degraded": "Degraded",
-  "admin.stats.revenueEvents": "Total Transactions / Settlements",
-  "admin.stats.usersCommunity": "Total Members / Posts",
-  "admin.stats.maintenance": "Maintenance Mode",
-  "admin.stats.maintenanceOn": "Emergency Maintenance (ON)",
-  "admin.stats.maintenanceOff": "Normal Operation (OFF)"
+  "admin.stats.health": "النظام الصحي",
+  "admin.stats.healthy": "صحية",
+  "admin.stats.degraded": "تدهور",
+  "admin.stats.revenueEvents": "إجمالي المعاملات / التسويات",
+  "admin.stats.usersCommunity": "إجمالي الأعضاء / المشاركات",
+  "admin.stats.maintenance": "وضع الصيانة",
+  "admin.stats.maintenanceOn": "الصيانة الطارئة (ON)",
+  "admin.stats.maintenanceOff": "التشغيل الطبيعي",
+  "admin.stats.activeVisitors": "5 دقائق من الزوار النشطين",
+  "admin.stats.views5m": "مشاهدات الصفحة لمدة 5 دقائق"
 }

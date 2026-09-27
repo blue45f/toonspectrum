@@ -1,16 +1,16 @@
 {
-  "common.loading": "Loading",
-  "common.loading.short": "Loading",
+  "common.loading": "Yuklash",
+  "common.loading.short": "Yuklash",
   "common.close": "Yopish",
   "common.open": "Ochish",
   "common.search": "Qidirish",
-  "common.retry": "Retry",
-  "common.retry.short": "Retry",
-  "common.backToTop": "Back to top",
-  "common.backToHome": "Go home",
-  "common.loading.search": "Searching…",
-  "common.notFoundWithQuery": "No results for '{query}'.",
-  "common.openSearch": "Find it in Search →",
-  "common.loading.empty": "No data returned.",
-  "common.retry.all": "Try again or go back to home."
+  "common.retry": "Yana urinib koʻring",
+  "common.retry.short": "Yana urinib koʻring",
+  "common.backToTop": "Yuqoriga qaytish",
+  "common.backToHome": "Uyga boring .",
+  "common.loading.search": "qidirish...",
+  "common.notFoundWithQuery": "\" {query} \" ning natijalari yoʻq.",
+  "common.openSearch": "Uni qidirib toping →",
+  "common.loading.empty": "Ma'lumotlar qaytarilmadi.",
+  "common.retry.all": "Yana urinib ko'ring yoki uyga qayt."
 }

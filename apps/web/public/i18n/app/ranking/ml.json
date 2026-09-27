@@ -1,8 +1,8 @@
 {
-  "ranking.detailTitle": "View score breakdown",
-  "ranking.metric.views": "Views",
-  "ranking.why": "Why",
-  "ranking.breakdownTitle": "Score breakdown",
-  "ranking.totalScore": "Total score",
-  "ranking.breakdownDescription": "Calculated with axis weights and title-specific normalization."
+  "ranking.detailTitle": "സ്കോർ വിഭജനം കാണുക",
+  "ranking.metric.views": "കാഴ്ചകൾ",
+  "ranking.why": "എന്തിന്",
+  "ranking.breakdownTitle": "സ്കോർ വിഭജനം",
+  "ranking.totalScore": "മൊത്തം സ്കോർ",
+  "ranking.breakdownDescription": "ആക്സിസ് ഭാരവും ടൈറ്റിൽ സ്പെസിഫിക് നോർമലൈസേഷനും ഉപയോഗിച്ച് കണക്കുകൂട്ടുന്നു."
 }

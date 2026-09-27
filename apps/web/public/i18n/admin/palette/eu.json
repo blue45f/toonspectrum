@@ -1,10 +1,10 @@
 {
-  "admin.palette.trigger": "Quick Search & Commands...",
-  "admin.palette.placeholder": "Search admin commands (Navigation, CSV export, Maintenance)...",
-  "admin.palette.empty": "No results found.",
-  "admin.palette.groupNav": "Console Navigation Shortcuts",
-  "admin.palette.groupQuick": "Quick Actions & Export",
-  "admin.palette.exportUsers": "Export All Members CSV",
-  "admin.palette.exportRevenue": "Export Revenue Ledger CSV",
-  "admin.palette.maintenance": "Control System Emergency Maintenance"
+  "admin.palette.trigger": "Bilaketa eta Aginduak azkar...",
+  "admin.palette.placeholder": "Bilaketa-administratzaileen aginduak (navigatzea, CSV esportazioa, mantentzea)...",
+  "admin.palette.empty": "Ez dago emaitzarik.",
+  "admin.palette.groupNav": "Kontsola-navigatzeko lasterbideak",
+  "admin.palette.groupQuick": "Ekintza azkarrak eta esportazioak",
+  "admin.palette.exportUsers": "Kide guztiak esportatu",
+  "admin.palette.exportRevenue": "Exportuko diru-sarreren liburua",
+  "admin.palette.maintenance": "Kontrol-sistema larrialdietan mantentzea"
 }
