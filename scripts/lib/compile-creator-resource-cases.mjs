@@ -7,6 +7,13 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("../../", import.meta.url));
 
+// 격리 CI의 컴파일러, Node, 브라우저가 동일한 계약 원본을 사용한다.
+export const creatorResourcePackageSources = {
+  "@toonstudio/core/creator-resources": "packages/core/src/creator-resources.ts",
+  "@toonstudio/contracts/creator-resource-workflow": "packages/contracts/src/creator-resource-workflow.ts",
+  "@toonstudio/contracts/reference-assets": "packages/contracts/src/reference-assets.ts",
+};
+
 /** Explicit project works with the isolated CI compiler and the workspace compiler. */
 export function compileCreatorResourceCases(output) {
   const project = path.join(output, "tsconfig.json");
@@ -22,11 +29,8 @@ export function compileCreatorResourceCases(output) {
   writeFileSync(project, JSON.stringify({
     compilerOptions: {
       strict: true, skipLibCheck: true, target: "es2022", module: "commonjs",
-      paths: {
-        "@toonstudio/core/creator-resources": [
-          path.join(root, "packages/core/src/creator-resources.ts"),
-        ],
-      },
+      paths: Object.fromEntries(Object.entries(creatorResourcePackageSources)
+        .map(([specifier, source]) => [specifier, [path.join(root, source)]])),
       lib: ["es2023", "dom", "dom.iterable"], rootDir: root, outDir: output,
     },
     files: [
@@ -39,15 +43,20 @@ export function compileCreatorResourceCases(output) {
     "--project", project], { cwd: root, stdio: "inherit" });
   if (result.status !== 0) throw new Error("Creator resource cases failed strict compilation");
 
-  const coreRuntime = path.join(output, "node_modules/@toonstudio/core");
-  mkdirSync(coreRuntime, { recursive: true });
-  writeFileSync(path.join(coreRuntime, "package.json"), JSON.stringify({
-    name: "@toonstudio/core",
-    private: true,
-    exports: { "./creator-resources": "./creator-resources.cjs" },
-  }));
-  writeFileSync(
-    path.join(coreRuntime, "creator-resources.cjs"),
-    'module.exports = require("../../../packages/core/src/creator-resources.js");\n',
-  );
+  const packages = new Map();
+  for (const [specifier, source] of Object.entries(creatorResourcePackageSources)) {
+    const [scope, name, entry] = specifier.split("/");
+    const packageName = `${scope}/${name}`;
+    const runtime = path.join(output, "node_modules", packageName);
+    const exports = packages.get(packageName) ?? {};
+    exports[`./${entry}`] = `./${entry}.cjs`;
+    packages.set(packageName, exports);
+    mkdirSync(runtime, { recursive: true });
+    writeFileSync(path.join(runtime, `${entry}.cjs`),
+      `module.exports = require(${JSON.stringify(`../../../${source.replace(/\.ts$/, ".js")}`)});\n`);
+  }
+  for (const [name, exports] of packages) {
+    writeFileSync(path.join(output, "node_modules", name, "package.json"),
+      JSON.stringify({ name, private: true, exports }));
+  }
 }

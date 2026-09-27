@@ -217,8 +217,15 @@ describe("pending stroke lifecycle source contract", () => {
     );
     expect(flushPipeline.indexOf("pendingBatchAwaitsSelectedGpuFinalReceipt"))
       .toBeLessThan(flushPipeline.indexOf("takePendingStrokeCommits()"));
-    expect(flushPipeline).toContain("mergeStudioPendingStrokeElements(");
-    expect(flushPipeline).toContain("document.finalizeStroke(stroke.id)");
+    // 배치 병합·확정은 추출된 함수에서 실행하며 호스트의 호출 연결도 함께 검증한다.
+    expect(flushPipeline).toContain("commitStudioDeferredStrokeBatch({");
+    const batchCommit = sourceBetween(
+      "export function commitStudioDeferredStrokeBatch({",
+      "export interface StudioDeferredStrokeCommitEngine",
+    );
+    expect(batchCommit).toContain("mergeStudioPendingStrokeElements(baseElements, batch.strokes)");
+    expect(batchCommit).toContain("if (!committed) return false");
+    expect(batchCommit).toContain("document.finalizeStroke(stroke.id)");
     expect(pageCommit).toContain("pendingBatch && !flushPendingStrokeCommitsRef.current()");
     expect(pageCommit).toContain("options.pendingStrokePolicy !== \"drop\"");
     expect(pageCommit).toContain("projectStudioPendingStrokes(nextPages");

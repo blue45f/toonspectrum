@@ -211,6 +211,10 @@ test("PR lint is scoped while push and merge validation stay repository-wide", (
 test("sparse lanes exclude artwork until foundation restores exactly its required Virtual Studio packs", () => {
   const world = "apps/web/public/assets/virtual-studio/world/default-world.json";
   const requiredArt = [
+    "apps/web/public/assets/studio/props/daily/webtoon_cafe_table_for_two.webp",
+    "apps/web/public/assets/studio/props/school/webtoon_school_desk_study_cluster.webp",
+    "apps/web/public/assets/studio/props/fantasy/webtoon_royal_letter_seal_cluster.webp",
+    "apps/web/public/assets/studio/props/urban/webtoon_street_fixture_cluster.webp",
     "apps/web/public/assets/virtual-studio/production-v2/art-manifest.json",
     "apps/web/public/assets/virtual-studio/production-v2/master-central-lossless.webp",
     "apps/web/public/assets/virtual-studio/production-v2/player-pink-direction-down.png",
@@ -295,6 +299,8 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/world-v2/",
     "/apps/web/public/assets/studio/props/daily/",
     "/apps/web/public/assets/studio/props/school/",
+    "/apps/web/public/assets/studio/props/fantasy/",
+    "/apps/web/public/assets/studio/props/urban/",
   ]);
   assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
     "artwork must be present before the required foundation tests execute");

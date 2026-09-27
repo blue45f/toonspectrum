@@ -201,7 +201,7 @@ const REVIEW_ACTIONS = [
   { id: "scroll-preview", name: "세로 스크롤 미리보기" },
   { id: "continuity", name: "마감·품질 검사" },
   { id: "comments", name: "문서 댓글" },
-  { id: "page-review", name: "페이지 검토와 편집 잠금" },
+  { id: "page-review", name: "페이지 검토와 편집 제한" },
 ] as const;
 
 /**

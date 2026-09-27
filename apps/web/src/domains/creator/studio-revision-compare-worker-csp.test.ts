@@ -408,6 +408,7 @@ describe("revision comparison Worker strict-CSP bootstrap", () => {
         root,
         configFile: false,
         logLevel: "error",
+        worker: { format: "es" },
         resolve: {
           alias: [
             { find: "virtual:revision-client", replacement: CLIENT_PATH },
