@@ -18138,6 +18138,17 @@ const puppetWarpArmed =
     pendingGpuDrawAuthoritiesRef.current = [];
     gpuFinalReceiptRequestIdsRef.current.clear();
     gpuFinalCrdtPublishedRequestIdsRef.current.clear();
+    // History transitions are a hard presentation boundary. A pinned WebGPU surface and its
+    // watchdog/request identity belong to the previous canonical snapshot and must never leak into
+    // the next brush/session, otherwise the first post-Undo stroke can wait forever for a receipt
+    // that can no longer arrive. The committed document remains the authority and will be repinned
+    // by the next live stroke when a GPU surface is actually available.
+    gpuLiveInkPinnedRef.current = false;
+    gpuLiveAcceptedRequestIdRef.current = null;
+    gpuFinalReceiptStrokeRef.current = null;
+    gpuFinalReceiptRequestIdRef.current = null;
+    gpuPinReceiptWatchdogRef.current = null;
+    cancelGpuPinnedRequestWatchdog();
     committedInkSurfaceHandoffsRef.current = [];
     committedInkRetainedRetryRef.current = null;
     skiaCommittedInkRuntime.clear();
