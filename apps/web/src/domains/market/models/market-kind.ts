@@ -104,6 +104,12 @@ export interface MarketLicenseMeta {
 
 export const MARKET_LICENSES: readonly MarketLicenseMeta[] = Object.freeze([
   {
+    license: "toonstudio-standard",
+    label: "ToonStudio 표준 사용권",
+    summary: "작품 사용은 자유, 리소스 파일 재배포는 불가",
+    url: null,
+  },
+  {
     license: "toonspectrum-standard",
     label: "ToonStudio 표준 사용권",
     summary: "작품 사용은 자유, 리소스 파일 재배포는 불가",
@@ -130,6 +136,16 @@ export const MARKET_LICENSES: readonly MarketLicenseMeta[] = Object.freeze([
 ]);
 
 const MARKET_LICENSE_BY_LICENSE = new Map(MARKET_LICENSES.map((meta) => [meta.license, meta]));
+
+// 표준 사용권은 toonspectrum-standard로 승격했지만 이전에 발행된 리소스가 toonstudio-standard를
+// 그대로 물고 있어, 계약 호환을 위해 조회 테이블에는 남기고 공개 안내에서만 접는다.
+const MARKET_LICENSE_LEGACY_ALIASES: ReadonlySet<CreatorMarketplaceResourceLicense> = new Set([
+  "toonstudio-standard",
+]);
+
+export const MARKET_LICENSE_GUIDE: readonly MarketLicenseMeta[] = Object.freeze(
+  MARKET_LICENSES.filter((meta) => !MARKET_LICENSE_LEGACY_ALIASES.has(meta.license)),
+);
 
 export function marketLicenseMeta(license: CreatorMarketplaceResourceLicense): MarketLicenseMeta {
   return MARKET_LICENSE_BY_LICENSE.get(license) ?? MARKET_LICENSES[0]!;
