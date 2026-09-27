@@ -14,6 +14,8 @@ describe("StudioVirtualExperienceArtPreview", () => {
     expect(svg?.getAttribute("viewBox")).toBe(`${frame?.x} ${frame?.y} ${frame?.width} ${frame?.height}`);
     expect(image?.getAttribute("href")).toContain(`experience-v8/${kind}-ink.png`);
     expect(image?.getAttribute("width")).toBe("1254");
+    expect(svg?.getAttribute("pointer-events")).toBe("none");
+    expect(image?.getAttribute("pointer-events")).toBe("none");
     expect(image?.getAttribute("clip-path")).toBe(`url(#${svg?.querySelector("clipPath")?.id})`);
     expect(svg?.querySelector("clipPath rect")?.getAttribute("height")).toBe(String(frame?.height));
     expect(view.container.querySelector("img")).toBeNull();

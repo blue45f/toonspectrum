@@ -58,17 +58,19 @@ export function StudioVirtualSpaceDecorationEditor({ world, decorations, selfPoi
       {state.placements.map((item, index) => {
         const frame = STUDIO_VIRTUAL_DECOR_FRAME[item.type];
         const geometry = studioExperienceFrameGeometry("furniture", artStyle, frame, 82 * item.scale, 82 * item.scale, .5, .9);
-        return <g key={item.id} role="button" tabIndex={0} aria-pressed={selected?.id === item.id}
-        aria-label={bt(`${index + 1}번 ${LABELS[item.type][0]} 선택`, `Select ${LABELS[item.type][1]} ${index + 1}`)}
-        className="studio-decoration-editor__object" onClick={(event) => { event.stopPropagation(); choose(item.id); }}
-        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); choose(item.id); } }}>
-        <rect {...studioVirtualDecorBounds(item)} rx="8" fill={selected?.id === item.id ? "#ad89ff" : "#72b6ca"} fillOpacity=".35" stroke={selected?.id === item.id ? "#f8e5ff" : "#83cfe2"} strokeWidth={selected?.id === item.id ? 4 : 2} />
+        return <g key={item.id} pointerEvents="none">
+        {/* 선택 영역은 rect만 소유한다. 원본 image의 큰 bbox가 버튼 중심이나 포인터 영역을 늘리지 않는다. */}
+        <rect {...studioVirtualDecorBounds(item)} role="button" tabIndex={0} pointerEvents="all" aria-pressed={selected?.id === item.id}
+          aria-label={bt(`${index + 1}번 ${LABELS[item.type][0]} 선택`, `Select ${LABELS[item.type][1]} ${index + 1}`)}
+          className="studio-decoration-editor__object" onClick={(event) => { event.stopPropagation(); choose(item.id); }}
+          onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); choose(item.id); } }}
+          rx="8" fill={selected?.id === item.id ? "#ad89ff" : "#72b6ca"} fillOpacity=".35" stroke={selected?.id === item.id ? "#f8e5ff" : "#83cfe2"} strokeWidth={selected?.id === item.id ? 4 : 2} />
         <g transform={`translate(${item.x} ${item.y}) rotate(${item.rotation})`} pointerEvents="none">
           <StudioVirtualExperienceArtPreview kind="furniture" artStyle={artStyle} frame={frame}
             x={-geometry.width * geometry.originX} y={-geometry.height * geometry.originY}
             width={geometry.width} height={geometry.height} preserveAspectRatio="none" />
         </g>
-        <circle cx={item.x} cy={item.y} r="6" fill="#f8e5ff" />
+        <circle cx={item.x} cy={item.y} r="6" fill="#f8e5ff" pointerEvents="none" />
         <text x={item.x} y={item.y - 30} textAnchor="middle" fill="#fff" fontSize="22" pointerEvents="none">{index + 1}</text>
       </g>;
       })}

@@ -20,11 +20,11 @@ export function StudioVirtualExperienceArtPreview({ kind, artStyle, frame: index
   const frame = studioCharacterAtlasGridFrames(atlas)[index];
   return <svg className={["studio-experience-art-preview", className].filter(Boolean).join(" ")}
     x={x} y={y} width={width} height={height} viewBox={frame ? `${frame.x} ${frame.y} ${frame.width} ${frame.height}` : "0 0 1 1"}
-    preserveAspectRatio={preserveAspectRatio} overflow="hidden" aria-hidden="true" focusable="false"
+    preserveAspectRatio={preserveAspectRatio} overflow="hidden" pointerEvents="none" aria-hidden="true" focusable="false"
     data-experience-atlas={kind} data-experience-frame={index} data-art-style={artStyle}>
     {frame ? <>
       <defs><clipPath id={clipId} clipPathUnits="userSpaceOnUse"><rect x={frame.x} y={frame.y} width={frame.width} height={frame.height} /></clipPath></defs>
-      <image href={studioExperienceAssetUrl(kind, artStyle)} x="0" y="0" width={atlas.width} height={atlas.height} clipPath={`url(#${clipId})`} />
+      <image href={studioExperienceAssetUrl(kind, artStyle)} x="0" y="0" width={atlas.width} height={atlas.height} pointerEvents="none" clipPath={`url(#${clipId})`} />
     </> : null}
   </svg>;
 }
