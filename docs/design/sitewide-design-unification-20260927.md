@@ -130,8 +130,8 @@
 미완료: 이 작업은 아트를 **배치**한 것이지 새로 생성한 것이 아니다. 신규 아트 생성은 이
 환경에서 불가능했다(사용 가능한 생성기가 워터마크를 강제하고 종횡비를 무시하며 팔레트가
 어긋남). 고품질 신규 아트가 필요하면 `OPENAI_API_KEY`를 설정한 뒤 별도 작업으로 진행한다.
-`toonstudio-route-header-*.jpg` 4장과 `toonstudio-premium-icons/projects.webp`는 지금도
-코드 참조가 없어 별도 배치 대상이다. `creator-home.css`는 현재 라이브인 레거시 파일로
+`toonstudio-route-header-*.jpg` 4장은 이 아틀라스에 편입되어 더 이상
+참조 0건이 아니다. `toonstudio-premium-icons/projects.webp`만 아직 배치되지 않았다. `creator-home.css`는 현재 라이브인 레거시 파일로
 하드코딩 hex와 초록 focus ring을 품고 있어 별도 정리 대상이다.
 
 ## 검증의 경계

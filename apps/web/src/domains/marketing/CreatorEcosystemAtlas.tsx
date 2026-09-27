@@ -44,12 +44,12 @@ export function CreatorEcosystemAtlas() {
         </div>
 
         <ul className="cf-atlas-grid">
-          {ECOSYSTEM_MODULES.map(({ icon: Icon, href, image, position, span, titleKo, titleEn, label, bodyKo, bodyEn }, index) => (
+          {ECOSYSTEM_MODULES.map(({ icon: Icon, href, image, width, height, position, span, titleKo, titleEn, label, bodyKo, bodyEn }, index) => (
             <li key={href} className={`cf-atlas-cell cf-atlas-cell--${span}`}>
               <Link href={href} className="cf-atlas-card">
                 {/* 모듈 이름과 설명이 이미 텍스트로 제공되므로 아트는 장식 이미지로 처리한다. */}
                 <span className="cf-atlas-art" aria-hidden="true">
-                  <img src={image} alt="" width={1536} height={1024} loading="lazy" decoding="async" style={{ objectPosition: position }} />
+                  <img src={image} alt="" width={width} height={height} loading="lazy" decoding="async" style={{ objectPosition: position }} />
                 </span>
                 <span className="cf-atlas-text">
                   <span className="cf-atlas-top">
