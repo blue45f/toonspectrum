@@ -882,6 +882,13 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
   await installCleanStudioState(page);
   await page.goto(studioUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
   await page.locator('[data-studio-editor="true"]').waitFor({ state: "visible", timeout: 45_000 });
+  // Static Vite preview has no API server. Let the service-capability probe settle to its
+  // explicit degraded state before interacting with transient Studio chrome; otherwise the
+  // probe's 502 retries can consume the drawing-readiness deadline and make the browser gate
+  // fail before the editor is usable.
+  await page.waitForFunction(() => ["available", "degraded"].includes(
+    document.documentElement.dataset.serviceCapabilityState ?? ""
+  ), undefined, { timeout: 20_000 });
   // Hide transient evidence chrome before any gesture. Moving the pointer or waiting after
   // pointerup would skip the exact live-to-retained boundary this verifier must measure.
   await page.addStyleTag({
@@ -894,9 +901,6 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
   });
   await dismissTransientChrome(page);
   // 초기 연결 상태 안내가 캔버스를 재배치하기 전에 그리기 좌표를 확정하지 않는다.
-  await page.waitForFunction(() => ["available", "degraded"].includes(
-    document.documentElement.dataset.serviceCapabilityState ?? ""
-  ), undefined, { timeout: 20_000 });
   if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
     await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible" });
   }

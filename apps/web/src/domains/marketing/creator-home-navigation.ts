@@ -103,7 +103,8 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
     frame = undefined;
     const hash = host.getHash();
     const focusedControl = host.getFocusedControl?.();
-    if (!creatorSectionFromHash(hash)) return;
+    const section = creatorSectionFromHash(hash);
+    if (!section) return;
     frame = host.requestFrame(() => {
       if (disposed || request !== revision || hash !== host.getHash()) return;
       frame = undefined;
@@ -111,10 +112,13 @@ export function bindCreatorSectionNavigation(host: CreatorNavigationHost): () =>
         blocked = true;
         return;
       }
-      // Native history may focus its destination before this deferred frame. A
-      // subsequent keyboard/user focus choice owns the interaction and must win.
+      // Native history may already focus the destination heading before this deferred frame.
+      // That native focus is the fragment navigation we are here to normalize; only a different
+      // interactive control chosen by the user should cancel the deferred correction.
+      const target = host.findTarget(section.headingId);
+      if (!target) return;
       const currentControl = host.getFocusedControl?.();
-      if (currentControl && currentControl !== focusedControl) return;
+      if (currentControl && currentControl !== focusedControl && currentControl !== target) return;
       focusCreatorSection(hash, host.findTarget, true);
     });
   };
