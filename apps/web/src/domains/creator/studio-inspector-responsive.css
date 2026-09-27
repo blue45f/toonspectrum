@@ -15,4 +15,10 @@
   body:has([data-studio-mobile-sheet="true"]) [data-studio-shell-floating-target="offline-readiness"] {
     z-index: 58 !important;
   }
+
+  /* 열린 브러시 시트의 조상 stacking context 아래에 저장 런처를 둔다.
+     시트를 닫으면 기존 저장 상태와 경고를 같은 위치에서 다시 조작할 수 있다. */
+  body:has([data-studio-mobile-sheet="draw"]:not([aria-hidden="true"])) [data-studio-draft-save-center] {
+    z-index: 0 !important;
+  }
 }
