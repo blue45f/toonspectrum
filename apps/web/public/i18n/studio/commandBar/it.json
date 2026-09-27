@@ -6,7 +6,7 @@
   "studio.commandBar.settingsClose": "Chiudi le impostazioni della barra dei comandi",
   "studio.commandBar.settingsStorageNote": "La disposizione degli slot viene salvata nelle impostazioni dell'area di lavoro di questo browser.",
   "studio.commandBar.showSlots": "Mostra gli slot dei comandi",
-  "studio.commandBar.slot": "Slot ZZPLACEholder0ZZ",
+  "studio.commandBar.slot": "Slot {index}",
   "studio.commandBar.slotAria": "Slot comando {index}",
   "studio.commandBar.slotEmpty": "Slot vuoto",
   "studio.commandBar.resetDefaults": "Ripristina la disposizione predefinita",

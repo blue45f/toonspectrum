@@ -1,10 +1,12 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
   {
     name: "@toonstudio/contracts",
+    sourceManifest: new URL("../packages/contracts/package.json", import.meta.url),
+    compiledDirectory: "packages/contracts",
     exports: {
       "./security/csrf": "./security/csrf.js",
       "./production-workspace": "./production-workspace.js",
@@ -26,9 +28,9 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
   },
   {
     name: "@toonstudio/core",
-    compiledEntry: "packages/core/src/index.js",
+    sourceManifest: new URL("../packages/core/package.json", import.meta.url),
+    compiledDirectory: "packages/core",
     exports: {
-      ".": "./index.js",
       "./creator-role": "./creator-role.js",
       "./creator-resources": "./creator-resources.js",
       "./infrastructure-fabric": "./infrastructure-fabric.js",
@@ -78,6 +80,28 @@ function requirePath(fromDirectory, target) {
   return path.startsWith(".") ? path : `./${path}`;
 }
 
+// API가 emit한 공개 계약만 배포한다. 타입 전용·Web 전용 계약까지 강제로 emit하지 않는다.
+async function emittedWorkspaceSubpaths(root, definition) {
+  const manifest = JSON.parse(await readFile(definition.sourceManifest, "utf8"));
+  const entries = [];
+  for (const [subpath, entry] of Object.entries(manifest.exports)) {
+    if (subpath === "." && definition.compiledEntry) continue;
+    const source = typeof entry === "string" ? entry : entry.import;
+    if (!source?.startsWith("./src/") || !source.endsWith(".ts")) continue;
+    const compiledEntry = `${definition.compiledDirectory}/${source.slice(2, -3)}.js`;
+    try {
+      await access(resolve(root, compiledEntry));
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+    const target = definition.exports?.[subpath]?.slice(2)
+      ?? (subpath === "." ? "index.js" : `${subpath.slice(2)}.js`);
+    entries.push({ subpath, target, compiledEntry });
+  }
+  return entries;
+}
+
 export async function stageApiWorkspaceRuntime(
   directory = fileURLToPath(new URL("../apps/api/dist/", import.meta.url)),
 ) {
@@ -85,6 +109,13 @@ export async function stageApiWorkspaceRuntime(
   const staged = [];
 
   for (const definition of WORKSPACE_RUNTIME_PACKAGES) {
+    const emittedSubpaths = definition.sourceManifest
+      ? await emittedWorkspaceSubpaths(root, definition)
+      : [];
+    const subpathEntries = new Map((definition.subpathEntries ?? []).map((entry) => [entry.target, entry]));
+    for (const entry of emittedSubpaths) subpathEntries.set(entry.target, entry);
+    const exports = definition.exports ? { ...definition.exports } : undefined;
+    for (const entry of emittedSubpaths) exports[entry.subpath] = `./${entry.target}`;
     const compiledEntry = definition.compiledEntry
       ? resolve(root, definition.compiledEntry)
       : null;
@@ -100,7 +131,7 @@ export async function stageApiWorkspaceRuntime(
         "utf8",
       );
     }
-    for (const subpath of definition.subpathEntries ?? []) {
+    for (const subpath of subpathEntries.values()) {
       const compiledSubpathEntry = resolve(root, subpath.compiledEntry);
       await access(compiledSubpathEntry);
       const target = resolve(targetDirectory, subpath.target);
@@ -119,8 +150,8 @@ export async function stageApiWorkspaceRuntime(
       `${JSON.stringify({
         name: definition.name,
         private: true,
-        ...(compiledEntry ? { main: "./index.js" } : {}),
-        ...(definition.exports ? { exports: definition.exports } : {}),
+        ...((compiledEntry || exports?.["."]) ? { main: "./index.js" } : {}),
+        ...(exports ? { exports } : {}),
       }, null, 2)}\n`,
       "utf8",
     );

@@ -1,6 +1,6 @@
-import { resolveReferenceQuery } from "../../../../../packages/core/src/reference-query-language";
+import { resolveReferenceQuery } from "@toonstudio/core/reference-query-language";
 
-import type { CreatorResource } from "./creator-resources";
+import type { CreatorResource } from "@toonstudio/core/creator-resources";
 
 export const REFERENCE_SEARCH_FIELDS = [
   { value: "all", label: "전체 메타데이터" },
@@ -56,7 +56,11 @@ export function defaultReferenceViewState(): ReferenceViewState {
   return { mode: "results", within: "", department: "", culture: "", classification: "", sort: "relevance", density: "comfortable" };
 }
 function cleanText(value: string | null, maximumLength = 80): string {
-  if (!value || /[\u0000-\u001f\u007f]/u.test(value)) return "";
+  if (!value) return "";
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code <= 0x1f || code === 0x7f) return "";
+  }
   return value.trim().slice(0, maximumLength);
 }
 function cleanYear(value: string | null): string {
