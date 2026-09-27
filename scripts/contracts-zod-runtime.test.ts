@@ -1,7 +1,9 @@
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
 
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
+import { z } from "zod";
 
 const contractRequire = createRequire(new URL("../packages/contracts/package.json", import.meta.url));
 const contractRuntime = realpathSync(contractRequire.resolve("zod"));
@@ -16,4 +18,27 @@ describe("공유 계약의 Zod 런타임 일치", () => {
     const consumerRequire = createRequire(new URL(manifest, import.meta.url));
     expect(realpathSync(consumerRequire.resolve("zod"))).toBe(contractRuntime);
   });
+});
+
+it("간접 의존성의 Zod 패키지와 설치 스냅샷을 모두 보존한다", () => {
+  const dependencyMap = z.record(z.string(), z.string()).optional();
+  const schema = z.object({
+    packages: z.record(z.string(), z.unknown()),
+    snapshots: z.record(z.string(), z.object({
+      dependencies: dependencyMap,
+      optionalDependencies: dependencyMap,
+    })),
+  });
+  const lock = schema.parse(parse(readFileSync(new URL("../pnpm-lock.yaml", import.meta.url), "utf8")));
+  const versions = new Set<string>();
+  for (const snapshot of Object.values(lock.snapshots)) {
+    for (const dependencies of [snapshot.dependencies, snapshot.optionalDependencies]) {
+      if (dependencies?.zod) versions.add(dependencies.zod);
+    }
+  }
+  expect(versions.size).toBeGreaterThan(0);
+  for (const version of versions) {
+    expect(Object.hasOwn(lock.packages, `zod@${version}`), `패키지 해시 누락: zod@${version}`).toBe(true);
+    expect(Object.hasOwn(lock.snapshots, `zod@${version}`), `설치 스냅샷 누락: zod@${version}`).toBe(true);
+  }
 });

@@ -25,6 +25,7 @@ import { chromium, type Browser, type Locator, type Page } from "playwright";
 
 import { STUDIO_BRUSH_LABELS } from "../apps/web/src/domains/creator/brush/studio-brush-product-model";
 
+import { clickStudioControlAfterReadiness, waitForStudioDrawingReady } from "./lib/studio-drawing-readiness";
 import { isStudioStaticPreviewReadinessUnavailable } from "./lib/studio-verify-preview-errors.mjs";
 import {
   cleanScratchDir,
@@ -565,7 +566,20 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
     }
   } catch {}
 
-  const workspaceMenu = await verifyWorkspaceMenuGate(page, run);
+  await waitForStudioDrawingReady(page);
+
+  let workspaceMenu: WorkspaceMenuGateContractResult;
+  try {
+    workspaceMenu = await verifyWorkspaceMenuGate(page, run);
+  } catch (cause) {
+    await page.screenshot({ path: shot, fullPage: true });
+    log(`run${run}: workspace boot diagnostics=${JSON.stringify({
+      errors: consoleErrors,
+      failedResponses,
+      text: (await page.locator("body").innerText()).slice(0, 2500),
+    })}`);
+    throw cause;
+  }
 
   // Stable shipped observables + reliable card count for delta (page cards)
   const pageCards = page.locator('[data-testid="studio-page-item"]');
@@ -721,7 +735,10 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   const workspaceMenu = await verifyMobileWorkspaceMenuGateDormant(page, "mobile");
   await dismissHydratedQuickStart(page);
 
-  await page.getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)" }).click();
+  await clickStudioControlAfterReadiness(
+    page,
+    page.getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)" }),
+  );
   const sheet = page.getByRole("dialog", { name: "브러시 설정" });
   await sheet.waitFor({ state: "visible", timeout: 3000 });
 
@@ -1626,6 +1643,23 @@ async function main() {
       ].join(" ")}`,
     );
     console.log(JSON.stringify({ runs: results, mobile, mobileDocks }, null, 2));
+  } catch (cause) {
+    if (browser) {
+      for (const [index, page] of browser.contexts().flatMap((context) => context.pages()).entries()) {
+        await page.screenshot({ path: join(SCRATCH, `studio-launch-failure-${index}.png`), fullPage: false });
+        const diagnostics = await page.evaluate(() => ({
+          href: window.location.href,
+          dialogs: [...document.querySelectorAll('[role="dialog"]')].map((node) => ({
+            label: node.getAttribute("aria-label"), hidden: node.closest('[inert], [aria-hidden="true"]') !== null,
+          })),
+          buttons: [...document.querySelectorAll("button")].filter((node) => node.getBoundingClientRect().width > 0)
+            .map((node) => ({ label: node.getAttribute("aria-label"), title: node.title, text: node.textContent?.trim().slice(0, 60),
+              hidden: node.closest('[inert], [aria-hidden="true"]') !== null })),
+        }));
+        log(`failure${index}: ${JSON.stringify(diagnostics)}`);
+      }
+    }
+    throw cause;
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     try { server.kill("SIGKILL"); } catch {}
