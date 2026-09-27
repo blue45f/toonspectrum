@@ -39,7 +39,7 @@ describe("Creator Intelligence mesh job token", () => {
     const token = signCreatorIntelligenceMeshArtifactToken(
       "user-a",
       {
-        contractVersion: "toonstudio.private-object-storage.v2",
+        contractVersion: "toonspectrum.private-object-storage.v2",
         providerId: "supabase",
         purpose: "derived",
         digest: `sha256:${digest}`,

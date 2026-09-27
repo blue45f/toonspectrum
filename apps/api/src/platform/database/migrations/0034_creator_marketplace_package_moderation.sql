@@ -275,7 +275,7 @@ ALTER TABLE public."creator_marketplace_resource_report"
     AND ("evidence"->>'manifestByteSize')::integer BETWEEN 1 AND 65536
     AND "evidence"->>'kind' IN ('asset', 'brush', 'filter', 'palette', 'template', '3d-preset')
     AND "evidence"->>'license' IN (
-      'toonstudio-standard',
+      'toonspectrum-standard',
       'cc0-1.0',
       'cc-by-4.0',
       'cc-by-nc-4.0'

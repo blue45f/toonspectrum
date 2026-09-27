@@ -40,7 +40,7 @@ const storage: PrivateObjectStoragePort = {
   async verifyPrivatePurposeBuckets() { return { ready: true, privatePurposeBuckets: 3 }; },
   async uploadImmutable(input) {
     const hash = createHash("sha256").update(input.bytes).digest("hex");
-    const object = { contractVersion: "toonstudio.private-object-storage.v2" as const, providerId: "cloudflare-r2" as const,
+    const object = { contractVersion: "toonspectrum.private-object-storage.v2" as const, providerId: "cloudflare-r2" as const,
       purpose: input.purpose, digest: `sha256:${hash}`, objectPath: `sha256/${hash.slice(0, 2)}/${hash}`, byteLength: input.bytes.length, contentType: input.contentType };
     objects.set(`${object.purpose}:${object.digest}`, Buffer.from(input.bytes)); return object;
   },

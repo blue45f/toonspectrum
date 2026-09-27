@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "toonstudio-realtime",
+  "name": "toonspectrum-realtime",
   "main": "src/index.ts",
   "workers_dev": true,
   "preview_urls": false,
@@ -45,8 +45,8 @@
   },
 
   "vars": {
-    "REALTIME_TICKET_ISSUER": "toonstudio-api",
-    "REALTIME_TICKET_AUDIENCE": "toonstudio-realtime",
+    "REALTIME_TICKET_ISSUER": "toonspectrum-api",
+    "REALTIME_TICKET_AUDIENCE": "toonspectrum-realtime",
     "REALTIME_ALLOWED_ORIGINS": "https://toonstudio.cloud,https://www.toonstudio.cloud",
     "REALTIME_MAX_CONNECTIONS_PER_ROOM": "64",
     "REALTIME_MAX_CONNECTIONS_PER_ACTOR": "4",

@@ -8,7 +8,7 @@ const subject = { schemaVersion: 1 as const, workId: "work", projectId: "project
   reviewId: "review", revisionId: "revision", rootGraphHash: "a".repeat(64) };
 const bytes = Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x42, 0x86, 0x81, 0x01]);
 const sha256 = createHash("sha256").update(bytes).digest("hex");
-const object = { contractVersion: "toonstudio.private-object-storage.v2" as const, providerId: "cloudflare-r2" as const,
+const object = { contractVersion: "toonspectrum.private-object-storage.v2" as const, providerId: "cloudflare-r2" as const,
   purpose: "derived" as const, digest: `sha256:${sha256}`, objectPath: `sha256/${sha256.slice(0, 2)}/${sha256}`,
   byteLength: bytes.length, contentType: "audio/webm" };
 const note = { contract: "studio-review-voice-note-v1" as const, id: "note", subject, authorUserId: "actor", title: "Context",

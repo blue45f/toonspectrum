@@ -22,7 +22,7 @@ describe("useMarketWishlist", () => {
     resourceVersion: "1.0.0",
     minimumStudioVersion: "0.1.0",
     tags: ["노을", "색감"],
-    license: "toonstudio-standard",
+    license: "toonspectrum-standard",
     attributionText: "",
     containsAi: false,
     provenance: { origin: "original", authoredByPublisher: true },

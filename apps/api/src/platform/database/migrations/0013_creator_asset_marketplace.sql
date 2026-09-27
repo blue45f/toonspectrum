@@ -15,7 +15,7 @@ ALTER TABLE "creator_asset"
   ADD COLUMN IF NOT EXISTS "previewMimeType" text,
   ADD COLUMN IF NOT EXISTS "previewByteSize" integer,
   ADD COLUMN IF NOT EXISTS "previewContentHash" text,
-  ADD COLUMN IF NOT EXISTS "license" text NOT NULL DEFAULT 'toonstudio-standard',
+  ADD COLUMN IF NOT EXISTS "license" text NOT NULL DEFAULT 'toonspectrum-standard',
   ADD COLUMN IF NOT EXISTS "attributionText" text NOT NULL DEFAULT '',
   ADD COLUMN IF NOT EXISTS "containsAi" boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS "rightsConfirmedAt" timestamptz,
@@ -49,7 +49,7 @@ ALTER TABLE "creator_asset"
   ALTER COLUMN "previewMimeType" DROP NOT NULL,
   ALTER COLUMN "previewByteSize" DROP NOT NULL,
   ALTER COLUMN "previewContentHash" DROP NOT NULL,
-  ALTER COLUMN "license" SET DEFAULT 'toonstudio-standard',
+  ALTER COLUMN "license" SET DEFAULT 'toonspectrum-standard',
   ALTER COLUMN "license" SET NOT NULL,
   ALTER COLUMN "attributionText" SET DEFAULT '',
   ALTER COLUMN "attributionText" SET NOT NULL,
@@ -94,7 +94,7 @@ ALTER TABLE "creator_asset"
 
 ALTER TABLE "creator_asset"
   ADD CONSTRAINT "creator_asset_license_check"
-    CHECK ("license" IN ('toonstudio-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')),
+    CHECK ("license" IN ('toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')),
   ADD CONSTRAINT "creator_asset_moderation_status_check"
     CHECK ("moderationStatus" IN ('published', 'under_review', 'rejected')),
   ADD CONSTRAINT "creator_asset_mime_type_check"

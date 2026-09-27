@@ -11,7 +11,7 @@ export const CREATOR_ASSET_PLATFORM_SCHEMA =
   "toonstudio.creator-asset-platform" as const;
 export const CREATOR_ASSET_PLATFORM_VERSION = 1 as const;
 export const CREATOR_ASSET_ARTIFACT_SET_SCHEMA =
-  "toonstudio.creator-asset-artifact-set" as const;
+  "toonspectrum.creator-asset-artifact-set" as const;
 export const CREATOR_WORK_CATALOG_BINDING_SCHEMA =
   "toonstudio.creator-work-catalog-asset-binding" as const;
 
