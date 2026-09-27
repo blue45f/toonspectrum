@@ -90,7 +90,8 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
     const armTimer = window.setTimeout(() => { armed = true; }, MINIMUM_ENGAGEMENT_DELAY_MS);
     const fallbackTimer = window.setTimeout(reveal, visits > 1 ? 14_000 : FALLBACK_REVEAL_DELAY_MS);
     const passive = { passive: true } as const;
-    window.addEventListener("pointerdown", onIntent, passive);
+    // 누르기와 떼기 사이에 안내가 클릭 대상을 가리지 않도록 완료된 클릭만 받는다.
+    window.addEventListener("click", onIntent, passive);
     window.addEventListener("keydown", onIntent);
     window.addEventListener("scroll", onIntent, passive);
     // 이미 표시된 안내도 메뉴가 열리면 숨기고, 닫은 뒤 다음 조작에서만 재개한다.
@@ -100,7 +101,7 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
       observer.disconnect();
       window.clearTimeout(armTimer);
       window.clearTimeout(fallbackTimer);
-      window.removeEventListener("pointerdown", onIntent);
+      window.removeEventListener("click", onIntent);
       window.removeEventListener("keydown", onIntent);
       window.removeEventListener("scroll", onIntent);
     };

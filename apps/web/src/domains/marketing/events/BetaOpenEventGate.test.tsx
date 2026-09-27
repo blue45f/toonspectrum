@@ -47,7 +47,7 @@ describe("BetaOpenEventGate", () => {
     renderGate();
 
     expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
-    fireEvent.pointerDown(screen.getByRole("button", { name: "작품 둘러보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "작품 둘러보기" }));
     expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
 
     act(() => vi.advanceTimersByTime(8_000));
@@ -71,6 +71,27 @@ describe("BetaOpenEventGate", () => {
     expect(window.localStorage.getItem(eventSeenStorageKey(BETA_OPEN_EVENT.id))).toBe("1");
   });
 
+  it("포인터를 누르고 떼는 사이에는 안내를 표시하지 않고 원래 클릭을 완료한다", () => {
+    const onClick = vi.fn();
+    render(
+      <MemoryRouter>
+        <button type="button" onClick={onClick}>실습 시작</button>
+        <BetaOpenEventGate pathname="/learn/lessons/story-board" />
+      </MemoryRouter>,
+    );
+    act(() => vi.advanceTimersByTime(8_000));
+    const action = screen.getByRole("button", { name: "실습 시작" });
+
+    fireEvent.pointerDown(action);
+    expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
+    fireEvent.pointerUp(action);
+    expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
+    fireEvent.click(action);
+
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(screen.getByRole("region", { name: "베타 오픈 혜택" })).toBeTruthy();
+  });
+
   it("does not mount on the product orientation route", () => {
     render(
       <MemoryRouter>
@@ -92,14 +113,14 @@ describe("BetaOpenEventGate", () => {
     document.body.append(dialog);
     try {
       act(() => vi.advanceTimersByTime(32_000));
-      fireEvent.pointerDown(dialog);
+      fireEvent.click(dialog);
       expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
       expect(window.localStorage.getItem(eventSeenStorageKey(BETA_OPEN_EVENT.id))).toBeNull();
     } finally {
       dialog.remove();
     }
 
-    fireEvent.pointerDown(screen.getByRole("button", { name: "작품 둘러보기" }));
+    fireEvent.click(screen.getByRole("button", { name: "작품 둘러보기" }));
     expect(screen.getByRole("region", { name: "베타 오픈 혜택" })).toBeTruthy();
   });
 
@@ -117,7 +138,7 @@ describe("BetaOpenEventGate", () => {
     expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
 
     view.container.querySelector("nav details")?.removeAttribute("open");
-    fireEvent.pointerDown(screen.getByRole("button", { name: "본문 조작" }));
+    fireEvent.click(screen.getByRole("button", { name: "본문 조작" }));
     expect(screen.getByRole("region", { name: "베타 오픈 혜택" })).toBeTruthy();
     expect(screen.getByText("기록은 현재 브라우저에 저장됩니다.")).toBeTruthy();
   });
@@ -139,7 +160,7 @@ describe("BetaOpenEventGate", () => {
 
     await act(async () => { menu?.removeAttribute("open"); });
     expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
-    fireEvent.pointerDown(screen.getByRole("button", { name: "본문 조작" }));
+    fireEvent.click(screen.getByRole("button", { name: "본문 조작" }));
     expect(screen.getByRole("region", { name: "베타 오픈 혜택" })).toBeTruthy();
   });
 });
