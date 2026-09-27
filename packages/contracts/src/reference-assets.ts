@@ -1,6 +1,6 @@
-import { resolveReferenceQuery } from "../../../../../packages/core/src/reference-query-language";
+import { resolveReferenceQuery } from "../../core/src/reference-query-language";
 
-import type { CreatorResource } from "./creator-resources";
+import type { CreatorResource } from "../../core/src/creator-resources";
 
 export const REFERENCE_SEARCH_FIELDS = [
   { value: "all", label: "전체 메타데이터" },
@@ -56,7 +56,7 @@ export function defaultReferenceViewState(): ReferenceViewState {
   return { mode: "results", within: "", department: "", culture: "", classification: "", sort: "relevance", density: "comfortable" };
 }
 function cleanText(value: string | null, maximumLength = 80): string {
-  if (!value || /[\u0000-\u001f\u007f]/u.test(value)) return "";
+  if (!value || [...value].some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) return "";
   return value.trim().slice(0, maximumLength);
 }
 function cleanYear(value: string | null): string {

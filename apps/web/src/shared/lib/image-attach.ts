@@ -2,6 +2,12 @@
 // 저장 형식은 creator_asset.dataUrl과 동일한 "축소된 webp/jpeg 데이터 URL"(별도 스토리지 없음).
 // 클라이언트가 긴 변 1600px 이하로 줄이고, 서버는 데이터 URL의 실제 바이트(≤2MB)와 형식만 다시 검증한다.
 
+import {
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_MAX_DIMENSION,
+  dataUrlBytes,
+} from "@toonstudio/contracts/image-attach";
+
 export {
   ATTACHMENT_MAX_BYTES,
   ATTACHMENT_MAX_COUNT,
@@ -9,13 +15,6 @@ export {
   dataUrlBytes,
   isAllowedImageDataUrl,
   validateAttachmentImages,
-} from "@toonstudio/contracts/image-attach";
-
-import {
-  ATTACHMENT_MAX_BYTES,
-  ATTACHMENT_MAX_COUNT,
-  ATTACHMENT_MAX_DIMENSION,
-  dataUrlBytes,
 } from "@toonstudio/contracts/image-attach";
 
 // ── 클라이언트 전용(브라우저 DOM) ──────────────────────────────────────────────

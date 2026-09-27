@@ -1,4 +1,4 @@
-import { sha256HexPortable } from "./studio-sha256";
+import { sha256HexPortable } from "./sha256-portable";
 
 export const STUDIO_CODEC_PROVIDER_CONTRACT_VERSION = 1 as const;
 
