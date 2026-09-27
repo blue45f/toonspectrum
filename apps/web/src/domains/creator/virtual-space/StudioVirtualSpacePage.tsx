@@ -185,7 +185,7 @@ import {
 import { useStudioVirtualSpaceOperations } from "./use-studio-virtual-space-operations";
 import { StudioVirtualSpaceEntryLobby } from "./StudioVirtualSpaceEntryLobby";
 import { StudioVirtualSpaceOfficeStart } from "./StudioVirtualSpaceOfficeStart";
-import { resolveStudioOfficeDestination } from "./studio-virtual-space-office-navigation";
+import { resolveStudioOfficeDestination, STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT } from "./studio-virtual-space-office-navigation";
 import { useStudioOfficePeerApproach } from "./use-studio-office-peer-approach";
 import { studioVirtualDecorationNavigationWorld } from "./studio-virtual-space-decoration-layout";
 import { readStudioOfficeDeskPreference, writeStudioOfficeDeskPreference, studioOfficeDeskPreferenceStorageKey } from "./office-desk-preference";
@@ -1375,9 +1375,9 @@ export function VirtualSpaceExperience({
     else setSocialNotice(bt("장소에 도착했어요. 이동할 작업 자리를 다시 선택해 주세요.", "You have arrived. Choose an accessible workspace here."));
   }, [worldReady, navigationWorld, selectedPlaceId, builtinPlaceWorld, personal, officeNavigationScope, queuePathTo, bt]);
   const openOfficeSeats = useCallback(() => {
-    if (personal) moveToRoomOrPlace("drawing");
+    if (personal) moveToRoomOrPlace("drawing", builtinPlaceWorld ? STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT : undefined);
     else setWorkspacePanel("seats");
-  }, [personal, moveToRoomOrPlace]);
+  }, [personal, builtinPlaceWorld, moveToRoomOrPlace]);
 
   const handleEnginePortal = useCallback((portal: StudioWorldPortalDefinition) => {
     void cancelSlotsRef.current();

@@ -7,6 +7,7 @@ import {
   STUDIO_DRAFT_CANVAS_PATHNAME,
   STUDIO_HOME_PATHNAME,
   parseStudioWorkspaceRoute,
+  studioVirtualSpaceLifecycleKey,
   studioWorkspaceCanonicalHref,
   studioWorkspaceDocumentIdentity,
   type InvalidStudioWorkspaceRoute,
@@ -255,7 +256,7 @@ function invalidResolution(
   return Object.freeze({
     errorCode,
     kind: "invalid",
-    lifecycleKey: href(pathname, params),
+    lifecycleKey: studioVirtualSpaceLifecycleKey({ pathname, search: params }) ?? href(pathname, params),
     ownsDocumentTitle: false,
   });
 }

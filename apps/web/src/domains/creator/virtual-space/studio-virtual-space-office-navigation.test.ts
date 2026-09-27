@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveStudioOfficeDestination, resolveStudioOfficePeerApproach } from "./studio-virtual-space-office-navigation";
+import { studioVirtualDecorationPreset } from "./studio-virtual-space-customization";
+import { studioVirtualDecorationNavigationWorld } from "./studio-virtual-space-decoration-layout";
+import { resolveStudioOfficeDestination, resolveStudioOfficePeerApproach, STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT } from "./studio-virtual-space-office-navigation";
 import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
 import { findStudioWorldPath, studioWorldCanOccupy, studioWorldCanTraverse } from "./studio-virtual-space-world-pathfinding";
+import { studioVirtualPlaceSetDressing } from "./studio-virtual-space-world-set-dressing";
 
 import type { StudioOfficeDestinationInput } from "./studio-virtual-space-office-navigation";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
@@ -26,6 +29,29 @@ function request(patch: Partial<StudioOfficeDestinationInput> = {}): StudioOffic
 }
 
 describe("사무실 목적지", () => {
+  it("개인 작업 자리 접근점은 실제 드로잉 책상 앞이며 기본·사용자 가구 충돌을 지켜 도달한다", () => {
+    const desk = studioVirtualPlaceSetDressing("personal-atelier")
+      .find((item) => item.id === "personal-atelier-workstation-west");
+    expect(desk).toMatchObject({ atlas: "furniture", frame: 12, x: 182, y: 402 });
+    expect(STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT).toEqual({ x: desk?.x, y: (desk?.y ?? 0) + 20 });
+    const place = studioVirtualPlaceWorldManifest("personal-atelier", true);
+    const manifest = studioVirtualDecorationNavigationWorld(place, { ...studioVirtualDecorationPreset("minimal"),
+      layoutWidth: place.width, layoutHeight: place.height,
+      placements: [{ id: "desk-route-bench", type: "bench", x: 330, y: 488, rotation: 0, scale: 1 }] });
+    expect(manifest.colliders.length).toBeGreaterThan(place.colliders.length);
+    const self = { x: 480, y: 540 }, point = STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT;
+    expect(studioWorldCanOccupy(manifest, { x: 182, y: 382 })).toBe(false);
+    expect(studioWorldCanOccupy(manifest, { x: 330, y: 478 })).toBe(false);
+    expect(resolveStudioOfficeDestination(request({ manifest, self, point, personal: true,
+      builtinPlaceWorld: true, selectedPlaceId: "personal-atelier", roomId: "drawing" })))
+      .toEqual({ type: "move", point });
+    const path = findStudioWorldPath(manifest, self, point);
+    expect(path.at(-1)).toEqual(point);
+    for (let index = 0; index < path.length; index += 1) {
+      expect(studioWorldCanTraverse(manifest, index === 0 ? self : path[index - 1], path[index])).toBe(true);
+    }
+  });
+
   it("이미 방문한 기본 장소도 실제 걷기 목적지로 해석한다", () => {
     const manifest = studioVirtualPlaceWorldManifest("personal-atelier");
     const result = resolveStudioOfficeDestination(request({

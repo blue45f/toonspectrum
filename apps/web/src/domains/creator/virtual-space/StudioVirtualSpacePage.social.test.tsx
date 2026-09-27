@@ -213,6 +213,20 @@ function nextDrawingWork() {
 }
 
 describe("가상 사무실 첫 작업과 자리의 Page 연결", () => {
+  it("개인 작업실 입구에서도 작업 자리 버튼은 보이는 책상 앞으로 걷게 한다", async () => {
+    render(officeElement("personal-local", true, "?place=personal-atelier"));
+    await screen.findByTestId("engine-ready");
+    const before = { ...f.engine?.snapshot.self };
+    expect(before).toMatchObject({ x: 480, y: 540 });
+    fireEvent.click(within(await screen.findByRole("region", { name: "스튜디오에서 작업 시작" }))
+      .getByRole("button", { name: /^작업 자리/u }));
+    expect(f.engine?.bridge.consumeMoveTarget()).toEqual({ x: 182, y: 422 });
+    expect(f.engine?.snapshot.self).toEqual(before);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+
   it("작업 안내가 처음 열리고 실제 원고 링크와 작업·동료·자리·추가 메뉴를 제공한다", async () => {
     nextDrawingWork();
     await mount(null);

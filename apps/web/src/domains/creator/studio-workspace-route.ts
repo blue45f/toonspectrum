@@ -211,8 +211,21 @@ export function studioWorkspaceDocumentIdentity(
     : `work:${encodeURIComponent(route.workId)}`;
 }
 
+/** 가상 사무실의 장소 이동은 같은 경험을 유지하고 그 외 검색 조건은 상태를 분리한다. */
+export function studioVirtualSpaceLifecycleKey(location: StudioWorkspaceLocationInput): string | null {
+  const projectSpace = /^\/studio\/p\/([^/]+)\/space\/?$/u.exec(location.pathname);
+  if (location.pathname !== "/studio/space" && location.pathname !== "/studio/space/"
+    && (!projectSpace || !decodeStudioIdentity(projectSpace[1]))) return null;
+  const params = queryParams(location.search);
+  params.delete("place");
+  const search = params.toString();
+  return search ? `${location.pathname}?${search}` : location.pathname;
+}
+
 export function studioRouteStageKey(locationLike: StudioWorkspaceLocationLike): string {
   const location = studioWorkspaceLocation(locationLike);
+  const virtualSpaceKey = studioVirtualSpaceLifecycleKey(location);
+  if (virtualSpaceKey !== null) return virtualSpaceKey;
   const route = parseStudioWorkspaceRoute(location);
   if (!route.valid) {
     const search = queryParams(location.search).toString();

@@ -13,6 +13,12 @@ import {
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 
+/** 기본 개인 작업실의 서쪽 드로잉 책상 앞. 사용자 제작 월드의 목적지에는 적용하지 않는다. */
+export const STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT: Readonly<StudioVirtualSpacePoint> = Object.freeze({
+  x: 182,
+  y: 422,
+});
+
 export type StudioOfficeDestination =
   | { readonly type: "move"; readonly point: StudioVirtualSpacePoint }
   | { readonly type: "place"; readonly placeId: string; readonly roomId?: string; readonly point?: StudioVirtualSpacePoint };

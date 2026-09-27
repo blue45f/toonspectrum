@@ -7,6 +7,15 @@ import {
 } from "./studio-route-manifest";
 
 describe("Studio route manifest", () => {
+  it.each(["/studio/space", "/studio/p/project-1/space"])("직접 소유하는 %s에서 장소만 바꾸면 외부 RouteStage key도 유지한다", (pathname) => {
+    const first = resolveStudioRoute({ pathname, search: "?place=creator-cafe&worldEdit=1" });
+    const next = resolveStudioRoute({ pathname, search: "?place=personal-atelier&worldEdit=1" });
+    expect(first.lifecycleKey).toBe(`${pathname}?worldEdit=1`);
+    expect(next.lifecycleKey).toBe(first.lifecycleKey);
+    expect(resolveStudioRoute({ pathname, search: "?place=personal-atelier" }).lifecycleKey).not.toBe(first.lifecycleKey);
+    expect(resolveStudioRoute({ pathname: "/studio/p/project-2/space", search: "?place=creator-cafe&worldEdit=1" }).lifecycleKey).not.toBe(first.lifecycleKey);
+  });
+
   it("declares one owner for each Studio route family", () => {
     expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.kind)).size).toBe(8);
     expect(new Set(STUDIO_ROUTE_MANIFEST.map((route) => route.id)).size).toBe(
