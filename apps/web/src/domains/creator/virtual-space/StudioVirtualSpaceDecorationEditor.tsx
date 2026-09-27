@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { removeStudioVirtualDecoration, STUDIO_VIRTUAL_DECOR_FRAME, type StudioVirtualDecorationState, type StudioVirtualDecorType } from "./studio-virtual-space-customization";
 import { editStudioVirtualDecoration, studioVirtualDecorBounds, studioVirtualDecorationStateForWorld, type StudioDecorationLayoutResult } from "./studio-virtual-space-decoration-layout";
@@ -25,16 +25,45 @@ export function StudioVirtualSpaceDecorationEditor({ world, decorations, selfPoi
 }) {
   const bt = useBilingual("StudioVirtualSpaceDecorationEditor"), id = useId();
   const [selection, setSelection] = useState<{ worldId: string; id: string } | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [drag, setDrag] = useState<{ id: string; pointerId: number; x: number; y: number; originX: number; originY: number } | null>(null);
   const state = studioVirtualDecorationStateForWorld(decorations, world);
   const selected = selection?.worldId === world.id ? state.placements.find((item) => item.id === selection.id) : undefined;
   const choose = (itemId: string) => setSelection({ worldId: world.id, id: itemId });
   const move = (dx: number, dy: number) => {
     if (selected) onChange(editStudioVirtualDecoration(state, selected.id, { x: selected.x + dx, y: selected.y + dy }, world, selfPoint));
   };
+  const worldPoint = (clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    return studioWorldLayoutPointer({ x: clientX, y: clientY }, { x: rect.left, y: rect.top, width: rect.width, height: rect.height }, world);
+  };
+  const beginDrag = (item: StudioVirtualDecorPlacement, event: React.PointerEvent<SVGRectElement>) => {
+    event.stopPropagation();
+    choose(item.id);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDrag({ id: item.id, pointerId: event.pointerId, x: item.x, y: item.y, originX: item.x, originY: item.y });
+  };
+  const trackDrag = (event: React.PointerEvent<SVGRectElement>) => {
+    if (!drag || drag.id !== state.placements.find((entry) => entry.id === drag.id)?.id || drag.pointerId !== event.pointerId) return;
+    const point = worldPoint(event.clientX, event.clientY);
+    if (!point) return;
+    event.stopPropagation();
+    setDrag({ ...drag, x: Math.round(point.x / 16) * 16, y: Math.round(point.y / 16) * 16 });
+  };
+  const endDrag = (item: StudioVirtualDecorPlacement, event: React.PointerEvent<SVGRectElement>) => {
+    if (!drag || drag.id !== item.id || drag.pointerId !== event.pointerId) return;
+    event.stopPropagation();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    const moved = drag.x !== drag.originX || drag.y !== drag.originY;
+    setDrag(null);
+    if (moved) onChange(editStudioVirtualDecoration(state, item.id, { x: drag.x, y: drag.y }, world, selfPoint));
+  };
   return <fieldset className="studio-decoration-editor">
     <legend>{bt("가구 배치 편집", "Edit furniture layout")}</legend>
-    <p id={`${id}-help`}>{bt("가구를 고른 뒤 지도의 빈 바닥을 누르거나 이동 버튼을 사용하세요. 화살표 키로 16px, Shift와 함께 1px씩 조정합니다.", "Select furniture, then tap an empty floor or use the movement buttons. Arrow keys move 16 pixels; hold Shift for 1 pixel.")}</p>
-    <svg className="studio-decoration-editor__map" viewBox={`0 0 ${world.width} ${world.height}`} role="group" tabIndex={0}
+    <p id={`${id}-help`}>{bt("가구를 고른 뒤 지도의 빈 바닥을 누르거나 이동 버튼을 사용하세요. 화살표 키로 16px, Shift와 함께 1px씩 조정합니다.", "Select furniture, then tap an empty floor, drag it, or use the movement buttons. Arrow keys move 16 pixels; hold Shift for 1 pixel.")}</p>
+    <svg ref={svgRef} className="studio-decoration-editor__map" viewBox={`0 0 ${world.width} ${world.height}`} role="group" tabIndex={0}
       aria-label={bt("가구 배치 지도", "Furniture layout map")} aria-describedby={`${id}-help`}
       onClick={(event) => {
         if (!selected) return;
@@ -58,20 +87,23 @@ export function StudioVirtualSpaceDecorationEditor({ world, decorations, selfPoi
       {state.placements.map((item, index) => {
         const frame = STUDIO_VIRTUAL_DECOR_FRAME[item.type];
         const geometry = studioExperienceFrameGeometry("furniture", artStyle, frame, 82 * item.scale, 82 * item.scale, .5, .9);
+        const dragging = drag?.id === item.id;
+        const shown = dragging ? { ...item, x: drag.x, y: drag.y } : item;
         return <g key={item.id} pointerEvents="none">
         {/* 선택 영역은 rect만 소유한다. 원본 image의 큰 bbox가 버튼 중심이나 포인터 영역을 늘리지 않는다. */}
         <rect {...studioVirtualDecorBounds(item)} role="button" tabIndex={0} pointerEvents="all" aria-pressed={selected?.id === item.id}
           aria-label={bt(`${index + 1}번 ${LABELS[item.type][0]} 선택`, `Select ${LABELS[item.type][1]} ${index + 1}`)}
           className="studio-decoration-editor__object" onClick={(event) => { event.stopPropagation(); choose(item.id); }}
+          onPointerDown={(event) => beginDrag(item, event)} onPointerMove={trackDrag} onPointerUp={(event) => endDrag(item, event)}
           onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); choose(item.id); } }}
           rx="8" fill={selected?.id === item.id ? "#ad89ff" : "#72b6ca"} fillOpacity=".35" stroke={selected?.id === item.id ? "#f8e5ff" : "#83cfe2"} strokeWidth={selected?.id === item.id ? 4 : 2} />
-        <g transform={`translate(${item.x} ${item.y}) rotate(${item.rotation})`} pointerEvents="none">
+        <g transform={`translate(${shown.x} ${shown.y}) rotate(${item.rotation})`} pointerEvents="none">
           <StudioVirtualExperienceArtPreview kind="furniture" artStyle={artStyle} frame={frame}
             x={-geometry.width * geometry.originX} y={-geometry.height * geometry.originY}
             width={geometry.width} height={geometry.height} preserveAspectRatio="none" />
         </g>
-        <circle cx={item.x} cy={item.y} r="6" fill="#f8e5ff" pointerEvents="none" />
-        <text x={item.x} y={item.y - 30} textAnchor="middle" fill="#fff" fontSize="22" pointerEvents="none">{index + 1}</text>
+        <circle cx={shown.x} cy={shown.y} r="6" fill="#f8e5ff" pointerEvents="none" />
+        <text x={shown.x} y={shown.y - 30} textAnchor="middle" fill="#fff" fontSize="22" pointerEvents="none">{index + 1}</text>
       </g>;
       })}
       <g pointerEvents="none"><circle cx={selfPoint.x} cy={selfPoint.y} r="12" fill="#ffce67" stroke="#152431" strokeWidth="4" /><text x={selfPoint.x} y={selfPoint.y + 30} fill="#ffdf90" fontSize="20" textAnchor="middle">{bt("나", "You")}</text></g>
