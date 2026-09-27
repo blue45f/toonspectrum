@@ -1,6 +1,6 @@
 # 무료 DB 연합 데이터 플레인 운영 기준
 
-상태: **migration — 새 Supabase의 빈 시작용 스키마와 D1 분석 DB 생성 완료, 운영 연결·배포 검증 전**
+상태: **runtime cutover 완료 — Core API는 Supabase production authority를 사용 중; 기존 Neon 원본의 실제 데이터 backfill은 Neon quota로 source read가 막혀 검증·완료되지 않음**
 
 ## 2026-09-26 방향 재검토
 
