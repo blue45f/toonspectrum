@@ -695,6 +695,25 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   };
 }
 
+async function openMobileWorkspaceMenu(page: Page, dock: Locator): Promise<void> {
+  const toggle = dock.locator('[data-studio-mobile-workspace-toggle="true"]');
+  if (await toggle.getAttribute("aria-expanded") !== "true") {
+    await clickStudioControlAfterReadiness(page, toggle);
+  }
+  await dock.locator('[data-studio-mobile-workspace-menu="true"]').waitFor({ state: "visible" });
+}
+
+async function openMobileDrawingSettings(page: Page, dock: Locator): Promise<void> {
+  const pen = dock.locator('[data-studio-primary-action="draw"]');
+  if (await pen.getAttribute("aria-expanded") !== "true") {
+    await clickStudioControlAfterReadiness(page, pen);
+    if (await pen.getAttribute("aria-expanded") !== "true") {
+      await clickStudioControlAfterReadiness(page, pen);
+    }
+  }
+  await page.getByRole("dialog", { name: "브러시 설정", exact: true }).waitFor({ state: "visible" });
+}
+
 async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRunResult> {
   const shot = join(SCRATCH, "studio-launch-mobile-drawing.png");
   const dotShot = join(SCRATCH, "studio-launch-mobile-dot.png");
@@ -735,10 +754,7 @@ async function runMobileDrawing(browser: Browser, url: string): Promise<MobileRu
   const workspaceMenu = await verifyMobileWorkspaceMenuGateDormant(page, "mobile");
   await dismissHydratedQuickStart(page);
 
-  await clickStudioControlAfterReadiness(
-    page,
-    page.getByRole("button", { name: "브러시 설정 (굵기·색·프리셋)" }),
-  );
+  await openMobileDrawingSettings(page, dock);
   const sheet = page.getByRole("dialog", { name: "브러시 설정" });
   await sheet.waitFor({ state: "visible", timeout: 3000 });
 
@@ -1320,13 +1336,10 @@ async function runMobileDockLayout(
     `mobile-dock-${width}`,
   );
   await dismissHydratedQuickStart(page);
-  const primary = dock.locator('[data-studio-mobile-dock-scroll="primary"]');
-  const secondary = dock.locator('[data-studio-mobile-dock-scroll="secondary"]');
+  await waitForStudioDrawingReady(page);
+  const primary = dock.locator('[data-studio-mobile-primary-actions="true"]');
   const secondaryToolbar = dock.getByRole("toolbar", { name: "작업 공간", exact: true });
-  const workspaceToolsToggle = dock.getByRole("button", {
-    name: "작업 메뉴",
-    exact: true,
-  });
+  const workspaceToolsToggle = dock.locator('[data-studio-mobile-workspace-toggle="true"]');
   const workspaceToggleInitiallyVisible = await workspaceToolsToggle.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     const dockBounds = element
@@ -1348,15 +1361,14 @@ async function runMobileDockLayout(
       && (hit === element || element.contains(hit))
     );
   });
-  await workspaceToolsToggle.click();
-  await secondary.waitFor({ state: "visible", timeout: 3000 });
+  await openMobileWorkspaceMenu(page, dock);
   const propsLauncher = dock.locator(
     'button[aria-label="작업 패널"]',
   );
   const panelLauncherInitiallyVisible = await propsLauncher.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     const scrollBounds = element
-      .closest<HTMLElement>('[data-studio-mobile-dock-scroll="secondary"]')
+      .closest<HTMLElement>('[data-studio-mobile-workspace-menu="true"]')
       ?.getBoundingClientRect();
     const hit = document.elementFromPoint(
       bounds.left + bounds.width / 2,
@@ -1401,12 +1413,18 @@ async function runMobileDockLayout(
       rect.right <= toolbarRect.right + 0.5
     );
     if (!bothInside || comment !== toolbar.firstElementChild) return false;
-    return side === "left"
-      ? quickRect.left >= commentRect.right - 0.5
-      : Math.abs(quickRect.right - toolbarRect.right) <= 1;
+    // 고정 6개 슬롯과 펼침 그리드는 같은 가로 스크롤 행이 아니다.
+    // 양쪽 설정 모두 댓글과 빠른 동작이 겹치지 않고 그리드 안에서 눌릴 수 있어야 한다.
+    const overlapX = Math.min(commentRect.right, quickRect.right) - Math.max(commentRect.left, quickRect.left);
+    const overlapY = Math.min(commentRect.bottom, quickRect.bottom) - Math.max(commentRect.top, quickRect.top);
+    return (overlapX <= 0.5 || overlapY <= 0.5) && [comment, quickSlot].every((element) => {
+      const bounds = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+      return hit === element || element.contains(hit);
+    });
   });
   const targetsReady =
-    primaryTargetCount >= 9 &&
+    primaryTargetCount === 6 &&
     secondaryTargetCount >= 9 &&
     pinnedPlacementReady &&
     [...primaryWidths, ...secondaryWidths].every((targetWidth) => targetWidth >= 44);
@@ -1415,6 +1433,12 @@ async function runMobileDockLayout(
     scrollWidth: toolbar.scrollWidth,
   }));
   const primaryScrollable = scrollGeometry.scrollWidth > scrollGeometry.clientWidth;
+  const primaryHitTargetsReady = await primaryTargets.evaluateAll((targets) => targets.every((element) => {
+    const rect = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return rect.width >= 44 && rect.height >= 44 && rect.left >= 0 && rect.right <= innerWidth
+      && (hit === element || element.contains(hit));
+  }));
   const noDocumentOverflow = await page.evaluate(() =>
     document.documentElement.scrollWidth === window.innerWidth &&
     document.body.scrollWidth <= window.innerWidth
@@ -1432,7 +1456,7 @@ async function runMobileDockLayout(
     const visible = await target.evaluate((element) => {
       const targetRect = element.getBoundingClientRect();
       const toolbarRect = element
-        .closest("[data-studio-mobile-dock-scroll]")
+        .closest("[data-studio-mobile-primary-actions]")
         ?.getBoundingClientRect();
       return Boolean(
         toolbarRect &&
@@ -1443,14 +1467,15 @@ async function runMobileDockLayout(
     historyFocusReady &&= visible;
   }
 
+  // 사용 조건 설명을 키보드로 확인한 뒤 Escape로 닫고 다음 작업 메뉴 동선을 검사한다.
+  await page.keyboard.press("Escape");
+  await page.locator('[data-studio-tool-hint="true"]').waitFor({ state: "hidden", timeout: 3000 });
+
   // Role locators can be re-resolved inconsistently while an overflow toolbar is scrolled in
   // Playwright/WebKit-style mobile layouts. The explicit labels are also the product's stable
   // accessibility contract, so keep the launcher identity independent of clipping geometry.
   const pagesLauncher = secondaryToolbar.locator('button[aria-label="페이지 목록 열기"]');
-  const brushDockLauncher = dock.getByRole("button", {
-    name: "브러시 설정 (굵기·색·프리셋)",
-    exact: true,
-  });
+  const brushDockLauncher = dock.locator('[data-studio-primary-action="draw"]');
   const pagesDialog = page.locator('[data-studio-sheet-id="pages"]');
   const propsDialog = page.locator('[data-studio-sheet-id="props"]');
   const sheets: MobileSheetContractResult[] = [];
@@ -1459,8 +1484,9 @@ async function runMobileDockLayout(
     dock,
     id: "pages",
     initialFocus: pagesDialog.getByRole("button", { name: "페이지 시트 닫기", exact: true }),
-    launcher: pagesLauncher,
+    launcher: workspaceToolsToggle,
     open: async () => {
+      await openMobileWorkspaceMenu(page, dock);
       await revealOverflowTarget(pagesLauncher);
       await pagesLauncher.click();
     },
@@ -1472,16 +1498,16 @@ async function runMobileDockLayout(
     dock,
     id: "props",
     initialFocus: propsDialog.getByRole("button", { name: "설정 닫기", exact: true }),
-    launcher: propsLauncher,
+    launcher: workspaceToolsToggle,
     open: async () => {
+      await openMobileWorkspaceMenu(page, dock);
       await propsLauncher.click();
     },
     page,
     shot: join(SCRATCH, `studio-launch-mobile-sheet-props-${width}.png`),
   }));
 
-  await revealOverflowTarget(brushDockLauncher);
-  await brushDockLauncher.click();
+  await openMobileDrawingSettings(page, dock);
   const drawDialog = page.locator('[data-studio-sheet-id="draw"]');
   await page.waitForFunction(() =>
     document.querySelector('[data-studio-sheet-id="draw"]')
@@ -1539,7 +1565,8 @@ async function runMobileDockLayout(
     workspaceToggleInitiallyVisible &&
     panelLauncherInitiallyVisible &&
     targetsReady &&
-    (width !== 320 || primaryScrollable) &&
+    !primaryScrollable &&
+    primaryHitTargetsReady &&
     noDocumentOverflow &&
     historyFocusReady &&
     drawSheetCanvasInteractive &&

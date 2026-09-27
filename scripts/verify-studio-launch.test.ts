@@ -17,6 +17,18 @@ const EXPECTED_HANDSHAKE_CLOSE = [
 ].join("");
 
 describe("Studio launch static-preview diagnostics", () => {
+  it("모바일 기본 여섯 도구를 스크롤 없이 모두 누를 수 있고 펼침 메뉴로 고급 기능을 연다", () => {
+    expect(launchHarness).toContain('data-studio-mobile-primary-actions="true"');
+    expect(launchHarness).toContain('data-studio-mobile-workspace-menu="true"');
+    expect(launchHarness).toContain('primaryTargetCount === 6');
+    expect(launchHarness).toContain('!primaryScrollable &&');
+    expect(launchHarness).toContain('primaryHitTargetsReady &&');
+    expect(launchHarness).toContain('await openMobileDrawingSettings(page, dock)');
+    expect(launchHarness).toContain('await openMobileWorkspaceMenu(page, dock)');
+    expect(launchHarness).not.toContain('primaryTargetCount >= 9');
+    expect(launchHarness).not.toContain('data-studio-mobile-dock-scroll="primary"');
+  });
+
   it("opens native mobile correction disclosure before querying controls and entering the modal", () => {
     const disclosure = launchHarness.indexOf('await correctionDetails.locator("summary").click()');
     const controls = launchHarness.indexOf('const lineCorrectionReady =');

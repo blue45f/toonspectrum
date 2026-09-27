@@ -18,12 +18,14 @@ describe("운영 이력과 브랜드 호환성", () => {
       expect(createHash("sha256").update(file).digest("hex"), id).toBe(expected);
     }
   });
-  it.each(["toonspectrum-standard", "toonstudio-standard"])("사용권 %s를 원문 그대로 읽는다", (license) => {
+  it("운영 사용권 toonspectrum-standard를 원문 그대로 읽는다", () => {
+    const license = "toonspectrum-standard";
     expect(CreatorMarketplaceResourceLicenseSchema.parse(license)).toBe(license);
     expect(isCreatorAssetLicenseId(license)).toBe(true);
     expect(creatorAssetLicenseOf(license).shortLabel).toBe("표준 사용권");
   });
-  it.each(["toonspectrum.private-object-storage.v2", "toonstudio.private-object-storage.v2"])("객체 참조 %s의 해시와 provider를 보존한다", (contractVersion) => {
+  it("운영 객체 참조 toonspectrum.private-object-storage.v2의 해시와 provider를 보존한다", () => {
+    const contractVersion = "toonspectrum.private-object-storage.v2";
     const digest = "a".repeat(64);
     const input = { contractVersion, providerId: "cloudflare-r2", purpose: "derived", digest: `sha256:${digest}`, objectPath: `sha256/aa/${digest}`, byteLength: 4, contentType: "image/png" };
     const object = PrivateObjectReferenceSchema.parse(input);
