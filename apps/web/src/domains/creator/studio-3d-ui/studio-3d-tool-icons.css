@@ -8,8 +8,11 @@
   --studio-3d-icon-accent: var(--color-accent, oklch(0.72 0.185 42));
 }
 
-/* 선택·흐름 중인 도구에서만 액센트를 밝힌다. 기본적으로는 버튼 텍스트 색을 따른다. */
-.studio-3d-tool-icon[data-studio-3d-tool-icon]:where([aria-pressed="true"], [data-active="true"]) {
+/* 선택된 도구에서 액센트를 한 단계 진하게 한다. 선택 상태는 아이콘 SVG가 아니라
+   조상 버튼이 aria-current / aria-pressed 로 표시하므로 자손 선택자로 물어야 한다. */
+[aria-current="true"] .studio-3d-tool-icon,
+[aria-pressed="true"] .studio-3d-tool-icon,
+[data-active="true"] .studio-3d-tool-icon {
   --studio-3d-icon-accent: var(--color-accent-2, oklch(0.66 0.2 38));
 }
 
