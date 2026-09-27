@@ -228,7 +228,8 @@ describe("Studio BG3D Blender 5.2 environment pack", () => {
       credentials: "same-origin",
     });
     expect(first.bytes).not.toBe(second.bytes);
-    expect(first.bytes).toEqual(deployedBytes);
+    // 수 MB의 바이트를 객체 속성으로 펼치지 않고 전체 바이트열을 동일하게 비교한다.
+    expect(Buffer.compare(first.bytes, deployedBytes)).toBe(0);
     first.bytes[0] = 0;
     expect(second.bytes[0]).toBe(0x67);
   });
