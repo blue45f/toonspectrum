@@ -37,7 +37,7 @@ import {
 import {
   resolveSignupAvatar,
   resolveSignupAvatarImage,
-} from "../../../../web/src/shared/lib/avatar";
+} from "@toonstudio/contracts/avatar";
 import { ZodValidationPipe } from "../../platform/http/zod-validation.pipe";
 import { accounts, db, sessions, users } from "../../platform/database";
 import { StudioRealtimeRevocationService } from "../../platform/adapters/studio-realtime-revocation/studio-realtime-revocation.client";

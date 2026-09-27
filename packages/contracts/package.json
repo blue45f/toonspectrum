@@ -17,6 +17,16 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./avatar": {
+      "types": "./src/avatar.ts",
+      "import": "./src/avatar.ts",
+      "default": "./src/avatar.ts"
+    },
+    "./affiliate": {
+      "types": "./src/affiliate.ts",
+      "import": "./src/affiliate.ts",
+      "default": "./src/affiliate.ts"
+    },
     "./security/csrf": {
       "types": "./src/security/csrf.ts",
       "import": "./src/security/csrf.ts",

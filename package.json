@@ -276,6 +276,7 @@
     "verify:ai-provider-status-canary": "tsx scripts/verify-ai-provider-status-canary.mts"
   },
   "dependencies": {
+    "@toonstudio/contracts": "workspace:*",
     "@automerge/automerge": "3.5.0",
     "@babylonjs/core": "9.19.0",
     "@babylonjs/loaders": "9.19.0",
