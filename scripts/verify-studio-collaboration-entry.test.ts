@@ -51,6 +51,10 @@ describe("collaboration browser entry contract", () => {
     expect(source).toContain("page.locator('[data-studio-beta-notice=\"true\"]')");
   });
 
+  it("문서 준비 대기에서 지연 시작 안내를 닫는 helper를 사용한다", () => {
+    expect(source).toContain("await waitForStudioCollaborationDocumentLane(page, READY_PHASES)");
+  });
+
   it("captures the failed page location and screenshot for future navigation regressions", () => {
     expect(source).toContain("failure-tab-${index}.png");
     expect(source).toContain("url: page.url()");

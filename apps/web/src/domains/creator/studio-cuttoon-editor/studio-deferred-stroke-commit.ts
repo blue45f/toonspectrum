@@ -323,7 +323,11 @@ export function createStudioDeferredStrokeCommitEngine(
       document.getPages(true),
       document.getLayerGroups({ includeDeleted: true })
     );
-    return reconciled.pages;
+    // 오프라인 branch에 보호한 변경은 아직 정본 frontier에 없으므로 히스토리 반영 전에 재투영한다.
+    const offline = runtime.offlineBranch;
+    return offline && offline.status.pendingOperations > 0
+      ? offline.projectPages(reconciled.pages)
+      : reconciled.pages;
   }
 
   // 요소 변경을 히스토리에 커밋. (마스터 편집 모드에서는 문서 마스터로 커밋 — 히스토리 미포함, 패널에서 고지)
