@@ -9,12 +9,12 @@ import {
   ExternalLink,
   Tag,
 } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 
 import {
   PALETTE_COMMANDS,
   PALETTE_MODE_TABS,
-  PALETTE_PAGES,
+  palettePagesForLocale,
   PALETTE_STUDIO_TOOLS,
   TRENDING_TAGS,
 } from "./command-palette-data";
@@ -32,7 +32,7 @@ import type { Title } from "@/shared/lib/types";
 
 import { statsAreEstimated } from "@/shared/lib/estimate";
 import { genreTextColor } from "@/shared/lib/genre-color";
-import { useT } from "@/shared/lib/i18n";
+import { useI18n, useT } from "@/shared/lib/i18n";
 import { useApp } from "@/shared/lib/store";
 import { TYPE_LABEL } from "@/shared/lib/taxonomy";
 import { toast } from "@/shared/lib/toast-store";
@@ -68,6 +68,8 @@ export function CommandPalette({
   const recentKey = recentlyViewed.slice(0, 6).join(",");
   const router = useRouter();
   const t = useT();
+  const language = useI18n((state) => state.lang);
+  const pages = useMemo(() => palettePagesForLocale(language), [language]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const trimmedQ = q.trim();
@@ -296,7 +298,7 @@ export function CommandPalette({
     return matchesCommandSearch(tool.name, effectiveQuery, tool.keywords, tool.tip);
   });
 
-  const filteredPages = PALETTE_PAGES.filter((page) => {
+  const filteredPages = pages.filter((page) => {
     if (activeMode !== "all" && activeMode !== "pages") return false;
     return matchesCommandSearch(page.title, effectiveQuery, page.keywords, page.subtitle);
   });
@@ -314,7 +316,7 @@ export function CommandPalette({
     const found = PALETTE_STUDIO_TOOLS.find((t) => t.id === activeValue);
     if (found) selectedItem = { type: "studio-tool", tool: found };
   } else if (activeValue.startsWith("page-")) {
-    const found = PALETTE_PAGES.find((p) => p.id === activeValue);
+    const found = pages.find((p) => p.id === activeValue);
     if (found) selectedItem = { type: "page", page: found };
   } else if (activeValue.startsWith("recent-query-")) {
     const query = activeValue.replace("recent-query-", "");
@@ -803,7 +805,7 @@ export function CommandPalette({
                       key={page.id}
                       value={page.id}
                       onSelect={() => go(page.href)}
-                      className="flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-fg transition-colors data-[selected=true]:bg-raised"
+                      className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2 text-sm text-fg transition-colors data-[selected=true]:bg-raised"
                     >
                       <Icon size={16} className="text-fg-3 shrink-0" />
                       <div className="min-w-0 flex-1">

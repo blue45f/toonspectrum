@@ -39,7 +39,10 @@ import Link from "@/shared/navigation/router-link";
 import { cx } from "@/shared/lib/cx";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { keepInlineText } from "@/shared/lib/text";
+import { canonicalSitePath } from "@/shared/lib/site-route-authority";
 import { useUi } from "@/shared/lib/ui-store";
+
+import "./public-site-shell.css";
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("site-header", ko, en);
@@ -119,10 +122,11 @@ function isStudioWorkPurpose(pathname: string): boolean {
  * both its purpose hub and the child destination announce aria-current="page". */
 function useDestinationActive() {
   useBilingualI18nRevision();
-  const path = usePathname();
+  const path = canonicalSitePath(usePathname());
   return (href: string, exact?: boolean) => {
-    if (exact) return path === href;
-    return path === href || path.startsWith(`${href}/`);
+    const destination = canonicalSitePath(href);
+    if (exact) return path === destination;
+    return path === destination || path.startsWith(`${destination}/`);
   };
 }
 
@@ -224,10 +228,7 @@ export function SiteHeader() {
     navigationContext === "studio"
       ? SITE_NAVIGATION_ITEMS.production.description
       : SITE_NAVIGATION_ITEMS.home.description;
-  const brandTagline =
-    navigationContext === "studio"
-      ? bi("기획 · 제작 · 검수 · 내보내기", "Plan · Produce · Review · Deliver")
-      : bi("찾기 · 읽기 · 나누기", "Discover · Read · Share");
+  const brandTagline = bi("이야기를 작품으로", "Bring stories to life");
   const isPurposeActive = (href: string, exact?: boolean) =>
     purposeActive(pathname, href, exact);
 
@@ -277,36 +278,27 @@ export function SiteHeader() {
         data-site-product={navigationContext}
         data-public-site={isPublicPage || undefined}
         data-scrolled={scrolled || undefined}
-        className={cx(
-          "sticky top-0 z-50 border-b backdrop-blur-2xl transition-[background-color,border-color,box-shadow] duration-200 motion-reduce:transition-none",
-          scrolled
-            ? "border-line-strong bg-canvas/95 shadow-[0_14px_35px_-28px_var(--color-fg)]"
-            : "border-line/70 bg-canvas/82 shadow-sm"
-        )}
+        className="site-header"
       >
-        <div className="mx-auto flex h-[4.5rem] max-w-[1320px] items-center gap-2 px-4 sm:px-6">
+        <div className="site-header__inner">
           <Link
             href={brandHref}
             aria-label={`${brandName} · ${siteNavigationText(
               brandDescription,
               locale
             )}`}
-            className="group flex min-h-11 min-w-0 shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl pr-1 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:pr-3"
+            className="site-header__brand group"
           >
-            <span className="relative grid size-10 shrink-0 place-items-center rounded-[0.95rem] border border-line/70 bg-panel/85 shadow-sm transition-transform duration-200 ease-out-expo group-hover:-rotate-3 group-hover:scale-[1.03] motion-reduce:transition-none">
+            <span className="site-header__brand-mark">
               <ToonStudioMark className="size-9 rounded-[0.8rem]" />
-              <span
-                aria-hidden="true"
-                className="absolute -bottom-1 -right-1 size-2.5 rounded-full border-2 border-canvas bg-accent"
-              />
             </span>
-            <span className="min-w-0">
+            <span className="site-header__brand-copy">
               <span className="flex items-center gap-1.5">
                 <span className="truncate font-display text-[1.05rem] font-bold tracking-[-0.02em] text-fg transition-colors group-hover:text-accent sm:text-lg">
                   {brandName}
                 </span>
                 <span
-                  className="hidden rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-display text-[0.65rem] font-bold uppercase leading-none tracking-[0.12em] text-accent min-[410px]:inline"
+                  className="hidden rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-display text-[0.65rem] font-bold uppercase leading-none tracking-[0.12em] text-accent min-[480px]:inline"
                   title={t("app.brandBeta")}
                 >
                   {translateCurrentStaticSourceText(
@@ -316,7 +308,7 @@ export function SiteHeader() {
                   )}
                 </span>
               </span>
-              <span className="hidden font-display text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-fg-3 lg:block">
+              <span className="site-header__tagline">
                 {brandTagline}
               </span>
             </span>
@@ -324,7 +316,7 @@ export function SiteHeader() {
 
           <nav
             aria-label={bi("주요 메뉴", "Primary navigation")}
-            className="ml-2 hidden items-center gap-0.5 rounded-[1.05rem] border border-line/70 bg-panel/70 p-1 shadow-sm ring-1 ring-inset ring-canvas/20 min-[1180px]:flex"
+            className="site-header__primary"
           >
             {primaryNavigation.map((item) => {
               const active = isPurposeActive(item.href, item.exact);
@@ -336,12 +328,7 @@ export function SiteHeader() {
                   aria-current={active ? "page" : undefined}
                   title={siteNavigationText(item.description, locale)}
                   data-navigation-entry={item.id}
-                  className={cx(
-                    "group relative inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-[0.82rem] font-semibold outline-none transition-[background-color,color,box-shadow,transform] duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
-                    active
-                      ? "bg-accent-soft text-accent shadow-sm ring-1 ring-inset ring-accent/20"
-                      : "text-fg-2 hover:bg-raised/80 hover:text-fg"
-                  )}
+                  className="site-header__primary-link group"
                 >
                   <Icon
                     size={15}
@@ -355,18 +342,12 @@ export function SiteHeader() {
                     )}
                   />
                   <span>{siteNavigationText(item.label, locale)}</span>
-                  {active ? (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-x-3 -bottom-1.5 h-0.5 rounded-full bg-accent"
-                    />
-                  ) : null}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          <div className="site-header__utilities">
             <button
               type="button"
               onClick={openSearch}
@@ -396,7 +377,7 @@ export function SiteHeader() {
               aria-current={isPurposeActive(create.href) ? "page" : undefined}
               title={siteNavigationText(create.description, locale)}
               className={cx(
-                "group relative hidden h-11 shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-[0.9rem] border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm outline-none transition-all duration-200 ease-out-expo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none sm:flex",
+                "group relative hidden h-11 min-w-11 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-[0.9rem] border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm outline-none transition-all duration-200 ease-out-expo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none sm:flex",
                 isPurposeActive(create.href)
                   ? "border-accent bg-accent text-on-accent"
                   : "border-line-strong bg-fg text-canvas hover:-translate-y-0.5 hover:border-fg"

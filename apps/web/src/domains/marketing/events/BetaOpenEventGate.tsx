@@ -73,7 +73,15 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
 
     const visits = recordEligibleRouteVisit();
     let armed = visits > 1;
+    const interactionOpen = () => document.querySelector('[aria-modal="true"], dialog[open], nav details[open]') !== null;
+    const deferForInteraction = () => {
+      if (!interactionOpen()) return;
+      setVisible(false);
+      setDetailsOpen(false);
+    };
     const reveal = () => {
+      // 사용자가 연 탐색 메뉴·대화상자에는 홍보를 유예한다. 본문 FAQ는 대상이 아니다.
+      if (interactionOpen()) return;
       if (!hasSeenMarketingEventForIdentity(BETA_OPEN_EVENT.id, userId)) setVisible(true);
     };
     const onIntent = () => {
@@ -85,7 +93,11 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
     window.addEventListener("pointerdown", onIntent, passive);
     window.addEventListener("keydown", onIntent);
     window.addEventListener("scroll", onIntent, passive);
+    // 이미 표시된 안내도 메뉴가 열리면 숨기고, 닫은 뒤 다음 조작에서만 재개한다.
+    const observer = new MutationObserver(deferForInteraction);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "aria-modal"] });
     return () => {
+      observer.disconnect();
       window.clearTimeout(armTimer);
       window.clearTimeout(fallbackTimer);
       window.removeEventListener("pointerdown", onIntent);

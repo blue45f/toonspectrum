@@ -1,4 +1,5 @@
 import { workspaceTaskRoute } from "../workspace/workspace-task-route.ts";
+import { isPublicCreativeRoute } from "../site-public-routes";
 
 export type ExperienceMode = "vivid" | "calm";
 export type ExperienceLocale = string;export const EXPERIENCE_MODE_KEY = "toonstudio:site-experience:v1";
@@ -29,9 +30,10 @@ const STUDIO_ROUTE_GUIDE_PATHS = new Set([
  */
 export function supportsRoutePurposeScene(pathname: string): boolean {
   const path = normalizedExperiencePath(pathname);
-  // The four studio destinations own their headers. Do not prepend promotional guide cards
-  // to an operational workspace or its work library.
-  if (["/", "/home", "/team", "/hub", "/studio"].includes(path)) return false;
+  // 공개 페이지는 각 도메인의 표제와 소개를 사용한다. 공통 소개 카드를 다시 쌓지 않는다.
+  if (isPublicCreativeRoute(path)) return false;
+  // 작업 공간과 작품 목록은 기존 Studio 안내 정책을 유지한다.
+  if (["/home", "/team", "/hub", "/studio"].includes(path)) return false;
   if (workspaceTaskRoute(path)) return false;
   if (supportsSiteExperience(path)) return true;
   if (STUDIO_ROUTE_GUIDE_PATHS.has(path) || path.startsWith("/studio/manual/")) return true;

@@ -80,4 +80,66 @@ describe("BetaOpenEventGate", () => {
     act(() => vi.advanceTimersByTime(60_000));
     expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
   });
+
+  it.each(["aria", "native"])("%s 대화상자가 열려 있으면 노출을 보류하고 다음 페이지 조작에서 재개한다", (kind) => {
+    renderGate();
+    const dialog = document.createElement(kind === "native" ? "dialog" : "div");
+    if (kind === "native") dialog.setAttribute("open", "");
+    else {
+      dialog.setAttribute("role", "dialog");
+      dialog.setAttribute("aria-modal", "true");
+    }
+    document.body.append(dialog);
+    try {
+      act(() => vi.advanceTimersByTime(32_000));
+      fireEvent.pointerDown(dialog);
+      expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
+      expect(window.localStorage.getItem(eventSeenStorageKey(BETA_OPEN_EVENT.id))).toBeNull();
+    } finally {
+      dialog.remove();
+    }
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "작품 둘러보기" }));
+    expect(screen.getByRole("region", { name: "베타 오픈 혜택" })).toBeTruthy();
+  });
+
+  it("열린 탐색 메뉴에는 안내를 유예하지만 본문 FAQ는 계속 사용할 수 있다", () => {
+    const view = render(
+      <MemoryRouter>
+        <nav aria-label="학습 탐색"><details open><summary>전체 메뉴</summary><a href="/learn/records">학습 기록</a></details></nav>
+        <details open><summary>학습 FAQ</summary><p>기록은 현재 브라우저에 저장됩니다.</p></details>
+        <button type="button">본문 조작</button>
+        <BetaOpenEventGate pathname="/learn" />
+      </MemoryRouter>,
+    );
+    act(() => vi.advanceTimersByTime(32_000));
+    fireEvent.scroll(window);
+    expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
+
+    view.container.querySelector("nav details")?.removeAttribute("open");
+    fireEvent.pointerDown(screen.getByRole("button", { name: "본문 조작" }));
+    expect(screen.getByRole("region", { name: "베타 오픈 혜택" })).toBeTruthy();
+    expect(screen.getByText("기록은 현재 브라우저에 저장됩니다.")).toBeTruthy();
+  });
+
+  it("표시 중인 안내도 탐색 메뉴가 열리면 숨기고 읽음 처리 없이 다음 조작까지 기다린다", async () => {
+    const view = render(
+      <MemoryRouter>
+        <nav aria-label="학습 탐색"><details><summary>전체 메뉴</summary><a href="/learn/records">학습 기록</a></details></nav>
+        <button type="button">본문 조작</button>
+        <BetaOpenEventGate pathname="/learn" />
+      </MemoryRouter>,
+    );
+    act(() => vi.advanceTimersByTime(32_000));
+    expect(screen.getByRole("region", { name: "베타 오픈 혜택" })).toBeTruthy();
+    const menu = view.container.querySelector("nav details");
+    await act(async () => { menu?.setAttribute("open", ""); });
+    expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
+    expect(window.localStorage.getItem(eventSeenStorageKey(BETA_OPEN_EVENT.id))).toBeNull();
+
+    await act(async () => { menu?.removeAttribute("open"); });
+    expect(screen.queryByRole("region", { name: "베타 오픈 혜택" })).toBeNull();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "본문 조작" }));
+    expect(screen.getByRole("region", { name: "베타 오픈 혜택" })).toBeTruthy();
+  });
 });

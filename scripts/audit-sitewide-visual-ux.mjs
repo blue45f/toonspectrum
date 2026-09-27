@@ -2,6 +2,15 @@ import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  auditReadinessFindings,
+  declaredArrayIds,
+  declaredStringArrayValues,
+  expandAuditRoutePattern,
+  inspectAuditRouteReadiness,
+  waitForAuditRouteReadiness,
+} from "./lib/sitewide-visual-ux-audit.mjs";
 
 const THEMES = ["aurora", "blossom", "starlight", "dark", "light", "graphite", "midnight", "sepia", "contrast"];
 const CRITICAL_THEMES = ["light", "dark", "contrast"];
@@ -14,7 +23,7 @@ const VIEWPORTS = {
   desktop: { width: 1440, height: 1000, hasTouch: false, isMobile: false },
   mobile: { width: 390, height: 844, hasTouch: true, isMobile: true },
 };
-const root = process.env.AUDIT_REPOSITORY || process.cwd();
+const root = process.env.AUDIT_REPOSITORY || path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const output = process.env.AUDIT_OUTPUT || path.join(root, ".qa/visual-ux/sitewide");
 const base = new URL(process.env.AUDIT_BASE_URL || "http://127.0.0.1:5276");
 const allowedHosts = new Set(["127.0.0.1", "localhost", "toonstudio.cloud", "www.toonstudio.cloud"]);
@@ -22,7 +31,7 @@ const auditWorkerLimit = Math.max(1, Number.parseInt(process.env.AUDIT_WORKERS |
 const auditSettleMs = Math.max(0, Number.parseInt(process.env.AUDIT_SETTLE_MS || "180", 10) || 180);
 const auditNavigationTimeoutMs = Math.max(1_000, Number.parseInt(process.env.AUDIT_NAVIGATION_TIMEOUT_MS || "45000", 10) || 45_000);
 const auditNavigationRetries = Math.max(0, Number.parseInt(process.env.AUDIT_NAVIGATION_RETRIES || "1", 10) || 0);
-const auditStageTimeoutMs = Math.max(0, Number.parseInt(process.env.AUDIT_STAGE_TIMEOUT_MS || "900", 10) || 900);
+const auditStageTimeoutMs = Math.max(1_000, Number.parseInt(process.env.AUDIT_STAGE_TIMEOUT_MS || "20000", 10) || 20_000);
 const auditSceneTimeoutMs = Math.max(0, Number.parseInt(process.env.AUDIT_SCENE_TIMEOUT_MS || "400", 10) || 400);
 const auditAxe = process.env.AUDIT_AXE !== "0";
 const auditSceneStrict = process.env.AUDIT_SCENE_STRICT === "1";
@@ -86,6 +95,28 @@ async function collectRoutes() {
   ];
   for (const manifest of routeManifests) {
     collectLiteralRoutes(await readFile(path.join(root, manifest), "utf8"), routes);
+  }
+  const studioManifest = await readFile(path.join(root, "apps/web/src/domains/creator/studio-router/studio-route-manifest.ts"), "utf8");
+  for (const match of studioManifest.matchAll(/\bpattern:\s*"([^"]+)"/gu)) {
+    const patterns = match[1] === "/studio/companion/:surface"
+      ? declaredStringArrayValues(studioManifest, "STUDIO_COMPANION_SURFACES").map((surface) => `/studio/companion/${surface}`)
+      : [match[1]];
+    for (const pattern of patterns) {
+      for (const route of expandAuditRoutePattern(pattern)) routes.add(route);
+    }
+  }
+  const learningRoot = path.join(root, "apps/web/src/domains/learn");
+  const learningPage = await readFile(path.join(learningRoot, "LearnPage.tsx"), "utf8");
+  for (const match of learningPage.matchAll(/"(\/learn(?:\/[a-z-]+)*)"/gu)) routes.add(match[1]);
+  const learningContent = await readFile(path.join(learningRoot, "LearnContent.tsx"), "utf8");
+  for (const match of learningContent.matchAll(/<Route\s+path="([^"*:]+)"/gu)) routes.add(`/learn/${match[1]}`);
+  for (const [file, authority, prefix] of [
+    ["learning-content.ts", "LESSONS", "/learn/lessons"],
+    ["learning-paths.ts", "LEARNING_PATHS", "/learn/paths"],
+  ]) {
+    for (const id of declaredArrayIds(await readFile(path.join(learningRoot, file), "utf8"), authority)) {
+      routes.add(`${prefix}/${encodeURIComponent(id)}`);
+    }
   }
   return [...routes].sort((left, right) => left.localeCompare(right));
 }
@@ -218,13 +249,7 @@ for (const [viewportName, viewport] of viewports) {
             }
             if (navigationError) throw navigationError;
             await page.locator("#main-content").waitFor({ timeout: 20_000 });
-            await page.waitForFunction(() => {
-              const stage = document.querySelector(".route-stage");
-              return Boolean(stage) && (
-                stage.classList.contains("route-stage--settled")
-                || stage.classList.contains("route-stage--instant")
-              );
-            }, undefined, { timeout: auditStageTimeoutMs }).catch(() => undefined);
+            result.readiness = await waitForAuditRouteReadiness(page, { timeoutMs: auditStageTimeoutMs });
             result.status = response?.status() ?? null;
             await page.waitForTimeout(auditSettleMs);
             await page.evaluate(async () => { await document.fonts?.ready; }).catch(() => undefined);
@@ -268,6 +293,13 @@ for (const [viewportName, viewport] of viewports) {
             }).catch(() => undefined);
             await page.waitForTimeout(35);
             result.finalPath = new URL(page.url()).pathname;
+            const currentReadiness = await page.evaluate(inspectAuditRouteReadiness);
+            if (currentReadiness.pathname !== result.readiness.pathname
+              || currentReadiness.outcome !== result.readiness.outcome) {
+              result.readiness = await waitForAuditRouteReadiness(page, { timeoutMs: auditStageTimeoutMs });
+              result.finalPath = result.readiness.pathname;
+            }
+            result.redirected = result.finalPath !== route;
             const runtimeSceneExpectation = async () => {
               const value = await page.evaluate(() => document.documentElement.dataset.routePurposeScene ?? null)
                 .catch(() => null);
@@ -284,6 +316,13 @@ for (const [viewportName, viewport] of viewports) {
                 sceneExpected = auditSceneCheck && await runtimeSceneExpectation();
               }
             }
+            result.visibleImagesReady = await page.waitForFunction(() => [...document.images].every((image) => {
+              const rect = image.getBoundingClientRect();
+              const style = getComputedStyle(image);
+              const inViewport = rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight
+                && rect.right > 0 && rect.left < innerWidth && style.display !== "none" && style.visibility !== "hidden";
+              return !inViewport || image.complete;
+            }), undefined, { timeout: 5_000 }).then(() => true, () => false);
             result.metrics = await page.evaluate(({ expectedTheme, expectedScene }) => {
               const visible = (element) => {
                 const style = getComputedStyle(element);
@@ -469,6 +508,10 @@ for (const [viewportName, viewport] of viewports) {
                 missingThemeTokens,
               };
             }, { expectedTheme: theme, expectedScene: sceneExpected });
+            // 대비 측정 중 DOM 관측과 화면 증거를 분리하기 위해 먼저 캡처한다.
+            const screenshotBeforeContrast = auditAxe && auditCaptureMode !== "never"
+              ? await page.screenshot({ fullPage: false })
+              : null;
             if (auditAxe) {
               try {
                 const axeResult = await new AxeBuilder({ page })
@@ -494,8 +537,8 @@ for (const [viewportName, viewport] of viewports) {
                 result.contrastAuditError = String(error).slice(0, 500);
               }
             }
-            const issues = [];
-            const warnings = [];
+            const { issues, warnings } = auditReadinessFindings(result.readiness, route);
+            if (!result.visibleImagesReady) warnings.push("visible-images-pending");
             if ((result.status ?? 0) >= 400) issues.push(`http-${result.status}`);
             if (result.metrics.theme !== theme) issues.push(`theme:${result.metrics.theme ?? "missing"}`);
             if (result.metrics.overflow > 2) issues.push(`overflow:${result.metrics.overflow}`);
@@ -539,7 +582,8 @@ for (const [viewportName, viewport] of viewports) {
             result.warnings = warnings;
             if (shouldCapture(route, issues)) {
               const file = screenshotName(theme, viewportName, route);
-              await page.screenshot({ path: path.join(output, file), fullPage: false });
+              if (screenshotBeforeContrast) await writeFile(path.join(output, file), screenshotBeforeContrast);
+              else await page.screenshot({ path: path.join(output, file), fullPage: false });
               result.screenshot = file;
             }
           } catch (error) {
@@ -556,6 +600,8 @@ for (const [viewportName, viewport] of viewports) {
               issues: result.issues,
               warnings: result.warnings,
               finalPath: result.finalPath,
+              readiness: result.readiness?.outcome,
+              readinessTimedOut: result.readiness?.timedOut,
             }));
             await page?.close().catch(() => undefined);
           }
@@ -602,6 +648,13 @@ const report = {
   settleMs: auditSettleMs,
   navigationTimeoutMs: auditNavigationTimeoutMs,
   navigationRetries: auditNavigationRetries,
+  readinessTimeoutMs: auditStageTimeoutMs,
+  observationConditions: {
+    authSession: "guest-fixture",
+    otherApiResponses: "503-fixture",
+    studioGpu: "disabled",
+    authenticatedWorkflowsVerified: false,
+  },
   axeColorContrast: auditAxe,
   sceneCheck: auditSceneCheck,
   sceneStrict: auditSceneStrict,
@@ -618,6 +671,11 @@ const report = {
     warned: warned.length,
     issueCounts,
     warningCounts,
+    readinessCounts: results.reduce((counts, result) => {
+      const state = result.readiness?.outcome ?? "unobserved";
+      counts[state] = (counts[state] || 0) + 1;
+      return counts;
+    }, {}),
   },
   results,
 };
@@ -633,6 +691,10 @@ const summary = [
   `Critical observations: ${failed.length}`,
   `Warning observations: ${warned.length}`,
   `Routes: ${routes.length}; themes: ${themes.length}; viewports: ${viewports.length}`,
+  `Content readiness timeout: ${auditStageTimeoutMs} ms; animation completion alone does not pass.`,
+  "",
+  "## 콘텐츠 준비 상태",
+  ...formatCounts(report.totals.readinessCounts),
   "",
   "## Critical categories",
   ...(Object.keys(issueCounts).length ? formatCounts(issueCounts) : ["- None"]),
@@ -642,7 +704,9 @@ const summary = [
   "",
   "Checks: computed theme/token application, WCAG color contrast, duplicate IDs, invisible or clipped text,",
   "horizontal and fixed overflow, visible broken images, unnamed controls, touch targets, contrast simplification and page errors.",
-  "Parameterized routes use a non-mutating visual-audit placeholder and may show an empty-data state.",
+  "Parameterized routes use a non-mutating visual-audit placeholder; learning lessons and paths use their declared content IDs.",
+  "Pending, stalled, loading fallback, skeleton-only, empty and error content cannot pass as ready. Blocked and degraded screens are reported separately.",
+  "Conditions: guest auth fixture; other APIs return 503; GPU disabled. A rendered access notice does not verify authenticated workflows.",
   "",
 ].join("\n");
 await writeFile(path.join(output, "SUMMARY.md"), summary);
