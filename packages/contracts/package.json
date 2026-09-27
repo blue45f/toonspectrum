@@ -331,12 +331,17 @@
       "types": "./src/studio-ink-envelope-webcrypto-attestation.ts",
       "import": "./src/studio-ink-envelope-webcrypto-attestation.ts",
       "default": "./src/studio-ink-envelope-webcrypto-attestation.ts"
+    },
+    "./production-workflow": {
+      "types": "./src/production-workflow.ts",
+      "import": "./src/production-workflow.ts",
+      "default": "./src/production-workflow.ts"
     }
   },
   "dependencies": {
     "@toonstudio/core": "workspace:*",
     "yjs": "^13.6.31",
-    "zod": "4.4.3"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.13.2"

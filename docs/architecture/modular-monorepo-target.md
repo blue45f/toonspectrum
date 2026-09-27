@@ -19,8 +19,8 @@
   다만 루트 `package.json`이 Web의 dependency/tool command surface를 함께 소유한다.
 - `apps/admin-web`은 독립 workspace와 빌드·타입 검사·테스트 설정을 갖는다. 실제 관리자 기능의
   상당 부분은 아직 `apps/web/src/domains/admin`에 남아 있다.
-- `apps/api`는 독립 workspace와 Drizzle 설정을 소유한다. API -> Web 직접 참조와
-  `server/common/infrastructure/db` 배치는 마이그레이션 부채다.
+- `apps/api`는 독립 workspace와 Drizzle 설정을 소유한다. API -> Web 직접 참조는 0이며,
+  레거시 서버 구현의 모듈·플랫폼 소유권 정리는 마이그레이션 중이다.
 - `apps/mobile`은 Capacitor, Android/iOS, launch shell, resource, native 검증을 소유한다.
 - `apps/desktop-sync`는 local agent와 cloud provider를 한 workspace에 통합했다.
 - 교차 앱 테스트는 `tests/integration`이 소유한다.
@@ -101,8 +101,10 @@ Web/API가 같은 구현을 실제로 소비하는 경우에만 별도 focused p
 - `config/architecture-boundary-ratchet.json`
 - `config/architecture-source-ratchet.json`
 
-2026-09-26 기준 주요 부채는 API -> Web 145, Web `shared -> domains` 44,
-Web cross-domain deep import 54, Creator 최상위 직접 파일 3,440이다. Admin과 package의 신규 교차 앱
+2026-09-27 기준 API -> Web 직접 소스 참조는 0이다. 남은 주요 부채는 Web `shared -> domains` 25,
+Web cross-domain deep import 53, Creator 최상위 직접 파일 3,436, Web Admin 파일 69이다.
+온보딩과 Studio 번역 로더는 Creator가 소유하고, 공용 읽기 요청 수명주기는 Web platform이 소유한다.
+Admin 화면을 독립 앱으로 이전하는 작업과 나머지 Creator capability 정리는 마이그레이션 중이다. Admin과 package의 신규 교차 앱
 결합은 0으로 고정한다.
 
 ## Studio 예외

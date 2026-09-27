@@ -223,7 +223,7 @@ test("PR lint is scoped while push and merge validation stay repository-wide", (
 test("sparse lanes exclude artwork until foundation restores exactly its required Virtual Studio packs", () => {
   const world = "apps/web/public/assets/virtual-studio/world/default-world.json";
   const requiredArt = [
-    // 기본 래스터 카탈로그가 읽는 네 종류의 원본도 sparse 복구에 포함한다.
+    // 필수 소품 회귀가 읽는 네 분류를 모두 복원하되 다른 스튜디오 자산은 제외한다.
     "apps/web/public/assets/studio/props/daily/webtoon_cafe_table_for_two.webp",
     "apps/web/public/assets/studio/props/school/webtoon_school_desk_study_cluster.webp",
     "apps/web/public/assets/studio/props/fantasy/webtoon_royal_letter_seal_cluster.webp",
@@ -280,6 +280,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
         `apps/web/public/assets/virtual-studio/drawn-characters-v1/player-${skin}-${state}.png`)),
   ];
   const unrelatedArt = [
+    "apps/web/public/assets/studio/unrelated-pack/large-image.webp",
     "apps/web/public/assets/3d/environments/refined-v6/large-model.glb",
     "apps/web/public/assets/virtual-studio/unrelated-pack/large-image.png",
   ];
@@ -307,10 +308,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/living-town-v6/",
     "/apps/web/public/assets/virtual-studio/imagegen25-v7/",
     "/apps/web/public/assets/virtual-studio/world-v2/",
-    "/apps/web/public/assets/studio/props/daily/",
-    "/apps/web/public/assets/studio/props/school/",
-    "/apps/web/public/assets/studio/props/fantasy/",
-    "/apps/web/public/assets/studio/props/urban/",
+    "/apps/web/public/assets/studio/props/",
   ]);
   assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
     "artwork must be present before the required foundation tests execute");
@@ -599,4 +597,12 @@ test("full-suite health probes cannot race the target database's NOLOGIN bootstr
   const bootstrap = readFileSync(new URL("./bootstrap-empty-production-database.mjs", import.meta.url), "utf8");
   assert.ok(bootstrap.includes("database client raced the runtime login gate"));
   assert.ok(bootstrap.includes("ALTER ROLE %I NOLOGIN"));
+});
+
+test("제작 보드의 실제 브라우저 검증과 증거가 필수 접근성 lane에 연결된다", () => {
+  const source = job("a11y");
+  assert.match(source, /run: pnpm exec playwright test --config playwright\.production-workflows\.config\.ts/u);
+  assert.match(source, /path: \.qa\/production-workflows/u);
+  assert.ok(source.indexOf("pnpm run test:a11y") < source.indexOf("playwright.production-workflows.config.ts"));
+  assert.doesNotMatch(source, /continue-on-error|\|\| true/u);
 });

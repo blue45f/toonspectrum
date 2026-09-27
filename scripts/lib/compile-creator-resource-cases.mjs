@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { accessSync, mkdirSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,12 +7,17 @@ import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("../../", import.meta.url));
 
-// 격리 CI의 컴파일러, Node, 브라우저가 동일한 계약 원본을 사용한다.
-export const creatorResourcePackageSources = {
-  "@toonstudio/core/creator-resources": "packages/core/src/creator-resources.ts",
-  "@toonstudio/contracts/creator-resource-workflow": "packages/contracts/src/creator-resource-workflow.ts",
-  "@toonstudio/contracts/reference-assets": "packages/contracts/src/reference-assets.ts",
-};
+// 격리된 CI 컴파일에서도 실제 공유 계약 소스와 배포되는 CommonJS 경계를 함께 검증한다.
+const RESOURCE_WORKSPACE_MODULES = [
+  { name: "@toonstudio/core/creator-resources", source: "packages/core/src/creator-resources.ts" },
+  { name: "@toonstudio/core/reference-query-language", source: "packages/core/src/reference-query-language.ts" },
+  { name: "@toonstudio/contracts/creator-resource-workflow", source: "packages/contracts/src/creator-resource-workflow.ts" },
+  { name: "@toonstudio/contracts/reference-assets", source: "packages/contracts/src/reference-assets.ts" },
+];
+
+export const creatorResourcePackageSources = Object.fromEntries(
+  RESOURCE_WORKSPACE_MODULES.map(({ name, source }) => [name, source]),
+);
 
 /** Explicit project works with the isolated CI compiler and the workspace compiler. */
 export function compileCreatorResourceCases(output) {
@@ -29,8 +34,9 @@ export function compileCreatorResourceCases(output) {
   writeFileSync(project, JSON.stringify({
     compilerOptions: {
       strict: true, skipLibCheck: true, target: "es2022", module: "commonjs",
-      paths: Object.fromEntries(Object.entries(creatorResourcePackageSources)
-        .map(([specifier, source]) => [specifier, [path.join(root, source)]])),
+      paths: Object.fromEntries(RESOURCE_WORKSPACE_MODULES.map(({ name, source }) => [
+        name, [path.join(root, source)],
+      ])),
       lib: ["es2023", "dom", "dom.iterable"], rootDir: root, outDir: output,
     },
     files: [
@@ -43,20 +49,19 @@ export function compileCreatorResourceCases(output) {
     "--project", project], { cwd: root, stdio: "inherit" });
   if (result.status !== 0) throw new Error("Creator resource cases failed strict compilation");
 
-  const packages = new Map();
-  for (const [specifier, source] of Object.entries(creatorResourcePackageSources)) {
-    const [scope, name, entry] = specifier.split("/");
-    const packageName = `${scope}/${name}`;
-    const runtime = path.join(output, "node_modules", packageName);
-    const exports = packages.get(packageName) ?? {};
-    exports[`./${entry}`] = `./${entry}.cjs`;
-    packages.set(packageName, exports);
-    mkdirSync(runtime, { recursive: true });
-    writeFileSync(path.join(runtime, `${entry}.cjs`),
-      `module.exports = require(${JSON.stringify(`../../../${source.replace(/\.ts$/, ".js")}`)});\n`);
-  }
-  for (const [name, exports] of packages) {
-    writeFileSync(path.join(output, "node_modules", name, "package.json"),
-      JSON.stringify({ name, private: true, exports }));
+  for (const packageName of ["@toonstudio/core", "@toonstudio/contracts"]) {
+    const modules = RESOURCE_WORKSPACE_MODULES.filter(({ name }) => name.startsWith(`${packageName}/`));
+    const directory = path.join(output, "node_modules", packageName);
+    mkdirSync(directory, { recursive: true });
+    const exports = {};
+    for (const { name, source } of modules) {
+      const subpath = name.slice(packageName.length + 1);
+      const emitted = path.join(output, source.replace(/\.ts$/u, ".js"));
+      accessSync(emitted);
+      const target = path.relative(directory, emitted).split(path.sep).join("/");
+      exports[`./${subpath}`] = `./${subpath}.cjs`;
+      writeFileSync(path.join(directory, `${subpath}.cjs`), `module.exports = require(${JSON.stringify(target)});\n`);
+    }
+    writeFileSync(path.join(directory, "package.json"), JSON.stringify({ name: packageName, private: true, exports }));
   }
 }

@@ -36,6 +36,7 @@ import {
   STUDIO_BETA_NOTICE_STORAGE_KEY,
 } from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 
+import { waitForStudioDrawingReady } from "./lib/studio-drawing-readiness";
 import { assertStudioFilterCanonicalEvidence } from "./lib/studio-filter-canonical-evidence";
 import { isStaticPreviewReadinessResponse, isStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import { readDurableStudioAutosaveDocument, type StudioDurableAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
@@ -194,27 +195,6 @@ function collectBrowserErrors(
     }
     if (AUTHENTICATED || !isOptionalStudioPreviewApiError(message, previewUrl)) collector.failedResponses.push(message);
   });
-}
-
-async function dismissTransientChrome(page: Page): Promise<void> {
-  // 캔버스 수화 뒤 나타나는 시작 안내를 실제 닫기 동작으로 해제한 뒤 획을 검증한다.
-  await page.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
-  const welcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
-  if (await welcome.isVisible()) {
-    await welcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click();
-    await welcome.waitFor({ state: "hidden" });
-  }
-  for (const text of ["나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
-    try {
-      const el = page.getByRole("button", { name: text }).first();
-      if (await el.isVisible({ timeout: 250 })) {
-        await el.click({ timeout: 600 });
-        await page.waitForTimeout(150);
-      }
-    } catch {
-      /* optional chrome */
-    }
-  }
 }
 
 async function activatePenAndDraw(page: Page): Promise<void> {
@@ -633,7 +613,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       state: "visible",
       timeout: 30_000,
     });
-    await dismissTransientChrome(page);
+    await waitForStudioDrawingReady(page, { requireWelcome: true });
     await page.waitForFunction(() => ["available", "degraded"].includes(
       document.documentElement.dataset.serviceCapabilityState ?? ""
     ), undefined, { timeout: 20_000 });

@@ -718,8 +718,8 @@ importers:
         specifier: ^13.6.31
         version: 13.6.31
       zod:
-        specifier: 4.4.3
-        version: 4.4.3
+        specifier: ^4.4.3
+        version: 4.5.4
     devDependencies:
       '@types/node':
         specifier: ^24.13.2
@@ -13557,7 +13557,7 @@ snapshots:
       libtess: 1.2.2
       omggif: 1.0.10
       pako: 2.2.0
-      zod: 4.4.3
+      zod: 4.5.4
 
   package-json-from-dist@1.0.1: {}
 

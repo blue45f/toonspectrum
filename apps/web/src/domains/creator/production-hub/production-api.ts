@@ -132,6 +132,9 @@ export interface ProductionMutationResponse {
 }
 
 export type ProductionClientCommand =
+  | { readonly type: "configure-workflow"; readonly profile: import("@toonstudio/core/production").ProductionWorkflowProfile; readonly expectedWorkflowRevision: number }
+  | { readonly type: "instantiate-workflow"; readonly episodeId: string; readonly workflowRevision: number; readonly instanceId: string }
+  | { readonly type: "transition-task-batch"; readonly transitions: readonly import("@toonstudio/core/production").ProductionTaskTransition[] }
   | { readonly type: "upsert-planning-record"; readonly record: ProductionPlanningRecord }
   | { readonly type: "create-planning-snapshot"; readonly snapshot: Omit<import("@toonstudio/core/production").PlanningSnapshot, "digest"> }
   | { readonly type: "upsert-commercial-record"; readonly record: ProductionCommercialRecord }
@@ -157,6 +160,7 @@ export type ProductionClientCommand =
       readonly type: "upsert-task-batch";
       readonly tasks: readonly ProductionTask[];
       readonly expectedTasks?: readonly ProductionTask[];
+      readonly expectedAbsentTaskIds?: readonly string[];
     }
   | { readonly type: "upsert-operations-record"; readonly record: ProductionOperationsRecord; readonly expectedNotificationPolicy?: import("@toonstudio/core/production").ProductionNotificationPolicy | null }
   | {
@@ -169,6 +173,7 @@ export type ProductionClientCommand =
   | {
       readonly type: "upsert-episode-operations";
       readonly episodeId: string;
+      readonly expectedWorkflowRevision?: number;
       readonly episode?: EpisodeCollaboration;
       readonly episodePlan?: EpisodePlan;
       readonly tasks: readonly ProductionTask[];

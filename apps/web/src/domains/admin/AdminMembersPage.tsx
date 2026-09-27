@@ -32,6 +32,7 @@ import { loadAdminI18nLocale } from "./admin-i18n-loader";
 import {
   buildMemberCsv,
   buildMemberQuery,
+  canManageAdminMembers,
   getPageCount,
   interpolateCount,
   toggleMemberSelection,
@@ -40,7 +41,6 @@ import {
   type MemberSort,
   type MemberStatus,
 } from "./admin-members-model";
-import { AdminRequestScope, canManageAdminMembers } from "./admin-request-scope";
 import {
   adminFetch,
   downloadAdminFile,
@@ -54,6 +54,7 @@ import { AdminDialog } from "./components/AdminDialog";
 import { AdminToastProvider } from "./components/AdminToast";
 import { useAdminToast } from "./components/use-admin-toast";
 
+import { ReadRequestScope } from "@/platform/read-request-scope";
 import { Container } from "@/shared/components/section";
 import { useI18n, useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
@@ -206,8 +207,8 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
   canManageMembers: boolean;
 }) {
   useBilingualI18nRevision();
-  const [listRequests] = useState(() => new AdminRequestScope());
-  const [detailRequests] = useState(() => new AdminRequestScope());
+  const [listRequests] = useState(() => new ReadRequestScope());
+  const [detailRequests] = useState(() => new ReadRequestScope());
   const [refreshRevision, setRefreshRevision] = useState(0);
   const actionLock = useRef(false);
   const mounted = useRef(true);

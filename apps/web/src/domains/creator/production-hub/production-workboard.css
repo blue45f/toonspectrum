@@ -1,0 +1,177 @@
+.production-workboard {
+  container-type: inline-size;
+}
+.production-board-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklch, var(--color-accent) 32%, var(--color-line));
+  border-radius: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(120deg, var(--color-accent-soft), var(--color-card) 65%);
+  box-shadow: 0 1px 0 color-mix(in oklch, var(--color-accent) 12%, transparent) inset;
+}
+.production-board-hero-image {
+  position: absolute;
+  z-index: -2;
+  inset: 0 0 0 auto;
+  height: 100%;
+  width: 46%;
+  object-fit: cover;
+  object-position: 80% 50%;
+  opacity: 0.85;
+  mask-image: linear-gradient(90deg, transparent, black 28%);
+}
+.production-board-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, var(--color-card) 25%, transparent 80%);
+}
+.production-board-hero-copy {
+  position: relative;
+  max-width: 65%;
+}
+.production-board-hero-copy p {
+  margin-top: 0.35rem;
+}
+.production-board-hero-copy h2 {
+  font-size: clamp(1.25rem, 3cqw, 1.8rem);
+}
+.production-board-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.production-board-hero-hint {
+  max-width: 65%;
+  margin-top: 0.65rem;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--color-fg-2);
+}
+.production-board-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.production-board-metrics > * {
+  min-width: 0;
+  padding: 0.9rem 1rem;
+}
+.production-board-metrics > * strong,
+.production-board-metrics > * p.text-2xl {
+  font-size: 1.35rem;
+  margin-top: 0.4rem;
+}
+.production-board-metrics > * > span:last-child {
+  margin-top: 0.5rem;
+}
+.production-workboard [data-testid^="production-card-"] {
+  position: relative;
+  border-radius: 1rem;
+  box-shadow: 0 3px 9px color-mix(in oklch, var(--color-fg) 3%, transparent);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.production-workboard [data-testid^="production-card-"]:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-soft);
+}
+.production-workboard [data-testid^="production-card-"] h4 {
+  text-wrap: pretty;
+}
+.production-workboard input[type="checkbox"],
+.production-workboard progress {
+  accent-color: var(--color-accent);
+}
+.production-workboard [role="region"] {
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+@container (max-width: 42rem) {
+  .production-board-hero {
+    padding: 1.1rem;
+  }
+  .production-board-hero-copy,
+  .production-board-hero-hint {
+    max-width: 100%;
+  }
+  .production-board-hero-image {
+    opacity: 0.15;
+    width: 70%;
+  }
+  .production-board-hero-actions > button {
+    white-space: normal;
+  }
+  .production-board-metrics {
+    gap: 0.5rem;
+  }
+  .production-board-metrics > * {
+    padding: 0.75rem;
+  }
+  .production-board-metrics > * > span:last-child,
+  .production-board-metrics > * > p:last-child {
+    display: none;
+  }
+}
+@container (max-width: 24rem) {
+  .production-board-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+  .production-board-metrics > * {
+    display: block;
+    padding: 0.65rem;
+    border-radius: 0.85rem;
+  }
+  .production-board-metrics svg,
+  .production-board-metrics > * progress {
+    display: none;
+  }
+  .production-board-metrics > * p.text-2xl,
+  .production-board-metrics > * strong {
+    margin-top: 0.45rem;
+    font-size: 1.1rem;
+  }
+  .production-board-metrics > * p.text-2xl span {
+    margin-left: 0.2rem;
+    font-size: 0.7rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .production-workboard *,
+  .production-workboard *::before,
+  .production-workboard *::after {
+    animation: none !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (forced-colors: active) {
+  .production-board-hero-image,
+  .production-board-hero::after {
+    display: none;
+  }
+  .production-board-hero {
+    border-color: CanvasText;
+    background: Canvas;
+  }
+  .production-workboard [data-testid^="production-card-"]:focus-within {
+    outline: 2px solid Highlight;
+  }
+}
+
+/* 공통 테마의 40px 밀도보다 제작 보드의 터치 영역 계약을 우선한다. */
+.production-workboard button,
+.production-workspace-dialog button {
+  min-height: 44px !important;
+}
+.production-workboard button[aria-label$="핸들"],
+.production-workspace-dialog button[aria-label$="드래그"],
+.production-workspace-dialog button[aria-label="대화상자 닫기"] {
+  min-width: 44px !important;
+}
+.production-board-filters [hidden] {
+  display: none !important;
+}

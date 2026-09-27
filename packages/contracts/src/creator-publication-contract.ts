@@ -93,14 +93,13 @@ function oneOf<Value extends string>(
 
 function cleanText(value: unknown, maximumLength: number): string {
   if (typeof value !== "string") return "";
-  return value
-    .replace(/\p{Cc}/gu, (character) => {
-      const code = character.charCodeAt(0);
-      const preserve = (code >= 32 && code !== 127) || code === 9 || code === 10 || code === 13;
-      return preserve ? character : "";
-    })
-    .trim()
-    .slice(0, maximumLength);
+  let cleaned = "";
+  for (const character of value) {
+    const code = character.charCodeAt(0);
+    if (code === 127 || (code < 32 && code !== 9 && code !== 10 && code !== 13)) continue;
+    cleaned += character;
+  }
+  return cleaned.trim().slice(0, maximumLength);
 }
 
 function canonicalIso(value: unknown): string | null {

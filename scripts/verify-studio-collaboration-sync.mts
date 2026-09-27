@@ -34,6 +34,7 @@ import {
 import { STUDIO_DRAFT_CANVAS_PATHNAME } from "../apps/web/src/domains/creator/studio-workspace-route";
 
 import { installStudioCollaborationPreviewSession } from "./lib/studio-collaboration-preview-session";
+import { waitForStudioCollaborationDocumentLane } from "./lib/studio-collaboration-readiness";
 import {
   fingerprintStudioCompositedPng,
   type StudioCompositedCanvasFingerprint,
@@ -191,26 +192,7 @@ async function waitForDocumentLane(
   page: Page,
   diagnostics: PageDiagnostics,
 ): Promise<string> {
-  const dock = page.locator('[data-studio-presence-dock="true"]').first();
-  const cinematicWelcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]').first();
-  // 문서 복원이 끝난 뒤 안내가 늦게 나타나면 협업 HUD가 숨겨진다.
-  // 실제 표시된 진입 화면을 기다려 사용자용 닫기 동작을 완료한다.
-  await dock.or(cinematicWelcome).filter({ visible: true }).first()
-    .waitFor({ state: "visible", timeout: 30_000 });
-  await dismissOverlays(page);
-  await dock.waitFor({ state: "visible", timeout: 30_000 });
-  const readyPhaseHandle = await page.waitForFunction(
-    (readyPhases) => {
-      const phase = document
-        .querySelector<HTMLElement>('[data-studio-presence-dock="true"]')
-        ?.dataset.studioSyncPhase;
-      return typeof phase === "string" && readyPhases.includes(phase) ? phase : false;
-    },
-    [...READY_PHASES],
-    { timeout: 30_000 },
-  );
-  const phase = await readyPhaseHandle.jsonValue();
-  await readyPhaseHandle.dispose();
+  const phase = await waitForStudioCollaborationDocumentLane(page, READY_PHASES);
   assert.ok(
     typeof phase === "string" && READY_PHASES.has(phase),
     `unexpected document sync phase: ${String(phase)}`,
