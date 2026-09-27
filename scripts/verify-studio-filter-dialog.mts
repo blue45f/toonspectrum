@@ -536,10 +536,41 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       viewport: { width: 1440, height: 1100 },
       locale: "ko-KR",
     });
-    const fixture = runtime && pool ? await createStudioReviewHostFixture(context, pool, runtime.origin) : null;
-    if (fixture) {
+    let fixture = runtime && pool ? await createStudioReviewHostFixture(context, pool, runtime.origin) : null;
+    if (fixture && runtime && pool) {
       invariant(fixture.initialSaved.workId === fixture.workId && fixture.initialSaved.role === "owner"
         && fixture.initialSaved.capabilities.edit === true, "실제 생성한 작품의 편집 권한이 확인되지 않았습니다");
+      // 기존 계정 fixture와 실제 초대/수락 API만 사용한다. 편집자 공동 저장은 현재 편집기와 undo를 유지한다.
+      const owner = fixture;
+      const ownerCookies = await context.cookies();
+      await context.clearCookies();
+      const editor = await createStudioReviewHostFixture(context, pool, runtime.origin);
+      const editorCookies = await context.cookies();
+      await context.clearCookies();
+      await context.addCookies(ownerCookies);
+      const teamEndpoint = `${origin}/api/creator/works/${owner.workId}/team`;
+      const invitationResponse = await context.request.post(teamEndpoint, { headers: owner.headers,
+        data: { identity: editor.actorId, role: "editor" } });
+      invariant(invitationResponse.ok(), `실제 편집자 초대 실패 (${invitationResponse.status()})`);
+      await context.clearCookies();
+      await context.addCookies(editorCookies);
+      const invitationInbox = await context.request.get(`${origin}/api/creator/team/invitations`, { headers: editor.headers });
+      invariant(invitationInbox.ok(), `실제 초대 목록 조회 실패 (${invitationInbox.status()})`);
+      const invitations: unknown = await invitationInbox.json();
+      invariant(Array.isArray(invitations), "실제 초대 목록 응답이 배열이 아닙니다");
+      const invitation = invitations.find((item) => item && typeof item === "object" && item.workId === owner.workId);
+      invariant(typeof invitation?.invitationId === "string", "실제 서버 초대 식별자가 없습니다");
+      const accepted = await context.request.post(`${teamEndpoint}/invitations/respond`, { headers: editor.headers,
+        data: { action: "accept", invitationId: invitation.invitationId } });
+      invariant(accepted.ok(), `실제 편집자 초대 수락 실패 (${accepted.status()})`);
+      const editorSource = await context.request.get(`${teamEndpoint}/document`, { headers: editor.headers });
+      invariant(editorSource.ok(), `실제 편집 권한 원고 조회 실패 (${editorSource.status()})`);
+      const initialSaved = await editorSource.json();
+      invariant(initialSaved.workId === owner.workId && initialSaved.role === "editor"
+        && initialSaved.status === "active" && initialSaved.capabilities.edit === true,
+      "실제 수락한 편집자의 활성 편집 권한이 확인되지 않았습니다");
+      fixture = { ...owner, actorId: editor.actorId, headers: editor.headers, initialSaved };
+      log("실제 소유자 초대·편집자 수락·활성 편집 권한을 확인했습니다");
       autosaveKey = studioAutosaveKey({ userId: fixture.actorId, workId: fixture.workId });
       url = `${origin}/studio?id=${encodeURIComponent(fixture.workId)}`;
     }
@@ -550,13 +581,15 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       const endpoint = `${origin}/api/creator/works/${fixture.workId}/team/document`;
       const responsePromise = page.waitForResponse((response) => response.url() === endpoint
         && response.request().method() === "PATCH", { timeout: 60_000 });
-      await page.getByRole("button", { name: "초안 저장", exact: true }).click();
+      await page.getByRole("button", { name: "공동 저장", exact: true }).click();
       const response = await responsePromise;
       invariant(response.ok(), `${phase}: 실제 정본 저장 실패 (${response.status()}): ${await response.text()}`);
       const request = response.request().postDataJSON();
       const readback = await context.request.get(endpoint, { headers: fixture.headers });
       invariant(readback.ok(), `${phase}: 정본 읽기 실패 (${readback.status()})`);
       const saved = await readback.json();
+      await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('button[aria-label="공동 저장"]')?.disabled === false);
+      invariant(page.url() === url, `${phase}: 공동 저장 뒤 실제 편집기 경로가 바뀌었습니다`);
       canonicalCheckpoints.push(assertStudioFilterCanonicalEvidence({ phase, request, source: saved,
         previousRevision: canonicalCheckpoints.at(-1)?.revision ?? fixture.initialSaved.revision, expectedPages }));
       log(`${phase}: 실제 인증 정본 저장 revision=${saved.revision}, ACK=${request.crdtServerSequence}`);
@@ -917,18 +950,15 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       try {
         // 1) Place a fresh image via the file chooser; it becomes the selected element.
         await placeTestImage(page);
-        // Materialize the selected image's interactive handles before the baseline, using the
-        // same visible selection state that Undo restores. File placement can select the image
-        // before its transformer has mounted. Compare the entire crop, including these handles.
+        const imageOriginalDocument = await waitForSavedPages(page, (document) => !isDeepStrictEqual(document.pagesList, originalPages),
+          "직접 이미지 원본이 영속 저장되지 않았습니다");
+        await saveCanonicalCheckpoint("image-target:original", imageOriginalDocument.pagesList);
+        // 실제 저장이 선택을 해제하므로 동일한 캔버스 클릭으로 이미지와 핸들을 다시 선택한 뒤 비교한다.
         await page.locator('[data-studio-rail-tool-id="select"][aria-pressed="true"]').waitFor({ state: "visible" });
         await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2);
         await page.mouse.move(4, 4);
         const preScenario = await screenshotClipped(page, clip);
         writeFileSync(join(SCRATCH, "studio-filter-dialog-image-target-before.png"), preScenario);
-
-        const imageOriginalDocument = await waitForSavedPages(page, (document) => !isDeepStrictEqual(document.pagesList, originalPages),
-          "직접 이미지 원본이 영속 저장되지 않았습니다");
-        await saveCanonicalCheckpoint("image-target:original", imageOriginalDocument.pagesList);
 
         // 2) The dialog must declare the direct-image (non-destructive) target.
         const openStartedAt = Date.now();
@@ -973,6 +1003,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         const undo = await enabledStudioHistoryControl(page, "undo", 10_000);
         await undo.click();
         await page.waitForTimeout(900);
+        await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2);
         await page.mouse.move(4, 4);
         const restored = await screenshotClipped(page, clip);
         writeFileSync(join(SCRATCH, "studio-filter-dialog-image-target-restored.png"), restored);
