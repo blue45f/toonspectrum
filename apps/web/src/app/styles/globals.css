@@ -1167,6 +1167,18 @@ body[data-studio-app="true"] .route-stage::before,
     --studio-canvas-bottom-inset: max(var(--studio-mobile-dock-compact-height), var(--studio-mobile-dock-measured-height, 0px));
   }
 
+  /* The offline readiness card is a secondary status surface. It must never occupy the same
+     hit area as the fixed mobile editing dock or its workspace menu. The measured dock inset is
+     the single layout authority, so the card follows it instead of guessing a viewport offset. */
+  body:has([data-studio-mobile-editing-dock="true"]) [data-studio-shell-floating-target="offline-readiness"] {
+    bottom: calc(var(--studio-canvas-bottom-inset, 7rem) + 5rem) !important;
+    max-height: min(48dvh, calc(100dvh - var(--studio-canvas-bottom-inset, 7rem) - 6rem));
+  }
+
+  body:has([data-studio-mobile-selection-actions="true"]) [data-studio-shell-floating-target="offline-readiness"] {
+    bottom: calc(var(--studio-canvas-bottom-inset, 7rem) + 9.5rem) !important;
+  }
+
   /* Keep safety notices visible above the active brush sheet, not over its controls. */
   body:has([data-studio-mobile-sheet="draw"]:not([aria-hidden="true"])) [data-studio-shell-floating-target="offline-readiness"] {
     bottom: min(calc(var(--studio-canvas-bottom-inset, 7rem) + var(--studio-mobile-active-draw-height, 16.5rem) + 0.75rem), calc(100dvh - env(safe-area-inset-top) - 5rem));
