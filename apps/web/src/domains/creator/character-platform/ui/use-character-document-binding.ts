@@ -1,3 +1,4 @@
+import { VRM } from "@pixiv/three-vrm";
 import { Euler, Quaternion } from "three";
 import { useCallback, useEffect, useRef } from "react";
 
@@ -6,6 +7,8 @@ import { findCharacterSlotEntry } from "../../character-shaper/character-shaper-
 import { planShaperGradeRecommend, restoreShaperSession, serializeShaperSession, shaperCharacterFromRecipe } from "../../character-shaper/character-shaper-grade-bridge";
 import { characterPoseEulerBones } from "../pose-v3/character-pose-runtime-adapter";
 import { mirrorStudioVrmPoseBones } from "../../vrm/studio-vrm-pose-editing";
+import { createStudioVrmHandPose, STUDIO_VRM_HAND_POSE_TYPES } from "../../vrm/studio-vrm-hand-poses";
+import { planCharacterPoseAuthoringInput } from "../runtime/character-pose-authoring-input";
 import { resolveCharacterPosePresetDocument } from "../runtime/character-pose-preset-document";
 import type { StudioVrmPoserHost } from "../../vrm/StudioVrmPoserHost";
 import { planCharacterPresetApplication } from "../../character-shaper/character-shaper-preset-plan";
@@ -39,7 +42,20 @@ export function useCharacterDocumentBinding(runtime: CharacterShaperBinding, aut
   }, [authoring]);
   const planSteps = (current: CharacterDocumentV3, steps: readonly CharacterApplyStep[], colors: Partial<CharacterRecipe["colors"]> = {}, expression?: CharacterDocumentV3["expression"]) => {
     const poseStep = steps.findLast((step) => step.kind === "pose-preset");
-    const pose = poseStep ? resolveCharacterPosePresetDocument(h.vrm, poseStep.presetId, current.pose) : undefined;
+    let pose = poseStep ? resolveCharacterPosePresetDocument(h.vrm, poseStep.presetId, current.pose) : undefined;
+    if (h.vrm instanceof VRM) for (const step of steps) {
+      if (step.kind !== "hand-pose") continue;
+      const kind = STUDIO_VRM_HAND_POSE_TYPES.find((value) => value === step.poseType);
+      if (!kind) throw new Error("손 모양 프리셋을 찾을 수 없습니다.");
+      const previous = pose ?? current.pose;
+      const fingers = {
+        ...(step.side !== "right" ? createStudioVrmHandPose("left", kind) : {}),
+        ...(step.side !== "left" ? createStudioVrmHandPose("right", kind) : {}),
+      };
+      const prepared = planCharacterPoseAuthoringInput({ source: h.vrm, previous, kind: "manual", bones: {}, fingers,
+        lockedBones: h.lockedPoseBones });
+      pose = { ...prepared, poseId: previous.poseId, source: previous.source };
+    }
     return planCharacterDocumentSteps(current, runtime.profile, runtime.handSide, steps, colors, expression, { pose });
   };
   const context = () => ({ snapshot: characterDocumentSnapshot(authoring.authority.getSnapshot().document, runtime.profile, runtime.handSide), handSide: runtime.handSide });

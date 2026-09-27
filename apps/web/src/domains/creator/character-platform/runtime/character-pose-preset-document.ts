@@ -10,14 +10,11 @@ import { validateCharacterPoseDocumentV3 } from "../pose-v3/character-pose-v3";
 import type { VRMHumanBones, VRMRequiredHumanBoneName } from "@pixiv/three-vrm";
 import type { CharacterPoseDocumentV3 } from "../pose-v3/character-pose-v3";
 
-/** 원본 VRM은 읽기만 하고 메시 없는 rest 뼈대에서 기존 방향·Euler 실행기를 재사용한다. */
-export function resolveCharacterPosePresetDocument(
+/** 메시를 복제하지 않고 현재 모델의 정규화 rest 뼈대만 별도로 구성한다. */
+export function createCharacterPoseEvaluationVrm(
   source: VRM | null | undefined,
-  presetId: string,
   previous: CharacterPoseDocumentV3,
-): CharacterPoseDocumentV3 {
-  const preset = findPoseById(presetId);
-  if (!preset) throw new Error("포즈 프리셋을 찾을 수 없습니다.");
+): VRM {
   if (!source?.humanoid?.normalizedRestPose || !source.humanoid.getNormalizedBoneNode("hips")) {
     throw new Error("포즈를 계산할 수 있는 정규화된 VRM 뼈대가 필요합니다.");
   }
@@ -63,13 +60,25 @@ export function resolveCharacterPosePresetDocument(
   scene.position.set(...previous.root.position);
   scene.quaternion.set(...previous.root.rotation);
   scene.scale.copy(source.scene.scale);
-  const isolated = new VRM({ scene, humanoid, meta: source.meta });
+  return new VRM({ scene, humanoid, meta: source.meta });
+}
+
+/** 원본 VRM은 읽기만 하고 메시 없는 rest 뼈대에서 기존 방향·Euler 실행기를 재사용한다. */
+export function resolveCharacterPosePresetDocument(
+  source: VRM | null | undefined,
+  presetId: string,
+  previous: CharacterPoseDocumentV3,
+): CharacterPoseDocumentV3 {
+  const preset = findPoseById(presetId);
+  if (!preset) throw new Error("포즈 프리셋을 찾을 수 없습니다.");
+  const isolated = createCharacterPoseEvaluationVrm(source, previous);
   if (!applyPoseToVrm(isolated, preset.bones, preset.yOffset ?? 0)) {
     throw new Error("현재 VRM 뼈대에서 포즈를 계산하지 못했습니다.");
   }
   const captured = captureCharacterPoseRuntimeV3({
     source: isolated, poseId: presetId, generationId: previous.generationId + 1,
   });
-  // 일반 손 모양은 recipe.handPose가 소유하므로 Pose V3에는 지원하는 몸통 관절만 저장한다.
-  return validateCharacterPoseDocumentV3({ ...captured, source: "preset", stylization: previous.stylization });
+  // 몸통 프리셋을 바꾸어도 사진·웹캠에서 확정한 손가락 원본은 그대로 유지한다.
+  const fingers = Object.fromEntries(Object.entries(previous.bones).filter(([name]) => /(?:Thumb|Index|Middle|Ring|Little)/u.test(name)));
+  return validateCharacterPoseDocumentV3({ ...captured, bones: { ...fingers, ...captured.bones }, source: "preset", stylization: previous.stylization });
 }

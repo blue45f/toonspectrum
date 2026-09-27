@@ -1,6 +1,6 @@
 import { Euler, Object3D, Quaternion, Vector3 } from "three";
 
-import { STUDIO_HUMANOID_BONE_NAMES, getStudioHumanoidBoneDescriptor, type StudioHumanoidBoneName } from "../../studio-humanoid-bones";
+import { STUDIO_HUMANOID_BONE_NAMES, isStudioHumanoidBoneName, getStudioHumanoidBoneDescriptor, type StudioHumanoidBoneName } from "../../studio-humanoid-bones";
 import { characterPoseRegionForBone, type CharacterPoseRegion, type CharacterQuaternion, type CharacterVector3 } from "../pose/character-pose-v2";
 import { solveCharacterGroundBalance } from "./character-ground-balance-solver";
 import { limitCharacterSwingTwist } from "./character-swing-twist";
@@ -44,7 +44,7 @@ export function readCharacterPoseRuntimeSource(value: unknown): CharacterPoseRun
   const rawRest: unknown = Reflect.get(humanoid, "normalizedRestPose");
   const normalizedRestPose: Partial<Record<StudioHumanoidBoneName, { readonly rotation?: readonly number[] }>> = {};
   if (rawRest && typeof rawRest === "object") {
-    for (const name of BODY_BONES) {
+    for (const name of STUDIO_HUMANOID_BONE_NAMES) {
       const rest: unknown = Reflect.get(rawRest, name);
       const rotation: unknown = rest && typeof rest === "object" ? Reflect.get(rest, "rotation") : null;
       if (Array.isArray(rotation) && rotation.length === 4 && rotation.every((value) => typeof value === "number" && Number.isFinite(value))) {
@@ -95,9 +95,10 @@ export function captureCharacterPoseRuntimeV3(input: {
   readonly source: CharacterPoseRuntimeSource;
   readonly poseId: string;
   readonly generationId: number;
+  readonly includeFingers?: boolean;
 }): CharacterPoseDocumentV3 {
   const bones: Record<string, CharacterQuaternion> = {};
-  for (const name of BODY_BONES) {
+  for (const name of input.includeFingers ? STUDIO_HUMANOID_BONE_NAMES : BODY_BONES) {
     const node = input.source.humanoid.getNormalizedBoneNode(name);
     if (node) bones[name] = quaternion(node.quaternion.clone().normalize());
   }
@@ -120,10 +121,12 @@ export function characterPoseEulerBones(pose: CharacterPoseDocumentV3): Readonly
 export function resolveCharacterPoseRuntimeV3(source: CharacterPoseRuntimeSource, pose: CharacterPoseDocumentV3): CharacterPoseDocumentV3 {
   validateCharacterPoseDocumentV3(pose);
   for (const name of Object.keys(pose.bones)) {
-    if (!isCharacterPoseBodyBone(name)) throw new Error(`${name}: Pose V3는 몸통·팔·다리·머리 관절을 지원합니다. 손가락은 손 모양 편집을 이용해 주세요.`);
+    if (!isStudioHumanoidBoneName(name)) throw new Error(`${name}: 정규화된 사람형 뼈대의 관절만 복원할 수 있습니다.`);
   }
   const bones: Record<string, CharacterQuaternion> = {};
-  for (const name of BODY_BONES) {
+  // 이전 V3의 손 모양은 recipe가 소유한다. 명시된 손가락만 새 포즈 원본으로 복원한다.
+  const names = STUDIO_HUMANOID_BONE_NAMES.filter((name) => isCharacterPoseBodyBone(name) || name in pose.bones);
+  for (const name of names) {
     const rotation = pose.bones[name];
     const node = source.humanoid.getNormalizedBoneNode(name);
     if (rotation && !node) throw new Error(`${name}: 현재 모델에 저장된 관절이 없습니다. 같은 뼈대의 모델을 불러와 주세요.`);
@@ -142,7 +145,7 @@ export function resolveCharacterPoseRuntimeV3(source: CharacterPoseRuntimeSource
 /** 저장·미리보기·취소·undo가 같은 Quaternion을 재생하며 관절을 재계산하지 않는다. */
 export function applyCharacterPoseRuntimeV3(source: CharacterPoseRuntimeSource, pose: CharacterPoseDocumentV3): void {
   const resolved = resolveCharacterPoseRuntimeV3(source, pose);
-  for (const name of BODY_BONES) {
+  for (const name of STUDIO_HUMANOID_BONE_NAMES) {
     const node = source.humanoid.getNormalizedBoneNode(name);
     const rotation = resolved.bones[name];
     if (node && rotation) node.quaternion.set(...rotation).normalize();
@@ -290,7 +293,7 @@ export function solveCharacterPoseRuntimeV3(input: {
     maximumError = Math.max(maximumError, error);
     if (error > 0.01) warnings.push(`${key}: 관절 한계 또는 도달 거리로 ${error.toFixed(3)}m 오차가 남았습니다.`);
   }
-  const bones = Object.fromEntries([...rig.bones].map(([name, node]) => [name, quaternion(node.quaternion)]));
+  const bones = { ...pose.bones, ...Object.fromEntries([...rig.bones].map(([name, node]) => [name, quaternion(node.quaternion)])) };
   const result = validateCharacterPoseDocumentV3({
     ...pose, bones, contacts, root: { position: vector(rig.scene.position), rotation: quaternion(rig.scene.quaternion) },
     stylization: { ...pose.stylization, preserveFootPlant: preserveFeet },

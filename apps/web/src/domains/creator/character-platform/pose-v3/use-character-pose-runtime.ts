@@ -12,6 +12,8 @@ import {
   type CharacterPoseEffectorBone,
 } from "./character-pose-runtime-adapter";
 
+import { useCharacterNormalizedFingers } from "./use-character-normalized-fingers";
+
 interface PendingPoseEcho {
   readonly request: PoseRuntimeRequest;
   readonly bones: Readonly<Record<string, CharacterVector3>>;
@@ -71,6 +73,7 @@ export function useCharacterPoseRuntime({ h, authoring, selectedRegions }: {
   const capability = inspectCharacterPoseRuntime(source);
   const previewing = authoring.snapshot.previewCommandId?.startsWith("pose-v3:") ?? false;
   const pose = (authoring.snapshot.previewDocument ?? authoring.snapshot.document).pose;
+  useCharacterNormalizedFingers({ vrm: h.vrm, pose, enabled: authoring.hydrated, tracking: Boolean(h.webcamActive) });
   const poseKey = JSON.stringify({ root: pose.root, bones: Object.entries(pose.bones).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0) });
   const poseRef = useRef(pose); poseRef.current = pose;
   const request: PoseRuntimeRequest = { owner: authoring.authority, vrm: h.vrm, key: poseKey, retry };
@@ -114,7 +117,7 @@ export function useCharacterPoseRuntime({ h, authoring, selectedRegions }: {
       const rotation = new Euler().setFromQuaternion(new Quaternion(...resolvedPose.root.rotation), "YXZ");
       if (Math.abs(rotation.x) > 1e-5 || Math.abs(rotation.z) > 1e-5) throw new Error("이 화면은 캐릭터 전체의 Y축 회전만 지원합니다. 기울어진 루트 회전은 복원할 수 없습니다.");
       // 같은 문서의 preview/cancel/undo는 동일한 시각 상태를 다시 적용한다.
-      const eulerBones = characterPoseEulerBones(resolvedPose);
+      const eulerBones = Object.fromEntries(Object.entries(characterPoseEulerBones(resolvedPose)).filter(([name]) => isCharacterPoseBodyBone(name)));
       // recipe가 소유하는 손가락은 보존하되, 이전 V3 몸통 관절 override는 남기지 않는다.
       const preserved = Object.fromEntries(Object.entries(current.customBones ?? {}).filter(([name]) => !isCharacterPoseBodyBone(name)));
       const bones = { ...preserved, ...Object.fromEntries(Object.entries(eulerBones).map(([name, value]) => [name, { rotation: value }])) };

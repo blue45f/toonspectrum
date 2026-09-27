@@ -1633,6 +1633,108 @@ export class StudioVrmTexturePaintRuntime {
     return success(Object.freeze(exported));
   }
 
+  /** V3 문서의 전체 표면 버전을 교체한다. 모든 비동기 읽기가 끝난 뒤 한 번에 반영한다. */
+  async replaceDocumentTargets(
+    inputs: readonly StudioVrmTexturePaintRehydrateTarget[],
+    signal?: AbortSignal,
+  ): Promise<StudioVrmTexturePaintRuntimeResult<StudioVrmTexturePaintRuntimeSnapshot>> {
+    const unavailable = () => this.disposed || this.sampling || this.filling || this.pending || this.active || this.surfaceSession;
+    if (unavailable()) return this.fail(this.disposed ? "disposed" : "pointer-active");
+    if (signal?.aborted) return this.fail("source-read-aborted");
+    const revision = this.contentRevision;
+    const prepared: { material: BaseColorMaterial; source: THREE.Texture; image: StudioVrmTexturePaintReadableImage;
+      original: StudioVrmTexturePaintReadableImage; binding: StudioVrmTexturePaintBindingDescriptor }[] = [];
+    const originals = new Map<THREE.Texture, StudioVrmTexturePaintReadableImage>();
+    let transientBytes = this.targets.reduce((total, target) => total + target.rgbaBytes, 0);
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    try {
+      for (const input of inputs) {
+        if (!isCanonicalBindingDescriptor(input.binding)) return this.fail("binding-missing");
+        const image = input.image;
+        if (!isStudioVrmTextureSize(image) || !(image.data instanceof Uint8ClampedArray)
+          || image.data.byteLength !== image.width * image.height * RGBA_CHANNELS) return this.fail("invalid-dimensions");
+        transientBytes += image.data.byteLength;
+        if (this.snapshot.residentBytes + transientBytes > this.options.maxAggregateResidentBytes) return this.fail("aggregate-rgba-budget");
+        const entries = [...collectSceneMaterialBindings(this.scene, input.binding.textureSlot)].filter(([, binding]) =>
+          binding.materialLocator === input.binding.materialLocator && binding.textureSlot === input.binding.textureSlot);
+        if (entries.length !== 1) return this.fail(entries.length ? "binding-conflict" : "binding-missing");
+        const material = entries[0]![0];
+        const current = this.materialChannels.get(material, input.binding.textureSlot);
+        if (!current?.isTexture) return this.fail("map-missing");
+        const existing = this.targetsByPainted.get(current) ?? this.targetsByOriginal.get(current);
+        const source = existing?.originalTexture ?? current;
+        let original = originals.get(source);
+        if (!original) {
+          if (existing) original = { ...existing.size, data: existing.originalPixels };
+          else {
+            const result = await this.readSourceTexture(source, controller);
+            if (!result.ok) return this.fail(result.error.code);
+            original = result.value;
+          }
+          originals.set(source, original);
+        }
+        if (this.contentRevision !== revision || unavailable() || signal?.aborted) return this.fail(this.disposed ? "disposed" : "stale-completion");
+        if (original.width !== image.width || original.height !== image.height) return this.fail("binding-conflict");
+        const duplicate = prepared.find((entry) => entry.source === source);
+        if (duplicate && !pixelsEqual(duplicate.image.data, image.data)) return this.fail("binding-conflict");
+        prepared.push({ material, source, original, image: { ...image, data: image.data.slice() }, binding: input.binding });
+      }
+      if (this.contentRevision !== revision || unavailable() || signal?.aborted) return this.fail(this.disposed ? "disposed" : "stale-completion");
+      for (const entry of prepared) {
+        const current = this.materialChannels.get(entry.material, entry.binding.textureSlot);
+        const existing = current ? this.targetsByPainted.get(current) ?? this.targetsByOriginal.get(current) : null;
+        if ((existing?.originalTexture ?? current) !== entry.source) return this.fail("source-changed");
+      }
+      const previousTargets = new Set(this.targets);
+      const before = new Map(this.targets.map((target) => [target, target.imageData.data.slice()]));
+      const requested = new Map<PaintTarget, Uint8ClampedArray>();
+      const rollback = () => {
+        for (const target of [...this.targets]) {
+          if (!previousTargets.has(target)) { this.invalidateTarget(target); continue; }
+          const pixels = before.get(target);
+          if (pixels) {
+            target.imageData.data.set(pixels);
+            if (!this.syncTarget(target)) this.invalidateTarget(target);
+          }
+        }
+      };
+      try {
+        for (const entry of prepared) {
+          const created = this.createTarget(entry.source, entry.original);
+          if (!created.ok) { rollback(); return this.fail(created.error.code); }
+          const target = created.value;
+          const descriptor = target.bindings.get(entry.material)?.descriptor;
+          if (descriptor?.materialLocator !== entry.binding.materialLocator || descriptor.textureSlot !== entry.binding.textureSlot) {
+            rollback(); return this.fail("binding-conflict");
+          }
+          requested.set(target, entry.image.data);
+        }
+        for (const target of this.targets) {
+          const desired = requested.get(target) ?? target.originalPixels;
+          if (pixelsEqual(target.imageData.data, desired)) continue;
+          target.imageData.data.set(desired);
+          if (!this.syncTarget(target)) { rollback(); return this.fail("canvas-unavailable"); }
+        }
+        // 표면 버전 이동의 이력은 V3가 소유한다. 과거 픽셀 patch를 새 버전에 다시 적용하지 않는다.
+        this.historyPast = [];
+        this.historyFuture = [];
+        this.historyBytes = 0;
+        this.lastError = null;
+        this.publish();
+        return success(this.snapshot);
+      } catch {
+        rollback();
+        return this.fail("source-changed");
+      }
+    } catch {
+      return this.fail(signal?.aborted ? "source-read-aborted" : "source-unreadable");
+    } finally {
+      signal?.removeEventListener("abort", abort);
+    }
+  }
+
   async rehydrateTarget(
     input: StudioVrmTexturePaintRehydrateTarget,
   ): Promise<

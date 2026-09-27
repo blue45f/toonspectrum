@@ -153,3 +153,56 @@ test("실제 PNG 파일을 생성하고 이미지 서명과 해상도를 검증�
   expect(pixels.colors).toBeGreaterThan(16);
   await info.attach("실제-PNG-출력", { path: file, contentType: "image/png" });
 });
+
+async function openAuthoringTools(root: Locator, page: Page, info: TestInfo): Promise<Locator> {
+  const launcher = root.getByRole("button", { name: "캐릭터 저작 도구", exact: true });
+  if (!(await launcher.isVisible())) await activate(root.getByRole("button", { name: "편집 도구 펼치기", exact: true }), info);
+  await activate(launcher, info);
+  const panel = page.locator('[data-character-authoring-workbench="true"]');
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+async function downloadAuthoringDocument(page: Page, panel: Locator, info: TestInfo, name: string) {
+  await activate(panel.getByRole("tab", { name: "웹 코어", exact: true }), info);
+  const pending = page.waitForEvent("download");
+  await activate(panel.getByRole("button", { name: "V3 JSON", exact: true }), info);
+  const download = await pending;
+  const path = info.outputPath(name);
+  await download.saveAs(path);
+  const value = JSON.parse(await readFile(path, "utf8")) as {
+    schemaVersion: number; documentId: string; revision: number;
+    groom: { groups: { name: string; guides: unknown[] }[] };
+  };
+  expect(value.schemaVersion).toBe(3);
+  await info.attach(name, { path, contentType: "application/json" });
+  return value;
+}
+
+test("실제 헤어 메시 미리보기·확정·V3 저장·재열기를 끝까지 연결한다", async ({ page }, info) => {
+  let root = await openCharacter(page);
+  let panel = await openAuthoringTools(root, page, info);
+  await activate(panel.getByRole("tab", { name: "헤어 저작", exact: true }), info);
+  const groom = panel.getByRole("region", { name: "헤어 가이드 편집", exact: true });
+  await expect(groom.getByRole("button", { name: "그룹 추가", exact: true })).toBeEnabled();
+  await activate(groom.getByRole("button", { name: "그룹 추가", exact: true }), info);
+  await groom.getByLabel("그룹 이름", { exact: true }).fill("모바일 브라우저 검증 헤어");
+  await activate(groom.getByRole("button", { name: "가이드 추가", exact: true }), info);
+  await activate(groom.getByRole("button", { name: "헤어 미리보기", exact: true }), info);
+  await expect(groom.getByRole("button", { name: "헤어 적용", exact: true })).toBeEnabled({ timeout: 60_000 });
+  await capture(page, info, "실제-헤어-Worker-미리보기");
+  await activate(groom.getByRole("button", { name: "헤어 적용", exact: true }), info);
+  const saved = await downloadAuthoringDocument(page, panel, info, "character-with-groom.json");
+  expect(saved.groom.groups).toHaveLength(1);
+  expect(saved.groom.groups[0]?.name).toBe("모바일 브라우저 검증 헤어");
+  expect(saved.groom.groups[0]?.guides.length).toBeGreaterThan(0);
+  await activate(panel.getByRole("button", { name: "지금 저장", exact: true }), info);
+  await expect(panel.locator("dd").filter({ hasText: "저장 완료" }).first()).toBeVisible();
+  await page.reload({ waitUntil: "domcontentloaded" });
+  root = page.locator(ROOT);
+  await expect(root.getByRole("button", { name: "캔버스에 추가", exact: true })).toBeEnabled({ timeout: 120_000 });
+  panel = await openAuthoringTools(root, page, info);
+  const restored = await downloadAuthoringDocument(page, panel, info, "character-restored-groom.json");
+  expect(restored.documentId).toBe(saved.documentId);
+  expect(restored.groom).toEqual(saved.groom);
+});

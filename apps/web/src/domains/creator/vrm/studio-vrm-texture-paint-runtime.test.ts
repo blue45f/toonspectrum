@@ -3243,3 +3243,59 @@ describe("Studio VRM texture-paint runtime", () => {
     expect(noMapReader).not.toHaveBeenCalled();
   });
 });
+
+describe("문서 소유 채색 버전 교체", () => {
+  it("두 표면 버전을 교체하고 없는 대상은 원래 텍스처로 되돌린다", async () => {
+    const scene = new THREE.Group(); const canvas = canvasHarness();
+    const source = new THREE.Texture(); const { material, mesh } = meshWithMap(source);
+    const binding = stampStudioVrmTexturePaintMaterialLocator(material, 7)!; scene.add(mesh);
+    const original = rgba(8, 8, [255, 255, 255, 255]);
+    const first = rgba(8, 8, [255, 0, 0, 255]); const second = rgba(8, 8, [0, 0, 255, 255]);
+    const runtime = createStudioVrmTexturePaintRuntime(scene, { createCanvas: canvas.createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(8, 8, original)]])) });
+    try {
+      unwrap(await runtime.replaceDocumentTargets([{ binding, image: readable(8, 8, first) }]));
+      expect(unwrap(runtime.exportPaintedTargets())[0]?.pixels).toEqual(first);
+      unwrap(await runtime.replaceDocumentTargets([{ binding, image: readable(8, 8, second) }]));
+      expect(unwrap(runtime.exportPaintedTargets())[0]?.pixels).toEqual(second);
+      unwrap(await runtime.replaceDocumentTargets([]));
+      expect(unwrap(runtime.exportPaintedTargets())).toEqual([]);
+      expect(canvas.canvases[0]!.frame).toEqual(original);
+      unwrap(await runtime.replaceDocumentTargets([{ binding, image: readable(8, 8, first) }]));
+      expect(unwrap(runtime.exportPaintedTargets())[0]?.pixels).toEqual(first);
+      expect(runtime.getSnapshot().history).toMatchObject({ undoCount: 0, redoCount: 0 });
+    } finally { runtime.dispose(); }
+    expect(material.map).toBe(source);
+  });
+  it("뒤쪽 재질이 없거나 취소되면 먼저 준비한 표면도 바꾸지 않는다", async () => {
+    const scene = new THREE.Group(); const canvas = canvasHarness();
+    const source = new THREE.Texture(); const { material, mesh } = meshWithMap(source);
+    const binding = stampStudioVrmTexturePaintMaterialLocator(material, 7)!; scene.add(mesh);
+    const original = rgba(8, 8, [255, 255, 255, 255]); const painted = rgba(8, 8, [255, 0, 0, 255]);
+    const runtime = createStudioVrmTexturePaintRuntime(scene, { createCanvas: canvas.createCanvas,
+      readTextureImage: imageReader(new Map([[source, readable(8, 8, original)]])) });
+    try {
+      const input = { binding, image: readable(8, 8, painted) };
+      expectFailure(await runtime.replaceDocumentTargets([input, { ...input, binding: { ...binding, materialLocator: "gltf-material:8" } }]), "binding-missing");
+      expect(material.map).toBe(source);
+      expect(canvas.createCanvas).not.toHaveBeenCalled();
+      const controller = new AbortController(); controller.abort();
+      expectFailure(await runtime.replaceDocumentTargets([input], controller.signal), "source-read-aborted");
+      expect(material.map).toBe(source);
+    } finally { runtime.dispose(); }
+  });
+  it("읽기를 기다리는 동안 원본이 교체되면 늦은 버전을 적용하지 않는다", async () => {
+    const scene = new THREE.Group(); const canvas = canvasHarness(); const deferred = deferredImageReader();
+    const source = new THREE.Texture(); const replacement = new THREE.Texture(); const { material, mesh } = meshWithMap(source);
+    const binding = stampStudioVrmTexturePaintMaterialLocator(material, 7)!; scene.add(mesh);
+    const runtime = createStudioVrmTexturePaintRuntime(scene, { createCanvas: canvas.createCanvas, readTextureImage: deferred.reader });
+    try {
+      const pending = runtime.replaceDocumentTargets([{ binding, image: readable(8, 8, rgba(8, 8, [255, 0, 0, 255])) }]);
+      material.map = replacement;
+      deferred.resolve(readable(8, 8));
+      expectFailure(await pending, "source-changed");
+      expect(material.map).toBe(replacement);
+      expect(canvas.createCanvas).not.toHaveBeenCalled();
+    } finally { runtime.dispose(); }
+  });
+});

@@ -67,6 +67,7 @@ export interface StudioVrmTexturePaintPersistenceDependencies {
 
 export interface StudioVrmTexturePaintPersistenceOptions {
   readonly signal?: AbortSignal;
+  readonly replaceDocument?: boolean;
   readonly dependencies?: Partial<StudioVrmTexturePaintPersistenceDependencies>;
 }
 
@@ -79,7 +80,7 @@ type StudioVrmTexturePaintRestoreRuntime =
   Pick<StudioVrmTexturePaintRuntime, "rehydrateTarget">
   & Partial<Pick<
     StudioVrmTexturePaintRuntime,
-    "exportPaintedTargets" | "resetActiveTarget"
+    "exportPaintedTargets" | "resetActiveTarget" | "replaceDocumentTargets"
   >>;
 
 interface PreparedRestoreBinding {
@@ -446,6 +447,14 @@ export async function rehydrateStudioVrmTexturePaintRuntime(
   }
   throwIfAborted(options.signal);
 
+  if (options.replaceDocument) {
+    if (typeof runtime.replaceDocumentTargets !== "function") throw new StudioVrmTexturePaintPersistenceError("restore-failed");
+    const result = await runtime.replaceDocumentTargets(prepared.map(({ texture, image }) => ({
+      binding: { bindingKey: texture.bindingKey, materialLocator: texture.materialLocator, textureSlot: texture.textureSlot }, image,
+    })), options.signal);
+    if (!result.ok) throw new StudioVrmTexturePaintPersistenceError("restore-failed", { cause: new Error(result.error.message) });
+    return Object.freeze({ artifactCount: grouped.size, bindingCount: prepared.length });
+  }
   const alreadyRestored = preflightAlreadyRestoredBindings(runtime, prepared);
   const applied: PreparedRestoreBinding[] = [];
   try {
