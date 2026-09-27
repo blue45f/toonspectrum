@@ -63,16 +63,6 @@ const LICENSE_METADATA: Readonly<
     redistributionAllowed: false,
     summary: "작품에는 사용할 수 있지만 리소스 파일 자체의 재배포는 허용하지 않습니다.",
   },
-  "toonstudio-standard": {
-    id: "toonstudio-standard",
-    label: "ToonStudio 표준 사용권",
-    url: null,
-    commercialUse: true,
-    attributionRequired: false,
-    derivativesAllowed: true,
-    redistributionAllowed: false,
-    summary: "작품에는 사용할 수 있지만 리소스 파일 자체의 재배포는 허용하지 않습니다.",
-  },
   "cc0-1.0": {
     id: "cc0-1.0",
     label: "CC0 1.0",
