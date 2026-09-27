@@ -4,6 +4,8 @@ import { EMPTY_LESSON, STORAGE_KEY } from "../apps/web/src/domains/learn/learnin
 
 import { expect, test, installBetaEventDismissal } from "./fixtures/non-studio-test";
 
+import type { Page } from "@playwright/test";
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("toonstudio-compat-dismissed", "true"));
 });
@@ -15,10 +17,18 @@ function backup(notes: string) {
   });
 }
 
+async function openLearningRecords(page: Page) {
+  const navigation = page.getByRole("navigation", { name: "웹툰 학습", exact: true });
+  await navigation.locator("summary").click();
+  const records = navigation.getByRole("link", { name: "내 학습 기록 · 백업 / 복원", exact: true });
+  await expect(records).toHaveAttribute("href", "/learn/records");
+  await records.click();
+}
+
 test("exports a real file and restores only after preview and explicit confirmation", async ({ page, browser }) => {
   await page.goto("/learn/lessons/story-board");
   await page.getByLabel("나의 실습 메모", { exact: true }).fill("내 컷의 호흡 🖋");
-  await page.getByRole("link", { name: "내 학습 기록 · 백업 / 복원 →", exact: true }).click();
+  await openLearningRecords(page);
   await expect(page).toHaveURL(/\/learn\/records$/u);
   const downloaded = page.waitForEvent("download");
   await page.getByRole("button", { name: "학습 기록 백업", exact: true }).click();
@@ -38,7 +48,7 @@ test("exports a real file and restores only after preview and explicit confirmat
     await expect(destination.getByRole("heading", { name: "복원 전 확인", exact: true })).toBeVisible();
     expect(await destination.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)).toBeNull();
     await destination.getByRole("button", { name: "기존 기록 유지하고 복원", exact: true }).click();
-    await destination.getByRole("link", { name: "제작 강좌", exact: true }).click();
+    await destination.getByRole("navigation", { name: "웹툰 학습", exact: true }).getByRole("link", { name: "학습 홈", exact: true }).click();
     await destination.getByRole("link", { name: "한 문장에서 세 컷의 이야기로", exact: true }).click();
     await expect(destination.getByLabel("나의 실습 메모", { exact: true })).toHaveValue("내 컷의 호흡 🖋");
   } finally { await fresh.close(); }
@@ -47,7 +57,7 @@ test("exports a real file and restores only after preview and explicit confirmat
 test("restoring keeps existing notes and reports invalid files without changing records", async ({ page }) => {
   await page.goto("/learn/lessons/story-board");
   await page.getByLabel("나의 실습 메모", { exact: true }).fill("덮어쓰면 안 되는 메모");
-  await page.getByRole("link", { name: "내 학습 기록 · 백업 / 복원 →", exact: true }).click();
+  await openLearningRecords(page);
   await page.getByText("백업 파일에서 복원", { exact: true }).click();
   const input = page.getByLabel("학습 백업 파일 선택 (.json, 최대 512 KiB)", { exact: true });
   await input.setInputFiles({ name: "valid.json", mimeType: "application/json", buffer: Buffer.from(backup("외부 메모")) });
@@ -130,9 +140,9 @@ test("failed writes survive real other-tab edits and SPA navigation to record ma
     await other.getByLabel("나의 실습 메모", { exact: true }).fill("다른 탭 메모");
     await expect(page.locator(".learn-page > [role=status]")).toContainText("다른 탭");
     await expect(page.getByLabel("나의 실습 메모", { exact: true })).toHaveValue("반드시 보존할 미저장 메모");
-    await page.getByRole("link", { name: "내 학습 기록 · 백업 / 복원 →", exact: true }).click();
+    await openLearningRecords(page);
     await expect(page.getByRole("heading", { name: "다른 탭의 기록과 충돌했습니다", exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "제작 강좌", exact: true }).click();
+    await page.getByRole("navigation", { name: "웹툰 학습", exact: true }).getByRole("link", { name: "학습 홈", exact: true }).click();
     await page.getByRole("link", { name: "한 문장에서 세 컷의 이야기로", exact: true }).click();
     await expect(page.getByLabel("나의 실습 메모", { exact: true })).toHaveValue("반드시 보존할 미저장 메모");
     expect(await other.evaluate((key) => JSON.parse(localStorage.getItem(key)!).lessons["story-board"].notes, STORAGE_KEY)).toBe("다른 탭 메모");
