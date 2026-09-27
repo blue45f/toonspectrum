@@ -138,7 +138,7 @@ describe("Studio VRM broadcast preview product boundary", () => {
     expect(poser).toContain("entry.contentRect.width");
     expect(poser).toContain("requestedDpr: window.devicePixelRatio");
     expect(poser).toContain(
-      "dpr={broadcastPreviewActive ? broadcastCanvasDpr : [1, 2]}",
+      "dpr={broadcastPreviewActive ? broadcastCanvasDpr : viewportBudget.dpr}",
     );
     const preflightIndex = poser.indexOf("const framebufferPreflight = planStudioVrmBroadcastFramebuffer");
     const dprPublishIndex = poser.indexOf(

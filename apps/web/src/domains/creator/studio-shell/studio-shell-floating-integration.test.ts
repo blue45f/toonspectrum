@@ -66,7 +66,7 @@ describe("studio shell floating integration", () => {
     expect(space).toContain('showHuddleLauncher={false}');
     expect(space).toContain('<StudioP2pHuddleLauncher placement="inline" />');
     expect(space).toContain('data-workspace-primary-action="true"');
-    expect(source("virtual-space/studio-workspace-live.css")).toContain('.workspace-live-actions>a[data-workspace-primary-action="true"]');
+    expect(source("virtual-space/studio-workspace-live.css")).toContain('.workspace-live-actions>:is(a,button)[data-workspace-primary-action="true"]');
   });
 
   it("lazy-loads the durable manager inside the document lifetime boundary", () => {
