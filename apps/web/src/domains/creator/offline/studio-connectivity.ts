@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { apiFetch } from "@/platform/api";
 
 export const STUDIO_CONNECTIVITY_EVENT = "toonspectrum:studio-connectivity";
@@ -165,19 +167,23 @@ function update(input: Partial<StudioConnectivityInput>): void {
   }));
 }
 
+// 누락된 값이나 잘못된 JSON을 온라인 복구로 오인하지 않되, 명시적 degraded는 유지한다.
+const StudioCapabilityProbeSchema = z.object({
+  capabilities: z.object({
+    studioProjectRead: z.enum(["available", "degraded", "unavailable"]),
+    studioCloudSave: z.enum(["available", "degraded", "unavailable"]),
+  }),
+});
+
 export async function isStudioServerCapabilityAvailable(
   response: Response,
 ): Promise<boolean> {
   if (!response.ok) return false;
   try {
-    const payload = await response.json() as {
-      readonly capabilities?: {
-        readonly studioProjectRead?: unknown;
-        readonly studioCloudSave?: unknown;
-      };
-    };
-    return payload.capabilities?.studioProjectRead !== "unavailable"
-      && payload.capabilities?.studioCloudSave !== "unavailable";
+    const parsed = StudioCapabilityProbeSchema.safeParse(await response.json());
+    if (!parsed.success) return false;
+    return parsed.data.capabilities.studioProjectRead !== "unavailable"
+      && parsed.data.capabilities.studioCloudSave !== "unavailable";
   } catch {
     return false;
   }

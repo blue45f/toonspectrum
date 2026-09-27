@@ -4,6 +4,7 @@ import {
   StudioCrdtDocument,
   type StudioCrdtDrawStrokePayload,
 } from "./studio-crdt-document";
+import { resolveStudioLiveCanonicalAuthority } from "./studio-live-canonical-authority";
 import { createStudioCrdtServerAckError } from "./studio-crdt-operation-error";
 import {
   StudioCrdtOutboxCorruptionError,
@@ -1502,6 +1503,11 @@ describe("StudioCrdtRoomBinding", () => {
   });
 
   it.each(["mesh", "none"] as const)("preserves server %s requests without treating peer receipts as authoritative", async (crdtFanout) => {
+    // 준비된 P2P 정본의 편집 허용이 아래의 서버 저장 ACK 검사를 대신해서는 안 된다.
+    expect(resolveStudioLiveCanonicalAuthority({
+      bindingState: "ready", transportReady: true, transportMode: "server", crdtFanout,
+      previousAuthority: false,
+    })).toBe(crdtFanout === "mesh");
     vi.useFakeTimers();
     const peer = new StudioCrdtDocument();
     const client = new StudioCrdtDocument();

@@ -323,7 +323,11 @@ export function createStudioDeferredStrokeCommitEngine(
       document.getPages(true),
       document.getLayerGroups({ includeDeleted: true })
     );
-    return reconciled.pages;
+    // 기기에 수락한 편집은 아직 정본에 없으므로 병합 뒤 다시 투영한다. 원격 요소는 그대로 보존한다.
+    const offlineBranch = runtime.offlineBranch;
+    return offlineBranch && offlineBranch.status.pendingOperations > 0
+      ? offlineBranch.projectPages(reconciled.pages)
+      : reconciled.pages;
   }
 
   // 요소 변경을 히스토리에 커밋. (마스터 편집 모드에서는 문서 마스터로 커밋 — 히스토리 미포함, 패널에서 고지)
