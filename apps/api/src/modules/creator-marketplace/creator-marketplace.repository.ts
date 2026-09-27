@@ -16,7 +16,7 @@ import {
   CreatorMarketplacePackageModerationStateSchema,
   CreatorMarketplaceResourceKindSchema,
   CreatorMarketplaceResourceReportEvidenceSchema,
-} from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
+} from "@toonstudio/contracts/creator-marketplace-resource-contract";
 import { db, users } from "../../platform/database";
 import {
   creatorMarketplacePackageModeration,

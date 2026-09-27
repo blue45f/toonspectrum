@@ -1,1 +1,1 @@
-export * from "../../domains/creator/contracts/studio-live-lock-resource";
+export * from "@toonstudio/contracts/studio-live-lock-resource";

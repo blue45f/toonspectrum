@@ -9,9 +9,9 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 
-import { parseCommunitySort } from "../../../../web/src/shared/lib/community-ui";
+import { parseCommunitySort } from "@toonstudio/contracts/community-ui";
 import { rethrowDatabaseCapabilityError, withDatabaseCapability } from "../../platform/http/service-availability";
-import { GENRES } from "../../../../web/src/shared/lib/taxonomy";
+import { GENRES } from "@toonstudio/contracts/taxonomy";
 import {
   createFanPost,
   createFanPostReply,
@@ -71,7 +71,7 @@ import type {
   FanCafePost,
   FanCafeReply,
   ReviewReply,
-} from "../../../../web/src/shared/lib/types";
+} from "@toonstudio/contracts/types";
 
 interface PostQuery {
   scope?: string | null;

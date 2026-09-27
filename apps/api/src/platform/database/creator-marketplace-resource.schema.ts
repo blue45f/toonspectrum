@@ -15,18 +15,18 @@ import {
 
 import {
   CREATOR_MARKETPLACE_RESOURCE_MAX_MANIFEST_BYTES,
-} from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
+} from "@toonstudio/contracts/creator-marketplace-resource-contract";
 import {
   CREATOR_MARKETPLACE_LEGACY_SEMVER_POSTGRES_PATTERN,
   CREATOR_MARKETPLACE_SEMVER_MAX_CHARACTERS,
   CREATOR_MARKETPLACE_SEMVER_POSTGRES_PATTERN,
-} from "../../../../web/src/shared/lib/creator-marketplace-semver";
+} from "@toonstudio/contracts/creator-marketplace-semver";
 
 import { users } from "./schema";
 
 import type {
   CreatorMarketplaceResourceManifest,
-} from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
+} from "@toonstudio/contracts/creator-marketplace-resource-contract";
 
 // Drizzle parameterizes primitive `${value}` interpolations as `$1`. PostgreSQL does not accept
 // parameters inside a CHECK constraint created by `drizzle-kit push`, so render this trusted,

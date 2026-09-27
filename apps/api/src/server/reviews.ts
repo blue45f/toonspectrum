@@ -10,7 +10,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 
-import { fromDb } from "../../../web/src/shared/lib/api-helpers";
+import { fromDb } from "@toonstudio/contracts/api-helpers";
 import { getTitle } from "../../../../packages/core/src/catalog/catalog-store";
 import { withDatabaseCapability } from "../platform/http/service-availability";
 import { db, reviewLikes, reviews, users } from "../platform/database";

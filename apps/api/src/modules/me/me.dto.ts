@@ -5,13 +5,13 @@ import {
   MAX_COLLECTION_ID_LENGTH,
   normalizeCollectionEmoji,
   normalizeCollectionName,
-} from "../../../../web/src/shared/lib/collection-contract";
+} from "@toonstudio/contracts/collection-contract";
 
 export {
   MAX_COLLECTION_EMOJI_LENGTH,
   MAX_COLLECTION_ID_LENGTH,
   MAX_COLLECTION_NAME_LENGTH,
-} from "../../../../web/src/shared/lib/collection-contract";
+} from "@toonstudio/contracts/collection-contract";
 
 const CollectionOpaqueIdSchema = z
   .string()

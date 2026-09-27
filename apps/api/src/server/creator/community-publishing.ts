@@ -11,7 +11,7 @@ import {
   readCreatorPublicationDirective,
   writeCreatorPublicationDirective,
   type CreatorPublicationVisibility,
-} from "../../../../web/src/shared/lib/creator-publication-contract";
+} from "@toonstudio/contracts/creator-publication-contract";
 import {
   readCreatorCommunityMetadata,
   type CreatorCommunityApprovalState,
@@ -19,7 +19,7 @@ import {
   type CreatorCommunityExternalStatus,
   type CreatorCommunityReleaseManifest,
   type CreatorCommunityReleaseState,
-} from "../../../../web/src/shared/lib/creator-community-publication-contract";
+} from "@toonstudio/contracts/creator-community-publication-contract";
 import { toPublicCreatorDoc } from "../creator-doc-visibility";
 import {
   creatorExternalPublications,

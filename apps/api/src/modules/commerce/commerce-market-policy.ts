@@ -10,7 +10,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 
-import { findStarterMarketplaceResourceById } from "../../../../web/src/shared/lib/creator-marketplace-starter-catalog";
+import { findStarterMarketplaceResourceById } from "@toonstudio/contracts/creator-marketplace-starter-catalog";
 import {
   commerceEntitlements,
   commerceProductPrices,

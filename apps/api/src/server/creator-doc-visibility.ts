@@ -1,6 +1,6 @@
-import { projectStudioAiProvenanceForPublish } from "../../../web/src/domains/creator/ai/studio-ai-provenance";
+import { projectStudioAiProvenanceForPublish } from "@toonstudio/contracts/studio-ai-provenance";
 import { toPublicCreatorPublicationSource } from "@toonstudio/contracts/creator-publication-integrity";
-import { toPublicCreatorPublicationDirective } from "../../../web/src/shared/lib/creator-publication-contract";
+import { toPublicCreatorPublicationDirective } from "@toonstudio/contracts/creator-publication-contract";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

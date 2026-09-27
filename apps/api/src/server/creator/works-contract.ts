@@ -2,7 +2,7 @@
 import { clampText } from "./shared";
 
 import type { CreatorPublicationSourceKind } from "@toonstudio/contracts/creator-publication-integrity";
-import type { CreatorCommunityMetadata } from "../../../../web/src/shared/lib/creator-community-publication-contract";
+import type { CreatorCommunityMetadata } from "@toonstudio/contracts/creator-community-publication-contract";
 import type { CreatorSeriesStatus } from "./community-contract";
 import type { CreatorWorkRevisionComparisonSnapshot, CreatorWorkRevisionSnapshot } from "../creator-work-revisions";
 

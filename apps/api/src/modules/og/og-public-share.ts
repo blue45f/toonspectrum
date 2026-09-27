@@ -1,5 +1,5 @@
 import { COLLABORATION_ROLES } from "../../../../../packages/core/src/collaboration";
-import { readCreatorPublicationDirective } from "../../../../web/src/shared/lib/creator-publication-contract";
+import { readCreatorPublicationDirective } from "@toonstudio/contracts/creator-publication-contract";
 
 export type PublicShareOgSource =
   | "creator-work"

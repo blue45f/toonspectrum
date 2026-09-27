@@ -7,7 +7,7 @@ import {
   normalizeCreatorPublicationDirective,
   readCreatorPublicationDirective,
   type CreatorPublicationValidationIssue,
-} from "../../../../web/src/shared/lib/creator-publication-contract";
+} from "@toonstudio/contracts/creator-publication-contract";
 import { creatorWorks, db } from "../../platform/database";
 
 import {

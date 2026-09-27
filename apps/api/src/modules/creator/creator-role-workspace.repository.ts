@@ -5,14 +5,14 @@ import {
   normalizeCreatorRoleWorkspacePreference,
   type CreatorRoleWorkspacePreference,
   type PublicCreatorRoleCandidate,
-} from "../../../../web/src/shared/lib/creator-role-workspace-contract";
+} from "@toonstudio/contracts/creator-role-workspace-contract";
 import {
   normalizeCreatorRoleProfile,
   publicCreatorRoleProfile,
   type CreatorCollaborationStatus,
   type CreatorRoleId,
   type CreatorSpecialtyId,
-} from "../../../../web/src/shared/lib/creator-role-contract";
+} from "@toonstudio/contracts/creator-role-contract";
 import { dbClient } from "../../platform/database";
 
 export interface CreatorRoleWorkspaceRecord {

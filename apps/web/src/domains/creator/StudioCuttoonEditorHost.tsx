@@ -18134,6 +18134,16 @@ const puppetWarpArmed =
     liveDraftPendingRef.current = null;
     liveDraftVisualRef.current = null;
     liveDraftDirectRef.current = false;
+    // History invalidates every renderer-preparation queue and audit session owned by the previous
+    // snapshot. Retiring them here prevents the next brush from inheriting stale admission or
+    // source-journal state that can leave its visible stroke outside canonical history.
+    pendingStrokeAdmissionRef.current?.cancelAll(
+      "히스토리 전환으로 이전 획 입력 대기를 종료하고 원본을 복구합니다.",
+    );
+    cancelAllLiveStrokeBackendAudits();
+    gpuLiveSourceJournalRef.current = null;
+    gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
+    gpuLiveOperationOrderKeyRef.current = null;
     pendingGpuStrokesRef.current = [];
     pendingGpuDrawAuthoritiesRef.current = [];
     gpuFinalReceiptRequestIdsRef.current.clear();

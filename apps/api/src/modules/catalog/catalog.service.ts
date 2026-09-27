@@ -6,9 +6,9 @@ import {
 } from "@nestjs/common";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 
-import { fromDb } from "../../../../web/src/shared/lib/api-helpers";
-import { buildTasteProfile, recommendForTaste, similarTitles } from "../../../../web/src/shared/lib/recommend";
-import { MAX_SEARCH_QUERY_LENGTH, sortTitles, suggest, type SearchFilters, type SortKey } from "../../../../web/src/shared/lib/search";
+import { fromDb } from "@toonstudio/contracts/api-helpers";
+import { buildTasteProfile, recommendForTaste, similarTitles } from "@toonstudio/contracts/recommend";
+import { MAX_SEARCH_QUERY_LENGTH, sortTitles, suggest, type SearchFilters, type SortKey } from "@toonstudio/contracts/search";
 import {
   activeTags,
   getAuthorData,
@@ -45,7 +45,7 @@ import { getTitleDetail as getTitleDetailFromLib } from "../../server/title";
 
 import { CatalogSearchCache } from "./catalog-search-cache";
 
-import type { AgeRating, PlatformId, ReadState, SerialStatus, Title, WorkType } from "../../../../web/src/shared/lib/types";
+import type { AgeRating, PlatformId, ReadState, SerialStatus, Title, WorkType } from "@toonstudio/contracts/types";
 import type { OnModuleInit } from "@nestjs/common";
 
 type QueryRecord = Record<string, string>;

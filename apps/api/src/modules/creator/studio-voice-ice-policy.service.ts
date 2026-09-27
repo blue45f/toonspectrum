@@ -9,12 +9,12 @@ import {
 } from "@nestjs/common";
 import { z } from "zod";
 
-import { rateLimit } from "../../../../web/src/shared/lib/rate-limit";
+import { rateLimit } from "@toonstudio/contracts/rate-limit";
 import {
   StudioVoiceIcePolicyResponseSchema,
   StudioVoiceIceUrlSchema,
   type StudioVoiceIcePolicyResponse,
-} from "../../../../web/src/shared/lib/studio-voice-ice-policy-contract";
+} from "@toonstudio/contracts/studio-voice-ice-policy-contract";
 
 import { CreatorService } from "./creator.service";
 

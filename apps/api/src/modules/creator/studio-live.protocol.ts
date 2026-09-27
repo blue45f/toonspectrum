@@ -9,7 +9,7 @@ import {
   decodeStudioCrdtBinaryEnvelope,
   reassembleStudioCrdtBinarySyncEnvelope,
   type StudioCrdtBinaryEnvelopeKind,
-} from "../../../../web/src/shared/lib/studio-crdt-binary-envelope";
+} from "@toonstudio/contracts/studio-crdt-binary-envelope";
 import {
   verifyStudioLiveAdmissionTicket,
   type VerifiedSessionToken,

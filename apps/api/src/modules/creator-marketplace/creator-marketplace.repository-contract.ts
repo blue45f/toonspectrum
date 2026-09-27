@@ -9,7 +9,7 @@ import type {
   CreatorMarketplaceResourceReportStatus,
   CreatorMarketplaceResourceSort,
   CreatorMarketplaceStoredResourceManifest,
-} from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
+} from "@toonstudio/contracts/creator-marketplace-resource-contract";
 
 export const CREATOR_MARKETPLACE_RESOURCE_REPOSITORY = Symbol(
   "CREATOR_MARKETPLACE_RESOURCE_REPOSITORY"

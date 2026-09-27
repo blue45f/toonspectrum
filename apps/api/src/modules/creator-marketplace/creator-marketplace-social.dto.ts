@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   CreateCreatorMarketplaceSocialCommentSchema,
   UpsertCreatorMarketplaceSocialReviewSchema,
-} from "../../../../web/src/shared/lib/creator-marketplace-social-contract";
+} from "@toonstudio/contracts/creator-marketplace-social-contract";
 
 export const CreatorMarketplaceSocialResourceParamsSchema = z
   .object({ id: z.string().uuid() })

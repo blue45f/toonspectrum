@@ -7,7 +7,7 @@ import {
 import {
   normalizeCreatorRoleWorkspacePreference,
   type CreatorRoleWorkspacePreference,
-} from "../../../../web/src/shared/lib/creator-role-workspace-contract";
+} from "@toonstudio/contracts/creator-role-workspace-contract";
 import type {
   BatchCreatorRoleProfilesDto,
   CreatorRoleDirectoryQueryDto,

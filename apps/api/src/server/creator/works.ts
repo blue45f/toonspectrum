@@ -6,12 +6,12 @@ import {
   assertStudioLinked3dPassAssetRows,
   extractStudioLinked3dPassAssetRequirements,
   type CreatorWorkLinked3dJsonEnvelope,
-} from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
+} from "@toonstudio/contracts/studio-linked-3d-pass-asset-fence";
 import {
   readCreatorCommunityMetadata,
   type CreatorCommunityContentGroup,
   type CreatorCommunityProvenance,
-} from "../../../../web/src/shared/lib/creator-community-publication-contract";
+} from "@toonstudio/contracts/creator-community-publication-contract";
 import {
   capabilityUnavailableException,
   withDatabaseCapability,

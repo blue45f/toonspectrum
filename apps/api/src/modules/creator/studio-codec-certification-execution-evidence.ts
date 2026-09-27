@@ -8,10 +8,10 @@ import { z } from "zod";
 
 import {
   STUDIO_CODEC_PROVIDER_LIMITS,
-} from "../../../../web/src/domains/creator/studio-codec-provider-contract";
+} from "@toonstudio/contracts/studio-codec-provider-contract";
 import {
   STUDIO_PRODUCT_CODEC_CERTIFICATION_LIMITS,
-} from "../../../../web/src/domains/creator/studio-product-codec-certification";
+} from "@toonstudio/contracts/studio-product-codec-certification";
 
 import {
   StudioCodecCertificationAuthoritySignatureSchema,

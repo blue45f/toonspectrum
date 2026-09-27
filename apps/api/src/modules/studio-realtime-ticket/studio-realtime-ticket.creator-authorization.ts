@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { isStudioLiveJamScope } from "../../../../web/src/shared/lib/studio-live-jam-scope";
+import { isStudioLiveJamScope } from "@toonstudio/contracts/studio-live-jam-scope";
 import { CreatorCollaborationRepository } from "../creator/creator-collaboration.repository";
 
 import {

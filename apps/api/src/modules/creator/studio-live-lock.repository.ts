@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, lte, sql } from "drizzle-orm";
 import { STUDIO_ACOUSTIC_RESOURCE_PREFIX } from "@toonstudio/studio-project-model/world-acoustic";
 
-import { studioLiveLockResourcesConflict } from "../../../../web/src/shared/lib/studio-live-lock-resource";
+import { studioLiveLockResourcesConflict } from "@toonstudio/contracts/studio-live-lock-resource";
 import {
   creatorWorkLiveLockClocks,
   creatorWorkLiveLocks,

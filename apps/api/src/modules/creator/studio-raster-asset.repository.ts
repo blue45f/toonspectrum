@@ -1,12 +1,12 @@
 import { and, count, eq, inArray, sql } from "drizzle-orm";
 import * as Y from "yjs";
 
-import { readStudioCrdtRasterDocument } from "../../../../web/src/shared/lib/studio-crdt-raster-document-contract";
+import { readStudioCrdtRasterDocument } from "@toonstudio/contracts/studio-crdt-raster-document-contract";
 import {
   STUDIO_RASTER_ASSET_CONTRACT_VERSION,
   STUDIO_RASTER_ASSET_MAX_ASSETS_PER_WORK,
   STUDIO_RASTER_ASSET_MAX_TOTAL_BYTES_PER_WORK,
-} from "../../../../web/src/shared/lib/studio-raster-asset-contract";
+} from "@toonstudio/contracts/studio-raster-asset-contract";
 import {
   creatorWorkCollaborators,
   creatorWorks,
@@ -32,7 +32,7 @@ import type {
 import type {
   StudioRasterAssetManifest,
   StudioRasterStorageMediaType,
-} from "../../../../web/src/shared/lib/studio-raster-asset-contract";
+} from "@toonstudio/contracts/studio-raster-asset-contract";
 
 export const STUDIO_RASTER_ASSET_REPOSITORY = Symbol("STUDIO_RASTER_ASSET_REPOSITORY");
 

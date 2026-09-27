@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
-import { fromDb } from "../../../web/src/shared/lib/api-helpers";
-import { similarTitles } from "../../../web/src/shared/lib/recommend";
+import { fromDb } from "@toonstudio/contracts/api-helpers";
+import { similarTitles } from "@toonstudio/contracts/recommend";
 import {
   TITLES,
   adaptationsOf,
@@ -11,7 +11,7 @@ import {
 import { isDatabaseAvailabilityError } from "../platform/http/database-availability";
 import { db, reviewLikes, reviews, users } from "../platform/database";
 
-import type { SeedReview, Title } from "../../../web/src/shared/lib/types";
+import type { SeedReview, Title } from "@toonstudio/contracts/types";
 
 type TitleReviewLoad =
   | { readonly status: "available"; readonly items: SeedReview[] }

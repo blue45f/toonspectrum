@@ -2,7 +2,7 @@ import { parsePublicSharePath } from "../../../../../packages/core/src/public-sh
 import {
   createDefaultCreatorPublicationDirective,
   readCreatorPublicationDirective,
-} from "../../../../web/src/shared/lib/creator-publication-contract";
+} from "@toonstudio/contracts/creator-publication-contract";
 import {
   canShareCollaborationPost,
   canShareCommunityCafe,
@@ -12,7 +12,7 @@ import {
   canSharePromotionPost,
   compactPublicShareDescription,
   publicShareImageUrl,
-} from "../../../../web/src/shared/lib/public-share-policy";
+} from "@toonstudio/contracts/public-share-policy";
 
 export type PublicOgMetadata = Readonly<{
   title: string;

@@ -1,10 +1,10 @@
 import type {
   ConfirmCreatorMarketplaceStudioInstall,
   CreatorMarketplaceCloudLibraryView,
-} from "../../../../web/src/shared/lib/creator-marketplace-cloud-library-contract";
+} from "@toonstudio/contracts/creator-marketplace-cloud-library-contract";
 import type {
   CreatorMarketplaceResourceKind,
-} from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
+} from "@toonstudio/contracts/creator-marketplace-resource-contract";
 
 export const CREATOR_MARKETPLACE_LIBRARY_REPOSITORY = Symbol(
   "CREATOR_MARKETPLACE_LIBRARY_REPOSITORY",

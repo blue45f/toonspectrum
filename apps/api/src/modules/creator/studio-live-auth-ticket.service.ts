@@ -6,7 +6,7 @@ import {
   StudioLiveAuthTicketResponseSchema,
   type StudioLiveAuthTicketRequest,
   type StudioLiveAuthTicketResponse,
-} from "../../../../web/src/shared/lib/studio-live-auth-ticket";
+} from "@toonstudio/contracts/studio-live-auth-ticket";
 import {
   signStudioLiveAdmissionTicket,
   type VerifiedSessionToken,

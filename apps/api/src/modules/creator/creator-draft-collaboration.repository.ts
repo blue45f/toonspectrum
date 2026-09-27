@@ -6,7 +6,7 @@ import {
   assertStudioLinked3dPassAssetRows,
   extractStudioLinked3dPassAssetRequirements,
   type StudioLinked3dPassAssetRow,
-} from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
+} from "@toonstudio/contracts/studio-linked-3d-pass-asset-fence";
 import {
   creatorDraftCollaborationRooms,
   creatorWorkAssets,

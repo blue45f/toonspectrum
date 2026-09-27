@@ -24,7 +24,7 @@ import type {
   CreatorAssetArtifactSetDescriptor,
   CreatorAssetDraftState,
   CreatorMarketplaceEntitlementGrant,
-} from "../../../../web/src/shared/lib/creator-asset-platform-contract";
+} from "@toonstudio/contracts/creator-asset-platform-contract";
 
 export const creatorMarketplaceDrafts = pgTable(
   "creator_marketplace_draft",

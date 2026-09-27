@@ -15,11 +15,11 @@ import {
 import {
   creatorMarketplaceLogicalPackIdFromPackageKeyHex,
   creatorMarketplacePackageIdentityPreimage,
-} from "../../../../web/src/shared/lib/creator-marketplace-cloud-library-contract";
+} from "@toonstudio/contracts/creator-marketplace-cloud-library-contract";
 import {
   CreatorMarketplacePackageModerationStateSchema,
   CreatorMarketplaceResourceKindSchema,
-} from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
+} from "@toonstudio/contracts/creator-marketplace-resource-contract";
 import { db, users } from "../../platform/database";
 import { creatorMarketplaceLibraryItems } from "../../platform/database/creator-marketplace-library.schema";
 import { creatorMarketplacePackageModeration } from "../../platform/database/creator-marketplace-package-moderation.schema";

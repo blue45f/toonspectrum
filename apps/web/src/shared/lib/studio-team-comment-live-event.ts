@@ -1,1 +1,1 @@
-export * from "../../domains/creator/contracts/studio-team-comment-live-event";
+export * from "@toonstudio/contracts/studio-team-comment-live-event";

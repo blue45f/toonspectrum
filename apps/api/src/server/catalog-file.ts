@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
 
-import type { Title } from "../../../web/src/shared/lib/types";
+import type { Title } from "@toonstudio/contracts/types";
 
 const CANDIDATES = ["apps/api/data/catalog.json.gz", "data/catalog.json.gz", "catalog.json.gz"];
 

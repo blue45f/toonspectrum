@@ -22,7 +22,7 @@ import type {
   FanCafePostList,
   FanCafeBoard,
   ReviewReply,
-} from "../../../web/src/shared/lib/types";
+} from "@toonstudio/contracts/types";
 import type { SQL } from "drizzle-orm";
 
 import { createSchemaReadinessCheck } from "./schema-readiness";

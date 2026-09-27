@@ -15,7 +15,7 @@ import {
 import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
-} from "../../../../web/src/shared/lib/studio-brush-r8-grain-asset-contract";
+} from "@toonstudio/contracts/studio-brush-r8-grain-asset-contract";
 import {
   parseStudioWorkAssetDescriptor,
   isStudioWorkAssetAdmissionOptedIn,
@@ -30,7 +30,7 @@ import {
   StudioWorkAssetManifestSchema,
   StudioWorkAssetReferenceSchema,
   serializeStudioWorkAssetDescriptorCanonical,
-} from "../../../../web/src/shared/lib/studio-work-asset-contract";
+} from "@toonstudio/contracts/studio-work-asset-contract";
 import {
   PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION,
   PrivateObjectReferenceSchema,
@@ -73,7 +73,7 @@ import type {
   StudioWorkAssetStorageReference,
   StudioWorkAssetWrite,
 } from "./studio-work-asset.repository";
-import type { StudioBrushR8TextureGrainSource } from "../../../../web/src/shared/lib/studio-brush-r8-grain-asset-contract";
+import type { StudioBrushR8TextureGrainSource } from "@toonstudio/contracts/studio-brush-r8-grain-asset-contract";
 import type {
   StudioWorkAssetDescriptor,
   StudioWorkAssetLayerLiftBatchMetadata,
@@ -82,7 +82,7 @@ import type {
   StudioWorkAssetIntrinsicImage,
   StudioWorkAssetReference,
   StudioWorkAssetType,
-} from "../../../../web/src/shared/lib/studio-work-asset-contract";
+} from "@toonstudio/contracts/studio-work-asset-contract";
 
 const GLB_HEADER_BYTES = 12;
 const GLB_CHUNK_HEADER_BYTES = 8;

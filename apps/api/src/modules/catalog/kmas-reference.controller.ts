@@ -1,6 +1,6 @@
 import { Controller, Get, Header, HttpException, Query } from "@nestjs/common";
 
-import { ReferenceError } from "../../../../web/src/shared/lib/kmas-reference";
+import { ReferenceError } from "@toonstudio/contracts/kmas-reference";
 import { searchKmasReferences } from "../../server/kmas-reference";
 
 @Controller()

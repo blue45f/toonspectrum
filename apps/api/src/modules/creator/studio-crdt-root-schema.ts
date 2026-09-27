@@ -1,23 +1,23 @@
-import { hasValidStudioBrushEngineProgramExtension, STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION } from "../../../../web/src/shared/lib/studio-brush-material-program-contract";
+import { hasValidStudioBrushEngineProgramExtension, STUDIO_BRUSH_ENGINE_PROGRAM_STROKE_VERSION } from "@toonstudio/contracts/studio-brush-material-program-contract";
 import * as Y from "yjs";
 
 import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
-} from "../../../../web/src/shared/lib/studio-brush-r8-grain-asset-contract";
-import { readStudioCrdtRasterDocument } from "../../../../web/src/shared/lib/studio-crdt-raster-document-contract";
+} from "@toonstudio/contracts/studio-brush-r8-grain-asset-contract";
+import { readStudioCrdtRasterDocument } from "@toonstudio/contracts/studio-crdt-raster-document-contract";
 import {
   STUDIO_FILTER_MASK_REFERENCE_EDIT_KEYS,
   isStudioFilterMaskReferenceProps,
   isStudioFilterMaskSurfaceId,
   isStudioFilterMaskSurfaceSpec,
-} from "../../../../web/src/shared/lib/studio-filter-mask-surface-contract";
+} from "@toonstudio/contracts/studio-filter-mask-surface-contract";
 import {
   STUDIO_INK_INPUT_V2_MAX_CONTACT_DIMENSION,
   STUDIO_INK_INPUT_V2_MAX_TIME_OFFSET_MS,
   isStudioInkInputContractV2,
   normalizeStudioInkInputContract,
-} from "../../../../web/src/shared/lib/studio-ink-input-contract";
+} from "@toonstudio/contracts/studio-ink-input-contract";
 import {
   STUDIO_WORK_ASSET_BOOLEAN_EDIT_KEYS,
   STUDIO_WORK_ASSET_REFERENCE_EDIT_KEYS,
@@ -27,10 +27,10 @@ import {
   StudioWorkAssetElementSchema,
   parseStudioWorkAssetStructuredEditValue,
   studioWorkAssetReferenceKey,
-} from "../../../../web/src/shared/lib/studio-work-asset-contract";
+} from "@toonstudio/contracts/studio-work-asset-contract";
 
-import type { StudioBrushR8TextureGrainSource } from "../../../../web/src/shared/lib/studio-brush-r8-grain-asset-contract";
-import type { StudioWorkAssetReference } from "../../../../web/src/shared/lib/studio-work-asset-contract";
+import type { StudioBrushR8TextureGrainSource } from "@toonstudio/contracts/studio-brush-r8-grain-asset-contract";
+import type { StudioWorkAssetReference } from "@toonstudio/contracts/studio-work-asset-contract";
 
 export const STUDIO_CRDT_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const STUDIO_CRDT_STROKE_SAMPLE_MAX_COUNT = 100_000;

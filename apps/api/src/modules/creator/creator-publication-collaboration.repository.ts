@@ -8,7 +8,7 @@ import {
   validateCreatorPublicationDirective,
   writeCreatorPublicationDirective,
   type CreatorPublicationDirective,
-} from "../../../../web/src/shared/lib/creator-publication-contract";
+} from "@toonstudio/contracts/creator-publication-contract";
 
 import { MembershipOperationsService } from "../membership-operations/membership-operations.service";
 import {

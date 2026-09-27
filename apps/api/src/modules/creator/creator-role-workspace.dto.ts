@@ -5,7 +5,7 @@ import {
   CREATOR_COLLABORATION_STATUSES,
   CREATOR_ROLE_IDS,
   CREATOR_SPECIALTY_IDS,
-} from "../../../../web/src/shared/lib/creator-role-contract";
+} from "@toonstudio/contracts/creator-role-contract";
 import {
   CREATOR_ACCOUNT_CONTEXTS,
   CREATOR_COLLABORATION_MODES,
@@ -16,7 +16,7 @@ import {
   CREATOR_ROLE_WORKSPACE_PRESETS,
   CREATOR_WORKSPACE_MODES,
   isCreatorRoleProjectKey,
-} from "../../../../web/src/shared/lib/creator-role-workspace-contract";
+} from "@toonstudio/contracts/creator-role-workspace-contract";
 
 const CreatorRoleIdSchema = z.enum(CREATOR_ROLE_IDS);
 const CreatorSpecialtyIdSchema = z.enum(CREATOR_SPECIALTY_IDS);

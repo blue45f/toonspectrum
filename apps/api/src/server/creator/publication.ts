@@ -14,11 +14,11 @@ import {
   writeCreatorPublicationDirective,
   type CreatorPublicationDirective,
   type CreatorPublicationValidationIssue,
-} from "../../../../web/src/shared/lib/creator-publication-contract";
+} from "@toonstudio/contracts/creator-publication-contract";
 import type {
   CreatorCommunityContentGroup,
   CreatorCommunityProvenance,
-} from "../../../../web/src/shared/lib/creator-community-publication-contract";
+} from "@toonstudio/contracts/creator-community-publication-contract";
 import {
   projectCreatorWorkDetailWithRelease,
   projectCreatorWorkListWithReleases,

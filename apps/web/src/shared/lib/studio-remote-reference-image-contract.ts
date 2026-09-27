@@ -1,1 +1,1 @@
-export * from "../../domains/creator/contracts/studio-remote-reference-image-contract";
+export * from "@toonstudio/contracts/studio-remote-reference-image-contract";

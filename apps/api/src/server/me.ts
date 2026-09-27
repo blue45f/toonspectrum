@@ -1,12 +1,12 @@
 import { and, eq, inArray, notLike } from "drizzle-orm";
 
-import { fromDb } from "../../../web/src/shared/lib/api-helpers";
-import { CREATOR_MARKETPLACE_SOCIAL_THREAD_PREFIX } from "../../../web/src/shared/lib/creator-marketplace-social-namespace";
+import { fromDb } from "@toonstudio/contracts/api-helpers";
+import { CREATOR_MARKETPLACE_SOCIAL_THREAD_PREFIX } from "@toonstudio/contracts/creator-marketplace-social-namespace";
 import {
   normalizeCreatorRoleProfile,
   type CreatorRoleProfile,
-} from "../../../web/src/shared/lib/creator-role-contract";
-import { parseRegionSettings, type RegionSettings } from "../../../web/src/shared/lib/region-settings";
+} from "@toonstudio/contracts/creator-role-contract";
+import { parseRegionSettings, type RegionSettings } from "@toonstudio/contracts/region-settings";
 import { findCreatorMarketplaceSocialInteractionIds } from "../platform/http/creator-marketplace-social-boundary";
 import { withDatabaseCapability } from "../platform/http/service-availability";
 import {

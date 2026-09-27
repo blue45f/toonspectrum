@@ -46,6 +46,241 @@
       "types": "./src/creator-publication-integrity.ts",
       "import": "./src/creator-publication-integrity.ts",
       "default": "./src/creator-publication-integrity.ts"
+    },
+    "./api-helpers": {
+      "types": "./src/api-helpers.ts",
+      "import": "./src/api-helpers.ts",
+      "default": "./src/api-helpers.ts"
+    },
+    "./recommend": {
+      "types": "./src/recommend.ts",
+      "import": "./src/recommend.ts",
+      "default": "./src/recommend.ts"
+    },
+    "./search": {
+      "types": "./src/search.ts",
+      "import": "./src/search.ts",
+      "default": "./src/search.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "import": "./src/types.ts",
+      "default": "./src/types.ts"
+    },
+    "./kmas-reference": {
+      "types": "./src/kmas-reference.ts",
+      "import": "./src/kmas-reference.ts",
+      "default": "./src/kmas-reference.ts"
+    },
+    "./creator-marketplace-semver": {
+      "types": "./src/creator-marketplace-semver.ts",
+      "import": "./src/creator-marketplace-semver.ts",
+      "default": "./src/creator-marketplace-semver.ts"
+    },
+    "./creator-marketplace-social-namespace": {
+      "types": "./src/creator-marketplace-social-namespace.ts",
+      "import": "./src/creator-marketplace-social-namespace.ts",
+      "default": "./src/creator-marketplace-social-namespace.ts"
+    },
+    "./public-share-policy": {
+      "types": "./src/public-share-policy.ts",
+      "import": "./src/public-share-policy.ts",
+      "default": "./src/public-share-policy.ts"
+    },
+    "./rate-limit": {
+      "types": "./src/rate-limit.ts",
+      "import": "./src/rate-limit.ts",
+      "default": "./src/rate-limit.ts"
+    },
+    "./region-settings": {
+      "types": "./src/region-settings.ts",
+      "import": "./src/region-settings.ts",
+      "default": "./src/region-settings.ts"
+    },
+    "./community-ui": {
+      "types": "./src/community-ui.ts",
+      "import": "./src/community-ui.ts",
+      "default": "./src/community-ui.ts"
+    },
+    "./creator-marketplace-starter-catalog": {
+      "types": "./src/creator-marketplace-starter-catalog.ts",
+      "import": "./src/creator-marketplace-starter-catalog.ts",
+      "default": "./src/creator-marketplace-starter-catalog.ts"
+    },
+    "./creator-marketplace-cloud-library-contract": {
+      "types": "./src/creator-marketplace-cloud-library-contract.ts",
+      "import": "./src/creator-marketplace-cloud-library-contract.ts",
+      "default": "./src/creator-marketplace-cloud-library-contract.ts"
+    },
+    "./creator-marketplace-resource-contract": {
+      "types": "./src/creator-marketplace-resource-contract.ts",
+      "import": "./src/creator-marketplace-resource-contract.ts",
+      "default": "./src/creator-marketplace-resource-contract.ts"
+    },
+    "./creator-marketplace-social-contract": {
+      "types": "./src/creator-marketplace-social-contract.ts",
+      "import": "./src/creator-marketplace-social-contract.ts",
+      "default": "./src/creator-marketplace-social-contract.ts"
+    },
+    "./creator-resource-workflow": {
+      "types": "./src/creator-resource-workflow.ts",
+      "import": "./src/creator-resource-workflow.ts",
+      "default": "./src/creator-resource-workflow.ts"
+    },
+    "./reference-assets": {
+      "types": "./src/reference-assets.ts",
+      "import": "./src/reference-assets.ts",
+      "default": "./src/reference-assets.ts"
+    },
+    "./studio-linked-3d-pass-asset-fence": {
+      "types": "./src/studio-linked-3d-pass-asset-fence.ts",
+      "import": "./src/studio-linked-3d-pass-asset-fence.ts",
+      "default": "./src/studio-linked-3d-pass-asset-fence.ts"
+    },
+    "./creator-publication-contract": {
+      "types": "./src/creator-publication-contract.ts",
+      "import": "./src/creator-publication-contract.ts",
+      "default": "./src/creator-publication-contract.ts"
+    },
+    "./creator-asset-contract": {
+      "types": "./src/creator-asset-contract.ts",
+      "import": "./src/creator-asset-contract.ts",
+      "default": "./src/creator-asset-contract.ts"
+    },
+    "./creator-community-publication-contract": {
+      "types": "./src/creator-community-publication-contract.ts",
+      "import": "./src/creator-community-publication-contract.ts",
+      "default": "./src/creator-community-publication-contract.ts"
+    },
+    "./studio-raster-asset-contract": {
+      "types": "./src/studio-raster-asset-contract.ts",
+      "import": "./src/studio-raster-asset-contract.ts",
+      "default": "./src/studio-raster-asset-contract.ts"
+    },
+    "./studio-work-asset-contract": {
+      "types": "./src/studio-work-asset-contract.ts",
+      "import": "./src/studio-work-asset-contract.ts",
+      "default": "./src/studio-work-asset-contract.ts"
+    },
+    "./studio-brush-material-program-contract": {
+      "types": "./src/studio-brush-material-program-contract.ts",
+      "import": "./src/studio-brush-material-program-contract.ts",
+      "default": "./src/studio-brush-material-program-contract.ts"
+    },
+    "./studio-brush-r8-grain-asset-contract": {
+      "types": "./src/studio-brush-r8-grain-asset-contract.ts",
+      "import": "./src/studio-brush-r8-grain-asset-contract.ts",
+      "default": "./src/studio-brush-r8-grain-asset-contract.ts"
+    },
+    "./studio-crdt-raster-ops": {
+      "types": "./src/studio-crdt-raster-ops.ts",
+      "import": "./src/studio-crdt-raster-ops.ts",
+      "default": "./src/studio-crdt-raster-ops.ts"
+    },
+    "./studio-crdt-raster-compaction": {
+      "types": "./src/studio-crdt-raster-compaction.ts",
+      "import": "./src/studio-crdt-raster-compaction.ts",
+      "default": "./src/studio-crdt-raster-compaction.ts"
+    },
+    "./studio-filter-mask-surface-contract": {
+      "types": "./src/studio-filter-mask-surface-contract.ts",
+      "import": "./src/studio-filter-mask-surface-contract.ts",
+      "default": "./src/studio-filter-mask-surface-contract.ts"
+    },
+    "./studio-ink-input-contract": {
+      "types": "./src/studio-ink-input-contract.ts",
+      "import": "./src/studio-ink-input-contract.ts",
+      "default": "./src/studio-ink-input-contract.ts"
+    },
+    "./studio-live-auth-ticket": {
+      "types": "./src/studio-live-auth-ticket.ts",
+      "import": "./src/studio-live-auth-ticket.ts",
+      "default": "./src/studio-live-auth-ticket.ts"
+    },
+    "./studio-crdt-binary-envelope": {
+      "types": "./src/studio-crdt-binary-envelope.ts",
+      "import": "./src/studio-crdt-binary-envelope.ts",
+      "default": "./src/studio-crdt-binary-envelope.ts"
+    },
+    "./studio-live-lock-resource": {
+      "types": "./src/studio-live-lock-resource.ts",
+      "import": "./src/studio-live-lock-resource.ts",
+      "default": "./src/studio-live-lock-resource.ts"
+    },
+    "./studio-team-comment-live-event": {
+      "types": "./src/studio-team-comment-live-event.ts",
+      "import": "./src/studio-team-comment-live-event.ts",
+      "default": "./src/studio-team-comment-live-event.ts"
+    },
+    "./studio-remote-reference-image-contract": {
+      "types": "./src/studio-remote-reference-image-contract.ts",
+      "import": "./src/studio-remote-reference-image-contract.ts",
+      "default": "./src/studio-remote-reference-image-contract.ts"
+    },
+    "./studio-voice-ice-policy-contract": {
+      "types": "./src/studio-voice-ice-policy-contract.ts",
+      "import": "./src/studio-voice-ice-policy-contract.ts",
+      "default": "./src/studio-voice-ice-policy-contract.ts"
+    },
+    "./collection-contract": {
+      "types": "./src/collection-contract.ts",
+      "import": "./src/collection-contract.ts",
+      "default": "./src/collection-contract.ts"
+    },
+    "./creator-asset-platform-contract": {
+      "types": "./src/creator-asset-platform-contract.ts",
+      "import": "./src/creator-asset-platform-contract.ts",
+      "default": "./src/creator-asset-platform-contract.ts"
+    },
+    "./revision-comparison-projection": {
+      "types": "./src/revision-comparison-projection.ts",
+      "import": "./src/revision-comparison-projection.ts",
+      "default": "./src/revision-comparison-projection.ts"
+    },
+    "./strict-raster-image-inspector": {
+      "types": "./src/strict-raster-image-inspector.ts",
+      "import": "./src/strict-raster-image-inspector.ts",
+      "default": "./src/strict-raster-image-inspector.ts"
+    },
+    "./creator-role-contract": {
+      "types": "./src/creator-role-contract.ts",
+      "import": "./src/creator-role-contract.ts",
+      "default": "./src/creator-role-contract.ts"
+    },
+    "./studio-live-jam-scope": {
+      "types": "./src/studio-live-jam-scope.ts",
+      "import": "./src/studio-live-jam-scope.ts",
+      "default": "./src/studio-live-jam-scope.ts"
+    },
+    "./taxonomy": {
+      "types": "./src/taxonomy.ts",
+      "import": "./src/taxonomy.ts",
+      "default": "./src/taxonomy.ts"
+    },
+    "./creator-role-workspace-contract": {
+      "types": "./src/creator-role-workspace-contract.ts",
+      "import": "./src/creator-role-workspace-contract.ts",
+      "default": "./src/creator-role-workspace-contract.ts"
+    },
+    "./studio-crdt-raster-document-contract": {
+      "types": "./src/studio-crdt-raster-document-contract.ts",
+      "import": "./src/studio-crdt-raster-document-contract.ts",
+      "default": "./src/studio-crdt-raster-document-contract.ts"
+    },
+    "./studio-codec-provider-contract": {
+      "types": "./src/studio-codec-provider-contract.ts",
+      "import": "./src/studio-codec-provider-contract.ts",
+      "default": "./src/studio-codec-provider-contract.ts"
+    },
+    "./studio-product-codec-certification": {
+      "types": "./src/studio-product-codec-certification.ts",
+      "import": "./src/studio-product-codec-certification.ts",
+      "default": "./src/studio-product-codec-certification.ts"
+    },
+    "./studio-ai-provenance": {
+      "types": "./src/studio-ai-provenance.ts",
+      "import": "./src/studio-ai-provenance.ts",
+      "default": "./src/studio-ai-provenance.ts"
     }
   }
 }

@@ -1,1 +1,1 @@
-export * from "../../domains/creator/contracts/studio-crdt-raster-document-contract";
+export * from "@toonstudio/contracts/studio-crdt-raster-document-contract";

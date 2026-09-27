@@ -1,7 +1,7 @@
 import {
   encodeStudioCrdtBinaryEnvelope,
   fragmentStudioCrdtBinarySyncEnvelope,
-} from "../../../../web/src/shared/lib/studio-crdt-binary-envelope";
+} from "@toonstudio/contracts/studio-crdt-binary-envelope";
 
 import { StudioCrdtService } from "./studio-crdt.service";
 import {

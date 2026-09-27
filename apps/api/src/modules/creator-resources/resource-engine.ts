@@ -1,14 +1,14 @@
-import { providerAvailability, upstreamRetrySeconds } from "../../../../web/src/shared/lib/creator-resource-workflow";
+import { providerAvailability, upstreamRetrySeconds } from "@toonstudio/contracts/creator-resource-workflow";
 import {
   httpsUrl, isProvider, parseDeadline, parseResource, recordOf, textOf,
 } from "@toonstudio/core/creator-resources";
 import {
   isReferenceSearchField,
   MET_DEPARTMENT_IDS,
-} from "../../../../web/src/shared/lib/reference-assets";
+} from "@toonstudio/contracts/reference-assets";
 
 import type { CreatorResource, ResourceProvider, ResourceSearchResult } from "@toonstudio/core/creator-resources";
-import type { ReferenceSearchField } from "../../../../web/src/shared/lib/reference-assets";
+import type { ReferenceSearchField } from "@toonstudio/contracts/reference-assets";
 
 import { ambientCgSearch, validAmbientCgShape } from "./ambientcg-provider";
 import { googleBooksSearch, validGoogleBooksShape } from "./google-books-provider";

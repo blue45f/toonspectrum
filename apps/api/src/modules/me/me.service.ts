@@ -5,9 +5,9 @@ import {
   normalizeCollectionClientId,
   normalizeCollectionEmoji,
   normalizeCollectionName,
-} from "../../../../web/src/shared/lib/collection-contract";
-import { parseCreatorRoleProfileInput } from "../../../../web/src/shared/lib/creator-role-contract";
-import { parseRegionSettings } from "../../../../web/src/shared/lib/region-settings";
+} from "@toonstudio/contracts/collection-contract";
+import { parseCreatorRoleProfileInput } from "@toonstudio/contracts/creator-role-contract";
+import { parseRegionSettings } from "@toonstudio/contracts/region-settings";
 import { db, ratings, reviews, reviewLikes, reads, subscriptions } from "../../platform/database";
 import { deleteMyAccount, loadMe, updateProfile, type UpdateProfileInput } from "../../server/me";
 import type { MembershipRewardService } from "../membership-wallet/membership-wallet.tokens";
@@ -20,7 +20,7 @@ export {
   MAX_COLLECTION_NAME_LENGTH,
   normalizeCollectionEmoji,
   normalizeCollectionName,
-} from "../../../../web/src/shared/lib/collection-contract";
+} from "@toonstudio/contracts/collection-contract";
 
 type MergeMapValue = Record<string, unknown>;
 

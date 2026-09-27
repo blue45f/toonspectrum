@@ -20,7 +20,7 @@ import {
   isStudioRasterAssetAdmissionOptedIn,
   isStudioRasterAssetReferenceStoredExactly,
   parseStudioRasterStoredReference,
-} from "../../../../web/src/shared/lib/studio-raster-asset-contract";
+} from "@toonstudio/contracts/studio-raster-asset-contract";
 
 import {
   STUDIO_RASTER_ASSET_REPOSITORY,
@@ -40,11 +40,11 @@ import type {
 } from "./studio-raster-asset.repository";
 import type {
   StudioRasterAssetReference,
-} from "../../../../web/src/shared/lib/studio-crdt-raster-ops";
+} from "@toonstudio/contracts/studio-crdt-raster-ops";
 import type {
   StudioRasterAssetManifest,
   StudioRasterStorageMediaType,
-} from "../../../../web/src/shared/lib/studio-raster-asset-contract";
+} from "@toonstudio/contracts/studio-raster-asset-contract";
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] as const;
 const PNG_KNOWN_CRITICAL_CHUNKS = new Set(["IHDR", "PLTE", "IDAT", "IEND"]);

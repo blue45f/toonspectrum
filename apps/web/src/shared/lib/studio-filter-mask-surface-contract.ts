@@ -1,1 +1,1 @@
-export * from "../../domains/creator/contracts/studio-filter-mask-surface-contract";
+export * from "@toonstudio/contracts/studio-filter-mask-surface-contract";

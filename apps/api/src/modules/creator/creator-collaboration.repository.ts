@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   assertStudioLinked3dPassAssetRows,
   extractStudioLinked3dPassAssetRequirements,
-} from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
+} from "@toonstudio/contracts/studio-linked-3d-pass-asset-fence";
 import {
   publicCreatorRoleProfile,
   type PublicCreatorRoleProfile,

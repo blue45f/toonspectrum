@@ -1,1 +1,1 @@
-export * from "../../domains/creator/contracts/studio-voice-ice-policy-contract";
+export * from "@toonstudio/contracts/studio-voice-ice-policy-contract";

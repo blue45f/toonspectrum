@@ -6,19 +6,19 @@ import * as Y from "yjs";
 import {
   normalizeStudioBrushR8TextureGrainSource,
   serializeStudioBrushR8TextureGrainSourceCanonical,
-} from "../../../../web/src/shared/lib/studio-brush-r8-grain-asset-contract";
+} from "@toonstudio/contracts/studio-brush-r8-grain-asset-contract";
 import {
   extractStudioLinked3dPassAssetRequirements,
   isStudioLinked3dPassServerAssetId,
   type CreatorWorkLinked3dJsonEnvelope,
-} from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
+} from "@toonstudio/contracts/studio-linked-3d-pass-asset-fence";
 import {
   STUDIO_WORK_ASSET_CONTRACT_VERSION,
   STUDIO_WORK_ASSET_MAX_ASSETS_PER_WORK,
   STUDIO_WORK_ASSET_MAX_TOMBSTONES_PER_WORK,
   STUDIO_WORK_ASSET_MAX_TOTAL_BYTES_PER_WORK,
   serializeStudioWorkAssetDescriptorCanonical,
-} from "../../../../web/src/shared/lib/studio-work-asset-contract";
+} from "@toonstudio/contracts/studio-work-asset-contract";
 import {
   creatorAssetStorageObjects,
   creatorWorkAssetStorageReferences,
@@ -61,7 +61,7 @@ import type {
   StudioWorkAssetIntrinsicImage,
   StudioWorkAssetManifest,
   StudioWorkAssetType,
-} from "../../../../web/src/shared/lib/studio-work-asset-contract";
+} from "@toonstudio/contracts/studio-work-asset-contract";
 
 export const STUDIO_WORK_ASSET_REPOSITORY = Symbol("STUDIO_WORK_ASSET_REPOSITORY");
 

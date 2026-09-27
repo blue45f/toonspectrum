@@ -1,13 +1,13 @@
 import {
   CREATOR_MARKETPLACE_MAX_RELEASE_ORDINAL,
-} from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
+} from "@toonstudio/contracts/creator-marketplace-resource-contract";
 import {
   compareCreatorMarketplaceSemver,
   isCreatorMarketplaceSemver,
   normalizeCreatorMarketplaceLegacySemver,
-} from "../../../../web/src/shared/lib/creator-marketplace-semver";
+} from "@toonstudio/contracts/creator-marketplace-semver";
 
-export { CREATOR_MARKETPLACE_MAX_RELEASE_ORDINAL } from "../../../../web/src/shared/lib/creator-marketplace-resource-contract";
+export { CREATOR_MARKETPLACE_MAX_RELEASE_ORDINAL } from "@toonstudio/contracts/creator-marketplace-resource-contract";
 
 export type CreatorMarketplaceReleaseAdmission =
   | Readonly<{

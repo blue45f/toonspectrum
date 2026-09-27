@@ -14,13 +14,13 @@ import {
 
 import {
   CREATOR_ASSET_LEGACY_FULL_MAX_PAGE_SIZE,
-} from "../../../../web/src/shared/lib/creator-asset-contract";
+} from "@toonstudio/contracts/creator-asset-contract";
 import {
   parseCreatorCommunityContentGroup,
   parseCreatorCommunityProvenance,
-} from "../../../../web/src/shared/lib/creator-community-publication-contract";
-import { rateLimit } from "../../../../web/src/shared/lib/rate-limit";
-import { StudioLinked3dPassAssetFenceError } from "../../../../web/src/shared/lib/studio-linked-3d-pass-asset-fence";
+} from "@toonstudio/contracts/creator-community-publication-contract";
+import { rateLimit } from "@toonstudio/contracts/rate-limit";
+import { StudioLinked3dPassAssetFenceError } from "@toonstudio/contracts/studio-linked-3d-pass-asset-fence";
 import { StudioRealtimeRevocationService } from "../../platform/adapters/studio-realtime-revocation/studio-realtime-revocation.client";
 import {
   MEMBERSHIP_REWARD_SERVICE,

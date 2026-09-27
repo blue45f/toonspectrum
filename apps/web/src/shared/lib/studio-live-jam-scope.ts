@@ -1,1 +1,1 @@
-export * from "../../domains/creator/contracts/studio-live-jam-scope";
+export * from "@toonstudio/contracts/studio-live-jam-scope";

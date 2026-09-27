@@ -81,6 +81,16 @@ export class StudioPendingStrokeAdmissionQueue {
     }
   }
 
+  /** History/navigation boundaries invalidate every queued admission from the previous snapshot. */
+  cancelAll(reason: string): void {
+    const queued = [...this.entries];
+    for (const entry of queued) this.cancel(entry.stroke.id, reason);
+    if (this.timer !== null && this.entries.length === 0) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+
   /** 테스트와 준비 상태 변경 알림에서도 동일한 실제 전이를 호출한다. */
   pump(): void {
     if (this.disposed || this.attemptingId !== null) return;

@@ -1,9 +1,9 @@
 import {
   normalizeReferenceResponse, parseReferenceQuery, REFERENCE_FIELDS,
   REFERENCE_PAGE_SIZE, ReferenceError, referenceSearchParams,
-} from "../../../web/src/shared/lib/kmas-reference";
+} from "@toonstudio/contracts/kmas-reference";
 
-import type { ReferenceResult } from "../../../web/src/shared/lib/kmas-reference";
+import type { ReferenceResult } from "@toonstudio/contracts/kmas-reference";
 
 export const REFERENCE_CACHE_TTL_MS = 30 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 128;
