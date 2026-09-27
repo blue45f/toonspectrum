@@ -79,8 +79,12 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     const caller = await compiledPackage(
       root,
       "apps/api/src/main.js",
-      '"use strict";\n',
+      '"use strict"; require("@toonstudio/contracts/avatar"); require("@toonstudio/contracts/studio-live-auth-ticket");\n',
     );
+    await compiledPackage(root, "packages/contracts/src/avatar.js", 'module.exports = require("@toonstudio/contracts/affiliate");\n');
+    await compiledPackage(root, "packages/contracts/src/affiliate.js", 'module.exports = { affiliate: "ready" };\n');
+    await compiledPackage(root, "packages/contracts/src/studio-live-auth-ticket.js", 'module.exports = { ticket: "ready" };\n');
+    await compiledPackage(root, "packages/contracts/src/private-internal.js", "module.exports = {};\n");
 
     const optionalModelEntries = ["work-session", "work-session-evidence", "pinned-review-share", "review-delivery", "review-voice-note", "world-publication", "world-acoustic", "world-conversation"];
     for (const name of optionalModelEntries) {
@@ -99,6 +103,9 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     ]);
 
     const requireFromApi = createRequire(caller);
+    assert.deepEqual(requireFromApi("@toonstudio/contracts/avatar"), { affiliate: "ready" });
+    assert.deepEqual(requireFromApi("@toonstudio/contracts/studio-live-auth-ticket"), { ticket: "ready" });
+    assert.throws(() => requireFromApi("@toonstudio/contracts/private-internal"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
     for (const name of ["production-workspace", "operation-policy", "creator-publication-integrity"]) {
       assert.deepEqual(requireFromApi(`@toonstudio/contracts/${name}`), { contract: name });
     }
@@ -172,6 +179,10 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       "./creator-publication-integrity.js",
     );
     assert.equal("main" in contractsPackageJson, false);
+    assert.equal(contractsPackageJson.exports["./avatar"], "./avatar.js");
+    assert.equal(contractsPackageJson.exports["./affiliate"], "./affiliate.js");
+    assert.equal(contractsPackageJson.exports["./studio-live-auth-ticket"], "./studio-live-auth-ticket.js");
+    assert.equal("./studio-ink-envelope-webcrypto-attestation" in contractsPackageJson.exports, false);
     assert.equal(contractsPackageJson.exports["./studio-crdt-raster-ops"], "./studio-crdt-raster-ops.js");
     assert.equal("./private-helper" in contractsPackageJson.exports, false);
     assert.equal("./types" in contractsPackageJson.exports, false);
@@ -184,6 +195,25 @@ test("stages workspace packages inside the emitted API boundary", async () => {
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+test("이관한 계약을 require하지만 컴파일 출력이 없으면 패키징을 거부한다", async () => {
+  const root = await mkdtemp(join(tmpdir(), "toonstudio-api-contract-missing-"));
+  try {
+    await compiledProductionContracts(root);
+    await compiledPackage(root, "packages/contracts/src/security/csrf.js", "module.exports = {};\n");
+    await compiledPackage(root, "apps/api/src/main.js", 'require("@toonstudio/contracts/avatar");\n');
+    await assert.rejects(stageApiWorkspaceRuntime(root), /packages\/contracts\/src\/avatar\.js/u);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("컴파일된 파일이 있어도 정식 exports에 없는 계약을 공개하지 않는다", async () => {
+  const root = await mkdtemp(join(tmpdir(), "toonstudio-api-contract-private-"));
+  try {
+    await compiledPackage(root, "packages/contracts/src/private-internal.js", "module.exports = {};\n");
+    await compiledPackage(root, "apps/api/src/main.js", 'require("@toonstudio/contracts/private-internal");\n');
+    await assert.rejects(stageApiWorkspaceRuntime(root), /API 계약 내보내기를 확인할 수 없습니다: @toonstudio\/contracts\/private-internal/u);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });
 
 test("fails when an exported workspace subpath was not compiled", async () => {

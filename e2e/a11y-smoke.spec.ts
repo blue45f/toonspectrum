@@ -100,6 +100,27 @@ for (const route of DESKTOP_A11Y_ROUTES) {
 test.describe("mobile shell accessibility", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
+  test("페이지 검색 결과는 44px 터치 영역으로 목적지에 이동한다", async ({ page }) => {
+    await page.goto("/about/technology", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('.route-stage[data-route-state="ready"]')).toBeVisible();
+    await expect(page.locator("[data-route-loading-fallback]")).toHaveCount(0);
+    await page.locator(".site-header__utilities > button").first().click();
+    const dialog = page.getByRole("dialog");
+    await dialog.locator("#command-palette-mode-pages").click();
+    await dialog.getByRole("combobox").fill("배우기");
+    const result = dialog.locator('[cmdk-item][data-value="page-nav-learn"]');
+    await expect(result).toBeVisible();
+    const target = await result.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return { width: bounds.width, height: bounds.height };
+    });
+    expect(target.width).toBeGreaterThanOrEqual(44);
+    expect(target.height).toBeGreaterThanOrEqual(44);
+    await result.click();
+    await expect(page).toHaveURL(/\/learn$/u);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
   for (const route of MOBILE_A11Y_ROUTES) {
     test(`${route} mobile has no serious or critical automated accessibility violations`, async ({ page }) => {
       await assertNoBlockingViolations(page, route);

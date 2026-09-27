@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 import { measureSourceLayout, repositoryFiles, validateSourceLayout } from "./validate-source-layout.mjs";
 

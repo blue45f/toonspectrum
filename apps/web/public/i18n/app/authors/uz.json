@@ -11,6 +11,6 @@
   "authors.works": "ishlar",
   "authors.views": "koʻrinish",
   "authors.pencafe": "Yaratuvchi fan kafesi",
-  "authors.stats": "ZZLBRACE jami}mualliflaridan}ko‘rsatilgan ZZLBRACE",
+  "authors.stats": "{total}mualliflaridan ko‘rsatilgan {shown}",
   "authors.noName": "Yaratuvchi"
 }

@@ -6,36 +6,40 @@ const source = readFileSync(
   new URL("./verify-studio-brushes.mts", import.meta.url),
   "utf8",
 );
+const readiness = readFileSync(
+  new URL("./lib/studio-drawing-readiness.ts", import.meta.url),
+  "utf8",
+);
 
 describe("Studio brush browser beta admission", () => {
-  it("dismisses the beta notice through the stable product selector before transient chrome", () => {
-    expect(source).toContain(
-      'page.locator(\'[data-studio-beta-notice="true"]\')',
+  it("브러시 검증은 문서별 안내 닫기를 소유한 공통 준비 경계를 호출한다", () => {
+    expect(source).toContain('} from "./lib/studio-drawing-readiness";');
+    const start = source.indexOf("async function dismissTransientChrome");
+    const end = source.indexOf("async function clearRecoveryNoticeIfPresent", start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const transientChrome = source.slice(start, end);
+    expect(transientChrome).toContain(
+      "await prepareStudioDrawingUi(page, (timeoutMs) => clearRecoveryNoticeIfPresent(page, timeoutMs))",
     );
-    expect(source).toContain(
-      '[data-studio-beta-notice-acknowledge="true"]',
-    );
-    expect(source).toContain(
-      'acknowledge.click({ timeout: 30_000, noWaitAfter: true })',
-    );
-    expect(source).toContain(
-      'notice.waitFor({ state: "hidden", timeout: 30_000 })',
-    );
+    expect(transientChrome).toContain("await waitForStudioDrawingReady(page)");
+    expect(source).toContain("await dismissTransientChrome(page);");
+    expect(readiness).toContain("documentReset || !welcomeDismissed");
+  });
 
-    const transientChrome = source.indexOf(
-      "async function dismissTransientChrome",
-    );
-    const admission = source.indexOf(
-      "await acknowledgeStudioBetaNoticeIfPresent(page);",
-      transientChrome,
-    );
-    const quickstart = source.indexOf(
-      "const quickstart = page.locator",
-      transientChrome,
-    );
-
-    expect(transientChrome).toBeGreaterThan(-1);
-    expect(admission).toBeGreaterThan(transientChrome);
-    expect(quickstart).toBeGreaterThan(admission);
+  it("베타 안내의 안정된 선택자와 정상 닫기, 후속 안내 순서 및 가시성 재검사를 보존한다", () => {
+    expect(readiness).toContain('page.locator(\'[data-studio-beta-notice="true"]\')');
+    expect(readiness).toContain('[data-studio-beta-notice-acknowledge="true"]');
+    expect(readiness).toContain("await close.click({ timeout: Math.min(1_000, remaining) })");
+    expect(readiness).not.toMatch(/force:\s*true/u);
+    const beta = readiness.indexOf("{ surface: beta,");
+    const welcome = readiness.indexOf("{ surface: welcome,");
+    const quickstart = readiness.indexOf("{ surface: quickstart,");
+    expect(beta).toBeGreaterThan(-1);
+    expect(welcome).toBeGreaterThan(beta);
+    expect(quickstart).toBeGreaterThan(welcome);
+    expect(readiness).toContain("if (!(await surface.isVisible())) continue;");
+    expect(readiness).toContain("Promise.all(overlays.map(({ surface }) => surface.isVisible()))");
+    expect(readiness).toContain("!blocked.some(Boolean)");
   });
 });

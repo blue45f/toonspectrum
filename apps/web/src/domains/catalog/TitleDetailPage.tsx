@@ -7,6 +7,8 @@ import { Bookmark, Eye, Heart, Layers, MapPin, Star } from "lucide-react";
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 
+import { TitleDetailBreadcrumb } from "./TitleDetailBreadcrumb";
+
 
 import type { SeedReview, Title } from "@/shared/lib/types";
 
@@ -148,6 +150,7 @@ export function TitleDetailPage() {
   if (loading) {
     return (
       <Container size="wide" className="relative py-8 lg:py-10">
+        <TitleDetailBreadcrumb />
         <div className="grid gap-8 lg:grid-cols-[19rem_1fr]">
           <aside className="flex flex-col gap-4">
             <div className="skeleton aspect-[3/4] rounded-2xl" />
@@ -167,12 +170,16 @@ export function TitleDetailPage() {
   }
 
   if (notFound || !data) {
-    if (!error) return <NotFoundPage />;
+    if (!error) return <>
+      <Container size="wide" className="pt-8 lg:pt-10"><TitleDetailBreadcrumb /></Container>
+      <NotFoundPage />
+    </>;
   }
 
   if (error || !data) {
     return (
       <Container size="wide" className="py-10">
+        <TitleDetailBreadcrumb />
         <ErrorState title={translateCurrentStaticSourceText("domains.catalog.TitleDetailPage", "ko", "작품 상세를 불러오지 못했습니다.")} message={error} onRetry={reload} />
       </Container>
     );
@@ -198,6 +205,7 @@ export function TitleDetailPage() {
 
   return (
     <Container size="wide" className="relative py-8 lg:py-10">
+      <TitleDetailBreadcrumb title={title.title} />
       {title.coverImage && (
         <div
           aria-hidden

@@ -89,6 +89,8 @@ export function readStudioCuttoonEditorSource(): string {
     resolve(baseDir, "../live/studio-collaboration-wiring.ts"),
     resolve(baseDir, "../studio-collaboration-lock-copy.ts"),
     resolve(baseDir, "./studio-deferred-stroke-commit.ts"),
+    // 분리된 라이브 표면의 입장·거절 조건도 기존 경계 검증에 포함한다.
+    resolve(baseDir, "./studio-live-surface-start.ts"),
     resolve(baseDir, "./studio-asset-library-mutations.ts"),
     resolve(baseDir, "../studio-page-shortcut-dispatcher.ts"),
     resolve(baseDir, "../studio-page-comments-runtime.ts"),

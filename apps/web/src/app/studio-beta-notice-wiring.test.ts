@@ -21,9 +21,15 @@ describe("Studio beta notice wiring", () => {
     );
   });
 
-  it("requires acknowledgement and versions the persistent notice", () => {
-    expect(gate).toContain("onEscapeKeyDown={(event) => event.preventDefault()}");
-    expect(gate).toContain("onPointerDownOutside={(event) => event.preventDefault()}");
+  it("keeps explicit acknowledgement and versioned risks without trapping canvas interaction", () => {
+    expect(gate).toContain('role="region"');
+    expect(gate).toContain('aria-live="polite"');
+    expect(gate).toContain('className="pointer-events-none fixed');
+    expect(gate).toContain('aria-expanded={detailsOpen}');
+    expect(gate).toContain('onClick={acknowledge}');
+    expect(gate).toContain('acknowledgeStudioBetaNotice();');
+    expect(gate).not.toContain('aria-modal');
+    expect(gate).not.toContain('role="dialog"');
     expect(gate).toContain("저장 데이터 초기화 가능");
     expect(gate).toContain("기능·정책 수시 변경");
     expect(gate).toContain("중요한 작업은 별도 백업");

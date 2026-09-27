@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "లేయర్ {count}",
   "studio.toolsCompanion.review.section.comments": "వ్యాఖ్య {count}",
   "studio.toolsCompanion.review.section.history": "రికార్డ్ {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE పేజీలేబుల్}·{ఎంపికలేబుల్ ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "తనిఖీ కన్సోల్",
   "studio.toolsCompanion.review.truncatedComments": "మరియు {count} వ్యాఖ్యలు",
   "studio.toolsCompanion.review.truncatedLayers": "{count} పొరలు",

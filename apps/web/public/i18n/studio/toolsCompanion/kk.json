@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Қабат {count}",
   "studio.toolsCompanion.review.section.comments": "Пікір {count}",
   "studio.toolsCompanion.review.section.history": "Жазба {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE бетіЖапсырма}·{таңдауЖапсырма ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "тексеру консолі",
   "studio.toolsCompanion.review.truncatedComments": "және {count} пікірлер",
   "studio.toolsCompanion.review.truncatedLayers": "{count} қабаттар",

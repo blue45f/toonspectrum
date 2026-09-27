@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { compileCreatorResourceCases } from "./lib/compile-creator-resource-cases.mjs";
+import { compileCreatorResourceCases, creatorResourcePackageSources } from "./lib/compile-creator-resource-cases.mjs";
 
 const require = createRequire(import.meta.url);
 const temporary = mkdtempSync(path.join(tmpdir(), "creator-browser-"));
@@ -23,14 +23,17 @@ try {
     }
   }
   collect(temporary);
+  const packageModules = Object.fromEntries(Object.entries(creatorResourcePackageSources)
+    .map(([specifier, source]) => [specifier, source.replace(/\.ts$/, ".js")]));
   const boot = `const sources=${JSON.stringify(sources).replaceAll("<", "\\u003c")};
+    const packageModules=${JSON.stringify(packageModules)};
     const cache={};
     function load(name){
       if(cache[name])return cache[name].exports;
       if(!sources[name])throw new Error('Unknown module '+name);
       const mod={exports:{}};cache[name]=mod;
       const require=(request)=>{
-        if(request==='@toonstudio/core/creator-resources')return load('packages/core/src/creator-resources.js');
+        if(Object.hasOwn(packageModules,request))return load(packageModules[request]);
         if(request==='fast-xml-parser')return {XMLParser:class{parse(){throw new Error('XML provider parsing is outside the browser workspace harness');}}};
         const parts=name.split('/');parts.pop();for(const part of request.split('/')){if(part==='..')parts.pop();else if(part!=='.')parts.push(part);}return load(parts.join('/')+'.js');
       };

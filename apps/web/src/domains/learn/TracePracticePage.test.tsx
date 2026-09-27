@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import { TracePracticePage } from "./TracePracticePage";
@@ -18,9 +18,10 @@ describe("trace practice", () => {
     expect(screen.getByText(/화면 공유 중이라면/)).toBeTruthy();
   });
 
-  it("is reachable from the existing /learn wildcard without a duplicate router", () => {
+  it("is reachable from the existing /learn wildcard without a duplicate router", async () => {
     render(<MemoryRouter initialEntries={["/learn/trace"]}><LearnPage /></MemoryRouter>);
     expect(screen.getByRole("heading", { name: /참고 이미지는 가이드로/ })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "따라 그리기" }).getAttribute("aria-current")).toBe("page");
+    fireEvent.click(screen.getByText("따라 그리기", { selector: "summary span" }));
+    expect((await screen.findByRole("link", { name: "따라 그리기" })).getAttribute("aria-current")).toBe("page");
   });
 });

@@ -74,8 +74,8 @@
   "search.explorer.unit.itemSuffix": "les articles",
   "search.explorer.time.noData": "Aucune mise à jour",
   "search.explorer.time.justNow": "Récemment mis à jour",
-  "search.explorer.time.minutesAgo": "ZZPLACEHOLDERil y a 0ZZ millions",
-  "search.explorer.time.hoursAgo": "ZZPLACEHOLDERil y a 0ZZh",
+  "search.explorer.time.minutesAgo": "il y a {count} millions",
+  "search.explorer.time.hoursAgo": "il y a {count}h",
   "search.explorer.time.daysAgo": "Il y a {count}j",
   "search.explorer.loadMore": "Charger plus"
 }

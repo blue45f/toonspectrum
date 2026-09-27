@@ -136,7 +136,7 @@ const STYLE_PROFILES: Record<NaturalSpeechStyle, NaturalSpeechProfile> = {
 };
 
 export const DEFAULT_KOREAN_PRONUNCIATIONS: readonly NaturalPronunciation[] = [
-  { source: "ToonStudio", spoken: "툰 스펙트럼" },
+  { source: "ToonSpectrum", spoken: "툰 스펙트럼" },
   { source: "ToonStudio", spoken: "툰 스튜디오" },
   { source: "UI/UX", spoken: "유 아이, 유 엑스" },
   { source: "WebM", spoken: "웹 엠" },

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Lag {count}",
   "studio.toolsCompanion.review.section.comments": "Kommenter {count}",
   "studio.toolsCompanion.review.section.history": "Ta opp {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE sideEtikett}·{utvalgEtikett ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "inspeksjonskonsoll",
   "studio.toolsCompanion.review.truncatedComments": "og {count} kommentarer",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lag",

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { canonicalSitePath } from "@/shared/lib/site-route-authority";
+
 import { activePublicJourney, nextPublicDestinations, PUBLIC_JOURNEY } from "./public-site-destinations";
 
 describe("connected public destinations", () => {
@@ -7,6 +9,8 @@ describe("connected public destinations", () => {
     ["/references", "discover"], ["/research/assets/", "discover"], ["/learn/lessons/panels", "learn"],
     ["/guide", "learn"], ["/market/resource/brush", "market"], ["/create/work/a", "share"],
     ["/pencafe/100%25", "share"], ["/community/post/a", "share"],
+    ["/make?from=home", "make"], ["/studio/new", "make"], ["/create/promo", "share"],
+    ["/market/browse?sort=newest", "market"], ["/learn/#lessons", "learn"],
   ])("announces one purpose for %s", (path, expected) => {
     expect(activePublicJourney(path)).toBe(expected);
   });
@@ -22,9 +26,10 @@ describe("connected public destinations", () => {
     expect(items).toHaveLength(3);
     expect(new Set(items.map((item) => item.href)).size).toBe(3);
     expect(items.every((item) => item.id !== activePublicJourney(path))).toBe(true);
-    expect(items.some((item) => item.href.startsWith("/studio") || item.href === "/make")).toBe(false);
+    expect(items.some((item) => item.href.startsWith("/studio") || item.id === "make")).toBe(false);
   });
   it("has unique canonical navigation targets", () => {
     expect(new Set(PUBLIC_JOURNEY.map((item) => item.href)).size).toBe(PUBLIC_JOURNEY.length);
+    for (const item of PUBLIC_JOURNEY) expect(canonicalSitePath(item.href)).toBe(item.href);
   });
 });

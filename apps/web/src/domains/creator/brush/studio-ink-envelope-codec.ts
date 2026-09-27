@@ -31,14 +31,9 @@ import {
 } from "../studio-document-envelope";
 
 import type {
-  StudioInkEnvelopeAttestationVerifier,
   StudioInkEnvelopeAttester,
-} from "@toonstudio/contracts/studio-ink-envelope-webcrypto-attestation";
-
-export type {
   StudioInkEnvelopeAttestationVerifier,
-  StudioInkEnvelopeAttester,
-} from "@toonstudio/contracts/studio-ink-envelope-webcrypto-attestation";
+} from "@toonstudio/contracts/studio-ink-envelope-attestation-contract";
 
 export const STUDIO_INK_ENVELOPE_CODEC_ID =
   "toonstudio.ink-envelope" as const;
@@ -153,6 +148,10 @@ export interface StudioInkEnvelopeManifest {
   readonly contentDigest: `sha256:${string}`;
   readonly digestAlgorithm: typeof STUDIO_INK_ENVELOPE_DIGEST_ALGORITHM;
 }
+export type {
+  StudioInkEnvelopeAttester,
+  StudioInkEnvelopeAttestationVerifier,
+} from "@toonstudio/contracts/studio-ink-envelope-attestation-contract";
 
 /**
  * Product-specific decoder for the opaque canonical content.

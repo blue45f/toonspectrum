@@ -49,40 +49,20 @@ main[data-public-experience] .public-story-route:hover {
 main[data-public-experience] .purpose-experience-stage {
   box-shadow: 0 18px 60px -42px color-mix(in oklch, var(--public-violet) 40%, transparent);
 }
-header[data-public-site] {
-  background: color-mix(in oklch, var(--color-canvas) 94%, transparent);
-  box-shadow: 0 8px 28px -24px color-mix(in oklch, var(--color-accent) 40%, transparent);
-}
-header[data-public-site] .public-site-journey {
-  background: linear-gradient(100deg, color-mix(in oklch, var(--color-accent) 5%, var(--color-panel)), var(--color-panel) 60%);
-}
-header[data-public-site] .public-site-journey__routes { scroll-padding-inline: 8px; }
-header[data-public-site] .public-site-journey__routes a {
-  border-radius: 10px 10px 0 0;
-  transition: background 180ms ease-out, color 180ms ease-out;
-}
-header[data-public-site] .public-site-journey__routes a[aria-current="step"] {
-  background: color-mix(in oklch, var(--color-accent) 10%, transparent);
-}
 .public-wayfinder {
   position: relative;
-  max-width: 1280px;
-  width: calc(100% - 48px);
+  max-width: var(--site-content-max, 82.5rem);
+  width: 100%;
   margin: 48px auto 72px;
-  padding: clamp(22px, 4vw, 44px);
-  border: 1px solid var(--color-line);
-  border-radius: 28px;
-  background:
-    radial-gradient(ellipse at 100% 0, color-mix(in oklch, var(--public-violet) 12%, transparent), transparent 60%),
-    var(--color-panel);
+  padding-inline: var(--site-page-gutter, clamp(1rem, 3vw, 2.5rem));
 }
 .public-wayfinder__heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
 .public-wayfinder__eyebrow { color: var(--color-accent); font-size: 10px; letter-spacing: 0.16em; font-weight: 700; }
-.public-wayfinder h2 { margin-top: 12px; font-size: clamp(1.5rem, 3vw, 2.3rem); line-height: 1.3; letter-spacing: -0.045em; color: var(--color-fg); text-wrap: balance; }
+.public-wayfinder h2 { margin-top: 10px; font-size: clamp(1.35rem, 2.5vw, 1.8rem); line-height: 1.4; letter-spacing: -0.035em; color: var(--color-fg); text-wrap: balance; }
 .public-wayfinder__all { display: inline-flex; flex: none; align-items: center; gap: 8px; min-height: 44px; color: var(--color-fg-2); font-size: 12px; }
 .public-wayfinder__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
 .public-wayfinder__card {
-  --destination-color: var(--public-coral);
+  --destination-color: var(--color-accent);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -90,24 +70,21 @@ header[data-public-site] .public-site-journey__routes a[aria-current="step"] {
   gap: 12px;
   padding: 24px;
   border: 1px solid var(--color-line);
-  border-radius: 18px;
+  border-radius: 16px;
   color: var(--color-fg);
-  background: var(--color-card);
+  background: var(--color-panel);
   transition: border-color 180ms ease-out, transform 180ms ease-out, box-shadow 180ms ease-out;
 }
-.public-wayfinder__card[data-destination="learn"] { --destination-color: var(--public-violet); }
-.public-wayfinder__card[data-destination="market"] { --destination-color: var(--public-sky); }
-.public-wayfinder__card[data-destination="share"] { --destination-color: oklch(0.73 0.16 350); }
 .public-wayfinder__icon { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid color-mix(in oklch, var(--destination-color) 36%, var(--color-line)); border-radius: 15px; background: color-mix(in oklch, var(--destination-color) 12%, var(--color-card)); }
 .public-wayfinder__card strong { font-size: 18px; letter-spacing: -0.03em; }
 .public-wayfinder__card > span:not(.public-wayfinder__icon) { max-width: 32em; color: var(--color-fg-2); font-size: 12px; line-height: 1.8; word-break: keep-all; overflow-wrap: anywhere; }
 .public-wayfinder__arrow { position: absolute; right: 22px; top: 25px; color: var(--color-fg-2); }
 .public-wayfinder a:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 4px; border-radius: 12px; }
 @media (hover: hover) and (pointer: fine) {
-  .public-wayfinder__card:hover { transform: translateY(-4px); border-color: var(--destination-color); box-shadow: 0 12px 25px -18px var(--destination-color); }
+  .public-wayfinder__card:hover { transform: translateY(-2px); border-color: var(--destination-color); box-shadow: 0 12px 25px -22px var(--destination-color); }
 }
 @media (width < 768px) {
-  .public-wayfinder { width: calc(100% - 32px); margin-block: 24px 40px; border-radius: 22px; padding: 20px; }
+  .public-wayfinder { margin-block: 32px 40px; }
   .public-wayfinder__heading { align-items: start; flex-direction: column; gap: 8px; }
   .public-wayfinder__grid { grid-template-columns: 1fr; gap: 10px; }
   .public-wayfinder__card { padding: 18px 46px 18px 18px; display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 6px 14px; }
@@ -120,7 +97,6 @@ header[data-public-site] .public-site-journey__routes a[aria-current="step"] {
 }
 @media (prefers-reduced-motion: reduce) {
   .public-wayfinder__card,
-  header[data-public-site] .public-site-journey__routes a,
   main[data-public-experience] .public-story-route { transition: none; }
   .public-wayfinder__card:hover { transform: none; }
 }

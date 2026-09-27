@@ -1,5 +1,5 @@
 {
   "admin.refresh.now": "Одражните се сада",
   "admin.refresh.auto": "Авто:",
-  "admin.refresh.seconds": "ЗЗПЛАЦЕХОЛДЕР0ЗЗс"
+  "admin.refresh.seconds": "{sec}с"
 }

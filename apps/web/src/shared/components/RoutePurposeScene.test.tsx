@@ -106,7 +106,7 @@ describe("route purpose scene", () => {
 });
 
 describe("route visual boundary", () => {
-  it("mounts public route guidance and exposes route metadata", async () => {
+  it("공개 마켓의 메타데이터는 유지하고 자체 표제 앞에 공통 안내를 쌓지 않는다", async () => {
     const result = render(
       <MemoryRouter initialEntries={["/market/browse"]}>
         <SiteRouteExperienceBoundary routeTitle="소재 마켓">
@@ -115,11 +115,12 @@ describe("route visual boundary", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(result.container.querySelector('[data-route-visual-kind="assets"]')).not.toBeNull();
+      expect(document.documentElement.dataset.routeVisualKind).toBe("assets");
     });
     expect(document.documentElement.dataset.routeVisualKind).toBe("assets");
     expect(document.documentElement.dataset.routeVisualMotion).toBe("stack");
-    expect(document.documentElement.dataset.routePurposeScene).toBe("true");
+    expect(document.documentElement.dataset.routePurposeScene).toBe("false");
+    expect(result.container.querySelector('[data-route-visual-kind="assets"]')).toBeNull();
     expect(screen.getByText("시장 내용")).not.toBeNull();
   });
 

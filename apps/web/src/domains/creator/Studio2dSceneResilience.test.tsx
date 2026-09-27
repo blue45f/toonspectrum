@@ -84,9 +84,12 @@ describe("2D resilient image insertion", () => {
     render(<Studio2dSceneBrowser groups={groupBgScenes(BG_SCENES)} query="" onQueryChange={vi.fn()} genre="all"
       onGenreChange={vi.fn()} loading={false} error={null} disabled={false} onPick={vi.fn()} />);
     fireEvent.click(screen.getByLabelText("문자 형태 없는 이미지 배경만"));
+    expect(document.querySelectorAll("[data-studio-2d-asset]")).toHaveLength(48);
+    fireEvent.click(screen.getByRole("button", { name: "장면 더 보기 (1개 남음)" }));
     const ids = [...document.querySelectorAll("[data-studio-2d-asset]")].map((node) => node.getAttribute("data-studio-2d-asset"));
     expect(ids.length).toBeGreaterThan(0);
     expect(ids.sort()).toEqual(STUDIO_2D_ASSET_METADATA.filter((asset) => asset.recommended && !asset.containsText).map((asset) => asset.id).sort());
+    expect(screen.queryByRole("button", { name: /장면 더 보기/u })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "필터 초기화" }));
     expect((screen.getByLabelText("문자 형태 없는 이미지 배경만") as HTMLInputElement).checked).toBe(false);
   });

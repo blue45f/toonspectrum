@@ -73,7 +73,15 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
 
     const visits = recordEligibleRouteVisit();
     let armed = visits > 1;
+    const interactionOpen = () => document.querySelector('[aria-modal="true"], dialog[open], nav details[open]') !== null;
+    const deferForInteraction = () => {
+      if (!interactionOpen()) return;
+      setVisible(false);
+      setDetailsOpen(false);
+    };
     const reveal = () => {
+      // 사용자가 연 탐색 메뉴·대화상자에는 홍보를 유예한다. 본문 FAQ는 대상이 아니다.
+      if (interactionOpen()) return;
       if (!hasSeenMarketingEventForIdentity(BETA_OPEN_EVENT.id, userId)) setVisible(true);
     };
     const onIntent = () => {
@@ -82,13 +90,18 @@ export function BetaOpenEventGate({ pathname }: { pathname: string }) {
     const armTimer = window.setTimeout(() => { armed = true; }, MINIMUM_ENGAGEMENT_DELAY_MS);
     const fallbackTimer = window.setTimeout(reveal, visits > 1 ? 14_000 : FALLBACK_REVEAL_DELAY_MS);
     const passive = { passive: true } as const;
-    window.addEventListener("pointerdown", onIntent, passive);
+    // 누르기와 떼기 사이에 안내가 클릭 대상을 가리지 않도록 완료된 클릭만 받는다.
+    window.addEventListener("click", onIntent, passive);
     window.addEventListener("keydown", onIntent);
     window.addEventListener("scroll", onIntent, passive);
+    // 이미 표시된 안내도 메뉴가 열리면 숨기고, 닫은 뒤 다음 조작에서만 재개한다.
+    const observer = new MutationObserver(deferForInteraction);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "aria-modal"] });
     return () => {
+      observer.disconnect();
       window.clearTimeout(armTimer);
       window.clearTimeout(fallbackTimer);
-      window.removeEventListener("pointerdown", onIntent);
+      window.removeEventListener("click", onIntent);
       window.removeEventListener("keydown", onIntent);
       window.removeEventListener("scroll", onIntent);
     };

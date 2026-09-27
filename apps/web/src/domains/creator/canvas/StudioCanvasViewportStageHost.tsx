@@ -751,6 +751,7 @@ export function StudioCanvasViewportStageHost({
                 <StudioSkiaDocumentHitLayer
                   elements={live.velloDocumentElements}
                   effectiveScale={effScale}
+                  selectionState={documentLayerProps}
                   onSelect={documentLayerProps.selectElementFromCanvas}
                 />
               ) : null}

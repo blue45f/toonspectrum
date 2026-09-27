@@ -4,25 +4,18 @@
  * Web Crypto Ed25519/ECDSA P-256과 정규 base64url을 사용한다.
  */
 
+import type {
+  StudioInkEnvelopeAttestationVerifier,
+  StudioInkEnvelopeAttester,
+} from "./studio-ink-envelope-attestation-contract";
+
 type CryptoKey = InstanceType<typeof globalThis.CryptoKey>;
 type SubtleCrypto = typeof globalThis.crypto.subtle;
 
-/** 소유한 메시지 바이트를 서명하는 호출자 제공 경계. */
-export interface StudioInkEnvelopeAttester {
-  readonly algorithm: string;
-  readonly keyId: string;
-  readonly sign: (message: Uint8Array) => string | Promise<string>;
-}
-
-/** 선택한 신뢰 도메인에서 발급한 서명을 검증한다. */
-export interface StudioInkEnvelopeAttestationVerifier {
-  readonly verify: (input: Readonly<{
-    algorithm: string;
-    keyId: string;
-    message: Uint8Array;
-    signature: string;
-  }>) => boolean | Promise<boolean>;
-}
+export type {
+  StudioInkEnvelopeAttestationVerifier,
+  StudioInkEnvelopeAttester,
+} from "./studio-ink-envelope-attestation-contract";
 
 export type StudioInkEnvelopeWebCryptoAlgorithm =
   | "ed25519"
