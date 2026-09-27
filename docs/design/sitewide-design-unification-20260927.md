@@ -102,6 +102,38 @@
 
 > Use case: stylized-concept. Asset type: final wide website hero artwork for ToonStudio, a Korean all-in-one webtoon creation studio. Create an extraordinarily beautiful, polished editorial concept illustration, a panoramic composition in roughly 16:10 aspect ratio. An open creative atelier suspended above a richly detailed illustrated story city at sunset. Elegant sculptural sheets of comic paper curl into architectural frames, transitioning from delicate pencil line art at left through inked webtoon panels to sumptuous fully painted worlds at right. A luminous coral-orange ribbon connects the drawing desk, miniature 3D stage and finished panels, conveying one connected creative process. Tactile paper, ink, fine ceramic and brushed metal; warm ivory sunlight, persimmon coral, deep warm charcoal, selective sage accents and blue from the illustrated sky only. The composition should feel premium and imaginative, authored by a master animation background artist with modern editorial art direction; rich painterly detail, strong perspective and sophisticated lighting, no generic glassmorphism. Central visual focal point in middle/right, calm edges for responsive cropping, no words, no letters, no logos, no UI controls, no watermark. This is brand concept art, not a screenshot. Output a high-quality landscape image suitable as a full-bleed website hero.
 
+## 2026-09-28 추가 고도화 — 공개 홈 아트 밀도
+
+상태: **current**. PR #2145가 병합된 뒤 남은 과제는 레이아웃이 아니라 아트 밀도였다.
+홈은 7개 섹션에 이미지 3개뿐이라 텍스트가 화면을 지배했다. 2026-09-25 Codex 컨셉
+렌더(쿨 바이올렛 네온, 하단 4×2 모듈 그리드 + 시네마틱 아트 레일)를 레퍼런스로 검토했다.
+
+채택한 것과 채택하지 않은 것:
+
+- **채택** — 모듈마다 다른 tinted 표면, 한글 제목 + 영문 대문자 마이크로 라벨, 콘텐츠 아트가
+  크롬을 압도하는 밀도. 이 구조는 테마 중립적이라 9개 테마와 함께 유지된다.
+- **채택하지 않음** — 쿨 바이올렛/인디고 뉴트럴. `DESIGN.md`가 장식 맥락의 hue 23x–27x를
+  금지하고 18개 장르 스펙트럼이 제품의 실제 시그니처라, 레퍼런스의 팔레트를 그대로 따르지 않는다.
+  모듈 tint는 전부 기존 시맨틱 토큰의 `color-mix` 파생값이라 warm-ink 축이 자동으로 유지된다.
+- **채택하지 않음** — 참고 이미지의 작품 진열대. `docs/COMPLIANCE.md`와 이 문서가 AI 콘셉트 아트를
+  실제 사용자 게시물·편집기 결과물로 표시하는 것을 금지하므로, 근거 없는 작품 카드는 만들지 않는다.
+
+`CreatorEcosystemAtlas`가 8개 모듈을 4열(→2→1)로 노출한다. 아트는 저장소에 이미 커밋된
+브랜드 콘셉트 3종을 서로 다른 `object-position` 크롭으로 잘라 8개의 서로 다른 그림처럼 읽히게
+한다. 화면에는 `AI로 제작한 브랜드 콘셉트 아트` 고지가 함께 표시된다.
+
+한글 타이포는 레퍼런스가 쓰는 `-0.06em` 음각을 **따르지 않았다.** 한글 음각은 sidebearing이
+0.0566em뿐이라 그 값을 쓰면 인접 글자가 서로 붙는다. 한글 제목은 `-0.02em`, 본문은
+`word-break: keep-all`로 어절 단위 줄바꿈을 지킨다. 영문 대문자 라벨만 디스플레이 폰트
+`+0.12em`을 쓴다.
+
+미완료: 이 작업은 아트를 **배치**한 것이지 새로 생성한 것이 아니다. 신규 아트 생성은 이
+환경에서 불가능했다(사용 가능한 생성기가 워터마크를 강제하고 종횡비를 무시하며 팔레트가
+어긋남). 고품질 신규 아트가 필요하면 `OPENAI_API_KEY`를 설정한 뒤 별도 작업으로 진행한다.
+`toonstudio-route-header-*.jpg` 4장과 `toonstudio-premium-icons/projects.webp`는 지금도
+코드 참조가 없어 별도 배치 대상이다. `creator-home.css`는 현재 라이브인 레거시 파일로
+하드코딩 hex와 초록 focus ring을 품고 있어 별도 정리 대상이다.
+
 ## 검증의 경계
 
 [전수 인벤토리](sitewide-review-20260927.routes.json)와

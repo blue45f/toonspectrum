@@ -14,8 +14,10 @@ import "./creator-home-experience-interactions.css";
 import "./creator-all-in-one.css";
 import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
+import "./creator-ecosystem-atlas.css";
 
 import { CreatorSectionLink } from "./CreatorHomeNavigation";
+import { CreatorEcosystemAtlas } from "./CreatorEcosystemAtlas";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
 
 interface FlowStep {
@@ -233,6 +235,8 @@ export function CreatorHomeExperience() {
           </ol>
         </div>
       </section>
+
+      <CreatorEcosystemAtlas />
 
       <section id="creator-principles" className="cf-principles cf-shell" aria-labelledby="creator-principles-title">
         <div className="cf-section-heading">
