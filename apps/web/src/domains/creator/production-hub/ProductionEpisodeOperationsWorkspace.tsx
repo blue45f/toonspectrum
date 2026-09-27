@@ -1,3 +1,4 @@
+import { workflowEpisodePipeline } from "./production-workflow-episode-plan";
 import {
   AlertTriangle,
   CalendarClock,
@@ -201,6 +202,8 @@ function EpisodeOperationsCard({
         type: "upsert-episode-operations",
         episodeId: row.episode.episodeId,
         tasks: plan.tasks,
+        expectedWorkflowRevision: plan.workflowRevision,
+        ...(plan.plannedReleaseAt ? { episode: { ...row.episode, plannedReleaseAt: plan.plannedReleaseAt } } : {}),
       }, `${episodeLabel} 게시 마감과 미완료 공정을 다시 배치했습니다.`);
     } finally {
       setSaving(false);
@@ -394,8 +397,9 @@ function NewEpisodeForm({
       await execute({
         type: "upsert-episode-operations",
         episodeId,
-        episode,
+        episode: { ...episode, ...(pipeline.plannedReleaseAt ? { plannedReleaseAt: pipeline.plannedReleaseAt } : {}) },
         episodePlan,
+        expectedWorkflowRevision: pipeline.workflowRevision,
         tasks: pipeline.tasks,
       }, `${episodeNumber}화와 표준 제작 일정을 만들었습니다.`);
       setTitle(`${episodeNumber + 1}화 제목 미정`);
@@ -524,9 +528,10 @@ export function ProductionEpisodeOperationsWorkspace({
       </section>
 
       <details className="rounded-2xl border border-line bg-card p-4">
-        <summary className="cursor-pointer text-sm font-black text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">표준 웹툰 제작 공정 보기</summary>
+        <summary className="cursor-pointer text-sm font-black text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">{aggregate.workflowProfile ? "저장된 팀 제작 공정 보기" : "표준 웹툰 제작 공정 보기"}</summary>
+        {aggregate.workflowProfile ? <p className="mt-3 text-xs leading-5 text-fg-2">공정 간격은 의존 경로의 예상 공수를 하루 8시간으로 환산한 계획 초안입니다. 실제 근무일·휴일·개인별 가용량은 별도로 확인하세요.</p> : null}
         <div className="mt-4 grid gap-2 md:grid-cols-3">
-          {WEBTOON_EPISODE_PIPELINE.map((step, index) => (
+          {(workflowEpisodePipeline(aggregate) ?? WEBTOON_EPISODE_PIPELINE).map((step, index) => (
             <div key={step.processKey} className="rounded-xl border border-line bg-panel p-3">
               <div className="flex items-center justify-between gap-2"><span className="text-[0.6875rem] font-black text-accent">{String(index + 1).padStart(2, "0")}</span><span className="text-[0.6875rem] text-fg-3">게시 {step.daysBeforeRelease ? `${step.daysBeforeRelease}일 전` : "당일"}</span></div>
               <p className="mt-1 text-sm font-bold text-fg">{step.label}</p>

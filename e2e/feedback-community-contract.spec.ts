@@ -42,28 +42,54 @@ for (const invalidPage of [
 }
 
 test("a failed refresh preserves the draft but revokes readiness until a verified response", async ({ page }) => {
-  let calls = 0;
-  let unavailable = false;
+  let refreshUnavailable = false;
+  let failedReads = 0;
+  let listReads = 0;
+  const writes: string[] = [];
   await page.route("**/api/feedback/posts**", async (route) => {
-    calls++;
-    return unavailable
-      ? route.fulfill({ status: 503, json: { message: "새로고침 일시 실패" } })
-      : route.fulfill({ json: result() });
+    if (route.request().method() !== "GET") {
+      writes.push(route.request().method());
+      return route.fulfill({ status: 403, json: { message: "준비 상태 미확인 쓰기" } });
+    }
+    listReads++;
+    // 자동 읽기 재시도가 끝나도 실패를 유지하고, 복구는 테스트가 명시한다.
+    if (refreshUnavailable) {
+      failedReads++;
+      return route.fulfill({ status: 503, json: { message: "새로고침 일시 실패" } });
+    }
+    return route.fulfill({ json: result() });
   });
   await page.goto("/e2e/feedback-community.html");
   const form = page.getByRole("form", { name: "공개 제보 작성" });
   const title = form.getByLabel("제목", { exact: false });
+  const body = form.getByLabel("어떤 문제가 있었나요?");
+  const confirmation = form.getByLabel("제보 내용이 공개되는 것을 확인했습니다.");
+  const submit = form.getByRole("button", { name: "공개 제보 등록" });
+  await expect(submit).toBeEnabled();
   await title.fill("작성 중인 제보를 보존합니다");
-  unavailable = true;
+  await body.fill("새로고침에 실패해도 작성한 내용을 유지합니다.");
+  await confirmation.check();
+  refreshUnavailable = true;
   await page.getByRole("button", { name: "제보 목록 새로고침" }).click();
-  await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다.");
-  expect(calls).toBe(4);
+  await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.");
+  await expect(page.getByRole("alert")).not.toContainText("새로고침 일시 실패");
+  expect(failedReads).toBe(3);
+  expect(listReads).toBe(4);
   await expect(title).toHaveValue("작성 중인 제보를 보존합니다");
-  await expect(form.getByRole("button", { name: "공개 제보 등록" })).toBeDisabled();
-  unavailable = false;
+  await expect(body).toHaveValue("새로고침에 실패해도 작성한 내용을 유지합니다.");
+  await expect(confirmation).toBeChecked();
+  await expect(submit).toBeDisabled();
+  await title.press("Enter");
+  expect(writes).toEqual([]);
+  refreshUnavailable = false;
   await page.getByRole("button", { name: "다시 불러오기", exact: true }).click();
-  await expect(form.getByRole("button", { name: "공개 제보 등록" })).toBeEnabled();
+  await expect(submit).toBeEnabled();
+  await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(title).toHaveValue("작성 중인 제보를 보존합니다");
+  await expect(body).toHaveValue("새로고침에 실패해도 작성한 내용을 유지합니다.");
+  await expect(confirmation).toBeChecked();
+  expect(writes).toEqual([]);
+  expect(listReads).toBe(5);
 });
 
 test("a malformed reply response is an error rather than an empty conversation", async ({ page }) => {

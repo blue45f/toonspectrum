@@ -133,9 +133,11 @@ postgres("Managed administrator PostgreSQL schema", () => {
     );
     const { schema, client } = await fixture();
     const role = `admin_runtime_${randomUUID().replaceAll("-", "")}`;
+    let roleCreated = false;
     try {
       await migrate(client, schema);
       await client.query(`CREATE ROLE "${role}" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
+      roleCreated = true;
       await client.query(`GRANT USAGE ON SCHEMA "${schema}" TO "${role}"`);
       const inSchema = (sql: string) => sql.replaceAll("public.", `"${schema}".`)
         .replaceAll("to_regnamespace('public')", `to_regnamespace('${schema}')`);
@@ -152,10 +154,15 @@ postgres("Managed administrator PostgreSQL schema", () => {
       await client.query("DELETE FROM admin_promos WHERE id='runtime'");
       expect((await client.query('SELECT * FROM admin_promos')).rows).toEqual([]);
     } finally {
-      await client.query("RESET ROLE");
-      await client.query(`DROP OWNED BY "${role}"`);
-      await client.query(`DROP ROLE "${role}"`);
-      client.release();
+      try {
+        await client.query("RESET ROLE");
+        if (roleCreated) {
+          await client.query(`DROP OWNED BY "${role}"`);
+          await client.query(`DROP ROLE "${role}"`);
+        }
+      } finally {
+        client.release(true);
+      }
     }
   });
 

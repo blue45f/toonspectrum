@@ -331,6 +331,11 @@
       "types": "./src/studio-ink-envelope-webcrypto-attestation.ts",
       "import": "./src/studio-ink-envelope-webcrypto-attestation.ts",
       "default": "./src/studio-ink-envelope-webcrypto-attestation.ts"
+    },
+    "./production-workflow": {
+      "types": "./src/production-workflow.ts",
+      "import": "./src/production-workflow.ts",
+      "default": "./src/production-workflow.ts"
     }
   },
   "dependencies": {

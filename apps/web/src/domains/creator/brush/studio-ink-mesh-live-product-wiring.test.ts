@@ -14,14 +14,16 @@ describe("Google Ink mesh actual /studio product wiring", () => {
   const page = source("../StudioCuttoonEditorHost.tsx");
   const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
   const host = source("../StudioInkMeshLivePreviewHost.tsx");
+  const admission = source("../studio-cuttoon-editor/studio-live-surface-start.ts");
   const runtime = source("./studio-ink-mesh-live-preview.ts");
 
   it("starts from the existing pointerdown live-ink admission without changing its owner route", () => {
-    expect(page).toContain("armTransientPenInkSurfaces({");
-    expect(page).toContain("inkMeshLivePreviewRuntimeRef.current?.begin(");
-    expect(page.indexOf("armTransientPenInkSurfaces({"))
-      .toBeLessThan(page.indexOf("inkMeshLivePreviewRuntimeRef.current?.begin("));
-    expect(page).toContain("liveInkAdmitted: liveInkOverlayStarted");
+    expect(page).toContain("bindStudioDrawLiveSurfaces");
+    expect(admission).toContain("armTransientPenInkSurfaces({");
+    expect(admission).toContain("inkMeshLivePreviewRuntimeRef.current?.begin(");
+    expect(admission.indexOf("armTransientPenInkSurfaces({"))
+      .toBeLessThan(admission.indexOf("inkMeshLivePreviewRuntimeRef.current?.begin("));
+    expect(admission).toContain("liveInkAdmitted: liveInkOverlayStarted");
     expect(runtime).toContain("retainedPixelAuthority: \"canvas2d-perfect-freehand\"");
   });
 
@@ -57,7 +59,7 @@ describe("Google Ink mesh actual /studio product wiring", () => {
     expect(host).not.toMatch(/from\s+["']\.\/studio-ink-mesh-live-preview["']/u);
     expect(loader).toContain('import("./studio-ink-mesh-live-preview")');
     expect(page).toContain("void loadStudioInkMeshLivePreviewModule()");
-    expect(page).toContain("inkMeshLivePreviewRuntimeRef.current?.begin(");
+    expect(admission).toContain("inkMeshLivePreviewRuntimeRef.current?.begin(");
     expect(page).toContain("inkMeshLivePreviewRuntime={inkMeshLivePreviewRuntime}");
     expect(viewport).toContain("webGpuViewportSurface && inkMeshLivePreviewRuntime");
   });

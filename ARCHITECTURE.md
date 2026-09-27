@@ -1,7 +1,7 @@
 # ToonStudio 아키텍처
 
 - 상태: **현재 구조 + 진행 중인 마이그레이션**
-- 최종 갱신: **2026-09-26**
+- 최종 갱신: **2026-09-27**
 - 적용 범위: 저장소 구조, 애플리케이션 경계, 공유 패키지, 테스트·도구·문서 소유권
 
 ## 1. 권위 순서
@@ -117,8 +117,8 @@ apps/api/
     runtime/          서버 실행 수명주기
 ```
 
-운영 진입점은 `apps/api/src/main.ts`다. API가 Web 소스를 직접 import하는 기존 참조는
-마이그레이션 부채이며 새로운 참조는 늘릴 수 없다.
+운영 진입점은 `apps/api/src/main.ts`다. API의 교차 앱 계약은 공용 package가 소유하며,
+Web 소스 직접 참조는 0으로 고정한다.
 
 ### 3.4 Mobile
 
@@ -233,19 +233,19 @@ Studio를 단순히 `components/hooks/utils` 형태로 평탄화하거나 `packa
 
 ## 9. 현재 마이그레이션 부채
 
-수치는 2026-09-26의 ratchet 기준이며 설정 파일이 최종 권위다.
+수치는 2026-09-27의 ratchet 기준이며 설정 파일이 최종 권위다. 미스테이징 이동과 신규 소스도 현재 작업트리에서 검사한다.
 
 | 항목 | 현재 상한 |
 | --- | ---: |
-| API -> Web 직접 소스 참조 | 145 |
-| Web `shared -> domains` | 44 |
-| Web cross-domain deep import | 54 |
-| Creator domain 최상위 직접 파일 | 3,440 |
-| Web에 남은 Admin 파일 | 71 |
-| API `server` 파일 | 64 |
-| API `common` 파일 | 11 |
-| API `infrastructure` 파일 | 78 |
-| API `db` 파일 | 138 |
+| API -> Web 직접 소스 참조 | 0 |
+| Web `shared -> domains` | 25 |
+| Web cross-domain deep import | 53 |
+| Creator domain 최상위 직접 파일 | 3,436 |
+| Web에 남은 Admin 파일 | 69 |
+| API `server` 파일 | 65 |
+| API `platform/http` 파일 | 13 |
+| API `platform/adapters` 파일 | 78 |
+| API `platform/database` 파일 | 139 |
 | `packages/core` 파일 | 124 |
 
 다음 항목은 0으로 고정한다.

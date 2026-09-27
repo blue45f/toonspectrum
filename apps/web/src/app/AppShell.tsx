@@ -65,7 +65,7 @@ const StoreSync = lazy(() =>
   })),
 );
 const CreatorAdaptiveOnboardingGate = lazy(() =>
-  import("@/shared/components/CreatorAdaptiveOnboardingGate").then((mod) => ({
+  import("@/domains/creator/onboarding/CreatorAdaptiveOnboardingGate").then((mod) => ({
     default: mod.CreatorAdaptiveOnboardingGate,
   })),
 );

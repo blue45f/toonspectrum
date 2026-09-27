@@ -1,16 +1,21 @@
 /**
- * Standards-only cryptographic attestation adapter for ToonStudio InkEnvelope.
- *
- * Keys remain caller-owned: this module never exports, persists, identifies, or uploads key
- * material. Production trust policy (release keys, organization CAs, key rotation, revocation) is
- * intentionally outside the codec. The implementation uses Web Crypto Ed25519 or ECDSA P-256 and
- * unpadded canonical base64url, so browser and server deployments can share one verifier contract.
+ * 브라우저와 API가 공유하는 InkEnvelope 표준 암호 서명 경계.
+ * 키는 호출자가 소유하며 저장·전송하지 않는다. 키 교체와 폐기 등 신뢰 정책도 호출자가 결정한다.
+ * Web Crypto Ed25519/ECDSA P-256과 정규 base64url을 사용한다.
  */
 
 import type {
   StudioInkEnvelopeAttestationVerifier,
   StudioInkEnvelopeAttester,
 } from "./studio-ink-envelope-attestation-contract";
+
+export type {
+  StudioInkEnvelopeAttestationVerifier,
+  StudioInkEnvelopeAttester,
+} from "./studio-ink-envelope-attestation-contract";
+
+type CryptoKey = InstanceType<typeof globalThis.CryptoKey>;
+type SubtleCrypto = typeof globalThis.crypto.subtle;
 
 export type StudioInkEnvelopeWebCryptoAlgorithm =
   | "ed25519"
@@ -62,7 +67,7 @@ function subtleCrypto(override: SubtleCrypto | undefined): SubtleCrypto {
 
 function algorithmIdentifier(
   algorithm: StudioInkEnvelopeWebCryptoAlgorithm
-): AlgorithmIdentifier | EcdsaParams {
+): Parameters<SubtleCrypto["sign"]>[0] {
   return algorithm === "ed25519"
     ? "Ed25519"
     : { name: "ECDSA", hash: "SHA-256" };
@@ -72,14 +77,15 @@ function keyMatchesAlgorithm(
   key: CryptoKey,
   algorithm: StudioInkEnvelopeWebCryptoAlgorithm,
   type: "private" | "public",
-  usage: KeyUsage
+  usage: CryptoKey["usages"][number]
 ): boolean {
   if (key.type !== type || !key.usages.includes(usage)) return false;
   if (algorithm === "ed25519") {
     return key.algorithm.name.toLowerCase() === "ed25519";
   }
-  const ec = key.algorithm as EcKeyAlgorithm;
-  return ec.name === "ECDSA" && ec.namedCurve === "P-256";
+  return key.algorithm.name === "ECDSA"
+    && "namedCurve" in key.algorithm
+    && key.algorithm.namedCurve === "P-256";
 }
 
 function base64Url(bytes: Uint8Array): string {

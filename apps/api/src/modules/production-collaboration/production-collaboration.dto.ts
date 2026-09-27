@@ -1,3 +1,4 @@
+import { ProductionTaskBriefBlockSchema, ProductionWorkflowCommandSchemas } from "./production-workflow.dto";
 import { createZodDto } from "nestjs-zod";
 import { z } from "zod";
 
@@ -136,6 +137,7 @@ const EpisodeCollaborationSchema = z.object({
   jointProofApproved: z.boolean(),
   creditPreflightPassed: z.boolean(),
   publicationPreflightPassed: z.boolean(),
+  plannedReleaseAt: NullableIsoDateTimeSchema.optional(),
   updatedAt: IsoDateTimeSchema,
 }).strict();
 
@@ -316,6 +318,8 @@ const ProductionTaskSchema = z.object({
   scope: ProductionScopeRefSchema,
   processKey: z.string().trim().min(1).max(120),
   title: z.string().trim().min(1).max(240),
+  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+  briefBlocks: z.array(ProductionTaskBriefBlockSchema).max(40).refine((blocks) => new Set(blocks.map((block) => block.id)).size === blocks.length, "설명 블록 식별자가 중복되었습니다.").optional(),
   status: z.enum(["draft", "needs-input", "ready", "in-progress", "internal-review", "external-review", "changes-requested", "conditionally-approved", "approved", "done", "blocked", "paused", "cancelled", "out-of-scope"]),
   assignmentIds: z.array(IdentitySchema).max(100),
   reviewerAssignmentIds: z.array(IdentitySchema).max(100),
@@ -1141,10 +1145,12 @@ const UpsertTaskBatchCommandSchema = z.object({
   type: z.literal("upsert-task-batch"),
   tasks: z.array(ProductionTaskSchema).min(1).max(10_000),
   expectedTasks: z.array(ProductionTaskSchema).max(10_000).default([]),
+  expectedAbsentTaskIds: z.array(IdentitySchema).max(200).optional(),
 }).strict();
 const UpsertEpisodeOperationsCommandSchema = z.object({
   type: z.literal("upsert-episode-operations"),
   episodeId: IdentitySchema,
+  expectedWorkflowRevision: RevisionNumberSchema.optional(),
   episode: EpisodeCollaborationSchema.optional(),
   episodePlan: EpisodePlanSchema.optional(),
   tasks: z.array(ProductionTaskSchema).max(64).default([]),
@@ -1261,6 +1267,7 @@ const UpsertCommercialRecordCommandSchema = z.object({
 }).strict();
 
 export const ProductionCommandSchema = z.discriminatedUnion("type", [
+  ...ProductionWorkflowCommandSchemas,
   UpsertPlanningRecordCommandSchema,
   CreatePlanningSnapshotCommandSchema,
   UpsertCommercialRecordCommandSchema,

@@ -1,3 +1,5 @@
+import { createProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
+import { ProductionCommandSchema } from "./production-collaboration.dto";
 import { createHash } from "node:crypto";
 
 import {
@@ -6,12 +8,7 @@ import {
 } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  createProductionProjectAggregate,
-  deriveProductionAutomationExecutionPlan,
-  episodeScope,
-  type ProductionProjectAggregate,
-} from "@toonstudio/core/production";
+import { createProductionProjectAggregate, deriveProductionAutomationExecutionPlan, episodeScope, type ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import {
   ProductionProjectRevisionConflictError,
@@ -1254,4 +1251,68 @@ describe("ProductionCollaborationService", () => {
     )).rejects.toMatchObject({ status: 404 });
   });
 
+});
+
+describe("제작 공정 명령 권한과 감사", () => {
+  beforeEach(() => { for (const mock of Object.values(repository)) mock.mockReset(); });
+  it("공정 변경은 저장소에 관리 권한을 요구하고 감사 이벤트를 남긴다", async () => {
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(aggregate()));
+    const command = ProductionCommandSchema.parse({ type: "configure-workflow", profile: createProductionWorkflowProfile("project-1", "team", at), expectedWorkflowRevision: 0 });
+    const result = await service().executeCommand("owner-1", "project-1", { expectedRevision: 0, mutationId: "11111111-1111-4111-8111-111111111111", command });
+    expect(repository.mutateProject).toHaveBeenCalledWith(expect.objectContaining({ requiredCapability: "manage" }));
+    expect(result.aggregate.workflowProfile?.steps).toHaveLength(6);
+    expect(result.aggregate.auditEvents.at(-1)).toMatchObject({ action: "configure-workflow", targetType: "workflow", actorPartyId: "party-owner" });
+  });
+  it("워크플로 팀 보기 저장도 관리 권한을 요구한다", async () => {
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(aggregate()));
+    const command = ProductionCommandSchema.parse({ type: "upsert-operations-record", record: { kind: "saved-view", value: {
+      id: "view-team", projectId: "project-1", ownerAssignmentId: null, name: "팀 작업", resource: "tasks", filters: { "board-kind": "workflow-board" }, sort: [], columns: [], density: "comfortable", shared: true, dashboardWidgets: [], updatedAt: at,
+    } } });
+    await service().executeCommand("owner-1", "project-1", { expectedRevision: 0, mutationId: "11111111-1111-4111-8111-111111111112", command });
+    expect(repository.mutateProject).toHaveBeenCalledWith(expect.objectContaining({ requiredCapability: "manage" }));
+  });
+});
+
+describe("제작 작업 생성과 팀 보기 보호", () => {
+  beforeEach(() => { for (const mock of Object.values(repository)) mock.mockReset(); });
+  it("같은 작업 ID로 새 작업을 만들 때 기존 작업을 덮어쓰지 않는다", async () => {
+    const command = ProductionCommandSchema.parse({ type: "upsert-task-batch", expectedAbsentTaskIds: ["task-a"], tasks: [{
+      id: "task-a", projectId: "project-1", scope: { kind: "project", id: "project-1", ancestors: [] }, processKey: "story-lock", title: "새 제목", status: "draft", assignmentIds: [], reviewerAssignmentIds: [], inputRevisionRefs: [], outputDeliverableIds: [], dependencyTaskIds: [], dueAt: null, estimateHours: null, completionCriteria: [], sourceAgreementMilestoneId: null,
+    }] });
+    if (command.type !== "upsert-task-batch") throw new Error("fixture");
+    const current = { ...aggregate(), tasks: command.tasks.map((task) => ({ ...task, title: "기존 작업" })) };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current));
+    await expect(service().executeCommand("owner-1", "project-1", { expectedRevision: 0, mutationId: "11111111-1111-4111-8111-111111111113", command })).rejects.toBeInstanceOf(ConflictException);
+    expect(current.tasks[0]?.title).toBe("기존 작업");
+  });
+  it("공유 보기 표시를 제거해 관리 권한을 우회하지 못한다", async () => {
+    const command = ProductionCommandSchema.parse({ type: "upsert-operations-record", record: { kind: "saved-view", value: {
+      id: "view-protected", projectId: "project-1", ownerAssignmentId: null, name: "수정 시도", resource: "tasks", filters: {}, sort: [], columns: [], density: "comfortable", shared: false, dashboardWidgets: [], updatedAt: at,
+    } } });
+    if (command.type !== "upsert-operations-record" || command.record.kind !== "saved-view") throw new Error("fixture");
+    const current = { ...aggregate(), savedViews: [{ ...command.record.value, shared: true, filters: { "board-kind": "workflow-board" } }] };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current, { view: true, comment: true, edit: true, manage: false, owner: false, role: "editor" }));
+    await expect(service().executeCommand("owner-1", "project-1", { expectedRevision: 0, mutationId: "11111111-1111-4111-8111-111111111114", command })).rejects.toThrow("팀 보기는 관리자만");
+  });
+});
+
+describe("회차 생성의 저장된 공정 버전", () => {
+  beforeEach(() => { for (const mock of Object.values(repository)) mock.mockReset(); });
+  it("팀 공정이 활성화된 프로젝트는 버전 없는 구형 생성 명령을 거절한다", async () => {
+    const current = { ...aggregate(), workflowProfile: createProductionWorkflowProfile("project-1", "solo", at) };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current));
+    const command = ProductionCommandSchema.parse({ type: "upsert-episode-operations", episodeId: "episode-new", tasks: [] });
+    await expect(service().executeCommand("owner-1", "project-1", { expectedRevision: 0, mutationId: "11111111-1111-4111-8111-111111111115", command })).rejects.toBeInstanceOf(ConflictException);
+  });
+  it("회차 제작 목표 마감을 실제 게시 승인과 분리하여 기록한다", async () => {
+    const current = { ...aggregate(), workflowProfile: createProductionWorkflowProfile("project-1", "solo", at) };
+    repository.mutateProject.mockImplementation(async (input) => input.mutate(current));
+    const command = ProductionCommandSchema.parse({ type: "upsert-episode-operations", episodeId: "episode-new", expectedWorkflowRevision: 1, tasks: [], episode: {
+      id: "episode-new", projectId: "project-1", episodeId: "episode-new", revision: 0, state: "episode-planning", narrativeRevisionRef: null, visualRevisionRef: null, integratedRevisionRef: null, activeHandoffId: null, openBlockerCount: 0, storyLockApproved: false, thumbnailLockApproved: false, jointProofApproved: false, creditPreflightPassed: false, publicationPreflightPassed: false, updatedAt: at, plannedReleaseAt: "2026-10-20T09:00:00.000Z",
+    } });
+    const result = await service().executeCommand("owner-1", "project-1", { expectedRevision: 0, mutationId: "11111111-1111-4111-8111-111111111116", command });
+    expect(result.aggregate.episodes[0]).toMatchObject({ plannedReleaseAt: "2026-10-20T09:00:00.000Z", state: "episode-planning", jointProofApproved: false });
+    expect(result.aggregate.releasePlans).toEqual([]);
+    expect(result.aggregate.auditEvents.at(-1)?.action).toBe("upsert-episode-operations");
+  });
 });

@@ -98,6 +98,11 @@ import {
 
 import { initializeStudioVerifierPageOnce, installStudioCanvasScaleDiagnostics } from "./lib/studio-brush-verifier-session";
 import {
+  clickStudioControlAfterReadiness,
+  prepareStudioDrawingUi,
+  waitForStudioDrawingReady,
+} from "./lib/studio-drawing-readiness";
+import {
   isStaticPreviewReadinessResponse,
   isStaticPreviewReadinessUnavailable,
 } from "./lib/studio-preview-readiness";
@@ -808,126 +813,48 @@ async function registerCleanStudioState(page: Page): Promise<void> {
   );
 }
 
-/**
- * Onboarding chrome is restored from the SQLite preference store, so on the mobile layout it
- * mounts a beat after the editor is interactive — after the seeded localStorage flags have
- * already been read — and then swallows every tap. The starter closes through its own Close
- * control; modal wizards (quick comic) close on Escape, exactly as a person would dismiss them.
- * Both leave the editor in its normal state instead of forcing gestures through overlay chrome.
- */
-async function dismissCinematicCanvasWelcome(page: Page): Promise<void> {
-  const welcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
-  if (!(await welcome.isVisible())) return;
-  await welcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click();
-  await welcome.waitFor({ state: "hidden" });
-}
-
-async function dismissQuickStartOverlay(page: Page, appearTimeoutMs: number): Promise<void> {
-  await dismissCinematicCanvasWelcome(page);
-  const modalOverlay = page.locator('[data-studio-quick-comic-overlay="true"]');
-  if (
-    await modalOverlay.first().isVisible().catch(() => false)
-  ) {
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
-  }
-  const backdrop = page.locator('[data-studio-quickstart-backdrop="true"]');
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    // isVisible() resolves immediately, so the starter must be awaited explicitly: it arrives
-    // only after the preference store reconciles, well past the editor becoming interactive.
-    const appeared = await backdrop
-      .first()
-      .waitFor({ state: "visible", timeout: attempt === 0 ? appearTimeoutMs : 600 })
-      .then(() => true)
-      .catch(() => false);
-    if (!appeared) return;
-    await backdrop.first().click({ timeout: 2_000, force: true }).catch(() => undefined);
-    await page.waitForTimeout(200);
-    if (await modalOverlay.first().isVisible().catch(() => false)) {
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(200);
-    }
-  }
-}
-
-/**
- * Onboarding chrome can mount at any point once the preference store reconciles, so a single
- * dismissal before the gesture is not enough: it may arrive between the dismissal and the tap.
- * Retrying the tap with a dismissal in between keeps the audit measuring the editor rather than
- * racing its overlays, and still fails loudly if the control never becomes reachable.
- */
-async function clickPastTransientOverlays(page: Page, target: Locator): Promise<void> {
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const clicked = await target
-      .click({ timeout: attempt === 3 ? 7_000 : 2_500 })
-      .then(() => true)
-      .catch(() => false);
-    if (clicked) return;
-    await dismissQuickStartOverlay(page, 500);
-  }
-  await target.click({ timeout: 7_000 });
-}
-
-async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean> {
-  const notice = page.locator('[data-studio-beta-notice="true"]');
-  const visible = await notice
-    .waitFor({ state: "visible", timeout: 10_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!visible) return false;
-
-  const acknowledge = notice.locator(
-    '[data-studio-beta-notice-acknowledge="true"]',
-  );
-  try {
-    await acknowledge.click({ timeout: 30_000, noWaitAfter: true });
-  } catch (error) {
-    const alreadyHidden = await notice
-      .isHidden({ timeout: 1_000 })
-      .catch(() => false);
-    if (!alreadyHidden) throw error;
-  }
-  await notice.waitFor({ state: "hidden", timeout: 30_000 });
-  return true;
-}
-
+/** 초기 진입과 문서 초기화는 이번 문서의 안내를 실제로 닫았는지 확인한다. */
 async function dismissTransientChrome(page: Page, clearAutosave = true): Promise<void> {
-  await acknowledgeStudioBetaNoticeIfPresent(page);
-  // 문서 hydration이 끝난 뒤 시작 안내를 닫아야 늦게 나타난 안내가 입력을 가로채지 않는다.
-  await page.locator(".konvajs-content").first().waitFor({ state: "visible", timeout: 30_000 });
-  await dismissCinematicCanvasWelcome(page);
-  const quickstart = page.locator('[data-studio-creative-starter="true"]');
-  if (await quickstart.isVisible({ timeout: 250 }).catch(() => false)) {
-    await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
-  }
-  await dismissQuickStartOverlay(page, 250);
-  if (!clearAutosave) return;
+  if (clearAutosave) {
+    await prepareStudioDrawingUi(page, (timeoutMs) => clearRecoveryNoticeIfPresent(page, timeoutMs));
+  } else await waitForStudioDrawingReady(page);
+}
 
+async function clearRecoveryNoticeIfPresent(page: Page, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  const remaining = () => {
+    const timeout = deadline - Date.now();
+    invariant(timeout > 0, "복구 안내 정리 시간 초과: 같은 verify:studio-brushes 명령으로 재검증하세요.");
+    return timeout;
+  };
   const recovery = page.locator("[data-studio-recovery-notice]").first();
-  if (!(await recovery.isVisible({ timeout: 250 }).catch(() => false))) return;
+  if (!(await recovery.isVisible())) return false;
 
   // The automatic-resume variant deliberately has no action buttons. Older survey cleanup read
   // `aria-expanded` from a non-existent "다른 방법" button and let Playwright's default timeout
   // abort the remaining catalogue after the first product failure. Give auto-resume a bounded
   // opportunity to settle, then interact only with controls that actually exist.
-  if (await recovery.getAttribute("data-studio-auto-resume") === "true") {
+  if (await recovery.getAttribute("data-studio-auto-resume", { timeout: remaining() }) === "true") {
     await page.waitForFunction(() => {
       const notice = document.querySelector('[data-studio-recovery-notice]');
       return !notice || notice.getAttribute("data-studio-auto-resume") !== "true";
-    }, undefined, { timeout: 8_000 }).catch(() => undefined);
+    }, undefined, { timeout: Math.min(8_000, remaining()) });
   }
-  if (!(await recovery.isVisible().catch(() => false))) return;
+  if (!(await recovery.isVisible())) return false;
 
   const more = recovery.getByRole("button", { name: "다른 방법", exact: true });
-  if (await more.count() === 0 || !(await more.isVisible().catch(() => false))) return;
-  if (await more.getAttribute("aria-expanded") !== "true") await more.click();
+  if (await more.count() === 0 || !(await more.isVisible())) return false;
+  if (await more.getAttribute("aria-expanded", { timeout: remaining() }) !== "true") {
+    await more.click({ timeout: remaining() });
+  }
   const remove = recovery.getByRole("button", { name: "이전 그림 삭제…", exact: true });
-  if (await remove.count() === 0 || !(await remove.isVisible().catch(() => false))) return;
-  await remove.click();
+  if (await remove.count() === 0 || !(await remove.isVisible())) return false;
+  await remove.click({ timeout: remaining() });
   const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
-  await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click();
-  await confirmation.waitFor({ state: "hidden" });
-  await recovery.waitFor({ state: "hidden" });
+  await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click({ timeout: remaining() });
+  await confirmation.waitFor({ state: "hidden", timeout: remaining() });
+  await recovery.waitFor({ state: "hidden", timeout: remaining() });
+  return true;
 }
 
 async function clearStudioVerifierOriginStorage(page: Page, studioUrl: string): Promise<void> {
@@ -4616,11 +4543,11 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
 async function openMobileBrushSettings(page: Page, dock: Locator): Promise<void> {
   const toggle = dock.locator('[data-studio-mobile-workspace-toggle="true"]');
   if (await toggle.getAttribute("aria-expanded") !== "true") {
-    await clickPastTransientOverlays(page, toggle);
+    await clickStudioControlAfterReadiness(page, toggle);
   }
   const tools = dock.locator('[data-studio-mobile-workspace-menu="true"]');
   await tools.waitFor({ state: "visible" });
-  await clickPastTransientOverlays(
+  await clickStudioControlAfterReadiness(
     page,
     tools.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])'),
   );
@@ -4641,11 +4568,10 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await prepareStudioPage(page, studioUrl);
     const dock = page.locator('nav[data-studio-mobile-editing-dock="true"]');
     await dock.waitFor({ state: "visible", timeout: 10_000 });
-    await dismissQuickStartOverlay(page, 4_000);
     await openMobileBrushSettings(page, dock);
     const drawSheet = page.locator('[data-studio-sheet-id="draw"][data-studio-mobile-sheet="draw"]');
     await drawSheet.waitFor({ state: "visible" });
-    await clickPastTransientOverlays(
+    await clickStudioControlAfterReadiness(
       page,
       drawSheet.locator('[data-studio-open-brush-library="true"]'),
     );

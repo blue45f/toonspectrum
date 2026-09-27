@@ -201,6 +201,7 @@ describe("webtoon production collaboration UI", () => {
         </Routes>
       </MemoryRouter>,
     );
+    fireEvent.click(screen.getByRole("button", { name: "역할별 작업실" }));
     expect(screen.getByRole("heading", { name: "직군별 제작 셀과 인수인계를 한 화면에서" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "팀 구성" }));
     expect(screen.getByRole("heading", { name: "직군별 팀 커버리지" })).toBeTruthy();
@@ -221,6 +222,7 @@ describe("webtoon production collaboration UI", () => {
         </Routes>
       </MemoryRouter>,
     );
+    fireEvent.click(screen.getByRole("button", { name: "역할별 작업실" }));
     fireEvent.click(screen.getByRole("button", { name: "공정 흐름" }));
     expect(screen.getByRole("heading", { name: "웹툰 표준 공정" })).toBeTruthy();
     expect(screen.getByText("캐릭터·선화")).toBeTruthy();
