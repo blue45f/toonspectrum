@@ -709,7 +709,21 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
-  packages/contracts: {}
+  packages/contracts:
+    dependencies:
+      '@toonstudio/core':
+        specifier: workspace:*
+        version: link:../core
+      yjs:
+        specifier: ^13.6.31
+        version: 13.6.31
+      zod:
+        specifier: ^4.4.3
+        version: 4.5.4
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
 
   packages/core:
     dependencies:

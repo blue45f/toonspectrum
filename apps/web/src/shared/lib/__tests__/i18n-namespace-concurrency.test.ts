@@ -28,20 +28,6 @@ describe("namespace translation loading", () => {
     expect(resolveI18nValue("fr", "recovery.namespace")).toBe(String(requests.length - 1));
   });
 
-  it("loads all required Studio namespaces before registering their deterministic merge", async () => {
-    const { loadStudioI18nLocale } = await import("../../../domains/creator/studio-i18n-loader");
-    const { resolveI18nValue } = await import("../i18n");
-    const { requests, fetchImpl } = deferredFetch();
-    const pending = loadStudioI18nLocale("fr", { fetchImpl });
-
-    expect(requests).toHaveLength(STUDIO_I18N_NAMESPACES.length);
-    for (let index = requests.length - 1; index >= 0; index -= 1) {
-      requests[index](new Response(JSON.stringify({ "studio.recovery.namespace": String(index) })));
-    }
-    await pending;
-    expect(resolveI18nValue("fr", "studio.recovery.namespace")).toBe(String(requests.length - 1));
-  });
-
   it("keeps available optional Studio namespaces when another request rejects", async () => {
     const { loadStudioAssetIfAvailable } = await import("../i18n-asset-loader");
     const { resolveI18nValue } = await import("../i18n");

@@ -300,7 +300,7 @@ export function SiteHeader() {
                 className="absolute -bottom-1 -right-1 size-2.5 rounded-full border-2 border-canvas bg-accent"
               />
             </span>
-            <span className="min-w-0">
+            <span className="hidden min-w-0 min-[375px]:block">
               <span className="flex items-center gap-1.5">
                 <span className="truncate font-display text-[1.05rem] font-bold tracking-[-0.02em] text-fg transition-colors group-hover:text-accent sm:text-lg">
                   {brandName}

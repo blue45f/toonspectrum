@@ -10,8 +10,8 @@ function normalize(value) {
   return value.split(path.sep).join("/").replace(/^\.\//u, "");
 }
 
-function trackedRepositoryFiles(root = ROOT) {
-  const result = spawnSync("git", ["ls-files", "-z"], {
+export function repositoryFiles(root = ROOT) {
+  const result = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], {
     cwd: root,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
@@ -20,7 +20,9 @@ function trackedRepositoryFiles(root = ROOT) {
   if (result.status !== 0) {
     throw new Error(`git ls-files failed: ${result.stderr.trim()}`);
   }
-  return result.stdout.split("\0").filter(Boolean).map(normalize);
+  // 스테이징 여부와 무관하게 현재 소스를 검사해 삭제 전 경로나 새 위반을 놓치지 않는다.
+  return [...new Set(result.stdout.split("\0").filter(Boolean).map(normalize))]
+    .filter((file) => fs.existsSync(path.join(root, file)));
 }
 
 function filesUnder(files, directory) {
@@ -84,7 +86,7 @@ export function validateSourceLayout({ files, budgets }) {
 }
 
 function main() {
-  const files = trackedRepositoryFiles();
+  const files = repositoryFiles();
   const budgets = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf8"));
   const { counts, failures } = validateSourceLayout({ files, budgets });
   if (process.argv.includes("--write-baseline")) {

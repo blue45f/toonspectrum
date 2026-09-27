@@ -15,8 +15,8 @@ import {
 import {
   EMPTY_CREATOR_ROLE_PROFILE,
   type CreatorRoleProfile,
-} from "../@toonstudio/contracts/creator-role-contract";
-import type { RegionSettings } from "../@toonstudio/contracts/region-settings";
+} from "@toonstudio/contracts/creator-role-contract";
+import type { RegionSettings } from "@toonstudio/contracts/region-settings";
 
 // libSQL(SQLite) → PostgreSQL(Neon) 마이그레이션:
 //  - integer{mode:"timestamp_ms"} → timestamp({mode:"date"})  (Drizzle가 Date로 주고받음)

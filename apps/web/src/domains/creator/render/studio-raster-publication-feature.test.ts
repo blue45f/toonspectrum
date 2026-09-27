@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -38,10 +39,21 @@ describe("automatic raster publication feature gate", () => {
 
   it("guards both draw promotion and raster history publication in the editor wiring", () => {
     const pageSource = readStudioCuttoonEditorSource();
+    const transitionPublisherSource = readFileSync(new URL(
+      "../studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher.ts",
+      import.meta.url,
+    ), "utf8");
     const viewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
     const source = `${pageSource}\n${viewportSource}`;
-    expect(source).toMatch(
-      /STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*&&\s*studioAuthUserId/u
+    // 히스토리 게시 가드는 분리된 게시자가 소유하며, 호스트는 실제 인증 사용자와 기능 플래그를 전달한다.
+    expect(pageSource).toContain(
+      'from "./studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher"'
+    );
+    expect(pageSource).toMatch(
+      /createStudioCrdtTransitionPublisher\(\{\s*actorId:\s*studioAuthUserId,\s*automaticRasterPublicationEnabled:\s*STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED,/u
+    );
+    expect(transitionPublisherSource).toMatch(
+      /if\s*\(input\.automaticRasterPublicationEnabled\s*&&\s*input\.actorId\)\s*\{\s*runtime\.publishRasterHistoryTransition\(\{/u
     );
     expect(source).toMatch(
       /STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*&&\s*!masterEditMode/u
