@@ -337,7 +337,6 @@ export function CreatorHomeExperience() {
           <Link href="/production/projects/sample-project/overview" className="cf-button cf-secondary">{copy.closingSecondary}</Link>
         </div>
       </section>
-      </div>
     </div>
   );
 }
