@@ -59,6 +59,8 @@ export function StudioVirtualSpaceEnvironmentPanel({ value, onChange, artStyle =
         <p><Sparkles size={14} aria-hidden />{bt("나만의 공간 연출", "Your studio atmosphere")}</p>
         <h2 id="studio-environment-title">{bt("배경과 환경", "Backdrop & environment")}</h2>
         <span>{bt("장소 배경, 시간대와 날씨를 분리해 같은 공간을 다른 분위기로 연출합니다.", "Combine a backdrop, time of day and weather without changing the workspace layout.")}</span>
+        <span>{bt("이 설정은 모든 장소에 함께 적용되어 이 브라우저에만 저장됩니다. 장소마다 다른 배경을 쓰려면 꾸미기의 배경 장소를 고르세요.",
+          "These settings apply across every place and are stored in this browser only. To use a different backdrop per place, choose a background district in the customization panel.")}</span>
       </div>
       <fieldset className="studio-environment-panel__backdrops">
         <legend>{bt("배경", "Backdrop")}</legend>

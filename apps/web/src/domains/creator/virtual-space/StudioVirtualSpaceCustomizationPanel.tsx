@@ -182,6 +182,8 @@ export function StudioVirtualSpaceCustomizationPanel({
     <fieldset>
       <legend>{bt("배경 장소", "Background district")}</legend>
       <p>{bt("장소마다 식생·조명·환경음·랜드마크 연출이 달라집니다.", "Each district changes foliage, lighting, ambience and landmark presentation.")}</p>
+      <p>{bt("배경 장소는 지금 장소에만 저장되고, 배경·시간대·날씨는 모든 장소에 함께 적용됩니다. 두 설정 모두 이 브라우저에만 저장되며 서버의 공유 월드 게시 권한을 대신하지 않습니다.",
+        "The background district is saved for this place only, while backdrop, time of day and weather apply across every place. Both are stored in this browser only and do not replace the server's shared-world publication permission.")}</p>
       <div className="studio-vspace-customization-districts">
         {STUDIO_TOWN_DISTRICT_IDS.map((district, index) => {
           const presentation = studioTownDistrictPresentation(district);
