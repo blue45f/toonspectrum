@@ -12,22 +12,23 @@ const entry: FeedbackEntry = {
 const result = () => ({ contractVersion: 2, items: [entry], hasMore: false, nextCursor: null, canManage: false });
 
 test("failed refresh and recovery keep the same inline comment draft mounted", async ({ page }) => {
-  let calls = 0;
+  let refreshFailed = false;
   await page.route("**/api/feedback/posts**", async (route) => {
     if (new URL(route.request().url()).pathname.endsWith("/replies")) return route.fulfill({ json: [] });
-    calls++;
-    return calls === 2 ? route.fulfill({ status: 503, json: { message: "새로고침 일시 실패" } }) : route.fulfill({ json: result() });
+    return refreshFailed ? route.fulfill({ status: 503, json: { message: "새로고침 일시 실패" } }) : route.fulfill({ json: result() });
   });
   await page.goto("/e2e/feedback-community.html");
   await page.getByRole("button", { name: entry.title, exact: true }).click();
   const draft = page.getByRole("textbox", { name: "공개 댓글", exact: true });
   await draft.fill("작성 중인 댓글입니다.");
+  refreshFailed = true;
   await page.getByRole("button", { name: "제보 목록 새로고침" }).click();
-  await expect(page.getByRole("alert")).toContainText("새로고침 일시 실패");
+  await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.");
   await expect(page.locator(".fb-post")).toHaveCount(1);
   await expect(draft).toHaveValue("작성 중인 댓글입니다.");
   await expect(page.getByRole("button", { name: "댓글 등록", exact: true })).toBeDisabled();
   await draft.fill("오류가 나도 계속 작성할 수 있습니다.");
+  refreshFailed = false;
   await page.getByRole("button", { name: "다시 불러오기", exact: true }).click();
   await expect(page.getByRole("button", { name: "댓글 등록", exact: true })).toBeEnabled();
   await expect(draft).toHaveValue("오류가 나도 계속 작성할 수 있습니다.");
@@ -42,7 +43,7 @@ test("failed new filters never display the preceding filter's rows", async ({ pa
   await expect(page.locator(".fb-post")).toHaveCount(1);
   await page.getByLabel("제보 검색").fill("새로운 조건");
   await page.getByRole("button", { name: "검색", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("검색 실패");
+  await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.");
   await expect(page.locator(".fb-post")).toHaveCount(0);
 });
 

@@ -23,7 +23,7 @@ async function setup(page: Page, options: { count?: number; admin?: boolean; lis
     const request = route.request(); const url = new URL(request.url()); const path = url.pathname;
     const json = (body: unknown, status = 200) => route.fulfill({ status, json: body });
     if (request.method() === "GET" && path.endsWith("/posts")) {
-      if (listFail) { listFail = false; return json({ message: "일시적인 목록 오류입니다." }, 503); }
+      if (listFail) return json({ message: "일시적인 목록 오류입니다." }, 503);
       let filtered = rows;
       const category = url.searchParams.get("category"); const progress = url.searchParams.get("progress"); const query = url.searchParams.get("q");
       if (category && category !== "all") filtered = filtered.filter((row) => row.category === category);
@@ -34,7 +34,7 @@ async function setup(page: Page, options: { count?: number; admin?: boolean; lis
     }
     const segments = path.split("/"); const action = segments.at(-1); const postId = segments.at(-2) ?? "";
     if (request.method() === "GET" && action === "replies") {
-      if (replyFail) { replyFail = false; return json({ message: "댓글 조회 오류입니다." }, 503); }
+      if (replyFail) return json({ message: "댓글 조회 오류입니다." }, 503);
       return json(replies[postId] ?? []);
     }
     if (request.method() === "GET") return json(rows.find((row) => row.id === action) ?? {}, 200);
@@ -60,7 +60,8 @@ async function setup(page: Page, options: { count?: number; admin?: boolean; lis
     }
     return json({ message: "Unknown test endpoint" }, 404);
   });
-  return { writes, errors };
+  // GET 자동 재시도가 끝나도 장애를 유지하고, 사용자가 복구를 누르기 직전에 해제한다.
+  return { writes, errors, recoverList: () => { listFail = false; }, recoverReplies: () => { replyFail = false; } };
 }
 const open = (page: Page, params = "") => page.goto(`/e2e/feedback-community.html${params}`);
 const composer = (page: Page) => page.getByRole("form", { name: "공개 제보 작성" });
@@ -132,23 +133,28 @@ test("failed comments retain text and report errors; Enter in textarea does not 
   const field = page.getByRole("textbox", { name: "공개 댓글", exact: true }); await field.fill("저도 같은 증상을 겪었어요."); await field.press("Enter");
   expect(state.writes).toHaveLength(0);
   await page.getByRole("button", { name: "댓글 등록", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("댓글 전송 실패"); await expect(field).toHaveValue("저도 같은 증상을 겪었어요.\n");
+  await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다."); await expect(field).toHaveValue("저도 같은 증상을 겪었어요.\n");
+  expect(state.writes).toHaveLength(1);
   await page.getByRole("button", { name: "댓글 등록", exact: true }).click();
   await expect(page.getByText("댓글이 등록되었습니다.")).toBeVisible(); await expect(field).toHaveValue("");
+  expect(state.writes).toHaveLength(2);
 });
 
 test("reply load failures are not displayed as an empty thread", async ({ page }) => {
-  await setup(page, { replyFail: true }); await open(page);
+  const state = await setup(page, { replyFail: true }); await open(page);
   await page.getByRole("button", { name: "필터 적용 후 브러시가 멈춰요", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("댓글 조회 오류");
+  await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.");
+  await expect(page.getByText("아직 댓글이 없어요.", { exact: false })).toHaveCount(0);
+  state.recoverReplies();
   await page.getByRole("button", { name: "댓글 다시 불러오기" }).click();
   await expect(page.getByText("아직 댓글이 없어요.", { exact: false })).toBeVisible();
 });
 
 test("list errors are recoverable, not mistaken for no reports", async ({ page }) => {
-  await setup(page, { listFail: true }); await open(page);
+  const state = await setup(page, { listFail: true }); await open(page);
   await expect(page.getByRole("heading", { name: "제보 목록을 불러오지 못했어요" })).toBeVisible();
   await expect(page.getByText("첫 의견을 기다리고 있어요")).toHaveCount(0);
+  state.recoverList();
   await page.getByRole("button", { name: "다시 불러오기", exact: true }).click(); await expect(page.locator(".fb-post")).toHaveCount(3);
 });
 
