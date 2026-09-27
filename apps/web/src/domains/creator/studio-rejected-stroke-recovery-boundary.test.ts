@@ -5,6 +5,10 @@ import { describe, expect, it } from "vitest";
 import { readStudioPageCompositionSource } from "./studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const host = readStudioPageCompositionSource();
+const liveSurfaceStart = readFileSync(
+  new URL("./studio-cuttoon-editor/studio-live-surface-start.ts", import.meta.url),
+  "utf8",
+);
 const pointersFinish = readFileSync(
   new URL("./studio-cuttoon-editor/studio-cuttoon-stage-pointers-finish.ts", import.meta.url),
   "utf8",
@@ -40,8 +44,9 @@ function expectInOrder(source: string, needles: readonly string[]): void {
 describe("rejected stroke recovery integration boundary", () => {
   it("provider 준비 획과 미완료 체크포인트 저장을 기존 이탈 경고 경계에 포함한다", () => {
     expect(host).toContain("(pendingStrokeAdmissionRef.current?.size ?? 0) > 0\n      || hasUnpersistedStudioPendingStrokeCheckpoints()");
-    expect(host).toContain("checkpoint: (stroke) => checkpointPendingStroke(stroke, capturedScope.pageId, capturedScope.generation)");
-    const deferred = sourceBetween(host, "const deferSelectedSurface =", "// 다이렉트 라이브 초안 무장");
+    expect(liveSurfaceStart).toContain("checkpoint: (stroke: DrawEl) => checkpointPendingStroke(stroke, capturedScope.pageId, capturedScope.generation)");
+    expect(liveSurfaceStart).toContain("setUnloadGuardArmed(true)");
+    const deferred = sourceBetween(liveSurfaceStart, "const deferSelectedSurface =", "// 다이렉트 라이브 초안 무장");
     expectInOrder(deferred, ["setUnloadGuardArmed(true)", "pendingStrokeAdmission().defer({"]);
   });
 

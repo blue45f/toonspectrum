@@ -1,8 +1,13 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
-const source = readStudioCuttoonEditorSource();
+const source = `${readStudioCuttoonEditorSource()}\n${readFileSync(
+  new URL("../studio-cuttoon-editor/studio-live-surface-start.ts", import.meta.url),
+  "utf8",
+)}`;
 
 describe("Studio live gesture preview publisher wiring", () => {
   it("publishes exactly one begin from the authoritative pointer-start path", () => {

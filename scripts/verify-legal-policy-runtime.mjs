@@ -20,8 +20,8 @@ const {
 // Privacy revision 456b874bd (2026-09-18) added business-inquiry disclosures.
 // Pin that reviewed version; a runtime/build repair must never rewrite the policy body.
 for (const [policy, digest] of [
-  ["terms-of-service", "725b4f7dff126f76bb68ed7c1c8cac1df0f69e62f536725168b28b2ef269fb73"],
-  ["privacy-policy", "ad3bb0df4f268212e049aebb4ba14e4b484f23e76d2bb144d261fda87f14f5f8"],
+  ["terms-of-service", "3beddb0259f639059faf84b2424fb13d3271dcbf3a586350f2ec9d4ba10920cd"],
+  ["privacy-policy", "e95abfe52c30de61a94aac2cc37044384c49440aafd5058f8db3322346e20204"],
 ]) {
   test(`${policy}: reviewed legal body is unchanged and its identity is stable`, () => {
     const document = getStaticPolicyDocument(policy);

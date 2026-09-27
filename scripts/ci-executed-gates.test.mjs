@@ -290,6 +290,8 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/living-town-v6/",
     "/apps/web/public/assets/virtual-studio/imagegen25-v7/",
     "/apps/web/public/assets/virtual-studio/world-v2/",
+    "/apps/web/public/assets/studio/props/daily/",
+    "/apps/web/public/assets/studio/props/school/",
   ]);
   assert.ok(staticJob.indexOf(restoreStep) < staticJob.indexOf("Run semantic regression shard"),
     "artwork must be present before the required foundation tests execute");

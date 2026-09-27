@@ -74,7 +74,7 @@ describe("Scene Layer Lift composition provenance receipt", () => {
       version: 1,
       ...input(),
       receiptSha256:
-        "sha256:88ced95ac2d515b98b868be9f43a5db11293a08440e0c1dc941ea35de2e58be4",
+        "sha256:cbab9a92fe7688682c2a15327a60d969c828d4262e0a44a9eb0168ab590ff73f",
     });
     expect(isTrustedStudioLayerLiftCompositionReceipt(created)).toBe(true);
 

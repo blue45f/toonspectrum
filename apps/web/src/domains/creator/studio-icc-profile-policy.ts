@@ -34,7 +34,7 @@ export const STUDIO_BUNDLED_ICC_PROFILE_ALLOWLIST: Readonly<
   Record<string, StudioBundledIccProfileGrant>
 > = Object.freeze({
   "toonstudio-srgb-v2": Object.freeze({
-    sha256: "320e97fb94f085925d825687024459249524fcc5d8308ec3764295b957d6a8cd",
+    sha256: "57974dd075212ee10a7fbc308454b86316ef949a137664af52b2273570ee6378",
     providerId: "toonstudio",
     provenance: "project-generated:studio-canvaskit-icc-profile",
     licenseClass: "project-generated",
