@@ -16,6 +16,24 @@ export function studioGaitShadowScale(distance: number, stride: number, moving: 
   return .96 + Math.cos(distance / stride * Math.PI * 4) * .04;
 }
 
+const GAIT_BODY_LIFT = 3.5;
+const GAIT_BODY_SWAY = 2.4;
+
+/**
+ * 그림자와 같은 이동 거리·같은 위상을 쓴다. 접지 순간 그림자가 가장 작아지므로 몸도 가장 낮아져야
+ * 하므로 `(cos - 1)`을 쓴다. 정지·벽·모션 감소에서는 0이다.
+ */
+export function studioGaitBodyOffset(distance: number, stride: number, moving: boolean, reducedMotion: boolean): {
+  readonly offsetX: number;
+  readonly offsetY: number;
+} {
+  if (!moving || reducedMotion || !Number.isFinite(distance) || distance < 0 || !Number.isFinite(stride) || stride <= 0) {
+    return { offsetX: 0, offsetY: 0 };
+  }
+  const phase = distance / stride * Math.PI * 4;
+  return { offsetX: Math.sin(phase) * GAIT_BODY_SWAY, offsetY: (Math.cos(phase) - 1) * GAIT_BODY_LIFT };
+}
+
 /** Phaser setDeadzone은 추적 위치도 재설정하므로 모드 변경 시에만 호출한다. */
 export class StudioCameraFollowModeController {
   private mode: StudioVirtualCameraMode | null = null;
