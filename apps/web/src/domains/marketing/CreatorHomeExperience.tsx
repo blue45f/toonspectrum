@@ -1,5 +1,5 @@
 import { translateCurrentStaticSourceText, useBilingualLocalizer } from "@/shared/lib/i18n-bilingual-copy";
-import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, ClipboardCheck, FileOutput, FolderKanban, Handshake, PackageCheck, PanelsTopLeft, ShieldCheck, Sparkles, Users, Workflow, type LucideIcon } from "lucide-react";
+import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, ChevronRight, ClipboardCheck, FileOutput, FolderKanban, Handshake, Layers3, PackageCheck, PanelsTopLeft, Search, ShieldCheck, Sparkles, Users, Workflow, type LucideIcon } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
@@ -15,6 +15,7 @@ import "./creator-all-in-one.css";
 import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
 import "./creator-ecosystem-atlas.css";
+import "./creator-home-reference.css";
 
 import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { CreatorEcosystemAtlas } from "./CreatorEcosystemAtlas";
@@ -149,6 +150,64 @@ const COPY = {
   },
 } as const;
 
+function ReferenceHomeDashboard({ copy }: { copy: typeof COPY.ko }) {
+  const quick = [
+    { href: "/studio/new", title: "새 웹툰 시작하기", body: "AI와 함께 작품을 빠르게 시작", image: "/brand/atelier-process-960.webp", icon: Brush },
+    { href: "/story-lab", title: "스토리 만들기", body: "시놉시스·콘티를 구성", image: "/brand/toonstudio-premium-icons/story.webp", icon: BookOpen },
+    { href: "/studio/character", title: "캐릭터 만들기", body: "캐릭터를 디자인하고 설정", image: "/brand/toonstudio-premium-icons/character.webp", icon: Users },
+    { href: "/studio/bg3d", title: "배경 만들기", body: "AI 배경과 3D 스튜디오", image: "/brand/atelier-world-960.webp", icon: Boxes },
+    { href: "/studio", title: "빈 캔버스", body: "지금 바로 그림 그리기", image: "/brand/production-os-workspace.svg", icon: PanelsTopLeft },
+  ] as const;
+  const projects = [
+    { title: "최설의 도시", meta: "12화 · 2024.11.12", image: "/brand/atelier-process-960.webp" },
+    { title: "다시, 봄이 오면", meta: "8화 · 2024.11.10", image: "/brand/atelier-world-960.webp" },
+    { title: "달빛 아래서", meta: "6화 · 연재 준비", image: "/brand/atelier-materials-960.webp" },
+    { title: "포토레톤 나비", meta: "5화 · 2024.11.08", image: "/brand/atelier-20260927/creation-world.webp" },
+    { title: "붉은 기억", meta: "3화 · 2024.11.05", image: "/brand/production-os-hero.svg" },
+  ] as const;
+  const modules = [
+    { href: "/studio", title: "프로젝트", body: "작품과 회차를 한곳에서 관리", image: "/brand/production-os-workspace.svg", icon: FolderKanban, tag: "WORKSPACE" },
+    { href: "/studio/character", title: "캐릭터 스튜디오", body: "기본 설정부터 포즈·의상·AI 생성까지", image: "/brand/toonstudio-premium-icons/character.webp", icon: Users, tag: "CHARACTER" },
+    { href: "/studio/bg3d", title: "배경 스튜디오", body: "장면과 공간을 빠르게 구성", image: "/brand/toonstudio-premium-icons/background.webp", icon: Boxes, tag: "WORLD" },
+    { href: "/studio/assets", title: "에셋 라이브러리", body: "작품을 완성하는 모든 소재", image: "/brand/toonstudio-premium-icons/assets.webp", icon: Layers3, tag: "ASSETS" },
+    { href: "/story-lab", title: "스토리보드", body: "아이디어를 장면과 컷으로", image: "/brand/toonstudio-premium-icons/story.webp", icon: PanelsTopLeft, tag: "STORY" },
+    { href: "/ai", title: "AI 크리에이티브 디렉터", body: "스토리·캐릭터·장면을 함께 발전", image: "/brand/toonstudio-visual-identity/ai-creative-director.webp", icon: Bot, tag: "AI" },
+    { href: "/publish", title: "발행 & 공유", body: "완성한 이야기를 세상과 연결", image: "/brand/product-tour/09-publish.png", icon: PackageCheck, tag: "PUBLISH" },
+    { href: "/community", title: "커뮤니티", body: "함께 만들고 더 많은 이야기를 발견", image: "/brand/toonstudio-premium-icons/community.webp", icon: Handshake, tag: "COMMUNITY" },
+  ] as const;
+  return (
+    <section className="reference-home-dashboard" aria-label={localeLabel(copy)}>
+      <div className="reference-home-topbar">
+        <div className="reference-home-brand"><span className="reference-home-logo">✦</span><div><strong>ToonStudio</strong><small>Stories Come to Life</small></div></div>
+        <nav aria-label="Creator workspace"><a href="/studio">프로젝트</a><a href="/studio/canvas">캔버스</a><a href="/studio/character">캐릭터</a><a href="/studio/bg3d">배경</a><a href="/studio/assets">에셋</a><a href="/ai">AI</a><a href="/community">커뮤니티</a></nav>
+        <div className="reference-home-actions"><button type="button" aria-label="검색"><Search size={16} /></button><button type="button" aria-label="알림"><Sparkles size={16} /></button><span className="reference-home-avatar">TS</span><Link href="/studio/new" className="reference-home-new">+ 새 프로젝트</Link></div>
+      </div>
+      <div className="reference-home-hero">
+        <div className="reference-home-copy">
+          <p className="reference-home-kicker">CREATOR WORKSPACE · TOONSTUDIO</p>
+          <h2 className="reference-home-display-title">오늘은 어떤 이야기를<br /><em>만들까요?</em></h2>
+          <p className="reference-home-lead">당신의 상상이, 새로운 세상을 닮게 될 웹툰이 됩니다.<br />좋은 이야기는 좋은 도구에서 시작됩니다.</p>
+          <div className="reference-home-search"><Search size={18} /><span>아이디어를 입력해보세요. 예: 비 오는 날의 첫사랑</span><ChevronRight size={19} /></div>
+          <div className="reference-home-quick-grid">
+            {quick.map(({ href, title, body, image, icon: Icon }) => <Link key={href} href={href} className="reference-home-quick"><span className="reference-home-media" style={{ backgroundImage: `url("${image}")` }} aria-hidden="true" /><span className="reference-home-quick-icon"><Icon size={16} /></span><strong>{title}</strong><small>{body}</small></Link>)}
+          </div>
+          <div className="reference-home-ai-note"><span className="reference-home-ai-avatar">L</span><div><strong>안녕하세요. 저는 Luna예요.</strong><p>스토리 아이디어, 캐릭터 설정, 장면 구성까지 함께 만들어볼까요?</p></div><ChevronRight size={17} /></div>
+        </div>
+        <div className="reference-home-editor">
+          <div className="reference-editor-heading"><strong>캔버스</strong><span>최신의 도시 · Chapter 08</span><button type="button">미리보기 ↗</button></div>
+          <div className="reference-editor-body"><aside><Brush size={16}/><PanelsTopLeft size={16}/><Layers3 size={16}/><Boxes size={16}/><Users size={16}/><Sparkles size={16}/></aside><div className="reference-editor-canvas"><div className="reference-editor-media" style={{ backgroundImage: "url(\"/brand/production-os-workspace.svg\")" }} aria-hidden="true" /><div className="reference-editor-bubble">…아직 끝나지 않았어.</div></div><div className="reference-editor-inspector"><strong>레이어</strong><span>불투명도 · 100%</span>{["대사","캐릭터","포즈","배경","그림자","스케치","원본"].map((x,i)=><div key={x} className={i===1 ? "is-active" : ""}><span>{x}</span><small>{i+1}</small></div>)}</div></div>
+          <div className="reference-editor-strip">{["/brand/atelier-process-640.webp","/brand/atelier-world-640.webp","/brand/atelier-materials-640.webp","/brand/atelier-20260927/creation-world.webp","/brand/production-os-hero.svg"].map((src,i)=><span key={src} className="reference-editor-thumb" style={{ backgroundImage: `url("${src}")` }} aria-label={`장면 ${i+1}`} role="img" />)}</div>
+          <div className="reference-editor-caption">그리는 순간, 이야기가 살아납니다. <i>Draw Your Story</i></div>
+        </div>
+      </div>
+      <div className="reference-home-projects"><div className="reference-home-section-title"><div><small>RECENT PROJECTS</small><h2>최근 프로젝트</h2></div><Link href="/studio">전체 보기 <ChevronRight size={16}/></Link></div><div className="reference-project-grid">{projects.map((p)=><Link href="/studio" key={p.title}><span className="reference-project-media" style={{ backgroundImage: `url("${p.image}")` }} aria-hidden="true"/><strong>{p.title}</strong><small>{p.meta}</small></Link>)}<Link href="/studio/new" className="reference-project-new"><span>+</span><strong>새 프로젝트</strong></Link></div></div>
+      <div className="reference-home-modules"><div className="reference-home-section-title"><div><small>YOUR CREATIVE UNIVERSE</small><h2>당신의 모든 이야기가, 하나의 세상으로</h2></div><span>Better Tools · Greater Stories</span></div><div className="reference-module-grid">{modules.map(({href,title,body,image,icon:Icon,tag})=><Link href={href} key={href} className="reference-module"><div className="reference-module-art"><span className="reference-module-media" style={{ backgroundImage: `url("${image}")` }} aria-hidden="true"/><span><Icon size={17}/></span></div><div className="reference-module-body"><small>{tag}</small><h3>{title}</h3><p>{body}</p><ChevronRight size={16}/></div></Link>)}</div></div>
+    </section>
+  );
+}
+
+function localeLabel(copy: typeof COPY.ko) { return copy.primary === "새 작품 시작하기" ? "ToonStudio 크리에이터 홈" : "ToonStudio creator home"; }
+
 export function CreatorHomeExperience() {
   useCreatorHomeSectionNavigation();
   const language = useI18n((state) => state.lang);
@@ -167,6 +226,9 @@ export function CreatorHomeExperience() {
       data-product-direction="planning-to-publishing"
       lang={language}
     >
+      <ReferenceHomeDashboard copy={copy} />
+
+      <div className="reference-home-legacy">
       <section className="cf-hero cf-shell" aria-labelledby="creator-hero-title">
         <div className="cf-hero-copy">
           <p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{identity.category}</p>
@@ -275,6 +337,7 @@ export function CreatorHomeExperience() {
           <Link href="/production/projects/sample-project/overview" className="cf-button cf-secondary">{copy.closingSecondary}</Link>
         </div>
       </section>
+      </div>
     </div>
   );
 }
