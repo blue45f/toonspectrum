@@ -11,6 +11,8 @@ export function StudioVirtualSpaceReviewPicker({ workId, peerName, disabled, onI
 }) {
   const bt = useBilingual("StudioVirtualSpaceReviewPicker");
   const selectId = useId();
+  const panelRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [result, setResult] = useState<StudioVirtualSpaceReviewChoices | null>(null);
   const [selected, setSelected] = useState("");
   const [sending, setSending] = useState(false);
@@ -19,6 +21,17 @@ export function StudioVirtualSpaceReviewPicker({ workId, peerName, disabled, onI
   const generation = useRef(0);
   const proposal = useRef<AbortController | null>(null);
   const invalidate = useCallback(() => { ++generation.current; proposal.current?.abort(); proposal.current = null; }, []);
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = panelRef.current;
+    headingRef.current?.focus({ preventScroll: true });
+    panel?.scrollIntoView?.({ block: "nearest", behavior: "auto" });
+    return () => {
+      if (previous?.isConnected && (panel?.contains(document.activeElement) || document.activeElement === document.body)) {
+        previous.focus({ preventScroll: true });
+      }
+    };
+  }, []);
   useEffect(() => {
     const own = ++generation.current;
     setResult(null); setSelected(""); setFailed(false); setSending(false);
@@ -43,8 +56,8 @@ export function StudioVirtualSpaceReviewPicker({ workId, peerName, disabled, onI
     } catch { if (own === generation.current) setFailed(true); }
     finally { if (own === generation.current) setSending(false); }
   };
-  return <section className="vs2-panel studio-vspace-review-picker" aria-label={bt("검수본 선택", "Choose a review snapshot")} data-space-interactive="true">
-    <h2>{bt("함께 볼 검수본", "Review the same snapshot")}</h2>
+  return <section ref={panelRef} className="vs2-panel studio-vspace-review-picker" aria-label={bt("검수본 선택", "Choose a review snapshot")} data-space-interactive="true">
+    <h2 ref={headingRef} tabIndex={-1}>{bt("함께 볼 검수본", "Review the same snapshot")}</h2>
     <p>{bt(`${peerName} 님에게 보낼 검수본을 선택하세요. 서로 같은 버전을 확인하며 원고 편집권은 바뀌지 않아요.`, `Choose a snapshot to review with ${peerName}. You will see the same version; editing permissions stay as assigned.`)}</p>
     {!result ? <p role="status">{bt("검수본을 확인하고 있어요…", "Checking review snapshots…")}</p>
       : !result.ok ? <p role="status">{result.reason === "access-denied"

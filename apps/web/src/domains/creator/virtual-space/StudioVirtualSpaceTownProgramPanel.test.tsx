@@ -7,6 +7,7 @@ import { studioVirtualDecorationPreset } from "./studio-virtual-space-customizat
 import { StudioVirtualSpaceTownProgramPanel } from "./StudioVirtualSpaceTownProgramPanel";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
+import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
 
 afterEach(cleanup);
 
@@ -119,5 +120,22 @@ describe("StudioVirtualSpaceTownProgramPanel", () => {
     expect(equip).toBeTruthy();
     fireEvent.click(equip!);
     expect(value.onEquipReward).toHaveBeenCalledWith("review-sparkle");
+  });
+
+  it("독립 장소의 블루프린트 적용 결과를 알리고 한도 부족 시 기존 배치를 유지한다", () => {
+    const value = { ...props(), manifest: studioVirtualPlaceWorldManifest("personal-atelier", true) };
+    const view = render(<StudioVirtualSpaceTownProgramPanel {...value} selfPoint={{ x: 480, y: 540 }} />);
+    fireEvent.click(screen.getByRole("tab", { name: "블루프린트" }));
+    clickFirstButton("블루프린트 배치");
+    expect(value.onDecorations).toHaveBeenCalledOnce();
+    expect(screen.getByRole("status").textContent).toContain("가구 4개를 배치했어요");
+    value.onDecorations.mockClear();
+    const decorations = { ...value.decorations, placements: Array.from({ length: 34 }, (_, index) => ({
+      id: `rug-${index}`, type: "rug" as const, x: 100, y: 100, rotation: 0 as const, scale: 1,
+    })) };
+    view.rerender(<StudioVirtualSpaceTownProgramPanel {...value} decorations={decorations} />);
+    clickFirstButton("블루프린트 배치");
+    expect(value.onDecorations).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toContain("빈 자리 4개가 필요해요");
   });
 });

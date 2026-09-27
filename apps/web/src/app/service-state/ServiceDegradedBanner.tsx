@@ -65,10 +65,11 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
           ? "border-good/35 bg-good/10 text-good"
           : "border-warn/40 bg-warn/10 text-fg",
         immersive
-          && "fixed left-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[90] w-[min(46rem,calc(100vw-1rem))] -translate-x-1/2 rounded-2xl border",
+          && "fixed left-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[90] w-[min(46rem,calc(100vw-1rem))] -translate-x-1/2 rounded-2xl border max-sm:bg-panel",
       )}
     >
-      <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-3 gap-y-2">
+      <div className={cn("mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-3 gap-y-2",
+        immersive && "max-sm:grid max-sm:grid-cols-[auto_minmax(0,1fr)] max-sm:items-start") }>
         {recovered
           ? <CheckCircle2 className="size-5 shrink-0" aria-hidden="true" />
           : <AlertTriangle className="size-5 shrink-0 text-warn" aria-hidden="true" />}
@@ -96,12 +97,14 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
           </button>
         ) : null}
         {!recovered ? (
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className={cn("ml-auto flex shrink-0 items-center gap-2",
+            immersive && "max-sm:col-span-2 max-sm:ml-0 max-sm:grid max-sm:grid-cols-2") }>
             <button
               type="button"
               onClick={requestServiceCapabilityRefresh}
               disabled={state.checking}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-warn/40 px-3 text-xs font-bold disabled:opacity-50"
+              className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-warn/40 px-3 text-xs font-bold disabled:opacity-50",
+                immersive && "max-sm:justify-center")}
             >
               <RefreshCw
                 className={cn("size-3.5", state.checking && "animate-spin")}
@@ -111,7 +114,8 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
             </button>
             <Link
               href="/status"
-              className="inline-flex min-h-11 items-center rounded-xl bg-fg px-3 text-xs font-bold text-canvas"
+              className={cn("inline-flex min-h-11 items-center rounded-xl bg-fg px-3 text-xs font-bold text-canvas",
+                immersive && "max-sm:justify-center")}
             >
               상태 자세히
             </Link>

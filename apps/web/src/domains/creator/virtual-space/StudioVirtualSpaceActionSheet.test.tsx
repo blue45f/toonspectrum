@@ -1,11 +1,26 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StudioVirtualSpaceActionSheet } from "./StudioVirtualSpaceActionSheet";
 import type { StudioSpatialAction } from "./studio-virtual-space-spatial-actions";
 import type { StudioWorldInteractionDefinition } from "./studio-virtual-space-world-manifest";
+
+const original = Object.fromEntries(["showModal", "close"].map((name) => [name, Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, name)]));
+const showModal = vi.fn(function (this: HTMLDialogElement) { this.setAttribute("open", ""); });
+beforeEach(() => {
+  showModal.mockClear();
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: showModal });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: function (this: HTMLDialogElement) { this.removeAttribute("open"); } });
+});
+afterEach(() => {
+  cleanup();
+  for (const [name, descriptor] of Object.entries(original)) {
+    if (descriptor) Object.defineProperty(HTMLDialogElement.prototype, name, descriptor);
+    else Reflect.deleteProperty(HTMLDialogElement.prototype, name);
+  }
+});
 
 const interaction: StudioWorldInteractionDefinition = {
   id: "team-console",
@@ -28,6 +43,38 @@ const actions: readonly StudioSpatialAction[] = [
   },
 ];
 describe("StudioVirtualSpaceActionSheet", () => {
+  it("네이티브 모달로 열고 확인 단계에서 취소 버튼으로 이동한 뒤 원래 버튼에 포커스를 돌린다", () => {
+    const trigger = document.createElement("button");
+    trigger.textContent = "상호작용";
+    document.body.append(trigger);
+    trigger.focus();
+    const value = { interaction, actions, onChoose: vi.fn(), onConfirm: vi.fn(), onClose: vi.fn() };
+    const view = render(<StudioVirtualSpaceActionSheet {...value} />);
+    expect(showModal).toHaveBeenCalledOnce();
+    expect(screen.getByRole("dialog").tagName).toBe("DIALOG");
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: /팀·그룹·초대/u }));
+    view.rerender(<StudioVirtualSpaceActionSheet {...value} phase="confirming" selectedActionId="team-hub" onClose={vi.fn()} />);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "취소" }));
+    expect(showModal).toHaveBeenCalledOnce();
+    view.rerender(<StudioVirtualSpaceActionSheet {...value} phase="running" selectedActionId="team-hub" />);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "닫기" }));
+    view.unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it("한글 조합 중 Escape는 유지하고 명시적 Escape와 네이티브 취소를 처리한다", () => {
+    const onClose = vi.fn();
+    render(<StudioVirtualSpaceActionSheet interaction={interaction} actions={actions} onChoose={vi.fn()} onClose={onClose} />);
+    const dialog = screen.getByRole("dialog");
+    fireEvent.keyDown(dialog, { key: "Escape", isComposing: true });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(fireEvent.keyDown(dialog, { key: "Escape" })).toBe(false);
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(fireEvent(dialog, new Event("cancel", { bubbles: false, cancelable: true }))).toBe(false);
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
   it("selects a guarded action without executing confirmation implicitly", () => {
     const onChoose = vi.fn();
     const onConfirm = vi.fn();

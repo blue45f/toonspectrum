@@ -1,6 +1,9 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
 import type { StudioVirtualCharacterCustomization } from "./studio-virtual-space-customization";
 import { pixelMakerNativeWalkClip } from "./studio-virtual-space-character-native-art";
+import { createStudioThemeCharacterSkin } from "./studio-virtual-space-character-theme-art";
+import { STUDIO_THEME_CHARACTER_SOURCES } from "./studio-virtual-space-theme-character-sources";
+import type { StudioCharacterAtlasLayout } from "./studio-virtual-space-character-atlas";
 import {
   studioVirtualArtNpcUrl,
   studioVirtualArtPlayerUrl,
@@ -35,6 +38,7 @@ export interface StudioCharacterPoseSheet {
   readonly textureUrl: string;
   readonly frameWidth: number;
   readonly frameHeight: number;
+  readonly atlas?: StudioCharacterAtlasLayout;
   readonly directionFrames: Readonly<Record<StudioVirtualSpaceFacing, number>>;
   readonly frames: readonly StudioCharacterFramePresentation[];
 }
@@ -43,12 +47,8 @@ export interface StudioCharacterAtlasClip {
   readonly textureUrl: string;
   readonly frameWidth: number;
   readonly frameHeight: number;
-  /** Original PNG dimensions and explicitly inspected pixels outside the four integer cells. */
-  readonly atlas?: {
-    readonly width: number;
-    readonly height: number;
-    readonly remainder: { readonly right: 0 | 1; readonly bottom: 0 | 1; readonly maxAlpha: 0 | 1; readonly nonzeroAlphaPixels: 0 | 1 };
-  };
+  /** 원본 크기와 명시적 격자 또는 기존 2×2 원본의 검수된 여백. */
+  readonly atlas?: StudioCharacterAtlasLayout;
   readonly start: number;
   readonly end: number;
   readonly frameRate: number;
@@ -63,6 +63,12 @@ export interface StudioCharacterSkin {
   readonly key: StudioCharacterSkinKey;
   readonly labelKo: string;
   readonly labelEn: string;
+  /** 신규 스킨 추가가 기존 자동 identity 배정을 바꾸지 않도록 명시 선택에만 노출한다. */
+  readonly selectionOnly?: boolean;
+  /** 독립 작화의 출처 테마. 다른 테마를 선택해도 이 스킨의 원본을 보존한다. */
+  readonly nativeArtStyle?: StudioVirtualArtStyleKey;
+  /** 모든 방향·행동이 같은 원본을 사용하는 스킨은 GPU 텍스처를 한 번만 보유한다. */
+  readonly sharedAtlas?: boolean;
   readonly directional: Readonly<Record<StudioVirtualSpaceFacing, string>>;
   readonly state?: Readonly<Partial<Record<"talk" | "draw" | "review", string>>>;
   readonly clips?: Readonly<Partial<Record<StudioCharacterWalkClipKey, StudioCharacterAtlasClip>>>;
@@ -136,6 +142,7 @@ function imagegen25Skin(): StudioCharacterSkin {
   });
   return Object.freeze({
     key: "imagegen25",
+    selectionOnly: true,
     labelKo: "픽셀 메이커",
     labelEn: "Pixel Maker",
     directional: imagegen25DirectionUrls(),
@@ -171,16 +178,18 @@ export const STUDIO_CHARACTER_SKINS: readonly StudioCharacterSkin[] = Object.fre
   { key: "dark", labelKo: "지훈", labelEn: "Jihun", directional: directionUrls("dark"), clips: DARK_DRAWN_WALKS, poses: DARK_DRAWN_POSES },
   { key: "purple", labelKo: "리호", labelEn: "Riho", directional: directionUrls("purple"), clips: PURPLE_DRAWN_WALKS, poses: PURPLE_DRAWN_POSES },
   imagegen25Skin(),
+  ...STUDIO_THEME_CHARACTER_SOURCES.map(createStudioThemeCharacterSkin),
 ]);
 
 const FALLBACK_SKIN = STUDIO_CHARACTER_SKINS[0]!;
 
-export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v1-actions-3-native-pixel-maker";
+export const STUDIO_CHARACTER_REGISTRY_REVISION = "drawn-characters-v2-independent-office-art";
 export const STUDIO_CHARACTER_APPEARANCE_REGISTRY: StudioVirtualSpaceAppearanceRegistry = Object.freeze({
   revision: STUDIO_CHARACTER_REGISTRY_REVISION,
   fallbackSkinKey: FALLBACK_SKIN.key,
   skins: STUDIO_CHARACTER_SKINS.map((skin) => ({
     key: skin.key,
+    selectionOnly: skin.selectionOnly,
     capabilities: [...new Set(["idle", ...Object.keys(skin.clips ?? {}), ...Object.keys(skin.poses ?? {}),
       ...Object.keys(skin.state ?? {}), ...Object.keys(skin.actions ?? {})])] as StudioVirtualSpaceAppearanceClip[],
   })),
@@ -211,7 +220,7 @@ export function studioCharacterSkinForAvatarIndex(index: number, identity?: stri
   }
   const explicit = Number.isInteger(index) && index >= 0;
   const safe = explicit ? index : identity ? hash >>> 0 : 0;
-  const candidates = explicit ? STUDIO_CHARACTER_SKINS : STUDIO_CHARACTER_SKINS.filter((skin) => skin.key !== "imagegen25");
+  const candidates = explicit ? STUDIO_CHARACTER_SKINS : STUDIO_CHARACTER_SKINS.filter((skin) => !skin.selectionOnly);
   return candidates[safe % candidates.length] ?? FALLBACK_SKIN;
 }
 
@@ -315,7 +324,7 @@ export function studioCharacterSkinForArtStyle(
   artStyle: StudioVirtualArtStyleKey,
 ): StudioCharacterSkin {
   // 네이티브 걷기 원본을 보존한다. 나머지 v6 행동은 별도 교체가 필요한 레거시다.
-  if (source.key === "imagegen25") return source;
+  if (source.key === "imagegen25" || source.nativeArtStyle) return source;
   const cacheKey = `${source.key}:${artStyle}:v5`;
   const cached = STYLED_SKIN_CACHE.get(cacheKey);
   if (cached) return cached;

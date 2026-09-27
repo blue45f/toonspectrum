@@ -7,6 +7,7 @@ import {
 } from "./studio-virtual-space-place-catalog";
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import { studioNpcToolAction } from "./studio-virtual-space-npc-director";
+import { registerStudioVirtualPlaceSetDressing, studioVirtualSetDressingColliders } from "./studio-virtual-space-world-set-dressing";
 import type {
   StudioVirtualSpaceWorldManifest,
   StudioWorldInteractionDefinition,
@@ -40,37 +41,23 @@ interface PlaceLayoutSpec {
   readonly floorFrame: number;
   readonly accentFrame: number;
   readonly npcSkinKey: typeof NPC_SKINS[number];
-  readonly obstacles: readonly StudioWorldRect[];
 }
 
-const SIMPLE_OBSTACLES: readonly StudioWorldRect[] = Object.freeze([
-  { x: 238, y: 218, width: 92, height: 44 },
-  { x: 630, y: 218, width: 92, height: 44 },
-]);
-const TABLE_OBSTACLE: readonly StudioWorldRect[] = Object.freeze([
-  { x: 385, y: 248, width: 190, height: 72 },
-]);
-const STAGE_OBSTACLES: readonly StudioWorldRect[] = Object.freeze([
-  { x: 350, y: 132, width: 260, height: 56 },
-  { x: 250, y: 366, width: 86, height: 42 },
-  { x: 624, y: 366, width: 86, height: 42 },
-]);
-
 const PLACE_LAYOUTS: Readonly<Record<string, PlaceLayoutSpec>> = Object.freeze({
-  skyport: { shape: "cross", indoor: false, baseFrame: 1, floorFrame: 6, accentFrame: 13, npcSkinKey: "npc-concierge", obstacles: SIMPLE_OBSTACLES },
-  "creator-plaza": { shape: "circle", indoor: false, baseFrame: 1, floorFrame: 5, accentFrame: 14, npcSkinKey: "npc-host", obstacles: SIMPLE_OBSTACLES },
-  "personal-atelier": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 9, accentFrame: 6, npcSkinKey: "npc-artist", obstacles: TABLE_OBSTACLE },
-  "story-lab": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 10, accentFrame: 5, npcSkinKey: "npc-producer", obstacles: TABLE_OBSTACLE },
-  "creator-cafe": { shape: "terrace", indoor: false, baseFrame: 1, floorFrame: 10, accentFrame: 6, npcSkinKey: "npc-cafe", obstacles: SIMPLE_OBSTACLES },
-  "team-meeting": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 9, accentFrame: 15, npcSkinKey: "npc-security", obstacles: TABLE_OBSTACLE },
-  "tree-library": { shape: "garden", indoor: false, baseFrame: 1, floorFrame: 5, accentFrame: 10, npcSkinKey: "npc-archivist", obstacles: SIMPLE_OBSTACLES },
-  "review-gallery": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 6, accentFrame: 14, npcSkinKey: "npc-editor", obstacles: TABLE_OBSTACLE },
-  garden: { shape: "garden", indoor: false, baseFrame: 1, floorFrame: 8, accentFrame: 14, npcSkinKey: "npc-cafe", obstacles: SIMPLE_OBSTACLES },
-  observatory: { shape: "circle", indoor: false, baseFrame: 4, floorFrame: 6, accentFrame: 16, npcSkinKey: "npc-editor", obstacles: SIMPLE_OBSTACLES },
-  arcade: { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 12, accentFrame: 16, npcSkinKey: "npc-host", obstacles: STAGE_OBSTACLES },
-  beach: { shape: "beach", indoor: false, baseFrame: 13, floorFrame: 8, accentFrame: 4, npcSkinKey: "npc-cafe", obstacles: SIMPLE_OBSTACLES },
-  "event-stage": { shape: "cross", indoor: false, baseFrame: 1, floorFrame: 11, accentFrame: 16, npcSkinKey: "npc-host", obstacles: STAGE_OBSTACLES },
-  "production-control": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 9, accentFrame: 15, npcSkinKey: "npc-producer", obstacles: TABLE_OBSTACLE },
+  skyport: { shape: "cross", indoor: false, baseFrame: 1, floorFrame: 6, accentFrame: 13, npcSkinKey: "npc-concierge" },
+  "creator-plaza": { shape: "circle", indoor: false, baseFrame: 1, floorFrame: 5, accentFrame: 14, npcSkinKey: "npc-host" },
+  "personal-atelier": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 9, accentFrame: 6, npcSkinKey: "npc-artist" },
+  "story-lab": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 10, accentFrame: 5, npcSkinKey: "npc-producer" },
+  "creator-cafe": { shape: "terrace", indoor: false, baseFrame: 1, floorFrame: 10, accentFrame: 6, npcSkinKey: "npc-cafe" },
+  "team-meeting": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 9, accentFrame: 15, npcSkinKey: "npc-security" },
+  "tree-library": { shape: "garden", indoor: false, baseFrame: 1, floorFrame: 5, accentFrame: 10, npcSkinKey: "npc-archivist" },
+  "review-gallery": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 6, accentFrame: 14, npcSkinKey: "npc-editor" },
+  garden: { shape: "garden", indoor: false, baseFrame: 1, floorFrame: 8, accentFrame: 14, npcSkinKey: "npc-cafe" },
+  observatory: { shape: "circle", indoor: false, baseFrame: 4, floorFrame: 6, accentFrame: 16, npcSkinKey: "npc-editor" },
+  arcade: { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 12, accentFrame: 16, npcSkinKey: "npc-host" },
+  beach: { shape: "beach", indoor: false, baseFrame: 13, floorFrame: 8, accentFrame: 4, npcSkinKey: "npc-cafe" },
+  "event-stage": { shape: "cross", indoor: false, baseFrame: 1, floorFrame: 11, accentFrame: 16, npcSkinKey: "npc-host" },
+  "production-control": { shape: "indoor", indoor: true, baseFrame: 2, floorFrame: 9, accentFrame: 15, npcSkinKey: "npc-producer" },
 });
 
 export function isStudioVirtualPlaceId(value: unknown): value is string {
@@ -172,16 +159,15 @@ function floorCell(spec: PlaceLayoutSpec, x: number, y: number): boolean {
 function buildTileData(place: StudioVirtualPlaceDefinition, spec: PlaceLayoutSpec) {
   const seed = placeIndex(place.id);
   const ground = Array.from({ length: MAP_COLUMNS * MAP_ROWS }, (_, index) => {
-    const x = index % MAP_COLUMNS;
     const y = Math.floor(index / MAP_COLUMNS);
-    if (spec.shape === "beach" && y >= 8) return 13 + ((x + seed) % 4);
-    return spec.baseFrame + ((x * 3 + y + seed) % 2);
+    if (spec.shape === "beach" && y >= 8) return 4;
+    return spec.baseFrame;
   });
   const floor = ground.map((_, index) => {
     const x = index % MAP_COLUMNS;
     const y = Math.floor(index / MAP_COLUMNS);
     if (!floorCell(spec, x, y)) return 0;
-    return spec.floorFrame + ((x + y + seed) % 2);
+    return spec.floorFrame;
   });
   const accent = ground.map((_, index) => {
     const x = index % MAP_COLUMNS;
@@ -309,7 +295,7 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
     { id: "portal-previous", point: { x: 58, y: 320 }, radius: 26, href: portalHref(previous.id) },
     { id: "portal-next", point: { x: 902, y: 320 }, radius: 26, href: portalHref(next.id) },
   ]);
-  return Object.freeze({
+  return registerStudioVirtualPlaceSetDressing(Object.freeze({
     id: `toonstudio-place-${place.id}`,
     version: 100 + index,
     width: WORLD_WIDTH,
@@ -347,7 +333,7 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
     }),
     rooms: Object.freeze([room]),
     props: placeProps(place, spec),
-    colliders: Object.freeze([...boundaries, ...spec.obstacles]),
+    colliders: Object.freeze([...boundaries, ...studioVirtualSetDressingColliders(place.id)]),
     interactions: Object.freeze(interactions),
     portals,
     spawns: Object.freeze([
@@ -394,5 +380,5 @@ export function studioVirtualPlaceWorldManifest(placeId: string, personal = fals
       maxDurationMs: 28_000,
     }]),
     npcs: Object.freeze([npcDefinition]),
-  }) as unknown as StudioVirtualSpaceWorldManifest;
+  }) as unknown as StudioVirtualSpaceWorldManifest, place.id);
 }

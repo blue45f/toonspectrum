@@ -1,8 +1,7 @@
 import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
-import { studioWorldCollisionRects, type StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
-import { studioWorldLineCanOccupy } from "./studio-virtual-space-world-connectivity";
+import type { StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
 import { stepStudioVirtualSpaceMotion, type StudioVirtualSpaceMotionConfig } from "./studio-virtual-space-motion";
-import { STUDIO_WORLD_PLAYER_RADIUS, studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
+import { studioWorldCanOccupy, studioWorldCanTraverse } from "./studio-virtual-space-world-pathfinding";
 import { studioWorldArrivalInput } from "./studio-virtual-space-runtime-policy";
 
 /** Same stop distance `studioWorldArrivalInput` uses for a final walkable point. */
@@ -24,12 +23,7 @@ export function advanceStudioWorldPath(
     const waypoint = path[skip]!;
     const next = path[skip + 1]!;
     if (Math.hypot(waypoint.x - current.x, waypoint.y - current.y) > lookAhead) break;
-    const count = Math.max(1, Math.ceil(Math.hypot(next.x - current.x, next.y - current.y) / 3));
-    let clear = true;
-    for (let n = 1; n <= count; n += 1) {
-      if (!studioWorldCanOccupy(manifest, { x: current.x + (next.x - current.x) * n / count, y: current.y + (next.y - current.y) * n / count })) { clear = false; break; }
-    }
-    if (!clear) break;
+    if (!studioWorldCanTraverse(manifest, current, next)) break;
     skip += 1;
   }
   return skip ? path.slice(skip) : path;
@@ -69,10 +63,9 @@ export function pullStudioWorldPath(
   path: readonly StudioVirtualSpacePoint[],
 ): readonly StudioVirtualSpacePoint[] {
   if (path.length <= 1) return path;
-  const colliders = studioWorldCollisionRects(manifest);
   for (let index = path.length - 1; index >= 1; index -= 1) {
     const candidate = path[index]!;
-    if (studioWorldLineCanOccupy(manifest, colliders, current, candidate, STUDIO_WORLD_PLAYER_RADIUS)) {
+    if (studioWorldCanTraverse(manifest, current, candidate)) {
       return path.slice(index);
     }
   }
@@ -84,13 +77,7 @@ function segmentFits(
   from: StudioVirtualSpacePoint,
   to: StudioVirtualSpacePoint,
 ): boolean {
-  return studioWorldLineCanOccupy(
-    manifest,
-    studioWorldCollisionRects(manifest),
-    from,
-    to,
-    STUDIO_WORLD_PLAYER_RADIUS,
-  ) && studioWorldCanOccupy(manifest, to);
+  return studioWorldCanTraverse(manifest, from, to) && studioWorldCanOccupy(manifest, to);
 }
 
 /**

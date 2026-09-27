@@ -26,20 +26,38 @@ export function StudioVirtualSpaceActionSheet({
   readonly onClose: () => void;
 }) {
   const bt = useBilingual("StudioVirtualSpaceActionSheet");
+  const dialog = useRef<HTMLDialogElement>(null);
   const first = useRef<HTMLButtonElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const close = useRef<HTMLButtonElement>(null);
   const selectedAction = actions.find((item) => item.id === selectedActionId) ?? null;
   const confirmationVisible = phase === "confirming" && selectedAction !== null;
   const busy = phase === "checking-authority" || phase === "running";
   useEffect(() => {
-    first.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    globalThis.addEventListener("keydown", closeOnEscape);
-    return () => globalThis.removeEventListener("keydown", closeOnEscape);
-  }, [interaction.id, onClose]);
+    const element = dialog.current;
+    if (!element) return;
+    const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // 네이티브 모달이 배경을 inert로 만들고 키보드 포커스를 시트 안에 유지한다.
+    element.showModal();
+    return () => {
+      element.close();
+      if (returnFocus?.isConnected && !returnFocus.closest("[inert]")) returnFocus.focus({ preventScroll: true });
+    };
+  }, [interaction.id]);
+  useEffect(() => {
+    // 동작 선택에서 확인 단계로 바뀌면 사라진 버튼 대신 취소 버튼에 포커스를 둔다.
+    const target = confirmationVisible ? cancel.current : busy ? close.current : first.current ?? close.current;
+    target?.focus({ preventScroll: true });
+  }, [interaction.id, phase, confirmationVisible, busy]);
 
-  return <div className="studio-vspace-action-backdrop" data-space-interactive="true">
-    <section className="studio-vspace-action-sheet" role="dialog" aria-modal="true"
-      aria-labelledby="studio-vspace-action-title" aria-busy={busy}
+  return <dialog ref={dialog} className="studio-vspace-action-backdrop" data-space-interactive="true"
+    aria-modal="true" aria-labelledby="studio-vspace-action-title" aria-busy={busy}
+    onCancel={(event) => { event.preventDefault(); onClose(); }}
+    onKeyDown={(event) => {
+      event.stopPropagation();
+      if (event.key === "Escape" && !event.nativeEvent.isComposing) { event.preventDefault(); onClose(); }
+    }} onKeyUp={(event) => event.stopPropagation()}>
+    <section className="studio-vspace-action-sheet"
       data-interaction-phase={phase}>
       <header>
         <div>
@@ -50,7 +68,7 @@ export function StudioVirtualSpaceActionSheet({
             "You are close enough. Choose an action; proximity never starts a tool automatically.",
           )}</span>
         </div>
-        <button type="button" onClick={onClose} aria-label={bt("닫기", "Close")}><X size={19} aria-hidden /></button>
+        <button ref={close} type="button" onClick={onClose} aria-label={bt("닫기", "Close")}><X size={19} aria-hidden /></button>
       </header>
       {confirmationVisible && selectedAction ? <section className="studio-vspace-action-confirm" role="group"
         aria-labelledby="studio-vspace-action-confirm-title">
@@ -70,7 +88,7 @@ export function StudioVirtualSpaceActionSheet({
             )}</small>
         </div>
         <div className="studio-vspace-action-confirm-buttons">
-          <button type="button" onClick={onClose}>{bt("취소", "Cancel")}</button>
+          <button ref={cancel} type="button" onClick={onClose}>{bt("취소", "Cancel")}</button>
           <button type="button" onClick={onConfirm}><Check size={16} aria-hidden />{bt("확인하고 계속", "Confirm and continue")}</button>
         </div>
       </section> : busy ? <div className="studio-vspace-action-progress" role="status">
@@ -93,5 +111,5 @@ export function StudioVirtualSpaceActionSheet({
         "Conversation, meeting and review invitations start only after consent; microphone and camera remain explicit choices.",
       )}</footer>
     </section>
-  </div>;
+  </dialog>;
 }

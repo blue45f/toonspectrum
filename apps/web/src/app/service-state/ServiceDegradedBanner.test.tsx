@@ -28,10 +28,10 @@ vi.mock("@/platform/service-capability-state", () => ({
   requestServiceCapabilityRefresh: mocks.refresh,
   useServiceCapabilityState: () => mocks.state,
 }));
-function renderBanner() {
+function renderBanner(immersive: boolean) {
   return render(
     <MemoryRouter>
-      <ServiceDegradedBanner />
+      <ServiceDegradedBanner immersive={immersive} />
     </MemoryRouter>,
   );
 }
@@ -59,9 +59,9 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("ServiceDegradedBanner", () => {
+describe.each([false, true])("ServiceDegradedBanner immersive=%s", (immersive) => {
   it("states the affected capabilities without blocking local editing", () => {
-    renderBanner();
+    renderBanner(immersive);
     const status = screen.getByRole("status");
     expect(status.textContent).toContain("커뮤니티 조회");
     expect(status.textContent).toContain("클라우드 저장");
@@ -87,7 +87,7 @@ describe("ServiceDegradedBanner", () => {
       recoveredAt: Date.now(),
     };
 
-    renderBanner();
+    renderBanner(immersive);
 
     expect(screen.getByRole("status").textContent)
       .toContain("온라인 기능이 복구되었습니다");
@@ -100,6 +100,8 @@ it("몰입 화면의 상단 도구를 덮지 않고 장애 상세를 펼치거�
   const status = screen.getByRole("status");
   expect(status.className).toContain("bottom-[calc(5.5rem+env(safe-area-inset-bottom))]");
   expect(status.className).not.toContain("top-");
+  expect(status.className).toContain("max-sm:bg-panel");
+  expect(status.querySelector("div")?.className).toContain("max-sm:grid-cols-[auto_minmax(0,1fr)]");
   const detail = screen.getByText(/로컬 편집은 계속 사용할 수 있습니다/);
   expect(detail.hidden).toBe(true);
   const expand = screen.getByRole("button", { name: "서비스 상태 알림 펼치기" });

@@ -750,7 +750,8 @@ export class StudioRealtimeProviderSession {
   }
 
   private scheduleReconnect(): void {
-    if (this.disposed || this.reconnectTimer !== null) return;
+    // 입장 거절·이력 복구 불가 판정은 타이머의 후속 catch에서도 다시 시도하지 않는다.
+    if (this.disposed || this.status.state === "revoked" || this.reconnectTimer !== null) return;
     this.reconnectAttempt += 1;
     const exponential = Math.min(
       this.maximumReconnectMs,
@@ -771,6 +772,7 @@ export class StudioRealtimeProviderSession {
     });
     this.reconnectTimer = this.scheduleTimeout(() => {
       this.reconnectTimer = null;
+      if (this.disposed || this.status.state === "revoked") return;
       void this.connect().catch(() => {
         this.scheduleReconnect();
       });

@@ -5,7 +5,9 @@ import {
   type StudioCharacterSkin,
   type StudioCharacterFramePresentation,
   type StudioCharacterAtlasClip,
+  type StudioCharacterPoseSheet,
 } from "./studio-virtual-space-character-skins";
+import { studioCharacterAtlasFrameCount, studioCharacterAtlasSheetMatches } from "./studio-virtual-space-character-atlas";
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
 import { STUDIO_CHARACTER_FOOT_ORIGIN } from "./studio-virtual-space-presentation";
 
@@ -16,6 +18,8 @@ export interface StudioCharacterTextureAsset {
   readonly frameWidth?: number;
   readonly frameHeight?: number;
   readonly animationKey?: string;
+  /** 공통 atlas를 해제할 때 함께 정리할 방향별 animation 목록. */
+  readonly animationKeys?: readonly string[];
   /** 정지 자세도 원본 atlas의 한 셀과 동일한 기하 정보를 사용한다. */
   readonly frame?: number;
   readonly presentation?: StudioCharacterFramePresentation;
@@ -41,13 +45,18 @@ export function studioCharacterStaticTextureKey(
 }
 
 export const studioCharacterWalkTextureKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing) =>
-  `studio-player-${skin.key}-walk-sheet-${facing}`;
+  skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-walk-sheet-${facing}`;
 export const studioCharacterWalkAnimationKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing) =>
   `studio-player-${skin.key}-walk-animation-${facing}`;
 export const studioCharacterPoseTextureKey = (skin: StudioCharacterSkin, state: "sit" | "wave") =>
-  `studio-player-${skin.key}-pose-sheet-${state}`;
+  skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-pose-sheet-${state}`;
 export const studioCharacterActionTextureKey = (skin: StudioCharacterSkin, facing: StudioVirtualSpaceFacing, state: StudioCharacterMotionState) =>
-  `studio-player-${skin.key}-${state}-sheet-${facing}`;
+  skin.sharedAtlas ? `studio-player-${skin.key}-atlas` : `studio-player-${skin.key}-${state}-sheet-${facing}`;
+
+function sharedAtlasAnimations(skin: StudioCharacterSkin) {
+  return skin.sharedAtlas ? { animationKeys: (["down", "right", "left", "up"] as const)
+    .map((facing) => studioCharacterWalkAnimationKey(skin, facing)) } : {};
+}
 
 /** Local scene time drives actions; floor distance only drives walking. */
 export function studioCharacterActionFrame(clip: StudioCharacterAtlasClip, elapsedMs: number, reducedMotion: boolean): number {
@@ -57,15 +66,21 @@ export function studioCharacterActionFrame(clip: StudioCharacterAtlasClip, elaps
 
 /** Never infer a different cell grid from an unexpected CDN/source image. */
 export function studioCharacterActionSheetMatches(clip: StudioCharacterAtlasClip, width: number, height: number): boolean {
-  const atlas = clip.atlas;
-  if (!atlas) return width === clip.frameWidth * 2 && height === clip.frameHeight * 2;
-  const remainder = atlas.remainder;
-  return [width, height, clip.frameWidth, clip.frameHeight].every((n) => Number.isSafeInteger(n) && n > 0)
-    && width === atlas.width && height === atlas.height
-    && (remainder.right === 0 || remainder.right === 1) && (remainder.bottom === 0 || remainder.bottom === 1)
-    && width === clip.frameWidth * 2 + remainder.right && height === clip.frameHeight * 2 + remainder.bottom
-    && (remainder.maxAlpha === 0 || remainder.maxAlpha === 1)
-    && (remainder.nonzeroAlphaPixels === 0 || remainder.nonzeroAlphaPixels === 1);
+  return studioCharacterAtlasSheetMatches(clip, width, height)
+    && Number.isSafeInteger(clip.start) && Number.isSafeInteger(clip.end)
+    && clip.start >= 0 && clip.end >= clip.start && clip.end < studioCharacterAtlasFrameCount(clip.atlas);
+}
+
+export function studioCharacterPoseSheetMatches(pose: StudioCharacterPoseSheet, width: number, height: number): boolean {
+  return studioCharacterAtlasSheetMatches(pose, width, height)
+    && Object.values(pose.directionFrames).every((frame) => Number.isSafeInteger(frame)
+      && frame >= 0 && frame < studioCharacterAtlasFrameCount(pose.atlas) && pose.frames[frame] !== undefined);
+}
+
+/** 로더는 선언된 원본 크기와 격자를 검증한 뒤 프레임을 등록한다. */
+export function studioCharacterTextureSheetMatches(asset: StudioCharacterTextureAsset, width: number, height: number): boolean {
+  return asset.type === "spritesheet" && asset.frameWidth !== undefined && asset.frameHeight !== undefined
+    && studioCharacterAtlasSheetMatches({ frameWidth: asset.frameWidth, frameHeight: asset.frameHeight, atlas: asset.atlas }, width, height);
 }
 
 export function studioCharacterFrameGeometry(
@@ -84,8 +99,8 @@ export function studioCharacterFrameGeometry(
 
 /** 원본 atlas 크기가 달라지면 전체 시트나 잘못된 셀을 정지 자세로 표시하지 않는다. */
 export function studioCharacterStaticSheetMatches(asset: StudioCharacterTextureAsset, width: number, height: number): boolean {
-  return asset.frame === undefined || (asset.type === "spritesheet" && asset.atlas !== undefined
-    && width === asset.atlas.width && height === asset.atlas.height);
+  return asset.frame === undefined || (asset.atlas !== undefined && studioCharacterTextureSheetMatches(asset, width, height)
+    && Number.isSafeInteger(asset.frame) && asset.frame >= 0 && asset.frame < studioCharacterAtlasFrameCount(asset.atlas));
 }
 
 export function studioCharacterStaticAsset(
@@ -101,6 +116,7 @@ export function studioCharacterStaticAsset(
     animationKey: studioCharacterWalkAnimationKey(skin, facing), frame: idle.frame,
     presentation: idle.clip.frames?.[idle.frame - idle.clip.start],
     atlas: idle.clip.atlas,
+    ...sharedAtlasAnimations(skin),
   };
   return { key: studioCharacterStaticTextureKey(skin, facing, state), url: stateUrl ?? skin.directional[facing], type: "image" };
 }
@@ -117,13 +133,13 @@ export function studioCharacterVisualAssets(
   const clip = state === "walk" ? studioCharacterWalkClip(skin, facing) : undefined;
   if (clip && !assets.some((asset) => asset.key === studioCharacterWalkTextureKey(skin, facing))) assets.push({ key: studioCharacterWalkTextureKey(skin, facing), url: clip.textureUrl,
     type: "spritesheet", frameWidth: clip.frameWidth, frameHeight: clip.frameHeight,
-    animationKey: studioCharacterWalkAnimationKey(skin, facing) });
+    animationKey: studioCharacterWalkAnimationKey(skin, facing), atlas: clip.atlas, ...sharedAtlasAnimations(skin) });
   const action = studioCharacterActionClip(skin, facing, state);
-  if (action) assets.push({ key: studioCharacterActionTextureKey(skin, facing, state), url: action.textureUrl,
-    type: "spritesheet", frameWidth: action.frameWidth, frameHeight: action.frameHeight });
+  if (action && !assets.some((asset) => asset.key === studioCharacterActionTextureKey(skin, facing, state))) assets.push({ key: studioCharacterActionTextureKey(skin, facing, state), url: action.textureUrl,
+    type: "spritesheet", frameWidth: action.frameWidth, frameHeight: action.frameHeight, atlas: action.atlas });
   const pose = state === "sit" || state === "wave" ? skin.poses?.[state] : undefined;
-  if (pose) assets.push({ key: studioCharacterPoseTextureKey(skin, state as "sit" | "wave"), url: pose.textureUrl,
-    type: "spritesheet", frameWidth: pose.frameWidth, frameHeight: pose.frameHeight });
+  if (pose && (state === "sit" || state === "wave") && !assets.some((asset) => asset.key === studioCharacterPoseTextureKey(skin, state))) assets.push({ key: studioCharacterPoseTextureKey(skin, state), url: pose.textureUrl,
+    type: "spritesheet", frameWidth: pose.frameWidth, frameHeight: pose.frameHeight, atlas: pose.atlas });
   return assets;
 }
 

@@ -103,6 +103,16 @@ function lineWalkable(
   return value;
 }
 
+/** 계획과 실제 경유점 단축이 같은 충돌·지형·높이 규칙을 사용한다. */
+export function studioWorldCanTraverse(
+  manifest: StudioVirtualSpaceWorldManifest,
+  from: StudioVirtualSpacePoint,
+  to: StudioVirtualSpacePoint,
+  radius = DEFAULT_RADIUS,
+): boolean {
+  return lineWalkable(manifest, studioWorldCollisionRects(manifest), from, to, radius);
+}
+
 function smoothPath(
   manifest: StudioVirtualSpaceWorldManifest,
   colliders: readonly StudioWorldRect[],
