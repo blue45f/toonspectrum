@@ -128,11 +128,11 @@ postgres("Managed administrator PostgreSQL schema", () => {
   });
 
   it("grants existing administrator CRUD without schema ownership or destructive table privileges", async () => {
+    const { buildAdminRuntimeAclSql, buildAdminCapabilitySql } = await import(
+      new URL("../../../../../scripts/admin-database-contract.mjs", import.meta.url).href
+    );
     const { schema, client } = await fixture();
     const role = `admin_runtime_${randomUUID().replaceAll("-", "")}`;
-    const { buildAdminRuntimeAclSql, buildAdminCapabilitySql } = await import(
-      new URL("../../../../scripts/admin-database-contract.mjs", import.meta.url).href
-    );
     try {
       await migrate(client, schema);
       await client.query(`CREATE ROLE "${role}" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`);
