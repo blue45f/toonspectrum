@@ -31,8 +31,15 @@ describe("private object storage location contract", () => {
       contractVersion: "toonspectrum.private-object-storage.v2",
       providerId: "cloudflare-r2",
     };
+    const brandedV2 = {
+      ...deployedV1,
+      contractVersion: "toonstudio.private-object-storage.v2",
+      providerId: "cloudflare-r2",
+    };
     expect(PrivateObjectReferenceSchema.parse(deployedV1)).toEqual(deployedV1);
     expect(PrivateObjectReferenceSchema.parse(deployedV2)).toEqual(deployedV2);
+    expect(PrivateObjectReferenceSchema.parse(brandedV2)).toEqual(brandedV2);
+    expect(isLocatedPrivateObjectReference(PrivateObjectReferenceSchema.parse(brandedV2))).toBe(true);
     expect(unlocatePrivateObjectReference(PrivateObjectReferenceSchema.parse(deployedV2)))
       .toEqual(deployedV1);
   });
