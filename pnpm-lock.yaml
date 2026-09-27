@@ -336,7 +336,7 @@ importers:
         specifier: ^13.6.31
         version: 13.6.31
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
       zustand:
         specifier: ^5.0.14
@@ -644,7 +644,7 @@ importers:
         specifier: ^13.6.31
         version: 13.6.31
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
     devDependencies:
       '@types/express':
@@ -718,7 +718,7 @@ importers:
         specifier: ^13.6.31
         version: 13.6.31
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
     devDependencies:
       '@types/node':
@@ -768,7 +768,7 @@ importers:
         specifier: workspace:*
         version: link:../studio-project-model
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
 
   packages/studio-engine-skia:
@@ -816,7 +816,7 @@ importers:
         specifier: workspace:*
         version: link:../studio-project-model
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
     devDependencies:
       '@types/node':
@@ -826,7 +826,7 @@ importers:
   packages/studio-project-model:
     dependencies:
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
 
   tests/integration/api-web:
