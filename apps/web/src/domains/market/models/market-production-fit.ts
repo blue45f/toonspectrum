@@ -172,6 +172,10 @@ const LICENSE_CAPABILITIES: Readonly<
     commercialUse: true,
     attributionRequired: false,
   },
+  "toonspectrum-standard": {
+    commercialUse: true,
+    attributionRequired: false,
+  },
   "cc0-1.0": {
     commercialUse: true,
     attributionRequired: false,

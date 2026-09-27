@@ -104,6 +104,12 @@ export interface MarketLicenseMeta {
 
 export const MARKET_LICENSES: readonly MarketLicenseMeta[] = Object.freeze([
   {
+    license: "toonstudio-standard",
+    label: "ToonStudio 표준 사용권",
+    summary: "작품 사용은 자유, 리소스 파일 재배포는 불가",
+    url: null,
+  },
+  {
     license: "toonspectrum-standard",
     label: "ToonStudio 표준 사용권",
     summary: "작품 사용은 자유, 리소스 파일 재배포는 불가",
@@ -128,6 +134,8 @@ export const MARKET_LICENSES: readonly MarketLicenseMeta[] = Object.freeze([
     url: "https://creativecommons.org/licenses/by-nc/4.0/",
   },
 ]);
+
+export const MARKET_LICENSE_GUIDE: readonly MarketLicenseMeta[] = MARKET_LICENSES;
 
 const MARKET_LICENSE_BY_LICENSE = new Map(MARKET_LICENSES.map((meta) => [meta.license, meta]));
 
