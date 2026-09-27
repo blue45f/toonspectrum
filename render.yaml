@@ -230,7 +230,7 @@ services:
       # Catalog ships in the reviewed deploy bundle; runtime ingest stays off here.
       - key: CATALOG_INGEST_MODE
         value: "off"
-      # Socket handshake ACL/CRDT state lookup Neon URL. This host is not the Core HTTP API.
+      # Socket handshake ACL/CRDT state lookup uses the current Supabase production authority.
       # Enter secrets in the dashboard; use a dedicated DB role with only Studio relations GRANTed.
       - key: DATABASE_URL
         sync: false
