@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Lager {count}",
   "studio.toolsCompanion.review.section.comments": "Kommentera {count}",
   "studio.toolsCompanion.review.section.history": "Spela in {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE sidaEtikett}·{urvalEtikett ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "inspektionskonsol",
   "studio.toolsCompanion.review.truncatedComments": "och {count} kommentarer",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lager",

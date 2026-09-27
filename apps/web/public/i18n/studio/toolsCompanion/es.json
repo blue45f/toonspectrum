@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Capa {count}",
   "studio.toolsCompanion.review.section.comments": "Comentar {count}",
   "studio.toolsCompanion.review.section.history": "Registro {count}",
-  "studio.toolsCompanion.review.subtitle": "Página ZZLBRACEEtiqueta}· Selección ZZLBRACEEtiqueta ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "consola de inspección",
   "studio.toolsCompanion.review.truncatedComments": "y {count} comentarios",
   "studio.toolsCompanion.review.truncatedLayers": "{count} capas",

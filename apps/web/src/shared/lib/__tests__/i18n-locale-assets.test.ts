@@ -33,14 +33,6 @@ const REFERENCE_LOCALE = "en";
 /** The app-shell key surface every published dictionary was authored against. */
 const BASELINE_APP_KEY_COUNT = 525;
 /**
- * Keys that exist only in the built-in ko/en pair. They describe the fallback chain itself, so
- * every other locale reaches them through that chain rather than through its own asset.
- */
-const SHELL_ONLY_KEYS = [
-  "control.language.group.englishBase",
-  "control.language.group.translated",
-];
-/**
  * Translated strings for `contact` / `play` / `fortune` surfaces that neither ko nor en publish
  * and no `t()` call reads. They are unreachable through the fallback chain, so they cost nothing
  * beyond a few bytes of a lazily fetched asset — but the set is frozen here so the next orphan
@@ -77,13 +69,8 @@ describe("published app locale assets", () => {
     for (const locale of APP_I18N_ASSET_LOCALES) {
       const dictionary = readAsset(locale);
       const missing = referenceKeys.filter((key) => typeof dictionary[key] !== "string");
-      const expectedMissing = (APP_I18N_BUILT_IN_LOCALES as readonly string[]).includes(locale)
-        ? []
-        : SHELL_ONLY_KEYS;
-
-      // Anything an asset omits must be a documented shell-only key, never an accidental hole
-      // that would surface as a raw translation key on screen.
-      expect(missing.sort(), `${locale} omits unexpected keys`).toEqual(expectedMissing);
+      // 언어 선택 그룹 이름까지 각 namespace에 게시되어 모든 기준 키를 보존해야 한다.
+      expect(missing.sort(), `${locale} omits unexpected keys`).toEqual([]);
       expect(
         Object.values(dictionary).every((value) => typeof value === "string"),
         `${locale} has a non-string value`,
@@ -135,24 +122,28 @@ describe("published app locale assets", () => {
 });
 
 describe("measured translation coverage", () => {
-  it("reports the five locales that carry a real translation", () => {
+  it("현재 게시한 모든 언어의 번역 비율이 기존 기준을 충족한다", () => {
     const fullyTranslated = APP_I18N_ASSET_LOCALES.filter((locale) =>
       APP_I18N_LOCALE_TRANSLATED_RATIO[locale] >= APP_I18N_TRANSLATED_LOCALE_THRESHOLD,
     );
 
-    expect([...fullyTranslated].sort()).toEqual(["en", "ja", "ko", "zh", "zh-hant"]);
+    expect(APP_I18N_ASSET_LOCALES).toHaveLength(75);
+    expect([...fullyTranslated].sort()).toEqual([...APP_I18N_ASSET_LOCALES].sort());
   });
 
-  it("does not let a mostly-English locale claim to be translated", () => {
-    // These render English for ~97% of the product surface. The picker must not present them
-    // the same way it presents Japanese.
-    for (const locale of ["af", "id", "pt", "sv", "es", "fr", "de"]) {
-      expect(
-        isFullyTranslatedAppLocale(locale),
-        `${locale} must not be advertised as fully translated`,
-      ).toBe(false);
-      expect(getAppI18nTranslatedRatio(locale)).toBeLessThan(
-        APP_I18N_TRANSLATED_LOCALE_THRESHOLD,
+  it("영어 placeholder가 많은 사전을 번역 완료로 계산하지 않는다", () => {
+    const reference = { first: "First", second: "Second", third: "Third", fourth: "Fourth" };
+    const mostlyEnglish = { ...reference, first: "첫째" };
+    const halfTranslated = { ...mostlyEnglish, second: "둘째" };
+    expect(APP_I18N_TRANSLATED_LOCALE_THRESHOLD).toBe(0.5);
+    expect(measureTranslatedRatio(mostlyEnglish, reference)).toBe(0.25);
+    expect(measureTranslatedRatio(mostlyEnglish, reference)).toBeLessThan(APP_I18N_TRANSLATED_LOCALE_THRESHOLD);
+    expect(measureTranslatedRatio(halfTranslated, reference)).toBe(APP_I18N_TRANSLATED_LOCALE_THRESHOLD);
+    expect(isFullyTranslatedAppLocale("cy")).toBe(false);
+    expect(getAppI18nTranslatedRatio("cy")).toBe(0);
+    for (const locale of APP_I18N_ASSET_LOCALES) {
+      expect(isFullyTranslatedAppLocale(locale)).toBe(
+        APP_I18N_LOCALE_TRANSLATED_RATIO[locale] >= APP_I18N_TRANSLATED_LOCALE_THRESHOLD,
       );
     }
   });
@@ -176,7 +167,7 @@ describe("measured translation coverage", () => {
     const byCode = new Map(options.map((option) => [option.code, option]));
 
     expect(byCode.get("ja")?.fullyTranslated).toBe(true);
-    expect(byCode.get("af")?.fullyTranslated).toBe(false);
+    expect(byCode.get("af")?.fullyTranslated).toBe(true);
     // es-419 has no asset of its own; it inherits the Spanish asset's measured coverage.
     expect(byCode.get("es-419")?.translatedRatio).toBe(
       APP_I18N_LOCALE_TRANSLATED_RATIO.es,

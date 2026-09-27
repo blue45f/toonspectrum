@@ -75,7 +75,7 @@
   "search.explorer.time.noData": "Nessuna informazione aggiornata",
   "search.explorer.time.justNow": "Aggiornato appena",
   "search.explorer.time.minutesAgo": "{count} m fa",
-  "search.explorer.time.hoursAgo": "ZZPLACEholder0ZZh fa",
+  "search.explorer.time.hoursAgo": "{count}h fa",
   "search.explorer.time.daysAgo": "{count} giorni fa",
   "search.explorer.loadMore": "Caricare di più"
 }

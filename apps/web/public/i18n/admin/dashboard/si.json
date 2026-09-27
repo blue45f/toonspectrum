@@ -1,5 +1,5 @@
 {
-  "admin.dashboard.period": "පසුගිය{දින}දින ·{දින ZZ RBRACE",
+  "admin.dashboard.period": "පසුගිය{days}දින ·{date}",
   "admin.dashboard.loadError": "ප් රමිති පැටවීමේ අසමත් වීම",
   "admin.dashboard.groupUsers": "පරිශීලකයින්",
   "admin.dashboard.groupCommunity": "ප් රජාව",

@@ -1,5 +1,5 @@
 {
-  "admin.campaigns.count": "ZZLBRACE تحسب حملات منشئي المحتوى ZZ RBRACE",
+  "admin.campaigns.count": "{count} حملات منشئي المحتوى",
   "admin.campaigns.new": "حملة جديدة",
   "admin.campaigns.edit": "تحرير الحملة",
   "admin.campaigns.empty": "لا توجد حملات مسجلة، انقر على حملة جديدة لإضافة واحدة",

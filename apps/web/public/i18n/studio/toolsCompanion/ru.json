@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Слой {count}",
   "studio.toolsCompanion.review.section.comments": "Комментарий {count}",
   "studio.toolsCompanion.review.section.history": "Запись {count}",
-  "studio.toolsCompanion.review.subtitle": "Страница ZZLBRACEМетка}· Выбор ZZLBRACEМетка ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "инспекционная консоль",
   "studio.toolsCompanion.review.truncatedComments": "и {count} комментариев",
   "studio.toolsCompanion.review.truncatedLayers": "{count} слоев",

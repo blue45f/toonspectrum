@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Շերտ {count}",
   "studio.toolsCompanion.review.section.comments": "Մեկնաբանություն {count}",
   "studio.toolsCompanion.review.section.history": "Ձայնագրեք {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{ընտրությունՊիտակ ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "ստուգման վահանակ",
   "studio.toolsCompanion.review.truncatedComments": "և {count} մեկնաբանություններ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} շերտ",

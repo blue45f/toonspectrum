@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "स्तर {count}",
   "studio.toolsCompanion.review.section.comments": "टिप्पणी {count}",
   "studio.toolsCompanion.review.section.history": "रेकॉर्ड {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE पृष्ठलेबल}·{निवडलेबल ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "तपासणी कन्सोल",
   "studio.toolsCompanion.review.truncatedComments": "आणि {count} टिप्पण्या",
   "studio.toolsCompanion.review.truncatedLayers": "{count} स्तर",
