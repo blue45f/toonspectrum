@@ -80,6 +80,9 @@ function isDirectoryTarget(target) {
 export function shardForTarget(target) {
   if (
     target.startsWith("apps/api/")
+    || target === "apps/web/src/domains/creator/production-hub"
+    || target.startsWith("apps/web/src/domains/creator/production-hub/")
+    || target === "packages/contracts/src/production-workflow.test.ts"
     || target.startsWith("deploy/cloudflare-analytics/")
     || target === "scripts/deploy-cloudflare-analytics.test.mjs"
     || target === "scripts/free-database-federation.test.mjs"
