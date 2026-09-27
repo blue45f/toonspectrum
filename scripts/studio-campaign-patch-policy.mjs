@@ -36,6 +36,7 @@ const FORBIDDEN_PATH_RULES = Object.freeze([
   /^apps\/(?:web|admin-web)\/vite\.config\.ts$/u,
   /^apps\/api\/drizzle\.config\.ts$/u,
   /^apps\/api\/src\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,
+  /^apps\/api\/src\/platform\/database\/(?:migrations(?:\/|$)|schema(?:\.|\/|$)|[^/]+\.schema\.ts$)/u,
   /^lib\/db\/(?:migrations(?:\/|$)|schema(?:\.|\/|$))/u,
   /^drizzle(?:\.|\/|$)/u,
   /^docs\/automation\/studio-seven-day-campaign\.json$/u,
