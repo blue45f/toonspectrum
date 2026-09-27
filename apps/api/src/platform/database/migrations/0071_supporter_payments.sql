@@ -1,4 +1,4 @@
--- One-time ToonStudio operating-cost supporter ledger and public funding settings.
+-- One-time ToonSpectrum operating-cost supporter ledger and public funding settings.
 -- Stores lifecycle metadata only; never card numbers, bank authentication data, or tax-donation receipt data.
 
 BEGIN;
@@ -78,6 +78,6 @@ REVOKE ALL ON TABLE public.supporter_funding_setting FROM PUBLIC;
 COMMENT ON TABLE public.supporter_payment IS
   'One-time voluntary operating-cost support ledger; no card/bank authentication data or tax-donation receipt data.';
 COMMENT ON TABLE public.supporter_funding_setting IS
-  'Public operating-cost goal and supporter-wall visibility settings managed by ToonStudio operators.';
+  'Public operating-cost goal and supporter-wall visibility settings managed by ToonSpectrum operators.';
 
 COMMIT;

@@ -24,6 +24,7 @@ const CREATOR_MARKETPLACE_DB_VERIFIER =
 
 export const POSTGRES_INTEGRATION_SUITES = Object.freeze([
   "scripts/production-operations-runtime-acl.integration.test.mjs",
+  "scripts/production-release-compatibility.integration.test.mjs",
   "apps/api/src/modules/operation-policy/operation-policy.integration.test.ts",
   "apps/api/src/modules/production-collaboration/team-workspace.repository.integration.test.ts",
   "scripts/bootstrap-runtime-login-gate.integration.test.mjs",

@@ -18,6 +18,7 @@ export const CREATOR_MARKETPLACE_RESOURCE_KINDS = [
 
 export const CREATOR_MARKETPLACE_RESOURCE_LICENSES = [
   "toonstudio-standard",
+  "toonspectrum-standard",
   "cc0-1.0",
   "cc-by-4.0",
   "cc-by-nc-4.0",
@@ -422,7 +423,7 @@ function refineCreatorMarketplaceManifest(
     }
     if (
       manifest.provenance.origin === "permissive" &&
-      manifest.license === "toonstudio-standard"
+      (manifest.license === "toonstudio-standard" || manifest.license === "toonspectrum-standard")
     ) {
       context.addIssue({
         code: "custom",

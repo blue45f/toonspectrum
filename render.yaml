@@ -3,7 +3,7 @@
 # runs as an independent HTTPS origin. Retired Vercel runtimes are not part of the release path.
 services:
   - type: web
-    name: toonstudio-core-api
+    name: toonspectrum-core-api
     runtime: node
     region: singapore
     # Free instances can sleep after inactivity and therefore do not provide an SLA.

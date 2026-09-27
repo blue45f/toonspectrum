@@ -107,8 +107,8 @@ describe("Cloudflare static gateway", () => {
     expect(wrangler.assets?.run_worker_first).not.toContain("/market/*");
     expect(wrangler.r2_buckets).toEqual([{
       binding: "LARGE_ASSETS",
-      bucket_name: "toonstudio-public-assets",
-      preview_bucket_name: "toonstudio-public-assets",
+      bucket_name: "toonspectrum-public-assets",
+      preview_bucket_name: "toonspectrum-public-assets",
     }]);
   });
 

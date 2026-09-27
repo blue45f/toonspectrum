@@ -299,6 +299,7 @@ const KIND_LABEL_FALLBACK: Readonly<Record<CreatorMarketplaceResourceKind, strin
 const LICENSE_LABEL: Readonly<Record<CreatorMarketplaceResourceLicense, string>> =
   Object.freeze({
     "toonstudio-standard": "studio.community.license.toonstudioStandard",
+    "toonspectrum-standard": "studio.community.license.toonstudioStandard",
     "cc0-1.0": "studio.community.license.cc0",
     "cc-by-4.0": "studio.community.license.ccBy4",
     "cc-by-nc-4.0": "studio.community.license.ccByNc4",
@@ -306,6 +307,7 @@ const LICENSE_LABEL: Readonly<Record<CreatorMarketplaceResourceLicense, string>>
 const LICENSE_LABEL_FALLBACK: Readonly<Record<CreatorMarketplaceResourceLicense, string>> =
   Object.freeze({
     "toonstudio-standard": "표준 · 파일 재배포 금지",
+    "toonspectrum-standard": "표준 · 파일 재배포 금지",
     "cc0-1.0": "CC0 · 제한 없이 허용",
     "cc-by-4.0": "CC BY · 출처 표시",
     "cc-by-nc-4.0": "CC BY-NC · 비상업",

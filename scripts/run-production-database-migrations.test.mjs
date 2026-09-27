@@ -46,10 +46,10 @@ import {
 
 test("manifest lists every numbered SQL migration exactly once in order", () => {
   const manifest = loadMigrationManifest();
-  expect(manifest).toHaveLength(92);
+  expect(manifest).toHaveLength(93);
   expect(manifest[0].id).toBe("0001_studio_ai_usage_ledger");
-  expect(manifest.at(-1).id).toBe("0092_collaboration_application_selection");
-  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(92);
+  expect(manifest.at(-1).id).toBe("0093_release_brand_compatibility");
+  expect(new Set(manifest.map(({ checksum }) => checksum)).size).toBe(93);
 });
 
 test("migration directory matches the managed manifest without duplicate sequence numbers", () => {
@@ -528,7 +528,7 @@ test("creator storage location migration pins primaries and inventories verified
   for (const requiredFragment of [
     'ADD COLUMN IF NOT EXISTS "providerId" text',
     "coalesce(\"providerId\", 'supabase')",
-    "toonstudio.private-object-storage.v2",
+    "toonspectrum.private-object-storage.v2",
     "creator_asset_storage_object_provider_check",
     "CREATE TABLE IF NOT EXISTS public.creator_asset_storage_replica",
     "creator_asset_storage_replica_object_fkey",
