@@ -163,3 +163,32 @@ test("모바일 일괄 편집은 미리 보기 후 지정한 필드만 원자적
   await expect(card).toContainText("긴급");
   await expect(card).toContainText("작업 중");
 });
+
+test("전역 장애 배너가 제작 편집 대화상자의 내용과 저장 버튼을 가리지 않는다", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const report = {
+    status: "degraded", incidentId: "qa-production-dialog-layer", retryAfterSeconds: 60,
+    checkedAt: "2026-09-27T00:00:00.000Z",
+    capabilities: {
+      publicCatalog: "available", authSession: "available", communityRead: "unavailable", communityWrite: "unavailable",
+      marketplaceRead: "available", studioLocalEditing: "available", studioProjectRead: "unavailable",
+      studioCloudSave: "unavailable", realtimeCollaboration: "unavailable", publishing: "unavailable", serverAi: "unavailable",
+    },
+  };
+  await page.addInitScript((value) => localStorage.setItem("toonspectrum:service-capabilities:v1", JSON.stringify(value)), report);
+  await page.route(/\/health\/capabilities(?:\?.*)?$/u, (route) => route.fulfill({ json: report }));
+  await openBoard(page);
+  const banner = page.locator('[data-service-degraded-banner="degraded"]');
+  await expect(banner).toBeVisible();
+  await page.getByRole("button", { name: "작업 만들기", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "새 제작 작업", exact: true });
+  const bannerLayer = await banner.evaluate((element) => Number.parseInt(getComputedStyle(element).zIndex, 10) || 0);
+  const dialogLayer = await dialog.evaluate((element) => Number.parseInt(getComputedStyle(element).zIndex, 10) || 0);
+  expect(dialogLayer).toBeGreaterThan(bannerLayer);
+  await dialog.getByRole("textbox", { name: "작업 제목", exact: true }).fill("배너 겹침 검증 작업");
+  const save = dialog.getByRole("button", { name: "작업 만들기", exact: true });
+  await save.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("production-dialog-above-banner-390.png") });
+  await save.click();
+  await expect(dialog).toBeHidden();
+});
