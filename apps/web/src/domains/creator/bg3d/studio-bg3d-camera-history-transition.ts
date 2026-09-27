@@ -24,7 +24,7 @@ export function resolveStudioBg3dCameraGestureCommitView(
  * hand the complete immutable composition to the replacement controller instead.
  */
 export function applyOrDeferStudioBg3dHistoryCamera(
-  viewport: BgViewportApi | null,
+  viewport: Pick<BgViewportApi, "applyView"> | null,
   pendingTarget: StudioBg3dPendingCameraTarget,
   camera: StudioBg3dCameraSettings,
 ): "applied" | "deferred" {

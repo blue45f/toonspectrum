@@ -13,7 +13,7 @@
  * from event handlers.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { CharacterShaperHistoryState } from "./character-shaper-ui-contract";
 
@@ -177,36 +177,63 @@ export interface CharacterShaperHistoryController<TSnapshot> {
   reset(): void;
 }
 
+export interface CharacterShaperHistoryOptions {
+  /** V3 authority가 이력을 소유하면 호스트 snapshot 이력을 생성·변경하지 않는다. */
+  readonly enabled?: boolean;
+}
+
+const EMPTY_CHARACTER_SHAPER_HISTORY_STATE: CharacterShaperHistoryState = {
+  canUndo: false,
+  canRedo: false,
+  recentLabels: [],
+  length: 0,
+};
+
 /**
  * React wrapper over the pure stack. The travel helpers need the *current* host state, which only
  * the caller can read, so `undo`/`redo` take it as an argument and return what to restore.
  */
-export function useCharacterShaperHistory<TSnapshot>(): CharacterShaperHistoryController<TSnapshot> {
-  const [stack, setStack] = useState<CharacterShaperHistoryStack<TSnapshot>>(createCharacterShaperHistory);
+export function useCharacterShaperHistory<TSnapshot>(
+  { enabled = true }: CharacterShaperHistoryOptions = {},
+): CharacterShaperHistoryController<TSnapshot> {
+  const [stack, setStack] = useState<CharacterShaperHistoryStack<TSnapshot> | null>(
+    () => enabled ? createCharacterShaperHistory<TSnapshot>() : null,
+  );
+
+  useEffect(() => {
+    if (!enabled) setStack(null);
+  }, [enabled]);
 
   const push = useCallback((label: string, before: TSnapshot) => {
-    setStack((current) => pushCharacterShaperHistory(current, { label, snapshot: before }));
-  }, []);
+    if (!enabled) return;
+    setStack((current) => pushCharacterShaperHistory(current ?? createCharacterShaperHistory<TSnapshot>(), { label, snapshot: before }));
+  }, [enabled]);
 
   const undo = useCallback((current: TSnapshot): TSnapshot | null => {
+    if (!enabled || !stack) return null;
     const travel = undoCharacterShaperHistory(stack, current);
     if (travel.restore === null) return null;
     setStack(travel.stack);
     return travel.restore;
-  }, [stack]);
+  }, [enabled, stack]);
 
   const redo = useCallback((current: TSnapshot): TSnapshot | null => {
+    if (!enabled || !stack) return null;
     const travel = redoCharacterShaperHistory(stack, current);
     if (travel.restore === null) return null;
     setStack(travel.stack);
     return travel.restore;
-  }, [stack]);
+  }, [enabled, stack]);
 
   const reset = useCallback(() => {
+    if (!enabled) return;
     setStack(createCharacterShaperHistory<TSnapshot>());
-  }, []);
+  }, [enabled]);
 
-  const state = useMemo(() => characterShaperHistoryState(stack), [stack]);
+  const state = useMemo(
+    () => enabled && stack ? characterShaperHistoryState(stack) : EMPTY_CHARACTER_SHAPER_HISTORY_STATE,
+    [enabled, stack],
+  );
 
   return useMemo(
     () => ({ state, push, undo, redo, reset }),

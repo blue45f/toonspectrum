@@ -152,6 +152,7 @@ export interface CharacterShaperSlotRailProps {
 }
 
 export interface CharacterShaperShelfProps {
+  readonly compact?: boolean;
   readonly binding: CharacterShaperBinding;
   readonly slot: CharacterSlotKind;
   readonly query: string;
@@ -163,6 +164,7 @@ export interface CharacterShaperShelfProps {
 }
 
 export interface CharacterSlotCardProps {
+  readonly compact?: boolean;
   readonly entry: CharacterSlotEntry;
   readonly availability: CharacterSlotAvailability;
   readonly selected: boolean;
@@ -219,5 +221,6 @@ export interface CharacterShaperMobileSheetProps {
   readonly state: CharacterShaperUiState["mobileSheet"];
   readonly onStateChange: (state: CharacterShaperUiState["mobileSheet"]) => void;
   readonly title: string;
+  readonly header?: ReactNode;
   readonly children: ReactNode;
 }

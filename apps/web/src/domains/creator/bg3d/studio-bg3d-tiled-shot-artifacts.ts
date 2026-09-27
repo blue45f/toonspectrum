@@ -1,5 +1,9 @@
 import { buildStudioBg3dTiledImages } from "./studio-bg3d-tiled-artifact-client";
 import { STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES } from "./studio-bg3d-shot-batch";
+import {
+  assertStudioBg3dShotArtifactActive,
+  assertStudioBg3dShotArtifactBudget,
+} from "./studio-bg3d-shot-artifact-pipeline";
 import type { StudioBg3dCaptureAdapter } from "./studio-bg3d-capture-adapter";
 import type {
   StudioBg3dShotArtifactPipelineInput,
@@ -18,6 +22,8 @@ export async function buildStudioBg3dTiledShotArtifacts(
     readonly onProgress?: (completed: number, total: number) => void;
   },
 ): Promise<StudioBg3dShotArtifactPipelineResult> {
+  assertStudioBg3dShotArtifactActive(input.signal);
+  assertStudioBg3dShotArtifactBudget(input.committedArtifactBytes);
   const { shot } = input;
   const result = await buildStudioBg3dTiledImages({
     adapter: input.adapter,
@@ -35,6 +41,7 @@ export async function buildStudioBg3dTiledShotArtifacts(
     assertCurrent: input.assertCurrent,
     onProgress: input.onProgress,
   });
+  assertStudioBg3dShotArtifactActive(input.signal);
   const artifactBytes = result.images.reduce(
     (sum, image) => sum + image.png.size,
     0,

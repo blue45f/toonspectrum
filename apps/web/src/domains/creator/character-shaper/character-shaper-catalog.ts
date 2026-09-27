@@ -46,21 +46,21 @@ import type { WardrobeItemDef } from "../vrm/studio-vrm-wardrobe";
 /* -------------------------------------------------------------------------- */
 
 export const CHARACTER_SLOT_METAS: readonly CharacterSlotMeta[] = Object.freeze([
-  { id: "face-shape", label: "얼굴형", labelEn: "Face shape", hint: "두상·볼·턱 비율을 한 번에 바꿉니다", group: "identity", icon: "CircleUserRound", multi: false },
-  { id: "eyes", label: "눈", labelEn: "Eyes", hint: "눈 크기·간격·눈꼬리 조합", group: "identity", icon: "Eye", multi: false },
-  { id: "irises", label: "눈동자", labelEn: "Irises", hint: "홍채 크기와 색", group: "identity", icon: "Aperture", multi: false },
-  { id: "nose", label: "코", labelEn: "Nose", hint: "코 높이와 너비", group: "identity", icon: "Triangle", multi: false },
-  { id: "mouth", label: "입", labelEn: "Mouth", hint: "입 너비·입술 볼륨과 기본 입모양", group: "identity", icon: "Smile", multi: false },
-  { id: "ears", label: "귀", labelEn: "Ears", hint: "귀 크기, 엘프·동물 귀", group: "identity", icon: "Ear", multi: false },
-  { id: "hair", label: "헤어", labelEn: "Hair", hint: "원본 헤어 또는 절차형 스타일", group: "identity", icon: "Scissors", multi: false },
-  { id: "body", label: "체형", labelEn: "Body", hint: "두신 비율 프리셋", group: "figure", icon: "Ruler", multi: false },
-  { id: "top", label: "상의", labelEn: "Top", hint: "티셔츠·셔츠·겉옷", group: "figure", icon: "Shirt", multi: false },
-  { id: "bottom", label: "하의", labelEn: "Bottom", hint: "스커트·팬츠", group: "figure", icon: "RectangleVertical", multi: false },
-  { id: "shoes", label: "신발", labelEn: "Shoes", hint: "스니커즈·부츠·힐", group: "figure", icon: "Footprints", multi: false },
-  { id: "accessory", label: "액세서리", labelEn: "Accessory", hint: "모자·안경·가방을 여러 개 조합", group: "figure", icon: "Glasses", multi: true },
-  { id: "expression", label: "표정", labelEn: "Expression", hint: "VRM 표정 조합", group: "performance", icon: "Laugh", multi: false },
-  { id: "pose", label: "포즈", labelEn: "Pose", hint: "전신 포즈 프리셋", group: "performance", icon: "PersonStanding", multi: false },
-  { id: "hand-pose", label: "손 포즈", labelEn: "Hand pose", hint: "손 모양, 왼손·오른손·양손", group: "performance", icon: "Hand", multi: false },
+  { id: "face-shape", label: "얼굴형", labelEn: "Face shape", hint: "두상·볼·턱 비율을 한 번에 바꿉니다", group: "identity", icon: "Studio3dFaceShape", multi: false },
+  { id: "eyes", label: "눈", labelEn: "Eyes", hint: "눈 크기·간격·눈꼬리 조합", group: "identity", icon: "Studio3dEyes", multi: false },
+  { id: "irises", label: "눈동자", labelEn: "Irises", hint: "홍채 크기와 색", group: "identity", icon: "Studio3dIrises", multi: false },
+  { id: "nose", label: "코", labelEn: "Nose", hint: "코 높이와 너비", group: "identity", icon: "Studio3dNose", multi: false },
+  { id: "mouth", label: "입", labelEn: "Mouth", hint: "입 너비·입술 볼륨과 기본 입모양", group: "identity", icon: "Studio3dMouth", multi: false },
+  { id: "ears", label: "귀", labelEn: "Ears", hint: "귀 크기, 엘프·동물 귀", group: "identity", icon: "Studio3dEars", multi: false },
+  { id: "hair", label: "헤어", labelEn: "Hair", hint: "원본 헤어 또는 절차형 스타일", group: "identity", icon: "Studio3dHair", multi: false },
+  { id: "body", label: "체형", labelEn: "Body", hint: "두신 비율 프리셋", group: "figure", icon: "Studio3dBody", multi: false },
+  { id: "top", label: "상의", labelEn: "Top", hint: "티셔츠·셔츠·겉옷", group: "figure", icon: "Studio3dTop", multi: false },
+  { id: "bottom", label: "하의", labelEn: "Bottom", hint: "스커트·팬츠", group: "figure", icon: "Studio3dBottom", multi: false },
+  { id: "shoes", label: "신발", labelEn: "Shoes", hint: "스니커즈·부츠·힐", group: "figure", icon: "Studio3dShoes", multi: false },
+  { id: "accessory", label: "액세서리", labelEn: "Accessory", hint: "모자·안경·가방을 여러 개 조합", group: "figure", icon: "Studio3dAccessory", multi: true },
+  { id: "expression", label: "표정", labelEn: "Expression", hint: "VRM 표정 조합", group: "performance", icon: "Studio3dExpression", multi: false },
+  { id: "pose", label: "포즈", labelEn: "Pose", hint: "전신 포즈 프리셋", group: "performance", icon: "Studio3dPose", multi: false },
+  { id: "hand-pose", label: "손 포즈", labelEn: "Hand pose", hint: "손 모양, 왼손·오른손·양손", group: "performance", icon: "Studio3dHandPose", multi: false },
 ] satisfies readonly CharacterSlotMeta[]);
 
 const SLOT_META_BY_ID = new Map(CHARACTER_SLOT_METAS.map((meta) => [meta.id, meta] as const));

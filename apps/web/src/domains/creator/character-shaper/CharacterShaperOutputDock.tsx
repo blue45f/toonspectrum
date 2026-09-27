@@ -29,6 +29,7 @@ import type { ReactNode } from "react";
 import type { Camera as ThreeCamera } from "three";
 
 import { cn } from "@/shared/lib/utils";
+import { useT } from "@/shared/lib/i18n";
 
 type DrawerMode = Exclude<CharacterShaperDrawerMode, null>;
 type ExportKind = "png" | "psd" | "sheet4" | "sheet8";
@@ -114,6 +115,7 @@ export function CharacterShaperOutputDock({
   framing = DEFAULT_CHARACTER_OUTPUT_FRAMING,
   onFramingChange,
 }: CharacterShaperOutputDockProps) {
+  const t = useT();
   const sheetId = useId();
   const aliveRef = useRef(true);
   const hostRef = useRef(h);
@@ -445,6 +447,7 @@ export function CharacterShaperOutputDock({
               key={item.id}
               type="button"
               aria-pressed={open}
+              data-character-dock-action={item.id}
               aria-label={item.label}
               title={item.label}
               disabled={capturing || exportBusy}
@@ -452,7 +455,10 @@ export function CharacterShaperOutputDock({
               className={cn(compact ? ICON_BUTTON : BUTTON, open && ACTIVE_BUTTON)}
             >
               <Icon size={16} aria-hidden />
-              {compact ? null : item.label}
+              {compact ? <span>{item.id === "reference"
+                ? t("studio.character.workspace.reference", "참고")
+                : item.id === "photo" ? t("studio.character.workspace.photoPose", "사진")
+                  : t("studio.character.workspace.webcam", "웹캠")}</span> : item.label}
             </button>
           );
         })}
@@ -464,6 +470,7 @@ export function CharacterShaperOutputDock({
         type="button"
         aria-pressed={paintActive}
         aria-keyshortcuts="B"
+        data-character-dock-action="paint"
         aria-label="표면 드로잉"
         disabled={capturing || exportBusy || paintBlocked || (!paintActive && !modelReady)}
         title={paintBlocked ? paintDisabledReason : "모델 표면에 직접 그립니다 (B)"}
@@ -471,7 +478,7 @@ export function CharacterShaperOutputDock({
         className={cn(compact ? ICON_BUTTON : BUTTON, paintActive && ACTIVE_BUTTON)}
       >
         <Paintbrush size={16} aria-hidden />
-        {compact ? null : "표면 드로잉"}
+        {compact ? <span>{t("studio.character.workspace.draw", "그리기")}</span> : "표면 드로잉"}
       </button>
 
       <div className={cn("ml-auto flex min-w-0 shrink-0 items-center", compact ? "gap-1" : "gap-1.5")}>
@@ -484,13 +491,14 @@ export function CharacterShaperOutputDock({
         <button
           type="button"
           disabled={exportBlocked}
+          data-character-dock-action="insert"
           aria-label="캔버스에 추가"
           title={auditionActive ? "후보를 확정하거나 취소한 뒤 캔버스에 넣을 수 있습니다" : "지금 화면 그대로 현재 페이지에 넣습니다"}
           onClick={insert}
           className={compact ? cn(ICON_BUTTON, "border-accent/60 bg-accent text-on-accent hover:bg-accent-2") : PRIMARY_BUTTON}
         >
           <FileImage size={16} aria-hidden />
-          {compact ? null : "캔버스에 추가"}
+          {compact ? <span>{t("studio.character.workspace.insert", "추가")}</span> : "캔버스에 추가"}
         </button>
         {compact ? (
           <button
@@ -498,12 +506,14 @@ export function CharacterShaperOutputDock({
             type="button"
             aria-expanded={sheetOpen}
             aria-controls={sheetId}
+            data-character-dock-action="export"
             aria-label="내보내기 더 보기"
             title="내보내기 더 보기"
             onClick={() => setSheetOpen((open) => !open)}
             className={cn(ICON_BUTTON, sheetOpen && ACTIVE_BUTTON)}
           >
             <Ellipsis size={16} aria-hidden />
+            <span>{t("studio.character.workspace.export", "출력")}</span>
           </button>
         ) : (
           <>

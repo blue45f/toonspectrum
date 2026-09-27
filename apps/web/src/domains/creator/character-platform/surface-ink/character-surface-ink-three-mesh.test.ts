@@ -102,3 +102,61 @@ describe("surface ink transform ownership", () => {
     expect(source.parent).toBe(f.root);
   });
 });
+
+describe("표면 원본과 topology 안전성", () => {
+  it("일치하는 revision이어도 존재하지 않는 삼각형은 표시하지 않고 앵커를 보존한다", () => {
+    const f = fixture();
+    const original = f.document.layers[0].strokes[0];
+    const invalid = { ...f.document, layers: [{ ...f.document.layers[0], strokes: [{ ...original, anchors: original.anchors.map((anchor) => ({ ...anchor, triangleIndex: 50 })) }] }] };
+    const reconciled = reconcileCharacterSurfaceInkTopology(invalid, "model-a", f.scene);
+    expect(reconciled.layers[0].strokes[0].status).toBe("needs-reprojection");
+    expect(reconciled.layers[0].strokes[0].anchors).toBe(invalid.layers[0].strokes[0].anchors);
+    const group = rebuildCharacterSurfaceInkGroup(f.scene, reconciled);
+    expect(group.children).toHaveLength(0);
+    disposeCharacterSurfaceInkGroup(group);
+  });
+
+  it("동일한 경로의 다른 메시가 붙으면 임의의 표면에 획을 투영하지 않는다", () => {
+    const f = fixture();
+    const duplicate = new Mesh(f.geometry.clone()); duplicate.name = f.mesh.name;
+    f.root.add(duplicate);
+    const reconciled = reconcileCharacterSurfaceInkTopology(f.document, "model-a", f.scene);
+    expect(reconciled.layers[0].strokes[0].status).toBe("needs-reprojection");
+    expect(reconciled.layers[0].strokes[0].anchors).toBe(f.document.layers[0].strokes[0].anchors);
+    const group = rebuildCharacterSurfaceInkGroup(f.scene, reconciled);
+    expect(group.children).toHaveLength(0);
+    disposeCharacterSurfaceInkGroup(group);
+    duplicate.removeFromParent();
+    expect(reconcileCharacterSurfaceInkTopology(reconciled, "model-a", f.scene)).toEqual(f.document);
+  });
+});
+
+describe("원본 앵커의 morph 표면 렌더링", () => {
+  it("morph된 표면에 실제 ribbon 정점을 만들면서 저장 앵커와 topology를 유지한다", () => {
+    const f = fixture();
+    f.geometry.morphTargetsRelative = true;
+    f.geometry.morphAttributes.position = [new Float32BufferAttribute([0, 0, 2, 0, 0, 2, 0, 0, 2], 3)];
+    f.mesh.updateMorphTargets();
+    if (!f.mesh.morphTargetInfluences) throw new Error("morph 가중치가 없습니다.");
+    f.mesh.morphTargetInfluences[0] = 0.5;
+    const before = JSON.stringify(f.document);
+    const group = rebuildCharacterSurfaceInkGroup(f.scene, f.document);
+    const ink = group.children[0];
+    if (!(ink instanceof Mesh)) throw new Error("펜선 메시가 없습니다.");
+    const position = ink.geometry.getAttribute("position");
+    for (let index = 0; index < position.count; index += 1) expect(position.getZ(index)).toBeCloseTo(1.001);
+    expect(characterSurfaceTopologyRevision("model-a", f.mesh)).toBe(f.revision);
+    expect(JSON.stringify(f.document)).toBe(before);
+    disposeCharacterSurfaceInkGroup(group);
+  });
+
+  it("생성된 Groom 메시를 원본 표면 목록에 섞지 않는다", () => {
+    const f = fixture(); const derivative = new Mesh(f.geometry.clone());
+    derivative.name = f.mesh.name; derivative.userData.characterAuthoringDerivative = "groom";
+    f.root.add(derivative);
+    expect(reconcileCharacterSurfaceInkTopology(f.document, "model-a", f.scene)).toBe(f.document);
+    const group = rebuildCharacterSurfaceInkGroup(f.scene, f.document);
+    expect(group.children).toHaveLength(1);
+    disposeCharacterSurfaceInkGroup(group);
+  });
+});

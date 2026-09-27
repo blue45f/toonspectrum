@@ -1,5 +1,5 @@
 /** Preset discovery shares the existing catalog/commit authority; favorites are UI preferences. */
-import { Search, Sparkles, Star, X } from "lucide-react";
+import { Search, SlidersHorizontal, Sparkles, Star, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { STUDIO_FOCUS_RING, StudioEmptyState, studioSegmentChipClass } from "../studio-panel-ui";
@@ -19,13 +19,15 @@ import {
   pushCharacterShaperKeyLayer,
 } from "./character-shaper-ui-model";
 import { CharacterSlotCard } from "./CharacterSlotCard";
+import { useCharacterPresetInteraction } from "./useCharacterPresetInteraction";
 import { useCharacterShaperFavorites } from "./useCharacterShaperFavorites";
 
 import type { CharacterGenreTag, CharacterSlotAvailability, CharacterSlotEntry } from "./character-shaper-contract";
 import type { CharacterShelfCollection } from "./character-shaper-discovery";
-import type { CharacterShaperShelfProps } from "./character-shaper-ui-contract";
+import type { CharacterShaperShelfProps, CharacterSlotCardProps } from "./character-shaper-ui-contract";
 import type { CharacterGridDirection } from "./character-shaper-ui-model";
 
+import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
 const SEARCH_DEBOUNCE_MS = 120;
@@ -43,9 +45,12 @@ export function CharacterShaperShelf(props: CharacterShaperShelfProps) {
 }
 
 function CharacterShaperShelfContent({
-  binding, slot, query, tag, onQueryChange, onTagChange, onHoverEntry, onCommitEntry,
+  binding, slot, query, tag, onQueryChange, onTagChange, onHoverEntry, onCommitEntry, compact = false,
 }: CharacterShaperShelfProps) {
+  const t = useT();
   const searchId = useId();
+  const filtersId = useId();
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const focusAfterRemoval = useRef<number | null>(null);
@@ -103,6 +108,8 @@ function CharacterShaperShelfContent({
     availability: statuses, tagLabels: CHARACTER_GENRE_TAG_LABELS,
   });
   const filtering = query.trim().length > 0 || tag !== null || collection !== "all" || onlyAvailable;
+  const filterCount = Number(tag !== null) + Number(collection !== "all") + Number(onlyAvailable) + Number(showExperimentalGarments);
+  const showDiscoveryTools = !compact || filtersOpen;
   const multi = isCharacterMultiSlot(slot);
   const equipped = multi ? slotEntries.filter((entry) => selectedSet.has(entry.id)) : [];
   const featured = slotEntries.filter((entry) => entry.featured && entry.apply.kind !== "wardrobe");
@@ -176,7 +183,7 @@ function CharacterShaperShelfContent({
     : collection === "selected" ? "조건에 맞는 선택 항목이 없습니다" : "검색 결과가 없습니다";
 
   return (
-    <div data-character-shaper-shelf={slot} className="flex h-full min-h-0 min-w-0 flex-col bg-panel">
+    <div data-character-shaper-shelf={slot} data-character-shaper-shelf-compact={compact || undefined} className="flex h-full min-h-0 min-w-0 flex-col bg-panel">
       <div className="shrink-0 border-b border-line px-3 pb-2.5 pt-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -187,7 +194,8 @@ function CharacterShaperShelfContent({
             {filtering ? `${visible.length}/${slotEntries.length}` : `${slotEntries.length}개`}
           </span>
         </div>
-        <div className="relative mt-2">
+        <div className="mt-2 flex gap-2">
+        <div className="relative min-w-0 flex-1">
           <Search size={14} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-3" />
           <input ref={searchRef} id={searchId} type="search" value={draft} maxLength={512}
             autoComplete="off" spellCheck={false} enterKeyHint="search" placeholder="이름·키워드·초성 검색"
@@ -201,14 +209,23 @@ function CharacterShaperShelfContent({
                 event.preventDefault(); event.stopPropagation(); clearSearch();
               }
             }}
-            className={cn("h-11 w-full rounded-xl border border-line bg-card pl-8 pr-12 text-[0.8rem] text-fg placeholder:text-fg-3", "[&::-webkit-search-cancel-button]:hidden", STUDIO_FOCUS_RING)} />
+            className={cn("h-11 w-full rounded-xl border border-line bg-card pl-8 pr-12 text-fg placeholder:text-fg-3", "[&::-webkit-search-cancel-button]:hidden", compact ? "text-base" : "text-[0.8rem]", STUDIO_FOCUS_RING)} />
           {draft.length > 0 ? <button type="button" aria-label="검색 지우기" onClick={clearSearch}
             className={cn("absolute right-0 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-fg", STUDIO_FOCUS_RING)}><X size={14} aria-hidden /></button> : null}
         </div>
-
+        {compact ? <button type="button" aria-expanded={filtersOpen} aria-controls={filtersId}
+          onClick={() => {
+            clearAuditionTimer(); activeAuditionRef.current = null; binding.cancelPreview?.();
+            setFiltersOpen((open) => !open);
+          }}
+          className={cn("inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3 text-xs font-semibold", STUDIO_FOCUS_RING,
+            filtersOpen || filterCount > 0 ? "border-accent bg-accent-soft text-accent" : "border-line bg-card text-fg-2 hover:bg-raised")}>
+          <SlidersHorizontal size={15} aria-hidden />{t("studio.character.shelf.filters", "필터")}{filterCount > 0 ? ` · ${filterCount}` : ""}
+        </button> : null}
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
-        <div className="px-3 pb-2">
+        <div id={filtersId} hidden={!showDiscoveryTools} className="px-3 pb-2">
         {hasExperimentalGarments ? (
           <div className="mt-2 rounded-xl border border-line bg-card p-2">
             <p className="text-[0.68rem] leading-relaxed text-fg-3">원본 의상을 기본으로 사용합니다. 실험 의상은 체형과 포즈에 따라 연결부나 관통 문제가 남아 있습니다.</p>
@@ -237,14 +254,14 @@ function CharacterShaperShelfContent({
             {tags.map((genre) => <button key={genre} type="button" aria-pressed={tag === genre} onClick={() => onTagChange(tag === genre ? null : genre)} className={cn(studioSegmentChipClass(tag === genre), "shrink-0")}>{tagLabel(genre)}</button>)}
           </div>
         ) : null}
+        </div>
         {slot === "hand-pose" ? (
-          <div role="group" aria-label="적용할 손" className="mt-2 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1">
+          <div role="group" aria-label="적용할 손" className="mx-3 mt-2 grid grid-cols-3 gap-1 rounded-xl border border-line bg-card p-1">
             {CHARACTER_HAND_SIDE_OPTIONS.map((option) => <button key={option.value} type="button" disabled={lockReason !== null}
               aria-pressed={binding.handSide === option.value} onClick={() => binding.setHandSide(option.value)}
               className={cn("min-h-11 rounded-lg text-[0.74rem] font-semibold transition-colors disabled:opacity-45 motion-reduce:transition-none", STUDIO_FOCUS_RING, binding.handSide === option.value ? "bg-accent text-on-accent" : "text-fg-2 hover:bg-raised hover:text-fg")}>{option.label}</button>)}
           </div>
         ) : null}
-        </div>
         {lockReason ? <p role="status" className="m-3 rounded-lg border border-warn/45 bg-warn/10 p-2 text-[0.7rem] text-warn">{lockReason}</p> : null}
         {binding.previewEntryId ? (
           <p role="status" className="mx-3 mt-2 rounded-xl border border-accent/45 bg-accent-soft px-3 py-2 text-[0.7rem] font-semibold text-accent">
@@ -263,7 +280,7 @@ function CharacterShaperShelfContent({
             ) : null}
           </div>
         ) : null}
-        {multi && equipped.length > 0 ? (
+        {showDiscoveryTools && multi && equipped.length > 0 ? (
           <section aria-label="장착 중" className="border-b border-line/70 px-3 py-2.5">
             <p className="mb-1.5 text-[0.66rem] font-semibold tracking-wide text-fg-3">장착 중 · {equipped.length}</p>
             <ul className="flex flex-wrap gap-1.5">
@@ -276,23 +293,16 @@ function CharacterShaperShelfContent({
             </ul>
           </section>
         ) : null}
-        {!filtering && featured.length > 0 ? (
+        {showDiscoveryTools && !filtering && featured.length > 0 ? (
           <section aria-label="추천" className="border-b border-line/70 px-3 py-2.5">
             <p className="mb-1.5 inline-flex items-center gap-1 text-[0.66rem] font-semibold tracking-wide text-fg-3"><Sparkles size={12} aria-hidden className="text-accent" />추천</p>
             <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {featured.map((entry) => {
                 const status = presentAvailability(entry);
                 const selected = isCharacterEntrySelected(binding.recipe, entry);
-                const blocked = status.status === "unavailable";
-                return <button key={entry.id} type="button" aria-pressed={selected} aria-disabled={blocked || undefined}
-                  title={status.reason ?? entry.hint} data-character-shaper-featured={entry.id}
-                  onClick={() => commitEntry(entry)} onPointerEnter={() => { onHoverEntry(entry.id); startAudition(entry); }}
-                  onPointerLeave={() => { onHoverEntry(null); endAudition(entry.id); }}
-                  onFocus={() => { onHoverEntry(entry.id); startAudition(entry); }} onBlur={() => endAudition(entry.id)}
-                  className={cn("flex min-h-11 shrink-0 items-center gap-2 rounded-xl border py-1 pl-1 pr-3 text-left text-[0.72rem] font-semibold", STUDIO_FOCUS_RING, selected ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg", blocked && "cursor-not-allowed opacity-55")}>
-                  <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-canvas/70"><CharacterSlotPreview spec={entry.preview} size={36} selected={selected} title={entry.label} /></span>
-                  <span className="max-w-[7.5rem] truncate">{entry.label}</span>
-                </button>;
+                return <FeaturedCharacterSlotCard key={entry.id} entry={entry} availability={status} selected={selected}
+                  onCommit={commitEntry} onHover={onHoverEntry} onFocus={onHoverEntry}
+                  onPreviewStart={startAudition} onPreviewEnd={endAudition} />;
               })}
             </div>
           </section>
@@ -306,7 +316,7 @@ function CharacterShaperShelfContent({
               <div key={entry.id} className="min-w-0">
                 {entry.apply.kind === "wardrobe" ? <p className="mb-1 text-[0.62rem] font-semibold text-warn">실험 의상 · 원고 적용 전 형태 확인</p> : null}
                 <CharacterSlotCard entry={entry} availability={presentAvailability(entry)} selected={isCharacterEntrySelected(binding.recipe, entry)}
-                  previewed={binding.previewEntryId === entry.id}
+                  previewed={binding.previewEntryId === entry.id} compact={compact}
                   tabIndex={index === rovingIndex ? 0 : -1} onCommit={commitEntry} onHover={onHoverEntry}
                   onFocus={(id) => { setFocusedId(id); onHoverEntry(id); }}
                   onPreviewStart={startAudition} onPreviewEnd={endAudition}
@@ -325,10 +335,26 @@ function CharacterShaperShelfContent({
               </div>
             ))}
           </div>}
-        <p className="px-3 pb-3 text-[0.62rem] leading-relaxed text-fg-3">
-          카드의 모양 도해는 실제 모델 이미지와 다릅니다. 잠시 머물면 3D 화면에서 후보를 시험할 수 있고, 클릭 전에는 저장·Undo 기록이 바뀌지 않습니다. 즐겨찾기는 이 브라우저에만 저장됩니다.
+        <p className={cn("px-3 pb-3 leading-relaxed text-fg-3", compact ? "text-xs" : "text-[0.62rem]")}>
+          {t("studio.character.shelf.interactionHint", "카드의 모양 도해는 실제 모델 이미지와 다릅니다. 터치는 탭하면 적용되고 스크롤로는 바뀌지 않습니다. 마우스를 올리거나 키보드로 선택하면 3D 화면에서 미리 보고, 클릭 전에는 저장·Undo 기록이 바뀌지 않습니다. 즐겨찾기는 이 브라우저에만 저장됩니다.")}
         </p>
       </div>
     </div>
   );
+}
+
+function FeaturedCharacterSlotCard({
+  entry, availability, selected, onCommit, onHover, onFocus, onPreviewStart, onPreviewEnd,
+}: Omit<CharacterSlotCardProps, "tabIndex" | "onKeyNavigate">) {
+  const unavailable = availability.status === "unavailable";
+  const interaction = useCharacterPresetInteraction({
+    entry, unavailable, onCommit, onHover, onFocus, onPreviewStart, onPreviewEnd,
+  });
+  return <button type="button" aria-pressed={selected} aria-disabled={unavailable || undefined}
+    title={availability.reason ?? entry.hint} data-character-shaper-featured={entry.id}
+    {...interaction}
+    className={cn("flex min-h-11 shrink-0 items-center gap-2 rounded-xl border py-1 pl-1 pr-3 text-left text-[0.72rem] font-semibold", STUDIO_FOCUS_RING, selected ? "border-accent bg-accent-soft text-fg" : "border-line bg-card text-fg-2 hover:bg-raised hover:text-fg", unavailable && "cursor-not-allowed opacity-55")}>
+    <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-canvas/70"><CharacterSlotPreview spec={entry.preview} size={36} selected={selected} title={entry.label} /></span>
+    <span className="max-w-[7.5rem] truncate">{entry.label}</span>
+  </button>;
 }

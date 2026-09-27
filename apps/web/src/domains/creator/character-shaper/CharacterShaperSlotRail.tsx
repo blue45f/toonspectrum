@@ -134,7 +134,7 @@ export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, ori
                 )}
               >
                 <span className="relative inline-flex">
-                  <Icon size={18} aria-hidden className={active ? "" : "opacity-85"} />
+                  <Icon size={20} aria-hidden className={active ? "" : "opacity-85"} />
                   {changed ? (
                     <span
                       aria-hidden

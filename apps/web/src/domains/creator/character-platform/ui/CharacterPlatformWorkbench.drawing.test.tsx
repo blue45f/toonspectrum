@@ -66,18 +66,48 @@ function renderWorkbench(withParent = false, withShell = false) {
 
 async function startDrawing() {
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: /품질 도구.*V2/u }));
+    fireEvent.click(screen.getByRole("button", { name: "캐릭터 저작 도구" }));
   });
   fireEvent.click(screen.getByRole("tab", { name: "3D 펜선" }));
   fireEvent.click(screen.getByRole("switch", { name: "뷰포트에 그리기" }));
 }
 
 describe("CharacterPlatformWorkbench drawing mode", () => {
+  it("저작 도구 탭이 키보드 선택과 패널 레이블을 함께 갱신한다", async () => {
+    const f = renderWorkbench();
+    try {
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "캐릭터 저작 도구" })); });
+      const first = screen.getByRole("tab", { name: "품질" });
+      first.focus();
+      fireEvent.keyDown(first, { key: "End" });
+      const last = screen.getByRole("tab", { name: "웹 코어" });
+      expect(document.activeElement).toBe(last);
+      expect(last.getAttribute("aria-selected")).toBe("true");
+      expect(screen.getByRole("tabpanel").getAttribute("aria-labelledby")).toBe(last.id);
+      expect(first.tabIndex).toBe(-1);
+      fireEvent.keyDown(last, { key: "ArrowRight" });
+      expect(document.activeElement).toBe(first);
+    } finally { f.dispose(); }
+  });
+
+  it("너무 큰 파일은 브라우저 alert 대신 대화상자 안에 오류를 표시한다", async () => {
+    const f = renderWorkbench();
+    try {
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "캐릭터 저작 도구" })); });
+      fireEvent.click(screen.getByRole("button", { name: "매니페스트 연결" }));
+      const file = new File(["{}"], "oversized.json", { type: "application/json" });
+      Object.defineProperty(file, "size", { value: 1024 * 1024 });
+      await act(async () => { fireEvent.change(screen.getByLabelText("캐릭터 품질 데이터 파일 선택"), { target: { files: [file] } }); });
+      expect(screen.getByRole("alert").textContent).toContain("512 KiB");
+      expect(screen.getByRole("dialog", { name: "캐릭터 품질 워크벤치" })).toBeTruthy();
+    } finally { f.dispose(); }
+  });
+
   it("handles Escape before the actual Shaper shell's existing key layer", async () => {
     const f = renderWorkbench(true, true);
     Object.defineProperty(document, "elementFromPoint", { configurable: true, value: () => f.canvas });
     try {
-      const launcher = screen.getByRole("button", { name: /품질 도구.*V2/u });
+      const launcher = screen.getByRole("button", { name: "캐릭터 저작 도구" });
       expect(launcher.closest("[data-character-quality-launcher]")).toBeTruthy();
       await startDrawing();
       expect(document.querySelector('[data-character-shaper="true"]')).toBeTruthy();
@@ -128,6 +158,15 @@ describe("CharacterPlatformWorkbench drawing mode", () => {
       fireEvent.click(screen.getByRole("tab", { name: "품질" }));
       f.canvas.focus(); fireEvent.keyDown(f.canvas, { key: "z", ctrlKey: true });
       expect(f.doUndo).toHaveBeenCalledOnce();
+      fireEvent.click(screen.getByRole("tab", { name: "웹 코어" }));
+      f.canvas.focus(); fireEvent.keyDown(f.canvas, { key: "z", ctrlKey: true, shiftKey: true });
+      fireEvent.click(screen.getByRole("tab", { name: "3D 펜선" }));
+      expect(screen.getByRole("heading", { name: "3D 펜선 · 1획" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("tab", { name: "웹 코어" }));
+      f.canvas.focus(); fireEvent.keyDown(f.canvas, { key: "z", ctrlKey: true });
+      fireEvent.click(screen.getByRole("tab", { name: "3D 펜선" }));
+      expect(screen.getByRole("heading", { name: "3D 펜선 · 0획" })).toBeTruthy();
+      expect(f.doUndo).toHaveBeenCalledOnce();
     } finally { f.dispose(); Reflect.deleteProperty(document, "elementFromPoint"); }
   });
 
@@ -137,7 +176,7 @@ describe("CharacterPlatformWorkbench drawing mode", () => {
     vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([new DOMRect(0, 0, 44, 44)] as unknown as DOMRectList);
     Object.defineProperty(document, "elementFromPoint", { configurable: true, value: () => f.canvas });
     try {
-      const trigger = screen.getByRole("button", { name: /품질 도구.*V2/u });
+      const trigger = screen.getByRole("button", { name: "캐릭터 저작 도구" });
       expect(f.parent.contains(trigger)).toBe(true);
       await startDrawing();
       const panel = screen.getByRole("dialog", { name: "캐릭터 품질 워크벤치" });
@@ -201,7 +240,7 @@ describe("CharacterPlatformWorkbench drawing mode", () => {
         .toBe("false");
       fireEvent.keyDown(window, { key: "Escape" });
       expect(screen.queryByRole("dialog", { name: "캐릭터 품질 워크벤치" })).toBeNull();
-      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: /품질 도구.*V2/u })));
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "캐릭터 저작 도구" })));
     } finally { f.dispose(); }
   });
 });

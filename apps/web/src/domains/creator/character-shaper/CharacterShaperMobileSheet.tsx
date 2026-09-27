@@ -6,7 +6,7 @@
  * keyboard. The sheet lives in normal flow under the viewport, so it never hides the model
  * completely; the dialog decides whether the background needs to be inert.
  */
-import { useRef } from "react";
+import { useId, useRef } from "react";
 
 import { useStudioBottomSheetGesture } from "../useStudioBottomSheetGesture";
 
@@ -22,13 +22,8 @@ import type { CharacterShaperMobileSheetProps } from "./character-shaper-ui-cont
 
 import { cn } from "@/shared/lib/utils";
 
-const SHEET_HEIGHT: Readonly<Record<CharacterShaperMobileSheetProps["state"], string>> = {
-  collapsed: "6rem",
-  half: "min(40dvh, 22rem)",
-  full: "min(62dvh, 34rem)",
-};
-
-export function CharacterShaperMobileSheet({ state, onStateChange, title, children }: CharacterShaperMobileSheetProps) {
+export function CharacterShaperMobileSheet({ state, onStateChange, title, header, children }: CharacterShaperMobileSheetProps) {
+  const contentId = useId();
   const sheetRef = useRef<HTMLElement | null>(null);
   const stateLabel = characterSheetStateLabel(state);
   const { handleProps } = useStudioBottomSheetGesture({
@@ -52,10 +47,11 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, childr
         "relative flex min-h-0 w-full shrink flex-col rounded-t-2xl border-t border-line bg-panel",
         "shadow-[0_-12px_32px_oklch(0.05_0.01_70/0.35)] transition-[height] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none",
       )}
-      style={{ height: SHEET_HEIGHT[state] }}
     >
+      <div data-character-shaper-sheet-header="true">
       <button
         {...handleProps}
+        data-character-shaper-sheet-handle={header ? "compact" : "true"}
         role="slider"
         aria-orientation="vertical"
         aria-valuemin={0}
@@ -72,12 +68,14 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, childr
           aria-hidden
           className="h-1 w-10 rounded-full bg-line-strong transition-[width,background-color] duration-150 group-hover:w-12 group-hover:bg-fg-3 group-focus-visible:w-12 group-focus-visible:bg-accent motion-reduce:transition-none"
         />
+        <span className={header ? "sr-only" : "min-w-0 truncate text-[0.75rem] font-semibold text-fg"}>{title}</span>
       </button>
-      <div className="flex shrink-0 items-center justify-between gap-2 px-3 pb-1.5">
-        <p className="min-w-0 flex-1 truncate text-[0.8rem] font-bold text-fg">{title}</p>
+      {header}
         <div data-character-quality-launcher="true" className="shrink-0" />
         <button
           type="button"
+          aria-expanded={!collapsed}
+          aria-controls={contentId}
           onClick={() => onStateChange(collapsed ? "half" : "collapsed")}
           className={cn(
             "inline-flex min-h-11 items-center rounded-lg px-2 text-[0.68rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg",
@@ -88,6 +86,7 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, childr
         </button>
       </div>
       <div
+        id={contentId}
         hidden={collapsed}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >

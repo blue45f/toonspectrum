@@ -10,6 +10,8 @@ import { CharacterShaperShelf } from "./CharacterShaperShelf";
 import type { CharacterRecipe, CharacterSlotEntry } from "./character-shaper-contract";
 import type { CharacterShaperBinding, CharacterShaperShelfProps } from "./character-shaper-ui-contract";
 
+const translations = vi.hoisted(() => new Map<string, string>());
+vi.mock("@/shared/lib/i18n", () => ({ useT: () => (key: string, fallback: string) => translations.get(key) ?? fallback }));
 vi.mock("./character-shaper-preview", () => ({ CharacterSlotPreview: () => <svg aria-hidden /> }));
 vi.mock("./character-shaper-catalog", () => ({ CHARACTER_GENRE_TAG_LABELS: { school: "학원", daily: "일상" } }));
 
@@ -54,9 +56,145 @@ const cards = () => Array.from(document.querySelectorAll<HTMLElement>("[data-cha
 const cardIds = () => cards().map((card) => card.dataset.characterSlotCard);
 
 beforeEach(() => { localStorage.clear(); vi.useFakeTimers(); });
-afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); translations.clear(); });
 
 describe("CharacterShaperShelf discovery integration", () => {
+  it("모바일에서는 필터를 접고 카드를 먼저 보여주며 데스크톱 기본 계약을 보존한다", () => {
+    const p = props(); const view = render(<CharacterShaperShelf {...p} compact />);
+    const toggle = screen.getByRole("button", { name: "필터" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.getElementById(toggle.getAttribute("aria-controls") ?? "")?.hidden).toBe(true);
+    expect(screen.queryByRole("group", { name: "장르 필터" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "프리셋 모아보기" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "추천" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "장착 중" })).toBeNull();
+    expect(cards()).toHaveLength(3);
+    expect(cards().every((card) => card.dataset.characterSlotCardCompact === "true")).toBe(true);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("group", { name: "장르 필터" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "추천" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "안경 해제" })).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(screen.queryByRole("group", { name: "장르 필터" })).toBeNull();
+    view.rerender(<CharacterShaperShelf {...p} />);
+    expect(screen.queryByRole("button", { name: "필터" })).toBeNull();
+    expect(screen.getByRole("group", { name: "장르 필터" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "추천" })).toBeTruthy();
+    expect(cards().every((card) => card.dataset.characterSlotCardCompact === undefined)).toBe(true);
+  });
+
+  it("필터와 터치 안내는 번역 키를 사용하고 누락된 문구에는 한국어 기본값을 표시한다", () => {
+    translations.set("studio.character.shelf.filters", "Preset filters");
+    const p = props({ compact: true });
+    const view = render(<CharacterShaperShelf {...p} />);
+    expect(screen.getByRole("button", { name: "Preset filters" })).toBeTruthy();
+    expect(screen.getByText(/터치는 탭하면 적용되고 스크롤로는 바뀌지 않습니다/u)).toBeTruthy();
+    translations.set("studio.character.shelf.interactionHint", "Tap to apply. Scrolling preserves the model.");
+    view.rerender(<CharacterShaperShelf {...p} />);
+    expect(screen.getByText("Tap to apply. Scrolling preserves the model.")).toBeTruthy();
+    expect(screen.queryByText(/터치는 탭하면 적용되고 스크롤로는 바뀌지 않습니다/u)).toBeNull();
+  });
+
+  it("모바일 필터를 다시 접어도 필터 조건과 활성 개수를 유지한다", () => {
+    const p = props({ compact: true, binding: binding({ evaluate: (item) => ({
+      status: item.id === "accessory:glasses" ? "available" : "partial", reason: "지원 범위", missing: [],
+    }) }) });
+    render(<CharacterShaperShelf {...p} />);
+    fireEvent.click(screen.getByRole("button", { name: "필터" }));
+    fireEvent.click(screen.getByRole("button", { name: /완전 지원만/u }));
+    fireEvent.click(screen.getByRole("button", { name: "필터 · 1" }));
+    expect(cardIds()).toEqual(["accessory:glasses"]);
+    expect(screen.queryByRole("button", { name: /완전 지원만/u })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "필터 · 1" }));
+    expect(screen.getByRole("button", { name: /완전 지원만/u }).getAttribute("aria-pressed")).toBe("true");
+    expect(p.onCommitEntry).not.toHaveBeenCalled();
+  });
+
+  it("모바일 손 적용 범위는 필터를 열지 않아도 선택할 수 있다", () => {
+    const p = props({ compact: true, slot: "hand-pose" });
+    render(<CharacterShaperShelf {...p} />);
+    fireEvent.click(screen.getByRole("button", { name: "왼손" }));
+    expect(p.binding.setHandSide).toHaveBeenCalledWith("left");
+    expect(screen.getByRole("button", { name: "필터" }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it.each(["grid", "featured"] as const)("%s 카드는 터치 스크롤과 취소로 미리보기나 적용을 하지 않고 탭만 확정한다", (kind) => {
+    const preview = vi.fn();
+    const p = props({ binding: binding({ preview, recipe: { ...recipe, slots: { ...recipe.slots, accessory: [] } } }) });
+    render(<CharacterShaperShelf {...p} />);
+    const selector = kind === "grid" ? '[data-character-slot-card="accessory:glasses"]' : '[data-character-shaper-featured="accessory:glasses"]';
+    const button = document.querySelector<HTMLButtonElement>(selector);
+    expect(button).not.toBeNull();
+    if (!button) throw new Error("프리셋 버튼이 없습니다.");
+    fireEvent.pointerEnter(button, { pointerType: "touch" });
+    fireEvent.pointerDown(button, { pointerType: "touch", isPrimary: true, clientX: 30, clientY: 30 });
+    fireEvent.focus(button);
+    advance(180);
+    expect(preview).not.toHaveBeenCalled();
+    fireEvent.pointerMove(button, { pointerType: "touch", clientX: 30, clientY: 90 });
+    fireEvent.pointerCancel(button, { pointerType: "touch" });
+    fireEvent.click(button, { detail: 1 });
+    advance(180);
+    expect(preview).not.toHaveBeenCalled();
+    expect(p.onCommitEntry).not.toHaveBeenCalled();
+    fireEvent.pointerDown(button, { pointerType: "touch", isPrimary: true, clientX: 30, clientY: 30 });
+    fireEvent.pointerUp(button, { pointerType: "touch" });
+    fireEvent.click(button, { detail: 1 });
+    expect(p.onCommitEntry).toHaveBeenCalledExactlyOnceWith(entries[0]);
+    expect(preview).not.toHaveBeenCalled();
+  });
+
+  it.each(["grid", "featured"] as const)("%s의 포커스 없는 터치 스크롤 취소 뒤 키보드 진입은 다시 미리 본다", (kind) => {
+    const preview = vi.fn();
+    const p = props({ binding: binding({ preview, recipe: { ...recipe, slots: { ...recipe.slots, accessory: [] } } }) });
+    render(<CharacterShaperShelf {...p} />);
+    const selector = kind === "grid" ? '[data-character-slot-card="accessory:glasses"]' : '[data-character-shaper-featured="accessory:glasses"]';
+    const button = document.querySelector<HTMLButtonElement>(selector);
+    if (!button) throw new Error("프리셋 버튼이 없습니다.");
+    fireEvent.pointerDown(button, { pointerType: "touch", isPrimary: true, clientX: 30, clientY: 30 });
+    fireEvent.pointerMove(button, { pointerType: "touch", clientX: 30, clientY: 90 });
+    fireEvent.pointerCancel(button, { pointerType: "touch" });
+    advance(180);
+    expect(preview).not.toHaveBeenCalled();
+    expect(document.activeElement).not.toBe(button);
+    if (kind === "grid") {
+      const first = cards()[0];
+      if (!first) throw new Error("첫 번째 카드가 없습니다.");
+      act(() => { first.focus(); });
+      fireEvent.keyDown(first, { key: "End" });
+    } else {
+      const search = screen.getByRole("searchbox");
+      act(() => { search.focus(); });
+      fireEvent.keyDown(search, { key: "Tab" });
+      act(() => { button.focus(); });
+    }
+    advance(180);
+    expect(document.activeElement).toBe(button);
+    expect(preview).toHaveBeenCalledExactlyOnceWith(entries[0]);
+    expect(p.onCommitEntry).not.toHaveBeenCalled();
+  });
+
+  it("추천은 마우스와 키보드로 미리 보고 필터를 접으면 예약된 미리보기를 취소한다", () => {
+    const preview = vi.fn();
+    const p = props({ compact: true, binding: binding({ preview, recipe: { ...recipe, slots: { ...recipe.slots, accessory: [] } } }) });
+    render(<CharacterShaperShelf {...p} />);
+    const toggle = screen.getByRole("button", { name: "필터" });
+    fireEvent.click(toggle);
+    const button = document.querySelector<HTMLButtonElement>('[data-character-shaper-featured="accessory:glasses"]');
+    if (!button) throw new Error("추천 버튼이 없습니다.");
+    fireEvent.pointerEnter(button, { pointerType: "mouse" }); advance(180);
+    expect(preview).toHaveBeenCalledExactlyOnceWith(entries[0]);
+    fireEvent.pointerLeave(button, { pointerType: "mouse" });
+    fireEvent.focus(button); advance(180);
+    expect(preview).toHaveBeenCalledTimes(2);
+    fireEvent.blur(button);
+    fireEvent.pointerEnter(button, { pointerType: "mouse" });
+    fireEvent.click(toggle); advance(180);
+    expect(preview).toHaveBeenCalledTimes(2);
+    expect(p.onCommitEntry).not.toHaveBeenCalled();
+  });
+
   it("keeps unreviewed garments out of default discovery and recommendations until explicit opt-in", () => {
     const original: CharacterSlotEntry = { ...entry("top:original", "원본 유지", "accessory", true), slot: "top",
       apply: { kind: "costume-original", wardrobeSlot: "top", costumeSlots: ["tops"] } };

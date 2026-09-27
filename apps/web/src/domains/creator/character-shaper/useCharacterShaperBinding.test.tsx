@@ -7,7 +7,7 @@ import { createCharacterPartPreset } from "../character-platform/presets/charact
 import { useCharacterPlatformWorkbench } from "../character-platform/ui/use-character-platform-workbench";
 
 import { createAvatarForgeState } from "../vrm/studio-vrm-avatar-forge";
-import { applyWardrobeSet, SELECTABLE_WARDROBE_SETS } from "../vrm/studio-vrm-wardrobe";
+import { applyWardrobeSet, createWardrobeEquip, SELECTABLE_WARDROBE_SETS } from "../vrm/studio-vrm-wardrobe";
 
 import { findCharacterSlotEntry, listCharacterSlotEntries } from "./character-shaper-catalog";
 import { applyCharacterIrisTint } from "./character-shaper-iris-tint";
@@ -222,6 +222,123 @@ function renderBinding(fake: FakeHost) {
 }
 
 describe("useCharacterShaperBinding", () => {
+  it("V3 실행 모드에서는 일반 편집과 replay가 별도 history를 만들지 않는다", () => {
+    const fake = createFakeHost();
+    const { result, rerender } = renderHook(() => useCharacterShaperBinding(fake.host, { runtimeOnly: true }));
+
+    act(() => result.current.commit(entryOf("eyes:romance-sparkle")));
+    rerender();
+    act(() => result.current.commitColor("skin", "#aabbcc"));
+    rerender();
+    const beforeReplayForge = fake.calls.forge.length;
+    act(() => {
+      expect(result.current.replay([
+        { kind: "forge-face", face: { headWidth: 1.1 } },
+        { kind: "forge-hair", hair: { style: "bob" } },
+        { kind: "semantic-morph", morphs: { noseHeight: 0.3 } },
+      ], { hairBase: "#112233", iris: "#445566" }, {
+        activeEntryId: "expression:calm",
+        weights: { happy: 0.25 },
+      })).toEqual({ ok: true, reason: null });
+    });
+    rerender();
+
+    expect(fake.calls.forge).toHaveLength(beforeReplayForge + 1);
+    expect(fake.state.avatarForgeState).toMatchObject({
+      face: { headWidth: 1.1 },
+      hair: { style: "bob", baseColor: "#112233" },
+      semanticFaceMorphs: { noseHeight: 0.3 },
+    });
+    expect(fake.state.customColors.body).toBe("#aabbcc");
+    expect(result.current.snapshot.irisColor).toBe("#445566");
+    expect(fake.state.activeExpressionId).toBe("expression:calm");
+    expect(fake.state.expressionWeights).toEqual({ happy: 0.25 });
+    expect(result.current.history).toEqual({ canUndo: false, canRedo: false, length: 0, recentLabels: [] });
+    act(() => result.current.undo());
+    expect(fake.state.avatarForgeState.hair.baseColor).toBe("#112233");
+  });
+
+  it("문서 replay는 사용자 busy gate를 우회하고 실패 시 history 없이 이전 화면을 복원한다", () => {
+    const fake = createFakeHost({ isCapturing: true });
+    const { result } = renderHook(() => useCharacterShaperBinding(fake.host, { runtimeOnly: true }));
+    expect(result.current.busyReason).toContain("캡처");
+    act(() => expect(result.current.replay([], { skin: "#123456" })).toEqual({ ok: true, reason: null }));
+    expect(fake.state.customColors.body).toBe("#123456");
+    const forgeBefore = fake.state.avatarForgeState;
+    const expressionBefore = fake.state.expressionWeights;
+    vi.spyOn(fake.host, "setExpressionWeights").mockImplementationOnce(() => {
+      throw new Error("표정 복원 실패");
+    });
+    act(() => {
+      expect(result.current.replay([{ kind: "forge-face", face: { headWidth: 1.2 } }], { skin: "#ffffff" }, {
+        activeEntryId: "expression:failed",
+        weights: { sad: 1 },
+      })).toEqual({ ok: false, reason: "표정 복원 실패" });
+    });
+    expect(fake.state.avatarForgeState).toEqual(forgeBefore);
+    expect(fake.state.customColors.body).toBe("#123456");
+    expect(fake.state.expressionWeights).toEqual(expressionBefore);
+    expect(result.current.history.length).toBe(0);
+  });
+
+  it("모델 변경 뒤 replay는 이전 모델의 baseline이나 undo로 덮어쓰지 않는다", () => {
+    const fake = createFakeHost();
+    const { result, rerender } = renderHook(() => useCharacterShaperBinding(fake.host, { runtimeOnly: true }));
+    act(() => result.current.replay([], { iris: "#aabbcc" }));
+    fake.state.activeModelId = "imported-second-model";
+    fake.state.avatarForgeState = createAvatarForgeState();
+    rerender();
+    act(() => result.current.replay([{ kind: "forge-face", face: { headHeight: 1.12 } }], { iris: "#112233" }));
+    act(() => {
+      result.current.resetToBaseline();
+      result.current.undo();
+      result.current.redo();
+    });
+    expect(fake.state.avatarForgeState.face.headHeight).toBe(1.12);
+    expect(result.current.snapshot.irisColor).toBe("#112233");
+    expect(result.current.history.length).toBe(0);
+  });
+
+  it("여러 의상과 색은 사용자 잠금 handler 없이 한 번에 재생하고 null 색은 기본색으로 복원한다", () => {
+    const fake = createFakeHost({ isCapturing: true });
+    const equip = vi.spyOn(fake.host, "equipWardrobeItem").mockImplementation(() => {
+      throw new Error("잠금된 사용자 handler를 재생에 쓰면 안 됩니다.");
+    });
+    const update = vi.spyOn(fake.host, "updateWardrobeEquip").mockImplementation(() => {
+      throw new Error("잠금된 사용자 색 handler를 재생에 쓰면 안 됩니다.");
+    });
+    const write = vi.spyOn(fake.host, "setWardrobeState");
+    const { result } = renderHook(() => useCharacterShaperBinding(fake.host, { runtimeOnly: true }));
+    act(() => expect(result.current.replay([
+      { kind: "wardrobe-equip", slot: "top", itemId: "shirt" },
+      { kind: "wardrobe-equip", slot: "bottom", itemId: "pants" },
+    ], { top: "#abcdef", bottom: "#112233" }).ok).toBe(true));
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(fake.state.wardrobeState).toMatchObject({ top: { itemId: "shirt", color: "#abcdef" }, bottom: { itemId: "pants", color: "#112233" } });
+    act(() => expect(result.current.replay([], { top: null, bottom: null }).ok).toBe(true));
+    expect(fake.state.wardrobeState.top?.color).toBe(createWardrobeEquip("shirt")?.color);
+    expect(fake.state.wardrobeState.bottom?.color).toBe(createWardrobeEquip("pants")?.color);
+    expect(equip).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(result.current.history.length).toBe(0);
+  });
+
+  it("문서 표정 재생은 native undo handler를 호출하지 않고 포즈도 native 이력으로 우회하지 않는다", () => {
+    const fake = createFakeHost();
+    const expression = vi.spyOn(fake.host, "handleExpressionPresetSelect");
+    const pose = vi.spyOn(fake.host, "handlePoseSelect");
+    const { result } = renderHook(() => useCharacterShaperBinding(fake.host, { runtimeOnly: true }));
+    act(() => expect(result.current.replay([{ kind: "expression-preset", presetId: "xf_joy" }]).ok).toBe(true));
+    expect(fake.state.activeExpressionId).toBe("preset:xf_joy");
+    expect(fake.state.expressionWeights.happy).toBeGreaterThan(0);
+    expect(expression).not.toHaveBeenCalled();
+    act(() => expect(result.current.replay([{ kind: "pose-preset", presetId: "xp_punch" }])).toEqual({
+      ok: false, reason: "포즈 원본은 Pose V3 문서 실행기로 재생해야 합니다.",
+    }));
+    expect(pose).not.toHaveBeenCalled();
+    expect(result.current.history.length).toBe(0);
+  });
+
   it("derives the recipe from host state and re-derives after a commit", () => {
     const fake = createFakeHost();
     const { result } = renderBinding(fake);

@@ -99,3 +99,102 @@ describe("Character authoring browser Worker client", () => {
     )).rejects.toMatchObject({ code: "worker-unavailable" });
   });
 });
+
+class ControlledWorker extends FakeWorker {
+  request: CharacterAuthoringWorkerRequest | null = null;
+  override postMessage(message: CharacterAuthoringWorkerRequest): void { this.request = message; }
+  result(): void {
+    const request = this.request;
+    if (!request) throw new Error("요청이 없습니다.");
+    this.listeners.message.forEach((listener) => listener({ data: {
+      version: CHARACTER_AUTHORING_WORKER_PROTOCOL_VERSION,
+      kind: "result", requestId: request.requestId, generationId: request.generationId,
+      result: executeCharacterAuthoringTask(request.task),
+    } }));
+  }
+}
+
+function expectReleased(worker: FakeWorker): void {
+  expect(worker.terminated).toBe(true);
+  expect(Object.values(worker.listeners).every((listeners) => listeners.size === 0)).toBe(true);
+}
+
+describe("Worker 작업 취소와 최신 편집 요청", () => {
+  it("dispose가 실행 중 작업을 거절하고 모든 Worker listener를 해제한다", async () => {
+    const workers = [new ControlledWorker(), new ControlledWorker()];
+    let next = 0;
+    const client = new CharacterAuthoringWorkerClient({ workerFactory: () => workers[next++] ?? null });
+    const first = client.execute({ kind: "build-geometry-stroke", stroke });
+    const second = client.execute({ kind: "build-geometry-stroke", stroke });
+    const results = Promise.allSettled([first, second]);
+    client.dispose();
+    expect(await results).toEqual([
+      { status: "rejected", reason: expect.objectContaining({ code: "disposed" }) },
+      { status: "rejected", reason: expect.objectContaining({ code: "disposed" }) },
+    ]);
+    workers.forEach(expectReleased);
+    await expect(client.execute({ kind: "build-geometry-stroke", stroke })).rejects.toMatchObject({ code: "disposed" });
+  });
+
+  it("같은 대상의 이전 메시를 취소하고 최신 폭의 실제 정점 결과만 반환한다", async () => {
+    const workers = [new ControlledWorker(), new ControlledWorker()];
+    let next = 0;
+    const client = new CharacterAuthoringWorkerClient({ workerFactory: () => workers[next++] ?? null });
+    const first = client.execute({ kind: "build-geometry-stroke", stroke }, { latestKey: "guide:a" });
+    const rejection = expect(first).rejects.toMatchObject({ code: "superseded" });
+    const edited = { ...stroke, style: { ...stroke.style, baseWidth: 0.2 } };
+    const second = client.execute({ kind: "build-geometry-stroke", stroke: edited }, { latestKey: "guide:a" });
+    workers[0]?.result();
+    workers[1]?.result();
+    await rejection;
+    const result = await second;
+    const expected = executeCharacterAuthoringTask({ kind: "build-geometry-stroke", stroke: edited });
+    expect(result.kind).toBe("mesh");
+    if (result.kind !== "mesh" || expected.kind !== "mesh") throw new Error("메시 결과가 아닙니다.");
+    expect(new Float32Array(result.positions)).toEqual(new Float32Array(expected.positions));
+    expect(Math.hypot(...new Float32Array(result.positions).slice(0, 3))).toBeCloseTo(0.1);
+    workers.forEach(expectReleased);
+  });
+
+  it("서로 다른 대상의 요청은 함께 완료한다", async () => {
+    const workers = [new ControlledWorker(), new ControlledWorker()];
+    let next = 0;
+    const client = new CharacterAuthoringWorkerClient({ workerFactory: () => workers[next++] ?? null });
+    const first = client.execute({ kind: "build-geometry-stroke", stroke }, { latestKey: "guide:a" });
+    const second = client.execute({ kind: "build-geometry-stroke", stroke }, { latestKey: "guide:b" });
+    workers[1]?.result(); workers[0]?.result();
+    expect((await Promise.all([first, second])).every((value) => value.kind === "mesh")).toBe(true);
+  });
+
+  it("Worker 생성 도중 취소되어도 자원을 종료한다", async () => {
+    const abort = new AbortController(); const worker = new ControlledWorker();
+    const client = new CharacterAuthoringWorkerClient({ workerFactory: () => { abort.abort(); return worker; } });
+    await expect(client.execute({ kind: "build-geometry-stroke", stroke }, { signal: abort.signal })).rejects.toMatchObject({ code: "aborted" });
+    expectReleased(worker);
+    expect(worker.request).toBeNull();
+  });
+
+  it("fallback이 입력 처리를 기다리는 동안 dispose/abort/최신 요청을 적용한다", async () => {
+    const client = new CharacterAuthoringWorkerClient({ workerFactory: () => null });
+    const first = client.execute({ kind: "build-geometry-stroke", stroke }, { latestKey: "guide:a" });
+    const rejection = expect(first).rejects.toMatchObject({ code: "superseded" });
+    const abort = new AbortController();
+    const second = client.execute({ kind: "build-geometry-stroke", stroke }, { latestKey: "guide:a", signal: abort.signal });
+    const aborted = expect(second).rejects.toMatchObject({ code: "aborted" });
+    abort.abort();
+    const third = client.execute({ kind: "build-geometry-stroke", stroke });
+    const disposed = expect(third).rejects.toMatchObject({ code: "disposed" });
+    client.dispose();
+    await Promise.all([rejection, aborted, disposed]);
+  });
+
+  it("fallback 실행 전 호출자가 원본을 바꾸어도 제출 시점의 정점을 계산한다", async () => {
+    const client = new CharacterAuthoringWorkerClient({ workerFactory: () => null });
+    const edited = { ...stroke, style: { ...stroke.style } };
+    const resultPromise = client.execute({ kind: "build-geometry-stroke", stroke: edited });
+    edited.style.baseWidth = 0.6;
+    const result = await resultPromise;
+    if (result.kind !== "mesh") throw new Error("메시 결과가 아닙니다.");
+    expect(Math.hypot(...new Float32Array(result.positions).slice(0, 3))).toBeCloseTo(0.01);
+  });
+});

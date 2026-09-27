@@ -74,3 +74,24 @@ describe("Character geometry stroke", () => {
     expect(changed.strokes[0]?.status).toBe("needs-reprojection");
   });
 });
+
+describe("입체선의 topology 변경 안전성", () => {
+  it("round profile은 평면 리본 대신 원형 단면과 유한한 노멀을 만든다", () => {
+    const mesh = buildCharacterGeometryStrokeMesh({ ...stroke, style: { ...stroke.style, profile: "round", taperStart: 0, taperEnd: 0 } });
+    expect(mesh.positions.length).toBe(stroke.points.length * 13 * 3);
+    expect(mesh.indices.length).toBe((stroke.points.length - 1) * 12 * 6);
+    expect([...mesh.normals].every(Number.isFinite)).toBe(true);
+    const normalDirections = new Set(Array.from({ length: 13 }, (_, index) => mesh.normals.slice(index * 3, index * 3 + 3).join(",")));
+    expect(normalDirections.size).toBeGreaterThan(10);
+  });
+  it("재투영이 필요한 원본을 유지하며 오래된 위치의 메시 생성을 거부한다", () => {
+    const changed = markCharacterGeometryStrokeTopology({ version: 1, strokes: [stroke] }, "topology:v2");
+    const saved = changed.strokes[0];
+    if (!saved) throw new Error("입체선 원본이 없습니다.");
+    expect(saved.points).toEqual(stroke.points);
+    expect(() => buildCharacterGeometryStrokeMesh(saved)).toThrow(expect.objectContaining({ code: "GEOMETRY_STROKE_REPROJECTION_REQUIRED" }));
+    const restored = markCharacterGeometryStrokeTopology(changed, "topology:v1").strokes[0];
+    if (!restored) throw new Error("입체선 원본이 없습니다.");
+    expect(buildCharacterGeometryStrokeMesh(restored).positions).toEqual(buildCharacterGeometryStrokeMesh(stroke).positions);
+  });
+});

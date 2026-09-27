@@ -7,11 +7,7 @@
  * "official codec" claim, or a trademark authorization.
  */
 
-import {
-  createStudioInkEnvelopeWebCryptoAttester,
-  createStudioInkEnvelopeWebCryptoVerifier,
-  type StudioInkEnvelopeWebCryptoAlgorithm,
-} from "./brush/studio-ink-envelope-webcrypto-attestation";
+import { sha256HexPortable } from "./sha256-portable";
 import {
   STUDIO_CODEC_PROVIDER_CONTRACT_VERSION,
   STUDIO_CODEC_PROVIDER_LIMITS,
@@ -21,7 +17,14 @@ import {
   type StudioCodecLicenseScope,
   type StudioCodecProviderMode,
 } from "./studio-codec-provider-contract";
-import { sha256HexPortable } from "./studio-sha256";
+import {
+  createStudioInkEnvelopeWebCryptoAttester,
+  createStudioInkEnvelopeWebCryptoVerifier,
+  type StudioInkEnvelopeWebCryptoAlgorithm,
+} from "./studio-ink-envelope-webcrypto-attestation";
+
+type CryptoKey = InstanceType<typeof globalThis.CryptoKey>;
+type SubtleCrypto = typeof globalThis.crypto.subtle;
 
 export const STUDIO_PRODUCT_CODEC_CERTIFICATE_VERSION = 1 as const;
 export const STUDIO_PRODUCT_CODEC_CERTIFICATE_KIND =

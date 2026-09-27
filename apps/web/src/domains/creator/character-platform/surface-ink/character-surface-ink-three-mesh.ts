@@ -100,9 +100,10 @@ function vertexIndex(mesh: Mesh, faceIndex: number, corner: number): number {
   return mesh.geometry.index ? mesh.geometry.index.getX(offset) : offset;
 }
 
-export function characterSurfaceTriangle(mesh: Mesh, faceIndex: number): CharacterTriangleSurface | null {
+export function characterSurfaceTriangle(mesh: Mesh, faceIndex: number, applyMorph = false): CharacterTriangleSurface | null {
   const position = mesh.geometry.attributes.position;
-  if (!position) return null;
+  if (!position || !Number.isSafeInteger(faceIndex) || faceIndex < 0
+    || faceIndex * 3 + 2 >= (mesh.geometry.index?.count ?? position.count)) return null;
   const normal = mesh.geometry.attributes.normal;
   const skinIndex = mesh.geometry.attributes.skinIndex;
   const skinWeight = mesh.geometry.attributes.skinWeight;
@@ -112,12 +113,20 @@ export function characterSurfaceTriangle(mesh: Mesh, faceIndex: number): Charact
   const skinWeights: CharacterInkVector4[] = [];
   for (let corner = 0; corner < 3; corner += 1) {
     const index = vertexIndex(mesh, faceIndex, corner);
-    positions.push([position.getX(index), position.getY(index), position.getZ(index)]);
+    if (!Number.isSafeInteger(index) || index < 0 || index >= position.count) return null;
+    const coordinates = [position.getX(index), position.getY(index), position.getZ(index)];
+    if (!coordinates.every(Number.isFinite)) return null;
+    // Ribbon의 SkinnedMesh가 관절 변형을 담당하므로 morph만 먼저 적용한다.
+    const vertex = applyMorph
+      ? Mesh.prototype.getVertexPosition.call(mesh, index, new Vector3())
+      : new Vector3(position.getX(index), position.getY(index), position.getZ(index));
+    if (![vertex.x, vertex.y, vertex.z].every(Number.isFinite)) return null;
+    positions.push([vertex.x, vertex.y, vertex.z]);
     normals.push(normal ? [normal.getX(index), normal.getY(index), normal.getZ(index)] : [0, 0, 1]);
     skinIndices.push(tuple4(skinIndex, index, [0, 0, 0, 0]));
     skinWeights.push(tuple4(skinWeight, index, [1, 0, 0, 0]));
   }
-  if (!normal) {
+  if (!normal || applyMorph && mesh.morphTargetInfluences?.some((value) => value !== 0)) {
     const a = new Vector3(...positions[0]);
     const b = new Vector3(...positions[1]);
     const c = new Vector3(...positions[2]);
@@ -134,8 +143,13 @@ export function characterSurfaceTriangle(mesh: Mesh, faceIndex: number): Charact
 
 export function characterSurfaceSourceMap(scene: Scene): Map<string, Mesh> {
   const values = new Map<string, Mesh>();
+  const ambiguous = new Set<string>();
   scene.traverse((object) => {
-    if (object instanceof Mesh && object.userData.toonstudioSurfaceInk !== true) values.set(characterSurfaceObjectPath(object), object);
+    if (!(object instanceof Mesh) || object.userData.toonstudioSurfaceInk === true || object.userData.characterAuthoringDerivative) return;
+    const path = characterSurfaceObjectPath(object);
+    // 중복 이름의 표면은 임의의 다른 메시로 획을 옮기지 않는다.
+    if (values.has(path) || ambiguous.has(path)) { values.delete(path); ambiguous.add(path); }
+    else values.set(path, object);
   });
   return values;
 }
@@ -154,6 +168,7 @@ export function reconcileCharacterSurfaceInkTopology(
     const strokes = layer.strokes.map((stroke) => {
       const source = sources.get(stroke.meshAssetId);
       const status = source && characterSurfaceTopologyRevision(modelKey, source) === stroke.topologyRevision
+        && stroke.anchors.every((anchor) => characterSurfaceTriangle(source, anchor.triangleIndex) !== null)
         ? "valid" : "needs-reprojection";
       if (status === stroke.status) return stroke;
       changed = layerChanged = true;
@@ -187,7 +202,7 @@ function materialFor(stroke: CharacterSurfaceInkStroke): MeshBasicMaterial {
   });
 }
 
-export function rebuildCharacterSurfaceInkGroup(scene: Scene, document: CharacterSurfaceInkDocument): Group {
+export function rebuildCharacterSurfaceInkGroup(scene: Scene, document: CharacterSurfaceInkDocument, parent: Object3D = scene): Group {
   const previous = scene.getObjectByName(CHARACTER_SURFACE_INK_GROUP_NAME);
   if (previous instanceof Group) disposeCharacterSurfaceInkGroup(previous);
   const group = new Group();
@@ -202,7 +217,7 @@ export function rebuildCharacterSurfaceInkGroup(scene: Scene, document: Characte
       if (!source) continue;
       const triangles = new Map<number, CharacterTriangleSurface>();
       for (const anchor of stroke.anchors) {
-        const triangle = characterSurfaceTriangle(source, anchor.triangleIndex);
+        const triangle = characterSurfaceTriangle(source, anchor.triangleIndex, true);
         if (triangle) triangles.set(anchor.triangleIndex, triangle);
       }
       try {
@@ -221,8 +236,11 @@ export function rebuildCharacterSurfaceInkGroup(scene: Scene, document: Characte
           ink.bind(source.skeleton, source.bindMatrix.clone());
           ink.bindMatrixInverse.copy(source.bindMatrixInverse);
         }
-        ink.name = `surface-ink:${stroke.strokeId}`;
+        // 원본 메시 분류를 유지해 기존 PNG/PSD의 부분 마스크에서 펜선도 함께 격리한다.
+        ink.name = `surface-ink:${source.name}:${stroke.strokeId}`;
         ink.userData.toonstudioSurfaceInk = true;
+        ink.userData.characterAuthoringDerivative = "surface-ink";
+        if (typeof source.userData.toonstudioComponent === "string") ink.userData.toonstudioComponent = source.userData.toonstudioComponent;
         ink.renderOrder = 10_000;
         ink.frustumCulled = false;
         ink.matrixAutoUpdate = false;
@@ -240,7 +258,7 @@ export function rebuildCharacterSurfaceInkGroup(scene: Scene, document: Characte
       }
     }
   }
-  scene.add(group);
+  parent.add(group);
   group.updateMatrixWorld(true);
   return group;
 }

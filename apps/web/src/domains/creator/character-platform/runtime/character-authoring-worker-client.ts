@@ -9,7 +9,7 @@ import {
   type CharacterAuthoringWorkerResultPayload,
   type CharacterAuthoringWorkerTask,
 } from "./character-authoring-worker-protocol";
-import { executeCharacterAuthoringTask } from "./character-authoring-worker-runtime";
+import { CharacterAuthoringWorkerRuntimeError, executeCharacterAuthoringTask } from "./character-authoring-worker-runtime";
 import { validateCharacterDocumentV3 } from "../document/character-document-v3";
 import { validateCharacterGroomDocument } from "../groom/character-groom-document";
 
@@ -20,7 +20,8 @@ export type CharacterAuthoringWorkerClientErrorCode =
   | "protocol"
   | "timeout"
   | "worker-failed"
-  | "worker-unavailable";
+  | "worker-unavailable"
+  | "superseded";
 
 export interface CharacterAuthoringWorkerProgress {
   readonly stage: "queued" | "validating" | "computing" | "packing" | "ready" | "main-thread-fallback";
@@ -31,6 +32,8 @@ export interface CharacterAuthoringWorkerProgress {
 
 export interface CharacterAuthoringWorkerExecutionOptions {
   readonly signal?: AbortSignal;
+  /** 같은 편집 대상의 이전 계산을 즉시 취소한다. 독립 대상은 서로 다른 키를 사용한다. */
+  readonly latestKey?: string;
   readonly timeoutMs?: number;
   readonly allowMainThreadFallback?: boolean;
   readonly onProgress?: (progress: CharacterAuthoringWorkerProgress) => void;
@@ -74,8 +77,8 @@ function createModuleWorker(): CharacterAuthoringWorkerLike | null {
 }
 
 function timeoutMs(value: number | undefined, fallback: number): number {
-  if (!Number.isFinite(value)) return fallback;
-  return Math.min(120_000, Math.max(1, Math.trunc(value!)));
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.min(120_000, Math.max(1, Math.trunc(value)));
 }
 
 function positive(value: unknown): value is number {
@@ -150,6 +153,8 @@ export class CharacterAuthoringWorkerClient {
   #nextRequestId = 1;
   #nextGenerationId = 1;
   #disposed = false;
+  readonly #pending = new Set<(code: CharacterAuthoringWorkerClientErrorCode) => void>();
+  readonly #latest = new Map<string, (code: CharacterAuthoringWorkerClientErrorCode) => void>();
 
   constructor(options: CharacterAuthoringWorkerClientOptions = {}) {
     this.#workerFactory = options.workerFactory ?? createModuleWorker;
@@ -160,132 +165,132 @@ export class CharacterAuthoringWorkerClient {
     task: CharacterAuthoringWorkerTask,
     options: CharacterAuthoringWorkerExecutionOptions = {},
   ): Promise<CharacterAuthoringWorkerResultPayload> {
-    if (this.#disposed) {
-      return Promise.reject(new CharacterAuthoringWorkerClientError("disposed"));
-    }
-    if (options.signal?.aborted) {
-      return Promise.reject(new CharacterAuthoringWorkerClientError("aborted"));
-    }
+    if (this.#disposed) return Promise.reject(new CharacterAuthoringWorkerClientError("disposed"));
+    if (options.signal?.aborted) return Promise.reject(new CharacterAuthoringWorkerClientError("aborted"));
     let inputBytes: number;
+    let snapshot: CharacterAuthoringWorkerTask;
     try {
       inputBytes = estimateCharacterAuthoringTaskBytes(task);
+      if (inputBytes <= 0 || inputBytes > CHARACTER_AUTHORING_WORKER_MAX_INPUT_BYTES) {
+        return Promise.reject(new CharacterAuthoringWorkerClientError("input-too-large"));
+      }
+      snapshot = structuredClone(task);
     } catch (error) {
       return Promise.reject(new CharacterAuthoringWorkerClientError("invalid-request", "3D 저작 작업을 직렬화하지 못했습니다.", { cause: error }));
     }
-    if (inputBytes <= 0 || inputBytes > CHARACTER_AUTHORING_WORKER_MAX_INPUT_BYTES) {
-      return Promise.reject(new CharacterAuthoringWorkerClientError("input-too-large"));
-    }
     const requestId = this.#allocate("request");
     const generationId = this.#allocate("generation");
-    options.onProgress?.({ stage: "queued", progress: 0, requestId, generationId });
-
-    let worker: CharacterAuthoringWorkerLike | null = null;
-    try {
-      worker = this.#workerFactory();
-    } catch (error) {
-      if (options.allowMainThreadFallback === false) {
-        return Promise.reject(new CharacterAuthoringWorkerClientError("worker-unavailable", "3D 저작 Worker를 만들지 못했습니다.", { cause: error }));
-      }
-    }
-    if (!worker) {
-      if (options.allowMainThreadFallback === false) {
-        return Promise.reject(new CharacterAuthoringWorkerClientError("worker-unavailable"));
-      }
-      return this.#executeFallback(task, requestId, generationId, options);
-    }
-
-    const request: CharacterAuthoringWorkerRequest = {
-      version: CHARACTER_AUTHORING_WORKER_PROTOCOL_VERSION,
-      kind: "execute",
-      requestId,
-      generationId,
-      inputBytes,
-      task,
-    };
-    const maximum = timeoutMs(options.timeoutMs, this.#defaultTimeoutMs);
+    if (options.latestKey) this.#latest.get(options.latestKey)?.("superseded");
     return new Promise((resolve, reject) => {
       let settled = false;
+      let worker: CharacterAuthoringWorkerLike | null = null;
       const cleanups: (() => void)[] = [];
-      const settle = (
-        outcome: CharacterAuthoringWorkerResultPayload | CharacterAuthoringWorkerClientError,
-      ) => {
+      const settle = (outcome: CharacterAuthoringWorkerResultPayload | CharacterAuthoringWorkerClientError) => {
         if (settled) return;
         settled = true;
+        this.#pending.delete(cancel);
+        if (options.latestKey && this.#latest.get(options.latestKey) === cancel) this.#latest.delete(options.latestKey);
+        const cleanupErrors: unknown[] = [];
         for (const cleanup of cleanups.splice(0)) {
-          try { cleanup(); } catch { /* cleanup cannot reclaim authority */ }
+          try { cleanup(); } catch (error) { cleanupErrors.push(error); }
         }
-        try { worker?.terminate(); } catch { /* ignore */ }
+        try { worker?.terminate(); } catch (error) { cleanupErrors.push(error); }
         if (outcome instanceof CharacterAuthoringWorkerClientError) reject(outcome);
+        else if (cleanupErrors.length > 0) reject(new CharacterAuthoringWorkerClientError(
+          "worker-failed", "3D 작업 자원을 완전히 정리하지 못했습니다.", { cause: new AggregateError(cleanupErrors) },
+        ));
         else resolve(outcome);
       };
-      const onFailure = (event: ErrorEventLike) => {
-        event.preventDefault?.();
-        settle(new CharacterAuthoringWorkerClientError("worker-failed"));
+      const cancel = (code: CharacterAuthoringWorkerClientErrorCode) => settle(new CharacterAuthoringWorkerClientError(code));
+      this.#pending.add(cancel);
+      if (options.latestKey) this.#latest.set(options.latestKey, cancel);
+      const notify = (stage: CharacterAuthoringWorkerProgress["stage"], progress: number) => {
+        if (settled) return;
+        try { options.onProgress?.({ stage, progress, requestId, generationId }); }
+        catch (error) {
+          settle(new CharacterAuthoringWorkerClientError("task-failed", "3D 작업 진행 상태를 전달하지 못했습니다.", { cause: error }));
+        }
       };
+      const complete = (value: CharacterAuthoringWorkerResultPayload) => {
+        if (settled) return;
+        try {
+          const expected = snapshot.kind === "build-groom-ribbon" || snapshot.kind === "build-geometry-stroke"
+            ? "mesh" : snapshot.kind === "resample-groom-guide" ? "groom-guide" : "document-v3";
+          if (value.kind !== expected) throw new CharacterAuthoringWorkerClientError("protocol", "요청과 다른 3D 작업 결과를 받았습니다.");
+          const result = validateResult(value);
+          notify("ready", 1);
+          if (!settled) settle(result);
+        } catch (error) {
+          settle(error instanceof CharacterAuthoringWorkerClientError ? error
+            : new CharacterAuthoringWorkerClientError("protocol", "Worker 결과를 검증하지 못했습니다.", { cause: error }));
+        }
+      };
+      const onAbort = () => cancel("aborted");
+      options.signal?.addEventListener("abort", onAbort, { once: true });
+      cleanups.push(() => options.signal?.removeEventListener("abort", onAbort));
+      const timeout = setTimeout(() => cancel("timeout"), timeoutMs(options.timeoutMs, this.#defaultTimeoutMs));
+      cleanups.push(() => clearTimeout(timeout));
+      notify("queued", 0);
+      if (settled) return;
+      try { worker = this.#workerFactory(); }
+      catch (error) {
+        if (options.allowMainThreadFallback === false) {
+          settle(new CharacterAuthoringWorkerClientError("worker-unavailable", "3D 저작 Worker를 만들지 못했습니다.", { cause: error }));
+          return;
+        }
+      }
+      // Worker 생성이나 진행 알림 안에서 취소가 발생해도 새 자원을 남기지 않는다.
+      if (settled) { worker?.terminate(); return; }
+      if (options.signal?.aborted || this.#disposed) { cancel(this.#disposed ? "disposed" : "aborted"); return; }
+      if (!worker) {
+        if (options.allowMainThreadFallback === false) { cancel("worker-unavailable"); return; }
+        notify("main-thread-fallback", 0.2);
+        if (settled) return;
+        // 브라우저가 입력과 취소를 처리할 수 있도록 실제 event-loop 경계를 넘는다.
+        const deferred = setTimeout(() => {
+          if (settled) return;
+          try { complete(executeCharacterAuthoringTask(snapshot)); }
+          catch (error) {
+            settle(new CharacterAuthoringWorkerClientError(error instanceof CharacterAuthoringWorkerRuntimeError ? error.code : "task-failed", error instanceof Error ? error.message : "3D 저작 계산에 실패했습니다.", { cause: error }));
+          }
+        }, 0);
+        cleanups.push(() => clearTimeout(deferred));
+        return;
+      }
+      const activeWorker = worker;
+      const onFailure = (event: ErrorEventLike) => { event.preventDefault?.(); cancel("worker-failed"); };
       let lastProgress = 0;
-      const stageOrder: Record<string, number> = {
-        validating: 1,
-        computing: 2,
-        packing: 3,
-      };
       let lastStage = 0;
+      const stageOrder = { validating: 1, computing: 2, packing: 3 } as const;
       const onMessage = (event: MessageEventLike) => {
+        if (settled) return;
         const responseIdentity = identity(event.data);
-        if (responseIdentity && (responseIdentity.requestId !== requestId || responseIdentity.generationId !== generationId)) {
-          return;
-        }
-        if (!responseIdentity || !isCharacterAuthoringWorkerResponse(event.data)) {
-          settle(new CharacterAuthoringWorkerClientError("protocol"));
-          return;
-        }
+        if (responseIdentity && (responseIdentity.requestId !== requestId || responseIdentity.generationId !== generationId)) return;
+        if (!responseIdentity || !isCharacterAuthoringWorkerResponse(event.data)) { cancel("protocol"); return; }
         const response = event.data;
         if (response.kind === "progress") {
-          const nextStage = stageOrder[response.stage] ?? 0;
+          const nextStage = stageOrder[response.stage];
           if (nextStage < lastStage || response.progress < lastProgress) {
             settle(new CharacterAuthoringWorkerClientError("protocol", "Worker 진행률이 역행했습니다."));
             return;
           }
           lastStage = nextStage;
           lastProgress = response.progress;
-          options.onProgress?.({
-            stage: response.stage,
-            progress: response.progress,
-            requestId,
-            generationId,
-          });
-          return;
-        }
-        if (response.kind === "error") {
+          notify(response.stage, response.progress);
+        } else if (response.kind === "error") {
           settle(new CharacterAuthoringWorkerClientError(response.code, response.message));
-          return;
-        }
-        try {
-          const result = validateResult(response.result);
-          options.onProgress?.({ stage: "ready", progress: 1, requestId, generationId });
-          settle(result);
-        } catch (error) {
-          settle(error instanceof CharacterAuthoringWorkerClientError
-            ? error
-            : new CharacterAuthoringWorkerClientError("protocol", "Worker 결과를 검증하지 못했습니다.", { cause: error }));
-        }
+        } else complete(response.result);
       };
-      const onAbort = () => settle(new CharacterAuthoringWorkerClientError("aborted"));
-      worker!.addEventListener("message", onMessage);
-      worker!.addEventListener("error", onFailure);
-      worker!.addEventListener("messageerror", onFailure);
+      activeWorker.addEventListener("message", onMessage);
+      activeWorker.addEventListener("error", onFailure);
+      activeWorker.addEventListener("messageerror", onFailure);
       cleanups.push(
-        () => worker?.removeEventListener("message", onMessage),
-        () => worker?.removeEventListener("error", onFailure),
-        () => worker?.removeEventListener("messageerror", onFailure),
+        () => activeWorker.removeEventListener("message", onMessage),
+        () => activeWorker.removeEventListener("error", onFailure),
+        () => activeWorker.removeEventListener("messageerror", onFailure),
       );
-      if (options.signal) {
-        options.signal.addEventListener("abort", onAbort, { once: true });
-        cleanups.push(() => options.signal?.removeEventListener("abort", onAbort));
-      }
-      const timeout = setTimeout(() => settle(new CharacterAuthoringWorkerClientError("timeout")), maximum);
-      cleanups.push(() => clearTimeout(timeout));
       try {
-        worker!.postMessage(request);
+        activeWorker.postMessage({ version: CHARACTER_AUTHORING_WORKER_PROTOCOL_VERSION, kind: "execute", requestId, generationId, inputBytes, task: snapshot });
       } catch (error) {
         settle(new CharacterAuthoringWorkerClientError("worker-failed", "Worker에 작업을 전달하지 못했습니다.", { cause: error }));
       }
@@ -294,6 +299,7 @@ export class CharacterAuthoringWorkerClient {
 
   dispose(): void {
     this.#disposed = true;
+    for (const cancel of [...this.#pending]) cancel("disposed");
   }
 
   #allocate(kind: "request" | "generation"): number {
@@ -302,32 +308,6 @@ export class CharacterAuthoringWorkerClient {
     if (kind === "request") this.#nextRequestId = next;
     else this.#nextGenerationId = next;
     return field;
-  }
-
-  async #executeFallback(
-    task: CharacterAuthoringWorkerTask,
-    requestId: number,
-    generationId: number,
-    options: CharacterAuthoringWorkerExecutionOptions,
-  ): Promise<CharacterAuthoringWorkerResultPayload> {
-    options.onProgress?.({
-      stage: "main-thread-fallback",
-      progress: 0.2,
-      requestId,
-      generationId,
-    });
-    await new Promise<void>((resolve, reject) => {
-      const onAbort = () => reject(new CharacterAuthoringWorkerClientError("aborted"));
-      options.signal?.addEventListener("abort", onAbort, { once: true });
-      queueMicrotask(() => {
-        options.signal?.removeEventListener("abort", onAbort);
-        if (options.signal?.aborted) reject(new CharacterAuthoringWorkerClientError("aborted"));
-        else resolve();
-      });
-    });
-    const result = validateResult(executeCharacterAuthoringTask(task));
-    options.onProgress?.({ stage: "ready", progress: 1, requestId, generationId });
-    return result;
   }
 }
 

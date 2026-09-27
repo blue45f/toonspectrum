@@ -7,13 +7,14 @@
  * only a click promotes that candidate into document history.
  */
 import { Ban, Check, Eye, Image, PencilRuler, TriangleAlert } from "lucide-react";
-import { useId, useRef } from "react";
+import { useId } from "react";
 
 import { useCharacterRuntimeThumbnail } from "../character-platform/thumbnail/character-runtime-thumbnail-store";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
 import { CharacterSlotPreview } from "./character-shaper-preview";
 import { characterGridDirectionForKey, describeAvailabilityBadge } from "./character-shaper-ui-model";
+import { useCharacterPresetInteraction } from "./useCharacterPresetInteraction";
 
 import type { CharacterSlotCardProps } from "./character-shaper-ui-contract";
 import type { KeyboardEvent } from "react";
@@ -31,6 +32,7 @@ export function CharacterSlotCard({
   availability,
   selected,
   previewed = false,
+  compact = false,
   tabIndex,
   onCommit,
   onHover,
@@ -44,19 +46,17 @@ export function CharacterSlotCard({
   // The recorder captures the committed composite, not an isolated candidate. Only the selected
   // card may truthfully label that image as its own runtime result.
   const runtimeThumbnail = selected ? capturedThumbnail : null;
-  const pointerInsideRef = useRef(false);
-  const focusedRef = useRef(false);
   const badge = describeAvailabilityBadge(availability);
   const unavailable = availability.status === "unavailable";
   const showBadge = availability.status !== "available";
   const title = badge.detail ? `${entry.label} · ${badge.label} — ${badge.detail}` : `${entry.label} · ${entry.hint}`;
 
-  const startPreview = () => {
-    if (!unavailable) onPreviewStart?.(entry);
-  };
-  const endPreview = () => onPreviewEnd?.(entry.id);
+  const interaction = useCharacterPresetInteraction({
+    entry, unavailable, onCommit, onHover, onFocus, onPreviewStart, onPreviewEnd,
+  });
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    interaction.onKeyDown(event);
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     const direction = characterGridDirectionForKey(event.key);
     if (!direction) return;
@@ -74,6 +74,7 @@ export function CharacterSlotCard({
       tabIndex={tabIndex}
       title={title}
       data-character-slot-card={entry.id}
+      data-character-slot-card-compact={compact || undefined}
       data-character-slot-card-availability={availability.status}
       data-character-slot-card-selected={selected ? "true" : undefined}
       data-character-slot-card-previewed={previewed ? "true" : undefined}
@@ -89,34 +90,13 @@ export function CharacterSlotCard({
             : "border-line bg-card hover:border-line-strong hover:bg-raised/70",
         unavailable ? "cursor-not-allowed" : "hover:-translate-y-0.5 motion-reduce:hover:translate-y-0",
       )}
-      onClick={() => {
-        if (unavailable) return;
-        onCommit(entry);
-      }}
-      onPointerEnter={() => {
-        pointerInsideRef.current = true;
-        onHover(entry.id);
-        startPreview();
-      }}
-      onPointerLeave={() => {
-        pointerInsideRef.current = false;
-        onHover(null);
-        if (!focusedRef.current) endPreview();
-      }}
-      onFocus={() => {
-        focusedRef.current = true;
-        onFocus(entry.id);
-        startPreview();
-      }}
-      onBlur={() => {
-        focusedRef.current = false;
-        if (!pointerInsideRef.current) endPreview();
-      }}
+      {...interaction}
       onKeyDown={handleKeyDown}
     >
       <span
         className={cn(
-          "relative block aspect-[4/5] w-full overflow-hidden bg-canvas/70",
+          "relative block w-full overflow-hidden bg-canvas/70",
+          compact ? "aspect-[4/3] max-h-28" : "aspect-[4/5]",
           unavailable && "opacity-45 grayscale-[0.4]",
         )}
       >
@@ -169,7 +149,8 @@ export function CharacterSlotCard({
           <span
             id={detailId}
             className={cn(
-              "mt-1 block break-words text-[0.66rem] leading-snug",
+              "mt-1 block break-words leading-snug",
+              compact ? "text-xs" : "text-[0.66rem]",
               badge.tone === "bad" ? "text-bad" : "text-warn",
             )}
           >

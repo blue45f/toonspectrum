@@ -5,6 +5,7 @@ import { loadStudioBg3dThreeWebglCaptureRuntime } from "./studio-bg3d-editor-der
 import {
   installStudioBg3dWebglContextRecovery,
   STUDIO_BG3D_WEBGL_RECOVERY_EVENT,
+  type StudioBg3dWebglRecoveryNoticeDetail,
   type StudioBg3dWebglRecoverySnapshot,
 } from "./studio-bg3d-webgl-context-recovery";
 
@@ -96,9 +97,9 @@ export function CaptureBridge({
         }
         if (typeof window !== "undefined") {
           window.dispatchEvent(
-            new CustomEvent<StudioBg3dWebglRecoverySnapshot>(
+            new CustomEvent<StudioBg3dWebglRecoveryNoticeDetail>(
               STUDIO_BG3D_WEBGL_RECOVERY_EVENT,
-              { detail: snapshot },
+              { detail: { ...snapshot, owner: canvas, snapshot, retry: () => controller.retry() } },
             ),
           );
         }
@@ -108,6 +109,10 @@ export function CaptureBridge({
     return () => {
       degradedRef.current = false;
       controller.dispose();
+      window.dispatchEvent(new CustomEvent<StudioBg3dWebglRecoveryNoticeDetail>(
+        STUDIO_BG3D_WEBGL_RECOVERY_EVENT,
+        { detail: { owner: canvas, snapshot: null, retry: () => false } },
+      ));
     };
   }, [gl, invalidate, setDpr]);
 

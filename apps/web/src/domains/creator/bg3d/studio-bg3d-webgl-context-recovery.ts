@@ -2,6 +2,7 @@ export type StudioBg3dWebglRecoveryPhase =
   | "healthy"
   | "lost"
   | "restored"
+  | "failed"
   | "degraded";
 
 export interface StudioBg3dWebglRecoverySnapshot {
@@ -26,11 +27,18 @@ export interface StudioBg3dWebglRecoveryOptions {
 
 export interface StudioBg3dWebglRecoveryController {
   readonly dispose: () => void;
+  readonly retry: () => boolean;
   readonly snapshot: () => StudioBg3dWebglRecoverySnapshot;
 }
 
 export const STUDIO_BG3D_WEBGL_RECOVERY_EVENT =
   "toonstudio:bg3d-webgl-recovery" as const;
+
+export interface StudioBg3dWebglRecoveryNoticeDetail {
+  readonly owner: HTMLCanvasElement;
+  readonly snapshot: StudioBg3dWebglRecoverySnapshot | null;
+  readonly retry: () => boolean;
+}
 
 const DEFAULT_RECOVERY_WINDOW_MS = 30_000;
 const DEFAULT_DEGRADATION_THRESHOLD = 3;
@@ -120,8 +128,8 @@ export function installStudioBg3dWebglContextRecovery(
     publish("lost", timestamp);
   };
 
-  const handleContextRestored = (): void => {
-    if (disposed) return;
+  const restoreRenderer = (): boolean => {
+    if (disposed) return false;
     const timestamp = now();
     const epoch = restorationEpoch + 1;
     restorationEpoch = epoch;
@@ -129,21 +137,25 @@ export function installStudioBg3dWebglContextRecovery(
 
     try {
       options.resetRenderer();
-    } finally {
-      queueMicrotask(() => {
-        if (!disposed && restorationEpoch === epoch) {
-          options.invalidate();
-        }
-      });
-      scheduledFrame = scheduleFrame(() => {
-        scheduledFrame = null;
-        if (!disposed && restorationEpoch === epoch) {
-          options.invalidate();
-        }
-      });
-      publish("restored", timestamp);
+    } catch {
+      // 캐시 재생성이 끝나지 않은 렌더러는 복구 성공이나 후속 프레임을 발행하지 않는다.
+      if (disposed || restorationEpoch !== epoch) return false;
+      publish("failed", timestamp);
+      return false;
     }
+    if (disposed || restorationEpoch !== epoch) return false;
+    queueMicrotask(() => {
+      if (!disposed && restorationEpoch === epoch) options.invalidate();
+    });
+    scheduledFrame = scheduleFrame(() => {
+      scheduledFrame = null;
+      if (!disposed && restorationEpoch === epoch) options.invalidate();
+    });
+    publish("restored", timestamp);
+    return true;
   };
+
+  const handleContextRestored = (): void => { restoreRenderer(); };
 
   canvas.addEventListener("webglcontextlost", handleContextLost, false);
   canvas.addEventListener(
@@ -169,6 +181,7 @@ export function installStudioBg3dWebglContextRecovery(
       );
       cancelScheduledFrame();
     },
+    retry: () => current.phase === "failed" && restoreRenderer(),
     snapshot: () => current,
   });
 }

@@ -4,6 +4,7 @@ import {
   addCharacterSurfaceInkStroke,
   createEmptyCharacterSurfaceInkDocument,
   removeCharacterSurfaceInkStroke,
+  validateCharacterSurfaceInkDocument,
 } from "./character-surface-ink";
 import {
   characterSurfaceAnchorFromIntersection,
@@ -88,13 +89,31 @@ export function useCharacterSurfaceInkRuntime({
   h,
   modelKey,
   revisionKey,
+  authoringDocument,
+  authoringReady = true,
+  authoringEditable = true,
+  onDocumentChange,
+  authoringUndo,
+  authoringRedo,
+  authoringCanUndo = false,
+  authoringCanRedo = false,
 }: {
   readonly h: StudioVrmPoserHost;
   readonly modelKey: string;
   readonly revisionKey: string;
+  readonly authoringDocument?: CharacterSurfaceInkDocument;
+  readonly authoringReady?: boolean;
+  readonly authoringEditable?: boolean;
+  readonly onDocumentChange?: (document: CharacterSurfaceInkDocument) => boolean | void;
+  readonly authoringUndo?: () => void;
+  readonly authoringRedo?: () => void;
+  readonly authoringCanUndo?: boolean;
+  readonly authoringCanRedo?: boolean;
 }): CharacterSurfaceInkRuntimeState {
   const [active, setActiveState] = useState(false);
-  const [document, setDocument] = useState<CharacterSurfaceInkDocument>(() => createEmptyCharacterSurfaceInkDocument());
+  const [localDocument, setDocument] = useState<CharacterSurfaceInkDocument>(() => createEmptyCharacterSurfaceInkDocument());
+  const controlled = authoringDocument !== undefined;
+  const document = authoringDocument ?? localDocument;
   const [loadedModelKey, setLoadedModelKey] = useState<string | null>(null);
   const [style, setStyleState] = useState<CharacterSurfaceInkStyle>(DEFAULT_STYLE);
   const [notice, setNotice] = useState<string | null>(null);
@@ -103,13 +122,19 @@ export function useCharacterSurfaceInkRuntime({
   const activeStrokeRef = useRef<ActiveStroke | null>(null);
   const documentRef = useRef(document);
   const styleRef = useRef(style);
+  const onDocumentChangeRef = useRef(onDocumentChange);
 
+  const ready = controlled ? authoringReady : loadedModelKey === modelKey;
+  const editable = ready && (!controlled || authoringEditable);
   useEffect(() => { documentRef.current = document; }, [document]);
   useEffect(() => { styleRef.current = style; }, [style]);
+  useEffect(() => { onDocumentChangeRef.current = onDocumentChange; }, [onDocumentChange]);
 
   useEffect(() => {
-    let current = true;
     setActiveState(false);
+    activeStrokeRef.current = null;
+    if (controlled) return;
+    let current = true;
     setLoadedModelKey(null);
     setDocument(createEmptyCharacterSurfaceInkDocument());
     historyRef.current = { past: [], future: [] };
@@ -123,19 +148,19 @@ export function useCharacterSurfaceInkRuntime({
       if (current) setNotice(error instanceof Error ? error.message : "3D 펜선을 읽지 못했습니다.");
     });
     return () => { current = false; };
-  }, [modelKey]);
+  }, [controlled, modelKey]);
 
   useEffect(() => {
-    if (loadedModelKey !== modelKey) return;
+    if (controlled || loadedModelKey !== modelKey) return;
     let current = true;
     void saveCharacterSurfaceInkDocument(modelKey, document).catch((error: unknown) => {
       if (current) setNotice(`3D 펜선이 저장되지 않았습니다: ${error instanceof Error ? error.message : "SQLite 저장 실패"}`);
     });
     return () => { current = false; };
-  }, [document, loadedModelKey, modelKey]);
+  }, [controlled, document, loadedModelKey, modelKey]);
 
   useEffect(() => {
-    if (loadedModelKey !== modelKey || h.status !== "ready") return;
+    if (!ready || h.status !== "ready") return;
     const capture = h.captureRef?.current;
     if (!capture?.scene) return;
     const scene = capture.scene as Scene;
@@ -151,11 +176,16 @@ export function useCharacterSurfaceInkRuntime({
       clearGroup();
       if (modelRoot && scene.getObjectById(modelRoot.id) !== modelRoot) return;
       const reconciled = reconcileCharacterSurfaceInkTopology(document, modelKey, scene);
-      if (reconciled !== document) {
+      if (reconciled !== document && !controlled) {
+        documentRef.current = reconciled;
         setDocument(reconciled);
         return;
       }
-      group = rebuildCharacterSurfaceInkGroup(scene, document);
+      // V3 미리보기의 파생 상태는 원본 문서나 별도 저장소에 쓰지 않는다.
+      if (controlled && reconciled.layers.some((layer) => layer.strokes.some((stroke) => stroke.status !== "valid"))) {
+        setNotice("표면 구조가 바뀐 펜선은 원본을 보존하고 표시를 중지했습니다. 원래 모델을 복원하면 다시 표시됩니다.");
+      }
+      group = rebuildCharacterSurfaceInkGroup(scene, reconciled, modelRoot ?? scene);
       h.texturePaintInvalidateRef?.current?.();
     };
     // R3F can attach the primitive after the host becomes ready without replacing the capture scene.
@@ -167,23 +197,30 @@ export function useCharacterSurfaceInkRuntime({
       modelRoot?.removeEventListener("removed", clearGroup);
       clearGroup();
     };
-  }, [document, h.captureRef, h.captureSceneGeneration, h.status, h.texturePaintInvalidateRef, h.vrm, loadedModelKey, modelKey, revisionKey]);
+  }, [controlled, document, h.captureRef, h.captureSceneGeneration, h.status, h.texturePaintInvalidateRef, h.vrm, ready, modelKey, revisionKey]);
 
   const commitDocument = useCallback((next: CharacterSurfaceInkDocument): boolean => {
-    if (loadedModelKey !== modelKey) {
-      setNotice("저장된 3D 펜선을 읽은 뒤 편집할 수 있습니다.");
+    if (!editable) {
+      setNotice(ready ? "미리보기를 적용하거나 취소한 뒤 펜선을 편집할 수 있습니다." : "저장된 3D 펜선을 읽은 뒤 편집할 수 있습니다.");
       return false;
+    }
+    const validated = validateCharacterSurfaceInkDocument(next);
+    if (controlled) {
+      if (!onDocumentChangeRef.current || onDocumentChangeRef.current(validated) === false) return false;
+      documentRef.current = validated;
+      return true;
     }
     historyRef.current.past.push(documentRef.current);
     if (historyRef.current.past.length > 80) historyRef.current.past.shift();
     historyRef.current.future = [];
-    setDocument(next);
+    documentRef.current = validated;
+    setDocument(validated);
     setHistoryRevision((value) => value + 1);
     return true;
-  }, [loadedModelKey, modelKey]);
+  }, [controlled, editable, ready]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || !editable) return;
     const capture = h.captureRef?.current;
     const canvas = capture?.gl?.domElement as HTMLCanvasElement | undefined;
     const scene = capture?.scene as Scene | undefined;
@@ -200,7 +237,7 @@ export function useCharacterSurfaceInkRuntime({
     };
 
     const onPointerDown = (event: PointerEvent) => {
-      if (event.button !== 0) return;
+      if (event.button !== 0 || activeStrokeRef.current) return;
       const anchor = sample(event);
       if (!anchor) {
         setNotice("그릴 수 있는 캐릭터 표면을 찾지 못했습니다.");
@@ -225,6 +262,11 @@ export function useCharacterSurfaceInkRuntime({
       event.stopImmediatePropagation();
       const anchor = sample(event);
       if (!anchor || anchor.meshAssetId !== current.meshId) return;
+      if (anchor.topologyRevision !== current.topologyRevision) {
+        finish(event, true);
+        setNotice("그리는 동안 표면 구조가 바뀌어 펜선을 취소했습니다. 기존 펜선은 보존했습니다.");
+        return;
+      }
       const previous = current.anchors.at(-1);
       if (previous) {
         const previousPosition = characterSurfaceAnchorPosition(previous, scene);
@@ -258,8 +300,13 @@ export function useCharacterSurfaceInkRuntime({
         style: Object.freeze({ ...styleRef.current }),
         status: "valid",
       });
-      commitDocument(addCharacterSurfaceInkStroke(documentRef.current, "default", stroke));
-      setNotice(`3D 펜선 ${current.anchors.length}개 표면점을 저장했습니다.`);
+      try {
+        if (commitDocument(addCharacterSurfaceInkStroke(documentRef.current, "default", stroke))) {
+          setNotice(`3D 펜선 ${current.anchors.length}개 표면점을 저장했습니다.`);
+        }
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : "3D 펜선을 저장하지 못했습니다.");
+      }
     };
 
     const onPointerUp = (event: PointerEvent) => finish(event, false);
@@ -269,29 +316,35 @@ export function useCharacterSurfaceInkRuntime({
     canvas.addEventListener("pointerup", onPointerUp, true);
     canvas.addEventListener("pointercancel", onPointerCancel, true);
     return () => {
+      const pointerId = activeStrokeRef.current?.pointerId;
       activeStrokeRef.current = null;
+      if (pointerId !== undefined && canvas.hasPointerCapture?.(pointerId)) canvas.releasePointerCapture(pointerId);
       canvas.removeEventListener("pointerdown", onPointerDown, true);
       canvas.removeEventListener("pointermove", onPointerMove, true);
       canvas.removeEventListener("pointerup", onPointerUp, true);
       canvas.removeEventListener("pointercancel", onPointerCancel, true);
     };
-  }, [active, commitDocument, h.captureRef, h.vrm, modelKey]);
+  }, [active, commitDocument, editable, h.captureRef, h.captureSceneGeneration, h.vrm, modelKey]);
 
   const undo = useCallback(() => {
+    if (controlled) { authoringUndo?.(); return; }
     const previous = historyRef.current.past.pop();
     if (!previous) return;
     historyRef.current.future.push(documentRef.current);
+    documentRef.current = previous;
     setDocument(previous);
     setHistoryRevision((value) => value + 1);
-  }, []);
+  }, [authoringUndo, controlled]);
 
   const redo = useCallback(() => {
+    if (controlled) { authoringRedo?.(); return; }
     const next = historyRef.current.future.pop();
     if (!next) return;
     historyRef.current.past.push(documentRef.current);
+    documentRef.current = next;
     setDocument(next);
     setHistoryRevision((value) => value + 1);
-  }, []);
+  }, [authoringRedo, controlled]);
 
   const clear = useCallback(() => {
     if (documentRef.current.layers.every((layer) => layer.strokes.length === 0)) return;
@@ -315,13 +368,13 @@ export function useCharacterSurfaceInkRuntime({
   }, [commitDocument]);
 
   const setActive = useCallback((next: boolean) => {
-    if (next && loadedModelKey !== modelKey) {
-      setNotice("저장된 3D 펜선을 읽은 뒤 편집할 수 있습니다.");
+    if (next && !editable) {
+      setNotice(ready ? "미리보기를 적용하거나 취소한 뒤 펜선을 편집할 수 있습니다." : "저장된 3D 펜선을 읽은 뒤 편집할 수 있습니다.");
       return;
     }
     setActiveState(next);
     setNotice(next ? "뷰포트의 캐릭터 표면에 직접 그리세요." : null);
-  }, [loadedModelKey, modelKey]);
+  }, [editable, ready]);
 
   const setStyle = useCallback((patch: Partial<CharacterSurfaceInkStyle>) => {
     setStyleState((current) => Object.freeze({ ...current, ...patch }));
@@ -336,8 +389,8 @@ export function useCharacterSurfaceInkRuntime({
     style,
     setStyle,
     strokeCount,
-    canUndo: historyRef.current.past.length > 0 && historyRevision >= 0,
-    canRedo: historyRef.current.future.length > 0 && historyRevision >= 0,
+    canUndo: controlled ? authoringCanUndo : historyRef.current.past.length > 0 && historyRevision >= 0,
+    canRedo: controlled ? authoringCanRedo : historyRef.current.future.length > 0 && historyRevision >= 0,
     undo,
     redo,
     clear,

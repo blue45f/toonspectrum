@@ -7,6 +7,12 @@ import {
   validateCharacterDocumentV3,
   type CharacterDocumentV3,
 } from "../character-platform/document/character-document-v3";
+import {
+  validateStudioScene3dShotVersionCollection,
+  parseStudioScene3dCutSource,
+  type StudioScene3dCutSource,
+  type StudioScene3dShotVersionCollection,
+} from "../scene3d/studio-scene3d-shot-versions";
 
 export const STUDIO_WEB_AUTHORING_PROJECT_VERSION = 3 as const;
 
@@ -92,6 +98,8 @@ export interface StudioWebAuthoringProjectV3 {
   readonly characters: Readonly<Record<string, CharacterDocumentV3>>;
   readonly resources: Readonly<Record<string, StudioWebAuthoringResourceDescriptor>>;
   readonly featureGraphs: Readonly<Record<string, StudioWebFeatureGraph>>;
+  readonly shotVersions?: StudioScene3dShotVersionCollection;
+  readonly legacyBg3d?: StudioScene3dCutSource["legacyBg3d"];
   readonly runtime: {
     readonly primaryEnvironment: "browser";
     readonly browserRequired: true;
@@ -234,6 +242,14 @@ function characterEntityReferences(scene: StudioScene3dDocumentV1): readonly Ext
   );
 }
 
+function freezeSnapshot<T>(value: T): T {
+  if (value !== null && typeof value === "object") {
+    for (const child of Object.values(value)) freezeSnapshot(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
 export function validateStudioWebAuthoringProjectV3(
   input: StudioWebAuthoringProjectV3,
 ): StudioWebAuthoringProjectV3 {
@@ -291,14 +307,29 @@ export function validateStudioWebAuthoringProjectV3(
     }
     featureGraphs[graphId] = validated;
   }
-  return Object.freeze({
+  const shotVersions = input.shotVersions === undefined
+    ? undefined
+    : validateStudioScene3dShotVersionCollection(input.shotVersions);
+  for (const cut of shotVersions?.cuts ?? []) {
+    if (cut.source.scene.documentId !== input.projectId) {
+      throw new StudioWebAuthoringProjectError(
+        "PROJECT_CUT_SCENE_ID_MISMATCH",
+        `컷 ${cut.id}의 원본 장면이 현재 프로젝트와 다릅니다.`,
+      );
+    }
+  }
+  const source = parseStudioScene3dCutSource(input);
+  // 프로젝트는 호출자의 편집 객체와 분리된 저장 snapshot을 소유한다.
+  return freezeSnapshot(structuredClone({
     ...input,
     scene: input.scene,
+    ...(source.legacyBg3d ? { legacyBg3d: source.legacyBg3d } : {}),
     characters: Object.freeze(characters),
     resources: Object.freeze(resources),
     featureGraphs: Object.freeze(featureGraphs),
+    ...(shotVersions === undefined ? {} : { shotVersions }),
     runtime: Object.freeze({ ...input.runtime }),
-  });
+  }));
 }
 
 export function createStudioWebAuthoringProjectV3(input: {
@@ -308,6 +339,8 @@ export function createStudioWebAuthoringProjectV3(input: {
   readonly characters?: Readonly<Record<string, CharacterDocumentV3>>;
   readonly resources?: Readonly<Record<string, StudioWebAuthoringResourceDescriptor>>;
   readonly featureGraphs?: Readonly<Record<string, StudioWebFeatureGraph>>;
+  readonly shotVersions?: StudioScene3dShotVersionCollection;
+  readonly legacyBg3d?: StudioScene3dCutSource["legacyBg3d"];
   readonly storage?: "sqlite-wasm-opfs" | "indexeddb";
   readonly revision?: number;
   readonly now?: string;
@@ -319,9 +352,11 @@ export function createStudioWebAuthoringProjectV3(input: {
     title: input.title,
     revision: input.revision ?? 0,
     scene: input.scene,
+    ...(input.legacyBg3d ? { legacyBg3d: input.legacyBg3d } : {}),
     characters: input.characters ?? {},
     resources: input.resources ?? {},
     featureGraphs: input.featureGraphs ?? {},
+    ...(input.shotVersions === undefined ? {} : { shotVersions: input.shotVersions }),
     runtime: {
       primaryEnvironment: "browser",
       browserRequired: true,

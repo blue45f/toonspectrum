@@ -101,6 +101,77 @@ function pipelineInput(
 }
 
 describe("Studio BG3D shot artifact pipeline", () => {
+  it("이미 취소된 출력은 LT와 PNG Worker를 시작하지 않는다", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const deps = dependencies();
+
+    await expect(buildStudioBg3dShotArtifacts(
+      pipelineInput({ signal: controller.signal }),
+      deps,
+    )).rejects.toMatchObject({ name: "AbortError" });
+    expect(deps.renderLtInWorker).not.toHaveBeenCalled();
+    expect(deps.encodePngInWorker).not.toHaveBeenCalled();
+  });
+
+  it.each(["lt", "png", "psd"] as const)(
+    "%s 완료 직후 취소되면 다음 패스를 실행하거나 완료 artifact를 반환하지 않는다",
+    async (stage) => {
+      const controller = new AbortController();
+      const deps = dependencies({
+        renderLtInWorker: vi.fn(async () => {
+          if (stage === "lt") controller.abort();
+          return renderedResult();
+        }),
+        encodePngInWorker: vi.fn(async () => {
+          if (stage === "png") controller.abort();
+          return pngBlob(1);
+        }),
+        buildLayeredPsdInWorker: vi.fn(async () => {
+          controller.abort();
+          return psdBlob(1);
+        }),
+      });
+
+      await expect(buildStudioBg3dShotArtifacts(pipelineInput({
+        signal: controller.signal,
+        passes: ["beauty", "color"],
+        includeLayeredPsd: true,
+      }), deps)).rejects.toMatchObject({ name: "AbortError" });
+      if (stage === "lt") expect(deps.encodePngInWorker).not.toHaveBeenCalled();
+      if (stage === "png") expect(deps.encodePngInWorker).toHaveBeenCalledOnce();
+      if (stage !== "psd") expect(deps.buildLayeredPsdInWorker).not.toHaveBeenCalled();
+    },
+  );
+
+  it("PSD 실패와 취소가 겹치면 PNG 성공 fallback으로 처리하지 않는다", async () => {
+    const controller = new AbortController();
+    const deps = dependencies({
+      buildLayeredPsdInWorker: vi.fn(async () => {
+        controller.abort();
+        throw new Error("worker failed");
+      }),
+    });
+
+    await expect(buildStudioBg3dShotArtifacts(pipelineInput({
+      signal: controller.signal,
+      passes: ["beauty"],
+      includeLayeredPsd: true,
+    }), deps)).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, -1, 1.5, 10_001])(
+    "누적 artifact 예산 %s가 잘못되면 Worker 실행 전에 거부한다",
+    async (committedArtifactBytes) => {
+      const deps = dependencies();
+      await expect(buildStudioBg3dShotArtifacts(
+        pipelineInput({ committedArtifactBytes }),
+        deps,
+      )).rejects.toBeInstanceOf(RangeError);
+      expect(deps.renderLtInWorker).not.toHaveBeenCalled();
+    },
+  );
+
   it("stages PNG passes in frozen plan order without mutating captured beauty pixels", async () => {
     const renderedLayers = [
       rasterLayer("color", 60),
@@ -218,6 +289,26 @@ describe("Studio BG3D shot artifact pipeline", () => {
       deps,
     )).rejects.toBe(workerUnavailable);
     expect(deps.encodePngInWorker).not.toHaveBeenCalled();
+  });
+
+  it("중간 PNG 실패 뒤 같은 원본과 고정 컷으로 재시도하면 완성된 패스만 반환한다", async () => {
+    const source = pipelineInput({ passes: ["beauty", "color"], includeLayeredPsd: true });
+    const originalPixels = source.captured.rgba.slice();
+    const encode = vi.fn(async () => pngBlob(4))
+      .mockResolvedValueOnce(pngBlob(4))
+      .mockRejectedValueOnce(new Error("PNG 인코딩 실패"));
+    const deps = dependencies({ encodePngInWorker: encode });
+
+    await expect(buildStudioBg3dShotArtifacts(source, deps)).rejects.toThrow("PNG 인코딩 실패");
+    expect(deps.buildLayeredPsdInWorker).not.toHaveBeenCalled();
+    expect(source.captured.rgba).toEqual(originalPixels);
+    expect(source.committedArtifactBytes).toBe(0);
+
+    const recovered = await buildStudioBg3dShotArtifacts(source, deps);
+    expect(recovered.images.map(({ pass }) => pass)).toEqual(["beauty", "color"]);
+    expect(recovered.layeredPsds).toHaveLength(1);
+    expect(recovered.artifactBytes).toBe(9);
+    expect(source.captured.rgba).toEqual(originalPixels);
   });
 
   it("keeps Worker and OffscreenCanvas PNG unavailability terminal", async () => {

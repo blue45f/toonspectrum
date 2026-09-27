@@ -8,6 +8,48 @@ import {
 } from "./studio-bg3d-webgl-context-recovery";
 
 describe("installStudioBg3dWebglContextRecovery", () => {
+  it("렌더러 초기화 실패를 성공으로 표시하지 않고 명시적 재시도에서만 복구한다", async () => {
+    const canvas = document.createElement("canvas");
+    const invalidate = vi.fn();
+    const scheduleFrame = vi.fn(() => 1);
+    const resetRenderer = vi.fn().mockImplementationOnce(() => {
+      throw new Error("렌더러 캐시 초기화 실패");
+    });
+    const onStateChange = vi.fn();
+    const controller = installStudioBg3dWebglContextRecovery(canvas, {
+      invalidate, scheduleFrame, resetRenderer, onStateChange,
+    });
+    canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+    expect(controller.retry()).toBe(false);
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    await Promise.resolve();
+    expect(controller.snapshot().phase).toBe("failed");
+    expect(onStateChange.mock.calls.map(([state]) => state.phase)).toEqual(["lost", "failed"]);
+    expect(invalidate).not.toHaveBeenCalled();
+    expect(scheduleFrame).not.toHaveBeenCalled();
+    expect(controller.retry()).toBe(true);
+    await Promise.resolve();
+    expect(controller.snapshot().phase).toBe("restored");
+    expect(resetRenderer).toHaveBeenCalledTimes(2);
+    expect(invalidate).toHaveBeenCalledOnce();
+    controller.dispose();
+    expect(controller.retry()).toBe(false);
+  });
+
+  it("복구 실패 뒤 새 context loss가 발생하면 이전 실패의 재시도를 막는다", () => {
+    const canvas = document.createElement("canvas");
+    const resetRenderer = vi.fn(() => { throw new Error("복구 실패"); });
+    const controller = installStudioBg3dWebglContextRecovery(canvas, {
+      invalidate: vi.fn(), resetRenderer,
+    });
+    canvas.dispatchEvent(new Event("webglcontextrestored"));
+    expect(controller.snapshot().phase).toBe("failed");
+    canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+    expect(controller.retry()).toBe(false);
+    expect(resetRenderer).toHaveBeenCalledOnce();
+    controller.dispose();
+  });
+
   it("keeps browser restoration available and redraws two recovery frames", async () => {
     const canvas = document.createElement("canvas");
     const invalidate = vi.fn();

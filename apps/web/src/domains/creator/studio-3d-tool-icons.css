@@ -1,0 +1,14 @@
+/* 색과 크기는 기존 버튼의 테마 토큰과 SVG props를 따른다. 터치 영역은 버튼이 소유한다. */
+.studio-3d-tool-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* 비활성 도구의 장식용 투명도가 고대비 모드에서 선을 흐리지 않게 한다. */
+@media (forced-colors: active), (prefers-contrast: more) {
+  .studio-3d-tool-icon {
+    opacity: 1;
+    forced-color-adjust: auto;
+  }
+}

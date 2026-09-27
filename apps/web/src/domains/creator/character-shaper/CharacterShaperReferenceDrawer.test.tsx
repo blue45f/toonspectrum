@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CHARACTER_SLOT_KINDS } from "./character-shaper-contract";
@@ -311,6 +311,69 @@ describe("CharacterShaperReferenceDrawer reference tab", () => {
     fireEvent.click(screen.getByRole("button", { name: "추천 프리셋 적용" }));
     expect(h.handleAvatarForgeReferenceApply).toHaveBeenCalledWith({ presetId: "preset-a" });
   });
+
+  it("이미지 읽기 실패 시 이전 추천 입력을 지우고 같은 이미지 재시도와 다른 파일 선택을 제공한다", async () => {
+    renderDrawer();
+    const input = screen.getByLabelText("참고 이미지 선택");
+    fireEvent.change(input, { target: { files: [new File(["old"], "old.png", { type: "image/png" })] } });
+    await screen.findByRole("button", { name: "참고 실루엣으로 프리셋 추천 적용" });
+
+    vi.mocked(createImageBitmap).mockRejectedValueOnce(new Error("decode failed"));
+    fireEvent.change(input, { target: { files: [new File(["new"], "new.png", { type: "image/png" })] } });
+    expect(screen.queryByRole("button", { name: "참고 실루엣으로 프리셋 추천 적용" })).toBeNull();
+    const retry = await screen.findByRole("button", { name: "이 이미지 다시 읽기" });
+    const replacement = screen.getByRole("button", { name: "다른 이미지 고르기" });
+    expect(replacement.getAttribute("aria-describedby")).toBe(screen.getByRole("alert").id);
+    const inputClick = vi.spyOn(input, "click");
+    fireEvent.click(replacement);
+    expect(inputClick).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(retry);
+    await screen.findByRole("button", { name: "참고 실루엣으로 프리셋 추천 적용" });
+    expect(createImageBitmap).toHaveBeenCalledTimes(3);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it.each(["invalid-type", "oversized"])("새 파일이 %s로 거절된 뒤 이전 읽기 완료가 오류와 적용 대상을 덮지 않는다", async (rejection) => {
+    let resolveRead: ((bitmap: { width: number; height: number; close: () => void }) => void) | undefined;
+    const read = new Promise<{ width: number; height: number; close: () => void }>((resolve) => {
+      resolveRead = resolve;
+    });
+    Object.defineProperty(globalThis, "createImageBitmap", { configurable: true, value: vi.fn(() => read) });
+    renderDrawer();
+    const input = screen.getByLabelText("참고 이미지 선택");
+    fireEvent.change(input, { target: { files: [new File(["old"], "old.png", { type: "image/png" })] } });
+    const rejected = rejection === "invalid-type"
+      ? new File(["x"], "notes.txt", { type: "text/plain" })
+      : new File(["x"], "large.png", { type: "image/png" });
+    if (rejection === "oversized") Object.defineProperty(rejected, "size", { value: 24 * 1024 * 1024 + 1 });
+    fireEvent.change(input, { target: { files: [rejected] } });
+    const expectedError = screen.getByRole("alert").textContent;
+    const close = vi.fn();
+    await act(async () => {
+      resolveRead?.({ width: 1, height: 1, close });
+      await read;
+    });
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("alert").textContent).toBe(expectedError);
+    expect(screen.queryByRole("button", { name: "참고 실루엣으로 프리셋 추천 적용" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "이 사진에서 포즈도 읽기" })).toBeNull();
+    expect(extractCharacterReferencePalette).not.toHaveBeenCalled();
+  });
+
+  it("이미지 디코딩 미지원에서도 직접 편집과 사진 입력 경로를 유지한다", async () => {
+    Object.defineProperty(globalThis, "createImageBitmap", { configurable: true, value: undefined });
+    const { onClose, onModeChange } = renderDrawer();
+    fireEvent.change(screen.getByLabelText("참고 이미지 선택"), {
+      target: { files: [new File(["photo"], "photo.png", { type: "image/png" })] },
+    });
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "이 브라우저에서는 이미지를 읽을 수 없습니다.");
+    fireEvent.click(screen.getByRole("button", { name: "이 사진에서 포즈도 읽기" }));
+    expect(onModeChange).toHaveBeenCalledWith("photo");
+    fireEvent.click(screen.getByRole("button", { name: "참고 도구 닫고 직접 편집" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("CharacterShaperReferenceDrawer photo and webcam tabs", () => {
@@ -349,5 +412,62 @@ describe("CharacterShaperReferenceDrawer photo and webcam tabs", () => {
       previous: Record<string, unknown>,
     ) => Record<string, unknown>;
     expect(updater({ mirrorMode: true })).toEqual({ mirrorMode: false });
+  });
+
+  it("권한 거부 시 복구 안내와 명시적 재시도를 제공하고 동의를 건너뛰지 않는다", () => {
+    const h = makeHost({ webcamError: "카메라 권한이 거부되었습니다.", webcamErrorStage: "camera" });
+    renderDrawer({ mode: "webcam", h });
+    const error = screen.getByRole("alert");
+    expect(error.textContent).toContain("브라우저의 사이트 설정에서 카메라 권한");
+    const retry = screen.getByRole("button", { name: "카메라 다시 시도" });
+    expect(retry.getAttribute("aria-describedby")).toBe(error.id);
+    expect(retry.className).toContain("min-h-11");
+    fireEvent.click(retry);
+    expect(h.setWebcamError).toHaveBeenCalledWith(null);
+    expect(h.setShowConsent).toHaveBeenCalledWith(true);
+    expect(h.setWebcamActive).not.toHaveBeenCalled();
+  });
+
+  it("모델 준비 실패를 권한 거부와 구분하고 이미 동의한 세션만 직접 재시작한다", () => {
+    const h = makeHost({ webcamError: "추적 준비 실패", webcamErrorStage: "engine", webcamConsentGranted: true });
+    renderDrawer({ mode: "webcam", h });
+    expect(screen.getByRole("alert").textContent).toContain("추적 모델을 준비하지 못했습니다.");
+    expect(screen.getByRole("alert").textContent).not.toContain("사이트 설정");
+    fireEvent.click(screen.getByRole("button", { name: "카메라 다시 시도" }));
+    expect(h.setWebcamActive).toHaveBeenCalledWith(true);
+    expect(h.setShowConsent).not.toHaveBeenCalled();
+  });
+
+  it("웹캠 준비 중에도 취소할 수 있다", () => {
+    const h = makeHost({ webcamActive: true, webcamLoading: true });
+    renderDrawer({ mode: "webcam", h });
+    const cancel = screen.getByRole("button", { name: "카메라 준비 취소" });
+    expect(cancel.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(cancel);
+    expect(h.setWebcamActive).toHaveBeenCalledWith(false);
+  });
+
+  it.each(["photo", "reference"] as const)("%s 대체 입력을 선택하면 카메라를 중지하고 해당 탭으로 포커스를 옮긴다", async (next) => {
+    const h = makeHost({ webcamActive: true });
+    const { onModeChange, setMode } = renderDrawer({ mode: "webcam", h });
+    fireEvent.click(screen.getByRole("button", {
+      name: next === "photo" ? "카메라 없이 사진 포즈 사용" : "참고 이미지 사용",
+    }));
+    expect(h.setWebcamActive).toHaveBeenCalledWith(false);
+    expect(h.setShowConsent).toHaveBeenCalledWith(false);
+    expect(onModeChange).toHaveBeenCalledWith(next);
+    setMode(next);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("tab", {
+      name: next === "photo" ? "사진 포즈" : "참고 이미지 AI 추천",
+    })));
+  });
+
+  it("사진 탭에서 다른 파일 선택 안내와 웹캠·직접 편집 경로를 제공한다", () => {
+    const { onModeChange, onClose } = renderDrawer({ mode: "photo" });
+    expect(screen.getByText(/사진을 읽지 못하면 ‘사진 선택’/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "웹캠으로 전환" }));
+    expect(onModeChange).toHaveBeenCalledWith("webcam");
+    fireEvent.click(screen.getByRole("button", { name: "참고 도구 닫고 직접 편집" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

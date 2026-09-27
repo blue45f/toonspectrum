@@ -143,9 +143,9 @@ describe("character-shaper-ui-model badges, icons, groups", () => {
   it("resolves lucide names in any casing and falls back per slot", () => {
     expect(characterShaperSlotIcon("ScanFace")).toBe(characterShaperSlotIcon("scan-face"));
     expect(characterShaperSlotIcon("scanFace")).toBe(characterShaperSlotIcon("scan_face"));
-    expect(characterShaperSlotIcon("NoSuchIcon", "hair")).toBe(characterShaperSlotIcon("Scissors"));
-    expect(characterShaperSlotIcon(null, "hand-pose")).toBe(characterShaperSlotIcon("Hand"));
-    // Names the shipped catalog uses resolve directly instead of falling back.
+    expect(characterShaperSlotIcon("NoSuchIcon", "hair")).toBe(characterShaperSlotIcon("Studio3dHair"));
+    expect(characterShaperSlotIcon(null, "hand-pose")).toBe(characterShaperSlotIcon("Studio3dHandPose"));
+    // 기존 카탈로그·사용자가 명시한 Lucide 이름은 새 fallback보다 우선한다.
     expect(characterShaperSlotIcon("CircleUserRound", "face-shape")).not.toBe(characterShaperSlotIcon("ScanFace"));
     expect(characterShaperSlotIcon("Aperture", "irises")).not.toBe(characterShaperSlotIcon("CircleDot"));
     expect(characterShaperSlotIcon("RectangleVertical", "bottom")).not.toBe(characterShaperSlotIcon("Layers2"));

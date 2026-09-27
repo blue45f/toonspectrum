@@ -92,13 +92,38 @@ export function executeCharacterAuthoringTask(
           kind: "document-v3" as const,
           document: validateCharacterDocumentV3(task.document),
         });
-      case "resample-groom-guide":
+      case "resample-groom-guide": {
+        let length = 0;
+        for (let index = 1; index < task.guide.points.length; index += 1) {
+          const previous = task.guide.points[index - 1];
+          const current = task.guide.points[index];
+          if (!previous || !current) continue;
+          length += Math.hypot(...current.position.map((value, axis) => value - (previous.position[axis] ?? 0)));
+        }
+        // 재샘플 결과도 Groom 원본 문서의 2048점 한도 안에서 생성해야 한다.
+        if (!Number.isFinite(length) || !Number.isFinite(task.spacing) || task.spacing <= 0
+          || Math.ceil(length / task.spacing) + 1 > 2048) {
+          throw new CharacterAuthoringWorkerRuntimeError("point-budget-exceeded", "재샘플 가이드가 2048점 한도를 넘습니다. 간격을 늘려 다시 시도해 주세요.");
+        }
         return Object.freeze({
           kind: "groom-guide" as const,
           guide: resampleCharacterGroomGuide(task.guide, task.spacing),
         });
-      case "build-groom-ribbon":
+      }
+      case "build-groom-ribbon": {
+        const samples = (task.guide.points.length - 1) * task.profile.segmentsPerSpan + 1;
+        const vertexCount = samples * 2;
+        const indexCount = Math.max(0, samples - 1) * 6;
+        const outputBytes = vertexCount * (3 + 3 + 2) * Float32Array.BYTES_PER_ELEMENT
+          + indexCount * Uint32Array.BYTES_PER_ELEMENT;
+        if (!Number.isSafeInteger(samples) || samples <= 0 || samples > CHARACTER_AUTHORING_WORKER_MAX_POINTS) {
+          throw new CharacterAuthoringWorkerRuntimeError("point-budget-exceeded", "Groom 곡선의 파생점 수가 안전 한도를 넘습니다.");
+        }
+        if (outputBytes > CHARACTER_AUTHORING_WORKER_MAX_OUTPUT_BYTES) {
+          throw new CharacterAuthoringWorkerRuntimeError("output-too-large", "Groom 파생 메시가 Worker 출력 한도를 넘습니다.");
+        }
         return meshPayload(buildCharacterGroomRibbon(task.guide, task.profile));
+      }
       case "build-geometry-stroke":
         return meshPayload(buildCharacterGeometryStrokeMesh(task.stroke));
     }

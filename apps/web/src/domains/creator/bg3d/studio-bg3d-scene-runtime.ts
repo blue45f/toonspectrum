@@ -363,6 +363,7 @@ function settingsOnlyDocument(
     nodes,
     ...(base.shots === undefined ? {} : { shots: base.shots }),
     ...(base.activeShotId === undefined ? {} : { activeShotId: base.activeShotId }),
+    ...(base.pinnedVersionedCut === undefined ? {} : { pinnedVersionedCut: base.pinnedVersionedCut }),
   };
 }
 
@@ -533,7 +534,8 @@ function shotStateMatches(
   document: StudioBg3dSceneDocument,
 ): boolean {
   return jsonStructuresEqual(base.shots, document.shots) &&
-    base.activeShotId === document.activeShotId;
+    base.activeShotId === document.activeShotId &&
+    jsonStructuresEqual(base.pinnedVersionedCut, document.pinnedVersionedCut);
 }
 
 /** Converts legacy runtime arrays to a strict, persistence-safe canonical scene document. */

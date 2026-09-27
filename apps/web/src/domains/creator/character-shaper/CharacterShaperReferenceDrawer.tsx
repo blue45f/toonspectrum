@@ -33,6 +33,7 @@ import type { StudioVrmPhotoPoseApplyPayload, StudioVrmPhotoPoseHandoff } from "
 import type { DragEvent as ReactDragEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { SwitchIndicator } from "@/shared/components/ui/switch";
+import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 
 type DrawerMode = CharacterShaperReferenceDrawerProps["mode"];
@@ -129,6 +130,7 @@ export function CharacterShaperReferenceDrawer({
   onModeChange,
   onClose,
 }: CharacterShaperReferenceDrawerProps) {
+  const t = useT();
   const tabsId = useId();
   const hostRef = useRef(h);
   const tabRefs = useRef(new Map<DrawerMode, HTMLButtonElement | null>());
@@ -148,6 +150,10 @@ export function CharacterShaperReferenceDrawer({
   useEffect(() => {
     hostRef.current = h;
   });
+
+  useEffect(() => () => {
+    requestRef.current += 1;
+  }, []);
 
   useEffect(() => {
     if (applied === null) return;
@@ -182,20 +188,23 @@ export function CharacterShaperReferenceDrawer({
   }, [mode]);
 
   const readFile = (file: File) => {
+    // 거절되는 파일도 이전 비동기 읽기를 무효화해야 이전 이미지가 다시 적용되지 않는다.
+    const request = requestRef.current + 1;
+    requestRef.current = request;
+    setGradeImage(null);
+    setPhotoHandoff(null);
+    setSelectedColor(null);
+    setApplied(null);
     if (!file.type.startsWith("image/")) {
       setPickedImage(null);
-      setGradeImage(null);
       setPalette({ status: "error", palette: null, fileName: file.name, message: "이미지 파일만 읽을 수 있습니다." });
       return;
     }
     if (file.size > MAX_IMAGE_BYTES) {
       setPickedImage(null);
-      setGradeImage(null);
       setPalette({ status: "error", palette: null, fileName: file.name, message: "24MB 이하 이미지를 올려 주세요." });
       return;
     }
-    const request = requestRef.current + 1;
-    requestRef.current = request;
     setPickedImage(file);
     setPalette({ status: "reading", palette: null, fileName: file.name, message: null });
     void (async () => {
@@ -228,6 +237,14 @@ export function CharacterShaperReferenceDrawer({
     })();
   };
 
+  const changeMode = (next: DrawerMode) => {
+    if (mode === "webcam" && next !== "webcam") {
+      h.setWebcamActive?.(false);
+      h.setShowConsent?.(false);
+    }
+    onModeChange(next);
+  };
+
   const onDrop = (event: ReactDragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setDragActive(false);
@@ -242,19 +259,19 @@ export function CharacterShaperReferenceDrawer({
       event.preventDefault();
       const delta = event.key === "ArrowRight" ? 1 : -1;
       const next = TABS[(index + delta + TABS.length) % TABS.length];
-      if (next) onModeChange(next.id);
+      if (next) changeMode(next.id);
       return;
     }
     if (event.key === "Home") {
       event.preventDefault();
       const first = TABS[0];
-      if (first) onModeChange(first.id);
+      if (first) changeMode(first.id);
       return;
     }
     if (event.key === "End") {
       event.preventDefault();
       const last = TABS[TABS.length - 1];
-      if (last) onModeChange(last.id);
+      if (last) changeMode(last.id);
     }
   };
 
@@ -320,9 +337,14 @@ export function CharacterShaperReferenceDrawer({
         <p className="mt-1 text-[0.66rem] leading-relaxed text-fg-3">
           이미지를 끌어다 놓거나 파일을 골라 주세요. 96px로 줄여 기기 안에서만 색을 계산합니다.
         </p>
-        <button type="button" className={cn(BUTTON, "mt-2")} onClick={() => fileInputRef.current?.click()}>
+        <button
+          type="button"
+          className={cn(BUTTON, "mt-2")}
+          aria-describedby={palette.status === "error" ? `${tabsId}-image-error` : undefined}
+          onClick={() => fileInputRef.current?.click()}
+        >
           <ImagePlus size={14} aria-hidden />
-          이미지 고르기
+          {palette.status === "error" ? t("studio.character.reference.chooseAnotherImage", "다른 이미지 고르기") : "이미지 고르기"}
         </button>
         <input
           ref={fileInputRef}
@@ -348,9 +370,14 @@ export function CharacterShaperReferenceDrawer({
           </p>
         ) : null}
         {palette.status === "error" && palette.message ? (
-          <p role="alert" className="mt-1 text-[0.66rem] font-semibold text-bad">
+          <p id={`${tabsId}-image-error`} role="alert" className="mt-1 text-xs leading-relaxed font-semibold text-bad">
             {palette.message}
           </p>
+        ) : null}
+        {palette.status === "error" && pickedImage ? (
+          <button type="button" className={cn(BUTTON, "mt-2 w-full")} onClick={() => readFile(pickedImage)}>
+            {t("studio.character.reference.retryImage", "이 이미지 다시 읽기")}
+          </button>
         ) : null}
         {pickedImage ? (
           <button
@@ -359,7 +386,7 @@ export function CharacterShaperReferenceDrawer({
             onClick={() => {
               handoffTokenRef.current += 1;
               setPhotoHandoff({ file: pickedImage, token: handoffTokenRef.current });
-              onModeChange("photo");
+              changeMode("photo");
             }}
           >
             <PersonStanding size={14} aria-hidden />
@@ -473,6 +500,10 @@ export function CharacterShaperReferenceDrawer({
         onApply={(selection) => h.handleAvatarForgeReferenceApply?.(selection)}
       />
 
+      <button type="button" className={cn(BUTTON, "w-full")} onClick={onClose}>
+        {t("studio.character.reference.editManually", "참고 도구 닫고 직접 편집")}
+      </button>
+
       <p className="flex items-start gap-1.5 rounded-lg border border-line bg-card/50 px-2.5 py-2 text-[0.64rem] leading-relaxed text-fg-3">
         <Info size={13} aria-hidden className="mt-0.5 shrink-0" />
         {ON_DEVICE_NOTE}
@@ -485,18 +516,32 @@ export function CharacterShaperReferenceDrawer({
   /* ---------------------------------------------------------------------- */
 
   const photoPanel = (
-    <StudioVrmPhotoPoseScanner
-      disabled={!h.vrm || binding.busyReason !== null}
-      handoff={photoHandoff}
-      onApply={(payload: StudioVrmPhotoPoseApplyPayload) => {
-        const applied = Boolean(h.handlePhotoPoseApply?.(payload));
-        // Grade twin must follow the host bone write — never advance on a rejected apply.
-        if (shouldSyncGradePoseAfterPhotoApply(applied) && gradeImage) {
-          binding.applyGradePoseFromImage?.(gradeImage, "photo");
-        }
-        return applied;
-      }}
-    />
+    <div className="space-y-3">
+      <StudioVrmPhotoPoseScanner
+        disabled={!h.vrm || binding.busyReason !== null}
+        handoff={photoHandoff}
+        onApply={(payload: StudioVrmPhotoPoseApplyPayload) => {
+          const applied = Boolean(h.handlePhotoPoseApply?.(payload));
+          // Grade twin must follow the host bone write — never advance on a rejected apply.
+          if (shouldSyncGradePoseAfterPhotoApply(applied) && gradeImage) {
+            binding.applyGradePoseFromImage?.(gradeImage, "photo");
+          }
+          return applied;
+        }}
+      />
+      <p className="text-xs leading-relaxed text-fg-3">
+        {t("studio.character.reference.photoRecovery", "사진을 읽지 못하면 ‘사진 선택’에서 JPG·PNG·WebP 파일을 다시 골라 주세요. 전신과 팔다리가 선명한 사진이 좋습니다.")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={BUTTON} onClick={() => changeMode("webcam")}>
+          <Video size={14} aria-hidden />
+          {t("studio.character.reference.tryWebcam", "웹캠으로 전환")}
+        </button>
+        <button type="button" className={BUTTON} onClick={onClose}>
+          {t("studio.character.reference.editManually", "참고 도구 닫고 직접 편집")}
+        </button>
+      </div>
+    </div>
   );
 
   /* ---------------------------------------------------------------------- */
@@ -506,6 +551,9 @@ export function CharacterShaperReferenceDrawer({
   const webcamActive = Boolean(h.webcamActive);
   const webcamLoading = Boolean(h.webcamLoading);
   const webcamError: string | null = typeof h.webcamError === "string" && h.webcamError ? h.webcamError : null;
+  const webcamRecoveryHint = h.webcamErrorStage === "engine"
+    ? t("studio.character.reference.webcamEngineRecovery", "추적 모델을 준비하지 못했습니다. 연결을 확인한 뒤 다시 시도하거나 사진 포즈를 사용해 주세요.")
+    : t("studio.character.reference.webcamCameraRecovery", "브라우저의 사이트 설정에서 카메라 권한을 확인하고, 카메라를 사용하는 다른 앱을 닫은 뒤 다시 시도해 주세요. 카메라 없이 사진 포즈도 사용할 수 있습니다.");
   const faceDetected = Boolean(h.faceDetected);
   const showConsent = Boolean(h.showConsent);
   const tracking = (h.trackingOptions ?? {}) as Partial<TrackingOptions>;
@@ -566,10 +614,13 @@ export function CharacterShaperReferenceDrawer({
           ) : null}
 
           {webcamError ? (
-            <p role="alert" className="flex items-start gap-1.5 rounded-xl border border-bad/45 bg-bad/10 px-2.5 py-2 text-[0.66rem] leading-relaxed text-bad">
+            <div id={`${tabsId}-webcam-error`} role="alert" className="flex items-start gap-1.5 rounded-xl border border-bad/45 bg-bad/10 px-2.5 py-2 text-xs leading-relaxed text-bad">
               <TriangleAlert size={13} aria-hidden className="mt-0.5 shrink-0" />
-              {webcamError}
-            </p>
+              <div className="min-w-0">
+                <p>{webcamError}</p>
+                <p className="mt-1 text-fg-2">{webcamRecoveryHint}</p>
+              </div>
+            </div>
           ) : null}
 
           {showConsent && !webcamActive ? (
@@ -578,7 +629,7 @@ export function CharacterShaperReferenceDrawer({
               <p className="mt-1 text-[0.66rem] leading-relaxed text-fg-2">
                 영상은 브라우저 밖으로 나가지 않습니다. 이 탭을 닫으면 동의도 함께 사라집니다.
               </p>
-              <div className="mt-2 flex gap-1.5">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   className={PRIMARY_BUTTON}
@@ -604,11 +655,14 @@ export function CharacterShaperReferenceDrawer({
                 type="button"
                 className={cn(BUTTON, "flex-1", webcamActive && "border-bad/45 text-bad hover:bg-bad/10")}
                 aria-pressed={webcamActive}
-                disabled={webcamLoading}
-                onClick={() => (webcamActive ? h.setWebcamActive?.(false) : startWebcam())}
+                aria-describedby={webcamError ? `${tabsId}-webcam-error` : undefined}
+                onClick={() => (webcamActive || webcamLoading ? h.setWebcamActive?.(false) : startWebcam())}
               >
                 {webcamActive ? <VideoOff size={14} aria-hidden /> : <Video size={14} aria-hidden />}
-                {webcamActive ? "트래킹 중지" : "트래킹 시작"}
+                {webcamLoading
+                  ? t("studio.character.reference.cancelWebcam", "카메라 준비 취소")
+                  : webcamActive ? "트래킹 중지"
+                    : webcamError ? t("studio.character.reference.retryWebcam", "카메라 다시 시도") : "트래킹 시작"}
               </button>
               {webcamActive ? (
                 <button
@@ -624,6 +678,17 @@ export function CharacterShaperReferenceDrawer({
               ) : null}
             </div>
           ) : null}
+
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={BUTTON} onClick={() => changeMode("photo")}>
+              <PersonStanding size={14} aria-hidden />
+              {t("studio.character.reference.usePhotoWithoutCamera", "카메라 없이 사진 포즈 사용")}
+            </button>
+            <button type="button" className={BUTTON} onClick={() => changeMode("reference")}>
+              <ImagePlus size={14} aria-hidden />
+              {t("studio.character.reference.useReferenceImage", "참고 이미지 사용")}
+            </button>
+          </div>
 
           {webcamActive ? (
             <div className="space-y-1.5">
@@ -697,7 +762,7 @@ export function CharacterShaperReferenceDrawer({
               aria-controls={`${tabsId}-panel`}
               tabIndex={active ? 0 : -1}
               title={tab.hint}
-              onClick={() => onModeChange(tab.id)}
+              onClick={() => changeMode(tab.id)}
               onKeyDown={onTabKeyDown}
               className={cn(
                 "min-h-11 flex-1 rounded-xl px-2 text-[0.72rem] font-semibold transition-colors motion-reduce:transition-none",

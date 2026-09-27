@@ -56,7 +56,10 @@ function recoveryPlan(
 export function planStudioScene3dRuntimeRecovery(
   failure: StudioScene3dRuntimeFailure,
 ): StudioScene3dRuntimeRecoveryPlan {
-  if (!failure.documentId || failure.documentRevision < 0 || !failure.documentSourceHash) {
+  if (!failure.documentId.trim()
+    || !Number.isSafeInteger(failure.documentRevision) || failure.documentRevision < 0
+    || !Number.isSafeInteger(failure.attempt) || failure.attempt < 0
+    || !/^sha256:[a-f0-9]{64}$/u.test(failure.documentSourceHash)) {
     throw new Error("Runtime recovery requires a canonical SceneDocument authority receipt.");
   }
   if (failure.kind === "babylon-specialist") {

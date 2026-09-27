@@ -1,0 +1,266 @@
+/* 편집 문서는 바꾸지 않고 화면 크기와 입력 방식에 따라 작업 공간만 재배치한다. */
+[data-character-shaper="true"] {
+  top: var(--studio-3d-viewport-top, 0px);
+  bottom: auto;
+  height: var(--studio-3d-viewport-height, 100dvh);
+}
+[data-character-shaper-surface="true"] {
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 70px color-mix(in oklab, var(--color-fg) 14%, transparent);
+}
+[data-character-shaper-summary="true"] {
+  background: linear-gradient(105deg, color-mix(in oklab, var(--color-accent) 7%, var(--color-panel)), var(--color-panel) 60%);
+}
+[data-character-shaper="true"] button svg {
+  stroke-width: 1.8;
+  flex-shrink: 0;
+}
+[data-character-slot][aria-current="true"] {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-accent) 22%, transparent);
+}
+[data-character-shaper="true"] input[type="range"] {
+  accent-color: var(--color-accent);
+}
+[data-character-shaper-main="true"] {
+  grid-template-columns: 64px minmax(230px, 300px) minmax(0, 1fr);
+}
+[data-character-shaper-main="true"][data-inspector-column="true"] {
+  grid-template-columns: 64px minmax(230px, 280px) minmax(0, 1fr) minmax(240px, 280px);
+}
+[data-character-shaper-rail="vertical"] { width: 100%; }
+[data-character-shaper-mobile-body="true"] {
+  height: 100%;
+  min-height: 0;
+}
+[data-character-shaper-sheet] {
+  height: min(40%, 24rem, calc(100% - 248px));
+  flex-shrink: 0;
+}
+[data-character-shaper-sheet="full"] { height: min(64%, 34rem, calc(100% - 248px)); }
+[data-character-shaper-sheet="collapsed"] { height: 56px; }
+[data-character-shaper-sheet-header="true"] {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 55px;
+  padding: 0 0.5rem;
+}
+[data-character-shaper-sheet-handle="true"] {
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  text-align: start;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-camera-bar="true"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 30%);
+  gap: 0.375rem;
+  padding: 0.375rem;
+  align-items: center;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-camera-bar] > [role="group"] {
+  border: 0;
+  padding: 0;
+  border-radius: 0.75rem;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-camera-bar] select {
+  padding-inline: 0.5rem;
+  font-size: 0.75rem;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-camera-bar] button {
+  padding-inline: 0.75rem;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-viewport="true"] {
+  min-height: 128px;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-hud] > [aria-label="뷰포트 보기 설정"] {
+  display: flex;
+  position: static;
+  padding: 0.375rem;
+  min-height: 56px;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-hud] > [role="status"] {
+  top: 0.375rem;
+  bottom: auto;
+  max-width: calc(100% - 7rem);
+  pointer-events: none;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-hud] button {
+  background-color: color-mix(in oklab, var(--color-panel) 94%, transparent);
+  box-shadow: none;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-shelf] {
+  height: auto;
+  min-height: 100%;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-shelf] > div {
+  flex: none;
+  overflow: visible;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-shelf] > div:first-child {
+  padding-top: 0.5rem;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-shelf] input {
+  font-size: 1rem;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-dock="compact"] {
+  gap: 0.25rem;
+  flex-wrap: nowrap;
+  padding: 0.375rem;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-dock="compact"] > [role="group"] {
+  flex: 1;
+  gap: 0.25rem;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-dock="compact"] button[data-character-dock-action] {
+  display: flex;
+  width: auto;
+  min-width: 44px;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  font-size: 0.625rem;
+  line-height: 1;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-dock="compact"] > [role="group"] > button {
+  flex: 1;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-dock="compact"] > span[aria-hidden] { display: none; }
+[data-character-shaper-layout="mobile"] [data-character-shaper-popover] {
+  max-height: calc(var(--studio-3d-viewport-height, 100dvh) - 8rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+[data-character-shaper-layout="mobile"] [data-character-sheet-panel="true"] {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+[data-character-shaper-layout="mobile"][data-studio-3d-keyboard-open="true"] [data-character-shaper-camera-bar],
+[data-character-shaper-layout="mobile"][data-studio-3d-keyboard-open="true"] [data-character-shaper-rail] {
+  display: none;
+}
+[data-character-shaper-layout="mobile"][data-studio-3d-keyboard-open="true"] [data-character-shaper-sheet]:not([data-character-shaper-sheet="collapsed"]) {
+  height: calc(100% - 72px);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-character-shaper="true"] *, [data-character-authoring-workbench="true"] * {
+    scroll-behavior: auto;
+  }
+}
+@media (forced-colors: active) {
+  [data-character-slot][aria-current="true"] { outline: 2px solid Highlight; }
+  [data-character-shaper-summary="true"] { background: Canvas; }
+}
+
+[data-character-shaper-sheet-handle="compact"] {
+  width: 44px;
+  flex: none;
+  padding: 0;
+  align-items: center;
+}
+[data-character-shaper-sheet-handle="compact"] > span[aria-hidden] { width: 20px; }
+[data-character-authoring-workbench="true"] {
+  top: calc(var(--studio-3d-viewport-top, 0px) + max(0.5rem, env(safe-area-inset-top)));
+  bottom: auto;
+  height: calc(var(--studio-3d-viewport-height, 100dvh) - max(0.5rem, env(safe-area-inset-top)) - max(0.5rem, env(safe-area-inset-bottom)));
+}
+[data-character-authoring-workbench="true"][data-drawing="true"] {
+  top: auto;
+  bottom: max(0.5rem, env(safe-area-inset-bottom));
+  height: auto;
+}
+
+[data-character-shaper-layout="mobile"] [data-character-shaper-hud="true"] {
+  position: static;
+  background: var(--color-panel);
+  border-top: 1px solid var(--color-line);
+}
+[data-character-shaper-layout="mobile"][data-studio-3d-keyboard-open="true"] [data-character-shaper-hud] { display: none; }
+[data-character-shaper-layout="mobile"][data-studio-3d-keyboard-open="true"] [data-character-shaper-viewport] { min-height: 72px; }
+
+/* 드로잉 도구는 캔버스와 같은 칸을 덮지 않고 별도 행에서 조작한다. */
+[data-character-shaper-paint="true"] [data-character-shaper-viewport="true"] {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+[data-character-shaper-paint-panel="true"] {
+  max-height: 45%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+[data-character-shaper-layout="mobile"] [data-character-shaper-paint-panel="true"] {
+  max-height: none;
+}
+[data-character-paint-options][hidden],
+[data-character-shaper-mobile-tools][hidden] { display: none; }
+[data-character-shaper-view-tools="true"] [data-character-shaper-hud] > [role="status"] {
+  position: static;
+  display: block;
+  max-width: none;
+  margin: 0.5rem;
+}
+
+/* 짧은 터치 가로 화면은 모델 옆으로 도구를 연다. 닫으면 모델이 전체 폭을 쓴다. */
+[data-character-shaper-landscape="true"] [data-character-shaper-mobile-body="true"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+[data-character-shaper-landscape="true"] [data-character-shaper-mobile-body][data-tools-open="true"] {
+  grid-template-columns: minmax(0, 1fr) minmax(264px, 36%);
+}
+[data-character-shaper-landscape="true"] [data-character-shaper-model-workspace="true"] {
+  grid-column: 1;
+  grid-row: 1;
+}
+[data-character-shaper-landscape="true"] [data-character-shaper-rail="horizontal"] {
+  grid-column: 1;
+  grid-row: 2;
+}
+[data-character-shaper-landscape="true"] [data-character-shaper-sheet] {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  height: 100%;
+  min-width: 0;
+  border-top: 0;
+  border-left: 1px solid var(--color-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-character-shaper-landscape="true"] [data-character-shaper-sheet="collapsed"] { display: none; }
+[data-character-shaper-landscape="true"] [data-character-shaper-sheet-handle] { display: none; }
+[data-character-shaper-landscape="true"] [data-character-shaper-sheet-header="true"] { padding-inline: 0.25rem; }
+[data-character-shaper-landscape="true"] [data-character-shaper-sheet-header] [role="tab"] { font-size: 0.7rem; }
+[data-character-shaper-landscape="true"] [data-character-shaper-viewport="true"] { grid-template-rows: minmax(0, 1fr); min-height: 0; }
+[data-character-shaper-landscape="true"][data-character-shaper-paint="true"] [data-character-shaper-viewport="true"] {
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+[data-character-shaper-landscape="true"][data-character-shaper-paint="true"] [data-character-shaper-mobile-body="true"] { grid-template-rows: minmax(0, 1fr); }
+[data-character-shaper-landscape="true"] [data-character-shaper-view-tools] [data-character-shaper-camera-bar="true"] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+[data-character-shaper-landscape="true"] [data-character-shaper-view-tools] [data-character-shaper-hud] > [aria-label="뷰포트 보기 설정"] {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+[data-character-shaper-landscape="true"] [data-character-shaper-drawer] { left: auto; width: min(52%, 26rem); }
+[data-character-shaper-landscape="true"][data-character-shaper-paint="true"] [data-character-shaper-viewport="true"] {
+  grid-template-columns: minmax(0, 1fr) minmax(264px, 36%);
+  grid-template-rows: minmax(0, 1fr);
+}
+[data-character-shaper-landscape="true"] [data-character-shaper-paint-panel="true"] {
+  height: 100%;
+  min-height: 0;
+  border-top: 0;
+  border-left: 1px solid var(--color-line);
+}

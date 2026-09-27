@@ -49,16 +49,19 @@ function props(overrides: Partial<StudioVrmPoserProps> = {}): StudioVrmPoserProp
 
 describe("StudioCharacterShaper", () => {
   it("renders nothing while closed but still builds the runtime so state survives a reopen", () => {
-    const { container } = render(<StudioCharacterShaper {...props({ open: false })} />);
+    const closedProps = props({ open: false });
+    const { container } = render(<StudioCharacterShaper {...closedProps} />);
     expect(container.innerHTML).toBe("");
-    expect(controllerCalls).toHaveLength(1);
+    // 상위 문서 controller의 복원 effect가 재렌더해도 닫힌 호스트 계약은 유지된다.
+    expect(controllerCalls[0]).toEqual(closedProps);
+    for (const call of controllerCalls) expect(call).toEqual(closedProps);
   });
 
   it("mounts the workshop shell with the controller host and the binding in one commit", () => {
     render(<StudioCharacterShaper {...props()} />);
     expect(screen.getByTestId("shaper-dialog")).toBeTruthy();
     expect(screen.queryByTestId("legacy-dialog")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "품질 도구V2" }));
+    fireEvent.click(screen.getByRole("button", { name: "캐릭터 저작 도구" }));
     expect(screen.getByRole("dialog", { name: "캐릭터 품질 워크벤치" })).toBeTruthy();
   });
 
@@ -67,6 +70,6 @@ describe("StudioCharacterShaper", () => {
     fireEvent.click(screen.getByRole("button", { name: "고급 편집" }));
     expect(screen.getByTestId("legacy-dialog")).toBeTruthy();
     expect(screen.queryByTestId("shaper-dialog")).toBeNull();
-    expect(screen.queryByRole("button", { name: "품질 도구V2" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "캐릭터 저작 도구" })).toBeNull();
   });
 });

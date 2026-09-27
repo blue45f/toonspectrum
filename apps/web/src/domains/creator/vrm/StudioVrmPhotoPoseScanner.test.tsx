@@ -256,3 +256,33 @@ describe("StudioVrmPhotoPoseScanner", () => {
     expect(scannerRuntimeMocks.files).toEqual([]);
   });
 });
+
+describe("사진 포즈 접근성", () => {
+  it("사진 판독 실패를 보조기기에 알린다", async () => {
+    scannerRuntimeMocks.detector.detect.mockImplementationOnce(() => { throw new Error("사진 판독 실패"); });
+    const file = new File([new Uint8Array([1])], "invalid-pose.png", { type: "image/png" });
+    const view = render(<StudioVrmPhotoPoseScanner includeHandDetection={false} handoff={{ file, token: 1 }} onApply={() => true} />);
+    await waitFor(() => expect(view.getByRole("alert").textContent).toContain("사진 판독 실패"));
+  });
+
+  it("적용 범위는 44px 조작 영역과 방향키·Home·End 탐색을 제공한다", async () => {
+    const file = new File([new Uint8Array([1, 2])], "pose.png", { type: "image/png" });
+    const view = render(<StudioVrmPhotoPoseScanner includeHandDetection={false} handoff={{ file, token: 1 }} onApply={() => true} />);
+    await waitFor(() => expect(view.getAllByRole("radio")).toHaveLength(3));
+    const [first, second, last] = view.getAllByRole("radio");
+    if (!first || !second || !last) throw new Error("사진 포즈 적용 범위가 없습니다.");
+    for (const button of [first, second, last]) expect(button.className).toContain("min-h-11");
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    expect(second.getAttribute("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(second);
+    fireEvent.keyDown(second, { key: "End" });
+    expect(last.getAttribute("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "Home" });
+    expect(first.getAttribute("aria-checked")).toBe("true");
+    expect(document.activeElement).toBe(first);
+    view.rerender(<StudioVrmPhotoPoseScanner disabled includeHandDetection={false} handoff={{ file, token: 1 }} onApply={() => true} />);
+    for (const button of view.getAllByRole("radio")) expect(button.hasAttribute("disabled")).toBe(true);
+  });
+});
