@@ -268,3 +268,18 @@ test("foundation sparse checkout은 전체 기본 래스터 소품 입력을 복
   assert.match(restore, /if: matrix.shard == 'studio-foundation'/u);
   assert.match(restore, /(?:^|\s)\/apps\/web\/public\/assets\/studio\/props\/(?:\s|$)/u);
 });
+
+test("제작 공정과 시각적 작업 보드 검증은 필수 product shard에서 한 번만 실행한다", () => {
+  const targets = [
+    "apps/web/src/domains/creator/production-hub/ProductionWorkBoard.test.tsx",
+    "apps/web/src/domains/creator/production-hub/production-bulk-task-edit.test.ts",
+    "apps/web/src/domains/creator/production-hub/production-workflow-episode-plan.test.ts",
+    "packages/contracts/src/production-workflow.test.ts",
+    "apps/api/src/modules/production-collaboration/production-workflow-command.test.ts",
+  ];
+  const execution = executionTargetsByShard();
+  for (const target of targets) {
+    assert.equal(shardForTarget(target), "product");
+    assert.deepEqual(SHARD_NAMES.filter((name) => targetIsCovered(target, execution[name])), ["product"], target);
+  }
+});
