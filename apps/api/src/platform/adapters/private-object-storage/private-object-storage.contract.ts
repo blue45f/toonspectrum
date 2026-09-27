@@ -20,6 +20,10 @@ export const PRIVATE_OBJECT_STORAGE_LEGACY_CONTRACT_VERSION =
   SUPABASE_OBJECT_STORAGE_CONTRACT_VERSION;
 export const PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION =
   "toonspectrum.private-object-storage.v2" as const;
+export const PRIVATE_OBJECT_STORAGE_COMPATIBLE_CONTRACT_VERSIONS = [
+  "toonspectrum.private-object-storage.v2",
+  "toonstudio.private-object-storage.v2",
+] as const;
 
 export const PRIVATE_OBJECT_STORAGE_PROVIDER_IDS = [
   "supabase",
@@ -42,7 +46,7 @@ export const LegacyPrivateObjectReferenceSchema =
 
 export const LocatedPrivateObjectReferenceSchema = z
   .object({
-    contractVersion: z.enum([PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION, "toonspectrum.private-object-storage.v2"]),
+    contractVersion: z.enum(PRIVATE_OBJECT_STORAGE_COMPATIBLE_CONTRACT_VERSIONS),
     providerId: PrivateObjectStorageProviderIdSchema,
     purpose: PrivateObjectPurposeSchema,
     digest: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
@@ -98,8 +102,8 @@ export type DeletePrivateObject = z.infer<
 export function isLocatedPrivateObjectReference(
   value: PrivateObjectReference,
 ): value is LocatedPrivateObjectReference {
-  return value.contractVersion === PRIVATE_OBJECT_STORAGE_CONTRACT_VERSION
-    || value.contractVersion === "toonspectrum.private-object-storage.v2";
+  return (PRIVATE_OBJECT_STORAGE_COMPATIBLE_CONTRACT_VERSIONS as readonly string[])
+    .includes(value.contractVersion);
 }
 
 export function unlocatePrivateObjectReference(

@@ -9,6 +9,15 @@ export const CREATOR_ASSET_LICENSES = [
     description: "ToonStudio에서 완성 작품의 일부로 편집·사용할 수 있고, 원본 에셋 자체의 재판매는 허용하지 않습니다.",
   },
   {
+    id: "toonstudio-standard",
+    label: "ToonStudio 표준 사용권",
+    shortLabel: "표준 사용권",
+    attributionRequired: false,
+    commercialUse: true,
+    url: null,
+    description: "ToonStudio에서 완성 작품의 일부로 편집·사용할 수 있고, 원본 에셋 자체의 재판매는 허용하지 않습니다.",
+  },
+  {
     id: "cc0-1.0",
     label: "CC0 1.0",
     shortLabel: "CC0",
