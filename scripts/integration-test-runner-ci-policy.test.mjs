@@ -149,7 +149,7 @@ describe("database integration runner CI policy", () => {
     // generation (apps/web/public/data/ is gitignored, so without it the bundle ships no catalog) and the
     // third-party notices plus CSP verification; the bundle-only build must get the same, or the
     // dist the browser gates drive is not the dist production serves.
-    expect(packageManifest.scripts?.prebuild).toBe("node scripts/verify-workspace-package-links.mjs && pnpm catalog:gen && pnpm i18n:builtins:gen");
+    expect(packageManifest.scripts?.prebuild).toBe("node scripts/verify-production-release-compatibility.mjs && node scripts/verify-workspace-package-links.mjs && pnpm catalog:gen && pnpm i18n:builtins:gen");
     expect(packageManifest.scripts?.["prebuild:bundle"]).toBe("pnpm run prebuild");
     expect(packageManifest.scripts?.["postbuild:bundle"]).toBe("pnpm run postbuild");
     expect(packageManifest.scripts?.postbuild).toContain(
