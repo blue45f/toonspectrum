@@ -634,6 +634,31 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
     expect(runtime.status.canonicalAuthority).toBe(false);
   });
 
+  it("로컬 전송 대기는 편집 권위를 유지하되 연결이 끊기면 재확인 전까지 잠근다", async () => {
+    offlineAuthority.enabled = true;
+    offlineAuthority.mode = "local";
+    lifecycle.roomStart = "resolve";
+    lifecycle.bindingStatusOnStart = { state: "ready", message: "로컬 문서 준비 완료" };
+    await renderProvider();
+    await vi.waitFor(async () => {
+      await renderProvider();
+      expect(offlineAuthority.instances).toHaveLength(1);
+    });
+    const runtime = offlineAuthority.instances[0];
+    const binding = lifecycle.bindings[0];
+    const room = rooms.instances[0];
+    binding.onStatus?.({ state: "retrying", message: "피어에게 전달한 변경을 기기에 보관 중", pendingCount: 1 });
+    expect(runtime.status.canonicalAuthority).toBe(true);
+    room.ready = false;
+    room.emit({ type: "transport-status", status: { state: "disconnected", message: "연결 종료", recoverable: true } });
+    expect(runtime.status.canonicalAuthority).toBe(false);
+    room.ready = true;
+    binding.onStatus?.({ state: "retrying", message: "재연결 대기", pendingCount: 1 });
+    expect(runtime.status.canonicalAuthority).toBe(false);
+    binding.onStatus?.({ state: "ready", message: "로컬 문서 재확인 완료" });
+    expect(runtime.status.canonicalAuthority).toBe(true);
+  });
+
   it("준비된 소켓만 있고 정본 확인이 없으면 새 오프라인 런타임에 권위를 부여하지 않는다", async () => {
     offlineAuthority.enabled = true;
     offlineAuthority.fanout = "authoritative";

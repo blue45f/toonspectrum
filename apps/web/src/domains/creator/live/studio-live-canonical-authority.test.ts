@@ -15,6 +15,20 @@ const mesh: StudioLiveCanonicalAuthorityInput = {
 };
 
 describe("정본 편집 권위와 전송 상태의 분리", () => {
+  it("로컬 문서는 전송 대기가 반복돼도 이미 확인한 페이지 편집 권위를 잃지 않는다", () => {
+    let previousAuthority = resolveStudioLiveCanonicalAuthority(local);
+    for (let index = 0; index < 100; index += 1) {
+      previousAuthority = resolveStudioLiveCanonicalAuthority({
+        ...local, bindingState: index % 2 === 0 ? "retrying" : "syncing", previousAuthority,
+      });
+      expect(previousAuthority).toBe(true);
+    }
+    expect(resolveStudioLiveCanonicalAuthority({ ...local, bindingState: "retrying" })).toBe(false);
+    expect(resolveStudioLiveCanonicalAuthority({
+      ...local, bindingState: "retrying", previousAuthority: true, transportReady: false,
+    })).toBe(false);
+  });
+
   it.each([local, server, mesh])("검증된 정본에 연속 편집하는 동안 syncing 표시는 기존 권위를 유지한다 ($transportMode)", (input) => {
     const ready = resolveStudioLiveCanonicalAuthority(input);
     expect(ready).toBe(true);
@@ -31,13 +45,20 @@ describe("정본 편집 권위와 전송 상태의 분리", () => {
     expect(resolveStudioLiveCanonicalAuthority({ ...input, bindingState: "syncing", transportReady: false, previousAuthority: true })).toBe(false);
   });
 
-  it.each(["idle", "retrying", "repairing", "error", "recovery-required"] as const)("%s 상태에서 권위를 해제하고 ready 확인 전까지 복구하지 않는다", (bindingState) => {
+  it.each(["idle", "repairing", "error", "recovery-required"] as const)("%s 상태에서 권위를 해제하고 ready 확인 전까지 복구하지 않는다", (bindingState) => {
     for (const input of [local, server, mesh]) {
       const revoked = resolveStudioLiveCanonicalAuthority({ ...input, bindingState, previousAuthority: true });
       expect(revoked).toBe(false);
       expect(resolveStudioLiveCanonicalAuthority({ ...input, bindingState: "syncing", previousAuthority: revoked })).toBe(false);
       expect(resolveStudioLiveCanonicalAuthority({ ...input, previousAuthority: revoked })).toBe(true);
     }
+  });
+
+  it.each([server, mesh])("서버 문서의 재시도에는 로컬 편집 예외를 적용하지 않는다 ($crdtFanout)", (input) => {
+    const revoked = resolveStudioLiveCanonicalAuthority({ ...input, bindingState: "retrying", previousAuthority: true });
+    expect(revoked).toBe(false);
+    expect(resolveStudioLiveCanonicalAuthority({ ...input, bindingState: "syncing", previousAuthority: revoked })).toBe(false);
+    expect(resolveStudioLiveCanonicalAuthority({ ...input, previousAuthority: revoked })).toBe(true);
   });
 
   it.each(["none", undefined] as const)("서버 신호 전달만으로 정본 권위를 부여하지 않는다 (%s)", (crdtFanout) => {
