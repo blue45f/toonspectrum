@@ -323,7 +323,12 @@ export function createStudioDeferredStrokeCommitEngine(
       document.getPages(true),
       document.getLayerGroups({ includeDeleted: true })
     );
-    return reconciled.pages;
+    // 오프라인 제안은 canonical 문서를 갱신하지 않으므로 정본 병합 뒤 커밋에 다시 투영한다.
+    // 원격 요소를 보존하면서 방금 수락한 편집이 이전 정본 값으로 되돌아가는 것을 막는다.
+    const offlineBranch = runtime.offlineBranch;
+    return offlineBranch && offlineBranch.status.pendingOperations > 0
+      ? offlineBranch.projectPages(reconciled.pages)
+      : reconciled.pages;
   }
 
   // 요소 변경을 히스토리에 커밋. (마스터 편집 모드에서는 문서 마스터로 커밋 — 히스토리 미포함, 패널에서 고지)

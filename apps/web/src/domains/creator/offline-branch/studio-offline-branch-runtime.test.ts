@@ -1,6 +1,10 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { StudioCrdtDocument } from "../live/studio-crdt-document";
+import { reconcileStudioCrdtSceneGraphPages } from "../live/studio-crdt-page-bridge";
+import { publishStudioCrdtSceneGraphDiff } from "../live/studio-crdt-scene-publisher";
+import { createStudioDeferredStrokeCommitEngine } from "../studio-cuttoon-editor/studio-deferred-stroke-commit";
+import { createStudioCrdtTransitionPublisher } from "../studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher";
 import {
   StudioOfflineBranchAutomergeEngine,
   initializeStudioOfflineBranchAutomerge,
@@ -8,6 +12,8 @@ import {
 import { StudioOfflineBranchRuntime } from "./studio-offline-branch-runtime";
 
 import type { DrawEl } from "../studio-element-model";
+import type { StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaborationProvider";
+import type { StudioDeferredStrokeCommitEngineContext } from "../studio-cuttoon-editor/studio-deferred-stroke-commit";
 import type { PageState } from "../studio-page-state";
 import type {
   CreateStudioOfflineBranchInput,
@@ -178,7 +184,192 @@ function runtimeOptions(storage: MemoryStorage, actorId = "user-1") {
   };
 }
 
+function offlineCommitEditor(
+  offlineBranch: StudioOfflineBranchRuntime,
+  initialPage: PageState,
+) {
+  const document = new StudioCrdtDocument();
+  publishStudioCrdtSceneGraphDiff(document, [], [initialPage]);
+  // 렌더링과 래스터 포트는 이 페이지 커밋에 참여하지 않는다. 문서·발행·병합은 실제 구현을 쓴다.
+  const runtime = {
+    offlineBranch,
+    publish: vi.fn(publishStudioCrdtSceneGraphDiff),
+    reconcilePages: reconcileStudioCrdtSceneGraphPages,
+  } as unknown as StudioCrdtSceneGraphRuntime;
+  const reportError = vi.fn();
+  const publisher = createStudioCrdtTransitionPublisher({
+    actorId: "user-1",
+    automaticRasterPublicationEnabled: false,
+    getDocument: () => document,
+    getRuntime: () => runtime,
+    reportError,
+    reportNotice: vi.fn(),
+  });
+  const state = {
+    activePage: initialPage, pages: [initialPage], elements: initialPage.elements,
+    editorMountedRef: { current: true }, documentSaveInFlightRef: { current: false },
+    collaborationAccessRef: { current: { locked: false } },
+    collaborationLockMessage: () => "locked", bg3dDccSourceRef: { current: null },
+    masterEditMode: false, pageEditLocked: false, advancedFillApplyingRef: { current: false },
+    invalidateAdvancedFillWork: vi.fn(() => true), coalesceKeyRef: { current: null },
+    currentPageIdRef: { current: initialPage.id }, pagesHiRef: { current: 0 },
+    pagesHistoryRef: { current: [[initialPage]] },
+    studioCrdtDocumentRef: { current: document }, studioCrdtSceneRuntimeRef: { current: runtime },
+    publishStudioCrdtSceneTransition: publisher.publishSceneTransition,
+    onHistoryBranch: vi.fn(), recordStudioHistoryTransition: vi.fn(),
+    recordStudioHistoryJournalPages: vi.fn(), noteStudioHistoryRetention: vi.fn(),
+    setPagesHistory: vi.fn(), setPagesHi: vi.fn(), setError: reportError,
+    setSharedDocumentNotice: vi.fn(), drawingRef: { current: null },
+    drawingPointerTransportRef: { current: { getSession: () => null } },
+    pendingStrokeCommitsRef: { current: null }, flushPendingStrokeCommitsRef: { current: () => true },
+  };
+  const engine = createStudioDeferredStrokeCommitEngine(
+    state as unknown as StudioDeferredStrokeCommitEngineContext,
+  );
+  const currentPages = () => state.pagesHistoryRef.current[state.pagesHiRef.current];
+  return { document, runtime, publisher, engine, state, currentPages, reportError };
+}
+
 describe("StudioOfflineBranchRuntime", () => {
+  it.each(["elements", "pages"] as const)(
+    "오프라인 %s 커밋에서 연속 그룹 편집과 실행 취소 제안을 보존한다",
+    async (kind) => {
+      const branchError = vi.fn();
+      const offlineBranch = await StudioOfflineBranchRuntime.create({
+        ...runtimeOptions(new MemoryStorage()), onError: branchError,
+      });
+      const initialPage = { ...page(), canvasH: 1080 };
+      const editor = offlineCommitEditor(offlineBranch, initialPage);
+      try {
+        // 로컬 렌더 이후 도착한 원격 획도 같은 커밋에서 보존해야 한다.
+        const remoteStroke = stroke("remote-ink", 20);
+        publishStudioCrdtSceneGraphDiff(editor.document, [initialPage], [
+          { ...initialPage, elements: [remoteStroke] },
+        ]);
+        const canonicalBefore = editor.document.encodeStateAsUpdate();
+        const rename = (name: string) => {
+          const groups = [{ id: "group-1", name, hidden: false, locked: false }];
+          return kind === "elements"
+            ? editor.engine.commit(editor.currentPages()[0].elements, { groups })
+            : editor.engine.commitPages(editor.currentPages().map((entry) => ({ ...entry, groups })));
+        };
+
+        expect(rename("채색")).toBe(true);
+        expect(editor.currentPages()[0].groups?.[0].name).toBe("채색");
+        expect(editor.currentPages()[0].elements.map(({ id }) => id)).toEqual(["remote-ink"]);
+        expect(rename("보정")).toBe(true);
+        expect(editor.currentPages()[0].groups?.[0].name).toBe("보정");
+        expect(editor.state.pagesHistoryRef.current.map((pages) => pages[0].groups?.[0].name))
+          .toEqual(["선화", "채색", "보정"]);
+        expect(editor.runtime.publish).not.toHaveBeenCalled();
+        expect(editor.document.encodeStateAsUpdate()).toEqual(canonicalBefore);
+
+        const undoTarget = editor.state.pagesHistoryRef.current[1];
+        expect(editor.publisher.publishHistoryTransition(editor.currentPages(), undoTarget)).toBe(true);
+        await offlineBranch.exportPeerDocument();
+        const canonicalPages = editor.runtime.reconcilePages(
+          [initialPage], editor.document.getStrokes({ includeDeleted: true }),
+          editor.document.getSceneElements({ includeDeleted: true }), editor.document.getPages(true),
+          editor.document.getLayerGroups({ includeDeleted: true }),
+        ).pages;
+        const undonePages = offlineBranch.projectPages(canonicalPages);
+        expect(undonePages[0].groups?.[0].name).toBe("채색");
+        expect(undonePages[0].elements.map(({ id }) => id)).toEqual(["remote-ink"]);
+        expect(editor.document.encodeStateAsUpdate()).toEqual(canonicalBefore);
+        expect(editor.reportError).not.toHaveBeenCalled();
+        expect(branchError).not.toHaveBeenCalled();
+      } finally {
+        editor.document.destroy();
+        await offlineBranch.close();
+      }
+    },
+  );
+
+  it("오프라인 연속 요소 커밋을 canonical 값으로 되돌리지 않는다", async () => {
+    const offlineBranch = await StudioOfflineBranchRuntime.create(runtimeOptions(new MemoryStorage()));
+    const ink = stroke("ink", 20);
+    const editor = offlineCommitEditor(offlineBranch, page("선화", [ink]));
+    try {
+      editor.engine.commitCoalesced([{ ...ink, opacity: 0.4 }], "opacity");
+      editor.engine.commitCoalesced([{ ...ink, opacity: 0.6 }], "opacity");
+      expect(editor.currentPages()[0].elements[0].opacity).toBe(0.6);
+      expect(editor.state.pagesHistoryRef.current).toHaveLength(2);
+      expect(editor.document.getStrokes()[0].payload.opacity).toBe(1);
+      expect(editor.runtime.publish).not.toHaveBeenCalled();
+      expect(editor.reportError).not.toHaveBeenCalled();
+    } finally {
+      editor.document.destroy();
+      await offlineBranch.close();
+    }
+  });
+
+  it("온라인 권한이 있으면 기존 canonical 발행 경로로 캔버스를 변경한다", async () => {
+    const offlineBranch = await StudioOfflineBranchRuntime.create({
+      ...runtimeOptions(new MemoryStorage()), canonicalAuthority: true,
+    });
+    const editor = offlineCommitEditor(offlineBranch, { ...page(), canvasH: 1080 });
+    try {
+      expect(editor.engine.commit([], { canvasH: 8348 })).toBe(true);
+      expect(editor.currentPages()[0].canvasH).toBe(8348);
+      expect(editor.document.getPages()[0].payload.props.canvasH).toBe(8348);
+      expect(editor.engine.commit([], { canvasH: 8000 })).toBe(true);
+      expect(editor.currentPages()[0].canvasH).toBe(8000);
+      const undoTarget = editor.state.pagesHistoryRef.current[1];
+      expect(editor.publisher.publishHistoryTransition(editor.currentPages(), undoTarget)).toBe(true);
+      expect(editor.document.getPages()[0].payload.props.canvasH).toBe(8348);
+      expect(editor.runtime.publish).toHaveBeenCalledTimes(3);
+      expect(offlineBranch.status.pendingOperations).toBe(0);
+      expect(editor.reportError).not.toHaveBeenCalled();
+    } finally {
+      editor.document.destroy();
+      await offlineBranch.close();
+    }
+  });
+
+  it("오프라인 획 보정 커밋은 canonical 원시 표본 대신 최종 경로와 도형 정보를 보존한다", async () => {
+    const offlineBranch = await StudioOfflineBranchRuntime.create(runtimeOptions(new MemoryStorage()));
+    const raw = { ...stroke("smart-line", 20), points: Array.from({ length: 18 }, (_, index) => [index * 10, 20]).flat() };
+    const corrected: DrawEl = {
+      ...raw, points: [0, 20, 170, 20],
+      smartShape: { version: 1, kind: "line", original: raw },
+    };
+    const editor = offlineCommitEditor(offlineBranch, page("선화", [raw]));
+    try {
+      expect(editor.engine.commit([corrected])).toBe(true);
+      expect(editor.currentPages()[0].elements[0]).toMatchObject(corrected);
+      expect(editor.document.getStrokes()[0].payload.points).toEqual(raw.points);
+      expect(editor.runtime.publish).not.toHaveBeenCalled();
+      expect(editor.reportError).not.toHaveBeenCalled();
+    } finally {
+      editor.document.destroy();
+      await offlineBranch.close();
+    }
+  });
+
+  it("정본 권한이 없는 캔버스 크기 변경은 기존 경계에서 원자적으로 거절한다", async () => {
+    const branchError = vi.fn();
+    const offlineBranch = await StudioOfflineBranchRuntime.create({
+      ...runtimeOptions(new MemoryStorage()), onError: branchError,
+    });
+    const initialPage = { ...page(), canvasH: 1080 };
+    const editor = offlineCommitEditor(offlineBranch, initialPage);
+    try {
+      const before = editor.document.encodeStateAsUpdate();
+      expect(editor.engine.commit([], { canvasH: 8348 })).toBe(false);
+      expect(editor.currentPages()).toEqual([initialPage]);
+      expect(editor.state.pagesHistoryRef.current).toHaveLength(1);
+      expect(editor.state.onHistoryBranch).not.toHaveBeenCalled();
+      expect(editor.runtime.publish).not.toHaveBeenCalled();
+      expect(editor.document.encodeStateAsUpdate()).toEqual(before);
+      expect(offlineBranch.status.pendingOperations).toBe(0);
+      expect(branchError).toHaveBeenCalledWith(expect.stringContaining("온라인 정본 연결"));
+      expect(editor.reportError).toHaveBeenCalledWith(expect.stringContaining("온라인 정본 연결"));
+    } finally {
+      editor.document.destroy();
+      await offlineBranch.close();
+    }
+  });
+
   it("reports a supported idempotent no-op without staging an operation", async () => {
     const runtime = await StudioOfflineBranchRuntime.create(runtimeOptions(new MemoryStorage()));
     const current = [page("line")];

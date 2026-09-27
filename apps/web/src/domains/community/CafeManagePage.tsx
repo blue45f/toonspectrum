@@ -341,7 +341,7 @@ export function CafeManagePage() {
   }
 
   if (!userId) {
-    return <Container size="wide" className="py-16"><p className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-3">로그인이 필요해요.</p></Container>;
+    return <Container size="wide" className="py-16"><p data-route-blocked="sign-in" className="rounded-2xl border border-line bg-card p-8 text-center text-sm text-fg-3">로그인이 필요해요.</p></Container>;
   }
   if (loading) {
     return <Container size="wide" className="py-10"><div className="skeleton h-28 rounded-3xl" /><div className="skeleton mt-5 h-96 rounded-3xl" /></Container>;

@@ -19,6 +19,15 @@ import {
 const now = new Date("2026-09-09T09:00:00.000Z");
 
 describe("creator publication contract", () => {
+  it("공유 문구의 C0·DEL만 정리하고 줄바꿈·탭·기존 C1 문자는 보존한다", () => {
+    for (let code = 0; code <= 159; code++) {
+      const character = String.fromCharCode(code);
+      const removable = code <= 8 || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127;
+      const result = normalizeCreatorPublicationDirective({ socialDescription: `앞${character}뒤` });
+      expect(result.socialDescription).toBe(removable ? "앞뒤" : `앞${character}뒤`);
+    }
+  });
+
   it("creates a conservative public vertical-reader default", () => {
     expect(createDefaultCreatorPublicationDirective("Asia/Seoul")).toEqual({
       version: 1,

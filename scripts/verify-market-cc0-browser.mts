@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
 import { createServer } from "vite";
 
 import { buildMarketCc0ReleaseManifests } from "./seed/market-cc0-release-manifests";
 
-const server = await createServer({ server: { host: "127.0.0.1", port: 5237, strictPort: true }, mode: "test" });
+const server = await createServer({
+  configFile: fileURLToPath(new URL("../apps/web/vite.config.ts", import.meta.url)),
+  server: { host: "127.0.0.1", port: 5237, strictPort: true },
+  mode: "test",
+});
 await server.listen();
 const browser = await chromium.launch({ headless: true, args: ["--enable-unsafe-swiftshader"] });
 const out = "artifacts/market-cc0";

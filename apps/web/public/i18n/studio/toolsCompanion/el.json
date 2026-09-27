@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Επίπεδο {count}",
   "studio.toolsCompanion.review.section.comments": "Σχόλιο {count}",
   "studio.toolsCompanion.review.section.history": "Εγγραφή {count}",
-  "studio.toolsCompanion.review.subtitle": "Σελίδα ZZLBRACEΕτικέτα}· Επιλογή ZZLBRACEΕτικέτα ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "κονσόλα επιθεώρησης",
   "studio.toolsCompanion.review.truncatedComments": "και {count} σχόλια",
   "studio.toolsCompanion.review.truncatedLayers": "{count} στρώματα",

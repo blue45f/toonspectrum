@@ -3,7 +3,7 @@ import {
   translateBilingualValueForActiveLocale,
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
-import { X } from "lucide-react";
+import { ArrowRight, FolderOpen, LayoutGrid, Palette, X } from "lucide-react";
 import { useEffect, useRef, type RefObject } from "react";
 
 import {
@@ -241,48 +241,25 @@ export function MobileHeaderNavigation({
               </div>
             </div>
 
-            <nav className="mx-auto max-w-[1320px] px-4 pb-6 pt-5 sm:px-6 sm:pb-8">
-              <aside className="relative mb-4 min-h-40 overflow-hidden rounded-[1.35rem] border border-accent/30 bg-panel shadow-[0_20px_60px_-38px_var(--color-accent)] sm:min-h-44">
-                <img
-                  src="/brand/atelier-world-960.webp"
-                  alt=""
-                  aria-hidden="true"
-                  decoding="async"
-                  className="absolute inset-0 size-full object-cover opacity-38 saturate-[0.85]"
-                />
-                <span aria-hidden="true" className="absolute inset-0 bg-gradient-to-r from-canvas via-canvas/92 to-accent-soft/45" />
-                <img
-                  src="/brand/toonstudio-visual-identity/ai-creative-director.webp"
-                  alt=""
-                  aria-hidden="true"
-                  decoding="async"
-                  className="absolute -bottom-8 -right-3 h-40 w-auto object-contain drop-shadow-[0_16px_24px_var(--color-canvas)] sm:h-48"
-                />
-                <div className="relative z-[1] max-w-[75%] p-4 sm:p-5">
-                  <p className="font-display text-[0.68rem] font-black uppercase tracking-[0.18em] text-accent">TOONSTUDIO NAVIGATOR</p>
-                  <h2 className="mt-2 font-display text-xl font-black leading-tight text-fg sm:text-2xl">
-                    {bi("어디서든 같은 제작 흐름", "One studio, every screen")}
-                  </h2>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-fg-2">
-                    {bi("제작·탐색·커뮤니티와 새 기능을 두 번의 탭 안에서 찾으세요.", "Reach creation, discovery, community and every new tool within two taps.")}
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Link href="/studio/new" className="inline-flex min-h-11 items-center rounded-xl bg-accent px-3 text-xs font-black text-on-accent shadow-lg shadow-accent/15">
-                      {bi("새 작품", "New work")}
-                    </Link>
-                    <Link href="/sitemap" className="inline-flex min-h-11 items-center rounded-xl border border-line-strong bg-card/80 px-3 text-xs font-bold text-fg backdrop-blur-md">
-                      {bi("전체 기능", "All tools")}
-                    </Link>
-                  </div>
-                </div>
-              </aside>
+            <nav aria-label={bi("전체 서비스 메뉴", "All service navigation")} className="site-menu-navigation">
+              <div className="site-menu-actions">
+                <Link href="/studio/new" aria-current={isActive("/studio/new", true) ? "page" : undefined} className="site-menu-actions__create">
+                  <Palette size={20} aria-hidden="true" />
+                  <span><strong>{bi("새 작품", "New work")}</strong><small>{bi("아이디어를 첫 장면으로", "Turn an idea into your first scene")}</small></span>
+                  <ArrowRight size={18} aria-hidden="true" />
+                </Link>
+                <Link href="/studio" aria-current={isActive("/studio", true) ? "page" : undefined} className="site-menu-actions__projects">
+                  <FolderOpen size={18} aria-hidden="true" />
+                  <span>{bi("내 프로젝트", "My projects")}</span>
+                </Link>
+              </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
                 {navigationGroups.map((group, groupIndex) => (
                   <section
                     key={group.id}
                     aria-labelledby={`${menuId}-${group.id}`}
-                    className="rounded-2xl border border-line/70 bg-panel/55 p-3 shadow-sm sm:p-4"
+                    className="site-menu-group"
                   >
                     <div className="mb-3 flex items-start gap-3 px-1 sm:px-2">
                       <span
@@ -315,7 +292,7 @@ export function MobileHeaderNavigation({
                               aria-label={label}
                               aria-current={active ? "page" : undefined}
                               className={cx(
-                                "group flex min-h-[4.5rem] items-center gap-3 rounded-xl border px-3 py-2.5 transition-all duration-150",
+                                "group flex min-h-[4.5rem] items-center gap-3 rounded-xl border px-3 py-2.5 outline-none transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                                 active
                                   ? "border-accent/40 bg-accent-soft text-accent shadow-sm"
                                   : "border-line/75 bg-card/70 text-fg-2 hover:border-line-strong hover:bg-raised/80 hover:text-fg"
@@ -367,7 +344,13 @@ export function MobileHeaderNavigation({
                 ))}
               </div>
 
-              <div className="mt-4 grid gap-2 rounded-2xl border border-line/70 bg-panel/55 p-3 sm:grid-cols-3 sm:p-4">
+              <Link href="/sitemap" aria-current={isActive("/sitemap", true) ? "page" : undefined} className="site-menu-directory">
+                <LayoutGrid size={18} aria-hidden="true" />
+                <span>{bi("전체 기능", "All tools")}</span>
+                <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 border-t border-line pt-4 sm:grid-cols-4">
                 {SITE_UTILITY_NAVIGATION.map((item) => {
                   const active = isActive(item.href, item.exact);
                   const Icon = item.icon;
@@ -379,7 +362,7 @@ export function MobileHeaderNavigation({
                       aria-label={label}
                       aria-current={active ? "page" : undefined}
                       className={cx(
-                        "group flex min-h-12 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
+                        "group flex min-h-12 items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold outline-none transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
                         active
                           ? "border-accent/40 bg-accent text-on-accent"
                           : "border-line bg-card/70 text-fg-2 hover:border-line-strong hover:bg-raised hover:text-fg"
@@ -443,7 +426,7 @@ export function MobileHeaderNavigation({
                   aria-label={label}
                   aria-current={active ? "page" : undefined}
                   className={cx(
-                    "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.68rem] font-semibold transition-all duration-150 active:bg-raised/55",
+                    "relative flex min-h-[3.75rem] flex-col items-center justify-center gap-1 py-2 text-[0.68rem] font-semibold outline-none transition-colors duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-accent active:bg-raised/55",
                     active ? "text-accent" : "text-fg-3 hover:text-fg"
                   )}
                 >

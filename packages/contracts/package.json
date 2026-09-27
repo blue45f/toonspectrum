@@ -302,6 +302,16 @@
       "import": "./src/image-attach.ts",
       "default": "./src/image-attach.ts"
     },
+    "./studio-adjustment-engine-ids": {
+      "types": "./src/studio-adjustment-engine-ids.ts",
+      "import": "./src/studio-adjustment-engine-ids.ts",
+      "default": "./src/studio-adjustment-engine-ids.ts"
+    },
+    "./studio-live-adjustment-contract": {
+      "types": "./src/studio-live-adjustment-contract.ts",
+      "import": "./src/studio-live-adjustment-contract.ts",
+      "default": "./src/studio-live-adjustment-contract.ts"
+    },
     "./studio-raster-asset-admission": {
       "types": "./src/studio-raster-asset-admission.ts",
       "import": "./src/studio-raster-asset-admission.ts",
@@ -312,20 +322,20 @@
       "import": "./src/studio-smart-filter-stack-contract.ts",
       "default": "./src/studio-smart-filter-stack-contract.ts"
     },
-    "./studio-live-adjustment-contract": {
-      "types": "./src/studio-live-adjustment-contract.ts",
-      "import": "./src/studio-live-adjustment-contract.ts",
-      "default": "./src/studio-live-adjustment-contract.ts"
-    },
-    "./studio-adjustment-engine-ids": {
-      "types": "./src/studio-adjustment-engine-ids.ts",
-      "import": "./src/studio-adjustment-engine-ids.ts",
-      "default": "./src/studio-adjustment-engine-ids.ts"
+    "./studio-ink-envelope-attestation-contract": {
+      "types": "./src/studio-ink-envelope-attestation-contract.ts",
+      "import": "./src/studio-ink-envelope-attestation-contract.ts",
+      "default": "./src/studio-ink-envelope-attestation-contract.ts"
     },
     "./studio-ink-envelope-webcrypto-attestation": {
       "types": "./src/studio-ink-envelope-webcrypto-attestation.ts",
       "import": "./src/studio-ink-envelope-webcrypto-attestation.ts",
       "default": "./src/studio-ink-envelope-webcrypto-attestation.ts"
+    },
+    "./production-workflow": {
+      "types": "./src/production-workflow.ts",
+      "import": "./src/production-workflow.ts",
+      "default": "./src/production-workflow.ts"
     }
   },
   "dependencies": {

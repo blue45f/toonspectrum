@@ -1199,6 +1199,7 @@ import {
 import { openStudioToolsCompanionForMenu } from "./studio-tools-companion-runtime";
 import { hasStudioUnloadPromptWork, installStudioUnloadGuard, studioPendingStrokeFingerprint } from "./studio-unsaved-work-guard";
 import { useStudioEditorUpdateSafety } from "./use-studio-editor-update-safety";
+import { useStudioEditorStatusNotices } from "./studio-cuttoon-editor/use-studio-editor-status-notices";
 import {
   planStudioVectorEraseToIntersectionApply,
   STUDIO_ERASE_TO_INTERSECTION_LABEL,
@@ -1456,11 +1457,8 @@ import { cn } from "@/shared/lib/utils";
 import { resolveAssetUrl } from "@/shared/catalog/catalog-static";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 
-type StudioWriterRoomRuntime = Pick<typeof import("./studio-writer-room"), "createEmptyStudioWriterRoomDocument" | "normalizeStudioWriterRoomDocument" | "replaceStudioWriterRoomStage">;
-let studioWriterRoomRuntimePromise: Promise<StudioWriterRoomRuntime> | null = null;
-function loadStudioWriterRoomRuntime(): Promise<StudioWriterRoomRuntime> {
-  return (studioWriterRoomRuntimePromise ??= import("./studio-writer-room"));
-}
+import { loadStudioWriterRoomRuntime } from "./studio-cuttoon-editor/runtime/loadStudioWriterRoomRuntime";
+
 const bi = <T,>(ko: T, en: T): T => translateBilingualValueForActiveLocale("StudioCuttoonEditorHost", ko, en);
 
 const StudioAiSuperSuiteModal = lazyRetry(studioAiSuperSuiteModalLoader.load, "StudioAiSuperSuiteModal");
@@ -1605,12 +1603,6 @@ export function StudioCuttoonEditor({
   });
   const [macroSession, setMacroSession] = useState<StudioMacroSession>(() => createStudioMacroSession());
   const [layerMergeBusy, setLayerMergeBusy] = useState(false);
-  /**
-   * 상태 레일의 중립 알림. `error`는 "bad" 톤 하나로만 렌더되므로, 작업이 성공했지만 결과가
-   * 요청한 모양과 다를 때(예: 실시간 룸에서 3D LT 번들 대신 병합 합성이 추가될 때)를 실패처럼
-   * 보이게 만들지 않고 알리기 위한 별도 채널이다.
-   */
-  const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [studioMarketplaceCloudSyncRetry, setStudioMarketplaceCloudSyncRetry] = useState<{
     readonly record: CreatorMarketplaceResourceRecord;
     readonly pack: StudioCreatorPackDefinition;
@@ -1839,6 +1831,7 @@ export function StudioCuttoonEditor({
     studioWorkAssetHydrator,
     workId,
   });
+  const { statusNotice, setStatusNotice, offlineSceneNotice } = useStudioEditorStatusNotices(autosaveKey, studioAuthUserId);
   const {
     pages,
     pagesHi,
@@ -11003,6 +10996,15 @@ export function StudioCuttoonEditor({
     }
     flushDirectLiveDraft();
   };
+  // 종료 경로가 같은 다이렉트 플래그를 동기적으로 반납하도록 한곳에서 초기화한다.
+  function resetLiveDraftDirectFlags(): void {
+    liveDraftDirectRef.current = false;
+    liveStampDraftDirectRef.current = false;
+    liveDynamicBrushDraftDirectRef.current = false;
+    liveRetainedMediaDraftDirectRef.current = false;
+    liveWetInkDraftDirectRef.current = false;
+  }
+
   // quickshape 변환 등으로 다이렉트 대상에서 벗어나면 React 초안 경로로 복귀한다(1회 렌더).
   const exitDirectLiveDraft = () => {
     if (pendingStrokeAdmissionRef.current?.has(drawingRef.current?.id)) return;
@@ -11019,11 +11021,7 @@ export function StudioCuttoonEditor({
       failSelectedGpuLiveInk("request-failed", drawingRef.current?.id ?? "unknown-stroke");
       return;
     }
-    liveDraftDirectRef.current = false;
-    liveStampDraftDirectRef.current = false;
-    liveDynamicBrushDraftDirectRef.current = false;
-    liveRetainedMediaDraftDirectRef.current = false;
-    liveWetInkDraftDirectRef.current = false;
+    resetLiveDraftDirectFlags();
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
     gpuLiveOperationOrderKeyRef.current = null;
@@ -11249,11 +11247,7 @@ export function StudioCuttoonEditor({
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
       liveDraftRafRef.current = null;
     }
-    liveDraftDirectRef.current = false;
-    liveStampDraftDirectRef.current = false;
-    liveDynamicBrushDraftDirectRef.current = false;
-    liveRetainedMediaDraftDirectRef.current = false;
-    liveWetInkDraftDirectRef.current = false;
+    resetLiveDraftDirectFlags();
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
     gpuLiveOperationOrderKeyRef.current = null;
@@ -16158,7 +16152,7 @@ const puppetWarpArmed =
     automaticRasterPublicationEnabled: STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED,
     getDocument: () => studioCrdtDocumentRef.current,
     getRuntime: () => studioCrdtSceneRuntimeRef.current,
-      reportError: setError, reportNotice: setStatusNotice,
+      reportError: setError, reportNotice: offlineSceneNotice.report,
     });
   publishStudioCrdtSceneTransitionRef.current = publishStudioCrdtSceneTransition;
 
@@ -23008,11 +23002,7 @@ const puppetWarpArmed =
       globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
       gpuLingerRafRef.current = 0;
     }
-    liveDraftDirectRef.current = false;
-    liveStampDraftDirectRef.current = false;
-    liveDynamicBrushDraftDirectRef.current = false;
-    liveRetainedMediaDraftDirectRef.current = false;
-    liveWetInkDraftDirectRef.current = false;
+    resetLiveDraftDirectFlags();
     gpuLiveInkPinnedRef.current = false;
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
@@ -29381,6 +29371,7 @@ function clearSelectionForEdit() {
       strokeGuideRef={strokeGuideRef}
       strokeWidth={strokeWidth}
       saveIntentScope={{ ownerId: studioAuthUserId, documentKey: autosaveKey }}
+      {...offlineSceneNotice.viewProps}
       studioAuthUserId={studioAuthUserId}
       studioBgSceneAssetsError={studioBgSceneAssetsError}
       studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}

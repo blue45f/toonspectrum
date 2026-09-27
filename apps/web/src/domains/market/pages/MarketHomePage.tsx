@@ -73,18 +73,14 @@ export function MarketHomePage() {
     <div>
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-10">
-          <MarketNavHeader />
-          <div className="mt-6 grid gap-7 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)] xl:items-center">
-            <div>
+          <div className="market-home-masthead">
+            <header className="market-home-masthead__copy">
               <p className="eyebrow text-accent">TOONSTUDIO / WEBTOON MATERIALS</p>
               <h1 className="mt-4 text-pretty text-[clamp(2.4rem,5vw,4.5rem)] font-bold leading-[1.15] tracking-[-0.055em] text-fg">
                 웹툰의 한 컷을,<br />더 깊게 만드는 재료.
               </h1>
               <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-fg-2 sm:text-lg">
                 소재 마켓에서 내 작품의 선, 색, 배경을 찾아보세요.
-              </p>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-fg-3">
-                템플릿으로 장면을 시작하고, 2D·3D 에셋을 배치하고, 브러시와 색·보정 리소스로 마무리하세요. 파일 형식보다 지금 만들고 싶은 결과에서 시작합니다.
               </p>
               <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-line pt-4 sm:mt-7 sm:pt-5">
                 <Link href="/market/browse" className={buttonClass({ variant: "solid", size: "md" })}>
@@ -113,8 +109,12 @@ export function MarketHomePage() {
                   {isPaidMode ? "현재 유료 운영 모드" : "현재 무료 운영 모드"}
                 </span>
               </div>
-            </div>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-fg-3">
+                템플릿으로 장면을 시작하고, 2D·3D 에셋을 배치하고, 브러시와 색·보정 리소스로 마무리하세요. 파일 형식보다 지금 만들고 싶은 결과에서 시작합니다.
+              </p>
+            </header>
 
+            <MarketNavHeader className="market-home-navigation" />
             <MarketMaterialPreview />
           </div>
 

@@ -26,6 +26,7 @@ export function StudioCuttoonEditorSessionDialogs(s: StudioCuttoonEditorViewSess
     currentPageIdRef,
     currentStudioFilterPageRasterContext,
     elementById,
+    error,
     groups,
     isLatestLayerContentMutationLocked,
     pagesHiRef,
@@ -73,6 +74,7 @@ export function StudioCuttoonEditorSessionDialogs(s: StudioCuttoonEditorViewSess
               ? { mutationLockReason: studioFilterDialogMutationLockReason }
               : {})}
             applying={studioFilterApplying}
+            applicationError={error}
             selectionAvailable={
               studioFilterSession.target === "image" && !!studioFilterSession.selection
             }
@@ -95,6 +97,7 @@ export function StudioCuttoonEditorSessionDialogs(s: StudioCuttoonEditorViewSess
             }}
             onApply={async (patch, draft, applicationScope) => {
               if (studioFilterApplyBusyRef.current) return;
+              setError(null);
               if (studioFilterSession.target === "image") {
                 if (applicationScope === "whole") {
                   if (!patchEl(studioFilterSession.elementId, patch as Partial<El>)) return;

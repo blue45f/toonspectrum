@@ -1,5 +1,5 @@
 {
-  "admin.dashboard.period": "آخر أيام{أيام}· اعتبارًا من تاريخ{ZZ RBRACE",
+  "admin.dashboard.period": "آخر أيام{days}· اعتبارًا من تاريخ{date}",
   "admin.dashboard.loadError": "فشلت في تحميل المقاييس",
   "admin.dashboard.groupUsers": "المستخدمين",
   "admin.dashboard.groupCommunity": "المجتمع",

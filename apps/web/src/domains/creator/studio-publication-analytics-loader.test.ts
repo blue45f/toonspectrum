@@ -128,7 +128,7 @@ describe("Studio publication analytics lazy boundary", () => {
     const studioSource = moduleImports("./StudioCuttoonEditorHost.tsx").source;
 
     expect(studioSource).toMatch(
-      /Promise\.all\(\[\s*loadStudioReleaseScheduleRuntime\(\),\s*normalizeStudioPublicationAnalyticsDeferred\(projectData\.publicationAnalytics\)/,
+      /Promise\.all\(\[\s*loadStudioReleaseScheduleRuntime\(\),\s*loadStudioWriterRoomRuntime\(\),\s*normalizeStudioPublicationAnalyticsDeferred\(projectData\.publicationAnalytics\)/,
     );
     expect(studioSource).toMatch(
       /if \(!canApplyStudioMutation\(mutationTicket\)\) return false;\s+return applyStudioProjectSnapshotWithPreparedDocuments\(/,
@@ -142,10 +142,10 @@ describe("Studio publication analytics lazy boundary", () => {
     const studioSource = moduleImports("./StudioCuttoonEditorHost.tsx").source;
 
     expect(studioSource).toMatch(
-      /remixId\s+\? createEmptyStudioPublicationAnalyticsSnapshot\(\)\s+: await normalizeStudioPublicationAnalyticsDeferred\(doc\?\.publicationAnalytics\)/,
+      /remixId\s+\? Promise\.resolve\(createEmptyStudioPublicationAnalyticsSnapshot\(\)\)\s+: normalizeStudioPublicationAnalyticsDeferred\(doc\?\.publicationAnalytics\)/,
     );
     expect(studioSource).toMatch(
-      /if \(!alive\) return;\s+const parsedProject = creatorWorkSnapshotToStudioProject\(w\);\s+const hasLinked3dRender = parsedProject\.pagesList\.some/,
+      /if \(!alive \|\| controller\.signal\.aborted\) return;\s+const parsedProject = creatorWorkSnapshotToStudioProject\(w\);\s+const hasLinked3dRender = parsedProject\.pagesList\.some/,
     );
     expect(studioSource).toMatch(
       /if \(remixId && hasLinked3dRender\) \{[\s\S]*?return;\s+\}\s+const hydratedProject = hasLinked3dRender/,

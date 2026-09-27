@@ -4,7 +4,7 @@ import {
   preloadStudioI18nCore,
   retryFailedStudioI18nNamespaces,
   scheduleStudioI18nDeferredLoad,
-} from "../studio-i18n-priority-loader";
+} from "../localization/studio-i18n-priority-loader";
 
 import { useI18n } from "@/shared/lib/i18n-core";
 

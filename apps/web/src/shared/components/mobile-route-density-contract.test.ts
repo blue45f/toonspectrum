@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { mobileSiteTabsForPath } from "./site-navigation";
 
 const source = (relativePath: string) =>
   readFileSync(new URL(relativePath, import.meta.url), "utf8");
@@ -36,13 +37,17 @@ describe("mobile route density contract", () => {
     const floating = source("./FloatingControls.tsx");
     const beta = source("../../domains/creator/StudioBetaNoticeGate.tsx");
     const shell = source("./public-site-shell.css");
+    const mobileNavigation = source("./site-header-mobile-nav.tsx");
     const scene = source("./route-purpose-scene.css");
     const workspace = source("./workspace/workspace-visual-v3.css");
     const research = source("../../domains/creator-resources/CreatorHubPage.tsx");
 
     expect(floating).toContain("calc(9rem+env(safe-area-inset-bottom))");
-    expect(beta).toContain("bottom-[calc(9rem+env(safe-area-inset-bottom))]");
-    expect(shell).toContain("grid-template-columns: repeat(5, minmax(0, 1fr))");
+    expect(beta).toContain("bottom-[calc(5.75rem+env(safe-area-inset-bottom))]");
+    expect(beta).toContain('data-studio-beta-notice-mode="compact"');
+    expect(shell).toMatch(/@media \(width < 768px\)\s*\{[\s\S]*?\.public-site-journey \{ display: none; \}/u);
+    expect(mobileSiteTabsForPath("/explore")).toHaveLength(5);
+    expect(mobileNavigation).toContain('mobileTabs.length === 5 ? "grid-cols-5" : "grid-cols-4"');
     expect(scene).toContain("min-height: 8rem");
     expect(scene).toContain(".route-purpose-scene__cards,");
     expect(workspace).toContain("grid-template-columns:repeat(5,minmax(0,1fr))");

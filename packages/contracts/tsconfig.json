@@ -2,9 +2,7 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
+      "ES2022"
     ],
     "strict": true,
     "noEmit": true,
@@ -15,8 +13,7 @@
     "verbatimModuleSyntax": true,
     "types": [
       "node"
-    ],
-    "jsx": "react-jsx"
+    ]
   },
   "include": [
     "src/**/*.ts"

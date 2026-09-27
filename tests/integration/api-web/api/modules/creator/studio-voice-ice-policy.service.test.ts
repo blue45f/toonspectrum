@@ -151,8 +151,9 @@ describe("Studio voice ICE credential issuance", () => {
     expect(turn?.username).toBe(`1784362200:${opaqueIdentity}`);
     expect(turn?.username).not.toContain("private-user-id");
     expect(turn?.username).not.toContain("private-work-id");
-    // Independent coturn REST HMAC-SHA1 test vector for the fixed username above.
-    expect(turn?.credential).toBe("Sx6lIgQJSISRRXKM/XF1Kvic3o0=");
+    // 현재 ToonStudio 식별자 namespace의 고정 입력을 Python hmac으로 독립 계산한 벡터다.
+    expect(opaqueIdentity).toBe("LnctKQgSmo8-hzYZ9VgWAJk1QvdUjypT");
+    expect(turn?.credential).toBe("cDXj28xy8twQQ2qG+9C4Ej8/p30=");
   });
 
   it("returns explicit direct or STUN-only policies when relay is optional", () => {

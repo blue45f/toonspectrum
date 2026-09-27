@@ -1,34 +1,14 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
-import { dirname, relative, resolve } from "node:path";
+import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { runtimeSpecifiers } from "./verify-api-runtime-imports.mjs";
 
 const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
   {
-    name: "@toonstudio/contracts",
-    exports: {
-      "./security/csrf": "./security/csrf.js",
-      "./production-workspace": "./production-workspace.js",
-      "./operation-policy": "./operation-policy.js",
-      "./creator-publication-integrity": "./creator-publication-integrity.js",
-    },
-    subpathEntries: [
-      {
-        target: "security/csrf.js",
-        compiledEntry: "packages/contracts/src/security/csrf.js",
-      },
-      { target: "production-workspace.js", compiledEntry: "packages/contracts/src/production-workspace.js" },
-      { target: "operation-policy.js", compiledEntry: "packages/contracts/src/operation-policy.js" },
-      {
-        target: "creator-publication-integrity.js",
-        compiledEntry: "packages/contracts/src/creator-publication-integrity.js",
-      },
-    ],
-  },
-  {
     name: "@toonstudio/core",
-    compiledEntry: "packages/core/src/index.js",
+    sourceManifest: new URL("../packages/core/package.json", import.meta.url),
+    compiledDirectory: "packages/core",
     exports: {
-      ".": "./index.js",
       "./creator-role": "./creator-role.js",
       "./creator-resources": "./creator-resources.js",
       "./infrastructure-fabric": "./infrastructure-fabric.js",
@@ -69,6 +49,44 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
   },
 ]);
 
+async function contractsRuntimeDefinition(root) {
+  const name = "@toonstudio/contracts";
+  const manifest = JSON.parse(await readFile(new URL("../packages/contracts/package.json", import.meta.url), "utf8"));
+  // 기존 필수 계약을 보존하고, 실제 출력의 require만 정식 package exports에 연결한다.
+  const subpaths = new Set(["./security/csrf", "./production-workspace", "./operation-policy", "./creator-publication-integrity"]);
+  const files = (await readdir(root, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
+    .map((entry) => resolve(entry.parentPath, entry.name))
+    .filter((filename) => !relative(root, filename).split(sep).includes("node_modules"))
+    .sort();
+  for (const filename of files) {
+    for (const specifier of runtimeSpecifiers(await readFile(filename, "utf8"), filename)) {
+      if (specifier === name) subpaths.add(".");
+      else if (specifier.startsWith(`${name}/`)) subpaths.add(`.${specifier.slice(name.length)}`);
+    }
+  }
+  const entries = [...subpaths].map((subpath) => {
+    const source = manifest.exports[subpath]?.default;
+    if (typeof source !== "string" || !source.startsWith("./src/") || !source.endsWith(".ts")
+      || source.split("/").includes("..") || subpath.split("/").includes("..")) {
+      throw new Error(`API 계약 내보내기를 확인할 수 없습니다: ${name}${subpath.slice(1)}. packages/contracts/package.json의 정식 exports를 확인하세요.`);
+    }
+    return {
+      subpath,
+      target: subpath === "." ? "index.js" : `${subpath.slice(2)}.js`,
+      compiledEntry: `packages/contracts/${source.slice(2, -3)}.js`,
+    };
+  });
+  return {
+    name,
+    sourceManifest: new URL("../packages/contracts/package.json", import.meta.url),
+    compiledDirectory: "packages/contracts",
+    compiledEntry: entries.find((entry) => entry.subpath === ".")?.compiledEntry,
+    exports: Object.fromEntries(entries.map((entry) => [entry.subpath, `./${entry.target}`])),
+    subpathEntries: entries.filter((entry) => entry.subpath !== "."),
+  };
+}
+
 function packageDirectory(root, packageName) {
   return resolve(root, "node_modules", ...packageName.split("/"));
 }
@@ -78,13 +96,42 @@ function requirePath(fromDirectory, target) {
   return path.startsWith(".") ? path : `./${path}`;
 }
 
+// API가 emit한 공개 계약만 배포한다. 타입 전용·Web 전용 계약까지 강제로 emit하지 않는다.
+async function emittedWorkspaceSubpaths(root, definition) {
+  const manifest = JSON.parse(await readFile(definition.sourceManifest, "utf8"));
+  const entries = [];
+  for (const [subpath, entry] of Object.entries(manifest.exports)) {
+    if (subpath === "." && definition.compiledEntry) continue;
+    const source = typeof entry === "string" ? entry : entry.import;
+    if (!source?.startsWith("./src/") || !source.endsWith(".ts")) continue;
+    const compiledEntry = `${definition.compiledDirectory}/${source.slice(2, -3)}.js`;
+    try {
+      await access(resolve(root, compiledEntry));
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+    const target = definition.exports?.[subpath]?.slice(2)
+      ?? (subpath === "." ? "index.js" : `${subpath.slice(2)}.js`);
+    entries.push({ subpath, target, compiledEntry });
+  }
+  return entries;
+}
+
 export async function stageApiWorkspaceRuntime(
   directory = fileURLToPath(new URL("../apps/api/dist/", import.meta.url)),
 ) {
   const root = resolve(directory);
   const staged = [];
 
-  for (const definition of WORKSPACE_RUNTIME_PACKAGES) {
+  for (const definition of [await contractsRuntimeDefinition(root), ...WORKSPACE_RUNTIME_PACKAGES]) {
+    const emittedSubpaths = definition.sourceManifest
+      ? await emittedWorkspaceSubpaths(root, definition)
+      : [];
+    const subpathEntries = new Map((definition.subpathEntries ?? []).map((entry) => [entry.target, entry]));
+    for (const entry of emittedSubpaths) subpathEntries.set(entry.target, entry);
+    const exports = definition.exports ? { ...definition.exports } : undefined;
+    for (const entry of emittedSubpaths) exports[entry.subpath] = `./${entry.target}`;
     const compiledEntry = definition.compiledEntry
       ? resolve(root, definition.compiledEntry)
       : null;
@@ -100,7 +147,7 @@ export async function stageApiWorkspaceRuntime(
         "utf8",
       );
     }
-    for (const subpath of definition.subpathEntries ?? []) {
+    for (const subpath of subpathEntries.values()) {
       const compiledSubpathEntry = resolve(root, subpath.compiledEntry);
       await access(compiledSubpathEntry);
       const target = resolve(targetDirectory, subpath.target);
@@ -119,8 +166,8 @@ export async function stageApiWorkspaceRuntime(
       `${JSON.stringify({
         name: definition.name,
         private: true,
-        ...(compiledEntry ? { main: "./index.js" } : {}),
-        ...(definition.exports ? { exports: definition.exports } : {}),
+        ...((compiledEntry || exports?.["."]) ? { main: "./index.js" } : {}),
+        ...(exports ? { exports } : {}),
       }, null, 2)}\n`,
       "utf8",
     );

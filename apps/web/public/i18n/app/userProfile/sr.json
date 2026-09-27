@@ -7,7 +7,7 @@
   "userProfile.series.empty": "Овај корисник још није имао ни једну серију.",
   "userProfile.fetchError": "Не могу да загрутим профил.",
   "userProfile.authorFallback": "Корисник",
-  "userProfile.metaTemplate": "ЗЗПЛАЦЕХОЛДЕР0ЗЗ профил · ЗЗПЛАЦЕХОЛДЕР1ЗЗ рецензије · ЗЗПЛАЦЕХОЛДЕР2ЗЗ ради · просечна оцена ЗЗПЛАЦЕХОЛДЕР3ЗЗ — ТоонСпецтрум.",
+  "userProfile.metaTemplate": "{author} профил · {reviews} рецензије · {works} ради · просечна оцена {avg} — ТоонСпецтрум.",
   "userProfile.bioFallback": "Профил читаоца и објављене радове",
   "userProfile.followHint": "Можете пратити кориснике након пријављивања.",
   "userProfile.follow": "Следи",

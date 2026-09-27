@@ -169,9 +169,14 @@ describe("Studio lazy i18n assets", () => {
     // Both slot rows interpolate the same placeholder the rest of the packs use.
     for (const key of ["studio.commandBar.slot", "studio.commandBar.slotAria"]) {
       for (const locale of STUDIO_I18N_ASSET_LOCALES) {
-        expect(assetDictionary(locale)?.[key]).toContain("{index}");
+        expect(assetDictionary(locale)?.[key], `${locale}/${key}`).toContain("{index}");
       }
     }
+  });
+
+  it("슬롯 번호를 번역 보호 토큰 대신 실제 값으로 보간한다", () => {
+    expect(assetDictionary("it")?.["studio.commandBar.slot"]?.replace("{index}", "3")).toBe("Slot 3");
+    expect(assetDictionary("fil")?.["studio.commandBar.slotAria"]?.replace("{index}", "3")).toBe("Command slot 3");
   });
 
   it("loads both assets in parallel before either Studio route commits", async () => {

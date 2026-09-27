@@ -1,5 +1,5 @@
 {
-  "admin.campaigns.count": "ZZLBRACE ספירת}יוצר מסעות פרסום",
+  "admin.campaigns.count": "{count}יוצר מסעות פרסום",
   "admin.campaigns.new": "קמפיין חדש",
   "admin.campaigns.edit": "תרגום קמפיין",
   "admin.campaigns.empty": "אין קמפיינים רשומים. לחץ על קמפיין חדש כדי להוסיף אחד.",

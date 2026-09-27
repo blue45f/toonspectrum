@@ -34,6 +34,7 @@ import {
 import { STUDIO_DRAFT_CANVAS_PATHNAME } from "../apps/web/src/domains/creator/studio-workspace-route";
 
 import { installStudioCollaborationPreviewSession } from "./lib/studio-collaboration-preview-session";
+import { waitForStudioCollaborationDocumentLane } from "./lib/studio-collaboration-readiness";
 import {
   fingerprintStudioCompositedPng,
   type StudioCompositedCanvasFingerprint,
@@ -141,8 +142,8 @@ async function dismissOverlays(page: Page): Promise<void> {
   }
   const cinematicWelcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
   if (await cinematicWelcome.isVisible().catch(() => false)) {
-    await cinematicWelcome.getByRole("button", { name: "시작 안내 닫기" }).click({ timeout: 2_000 }).catch(() => undefined);
-    await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
+    await cinematicWelcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click({ timeout: 2_000 });
+    await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 });
   }
   const explicitDismiss = page.locator('[data-studio-quickstart-dismiss="true"]');
   if (await explicitDismiss.isVisible().catch(() => false)) {
@@ -191,20 +192,7 @@ async function waitForDocumentLane(
   page: Page,
   diagnostics: PageDiagnostics,
 ): Promise<string> {
-  const dock = page.locator('[data-studio-presence-dock="true"]').first();
-  await dock.waitFor({ state: "visible", timeout: 30_000 });
-  const readyPhaseHandle = await page.waitForFunction(
-    (readyPhases) => {
-      const phase = document
-        .querySelector<HTMLElement>('[data-studio-presence-dock="true"]')
-        ?.dataset.studioSyncPhase;
-      return typeof phase === "string" && readyPhases.includes(phase) ? phase : false;
-    },
-    [...READY_PHASES],
-    { timeout: 30_000 },
-  );
-  const phase = await readyPhaseHandle.jsonValue();
-  await readyPhaseHandle.dispose();
+  const phase = await waitForStudioCollaborationDocumentLane(page, READY_PHASES);
   assert.ok(
     typeof phase === "string" && READY_PHASES.has(phase),
     `unexpected document sync phase: ${String(phase)}`,

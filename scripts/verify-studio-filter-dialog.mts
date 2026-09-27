@@ -23,9 +23,11 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { deflateSync } from "node:zlib";
 
 
+import pg from "pg";
 import { chromium, type Browser, type Page } from "playwright";
 
 import { studioAutosaveKey } from "../apps/web/src/domains/creator/studio-autosave";
@@ -34,6 +36,9 @@ import {
   STUDIO_BETA_NOTICE_STORAGE_KEY,
 } from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 
+import { waitForStudioDrawingReady } from "./lib/studio-drawing-readiness";
+import { assertStudioFilterCanonicalEvidence } from "./lib/studio-filter-canonical-evidence";
+import { isStaticPreviewReadinessResponse, isStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import { readDurableStudioAutosaveDocument, type StudioDurableAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
 import { isOptionalStudioPreviewApiError } from "./lib/studio-verify-preview-errors.mjs";
@@ -44,6 +49,8 @@ import {
   stopChildProcess,
   waitForServer,
 } from "./lib/studio-verify-preview-harness.mjs";
+import { withStudioReviewHostQaRuntime } from "./studio-review-host-qa-runtime.mjs";
+import { createStudioReviewHostFixture, openStudioReviewHost } from "./studio-review-host-steps";
 
 import type { ChildProcess } from "node:child_process";
 
@@ -54,6 +61,13 @@ const SCRATCH =
 const LOG_PATH = join(SCRATCH, "studio-filter-dialog-preview.log");
 const REPORT_PATH = join(SCRATCH, "studio-filter-dialog-report.json");
 
+const AUTHENTICATED = process.env.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED === "1";
+const EXPECT_DENIAL = process.env.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL === "1";
+if (AUTHENTICATED && EXPECT_DENIAL) throw new Error("정본 성공과 정적 거절 검증은 별도 실행하세요.");
+if (EXPECT_DENIAL && process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()) {
+  throw new Error("정적 거절은 검사기가 소유한 preview에서만 확인하세요.");
+}
+let autosaveKey = studioAutosaveKey({});
 const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
 const AUTOSAVE_PREFIX = "toonstudio-studio-autosave";
 
@@ -124,6 +138,9 @@ interface FilterCaseResult {
   diff: PixelDiff | null;
   undoDiff: PixelDiff | null;
   persistedUndoRestored?: boolean;
+  denialFrames?: { before: { x: number; y: number; width: number; height: number };
+    after: { x: number; y: number; width: number; height: number };
+    alignedClip: { x: number; y: number; width: number; height: number }; dismissedDiff: PixelDiff };
   failure?: string;
 }
 
@@ -134,12 +151,15 @@ interface FilterDialogReport {
   startedAt: string;
   finishedAt: string;
   cases: FilterCaseResult[];
+  authority: "authenticated-canonical" | "owned-static-denial" | "external-or-static";
+  canonicalCheckpoints: { phase: string; revision: number; crdtServerSequence: string; pageSha256: string }[];
   committedBaseline: { livePresentationDiff: PixelDiff; originalDrawCount: number; persistedHistoryUnchanged: boolean } | null;
   consoleErrorCount: number;
   failedResponses: string[];
 }
 
 function log(message: string): void {
+  mkdirSync(SCRATCH, { recursive: true });
   const line = `[verify-filter-dialog] ${message}`;
   console.log(line);
   appendFileSync(LOG_PATH, `${line}\n`);
@@ -154,32 +174,27 @@ function collectBrowserErrors(
   collector: { messages: string[]; failedResponses: string[] },
   previewUrl: string,
 ): void {
+  const ownsStaticPreview = !AUTHENTICATED && !process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
     const location = entry.location().url;
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
-    if (!isOptionalStudioPreviewApiError(message, previewUrl)) collector.messages.push(message);
+    if (ownsStaticPreview && isStaticPreviewReadinessUnavailable(message, previewUrl)) {
+      log(`STATIC PREVIEW API UNAVAILABLE (not a live API pass): ${message}`);
+      return;
+    }
+    if (AUTHENTICATED || !isOptionalStudioPreviewApiError(message, previewUrl)) collector.messages.push(message);
   });
   page.on("pageerror", (error) => collector.messages.push(String(error)));
   page.on("response", (response) => {
     if (response.status() < 400) return;
     const message = `${response.status()} ${response.url()}`;
-    if (!isOptionalStudioPreviewApiError(message, previewUrl)) collector.failedResponses.push(message);
-  });
-}
-
-async function dismissTransientChrome(page: Page): Promise<void> {
-  for (const text of ["나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
-    try {
-      const el = page.getByRole("button", { name: text }).first();
-      if (await el.isVisible({ timeout: 250 })) {
-        await el.click({ timeout: 600 });
-        await page.waitForTimeout(150);
-      }
-    } catch {
-      /* optional chrome */
+    if (ownsStaticPreview && isStaticPreviewReadinessResponse(response.status(), response.url(), previewUrl)) {
+      log(`STATIC PREVIEW API UNAVAILABLE (not a live API pass): ${message}`);
+      return;
     }
-  }
+    if (AUTHENTICATED || !isOptionalStudioPreviewApiError(message, previewUrl)) collector.failedResponses.push(message);
+  });
 }
 
 async function activatePenAndDraw(page: Page): Promise<void> {
@@ -247,7 +262,7 @@ async function waitForSavedPages(
   const deadline = Date.now() + 15_000;
   let lastDocument: StudioDurableAutosaveDocument | null = null;
   do {
-    const document = await readDurableStudioAutosaveDocument(page, studioAutosaveKey({}));
+    const document = await readDurableStudioAutosaveDocument(page, autosaveKey);
     if (document) lastDocument = document;
     if (document && accepts(document)) return document;
     await page.waitForTimeout(150);
@@ -452,7 +467,12 @@ async function placeTestImage(page: Page): Promise<void> {
   await page.waitForTimeout(1_200);
 }
 
-async function main(): Promise<void> {
+interface AuthenticatedRuntime {
+  origin: URL;
+  databaseTarget: { databaseUrl: string };
+}
+
+async function main(runtime?: AuthenticatedRuntime): Promise<void> {
   mkdirSync(SCRATCH, { recursive: true });
   cleanScratchDir({
     directory: SCRATCH,
@@ -461,15 +481,18 @@ async function main(): Promise<void> {
   });
 
   const startedAt = new Date().toISOString();
-  const externalOrigin = process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim().replace(/\/+$/, "");
+  const externalOrigin = runtime?.origin.origin ?? process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim().replace(/\/+$/, "");
   const port = externalOrigin ? null : await findFreePort({ unavailableMessage: "could not allocate preview port" });
   const origin = externalOrigin ?? `http://127.0.0.1:${port}`;
-  const url = `${origin}/studio/canvas`;
+  let url = `${origin}/studio/canvas`;
   let child: ChildProcess | null = null;
   let browser: Browser | null = null;
+  let evidencePage: Page | null = null;
+  const pool = runtime ? new pg.Pool({ connectionString: runtime.databaseTarget.databaseUrl, max: 1 }) : null;
+  const canonicalCheckpoints: FilterDialogReport["canonicalCheckpoints"] = [];
 
   const results: FilterCaseResult[] = [];
-  let committedBaseline: NonNullable<FilterDialogReport["committedBaseline"]>;
+  let committedBaseline: FilterDialogReport["committedBaseline"] = null;
   const browserErrors: { messages: string[]; failedResponses: string[] } = {
     messages: [],
     failedResponses: [],
@@ -480,6 +503,7 @@ async function main(): Promise<void> {
       port,
       runner: "pnpm-exec",
       logPath: LOG_PATH,
+      outDir: process.env.TOONSPECTRUM_VERIFY_DIST?.trim() || undefined,
     });
     await waitForServer(`${origin}/`, {
       timeoutMs: 20_000,
@@ -495,7 +519,64 @@ async function main(): Promise<void> {
       viewport: { width: 1440, height: 1100 },
       locale: "ko-KR",
     });
+    let fixture = runtime && pool ? await createStudioReviewHostFixture(context, pool, runtime.origin) : null;
+    if (fixture && runtime && pool) {
+      invariant(fixture.initialSaved.workId === fixture.workId && fixture.initialSaved.role === "owner"
+        && fixture.initialSaved.capabilities.edit === true, "실제 생성한 작품의 편집 권한이 확인되지 않았습니다");
+      // 기존 계정 fixture와 실제 초대/수락 API만 사용한다. 편집자 공동 저장은 현재 편집기와 undo를 유지한다.
+      const owner = fixture;
+      const ownerCookies = await context.cookies();
+      await context.clearCookies();
+      const editor = await createStudioReviewHostFixture(context, pool, runtime.origin);
+      const editorCookies = await context.cookies();
+      await context.clearCookies();
+      await context.addCookies(ownerCookies);
+      const teamEndpoint = `${origin}/api/creator/works/${owner.workId}/team`;
+      const invitationResponse = await context.request.post(teamEndpoint, { headers: owner.headers,
+        data: { identity: editor.actorId, role: "editor" } });
+      invariant(invitationResponse.ok(), `실제 편집자 초대 실패 (${invitationResponse.status()})`);
+      await context.clearCookies();
+      await context.addCookies(editorCookies);
+      const invitationInbox = await context.request.get(`${origin}/api/creator/team/invitations`, { headers: editor.headers });
+      invariant(invitationInbox.ok(), `실제 초대 목록 조회 실패 (${invitationInbox.status()})`);
+      const invitations: unknown = await invitationInbox.json();
+      invariant(Array.isArray(invitations), "실제 초대 목록 응답이 배열이 아닙니다");
+      const invitation = invitations.find((item) => item && typeof item === "object" && item.workId === owner.workId);
+      invariant(typeof invitation?.invitationId === "string", "실제 서버 초대 식별자가 없습니다");
+      const accepted = await context.request.post(`${teamEndpoint}/invitations/respond`, { headers: editor.headers,
+        data: { action: "accept", invitationId: invitation.invitationId } });
+      invariant(accepted.ok(), `실제 편집자 초대 수락 실패 (${accepted.status()})`);
+      const editorSource = await context.request.get(`${teamEndpoint}/document`, { headers: editor.headers });
+      invariant(editorSource.ok(), `실제 편집 권한 원고 조회 실패 (${editorSource.status()})`);
+      const initialSaved = await editorSource.json();
+      invariant(initialSaved.workId === owner.workId && initialSaved.role === "editor"
+        && initialSaved.status === "active" && initialSaved.capabilities.edit === true,
+      "실제 수락한 편집자의 활성 편집 권한이 확인되지 않았습니다");
+      fixture = { ...owner, actorId: editor.actorId, headers: editor.headers, initialSaved };
+      log("실제 소유자 초대·편집자 수락·활성 편집 권한을 확인했습니다");
+      autosaveKey = studioAutosaveKey({ userId: fixture.actorId, workId: fixture.workId });
+      url = `${origin}/studio?id=${encodeURIComponent(fixture.workId)}`;
+    }
     const page = await context.newPage();
+    evidencePage = page;
+    const saveCanonicalCheckpoint = async (phase: string, expectedPages: StudioDurableAutosaveDocument["pagesList"]) => {
+      if (!fixture) return;
+      const endpoint = `${origin}/api/creator/works/${fixture.workId}/team/document`;
+      const responsePromise = page.waitForResponse((response) => response.url() === endpoint
+        && response.request().method() === "PATCH", { timeout: 60_000 });
+      await page.getByRole("button", { name: "공동 저장", exact: true }).click();
+      const response = await responsePromise;
+      invariant(response.ok(), `${phase}: 실제 정본 저장 실패 (${response.status()}): ${await response.text()}`);
+      const request = response.request().postDataJSON();
+      const readback = await context.request.get(endpoint, { headers: fixture.headers });
+      invariant(readback.ok(), `${phase}: 정본 읽기 실패 (${readback.status()})`);
+      const saved = await readback.json();
+      await page.waitForFunction(() => document.querySelector<HTMLButtonElement>('button[aria-label="공동 저장"]')?.disabled === false);
+      invariant(page.url() === url, `${phase}: 공동 저장 뒤 실제 편집기 경로가 바뀌었습니다`);
+      canonicalCheckpoints.push(assertStudioFilterCanonicalEvidence({ phase, request, source: saved,
+        previousRevision: canonicalCheckpoints.at(-1)?.revision ?? fixture.initialSaved.revision, expectedPages }));
+      log(`${phase}: 실제 인증 정본 저장 revision=${saved.revision}, ACK=${request.crdtServerSequence}`);
+    };
     collectBrowserErrors(page, browserErrors, url);
     await page.addInitScript(
       ({ autosavePrefix, betaNoticeRevision, betaNoticeStorageKey, quickstartKey }) => {
@@ -526,20 +607,30 @@ async function main(): Promise<void> {
       },
     );
 
-    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
+    if (runtime && fixture) await openStudioReviewHost(page, runtime.origin, fixture.workId);
+    else await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
     await page.locator("[data-studio-canvas-viewport]").waitFor({
       state: "visible",
       timeout: 30_000,
     });
-    await dismissTransientChrome(page);
+    await waitForStudioDrawingReady(page, { requireWelcome: true });
+    await page.waitForFunction(() => ["available", "degraded"].includes(
+      document.documentElement.dataset.serviceCapabilityState ?? ""
+    ), undefined, { timeout: 20_000 });
+    if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
+      await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible" });
+    }
 
     await activatePenAndDraw(page);
     const originalDocument = await waitForSavedPages(page, (document) =>
       document.pagesList.flatMap((item) => item.elements ?? []).filter((item) =>
         item && typeof item === "object" && "type" in item && item.type === "draw").length === 2,
     "The two original pen strokes were not saved");
-    const originalPages = JSON.stringify(originalDocument.pagesList);
+    // CRDT 직렬화의 키 삽입 순서와 무관하게 모든 필드·좌표·배열 순서를 정확히 비교한다.
+    const originalPages = originalDocument.pagesList;
     const clip = await canvasEvidenceClip(page);
+    const baselineStage = await page.locator(".konvajs-content").first().boundingBox();
+    invariant(baselineStage, "원본 캔버스의 문서 좌표를 확인하지 못했습니다");
     const liveBaseline = await screenshotClipped(page, clip);
     writeFileSync(join(SCRATCH, "studio-filter-dialog-live-baseline.png"), liveBaseline);
     // Compare committed-history rendering on both sides of the filter operation.
@@ -549,7 +640,7 @@ async function main(): Promise<void> {
     await (await enabledStudioHistoryControl(page, "redo", 10_000)).click();
     await page.waitForTimeout(900);
     await waitForSavedPages(page, (document) => document.savedAt > originalDocument.savedAt
-      && JSON.stringify(document.pagesList) === originalPages,
+      && isDeepStrictEqual(document.pagesList, originalPages),
     "History traversal changed the original saved strokes");
     const baseline = await screenshotClipped(page, clip);
     committedBaseline = { livePresentationDiff: await compareScreenshotPixels(page, liveBaseline, baseline),
@@ -557,6 +648,66 @@ async function main(): Promise<void> {
     writeFileSync(join(SCRATCH, "studio-filter-dialog-baseline.png"), baseline);
     log(`live-to-history presentation difference: ${JSON.stringify(committedBaseline.livePresentationDiff)}; saved strokes unchanged`);
     log(`baseline evidence captured (${clip.width}x${clip.height})`);
+    await saveCanonicalCheckpoint("original", originalPages);
+
+    if (EXPECT_DENIAL) {
+      for (const filterCase of FILTER_CASES) {
+        const result: FilterCaseResult = { ...filterCase, ok: false, openMs: null, applyMs: null,
+          target: "page-composite", diff: null, undoDiff: null };
+        results.push(result);
+        const openedAt = Date.now();
+        await openMainMenuGroup(page, "효과");
+        await clickEnabledMenuItem(page, filterCase.label);
+        const dialog = filterDialog(page);
+        await dialog.waitFor({ state: "visible", timeout: 45_000 });
+        result.openMs = Date.now() - openedAt;
+        await nudgeFirstParameterSlider(dialog);
+        const appliedAt = Date.now();
+        await dialog.getByRole("button", { name: "적용", exact: true }).click();
+        const refusal = dialog.getByRole("alert").filter({ hasText: "에셋 참조 요소는 서버 정본 연결 후 수정해 주세요." });
+        await refusal.waitFor({ state: "visible", timeout: 90_000 });
+        result.applyMs = Date.now() - appliedAt;
+        invariant(await dialog.isVisible(), `${filterCase.label}: 거절된 필터 창이 사라졌습니다`);
+        invariant(await dialog.getByRole("button", { name: "적용", exact: true }).isEnabled(), "거절 후 재시도를 할 수 없습니다");
+        const persisted = await readDurableStudioAutosaveDocument(page, autosaveKey);
+        invariant(persisted && isDeepStrictEqual(persisted.pagesList, originalPages), `${filterCase.label}: 거절 후 원본이 변경됐습니다`);
+        await page.screenshot({ path: join(SCRATCH, `studio-filter-dialog-denied-${filterCase.group}-${results.length}.png`) });
+        await dialog.getByRole("button", { name: "취소", exact: true }).click();
+        await dialog.waitFor({ state: "hidden" });
+        await page.mouse.move(4, 4);
+        const deniedStage = await page.locator(".konvajs-content").first().boundingBox();
+        invariant(deniedStage && Math.abs(deniedStage.width - baselineStage.width) < 0.5
+          && Math.abs(deniedStage.height - baselineStage.height) < 0.5,
+        "오류 안내 뒤 문서 배율이 바뀌어 같은 문서 영역을 비교할 수 없습니다");
+        // 오류 행의 높이 변화는 기록하되 같은 문서 좌표·크기의 픽셀만 비교한다.
+        const alignedClip = { ...clip, x: clip.x + deniedStage.x - baselineStage.x,
+          y: clip.y + deniedStage.y - baselineStage.y };
+        const restoredDeadline = Date.now() + 10_000;
+        do {
+          result.undoDiff = await compareScreenshotPixels(page, baseline, await screenshotClipped(page, alignedClip));
+          if (result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002) break;
+          await page.waitForTimeout(150);
+        } while (Date.now() < restoredDeadline);
+        invariant(result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002,
+          `${filterCase.label}: 거절·취소 뒤 원본 픽셀이 복원되지 않았습니다`);
+        await page.getByRole("button", { name: "오류 메시지 닫기", exact: true }).click();
+        await page.waitForFunction((before) => {
+          const after = document.querySelector(".konvajs-content")?.getBoundingClientRect();
+          return after && Math.abs(after.x - before.x) < 0.5 && Math.abs(after.y - before.y) < 0.5
+            && Math.abs(after.width - before.width) < 0.5 && Math.abs(after.height - before.height) < 0.5;
+        }, baselineStage);
+        const dismissedDiff = await compareScreenshotPixels(page, baseline, await screenshotClipped(page, clip));
+        invariant(dismissedDiff.changedPixels <= dismissedDiff.totalPixels * 0.002,
+          `${filterCase.label}: 오류를 닫은 뒤 원래 화면 영역의 원본 픽셀이 달라졌습니다`);
+        const afterDismiss = await readDurableStudioAutosaveDocument(page, autosaveKey);
+        invariant(afterDismiss && isDeepStrictEqual(afterDismiss.pagesList, originalPages),
+          `${filterCase.label}: 오류를 닫는 동작이 원본 문서를 변경했습니다`);
+        result.denialFrames = { before: baselineStage, after: deniedStage, alignedClip, dismissedDiff };
+        result.persistedUndoRestored = true;
+        result.ok = true;
+        log(`${filterCase.label}: 정적 거절 사유·재시도·취소·원본 보존 PASS`);
+      }
+    } else {
 
     const cases = SURVEY_MODE
       ? (await collectFilterMenuLabels(page)).map((label) => ({ label, group: "survey" }))
@@ -627,16 +778,18 @@ async function main(): Promise<void> {
         }
 
         const appliedDocument = await waitForSavedPages(page,
-          (document) => JSON.stringify(document.pagesList) !== originalPages,
+          (document) => !isDeepStrictEqual(document.pagesList, originalPages),
           `${filterCase.label}: applied filter did not reach durable storage`);
+        await saveCanonicalCheckpoint(`${filterCase.label}:round-${result.round}:applied`, appliedDocument.pagesList);
         const undo = await enabledStudioHistoryControl(page, "undo", 10_000);
         await undo.click();
         await page.waitForTimeout(900);
         const restored = await screenshotClipped(page, clip);
         if (index === 0) writeFileSync(join(SCRATCH, "studio-filter-dialog-first-restored.png"), restored);
         await waitForSavedPages(page, (document) => document.savedAt > appliedDocument.savedAt
-          && JSON.stringify(document.pagesList) === originalPages,
+          && isDeepStrictEqual(document.pagesList, originalPages),
         `${filterCase.label}: undo changed the original saved page data`);
+        await saveCanonicalCheckpoint(`${filterCase.label}:round-${result.round}:undo`, originalPages);
         result.persistedUndoRestored = true;
         result.undoDiff = await compareScreenshotPixels(page, baseline, restored);
         invariant(
@@ -802,9 +955,10 @@ async function main(): Promise<void> {
       try {
         // 1) Place a fresh image via the file chooser; it becomes the selected element.
         await placeTestImage(page);
-        // Materialize the selected image's interactive handles before the baseline, using the
-        // same visible selection state that Undo restores. File placement can select the image
-        // before its transformer has mounted. Compare the entire crop, including these handles.
+        const imageOriginalDocument = await waitForSavedPages(page, (document) => !isDeepStrictEqual(document.pagesList, originalPages),
+          "직접 이미지 원본이 영속 저장되지 않았습니다");
+        await saveCanonicalCheckpoint("image-target:original", imageOriginalDocument.pagesList);
+        // 실제 저장이 선택을 해제하므로 동일한 캔버스 클릭으로 이미지와 핸들을 다시 선택한 뒤 비교한다.
         await page.locator('[data-studio-rail-tool-id="select"][aria-pressed="true"]').waitFor({ state: "visible" });
         await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2);
         await page.mouse.move(4, 4);
@@ -847,9 +1001,14 @@ async function main(): Promise<void> {
             + `(${result.diff.changedPixels}/${result.diff.totalPixels})`,
         );
 
+        const imageAppliedDocument = await waitForSavedPages(page,
+          (document) => !isDeepStrictEqual(document.pagesList, imageOriginalDocument.pagesList),
+          "직접 이미지 필터 결과가 영속 저장되지 않았습니다");
+        await saveCanonicalCheckpoint("image-target:applied", imageAppliedDocument.pagesList);
         const undo = await enabledStudioHistoryControl(page, "undo", 10_000);
         await undo.click();
         await page.waitForTimeout(900);
+        await page.mouse.click(clip.x + clip.width / 2, clip.y + clip.height / 2);
         await page.mouse.move(4, 4);
         const restored = await screenshotClipped(page, clip);
         writeFileSync(join(SCRATCH, "studio-filter-dialog-image-target-restored.png"), restored);
@@ -860,6 +1019,10 @@ async function main(): Promise<void> {
             + `(${result.undoDiff.changedPixels}/${result.undoDiff.totalPixels})`,
         );
 
+        await waitForSavedPages(page, (document) => isDeepStrictEqual(document.pagesList, imageOriginalDocument.pagesList),
+          "직접 이미지 실행 취소가 원본 문서를 복원하지 않았습니다");
+        await saveCanonicalCheckpoint("image-target:undo", imageOriginalDocument.pagesList);
+        result.persistedUndoRestored = true;
         result.ok = true;
         log(
           `선택 이미지 직접 적용: OK — apply ${result.applyMs}ms, `
@@ -873,11 +1036,22 @@ async function main(): Promise<void> {
       }
     }
 
+    }
+  } catch (error) {
+    if (evidencePage && !evidencePage.isClosed()) {
+      await evidencePage.screenshot({ path: join(SCRATCH, "studio-filter-dialog-fatal.png") }).catch(() => undefined);
+    }
+    writeFileSync(REPORT_PATH, `${JSON.stringify({ ok: false, startedAt, finishedAt: new Date().toISOString(),
+      authority: AUTHENTICATED ? "authenticated-canonical" : EXPECT_DENIAL ? "owned-static-denial" : "external-or-static",
+      cases: results, committedBaseline, canonicalCheckpoints, browserErrors,
+      failure: String(error instanceof Error ? error.message : error) }, null, 2)}\n`);
+    throw error;
   } finally {
     try {
       await browser?.close();
     } finally {
-      if (child) await stopChildProcess(child);
+      try { if (child) await stopChildProcess(child); }
+      finally { await pool?.end(); }
     }
   }
 
@@ -890,6 +1064,8 @@ async function main(): Promise<void> {
     finishedAt: new Date().toISOString(),
     cases: results,
     committedBaseline,
+    authority: AUTHENTICATED ? "authenticated-canonical" : EXPECT_DENIAL ? "owned-static-denial" : "external-or-static",
+    canonicalCheckpoints,
     consoleErrorCount: browserErrors.messages.length,
     failedResponses: browserErrors.failedResponses,
   };
@@ -901,7 +1077,8 @@ async function main(): Promise<void> {
     for (const message of browserErrors.messages.slice(0, 8)) log(`  ${message}`);
   }
   if (report.ok && browserErrors.messages.length === 0 && browserErrors.failedResponses.length === 0) {
-    log("PASS — 모든 필터 케이스가 실제 브라우저에서 적용·복원되었습니다");
+    log(EXPECT_DENIAL ? "PASS — 정적 필터 거절 사유와 원본 보존을 실제 브라우저에서 확인했습니다"
+      : "PASS — 모든 필터 케이스가 실제 브라우저에서 적용·복원되었습니다");
     return;
   }
   throw new Error(
@@ -911,7 +1088,11 @@ async function main(): Promise<void> {
   );
 }
 
-main()
+(AUTHENTICATED
+  ? withStudioReviewHostQaRuntime(process.env, (runtime: AuthenticatedRuntime) => main(runtime), {
+    webMode: "preview", webOutDir: process.env.STUDIO_QA_WEB_OUT_DIR, apiEntry: "compiled",
+  })
+  : main())
   .then(() => process.exit(0))
   .catch((error: unknown) => {
     log(`FAIL ${String(error instanceof Error ? error.message : error)}`);

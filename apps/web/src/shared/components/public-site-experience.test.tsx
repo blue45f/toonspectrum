@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PublicSiteJourney } from "./public-site-journey";
-import { PublicSiteNextSteps } from "./public-site-next-steps";
+import { PublicSiteAtelierJourney, PublicSiteNextSteps } from "./public-site-next-steps";
 import { isPublicCreativeRoute } from "./site-public-routes";
 
 vi.mock("@/shared/lib/i18n", () => ({ useI18n: (selector: (state: { lang: string }) => string) => selector({ lang: "ko" }) }));
@@ -13,6 +13,12 @@ afterEach(cleanup);
 describe("public site experience boundaries", () => {
   it.each(["/", "/studio", "/studio/assets", "/settings", "/my", "/admin", "/privacy", "/market/manage"])("does not add promotional next steps on %s", (pathname) => {
     const { container } = render(<MemoryRouter><PublicSiteNextSteps pathname={pathname} /></MemoryRouter>);
+    expect(container.children.length).toBe(0);
+  });
+
+  it.each(["/terms", "/privacy", "/copyright", "/privacy/"])("공개 정책 %s에는 장식 장면과 다음 작업 홍보를 추가하지 않는다", (pathname) => {
+    expect(isPublicCreativeRoute(pathname)).toBe(true);
+    const { container } = render(<MemoryRouter><PublicSiteAtelierJourney pathname={pathname} /><PublicSiteNextSteps pathname={pathname} /></MemoryRouter>);
     expect(container.children.length).toBe(0);
   });
 

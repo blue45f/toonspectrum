@@ -114,7 +114,15 @@ describe("Studio startup capability chunk boundary", () => {
     "apps/web/src/domains/creator/render/studio-engine-failure-policy.ts",
     "apps/web/src/domains/creator/contracts/studio-live-lock-resource.ts",
   ])("keeps startup contract %s free from database, panel and engine runtime imports", (file) => {
-    const emitted = ts.transpileModule(parseFile(file).text, {
+    let authorityFile = file;
+    if (file.endsWith("/contracts/studio-live-lock-resource.ts")) {
+      // 웹 shim에 다른 런타임 연결이 생기지 않았는지 검사한 뒤 공유 계약의 AST를 확인한다.
+      expect(parseFile(file).text.replace(/\/\*[\s\S]*?\*\//gu, "").trim()).toBe(
+        'export * from "@toonstudio/contracts/studio-live-lock-resource";',
+      );
+      authorityFile = "packages/contracts/src/studio-live-lock-resource.ts";
+    }
+    const emitted = ts.transpileModule(parseFile(authorityFile).text, {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
     }).outputText;
     visitTree(ts.createSourceFile(file, emitted, ts.ScriptTarget.Latest, true), (node) => {

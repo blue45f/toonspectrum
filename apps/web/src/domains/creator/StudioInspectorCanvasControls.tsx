@@ -227,7 +227,7 @@ export function StudioInspectorCanvasControls({
             </button>
             <span
               className="numeral w-12 text-center text-xs"
-              aria-label={localizeText(t, "높이 240px", "studio.canvas.heightValue").replace("{height}", String(canvasHeight))}
+              aria-label={localizeText(t, "높이 {height}px", "studio.canvas.heightValue").replace("{height}", String(canvasHeight))}
             >
               {canvasHeight}
             </span>

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Katman {count}",
   "studio.toolsCompanion.review.section.comments": "Yorum {count}",
   "studio.toolsCompanion.review.section.history": "{count} kaydını yap",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE sayfasıEtiket}·{seçimiEtiket ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "muayene konsolu",
   "studio.toolsCompanion.review.truncatedComments": "ve {count} yorumları",
   "studio.toolsCompanion.review.truncatedLayers": "{count} katmanlar",

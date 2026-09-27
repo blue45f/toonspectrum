@@ -48,6 +48,26 @@ describe("campus route authority coverage", () => {
   it("does not turn an unknown future route into a fake plaza page", () => {
     expect(campusBinding("future-unregistered", "/unknown")).toBeNull();
   });
+  it("개인 공간과 팀 가입은 기존 전용 화면과 보호 경계를 유지한다", () => {
+    expect(campusBinding("creator-studio-personal-space", "/studio/space"))
+      .toMatchObject({ districtId: "atelier", surface: "native", private: true });
+    expect(campusBinding("team-people-join", "/team/people/join"))
+      .toMatchObject({ districtId: "production", surface: "protected", private: true });
+    expect(campusBinding("team-people-detail", "/team/people/workspace-1"))
+      .toMatchObject({ districtId: "production", private: true });
+    expect(campusBinding("creator-character-onboarding", "/onboarding/character")?.surface).toBe("protected");
+    expect(campusBinding("engagement-taste-onboarding", "/onboarding/taste")?.surface).toBe("protected");
+  });
+  it.each([
+    ["team-people-detail", "/team/people/workspace-1"],
+    ["production-project-overview", "/production/project/project-1"],
+    ["creator-studio-home", "/studio"],
+    ["account-messages", "/messages"],
+    ["collaboration-workspace", "/collaborate/workspace"],
+    ["community-promote-moderation", "/community/promote/moderation"],
+  ])("대소문자 별칭도 %s의 가림·보호 경계를 유지한다", (id, pathname) => {
+    expect(campusBinding(id, pathname.toUpperCase())).toEqual(campusBinding(id, pathname));
+  });
   it.each(["token", "shareToken", "reviewToken", "presentationToken", "invite", "credential", "code", "state"])("isolates %s before showing any world or return target", (key) => {
     expect(campusProtectedSearch(`?${key}=secret`)).toBe(true);
     expect(campusBinding("market-home", "/market", `?${key}=secret`)?.surface).toBe("protected");

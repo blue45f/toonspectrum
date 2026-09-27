@@ -1,2 +1,2 @@
-// 브라우저와 서버가 공유하는 WebCrypto 서명 계약의 호환 진입점.
+/** 웹 호환 진입점. 키 소유권과 검증 규칙은 공용 계약에 유지한다. */
 export * from "@toonstudio/contracts/studio-ink-envelope-webcrypto-attestation";

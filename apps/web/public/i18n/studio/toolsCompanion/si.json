@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ස්ථරය {count}",
   "studio.toolsCompanion.review.section.comments": "අදහස {count}",
   "studio.toolsCompanion.review.section.history": "වාර්තා {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE පිටුවලේබලය}·{තේරීමලේබලය ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "පරීක්ෂණ කොන්සෝලය",
   "studio.toolsCompanion.review.truncatedComments": "සහ {count} අදහස්",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ස්ථර",

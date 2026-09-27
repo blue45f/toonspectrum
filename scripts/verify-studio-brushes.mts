@@ -40,6 +40,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 
 
 import { decodePng } from "image-js";
@@ -95,6 +96,16 @@ import {
   studioCc0MypaintPresetUsesIntentionalDiscreteCarrier,
 } from "../apps/web/src/domains/creator/studio-cc0-mypaint-preset-import-v1";
 
+import { initializeStudioVerifierPageOnce, installStudioCanvasScaleDiagnostics } from "./lib/studio-brush-verifier-session";
+import {
+  clickStudioControlAfterReadiness,
+  prepareStudioDrawingUi,
+  waitForStudioDrawingReady,
+} from "./lib/studio-drawing-readiness";
+import {
+  isStaticPreviewReadinessResponse,
+  isStaticPreviewReadinessUnavailable,
+} from "./lib/studio-preview-readiness";
 import { meetsStudioMinimumTouchTarget } from "./lib/studio-touch-target-measurement.mjs";
 import {
   readDurableStudioAutosaveDocument,
@@ -222,6 +233,7 @@ type VerifierBrushOperation = "paint" | "erase";
 interface BrowserErrorCollector {
   messages: string[];
   failedResponses: string[];
+  optionalReadinessFailures: string[];
 }
 
 interface BrushStrokeEvidence {
@@ -645,11 +657,20 @@ function collectBrowserErrors(
   label: string,
   studioUrl: string,
 ): BrowserErrorCollector {
-  const collector: BrowserErrorCollector = { messages: [], failedResponses: [] };
+  const collector: BrowserErrorCollector = {
+    messages: [], failedResponses: [], optionalReadinessFailures: [],
+  };
+  // 검증기가 직접 실행한 정적 preview만 API 부재로 분류한다. 외부 서버는 그대로 검사한다.
+  const ownsStaticPreview = !process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim();
   page.on("console", (entry) => {
     if (entry.type() !== "error") return;
     const location = entry.location().url;
     const message = location ? `${entry.text()} @ ${location}` : entry.text();
+    if (ownsStaticPreview && isStaticPreviewReadinessUnavailable(message, studioUrl)) {
+      collector.optionalReadinessFailures.push(`${label}: ${message}`);
+      log(`STATIC PREVIEW API UNAVAILABLE (not a live API pass): ${message}`);
+      return;
+    }
     if (
       !expectedStaticPreviewError(message, studioUrl)
       && !expectedExternalFontCdnError(message)
@@ -663,7 +684,10 @@ function collectBrowserErrors(
   page.on("response", (response) => {
     if (response.status() < 500) return;
     const message = `${response.status()} ${response.url()}`;
-    if (!expectedStaticPreviewError(message, studioUrl)) {
+    if (ownsStaticPreview && isStaticPreviewReadinessResponse(response.status(), response.url(), studioUrl)) {
+      collector.optionalReadinessFailures.push(`${label}: ${message}`);
+      log(`STATIC PREVIEW API UNAVAILABLE (not a live API pass): ${message}`);
+    } else if (!expectedStaticPreviewError(message, studioUrl)) {
       collector.failedResponses.push(`${label}: ${message}`);
     }
   });
@@ -699,6 +723,10 @@ function reportBrowserErrors(collector: BrowserErrorCollector): void {
 }
 
 async function installCleanStudioState(page: Page): Promise<void> {
+  return initializeStudioVerifierPageOnce(page, () => registerCleanStudioState(page));
+}
+
+async function registerCleanStudioState(page: Page): Promise<void> {
   // tsx가 keep-names로 트랜스파일한 함수를 page.evaluate 로 직렬화하면 esbuild 의 `__name`
   // 헬퍼 호출이 함수 본문에 남는다. 브라우저 컨텍스트에는 그 헬퍼가 없으므로 여기서
   // 항등 함수로 채운다(문자열 스크립트라 트랜스파일 대상이 아니다). 앱 코드는 번들이
@@ -785,115 +813,48 @@ async function installCleanStudioState(page: Page): Promise<void> {
   );
 }
 
-/**
- * Onboarding chrome is restored from the SQLite preference store, so on the mobile layout it
- * mounts a beat after the editor is interactive — after the seeded localStorage flags have
- * already been read — and then swallows every tap. The starter closes through its own Close
- * control; modal wizards (quick comic) close on Escape, exactly as a person would dismiss them.
- * Both leave the editor in its normal state instead of forcing gestures through overlay chrome.
- */
-async function dismissQuickStartOverlay(page: Page, appearTimeoutMs: number): Promise<void> {
-  const modalOverlay = page.locator('[data-studio-quick-comic-overlay="true"]');
-  if (
-    await modalOverlay.first().isVisible().catch(() => false)
-  ) {
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
-  }
-  const backdrop = page.locator('[data-studio-quickstart-backdrop="true"]');
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    // isVisible() resolves immediately, so the starter must be awaited explicitly: it arrives
-    // only after the preference store reconciles, well past the editor becoming interactive.
-    const appeared = await backdrop
-      .first()
-      .waitFor({ state: "visible", timeout: attempt === 0 ? appearTimeoutMs : 600 })
-      .then(() => true)
-      .catch(() => false);
-    if (!appeared) return;
-    await backdrop.first().click({ timeout: 2_000, force: true }).catch(() => undefined);
-    await page.waitForTimeout(200);
-    if (await modalOverlay.first().isVisible().catch(() => false)) {
-      await page.keyboard.press("Escape");
-      await page.waitForTimeout(200);
-    }
-  }
-}
-
-/**
- * Onboarding chrome can mount at any point once the preference store reconciles, so a single
- * dismissal before the gesture is not enough: it may arrive between the dismissal and the tap.
- * Retrying the tap with a dismissal in between keeps the audit measuring the editor rather than
- * racing its overlays, and still fails loudly if the control never becomes reachable.
- */
-async function clickPastTransientOverlays(page: Page, target: Locator): Promise<void> {
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const clicked = await target
-      .click({ timeout: attempt === 3 ? 7_000 : 2_500 })
-      .then(() => true)
-      .catch(() => false);
-    if (clicked) return;
-    await dismissQuickStartOverlay(page, 500);
-  }
-  await target.click({ timeout: 7_000 });
-}
-
-async function acknowledgeStudioBetaNoticeIfPresent(page: Page): Promise<boolean> {
-  const notice = page.locator('[data-studio-beta-notice="true"]');
-  const visible = await notice
-    .waitFor({ state: "visible", timeout: 10_000 })
-    .then(() => true)
-    .catch(() => false);
-  if (!visible) return false;
-
-  const acknowledge = notice.locator(
-    '[data-studio-beta-notice-acknowledge="true"]',
-  );
-  try {
-    await acknowledge.click({ timeout: 30_000, noWaitAfter: true });
-  } catch (error) {
-    const alreadyHidden = await notice
-      .isHidden({ timeout: 1_000 })
-      .catch(() => false);
-    if (!alreadyHidden) throw error;
-  }
-  await notice.waitFor({ state: "hidden", timeout: 30_000 });
-  return true;
-}
-
+/** 초기 진입과 문서 초기화는 이번 문서의 안내를 실제로 닫았는지 확인한다. */
 async function dismissTransientChrome(page: Page, clearAutosave = true): Promise<void> {
-  await acknowledgeStudioBetaNoticeIfPresent(page);
-  const quickstart = page.locator('[data-studio-creative-starter="true"]');
-  if (await quickstart.isVisible({ timeout: 250 }).catch(() => false)) {
-    await quickstart.locator('[data-studio-quickstart-dismiss="true"]').click();
-  }
-  await dismissQuickStartOverlay(page, 250);
-  if (!clearAutosave) return;
+  if (clearAutosave) {
+    await prepareStudioDrawingUi(page, (timeoutMs) => clearRecoveryNoticeIfPresent(page, timeoutMs));
+  } else await waitForStudioDrawingReady(page);
+}
 
+async function clearRecoveryNoticeIfPresent(page: Page, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  const remaining = () => {
+    const timeout = deadline - Date.now();
+    invariant(timeout > 0, "복구 안내 정리 시간 초과: 같은 verify:studio-brushes 명령으로 재검증하세요.");
+    return timeout;
+  };
   const recovery = page.locator("[data-studio-recovery-notice]").first();
-  if (!(await recovery.isVisible({ timeout: 250 }).catch(() => false))) return;
+  if (!(await recovery.isVisible())) return false;
 
   // The automatic-resume variant deliberately has no action buttons. Older survey cleanup read
   // `aria-expanded` from a non-existent "다른 방법" button and let Playwright's default timeout
   // abort the remaining catalogue after the first product failure. Give auto-resume a bounded
   // opportunity to settle, then interact only with controls that actually exist.
-  if (await recovery.getAttribute("data-studio-auto-resume") === "true") {
+  if (await recovery.getAttribute("data-studio-auto-resume", { timeout: remaining() }) === "true") {
     await page.waitForFunction(() => {
       const notice = document.querySelector('[data-studio-recovery-notice]');
       return !notice || notice.getAttribute("data-studio-auto-resume") !== "true";
-    }, undefined, { timeout: 8_000 }).catch(() => undefined);
+    }, undefined, { timeout: Math.min(8_000, remaining()) });
   }
-  if (!(await recovery.isVisible().catch(() => false))) return;
+  if (!(await recovery.isVisible())) return false;
 
   const more = recovery.getByRole("button", { name: "다른 방법", exact: true });
-  if (await more.count() === 0 || !(await more.isVisible().catch(() => false))) return;
-  if (await more.getAttribute("aria-expanded") !== "true") await more.click();
+  if (await more.count() === 0 || !(await more.isVisible())) return false;
+  if (await more.getAttribute("aria-expanded", { timeout: remaining() }) !== "true") {
+    await more.click({ timeout: remaining() });
+  }
   const remove = recovery.getByRole("button", { name: "이전 그림 삭제…", exact: true });
-  if (await remove.count() === 0 || !(await remove.isVisible().catch(() => false))) return;
-  await remove.click();
+  if (await remove.count() === 0 || !(await remove.isVisible())) return false;
+  await remove.click({ timeout: remaining() });
   const confirmation = page.locator('[data-studio-destructive-confirm="studio.autosave.clear"]');
-  await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click();
-  await confirmation.waitFor({ state: "hidden" });
-  await recovery.waitFor({ state: "hidden" });
+  await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click({ timeout: remaining() });
+  await confirmation.waitFor({ state: "hidden", timeout: remaining() });
+  await recovery.waitFor({ state: "hidden", timeout: remaining() });
+  return true;
 }
 
 async function clearStudioVerifierOriginStorage(page: Page, studioUrl: string): Promise<void> {
@@ -932,6 +893,13 @@ async function prepareStudioPage(page: Page, studioUrl: string): Promise<void> {
     ].join("\n"),
   });
   await dismissTransientChrome(page);
+  // 초기 연결 상태 안내가 캔버스를 재배치하기 전에 그리기 좌표를 확정하지 않는다.
+  await page.waitForFunction(() => ["available", "degraded"].includes(
+    document.documentElement.dataset.serviceCapabilityState ?? ""
+  ), undefined, { timeout: 20_000 });
+  if (await page.locator("html").getAttribute("data-service-capability-state") === "degraded") {
+    await page.locator('[data-service-degraded-banner="degraded"]').waitFor({ state: "visible" });
+  }
   const shellState = await page.evaluate(() => ({
     bodyTextLength: document.body.innerText.trim().length,
     hasErrorOverlay: Boolean(
@@ -1901,9 +1869,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
 
     const stage = page.locator(".konvajs-content").first();
     await stage.waitFor({ state: "visible" });
-    const stageBox = await stage.boundingBox();
     const viewport = page.viewportSize();
-    invariant(stageBox && viewport, "could not measure the desktop canvas");
+    invariant(viewport, "could not measure the desktop viewport");
 
     const evidence: BrushStrokeEvidence[] = [];
     for (const [index, preset] of DESKTOP_STABILITY_CASES.entries()) {
@@ -1921,6 +1888,9 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         && isStudioBrushEraserAliasId(expectedSelection.runtimeBrushId);
       await selectDesktopBrush(page, preset, expectedSelection);
       await page.mouse.move(4, 4);
+      // 도구 전환·진단 복구 뒤에는 안내 배너와 작업 영역의 현재 좌표로 다시 측정한다.
+      const stageBox = await stage.boundingBox();
+      invariant(stageBox, `${preset.id}: could not measure the current desktop canvas`);
       const presetDescriptor = studioBrushPackDescriptorById(preset.id);
       const desktopDryMediaClassification = classifyStudioDryMediaCatalogIdV1(preset.id);
       // The continuity audit's own excuse list is consulted FIRST, because it is the product's
@@ -2191,6 +2161,11 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         }
       }
       await page.mouse.up();
+      const releasedStageBox = await stage.boundingBox();
+      invariant(releasedStageBox && (["x", "y", "width", "height"] as const).every((key) =>
+        Math.abs(releasedStageBox[key] - stageBox[key]) < 0.5
+      ), `${preset.id}: the canvas coordinate frame changed during the gesture; `
+        + `before=${JSON.stringify(stageBox)} after=${JSON.stringify(releasedStageBox)}`);
       const immediate = await page.screenshot({ animations: "disabled", clip: usedClip });
       await page.mouse.move(4, 4);
       const immediateDiff = await compareScreenshotPixels(page, before, immediate);
@@ -2568,8 +2543,12 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // visibly accepted. Make the isolation boundary explicit for every operation, not only erasers.
       await waitForPersistedDrawElements(
         page,
-        (draws) => draws.length === 0,
-        `${preset.id}: post-redo cleanup left persisted operations`,
+        (draws) => operation === "erase"
+          ? draws.length === 1 && draws[0]?.mode === "pen"
+            && draws[0]?.id === persistedErase?.draws[0]?.id
+            && isDeepStrictEqual(draws[0], persistedErase?.draws[0])
+          : draws.length === 0,
+        `${preset.id}: post-redo cleanup did not restore the exact operation baseline`,
       );
       if (operation === "erase") {
         invariant(emptyBefore, `${preset.id}: eraser cleanup lost its empty baseline`);
@@ -2615,7 +2594,6 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         surveyFailures.push(message);
         log(`SURVEY FAILURE ${index + 1}/${DESKTOP_STABILITY_CASES.length} ${message}`);
         await clearStudioVerifierOriginStorage(page, studioUrl);
-        await installCleanStudioState(page);
         await prepareStudioPage(page, studioUrl);
         await activateDesktopPen(page);
       }
@@ -3234,37 +3212,8 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
       "globalThis.__name ??= (fn) => fn;"
       + " globalThis.__studioDynamicSealDebugEnabled = true;",
   });
-  // 채널 2 진단: 모든 캔버스 2D 컨텍스트의 setTransform 스케일을 기록해 커밋 렌더가
-  // 실제 어떤 물리 배율에서 래스터되는지 덤프와 함께 확인한다.
-  await context.addInitScript(() => {
-    const w = globalThis as unknown as { __studioCtxScales?: Record<string, number[]> };
-    w.__studioCtxScales = {};
-    let canvasSeq = 0;
-    const original = CanvasRenderingContext2D.prototype.setTransform;
-    CanvasRenderingContext2D.prototype.setTransform = function patched(
-      this: CanvasRenderingContext2D,
-      ...args: unknown[]
-    ) {
-      try {
-        const canvas = this.canvas;
-        if (canvas) {
-          if (!canvas.dataset.__ctxId) {
-            canvas.dataset.__ctxId = `c${canvasSeq++}`;
-          }
-          const id = canvas.dataset.__ctxId;
-          const a = Number(args[0]);
-          const d = Number(args[3]);
-          if (Number.isFinite(a) && Number.isFinite(d) && args.length >= 6) {
-            const scale = Math.hypot(a, d);
-            (w.__studioCtxScales![id] ??= []).push(+scale.toFixed(4));
-          }
-        }
-      } catch {
-        // diagnostics must never break rendering
-      }
-      return original.apply(this, args as never);
-    } as typeof CanvasRenderingContext2D.prototype.setTransform;
-  });
+  // 현재·직전 커밋 배율과 전체 표본 수만 남겨 긴 검증의 진단 메모리를 제한한다.
+  await context.addInitScript(installStudioCanvasScaleDiagnostics);
   const page = await context.newPage();
   if (DEBUG_BRUSH_VERIFIER) {
     page.on("console", (entry) => {
@@ -3413,6 +3362,7 @@ async function runLongBrushMatrix(browser: Browser, studioUrl: string): Promise<
           writeFileSync(join(SCRATCH, `canvas-dump-${preset.id}-live-manifest.json`), JSON.stringify({
             canvases: dump.map(({ url: _url, ...rest }) => rest),
             ctxScales,
+            ctxScaleSampleCounts: await page.evaluate(() => Reflect.get(globalThis, "__studioCtxScaleSampleCounts") ?? {}),
           }, null, 1));
           for (const entry of dump) {
             const base64 = entry.url.split(",")[1] ?? "";
@@ -4104,6 +4054,8 @@ async function enableSmartShape(page: Page): Promise<void> {
   const railToggle = page.locator('button[data-studio-rail-tool-id="smart-shape"]');
   if (await railToggle.isVisible()) {
     if (await railToggle.getAttribute("aria-pressed") !== "true") await railToggle.click();
+    await page.locator('button[data-studio-rail-tool-id="smart-shape"][aria-pressed="true"]')
+      .waitFor({ state: "visible" });
     return;
   }
   const buttons = page.getByRole("button", { name: "스마트 도형", exact: true });
@@ -4112,6 +4064,7 @@ async function enableSmartShape(page: Page): Promise<void> {
     const button = buttons.nth(index);
     if (!await button.isVisible()) continue;
     if (await button.getAttribute("aria-pressed") !== "true") await button.click();
+    invariant(await button.getAttribute("aria-pressed") === "true", "Smart Shape toggle did not activate");
     return;
   }
   throw new Error("visible Smart Shape toggle was not found");
@@ -4173,12 +4126,21 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
     writeFileSync(join(SCRATCH, "studio-smart-shape-correction.json"), JSON.stringify({ before, corrected }, null, 2));
   }
   const handle = await toScreen(corrected.points[0]!, corrected.points[1]!);
+  const controlPointStage = page.locator(".konvajs-content").first();
+  const controlPointFrame = await controlPointStage.boundingBox();
+  invariant(controlPointFrame, "control-point gesture has no stage coordinate frame");
+  invariant(await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest(".konvajs-content")), handle),
+    "control-point gesture is covered by editor chrome");
   await page.mouse.move(handle.x, handle.y);
   await page.keyboard.down("Shift");
   await page.mouse.down();
   await page.mouse.move(handle.x + 24, handle.y + 16, { steps: 8 });
   await page.mouse.up();
   await page.keyboard.up("Shift");
+  const releasedControlPointFrame = await controlPointStage.boundingBox();
+  invariant(releasedControlPointFrame && (["x", "y", "width", "height"] as const).every((key) =>
+    Math.abs(releasedControlPointFrame[key] - controlPointFrame[key]) < 0.5
+  ), `the canvas coordinate frame changed during the control-point gesture: ${JSON.stringify({ before: controlPointFrame, after: releasedControlPointFrame })}`);
   const moved = (await waitForPersistedDrawElements(page, (draws) =>
     draws.at(-1)?.id === corrected.id && JSON.stringify(draws.at(-1)?.points) !== JSON.stringify(corrected.points),
   "canvas control-point drag did not change corrected shape")).at(-1)!;
@@ -4383,7 +4345,8 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
     const left = Math.max(stageBox.x + 65, viewport.width * 0.33);
     const right = Math.min(stageBox.x + stageBox.width - 65, viewport.width * 0.70);
     const top = Math.max(stageBox.y + 65, viewport.height * 0.16);
-    const bottom = Math.min(stageBox.y + stageBox.height - 65, viewport.height * 0.75);
+    // 상단 상태 배너 높이와 무관하게 실제 캔버스와 화면의 교집합에서 같은 65px 여백을 둔다.
+    const bottom = Math.min(stageBox.y + stageBox.height, viewport.height) - 65;
     invariant(right - left >= 480, "visible canvas is too narrow for Smart Shape fixtures");
     invariant(bottom - top >= 520, "visible canvas is too short for Smart Shape fixtures");
 
@@ -4458,7 +4421,17 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
     ];
 
     const evidence: SmartShapeEvidence[] = [];
+    const fixtureStageFrames: NonNullable<Awaited<ReturnType<Locator["boundingBox"]>>>[] = [];
     for (const fixture of fixtures) {
+      const blockedPoints = await page.evaluate((points) => points.flatMap(({ x, y }) => {
+        const target = document.elementFromPoint(x, y);
+        return target?.closest(".konvajs-content") ? [] : [{
+          x, y, tag: target?.tagName ?? null,
+          className: target?.getAttribute("class") ?? null,
+        }];
+      }), fixture.path);
+      invariant(blockedPoints.length === 0,
+        `${fixture.expectedKind}: ${blockedPoints.length} gesture points miss visible canvas: ${JSON.stringify(blockedPoints.slice(0, 8))}`);
       const clip = {
         x: Math.max(0, Math.floor(fixture.box.left - 20)),
         y: Math.max(0, Math.floor(fixture.box.top - 20)),
@@ -4466,8 +4439,15 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
         height: Math.ceil(fixture.box.bottom - fixture.box.top + 40),
       };
       const before = await captureStableEvidence(page, clip);
+      const gestureFrame = await stage.boundingBox();
+      invariant(gestureFrame, `${fixture.expectedKind}: Smart Shape has no stage coordinate frame`);
+      fixtureStageFrames.push(gestureFrame);
       if (fixture.penJitterHold) await drawPenPathWithJitterHold(page, fixture.path);
       else await drawMousePath(page, fixture.path);
+      const releasedFrame = await stage.boundingBox();
+      invariant(releasedFrame && (["x", "y", "width", "height"] as const).every((key) =>
+        Math.abs(releasedFrame[key] - gestureFrame[key]) < 0.5
+      ), `${fixture.expectedKind}: the canvas coordinate frame changed during the gesture: ${JSON.stringify({ before: gestureFrame, after: releasedFrame })}`);
       await page.waitForTimeout(300);
       const after = await page.screenshot({ animations: "disabled", clip });
       const coverage = await compareScreenshotCoverage(page, before, after, 1);
@@ -4526,6 +4506,7 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
     const xs = calibration.filter((_, index) => index % 2 === 0);
     const ys = calibration.filter((_, index) => index % 2 === 1);
     const box = fixtures[1]!.box;
+    const calibrationFrame = fixtureStageFrames[1]!;
     const docLeft = Math.min(...xs), docTop = Math.min(...ys);
     const scaleX = (box.right - box.left) / (Math.max(...xs) - docLeft);
     const scaleY = (box.bottom - box.top) / (Math.max(...ys) - docTop);
@@ -4535,8 +4516,8 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
       // Node-edit chrome can move or resize the stage after the pen fixture calibrated it.
       // Reproject its normalized stage position before hit testing the actual first endpoint.
       return {
-        x: liveStageBox.x + (box.left + (x - docLeft) * scaleX - stageBox.x) * liveStageBox.width / stageBox.width,
-        y: liveStageBox.y + (box.top + (y - docTop) * scaleY - stageBox.y) * liveStageBox.height / stageBox.height,
+        x: liveStageBox.x + (box.left + (x - docLeft) * scaleX - calibrationFrame.x) * liveStageBox.width / calibrationFrame.width,
+        y: liveStageBox.y + (box.top + (y - docTop) * scaleY - calibrationFrame.y) * liveStageBox.height / calibrationFrame.height,
       };
     });
     await page.screenshot({ path: screenshot, animations: "disabled" });
@@ -4559,6 +4540,20 @@ async function runSmartShapeMatrix(browser: Browser, studioUrl: string): Promise
   }
 }
 
+async function openMobileBrushSettings(page: Page, dock: Locator): Promise<void> {
+  const toggle = dock.locator('[data-studio-mobile-workspace-toggle="true"]');
+  if (await toggle.getAttribute("aria-expanded") !== "true") {
+    await clickStudioControlAfterReadiness(page, toggle);
+  }
+  const tools = dock.locator('[data-studio-mobile-workspace-menu="true"]');
+  await tools.waitFor({ state: "visible" });
+  await clickStudioControlAfterReadiness(
+    page,
+    tools.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])'),
+  );
+  await tools.waitFor({ state: "hidden" });
+}
+
 async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise<MobileTouchResult> {
   const context = await browser.newContext({
     hasTouch: true,
@@ -4573,14 +4568,10 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await prepareStudioPage(page, studioUrl);
     const dock = page.locator('nav[data-studio-mobile-editing-dock="true"]');
     await dock.waitFor({ state: "visible", timeout: 10_000 });
-    await dismissQuickStartOverlay(page, 4_000);
-    await clickPastTransientOverlays(
-      page,
-      dock.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])'),
-    );
+    await openMobileBrushSettings(page, dock);
     const drawSheet = page.locator('[data-studio-sheet-id="draw"][data-studio-mobile-sheet="draw"]');
     await drawSheet.waitFor({ state: "visible" });
-    await clickPastTransientOverlays(
+    await clickStudioControlAfterReadiness(
       page,
       drawSheet.locator('[data-studio-open-brush-library="true"]'),
     );
@@ -4632,7 +4623,7 @@ async function runMobileTouchAudit(browser: Browser, studioUrl: string): Promise
     await eraserButton.click();
     await dock.locator('[data-studio-mobile-tool="eraser"][aria-pressed="true"]')
       .waitFor({ state: "visible" });
-    await dock.locator('button[aria-controls="studio-mobile-draw-settings"]:not([data-studio-primary-action])').click();
+    await openMobileBrushSettings(page, dock);
     await drawSheet.waitFor({ state: "visible" });
     const eraserQuickPicker = drawSheet.locator('[data-studio-eraser-quick-picker="true"]');
     await eraserQuickPicker.waitFor({ state: "visible" });
@@ -5232,7 +5223,10 @@ async function main(): Promise<void> {
   const studioUrl = `${origin}studio/canvas`;
   const server: ChildProcess | null = port === null
     ? null
-    : spawnVitePreview({ port, runner: "node-vite-bin", logPath: LOG_PATH });
+    : spawnVitePreview({
+      port, runner: "node-vite-bin", logPath: LOG_PATH,
+      outDir: process.env.TOONSPECTRUM_VERIFY_DIST?.trim() || undefined,
+    });
 
   let browser: Browser | null = null;
   try {

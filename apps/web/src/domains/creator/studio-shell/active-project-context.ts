@@ -32,27 +32,28 @@ export function activeProjectIdFromLocation(pathname: string, search = ""): stri
   return null;
 }
 
-export function readActiveProjectContext(storage: Pick<Storage, "getItem"> | null): string | null {
-  if (!storage) return null;
+// 원고의 저장 권위가 아닌 탭 내 이동 문맥이다. 호출자는 window.sessionStorage만 전달한다.
+export function readActiveProjectContext(sessionStorage: Pick<Storage, "getItem"> | null): string | null {
+  if (!sessionStorage) return null;
   try {
-    return decodedSegment(storage.getItem(ACTIVE_PROJECT_CONTEXT_KEY) ?? undefined);
+    return decodedSegment(sessionStorage.getItem(ACTIVE_PROJECT_CONTEXT_KEY) ?? undefined);
   } catch {
     return null;
   }
 }
 
 export function writeActiveProjectContext(
-  storage: Pick<Storage, "setItem" | "removeItem"> | null,
+  sessionStorage: Pick<Storage, "setItem" | "removeItem"> | null,
   projectId: string | null,
 ): void {
-  if (!storage) return;
+  if (!sessionStorage) return;
   try {
     if (!projectId) {
-      storage.removeItem(ACTIVE_PROJECT_CONTEXT_KEY);
+      sessionStorage.removeItem(ACTIVE_PROJECT_CONTEXT_KEY);
       return;
     }
     const normalized = decodedSegment(projectId);
-    if (normalized) storage.setItem(ACTIVE_PROJECT_CONTEXT_KEY, normalized);
+    if (normalized) sessionStorage.setItem(ACTIVE_PROJECT_CONTEXT_KEY, normalized);
   } catch {
     // Private and embedded contexts may deny session storage.
   }

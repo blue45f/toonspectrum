@@ -20,6 +20,7 @@ apps/api/src/modules/production-collaboration/production-collaboration.service.t
 apps/api/src/modules/production-collaboration/production-integration-providers.test.ts
 apps/api/src/modules/production-collaboration/production-notification-safety.test.ts
 apps/api/src/modules/production-collaboration/production-webhook-network.test.ts
+apps/api/src/modules/production-collaboration/production-workflow-command.test.ts
 apps/api/src/modules/studio-ai/studio-3d-generation-provider-identity-store.test.ts
 apps/api/src/modules/studio-project-graph
 apps/api/src/modules/studio-project-graph/studio-project-graph.module.di.test.ts
@@ -189,6 +190,7 @@ apps/web/src/domains/creator/live/studio-live-socket-transport.test.ts
 apps/web/src/domains/creator/live/studio-pending-stroke-admission.test.ts
 apps/web/src/domains/creator/live/studio-rejected-stroke-recovery-persistence.test.ts
 apps/web/src/domains/creator/offline
+apps/web/src/domains/creator/production-hub
 apps/web/src/domains/creator/production-hub/ProductionNotificationPolicyEditor.test.tsx
 apps/web/src/domains/creator/production-hub/ProductionOperationsControlWorkspace.test.tsx
 apps/web/src/domains/creator/production-hub/ProductionStudioRevisionBridgePanel.test.tsx
@@ -329,6 +331,7 @@ apps/web/src/shared/lib/creator-role-workspace-contract.test.ts
 apps/web/tests/vite-react-compiler-runtime-interop.test.ts
 apps/web/tools/browser-harnesses/studio-p2p-direct-diagnostics.test.ts
 deploy/cloudflare-analytics/src/index.test.ts
+packages/contracts/src/production-workflow.test.ts
 packages/core/src/catalog/home.cpu-cache.test.ts
 packages/core/src/fortune/fortune-engine.security.test.ts
 packages/core/src/fortune/fortune-observatory.test.ts

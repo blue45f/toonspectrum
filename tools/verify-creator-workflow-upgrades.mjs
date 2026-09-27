@@ -29,12 +29,14 @@ await check('Partial search never discards unknown words', () => { assert.equal(
 await check('Malformed and over-budget queries remain invalid', () => { for (const input of ['', 'a', 'ㅁ', '갑옷\n', '갑옷\0', 'x'.repeat(81)]) assert.equal(r(input).status, 'invalid'); });
 await check('Expanded queries stay within the provider budget', () => { const result = r('중세 '.repeat(26).trim()); assert.equal(result.status, 'unsupported'); assert.ok(result.providerQuery.length <= 80); });
 await check('Other providers and filters retain authority', () => { const input = { provider: 'met', q: '숲', page: '3', field: 'tags' }; const out = language.localizeReferenceProviderQuery(input); assert.equal(out.q, 'forest'); assert.equal(out.page, '3'); assert.equal(out.field, 'tags'); assert.equal(input.q, '숲'); const kakao = { provider: 'kakao', q: '숲' }; assert.equal(language.localizeReferenceProviderQuery(kakao), kakao); });
-const assets = load('apps/web/src/shared/lib/reference-assets.ts', { '../../../../../packages/core/src/reference-query-language': language });
+const referenceAssets = load('packages/contracts/src/reference-assets.ts', { '../../core/src/reference-query-language': language });
+const assets = load('apps/web/src/shared/lib/reference-assets.ts', { '@toonstudio/contracts/reference-assets': referenceAssets });
 await check('Single-character terms pass the actual results-page validator', () => { assert.equal(assets.referenceSearchValidation({ ...assets.defaultReferenceSearchState(), query: '숲' }), ''); assert.notEqual(assets.referenceSearchValidation({ ...assets.defaultReferenceSearchState(), query: 'a' }), ''); });
 await check('Date validation is not weakened by bilingual search', () => { assert.notEqual(assets.referenceSearchValidation({ ...assets.defaultReferenceSearchState(), query: '숲', dateBegin: '2000', dateEnd: '1900' }), ''); });
 await check('URL and API queries keep the Korean original', () => { const search = { ...assets.defaultReferenceSearchState(), query: '손' }; assert.equal(assets.buildReferenceApiParams(search).get('q'), '손'); assert.equal(assets.parseReferenceUrlParams(assets.buildReferenceUrlParams(search, assets.defaultReferenceViewState())).search.query, '손'); });
 await check('Korean filtering also works on locally saved English metadata', () => { const items = [{ id: '1', title: 'A study of a hand', asset: { tags: [] } }, { id: '2', title: 'Castle', asset: { tags: [] } }]; const result = assets.filterAndSortReferenceItems(items, { ...assets.defaultReferenceViewState(), mode: 'saved', within: '손' }, new Set(['1','2'])); assert.equal(result.length, 1); assert.equal(result[0].id, '1'); assert.equal(assets.filterAndSortReferenceItems(items, { ...assets.defaultReferenceViewState(), within: '손 우주해적선' }, new Set()).length, 0); });
-const promo = load('apps/web/src/domains/creator/promo/promo-model.ts');
+const promoVoice = load('apps/web/src/domains/creator/promo/promo-voice-studio-model.ts');
+const promo = load('apps/web/src/domains/creator/promo/promo-model.ts', { './promo-voice-studio-model': promoVoice });
 const panel = (id, caption = '') => ({ id, src: 'data:image/png;base64,AAAA', description: '설명', caption, motion: 'push-in', fit: 'contain', weight: 1 });
 for (const motion of promo.PROMO_MOTIONS) {
   await check(`Motion trajectory stays finite and crop-safe: ${motion}`, () => {

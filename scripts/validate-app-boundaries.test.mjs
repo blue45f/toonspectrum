@@ -3,8 +3,9 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
-import test from "node:test";
 import { fileURLToPath } from "node:url";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const validator = path.join(repositoryRoot, "scripts/validate-app-boundaries.mjs");

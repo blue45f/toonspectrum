@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ស្រទាប់ {count}",
   "studio.toolsCompanion.review.section.comments": "មតិ {count}",
   "studio.toolsCompanion.review.section.history": "កត់ត្រា {count}",
-  "studio.toolsCompanion.review.subtitle": "ទំព័រ{ស្លាក}· ការជ្រើសរើស{ស្លាក ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "កុងសូលត្រួតពិនិត្យ",
   "studio.toolsCompanion.review.truncatedComments": "និង {count} មតិ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ស្រទាប់",

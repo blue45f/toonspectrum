@@ -94,3 +94,25 @@ describe.each([false, true])("ServiceDegradedBanner immersive=%s", (immersive) =
     expect(screen.queryByRole("button", { name: "다시 확인" })).toBeNull();
   });
 });
+
+it("몰입 화면의 상단 도구를 덮지 않고 장애 상세를 펼치거나 접을 수 있다", () => {
+  render(<MemoryRouter><ServiceDegradedBanner immersive /></MemoryRouter>);
+  const status = screen.getByRole("status");
+  expect(status.className).toContain("bottom-[calc(5.5rem+env(safe-area-inset-bottom))]");
+  expect(status.className).not.toContain("top-");
+  expect(status.className).toContain("max-sm:bg-panel");
+  expect(status.querySelector("div")?.className).toContain("max-sm:grid-cols-[auto_minmax(0,1fr)]");
+  const detail = screen.getByText(/로컬 편집은 계속 사용할 수 있습니다/);
+  expect(detail.hidden).toBe(true);
+  const expand = screen.getByRole("button", { name: "서비스 상태 알림 펼치기" });
+  expect(expand.getAttribute("aria-expanded")).toBe("false");
+  fireEvent.click(expand);
+  expect(detail.hidden).toBe(false);
+  const collapse = screen.getByRole("button", { name: "서비스 상태 알림 접기" });
+  expect(collapse.getAttribute("aria-expanded")).toBe("true");
+  fireEvent.click(collapse);
+  expect(detail.hidden).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "다시 확인" }));
+  expect(mocks.refresh).toHaveBeenCalledOnce();
+  expect(screen.getByRole("link", { name: "상태 자세히" }).getAttribute("href")).toBe("/status");
+});

@@ -17,10 +17,16 @@ describe("header width budget", () => {
 
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);
-    expect(primaryNavigation).toContain("min-[1180px]:flex");
-    expect(primaryNavigation).toContain(
-      "rounded-xl px-3 py-2 text-[0.82rem] font-semibold",
-    );
+    const css = read("apps/web/src/shared/components/public-site-shell.css");
+    expect(primaryNavigation).toContain('className="site-header__primary"');
+    expect(primaryNavigation).toContain('className="site-header__primary-link group"');
+    expect(css).toMatch(/\.site-header__primary\s*\{[^}]*display:\s*none/u);
+    expect(css).toMatch(/@media\s*\(width\s*>=\s*1180px\)\s*\{\s*\.site-header__primary\s*\{\s*display:\s*flex/u);
+    const linkRule = css.match(/\.site-header__primary-link\s*\{([^}]*)\}/u)?.[1] ?? "";
+    expect(linkRule).toContain("min-height: 44px");
+    expect(linkRule).toContain("flex-shrink: 0");
+    expect(linkRule).toContain("white-space: nowrap");
+    expect(linkRule).toContain("padding: 8px 11px");
     expect(primaryNavigation).not.toContain("xl:grid");
     expect(primaryNavigation).toContain("<Icon");
     expect(primaryNavigation).toContain("size={15}");

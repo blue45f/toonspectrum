@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Shtresa {count}",
   "studio.toolsCompanion.review.section.comments": "Koment {count}",
   "studio.toolsCompanion.review.section.history": "Regjistro {count}",
-  "studio.toolsCompanion.review.subtitle": "Faqja ZZLBRACEEtiketa}·{Zgjedhja Etiketa ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "tastierë inspektimi",
   "studio.toolsCompanion.review.truncatedComments": "dhe {count} komente",
   "studio.toolsCompanion.review.truncatedLayers": "{count} shtresa",

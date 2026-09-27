@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Lớp {count}",
   "studio.toolsCompanion.review.section.comments": "Bình luận {count}",
   "studio.toolsCompanion.review.section.history": "Ghi {count}",
-  "studio.toolsCompanion.review.subtitle": "Trang ZZLBRACENhãn}· Lựa chọn ZZLBRACENhãn ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "bảng điều khiển kiểm tra",
   "studio.toolsCompanion.review.truncatedComments": "và {count} bình luận",
   "studio.toolsCompanion.review.truncatedLayers": "{count} lớp",

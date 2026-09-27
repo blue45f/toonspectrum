@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ਪਰਤ {count}",
   "studio.toolsCompanion.review.section.comments": "ਟਿੱਪਣੀ {count}",
   "studio.toolsCompanion.review.section.history": "ਰਿਕਾਰਡ {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE ਪੇਜਲੇਬਲ}·{ਚੋਣਲੇਬਲ ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "ਨਿਰੀਖਣ ਕੰਸੋਲ",
   "studio.toolsCompanion.review.truncatedComments": "ਅਤੇ {count} ਟਿੱਪਣੀਆਂ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ਪਰਤਾਂ",

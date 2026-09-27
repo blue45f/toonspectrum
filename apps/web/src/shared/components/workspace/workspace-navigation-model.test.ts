@@ -10,6 +10,11 @@ describe("studio-first navigation contract", () => {
     ["/production/projects/a", "studio"], ["/collaborate/new", "community"],
     ["/team?project=a", "community"], ["/market/resources", "explore"],
     ["/ranking", "explore"], ["/settings", "all-menu"],
+    ["/make?from=home", "studio"], ["/shaper", "studio"], ["/music", "studio"],
+    ["/brush-lab", "studio"], ["/publishing", "studio"], ["/creator-hub", "studio"],
+    ["/create", "community"], ["/create/work/a", "community"], ["/challenges", "community"],
+    ["/pencafe/artist", "community"], ["/references", "explore"], ["/compare", "explore"],
+    ["/story-lab", "studio"], ["/my", "all-menu"], ["/notifications", "all-menu"],
   ])("keeps %s in the right global destination", (path, id) => {
     expect(workspaceNavigationActiveId(path!)).toBe(id);
   });

@@ -21,7 +21,7 @@ describe("creator home spacing and app install prompt contracts", () => {
     expect(homeExperience.indexOf('className="cf-hero cf-shell"')).toBeLessThan(
       homeExperience.indexOf('className="cf-shell cf-home-wayfinding"'),
     );
-    expect(homeExperience).toContain("<ProductIntentStart />");
+    expect(homeExperience).toContain('<ProductIntentStart headingId="creator-toolkit-title" />');
     expect(homeExperience).toContain('<CreatorSectionLink sectionId="creator-principles">');
   });
 

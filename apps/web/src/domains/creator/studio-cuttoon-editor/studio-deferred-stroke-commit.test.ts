@@ -266,3 +266,33 @@ describe("deferred stroke collaboration echo history", () => {
     expect(editor.state.recordStudioHistoryJournalPages).toHaveBeenCalledWith(1, 2);
   });
 });
+
+
+describe("오프라인 변경을 유지하는 원자적 페이지 커밋", () => {
+  it("오래된 정본 높이가 대기 중인 캔버스 규격과 연속 히스토리를 덮어쓰지 않는다", () => {
+    const editor = createEditor({ id: "A", elements: [], bg: "#ffffff", bgGrad: null, canvasH: 1080 });
+    let pendingHeight = 1080;
+    const projectPages = vi.fn((canonical: PageState[]) => canonical.map((page) => ({ ...page, canvasH: pendingHeight })));
+    const runtime = {
+      reconcilePages: vi.fn((local: PageState[]) => ({ pages: local.map((page) => ({ ...page, canvasH: 1080 })) })),
+      offlineBranch: { status: { pendingOperations: 1 }, projectPages },
+    };
+    Object.assign(editor.state, {
+      studioCrdtDocumentRef: { current: {
+        getStrokes: () => [], getSceneElements: () => [], getPages: () => [], getLayerGroups: () => [],
+      } },
+      studioCrdtSceneRuntimeRef: { current: runtime },
+      publishStudioCrdtSceneTransition: vi.fn((_before: PageState[], next: PageState[]) => {
+        pendingHeight = next[0].canvasH;
+        return true;
+      }),
+    });
+    const engine = editor.engine();
+    expect(engine.commit([], { canvasH: 8348 })).toBe(true);
+    expect(engine.commit([], { canvasH: 8000 })).toBe(true);
+    expect(editor.state.pagesHistoryRef.current.map((pages) => pages[0].canvasH)).toEqual([1080, 8348, 8000]);
+    expect(editor.state.pagesHiRef.current).toBe(2);
+    expect(projectPages).toHaveBeenCalledTimes(2);
+    expect(editor.state.setError).not.toHaveBeenCalled();
+  });
+});

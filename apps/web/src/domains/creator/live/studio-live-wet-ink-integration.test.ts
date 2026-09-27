@@ -110,7 +110,7 @@ describe("live wet-ink product boundary", () => {
     );
     const discard = finish.indexOf("discardDrawingPointerSession();", sealGuard);
     const deferredCommit = finish.indexOf("queueDeferredStrokeCommit(finished)", seal);
-    const immediateCommit = finish.indexOf("commit([...baseElements, finished])", seal);
+    const immediateCommit = finish.indexOf("commit(committedElements, undefined, activePage.id)", seal);
 
     expect(seal).toBeGreaterThan(0);
     expect(sealGuard).toBeGreaterThan(seal);

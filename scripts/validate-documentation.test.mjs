@@ -4,7 +4,8 @@ import { devNull, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import test from "node:test";
+
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
 const VALIDATOR = fileURLToPath(new URL("./validate-documentation.mjs", import.meta.url));
 
@@ -49,7 +50,7 @@ function git(root, args, environment = process.env) {
 
 function fixture(t, { config = baseConfig(), files = {}, environment = process.env } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), "toonstudio-documentation-"));
-  t.after(() => rmSync(root, { force: true, recursive: true }));
+  (t.onTestFinished ?? t.after.bind(t))(() => rmSync(root, { force: true, recursive: true }));
   git(root, ["init", "--quiet"], environment);
   write(root, "config/documentation-authority.json", `${JSON.stringify(config, null, 2)}\n`);
   for (const [relativePath, contents] of Object.entries(files)) write(root, relativePath, contents);

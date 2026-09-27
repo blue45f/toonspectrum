@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "{count} geruza",
   "studio.toolsCompanion.review.section.comments": "Iruzkina {count}",
   "studio.toolsCompanion.review.section.history": "Grabatu {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE orriaLabel}·{hautaketaLabel ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "ikuskapen kontsola",
   "studio.toolsCompanion.review.truncatedComments": "eta {count} iruzkinak",
   "studio.toolsCompanion.review.truncatedLayers": "{count} geruzak",

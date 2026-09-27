@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Warstwa {count}",
   "studio.toolsCompanion.review.section.comments": "Komentarz {count}",
   "studio.toolsCompanion.review.section.history": "Nagraj {count}",
-  "studio.toolsCompanion.review.subtitle": "Strona{Etykieta}· Wybór{Etykieta ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "konsola inspekcyjna",
   "studio.toolsCompanion.review.truncatedComments": "i {count} komentarze",
   "studio.toolsCompanion.review.truncatedLayers": "{count} warstwy",
