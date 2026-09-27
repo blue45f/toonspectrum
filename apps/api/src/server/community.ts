@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 
-import { validateAttachmentImages } from "../../../web/src/shared/lib/image-attach";
+import { validateAttachmentImages } from "@toonstudio/contracts/image-attach";
 import { escapeLikePattern } from "./sql-like";
 import {
   communityCafeMembers,

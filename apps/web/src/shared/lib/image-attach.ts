@@ -2,43 +2,21 @@
 // 저장 형식은 creator_asset.dataUrl과 동일한 "축소된 webp/jpeg 데이터 URL"(별도 스토리지 없음).
 // 클라이언트가 긴 변 1600px 이하로 줄이고, 서버는 데이터 URL의 실제 바이트(≤2MB)와 형식만 다시 검증한다.
 
-export const ATTACHMENT_MAX_COUNT = 3; // 게시글당 최대 첨부 수
-export const ATTACHMENT_MAX_DIMENSION = 1600; // px — 긴 변 기준
-export const ATTACHMENT_MAX_BYTES = 2 * 1024 * 1024; // 2MB — 디코딩된 이미지 바이트 캡
+export {
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_MAX_COUNT,
+  ATTACHMENT_MAX_DIMENSION,
+  dataUrlBytes,
+  isAllowedImageDataUrl,
+  validateAttachmentImages,
+} from "@toonstudio/contracts/image-attach";
 
-const DATA_URL_RE = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/]+=*$/;
-
-// 데이터 URL의 base64 본문이 디코딩되면 몇 바이트인지 계산(업로드 없이 용량 캡 검증).
-export function dataUrlBytes(dataUrl: string): number {
-  const comma = dataUrl.indexOf(",");
-  const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
-  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
-  return Math.max(0, Math.floor((base64.length / 4) * 3 - padding));
-}
-
-export function isAllowedImageDataUrl(value: unknown): value is string {
-  return typeof value === "string" && DATA_URL_RE.test(value);
-}
-
-// 첨부 목록 검증 — 형식·개수·개별 용량을 확인하고 정규화된 배열 또는 오류 메시지를 돌려준다.
-export function validateAttachmentImages(value: unknown): { images?: string[]; error?: string } {
-  if (value === undefined || value === null) return { images: [] };
-  if (!Array.isArray(value)) return { error: "첨부 형식이 올바르지 않아요." };
-  if (value.length > ATTACHMENT_MAX_COUNT) {
-    return { error: `이미지는 최대 ${ATTACHMENT_MAX_COUNT}장까지 첨부할 수 있어요.` };
-  }
-  const images: string[] = [];
-  for (const item of value) {
-    if (!isAllowedImageDataUrl(item)) {
-      return { error: "이미지는 webp/jpeg/png 데이터 URL만 첨부할 수 있어요." };
-    }
-    if (dataUrlBytes(item) > ATTACHMENT_MAX_BYTES) {
-      return { error: "이미지 한 장은 2MB 이하여야 해요." };
-    }
-    images.push(item);
-  }
-  return { images };
-}
+import {
+  ATTACHMENT_MAX_BYTES,
+  ATTACHMENT_MAX_COUNT,
+  ATTACHMENT_MAX_DIMENSION,
+  dataUrlBytes,
+} from "@toonstudio/contracts/image-attach";
 
 // ── 클라이언트 전용(브라우저 DOM) ──────────────────────────────────────────────
 

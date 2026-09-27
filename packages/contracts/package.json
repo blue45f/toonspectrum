@@ -296,6 +296,11 @@
       "types": "./src/creator-marketplace-gpt25-starter.generated.ts",
       "import": "./src/creator-marketplace-gpt25-starter.generated.ts",
       "default": "./src/creator-marketplace-gpt25-starter.generated.ts"
+    },
+    "./image-attach": {
+      "types": "./src/image-attach.ts",
+      "import": "./src/image-attach.ts",
+      "default": "./src/image-attach.ts"
     }
   }
 }
