@@ -166,7 +166,7 @@ async function openAuthoringTools(root: Locator, page: Page, info: TestInfo): Pr
 async function downloadAuthoringDocument(page: Page, panel: Locator, info: TestInfo, name: string) {
   await activate(panel.getByRole("tab", { name: "웹 코어", exact: true }), info);
   const pending = page.waitForEvent("download");
-  await activate(panel.getByRole("button", { name: "V3 JSON", exact: true }), info);
+  await activate(panel.getByRole("button", { name: "V3 내보내기", exact: true }), info);
   const download = await pending;
   const path = info.outputPath(name);
   await download.saveAs(path);
