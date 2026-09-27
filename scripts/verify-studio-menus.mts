@@ -24,6 +24,7 @@ import {
   studioMainMenuPresentedTitleFor,
 } from "../apps/web/src/domains/creator/studio-main-menu-presentation";
 
+import { studioOwnedPreviewSessionEndpoint } from "./lib/studio-collaboration-preview-session";
 import { findFreePort, spawnVitePreview, waitForServer } from "./lib/studio-verify-preview-harness.mjs";
 
 import type { StudioRailToolId } from "../apps/web/src/domains/creator/studio-app-settings";
@@ -189,7 +190,7 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
     ],
   },
   { id: "animation", caption: "애니메이션", items: ["프레임 애니메이션…"] },
-  { id: "3d", caption: "3D", items: ["3D 데생 인형", "3D 캐릭터", "3D 배경"] },
+  { id: "3d", caption: "3D", items: ["기본 데생 인형", "인물·포즈 편집", "장면 도우미"] },
   { id: "collaboration", caption: "협업", items: ["팀 · 공유 권한…", "페이지 검토 · 승인…"] },
   {
     id: "window",
@@ -1058,7 +1059,29 @@ async function assertMenuDrivenPopovers(page: Page): Promise<string[]> {
   return failures;
 }
 
-async function assertCurrentCanvasPlatformResize(page: Page): Promise<string[]> {
+export const CANVAS_RESIZE_AUTHORITY_MESSAGE = "페이지 배경·크기 변경은 온라인 정본 연결이 필요합니다.";
+
+export function classifyStudioCanvasResizeResult(input: {
+  readonly expectedHeight: string;
+  readonly previousHeight: string;
+  readonly actualHeight: string | null;
+  readonly authorityAlertVisible: boolean;
+  readonly currentOrigin: string;
+  readonly ownedPreviewOrigin?: string;
+}): "applied" | "denied" | "failed" {
+  if (input.actualHeight === input.expectedHeight && !input.authorityAlertVisible) return "applied";
+  if (
+    input.ownedPreviewOrigin && input.currentOrigin === input.ownedPreviewOrigin
+    && studioOwnedPreviewSessionEndpoint(input.ownedPreviewOrigin)
+    && input.authorityAlertVisible && input.actualHeight === input.previousHeight
+  ) return "denied";
+  return "failed";
+}
+
+export async function assertCurrentCanvasPlatformResize(
+  page: Page,
+  options: { readonly ownedPreviewOrigin?: string } = {},
+): Promise<string[]> {
   const failures: string[] = [];
   const canvasMenuTitle = presentedTitleFor("canvas");
   const windowMenuTitle = presentedTitleFor("window");
@@ -1070,15 +1093,39 @@ async function assertCurrentCanvasPlatformResize(page: Page): Promise<string[]> 
       .then(() => true)
       .catch(() => false);
 
-  const applyPreset = async (itemId: string, expectedHeight: number): Promise<boolean> => {
+  const heightIndicator = page.locator('span[aria-label^="높이 "][aria-label$="px"]').first();
+  const authorityAlert = page.getByRole("alert").filter({ hasText: CANVAS_RESIZE_AUTHORITY_MESSAGE });
+  const applyPreset = async (itemId: string, expectedHeight: number) => {
+    const previousHeight = await heightIndicator.getAttribute("aria-label");
+    if (!previousHeight) throw new Error("플랫폼 규격 적용 전 캔버스 높이가 없음");
+    // 두 명령은 각각 새 거절 안내를 내야 한다. 이전 명령의 alert를 재사용하지 않는다.
+    if (await authorityAlert.isVisible()) {
+      await authorityAlert.locator("[data-studio-status-error-dismiss]").click();
+      await authorityAlert.waitFor({ state: "hidden" });
+    }
     await openMainMenuGroup(page, canvasMenuTitle);
     const menu = page.locator(`[role="menu"][aria-label="${canvasMenuTitle}"]`);
     await menu.locator(`[data-studio-menu-item-id="${itemId}"]`).click({ timeout: 4_000 });
-    return waitForHeight(expectedHeight);
+    await page.waitForFunction(({ expected, message }) =>
+      Boolean(document.querySelector(`span[aria-label="높이 ${expected}px"]`))
+      || [...document.querySelectorAll('[role="alert"]')].some((alert) => alert.textContent?.includes(message)),
+    { expected: expectedHeight, message: CANVAS_RESIZE_AUTHORITY_MESSAGE }, { timeout: 5_000 }).catch(() => undefined);
+    const outcome = classifyStudioCanvasResizeResult({
+      expectedHeight: `높이 ${expectedHeight}px`, previousHeight,
+      actualHeight: await heightIndicator.getAttribute("aria-label"),
+      authorityAlertVisible: await authorityAlert.isVisible(),
+      currentOrigin: new URL(page.url()).origin,
+      ownedPreviewOrigin: options.ownedPreviewOrigin,
+    });
+    if (outcome === "failed") {
+      log(`  ${itemId}: expected height ${expectedHeight}, observed ${await page.locator('span[aria-label^="높이 "]').evaluateAll((elements) => elements.map((element) => element.getAttribute("aria-label")))}`);
+    }
+    return outcome;
   };
 
   try {
     await closeFloatingUi(page);
+    await dismissCinematicCanvasWelcome(page);
     await openMainMenuGroup(page, windowMenuTitle);
     await page
       .locator(`[role="menu"][aria-label="${windowMenuTitle}"]`)
@@ -1094,13 +1141,25 @@ async function assertCurrentCanvasPlatformResize(page: Page): Promise<string[]> 
     await page.locator("span[aria-label^=\"높이 \"][aria-label$=\"px\"]").first().waitFor({ state: "visible", timeout: 5_000 });
 
     const drawingUrl = page.url();
-    if (!(await applyPreset("apply-webtoon-naver", 8_348))) {
+    const naverResult = await applyPreset("apply-webtoon-naver", 8_348);
+    if (naverResult === "denied") {
+      const deniedHeight = await heightIndicator.getAttribute("aria-label");
+      if (await applyPreset("apply-webtoon-kakao", 8_000) !== "denied") {
+        failures.push("정본 권한 없는 카카오 규격 변경이 별도 거절 안내와 높이 보존을 충족하지 못함");
+      }
+      if (await heightIndicator.getAttribute("aria-label") !== deniedHeight || page.url() !== drawingUrl) {
+        failures.push("정본 권한 없는 플랫폼 규격 변경이 현재 원고·높이를 바꿈");
+      }
+      if (failures.length === 0) log("  owned static mesh preview: Naver + Kakao each report canonical-authority denial; canvas unchanged (canonical resize/undo covered by mandatory native integration tests)");
+      return failures;
+    }
+    if (naverResult !== "applied") {
       failures.push("현재 드로잉에 네이버 690 × 8000 비율을 적용하지 못함");
     }
     if (page.url() !== drawingUrl) {
       failures.push("플랫폼 규격 적용이 현재 드로잉을 유지하지 않고 다른 화면으로 이동함");
     }
-    if (!(await applyPreset("apply-webtoon-kakao", 8_000))) {
+    if (await applyPreset("apply-webtoon-kakao", 8_000) !== "applied") {
       failures.push("현재 드로잉에 카카오 720 × 8000 비율을 적용하지 못함");
     }
 
@@ -1335,6 +1394,7 @@ async function main() {
     child = spawnVitePreview({
       port,
       runner: "node-vite-bin",
+      outDir: process.env.TOONSPECTRUM_VERIFY_DIST?.trim() || undefined,
     });
     child.stderr?.on("data", (d) => {
       const s = String(d);
@@ -1384,7 +1444,7 @@ async function main() {
       ...(await assertReferenceWindowToggle(page)),
       ...(await assertRailTools(page)),
       ...(await assertMenuDrivenPopovers(page)),
-      ...(await assertCurrentCanvasPlatformResize(page)),
+      ...(await assertCurrentCanvasPlatformResize(page, { ownedPreviewOrigin: new URL(url).origin })),
       ...(await assertWorkspaceDeviceEditor(page)),
       ...(await assertDrawOptionsBar(page)),
       ...(await assertFloatingLayoutManager(page)),
