@@ -18,7 +18,7 @@ import { StaleNoticeBar } from "../components/StaleNoticeBar";
 import { useCommerceConfig } from "../hooks/use-commerce-config";
 import { useMarketResources } from "../hooks/use-market-resources";
 import { marketHomeJsonLd } from "../models/market-jsonld";
-import { MARKET_LICENSES } from "../models/market-kind";
+import { MARKET_LICENSE_GUIDE } from "../models/market-kind";
 import { isMarketPublicKeywordTag } from "../models/market-catalog-public";
 import { MARKET_CURATED_THEMES } from "../models/market-theme";
 
@@ -307,7 +307,7 @@ export function MarketHomePage() {
           <p className="mt-1 text-xs leading-5 text-fg-3">무료 여부와 별개로 상업 이용, 수정, 출처 표기 조건을 확인하세요.</p>
         </div>
         <ul className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          {MARKET_LICENSES.map((license) => (
+          {MARKET_LICENSE_GUIDE.map((license) => (
             <li key={license.license} className="rounded-xl border border-line bg-card p-4 transition-colors hover:border-accent/30 hover:bg-raised/60">
               <h3 className="text-sm font-semibold text-fg">{license.label}</h3>
               <p className="mt-1.5 text-xs leading-relaxed text-fg-2">{license.summary}</p>
