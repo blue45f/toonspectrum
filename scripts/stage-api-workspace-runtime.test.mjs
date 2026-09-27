@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 
 import { stageApiWorkspaceRuntime } from "./stage-api-workspace-runtime.mjs";
+import { verifyCompiledApiImports } from "./verify-api-runtime-imports.mjs";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
@@ -25,6 +26,12 @@ test("stages workspace packages inside the emitted API boundary", async () => {
   const root = await mkdtemp(join(tmpdir(), "toonstudio-api-runtime-"));
   try {
     await compiledProductionContracts(root);
+    await compiledPackage(root, "packages/contracts/src/studio-live-auth-ticket.js",
+      'module.exports = require("./studio-sha256.js");');
+    await compiledPackage(root, "packages/contracts/src/studio-sha256.js",
+      'module.exports = { ticket: "compiled-contract" };');
+    await compiledPackage(root, "packages/contracts/src/creator-resource-workflow.js",
+      'module.exports = { workflow: "compiled-contract" };');
     await compiledPackage(
       root,
       "packages/contracts/src/security/csrf.js",
@@ -91,6 +98,22 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     for (const name of ["production-workspace", "operation-policy", "creator-publication-integrity"]) {
       assert.deepEqual(requireFromApi(`@toonstudio/contracts/${name}`), { contract: name });
     }
+    assert.deepEqual(requireFromApi("@toonstudio/contracts/studio-live-auth-ticket"), {
+      ticket: "compiled-contract",
+    });
+    assert.deepEqual(requireFromApi("@toonstudio/contracts/creator-resource-workflow"), {
+      workflow: "compiled-contract",
+    });
+    // 공개된 계약만 노출하며, private helper나 미컴파일 계약을 원본 TS로 우회하지 않는다.
+    for (const name of ["studio-sha256", "studio-live-lock-resource"]) {
+      assert.throws(() => requireFromApi(`@toonstudio/contracts/${name}`), {
+        code: "ERR_PACKAGE_PATH_NOT_EXPORTED",
+      });
+    }
+    await writeFile(caller, 'require("@toonstudio/contracts/studio-live-auth-ticket");\nrequire("@toonstudio/contracts/creator-resource-workflow");\n');
+    assert.ok(verifyCompiledApiImports(root).importsChecked > 2);
+    await writeFile(caller, 'require("@toonstudio/contracts/studio-live-lock-resource");\n');
+    assert.throws(() => verifyCompiledApiImports(root), /studio-live-lock-resource cannot resolve/u);
     assert.deepEqual(requireFromApi("@toonstudio/contracts/security/csrf"), {
       csrf: "ready",
     });

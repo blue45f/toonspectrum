@@ -1,10 +1,11 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
   {
     name: "@toonstudio/contracts",
+    sourceManifest: new URL("../packages/contracts/package.json", import.meta.url),
     exports: {
       "./security/csrf": "./security/csrf.js",
       "./production-workspace": "./production-workspace.js",
@@ -78,13 +79,38 @@ function requirePath(fromDirectory, target) {
   return path.startsWith(".") ? path : `./${path}`;
 }
 
+async function withCompiledPublicSubpaths(root, definition) {
+  if (!definition.sourceManifest) return definition;
+  const manifest = JSON.parse(await readFile(definition.sourceManifest, "utf8"));
+  const exports = { ...definition.exports };
+  const subpathEntries = [...definition.subpathEntries];
+  // API에서 실제 컴파일한 공개 계약만 배포 경계 안에 연결한다. 필수 계약의 누락 검사는 유지한다.
+  for (const [subpath, conditions] of Object.entries(manifest.exports)) {
+    if (!subpath.startsWith("./") || subpath.includes("*") || subpath in exports) continue;
+    const source = typeof conditions === "string" ? conditions : conditions.default ?? conditions.import;
+    if (typeof source !== "string" || !source.startsWith("./src/") || !source.endsWith(".ts")) continue;
+    const compiledEntry = `packages/contracts/${source.slice(2).replace(/\.ts$/u, ".js")}`;
+    try {
+      await access(resolve(root, compiledEntry));
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+    const target = `${subpath.slice(2)}.js`;
+    exports[subpath] = `./${target}`;
+    subpathEntries.push({ target, compiledEntry });
+  }
+  return { ...definition, exports, subpathEntries };
+}
+
 export async function stageApiWorkspaceRuntime(
   directory = fileURLToPath(new URL("../apps/api/dist/", import.meta.url)),
 ) {
   const root = resolve(directory);
   const staged = [];
 
-  for (const definition of WORKSPACE_RUNTIME_PACKAGES) {
+  for (const sourceDefinition of WORKSPACE_RUNTIME_PACKAGES) {
+    const definition = await withCompiledPublicSubpaths(root, sourceDefinition);
     const compiledEntry = definition.compiledEntry
       ? resolve(root, definition.compiledEntry)
       : null;
