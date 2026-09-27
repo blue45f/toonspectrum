@@ -1199,7 +1199,7 @@ import {
 import { openStudioToolsCompanionForMenu } from "./studio-tools-companion-runtime";
 import { hasStudioUnloadPromptWork, installStudioUnloadGuard, studioPendingStrokeFingerprint } from "./studio-unsaved-work-guard";
 import { useStudioEditorUpdateSafety } from "./use-studio-editor-update-safety";
-import { useStudioEditorStatusNotices } from "./use-studio-editor-status-notices";
+import { useStudioEditorStatusNotices } from "./studio-cuttoon-editor/use-studio-editor-status-notices";
 import {
   planStudioVectorEraseToIntersectionApply,
   STUDIO_ERASE_TO_INTERSECTION_LABEL,
