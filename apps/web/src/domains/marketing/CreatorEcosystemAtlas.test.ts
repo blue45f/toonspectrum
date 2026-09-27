@@ -1,11 +1,11 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
 import { CreatorEcosystemAtlas } from "./CreatorEcosystemAtlas";
 import { ECOSYSTEM_MODULES as MODULES } from "./creator-ecosystem-atlas-data";
+import { imageSizeOf } from "./image-header-size";
 
 const COMPONENT_SOURCE = "apps/web/src/domains/marketing/CreatorEcosystemAtlas.tsx";
 const STYLES = "apps/web/src/domains/marketing/creator-ecosystem-atlas.css";
@@ -49,9 +49,8 @@ describe("생태계 아틀라스 모듈 그리드", () => {
 
   it("선언한 원본 크기와 실제 파일의 크기가 어긋나지 않는다", () => {
     for (const module of MODULES) {
-      const out = execFileSync("sips", ["-g", "pixelWidth", "-g", "pixelHeight", `apps/web/public${module.image}`], { encoding: "utf8" });
-      expect(out).toContain(`pixelWidth: ${module.width}`);
-      expect(out).toContain(`pixelHeight: ${module.height}`);
+      const actual = imageSizeOf(`apps/web/public${module.image}`);
+      expect({ ...actual, image: module.image }).toEqual({ width: module.width, height: module.height, image: module.image });
     }
   });
 
@@ -112,6 +111,13 @@ describe("생태계 아틀라스 모듈 그리드", () => {
     const source = readFileSync(COMPONENT_SOURCE, "utf8");
     expect(source).toContain('alt=""');
     expect(source).toContain("aria-hidden");
+  });
+
+  it("이미지 헤더 파서는 이미지가 아니면 조용히 통과하지 않고 실패한다", () => {
+    // CI에서 macOS 전용 sips를 쓰면 ENOENT로 터졌었다. 순수 Node 파서로 대체했고,
+    // 지원하지 않는 컨테이너를 조용히 넘기지 않는지 확인한다.
+    expect(() => imageSizeOf("package.json")).toThrow(/unsupported image container/gu);
+    expect(() => imageSizeOf("apps/web/public/brand/film-manifest.json")).toThrow();
   });
 
   it("명시적 export로 나뉘어 있어 다른 화면에서도 재사용할 수 있다", () => {
