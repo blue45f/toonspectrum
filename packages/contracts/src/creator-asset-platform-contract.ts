@@ -116,7 +116,7 @@ export function assertCreatorAssetDraftTransition(
 
 export const CreatorAssetDraftSchema = z
   .object({
-    schema: z.enum([CREATOR_ASSET_PLATFORM_SCHEMA, "toonspectrum.creator-asset-platform"]),
+    schema: z.literal(CREATOR_ASSET_PLATFORM_SCHEMA),
     version: z.literal(CREATOR_ASSET_PLATFORM_VERSION),
     id: SafeIdSchema,
     publisherId: SafeIdSchema,
@@ -257,7 +257,7 @@ export type CreatorAssetArtifactDescriptor = z.infer<
 
 export const CreatorAssetArtifactSetDescriptorSchema = z
   .object({
-    schema: z.enum([CREATOR_ASSET_ARTIFACT_SET_SCHEMA, "toonspectrum.creator-asset-artifact-set"]),
+    schema: z.literal(CREATOR_ASSET_ARTIFACT_SET_SCHEMA),
     version: z.literal(CREATOR_ASSET_PLATFORM_VERSION),
     id: SafeIdSchema,
     entryKind: CreatorAssetEntryKindSchema,
@@ -369,7 +369,7 @@ export const CreatorAssetLicenseCapabilitiesSchema = z
 
 export const CreatorAssetLicenseSnapshotSchema = z
   .object({
-    schema: z.enum([CREATOR_ASSET_PLATFORM_SCHEMA, "toonspectrum.creator-asset-platform"]),
+    schema: z.literal(CREATOR_ASSET_PLATFORM_SCHEMA),
     version: z.literal(CREATOR_ASSET_PLATFORM_VERSION),
     id: SafeIdSchema,
     licenseCode: z.string().min(1).max(80),
@@ -682,7 +682,7 @@ export function resolveCreatorMarketplaceEntitlement(
 
 export const CreatorWorkCatalogAssetBindingSchema = z
   .object({
-    schema: z.enum([CREATOR_WORK_CATALOG_BINDING_SCHEMA, "toonspectrum.creator-work-catalog-asset-binding"]),
+    schema: z.literal(CREATOR_WORK_CATALOG_BINDING_SCHEMA),
     version: z.literal(CREATOR_ASSET_PLATFORM_VERSION),
     workId: SafeIdSchema,
     attachmentId: SafeIdSchema,
