@@ -1,0 +1,219 @@
+/*
+ * 생태계 아틀라스 — 4×2 모듈 그리드.
+ * 카드가 4 → 2 → 1로 접히며 최소 320px에서 가로 넘침이 없어야 한다.
+ * 그림자는 깊이의 주 수단이 아니다: surface 단계와 보더로 깊이를 만든다(DESIGN.md).
+ */
+.cf-atlas {
+  padding: 92px 0 24px;
+}
+
+.cf-atlas-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 34px;
+}
+
+.cf-atlas-heading h2 {
+  margin: 14px 0 0;
+  font-size: clamp(28px, 3vw, 42px);
+  line-height: 1.32;
+  /* 한글 음각은 sidebearing이 0.0566em뿐이라 라틴 디스플레이값(-0.04em)을 그대로 쓰면 글자가 붙는다. */
+  letter-spacing: -0.02em;
+  font-weight: 750;
+  white-space: pre-line;
+  word-break: keep-all;
+}
+
+.cf-atlas-body {
+  max-width: 42ch;
+  margin: 0;
+  color: var(--color-fg-2);
+  font-size: 15px;
+  line-height: 1.72;
+  word-break: keep-all;
+}
+
+.cf-atlas-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cf-atlas-cell {
+  min-width: 0;
+}
+
+@media (min-width: 1200px) {
+  .cf-atlas-cell--wide {
+    grid-column: span 2;
+  }
+}
+
+.cf-atlas-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 44px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-card);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), border-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cf-atlas-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-line-strong);
+}
+
+.cf-atlas-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+/* 아트는 카드 상단을 채우는 필름스트립. hover 시 아주 조금 밀려 깊이를 만든다. */
+.cf-atlas-art {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--color-panel);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.cf-atlas-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 46%, color-mix(in oklch, var(--color-card) 82%, transparent));
+  pointer-events: none;
+}
+
+.cf-atlas-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cf-atlas-card:hover .cf-atlas-art img {
+  transform: scale(1.03);
+}
+
+.cf-atlas-text {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1;
+  padding: 15px 17px 18px;
+}
+
+.cf-atlas-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 3px;
+}
+
+.cf-atlas-index {
+  color: var(--color-fg-3);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.cf-atlas-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.cf-atlas-name {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--color-fg);
+}
+
+/* 영문 대문자 마이크로 라벨은 디스플레이 폰트 + DESIGN.md의 +0.12em. 한글과 섞어 자간하지 않는다. */
+.cf-atlas-label {
+  color: var(--color-fg-3);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.12em;
+}
+
+.cf-atlas-blurb {
+  margin-top: auto;
+  padding-top: 6px;
+  color: var(--color-fg-2);
+  font-size: 13px;
+  line-height: 1.68;
+  word-break: keep-all;
+}
+
+.cf-atlas-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 18px 0 0;
+  color: var(--color-fg-3);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1199px) {
+  .cf-atlas {
+    padding-top: 72px;
+  }
+
+  .cf-atlas-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .cf-atlas {
+    padding-top: 56px;
+  }
+
+  .cf-atlas-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .cf-atlas-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-atlas-card,
+  .cf-atlas-art img {
+    transition: none;
+  }
+
+  .cf-atlas-card:hover,
+  .cf-atlas-card:hover .cf-atlas-art img {
+    transform: none;
+  }
+}
