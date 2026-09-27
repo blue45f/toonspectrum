@@ -159,7 +159,7 @@ describe("creator client revision conflicts", () => {
       width: 360,
       height: 520,
       kind: "vrm_pose",
-      license: "toonstudio-standard" as const,
+      license: "toonspectrum-standard" as const,
       rightsConfirmed: true as const,
     };
     apiPost.mockResolvedValue({ id: "shared-pose" });

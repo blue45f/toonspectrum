@@ -30,7 +30,7 @@ export function analyticsDeploymentConfig(environment, production, gitState) {
     }
   }
   return {
-    name: "toonstudio-analytics",
+    name: "toonspectrum-analytics",
     main: resolve(ROOT, "deploy/cloudflare-analytics/src/index.ts"),
     compatibility_date: "2026-07-30",
     workers_dev: true,

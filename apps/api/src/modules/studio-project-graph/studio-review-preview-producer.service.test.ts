@@ -20,7 +20,7 @@ function fixture() {
   const assets = { assertAdmissionEnabled: vi.fn(), upload: vi.fn().mockImplementation(async (_actor, _work, _asset, _type, _descriptor, upload: StudioWorkAssetUploadFile) => { uploaded.push(Buffer.from(upload.buffer)); }),
     uploadGeneratedObject: vi.fn().mockImplementation(async (_actor, workId, sourceAssetId, purpose, referenceId, _type, upload: StudioWorkAssetUploadFile) => {
       const hash = createHash("sha256").update(upload.buffer).digest("hex");
-      return { workId, sourceAssetId, referenceId, object: { contractVersion: "toonstudio.private-object-storage.v2", providerId: "cloudflare-r2",
+      return { workId, sourceAssetId, referenceId, object: { contractVersion: "toonspectrum.private-object-storage.v2", providerId: "cloudflare-r2",
         purpose, digest: `sha256:${hash}`, objectPath: `sha256/${hash.slice(0, 2)}/${hash}`, contentType: "image/png", byteLength: upload.size } };
     }), deleteGeneratedObject: vi.fn().mockResolvedValue({ deleted: true }), deleteUnreferencedUpload: vi.fn().mockResolvedValue(true) };
   const service = new StudioReviewPreviewProducerService(repository as unknown as StudioReviewPreviewProducerRepository, assets as unknown as StudioWorkAssetService);

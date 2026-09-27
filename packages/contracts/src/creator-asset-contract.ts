@@ -1,6 +1,6 @@
 export const CREATOR_ASSET_LICENSES = [
   {
-    id: "toonstudio-standard",
+    id: "toonspectrum-standard",
     label: "ToonStudio 표준 사용권",
     shortLabel: "표준 사용권",
     attributionRequired: false,
@@ -91,7 +91,7 @@ export function isCreatorAssetLicenseId(value: unknown): value is CreatorAssetLi
 }
 
 export function creatorAssetLicenseOf(value: unknown) {
-  const id = isCreatorAssetLicenseId(value) ? value : "toonstudio-standard";
+  const id = isCreatorAssetLicenseId(value) ? value : "toonspectrum-standard";
   return CREATOR_ASSET_LICENSES.find((license) => license.id === id) ?? CREATOR_ASSET_LICENSES[0];
 }
 

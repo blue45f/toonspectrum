@@ -54,7 +54,7 @@ describe("projectStudioAssetRightsUsages", () => {
       }),
       expect.objectContaining({
         assetId: "builtin-raster-school-corridor",
-        licenseId: "toonstudio-standard",
+        licenseId: "toonspectrum-standard",
         source: { kind: "builtin", id: "builtin-raster-school-corridor" },
       }),
     ]);

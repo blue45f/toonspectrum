@@ -3,6 +3,12 @@ import { readFileSync, readdirSync } from "node:fs";
 import { expect, test } from "vitest";
 
 import {
+  collectProductionCompatibilityIssues,
+  compareFrozenMigrationChecksums,
+  compareSchemaVersions,
+} from "./verify-production-release-compatibility.mjs";
+
+import {
   buildCommunityCafeCapabilitySql,
   buildCommunityCafeRuntimeAclSql,
 } from "./community-cafe-database-contract.mjs";
@@ -528,7 +534,7 @@ test("creator storage location migration pins primaries and inventories verified
   for (const requiredFragment of [
     'ADD COLUMN IF NOT EXISTS "providerId" text',
     "coalesce(\"providerId\", 'supabase')",
-    "toonstudio.private-object-storage.v2",
+    "toonspectrum.private-object-storage.v2",
     "creator_asset_storage_object_provider_check",
     "CREATE TABLE IF NOT EXISTS public.creator_asset_storage_replica",
     "creator_asset_storage_replica_object_fkey",
@@ -1832,4 +1838,27 @@ test("creator publication media stores immutable object references without inlin
     "REVOKE ALL ON TABLE public.creator_work_publication_media FROM PUBLIC",
   );
   expect(migration?.contents).not.toMatch(/data:image|base64/iu);
+});
+
+
+test("기존 운영 릴리스의 SQL 92개와 런타임·리소스 식별자를 보존한다", () => {
+  expect(collectProductionCompatibilityIssues()).toEqual([]);
+});
+
+test("과거 SQL의 주석 변경과 파일 누락도 기배포 이력 불일치로 거절한다", () => {
+  const frozen = [{ id: "0001_example", sha256: "a".repeat(64) }];
+  expect(compareFrozenMigrationChecksums(frozen, frozen)).toEqual([]);
+  expect(compareFrozenMigrationChecksums(frozen, [])).toHaveLength(1);
+  expect(compareFrozenMigrationChecksums(frozen, [{
+    id: "0001_example", sha256: "b".repeat(64),
+  }])).toHaveLength(1);
+});
+
+test("패키지 간 Zod 기본값의 의미가 달라지는 버전 분리를 거절한다", () => {
+  const root = { path: "package.json", declared: "4.4.3", installed: "4.4.3" };
+  expect(compareSchemaVersions([root])).toEqual([]);
+  expect(compareSchemaVersions([root, {
+    path: "packages/contracts/package.json", declared: "4.4.3", installed: "4.5.4",
+  }])).toHaveLength(1);
+  expect(compareSchemaVersions([{ ...root, declared: "^4.4.3" }])).toHaveLength(1);
 });

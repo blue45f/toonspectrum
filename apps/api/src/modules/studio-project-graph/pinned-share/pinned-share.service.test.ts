@@ -9,7 +9,7 @@ const bytes = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const hash = createHash("sha256").update(bytes).digest("hex");
 const source = () => ({ shareId: "share", expiresAt: Date.now() + 60_000,
   page: { ordinal: 0, sha256: hash, byteLength: bytes.length, mediaType: "image/png" as const, width: 1, height: 1 },
-  object: { contractVersion: "toonstudio.private-object-storage.v2" as const, providerId: "cloudflare-r2" as const,
+  object: { contractVersion: "toonspectrum.private-object-storage.v2" as const, providerId: "cloudflare-r2" as const,
     purpose: "derived" as const, digest: `sha256:${hash}`, objectPath: `sha256/${hash.slice(0, 2)}/${hash}`, byteLength: bytes.length, contentType: "image/png" } });
 const access = { token: "a".repeat(43) };
 const image = vi.fn(), sources = vi.fn(), create = vi.fn(), fetcher = vi.fn<typeof fetch>(), signed = vi.fn();

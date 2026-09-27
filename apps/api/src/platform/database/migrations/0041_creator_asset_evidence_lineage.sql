@@ -19,7 +19,7 @@ AS $lineage_matches$
     AND artifact_set."sourceDigest" = processing_run."sourceDigest"
     AND artifact_set."toolchainDigest" = processing_run."toolchainDigest"
     AND artifact_set."descriptor" @> jsonb_build_object(
-      'schema', 'toonstudio.creator-asset-artifact-set', 'version', 1,
+      'schema', 'toonspectrum.creator-asset-artifact-set', 'version', 1,
       'id', artifact_set."id", 'entryKind', artifact_set."entryKind",
       'sourceDigest', processing_run."sourceDigest", 'toolchainDigest', processing_run."toolchainDigest",
       'profileId', processing_run."pipelineProfile", 'profileVersion', processing_run."pipelineVersion"

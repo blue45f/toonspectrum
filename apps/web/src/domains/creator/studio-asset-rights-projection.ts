@@ -34,7 +34,7 @@ function imageUsage(
       ...placement,
       assetId: element.builtinRasterAssetId,
       source: { kind: "builtin", id: element.builtinRasterAssetId },
-      licenseId: "toonstudio-standard",
+      licenseId: "toonspectrum-standard",
       attributionRequired: false,
       commercialUse: true,
       aiTraining: "unknown",

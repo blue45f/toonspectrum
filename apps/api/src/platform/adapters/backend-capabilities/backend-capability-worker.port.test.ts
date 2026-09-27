@@ -6,7 +6,7 @@ import {
 } from "./backend-capability-worker.port";
 
 const sourceObject = {
-  contractVersion: "toonstudio.private-object-storage.v2",
+  contractVersion: "toonspectrum.private-object-storage.v2",
   providerId: "cloudflare-r2",
   purpose: "source",
   digest: `sha256:${"a".repeat(64)}`,
@@ -35,7 +35,7 @@ describe("backend capability worker contract", () => {
   it("continues to accept legacy source references during the location migration", () => {
     const legacy = {
       ...sourceObject,
-      contractVersion: "toonstudio.supabase-object-storage.v1" as const,
+      contractVersion: "toonspectrum.supabase-object-storage.v1" as const,
     };
     const { providerId: _providerId, ...legacyWithoutProvider } = legacy;
     expect(

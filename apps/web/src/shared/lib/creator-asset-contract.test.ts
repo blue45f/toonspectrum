@@ -29,7 +29,7 @@ describe("creator asset marketplace contract", () => {
       commercialUse: false,
       url: "https://creativecommons.org/licenses/by-nc/4.0/",
     });
-    expect(creatorAssetLicenseOf("bad").id).toBe("toonstudio-standard");
+    expect(creatorAssetLicenseOf("bad").id).toBe("toonspectrum-standard");
   });
 
   it("최대 catalog·moderation 페이지를 공급자 중립 4 MB JSON 경계에 고정한다", () => {

@@ -294,7 +294,7 @@ const AttributionRequirementSchema = z.enum([
 const SourceKindSchema = z.enum(STUDIO_ASSET_RIGHTS_SOURCE_KINDS);
 const RightsScopeSchema = z.enum(STUDIO_ASSET_RIGHTS_SCOPES);
 const LicenseIdSchema = z.enum([
-  "toonstudio-standard",
+  "toonspectrum-standard",
   "cc0-1.0",
   "cc-by-4.0",
   "cc-by-nc-4.0",
@@ -557,7 +557,7 @@ function knownLicensePolicy(
       commercialUse: license.commercialUse ? "allowed" : "prohibited",
       aiTraining: "unknown",
       redistribution:
-        license.id === "toonstudio-standard" ? "prohibited" : "allowed",
+        license.id === "toonspectrum-standard" ? "prohibited" : "allowed",
     };
   }
   if (licenseId === "creator-owned") {

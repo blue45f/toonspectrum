@@ -98,7 +98,7 @@ pnpm run cloudflare:static:dry-run
 
 Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `prepare:cloudflare-static-assets`가 `dist` 전체를 검사하고, 검토된 OpenCascade WASM 및 modular street seating GLB의 Brotli(`.br`)·gzip(`.gz`) sidecar를 생성한다. 원본 대형 파일만 `.assetsignore`에서 제외하고, sidecar가 25 MiB를 넘거나 새로운 미검토 파일이 한도를 넘으면 배포를 중단한다.
 
-일반 GET·HEAD는 브라우저의 `Accept-Encoding`에 맞는 sidecar를 같은 URL에서 투명하게 제공해 무제한 Static Assets 요청을 우선 활용한다. 두 객체의 원본은 Standard 클래스 R2 버킷 `toonstudio-public-assets`에 동일 key로 저장하며 Worker의 `LARGE_ASSETS` binding으로 직접 읽는다. byte Range, 압축 미지원 요청, HEAD와 `If-None-Match`를 처리하고 1년 immutable 캐시 및 원본 MIME을 적용한다. sidecar와 R2가 모두 없거나 일시적으로 읽히지 않을 때만 명시적으로 설정한 `LARGE_ASSET_ORIGIN`으로 폴백하며 Authorization, Cookie, 사용자·관리자·세션 헤더는 전달하지 않는다. 변수를 생략하면 Core API fallback을 추론하지 않는다.
+일반 GET·HEAD는 브라우저의 `Accept-Encoding`에 맞는 sidecar를 같은 URL에서 투명하게 제공해 무제한 Static Assets 요청을 우선 활용한다. 두 객체의 원본은 Standard 클래스 R2 버킷 `toonspectrum-public-assets`에 동일 key로 저장하며 Worker의 `LARGE_ASSETS` binding으로 직접 읽는다. byte Range, 압축 미지원 요청, HEAD와 `If-None-Match`를 처리하고 1년 immutable 캐시 및 원본 MIME을 적용한다. sidecar와 R2가 모두 없거나 일시적으로 읽히지 않을 때만 명시적으로 설정한 `LARGE_ASSET_ORIGIN`으로 폴백하며 Authorization, Cookie, 사용자·관리자·세션 헤더는 전달하지 않는다. 변수를 생략하면 Core API fallback을 추론하지 않는다.
 
 `sync:cloudflare-r2-assets:dry-run`은 빌드 산출물과 허용 목록을 검증하고 원격 쓰기를 하지 않는다. 운영 배포에서는 `prepare:cloudflare-static-assets`가 sidecar를 만든 뒤 `sync:cloudflare-r2-assets`가 승인된 원본 초과 파일을 R2에 먼저 업로드하고 Worker를 배포한다.
 
@@ -107,7 +107,7 @@ Cloudflare Static Assets의 개별 파일 한도는 25 MiB다. 배포 전에 `pr
 자동 Git 배포는 허용하지 않는다. 검토된 `main`의 깨끗한 worktree에서만 다음 명령을 실행한다.
 
 ```bash
-export CLOUDFLARE_CORE_API_ORIGIN=https://toonstudio-core-api.onrender.com
+export CLOUDFLARE_CORE_API_ORIGIN=https://toonspectrum-core-api.onrender.com
 export CLOUDFLARE_PUBLIC_READ_API_ORIGINS=https://<read-a>,https://<read-b>
 export CLOUDFLARE_SOCIAL_API_ORIGIN=https://<social-origin>
 export CLOUDFLARE_PLAYGROUND_API_ORIGIN=https://<playground-origin>

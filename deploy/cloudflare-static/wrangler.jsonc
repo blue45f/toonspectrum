@@ -1,9 +1,10 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "toonstudio-web",
+  "name": "toonspectrum-web",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-14",
   "workers_dev": true,
+  "keep_vars": true,
   "assets": {
     "directory": "../../dist",
     "binding": "ASSETS",
@@ -38,8 +39,8 @@
   "r2_buckets": [
     {
       "binding": "LARGE_ASSETS",
-      "bucket_name": "toonstudio-public-assets",
-      "preview_bucket_name": "toonstudio-public-assets"
+      "bucket_name": "toonspectrum-public-assets",
+      "preview_bucket_name": "toonspectrum-public-assets"
     }
   ]
 }
