@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { StudioCrdtDocument } from "../live/studio-crdt-document";
+import { createStudioCrdtTransitionPublisher } from "../studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher";
 import {
   StudioOfflineBranchAutomergeEngine,
   initializeStudioOfflineBranchAutomerge,
@@ -8,6 +9,7 @@ import {
 import { StudioOfflineBranchRuntime } from "./studio-offline-branch-runtime";
 
 import type { DrawEl } from "../studio-element-model";
+import type { StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaborationProvider";
 import type { PageState } from "../studio-page-state";
 import type {
   CreateStudioOfflineBranchInput,
@@ -179,6 +181,36 @@ function runtimeOptions(storage: MemoryStorage, actorId = "user-1") {
 }
 
 describe("StudioOfflineBranchRuntime", () => {
+  it("네이버와 카카오 규격 변경을 각각 거절하고 오프라인 페이지와 대기 작업을 보존한다", async () => {
+    const errors: string[] = [];
+    const runtime = await StudioOfflineBranchRuntime.create({
+      ...runtimeOptions(new MemoryStorage()), onError: (message) => errors.push(message),
+    });
+    const original = [page()];
+    const editorErrors: string[] = [];
+    const publisher = createStudioCrdtTransitionPublisher({
+      actorId: "user-1", automaticRasterPublicationEnabled: false,
+      getDocument: () => null,
+      getRuntime: () => ({ offlineBranch: runtime }) as StudioCrdtSceneGraphRuntime,
+      reportError: (message) => editorErrors.push(message), reportNotice: () => undefined,
+    });
+    try {
+      runtime.observeCanonicalPages(original);
+      for (const canvasH of [8348, 8000]) {
+        expect(publisher.publishSceneTransition(original, [{ ...original[0], canvasH }])).toBe(false);
+        expect(runtime.projectPages(original)).toEqual(original);
+        expect(runtime.canonicalPagesSnapshot()).toEqual(original);
+        expect(runtime.status.pendingOperations).toBe(0);
+      }
+      expect(errors).toEqual([
+        "page-1: 페이지 배경·크기 변경은 온라인 정본 연결이 필요합니다.",
+        "page-1: 페이지 배경·크기 변경은 온라인 정본 연결이 필요합니다.",
+      ]);
+      expect(editorErrors).toEqual(errors);
+    } finally {
+      await runtime.close();
+    }
+  });
   it("reports a supported idempotent no-op without staging an operation", async () => {
     const runtime = await StudioOfflineBranchRuntime.create(runtimeOptions(new MemoryStorage()));
     const current = [page("line")];

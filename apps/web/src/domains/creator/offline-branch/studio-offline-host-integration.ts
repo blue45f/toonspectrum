@@ -140,6 +140,7 @@ export function stageStudioOfflineSceneTransition(
   previousPages: readonly PageState[],
   nextPages: readonly PageState[],
   reportNotice: (message: string) => void,
+  reportError?: (message: string) => void,
 ): boolean | null {
   const offlineBranch = runtime?.offlineBranch ?? null;
   if (!offlineBranch?.shouldStageSceneTransition()) return null;
@@ -149,6 +150,10 @@ export function stageStudioOfflineSceneTransition(
       "변경을 Automerge 오프라인 branch에 보호했습니다. 서버 정본 연결 후 안전하게 합칩니다.",
     );
     return true;
+  }
+  if (result.unsupported.length > 0) {
+    // 연결 패널에만 남기지 않고 명령을 실행한 편집기의 오류 안내에도 같은 거절 사유를 전달한다.
+    reportError?.(result.unsupported.join("\n"));
   }
 
   // A pointer-contact CRDT stream can materialize the exact completed local stroke before the
