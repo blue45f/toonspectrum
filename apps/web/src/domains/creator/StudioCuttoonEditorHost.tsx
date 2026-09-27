@@ -1199,6 +1199,7 @@ import {
 import { openStudioToolsCompanionForMenu } from "./studio-tools-companion-runtime";
 import { hasStudioUnloadPromptWork, installStudioUnloadGuard, studioPendingStrokeFingerprint } from "./studio-unsaved-work-guard";
 import { useStudioEditorUpdateSafety } from "./use-studio-editor-update-safety";
+import { useStudioEditorStatusNotices } from "./use-studio-editor-status-notices";
 import {
   planStudioVectorEraseToIntersectionApply,
   STUDIO_ERASE_TO_INTERSECTION_LABEL,
@@ -1605,12 +1606,6 @@ export function StudioCuttoonEditor({
   });
   const [macroSession, setMacroSession] = useState<StudioMacroSession>(() => createStudioMacroSession());
   const [layerMergeBusy, setLayerMergeBusy] = useState(false);
-  /**
-   * 상태 레일의 중립 알림. `error`는 "bad" 톤 하나로만 렌더되므로, 작업이 성공했지만 결과가
-   * 요청한 모양과 다를 때(예: 실시간 룸에서 3D LT 번들 대신 병합 합성이 추가될 때)를 실패처럼
-   * 보이게 만들지 않고 알리기 위한 별도 채널이다.
-   */
-  const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [studioMarketplaceCloudSyncRetry, setStudioMarketplaceCloudSyncRetry] = useState<{
     readonly record: CreatorMarketplaceResourceRecord;
     readonly pack: StudioCreatorPackDefinition;
@@ -1839,6 +1834,7 @@ export function StudioCuttoonEditor({
     studioWorkAssetHydrator,
     workId,
   });
+  const { statusNotice, setStatusNotice, offlineSceneNotice } = useStudioEditorStatusNotices(autosaveKey, studioAuthUserId);
   const {
     pages,
     pagesHi,
@@ -16159,7 +16155,7 @@ const puppetWarpArmed =
     automaticRasterPublicationEnabled: STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED,
     getDocument: () => studioCrdtDocumentRef.current,
     getRuntime: () => studioCrdtSceneRuntimeRef.current,
-      reportError: setError, reportNotice: setStatusNotice,
+      reportError: setError, reportNotice: offlineSceneNotice.report,
     });
   publishStudioCrdtSceneTransitionRef.current = publishStudioCrdtSceneTransition;
 
@@ -29378,6 +29374,7 @@ function clearSelectionForEdit() {
       strokeGuideRef={strokeGuideRef}
       strokeWidth={strokeWidth}
       saveIntentScope={{ ownerId: studioAuthUserId, documentKey: autosaveKey }}
+      {...offlineSceneNotice.viewProps}
       studioAuthUserId={studioAuthUserId}
       studioBgSceneAssetsError={studioBgSceneAssetsError}
       studioBgSceneAssetsLoaded={studioBgSceneAssetsLoaded}

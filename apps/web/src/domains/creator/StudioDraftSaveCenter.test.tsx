@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ComponentProps } from "react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState, type ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -56,6 +56,41 @@ afterEach(() => {
 });
 
 describe("StudioDraftSaveCenter", () => {
+  it("오프라인 보호 성공을 기존 저장 상태에서 알리고 상세 안내만 닫는다", () => {
+    setOnline(false);
+    const notice = "변경을 Automerge 오프라인 branch에 보호했습니다. 서버 정본 연결 후 안전하게 합칩니다.";
+    const onDismissOfflineSceneNotice = vi.fn();
+    const actions = { onSaveDraft: vi.fn(), onExportBackup: vi.fn() };
+    function NoticeCenter() {
+      const [message, setMessage] = useState<string | null>(notice);
+      return <StudioDraftSaveCenter saving={false} workId="work-1" loadedWork={{ id: "work-1", revision: 7 }}
+        offlineSceneNotice={message} onDismissOfflineSceneNotice={() => {
+          onDismissOfflineSceneNotice(); setMessage(null);
+        }} onSaveDraft={actions.onSaveDraft} onExportBackup={actions.onExportBackup} onOpenVersions={() => undefined} />;
+    }
+    render(<NoticeCenter />);
+    const trigger = screen.getByRole("button", { name: "저장 상태: 오프라인" });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger.getAttribute("title")).toBe(notice);
+    const liveNotice = document.getElementById(trigger.getAttribute("aria-describedby") ?? "");
+    expect(liveNotice?.getAttribute("aria-live")).toBe("polite");
+    expect(liveNotice?.textContent).toBe(notice);
+    expect(document.querySelector("[data-studio-offline-scene-notice]")).toBeNull();
+
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "초안 저장 센터" });
+    expect(within(dialog).getByText(notice)).not.toBeNull();
+    const dismiss = within(dialog).getByRole("button", { name: "알림 닫기" });
+    dismiss.focus();
+    fireEvent.click(dismiss);
+    expect(onDismissOfflineSceneNotice).toHaveBeenCalledTimes(1);
+    expect(actions.onSaveDraft).not.toHaveBeenCalled();
+    expect(actions.onExportBackup).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-studio-offline-scene-notice]")).toBeNull();
+    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "초안 저장 센터 닫기" }));
+    expect(screen.getByRole("dialog", { name: "초안 저장 센터" })).not.toBeNull();
+  });
+
   it("opens a two-authority save explanation from the compact status", () => {
     setOnline(true);
     renderCenter();
