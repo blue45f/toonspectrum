@@ -1,0 +1,226 @@
+:root[data-design-theme="starlight"] {
+  --reference-violet: #8b6cff;
+  --reference-violet-2: #b18cff;
+  --reference-cyan: #35d9ff;
+  --reference-pink: #ff5db1;
+  --reference-bg: #070918;
+  --reference-panel: #0d1022;
+  --reference-card: #14182e;
+  --reference-line: rgba(171, 182, 255, .18);
+}
+:root[data-design-theme="starlight"] body {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(139, 108, 255, .12), transparent 32rem),
+    radial-gradient(circle at 92% 4%, rgba(53, 217, 255, .08), transparent 30rem),
+    var(--reference-bg);
+}
+:root[data-design-theme="starlight"] .site-header {
+  border-bottom-color: rgba(171, 182, 255, .18);
+  background: rgba(7, 9, 24, .86);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .22);
+  backdrop-filter: blur(24px) saturate(1.25);
+}
+:root[data-design-theme="starlight"] .site-header[data-scrolled] {
+  border-bottom-color: rgba(177, 188, 255, .34);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .32);
+}
+:root[data-design-theme="starlight"] .site-header__inner {
+  max-width: 92rem;
+  min-height: 72px;
+}
+:root[data-design-theme="starlight"] .site-header__brand-mark {
+  border-color: rgba(190, 198, 255, .25);
+  background: linear-gradient(145deg, rgba(139, 108, 255, .26), rgba(53, 217, 255, .10));
+  box-shadow: 0 10px 28px rgba(111, 84, 255, .18);
+}
+:root[data-design-theme="starlight"] .site-header__primary-link {
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: var(--color-fg-2);
+}
+:root[data-design-theme="starlight"] .site-header__primary-link:hover {
+  border-color: rgba(171, 182, 255, .18);
+  background: rgba(139, 108, 255, .09);
+  color: var(--color-fg);
+}
+:root[data-design-theme="starlight"] .site-header__primary-link[aria-current="page"] {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(139, 108, 255, .18), rgba(53, 217, 255, .06));
+  box-shadow: inset 0 -2px var(--reference-violet);
+}
+:root[data-design-theme="starlight"] .site-header__utilities > :is(button, a) {
+  border-color: rgba(171, 182, 255, .18);
+  background: rgba(255, 255, 255, .025);
+}
+:root[data-design-theme="starlight"] .site-header__utilities > :is(button, a):hover {
+  border-color: rgba(177, 188, 255, .34);
+  background: rgba(139, 108, 255, .11);
+}
+:root[data-design-theme="starlight"] [data-site-experience] {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 78% 0%, rgba(139, 108, 255, .10), transparent 34rem),
+    linear-gradient(180deg, rgba(8, 10, 25, .96), rgba(7, 9, 22, .99));
+}
+:root[data-design-theme="starlight"] [data-site-experience]::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(145, 158, 255, .025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(145, 158, 255, .025) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: linear-gradient(to bottom, #000, transparent 82%);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-theme-scene {
+  opacity: .16;
+  filter: saturate(1.18) contrast(1.06);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-theme-mosaic {
+  opacity: .42;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-atelier-chapter {
+  border-color: var(--reference-line);
+  background: linear-gradient(145deg, rgba(20, 24, 46, .94), rgba(10, 13, 29, .94));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .24), inset 0 1px rgba(255, 255, 255, .04);
+  border-radius: 24px;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-atelier-chapter__heading {
+  color: #fff;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-atelier-chapter__heading p {
+  color: var(--color-fg-2);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__card,
+:root[data-design-theme="starlight"] [data-site-experience] .public-story-route,
+:root[data-design-theme="starlight"] [data-site-experience] .market-collection-card {
+  border-color: var(--reference-line);
+  background: linear-gradient(145deg, rgba(21, 25, 47, .96), rgba(11, 14, 31, .96));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .20), inset 0 1px rgba(255, 255, 255, .035);
+  border-radius: 18px;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__card:hover,
+:root[data-design-theme="starlight"] [data-site-experience] .public-story-route:hover,
+:root[data-design-theme="starlight"] [data-site-experience] .market-collection-card:hover {
+  border-color: rgba(139, 108, 255, .48);
+  box-shadow: 0 22px 52px rgba(0, 0, 0, .28), 0 0 0 1px rgba(139, 108, 255, .10);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__icon {
+  border-color: rgba(171, 182, 255, .20);
+  background: linear-gradient(145deg, rgba(139, 108, 255, .22), rgba(53, 217, 255, .07));
+  color: #fff;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__arrow {
+  color: var(--reference-violet-2);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .public-story-hero {
+  border-color: rgba(171, 182, 255, .20);
+  background: linear-gradient(135deg, rgba(12, 15, 33, .86), rgba(20, 17, 43, .92));
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .36);
+  border-radius: 28px;
+  overflow: hidden;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .public-story-hero::after {
+  background: linear-gradient(180deg, transparent 34%, rgba(5, 7, 18, .88));
+}
+:root[data-design-theme="starlight"] [data-site-experience] .public-story-hero__study-mark span {
+  border-color: rgba(190, 198, 255, .22);
+  background: rgba(7, 9, 23, .68);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-theme-art--constellation {
+  opacity: .72;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-theme-art--orbit {
+  opacity: .42;
+}
+:root[data-design-theme="starlight"] :is(
+  .public-site-atelier,
+  .site-directory,
+  .support-center,
+  .learning-hub,
+  .fortune-observatory,
+  .market-atelier,
+  .creator-resources
+) {
+  color: var(--color-fg);
+}
+:root[data-design-theme="starlight"] :is(
+  .public-site-atelier,
+  .site-directory,
+  .support-center,
+  .learning-hub,
+  .market-atelier,
+  .creator-resources
+) :is(
+  article,
+  section[data-surface],
+  [data-surface="card"],
+  .card,
+  .panel
+) {
+  border-color: var(--reference-line);
+  background: linear-gradient(145deg, rgba(20, 24, 46, .92), rgba(10, 13, 29, .94));
+  box-shadow: inset 0 1px rgba(255, 255, 255, .03);
+}
+:root[data-design-theme="starlight"] :is(
+  .public-site-atelier,
+  .site-directory,
+  .support-center,
+  .learning-hub,
+  .market-atelier,
+  .creator-resources
+) :is(button, [role="button"], a[data-primary="true"]) {
+  border-radius: 12px;
+}
+:root[data-design-theme="starlight"] :is(
+  .public-site-atelier,
+  .site-directory,
+  .support-center,
+  .learning-hub,
+  .market-atelier,
+  .creator-resources
+) :is(button, [role="button"], a[data-primary="true"]):hover {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .22);
+}
+:root[data-design-theme="starlight"] .route-purpose-scene {
+  border-color: rgba(171, 182, 255, .18);
+  background: linear-gradient(145deg, rgba(15, 18, 37, .94), rgba(8, 11, 25, .96));
+  box-shadow: 0 26px 72px rgba(0, 0, 0, .28);
+}
+:root[data-design-theme="starlight"] .route-purpose-scene :is(h1, h2, h3) {
+  color: #fff;
+  text-shadow: 0 8px 28px rgba(139, 108, 255, .14);
+}
+:root[data-design-theme="starlight"] .route-purpose-scene :is(.eyebrow, [data-eyebrow]) {
+  color: var(--reference-cyan);
+}
+:root[data-design-theme="starlight"] .route-purpose-scene :is(button, a) {
+  border-radius: 12px;
+}
+@media (max-width: 767px) {
+  :root[data-design-theme="starlight"] .site-header__inner {
+    min-height: 64px;
+    gap: 8px;
+  }
+  :root[data-design-theme="starlight"] .site-header__brand-copy .site-header__tagline {
+    display: none;
+  }
+  :root[data-design-theme="starlight"] [data-site-experience] .public-story-hero {
+    border-radius: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-design-theme="starlight"] [data-site-experience] *,
+  :root[data-design-theme="starlight"] .route-purpose-scene * {
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}
+@media (forced-colors: active) {
+  :root[data-design-theme="starlight"] [data-site-experience]::before {
+    display: none;
+  }
+}

@@ -50,7 +50,7 @@ describe("appearance preferences and first paint", () => {
     expect(bootstrapResult({ preference: "light", studioPreference: "midnight" }, "/studio-guide", true)["data-design-theme"]).toBe("light");
   });
   it("boots safely with unavailable storage", () => {
-    expect(bootstrapResult(null, "/studio", true, true)["data-design-theme"]).toBe("dark");
+    expect(bootstrapResult(null, "/studio", true, true)["data-design-theme"]).toBe("starlight");
   });
   it("lets system appearance prioritize OS high contrast at first paint and runtime", () => {
     const state = { preference: "system", studioPreference: "inherit" } as const;

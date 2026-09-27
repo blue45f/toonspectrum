@@ -37,6 +37,7 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, header
     sheetRef,
   });
   const collapsed = state === "collapsed";
+  const snapIndex = characterSheetStateIndex(state);
 
   return (
     <section
@@ -56,11 +57,11 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, header
         aria-orientation="vertical"
         aria-valuemin={0}
         aria-valuemax={2}
-        aria-valuenow={characterSheetStateIndex(state)}
+        aria-valuenow={snapIndex}
         aria-valuetext={`시트 높이 ${stateLabel}`}
         title={`${title} 크기 전환 (현재 ${stateLabel})`}
         className={cn(
-          "group relative flex min-h-11 w-full shrink-0 cursor-grab select-none items-start justify-center rounded-t-2xl pt-2 active:cursor-grabbing",
+          "group relative flex min-h-11 w-full shrink-0 cursor-grab select-none items-center justify-center gap-2 rounded-t-2xl py-1 active:cursor-grabbing",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent",
         )}
       >
@@ -68,6 +69,16 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, header
           aria-hidden
           className="h-1 w-10 rounded-full bg-line-strong transition-[width,background-color] duration-150 group-hover:w-12 group-hover:bg-fg-3 group-focus-visible:w-12 group-focus-visible:bg-accent motion-reduce:transition-none"
         />
+        {/* 세 단계 스냅 위치를 눈으로 확인하게 한다. collapsed/half/full 한 칸씩 채워진다. */}
+        <span aria-hidden data-character-shaper-sheet-snaps="true" className="flex items-center gap-1">
+          {[0, 1, 2].map((step) => (
+            <span
+              key={step}
+              data-character-shaper-sheet-snap={step <= snapIndex ? "on" : "off"}
+              className="h-1 w-1 rounded-full bg-line-strong transition-colors duration-150 motion-reduce:transition-none"
+            />
+          ))}
+        </span>
         <span className={header ? "sr-only" : "min-w-0 truncate text-[0.75rem] font-semibold text-fg"}>{title}</span>
       </button>
       {header}
@@ -78,7 +89,8 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, header
           aria-controls={contentId}
           onClick={() => onStateChange(collapsed ? "half" : "collapsed")}
           className={cn(
-            "inline-flex min-h-11 items-center rounded-lg px-2 text-[0.68rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg",
+            // 펼치기/접기는 글자 수가 달라 폭이 흔들린다. 고정 폭으로 헤더가 안정된다.
+            "inline-flex min-h-11 w-16 shrink-0 items-center justify-center rounded-lg px-2 text-[0.68rem] font-semibold text-fg-3 hover:bg-raised hover:text-fg",
             "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
           )}
         >
@@ -90,6 +102,8 @@ export function CharacterShaperMobileSheet({ state, onStateChange, title, header
         hidden={collapsed}
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
+        {/* 마지막 조작 행이 홈 인디케이터에 깔리지 않게 안전영역을 존중한다. */}
+        <div data-character-shaper-sheet-safe-area="true" className="shrink-0" aria-hidden />
         {children}
       </div>
     </section>
