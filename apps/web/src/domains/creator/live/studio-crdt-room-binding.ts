@@ -40,7 +40,12 @@ export type StudioCrdtBindingStatusPayload =
   | { state: "idle"; message: string }
   | { state: "syncing"; message: string }
   | { state: "ready"; message: string }
-  | { state: "retrying"; message: string }
+  | {
+      state: "retrying";
+      message: string;
+      /** 문서 전달은 완료했지만 권위 서버 ACK가 없어 보관함을 유지하는 상태다. */
+      nonAuthoritativeDeliveryPending?: true;
+    }
   | { state: "repairing"; message: string }
   | { state: "error"; message: string; durabilityAtRisk?: boolean }
   | {
@@ -906,6 +911,7 @@ export class StudioCrdtRoomBinding {
       if (!this.hasAuthoritativeServer() && this.pending.size > 0) {
         this.emitStatus({
           state: "retrying",
+          nonAuthoritativeDeliveryPending: true,
           message:
             "참여자에게 전달됐지만 팀 서버 승인은 아직 없습니다. 서버 재연결까지 이 기기의 복구 저장소에 보관합니다.",
         });

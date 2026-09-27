@@ -1522,7 +1522,10 @@ describe("StudioCrdtRoomBinding", () => {
     await binding.start();
     add(client, "unacknowledged-server-peer", 54);
     await vi.advanceTimersByTimeAsync(40);
-    expect(statuses.at(-1)).toMatchObject({ state: "retrying", pendingCount: 1, lastAckAt: null });
+    expect(statuses.at(-1)).toMatchObject({
+      state: "retrying", pendingCount: 1, lastAckAt: null,
+      nonAuthoritativeDeliveryPending: true,
+    });
     await expect(binding.flushAndWaitForAuthoritativeAck()).rejects.toThrow("서버 승인 전");
     await vi.advanceTimersByTimeAsync(20_000);
     expect(serverRoom.publications).toHaveLength(1);
@@ -1559,6 +1562,7 @@ describe("StudioCrdtRoomBinding", () => {
     const updateId = localRoom.publications[0]?.updateId;
     expect(statuses.at(-1)).toMatchObject({
       state: "retrying",
+      nonAuthoritativeDeliveryPending: true,
       pendingCount: 1,
       persistenceDurability: "durable",
       lastAckAt: null,

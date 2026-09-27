@@ -15,17 +15,19 @@ const mesh: StudioLiveCanonicalAuthorityInput = {
 };
 
 describe("정본 편집 권위와 전송 상태의 분리", () => {
-  it("로컬 문서는 전송 대기가 반복돼도 이미 확인한 페이지 편집 권위를 잃지 않는다", () => {
-    let previousAuthority = resolveStudioLiveCanonicalAuthority(local);
+  it.each([local, mesh])("전달을 마친 $transportMode 문서는 서버 ACK 대기만으로 페이지 편집 권위를 잃지 않는다", (input) => {
+    let previousAuthority = resolveStudioLiveCanonicalAuthority(input);
     for (let index = 0; index < 100; index += 1) {
       previousAuthority = resolveStudioLiveCanonicalAuthority({
-        ...local, bindingState: index % 2 === 0 ? "retrying" : "syncing", previousAuthority,
+        ...input, bindingState: index % 2 === 0 ? "retrying" : "syncing", previousAuthority,
+        nonAuthoritativeDeliveryPending: true,
       });
       expect(previousAuthority).toBe(true);
     }
-    expect(resolveStudioLiveCanonicalAuthority({ ...local, bindingState: "retrying" })).toBe(false);
+    expect(resolveStudioLiveCanonicalAuthority({ ...input, bindingState: "retrying", nonAuthoritativeDeliveryPending: true })).toBe(false);
+    expect(resolveStudioLiveCanonicalAuthority({ ...input, bindingState: "retrying", previousAuthority: true })).toBe(false);
     expect(resolveStudioLiveCanonicalAuthority({
-      ...local, bindingState: "retrying", previousAuthority: true, transportReady: false,
+      ...input, bindingState: "retrying", previousAuthority: true, transportReady: false, nonAuthoritativeDeliveryPending: true,
     })).toBe(false);
   });
 
@@ -52,6 +54,11 @@ describe("정본 편집 권위와 전송 상태의 분리", () => {
       expect(resolveStudioLiveCanonicalAuthority({ ...input, bindingState: "syncing", previousAuthority: revoked })).toBe(false);
       expect(resolveStudioLiveCanonicalAuthority({ ...input, previousAuthority: revoked })).toBe(true);
     }
+  });
+
+  it("권위 서버 ACK 실패는 비권위 전달 대기 표식으로 우회할 수 없다", () => {
+    expect(resolveStudioLiveCanonicalAuthority({ ...server, bindingState: "retrying", previousAuthority: true,
+      nonAuthoritativeDeliveryPending: true })).toBe(false);
   });
 
   it.each([server, mesh])("서버 문서의 재시도에는 로컬 편집 예외를 적용하지 않는다 ($crdtFanout)", (input) => {

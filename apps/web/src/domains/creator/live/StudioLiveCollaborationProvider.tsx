@@ -649,6 +649,8 @@ export function StudioLiveCollaborationProvider({
                 transportMode: nextRoom.mode,
                 crdtFanout: nextRoom.crdtFanout,
                 previousAuthority: canonicalDocumentAuthority,
+                nonAuthoritativeDeliveryPending: status.state === "retrying"
+                  && status.nonAuthoritativeDeliveryPending === true,
               });
               canonicalDocumentAuthority = hasCanonicalAuthority;
               offlineBranchRuntime?.setCanonicalAuthority(hasCanonicalAuthority);
