@@ -32,6 +32,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 
 import type { ReactNode } from "react";
 
+import { StudioScene3dBg3dCutPanel } from "../scene3d/StudioScene3dBg3dCutPanel";
 import { StudioBg3dEditorViewport } from "./StudioBg3dEditorViewport";
 import {
   STUDIO_BG3D_ASSISTANT_CAMERA_PRESETS,
@@ -973,7 +974,7 @@ export function StudioBg3dSceneAssistantWorkspace({
         </div>
 
         <AssistantStepper step={step} onStepChange={changeStep} />
-        <div className="scene-assistant__panel-scroll">{stepContent}</div>
+        <div className="scene-assistant__panel-scroll"><StudioScene3dBg3dCutPanel host={h} />{stepContent}</div>
         {h.error || h.sharedStageUpdateBlockedReason ? (
           <div className="scene-assistant__notice" role="alert">
             {h.error ?? h.sharedStageUpdateBlockedReason}

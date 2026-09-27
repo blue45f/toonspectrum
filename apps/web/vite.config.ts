@@ -5,6 +5,8 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
+import { WEB_REACT_COMPILER_EXCLUDE } from "./vite-react-compiler-filter";
+
 import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { build as viteBuild, createLogger, defineConfig, type Logger, type Plugin } from "vite";
@@ -571,7 +573,7 @@ export default defineConfig(({ command, mode }) => ({
     react(),
     babel({
       presets: [reactCompilerPreset()],
-      exclude: /programmatic-reload(?:-hmr)?\.ts$/u,
+      exclude: WEB_REACT_COMPILER_EXCLUDE,
     }),
   ],
   // 정적 카탈로그 모드에선 lib/server/* (예: live.ts) 가 브라우저 번들로 끌려오며

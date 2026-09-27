@@ -2,7 +2,7 @@
 
 import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Group } from "three";
+import { Bone, Group, Vector3 } from "three";
 
 import { useCharacterShaperBinding } from "../../character-shaper/useCharacterShaperBinding";
 import { createCharacterPartPreset } from "../presets/character-part-preset";
@@ -268,7 +268,7 @@ describe("character SQLite persistence", () => {
   it("retains the preset name until durable success and keeps the draft after failure", async () => {
     render(<Workbench />);
     await act(async () => {});
-    fireEvent.click(screen.getByRole("button", { name: /품질 도구/u }));
+    fireEvent.click(screen.getByRole("button", { name: "캐릭터 저작 도구" }));
     fireEvent.click(screen.getByRole("tab", { name: /프리셋/u }));
     const name = screen.getByRole("textbox", { name: "이름" }) as HTMLInputElement;
     const button = screen.getByRole("button", { name: "현재 파츠 저장" }) as HTMLButtonElement;
@@ -398,24 +398,54 @@ describe("workbench document and pose actions", () => {
     const apply = vi.fn();
     const hook = readyWorkbench({ customBones: { invalid: [1, 2], nonfinite: [0, Number.NaN, 0] }, handlePhotoPoseApply: apply });
     await act(async () => {}); act(() => expect(hook.result.current.stabilizeCurrentPose()).toBe(false));
-    expect(apply).not.toHaveBeenCalled(); expect(hook.result.current.notice).toContain("먼저 포즈");
+    expect(apply).not.toHaveBeenCalled();
+    expect(hook.result.current.poseRuntime.supported).toBe(false);
+    expect(hook.result.current.poseRuntime.message).toContain("지원하는 캐릭터");
     hook.unmount(); const noHandler = readyWorkbench({ customBones: { spine: [0.1, 0.2, 0.3] } });
     await act(async () => {}); act(() => expect(noHandler.result.current.stabilizeCurrentPose()).toBe(false));
   });
   it("stabilizes selected pose regions with finite Euler output and actual foot-contact data", async () => {
     const apply = vi.fn();
-    const h = { ...host(), customBones: { spine: [0.1, 0.2, 0.3], leftUpperArm: [0.1, 0.2, 0], malformed: [1, 2] }, handlePhotoPoseApply: apply,
-      vrm: { scene: new Group(), humanoid: { getNormalizedBoneNode: (name: string) => name === "leftFoot" ? { getWorldPosition: (target: { set: (x: number, y: number, z: number) => unknown }) => target.set(0.1, -0.02, 0.3) } : null } },
-    } as unknown as StudioVrmPoserHost;
+    const scene = new Group(); scene.position.y = -0.02;
+    const nodes = new Map<string, Bone>();
+    const add = (name: string, parent: Group | Bone, position: readonly [number, number, number]) => {
+      const node = new Bone(); node.position.set(...position); nodes.set(name, node); parent.add(node); return node;
+    };
+    const hips = add("hips", scene, [0, 2, 0]);
+    add("spine", hips, [0, 0.3, 0]).rotation.set(0.1, 0.2, 0.3, "XYZ");
+    const arm = add("leftUpperArm", hips, [0.2, 0.4, 0]); arm.rotation.set(0.1, 0.2, 0, "YXZ");
+    const elbow = add("leftLowerArm", arm, [0.6, 0, 0]); add("leftHand", elbow, [0.6, 0, 0]);
+    for (const [side, x] of [["left", 0.15], ["right", -0.15]] as const) {
+      const upper = add(`${side}UpperLeg`, hips, [x, 0, 0]);
+      const lower = add(`${side}LowerLeg`, upper, [0, -1, 0]); add(`${side}Foot`, lower, [0, -1, 0]);
+    }
+    scene.updateMatrixWorld(true);
+    const armBefore = arm.quaternion.clone();
+    const h: StudioVrmPoserHost = { ...host(), status: "ready", customBones: { spine: { rotation: [0.1, 0.2, 0.3] }, leftUpperArm: { rotation: [0.1, 0.2, 0] } }, customYOffset: -0.02,
+      bodyRotation: 0, poseTranslations: { version: 1, root: [0, 0, 0], hips: [0, 0, 0], spine: [0, 0, 0] }, handlePhotoPoseApply: apply,
+      vrm: { scene, humanoid: { getNormalizedBoneNode: (name: string) => nodes.get(name) ?? null, update: () => {} } },
+      setCustomBones: (value: unknown) => { h.customBones = value; }, setCustomYOffset: (value: number) => { h.customYOffset = value; },
+      setPoseTranslations: (value: unknown) => { h.poseTranslations = value; }, setBodyRotation: (value: number) => { h.bodyRotation = value; },
+    };
     const hook = renderHook(() => useCharacterPlatformWorkbench(h, useCharacterShaperBinding(h))); await act(async () => {});
     act(() => hook.result.current.setSelectedPoseRegions(["torso"]));
     expect(hook.result.current.selectedPoseRegions).toEqual(["torso"]);
     act(() => expect(hook.result.current.stabilizeCurrentPose()).toBe(true));
-    expect(apply).toHaveBeenCalledTimes(1);
-    const value = apply.mock.calls[0][0]; expect(value.sourceName).toBe("현재 포즈 · Pose V2 안정화");
-    expect(Object.keys(value.bones).sort()).toEqual(["leftUpperArm", "spine"]);
-    for (const bone of Object.values(value.bones) as number[][]) { expect(bone).toHaveLength(3); expect(bone.every(Number.isFinite)).toBe(true); }
-    expect(value.bones.leftUpperArm[0]).toBeCloseTo(0.1); expect(value.bones.leftUpperArm[1]).toBeCloseTo(0.2);
-    expect(hook.result.current.notice).toContain("Pose V2 적용");
+    expect(apply).not.toHaveBeenCalled();
+    expect(hook.result.current.poseRuntime.previewing).toBe(true);
+    const pose = hook.result.current.authoring.snapshot.previewDocument?.pose;
+    expect(pose?.contacts).toHaveLength(2);
+    expect(pose?.contacts.find((contact) => contact.bone === "leftFoot")?.target[1]).toBeCloseTo(-0.02);
+    expect(nodes.get("leftFoot")?.getWorldPosition(new Vector3()).y).toBeCloseTo(-0.02);
+    expect(arm.quaternion.angleTo(armBefore)).toBeLessThan(1e-7);
+    const values: unknown = h.customBones;
+    if (!values || typeof values !== "object") throw new Error("포즈 출력 누락");
+    for (const entry of Object.values(values)) {
+      if (!entry || typeof entry !== "object" || !("rotation" in entry) || !Array.isArray(entry.rotation)) throw new Error("회전 출력 누락");
+      expect(entry.rotation).toHaveLength(3); expect(entry.rotation.every(Number.isFinite)).toBe(true);
+    }
+    expect(hook.result.current.authoring.snapshot.historyLength).toBe(0);
+    act(() => hook.result.current.poseRuntime.apply());
+    expect(hook.result.current.authoring.snapshot.historyLength).toBe(1);
   });
 });

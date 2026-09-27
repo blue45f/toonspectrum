@@ -1,8 +1,4 @@
 import {
-  serializeStudioBg3dSceneDocument,
-  type StudioBg3dSceneDocument,
-} from "../bg3d/studio-bg3d-scene-document";
-import {
   parseStudioLinked3dRenderDocument,
   validateStudioLinked3dRenderDocumentAgainstPage,
   type StudioLinked3dRenderDocument,
@@ -21,6 +17,16 @@ import {
   type StudioScene3dAuthoritySnapshot,
 } from "./studio-scene3d-authority";
 import type { StudioScene3dDocumentV1 } from "./studio-scene3d-document";
+import {
+  describeStudioScene3dLinkedLayerReview,
+  resolveCanonicalStudioBg3dSceneForBundle,
+  type StudioScene3dLinkedLayerReviewState,
+} from "./studio-scene3d-linked-layer-source";
+
+export {
+  resolveCanonicalStudioBg3dSceneForBundle,
+  type StudioScene3dCanonicalSceneLookup,
+} from "./studio-scene3d-linked-layer-source";
 
 export type StudioScene3dLinkedLayerBridgeFailureCode =
   | "invalid-linked-document"
@@ -47,6 +53,7 @@ export interface StudioScene3dLinkedLayerRoundTrip {
   readonly layerElementIds: readonly string[];
   readonly correctionElementIds: readonly string[];
   readonly pageDocument: StudioLinked3dRenderDocument;
+  readonly review: StudioScene3dLinkedLayerReviewState | null;
 }
 
 export type StudioScene3dLinkedLayerBridgeResult =
@@ -60,30 +67,6 @@ function failure(
   message: string,
 ): StudioScene3dLinkedLayerBridgeFailure {
   return Object.freeze({ ok: false as const, code, message });
-}
-export type StudioScene3dCanonicalSceneLookup =
-  | { readonly ok: true; readonly scene: StudioBg3dSceneDocument }
-  | { readonly ok: false; readonly reason: "missing" | "diverged" };
-
-export function resolveCanonicalStudioBg3dSceneForBundle(
-  elements: readonly StudioLinked3dRenderElementLike[],
-  bundleId: string,
-): StudioScene3dCanonicalSceneLookup {
-  const scenes = elements
-    .filter((element) =>
-      element.type === "image"
-      && element.bg3dLtBundleId === bundleId
-      && element.bg3dScene !== undefined)
-    .map((element) => element.bg3dScene!);
-  if (scenes.length === 0) return { ok: false, reason: "missing" };
-  const serialized = scenes.map(serializeStudioBg3dSceneDocument);
-  const first = serialized[0];
-  if (!first || serialized.some((candidate) => candidate !== first)) {
-    return { ok: false, reason: "diverged" };
-  }
-  const scene = scenes[0];
-  if (!scene) return { ok: false, reason: "missing" };
-  return { ok: true, scene };
 }
 
 export function resolveStudioScene3dLinkedLayerRoundTrip(input: {
@@ -179,6 +162,11 @@ export function resolveStudioScene3dLinkedLayerRoundTrip(input: {
     layerElementIds: Object.freeze(link.layers.map(({ elementId }) => elementId)),
     correctionElementIds: Object.freeze(link.corrections.map(({ elementId }) => elementId)),
     pageDocument,
+    review: describeStudioScene3dLinkedLayerReview({
+      scene,
+      bundleId: input.bundleId,
+      linked3dRender: pageDocument,
+    }),
   });
 }
 

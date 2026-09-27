@@ -96,6 +96,22 @@ const DEFAULT_DEPENDENCIES: StudioBg3dShotArtifactPipelineDependencies = {
   maxTotalBytes: STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
 };
 
+export function assertStudioBg3dShotArtifactActive(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw Object.assign(new Error("컷 출력 artifact 생성을 취소했습니다."), { name: "AbortError" });
+  }
+}
+
+export function assertStudioBg3dShotArtifactBudget(
+  committedArtifactBytes: number,
+  maxTotalBytes = STUDIO_BG3D_SHOT_BATCH_MAX_TOTAL_BYTES,
+): void {
+  if (!Number.isSafeInteger(committedArtifactBytes) || committedArtifactBytes < 0 ||
+    committedArtifactBytes > maxTotalBytes) {
+    throw new RangeError("누적 컷 artifact 크기가 브라우저 배치 메모리 예산을 벗어났습니다.");
+  }
+}
+
 
 /**
  * Produces one shot's artifacts without publishing them. The caller must commit the returned batch
@@ -105,6 +121,8 @@ export async function buildStudioBg3dShotArtifacts(
   input: StudioBg3dShotArtifactPipelineInput,
   dependencies: StudioBg3dShotArtifactPipelineDependencies = DEFAULT_DEPENDENCIES,
 ): Promise<StudioBg3dShotArtifactPipelineResult> {
+  assertStudioBg3dShotArtifactActive(input.signal);
+  assertStudioBg3dShotArtifactBudget(input.committedArtifactBytes, dependencies.maxTotalBytes);
   const ltRenderInput: StudioBg3dLtRasterInput = {
     width: input.captured.width,
     height: input.captured.height,
@@ -117,6 +135,7 @@ export async function buildStudioBg3dShotArtifacts(
     input.settings,
     { signal: input.signal },
   );
+  assertStudioBg3dShotArtifactActive(input.signal);
 
   const images: StudioBg3dShotBatchImage[] = [];
   const skippedArtifacts: StudioBg3dShotBatchSkippedArtifact[] = [];
@@ -125,6 +144,7 @@ export async function buildStudioBg3dShotArtifacts(
   let artifactBytes = 0;
 
   for (const pass of input.passes) {
+    assertStudioBg3dShotArtifactActive(input.signal);
     const selection = selectStudioBg3dShotPassLayers(
       pass,
       input.captured,
@@ -144,6 +164,7 @@ export async function buildStudioBg3dShotArtifacts(
     }
     const pngOptions = { signal: input.signal, timeoutMs: 20_000 } as const;
     const png = await dependencies.encodePngInWorker(passLayers, pngOptions);
+    assertStudioBg3dShotArtifactActive(input.signal);
     if (
       png.size > dependencies.maxImageBytes ||
       input.committedArtifactBytes + artifactBytes + png.size > dependencies.maxTotalBytes
@@ -185,6 +206,7 @@ export async function buildStudioBg3dShotArtifacts(
           signal: input.signal,
           timeoutMs: 90_000,
         });
+        assertStudioBg3dShotArtifactActive(input.signal);
         if (
           input.committedArtifactBytes + artifactBytes + psd.size > dependencies.maxTotalBytes
         ) {
@@ -205,6 +227,7 @@ export async function buildStudioBg3dShotArtifacts(
         }
       } catch (cause) {
         if (cause instanceof Error && cause.name === "AbortError") throw cause;
+        assertStudioBg3dShotArtifactActive(input.signal);
         psdFallbacks.push({
           shotId: input.shot.shotId,
           shotName: input.shot.shotName,
@@ -214,6 +237,7 @@ export async function buildStudioBg3dShotArtifacts(
     }
   }
 
+  assertStudioBg3dShotArtifactActive(input.signal);
   return {
     images,
     skippedArtifacts,

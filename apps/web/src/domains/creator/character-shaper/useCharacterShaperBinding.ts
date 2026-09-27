@@ -1,7 +1,8 @@
 /**
- * Character Shaper — the one bridge between the workshop UI and the existing VRM poser host.
+ * Character Shaper의 기존 VRM 실행 어댑터.
  *
- * The Shaper owns no scene document. Every card selection is *derived* from host state and every
+ * V3 상위 controller에서는 runtimeOnly로 호스트 실행만 담당하며 편집 원본과 이력은 V3가 소유한다.
+ * 기존 독립 사용자는 호스트 snapshot 이력을 유지한다. Every card selection is *derived* from host state and every
  * commit is a small, ordered set of host calls (`character-shaper-apply-plan.ts` decides which).
  * This hook is where those two directions meet:
  *
@@ -31,6 +32,7 @@ import {
 } from "../vrm/studio-vrm-avatar-forge";
 import { STUDIO_VRM_PROPORTION_PRESETS } from "../vrm/studio-vrm-proportion-core";
 import { createPropInstance } from "../vrm/studio-vrm-props";
+import { applyWardrobeItemSelection, applyWardrobeSet, createWardrobeEquip, selectableWardrobeSetById } from "../vrm/studio-vrm-wardrobe";
 
 import {
   planCharacterSlotApply,
@@ -279,7 +281,27 @@ export function characterShaperBusyReason(h: StudioVrmPoserHost): string | null 
 /* Binding                                                                     */
 /* -------------------------------------------------------------------------- */
 
-export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShaperBinding {
+export interface CharacterShaperBindingOptions {
+  /** 편집 명령·history를 상위 V3 authority가 소유하는 호스트 재생 모드. */
+  readonly runtimeOnly?: boolean;
+}
+
+export interface CharacterShaperRuntimeBinding extends CharacterShaperBinding {
+  /** 검증한 문서 명령을 재생한다. 사용자 busy/preview gate와 snapshot history는 통과하지 않는다. */
+  replay(
+    steps: readonly CharacterApplyStep[],
+    colors?: Partial<CharacterRecipe["colors"]>,
+    expression?: {
+      readonly activeEntryId: string | null;
+      readonly weights: Readonly<Record<string, number>>;
+    },
+  ): { readonly ok: boolean; readonly reason: string | null };
+}
+
+export function useCharacterShaperBinding(
+  h: StudioVrmPoserHost,
+  { runtimeOnly = false }: CharacterShaperBindingOptions = {},
+): CharacterShaperRuntimeBinding {
   const hostRef = useRef(h);
   const [session, setSession] = useState<CharacterShaperSession>({
     irisColor: null,
@@ -296,7 +318,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     sessionRef.current = next;
     setSession(next);
   }, []);
-  const history = useCharacterShaperHistory<CharacterShaperHostState>();
+  const history = useCharacterShaperHistory<CharacterShaperHostState>({ enabled: !runtimeOnly });
   const resetHistory = history.reset;
   const pushHistory = history.push;
 
@@ -458,6 +480,14 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
       lastHandPoseType: null,
       handPoseTypes: undefined,
     };
+    if (runtimeOnly) {
+      if (baselineModelRef.current === modelId) return;
+      baselineModelRef.current = modelId;
+      baselineRef.current = null;
+      compareStashRef.current = null;
+      updateSession(baselineSession);
+      return;
+    }
     baselineModelRef.current = modelId;
     baselineRef.current = { ...captureHostState(), ...baselineSession };
     compareStashRef.current = null;
@@ -465,7 +495,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     setCompareActiveState(false);
     resetHistory();
     updateSession(baselineSession);
-  }, [status, modelId, derivedSnapshot, captureHostState, resetHistory, updateSession]);
+  }, [status, modelId, derivedSnapshot, captureHostState, resetHistory, runtimeOnly, updateSession]);
 
   /* ---------------------------------------------------------------------- */
   /* Iris tint — re-applied whenever the host repaints custom colours         */
@@ -490,8 +520,10 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     gradeCharacterRef.current = shaperCharacterFromRecipe(recipe, gradeCharacterRef.current.pose);
   }, [recipe]);
 
-  const runSteps = useCallback((steps: readonly CharacterApplyStep[], colorChanges: Partial<CharacterRecipe["colors"]> = {}) => {
+  const runSteps = useCallback((steps: readonly CharacterApplyStep[], colorChanges: Partial<CharacterRecipe["colors"]> = {}, runtimeReplay = false) => {
     const host = hostRef.current;
+    let wardrobeDraft = readRecord<WardrobeEquip>(host.wardrobeState) as WardrobeState;
+    let wardrobeChanged = false;
     let mergedForge: AvatarForgeState | null = null;
     const forgeDraft = (): AvatarForgeState => {
       mergedForge ??= forgeOfHost(host);
@@ -551,13 +583,25 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
           host.setExpressionWeights?.(merged);
           break;
         }
-        case "wardrobe-equip":
-          host.equipWardrobeItem?.(step.slot, step.itemId);
-          if (step.itemId !== null && step.color) host.updateWardrobeEquip?.(step.slot, { color: step.color });
+        case "wardrobe-equip": {
+          wardrobeDraft = applyWardrobeItemSelection(wardrobeDraft, step.slot, step.itemId);
+          const equip = wardrobeDraft[step.slot];
+          if (equip && step.color) wardrobeDraft = { ...wardrobeDraft, [step.slot]: { ...equip, color: step.color } };
+          wardrobeChanged = true;
+          if (!runtimeReplay) {
+            host.equipWardrobeItem?.(step.slot, step.itemId);
+            if (step.itemId !== null && step.color) host.updateWardrobeEquip?.(step.slot, { color: step.color });
+          }
           break;
-        case "wardrobe-set":
-          host.equipWardrobeSetById?.(step.setId);
+        }
+        case "wardrobe-set": {
+          const set = selectableWardrobeSetById(step.setId);
+          if (!set) throw new Error("옷 세트를 찾을 수 없습니다.");
+          wardrobeDraft = applyWardrobeSet(set);
+          wardrobeChanged = true;
+          if (!runtimeReplay) host.equipWardrobeSetById?.(step.setId);
           break;
+        }
         case "costume-visibility": {
           const costume = (host.costumeState ?? null) as CharacterCostumeState | null;
           if (!costume) break;
@@ -591,10 +635,14 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
           break;
         case "expression-preset": {
           const preset = EXPRESSION_PRESETS.find((item) => item.id === step.presetId);
-          if (preset) host.handleExpressionPresetSelect?.(preset);
+          if (preset && runtimeReplay) {
+            host.setActiveExpressionId(`preset:${preset.id}`);
+            host.setExpressionWeights({ ...preset.weights });
+          } else if (preset) host.handleExpressionPresetSelect?.(preset);
           break;
         }
         case "pose-preset":
+          if (runtimeReplay) throw new Error("포즈 원본은 Pose V3 문서 실행기로 재생해야 합니다.");
           host.handlePoseSelect?.(step.presetId);
           // Keep the grade twin aligned with shelf pose commits (bridge was unused).
           gradeCharacterRef.current = planShaperGradePosePreset(
@@ -631,8 +679,13 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     };
     const garment = (slots: readonly WardrobeSlot[], fallback: string | null, hex: string | null) => {
       const equipped = slots.find((slot) => worn.has(slot));
-      if (equipped && hex) {
-        host.updateWardrobeEquip?.(equipped, { color: hex });
+      const item = equipped ? wardrobeDraft[equipped] : undefined;
+      if (equipped && item) {
+        const color = hex ?? createWardrobeEquip(item.itemId)?.color;
+        if (!color) return;
+        wardrobeDraft = { ...wardrobeDraft, [equipped]: { ...item, color } };
+        wardrobeChanged = true;
+        if (!runtimeReplay) host.updateWardrobeEquip?.(equipped, { color });
         colorChanged = true;
       } else if (fallback) setCustom(fallback, hex);
     };
@@ -661,6 +714,10 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
       }
     }
     if (customColorsChanged) host.setCustomColors?.(colors);
+    if (runtimeReplay && wardrobeChanged) {
+      if (typeof host.setWardrobeState !== "function") throw new Error("의상 원본을 재생할 수 있는 편집기가 필요합니다.");
+      host.setWardrobeState(wardrobeDraft);
+    }
 
     // One merged Avatar Forge write per commit, exactly as the brief requires.
     if (mergedForge) host.handleAvatarForgeChange?.(mergedForge);
@@ -673,6 +730,27 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     }
     return steps.length > 0 || colorChanged;
   }, [updateSession]);
+
+  const replay = useCallback<CharacterShaperRuntimeBinding["replay"]>((steps, colors, expression) => {
+    const before = captureHostState();
+    try {
+      runSteps(steps, colors, true);
+      if (expression) {
+        hostRef.current.setActiveExpressionId(expression.activeEntryId ?? "");
+        hostRef.current.setExpressionWeights({ ...expression.weights });
+      }
+      return { ok: true, reason: null };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "캐릭터 문서를 화면에 적용하지 못했습니다.";
+      try {
+        restoreHostState(before);
+      } catch (restoreError) {
+        const detail = restoreError instanceof Error ? restoreError.message : "복원 오류";
+        return { ok: false, reason: `${reason} · 이전 상태 복원도 실패했습니다: ${detail}` };
+      }
+      return { ok: false, reason };
+    }
+  }, [captureHostState, restoreHostState, runSteps]);
 
   /* ---------------------------------------------------------------------- */
   /* Commit surface                                                          */
@@ -981,7 +1059,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     }
   }, []);
 
-  return useMemo<CharacterShaperBinding>(() => ({
+  return useMemo<CharacterShaperRuntimeBinding>(() => ({
     catalog: CHARACTER_SLOT_CATALOG,
     profile,
     snapshot,
@@ -1015,6 +1093,7 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     mirrorGradePose,
     exportGradeSession,
     importGradeSession,
+    replay,
   }), [
     profile,
     snapshot,
@@ -1048,5 +1127,6 @@ export function useCharacterShaperBinding(h: StudioVrmPoserHost): CharacterShape
     mirrorGradePose,
     exportGradeSession,
     importGradeSession,
+    replay,
   ]);
 }

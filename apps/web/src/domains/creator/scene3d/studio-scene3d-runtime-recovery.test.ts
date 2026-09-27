@@ -23,6 +23,15 @@ function failure(
 }
 
 describe("Studio Scene3D runtime recovery", () => {
+  it.each([NaN, Infinity, -1, 0.5])("복구 원본 revision %s와 잘못된 재시도 횟수를 거부한다", (value) => {
+    expect(() => planStudioScene3dRuntimeRecovery(failure({ documentRevision: value }))).toThrow(/authority receipt/);
+    expect(() => planStudioScene3dRuntimeRecovery(failure({ attempt: value }))).toThrow(/authority receipt/);
+  });
+
+  it("손상된 원본 해시로 GPU 복구를 시작하지 않는다", () => {
+    expect(() => planStudioScene3dRuntimeRecovery(failure({ documentSourceHash: "sha256:broken" }))).toThrow(/authority receipt/);
+  });
+
   it("retries the exact WebGPU authority once, then requires explicit WebGL2 consent", () => {
     expect(planStudioScene3dRuntimeRecovery(failure())).toMatchObject({
       action: "retry-selected-runtime",

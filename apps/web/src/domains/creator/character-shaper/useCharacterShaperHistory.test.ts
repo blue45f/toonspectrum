@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
 
-import { CHARACTER_SHAPER_HISTORY_LIMIT, CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES, characterShaperHistoryState, estimateCharacterShaperHistoryEntryBytes, createCharacterShaperHistory, pushCharacterShaperHistory, redoCharacterShaperHistory, undoCharacterShaperHistory } from "./useCharacterShaperHistory";
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { CHARACTER_SHAPER_HISTORY_LIMIT, CHARACTER_SHAPER_HISTORY_MAX_ESTIMATED_BYTES, characterShaperHistoryState, estimateCharacterShaperHistoryEntryBytes, createCharacterShaperHistory, pushCharacterShaperHistory, redoCharacterShaperHistory, undoCharacterShaperHistory, useCharacterShaperHistory } from "./useCharacterShaperHistory";
 
 import type { CharacterShaperHistoryStack } from "./useCharacterShaperHistory";
 
 type Snapshot = { readonly value: string };
+
+afterEach(cleanup);
 
 function stackOf(...labels: readonly string[]): CharacterShaperHistoryStack<Snapshot> {
   let stack = createCharacterShaperHistory<Snapshot>();
@@ -15,6 +20,38 @@ function stackOf(...labels: readonly string[]): CharacterShaperHistoryStack<Snap
 }
 
 describe("character shaper history", () => {
+  it("외부 authority 모드에서는 snapshot을 읽거나 이력 변경으로 렌더하지 않는다", () => {
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders += 1;
+      return useCharacterShaperHistory<Snapshot>({ enabled: false });
+    });
+    const initialRenders = renders;
+    const snapshot: Snapshot = {
+      get value(): string { throw new Error("외부 authority의 snapshot을 로컬 이력에서 읽으면 안 됩니다."); },
+    };
+    act(() => {
+      result.current.push("문서 재생", snapshot);
+      expect(result.current.undo(snapshot)).toBeNull();
+      expect(result.current.redo(snapshot)).toBeNull();
+      result.current.reset();
+    });
+    expect(renders).toBe(initialRenders);
+    expect(result.current.state).toEqual({ canUndo: false, canRedo: false, length: 0, recentLabels: [] });
+  });
+
+  it("authority 전환 후 독립 모드로 돌아와도 이전 snapshot을 복원하지 않는다", () => {
+    const { result, rerender } = renderHook(({ enabled }) => useCharacterShaperHistory<Snapshot>({ enabled }), {
+      initialProps: { enabled: true },
+    });
+    act(() => result.current.push("이전 호스트", { value: "이전 모델" }));
+    expect(result.current.state.length).toBe(1);
+    rerender({ enabled: false });
+    rerender({ enabled: true });
+    act(() => expect(result.current.undo({ value: "복원한 문서" })).toBeNull());
+    expect(result.current.state.length).toBe(0);
+  });
+
   it("starts empty and reports nothing to undo or redo", () => {
     expect(characterShaperHistoryState(createCharacterShaperHistory<Snapshot>())).toEqual({
       canUndo: false,

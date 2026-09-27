@@ -38,6 +38,7 @@ import {
 } from "./studio-bg3d-scene-document";
 import { STUDIO_BG3D_SHOT_BATCH_MAX_DIMENSION } from "./studio-bg3d-shot-batch-limits";
 import { loadStudioBg3dShotBatchRuntime } from "./studio-bg3d-shot-batch-runtime-loader";
+import { assertStudioBg3dShotPsdCaptureSupported, assertStudioBg3dShotRequestedOutput } from "./studio-bg3d-shot-output-contract";
 import {
   freezeStudioBg3dShotAnimationsForBatch,
   projectStudioBg3dShotVisibilityToRuntime,
@@ -462,6 +463,11 @@ export function createStudioBg3dShotBatchExportRunner(
       });
       if (!batchPlanResult.ok) throw new Error(batchPlanResult.message);
       batchPlan = batchPlanResult.plan;
+      assertStudioBg3dShotPsdCaptureSupported({
+        includeLayeredPsd: batchPlan.includeLayeredPsd,
+        shots: batchPlan.shots,
+        needsTiles: (width, height) => studioBg3dBatchNeedsTiles(planningAdapter, width * height, captureQuality.maxRenderPixels, false),
+      });
       await assertRecoveryAccess();
       recoverySession = await shotBatchRecoveryStore.acquire(batchPlan, batchSourceRevision, {
         signal: controller.signal,
@@ -744,6 +750,12 @@ export function createStudioBg3dShotBatchExportRunner(
           signal: controller.signal,
         });
         if (!activeRunToken) throw new Error("컷 배치 실행 토큰을 읽지 못했습니다.");
+        assertStudioBg3dShotRequestedOutput({
+          includeLayeredPsd: batchPlan.includeLayeredPsd,
+          shots: [shot],
+          layeredPsds: shotArtifacts.layeredPsds,
+          psdFallbacks: shotArtifacts.psdFallbacks,
+        });
         await assertRecoveryAccess();
         await shotBatchRecoveryStore.completeShot(recoverySession, activeRunToken, {
           images: shotArtifacts.images,
@@ -789,6 +801,13 @@ export function createStudioBg3dShotBatchExportRunner(
       if (images.length === 0) {
         throw new Error("선택한 패스가 모든 컷에서 꺼져 있어 출력 artifact가 없습니다.");
       }
+      const requestedOutput = {
+        includeLayeredPsd: batchPlan.includeLayeredPsd,
+        shots: batchPlan.shots,
+        layeredPsds,
+        psdFallbacks,
+      };
+      assertStudioBg3dShotRequestedOutput(requestedOutput);
 
       let contactSheets: StudioBg3dShotBatchContactSheet[] = [];
       let contactSheetFallback: StudioBg3dShotBatchContactSheetFallback | undefined;
@@ -891,6 +910,7 @@ export function createStudioBg3dShotBatchExportRunner(
         document.body.append(anchor);
         try {
           await commitStudioBg3dShotBatchDownload({
+            requestedOutput,
             signal: controller.signal,
             isActive: () => componentActiveRef.current,
             assertAccess: assertRecoveryAccess,

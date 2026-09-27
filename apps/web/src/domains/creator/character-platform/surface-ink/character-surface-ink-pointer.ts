@@ -37,15 +37,17 @@ export function characterSurfacePointerIntersection(
     if (
       object instanceof Mesh &&
       object.visible &&
-      object.userData.toonstudioSurfaceInk !== true
+      object.userData.toonstudioSurfaceInk !== true &&
+      !object.userData.characterAuthoringDerivative
     ) {
       targets.push(object);
     }
   });
+  const sources = characterSurfaceSourceMap(scene);
   return (
     raycaster
       .intersectObjects(targets, false)
-      .find((hit) => hit.faceIndex != null) ?? null
+      .find((hit) => hit.faceIndex != null && sources.get(characterSurfaceObjectPath(hit.object)) === hit.object) ?? null
   );
 }
 

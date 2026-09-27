@@ -256,10 +256,14 @@ function makeHost(overrides: Record<string, unknown> = {}): StudioVrmPoserHost {
   };
 }
 
-function installMatchMedia(width: number) {
+function installMatchMedia(width: number, height = 900, coarse = false) {
   vi.stubGlobal("matchMedia", (query: string) => {
     const match = /\(min-width:\s*(\d+)px\)/u.exec(query);
-    const matches = match ? width >= Number(match[1]) : false;
+    const matches = query.includes("orientation: portrait")
+      ? coarse && height >= width && width <= 1023
+      : query.includes("pointer: coarse")
+        ? coarse && width >= 600 && width > height && height <= 500
+        : match ? width >= Number(match[1]) : false;
     return {
       matches,
       media: query,
@@ -296,8 +300,8 @@ function HostHarness({ base, binding, onOpenAdvanced }: { base: StudioVrmPoserHo
   return <StudioCharacterShaperDialog h={h} binding={binding} onOpenAdvanced={onOpenAdvanced} />;
 }
 
-function renderDialog(options: { width?: number; h?: StudioVrmPoserHost; binding?: CharacterShaperBinding; onOpenAdvanced?: () => void } = {}) {
-  installMatchMedia(options.width ?? 1440);
+function renderDialog(options: { width?: number; height?: number; coarse?: boolean; h?: StudioVrmPoserHost; binding?: CharacterShaperBinding; onOpenAdvanced?: () => void } = {}) {
+  installMatchMedia(options.width ?? 1440, options.height, options.coarse);
   const h = options.h ?? makeHost();
   const binding = options.binding ?? makeBinding();
   const view = render(<HostHarness base={h} binding={binding} onOpenAdvanced={options.onOpenAdvanced} />);
@@ -323,6 +327,128 @@ afterEach(() => {
 });
 
 describe("StudioCharacterShaperDialog shell", () => {
+  it.each([[768, 1024], [820, 1180]])("세로 터치 태블릿 %sx%s는 검사 패널이 카메라를 덮지 않는다", (width, height) => {
+    const { h } = renderDialog({ width, height, coarse: true });
+    expect(dialogRoot()?.getAttribute("data-character-shaper-layout")).toBe("mobile");
+    expect(document.querySelector('[data-character-shaper-sheet="collapsed"]')).toBeTruthy();
+    expect(document.querySelector('[data-character-shaper-inspector="slide-over"]')).toBeNull();
+    expect(screen.getByTestId("dock").getAttribute("data-compact")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "전신" }));
+    expect(h.setActiveCameraId).toHaveBeenCalledWith("fullBody");
+  });
+
+  it.each([320, 360, 390, 412])("세로 %spx에서 필터를 접은 프리셋을 연다", (width) => {
+    renderDialog({ width, height: 800, coarse: true });
+    fireEvent.click(screen.getByRole("tab", { name: "프리셋" }));
+    expect(screen.getByRole("button", { name: /필터/u }).getAttribute("aria-expanded")).toBe("false");
+    expect(document.querySelectorAll("[data-character-slot-card]")).toHaveLength(2);
+  });
+
+  it.each([[667, 375], [844, 390]])("터치 가로 %sx%s에서 도구를 옆에 열고 보기 조작까지 다시 접근한다", (width, height) => {
+    const { h } = renderDialog({ width, height, coarse: true });
+    const root = dialogRoot();
+    const stage = document.querySelector('[data-character-shaper-stage="true"]');
+    expect(root?.getAttribute("data-character-shaper-layout")).toBe("mobile");
+    expect(root?.getAttribute("data-character-shaper-landscape")).toBe("true");
+    expect(document.querySelector('[data-character-shaper-sheet="collapsed"]')).toBeTruthy();
+    expect(screen.getByTestId("dock").getAttribute("data-compact")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "편집 도구 펼치기" }));
+    expect(document.querySelector('[data-character-shaper-mobile-body]')?.getAttribute("data-tools-open")).toBe("true");
+    fireEvent.click(screen.getByRole("tab", { name: "보기" }));
+    const tools = screen.getByRole("tabpanel", { name: "보기" });
+    expect(tools.contains(screen.getByRole("group", { name: "카메라 프리셋" }))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "전신" }));
+    expect(h.setActiveCameraId).toHaveBeenCalledWith("fullBody");
+    expect(tools.contains(screen.getByRole("button", { name: "확대" }))).toBe(true);
+    fireEvent.keyDown(screen.getByRole("tab", { name: "보기" }), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "프리셋" }));
+    fireEvent.click(screen.getByRole("button", { name: "모델 크게 보기" }));
+    expect(document.querySelector('[data-character-shaper-mobile-body]')?.hasAttribute("data-tools-open")).toBe(false);
+    expect(document.querySelector('[data-character-shaper-stage="true"]')).toBe(stage);
+  });
+
+  it("세로 휴대폰에서 키보드가 높이를 줄여도 우측 패널로 바뀌지 않는다", () => {
+    renderDialog({ width: 390, height: 350, coarse: true });
+    expect(dialogRoot()?.getAttribute("data-character-shaper-layout")).toBe("mobile");
+    expect(dialogRoot()?.hasAttribute("data-character-shaper-landscape")).toBe(false);
+    expect(screen.queryByRole("tab", { name: "보기" })).toBeNull();
+  });
+
+  it.each([[768, 1024, false, "tablet"], [1280, 800, false, "desktop"]] as const)("%sx%s의 기존 %s 입력 레이아웃을 보존한다", (width, height, coarse, expected) => {
+    renderDialog({ width, height, coarse });
+    expect(dialogRoot()?.getAttribute("data-character-shaper-layout")).toBe(expected);
+    expect(dialogRoot()?.hasAttribute("data-character-shaper-landscape")).toBe(false);
+  });
+
+  it("모바일 드로잉은 시트를 가리고 캔버스 밖 HUD를 쓰며 종료 시 도구와 포커스를 복구한다", () => {
+    const { h } = renderDialog({ width: 390, coarse: true });
+    fireEvent.click(screen.getByRole("tab", { name: "프리셋" }));
+    const opener = screen.getByRole("button", { name: "표면 드로잉" });
+    opener.focus();
+    fireEvent.click(opener);
+    expect(screen.queryByRole("toolbar", { name: "캐릭터 슬롯" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "프리셋" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "모델 크게 보기" })).toBeNull();
+    const panel = screen.getByTestId("paint-hud").parentElement;
+    expect(panel?.getAttribute("data-character-shaper-paint-panel")).toBe("true");
+    expect(panel?.classList.contains("absolute")).toBe(false);
+    expect(document.querySelector('[data-character-shaper-stage]')?.contains(panel)).toBe(false);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "드로잉 종료" }));
+    fireEvent.click(screen.getByRole("button", { name: "드로잉 종료" }));
+    expect(h.cancelActiveTexturePaintStroke).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("tab", { name: "프리셋" })).toBeTruthy();
+    expect(document.querySelector('[data-character-shaper-sheet="half"]')).toBeTruthy();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it("프리셋 키보드 포커스에서 드로잉으로 들어가면 Escape 한 번으로 원래 도구에 돌아온다", () => {
+    const { h } = renderDialog({ width: 390 });
+    fireEvent.click(screen.getByRole("tab", { name: "프리셋" }));
+    const card = document.querySelector<HTMLElement>("[data-character-slot-card]");
+    if (!card) throw new Error("프리셋 카드 누락");
+    card.focus();
+    fireEvent.keyDown(card, { key: "b" });
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "드로잉 종료" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByTestId("paint-hud")).toBeNull();
+    expect(document.querySelector('[data-character-shaper-sheet="half"]')).toBeTruthy();
+    expect(document.activeElement).toBe(card);
+    expect(h.onClose).not.toHaveBeenCalled();
+  });
+
+  it("가로 보조 패널을 접으면 숨겨진 도구 대신 모델의 재열기 버튼으로 포커스를 돌린다", () => {
+    renderDialog({ width: 844, height: 390, coarse: true });
+    fireEvent.click(screen.getByRole("button", { name: "편집 도구 펼치기" }));
+    const close = screen.getByRole("button", { name: "접기" });
+    close.focus();
+    fireEvent.click(close);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "편집 도구 펼치기" }));
+  });
+
+  it("모바일은 모델부터 보여주고 현재 슬롯을 눌러도 도구를 열 수 있다", () => {
+    renderDialog({ width: 390 });
+    const viewport = document.querySelector('[data-character-shaper-stage="true"]');
+    expect(document.querySelector('[data-character-shaper-sheet="collapsed"]')).toBeTruthy();
+    fireEvent.click(railButton("face-shape"));
+    expect(document.querySelector('[data-character-shaper-sheet="half"]')).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "모델 크게 보기" }));
+    expect(document.querySelector('[data-character-shaper-sheet="collapsed"]')).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "편집 도구 펼치기" }));
+    expect(document.querySelector('[data-character-shaper-sheet="half"]')).toBeTruthy();
+    expect(document.querySelector('[data-character-shaper-stage="true"]')).toBe(viewport);
+  });
+
+  it("접힌 모바일 시트의 정밀 조절 탭을 누르면 편집 도구가 열린다", () => {
+    renderDialog({ width: 390 });
+    fireEvent.click(screen.getByRole("tab", { name: "정밀 조절" }));
+    expect(document.querySelector('[data-character-shaper-sheet="half"]')).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "정밀 조절" }).getAttribute("aria-selected")).toBe("true");
+    const tab = screen.getByRole("tab", { name: "정밀 조절" });
+    tab.focus();
+    fireEvent.keyDown(tab, { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "프리셋" }));
+  });
+
   it.each([320, 390])("reserves camera controls above the measured canvas at mobile width %s", (width) => {
     const { h } = renderDialog({ width });
     const viewport = document.querySelector<HTMLElement>('[data-character-shaper-viewport="true"]')!;
@@ -567,6 +693,8 @@ describe("StudioCharacterShaperDialog shell", () => {
     expect(rail().getAttribute("aria-orientation")).toBe("horizontal");
     expect(screen.getByTestId("dock").getAttribute("data-compact")).toBe("true");
     const sheet = screen.getByRole("region", { name: "프리셋과 정밀 조절" });
+    expect(sheet.getAttribute("data-character-shaper-sheet")).toBe("collapsed");
+    fireEvent.click(screen.getByRole("button", { name: "펼치기" }));
     expect(sheet.getAttribute("data-character-shaper-sheet")).toBe("half");
     expect(screen.getByRole("tab", { name: "프리셋" }).getAttribute("aria-selected")).toBe("true");
     fireEvent.click(screen.getByRole("tab", { name: "정밀 조절" }));

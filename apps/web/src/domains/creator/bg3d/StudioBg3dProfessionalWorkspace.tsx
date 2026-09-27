@@ -2,7 +2,8 @@
 /* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex --
  * A focusable WAI-ARIA separator is the prescribed interaction model for resizing adjacent panes.
  */
-import { useEffect, useRef, useState } from "react";
+import { isValidElement, useEffect, useRef, useState } from "react";
+import { StudioScene3dBg3dCutPanel } from "../scene3d/StudioScene3dBg3dCutPanel";
 
 import type {
   CSSProperties,
@@ -205,6 +206,7 @@ export function StudioBg3dProfessionalWorkspace({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {isValidElement<{ h?: unknown }>(viewport) && Boolean(viewport.props.h) && <StudioScene3dBg3dCutPanel host={viewport.props.h} />}
       <div
         className="hidden min-h-10 shrink-0 items-center gap-1.5 border-b border-line bg-panel/90 px-2 xl:flex"
         role="toolbar"

@@ -71,11 +71,13 @@ function makeBinding(overrides: Partial<CharacterShaperBinding> = {}): Character
   };
 }
 
-function installMatchMedia(width: number) {
+function installMatchMedia(width: number, height = 900, coarse = false) {
   vi.stubGlobal("matchMedia", (query: string) => {
     const match = /\(min-width:\s*(\d+)px\)/u.exec(query);
     return {
-      matches: match ? width >= Number(match[1]) : false,
+      matches: query.includes("pointer: coarse")
+        ? coarse && width >= 600 && width > height && height <= 500
+        : match ? width >= Number(match[1]) : false,
       media: query,
       onchange: null,
       addEventListener: () => {},
@@ -138,6 +140,21 @@ afterEach(() => {
 });
 
 describe("CharacterShaperSummaryBar", () => {
+  it.each([[667, 375], [844, 390]])("%sx%s 터치 가로에서도 모델 전환·저장·고급 편집을 더 보기에서 쓴다", (width, height) => {
+    installMatchMedia(width, height, true);
+    const host = baseHost();
+    const onSaved = vi.fn();
+    render(<Harness binding={makeBinding()} host={host} onSaved={onSaved} />);
+    expect(screen.queryByLabelText("모델")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+    fireEvent.change(screen.getByLabelText("모델"), { target: { value: "mio" } });
+    expect(host.loadModelFromLibraryEntry).toHaveBeenCalledWith(expect.objectContaining({ id: "mio" }));
+    expect(screen.getByRole("button", { name: "고급 편집" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("변형 이름"), { target: { value: "가로 작업" } });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+    expect(onSaved).toHaveBeenCalledWith("가로 작업");
+  });
+
   it("shows model, style, palette and the changed count, and drives undo / redo", () => {
     const binding = makeBinding();
     render(<Harness binding={binding} host={baseHost()} onSaved={vi.fn()} />);

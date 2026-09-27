@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createStudioScene3dDocument } from "../scene3d/studio-scene3d-document";
+import { createStudioScene3dVersionedCut } from "../scene3d/studio-scene3d-shot-versions";
 import {
   createCharacterDocumentV2,
   projectCharacterRecipeV1,
@@ -62,6 +63,35 @@ function scene() {
 }
 
 describe("Studio browser-first 3D project V3", () => {
+  it("다른 프로젝트 장면을 고정한 컷을 저장하거나 복원하지 않는다", () => {
+    const cut = createStudioScene3dVersionedCut({
+      id: "cut:foreign", name: "다른 프로젝트 컷",
+      scene: createStudioScene3dDocument("project:other"), characters: {},
+    });
+    const project = createStudioWebAuthoringProjectV3({
+      projectId: "project:web-3d", title: "프로젝트 경계",
+      scene: createStudioScene3dDocument("project:web-3d"),
+    });
+    const foreignCuts = { ...project, shotVersions: { version: 1 as const, cuts: [cut] } };
+    expect(() => serializeStudioWebAuthoringProjectV3(foreignCuts)).toThrow(/컷.*프로젝트/u);
+    expect(() => parseStudioWebAuthoringProjectV3(JSON.stringify(foreignCuts))).toThrow(/컷.*프로젝트/u);
+    expect(Object.hasOwn(project, "shotVersions")).toBe(false);
+    expect(cut.source.scene.documentId).toBe("project:other");
+  });
+
+  it("입력 장면의 후속 변경과 복원 소비자의 변경으로부터 저장 snapshot을 보호한다", () => {
+    const sourceScene = { ...createStudioScene3dDocument("project:web-3d"), revision: 1 };
+    const project = createStudioWebAuthoringProjectV3({
+      projectId: "project:web-3d", title: "원본 보존", scene: sourceScene,
+    });
+    sourceScene.revision = 2;
+    expect(project.scene.revision).toBe(1);
+    expect(project.scene).not.toBe(sourceScene);
+    const restored = parseStudioWebAuthoringProjectV3(serializeStudioWebAuthoringProjectV3(project));
+    expect(Object.isFrozen(restored.scene)).toBe(true);
+    expect(Object.isFrozen(restored.scene.cameras[0]?.position)).toBe(true);
+  });
+
   it("keeps Scene3D and CharacterDocument authorities linked by stable id and revision", () => {
     const hero = character();
     const project = createStudioWebAuthoringProjectV3({

@@ -53,6 +53,8 @@ import {
   WandSparkles,
 } from "lucide-react";
 
+import { STUDIO_3D_TOOL_ICONS } from "../studio-3d-ui/studio-3d-tool-icon-registry";
+
 import { CHARACTER_MULTI_SLOT_KINDS, CHARACTER_SLOT_KINDS } from "./character-shaper-contract";
 
 import type {
@@ -76,6 +78,10 @@ export const CHARACTER_SHAPER_BREAKPOINTS = Object.freeze({ desktop: 1280, table
 
 export const CHARACTER_SHAPER_DESKTOP_QUERY = `(min-width: ${CHARACTER_SHAPER_BREAKPOINTS.desktop}px)`;
 export const CHARACTER_SHAPER_TABLET_QUERY = `(min-width: ${CHARACTER_SHAPER_BREAKPOINTS.tablet}px)`;
+/** 짧은 터치 가로 화면에서는 폭과 관계없이 모델 중심 모바일 작업면을 쓴다. */
+export const CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY = "(pointer: coarse) and (orientation: landscape) and (min-width: 600px) and (max-height: 500px)";
+
+export const CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY = "(pointer: coarse) and (orientation: portrait) and (max-width: 1023px)";
 
 export type CharacterShaperLayout = "desktop" | "tablet" | "mobile";
 
@@ -321,7 +327,7 @@ export function describeAvailabilityBadge(availability: CharacterSlotAvailabilit
 /* Slot icons                                                                    */
 /* -------------------------------------------------------------------------- */
 
-const ICON_TABLE: Readonly<Record<string, LucideIcon>> = {
+export const CHARACTER_SHAPER_ICON_REGISTRY: Readonly<Record<string, LucideIcon>> = Object.freeze({
   activity: Activity,
   aperture: Aperture,
   baby: Baby,
@@ -365,33 +371,38 @@ const ICON_TABLE: Readonly<Record<string, LucideIcon>> = {
   venetianmask: VenetianMask,
   wand: Wand,
   wandsparkles: WandSparkles,
-};
+  studio3dfaceshape: STUDIO_3D_TOOL_ICONS["face-shape"],
+  studio3deyes: STUDIO_3D_TOOL_ICONS.eyes,
+  studio3dirises: STUDIO_3D_TOOL_ICONS.irises,
+  studio3dnose: STUDIO_3D_TOOL_ICONS.nose,
+  studio3dmouth: STUDIO_3D_TOOL_ICONS.mouth,
+  studio3dears: STUDIO_3D_TOOL_ICONS.ears,
+  studio3dhair: STUDIO_3D_TOOL_ICONS.hair,
+  studio3dbody: STUDIO_3D_TOOL_ICONS.body,
+  studio3dtop: STUDIO_3D_TOOL_ICONS.top,
+  studio3dbottom: STUDIO_3D_TOOL_ICONS.bottom,
+  studio3dshoes: STUDIO_3D_TOOL_ICONS.shoes,
+  studio3daccessory: STUDIO_3D_TOOL_ICONS.accessory,
+  studio3dexpression: STUDIO_3D_TOOL_ICONS.expression,
+  studio3dpose: STUDIO_3D_TOOL_ICONS.pose,
+  studio3dhandpose: STUDIO_3D_TOOL_ICONS["hand-pose"],
+  studio3dcamera: STUDIO_3D_TOOL_ICONS.camera,
+  studio3dscene: STUDIO_3D_TOOL_ICONS.scene,
+  studio3dsurfaceink: STUDIO_3D_TOOL_ICONS["surface-ink"],
+  studio3dlayers: STUDIO_3D_TOOL_ICONS.layers,
+  studio3dexport: STUDIO_3D_TOOL_ICONS.export,
+  studio3dorbit: STUDIO_3D_TOOL_ICONS.orbit,
+});
 
-const SLOT_FALLBACK_ICON: Readonly<Record<CharacterSlotKind, LucideIcon>> = {
-  "face-shape": ScanFace,
-  eyes: Eye,
-  irises: CircleDot,
-  nose: Triangle,
-  mouth: Smile,
-  ears: Ear,
-  hair: Scissors,
-  body: PersonStanding,
-  top: Shirt,
-  bottom: Layers2,
-  shoes: Footprints,
-  accessory: Gem,
-  expression: Drama,
-  pose: Move,
-  "hand-pose": Hand,
-};
+const SLOT_FALLBACK_ICON: Readonly<Record<CharacterSlotKind, LucideIcon>> = STUDIO_3D_TOOL_ICONS;
 
 /**
- * Resolves a slot meta's lucide icon name ("ScanFace", "scan-face", "scanFace" all match). Unknown
- * names fall back to a per-slot default so the rail never renders an empty button.
+ * 명시한 Lucide/Studio3d 이름을 먼저 찾고, 알 수 없는 이름만 슬롯 기본 벡터로 표시한다.
+ * PascalCase·camelCase·kebab-case·snake_case는 같은 이름으로 취급한다.
  */
 export function characterShaperSlotIcon(name: string | null | undefined, slot?: CharacterSlotKind): LucideIcon {
   const key = (name ?? "").replace(/[^a-z0-9]/giu, "").toLowerCase();
-  const icon = key ? ICON_TABLE[key] : undefined;
+  const icon = Object.hasOwn(CHARACTER_SHAPER_ICON_REGISTRY, key) ? CHARACTER_SHAPER_ICON_REGISTRY[key] : undefined;
   if (icon) return icon;
   return slot ? SLOT_FALLBACK_ICON[slot] : Shapes;
 }

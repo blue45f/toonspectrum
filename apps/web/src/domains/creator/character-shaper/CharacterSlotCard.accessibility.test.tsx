@@ -21,6 +21,79 @@ function card(status: "available" | "unavailable", onCommit = vi.fn(), onKeyNavi
     onCommit={onCommit} onHover={vi.fn()} onFocus={vi.fn()} onKeyNavigate={onKeyNavigate} />;
 }
 describe("CharacterSlotCard touch and keyboard accessibility", () => {
+  it("compact 카드 이미지는 짧게 표시하고 지원 제한의 전체 설명과 접근성 연결을 유지한다", () => {
+    render(<CharacterSlotCard entry={entry} selected={false} compact tabIndex={0}
+      availability={{ status: "partial", reason: "이 모델의 눈 크기만 적용되며 홍채 모양은 유지됩니다.", missing: [] }}
+      onCommit={vi.fn()} onHover={vi.fn()} onFocus={vi.fn()} onKeyNavigate={vi.fn()} />);
+    const button = screen.getByRole("button");
+    expect(button.dataset.characterSlotCardCompact).toBe("true");
+    expect(button.querySelector(".max-h-28")).not.toBeNull();
+    const reason = screen.getByText("이 모델의 눈 크기만 적용되며 홍채 모양은 유지됩니다.");
+    expect(reason.className.split(" ")).toContain("text-xs");
+    expect(reason.className).not.toMatch(/truncate|line-clamp|hidden/u);
+    expect(button.getAttribute("aria-describedby")).toBe(reason.id);
+  });
+
+  it.each(["move", "cancel", "leave"] as const)("터치 %s 이후의 click은 적용하지 않고 새 탭만 한 번 적용한다", (ending) => {
+    const commit = vi.fn(), preview = vi.fn();
+    render(<CharacterSlotCard entry={entry} selected={false} tabIndex={0}
+      availability={{ status: "available", reason: null, missing: [] }}
+      onCommit={commit} onHover={vi.fn()} onFocus={vi.fn()} onKeyNavigate={vi.fn()} onPreviewStart={preview} />);
+    const button = screen.getByRole("button");
+    fireEvent.pointerEnter(button, { pointerType: "touch" });
+    fireEvent.pointerDown(button, { pointerType: "touch", isPrimary: true, clientX: 20, clientY: 30 });
+    fireEvent.focus(button);
+    expect(preview).not.toHaveBeenCalled();
+    if (ending === "move") fireEvent.pointerMove(button, { pointerType: "touch", clientX: 20, clientY: 70 });
+    if (ending === "cancel") fireEvent.pointerCancel(button, { pointerType: "touch" });
+    if (ending === "leave") fireEvent.pointerLeave(button, { pointerType: "touch" });
+    fireEvent.pointerUp(button, { pointerType: "touch" });
+    fireEvent.click(button, { detail: 1 });
+    expect(commit).not.toHaveBeenCalled();
+    fireEvent.pointerDown(button, { pointerType: "touch", isPrimary: true, clientX: 20, clientY: 30 });
+    fireEvent.pointerUp(button, { pointerType: "touch" });
+    fireEvent.click(button, { detail: 1 });
+    expect(commit).toHaveBeenCalledExactlyOnceWith(entry);
+    expect(preview).not.toHaveBeenCalled();
+  });
+
+  it.each(["cancel", "leave", "move-end"] as const)("포커스 없는 터치 %s 이후 들어온 키보드 focus는 미리보기를 시작한다", (ending) => {
+    const preview = vi.fn();
+    render(<CharacterSlotCard entry={entry} selected={false} tabIndex={0}
+      availability={{ status: "available", reason: null, missing: [] }}
+      onCommit={vi.fn()} onHover={vi.fn()} onFocus={vi.fn()} onKeyNavigate={vi.fn()} onPreviewStart={preview} />);
+    const button = screen.getByRole("button");
+    fireEvent.pointerDown(button, { pointerType: "touch", isPrimary: true, clientX: 20, clientY: 30 });
+    if (ending === "cancel") fireEvent.pointerCancel(button, { pointerType: "touch" });
+    if (ending === "leave") fireEvent.pointerLeave(button, { pointerType: "touch" });
+    if (ending === "move-end") {
+      fireEvent.pointerMove(button, { pointerType: "touch", clientX: 20, clientY: 70 });
+      fireEvent.pointerUp(button, { pointerType: "touch" });
+    }
+    expect(preview).not.toHaveBeenCalled();
+    fireEvent.focus(button);
+    expect(preview).toHaveBeenCalledExactlyOnceWith(entry);
+  });
+
+  it("터치 뒤에도 키보드 탐색과 보조 기술의 명시적 활성화를 유지한다", () => {
+    const commit = vi.fn(), preview = vi.fn(), navigate = vi.fn();
+    render(<CharacterSlotCard entry={entry} selected={false} tabIndex={0}
+      availability={{ status: "available", reason: null, missing: [] }}
+      onCommit={commit} onHover={vi.fn()} onFocus={vi.fn()} onKeyNavigate={navigate} onPreviewStart={preview} />);
+    const button = screen.getByRole("button");
+    fireEvent.pointerDown(button, { pointerType: "touch", isPrimary: true });
+    fireEvent.focus(button);
+    fireEvent.pointerCancel(button, { pointerType: "touch" });
+    fireEvent.click(button, { detail: 0 });
+    expect(commit).toHaveBeenCalledExactlyOnceWith(entry);
+    fireEvent.keyDown(button, { key: "ArrowRight" });
+    expect(navigate).toHaveBeenCalledWith("right");
+    expect(preview).toHaveBeenCalledExactlyOnceWith(entry);
+    fireEvent.blur(button);
+    fireEvent.focus(button);
+    expect(preview).toHaveBeenCalledTimes(2);
+  });
+
   it("clearly identifies illustrated shapes as diagrams rather than applied model previews", () => {
     render(card("available"));
     expect(screen.getByText("모양 도해").title).toContain("실제 적용 결과는 3D 화면에서 확인");

@@ -10,7 +10,7 @@ import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { resolveVrmLibraryEntryDisplayName } from "../vrm/studio-vrm-display-name";
 
 import { describeCharacterRecipe, diffCharacterRecipes } from "./character-shaper-recipe";
-import { CHARACTER_SHAPER_TABLET_QUERY, pushCharacterShaperKeyLayer } from "./character-shaper-ui-model";
+import { CHARACTER_SHAPER_TABLET_QUERY, CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY, CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY, pushCharacterShaperKeyLayer } from "./character-shaper-ui-model";
 
 import type { CharacterRecipeColors, CharacterSlotKind } from "./character-shaper-contract";
 import type { CharacterShaperSummaryBarProps } from "./character-shaper-ui-contract";
@@ -86,7 +86,9 @@ export function CharacterShaperSummaryBar({
 }: CharacterShaperSummaryBarProps) {
   const locale = useI18n((state) => state.lang);
   const wide = useMediaQuery(CHARACTER_SHAPER_TABLET_QUERY);
-  const compact = !wide;
+  const touchLandscape = useMediaQuery(CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY);
+  const touchPortrait = useMediaQuery(CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY);
+  const compact = !wide || touchLandscape || touchPortrait;
   const selectId = useId();
   const saveInputId = useId();
   const resetTitleId = useId();

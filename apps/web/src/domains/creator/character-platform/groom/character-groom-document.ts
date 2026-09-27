@@ -254,6 +254,19 @@ export function resampleCharacterGroomGuide(
   if (!finite(spacing) || spacing <= 0) {
     throw new CharacterGroomDocumentError("CHARACTER_GROOM_SPACING_INVALID", "Groom 재샘플 간격은 0보다 커야 합니다.");
   }
+  if (!Array.isArray(guide.points) || guide.points.length < 2 || guide.points.length > 2048) {
+    throw new CharacterGroomDocumentError("CHARACTER_GROOM_POINT_LIMIT", "Groom 원본은 2~2048개의 점이 필요합니다.");
+  }
+  guide.points.forEach(validatePoint);
+  let totalLength = 0;
+  for (let index = 1; index < guide.points.length; index += 1) {
+    const before = guide.points[index - 1];
+    const point = guide.points[index];
+    if (before && point) totalLength += distance(before.position, point.position);
+  }
+  if (!Number.isFinite(totalLength) || Math.ceil(totalLength / spacing) + 1 > 2048) {
+    throw new CharacterGroomDocumentError("CHARACTER_GROOM_POINT_LIMIT", "Groom 재샘플 결과는 2048개 점을 넘을 수 없습니다. 간격을 늘려 주세요.");
+  }
   const result: CharacterGroomGuidePoint[] = [freezePoint(guide.points[0]!)];
   let previous = guide.points[0]!;
   let carry = 0;
@@ -298,6 +311,69 @@ function rotateAroundAxis(
   );
 }
 
+function sampledGuidePoints(
+  guide: CharacterGroomGuideCurve,
+  profile: CharacterGroomProfile,
+): readonly CharacterGroomGuidePoint[] {
+  const root = guide.points[0];
+  if (!root) return [];
+  const samples: CharacterGroomGuidePoint[] = [];
+  const interpolate = (a: number, b: number, c: number, d: number, t: number) =>
+    0.5 * ((2 * b) + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t * t
+      + (-a + 3 * b - 3 * c + d) * t * t * t);
+  let totalLength = 0;
+  for (let index = 1; index < guide.points.length; index += 1) {
+    const before = guide.points[index - 1];
+    const current = guide.points[index];
+    if (before && current) totalLength += distance(before.position, current.position);
+  }
+  if (!Number.isFinite(totalLength) || totalLength <= EPSILON) {
+    throw new CharacterGroomDocumentError("CHARACTER_GROOM_CURVE_EMPTY", "헤어 가이드의 길이가 너무 짧습니다. 제어점을 이동해 주세요.");
+  }
+  const normal = normalize(root.surfaceAnchor?.localNormal ?? [0, 0, 1]);
+  const tip = guide.points.at(-1) ?? root;
+  const tangent = normalize(subtract(tip.position, root.position), [0, -1, 0]);
+  const side = normalize(cross(tangent, normal), [1, 0, 0]);
+  const spanCount = guide.points.length - 1;
+  for (let span = 0; span < spanCount; span += 1) {
+    const before = guide.points[Math.max(0, span - 1)] ?? root;
+    const from = guide.points[span] ?? root;
+    const to = guide.points[span + 1] ?? tip;
+    const after = guide.points[Math.min(guide.points.length - 1, span + 2)] ?? tip;
+    for (let step = 0; step < profile.segmentsPerSpan; step += 1) {
+      const t = step / profile.segmentsPerSpan;
+      const progress = (span + t) / spanCount;
+      const source: CharacterGroomVector3 = [
+        interpolate(before.position[0], from.position[0], to.position[0], after.position[0], t),
+        interpolate(before.position[1], from.position[1], to.position[1], after.position[1], t),
+        interpolate(before.position[2], from.position[2], to.position[2], after.position[2], t),
+      ];
+      const relative = subtract(source, root.position);
+      const axisPoint = multiply(tangent, relative[0] * tangent[0] + relative[1] * tangent[1] + relative[2] * tangent[2]);
+      const clumped = add(multiply(relative, 1 - profile.clump * progress), multiply(axisPoint, profile.clump * progress));
+      const angle = progress * Math.PI * 4;
+      const amplitude = totalLength * profile.lengthScale * 0.12 * progress;
+      const lateral = amplitude * (profile.wave * Math.sin(angle)
+        + profile.curl * Math.sin(angle * 2)
+        + profile.noise * Math.sin(progress * 91.7) * Math.sin(progress * 43.1));
+      const outward = amplitude * profile.curl * (1 - Math.cos(angle * 2));
+      samples.push({
+        ...from,
+        position: add(add(root.position, multiply(clumped, profile.lengthScale)), add(multiply(side, lateral), multiply(normal, outward))),
+        width: from.width + (to.width - from.width) * t,
+        twist: from.twist + (to.twist - from.twist) * t,
+      });
+    }
+  }
+  const relativeTip = subtract(tip.position, root.position);
+  const axialTip = multiply(tangent, magnitude(relativeTip));
+  samples.push({
+    ...tip,
+    position: add(root.position, multiply(add(multiply(relativeTip, 1 - profile.clump), multiply(axialTip, profile.clump)), profile.lengthScale)),
+  });
+  return samples;
+}
+
 export function buildCharacterGroomRibbon(
   guide: CharacterGroomGuideCurve,
   profile: CharacterGroomProfile,
@@ -305,32 +381,37 @@ export function buildCharacterGroomRibbon(
   if (guide.points.length < 2) {
     throw new CharacterGroomDocumentError("CHARACTER_GROOM_RIBBON_EMPTY", "리본 생성에는 두 개 이상의 가이드 점이 필요합니다.");
   }
+  if (guide.points.length > 2048) {
+    throw new CharacterGroomDocumentError("CHARACTER_GROOM_POINT_LIMIT", "헤어 가이드는 2048개 점을 넘을 수 없습니다.");
+  }
   validateProfile(profile);
+  guide.points.forEach(validatePoint);
+  const points = sampledGuidePoints(guide, profile);
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
   const lengths: number[] = [];
   let travelled = 0;
-  guide.points.forEach((point, index) => {
-    if (index > 0) travelled += distance(guide.points[index - 1]!.position, point.position);
+  points.forEach((point, index) => {
+    if (index > 0) travelled += distance(points[index - 1]!.position, point.position);
     lengths.push(travelled);
   });
   const total = Math.max(EPSILON, travelled);
   let minimum: CharacterGroomVector3 = [Infinity, Infinity, Infinity];
   let maximum: CharacterGroomVector3 = [-Infinity, -Infinity, -Infinity];
 
-  guide.points.forEach((point, index) => {
-    const before = guide.points[Math.max(0, index - 1)]!.position;
-    const after = guide.points[Math.min(guide.points.length - 1, index + 1)]!.position;
+  points.forEach((point, index) => {
+    const before = points[Math.max(0, index - 1)]!.position;
+    const after = points[Math.min(points.length - 1, index + 1)]!.position;
     const tangent = normalize(subtract(after, before), [0, 1, 0]);
     const rootNormal = point.surfaceAnchor?.localNormal ?? [0, 0, 1];
     let side = normalize(cross(tangent, normalize(rootNormal)), [1, 0, 0]);
     side = normalize(rotateAroundAxis(side, tangent, point.twist + profile.rootRotation), side);
-    const progress = guide.points.length <= 1 ? 0 : index / (guide.points.length - 1);
+    const progress = points.length <= 1 ? 0 : index / (points.length - 1);
     const taper = 1 - clamp(profile.taper, 0, 1) * progress;
     const halfWidth = Math.max(EPSILON, point.width * profile.baseWidth * taper) / 2;
-    const centre = multiply(point.position, profile.lengthScale);
+    const centre = point.position;
     const left = subtract(centre, multiply(side, halfWidth));
     const right = add(centre, multiply(side, halfWidth));
     const normal = normalize(cross(side, tangent), normalize(rootNormal));
@@ -350,7 +431,7 @@ export function buildCharacterGroomRibbon(
     }
     const u = lengths[index]! / total;
     uvs.push(u, 0, u, 1);
-    if (index < guide.points.length - 1) {
+    if (index < points.length - 1) {
       const offset = index * 2;
       indices.push(offset, offset + 2, offset + 1, offset + 2, offset + 3, offset + 1);
     }

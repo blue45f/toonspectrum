@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Euler, Quaternion, Vector3 } from "three";
+import { Euler, Quaternion } from "three";
 
 import { createCharacterCompatibilityReport } from "../compatibility/character-compatibility-report";
 import {
@@ -10,10 +10,6 @@ import {
   createCharacterPartPreset,
 } from "../presets/character-part-preset";
 import { createCharacterPartPresetStore } from "../presets/character-part-preset-store";
-import {
-  createDefaultCharacterPoseConstraintProfile,
-  solveCharacterPoseV2,
-} from "../pose/character-pose-v2";
 import { useCharacterSurfaceInkRuntime } from "../surface-ink/use-character-surface-ink-runtime";
 import { projectCharacterShaperDocument } from "../../character-shaper/character-shaper-document-projection";
 import {
@@ -23,11 +19,21 @@ import {
 import { createCurrentStudioWebAuthoringRuntimePlan } from "../../studio-web-runtime/studio-web-authoring-runtime";
 import { useCharacterAuthoringAuthority } from "./use-character-authoring-authority";
 import { useCharacterCanonicalParts } from "./use-character-canonical-parts";
+import { loadCharacterSurfaceInkDocument } from "../surface-ink/character-surface-ink-storage";
+import { useCharacterGroomRuntime } from "../groom/use-character-groom-runtime";
+import { useCharacterPoseRuntime } from "../pose-v3/use-character-pose-runtime";
+import { useCharacterRenderExtras } from "../runtime/use-character-render-extras";
+import { useCharacterDocumentBinding } from "./use-character-document-binding";
+import { characterDocumentCompatibilityView } from "../application/character-shaper-document-plan";
+import { useCharacterDocumentHostRuntime } from "./use-character-document-host-runtime";
+import { captureCharacterPoseRuntimeV3, readCharacterPoseRuntimeSource } from "../pose-v3/character-pose-runtime-adapter";
+import { STUDIO_VRM_BASE_ROTATION_Y_KEY } from "../../vrm/studio-vrm-asset-runtime";
+import { sanitizeAvatarForgeState, createAvatarForgeState } from "../../vrm/studio-vrm-avatar-forge";
+import { normalizeStudioVrmPoseTranslations } from "../../vrm/studio-vrm-pose-translations";
 
 import type { CharacterCanonicalManifestV2 } from "../assets/character-canonical-manifest";
 import type { CharacterPartPresetV1 } from "../presets/character-part-preset";
 import type {
-  CharacterPoseCandidateV2,
   CharacterPoseRegion,
 } from "../pose/character-pose-v2";
 import type { CharacterShaperBinding } from "../../character-shaper/character-shaper-ui-contract";
@@ -53,6 +59,7 @@ const ALL_POSE_REGIONS: readonly CharacterPoseRegion[] = Object.freeze([
 ]);
 
 export interface CharacterPlatformWorkbenchState {
+  readonly binding: CharacterShaperBinding;
   readonly modelId: string;
   readonly canonicalManifest: CharacterCanonicalManifestV2 | null;
   readonly canonicalError: string | null;
@@ -61,6 +68,10 @@ export interface CharacterPlatformWorkbenchState {
   readonly document: ReturnType<typeof projectCharacterShaperDocument>;
   readonly documentV3: ReturnType<typeof migrateCharacterDocumentV2ToV3>;
   readonly authoring: ReturnType<typeof useCharacterAuthoringAuthority>;
+  readonly groom: ReturnType<typeof useCharacterGroomRuntime>;
+  readonly renderExtras: ReturnType<typeof useCharacterRenderExtras>;
+  readonly poseRuntime: ReturnType<typeof useCharacterPoseRuntime>;
+  readonly hostRuntime: ReturnType<typeof useCharacterDocumentHostRuntime>;
   readonly webRuntime: ReturnType<typeof createCurrentStudioWebAuthoringRuntimePlan>;
   readonly renderGraph: ReturnType<typeof createCharacterRenderGraphPlan>;
   readonly presets: readonly CharacterPartPresetV1[];
@@ -119,9 +130,8 @@ function activeModelId(
 }
 
 function customBones(
-  h: StudioVrmPoserHost,
+  source: unknown,
 ): Record<string, readonly [number, number, number]> {
-  const source: unknown = h.customBones;
   if (!source || typeof source !== "object" || Array.isArray(source)) return {};
   const values: Record<string, readonly [number, number, number]> = {};
   for (const [bone, entry] of Object.entries(source)) {
@@ -147,7 +157,7 @@ function quaternionBones(
     Object.fromEntries(
       Object.entries(values).map(([bone, value]) => {
         const quaternion = new Quaternion()
-          .setFromEuler(new Euler(value[0], value[1], value[2], "XYZ"))
+          .setFromEuler(new Euler(value[0], value[1], value[2], /Hand|Arm|Finger/u.test(bone) ? "YXZ" : "XYZ"))
           .normalize();
         return [
           bone,
@@ -156,87 +166,17 @@ function quaternionBones(
             quaternion.y,
             quaternion.z,
             quaternion.w,
-          ]),
+          ] as const),
         ];
       }),
     ),
   );
 }
 
-function eulerBones(
-  values: Readonly<
-    Record<string, readonly [number, number, number, number]>
-  >,
-) {
-  return Object.freeze(
-    Object.fromEntries(
-      Object.entries(values).map(([bone, value]) => {
-        const euler = new Euler().setFromQuaternion(
-          new Quaternion(value[0], value[1], value[2], value[3]),
-          "XYZ",
-        );
-        return [bone, Object.freeze([euler.x, euler.y, euler.z])];
-      }),
-    ),
-  );
-}
-
-interface HumanoidLike {
-  getNormalizedBoneNode(name: string): {
-    getWorldPosition(target: Vector3): Vector3;
-  } | null;
-}
-
-function footPositions(
-  h: StudioVrmPoserHost,
-): Readonly<Record<string, readonly [number, number, number]>> {
-  const humanoid = h.vrm?.humanoid as HumanoidLike | undefined;
-  if (!humanoid || typeof humanoid.getNormalizedBoneNode !== "function") {
-    return {};
-  }
-  const values: Record<string, readonly [number, number, number]> = {};
-  for (const bone of ["leftFoot", "rightFoot"] as const) {
-    const node = humanoid.getNormalizedBoneNode(bone);
-    if (!node) continue;
-    const position = node.getWorldPosition(new Vector3());
-    values[bone] = [position.x, position.y, position.z];
-  }
-  return Object.freeze(values);
-}
-
-function poseConfidence() {
-  return Object.freeze({
-    overall: 1,
-    coverage: 1,
-    quality: "high" as const,
-    groups: Object.freeze({
-      torso: 1,
-      leftArm: 1,
-      rightArm: 1,
-      leftLeg: 1,
-      rightLeg: 1,
-    }),
-    joints: Object.freeze({
-      leftShoulder: 1,
-      rightShoulder: 1,
-      leftElbow: 1,
-      rightElbow: 1,
-      leftWrist: 1,
-      rightWrist: 1,
-      leftHip: 1,
-      rightHip: 1,
-      leftKnee: 1,
-      rightKnee: 1,
-      leftAnkle: 1,
-      rightAnkle: 1,
-    }),
-    lowConfidenceGroups: Object.freeze([]),
-  });
-}
-
 export function useCharacterPlatformWorkbench(
   h: StudioVrmPoserHost,
   binding: CharacterShaperBinding,
+  options: { readonly documentAuthority?: boolean; readonly legacyEditing?: boolean } = {},
 ): CharacterPlatformWorkbenchState {
   const modelId = activeModelId(h, binding);
   const scopeRef = useRef({ active: false });
@@ -317,42 +257,92 @@ export function useCharacterPlatformWorkbench(
     ],
   );
 
-  const surfaceInk = useCharacterSurfaceInkRuntime({
-    h,
-    modelKey: modelId,
-    revisionKey: JSON.stringify([
-      binding.recipe,
-      binding.snapshot.forgeFace,
-      binding.snapshot.semanticMorphs,
-    ]),
-  });
   const documentV3Projection = useMemo(() => {
     const migrated = migrateCharacterDocumentV2ToV3(document);
+    const runtime = readCharacterPoseRuntimeSource(h.vrm);
+    const captured = runtime ? captureCharacterPoseRuntimeV3({
+      source: runtime, poseId: migrated.pose.poseId, generationId: migrated.pose.generationId,
+    }) : migrated.pose;
+    const translations = normalizeStudioVrmPoseTranslations(h.poseTranslations)?.root;
+    const base: unknown = runtime?.scene.userData[STUDIO_VRM_BASE_ROTATION_Y_KEY];
+    const yaw = typeof h.bodyRotation === "number" && Number.isFinite(h.bodyRotation)
+      ? h.bodyRotation + (typeof base === "number" && Number.isFinite(base) ? base : 0) : null;
+    const rotation = yaw === null ? captured.root.rotation
+      : new Quaternion().setFromEuler(new Euler(0, yaw, 0)).toArray();
     return validateCharacterDocumentV3({
       ...migrated,
-      surfaceInk: surfaceInk.document,
+      recipe: { ...migrated.recipe, slots: { ...migrated.recipe.slots,
+        ...(migrated.recipe.slots.hair ? { hair: { ...migrated.recipe.slots.hair,
+          overrides: Object.fromEntries(Object.entries(sanitizeAvatarForgeState(h.avatarForgeState ?? createAvatarForgeState()).hair)
+            .map(([key, value]) => [`hair.${key}`, value])) } } : {}) } },
+      pose: {
+        ...migrated.pose,
+        bones: { ...captured.bones, ...quaternionBones(customBones(h.customBones)) },
+        root: {
+          position: [translations?.[0] ?? captured.root.position[0], typeof h.customYOffset === "number" && Number.isFinite(h.customYOffset) ? h.customYOffset : captured.root.position[1], translations?.[2] ?? captured.root.position[2]],
+          rotation: [rotation[0], rotation[1], rotation[2], rotation[3]],
+        },
+      },
     });
-  }, [document, surfaceInk.document]);
+  }, [document, h.avatarForgeState, h.vrm, h.customBones, h.customYOffset, h.poseTranslations, h.bodyRotation]);
   const sourceFingerprint = useMemo(() => JSON.stringify({
-    revision: document.revision,
-    model: document.model,
-    compatibility: document.compatibility,
-    recipe: document.recipe,
-    customControls: document.customControls,
-    expression: document.expression,
-    pose: document.pose,
-    render: document.render,
-    surfaceInk: surfaceInk.document,
-  }), [document, surfaceInk.document]);
+    model: documentV3Projection.model,
+    compatibility: documentV3Projection.compatibility,
+    recipe: documentV3Projection.recipe,
+    deformation: documentV3Projection.deformation,
+    colors: documentV3Projection.look.colors,
+    expression: documentV3Projection.expression,
+    pose: { root: documentV3Projection.pose.root, bones: documentV3Projection.pose.bones, poseId: documentV3Projection.pose.poseId },
+    transparent: documentV3Projection.output.transparent,
+  }), [documentV3Projection]);
   const authoring = useCharacterAuthoringAuthority(
     documentV3Projection,
     sourceFingerprint,
+    {
+      synchronizeProjection: options.documentAuthority !== true || options.legacyEditing === true,
+      enabled: !options.documentAuthority || (h.status === "ready" && Boolean(h.vrm)),
+      initializeDocument: async (initial) => validateCharacterDocumentV3({
+        ...initial,
+        surfaceInk: await loadCharacterSurfaceInkDocument(initial.model.assetId),
+      }),
+    },
   );
+  const documentBinding = useCharacterDocumentBinding(binding, authoring, h);
+  const uiBinding = options.documentAuthority ? documentBinding : binding;
+  const authorityDocument = characterDocumentCompatibilityView(authoring.snapshot.document);
+  const documentV3 = authoring.snapshot.previewDocument ?? authoring.snapshot.document;
+  const surfaceInk = useCharacterSurfaceInkRuntime({
+    h,
+    modelKey: modelId,
+    revisionKey: JSON.stringify([documentV3.recipe, documentV3.deformation]),
+    authoringDocument: documentV3.surfaceInk,
+    authoringReady: authoring.hydrated,
+    authoringEditable: authoring.snapshot.previewCommandId === null,
+    onDocumentChange: (next) => {
+      const current = authoring.authority.getSnapshot().document;
+      const result = authoring.dispatch({
+        commandId: `character.ink/${current.revision}`,
+        label: "3D 펜선 편집",
+        source: "user",
+        expectedDocumentId: current.documentId,
+        expectedRevision: current.revision,
+        operations: [{ kind: "replace-surface-ink", surfaceInk: next }],
+      });
+      return result.status === "applied" || result.status === "noop";
+    },
+    authoringUndo: authoring.undo,
+    authoringRedo: authoring.redo,
+    authoringCanUndo: authoring.snapshot.canUndo,
+    authoringCanRedo: authoring.snapshot.canRedo,
+  });
+  const hostRuntime = useCharacterDocumentHostRuntime({ h, binding, current: document, authoring });
+  const renderExtras = useCharacterRenderExtras({ h, document: documentV3, enabled: authoring.hydrated });
+  const groom = useCharacterGroomRuntime({ h, document: documentV3, modelKey: modelId, enabled: authoring.hydrated });
+  const poseRuntime = useCharacterPoseRuntime({ h, authoring, selectedRegions: selectedPoseRegions });
   const webRuntime = useMemo(
     () => createCurrentStudioWebAuthoringRuntimePlan(),
     [],
   );
-  const documentV3 = authoring.snapshot.previewDocument ?? authoring.snapshot.document;
   const hasSurfacePaint = Boolean(
     h.texturePaintCanUndo || h.texturePaintHasContent || h.texturePaintDirty,
   );
@@ -437,7 +427,7 @@ export function useCharacterPlatformWorkbench(
           name,
           kind: "slot",
           scope: "personal",
-          document,
+          document: options.documentAuthority ? authorityDocument : document,
           slot,
         });
         const result = await PRESET_STORE.save(preset);
@@ -457,12 +447,12 @@ export function useCharacterPlatformWorkbench(
         return false;
       }
     },
-    [document],
+    [document, options.documentAuthority, authorityDocument],
   );
 
   const applyPreset = useCallback(
     (preset: CharacterPartPresetV1): boolean => {
-      const committed = binding.commitPreset(preset, document);
+      const committed = uiBinding.commitPreset(preset, options.documentAuthority ? authorityDocument : document);
       if (!committed.ok) {
         setNotice(committed.reason ?? "프리셋을 적용하지 못했습니다.");
         return false;
@@ -470,7 +460,7 @@ export function useCharacterPlatformWorkbench(
       setNotice(`${preset.name} 프리셋을 적용했습니다.`);
       return true;
     },
-    [binding, document],
+    [uiBinding, options.documentAuthority, authorityDocument, document],
   );
 
   const exportPresets = useCallback(
@@ -503,93 +493,31 @@ export function useCharacterPlatformWorkbench(
     }
   }, []);
 
-  const stabilizeCurrentPose = useCallback((): boolean => {
-    const bones = customBones(h);
-    if (
-      Object.keys(bones).length === 0 ||
-      typeof h.handlePhotoPoseApply !== "function"
-    ) {
-      setNotice("먼저 포즈 프리셋이나 사진 포즈를 적용해 주세요.");
-      return false;
-    }
-    const quaternions = quaternionBones(bones) as Readonly<
-      Record<string, readonly [number, number, number, number]>
-    >;
-    const feet = footPositions(h);
-    const contacts = Object.keys(feet).map((bone) =>
-      Object.freeze({
-        id: `${bone}:ground`,
-        kind: "ground" as const,
-        bone,
-        target: Object.freeze([
-          feet[bone]![0],
-          0,
-          feet[bone]![2],
-        ]) as readonly [number, number, number],
-        weight: 1,
-        tolerance: 0.01,
-      }),
-    );
-    const candidate: CharacterPoseCandidateV2 = Object.freeze({
-      candidateId: `pose-v2:${Date.now().toString(36)}`,
-      generationId: Date.now(),
-      source: "manual",
-      root: Object.freeze({
-        position: [0, typeof h.customYOffset === "number" && Number.isFinite(h.customYOffset) ? h.customYOffset : 0, 0] as const,
-        rotation: [0, 0, 0, 1] as const,
-      }),
-      bones: quaternions,
-      confidence: Object.freeze({
-        overall: 1,
-        regions: Object.freeze(
-          Object.fromEntries(ALL_POSE_REGIONS.map((region) => [region, 1])),
-        ),
-        joints: Object.freeze(
-          Object.fromEntries(Object.keys(quaternions).map((bone) => [bone, 1])),
-        ),
-      }),
-      contacts: Object.freeze(contacts),
-      warnings: Object.freeze([]),
-    });
-    const solved = solveCharacterPoseV2({
-      candidate,
-      currentBones: quaternions,
-      selectedRegions: selectedPoseRegions,
-      footPositions: feet,
-      profile: createDefaultCharacterPoseConstraintProfile(),
-    });
-    const applied = h.handlePhotoPoseApply({
-      sourceName: "현재 포즈 · Pose V2 안정화",
-      bones: eulerBones(solved.candidate.bones),
-      yOffset: solved.candidate.root.position[1],
-      landmarks: [],
-      worldLandmarks: [],
-      confidence: poseConfidence(),
-      fingerEdits: {},
-      detectedHandSides: [],
-    });
-    if (applied === false) {
-      setNotice("현재 포즈를 적용할 수 없습니다. 진행 중인 포즈 편집을 마친 뒤 다시 시도해 주세요.");
-      return false;
-    }
-    setNotice(
-      `Pose V2 적용 · 본 ${solved.appliedBones.length}개 · 유지 ${solved.preservedBones.length}개` +
-        (Math.abs(solved.groundedBy) > 0.0001
-          ? ` · 접지 보정 ${solved.groundedBy.toFixed(3)}m 적용`
-          : ""),
-    );
-    return true;
-  }, [h, selectedPoseRegions]);
 
+  const renderProblem = hostRuntime.error
+    ?? poseRuntime.runtimeError
+    ?? (documentV3.groom.groups.length > 0 ? groom.error ?? (!groom.supported ? groom.reason : null) : null)
+    ?? (documentV3.geometryStrokes.strokes.length > 0 || documentV3.look.materialOverrides.length > 0 ? renderExtras.error : null);
+  const renderPending = hostRuntime.pending || poseRuntime.pending || (documentV3.groom.groups.length > 0 && (groom.status === "building" || groom.status === "idle"))
+    || ((documentV3.geometryStrokes.strokes.length > 0 || documentV3.look.materialOverrides.length > 0) && (renderExtras.status === "building" || renderExtras.status === "idle"));
+  const visibleBinding = options.documentAuthority ? { ...uiBinding,
+    busyReason: uiBinding.busyReason ?? renderProblem ?? (renderPending ? "캐릭터 원본을 화면에 적용하는 중입니다." : null),
+    previewEntryId: uiBinding.previewEntryId ?? authoring.snapshot.previewCommandId,
+  } : uiBinding;
   return Object.freeze({
+    binding: visibleBinding,
     modelId,
     canonicalManifest,
     canonicalError,
     canonicalParts,
     compatibility,
-    document,
+    document: options.documentAuthority ? authorityDocument : document,
     documentV3,
     authoring,
+    groom,
+    renderExtras,
+    poseRuntime,
+    hostRuntime,
     webRuntime,
     renderGraph,
     presets: presetSnapshot.presets,
@@ -610,6 +538,6 @@ export function useCharacterPlatformWorkbench(
     },
     exportPresets,
     importPresets,
-    stabilizeCurrentPose,
+    stabilizeCurrentPose: poseRuntime.previewStabilization,
   });
 }

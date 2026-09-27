@@ -11,6 +11,26 @@ function deferred(): { readonly promise: Promise<void>; readonly resolve: () => 
 }
 
 describe("Studio BG3D shot batch download gate", () => {
+  it("복구 완료 기록이 실패하면 다운로드하지 않고 기록 복구 뒤 명시적 재시도를 허용한다", async () => {
+    const controller = new AbortController();
+    const download = vi.fn();
+    const markDownloadRequested = vi.fn()
+      .mockRejectedValueOnce(new Error("저장소 실패"))
+      .mockResolvedValue(undefined);
+    const request = {
+      signal: controller.signal,
+      isActive: () => true,
+      assertAccess: async () => undefined,
+      markDownloadRequested,
+      download,
+    };
+
+    await expect(commitStudioBg3dShotBatchDownload(request)).rejects.toThrow("저장소 실패");
+    expect(download).not.toHaveBeenCalled();
+    await commitStudioBg3dShotBatchDownload(request);
+    expect(download).toHaveBeenCalledOnce();
+  });
+
   it("does not download when the editor aborts during delayed IndexedDB bookkeeping", async () => {
     const controller = new AbortController();
     const mark = deferred();

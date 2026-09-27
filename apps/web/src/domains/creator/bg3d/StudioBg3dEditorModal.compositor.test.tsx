@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createElement, createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -12,9 +12,9 @@ vi.mock("./studio-bg3d-editor-runtime-bindings", () => ({}));
 vi.mock("./StudioBg3dEditorViewport", () => ({ StudioBg3dEditorViewport: () => null }));
 vi.mock("./StudioBg3dEditorSidebar", () => ({ StudioBg3dEditorSidebar: () => null }));
 vi.mock("./StudioBg3dSceneAssistantWorkspace", () => ({
-  StudioBg3dSceneAssistantWorkspace: () => <div data-testid="mock-scene-assistant" />,
+  StudioBg3dSceneAssistantWorkspace: () => <div data-testid="mock-scene-assistant"><input aria-label="장면 검색" /></div>,
 }));
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 function emptyOutlinerController(): StudioBg3dSceneOutlinerController {
   return {
@@ -95,6 +95,31 @@ describe("BG3D modal compositor boundary", () => {
     expect(close.getAttribute("data-bg3d-initial-focus")).toBe("true");
     fireEvent.click(close);
     expect(h.requestUserClose).toHaveBeenCalledOnce();
+  });
+
+  it("닫힌 상태에서 연 모달도 키보드 높이를 적용하고 모드를 바꿔도 닫기를 유지한다", () => {
+    vi.useFakeTimers();
+    const viewport = Object.assign(new EventTarget(), { height: 664, offsetTop: 0, scale: 1 });
+    vi.stubGlobal("visualViewport", viewport);
+    vi.stubGlobal("innerHeight", 664);
+    const h = host({ open: false });
+    const view = render(createElement(StudioBg3dEditorModal, { h }));
+    view.rerender(createElement(StudioBg3dEditorModal, { h: { ...h, open: true } }));
+    const dialog = screen.getByRole("dialog", { name: "장면 도우미" });
+    screen.getByRole("textbox", { name: "장면 검색" }).focus();
+    viewport.height = 350;
+    viewport.dispatchEvent(new Event("resize"));
+    act(() => { vi.advanceTimersByTime(32); });
+    expect(dialog.style.getPropertyValue("--studio-3d-viewport-height")).toBe("350px");
+    expect(dialog.getAttribute("data-studio-3d-keyboard-open")).toBe("true");
+    expect(dialog.getAttribute("aria-describedby")).toBe("studio-bg3d-dialog-description");
+    expect(document.getElementById("studio-bg3d-dialog-description")?.textContent).toContain("장소를 고르고");
+    fireEvent.click(screen.getByRole("button", { name: /정밀/ }));
+    expect(screen.getByRole("dialog", { name: "정밀 3D 편집" })).toBe(dialog);
+    fireEvent.click(screen.getByRole("button", { name: /^닫기$/ }));
+    expect(h.requestUserClose).toHaveBeenCalledOnce();
+    view.rerender(createElement(StudioBg3dEditorModal, { h }));
+    expect(dialog.style.getPropertyValue("--studio-3d-viewport-height")).toBe("");
   });
 
   it("does not dismiss or expose scene editing while a capture owns the scene", () => {

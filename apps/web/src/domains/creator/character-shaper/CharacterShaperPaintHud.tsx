@@ -1,17 +1,11 @@
 import { StudioVrmPaintMaterialControls } from "../vrm/StudioVrmPaintMaterialControls";
 /**
- * Character Shaper — 표면 드로잉 HUD.
- *
- * A floating toolbar over the viewport for the runtime's texture-paint session: the four tools
- * mapped onto the real settings (브러시 / 지우개 = surface brush with the erase blend, 스포이드 =
- * the eyedropper toggle, 채우기 = ColorDrop), compact size and opacity ranges, the paint color,
- * undo / redo / reset and the exit button. `[` and `]` resize the brush while the HUD is mounted.
- *
- * Every control reflects the host's own state; when the runtime reports a disabled reason the HUD
- * shows it instead of pretending the tools work.
+ * 표면 드로잉은 캔버스를 덮지 않는 별도 도구 영역에서 호스트의 설정과 기록을 조작한다.
+ * 작은 화면은 브러시 옵션을 접고 실행 취소·다시 실행·종료를 계속 표시한다.
+ * 비활성 이유와 진행 중 획 상태를 반영하며 [ / ] 단축키는 브러시 굵기를 조절한다.
  */
-import { Brush, Eraser, PaintBucket, Pipette, Redo2, RotateCcw, Undo2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Brush, Eraser, PaintBucket, Pipette, Redo2, RotateCcw, SlidersHorizontal, Undo2, X } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { DEFAULT_STUDIO_VRM_TEXTURE_PAINT_SETTINGS } from "../vrm/StudioVrmPoserTypes";
@@ -25,6 +19,7 @@ import type { CharacterShaperPaintHudProps } from "./character-shaper-ui-contrac
 import type { StudioVrmTexturePaintPanelSettings } from "../vrm/StudioVrmTexturePaintPanel";
 
 import { cn } from "@/shared/lib/utils";
+import { useT } from "@/shared/lib/i18n";
 
 type PaintTool = "brush" | "eraser" | "eyedropper" | "fill";
 
@@ -52,7 +47,10 @@ function clampSize(value: number): number {
   return Math.min(SIZE_MAX, Math.max(SIZE_MIN, Math.round(value)));
 }
 
-export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudProps) {
+export function CharacterShaperPaintHud({ h, onExit, compact = false }: CharacterShaperPaintHudProps & { readonly compact?: boolean }) {
+  const t = useT();
+  const optionsId = useId();
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const keyHandlerRef = useRef<(event: KeyboardEvent) => boolean>(() => false);
   const [resetArmed, setResetArmed] = useState(false);
 
@@ -135,98 +133,130 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
       role="toolbar"
       aria-label="표면 드로잉 도구"
       data-character-shaper-paint-hud="true"
+      data-compact={compact ? "true" : undefined}
       className="flex max-w-full flex-wrap items-center gap-1.5 rounded-2xl border border-line/70 bg-panel/95 p-1.5 shadow-[0_12px_36px_oklch(0.05_0.01_70/0.4)] backdrop-blur"
     >
-      <StudioVrmPaintChannelControls channel={channel} supportedChannels={snapshot?.supportedChannels ?? ["baseColor"]}
-        color={settings.color} disabled={disabled} onColorChange={(color) => update({ color })}
-        onChannelChange={(next) => {
-          if (disabled) return;
-          if (h.texturePaintRuntime?.setChannel(next).ok) h.setTexturePaintEyedropperActive?.(false);
-        }} />
-      <StudioVrmPaintMaterialControls runtime={h.texturePaintRuntime ?? null} snapshot={snapshot} disabled={disabled} />
-      <StudioVrmTextureExportButton runtime={h.texturePaintRuntime ?? null} disabled={disabled || (snapshot?.targets?.length ?? 0) === 0} />
-      <div role="group" aria-label="도구" className="flex shrink-0 items-center gap-1">
-        {tools.map((tool) => {
-          const Icon = tool.icon;
-          const active = activeTool === tool.id;
-          return (
-            <button
-              key={tool.id}
-              type="button"
-              aria-pressed={active}
-              aria-label={tool.label}
-              title={`${tool.label} · ${tool.hint}`}
+      {compact ? (
+        <button type="button" aria-expanded={optionsOpen} aria-controls={optionsId}
+          onClick={() => setOptionsOpen((open) => !open)}
+          className={cn(CHIP, "w-auto gap-1 px-2 text-xs grid-flow-col")}>
+          <SlidersHorizontal size={16} aria-hidden />
+          {t("studio.character.paint.settings", "브러시 설정")}
+        </button>
+      ) : null}
+      <div id={optionsId} hidden={compact && !optionsOpen} data-character-paint-options="true"
+        className={cn(compact ? "order-2 max-h-[min(28dvh,12rem)] w-full overflow-y-auto overscroll-contain" : "contents")}>
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <StudioVrmPaintChannelControls channel={channel} supportedChannels={snapshot?.supportedChannels ?? ["baseColor"]}
+            color={settings.color} disabled={disabled} onColorChange={(color) => update({ color })}
+            onChannelChange={(next) => {
+              if (disabled) return;
+              if (h.texturePaintRuntime?.setChannel(next).ok) h.setTexturePaintEyedropperActive?.(false);
+            }} />
+          <StudioVrmPaintMaterialControls runtime={h.texturePaintRuntime ?? null} snapshot={snapshot} disabled={disabled} />
+          <StudioVrmTextureExportButton runtime={h.texturePaintRuntime ?? null} disabled={disabled || (snapshot?.targets?.length ?? 0) === 0} />
+          <div role="group" aria-label="도구" className="flex shrink-0 items-center gap-1">
+            {tools.map((tool) => {
+              const Icon = tool.icon;
+              const active = activeTool === tool.id;
+              return (
+                <button
+                  key={tool.id}
+                  type="button"
+                  aria-pressed={active}
+                  aria-label={tool.label}
+                  title={`${tool.label} · ${tool.hint}`}
+                  disabled={disabled}
+                  onClick={() => selectTool(tool.id)}
+                  className={cn(CHIP, active && CHIP_ACTIVE)}
+                >
+                  <Icon size={16} aria-hidden />
+                </button>
+              );
+            })}
+          </div>
+
+          <span aria-hidden className="h-6 w-px shrink-0 bg-line/70" />
+
+          <label className="flex min-w-0 shrink-0 items-center gap-1.5 text-[0.66rem] font-semibold text-fg-2">
+            <span className="shrink-0">굵기</span>
+            <input
+              type="range"
+              min={SIZE_MIN}
+              max={SIZE_MAX}
+              step={1}
+              value={size}
               disabled={disabled}
-              onClick={() => selectTool(tool.id)}
-              className={cn(CHIP, active && CHIP_ACTIVE)}
+              aria-label="브러시 굵기"
+              aria-keyshortcuts="[ ]"
+              aria-valuetext={`${size} px`}
+              className="h-11 w-24 min-w-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+              onChange={(event) => update({ sizeTexels: clampSize(Number(event.currentTarget.value)) })}
+            />
+            <output aria-live="off" className="w-9 shrink-0 text-right tabular-nums text-fg-3">{size}px</output>
+          </label>
+
+          <label className="flex min-w-0 shrink-0 items-center gap-1.5 text-[0.66rem] font-semibold text-fg-2">
+            <span className="shrink-0">농도</span>
+            <input
+              type="range"
+              min={0.05}
+              max={1}
+              step={0.05}
+              value={settings.opacity}
+              disabled={disabled}
+              aria-label="브러시 농도"
+              aria-valuetext={`${Math.round(settings.opacity * 100)}%`}
+              className="h-11 w-20 min-w-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-45"
+              onChange={(event) => update({ opacity: Number(event.currentTarget.value) })}
+            />
+            <output aria-live="off" className="w-9 shrink-0 text-right tabular-nums text-fg-3">
+              {Math.round(settings.opacity * 100)}%
+            </output>
+          </label>
+
+          <input
+            type="color"
+            hidden={isStudioVrmTexturePaintScalarChannel(channel)}
+            value={settings.color}
+            disabled={disabled}
+            aria-label="칠할 색"
+            title={`칠할 색 ${settings.color.toUpperCase()}`}
+            className={cn(
+              "size-11 shrink-0 cursor-pointer rounded-xl border border-line bg-card p-1 disabled:cursor-not-allowed disabled:opacity-45",
+              STUDIO_FOCUS_RING,
+            )}
+            onChange={(event) => update({ color: event.currentTarget.value.toLowerCase() })}
+          />
+
+          <span aria-hidden className="h-6 w-px shrink-0 bg-line/70" />
+
+            <button
+              type="button"
+              aria-label={resetArmed ? "이 표면의 드로잉 전부 지우기 확인" : "이 표면의 드로잉 전부 지우기"}
+              title={resetArmed ? "한 번 더 누르면 이 표면의 드로잉이 모두 지워집니다" : "이 표면의 드로잉을 원본 텍스처로 되돌립니다"}
+              disabled={disabled}
+              onClick={() => {
+                if (!resetArmed) {
+                  setResetArmed(true);
+                  return;
+                }
+                setResetArmed(false);
+                h.handleTexturePaintReset?.();
+              }}
+              className={cn(CHIP, resetArmed && "border-bad/55 bg-bad/10 text-bad")}
             >
-              <Icon size={16} aria-hidden />
+              <RotateCcw size={16} aria-hidden />
             </button>
-          );
-        })}
+        </div>
       </div>
-
-      <span aria-hidden className="h-6 w-px shrink-0 bg-line/70" />
-
-      <label className="flex min-w-0 shrink-0 items-center gap-1.5 text-[0.66rem] font-semibold text-fg-2">
-        <span className="shrink-0">굵기</span>
-        <input
-          type="range"
-          min={SIZE_MIN}
-          max={SIZE_MAX}
-          step={1}
-          value={size}
-          disabled={disabled}
-          aria-label="브러시 굵기"
-          aria-keyshortcuts="[ ]"
-          aria-valuetext={`${size} px`}
-          className="h-11 w-24 min-w-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-45"
-          onChange={(event) => update({ sizeTexels: clampSize(Number(event.currentTarget.value)) })}
-        />
-        <output aria-live="off" className="w-9 shrink-0 text-right tabular-nums text-fg-3">{size}px</output>
-      </label>
-
-      <label className="flex min-w-0 shrink-0 items-center gap-1.5 text-[0.66rem] font-semibold text-fg-2">
-        <span className="shrink-0">농도</span>
-        <input
-          type="range"
-          min={0.05}
-          max={1}
-          step={0.05}
-          value={settings.opacity}
-          disabled={disabled}
-          aria-label="브러시 농도"
-          aria-valuetext={`${Math.round(settings.opacity * 100)}%`}
-          className="h-11 w-20 min-w-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-45"
-          onChange={(event) => update({ opacity: Number(event.currentTarget.value) })}
-        />
-        <output aria-live="off" className="w-9 shrink-0 text-right tabular-nums text-fg-3">
-          {Math.round(settings.opacity * 100)}%
-        </output>
-      </label>
-
-      <input
-        type="color"
-        hidden={isStudioVrmTexturePaintScalarChannel(channel)}
-        value={settings.color}
-        disabled={disabled}
-        aria-label="칠할 색"
-        title={`칠할 색 ${settings.color.toUpperCase()}`}
-        className={cn(
-          "size-11 shrink-0 cursor-pointer rounded-xl border border-line bg-card p-1 disabled:cursor-not-allowed disabled:opacity-45",
-          STUDIO_FOCUS_RING,
-        )}
-        onChange={(event) => update({ color: event.currentTarget.value.toLowerCase() })}
-      />
-
-      <span aria-hidden className="h-6 w-px shrink-0 bg-line/70" />
 
       <div role="group" aria-label="되돌리기" className="flex shrink-0 items-center gap-1">
         <button
           type="button"
           aria-label="드로잉 되돌리기"
           title="드로잉 되돌리기"
-          disabled={!canUndo}
+          disabled={disabled || !canUndo}
           onClick={() => h.handleTexturePaintUndo?.()}
           className={CHIP}
         >
@@ -236,28 +266,11 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
           type="button"
           aria-label="드로잉 다시 실행"
           title="드로잉 다시 실행"
-          disabled={!canRedo}
+          disabled={disabled || !canRedo}
           onClick={() => h.handleTexturePaintRedo?.()}
           className={CHIP}
         >
           <Redo2 size={16} aria-hidden />
-        </button>
-        <button
-          type="button"
-          aria-label={resetArmed ? "이 표면의 드로잉 전부 지우기 확인" : "이 표면의 드로잉 전부 지우기"}
-          title={resetArmed ? "한 번 더 누르면 이 표면의 드로잉이 모두 지워집니다" : "이 표면의 드로잉을 원본 텍스처로 되돌립니다"}
-          disabled={disabled}
-          onClick={() => {
-            if (!resetArmed) {
-              setResetArmed(true);
-              return;
-            }
-            setResetArmed(false);
-            h.handleTexturePaintReset?.();
-          }}
-          className={cn(CHIP, resetArmed && "border-bad/55 bg-bad/10 text-bad")}
-        >
-          <RotateCcw size={16} aria-hidden />
         </button>
       </div>
 
@@ -267,21 +280,23 @@ export function CharacterShaperPaintHud({ h, onExit }: CharacterShaperPaintHudPr
         title="표면 드로잉 끝내기 (B)"
         aria-keyshortcuts="B"
         onClick={onExit}
-        className={cn(CHIP, "ml-auto")}
+        className={cn(CHIP, compact ? "ml-auto w-auto grid-flow-col gap-1 px-2 text-xs" : "ml-auto")}
       >
         <X size={16} aria-hidden />
+        {compact ? t("studio.character.paint.finish", "드로잉 종료") : null}
       </button>
 
       <p
         role="status"
         aria-label="표면 드로잉 상태"
         className={cn(
-          "w-full min-w-0 px-1 text-[0.64rem] leading-relaxed",
+          "w-full min-w-0 px-1 text-xs leading-relaxed",
           disabledReason ? "font-semibold text-warn" : "text-fg-3",
         )}
       >
         {disabledReason
           || (resetArmed ? "한 번 더 누르면 이 표면의 드로잉이 모두 지워집니다." : "")
+          || (compact && h.viewportCameraInteractionLocked ? `${t("studio.character.paint.cameraLocked", "회전 잠금 · 모델 표면을 드래그해 그리세요.")} ${status}`.trim() : "")
           || status
           || "뷰포트에서 칠할 표면을 누른 뒤 드래그하세요. [ ] 로 굵기를 바꿉니다."}
       </p>

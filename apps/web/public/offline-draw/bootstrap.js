@@ -18,9 +18,19 @@
   }
   // Ordinary network loss stays in the current Studio. Offer this separate
   // emergency document only when the Studio root never mounted at all.
-  setTimeout(() => {
+  const recoveryTimer = setTimeout(() => {
     if (!document.getElementById('root')?.firstElementChild) offer();
   }, 10000);
+  // 느린 기기에서도 정상 시작 후 긴급 안내가 편집 버튼을 가리지 않아야 한다.
+  const mountObserver = new MutationObserver(clearRecoveredNotice);
+  function clearRecoveredNotice() {
+    if (!document.getElementById('root')?.firstElementChild) return;
+    clearTimeout(recoveryTimer);
+    document.getElementById('toon-local-recovery')?.remove();
+    mountObserver.disconnect();
+  }
+  mountObserver.observe(document.documentElement, { childList: true, subtree: true });
+  clearRecoveredNotice();
   const prepare = async () => {
     try {
       await import('/offline-draw/cache.js');

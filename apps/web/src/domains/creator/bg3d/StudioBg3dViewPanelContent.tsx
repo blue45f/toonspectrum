@@ -10,6 +10,7 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { useId } from "react";
+import { StudioBg3dPsdOutputNotice } from "./StudioBg3dPsdOutputNotice";
 
 import {
   STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
@@ -757,7 +758,7 @@ export function StudioBg3dViewPanel({
                       </select>
                     </label>
                     <p className="mt-2 text-[0.62rem] leading-relaxed text-fg-3">
-                      {tiledCopy("Three 캡처는 큰 PNG를 타일로 분할해 최대 4096px까지 출력합니다. 선·톤의 위치와 굵기를 유지하며, 큰 타일 출력의 PSD는 예산 사유로 제외됩니다. 최대 변 길이에 따라 높이는 줄어들 수 있습니다. 커스텀 셰이더·포인트·화면 기반 굴절은 지원하지 않습니다.", "Three capture renders large PNGs in bounded tiles up to 4096 px. Line and tone alignment is preserved; layered PSD is omitted for large tiled output. The maximum edge can still reduce the height. Custom shaders, points and screen-space refraction are unsupported.")}
+                      {tiledCopy("Three 캡처는 큰 PNG를 타일로 분할해 최대 4096px까지 출력합니다. 선·톤의 위치와 굵기를 유지합니다. 큰 타일 PSD는 지원하지 않으며 출력 형식을 직접 선택해야 합니다. 최대 변 길이에 따라 높이는 줄어들 수 있습니다. 커스텀 셰이더·포인트·화면 기반 굴절은 지원하지 않습니다.", "Three capture renders large PNGs in bounded tiles up to 4096 px, preserving line and tone alignment. Large tiled PSD is unsupported and requires an explicit output choice. The maximum edge can still reduce the height. Custom shaders, points and screen-space refraction are unsupported.")}
                     </p>
                     <fieldset className="mt-2">
                       <legend className="text-[0.62rem] font-semibold text-fg-3">
@@ -801,9 +802,10 @@ export function StudioBg3dViewPanel({
                         />
                         <span>
                           {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "컷별 레이어 PSD도 포함")}<span className="mt-0.5 block font-normal leading-relaxed text-fg-3">
-                            {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "LT 레이어가 1080p급·합계 8.4Mpx 안일 때 Worker에서 생성합니다. 초과 시 PNG는 유지하고 manifest에 예산 fallback을 기록합니다.")}</span>
+                            {tiledCopy("모든 컷의 PSD가 준비되어야 다운로드합니다.", "Every shot must have its PSD ready before download.")}</span>
                         </span>
                       </label>
+                      <StudioBg3dPsdOutputNotice includeLayeredPsd={shotBatchIncludeLayeredPsd} disabled={isCapturing} onSelectPng={() => setShotBatchIncludeLayeredPsd(false)} />
                       <label className="mt-2 flex min-h-10 cursor-pointer items-start gap-2 rounded-lg border border-line bg-card px-2.5 py-2 text-[0.62rem] text-fg-2">
                         <input
                           type="checkbox"
@@ -842,7 +844,7 @@ export function StudioBg3dViewPanel({
                     {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "한 번의 GPU 캡처에서 원본·LT 분리 레이어·깊이를 만들고, 꺼진 레이어는 manifest에 생략 사유를 기록합니다. 기기 예산으로 축소되면 artifact에 요청/실제 높이를 함께 기록합니다. 최대 64컷·448 PNG·64 PSD·콘택트 6장(장당 12컷)·384 MiB입니다.")}</p>
                   {shotBatchRecoverySummary ? (
                     <p className="mt-1.5 rounded-lg border border-accent/35 bg-accent-soft px-2.5 py-2 text-[0.62rem] leading-relaxed text-accent">
-                      {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "완료된 ")}{shotBatchRecoverySummary.completedShots}/{shotBatchRecoverySummary.totalShots}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "컷을")}{shotBatchRecoverySummary.mode === "durable"
+                      {tiledCopy("산출물이 준비된 ", "Artifacts prepared for ")}{shotBatchRecoverySummary.completedShots}/{shotBatchRecoverySummary.totalShots}{translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "컷을")}{shotBatchRecoverySummary.mode === "durable"
                         ? translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", " 브라우저 복구 저장소에")
                         : translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", " 현재 탭 메모리에")} {translateCurrentStaticSourceText("domains.creator.bg3d.StudioBg3dViewPanelContent", "ko", "보존했습니다. 장면·선택·패스·해상도·엔진 및 캡처 프로필까지 같아 새 계획의 digest가 일치할 때만 완료 컷을 재사용합니다.")}{shotBatchRecoverySummary.downloadRequested
                         ? shotBatchRecoverySummary.mode === "durable"

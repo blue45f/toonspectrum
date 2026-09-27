@@ -84,3 +84,37 @@ describe("Character authoring worker runtime", () => {
     }
   });
 });
+
+describe("Worker 파생 데이터 안전 한도", () => {
+  it("작은 입력의 극단적 재샘플 확대도 계산 전에 거절하고 원본 점을 보존한다", () => {
+    const before = JSON.stringify(guide);
+    expect(() => executeCharacterAuthoringTask({ kind: "resample-groom-guide", guide, spacing: 1e-20 }))
+      .toThrow(expect.objectContaining({ code: "point-budget-exceeded" }));
+    expect(JSON.stringify(guide)).toBe(before);
+  });
+
+  it("허용된 재샘플에서는 유한한 위치와 원래 끝점을 만든다", () => {
+    const result = executeCharacterAuthoringTask({ kind: "resample-groom-guide", guide, spacing: 0.01 });
+    if (result.kind !== "groom-guide") throw new Error("가이드 결과가 아닙니다.");
+    expect(result.guide.points.length).toBeLessThanOrEqual(2048);
+    expect(result.guide.points.every((point) => point.position.every(Number.isFinite))).toBe(true);
+    expect(result.guide.points[0]?.position).toEqual(guide.points[0]?.position);
+    expect(result.guide.points.at(-1)?.position).toEqual(guide.points.at(-1)?.position);
+  });
+});
+
+describe("Groom 보간점과 메시 예산", () => {
+  it("segmentsPerSpan이 만든 실제 보간 정점과 인덱스의 수를 반환한다", () => {
+    const result = executeCharacterAuthoringTask({ kind: "build-groom-ribbon", guide, profile });
+    if (result.kind !== "mesh") throw new Error("메시 결과가 아닙니다.");
+    const samples = (guide.points.length - 1) * profile.segmentsPerSpan + 1;
+    expect(result.vertexCount).toBe(samples * 2);
+    expect(result.triangleCount).toBe((samples - 1) * 2);
+    expect(new Float32Array(result.positions).every(Number.isFinite)).toBe(true);
+  });
+
+  it("작은 원본을 과도하게 확대하는 보간 요청을 메시 할당 전에 거절한다", () => {
+    expect(() => executeCharacterAuthoringTask({ kind: "build-groom-ribbon", guide, profile: { ...profile, segmentsPerSpan: 100_000_000 } }))
+      .toThrow(expect.objectContaining({ code: "point-budget-exceeded" }));
+  });
+});

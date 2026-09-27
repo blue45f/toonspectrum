@@ -11,6 +11,7 @@ import {
 import { useMemo } from "react";
 
 import { studioBg3dClassNames as cx } from "./studio-bg3d-editor-ui";
+import { StudioBg3dPsdOutputNotice } from "./StudioBg3dPsdOutputNotice";
 import {
   STUDIO_BG3D_DEFERRED_ARTIFACT_PASSES,
   STUDIO_BG3D_PRODUCTION_BATCH_PRESETS,
@@ -269,10 +270,11 @@ export function StudioBg3dProductionMultiPassExporterPanel({
           <span>
             컷별 레이어 PSD
             <span className="mt-0.5 block font-normal leading-relaxed text-fg-3">
-              예산 초과 시 PNG는 유지하고 manifest에 PSD fallback을 기록합니다.
+              모든 컷의 PSD가 준비되어야 다운로드합니다.
             </span>
           </span>
         </label>
+        <StudioBg3dPsdOutputNotice includeLayeredPsd={batch.includeLayeredPsd} disabled={interactionLocked} onSelectPng={() => batch.setIncludeLayeredPsd(false)} />
         <label className="flex min-h-10 cursor-pointer items-start gap-2 rounded-lg border border-line bg-panel px-2.5 py-2 text-[0.6rem] text-fg-2">
           <input
             type="checkbox"
@@ -344,7 +346,7 @@ export function StudioBg3dProductionMultiPassExporterPanel({
           <div className="flex items-start gap-1.5">
             <Archive className="mt-0.5 size-3.5 shrink-0" aria-hidden />
             <p>
-              완료 {batch.recoverySummary.completedShots}/{batch.recoverySummary.totalShots}컷 ·
+              산출물 보존 {batch.recoverySummary.completedShots}/{batch.recoverySummary.totalShots}컷 ·
               {batch.recoverySummary.mode === "durable" ? " 복구 저장소" : " 현재 탭 메모리"}
               {batch.recoverySummary.downloadRequested ? " · 다운로드 이력 보존" : ""}
               {batch.recoverySummary.degradedReason

@@ -69,6 +69,17 @@ function createBatch(
 describe("StudioBg3dProductionMultiPassExporterPanel", () => {
   afterEach(() => cleanup());
 
+  it("PSD 제한을 알리고 출력 크기 변경 없이 분리 PNG를 직접 선택하게 한다", () => {
+    const batch = createBatch({ includeLayeredPsd: true, exportHeight: 4096 });
+    render(<StudioBg3dProductionMultiPassExporterPanel shots={SHOTS} batch={batch} />);
+    expect(screen.getByText(/큰 타일 PSD는 지원하지 않습니다/)).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "분리 PNG 패스로 전환" }));
+    expect(batch.setIncludeLayeredPsd).toHaveBeenCalledWith(false);
+    expect(batch.setExportHeight).not.toHaveBeenCalled();
+    expect(batch.setSelectedPasses).not.toHaveBeenCalled();
+    expect(batch.startExport).not.toHaveBeenCalled();
+  });
+
   it("routes shot, preset, pass and export actions to the canonical batch runtime", () => {
     const batch = createBatch();
     render(
@@ -149,7 +160,7 @@ describe("StudioBg3dProductionMultiPassExporterPanel", () => {
 
     expect(screen.getByText(blockedReason)).toBeDefined();
     expect(screen.getByText(/렌더 · 표정 클로즈업/)).toBeDefined();
-    expect(screen.getByText(/완료 1\/2컷 · 복구 저장소 · 다운로드 이력 보존/)).toBeDefined();
+    expect(screen.getByText(/산출물 보존 1\/2컷 · 복구 저장소 · 다운로드 이력 보존/)).toBeDefined();
     expect(
       (screen.getByRole("button", { name: /선택 1컷 · 2패스 ZIP/ }) as HTMLButtonElement).disabled,
     ).toBe(true);

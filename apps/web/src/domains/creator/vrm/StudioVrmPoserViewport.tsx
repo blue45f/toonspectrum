@@ -22,6 +22,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import * as THREE from "three";
+import { useStudioVrmViewportBudget } from "./useStudioVrmViewportBudget";
 
 import {
   StudioToolHintTarget,
@@ -196,6 +197,8 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
     handleWardrobeSurfaceReceipt,
     handleWardrobeXpbdCaptureSyncChange,
   } = h;
+  const captureActive = Boolean(isCapturing || isThumbnailCapturing || isSharingPose || broadcastPreviewActive);
+  const viewportBudget = useStudioVrmViewportBudget(broadcastViewportHostRef, captureActive);
   const frameless = broadcastPreviewActive || presentation === "shaper";
   return (
           <section
@@ -280,8 +283,8 @@ export function StudioVrmPoserViewport({ h, presentation = "poser" }: {
                   }}
                   camera={{ fov: activeCamera.fov, position: new THREE.Vector3(...activeCamera.position), near: 0.1, far: 20 }}
                   className="h-full w-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent"
-                  dpr={broadcastPreviewActive ? broadcastCanvasDpr : [1, 2]}
-                  frameloop={vrmFrameLoop}
+                  dpr={broadcastPreviewActive ? broadcastCanvasDpr : viewportBudget.dpr}
+                  frameloop={viewportBudget.visible || captureActive ? vrmFrameLoop : "never"}
                   gl={{ alpha: true, antialias: true }}
                   onCreated={({ gl }) => {
                     gl.outputColorSpace = THREE.SRGBColorSpace;

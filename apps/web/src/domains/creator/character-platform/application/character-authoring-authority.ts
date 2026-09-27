@@ -37,9 +37,14 @@ export type CharacterAuthoringCommandSource =
 
 export type CharacterAuthoringOperation =
   | {
+      readonly kind: "restore-document";
+      readonly document: CharacterDocumentV3;
+    }
+  | {
       readonly kind: "sync-compatibility-projection";
       readonly projection: CharacterDocumentV3;
       readonly sourceFingerprint: string;
+      readonly previousProjection?: CharacterDocumentV3;
     }
   | {
       readonly kind: "set-slot";
@@ -139,6 +144,7 @@ export interface CharacterAuthoringAuthoritySnapshot {
   readonly canUndo: boolean;
   readonly canRedo: boolean;
   readonly historyLength: number;
+  readonly recentLabels: readonly string[];
 }
 
 export interface CharacterAuthoringJobToken {
@@ -211,13 +217,89 @@ const COMPATIBILITY_DEFORMATION_KINDS = new Set<CharacterDeformationLayerV3["kin
   "control-cage",
 ]);
 
+function mergeRecordDelta<T>(
+  current: Readonly<Record<string, T>>,
+  previous: Readonly<Record<string, T>>,
+  next: Readonly<Record<string, T>>,
+): Readonly<Record<string, T>> {
+  const merged = { ...current };
+  for (const key of new Set([...Object.keys(previous), ...Object.keys(next)])) {
+    if (sameValue(previous[key], next[key])) continue;
+    if (Object.hasOwn(next, key)) merged[key] = next[key];
+    else delete merged[key];
+  }
+  return merged;
+}
+
+function mergeProjectionDelta(
+  current: CharacterDocumentV3,
+  previous: CharacterDocumentV3,
+  next: CharacterDocumentV3,
+): CharacterDocumentV3 {
+  const changed = <T,>(before: T, after: T, original: T): T => sameValue(before, after) ? original : after;
+  const topology = changed(previous.topology, next.topology, current.topology);
+  const topologyChanged = topology.revision !== current.topology.revision;
+  const layerMap = (document: CharacterDocumentV3) => Object.fromEntries(
+    document.deformation.layers.map((layer) => [layer.layerId, layer]),
+  );
+  const deformation = Object.values(mergeRecordDelta(layerMap(current), layerMap(previous), layerMap(next)));
+  const surfaceInk = changed(previous.surfaceInk, next.surfaceInk, current.surfaceInk);
+  const poseChanged = previous.pose.poseId !== next.pose.poseId;
+  return {
+    ...current,
+    model: changed(previous.model, next.model, current.model),
+    compatibility: changed(previous.compatibility, next.compatibility, current.compatibility),
+    topology,
+    recipe: {
+      ...current.recipe,
+      slots: mergeRecordDelta(current.recipe.slots, previous.recipe.slots, next.recipe.slots),
+      accessories: changed(previous.recipe.accessories, next.recipe.accessories, current.recipe.accessories),
+      handPose: mergeRecordDelta(current.recipe.handPose, previous.recipe.handPose, next.recipe.handPose),
+    },
+    deformation: { layers: deformation },
+    look: { ...current.look, colors: mergeRecordDelta(current.look.colors, previous.look.colors, next.look.colors) },
+    expression: changed(previous.expression, next.expression, current.expression),
+    pose: {
+      ...(poseChanged ? next.pose : current.pose),
+      root: changed(previous.pose.root, next.pose.root, current.pose.root),
+      bones: mergeRecordDelta(current.pose.bones, previous.pose.bones, next.pose.bones),
+    },
+    groom: topologyChanged ? markCharacterGroomTopology(current.groom, topology.revision) : current.groom,
+    surfaceInk: topologyChanged ? markCharacterSurfaceInkTopology(surfaceInk, topology.revision) : surfaceInk,
+    geometryStrokes: topologyChanged ? markCharacterGeometryStrokeTopology(current.geometryStrokes, topology.revision) : current.geometryStrokes,
+    output: { ...current.output, transparent: changed(previous.output.transparent, next.output.transparent, current.output.transparent) },
+  };
+}
+
 function mergeCompatibilityProjection(
   document: CharacterDocumentV3,
   projection: CharacterDocumentV3,
   sourceFingerprint: string,
+  previousProjection?: CharacterDocumentV3,
 ): CharacterDocumentV3 {
   if (projection.documentId !== document.documentId) {
     throw new Error("호환 projection의 캐릭터 문서 ID가 현재 authority와 다릅니다.");
+  }
+  // 호환 화면에서 실제 바뀐 필드만 반영한다. 복원·undo로 바뀐 V3 값을
+  // 아직 갱신되지 않은 런타임 projection 전체로 덮어쓰지 않는다.
+  if (previousProjection) {
+    const changes = mergeProjectionDelta(document, previousProjection, projection);
+    const next = validateCharacterDocumentV3({
+      ...changes,
+      documentId: document.documentId,
+      revision: document.revision,
+      createdAt: document.createdAt,
+      updatedAt: document.updatedAt,
+      sourceReceipts: document.sourceReceipts,
+    });
+    if (operationSections(document, next).length === 0) return document;
+    return {
+      ...next,
+      sourceReceipts: Object.freeze([
+        ...document.sourceReceipts.filter((item) => item.kind !== "compatibility-projection"),
+        { kind: "compatibility-projection", sourceFingerprint, sourceRevision: projection.revision },
+      ]),
+    };
   }
   const topologyChanged = projection.topology.revision !== document.topology.revision;
   const localDeformation = document.deformation.layers.filter((layer) =>
@@ -278,8 +360,15 @@ function applyOperation(
   operation: CharacterAuthoringOperation,
 ): CharacterDocumentV3 {
   switch (operation.kind) {
+    case "restore-document": {
+      if (operation.document.documentId !== document.documentId) {
+        throw new Error("다른 캐릭터 문서의 백업을 복원할 수 없습니다.");
+      }
+      // 과거 백업도 현재 문서의 새 편집이다. revision과 생성 시각은 명령 확정 경로가 소유한다.
+      return { ...operation.document, createdAt: document.createdAt, revision: document.revision };
+    }
     case "sync-compatibility-projection":
-      return mergeCompatibilityProjection(document, operation.projection, operation.sourceFingerprint);
+      return mergeCompatibilityProjection(document, operation.projection, operation.sourceFingerprint, operation.previousProjection);
     case "set-slot": {
       const slots = { ...document.recipe.slots };
       if (operation.selection === null) delete slots[operation.slot];
@@ -536,6 +625,7 @@ export class CharacterAuthoringAuthority {
       canUndo: this.#undo.length > 0,
       canRedo: this.#redo.length > 0,
       historyLength: this.#undo.length,
+      recentLabels: Object.freeze(this.#undo.slice(-5).reverse().map((entry) => entry.command.label)),
     });
   }
 

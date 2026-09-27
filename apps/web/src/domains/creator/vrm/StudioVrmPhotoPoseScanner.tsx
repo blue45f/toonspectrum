@@ -604,7 +604,7 @@ export function StudioVrmPhotoPoseScanner({
         </div>
       ) : null}
 
-      {error ? <p className="mt-2 rounded-md border border-danger/30 bg-danger-soft p-2 text-[0.66rem] text-danger">{error}</p> : null}
+      {error ? <p role="alert" className="mt-2 rounded-md border border-danger/30 bg-danger-soft p-2 text-[0.66rem] text-danger">{error}</p> : null}
 
       {candidate ? (
         <div className="mt-3 grid gap-2">
@@ -655,12 +655,28 @@ export function StudioVrmPhotoPoseScanner({
                   type="button"
                   role="radio"
                   aria-checked={applyScope === scope.id}
+                  tabIndex={applyScope === scope.id ? 0 : -1}
+                  disabled={busy || disabled}
                   title={scope.hint}
-                  className={`min-h-10 rounded-lg border px-1 text-[0.6rem] font-bold transition-colors ${
+                  className={`min-h-11 rounded-lg border px-1 text-[0.6rem] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                     applyScope === scope.id
                       ? "border-accent/60 bg-accent-soft text-accent"
                       : "border-line bg-card text-fg-3 hover:bg-raised hover:text-fg"
                   }`}
+                  onKeyDown={(event) => {
+                    if (event.metaKey || event.ctrlKey || event.altKey || event.nativeEvent.isComposing) return;
+                    const index = PHOTO_POSE_APPLY_SCOPES.findIndex((item) => item.id === scope.id);
+                    const count = PHOTO_POSE_APPLY_SCOPES.length;
+                    const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? count - 1
+                      : event.key === "ArrowLeft" || event.key === "ArrowUp" ? (index + count - 1) % count
+                      : event.key === "ArrowRight" || event.key === "ArrowDown" ? (index + 1) % count : -1;
+                    const next = PHOTO_POSE_APPLY_SCOPES[nextIndex];
+                    if (!next) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setApplyScope(next.id);
+                    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('button[role="radio"]')[nextIndex]?.focus();
+                  }}
                   onClick={() => setApplyScope(scope.id)}
                 >
                   {scope.label}

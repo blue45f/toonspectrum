@@ -8,16 +8,20 @@
  * Tab trapping, first focus and focus return are the poser runtime's (`h.dialogRef` /
  * `h.closeButtonRef`), exactly as in `StudioVrmPoserDialog`.
  */
-import { PanelRightClose, PanelRightOpen, Upload, UserRound, X } from "lucide-react";
+import { Maximize2, Minimize2, PanelRightClose, PanelRightOpen, Upload, UserRound, X } from "lucide-react";
 import { useEffect, useId, useReducer, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { STUDIO_FOCUS_RING, StudioEmptyState } from "../studio-panel-ui";
 import { StudioVrmPoserViewport } from "../vrm/StudioVrmPoserViewport";
+import { useStudio3dVisualViewport } from "../studio-3d-ui/useStudio3dVisualViewport";
+import "./studio-character-shaper-workspace.css";
 
 import {
   CHARACTER_SHAPER_DESKTOP_QUERY,
   CHARACTER_SHAPER_TABLET_QUERY,
+  CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY,
+  CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY,
   createCharacterShaperUiState,
   isCharacterShaperTypingTarget,
   pushCharacterShaperKeyLayer,
@@ -40,12 +44,13 @@ import type { CharacterSlotEntry, CharacterSlotKind } from "./character-shaper-c
 import type { CharacterShaperDrawerMode, StudioCharacterShaperDialogProps } from "./character-shaper-ui-contract";
 import type { CharacterShaperLayout } from "./character-shaper-ui-model";
 import type { LoadStatus } from "../vrm/StudioVrmPoserTypes";
-import type { ChangeEvent, ReactNode } from "react";
+import type { ChangeEvent, ReactNode, RefObject } from "react";
 
 import { cn } from "@/shared/lib/utils";
+import { useT } from "@/shared/lib/i18n";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
 
-type MobileSheetTab = "shelf" | "inspector";
+type MobileSheetTab = "shelf" | "inspector" | "view";
 
 const COMMIT_NOTICE_MS = 4000;
 
@@ -80,12 +85,23 @@ function ShelfSkeleton() {
 }
 
 export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: StudioCharacterShaperDialogProps) {
+  const t = useT();
+  useStudio3dVisualViewport(h.dialogRef as RefObject<HTMLElement | null>);
   const isDesktop = useMediaQuery(CHARACTER_SHAPER_DESKTOP_QUERY);
   const isTablet = useMediaQuery(CHARACTER_SHAPER_TABLET_QUERY);
-  const layout: CharacterShaperLayout = isDesktop ? "desktop" : isTablet ? "tablet" : "mobile";
-  const [ui, dispatch] = useReducer(reduceCharacterShaperUiState, undefined, () => createCharacterShaperUiState());
+  const touchLandscape = useMediaQuery(CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY);
+  const touchPortrait = useMediaQuery(CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY);
+  const layout: CharacterShaperLayout = touchLandscape || touchPortrait ? "mobile" : isDesktop ? "desktop" : isTablet ? "tablet" : "mobile";
+  const [ui, dispatch] = useReducer(reduceCharacterShaperUiState, undefined, () => createCharacterShaperUiState({ mobileSheet: layout === "mobile" ? "collapsed" : "half" }));
   const [outputFraming, setOutputFraming] = useState(DEFAULT_CHARACTER_OUTPUT_FRAMING);
+  const previousSheetRef = useRef<"half" | "full">("half");
   const [mobileTab, setMobileTab] = useState<MobileSheetTab>("shelf");
+  const activeMobileTab = mobileTab === "view" && !touchLandscape ? "shelf" : mobileTab;
+  const mobileTabs: readonly { readonly id: MobileSheetTab; readonly label: string }[] = [
+    { id: "shelf", label: "프리셋" },
+    { id: "inspector", label: "정밀 조절" },
+    ...(touchLandscape ? [{ id: "view" as const, label: t("studio.character.workspace.view", "보기") }] : []),
+  ];
   const [commitNotice, setCommitNotice] = useState<string | null>(null);
   const fallbackTitleId = useId();
   const fallbackDescriptionId = useId();
@@ -95,6 +111,8 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   const fileInputRef = useRef<HTMLInputElement>(null);
   const drawerReturnFocusRef = useRef<HTMLElement | null>(null);
   const restoreDrawerFocusRef = useRef(false);
+  const paintReturnFocusRef = useRef<HTMLElement | null>(null);
+  const restorePaintFocusRef = useRef(false);
   const previousPanelRef = useRef<{ readonly tab: string; readonly section: string } | null>(null);
   const keyHandlerRef = useRef<(event: KeyboardEvent) => boolean>(() => false);
 
@@ -125,6 +143,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   }, [commitNotice]);
 
   const enterPaint = () => {
+    paintReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     previousPanelRef.current = {
       tab: typeof h.activePanelTab === "string" ? h.activePanelTab : "pose",
       section: typeof h.activeCharacterSection === "string" ? h.activeCharacterSection : "forge",
@@ -135,6 +154,8 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   };
 
   const exitPaint = () => {
+    restorePaintFocusRef.current = true;
+    h.cancelActiveTexturePaintStroke?.();
     const previous = previousPanelRef.current;
     previousPanelRef.current = null;
     const restoreTab = previous && !(previous.tab === "character" && previous.section === "surface") ? previous.tab : "pose";
@@ -150,6 +171,21 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     if (paintActive) exitPaint();
     else enterPaint();
   };
+
+  useEffect(() => {
+    if (paintActive) {
+      const dialog = h.dialogRef.current;
+      if (dialog instanceof HTMLElement) {
+        dialog.querySelector<HTMLElement>('[data-character-shaper-paint-panel] button:not(:disabled)')?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    if (!restorePaintFocusRef.current) return;
+    restorePaintFocusRef.current = false;
+    const target = paintReturnFocusRef.current;
+    paintReturnFocusRef.current = null;
+    if (target?.isConnected) target.focus({ preventScroll: true });
+  }, [paintActive, h.dialogRef]);
 
   const openDrawer = (mode: Exclude<CharacterShaperDrawerMode, null>) => {
     binding.cancelPreview?.();
@@ -187,7 +223,10 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   const selectSlot = (slot: CharacterSlotKind) => {
     binding.cancelPreview?.();
     dispatch({ type: "select-slot", slot });
-    if (layout === "mobile") setMobileTab("shelf");
+    if (layout === "mobile") {
+      setMobileTab("shelf");
+      if (ui.mobileSheet === "collapsed") dispatch({ type: "set-mobile-sheet", sheet: "half" });
+    }
   };
 
   const commitEntry = (entry: CharacterSlotEntry) => {
@@ -208,6 +247,20 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     const next = !ui.advanced;
     dispatch({ type: "set-advanced", advanced: next });
     if (next) onOpenAdvanced?.();
+  };
+
+  const changeMobileSheet = (sheet: "collapsed" | "half" | "full") => {
+    if (sheet === "collapsed") {
+      binding.cancelPreview?.();
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.closest("[data-character-shaper-sheet]")) {
+        const dialog = h.dialogRef.current;
+        if (dialog instanceof HTMLElement) {
+          dialog.querySelector<HTMLElement>("[data-character-viewport-focus]")?.focus({ preventScroll: true });
+        }
+      }
+    }
+    dispatch({ type: "set-mobile-sheet", sheet });
   };
 
   const handleKeyDown = (event: KeyboardEvent): boolean => {
@@ -231,10 +284,14 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
         binding.cancelPreview();
         return true;
       }
+      if (ui.drawer === null && paintActive) {
+        exitPaint();
+        return true;
+      }
       const next = reduceCharacterShaperUiState(ui, { type: "escape", layout });
       if (next !== ui) {
         if (ui.drawer !== null) closeDrawer();
-        else if (next.mobileSheet !== ui.mobileSheet) dispatch({ type: "set-mobile-sheet", sheet: next.mobileSheet });
+        else if (next.mobileSheet !== ui.mobileSheet) changeMobileSheet(next.mobileSheet);
         else if (ui.paintActive && !next.paintActive) exitPaint();
         return true;
       }
@@ -357,6 +414,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   ) : (
     <CharacterShaperShelf
       binding={binding}
+      compact={layout === "mobile"}
       slot={ui.activeSlot}
       query={ui.query}
       tag={ui.tag}
@@ -411,15 +469,32 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   const renderViewport = (className?: string) => {
     const viewport = (
     <div data-character-shaper-viewport="true" className={cn(VIEWPORT_WRAPPER_CLASS, layout === "mobile" ? "flex-1" : className)}>
-      <StudioVrmPoserViewport h={h} presentation="shaper" />
-      <CharacterShaperCompositionGuide framing={outputFraming} />
-      <CharacterShaperViewportHud h={h} binding={binding} compact={layout === "mobile"} />
+      <div data-character-shaper-stage="true" className="relative grid min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
+        <StudioVrmPoserViewport h={h} presentation="shaper" />
+        <CharacterShaperCompositionGuide framing={outputFraming} />
+      </div>
+      {!paintActive && !touchLandscape ? <CharacterShaperViewportHud h={h} binding={binding} compact={layout === "mobile"} /> : null}
+      {layout === "mobile" && !paintActive ? (
+        <button type="button" data-character-viewport-focus="true"
+          aria-pressed={ui.mobileSheet === "collapsed"}
+          aria-label={ui.mobileSheet === "collapsed"
+            ? t("studio.character.workspace.showTools", "편집 도구 펼치기")
+            : t("studio.character.workspace.focusModel", "모델 크게 보기")}
+          onClick={() => {
+            if (ui.mobileSheet === "collapsed") changeMobileSheet(previousSheetRef.current);
+            else { previousSheetRef.current = ui.mobileSheet; changeMobileSheet("collapsed"); }
+          }}
+          className={cn("absolute right-1.5 top-1.5 z-30 inline-flex min-h-11 items-center gap-1 rounded-xl border border-line bg-panel/95 px-2 text-xs font-semibold text-fg shadow-sm", STUDIO_FOCUS_RING)}>
+          {ui.mobileSheet === "collapsed" ? <Minimize2 size={16} aria-hidden /> : <Maximize2 size={16} aria-hidden />}
+          {ui.mobileSheet === "collapsed" ? t("studio.character.workspace.tools", "도구") : t("studio.character.workspace.expand", "크게")}
+        </button>
+      ) : null}
       {paintActive ? (
-        <div className="pointer-events-none absolute inset-x-2 bottom-2 z-30 flex justify-center [&>*]:pointer-events-auto">
-          <CharacterShaperPaintHud h={h} onExit={exitPaint} />
+        <div data-character-shaper-paint-panel="true" className="min-h-0 min-w-0 border-t border-line bg-panel">
+          <CharacterShaperPaintHud h={h} onExit={exitPaint} compact={layout === "mobile"} />
         </div>
       ) : null}
-      {layout !== "mobile" ? (
+      {layout !== "mobile" && !paintActive ? (
         <button
           type="button"
           aria-expanded={ui.inspectorOpen}
@@ -437,7 +512,7 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
           정밀 조절
         </button>
       ) : null}
-      {layout === "tablet" && ui.inspectorOpen ? (
+      {layout === "tablet" && ui.inspectorOpen && !paintActive ? (
         <aside
           id={inspectorId}
           aria-label="정밀 조절"
@@ -464,8 +539,8 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     </div>
     );
     return layout === "mobile" ? (
-      <div className={cn("flex min-h-0 min-w-0 flex-col bg-card", className)}>
-        <CharacterShaperCameraControls h={h} compact />
+      <div data-character-shaper-model-workspace="true" className={cn("flex min-h-0 min-w-0 flex-col bg-card", className)}>
+        {!touchLandscape && !paintActive ? <CharacterShaperCameraControls h={h} compact /> : null}
         {viewport}
       </div>
     ) : viewport;
@@ -491,9 +566,12 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
       <div className="relative flex min-h-0 min-w-0 flex-col">
         <div
           inert={ui.drawer !== null ? true : undefined}
+          data-character-shaper-mobile-body="true"
+          data-tools-open={ui.mobileSheet !== "collapsed" && !paintActive ? "true" : undefined}
           className="flex min-h-0 flex-1 flex-col"
         >
-          {renderViewport("min-h-[44vh] flex-1")}
+          {renderViewport("min-h-0 flex-1")}
+          <div data-character-shaper-mobile-tools="true" hidden={paintActive} className={paintActive ? "hidden" : "contents"}>
           <CharacterShaperSlotRail
             binding={binding}
             activeSlot={ui.activeSlot}
@@ -502,50 +580,62 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
           />
           <CharacterShaperMobileSheet
             state={ui.mobileSheet}
-            onStateChange={(sheet) => dispatch({ type: "set-mobile-sheet", sheet })}
+            onStateChange={changeMobileSheet}
             title="프리셋과 정밀 조절"
-          >
-            <div role="tablist" aria-label="시트 내용" className="flex shrink-0 gap-1 border-b border-line px-2 pb-1.5">
-              {(
-                [
-                  { id: "shelf", label: "프리셋" },
-                  { id: "inspector", label: "정밀 조절" },
-                ] as const
-              ).map((tab) => (
+            header={
+            <div role="tablist" aria-label="시트 내용" className="flex min-w-0 flex-1 gap-1">
+              {mobileTabs.map((tab) => (
                 <button
                   key={tab.id}
                   id={`${sheetTabsId}-${tab.id}`}
                   type="button"
                   role="tab"
-                  aria-selected={mobileTab === tab.id}
+                  aria-selected={activeMobileTab === tab.id}
                   aria-controls={`${sheetTabsId}-panel`}
-                  tabIndex={mobileTab === tab.id ? 0 : -1}
-                  onClick={() => setMobileTab(tab.id)}
+                  tabIndex={activeMobileTab === tab.id ? 0 : -1}
+                  onClick={() => {
+                    setMobileTab(tab.id);
+                    if (ui.mobileSheet === "collapsed") dispatch({ type: "set-mobile-sheet", sheet: "half" });
+                  }}
                   onKeyDown={(event) => {
                     if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
                       event.preventDefault();
-                      setMobileTab(mobileTab === "shelf" ? "inspector" : "shelf");
+                      const index = mobileTabs.findIndex((item) => item.id === activeMobileTab);
+                      const step = event.key === "ArrowRight" ? 1 : -1;
+                      const next = mobileTabs[(index + step + mobileTabs.length) % mobileTabs.length]?.id ?? "shelf";
+                      setMobileTab(next);
+                      if (ui.mobileSheet === "collapsed") dispatch({ type: "set-mobile-sheet", sheet: "half" });
+                      document.getElementById(`${sheetTabsId}-${next}`)?.focus({ preventScroll: true });
                     }
                   }}
                   className={cn(
                     TAB_BUTTON,
-                    mobileTab === tab.id ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
+                    activeMobileTab === tab.id ? "bg-accent-soft text-accent" : "text-fg-2 hover:bg-raised hover:text-fg",
                   )}
                 >
                   {tab.label}
                 </button>
               ))}
             </div>
+            }
+          >
             <div
               id={`${sheetTabsId}-panel`}
+              data-character-sheet-panel="true"
               role="tabpanel"
-              aria-labelledby={`${sheetTabsId}-${mobileTab}`}
+              aria-labelledby={`${sheetTabsId}-${activeMobileTab}`}
               className="relative min-h-0 flex-1 overflow-hidden"
             >
-              {mobileTab === "shelf" ? shelfContent : <div className="h-full overflow-y-auto overscroll-contain">{inspector}</div>}
+              {activeMobileTab === "shelf" ? shelfContent : activeMobileTab === "view" ? (
+                <div data-character-shaper-view-tools="true" className="relative min-h-0">
+                  <CharacterShaperCameraControls h={h} compact />
+                  <CharacterShaperViewportHud h={h} binding={binding} compact />
+                </div>
+              ) : <div className="h-full overflow-y-auto overscroll-contain">{inspector}</div>}
               {commitNoticeNode}
             </div>
           </CharacterShaperMobileSheet>
+          </div>
         </div>
         {drawer}
       </div>
@@ -554,6 +644,8 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
     const showInspectorColumn = layout === "desktop" && ui.inspectorOpen;
     middle = (
       <div
+        data-character-shaper-main="true"
+        data-inspector-column={showInspectorColumn ? "true" : undefined}
         className={cn(
           "grid min-h-0 min-w-0 grid-rows-[minmax(0,1fr)]",
           layout === "desktop"
@@ -603,11 +695,14 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
       data-studio-vrm-dialog="true"
       data-character-shaper="true"
       data-character-shaper-layout={layout}
+      data-character-shaper-landscape={touchLandscape ? "true" : undefined}
       data-character-shaper-paint={paintActive ? "true" : undefined}
       className={DIALOG_ROOT_CLASS}
       style={{
         paddingTop: "max(0.5rem, env(safe-area-inset-top))",
         paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))",
+        paddingLeft: "max(0.5rem, env(safe-area-inset-left))",
+        paddingRight: "max(0.5rem, env(safe-area-inset-right))",
       }}
     >
       <div data-character-shaper-surface="true" className="relative mx-auto grid h-full max-h-full min-h-0 w-full max-w-[1600px] grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-2xl border border-line bg-panel shadow-[0_24px_80px_oklch(0.05_0.01_70/0.55)]">

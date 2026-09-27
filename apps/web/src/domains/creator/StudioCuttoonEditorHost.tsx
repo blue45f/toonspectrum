@@ -650,7 +650,11 @@ import {
   removeStudioLinked3dRenderLinks,
   upsertStudioLinked3dRenderLink,
 } from "./studio-linked-3d-render-document";
-import { resolveStudioScene3dLinkedLayerEditSource } from "./scene3d/studio-scene3d-linked-layer-source";
+import {
+  describeStudioScene3dLinkedLayerReview,
+  resolveStudioScene3dLinkedLayerEditSource,
+  snapshotStudioScene3dLinkedLayerEditSource,
+} from "./scene3d/studio-scene3d-linked-layer-source";
 import type { StudioLiquifyMode } from "./studio-liquify-contract";
 import { mapLiquifyRoiToDocumentFrame, planStudioLiquifyLivePreview } from "./studio-liquify-live-preview";
 import {
@@ -14589,9 +14593,15 @@ const puppetWarpArmed =
             candidate.bg3dLtBundleId === element.bg3dLtBundleId &&
             candidate.bg3dScene !== undefined
         );
-        if (anchor?.bg3dScene) return { scene: anchor.bg3dScene };
+        if (anchor?.bg3dScene) {
+          const scene = snapshotStudioScene3dLinkedLayerEditSource(anchor.bg3dScene);
+          return scene ? { scene } : null;
+        }
       }
-      if (element.bg3dScene) return { scene: element.bg3dScene };
+      if (element.bg3dScene) {
+        const scene = snapshotStudioScene3dLinkedLayerEditSource(element.bg3dScene);
+        return scene ? { scene } : null;
+      }
       return parseStudio3dTool(element.src) === "bg3d" ? { legacyDataUrl: element.src } : null;
     },
     [activePage.linked3dRender, activePage.shared3dStage, elements]
@@ -14601,6 +14611,22 @@ const puppetWarpArmed =
     () => resolveBg3dEditSource(selected),
     [selected, resolveBg3dEditSource]
   );
+  const selectedLinked3dReview = useMemo(() => {
+    const bundleId = selected?.type === "image"
+      ? selected.bg3dLtBundleId
+      : selected?.type === "draw" ? selected.linked3dCorrection?.bundleId : undefined;
+    const linkedScene = bundleId
+      ? elements.find((element): element is ImageEl => element.type === "image"
+        && element.bg3dLtBundleId === bundleId && element.bg3dScene !== undefined)?.bg3dScene
+      : undefined;
+    const scene = selectedBg3dEditSource?.scene
+      ?? (linkedScene ? snapshotStudioScene3dLinkedLayerEditSource(linkedScene) : null);
+    return scene ? describeStudioScene3dLinkedLayerReview({
+      scene,
+      bundleId,
+      linked3dRender: activePage.linked3dRender,
+    }) : null;
+  }, [activePage.linked3dRender, elements, selected, selectedBg3dEditSource]);
   const contextMenuBg3dEditSource = resolveBg3dEditSource(contextMenuEl);
   // Auto-coach only while the page is still idle. Late work/autosave hydration must not
   // cover the canvas after the artist already placed content or operated any Studio control
@@ -29457,7 +29483,7 @@ function clearSelectionForEdit() {
         setStudioMarketplaceCloudSyncRetryPending(false);
         setStudioMarketplaceCloudSyncRetry(null);
       }}
-      studioStatusNotice={statusNotice}
+      studioStatusNotice={[statusNotice, selectedLinked3dReview?.message].filter(Boolean).join(" · ") || null}
       studioStickerAssetsError={studioStickerAssetsError}
       studioStickerAssetsLoaded={studioStickerAssetsLoaded}
       studioStickerAssetsLoading={studioStickerAssetsLoading}

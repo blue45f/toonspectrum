@@ -160,6 +160,8 @@ function validateAnchor(anchor: CharacterGeometryStrokeAnchor): CharacterGeometr
 
 function validateStyle(style: CharacterGeometryStrokeStyle): CharacterGeometryStrokeStyle {
   if (!HEX.test(style.color)
+    || !["ribbon", "round"].includes(style.profile)
+    || typeof style.fill !== "boolean" || typeof style.lineOnly !== "boolean"
     || !Number.isFinite(style.baseWidth) || style.baseWidth <= 0 || style.baseWidth > 10
     || !Number.isFinite(style.opacity) || style.opacity < 0 || style.opacity > 1
     || !Number.isFinite(style.taperStart) || style.taperStart < 0 || style.taperStart > 1
@@ -189,6 +191,10 @@ export function validateCharacterGeometryStrokeDocument(
       throw new CharacterGeometryStrokeError("GEOMETRY_STROKE_ID_INVALID", `Geometry stroke ID가 중복되거나 올바르지 않습니다: ${stroke.strokeId}`);
     }
     ids.add(stroke.strokeId);
+    if (!["valid", "needs-reprojection", "orphaned"].includes(stroke.status)
+      || typeof stroke.visible !== "boolean" || typeof stroke.locked !== "boolean") {
+      throw new CharacterGeometryStrokeError("GEOMETRY_STROKE_STATE_INVALID", "Geometry stroke 상태가 올바르지 않습니다.");
+    }
     if (!Array.isArray(stroke.points) || stroke.points.length < 2 || stroke.points.length > 8192) {
       throw new CharacterGeometryStrokeError("GEOMETRY_STROKE_POINT_LIMIT", `${stroke.strokeId}에는 2~8192개의 점이 필요합니다.`);
     }
@@ -219,6 +225,9 @@ export function buildCharacterGeometryStrokeMesh(
   stroke: CharacterGeometryStroke,
 ): CharacterGeometryStrokeMesh {
   const validated = validateCharacterGeometryStrokeDocument({ version: 1, strokes: [stroke] }).strokes[0]!;
+  if (validated.status !== "valid") {
+    throw new CharacterGeometryStrokeError("GEOMETRY_STROKE_REPROJECTION_REQUIRED", "표면 구조가 바뀐 입체선은 원본을 보존하고 메시 생성을 중지합니다.");
+  }
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
@@ -230,6 +239,7 @@ export function buildCharacterGeometryStrokeMesh(
     lengths.push(travelled);
   });
   const total = Math.max(EPSILON, travelled);
+  const roundSegments = 12;
   validated.points.forEach((point, index) => {
     const before = validated.points[Math.max(0, index - 1)]!.anchor.position;
     const after = validated.points[Math.min(validated.points.length - 1, index + 1)]!.anchor.position;
@@ -246,9 +256,24 @@ export function buildCharacterGeometryStrokeMesh(
     const left = subtract(centre, multiply(side, halfWidth));
     const right = add(centre, multiply(side, halfWidth));
     const normal = normalize(cross(side, tangent), normalize(normalHint));
+    const u = lengths[index]! / total;
+    if (validated.style.profile === "round") {
+      for (let radial = 0; radial <= roundSegments; radial += 1) {
+        const angle = radial / roundSegments * Math.PI * 2;
+        const outward = add(multiply(side, Math.cos(angle)), multiply(normal, Math.sin(angle)));
+        positions.push(...add(centre, multiply(outward, halfWidth)));
+        normals.push(...outward);
+        uvs.push(u, radial / roundSegments);
+        if (index < validated.points.length - 1 && radial < roundSegments) {
+          const offset = index * (roundSegments + 1) + radial;
+          const next = offset + roundSegments + 1;
+          indices.push(offset, next, offset + 1, next, next + 1, offset + 1);
+        }
+      }
+      return;
+    }
     positions.push(...left, ...right);
     normals.push(...normal, ...normal);
-    const u = lengths[index]! / total;
     uvs.push(u, 0, u, 1);
     if (index < validated.points.length - 1) {
       const offset = index * 2;

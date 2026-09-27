@@ -1,4 +1,7 @@
+import { assertStudioBg3dShotRequestedOutput, type StudioBg3dShotRequestedOutput } from "./studio-bg3d-shot-output-contract";
+
 export interface StudioBg3dShotBatchDownloadGateInput {
+  readonly requestedOutput?: StudioBg3dShotRequestedOutput;
   readonly signal: AbortSignal;
   readonly isActive: () => boolean;
   readonly assertAccess: () => Promise<void>;
@@ -22,6 +25,7 @@ export async function commitStudioBg3dShotBatchDownload(
   input: StudioBg3dShotBatchDownloadGateInput,
 ): Promise<void> {
   assertActive(input);
+  if (input.requestedOutput) assertStudioBg3dShotRequestedOutput(input.requestedOutput);
   await input.assertAccess();
   assertActive(input);
   await input.markDownloadRequested();

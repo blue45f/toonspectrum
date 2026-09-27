@@ -11,6 +11,10 @@ import {
   parseStudioGeneric3dWorkflowMetadata,
   type StudioGeneric3dWorkflowMetadataRecord,
 } from "../studio-generic-3d-workflow-metadata";
+import {
+  validateStudioScene3dShotVersionCollection,
+  type StudioScene3dVersionedCut,
+} from "../scene3d/studio-scene3d-shot-versions";
 
 import {
   STUDIO_BG3D_CAMERA_DEFAULT_NEAR_CLIP,
@@ -653,6 +657,8 @@ export interface StudioBg3dSceneDocument {
   readonly shots?: readonly StudioBg3dShot[];
   /** Absent means no shot is currently applied; it must reference `shots` when present. */
   readonly activeShotId?: string;
+  /** 원고 레이어 재편집에도 고정한 컷 원본·버전·승인 상태를 함께 보존한다. */
+  readonly pinnedVersionedCut?: StudioScene3dVersionedCut;
 }
 
 const DEFAULT_CAMERA_POSITION: StudioBg3dVec3 = [4, 3, 6];
@@ -2065,6 +2071,19 @@ function normalizeDecodedCurrentDocument(
     const shots = includesShots ? normalizeShots(value.shots, nodeIds) : undefined;
     const shotIds = new Set(shots?.map((shot) => shot.id) ?? []);
     const activeShotId = normalizedId(value.activeShotId);
+    let pinnedVersionedCut: StudioScene3dVersionedCut | undefined;
+    if (hasOwn(value, "pinnedVersionedCut")) {
+      try {
+        pinnedVersionedCut = validateStudioScene3dShotVersionCollection({
+          version: 1,
+          cuts: [value.pinnedVersionedCut],
+        }).cuts[0];
+      } catch {
+        // 손상된 승인/원본 정보를 조용히 지운 정상 장면으로 취급하지 않는다.
+        if (rootMode === "lenient") throw new Error("고정 컷 원본이 손상되어 장면을 변경하지 않았습니다.");
+        return null;
+      }
+    }
     const normalized: StudioBg3dSceneDocument = {
       kind: STUDIO_BG3D_SCENE_DOCUMENT_KIND,
       version: STUDIO_BG3D_SCENE_DOCUMENT_VERSION,
@@ -2079,6 +2098,7 @@ function normalizeDecodedCurrentDocument(
       nodes,
       ...(shots ? { shots } : {}),
       ...(activeShotId && shotIds.has(activeShotId) ? { activeShotId } : {}),
+      ...(pinnedVersionedCut ? { pinnedVersionedCut } : {}),
     };
     if (canonicalDocumentByteLength(normalized) > STUDIO_BG3D_SCENE_DOCUMENT_MAX_BYTES) {
       failBudget("document-byte-budget-exceeded");

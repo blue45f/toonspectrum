@@ -17,6 +17,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { CharacterRuntimeThumbnailRecorder } from "../character-platform/thumbnail/character-runtime-thumbnail-store";
+import { useCharacterAuthoringInputs } from "../character-platform/ui/use-character-authoring-inputs";
+import { useCharacterPlatformWorkbench } from "../character-platform/ui/use-character-platform-workbench";
 import { CharacterPlatformWorkbench } from "../character-platform/ui/CharacterPlatformWorkbench";
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 import { StudioVrmPoserDialog } from "../vrm/StudioVrmPoserDialog";
@@ -41,9 +43,12 @@ const RETURN_BUTTON_CLASS = cn(
 export function StudioCharacterShaper(props: StudioVrmPoserProps) {
   const { open } = props;
   const h = useStudioVrmPoserController(props);
-  const binding = useCharacterShaperBinding(h);
-  const cancelPreview = binding.cancelPreview;
   const [advanced, setAdvanced] = useState(false);
+  const runtimeBinding = useCharacterShaperBinding(h, { runtimeOnly: true });
+  const controller = useCharacterPlatformWorkbench(h, runtimeBinding, { documentAuthority: true, legacyEditing: advanced });
+  const binding = controller.binding;
+  const inputHost = useCharacterAuthoringInputs(h, controller.authoring, !advanced);
+  const cancelPreview = binding.cancelPreview;
   const [advancedRoot, setAdvancedRoot] = useState<HTMLElement | null>(null);
   const dialogRef = h.dialogRef as RefObject<HTMLElement | null> | undefined;
 
@@ -90,9 +95,9 @@ export function StudioCharacterShaper(props: StudioVrmPoserProps) {
 
   return (
     <>
-      <StudioCharacterShaperDialog h={h} binding={binding} onOpenAdvanced={() => setAdvanced(true)} />
+      <StudioCharacterShaperDialog h={inputHost} binding={binding} onOpenAdvanced={() => setAdvanced(true)} />
       <CharacterRuntimeThumbnailRecorder h={h} binding={binding} />
-      <CharacterPlatformWorkbench h={h} binding={binding} />
+      <CharacterPlatformWorkbench h={inputHost} binding={binding} controller={controller} />
     </>
   );
 }

@@ -44,6 +44,38 @@ function renderHud(overrides: Record<string, unknown> = {}) {
 }
 
 describe("CharacterShaperPaintHud", () => {
+  it("작은 작업면은 실행 취소와 종료를 유지하고 브러시 설정을 선택해서 펼친다", () => {
+    const h = makeHost({ viewportCameraInteractionLocked: true });
+    const onExit = vi.fn();
+    render(<CharacterShaperPaintHud h={h} onExit={onExit} compact />);
+    const settings = screen.getByRole("button", { name: "브러시 설정" });
+    expect(settings.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("slider", { name: "브러시 굵기" })).toBeNull();
+    expect(screen.getByRole("status", { name: "표면 드로잉 상태" }).textContent).toContain("회전 잠금");
+    expect(screen.getByRole("status", { name: "표면 드로잉 상태" }).textContent).toContain("상의 텍스처를 칠하는 중");
+    fireEvent.click(screen.getByRole("button", { name: "드로잉 되돌리기" }));
+    expect(h.handleTexturePaintUndo).toHaveBeenCalledTimes(1);
+    fireEvent.click(settings);
+    expect(settings.getAttribute("aria-expanded")).toBe("true");
+    expect(document.getElementById(settings.getAttribute("aria-controls") ?? "")?.contains(screen.getByRole("slider", { name: "브러시 굵기" }))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "지우개" }));
+    expect(h.handleTexturePaintSettingsChange).toHaveBeenCalledWith({ tool: "surface-brush", blend: "erase" });
+    fireEvent.click(settings);
+    expect(screen.queryByRole("button", { name: "지우개" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "표면 드로잉 끝내기" }));
+    expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it("그리는 중에는 기록 조작을 잠그고 종료 경로를 남긴다", () => {
+    const { h, onExit } = renderHud({ texturePaintStrokeActive: true });
+    fireEvent.click(screen.getByRole("button", { name: "드로잉 되돌리기" }));
+    fireEvent.click(screen.getByRole("button", { name: "드로잉 다시 실행" }));
+    expect(h.handleTexturePaintUndo).not.toHaveBeenCalled();
+    expect(h.handleTexturePaintRedo).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "표면 드로잉 끝내기" }));
+    expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
   it("maps the four tools onto the runtime settings", () => {
     const { h } = renderHud();
 
