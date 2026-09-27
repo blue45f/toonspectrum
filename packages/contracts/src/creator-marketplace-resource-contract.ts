@@ -17,6 +17,7 @@ export const CREATOR_MARKETPLACE_RESOURCE_KINDS = [
 ] as const;
 
 export const CREATOR_MARKETPLACE_RESOURCE_LICENSES = [
+  "toonstudio-standard",
   "toonspectrum-standard",
   "cc0-1.0",
   "cc-by-4.0",
