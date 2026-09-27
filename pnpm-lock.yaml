@@ -15282,9 +15282,9 @@ snapshots:
     dependencies:
       zod: 3.25.76
 
-  zod-validation-error@4.0.2(zod@4.5.4):
+  zod-validation-error@4.0.2(zod@4.4.3):
     dependencies:
-      zod: 4.5.4
+      zod: 4.4.3
 
   zod@3.25.76: {}
 
