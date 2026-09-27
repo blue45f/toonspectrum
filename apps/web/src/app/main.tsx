@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import { installStaticCatalog } from "../shared/catalog/catalog-static";
 import { initializeCreatorContinuity } from "../shared/lib/creator-continuity";
 import { initializePwaInstallCapture } from "../shared/lib/pwa-install-store";
+import "../shared/lib/programmatic-reload-hmr";
 
 import App from "./App";
 import { ensureSerifWebFontForRoute } from "./serif-webfont";

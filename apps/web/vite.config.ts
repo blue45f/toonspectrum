@@ -7,7 +7,7 @@ import { fileURLToPath, URL } from "node:url";
 
 import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
-import { build as viteBuild, defineConfig, type Plugin } from "vite";
+import { build as viteBuild, createLogger, defineConfig, type Logger, type Plugin } from "vite";
 
 import { createStudioManualChunks } from "./config/vite-manual-chunks";
 import { STUDIO_I18N_NAMESPACES } from "./src/shared/lib/i18n-asset-manifest";
@@ -168,6 +168,27 @@ const STUDIO_WORKSPACE_ICON_MODULES = new Set([
   "waves-horizontal",
   "zap",
 ]);
+const KNOWN_BROWSER_EXTERNALIZATION_MODULES = [
+  /node_modules\/.pnpm\/(?:ag-psd|@techstark\+opencv-js|canvaskit-wasm|opencascade\.js|@gltf-transform\+core|manifold-3d|rhino3dm|ktx2-encoder|@sparkjsdev\+spark)@/,
+  /packages\/studio-brush-platform\/src\/libmypaint\/mypaint-wasm\.mjs$/,
+];
+
+function createStudioBuildLogger(): Logger {
+  const logger = createLogger();
+  const originalWarn = logger.warn.bind(logger);
+  logger.warn = (message, options) => {
+    if (
+      typeof message === "string" &&
+      message.includes("has been externalized for browser compatibility") &&
+      KNOWN_BROWSER_EXTERNALIZATION_MODULES.some((pattern) => pattern.test(message))
+    ) {
+      return;
+    }
+    originalWarn(message, options);
+  };
+  return logger;
+}
+
 const STUDIO_CORE_ICON_MODULES = new Set([
   // These leaves already ship synchronously with the Studio editor.
   "external-link",
@@ -541,13 +562,17 @@ function debugStudioMicroChunkPlugin(): Plugin | null {
 }
 
 export default defineConfig(({ command, mode }) => ({
+  ...(command === "build" ? { customLogger: createStudioBuildLogger() } : {}),
   ...viteServeCacheConfig(command),
   plugins: [
     preferImplementationOverTestModulePlugin(),
     studioCrossOriginIsolationPlugin(),
     studioServiceWorkerPlugin(),
     react(),
-    babel({ presets: [reactCompilerPreset()] }),
+    babel({
+      presets: [reactCompilerPreset()],
+      exclude: /programmatic-reload(?:-hmr)?\.ts$/u,
+    }),
   ],
   // 정적 카탈로그 모드에선 lib/server/* (예: live.ts) 가 브라우저 번들로 끌려오며
   // 모듈 로드 시점에 process.env.* 를 읽어 "process is not defined" 백스크린을 유발한다.

@@ -52,6 +52,7 @@ overrides:
 patchedDependencies:
   '@gltf-transform/functions@4.4.2': 6e750bb844d4b21f5b7ead6ab2063a25ce63953173b1553355c0ad6b2682fe69
   '@react-three/fiber@9.6.1': 68f1cb873dce662afa8148b10c5896d9e74acdcf70313881d944c1588be4c222
+  ag-psd@31.0.1: 45b44b0b2c25317b0030248e3145d7abfd4e40c1620b98fc4a211b45341e6d2c
   ktx2-encoder@0.6.0: 20ab5cce62142bddaf85f69af8a41633b64f264f931b3ef71c8a57c3e0de5c74
   manifold-3d@3.5.1: 53990fc6cbf1cc1a3839a32a88a8a1d4b76e28d2699332b21e2afeca78e466ad
   minimatch@3.1.5: fe761a9f2ee67f36ecef95437aff71cccde54f98d08053c41eb3f815a907be71
@@ -162,7 +163,7 @@ importers:
         version: link:packages/studio-project-model
       ag-psd:
         specifier: ^31.0.1
-        version: 31.0.1
+        version: 31.0.1(patch_hash=45b44b0b2c25317b0030248e3145d7abfd4e40c1620b98fc4a211b45341e6d2c)
       bezier-js:
         specifier: ^6.1.4
         version: 6.1.4
@@ -10891,7 +10892,7 @@ snapshots:
 
   acorn@8.18.0: {}
 
-  ag-psd@31.0.1:
+  ag-psd@31.0.1(patch_hash=45b44b0b2c25317b0030248e3145d7abfd4e40c1620b98fc4a211b45341e6d2c):
     dependencies:
       base64-js: 1.5.1
       pako: 2.1.0

@@ -1,0 +1,22 @@
+diff --git a/dist/abr.js b/dist/abr.js
+index 822a81ab2902608080dd917e31c7a02581752747..74d35037e0a3a2296028c58d5dbcf89ff8cbea45 100644
+--- a/dist/abr.js
++++ b/dist/abr.js
+@@ -78,7 +78,7 @@ function parseBrushShape(desc) {
+                 tipsAirbrushCutoffAngle: desc.dtipsAirbrushCutoffAngle, tipsAirbrushGranularity: (0, descriptor_1.parsePercent)(desc.dtipsAirbrushGranularity), tipsAirbrushStreakiness: (0, descriptor_1.parsePercent)(desc.dtipsAirbrushStreakiness), tipsAirbrushSplatSize: (0, descriptor_1.parsePercent)(desc.dtipsAirbrushSplatSize), tipsAirbrushSplatCount: desc.dtipsAirbrushSplatCount });
+         }
+         default:
+-            console.log(require('util').inspect(desc, false, 99, true));
++            console.log(desc);
+             throw new Error(`Unknown brush classId: ${desc._classID}`);
+     }
+ }
+@@ -168,7 +168,7 @@ function readAbr(buffer, options = {}) {
+                 }
+                 case 'desc': {
+                     const desc = (0, descriptor_1.readVersionAndDescriptor)(reader, true);
+-                    // console.log(require('util').inspect(desc, false, 99, true));
++                    // console.log(desc);
+                     // require('fs').writeFileSync('test.log', require('util').inspect(desc, false, 99, false), 'utf8');
+                     for (const brush of desc.Brsh) {
+                         const b = {

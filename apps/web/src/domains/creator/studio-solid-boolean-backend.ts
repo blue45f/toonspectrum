@@ -32,7 +32,7 @@ async function loadManifoldRuntimeForHost(): Promise<StudioManifoldRuntime> {
     // Select one host-specific loader before work starts. A loader failure is terminal for this
     // request; it must not trigger a second execution path with different module semantics.
     if (typeof process !== "undefined" && process.versions?.node) {
-      const { createRequire } = await import("node:module");
+      const { createRequire } = await import(/* @vite-ignore */ "node:module");
       const require = createRequire(import.meta.url);
       const wasmPath = require.resolve("manifold-3d/manifold.wasm");
       const factory = await import("manifold-3d");
