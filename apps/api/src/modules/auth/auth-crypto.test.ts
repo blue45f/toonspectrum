@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { hashPassword, verifyPassword } from "../auth-crypto";
+import { hashPassword, verifyPassword } from "./auth-crypto";
 
 describe("auth-crypto", () => {
   it("해시는 salt:hash 형식이고 평문을 노출하지 않는다", () => {
