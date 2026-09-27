@@ -25,10 +25,11 @@ describe("purpose-first product UX foundation", () => {
     expect(root).not.toContain("<StudioWorkspacePage");
     const routes = readFileSync("apps/web/src/app/routes/groups/marketing.routes.tsx", "utf8");
     expect(routes).toContain('path: "/about/studio"');
-    expect(experience).toContain("<ProductIntentStart />");
-    expect(experience.indexOf("<ProductIntentStart />")).toBeLessThan(
-      experience.indexOf('id="creator-start"'),
-    );
+    const launcher = '<ProductIntentStart headingId="creator-toolkit-title" />';
+    expect(experience).toContain(launcher);
+    expect(experience.indexOf('id="creator-start"')).toBeLessThan(experience.indexOf(launcher));
+    expect(experience.indexOf(launcher)).toBeLessThan(experience.indexOf('className="cf-bridge cf-shell"'));
+    expect(experience.match(/<ProductIntentStart\b/gu)).toHaveLength(1);
   });
 
   it("opens the true global command palette from the home search launcher", () => {

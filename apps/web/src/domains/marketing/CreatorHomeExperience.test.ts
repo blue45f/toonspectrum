@@ -40,7 +40,7 @@ describe("creator home experience contracts", () => {
     expect(source).toContain('id="creator-principles"');
     expect(source).toContain('href="/about/principles"');
     expect(source).toContain("AI는 보조 도구로");
-    expect(source).toContain('id="creator-toolkit-title"');
+    expect(source).toContain('headingId="creator-toolkit-title"');
     expect(source).toContain('id="creator-process-title"');
     expect(source).toContain('import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation"');
     expect(source).toContain("useCreatorHomeSectionNavigation();");
@@ -51,7 +51,7 @@ describe("creator home experience contracts", () => {
     expect(source).toContain("useTheme((state) => state.resolvedTheme)");
     expect(source).toContain('import "./creator-theme-gallery.css"');
     expect(source).toContain('data-product-direction="planning-to-publishing"');
-    expect(source).toContain("<ProductIntentStart />");
+    expect(source).toContain('<ProductIntentStart headingId="creator-toolkit-title" />');
     expect(source).toContain('href="/studio/new"');
     expect(source).toContain('href="/studio"');
     expect(source).toContain('href="/brand-film"');
@@ -80,7 +80,9 @@ describe("creator home experience contracts", () => {
     }
     expect(source.match(/<img\b/gu)).toHaveLength(3);
     expect(source).toContain('loading="lazy"');
-    expect(source).toContain('/brand/production-os-hero.svg');
+    expect(source).toContain('/brand/atelier-20260927/creation-world.webp');
+    expect(existsSync('apps/web/public/brand/atelier-20260927/creation-world.webp')).toBe(true);
+    expect(source).toContain('AI로 제작한 브랜드 콘셉트 아트');
     expect(source).toContain('/brand/production-os-workspace.svg');
     expect(source).toContain('/brand/production-os-journey.svg');
     expect(source).not.toMatch(/from ["'](?:remotion|@remotion|.*StudioPage)/u);

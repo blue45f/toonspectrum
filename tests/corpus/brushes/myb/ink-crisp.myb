@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "group": "ToonStudio Corpus",
+  "group": "ToonSpectrum Corpus",
   "comment": "Crisp ink — hard, dense-dab corpus brush (raster compile bridge)",
   "settings": {
     "opaque": {

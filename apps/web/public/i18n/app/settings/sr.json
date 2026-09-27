@@ -22,7 +22,7 @@
   "settings.filters.clearNow": "Чисти филтри",
   "settings.age.title": "Видимост значева за одрасле",
   "settings.age.descriptionVerified": "Проверена као 19+",
-  "settings.age.descriptionVerifiedWithBirthdate": "Верификован као 19+ (ЗЗПЛАЦЕХОЛДЕР0ЗЗ)",
+  "settings.age.descriptionVerifiedWithBirthdate": "Верификован као 19+ ({date})",
   "settings.age.description": "Значки одраслих се појављују након провере старости.",
   "settings.age.reset": "Проверка повлачења",
   "settings.age.verify": "Проверење старости",

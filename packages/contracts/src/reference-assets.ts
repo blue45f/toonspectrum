@@ -1,6 +1,6 @@
-import { resolveReferenceQuery } from "../../core/src/reference-query-language";
+import { resolveReferenceQuery } from "@toonstudio/core/reference-query-language";
 
-import type { CreatorResource } from "../../core/src/creator-resources";
+import type { CreatorResource } from "@toonstudio/core/creator-resources";
 
 export const REFERENCE_SEARCH_FIELDS = [
   { value: "all", label: "전체 메타데이터" },
@@ -59,7 +59,7 @@ function cleanText(value: string | null, maximumLength = 80): string {
   if (!value) return "";
   for (const character of value) {
     const code = character.charCodeAt(0);
-    if (code < 32 || code === 127) return "";
+    if (code <= 0x1f || code === 0x7f) return "";
   }
   return value.trim().slice(0, maximumLength);
 }

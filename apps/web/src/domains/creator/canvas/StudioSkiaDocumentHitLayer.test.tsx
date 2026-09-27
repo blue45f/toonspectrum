@@ -2,88 +2,212 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, renderHook } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { bindStudioCuttoonStagePointersDownArmed } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-down-armed";
+import { planGroupClickSelection } from "../studio-group-selection";
+import { useStudioVectorNodeBubbleEdit } from "../vector/studio-node-bubble-edit-controller";
+
 import { StudioSkiaDocumentHitLayer } from "./StudioSkiaDocumentHitLayer";
+import { canSelectStudioCanvasElement } from "./studio-canvas-element-selection";
 import { studioCanvasDocumentSelectionEnabled } from "./studio-canvas-selection-authority";
 
-import type { El } from "../studio-element-model";
+import type { StudioCuttoonStagePointersApi } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-api";
+import type { StudioCuttoonStagePointersHost } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-types";
+import type { DrawEl } from "../studio-element-model";
+import type { GroupSelectionState } from "../studio-group-selection";
 import type Konva from "konva";
 
-type PointerEventObject = Konva.KonvaEventObject<PointerEvent>;
-const captured = vi.hoisted(() => ({ props: null as null | {
-  onPointerDown: (event: PointerEventObject) => void;
-  onPointerUp: (event: PointerEventObject) => void;
-} }));
+type HitEvent = Konva.KonvaEventObject<PointerEvent>;
+const shape = vi.hoisted(() => ({
+  props: null as null | {
+    onPointerDown: (event: HitEvent) => void;
+    onPointerUp: (event: HitEvent) => void;
+  },
+}));
 vi.mock("react-konva/lib/ReactKonvaCore", () => ({
-  Shape: (props: NonNullable<typeof captured.props>) => { captured.props = props; return null; },
+  Shape: (props: NonNullable<typeof shape.props>) => {
+    shape.props = props;
+    return null;
+  },
 }));
 
-const guards = ["activeSurfaceReviewLocked", "canvasInteractionBlocked", "commentPinArmed",
-  "advancedFillArmed", "pixelToolArmed", "cropArmed", "panelSplitArmed", "nodeEditArmed", "smudgeArmed",
-  "dodgeBurnArmed", "wetMixArmed", "liquifyArmed", "healCloneArmed", "layerMaskPaintArmed",
-  "filterMaskPaintArmed", "quickMaskArmed", "historyBrushArmed", "bubbleShapeArmed", "puppetWarpArmed"] as const;
-const available: Parameters<typeof studioCanvasDocumentSelectionEnabled>[0] = {
-  tool: "select", activeSurfaceReviewLocked: false, canvasInteractionBlocked: false, commentPinArmed: false,
-  advancedFillArmed: false, pixelToolArmed: false, cropArmed: false, panelSplitArmed: false, nodeEditArmed: false,
-  smudgeArmed: false, dodgeBurnArmed: false, wetMixArmed: false, liquifyArmed: false, healCloneArmed: false,
-  layerMaskPaintArmed: false, filterMaskPaintArmed: false, quickMaskArmed: false, historyBrushArmed: false,
-  bubbleShapeArmed: false, puppetWarpArmed: false,
-};
-const stroke = { id: "corrected", type: "draw", kind: "freehand", mode: "pen", brush: "pen",
-  points: [10, 20, 30, 40], stroke: "#333333", strokeWidth: 4 } as El;
+afterEach(() => { cleanup(); shape.props = null; });
 
-function pointer(shiftKey = true, point = { x: 10, y: 20 }) {
-  const setAttrs = vi.fn();
-  const native = { shiftKey, pointerId: 1, preventDefault: vi.fn(), stopPropagation: vi.fn() };
-  const event = { evt: native, cancelBubble: false, target: {
-    setAttrs, getStage: () => ({ getPointerPosition: () => point }),
-    getAbsoluteTransform: () => ({ copy: () => ({ invert: () => ({ point: (value: unknown) => value }) }) }),
-  } } as unknown as PointerEventObject;
-  return { event, setAttrs, native };
+const idleSelection = {
+  tool: "select" as const,
+  activeSurfaceReviewLocked: false,
+  canvasInteractionBlocked: false,
+  commentPinArmed: false,
+  advancedFillArmed: false,
+  pixelToolArmed: false,
+  cropArmed: false,
+  panelSplitArmed: false,
+  nodeEditArmed: false,
+  smudgeArmed: false,
+  dodgeBurnArmed: false,
+  wetMixArmed: false,
+  liquifyArmed: false,
+  healCloneArmed: false,
+  layerMaskPaintArmed: false,
+  filterMaskPaintArmed: false,
+  quickMaskArmed: false,
+  historyBrushArmed: false,
+  bubbleShapeArmed: false,
+  puppetWarpArmed: false,
+};
+
+const stroke: DrawEl = {
+  id: "corrected-shape", type: "draw", kind: "freehand", mode: "pen", brush: "pen",
+  points: [10, 20, 80, 20, 100, 40], pressures: [0.2, 0.5, 0.8],
+  stroke: "#123456", strokeWidth: 4,
+};
+
+function hitEvent(shiftKey = false, point = { x: 10, y: 20 }) {
+  const canvas = document.createElement("canvas");
+  canvas.setPointerCapture = vi.fn();
+  canvas.releasePointerCapture = vi.fn();
+  let name = "skia-document-hit-proxy";
+  const setAttrs = vi.fn((attrs: { name: string }) => { name = attrs.name; });
+  const target = {
+    getStage: () => ({
+      getPointerPosition: () => point,
+      getRelativePointerPosition: () => point,
+    }),
+    getAbsoluteTransform: () => ({ copy: () => ({ invert: () => ({ point: () => point }) }) }),
+    getParent: () => null,
+    name: () => name,
+    setAttrs,
+  };
+  const event = {
+    evt: { pointerId: 7, pointerType: "pen", target: canvas, shiftKey,
+      preventDefault: vi.fn(), stopPropagation: vi.fn() },
+    target,
+    cancelBubble: false,
+  } as unknown as HitEvent;
+  return { event, setAttrs, canvas };
 }
 
-afterEach(() => { cleanup(); captured.props = null; });
+function dispatchDown(event: HitEvent) {
+  if (!shape.props) throw new Error("Skia hit 레이어가 렌더되지 않았습니다.");
+  act(() => shape.props?.onPointerDown(event));
+}
 
-describe("Skia 문서 접촉의 선택 권한", () => {
-  it.each(guards)("%s가 접촉을 소유하면 Shift 선택 전환 없이 Stage에 전달한다", (guard) => {
-    const onSelect = vi.fn();
-    render(<StudioSkiaDocumentHitLayer elements={[stroke]} effectiveScale={1}
-      selectionEnabled={studioCanvasDocumentSelectionEnabled({ ...available, [guard]: true })} onSelect={onSelect} />);
-    const { event, setAttrs, native } = pointer();
-    captured.props!.onPointerDown(event);
-    captured.props!.onPointerUp(event);
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(setAttrs).toHaveBeenLastCalledWith({ studioElementId: "corrected", name: "skia-document-hit-proxy" });
-    expect(event.cancelBubble).toBe(false);
-    expect(native.preventDefault).not.toHaveBeenCalled();
-    expect(native.stopPropagation).not.toHaveBeenCalled();
-  });
-
-  it.each([false, true])("일반 선택은 Shift=%s와 원래 포인터를 그대로 전달한다", (shiftKey) => {
-    const onSelect = vi.fn();
-    render(<StudioSkiaDocumentHitLayer elements={[stroke]} effectiveScale={1}
-      selectionEnabled={studioCanvasDocumentSelectionEnabled(available)} onSelect={onSelect} />);
-    const { event } = pointer(shiftKey);
-    captured.props!.onPointerDown(event);
-    captured.props!.onPointerUp(event);
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith("corrected", event);
-  });
-
-  it("빈 곳은 Stage 배경 경로에 맡기고 다른 기본 도구는 선택하지 않는다", () => {
-    const onSelect = vi.fn();
-    expect(studioCanvasDocumentSelectionEnabled({ ...available, tool: "draw" })).toBe(false);
-    render(<StudioSkiaDocumentHitLayer elements={[stroke]} effectiveScale={1} selectionEnabled onSelect={onSelect} />);
-    const { event, setAttrs } = pointer(false, { x: 100, y: 100 });
-    captured.props!.onPointerDown(event);
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(setAttrs).toHaveBeenCalledWith({ studioElementId: undefined, name: "bg" });
-    expect(event.cancelBubble).toBe(false);
-  });
-
-  it("실제 Stage가 현재 viewport 권한을 hit layer로 전달한다", () => {
+describe("Skia 문서 선택의 도구 권위 경계", () => {
+  it("두 렌더러에 현재 입력 차단과 주석 핀 권한을 같은 경로로 전달한다", () => {
     const source = readFileSync(resolve(process.cwd(), "apps/web/src/domains/creator/canvas/StudioCanvasViewportStageHost.tsx"), "utf8");
-    expect(source).toContain("selectionEnabled={studioCanvasDocumentSelectionEnabled(viewport)}");
+    expect(source).toContain("canvasInteractionBlocked: viewport.canvasInteractionBlocked,");
+    expect(source).toContain("commentPinArmed: viewport.commentPinArmed,");
+    expect(source).toContain("selectionState={documentLayerProps}");
+    expect(studioCanvasDocumentSelectionEnabled).toBe(canSelectStudioCanvasElement);
+  });
+  it.each(Object.keys(idleSelection).filter((key) => key !== "tool"))(
+    "%s 동안 요소 선택을 바꾸지 않고 상위 포인터 이벤트를 보존한다",
+    (blocked) => {
+      const onSelect = vi.fn();
+      const props = {
+        elements: [stroke], effectiveScale: 1, onSelect,
+        selectionState: { ...idleSelection, [blocked]: true },
+      };
+      render(<StudioSkiaDocumentHitLayer {...props} />);
+      const { event, setAttrs } = hitEvent(true);
+      dispatchDown(event);
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(event.cancelBubble).toBe(false);
+      expect(event.evt.preventDefault).not.toHaveBeenCalled();
+      expect(event.evt.stopPropagation).not.toHaveBeenCalled();
+      expect(setAttrs).toHaveBeenCalledWith({
+        studioElementId: stroke.id, name: "skia-document-hit-proxy",
+      });
+    },
+  );
+
+  it("드로잉 도구에서는 요소 선택을 시작하지 않는다", () => {
+    const onSelect = vi.fn();
+    const props = {
+      elements: [stroke], effectiveScale: 1, onSelect,
+      selectionState: { ...idleSelection, tool: "draw" as const },
+    };
+    render(<StudioSkiaDocumentHitLayer {...props} />);
+    dispatchDown(hitEvent().event);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("일반 선택과 Shift 다중 선택은 원래 이벤트로 기존 선택 엔진에 전달한다", () => {
+    const other: DrawEl = { ...stroke, id: "other", points: [10, 50, 80, 50] };
+    let selection: GroupSelectionState = { selectedId: null, marqueeIds: [], activeGroupId: null };
+    const onSelect = vi.fn((id: string, event?: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+      selection = planGroupClickSelection({
+        items: [stroke, other], groups: [], clickedId: id,
+        current: selection, additive: event?.evt.shiftKey === true,
+      });
+    });
+    const props = { elements: [stroke, other], effectiveScale: 1, onSelect, selectionState: idleSelection };
+    render(<StudioSkiaDocumentHitLayer {...props} />);
+    const first = hitEvent().event;
+    dispatchDown(first);
+    expect(selection).toEqual({ selectedId: stroke.id, marqueeIds: [], activeGroupId: null });
+    expect(onSelect).toHaveBeenLastCalledWith(stroke.id, first);
+    const second = hitEvent(true, { x: 10, y: 50 }).event;
+    dispatchDown(second);
+    expect(selection).toEqual({ selectedId: null, marqueeIds: [stroke.id, other.id], activeGroupId: null });
+    expect(onSelect).toHaveBeenLastCalledWith(other.id, second);
+  });
+
+  it("빈 영역과 pointerup은 선택을 추가하지 않고 Stage 배경 처리에 위임한다", () => {
+    const onSelect = vi.fn();
+    const props = { elements: [stroke], effectiveScale: 1, onSelect, selectionState: idleSelection };
+    render(<StudioSkiaDocumentHitLayer {...props} />);
+    const empty = hitEvent(false, { x: 500, y: 500 });
+    dispatchDown(empty.event);
+    expect(empty.setAttrs).toHaveBeenCalledWith({ studioElementId: undefined, name: "bg" });
+    act(() => shape.props?.onPointerUp(hitEvent().event));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(empty.event.cancelBubble).toBe(false);
+  });
+
+  it("무장한 노드의 Shift pointerdown은 선택을 유지하고 실제 Stage 노드 드래그를 연다", () => {
+    const hook = renderHook(() => {
+      const [selectedId, setSelectedId] = useState<string | null>(stroke.id);
+      return { selectedId, setSelectedId, ...useStudioVectorNodeBubbleEdit({ selectedId }) };
+    });
+    act(() => hook.result.current.setNodeEditTool("move", stroke.id));
+    const hostValues: Record<string, unknown> = {
+      ...hook.result.current, selected: stroke, nodeEditArmed: true, effScale: 1,
+      nodeEditHandles: [{ pointIndex: 0, x: 10, y: 20 }],
+    };
+    const host = new Proxy(hostValues, {
+      get(values, property: string) {
+        if (!(property in values) && property.endsWith("Ref")) values[property] = { current: null };
+        return values[property];
+      },
+    }) as unknown as StudioCuttoonStagePointersHost;
+    const api = {} as StudioCuttoonStagePointersApi;
+    bindStudioCuttoonStagePointersDownArmed(host, api);
+    const onSelect = vi.fn((id: string, event?: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+      const next = planGroupClickSelection({
+        items: [stroke], groups: [], clickedId: id,
+        current: { selectedId: hook.result.current.selectedId, marqueeIds: [], activeGroupId: null },
+        additive: event?.evt.shiftKey === true,
+      });
+      hook.result.current.setSelectedId(next.selectedId);
+    });
+    const props = {
+      elements: [stroke], effectiveScale: 1, onSelect,
+      selectionState: { ...idleSelection, nodeEditArmed: true },
+    };
+    render(<StudioSkiaDocumentHitLayer {...props} />);
+    const { event, canvas } = hitEvent(true);
+    act(() => {
+      shape.props?.onPointerDown(event);
+      if (!event.cancelBubble) expect(api.tryStageDownArmedTools(event, event.evt)).toBe(true);
+    });
+    expect(hook.result.current.selectedId).toBe(stroke.id);
+    expect(hook.result.current.nodeEditTool).toBe("move");
+    expect(hook.result.current.nodeEditDragRef.current?.pointerId).toBe(7);
+    expect(canvas.setPointerCapture).toHaveBeenCalledWith(7);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

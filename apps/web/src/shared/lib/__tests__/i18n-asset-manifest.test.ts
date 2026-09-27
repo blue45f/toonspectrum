@@ -99,7 +99,7 @@ describe("i18n asset manifest", () => {
         expect(dropped).toEqual([]);
       });
 
-      it("preserves legacy key coverage and app/admin value compatibility", () => {
+      it("preserves legacy key coverage and every bucket's value compatibility", () => {
         // The loaders and catalog generator merge namespace files; older consumers read the flat
         // file. If these ever disagree, the language picker advertises coverage the browser will
         // not render.
@@ -118,9 +118,8 @@ describe("i18n asset manifest", () => {
           const flatKeys = Object.keys(flat);
           const onlyFlat = flatKeys.filter((key) => !(key in merged));
           const onlyMerged = Object.keys(merged).filter((key) => !(key in flat));
-          // Studio's published namespace copy has newer wording than its legacy flat file.
-          // Preserve its key surface without making old wording authoritative again.
-          const changed = name === "studio" ? [] : flatKeys.filter((key) => key in merged && merged[key] !== flat[key]);
+          // Studio도 namespace 권위에서 재생성하므로 레거시 소비자는 동일한 문구를 받는다.
+          const changed = flatKeys.filter((key) => key in merged && merged[key] !== flat[key]);
           if (onlyFlat.length > 0 || onlyMerged.length > 0 || changed.length > 0) {
             disagreeing.push(
               `${name}/${locale}: only-in-flat=${onlyFlat.length}${onlyFlat[0] ? ` (e.g. ${onlyFlat[0]})` : ""}`

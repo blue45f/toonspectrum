@@ -36,6 +36,7 @@ import { StudioFocusLinesNode, StudioFramePanel, StudioSpeedLinesNode, StudioWor
 import { StudioKonvaStickerNode, StudioKonvaTextNode } from "../StudioKonvaTextNodes";
 
 import { studioCanonicalDryMediaOwnsDocumentElement } from "./studio-canonical-dry-media-authority";
+import { canSelectStudioCanvasElement } from "./studio-canvas-element-selection";
 
 import type {
   StudioCanvasViewportHandlers,
@@ -55,6 +56,8 @@ export interface StudioCanvasViewportDocumentLayerProps {
   animTimeline: StudioCanvasViewportProps["animTimeline"];
   bubbleShapeArmed: StudioCanvasViewportProps["bubbleShapeArmed"];
   bubbleShapeDraft: StudioCanvasViewportProps["bubbleShapeDraft"];
+  canvasInteractionBlocked: StudioCanvasViewportProps["canvasInteractionBlocked"];
+  commentPinArmed: StudioCanvasViewportProps["commentPinArmed"];
   canonicalDryMediaHiddenElementId: string | null;
   commitTextTransformEnd: StudioCanvasViewportHandlers["commitTextTransformEnd"];
   cropArmed: StudioCanvasViewportProps["cropArmed"];
@@ -123,6 +126,8 @@ export function StudioCanvasViewportDocumentLayer({
   animTimeline,
   bubbleShapeArmed,
   bubbleShapeDraft,
+  canvasInteractionBlocked,
+  commentPinArmed,
   canonicalDryMediaHiddenElementId,
   commitTextTransformEnd,
   cropArmed,
@@ -181,6 +186,14 @@ export function StudioCanvasViewportDocumentLayer({
   webtoonTheme,
   wetMixArmed,
 }: StudioCanvasViewportDocumentLayerProps) {
+                const selectionEnabled = canSelectStudioCanvasElement({
+                  activeSurfaceReviewLocked, canvasInteractionBlocked, commentPinArmed,
+                  tool, advancedFillArmed, pixelToolArmed,
+                  cropArmed, panelSplitArmed, nodeEditArmed, smudgeArmed, dodgeBurnArmed,
+                  wetMixArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed,
+                  filterMaskPaintArmed, quickMaskArmed, historyBrushArmed, bubbleShapeArmed,
+                  puppetWarpArmed,
+                });
                 // Only this paint-time array may contain ephemeral Blob URLs. The authored
                 // `elements`, page history, autosave, revisions, and CRDT publisher continue to
                 // see stable work-asset URIs.
@@ -304,26 +317,7 @@ export function StudioCanvasViewportDocumentLayer({
                 const onSelect = isNonInteractiveRender
                   ? () => {}
                   : (evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-                      if (
-                        activeSurfaceReviewLocked ||
-                        tool !== "select" ||
-                        advancedFillArmed ||
-                        pixelToolArmed ||
-                        cropArmed ||
-                        panelSplitArmed ||
-                        nodeEditArmed ||
-                        smudgeArmed ||
-                        dodgeBurnArmed ||
-                        wetMixArmed ||
-                        liquifyArmed ||
-                        healCloneArmed ||
-                        layerMaskPaintArmed ||
-                        filterMaskPaintArmed ||
-                        quickMaskArmed ||
-                        historyBrushArmed ||
-                        bubbleShapeArmed ||
-                        puppetWarpArmed
-                      ) {
+                      if (!selectionEnabled) {
                         return;
                       }
                       // 그룹으로 묶인 요소는 PPT/Figma처럼 그룹 전체가 한 단위로 선택된다. Shift=그룹 단위

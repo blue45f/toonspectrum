@@ -58,24 +58,12 @@ describe("membership operations integration boundaries", () => {
       "apps/api/src/modules/creator/creator.service.ts",
     );
 
-    expect(community).toContain(
-      '"community.post.created",\n        postId',
-    );
-    expect(community).toContain(
-      '"community.comment.created",\n        replyId',
-    );
-    expect(creator).toContain(
-      '"creator.work.created",\n            id',
-    );
-    expect(creator).toContain(
-      '"creator.work.published",\n          id',
-    );
-    expect(creator).toContain(
-      '"community.comment.created",\n          commentId',
-    );
-    expect(creator).toContain(
-      '"community.comment.created",\n            "workId"',
-    );
+    expect(community).toMatch(/this\.reverseActivity\(\s*"community\.post\.created",\s*postId,/u);
+    expect(community).toMatch(/this\.reverseActivity\(\s*"community\.comment\.created",\s*replyId,/u);
+    expect(creator).toMatch(/this\.reverseActivity\(\s*"creator\.work\.created",\s*id,/u);
+    expect(creator).toMatch(/this\.reverseActivity\(\s*"creator\.work\.published",\s*id,/u);
+    expect(creator).toMatch(/this\.reverseActivity\(\s*"community\.comment\.created",\s*commentId,/u);
+    expect(creator).toMatch(/this\.reverseActivitiesByMetadata\(\s*"community\.comment\.created",\s*"workId",/u);
     expect(community).toContain("리뷰 답글 삭제에 따른 활동 포인트 회수");
   });
 

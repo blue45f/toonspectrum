@@ -12,8 +12,11 @@
  *
  * Run: pnpm exec tsx scripts/verify-studio-menus.mts
  * Expects production build in dist/ (vite preview).
+ * 로컬 후보: pnpm exec tsx scripts/verify-studio-menus-ci.mjs --url=http://127.0.0.1:5417/studio/canvas --evidence-dir=/private/tmp/studio-menu-evidence
  */
-import { pathToFileURL } from "node:url";
+import { mkdir } from "node:fs/promises";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { chromium, type Locator, type Page } from "playwright";
 
@@ -32,6 +35,34 @@ import type { StudioMainMenuCompositeGroupId } from "../apps/web/src/domains/cre
 import type { ChildProcess } from "node:child_process";
 
 const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
+
+/** 이름 변경 뒤에도 세 기능의 독립적인 명령 정체성을 유지한다. */
+export const THREE_D_MENU_ENTRIES = [
+  { id: "mannequin3d", commandId: "insert.mannequin-3d", label: "기본 데생 인형" },
+  { id: "char", commandId: "insert.character-3d", label: "인물·포즈 편집" },
+  { id: "bg3d", commandId: "insert.background-3d", label: "장면 도우미" },
+] as const;
+
+/** 운영 주소를 받지 않고 이미 실행 중인 로컬 후보만 검증한다. */
+export function resolveMenuVerifierCandidateUrl(value: string): string {
+  const url = new URL(value);
+  if (url.protocol !== "http:" || !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
+    || url.username || url.password || url.pathname !== "/studio/canvas" || url.search || url.hash) {
+    throw new Error("--url은 인증정보·쿼리가 없는 로컬 http://127.0.0.1:<port>/studio/canvas 주소여야 합니다.");
+  }
+  return url.href;
+}
+
+/** 표시 숫자와 스크린리더 이름이 동일한 문서 높이를 말해야 한다. */
+export function canvasHeightSnapshotMatches(
+  snapshot: { text: string; label: string | null }, height: number,
+): boolean {
+  return snapshot.text.trim() === String(height) && snapshot.label === `높이 ${height}px`;
+}
+
+async function captureMenuEvidence(page: Page, evidenceDir: string | undefined, name: string) {
+  if (evidenceDir) await page.screenshot({ path: resolve(evidenceDir, `${name}.png`), fullPage: true });
+}
 
 interface CatalogueGroup {
   /** §15.3 catalogue group id — the key the presentation folds on. */
@@ -190,7 +221,7 @@ export const CATALOGUE_GROUPS: readonly CatalogueGroup[] = [
     ],
   },
   { id: "animation", caption: "애니메이션", items: ["프레임 애니메이션…"] },
-  { id: "3d", caption: "3D", items: ["기본 데생 인형", "인물·포즈 편집", "장면 도우미"] },
+  { id: "3d", caption: "3D", items: THREE_D_MENU_ENTRIES.map((entry) => entry.label) },
   { id: "collaboration", caption: "협업", items: ["팀 · 공유 권한…", "페이지 검토 · 승인…"] },
   {
     id: "window",
@@ -571,11 +602,13 @@ export function menuItemRowHasExactLabel(rowText: string, name: string): boolean
 
 interface VisibleMenuFrame {
   readonly itemRows: readonly string[];
+  readonly identifiedRows: readonly { id: string | null; label: string }[];
   readonly sectionCaptions: readonly string[];
 }
 
 const EMPTY_VISIBLE_MENU_FRAME: VisibleMenuFrame = {
   itemRows: [],
+  identifiedRows: [],
   sectionCaptions: [],
 };
 
@@ -600,7 +633,7 @@ async function snapshotVisibleMenuFrame(menu: Locator): Promise<VisibleMenuFrame
         continue;
       }
 
-      const itemRows = Array.from(element.querySelectorAll<HTMLElement>(
+      const identifiedRows = Array.from(element.querySelectorAll<HTMLElement>(
         '[role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"]',
       )).flatMap((row) => {
         const style = getComputedStyle(row);
@@ -616,7 +649,7 @@ async function snapshotVisibleMenuFrame(menu: Locator): Promise<VisibleMenuFrame
         const label = row.querySelector<HTMLElement>(
           '[data-studio-main-menu-item-label="true"]',
         )?.textContent?.trim();
-        return label ? [label] : [];
+        return label ? [{ id: row.getAttribute("data-studio-menu-item-id"), label }] : [];
       });
 
       const sectionCaptions = Array.from(element.querySelectorAll<HTMLElement>(
@@ -642,9 +675,9 @@ async function snapshotVisibleMenuFrame(menu: Locator): Promise<VisibleMenuFrame
         return [label];
       });
 
-      return { itemRows, sectionCaptions };
+      return { itemRows: identifiedRows.map((row) => row.label), identifiedRows, sectionCaptions };
     }
-    return { itemRows: [], sectionCaptions: [] };
+    return { itemRows: [], identifiedRows: [], sectionCaptions: [] };
   });
 }
 
@@ -751,7 +784,7 @@ async function assertChrome(page: Page): Promise<string[]> {
   return failures;
 }
 
-async function assertMainMenus(page: Page): Promise<string[]> {
+async function assertMainMenus(page: Page, evidenceDir?: string): Promise<string[]> {
   const failures: string[] = [];
   for (const drift of PRESENTATION_TITLE_DRIFT) failures.push(drift);
   for (const orphan of PRESENTATION_ORPHANS) {
@@ -820,6 +853,15 @@ async function assertMainMenus(page: Page): Promise<string[]> {
                 : presented.title;
               failures.push(`${spec.label} [${where}] 항목 없음: ${item}`);
             }
+          }
+          if (section.id === "3d") {
+            for (const entry of THREE_D_MENU_ENTRIES) {
+              const rows = frame.identifiedRows.filter((row) => row.id === entry.id);
+              if (rows.length !== 1 || rows[0].label !== entry.label) {
+                failures.push(`3D 메뉴 명령과 이름 불일치: ${entry.id} → ${entry.label}`);
+              }
+            }
+            await captureMenuEvidence(page, evidenceDir, "insert-3d-menu");
           }
         }
         await page.keyboard.press("Escape");
@@ -1080,18 +1122,29 @@ export function classifyStudioCanvasResizeResult(input: {
 
 export async function assertCurrentCanvasPlatformResize(
   page: Page,
-  options: { readonly ownedPreviewOrigin?: string } = {},
+  options: { readonly ownedPreviewOrigin?: string; readonly evidenceDir?: string } = {},
 ): Promise<string[]> {
+  const { evidenceDir } = options;
   const failures: string[] = [];
   const canvasMenuTitle = presentedTitleFor("canvas");
   const windowMenuTitle = presentedTitleFor("window");
 
-  const waitForHeight = async (height: number): Promise<boolean> =>
-    page
-      .locator(`span[aria-label="높이 ${height}px"]`)
-      .waitFor({ state: "visible", timeout: 5_000 })
-      .then(() => true)
-      .catch(() => false);
+  const waitForHeight = async (height: number): Promise<boolean> => {
+    const value = page.locator(`span[aria-label="높이 ${height}px"]`);
+    try {
+      await value.waitFor({ state: "visible", timeout: 5_000 });
+      const snapshot = await value.evaluate((element) => ({
+        text: element.textContent ?? "", label: element.getAttribute("aria-label"),
+      }));
+      return canvasHeightSnapshotMatches(snapshot, height);
+    } catch {
+      const actual = await page.locator('span[aria-label^="높이 "][aria-label$="px"]').evaluateAll(
+        (elements) => elements.map((element) => ({ text: element.textContent, label: element.getAttribute("aria-label") })),
+      );
+      log(`  높이 ${height}px 검증 실패 — 실제 표시/접근명: ${JSON.stringify(actual)}`);
+      return false;
+    }
+  };
 
   const heightIndicator = page.locator('span[aria-label^="높이 "][aria-label$="px"]').first();
   const authorityAlert = page.getByRole("alert").filter({ hasText: CANVAS_RESIZE_AUTHORITY_MESSAGE });
@@ -1157,17 +1210,23 @@ export async function assertCurrentCanvasPlatformResize(
     if (naverResult !== "applied") {
       failures.push("현재 드로잉에 네이버 690 × 8000 비율을 적용하지 못함");
     }
+    await captureMenuEvidence(page, evidenceDir, "canvas-naver");
     if (page.url() !== drawingUrl) {
       failures.push("플랫폼 규격 적용이 현재 드로잉을 유지하지 않고 다른 화면으로 이동함");
     }
     if (await applyPreset("apply-webtoon-kakao", 8_000) !== "applied") {
       failures.push("현재 드로잉에 카카오 720 × 8000 비율을 적용하지 못함");
     }
+    if (page.url() !== drawingUrl) {
+      failures.push("카카오 규격 적용이 현재 드로잉을 유지하지 않고 다른 화면으로 이동함");
+    }
+    await captureMenuEvidence(page, evidenceDir, "canvas-kakao");
 
     await page.keyboard.press(process.platform === "darwin" ? "Meta+z" : "Control+z");
     if (!(await waitForHeight(8_348))) {
       failures.push("플랫폼 규격 변경을 한 번의 실행취소로 복원하지 못함");
     }
+    await captureMenuEvidence(page, evidenceDir, "canvas-one-step-undo");
 
     if (failures.length === 0) {
       log("  current canvas platform resize ok: Naver → Kakao → undo");
@@ -1385,31 +1444,52 @@ async function assertExportOptions(page: Page): Promise<string[]> {
 }
 
 async function main() {
-  const port = await findFreePort({ unavailableMessage: "could not allocate port" });
-  const url = `http://127.0.0.1:${port}/studio/canvas`;
   let child: ChildProcess | null = null;
   let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+  let page: Page | null = null;
+  let evidenceDir: string | undefined;
   let exitCode: number;
 
   try {
-    child = spawnVitePreview({
-      port,
-      runner: "node-vite-bin",
-      outDir: process.env.TOONSPECTRUM_VERIFY_DIST?.trim() || undefined,
-    });
-    child.stderr?.on("data", (d) => {
-      const s = String(d);
-      if (!s.includes("ECONNREFUSED") && !s.includes("proxy error")) process.stderr.write(d);
-    });
-    await waitForServer(`http://127.0.0.1:${port}/`, {
+    const candidateArgument = process.argv.slice(2).find((argument) => argument.startsWith("--url="));
+    const candidate = candidateArgument === undefined ? undefined
+      : resolveMenuVerifierCandidateUrl(candidateArgument.slice("--url=".length));
+    const evidenceArgument = process.argv.slice(2).find((argument) => argument.startsWith("--evidence-dir="))?.slice("--evidence-dir=".length);
+    if (evidenceArgument) {
+      const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+      evidenceDir = resolve(evidenceArgument);
+      const fromRoot = relative(root, evidenceDir);
+      if (!fromRoot || (fromRoot !== ".." && !fromRoot.startsWith(`..${sep}`) && !isAbsolute(fromRoot))) {
+        throw new Error("--evidence-dir에는 저장소 밖의 증거 폴더를 지정하세요.");
+      }
+      await mkdir(evidenceDir, { recursive: true });
+    }
+    let url: string;
+    if (candidate) {
+      url = candidate;
+    } else {
+      const port = await findFreePort({ unavailableMessage: "검증용 로컬 포트를 할당하지 못했습니다." });
+      url = `http://127.0.0.1:${port}/studio/canvas`;
+      child = spawnVitePreview({ port, runner: "node-vite-bin", outDir: process.env.TOONSPECTRUM_VERIFY_DIST?.trim() || undefined });
+      child.stderr?.on("data", (d) => {
+        const s = String(d);
+        if (!s.includes("ECONNREFUSED") && !s.includes("proxy error")) process.stderr.write(d);
+      });
+    }
+    await waitForServer(new URL("/", url).href, {
       timeoutMs: 20000,
-      notReadyMessage: `preview not ready: http://127.0.0.1:${port}/`,
+      notReadyMessage: `로컬 서버가 준비되지 않았습니다: ${url} — 서버 실행과 포트 접근 권한을 확인하세요.`,
     });
-    log(`preview ready @ ${url}`);
+    log(`${candidate ? "candidate" : "preview"} ready @ ${url}`);
 
     browser = await chromium.launch({ headless: true });
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
-    const page = await ctx.newPage();
+    if (candidate) {
+      const origin = new URL(url).origin;
+      await ctx.route("**/*", (route) => new URL(route.request().url()).origin === origin
+        ? route.continue() : route.abort("blockedbyclient"));
+    }
+    page = await ctx.newPage();
     await page.addInitScript(({ key }) => {
       try {
         window.localStorage.setItem(key, "1");
@@ -1441,16 +1521,20 @@ async function main() {
 
     const failures = [
       ...(await assertChrome(page)),
-      ...(await assertMainMenus(page)),
+      ...(await assertMainMenus(page, evidenceDir)),
       ...(await assertReferenceWindowToggle(page)),
       ...(await assertRailTools(page)),
       ...(await assertMenuDrivenPopovers(page)),
-      ...(await assertCurrentCanvasPlatformResize(page, { ownedPreviewOrigin: new URL(url).origin })),
+      ...(await assertCurrentCanvasPlatformResize(page, {
+        evidenceDir,
+        ownedPreviewOrigin: candidate ? undefined : new URL(url).origin,
+      })),
       ...(await assertWorkspaceDeviceEditor(page)),
       ...(await assertDrawOptionsBar(page)),
       ...(await assertFloatingLayoutManager(page)),
       ...(await assertExportOptions(page)),
     ];
+    await captureMenuEvidence(page, evidenceDir, "menu-verification-final");
 
     if (failures.length === 0) {
       log("PASS: canvas-first menus exposed (9 primary + AI action + current-canvas platform resize + rail + popovers)");
@@ -1463,6 +1547,7 @@ async function main() {
       exitCode = 1;
     }
   } catch (err) {
+    if (page) await captureMenuEvidence(page, evidenceDir, "menu-verification-error").catch(() => undefined);
     console.error("[verify-menus] fatal:", err);
     exitCode = 1;
   } finally {

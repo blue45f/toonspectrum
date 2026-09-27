@@ -152,6 +152,97 @@
   --unified-route-accent-soft: var(--unified-accent-soft);
 }
 
+/* 공개 페이지의 1320px 외곽 폭에는 좌우 여백을 포함한다. 편집기는 자체 밀도를 유지한다. */
+[data-site-experience] {
+  --site-content-max: 82.5rem;
+  --site-page-gutter: clamp(1rem, 3vw, 2.5rem);
+  --site-reading-max: 48rem;
+  --site-heading-space: clamp(1.5rem, 3vw, 2.5rem);
+  --site-heading-size: clamp(1.875rem, 3.5vw, 3rem);
+  --site-section-title-size: clamp(1.25rem, 2vw, 1.75rem);
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-page-container] {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--site-content-max);
+  margin-inline: auto;
+  padding-inline: max(var(--site-page-gutter), env(safe-area-inset-left)) max(var(--site-page-gutter), env(safe-area-inset-right));
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-page-container="prose"] {
+  max-width: var(--site-reading-max);
+}
+
+/* 같은 페이지 안의 중첩 컨테이너는 본문 여백을 두 번 차지하지 않는다. */
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-page-container] [data-page-container] {
+  padding-inline: 0;
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-page-container] > header {
+  margin-bottom: var(--site-heading-space);
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-page-container] > header h1 {
+  max-width: 24ch;
+  font-family: var(--font-display);
+  font-size: var(--site-heading-size);
+  font-weight: 760;
+  letter-spacing: -0.045em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-section-heading] {
+  align-items: start;
+  gap: 1rem 1.5rem;
+  margin-bottom: clamp(1rem, 2vw, 1.5rem);
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-section-title] {
+  font-family: var(--font-display);
+  font-size: var(--site-section-title-size);
+  font-weight: 720;
+  letter-spacing: -0.035em;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-section-description] {
+  max-width: 66ch;
+  margin-top: 0.625rem;
+  font-size: 0.875rem;
+  line-height: 1.75;
+  text-wrap: pretty;
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-section-action] {
+  flex-shrink: 0;
+  align-self: start;
+  min-height: var(--site-control-size, 44px);
+  padding-inline: 0.875rem;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-panel);
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-section-action]:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+[data-site-experience] .route-stage[data-theme-contract="unified"] [data-section-action]:focus-visible {
+  outline: var(--site-focus-ring-width, 2px) solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+@media (min-width: 640px) {
+  [data-site-experience] .route-stage[data-theme-contract="unified"] [data-section-action] {
+    align-self: end;
+  }
+}
+
 .route-stage[data-theme-contract="unified"] {
   --route-accent: var(--unified-route-accent);
   --route-accent-soft: var(--unified-route-accent-soft);

@@ -27,7 +27,7 @@
   "account.profile.namePlaceholder": "Име приказа",
   "account.profile.bioLabel": "Биографски",
   "account.profile.bioPlaceholder": "Разкажи нам о себи у једном реченици.",
-  "account.profile.bioLength": "ЗЗПЛАЦЕХОЛДЕР0ЗЗ/280",
+  "account.profile.bioLength": "{length}/280",
   "account.profile.saveButton": "Сачувајте профил",
   "account.profile.saving": "Скупање...",
   "account.profile.saved": "Спасена",

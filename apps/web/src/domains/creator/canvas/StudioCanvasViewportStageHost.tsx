@@ -41,7 +41,6 @@ import { StudioCanvasGuideUnderlay } from "./StudioCanvasGuideLayers";
 import { StudioDrawingPracticeGuide } from "./StudioDrawingPracticeGuide";
 import { renderStudioCanvasSelectionDecorations } from "./StudioCanvasSelectionDecorations";
 import { StudioSkiaDocumentHitLayer } from "./StudioSkiaDocumentHitLayer";
-import { studioCanvasDocumentSelectionEnabled } from "./studio-canvas-selection-authority";
 import {
   StudioCanvasViewportDocumentLayer,
   type StudioCanvasViewportDocumentLayerProps,
@@ -259,6 +258,8 @@ export function StudioCanvasViewportStageHost({
     animTimeline: viewport.animTimeline,
     bubbleShapeArmed: viewport.bubbleShapeArmed,
     bubbleShapeDraft: viewport.bubbleShapeDraft,
+    canvasInteractionBlocked: viewport.canvasInteractionBlocked,
+    commentPinArmed: viewport.commentPinArmed,
     canonicalDryMediaHiddenElementId: live.canonicalDryMediaHiddenElementId,
     commitTextTransformEnd: viewport.stableHandlers.commitTextTransformEnd,
     cropArmed: viewport.cropArmed,
@@ -752,7 +753,7 @@ export function StudioCanvasViewportStageHost({
                 <StudioSkiaDocumentHitLayer
                   elements={live.velloDocumentElements}
                   effectiveScale={effScale}
-                  selectionEnabled={studioCanvasDocumentSelectionEnabled(viewport)}
+                  selectionState={documentLayerProps}
                   onSelect={documentLayerProps.selectElementFromCanvas}
                 />
               ) : null}

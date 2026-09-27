@@ -17,7 +17,7 @@ export function synchronizeLegacyI18nAssets(directory = root, { check = false } 
     changed.push(filename);
     if (!check) writeFileSync(filename, contents);
   };
-  for (const bucket of ["app", "admin"]) {
+  for (const bucket of ["app", "admin", "studio"]) {
     const base = path.join(directory, bucket);
     const namespaces = readdirSync(base, { withFileTypes: true })
       .filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();

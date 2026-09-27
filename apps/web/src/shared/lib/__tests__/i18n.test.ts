@@ -12,6 +12,8 @@ import {
   getLocaleDirection,
   i18nDict,
   loadAppI18nLocale,
+  registerI18nEnglishSourceEntries,
+  registerI18nLocaleEntries,
   resolveI18nValue,
   resolveSelectableLocale,
 } from "@/shared/lib/i18n";
@@ -252,6 +254,12 @@ describe("runtime translation bundles", () => {
   });
 
   it("fills English placeholders without replacing authored locale strings", async () => {
+    await loadAppI18nLocale("es");
+    const placeholderKey = "test.runtime.englishPlaceholder";
+    const placeholderSource = "Pending English fixture";
+    const authoredAppName = i18nDict.es["app.name"];
+    registerI18nEnglishSourceEntries({ [placeholderKey]: placeholderSource });
+    registerI18nLocaleEntries("es", { [placeholderKey]: placeholderSource });
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation((url) =>
@@ -261,9 +269,8 @@ describe("runtime translation bundles", () => {
     await ensureRuntimeLocaleBundle("es");
 
     expect(resolveI18nValue("es", "common.close")).toBe("Cerrar");
-    expect(resolveI18nValue("es", "app.name")).toBe(
-      `${i18nDict.en["app.name"]}-translated`,
-    );
+    expect(resolveI18nValue("es", "app.name")).toBe(authoredAppName);
+    expect(resolveI18nValue("es", placeholderKey)).toBe(`${placeholderSource}-translated`);
     fetchSpy.mockRestore();
   });
 
@@ -363,6 +370,12 @@ describe("runtime translation bundles", () => {
   });
 
   it("falls back when translator returns non-success status", async () => {
+    await loadAppI18nLocale("de");
+    const placeholderKey = "test.runtime.unavailablePlaceholder";
+    const placeholderSource = "Unavailable English fixture";
+    const authoredAppName = i18nDict.de["app.name"];
+    registerI18nEnglishSourceEntries({ [placeholderKey]: placeholderSource });
+    registerI18nLocaleEntries("de", { [placeholderKey]: placeholderSource });
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(
@@ -374,7 +387,9 @@ describe("runtime translation bundles", () => {
 
     await ensureRuntimeLocaleBundle("de");
 
-    expect(resolveI18nValue("de", "app.name", ["en", "ko"])).toBe(i18nDict.en["app.name"]);
+    expect(fetchSpy).toHaveBeenCalled();
+    expect(resolveI18nValue("de", placeholderKey, ["en", "ko"])).toBe(placeholderSource);
+    expect(resolveI18nValue("de", "app.name", ["en", "ko"])).toBe(authoredAppName);
 
     fetchSpy.mockRestore();
   });

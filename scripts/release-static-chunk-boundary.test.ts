@@ -30,7 +30,7 @@ describe("release static chunk isolation", () => {
     }
     expect(manual(resolve("packages/contracts/src/index.ts"))).toBeUndefined();
     expect(manual(resolve("packages/contracts/src/studio-live-protocol.ts"))).toBeUndefined();
-    expect(readFileSync(lockResourceFacade, "utf8").trim())
+    expect(readFileSync(lockResourceFacade, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").trim())
       .toBe('export * from "@toonstudio/contracts/studio-live-lock-resource";');
     const packageManifest = JSON.parse(readFileSync("packages/contracts/package.json", "utf8"));
     expect(packageManifest.exports["./studio-live-lock-resource"]).toEqual({

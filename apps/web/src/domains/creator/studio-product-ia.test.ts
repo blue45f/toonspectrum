@@ -17,7 +17,7 @@ import {
 
 describe("ToonStudio final product IA", () => {
   it("keeps the bounded navigation and default-tool budgets", () => {
-    expect(STUDIO_GLOBAL_NAVIGATION).toHaveLength(4);
+    expect(STUDIO_GLOBAL_NAVIGATION).toHaveLength(5);
     expect(STUDIO_PROJECT_NAVIGATION).toHaveLength(6);
     expect(STUDIO_PROJECT_NAVIGATION.map((item) => item.label)).toEqual([
       "홈",
@@ -99,7 +99,8 @@ describe("ToonStudio final product IA", () => {
   it("separates creation and discovery product contexts", () => {
     expect(siteNavigationContextForPath("/studio")).toBe("studio");
     expect(siteNavigationContextForPath("/studio/canvas")).toBe("studio");
-    expect(siteNavigationContextForPath("/market")).toBe("studio");
+    expect(siteNavigationContextForPath("/market")).toBe("spectrum");
+    expect(siteNavigationContextForPath("/market/upload")).toBe("studio");
     expect(siteNavigationContextForPath("/discover")).toBe("spectrum");
     expect(siteNavigationContextForPath("/community")).toBe("spectrum");
   });

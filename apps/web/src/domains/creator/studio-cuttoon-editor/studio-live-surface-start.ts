@@ -4,6 +4,7 @@
  */
 import { flushSync } from "react-dom";
 import type { DrawEl } from "../studio-element-model";
+import type { StudioLiveSurfaceAdmission } from "./studio-live-surface-admission";
 
 // The host is a mutable runtime bag by design; keep the dynamic seam isolated to this adapter.
 type StudioLiveSurfaceHost = Record<string, unknown>;
@@ -122,11 +123,7 @@ export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
     next: DrawEl,
     pointerSample: PointerEvent,
     strokeOrigin: Readonly<{ x: number; y: number }>,
-    admission: {
-      readonly pendingBackdrop?: boolean;
-      readonly onAdmitted?: (stroke: DrawEl) => void;
-      readonly pinnedMedia?: ReturnType<typeof selectStudioLiveStrokeMedia>;
-    } = {},
+    admission: StudioLiveSurfaceAdmission = {},
   ): boolean {
     const { pinnedMedia } = admission;
     const selectedMedia = pinnedMedia ?? selectStudioLiveStrokeMedia(next, {

@@ -186,7 +186,8 @@ describe("Studio BG3D Blender 5.2 Wave 4 environment pack", () => {
       expect(root?.extras).toMatchObject({
         asset_id: asset.id,
         asset_type: "studio-bg3d-environment",
-        asset_author: "ToonStudio",
+        // 불변 GLB의 생성 당시 출처는 서비스 표시명 변경과 별개다.
+        asset_author: "ToonSpectrum",
         asset_generator: "scripts/blender/generate_environment_pack_v4.py",
         asset_generator_version: "4.0.0-blender-5.2",
         asset_license: "CC0-1.0",

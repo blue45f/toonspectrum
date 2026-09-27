@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Vrstva {count}",
   "studio.toolsCompanion.review.section.comments": "Komentár {count}",
   "studio.toolsCompanion.review.section.history": "Zaznamenať {count}",
-  "studio.toolsCompanion.review.subtitle": "Strana{Označenie}· Výber{Označenie ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "kontrolná konzola",
   "studio.toolsCompanion.review.truncatedComments": "a {count} komentárov",
   "studio.toolsCompanion.review.truncatedLayers": "{count} vrstiev",

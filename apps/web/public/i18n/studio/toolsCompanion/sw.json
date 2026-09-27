@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Safu {count}",
   "studio.toolsCompanion.review.section.comments": "Maoni {count}",
   "studio.toolsCompanion.review.section.history": "Rekodi {count}",
-  "studio.toolsCompanion.review.subtitle": "ukurasa wa ZZLBRACEWeka lebo}· uteuzi wa ZZLBRACELebo ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "console ya ukaguzi",
   "studio.toolsCompanion.review.truncatedComments": "na maoni {count}",
   "studio.toolsCompanion.review.truncatedLayers": "{count} safu",

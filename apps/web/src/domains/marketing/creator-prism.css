@@ -21,9 +21,7 @@ html[data-theme="dark"] .creator-home.creator-experience.creator-flagship {
 .creator-flagship .cf-signal { width: 8px; height: 8px; box-shadow: 0 0 0 5px oklch(0.72 0.185 42 / 0.13), 0 0 22px oklch(0.72 0.185 42 / 0.5); }
 .creator-flagship .cf-hero h1 { font-size: clamp(42px, 4.6vw, 72px); }
 .creator-flagship .cf-hero h1 em { color: var(--prism-coral); }
-@supports (background-clip: text) {
-  .creator-flagship .cf-hero h1 em { background: linear-gradient(110deg, var(--prism-coral) 5%, oklch(0.8 0.14 355) 48%, var(--prism-violet)); background-clip: text; -webkit-text-fill-color: transparent; }
-}
+
 .creator-flagship .cf-button { border-radius: 14px; }
 .creator-flagship .cf-primary { background: linear-gradient(115deg, oklch(0.83 0.14 56), var(--prism-coral)); box-shadow: 0 8px 26px -12px oklch(0.72 0.185 42 / 0.8); }
 .creator-flagship .cf-secondary { background: oklch(0.25 0.025 285 / 0.8); }

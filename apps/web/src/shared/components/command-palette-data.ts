@@ -38,6 +38,8 @@ import {
 import type { PaletteCommand, PalettePage, PaletteStudioTool, PaletteMode } from "./command-palette-types";
 
 import { useApp } from "@/shared/lib/store";
+import { canonicalSitePath } from "@/shared/lib/site-route-authority";
+import { SITE_NAVIGATION_ITEMS, siteNavigationLocale } from "./site-navigation";
 
 export const PALETTE_MODE_TABS: { id: PaletteMode; label: string; prefix?: string }[] = [
   { id: "all", label: "전체" },
@@ -336,7 +338,7 @@ export const PALETTE_STUDIO_TOOLS: PaletteStudioTool[] = [
   },
 ];
 
-export const PALETTE_PAGES: PalettePage[] = [
+const CURATED_PALETTE_PAGES: PalettePage[] = [
   {
     id: "page-home",
     href: "/",
@@ -464,7 +466,7 @@ export const PALETTE_PAGES: PalettePage[] = [
     icon: Paintbrush,
     shortcut: ["G", "S"],
     category: "creator",
-    keywords: ["스튜디오", "그리기", "캔버스", "제작", "창작", "studio", "creator"],
+    keywords: ["스튜디오", "그리기", "캔버스", "제작", "창작", "내 프로젝트", "이어하기", "studio", "creator", "projects", "resume"],
   },
   {
     id: "page-shaper",
@@ -512,3 +514,49 @@ export const PALETTE_PAGES: PalettePage[] = [
     keywords: ["가이드", "도움말", "설명서", "튜토리얼", "guide", "help"],
   },
 ];
+
+const navigationDestinations = Object.values(SITE_NAVIGATION_ITEMS);
+const curatedPagePaths = new Set(CURATED_PALETTE_PAGES.map((page) => canonicalSitePath(page.href)));
+
+/** 메뉴의 현재 명칭·목적지를 검색에도 공유하고 예전 명칭은 검색어로 보존한다. */
+export const PALETTE_PAGES: PalettePage[] = [
+  ...CURATED_PALETTE_PAGES.map((page) => {
+    const href = canonicalSitePath(page.href);
+    const destination = navigationDestinations.find((item) => item.href === href);
+    if (!destination) return { ...page, href };
+    return {
+      ...page,
+      href,
+      title: destination.label.ko,
+      subtitle: destination.description.ko,
+      keywords: [...page.keywords, page.title, page.subtitle, destination.label.en, destination.description.en],
+    };
+  }),
+  ...navigationDestinations.filter((item) => !curatedPagePaths.has(item.href)).map((item): PalettePage => ({
+    id: `page-nav-${item.id}`,
+    href: item.href,
+    title: item.label.ko,
+    subtitle: item.description.ko,
+    icon: item.icon,
+    category: "main",
+    keywords: [item.label.en, item.description.en, item.href, ...(item.id === "all-menu" ? ["전체 기능", "서비스 메뉴", "all tools", "sitemap"] : [])],
+  })),
+];
+
+const ENGLISH_EXTRA_PAGES: Record<string, { title: string; subtitle: string }> = {
+  "/explore": { title: "Explore genres", subtitle: "Find stories by genre, color and keywords" },
+  "/compare": { title: "Compare stories", subtitle: "Compare ratings, metrics and reader preferences side by side" },
+  "/guide": { title: "Service guide", subtitle: "Explore platform features and Studio tutorials" },
+};
+
+/** 화면 언어가 바뀌어도 두 언어와 기존 메뉴 이름으로 같은 목적지를 찾는다. */
+export function palettePagesForLocale(locale: string): PalettePage[] {
+  if (siteNavigationLocale(locale) === "ko") return PALETTE_PAGES;
+  return PALETTE_PAGES.map((page) => {
+    const destination = navigationDestinations.find((item) => item.href === page.href);
+    const english = destination
+      ? { title: destination.label.en, subtitle: destination.description.en }
+      : ENGLISH_EXTRA_PAGES[page.href];
+    return { ...page, ...english, keywords: [...page.keywords, page.title, page.subtitle] };
+  });
+}

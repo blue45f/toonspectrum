@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Qatlam {count}",
   "studio.toolsCompanion.review.section.comments": "Izoh {count}",
   "studio.toolsCompanion.review.section.history": "Yozib olish {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE sahifasi}yorlig‘i ·{tanlovi}yorlig‘i",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "tekshirish konsoli",
   "studio.toolsCompanion.review.truncatedComments": "va {count} sharhlar",
   "studio.toolsCompanion.review.truncatedLayers": "{count} qatlamlar",

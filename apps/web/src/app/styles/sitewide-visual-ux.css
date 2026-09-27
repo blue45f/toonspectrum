@@ -272,6 +272,11 @@ html {
   }
 }
 
+/* 열린 대화상자가 작업을 소유하는 동안 기존 홍보는 숨기고 닫힌 뒤 원래 상태로 복원한다. */
+body:has([aria-modal="true"], dialog[open]) > [data-beta-open-prompt="engaged"] {
+  display: none;
+}
+
 /* Engaged marketing prompts stay compact on phones so they do not cover the primary page heading or controls. */
 @media (max-width: 767px) {
   [data-beta-open-prompt="engaged"] {

@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Shape } from "react-konva/lib/ReactKonvaCore";
 
+import { canSelectStudioCanvasElement } from "./studio-canvas-element-selection";
 import { createStudioSkiaDocumentHitIndex } from "./studio-skia-document-hit-index";
 
+import type { StudioCanvasElementSelectionState } from "./studio-canvas-element-selection";
 import type { El } from "../studio-element-model";
 import type Konva from "konva";
 
 export interface StudioSkiaDocumentHitLayerProps {
   readonly elements: readonly El[];
   readonly effectiveScale: number;
-  readonly selectionEnabled: boolean;
+  readonly selectionState: StudioCanvasElementSelectionState;
   readonly onSelect: (
     id: string,
     event?: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
@@ -29,7 +31,7 @@ function localPointer(
 export function StudioSkiaDocumentHitLayer({
   elements,
   effectiveScale,
-  selectionEnabled,
+  selectionState,
   onSelect,
 }: StudioSkiaDocumentHitLayerProps) {
   const runtimeRef = useRef<
@@ -57,7 +59,7 @@ export function StudioSkiaDocumentHitLayer({
       // The existing Stage background path owns empty-click deselection and marquee start.
       name: element ? "skia-document-hit-proxy" : "bg",
     });
-    if (element && select && selectionEnabled) onSelect(element.id, event);
+    if (element && select && canSelectStudioCanvasElement(selectionState)) onSelect(element.id, event);
   };
 
   return (

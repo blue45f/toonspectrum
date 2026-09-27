@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -31,6 +31,8 @@ function unavailableLabels(
 export function ServiceDegradedBanner({ immersive = false }: { immersive?: boolean }) {
   const state = useServiceCapabilityState();
   const [recoveryVisible, setRecoveryVisible] = useState(false);
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const compact = immersive && !detailsExpanded;
 
   useEffect(() => {
     if (!state.recoveredAt) return;
@@ -63,7 +65,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
           ? "border-good/35 bg-good/10 text-good"
           : "border-warn/40 bg-warn/10 text-fg",
         immersive
-          && "fixed left-1/2 top-[calc(0.75rem+env(safe-area-inset-top))] z-[90] w-[min(46rem,calc(100vw-1rem))] -translate-x-1/2 rounded-2xl border max-sm:bg-panel",
+          && "fixed left-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[90] w-[min(46rem,calc(100vw-1rem))] -translate-x-1/2 rounded-2xl border max-sm:bg-panel",
       )}
     >
       <div className={cn("mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-3 gap-y-2",
@@ -77,12 +79,23 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
               ? "온라인 기능이 복구되었습니다."
               : "일부 온라인 기능을 잠시 사용할 수 없습니다."}
           </p>
-          <p className="mt-0.5 text-xs leading-relaxed text-fg-2">
+          <p hidden={compact} className="mt-0.5 text-xs leading-relaxed text-fg-2">
             {recovered
               ? "대기 중인 저장과 동기화를 순서대로 다시 확인합니다."
               : `${detail}이 제한됩니다. 탐색과 로컬 편집은 계속 사용할 수 있습니다.`}
           </p>
         </div>
+        {immersive ? (
+          <button
+            type="button"
+            aria-label={compact ? "서비스 상태 알림 펼치기" : "서비스 상태 알림 접기"}
+            aria-expanded={!compact}
+            onClick={() => setDetailsExpanded((expanded) => !expanded)}
+            className="grid size-11 shrink-0 place-items-center rounded-xl border border-current/20"
+          >
+            {compact ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+          </button>
+        ) : null}
         {!recovered ? (
           <div className={cn("ml-auto flex shrink-0 items-center gap-2",
             immersive && "max-sm:col-span-2 max-sm:ml-0 max-sm:grid max-sm:grid-cols-2") }>

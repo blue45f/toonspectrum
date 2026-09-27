@@ -1,4 +1,4 @@
-import test from "node:test";
+const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 import assert from "node:assert/strict";
 
 import { verifyVirtualStudioImagegen25V7 } from "./verify-virtual-studio-imagegen25-v7.mjs";

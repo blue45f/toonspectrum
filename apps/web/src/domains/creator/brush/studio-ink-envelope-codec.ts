@@ -20,11 +20,6 @@
  * adherence to this format, but do not impersonate a third party's certification.
  */
 
-import type {
-  StudioInkEnvelopeAttester,
-  StudioInkEnvelopeAttestationVerifier,
-} from "@toonstudio/contracts/studio-ink-envelope-webcrypto-attestation";
-
 import {
   STUDIO_DOCUMENT_ENVELOPE_LIMITS,
   canonicalizeStudioDocumentEnvelope,
@@ -35,10 +30,10 @@ import {
   type StudioDocumentEnvelopeOptions,
 } from "../studio-document-envelope";
 
-export type {
+import type {
   StudioInkEnvelopeAttester,
   StudioInkEnvelopeAttestationVerifier,
-} from "@toonstudio/contracts/studio-ink-envelope-webcrypto-attestation";
+} from "@toonstudio/contracts/studio-ink-envelope-attestation-contract";
 
 export const STUDIO_INK_ENVELOPE_CODEC_ID =
   "toonstudio.ink-envelope" as const;
@@ -153,6 +148,10 @@ export interface StudioInkEnvelopeManifest {
   readonly contentDigest: `sha256:${string}`;
   readonly digestAlgorithm: typeof STUDIO_INK_ENVELOPE_DIGEST_ALGORITHM;
 }
+export type {
+  StudioInkEnvelopeAttester,
+  StudioInkEnvelopeAttestationVerifier,
+} from "@toonstudio/contracts/studio-ink-envelope-attestation-contract";
 
 /**
  * Product-specific decoder for the opaque canonical content.

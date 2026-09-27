@@ -3,6 +3,7 @@ import {
   Bot,
   Boxes,
   Brush,
+  ChevronDown,
   CheckCircle2,
   Cuboid,
   Database,
@@ -47,6 +48,8 @@ import {
   useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 
+import "./engineering-playbook.css";
+
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
   translateBilingualValueForActiveLocale("EngineeringPlaybookPage", ko, en);
 
@@ -86,9 +89,19 @@ export function EngineeringPlaybookPage() {
   );
 
   return (
-    <Container size="wide" className="py-7 sm:py-10 lg:py-12">
-      <AboutSectionNav />
-      <EngineeringStoryNav className="mt-3" />
+    <Container size="wide" className="engineering-playbook py-7 sm:py-10 lg:py-12">
+      <details className="engineering-playbook__related">
+        <summary>
+          <LibraryBig size={17} aria-hidden="true" />
+          <span>{bi("소개·기술 문서 둘러보기", "Browse service and engineering documents")}</span>
+          <ChevronDown size={17} aria-hidden="true" />
+        </summary>
+        <div className="engineering-playbook__related-links">
+          <AboutSectionNav />
+          <EngineeringStoryNav />
+          <ServiceStoryJourney current="playbook" />
+        </div>
+      </details>
 
       <EngineeringPageIntro
         eyebrow="ENGINEERING PLAYBOOK · SERVICE · MARKET · SEMINAR"
@@ -101,7 +114,7 @@ export function EngineeringPlaybookPage() {
           "Service positioning, identity and sharing, brushes, CRDT, Workers, PWA, virtual studio, 3D, AI and data acquisition are connected to market benchmarks, film treatments, a seminar curriculum and reusable implementation sequences.",
         )}
         aside={
-          <div className="grid grid-cols-2 gap-3 rounded-3xl border border-line/70 bg-card/70 p-4">
+          <dl className="engineering-playbook__stats">
             {[
               {
                 value: ENGINEERING_PLAYBOOK_DOSSIERS.length,
@@ -124,31 +137,29 @@ export function EngineeringPlaybookPage() {
                 en: "talk modules",
               },
             ].map((stat) => (
-              <div key={stat.ko} className="rounded-2xl border border-line/60 bg-panel/70 p-3">
-                <p className="font-display text-2xl font-black text-fg">{stat.value}</p>
-                <p className="mt-1 text-[0.68rem] font-bold uppercase tracking-[0.08em] text-fg-3">
+              <div key={stat.ko}>
+                <dt className="text-[0.68rem] font-bold text-fg-3">
                   {bi((stat).ko, (stat).en)}
-                </p>
+                </dt>
+                <dd className="mt-1 font-display text-2xl font-black text-fg">{stat.value}</dd>
               </div>
             ))}
-          </div>
+          </dl>
         }
       />
 
-      <ServiceStoryJourney current="playbook" className="mb-5" />
-
       <nav
         aria-label={bi("기술 플레이북 목차", "Engineering playbook sections")}
-        className="sticky top-3 z-20 rounded-3xl border border-line/70 bg-page/90 p-2 shadow-lg backdrop-blur-xl"
+        className="engineering-playbook__contents"
       >
-        <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+        <div>
           {SECTION_LINKS.map((item) => {
             const Icon = item.icon;
             return (
               <a
                 key={item.href}
                 href={item.href}
-                className="flex min-h-11 items-center gap-2 rounded-2xl px-3 py-2 text-xs font-bold text-fg-2 transition-colors hover:bg-raised hover:text-accent"
+                className="engineering-playbook__section-link"
               >
                 <Icon size={15} aria-hidden="true" />
                 {bi((item).ko, (item).en)}
