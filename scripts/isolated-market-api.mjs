@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { access } from "node:fs/promises";
 import { createConnection } from "node:net";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -281,20 +282,34 @@ async function requireRunningApi(apiOrigin, child) {
   fail("The isolated marketplace API did not become live in time.");
 }
 
+/** 기존 source 실행은 유지하고, 명시적으로 선택한 QA만 검증된 API 빌드를 재사용한다. */
+export function isolatedMarketApiEntryArguments(entry = "source") {
+  if (entry === "source") return ["--import", "tsx", "src/main.ts"];
+  if (entry === "compiled") return ["dist/apps/api/src/main.js"];
+  throw new Error("격리 API 실행 방식은 source 또는 compiled로 지정하세요.");
+}
+
 /**
  * @param {IsolatedMarketApiTarget} target
  * @param {{
  *   environment?: NodeJS.ProcessEnv,
  *   onSpawn?: (child: import("node:child_process").ChildProcess) => void,
  *   localReviewStorage?: import("./studio-review-local-storage-config.mjs").StudioReviewLocalStorageOptions,
+ *   entry?: "source" | "compiled",
  * }} [options]
  */
 export async function startIsolatedMarketApi(target, options = {}) {
   const { environment = process.env, onSpawn } = options;
+  const entryArguments = isolatedMarketApiEntryArguments(options.entry);
+  if (options.entry === "compiled") {
+    await access(resolve(API_ROOT, entryArguments[0])).catch(() => {
+      throw new Error("격리 API 빌드가 없습니다. pnpm --filter @webtoon-nest/api build를 먼저 실행하세요.");
+    });
+  }
   await requireUnusedApiTarget(target);
   const child = spawn(
     process.execPath,
-    ["--import", "tsx", "src/main.ts"],
+    entryArguments,
     {
       cwd: API_ROOT,
       detached: process.platform !== "win32",

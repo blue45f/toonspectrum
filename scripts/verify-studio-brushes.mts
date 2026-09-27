@@ -40,6 +40,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 
 
 import { decodePng } from "image-js";
@@ -2610,8 +2611,12 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // visibly accepted. Make the isolation boundary explicit for every operation, not only erasers.
       await waitForPersistedDrawElements(
         page,
-        (draws) => draws.length === 0,
-        `${preset.id}: post-redo cleanup left persisted operations`,
+        (draws) => operation === "erase"
+          ? draws.length === 1 && draws[0]?.mode === "pen"
+            && draws[0]?.id === persistedErase?.draws[0]?.id
+            && isDeepStrictEqual(draws[0], persistedErase?.draws[0])
+          : draws.length === 0,
+        `${preset.id}: post-redo cleanup did not restore the exact operation baseline`,
       );
       if (operation === "erase") {
         invariant(emptyBefore, `${preset.id}: eraser cleanup lost its empty baseline`);
@@ -4223,6 +4228,11 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   invariant(controlPointFrame, "control-point gesture has no stage coordinate frame");
   invariant(await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest(".konvajs-content")), handle),
     "control-point gesture is covered by editor chrome");
+  // 실제 교정점과 좌표 프레임을 보존해 잘못된 포인터 위치와 제품 편집 실패를 구분한다.
+  writeFileSync(join(SCRATCH, "studio-smart-shape-control-point.json"), JSON.stringify({
+    handle, controlPointFrame, corrected,
+  }, null, 2));
+  await page.screenshot({ path: join(SCRATCH, "studio-smart-shape-before-control-point.png"), animations: "disabled" });
   await page.mouse.move(handle.x, handle.y);
   await page.keyboard.down("Shift");
   await page.mouse.down();
