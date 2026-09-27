@@ -44,12 +44,14 @@ for (const invalidPage of [
 test("a failed refresh preserves the draft but revokes readiness until a verified response", async ({ page }) => {
   let refreshUnavailable = false;
   let failedReads = 0;
+  let listReads = 0;
   const writes: string[] = [];
   await page.route("**/api/feedback/posts**", async (route) => {
     if (route.request().method() !== "GET") {
       writes.push(route.request().method());
       return route.fulfill({ status: 403, json: { message: "준비 상태 미확인 쓰기" } });
     }
+    listReads++;
     // 자동 읽기 재시도가 끝나도 실패를 유지하고, 복구는 테스트가 명시한다.
     if (refreshUnavailable) {
       failedReads++;
@@ -73,6 +75,7 @@ test("a failed refresh preserves the draft but revokes readiness until a verifie
   await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.");
   await expect(page.getByRole("alert")).not.toContainText("새로고침 일시 실패");
   expect(failedReads).toBe(3);
+  expect(listReads).toBe(4);
   await expect(title).toHaveValue("작성 중인 제보를 보존합니다");
   await expect(body).toHaveValue("새로고침에 실패해도 작성한 내용을 유지합니다.");
   await expect(confirmation).toBeChecked();
@@ -87,6 +90,7 @@ test("a failed refresh preserves the draft but revokes readiness until a verifie
   await expect(body).toHaveValue("새로고침에 실패해도 작성한 내용을 유지합니다.");
   await expect(confirmation).toBeChecked();
   expect(writes).toEqual([]);
+  expect(listReads).toBe(5);
 });
 
 test("a malformed reply response is an error rather than an empty conversation", async ({ page }) => {

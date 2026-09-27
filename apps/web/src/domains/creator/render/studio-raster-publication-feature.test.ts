@@ -45,6 +45,13 @@ describe("automatic raster publication feature gate", () => {
     ), "utf8");
     const viewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
     const source = `${pageSource}\n${viewportSource}`;
+    expect(source).toMatch(
+      /!STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*\|\|\s*!authorizedWorkAssetScopeId\s*\|\|\s*!studioAuthUserId\s*\|\|\s*!studioCrdtDocument/u
+    );
+    expect(source).toContain("const rasterActorId = studioAuthUserId");
+    expect(source).toMatch(
+      /STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*&&\s*rasterWorkId\s*&&\s*rasterDocument\s*&&\s*rasterRuntime\s*&&\s*rasterActorId/u
+    );
     // 히스토리 게시 가드는 분리된 게시자가 소유하며, 호스트는 실제 인증 사용자와 기능 플래그를 전달한다.
     expect(pageSource).toContain(
       'from "./studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher"'

@@ -14,6 +14,7 @@ const result = () => ({ contractVersion: 2, items: [entry], hasMore: false, next
 test("failed refresh and recovery keep the same inline comment draft mounted", async ({ page }) => {
   let refreshUnavailable = false;
   let failedReads = 0;
+  let listReads = 0;
   let replyReads = 0;
   const writes: string[] = [];
   await page.route("**/api/feedback/posts**", async (route) => {
@@ -25,6 +26,7 @@ test("failed refresh and recovery keep the same inline comment draft mounted", a
       replyReads++;
       return route.fulfill({ json: [] });
     }
+    listReads++;
     // 자동 읽기 재시도 전체에 장애를 유지한다.
     if (refreshUnavailable) {
       failedReads++;
@@ -43,6 +45,7 @@ test("failed refresh and recovery keep the same inline comment draft mounted", a
   await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다. 입력한 내용은 그대로 유지됩니다.");
   await expect(page.getByRole("alert")).not.toContainText("새로고침 일시 실패");
   expect(failedReads).toBe(3);
+  expect(listReads).toBe(4);
   await expect(page.locator(".fb-post")).toHaveCount(1);
   await expect(draft).toHaveValue("작성 중인 댓글입니다.");
   await expect(page.getByRole("button", { name: "댓글 등록", exact: true })).toBeDisabled();
@@ -55,6 +58,7 @@ test("failed refresh and recovery keep the same inline comment draft mounted", a
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(draft).toHaveValue("오류가 나도 계속 작성할 수 있습니다.");
   expect(replyReads).toBe(1);
+  expect(listReads).toBe(5);
   expect(writes).toEqual([]);
 });
 
