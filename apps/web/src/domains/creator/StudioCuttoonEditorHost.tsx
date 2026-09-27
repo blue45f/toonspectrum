@@ -11003,6 +11003,15 @@ export function StudioCuttoonEditor({
     }
     flushDirectLiveDraft();
   };
+  // 종료 경로가 같은 다이렉트 플래그를 동기적으로 반납하도록 한곳에서 초기화한다.
+  function resetLiveDraftDirectFlags(): void {
+    liveDraftDirectRef.current = false;
+    liveStampDraftDirectRef.current = false;
+    liveDynamicBrushDraftDirectRef.current = false;
+    liveRetainedMediaDraftDirectRef.current = false;
+    liveWetInkDraftDirectRef.current = false;
+  }
+
   // quickshape 변환 등으로 다이렉트 대상에서 벗어나면 React 초안 경로로 복귀한다(1회 렌더).
   const exitDirectLiveDraft = () => {
     if (pendingStrokeAdmissionRef.current?.has(drawingRef.current?.id)) return;
@@ -11019,11 +11028,7 @@ export function StudioCuttoonEditor({
       failSelectedGpuLiveInk("request-failed", drawingRef.current?.id ?? "unknown-stroke");
       return;
     }
-    liveDraftDirectRef.current = false;
-    liveStampDraftDirectRef.current = false;
-    liveDynamicBrushDraftDirectRef.current = false;
-    liveRetainedMediaDraftDirectRef.current = false;
-    liveWetInkDraftDirectRef.current = false;
+    resetLiveDraftDirectFlags();
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
     gpuLiveOperationOrderKeyRef.current = null;
@@ -11249,11 +11254,7 @@ export function StudioCuttoonEditor({
       globalThis.cancelAnimationFrame(liveDraftRafRef.current);
       liveDraftRafRef.current = null;
     }
-    liveDraftDirectRef.current = false;
-    liveStampDraftDirectRef.current = false;
-    liveDynamicBrushDraftDirectRef.current = false;
-    liveRetainedMediaDraftDirectRef.current = false;
-    liveWetInkDraftDirectRef.current = false;
+    resetLiveDraftDirectFlags();
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;
     gpuLiveOperationOrderKeyRef.current = null;
@@ -23008,11 +23009,7 @@ const puppetWarpArmed =
       globalThis.cancelAnimationFrame(gpuLingerRafRef.current);
       gpuLingerRafRef.current = 0;
     }
-    liveDraftDirectRef.current = false;
-    liveStampDraftDirectRef.current = false;
-    liveDynamicBrushDraftDirectRef.current = false;
-    liveRetainedMediaDraftDirectRef.current = false;
-    liveWetInkDraftDirectRef.current = false;
+    resetLiveDraftDirectFlags();
     gpuLiveInkPinnedRef.current = false;
     gpuLiveSourceJournalRef.current = null;
     gpuLiveSourceJournalFirstStrokeIndexRef.current = 0;

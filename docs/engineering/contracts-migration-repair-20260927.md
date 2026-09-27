@@ -140,3 +140,24 @@ pnpm audit:licenses
 구현 복구와 위 범위의 검증은 완료했다. 루트 typecheck·build·CI·전체 브라우저 관측이
 통과했다고 이 문서만으로 판단하지 않는다. main 병합은 배포 승인이 아니며 운영 배포는
 별도 명시적 승인과 지정 SHA 검증이 필요하다.
+
+## CI의 남은 검증 복구
+
+기준 main의 `36307510760` CI 로그를 별도로 분류했다. 계약 import 연쇄 외에
+Studio 소스 크기 상한 두 개와 sparse checkout에서 원본 이미지 두 계열이 빠지는 실패가 있었다.
+
+- CI가 기존 `daily`, `school`과 함께 `fantasy`, `urban` 원본을 복구하도록 수정했다.
+  임시 Git 저장소에서 실제 sparse checkout을 실행하는 21개 검사와 원본 WebP 6개 검사가 통과했다.
+  배포 워크플로·필수 검사 조건은 변경하지 않았다.
+- host의 동일한 direct flag 5개 초기화를 세 호출부에서 같은 동기 helper로 공유했다.
+  helper를 다시 펼치면 기준 커밋의 소스와 바이트 단위로 동일하며,
+  GPU pin과 journal 초기화 순서도 유지한다. host는 29650행, live admission은 559행으로
+  기존 상한을 그대로 만족한다. 상한·실패 조건을 완화하지 않았다.
+- live admission 세 경로의 같은 geometry 조건을 하나의 순수 값으로 공유했다.
+- 소스 검증 reader에 이미 추출된 실제 live-surface 모듈을 포함했다.
+  wet-ink 검사는 현재 commit 호출문을 찾도록 맞췄으며 seal 거절 이후의 조기 반환과
+  commit 순서 검사는 그대로 유지했다.
+- 관련 ratchet·pointer·history·live integration 9개 파일의 83개 검사가 통과했다.
+
+이 변경은 c926에만 적용했다. 다른 작업트리의 experience-v8 CI 변경은 복사하거나 덮어쓰지 않았다.
+최종 CI와 disposable DB 검증은 별도로 확인해야 한다.

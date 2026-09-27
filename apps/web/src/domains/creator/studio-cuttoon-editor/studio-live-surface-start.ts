@@ -236,14 +236,15 @@ export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
         () => flushSync(() => flushPendingStrokeCommitsRef.current()),
       );
       const pixelDirect = isStudioPixelPencilRenderMode(next.brush);
+      const simpleStrokeGeometry = next.mode !== "eraser"
+        && !next.fill
+        && (next.symmetry?.type ?? "none") === "none";
       const causalPostCorrectionEligible = !pixelDirect
         && studioPostCorrectionRunsDuringPointerContact()
         && isDirectLiveDraftEl(next)
         && postCorrection > 0
         && (next.opacity ?? 1) === 1
-        && next.mode !== "eraser"
-        && !next.fill
-        && (next.symmetry?.type ?? "none") === "none";
+        && simpleStrokeGeometry;
       const overlayCandidate = !pixelDirect
         && isDirectLiveDraftEl(next)
         && (next.opacity ?? 1) === 1
@@ -350,9 +351,7 @@ export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
       // 표준 지우개가 "2D 표면을 시작하지 못했다"며 통째로 거부되는 일이 없다(실측: 지우개 획이
       // 화면에는 보이지만 문서·자동저장에 남지 않았다).
       const liveInkOverlayEligible = overlayCandidate
-        && next.mode !== "eraser"
-        && !next.fill
-        && (next.symmetry?.type ?? "none") === "none";
+        && simpleStrokeGeometry;
       if ((selectedMedia.kind === "canvas2d")
         && liveInkBackendDecision.status === "ready"
         && liveInkBackendDecision.backend === "canvas2d"
@@ -498,9 +497,7 @@ export function bindStudioDrawLiveSurfaces(h: StudioLiveSurfaceHost) {
         drawingPointerTransportRef.current?.getSession()
       )
         && liveInkOverlayStarted
-        && next.mode !== "eraser"
-        && !next.fill
-        && (next.symmetry?.type ?? "none") === "none";
+        && simpleStrokeGeometry;
       armTransientPenInkSurfaces({
         pointerEvent: pointerSample,
         drawing: next,
