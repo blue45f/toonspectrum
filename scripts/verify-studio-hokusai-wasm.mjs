@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdtempSync,
@@ -420,6 +421,10 @@ export function createHokusaiReleaseBuildEnvironment({
       destination: "/toonstudio-build/cargo-home",
     },
     {
+      source: rustupHome,
+      destination: "/toonstudio-build/rustup-home",
+    },
+    {
       source: buildDirectory,
       destination: "/toonstudio-build/session",
     },
@@ -464,11 +469,21 @@ export function createHokusaiReleaseBuildEnvironment({
   });
 }
 
+function copyHokusaiSourceToBuildDirectory(buildDirectory) {
+  const sourceDirectory = join(buildDirectory, "source");
+  cpSync(HOKUSAI_PACKAGE_DIRECTORY, sourceDirectory, {
+    recursive: true,
+    filter: (source) => !source.startsWith(join(HOKUSAI_PACKAGE_DIRECTORY, "pkg")),
+  });
+  return sourceDirectory;
+}
+
 function buildIntoTemporaryDirectory() {
   const { cargo, rustc, wasmPack } = resolvePinnedToolchain();
   const buildDirectory = mkdtempSync(
     join(tmpdir(), "toonstudio-hokusai-wasm-"),
   );
+  const sourceDirectory = copyHokusaiSourceToBuildDirectory(buildDirectory);
   const packageDirectory = join(buildDirectory, "pkg");
   const environment = createHokusaiReleaseBuildEnvironment({
     buildDirectory,
@@ -480,7 +495,7 @@ function buildIntoTemporaryDirectory() {
     wasmPack,
     [
       "build",
-      HOKUSAI_PACKAGE_DIRECTORY,
+      sourceDirectory,
       "--target",
       "web",
       "--release",
@@ -644,6 +659,8 @@ function resealManifest() {
     + (dropped.length > 0 ? `; dropped ${dropped.length} stale record(s):\n` + dropped.map((path) => `  ${path}\n`).join("") : ".\n"),
   );
 }
+
+export { copyHokusaiSourceToBuildDirectory };
 
 export function main(argumentsList = process.argv.slice(2)) {
   if (

@@ -1,5 +1,6 @@
 import {
   appendFileSync,
+  readFileSync,
   copyFileSync,
   mkdirSync,
   mkdtempSync,
@@ -144,6 +145,28 @@ describe("Studio Hokusai WASM checked-in artifact gate", () => {
     expect(() => assertSafeHokusaiWasmBinary(wasmPath)).toThrow(
       "contains a forbidden local build path marker",
     );
+  });
+
+  it("keeps the pinned rebuild source outside the checked-in pkg directory", async () => {
+    const buildDirectory = mkdtempSync(
+      join(tmpdir(), "toonstudio-hokusai-isolation-test-"),
+    );
+    temporaryDirectories.push(buildDirectory);
+    const before = readFileSync(
+      join(HOKUSAI_PKG_DIRECTORY, "studio_hokusai_wasm_bg.wasm"),
+    );
+
+    const module = await import("../verify-studio-hokusai-wasm.mjs");
+    const sourceDirectory = module.copyHokusaiSourceToBuildDirectory(buildDirectory);
+
+    expect(sourceDirectory.startsWith(buildDirectory)).toBe(true);
+    expect(readFileSync(join(sourceDirectory, "src/lib.rs"), "utf8")).toBe(
+      readFileSync(join(HOKUSAI_PACKAGE_DIRECTORY, "src/lib.rs"), "utf8"),
+    );
+    expect(() => readFileSync(join(sourceDirectory, "pkg/studio_hokusai_wasm_bg.wasm"))).toThrow();
+    expect(
+      readFileSync(join(HOKUSAI_PKG_DIRECTORY, "studio_hokusai_wasm_bg.wasm")),
+    ).toEqual(before);
   });
 
   it("builds from an allowlisted, offline and path-remapped environment", () => {
