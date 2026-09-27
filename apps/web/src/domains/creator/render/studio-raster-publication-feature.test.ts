@@ -41,7 +41,11 @@ describe("automatic raster publication feature gate", () => {
     const viewportSource = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
     const source = `${pageSource}\n${viewportSource}`;
     expect(source).toMatch(
-      /STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*&&\s*studioAuthUserId/u
+      /!STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*\|\|\s*!authorizedWorkAssetScopeId\s*\|\|\s*!studioAuthUserId\s*\|\|\s*!studioCrdtDocument/u
+    );
+    expect(source).toContain("const rasterActorId = studioAuthUserId");
+    expect(source).toMatch(
+      /STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*&&\s*rasterWorkId\s*&&\s*rasterDocument\s*&&\s*rasterRuntime\s*&&\s*rasterActorId/u
     );
     expect(source).toMatch(
       /STUDIO_AUTOMATIC_RASTER_PUBLICATION_ENABLED\s*&&\s*!masterEditMode/u
