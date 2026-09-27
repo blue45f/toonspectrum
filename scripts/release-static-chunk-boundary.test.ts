@@ -24,7 +24,14 @@ describe("release static chunk isolation", () => {
   });
   it("keeps grouped contracts free of runtime imports and dynamic dependencies", () => {
     for (const leaf of [...leaves, ...metadataLeaves, "render/studio-engine-failure-policy", "contracts/studio-live-lock-resource"]) {
-      const file = `apps/web/src/domains/creator/${leaf}.ts`;
+      let file = `apps/web/src/domains/creator/${leaf}.ts`;
+      if (leaf === "contracts/studio-live-lock-resource") {
+        // 웹 호환 파일은 이 단일 re-export만 허용하고 순수성은 실제 패키지 소스에서 검사한다.
+        expect(readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").trim()).toBe(
+          'export * from "@toonstudio/contracts/studio-live-lock-resource";',
+        );
+        file = "packages/contracts/src/studio-live-lock-resource.ts";
+      }
       const output = ts.transpileModule(readFileSync(file, "utf8"), {
         compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
       }).outputText;
