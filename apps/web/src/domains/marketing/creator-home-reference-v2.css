@@ -1,0 +1,152 @@
+/* Reference v2: the creator dashboard is intentionally composed like the supplied concept board. */
+.creator-home .reference-home-dashboard {
+  width: 100%;
+  max-width: none;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0 22px 72px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background:
+    radial-gradient(circle at 18% -12%, rgba(111, 86, 255, .18), transparent 30rem),
+    radial-gradient(circle at 84% 10%, rgba(29, 183, 255, .10), transparent 28rem),
+    linear-gradient(180deg, #070916 0%, #090b19 42%, #060713 100%);
+}
+.creator-home .reference-home-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  min-height: 64px;
+  margin: 0 -22px;
+  padding: 0 24px;
+  background: rgba(6, 8, 19, .82);
+  border-bottom-color: rgba(171, 182, 255, .14);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+.creator-home .reference-home-brand strong { font-size: 20px; }
+.creator-home .reference-home-brand small { font-size: 8px; }
+.creator-home .reference-home-topbar nav a {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 11px;
+  font-size: 11px;
+  font-weight: 650;
+}
+.creator-home .reference-home-topbar nav a:nth-child(1),
+.creator-home .reference-home-topbar nav a:nth-child(2) { color: #fff; }
+.creator-home .reference-home-topbar nav a:nth-child(1)::before { content: "⌂"; opacity: .8; }
+.creator-home .reference-home-topbar nav a:nth-child(2)::before { content: "▣"; opacity: .8; }
+.creator-home .reference-home-actions button { width: 34px; height: 34px; }
+.creator-home .reference-home-new { min-height: 38px; font-size: 11px; }
+
+.creator-home .reference-home-hero {
+  grid-template-columns: minmax(420px, .9fr) minmax(0, 1.1fr);
+  align-items: stretch;
+  gap: 20px;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 32px 0 24px;
+}
+.creator-home .reference-home-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 18px 12px 12px 8px;
+}
+.creator-home .reference-home-display-title {
+  max-width: 640px;
+  margin: 17px 0 13px !important;
+  font-size: clamp(46px, 4.7vw, 74px) !important;
+  line-height: .98 !important;
+  letter-spacing: -.075em !important;
+}
+.creator-home .reference-home-display-title em {
+  background: linear-gradient(90deg, #d6c4ff 0%, #9d83ff 42%, #5c7dff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.creator-home .reference-home-lead { max-width: 570px; font-size: 13px; }
+.creator-home .reference-home-search {
+  max-width: 610px;
+  min-height: 49px;
+  margin: 21px 0 16px;
+}
+.creator-home .reference-home-quick-grid { max-width: 610px; gap: 8px; }
+.creator-home .reference-home-quick {
+  min-height: 130px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(20, 24, 48, .92), rgba(13, 16, 34, .96));
+}
+.creator-home .reference-home-ai-note { max-width: 610px; margin-top: 13px; }
+
+.creator-home .reference-home-editor {
+  min-height: 0;
+  border-radius: 18px;
+  border-color: rgba(181, 188, 255, .18);
+  background: #080b18;
+  box-shadow: 0 35px 90px rgba(0, 0, 0, .42), inset 0 1px rgba(255, 255, 255, .04);
+}
+.creator-home .reference-editor-heading { min-height: 46px; font-size: 10px; }
+.creator-home .reference-editor-body { min-height: 430px; grid-template-columns: 42px minmax(0, 1fr) 142px; }
+.creator-home .reference-editor-body > aside { gap: 22px; padding-top: 20px; }
+.creator-home .reference-editor-canvas { padding: 12px; }
+.creator-home .reference-editor-inspector { padding: 14px 11px; }
+.creator-home .reference-editor-inspector > div { padding: 9px 5px; }
+.creator-home .reference-editor-strip { min-height: 67px; padding: 10px; }
+.creator-home .reference-editor-thumb { width: 76px; height: 48px; }
+.creator-home .reference-editor-caption { min-height: 43px; padding: 13px 15px; font-size: 11px; }
+
+.creator-home .reference-home-projects,
+.creator-home .reference-home-modules {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding-left: 0;
+  padding-right: 0;
+}
+.creator-home .reference-home-projects { padding-top: 24px; }
+.creator-home .reference-home-section-title { margin-bottom: 13px; }
+.creator-home .reference-home-section-title h2 { font-size: 22px !important; }
+.creator-home .reference-project-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.creator-home .reference-project-grid > a { min-height: 151px; padding: 7px; }
+.creator-home .reference-project-media { height: 105px; }
+.creator-home .reference-project-grid strong { font-size: 10px; }
+.creator-home .reference-project-grid small { font-size: 8px; }
+.creator-home .reference-home-modules { padding-top: 28px; }
+.creator-home .reference-module-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.creator-home .reference-module { min-height: 208px; border-radius: 14px; }
+.creator-home .reference-module-art { height: 112px; }
+.creator-home .reference-module-body { padding: 12px 13px; }
+.creator-home .reference-module-body h3 { font-size: 14px; }
+.creator-home .reference-module-body p { font-size: 8.5px; }
+
+@media (max-width: 1180px) {
+  .creator-home .reference-home-hero { grid-template-columns: 1fr; max-width: 1000px; }
+  .creator-home .reference-home-copy { padding: 20px 4px 4px; }
+  .creator-home .reference-home-editor { min-height: 0; }
+  .creator-home .reference-project-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .creator-home .reference-module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .creator-home .reference-home-dashboard { padding: 0 12px 44px; }
+  .creator-home .reference-home-topbar { margin: 0 -12px; padding: 0 14px; min-height: 58px; }
+  .creator-home .reference-home-topbar nav { display: none; }
+  .creator-home .reference-home-hero { gap: 14px; padding: 19px 0 16px; }
+  .creator-home .reference-home-copy { padding: 8px 2px 2px; }
+  .creator-home .reference-home-display-title { font-size: clamp(38px, 11vw, 54px) !important; }
+  .creator-home .reference-home-lead { font-size: 12px; }
+  .creator-home .reference-home-quick-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .creator-home .reference-home-quick:last-child { grid-column: auto; }
+  .creator-home .reference-home-editor { border-radius: 13px; }
+  .creator-home .reference-editor-body { grid-template-columns: 32px minmax(0, 1fr); min-height: 300px; }
+  .creator-home .reference-editor-inspector { display: none; }
+  .creator-home .reference-editor-thumb { width: 60px; height: 40px; }
+  .creator-home .reference-project-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .creator-home .reference-module-grid { grid-template-columns: 1fr; }
+}
+.creator-home .reference-home-search span { color: #626a88; }
+.creator-home .reference-editor-inspector > span { color: #8e98bc; }
