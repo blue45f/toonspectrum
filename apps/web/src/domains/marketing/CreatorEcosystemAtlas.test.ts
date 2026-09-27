@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -31,6 +32,26 @@ describe("생태계 아틀라스 모듈 그리드", () => {
     expect(new Set(positions).size).toBe(positions.length);
     for (const module of MODULES) {
       expect(module.position).toMatch(/^\d+% \d+%$/u);
+    }
+  });
+
+  it("8개 모듈이 8개의 서로 다른 원본 아트를 쓴다", () => {
+    const images = MODULES.map((module) => module.image);
+    expect(new Set(images).size).toBe(images.length);
+  });
+
+  it("이전까지 코드 참조가 없던 시네마틱 아트를 제품 화면에 편입한다", () => {
+    const images = MODULES.map((module) => module.image);
+    for (const orphan of ["/brand/toonstudio-route-header-0.jpg", "/brand/toonstudio-route-header-6.jpg", "/brand/toonstudio-route-header-12.jpg", "/brand/toonstudio-route-header-18.jpg"]) {
+      expect(images).toContain(orphan);
+    }
+  });
+
+  it("선언한 원본 크기와 실제 파일의 크기가 어긋나지 않는다", () => {
+    for (const module of MODULES) {
+      const out = execFileSync("sips", ["-g", "pixelWidth", "-g", "pixelHeight", `apps/web/public${module.image}`], { encoding: "utf8" });
+      expect(out).toContain(`pixelWidth: ${module.width}`);
+      expect(out).toContain(`pixelHeight: ${module.height}`);
     }
   });
 

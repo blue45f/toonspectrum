@@ -4,12 +4,18 @@ import { Binoculars, BookOpen, Compass, Layers, PackageCheck, Sparkles, Store, U
  * 모듈 tint와 아트 tint는 하드코딩하지 않고 기존 시맨틱 토큰에서 유도한다.
  * DESIGN.md가 장식 맥락의 임의 hue를 금지하므로 토큰 파생이어야 warm-ink 축이 유지된다.
  * 아트는 저장소에 이미 커밋된 브랜드 콘셉트이며 AI 제작 사실을 화면에 명시한다.
+ *
+ * 8개 모듈이 8개의 서로 다른 원본 파일을 쓰도록 골랐다. 이전 커밋은 아틀리에 3종만
+ * 크롭으로 반복해 같은 그림처럼 보였다. `toonstudio-route-header-*.jpg` 4장은 이전까지
+ * 코드 참조가 0건이었는데 여기서 제품 화면에 들어간다.
  */
 export interface AtlasModule {
   readonly icon: LucideIcon;
   readonly href: string;
   readonly image: string;
-  /** 같은 원본을 다른 크롭으로 잘라 3개의 파일이 8개의 서로 다른 그림처럼 읽히게 한다. */
+  readonly width: number;
+  readonly height: number;
+  /** 시선을 유도할 크롭. 종횡비가 다른 원본에서도 패널 중앙에 오도록 조정한다. */
   readonly position: string;
   readonly span: "wide" | "normal";
   readonly titleKo: string;
@@ -23,8 +29,10 @@ export const ECOSYSTEM_MODULES = [
   {
     icon: Compass,
     href: "/explore",
-    image: "/brand/atelier-world.webp",
-    position: "50% 42%",
+    image: "/brand/toonstudio-route-header-0.jpg",
+    width: 1920,
+    height: 768,
+    position: "50% 46%",
     span: "wide",
     titleKo: "탐색",
     titleEn: "Explore",
@@ -35,8 +43,10 @@ export const ECOSYSTEM_MODULES = [
   {
     icon: Binoculars,
     href: "/research",
-    image: "/brand/atelier-materials.webp",
-    position: "18% 46%",
+    image: "/brand/toonstudio-route-header-6.jpg",
+    width: 1920,
+    height: 768,
+    position: "38% 44%",
     span: "normal",
     titleKo: "리서치",
     titleEn: "Research",
@@ -47,8 +57,10 @@ export const ECOSYSTEM_MODULES = [
   {
     icon: BookOpen,
     href: "/learn",
-    image: "/brand/atelier-process.webp",
-    position: "62% 38%",
+    image: "/brand/toonstudio-route-header-12.jpg",
+    width: 1920,
+    height: 768,
+    position: "62% 50%",
     span: "normal",
     titleKo: "배우기",
     titleEn: "Learn",
@@ -59,8 +71,10 @@ export const ECOSYSTEM_MODULES = [
   {
     icon: Store,
     href: "/market",
-    image: "/brand/atelier-materials.webp",
-    position: "72% 68%",
+    image: "/brand/toonstudio-route-header-18.jpg",
+    width: 1920,
+    height: 768,
+    position: "44% 42%",
     span: "normal",
     titleKo: "창작 마켓",
     titleEn: "Market",
@@ -72,6 +86,8 @@ export const ECOSYSTEM_MODULES = [
     icon: Layers,
     href: "/story-lab",
     image: "/brand/atelier-process.webp",
+    width: 1536,
+    height: 1024,
     position: "26% 60%",
     span: "normal",
     titleKo: "스토리 랩",
@@ -84,6 +100,8 @@ export const ECOSYSTEM_MODULES = [
     icon: Sparkles,
     href: "/settings/ai",
     image: "/brand/atelier-20260927/creation-world.webp",
+    width: 1586,
+    height: 992,
     position: "38% 55%",
     span: "normal",
     titleKo: "AI 크리에이티브 디렉터",
@@ -96,6 +114,8 @@ export const ECOSYSTEM_MODULES = [
     icon: Users,
     href: "/collaborate",
     image: "/brand/atelier-world.webp",
+    width: 1536,
+    height: 1024,
     position: "82% 30%",
     span: "normal",
     titleKo: "함께 만들기",
@@ -108,6 +128,8 @@ export const ECOSYSTEM_MODULES = [
     icon: PackageCheck,
     href: "/studio",
     image: "/brand/atelier-materials.webp",
+    width: 1536,
+    height: 1024,
     position: "52% 78%",
     span: "wide",
     titleKo: "내 프로젝트",
