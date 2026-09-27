@@ -278,3 +278,29 @@ test("fails when a production operating contract was not emitted", async () => {
     await assert.rejects(stageApiWorkspaceRuntime(root), /packages\/contracts\/src\/production-workspace\.js/u);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+
+test("API가 소비하지 않는 Web 포함 Core 루트는 강제 emit하지 않고 누락된 실제 루트 참조는 거부한다", async () => {
+  const root = await mkdtemp(join(tmpdir(), "toonstudio-api-core-subpaths-"));
+  try {
+    await compiledProductionContracts(root);
+    const entries = [
+      "packages/contracts/src/security/csrf.js",
+      ...["creator-role", "creator-resources", "infrastructure-fabric", "production/index"].map((name) => `packages/core/src/${name}.js`),
+      "packages/studio-project-model/src/index.js",
+      "packages/studio-format-gateway/src/index.js",
+      ...["work-session", "work-session-evidence", "pinned-review-share", "review-delivery", "review-voice-note", "world-publication", "world-acoustic", "world-conversation"].map((name) => `packages/studio-project-model/src/graph/${name}.js`),
+    ];
+    for (const entry of entries) await compiledPackage(root, entry, "module.exports = { ready: true };\n");
+    const caller = await compiledPackage(root, "apps/api/src/main.js", 'module.exports = require("@toonstudio/core/creator-role");\n');
+    await stageApiWorkspaceRuntime(root);
+    const core = JSON.parse(await readFile(resolve(root, "node_modules/@toonstudio/core/package.json"), "utf8"));
+    assert.equal("main" in core, false);
+    assert.equal("." in core.exports, false);
+    assert.equal(core.exports["./creator-role"], "./creator-role.js");
+    assert.deepEqual(createRequire(caller)("@toonstudio/core/creator-role"), { ready: true });
+    assert.ok(verifyCompiledApiImports(root).importsChecked > 0);
+    await writeFile(caller, 'require("@toonstudio/core");\n');
+    assert.throws(() => verifyCompiledApiImports(root), /@toonstudio\/core cannot resolve/u);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

@@ -30,9 +30,7 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
     name: "@toonstudio/core",
     sourceManifest: new URL("../packages/core/package.json", import.meta.url),
     compiledDirectory: "packages/core",
-    compiledEntry: "packages/core/src/index.js",
     exports: {
-      ".": "./index.js",
       "./creator-role": "./creator-role.js",
       "./creator-resources": "./creator-resources.js",
       "./infrastructure-fabric": "./infrastructure-fabric.js",
@@ -152,7 +150,7 @@ export async function stageApiWorkspaceRuntime(
       `${JSON.stringify({
         name: definition.name,
         private: true,
-        ...(compiledEntry ? { main: "./index.js" } : {}),
+        ...((compiledEntry || exports?.["."]) ? { main: "./index.js" } : {}),
         ...(exports ? { exports } : {}),
       }, null, 2)}\n`,
       "utf8",
