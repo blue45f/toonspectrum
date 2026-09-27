@@ -4,7 +4,7 @@
 import { SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { useState } from "react";
 
-import { useStudio3dVisualViewport } from "../useStudio3dVisualViewport";
+import { useStudio3dVisualViewport } from "../studio-3d-ui/useStudio3dVisualViewport";
 import "./studio-bg3d-mobile-workspace.css";
 
 import type { RefObject } from "react";

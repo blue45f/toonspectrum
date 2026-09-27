@@ -5,9 +5,9 @@ import { Layers2, Scissors, Shapes, Triangle } from "lucide-react";
 import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { CHARACTER_SLOT_METAS } from "./character-shaper/character-shaper-catalog";
-import { CHARACTER_SLOT_KINDS } from "./character-shaper/character-shaper-contract";
-import { CHARACTER_SHAPER_ICON_REGISTRY, characterShaperSlotIcon } from "./character-shaper/character-shaper-ui-model";
+import { CHARACTER_SLOT_METAS } from "../character-shaper/character-shaper-catalog";
+import { CHARACTER_SLOT_KINDS } from "../character-shaper/character-shaper-contract";
+import { CHARACTER_SHAPER_ICON_REGISTRY, characterShaperSlotIcon } from "../character-shaper/character-shaper-ui-model";
 import { STUDIO_3D_TOOL_ICON_NAMES, STUDIO_3D_TOOL_ICONS } from "./studio-3d-tool-icon-registry";
 import { Studio3dToolIcon } from "./Studio3dToolIcon";
 

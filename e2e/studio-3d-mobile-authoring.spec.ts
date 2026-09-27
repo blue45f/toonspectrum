@@ -27,7 +27,7 @@ async function openCharacter(page: Page): Promise<Locator> {
   await page.goto("/studio/character", { waitUntil: "domcontentloaded" });
   const root = page.locator(ROOT);
   await expect(root).toBeVisible({ timeout: 150_000 });
-  await expect(root.getByRole("button", { name: "전신", exact: true })).toBeEnabled({ timeout: 120_000 });
+  await expect(root.getByRole("button", { name: "캔버스에 추가", exact: true })).toBeEnabled({ timeout: 120_000 });
   return root;
 }
 
@@ -63,6 +63,10 @@ test("실제 캐릭터와 핵심 조작이 화면 안에서 겹치지 않고 도
   }
   const more = root.getByRole("button", { name: "내보내기 더 보기", exact: true });
   if (await more.count()) await assertUsableControl(more);
+  if (await root.getAttribute("data-character-shaper-landscape") === "true") {
+    await activate(root.getByRole("button", { name: "편집 도구 펼치기", exact: true }), info);
+    await activate(root.getByRole("tab", { name: "보기", exact: true }), info);
+  }
   await activate(root.getByRole("button", { name: "전신", exact: true }), info);
   await expect(root.getByRole("button", { name: "전신", exact: true })).toHaveAttribute("aria-pressed", "true");
   await activate(root.getByRole("button", { name: "확대", exact: true }), info);

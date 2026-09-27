@@ -14,12 +14,13 @@ import { createPortal } from "react-dom";
 
 import { STUDIO_FOCUS_RING, StudioEmptyState } from "../studio-panel-ui";
 import { StudioVrmPoserViewport } from "../vrm/StudioVrmPoserViewport";
-import { useStudio3dVisualViewport } from "../useStudio3dVisualViewport";
+import { useStudio3dVisualViewport } from "../studio-3d-ui/useStudio3dVisualViewport";
 import "./studio-character-shaper-workspace.css";
 
 import {
   CHARACTER_SHAPER_DESKTOP_QUERY,
   CHARACTER_SHAPER_TABLET_QUERY,
+  CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY,
   CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY,
   createCharacterShaperUiState,
   isCharacterShaperTypingTarget,
@@ -89,8 +90,9 @@ export function StudioCharacterShaperDialog({ h, binding, onOpenAdvanced }: Stud
   const isDesktop = useMediaQuery(CHARACTER_SHAPER_DESKTOP_QUERY);
   const isTablet = useMediaQuery(CHARACTER_SHAPER_TABLET_QUERY);
   const touchLandscape = useMediaQuery(CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY);
-  const layout: CharacterShaperLayout = touchLandscape ? "mobile" : isDesktop ? "desktop" : isTablet ? "tablet" : "mobile";
-  const [ui, dispatch] = useReducer(reduceCharacterShaperUiState, undefined, () => createCharacterShaperUiState({ mobileSheet: isTablet && !touchLandscape ? "half" : "collapsed" }));
+  const touchPortrait = useMediaQuery(CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY);
+  const layout: CharacterShaperLayout = touchLandscape || touchPortrait ? "mobile" : isDesktop ? "desktop" : isTablet ? "tablet" : "mobile";
+  const [ui, dispatch] = useReducer(reduceCharacterShaperUiState, undefined, () => createCharacterShaperUiState({ mobileSheet: layout === "mobile" ? "collapsed" : "half" }));
   const [outputFraming, setOutputFraming] = useState(DEFAULT_CHARACTER_OUTPUT_FRAMING);
   const previousSheetRef = useRef<"half" | "full">("half");
   const [mobileTab, setMobileTab] = useState<MobileSheetTab>("shelf");

@@ -258,11 +258,12 @@ describe("StudioVrmPhotoPoseScanner", () => {
 });
 
 describe("사진 포즈 접근성", () => {
-  it("사진 판독 실패를 보조기기에 알린다", async () => {
+  it("내부 판독 오류를 사용자용 오류로 변환해 보조기기에 알린다", async () => {
     scannerRuntimeMocks.detector.detect.mockImplementationOnce(() => { throw new Error("사진 판독 실패"); });
     const file = new File([new Uint8Array([1])], "invalid-pose.png", { type: "image/png" });
     const view = render(<StudioVrmPhotoPoseScanner includeHandDetection={false} handoff={{ file, token: 1 }} onApply={() => true} />);
-    await waitFor(() => expect(view.getByRole("alert").textContent).toContain("사진 판독 실패"));
+    await waitFor(() => expect(view.getByRole("alert").textContent).toBe("사진에서 포즈를 분석하지 못했습니다."));
+    expect(view.getByRole("alert").textContent).not.toContain("사진 판독 실패");
   });
 
   it("적용 범위는 44px 조작 영역과 방향키·Home·End 탐색을 제공한다", async () => {

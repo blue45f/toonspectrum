@@ -53,7 +53,7 @@ import {
   WandSparkles,
 } from "lucide-react";
 
-import { STUDIO_3D_TOOL_ICONS } from "../studio-3d-tool-icon-registry";
+import { STUDIO_3D_TOOL_ICONS } from "../studio-3d-ui/studio-3d-tool-icon-registry";
 
 import { CHARACTER_MULTI_SLOT_KINDS, CHARACTER_SLOT_KINDS } from "./character-shaper-contract";
 
@@ -80,6 +80,8 @@ export const CHARACTER_SHAPER_DESKTOP_QUERY = `(min-width: ${CHARACTER_SHAPER_BR
 export const CHARACTER_SHAPER_TABLET_QUERY = `(min-width: ${CHARACTER_SHAPER_BREAKPOINTS.tablet}px)`;
 /** 짧은 터치 가로 화면에서는 폭과 관계없이 모델 중심 모바일 작업면을 쓴다. */
 export const CHARACTER_SHAPER_TOUCH_LANDSCAPE_QUERY = "(pointer: coarse) and (orientation: landscape) and (min-width: 600px) and (max-height: 500px)";
+
+export const CHARACTER_SHAPER_TOUCH_PORTRAIT_QUERY = "(pointer: coarse) and (orientation: portrait) and (max-width: 1023px)";
 
 export type CharacterShaperLayout = "desktop" | "tablet" | "mobile";
 

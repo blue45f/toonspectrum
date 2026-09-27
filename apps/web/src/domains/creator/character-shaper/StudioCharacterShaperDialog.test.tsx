@@ -259,9 +259,11 @@ function makeHost(overrides: Record<string, unknown> = {}): StudioVrmPoserHost {
 function installMatchMedia(width: number, height = 900, coarse = false) {
   vi.stubGlobal("matchMedia", (query: string) => {
     const match = /\(min-width:\s*(\d+)px\)/u.exec(query);
-    const matches = query.includes("pointer: coarse")
-      ? coarse && width >= 600 && width > height && height <= 500
-      : match ? width >= Number(match[1]) : false;
+    const matches = query.includes("orientation: portrait")
+      ? coarse && height >= width && width <= 1023
+      : query.includes("pointer: coarse")
+        ? coarse && width >= 600 && width > height && height <= 500
+        : match ? width >= Number(match[1]) : false;
     return {
       matches,
       media: query,
@@ -325,6 +327,16 @@ afterEach(() => {
 });
 
 describe("StudioCharacterShaperDialog shell", () => {
+  it.each([[768, 1024], [820, 1180]])("세로 터치 태블릿 %sx%s는 검사 패널이 카메라를 덮지 않는다", (width, height) => {
+    const { h } = renderDialog({ width, height, coarse: true });
+    expect(dialogRoot()?.getAttribute("data-character-shaper-layout")).toBe("mobile");
+    expect(document.querySelector('[data-character-shaper-sheet="collapsed"]')).toBeTruthy();
+    expect(document.querySelector('[data-character-shaper-inspector="slide-over"]')).toBeNull();
+    expect(screen.getByTestId("dock").getAttribute("data-compact")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "전신" }));
+    expect(h.setActiveCameraId).toHaveBeenCalledWith("fullBody");
+  });
+
   it.each([320, 360, 390, 412])("세로 %spx에서 필터를 접은 프리셋을 연다", (width) => {
     renderDialog({ width, height: 800, coarse: true });
     fireEvent.click(screen.getByRole("tab", { name: "프리셋" }));
@@ -362,7 +374,7 @@ describe("StudioCharacterShaperDialog shell", () => {
     expect(screen.queryByRole("tab", { name: "보기" })).toBeNull();
   });
 
-  it.each([[768, 1024, true, "tablet"], [1280, 800, false, "desktop"]] as const)("%sx%s의 기존 %s 입력 레이아웃을 보존한다", (width, height, coarse, expected) => {
+  it.each([[768, 1024, false, "tablet"], [1280, 800, false, "desktop"]] as const)("%sx%s의 기존 %s 입력 레이아웃을 보존한다", (width, height, coarse, expected) => {
     renderDialog({ width, height, coarse });
     expect(dialogRoot()?.getAttribute("data-character-shaper-layout")).toBe(expected);
     expect(dialogRoot()?.hasAttribute("data-character-shaper-landscape")).toBe(false);
