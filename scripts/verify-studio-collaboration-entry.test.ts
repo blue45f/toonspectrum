@@ -51,8 +51,13 @@ describe("collaboration browser entry contract", () => {
     expect(source).toContain("page.locator('[data-studio-beta-notice=\"true\"]')");
   });
 
-  it("문서 준비 대기에서 지연 시작 안내를 닫는 helper를 사용한다", () => {
-    expect(source).toContain("await waitForStudioCollaborationDocumentLane(page, READY_PHASES)");
+  it("문서 준비 helper로 늦은 안내를 닫고 보이는 dock의 허용 phase를 요구한다", () => {
+    const readiness = source.slice(source.indexOf("async function waitForDocumentLane("),
+      source.indexOf("async function enableBrushTool("));
+    expect(readiness).toContain("await waitForStudioCollaborationDocumentLane(page, READY_PHASES)");
+    expect(readiness).toContain("READY_PHASES.has(phase)");
+    expect(source).toContain('name: "시작 안내 닫기", exact: true }).click({ timeout: 2_000 });');
+    expect(source).toContain('await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 });');
   });
 
   it("captures the failed page location and screenshot for future navigation regressions", () => {
