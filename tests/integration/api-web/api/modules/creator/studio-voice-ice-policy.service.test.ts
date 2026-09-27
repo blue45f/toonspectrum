@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, webcrypto } from "node:crypto";
 
 import {
   ForbiddenException,
@@ -117,7 +117,7 @@ describe("Studio voice ICE configuration", () => {
 });
 
 describe("Studio voice ICE credential issuance", () => {
-  it("issues coturn REST-compatible, opaque, expiring credentials", () => {
+  it("issues coturn REST-compatible, opaque, expiring credentials", async () => {
     const nowMs = Date.parse("2026-07-18T08:00:00.000Z");
     const policy = issueStudioVoiceIcePolicy({
       configuration: configuration({
@@ -151,8 +151,16 @@ describe("Studio voice ICE credential issuance", () => {
     expect(turn?.username).toBe(`1784362200:${opaqueIdentity}`);
     expect(turn?.username).not.toContain("private-user-id");
     expect(turn?.username).not.toContain("private-work-id");
-    // Independent coturn REST HMAC-SHA1 test vector for the fixed username above.
-    expect(turn?.credential).toBe("Sx6lIgQJSISRRXKM/XF1Kvic3o0=");
+    // 현재 toonstudio 접두사의 고정 벡터이며, 별도 Web Crypto 구현으로도 검증한다.
+    expect(turn?.credential).toBe("cDXj28xy8twQQ2qG+9C4Ej8/p30=");
+    const signingKey = await webcrypto.subtle.importKey(
+      "raw", new TextEncoder().encode(TURN_SECRET),
+      { name: "HMAC", hash: "SHA-1" }, false, ["sign"],
+    );
+    const independentSignature = await webcrypto.subtle.sign(
+      "HMAC", signingKey, new TextEncoder().encode(`1784362200:${opaqueIdentity}`),
+    );
+    expect(turn?.credential).toBe(Buffer.from(independentSignature).toString("base64"));
   });
 
   it("returns explicit direct or STUN-only policies when relay is optional", () => {

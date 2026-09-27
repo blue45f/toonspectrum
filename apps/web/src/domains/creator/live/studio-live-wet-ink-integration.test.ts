@@ -5,6 +5,11 @@ import { describe, expect, it } from "vitest";
 import { readStudioCuttoonEditorSource } from "../studio-cuttoon-editor/read-studio-cuttoon-editor-source";
 
 const studioPageSource = readStudioCuttoonEditorSource();
+// 시작 권위는 분리된 모듈에서, 후속 포인터/페이지 수명주기는 실제 편집기에서 검증한다.
+const liveSurfaceStartSource = readFileSync(
+  new URL("../studio-cuttoon-editor/studio-live-surface-start.ts", import.meta.url),
+  "utf8",
+);
 const viewportSource = readFileSync(
   new URL("../canvas/StudioCanvasViewport.tsx", import.meta.url),
   "utf8",
@@ -46,9 +51,11 @@ describe("live wet-ink product boundary", () => {
   });
 
   it("owns begin/append/end and every destructive pointer/page lifecycle explicitly", () => {
-    expect(studioPageSource).toContain(
+    expect(liveSurfaceStartSource).toContain(
       "liveWetInkOverlayRendererRef.current.begin(next",
     );
+    expect(studioPageSource).toContain("beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({");
+    expect(studioPageSource).toContain("beginStudioDrawLiveSurfaces(");
     expect(studioPageSource).toContain(
       "renderer.appendFrom(next,",
     );
@@ -94,9 +101,11 @@ describe("live wet-ink product boundary", () => {
   });
 
   it("requires wet-ink seal before commit and never settles a rejected/unavailable operation", () => {
-    const beginStart = studioPageSource.indexOf("const wetInkOverlayStarted =");
-    const beginEnd = studioPageSource.indexOf("const retainedMediaDirect =", beginStart);
-    const begin = studioPageSource.slice(beginStart, beginEnd);
+    const beginStart = liveSurfaceStartSource.indexOf("const wetInkOverlayStarted =");
+    const beginEnd = liveSurfaceStartSource.indexOf("const retainedMediaDirect =", beginStart);
+    expect(beginStart).toBeGreaterThanOrEqual(0);
+    expect(beginEnd).toBeGreaterThan(beginStart);
+    const begin = liveSurfaceStartSource.slice(beginStart, beginEnd);
     expect(begin).toContain("if ((selectedMedia.kind === \"wet\") && !wetInkOverlayStarted)");
     expect(begin).toContain('return rejectSelectedSurface("습식 매체"');
 
@@ -110,7 +119,11 @@ describe("live wet-ink product boundary", () => {
     );
     const discard = finish.indexOf("discardDrawingPointerSession();", sealGuard);
     const deferredCommit = finish.indexOf("queueDeferredStrokeCommit(finished)", seal);
-    const immediateCommit = finish.indexOf("commit([...baseElements, finished])", seal);
+    const immediateCommit = finish.indexOf("commit(committedElements, undefined, activePage.id)", seal);
+    const mergeCompleted = finish.indexOf("const completedStrokes = [...(merged?.strokes ?? []), finished]", seal);
+    expect(mergeCompleted).toBeGreaterThan(discard);
+    expect(immediateCommit).toBeGreaterThan(mergeCompleted);
+    expect(finish.slice(mergeCompleted, immediateCommit)).toContain("mergeStudioPendingStrokeElements(");
 
     expect(seal).toBeGreaterThan(0);
     expect(sealGuard).toBeGreaterThan(seal);

@@ -12,16 +12,20 @@ function source(file: string): string {
 
 describe("Google Ink mesh actual /studio product wiring", () => {
   const page = source("../StudioCuttoonEditorHost.tsx");
+  // 시작 경로는 전용 모듈로 분리되었지만 편집기 호스트의 연결과 호출 순서를 함께 검증한다.
+  const start = source("../studio-cuttoon-editor/studio-live-surface-start.ts");
   const viewport = readStudioCanvasViewportStack(import.meta.url, "../canvas/");
   const host = source("../StudioInkMeshLivePreviewHost.tsx");
   const runtime = source("./studio-ink-mesh-live-preview.ts");
 
   it("starts from the existing pointerdown live-ink admission without changing its owner route", () => {
-    expect(page).toContain("armTransientPenInkSurfaces({");
-    expect(page).toContain("inkMeshLivePreviewRuntimeRef.current?.begin(");
-    expect(page.indexOf("armTransientPenInkSurfaces({"))
-      .toBeLessThan(page.indexOf("inkMeshLivePreviewRuntimeRef.current?.begin("));
-    expect(page).toContain("liveInkAdmitted: liveInkOverlayStarted");
+    expect(page).toContain('from "./studio-cuttoon-editor/studio-live-surface-start"');
+    expect(page).toContain("beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({");
+    expect(start).toContain("armTransientPenInkSurfaces({");
+    expect(start).toContain("inkMeshLivePreviewRuntimeRef.current?.begin(");
+    expect(start.indexOf("armTransientPenInkSurfaces({"))
+      .toBeLessThan(start.indexOf("inkMeshLivePreviewRuntimeRef.current?.begin("));
+    expect(start).toContain("liveInkAdmitted: liveInkOverlayStarted");
     expect(runtime).toContain("retainedPixelAuthority: \"canvas2d-perfect-freehand\"");
   });
 
@@ -57,7 +61,7 @@ describe("Google Ink mesh actual /studio product wiring", () => {
     expect(host).not.toMatch(/from\s+["']\.\/studio-ink-mesh-live-preview["']/u);
     expect(loader).toContain('import("./studio-ink-mesh-live-preview")');
     expect(page).toContain("void loadStudioInkMeshLivePreviewModule()");
-    expect(page).toContain("inkMeshLivePreviewRuntimeRef.current?.begin(");
+    expect(start).toContain("inkMeshLivePreviewRuntimeRef.current?.begin(");
     expect(page).toContain("inkMeshLivePreviewRuntime={inkMeshLivePreviewRuntime}");
     expect(viewport).toContain("webGpuViewportSurface && inkMeshLivePreviewRuntime");
   });

@@ -34,6 +34,11 @@ import {
   STUDIO_BETA_NOTICE_STORAGE_KEY,
 } from "../apps/web/src/domains/creator/studio-beta-notice-storage";
 
+import { waitForStudioDrawingReady } from "./lib/studio-drawing-readiness";
+import {
+  measureStudioFilterResponsiveLayout, studioFilterResponsiveLayoutIssues,
+  type StudioFilterResponsiveLayout,
+} from "./lib/studio-filter-responsive-layout";
 import { readDurableStudioAutosaveDocument, type StudioDurableAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
 import { isOptionalStudioPreviewApiError } from "./lib/studio-verify-preview-errors.mjs";
@@ -124,6 +129,7 @@ interface FilterCaseResult {
   diff: PixelDiff | null;
   undoDiff: PixelDiff | null;
   persistedUndoRestored?: boolean;
+  responsiveViewports?: StudioFilterResponsiveLayout[];
   failure?: string;
 }
 
@@ -166,20 +172,6 @@ function collectBrowserErrors(
     const message = `${response.status()} ${response.url()}`;
     if (!isOptionalStudioPreviewApiError(message, previewUrl)) collector.failedResponses.push(message);
   });
-}
-
-async function dismissTransientChrome(page: Page): Promise<void> {
-  for (const text of ["나중에", "닫기", "예시로 시작", "빈 캔버스", "확인"]) {
-    try {
-      const el = page.getByRole("button", { name: text }).first();
-      if (await el.isVisible({ timeout: 250 })) {
-        await el.click({ timeout: 600 });
-        await page.waitForTimeout(150);
-      }
-    } catch {
-      /* optional chrome */
-    }
-  }
 }
 
 async function activatePenAndDraw(page: Page): Promise<void> {
@@ -531,7 +523,7 @@ async function main(): Promise<void> {
       state: "visible",
       timeout: 30_000,
     });
-    await dismissTransientChrome(page);
+    await waitForStudioDrawingReady(page, { requireWelcome: true });
 
     await activatePenAndDraw(page);
     const originalDocument = await waitForSavedPages(page, (document) =>
@@ -870,6 +862,66 @@ async function main(): Promise<void> {
         log(`선택 이미지 직접 적용: FAILED — ${result.failure}`);
         await page.keyboard.press("Escape").catch(() => undefined);
         await page.waitForTimeout(300);
+      }
+    }
+
+    // 원고 픽셀 검증과 별도로 실제 열린 필터 창의 방향 전환·테마별 실행 영역을 검사한다.
+    {
+      const result: FilterCaseResult = {
+        label: "필터 창 반응형 실행 영역", group: "responsive", ok: false,
+        openMs: null, applyMs: null, target: null, diff: null, undoDiff: null, responsiveViewports: [],
+      };
+      results.push(result);
+      const originalTheme = await page.evaluate(() => ({
+        theme: document.documentElement.dataset.theme ?? "dark",
+        designTheme: document.documentElement.dataset.designTheme ?? "dark",
+        contrast: document.documentElement.dataset.contrast ?? "standard",
+        colorScheme: document.documentElement.style.colorScheme,
+      }));
+      try {
+        await openMainMenuGroup(page, "효과");
+        await clickEnabledMenuItem(page, "가우시안 블러");
+        const dialog = filterDialog(page);
+        await dialog.waitFor({ state: "visible", timeout: 45_000 });
+        for (const theme of ["dark", "light", "contrast"]) {
+          // 테마 저장과 권한은 건드리지 않고 제품 테마 적용기가 사용하는 CSS 속성만 측정한다.
+          await page.evaluate((value) => {
+            const root = document.documentElement;
+            root.dataset.theme = value === "light" ? "light" : "dark";
+            root.dataset.designTheme = value;
+            root.dataset.contrast = value === "contrast" ? "more" : "standard";
+            root.style.colorScheme = value === "light" ? "light" : "dark";
+          }, theme);
+          for (const [width, height] of [[320, 568], [360, 640], [390, 844], [430, 932],
+            [568, 320], [844, 390], [768, 1024], [1024, 768], [1280, 720], [1440, 900], [1920, 1080]]) {
+            await page.setViewportSize({ width, height });
+            await page.waitForTimeout(200);
+            const measured = await measureStudioFilterResponsiveLayout(page);
+            result.responsiveViewports?.push(measured);
+            const issues = studioFilterResponsiveLayoutIssues(measured);
+            log(`필터 반응형 ${theme} ${width}x${height}: ${issues.length ? issues.join("; ") : "OK"}`);
+            if (issues.length > 0 || width === 568) {
+              await page.screenshot({ path: join(SCRATCH, `studio-filter-responsive-${theme}-${width}x${height}.png`) });
+            }
+          }
+        }
+        invariant(result.responsiveViewports?.length === 33, "11개 화면 크기와 3개 테마가 모두 측정되어야 합니다");
+        const failures = result.responsiveViewports?.flatMap((layout) =>
+          studioFilterResponsiveLayoutIssues(layout).map((issue) => `${layout.theme} ${layout.width}x${layout.height}: ${issue}`)) ?? [];
+        invariant(failures.length === 0, failures.join("\n"));
+        await dialog.getByRole("button", { name: "취소", exact: true }).click();
+        await dialog.waitFor({ state: "hidden" });
+        result.ok = true;
+      } catch (error) {
+        result.failure = error instanceof Error ? error.message : String(error);
+        log(`필터 반응형: FAILED — ${result.failure}`);
+      } finally {
+        await page.evaluate((previous) => {
+          const { colorScheme, ...attributes } = previous;
+          Object.assign(document.documentElement.dataset, attributes);
+          document.documentElement.style.colorScheme = colorScheme;
+        }, originalTheme);
+        await page.setViewportSize({ width: 1440, height: 1100 });
       }
     }
 
