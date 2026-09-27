@@ -181,14 +181,14 @@ export function createStudioManualChunks(predicates: {
       id.endsWith("/src/domains/creator/studio-id.ts")
       || id.endsWith("/src/domains/creator/render/studio-engine-failure-policy.ts")
       || id.endsWith("/src/domains/creator/contracts/studio-live-lock-resource.ts")
+      || id.endsWith("/packages/contracts/src/studio-live-lock-resource.ts")
       || id.endsWith("/src/domains/creator/live/studio-live-local-transport-support.ts")
       || id.endsWith("/src/domains/creator/studio-content-aware-fill-contract.ts")
       || id.endsWith("/src/domains/creator/studio-z-index.ts")
       || id.endsWith("/src/domains/creator/studio-initial-primary-tool.ts")
     ) {
-      // These dependency-free leaves total less than 1 KiB. The initial-tool policy is
-      // already synchronous in workspace restoration; co-locate it instead of paying a
-      // separate startup request. Do not include the preferences repository or any UI.
+      // 의존성이 없는 구현과 잠금 계약의 호환 진입점만 묶는다. 공용 패키지로 옮긴
+      // 잠금 구현도 같은 청크를 사용하며 패키지 전체나 UI를 이 경계에 포함하지 않는다.
       return "studio-tiny-capability-contracts";
     }
     if (

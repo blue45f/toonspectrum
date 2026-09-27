@@ -102,6 +102,7 @@ describe("Studio startup capability chunk boundary", () => {
       "/src/domains/creator/studio-id.ts",
       "/src/domains/creator/render/studio-engine-failure-policy.ts",
       "/src/domains/creator/contracts/studio-live-lock-resource.ts",
+      "/packages/contracts/src/studio-live-lock-resource.ts",
       "/src/domains/creator/live/studio-live-local-transport-support.ts",
       "/src/domains/creator/studio-content-aware-fill-contract.ts",
       "/src/domains/creator/studio-z-index.ts",
@@ -112,7 +113,7 @@ describe("Studio startup capability chunk boundary", () => {
   it.each([
     "apps/web/src/domains/creator/studio-initial-primary-tool.ts",
     "apps/web/src/domains/creator/render/studio-engine-failure-policy.ts",
-    "apps/web/src/domains/creator/contracts/studio-live-lock-resource.ts",
+    "packages/contracts/src/studio-live-lock-resource.ts",
   ])("keeps startup contract %s free from database, panel and engine runtime imports", (file) => {
     const emitted = ts.transpileModule(parseFile(file).text, {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
