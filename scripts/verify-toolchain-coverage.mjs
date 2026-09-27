@@ -102,7 +102,7 @@ function countTypecheckedFiles(project) {
   try {
     stdout = execFileSync(
       "pnpm",
-      ["exec", "tsc", "-p", project, "--listFilesOnly", "--incremental", "false", "--pretty", "false"],
+      ["exec", "tsc", "-p", project, "--listFilesOnly", "--noCheck", "--incremental", "false", "--pretty", "false"],
       { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 },
     );
   } catch (error) {
