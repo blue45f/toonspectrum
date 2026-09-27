@@ -85,8 +85,9 @@ function invariant(condition: boolean, message: string): void {
 async function viewportStats(page: Page): Promise<PixelStats> {
   const shot = await page.locator(`${DIALOG} [data-character-shaper-viewport] canvas`).first().screenshot();
   return page.evaluate(async (encodedPng) => {
-    const response = await fetch(`data:image/png;base64,${encodedPng}`);
-    const bitmap = await createImageBitmap(await response.blob());
+    const binary = atob(encodedPng);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
     const width = Math.min(bitmap.width, 320);
     const height = Math.min(bitmap.height, 240);
     const canvas = new OffscreenCanvas(width, height);
@@ -229,8 +230,9 @@ async function mobileChromeBounds(page: Page, exportOpen: boolean) {
 
 async function downloadedPngStats(page: Page, path: string) {
   return page.evaluate(async (encodedPng) => {
-    const response = await fetch(`data:image/png;base64,${encodedPng}`);
-    const bitmap = await createImageBitmap(await response.blob());
+    const binary = atob(encodedPng);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
     const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
     const context = canvas.getContext("2d");
     if (!context) throw new Error("2D context unavailable");
@@ -257,8 +259,9 @@ async function downloadedPngStats(page: Page, path: string) {
 /** Compare real decoded export pixels, ignoring undefined straight RGB at alpha zero. */
 async function comparePngWithPsdBeauty(page: Page, path: string, rgba: Uint8ClampedArray | Uint8Array, width: number, height: number) {
   return page.evaluate(async ({ encodedPng, encodedBeauty, width, height }) => {
-    const png = await fetch(`data:image/png;base64,${encodedPng}`);
-    const bitmap = await createImageBitmap(await png.blob());
+    const binary = atob(encodedPng);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
     const canvas = new OffscreenCanvas(width, height);
     try {
       if (bitmap.width !== width || bitmap.height !== height) throw new Error("PNG and PSD Beauty dimensions differ");
@@ -266,7 +269,8 @@ async function comparePngWithPsdBeauty(page: Page, path: string, rgba: Uint8Clam
       if (!context) throw new Error("2D context unavailable");
       context.drawImage(bitmap, 0, 0);
       const pngRgba = context.getImageData(0, 0, width, height).data;
-      const beauty = new Uint8Array(await (await fetch(`data:application/octet-stream;base64,${encodedBeauty}`)).arrayBuffer());
+      const beautyBinary = atob(encodedBeauty);
+      const beauty = Uint8Array.from(beautyBinary, (character) => character.charCodeAt(0));
       if (beauty.byteLength !== pngRgba.byteLength) throw new Error("PSD Beauty pixel storage does not cover the PNG frame");
       let alphaSum = 0;
       let maxAlpha = 0;
