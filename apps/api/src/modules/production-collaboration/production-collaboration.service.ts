@@ -1,5 +1,6 @@
+import { validateProductionWorkflowMutation } from "@toonstudio/contracts/production-workflow";
 import { applyProductionWorkflowCommand } from "./production-workflow-command";
-import { validateProductionWorkflowMutation } from "../../../../../packages/core/src/production";
+
 import { isDeepStrictEqual } from "node:util";
 import { verifyProductionAutomationCommand } from "./production-automation-verification";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";

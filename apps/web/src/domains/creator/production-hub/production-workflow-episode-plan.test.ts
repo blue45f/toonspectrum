@@ -1,5 +1,6 @@
+import { canonicalProductionProcessKey, createProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
 import { describe, expect, it } from "vitest";
-import { canonicalProductionProcessKey, createProductionWorkflowProfile } from "@toonstudio/core/production";
+
 import { createProductionDemoProject } from "./production-demo";
 import { buildEpisodePipelinePlan, deriveEpisodeOperationsRow } from "./production-episode-operations";
 import { workflowEpisodePipeline } from "./production-workflow-episode-plan";

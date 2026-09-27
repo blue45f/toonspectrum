@@ -1,8 +1,5 @@
-import {
-  buildProductionWorkflowTasks,
-  canonicalProductionProcessKey,
-  type ProductionProjectAggregate,
-} from "@toonstudio/core/production";
+import { buildProductionWorkflowTasks, canonicalProductionProcessKey } from "@toonstudio/contracts/production-workflow";
+import { type ProductionProjectAggregate } from "@toonstudio/core/production";
 import type {
   BuildEpisodePipelineInput,
   EpisodePipelinePlan,
@@ -28,7 +25,7 @@ export function workflowEpisodePipeline(
     memo.set(key, hours);
     return hours;
   };
-  return profile.steps.map((step) => ({
+  return profile.steps.map((step): EpisodePipelineTemplateStep => ({
     processKey: step.key,
     label: step.name,
     daysBeforeRelease: Math.ceil(remainingHours(step.key) / 8),

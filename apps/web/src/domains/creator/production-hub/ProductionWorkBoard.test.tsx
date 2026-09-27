@@ -1,12 +1,9 @@
+import { createProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  createProductionWorkflowProfile,
-  type ProductionProjectAggregate,
-  type ProductionTask,
-} from "@toonstudio/core/production";
+import { type ProductionProjectAggregate, type ProductionTask } from "@toonstudio/core/production";
 import { ProductionWorkBoard } from "./ProductionWorkBoard";
 import { createProductionDemoProject } from "./production-demo";
 

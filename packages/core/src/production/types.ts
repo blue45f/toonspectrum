@@ -520,6 +520,32 @@ export type ProductionTaskStatus =
   | "cancelled"
   | "out-of-scope";
 
+export interface ProductionProcessStep {
+  readonly key: string;
+  readonly name: string;
+  readonly description: string;
+  readonly defaultRole: ProductionRoleType;
+  readonly dependsOn: readonly string[];
+  readonly wipLimit: number | null;
+  readonly reviewRequired: boolean;
+  readonly estimateHours: number;
+  readonly completionCriteria: readonly string[];
+}
+export interface ProductionWorkflowProfile {
+  readonly id: string;
+  readonly projectId: string;
+  readonly name: string;
+  readonly scale: "solo" | "team" | "studio";
+  readonly revision: number;
+  readonly steps: readonly ProductionProcessStep[];
+  readonly updatedAt: string;
+}
+export interface ProductionTaskTransition {
+  readonly taskId: string;
+  readonly fromStatus: ProductionTaskStatus;
+  readonly toStatus: ProductionTaskStatus;
+}
+
 export interface ProductionTaskBriefBlock {
   readonly id: string;
   readonly kind: "paragraph" | "heading" | "checklist" | "quote";
@@ -1651,7 +1677,7 @@ export interface ProductionProjectAggregate {
   readonly notificationPolicies?: readonly ProductionNotificationPolicy[];
   readonly notifications?: readonly ProductionNotification[];
   readonly savedViews?: readonly ProductionSavedView[];
-  readonly workflowProfile?: import("./workflow-profile").ProductionWorkflowProfile | null;
+  readonly workflowProfile?: ProductionWorkflowProfile | null;
   readonly auditEvents: readonly ProductionAuditEvent[];
   readonly createdAt: string;
   readonly updatedAt: string;

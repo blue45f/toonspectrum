@@ -3,7 +3,6 @@ export * from "./scope";
 export * from "./collaboration";
 export * from "./handoff";
 export * from "./workflow";
-export * from "./workflow-profile";
 export * from "./review";
 export * from "./change-impact";
 export * from "./procurement";

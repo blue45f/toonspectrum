@@ -88,3 +88,13 @@ pnpm exec playwright test --config playwright.production-workflows.config.ts
 - 공정이 활성화된 회차 변경은 `expectedWorkflowRevision`을 요구한다. 작성 중 팀 설정이 달라지면 최신 기준에서 다시 계획하도록 거절한다.
 - 개인 공정에 게시 작업이 없어도 `EpisodeCollaboration.plannedReleaseAt`으로 제작 목표 마감을 표시한다. 이 필드는 실제 플랫폼 게시 일정·승인·발행 기록이 아니다.
 - 회차 진행률도 설정된 공정의 승인·완료 상태를 기준으로 계산한다. 취소·범위 제외를 제작 완료로 간주하지 않는다.
+
+## 공유 계약의 배치
+
+공정 검증·상태 전환·작업 생성은 `packages/contracts/src/production-workflow.ts`에서 웹과 API가 함께 소비한다. 기존 `packages/core` 파일 예산은 늘리지 않으며, 기존 aggregate의 선택적 타입 필드만 해당 모델에 추가한다.
+
+공유 공정 계약 테스트도 함께 실행한다.
+
+```sh
+pnpm exec vitest run packages/contracts/src/production-workflow.test.ts --maxWorkers=1
+```

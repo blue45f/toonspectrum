@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { createProductionProjectAggregate } from "./aggregate";
-import { episodeScope, projectScope } from "./scope";
+import { createProductionProjectAggregate } from "../../core/src/production/aggregate";
+import { episodeScope, projectScope } from "../../core/src/production/scope";
+
 import {
   buildProductionWorkflowTasks,
   createProductionWorkflowProfile,
   transitionProductionTaskBatch,
   validateProductionWorkflowMutation,
   validateProductionWorkflowProfile,
-} from "./workflow-profile";
+} from "./production-workflow";
 
-import type { ProductionProjectAggregate, ProductionTask } from "./types";
+import type { ProductionProjectAggregate, ProductionTask } from "../../core/src/production/types";
 
 const at = "2026-09-27T09:00:00.000Z";
 function base(): ProductionProjectAggregate {

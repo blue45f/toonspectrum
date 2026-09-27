@@ -1,4 +1,5 @@
-import { canonicalProductionProcessKey } from "@toonstudio/core/production";
+import { canonicalProductionProcessKey } from "@toonstudio/contracts/production-workflow";
+
 import {
   projectScope,
   type ProductionProjectAggregate,

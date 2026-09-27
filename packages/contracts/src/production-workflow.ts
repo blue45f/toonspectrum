@@ -1,38 +1,16 @@
-import { episodeScope, scopeContains } from "./scope";
+import { episodeScope, scopeContains } from "../../core/src/production/scope";
 import {
   PRODUCTION_ROLE_TYPES,
   type ProductionProjectAggregate,
+  type ProductionProcessStep,
+  type ProductionWorkflowProfile,
+  type ProductionTaskTransition,
   type ProductionRoleType,
   type ProductionTask,
   type ProductionTaskStatus,
-} from "./types";
-import { detectTaskDependencyCycles, transitionProductionTask } from "./workflow";
+} from "../../core/src/production/types";
+import { detectTaskDependencyCycles, transitionProductionTask } from "../../core/src/production/workflow";
 
-export interface ProductionProcessStep {
-  readonly key: string;
-  readonly name: string;
-  readonly description: string;
-  readonly defaultRole: ProductionRoleType;
-  readonly dependsOn: readonly string[];
-  readonly wipLimit: number | null;
-  readonly reviewRequired: boolean;
-  readonly estimateHours: number;
-  readonly completionCriteria: readonly string[];
-}
-export interface ProductionWorkflowProfile {
-  readonly id: string;
-  readonly projectId: string;
-  readonly name: string;
-  readonly scale: "solo" | "team" | "studio";
-  readonly revision: number;
-  readonly steps: readonly ProductionProcessStep[];
-  readonly updatedAt: string;
-}
-export interface ProductionTaskTransition {
-  readonly taskId: string;
-  readonly fromStatus: ProductionTaskStatus;
-  readonly toStatus: ProductionTaskStatus;
-}
 export const PRODUCTION_BOARD_STATUSES = [
   "draft",
   "needs-input",

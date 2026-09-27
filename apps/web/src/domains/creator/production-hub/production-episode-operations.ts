@@ -1,15 +1,6 @@
+import { canonicalProductionProcessKey } from "@toonstudio/contracts/production-workflow";
 import { buildWorkflowEpisodePlan, workflowEpisodePipeline } from "./production-workflow-episode-plan";
-import {
-  episodeScope,
-  canonicalProductionProcessKey,
-  type EpisodeCollaboration,
-  type EpisodePlan,
-  type ProductionProjectAggregate,
-  type ProductionRoleType,
-  type ProductionTask,
-  type ProductionTaskStatus,
-  type RevisionRef,
-} from "@toonstudio/core/production";
+import { episodeScope, type EpisodeCollaboration, type EpisodePlan, type ProductionProjectAggregate, type ProductionRoleType, type ProductionTask, type ProductionTaskStatus, type RevisionRef } from "@toonstudio/core/production";
 
 const DAY_MS = 86_400_000;
 const COMPLETE_TASK_STATUSES = new Set<ProductionTaskStatus>([

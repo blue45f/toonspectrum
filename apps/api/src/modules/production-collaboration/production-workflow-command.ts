@@ -1,10 +1,6 @@
+import { buildProductionWorkflowTasks, transitionProductionTaskBatch, validateProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
 import { BadRequestException, ConflictException } from "@nestjs/common";
-import {
-  buildProductionWorkflowTasks,
-  transitionProductionTaskBatch,
-  validateProductionWorkflowProfile,
-  type ProductionProjectAggregate,
-} from "../../../../../packages/core/src/production";
+import { type ProductionProjectAggregate } from "../../../../../packages/core/src/production";
 import type { ProductionCommand } from "./production-collaboration.dto";
 
 type WorkflowCommand = Extract<

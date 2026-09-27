@@ -1,3 +1,4 @@
+import { createProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
 import { ProductionCommandSchema } from "./production-collaboration.dto";
 import { createHash } from "node:crypto";
 
@@ -7,13 +8,7 @@ import {
 } from "@nestjs/common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  createProductionProjectAggregate,
-  createProductionWorkflowProfile,
-  deriveProductionAutomationExecutionPlan,
-  episodeScope,
-  type ProductionProjectAggregate,
-} from "@toonstudio/core/production";
+import { createProductionProjectAggregate, deriveProductionAutomationExecutionPlan, episodeScope, type ProductionProjectAggregate } from "@toonstudio/core/production";
 
 import {
   ProductionProjectRevisionConflictError,

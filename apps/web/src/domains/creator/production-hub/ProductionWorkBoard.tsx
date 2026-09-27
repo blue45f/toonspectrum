@@ -1,18 +1,11 @@
+import { buildProductionWorkflowTasks, productionProcessWip, transitionProductionTaskBatch } from "@toonstudio/contracts/production-workflow";
 import { productionText, useProductionCopy } from "./production-workboard-copy";
 import { ProductionBoardFilters } from "./ProductionBoardFilters";
 import "./production-workboard.css";
 import { CalendarClock, CheckCheck, Filter, Plus, Settings2, Sparkles, Users, Workflow } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import {
-  buildProductionWorkflowTasks,
-  productionProcessWip,
-  transitionProductionTaskBatch,
-  type ProductionProjectAggregate,
-  type ProductionSavedView,
-  type ProductionTask,
-  type ProductionTaskStatus,
-} from "@toonstudio/core/production";
+import { type ProductionProjectAggregate, type ProductionSavedView, type ProductionTask, type ProductionTaskStatus } from "@toonstudio/core/production";
 import { ProductionBoardScroller } from "./ProductionBoardScroller";
 import { ProductionBoardTaskCard } from "./ProductionBoardTaskCard";
 import { ProductionTaskEditor } from "./ProductionTaskEditor";

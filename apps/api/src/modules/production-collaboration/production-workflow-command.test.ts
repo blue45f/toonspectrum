@@ -1,9 +1,7 @@
+import { createProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import { describe, expect, it } from "vitest";
-import {
-  createProductionProjectAggregate,
-  createProductionWorkflowProfile,
-} from "@toonstudio/core/production";
+import { createProductionProjectAggregate } from "@toonstudio/core/production";
 import { ProductionCommandSchema } from "./production-collaboration.dto";
 import { applyProductionWorkflowCommand } from "./production-workflow-command";
 

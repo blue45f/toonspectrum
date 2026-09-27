@@ -1,4 +1,5 @@
-import { canonicalProductionProcessKey } from "@toonstudio/core/production";
+import { canonicalProductionProcessKey } from "@toonstudio/contracts/production-workflow";
+
 import { productionText, useProductionCopy } from "./production-workboard-copy";
 import { ChevronDown, Filter, KanbanSquare, LayoutList, Save, Search, X } from "lucide-react";
 import { useId, useState, type RefObject } from "react";

@@ -1,3 +1,4 @@
+import { PRODUCTION_WORKFLOW_SCALES, createProductionWorkflowProfile, validateProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
 import { productionText, useProductionCopy } from "./production-workboard-copy";
 import {
   ArrowDown,
@@ -11,16 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { useRef, useState } from "react";
-import {
-  PRODUCTION_ROLE_LABELS,
-  PRODUCTION_ROLE_TYPES,
-  PRODUCTION_WORKFLOW_SCALES,
-  createProductionWorkflowProfile,
-  validateProductionWorkflowProfile,
-  type ProductionProjectAggregate,
-  type ProductionProcessStep,
-  type ProductionWorkflowProfile,
-} from "@toonstudio/core/production";
+import { PRODUCTION_ROLE_LABELS, PRODUCTION_ROLE_TYPES, type ProductionProjectAggregate, type ProductionProcessStep, type ProductionWorkflowProfile } from "@toonstudio/core/production";
 import { ProductionWorkspaceDialog } from "./ProductionWorkspaceDialog";
 import { moveProductionItem } from "./production-workboard-model";
 import type { ProductionClientCommand } from "./production-api";

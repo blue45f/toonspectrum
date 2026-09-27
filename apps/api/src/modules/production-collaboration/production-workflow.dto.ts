@@ -1,8 +1,6 @@
+import { PRODUCTION_BOARD_STATUSES } from "@toonstudio/contracts/production-workflow";
 import { z } from "zod";
-import {
-  PRODUCTION_BOARD_STATUSES,
-  PRODUCTION_ROLE_TYPES,
-} from "../../../../../packages/core/src/production";
+import { PRODUCTION_ROLE_TYPES } from "../../../../../packages/core/src/production";
 
 const Identity = z
   .string()

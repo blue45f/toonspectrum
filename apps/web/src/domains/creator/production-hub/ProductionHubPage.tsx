@@ -1,3 +1,4 @@
+import { buildProductionWorkflowTasks, transitionProductionTaskBatch, validateProductionWorkflowMutation, validateProductionWorkflowProfile } from "@toonstudio/contracts/production-workflow";
 import { formatI18nTemplate, translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 import { AlertTriangle, ArrowRight, BadgeCheck, BookOpenText, Boxes, BriefcaseBusiness, CalendarClock, ChevronRight, ClipboardCheck, Coins, FileKey2, GitBranch, Handshake, Layers3, LayoutDashboard, LockKeyhole, MessagesSquare, PanelTopOpen, Scale, ScrollText, ShieldCheck, Users, Workflow } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -6,7 +7,7 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { applyProductionStudioRevisionLink, createPlanningSnapshot, evaluateHandoffReadiness, evaluateProductionRisks, evaluateReviewApproval, preflightCreditManifest, transitionProductionRisk, transitionProductionRiskResponse, type ClarificationThread, type EpisodeCollaboration, type ProductionProjectAggregate, type ProductionTask, type ReviewDecision, type StoryToArtHandoffPackage } from "@toonstudio/core/production";
 
 import { ProductionWorkBoard } from "./ProductionWorkBoard";
-import { buildProductionWorkflowTasks, transitionProductionTaskBatch, validateProductionWorkflowMutation, validateProductionWorkflowProfile } from "@toonstudio/core/production";
+
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
 import { ProductionEpisodeOperationsWorkspace } from "./ProductionEpisodeOperationsWorkspace";
 import { ProductionReviewWorkspace } from "./ProductionReviewWorkspace";
