@@ -62,19 +62,6 @@ function browserStorage(): Storage | null {
   return typeof window === "undefined" ? null : window.localStorage;
 }
 
-function LearningNavigation({ active }: { active: "home" | "paths" }) {
-  return (
-    <nav className="learn-navigation" aria-label="웹툰 학습">
-      <Link to="/learn" aria-current={active === "home" ? "page" : undefined}>학습 홈</Link>
-      <Link to="/learn#learning-paths" aria-current={active === "paths" ? "page" : undefined}>학습 경로</Link>
-      <Link to="/learn/resources">강좌·자료</Link>
-      <Link to="/learn/classroom">Classroom</Link>
-      <Link to="/learn/glossary">용어 사전</Link>
-      <Link to="/learn/studio">툰스튜디오 실습</Link>
-    </nav>
-  );
-}
-
 function lessonRequirementProgress(lesson: Lesson, store: LearningStore): number {
   const saved = store.progress.lessons[lesson.id];
   if (saved?.completed) return 100;
@@ -218,7 +205,6 @@ export function LearningHome() {
   return (
     <div className="learn-page learn-home-page" lang="ko">
       <a className="learn-skip-link" href="#learn-library">전체 강좌로 건너뛰기</a>
-      <LearningNavigation active="home" />
       {store.warning && <p className="learn-caution" role="status">{store.warning}</p>}
 
       <header className="learn-hub-hero">
@@ -462,7 +448,6 @@ export function LearningPathPage({ pathId }: { pathId: string }) {
   if (!path || !stats || !nextLesson) {
     return (
       <div className="learn-page learn-path-page" lang="ko">
-        <LearningNavigation active="paths" />
         <section className="learn-empty"><h1>학습 경로를 찾을 수 없습니다.</h1><p>주소가 변경되었거나 존재하지 않는 경로입니다.</p><Link className="learn-primary" to="/learn#learning-paths">학습 경로 보기</Link></section>
       </div>
     );
@@ -470,7 +455,6 @@ export function LearningPathPage({ pathId }: { pathId: string }) {
 
   return (
     <div className="learn-page learn-path-page" lang="ko">
-      <LearningNavigation active="paths" />
       {store.warning && <p className="learn-caution" role="status">{store.warning}</p>}
       <header className="learn-path-hero">
         <div>

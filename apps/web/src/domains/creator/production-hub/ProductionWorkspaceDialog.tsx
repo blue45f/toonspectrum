@@ -52,10 +52,10 @@ export function ProductionWorkspaceDialog({
       }}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm" />
+        <Dialog.Overlay className="fixed inset-0 z-[180] bg-black/55 backdrop-blur-sm" />
         <Dialog.Content
           className={cn(
-            "production-workspace-dialog fixed left-1/2 top-1/2 z-50 max-h-[92dvh] w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-3xl border border-line bg-card p-5 text-fg shadow-2xl sm:p-7",
+            "production-workspace-dialog fixed left-1/2 top-1/2 z-[181] max-h-[92dvh] w-[calc(100%-1.5rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-3xl border border-line bg-card p-5 text-fg shadow-2xl sm:p-7",
             wide ? "max-w-5xl" : "max-w-2xl",
           )}
           aria-busy={busy}

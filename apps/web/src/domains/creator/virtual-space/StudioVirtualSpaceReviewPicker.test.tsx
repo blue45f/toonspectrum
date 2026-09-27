@@ -24,4 +24,23 @@ describe("Review picker consent lifetime", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     expect(onClose).toHaveBeenCalledTimes(action === "close" ? 1 : 0);
   });
+  it("moves keyboard focus into the visible review handoff and restores the initiating control", async () => {
+    const trigger = document.createElement("button");
+    document.body.append(trigger); trigger.focus();
+    const view = render(<StudioVirtualSpaceReviewPicker workId="work-1" peerName="Bob" disabled={false} onInvite={vi.fn()} onClose={vi.fn()} />);
+    await screen.findByRole("button", { name: "이 검수본으로 초대" });
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "함께 볼 검수본" }));
+    view.unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+  it("does not steal focus back if the user has already moved to another control", async () => {
+    const trigger = document.createElement("button"), another = document.createElement("button");
+    document.body.append(trigger, another); trigger.focus();
+    const view = render(<StudioVirtualSpaceReviewPicker workId="work-1" peerName="Bob" disabled={false} onInvite={vi.fn()} onClose={vi.fn()} />);
+    await screen.findByRole("button", { name: "이 검수본으로 초대" });
+    another.focus(); view.unmount();
+    expect(document.activeElement).toBe(another);
+    trigger.remove(); another.remove();
+  });
 });

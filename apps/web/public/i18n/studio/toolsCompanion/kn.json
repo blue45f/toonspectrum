@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ಲೇಯರ್ {count}",
   "studio.toolsCompanion.review.section.comments": "ಕಾಮೆಂಟ್ {count}",
   "studio.toolsCompanion.review.section.history": "ರೆಕಾರ್ಡ್ {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE ಪುಟಲೇಬಲ್}·{ಆಯ್ಕೆಲೇಬಲ್ ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "ತಪಾಸಣೆ ಕನ್ಸೋಲ್",
   "studio.toolsCompanion.review.truncatedComments": "ಮತ್ತು {count} ಕಾಮೆಂಟ್‌ಗಳು",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ಪದರಗಳು",

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Layer {count}",
   "studio.toolsCompanion.review.section.comments": "Komento {count}",
   "studio.toolsCompanion.review.section.history": "Record {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{selectionLabel ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "console ng inspeksyon",
   "studio.toolsCompanion.review.truncatedComments": "at {count} komento",
   "studio.toolsCompanion.review.truncatedLayers": "{count} layer",

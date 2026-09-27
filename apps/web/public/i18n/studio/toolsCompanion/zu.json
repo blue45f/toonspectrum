@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Isendlalelo {count}",
   "studio.toolsCompanion.review.section.comments": "Amazwana {count}",
   "studio.toolsCompanion.review.section.history": "Rekhoda {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE ikhasiIlebula}·{ukukhethaIlebula ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "i-console yokuhlola",
   "studio.toolsCompanion.review.truncatedComments": "kanye namazwana angu-{count}",
   "studio.toolsCompanion.review.truncatedLayers": "{count} izendlalelo",

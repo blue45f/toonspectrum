@@ -43,8 +43,9 @@
   --cf-section-space: clamp(3.5rem, 6.5vw, 6.25rem);
 }
 .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-shell {
-  width: min(90rem, calc(100% - var(--cf-shell-inline-total)));
-  max-width: none; margin-inline: auto;
+  box-sizing: border-box;
+  width: 100%; max-width: var(--site-content-max, 82.5rem); margin-inline: auto;
+  padding-inline: max(var(--site-page-gutter, clamp(1rem, 3vw, 2.5rem)), env(safe-area-inset-left)) max(var(--site-page-gutter, clamp(1rem, 3vw, 2.5rem)), env(safe-area-inset-right));
 }
 .creator-home[data-creator-experience="all-in-one-studio-v3"] .cf-hero {
   margin-inline: auto;

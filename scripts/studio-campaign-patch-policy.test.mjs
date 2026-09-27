@@ -94,6 +94,24 @@ test("rejects build configuration, verification scripts, tools, and arbitrary ro
   }
 });
 
+test("이전·현재 데이터베이스 경로는 focused test를 동반해도 수정할 수 없다", () => {
+  for (const pathname of [
+    "apps/api/src/db/migrations/9999_campaign.sql",
+    "apps/api/src/db/schema.ts",
+    "apps/api/src/platform/database/migrations/9999_campaign.sql",
+    "apps/api/src/platform/database/schema.ts",
+    "apps/api/src/platform/database/schema/studio.ts",
+    "apps/api/src/platform/database/creator-asset-platform.schema.ts",
+  ]) {
+    const result = evaluateStudioCampaignPatch(config, [
+      change(pathname),
+      change("tests/campaign/database.test.ts"),
+    ]);
+    assert.equal(result.ok, false, pathname);
+    assert.ok(result.issues.includes(`agent may not modify protected path: ${pathname}`), pathname);
+  }
+});
+
 test("rejects patches that exceed changed-file or changed-line budgets", () => {
   const tooManyFiles = Array.from(
     { length: config.agent.maxChangedFiles + 1 },

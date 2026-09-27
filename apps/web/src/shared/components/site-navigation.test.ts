@@ -51,18 +51,19 @@ describe("site navigation information architecture", () => {
     expect(SITE_NAVIGATION_ITEMS.market.label.ko).toBe("소재 마켓");
   });
 
-  it("keeps fortune and tarot in Spectrum's research and growth directory", () => {
+  it("학습과 작업 자료를 먼저 제공하고 운세·타로 기능도 성장 메뉴에 유지한다", () => {
     const growItems = TOONSPECTRUM_NAVIGATION_GROUPS.find(
       (group) => group.id === "grow",
     )?.items;
 
     expect(growItems?.map((item) => item.id)).toEqual([
-      "now",
-      "fortune",
       "research",
       "market",
+      "learn",
       "opportunities",
       "insights",
+      "now",
+      "fortune",
       "technology",
     ]);
     expect(SITE_NAVIGATION_ITEMS.fortune.href).toBe("/fortune");

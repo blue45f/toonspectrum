@@ -5,7 +5,7 @@ import { useId } from "react";
 import { SiteAtelierChapter } from "./site-experience/SiteAtelierChapter";
 import { artworkSourcesForPath } from "./site-experience/site-art-direction";
 import { publicSiteNextSteps } from "./public-site-pathways";
-import { isPublicCreativeRoute } from "./site-public-routes";
+import { supportsPublicSiteOnwardJourney } from "./site-public-routes";
 
 import Link from "@/shared/navigation/router-link";
 
@@ -20,7 +20,7 @@ export function PublicSiteNextSteps({ pathname }: { pathname: string }) {
   useBilingualI18nRevision();
 
   const headingId = useId();
-  if (pathname === "/" || !isPublicCreativeRoute(pathname)) return null;
+  if (!supportsPublicSiteOnwardJourney(pathname)) return null;
 
   const destinations = publicSiteNextSteps(pathname);
   return (
@@ -54,7 +54,7 @@ export function PublicSiteNextSteps({ pathname }: { pathname: string }) {
 export function PublicSiteAtelierJourney({ pathname }: { pathname: string }) {
   useBilingualI18nRevision();
 
-  if (pathname === "/" || !isPublicCreativeRoute(pathname)) return null;
+  if (!supportsPublicSiteOnwardJourney(pathname)) return null;
   const locale = getActiveI18nLocale() === "ko" ? "ko" : "en";
   return <>
     <div className="public-site-atelier"><SiteAtelierChapter pathname={pathname} locale={locale} /></div>

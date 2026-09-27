@@ -60,6 +60,7 @@ describe("product PSD capture lifetime and canonical metadata", () => {
     expect(context.setMasterEditMode.mock.calls).toEqual([[false]]);
     expect(exportPagePsd).toHaveBeenCalledWith("ready-stage", capturedPage.elements, 720, 1440, 1, {
       scale: 2, background: { color: "#123456", gradient: null },
+      groups: [], pageGrade: undefined,
     });
 
     if (result === "resolve") {

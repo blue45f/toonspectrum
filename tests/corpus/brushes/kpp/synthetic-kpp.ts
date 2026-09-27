@@ -227,7 +227,7 @@ export function buildKppFile(options: KppFileOptions): Uint8Array {
 }
 
 // ---------------------------------------------------------------------------
-// The three committed corpus fixtures
+// 고정 corpus의 원본 이름은 브랜드 표시명과 별개이며 커밋된 바이너리와 일치해야 한다.
 // ---------------------------------------------------------------------------
 
 /** Escaped auto-brush definition shared by the paintbrush fixtures. */
@@ -240,7 +240,7 @@ const INK_BRUSH_DEFINITION =
 export function buildInkBasicKpp(): Uint8Array {
   return buildKppFile({
     presetXml: serializeKppPresetXml({
-      name: "ToonStudio Ink Crisp",
+      name: "ToonSpectrum Ink Crisp",
       paintopid: "paintbrush",
       params: [
         { name: "brush_definition", type: "string", value: INK_BRUSH_DEFINITION },
@@ -262,7 +262,7 @@ const PRESSURE_OPACITY_SENSOR =
 export function buildPressureCurveKpp(): Uint8Array {
   return buildKppFile({
     presetXml: serializeKppPresetXml({
-      name: "ToonStudio Pressure Sketch",
+      name: "ToonSpectrum Pressure Sketch",
       paintopid: "paintbrush",
       params: [
         { name: "brush_definition", type: "string", value: INK_BRUSH_DEFINITION },
@@ -279,7 +279,7 @@ export function buildPressureCurveKpp(): Uint8Array {
 /** The `.myb` v3 JSON Krita's MyPaint engine embeds as `mypaint_json`. */
 export const MYPAINT_WASH_JSON = JSON.stringify({
   version: 3,
-  group: "ToonStudio KPP Corpus",
+  group: "ToonSpectrum KPP Corpus",
   comment: "Soft wash delegated through the myb lane",
   settings: {
     radius_logarithmic: {
@@ -296,7 +296,7 @@ export const MYPAINT_WASH_JSON = JSON.stringify({
 export function buildMypaintWashKpp(): Uint8Array {
   return buildKppFile({
     presetXml: serializeKppPresetXml({
-      name: "ToonStudio MyPaint Wash",
+      name: "ToonSpectrum MyPaint Wash",
       paintopid: "mypaintbrush",
       params: [
         { name: "mypaint_json", type: "string", value: MYPAINT_WASH_JSON },

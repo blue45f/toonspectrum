@@ -4,6 +4,7 @@ import {
   StudioFixedStepPose,
   StudioPeerTimeline,
   studioCameraLerp,
+  studioCameraZoom,
   studioCoverRect,
   studioGaitFrame,
   studioRenderViewport,
@@ -20,19 +21,36 @@ const openWorld = { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 500, height: 500, c
 };
 
 describe("Virtual Studio art and presentation", () => {
+  it("세로 모바일 화면과 가로 회전에서 주변 600px 동선을 유지한다", () => {
+    for (const [width, height] of [[390, 844], [458, 1100], [844, 390], [1440, 900]]) {
+      const zoom = studioCameraZoom(width!, height!);
+      expect(width! / zoom).toBeGreaterThanOrEqual(599);
+      expect(height! / zoom).toBeGreaterThanOrEqual(419);
+      expect(zoom).toBeLessThanOrEqual(1.2);
+    }
+    expect(studioCameraZoom(390, 844, 2) / 2).toBe(studioCameraZoom(390, 844, 1));
+    expect(Number.isFinite(studioCameraZoom(NaN, Infinity, NaN))).toBe(true);
+  });
   it("keeps explicit gait technique, frame count and source paths for every skin/direction", () => {
     for (const skin of STUDIO_CHARACTER_SKINS) for (const direction of ["down", "left", "right", "up"] as const) {
       const clip = skin.clips?.[`walk-${direction}`];
-      expect(clip?.start).toBe(0);
-      expect(clip?.end).toBe(clip?.technique === "drawn" ? 3 : 7);
+      const start = skin.nativeArtStyle ? ({ down: 0, right: 8, left: 16, up: 24 } as const)[direction] : 0;
+      expect(clip?.start).toBe(start);
+      expect(clip?.end).toBe(start + (clip?.technique === "drawn" ? 3 : 7));
       expect(["drawn", "cutout-rig"]).toContain(clip?.technique);
       expect(clip?.distancePerCycle).toBeGreaterThan(0);
-      const expectedRoot = skin.key === "imagegen25" ? "/world-v2/characters/pixel-maker/"
-        : clip?.technique === "drawn" ? "/drawn-characters-v1/" : "/production-v2/";
-      expect(clip?.textureUrl).toContain(expectedRoot);
-      expect(skin.directional[direction]).toContain(
-        skin.key === "imagegen25" ? "/living-town-v6/imagegen25-character/" : "/production-v2/",
-      );
+      if (skin.nativeArtStyle) {
+        const source = `/assets/virtual-studio/experience-v8/avatar-${skin.nativeArtStyle}.png`;
+        expect(clip?.textureUrl).toBe(source);
+        expect(skin.directional[direction]).toBe(source);
+      } else {
+        const expectedRoot = skin.key === "imagegen25" ? "/world-v2/characters/pixel-maker/"
+          : clip?.technique === "drawn" ? "/drawn-characters-v1/" : "/production-v2/";
+        expect(clip?.textureUrl).toContain(expectedRoot);
+        expect(skin.directional[direction]).toContain(
+          skin.key === "imagegen25" ? "/living-town-v6/imagegen25-character/" : "/production-v2/",
+        );
+      }
     }
   });
   it("uses the occupant-free generated sky-island base for live actors", () => {

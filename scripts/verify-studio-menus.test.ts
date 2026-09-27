@@ -25,6 +25,7 @@ import { StudioBackgroundPanel } from "../apps/web/src/domains/creator/StudioBac
 
 import {
   CATALOGUE_GROUPS,
+  classifyStudioCanvasResizeResult,
   closeFloatingUi,
   dismissCinematicCanvasWelcome,
   dismissOverlays,
@@ -56,6 +57,26 @@ afterEach(() => {
 });
 
 describe("production menu verifier follows shipped feature entry points", () => {
+  it("정확한 자체 preview의 권한 거절과 불변 높이만 별도 계약으로 인정한다", () => {
+    const denied = {
+      expectedHeight: "높이 8348px", previousHeight: "높이 1080px", actualHeight: "높이 1080px",
+      authorityAlertVisible: true, currentOrigin: "http://127.0.0.1:5279", ownedPreviewOrigin: "http://127.0.0.1:5279",
+    };
+    expect(classifyStudioCanvasResizeResult(denied)).toBe("denied");
+    expect(classifyStudioCanvasResizeResult({ ...denied, authorityAlertVisible: false })).toBe("failed");
+    expect(classifyStudioCanvasResizeResult({ ...denied, actualHeight: null })).toBe("failed");
+    expect(classifyStudioCanvasResizeResult({ ...denied, actualHeight: "높이 8000px" })).toBe("failed");
+    expect(classifyStudioCanvasResizeResult({ ...denied, actualHeight: "높이 8348px" })).toBe("failed");
+    expect(classifyStudioCanvasResizeResult({ ...denied, ownedPreviewOrigin: undefined })).toBe("failed");
+    expect(classifyStudioCanvasResizeResult({ ...denied, currentOrigin: "https://toonstudio.cloud" })).toBe("failed");
+    expect(() => classifyStudioCanvasResizeResult({
+      ...denied, currentOrigin: "https://toonstudio.cloud", ownedPreviewOrigin: "https://toonstudio.cloud",
+    })).toThrow(/owned loopback/u);
+    expect(classifyStudioCanvasResizeResult({
+      ...denied, actualHeight: "높이 8348px", authorityAlertVisible: false, ownedPreviewOrigin: undefined,
+    })).toBe("applied");
+  });
+
   it("preserves eight stored defaults and verifies ten rendered tools plus More additions", () => {
     let visibleIds = defaultStudioAppSettings().toolbar.visibleIds;
     expect(visibleIds).toHaveLength(8);

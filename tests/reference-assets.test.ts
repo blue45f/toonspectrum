@@ -111,6 +111,16 @@ describe("reference asset search state", () => {
     expect(referenceSearchValidation({ ...defaultReferenceSearchState(), query: "a" })).toContain("2~80");
   });
 
+  it("공유 URL의 ASCII 제어 문자를 거부하고 한글과 이모지는 보존한다", () => {
+    const controls = [...Array.from({ length: 32 }, (_, index) => index), 127];
+    for (const code of controls) {
+      const params = new URLSearchParams({ q: `한국${String.fromCharCode(code)}자료` });
+      expect(parseReferenceUrlParams(params).search.query).toBe("");
+    }
+    const params = new URLSearchParams({ q: "  한국 복식 🎨  " });
+    expect(parseReferenceUrlParams(params).search.query).toBe("한국 복식 🎨");
+  });
+
   it("builds curated lens state without leaking previous filters", () => {
     const lens = REFERENCE_LENSES.find((entry) => entry.id === "korea");
     expect(lens).toBeDefined();

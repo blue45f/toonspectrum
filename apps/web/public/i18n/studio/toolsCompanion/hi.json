@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "परत {count}",
   "studio.toolsCompanion.review.section.comments": "टिप्पणी {count}",
   "studio.toolsCompanion.review.section.history": "रिकॉर्ड {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE पेज लेबल}·{चयन लेबल ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "निरीक्षण कंसोल",
   "studio.toolsCompanion.review.truncatedComments": "और {count} टिप्पणियाँ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} परतें",

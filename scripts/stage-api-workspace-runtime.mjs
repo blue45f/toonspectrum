@@ -1,31 +1,9 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, relative, resolve } from "node:path";
+import { access, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { runtimeSpecifiers } from "./verify-api-runtime-imports.mjs";
 
 const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
-  {
-    name: "@toonstudio/contracts",
-    sourceManifest: new URL("../packages/contracts/package.json", import.meta.url),
-    compiledDirectory: "packages/contracts",
-    exports: {
-      "./security/csrf": "./security/csrf.js",
-      "./production-workspace": "./production-workspace.js",
-      "./operation-policy": "./operation-policy.js",
-      "./creator-publication-integrity": "./creator-publication-integrity.js",
-    },
-    subpathEntries: [
-      {
-        target: "security/csrf.js",
-        compiledEntry: "packages/contracts/src/security/csrf.js",
-      },
-      { target: "production-workspace.js", compiledEntry: "packages/contracts/src/production-workspace.js" },
-      { target: "operation-policy.js", compiledEntry: "packages/contracts/src/operation-policy.js" },
-      {
-        target: "creator-publication-integrity.js",
-        compiledEntry: "packages/contracts/src/creator-publication-integrity.js",
-      },
-    ],
-  },
   {
     name: "@toonstudio/core",
     sourceManifest: new URL("../packages/core/package.json", import.meta.url),
@@ -71,6 +49,44 @@ const WORKSPACE_RUNTIME_PACKAGES = Object.freeze([
   },
 ]);
 
+async function contractsRuntimeDefinition(root) {
+  const name = "@toonstudio/contracts";
+  const manifest = JSON.parse(await readFile(new URL("../packages/contracts/package.json", import.meta.url), "utf8"));
+  // 기존 필수 계약을 보존하고, 실제 출력의 require만 정식 package exports에 연결한다.
+  const subpaths = new Set(["./security/csrf", "./production-workspace", "./operation-policy", "./creator-publication-integrity"]);
+  const files = (await readdir(root, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".js"))
+    .map((entry) => resolve(entry.parentPath, entry.name))
+    .filter((filename) => !relative(root, filename).split(sep).includes("node_modules"))
+    .sort();
+  for (const filename of files) {
+    for (const specifier of runtimeSpecifiers(await readFile(filename, "utf8"), filename)) {
+      if (specifier === name) subpaths.add(".");
+      else if (specifier.startsWith(`${name}/`)) subpaths.add(`.${specifier.slice(name.length)}`);
+    }
+  }
+  const entries = [...subpaths].map((subpath) => {
+    const source = manifest.exports[subpath]?.default;
+    if (typeof source !== "string" || !source.startsWith("./src/") || !source.endsWith(".ts")
+      || source.split("/").includes("..") || subpath.split("/").includes("..")) {
+      throw new Error(`API 계약 내보내기를 확인할 수 없습니다: ${name}${subpath.slice(1)}. packages/contracts/package.json의 정식 exports를 확인하세요.`);
+    }
+    return {
+      subpath,
+      target: subpath === "." ? "index.js" : `${subpath.slice(2)}.js`,
+      compiledEntry: `packages/contracts/${source.slice(2, -3)}.js`,
+    };
+  });
+  return {
+    name,
+    sourceManifest: new URL("../packages/contracts/package.json", import.meta.url),
+    compiledDirectory: "packages/contracts",
+    compiledEntry: entries.find((entry) => entry.subpath === ".")?.compiledEntry,
+    exports: Object.fromEntries(entries.map((entry) => [entry.subpath, `./${entry.target}`])),
+    subpathEntries: entries.filter((entry) => entry.subpath !== "."),
+  };
+}
+
 function packageDirectory(root, packageName) {
   return resolve(root, "node_modules", ...packageName.split("/"));
 }
@@ -108,7 +124,7 @@ export async function stageApiWorkspaceRuntime(
   const root = resolve(directory);
   const staged = [];
 
-  for (const definition of WORKSPACE_RUNTIME_PACKAGES) {
+  for (const definition of [await contractsRuntimeDefinition(root), ...WORKSPACE_RUNTIME_PACKAGES]) {
     const emittedSubpaths = definition.sourceManifest
       ? await emittedWorkspaceSubpaths(root, definition)
       : [];

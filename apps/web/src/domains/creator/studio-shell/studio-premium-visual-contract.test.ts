@@ -2,6 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import { TOONSTUDIO_PRIMARY_NAVIGATION } from "../../../shared/components/site-navigation";
+
 const canvasWelcome = readFileSync(
   new URL("../canvas/StudioCinematicCanvasWelcome.tsx", import.meta.url),
   "utf8",
@@ -51,7 +53,10 @@ describe("ToonStudio premium visual flow contract", () => {
   it("uses image-led creation paths in the lobby and global workspace navigation", () => {
     expect(creatorLobby).toContain("/brand/toonstudio-premium-icons");
     expect(creatorLobby.match(/art: "[^"]+\.webp"/gu)).toHaveLength(5);
-    expect(workspaceNavigation.match(/toonstudio-premium-icons\/[^"]+\.webp/gu)).toHaveLength(4);
+    const navigationArt = [...workspaceNavigation.matchAll(/(?:"([\w-]+)"|(\w+)):\s*"\/brand\/toonstudio-premium-icons\/([^"]+\.webp)"/gu)];
+    expect(navigationArt.map((entry) => entry[1] ?? entry[2]).sort())
+      .toEqual(TOONSTUDIO_PRIMARY_NAVIGATION.map(({ id }) => id).sort());
+    for (const entry of navigationArt) expect(PREMIUM_ICON_NAMES).toContain(entry[3]);
     expect(workspaceCss).toContain(".workspace-nav-visual>img");
   });
 

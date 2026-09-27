@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "پرت {count}",
   "studio.toolsCompanion.review.section.comments": "تبصرہ {count}",
   "studio.toolsCompanion.review.section.history": "ریکارڈ {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE صفحہ لیبل}·{انتخاب لیبل ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "معائنہ کنسول",
   "studio.toolsCompanion.review.truncatedComments": "اور {count} تبصرے",
   "studio.toolsCompanion.review.truncatedLayers": "{count} تہیں",

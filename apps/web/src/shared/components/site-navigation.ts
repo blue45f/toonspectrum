@@ -367,7 +367,7 @@ export const TOONSTUDIO_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
     id: "production-flow",
     label: { ko: "제작 흐름", en: "Production flow" },
     description: { ko: "작품 전체를 계획하고 오늘 할 일을 바로 확인", en: "Plan the whole work and see what needs attention today" },
-    items: [I.workspaceHome, I.studio, I.make, I.production, I.growthLab],
+    items: [I.workspaceHome, I.production, I.growthLab],
   },
   {
     id: "production-resources",
@@ -406,7 +406,7 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
       ko: "영감·자료·기회를 실제 작업으로",
       en: "Connect inspiration, research and opportunity",
     },
-    items: [I.now, I.fortune, I.research, I.market, I.opportunities, I.insights, I.technology],
+    items: [I.research, I.market, I.learn, I.opportunities, I.insights, I.now, I.fortune, I.technology],
   },
   {
     id: "connect",
@@ -421,10 +421,10 @@ export const TOONSPECTRUM_NAVIGATION_GROUPS: readonly SiteNavigationGroup[] = [
     id: "personal",
     label: { ko: "내 기록", en: "Personal" },
     description: {
-      ko: "서재·활동·설정을 한곳에서",
-      en: "Library, activity and settings in one place",
+      ko: "내 작업실과 읽던 작품으로 돌아가기",
+      en: "Return to your workspace and reading library",
     },
-    items: [I.library, I.notifications, I.me, I.home],
+    items: [I.workspaceHome, I.library, I.home],
   },
 ];
 

@@ -29,6 +29,10 @@ describe("public shell integration", () => {
     expect(app).toContain("<DeferredFooter immediate={publicExperience} />");
   });
 
+  it("오프라인 작업실 홈에서는 상태 안내를 흐름에 배치해 작업 버튼을 가리지 않는다", () => {
+    expect(shell).toContain('<ServiceDegradedBanner immersive={immersiveVirtualExperience && normalizedPath !== "/home"} />');
+  });
+
   it("retains a single lifecycle-preserving owner for history and late fragments", () => {
     expect(shell.match(/<RouteScrollRestoration\s*\/>/gu)).toHaveLength(1);
     expect(shell).not.toContain("<PublicSiteNavigationEffects");
@@ -71,6 +75,9 @@ describe("public shell integration", () => {
     expect(shell).toContain("const PublicSiteWayfinder = lazy(");
     expect(shell).not.toContain('import { PublicSiteWayfinder }');
     expect(shell).toContain('publicCreativeRoute && !immersiveVirtualExperience');
+    expect(shell).toContain('publicCreativeRoute && !immersiveVirtualExperience && supportsPublicSiteOnwardJourney(pathname)');
+    expect(shell).toContain('{immersiveVirtualExperience ? null : header}');
+    expect(shell).toContain('{immersiveVirtualExperience ? null : footer}');
     expect(shell.match(/<SpatialCampusFrame binding=/gu)).toHaveLength(1);
     const campus = readFileSync(new URL("./spatial-campus/SpatialCampusFrame.tsx", import.meta.url), "utf8");
     expect(campus.match(/<WorkspaceTaskFrame route=/gu)).toHaveLength(1);

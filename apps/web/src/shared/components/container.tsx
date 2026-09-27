@@ -15,6 +15,7 @@ export function Container({
   return (
     <div
       style={style}
+      data-page-container={size}
       className={cx(
         "mx-auto w-full px-4 sm:px-6",
         size === "wide" && "max-w-[1320px]",

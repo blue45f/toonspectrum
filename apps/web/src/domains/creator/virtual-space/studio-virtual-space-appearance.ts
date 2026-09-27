@@ -31,6 +31,7 @@ export interface StudioVirtualSpaceAppearanceRegistry {
   readonly skins: readonly {
     readonly key: string;
     readonly capabilities: readonly StudioVirtualSpaceAppearanceClip[];
+    readonly selectionOnly?: boolean;
   }[];
 }
 
@@ -106,7 +107,7 @@ function legacySkin(registry: StudioVirtualSpaceAppearanceRegistry, avatarIndex:
   const explicit = Number.isInteger(avatarIndex) && avatarIndex >= 0;
   const index = explicit ? avatarIndex : identity ? hash >>> 0 : 0;
   // Preserve the established automatic identity mapping; generated bonus skins are explicit choices.
-  const candidates = explicit ? registry.skins : registry.skins.filter((skin) => skin.key !== "imagegen25");
+  const candidates = explicit ? registry.skins : registry.skins.filter((skin) => !skin.selectionOnly && skin.key !== "imagegen25");
   return candidates[index % candidates.length] ?? fallbackSkin(registry);
 }
 

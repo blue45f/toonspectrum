@@ -21,7 +21,7 @@ const PRODUCTION_JOURNEY = [
   { id: "publish", href: "/studio/publish", ko: "검수·내보내기", en: "Review & export" },
 ] as const;
 
-/** The active step stays visible in the mobile rail without scrolling the page. */
+/** 현재 창작 단계만 가로 탐색 안에서 드러내고 페이지 스크롤과 포커스는 유지한다. */
 export function PublicSiteJourney({ pathname, locale }: { pathname: string; locale: "ko" | "en" }) {
   useBilingualI18nRevision();
   const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
@@ -45,15 +45,14 @@ export function PublicSiteJourney({ pathname, locale }: { pathname: string; loca
   return (
     <div className="public-site-journey">
       <div className="public-site-journey__inner">
-        <span className="public-site-journey__label">{isProductionHome ? "WEBTOON PRODUCTION WORKSPACE" : "THE DIGITAL ATELIER"}</span>
+        <span className="public-site-journey__label"><Compass size={14} aria-hidden="true" />{bi(isProductionHome ? "작업 바로가기" : "창작 둘러보기", isProductionHome ? "Workspace shortcuts" : "Explore creation")}</span>
         <nav ref={railRef} aria-label={bi(isProductionHome ? "제작 기능 바로가기" : "창작 단계별 바로가기", isProductionHome ? "Production shortcuts" : "Creative journey")} className="public-site-journey__routes">
-          {journey.map(({ id, href, ko, en }, index) => {
+          {journey.map(({ id, href, ko, en }) => {
             const Icon = isProductionHome
               ? PRODUCTION_ICONS[id as keyof typeof PRODUCTION_ICONS]
               : ICONS[id as keyof typeof ICONS];
             return (
               <Link key={href} href={href} data-phase={id === "market" || id === "assets" ? "resources" : id === "make" ? "create" : id} aria-current={active === id ? "step" : undefined} data-active={active === id || undefined}>
-                <span aria-hidden="true" className="public-site-journey__step">{String(index + 1).padStart(2, "0")}</span>
                 <Icon size={13} aria-hidden="true" />
                 <span>{bi(ko, en)}</span>
               </Link>

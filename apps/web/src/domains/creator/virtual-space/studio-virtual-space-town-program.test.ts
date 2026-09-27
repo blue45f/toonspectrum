@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   STUDIO_TOWN_BLUEPRINTS,
   STUDIO_TOWN_MINI_GAMES,
+  applyStudioTownBlueprint,
   studioRuntimeBudget,
   studioTownActiveEvent,
   studioTownCompanionSnapshot,
@@ -13,6 +14,11 @@ import {
 } from "./studio-virtual-space-town-program";
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
+import { studioVirtualDecorationPreset } from "./studio-virtual-space-customization";
+import { STUDIO_VIRTUAL_PLACES } from "./studio-virtual-space-place-catalog";
+import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
+import { studioVirtualDecorationNavigationWorld } from "./studio-virtual-space-decoration-layout";
+import { studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
 
 const operations: StudioVirtualOperationsSnapshot = {
   phase: "ready",
@@ -60,5 +66,30 @@ describe("Virtual Studio town program", () => {
     expect(interest.dormantIds.has("far")).toBe(true);
     expect(studioRuntimeBudget(390, false, 2).maxActiveNpcs).toBe(4);
     expect(studioRuntimeBudget(1400, true, 2).maxParticles).toBe(0);
+  });
+
+  it.each(STUDIO_VIRTUAL_PLACES.map((place) => place.id))("%s 독립 장소에서도 모든 업무 블루프린트를 안전하게 배치한다", (id) => {
+    const world = studioVirtualPlaceWorldManifest(id, false);
+    for (const blueprint of STUDIO_TOWN_BLUEPRINTS) {
+      const result = applyStudioTownBlueprint(studioVirtualDecorationPreset("minimal"), world, blueprint);
+      expect(result.ok, blueprint.id).toBe(true);
+      if (!result.ok) continue;
+      expect(result.state.placements).toHaveLength(blueprint.decor.length);
+      expect(result.state).toMatchObject({ layoutWidth: world.width, layoutHeight: world.height });
+      const navigation = studioVirtualDecorationNavigationWorld(world, result.state);
+      for (const spawn of world.spawns) expect(studioWorldCanOccupy(navigation, spawn.point)).toBe(true);
+    }
+  });
+
+  it("블루프린트 수량이 남은 한도를 넘으면 일부만 추가하지 않는다", () => {
+    const world = studioVirtualPlaceWorldManifest("skyport", true);
+    const current = { ...studioVirtualDecorationPreset("minimal"), placements: Array.from({ length: 34 }, (_, index) => ({
+      id: `rug-${index}`, type: "rug" as const, x: 100, y: 100, rotation: 0 as const, scale: 1,
+    })) };
+    const blueprint = STUDIO_TOWN_BLUEPRINTS[0];
+    expect(blueprint).toBeDefined();
+    if (!blueprint) return;
+    expect(applyStudioTownBlueprint(current, world, blueprint)).toEqual({ ok: false, reason: "limit" });
+    expect(current.placements).toHaveLength(34);
   });
 });

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Пласт {count}",
   "studio.toolsCompanion.review.section.comments": "Каментарый {count}",
   "studio.toolsCompanion.review.section.history": "Запіс {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{selectionLabel ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "аглядная кансоль",
   "studio.toolsCompanion.review.truncatedComments": "і {count} каментарыяў",
   "studio.toolsCompanion.review.truncatedLayers": "{count} слаёў",

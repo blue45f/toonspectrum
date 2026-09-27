@@ -30,8 +30,8 @@ export function Section({
   live?: boolean;
 }) {
   return (
-    <section className={cn(className)}>
-      <header className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+    <section data-content-section="" className={cn(className)}>
+      <header data-section-heading="" className="mb-4 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
           {eyebrow && (
             <p className="eyebrow mb-1.5 flex items-center gap-2 text-accent">
@@ -49,14 +49,15 @@ export function Section({
               {eyebrow}
             </p>
           )}
-          <h2 className="text-pretty text-xl font-bold tracking-tight text-fg sm:text-2xl">
+          <h2 data-section-title="" className="text-pretty text-xl font-bold tracking-tight text-fg sm:text-2xl">
             {title}
           </h2>
-          {desc && <p className="mt-1.5 text-sm leading-relaxed text-fg-2">{desc}</p>}
+          {desc && <p data-section-description="" className="mt-1.5 text-sm leading-relaxed text-fg-2">{desc}</p>}
         </div>
         {action && (
           <Link
             href={action.href}
+            data-section-action=""
             className={buttonClass({ size: "sm", variant: "quiet", className: "group gap-1" })}
             // 링크 접근명에 섹션 제목을 포함해 "전체 보기" 같은 모호한 링크텍스트 문제 방지(문자열 제목 한정).
             aria-label={typeof title === "string" ? `${title} ${action.label}` : `${action.label} 바로가기`}

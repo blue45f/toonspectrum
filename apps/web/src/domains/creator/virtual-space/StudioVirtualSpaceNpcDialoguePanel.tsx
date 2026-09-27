@@ -10,6 +10,7 @@ import {
   speakStudioVirtualDialogue,
   type StudioVirtualDialogueTurn,
 } from "./studio-virtual-space-dialogue-history";
+import { StudioVirtualCharacterPreview } from "./StudioVirtualCharacterPreview";
 import { studioNpcCastSkinByKey } from "./studio-virtual-space-npc-cast";
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
 import type { StudioVirtualSpacePeer } from "./studio-virtual-space-model";
@@ -42,7 +43,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
 }) {
   const bt = useBilingual("StudioVirtualSpaceNpcDialoguePanel");
   const role = studioNpcRole(npc), identity = studioNpcLabel(npc);
-  const portraitUrl = studioNpcCastSkinByKey(npc.skinKey, artStyle).directional.down;
+  const portraitSkin = studioNpcCastSkinByKey(npc.skinKey, artStyle);
   const questionInput = useRef<HTMLInputElement>(null);
   const greeting = bt(
     `${room?.labelKo ?? "스튜디오"}에 오신 것을 환영해요. 일정, 검수, 팀원 위치 또는 다음 작업을 물어보세요.`,
@@ -130,7 +131,7 @@ export function StudioVirtualSpaceNpcDialoguePanel({
   return <section className="studio-vspace-npc-dialogue" role="dialog" aria-modal="true"
     aria-labelledby="studio-npc-dialogue-title" data-space-interactive="true" data-dialogue-scale={dialogueScale}>
     <header>
-      <div className="studio-vspace-npc-portrait"><img src={portraitUrl} alt="" draggable={false} /></div>
+      <div className="studio-vspace-npc-portrait"><StudioVirtualCharacterPreview skin={portraitSkin} /></div>
       <div><p>{bt(identity.ko, identity.en)}</p><h2 id="studio-npc-dialogue-title">{bt(room?.labelKo ?? "스튜디오", room?.labelEn ?? "Studio")}</h2></div>
       <div className="studio-vspace-npc-dialogue-tools">
         <button type="button" onClick={copyAnswer} aria-label={bt("답변 복사", "Copy answer")}><Copy size={17} aria-hidden /></button>

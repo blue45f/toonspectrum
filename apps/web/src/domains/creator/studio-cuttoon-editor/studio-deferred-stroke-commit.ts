@@ -323,10 +323,11 @@ export function createStudioDeferredStrokeCommitEngine(
       document.getPages(true),
       document.getLayerGroups({ includeDeleted: true })
     );
-    // 오프라인 branch에 보호한 변경은 아직 정본 frontier에 없으므로 히스토리 반영 전에 재투영한다.
-    const offline = runtime.offlineBranch;
-    return offline && offline.status.pendingOperations > 0
-      ? offline.projectPages(reconciled.pages)
+    // 오프라인 제안은 canonical 문서를 갱신하지 않으므로 정본 병합 뒤 커밋에 다시 투영한다.
+    // 원격 요소를 보존하면서 방금 수락한 편집이 이전 정본 값으로 되돌아가는 것을 막는다.
+    const offlineBranch = runtime.offlineBranch;
+    return offlineBranch && offlineBranch.status.pendingOperations > 0
+      ? offlineBranch.projectPages(reconciled.pages)
       : reconciled.pages;
   }
 

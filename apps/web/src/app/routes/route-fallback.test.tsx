@@ -20,7 +20,7 @@ describe("route loading fallback", () => {
     );
     expect(document.querySelector("[data-route-loading-fallback]")).not.toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: "정밀 CAD" })).toBeTruthy();
-    expect(screen.getByText("웹툰 컷에 사용할 3D 배경·소품·카메라 구도를 직접 만듭니다.")).toBeTruthy();
+    expect(screen.getByText("장소·인물·소품을 고르고 구도와 작화 스타일을 정해 현재 컷에 적용합니다.")).toBeTruthy();
     expect(screen.queryByText("이 작업에 필요한 상태를 준비하고 있어요.")).toBeNull();
     await act(async () => { await vi.advanceTimersByTimeAsync(4_600); });
     expect(screen.getByText("이 작업에 필요한 상태를 준비하고 있어요.")).toBeTruthy();

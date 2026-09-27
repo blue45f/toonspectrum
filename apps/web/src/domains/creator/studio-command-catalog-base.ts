@@ -499,10 +499,10 @@ export const STUDIO_MENU_ITEM_INVENTORY: readonly string[] = Object.freeze([
   "animation/frame-anim",
   "animation/onion-skin",
   // 3d (5) — insert tools + 캐릭터 셰이퍼 + sculpt workbench (was creative-modes pill)
+  "3d/bg3d",
   "3d/mannequin3d",
   "3d/char",
   "3d/character",
-  "3d/bg3d",
   "3d/sculpt",
   // collaboration (4) — Wave E doors + ephemeral whiteboard
   "collaboration/team",

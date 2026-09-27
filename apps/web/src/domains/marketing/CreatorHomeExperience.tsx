@@ -3,7 +3,7 @@ import { Accessibility, ArrowRight, BookOpen, Bot, Boxes, Brush, Check, Clipboar
 
 import Link from "@/shared/navigation/router-link";
 import { ProductIntentStart } from "@/domains/creator-resources/ProductIntentStart";
-import { PRODUCT_IDENTITY, PRODUCT_START_DESTINATIONS, resolveProductLocale, type ProductStartDestinationId } from "@/shared/lib/product-identity";
+import { PRODUCT_IDENTITY, resolveProductLocale } from "@/shared/lib/product-identity";
 import { useI18n } from "@/shared/lib/i18n";
 import { useTheme } from "@/shared/lib/theme";
 
@@ -18,17 +18,6 @@ import "./creator-home-spacing.css";
 import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { useCreatorHomeSectionNavigation } from "./use-creator-home-section-navigation";
 
-interface LocalizedText {
-  readonly ko: string;
-  readonly en: string;
-}
-
-interface StartMeta {
-  readonly icon: LucideIcon;
-  readonly tag: LocalizedText;
-  readonly action: LocalizedText;
-}
-
 interface FlowStep {
   readonly icon: LucideIcon;
   readonly title: string;
@@ -37,56 +26,21 @@ interface FlowStep {
   readonly action: string;
 }
 
-const START_META: Record<ProductStartDestinationId, StartMeta> = {
-  plan: {
-    icon: BookOpen,
-    tag: { ko: "기획", en: "Planning" },
-    action: { ko: "기획실 열기", en: "Open planning" },
-  },
-  draw: {
-    icon: Brush,
-    tag: { ko: "2D 제작", en: "2D creation" },
-    action: { ko: "새 작품 만들기", en: "Create a new work" },
-  },
-  "three-d": {
-    icon: Boxes,
-    tag: { ko: "3D 제작", en: "3D creation" },
-    action: { ko: "3D 장면 만들기", en: "Create a 3D scene" },
-  },
-  assets: {
-    icon: PackageCheck,
-    tag: { ko: "소재", en: "Assets" },
-    action: { ko: "소재 열기", en: "Open assets" },
-  },
-  collaborate: {
-    icon: Workflow,
-    tag: { ko: "제작·협업", en: "Production" },
-    action: { ko: "제작 흐름 열기", en: "Open production" },
-  },
-  publish: {
-    icon: FileOutput,
-    tag: { ko: "검토·연재", en: "Publishing" },
-    action: { ko: "연재 준비 열기", en: "Prepare to publish" },
-  },
-};
-
 const COPY = {
   ko: {
-    primary: "내 캐릭터를 고르고 시작하기",
+    primary: "새 작품 시작하기",
     secondary: "8분 제품 투어 보기",
     projects: "내 프로젝트",
-    brandFilm: "8분 제품 투어 보기",
+    brandFilm: "창작 이야기 보기",
     trust: ["전문 2D·3D 제작", "자동 저장·버전·복구", "일정·협업·검수·연재"],
-    previewAlt: "기획, 2D·3D 제작, 검토와 연재 준비가 한 프로젝트에서 이어지는 ToonStudio 제품 예시 화면",
-    previewCaption: "대본 → 콘티 → 2D·3D 제작 → 검토 → 연재 준비가 하나의 작품 기록으로 이어집니다.",
+    previewAlt: "햇살이 드는 아틀리에에서 연필 스케치가 채색된 웹툰과 입체적인 이야기 세계로 이어지는 브랜드 콘셉트 아트",
+    previewCaption: "작은 아이디어가 하나의 세계가 될 때까지.",
+    artworkBadge: "AI로 제작한 브랜드 콘셉트 아트",
     previewBadge: "기능 설명용 제품 콘셉트 화면",
     jumpStart: "바로 시작",
     jumpFlow: "전체 제작 흐름",
     jumpPrinciples: "제품 원칙",
     jumpSupport: "소재·협업·도움",
-    toolkitEyebrow: "하려는 일에서 시작",
-    toolkitTitle: "기능 이름을 몰라도,\n바로 만들 수 있습니다.",
-    toolkitIntro: "현재 가진 아이디어·대본·원고에서 시작하세요. 필요한 작업공간과 다음 단계는 ToonStudio가 이어줍니다.",
     bridgeEyebrow: "한 프로젝트, 하나의 제작 공간",
     bridgeTitle: "그리기부터 연재 준비까지,\n작업이 끊기지 않게.",
     bridgeBody: "2D 원고, 3D 장면, 소재, 파일, 일정과 검토가 같은 작품·회차·컷을 가리킵니다. 프로그램 사이에서 파일을 반복해 옮기지 않고 한곳에서 만들고 이어서 작업하세요.",
@@ -106,7 +60,7 @@ const COPY = {
       { icon: PanelsTopLeft, title: "콘티·컷 구성", body: "대본을 장면과 컷으로 나누고 스크롤 리듬과 연출을 설계합니다.", href: "/studio/new", action: "콘티 만들기" },
       { icon: Brush, title: "2D·3D 제작", body: "선화·채색·식자와 캐릭터 포즈·배경·카메라를 직접 제작합니다.", href: "/studio", action: "작업실 열기" },
       { icon: Workflow, title: "일정·협업", body: "역할, 담당자, 선행 작업, 마감과 인수인계를 실제 산출물에 연결합니다.", href: "/production", action: "제작 흐름 보기" },
-      { icon: ClipboardCheck, title: "검토·승인", body: "고정된 검수본에 의견을 남기고 수정본과 승인본을 정확히 구분합니다.", href: "/production/projects/sample-project/review", action: "검토 화면 보기" },
+      { icon: ClipboardCheck, title: "검토·승인", body: "고정된 검수본에 의견을 남기고 수정본과 승인본을 정확히 구분합니다.", href: "/production/projects/sample-project/review", action: "샘플 검토 체험" },
       { icon: FileOutput, title: "연재·배포", body: "규격과 권리를 검사하고 모바일 미리보기와 게시본을 준비합니다.", href: "/studio/publish", action: "연재 준비" },
     ] satisfies FlowStep[],
     principlesEyebrow: "창작자를 중심에 둔 제품 원칙",
@@ -133,21 +87,19 @@ const COPY = {
     closingSecondary: "샘플 제작 흐름 보기",
   },
   en: {
-    primary: "Choose a character and start",
+    primary: "Start a new work",
     secondary: "Watch the 8-minute product tour",
     projects: "My projects",
-    brandFilm: "Watch 8-minute product tour",
+    brandFilm: "Explore our creative story",
     trust: ["Professional 2D and 3D creation", "Autosave, versions and recovery", "Scheduling, collaboration, review and publishing"],
-    previewAlt: "A ToonStudio product concept connecting planning, 2D and 3D creation, review and publishing inside one project",
-    previewCaption: "Script, storyboard, 2D and 3D creation, review and publishing stay connected to one work.",
+    previewAlt: "Brand concept art of a sunlit atelier where pencil sketches become painted webtoon panels and a dimensional story world",
+    previewCaption: "From a small idea to a world of your own.",
+    artworkBadge: "AI-generated brand concept art",
     previewBadge: "Product concept screen for explaining features",
     jumpStart: "Start here",
     jumpFlow: "Full workflow",
     jumpPrinciples: "Product principles",
     jumpSupport: "Assets, people and help",
-    toolkitEyebrow: "Start from your task",
-    toolkitTitle: "Create right away,\neven before you know every feature name.",
-    toolkitIntro: "Start from the idea, script or files you already have. ToonStudio connects the right workspace and the next step.",
     bridgeEyebrow: "One project, one creation space",
     bridgeTitle: "Keep the work moving\nfrom drawing to publishing.",
     bridgeBody: "2D art, 3D scenes, assets, files, schedules and review refer to the same work, episode and panel. Create and continue without repeatedly moving files between applications.",
@@ -167,7 +119,7 @@ const COPY = {
       { icon: PanelsTopLeft, title: "Storyboard and panels", body: "Turn the script into scenes and panels while designing scroll rhythm and direction.", href: "/studio/new", action: "Create a storyboard" },
       { icon: Brush, title: "Create in 2D and 3D", body: "Produce line art, color, lettering, character poses, backgrounds and camera compositions.", href: "/studio", action: "Open the studio" },
       { icon: Workflow, title: "Schedule and collaborate", body: "Connect roles, owners, dependencies, deadlines and handoffs to real deliverables.", href: "/production", action: "Open production" },
-      { icon: ClipboardCheck, title: "Review and approve", body: "Comment on a fixed review version and keep revisions, approvals and releases distinct.", href: "/production/projects/sample-project/review", action: "See review" },
+      { icon: ClipboardCheck, title: "Review and approve", body: "Comment on a fixed review version and keep revisions, approvals and releases distinct.", href: "/production/projects/sample-project/review", action: "Try sample review" },
       { icon: FileOutput, title: "Publish and deliver", body: "Check format and rights, preview mobile reading and prepare a release.", href: "/studio/publish", action: "Prepare to publish" },
     ] satisfies FlowStep[],
     principlesEyebrow: "Creator-first product principles",
@@ -219,7 +171,7 @@ export function CreatorHomeExperience() {
           <h1 id="creator-hero-title">{identity.headline[0]}<br /><em>{identity.headline[1]}</em></h1>
           <p className="cf-lead">{identity.description}</p>
           <div className="cf-actions">
-            <Link href="/onboarding/character?next=%2Fhome" className="cf-button cf-primary">{copy.primary}<ArrowRight size={17} aria-hidden="true" /></Link>
+            <Link href="/studio/new" className="cf-button cf-primary">{copy.primary}<ArrowRight size={17} aria-hidden="true" /></Link>
             <Link href="/product-tour" className="cf-button cf-secondary">{copy.secondary}</Link>
           </div>
           <div className="cf-hero-links">
@@ -231,14 +183,13 @@ export function CreatorHomeExperience() {
           </div>
         </div>
         <figure className="cf-home-preview cf-production-preview">
-          <img src="/brand/production-os-hero.svg" alt={copy.previewAlt} width="1600" height="1120" fetchPriority="high" />
-          <span className="cf-preview-badge"><Sparkles size={13} aria-hidden="true" />{copy.previewBadge}</span>
-          <figcaption>{copy.previewCaption}</figcaption>
+          <img src="/brand/atelier-20260927/creation-world.webp" alt={copy.previewAlt} width="1586" height="992" fetchPriority="high" decoding="async" />
+          <figcaption><span>{copy.previewCaption}</span><span className="cf-artwork-credit"><Sparkles size={13} aria-hidden="true" />{copy.artworkBadge}</span></figcaption>
         </figure>
       </section>
 
-      <div className="cf-shell cf-home-wayfinding">
-        <ProductIntentStart />
+      <div id="creator-start" className="cf-shell cf-home-wayfinding">
+        <ProductIntentStart headingId="creator-toolkit-title" />
         <nav className="cf-jump-nav" aria-label={locale === "ko" ? "홈 주요 영역" : "Home sections"}>
           <CreatorSectionLink sectionId="creator-start">{copy.jumpStart}</CreatorSectionLink>
           <CreatorSectionLink sectionId="creator-flow">{copy.jumpFlow}</CreatorSectionLink>
@@ -246,27 +197,6 @@ export function CreatorHomeExperience() {
           <CreatorSectionLink sectionId="creator-support">{copy.jumpSupport}</CreatorSectionLink>
         </nav>
       </div>
-
-      <section id="creator-start" className="cf-toolkit cf-shell" aria-labelledby="creator-toolkit-title">
-        <div className="cf-section-heading">
-          <div><p className="cf-kicker"><span className="cf-signal" aria-hidden="true" />{copy.toolkitEyebrow}</p><h2 id="creator-toolkit-title" tabIndex={-1}>{copy.toolkitTitle}</h2></div>
-          <p>{copy.toolkitIntro}</p>
-        </div>
-        <div className="cf-start-grid">
-          {PRODUCT_START_DESTINATIONS.filter((destination) => ["plan", "draw", "three-d"].includes(destination.id) || destination.id === "assets").map((destination) => {
-            const meta = START_META[destination.id];
-            const Icon = meta.icon;
-            return (
-              <Link key={destination.id} href={destination.href} className="cf-start-card">
-                <span className="cf-start-icon"><Icon size={24} aria-hidden="true" /></span>
-                <span className="cf-start-tag">{bi(meta.tag.ko, meta.tag.en)}</span>
-                <strong>{bi((destination.label).ko, (destination.label).en)}</strong><p>{bi((destination.description).ko, (destination.description).en)}</p>
-                <span className="cf-start-action">{bi(meta.action.ko, meta.action.en)}<ArrowRight size={15} aria-hidden="true" /></span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
 
       <section className="cf-bridge cf-shell" aria-labelledby="creator-bridge-title">
         <figure className="cf-bridge-visual">

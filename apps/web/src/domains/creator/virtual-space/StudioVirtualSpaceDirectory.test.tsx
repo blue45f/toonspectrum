@@ -32,6 +32,19 @@ describe("Virtual Studio directory", () => {
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByRole("status").textContent).toContain("없어요");
   });
+  it("finds a teammate by real location, work status and permission role", () => {
+    const onSelectPeer = vi.fn();
+    render(<StudioVirtualSpaceDirectory manifest={DEFAULT_STUDIO_WORLD_MANIFEST} peers={[{
+      participant: { sessionId: "reviewer", displayName: "검수자", role: "commenter" },
+      state: studioVirtualSpaceState({ x: 300, y: 200 }, "down", "reviewing", false, 0, "review"),
+      lastSeen: 1, sequence: 1,
+    }]} onMove={vi.fn()} onOpen={vi.fn()} onSelectPeer={onSelectPeer} />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "reviewing commenter" } });
+    fireEvent.click(screen.getByRole("button", { name: /검수자/u }));
+    expect(onSelectPeer).toHaveBeenCalledExactlyOnceWith("reviewer");
+    expect(screen.getByText("의견 참여자")).toBeTruthy();
+    expect(screen.getByText(/원고 검토 중/u)).toBeTruthy();
+  });
 });
 
 it("does not execute a composing Enter and prioritizes direct tool opening on explicit Enter", () => {

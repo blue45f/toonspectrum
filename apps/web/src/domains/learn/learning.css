@@ -1,5 +1,5 @@
 /* Intentionally scoped: never changes the drawing workspace or global theme. */
-.learn-page{--learn-fg:var(--color-fg);--learn-muted:var(--color-fg-2);--learn-bg:var(--color-panel);--learn-line:var(--color-line);--learn-accent:var(--color-accent);color:var(--learn-fg);max-width:1180px;margin:0 auto;padding:24px 24px 0;font-size:16px;line-height:1.7;overflow-wrap:anywhere}
+.learn-page{--learn-fg:var(--color-fg);--learn-muted:var(--color-fg-2);--learn-bg:var(--color-panel);--learn-line:var(--color-line);--learn-accent:var(--color-accent);color:var(--learn-fg);max-width:var(--site-content-max,82.5rem);margin:0 auto;padding:24px var(--site-page-gutter,1.5rem) 0;font-size:16px;line-height:1.7;overflow-wrap:anywhere}
 .learn-page *{box-sizing:border-box}
 .learn-page h1,.learn-page h2,.learn-page h3{color:var(--learn-fg);font-weight:750;line-height:1.3;text-wrap:pretty;margin:0 0 16px;word-break:keep-all;overflow-wrap:anywhere}
 .learn-page h1{font-size:clamp(32px,5vw,58px);letter-spacing:-.045em}

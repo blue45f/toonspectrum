@@ -1,8 +1,10 @@
 import { MapPin, Search, UsersRound } from "lucide-react";
-import { useId, useMemo, useRef, useState, type RefObject, type KeyboardEvent } from "react";
+import { useId, useRef, useState, type RefObject, type KeyboardEvent } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpacePeer, StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 import type { StudioVirtualSpaceWorldManifest, StudioWorldRoomDefinition } from "./studio-virtual-space-world-manifest";
+import { studioTeammateMatches, studioTeammatePresentation } from "./studio-virtual-space-teammates";
+import "./studio-virtual-space-teammates.css";
 
 /** An equivalent keyboard/mobile route to places and people, independent of avatar movement. */
 export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, onSelectPeer, inputRef, expanded = false }: {
@@ -23,8 +25,7 @@ export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, o
   const nameMatch = (room: StudioWorldRoomDefinition) => matches(`${room.labelKo} ${room.labelEn}`);
   const rooms = manifest.rooms.filter((room) => matches(`${room.labelKo} ${room.labelEn} ${room.descriptionKo ?? ""} ${room.descriptionEn ?? ""}`))
     .sort((a, b) => Number(nameMatch(b)) - Number(nameMatch(a)));
-  const people = peers.filter((peer) => matches(peer.participant.displayName));
-  const roomNames = useMemo(() => new Map(manifest.rooms.map((room) => [room.id, bt(room.labelKo, room.labelEn)])), [bt, manifest.rooms]);
+  const people = peers.filter((peer) => studioTeammateMatches(peer, query, manifest));
   const onResultKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
       if (event.key !== "Escape") event.stopPropagation();
       if (event.nativeEvent.isComposing || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
@@ -37,7 +38,7 @@ export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, o
   };
   return <section className="vs2-panel studio-vspace-directory" aria-label={bt("작업실 찾기", "Studio directory")} data-space-interactive="true">
     <h2><Search size={16} aria-hidden />{bt("작업실 찾기", "Find a place or teammate")}</h2>
-    <label htmlFor={inputId}>{bt("방 또는 팀원 이름", "Room or teammate name")}</label>
+    <label htmlFor={inputId}>{bt("방·팀원 이름·작업 상태", "Room, teammate or work status")}</label>
     <input ref={inputRef} id={inputId} type="search" value={query} maxLength={120} autoComplete="off"
       placeholder={bt("리뷰, 드로잉, 팀원…", "Review, drawing, teammate…")}
       onChange={(event) => setQuery(event.target.value)}
@@ -52,12 +53,14 @@ export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, o
       }} />
     <details open={expanded || search ? true : undefined}><summary>{bt("방과 팀원 둘러보기", "Browse rooms and teammates")}</summary><div ref={results} role="group" aria-label={bt("찾기 결과", "Search results")} className="studio-vspace-directory-results">
       {people.length ? <div role="group" aria-label={bt("팀원", "Teammates")}>
-        {people.map((peer) => <button type="button" onKeyDown={onResultKeyDown} className="studio-vspace-directory-person" data-space-result-primary="true" key={peer.participant.sessionId}
+        {people.map((peer) => {
+          const presentation = studioTeammatePresentation(peer, manifest);
+          return <button type="button" onKeyDown={onResultKeyDown} className="studio-vspace-directory-person" data-space-result-primary="true" key={peer.participant.sessionId} data-activity={peer.state.activity}
           onClick={() => onSelectPeer(peer.participant.sessionId)}>
           <UsersRound size={15} aria-hidden /><span><strong>{peer.participant.displayName}</strong>
-            <small>{roomNames.get(peer.state.zoneId)} · {peer.state.activity === "focused" ? bt("집중 중", "Focusing")
-              : peer.state.activity === "away" ? bt("자리비움", "Away") : bt("접속 중", "Online")}</small></span>
-        </button>)}
+            <small><span className="studio-vspace-presence-dot" aria-hidden />{bt(presentation.location.ko, presentation.location.en)} · {bt(presentation.activity.ko, presentation.activity.en)}</small>
+            <small>{bt(presentation.role.ko, presentation.role.en)}</small></span>
+        </button>; })}
       </div> : null}
       {rooms.map((room) => <div className="studio-vspace-directory-place" key={room.id}>
         <strong><MapPin size={14} aria-hidden />{bt(room.labelKo, room.labelEn)}</strong>

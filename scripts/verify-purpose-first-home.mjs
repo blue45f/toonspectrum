@@ -50,11 +50,11 @@ try {
     await page.goto(`${origin}/home`, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await assertStudioWorkspaceHome(page);
     await page.goto(`${origin}/about/studio`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await page.locator("#product-intent-title").waitFor({ timeout: 60_000 });
+    await page.locator("#creator-toolkit-title").waitFor({ timeout: 60_000 });
     await page.locator('[data-creator-home="production-first"]').waitFor({ timeout: 60_000 });
     await page.evaluate(() => document.fonts.ready);
 
-    const purposeTitle = page.locator("#product-intent-title");
+    const purposeTitle = page.locator("#creator-toolkit-title");
     assert.equal(await purposeTitle.count(), 1, `Purpose title must be unique: ${name}`);
     assert(await purposeTitle.isVisible(), `Purpose title must be visible: ${name}`);
     assert.equal(await page.locator("video").count(), 0, `Video must stay lazy before gesture: ${name}`);

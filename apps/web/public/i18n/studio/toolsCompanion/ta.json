@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "அடுக்கு {count}",
   "studio.toolsCompanion.review.section.comments": "கருத்து {count}",
   "studio.toolsCompanion.review.section.history": "பதிவு {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE பக்கலேபிள்}·{தேர்வுலேபிள் ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "ஆய்வு பணியகம்",
   "studio.toolsCompanion.review.truncatedComments": "மற்றும் {count} கருத்துகள்",
   "studio.toolsCompanion.review.truncatedLayers": "{count} அடுக்குகள்",

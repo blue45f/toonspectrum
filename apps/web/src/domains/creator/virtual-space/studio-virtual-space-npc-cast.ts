@@ -1,5 +1,6 @@
 import type { StudioVirtualSpaceFacing } from "./studio-virtual-space-model";
 import type { StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
+import { studioNativeNpcSkin } from "./studio-virtual-space-npc-native-art";
 import {
   studioCharacterSkinForArtStyle,
   type StudioCharacterAction,
@@ -106,6 +107,8 @@ function poseSheet(key: StudioNpcCastKey, pose: "wave" | "sit"): StudioCharacter
 }
 
 function npcSkin(key: StudioNpcCastKey, labelKo: string, labelEn: string): StudioCharacterSkin {
+  const native = studioNativeNpcSkin(key, labelKo, labelEn);
+  if (native) return native;
   return Object.freeze({
     key,
     labelKo,
@@ -123,11 +126,7 @@ function npcSkin(key: StudioNpcCastKey, labelKo: string, labelEn: string): Studi
   });
 }
 
-/**
- * Semantic role registry backed by the independent v5 webtoon pack. Runtime art directions
- * replace every NPC texture with separately rendered style-specific images while preserving the
- * canonical identity key used by authored worlds and interaction contracts.
- */
+/** 원본 역할·identity·동선을 유지한다. 전용 4종은 독립 작화를, 나머지 역할은 기존 테마 자산을 사용한다. */
 export const STUDIO_NPC_CAST: readonly StudioCharacterSkin[] = Object.freeze([
   npcSkin("npc-concierge", "모아 · 컨시어지", "Moa · Concierge"),
   npcSkin("npc-producer", "윤 · 프로듀서", "Yoon · Producer"),

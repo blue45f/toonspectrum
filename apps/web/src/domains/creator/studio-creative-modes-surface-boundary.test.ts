@@ -48,7 +48,7 @@ describe("Studio creative modes surface", () => {
     expect(canvasMenu).toContain('commandId: "canvas.sticky-note"');
     expect(canvasMenu).toContain("스티키 노트");
     expect(storyMenu).toContain('commandId: "insert.sculpt-3d"');
-    expect(storyMenu).toContain("3D 스컬프트…");
+    expect(storyMenu).toContain("정밀 3D 모델링…");
     expect(collabMenu).toContain('commandId: "collaboration.ephemeral-board"');
     expect(collabMenu).toContain("빠른 화이트보드…");
   });

@@ -11,6 +11,10 @@ on:
       - 'scripts/integration-test-runner-ci-policy.test.mjs'
       - 'scripts/verify-studio-menus.mts'
       - 'scripts/verify-studio-menus-ci.mjs'
+      - 'scripts/verify-studio-menus.test.ts'
+      - 'apps/web/src/domains/creator/offline-branch/**'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-deferred-stroke-commit*'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher.ts'
       - 'apps/web/src/domains/creator/StudioBetaNoticeGate.tsx'
       - 'apps/web/src/domains/creator/studio-beta-notice-storage.ts'
       - 'apps/web/vite.config.ts'
@@ -35,6 +39,10 @@ on:
       - 'scripts/integration-test-runner-ci-policy.test.mjs'
       - 'scripts/verify-studio-menus.mts'
       - 'scripts/verify-studio-menus-ci.mjs'
+      - 'scripts/verify-studio-menus.test.ts'
+      - 'apps/web/src/domains/creator/offline-branch/**'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-deferred-stroke-commit*'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher.ts'
       - 'apps/web/src/domains/creator/StudioBetaNoticeGate.tsx'
       - 'apps/web/src/domains/creator/studio-beta-notice-storage.ts'
       - 'apps/web/vite.config.ts'
@@ -92,6 +100,13 @@ jobs:
             apps/web/src/domains/creator/StudioInspectorBatchRenameSection.test.tsx \
             apps/web/src/domains/creator/studio-inspector-multi-selection-boundary.test.ts \
             apps/web/src/domains/creator/StudioInspectorOrderAlignSection.test.tsx
+      - name: Verify canonical resize and offline rejection contracts
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/offline-branch/studio-offline-branch-runtime.test.ts \
+            apps/web/src/domains/creator/offline-branch/studio-offline-host-integration.test.ts \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-deferred-stroke-commit.test.ts \
+            scripts/verify-studio-menus.test.ts
       - name: Build production browser without repeating the core typecheck
         shell: bash
         run: |

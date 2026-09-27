@@ -67,6 +67,18 @@ test("production integrity follows the real menu verifier and its CI bootstrap",
       + "        run: pnpm exec tsx scripts/verify-studio-menus-ci.mjs\n",
   ));
   assert.doesNotMatch(productionIntegritySource, /run: pnpm run verify:studio-menus/u);
+  const authorityStep = productionIntegritySource.slice(
+    productionIntegritySource.indexOf("      - name: Verify canonical resize and offline rejection contracts\n"),
+    productionIntegritySource.indexOf("      - name: Build production browser without repeating the core typecheck\n"),
+  );
+  assert.match(authorityStep, /run: \|\n {10}pnpm exec vitest run/u);
+  for (const target of [
+    "apps/web/src/domains/creator/offline-branch/studio-offline-branch-runtime.test.ts",
+    "apps/web/src/domains/creator/offline-branch/studio-offline-host-integration.test.ts",
+    "apps/web/src/domains/creator/studio-cuttoon-editor/studio-deferred-stroke-commit.test.ts",
+    "scripts/verify-studio-menus.test.ts",
+  ]) assert.ok(authorityStep.includes(target), `missing paired authority contract: ${target}`);
+  assert.doesNotMatch(authorityStep, /continue-on-error|if:|\|\| true/u);
 });
 
 test("core retains every mandatory quality lane without a bypass", () => {
@@ -254,6 +266,8 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "apps/web/public/assets/virtual-studio/imagegen25-v7/places/personal-atelier.webp",
     "apps/web/public/assets/virtual-studio/imagegen25-v7/backgrounds/sky.webp",
     "apps/web/public/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp",
+    ...["art-manifest.json", "sky.png", "forest.png", "coast.png", "city.png", "furniture.png", "terrain.png"]
+      .map((file) => `apps/web/public/assets/virtual-studio/experience-v8/${file}`),
     "apps/web/public/assets/virtual-studio/world-v2/manifest.json",
     "apps/web/public/assets/virtual-studio/world-v2/tiles/limestone-native.png",
     "apps/web/public/assets/virtual-studio/world-v2/tiles/grass-native.png",
@@ -295,6 +309,7 @@ test("sparse lanes exclude artwork until foundation restores exactly its require
     "/apps/web/public/assets/virtual-studio/style-packs-v5/",
     "/apps/web/public/assets/virtual-studio/living-town-v6/",
     "/apps/web/public/assets/virtual-studio/imagegen25-v7/",
+    "/apps/web/public/assets/virtual-studio/experience-v8/",
     "/apps/web/public/assets/virtual-studio/world-v2/",
     "/apps/web/public/assets/studio/props/",
   ]);
