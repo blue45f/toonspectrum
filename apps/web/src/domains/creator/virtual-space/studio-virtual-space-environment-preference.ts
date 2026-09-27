@@ -71,5 +71,5 @@ export function patchStudioVirtualEnvironmentPreference(
 }
 
 export function studioVirtualBackdropUrl(backdrop: StudioVirtualBackdrop): string {
-  return `/assets/virtual-studio/imagegen25-v7/backgrounds/${backdrop}.webp`;
+  return `/assets/virtual-studio/experience-v8/${backdrop}.png`;
 }

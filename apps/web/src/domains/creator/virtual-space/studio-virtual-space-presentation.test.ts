@@ -4,6 +4,7 @@ import {
   StudioFixedStepPose,
   StudioPeerTimeline,
   studioCameraLerp,
+  studioCameraZoom,
   studioCoverRect,
   studioGaitFrame,
   studioRenderViewport,
@@ -20,6 +21,16 @@ const openWorld = { ...DEFAULT_STUDIO_WORLD_MANIFEST, width: 500, height: 500, c
 };
 
 describe("Virtual Studio art and presentation", () => {
+  it("세로 모바일 화면과 가로 회전에서 주변 600px 동선을 유지한다", () => {
+    for (const [width, height] of [[390, 844], [458, 1100], [844, 390], [1440, 900]]) {
+      const zoom = studioCameraZoom(width!, height!);
+      expect(width! / zoom).toBeGreaterThanOrEqual(599);
+      expect(height! / zoom).toBeGreaterThanOrEqual(419);
+      expect(zoom).toBeLessThanOrEqual(1.2);
+    }
+    expect(studioCameraZoom(390, 844, 2) / 2).toBe(studioCameraZoom(390, 844, 1));
+    expect(Number.isFinite(studioCameraZoom(NaN, Infinity, NaN))).toBe(true);
+  });
   it("keeps explicit gait technique, frame count and source paths for every skin/direction", () => {
     for (const skin of STUDIO_CHARACTER_SKINS) for (const direction of ["down", "left", "right", "up"] as const) {
       const clip = skin.clips?.[`walk-${direction}`];

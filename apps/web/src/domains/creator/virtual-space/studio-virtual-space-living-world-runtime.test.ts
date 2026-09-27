@@ -112,6 +112,18 @@ describe("직접 작성한 타일 월드의 환경 표현", () => {
     h.runtime.destroy();
   });
 
+  it("배경 밀도가 날씨 수에 반영되고 접근성 설정을 우회하지 않는다", () => {
+    const h = harness();
+    const environment = { ...DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT, weather: "petals" as const };
+    for (const [mode, expected] of [["minimal", 5], ["decorated", 9], ["festival", 12]] as const) {
+      h.runtime.update(1000, 16, { x: 100, y: 100 }, 0, false, undefined, "balanced", environment, mode);
+      expect(h.textured(keys.weather).filter((item) => item.visible)).toHaveLength(expected);
+    }
+    h.runtime.update(1100, 16, { x: 100, y: 100 }, 0, true, undefined, "low", environment, "festival");
+    expect(h.textured(keys.weather).filter((item) => item.visible)).toHaveLength(0);
+    h.runtime.destroy();
+  });
+
   it("reduced motion에서 환경 이동을 멈추며 명시 효과만 요청한 좌표에 생성한다", () => {
     const h = harness();
     const before = h.objects.map((item) => ({ x: item.x, y: item.y, tx: item.tilePositionX, ty: item.tilePositionY }));

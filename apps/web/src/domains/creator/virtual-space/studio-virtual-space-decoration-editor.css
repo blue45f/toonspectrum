@@ -1,0 +1,11 @@
+.studio-decoration-editor__map{display:block;width:100%;max-height:340px;border:1px solid var(--vs2-line);border-radius:12px;color:var(--vs2-fg);touch-action:manipulation}
+.studio-decoration-editor__map:focus-visible,.studio-decoration-editor__object:focus-visible{outline:3px solid var(--color-accent);outline-offset:3px}
+.studio-decoration-editor__object{cursor:pointer}
+.studio-decoration-editor__select{display:grid;gap:6px;font-size:13px;font-weight:700}
+.studio-decoration-editor__select select{min-width:0;min-height:44px;border:1px solid var(--vs2-line);border-radius:10px;padding:8px;background:var(--vs2-panel-2);color:var(--vs2-fg);font-size:14px}
+.studio-decoration-editor__controls,.studio-decoration-history{display:flex;flex-wrap:wrap;gap:6px}
+.studio-vspace-customization .studio-decoration-editor__controls button,.studio-vspace-customization .studio-decoration-history button{min-height:44px;padding:8px 10px;font-size:12px}
+.studio-vspace-customization button:disabled{cursor:not-allowed;opacity:.45}
+.studio-vspace-customization .studio-decoration-editor>p,.studio-decoration-notice{font-size:12px;line-height:1.55;color:var(--vs2-muted)}
+.studio-decoration-notice{margin:0;padding:10px 12px;border:1px solid var(--vs2-line);border-radius:10px}
+@media(max-width:640px){.studio-vspace-customization button{min-height:44px;font-size:12px}.studio-vspace-customization legend{font-size:13px}.studio-vspace-customization fieldset>p{font-size:12px}.studio-vspace-customization-districts strong{font-size:12px}.studio-vspace-customization-districts small{font-size:11px}.studio-vspace-customization-catalog{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.studio-decoration-editor__controls button{flex:1 1 40%}.studio-decoration-editor__map{min-height:210px}}

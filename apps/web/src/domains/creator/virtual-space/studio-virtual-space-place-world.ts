@@ -172,16 +172,15 @@ function floorCell(spec: PlaceLayoutSpec, x: number, y: number): boolean {
 function buildTileData(place: StudioVirtualPlaceDefinition, spec: PlaceLayoutSpec) {
   const seed = placeIndex(place.id);
   const ground = Array.from({ length: MAP_COLUMNS * MAP_ROWS }, (_, index) => {
-    const x = index % MAP_COLUMNS;
     const y = Math.floor(index / MAP_COLUMNS);
-    if (spec.shape === "beach" && y >= 8) return 13 + ((x + seed) % 4);
-    return spec.baseFrame + ((x * 3 + y + seed) % 2);
+    if (spec.shape === "beach" && y >= 8) return 4;
+    return spec.baseFrame;
   });
   const floor = ground.map((_, index) => {
     const x = index % MAP_COLUMNS;
     const y = Math.floor(index / MAP_COLUMNS);
     if (!floorCell(spec, x, y)) return 0;
-    return spec.floorFrame + ((x + y + seed) % 2);
+    return spec.floorFrame;
   });
   const accent = ground.map((_, index) => {
     const x = index % MAP_COLUMNS;

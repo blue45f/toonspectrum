@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION,
@@ -18,7 +18,7 @@ const CHARACTER_STORAGE_KEY = "toonspectrum:virtual-space-character-customizatio
 const DECOR_STORAGE_KEY = "toonspectrum:virtual-space-decoration:v1";
 
 beforeEach(() => localStorage.clear());
-afterEach(() => localStorage.clear());
+afterEach(() => { localStorage.clear(); vi.restoreAllMocks(); });
 
 describe("Virtual Studio safe customization", () => {
   it("accepts only allowlisted cosmetic tokens", () => {
@@ -86,5 +86,38 @@ describe("Virtual Studio safe customization", () => {
     expect(added.placements).toHaveLength(1);
     expect(parseStudioVirtualDecorationState(added)).toEqual(added);
     expect(removeStudioVirtualDecoration(added, added.placements[0]!.id).placements).toEqual([]);
+  });
+
+  it("장소별 배치를 분리하며 읽기는 기존 저장본을 바꾸지 않는다", () => {
+    const legacy = studioVirtualDecorationPreset("festival");
+    writeStudioVirtualDecorationState(legacy);
+    const writer = vi.spyOn(Storage.prototype, "setItem");
+    expect(readStudioVirtualDecorationState("project-a:skyport")).toEqual(legacy);
+    expect(writer).not.toHaveBeenCalled();
+    const personal = studioVirtualDecorationPreset("minimal");
+    expect(writeStudioVirtualDecorationState(personal, "project-a:skyport")).toBe(true);
+    expect(readStudioVirtualDecorationState("project-a:skyport")).toEqual(personal);
+    expect(readStudioVirtualDecorationState("project-b:skyport")).toEqual(legacy);
+    expect(readStudioVirtualDecorationState()).toEqual(legacy);
+    localStorage.setItem(`${DECOR_STORAGE_KEY}:${encodeURIComponent("project-a:skyport")}`, "{");
+    expect(readStudioVirtualDecorationState("project-a:skyport").presetKey).toBe("creator-garden");
+  });
+
+  it("실제 월드 크기와 새 가구를 저장하고 비정상 수치·부분 크기는 거부한다", () => {
+    const state = { ...studioVirtualDecorationPreset("minimal"), layoutWidth: 1600, layoutHeight: 1200,
+      placements: [{ id: "desk-a", type: "drawing-desk" as const, x: 1400, y: 1000, rotation: 90 as const, scale: 1 }] };
+    expect(writeStudioVirtualDecorationState(state, "large-world")).toBe(true);
+    expect(readStudioVirtualDecorationState("large-world")).toEqual(state);
+    expect(parseStudioVirtualDecorationState({ ...state, layoutHeight: undefined })).toBeNull();
+    expect(parseStudioVirtualDecorationState({ ...state, placements: [{ ...state.placements[0], scale: Number.NaN }] })).toBeNull();
+    expect(parseStudioVirtualDecorationState({ ...state, placements: [{ ...state.placements[0], rotation: "90" }] })).toBeNull();
+  });
+
+  it("같은 밀리초에서 가구를 반복 추가해도 식별자가 겹치지 않는다", () => {
+    vi.spyOn(Date, "now").mockReturnValue(1700000000000);
+    let state = studioVirtualDecorationPreset("minimal");
+    for (let index = 0; index < 12; index += 1) state = addStudioVirtualDecoration(state, "rug", { x: 100, y: 100 });
+    expect(new Set(state.placements.map((item) => item.id)).size).toBe(12);
+    expect(parseStudioVirtualDecorationState(state)).not.toBeNull();
   });
 });

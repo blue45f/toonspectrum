@@ -176,6 +176,16 @@ async function accept(request: StudioSpaceSocialRequest): Promise<void> {
 // The transport and renderer are boundaries; these tests execute the real Page's
 // activity ownership, UI events, engine bridge and Huddle event integration.
 describe("Virtual Studio social activity ownership", () => {
+  it("모바일 추가 메뉴에서 키보드 없이 방 찾기와 마을 활동을 연다", async () => {
+    await mount("space");
+    const menu = screen.getByRole("navigation", { name: "추가 스튜디오 기능" });
+    fireEvent.click(within(menu).getByRole("button", { name: "방·팀원 찾기" }));
+    expect(await screen.findByRole("dialog", { name: "방·팀원 찾기" })).toBeTruthy();
+    await showPanel("space");
+    fireEvent.click(within(screen.getByRole("navigation", { name: "추가 스튜디오 기능" })).getByRole("button", { name: "마을 활동" }));
+    expect(await screen.findByRole("dialog", { name: "살아 있는 제작 마을" })).toBeTruthy();
+  });
+
   it("프로젝트 환경 설정에서 모바일 전용 메뉴 밖의 실시간 연결 진단을 연다", async () => {
     await mount("space");
     await act(async () => {
@@ -207,6 +217,19 @@ describe("Virtual Studio social activity ownership", () => {
     fireEvent.click(screen.getByRole("button", { name: "꾸미기" }));
     expect(screen.getByDisplayValue("저장 전 닉네임")).toBeTruthy();
     expect(screen.getByRole("button", { name: "저장" }).hasAttribute("disabled")).toBe(false);
+  });
+  it("이미 선택한 배경 장소를 눌러도 해당 환경 프리셋을 다시 적용한다", async () => {
+    await mount("space");
+    expect(f.engine?.decorations?.districtKey).toBe("atelier-gardens");
+    expect(f.engine?.environmentPreference?.backdrop).toBe("sky");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "꾸미기" }));
+      await import("./StudioVirtualSpaceCustomizationPanel");
+    });
+    const district = await screen.findByRole("button", { name: /아틀리에 정원/ });
+    expect(district.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(district);
+    expect(f.engine?.environmentPreference).toMatchObject({ backdrop: "forest", dayPhase: "day", weather: "petals" });
   });
   it("개인 공간은 프로젝트 전용 패널을 숨기고 캐릭터와 장소 설정을 유지한다", async () => {
     render(<MemoryRouter initialEntries={["/studio/personal-local/virtual?activity=board"]}>

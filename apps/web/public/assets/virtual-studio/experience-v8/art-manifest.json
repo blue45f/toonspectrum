@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "createdAt": "2026-09-27",
+  "descriptionKo": "가상 스튜디오용 원경과 가구 아트. 내장 도구는 모델 버전을 노출하지 않으므로 특정 버전을 인증하지 않는다.",
+  "assets": [
+    {
+      "file": "sky.png",
+      "bytes": 3084314,
+      "sha256": "ab98128d1e32a73addd80e4900503fd90fa4bde5ad9b02498693cb37b257e12a",
+      "source": "built-in image_gen",
+      "modelVersion": null,
+      "prompt": "Use case: stylized-concept. Asset type: production landscape background for an actual 2D virtual-office game, landscape 1536x1024. Primary request: A radiant floating-island webtoon creator campus horizon: distant emerald islands, delicate white waterfalls falling into luminous turquoise mist, ivory observatories, tiny pastel-roof atelier villages, elegant arched bridges, drifting fluffy clouds, warm sunrise gold and lavender sky. Spacious luminous center, intricate scenery around the left/right and bottom perimeter. Style: high-end hand-painted animated feature background, cozy fantasy adventure game, crisp silhouettes and beautifully rendered painterly materials, subtle anime linework, rich luminous colors, polished miniature architecture; elevated top-down three-quarter horizon perspective. This is distant noninteractive scenery behind a tile-based playable floor, not a floor map. No player characters, no UI, no borders, no grids, no text, no logos, no labels, no watermark. Full bleed edge-to-edge illustration. Keep vivid appeal and high visual detail while readable when scaled to mobile."
+    },
+    {
+      "file": "forest.png",
+      "bytes": 3623685,
+      "sha256": "36af32173f8a268c6655cc8034148524e318e00856a949c5b7306de67edb4e00",
+      "source": "built-in image_gen",
+      "modelVersion": null,
+      "prompt": "Use case: stylized-concept. Asset type: production landscape background for an actual 2D virtual-office game, landscape 1536x1024. Primary request: An enchanted tree-library creator campus horizon: enormous ancient trees supporting cozy copper-roof studios and golden lantern reading rooms, glass greenhouse ateliers, suspended bridges, fireflies, luminous blue brook, richly layered emerald and teal foliage, dappled sunrays. Spacious clearing through the central third with distant hazy landscape. Style: high-end hand-painted animated feature background, cozy fantasy adventure game, crisp silhouettes and beautifully rendered painterly materials, subtle anime linework, rich luminous colors, polished miniature architecture; elevated top-down three-quarter horizon perspective. This is distant noninteractive scenery behind a tile-based playable floor, not a floor map. No player characters, no UI, no borders, no grids, no text, no logos, no labels, no watermark. Full bleed edge-to-edge illustration. Keep vivid appeal and high visual detail while readable when scaled to mobile."
+    },
+    {
+      "file": "coast.png",
+      "bytes": 3394824,
+      "sha256": "d27994be5f270d9e5d0c5c9e0ed7db54b0fd3f1b087d6ffc7ac07c1bad699a41",
+      "source": "built-in image_gen",
+      "modelVersion": null,
+      "prompt": "Use case: stylized-concept. Asset type: production landscape background for an actual 2D virtual-office game, landscape 1536x1024. Primary request: A magnificent seaside webtoon atelier horizon: jewel turquoise ocean and gentle sparkling surf, white sandstone islands, Mediterranean peach-roof creator studios, blooming bougainvillea, wooden boardwalks, sailboats far away, golden evening light, pink coral clouds. Broad serene luminous ocean visible through center with detailed buildings at left and right edges. Style: high-end hand-painted animated feature background, cozy fantasy adventure game, crisp silhouettes and beautifully rendered painterly materials, subtle anime linework, rich luminous colors, polished miniature architecture; elevated top-down three-quarter horizon perspective. This is distant noninteractive scenery behind a tile-based playable floor, not a floor map. No player characters, no UI, no borders, no grids, no text, no logos, no labels, no watermark. Full bleed edge-to-edge illustration. Keep vivid appeal and high visual detail while readable when scaled to mobile."
+    },
+    {
+      "file": "city.png",
+      "bytes": 3195744,
+      "sha256": "ee7d7bd63cc02cc7eb4f86d53a606fd4fc382d50ca7f02a8d8f159206cd7fa98",
+      "source": "built-in image_gen",
+      "modelVersion": null,
+      "prompt": "Use case: stylized-concept. Asset type: production landscape background for an actual 2D virtual-office game, landscape 1536x1024. Primary request: A spectacular night creator-city horizon: layered rooftop webtoon ateliers, colorful neon-lit windows with no writing, violet and cyan holographic rings, warm amber cafes, aerial garden bridges, hanging plants, rainy reflections far below, starry cobalt sky and distant towers. Clear atmospheric center and rich edge detail. Style: high-end hand-painted animated feature background, cozy fantasy adventure game, crisp silhouettes and beautifully rendered painterly materials, subtle anime linework, rich luminous colors, polished miniature architecture; elevated top-down three-quarter horizon perspective. This is distant noninteractive scenery behind a tile-based playable floor, not a floor map. No player characters, no UI, no borders, no grids, no text, no logos, no labels, no watermark. Full bleed edge-to-edge illustration. Keep vivid appeal and high visual detail while readable when scaled to mobile."
+    },
+    {
+      "file": "furniture.png",
+      "bytes": 2109987,
+      "sha256": "a6b93c4e7a4075b024a7fbad0e932eee650ffcee10dd7c2b4a92290f1c4b4546",
+      "width": 1254,
+      "height": 1254,
+      "columns": 4,
+      "rows": 4,
+      "source": "built-in image_gen",
+      "modelVersion": null,
+      "prompt": "Use case: stylized-concept. Asset type: production transparent furniture sprite atlas for a cozy top-down fantasy virtual-office game. Make a square 1536x1536 RGBA transparent sprite sheet in an EXACT 4 columns by 4 rows regular grid, each cell 384x384 pixels. Each object isolated fully inside its own equal cell, no grid lines, no text, no numbers, no background floor, generous transparent padding, common ground contact baseline 85% down every cell. Consistent elevated front three-quarter view, beautifully detailed hand-painted anime RPG props, crisp contours, soft contact shadows, warm wood and ivory ceramic with violet turquoise and gold accents, luminous cozy studio style. Exactly these 16 objects in reading order: ROW1 small flowering cherry tree, lush rectangular flower planter, carved wooden park bench, elegant glowing brass garden lamp. ROW2 festival pennant arch, tiny wooden market kiosk with teal canopy, circular turquoise magical fountain, ornate luminous violet portal arch. ROW3 violet patterned oval rug, carved wooden direction sign with blank boards, round coral beach parasol on stand, cute curled orange cat. ROW4 professional webtoon drawing desk with pen display and desk light, tall wooden bookcase full of colorful books, standing double-width cork review board with small blank manuscript sheets pinned, plush teal two-seat sofa with pillows. Readable silhouettes even when rendered small, polished high-quality sprites. NO characters other than the cat, no perspective floor, no watermark. Strict regular 4x4 layout, no object crossing cell boundaries."
+    },
+    {
+      "file": "terrain.png",
+      "bytes": 2852955,
+      "sha256": "6804936915fa93b379e8127e8f0751312a8153e5fce3e30fc6059ab50cc29ca1",
+      "width": 1254,
+      "height": 1254,
+      "columns": 4,
+      "rows": 4,
+      "source": "built-in image_gen",
+      "modelVersion": null,
+      "prompt": "Use case: stylized-concept. Asset type: actual game-ready 4x4 terrain material texture atlas for a top-down cozy fantasy RPG virtual office. A square 1536x1536 image divided into EXACT 4 columns and 4 rows of equal square material cells, no margins, no gutters, no border, no words, no UI. Every cell is a completely flat orthographic TOP-DOWN texture swatch that fills its cell edge to edge. Fine detailed clean hand-painted anime game textures, subtle restrained contrast so characters read clearly, not an illustration of a room. Individual textures should repeat seamlessly. Materials in reading order: ROW1 lush softly variegated mint-green grass; dark slate retaining-wall stone; weathered brown wood planks; luminous turquoise shallow water with subtle ripples. ROW2 soft grey cobblestone footpath; elegant ivory limestone floor with very faint seams; dark warm wooden boardwalk; warm fine pale golden sand. ROW3 polished honey oak interior floorboards; light cream maple wood floorboards; reddish cedar stage planks; midnight violet smooth arcade floor with tiny sparse cyan geometric flecks. ROW4 golden beach sand with a few tiny pastel shells; pale lavender marble walkway; charcoal grey studio carpet with tiny blue thread detail; decorative subtle teal and ivory mosaic floor. Straight overhead texture only, no isometric cubes, no objects, no shadows of furniture, no dramatic large motifs, no high-contrast checkerboard, no lettering. Uniform scale and consistent soft neutral illumination across all 16 cells."
+    }
+  ]
+}

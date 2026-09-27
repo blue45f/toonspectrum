@@ -32,7 +32,7 @@ describe("Virtual Studio environment preference", () => {
     })).toBeNull();
   });
 
-  it("resolves only bundled ImageGen 2.5 backdrop paths", () => {
-    expect(studioVirtualBackdropUrl("coast")).toBe("/assets/virtual-studio/imagegen25-v7/backgrounds/coast.webp");
+  it("새 원경은 검토한 내장 아트만 사용한다", () => {
+    expect(studioVirtualBackdropUrl("coast")).toBe("/assets/virtual-studio/experience-v8/coast.png");
   });
 });

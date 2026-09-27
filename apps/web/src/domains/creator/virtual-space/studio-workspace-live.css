@@ -95,7 +95,13 @@
  .vs2-shell--project .studio-vspace-avatar-nameplate{bottom:-1.15rem;max-width:9rem;min-height:1.65rem;padding:.2rem .55rem;font-size:.75rem;line-height:1.2}
  .vs2-shell--project .studio-vspace-avatar-self-badge{right:-.2rem;top:.2rem;min-width:1.7rem;min-height:1.35rem;align-content:center;font-size:.62rem}
  .studio-vspace-mobile-more-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin-bottom:.85rem}
- .studio-vspace-mobile-more-grid :is(button,a){display:flex;min-height:48px;align-items:center;justify-content:center;gap:.4rem;border:1px solid var(--vs2-line);border-radius:.75rem;background:var(--vs2-panel-2);color:var(--vs2-fg);font-size:.75rem;font-weight:850;text-decoration:none}
+ .studio-vspace-mobile-more-grid :is(button,a){display:flex;min-width:0;min-height:48px;align-items:center;justify-content:center;gap:.4rem;padding:.5rem;border:1px solid var(--vs2-line);border-radius:.75rem;background:var(--vs2-panel-2);color:var(--vs2-fg);font-size:.8125rem;font-weight:850;line-height:1.4;text-align:center;text-decoration:none;white-space:normal;overflow-wrap:anywhere}
+ .studio-vspace-mobile-more-grid svg{flex:0 0 auto}
+ .studio-vspace-today-board header p,.studio-vspace-today-board h3,.studio-vspace-today-metrics span{font-size:.75rem}
+ .studio-vspace-today-board>p,.studio-vspace-today-list small,.studio-vspace-today-board>footer a{font-size:.8125rem;line-height:1.5}
+ .studio-vspace-today-list article{display:grid;grid-template-columns:minmax(0,1fr)}
+ .studio-vspace-today-list strong{font-size:.9375rem;line-height:1.5;overflow-wrap:anywhere}
+ .studio-vspace-today-list button,.studio-vspace-today-list a{min-height:44px;justify-content:center;font-size:.8125rem;white-space:normal}
  .workspace-inspector[data-presentation=adaptive],.workspace-inspector[data-presentation=nonmodal]{inset:auto 0 0!important;z-index:140!important;width:100%!important;max-width:none!important;max-height:92dvh!important;border-radius:1.25rem 1.25rem 0 0!important}
 }
 

@@ -1,0 +1,88 @@
+import { useId, useState } from "react";
+import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import { removeStudioVirtualDecoration, STUDIO_VIRTUAL_DECOR_FRAME, type StudioVirtualDecorationState, type StudioVirtualDecorType } from "./studio-virtual-space-customization";
+import { editStudioVirtualDecoration, studioVirtualDecorBounds, studioVirtualDecorationStateForWorld, type StudioDecorationLayoutResult } from "./studio-virtual-space-decoration-layout";
+import type { StudioVirtualSpacePoint } from "./studio-virtual-space-model";
+import { studioWorldCollisionRects, type StudioVirtualSpaceWorldManifest } from "./studio-virtual-space-world-manifest";
+import { studioWorldLayoutPointer } from "./studio-world-layout-edit";
+
+const LABELS: Readonly<Record<StudioVirtualDecorType, readonly [string, string]>> = {
+  tree: ["나무", "Tree"], "flower-bed": ["화단", "Flower bed"], bench: ["벤치", "Bench"], lamp: ["조명", "Lamp"],
+  banner: ["배너", "Banner"], "market-stall": ["마켓 부스", "Market stall"], fountain: ["분수", "Fountain"],
+  portal: ["포털", "Portal"], rug: ["러그", "Rug"], sign: ["안내판", "Sign"], parasol: ["파라솔", "Parasol"], pet: ["고양이", "Cat"],
+  "drawing-desk": ["드로잉 데스크", "Drawing desk"], bookshelf: ["책장", "Bookshelf"], "review-board": ["원고 리뷰 보드", "Review board"], sofa: ["소파", "Sofa"],
+};
+
+export function StudioVirtualSpaceDecorationEditor({ world, decorations, selfPoint, onChange }: {
+  readonly world: StudioVirtualSpaceWorldManifest;
+  readonly decorations: StudioVirtualDecorationState;
+  readonly selfPoint: StudioVirtualSpacePoint;
+  readonly onChange: (result: StudioDecorationLayoutResult) => void;
+}) {
+  const bt = useBilingual("StudioVirtualSpaceDecorationEditor"), id = useId();
+  const [selection, setSelection] = useState<{ worldId: string; id: string } | null>(null);
+  const state = studioVirtualDecorationStateForWorld(decorations, world);
+  const selected = selection?.worldId === world.id ? state.placements.find((item) => item.id === selection.id) : undefined;
+  const choose = (itemId: string) => setSelection({ worldId: world.id, id: itemId });
+  const move = (dx: number, dy: number) => {
+    if (selected) onChange(editStudioVirtualDecoration(state, selected.id, { x: selected.x + dx, y: selected.y + dy }, world, selfPoint));
+  };
+  return <fieldset className="studio-decoration-editor">
+    <legend>{bt("가구 배치 편집", "Edit furniture layout")}</legend>
+    <p id={`${id}-help`}>{bt("가구를 고른 뒤 지도의 빈 바닥을 누르거나 이동 버튼을 사용하세요. 화살표 키로 16px, Shift와 함께 1px씩 조정합니다.", "Select furniture, then tap an empty floor or use the movement buttons. Arrow keys move 16 pixels; hold Shift for 1 pixel.")}</p>
+    <svg className="studio-decoration-editor__map" viewBox={`0 0 ${world.width} ${world.height}`} role="group" tabIndex={0}
+      aria-label={bt("가구 배치 지도", "Furniture layout map")} aria-describedby={`${id}-help`}
+      onClick={(event) => {
+        if (!selected) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const point = studioWorldLayoutPointer({ x: event.clientX, y: event.clientY }, { x: rect.left, y: rect.top, width: rect.width, height: rect.height }, world);
+        if (point) onChange(editStudioVirtualDecoration(state, selected.id, { x: Math.round(point.x / 16) * 16, y: Math.round(point.y / 16) * 16 }, world, selfPoint));
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") { setSelection(null); return; }
+        if (!selected || event.altKey || event.metaKey || event.ctrlKey) return;
+        const movements: Readonly<Record<string, readonly [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+        const delta = movements[event.key];
+        if (!delta) return;
+        event.preventDefault(); event.stopPropagation(); move(delta[0] * (event.shiftKey ? 1 : 16), delta[1] * (event.shiftKey ? 1 : 16));
+      }}>
+      <defs><pattern id={`${id}-grid`} width="32" height="32" patternUnits="userSpaceOnUse"><path d="M 32 0 L 0 0 0 32" fill="none" stroke="currentColor" strokeOpacity=".13" /></pattern></defs>
+      <rect width={world.width} height={world.height} fill="var(--vs2-panel-2, #182332)" />
+      <rect width={world.width} height={world.height} fill={`url(#${id}-grid)`} />
+      <g pointerEvents="none" fill="currentColor" opacity=".18">{studioWorldCollisionRects(world).map((rect, index) => <rect key={index} {...rect} />)}</g>
+      <g pointerEvents="none" fill="none" stroke="#7fe0ce" strokeOpacity=".45">{world.portals.map((portal) => <circle key={portal.id} cx={portal.point.x} cy={portal.point.y} r={portal.radius} />)}</g>
+      {state.placements.map((item, index) => <g key={item.id} role="button" tabIndex={0} aria-pressed={selected?.id === item.id}
+        aria-label={bt(`${index + 1}번 ${LABELS[item.type][0]} 선택`, `Select ${LABELS[item.type][1]} ${index + 1}`)}
+        className="studio-decoration-editor__object" onClick={(event) => { event.stopPropagation(); choose(item.id); }}
+        onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); choose(item.id); } }}>
+        <rect {...studioVirtualDecorBounds(item)} rx="8" fill={selected?.id === item.id ? "#ad89ff" : "#72b6ca"} fillOpacity=".35" stroke={selected?.id === item.id ? "#f8e5ff" : "#83cfe2"} strokeWidth={selected?.id === item.id ? 4 : 2} />
+        <g transform={`translate(${item.x} ${item.y}) rotate(${item.rotation})`} pointerEvents="none">
+          <svg x={-41 * item.scale} y={-73.8 * item.scale} width={82 * item.scale} height={82 * item.scale} viewBox="0 0 1 1" overflow="hidden">
+            <image href="/assets/virtual-studio/experience-v8/furniture.png" x={-(STUDIO_VIRTUAL_DECOR_FRAME[item.type] % 4)} y={-Math.floor(STUDIO_VIRTUAL_DECOR_FRAME[item.type] / 4)} width="4" height="4" />
+          </svg>
+        </g>
+        <circle cx={item.x} cy={item.y} r="6" fill="#f8e5ff" />
+        <text x={item.x} y={item.y - 30} textAnchor="middle" fill="#fff" fontSize="22" pointerEvents="none">{index + 1}</text>
+      </g>)}
+      <g pointerEvents="none"><circle cx={selfPoint.x} cy={selfPoint.y} r="12" fill="#ffce67" stroke="#152431" strokeWidth="4" /><text x={selfPoint.x} y={selfPoint.y + 30} fill="#ffdf90" fontSize="20" textAnchor="middle">{bt("나", "You")}</text></g>
+    </svg>
+    <label className="studio-decoration-editor__select">{bt("편집할 가구", "Furniture to edit")}
+      <select value={selected?.id ?? ""} onChange={(event) => event.target.value ? choose(event.target.value) : setSelection(null)}>
+        <option value="">{bt("가구를 선택하세요", "Select furniture")}</option>
+        {state.placements.map((item, index) => <option value={item.id} key={item.id}>{index + 1}. {bt(...LABELS[item.type])}</option>)}
+      </select>
+    </label>
+    {selected ? <>
+      <p>{bt(`${LABELS[selected.type][0]} · X ${selected.x} / Y ${selected.y} · ${selected.rotation}° · ${Math.round(selected.scale * 100)}%`, `${LABELS[selected.type][1]} · X ${selected.x} / Y ${selected.y} · ${selected.rotation}° · ${Math.round(selected.scale * 100)}%`)}</p>
+      <div className="studio-decoration-editor__controls" role="group" aria-label={bt("선택한 가구 이동", "Move selected furniture")}>
+        {([[-16, 0, "왼쪽", "Left"], [0, -16, "위", "Up"], [0, 16, "아래", "Down"], [16, 0, "오른쪽", "Right"]] as const).map(([x, y, ko, en]) => <button key={en} type="button" onClick={() => move(x, y)}>{bt(`가구 ${ko}`, `Furniture ${en.toLowerCase()}`)}</button>)}
+      </div>
+      <div className="studio-decoration-editor__controls">
+        <button type="button" onClick={() => onChange(editStudioVirtualDecoration(state, selected.id, { rotation: ((selected.rotation + 90) % 360) as 0 | 90 | 180 | 270 }, world, selfPoint))}>{bt("가구 90도 회전", "Rotate furniture 90°")}</button>
+        <button type="button" disabled={selected.scale <= .65} onClick={() => onChange(editStudioVirtualDecoration(state, selected.id, { scale: Math.max(.65, Math.round((selected.scale - .1) * 100) / 100) }, world, selfPoint))}>{bt("가구 작게", "Smaller furniture")}</button>
+        <button type="button" disabled={selected.scale >= 1.35} onClick={() => onChange(editStudioVirtualDecoration(state, selected.id, { scale: Math.min(1.35, Math.round((selected.scale + .1) * 100) / 100) }, world, selfPoint))}>{bt("가구 크게", "Larger furniture")}</button>
+        <button type="button" onClick={() => { onChange({ ok: true, state: removeStudioVirtualDecoration(state, selected.id) }); setSelection(null); }}>{bt("선택 가구 삭제", "Remove selected furniture")}</button>
+      </div>
+    </> : null}
+  </fieldset>;
+}

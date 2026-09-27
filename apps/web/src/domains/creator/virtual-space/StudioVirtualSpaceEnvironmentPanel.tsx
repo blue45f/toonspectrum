@@ -54,7 +54,7 @@ export function StudioVirtualSpaceEnvironmentPanel({ value, onChange }: StudioVi
   return (
     <section className="studio-environment-panel" aria-labelledby="studio-environment-title">
       <div className="studio-environment-panel__heading">
-        <p><Sparkles size={14} aria-hidden />ImageGen 2.5 scene direction</p>
+        <p><Sparkles size={14} aria-hidden />{bt("나만의 공간 연출", "Your studio atmosphere")}</p>
         <h2 id="studio-environment-title">{bt("배경과 환경", "Backdrop & environment")}</h2>
         <span>{bt("장소 배경, 시간대와 날씨를 분리해 같은 공간을 다른 분위기로 연출합니다.", "Combine a backdrop, time of day and weather without changing the workspace layout.")}</span>
       </div>

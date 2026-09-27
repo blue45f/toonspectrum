@@ -16,7 +16,7 @@ import {
   type StudioWorldNpcDefinition,
   type StudioWorldRect,
 } from "./studio-virtual-space-world-manifest";
-import { findStudioWorldPath, STUDIO_WORLD_PLAYER_RADIUS, studioWorldCanOccupy } from "./studio-virtual-space-world-pathfinding";
+import { findStudioWorldPath, resolveStudioWorldSpawn, STUDIO_WORLD_PLAYER_RADIUS, studioWorldCanOccupy, studioWorldCanTraverse } from "./studio-virtual-space-world-pathfinding";
 import { studioWorldCircleCanOccupy } from "./studio-virtual-space-world-connectivity";
 import { studioSemanticSurfaceAt } from "./studio-virtual-space-semantic-world";
 
@@ -176,7 +176,7 @@ function random(actor: NpcActor): number {
 /** Cosmetic local actors never enter presence, lease a shared seat, or call an AI service. */
 export class StudioNpcDirector {
   private readonly actors: NpcActor[];
-  private readonly colliders: readonly StudioWorldRect[];
+  private colliders: readonly StudioWorldRect[];
   private accumulator = 0;
   private time = 0;
   private lastGreetingAt = -Infinity;
@@ -187,8 +187,8 @@ export class StudioNpcDirector {
     stops: readonly StudioNpcGuideStop[]; index: number; status: StudioVirtualNpcGuideTourState["status"]; deadline: number; blockedAt: number | null } | null = null;
   private lastTourState: StudioVirtualNpcGuideTourState | null = null;
 
-  constructor(private readonly manifest: StudioVirtualSpaceWorldManifest) {
-    // 한 director는 읽기 전용 월드 revision에 속한다. 매 미세 이동마다 동일한 collider 목록을 재구성하지 않는다.
+  constructor(private manifest: StudioVirtualSpaceWorldManifest) {
+    // 충돌 목록은 새 월드 revision을 받을 때만 갱신하며 미세 이동마다 재구성하지 않는다.
     this.colliders = studioWorldCollisionRects(manifest);
     // Invalid spawns are omitted, never silently teleported to the player's spawn.
     this.actors = manifest.npcs.slice(0, 8).filter((npc) => studioWorldCanOccupy(manifest, npc.point)).map((definition) => {
@@ -242,6 +242,45 @@ export class StudioNpcDirector {
       this.tick(environment);
     }
     return this.views;
+  }
+
+  /** 가구 변경 시 생활 상태를 보존하고 실제 막힌 동선만 다시 계획한다. */
+  updateNavigationWorld(manifest: StudioVirtualSpaceWorldManifest): void {
+    if (this.disposed || manifest === this.manifest) return;
+    this.manifest = manifest;
+    this.colliders = studioWorldCollisionRects(manifest);
+    for (const actor of this.actors) {
+      const displaced = !studioWorldCanOccupy(manifest, actor.point);
+      let cursor = actor.point;
+      const clearPath = actor.path.every((point) => {
+        const clear = studioWorldCanTraverse(manifest, cursor, point);
+        cursor = point;
+        return clear;
+      });
+      if (!displaced && clearPath) continue;
+      const target = actor.target;
+      const phase = actor.phase;
+      this.clearRoute(actor);
+      if (displaced) {
+        const safe = resolveStudioWorldSpawn(manifest, actor.point);
+        if (safe) {
+          actor.point = safe;
+          actor.previous = safe;
+          actor.previousDistance = actor.distance;
+        }
+        this.releaseActivity(actor);
+      }
+      const path = target ? findStudioWorldPath(manifest, actor.point, target) : [];
+      if (target && path.length > 0 && distance(path.at(-1)!, target) <= 3) {
+        actor.path = path;
+        actor.target = target;
+        actor.phase = phase;
+      } else {
+        this.releaseActivity(actor);
+        actor.phase = "wait";
+        actor.deadline = this.time + 1_000;
+      }
+    }
   }
 
   get guideTourState(): StudioVirtualNpcGuideTourState | null {

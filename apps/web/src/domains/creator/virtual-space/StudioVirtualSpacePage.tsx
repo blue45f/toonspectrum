@@ -100,6 +100,7 @@ import {
 
 
 import { captureStudioVirtualPhoto } from "./studio-virtual-space-photo-mode";
+import { studioDistrictEnvironment } from "./studio-virtual-space-scene-direction";
 import {
   readStudioVirtualExperiencePreference,
   writeStudioVirtualExperiencePreference,
@@ -787,11 +788,10 @@ export function VirtualSpaceExperience({
       return next;
     });
   }, []);
-  const [decorations, setDecorations] = useState<StudioVirtualDecorationState>(() => readStudioVirtualDecorationState());
-  const selectDecorations = useCallback((next: StudioVirtualDecorationState) => {
-    setDecorations(next);
-    writeStudioVirtualDecorationState(next);
-  }, []);
+  const decorationScope = JSON.stringify([projectId, activeWorldScope, authoringMode]);
+  const [decorationDrafts, setDecorationDrafts] = useState<ReadonlyMap<string, StudioVirtualDecorationState>>(() => new Map());
+  const initialDecorations = useMemo(() => readStudioVirtualDecorationState(decorationScope), [decorationScope]);
+  const decorations = decorationDrafts.get(decorationScope) ?? initialDecorations;
   const [experiencePreference, setExperiencePreference] = useState<StudioVirtualExperiencePreference>(initialExperiencePreference);
   const selectExperiencePreference = useCallback((next: StudioVirtualExperiencePreference) => {
     setExperiencePreference(next);
@@ -804,6 +804,13 @@ export function VirtualSpaceExperience({
     setEnvironmentPreference(next);
     writeStudioVirtualEnvironmentPreference(next);
   }, []);
+  const selectDecorations = useCallback((next: StudioVirtualDecorationState) => {
+    setDecorationDrafts((current) => new Map(current).set(decorationScope, next));
+    if (!writeStudioVirtualDecorationState(next, decorationScope)) {
+      setSocialNotice(bt("공간 변경은 적용됐지만 이 기기에 저장하지 못했어요. 저장 공간을 확인해 주세요.", "Space changes are applied, but could not be saved on this device. Check available storage."));
+    }
+    if (next.districtKey !== decorations.districtKey) selectEnvironmentPreference(studioDistrictEnvironment(next.districtKey));
+  }, [bt, decorationScope, decorations.districtKey, selectEnvironmentPreference]);
   const [runtimeMetrics, setRuntimeMetrics] = useState<StudioVirtualRuntimeMetrics>(EMPTY_STUDIO_VIRTUAL_RUNTIME_METRICS);
   const captureVirtualPhoto = useCallback(() => {
     void captureStudioVirtualPhoto().then((capture) => {
@@ -1851,8 +1858,8 @@ export function VirtualSpaceExperience({
           <Suspense fallback={<p role="status">{bt("패널 불러오는 중…", "Loading panel…")}</p>}><div className="vs2-live-inspector-content">
           {workspacePanel === "today" ? <StudioVirtualSpaceTodayBoard snapshot={operations.snapshot} workId={projectId}
             onRefresh={operations.refresh} onGuide={(destination) => {
-              const roomId = destination === "story" ? "writers" : destination === "drawing" ? "drawing" : destination === "review" ? "review" : "production";
-              queuePathTo(studioWorldSpawn(worldManifest, roomId).point); setWorkspacePanel(null);
+              const roomId = destination === "story" ? "writers" : destination;
+              moveToRoomOrPlace(roomId); setWorkspacePanel(null);
             }} /> : null}
           {workspacePanel === "team" ? personal ? <p>{bt("프로젝트를 만든 뒤 제작 그룹과 팀원을 연결할 수 있습니다.", "Create a project before connecting production groups and teammates.")} <Link href="/studio/new">{bt("새 작품 만들기", "Create a work")}</Link></p>
             : <StudioVirtualSpaceTeamHub productionProjectId={operations.snapshot.project?.aggregate.projectId} workId={projectId} /> : null}
@@ -1876,6 +1883,7 @@ export function VirtualSpaceExperience({
             onClearOwn={p2pBoard.clearOwn}
           /> : null}
           {workspacePanel === "town" ? <StudioVirtualSpaceTownProgramPanel
+            selfPoint={snapshot.self}
             personal={personal}
             operations={operations.snapshot}
             manifest={worldManifest}
@@ -1899,6 +1907,8 @@ export function VirtualSpaceExperience({
           </StudioVirtualSpacePanelGate>
           <div hidden={workspacePanel !== "space"}>
             <nav className="studio-vspace-mobile-more-grid" aria-label={bt("추가 스튜디오 기능", "More studio tools")}>
+              <button type="button" onClick={() => setWorkspacePanel("search")}><MapIcon size={17} aria-hidden />{bt("방·팀원 찾기", "Find rooms & people")}</button>
+              <button type="button" onClick={() => setWorkspacePanel("town")}><Sparkles size={17} aria-hidden />{bt("마을 활동", "Town activities")}</button>
               {!personal ? <>
                 <button type="button" onClick={() => setWorkspacePanel("team")}><UsersRound size={17} aria-hidden />{bt("팀·초대", "Teams")}</button>
                 <button type="button" onClick={() => setWorkspacePanel("work")}><BookOpen size={17} aria-hidden />{bt("검수·작업함", "Reviews")}</button>
@@ -1979,6 +1989,8 @@ export function VirtualSpaceExperience({
             </StudioVirtualSpacePanelGate>
             <StudioVirtualSpacePanelGate active={workspacePanel === "space" && spacePanelSection === "appearance"} preserveAfterOpen>
             <StudioVirtualSpaceCustomizationPanel
+              key={decorationScope}
+              world={worldManifest}
               nickname={nickname}
               character={characterCustomization}
               decorations={decorations}
@@ -1986,6 +1998,7 @@ export function VirtualSpaceExperience({
               onNickname={onNicknameChange}
               onCharacter={selectCharacterCustomization}
               onDecorations={selectDecorations}
+              onSelectDistrict={(district) => selectEnvironmentPreference(studioDistrictEnvironment(district))}
             />
             </StudioVirtualSpacePanelGate>
             <StudioVirtualSpacePanelGate active={workspacePanel === "space" && spacePanelSection === "places"}>

@@ -5,13 +5,15 @@ import {
   STUDIO_VIRTUAL_DECOR_FRAME,
   type StudioVirtualCharacterCustomization,
   type StudioVirtualDecorationState,
-  type StudioVirtualDecorType,
 } from "./studio-virtual-space-customization";
+import { studioVirtualDecorCollider } from "./studio-virtual-space-decoration-layout";
 import type { StudioVirtualSpaceFacing, StudioVirtualSpacePoint } from "./studio-virtual-space-model";
 
 export interface StudioDecorationTextureKeys {
   readonly decor: string;
   readonly accessory: string;
+  readonly furniture?: string;
+  readonly illustratedFurniture?: boolean;
 }
 
 interface ActorCosmeticVisual {
@@ -21,13 +23,13 @@ interface ActorCosmeticVisual {
   lastTrailAt: number;
 }
 
-const SOLID_DECOR = new Set<StudioVirtualDecorType>(["tree", "bench", "market-stall", "fountain", "portal"]);
 const DIRECTION_FRAME: Readonly<Record<StudioVirtualSpaceFacing, number>> = Object.freeze({ down: 0, right: 1, left: 2, up: 3 });
 const AURA_COLOR = Object.freeze({ none: 0, sparkle: 0xffe58a, focus: 0x72ddc6, neon: 0x57e8ff });
 const NAMEPLATE_COLOR = Object.freeze({ violet: "#d7c8ff", rose: "#ffc2db", sky: "#bde8ff", amber: "#ffe09a" });
 export class StudioVirtualDecorationRuntime {
   private readonly decorationSprites = new Map<string, Phaser.GameObjects.Sprite>();
   private readonly decorationColliders: Phaser.Physics.Arcade.Collider[] = [];
+  private readonly decorationBodies: Phaser.GameObjects.Zone[] = [];
   private readonly actorVisuals = new Map<string, ActorCosmeticVisual>();
 
   constructor(
@@ -38,21 +40,26 @@ export class StudioVirtualDecorationRuntime {
 
   syncDecorations(state: StudioVirtualDecorationState): void {
     this.decorationColliders.splice(0).forEach((collider) => collider.destroy());
+    this.decorationBodies.splice(0).forEach((body) => body.destroy());
     this.decorationSprites.forEach((sprite) => sprite.destroy());
     this.decorationSprites.clear();
     for (const placement of state.placements) {
-      const sprite = this.scene.add.sprite(placement.x, placement.y, this.keys.decor, STUDIO_VIRTUAL_DECOR_FRAME[placement.type])
+      const frame = STUDIO_VIRTUAL_DECOR_FRAME[placement.type];
+      const texture = this.keys.furniture && (this.keys.illustratedFurniture || frame >= 12) ? this.keys.furniture : this.keys.decor;
+      const sprite = this.scene.add.sprite(placement.x, placement.y, texture, frame)
         .setDisplaySize(82 * placement.scale, 82 * placement.scale)
         .setAngle(placement.rotation)
         .setOrigin(.5, .9)
         .setDepth(Math.round(placement.y) + 948)
         .setData("decorType", placement.type);
       sprite.setData("baseScaleX", sprite.scaleX).setData("baseScaleY", sprite.scaleY);
-      if (SOLID_DECOR.has(placement.type)) {
-        this.scene.physics.add.existing(sprite, true);
-        const body = sprite.body as Phaser.Physics.Arcade.StaticBody;
-        body.setSize(sprite.displayWidth * .62, sprite.displayHeight * .36).setOffset(sprite.displayWidth * .19, sprite.displayHeight * .57);
-        this.decorationColliders.push(this.scene.physics.add.collider(this.player, sprite));
+      const collider = studioVirtualDecorCollider(placement);
+      if (collider) {
+        // 연출용 회전·펄스와 분리한 발밑 충돌 면적을 길찾기와 공유한다.
+        const body = this.scene.add.zone(collider.x, collider.y, collider.width, collider.height).setOrigin(0);
+        this.scene.physics.add.existing(body, true);
+        this.decorationBodies.push(body);
+        this.decorationColliders.push(this.scene.physics.add.collider(this.player, body));
       }
       this.decorationSprites.set(placement.id, sprite);
     }
@@ -142,6 +149,7 @@ export class StudioVirtualDecorationRuntime {
 
   destroy(): void {
     this.decorationColliders.splice(0).forEach((collider) => collider.destroy());
+    this.decorationBodies.splice(0).forEach((body) => body.destroy());
     this.decorationSprites.forEach((sprite) => sprite.destroy());
     this.decorationSprites.clear();
     for (const id of [...this.actorVisuals.keys()]) this.removeActor(id);

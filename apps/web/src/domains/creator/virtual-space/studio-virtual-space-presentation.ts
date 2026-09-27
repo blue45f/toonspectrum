@@ -160,6 +160,13 @@ export function studioRenderViewport(width: number, height: number, deviceRatio:
   return { cssWidth, cssHeight, ratio, width: Math.round(cssWidth * ratio), height: Math.round(cssHeight * ratio) };
 }
 
+/** 세로 화면에서도 주변 동선이 보이도록 CSS 크기로 배율을 정하고 렌더 해상도만 별도로 적용한다. */
+export function studioCameraZoom(width: number, height: number, deviceRatio = 1): number {
+  const viewport = studioRenderViewport(width, height, deviceRatio);
+  const scale = Math.max(.5, Math.min(1.2, viewport.cssWidth / 600, viewport.cssHeight / 420));
+  return scale * viewport.ratio;
+}
+
 /** Cover a fixed world without distorting native artwork; any excess is cropped equally around the centre. */
 export function studioCoverRect(
   targetWidth: number,
