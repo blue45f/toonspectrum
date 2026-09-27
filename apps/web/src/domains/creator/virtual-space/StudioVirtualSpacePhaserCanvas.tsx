@@ -82,6 +82,7 @@ import { StudioDeskPodRuntime } from "./studio-virtual-space-desk-pods";
 import { studioRuntimeBudget, studioTownInterestSnapshot } from "./studio-virtual-space-town-program";
 import type { StudioVirtualDecorationState } from "./studio-virtual-space-customization";
 import { studioVirtualDecorationNavigationWorld, studioVirtualDecorationStateForWorld } from "./studio-virtual-space-decoration-layout";
+import { StudioCameraFollowModeController, studioGaitShadowScale, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
 import {
   DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
   type StudioVirtualExperiencePreference,
@@ -498,6 +499,7 @@ export function StudioVirtualSpacePhaserCanvas({
         [actorExpressionTextureKey, STUDIO_EXPERIENCE_ATLAS],
       ]);
       const actorVisualScale = studioSceneActorScale(manifest);
+      const playerLocomotion = studioPlayerLocomotionProfile(actorVisualScale < 1);
       const worldSetDressing = studioVirtualWorldSetDressing(manifest);
       const objectTextureKeys = {
         door: `studio-object-${artStyle}-door`,
@@ -698,7 +700,8 @@ export function StudioVirtualSpacePhaserCanvas({
             if (clip.distancePerCycle || reducedMotion.matches) {
               if (sprite.anims.isPlaying) sprite.stop();
               const frame = clip.start + (reducedMotion.matches ? 0 : studioGaitFrame(
-                Number(sprite.getData("walkDistance") ?? 0), clip.end - clip.start + 1, clip.distancePerCycle,
+                Number(sprite.getData("walkDistance") ?? 0), clip.end - clip.start + 1,
+                (sprite.getData("gaitDistancePerCycle") as number | undefined) ?? clip.distancePerCycle,
               ));
               const sheet = walkSheetKey(skin, nextFacing);
               if (sprite.texture.key !== sheet || String(sprite.frame.name) !== String(frame)) sprite.setTexture(sheet, frame);
@@ -763,7 +766,8 @@ export function StudioVirtualSpacePhaserCanvas({
         if (!visual) {
           const sprite = scene.add.sprite(peer.state.x, peer.state.y, peerInitialAsset.key, peerInitialAsset.frame)
             .setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
-            .setData({ visualWidth: 92 * actorVisualScale, visualHeight: 123 * actorVisualScale, assetOwner: `peer:${id}` })
+            .setData({ visualWidth: 92 * actorVisualScale, visualHeight: 123 * actorVisualScale, assetOwner: `peer:${id}`,
+              gaitDistancePerCycle: playerLocomotion.gaitDistancePerCycle })
             .setDisplaySize(92 * actorVisualScale, 123 * actorVisualScale)
             .setDepth(Math.round(peer.state.y) + 1_001)
             .setInteractive({ useHandCursor: true });
@@ -1135,7 +1139,8 @@ export function StudioVirtualSpacePhaserCanvas({
           localInitialAsset.key,
           localInitialAsset.frame,
         ).setOrigin(0.5, STUDIO_CHARACTER_FOOT_ORIGIN)
-          .setData({ visualWidth: 98 * actorVisualScale, visualHeight: 131 * actorVisualScale, assetOwner: "self", framePresentation: localInitialAsset.presentation })
+          .setData({ visualWidth: 98 * actorVisualScale, visualHeight: 131 * actorVisualScale, assetOwner: "self", framePresentation: localInitialAsset.presentation,
+            gaitDistancePerCycle: playerLocomotion.gaitDistancePerCycle })
           .setDisplaySize(98 * actorVisualScale, 131 * actorVisualScale)
           .setDepth(Math.round(initialPoint.y) + 1_001);
         updateDisplaySize(localSprite);
@@ -1305,10 +1310,8 @@ export function StudioVirtualSpacePhaserCanvas({
         const camera = this.cameras.main;
         camera.setBounds(0, 0, manifest.width, manifest.height);
         camera.startFollow(cameraTarget, false, reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
-        applyCameraMode = () => {
-          const mode = experienceRef.current.cameraMode;
-          camera.setDeadzone(mode === "steady" ? 200 : mode === "cinematic" ? 110 : 150, mode === "steady" ? 135 : mode === "cinematic" ? 78 : 100);
-        };
+        const cameraModeController = new StudioCameraFollowModeController(camera);
+        applyCameraMode = () => cameraModeController.update(experienceRef.current.cameraMode);
         applyCameraMode();
         const resizeCamera = (gameSize: { width: number; height: number }) => {
           const width = gameSize.width / viewport.ratio, height = gameSize.height / viewport.ratio;
@@ -1581,7 +1584,7 @@ export function StudioVirtualSpacePhaserCanvas({
           ...DEFAULT_STUDIO_MOTION_CONFIG,
           acceleration: DEFAULT_STUDIO_MOTION_CONFIG.acceleration / terrain.dragMultiplier,
           deceleration: DEFAULT_STUDIO_MOTION_CONFIG.deceleration * terrain.dragMultiplier,
-          maxSpeed: STUDIO_VIRTUAL_SPACE_WALK_SPEED * (sprint ? 1.35 : 1) * terrain.speedMultiplier,
+          maxSpeed: playerLocomotion.walkSpeed * (sprint ? playerLocomotion.sprintMultiplier : 1) * terrain.speedMultiplier,
         };
         const nearbyNpc = [...npcs.values()].filter((npc) => Math.hypot(npc.groundPoint.x - currentPoint.x, npc.groundPoint.y - currentPoint.y) < 55)
           .sort((left, right) => Math.hypot(left.sprite.x - currentPoint.x, left.sprite.y - currentPoint.y) - Math.hypot(right.sprite.x - currentPoint.x, right.sprite.y - currentPoint.y))
@@ -1905,7 +1908,10 @@ export function StudioVirtualSpacePhaserCanvas({
         localSprite.setAngle(nextMoving && !hasWalkClip ? Math.sin(time * 0.018) * 0.8 : 0);
         localSprite.setDepth(studioTownDepthForPoint(manifest, localGroundPoint, 1_001));
         localShadow.setPosition(localShadowPoint.x, localShadowPoint.y + 1);
-        localShadow.setVisible(!localSeat).setScale(nextMoving && !reducedMotion.matches ? 0.86 + Math.cos(time * 0.024) * 0.07 : 1, 1);
+        const shadowScale = playerLocomotion.gaitDistancePerCycle
+          ? studioGaitShadowScale(localDistance, playerLocomotion.gaitDistancePerCycle, nextMoving, reducedMotion.matches)
+          : nextMoving && !reducedMotion.matches ? 0.86 + Math.cos(time * 0.024) * 0.07 : 1;
+        localShadow.setVisible(!localSeat).setScale(shadowScale, 1);
         localShadow.setDepth(studioTownDepthForPoint(manifest, rendered, 990));
         const overlayScale = studioSceneOverlayScale(actorVisualScale, this.cameras.main.zoom, viewport.ratio);
         localLabel.setText(displayNameRef.current).setVisible(true).setAlpha(1).setScale(overlayScale);
@@ -2137,6 +2143,8 @@ export function StudioVirtualSpacePhaserCanvas({
           parent.dataset.loadedWalkSheets = String(this.textures.getTextureKeys().filter((key) => key.includes("walk-sheet")).length);
           parent.dataset.loadedActionSheets = String(this.textures.getTextureKeys().filter((key) => /-(talk|draw|review)-sheet-/u.test(key)).length);
           parent.dataset.walkDistance = localDistance.toFixed(2);
+          parent.dataset.walkSpeed = String(playerLocomotion.walkSpeed);
+          parent.dataset.gaitDistancePerCycle = String(playerLocomotion.gaitDistancePerCycle ?? "native");
           parent.dataset.pixelRatio = viewport.ratio.toFixed(2);
           parent.dataset.localMoving = String(nextMoving);
           parent.dataset.localFacing = facing;
