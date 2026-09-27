@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
-import { isDiscoverPurposeRoute, isPublicCreativeRoute } from "./site-public-routes";
+import { isDiscoverPurposeRoute, isPublicCreativeRoute, supportsPublicSiteOnwardJourney } from "./site-public-routes";
 
 describe("public creative chrome route boundaries", () => {
+  it.each(["/terms", "/privacy", "/copyright", "/terms/", "/privacy/", "/copyright/"])("정책 %s의 공개 셸은 유지하고 홍보 여정만 제외한다", (pathname) => {
+    expect(isPublicCreativeRoute(pathname)).toBe(true);
+    expect(supportsPublicSiteOnwardJourney(pathname)).toBe(false);
+  });
+
+  it.each(["/discover", "/learn", "/market", "/community"])("공개 창작 목적지 %s의 다음 탐색은 유지한다", (pathname) => {
+    expect(supportsPublicSiteOnwardJourney(pathname)).toBe(true);
+  });
+
   it.each([
     "/", "/about", "/about/", "/help", "/support", "/contact", "/business", "/collaborate", "/creators", "/research/assets",
     "/learn", "/learn/process", "/learn/careers", "/learn/education", "/learn/resources", "/learn/classroom",

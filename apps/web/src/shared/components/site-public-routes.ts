@@ -46,6 +46,14 @@ export function isPublicCreativeRoute(pathname: string): boolean {
     || PUBLIC_DETAIL_ROUTES.some((route) => route.test(normalized));
 }
 
+/** 정책 읽기는 공개 셸을 유지하되 창작 홍보와 다음 작업 제안은 덧붙이지 않는다. */
+export function supportsPublicSiteOnwardJourney(pathname: string): boolean {
+  const normalized = pathname.replace(/\/+$/u, "") || "/";
+  return normalized !== "/"
+    && !["/terms", "/privacy", "/copyright"].includes(normalized)
+    && isPublicCreativeRoute(normalized);
+}
+
 export function isDiscoverPurposeRoute(pathname: string): boolean {
   return DISCOVER_PURPOSE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
