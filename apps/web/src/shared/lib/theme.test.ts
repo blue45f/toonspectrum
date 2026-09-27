@@ -106,7 +106,7 @@ describe("theme runtime", () => {
     expect(useTheme.getState().resolvedTheme).toBe("sepia");
     expect(spy).not.toHaveBeenCalled();
     window.dispatchEvent(new StorageEvent("storage", { key: null, newValue: null }));
-    expect(useTheme.getState().resolvedTheme).toBe("dark");
+    expect(useTheme.getState().resolvedTheme).toBe("starlight");
     expect(spy).not.toHaveBeenCalled();
   });
   it("ignores unrelated/session-storage events", async () => {
