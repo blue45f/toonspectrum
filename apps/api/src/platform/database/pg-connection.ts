@@ -147,3 +147,65 @@ export function normalizePgConnectionStringForTls(connectionString: string): str
 
   return parsed.toString();
 }
+
+
+export type PgPoolEnvironment = Partial<Record<string, string | undefined>>;
+
+export interface PgRuntimePoolOptions {
+  max: number;
+  idleTimeoutMillis: number;
+  connectionTimeoutMillis: number;
+  allowExitOnIdle: boolean;
+  query_timeout: number;
+  keepAlive: boolean;
+  keepAliveInitialDelayMillis: number;
+  maxLifetimeSeconds: number;
+  application_name: string;
+  statement_timeout?: number;
+  lock_timeout?: number;
+  idle_in_transaction_session_timeout?: number;
+}
+
+function boundedPoolInt(raw: string | undefined, fallback: number, min: number, max: number): number {
+  if (raw == null || raw.trim() === "") return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(parsed)));
+}
+
+/** 런타임 풀만 제한한다. 마이그레이션과 운영 DB의 전역 설정은 변경하지 않는다. */
+export function resolvePgPoolOptions(
+  env: PgPoolEnvironment = process.env,
+  connectionString: string | undefined = env.DATABASE_URL,
+): PgRuntimePoolOptions {
+  const mode = env.WEBDEX_PG_CONNECTION_MODE?.trim().toLowerCase() || "auto";
+  if (!["auto", "direct", "transaction"].includes(mode)) {
+    throw new Error("WEBDEX_PG_CONNECTION_MODE는 auto, direct, transaction 중 하나여야 합니다.");
+  }
+  const hostname = connectionString ? new URL(connectionString).hostname.toLowerCase() : "";
+  const transactionPooling = mode === "transaction"
+    || (mode === "auto" && isNeonHost(hostname) && hostname.split(".")[0].endsWith("-pooler"));
+  const statementTimeout = boundedPoolInt(env.WEBDEX_PG_STATEMENT_MS, 30_000, 1_000, 300_000);
+  const queryTimeout = boundedPoolInt(env.WEBDEX_PG_QUERY_MS, 35_000, 1_000, 360_000);
+  return {
+    max: boundedPoolInt(env.WEBDEX_PG_POOL_MAX, 3, 1, 50),
+    idleTimeoutMillis: boundedPoolInt(env.WEBDEX_PG_IDLE_MS, 10_000, 1_000, 600_000),
+    connectionTimeoutMillis: boundedPoolInt(env.WEBDEX_PG_CONNECT_MS, 10_000, 1_000, 30_000),
+    allowExitOnIdle: true,
+    query_timeout: transactionPooling ? queryTimeout : Math.max(queryTimeout, statementTimeout + 1_000),
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
+    maxLifetimeSeconds: boundedPoolInt(env.WEBDEX_PG_MAX_LIFETIME_SECONDS, 300, 30, 3_600),
+    application_name: "toonstudio-core-api",
+    // Transaction pooler의 세션 상태를 가정하지 않는다. 서버 제한은 별도 승인된 역할 정책으로 설정한다.
+    ...(!transactionPooling ? {
+      statement_timeout: statementTimeout,
+      lock_timeout: Math.min(statementTimeout, boundedPoolInt(env.WEBDEX_PG_LOCK_MS, 5_000, 100, 300_000)),
+      idle_in_transaction_session_timeout: boundedPoolInt(env.WEBDEX_PG_IDLE_TRANSACTION_MS, 15_000, 1_000, 300_000),
+    } : {}),
+  };
+}
+
+export function resolvePgShutdownTimeout(env: PgPoolEnvironment = process.env): number {
+  return boundedPoolInt(env.WEBDEX_PG_SHUTDOWN_MS, 15_000, 1_000, 60_000);
+}

@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, afterEach, beforeEach, expect } from "vitest";
 import { APP_I18N_NAMESPACES, STUDIO_I18N_NAMESPACES } from "@/shared/lib/i18n-asset-manifest";
 import { registerI18nLocaleEntries, setAppI18nAssetSource } from "@/shared/lib/i18n";
-import { parseStudioI18nDictionary, STUDIO_I18N_ASSET_LOCALES } from "@/domains/creator/studio-i18n-loader";
+import { parseStudioI18nDictionary, STUDIO_I18N_ASSET_LOCALES } from "@/domains/creator/localization/studio-i18n-loader";
 import "@/domains/catalog/references/reference-i18n";
 
 const WEB_PUBLIC = path.resolve(process.cwd(), "apps/web/public");

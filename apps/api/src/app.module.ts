@@ -3,6 +3,7 @@ import { OperationPolicyModule } from "./modules/operation-policy/operation-poli
 
 import { BackendCapabilitiesModule } from "./platform/adapters/backend-capabilities/backend-capabilities.module";
 import { createFederatedDataPlaneDynamicModule } from "./platform/federated-data-plane/federated-data-plane.module";
+import { DatabaseLifecycleModule } from "./runtime/database-lifecycle.module";
 import { ApiHttpInfrastructureModule } from "./runtime/api-http-infrastructure.module";
 import { AdminModule } from "./modules/admin/admin.module";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -46,6 +47,7 @@ const studioRealtimeTicketModule =
 @Module({
   imports: [
     ApiHttpInfrastructureModule,
+    DatabaseLifecycleModule,
     BackendCapabilitiesModule,
     federatedDataPlaneModule,
     AuthModule,

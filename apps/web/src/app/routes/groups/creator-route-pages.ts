@@ -1,4 +1,4 @@
-import { preloadStudioI18nCore } from "@/domains/creator/studio-i18n-priority-loader";
+import { preloadStudioI18nCore } from "@/domains/creator/localization/studio-i18n-priority-loader";
 import { lazyRetry } from "@/shared/lib/lazy-retry";
 
 /** Preload only the locale core required before an immersive Studio route mounts. */

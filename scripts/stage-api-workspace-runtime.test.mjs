@@ -3,8 +3,10 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import ts from "typescript";
 
 import { stageApiWorkspaceRuntime } from "./stage-api-workspace-runtime.mjs";
+import { verifyCompiledApiImports } from "./verify-api-runtime-imports.mjs";
 
 const { test } = process.env.VITEST ? await import("vitest") : await import("node:test");
 
@@ -25,6 +27,15 @@ test("stages workspace packages inside the emitted API boundary", async () => {
   const root = await mkdtemp(join(tmpdir(), "toonstudio-api-runtime-"));
   try {
     await compiledProductionContracts(root);
+    for (const name of ["studio-crdt-raster-ops", "studio-crdt-raster-compaction", "studio-ink-input-contract"]) {
+      const source = await readFile(new URL(`../packages/contracts/src/${name}.ts`, import.meta.url), "utf8");
+      const { outputText } = ts.transpileModule(source, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+      });
+      await compiledPackage(root, `packages/contracts/src/${name}.js`, outputText);
+    }
+    await compiledPackage(root, "packages/contracts/src/private-helper.js", "module.exports = {};\n");
+    await compiledPackage(root, "packages/core/src/reference-query-language.js", "module.exports = { query: 'ready' };\n");
     await compiledPackage(
       root,
       "packages/contracts/src/security/csrf.js",
@@ -94,6 +105,14 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     assert.deepEqual(requireFromApi("@toonstudio/contracts/security/csrf"), {
       csrf: "ready",
     });
+    // 실제 이전 소스를 plain Node로 읽어 공개 subpath와 내부 상대 의존성을 함께 검증한다.
+    const raster = requireFromApi("@toonstudio/contracts/studio-crdt-raster-ops");
+    assert.equal(raster.canonicalStudioRasterJson({ z: 1, a: 2 }), '{"a":2,"z":1}');
+    assert.equal(typeof requireFromApi("@toonstudio/contracts/studio-crdt-raster-compaction").compactStudioRasterOperationLog, "function");
+    assert.equal(requireFromApi("@toonstudio/contracts/studio-ink-input-contract").isStudioInkInputContractV1(null), false);
+    assert.deepEqual(requireFromApi("@toonstudio/core/reference-query-language"), { query: "ready" });
+    assert.throws(() => requireFromApi("@toonstudio/contracts/private-helper"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
+    assert.throws(() => requireFromApi("@toonstudio/contracts/types"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
     assert.deepEqual(requireFromApi("@toonstudio/core"), {
       core: "ready",
     });
@@ -153,6 +172,15 @@ test("stages workspace packages inside the emitted API boundary", async () => {
       "./creator-publication-integrity.js",
     );
     assert.equal("main" in contractsPackageJson, false);
+    assert.equal(contractsPackageJson.exports["./studio-crdt-raster-ops"], "./studio-crdt-raster-ops.js");
+    assert.equal("./private-helper" in contractsPackageJson.exports, false);
+    assert.equal("./types" in contractsPackageJson.exports, false);
+    assert.ok(verifyCompiledApiImports(root).importsChecked > 0);
+    await writeFile(caller, 'require("@toonstudio/contracts/studio-live-lock-resource");\n');
+    assert.throws(
+      () => verifyCompiledApiImports(root),
+      /studio-live-lock-resource cannot resolve \(ERR_PACKAGE_PATH_NOT_EXPORTED\)/u,
+    );
   } finally {
     await rm(root, { recursive: true, force: true });
   }
