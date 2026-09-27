@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { StudioCameraFollowModeController, studioGaitShadowScale, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
+import { StudioCameraFollowModeController, studioGaitBodyOffset, studioGaitShadowScale, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
 import { DEFAULT_STUDIO_MOTION_CONFIG, stepStudioVirtualSpaceMotion } from "./studio-virtual-space-motion";
 import { STUDIO_VIRTUAL_SPACE_WALK_SPEED } from "./studio-virtual-space-navigation";
 import { studioGaitFrame } from "./studio-virtual-space-presentation";
@@ -54,6 +54,67 @@ describe("업무 공간의 걷기 표현", () => {
     expect(studioGaitShadowScale(27, 0, true, false)).toBe(1);
     const atWall = studioGaitShadowScale(21, 108, true, false);
     for (let render = 0; render < 120; render++) expect(studioGaitShadowScale(21, 108, true, false)).toBe(atWall);
+  });
+});
+
+describe("몸의 보행 위상", () => {
+  it("접지 순간에만 몸이 낮아지고 그림자와 같은 거리에서 같은 위상을 쓴다", () => {
+    const stride = 108;
+    // 그림자가 가장 작은 27px가 두 발 접지다. 몸도 정확히 그때 가장 낮아야 한다.
+    const planted = studioGaitBodyOffset(27, stride, true, false);
+    expect(planted.offsetY).toBeLessThan(0);
+    // cos(π) = -1 이므로 접지 지점은 정확히 두 배 리프트만큼 내려간다.
+    expect(planted.offsetY).toBeCloseTo(-7, 6);
+    expect(studioGaitBodyOffset(0, stride, true, false).offsetY).toBeCloseTo(0, 6);
+    expect(studioGaitBodyOffset(54, stride, true, false).offsetY).toBeCloseTo(0, 6);
+
+    for (let step = 0; step <= 108; step += 3) {
+      const distance = step;
+      const shadow = studioGaitShadowScale(distance, stride, true, false);
+      const body = studioGaitBodyOffset(distance, stride, true, false);
+      // 둘 다 같은 (1 - cos)에서 나오므로 몸이 내리는 높이는 그림자가 줄어든 높이의 고정 배다.
+      // 비례가 깨지면 그림자와 캐릭터가 따로 동동하지 않는다.
+      const shadowDip = 1 - shadow;
+      const bodyDip = -body.offsetY;
+      expect(shadowDip === 0, `거리 ${distance}`).toBe(bodyDip === 0);
+      if (shadowDip > 0) expect(bodyDip / shadowDip, `거리 ${distance}`).toBeCloseTo(87.5, 6);
+    }
+  });
+
+  it("좌우 흔들림은 한 보행 주기에서 두 번 방향을 바꾼다", () => {
+    const stride = 108;
+    const first = studioGaitBodyOffset(13.5, stride, true, false).offsetX;
+    const second = studioGaitBodyOffset(40.5, stride, true, false).offsetX;
+    expect(first).toBeGreaterThan(0);
+    expect(second).toBeLessThan(0);
+    expect(first).toBeCloseTo(-second, 6);
+    // 두 번째 보행 주기도 같은 자리에서 같은 흔들림으로 반복된다.
+    expect(studioGaitBodyOffset(13.5 + stride, stride, true, false).offsetX).toBeCloseTo(first, 6);
+  });
+
+  it("정지·벽·모션 감소·입력 오류에서는 몸이 완전히 고정된다", () => {
+    for (const offset of [
+      studioGaitBodyOffset(27, 108, false, false),
+      studioGaitBodyOffset(27, 108, true, true),
+      studioGaitBodyOffset(NaN, 108, true, false),
+      studioGaitBodyOffset(-5, 108, true, false),
+      studioGaitBodyOffset(27, 0, true, false),
+      studioGaitBodyOffset(27, Number.NaN, true, false),
+    ]) {
+      expect(offset).toEqual({ offsetX: 0, offsetY: 0 });
+    }
+  });
+
+  it("보행 클립이 있는 내장 장소에서도 몸이 그림자와 함께 움직인다", () => {
+    const profile = studioPlayerLocomotionProfile(true);
+    expect(profile.gaitDistancePerCycle).toBeDefined();
+    const stride = profile.gaitDistancePerCycle!;
+    const moving = studioGaitBodyOffset(27, stride, true, false);
+    const idle = studioGaitBodyOffset(27, stride, false, false);
+    expect(moving.offsetY).toBeLessThan(idle.offsetY);
+    expect(moving.offsetX).not.toBe(0);
+    // 기존 사용자 월드는 보폭이 없으므로 원본 속도와 흔들림을 그대로 유지한다.
+    expect(studioPlayerLocomotionProfile(false).gaitDistancePerCycle).toBeUndefined();
   });
 });
 

@@ -82,7 +82,7 @@ import { StudioDeskPodRuntime } from "./studio-virtual-space-desk-pods";
 import { studioRuntimeBudget, studioTownInterestSnapshot } from "./studio-virtual-space-town-program";
 import type { StudioVirtualDecorationState } from "./studio-virtual-space-customization";
 import { studioVirtualDecorationNavigationWorld, studioVirtualDecorationStateForWorld } from "./studio-virtual-space-decoration-layout";
-import { StudioCameraFollowModeController, studioGaitShadowScale, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
+import { StudioCameraFollowModeController, studioGaitBodyOffset, studioGaitShadowScale, studioPlayerLocomotionProfile } from "./studio-virtual-space-locomotion-presentation";
 import {
   DEFAULT_STUDIO_VIRTUAL_EXPERIENCE,
   type StudioVirtualExperiencePreference,
@@ -1900,12 +1900,14 @@ export function StudioVirtualSpacePhaserCanvas({
         if (snapCamera) this.cameras.main.centerOn(cameraVisualTarget.x, cameraVisualTarget.y);
 
         const hasWalkClip = scene.anims.exists(walkAnimationKey(localSkin, facing)) || reducedMotion.matches;
-        const bob = nextMoving && !hasWalkClip ? Math.sin(time * 0.024) * 2.8 : 0;
+        const bodyOffset = playerLocomotion.gaitDistancePerCycle
+          ? studioGaitBodyOffset(localDistance, playerLocomotion.gaitDistancePerCycle, nextMoving, reducedMotion.matches)
+          : { offsetX: 0, offsetY: nextMoving && !hasWalkClip ? Math.sin(time * 0.024) * 2.8 : 0 };
         const localGroundPoint = localSeat?.anchorPoint ?? rendered;
         const localVisualPoint = studioProjectTownPoint(manifest, localGroundPoint);
         const localShadowPoint = studioProjectTownPoint(manifest, rendered);
-        localSprite.setPosition(localVisualPoint.x, localVisualPoint.y + bob);
-        localSprite.setAngle(nextMoving && !hasWalkClip ? Math.sin(time * 0.018) * 0.8 : 0);
+        localSprite.setPosition(localVisualPoint.x + bodyOffset.offsetX, localVisualPoint.y + bodyOffset.offsetY);
+        localSprite.setAngle(playerLocomotion.gaitDistancePerCycle ? 0 : nextMoving && !hasWalkClip ? Math.sin(time * 0.018) * 0.8 : 0);
         localSprite.setDepth(studioTownDepthForPoint(manifest, localGroundPoint, 1_001));
         localShadow.setPosition(localShadowPoint.x, localShadowPoint.y + 1);
         const shadowScale = playerLocomotion.gaitDistancePerCycle
