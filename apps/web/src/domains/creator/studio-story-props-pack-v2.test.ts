@@ -147,7 +147,8 @@ describe("ToonStudio story prop GLB pack v2", () => {
     expect(gate.requiredNodes.every((name) => nodeNames.has(name))).toBe(true);
     expect(root?.extras).toMatchObject({
       asset_id: gate.assetId,
-      asset_author: "ToonStudio",
+      // GLB 생성 당시의 저작자 메타데이터는 제품 표시명과 별개로 보존한다.
+      asset_author: "ToonSpectrum",
       asset_generator: GENERATOR,
       asset_license: "CC0-1.0",
       asset_license_url: CC0_LICENSE_URL,

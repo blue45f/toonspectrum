@@ -641,11 +641,11 @@ async function generateEnvelope(): Promise<Readonly<{
       playwrightVersion,
     ] = packageVersions;
     const authority = {
-      sourceAssetId: "toonstudio-minseo-campus",
+      sourceAssetId: "toonspectrum-minseo-campus",
       sourceUrl: SOURCE_URL,
       sourceByteLength: SOURCE_BYTE_LENGTH,
       sourceSha256: SOURCE_SHA256,
-      rendererId: "toonstudio-avatar-forge-front",
+      rendererId: "toonspectrum-avatar-forge-front",
       rendererRevision: "2",
       rendererModuleSha256: rendererModuleHash.sha256,
       avatarForgeStateModuleSha256: avatarForgeStateModuleHash.sha256,
