@@ -36,7 +36,7 @@ import {
   pickAvatarPreset,
   resolveSignupAvatar,
   resolveSignupAvatarImage,
-} from "@/shared/lib/avatar";
+} from "@toonstudio/contracts/avatar";
 import { withCsrfProtection } from "@/shared/lib/csrf";
 import { cn } from "@/shared/lib/utils";
 import { signIn } from "@/domains/auth/public/session/auth-session-store";

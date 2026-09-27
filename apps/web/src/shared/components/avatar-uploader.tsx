@@ -2,7 +2,7 @@ import { Camera, Trash2, UserRound } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
-import { resolveSignupAvatarImage } from "@/shared/lib/avatar";
+import { resolveSignupAvatarImage } from "@toonstudio/contracts/avatar";
 import { useT } from "@/shared/lib/i18n";
 import { cn } from "@/shared/lib/utils";
 

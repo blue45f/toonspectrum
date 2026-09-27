@@ -6,7 +6,7 @@ import {
   pickAvatarPreset,
   resolveSignupAvatar,
   resolveSignupAvatarImage,
-} from "../avatar";
+} from "./avatar";
 
 describe("signup avatar presets", () => {
   it("resolves preset ids to the stored avatar color", () => {

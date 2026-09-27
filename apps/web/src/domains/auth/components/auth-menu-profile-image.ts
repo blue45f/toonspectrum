@@ -1,4 +1,4 @@
-import { resolveSignupAvatarImage } from "@/shared/lib/avatar";
+import { resolveSignupAvatarImage } from "@toonstudio/contracts/avatar";
 
 export function safeAuthProfileImageSrc(
   value: string | null | undefined
