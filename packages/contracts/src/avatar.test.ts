@@ -1,5 +1,3 @@
-import { Buffer } from "node:buffer";
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -36,9 +34,9 @@ describe("signup avatar presets", () => {
 
 describe("signup avatar image uploads", () => {
   it("accepts small png, jpeg, and webp data urls", () => {
-    const png = `data:image/png;base64,${Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString("base64")}`;
-    const jpeg = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xdb]).toString("base64")}`;
-    const webp = `data:image/webp;base64,${Buffer.from("RIFFxxxxWEBP").toString("base64")}`;
+    const png = `data:image/png;base64,${btoa(String.fromCharCode(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a))}`;
+    const jpeg = `data:image/jpeg;base64,${btoa(String.fromCharCode(0xff, 0xd8, 0xff, 0xdb))}`;
+    const webp = `data:image/webp;base64,${btoa("RIFFxxxxWEBP")}`;
 
     expect(resolveSignupAvatarImage(png)).toBe(png);
     expect(resolveSignupAvatarImage(jpeg)).toBe(jpeg);
@@ -53,13 +51,13 @@ describe("signup avatar image uploads", () => {
   });
 
   it("rejects spoofed data urls without a matching image signature", () => {
-    const spoofed = `data:image/png;base64,${Buffer.from("not actually png").toString("base64")}`;
+    const spoofed = `data:image/png;base64,${btoa("not actually png")}`;
 
     expect(resolveSignupAvatarImage(spoofed)).toBeNull();
   });
 
   it("rejects images over the signup payload limit", () => {
-    const oversized = `data:image/png;base64,${Buffer.alloc(MAX_AVATAR_IMAGE_BYTES + 1).toString("base64")}`;
+    const oversized = `data:image/png;base64,${btoa("\0".repeat(MAX_AVATAR_IMAGE_BYTES + 1))}`;
 
     expect(resolveSignupAvatarImage(oversized)).toBeNull();
   });
