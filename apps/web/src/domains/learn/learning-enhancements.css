@@ -62,6 +62,8 @@
 .learn-site-navigation__menu > a { justify-content: flex-start; }
 .learn-site-navigation__menu[hidden] { display: none; }
 @media (max-width: 640px) {
+  /* 열린 학습 탐색을 가리는 축소 조작부만 유예하고 OST 재생 상태는 유지한다. */
+  body:has(.learn-site-navigation__more[open]) [data-site-ost="mounted"]:not([data-site-ost-expanded]) { visibility: hidden; }
   .learn-site-navigation { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.375rem; padding-top: 1rem; }
   .learn-site-navigation > a,
   .learn-site-navigation summary { padding: 0.5rem 0.375rem; font-size: 0.75rem; }
