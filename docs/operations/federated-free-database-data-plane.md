@@ -167,7 +167,7 @@ USAGE가 차단된 것을 확인했고, 해당 4개 함수는 trigger 반환형�
 
 ### Cloudflare D1 분석 DB — 생성·단독 검증 완료, 운영 미연결
 
-현재 실제 생성한 D1 DB는 `toonstudio-analytics-buffer` 1개다. 분석 테이블과 migration checkpoint를
+현재 실제 생성한 D1 DB는 `toonspectrum-analytics-buffer` 1개다. 분석 테이블과 migration checkpoint를
 적용한 뒤 `analytics-buffer-v2`로 원격 upgrade를 완료했다. v2는 검토한 미사용 인덱스 6개를
 제거해 쓰기 행 비용을 줄인다. 적용 후 schema SHA256은
 `e7beb58add8f451fd08336b92752590f5d8750178e23891ed840f8fd0a9e2120`다.

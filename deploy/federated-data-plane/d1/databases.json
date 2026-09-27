@@ -11,7 +11,7 @@
     },
     {
       "shardId": "d1-analytics-buffer",
-      "name": "toonstudio-analytics-buffer",
+      "name": "toonspectrum-analytics-buffer",
       "schemaFiles": ["analytics-buffer.sql", "traffic-analytics.sql"],
       "migrationId": "analytics-buffer-v2"
     }

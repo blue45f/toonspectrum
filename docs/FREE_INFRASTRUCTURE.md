@@ -55,7 +55,7 @@ AI는 기능에서 제외하지 않는다. 사용자 키는 통합 설정에서 
 | --- | --- | --- |
 | Supabase PostgreSQL 17 핵심 DB | 정본 스키마 적용, migration 원장 92행·marker 13개·사용자 0행, 제한 runtime TLS 인증·권한·rollback 검증 | Render DB·CA 설정과 배포된 API의 가입·로그인·저장 검증 |
 | Supabase 앱 readiness | 실제 runtime과 CA `verify-full`로 Node `PostgresHealthReadinessRepository` 실행: `database=true`, `schema=true` | 배포된 HTTP readiness 및 사용자 흐름 검증 |
-| Cloudflare D1 분석 DB | 실제 DB 1개 `toonstudio-analytics-buffer`, `analytics-buffer-v2` 적용, 단독 중복 이벤트·heartbeat·overview·pulse canary 통과 | 인증 Worker 배포와 Core 수집·관리자 조회의 `TRAFFIC_ANALYTICS_STORE=d1` 전환 |
+| Cloudflare D1 분석 DB | 실제 DB 1개 `toonspectrum-analytics-buffer`, `analytics-buffer-v2` 적용, 단독 중복 이벤트·heartbeat·overview·pulse canary 통과 | 인증 Worker 배포와 Core 수집·관리자 조회의 `TRAFFIC_ANALYTICS_STORE=d1` 전환 |
 | Firestore·Firebase RTDB·BigQuery | 무료 자원과 초기 규칙·테이블 생성, GCP billing 비활성 | 제품 repository·권한·실제 runtime 연결; 아직 알림·presence·분석의 운영 권위가 아님 |
 | Supabase compatibility schema | private `toonspectrum_federation` 3개 테이블 보존 | 이관 검증용 보조 schema이며 소셜 운영 권위로 전환하지 않음 |
 | 공급자 후보 라우터 | 정책·quota 검사·경로 계획 코드 | 기본 비활성; `plan()` 실행만으로 제품 읽기·쓰기가 분산되지 않음 |

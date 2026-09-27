@@ -36,7 +36,7 @@ export function analyticsDeploymentConfig(environment, production, gitState) {
     workers_dev: true,
     preview_urls: false,
     observability: { enabled: false },
-    d1_databases: [{ binding: "ANALYTICS_DB", database_name: "toonstudio-analytics-buffer", database_id: databaseId }],
+    d1_databases: [{ binding: "ANALYTICS_DB", database_name: "toonspectrum-analytics-buffer", database_id: databaseId }],
     secrets: { required: ["ANALYTICS_RPC_TOKEN"] },
     ...(accountId ? { account_id: accountId } : {}),
     ...(production ? { vars: { RELEASE_SHA: environment.TOONSPECTRUM_APPROVED_MAIN_SHA } } : {}),
