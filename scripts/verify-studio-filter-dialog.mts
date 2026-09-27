@@ -137,6 +137,9 @@ interface FilterCaseResult {
   diff: PixelDiff | null;
   undoDiff: PixelDiff | null;
   persistedUndoRestored?: boolean;
+  denialFrames?: { before: { x: number; y: number; width: number; height: number };
+    after: { x: number; y: number; width: number; height: number };
+    alignedClip: { x: number; y: number; width: number; height: number }; dismissedDiff: PixelDiff };
   failure?: string;
 }
 
@@ -646,6 +649,8 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
     // CRDT 직렬화의 키 삽입 순서와 무관하게 모든 필드·좌표·배열 순서를 정확히 비교한다.
     const originalPages = originalDocument.pagesList;
     const clip = await canvasEvidenceClip(page);
+    const baselineStage = await page.locator(".konvajs-content").first().boundingBox();
+    invariant(baselineStage, "원본 캔버스의 문서 좌표를 확인하지 못했습니다");
     const liveBaseline = await screenshotClipped(page, clip);
     writeFileSync(join(SCRATCH, "studio-filter-dialog-live-baseline.png"), liveBaseline);
     // Compare committed-history rendering on both sides of the filter operation.
@@ -690,14 +695,34 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         await dialog.getByRole("button", { name: "취소", exact: true }).click();
         await dialog.waitFor({ state: "hidden" });
         await page.mouse.move(4, 4);
+        const deniedStage = await page.locator(".konvajs-content").first().boundingBox();
+        invariant(deniedStage && Math.abs(deniedStage.width - baselineStage.width) < 0.5
+          && Math.abs(deniedStage.height - baselineStage.height) < 0.5,
+        "오류 안내 뒤 문서 배율이 바뀌어 같은 문서 영역을 비교할 수 없습니다");
+        // 오류 행의 높이 변화는 기록하되 같은 문서 좌표·크기의 픽셀만 비교한다.
+        const alignedClip = { ...clip, x: clip.x + deniedStage.x - baselineStage.x,
+          y: clip.y + deniedStage.y - baselineStage.y };
         const restoredDeadline = Date.now() + 10_000;
         do {
-          result.undoDiff = await compareScreenshotPixels(page, baseline, await screenshotClipped(page, clip));
+          result.undoDiff = await compareScreenshotPixels(page, baseline, await screenshotClipped(page, alignedClip));
           if (result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002) break;
           await page.waitForTimeout(150);
         } while (Date.now() < restoredDeadline);
         invariant(result.undoDiff.changedPixels <= result.undoDiff.totalPixels * 0.002,
           `${filterCase.label}: 거절·취소 뒤 원본 픽셀이 복원되지 않았습니다`);
+        await page.getByRole("button", { name: "오류 메시지 닫기", exact: true }).click();
+        await page.waitForFunction((before) => {
+          const after = document.querySelector(".konvajs-content")?.getBoundingClientRect();
+          return after && Math.abs(after.x - before.x) < 0.5 && Math.abs(after.y - before.y) < 0.5
+            && Math.abs(after.width - before.width) < 0.5 && Math.abs(after.height - before.height) < 0.5;
+        }, baselineStage);
+        const dismissedDiff = await compareScreenshotPixels(page, baseline, await screenshotClipped(page, clip));
+        invariant(dismissedDiff.changedPixels <= dismissedDiff.totalPixels * 0.002,
+          `${filterCase.label}: 오류를 닫은 뒤 원래 화면 영역의 원본 픽셀이 달라졌습니다`);
+        const afterDismiss = await readDurableStudioAutosaveDocument(page, autosaveKey);
+        invariant(afterDismiss && isDeepStrictEqual(afterDismiss.pagesList, originalPages),
+          `${filterCase.label}: 오류를 닫는 동작이 원본 문서를 변경했습니다`);
+        result.denialFrames = { before: baselineStage, after: deniedStage, alignedClip, dismissedDiff };
         result.persistedUndoRestored = true;
         result.ok = true;
         log(`${filterCase.label}: 정적 거절 사유·재시도·취소·원본 보존 PASS`);

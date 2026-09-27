@@ -40,6 +40,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 
 
 import { decodePng } from "image-js";
@@ -2615,8 +2616,12 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // visibly accepted. Make the isolation boundary explicit for every operation, not only erasers.
       await waitForPersistedDrawElements(
         page,
-        (draws) => draws.length === 0,
-        `${preset.id}: post-redo cleanup left persisted operations`,
+        (draws) => operation === "erase"
+          ? draws.length === 1 && draws[0]?.mode === "pen"
+            && draws[0]?.id === persistedErase?.draws[0]?.id
+            && isDeepStrictEqual(draws[0], persistedErase?.draws[0])
+          : draws.length === 0,
+        `${preset.id}: post-redo cleanup did not restore the exact operation baseline`,
       );
       if (operation === "erase") {
         invariant(emptyBefore, `${preset.id}: eraser cleanup lost its empty baseline`);
