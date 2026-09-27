@@ -150,7 +150,7 @@ const COPY = {
   },
 } as const;
 
-function ReferenceHomeDashboard({ copy }: { copy: typeof COPY.ko }) {
+function ReferenceHomeDashboard({ copy }: { copy: (typeof COPY)[keyof typeof COPY] }) {
   const quick = [
     { href: "/studio/new", title: "새 웹툰 시작하기", body: "AI와 함께 작품을 빠르게 시작", image: "/brand/atelier-process-960.webp", icon: Brush },
     { href: "/story-lab", title: "스토리 만들기", body: "시놉시스·콘티를 구성", image: "/brand/toonstudio-premium-icons/story.webp", icon: BookOpen },
@@ -206,7 +206,7 @@ function ReferenceHomeDashboard({ copy }: { copy: typeof COPY.ko }) {
   );
 }
 
-function localeLabel(copy: typeof COPY.ko) { return copy.primary === "새 작품 시작하기" ? "ToonStudio 크리에이터 홈" : "ToonStudio creator home"; }
+function localeLabel(copy: (typeof COPY)[keyof typeof COPY]) { return copy.primary === "새 작품 시작하기" ? "ToonStudio 크리에이터 홈" : "ToonStudio creator home"; }
 
 export function CreatorHomeExperience() {
   useCreatorHomeSectionNavigation();
