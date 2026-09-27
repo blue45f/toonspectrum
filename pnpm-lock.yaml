@@ -336,7 +336,7 @@ importers:
         specifier: ^13.6.31
         version: 13.6.31
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
       zustand:
         specifier: ^5.0.14
@@ -644,7 +644,7 @@ importers:
         specifier: ^13.6.31
         version: 13.6.31
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
     devDependencies:
       '@types/express':
@@ -718,7 +718,7 @@ importers:
         specifier: ^13.6.31
         version: 13.6.31
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
     devDependencies:
       '@types/node':
@@ -768,7 +768,7 @@ importers:
         specifier: workspace:*
         version: link:../studio-project-model
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
 
   packages/studio-engine-skia:
@@ -816,7 +816,7 @@ importers:
         specifier: workspace:*
         version: link:../studio-project-model
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
     devDependencies:
       '@types/node':
@@ -826,7 +826,7 @@ importers:
   packages/studio-project-model:
     dependencies:
       zod:
-        specifier: ^4.4.3
+        specifier: 4.4.3
         version: 4.4.3
 
   tests/integration/api-web:
@@ -8009,9 +8009,6 @@ packages:
   zod@4.4.3:
     resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
-  zod@4.5.4:
-    resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
-
   zustand@4.5.7:
     resolution: {integrity: sha512-CHOUy7mu3lbD6o6LJLfllpjkzhHXSBlX8B9+qPddUsIfeF5S/UZ5q0kmCsnRqT1UHFQZchNFDDzMbQsuesHWlw==}
     engines: {node: '>=12.7.0'}
@@ -12894,7 +12891,7 @@ snapshots:
       tinyglobby: 0.2.17
       unbash: 4.0.11
       yaml: 2.9.0
-      zod: 4.5.4
+      zod: 4.4.3
 
   konva@10.3.0: {}
 
@@ -13547,7 +13544,7 @@ snapshots:
       libtess: 1.2.2
       omggif: 1.0.10
       pako: 2.2.0
-      zod: 4.5.4
+      zod: 4.4.3
 
   package-json-from-dist@1.0.1: {}
 
@@ -15289,8 +15286,6 @@ snapshots:
   zod@3.25.76: {}
 
   zod@4.4.3: {}
-
-  zod@4.5.4: {}
 
   zustand@4.5.7(@types/react@19.2.15)(react@19.2.7):
     dependencies:
