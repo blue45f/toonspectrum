@@ -217,6 +217,8 @@ describe("studio offline host integration", () => {
   it("keeps a rejected non-empty offline transition as a commit failure", () => {
     const previousPages = [page("이전")];
     const nextPages = [page("다음")];
+    const reportError = vi.fn();
+    const reportNotice = vi.fn();
     const runtime = {
       offlineBranch: {
         shouldStageSceneTransition: () => true,
@@ -229,8 +231,10 @@ describe("studio offline host integration", () => {
     } as unknown as StudioCrdtSceneGraphRuntime;
 
     expect(stageStudioOfflineSceneTransition(
-      runtime, previousPages, nextPages, vi.fn(),
+      runtime, previousPages, nextPages, reportNotice, reportError,
     )).toBe(false);
+    expect(reportError).toHaveBeenCalledExactlyOnceWith("transition rejected");
+    expect(reportNotice).not.toHaveBeenCalled();
   });
 
   it("reports failed canonical promotion without dropping the pending branch", async () => {

@@ -15,7 +15,7 @@ function fixtures(): CreatorMarketplaceResourceRecord[] {
     {
       ...base,
       compatibility: { engines: ["canvas2d", "webgl2"] },
-      license: "toonstudio-standard",
+      license: "toonspectrum-standard",
       containsAi: false,
     },
     {

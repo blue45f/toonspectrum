@@ -26,11 +26,11 @@ describe("Render Core API verification", () => {
     });
 
     await expect(verifyRenderCoreOrigin({
-      origin: "https://toonstudio-core-api.onrender.com",
+      origin: "https://toonspectrum-core-api.onrender.com",
       fetchImpl,
       timeoutMs: 5_000,
     })).resolves.toMatchObject({
-      origin: "https://toonstudio-core-api.onrender.com",
+      origin: "https://toonspectrum-core-api.onrender.com",
       liveness: { status: 200 },
       readiness: { status: 200 },
     });
@@ -44,7 +44,7 @@ describe("Render Core API verification", () => {
     ));
 
     await expect(verifyRenderCoreOrigin({
-      origin: "https://toonstudio-core-api.onrender.com",
+      origin: "https://toonspectrum-core-api.onrender.com",
       fetchImpl,
       timeoutMs: 5_000,
     })).rejects.toThrow("still served by Vercel");
@@ -63,7 +63,7 @@ describe("Render Core API verification", () => {
     });
 
     await expect(verifyRenderCoreOrigin({
-      origin: "https://toonstudio-core-api.onrender.com",
+      origin: "https://toonspectrum-core-api.onrender.com",
       fetchImpl,
       timeoutMs: 5_000,
     })).rejects.toThrow("/api/health/ready returned 503");

@@ -43,7 +43,8 @@ interface RoomRecord {
 }
 
 interface MockBindingStatus {
-  state: "idle" | "syncing" | "ready" | "retrying" | "error" | "recovery-required";
+  nonAuthoritativeDeliveryPending?: boolean;
+  state: "idle" | "syncing" | "ready" | "retrying" | "repairing" | "error" | "recovery-required";
   message: string;
   durabilityAtRisk?: boolean;
   pendingCount?: number;
@@ -182,6 +183,42 @@ const hooks = vi.hoisted(() => {
 });
 
 const rooms = vi.hoisted(() => ({ instances: [] as RoomRecord[] }));
+const offlineAuthority = vi.hoisted(() => ({
+  enabled: false,
+  mode: "server" as "server" | "local",
+  fanout: undefined as "authoritative" | "mesh" | "none" | undefined,
+  instances: [] as Array<{
+    status: { canonicalAuthority: boolean };
+    setCanonicalAuthority: (value: boolean) => void;
+    promotePending: () => Promise<void>;
+    close: () => Promise<void>;
+  }>,
+}));
+
+vi.mock("../offline-branch/studio-offline-branch-feature", () => ({
+  studioAutomergeOfflineBranchEnabled: () => offlineAuthority.enabled,
+}));
+
+vi.mock("../offline-branch/studio-offline-branch-runtime", () => ({
+  StudioOfflineBranchRuntime: {
+    create: async ({ canonicalAuthority }: { canonicalAuthority: boolean }) => {
+      const status = { canonicalAuthority };
+      const runtime = {
+        status,
+        setCanonicalAuthority: (value: boolean) => { status.canonicalAuthority = value; },
+        promotePending: async () => undefined,
+        close: async () => undefined,
+      };
+      offlineAuthority.instances.push(runtime);
+      return runtime;
+    },
+  },
+}));
+
+vi.mock("../offline-branch/studio-offline-branch-p2p", () => ({
+  connectStudioOfflineBranchPeerSync: () => ({ close: () => undefined }),
+}));
+
 const recoveryDownloads = vi.hoisted(() => ({ count: 0 }));
 const recoveryVault = vi.hoisted(() => ({
   entries: [] as StudioCrdtRecoveryVaultEntry[],
@@ -235,7 +272,8 @@ vi.mock("react", async (importOriginal) => {
 
 vi.mock("./studio-live-collaboration-room", () => {
   class StudioLiveRoom {
-    readonly mode = "server";
+    get mode() { return offlineAuthority.mode; }
+    get crdtFanout() { return offlineAuthority.fanout; }
     readonly workId: string;
     readonly record: RoomRecord;
 
@@ -541,6 +579,10 @@ async function renderProvider(
 
 describe("StudioLiveCollaborationProvider lifecycle", () => {
   beforeEach(() => {
+    offlineAuthority.enabled = false;
+    offlineAuthority.mode = "server";
+    offlineAuthority.fanout = undefined;
+    offlineAuthority.instances.length = 0;
     rooms.instances.length = 0;
     lifecycle.roomStart = "pending";
     lifecycle.bindingStart = "resolve";
@@ -557,6 +599,79 @@ describe("StudioLiveCollaborationProvider lifecycle", () => {
   afterEach(() => {
     hooks.reset();
     vi.unstubAllGlobals();
+  });
+
+  it.each([
+    ["local", undefined], ["server", "authoritative"], ["server", "mesh"],
+  ] as const)("%s / %s 정상 전송 중 페이지 편집 권위를 유지하고 재연결 때는 다시 검증한다", async (mode, fanout) => {
+    offlineAuthority.enabled = true;
+    offlineAuthority.mode = mode;
+    offlineAuthority.fanout = fanout;
+    lifecycle.roomStart = "resolve";
+    lifecycle.bindingStatusOnStart = { state: "ready", message: "정본 동기화 완료" };
+    await renderProvider();
+    await vi.waitFor(async () => {
+      await renderProvider();
+      expect(offlineAuthority.instances).toHaveLength(1);
+    });
+    const runtime = offlineAuthority.instances[0];
+    const binding = lifecycle.bindings[0];
+    expect(runtime.status.canonicalAuthority).toBe(true);
+    binding.onStatus?.({ state: "syncing", message: "연속 변경 전송 중", pendingCount: 2 });
+    expect(runtime.status.canonicalAuthority).toBe(true);
+
+    const room = rooms.instances[0];
+    room.ready = false;
+    room.emit({ type: "transport-status", status: { state: "disconnected", message: "연결 종료", recoverable: true } });
+    expect(runtime.status.canonicalAuthority).toBe(false);
+    room.ready = true;
+    binding.onStatus?.({ state: "syncing", message: "재연결 원고 확인 중" });
+    expect(runtime.status.canonicalAuthority).toBe(false);
+    binding.onStatus?.({ state: "ready", message: "정본 재확인 완료" });
+    expect(runtime.status.canonicalAuthority).toBe(true);
+    binding.onStatus?.({ state: "repairing", message: "누락된 서버 순번 복구 중" });
+    expect(runtime.status.canonicalAuthority).toBe(false);
+    binding.onStatus?.({ state: "syncing", message: "복구 전송 중" });
+    expect(runtime.status.canonicalAuthority).toBe(false);
+  });
+
+  it.each([["local", undefined], ["server", "mesh"]] as const)("%s / %s 전달 대기는 편집을 유지하되 연결이 끊기면 재확인 전까지 잠근다", async (mode, fanout) => {
+    offlineAuthority.enabled = true;
+    offlineAuthority.mode = mode;
+    offlineAuthority.fanout = fanout;
+    lifecycle.roomStart = "resolve";
+    lifecycle.bindingStatusOnStart = { state: "ready", message: "로컬 문서 준비 완료" };
+    await renderProvider();
+    await vi.waitFor(async () => {
+      await renderProvider();
+      expect(offlineAuthority.instances).toHaveLength(1);
+    });
+    const runtime = offlineAuthority.instances[0];
+    const binding = lifecycle.bindings[0];
+    const room = rooms.instances[0];
+    binding.onStatus?.({ state: "retrying", message: "피어에게 전달한 변경을 기기에 보관 중", pendingCount: 1, nonAuthoritativeDeliveryPending: true });
+    expect(runtime.status.canonicalAuthority).toBe(true);
+    room.ready = false;
+    room.emit({ type: "transport-status", status: { state: "disconnected", message: "연결 종료", recoverable: true } });
+    expect(runtime.status.canonicalAuthority).toBe(false);
+    room.ready = true;
+    binding.onStatus?.({ state: "retrying", message: "재연결 대기", pendingCount: 1, nonAuthoritativeDeliveryPending: true });
+    expect(runtime.status.canonicalAuthority).toBe(false);
+    binding.onStatus?.({ state: "ready", message: "로컬 문서 재확인 완료" });
+    expect(runtime.status.canonicalAuthority).toBe(true);
+  });
+
+  it("준비된 소켓만 있고 정본 확인이 없으면 새 오프라인 런타임에 권위를 부여하지 않는다", async () => {
+    offlineAuthority.enabled = true;
+    offlineAuthority.fanout = "authoritative";
+    lifecycle.roomStart = "resolve";
+    lifecycle.bindingStatusOnStart = { state: "syncing", message: "정본 대기" };
+    await renderProvider();
+    await vi.waitFor(async () => {
+      await renderProvider();
+      expect(offlineAuthority.instances).toHaveLength(1);
+    });
+    expect(offlineAuthority.instances[0].status.canonicalAuthority).toBe(false);
   });
 
   it("automatically recreates a failed server generation and stops retrying once connected", async () => {

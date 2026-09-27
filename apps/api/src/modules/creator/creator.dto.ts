@@ -402,7 +402,7 @@ export const CreatorDraftCollaborationRoomResponseSchema = z
   .strict();
 
 const CreatorAssetLicenseSchema = z.enum([
-  "toonstudio-standard",
+  "toonspectrum-standard",
   "cc0-1.0",
   "cc-by-4.0",
   "cc-by-nc-4.0",

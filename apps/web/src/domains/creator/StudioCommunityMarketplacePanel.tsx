@@ -319,7 +319,7 @@ const LICENSE_OPTIONS: readonly {
   labelFallback: string;
 }[] = [
   {
-    value: "toonstudio-standard",
+    value: "toonspectrum-standard",
     labelKey: "studio.community.license.toonstudioStandard",
     labelFallback: "표준 · 파일 재배포 금지",
   },
@@ -1297,7 +1297,7 @@ export function ShareResourceForm({
   const [releaseNotes, setReleaseNotes] = useState("");
   const [resourceVersion, setResourceVersion] = useState("1.0.0");
   const [license, setLicense] =
-    useState<CreatorMarketplaceResourceLicense>("toonstudio-standard");
+    useState<CreatorMarketplaceResourceLicense>("toonspectrum-standard");
   const [attributionText, setAttributionText] = useState("");
   const [containsAi, setContainsAi] = useState(false);
   const [ownsRights, setOwnsRights] = useState(false);

@@ -17,7 +17,7 @@ function asset(overrides: Partial<SharedAssetCatalogItem>): SharedAssetCatalogIt
     previewAvailable: true,
     width: 1,
     height: 1,
-    license: "toonstudio-standard",
+    license: "toonspectrum-standard",
     licenseLabel: "toonstudio",
     licenseUrl: null,
     attributionRequired: false,

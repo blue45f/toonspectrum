@@ -88,6 +88,29 @@ describe("Studio capability probe", () => {
     }), { status: 200 }))).resolves.toBe(false);
   });
 
+  it.each([
+    {}, [], null, 42, "available",
+    { capabilities: {} },
+    { capabilities: [] },
+    { capabilities: { studioProjectRead: "available" } },
+    { capabilities: { studioCloudSave: "available" } },
+    { capabilities: { studioProjectRead: true, studioCloudSave: "available" } },
+    { capabilities: { studioProjectRead: "available", studioCloudSave: "unknown" } },
+  ])("필수 기능 상태가 빠지거나 잘못된 JSON을 서버 복구로 해석하지 않는다: %j", async (payload) => {
+    await expect(isStudioServerCapabilityAvailable(
+      new Response(JSON.stringify(payload), { status: 200 }),
+    )).resolves.toBe(false);
+  });
+
+  it.each([
+    ["available", "available"], ["degraded", "available"],
+    ["available", "degraded"], ["degraded", "degraded"],
+  ])("명시적인 사용 가능·저하 상태의 호환성을 유지한다: %s/%s", async (studioProjectRead, studioCloudSave) => {
+    await expect(isStudioServerCapabilityAvailable(new Response(JSON.stringify({
+      capabilities: { studioProjectRead, studioCloudSave },
+    }), { status: 200 }))).resolves.toBe(true);
+  });
+
   it("fails closed on invalid or non-success capability responses", async () => {
     await expect(isStudioServerCapabilityAvailable(
       new Response("not-json", { status: 200 }),

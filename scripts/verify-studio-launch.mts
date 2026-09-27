@@ -604,6 +604,21 @@ async function runOne(browser: Browser, run: number, url: string): Promise<RunRe
   const pageDelta = afterCount - beforeCount;
   log(`run${run}: afterCount=${afterCount} pageDelta=${pageDelta}`);
 
+  if (pageDelta < 2) {
+    const creationState = await page.evaluate(() => ({
+      syncPhases: [...document.querySelectorAll("[data-studio-sync-phase]")]
+        .map((node) => node.getAttribute("data-studio-sync-phase")),
+      transportModes: [...document.querySelectorAll("[data-studio-live-mode]")]
+        .map((node) => node.getAttribute("data-studio-live-mode")),
+      alerts: [...document.querySelectorAll('[role="alert"]')]
+        .map((node) => node.textContent?.trim().slice(0, 400)),
+      historyCount: document.querySelector("[data-studio-history-entry-count]")
+        ?.getAttribute("data-studio-history-entry-count"),
+    }));
+    log(`run${run}: page creation diagnostics=${JSON.stringify(creationState)}`);
+  }
+
+
   // Editor shell carries exact logical width (shipped attr)
   const logicalW = await shell.getAttribute("data-studio-logical-w").catch(() => null);
   log(`run${run}: data-studio-logical-w=${logicalW}`);

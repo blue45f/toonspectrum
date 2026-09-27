@@ -208,7 +208,7 @@ services:
         sync: false
 
   - type: web
-    name: toonstudio-studio-live
+    name: toonspectrum-studio-live
     runtime: node
     region: singapore
     # Optional native Socket.IO fallback. Durable Objects remain the default ephemeral

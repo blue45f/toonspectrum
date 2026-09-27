@@ -53,8 +53,8 @@ import {
 const LICENSE_METADATA: Readonly<
   Record<CreatorMarketplaceResourceLicense, Omit<StudioMarketplaceLicense, "sourceVerifiedAt">>
 > = Object.freeze({
-  "toonstudio-standard": {
-    id: "toonstudio-standard",
+  "toonspectrum-standard": {
+    id: "toonspectrum-standard",
     label: "ToonStudio 표준 사용권",
     url: null,
     commercialUse: true,

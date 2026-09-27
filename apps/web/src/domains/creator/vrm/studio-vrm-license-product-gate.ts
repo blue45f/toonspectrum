@@ -524,7 +524,7 @@ function platformLicenseForRenderedPose(
     && context.toonstudioRenderedPoseGrant.renderedPoseOnly === true
     && context.toonstudioRenderedPoseGrant.originalVrmBytesExcluded === true
   ) {
-    return "toonstudio-standard";
+    return "toonspectrum-standard";
   }
   return null;
 }

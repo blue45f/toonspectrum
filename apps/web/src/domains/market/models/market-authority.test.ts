@@ -99,7 +99,7 @@ const BRUSH_AUTHORING_ENVELOPE = {
     breaking: false,
   },
   rights: {
-    license: "toonstudio-standard",
+    license: "toonspectrum-standard",
     commercialUse: true,
     redistribution: false,
     aiTrainingAllowed: false,
@@ -194,7 +194,7 @@ describe("market authority", () => {
     expect(parsed.message).toContain("사용권");
   });
 
-  it.each(["free", "commercial", "toonstudio-standard", "cc0-1.0", "cc-by-4.0"])
+  it.each(["free", "commercial", "toonspectrum-standard", "cc0-1.0", "cc-by-4.0"])
   ("rejects commercial permission broadening for %s", (license) => {
     expect(parseAuthoritativeMarketManifest(JSON.stringify({
       ...BRUSH_AUTHORING_ENVELOPE,
@@ -211,11 +211,11 @@ describe("market authority", () => {
     })).state).toBe("invalid");
   });
 
-  it.each(["free", "commercial", "toonstudio-standard"])("preserves the explicit workshop standard rights for %s", (license) => {
+  it.each(["free", "commercial", "toonspectrum-standard"])("preserves the explicit workshop standard rights for %s", (license) => {
     expect(parseAuthoritativeMarketManifest(JSON.stringify({
       ...BRUSH_AUTHORING_ENVELOPE,
       rights: { ...BRUSH_AUTHORING_ENVELOPE.rights, license },
-    }))).toMatchObject({ state: "valid", manifest: { license: "toonstudio-standard" } });
+    }))).toMatchObject({ state: "valid", manifest: { license: "toonspectrum-standard" } });
   });
 
   it("preserves explicit non-commercial rights and required attribution", () => {

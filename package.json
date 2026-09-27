@@ -39,7 +39,7 @@
     "kmas:fetch": "node scripts/kmas-fetch.mjs",
     "kmas:update-catalog": "node scripts/kmas-update-catalog.mjs && pnpm catalog:gen",
     "predev": "node scripts/verify-workspace-package-links.mjs && pnpm catalog:gen && pnpm i18n:builtins:gen",
-    "prebuild": "node scripts/verify-workspace-package-links.mjs && pnpm catalog:gen && pnpm i18n:builtins:gen",
+    "prebuild": "node scripts/verify-production-release-compatibility.mjs && node scripts/verify-workspace-package-links.mjs && pnpm catalog:gen && pnpm i18n:builtins:gen",
     "build:all": "pnpm -r run build",
     "lint": "NODE_OPTIONS='--max-old-space-size=8192' eslint --cache --cache-strategy content --cache-location node_modules/.cache/eslint/full/",
     "lint:quick": "node scripts/lint-changed.mjs",
@@ -276,7 +276,6 @@
     "verify:ai-provider-status-canary": "tsx scripts/verify-ai-provider-status-canary.mts"
   },
   "dependencies": {
-    "@toonstudio/contracts": "workspace:*",
     "@automerge/automerge": "3.5.0",
     "@babylonjs/core": "9.19.0",
     "@babylonjs/loaders": "9.19.0",
@@ -368,7 +367,7 @@
     "web-ifc": "0.0.77",
     "xatlasjs": "0.2.0",
     "yjs": "^13.6.31",
-    "zod": "^4.4.3",
+    "zod": "4.4.3",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

@@ -660,14 +660,14 @@ describe("studio community marketplace projection", () => {
 
     await expect(createStudioCommunityPublishManifest(candidate, {
       resourceVersion: "1.0.0",
-      license: "toonstudio-standard",
+      license: "toonspectrum-standard",
       containsAi: false,
       creatorOwnsRights: false,
       recognizableMarketplaceDerivative: false,
     })).rejects.toThrow("권리");
     await expect(createStudioCommunityPublishManifest(candidate, {
       resourceVersion: "1.0.0",
-      license: "toonstudio-standard",
+      license: "toonspectrum-standard",
       containsAi: false,
       creatorOwnsRights: true,
       recognizableMarketplaceDerivative: true,
@@ -675,7 +675,7 @@ describe("studio community marketplace projection", () => {
 
     await expect(createStudioCommunityPublishManifest(candidate, {
       resourceVersion: "1.0.0-01",
-      license: "toonstudio-standard",
+      license: "toonspectrum-standard",
       containsAi: false,
       creatorOwnsRights: true,
       recognizableMarketplaceDerivative: false,

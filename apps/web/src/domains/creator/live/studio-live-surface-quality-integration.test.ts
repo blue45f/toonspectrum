@@ -22,11 +22,16 @@ function liveSurfaceStartSource(): string {
 
 describe("Studio native live-surface quality integration", () => {
   it("lets only a native-DPR Canvas overlay with a successful begin own the draft", () => {
-    const page = liveSurfaceStartSource();
-    const start = page.slice(
-      page.indexOf("const overlayCandidate ="),
-      page.indexOf("const predictionTailEligible ="),
-    );
+    const page = source("../StudioCuttoonEditorHost.tsx");
+    const surfaceStart = liveSurfaceStartSource();
+    const begin = surfaceStart.indexOf("const overlayCandidate =");
+    const end = surfaceStart.indexOf("const predictionTailEligible =", begin);
+    expect(begin).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(begin);
+    expect(page).toContain("beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({");
+    const pointerDown = source("../studio-cuttoon-editor/studio-cuttoon-stage-pointers-down-draw.ts");
+    expect(pointerDown).toContain("if (!beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin, {");
+    const start = surfaceStart.slice(begin, end);
 
     expect(start).toContain(
       "liveInkOverlayRendererRef.current.isNativeSurfaceReady",
@@ -74,11 +79,14 @@ describe("Studio native live-surface quality integration", () => {
   });
 
   it("does not admit prediction or block the exact dynamic fallback from a mere candidate", () => {
-    const page = liveSurfaceStartSource();
-    const start = page.slice(
-      page.indexOf("const overlayCandidate ="),
-      page.indexOf("armTransientPenInkSurfaces({"),
-    );
+    const page = source("../StudioCuttoonEditorHost.tsx");
+    const surfaceStart = liveSurfaceStartSource();
+    const begin = surfaceStart.indexOf("const overlayCandidate =");
+    const end = surfaceStart.indexOf("armTransientPenInkSurfaces({", begin);
+    expect(begin).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(begin);
+    expect(page).toContain('from "./studio-cuttoon-editor/studio-live-surface-start"');
+    const start = surfaceStart.slice(begin, end);
 
     expect(start).toContain("&& !liveInkOverlayStarted");
     expect(start).toContain("&& liveInkOverlayStarted");

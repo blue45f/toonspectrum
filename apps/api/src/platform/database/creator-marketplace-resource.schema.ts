@@ -150,7 +150,7 @@ export const creatorMarketplaceResources = pgTable(
     ),
     check(
       "creator_marketplace_resource_license_check",
-      sql`${table.license} in ('toonstudio-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')`
+      sql`${table.license} in ('toonspectrum-standard', 'cc0-1.0', 'cc-by-4.0', 'cc-by-nc-4.0')`
     ),
     check(
       "creator_marketplace_resource_origin_check",
