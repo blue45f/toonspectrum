@@ -16,6 +16,14 @@ on:
       - 'apps/web/src/domains/creator/studio-detail*'
       - 'scripts/verify-studio-brushes.mts'
       - 'scripts/verify-studio-filter-dialog.mts'
+      - 'scripts/lib/studio-filter-canonical-evidence*'
+      - 'scripts/studio-review-host-qa-runtime*'
+      - 'scripts/studio-review-host-steps.ts'
+      - 'scripts/isolated-market-api*'
+      - 'scripts/prepare-studio-review-test-db.mjs'
+      - 'apps/api/**'
+      - 'apps/web/src/domains/creator/live/studio-live-socket-endpoint*'
+      - 'apps/web/vite.config.ts'
       - 'scripts/verify-studio-source-hydration.mts'
       - 'apps/web/src/platform/creator-work-read-options*'
       - 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
@@ -36,6 +44,14 @@ on:
       - 'apps/web/src/domains/creator/studio-detail*'
       - 'scripts/verify-studio-brushes.mts'
       - 'scripts/verify-studio-filter-dialog.mts'
+      - 'scripts/lib/studio-filter-canonical-evidence*'
+      - 'scripts/studio-review-host-qa-runtime*'
+      - 'scripts/studio-review-host-steps.ts'
+      - 'scripts/isolated-market-api*'
+      - 'scripts/prepare-studio-review-test-db.mjs'
+      - 'apps/api/**'
+      - 'apps/web/src/domains/creator/live/studio-live-socket-endpoint*'
+      - 'apps/web/vite.config.ts'
       - 'scripts/verify-studio-source-hydration.mts'
       - 'apps/web/src/platform/creator-work-read-options*'
       - 'apps/web/src/domains/creator/StudioCuttoonEditorHost.tsx'
@@ -97,6 +113,9 @@ jobs:
             apps/web/src/domains/creator/brush/studio-brush-browser-harness-boundary.test.ts \
             apps/web/src/domains/creator/studio-detail.test.ts \
             apps/web/src/domains/creator/studio-detail-median-stability.test.ts \
+            scripts/studio-review-host-qa-runtime.test.mjs \
+            scripts/isolated-market-api.test.ts \
+            scripts/lib/studio-filter-canonical-evidence.test.ts \
             2>&1 | tee /tmp/studio-stability-unit-evidence/tests.log
       - name: Preserve focused regression results
         if: always()
@@ -134,6 +153,19 @@ jobs:
       fail-fast: false
       matrix:
         suite: [filters, desktop, long, shapes, mobile, durability, source]
+    services:
+      postgres:
+        # 필터 정본 검증만 새 DB를 소유한다. 다른 matrix 실행은 서비스를 시작하지 않는다.
+        image: ${{ matrix.suite == 'filters' && 'postgres:16-alpine' || '' }}
+        env:
+          POSTGRES_USER: studio_filter_test
+          POSTGRES_DB: studio_filter_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U studio_filter_test -d studio_filter_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       NODE_OPTIONS: --max-old-space-size=8192
       TOONSPECTRUM_VERIFY_DIR: /tmp/studio-stability-evidence
@@ -152,9 +184,35 @@ jobs:
           path: dist
       - name: Verify hidden manifest survived artifact transport
         run: test -s dist/.vite/manifest.json
-      - name: Every dialog filter repeated in the same browser session
+      - name: 정본 서버가 없는 정적 화면의 적용 거절과 원고 보존
         if: matrix.suite == 'filters'
         env:
+          TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL: '1'
+          TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR: /tmp/studio-stability-evidence/filters-denial
+        run: pnpm run verify:studio-filter-dialog
+      - name: 임시 정본 API와 전용 production QA 빌드 준비
+        if: matrix.suite == 'filters'
+        env:
+          TEST_DATABASE_URL: postgresql://studio_filter_test@127.0.0.1:5432/studio_filter_test
+          VITE_STUDIO_LIVE_ORIGIN: http://127.0.0.1:5173
+        run: |
+          set -euo pipefail
+          pnpm --filter @webtoon-nest/api build
+          node scripts/prepare-studio-review-test-db.mjs
+          pnpm run prebuild
+          pnpm exec vite build --config apps/web/vite.config.ts --outDir "$PWD/.qa/studio-filter-canonical/dist"
+          node scripts/generate-third-party-notices.mjs --output "$PWD/.qa/studio-filter-canonical/dist/legal/THIRD_PARTY_NOTICES.generated.md"
+          node scripts/verify-static-csp.mjs "$PWD/.qa/studio-filter-canonical/dist/index.html"
+          test -s "$PWD/.qa/studio-filter-canonical/dist/.vite/manifest.json"
+      - name: 실제 인증·정본 ACK에서 모든 필터 적용·픽셀·실행취소 3회 확인
+        if: matrix.suite == 'filters'
+        env:
+          TEST_DATABASE_URL: postgresql://studio_filter_test@127.0.0.1:5432/studio_filter_test
+          STUDIO_QA_BASE_URL: http://127.0.0.1:5173
+          STUDIO_QA_API_BASE_URL: http://127.0.0.1:4355
+          STUDIO_QA_WEB_OUT_DIR: .qa/studio-filter-canonical/dist
+          TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED: '1'
+          TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR: /tmp/studio-stability-evidence/filters-canonical
           TOONSPECTRUM_FILTER_DIALOG_SURVEY: '1'
           TOONSPECTRUM_FILTER_DIALOG_ROUNDS: '3'
         run: pnpm run verify:studio-filter-dialog
