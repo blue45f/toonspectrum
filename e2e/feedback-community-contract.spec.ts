@@ -43,9 +43,10 @@ for (const invalidPage of [
 
 test("a failed refresh preserves the draft but revokes readiness until a verified response", async ({ page }) => {
   let calls = 0;
+  let unavailable = false;
   await page.route("**/api/feedback/posts**", async (route) => {
     calls++;
-    return calls === 2
+    return unavailable
       ? route.fulfill({ status: 503, json: { message: "새로고침 일시 실패" } })
       : route.fulfill({ json: result() });
   });
@@ -53,10 +54,13 @@ test("a failed refresh preserves the draft but revokes readiness until a verifie
   const form = page.getByRole("form", { name: "공개 제보 작성" });
   const title = form.getByLabel("제목", { exact: false });
   await title.fill("작성 중인 제보를 보존합니다");
+  unavailable = true;
   await page.getByRole("button", { name: "제보 목록 새로고침" }).click();
-  await expect(page.getByRole("alert")).toContainText("새로고침 일시 실패");
+  await expect(page.getByRole("alert")).toContainText("일부 온라인 기능을 일시적으로 사용할 수 없습니다.");
+  expect(calls).toBe(4);
   await expect(title).toHaveValue("작성 중인 제보를 보존합니다");
   await expect(form.getByRole("button", { name: "공개 제보 등록" })).toBeDisabled();
+  unavailable = false;
   await page.getByRole("button", { name: "다시 불러오기", exact: true }).click();
   await expect(form.getByRole("button", { name: "공개 제보 등록" })).toBeEnabled();
   await expect(title).toHaveValue("작성 중인 제보를 보존합니다");

@@ -26,12 +26,12 @@ try {
     const context = await browser.newContext({ viewport: { width, height }, reducedMotion: "reduce" });
     await context.addInitScript(({ lang, theme }) => {
       localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang }, version: 0 }));
-      localStorage.setItem("toonstudio-theme", JSON.stringify({ state: { theme }, version: 0 }));
+      localStorage.setItem("toonstudio-theme", JSON.stringify({ state: { preference: theme }, version: 0 }));
     }, { lang, theme });
     const page = await context.newPage();
-    // A slow shared hero/card image must not move an already focused section.
+    // 늦게 도착한 현재 홈 이미지도 이미 초점을 받은 영역을 이동시키면 안 된다.
     const artworkReady = new Promise((resolve) => { releaseArtwork = resolve; });
-    await page.route("**/brand/production-os-hero.svg", async (route) => {
+    await page.route("**/brand/atelier-20260927/creation-world.webp", async (route) => {
       await artworkReady;
       await route.continue();
     });
@@ -66,7 +66,7 @@ try {
         && target.y < height);
     }, { message: "The legacy support fragment must resolve below the public header" }).toBe(true);
 
-    await expect(page.locator(".cf-hero .cf-primary")).toHaveAttribute("href", "/onboarding/character?next=%2Fhome");
+    await expect(page.locator(".cf-hero .cf-primary")).toHaveAttribute("href", "/studio/new");
     await expect(page.locator(".cf-hero .cf-secondary")).toHaveAttribute("href", "/product-tour");
     await expect(page.locator('.cf-simple-closing a[href="/production/projects/sample-project/overview"]')).toHaveCount(1);
     await expect(page.locator('.cf-hero-links a[href="/studio"]')).toHaveCount(1);
@@ -75,10 +75,12 @@ try {
     for (const href of ["#creator-start", "#creator-flow", "#creator-principles", "#creator-support"]) {
       await expect(page.locator(`.cf-jump-nav a[href="${href}"]`)).toHaveCount(1);
     }
-    await expect(page.locator(".cf-start-card")).toHaveCount(4);
+    await expect(page.locator("#creator-toolkit-title")).toHaveCount(1);
     await expect(page.locator(".cf-flow li a")).toHaveCount(6);
     await expect(page.locator(".cf-support-grid a")).toHaveCount(3);
     await expect(page.locator(".cf-intent nav a")).toHaveCount(6);
+    assert.deepEqual(await page.locator(".cf-intent nav a").evaluateAll((links) => links.map((link) => link.getAttribute("href"))),
+      ["/story-lab", "/studio/new", "/studio/bg3d", "/studio/assets", "/production", "/studio/publish"]);
     for (const artwork of await page.locator(".cf-intent-card-media").all()) {
       const box = await artwork.boundingBox();
       assert(box && box.width > 0 && box.height >= 80 && box.height < 300,
@@ -121,7 +123,7 @@ try {
     assert.deepEqual(mediaRequests, [], "The all-in-one homepage must not mount or download a video");
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     for (const control of await page.locator(
-      ".cf-actions a,.cf-start-card,.cf-flow li a,.cf-support-grid a,.cf-jump-nav a",
+      ".cf-actions a,.cf-intent nav a,.cf-flow li a,.cf-support-grid a,.cf-jump-nav a",
     ).all()) {
       const box = await control.boundingBox();
       assert(box && box.height >= 44, "Homepage navigation controls must keep the 44px touch target");
