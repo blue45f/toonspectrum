@@ -394,7 +394,7 @@ export function ExplorePage() {
                 <button
                   type="button"
                   onClick={() => setShowAllGenres(true)}
-                  className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
+                  className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg transition-colors hover:border-accent/45 hover:text-accent"
                 >
                   모든 장르 보기 · {GENRES.length - visibleGenres.length}개
                 </button>
@@ -464,7 +464,7 @@ export function ExplorePage() {
               <button
                 type="button"
                 onClick={() => setShowAllTags(true)}
-                className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-accent"
+                className="inline-flex min-h-9 items-center rounded-full border border-line bg-card px-3 text-sm font-semibold text-fg transition-colors hover:border-accent/45 hover:text-accent"
               >
                 태그 더 보기 · {hiddenTagCount}개
               </button>
