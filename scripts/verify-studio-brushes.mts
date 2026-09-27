@@ -1392,6 +1392,22 @@ function sanitizeEvidenceClip(
   };
 }
 
+async function reanchorEvidenceClip(
+  stage: Locator,
+  initialStageBox: { x: number; y: number; width: number; height: number },
+  clip: { x: number; y: number; width: number; height: number },
+  viewport: { width: number; height: number },
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  const currentStageBox = await stage.boundingBox();
+  if (!currentStageBox) return clip;
+  return sanitizeEvidenceClip({
+    x: currentStageBox.x + (clip.x - initialStageBox.x),
+    y: currentStageBox.y + (clip.y - initialStageBox.y),
+    width: clip.width,
+    height: clip.height,
+  }, viewport);
+}
+
 async function _compareScreenshotPixelsWithinReferenceDelta(
   page: Page,
   baseline: Buffer,
@@ -1930,20 +1946,31 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       if (DEBUG_BRUSH_VERIFIER) {
         log(`viewport=${JSON.stringify(viewport)} stageBox=${JSON.stringify(stageBox)} presetIndex=${index}`);
       }
+      const paperSafeRect = canvasSafeRect(stageBox, viewport);
+      const isInsidePaperSafeRect = ({ x, y }: { x: number; y: number }) =>
+        x >= paperSafeRect.left
+        && x <= paperSafeRect.right
+        && y >= paperSafeRect.top
+        && y <= paperSafeRect.bottom;
       const safeCanvasPoint = async ({ x, y }: { x: number; y: number }) =>
-        page.evaluate(({ x: pointerX, y: pointerY }) =>
+        isInsidePaperSafeRect({ x, y })
+        && await page.evaluate(({ x: pointerX, y: pointerY }) =>
           Boolean(document.elementFromPoint(pointerX, pointerY)?.closest(".konvajs-content")),
-        { x, y }
-      );
+        { x, y });
       let evidencePoint = point;
       const safeCandidates: Array<{ x: number; y: number }> = [
         { x: point.x, y: point.y },
       ];
       if (!await safeCanvasPoint(point)) {
-        const safeLeft = Math.max(0, Math.min(stageBox.x + 36, viewport.width - 36));
-        const safeRight = Math.max(0, Math.min(stageBox.x + stageBox.width - 36, viewport.width - 16));
-        const safeTop = Math.max(0, Math.min(stageBox.y + 36, viewport.height - 36));
-        const safeBottom = Math.max(0, Math.min(stageBox.y + stageBox.height - 36, viewport.height - 16));
+        // Konva content can legitimately extend underneath the fixed bottom dock. An
+        // elementFromPoint() hit therefore does not prove that the point is visually exposed.
+        // Keep fallback evidence points inside the same paper-safe rectangle used by the pixel
+        // comparison so fixed editor chrome cannot become the "canvas" under test.
+        const safeRect = canvasSafeRect(stageBox, viewport);
+        const safeLeft = Math.max(0, Math.min(safeRect.left, viewport.width - 36));
+        const safeRight = Math.max(0, Math.min(safeRect.right, viewport.width - 16));
+        const safeTop = Math.max(0, Math.min(safeRect.top, viewport.height - 36));
+        const safeBottom = Math.max(0, Math.min(safeRect.bottom, viewport.height - 16));
         if (safeRight > safeLeft + 8 && safeBottom > safeTop + 8) {
           for (let row = 0; row < 4; row += 1) {
             for (let column = 0; column < 4; column += 1) {
@@ -2449,10 +2476,15 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // against a Δ20 threshold, while the diagnostic capture was visually blank paper. Polling for
       // two identical consecutive frames measures the same thing the bound below asks about, and
       // does NOT widen that bound: real residual ink still fails.
-      let undone = await page.screenshot({ animations: "disabled", clip: usedClip });
+      // The fixed dock can move the stage's viewport origin during a history transition. Keep
+      // the evidence region anchored to the same local canvas coordinates rather than reusing the
+      // old absolute page coordinates, otherwise UI chrome movement is counted as residual ink.
+      const undoClip = await reanchorEvidenceClip(page.locator(".konvajs-content").first(), stageBox, usedClip, viewport);
+      let undone = await page.screenshot({ animations: "disabled", clip: undoClip });
       for (let settleAttempt = 0; settleAttempt < 12; settleAttempt += 1) {
         await page.waitForTimeout(60);
-        const next = await page.screenshot({ animations: "disabled", clip: usedClip });
+        const nextClip = await reanchorEvidenceClip(page.locator(".konvajs-content").first(), stageBox, usedClip, viewport);
+        const next = await page.screenshot({ animations: "disabled", clip: nextClip });
         const settled = next.equals(undone);
         undone = next;
         // A retained-stroke history jump can look stable for the first two animation frames while
@@ -2487,7 +2519,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       invariant(await redo.isEnabled(), `${preset.id}: Redo control did not become enabled`);
       await page.keyboard.press("Meta+Shift+z");
       await page.waitForTimeout(60);
-      const redone = await page.screenshot({ animations: "disabled", clip: usedClip });
+      const redoClip = await reanchorEvidenceClip(page.locator(".konvajs-content").first(), stageBox, usedClip, viewport);
+      const redone = await page.screenshot({ animations: "disabled", clip: redoClip });
       const redoDiff = await compareScreenshotPixels(page, before, redone);
       const redoRestoredStroke = transparentPaint || hasMeaningfulPixelChange(redoDiff);
       invariant(redoRestoredStroke, `${preset.id}: Redo did not restore visible stroke pixels`);
@@ -2519,7 +2552,8 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
       // brush's evidence lane and turn a real no-op into an apparent pixel change.
       await page.keyboard.press("Meta+z");
       await page.waitForTimeout(40);
-      const cleaned = await page.screenshot({ animations: "disabled", clip: usedClip });
+      const cleanupClip = await reanchorEvidenceClip(page.locator(".konvajs-content").first(), stageBox, usedClip, viewport);
+      const cleaned = await page.screenshot({ animations: "disabled", clip: cleanupClip });
       const cleanupDiff = await compareScreenshotPixels(page, before, cleaned, 20);
       const cleanupCrossSurfaceAntialiasOnly = operation === "erase"
         && cleanupDiff.changedPixels <= 16
@@ -2528,11 +2562,21 @@ async function runDesktopBrushMatrix(browser: Browser, studioUrl: string): Promi
         cleanupDiff.changedPixels <= 3 || cleanupCrossSurfaceAntialiasOnly,
         `${preset.id}: post-redo cleanup left perceptible stroke pixels behind`,
       );
+      // The next catalogue item may require the durable pro-brush identity to be persisted. A
+      // visual Undo can finish before the debounced SQLite/OPFS autosave removes the previous draw,
+      // which made the following pro brush report zero durable elements even though its stroke was
+      // visibly accepted. Make the isolation boundary explicit for every operation, not only erasers.
+      await waitForPersistedDrawElements(
+        page,
+        (draws) => draws.length === 0,
+        `${preset.id}: post-redo cleanup left persisted operations`,
+      );
       if (operation === "erase") {
         invariant(emptyBefore, `${preset.id}: eraser cleanup lost its empty baseline`);
         await page.keyboard.press("Meta+z");
         await page.waitForTimeout(80);
-        const fullyCleaned = await page.screenshot({ animations: "disabled", clip: usedClip });
+        const fullyCleanedClip = await reanchorEvidenceClip(page.locator(".konvajs-content").first(), stageBox, usedClip, viewport);
+        const fullyCleaned = await page.screenshot({ animations: "disabled", clip: fullyCleanedClip });
         const fullCleanupDiff = await compareScreenshotPixels(
           page,
           emptyBefore,

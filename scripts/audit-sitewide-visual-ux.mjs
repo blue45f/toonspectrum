@@ -137,7 +137,15 @@ for (const [viewportName, viewport] of viewports) {
     // Heavy Studio/WebGL routes can retain renderer resources after a context closes.
     // Recycle Chromium for every theme/viewport cell so later palettes are audited with
     // the same clean memory conditions as the first one instead of producing false timeouts.
-    const browser = await chromium.launch({ args: ["--disable-dev-shm-usage"] });
+    const browser = await chromium.launch({
+      args: [
+        "--disable-dev-shm-usage",
+        // This audit excludes Studio/drawing GPU behavior. Keep Chromium GPU failures
+        // from invalidating otherwise valid sitewide visual observations on macOS.
+        "--disable-gpu",
+        "--disable-software-rasterizer",
+      ],
+    });
     try {
       const context = await browser.newContext({
         viewport: { width: viewport.width, height: viewport.height },
@@ -150,12 +158,18 @@ for (const [viewportName, viewport] of viewports) {
         isMobile: viewport.isMobile,
       });
       await context.addInitScript(({ themeName }) => {
-        localStorage.setItem("toonstudio-theme", JSON.stringify({
-          state: { preference: themeName, studioPreference: themeName }, version: 0,
-        }));
-        localStorage.setItem("toonstudio:site-experience:v1", "vivid");
-        localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
-        sessionStorage.setItem("toonstudio-compat-dismissed", "true");
+        // The init script also runs for Chromium's initial opaque about:blank document.
+        // Accessing Web Storage there can throw SecurityError; it must not abort the audit.
+        try {
+          localStorage.setItem("toonstudio-theme", JSON.stringify({
+            state: { preference: themeName, studioPreference: themeName }, version: 0,
+          }));
+          localStorage.setItem("toonstudio:site-experience:v1", "vivid");
+          localStorage.setItem("toonstudio-lang", JSON.stringify({ state: { lang: "ko" }, version: 0 }));
+          sessionStorage.setItem("toonstudio-compat-dismissed", "true");
+        } catch {
+          // The real-origin document gets storage on its next navigation.
+        }
       }, { themeName: theme });
       await context.route("**/api/**", async (route) => {
         const pathname = new URL(route.request().url()).pathname;

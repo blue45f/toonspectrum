@@ -240,7 +240,9 @@ const StudioVirtualSpaceSocialPanel = createStudioVirtualSpacePanel(() => import
 const StudioVirtualSpaceConversationPanel = createStudioVirtualSpacePanel(() => import("./StudioVirtualSpaceConversationPanel").then((module) => ({ default: module.StudioVirtualSpaceConversationPanel })));
 const StudioVirtualSpaceReviewPicker = createStudioVirtualSpacePanel(() => import("./StudioVirtualSpaceReviewPicker").then((module) => ({ default: module.StudioVirtualSpaceReviewPicker })));
 
-const StudioP2pHuddleLauncher = createStudioVirtualSpacePanel(() => import("../live/huddle/StudioP2pHuddleLauncher"));
+const StudioP2pHuddleLauncher = createStudioVirtualSpacePanel<{ readonly placement?: "floating" | "inline" }>(
+  () => import("../live/huddle/StudioP2pHuddleLauncher"),
+);
 const StudioVirtualSpacePlaceGallery = createStudioVirtualSpacePanel(() => import("./StudioVirtualSpacePlaceGallery").then((module) => ({
   default: module.StudioVirtualSpacePlaceGallery,
 })));
@@ -2217,7 +2219,7 @@ export function VirtualSpaceExperience({
               <Settings size={18} aria-hidden />{bt("공간·꾸미기", "Space & settings")}
             </button>
             <Link data-workspace-primary-action="true" href={personal ? "/studio/new" : `/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{personal ? bt("새 작품 만들기", "Create a work") : bt("원고 목록", "Manuscript list")}<ExternalLink size={16} aria-hidden /></Link>
-            {!personal ? <Suspense fallback={null}><StudioP2pHuddleLauncher /></Suspense> : null}
+            {!personal ? <Suspense fallback={null}><StudioP2pHuddleLauncher placement="inline" /></Suspense> : null}
           </div>
         </footer>
       </Container>

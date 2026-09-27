@@ -18225,6 +18225,11 @@ const puppetWarpArmed =
           currentHistory[currentIndex] = withoutPending;
           pagesHistoryRef.current = currentHistory;
           setPagesHistoryState([...currentHistory]);
+          // A retained stroke can already have crossed the live/committed surface boundary before
+          // Undo reaches this callback. Rebuild every transient presentation now; otherwise the
+          // hidden retained overlay can be replaced by a stale committed raster for one or more
+          // frames until the normal history transition renderer catches up.
+          resetTransientInkPresentationForHistoryTransition();
           mainLayerRef.current?.batchDraw();
           if (liveDraftVisualRef.current?.mode === "eraser") {
             liveDraftVisualRef.current = null;
