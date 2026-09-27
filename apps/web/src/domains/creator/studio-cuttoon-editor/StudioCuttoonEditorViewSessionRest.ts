@@ -562,6 +562,8 @@ export type StudioCuttoonEditorViewSessionRest = {
   autosaveDocumentLeadership: any;
   bg: any;
   densityShowsStatusRail: any;
+  offlineSceneNotice: string | null;
+  dismissOfflineSceneNotice: () => void;
   drawingShortcutNoticeStore: any;
   drawingPracticeDocument: StudioDrawingPracticeDocument | null;
   drawingPracticeSourceDataUrl: string | null;

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "স্তর {count}",
   "studio.toolsCompanion.review.section.comments": "মন্তব্য {count}",
   "studio.toolsCompanion.review.section.history": "রেকর্ড {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE পৃষ্ঠা লেবেল}·{নির্বাচন লেবেল ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "পরিদর্শন কনসোল",
   "studio.toolsCompanion.review.truncatedComments": "এবং {count} মন্তব্য",
   "studio.toolsCompanion.review.truncatedLayers": "{count} স্তর",

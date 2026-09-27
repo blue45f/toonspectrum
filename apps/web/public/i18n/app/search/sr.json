@@ -53,7 +53,7 @@
   "search.explorer.view.list": "Виђење листе",
   "search.explorer.refresh": "Одразање",
   "search.explorer.loading": "Натовар",
-  "search.explorer.resultCount": "ЗЗПЛАЦЕХОЛДЕР0ЗЗ наслова",
+  "search.explorer.resultCount": "{count} наслова",
   "search.explorer.noResult": "Нису резултати",
   "search.explorer.recent": "Недавни претрагови",
   "search.explorer.recent.clearAll": "Све очистите.",
@@ -74,8 +74,8 @@
   "search.explorer.unit.itemSuffix": "појме",
   "search.explorer.time.noData": "Нема информација о актуелности",
   "search.explorer.time.justNow": "Ажурирано је управо",
-  "search.explorer.time.minutesAgo": "ЗЗПЛАЦЕХОЛДЕР0ЗЗм пре",
-  "search.explorer.time.hoursAgo": "ЗЗПЛАЦЕХОЛДЕР0ЗЗх пре",
-  "search.explorer.time.daysAgo": "ЗЗПЛАЦЕХОЛДЕР0ЗЗд пре",
+  "search.explorer.time.minutesAgo": "{count}м пре",
+  "search.explorer.time.hoursAgo": "{count}х пре",
+  "search.explorer.time.daysAgo": "{count}д пре",
   "search.explorer.loadMore": "Погрузи још"
 }

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ຊັ້ນ {count}",
   "studio.toolsCompanion.review.section.comments": "ຄຳເຫັນ {count}",
   "studio.toolsCompanion.review.section.history": "ບັນທຶກ {count}",
-  "studio.toolsCompanion.review.subtitle": "ໜ້າ{ປ້າຍກຳກັບ}· ການເລືອກ{ປ້າຍກຳກັບ ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "console ການ​ກວດ​ກາ​",
   "studio.toolsCompanion.review.truncatedComments": "ແລະ {count} ຄຳເຫັນ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ຊັ້ນ",

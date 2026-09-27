@@ -21,6 +21,9 @@ test("recovers stranded translations, preserves newer namespace copy, and report
       write(`app/route/${locale}.json`, { "route.home": locale + " home", ...(locale === "en" ? { "route.share": "Share" } : {}) });
       write(`admin/${locale}.json`, { "admin.title": "old admin" });
       write(`admin/admin/${locale}.json`, { "admin.title": locale + " admin" });
+      write(`studio/${locale}.json`, { "studio.commandBar.slot": "old slot" });
+      write(`studio/commandBar/${locale}.json`, { "studio.commandBar.slot": locale + " {index}" });
+      write(`studio/settings/${locale}.json`, { "studio.settings.tool.characterShaper": locale + " character shaper" });
     }
     const stale = synchronizeLegacyI18nAssets(root, { check: true });
     assert.ok(stale.length > 0);
@@ -30,6 +33,11 @@ test("recovers stranded translations, preserves newer namespace copy, and report
     assert.equal(read("app/ja.json")["route.home"], "ja home");
     assert.equal(read("app/ja.json")["route.share"], "Share", "English fallback must not masquerade as translated copy");
     assert.equal(read("admin/ja.json")["admin.title"], "ja admin");
+    assert.deepEqual(read("studio/ja.json"), {
+      "studio.commandBar.slot": "ja {index}",
+      "studio.settings.tool.characterShaper": "ja character shaper",
+    });
+    assert.deepEqual(read("studio/commandBar/ja.json"), { "studio.commandBar.slot": "ja {index}" });
     assert.deepEqual(synchronizeLegacyI18nAssets(root, { check: true }), []);
   } finally {
     rmSync(root, { recursive: true, force: true });

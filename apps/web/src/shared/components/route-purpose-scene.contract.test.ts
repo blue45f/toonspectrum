@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { resolveSiteRouteVisual } from "@/shared/lib/site-route-visual";
+import { supportsRoutePurposeScene } from "./site-experience/site-experience-policy";
 
 const component = readFileSync(new URL("./RoutePurposeScene.tsx", import.meta.url), "utf8");
 const routeCss = readFileSync(new URL("./route-purpose-scene.css", import.meta.url), "utf8");
@@ -20,7 +21,7 @@ const REPRESENTATIVE_PATHS = [
 
 describe("site-wide visual UX contracts", () => {
   it("loads layout and contrast hardening after the theme tokens", () => {
-    expect(entry).toContain('import "../styles/sitewide-visual-ux.css"');
+    expect(entry).toContain('import "./styles/sitewide-visual-ux.css"');
     expect(entry.indexOf("design-themes.css")).toBeLessThan(entry.indexOf("sitewide-visual-ux.css"));
     expect(systemCss).toContain("--site-page-gutter");
     expect(systemCss).toContain("overflow-x: clip");
@@ -66,5 +67,11 @@ describe("site-wide visual UX contracts", () => {
     expect(component).not.toContain("StudioPage");
     expect(component).not.toContain("three");
     expect(component).not.toContain("@react-three");
+    for (const pathname of ["/studio/canvas", "/studio/bg3d", "/studio/p/demo/space", "/admin"]) {
+      expect(supportsRoutePurposeScene(pathname)).toBe(false);
+    }
+    for (const pathname of ["/learn", "/market", "/community", "/community/events"]) {
+      expect(supportsRoutePurposeScene(pathname)).toBe(false);
+    }
   });
 });

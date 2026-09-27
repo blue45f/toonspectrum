@@ -142,8 +142,8 @@ async function dismissOverlays(page: Page): Promise<void> {
   }
   const cinematicWelcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
   if (await cinematicWelcome.isVisible().catch(() => false)) {
-    await cinematicWelcome.getByRole("button", { name: "시작 안내 닫기" }).click({ timeout: 2_000 }).catch(() => undefined);
-    await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
+    await cinematicWelcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click({ timeout: 2_000 });
+    await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 });
   }
   const explicitDismiss = page.locator('[data-studio-quickstart-dismiss="true"]');
   if (await explicitDismiss.isVisible().catch(() => false)) {

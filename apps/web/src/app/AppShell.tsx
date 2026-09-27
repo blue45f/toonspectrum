@@ -18,7 +18,7 @@ import {
 } from "@/domains/creator/studio-shell/active-project-context";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { PwaInstallNudgeHost as PwaInstallNudge } from "@/shared/components/pwa-install-nudge-host";
-import { isPublicCreativeRoute } from "@/shared/components/site-public-routes";
+import { isPublicCreativeRoute, supportsPublicSiteOnwardJourney } from "@/shared/components/site-public-routes";
 import { SiteConnectionNotice } from "@/shared/components/site-experience/SiteConnectionNotice";
 import { SiteExperienceFrame } from "@/shared/components/site-experience/SiteExperienceFrame";
 import { supportsSiteExperience } from "@/shared/components/site-experience/site-experience-policy";
@@ -218,7 +218,7 @@ export function AppShell({
         ) : null}
         {immersiveVirtualExperience ? null : header}
         <Suspense fallback={null}>
-          <ServiceDegradedBanner immersive={immersiveVirtualExperience} />
+          <ServiceDegradedBanner immersive={immersiveVirtualExperience && normalizedPath !== "/home"} />
         </Suspense>
         {enhancedSite ? <SiteConnectionNotice /> : null}
         {immersiveVirtualExperience ? null : <PwaInstallNudge />}
@@ -241,7 +241,7 @@ export function AppShell({
               <AppRouter />
             </SpatialCampusFrame>
           </WorkspaceAccountContext.Provider>
-          {publicCreativeRoute && !immersiveVirtualExperience ? (
+          {publicCreativeRoute && !immersiveVirtualExperience && supportsPublicSiteOnwardJourney(pathname) ? (
             <ErrorBoundary resetKey={pathname}>
               <Suspense fallback={<Suspense fallback={null}><PublicSiteWayfinder /></Suspense>}>
                 <PublicSiteNextSteps pathname={pathname} />

@@ -10,6 +10,8 @@ const appRouterSource = read("../../app/routes/AppRouter.tsx");
 const contractCss = read("../../app/styles/unified-theme-contract.css");
 const themeSource = read("../../shared/lib/theme-presets.ts");
 const editorCss = read("../../domains/creator/studio-shell/studio-visual-identity-v2.css");
+const containerSource = read("./container.tsx");
+const sectionSource = read("./section.tsx");
 
 const themeIds = [...themeSource.matchAll(/\bid:\s*"([a-z-]+)"/gu)]
   .map((match) => match[1]);
@@ -45,6 +47,42 @@ describe("unified theme contract", () => {
     expect(appRouterSource).toContain('appRoutes.map(({ element, id, path }) =>');
     expect(appRouterSource.indexOf("<RouteStage"))
       .toBeLessThan(appRouterSource.indexOf("<Routes>"));
+  });
+
+  it("공개 페이지의 공통 폭을 선언적 컨테이너에 적용하고 읽기 폭을 별도로 유지한다", () => {
+    expect(containerSource).toContain("data-page-container={size}");
+    expect(contractCss).toContain("--site-content-max: 82.5rem");
+    expect(contractCss).toContain("--site-page-gutter: clamp(1rem, 3vw, 2.5rem)");
+    expect(contractCss).toContain("--site-reading-max: 48rem");
+    expect(contractCss).toContain("env(safe-area-inset-left)");
+    expect(contractCss).toContain("env(safe-area-inset-right)");
+
+    const publicContainerRules = [...contractCss.matchAll(/([^{}]+)\{([^{}]*)\}/gu)]
+      .filter(([, selector]) => selector.includes("[data-page-container"));
+    expect(publicContainerRules.length).toBeGreaterThan(0);
+    for (const [, selector] of publicContainerRules) {
+      expect(selector).toContain("[data-site-experience]");
+      expect(selector).toContain('[data-theme-contract="unified"]');
+    }
+    expect(publicContainerRules.some(([, selector, declarations]) => (
+      selector.includes('[data-page-container="prose"]')
+      && declarations.includes("max-width: var(--site-reading-max)")
+    ))).toBe(true);
+  });
+
+  it("공통 섹션의 설명·다음 이동·초점 규격을 편집기 밖에 한정한다", () => {
+    for (const marker of [
+      "data-section-heading", "data-section-title",
+      "data-section-description", "data-section-action",
+    ]) {
+      expect(sectionSource).toContain(marker);
+      const rules = [...contractCss.matchAll(/([^{}]+)\{([^{}]*)\}/gu)]
+        .filter(([, selector]) => selector.includes(`[${marker}]`));
+      expect(rules.length).toBeGreaterThan(0);
+      for (const [, selector] of rules) expect(selector).toContain("[data-site-experience]");
+    }
+    expect(contractCss).toContain("[data-section-action]:focus-visible");
+    expect(contractCss).toContain("min-height: var(--site-control-size, 44px)");
   });
 
   it("marks every registered route stage with product, purpose and maturity", () => {

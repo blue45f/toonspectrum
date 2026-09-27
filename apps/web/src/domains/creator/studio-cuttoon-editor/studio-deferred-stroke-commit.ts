@@ -323,7 +323,8 @@ export function createStudioDeferredStrokeCommitEngine(
       document.getPages(true),
       document.getLayerGroups({ includeDeleted: true })
     );
-    // 기기에 수락한 편집은 아직 정본에 없으므로 병합 뒤 다시 투영한다. 원격 요소는 그대로 보존한다.
+    // 오프라인 제안은 canonical 문서를 갱신하지 않으므로 정본 병합 뒤 커밋에 다시 투영한다.
+    // 원격 요소를 보존하면서 방금 수락한 편집이 이전 정본 값으로 되돌아가는 것을 막는다.
     const offlineBranch = runtime.offlineBranch;
     return offlineBranch && offlineBranch.status.pendingOperations > 0
       ? offlineBranch.projectPages(reconciled.pages)

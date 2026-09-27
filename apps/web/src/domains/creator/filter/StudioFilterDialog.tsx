@@ -156,6 +156,7 @@ interface StudioFilterDialogProps {
   mutationLocked?: boolean;
   mutationLockReason?: string;
   applying?: boolean;
+  applicationError?: string | null;
   /** A usable pixel selection captured for this image-filter session. */
   selectionAvailable?: boolean;
   selectionFeatherPx?: number;
@@ -476,6 +477,7 @@ export function StudioFilterDialog({
   mutationLocked = false,
   mutationLockReason,
   applying = false,
+  applicationError,
   selectionAvailable = false,
   selectionFeatherPx = 0,
   selectionInverted = false,
@@ -986,10 +988,12 @@ export function StudioFilterDialog({
   const descriptionId = "studio-filter-dialog-description";
   const compositeNoticeId = "studio-filter-composite-notice";
   const lockMessageId = "studio-filter-lock-message";
+  const applicationErrorId = "studio-filter-application-error";
   const describedBy = [
     descriptionId,
     targetKind === "page-composite" ? compositeNoticeId : null,
     mutationLocked ? lockMessageId : null,
+    applicationError ? applicationErrorId : null,
   ]
     .filter(Boolean)
     .join(" ");
@@ -1622,6 +1626,15 @@ export function StudioFilterDialog({
               className="mb-2 rounded-xl border border-warn/35 bg-warn/10 px-3 py-2 text-[0.7rem] font-semibold leading-relaxed text-warn"
             >
               {lockMessage}
+            </p>
+          ) : null}
+          {applicationError ? (
+            <p
+              id={applicationErrorId}
+              role="alert"
+              className="mb-2 break-words rounded-xl border border-bad/40 bg-bad/10 px-3 py-2 text-xs leading-relaxed text-bad"
+            >
+              {applicationError}
             </p>
           ) : null}
         </div>

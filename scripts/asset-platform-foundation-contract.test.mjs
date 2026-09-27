@@ -12,7 +12,7 @@ const drizzlePath = "apps/api/src/platform/database/creator-asset-platform.schem
 const processingPath = "apps/api/src/platform/database/creator-asset-processing.schema.ts";
 const rightsPath = "apps/api/src/platform/database/creator-asset-rights-evidence.schema.ts";
 const sharedContractPath =
-  "apps/web/src/shared/lib/creator-asset-platform-contract.ts";
+  "packages/contracts/src/creator-asset-platform-contract.ts";
 const publishPagePath =
   "apps/web/src/domains/market/pages/MarketPublishPage.tsx";
 
@@ -93,6 +93,12 @@ describe("asset platform production migration", () => {
 });
 
 describe("asset platform code contracts", () => {
+  it("웹 호환 진입점은 공유 패키지의 동일한 계약을 그대로 전달한다", () => {
+    expect(read("apps/web/src/shared/lib/creator-asset-platform-contract.ts").trim()).toBe(
+      'export * from "@toonstudio/contracts/creator-asset-platform-contract";',
+    );
+  });
+
   it("exports every Drizzle schema from the API database boundary", () => {
     const index = read("apps/api/src/platform/database/index.ts");
     expect(index).toContain('export * from "./creator-asset-platform.schema";');

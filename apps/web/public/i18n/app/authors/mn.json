@@ -11,6 +11,6 @@
   "authors.works": "works",
   "authors.views": "views",
   "authors.pencafe": "Зохиогчийн фэн кафе",
-  "authors.stats": "Шилдэг{нийт}зохиогчдоос ZZ RBRACE-г харуулсан.",
+  "authors.stats": "Шилдэг{total}зохиогчдоос {shown}-г харуулсан.",
   "authors.noName": "Creator"
 }

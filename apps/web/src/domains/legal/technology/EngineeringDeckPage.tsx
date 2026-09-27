@@ -450,7 +450,7 @@ export function EngineeringDeckPage() {
                 type="button"
                 onClick={resetTimer}
                 aria-label={bi("발표 타이머 초기화", "Reset presentation timer")}
-                className="grid size-8 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-accent"
+                className="grid size-11 place-items-center rounded-lg text-fg-3 hover:bg-raised hover:text-accent"
               >
                 <RotateCcw size={13} aria-hidden="true" />
               </button>

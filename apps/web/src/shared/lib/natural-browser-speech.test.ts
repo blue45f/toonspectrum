@@ -29,6 +29,10 @@ describe("natural Korean speech preparation", () => {
     expect(plan[0]?.spokenText).toContain("툰 스튜디오");
   });
 
+  it("현재 제품명과 이전 제품명의 발음을 서로 덮어쓰지 않는다", () => {
+    expect(normalizeNaturalSpeechText("ToonStudio ToonSpectrum")).toBe("툰 스튜디오 툰 스펙트럼");
+  });
+
   it("splits long copy into breathing phrases with deterministic prosody and useful pauses", () => {
     const source = "오늘의 흐름을 천천히 살펴볼게요, 중요한 선택은 서두르지 마세요. 좋은 기회가 가까이 와 있습니다!\n\n마음을 편하게 가져보세요.";
     const first = buildNaturalSpeechPlan(source, { style: "fortune", maxSegmentChars: 36 });

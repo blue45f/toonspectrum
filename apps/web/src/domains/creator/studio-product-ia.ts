@@ -2,7 +2,7 @@
  * ToonStudio final product IA contract.
  *
  * Feature breadth may grow, but the user-facing concepts below are intentionally bounded:
- * - four global destinations
+ * - five global destinations
  * - six project destinations
  * - nine default direct-manipulation tools
  * - four user-facing work states
@@ -15,8 +15,9 @@
 export const STUDIO_GLOBAL_NAVIGATION = [
   { id: "workspace-home", label: "스튜디오", href: "/home" },
   { id: "studio", label: "작품", href: "/studio" },
-  { id: "workspace-team", label: "팀", href: "/team" },
-  { id: "workspace-hub", label: "둘러보기", href: "/hub" },
+  { id: "explore", label: "탐색", href: "/discover" },
+  { id: "community", label: "커뮤니티", href: "/community" },
+  { id: "all-menu", label: "전체", href: "/sitemap" },
 ] as const;
 
 export const STUDIO_PROJECT_NAVIGATION = [
@@ -290,8 +291,8 @@ export function studioCapabilityById(id: string): StudioCapabilityDefinition | n
 export function validateStudioProductIa(): readonly string[] {
   const issues: string[] = [];
 
-  if (STUDIO_GLOBAL_NAVIGATION.length !== 4) {
-    issues.push(`global navigation must contain 4 items, found ${STUDIO_GLOBAL_NAVIGATION.length}`);
+  if (STUDIO_GLOBAL_NAVIGATION.length !== 5) {
+    issues.push(`global navigation must contain 5 items, found ${STUDIO_GLOBAL_NAVIGATION.length}`);
   }
   if (STUDIO_PROJECT_NAVIGATION.length !== 6) {
     issues.push(`project navigation must contain 6 items, found ${STUDIO_PROJECT_NAVIGATION.length}`);

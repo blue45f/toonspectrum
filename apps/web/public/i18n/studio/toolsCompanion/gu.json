@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "સ્તર {count}",
   "studio.toolsCompanion.review.section.comments": "ટિપ્પણી {count}",
   "studio.toolsCompanion.review.section.history": "રેકોર્ડ {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE પૃષ્ઠ લેબલ}·{પસંદગી લેબલ ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "નિરીક્ષણ કન્સોલ",
   "studio.toolsCompanion.review.truncatedComments": "અને {count} ટિપ્પણીઓ",
   "studio.toolsCompanion.review.truncatedLayers": "{count} સ્તરો",

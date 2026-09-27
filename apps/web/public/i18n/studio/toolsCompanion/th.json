@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "เลเยอร์ {count}",
   "studio.toolsCompanion.review.section.comments": "ความคิดเห็น {count}",
   "studio.toolsCompanion.review.section.history": "บันทึก {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE หน้าฉลาก}·{การเลือกฉลาก ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "คอนโซลการตรวจสอบ",
   "studio.toolsCompanion.review.truncatedComments": "และ {count} ความคิดเห็น",
   "studio.toolsCompanion.review.truncatedLayers": "{count} เลเยอร์",

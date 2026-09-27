@@ -80,6 +80,8 @@ interface StudioDraftSaveLeadershipView {
 
 export interface StudioDraftSaveCenterProps {
   readonly saveIntentScope?: StudioSaveIntentScope | null;
+  readonly offlineSceneNotice?: string | null;
+  readonly onDismissOfflineSceneNotice?: () => void;
   readonly saving: boolean;
   readonly workId?: string | null;
   readonly workHydrated?: boolean;
@@ -204,6 +206,8 @@ function SaveStatusCard({
 
 export function StudioDraftSaveCenter({
   saveIntentScope = null,
+  offlineSceneNotice = null,
+  onDismissOfflineSceneNotice,
   saving,
   workId = null,
   workHydrated = true,
@@ -241,6 +245,7 @@ export function StudioDraftSaveCenter({
   const [manualSaveError, setManualSaveError] = useState<string | null>(null);
   const [observedServerSaveAt, setObservedServerSaveAt] = useState<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const dialogCloseRef = useRef<HTMLButtonElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const replayInFlightRef = useRef(false);
   const previousSaveRef = useRef<{ saving: boolean; revision: number | null }>({
@@ -564,6 +569,10 @@ export function StudioDraftSaveCenter({
       )}
     >
       <span className="sr-only" role="status" aria-live="polite">{model.ariaLiveMessage}</span>
+      {/* 오프라인 보호 성공은 기존 저장 상태에 알린다. 새 행으로 캔버스 원점을 밀지 않는다. */}
+      <span id={`${dialogId}-offline-notice`} className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {offlineSceneNotice}
+      </span>
       <button
         ref={triggerRef}
         type="button"
@@ -571,6 +580,8 @@ export function StudioDraftSaveCenter({
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}
         aria-label={`저장 상태: ${model.compactLabel}`}
+        aria-describedby={offlineSceneNotice ? `${dialogId}-offline-notice` : undefined}
+        title={offlineSceneNotice ?? undefined}
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "flex min-h-11 max-w-[min(17rem,calc(100vw-1.5rem))] items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold shadow-lg backdrop-blur-xl transition",
@@ -608,6 +619,20 @@ export function StudioDraftSaveCenter({
             anchorAtBottom ? "bottom-full mb-2" : "top-full mt-2",
           )}
         >
+          {offlineSceneNotice ? (
+            <div data-studio-offline-scene-notice="true" className="mb-3 flex items-start gap-2 rounded-xl border border-accent/35 bg-accent-soft/30 p-2.5 text-xs text-fg-2">
+              <p className="min-w-0 flex-1 break-words leading-relaxed">{offlineSceneNotice}</p>
+              {onDismissOfflineSceneNotice ? (
+                <button type="button" aria-label="알림 닫기" onClick={() => {
+                  onDismissOfflineSceneNotice();
+                  dialogCloseRef.current?.focus({ preventScroll: true });
+                }}
+                  className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-accent-soft/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+                  <X size={14} aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex items-start gap-3">
             <div className={cn("mt-0.5 rounded-xl border p-2", TONE_CLASS[model.tone])}>
               <StatusIcon tone={model.tone} className="h-5 w-5" />
@@ -620,6 +645,7 @@ export function StudioDraftSaveCenter({
               </p>
             </div>
             <button
+              ref={dialogCloseRef}
               type="button"
               onClick={closeAndRestoreFocus}
               aria-label="초안 저장 센터 닫기"

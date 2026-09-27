@@ -201,7 +201,8 @@ describe("ToonStudio everyday prop pack v4", () => {
     expect(gate.requiredNodes.every((name) => nodeNames.has(name))).toBe(true);
     expect(root?.extras).toMatchObject({
       asset_id: gate.assetId,
-      asset_author: "ToonStudio",
+      // 불변 GLB의 생성 당시 출처는 서비스 표시명 변경과 별개다.
+      asset_author: "ToonSpectrum",
       asset_generator: GENERATOR,
       asset_license: "CC0-1.0",
       asset_license_url: CC0_LICENSE_URL,

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Давхарга {count}",
   "studio.toolsCompanion.review.section.comments": "Сэтгэгдэл {count}",
   "studio.toolsCompanion.review.section.history": "Бичлэг {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE хуудас Шошго}·{сонголт Шошго ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "хяналтын консол",
   "studio.toolsCompanion.review.truncatedComments": "болон {count} сэтгэгдэл",
   "studio.toolsCompanion.review.truncatedLayers": "{count} давхаргууд",

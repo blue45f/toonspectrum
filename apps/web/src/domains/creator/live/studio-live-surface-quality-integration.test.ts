@@ -10,10 +10,20 @@ function source(path: string): string {
   return readFileSync(new URL(path, import.meta.url), "utf8");
 }
 
+function liveSurfaceStartSource(): string {
+  const host = source("../StudioCuttoonEditorHost.tsx");
+  expect(host).toContain('import { bindStudioDrawLiveSurfaces } from "./studio-cuttoon-editor/studio-live-surface-start"');
+  expect(host).toContain("const beginStudioDrawLiveSurfaces = bindStudioDrawLiveSurfaces({");
+  expect(host).toContain("    beginStudioDrawLiveSurfaces,");
+  expect(source("../studio-cuttoon-editor/studio-cuttoon-stage-pointers-down-draw.ts"))
+    .toContain("if (!beginStudioDrawLiveSurfaces(next, pointerSample, strokeOrigin, {");
+  return source("../studio-cuttoon-editor/studio-live-surface-start.ts");
+}
+
 describe("Studio native live-surface quality integration", () => {
   it("lets only a native-DPR Canvas overlay with a successful begin own the draft", () => {
     const page = source("../StudioCuttoonEditorHost.tsx");
-    const surfaceStart = source("../studio-cuttoon-editor/studio-live-surface-start.ts");
+    const surfaceStart = liveSurfaceStartSource();
     const begin = surfaceStart.indexOf("const overlayCandidate =");
     const end = surfaceStart.indexOf("const predictionTailEligible =", begin);
     expect(begin).toBeGreaterThanOrEqual(0);
@@ -70,7 +80,7 @@ describe("Studio native live-surface quality integration", () => {
 
   it("does not admit prediction or block the exact dynamic fallback from a mere candidate", () => {
     const page = source("../StudioCuttoonEditorHost.tsx");
-    const surfaceStart = source("../studio-cuttoon-editor/studio-live-surface-start.ts");
+    const surfaceStart = liveSurfaceStartSource();
     const begin = surfaceStart.indexOf("const overlayCandidate =");
     const end = surfaceStart.indexOf("armTransientPenInkSurfaces({", begin);
     expect(begin).toBeGreaterThanOrEqual(0);

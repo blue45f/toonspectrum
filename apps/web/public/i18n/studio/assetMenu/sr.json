@@ -99,7 +99,7 @@
   "studio.assetMenu.reportDialog.detailsLabel": "Детаљан опис",
   "studio.assetMenu.reportDialog.detailsPlaceholder": "Молимо запишите специфичне информације потребне за инспекцију.",
   "studio.assetMenu.reportDialog.reasonLabel": "разлог",
-  "studio.assetMenu.reportDialog.subtitle": "Пошаљите ЗЗПЛАЦЕХОЛДЕР0ЗЗ издање рецензенту.",
+  "studio.assetMenu.reportDialog.subtitle": "Пошаљите {assetName} издање рецензенту.",
   "studio.assetMenu.reportDialog.title": "Пријавите средство",
   "studio.assetMenu.reportSubmit": "Пошаљи извештај",
   "studio.assetMenu.retry": "покушајте поново",

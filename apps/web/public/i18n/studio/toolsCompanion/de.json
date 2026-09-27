@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Ebene {count}",
   "studio.toolsCompanion.review.section.comments": "Kommentar {count}",
   "studio.toolsCompanion.review.section.history": "Rekord {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE pageLabel}·{SelectionLabel ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "Inspektionskonsole",
   "studio.toolsCompanion.review.truncatedComments": "und {count} Kommentare",
   "studio.toolsCompanion.review.truncatedLayers": "{count} Schichten",

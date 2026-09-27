@@ -2,18 +2,19 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 
-import { creatorMarketplacePublisherGateKey } from "../apps/api/src/modules/creator-marketplace/creator-marketplace-publish-gate";
-import { creatorMarketplaceReporterKey } from "../apps/api/src/modules/creator-marketplace/creator-marketplace-report-gate";
 import {
   creatorMarketplacePackageIdentityPreimage,
   creatorMarketplaceLogicalPackIdFromPackageKeyHex,
-} from "../apps/web/src/shared/lib/creator-marketplace-cloud-library-contract";
+} from "@toonstudio/contracts/creator-marketplace-cloud-library-contract";
 import {
   CREATOR_MARKETPLACE_RUNTIME_BY_KIND,
   CreatorMarketplaceResourceManifestSchema,
   canonicalizeCreatorMarketplaceJson,
   creatorMarketplaceJsonByteSize,
-} from "../apps/web/src/shared/lib/creator-marketplace-resource-contract";
+} from "@toonstudio/contracts/creator-marketplace-resource-contract";
+
+import { creatorMarketplacePublisherGateKey } from "../apps/api/src/modules/creator-marketplace/creator-marketplace-publish-gate";
+import { creatorMarketplaceReporterKey } from "../apps/api/src/modules/creator-marketplace/creator-marketplace-report-gate";
 
 import {
   VITEST_VALIDATED_REMOTE_DATABASE_MARKER,
@@ -24,7 +25,7 @@ import type {
   CreatorMarketplaceJsonValue,
   CreatorMarketplaceResourceKind,
   CreatorMarketplaceResourceManifest,
-} from "../apps/web/src/shared/lib/creator-marketplace-resource-contract";
+} from "@toonstudio/contracts/creator-marketplace-resource-contract";
 
 function sha256(value: unknown): string {
   return createHash("sha256")

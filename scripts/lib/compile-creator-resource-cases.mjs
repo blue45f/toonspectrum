@@ -15,6 +15,10 @@ const RESOURCE_WORKSPACE_MODULES = [
   { name: "@toonstudio/contracts/reference-assets", source: "packages/contracts/src/reference-assets.ts" },
 ];
 
+export const creatorResourcePackageSources = Object.fromEntries(
+  RESOURCE_WORKSPACE_MODULES.map(({ name, source }) => [name, source]),
+);
+
 /** Explicit project works with the isolated CI compiler and the workspace compiler. */
 export function compileCreatorResourceCases(output) {
   const project = path.join(output, "tsconfig.json");

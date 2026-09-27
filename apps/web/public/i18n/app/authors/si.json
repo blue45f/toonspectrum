@@ -11,6 +11,6 @@
   "authors.works": "වැඩ",
   "authors.views": "දර්ශන",
   "authors.pencafe": "නිර්මාණකරුවාගේ රසික කැෆේ",
-  "authors.stats": "ZZLBRACE මුළු}කතුවරුන් අතරින්}පෙන්වා ඇති ඉහළම ZZLBRACE",
+  "authors.stats": "{total}කතුවරුන් අතරින් පෙන්වා ඇති ඉහළම {shown}",
   "authors.noName": "නිර්මාණකරු"
 }

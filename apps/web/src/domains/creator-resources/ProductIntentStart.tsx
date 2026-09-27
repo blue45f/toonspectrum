@@ -81,7 +81,7 @@ const COPY = {
   },
 } as const;
 
-export function ProductIntentStart() {
+export function ProductIntentStart({ headingId = "product-intent-title" }: { headingId?: string }) {
   useBilingualI18nRevision();
   const language = useI18n((state) => state.lang);
   const locale = resolveProductLocale(language);
@@ -102,10 +102,10 @@ export function ProductIntentStart() {
   const recent = continuity.recent[0] ?? null;
 
   return (
-    <section className="cf-intent cf-intent-visual" lang={locale} aria-labelledby="product-intent-title">
+    <section className="cf-intent cf-intent-visual" lang={locale} aria-labelledby={headingId}>
       <div className="cf-intent-main">
         <p className="cf-intent-eyebrow">{copy.eyebrow}</p>
-        <h2 id="product-intent-title">{copy.title}</h2>
+        <h2 id={headingId} tabIndex={-1}>{copy.title}</h2>
         <p className="cf-intent-hint">{copy.hint}</p>
 
         <button type="button" className="cf-intent-search" onClick={openSearch}>

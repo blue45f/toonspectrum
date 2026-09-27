@@ -149,6 +149,7 @@ describe("StudioFilterDialog", () => {
         activeKey="landscape-selection" kind="motion-blur" image={{}}
         rootRef={createRef<HTMLElement>()} selectionAvailable mutationLocked
         mutationLockReason="동기화 중에는 적용할 수 없습니다."
+        applicationError="서버 저장에 실패했습니다. 다시 시도해 주세요."
         onPreview={vi.fn()} onApply={vi.fn()} onClose={vi.fn()}
       />,
     );
@@ -156,6 +157,8 @@ describe("StudioFilterDialog", () => {
     const footer = container.querySelector("footer");
     expect(scrollRegion?.contains(screen.getByRole("group", { name: "적용 범위" }))).toBe(true);
     expect(scrollRegion?.contains(screen.getByText("동기화 중에는 적용할 수 없습니다."))).toBe(true);
+    expect(scrollRegion?.contains(screen.getByRole("alert"))).toBe(true);
+    expect(footer?.querySelector('[role="alert"]')).toBeNull();
     expect(footer?.querySelector("fieldset")).toBeNull();
     expect(footer?.querySelector('[role="status"]')).toBeNull();
     expect(footer?.querySelectorAll("button")).toHaveLength(2);
@@ -330,6 +333,28 @@ describe("StudioFilterDialog", () => {
     expect(html).toMatch(/<button type="button"[^>]*aria-label="[^"]+ 닫기"[^>]*>/);
     expect(filterDialogSource).toContain("if (applying) return;");
     expect(filterDialogSource).toContain("if (mutationLocked || applying) return;");
+  });
+
+  it("적용 거절 사유를 열린 필터 창 안에서 알리고 원본 복귀와 재시도를 유지한다", () => {
+    const reason = "에셋 참조 요소는 서버 정본 연결 후 수정해 주세요.";
+    const onApply = vi.fn(), onClose = vi.fn();
+    const props = {
+      activeKey: "filter:motion-blur", kind: "motion-blur" as const, image: {},
+      rootRef: createRef<HTMLElement>(), targetKind: "page-composite" as const,
+      acquireUiPreferences: createUiPreferencesHarness().acquire,
+      onPreview: vi.fn(), onApply, onClose,
+    };
+    const view = render(<StudioFilterDialog {...props} applicationError={reason} />);
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByRole("alert").textContent).toBe(reason);
+    expect(dialog.getAttribute("aria-describedby")).toContain("studio-filter-application-error");
+    expect((within(dialog).getByRole("button", { name: "적용" }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onApply).not.toHaveBeenCalled();
+    view.rerender(<StudioFilterDialog {...props} applicationError={null} />);
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    expect(dialog.getAttribute("aria-describedby")).not.toContain("studio-filter-application-error");
   });
 
   it("keeps brightness and contrast controls inside the renderer's exact ±80 range", () => {

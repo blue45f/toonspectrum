@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "ንብርብር {count}",
   "studio.toolsCompanion.review.section.comments": "አስተያየት {count}",
   "studio.toolsCompanion.review.section.history": "መዝገብ {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRAACE ገጽ መሰየሚያ}· የZZLBRACE ምርጫ መለያ ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "የፍተሻ ኮንሶል",
   "studio.toolsCompanion.review.truncatedComments": "እና {count} አስተያየቶች",
   "studio.toolsCompanion.review.truncatedLayers": "{count} ንብርብሮች",

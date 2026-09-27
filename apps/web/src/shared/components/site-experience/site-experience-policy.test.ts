@@ -28,6 +28,16 @@ describe("site experience policy", () => {
     expect(supportsRoutePurposeScene("/production")).toBe(false);
     expect(supportsRoutePurposeScene("/production/projects/demo/review")).toBe(false);
   });
+
+  it.each([
+    "/discover", "/market", "/market/browse", "/learn", "/learn/paths/first-episode",
+    "/community", "/community/events", "/collaborate/positions", "/about/technology/playbook",
+    "/help", "/research/fonts", "/title/example", "/showcase/series/example",
+  ])("공개 페이지 %s의 고유 표제 위에 공통 소개 카드를 쌓지 않는다", (pathname) => {
+    expect(supportsSiteExperience(pathname)).toBe(true);
+    expect(supportsRoutePurposeScene(pathname)).toBe(false);
+    expect(supportsRoutePurposeScene(`${pathname}/`)).toBe(false);
+  });
 });
 
 describe("studio-first destination ownership", () => {

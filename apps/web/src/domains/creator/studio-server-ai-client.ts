@@ -1,4 +1,4 @@
-import { HTTPError, api, getApiErrorMessage } from "@/platform/api";
+import { HTTPError, api, getApiErrorMessage, isAppApiError } from "@/platform/api";
 import { completeWithUserTextKey } from "@/shared/ai/unified-ai-settings";
 import {
   getUserAiSnapshot,
@@ -301,6 +301,7 @@ export function parseStudioServerAiCompletion(value: unknown): StudioServerAiCom
 }
 
 function httpErrorCode(error: unknown): string | undefined {
+  if (isAppApiError(error)) return error.code ?? undefined;
   if (!(error instanceof HTTPError) || !isRecord(error.data)) return undefined;
   return typeof error.data.code === "string" ? error.data.code : undefined;
 }

@@ -40,7 +40,7 @@
   "studio.toolsCompanion.review.section.layers": "Slānis {count}",
   "studio.toolsCompanion.review.section.comments": "komentēt {count}",
   "studio.toolsCompanion.review.section.history": "Ierakstīt {count}",
-  "studio.toolsCompanion.review.subtitle": "ZZLBRACE lapaEtiķete}·{izvēleEtiķete ZZ RBRACE",
+  "studio.toolsCompanion.review.subtitle": "{pageLabel} · {selectionLabel}",
   "studio.toolsCompanion.review.title": "pārbaudes konsole",
   "studio.toolsCompanion.review.truncatedComments": "un {count} komentāri",
   "studio.toolsCompanion.review.truncatedLayers": "{count} slāņi",
