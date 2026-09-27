@@ -37,7 +37,13 @@
   flex-shrink: 0;
 }
 [data-character-shaper-sheet="full"] { height: min(64%, 34rem, calc(100% - 248px)); }
-[data-character-shaper-sheet="collapsed"] { height: 56px; }
+/* 접힌 높이에도 홈 인디케이터 여백을 더해 그래버가 손가락에 닿지 않게 한다. */
+[data-character-shaper-sheet="collapsed"] {
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+[data-character-shaper-sheet-safe-area] { height: env(safe-area-inset-bottom, 0px); }
+[data-character-shaper-sheet-snap="on"] { background-color: var(--color-accent); }
 [data-character-shaper-sheet-header="true"] {
   display: flex;
   flex-shrink: 0;
@@ -159,6 +165,13 @@
 @media (forced-colors: active) {
   [data-character-slot][aria-current="true"] { outline: 2px solid Highlight; }
   [data-character-shaper-summary="true"] { background: Canvas; }
+  /* 강제 색상에는 색이 없으므로 스냅 표시를 테두리로 남긴다. */
+  [data-character-shaper-sheet-snap="on"] { background-color: Highlight; }
+  [data-character-shaper-sheet-snap="off"] { background-color: Canvas; border: 1px solid GrayText; }
+}
+@media (prefers-contrast: more) {
+  [data-character-shaper-sheet] { border-top-color: var(--color-line-strong); }
+  [data-character-shaper-sheet-snap="on"] { background-color: var(--color-accent); }
 }
 
 [data-character-shaper-sheet-handle="compact"] {
