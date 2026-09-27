@@ -4131,6 +4131,11 @@ async function runCurrentStrokeCorrection(page: Page, toScreen: (x: number, y: n
   invariant(controlPointFrame, "control-point gesture has no stage coordinate frame");
   invariant(await page.evaluate(({ x, y }) => Boolean(document.elementFromPoint(x, y)?.closest(".konvajs-content")), handle),
     "control-point gesture is covered by editor chrome");
+  // 실제 교정점과 좌표 프레임을 보존해 잘못된 포인터 위치와 제품 편집 실패를 구분한다.
+  writeFileSync(join(SCRATCH, "studio-smart-shape-control-point.json"), JSON.stringify({
+    handle, controlPointFrame, corrected,
+  }, null, 2));
+  await page.screenshot({ path: join(SCRATCH, "studio-smart-shape-before-control-point.png"), animations: "disabled" });
   await page.mouse.move(handle.x, handle.y);
   await page.keyboard.down("Shift");
   await page.mouse.down();

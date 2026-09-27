@@ -81,23 +81,24 @@ export function StudioVirtualSpaceEntryLobby({
               : bt("함께할 캐릭터를 선택하세요", "Choose the character who will join you")
             : returning
               ? bt("다시 스튜디오로", "Return to the studio")
-              : bt("입장할 캐릭터를 선택하세요", "Choose your character before entering")}</h1>
+              : personal ? bt("내 원고 작업실에 입장하세요", "Enter your manuscript office")
+                : bt("함께 작업할 스튜디오에 입장하세요", "Enter your shared work studio")}</h1>
           <p>{onboarding
             ? bt(
               "직접 고른 캐릭터는 홈, 프로필, 방문자 목록과 가상스튜디오에서 나를 이어 주는 모습이 됩니다. 나중에도 언제든 변경할 수 있어요.",
               "The character you choose connects your identity across home, profile, visitor lists and the virtual studio. You can change it later.",
             )
             : personal ? bt(
-              "나의 아틀리에를 자유롭게 둘러보고 캐릭터와 분위기를 꾸며 보세요. 작품은 준비됐을 때 시작할 수 있어요.",
-              "Explore your atelier and personalize your character and atmosphere. Start a work whenever you are ready.",
+              "내 캐릭터로 작업실에 입장해 원고 작업을 시작하세요. 내 작품을 열거나 새 작품을 만들고, 작업할 위치와 분위기를 고를 수 있어요.",
+              "Enter your office with your character to work on a manuscript. Open a work or create one, then choose your workspace and atmosphere.",
             ) : bt(
-              `${projectName} 공간에서 팀원과 이동하고, 대화·검수·화이트보드를 P2P로 함께 사용할 수 있어요.`,
-              `Move through ${projectName}, meet teammates and use conversations, reviews and whiteboards over P2P.`,
+              `${projectName}에서 오늘 할 원고 작업을 고르고, 동료에게 다가가 대화하거나 검수를 요청하세요. 작업 자리로 돌아와 제작을 이어갈 수 있어요.`,
+              `Choose today's manuscript work in ${projectName}, walk to a teammate to talk or request a review, and return to your desk to continue creating.`,
             )}</p>
           {!onboarding && !personal ? <ul className="studio-vspace-entry-privacy" aria-label={bt("입장 시 기본 상태", "Default state on entry")}>
             <li><MicOff size={16} aria-hidden />{bt("마이크 꺼짐", "Microphone off")}</li>
             <li><CameraOff size={16} aria-hidden />{bt("카메라 꺼짐", "Camera off")}</li>
-            <li><Network size={16} aria-hidden />{bt("소규모 협업은 P2P 우선", "Small-group collaboration is P2P-first")}</li>
+            <li><Network size={16} aria-hidden />{bt("동료가 수락하면 함께 작업", "Work together after an invitation is accepted")}</li>
             <li><ShieldCheck size={16} aria-hidden />{bt("미디어는 별도 동의 후 시작", "Media starts only after consent")}</li>
           </ul> : null}
         </div>

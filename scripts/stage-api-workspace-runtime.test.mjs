@@ -27,6 +27,13 @@ test("stages workspace packages inside the emitted API boundary", async () => {
   const root = await mkdtemp(join(tmpdir(), "toonstudio-api-runtime-"));
   try {
     await compiledProductionContracts(root);
+    await compiledPackage(root, "packages/contracts/src/studio-live-auth-ticket.js",
+      'module.exports = require("./studio-sha256.js");');
+    await compiledPackage(root, "packages/contracts/src/studio-sha256.js",
+      'module.exports = { ticket: "compiled-contract" };');
+    await compiledPackage(root, "packages/contracts/src/creator-resource-workflow.js",
+      'module.exports = { workflow: "compiled-contract" };');
+
     for (const name of ["studio-crdt-raster-ops", "studio-crdt-raster-compaction", "studio-ink-input-contract"]) {
       const source = await readFile(new URL(`../packages/contracts/src/${name}.ts`, import.meta.url), "utf8");
       const { outputText } = ts.transpileModule(source, {
@@ -83,7 +90,7 @@ test("stages workspace packages inside the emitted API boundary", async () => {
     );
     await compiledPackage(root, "packages/contracts/src/avatar.js", 'module.exports = require("@toonstudio/contracts/affiliate");\n');
     await compiledPackage(root, "packages/contracts/src/affiliate.js", 'module.exports = { affiliate: "ready" };\n');
-    await compiledPackage(root, "packages/contracts/src/studio-live-auth-ticket.js", 'module.exports = { ticket: "ready" };\n');
+    // 위에서 만든 상대 의존성 fixture를 덮어쓰지 않아 실제 전이 의존성 해석도 검증한다.
     await compiledPackage(root, "packages/contracts/src/private-internal.js", "module.exports = {};\n");
 
     const optionalModelEntries = ["work-session", "work-session-evidence", "pinned-review-share", "review-delivery", "review-voice-note", "world-publication", "world-acoustic", "world-conversation"];
@@ -104,11 +111,30 @@ test("stages workspace packages inside the emitted API boundary", async () => {
 
     const requireFromApi = createRequire(caller);
     assert.deepEqual(requireFromApi("@toonstudio/contracts/avatar"), { affiliate: "ready" });
-    assert.deepEqual(requireFromApi("@toonstudio/contracts/studio-live-auth-ticket"), { ticket: "ready" });
+    assert.deepEqual(requireFromApi("@toonstudio/contracts/studio-live-auth-ticket"), { ticket: "compiled-contract" });
     assert.throws(() => requireFromApi("@toonstudio/contracts/private-internal"), { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" });
     for (const name of ["production-workspace", "operation-policy", "creator-publication-integrity"]) {
       assert.deepEqual(requireFromApi(`@toonstudio/contracts/${name}`), { contract: name });
     }
+    assert.deepEqual(requireFromApi("@toonstudio/contracts/studio-live-auth-ticket"), {
+      ticket: "compiled-contract",
+    });
+    assert.deepEqual(requireFromApi("@toonstudio/contracts/creator-resource-workflow"), {
+      workflow: "compiled-contract",
+    });
+    // 공개된 계약만 노출하며, private helper나 미컴파일 계약을 원본 TS로 우회하지 않는다.
+    for (const name of ["studio-sha256", "studio-live-lock-resource"]) {
+      assert.throws(() => requireFromApi(`@toonstudio/contracts/${name}`), {
+        code: "ERR_PACKAGE_PATH_NOT_EXPORTED",
+      });
+    }
+    await writeFile(caller, 'require("@toonstudio/contracts/studio-live-auth-ticket");\nrequire("@toonstudio/contracts/creator-resource-workflow");\n');
+    assert.ok(verifyCompiledApiImports(root).importsChecked > 2);
+    const validCallerSource = await readFile(caller, "utf8");
+    await writeFile(caller, 'require("@toonstudio/contracts/studio-live-lock-resource");\n');
+    assert.throws(() => verifyCompiledApiImports(root), /studio-live-lock-resource cannot resolve/u);
+    // 거절 검증의 손상 fixture를 복구한 뒤 나머지 정상 배포 경계를 검사한다.
+    await writeFile(caller, validCallerSource);
     assert.deepEqual(requireFromApi("@toonstudio/contracts/security/csrf"), {
       csrf: "ready",
     });

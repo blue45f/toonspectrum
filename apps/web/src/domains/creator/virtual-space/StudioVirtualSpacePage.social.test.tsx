@@ -18,6 +18,8 @@ import type { useStudioVirtualSpaceSocial } from "./use-studio-virtual-space-soc
 import { STUDIO_P2P_HUDDLE_OPEN_EVENT, STUDIO_P2P_HUDDLE_CLOSE_EVENT, STUDIO_P2P_HUDDLE_CLOSED_EVENT } from "../live/huddle/studio-p2p-huddle-events";
 import { StudioVirtualSpacePage } from "./StudioVirtualSpacePage";
 import { writeStudioVirtualSpaceEntryPreference } from "./studio-virtual-space-entry-preference";
+import { createProductionDemoProject } from "../production-hub/production-demo";
+import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 
 type Engine = ComponentProps<typeof StudioVirtualSpacePhaserCanvas>;
 type ConversationOptions = Parameters<typeof import("./use-studio-virtual-space-conversation").useStudioVirtualSpaceConversation>[0];
@@ -27,6 +29,8 @@ const f = vi.hoisted(() => ({
   realPresence: false,
   presenceOverrides: {} as Record<string, Partial<StudioVirtualSpacePresenceState>>,
   worldLoad: null as Promise<StudioVirtualSpaceWorldManifest> | null,
+  operations: { phase: "ready", project: null, inbox: [], calendar: [], error: null } as StudioVirtualOperationsSnapshot,
+  refreshOperations: vi.fn(),
   engine: null as Engine | null,
   socialOptions: null as SocialOptions | null,
   conversationOptions: null as ConversationOptions | null,
@@ -52,6 +56,7 @@ vi.mock("./world-publication/use-studio-world-publication", async () => {
   return { useStudioWorldPublication: () => f.worldPublication ?? ({ enabled: false, snapshot: EMPTY_WORLD_PUBLICATION, refresh: vi.fn(), publish: vi.fn() }) };
 });
 vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => f.session }));
+vi.mock("./use-studio-virtual-space-operations", () => ({ useStudioVirtualSpaceOperations: () => ({ snapshot: f.operations, refresh: f.refreshOperations }) }));
 vi.mock("./private-room/use-studio-private-room",()=>({useStudioPrivateRoom:(options:Parameters<typeof import("./private-room/use-studio-private-room").useStudioPrivateRoom>[0])=>{
   f.privateOptions=options;return {snapshot:{door:null,team:null,session:null,conversations:[],candidates:[],busy:false,uncertain:false,reason:null},controller:null,available:false,entryReason:"outside"};
 }}));
@@ -96,6 +101,11 @@ vi.mock("./studio-virtual-space-presence", async (importOriginal) => {
     start() { this.real?.start(); }
     close() { this.real?.close(); }
     setActivity(activity: StudioVirtualSpacePresenceState["activity"]) { this.real?.setActivity(activity); }
+    update(...args: Parameters<InstanceType<typeof actual.StudioVirtualSpacePresenceController>["update"]>) {
+      this.real?.update(...args);
+      const [point, facing = this.self.facing, activity = this.self.activity, moving = this.self.moving, avatarIndex = this.self.avatarIndex, zoneId = this.self.zoneId] = args;
+      this.self = { ...this.self, ...point, facing, activity, moving, avatarIndex, zoneId };
+    }
     sendReaction() {}
     subscribe(listener: () => void) { return this.real?.subscribe(listener) ?? (() => undefined); }
     snapshot() {
@@ -127,7 +137,9 @@ async function showPanel(panel: "people" | "space") {
   if (screen.queryByRole("dialog", { name: title })) return;
   if (screen.queryByRole("dialog")) fireEvent.click(screen.getByRole("button", { name: "패널 닫기" }));
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: panel === "space" ? "공간·꾸미기" : /^사람·대화/u }));
+    const button = document.querySelector<HTMLButtonElement>(`[data-mobile-slot="${panel === "space" ? "space" : "people"}"]`);
+    if (!button) throw new Error("주 동작의 패널 버튼이 필요합니다.");
+    fireEvent.click(button);
     // 실제 패널을 연 뒤 모듈 로딩을 기다린다. 테스트 서버 변환 시간은 UI 반응 시간과 분리한다.
     if (panel === "space") await Promise.all([
       import("./StudioVirtualSpacePlaceGallery"), import("./StudioVirtualSpaceRoomCatalog"),
@@ -142,6 +154,9 @@ beforeEach(() => {
   localStorage.clear(); sessionStorage.clear();
   writeStudioVirtualSpaceEntryPreference(0);
   f.worldPublication = null; f.worldLoad = null; f.engine = null; f.socialOptions = null; f.realPresence = false;
+  f.operations = { phase: "ready", project: null, inbox: [], calendar: [], error: null };
+  f.refreshOperations.mockClear();
+  f.session = { ready: true, data: { user: { id: "alice", name: "Alice", email: "alice@example.test" } } };
   f.live.room.ready = false;
   f.presenceOverrides = {};
   f.snapshot = { requests: [], readyPeerIds: ["bob", "cleo"], reviewReadyPeerIds: ["bob", "cleo"], blockedPeerIds: [], greetingReadyPeerIds: ["bob", "cleo"], greetings: [], available: true };
@@ -173,17 +188,255 @@ async function accept(request: StudioSpaceSocialRequest): Promise<void> {
   });
 }
 
+function officeElement(projectId = "project-social", personal = false, search = "") {
+  return <MemoryRouter initialEntries={[`/studio/${projectId}/virtual${search}`]}>
+    <Routes><Route path="/studio/:projectId/virtual" element={<StudioVirtualSpacePage personal={personal} projectIdOverride={projectId} />} /></Routes>
+  </MemoryRouter>;
+}
+function pressOfficeDock(slot: "work" | "people" | "seats" | "space") {
+  const button = document.querySelector<HTMLButtonElement>(`[data-mobile-slot="${slot}"]`);
+  if (!button) throw new Error(`주 동작 버튼이 필요합니다: ${slot}`);
+  fireEvent.click(button);
+}
+async function openOfficeSeats() {
+  await act(async () => { pressOfficeDock("seats"); await import("./StudioVirtualSpaceSeatsPanel"); });
+  return screen.findByRole("dialog", { name: "내 작업 자리" });
+}
+function nextDrawingWork() {
+  const aggregate = createProductionDemoProject();
+  const task = aggregate.tasks[0];
+  if (!task) throw new Error("작업 fixture가 필요합니다.");
+  f.operations = { phase: "ready", inbox: [], calendar: [], error: null, project: {
+    access: { view: true, comment: true, edit: true, manage: true, owner: true, role: "owner" },
+    aggregate: { ...aggregate, workId: "project-social", tasks: [{ ...task, title: "오늘의 3화 콘티", processKey: "storyboard", status: "in-progress" }] },
+  } };
+}
+
+describe("가상 사무실 첫 작업과 자리의 Page 연결", () => {
+  it("개인 작업실 입구에서도 작업 자리 버튼은 보이는 책상 앞으로 걷게 한다", async () => {
+    render(officeElement("personal-local", true, "?place=personal-atelier"));
+    await screen.findByTestId("engine-ready");
+    const before = { ...f.engine?.snapshot.self };
+    expect(before).toMatchObject({ x: 480, y: 540 });
+    fireEvent.click(within(await screen.findByRole("region", { name: "스튜디오에서 작업 시작" }))
+      .getByRole("button", { name: /^작업 자리/u }));
+    expect(f.engine?.bridge.consumeMoveTarget()).toEqual({ x: 182, y: 422 });
+    expect(f.engine?.snapshot.self).toEqual(before);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+
+  it("작업 안내가 처음 열리고 실제 원고 링크와 작업·동료·자리·추가 메뉴를 제공한다", async () => {
+    nextDrawingWork();
+    await mount(null);
+    const office = await screen.findByRole("region", { name: "스튜디오에서 작업 시작" });
+    expect(within(office).getByText("오늘의 3화 콘티")).toBeTruthy();
+    expect(within(office).getByRole("link", { name: "원고 목록 바로 열기" }).getAttribute("href")).toBe("/studio/p/project-social/production?view=documents");
+    expect([...document.querySelectorAll(".workspace-live-actions [data-mobile-slot]")].map((button) => button.getAttribute("data-mobile-slot"))).toEqual(["work", "people", "seats", "space"]);
+    expect(f.request).not.toHaveBeenCalled();
+    fireEvent.click(within(office).getByRole("button", { name: /동료 찾기/u }));
+    expect(await screen.findByRole("dialog", { name: "사람과 대화" })).toBeTruthy();
+    expect(f.request).not.toHaveBeenCalled();
+    pressOfficeDock("work");
+    fireEvent.click(within(await screen.findByRole("region", { name: "스튜디오에서 작업 시작" })).getByRole("button", { name: /내 작업 열기/u }));
+    expect(await screen.findByRole("dialog", { name: "검수·작업함" })).toBeTruthy();
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+  it("개인 첫 화면은 실제 작품 목록·새 작품 링크를 제공하고 협업 동료를 만들지 않는다", async () => {
+    nextDrawingWork();
+    render(officeElement("personal-local", true));
+    await screen.findByTestId("engine-ready");
+    const office = await screen.findByRole("region", { name: "스튜디오에서 작업 시작" });
+    expect(within(office).getByRole("link", { name: /내 작품 열기/u }).getAttribute("href")).toBe("/studio");
+    expect(within(office).getByRole("link", { name: "새 작품 만들기" }).getAttribute("href")).toBe("/studio/new");
+    expect(within(office).getByRole("button", { name: /동료 찾기/u })).toHaveProperty("disabled", true);
+    expect(within(office).queryByText("오늘의 3화 콘티")).toBeNull();
+    expect(within(office).getByText("개인 작업실 · 동료 없음")).toBeTruthy();
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+  it("이미 같은 작업실에 있어도 다음 업무 안내가 실제 걷기를 예약하고 패널을 닫는다", async () => {
+    nextDrawingWork();
+    render(officeElement("project-social", false, "?place=personal-atelier"));
+    await screen.findByTestId("engine-ready");
+    await act(async () => { f.engine?.onLocalState({ point: { x: 110, y: 320 }, facing: "down", moving: false, zoneId: "personal-atelier" }); });
+    const before = { ...f.engine?.snapshot.self };
+    fireEvent.click(await screen.findByRole("button", { name: "드로잉 스튜디오로 이동" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(f.engine?.bridge.consumeMoveTarget()).toEqual({ x: 480, y: 540 });
+    expect(f.engine?.snapshot.self).toEqual(before);
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+  it("다른 장소의 업무를 고르면 장소 전환 후 도착 월드에서 걷기를 예약한다", async () => {
+    nextDrawingWork();
+    await mount(null);
+    expect(f.engine?.manifest.rooms.some((room) => room.id === "skyport")).toBe(true);
+    fireEvent.click(await screen.findByRole("button", { name: "드로잉 스튜디오로 이동" }));
+    await waitFor(() => expect(f.engine?.manifest.rooms.some((room) => room.id === "personal-atelier")).toBe(true));
+    await act(async () => {});
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(f.engine?.bridge.consumeMoveTarget()).toEqual({ x: 480, y: 540 });
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+  it("자리를 고르면 창을 닫고 접근하며 실제 도착 전에 서버 점유를 요청하지 않는다", async () => {
+    vi.stubGlobal("crypto", webcrypto);
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    f.live.room.ready = true;
+    await mount(null);
+    const slot = f.engine?.manifest.interactionSlots?.[0];
+    if (!slot) throw new Error("현재 월드의 작업 자리가 필요합니다.");
+    const acquire = vi.spyOn(StudioVirtualSlotLeaseController.prototype, "acquire").mockResolvedValue(false);
+    const panel = await openOfficeSeats();
+    const button = within(panel).getByRole("button", { name: `${slot.labelKo} 사용하기` });
+    await waitFor(() => expect(button).toHaveProperty("disabled", false));
+    const move = vi.spyOn(f.engine!.bridge, "requestMove");
+    fireEvent.click(button);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(move).toHaveBeenCalledExactlyOnceWith(slot.approachPoint));
+    expect(acquire).not.toHaveBeenCalled();
+    await act(async () => { f.engine?.onLocalState({ point: slot.approachPoint, facing: slot.facing, moving: false, zoneId: slot.roomId }); });
+    await waitFor(() => expect(acquire).toHaveBeenCalledExactlyOnceWith(slot.id));
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+  it.each(["owner", "project"] as const)("%s 전환 시 다른 범위의 선호 자리를 표시하지 않고 원래 범위로 돌아오면 복원한다", async (scope) => {
+    const view = render(officeElement());
+    await screen.findByTestId("engine-ready");
+    const slot = f.engine?.manifest.interactionSlots?.[0];
+    if (!slot) throw new Error("현재 월드의 작업 자리가 필요합니다.");
+    const panel = await openOfficeSeats();
+    fireEvent.click(within(panel).getByRole("button", { name: `${slot.labelKo}를 내 자리로 기억` }));
+    expect(within(panel).getByText("기억한 내 자리")).toBeTruthy();
+    expect(f.engine?.bridge.consumeMoveTarget()).toBeNull();
+    if (scope === "owner") f.session = { ...f.session, data: { user: { id: "bob", name: "Bob", email: "bob@example.test" } } };
+    view.rerender(officeElement(scope === "project" ? "other-project" : "project-social"));
+    await screen.findByRole("dialog", { name: "웹툰 작업실" });
+    const changed = await openOfficeSeats();
+    expect(within(changed).queryByText("기억한 내 자리")).toBeNull();
+    expect(within(changed).getByRole("button", { name: `${slot.labelKo}를 내 자리로 기억` }).getAttribute("aria-pressed")).toBe("false");
+    f.session = { ...f.session, data: { user: { id: "alice", name: "Alice", email: "alice@example.test" } } };
+    view.rerender(officeElement());
+    await screen.findByRole("dialog", { name: "웹툰 작업실" });
+    const restored = await openOfficeSeats();
+    expect(within(restored).getByRole("button", { name: `${slot.labelKo}를 내 자리로 기억` }).getAttribute("aria-pressed")).toBe("true");
+    expect(f.request).not.toHaveBeenCalled();
+  });
+
+  it("장소마다 선호 자리를 따로 기억하고 다른 장소에서 기억해도 이전 자리를 보존한다", async () => {
+    await mount(null);
+    let panel = await openOfficeSeats();
+    fireEvent.click(within(panel).getByRole("button", { name: "리뷰 테이블 왼쪽를 내 자리로 기억" }));
+    await showPanel("space");
+    fireEvent.click(await screen.findByRole("button", { name: "리뷰 갤러리로 이동" }));
+    await waitFor(() => expect(f.engine?.manifest.rooms.some((room) => room.id === "review-gallery")).toBe(true));
+    panel = await openOfficeSeats();
+    expect(within(panel).queryByText("기억한 내 자리")).toBeNull();
+    fireEvent.click(within(panel).getByRole("button", { name: "공동 자리 오른쪽를 내 자리로 기억" }));
+    await showPanel("space");
+    fireEvent.click(await screen.findByRole("button", { name: "스카이 포트로 이동" }));
+    await waitFor(() => expect(f.engine?.manifest.rooms.some((room) => room.id === "skyport")).toBe(true));
+    panel = await openOfficeSeats();
+    expect(within(panel).getByRole("button", { name: "리뷰 테이블 왼쪽를 내 자리로 기억" }).getAttribute("aria-pressed")).toBe("true");
+    expect(within(panel).getByRole("button", { name: "리뷰 테이블 오른쪽를 내 자리로 기억" }).getAttribute("aria-pressed")).toBe("false");
+  });
+});
+
+describe("동료에게 다가가기의 실제 Page 연결", () => {
+  async function prepareApproach() {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+    f.presenceOverrides.bob = { x: 850, y: 320, zoneId: "personal-atelier", activity: "available" };
+    render(officeElement("project-social", false, "?place=personal-atelier"));
+    await screen.findByTestId("engine-ready");
+    await act(async () => { f.engine?.onLocalState({ point: { x: 110, y: 320 }, facing: "right", moving: false, zoneId: "personal-atelier" }); });
+    await showPanel("people");
+    const engine = f.engine;
+    if (!engine) throw new Error("현재 월드의 renderer 연결이 필요합니다.");
+    const move = vi.spyOn(engine.bridge, "requestMove");
+    const button = await screen.findByRole("button", { name: "Bob 님에게 다가가기" });
+    expect(button).toHaveProperty("disabled", false);
+    expect(engine.snapshot.self).toMatchObject({ x: 110, y: 320 });
+    return { engine, move, button };
+  }
+
+  it("먼 동료에게 실제로 다가가고 도착한 뒤에도 명시적인 대화 요청만 한 번 보낸다", async () => {
+    const { engine, move, button } = await prepareApproach();
+    const opened = vi.fn();
+    window.addEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, opened);
+    try {
+      fireEvent.click(button);
+      expect(move).toHaveBeenCalledOnce();
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(f.request).not.toHaveBeenCalled();
+      expect(opened).not.toHaveBeenCalled();
+      const destination = move.mock.calls[0]?.[0];
+      if (!destination) throw new Error("실제 접근 목적지가 필요합니다.");
+      const distance = Math.hypot(destination.x - 850, destination.y - 320);
+      expect(distance).toBeGreaterThanOrEqual(26);
+      expect(distance).toBeLessThanOrEqual(120);
+      expect(engine.bridge.consumeMoveTarget()).toEqual(destination);
+      expect(f.engine?.snapshot.self).toMatchObject({ x: 110, y: 320 });
+
+      await act(async () => { f.engine?.onLocalState({ point: destination, facing: "right", moving: false, zoneId: "personal-atelier" }); });
+      const people = await screen.findByRole("dialog", { name: "사람과 대화" });
+      expect(f.request).not.toHaveBeenCalled();
+      expect(opened).not.toHaveBeenCalled();
+      expect(within(people).getByRole("button", { name: "Bob" }).getAttribute("aria-pressed")).toBe("true");
+      fireEvent.click(within(people).getByRole("button", { name: "대화 요청" }));
+      expect(f.request).toHaveBeenCalledExactlyOnceWith("bob", "talk");
+      expect(opened).not.toHaveBeenCalled();
+    } finally { window.removeEventListener(STUDIO_P2P_HUDDLE_OPEN_EVENT, opened); }
+  });
+
+  it.each(["npc", "interaction"] as const)("접근 중 %s로 전환하면 의도를 취소하고 동료 위치 변경이나 늦은 도착으로 다시 이동하지 않는다", async (surface) => {
+    const { engine, move, button } = await prepareApproach();
+    fireEvent.click(button);
+    expect(move).toHaveBeenCalledOnce();
+    const destination = move.mock.calls[0]?.[0];
+    const npc = engine.manifest.npcs[0];
+    const interaction = engine.manifest.interactions.find((item) => item.zoneId === npc?.roomId);
+    if (!destination || !npc || !interaction) throw new Error("현재 월드의 NPC와 상호작용이 필요합니다.");
+    await act(async () => {
+      if (surface === "npc") {
+        f.engine?.onNpcInteract?.(interaction, npc);
+        await import("./StudioVirtualSpaceNpcDialoguePanel");
+      } else {
+        f.engine?.onInteract(interaction);
+        await import("./StudioVirtualSpaceActionSheet");
+      }
+    });
+    const dialog = await screen.findByRole("dialog");
+    expect(screen.queryByRole("dialog", { name: "사람과 대화" })).toBeNull();
+    expect(engine.bridge.consumeMoveTarget()).toBeNull();
+    f.presenceOverrides.bob = { ...f.presenceOverrides.bob, x: 750 };
+    await act(async () => { f.engine?.onLocalState({ point: { x: 110, y: 320 }, facing: "right", moving: false, zoneId: "personal-atelier" }); });
+    expect(move).toHaveBeenCalledOnce();
+    expect(engine.bridge.consumeMoveTarget()).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: surface === "npc" ? "대화 닫기" : "닫기" }));
+    await act(async () => { f.engine?.onLocalState({ point: destination, facing: "right", moving: false, zoneId: "personal-atelier" }); });
+    expect(move).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(engine.bridge.consumeMoveTarget()).toBeNull();
+    expect(f.request).not.toHaveBeenCalled();
+  });
+});
+
 // The transport and renderer are boundaries; these tests execute the real Page's
 // activity ownership, UI events, engine bridge and Huddle event integration.
 describe("Virtual Studio social activity ownership", () => {
-  it("모바일 추가 메뉴에서 키보드 없이 방 찾기와 마을 활동을 연다", async () => {
+  it("모바일 추가 메뉴에서 키보드 없이 방 찾기와 제작 공간을 연다", async () => {
     await mount("space");
     const menu = screen.getByRole("navigation", { name: "추가 스튜디오 기능" });
     fireEvent.click(within(menu).getByRole("button", { name: "방·팀원 찾기" }));
     expect(await screen.findByRole("dialog", { name: "방·팀원 찾기" })).toBeTruthy();
     await showPanel("space");
-    fireEvent.click(within(screen.getByRole("navigation", { name: "추가 스튜디오 기능" })).getByRole("button", { name: "마을 활동" }));
-    expect(await screen.findByRole("dialog", { name: "살아 있는 제작 마을" })).toBeTruthy();
+    fireEvent.click(within(screen.getByRole("navigation", { name: "추가 스튜디오 기능" })).getByRole("button", { name: "제작 공간" }));
+    expect(await screen.findByRole("dialog", { name: "함께 일하는 제작 공간" })).toBeTruthy();
   });
 
   it("프로젝트 환경 설정에서 모바일 전용 메뉴 밖의 실시간 연결 진단을 연다", async () => {
@@ -255,9 +508,12 @@ describe("Virtual Studio social activity ownership", () => {
     expect(screen.queryByRole("button", { name: "게시 공간 확인·적용" })).toBeNull();
     expect(screen.queryByRole("button", { name: "실시간 연결 상태" })).toBeNull();
   });
-  it("starts with one closed inspector and opening or closing it grants no social consent", async () => {
+  it("starts with one work guide and opening or closing panels grants no social consent", async () => {
     await mount(null);
-    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.getByRole("dialog", { name: "웹툰 작업실" })).toBeTruthy();
+    expect(f.request).not.toHaveBeenCalled();
+    expect(f.cancel).not.toHaveBeenCalled();
     expect(document.querySelector(".vs2-bottom")).toBeNull();
     await showPanel("people");
     expect(screen.getByRole("dialog", { name: "사람과 대화" })).toBeTruthy();

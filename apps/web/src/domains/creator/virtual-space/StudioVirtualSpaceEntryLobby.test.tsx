@@ -25,6 +25,9 @@ describe("StudioVirtualSpaceEntryLobby", () => {
 
     expect(screen.getByText("마이크 꺼짐")).toBeTruthy();
     expect(screen.getByText("카메라 꺼짐")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "함께 작업할 스튜디오에 입장하세요" })).toBeTruthy();
+    expect(screen.getByText(/오늘 할 원고 작업을 고르고/u)).toBeTruthy();
+    expect(screen.getByText("동료가 수락하면 함께 작업")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "자동 선택" })).toBeNull();
     expect(screen.getByRole("button", { name: "선택하고 입장" }).hasAttribute("disabled")).toBe(true);
 
@@ -53,5 +56,7 @@ describe("StudioVirtualSpaceEntryLobby", () => {
     fireEvent.click(screen.getByText("아트 스타일 설정"));
     expect(within(await screen.findByRole("group", { name: "아트 스타일" })).getByRole("button", { name: /픽셀 아틀리에/ })).toBeTruthy();
     expect(document.querySelector(".studio-vspace-rtc-panel")).toBeNull();
+    expect(screen.getByText(/내 작품을 열거나 새 작품을 만들고/u)).toBeTruthy();
+    expect(screen.queryByText("동료가 수락하면 함께 작업")).toBeNull();
   });
 });

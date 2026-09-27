@@ -258,6 +258,8 @@ export function StudioCanvasViewportStageHost({
     animTimeline: viewport.animTimeline,
     bubbleShapeArmed: viewport.bubbleShapeArmed,
     bubbleShapeDraft: viewport.bubbleShapeDraft,
+    canvasInteractionBlocked: viewport.canvasInteractionBlocked,
+    commentPinArmed: viewport.commentPinArmed,
     canonicalDryMediaHiddenElementId: live.canonicalDryMediaHiddenElementId,
     commitTextTransformEnd: viewport.stableHandlers.commitTextTransformEnd,
     cropArmed: viewport.cropArmed,

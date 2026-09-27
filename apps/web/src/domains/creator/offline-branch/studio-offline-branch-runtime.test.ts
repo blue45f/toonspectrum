@@ -3,8 +3,8 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { StudioCrdtDocument } from "../live/studio-crdt-document";
 import { reconcileStudioCrdtSceneGraphPages } from "../live/studio-crdt-page-bridge";
 import { publishStudioCrdtSceneGraphDiff } from "../live/studio-crdt-scene-publisher";
+import { createStudioDeferredStrokeCommitEngine } from "../studio-cuttoon-editor/studio-deferred-stroke-commit";
 import { createStudioCrdtTransitionPublisher } from "../studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher";
-import { createStudioDeferredStrokeCommitEngine, type StudioDeferredStrokeCommitEngineContext } from "../studio-cuttoon-editor/studio-deferred-stroke-commit";
 import {
   StudioOfflineBranchAutomergeEngine,
   initializeStudioOfflineBranchAutomerge,
@@ -13,6 +13,7 @@ import { StudioOfflineBranchRuntime } from "./studio-offline-branch-runtime";
 
 import type { DrawEl } from "../studio-element-model";
 import type { StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaborationProvider";
+import type { StudioDeferredStrokeCommitEngineContext } from "../studio-cuttoon-editor/studio-deferred-stroke-commit";
 import type { PageState } from "../studio-page-state";
 import type {
   CreateStudioOfflineBranchInput,
@@ -314,6 +315,7 @@ describe("StudioOfflineBranchRuntime", () => {
       await runtime.close();
     }
   });
+
   it.each(["elements", "pages"] as const)(
     "오프라인 %s 커밋에서 연속 그룹 편집과 실행 취소 제안을 보존한다",
     async (kind) => {

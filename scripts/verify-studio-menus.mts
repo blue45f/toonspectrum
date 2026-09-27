@@ -1172,6 +1172,7 @@ export async function assertCurrentCanvasPlatformResize(
     });
     if (outcome === "failed") {
       log(`  ${itemId}: expected height ${expectedHeight}, observed ${await page.locator('span[aria-label^="높이 "]').evaluateAll((elements) => elements.map((element) => element.getAttribute("aria-label")))}`);
+      log(`  resize notices: ${JSON.stringify(await page.locator('[role="alert"], [role="status"]').allTextContents())}`);
     }
     return outcome;
   };

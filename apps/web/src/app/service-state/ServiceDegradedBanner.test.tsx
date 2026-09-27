@@ -116,3 +116,30 @@ it("몰입 화면의 상단 도구를 덮지 않고 장애 상세를 펼치거�
   expect(mocks.refresh).toHaveBeenCalledOnce();
   expect(screen.getByRole("link", { name: "상태 자세히" }).getAttribute("href")).toBe("/status");
 });
+
+it("고정 알림의 높이 변경에 맞춰 조작부 공간을 확보하고 해제한다", () => {
+  const property = "--service-status-overlay-clearance";
+  document.documentElement.style.setProperty(property, "8px");
+  const view = renderBanner(true);
+  const banner = screen.getByRole("status");
+  banner.style.position = "fixed";
+  const bounds = vi.spyOn(banner, "getBoundingClientRect");
+  bounds.mockReturnValue(new DOMRect(0, 600, 390, 150));
+  fireEvent(window, new Event("resize"));
+  expect(document.documentElement.style.getPropertyValue(property)).toBe(`${window.innerHeight - 600 + 12}px`);
+  bounds.mockReturnValue(new DOMRect(0, 520, 390, 230));
+  fireEvent.click(screen.getByRole("button", { name: "서비스 상태 알림 펼치기" }));
+  expect(document.documentElement.style.getPropertyValue(property)).toBe(`${window.innerHeight - 520 + 12}px`);
+  view.unmount();
+  expect(document.documentElement.style.getPropertyValue(property)).toBe("8px");
+  bounds.mockRestore();
+  document.documentElement.style.removeProperty(property);
+});
+
+it("일반 문서 흐름의 알림은 고정 조작부의 공간을 변경하지 않는다", () => {
+  const property = "--service-status-overlay-clearance";
+  const view = renderBanner(false);
+  fireEvent(window, new Event("resize"));
+  expect(document.documentElement.style.getPropertyValue(property)).toBe("");
+  view.unmount();
+});

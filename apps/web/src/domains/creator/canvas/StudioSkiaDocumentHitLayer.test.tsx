@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { act, cleanup, render, renderHook } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -8,6 +11,8 @@ import { planGroupClickSelection } from "../studio-group-selection";
 import { useStudioVectorNodeBubbleEdit } from "../vector/studio-node-bubble-edit-controller";
 
 import { StudioSkiaDocumentHitLayer } from "./StudioSkiaDocumentHitLayer";
+import { canSelectStudioCanvasElement } from "./studio-canvas-element-selection";
+import { studioCanvasDocumentSelectionEnabled } from "./studio-canvas-selection-authority";
 
 import type { StudioCuttoonStagePointersApi } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-api";
 import type { StudioCuttoonStagePointersHost } from "../studio-cuttoon-editor/studio-cuttoon-stage-pointers-types";
@@ -34,6 +39,8 @@ afterEach(() => { cleanup(); shape.props = null; });
 const idleSelection = {
   tool: "select" as const,
   activeSurfaceReviewLocked: false,
+  canvasInteractionBlocked: false,
+  commentPinArmed: false,
   advancedFillArmed: false,
   pixelToolArmed: false,
   cropArmed: false,
@@ -75,7 +82,8 @@ function hitEvent(shiftKey = false, point = { x: 10, y: 20 }) {
     setAttrs,
   };
   const event = {
-    evt: { pointerId: 7, pointerType: "pen", target: canvas, shiftKey },
+    evt: { pointerId: 7, pointerType: "pen", target: canvas, shiftKey,
+      preventDefault: vi.fn(), stopPropagation: vi.fn() },
     target,
     cancelBubble: false,
   } as unknown as HitEvent;
@@ -88,6 +96,13 @@ function dispatchDown(event: HitEvent) {
 }
 
 describe("Skia 문서 선택의 도구 권위 경계", () => {
+  it("두 렌더러에 현재 입력 차단과 주석 핀 권한을 같은 경로로 전달한다", () => {
+    const source = readFileSync(resolve(process.cwd(), "apps/web/src/domains/creator/canvas/StudioCanvasViewportStageHost.tsx"), "utf8");
+    expect(source).toContain("canvasInteractionBlocked: viewport.canvasInteractionBlocked,");
+    expect(source).toContain("commentPinArmed: viewport.commentPinArmed,");
+    expect(source).toContain("selectionState={documentLayerProps}");
+    expect(studioCanvasDocumentSelectionEnabled).toBe(canSelectStudioCanvasElement);
+  });
   it.each(Object.keys(idleSelection).filter((key) => key !== "tool"))(
     "%s 동안 요소 선택을 바꾸지 않고 상위 포인터 이벤트를 보존한다",
     (blocked) => {
@@ -101,6 +116,8 @@ describe("Skia 문서 선택의 도구 권위 경계", () => {
       dispatchDown(event);
       expect(onSelect).not.toHaveBeenCalled();
       expect(event.cancelBubble).toBe(false);
+      expect(event.evt.preventDefault).not.toHaveBeenCalled();
+      expect(event.evt.stopPropagation).not.toHaveBeenCalled();
       expect(setAttrs).toHaveBeenCalledWith({
         studioElementId: stroke.id, name: "skia-document-hit-proxy",
       });

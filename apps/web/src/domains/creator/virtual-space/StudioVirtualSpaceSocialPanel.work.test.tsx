@@ -98,4 +98,35 @@ describe("웹툰 팀원의 상태와 검수 핸드오프", () => {
     expect(summary).not.toBeNull();
     if (summary) expect(within(summary as HTMLElement).getAllByText("0")).toHaveLength(3);
   });
+  it("먼 팀원에게는 다가가기를 먼저 제공하고 실제 도착 후 명시적인 대화 요청만 보낸다", () => {
+    const props = { ...options(), peers: [alice], selectedPeer: alice, onApproachPeer: vi.fn() };
+    const view = render(<StudioVirtualSpaceSocialPanel {...props} />);
+    expect((screen.getByRole("button", { name: "대화 요청" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "대화 요청" }));
+    fireEvent.click(screen.getByRole("button", { name: "나비 님에게 다가가기" }));
+    expect(props.onApproachPeer).toHaveBeenCalledExactlyOnceWith("나비");
+    expect(props.onRequest).not.toHaveBeenCalled();
+    expect(props.onSelect).not.toHaveBeenCalled();
+    view.rerender(<StudioVirtualSpaceSocialPanel {...props} approachingPeerId="나비" />);
+    expect((screen.getByRole("button", { name: "선택한 팀원에게 다가가기" }) as HTMLButtonElement).disabled).toBe(true);
+    view.rerender(<StudioVirtualSpaceSocialPanel {...props} nearbyPeerIds={["나비"]} />);
+    expect(screen.queryByRole("button", { name: "나비 님에게 다가가기" })).toBeNull();
+    expect(props.onRequest).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "대화 요청" }));
+    expect(props.onRequest).toHaveBeenCalledExactlyOnceWith("나비", "talk");
+  });
+  it.each(["focused", "away", "blocked", "offline", "self-focus", "movement-unavailable"] as const)("%s 조건에서도 다가가기로 기존 제한을 우회하지 않는다", (condition) => {
+    const base = options(), peer = makePeer("나비", condition === "focused" || condition === "away" ? condition : "available");
+    const props = { ...base, selectedPeer: peer, peers: [peer], onApproachPeer: vi.fn(),
+      focused: condition === "self-focus", disabled: condition === "offline", approachDisabled: condition === "movement-unavailable",
+      social: { ...base.social, blockedPeerIds: condition === "blocked" ? ["나비"] : [] } };
+    render(<StudioVirtualSpaceSocialPanel {...props} />);
+    for (const name of ["나비 님에게 다가가기", "선택한 팀원에게 다가가기"]) {
+      const button = screen.getByRole("button", { name }) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      fireEvent.click(button);
+    }
+    expect(props.onApproachPeer).not.toHaveBeenCalled();
+    expect(props.onRequest).not.toHaveBeenCalled();
+  });
 });

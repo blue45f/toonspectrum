@@ -35,5 +35,7 @@ describe("편집기 상태 안내 소유권", () => {
     expect(result.current.offlineSceneNotice.viewProps.offlineSceneNotice).toBeNull();
     act(() => result.current.offlineSceneNotice.report("현재 문서에 보호했습니다."));
     expect(result.current.offlineSceneNotice.viewProps.offlineSceneNotice).toBe("현재 문서에 보호했습니다.");
+    act(() => oldReport("현재 안내 이후 도착한 이전 문서 안내"));
+    expect(result.current.offlineSceneNotice.viewProps.offlineSceneNotice).toBe("현재 문서에 보호했습니다.");
   });
 });

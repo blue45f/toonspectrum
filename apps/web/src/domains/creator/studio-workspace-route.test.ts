@@ -14,11 +14,32 @@ import {
   studioCanvasReturnHref,
   studioDccHref,
   studioRouteStageKey,
+  studioVirtualSpaceLifecycleKey,
   studioWorkspaceCanonicalHref,
   studioWorkspaceReturnHref,
 } from "./studio-workspace-route";
 
 describe("studio workspace routes", () => {
+  it.each(["/studio/space", "/studio/p/project-1/space"])("%s 장소 이동만 같은 가상 사무실 lifecycle을 유지한다", (pathname) => {
+    const initial = { pathname, search: "?place=creator-cafe&worldEdit=1&session=team-a" };
+    const next = { pathname, search: "?place=personal-atelier&worldEdit=1&session=team-a" };
+    expect(studioVirtualSpaceLifecycleKey(initial)).toBe(`${pathname}?worldEdit=1&session=team-a`);
+    expect(studioRouteStageKey(next)).toBe(studioRouteStageKey(initial));
+    expect(studioRouteStageKey({ pathname, search: "?place=personal-atelier&session=team-a" })).not.toBe(studioRouteStageKey(initial));
+    expect(studioRouteStageKey({ pathname, search: "?place=personal-atelier&worldEdit=1&session=team-b" })).not.toBe(studioRouteStageKey(initial));
+    expect(studioRouteStageKey({ pathname, search: "?place=creator-cafe" })).toBe(pathname);
+  });
+
+  it("다른 프로젝트와 가상 사무실 밖의 query는 lifecycle에서 제거하지 않는다", () => {
+    expect(studioRouteStageKey({ pathname: "/studio/p/project-1/space", search: "?place=creator-cafe" }))
+      .not.toBe(studioRouteStageKey({ pathname: "/studio/p/project-2/space", search: "?place=creator-cafe" }));
+    for (const pathname of ["/studio/avatar", "/studio/p/project-1/space/extra", "/studio/p/%5C/space", "/studio/p/%/space"]) {
+      const location = { pathname, search: "?place=creator-cafe" };
+      expect(studioVirtualSpaceLifecycleKey(location)).toBeNull();
+      expect(studioRouteStageKey(location)).toBe(`${pathname}?place=creator-cafe`);
+    }
+  });
+
   it.each([
     ["/studio/canvas", "", "canvas", null, null, "/studio/canvas"],
     ["/studio/canvas?id=legacy", "?id=legacy", "canvas", "legacy", null, "/studio/work/legacy/canvas"],

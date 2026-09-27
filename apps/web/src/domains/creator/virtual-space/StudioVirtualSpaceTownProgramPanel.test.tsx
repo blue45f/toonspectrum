@@ -8,6 +8,7 @@ import { StudioVirtualSpaceTownProgramPanel } from "./StudioVirtualSpaceTownProg
 import { DEFAULT_STUDIO_WORLD_MANIFEST } from "./studio-virtual-space-world-manifest";
 import type { StudioVirtualOperationsSnapshot } from "./use-studio-virtual-space-operations";
 import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
+import { STUDIO_TOWN_DESK_PODS } from "./studio-virtual-space-town-program";
 
 afterEach(cleanup);
 
@@ -45,6 +46,17 @@ function clickFirstButton(name: string) {
 }
 
 describe("StudioVirtualSpaceTownProgramPanel", () => {
+  it("팀 자리 이동 시 방 이름만이 아닌 실제 자리 좌표와 식별자를 전달한다", () => {
+    const value = { ...props(), onMoveToDesk: vi.fn() };
+    render(<StudioVirtualSpaceTownProgramPanel {...value} />);
+    fireEvent.click(screen.getByRole("tab", { name: "팀 자리" }));
+    for (const pod of STUDIO_TOWN_DESK_PODS) {
+      fireEvent.click(screen.getByRole("button", { name: `${pod.labelKo} 팀 자리로 이동` }));
+      expect(value.onMoveToDesk).toHaveBeenLastCalledWith(pod);
+    }
+    expect(value.onMoveToRoom).not.toHaveBeenCalled();
+    expect(value.onOpenSessions).not.toHaveBeenCalled();
+  });
   it("개인 마을에서 협업 목적지를 숨기고 탐방·활동·블루프린트를 유지한다", () => {
     const value = props();
     const view = render(<StudioVirtualSpaceTownProgramPanel {...value} personal />);

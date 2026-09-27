@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import {
   requestServiceCapabilityRefresh,
@@ -33,6 +33,36 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
   const [recoveryVisible, setRecoveryVisible] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
   const compact = immersive && !detailsExpanded;
+  const bannerRef = useRef<HTMLElement>(null);
+  const visible = state.status === "degraded" || recoveryVisible;
+
+  useLayoutEffect(() => {
+    const banner = bannerRef.current;
+    if (!visible || !immersive || !banner) return;
+    // 실제 알림 높이를 공유해 OST가 경고·재시도 버튼을 가리거나 그 아래 숨지 않게 한다.
+    const root = banner.ownerDocument.documentElement;
+    const property = "--service-status-overlay-clearance";
+    const previous = root.style.getPropertyValue(property);
+    let published = "";
+    const measure = () => {
+      const bounds = banner.getBoundingClientRect();
+      const fixed = getComputedStyle(banner).position === "fixed" && bounds.height > 0;
+      published = `${fixed ? Math.max(0, Math.ceil(window.innerHeight - bounds.top + 12)) : 0}px`;
+      root.style.setProperty(property, published);
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(banner);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      if (root.style.getPropertyValue(property) === published) {
+        if (previous) root.style.setProperty(property, previous);
+        else root.style.removeProperty(property);
+      }
+    };
+  }, [compact, immersive, visible]);
 
   useEffect(() => {
     if (!state.recoveredAt) return;
@@ -46,7 +76,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
     () => unavailableLabels(state.report?.capabilities),
     [state.report?.capabilities],
   );
-  if (state.status !== "degraded" && !recoveryVisible) return null;
+  if (!visible) return null;
 
   const recovered = state.status === "available" && recoveryVisible;
   const detail = unavailable.length > 0
@@ -55,6 +85,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
 
   return (
     <aside
+      ref={bannerRef}
       role="status"
       aria-live="polite"
       aria-atomic="true"

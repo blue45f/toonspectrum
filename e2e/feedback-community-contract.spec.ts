@@ -59,6 +59,7 @@ test("a failed refresh preserves the draft but revokes readiness until a verifie
   });
   await page.goto("/e2e/feedback-community.html");
   const form = page.getByRole("form", { name: "공개 제보 작성" });
+  await expect(form.getByRole("button", { name: "공개 제보 등록" })).toBeEnabled();
   const title = form.getByLabel("제목", { exact: false });
   const body = form.getByLabel("어떤 문제가 있었나요?");
   const confirmation = form.getByLabel("제보 내용이 공개되는 것을 확인했습니다.");

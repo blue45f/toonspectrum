@@ -45,6 +45,35 @@ describe("Virtual Studio directory", () => {
     expect(screen.getByText("의견 참여자")).toBeTruthy();
     expect(screen.getByText(/원고 검토 중/u)).toBeTruthy();
   });
+  it("명시적으로 다가가기를 선택하면 이동만 요청하고 대화나 도구를 시작하지 않는다", () => {
+    const onApproachPeer = vi.fn(), onSelectPeer = vi.fn(), onOpen = vi.fn();
+    const props = { manifest: DEFAULT_STUDIO_WORLD_MANIFEST, peers: [{
+      participant: { sessionId: "writer-session", displayName: "Nabi", role: "editor" as const },
+      state: studioVirtualSpaceState({ x: 300, y: 200 }, "down", "available", false, 0, "writers"), lastSeen: 1, sequence: 1,
+    }], onMove: vi.fn(), onOpen, onSelectPeer, onApproachPeer, expanded: true };
+    const view = render(<StudioVirtualSpaceDirectory {...props} />);
+    const button = screen.getByRole("button", { name: "Nabi 님에게 다가가기" });
+    fireEvent.click(button);
+    expect(onApproachPeer).toHaveBeenCalledExactlyOnceWith("writer-session");
+    expect(onSelectPeer).not.toHaveBeenCalled();
+    expect(onOpen).not.toHaveBeenCalled();
+    view.rerender(<StudioVirtualSpaceDirectory {...props} approachingPeerId="writer-session" />);
+    expect(screen.getByText("다가가는 중…")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Nabi 님에게 다가가기" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Nabi 님에게 다가가기" }));
+    expect(onApproachPeer).toHaveBeenCalledOnce();
+  });
+  it.each(["focused", "away", "movement-unavailable"] as const)("%s 상태에서는 자동으로 팀원에게 접근하지 않는다", (condition) => {
+    const onApproachPeer = vi.fn();
+    render(<StudioVirtualSpaceDirectory manifest={DEFAULT_STUDIO_WORLD_MANIFEST} peers={[{
+      participant: { sessionId: "writer-session", displayName: "Nabi", role: "editor" },
+      state: studioVirtualSpaceState({ x: 300, y: 200 }, "down", condition === "movement-unavailable" ? "available" : condition, false, 0, "writers"), lastSeen: 1, sequence: 1,
+    }]} onMove={vi.fn()} onOpen={vi.fn()} onSelectPeer={vi.fn()} onApproachPeer={onApproachPeer} approachDisabled={condition === "movement-unavailable"} expanded />);
+    const button = screen.getByRole("button", { name: "Nabi 님에게 다가가기" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    fireEvent.click(button);
+    expect(onApproachPeer).not.toHaveBeenCalled();
+  });
 });
 
 it("does not execute a composing Enter and prioritizes direct tool opening on explicit Enter", () => {

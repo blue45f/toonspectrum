@@ -29,8 +29,33 @@ describe("shared workspace panel", () => {
   it.each(["held", "approaching"])("provides explicit release while %s without claiming a seated pose", (state) => {
     const onRelease = vi.fn();
     render(<StudioVirtualSpaceSeatsPanel slots={slots} snapshot={state === "held" ? { ...idle, status: "held", slotId: slots[0]!.id, claimId: "fence", ownerSessionId: "alice" } : idle} approachingSlotId={state === "approaching" ? slots[0]!.id : null} onSelect={vi.fn()} onRelease={onRelease} />);
-    fireEvent.click(screen.getByRole("button", { name: "그만 사용" }));
+    fireEvent.click(screen.getByRole("button", { name: state === "held" ? "그만 사용" : "이동 취소" }));
     expect(onRelease).toHaveBeenCalledOnce();
     expect(screen.queryByText(/앉아/u)).toBeNull();
+  });
+  it("내 자리 기억은 예약하지 않으며 다른 사람의 점유를 덮어쓰지 않는다", () => {
+    const slot = slots[0];
+    if (!slot) throw new Error("작업 자리가 필요합니다.");
+    const onPreferSlot = vi.fn(), onSelect = vi.fn();
+    const props = { slots, snapshot: { ...idle, occupied: [{ slotId: slot.id, owner: { sessionId: "bob", displayName: "Bob", role: "editor" as const }, claimId: "bob-fence" }] }, approachingSlotId: null, onSelect, onRelease: vi.fn(), onPreferSlot };
+    const view = render(<StudioVirtualSpaceSeatsPanel {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: `${slot.labelKo}를 내 자리로 기억` }));
+    expect(onPreferSlot).toHaveBeenCalledExactlyOnceWith(slot.id);
+    expect(onSelect).not.toHaveBeenCalled();
+    view.rerender(<StudioVirtualSpaceSeatsPanel {...props} preferredSlotId={slot.id} />);
+    expect(screen.getByText("기억한 내 자리")).toBeTruthy();
+    expect(screen.getByText("Bob 사용 중")).toBeTruthy();
+    expect((screen.getByRole("button", { name: `${slot.labelKo} 사용하기` }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByText("내가 사용 중")).toBeNull();
+  });
+  it("확인되지 않은 선호 자리는 비어 있다고 표시하거나 예약하지 않는다", () => {
+    const slot = slots[0];
+    if (!slot) throw new Error("작업 자리가 필요합니다.");
+    const onSelect = vi.fn();
+    render(<StudioVirtualSpaceSeatsPanel slots={slots} snapshot={{ ...idle, available: false }} approachingSlotId={null} onSelect={onSelect} onRelease={vi.fn()} preferredSlotId={slot.id} onPreferSlot={vi.fn()} />);
+    expect(screen.getByText("기억한 내 자리")).toBeTruthy();
+    expect(screen.queryByText("비어 있음")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: `${slot.labelKo} 사용하기` }));
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

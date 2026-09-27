@@ -12,6 +12,17 @@ const readiness = readFileSync(
 );
 
 describe("Studio brush browser beta admission", () => {
+  it("도형의 캔버스 수신과 제스처 전후 동일 좌표계를 검증한다", () => {
+    const start = source.indexOf("async function runSmartShapeMatrix");
+    const end = source.indexOf("async function openMobileBrushSettings", start);
+    const shapes = source.slice(start, end);
+    expect(shapes).toContain("document.elementFromPoint(x, y)");
+    expect(shapes).toContain('target?.closest(".konvajs-content")');
+    expect(shapes).toContain("blockedPoints.length === 0");
+    expect(shapes).toContain("Math.abs(releasedFrame[key] - gestureFrame[key]) < 0.5");
+    expect(shapes).toContain("const calibrationFrame = fixtureStageFrames[1]!");
+    expect(shapes).toContain("calibrationFrame.height");
+  });
   it("브러시 검증은 문서별 안내 닫기를 소유한 공통 준비 경계를 호출한다", () => {
     expect(source).toContain('} from "./lib/studio-drawing-readiness";');
     const start = source.indexOf("async function dismissTransientChrome");

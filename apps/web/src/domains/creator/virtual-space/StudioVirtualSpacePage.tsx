@@ -1,6 +1,7 @@
 import { useStudioWorldRuleGate } from "./StudioWorldRuleGate";
 import {
   Bot,
+  Armchair,
   BookOpen,
   Boxes,
   Brush,
@@ -112,7 +113,6 @@ import {
 } from "./studio-virtual-space-environment-preference";
 import {
   readStudioVirtualPlaceId,
-  studioVirtualPlaceIdForLegacyZone,
   studioVirtualPlaceIdForMode,
   studioVirtualPlaceIdFromPortalHref,
   studioVirtualPlaceSearch,
@@ -184,6 +184,11 @@ import {
 } from "./studio-virtual-space-interaction-state";
 import { useStudioVirtualSpaceOperations } from "./use-studio-virtual-space-operations";
 import { StudioVirtualSpaceEntryLobby } from "./StudioVirtualSpaceEntryLobby";
+import { StudioVirtualSpaceOfficeStart } from "./StudioVirtualSpaceOfficeStart";
+import { resolveStudioOfficeDestination, STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT } from "./studio-virtual-space-office-navigation";
+import { useStudioOfficePeerApproach } from "./use-studio-office-peer-approach";
+import { studioVirtualDecorationNavigationWorld } from "./studio-virtual-space-decoration-layout";
+import { readStudioOfficeDeskPreference, writeStudioOfficeDeskPreference, studioOfficeDeskPreferenceStorageKey } from "./office-desk-preference";
 
 
 
@@ -817,7 +822,7 @@ export function VirtualSpaceExperience({
   const [requestedWorkspacePanel, setWorkspacePanel] = useState<StudioVirtualWorkspacePanel | null>(() => {
     const query = new URLSearchParams(location.search);
     if (query.get("activity") === "board") return "board";
-    return query.has("session") || query.get("activity") === "sessions" ? "sessions" : null;
+    return query.has("session") || query.get("activity") === "sessions" ? "sessions" : "office";
   });
   const workspacePanel = studioVirtualWorkspacePanelForScope(requestedWorkspacePanel, personal);
   const [spacePanelSection, setSpacePanelSection] = useState<"places" | "appearance" | "environment" | "settings">("places");
@@ -825,6 +830,7 @@ export function VirtualSpaceExperience({
   const [reviewPeerId, setReviewPeerId] = useState<string | null>(null);
   const [openingReview, setOpeningReview] = useState(false);
   const cancelSlotsRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const cancelOfficeApproachRef = useRef<() => void>(() => undefined);
   const [sharedActivity, setSharedActivity] = useState<StudioSpaceSocialRequest | null>(null);
   const [waveActorIds, setWaveActorIds] = useState<readonly string[]>([]);
   const shownGreetings = useRef(new Set<string>());
@@ -850,6 +856,23 @@ export function VirtualSpaceExperience({
   const [worldManifest, setWorldManifest] = useState<StudioVirtualSpaceWorldManifest>(
     DEFAULT_STUDIO_WORLD_MANIFEST,
   );
+  const navigationWorld = useMemo(() => studioVirtualDecorationNavigationWorld(worldManifest, decorations), [worldManifest, decorations]);
+  const deskScope = useMemo(() => ({ userId: privateActorId, projectId, activeWorldScope, authoringMode }), [privateActorId, projectId, activeWorldScope, authoringMode]);
+  const deskScopeKey = studioOfficeDeskPreferenceStorageKey(deskScope);
+  const [deskPreferences, setDeskPreferences] = useState<ReadonlyMap<string, string | null>>(() => new Map());
+  const storedDeskPreference = useMemo(() => readStudioOfficeDeskPreference(deskScope, worldManifest), [deskScope, worldManifest]);
+  const candidateDeskPreference = deskPreferences.has(deskScopeKey) ? deskPreferences.get(deskScopeKey) : storedDeskPreference;
+  const preferredSlotId = worldManifest.interactionSlots?.some((slot) => slot.id === candidateDeskPreference) ? candidateDeskPreference ?? null : null;
+  const preferDesk = useCallback((id: string) => {
+    const next = preferredSlotId === id ? null : id;
+    if (!writeStudioOfficeDeskPreference(deskScope, worldManifest, next)) {
+      setSocialNotice(bt("이 기기에 자리를 기억하지 못했어요. 저장 공간을 확인해 주세요.", "Your desk could not be saved on this device. Check available storage."));
+      return;
+    }
+    setDeskPreferences((current) => new Map(current).set(deskScopeKey, next));
+  }, [bt, deskScope, deskScopeKey, preferredSlotId, worldManifest, setSocialNotice, setDeskPreferences]);
+  const pendingOfficeDestination = useRef<{ scope: string; placeId: string; roomId: string; point?: StudioVirtualSpacePoint } | null>(null);
+  const officeNavigationScope = JSON.stringify([privateActorId, projectId, authoringMode, publishedScope]);
   const [authoringDraft, setAuthoringDraft] = useState<StudioVirtualSpaceWorldManifest>(
     DEFAULT_STUDIO_WORLD_MANIFEST,
   );
@@ -1175,6 +1198,7 @@ export function VirtualSpaceExperience({
 
   const queuePathTo = useCallback((point: StudioVirtualSpacePoint) => {
     if (!worldReady) return;
+    cancelOfficeApproachRef.current();
     void cancelSlotsRef.current();
     setFollowingPeer(null);
     engineBridge.requestMove(point);
@@ -1184,7 +1208,7 @@ export function VirtualSpaceExperience({
     room: live.room, manifest: worldManifest, publishedScope: activeWorldScope,
     enabled: signedIn && sharedWorldAllowed && worldReady && !authoringMode && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     point: snapshot.self, moving,
-    onApproach: (point) => { setFollowingPeer(null); engineBridge.requestMove(point); },
+    onApproach: (point) => { cancelOfficeApproachRef.current(); setFollowingPeer(null); engineBridge.requestMove(point); },
   });
   useEffect(() => { cancelSlotsRef.current = slots.cancel; }, [slots.cancel]);
   const seatedActors = useMemo(() => studioVirtualSpaceSeatedActors({ manifest: worldManifest, lease: slots.snapshot,
@@ -1310,6 +1334,7 @@ export function VirtualSpaceExperience({
 
   const selectPlace = useCallback((placeId: string) => {
     const nextPlaceId = studioVirtualPlaceIdForMode(placeId, personal);
+    if (pendingOfficeDestination.current?.placeId !== nextPlaceId) pendingOfficeDestination.current = null;
     if (!builtinPlaceWorld || nextPlaceId === selectedPlaceId) return;
     void cancelSlotsRef.current();
     engineBridge.clearMovement();
@@ -1323,15 +1348,36 @@ export function VirtualSpaceExperience({
   }, [builtinPlaceWorld, engineBridge, location.pathname, location.search, navigate,
     personal, selectedPlaceId, setFollowingPeer]);
 
-  const moveToRoomOrPlace = useCallback((roomId: StudioVirtualSpaceZoneId) => {
-    const placeId = builtinPlaceWorld ? studioVirtualPlaceIdForLegacyZone(roomId) : null;
-    if (placeId) {
-      selectPlace(placeId);
+  const moveToRoomOrPlace = useCallback((roomId: StudioVirtualSpaceZoneId, point?: StudioVirtualSpacePoint) => {
+    if (!worldReady) return;
+    const destination = resolveStudioOfficeDestination({ manifest: navigationWorld, builtinPlaceWorld,
+      selectedPlaceId, personal, self: selfRef.current, roomId, point });
+    if (!destination) {
+      setSocialNotice(bt("이 작업 자리까지 이동할 수 없어요. 통로와 장소를 확인해 주세요.", "This workspace cannot be reached. Check the route and place."));
       return;
     }
-    queuePathTo(studioWorldSpawn(worldManifest, roomId).point);
     setWorkspacePanel(null);
-  }, [builtinPlaceWorld, queuePathTo, selectPlace, worldManifest]);
+    if (destination.type === "place") {
+      pendingOfficeDestination.current = { scope: officeNavigationScope, placeId: destination.placeId,
+        roomId: destination.roomId ?? roomId, point: destination.point };
+      selectPlace(destination.placeId);
+    } else queuePathTo(destination.point);
+  }, [worldReady, navigationWorld, builtinPlaceWorld, selectedPlaceId, personal, bt, officeNavigationScope, selectPlace, queuePathTo, setSocialNotice]);
+  useEffect(() => {
+    const pending = pendingOfficeDestination.current;
+    if (!pending) return;
+    if (pending.scope !== officeNavigationScope || !builtinPlaceWorld) { pendingOfficeDestination.current = null; return; }
+    if (!worldReady || pending.placeId !== selectedPlaceId) return;
+    pendingOfficeDestination.current = null;
+    const destination = resolveStudioOfficeDestination({ manifest: navigationWorld, builtinPlaceWorld,
+      selectedPlaceId, personal, self: selfRef.current, roomId: pending.roomId, point: pending.point });
+    if (destination?.type === "move") queuePathTo(destination.point);
+    else setSocialNotice(bt("장소에 도착했어요. 이동할 작업 자리를 다시 선택해 주세요.", "You have arrived. Choose an accessible workspace here."));
+  }, [worldReady, navigationWorld, selectedPlaceId, builtinPlaceWorld, personal, officeNavigationScope, queuePathTo, bt]);
+  const openOfficeSeats = useCallback(() => {
+    if (personal) moveToRoomOrPlace("drawing", builtinPlaceWorld ? STUDIO_PERSONAL_ATELIER_DESK_APPROACH_POINT : undefined);
+    else setWorkspacePanel("seats");
+  }, [personal, builtinPlaceWorld, moveToRoomOrPlace]);
 
   const handleEnginePortal = useCallback((portal: StudioWorldPortalDefinition) => {
     void cancelSlotsRef.current();
@@ -1378,6 +1424,30 @@ export function VirtualSpaceExperience({
       && activity !== "focused" && activity !== "away" && atmosphere !== "focus",
     onAccepted: (request) => acceptedActivityHandler.current(request),
   });
+  const officeApproachEnabled = !personal && signedIn && worldReady && sharedWorldAllowed && !authoringMode
+    && snapshot.direct && connectivity.serverAvailable && socialInteractive
+    && activity !== "focused" && activity !== "away" && atmosphere !== "focus";
+  const officeApproach = useStudioOfficePeerApproach({
+    manifest: navigationWorld, scope: `${officeNavigationScope}:${activeWorldScope}`, self: snapshot.self,
+    peers: snapshot.peers, blockedPeerIds: socialSnapshot.blockedPeerIds, moving, enabled: officeApproachEnabled,
+    onMove: (point) => { void cancelSlotsRef.current(); setFollowingPeer(null); engineBridge.requestMove(point); },
+    onStop: () => engineBridge.clearMovement(),
+    onArrive: (sessionId) => {
+      setSelectedPeerId(sessionId); setWorkspacePanel("people");
+      setSocialNotice(bt("동료 가까이에 도착했어요. 대화 요청을 보내면 상대가 참여 여부를 선택합니다.", "You are near your teammate. Send a conversation request so they can choose whether to join."));
+    },
+  });
+  const cancelOfficeApproach = officeApproach.cancel;
+  const approachingOfficePeerId = officeApproach.approachingPeerId;
+  useEffect(() => { cancelOfficeApproachRef.current = cancelOfficeApproach; }, [cancelOfficeApproach]);
+  useEffect(() => {
+    if ((workspacePanel || pendingInteraction || dialogueNpc) && approachingOfficePeerId) cancelOfficeApproach();
+  }, [workspacePanel, pendingInteraction, dialogueNpc, approachingOfficePeerId, cancelOfficeApproach]);
+  const approachOfficePeer = (sessionId: string) => {
+    if (officeApproach.start(sessionId)) {
+      setSelectedPeerId(sessionId); setWorkspacePanel(null); setSocialNotice("");
+    }
+  };
   const finishSharedActivity = useCallback(() => {
     const current = sharedActivityRef.current;
     if (!current) return;
@@ -1534,10 +1604,11 @@ export function VirtualSpaceExperience({
   };
   const cancelSlotApproach = slots.cancel;
   const cancelFollowing = useCallback(() => {
+    cancelOfficeApproach();
     void cancelSlotApproach();
     if (sharedActivity?.action === "follow") finishSharedActivity();
     else setFollowingPeer(null);
-  }, [cancelSlotApproach, sharedActivity?.action, finishSharedActivity, setFollowingPeer]);
+  }, [cancelOfficeApproach, cancelSlotApproach, sharedActivity?.action, finishSharedActivity, setFollowingPeer]);
   const startGuideTour = useCallback((guideId: string) => {
     if (!worldReady || authoringMode || atmosphere === "focus" || activity === "focused" || activity === "away"
       || !worldManifest.npcs.some((npc) => npc.id === guideId && studioNpcRole(npc) === "guide")) return;
@@ -1619,12 +1690,14 @@ export function VirtualSpaceExperience({
         <div className="studio-space-commandbar" data-space-interactive="true">
           <StudioSpaceWorkContext workId={projectId} personal={personal} />
           <div className="studio-space-command-actions">
+            <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "office"}
+              onClick={() => setWorkspacePanel("office")}>{bt("작업 시작", "Start work")}</button>
             <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "search"}
               onClick={() => setWorkspacePanel("search")}>{bt("방·팀원 찾기", "Find rooms & people")} <kbd>⌘ / Ctrl K</kbd></button>
             {!personal ? <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "today"}
               onClick={() => setWorkspacePanel("today")}>{bt("오늘", "Today")}</button> : null}
             <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "town"}
-              onClick={() => setWorkspacePanel("town")}>{bt("마을 활동", "Town activities")}</button>
+              onClick={() => setWorkspacePanel("town")}>{bt("제작 공간", "Production spaces")}</button>
             <button type="button" aria-haspopup="dialog" aria-expanded={workspacePanel === "space"}
               onClick={() => setWorkspacePanel("space")}>{bt("장소·꾸미기", "Places & settings")}</button>
           </div>
@@ -1633,6 +1706,15 @@ export function VirtualSpaceExperience({
 
         <section className="vs2-live-layout">
           <div className="vs2-world-wrap vs2-world-wrap--live">
+            {officeApproach.status === "walking" || officeApproach.status === "unreachable" ? <div className="studio-office-movement-status" data-space-interactive="true">
+              <p role="status">{officeApproach.status === "walking"
+                ? bt(`${officeApproach.peerName ?? "동료"} 님에게 가는 중 · 도착 후 대화를 요청하세요.`, `Walking to ${officeApproach.peerName ?? "your teammate"} · request a conversation when you arrive.`)
+                : bt("동료에게 갈 수 있는 통로를 찾지 못했어요. 위치를 확인하고 다시 선택해 주세요.", "No reachable route to your teammate was found. Check their location and try again.")}</p>
+              <button type="button" onClick={officeApproach.cancel}>{officeApproach.status === "walking" ? bt("이동 취소", "Cancel walk") : bt("닫기", "Dismiss")}</button>
+            </div> : null}
+            {socialNotice && workspacePanel !== "people" && officeApproach.status !== "walking" && officeApproach.status !== "unreachable" ? <div className="studio-office-movement-status" data-space-interactive="true">
+              <p role="status">{socialNotice}</p><button type="button" onClick={() => setSocialNotice("")}>{bt("닫기", "Dismiss")}</button>
+            </div> : null}
             <div className="vs2-live-stage-host">
               <div
                 role="application"
@@ -1833,19 +1915,37 @@ export function VirtualSpaceExperience({
           <WorkspaceContextPanel open={workspacePanel !== null}
             presentation={workspacePanel === "search" ? "modal" : "adaptive"}
             initialFocusRef={workspacePanel === "search" ? spaceSearchRef : undefined}
-            title={workspacePanel === "space" ? bt("공간과 꾸미기", "Space and customization")
+            title={workspacePanel === "office" ? bt("웹툰 작업실", "Webtoon office")
+              : workspacePanel === "seats" ? bt("내 작업 자리", "My workspace")
+              : workspacePanel === "space" ? bt("공간과 꾸미기", "Space and customization")
               : workspacePanel === "search" ? bt("방·팀원 찾기", "Find rooms & people")
                 : workspacePanel === "work" ? bt("검수·작업함", "Reviews & inbox")
                   : workspacePanel === "sessions" ? bt("공동 작업 세션", "Work sessions")
                     : workspacePanel === "board" ? bt("P2P 공유 화이트보드", "P2P shared whiteboard")
                       : workspacePanel === "annotation" ? bt("공유 화면 라이브 주석", "Live shared-screen annotation")
-                        : workspacePanel === "town" ? bt("살아 있는 제작 마을", "Living production town")
+                        : workspacePanel === "town" ? bt("함께 일하는 제작 공간", "Production spaces for collaboration")
                           : workspacePanel === "team" ? bt("팀·그룹·초대", "Teams, groups & invites")
                         : workspacePanel === "today" ? bt("오늘의 제작 동선", "Today's production flow")
                           : workspacePanel === "rtc" ? bt("실시간 연결 상태", "Live connection status")
                             : personal ? bt("내 캐릭터", "My character") : bt("사람과 대화", "People and conversations")}
             onClose={() => setWorkspacePanel(null)}>
           <Suspense fallback={<p role="status">{bt("패널 불러오는 중…", "Loading panel…")}</p>}><div className="vs2-live-inspector-content">
+          {workspacePanel === "office" ? <StudioVirtualSpaceOfficeStart snapshot={operations.snapshot} workId={projectId}
+            personal={personal} peerCount={snapshot.peers.length} onRefresh={operations.refresh}
+            onOpenWork={() => setWorkspacePanel("work")} onOpenPeople={() => setWorkspacePanel("people")}
+            onOpenSeats={openOfficeSeats} onDismiss={() => setWorkspacePanel(null)}
+            onGuide={(destination) => moveToRoomOrPlace(destination === "story" ? "writers" : destination)} /> : null}
+          {workspacePanel === "seats" ? <>
+            <p>{bt("작업실 안에서 쓸 자리를 선택하세요. 원고와 검수는 작업함에서 바로 열 수 있어요.", "Choose a desk in this space. Open manuscripts and reviews directly from your work inbox.")}</p>
+            {worldReady && worldManifest.interactionSlots?.length ? <StudioVirtualSpaceSeatsPanel
+              slots={worldManifest.interactionSlots} snapshot={slots.snapshot} approachingSlotId={slots.approachingSlotId}
+              preferredSlotId={preferredSlotId} onPreferSlot={preferDesk}
+              onSelect={(id) => { setWorkspacePanel(null); slots.requestSlot(id); }}
+              onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} />
+              : <p role="status">{worldReady ? bt("현재 장소에는 공유 작업 자리가 없어요. 공유 자리가 있는 로비로 이동할 수 있어요.", "This place has no shared desks. You can find shared workspaces in the lobby.") : bt("작업 자리를 확인하고 있어요.", "Checking the workspaces.")}</p>}
+            {builtinPlaceWorld ? <button type="button" className="studio-office-desk-link" onClick={() => moveToRoomOrPlace("lobby")}><Armchair size={18} aria-hidden />{bt("공유 자리 있는 로비로 이동", "Go to shared workspaces in the lobby")}</button> : null}
+            {!personal ? <button type="button" className="studio-office-desk-link" onClick={() => setWorkspacePanel("work")}><BookOpen size={18} aria-hidden />{bt("내 작업 열기", "Open my work")}</button> : null}
+          </> : null}
           {workspacePanel === "today" ? <StudioVirtualSpaceTodayBoard snapshot={operations.snapshot} workId={projectId}
             onRefresh={operations.refresh} onGuide={(destination) => {
               const roomId = destination === "story" ? "writers" : destination;
@@ -1884,6 +1984,7 @@ export function VirtualSpaceExperience({
             onClaimReward={(id) => { claimReward(id); setSocialNotice(bt("꾸미기 보상을 획득했어요.", "Cosmetic reward unlocked.")); }}
             onEquipReward={(id) => { equipReward(id); setSocialNotice(bt("꾸미기 보상을 적용했어요.", "Cosmetic reward equipped.")); }}
             onMoveToRoom={moveToRoomOrPlace}
+            onMoveToDesk={(pod) => moveToRoomOrPlace(pod.roomId, builtinPlaceWorld ? undefined : pod.point)}
             onOpenPeople={() => setWorkspacePanel("people")}
             onOpenAnnotation={() => setWorkspacePanel("annotation")}
             onOpenSessions={() => setWorkspacePanel("sessions")}
@@ -1892,13 +1993,15 @@ export function VirtualSpaceExperience({
           /> : null}
           <StudioVirtualSpacePanelGate active={workspacePanel === "search"}>
             {worldReady ? <StudioVirtualSpaceDirectory manifest={worldManifest} peers={snapshot.peers}
+              onApproachPeer={approachOfficePeer} approachingPeerId={officeApproach.approachingPeerId} approachDisabled={!officeApproachEnabled}
               inputRef={spaceSearchRef} expanded onMove={queuePathTo} onOpen={activateAction} onSelectPeer={handleEnginePeerSelect} />
               : <p role="status">{bt("공간 목록을 확인 중입니다.", "Checking the space directory.")}</p>}
           </StudioVirtualSpacePanelGate>
           <div hidden={workspacePanel !== "space"}>
             <nav className="studio-vspace-mobile-more-grid" aria-label={bt("추가 스튜디오 기능", "More studio tools")}>
               <button type="button" onClick={() => setWorkspacePanel("search")}><MapIcon size={17} aria-hidden />{bt("방·팀원 찾기", "Find rooms & people")}</button>
-              <button type="button" onClick={() => setWorkspacePanel("town")}><Sparkles size={17} aria-hidden />{bt("마을 활동", "Town activities")}</button>
+              <button type="button" onClick={() => setWorkspacePanel("office")}><BookOpen size={17} aria-hidden />{bt("작업 시작", "Start work")}</button>
+              <button type="button" onClick={() => setWorkspacePanel("town")}><Sparkles size={17} aria-hidden />{bt("제작 공간", "Production spaces")}</button>
               {!personal ? <>
                 <button type="button" onClick={() => setWorkspacePanel("team")}><UsersRound size={17} aria-hidden />{bt("팀·초대", "Teams")}</button>
                 <button type="button" onClick={() => setWorkspacePanel("work")}><BookOpen size={17} aria-hidden />{bt("검수·작업함", "Reviews")}</button>
@@ -2037,7 +2140,8 @@ export function VirtualSpaceExperience({
             {worldReady ? <StudioVirtualSpaceNpcPanel manifest={worldManifest} onInteract={requestInteraction} /> : null}
             {!personal && worldReady ? <StudioVirtualSpaceSeatsPanel slots={worldManifest.interactionSlots ?? []}
               snapshot={slots.snapshot} approachingSlotId={slots.approachingSlotId}
-              onSelect={slots.requestSlot} onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} /> : null}
+              preferredSlotId={preferredSlotId} onPreferSlot={preferDesk}
+              onSelect={(id) => { setWorkspacePanel(null); slots.requestSlot(id); }} onRelease={() => { void slots.cancel(); engineBridge.clearMovement(); }} /> : null}
 
             {!personal ? <StudioPrivateRoomPanel key={`${privateActorId}:${projectId}:${activeWorldScope}:${privateZoneId}`} room={privateRoom}
               zones={privateZones} zoneId={privateZoneId} onZone={setPrivateZoneSelection} peers={snapshot.peers}
@@ -2054,7 +2158,8 @@ export function VirtualSpaceExperience({
               renderPeerAvatar={(peer) => <ChibiAvatar identity={peer.participant.sessionId} name={peer.participant.displayName} activity={peer.state.activity} avatarIndex={peer.state.avatarIndex} appearance={peer.state.appearance} compact />}
               selectedPeer={snapshot.peers.find((peer) => peer.participant.sessionId === selectedPeerId) ?? null}
               peers={snapshot.peers} social={socialSnapshot}
-              nearbyPeerIds={snapshot.nearbyPeers.map((peer) => peer.participant.sessionId)}
+              nearbyPeerIds={snapshot.peers.filter((peer) => Math.hypot(peer.state.x - snapshot.self.x, peer.state.y - snapshot.self.y) <= 120).map((peer) => peer.participant.sessionId)}
+              onApproachPeer={approachOfficePeer} approachingPeerId={officeApproach.approachingPeerId} approachDisabled={!officeApproachEnabled}
               conversationPeerIds={activeConversation?.memberIds ?? pairConversation?.memberIds ?? []}
               disabled={!signedIn || !snapshot.direct || authoringMode || !socialInteractive}
               focused={activity === "focused" || activity === "away" || atmosphere === "focus"}
@@ -2210,15 +2315,21 @@ export function VirtualSpaceExperience({
             {sharedActivity ? <span role="status">{bt("공동 작업 진행 중", "Shared activity active")}</span> : null}
           </div>
           <div className="workspace-live-actions" data-space-interactive="true">
-            {!personal ? <button type="button" data-mobile-slot="today" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("today"); }}>
+            <button type="button" data-mobile-slot="work" data-workspace-primary-action="true" aria-expanded={workspacePanel === "office"} onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("office"); }}>
+              <BookOpen size={18} aria-hidden />{bt("작업 시작", "Start work")}
+            </button>
+            {!personal ? <button type="button" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("today"); }}>
               <CalendarDays size={18} aria-hidden />{bt("오늘", "Today")}
             </button> : null}
             <button type="button" data-mobile-slot="people" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("people"); }}>
-              <UsersRound size={18} aria-hidden />{personal ? bt("내 캐릭터", "My character") : bt("사람·대화", "People & conversations")}
+              <UsersRound size={18} aria-hidden />{personal ? bt("내 캐릭터", "My character") : bt("동료 찾기", "Teammates")}
               {socialSnapshot.requests.some((request) => request.direction === "incoming" && request.status === "offered") ? <span>{bt("요청 있음", "Request")}</span> : null}
             </button>
+            <button type="button" data-mobile-slot="seats" onClick={openOfficeSeats}>
+              <Armchair size={18} aria-hidden />{bt("작업 자리", "Work desk")}
+            </button>
             <button type="button" data-mobile-slot="space" onClick={() => { engineBridge.clearMovement(); setWorkspacePanel("space"); }}>
-              <Settings size={18} aria-hidden />{bt("공간·꾸미기", "Space & settings")}
+              <Settings size={18} aria-hidden />{bt("더 보기", "More")}
             </button>
             <Link data-workspace-primary-action="true" href={personal ? "/studio/new" : `/studio/p/${encodeURIComponent(projectId)}/production?view=documents`}>{personal ? bt("새 작품 만들기", "Create a work") : bt("원고 목록", "Manuscript list")}<ExternalLink size={16} aria-hidden /></Link>
             {!personal ? <Suspense fallback={null}><StudioP2pHuddleLauncher placement="inline" /></Suspense> : null}

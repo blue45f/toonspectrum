@@ -8,6 +8,8 @@ import { createStudioManualChunks } from "../apps/web/config/vite-manual-chunks"
 
 const leaves = ["studio-material-pressure-model", "studio-hand-feel-media-load-v1", "brush/studio-ink-pressure-model", "studio-color-utils", "studio-color-wheel"];
 const metadataLeaves = ["studio-project-version", "studio-revision-document-extensions", "studio-webtoon-canvas-presets", "studio-tool-search"];
+const lockResourceContract = "packages/contracts/src/studio-live-lock-resource.ts";
+const lockResourceFacade = "apps/web/src/domains/creator/contracts/studio-live-lock-resource.ts";
 const manual = createStudioManualChunks({ isInitialIconModule: () => false, isStudioCoreIconModule: () => false });
 
 describe("release static chunk isolation", () => {
@@ -22,16 +24,28 @@ describe("release static chunk isolation", () => {
       expect(manual(resolve(`apps/web/src/domains/creator/${file}`))).toBeUndefined();
     }
   });
+  it("잠금 계약의 구현과 공개 호환 진입점을 같은 작은 청크에 유지한다", () => {
+    for (const file of [lockResourceContract, lockResourceFacade]) {
+      expect(manual(resolve(file))).toBe("studio-tiny-capability-contracts");
+    }
+    expect(manual(resolve("packages/contracts/src/index.ts"))).toBeUndefined();
+    expect(manual(resolve("packages/contracts/src/studio-live-protocol.ts"))).toBeUndefined();
+    expect(readFileSync(lockResourceFacade, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").trim())
+      .toBe('export * from "@toonstudio/contracts/studio-live-lock-resource";');
+    const packageManifest = JSON.parse(readFileSync("packages/contracts/package.json", "utf8"));
+    expect(packageManifest.exports["./studio-live-lock-resource"]).toEqual({
+      types: "./src/studio-live-lock-resource.ts",
+      import: "./src/studio-live-lock-resource.ts",
+      default: "./src/studio-live-lock-resource.ts",
+    });
+  });
   it("keeps grouped contracts free of runtime imports and dynamic dependencies", () => {
-    for (const leaf of [...leaves, ...metadataLeaves, "render/studio-engine-failure-policy", "contracts/studio-live-lock-resource"]) {
-      let file = `apps/web/src/domains/creator/${leaf}.ts`;
-      if (leaf === "contracts/studio-live-lock-resource") {
-        // 웹 호환 파일은 이 단일 re-export만 허용하고 순수성은 실제 패키지 소스에서 검사한다.
-        expect(readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//gu, "").trim()).toBe(
-          'export * from "@toonstudio/contracts/studio-live-lock-resource";',
-        );
-        file = "packages/contracts/src/studio-live-lock-resource.ts";
-      }
+    const contractFiles = [
+      ...[...leaves, ...metadataLeaves, "render/studio-engine-failure-policy"]
+        .map((leaf) => `apps/web/src/domains/creator/${leaf}.ts`),
+      lockResourceContract,
+    ];
+    for (const file of contractFiles) {
       const output = ts.transpileModule(readFileSync(file, "utf8"), {
         compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
       }).outputText;

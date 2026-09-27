@@ -24,6 +24,11 @@ on:
       - 'apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig*.tsx'
       - 'scripts/verify-studio-menus.mts'
       - 'scripts/verify-studio-menus-ci.mjs'
+      - 'scripts/verify-studio-menus.test.ts'
+      - 'apps/web/src/domains/creator/offline-branch/**'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-deferred-stroke-commit*'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher.ts'
+      - 'scripts/ci-executed-gates.test.mjs'
       - 'scripts/studio-quality-bundle-leaves.test.mjs'
       - '.github/workflows/studio-finishing-quality.yml'
   push:
@@ -48,6 +53,11 @@ on:
       - 'apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig*.tsx'
       - 'scripts/verify-studio-menus.mts'
       - 'scripts/verify-studio-menus-ci.mjs'
+      - 'scripts/verify-studio-menus.test.ts'
+      - 'apps/web/src/domains/creator/offline-branch/**'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/studio-deferred-stroke-commit*'
+      - 'apps/web/src/domains/creator/studio-cuttoon-editor/runtime/createStudioCrdtTransitionPublisher.ts'
+      - 'scripts/ci-executed-gates.test.mjs'
       - 'scripts/studio-quality-bundle-leaves.test.mjs'
       - '.github/workflows/studio-finishing-quality.yml'
   workflow_dispatch:
@@ -145,6 +155,13 @@ jobs:
             apps/web/src/domains/creator/studio-ux-convergence-boundary.test.ts \
             apps/web/src/domains/creator/hybrid-dcc/StudioHybridDccCameraRig.test.tsx \
             --reporter=verbose 2>&1 | tee "$RUNNER_TEMP/finishing-quality/tests.log"
+      - name: Verify canonical resize and offline rejection contracts
+        run: |
+          pnpm exec vitest run \
+            apps/web/src/domains/creator/offline-branch/studio-offline-branch-runtime.test.ts \
+            apps/web/src/domains/creator/offline-branch/studio-offline-host-integration.test.ts \
+            apps/web/src/domains/creator/studio-cuttoon-editor/studio-deferred-stroke-commit.test.ts \
+            scripts/verify-studio-menus.test.ts
       - name: Build the production browser surface with types and CSP checks
         run: |
           set -euo pipefail

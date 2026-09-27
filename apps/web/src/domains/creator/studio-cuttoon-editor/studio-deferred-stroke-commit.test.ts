@@ -1,18 +1,26 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { captureLayerComp } from "../layer/studio-layer-comps";
+import { StudioCrdtDocument } from "../live/studio-crdt-document";
+import { reconcileStudioCrdtSceneGraphPages } from "../live/studio-crdt-page-bridge";
 import * as pagePayload from "../live/studio-crdt-page-payload";
+import { publishStudioCrdtSceneGraphDiff } from "../live/studio-crdt-scene-publisher";
 import { STUDIO_CRDT_PAGE_MAX_BYTES } from "../live/studio-crdt-scene-schema";
+import { computeMagicResize, presetCanvasSize } from "../studio-magic-resize";
 import { withPageMeta } from "../studio-page-meta";
 import { duplicateMirroredPage, duplicatePageState } from "../studio-pages";
 import { serializeStudioProjectFile } from "../studio-project-file";
 import { discardStudioRetainedStrokeRedo } from "../studio-retained-stroke-history";
+import { studioWebtoonCanvasMagicResizePresetForId } from "../studio-webtoon-canvas-presets";
 
+import { createStudioCrdtTransitionPublisher } from "./runtime/createStudioCrdtTransitionPublisher";
 import { createStudioDeferredStrokeCommitEngine } from "./studio-deferred-stroke-commit";
 
+import type { StudioCrdtSceneGraphRuntime } from "../live/StudioLiveCollaborationProvider";
 import type { DrawEl, El } from "../studio-element-model";
 import type { PageState } from "../studio-page-state";
 import type { StudioRetainedStrokeUndoneBatch } from "../studio-retained-stroke-history";
+import type { StudioCrdtTransitionPublisher } from "./runtime/createStudioCrdtTransitionPublisher";
 import type { PendingStrokeCommitBatch, StudioDeferredStrokeCommitEngineContext } from "./studio-deferred-stroke-commit";
 
 const stroke: DrawEl = {
@@ -37,8 +45,9 @@ function createEditor(page: PageState = {
     masterEditMode: false, pageEditLocked: false, advancedFillApplyingRef: { current: false },
     invalidateAdvancedFillWork: vi.fn(() => true), coalesceKeyRef: { current: null as string | null },
     currentPageIdRef: { current: "A" }, pagesHiRef: { current: 0 }, pagesHistoryRef: { current: [[page]] },
-    studioCrdtDocumentRef: { current: null }, studioCrdtSceneRuntimeRef: { current: null },
-    publishStudioCrdtSceneTransition: vi.fn(() => true),
+    studioCrdtDocumentRef: { current: null as StudioCrdtDocument | null },
+    studioCrdtSceneRuntimeRef: { current: null as StudioCrdtSceneGraphRuntime | null },
+    publishStudioCrdtSceneTransition: vi.fn<StudioCrdtTransitionPublisher["publishSceneTransition"]>(() => true),
     onHistoryBranch: vi.fn(() => { discardStudioRetainedStrokeRedo(undone, discardPixels); }),
     recordStudioHistoryTransition: vi.fn(), recordStudioHistoryJournalPages: vi.fn(),
     noteStudioHistoryRetention: vi.fn(), setPagesHistory: vi.fn(), setPagesHi: vi.fn(),
@@ -54,6 +63,53 @@ function createEditor(page: PageState = {
 }
 
 afterEach(() => { vi.restoreAllMocks(); });
+
+describe("플랫폼 규격의 정본 커밋과 실행 취소 발행", () => {
+  it("네이버와 카카오 규격을 각각 한 단계로 확정하고 직전 규격을 정본과 피어에 복원한다", () => {
+    const editor = createEditor({ id: "A", elements: [], bg: "#ffffff", bgGrad: null, canvasH: 1080 });
+    const document = new StudioCrdtDocument();
+    const publish = vi.fn(publishStudioCrdtSceneGraphDiff);
+    const runtime = {
+      publish,
+      reconcilePages: reconcileStudioCrdtSceneGraphPages,
+    } as unknown as StudioCrdtSceneGraphRuntime;
+    const publisher = createStudioCrdtTransitionPublisher({
+      actorId: "author", automaticRasterPublicationEnabled: false,
+      getDocument: () => document, getRuntime: () => runtime,
+      reportError: editor.state.setError, reportNotice: editor.state.setSharedDocumentNotice,
+    });
+    editor.state.studioCrdtDocumentRef.current = document;
+    editor.state.studioCrdtSceneRuntimeRef.current = runtime;
+    editor.state.publishStudioCrdtSceneTransition.mockImplementation(publisher.publishSceneTransition);
+    try {
+      for (const [presetId, expectedHeight] of [["webtoon-naver", 8348], ["webtoon-kakao", 8000]] as const) {
+        const currentPage = editor.state.pagesHistoryRef.current[editor.state.pagesHiRef.current][0];
+        const size = presetCanvasSize(studioWebtoonCanvasMagicResizePresetForId(presetId), 720);
+        const resized = computeMagicResize(currentPage.elements, { width: 720, height: currentPage.canvasH }, size);
+        expect(editor.engine().commit(resized, { canvasH: size.height })).toBe(true);
+        expect(editor.state.pagesHistoryRef.current[editor.state.pagesHiRef.current][0].canvasH).toBe(expectedHeight);
+        expect(document.getPage("A")?.payload.props.canvasH).toBe(expectedHeight);
+      }
+      expect(editor.state.pagesHistoryRef.current.map((pages) => pages[0].canvasH)).toEqual([1080, 8348, 8000]);
+      expect(editor.state.pagesHiRef.current).toBe(2);
+      expect(editor.state.recordStudioHistoryTransition).toHaveBeenCalledTimes(2);
+      const history = editor.state.pagesHistoryRef.current;
+      expect(publisher.publishHistoryTransition(history[2], history[1])).toBe(true);
+      expect(publish).toHaveBeenLastCalledWith(document, history[2], history[1], { registerNewDraws: false });
+      expect(document.getPage("A")?.payload.props.canvasH).toBe(8348);
+      const peer = new StudioCrdtDocument(document.encodeStateAsUpdate());
+      try {
+        expect(peer.getPage("A")?.payload.props.canvasH).toBe(8348);
+        expect(peer.getPages().map(({ id }) => id)).toEqual(["A"]);
+      } finally {
+        peer.destroy();
+      }
+      expect(editor.state.setError).not.toHaveBeenCalled();
+    } finally {
+      document.destroy();
+    }
+  });
+});
 
 describe("accepted history branches consume retained stroke redo", () => {
   it.each(["elements", "coalesced", "pages"] as const)("consumes redo after a %s edit", (kind) => {

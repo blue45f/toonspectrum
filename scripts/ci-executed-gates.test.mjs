@@ -67,18 +67,22 @@ test("production integrity follows the real menu verifier and its CI bootstrap",
       + "        run: pnpm exec tsx scripts/verify-studio-menus-ci.mjs\n",
   ));
   assert.doesNotMatch(productionIntegritySource, /run: pnpm run verify:studio-menus/u);
-  const authorityStep = productionIntegritySource.slice(
-    productionIntegritySource.indexOf("      - name: Verify canonical resize and offline rejection contracts\n"),
-    productionIntegritySource.indexOf("      - name: Build production browser without repeating the core typecheck\n"),
+  const finishingQualitySource = readFileSync(
+    new URL("../.github/workflows/studio-finishing-quality.yml", import.meta.url), "utf8",
   );
-  assert.match(authorityStep, /run: \|\n {10}pnpm exec vitest run/u);
-  for (const target of [
-    "apps/web/src/domains/creator/offline-branch/studio-offline-branch-runtime.test.ts",
-    "apps/web/src/domains/creator/offline-branch/studio-offline-host-integration.test.ts",
-    "apps/web/src/domains/creator/studio-cuttoon-editor/studio-deferred-stroke-commit.test.ts",
-    "scripts/verify-studio-menus.test.ts",
-  ]) assert.ok(authorityStep.includes(target), `missing paired authority contract: ${target}`);
-  assert.doesNotMatch(authorityStep, /continue-on-error|if:|\|\| true/u);
+  for (const workflow of [productionIntegritySource, finishingQualitySource]) {
+    const start = workflow.indexOf("      - name: Verify canonical resize and offline rejection contracts\n");
+    assert.ok(start >= 0, "브라우저 메뉴 검증에는 정본 변경과 오프라인 거절 검증이 필수다");
+    const authorityStep = workflow.slice(start, workflow.indexOf("      - name: Build", start));
+    assert.match(authorityStep, /run: \|\n {10}pnpm exec vitest run/u);
+    for (const target of [
+      "apps/web/src/domains/creator/offline-branch/studio-offline-branch-runtime.test.ts",
+      "apps/web/src/domains/creator/offline-branch/studio-offline-host-integration.test.ts",
+      "apps/web/src/domains/creator/studio-cuttoon-editor/studio-deferred-stroke-commit.test.ts",
+      "scripts/verify-studio-menus.test.ts",
+    ]) assert.ok(authorityStep.includes(target), `missing paired authority contract: ${target}`);
+    assert.doesNotMatch(authorityStep, /continue-on-error|if:|\|\| true/u);
+  }
 });
 
 test("core retains every mandatory quality lane without a bypass", () => {
@@ -520,11 +524,25 @@ test("focused integration checks cannot collide with the protected core status",
 });
 
 
-test("focused ToonStudio checkout includes imported metadata and fault evidence without unrelated artwork/results", () => {
+test("focused ToonStudio checkout includes imported metadata, validated artwork and fault evidence without unrelated inputs", () => {
   const workflow = readFileSync(new URL("../.github/workflows/toonstudio-session-goals.yml", import.meta.url), "utf8");
   const patterns = workflow.match(/sparse-checkout: \|\n((?: {12}[^\n]*\n)+)/u)?.[1];
   assert.ok(patterns, "focused workflow must declare its checkout");
   const manifests = ["3d/environments/refined-v6/manifest.json", "3d/environments/expansion-v1/manifest.json", "3d/environments/webtoon-v7/manifest.json", "3d/environments/mcp-free-v1/manifest.json", "virtual-studio/world/default-world.json"].map((file) => `apps/web/public/assets/${file}`);
+  const validatedArt = [
+    "world-v2/characters/pixel-maker/manifest.json",
+    ...["down", "right", "left", "up"].map((direction) => `world-v2/characters/pixel-maker/walk-${direction}.png`),
+    "style-packs-v5/art-v5-manifest.json",
+    ...["sky-island", "webtoon", "pastel", "retro", "ink", "neon"]
+      .map((style) => `style-packs-v5/${style}/npcs/npc-producer-walk-down.webp`),
+    "experience-v8/art-manifest.json",
+    "experience-v8/npc-art-manifest.json",
+    "experience-v8/avatar-webtoon.png",
+    "experience-v8/npc-concierge.png",
+    "experience-v8/landmarks-pastel.png",
+    "experience-v8/backdrop-neon-city.png",
+  ].map((file) => `apps/web/public/assets/virtual-studio/${file}`);
+  const requiredInputs = [...manifests, ...validatedArt];
   const faultEvidence = "tests/benchmarks/results/v12-runtime-fault-matrix.json";
   const unrelatedResult = "tests/benchmarks/results/unrelated-benchmark.json";
   const artwork = "apps/web/public/assets/3d/environments/unrelated-pack/large-model.glb";
@@ -535,7 +553,7 @@ test("focused ToonStudio checkout includes imported metadata and fault evidence 
   };
   try {
     git("init", "--quiet");
-    for (const file of [...manifests, faultEvidence, unrelatedResult, artwork, "package.json"]) {
+    for (const file of [...requiredInputs, faultEvidence, unrelatedResult, artwork, "package.json"]) {
       mkdirSync(dirname(join(scratch, file)), { recursive: true });
       writeFileSync(join(scratch, file), "{}\n");
     }
@@ -545,7 +563,7 @@ test("focused ToonStudio checkout includes imported metadata and fault evidence 
     git("config", "core.sparseCheckoutCone", "false");
     writeFileSync(join(scratch, ".git/info/sparse-checkout"), patterns.replace(/^ {12}/gmu, ""));
     git("read-tree", "-mu", "HEAD");
-    for (const file of [...manifests, faultEvidence]) assert.ok(existsSync(join(scratch, file)), `missing import: ${file}`);
+    for (const file of [...requiredInputs, faultEvidence]) assert.ok(existsSync(join(scratch, file)), `missing import: ${file}`);
     assert.equal(existsSync(join(scratch, unrelatedResult)), false);
     assert.equal(existsSync(join(scratch, artwork)), false);
   } finally { rmSync(scratch, { recursive: true, force: true }); }

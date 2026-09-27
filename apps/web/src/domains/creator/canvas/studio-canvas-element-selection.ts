@@ -4,6 +4,8 @@ export type StudioCanvasElementSelectionState = Pick<
   StudioCanvasViewportProps,
   | "tool"
   | "activeSurfaceReviewLocked"
+  | "canvasInteractionBlocked"
+  | "commentPinArmed"
   | "advancedFillArmed"
   | "pixelToolArmed"
   | "cropArmed"
@@ -26,6 +28,8 @@ export type StudioCanvasElementSelectionState = Pick<
 export function canSelectStudioCanvasElement(state: StudioCanvasElementSelectionState): boolean {
   return state.tool === "select"
     && !state.activeSurfaceReviewLocked
+    && !state.canvasInteractionBlocked
+    && !state.commentPinArmed
     && !state.advancedFillArmed
     && !state.pixelToolArmed
     && !state.cropArmed

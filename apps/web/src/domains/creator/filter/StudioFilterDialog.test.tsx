@@ -348,8 +348,8 @@ describe("StudioFilterDialog", () => {
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByRole("alert").textContent).toBe(reason);
     expect(dialog.getAttribute("aria-describedby")).toContain("studio-filter-application-error");
-    expect((within(dialog).getByRole("button", { name: "적용" }) as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(within(dialog).getByRole("button", { name: "취소" }));
+    expect((within(dialog).getByRole("button", { name: /^적용$/u }) as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(within(dialog).getByRole("button", { name: /^취소$/u }));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onApply).not.toHaveBeenCalled();
     view.rerender(<StudioFilterDialog {...props} applicationError={null} />);

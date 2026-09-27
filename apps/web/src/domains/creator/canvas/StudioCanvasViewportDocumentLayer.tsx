@@ -56,6 +56,8 @@ export interface StudioCanvasViewportDocumentLayerProps {
   animTimeline: StudioCanvasViewportProps["animTimeline"];
   bubbleShapeArmed: StudioCanvasViewportProps["bubbleShapeArmed"];
   bubbleShapeDraft: StudioCanvasViewportProps["bubbleShapeDraft"];
+  canvasInteractionBlocked: StudioCanvasViewportProps["canvasInteractionBlocked"];
+  commentPinArmed: StudioCanvasViewportProps["commentPinArmed"];
   canonicalDryMediaHiddenElementId: string | null;
   commitTextTransformEnd: StudioCanvasViewportHandlers["commitTextTransformEnd"];
   cropArmed: StudioCanvasViewportProps["cropArmed"];
@@ -124,6 +126,8 @@ export function StudioCanvasViewportDocumentLayer({
   animTimeline,
   bubbleShapeArmed,
   bubbleShapeDraft,
+  canvasInteractionBlocked,
+  commentPinArmed,
   canonicalDryMediaHiddenElementId,
   commitTextTransformEnd,
   cropArmed,
@@ -183,7 +187,8 @@ export function StudioCanvasViewportDocumentLayer({
   wetMixArmed,
 }: StudioCanvasViewportDocumentLayerProps) {
                 const selectionEnabled = canSelectStudioCanvasElement({
-                  activeSurfaceReviewLocked, tool, advancedFillArmed, pixelToolArmed,
+                  activeSurfaceReviewLocked, canvasInteractionBlocked, commentPinArmed,
+                  tool, advancedFillArmed, pixelToolArmed,
                   cropArmed, panelSplitArmed, nodeEditArmed, smudgeArmed, dodgeBurnArmed,
                   wetMixArmed, liquifyArmed, healCloneArmed, layerMaskPaintArmed,
                   filterMaskPaintArmed, quickMaskArmed, historyBrushArmed, bubbleShapeArmed,
