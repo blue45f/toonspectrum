@@ -1,5 +1,6 @@
 import { studioKonvaRuntime } from "../render/studio-konva-runtime";
 import { CANVAS_W } from "../studio-assets";
+import { STUDIO_VIEW_ZOOM_MAX, STUDIO_VIEW_ZOOM_MIN } from "../studio-view-controls";
 
 /**
  * Live-only tap visibility.
@@ -34,7 +35,12 @@ export function peekStudioStageCssScale(): number {
     const content = stage.content as HTMLElement | undefined;
     const clientWidth = content?.clientWidth ?? 0;
     if (width > 0 && clientWidth > 0) {
-      return clientWidth / width;
+      const inferred = clientWidth / width;
+      // 첫 레이아웃 전에는 stage.width()가 컨테이너보다 작아 비율이 크게 부풀어난다. 그 값으로 첫
+      // 획을 지연 배치에 넘기면 짧은 획이 저장되지 않는다. 뷰 줌 범위를 벗어나면 스테이지의 실제 변환을 쓴다.
+      if (Number.isFinite(inferred) && inferred >= STUDIO_VIEW_ZOOM_MIN && inferred <= STUDIO_VIEW_ZOOM_MAX) {
+        return inferred;
+      }
     }
     const scale = stage.scaleX();
     if (typeof scale === "number" && Number.isFinite(scale) && scale > 1e-6) {
