@@ -14,7 +14,7 @@ import {
   Res,
 } from "@nestjs/common";
 
-import { buildAffiliateUrl } from "../../../../web/src/shared/lib/affiliate";
+import { buildAffiliateUrl } from "@toonstudio/contracts/affiliate";
 import { coverImagePolicy } from "../../../../../packages/core/src/catalog";
 import { getAppConfig } from "../../server/app-config";
 
