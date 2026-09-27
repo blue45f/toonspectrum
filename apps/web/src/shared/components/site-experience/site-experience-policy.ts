@@ -1,5 +1,5 @@
 import { workspaceTaskRoute } from "../workspace/workspace-task-route.ts";
-import { isPublicCreativeRoute } from "../site-public-routes";
+import { isPublicCreativeRoute } from "../site-public-routes.ts";
 
 export type ExperienceMode = "vivid" | "calm";
 export type ExperienceLocale = string;export const EXPERIENCE_MODE_KEY = "toonstudio:site-experience:v1";
