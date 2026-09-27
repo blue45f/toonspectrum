@@ -281,6 +281,21 @@
       "types": "./src/studio-ai-provenance.ts",
       "import": "./src/studio-ai-provenance.ts",
       "default": "./src/studio-ai-provenance.ts"
+    },
+    "./sha256-portable": {
+      "types": "./src/sha256-portable.ts",
+      "import": "./src/sha256-portable.ts",
+      "default": "./src/sha256-portable.ts"
+    },
+    "./creator-marketplace-cc0-starter.generated": {
+      "types": "./src/creator-marketplace-cc0-starter.generated.ts",
+      "import": "./src/creator-marketplace-cc0-starter.generated.ts",
+      "default": "./src/creator-marketplace-cc0-starter.generated.ts"
+    },
+    "./creator-marketplace-gpt25-starter.generated": {
+      "types": "./src/creator-marketplace-gpt25-starter.generated.ts",
+      "import": "./src/creator-marketplace-gpt25-starter.generated.ts",
+      "default": "./src/creator-marketplace-gpt25-starter.generated.ts"
     }
   }
 }
