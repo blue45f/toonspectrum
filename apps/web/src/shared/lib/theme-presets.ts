@@ -28,7 +28,7 @@ export interface ThemePreset {
   motif: ThemeMotif;
 }
 
-export const DEFAULT_APPEARANCE: AppearancePreferences = { preference: "dark", studioPreference: "inherit" };
+export const DEFAULT_APPEARANCE: AppearancePreferences = { preference: "starlight", studioPreference: "inherit" };
 export const THEME_STORAGE_KEY = "toonstudio-theme";
 export const THEME_PRESETS = [
   { id: "aurora", ko: "오로라", en: "Aurora", descriptionKo: "민트·라일락·핑크가 흐르는 밝은 창작 테마", descriptionEn: "A bright creative palette flowing through mint, lilac and pink", mode: "light", chrome: "#f4f2ff", group: "signature", motif: "ribbon" },
@@ -52,7 +52,7 @@ export function normalizeAppearance(value: unknown): AppearancePreferences {
   const record = value as Record<string, unknown>;
   return {
     preference: isThemePreference(record.preference) ? record.preference
-      : record.theme === "light" ? "light" : "dark",
+      : record.theme === "light" ? "light" : DEFAULT_APPEARANCE.preference,
     studioPreference: record.studioPreference === "inherit" || isThemePreference(record.studioPreference)
       ? record.studioPreference : "inherit",
   };

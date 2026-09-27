@@ -37,7 +37,13 @@
   flex-shrink: 0;
 }
 [data-character-shaper-sheet="full"] { height: min(64%, 34rem, calc(100% - 248px)); }
-[data-character-shaper-sheet="collapsed"] { height: 56px; }
+/* 접힌 높이에도 홈 인디케이터 여백을 더해 그래버가 손가락에 닿지 않게 한다. */
+[data-character-shaper-sheet="collapsed"] {
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+[data-character-shaper-sheet-safe-area] { height: env(safe-area-inset-bottom, 0px); }
+[data-character-shaper-sheet-snap="on"] { background-color: var(--color-accent); }
 [data-character-shaper-sheet-header="true"] {
   display: flex;
   flex-shrink: 0;
@@ -159,15 +165,29 @@
 @media (forced-colors: active) {
   [data-character-slot][aria-current="true"] { outline: 2px solid Highlight; }
   [data-character-shaper-summary="true"] { background: Canvas; }
+  /* 강제 색상에는 색이 없으므로 스냅 표시를 테두리로 남긴다. */
+  [data-character-shaper-sheet-snap="on"] { background-color: Highlight; }
+  [data-character-shaper-sheet-snap="off"] { background-color: Canvas; border: 1px solid GrayText; }
+}
+@media (prefers-contrast: more) {
+  [data-character-shaper-sheet] { border-top-color: var(--color-line-strong); }
+  [data-character-shaper-sheet-snap="on"] { background-color: var(--color-accent); }
 }
 
+/* `header`(탭 목록)가 있으면 그래버는 폭이 좁은 선행 컨트롤이 된다. 44px는 372px 헤더의 12%에
+   불과해 엄지가 닿기 어려우므로 72px로 넓히고 헤더 높이 전체를 드래그 영역으로 쓴다. */
 [data-character-shaper-sheet-handle="compact"] {
-  width: 44px;
+  width: 72px;
+  align-self: stretch;
   flex: none;
   padding: 0;
   align-items: center;
 }
-[data-character-shaper-sheet-handle="compact"] > span[aria-hidden] { width: 20px; }
+/* 이 선택자는 시각 막대 하나만 겨냥한다. 스냅 눈금 컨테이너도 span[aria-hidden]이므로
+   함께 선택하면 눈금 세 개가 20px로 뭉개진다. */
+[data-character-shaper-sheet-handle="compact"] > span[aria-hidden]:not([data-character-shaper-sheet-snaps]) {
+  width: 20px;
+}
 [data-character-authoring-workbench="true"] {
   top: calc(var(--studio-3d-viewport-top, 0px) + max(0.5rem, env(safe-area-inset-top)));
   bottom: auto;
