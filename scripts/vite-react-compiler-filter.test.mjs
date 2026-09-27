@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import nodeTest from "node:test";
+import { test as vitestTest } from "vitest";
 
 import { WEB_REACT_COMPILER_EXCLUDE } from "../apps/web/vite-react-compiler-filter.ts";
+
+// 이 파일은 루트 Vitest 수집 대상이면서 `node --test`로도 직접 돌려야 하므로,
+// 러너에 따라 테스트 등록 함수를 바꾼다.
+const test = process.env.VITEST ? vitestTest : nodeTest;
 
 const excluded = (path) => WEB_REACT_COMPILER_EXCLUDE.some((pattern) => pattern.test(path));
 
