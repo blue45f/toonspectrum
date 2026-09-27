@@ -1,3 +1,5 @@
+import { CREATOR_MARKETPLACE_CC0_STARTER_RECORDS } from "./creator-marketplace-cc0-starter.generated";
+import { CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS } from "./creator-marketplace-gpt25-starter.generated";
 import {
   CREATOR_MARKETPLACE_BUILTIN_PREFIX_BY_KIND,
   CREATOR_MARKETPLACE_RUNTIME_BY_KIND,
@@ -6,8 +8,6 @@ import {
   creatorMarketplaceJsonByteSize,
 } from "./creator-marketplace-resource-contract";
 import { sha256HexPortable } from "./sha256-portable";
-import { CREATOR_MARKETPLACE_CC0_STARTER_RECORDS } from "./creator-marketplace-cc0-starter.generated";
-import { CREATOR_MARKETPLACE_GPT25_STARTER_RECORDS } from "./creator-marketplace-gpt25-starter.generated";
 
 import type {
   CreatorMarketplaceJsonValue,
