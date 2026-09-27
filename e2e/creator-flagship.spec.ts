@@ -9,6 +9,14 @@ import { expect, test } from "./fixtures/non-studio-test";
 import { capturePageEvidence } from "./helpers/capture-page-evidence";
 
 const THEME_STORAGE_KEY = "toonstudio-theme";
+const CREATOR_INTENT_DESTINATIONS = [
+  "/story-lab",
+  "/studio/new",
+  "/studio/bg3d",
+  "/studio/assets",
+  "/production",
+  "/studio/publish",
+];
 
 function themeEnvelope() {
   return JSON.stringify({
@@ -68,8 +76,8 @@ for (const width of [320, 390, 820, 1440]) {
 
     await page.goto("/about/studio", { waitUntil: "domcontentloaded" });
     const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
-    const primaryAction = home.locator('.cf-hero a.cf-primary[href="/onboarding/character?next=%2Fhome"]');
-    const startCards = home.locator(".cf-start-card");
+    const primaryAction = home.locator('.cf-hero a.cf-primary[href="/studio/new"]');
+    const intentCards = home.locator(".cf-intent nav a");
 
     await expect(home).toBeVisible();
     await expect(page).toHaveTitle(/기획부터 연재까지/u);
@@ -81,11 +89,13 @@ for (const width of [320, 390, 820, 1440]) {
     await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
     await expect(home.locator(".cf-bridge-visual img")).toBeVisible();
     await expect(home.locator(".cf-production-journey img")).toBeVisible();
-    await expect(startCards).toHaveCount(4);
+    await expect(intentCards).toHaveCount(CREATOR_INTENT_DESTINATIONS.length);
+    expect(await intentCards.evaluateAll((links) => links.map((link) => link.getAttribute("href"))))
+      .toEqual(CREATOR_INTENT_DESTINATIONS);
     await expect(primaryAction).toBeVisible();
 
-    await startCards.first().focus();
-    await expect(startCards.first()).toBeFocused();
+    await intentCards.first().focus();
+    await expect(intentCards.first()).toBeFocused();
 
     const hasNoHorizontalOverflow = await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth + 1,
@@ -116,14 +126,13 @@ test("the front door exposes planning, 2D, 3D, assets, collaboration and publish
   await page.goto("/about/studio");
   const home = page.locator('[data-creator-experience="all-in-one-studio-v3"]');
 
-  await expect(home.locator('.cf-hero a.cf-primary[href="/onboarding/character?next=%2Fhome"]')).toBeVisible();
+  await expect(home.locator('.cf-hero a.cf-primary[href="/studio/new"]')).toBeVisible();
   await expect(home.locator('.cf-hero a.cf-secondary[href="/product-tour"]')).toBeVisible();
   await expect(home.locator('.cf-simple-closing a[href="/production/projects/sample-project/overview"]')).toBeVisible();
-  await expect(home.locator('.cf-start-card[href="/story-lab"]')).toBeVisible();
-  await expect(home.locator('.cf-start-card[href="/studio/new"]')).toBeVisible();
-  await expect(home.locator('.cf-start-card[href="/studio/bg3d"]')).toBeVisible();
-  await expect(home.locator('.cf-start-card[href="/studio/assets"]')).toBeVisible();
-  await expect(home.locator(".cf-intent nav a")).toHaveCount(6);
+  await expect(home.locator(".cf-intent nav a")).toHaveCount(CREATOR_INTENT_DESTINATIONS.length);
+  for (const destination of CREATOR_INTENT_DESTINATIONS) {
+    await expect(home.locator(`.cf-intent nav a[href="${destination}"]`)).toBeVisible();
+  }
   await expect(home).not.toContainText("그림은 익숙한 도구에서");
   await expect(home).not.toContainText("기존 드로잉 도구 그대로");
 });
