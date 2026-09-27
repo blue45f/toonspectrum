@@ -210,3 +210,41 @@ describe("제작 팀 작업 보드", () => {
     );
   });
 });
+
+describe("작업 보드 일괄 필드 편집", () => {
+  it("미리 보기 전에는 저장하지 않고 명시적 확인 후 선택 필드만 변경한다", async () => {
+    const aggregate = fixture(); const execute = mount({ aggregate });
+    fireEvent.click(screen.getByRole("button", { name: "현재 결과 선택 (최대 200개)" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 작업 일괄 편집" }));
+    const dialog = screen.getByRole("dialog", { name: "선택 작업 일괄 편집" });
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "우선순위" }), { target: { value: "urgent" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "변경 미리 보기" }));
+    expect(execute).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole("region", { name: "일괄 변경 미리 보기" })).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "2개 작업 변경" }));
+    await waitFor(() => expect(execute).toHaveBeenCalledWith({ type: "upsert-task-batch", tasks: aggregate.tasks.map((task) => ({ ...task, priority: "urgent" })), expectedTasks: aggregate.tasks }, expect.any(String)));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect((screen.getByRole("button", { name: "선택 작업 일괄 편집" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it("실패 시 일괄 편집 내용을 보존하고 미리 보기를 다시 확인할 수 있다", async () => {
+    mount({ execute: vi.fn(async () => { throw new Error("동시 수정 충돌"); }) });
+    fireEvent.click(screen.getByRole("checkbox", { name: "콘티 작업 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 작업 일괄 편집" }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "우선순위" }), { target: { value: "high" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "변경 미리 보기" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "1개 작업 변경" }));
+    await waitFor(() => expect(within(dialog).getByRole("alert").textContent).toContain("동시 수정 충돌"));
+    expect((within(dialog).getByRole("combobox", { name: "우선순위" }) as HTMLSelectElement).value).toBe("high");
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "우선순위" }), { target: { value: "urgent" } });
+    expect(within(dialog).getByRole("button", { name: "변경 미리 보기" })).toBeTruthy();
+  });
+  it("기본 유지 설정으로 쓰기를 보내지 않는다", () => {
+    const execute = mount();
+    fireEvent.click(screen.getByRole("checkbox", { name: "콘티 작업 선택" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 작업 일괄 편집" }));
+    const dialog = screen.getByRole("dialog");
+    expect((within(dialog).getByRole("button", { name: "변경 미리 보기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(execute).not.toHaveBeenCalled();
+  });
+});

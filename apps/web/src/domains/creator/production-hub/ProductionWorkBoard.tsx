@@ -9,6 +9,8 @@ import { type ProductionProjectAggregate, type ProductionSavedView, type Product
 import { ProductionBoardScroller } from "./ProductionBoardScroller";
 import { ProductionBoardTaskCard } from "./ProductionBoardTaskCard";
 import { ProductionTaskEditor } from "./ProductionTaskEditor";
+import { ProductionTaskBulkEditor } from "./ProductionTaskBulkEditor";
+import { isProductionTaskBulkEditable } from "./production-bulk-task-edit";
 import { ProductionWorkflowDesigner } from "./ProductionWorkflowDesigner";
 import { ProductionWorkspaceDialog } from "./ProductionWorkspaceDialog";
 import {
@@ -53,6 +55,7 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
   const [generationOpen, setGenerationOpen] = useState(false);
   const [generationEpisode, setGenerationEpisode] = useState("");
   const [editor, setEditor] = useState<{ task: ProductionTask; isNew: boolean } | null>(null);
+  const [bulkTasks, setBulkTasks] = useState<readonly ProductionTask[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
@@ -70,6 +73,8 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
   );
   const visibleIds = new Set(visible.map((task) => task.id));
   const selectedIds = selection.filter((id) => visibleIds.has(id));
+  const selectedTasks = aggregate.tasks.filter((task) => selectedIds.includes(task.id));
+  const canBulkEdit = selectedTasks.length > 0 && selectedTasks.every(isProductionTaskBulkEditable);
   const layout = params.get("boardLayout") === "list" ? "list" : "board";
   const savedViews = (aggregate.savedViews ?? []).filter(
     (view) => view.shared && view.resource === "tasks" && view.filters["board-kind"] === "workflow-board",
@@ -573,6 +578,10 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
           >
             {productionText("선택 작업 이동")}
           </button>
+          <button type="button" disabled={busy || !canBulkEdit} className={cn(buttonClass({ variant: "outline" }), "min-h-11 text-xs")} onClick={() => setBulkTasks(selectedTasks)}>
+            {productionText("선택 작업 일괄 편집")}
+          </button>
+          {selectedIds.length > 0 && !canBulkEdit ? <p className="w-full text-xs text-warn">{productionText("일괄 편집하려면 승인·완료·보관된 작업의 선택을 해제하세요.")}</p> : null}
           {selectedIds.length ? (
             <button
               type="button"
@@ -701,6 +710,7 @@ export function ProductionWorkBoard({ aggregate, canEdit, canManage, execute }: 
           </div>
         </ProductionBoardScroller>
       )}
+      {bulkTasks ? <ProductionTaskBulkEditor aggregate={aggregate} tasks={bulkTasks} canEdit={canEdit} execute={execute} onClose={() => setBulkTasks(null)} onSaved={(count) => { setBulkTasks(null); setSelection([]); setNotice(`${count}개 작업의 선택한 필드를 변경했습니다.`); }} /> : null}
       {workflowOpen ? (
         <ProductionWorkflowDesigner
           aggregate={aggregate}

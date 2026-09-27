@@ -137,3 +137,29 @@ test("320px 편집 대화상자의 가로 넘침·접근성·키보드 닫기", 
   await expect(designer).toBeHidden();
   await expect(page.getByRole("button", { name: "공정 설정", exact: true })).toBeFocused();
 });
+
+test("모바일 일괄 편집은 미리 보기 후 지정한 필드만 원자적으로 저장한다", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openBoard(page);
+  const board = page.getByTestId("production-work-board");
+  const taskTitle = "13화 대본 2차 초안";
+  await board.getByRole("checkbox", { name: `${taskTitle} 선택`, exact: true }).check();
+  await board.getByRole("button", { name: "선택 작업 일괄 편집", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "선택 작업 일괄 편집", exact: true });
+  await dialog.getByRole("combobox", { name: "우선순위", exact: true }).selectOption("urgent");
+  await dialog.getByRole("combobox", { name: "마감 변경", exact: true }).selectOption("set");
+  await dialog.getByLabel("새 마감 · 내 시간대", { exact: true }).fill("2026-10-15T18:00");
+  await dialog.getByRole("button", { name: "변경 미리 보기", exact: true }).click();
+  await expect(dialog.getByRole("region", { name: "일괄 변경 미리 보기", exact: true })).toContainText(taskTitle);
+  const geometry = await dialog.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(geometry.scroll).toBeLessThanOrEqual(geometry.width + 1);
+  const result = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+  expect(result.violations.map((entry) => entry.id)).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath("bulk-edit-preview-390.png") });
+  await dialog.getByRole("button", { name: "1개 작업 변경", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(board.getByRole("status")).toContainText("1개 작업");
+  const card = board.locator('article[data-testid^="production-card-"]').filter({ has: page.getByRole("button", { name: taskTitle, exact: true }) });
+  await expect(card).toContainText("긴급");
+  await expect(card).toContainText("작업 중");
+});
