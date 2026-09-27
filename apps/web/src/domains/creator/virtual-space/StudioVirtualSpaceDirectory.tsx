@@ -1,4 +1,4 @@
-import { MapPin, Search, UsersRound } from "lucide-react";
+import { Footprints, MapPin, Search, UsersRound } from "lucide-react";
 import { useId, useRef, useState, type RefObject, type KeyboardEvent } from "react";
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import type { StudioVirtualSpacePeer, StudioVirtualSpacePoint } from "./studio-virtual-space-model";
@@ -7,7 +7,7 @@ import { studioTeammateMatches, studioTeammatePresentation } from "./studio-virt
 import "./studio-virtual-space-teammates.css";
 
 /** An equivalent keyboard/mobile route to places and people, independent of avatar movement. */
-export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, onSelectPeer, inputRef, expanded = false }: {
+export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, onSelectPeer, onApproachPeer, approachingPeerId, approachDisabled = false, inputRef, expanded = false }: {
   readonly inputRef?: RefObject<HTMLInputElement | null>;
   readonly expanded?: boolean;
   readonly manifest: StudioVirtualSpaceWorldManifest;
@@ -15,6 +15,9 @@ export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, o
   readonly onMove: (point: StudioVirtualSpacePoint) => void;
   readonly onOpen: (action: NonNullable<StudioWorldRoomDefinition["action"]>) => void;
   readonly onSelectPeer: (id: string) => void;
+  readonly onApproachPeer?: (sessionId: string) => void;
+  readonly approachingPeerId?: string | null;
+  readonly approachDisabled?: boolean;
 }) {
   const bt = useBilingual("StudioVirtualSpaceDirectory");
   const inputId = useId();
@@ -55,12 +58,21 @@ export function StudioVirtualSpaceDirectory({ manifest, peers, onMove, onOpen, o
       {people.length ? <div role="group" aria-label={bt("팀원", "Teammates")}>
         {people.map((peer) => {
           const presentation = studioTeammatePresentation(peer, manifest);
-          return <button type="button" onKeyDown={onResultKeyDown} className="studio-vspace-directory-person" data-space-result-primary="true" key={peer.participant.sessionId} data-activity={peer.state.activity}
+          const approaching = approachingPeerId === peer.participant.sessionId;
+          const unavailable = approachDisabled || approaching || peer.state.activity === "focused" || peer.state.activity === "away";
+          return <div key={peer.participant.sessionId} className="mb-2 grid min-w-0 gap-1 rounded-xl border border-line p-2">
+          <button type="button" onKeyDown={onResultKeyDown} className="studio-vspace-directory-person min-h-11" data-space-result-primary="true" data-activity={peer.state.activity}
           onClick={() => onSelectPeer(peer.participant.sessionId)}>
           <UsersRound size={15} aria-hidden /><span><strong>{peer.participant.displayName}</strong>
             <small><span className="studio-vspace-presence-dot" aria-hidden />{bt(presentation.location.ko, presentation.location.en)} · {bt(presentation.activity.ko, presentation.activity.en)}</small>
             <small>{bt(presentation.role.ko, presentation.role.en)}</small></span>
-        </button>; })}
+        </button>
+          {onApproachPeer ? <button type="button" className="min-h-11 justify-center" onKeyDown={onResultKeyDown}
+            disabled={unavailable} aria-label={bt(`${peer.participant.displayName} 님에게 다가가기`, `Go to ${peer.participant.displayName}`)}
+            onClick={() => { if (!unavailable) onApproachPeer(peer.participant.sessionId); }}>
+            <Footprints size={16} aria-hidden />{approaching ? bt("다가가는 중…", "Walking over…") : bt("다가가기", "Go to teammate")}
+          </button> : null}
+        </div>; })}
       </div> : null}
       {rooms.map((room) => <div className="studio-vspace-directory-place" key={room.id}>
         <strong><MapPin size={14} aria-hidden />{bt(room.labelKo, room.labelEn)}</strong>

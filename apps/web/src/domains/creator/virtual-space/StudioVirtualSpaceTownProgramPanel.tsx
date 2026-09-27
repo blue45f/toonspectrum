@@ -13,6 +13,7 @@ import {
   studioTownEvents,
   studioTownQuests,
   type StudioTownEvent,
+  type StudioTownDeskPod,
 } from "./studio-virtual-space-town-program";
 import type { StudioVirtualDecorationState } from "./studio-virtual-space-customization";
 import {
@@ -41,6 +42,7 @@ export function StudioVirtualSpaceTownProgramPanel({
   onClaimReward,
   onEquipReward,
   onMoveToRoom,
+  onMoveToDesk,
   onOpenPeople,
   onOpenAnnotation,
   onOpenSessions,
@@ -58,6 +60,7 @@ export function StudioVirtualSpaceTownProgramPanel({
   readonly onClaimReward: (id: StudioVirtualRewardId) => void;
   readonly onEquipReward: (id: StudioVirtualRewardId) => void;
   readonly onMoveToRoom: (roomId: string) => void;
+  readonly onMoveToDesk?: (pod: StudioTownDeskPod) => void;
   readonly onOpenPeople: () => void;
   readonly onOpenAnnotation: () => void;
   readonly onOpenSessions: () => void;
@@ -167,8 +170,8 @@ export function StudioVirtualSpaceTownProgramPanel({
       {STUDIO_TOWN_DESK_PODS.map((pod) => <article key={pod.id}>
         <div><UsersRound size={15} aria-hidden /><strong>{bt(pod.labelKo, pod.labelEn)}</strong></div>
         <p>{pod.roles.join(" · ")}</p>
-        <p>{bt("자리에서는 현재 작업, 집중 상태와 검수 대기 상태만 보이고 권한 없는 문서 내용은 노출하지 않습니다.", "Desks show work, focus and review status without exposing unauthorized document content.")}</p>
-        <button type="button" onClick={() => onMoveToRoom(pod.roomId)}>{bt("팀 자리로 이동", "Walk to desk pod")}</button>
+        <p>{bt("이 팀의 작업 위치로 이동해요. 자리 사용은 도착한 곳의 작업 자리에서 확인할 수 있어요.", "Walk to this team's workspace. Confirm an available desk in the workspace panel when you arrive.")}</p>
+        <button type="button" style={{ minHeight: 44 }} aria-label={bt(`${pod.labelKo} 팀 자리로 이동`, `Walk to ${pod.labelEn} desk pod`)} onClick={() => onMoveToDesk ? onMoveToDesk(pod) : onMoveToRoom(pod.roomId)}>{bt("팀 자리로 이동", "Walk to desk pod")}</button>
       </article>)}
       <article className="studio-vspace-town-feature-card"><strong>{bt("작업 세션 연결", "Work-session handoff")}</strong><p>{bt("자리에서 대본 리딩·콘티·검수 세션을 명시적으로 시작하거나 이어갑니다.", "Explicitly start or continue reading, storyboard and review sessions from the desk.")}</p><button type="button" onClick={onOpenSessions}>{bt("세션 열기", "Open sessions")}</button></article>
     </div> : null}

@@ -20,7 +20,7 @@ const ACTIONS = [
 ] as const;
 
 export function StudioVirtualSpaceSocialPanel({
-  selectedPeer, peers, social, disabled, focused, onSelect, onWave, onRequest, onRespond, onCancel, onBlock, nearbyPeerIds = [], conversationPeerIds = [], renderPeerAvatar, manifest,
+  selectedPeer, peers, social, disabled, focused, onSelect, onWave, onRequest, onRespond, onCancel, onBlock, nearbyPeerIds = [], conversationPeerIds = [], renderPeerAvatar, manifest, onApproachPeer, approachingPeerId, approachDisabled = false,
 }: {
   readonly manifest?: StudioVirtualSpaceWorldManifest;
   readonly renderPeerAvatar?: (peer: StudioVirtualSpacePeer) => ReactNode;
@@ -32,6 +32,9 @@ export function StudioVirtualSpaceSocialPanel({
   readonly disabled: boolean;
   readonly focused: boolean;
   readonly onSelect: (id: string | null) => void;
+  readonly onApproachPeer?: (sessionId: string) => void;
+  readonly approachingPeerId?: string | null;
+  readonly approachDisabled?: boolean;
   readonly onWave: () => void;
   readonly onRequest: (id: string, action: StudioSpaceSocialAction) => void;
   readonly onRespond: (id: string, response: "accept" | "decline") => void;
@@ -57,6 +60,7 @@ export function StudioVirtualSpaceSocialPanel({
   const appearance = selectedPeer ? resolveStudioCharacterAppearance(selectedPeer.state, selectedPeer.participant.sessionId) : null;
   const selectedReason = selectedPeer ? inviteReason(selectedPeer) : null;
   const selectedPresentation = selectedPeer ? studioTeammatePresentation(selectedPeer, manifest) : null;
+  const selectedFar = Boolean(onApproachPeer && selectedPeer && !nearbyPeerIds.includes(selectedPeer.participant.sessionId));
   return <section className="vs2-panel studio-vspace-social" aria-label={bt("팀원과 상호작용", "Teammate interactions")} data-space-interactive="true">
     <header><h2>{bt("함께 작업하기", "Work together")}</h2><UsersMark /></header>
     <p>{focused
@@ -81,6 +85,9 @@ export function StudioVirtualSpaceSocialPanel({
       {shownPeers.map((peer, index) => {
         const presentation = studioTeammatePresentation(peer, manifest);
         const reviewReason = inviteReason(peer, true);
+        const approachReason = inviteReason(peer);
+        const approaching = approachingPeerId === peer.participant.sessionId;
+        const canApproach = !approachDisabled && !approachReason && !approaching;
         const peerReasonId = `${reasonId}-${index}`;
         return <div className="studio-vspace-team-card" key={peer.participant.sessionId} data-activity={peer.state.activity}>
         <button type="button" className="studio-vspace-team-select" aria-label={peer.participant.displayName} aria-describedby={`${peerReasonId}-info`}
@@ -91,13 +98,22 @@ export function StudioVirtualSpaceSocialPanel({
             <small>{bt(presentation.location.ko, presentation.location.en)} · {bt(presentation.role.ko, presentation.role.en)}</small>
           </span>
         </button>
+        <div className="grid content-center gap-1">
+        {onApproachPeer && !nearbyPeerIds.includes(peer.participant.sessionId) ? <button className="studio-vspace-team-review" type="button" disabled={!canApproach}
+          aria-label={bt(`${peer.participant.displayName} 님에게 다가가기`, `Go to ${peer.participant.displayName}`)}
+          aria-describedby={approachReason ? `${peerReasonId}-approach` : undefined}
+          onClick={() => { if (canApproach) onApproachPeer(peer.participant.sessionId); }}>
+          <Footprints size={16} aria-hidden />{approaching ? bt("다가가는 중…", "Walking over…") : bt("다가가기", "Go to teammate")}
+        </button> : null}
         <button className="studio-vspace-team-review" type="button" disabled={Boolean(reviewReason)}
           aria-label={bt(`${peer.participant.displayName} 님에게 검수 초대`, `Invite ${peer.participant.displayName} to review`)}
           aria-describedby={reviewReason ? peerReasonId : undefined}
           onClick={() => { if (!inviteReason(peer, true)) { onSelect(peer.participant.sessionId); onRequest(peer.participant.sessionId, "review"); } }}>
           <ClipboardCheck size={16} aria-hidden />{bt("검수 초대", "Review invite")}
         </button>
-        {reviewReason ? <small className="studio-vspace-team-reason" id={peerReasonId}>{bt(reviewReason.ko, reviewReason.en)}</small> : null}
+        </div>
+        {onApproachPeer && approachReason ? <small className="studio-vspace-team-reason" id={`${peerReasonId}-approach`}>{bt(approachReason.ko, approachReason.en)}</small> : null}
+        {reviewReason ? <small className={onApproachPeer && approachReason?.ko === reviewReason.ko ? "sr-only" : "studio-vspace-team-reason"} id={peerReasonId}>{bt(reviewReason.ko, reviewReason.en)}</small> : null}
       </div>; })}
     </div> : <p className="studio-vspace-social-empty">{bt("같은 프로젝트에 접속한 팀원이 여기에 표시됩니다. NPC는 접속 인원에 포함되지 않아요.", "Teammates in this project appear here. NPCs are not counted as online members.")}</p>}
     {selectedPeer ? <div className="studio-vspace-peer-actions">
@@ -106,6 +122,14 @@ export function StudioVirtualSpaceSocialPanel({
       </div>
       {selectedPresentation ? <p className="studio-vspace-team-detail">{bt(selectedPresentation.location.ko, selectedPresentation.location.en)} · {bt(selectedPresentation.role.ko, selectedPresentation.role.en)} · {bt(selectedPresentation.activity.ko, selectedPresentation.activity.en)}</p> : null}
       {selectedReason ? <p className="studio-vspace-team-detail" role="status">{bt(selectedReason.ko, selectedReason.en)}</p> : null}
+      {selectedFar && !selectedReason ? <p className="studio-vspace-team-detail" role="status">{approachingPeerId === selectedPeer.participant.sessionId
+        ? bt("팀원에게 다가가는 중이에요. 도착하면 대화를 요청할 수 있어요.", "Walking to your teammate. You can request a conversation after arriving.")
+        : bt("다가가기를 누른 뒤 도착하면 대화를 요청하세요.", "Walk to your teammate, then request a conversation after arriving.")}</p> : null}
+      {selectedFar && onApproachPeer ? <button type="button" className="min-h-11" disabled={approachDisabled || Boolean(selectedReason) || approachingPeerId === selectedPeer.participant.sessionId}
+        aria-label={bt("선택한 팀원에게 다가가기", "Go to selected teammate")}
+        onClick={() => { if (!approachDisabled && !selectedReason && approachingPeerId !== selectedPeer.participant.sessionId) onApproachPeer(selectedPeer.participant.sessionId); }}>
+        <Footprints size={16} aria-hidden />{approachingPeerId === selectedPeer.participant.sessionId ? bt("다가가는 중…", "Walking over…") : bt("다가가기", "Go to teammate")}
+      </button> : null}
       {appearance?.issues.length ? <p className="text-xs text-fg-3">
         {appearance.issues.includes("unknown-skin") || appearance.issues.includes("invalid-appearance")
           ? bt("상대 캐릭터가 아직 지원되지 않아 기본 캐릭터로 표시합니다.", "This character is not supported here yet, so a default character is shown.")
@@ -116,8 +140,8 @@ export function StudioVirtualSpaceSocialPanel({
       <button type="button" disabled={disabled || focused || blocked || !social.greetingReadyPeerIds.includes(selectedPeer.participant.sessionId)
         || selectedPeer.state.activity === "focused" || selectedPeer.state.activity === "away"} onClick={onWave}><Hand size={16} aria-hidden />{bt("인사하기", "Wave hello")}</button>
       {ACTIONS.map(({ id, ko, en, icon: Icon }) => <button key={id} type="button"
-        disabled={Boolean(inviteReason(selectedPeer, id === "review"))}
-        onClick={() => onRequest(selectedPeer.participant.sessionId, id)}>
+        disabled={Boolean(inviteReason(selectedPeer, id === "review")) || (selectedFar && (id === "talk" || id === "high-five"))}
+        onClick={() => { if (!inviteReason(selectedPeer, id === "review") && !(selectedFar && (id === "talk" || id === "high-five"))) onRequest(selectedPeer.participant.sessionId, id); }}>
         <Icon size={16} aria-hidden />{bt(ko, en)}
       </button>)}
       <button type="button" aria-pressed={blocked} onClick={() => onBlock(selectedPeer.participant.sessionId, !blocked)}>
