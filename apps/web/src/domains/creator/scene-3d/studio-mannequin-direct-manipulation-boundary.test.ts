@@ -21,7 +21,8 @@ describe("3D mannequin direct-manipulation runtime boundary", () => {
 
   it("uses rounded high-detail geometry, soft shadows and joint double-click focus", () => {
     expect(source).toContain("new RoundedBoxGeometry(");
-    expect(source).toContain("new THREE.CapsuleGeometry(primitive.radius, middleLength, 12, 28)");
+    expect(source).toContain("const radialSegments = relativeRadius < 0.055 ? 12 : relativeRadius < 0.11 ? 20 : 28");
+    expect(source).toMatch(/new THREE\.CapsuleGeometry\(\s*primitive\.radius,\s*middleLength,\s*relativeRadius < 0\.055 \? 6 : 10,\s*radialSegments,\s*\)/u);
     expect(source).toContain("new THREE.CylinderGeometry(");
     expect(source).toContain("const hasAnatomicalTaper");
     expect(source).toContain("side: THREE.BackSide");

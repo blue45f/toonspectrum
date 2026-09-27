@@ -30,8 +30,11 @@ describe("StudioPublishAccountReviewCard", () => {
     expect(screen.getAllByText("김희준").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("blue45f@gmail.com")).toBeTruthy();
     expect(screen.getByText("관리자")).toBeTruthy();
-    expect(screen.getByText("운영 환경")).toBeTruthy();
-    expect(screen.getByRole("alert").textContent).toContain("관리 권한 계정");
+    expect(screen.getAllByText("운영 환경")).toHaveLength(2);
+    expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
+      expect.stringContaining("운영 환경"),
+      expect.stringContaining("관리 권한 계정"),
+    ]);
     expect(screen.getByText("비로그인 독자도 공개 열람")).toBeTruthy();
   });
 
@@ -83,6 +86,9 @@ describe("StudioPublishAccountReviewCard", () => {
     );
 
     expect((screen.getByRole("checkbox") as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByRole("alert").textContent).toContain("먼저 로그인");
+    expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual([
+      expect.stringContaining("환경 확인 필요"),
+      expect.stringContaining("먼저 로그인"),
+    ]);
   });
 });
