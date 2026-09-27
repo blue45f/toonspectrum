@@ -21,14 +21,15 @@ function contrast(foreground: string, background: string): number {
 }
 
 describe("Virtual Studio mobile identity and contrast contract", () => {
-  it("keeps the mobile world immersive and limits persistent commands to three safe-area slots", () => {
+  it("모바일 작업실의 네 가지 행동을 각각 안전 영역 슬롯에 배치한다", () => {
     expect(shellCss).toContain("position:fixed;inset:0");
     expect(shellCss).toContain("height:100dvh");
-    expect(shellCss).toContain("grid-template-columns:repeat(3,minmax(0,1fr))");
+    expect(shellCss).toMatch(/\.vs2-shell--project \.workspace-live-actions\{[^}]*grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/u);
     expect(shellCss).toContain("env(safe-area-inset-bottom)");
     expect(shellCss).toContain('nav[data-site-product]{display:none!important}');
     expect(shellCss).toContain('[data-site-ost="mounted"]{display:none!important}');
-    expect(pageSource.match(/data-mobile-slot=/gu)).toHaveLength(3);
+    const slots = Array.from(pageSource.matchAll(/data-mobile-slot="([^"]+)"/gu), (match) => match[1]);
+    expect(slots).toEqual(["work", "people", "seats", "space"]);
   });
 
   it("requires a public nickname and never falls back to an email address", () => {
