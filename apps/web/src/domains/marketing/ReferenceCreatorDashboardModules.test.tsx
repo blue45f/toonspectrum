@@ -35,6 +35,12 @@ describe("홈 미니 작업공간의 탐색과 예시 조작", () => {
     expect(within(region).queryByText(/최근 프로젝트|참여자|조회 수/u)).toBeNull();
   });
 
+  it("이미지로 그린 패턴에 허용된 이미지 역할과 설명을 제공한다", async () => {
+    await modules();
+    expect(screen.getByRole("img", { name: "망점 패턴" })).toBeTruthy();
+    expect(screen.getByRole("img", { name: "집중선 효과" })).toBeTruthy();
+  });
+
   it("캐릭터 선택은 로컬 이미지 스터디만 바꾼다", async () => {
     await modules();
     const picker = screen.getByRole("group", { name: "예시 캐릭터 선택" });

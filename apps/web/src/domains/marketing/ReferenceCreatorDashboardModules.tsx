@@ -100,8 +100,8 @@ function AssetGrid({ bi }: { bi: Localize }) {
         <div className="rd-mini-asset-tile rd-mini-asset-bubble"><MessageCircle aria-hidden="true" /><span>{bi("안녕!", "Hello!")}</span></div>
         <div className="rd-mini-asset-tile rd-mini-asset-spark"><Sparkles aria-hidden="true" /></div>
         <div className="rd-mini-asset-tile"><MiniArt name="character-blue" /></div>
-        <div className="rd-mini-asset-tile rd-mini-asset-screentone" aria-label={bi("망점 패턴", "Halftone pattern")} />
-        <div className="rd-mini-asset-tile rd-mini-asset-speed" aria-label={bi("집중선 효과", "Speed line effect")} />
+        <div className="rd-mini-asset-tile rd-mini-asset-screentone" role="img" aria-label={bi("망점 패턴", "Halftone pattern")} />
+        <div className="rd-mini-asset-tile rd-mini-asset-speed" role="img" aria-label={bi("집중선 효과", "Speed line effect")} />
         <div className="rd-mini-asset-tile rd-mini-asset-letter">Aa<span>{bi("글자", "Type")}</span></div>
         <div className="rd-mini-asset-tile rd-mini-asset-paper"><span>{bi("효과음", "SFX")}</span></div>
       </div>
