@@ -33,3 +33,40 @@ export function assertStudioFilterCanonicalEvidence(input: {
   return { phase: input.phase, revision, crdtServerSequence: sequence,
     pageSha256: createHash("sha256").update(JSON.stringify(pages)).digest("hex") };
 }
+
+/** 거절된 변경이 실제 저장된 원고·revision·ACK를 건드리지 않았음을 독립 조회로 검증한다. */
+export function assertStudioFilterCanonicalUnchanged(before: unknown, after: unknown): void {
+  const snapshot = (input: unknown) => {
+    const source = record(input);
+    const pages = record(record(source?.document)?.doc)?.pagesList;
+    if (!source || !Array.isArray(pages) || pages.length === 0
+      || typeof source.revision !== "number" || !Number.isSafeInteger(source.revision) || source.revision < 1
+      || typeof source.crdtServerSequence !== "string" || !/^\d+$/u.test(source.crdtServerSequence)
+      || BigInt(source.crdtServerSequence) <= BigInt(0)) {
+      throw new Error("연결 단절 검증에 실제 원고·revision·서버 ACK가 필요합니다.");
+    }
+    return { document: source.document, revision: source.revision, sequence: source.crdtServerSequence };
+  };
+  if (!isDeepStrictEqual(snapshot(before), snapshot(after))) {
+    throw new Error("거절된 필터 작업이 서버 정본을 변경했습니다.");
+  }
+}
+
+
+/** 성공한 서버 저장은 로컬 복구 슬롯을 비운다. 비어 있던 슬롯의 오염도 거부한다. */
+export function assertStudioFilterRecoveryUnchanged(before: unknown, after: unknown, expectedPages: readonly unknown[]): void {
+  const pages = (value: unknown) => {
+    if (value === null) return null;
+    const snapshot = record(value)?.pagesList;
+    if (!Array.isArray(snapshot) || snapshot.length === 0 || !isDeepStrictEqual(snapshot, expectedPages)) {
+      throw new Error("로컬 복구 원고가 검증한 서버 원본과 다릅니다.");
+    }
+    return snapshot;
+  };
+  if (!Array.isArray(expectedPages) || expectedPages.length === 0) {
+    throw new Error("검증한 서버 원본이 없는 복구 비교는 허용하지 않습니다.");
+  }
+  if (!isDeepStrictEqual(pages(before), pages(after))) {
+    throw new Error("거절된 필터가 로컬 복구 슬롯을 변경했습니다.");
+  }
+}

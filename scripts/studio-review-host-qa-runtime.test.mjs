@@ -50,20 +50,31 @@ test("빌드가 없으면 API나 DB를 시작하기 전에 실패한다", async 
   assert.equal(ran, false);
 });
 
-test("필터 CI는 정적 거절과 임시 정본 production 검증을 모두 실행한다", () => {
+test("필터 CI는 로컬 편집·인증 연결 단절·정본 production 검증을 모두 실행한다", () => {
   const workflow = parse(readFileSync(new URL("../.github/workflows/studio-brush-filter-stability.yml", import.meta.url), "utf8"));
   const browser = workflow.jobs.browser;
   assert.deepEqual(browser.strategy.matrix.suite, ["filters", "desktop", "long", "shapes", "mobile", "durability", "source"]);
   assert.equal(browser.services.postgres.image, "${{ matrix.suite == 'filters' && 'postgres:16-alpine' || '' }}");
   assert.equal(browser.services.postgres.env.POSTGRES_DB, "studio_filter_test");
   const denial = browser.steps.find((step) => step.env?.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL === "1");
-  const canonical = browser.steps.find((step) => step.env?.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED === "1");
+  const canonical = browser.steps.find((step) => step.env?.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED === "1"
+    && step.env?.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL !== "1");
+  const local = browser.steps.find((step) => step.env?.TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR?.endsWith("/filters-local"));
   const preparation = browser.steps.find((step) => step.env?.VITE_STUDIO_LIVE_ORIGIN);
-  for (const step of [denial, canonical, preparation]) {
+  for (const step of [local, denial, canonical, preparation]) {
     assert.equal(step?.if, "matrix.suite == 'filters'");
     assert.notEqual(step["continue-on-error"], true);
   }
+  assert.equal(local.run, "pnpm run verify:studio-filter-dialog");
+  assert.equal(local.env.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL, undefined);
+  assert.equal(local.env.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED, undefined);
+  assert.equal(local.env.TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY, "1");
   assert.equal(denial.run, "pnpm run verify:studio-filter-dialog");
+  assert.equal(denial.env.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED, "1");
+  assert.equal(denial.env.TEST_DATABASE_URL, preparation.env.TEST_DATABASE_URL);
+  assert.equal(denial.env.STUDIO_QA_BASE_URL, preparation.env.VITE_STUDIO_LIVE_ORIGIN);
+  assert.equal(denial.env.STUDIO_QA_WEB_OUT_DIR, canonical.env.STUDIO_QA_WEB_OUT_DIR);
+  assert.equal(preparation.env.VITE_STUDIO_REALTIME_ORIGIN, "");
   assert.equal(canonical.run, "pnpm run verify:studio-filter-dialog");
   assert.equal(canonical.env.TOONSPECTRUM_FILTER_DIALOG_SURVEY, "1");
   assert.equal(canonical.env.TOONSPECTRUM_FILTER_DIALOG_ROUNDS, "3");
@@ -74,8 +85,9 @@ test("필터 CI는 정적 거절과 임시 정본 production 검증을 모두 �
   assert.match(preparation.run, /pnpm run prebuild/u);
   assert.equal(canonical.env.STUDIO_QA_WEB_OUT_DIR, ".qa/studio-filter-canonical/dist");
   assert.notEqual(canonical.env.TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR, denial.env.TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR);
-  assert(browser.steps.indexOf(denial) < browser.steps.indexOf(preparation));
-  assert(browser.steps.indexOf(preparation) < browser.steps.indexOf(canonical));
+  assert(browser.steps.indexOf(local) < browser.steps.indexOf(preparation));
+  assert(browser.steps.indexOf(preparation) < browser.steps.indexOf(denial));
+  assert(browser.steps.indexOf(denial) < browser.steps.indexOf(canonical));
   assert(workflow.jobs.build.steps.some((step) => step.run === "pnpm run build:bundle" && !step.env?.VITE_STUDIO_LIVE_ORIGIN));
 });
 

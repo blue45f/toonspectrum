@@ -33,13 +33,16 @@ async function reachDrawingUi(
       // 위쪽 모달부터 한 번씩 처리하고 다시 조회한다. 클릭 중 나타난 안내도 다음 회차에 닫는다.
       let overlayVisible = false;
       for (const { surface, close } of overlays) {
-        if (!(await surface.isVisible())) continue;
+        const visible = await surface.isVisible();
+        // 정상 닫기 클릭 뒤 실제 숨김 전환을 확인한다. 응답 timeout만으로
+        // 이미 닫힌 안내의 증거를 잃거나 처음부터 없는 안내를 성공 처리하지 않는다.
+        if (surface === welcome && welcomeCloseAttempted && !visible) welcomeDismissed = true;
+        if (!visible) continue;
         overlayVisible = true;
         const remaining = deadline - Date.now();
         if (remaining <= 0) break;
         if (surface === welcome) welcomeCloseAttempted = true;
         await close.click({ timeout: Math.min(1_000, remaining) });
-        if (surface === welcome) welcomeDismissed = true;
         break;
       }
       if (

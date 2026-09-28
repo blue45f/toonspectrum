@@ -17,6 +17,9 @@ on:
       - 'scripts/verify-studio-brushes.mts'
       - 'scripts/verify-studio-filter-dialog.mts'
       - 'scripts/lib/studio-filter-canonical-evidence*'
+      - 'scripts/lib/studio-filter-connection-fault*'
+      - 'scripts/lib/studio-filter-comparison-region*'
+      - 'scripts/lib/studio-drawing-readiness*'
       - 'scripts/studio-review-host-qa-runtime*'
       - 'scripts/studio-review-host-steps.ts'
       - 'scripts/isolated-market-api*'
@@ -45,6 +48,9 @@ on:
       - 'scripts/verify-studio-brushes.mts'
       - 'scripts/verify-studio-filter-dialog.mts'
       - 'scripts/lib/studio-filter-canonical-evidence*'
+      - 'scripts/lib/studio-filter-connection-fault*'
+      - 'scripts/lib/studio-filter-comparison-region*'
+      - 'scripts/lib/studio-drawing-readiness*'
       - 'scripts/studio-review-host-qa-runtime*'
       - 'scripts/studio-review-host-steps.ts'
       - 'scripts/isolated-market-api*'
@@ -116,6 +122,8 @@ jobs:
             scripts/studio-review-host-qa-runtime.test.mjs \
             scripts/isolated-market-api.test.ts \
             scripts/lib/studio-filter-canonical-evidence.test.ts \
+            scripts/lib/studio-filter-connection-fault.test.ts \
+            scripts/lib/studio-filter-comparison-region.test.ts \
             scripts/lib/studio-drawing-readiness.test.ts \
             scripts/lib/studio-filter-comparison-clip.test.ts \
             apps/web/src/domains/creator/filter/StudioFilterDialog.test.tsx \
@@ -188,7 +196,7 @@ jobs:
           path: dist
       - name: Verify hidden manifest survived artifact transport
         run: test -s dist/.vite/manifest.json
-      - name: 정본 서버가 없는 로컬 문서의 필터 적용·실행취소·원고 보존
+      - name: 로컬 단독 원고의 필터 적용·실행취소와 원본 보존
         if: matrix.suite == 'filters'
         env:
           TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY: '1'
@@ -199,6 +207,8 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://studio_filter_test@127.0.0.1:5432/studio_filter_test
           VITE_STUDIO_LIVE_ORIGIN: http://127.0.0.1:5173
+          # 임시 API는 DO 입장권 발급을 비활성화한다. 이 빌드는 실제 Nest 정본 경계만 사용한다.
+          VITE_STUDIO_REALTIME_ORIGIN: ''
         run: |
           set -euo pipefail
           pnpm --filter @webtoon-nest/api build
@@ -208,6 +218,17 @@ jobs:
           node scripts/generate-third-party-notices.mjs --output "$PWD/.qa/studio-filter-canonical/dist/legal/THIRD_PARTY_NOTICES.generated.md"
           node scripts/verify-static-csp.mjs "$PWD/.qa/studio-filter-canonical/dist/index.html"
           test -s "$PWD/.qa/studio-filter-canonical/dist/.vite/manifest.json"
+      - name: 실제 인증 원고의 연결 단절·필터 거절·로컬과 서버 원본 보존
+        if: matrix.suite == 'filters'
+        env:
+          TEST_DATABASE_URL: postgresql://studio_filter_test@127.0.0.1:5432/studio_filter_test
+          STUDIO_QA_BASE_URL: http://127.0.0.1:5173
+          STUDIO_QA_API_BASE_URL: http://127.0.0.1:4355
+          STUDIO_QA_WEB_OUT_DIR: .qa/studio-filter-canonical/dist
+          TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED: '1'
+          TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL: '1'
+          TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR: /tmp/studio-stability-evidence/filters-denial
+        run: pnpm run verify:studio-filter-dialog
       - name: 실제 인증·정본 ACK에서 모든 필터 적용·픽셀·실행취소 3회 확인
         if: matrix.suite == 'filters'
         env:
