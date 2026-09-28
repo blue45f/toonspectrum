@@ -115,7 +115,7 @@
 Supabase PostgreSQL TLS를 사용하는 배포 이미지에는 공개 CA를 포함하고
 `NODE_EXTRA_CA_CERTS=/app/deploy/trust/supabase-prod-ca-2021.crt` 계약을 유지한다.
 Native Render runtime을 사용하는 경우에는 이 파일 경로가 실제 runtime에 존재하는지 별도로 확인한다.
-**환경변수에 CA private key나 DB 비밀번호를 기록하지 않는다.**
+**DB 비밀번호, API token, OAuth secret, private key, connection string 등 실제 secret 값은 Git에 기록하지 않는다. 로컬 개발/검증에서는 `.env.local`, `.env.development.local`, `.env.production.local` 등 Git에서 제외된 로컬 env 파일에 저장하고, 실제 운영에서는 배포 플랫폼의 secret/environment store에 저장한다. 문서와 `.env.*.example` 파일에는 변수명과 placeholder만 기록한다.**
 
 ### Studio live runtime
 
@@ -165,7 +165,7 @@ routing fingerprint만 바꾼다고 기존 객체가 이동하지 않는다. 기
 6. 기존 Neon 데이터가 남아 있다는 이유로 Neon을 새 권위로 되돌리지 않는다.
 7. 생성된 DB와 실제 runtime 연결을 구분한다.
 8. 문서의 “provisioned / connected / cut over / candidate” 상태를 분리해 기록한다.
-9. 운영 credential, DB URL, token 값 자체는 Git에 기록하지 않는다.
+9. 운영 credential, DB URL, token 값 자체는 Git에 기록하지 않는다. 실제 값은 로컬에서는 `.env.local` 계열의 Git-ignored 파일에 저장하고, 운영에서는 배포 플랫폼의 secret/environment store에 저장한다.
 10. 이 문서와 `config/free-database-federation.json`의 shard/route 변경은 함께 검토한다.
 
 ## 6. 관련 정본
