@@ -59,7 +59,7 @@ test("guide filters and deck shortcuts preserve control keyboard behavior", asyn
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("ArrowRight");
   await expect(previous).toBeEnabled();
-  await expect(page).toHaveURL(/#deck=investor:2$/u);
+  await expect(page).toHaveURL(/#deck=seminar:2$/u);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2)).toBe(true);
 });
 
