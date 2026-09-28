@@ -30,6 +30,10 @@ try {
       const card = cards.nth(index), image = card.locator('img');
       await image.scrollIntoViewIfNeeded();
       await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0 && element.currentSrc.includes("/brand/workflow-20260928/") && element.getBoundingClientRect().height >= 90)).toBe(true);
+      const imageLink = card.locator('.cf-step-image-link');
+      await expect(imageLink).toHaveAttribute('href', routes[index]);
+      await imageLink.click({ trial: true });
+      await imageLink.focus(); await expect(imageLink).toBeFocused();
       await expect(card).toHaveAttribute('data-workflow-step', stages[index]);
       assert((await image.getAttribute('alt'))?.length > 5, '설명 이미지에 의미 있는 대체텍스트가 있어야 합니다.');
       assert.deepEqual(await card.locator('.cf-step-actions > a').evaluateAll((links) => links.map((link) => link.getAttribute('href'))), [routes[index], routes[index + 1] || '/studio']);
@@ -45,7 +49,7 @@ try {
     await page.waitForTimeout(150);
     const sectionBounds = await section.boundingBox();
     await page.screenshot({ path: `${output}/workflow-${width}.png`, fullPage: true, animations: 'disabled' });
-    const first = cards.first().locator('.cf-step-actions > a').first();
+    const first = cards.first().locator('.cf-step-image-link');
     await first.click(); await expect(page).toHaveURL(/\/story-lab$/u);
     results.push({ width, sectionBounds, stages: 6, imageReady: true, keyboardAndTouch: true, firstActionNavigates: true, errors });
     await context.close();

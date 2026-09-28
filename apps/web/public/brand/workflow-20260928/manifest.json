@@ -1,308 +1,443 @@
 {
-  "schemaVersion": 1,
-  "method": "Pillow composition of existing AI artwork and purpose-specific vector shapes",
-  "sourceCollection": "illustrated-20260928",
-  "externalRequests": 0,
-  "newCharges": 0,
+  "schemaVersion": 2,
+  "method": "AI-generated independent illustrations, atlas crop and WebP compression",
+  "model": "gpt-image-2",
+  "externalRequests": 2,
+  "newCharges": 0.2571002919708029,
+  "currency": "USD",
   "artIsIllustrative": true,
+  "sources": {
+    "production": {
+      "generationId": "rs4O3CxbxSHemdzUc6aM",
+      "sha256": "4f0d99282fe292010500dffc02c62fc0100956e78a5feb23af643a2f6b2a2e9b",
+      "width": 3072,
+      "height": 1280
+    },
+    "support": {
+      "generationId": "mWPFReR0rpIqUt9evF6i",
+      "sha256": "b3d1b3a200ec757e8d379526187fce19ab578ba79c0c296fd9811f1a24670b84",
+      "width": 3072,
+      "height": 1280
+    }
+  },
   "assets": {
     "plan": {
+      "source": "production",
+      "crop": [
+        4,
+        4,
+        1020,
+        636
+      ],
       "variants": [
         {
           "file": "plan-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 7932,
-          "sha256": "183c23f5fcfc148e47bd61f0268198668103b361ddb8ee88221e22d8bdb112aa"
+          "bytes": 9910,
+          "quality": 72,
+          "sha256": "0fc036d87498ec1903daa1b726fbf04c3bbdb1c9faca77627132769a0410b102"
         },
         {
           "file": "plan-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 23382,
-          "sha256": "f2d834387f06c26abc65b0e8fdad78ca2706dd16903d731c290a19b7c8d48540"
+          "bytes": 34452,
+          "quality": 72,
+          "sha256": "e440b88ddc257af5d5390f194c29b5fc522ff4c49a0ff8987fab5f97804383ea"
         },
         {
           "file": "plan-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 44998,
-          "sha256": "0df6706f37dcdd75ce097c0b91a742adb4d7c42ab58095f785a1aefb6c218256"
+          "bytes": 67166,
+          "quality": 72,
+          "sha256": "36e6690efa641ce1f98c82f2c93abfbaf7950c8d10c681d85dbc92ea9f8b2178"
         }
       ]
     },
     "storyboard": {
+      "source": "production",
+      "crop": [
+        1028,
+        4,
+        2044,
+        636
+      ],
       "variants": [
         {
           "file": "storyboard-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 10082,
-          "sha256": "1c79bd5e697175ef4dab2546b276c041471f84796b491f6f681b4f40cb0b3f3e"
+          "bytes": 8242,
+          "quality": 72,
+          "sha256": "211cfdc123975d4da6048d9b66564714d71501d0d8eb7e9f4814f781bbbc8e29"
         },
         {
           "file": "storyboard-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 31394,
-          "sha256": "31537909d2c8911162c8d11d7af70d89eb792d240ca19f0f879ed6db5c39beea"
+          "bytes": 27596,
+          "quality": 72,
+          "sha256": "7362ee4fd9a5496d8a0f896c0628d451e9e24f2dd7771cd0519d2aaed0eb56ee"
         },
         {
           "file": "storyboard-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 62804,
-          "sha256": "c2183ef73e1ebcab22cb05a725e5940134b65701b4435c8c92a3c2f71105ab11"
+          "bytes": 51910,
+          "quality": 72,
+          "sha256": "afe816872cc5224f7735c460fb2afdca5c276bde7c1cf92a2a6a6dbc1a8b1095"
         }
       ]
     },
     "create": {
+      "source": "production",
+      "crop": [
+        2052,
+        4,
+        3068,
+        636
+      ],
       "variants": [
         {
           "file": "create-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 10872,
-          "sha256": "e584e4c53f0b8c4d18311ba4762d3d5952cec9bcac14cfc2dff253cab068cb85"
+          "bytes": 10082,
+          "quality": 72,
+          "sha256": "4254bb858272deac07db2d91ce39a55c9b34db168abc9d7d2c514eb17917a3d6"
         },
         {
           "file": "create-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 33950,
-          "sha256": "566425b93adc2eb9fa1edbbfd8e77f522e773d8e978d032a471fa9599d20a045"
+          "bytes": 34466,
+          "quality": 72,
+          "sha256": "e5fd54a7a1485fbe1e504b0ef94fb63ac2c567c77afb297defb3ad36587577c4"
         },
         {
           "file": "create-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 66192,
-          "sha256": "7b1fbcdbb7d2be5ce32cb5669afc48eff9ee4da2adc3e1db568b43931ceb0c3a"
+          "bytes": 66244,
+          "quality": 72,
+          "sha256": "195cc882537d533d4f3ad56e63fcd004d12e568602c6285a5027777113a7b1cf"
         }
       ]
     },
     "collaborate": {
+      "source": "production",
+      "crop": [
+        4,
+        644,
+        1020,
+        1276
+      ],
       "variants": [
         {
           "file": "collaborate-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 7130,
-          "sha256": "95eaed7fca9b2cc646d97d32c559cb3f6c26bdd0752547184e987f526b5d6d10"
+          "bytes": 9652,
+          "quality": 72,
+          "sha256": "c3dba069be2e520d51f58cfb45daea85bbac7a5e97d8a369654009a0dc8bb68e"
         },
         {
           "file": "collaborate-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 18636,
-          "sha256": "2227930f84c545f6217e1ed9cb5677901749b9b42d5744023973a607bd997d52"
+          "bytes": 30830,
+          "quality": 72,
+          "sha256": "1d20befd3213b125853d2ffb0ab158d473021b6c3e793a37583a034ed0b5f91f"
         },
         {
           "file": "collaborate-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 34264,
-          "sha256": "5974e0895aaa113fd696432ece1fb682abe68d6e9ff603ea0d5cac047caeef90"
+          "bytes": 58258,
+          "quality": 72,
+          "sha256": "308079ce4912712e169325fd345ff159db4e46dfb4f20d84b14b812755b985f2"
         }
       ]
     },
     "review": {
+      "source": "production",
+      "crop": [
+        1028,
+        644,
+        2044,
+        1276
+      ],
       "variants": [
         {
           "file": "review-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 10518,
-          "sha256": "3ee82379c237ca04581ef860a779bbbfb2ba37e6b3fe6b014071b498afc45b78"
+          "bytes": 9954,
+          "quality": 72,
+          "sha256": "7ee1b55ab06c53e76deb27bd3e4b88f0002ad1d3f1acf7271c7963b6c9099122"
         },
         {
           "file": "review-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 32388,
-          "sha256": "ac26dfdf8ff9af0c636f9c350b613fb0ffebfd1a47b654b6e2513fcb193e4eb2"
+          "bytes": 34388,
+          "quality": 72,
+          "sha256": "cf3a2e3b7e5ada7da14918a495901493cd05cc677e842bab9250260611e10fe4"
         },
         {
           "file": "review-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 63840,
-          "sha256": "7972096a1492760a654be1e4256cfc0d2cb93ff1f8fa2aa62952d611ed916b52"
+          "bytes": 66912,
+          "quality": 72,
+          "sha256": "d76153b63eb673bd008e0fbe3e4280a3bf3217eece6df2ab5bb2654dcb2746e7"
         }
       ]
     },
     "publish": {
+      "source": "production",
+      "crop": [
+        2052,
+        644,
+        3068,
+        1276
+      ],
       "variants": [
         {
           "file": "publish-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 9702,
-          "sha256": "fe30876f3f00dae4b85003a5e245fc067632980eabbaed815cbc6b18d1177477"
+          "bytes": 9780,
+          "quality": 72,
+          "sha256": "0ebf59ff4c9e0e0ccb19cac55c17f33461a77077e9abe64808ce70e26bcbfbda"
         },
         {
           "file": "publish-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 28284,
-          "sha256": "550e79482bf78d3960de14d069afb41b5e350cb87b1ab4a9ef474afcdf87ab75"
+          "bytes": 33456,
+          "quality": 72,
+          "sha256": "ad9a978f209aec55a5c33cda0ec377c3776b61cecd558d0c5a9fc094fa25360e"
         },
         {
           "file": "publish-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 55450,
-          "sha256": "5e6a3d7cac18b011a3e0530a7548e40097407f19043559fba303e23a875da441"
+          "bytes": 64260,
+          "quality": 72,
+          "sha256": "a8d2fc96379f9f8cdb601d762d17a90ea32339bf0baf5c278143eab06c2ae62b"
         }
       ]
     },
     "assets": {
+      "source": "support",
+      "crop": [
+        4,
+        4,
+        1020,
+        636
+      ],
       "variants": [
         {
           "file": "assets-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 13348,
-          "sha256": "34940e13a90fffb84bbadd885640d6421ff4911b7bd1da5fc9f89dd4767f2194"
+          "bytes": 13438,
+          "quality": 72,
+          "sha256": "3ca32a28f1a9ffba833cd8860049968337faba4e79408c5307dc1654ee523ff6"
         },
         {
           "file": "assets-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 41230,
-          "sha256": "9f86f476fcd223f8a46324434d09823ff933e134fe3c8d1d90c36e5a325daad9"
+          "bytes": 44410,
+          "quality": 72,
+          "sha256": "34c4046f8045f391c408f7698af6cc45e4021d9260d226a1ae76bbbc760a8ba9"
         },
         {
           "file": "assets-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 80960,
-          "sha256": "377d73f45722d20c18fc6ab6f4608e4fc3bc9770fea24e57ed722bcae3c2468e"
+          "bytes": 83412,
+          "quality": 72,
+          "sha256": "87a8b458f2d56458ef8bc41c17e9316531efb2f49c9ea3b7ed3118ceee1e9487"
         }
       ]
     },
     "learn": {
+      "source": "support",
+      "crop": [
+        1028,
+        4,
+        2044,
+        636
+      ],
       "variants": [
         {
           "file": "learn-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 10260,
-          "sha256": "6a444af63e24d93733032b4353b5dbf6b1ace598dbf97d4ee5270a9a5e6c1f0c"
+          "bytes": 13246,
+          "quality": 72,
+          "sha256": "2ba99a3b8c215e6325fc894bc2c9943309f13d038e797adbe3e2fe4859a8c714"
         },
         {
           "file": "learn-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 33006,
-          "sha256": "352ef106cbeea043c2f75f42b674243e4f9c8664d1b75dcf4c9b788ced7ff9ae"
+          "bytes": 47308,
+          "quality": 72,
+          "sha256": "b89166be00567aac60efd6221fe4fc2035982a6ab7c9fb8c7e125ae9e4045502"
         },
         {
           "file": "learn-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 66042,
-          "sha256": "c8a628e2b78a6d14be3253949f8ae1d2e2a3f024224936287a79b8538cc8fbe5"
+          "bytes": 92322,
+          "quality": 72,
+          "sha256": "2afee27a3da246300b2ee395f13282e370ed3bc235d581abf958ca021929e39e"
         }
       ]
     },
     "ai": {
+      "source": "support",
+      "crop": [
+        2052,
+        4,
+        3068,
+        636
+      ],
       "variants": [
         {
           "file": "ai-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 12364,
-          "sha256": "9276efa6fef5fbd99d16340c344f5af4f649bde36224096b5405ba66c8f28dcd"
+          "bytes": 10794,
+          "quality": 72,
+          "sha256": "014f96c0cb1208628d2dbe32f2e7c927b7a94307b782879f732ec7c99051007d"
         },
         {
           "file": "ai-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 38108,
-          "sha256": "259ffcaaffd364d7848f37aade2aca7663cce6c385d593318e2935d0c99f91ed"
+          "bytes": 32874,
+          "quality": 72,
+          "sha256": "4593446b5cc5a658031b1105243988a7711fd4eb669747bc67748705eb4e68ab"
         },
         {
           "file": "ai-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 75534,
-          "sha256": "2920875a3c2c73d6c1a4a88845beab07c1fd0ff9c9a67285eb1705d810e365de"
+          "bytes": 60682,
+          "quality": 72,
+          "sha256": "acfdf08220920d7da8978da9cf4c1bf8870e81c50dfc385a449f34bc2aa53b67"
         }
       ]
     },
     "recovery": {
+      "source": "support",
+      "crop": [
+        4,
+        644,
+        1020,
+        1276
+      ],
       "variants": [
         {
           "file": "recovery-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 10394,
-          "sha256": "b55d5addefe8be8080f91f6559730434beb79305b5e62f5cc6c51c9eec434b20"
+          "bytes": 10168,
+          "quality": 72,
+          "sha256": "7107169c184498dfa0ae29f3b9db95e54552541fbb4bdac66c381fa542ef68f6"
         },
         {
           "file": "recovery-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 31276,
-          "sha256": "77483d627364b74ea9bbc6ed3645215197e0af29bb1bcb0b332c378b04a6af42"
+          "bytes": 35482,
+          "quality": 72,
+          "sha256": "c781319d785c605262d6b431ffb867f0a0ea5cc5e9b6032907ab2a0a211c1fc2"
         },
         {
           "file": "recovery-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 62340,
-          "sha256": "d3b2e12372f8e2e4ea3850202bcd71e7711864102c39e9dfb5b3d9af2b86c90e"
+          "bytes": 68870,
+          "quality": 72,
+          "sha256": "23ca51948a1cea48fc16f4673339448e58871631748396deb7434581b35e65f5"
         }
       ]
     },
     "rights": {
+      "source": "support",
+      "crop": [
+        1028,
+        644,
+        2044,
+        1276
+      ],
       "variants": [
         {
           "file": "rights-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 8488,
-          "sha256": "7f4601ccf46541d4d079b70d84e222eb318d84db34b4267cdb1ee671edbd9a8c"
+          "bytes": 9884,
+          "quality": 72,
+          "sha256": "70171627788c38119a4254c18ae590a0bef4ea20424b2706971f7cf9bcbf2f60"
         },
         {
           "file": "rights-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 26266,
-          "sha256": "e4a69bbb065e1a972d1cf504273fb4a8a198aa00335a3500ede39f456554dcd6"
+          "bytes": 32694,
+          "quality": 72,
+          "sha256": "11388b63caaae87f72928155ba8099d840bbc8d2ed5ba0827d53a7eb1d17d639"
         },
         {
           "file": "rights-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 52342,
-          "sha256": "1993f40e717525c144bcbc9782b81f5f2b50597a85e12a517254321bcedf6f8e"
+          "bytes": 60922,
+          "quality": 72,
+          "sha256": "3af400cf06ee43a5d9d42fd8203c8a3eb904def7c49e81926be05a5f2cd82bc2"
         }
       ]
     },
     "community": {
+      "source": "support",
+      "crop": [
+        2052,
+        644,
+        3068,
+        1276
+      ],
       "variants": [
         {
           "file": "community-320.webp",
           "width": 320,
           "height": 200,
-          "bytes": 12162,
-          "sha256": "a242f19c62f33e2edaeaff3e8e931b7ee7f9b0f6b667d1b8b2ca78deda16af20"
+          "bytes": 12662,
+          "quality": 72,
+          "sha256": "0dd0f4c155938c9cb74590367651daeb3f049896a2c1364229868807da7ff754"
         },
         {
           "file": "community-640.webp",
           "width": 640,
           "height": 400,
-          "bytes": 37558,
-          "sha256": "0b10eb2d9f77fc652a2e95a6892cd7e3afa1e03e7df931149e39406d67aa1d79"
+          "bytes": 40446,
+          "quality": 72,
+          "sha256": "3f260fc04dcb356f6bb50c76077cebbecf63eeb789aa6841ae7ab1780f31c04e"
         },
         {
           "file": "community-960.webp",
           "width": 960,
           "height": 600,
-          "bytes": 74804,
-          "sha256": "8ff785c34e3e7a0fcb964ed957102c6ab433783486245e55868d4e8148b765bc"
+          "bytes": 75226,
+          "quality": 72,
+          "sha256": "a89e247a21391beb238ecd7ec44c7545ef80a7322d3d891736cf5df791f0b9ad"
         }
       ]
     }

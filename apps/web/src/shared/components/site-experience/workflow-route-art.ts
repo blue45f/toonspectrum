@@ -15,5 +15,7 @@ export function workflowVisualForPath(pathname: string): WorkflowVisual {
   if (/^\/(?:settings\/ai|studio\/(?:ai-lab|ai-runtime|ai-settings|generate))(?:\/|$)/u.test(path)) return 'ai';
   if (/^\/studio\/(?:import|recovery|trash)(?:\/|$)/u.test(path)) return 'recovery';
   if (/^\/community(?:\/|$)/u.test(path)) return 'community';
+  // 공개 작품 갤러리와 홍보 영상 제작은 목적이 다르다.
+  if (path === '/showcase' || /^\/showcase\/(?:works|series)(?:\/|$)/u.test(path)) return 'community';
   return WORKFLOW_BY_ROUTE_KIND[resolveSiteRouteVisualKind(path)];
 }

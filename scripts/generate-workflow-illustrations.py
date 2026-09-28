@@ -7,7 +7,7 @@ import json
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / 'apps/web/public/brand/illustrated-20260928'
-OUTPUT = ROOT / 'apps/web/public/brand/workflow-20260928'
+OUTPUT = ROOT / '.qa/workflow-composition'
 SIZE = (960, 600)
 INK, LINE, CYAN, VIOLET, PAPER = '#111a31', '#536084', '#7ee5ed', '#bb9cfa', '#f1f2ff'
 

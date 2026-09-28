@@ -4,7 +4,8 @@ import { useId } from "react";
 
 import { SiteAtelierChapter } from "./site-experience/SiteAtelierChapter";
 import { atelierChapterForPath } from "./site-experience/site-atelier-content";
-import { artworkSourcesForPath } from "./site-experience/site-art-direction";
+import { WorkflowIllustration } from "./site-experience/WorkflowIllustration";
+import { workflowVisualForPath } from "./site-experience/workflow-route-art";
 import { publicSiteNextSteps } from "./public-site-pathways";
 import { supportsPublicSiteOnwardJourney } from "./site-public-routes";
 
@@ -38,7 +39,7 @@ export function PublicSiteNextSteps({ pathname }: { pathname: string }) {
       <div className="public-site-next__grid">
         {destinations.map((destination) => (
           <Link key={destination.href} href={destination.href} className="public-site-next__card" data-phase={destination.phase}>
-            <div className="public-site-next__art" aria-hidden="true"><img src={destination.image} srcSet={artworkSourcesForPath(destination.image)} sizes="(max-width: 767px) 90vw, 380px" alt="" width={1536} height={1024} loading="lazy" decoding="async" /></div>
+            <div className="public-site-next__art" aria-hidden="true"><WorkflowIllustration kind={workflowVisualForPath(destination.href)} sizes="(max-width: 767px) 96px, 130px" decorative /></div>
             <div className="public-site-next__copy">
               <span className="public-site-next__tag">{destination.tag}</span>
               <h3>{bi(destination.ko, destination.en)}</h3>

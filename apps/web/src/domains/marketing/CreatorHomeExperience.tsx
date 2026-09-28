@@ -34,6 +34,7 @@ interface FlowStep {
 }
 
 const FLOW_ART: readonly WorkflowVisual[] = ["plan", "storyboard", "create", "collaborate", "review", "publish"];
+const BRIDGE_ART: readonly WorkflowVisual[] = ["create", "assets", "recovery", "collaborate"];
 const PRINCIPLE_ART: readonly WorkflowVisual[] = ["rights", "ai", "recovery", "learn"];
 const SUPPORT_ART: readonly WorkflowVisual[] = ["assets", "collaborate", "learn"];
 const FLOW_OUTCOMES = {
@@ -228,7 +229,7 @@ export function CreatorHomeExperience() {
           <h2 id="creator-bridge-title">{copy.bridgeTitle}</h2>
           <p>{copy.bridgeBody}</p>
           <div className="cf-bridge-list">
-            {copy.bridgeItems.map(({ icon: Icon, title, body }) => <article key={title}><Icon size={19} aria-hidden="true" /><div><h3>{title}</h3><p>{body}</p></div></article>)}
+            {copy.bridgeItems.map(({ icon: Icon, title, body }, index) => <article key={title}><WorkflowIllustration kind={BRIDGE_ART[index] ?? "create"} className="cf-bridge-art" decorative /><Icon size={19} aria-hidden="true" /><div><h3>{title}</h3><p>{body}</p></div></article>)}
           </div>
         </div>
       </section>
@@ -248,7 +249,7 @@ export function CreatorHomeExperience() {
           <ol className="cf-flow-grid cf-flow-grid--illustrated">
             {copy.flow.map(({ icon: Icon, title, body, href, action }, index) => (
               <li key={title} data-workflow-step={FLOW_ART[index]}>
-                <WorkflowIllustration kind={FLOW_ART[index] ?? "plan"} className="cf-step-art" />
+                <Link className="cf-step-image-link" href={href} aria-label={`${title} — ${action}`}><WorkflowIllustration kind={FLOW_ART[index] ?? "plan"} className="cf-step-art" /><span className="cf-step-image-action" aria-hidden="true">{action}<ArrowRight size={16} /></span></Link>
                 <div className="cf-flow-step"><span>{String(index + 1).padStart(2, "0")}</span><Icon size={18} aria-hidden="true" /></div>
                 <h3>{title}</h3><p>{body}</p>
                 <div className="cf-step-output"><span>{bi("완성되는 것", "You create")}</span><strong>{FLOW_OUTCOMES[locale][index]}</strong></div>

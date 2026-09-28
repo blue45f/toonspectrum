@@ -21,6 +21,8 @@ describe('제작 흐름의 시각적 안내와 다음 작업', () => {
       expect(image?.getAttribute('src')).toBe(`/brand/workflow-20260928/${visuals[index]}-640.webp`);
       expect(image?.getAttribute('loading')).toBe('lazy');
       expect(image?.getAttribute('alt')).toBeTruthy();
+      expect(card.querySelector('.cf-step-image-link')?.getAttribute('href')).toBe(actions[index]);
+      expect(card.querySelector('.cf-step-image-link')?.getAttribute('aria-label')).toBeTruthy();
       expect(card.querySelector('.cf-step-output strong')?.textContent).toBeTruthy();
       const links = [...card.querySelectorAll('.cf-step-actions > a')];
       expect(links.map((link) => link.getAttribute('href'))).toEqual([actions[index], actions[index + 1] ?? '/studio']);

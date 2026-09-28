@@ -26,3 +26,15 @@
   .creator-home[data-creator-experience] .cf-flow-grid--illustrated > li, .creator-home[data-creator-experience] .cf-step-output { background: Canvas; color: CanvasText; border-color: CanvasText; }
   .creator-home[data-creator-experience] .cf-step-actions > a { color: LinkText; }
 }
+
+/* 그림을 누르는 행동과 제목 옆의 시작 버튼은 같은 목적지로 연결한다. */
+.creator-home[data-creator-experience] .cf-step-image-link { display: block; position: relative; margin: 0 0 16px; padding: 0; min-width: 0; overflow: hidden; border-radius: 12px; color: #f7f4ff; text-decoration: none; }
+.creator-home[data-creator-experience] .cf-step-image-link .cf-step-art { margin: 0; }
+.creator-home[data-creator-experience] .cf-step-image-action { position: absolute; inset: auto 0 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 24px 12px 10px; background: linear-gradient(transparent, #070a14ed 60%); color: #f7f4ff; font-size: 12px; font-weight: 650; }
+.creator-home[data-creator-experience] .cf-step-image-link:focus-visible { outline: 3px solid var(--color-focus-ring); outline-offset: 4px; }
+.creator-home[data-creator-experience] .cf-bridge-list > article { display: grid; grid-template-columns: 39px minmax(0, 1fr); align-content: start; gap: 12px; }
+.creator-home[data-creator-experience] .cf-bridge-list .cf-bridge-art { grid-column: 1 / -1; width: 100%; }
+@media (forced-colors: active) {
+  .creator-home[data-creator-experience] .cf-step-image-action { color: LinkText; background: Canvas; padding-top: 10px; }
+  .creator-home[data-creator-experience] .cf-step-image-link:focus-visible { outline-color: Highlight; }
+}
