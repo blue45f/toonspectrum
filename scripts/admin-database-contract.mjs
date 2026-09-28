@@ -23,6 +23,14 @@ export function buildAdminRuntimeAclSql(role) {
 REVOKE ALL ON TABLE ${tables} FROM PUBLIC;
 REVOKE ALL ON TABLE ${tables} FROM ${quotedRole};
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE ${tables} TO ${quotedRole};
+-- 내부 테스트 계정은 삭제 권한 없이 승인된 실제 런타임 역할에만 연결한다.
+REVOKE ALL ON TABLE public.admin_member_test_accounts FROM PUBLIC;
+REVOKE ALL ON TABLE public.admin_member_test_accounts FROM ${quotedRole};
+GRANT SELECT, INSERT, UPDATE ON TABLE public.admin_member_test_accounts TO ${quotedRole};
+ALTER TABLE public.admin_member_test_accounts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS admin_member_test_accounts_runtime ON public.admin_member_test_accounts;
+CREATE POLICY admin_member_test_accounts_runtime ON public.admin_member_test_accounts
+  TO ${quotedRole} USING (true) WITH CHECK (true);
 `;
 }
 
@@ -45,6 +53,15 @@ BEGIN
     WHERE NOT pg_catalog.has_table_privilege('${safeRole}', 'public.' || table_name, privilege_name)
   ) THEN
     RAISE EXCEPTION 'administrator runtime DML privileges are incomplete';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM unnest(ARRAY['SELECT', 'INSERT', 'UPDATE']) AS permission(privilege_name)
+    WHERE NOT pg_catalog.has_table_privilege('${safeRole}', 'public.admin_member_test_accounts', privilege_name)
+  ) OR pg_catalog.has_table_privilege('${safeRole}', 'public.admin_member_test_accounts', 'DELETE')
+    OR pg_catalog.has_table_privilege(0::oid, 'public.admin_member_test_accounts', 'SELECT')
+    OR NOT (SELECT relrowsecurity FROM pg_catalog.pg_class WHERE oid = 'public.admin_member_test_accounts'::regclass)
+  THEN
+    RAISE EXCEPTION 'administrator test account classification privileges are incompatible';
   END IF;
 END
 $admin_capability$;

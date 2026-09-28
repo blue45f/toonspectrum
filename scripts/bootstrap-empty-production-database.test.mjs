@@ -454,6 +454,7 @@ describe("bootstrap SQL and repository contract", () => {
       "0094_studio_virtual_space_decoration_layout",
       "0095_studio_virtual_space_decoration_scope_key",
       "0096_studio_virtual_space_custom_furniture",
+      "0097_admin_member_test_accounts",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
     expect(contract.fingerprintPaths).toEqual(expect.arrayContaining([
@@ -464,7 +465,7 @@ describe("bootstrap SQL and repository contract", () => {
   });
 
   test("0094~0096은 원자적 적용과 사용자 소유권·기존 배치 보존을 유지한다", () => {
-    const migrations = loadBootstrapContract().manifest.slice(-3);
+    const migrations = loadBootstrapContract().manifest.filter(({ sequence }) => sequence >= 94 && sequence <= 96);
     expect(migrations.map(({ id }) => id)).toEqual([
       "0094_studio_virtual_space_decoration_layout",
       "0095_studio_virtual_space_decoration_scope_key",

@@ -105,6 +105,10 @@ export class AdminService {
     return this.adminMembersService.listUsers(userId, query);
   }
 
+  async setUserTestAccount(userId: string, targetUserId: string, value: unknown) {
+    return this.adminMembersService.setUserTestAccount(userId, targetUserId, value);
+  }
+
   async setUserRole(
     userId: string,
     targetUserId: string,
