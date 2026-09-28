@@ -35,8 +35,8 @@ async function start() {
 function storage(value: ReturnType<typeof report>) {
   window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY, newValue: JSON.stringify(value) }));
 }
-function failure(capability = "creator.work.write") {
-  window.dispatchEvent(new CustomEvent(ERROR_EVENT, { detail: { capability, retryAfterSeconds: 5 } }));
+function failure(capability = "creator.work.write", retryAfterSeconds: number | null = 5) {
+  window.dispatchEvent(new CustomEvent(ERROR_EVENT, { detail: { capability, retryAfterSeconds } }));
 }
 
 describe("서비스 상태 캐시와 재연결 수명주기", () => {
@@ -137,10 +137,52 @@ it("20분 뒤 복귀해도 과거 backoff를 기다리지 않고 최신 상태�
 
 it("범위 없는 HTTP 장애는 1초 뒤 상태를 확인하고 반복 이벤트가 검사를 미루지 않는다", async () => {
   const subject = await start();
-  failure("");
+  failure("", null);
   await vi.advanceTimersByTimeAsync(500);
-  failure("");
+  failure("", null);
   await vi.advanceTimersByTimeAsync(500);
   expect(mocks.get).toHaveBeenCalledTimes(2);
   expect(subject.getServiceCapabilitySnapshot().status).toBe("available");
+});
+
+
+it("상태 API 자체가 실패해도 자체 오류 이벤트 때문에 즉시 재시도 루프를 만들지 않는다", async () => {
+  const { AppApiError } = await import("./api-error");
+  mocks.get.mockImplementationOnce(async () => {
+    failure("", null);
+    throw new AppApiError("상태 API 연결 실패", { kind: "capability_unavailable", status: 503 });
+  });
+  await start();
+  await vi.advanceTimersByTimeAsync(29_999);
+  expect(mocks.get).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(mocks.get).toHaveBeenCalledTimes(2);
+});
+
+it("반복 포커스는 5초 안에 상태 요청을 쏟아내지 않는다", async () => {
+  await start();
+  for (let index = 0; index < 20; index += 1) {
+    window.dispatchEvent(new Event("focus"));
+    await vi.advanceTimersByTimeAsync(100);
+  }
+  expect(mocks.get).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(3_000);
+  window.dispatchEvent(new Event("focus"));
+  await vi.advanceTimersByTimeAsync(0);
+  expect(mocks.get).toHaveBeenCalledTimes(2);
+});
+
+it("범위 없는 요청 오류도 명시적인 Retry-After를 존중한다", async () => {
+  await start();
+  failure("", 30);
+  await vi.advanceTimersByTimeAsync(29_999);
+  expect(mocks.get).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(mocks.get).toHaveBeenCalledTimes(2);
+});
+
+
+it("HTTP 클라이언트와 상태 런타임에서 중복 재시도하지 않는다", async () => {
+  await start();
+  expect(mocks.get).toHaveBeenCalledWith("/health/capabilities", expect.objectContaining({ retry: 0 }));
 });

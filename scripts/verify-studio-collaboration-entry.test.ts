@@ -39,6 +39,7 @@ describe("collaboration browser entry contract", () => {
     expect(source).toContain("late joiner did not restore converged ink");
     expect(source).toContain(`page.locator('[data-studio-post-processing-scope=""]')`);
     expect(source).toContain("const screenshot = await page.screenshot({");
+    expect(source).toContain("await page.bringToFront();");
     expect(source).toContain("fingerprintStudioCompositedPng");
     expect(source).not.toContain('querySelectorAll<HTMLCanvasElement>(".konvajs-content canvas")');
     expect(source).not.toContain("documentSurface.screenshot({");

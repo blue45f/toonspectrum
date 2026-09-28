@@ -106,6 +106,8 @@ let intervalId: ReturnType<typeof setInterval> | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 // 최신 장애 이벤트나 다른 탭의 확인 결과를 지연 응답이 덮지 않도록 한다.
 let observationVersion = 0;
+let lastProbeStartedAt: number | null = null;
+const FOREGROUND_PROBE_GAP_MS = 5_000;
 
 function scheduleNextProbe(): void {
   if (retryTimer !== null) globalThis.clearTimeout(retryTimer);
@@ -160,19 +162,13 @@ export async function probeServiceCapabilities(
   }
 
   const startedVersion = observationVersion;
+  lastProbeStartedAt = Date.now();
   publish({ ...snapshot, checking: true });
   activeProbe = Promise.resolve().then(() => api.get<unknown>("/health/capabilities", {
     timeout: 5_000,
     totalTimeout: 10_000,
-    retry: {
-      limit: 1,
-      methods: ["get"],
-      statusCodes: [408, 429, 502, 503, 504],
-      afterStatusCodes: [429, 503],
-      maxRetryAfter: 5_000,
-      jitter: true,
-      retryOnTimeout: true,
-    },
+    // 재시도는 이 런타임 타이머 한 곳에서 담당한다.
+    retry: 0,
     errorMessage: "서비스 상태를 확인하지 못했습니다.",
   })).then((payload) => {
     const report = SERVICE_CAPABILITIES_SCHEMA.parse(payload);
@@ -194,10 +190,19 @@ export async function probeServiceCapabilities(
       recoveredAt,
     });
   }).catch((error: unknown) => {
-    if (isAbortError(error) || startedVersion !== observationVersion) {
-      return publish({ ...snapshot, checking: false });
-    }
+    if (isAbortError(error)) return publish({ ...snapshot, checking: false });
     const appError = toAppApiError(error, "서비스 상태를 확인하지 못했습니다.");
+    if (startedVersion !== observationVersion) {
+      // 상태 API 자신의 오류 이벤트도 같은 경로로 들어온다. 재확인 실패는 즉시 반복하지 않는다.
+      return publish({
+        ...snapshot,
+        checking: false,
+        lastError: snapshot.status === "degraded" ? appError : snapshot.lastError,
+        nextProbeAt: snapshot.status === "degraded"
+          ? Math.max(snapshot.nextProbeAt ?? 0, retryAt(appError.retryAfterSeconds))
+          : snapshot.nextProbeAt,
+      });
+    }
     const degraded = appError.kind === "capability_unavailable"
       || appError.kind === "server"
       || appError.kind === "unreachable"
@@ -277,7 +282,9 @@ function onCapabilityFailure(event: Event): void {
     report,
     // 범위가 없는 단일 요청 오류는 빠르게 확인하되 반복 오류가 재확인을 미루지 않게 한다.
     nextProbeAt: Math.min(snapshot.nextProbeAt ?? Number.POSITIVE_INFINITY,
-      key ? retryAt(seconds) : Date.now() + 1_000),
+      key || seconds !== null ? retryAt(seconds)
+        : snapshot.lastError && snapshot.nextProbeAt !== null
+          ? snapshot.nextProbeAt : Date.now() + 1_000),
   });
 }
 
@@ -314,11 +321,16 @@ export function startServiceCapabilityRuntime(): () => void {
   if (runtimeUsers > 1) return release;
 
   const refresh = () => { void probeServiceCapabilities(); };
-  const foregroundRefresh = () => { void probeServiceCapabilities(true); };
+  const onOnline = () => { void probeServiceCapabilities(true); };
+  const foregroundRefresh = () => {
+    // 탭·도구의 연속 포커스가 이미 진행한 상태 확인의 backoff를 매번 우회하지 않는다.
+    if (lastProbeStartedAt !== null && Date.now() - lastProbeStartedAt < FOREGROUND_PROBE_GAP_MS) return;
+    void probeServiceCapabilities(true);
+  };
   const onVisibility = () => {
     if (document.visibilityState === "visible") foregroundRefresh();
   };
-  globalThis.addEventListener("online", foregroundRefresh, { passive: true });
+  globalThis.addEventListener("online", onOnline, { passive: true });
   globalThis.addEventListener("focus", foregroundRefresh, { passive: true });
   globalThis.addEventListener(
     SERVICE_CAPABILITY_ERROR_EVENT,
@@ -328,7 +340,7 @@ export function startServiceCapabilityRuntime(): () => void {
   document.addEventListener("visibilitychange", onVisibility, { passive: true });
   intervalId = globalThis.setInterval(refresh, CHECK_INTERVAL_MS);
   removeRuntimeListeners = () => {
-    globalThis.removeEventListener("online", foregroundRefresh);
+    globalThis.removeEventListener("online", onOnline);
     globalThis.removeEventListener("focus", foregroundRefresh);
     globalThis.removeEventListener(
       SERVICE_CAPABILITY_ERROR_EVENT,

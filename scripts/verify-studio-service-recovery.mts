@@ -48,8 +48,14 @@ try {
     let checking = 0;
     let degraded = false;
     let typedFailure = false;
+    let healthUnavailable = false;
     await context.route("**/api/health/capabilities", async (route) => {
       checking += 1;
+      if (healthUnavailable) {
+        await route.fulfill({ status: 503, contentType: "application/json",
+          headers: { "Retry-After": "30" }, body: JSON.stringify({ message: "격리 상태 API 오류" }) });
+        return;
+      }
       await route.fulfill({ status: 200, contentType: "application/json", headers: { "Cache-Control": "no-store" }, body: JSON.stringify(report(degraded)) });
     });
     await context.route("**/api/qa/capability-failure", async (route) => {
@@ -88,10 +94,21 @@ try {
     await otherTab.evaluate((value) => localStorage.setItem("toonspectrum:service-capabilities:v1", JSON.stringify(value)), report(true, 30_000));
     await page.waitForTimeout(250);
     assert.equal(await page.locator("html").getAttribute("data-service-capability-state"), "available");
+    await otherTab.close();
+    healthUnavailable = true;
+    await page.getByRole("button", { name: "상태 확인 요청" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-service-capability-state", "degraded");
+    await expect(page.getByRole("button", { name: "다시 확인", exact: true })).toBeEnabled();
+    const failedProbeCount = checking;
+    await page.waitForTimeout(1_500);
+    assert.equal(checking, failedProbeCount, "상태 API의 자체 오류가 Retry-After를 무시하고 반복 요청됨");
+    healthUnavailable = false;
+    await page.getByRole("button", { name: "상태 확인 요청" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-service-capability-state", "available");
     await page.screenshot({ path: join(scratch, `${engine}-recovered.png`), fullPage: true });
     assert.deepEqual(errors, []);
     results.push({ engine, version: browser.version(), status: "PASS", checking, pageErrors: errors,
-      cases: ["만료 캐시 무시", "범위 없는 HTTP 503 안내", "확인된 저장 장애 안내", "온라인 복귀", "다른 탭의 과거 상태 무시", "WCAG A/AA", "390px 화면"] });
+      cases: ["만료 캐시 무시", "범위 없는 HTTP 503 안내", "확인된 저장 장애 안내", "온라인 복귀", "다른 탭의 과거 상태 무시", "상태 API 오류 backoff", "WCAG A/AA", "390px 화면"] });
     await context.close(); await browser.close(); browser = null;
   }
   writeFileSync(join(scratch, "report.json"), JSON.stringify({ status: "PASS", boundary: "local-http-failure-injection-not-production-db", results }, null, 2));

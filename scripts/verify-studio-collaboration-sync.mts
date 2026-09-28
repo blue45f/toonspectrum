@@ -215,6 +215,8 @@ async function enableBrushTool(page: Page): Promise<void> {
 }
 
 async function canvasFingerprint(page: Page): Promise<StudioCompositedCanvasFingerprint> {
+  // Firefox의 비활성 탭 합성 프레임이 아니라 사용자가 탭을 열었을 때의 실제 출력을 확인한다.
+  await page.bringToFront();
   const documentSurface = page.locator('[data-studio-post-processing-scope=""]').first();
   await documentSurface.waitFor({ state: "visible" });
   const clip = await documentSurface.boundingBox();
