@@ -7,7 +7,7 @@ import { STUDIO_VIRTUAL_MAX_PLACEMENTS } from "@toonstudio/contracts/studio-virt
 import {
   studioVirtualSpaceCustomFurniture,
   studioVirtualSpaceDecorationLayouts,
-} from "./studio-virtual-space-decoration.schema";
+} from "../../platform/database/schema/studio-virtual-space-decoration.schema";
 
 const dialect = new PgDialect();
 
@@ -34,7 +34,7 @@ describe("가상 공간 스키마의 실행 가능한 CHECK DDL", () => {
     expect(rendered.sql).toBe('jsonb_array_length("studio_virtual_space_decoration_layout"."placements") <= 36');
     expect(rendered.params).toEqual([]);
 
-    const migration = readFileSync(new URL("../migrations/0094_studio_virtual_space_decoration_layout.sql", import.meta.url), "utf8");
+    const migration = readFileSync(new URL("../../platform/database/migrations/0094_studio_virtual_space_decoration_layout.sql", import.meta.url), "utf8");
     const unqualified = rendered.sql.replaceAll(`"${config.name}".`, "");
     expect(migration).toContain(`CONSTRAINT ${constraint.name} CHECK (${unqualified})`);
   });
