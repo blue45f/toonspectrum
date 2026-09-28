@@ -15,7 +15,6 @@ import "./creator-all-in-one.css";
 import "./creator-theme-gallery.css";
 import "./creator-home-spacing.css";
 import "./creator-ecosystem-atlas.css";
-import "./creator-home-reference.css";
 
 import { CreatorSectionLink } from "./CreatorHomeNavigation";
 import { CreatorEcosystemAtlas } from "./CreatorEcosystemAtlas";
