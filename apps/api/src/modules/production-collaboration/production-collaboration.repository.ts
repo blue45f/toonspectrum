@@ -261,6 +261,20 @@ export class ProductionCollaborationRepository {
     readonly requestDigest: string;
   }): Promise<ProductionMutationResponse> {
     return db.transaction(async (transaction) => {
+      // 생성 재전송도 현재 작품 소유권을 다시 확인한다. 작품 잠금 이후 영수증을 읽어
+      // 같은 요청의 동시 재전송은 중복 생성 충돌 대신 최초 결과를 반환한다.
+      const workRows = await transaction
+        .select({ ownerUserId: creatorWorks.userId })
+        .from(creatorWorks)
+        .where(eq(creatorWorks.id, input.aggregate.workId))
+        .limit(1)
+        .for("update");
+      const work = workRows[0];
+      if (!work) throw new ProductionProjectNotFoundError("work");
+      if (work.ownerUserId !== input.actorUserId) {
+        throw new ProductionProjectForbiddenError("create");
+      }
+
       const existingReceipt = await transaction
         .select({
           requestDigest: productionProjectMutationReceipts.requestDigest,
@@ -278,18 +292,6 @@ export class ProductionCollaborationRepository {
           throw new ProductionProjectMutationConflictError();
         }
         return existingReceipt[0].response;
-      }
-
-      const workRows = await transaction
-        .select({ ownerUserId: creatorWorks.userId })
-        .from(creatorWorks)
-        .where(eq(creatorWorks.id, input.aggregate.workId))
-        .limit(1)
-        .for("update");
-      const work = workRows[0];
-      if (!work) throw new ProductionProjectNotFoundError("work");
-      if (work.ownerUserId !== input.actorUserId) {
-        throw new ProductionProjectForbiddenError("create");
       }
 
       const duplicateByProject = await loadProjectRow(transaction, input.aggregate.projectId, true);
