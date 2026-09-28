@@ -48,10 +48,13 @@ function title(overrides: Partial<Title> = {}): Title {
 
 describe("engagement model", () => {
   it("creates deterministic release notifications only on the configured weekday", () => {
-    const friday = new Date("2026-09-25T00:00:00+09:00");
+    // releaseNotificationForTitle는 로컬 시간 기준(getDay/localDateKey)이라
+    // 고정 오프셋을 박으면 러너 시간대에 따라 같은 instant의 요일이 달라진다.
+    // 2026-09-25는 실제로 금요일이므로 로컬 자정으로 만들어 어떤 TZ에서도 성립하게 한다.
+    const friday = new Date(2026, 8, 25);
     const notification = releaseNotificationForTitle(title(), friday);
     expect(notification?.id).toBe("release:2026-09-25:title-1");
-    expect(releaseNotificationForTitle(title(), new Date("2026-09-24T00:00:00+09:00"))).toBeNull();
+    expect(releaseNotificationForTitle(title(), new Date(2026, 8, 24))).toBeNull();
   });
 
   it("explains observed availability changes without inventing historical facts", () => {
