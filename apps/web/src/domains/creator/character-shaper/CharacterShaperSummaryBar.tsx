@@ -446,6 +446,7 @@ export function CharacterShaperSummaryBar({
                 aria-haspopup="dialog"
                 aria-expanded={popover === "save"}
                 title="현재 캐릭터를 이름 붙여 저장"
+                data-character-primary-save="true"
                 disabled={loading || h.status === "empty"}
                 onClick={(event) => openPopover("save", event.currentTarget)}
                 className={TEXT_BUTTON}

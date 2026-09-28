@@ -5,7 +5,7 @@
  * (automatic activation — switching a slot only changes the shelf, never the scene). Digits `1`–`9`
  * and `0` jump to the first ten slots while focus is inside the rail.
  */
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { STUDIO_FOCUS_RING } from "../studio-panel-ui";
 
@@ -39,6 +39,10 @@ export function CharacterShaperSlotRail({ binding, activeSlot, onSelectSlot, ori
     return entries;
   }, [binding.catalog.entries]);
   const vertical = orientation === "vertical";
+  useEffect(() => {
+    containerRef.current?.querySelector<HTMLElement>(`[data-character-slot="${activeSlot}"]`)
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "instant" });
+  }, [activeSlot]);
 
   const focusSlot = (slot: CharacterSlotKind) => {
     containerRef.current?.querySelector<HTMLButtonElement>(`[data-character-slot="${slot}"]`)?.focus();

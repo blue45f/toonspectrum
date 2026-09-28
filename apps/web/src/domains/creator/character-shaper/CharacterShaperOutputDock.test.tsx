@@ -379,3 +379,19 @@ describe("CharacterShaperOutputDock", () => {
     expect(screen.getByRole("button", { name: "PSD 내보내기" })).toBeTruthy();
   });
 });
+
+
+it("참조 작업면의 출력 설정은 팝오버로 열리고 Escape로 닫으며 포커스를 복원한다", () => {
+  render(<CharacterShaperOutputDock h={makeHost()} binding={makeBinding()} drawer={null}
+    onOpenDrawer={vi.fn()} paintActive={false} onTogglePaint={vi.fn()} compact={false} collapsedSettings />);
+  const trigger = screen.getByRole("button", { name: "출력 설정" });
+  expect(document.querySelector("[data-character-export-sheet]")).toBeNull();
+  fireEvent.click(trigger);
+  const panel = screen.getByRole("group", { name: "내보내기" });
+  expect(panel.id).toBe(trigger.getAttribute("aria-controls"));
+  expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(document.querySelector("[data-character-export-sheet]")).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  expect(trigger.getAttribute("aria-expanded")).toBe("false");
+});
