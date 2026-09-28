@@ -33,8 +33,8 @@ function registerJapanese() {
   registerI18nLocaleEntries("ja", Object.fromEntries(keys.map((key, index) => [key, pairs[index]![3]])));
   triggerTranslationBundleUpdate();
 }
-function home() {
-  return <MemoryRouter><CreatorHomeExperience /></MemoryRouter>;
+function home(pathname = "/about/studio") {
+  return <MemoryRouter initialEntries={[pathname]}><CreatorHomeExperience /></MemoryRouter>;
 }
 function expectJapaneseContent() {
   expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("企画から公開まで");
@@ -43,6 +43,15 @@ function expectJapaneseContent() {
 }
 
 describe("creator homepage active-locale recovery", () => {
+  it.each(["/about/studio/", "/ABOUT/STUDIO"])("%s에서도 소개 콘텐츠와 기존 앵커를 보존한다", async (pathname) => {
+    await act(async () => { render(home(pathname)); });
+
+    expect(document.querySelector('[data-home-view="introduction"]')).not.toBeNull();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain(PRODUCT_IDENTITY.ko.headline[0]);
+    expect(document.querySelector("#creator-closing-title")).not.toBeNull();
+    expect(document.querySelector("#creator-start .cf-intent-visual-nav")?.querySelectorAll("a")).toHaveLength(PRODUCT_START_DESTINATIONS.length);
+  });
+
   it.each(["ko", "en"] as const)("retains authored %s identity and navigation", async (lang) => {
     useI18n.setState({ lang });
     await act(async () => { render(home()); });

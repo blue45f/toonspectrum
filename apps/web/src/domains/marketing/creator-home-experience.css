@@ -1233,34 +1233,3 @@ html[data-theme="dark"] .ce-stage-switcher button[aria-pressed="true"] {
     transform: none;
   }
 }
-
-/*
- * 레퍼런스 크리에이터 대시보드 셸(target-size 보정)
- *
- * `1930772db`가 `reference-site-exact.css`를 되돌리면서 `ReferenceHomeDashboard`의
- * 스타일시트까지 지웠다. 컴포넌트는 남아 있어 그 셸이 스타일 없는 상태로 렌더링되고,
- * 상단 내비게이션 링크가 24px 미만 터치 영역이 되어 WCAG 2.5.8 위반이 났다.
- *
- * 디자인 방향을 정하지 않고, 어떤 방향으로 가도 지켜야 하는 최소 터치 영역만 보장한다.
- * 레이아웃·색·타이포는 이 규칙이 다루지 않는다.
- */
-.creator-home nav[aria-label="Creator workspace"] > a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  min-height: 24px;
-  padding-block: 4px;
-  padding-inline: 6px;
-}
-
-/*
- * 프로젝트 그리드 카드에도 같은 최소 영역을 보장한다. 스타일시트가 지워져 있어
- * 카드가 인라인이라 min-*가 적용되지 않는다. 카드들이 한 줄로 흐르도록
- * inline-block을 쓰고, 블록으로 바꾸면 세로로 쌓여 레이아웃이 깨진다.
- */
-.reference-home-dashboard .reference-project-grid > a {
-  display: inline-block;
-  min-block-size: 24px;
-  min-inline-size: 24px;
-}

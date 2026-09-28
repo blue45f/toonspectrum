@@ -57,6 +57,11 @@ vi.mock("./world-publication/use-studio-world-publication", async () => {
 });
 vi.mock("@/domains/auth/public/session/auth-session-store", () => ({ useSession: () => f.session }));
 vi.mock("./use-studio-virtual-space-operations", () => ({ useStudioVirtualSpaceOperations: () => ({ snapshot: f.operations, refresh: f.refreshOperations }) }));
+// 소셜 동선의 가구 목록은 정상 빈 응답으로 고정하고, HTTP·업로드 계약은 client 테스트에서 검증한다.
+vi.mock("./studio-virtual-custom-furniture-client", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./studio-virtual-custom-furniture-client")>(),
+  listStudioVirtualCustomFurniture: vi.fn(async () => []),
+}));
 vi.mock("./private-room/use-studio-private-room",()=>({useStudioPrivateRoom:(options:Parameters<typeof import("./private-room/use-studio-private-room").useStudioPrivateRoom>[0])=>{
   f.privateOptions=options;return {snapshot:{door:null,team:null,session:null,conversations:[],candidates:[],busy:false,uncertain:false,reason:null},controller:null,available:false,entryReason:"outside"};
 }}));

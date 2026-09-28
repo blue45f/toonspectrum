@@ -40,7 +40,7 @@ const PUBLIC_DETAIL_ROUTES = [
 
 /** Promotional navigation belongs to public discovery and learning, never account workflows. */
 export function isPublicCreativeRoute(pathname: string): boolean {
-  const normalized = pathname.replace(/\/+$/u, "") || "/";
+  const normalized = pathname.toLowerCase().replace(/\/+$/u, "") || "/";
   if (PRIVATE_WORKFLOW_PAGES.has(normalized)) return false;
   return PUBLIC_PAGES.has(normalized)
     || PUBLIC_DETAIL_ROUTES.some((route) => route.test(normalized));
@@ -48,12 +48,13 @@ export function isPublicCreativeRoute(pathname: string): boolean {
 
 /** 정책 읽기는 공개 셸을 유지하되 창작 홍보와 다음 작업 제안은 덧붙이지 않는다. */
 export function supportsPublicSiteOnwardJourney(pathname: string): boolean {
-  const normalized = pathname.replace(/\/+$/u, "") || "/";
+  const normalized = pathname.toLowerCase().replace(/\/+$/u, "") || "/";
   return normalized !== "/"
     && !["/terms", "/privacy", "/copyright"].includes(normalized)
     && isPublicCreativeRoute(normalized);
 }
 
 export function isDiscoverPurposeRoute(pathname: string): boolean {
-  return DISCOVER_PURPOSE_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  const normalized = pathname.toLowerCase().replace(/\/+$/u, "") || "/";
+  return DISCOVER_PURPOSE_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`));
 }

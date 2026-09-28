@@ -51,14 +51,28 @@ export function StudioVirtualSpaceCustomFurniturePicker({
   const [items, setItems] = useState<readonly StudioVirtualCustomFurniture[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [listState, setListState] = useState<"loading" | "ready" | "error">("loading");
   const fileRef = useRef<HTMLInputElement>(null);
+  const listRequest = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async () => {
-    setItems(await listStudioVirtualCustomFurniture());
+    listRequest.current?.abort();
+    const request = new AbortController();
+    listRequest.current = request;
+    setListState("loading");
+    try {
+      const next = await listStudioVirtualCustomFurniture(request.signal);
+      if (request.signal.aborted) return;
+      setItems(next);
+      setListState("ready");
+    } catch {
+      if (!request.signal.aborted) setListState("error");
+    }
   }, []);
 
   useEffect(() => {
     void refresh();
+    return () => listRequest.current?.abort();
   }, [refresh]);
 
   const place = useCallback(
@@ -95,10 +109,10 @@ export function StudioVirtualSpaceCustomFurniturePicker({
         setNotice(result.error);
         return;
       }
-      setItems(await listStudioVirtualCustomFurniture());
+      await refresh();
       setNotice(bt(`${result.furniture.name} 을(를) 올렸어요.`, `Uploaded ${result.furniture.name}.`));
     },
-    [bt],
+    [bt, refresh],
   );
 
   return (
@@ -139,9 +153,14 @@ export function StudioVirtualSpaceCustomFurniturePicker({
             </li>
           ))}
         </ul>
-      ) : (
+      ) : listState === "ready" ? (
         <p>{bt("아직 올린 가구가 없어요.", "You have not uploaded any furniture yet.")}</p>
-      )}
+      ) : null}
+      {listState === "loading" ? <p role="status">{bt("가구 목록을 불러오는 중…", "Loading your furniture…")}</p> : null}
+      {listState === "error" ? <div>
+        <p role="status">{bt("가구 목록을 불러오지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.", "Could not load your furniture. Check your connection and try again.")}</p>
+        <button type="button" onClick={() => void refresh()}>{bt("목록 다시 불러오기", "Reload furniture")}</button>
+      </div> : null}
       {notice ? <p role="status">{notice}</p> : null}
     </fieldset>
   );

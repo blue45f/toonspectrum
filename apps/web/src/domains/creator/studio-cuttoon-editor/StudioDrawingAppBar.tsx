@@ -12,6 +12,8 @@ import {
 
 import Link from "@/shared/navigation/router-link";
 import { buttonClass } from "@/shared/components/ui/button-utils";
+import { ToonStudioWordmark } from "@/shared/components/toonstudio-brand";
+import { ToonStudioMark } from "@/shared/components/toonstudio-mark";
 import { cn } from "@/shared/lib/utils";
 import { translateCurrentStaticSourceText } from "@/shared/lib/i18n-bilingual-copy";
 
@@ -40,11 +42,9 @@ export function StudioDrawingAppBar({ session }: { readonly session: StudioCutto
       className="flex min-h-12 shrink-0 items-center gap-2 border-b border-line bg-panel/95 px-2.5 shadow-sm backdrop-blur-xl sm:px-3"
     >
       <div className="flex min-w-0 items-center gap-2 pr-1">
-        <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-accent text-on-accent shadow-sm">
-          <Brush size={17} aria-hidden="true" />
-        </span>
+        <ToonStudioMark className="size-8 rounded-xl shadow-sm" />
         <div className="hidden min-w-0 sm:block">
-          <strong className="block truncate text-xs font-black tracking-[-0.02em] text-fg">ToonStudio Draw</strong>
+          <strong className="block truncate text-xs font-black tracking-[-0.02em] text-fg"><ToonStudioWordmark /> Draw</strong>
           <span className="block max-w-48 truncate text-[0.65rem] text-fg-3">{s.name || "Untitled"}</span>
         </div>
       </div>

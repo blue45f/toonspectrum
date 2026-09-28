@@ -1,6 +1,7 @@
 import { ArrowRight, CalendarDays, Gift, Sparkles } from "lucide-react";
 
 import Link from "@/shared/navigation/router-link";
+import { Container } from "@/shared/components/container";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import {
   useDocumentTitle,
@@ -34,7 +35,7 @@ export function EventsHubPage() {
   usePageSocialMeta({ canonicalPath: "/events", title, description });
 
   return (
-    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas px-4 py-10 sm:px-6 sm:py-16">
+    <div className="min-h-[calc(100dvh-var(--site-header-height,4.25rem))] bg-canvas py-10 sm:py-16">
       <CampusObjectSource objects={MARKETING_EVENTS.map((event) => ({
         id: event.id,
         title: text(event.title),
@@ -42,7 +43,7 @@ export function EventsHubPage() {
         kind: "event",
         exposure: "public",
       }))} />
-      <div className="mx-auto max-w-6xl">
+      <Container size="wide">
         <header className="max-w-3xl">
           <p className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent-soft px-3 py-1 text-xs font-black tracking-[0.14em] text-accent">
             <Sparkles size={14} aria-hidden /> EVENTS
@@ -82,7 +83,7 @@ export function EventsHubPage() {
             );
           })}
         </section>
-      </div>
+      </Container>
     </div>
   );
 }

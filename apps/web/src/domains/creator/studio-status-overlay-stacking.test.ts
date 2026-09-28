@@ -6,6 +6,7 @@ const appEntry = readFileSync(new URL("../../app/main.tsx", import.meta.url), "u
 const saveCenter = readFileSync(new URL("./StudioDraftSaveCenterImpl.tsx", import.meta.url), "utf8");
 const overlayCss = readFileSync(new URL("../../app/styles/studio-overlay-stacking.css", import.meta.url), "utf8");
 const responsiveCss = readFileSync(new URL("./studio-inspector-responsive.css", import.meta.url), "utf8");
+const offlinePanel = readFileSync(new URL("./offline/StudioOfflinePanel.tsx", import.meta.url), "utf8");
 
 describe("Studio global status overlay stacking", () => {
   it("loads the narrowly scoped Studio overlay boundary", () => {
@@ -47,5 +48,20 @@ describe("Studio global status overlay stacking", () => {
     expect(drawingRule).not.toMatch(/display|visibility|pointer-events/u);
     expect(saveCenter).toContain('aria-live="polite"');
     expect(saveCenter).toContain('open ? "z-[58]" : "z-[52]"');
+  });
+
+  it("keeps offline recovery controls below an open drawing sheet without disabling the warning", () => {
+    const drawingRule = responsiveCss.match(
+      /body:has\(\[data-studio-mobile-sheet="draw"\]:not\(\[aria-hidden="true"\]\)\) \[data-studio-shell-floating-target="offline-readiness"\]\s*\{([^}]+)\}/u,
+    )?.[1];
+
+    expect(drawingRule).toBeDefined();
+    expect(drawingRule).toMatch(/z-index:\s*0\s*!important/u);
+    expect(drawingRule).not.toMatch(/display|visibility|pointer-events/u);
+    expect(responsiveCss).toContain('@media (max-width: 63.999rem)');
+    expect(offlinePanel).toContain('data-studio-shell-floating-target="offline-readiness"');
+    expect(offlinePanel).toContain('data-studio-shell-force-visible="true"');
+    expect(offlinePanel).toContain('<summary');
+    expect(offlinePanel).toContain('z-40');
   });
 });

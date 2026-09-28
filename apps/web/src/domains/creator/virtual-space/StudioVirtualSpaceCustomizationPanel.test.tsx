@@ -12,6 +12,12 @@ import {
 import { useState } from "react";
 import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
 
+// 배치·테마 검증은 정상 빈 목록을 사용하고 HTTP 계약은 client 테스트가 소유한다.
+vi.mock("./studio-virtual-custom-furniture-client", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./studio-virtual-custom-furniture-client")>(),
+  listStudioVirtualCustomFurniture: vi.fn(async () => []),
+}));
+
 describe("StudioVirtualSpaceCustomizationPanel", () => {
   it("현재 테마의 가구 원본을 목록과 지도에 함께 반영하며 기존 배치를 유지한다", () => {
     const world = { ...studioVirtualPlaceWorldManifest("skyport", true), colliders: [], props: [], portals: [], npcs: [], interactions: [], interactionSlots: [] };
@@ -116,7 +122,7 @@ describe("StudioVirtualSpaceCustomizationPanel", () => {
     view.rerender(<StudioVirtualSpaceCustomizationPanel {...props} decorations={moved} selfPoint={{ x: 381, y: 310 }} />);
     fireEvent.click(screen.getByRole("button", { name: "배치 실행 취소" }));
     expect(onDecorations).not.toHaveBeenCalled();
-    expect(screen.getByRole("status").textContent).toContain("현재 위치");
+    expect(screen.getByText(/현재 위치/u, { selector: '[role="status"]' }).textContent).toContain("현재 위치");
     view.rerender(<StudioVirtualSpaceCustomizationPanel {...props} decorations={moved} />);
     fireEvent.click(screen.getByRole("button", { name: "배치 실행 취소" }));
     expect(onDecorations).toHaveBeenCalledWith(expect.objectContaining({ placements: [expect.objectContaining({ x: 400 })] }));

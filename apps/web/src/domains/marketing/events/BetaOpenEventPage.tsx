@@ -14,6 +14,7 @@ import {
 import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { useSession } from "@/domains/auth/public/session/auth-session-store";
 import Link from "@/shared/navigation/router-link";
+import { Container } from "@/shared/components/container";
 import {
   useDocumentTitle,
   useJsonLd,
@@ -76,7 +77,7 @@ export function BetaOpenEventPage() {
   return (
     <div className="relative min-h-screen overflow-hidden bg-[oklch(0.145_0.025_270)] text-white">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_10%_5%,oklch(0.8_0.16_75/0.20),transparent_28%),radial-gradient(circle_at_86%_18%,oklch(0.72_0.19_318/0.18),transparent_31%),radial-gradient(circle_at_50%_100%,oklch(0.68_0.15_235/0.14),transparent_36%)]" />
-      <div className="relative mx-auto max-w-7xl px-4 pb-20 pt-6 sm:px-6 sm:pb-28">
+      <Container size="wide" className="relative pb-20 pt-6 sm:pb-28">
         <nav className="flex items-center justify-between gap-3" aria-label={text({ ko: "이벤트 탐색", en: "Event navigation" })}>
           <Link href="/events" className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-bold text-white/75 hover:bg-white/8 hover:text-white">
             <ArrowLeft size={16} aria-hidden />{text({ ko: "전체 이벤트", en: "All events" })}
@@ -208,7 +209,7 @@ export function BetaOpenEventPage() {
             )}
           </div>
         </section>
-      </div>
+      </Container>
     </div>
   );
 }

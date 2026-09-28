@@ -1,4 +1,5 @@
 import { apiFetch } from "@/platform/api";
+import * as Dialog from "@radix-ui/react-dialog";
 import { playSfx } from "@toonstudio/core/fx";
 import { Command } from "cmdk";
 import {
@@ -71,6 +72,8 @@ export function CommandPalette({
   const language = useI18n((state) => state.lang);
   const pages = useMemo(() => palettePagesForLocale(language), [language]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   const trimmedQ = q.trim();
   const debouncedTrimmedQ = debouncedQ.trim();
@@ -355,12 +358,37 @@ export function CommandPalette({
   if (!open) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
+    <Dialog.Root open={open} onOpenChange={(next) => {
+      if (!next) playSfx("close");
+      onOpenChange(next);
+    }}>
+    <Dialog.Portal>
+    <Dialog.Content
+      ref={dialogRef}
       aria-label={t("command.palette.label")}
+      aria-describedby={undefined}
+      onOpenAutoFocus={(event) => {
+        event.preventDefault();
+        // 검색 진입점은 여러 곳이므로 실제로 열기 전 초점을 기억한다.
+        const previousFocus = document.activeElement;
+        returnFocusRef.current = previousFocus instanceof HTMLElement ? previousFocus : null;
+        inputRef.current?.focus({ preventScroll: true });
+      }}
+      onCloseAutoFocus={(event) => {
+        event.preventDefault();
+        // 명령 실행으로 다른 창에 이미 이동한 초점은 가로채지 않는다.
+        const currentFocus = document.activeElement;
+        if (returnFocusRef.current?.isConnected &&
+          (currentFocus === document.body || dialogRef.current?.contains(currentFocus))) {
+          returnFocusRef.current.focus({ preventScroll: true });
+        }
+      }}
+      onEscapeKeyDown={(event) => {
+        if (event.isComposing || event.keyCode === 229) event.preventDefault();
+      }}
       className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[8vh] sm:pt-[10vh]"
     >
+      <Dialog.Title className="sr-only">{t("command.palette.label")}</Dialog.Title>
       {/* Backdrop */}
       <button
         type="button"
@@ -882,6 +910,8 @@ export function CommandPalette({
           </div>
         </div>
       </Command>
-    </div>
+    </Dialog.Content>
+    </Dialog.Portal>
+    </Dialog.Root>
   );
 }

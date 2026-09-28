@@ -53,4 +53,29 @@ describe("Studio brush browser beta admission", () => {
     expect(readiness).toContain("Promise.all(overlays.map(({ surface }) => surface.isVisible()))");
     expect(readiness).toContain("!blocked.some(Boolean)");
   });
+
+  it("저장된 복구 사본 삭제를 현재 문서 초기화로 보고하지 않는다", () => {
+    const start = source.indexOf("async function clearRecoveryNoticeIfPresent");
+    const end = source.indexOf("async function clearStudioVerifierOriginStorage", start);
+    const clearRecovery = source.slice(start, end);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    expect(clearRecovery).toContain('name: "이전 그림 영구 삭제", exact: true');
+    expect(clearRecovery).toContain('await confirmation.waitFor({ state: "hidden", timeout: remaining() })');
+    expect(clearRecovery).toContain('await recovery.waitFor({ state: "hidden", timeout: remaining() })');
+    expect(clearRecovery).not.toContain("return true;");
+    expect(clearRecovery).toMatch(/return false;\s*\}\s*$/u);
+
+    const autosaveRuntime = readFileSync(
+      new URL("../apps/web/src/domains/creator/studio-page-autosave-runtime.ts", import.meta.url), "utf8",
+    );
+    const clearStart = autosaveRuntime.indexOf("export async function clearStudioAutosaveRecord");
+    const clearEnd = autosaveRuntime.indexOf("export interface StudioClearAutosaveContext", clearStart);
+    const clearRecord = autosaveRuntime.slice(clearStart, clearEnd);
+    expect(clearStart).toBeGreaterThan(-1);
+    expect(clearEnd).toBeGreaterThan(clearStart);
+    expect(clearRecord).toContain("await clearAutosaveDurableAuthority()");
+    expect(clearRecord).toContain("setHasAutosave(false)");
+    expect(clearRecord).not.toMatch(/setPages|setCurrentPageId|replaceDocument|resetDocument/u);
+  });
 });

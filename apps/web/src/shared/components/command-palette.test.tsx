@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CommandPalette } from "./command-palette";
@@ -82,20 +83,42 @@ describe("CommandPalette", () => {
     });
   });
 
-  it("방향키로 검색 범위 탭을 이동하고 Tab의 기본 포커스 이동은 가로채지 않는다", async () => {
+  it("방향키 초점 이동 후 내부 Tab은 보존하고 모달 경계에서만 순환한다", async () => {
     render(<CommandPalette open={true} onOpenChange={vi.fn()} />);
 
     const allTab = screen.getByRole("tab", { name: "전체" });
     const titlesTab = screen.getByRole("tab", { name: /작품/ });
+    allTab.focus();
     fireEvent.keyDown(allTab, { key: "ArrowRight" });
 
     await waitFor(() => {
       expect(titlesTab.getAttribute("aria-selected")).toBe("true");
+      expect(document.activeElement).toBe(titlesTab);
     });
 
-    const tabEvent = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
-    expect(titlesTab.dispatchEvent(tabEvent)).toBe(true);
-    expect(tabEvent.defaultPrevented).toBe(false);
+    // 선택 상태는 초점보다 먼저 바뀔 수 있다. 실제 rAF 초점 이동 뒤 키보드 계약을 확인한다.
+    const interiorBackward = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
+    expect(fireEvent(titlesTab, interiorBackward)).toBe(true);
+    expect(interiorBackward.defaultPrevented).toBe(false);
+
+    // 빈 작품 범위에서는 활성 탭이 마지막 Tab 대상이므로 앞으로 이동하면 모달 처음으로 순환한다.
+    const first = screen.getByRole("button", { name: /close|닫기/i });
+    const forwardBoundary = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    expect(fireEvent(titlesTab, forwardBoundary)).toBe(false);
+    expect(forwardBoundary.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+
+    const backwardBoundary = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
+    expect(fireEvent(first, backwardBoundary)).toBe(false);
+    expect(backwardBoundary.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(titlesTab);
+
+    const input = screen.getByRole("combobox");
+    input.focus();
+    const interiorForward = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    expect(fireEvent(input, interiorForward)).toBe(true);
+    expect(interiorForward.defaultPrevented).toBe(false);
+    expect(titlesTab.getAttribute("aria-selected")).toBe("true");
   });
 
   it("접두사(>) 입력 시 명령어 모드로 자동 전환된다", async () => {
@@ -181,5 +204,120 @@ describe("CommandPaletteHost", () => {
     fireEvent.keyDown(input, { key: "/" });
 
     expect(useUi.getState().commandPaletteOpen).toBe(false);
+  });
+
+  it("검색어 입력 후 Escape로 닫고 검색을 연 버튼에 초점을 복원한다", async () => {
+    render(<>
+      <button type="button" onClick={() => useUi.getState().openCommandPalette()}>도구 검색</button>
+      <CommandPaletteHost />
+    </>);
+    const trigger = screen.getByRole("button", { name: "도구 검색" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const input = await screen.findByRole("combobox");
+    expect(document.activeElement).toBe(input);
+    fireEvent.change(input, { target: { value: "브러시" } });
+
+    fireEvent.keyDown(input, { key: "Escape" });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(useUi.getState().commandPaletteOpen).toBe(false);
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("범위 탭과 닫기 버튼에서도 종료 후 매번 사용한 검색 버튼으로 돌아간다", async () => {
+    render(<>
+      <button type="button" onClick={() => useUi.getState().openCommandPalette()}>헤더 검색</button>
+      <button type="button" onClick={() => useUi.getState().openCommandPalette()}>홈 검색</button>
+      <CommandPaletteHost />
+    </>);
+    const headerTrigger = screen.getByRole("button", { name: "헤더 검색" });
+    headerTrigger.focus();
+    fireEvent.click(headerTrigger);
+    await screen.findByRole("combobox");
+    const tab = screen.getByRole("tab", { name: "전체" });
+    tab.focus();
+    fireEvent.keyDown(tab, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(headerTrigger));
+
+    const homeTrigger = screen.getByRole("button", { name: "홈 검색" });
+    homeTrigger.focus();
+    fireEvent.click(homeTrigger);
+    await screen.findByRole("combobox");
+    fireEvent.click(screen.getByRole("button", { name: /close|닫기/i }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(homeTrigger));
+  });
+
+  it("한글 조합 중의 Escape는 검색창을 닫지 않는다", async () => {
+    render(<CommandPaletteHost />);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const input = await screen.findByRole("combobox");
+
+    fireEvent.keyDown(input, { key: "Escape", isComposing: true });
+
+    expect(screen.queryByRole("dialog")).not.toBeNull();
+    expect(useUi.getState().commandPaletteOpen).toBe(true);
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Tab과 Shift+Tab은 검색 모달의 끝과 처음에서만 순환한다", async () => {
+    render(<>
+      <button type="button">배경 작업</button>
+      <CommandPaletteHost />
+    </>);
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const dialog = await screen.findByRole("dialog");
+    const first = screen.getByRole("button", { name: /close|닫기/i });
+    const buttons = dialog.querySelectorAll<HTMLButtonElement>("button");
+    const last = buttons[buttons.length - 1];
+    last.focus();
+    const forward = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    fireEvent(last, forward);
+    expect(forward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+
+    const backward = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
+    fireEvent(first, backward);
+    expect(backward.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(last);
+
+    const input = screen.getByRole("combobox");
+    input.focus();
+    const withinDialog = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    fireEvent(input, withinDialog);
+    expect(withinDialog.defaultPrevented).toBe(false);
+  });
+
+  it("다음 모달이 열린 뒤 검색이 닫혀도 새 모달의 초점을 가로채지 않는다", async () => {
+    function frame(nextOpen = false) {
+      return <>
+        <button type="button" onClick={() => useUi.getState().openCommandPalette()}>검색 열기</button>
+        <CommandPaletteHost />
+        <Dialog.Root open={nextOpen}>
+          <Dialog.Portal><Dialog.Content aria-describedby={undefined}>
+            <Dialog.Title>다음 작업</Dialog.Title>
+            <button type="button">다음 작업 실행</button>
+          </Dialog.Content></Dialog.Portal>
+        </Dialog.Root>
+      </>;
+    }
+    const view = render(frame());
+    const trigger = screen.getByRole("button", { name: "검색 열기" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    await screen.findByRole("combobox");
+    view.rerender(frame(true));
+    const nextAction = screen.getByRole("button", { name: "다음 작업 실행" });
+    expect(document.activeElement).toBe(nextAction);
+
+    await act(async () => {
+      useUi.getState().closeCommandPalette();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(document.activeElement).toBe(nextAction);
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 });

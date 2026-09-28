@@ -7,6 +7,12 @@ import { DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT } from "./studio-virtual-space-envir
 import { studioVirtualDecorationPreset, DEFAULT_STUDIO_VIRTUAL_CHARACTER_CUSTOMIZATION } from "./studio-virtual-space-customization";
 import { studioVirtualPlaceWorldManifest } from "./studio-virtual-space-place-world";
 
+// 저장 안내 검증은 정상 빈 목록을 사용하고 HTTP 계약은 client 테스트가 소유한다.
+vi.mock("./studio-virtual-custom-furniture-client", async (importOriginal) => ({
+  ...await importOriginal<typeof import("./studio-virtual-custom-furniture-client")>(),
+  listStudioVirtualCustomFurniture: vi.fn(async () => []),
+}));
+
 afterEach(cleanup);
 
 describe("배치와 환경의 저장 의미 안내", () => {

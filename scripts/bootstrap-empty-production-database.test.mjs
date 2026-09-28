@@ -451,6 +451,9 @@ describe("bootstrap SQL and repository contract", () => {
       "0091_creator_work_publication_media",
       "0092_collaboration_application_selection",
       "0093_review_voice_note_constraints_repair",
+      "0094_studio_virtual_space_decoration_layout",
+      "0095_studio_virtual_space_decoration_scope_key",
+      "0096_studio_virtual_space_custom_furniture",
     ]);
     expect(contract.fingerprint).toMatch(/^[0-9a-f]{64}$/u);
     expect(contract.fingerprintPaths).toEqual(expect.arrayContaining([
@@ -458,5 +461,31 @@ describe("bootstrap SQL and repository contract", () => {
       "scripts/creator-hiring-automation-database-contract.mjs",
       "scripts/creator-career-confirmation-database-contract.mjs",
     ]));
+  });
+
+  test("0094~0096은 원자적 적용과 사용자 소유권·기존 배치 보존을 유지한다", () => {
+    const migrations = loadBootstrapContract().manifest.slice(-3);
+    expect(migrations.map(({ id }) => id)).toEqual([
+      "0094_studio_virtual_space_decoration_layout",
+      "0095_studio_virtual_space_decoration_scope_key",
+      "0096_studio_virtual_space_custom_furniture",
+    ]);
+    for (const { contents } of migrations) {
+      expect(contents).toMatch(/\nBEGIN;[\s\S]*COMMIT;\s*$/u);
+      expect(contents).toContain("SET LOCAL lock_timeout = '5s'");
+      expect(contents).toContain("SET LOCAL statement_timeout = '90s'");
+      expect(contents).toContain("SET LOCAL search_path = pg_catalog, public");
+      expect(contents).not.toMatch(/\b(?:DROP (?:TABLE|SCHEMA)|TRUNCATE|DELETE FROM)\b/iu);
+    }
+    const [layout, scope, furniture] = migrations.map(({ contents }) => contents);
+    expect(layout).toContain('PRIMARY KEY ("userId", "districtKey")');
+    expect(layout).toContain('CHECK (jsonb_array_length("placements") <= 36)');
+    expect(layout).toContain('CHECK ("revision" >= 0)');
+    expect(scope).toMatch(/SET "scopeKey" = "districtKey"\s+WHERE "scopeKey" IS NULL;[\s\S]*ALTER COLUMN "scopeKey" SET NOT NULL;[\s\S]*PRIMARY KEY \("userId", "scopeKey"\)/u);
+    expect(scope).toContain('CHECK (char_length("scopeKey") <= 240)');
+    for (const sql of [layout, furniture]) {
+      expect(sql).toContain('FOREIGN KEY ("userId") REFERENCES public."user"("id") ON DELETE CASCADE');
+    }
+    expect(furniture).toContain('CHECK ("width" > 0 AND "height" > 0 AND "byteLength" > 0)');
   });
 });

@@ -665,6 +665,10 @@ export default defineConfig(({ command, mode }) => ({
   },
   server: {
     port: 5173,
+    // 감사 산출물과 임시 검증 DB의 쓰기는 앱 소스 HMR 대상이 아니다.
+    watch: {
+      ignored: ["**/.qa/**"],
+    },
     proxy: {
       "/api": {
         target: apiTarget,

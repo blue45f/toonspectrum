@@ -4,6 +4,20 @@ import { readFileSync } from "node:fs";
 import { isDiscoverPurposeRoute, isPublicCreativeRoute, supportsPublicSiteOnwardJourney } from "./site-public-routes";
 
 describe("public creative chrome route boundaries", () => {
+  it("라우터와 같은 대소문자 규칙으로 공개·개인·정책 동선을 분류한다", () => {
+    for (const pathname of ["/MARKET/", "/Learn/Lessons/Ink", "/Community/Post/ABC"]) {
+      expect(isPublicCreativeRoute(pathname)).toBe(true);
+      expect(supportsPublicSiteOnwardJourney(pathname)).toBe(true);
+    }
+    for (const pathname of ["/COLLABORATE/NEW/", "/Community/Promote/Moderation", "/MARKET/MANAGE"]) {
+      expect(isPublicCreativeRoute(pathname)).toBe(false);
+      expect(supportsPublicSiteOnwardJourney(pathname)).toBe(false);
+    }
+    expect(isPublicCreativeRoute("/PRIVACY/")).toBe(true);
+    expect(supportsPublicSiteOnwardJourney("/PRIVACY/")).toBe(false);
+    expect(isDiscoverPurposeRoute("/TITLE/ABC/")).toBe(true);
+    expect(isDiscoverPurposeRoute("/TITLES-IN-PROGRESS")).toBe(false);
+  });
   it.each(["/terms", "/privacy", "/copyright", "/terms/", "/privacy/", "/copyright/"])("정책 %s의 공개 셸은 유지하고 홍보 여정만 제외한다", (pathname) => {
     expect(isPublicCreativeRoute(pathname)).toBe(true);
     expect(supportsPublicSiteOnwardJourney(pathname)).toBe(false);

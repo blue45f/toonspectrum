@@ -1,0 +1,41 @@
+.toonstudio-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: .625rem;
+  min-width: 0;
+}
+
+.toonstudio-wordmark {
+  display: inline;
+  color: var(--color-fg);
+  font-family: var(--font-display, var(--font-sans));
+  font-size: inherit;
+  font-weight: 800;
+  letter-spacing: -.045em;
+  white-space: nowrap;
+}
+
+.toonstudio-wordmark__studio {
+  color: var(--color-accent);
+}
+
+/* 어두운 시그니처에서는 참조의 청록·보라 색을, 밝은 테마에서는 짙은 강조색을 쓴다. */
+:root[data-design-theme="starlight"] .toonstudio-wordmark__studio {
+  color: #a9a1ff;
+}
+
+@supports (background-clip: text) {
+  :root[data-design-theme="starlight"] .toonstudio-wordmark__studio {
+    background: linear-gradient(110deg, #69d8ff, #b9a1ff 62%, #de91f5);
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+@media (prefers-contrast: more), (forced-colors: active) {
+  .toonstudio-wordmark__studio {
+    background: none !important;
+    color: inherit !important;
+    -webkit-text-fill-color: currentColor !important;
+  }
+}

@@ -29,6 +29,7 @@ apps/api/src/modules/studio-project-graph/studio-review-preview-producer.service
 apps/api/src/modules/studio-project-graph/studio-review-preview.test.ts
 apps/api/src/modules/studio-project-graph/studio-session-evidence-projection.test.ts
 apps/api/src/modules/studio-project-graph/studio-session-evidence.service.test.ts
+apps/api/src/modules/studio-virtual-space-decoration/studio-virtual-space-decoration.schema.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics-d1.client.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics-d1.repository.test.ts
 apps/api/src/modules/traffic-analytics/traffic-analytics-repository.provider.test.ts
