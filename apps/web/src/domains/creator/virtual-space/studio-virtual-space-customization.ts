@@ -30,8 +30,10 @@ export const STUDIO_VIRTUAL_DECOR_TYPES = [
   "drawing-desk", "bookshelf", "review-board", "sofa",
 ] as const;
 export type StudioVirtualDecorType = typeof STUDIO_VIRTUAL_DECOR_TYPES[number];
-export type StudioVirtualDecorPresetKey = "minimal" | "creator-garden" | "festival" | "night-market";
-export type StudioVirtualBackgroundPresentationMode = "minimal" | "decorated" | "festival";
+export const STUDIO_VIRTUAL_PRESET_KEYS = ["minimal", "creator-garden", "festival", "night-market"] as const;
+export type StudioVirtualDecorPresetKey = (typeof STUDIO_VIRTUAL_PRESET_KEYS)[number];
+export const STUDIO_VIRTUAL_PRESENTATION_MODES = ["minimal", "decorated", "festival"] as const;
+export type StudioVirtualBackgroundPresentationMode = (typeof STUDIO_VIRTUAL_PRESENTATION_MODES)[number];
 
 export interface StudioVirtualDecorPlacement extends StudioVirtualSpacePoint {
   readonly id: string;
