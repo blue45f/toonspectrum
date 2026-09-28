@@ -16,6 +16,7 @@ import {
   activeProjectIdFromLocation,
   writeActiveProjectContext,
 } from "@/domains/creator/studio-shell/active-project-context";
+import { isStudioWorkspaceRoutePathname } from "@/domains/creator/studio-workspace-route";
 import { CommandPaletteHost } from "@/shared/components/command-palette-host";
 import { PwaInstallNudgeHost as PwaInstallNudge } from "@/shared/components/pwa-install-nudge-host";
 import { isPublicCreativeRoute, supportsPublicSiteOnwardJourney } from "@/shared/components/site-public-routes";
@@ -218,7 +219,10 @@ export function AppShell({
         ) : null}
         {immersiveVirtualExperience ? null : header}
         <Suspense fallback={null}>
-          <ServiceDegradedBanner immersive={immersiveVirtualExperience && normalizedPath !== "/home"} />
+          <ServiceDegradedBanner immersive={
+            isStudioWorkspaceRoutePathname(pathname)
+            || (immersiveVirtualExperience && normalizedPath !== "/home")
+          } />
         </Suspense>
         {enhancedSite ? <SiteConnectionNotice /> : null}
         {immersiveVirtualExperience ? null : <PwaInstallNudge />}
