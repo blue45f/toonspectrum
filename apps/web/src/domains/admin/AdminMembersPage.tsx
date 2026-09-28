@@ -70,6 +70,7 @@ interface MemberRow {
   email: string | null;
   role: MemberRole;
   status: MemberStatus;
+  isTestAccount?: boolean | null;
   suspendedAt: string | null;
   suspensionReason: string | null;
   deletedAt: string | null;
@@ -96,6 +97,7 @@ interface MemberDetails {
     email: string | null;
     role: MemberRole;
     status: MemberStatus;
+    isTestAccount?: boolean | null;
     suspendedAt: string | null;
     suspensionReason: string | null;
     deletedAt: string | null;
@@ -836,6 +838,7 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                     <td className="px-4 py-3 align-top">
                       <p className="font-medium text-fg">
                         {member.name ?? "—"}
+                        <span className="ml-2"><AdminMemberTestAccountBadge value={member.isTestAccount} /></span>
                         {isSelf ? (
                           <span className="ml-1.5 text-[0.65rem] text-fg-3">
                             {t("admin.members.selfTag")}
@@ -1159,6 +1162,15 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
                   </dd>
                 </div>
               </dl>
+              <div className="mt-4">
+                <AdminMemberTestAccountPanel actorId={uid} targetId={detail.user.id} targetName={detail.user.name ?? detail.user.id}
+                  value={detail.user.isTestAccount} canManage={canManageMembers && detail.user.status === "active"}
+                  onUpdated={(targetId, value) => {
+                    setDetail((current) => current?.user.id === targetId ? { ...current, user: { ...current.user, isTestAccount: value } } : current);
+                    setMembers((current) => current.map((member) => member.id === targetId ? { ...member, isTestAccount: value } : member));
+                    showToast("계정 구분을 저장했습니다.");
+                  }} />
+              </div>
             </section>
 
             <section className="rounded-xl border border-line bg-panel/50 p-4 md:col-span-3">
@@ -1258,4 +1270,79 @@ function MemberBoard({ uid, selfId, canManageMembers }: {
       </AdminDialog>
     </div>
   );
+}
+
+export function AdminMemberTestAccountBadge({ value }: { value: boolean | null | undefined }) {
+  useBilingualI18nRevision();
+  return <span className="inline-flex rounded-full border border-line bg-raised px-2 py-0.5 text-xs text-fg-2">
+    {value === true ? bi("테스트 계정 · 관리자 전용", "Test account · admins only") : value === false ? bi("일반 계정", "Regular account") : bi("계정 구분 확인 불가", "Classification unavailable")}
+  </span>;
+}
+interface TestAccountEditorProps {
+  actorId: string;
+  targetId: string;
+  targetName: string;
+  value: boolean | null | undefined;
+  canManage: boolean;
+  onUpdated: (targetId: string, value: boolean) => void;
+}
+/** 내부 구분은 공개 프로필이나 인증 권한에 사용하지 않는다. */
+export function AdminMemberTestAccountPanel(props: TestAccountEditorProps) {
+  return <TestAccountEditor key={`${props.targetId}:${String(props.value)}`} {...props} />;
+}
+function TestAccountEditor({ actorId, targetId, targetName, value, canManage, onUpdated }: TestAccountEditorProps) {
+  useBilingualI18nRevision();
+  const [reason, setReason] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pendingRef = useRef(false);
+  const activeRef = useRef(true);
+  useEffect(() => { activeRef.current = true; return () => { activeRef.current = false; }; }, []);
+  const available = typeof value === "boolean";
+  async function save() {
+    if (!canManage || !available || !reason.trim() || !confirmed || pendingRef.current) return;
+    pendingRef.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await adminFetch<{ ok: boolean; id: string; isTestAccount: boolean }>(
+        `/users/${encodeURIComponent(targetId)}/test-account`, actorId, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isTestAccount: !value, expectedIsTestAccount: value, reason: reason.trim() }),
+        },
+      );
+      if (!activeRef.current) return;
+      if (!result.ok || result.id !== targetId || result.isTestAccount !== !value) {
+        throw new Error(bi("저장 결과를 확인하지 못했습니다. 회원 상세 정보를 다시 열어 주세요.", "Unable to confirm the saved result. Reopen the member details."));
+      }
+      onUpdated(targetId, result.isTestAccount);
+    } catch (failure) {
+      if (activeRef.current) setError(failure instanceof Error ? failure.message : bi("계정 구분을 저장하지 못했습니다.", "Unable to save the account classification."));
+    } finally {
+      pendingRef.current = false;
+      if (activeRef.current) setBusy(false);
+    }
+  }
+  return <section aria-label={bi("내부 테스트 계정 관리", "Internal test account management")} className="space-y-3 rounded-2xl border border-line bg-canvas/40 p-4">
+    <h3 className="font-semibold text-fg">{bi("내부 품질 검증 계정", "Internal QA account")}</h3>
+    <AdminMemberTestAccountBadge value={value} />
+    <p className="text-xs leading-relaxed text-fg-3">{bi("이 구분은 관리자 화면에서만 표시됩니다. 공개 프로필과 닉네임, 권한은 바뀌지 않습니다. 테스트 글·댓글은 검증 후 정리하세요.", "This classification is visible only in admin views. Public profiles, names and permissions stay unchanged. Clean up test posts and comments after verification.")}</p>
+    {!available && <p role="status" className="text-xs text-fg-3">{bi("API 배포·마이그레이션 상태를 확인한 뒤 상세 정보를 다시 열어 주세요.", "Check the API deployment and migration, then reopen the member details.")}</p>}
+    {canManage && available && <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="space-y-3">
+      <label className="block text-sm text-fg-2">{bi("변경 사유", "Reason for change")}
+        <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={300} required disabled={busy}
+          className="mt-1 min-h-20 w-full rounded-xl border border-line bg-panel p-3 text-sm text-fg" placeholder={bi("검증 범위와 계정 관리 목적을 입력하세요.", "Describe the verification scope and purpose.")} />
+      </label>
+      <label className="flex min-h-11 items-center gap-2 text-xs text-fg-2">
+        <input type="checkbox" checked={confirmed} disabled={busy} onChange={(event) => setConfirmed(event.target.checked)} />
+        {formatI18nTemplate(bi("{name} 회원을 {kind} 계정으로 구분하고 변경 사유를 감사 기록에 남깁니다.", "Classify {name} as a {kind} account and record the reason in the audit log."), { name: targetName, kind: value ? bi("일반", "regular") : bi("테스트", "test") })}
+      </label>
+      <button type="submit" disabled={busy || !confirmed || !reason.trim()} className="min-h-11 rounded-xl bg-accent px-4 text-sm font-semibold text-on-accent disabled:opacity-50">
+        {busy ? bi("계정 구분 저장 중...", "Saving classification...") : value ? bi("일반 계정으로 변경", "Mark as regular account") : bi("테스트 계정으로 지정", "Mark as test account")}
+      </button>
+    </form>}
+    {!canManage && <p className="text-xs text-fg-3">{bi("계정 구분 변경은 관리자만 실행할 수 있습니다.", "Only administrators can change this classification.")}</p>}
+    {error && <p role="alert" className="text-sm text-bad">{error}</p>}
+  </section>;
 }

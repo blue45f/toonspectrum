@@ -11,8 +11,8 @@ test("0079 closes its atomic transaction and exactly matches the canonical job/r
   expect([...sql.matchAll(/CREATE FUNCTION (\w+)/gu)].map((m) => m[1]).sort()).toEqual([...HIRING_FUNCTIONS].sort());
   expect(sql).toContain("claim_token"); expect(sql).toContain("next_round");
   expect(sql).not.toContain("target_round"); expect(sql).not.toContain("lease_token");
-  const manifest = loadMigrationManifest(); expect(manifest).toHaveLength(96);
-  expect(manifest.slice(-15).map((m) => m.id)).toEqual(["0082_studio_review_policy", "0083_studio_review_vote_epoch", "0084_production_model_v2_compatibility", "0085_production_team_workspace", "0086_production_operation_policy", "0087_studio_pinned_review_share", "0088_studio_review_delivery", "0089_creator_series_spatial_showcase", "0090_studio_review_voice_note", "0091_creator_work_publication_media", "0092_collaboration_application_selection", "0093_review_voice_note_constraints_repair", "0094_studio_virtual_space_decoration_layout", "0095_studio_virtual_space_decoration_scope_key", "0096_studio_virtual_space_custom_furniture"]);
+  const manifest = loadMigrationManifest(); expect(manifest).toHaveLength(97);
+  expect(manifest.slice(-16).map((m) => m.id)).toEqual(["0082_studio_review_policy", "0083_studio_review_vote_epoch", "0084_production_model_v2_compatibility", "0085_production_team_workspace", "0086_production_operation_policy", "0087_studio_pinned_review_share", "0088_studio_review_delivery", "0089_creator_series_spatial_showcase", "0090_studio_review_voice_note", "0091_creator_work_publication_media", "0092_collaboration_application_selection", "0093_review_voice_note_constraints_repair", "0094_studio_virtual_space_decoration_layout", "0095_studio_virtual_space_decoration_scope_key", "0096_studio_virtual_space_custom_furniture", "0097_admin_member_test_accounts"]);
   expect(createHash("sha256").update(read("../apps/api/src/platform/database/migrations/0078_creator_hiring_workspace.sql")).digest("hex")).toBe("c8094e53ce497dfd8f0649adb3e51ad67ae4a67f27d4547b5863484d2e8e2085");
 });
 test("runtime is DML-only and round receipts are immutable", () => {

@@ -7,6 +7,7 @@ import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 
 import { applyProductionStudioRevisionLink, createPlanningSnapshot, evaluateHandoffReadiness, evaluateProductionRisks, evaluateReviewApproval, preflightCreditManifest, transitionProductionRisk, transitionProductionRiskResponse, type ClarificationThread, type EpisodeCollaboration, type ProductionProjectAggregate, type ProductionTask, type ReviewDecision, type StoryToArtHandoffPackage } from "@toonstudio/core/production";
 
+import { ProductionSessionStatus } from "./ProductionSessionStatus";
 import { ProductionWorkBoard } from "./ProductionWorkBoard";
 
 import { ProductionCommandPalette } from "./ProductionCommandPalette";
@@ -23,13 +24,14 @@ import { ProductionIntegrationsPanel } from "./ProductionIntegrationsPanel";
 import { ProductionManagementWorkspace } from "./ProductionManagementWorkspace";
 import { ProductionManuscriptWorkspace } from "./ProductionManuscriptWorkspace";
 import { ProductionOperationsControlWorkspace } from "./ProductionOperationsControlWorkspace";
-import { executeProductionCommand, getProductionPersonalInbox, getProductionProject, listProductionProjects, type ProductionClientCommand, type ProductionPersonalInboxItem, type ProductionProjectAccess, type ProductionProjectSummary } from "./production-api";
+import { getProductionPersonalInbox, listProductionProjects, type ProductionClientCommand, type ProductionPersonalInboxItem, type ProductionProjectAccess, type ProductionProjectSummary } from "./production-api";
 
 import { buttonClass } from "@/shared/components/ui/button-utils";
 import { creatorRoleLens, type CreatorRoleLens } from "@/shared/lib/creator-role-contract";
 import { cn } from "@/shared/lib/utils";
 import { useApp } from "@/shared/lib/store";
-import { getApiErrorMessage, httpStatus } from "@/platform/api";
+import { useProductionProjectSession } from "./use-production-project-session";
+import { getApiErrorMessage } from "@/platform/api";
 import { getMyProfile } from "@/platform/me-client";
 
 export type ProductionProjectSurface =
@@ -49,7 +51,6 @@ export type ProductionProjectSurface =
 type RoleLens = CreatorRoleLens;
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-const SAMPLE_PROJECT_ID = "sample-project";
 const DATE_ONLY = new Intl.DateTimeFormat("ko-KR", { month: "short", day: "numeric" });
 
 function usePreferredRoleLens(fallback: RoleLens): readonly [RoleLens, (next: RoleLens) => void] {
@@ -484,111 +485,18 @@ function evaluateDemoRiskState(aggregate: ProductionProjectAggregate): Productio
   };
 }
 
+const productionDemoAdapter = {
+  create: () => evaluateDemoRiskState(createProductionDemoProject()),
+  reduce: (current: ProductionProjectAggregate, command: ProductionClientCommand) => {
+    const next = evaluateDemoRiskState(reduceDemoCommand(current, command));
+    const issues = validateProductionWorkflowMutation(current, next);
+    if (issues.length) throw new Error(issues.join("\n"));
+    return next;
+  },
+};
 function useProductionProject(projectId: string | undefined) {
-  const isDemo = !projectId || projectId === SAMPLE_PROJECT_ID;
-  const [aggregate, setAggregate] = useState<ProductionProjectAggregate | null>(
-    isDemo ? evaluateDemoRiskState(createProductionDemoProject()) : null,
-  );
-  const [access, setAccess] = useState<ProductionProjectAccess>({
-    view: true,
-    comment: true,
-    edit: true,
-    manage: true,
-    owner: true,
-    role: "owner",
-  });
-  const [loading, setLoading] = useState(!isDemo);
-  const [error, setError] = useState<string | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [notice, setNotice] = useState<string | null>(null);
-  const aggregateRef = useRef<ProductionProjectAggregate | null>(aggregate);
-  const commandQueueRef = useRef<Promise<void>>(Promise.resolve());
-
-  useEffect(() => {
-    aggregateRef.current = aggregate;
-  }, [aggregate]);
-
-  useEffect(() => {
-    if (isDemo) {
-      setAggregate(evaluateDemoRiskState(createProductionDemoProject()));
-      setLoading(false);
-      setError(null);
-      return;
-    }
-    let active = true;
-    setLoading(true);
-    setError(null);
-    void getProductionProject(projectId).then((record) => {
-      if (!active) return;
-      setAggregate(record.aggregate);
-      setAccess(record.access);
-      setLoading(false);
-    }).catch(async (cause: unknown) => {
-      if (!active) return;
-      setError(await getApiErrorMessage(cause, "제작 프로젝트를 불러오지 못했습니다."));
-      setLoading(false);
-    });
-    return () => { active = false; };
-  }, [isDemo, projectId]);
-
-  const queueCommand = useCallback((
-    command: ProductionClientCommand,
-    successMessage: string,
-    propagateFailure: boolean,
-  ): Promise<void> => {
-    const run = async () => {
-      const current = aggregateRef.current;
-      if (!current) {
-        if (propagateFailure) throw new Error("저장할 제작 프로젝트가 없습니다.");
-        return;
-      }
-      setSaveState("saving");
-      setNotice(null);
-      try {
-        const next = isDemo
-          ? evaluateDemoRiskState(reduceDemoCommand(current, command))
-          : (await executeProductionCommand(current.projectId, current.revision, command)).aggregate;
-        if (isDemo) {
-          const issues = validateProductionWorkflowMutation(current, next);
-          if (issues.length) throw new Error(issues.join("\n"));
-        }
-        aggregateRef.current = next;
-        setAggregate(next);
-        setSaveState("saved");
-        setNotice(successMessage);
-      } catch (cause) {
-        let message = await getApiErrorMessage(cause, "변경 내용을 저장하지 못했습니다.");
-        if (!isDemo && httpStatus(cause) === 409) {
-          try {
-            const refreshed = await getProductionProject(current.projectId);
-            aggregateRef.current = refreshed.aggregate;
-            setAggregate(refreshed.aggregate);
-            setAccess(refreshed.access);
-            message = `${message} 최신 프로젝트 상태를 다시 불러왔습니다.`;
-          } catch {
-            message = `${message} 최신 상태 자동 갱신에도 실패해 페이지 새로고침이 필요합니다.`;
-          }
-        }
-        setSaveState("error");
-        setNotice(message);
-        if (propagateFailure) throw new Error(message, { cause });
-      }
-    };
-    const pending = commandQueueRef.current.then(run, run);
-    commandQueueRef.current = pending.catch(() => undefined);
-    return pending;
-  }, [isDemo]);
-
-  const execute = useCallback(
-    (command: ProductionClientCommand, successMessage: string) => queueCommand(command, successMessage, false),
-    [queueCommand],
-  );
-  const executeStrict = useCallback(
-    (command: ProductionClientCommand, successMessage: string) => queueCommand(command, successMessage, true),
-    [queueCommand],
-  );
-
-  return { aggregate, access, loading, error, saveState, notice, execute, executeStrict, isDemo };
+  const actorId = useApp((state) => state.userId);
+  return useProductionProjectSession(projectId, actorId, productionDemoAdapter);
 }
 
 export function ProductionLandingPage() {
@@ -1340,7 +1248,7 @@ function SurfaceContent({
     case "schedule": return <ScheduleSurface aggregate={aggregate} execute={execute} canEdit={canEdit} />;
     case "control": return <ProductionOperationsControlWorkspace aggregate={aggregate} execute={executeStrict} canEdit={canEdit} canManage={canManage} />;
     case "handoff": return <HandoffSurface aggregate={aggregate} roleLens={roleLens} execute={execute} canEdit={canEdit} />;
-    case "review": return <ReviewSurface aggregate={aggregate} execute={execute} canEdit={canEdit} roleLens={roleLens} />;
+    case "review": return <ReviewSurface aggregate={aggregate} execute={executeStrict} canEdit={canEdit} roleLens={roleLens} />;
     case "procurement": return <ProcurementSurface aggregate={aggregate} />;
     case "rights": return <RightsSurface aggregate={aggregate} />;
     case "settings": return <SettingsSurface aggregate={aggregate} />;
@@ -1355,7 +1263,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
 
   if (!projectId) return <Navigate to="/production" replace />;
   if (project.loading) return <div data-route-pending="production-project" className="min-h-dvh bg-canvas p-6 text-fg"><div className="mx-auto max-w-5xl animate-pulse rounded-3xl border border-line bg-card p-8">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "제작 프로젝트를 불러오는 중…")}</div></div>;
-  if (project.error || !project.aggregate) return <div data-route-error="production-project" className="min-h-dvh bg-canvas p-6 text-fg"><div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6"><h1 className="font-bold">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "프로젝트를 열 수 없습니다")}</h1><p className="mt-2 text-sm text-fg-2">{project.error ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "프로젝트 데이터가 없습니다.")}</p><Link className={cn(buttonClass({ variant: "outline" }), "mt-4")} to="/production">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "제작 관리 홈")}</Link></div></div>;
+  if (project.error || !project.aggregate) return <div data-route-error="production-project" className="min-h-dvh bg-canvas p-6 text-fg"><div role="alert" className="mx-auto max-w-3xl rounded-2xl border border-bad/30 bg-bad/10 p-6"><h1 className="font-bold">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "프로젝트를 열 수 없습니다")}</h1><p className="mt-2 text-sm text-fg-2">{project.error ?? translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "프로젝트 데이터가 없습니다.")}</p><button type="button" disabled={project.refreshing} onClick={() => void project.refresh()} className={cn(buttonClass({ variant: "outline" }), "mr-3 mt-4")}>다시 불러오기</button><Link className={cn(buttonClass({ variant: "outline" }), "mt-4")} to="/production">{translateCurrentStaticSourceText("domains.creator.production.hub.ProductionHubPage", "ko", "제작 관리 홈")}</Link></div></div>;
 
   return (
     <div data-creator-workflow="production-project" data-route-ready="production-project" className="min-h-dvh bg-canvas text-fg">
@@ -1363,6 +1271,7 @@ export function ProductionProjectPage({ surface }: { readonly surface: Productio
       <div className="mx-auto grid max-w-[100rem] lg:grid-cols-[15rem_minmax(0,1fr)]">
         <ProjectNav projectId={project.aggregate.projectId} surface={surface} />
         <div className="min-w-0 p-4 sm:p-6">
+          {!project.isDemo && <ProductionSessionStatus revision={project.aggregate.revision} refreshing={project.refreshing} saving={project.saveState === "saving"} onRefresh={project.refresh} />}
           {project.notice ? <div className={cn("mb-4 rounded-xl border px-3 py-2 text-xs", project.saveState === "error" ? "border-bad/30 bg-bad/10 text-fg" : "border-good/30 bg-good/10 text-fg")} role="status">{project.notice}</div> : null}
           {project.isDemo ? surface === "production" ? <details className="mb-3 rounded-xl border border-line bg-card px-4"><summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-fg-2">샘플 프로젝트 안내 · 변경은 실제 프로젝트에 반영되지 않습니다</summary><ProductionSampleJourneyGuide /></details> : <ProductionSampleJourneyGuide /> : null}
           <SurfaceContent

@@ -1,6 +1,8 @@
 import {
   formatI18nTemplate,
   translateCurrentStaticSourceText,
+  translateBilingualValueForActiveLocale,
+  useBilingualI18nRevision,
 } from "@/shared/lib/i18n-bilingual-copy";
 import {
   BookOpenText,
@@ -22,7 +24,6 @@ import {
   FAN_CAFE_POST_TITLE_MAX_LENGTH,
   FAN_CAFE_POST_TEXT_MAX_LENGTH,
   FAN_CAFE_POST_TAGS_MAX_LENGTH,
-  FAN_CAFE_ACTIVITY_STORAGE_KEY,
   KIND_ITEMS,
 } from "./fan-cafe-constants";
 import FanPostCard from "./fan-cafe-post-card";
@@ -39,6 +40,7 @@ import {
   COMMUNITY_SCOPE_LABEL_WITH_ALL,
   FAN_CAFE_SCOPE_COPY,
 } from "@/shared/lib/community-ui";
+import { requestAuthModalOpen } from "@/domains/auth/public/session/auth-modal-intent";
 import { api, getApiErrorMessage } from "@/platform/api";
 import { ensureArray } from "@/shared/lib/http-safe";
 import {
@@ -52,6 +54,8 @@ import { useCelebrate } from "@/shared/hooks/use-celebrate";
 export { FanPostImages } from "./fan-cafe-images";
 export { FanPostReplySection } from "./fan-cafe-reply-section";
 export type { FanCafeComposeLock };
+
+const bi = (ko: string, en: string) => translateBilingualValueForActiveLocale("FanCafePanel", ko, en);
 
 export function FanCafePanel({
   scope,
@@ -72,6 +76,7 @@ export function FanCafePanel({
   onTopLevelReplyDelta?: (post: FanCafePost, delta: number) => void;
   onTopLevelPostCreated?: (post: FanCafePost) => void;
 }) {
+  useBilingualI18nRevision();
   const userId = useApp((s) => s.userId);
   const sessionToken = useApp((s) => s.sessionToken);
   const [posts, setPosts] = useState<FanCafePost[]>([]);
@@ -142,10 +147,9 @@ export function FanCafePanel({
   }, [posts]);
 
   const selectedTag =
-    selectedTagState.context === selectedTagContext && postTagSuggests.includes(selectedTagState.tag ?? "")
-      ? selectedTagState.tag
-      : null;
+    selectedTagState.context === selectedTagContext ? selectedTagState.tag : null;
   const showOnlyMine = Boolean(showMyPostsOnly && userId);
+  const hasActiveFilters = filterKind !== "all" || Boolean(selectedTag || queryText || showOnlyMine);
 
   function setSelectedTagFilter(tag: string | null) {
     setLoading(true);
@@ -171,39 +175,17 @@ export function FanCafePanel({
   const canComposePost = scope !== "all" && Boolean(targetId);
   const authHeaders = useMemo(() => (sessionToken ? { "x-user-id": sessionToken } : undefined), [sessionToken]);
 
-  function appendDemoActivity(action: string, label: string, detail?: string) {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = globalThis.localStorage.getItem(FAN_CAFE_ACTIVITY_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      const current = Array.isArray(parsed) ? parsed : [];
-      const next = [
-        ...current,
-        {
-          id: `fan-cafe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, // NOSONAR S2245 비암호화 용도(시각효과/ID 생성)
-          at: Date.now(),
-          action,
-          label,
-          detail,
-          scope,
-          targetLabel,
-        },
-      ].slice(-20);
-      globalThis.localStorage.setItem(FAN_CAFE_ACTIVITY_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // Demo activity is optional; storage failures should not block the UI.
-    }
-  }
-
   useEffect(() => {
+    const normalized = searchText.trim().toLowerCase();
+    if (normalized === queryText) return;
     const timer = setTimeout(() => {
       setLoading(true);
       setLoadError(null);
       setError(null);
-      setQueryText(searchText.trim().toLowerCase());
+      setQueryText(normalized);
     }, 220);
     return () => clearTimeout(timer);
-  }, [searchText]);
+  }, [queryText, searchText]);
 
   useEffect(() => {
     if (!autoRefreshEnabled) return;
@@ -279,6 +261,8 @@ export function FanCafePanel({
       },
     )
       .then((data) => {
+        if (controller.signal.aborted) return;
+        globalThis.clearTimeout(resetTimer);
         if (!Array.isArray(data.items)) throw new Error("invalid payload");
         const nextItems = ensureArray(data.items) as FanCafePost[];
         let incomingPosts = 0;
@@ -305,9 +289,17 @@ export function FanCafePanel({
       .catch(async (caught) => {
         if ((caught as Error).name === "AbortError") return;
         const message = await getApiErrorMessage(caught, "팬카페 글을 불러오지 못했습니다.");
-        if (!controller.signal.aborted) setLoadError(message);
+        if (!controller.signal.aborted) {
+          if (isContextChanged) {
+            setPosts([]);
+            setHasMore(false);
+            setNextCursor(null);
+          }
+          setLoadError(message);
+        }
       })
       .finally(() => {
+        globalThis.clearTimeout(resetTimer);
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => {
@@ -737,10 +729,10 @@ export function FanCafePanel({
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
                   <button
                     type="button"
-                    onClick={() => appendDemoActivity("blocked", "로그인 전 작성 차단", "약관 확인 후 로그인 필요")}
-                    className="rounded-lg border border-line bg-raised px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-fg"
+                    onClick={() => requestAuthModalOpen({ reason: "protected-action", source: "community-compose", mode: "login" })}
+                    className="min-h-11 rounded-lg border border-line bg-raised px-3 py-2 text-xs font-semibold text-fg-2 transition-colors hover:border-accent/45 hover:text-fg"
                   >
-                    {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "차단 로그 남기기")}</button>
+                    {bi("로그인하고 글 쓰기", "Sign in to post")}</button>
                   <a className="rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-on-accent" href="/terms">
                     {translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "약관 보기")}</a>
                 </div>
@@ -753,15 +745,16 @@ export function FanCafePanel({
                   <Sparkles size={18} aria-hidden="true" />
                 </span>
                 <div>
-                  <p className="text-sm font-black text-fg">첫 대화를 시작할 보드를 고르세요</p>
-                  <p className="mt-1 text-xs leading-5 text-fg-3">통합 피드는 모든 대화를 읽는 곳입니다. 작품·챌린지·협업 보드에서 맥락을 정한 뒤 글을 시작하세요.</p>
+                  <p className="text-sm font-black text-fg">{bi("주제에 맞는 대화 공간을 고르세요", "Choose a conversation space")}</p>
+                  <p className="mt-1 text-xs leading-5 text-fg-3">{bi("통합 피드에서 대화를 둘러보고, 글을 남길 공간을 선택하세요.", "Browse the shared feed, then choose a space to start your conversation.")}</p>
                 </div>
               </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
                 {[
-                  { href: "/community/cafes?topic=work-checkin", icon: BookOpenText, title: "오늘 작업 인증", body: "막힌 컷과 다음 한 걸음" },
-                  { href: "/showcase/challenges", icon: ImagePlus, title: "3컷 챌린지", body: "작은 결과물 공개" },
-                  { href: "/collaborate", icon: UsersRound, title: "피드백 파트너", body: "함께 검토할 사람 찾기" },
+                  { href: "/community/title", icon: BookOpenText, title: bi("작품 대화", "Titles"), body: bi("장면과 해석을 함께 나누기", "Discuss scenes and interpretations") },
+                  { href: "/community/author", icon: UsersRound, title: bi("작가 대화", "Authors"), body: bi("좋아하는 작가의 이야기", "Talk about your favorite creators") },
+                  { href: "/community/pencafe", icon: MessageCircle, title: bi("펜카페", "Pen cafés"), body: bi("창작자의 작업과 소식", "Creative work and studio updates") },
+                  { href: "/community/cafes", icon: Sparkles, title: bi("장르 카페", "Genre cafés"), body: bi("취향이 맞는 사람들과 나누기", "Find people with shared tastes") },
                 ].map(({ href, icon: Icon, title, body }) => (
                   <Link key={href} href={href} className="rounded-xl border border-line bg-panel/75 p-3 transition-colors hover:border-accent/35 hover:bg-raised">
                     <Icon size={15} className="text-accent" aria-hidden="true" />
@@ -791,12 +784,12 @@ export function FanCafePanel({
               </button>
             </div>
           ) : null}
-          {loading ? (
+          {loading && posts.length === 0 ? (
             <>
               <div className="skeleton h-28 w-full rounded-xl" />
               <div className="skeleton h-28 w-full rounded-xl" />
             </>
-          ) : loadError ? (
+          ) : loadError && posts.length === 0 ? (
             <ErrorState
               title="팬카페 글을 불러오지 못했습니다."
               message={`${loadError} 현재 글이 없다는 뜻은 아닙니다.`}
@@ -833,8 +826,13 @@ export function FanCafePanel({
             ) : (
               <div className="rounded-xl border border-dashed border-line bg-card/50 px-5 py-10 text-center">
                 <MessageCircle className="mx-auto mb-3 text-fg-3" size={22} />
-                <p className="text-sm font-medium text-fg">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "아직 팬카페 글이 없습니다.")}</p>
-                <p className="mt-1 text-xs text-fg-3">{translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "첫 해석이나 응원을 남겨보세요.")}</p>
+                <p className="text-sm font-medium text-fg">{hasActiveFilters ? bi("검색 조건에 맞는 글이 없습니다.", "No posts match your filters.") : translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "아직 팬카페 글이 없습니다.")}</p>
+                <p className="mt-1 text-xs text-fg-3">{hasActiveFilters ? bi("검색어나 필터를 바꿔 다른 대화를 찾아보세요.", "Try another keyword or reset your filters.") : translateCurrentStaticSourceText("domains.community.components.fan.cafe.panel", "ko", "첫 해석이나 응원을 남겨보세요.")}</p>
+                {hasActiveFilters && <button type="button" onClick={() => {
+                  setSearchText(""); setQueryText(""); setFilterKind("all"); setSelectedTagFilter(null); setShowMyPostsOnly(false);
+                }} className="mt-4 min-h-11 rounded-xl border border-line px-4 text-sm font-semibold text-fg-2">
+                  {bi("검색 조건 초기화", "Reset filters")}
+                </button>}
               </div>
             )
           ) : (
