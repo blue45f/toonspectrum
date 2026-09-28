@@ -20,9 +20,9 @@ describe("필터 비교 띠의 실제 가림 제외", () => {
   it("비교할 픽셀이 충분하지 않으면 빈 영역으로 성공 처리하지 않는다", () => {
     expect(() => studioFilterComparisonBandHeight(band, { ...panel, y: 550 })).toThrow("120px");
   });
-  it("그림자를 제외한 실제 120px는 허용하고 119px는 거절한다", () => {
+  it("119px로 줄어든 비교는 거부하고 120px 이상의 실제 픽셀을 요구한다", () => {
+    expect(() => studioFilterComparisonBandHeight(band, { ...panel, y: band.y + 12 + 119.9 })).toThrow("120px");
     expect(studioFilterComparisonBandHeight(band, { ...panel, y: band.y + 12 + 120 })).toBe(120);
-    expect(() => studioFilterComparisonBandHeight(band, { ...panel, y: band.y + 12 + 119.99 })).toThrow("120px");
   });
   it("패널이 옆에 있어도 원본 띠 자체가 120px보다 작으면 거절한다", () => {
     expect(() => studioFilterComparisonBandHeight({ ...band, height: 119 }, { ...panel, x: 730 })).toThrow("120px");

@@ -40,14 +40,13 @@ import { parseStudioWorkspaceRoute } from "../apps/web/src/domains/creator/studi
 import { waitForStudioCollaborationDocumentLane } from "./lib/studio-collaboration-readiness";
 import { waitForStudioDrawingReady } from "./lib/studio-drawing-readiness";
 import { assertStudioFilterCanonicalEvidence, assertStudioFilterCanonicalUnchanged, assertStudioFilterRecoveryUnchanged } from "./lib/studio-filter-canonical-evidence";
-import { studioFilterComparisonClip } from "./lib/studio-filter-comparison-clip";
 import { studioFilterComparisonBandHeight } from "./lib/studio-filter-comparison-region";
 import { installStudioFilterConnectionFault } from "./lib/studio-filter-connection-fault";
 import {
   measureStudioFilterResponsiveLayout, studioFilterResponsiveLayoutIssues,
   type StudioFilterResponsiveLayout,
 } from "./lib/studio-filter-responsive-layout";
-import { resolveStudioFilterVerificationMode, type StudioFilterVerificationAuthority } from "./lib/studio-filter-verification-mode";
+import { resolveStudioFilterVerificationMode } from "./lib/studio-filter-verification-mode";
 import { isStaticPreviewReadinessResponse, isStaticPreviewReadinessUnavailable } from "./lib/studio-preview-readiness";
 import { readDurableStudioAutosaveDocument, type StudioDurableAutosaveDocument } from "./lib/studio-verify-durable-autosave.mjs";
 import { enabledStudioHistoryControl } from "./lib/studio-verify-history-controls.mjs";
@@ -158,7 +157,7 @@ interface FilterDialogReport {
   startedAt: string;
   finishedAt: string;
   cases: FilterCaseResult[];
-  authority: StudioFilterVerificationAuthority;
+  authority: "authenticated-canonical" | "authenticated-disconnected-denial" | "owned-static-local" | "external-or-static";
   canonicalCheckpoints: { phase: string; revision: number; crdtServerSequence: string; pageSha256: string }[];
   committedBaseline: { livePresentationDiff: PixelDiff; originalDrawCount: number; persistedHistoryUnchanged: boolean } | null;
   consoleErrorCount: number;
@@ -964,8 +963,10 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       };
       results.push(result);
       try {
-        // 패널 생성 전 전체 기준 픽셀을 보존하고, 측정한 패널 위치로만 비교 띠를 정한다.
-        const beforeOpenCanvas = await screenshotClipped(page, clip);
+        // The band of canvas this case judges by: fixed up front so its baseline is captured before
+        // the dialog exists, and asserted dialog-free after the drag.
+        const compareClip = { x: clip.x, y: clip.y, width: clip.width, height: 180 };
+        const beforeOpenBand = await screenshotClipped(page, compareClip);
         await openMainMenuGroup(page, "효과");
         await clickEnabledMenuItem(page, "가우시안 블러");
         const dialog = filterDialog(page);
@@ -998,24 +999,6 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
           `이동한 다이얼로그가 화면 밖으로 나갔습니다 `
             + `(${after.x},${after.y},${after.width}x${after.height} in ${viewport.width}x${viewport.height})`,
         );
-
-        const compareClip = studioFilterComparisonClip(clip, after);
-        const baselineBand = await page.evaluate(async ({ encoded, width, height }) => {
-          const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${encoded}`)).blob());
-          try {
-            const canvas = document.createElement("canvas");
-            canvas.width = width;
-            canvas.height = height;
-            const context = canvas.getContext("2d");
-            if (!context || bitmap.width !== width || bitmap.height < height) {
-              throw new Error("원본 비교 이미지의 크기가 실제 화면과 다릅니다.");
-            }
-            context.drawImage(bitmap, 0, 0);
-            return canvas.toDataURL("image/png").split(",")[1];
-          } finally { bitmap.close(); }
-        }, { encoded: beforeOpenCanvas.toString("base64"), width: compareClip.width, height: compareClip.height });
-        invariant(baselineBand, "원본 비교 픽셀을 추출하지 못했습니다");
-        const beforeOpenBand = Buffer.from(baselineBand, "base64");
 
         // 2) Holding 원본 비교 returns the canvas to the untouched page, and releasing brings the
         //    filtered preview back. A toggle that stuck would silently apply the wrong pixels.
@@ -1242,8 +1225,8 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
         await page.setViewportSize({ width: 1440, height: 1100 });
       }
     }
-    }
 
+    }
   } catch (error) {
     if (evidencePage && !evidencePage.isClosed()) {
       await evidencePage.screenshot({ path: join(SCRATCH, "studio-filter-dialog-fatal.png") }).catch(() => undefined);
