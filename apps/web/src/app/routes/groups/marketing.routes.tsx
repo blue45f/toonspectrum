@@ -42,11 +42,6 @@ const StudioWorkspacePage = lazyRetry(
   "StudioWorkspacePage",
 );
 
-const CreatorHomeExperience = lazyRetry(
-  () => import("@/domains/marketing/CreatorHomeExperience").then((module) => ({ default: module.CreatorHomeExperience })),
-  "CreatorHomeExperience",
-);
-
 const StudioIntroductionPage = lazyRetry(
   () => import("@/domains/marketing/CreatorHomeExperience").then((module) => ({ default: module.CreatorHomeExperience })),
   "StudioIntroductionPage",
@@ -54,7 +49,7 @@ const StudioIntroductionPage = lazyRetry(
 
 export const marketingRoutes = defineAppRoutes([
   { id: "marketing-studio-introduction", path: "/about/studio", element: <StudioIntroductionPage /> },
-  { id: "workspace-home", path: "/home", element: <CreatorHomeExperience /> },
+  { id: "workspace-home", path: "/home", element: <StudioWorkspacePage /> },
   { id: "workspace-team", path: "/team", element: <StudioWorkspacePage surface="team" /> },
   { id: "workspace-hub", path: "/hub", element: <StudioWorkspacePage surface="hub" /> },
   { id: "marketing-product-tour", path: "/product-tour", element: <ProductTourPage /> },
