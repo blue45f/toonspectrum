@@ -1,9 +1,30 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
   studioFilterResponsiveLayoutIssues, waitForStudioFilterLayoutSettled,
   type StudioFilterResponsiveLayout,
 } from "./studio-filter-responsive-layout";
+
+/** evaluate 호출마다 괄호 깊이로 본문을 잘라낸다. */
+function evaluateBodies(source: string): string[] {
+  const marker = ".evaluate(";
+  const bodies: string[] = [];
+  let index = source.indexOf(marker);
+  while (index !== -1) {
+    let depth = 0;
+    for (let cursor = index + marker.length - 1; cursor < source.length; cursor += 1) {
+      if (source[cursor] === "(") depth += 1;
+      if (source[cursor] === ")" && --depth === 0) {
+        bodies.push(source.slice(index + marker.length, cursor));
+        break;
+      }
+    }
+    index = source.indexOf(marker, index + marker.length);
+  }
+  return bodies;
+}
 
 function fakePage() {
   const waitFor = vi.fn();
@@ -19,6 +40,20 @@ const valid: StudioFilterResponsiveLayout = {
     width: 80, height: 44,
   })),
 };
+
+describe("브라우저로 넘기는 evaluate 본문 계약", () => {
+  const source = () => readFileSync(new URL("./studio-filter-responsive-layout.ts", import.meta.url), "utf8");
+
+  it("두 측정 경로가 모두 evaluate로 브라우저에서 실행된다", () => {
+    expect(evaluateBodies(source()).length).toBe(2);
+  });
+  it("evaluate 본문은 이름을 얻는 함수를 지역에 만들지 않는다", () => {
+    const assignedFunction = /(?:const|let|var)\s+\w+\s*(?::[^=]*)?=\s*(?:async\s*)?(?:\(|function\b)/u;
+    for (const body of evaluateBodies(source())) {
+      expect(assignedFunction.test(body), body).toBe(false);
+    }
+  });
+});
 
 describe("필터 실행 영역 반응형 판정", () => {
   it("모든 실행 영역과 본문이 닿을 수 있어야 통과한다", () => {

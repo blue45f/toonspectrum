@@ -43,14 +43,11 @@ export async function waitForStudioFilterLayoutSettled(page: Page): Promise<void
   await page.evaluate(async (selector) => {
     const target = document.querySelector(selector);
     if (!target) throw new Error("필터 창이 없어 반응형 측정을 진행할 수 없습니다.");
-    const rect = () => {
-      const box = target.getBoundingClientRect();
-      return `${box.left},${box.top},${box.width},${box.height}`;
-    };
-    let previous = rect();
+    let previous = `${target.getBoundingClientRect().left},${target.getBoundingClientRect().top}`;
     for (let frame = 0; frame < 120; frame += 1) {
       await new Promise<void>((resolve) => { requestAnimationFrame(() => { resolve(); }); });
-      const current = rect();
+      const box = target.getBoundingClientRect();
+      const current = `${box.left},${box.top},${box.width},${box.height}`;
       if (current === previous) return;
       previous = current;
     }
@@ -61,30 +58,26 @@ export async function measureStudioFilterResponsiveLayout(page: Page): Promise<S
   return page.locator(PANEL_SELECTOR).evaluate((panel) => {
     const bounds = panel.getBoundingClientRect();
     const body = panel.querySelector('[data-studio-filter-scroll-region="true"]');
-    const describe = (element: Element | null): string => {
-      if (!element) return "알 수 없음";
-      const tag = element.tagName.toLowerCase();
-      const id = element.id ? `#${element.id}` : "";
-      const classes = [...element.classList].slice(0, 3).map((name) => `.${name}`).join("");
-      const data = [...element.attributes]
-        .filter((attribute) => attribute.name.startsWith("data-")
-          || attribute.name === "role" || attribute.name === "aria-label")
-        .slice(0, 3)
-        .map((attribute) => `[${attribute.name}="${attribute.value.slice(0, 40)}"]`)
-        .join("");
-      return `${tag}${id}${classes}${data}`;
-    };
     const actions = [...panel.querySelectorAll<HTMLButtonElement>("footer button")].map((button) => {
       const box = button.getBoundingClientRect();
       const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      const clear = hit === button || button.contains(hit);
       return {
         label: button.textContent?.trim() ?? "이름 없는 버튼", disabled: button.disabled,
         withinViewport: box.left >= -0.5 && box.top >= -0.5
           && box.right <= innerWidth + 0.5 && box.bottom <= innerHeight + 0.5,
         withinPanel: box.left >= bounds.left - 0.5 && box.top >= bounds.top - 0.5
           && box.right <= bounds.right + 0.5 && box.bottom <= bounds.bottom + 0.5,
-        hitTarget: hit === button || button.contains(hit),
-        blocking: hit === button || button.contains(hit) ? "" : describe(hit),
+        hitTarget: clear,
+        blocking: clear || !hit ? "" : `${hit.tagName.toLowerCase()}`
+          + (hit.id ? `#${hit.id}` : "")
+          + [...hit.classList].slice(0, 3).map((name) => `.${name}`).join("")
+          + [...hit.attributes]
+            .filter((attribute) => attribute.name.startsWith("data-")
+              || attribute.name === "role" || attribute.name === "aria-label")
+            .slice(0, 3)
+            .map((attribute) => `[${attribute.name}="${attribute.value.slice(0, 40)}"]`)
+            .join(""),
         width: box.width, height: box.height,
       };
     });
