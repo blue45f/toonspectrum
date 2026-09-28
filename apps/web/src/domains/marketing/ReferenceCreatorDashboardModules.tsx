@@ -95,13 +95,13 @@ function AssetGrid({ bi }: { bi: Localize }) {
   return (
     <Workspace kind="assets" title={bi("에셋 라이브러리", "Asset library")} href="/studio/assets" icon={Layers3} caption={bi("작품을 완성하는 작은 재료들", "Everything your next scene needs")} bi={bi}>
       <div className="rd-mini-meta"><strong>{bi("소재 보드", "Material board")}</strong><span>{bi("소재 예시", "Material examples")}</span></div>
-      <div className="rd-mini-asset-grid" aria-label={bi("캐릭터·말풍선·효과 소재 예시", "Character, speech bubble and effect examples")}>
+      <div className="rd-mini-asset-grid" role="group" aria-label={bi("캐릭터·말풍선·효과 소재 예시", "Character, speech bubble and effect examples")}>
         <div className="rd-mini-asset-tile"><MiniArt name="materials" /></div>
         <div className="rd-mini-asset-tile rd-mini-asset-bubble"><MessageCircle aria-hidden="true" /><span>{bi("안녕!", "Hello!")}</span></div>
         <div className="rd-mini-asset-tile rd-mini-asset-spark"><Sparkles aria-hidden="true" /></div>
         <div className="rd-mini-asset-tile"><MiniArt name="character-blue" /></div>
-        <div className="rd-mini-asset-tile rd-mini-asset-screentone" aria-label={bi("망점 패턴", "Halftone pattern")} />
-        <div className="rd-mini-asset-tile rd-mini-asset-speed" aria-label={bi("집중선 효과", "Speed line effect")} />
+        <div className="rd-mini-asset-tile rd-mini-asset-screentone" role="img" aria-label={bi("망점 패턴", "Halftone pattern")} />
+        <div className="rd-mini-asset-tile rd-mini-asset-speed" role="img" aria-label={bi("집중선 효과", "Speed line effect")} />
         <div className="rd-mini-asset-tile rd-mini-asset-letter">Aa<span>{bi("글자", "Type")}</span></div>
         <div className="rd-mini-asset-tile rd-mini-asset-paper"><span>{bi("효과음", "SFX")}</span></div>
       </div>

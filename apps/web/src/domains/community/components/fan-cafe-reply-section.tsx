@@ -3,7 +3,7 @@ import { CornerDownRight, MessageCircle, RefreshCw, Send, Trash2 } from "lucide-
 import { useEffect, useRef, useState } from "react";
 
 import { FAN_CAFE_REPLY_MAX_LENGTH, MAX_REPLY_DEPTH } from "./fan-cafe-constants";
-import { countReplies, maskReplyNode, removeReplyNode } from "./fan-cafe-tree-utils";
+import { countReplies, insertReplyNode, maskReplyNode, removeReplyNode } from "./fan-cafe-tree-utils";
 
 import type { FanCafeReply } from "@/shared/lib/types";
 
@@ -13,7 +13,20 @@ import { useApp } from "@/shared/lib/store";
 import { cn, relativeDate } from "@/shared/lib/utils";
 import { useCelebrate } from "@/shared/hooks/use-celebrate";
 
-export function FanPostReplySection({
+type ReplySectionProps = {
+  postId: string;
+  initialReplies?: FanCafeReply[];
+  onCountChange?: (count: number) => void;
+  onReplyDelta?: (delta: number) => void;
+  className?: string;
+};
+
+export function FanPostReplySection(props: ReplySectionProps) {
+  const userId = useApp((state) => state.userId);
+  return <FanPostReplySectionContent key={`${props.postId}:${userId ?? "guest"}`} {...props} />;
+}
+
+function FanPostReplySectionContent({
   postId,
   initialReplies,
   onCountChange,
@@ -42,8 +55,16 @@ export function FanPostReplySection({
   const [replyRefreshTick, setReplyRefreshTick] = useState(0);
   const replyRefreshControllerRef = useRef<AbortController | null>(null);
   const celebrate = useCelebrate();
+  const pendingWritesRef = useRef(new Set<string>());
+  const activeRef = useRef(true);
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    activeRef.current = true;
+    return () => { activeRef.current = false; };
+  }, []);
 
   function refreshReplies() {
+    if (pendingWritesRef.current.size) return;
     setReplyRefreshTick((current) => current + 1);
   }
 
@@ -130,34 +151,20 @@ export function FanPostReplySection({
     setOpenComposerFor((current) => (current === id ? null : id));
   }
 
-  function insertReply(tree: FanCafeReply[], parentId: string | null, reply: FanCafeReply): FanCafeReply[] {
-    if (!parentId) return [...tree, reply];
-    let inserted = false;
-    const next = tree.map((item) => {
-      if (item.id === parentId) {
-        inserted = true;
-        return { ...item, children: [...(item.children ?? []), reply] };
-      }
-      if (!item.children || item.children.length === 0) return item;
-      const nextChildren = insertReply(item.children, parentId, reply);
-      if (nextChildren !== item.children) {
-        inserted = true;
-        return { ...item, children: nextChildren };
-      }
-      return item;
-    });
-    if (!inserted) return [...tree, reply];
-    return next;
-  }
-
   async function submitReply(parentId: string | null, sourceEl?: HTMLElement | null) {
     if (!userId) return;
     const draft = getDraft(parentId ?? "__root__").trim();
     if (!draft) return;
 
     const draftKey = parentId ?? "__root__";
+    if (pendingWritesRef.current.has(draftKey)) return;
+    const submittedValue = getDraft(draftKey);
+    pendingWritesRef.current.add(draftKey);
+    replyRefreshControllerRef.current?.abort();
+    setIsLoadingReplies(false);
     setSubmittingReplies((current) => ({ ...current, [draftKey]: true }));
     setError(null);
+    setNotice("");
 
     try {
       const res = await apiFetch(`/api/community/posts/${encodeURIComponent(postId)}/replies`, withCsrfProtection({
@@ -171,35 +178,42 @@ export function FanPostReplySection({
       }));
 
       const data = await safeParseJson<unknown>(res);
+      if (!activeRef.current) return;
       if (!res.ok) {
-        setError(resolveApiError(data, "댓글을 저장하지 못했습니다."));
+        setError(resolveApiError(data, "댓글을 저장하지 못했습니다. 입력 내용은 유지됩니다."));
         return;
       }
-      if (!data || typeof data !== "object") {
+      if (!data || typeof data !== "object" || !("id" in data) || typeof data.id !== "string" || !("author" in data) || !data.author) {
         setError("댓글 응답이 유효하지 않습니다.");
         return;
       }
       const created = data as FanCafeReply;
       // 댓글 등록 축하 — 등록 버튼에서 작게 팡(글 등록보다 한 단계 절제).
       celebrate(sourceEl, { chars: ["🎉", "✨", "💬"], count: 14, spread: 0.9 });
-      setReplies((current) => insertReply(current, parentId, created));
+      setReplies((current) => insertReplyNode(current, parentId, created));
       onReplyDelta?.(1);
       setReplySyncAt(new Date().toISOString());
-      setDraft(parentId ?? "__root__", "");
+      setReplyDrafts((current) => current[draftKey] === submittedValue
+        ? { ...current, [draftKey]: "" } : current);
       setLoaded(true);
-      setOpenComposerFor(null);
+      setNotice("댓글을 등록했습니다.");
     } catch {
-      setError("댓글을 저장하지 못했습니다.");
+      if (activeRef.current) setError("댓글을 저장하지 못했습니다. 입력 내용은 유지됩니다.");
     } finally {
-      setSubmittingReplies((current) => ({ ...current, [draftKey]: false }));
+      pendingWritesRef.current.delete(draftKey);
+      if (activeRef.current) setSubmittingReplies((current) => ({ ...current, [draftKey]: false }));
     }
   }
 
   // 본인 답글 삭제 — 하위 답글이 있으면 서버가 소프트 삭제(자리 표시)로 남긴다.
   async function deleteReply(replyId: string) {
-    if (!userId) return;
+    if (!userId || pendingWritesRef.current.has(`delete:${replyId}`)) return;
     if (!globalThis.confirm("이 댓글을 삭제할까요?")) return;
+    pendingWritesRef.current.add(`delete:${replyId}`);
+    replyRefreshControllerRef.current?.abort();
+    setIsLoadingReplies(false);
     setError(null);
+    setNotice("");
     try {
       const res = await apiFetch(
         `/api/community/posts/${encodeURIComponent(postId)}/replies/${encodeURIComponent(replyId)}`,
@@ -210,6 +224,7 @@ export function FanPostReplySection({
         })
       );
       const data = await safeParseJson<unknown>(res);
+      if (!activeRef.current) return;
       if (!res.ok) {
         setError(resolveApiError(data, "댓글을 삭제하지 못했습니다."));
         return;
@@ -222,8 +237,11 @@ export function FanPostReplySection({
       setReplies((current) => (result.soft ? maskReplyNode(current, replyId) : removeReplyNode(current, replyId)));
       if (!result.soft) onReplyDelta?.(-1);
       setReplySyncAt(new Date().toISOString());
+      setNotice("댓글을 삭제했습니다.");
     } catch {
-      setError("댓글을 삭제하지 못했습니다.");
+      if (activeRef.current) setError("댓글을 삭제하지 못했습니다.");
+    } finally {
+      pendingWritesRef.current.delete(`delete:${replyId}`);
     }
   }
 
@@ -231,11 +249,12 @@ export function FanPostReplySection({
   const isRootSubmitting = Boolean(submittingReplies.__root__);
 
   return (
-    <div className={cn("flex flex-col gap-3", className)}>
+    <div className={cn("min-w-0 flex flex-col gap-3", className)} role="region" aria-label="댓글 대화">
+      <p role="status" className="text-xs text-fg-3">{notice}</p>
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-canvas/25 px-3 py-2 text-[0.68rem] text-fg-3">
         <span>동기화 {replySyncAt ? new Date(replySyncAt).toLocaleTimeString() : "대기 중"}</span>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg px-1.5 transition-colors hover:bg-raised/70">
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg px-1.5 transition-colors hover:bg-raised/70">
             <input
               type="checkbox"
               checked={replyAutoRefreshEnabled}
@@ -247,8 +266,8 @@ export function FanPostReplySection({
           <button
             type="button"
             onClick={refreshReplies}
-            className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-line bg-raised/50 px-2 text-[0.65rem] font-medium text-fg-3 transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={isLoadingReplies}
+            className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-line bg-raised/50 px-2 text-[0.65rem] font-medium text-fg-3 transition-colors hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isLoadingReplies || Object.values(submittingReplies).some(Boolean)}
           >
             <RefreshCw size={12} className={cn(isLoadingReplies && "animate-spin motion-reduce:animate-none")} />
             {isLoadingReplies ? "동기화 중" : "새로고침"}
@@ -295,7 +314,7 @@ export function FanPostReplySection({
               type="button"
               onClick={(event) => void submitReply(null, event.currentTarget)}
               disabled={!rootDraft.trim() || isRootSubmitting}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Send size={13} />
               {isRootSubmitting ? "등록 중..." : "등록"}
@@ -308,14 +327,14 @@ export function FanPostReplySection({
         </p>
       )}
       {error ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-xs text-bad">
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-bad/35 bg-bad/10 px-3 py-2 text-xs text-bad">
           <span>{error}</span>
           <button
             type="button"
             onClick={refreshReplies}
             className="rounded-lg border border-bad/30 px-2 py-1 font-medium"
           >
-            다시 시도
+            댓글 목록 다시 불러오기
           </button>
         </div>
       ) : null}
@@ -356,7 +375,7 @@ export function ReplyThread({
           reply={reply}
           depth={depth}
           userId={userId}
-          canReply={depth < MAX_REPLY_DEPTH - 1}
+          canReply={depth < MAX_REPLY_DEPTH}
           onSubmit={onSubmit}
           onDelete={onDelete}
           onToggleComposer={onToggleComposer}
@@ -437,7 +456,7 @@ export function FanPostReplyItem({
       {isDeleted ? (
         <p className="text-sm italic leading-relaxed text-fg-3">삭제된 댓글입니다.</p>
       ) : (
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-fg-2">{reply.text}</p>
+        <p className="whitespace-pre-wrap [overflow-wrap:anywhere] text-sm leading-relaxed text-fg-2">{reply.text}</p>
       )}
       {!isDeleted && canReply && (
         <button
@@ -445,7 +464,7 @@ export function FanPostReplyItem({
           onClick={() => onToggleComposer(reply.id)}
           aria-expanded={isOpen}
           className={cn(
-            "mt-2 inline-flex min-h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[0.68rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
+            "mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-2.5 text-[0.68rem] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent",
             isOpen
               ? "border-accent/45 bg-accent-soft text-accent"
               : "border-line bg-raised/40 text-fg-3 hover:text-fg-2"
@@ -474,7 +493,7 @@ export function FanPostReplyItem({
                   <button
                     type="button"
                     onClick={() => onToggleComposer(reply.id)}
-                    className="inline-flex min-h-8 items-center rounded-lg border border-line px-2.5 text-xs text-fg-3 transition-colors hover:text-fg"
+                    className="inline-flex min-h-11 items-center rounded-lg border border-line px-2.5 text-xs text-fg-3 transition-colors hover:text-fg"
                   >
                     닫기
                   </button>
@@ -482,7 +501,7 @@ export function FanPostReplyItem({
                     type="button"
                     onClick={(event) => void onSubmit(reply.id, event.currentTarget)}
                     disabled={!draft.trim() || isSubmitting}
-                    className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-accent px-2.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
+                    className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-accent px-2.5 text-xs font-semibold text-on-accent transition-colors hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <Send size={12} />
                     {isSubmitting ? "저장 중..." : "등록"}
