@@ -83,20 +83,42 @@ describe("CommandPalette", () => {
     });
   });
 
-  it("방향키로 검색 범위 탭을 이동하고 Tab의 기본 포커스 이동은 가로채지 않는다", async () => {
+  it("방향키 초점 이동 후 내부 Tab은 보존하고 모달 경계에서만 순환한다", async () => {
     render(<CommandPalette open={true} onOpenChange={vi.fn()} />);
 
     const allTab = screen.getByRole("tab", { name: "전체" });
     const titlesTab = screen.getByRole("tab", { name: /작품/ });
+    allTab.focus();
     fireEvent.keyDown(allTab, { key: "ArrowRight" });
 
     await waitFor(() => {
       expect(titlesTab.getAttribute("aria-selected")).toBe("true");
+      expect(document.activeElement).toBe(titlesTab);
     });
 
-    const tabEvent = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
-    expect(titlesTab.dispatchEvent(tabEvent)).toBe(true);
-    expect(tabEvent.defaultPrevented).toBe(false);
+    // 선택 상태는 초점보다 먼저 바뀔 수 있다. 실제 rAF 초점 이동 뒤 키보드 계약을 확인한다.
+    const interiorBackward = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
+    expect(fireEvent(titlesTab, interiorBackward)).toBe(true);
+    expect(interiorBackward.defaultPrevented).toBe(false);
+
+    // 빈 작품 범위에서는 활성 탭이 마지막 Tab 대상이므로 앞으로 이동하면 모달 처음으로 순환한다.
+    const first = screen.getByRole("button", { name: /close|닫기/i });
+    const forwardBoundary = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    expect(fireEvent(titlesTab, forwardBoundary)).toBe(false);
+    expect(forwardBoundary.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(first);
+
+    const backwardBoundary = new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
+    expect(fireEvent(first, backwardBoundary)).toBe(false);
+    expect(backwardBoundary.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(titlesTab);
+
+    const input = screen.getByRole("combobox");
+    input.focus();
+    const interiorForward = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    expect(fireEvent(input, interiorForward)).toBe(true);
+    expect(interiorForward.defaultPrevented).toBe(false);
+    expect(titlesTab.getAttribute("aria-selected")).toBe("true");
   });
 
   it("접두사(>) 입력 시 명령어 모드로 자동 전환된다", async () => {
