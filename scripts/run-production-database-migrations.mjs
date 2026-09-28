@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { buildProductionOperationsRuntimeAclSql } from "./production-operations-database-contract.mjs";
 import { buildProductionOperationRuntimeAclSql, buildProductionOperationCapabilitySql } from "./production-operation-database-contract.mjs";
+import { buildStudioVirtualSpaceRuntimeAclSql, buildStudioVirtualSpaceCapabilitySql } from "./studio-virtual-space-database-contract.mjs";
 
 import { createHash, randomBytes } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
@@ -228,6 +229,8 @@ export const POST_BASELINE_RELATIONS = Object.freeze([
   "studio_revision",
   "studio_revision_blob",
   "studio_revision_parent",
+  "studio_virtual_space_custom_furniture",
+  "studio_virtual_space_decoration_layout",
   "supporter_funding_setting",
   "supporter_payment",
   "traffic_page_view",
@@ -3881,6 +3884,8 @@ export function runProductionDatabaseMigrations({ // NOSONAR javascript:S3776
     psql(databaseUrl, buildCareerConfirmationCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildProductionOperationRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildProductionOperationCapabilitySql(runtimeDatabaseRole));
+    psql(databaseUrl, buildStudioVirtualSpaceRuntimeAclSql(runtimeDatabaseRole));
+    psql(databaseUrl, buildStudioVirtualSpaceCapabilitySql(runtimeDatabaseRole));
     psql(databaseUrl, buildStudioProductionRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildProductionOperationsRuntimeAclSql(runtimeDatabaseRole));
     psql(databaseUrl, buildStudioProjectGraphRuntimeAclSql(runtimeDatabaseRole));
