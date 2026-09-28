@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { RoutePurposeScene } from "./RoutePurposeScene";
-import { ReferenceRouteChrome } from "./ReferenceRouteChrome";
 import { useCampus } from "./spatial-campus/campus-context";
 import { WorkflowTrustBadge } from "./WorkflowTrustBadge";
 import { supportsRoutePurposeScene } from "./site-experience/site-experience-policy";
@@ -66,11 +65,6 @@ function useOnlineState() {
     };
   }, []);
   return online;
-}
-
-
-function supportsSiteReferenceChrome(pathname: string) {
-  return !/^\/(?:admin|studio|shaper|brush-lab|music|offline)(?:\/|$)/u.test(pathname) && pathname !== "/home";
 }
 
 /**
@@ -178,9 +172,7 @@ export function SiteRouteExperienceBoundary({
         </aside>
       ) : null}
 
-      {supportsSiteReferenceChrome(pathname) ? (
-        <ReferenceRouteChrome pathname={pathname}>{children}</ReferenceRouteChrome>
-      ) : children}
+      {children}
     </>
   );
 }
