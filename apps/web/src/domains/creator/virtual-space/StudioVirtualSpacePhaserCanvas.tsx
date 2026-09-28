@@ -1,3 +1,5 @@
+import { studioVisibleBootDeadline } from "./experience/studio-visible-boot-deadline";
+import { studioCinematicBackdropUrl } from "./experience/studio-cinematic-art";
 import {
   useEffect,
   useRef,
@@ -89,7 +91,6 @@ import {
 } from "./studio-virtual-space-experience-preference";
 import {
   DEFAULT_STUDIO_VIRTUAL_ENVIRONMENT,
-  studioVirtualBackdropUrl,
   type StudioVirtualEnvironmentPreference,
 } from "./studio-virtual-space-environment-preference";
 import {
@@ -408,8 +409,8 @@ export function StudioVirtualSpacePhaserCanvas({
       setFailure(true);
       setReady(false);
     };
-    const bootDeadline = globalThis.setTimeout(() => fail(new Error(`boot-timeout:${parent.dataset.bootStage}`)), 25000);
-    cleanup.push(() => globalThis.clearTimeout(bootDeadline));
+    const cancelBootDeadline = studioVisibleBootDeadline(document, () => fail(new Error(`boot-timeout:${parent.dataset.bootStage}`)));
+    cleanup.push(() => cancelBootDeadline());
     let game: import("phaser").Game | null = null;
 
     void (async () => {
@@ -468,7 +469,7 @@ export function StudioVirtualSpacePhaserCanvas({
       const backgroundTextureKey = `studio-world-background-${manifest.backgroundAssetKey}-${artStyle}`;
       const backgroundUrl = studioVirtualArtTextureUrl(artStyle, "world-base");
       const horizonTextureKey = `studio-imagegen25-horizon-${artStyle}-${environmentPreference.backdrop}`;
-      const horizonUrl = studioVirtualBackdropUrl(environmentPreference.backdrop, artStyle);
+      const horizonUrl = studioCinematicBackdropUrl(environmentPreference.backdrop, artStyle, studioSceneActorScale(manifest) < 1);
       const livingTextureKeys = {
         cloudBack: `studio-living-${artStyle}-cloud-back`,
         cloudFront: `studio-living-${artStyle}-cloud-front`,
@@ -943,10 +944,11 @@ export function StudioVirtualSpacePhaserCanvas({
           backgroundSource.width,
           backgroundSource.height,
         );
+        let horizonArtwork: import("phaser").GameObjects.Image | null = null;
         if (this.textures.exists(horizonTextureKey)) {
           const horizonSource = this.textures.get(horizonTextureKey).getSourceImage();
           const horizonRect = studioCoverRect(manifest.width * 3, manifest.height * 3, horizonSource.width, horizonSource.height);
-          this.add.image(manifest.width / 2, manifest.height / 2, horizonTextureKey)
+          horizonArtwork = this.add.image(manifest.width / 2, manifest.height / 2, horizonTextureKey)
           .setDisplaySize(horizonRect.width, horizonRect.height)
           .setScrollFactor(0.92)
           .setDepth(-1_004)
@@ -1324,6 +1326,12 @@ export function StudioVirtualSpacePhaserCanvas({
             camera.setBounds(0, 0, manifest.width, manifest.height);
             camera.setZoom(studioCameraZoom(width, height, viewport.ratio));
           }
+          if (horizonArtwork && horizonUrl.includes("/cinematic-v9/")) {
+            // 생성 원경을 월드 세 배로 확대하지 않고 화면에 맞춰 선명도와 종횡비를 유지한다.
+            const source = horizonArtwork.texture.getSourceImage();
+            const rect = studioCoverRect(gameSize.width / camera.zoom, gameSize.height / camera.zoom, source.width, source.height);
+            horizonArtwork.setOrigin(.5).setScrollFactor(0).setPosition(gameSize.width / 2, gameSize.height / 2).setDisplaySize(rect.width, rect.height);
+          }
         };
         resizeCamera({ width: this.scale.width, height: this.scale.height });
         this.scale.on("resize", (gameSize: { width: number; height: number }) => resizeCamera(gameSize));
@@ -1375,11 +1383,8 @@ export function StudioVirtualSpacePhaserCanvas({
         const visibility = () => { if (document.hidden) { npcDirector.cancelGuideTour(); stopMovement(); } };
         const reduceMotionChanged = () => {
           camera.setLerp(reducedMotion.matches ? 1 : 0.12, reducedMotion.matches ? 1 : 0.12);
-          const tier = experienceRef.current.qualityPreset === "auto"
-            ? studioVirtualAutomaticQualityTier(qualityEnvironment())
-            : experienceRef.current.qualityPreset;
-          adaptiveQuality.reset(tier);
-          currentQualityProfile = studioVirtualQualityProfile(tier, qualityEnvironment());
+          currentQualityProfile = studioVirtualQualityProfile(experienceRef.current.qualityPreset, qualityEnvironment());
+          adaptiveQuality.reset(currentQualityProfile.tier);
           lastQualityTier = currentQualityProfile.tier;
           resizeRuntime();
         };
@@ -1438,7 +1443,7 @@ export function StudioVirtualSpacePhaserCanvas({
         parent.dataset.bootStage = manifest.tilemap ? "loading-tiles" : "ready";
         setFailure(false);
         if (!manifest.tilemap) {
-          globalThis.clearTimeout(bootDeadline);
+          cancelBootDeadline();
           setReady(true);
         }
         const contextLost = (event: Event) => { event.preventDefault(); stopMovement(); fail(); };
@@ -1501,15 +1506,12 @@ export function StudioVirtualSpacePhaserCanvas({
         const requestedQuality = experienceRef.current.qualityPreset;
         if (requestedQuality !== lastRequestedQualityPreset) {
           lastRequestedQualityPreset = requestedQuality;
-          const selectedTier = requestedQuality === "auto"
-            ? studioVirtualAutomaticQualityTier(qualityEnvironment())
-            : requestedQuality;
-          adaptiveQuality.reset(selectedTier);
-          currentQualityProfile = studioVirtualQualityProfile(selectedTier, qualityEnvironment());
+          currentQualityProfile = studioVirtualQualityProfile(requestedQuality, qualityEnvironment());
+          adaptiveQuality.reset(currentQualityProfile.tier);
           lastQualityTier = currentQualityProfile.tier;
           resizeRuntime();
         }
-        const qualitySample = adaptiveQuality.sample(deltaMs, requestedQuality === "auto" && !reducedMotion.matches);
+        const qualitySample = adaptiveQuality.sample(deltaMs, requestedQuality === "auto" && !reducedMotion.matches, studioVirtualAutomaticQualityTier(qualityEnvironment()));
         if (qualitySample.tier !== lastQualityTier) {
           lastQualityTier = qualitySample.tier;
           currentQualityProfile = studioVirtualQualityProfile(qualitySample.tier, qualityEnvironment());
@@ -1836,7 +1838,7 @@ export function StudioVirtualSpacePhaserCanvas({
           if (!engineFailed && !initialTilesReady && tileMetrics.ready) {
             initialTilesReady = true;
             startOptionalSceneArt?.(); startOptionalSceneArt = null;
-            globalThis.clearTimeout(bootDeadline);
+            cancelBootDeadline();
             parent.dataset.bootStage = "ready";
             setReady(true);
           }

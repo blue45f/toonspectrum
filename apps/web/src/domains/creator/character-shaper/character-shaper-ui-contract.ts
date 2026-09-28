@@ -195,6 +195,7 @@ export interface CharacterShaperReferenceDrawerProps {
 }
 
 export interface CharacterShaperOutputDockProps {
+  readonly collapsedSettings?: boolean;
   readonly h: StudioVrmPoserHost;
   readonly binding: CharacterShaperBinding;
   readonly drawer: CharacterShaperDrawerMode;

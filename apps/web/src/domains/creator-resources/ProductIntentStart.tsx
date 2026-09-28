@@ -1,3 +1,5 @@
+import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
+import type { WorkflowVisual } from "@/shared/components/site-experience/workflow-illustration";
 import {
   ArrowRight,
   BookOpen,
@@ -40,16 +42,16 @@ const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
 
 interface IntentVisual {
   readonly icon: LucideIcon;
-  readonly image: string;
+  readonly kind: WorkflowVisual;
 }
 
 const INTENT_VISUALS: Record<ProductStartDestinationId, IntentVisual> = {
-  plan: { icon: BookOpen, image: "/brand/atelier-process-640.webp" },
-  draw: { icon: Brush, image: "/brand/atelier-world-640.webp" },
-  "three-d": { icon: Boxes, image: "/brand/production-os-workspace.svg" },
-  assets: { icon: PackageCheck, image: "/brand/atelier-materials-640.webp" },
-  collaborate: { icon: Workflow, image: "/brand/production-os-journey.svg" },
-  publish: { icon: FileOutput, image: "/brand/production-os-hero.svg" },
+  plan: { icon: BookOpen, kind: "plan" },
+  draw: { icon: Brush, kind: "create" },
+  "three-d": { icon: Boxes, kind: "create" },
+  assets: { icon: PackageCheck, kind: "assets" },
+  collaborate: { icon: Workflow, kind: "collaborate" },
+  publish: { icon: FileOutput, kind: "publish" },
 };
 
 const COPY = {
@@ -128,7 +130,7 @@ export function ProductIntentStart({ headingId = "product-intent-title" }: { hea
               >
                 <Link href={destination.href} title={bi((destination.description).ko, (destination.description).en)}>
                   <span className="cf-intent-card-media" aria-hidden="true">
-                    <img src={visual.image} alt="" loading="lazy" decoding="async" />
+                    <WorkflowIllustration kind={visual.kind} decorative sizes="(max-width: 600px) 40vw, 200px" />
                     <span className="cf-intent-card-icon"><Icon size={18} /></span>
                   </span>
                   <span className="cf-intent-card-copy">

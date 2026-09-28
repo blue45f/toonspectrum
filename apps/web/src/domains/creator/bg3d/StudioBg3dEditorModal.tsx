@@ -1,3 +1,4 @@
+import "../studio-3d-ui/studio-3d-reference-workspace.css";
 // The legacy editor still reuses one mutable host object. Keep this shell out of React Compiler
 // memoization until the remaining document/session controllers stop mutating that identity.
 
@@ -104,6 +105,7 @@ export function StudioBg3dEditorModal({ h }: StudioBg3dEditorModalProps) {
       aria-labelledby="studio-bg3d-dialog-title"
       aria-describedby="studio-bg3d-dialog-description"
       data-testid="studio-bg3d-dialog"
+      data-studio-3d-reference="tooncraft"
       data-studio-bg3d-workspace={experienceMode === "simple" ? "scene-assistant-v1" : "professional-v2"}
       data-studio-bg3d-experience={experienceMode}
       hidden={!open}

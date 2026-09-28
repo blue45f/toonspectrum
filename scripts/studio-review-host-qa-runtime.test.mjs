@@ -68,6 +68,7 @@ test("필터 CI는 로컬 편집·인증 연결 단절·정본 production 검증
   assert.equal(local.run, "pnpm run verify:studio-filter-dialog");
   assert.equal(local.env.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL, undefined);
   assert.equal(local.env.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED, undefined);
+  assert.equal(local.env.TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY, "1");
   assert.equal(denial.run, "pnpm run verify:studio-filter-dialog");
   assert.equal(denial.env.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED, "1");
   assert.equal(denial.env.TEST_DATABASE_URL, preparation.env.TEST_DATABASE_URL);

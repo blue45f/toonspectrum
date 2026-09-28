@@ -15,12 +15,13 @@ vi.mock("phaser", () => ({
 const frames: FrameRequestCallback[] = [];
 beforeEach(() => {
   vi.useFakeTimers();
+  vi.spyOn(document, "hidden", "get").mockReturnValue(false);
   fixture.scene.mockClear();
   frames.splice(0);
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 function props(): StudioVirtualSpacePhaserCanvasProps {
   return {
@@ -71,4 +72,16 @@ describe("Phaser 장면 초기화 진단과 재시도", () => {
     expect(fixture.scene).toHaveBeenCalledOnce();
     expect(host.dataset.engineError).toBe("fixture-renderer-unavailable");
   });
+  it("탭을 숨긴 시간으로 초기화 실패를 만들지 않고 복귀 후 남은 예산만 사용한다", () => {
+    const visibility = vi.spyOn(document, "hidden", "get");
+    const view = render(<StudioVirtualSpacePhaserCanvas {...props()} />);
+    const host = view.container.querySelector<HTMLElement>("[data-studio-phaser-runtime]");
+    act(() => { vi.advanceTimersByTime(5_000); visibility.mockReturnValue(true); document.dispatchEvent(new Event("visibilitychange")); });
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(host?.dataset.studioEngineStatus).toBe("loading");
+    expect(host?.dataset.engineError).toBeUndefined();
+    act(() => { visibility.mockReturnValue(false); document.dispatchEvent(new Event("visibilitychange")); vi.advanceTimersByTime(20_000); });
+    expect(host?.dataset.engineError).toBe("boot-timeout:waiting-frame");
+  });
+
 });

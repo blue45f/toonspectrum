@@ -1,3 +1,4 @@
+import type { WorkflowVisual } from "./site-experience/workflow-illustration";
 import { translateBilingualValueForActiveLocale, useBilingualI18nRevision } from "@/shared/lib/i18n-bilingual-copy";
 import { useState, type ReactNode, type Ref } from "react";
 
@@ -15,13 +16,14 @@ interface PublicStoryHeroProps {
   description: string;
   image: "world" | "process" | "materials";
   imageAlt: string;
+  purpose?: WorkflowVisual;
   caption: string;
   children?: ReactNode;
   headingRef?: Ref<HTMLHeadingElement>;
 }
 
 /** The same artwork can be studied in color, values and an illustrative composition grid. */
-export function PublicStoryHero({ eyebrow, title, description, image, imageAlt, caption, children, headingRef }: PublicStoryHeroProps) {
+export function PublicStoryHero({ eyebrow, title, description, image, imageAlt, purpose, caption, children, headingRef }: PublicStoryHeroProps) {
   useBilingualI18nRevision();
 
 
@@ -35,7 +37,7 @@ export function PublicStoryHero({ eyebrow, title, description, image, imageAlt, 
         {children && <div className="public-story-hero__actions">{children}</div>}
       </div>
       <figure className="public-story-hero__figure">
-        <SiteArtwork image={image} alt={imageAlt} view={view} priority />
+        <SiteArtwork purpose={purpose} image={image} alt={imageAlt} view={view} priority />
         <span className="public-story-hero__edition" aria-hidden="true">TOONSTUDIO / ART STUDY</span>
         <div className="public-story-hero__views" role="group" aria-label={bi("작품 관찰 방식", "Artwork study view")}>
           {(["art", "values", "composition"] as const).map((mode) => <button type="button" key={mode} aria-pressed={view === mode} onClick={() => setView(mode)}>{bi((ART_VIEW_LABELS).ko, (ART_VIEW_LABELS).en)[mode]}</button>)}

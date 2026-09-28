@@ -1,0 +1,25 @@
+.workflow-illustration { display: block; width: 100%; min-width: 0; aspect-ratio: 8 / 5; overflow: hidden; border-radius: 12px; background: #0b1427; border: 1px solid var(--color-line-strong); }
+.workflow-illustration > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.workflow-illustration[data-artwork-fallback="true"] > img { object-fit: cover; }
+@media (forced-colors: active) { .workflow-illustration { border: 2px solid CanvasText; } }
+@media print { .workflow-illustration { break-inside: avoid; } }
+
+.site-artwork[data-artwork-collection="workflow-20260928"] > img { object-fit: contain; background: #0b1427; }
+.workspace-task-purpose > .workspace-task-illustration { flex: 0 0 112px; width: 112px; border-radius: 9px; }
+.workspace-task-purpose > p { flex: 1; }
+.cf-intent-card-media .workflow-illustration { height: 100%; border: 0; border-radius: inherit; }
+@media (max-width: 767px) {
+  .workspace-task-purpose > .workspace-task-illustration { flex-basis: 86px; width: 86px; margin-right: 8px; }
+  .workspace-task-purpose > p { min-width: 0; flex: 1 1 150px; }
+  .workspace-task-purpose > a { margin-left: auto; }
+}
+
+.public-site-next__art > .workflow-illustration { height: 100%; border: 0; border-radius: inherit; }
+.public-site-next__art > .workflow-illustration > img { width: 100%; height: 100%; object-fit: contain; }
+
+/* 원본과 대체 아트가 모두 없을 때 깨진 이미지 아이콘 대신 크기를 유지한다. */
+.workflow-illustration > img[hidden] { display: none; }
+.workflow-illustration__unavailable { display: flex; width: 100%; height: 100%; min-width: 0; align-items: center; justify-content: center; flex-direction: column; gap: 6px; padding: 8px; color: var(--color-fg-2); background: var(--color-panel); }
+.workflow-illustration__unavailable > span { font-size: 12px; line-height: 1.4; text-align: center; overflow-wrap: anywhere; }
+.workflow-illustration__unavailable > svg { flex-shrink: 0; }
+@media (forced-colors: active) { .workflow-illustration__unavailable { color: CanvasText; background: Canvas; } }

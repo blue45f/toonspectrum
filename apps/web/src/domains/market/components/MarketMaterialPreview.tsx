@@ -1,3 +1,4 @@
+import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
 import { ArrowUpRight, Brush, Layers3, Palette } from "lucide-react";
 import { useState } from "react";
 
@@ -16,7 +17,7 @@ export function MarketMaterialPreview() {
   const material = MATERIALS[selected];
   return <figure className="market-material-preview">
     <div className="market-material-image">
-      <img src="/brand/atelier-materials.webp" alt="잉크 자국, 색 견본, 인물과 건축 스케치를 모은 웹툰 드로잉 재료 콘셉트 이미지" width={1536} height={1024} fetchPriority="high" style={{ objectPosition: material.position }} />
+      <WorkflowIllustration kind={selected === 1 ? "create" : "assets"} priority />
       <span className="market-material-label">THE ARTIST'S MATERIAL DESK</span>
     </div>
     <figcaption>

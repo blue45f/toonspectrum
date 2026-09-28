@@ -105,6 +105,7 @@ export function DiscoverHubPage() {
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <PublicStoryHero
+        purpose="community"
         eyebrow="DISCOVER · STORIES & INSPIRATION"
         title={copy.title}
         description={copy.body}

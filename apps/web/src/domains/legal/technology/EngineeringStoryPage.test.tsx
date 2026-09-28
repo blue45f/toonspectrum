@@ -13,7 +13,7 @@ import { EngineeringVideosPage } from "./EngineeringVideosPage";
 
 vi.mock("@/shared/seo/use-document-title", () => ({ useDocumentTitle: vi.fn() }));
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); sessionStorage.clear(); });
 
 describe("engineering story pages", () => {
   it("renders all chapters with status, evidence and a reusable guide path", () => {
@@ -125,10 +125,10 @@ describe("engineering story pages", () => {
     expect(previous.hasAttribute("disabled")).toBe(true);
 
     fireEvent.click(screen.getByRole("button", { name: /기술 발표|Engineering talk/u }));
-    for (let step = 0; step < 26; step += 1) fireEvent.keyDown(document, { key: "ArrowRight" });
+    fireEvent.change(screen.getByRole("combobox", { name: /발표 슬라이드 선택|Select presentation slide/u }), { target: { value: "8" } });
     expect(
       document.querySelector('[data-engineering-deck-shell] [data-deck-slide] h2')?.textContent,
-    ).toMatch(/Worker를 하나의 만능|Workers are task-specific/u);
+    ).toMatch(/무거운 작업을 옮겨도|Moving work off-thread/u);
   });
 
   it("renders the reviewable film and rights surfaces from the shared story model", () => {

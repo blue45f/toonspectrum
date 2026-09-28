@@ -39,7 +39,10 @@ const EnabledEnvironmentSchema = z
   .object({
     enabled: z.literal("true"),
     projectUrl: HttpsOriginSchema,
-    serviceRoleKey: z.string().min(32).max(16_384),
+    serviceRoleKey: z.string().min(32).max(16_384)
+      .refine((value) => !/\s/u.test(value) && !value.startsWith("sb_publishable_"), {
+        message: "Storage credentials must be a server-only key without whitespace.",
+      }),
     sourceBucket: BucketNameSchema,
     derivedBucket: BucketNameSchema,
     exportBucket: BucketNameSchema,
@@ -102,8 +105,10 @@ function configuredEnvironment(
   return {
     enabled: environment.SUPABASE_OBJECT_STORAGE_ENABLED,
     projectUrl: environment.SUPABASE_OBJECT_STORAGE_URL,
+    // 신규 이름을 우선하며 잘못 지정한 빈 값을 기존 키로 숨기지 않는다.
     serviceRoleKey:
-      environment.SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY,
+      environment.SUPABASE_OBJECT_STORAGE_SECRET_KEY
+      ?? environment.SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY,
     sourceBucket: environment.SUPABASE_OBJECT_STORAGE_SOURCE_BUCKET,
     derivedBucket: environment.SUPABASE_OBJECT_STORAGE_DERIVED_BUCKET,
     exportBucket: environment.SUPABASE_OBJECT_STORAGE_EXPORT_BUCKET,

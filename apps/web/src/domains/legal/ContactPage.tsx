@@ -67,6 +67,7 @@ export function ContactPage() {
   return (
     <Container size="wide" className="py-8 sm:py-12 lg:py-16">
       <PublicStoryHero
+        purpose="collaborate"
         eyebrow="CONTACT · CREATE SOMETHING TOGETHER"
         title="웹툰을 만드는 더 나은 환경, 함께."
         description="창작 도구와 교육, 리소스 공유, 콘텐츠와 플랫폼의 연결. 웹툰을 그리는 사람에게 도움이 되는 협업을 제안해 주세요. 서비스 이용 문제는 지원 센터에서, 투자·제휴·스폰서십은 비공개 비즈니스 센터에서, 개인 서포터와 후원 경계는 응원 센터에서 확인할 수 있습니다."

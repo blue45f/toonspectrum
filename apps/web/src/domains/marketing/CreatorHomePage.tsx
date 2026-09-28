@@ -2,6 +2,8 @@ import { formatI18nTemplate, translateCurrentStaticSourceText, translateBilingua
 import { ArrowDown, ArrowRight, Box, Brush, Check, Layers, LayoutGrid, MousePointer2, Play, Plus, Square, Type } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useSeekableMediaAsset } from "./use-seekable-media-asset";
+import { TOUR_VIDEO_MAX_BYTES } from "./seekable-media-asset";
 import { CREATOR_FILM_DOWNLOADS, CREATOR_FILM_UI, createCreatorFilmPlayback, creatorFilmChapterAt } from "./creator-film-playback";
 import { CREATOR_FILM, HOME_COPY, creatorHomeLocale, type CreatorHomeCopy } from "./creator-home-content";
 import { CreatorHomeNavigation, CreatorSectionLink } from "./CreatorHomeNavigation";
@@ -38,6 +40,7 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
   const [mode, setMode] = useState<"poster" | "playing" | "error">("poster");
   const [loading, setLoading] = useState(false);
   const [activeChapter, setActiveChapter] = useState(0);
+  const preparedMedia = useSeekableMediaAsset(mode === "playing" ? CREATOR_FILM.src : null, TOUR_VIDEO_MAX_BYTES, "video");
   const videoRef = useRef<HTMLVideoElement>(null);
   const posterRef = useRef<HTMLButtonElement>(null);
   const controllerRef = useRef<ReturnType<typeof createCreatorFilmPlayback> | null>(null);
@@ -54,6 +57,10 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
     setLoading(false);
     setMode("error");
   }, []);
+
+  useEffect(() => {
+    if (preparedMedia.error) failPlayback();
+  }, [preparedMedia.error, failPlayback]);
 
   useEffect(() => {
     if (mode !== "playing") {
@@ -108,12 +115,12 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
   return (
     <section className="ch-film-section" id="creator-film" aria-labelledby="creator-film-title">
       <div className="ch-film-heading"><p className="ch-eyebrow">{copy.filmEyebrow}</p><h2 id="creator-film-title" tabIndex={-1}>{copy.filmTitle}</h2><p>{copy.filmBody}</p></div>
-      <div className="ch-film-frame" aria-busy={mode === "playing" && loading}>
+      <div className="ch-film-frame" aria-busy={mode === "playing" && (loading || preparedMedia.loading)}>
         {mode === "playing" ? (
           <video
             id="creator-brand-video"
             ref={videoRef}
-            src={CREATOR_FILM.src}
+            src={preparedMedia.url ?? undefined}
             controls
             muted
             playsInline
@@ -123,7 +130,7 @@ export function CreatorBrandFilm({ copy, locale }: { copy: CreatorHomeCopy; loca
             aria-label={copy.filmLabel}
             onCanPlay={() => setLoading(false)}
             onPlaying={() => setLoading(false)}
-            onSeeked={() => setLoading(false)}
+            onSeeked={(event) => { setLoading(false); setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, CREATOR_FILM.chapters)); }}
             onWaiting={() => setLoading(true)}
             onError={failPlayback}
             onTimeUpdate={(event) => setActiveChapter(creatorFilmChapterAt(event.currentTarget.currentTime, CREATOR_FILM.chapters))}

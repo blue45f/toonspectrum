@@ -310,6 +310,20 @@ describe("studio-brush-velocity-pressure", () => {
     expect(result.sample.widthRatio).toBe(0.8);
   });
 
+  it.each(["gpen", "maru-pen", "pen"])("마우스 릴리스가 %s의 마지막 접촉 필압을 다시 계산하지 않는다", (brushId) => {
+    const lastContactPressure = 0.506;
+    expect(resolveStudioBrushReleasePressure({
+      brushId, pointerType: "mouse", rawPressure: 0, lastContactPressure,
+      useVelocityPressure: true,
+    })).toBe(lastContactPressure);
+  });
+
+  it("압력을 보고하지 않는 터치 릴리스는 마지막 접촉을 유지한다", () => {
+    expect(resolveStudioBrushReleasePressure({
+      brushId: "maru-pen", pointerType: "touch", rawPressure: 0, lastContactPressure: 0.64,
+    })).toBe(0.64);
+  });
+
   it("uses the family curve for a nonzero release but keeps the last contact for pen-up zero", () => {
     const nonzero = resolveStudioBrushReleasePressure({
       ...base,

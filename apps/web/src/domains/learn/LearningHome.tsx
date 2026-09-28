@@ -1,3 +1,4 @@
+import { WorkflowIllustration } from "@/shared/components/site-experience/WorkflowIllustration";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -220,7 +221,7 @@ export function LearningHome() {
           </div>
           <p className="learn-small">로그인 없이 시작 · 완료 기록과 메모는 현재 브라우저에 저장</p>
         </div>
-        <figure className="learn-hero-art"><img src="/brand/atelier-world.webp" alt="배경과 인물, 빛과 색이 어우러진 상상 속 항구 도시 콘셉트 아트" width={1536} height={1024} fetchPriority="high" /><figcaption><span>YOUR NEXT SCENE</span><strong>관찰하고. 익히고. 그려보세요.</strong><span>ToonStudio 콘셉트 아트</span></figcaption></figure>
+        <figure className="learn-hero-art"><WorkflowIllustration kind="learn" priority /><figcaption><span>YOUR NEXT SCENE</span><strong>관찰하고. 익히고. 그려보세요.</strong><span>ToonStudio 콘셉트 아트</span></figcaption></figure>
       </header>
 
         <aside className="learn-dashboard-card learn-dashboard-overview" aria-label="내 학습 현황">

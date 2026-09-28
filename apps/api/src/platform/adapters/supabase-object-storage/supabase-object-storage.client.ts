@@ -576,7 +576,10 @@ export class SupabaseRestObjectStoragePort
           headers: {
             accept: "application/json",
             apikey: this.config.serviceRoleKey,
-            authorization: `Bearer ${this.config.serviceRoleKey}`,
+            // 새 secret key는 JWT가 아니므로 apikey만 보낸다. 기존 JWT 인증은 유지한다.
+            ...(this.config.serviceRoleKey.startsWith("sb_secret_")
+              ? {}
+              : { authorization: `Bearer ${this.config.serviceRoleKey}` }),
             "x-client-info":
               "toonstudio-supabase-object-storage/1",
             ...request.headers,

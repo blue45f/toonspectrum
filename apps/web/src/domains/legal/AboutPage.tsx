@@ -178,6 +178,7 @@ export function AboutPage() {
   return (
     <Container size="wide" className="py-7 sm:py-10 lg:py-12">
       <PublicStoryHero
+        purpose="create"
         eyebrow="ABOUT · TOONSTUDIO"
         title={
           bi("아이디어부터 완성된 웹툰까지, 하나의 작업실에서.", "From the first idea to a finished webtoon, in one studio.")

@@ -71,6 +71,11 @@ const REPORT_PATH = join(SCRATCH, "studio-filter-dialog-report.json");
 
 const AUTHENTICATED = process.env.TOONSPECTRUM_FILTER_DIALOG_AUTHENTICATED === "1";
 const EXPECT_DENIAL = process.env.TOONSPECTRUM_FILTER_DIALOG_EXPECT_DENIAL === "1";
+const STATIC_LOCAL_ONLY = process.env.TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY === "1";
+if (AUTHENTICATED && STATIC_LOCAL_ONLY) throw new Error("정본 저장과 로컬 문서 검증은 별도 실행하세요.");
+if (STATIC_LOCAL_ONLY && process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()) {
+  throw new Error("로컬 문서는 검사기가 소유한 preview에서만 확인하세요.");
+}
 if (EXPECT_DENIAL && !AUTHENTICATED) throw new Error("거절 검증은 실제 인증된 QA 원고의 연결 단절로 재현해야 합니다. 로컬 단독 원고는 필터 편집을 허용합니다.");
 if (EXPECT_DENIAL && process.env.TOONSPECTRUM_VERIFY_ORIGIN?.trim()) {
   throw new Error("연결 단절은 검사기가 소유한 loopback QA runtime에서만 확인하세요.");
@@ -160,7 +165,7 @@ interface FilterDialogReport {
   startedAt: string;
   finishedAt: string;
   cases: FilterCaseResult[];
-  authority: "authenticated-canonical" | "authenticated-disconnected-denial" | "external-or-static";
+  authority: "authenticated-canonical" | "authenticated-disconnected-denial" | "owned-static-local" | "external-or-static";
   canonicalCheckpoints: { phase: string; revision: number; crdtServerSequence: string; pageSha256: string }[];
   committedBaseline: { livePresentationDiff: PixelDiff; originalDrawCount: number; persistedHistoryUnchanged: boolean } | null;
   consoleErrorCount: number;
@@ -650,6 +655,14 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       await selectCanonicalImage();
     };
     collectBrowserErrors(page, browserErrors, url, (message) => connectionFault?.isExpectedConsoleFailure(message) ?? false);
+    if (STATIC_LOCAL_ONLY) page.on("response", (response) => {
+      const request = response.request();
+      const path = new URL(response.url()).pathname;
+      if (response.ok() && request.method() !== "GET"
+        && /^\/api\/creator\/works(?:\/|$)/u.test(path)) {
+        browserErrors.messages.push("로컬 검증에서 성공한 서버 원고 변경이 관측됐습니다.");
+      }
+    });
     await page.addInitScript(
       ({ autosavePrefix, betaNoticeRevision, betaNoticeStorageKey, quickstartKey }) => {
         try {
@@ -1227,7 +1240,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
       await evidencePage.screenshot({ path: join(SCRATCH, "studio-filter-dialog-fatal.png") }).catch(() => undefined);
     }
     writeFileSync(REPORT_PATH, `${JSON.stringify({ ok: false, startedAt, finishedAt: new Date().toISOString(),
-      authority: EXPECT_DENIAL ? "authenticated-disconnected-denial" : AUTHENTICATED ? "authenticated-canonical" : "external-or-static",
+      authority: EXPECT_DENIAL ? "authenticated-disconnected-denial" : AUTHENTICATED ? "authenticated-canonical" : STATIC_LOCAL_ONLY ? "owned-static-local" : "external-or-static",
       cases: results, committedBaseline, canonicalCheckpoints, browserErrors,
       connectionFault: connectionFault?.evidence() ?? null, canonicalUnchangedChecks,
       failure: String(error instanceof Error ? error.message : error) }, null, 2)}\n`);
@@ -1252,7 +1265,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
     finishedAt: new Date().toISOString(),
     cases: results,
     committedBaseline,
-    authority: EXPECT_DENIAL ? "authenticated-disconnected-denial" : AUTHENTICATED ? "authenticated-canonical" : "external-or-static",
+    authority: EXPECT_DENIAL ? "authenticated-disconnected-denial" : AUTHENTICATED ? "authenticated-canonical" : STATIC_LOCAL_ONLY ? "owned-static-local" : "external-or-static",
     canonicalCheckpoints,
     connectionFault: connectionFault?.evidence() ?? null, canonicalUnchangedChecks,
     consoleErrorCount: browserErrors.messages.length,
@@ -1267,6 +1280,7 @@ async function main(runtime?: AuthenticatedRuntime): Promise<void> {
   }
   if (report.ok && browserErrors.messages.length === 0 && browserErrors.failedResponses.length === 0) {
     log(EXPECT_DENIAL ? "PASS — 실제 연결 단절 후 필터 거절과 로컬·서버 원고 보존을 확인했습니다"
+      : STATIC_LOCAL_ONLY ? "PASS — 서버 저장으로 오인하지 않는 로컬 필터 적용·실행취소·내구 저장을 확인했습니다"
       : "PASS — 모든 필터 케이스가 실제 브라우저에서 적용·복원되었습니다");
     return;
   }

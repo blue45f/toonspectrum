@@ -136,3 +136,20 @@ describe("route stage semantic and recovery guarantees", () => {
     expect(hasMeaningfulRouteContent(root)).toBe(true);
   });
 });
+
+
+it.each(["/studio/new", "/studio/new/"])("%s 새 프로젝트 양식을 첫 프레임부터 선명하게 표시한다", (pathname) => {
+  render(<RouteStage pathname={pathname} search="?format=vertical-webtoon" accessibleTitle="새 프로젝트">
+    <section data-route-ready=""><h1>새 프로젝트</h1></section>
+  </RouteStage>);
+  const stage = document.querySelector(".route-stage");
+  expect(stage?.classList.contains("route-stage--settled")).toBe(true);
+  expect(stage?.classList.contains("route-stage--instant")).toBe(true);
+});
+
+it("일반 탐색 페이지의 전환 정책은 변경하지 않는다", () => {
+  render(<RouteStage pathname="/discover" search="" accessibleTitle="탐색">
+    <section data-route-ready=""><h1>탐색</h1></section>
+  </RouteStage>);
+  expect(document.querySelector(".route-stage--instant")).toBeNull();
+});

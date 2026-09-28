@@ -212,6 +212,7 @@ export function CreatorSupportPage() {
   return (
     <Container size="wide" className="py-8 sm:py-12 lg:py-16">
       <PublicStoryHero
+        purpose="community"
         eyebrow={t("creatorSupport.hero.eyebrow")}
         title={t("creatorSupport.hero.title")}
         description={t("creatorSupport.hero.description")}

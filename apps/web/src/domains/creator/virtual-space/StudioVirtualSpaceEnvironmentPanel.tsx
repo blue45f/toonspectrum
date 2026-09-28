@@ -1,6 +1,7 @@
 import { CloudRain, Flower2, MoonStar, Snowflake, Sparkles, SunMedium, Sunrise, Sunset } from "lucide-react";
 
 import "./studio-virtual-space-environment-panel.css";
+import { StudioAtmospherePresets } from "./experience/StudioAtmospherePresets";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
 import { DEFAULT_STUDIO_VIRTUAL_ART_STYLE, type StudioVirtualArtStyleKey } from "./studio-virtual-space-art-style";
@@ -62,6 +63,7 @@ export function StudioVirtualSpaceEnvironmentPanel({ value, onChange, artStyle =
         <span>{bt("이 설정은 모든 장소에 함께 적용되어 이 브라우저에만 저장됩니다. 장소마다 다른 배경을 쓰려면 꾸미기의 배경 장소를 고르세요.",
           "These settings apply across every place and are stored in this browser only. To use a different backdrop per place, choose a background district in the customization panel.")}</span>
       </div>
+      <StudioAtmospherePresets value={value} onChange={onChange} artStyle={artStyle} />
       <fieldset className="studio-environment-panel__backdrops">
         <legend>{bt("배경", "Backdrop")}</legend>
         <div>

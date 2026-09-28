@@ -125,6 +125,9 @@ jobs:
             scripts/lib/studio-filter-connection-fault.test.ts \
             scripts/lib/studio-filter-comparison-region.test.ts \
             scripts/lib/studio-drawing-readiness.test.ts \
+            scripts/lib/studio-filter-comparison-clip.test.ts \
+            apps/web/src/domains/creator/filter/StudioFilterDialog.test.tsx \
+            apps/web/src/domains/creator/offline-branch/studio-offline-branch-scene-bridge.test.ts \
             2>&1 | tee /tmp/studio-stability-unit-evidence/tests.log
       - name: Preserve focused regression results
         if: always()
@@ -196,6 +199,7 @@ jobs:
       - name: 로컬 단독 원고의 필터 적용·실행취소와 원본 보존
         if: matrix.suite == 'filters'
         env:
+          TOONSPECTRUM_FILTER_DIALOG_LOCAL_ONLY: '1'
           TOONSPECTRUM_FILTER_DIALOG_VERIFY_DIR: /tmp/studio-stability-evidence/filters-local
         run: pnpm run verify:studio-filter-dialog
       - name: 임시 정본 API와 전용 production QA 빌드 준비

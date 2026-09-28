@@ -39,6 +39,7 @@ import {
   fingerprintStudioCompositedPng,
   type StudioCompositedCanvasFingerprint,
 } from "./lib/studio-composited-canvas-fingerprint";
+import { waitForStudioDrawingReady } from "./lib/studio-drawing-readiness";
 import { findFreePort } from "./lib/studio-verify-preview-harness.mjs";
 
 const QUICKSTART_KEY = "toonstudio-studio-quick-start-dismissed";
@@ -135,24 +136,7 @@ async function attachPage(
 }
 
 async function dismissOverlays(page: Page): Promise<void> {
-  const betaNotice = page.locator('[data-studio-beta-notice="true"]');
-  if (await betaNotice.isVisible().catch(() => false)) {
-    await betaNotice.getByRole("button").first().click({ timeout: 2_000 }).catch(() => undefined);
-    await betaNotice.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
-  }
-  // 시작 안내 닫기는 문서 readiness helper가 단일 deadline 안에서 실제 클릭·숨김까지 검증한다.
-  // 초기 엔진 로드 중의 중복 2초 클릭이 그 검증에 도달하기 전에 실패하지 않도록 한다.
-  const explicitDismiss = page.locator('[data-studio-quickstart-dismiss="true"]');
-  if (await explicitDismiss.isVisible().catch(() => false)) {
-    await explicitDismiss.click({ timeout: 2_000 }).catch(() => undefined);
-  }
-  for (const text of ["빠른 시작 닫기 (Esc)", "나중에", "닫기", "확인", "빈 캔버스"]) {
-    const button = page.getByRole("button", { name: text, exact: true }).first();
-    if (await button.isVisible().catch(() => false)) {
-      await button.click({ timeout: 1_000 }).catch(() => undefined);
-    }
-  }
-  await page.keyboard.press("Escape").catch(() => undefined);
+  await waitForStudioDrawingReady(page, { timeoutMs: 20_000 });
 }
 
 async function waitForCanvasSurface(page: Page): Promise<void> {

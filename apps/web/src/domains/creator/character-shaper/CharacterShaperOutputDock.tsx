@@ -112,6 +112,7 @@ export function CharacterShaperOutputDock({
   paintActive,
   onTogglePaint,
   compact,
+  collapsedSettings = false,
   framing = DEFAULT_CHARACTER_OUTPUT_FRAMING,
   onFramingChange,
 }: CharacterShaperOutputDockProps) {
@@ -437,7 +438,13 @@ export function CharacterShaperOutputDock({
       data-character-shaper-dock={compact ? "compact" : "wide"}
       className={cn("relative flex min-w-0 shrink-0 flex-wrap items-center border-t border-line bg-panel px-2 py-2", compact ? "gap-1" : "gap-1.5")}
     >
-      {compact ? null : <div className="w-full">{exportSettings}</div>}
+      {compact ? null : collapsedSettings ? (
+        <button ref={sheetTriggerRef} type="button" aria-expanded={sheetOpen} aria-controls={sheetId}
+          data-character-output-settings="true" className={cn(BUTTON, sheetOpen && ACTIVE_BUTTON)}
+          onClick={() => setSheetOpen((open) => !open)}>
+          <Layers size={16} aria-hidden />{t("studio.character.workspace.outputSettings", "출력 설정")}
+        </button>
+      ) : <div className="w-full">{exportSettings}</div>}
       <div role="group" aria-label="참고 도구" className="flex shrink-0 items-center gap-1">
         {DRAWER_BUTTONS.map((item) => {
           const Icon = item.icon;
@@ -542,7 +549,7 @@ export function CharacterShaperOutputDock({
         </div>
       ) : null}
 
-      {compact && sheetOpen ? (
+      {(compact || collapsedSettings) && sheetOpen ? (
         <div
           ref={sheetRef}
           id={sheetId}

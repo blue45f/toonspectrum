@@ -110,3 +110,12 @@ export function parseAuthProviderDiscovery(
 
   return result;
 }
+
+/** 구 API에서 필드가 없으면 미확인으로 유지하며 지원 여부를 추측하지 않는다. */
+export function parseAuthEmailAvailability(value: unknown): boolean | null {
+  if (!isRecord(value) || !isRecord(value.email)) return null;
+  const { available, reason } = value.email;
+  if (available === true && reason === "configured") return true;
+  if (available === false && ["disabled", "missing-key", "missing-sender", "invalid-configuration"].includes(String(reason))) return false;
+  return null;
+}

@@ -138,9 +138,17 @@ export function createStudioMaterialTipField(
     const disc = edge(r - 0.94, 0.07);
     switch (program) {
       case "filbert-bristle": {
-        // 타원 안의 굵은 강모 다섯 줄. 빈 홈을 실제 알파에 남겨 겹쳐도 단색 면이 되지 않는다.
+        // 서로 다른 굵기·간격의 강모 다섯 줄. 등간격 코사인 격자는 긴 획에서 인공적인
+        // 반복 줄무늬가 됐으므로, 빈 홈은 유지하면서 실제 촉의 불균일한 묶음을 고정한다.
         const silhouette = edge(Math.hypot(x * 1.18, y) - 0.9, 0.06);
-        const fibers = Math.pow(0.5 + 0.5 * Math.cos((x + Math.sin(y * 2.8) * 0.008) * 18), 4);
+        const curvedX = x + Math.sin(y * 2.8) * 0.008;
+        const strand = (center: number, radius: number, pigment: number) =>
+          Math.exp(-Math.pow((curvedX - center) / radius, 2)) * pigment;
+        const fibers = clamp01(
+          strand(-0.71, 0.073, 0.92) + strand(-0.46, 0.048, 1)
+          + strand(-0.08, 0.092, 0.94) + strand(0.34, 0.062, 0.86)
+          + strand(0.69, 0.045, 0.96),
+        );
         return silhouette * fibers * (0.77 + 0.23 * noise(x * 21, y * 17, stableSeed));
       }
       case "graphite-contour": {

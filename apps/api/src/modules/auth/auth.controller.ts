@@ -50,6 +50,7 @@ import {
   AuthEmailConfigurationError,
   AuthEmailDeliveryError,
   isAuthEmailDeliveryConfigured,
+  authEmailAvailability,
   sendAuthEmail,
 } from "../../server/auth-email";
 import {
@@ -192,6 +193,7 @@ export class AuthController {
 
   private assertAuthEmailDeliveryConfigured(): void {
     if (!isAuthEmailDeliveryConfigured()) {
+      this.logger.warn({ event: "auth.email.configuration-unavailable", reason: authEmailAvailability().reason });
       throw new ServiceUnavailableException({
         error: "이메일 인증 서비스 설정이 완료되지 않았어요. 잠시 후 다시 시도해 주세요.",
       });
@@ -227,10 +229,10 @@ export class AuthController {
   @Get("providers")
   async getProviders() {
     const config = await getAppConfig();
-    return listAuthProviders({
-      kakao: config.authKakao,
-      naver: config.authNaver,
-    });
+    return {
+      ...listAuthProviders({ kakao: config.authKakao, naver: config.authNaver }),
+      email: authEmailAvailability(),
+    };
   }
 
   /**

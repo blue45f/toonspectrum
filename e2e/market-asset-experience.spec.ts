@@ -169,3 +169,54 @@ test("밝은 테마의 에셋 검색·필터도 접근성 대비를 유지한다
   await assertNoOverflow(page);
   await expect(page.getByRole("button", { name: "목록 보기", exact: true })).toBeEnabled();
 });
+
+test("내 에셋에서 일반 회원가입을 열고 503에도 현재 작업과 입력을 보존한다", async ({ page }) => {
+  await mockMarket(page);
+  await page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, json: { authenticated: false, user: null } }));
+  await page.route("**/api/auth/providers", (route) => route.fulfill({ status: 200, json: {} }));
+  await page.route("**/api/auth/signup", (route) => route.fulfill({ status: 503, json: { statusCode: 503, message: "Request could not be completed" } }));
+  await page.goto("/market/library", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "회원가입", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("textbox", { name: "닉네임", exact: true }).fill("가입 응답 검증");
+  await dialog.getByRole("textbox", { name: "이메일", exact: true }).fill("material-qa@example.test");
+  await dialog.locator('input[name="password"]').fill("fixture-only-password-long-enough");
+  await dialog.getByRole("button", { name: "가입하고 시작", exact: true }).click();
+  await expect(dialog.getByText(/가입·이메일 인증 서비스를 일시적으로 이용할 수 없어요/u)).toBeVisible();
+  await expect(dialog.locator('input[name="password"]')).toHaveValue("fixture-only-password-long-enough");
+  await expect(dialog.getByRole("tab", { name: "회원가입", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page).toHaveURL(/\/market\/library$/u);
+  await dialog.getByRole("button", { name: "로그인 창 닫기", exact: true }).click();
+  await expect(page.getByRole("link", { name: "로그인 없이 무료 제작 소재 둘러보기" })).toBeVisible();
+});
+
+test("공개 카탈로그가 비어 있어도 실제 기본 소재까지 이동할 수 있다", async ({ page }) => {
+  await mockMarket(page);
+  await page.route("**/api/creator/marketplace/resources?*", (route) => route.fulfill({ status: 200, json: { items: [], limit: 12, hasMore: false, nextCursor: null } }));
+  await page.goto("/market/browse", { waitUntil: "domcontentloaded" });
+  await page.getByRole("link", { name: "기본 무료 소재 사용하기", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "바로 꺼내 쓰는 무료 제작 소재" })).toBeVisible();
+  await expect(page.locator('[data-essentials-id]').first()).toBeVisible();
+});
+
+test("이메일 가입 설정이 없으면 제출 전에 안내하고 기존 로그인은 유지한다", async ({ page }) => {
+  await mockMarket(page);
+  let signupRequests = 0;
+  await page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, json: { authenticated: false, user: null } }));
+  await page.route("**/api/auth/providers", (route) => route.fulfill({ status: 200, json: { email: { available: false, reason: "missing-key" } } }));
+  await page.route("**/api/auth/signup", (route) => { signupRequests += 1; return route.fulfill({ status: 503, json: {} }); });
+  await page.goto("/market/library", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "회원가입", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText(/이메일 신규 가입·인증 메일 발송이 아직 준비되지 않았습니다/u)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "가입하고 시작", exact: true })).toBeDisabled();
+  await dialog.getByRole("tab", { name: "로그인", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "로그인", exact: true })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "인증 메일 다시 보내기", exact: true })).toBeDisabled();
+  expect(signupRequests).toBe(0);
+  await page.route("**/api/auth/providers", (route) => route.fulfill({ status: 200, json: { email: { available: true, reason: "configured" } } }));
+  await dialog.getByRole("button", { name: "이메일 서비스 다시 확인" }).click();
+  await dialog.getByRole("tab", { name: "회원가입", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "가입하고 시작", exact: true })).toBeEnabled();
+  await expect(page).toHaveURL(/\/market\/library$/u);
+});

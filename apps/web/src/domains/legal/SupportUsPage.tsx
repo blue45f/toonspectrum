@@ -24,6 +24,7 @@ export function SupportUsPage() {
   return (
     <Container size="wide" className="py-8 sm:py-12 lg:py-16">
       <PublicStoryHero
+        purpose="rights"
         eyebrow={t("supportUs.hero.eyebrow")}
         title={t("supportUs.hero.title")}
         description={t("supportUs.hero.description")}

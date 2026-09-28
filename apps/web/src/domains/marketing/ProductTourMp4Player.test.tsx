@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,12 +10,17 @@ const { suspendBgmForContext, resumeBgmForContext } = vi.hoisted(() => ({
   resumeBgmForContext: vi.fn(),
 }));
 
+vi.mock("./use-seekable-media-asset", () => ({
+  useSeekableMediaAsset: (source: string | null) => ({ source, url: source, error: null, loading: false }),
+}));
+
 vi.mock("@toonstudio/core/fx", () => ({
   suspendBgmForContext,
   resumeBgmForContext,
 }));
 
 beforeEach(() => {
+  window.history.replaceState(null, "", "/product-tour");
   suspendBgmForContext.mockReset();
   resumeBgmForContext.mockReset();
   vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
@@ -100,4 +105,19 @@ describe("ProductTourMp4Player", () => {
     });
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("현재 위치에서 다시 시도");
   });
+  it("이전 play 요청의 늦은 실패는 새로운 탐색을 되돌리지 않는다", async () => {
+    let rejectPrevious: (reason: Error) => void = () => { throw new Error("play request not initialized"); };
+    vi.mocked(HTMLMediaElement.prototype.play).mockImplementationOnce(() => new Promise<void>((_resolve, reject) => { rejectPrevious = reject; }));
+    const { container } = renderPlayer("ko");
+    fireEvent.click(container.querySelector<HTMLButtonElement>(".product-tour-player__poster")!);
+    const video = container.querySelector<HTMLVideoElement>("video")!;
+    fireEvent.loadedMetadata(video);
+    fireEvent.click(container.querySelectorAll<HTMLButtonElement>(".product-tour-player__chapter > button")[2]!);
+    expect(video.currentTime).toBe(108);
+    await act(async () => { rejectPrevious(new Error("old decode failure")); });
+    expect(container.querySelector("video")).toBe(video);
+    expect(video.getAttribute("src")).not.toContain("recovery=");
+    expect(video.currentTime).toBe(108);
+  });
+
 });

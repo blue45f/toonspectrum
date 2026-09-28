@@ -133,7 +133,11 @@ export async function verifyVirtualStudioImagegen25V7() {
   if (!catalog.includes("/assets/virtual-studio/imagegen25-v7/places")) errors.push("runtime place catalog is not connected");
   const runtimeBackdrops = await verifyVirtualStudioRuntimeBackdrops();
   const canvas = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/StudioVirtualSpacePhaserCanvas.tsx"), "utf8");
-  if (!canvas.includes("studioVirtualBackdropUrl") || !canvas.includes("livingTextureKeys.terrain")
+  const backdropAdapter = await readFile(resolve(repo, "apps/web/src/domains/creator/virtual-space/experience/studio-cinematic-art.ts"), "utf8");
+  if (!canvas.includes("studioCinematicBackdropUrl(environmentPreference.backdrop, artStyle,")
+    || !canvas.includes("this.load.image(horizonTextureKey, horizonUrl)")
+    || !backdropAdapter.includes("return studioVirtualBackdropUrl(backdrop, style);")
+    || !canvas.includes("livingTextureKeys.terrain")
     || !canvas.includes("/assets/virtual-studio/imagegen25-v7/tiles/terrain-atlas.webp")) {
     errors.push("Phaser runtime does not load ImageGen backdrops and terrain tiles");
   }

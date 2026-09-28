@@ -60,6 +60,8 @@ async function reachDrawingUi(
     } catch (error) {
       if (!(error instanceof errors.TimeoutError)) throw error;
       lastTimeout = error;
+      // 클릭은 처리됐지만 후속 탐색 대기만 timeout일 수 있다. 실제로 본 안내의 소멸만 인정한다.
+      if (welcomeCloseAttempted && !(await welcome.isVisible())) welcomeDismissed = true;
     }
     const remaining = deadline - Date.now();
     if (remaining > 0) await page.waitForTimeout(Math.min(100, remaining));

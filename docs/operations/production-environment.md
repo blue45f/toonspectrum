@@ -64,6 +64,20 @@ Render dashboard에서 암호화하여 저장하고 로컬 임시 파일은 전�
 
 개인 저장소 공급자의 콘솔 등록값, 최소 scope, 운영·로컬 콜백은 [`personal-cloud-provider-registration.md`](./personal-cloud-provider-registration.md)를 따른다.
 
+## Supabase 저장소 인증 형식
+
+신규 서버 전용 키는 `SUPABASE_OBJECT_STORAGE_SECRET_KEY`로 주입한다. 새 키는 JWT가 아니므로
+저장소 요청의 `apikey` 헤더에만 전달한다. 기존 `SUPABASE_OBJECT_STORAGE_SERVICE_ROLE_KEY`는
+하위 호환을 위해 유지하며 기존 JWT는 `apikey`와 `Authorization: Bearer`를 함께 사용한다.
+신규 이름이 명시됐으면 우선하며, 빈 값·공백·publishable key를 기존 키로 숨겨서 대체하지 않는다.
+두 이름을 동시에 설정하거나 예제의 빈 신규 변수를 그대로 활성화하지 않는다.
+
+활성화 전 기존 세 purpose 버킷의 실제 HTTP 응답과 비공개 여부를 확인한다. DB에서 버킷 행이
+보이는 것만으로 인증 성공을 대신하지 않는다. 검증이 실패하면 저장소 활성화와 배포를 중단한다.
+기존 키를 회전하지 않으며 토큰을 채팅, Git, 로그, 브라우저 번들에 넣지 않는다.
+
+공급자 계약: <https://supabase.com/docs/guides/getting-started/migrating-to-new-api-keys>
+
 ## Render 전환 검증
 
 환경 주입과 수동 deploy가 완료된 뒤 Cloudflare origin을 바꾸기 전에 다음을 실행한다.
