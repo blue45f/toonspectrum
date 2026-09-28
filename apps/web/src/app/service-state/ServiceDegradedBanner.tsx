@@ -29,17 +29,37 @@ function unavailableLabels(
     .filter(([key]) => capabilities[key] === "unavailable" || capabilities[key] === "degraded")
     .map(([, label]) => label);
 }
+/**
+ * 열린 모달이 있는지 따라 배너의 떠 있는 표시를 멈춘다. 이 배너는 AppShell에 있어
+ * 창(모달)이 inert로 만드는 studio 루트의 바깥에 있고, z-[90]은 창보다 높은 층이라
+ * 좁은 화면에서 창의 실행 영역을 그대로 덮는다. 모달 안에서는 흐름에 얹힌 표시로 물러난다.
+ */
+function useOpenModalPresent(): boolean {
+  const [present, setPresent] = useState(false);
+  useEffect(() => {
+    const root = document.documentElement;
+    const sync = () => { setPresent(root.querySelector('[aria-modal="true"]') !== null); };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(root, { attributes: true, attributeFilter: ["aria-modal"], childList: true, subtree: true });
+    return () => { observer.disconnect(); };
+  }, []);
+  return present;
+}
+
 export function ServiceDegradedBanner({ immersive = false }: { immersive?: boolean }) {
   const state = useServiceCapabilityState();
   const [recoveryVisible, setRecoveryVisible] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
-  const compact = immersive && !detailsExpanded;
+  const modalPresent = useOpenModalPresent();
+  const overlay = immersive && !modalPresent;
+  const compact = overlay && !detailsExpanded;
   const bannerRef = useRef<HTMLElement>(null);
   const visible = state.status === "degraded" || recoveryVisible;
 
   useLayoutEffect(() => {
     const banner = bannerRef.current;
-    if (!visible || !immersive || !banner) return;
+    if (!visible || !overlay || !banner) return;
     // 실제 알림 높이를 공유해 OST가 경고·재시도 버튼을 가리거나 그 아래 숨지 않게 한다.
     const root = banner.ownerDocument.documentElement;
     const property = "--service-status-overlay-clearance";
@@ -63,7 +83,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
         else root.style.removeProperty(property);
       }
     };
-  }, [compact, immersive, visible]);
+  }, [compact, overlay, visible]);
 
   useEffect(() => {
     if (!state.recoveredAt) return;
@@ -96,12 +116,12 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
         recovered
           ? "border-good/35 bg-good/10 text-good"
           : "border-warn/40 bg-warn/10 text-fg",
-        immersive
-          && "fixed left-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[70] w-[min(46rem,calc(100vw-1rem))] -translate-x-1/2 rounded-2xl border max-sm:bg-panel",
+        overlay
+          && "fixed left-1/2 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[90] w-[min(46rem,calc(100vw-1rem))] -translate-x-1/2 rounded-2xl border max-sm:bg-panel",
       )}
     >
       <div className={cn("mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-3 gap-y-2",
-        immersive && "max-sm:grid max-sm:grid-cols-[auto_minmax(0,1fr)] max-sm:items-start") }>
+        overlay && "max-sm:grid max-sm:grid-cols-[auto_minmax(0,1fr)] max-sm:items-start") }>
         {recovered
           ? <CheckCircle2 className="size-5 shrink-0" aria-hidden="true" />
           : <AlertTriangle className="size-5 shrink-0 text-warn" aria-hidden="true" />}
@@ -121,7 +141,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
                 : "일부 온라인 요청의 응답을 확인하지 못했습니다. 서비스 전체 장애로 확인된 것은 아니며, 탐색과 로컬 편집은 계속 사용할 수 있습니다."}
           </p>
         </div>
-        {immersive ? (
+        {overlay ? (
           <button
             type="button"
             aria-label={compact ? "서비스 상태 알림 펼치기" : "서비스 상태 알림 접기"}
@@ -134,13 +154,13 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
         ) : null}
         {!recovered ? (
           <div className={cn("ml-auto flex shrink-0 items-center gap-2",
-            immersive && "max-sm:col-span-2 max-sm:ml-0 max-sm:grid max-sm:grid-cols-2") }>
+            overlay && "max-sm:col-span-2 max-sm:ml-0 max-sm:grid max-sm:grid-cols-2") }>
             <button
               type="button"
               onClick={requestServiceCapabilityRefresh}
               disabled={state.checking}
               className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-warn/40 px-3 text-xs font-bold disabled:opacity-50",
-                immersive && "max-sm:justify-center")}
+                overlay && "max-sm:justify-center")}
             >
               <RefreshCw
                 className={cn("size-3.5", state.checking && "animate-spin motion-reduce:animate-none")}
@@ -151,7 +171,7 @@ export function ServiceDegradedBanner({ immersive = false }: { immersive?: boole
             <Link
               href="/status"
               className={cn("inline-flex min-h-11 items-center rounded-xl bg-fg px-3 text-xs font-bold text-canvas",
-                immersive && "max-sm:justify-center")}
+                overlay && "max-sm:justify-center")}
             >
               상태 자세히
             </Link>
