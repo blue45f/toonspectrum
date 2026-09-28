@@ -55,8 +55,8 @@ describe("MarketNavHeader", () => {
   });
 
   it.each([
-    ["/market/library", "내 리소스"],
-    ["/market/wishlist", "내 리소스"],
+    ["/market/library", "내 에셋"],
+    ["/market/wishlist", "찜 목록"],
     ["/market/manage", "배포하기"],
     ["/market/publish", "배포하기"],
   ])("marks the current top-level market place for %s", (route, label) => {

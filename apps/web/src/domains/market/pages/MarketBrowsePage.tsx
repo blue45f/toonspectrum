@@ -13,6 +13,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigationType, useSearchParams } from "react-router-dom";
 
+import { MarketCompareShelf } from "../components/MarketCompareShelf";
+import { MarketViewToggle } from "../components/MarketViewToggle";
 import { MarketNavHeader } from "../components/MarketNavHeader";
 import { CampusObjectSource } from "@/shared/components/spatial-campus/CampusObjectSource";
 import { MarketResourceCard } from "../components/MarketResourceCard";
@@ -70,9 +72,11 @@ function filterChipClass(active: boolean): string {
   );
 }
 
-export function MarketBrowsePage() {
+export function MarketBrowsePage({ embedded = false }: { readonly embedded?: boolean } = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigationType = useNavigationType();
+  const layout = searchParams.get("layout") === "list" ? "list" : "grid";
+  const composingRef = useRef(false);
   const serializedSearchParams = searchParams.toString();
   const searchParamsRef = useRef(new URLSearchParams(searchParams));
   // React Router search-param updates are navigation calls, not queued React state updates.
@@ -150,6 +154,7 @@ export function MarketBrowsePage() {
   const updateDraftSearch = useCallback((value: string) => {
     setDraftSearch(value);
     cancelPendingSearchCommit();
+    if (composingRef.current) return;
     const parsed = CreatorMarketplaceResourceSearchQuerySchema.safeParse(value);
     if (!parsed.success) return;
     pendingSearchTimerRef.current = setTimeout(() => {
@@ -178,13 +183,13 @@ export function MarketBrowsePage() {
   };
 
   return (
-    <div>
+    <div className="market-browse-page">
       <CampusObjectSource objects={hasInvalidQuery ? [] : page.items.map((record) => ({
         id: record.id, title: record.name, href: `/market/resource/${encodeURIComponent(record.id)}`,
       }))} />
       <section className="border-b border-line bg-ledger">
         <Container size="wide" className="py-7 sm:py-10">
-          <MarketNavHeader />
+          {!embedded ? <MarketNavHeader showFamilies={false} /> : null}
           <div className="market-browse-masthead">
             <div><p className="eyebrow text-accent">THE WEBTOON MATERIAL LIBRARY</p>
               <h1 className="mt-3 text-pretty text-3xl font-bold leading-tight tracking-tight sm:text-4xl">{pageTitle}</h1>
@@ -199,6 +204,7 @@ export function MarketBrowsePage() {
             className="mt-5 flex max-w-2xl items-center gap-2"
             onSubmit={(event) => {
               event.preventDefault();
+              if (composingRef.current) return;
               cancelPendingSearchCommit();
               const parsed = CreatorMarketplaceResourceSearchQuerySchema.safeParse(draftSearch);
               if (parsed.success) patchParams({ q: parsed.data || null, ...(parsed.data ? {} : { sort: null }) });
@@ -210,6 +216,9 @@ export function MarketBrowsePage() {
                 type="search"
                 aria-label="마켓 리소스 검색"
                 value={draftSearch}
+                onCompositionStart={() => { composingRef.current = true; cancelPendingSearchCommit(); }}
+                onCompositionEnd={(event) => { composingRef.current = false; updateDraftSearch(event.currentTarget.value); }}
+                onKeyDown={(event) => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }}
                 onChange={(event) => updateDraftSearch(event.target.value)}
                 maxLength={CREATOR_MARKETPLACE_RESOURCE_QUERY_SEARCH_MAX_CHARACTERS}
                 aria-invalid={parsedUrlQuery.issues.some((issue) => issue.param === "q") || undefined}
@@ -291,6 +300,7 @@ export function MarketBrowsePage() {
           ) : <span />}
 
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <MarketViewToggle value={layout} onChange={(value) => patchParams({ layout: value === "grid" ? null : value })} />
             <label className="grid min-w-[10.5rem] gap-1 text-[0.66rem] font-bold text-fg-3 sm:hidden">
               라이선스
               <select
@@ -338,6 +348,7 @@ export function MarketBrowsePage() {
 
         {hasActiveFilters ? (
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs" aria-label="적용된 조건">
+            {activeKind ? <button type="button" aria-label={`종류: ${marketKindMeta(activeKind).label} 필터 제거`} onClick={() => patchParams({ kind: null })} className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">{marketKindMeta(activeKind).label}<X className="size-3" aria-hidden="true" /></button> : null}
             {query.search ? <button type="button" aria-label={`검색: “${query.search}” 필터 제거`} onClick={clearSearch} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">검색: “{query.search}” <X className="size-3" aria-hidden="true" /></button> : null}
             {query.tag ? <button type="button" aria-label={`#${query.tag} 태그 필터 제거`} onClick={() => patchParams({ tag: null })} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">#{query.tag} <X className="size-3" aria-hidden="true" /></button> : null}
             {activeLicense ? <button type="button" aria-label={`${MARKET_LICENSES.find((meta) => meta.license === activeLicense)?.label ?? activeLicense} 필터 제거`} onClick={() => patchParams({ license: null })} className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-raised px-2.5 text-fg-2 hover:text-fg">{MARKET_LICENSES.find((meta) => meta.license === activeLicense)?.label} <X className="size-3" aria-hidden="true" /></button> : null}
@@ -373,7 +384,7 @@ export function MarketBrowsePage() {
           <>
             <h2 className="sr-only">탐색 결과</h2>
             {page.loading ? <p role="status" className="sr-only">마켓 탐색 결과를 불러오는 중입니다.</p> : null}
-            <ul aria-busy={page.loading || undefined} className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+            <ul aria-busy={page.loading || undefined} className={`market-browse-results market-browse-results--${layout}`}>
               {page.loading && page.items.length === 0
                 ? Array.from({ length: PAGE_SIZE }, (_, index) => <li key={index} aria-hidden="true"><div className="skeleton aspect-[16/9] w-full rounded-t-xl" /><div className="space-y-2 rounded-b-xl border border-t-0 border-line bg-card p-3.5"><div className="skeleton h-4 w-4/5" /><div className="skeleton h-3 w-2/5" /></div></li>)
                 : page.items.map((record) => <li key={record.id}><MarketResourceCard record={record} className="h-full" /></li>)}
@@ -398,6 +409,7 @@ export function MarketBrowsePage() {
             ) : null}
           </>
         )}
+        <MarketCompareShelf />
       </Container>
     </div>
   );

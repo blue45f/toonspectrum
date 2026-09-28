@@ -2,6 +2,7 @@ import {
   Boxes,
   ChevronDown,
   GitCompareArrows,
+  Heart,
   Library,
   PackagePlus,
   Palette,
@@ -21,6 +22,7 @@ import Link from "@/shared/navigation/router-link";
 
 interface MarketNavHeaderProps {
   className?: string;
+  showFamilies?: boolean;
 }
 
 function familyIsActive(
@@ -34,7 +36,7 @@ function familyIsActive(
   return kind === "palette" || kind === "filter";
 }
 
-export function MarketNavHeader({ className }: MarketNavHeaderProps) {
+export function MarketNavHeader({ className, showFamilies = true }: MarketNavHeaderProps) {
   const { pathname, search } = useLocation();
   const kind = new URLSearchParams(search).get("kind");
   const findingAsset =
@@ -43,7 +45,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
     || pathname === "/market/fit"
     || pathname === "/market/compare"
     || pathname.startsWith("/market/resource");
-  const myAssets = pathname === "/market/library" || pathname === "/market/wishlist";
+  const myAssets = pathname === "/market/library";
   const distributing = pathname === "/market/manage" || pathname === "/market/publish";
 
   return (
@@ -68,7 +70,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
           </Link>
           <Link
             href="/market/library"
-            aria-current={myAssets ? "page" : undefined}
+            aria-current={pathname === "/market/library" ? "page" : undefined}
             className={cn(
               "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-colors pointer-coarse:min-h-11",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
@@ -76,7 +78,12 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
             )}
           >
             <Library className="size-3.5" aria-hidden="true" />
-            내 리소스
+            내 에셋
+          </Link>
+          <Link href="/market/wishlist" aria-current={pathname === "/market/wishlist" ? "page" : undefined}
+            className={cn("inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70",
+              pathname === "/market/wishlist" ? "bg-accent text-on-accent" : "bg-raised/60 text-fg-2 hover:bg-raised hover:text-fg")}>
+            <Heart className="size-3.5" aria-hidden="true" />찜 목록
           </Link>
           <Link
             href="/market/manage"
@@ -161,7 +168,7 @@ export function MarketNavHeader({ className }: MarketNavHeaderProps) {
         </div>
       </div>
 
-      {findingAsset ? (
+      {findingAsset && showFamilies ? (
         <div className="mt-3 border-t border-line/50 pt-3">
           <p className="mb-2 text-[0.65rem] font-semibold text-fg-3">무엇을 찾고 있나요?</p>
           <div className="grid grid-cols-3 gap-1.5 pb-1 sm:flex sm:max-w-full sm:items-stretch sm:overflow-x-auto">
