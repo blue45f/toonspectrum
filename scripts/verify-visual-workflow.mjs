@@ -1,3 +1,4 @@
+import { verifyWorkflowImageFailure } from './lib/workflow-image-failure-browser.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, expect } from '@playwright/test';
@@ -10,6 +11,7 @@ const stages = ['plan', 'storyboard', 'create', 'collaborate', 'review', 'publis
 const routes = ['/story-lab', '/studio/new', '/studio', '/production', '/production/projects/sample-project/review', '/studio/publish'];
 await mkdir(output, { recursive: true });
 const results = [];
+let imageFailure;
 const browser = await chromium.launch();
 try {
   for (const width of [1440, 820, 390, 320]) {
@@ -49,11 +51,20 @@ try {
     await page.waitForTimeout(150);
     const sectionBounds = await section.boundingBox();
     await page.screenshot({ path: `${output}/workflow-${width}.png`, fullPage: true, animations: 'disabled' });
-    const first = cards.first().locator('.cf-step-image-link');
-    await first.click(); await expect(page).toHaveURL(/\/story-lab$/u);
-    results.push({ width, sectionBounds, stages: 6, imageReady: true, keyboardAndTouch: true, firstActionNavigates: true, errors });
+    const destinationsVisited = [];
+    for (let index = 0; index < routes.length; index += 1) {
+      if (index > 0) await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      const action = page.locator('[data-workflow-step]').nth(index).locator('.cf-step-image-link');
+      await action.click();
+      await expect.poll(() => new URL(page.url()).pathname).toBe(routes[index]);
+      await expect(page.locator('#main-content')).toBeVisible();
+      destinationsVisited.push(routes[index]);
+    }
+    assert.deepEqual(errors, []);
+    results.push({ width, sectionBounds, stages: 6, imageReady: true, keyboardAndTouch: true, firstActionNavigates: true, destinationsVisited, errors });
     await context.close();
   }
+  imageFailure = await verifyWorkflowImageFailure(browser, base, output);
 } finally { await browser.close(); }
-await writeFile(`${output}/report.json`, JSON.stringify({ base, authenticatedWorkflowsVerified: false, results }, null, 2));
+await writeFile(`${output}/report.json`, JSON.stringify({ base, authenticatedWorkflowsVerified: false, imageFailure, results }, null, 2));
 console.log(JSON.stringify(results, null, 2));
