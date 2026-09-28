@@ -1,0 +1,83 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-28",
+  "provider": "ChatGPT image_gen",
+  "actualModelVersion": null,
+  "modelVersionVerified": false,
+  "transport": "ElevenLabs asset preview WebP, 1024px; 원본 PNG와 별도의 파생본이며 무손실 원본 전송이 아니다.",
+  "note": "현재 대화에서 생성한 4개 아트의 실제 화면 연결용 파일. 이미지 속 UI·인물은 컨셉 표현이며 실시간 참여자나 조작 영역이 아니다. 다섯 번째 이미지는 전송 차단으로 제외했다.",
+  "assets": [
+    {
+      "file": "campus-day-480.webp",
+      "width": 480,
+      "height": 320,
+      "bytes": 60534,
+      "sha256": "c6c37dbd542f12e2bc393eae79dac1e53bc225d7dea53fde524f5d3abe2a3f0b",
+      "sourceGenerationId": "7705b107-bcab-4ef8-9780-c85020eda04a",
+      "sourceId": "campus-day"
+    },
+    {
+      "file": "campus-day-1024.webp",
+      "width": 1024,
+      "height": 682,
+      "bytes": 225758,
+      "sha256": "34b8f153a1779e643b28a3b536e46ffd3ff783010f294a5cd7042b7ae91c5358",
+      "sourceGenerationId": "7705b107-bcab-4ef8-9780-c85020eda04a",
+      "sourceId": "campus-day"
+    },
+    {
+      "file": "studio-tour-480.webp",
+      "width": 480,
+      "height": 270,
+      "bytes": 53364,
+      "sha256": "64f6982aa32bcd139c29d36542fc5b6a2f89fcadeea5778d05bea74e6dcde334",
+      "sourceGenerationId": "3b403a66-57f2-4bde-997b-a3e03086b21a",
+      "sourceId": "studio-tour"
+    },
+    {
+      "file": "studio-tour-1024.webp",
+      "width": 1024,
+      "height": 576,
+      "bytes": 205072,
+      "sha256": "5ec88432d8842cfb3da612e0fa23500ba68efe47a9b7645f5201b2930b25d4d3",
+      "sourceGenerationId": "3b403a66-57f2-4bde-997b-a3e03086b21a",
+      "sourceId": "studio-tour"
+    },
+    {
+      "file": "campus-garden-480.webp",
+      "width": 480,
+      "height": 320,
+      "bytes": 73428,
+      "sha256": "6cb637355a195e27b6739662bb56008aa2bb76e75c118f2e6335a93d82ec7904",
+      "sourceGenerationId": "560d5b5c-0ef9-4bbe-86c1-30f31a05e740",
+      "sourceId": "campus-garden"
+    },
+    {
+      "file": "campus-garden-1024.webp",
+      "width": 1024,
+      "height": 682,
+      "bytes": 287420,
+      "sha256": "79611cf69889be745c1319817924d68e33b5ef4c9903f059936bbe700edf5413",
+      "sourceGenerationId": "560d5b5c-0ef9-4bbe-86c1-30f31a05e740",
+      "sourceId": "campus-garden"
+    },
+    {
+      "file": "campus-social-480.webp",
+      "width": 480,
+      "height": 270,
+      "bytes": 62714,
+      "sha256": "91e994a49f880d5373b246b9a67d9f8cd71354113e31e8600e703d9f51030271",
+      "sourceGenerationId": "3da019d2-56a6-41d0-b5f1-81310e9148b8",
+      "sourceId": "campus-social"
+    },
+    {
+      "file": "campus-social-1024.webp",
+      "width": 1024,
+      "height": 576,
+      "bytes": 249250,
+      "sha256": "9e217a0b18c756ed2c9b4152048d5595984099e452418d219941029ca18f0d89",
+      "sourceGenerationId": "3da019d2-56a6-41d0-b5f1-81310e9148b8",
+      "sourceId": "campus-social"
+    }
+  ]
+}

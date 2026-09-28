@@ -116,26 +116,26 @@ export function StudioProjectFormatPreview({
           <h3 className="mt-1 text-lg font-black text-fg">
             {locale === "ko" ? profile.titleKo : profile.titleEn}
           </h3>
-          <p className="mt-1 text-sm leading-6 text-fg-3">
+          <p className="mt-1 text-sm leading-6 text-fg-2">
             {locale === "ko" ? profile.descriptionKo : profile.descriptionEn}
           </p>
 
           <div className="mt-3">
-            <p className="text-[0.65rem] font-black uppercase tracking-wide text-fg-3">
+            <p className="text-[0.65rem] font-black uppercase tracking-wide text-fg-2">
               {locale === "ko" ? "작품 구조" : "Content structure"}
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {hierarchy.map((item, index) => (
                 <span key={item} className="contents">
                   <span className="rounded-full border border-line bg-card px-2 py-1 text-[0.68rem] font-bold text-fg-2">{item}</span>
-                  {index < hierarchy.length - 1 ? <span className="text-xs text-fg-3">›</span> : null}
+                  {index < hierarchy.length - 1 ? <span className="text-xs text-fg-2">›</span> : null}
                 </span>
               ))}
             </div>
           </div>
 
           <div className="mt-3">
-            <p className="text-[0.65rem] font-black uppercase tracking-wide text-fg-3">
+            <p className="text-[0.65rem] font-black uppercase tracking-wide text-fg-2">
               {locale === "ko" ? "제작 흐름" : "Production flow"}
             </p>
             <p className="mt-1.5 text-xs leading-5 text-fg-2">{workflow.join(" → ")}</p>
@@ -149,14 +149,14 @@ export function StudioProjectFormatPreview({
             <CheckCircle2 size={14} className="text-accent" aria-hidden="true" />
             {locale === "ko" ? "형식별 자동 검사" : "Format-specific checks"}
           </p>
-          <p className="mt-1.5 text-xs leading-5 text-fg-3">{checks.join(" · ")}</p>
+          <p className="mt-1.5 text-xs leading-5 text-fg-2">{checks.join(" · ")}</p>
         </div>
         <div>
           <p className="flex items-center gap-1.5 text-xs font-black text-fg-2">
             <PackageCheck size={14} className="text-accent" aria-hidden="true" />
             {locale === "ko" ? "최종 출력" : "Final outputs"}
           </p>
-          <p className="mt-1.5 text-xs leading-5 text-fg-3">{outputs.join(" · ")}</p>
+          <p className="mt-1.5 text-xs leading-5 text-fg-2">{outputs.join(" · ")}</p>
         </div>
       </div>
     </section>

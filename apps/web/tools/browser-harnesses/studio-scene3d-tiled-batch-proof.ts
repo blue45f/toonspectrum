@@ -206,8 +206,15 @@ export async function verifyScene3dTiledSavedShotFlow(
     return createUrl.call(URL, blob);
   };
   try {
-    const run = createStudioBg3dShotBatchExportRunner(ctx);
+    // 지원하지 않는 4K PSD는 캡처·다운로드 전에 거부되어야 한다. PNG로 조용히 대체하지 않는다.
+    await createStudioBg3dShotBatchExportRunner(ctx)();
+    assert(String(error).includes("타일 레이어 PSD"), "Unsupported 4K PSD was not rejected.");
+    assert(Number(captureCalls) === 0 && Number(archives.length) === 0, "Rejected PSD captured or published output.");
+    assert(!capturing && !ctx.captureInFlightRef.current, "Rejected PSD retained capture ownership.");
+    // 사용자가 분리 PNG를 명시적으로 선택한 다음 같은 4K 출력·취소·복구 계약을 검사한다.
+    const run = createStudioBg3dShotBatchExportRunner({ ...ctx, shotBatchIncludeLayeredPsd: false });
     await run();
+    assert(!abortAtTile && captureCalls > 0, "Cancellation did not exercise a real tile capture.");
     assert(
       Number(archives.length) === 0,
       "Cancellation published a partial archive.",
@@ -253,8 +260,30 @@ export async function verifyScene3dTiledSavedShotFlow(
         JSON.stringify(originalDoc.camera),
       "Original viewport camera did not return.",
     );
+    // 지원 범위인 512px 컷에서는 실제 레이어 PSD를 생성하고 ZIP 정본 검증까지 통과시킨다.
+    await createStudioBg3dShotBatchExportRunner({ ...ctx, shotBatchSelectedIds: ["small-reference"], shotBatchIncludeLayeredPsd: true })();
+    assert(!error, `Supported PSD failed: ${error}`);
+    const psdArchive = archives[2];
+    assert(psdArchive && Number(archives.length) === 3, "Supported PSD did not publish exactly one archive.");
+    assert(await verifyStudioBg3dShotBatchArchiveBlob(psdArchive), "Supported PSD archive failed verification.");
+    const header = new DataView(await psdArchive.slice(0, 30).arrayBuffer());
+    assert(header.getUint32(0, true) === 0x04034b50 && header.getUint16(8, true) === 0, "Manifest is not a stored ZIP entry.");
+    const nameLength = header.getUint16(26, true), extraLength = header.getUint16(28, true);
+    const manifestSize = header.getUint32(22, true), dataOffset = 30 + nameLength + extraLength;
+    assert(await psdArchive.slice(30, 30 + nameLength).text() === "manifest.json", "Manifest entry is missing.");
+    assert(manifestSize > 0 && manifestSize <= 2 * 1024 * 1024, "Invalid manifest size.");
+    const manifest: unknown = JSON.parse(await psdArchive.slice(dataOffset, dataOffset + manifestSize).text());
+    assert(manifest && typeof manifest === "object" && "artifacts" in manifest && Array.isArray(manifest.artifacts), "PSD manifest artifacts are missing.");
+    assert(manifest.artifacts.some((item: unknown) => item && typeof item === "object" && "kind" in item && item.kind === "layered-psd"
+      && "shotId" in item && item.shotId === "small-reference" && "width" in item && item.width === 512 && "height" in item && item.height === 512), "A real 512px layered PSD is missing.");
+    assert(!capturing && !ctx.captureInFlightRef.current && !ctx.shotBatchAbortRef.current, "Supported PSD leaked capture ownership.");
+    assert(serializeStudioBg3dSceneDocument(doc) === originalSerialized, "Supported PSD changed canonical source.");
+    assert(JSON.stringify(viewport.readView()) === JSON.stringify(originalDoc.camera), "Supported PSD did not restore the camera.");
     return {
       status: "ok",
+      unsupportedLargePsdRejected: true,
+      explicitPngSelection: true,
+      smallLayeredPsdProduced: true,
       cancelledPartialArchive: false,
       canonicalSourcePreserved: true,
       cameraRestored: true,
