@@ -8,6 +8,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import {
   STUDIO_VIRTUAL_DISTRICT_IDS,
+  STUDIO_VIRTUAL_SCOPE_KEY_MAX,
   emptyStudioVirtualDecorationState,
   validateStudioVirtualDecorationSave,
   type StudioVirtualDecorationStateDto,
@@ -15,6 +16,18 @@ import {
 } from "@toonstudio/contracts/studio-virtual-space-placement-contract";
 
 import { db, studioVirtualSpaceDecorationLayouts, users } from "../../platform/database";
+
+/**
+ * 범위 키는 경로로 오므로 짧게 고정한다. 계약이 같은 상한을 본문에서 다시 확인한다.
+ * DB에 그대로 넣을 수 있도록 길이를 먼저 잘라 서버 키 크기 제한도 피한다.
+ */
+function readScope(value: string): string {
+  const scope = decodeURIComponent(value).trim();
+  if (!scope || scope.length > STUDIO_VIRTUAL_SCOPE_KEY_MAX) {
+    throw new NotFoundException("알 수 없는 배치 범위입니다.");
+  }
+  return scope;
+}
 
 function isDistrict(value: string): value is StudioVirtualDistrictId {
   return (STUDIO_VIRTUAL_DISTRICT_IDS as readonly string[]).includes(value);
@@ -40,9 +53,14 @@ export class StudioVirtualSpaceDecorationService {
     return id;
   }
 
-  async getState(userId: string | undefined, districtKey: string): Promise<StudioVirtualDecorationStateDto> {
+  async getState(
+    userId: string | undefined,
+    scopeKey: string,
+    districtKey: string,
+  ): Promise<StudioVirtualDecorationStateDto> {
     const owner = await this.requireActiveUser(userId);
     if (!isDistrict(districtKey)) throw new NotFoundException("알 수 없는 장소입니다.");
+    const scope = readScope(scopeKey);
 
     const [row] = await db
       .select()
@@ -50,14 +68,15 @@ export class StudioVirtualSpaceDecorationService {
       .where(
         and(
           eq(studioVirtualSpaceDecorationLayouts.userId, owner),
-          eq(studioVirtualSpaceDecorationLayouts.districtKey, districtKey),
+          eq(studioVirtualSpaceDecorationLayouts.scopeKey, scope),
         ),
       )
       .limit(1);
 
-    if (!row) return emptyStudioVirtualDecorationState(districtKey);
+    if (!row) return emptyStudioVirtualDecorationState(scope, districtKey);
 
     return {
+      scopeKey: row.scopeKey,
       districtKey: row.districtKey as StudioVirtualDistrictId,
       presetKey: row.presetKey as StudioVirtualDecorationStateDto["presetKey"],
       presentationMode: row.presentationMode as StudioVirtualDecorationStateDto["presentationMode"],
@@ -78,16 +97,21 @@ export class StudioVirtualSpaceDecorationService {
    */
   async save(
     userId: string | undefined,
+    scopeKey: string,
     districtKey: string,
     body: unknown,
   ): Promise<StudioVirtualDecorationStateDto> {
     const owner = await this.requireActiveUser(userId);
     if (!isDistrict(districtKey)) throw new NotFoundException("알 수 없는 장소입니다.");
+    const scope = readScope(scopeKey);
 
     const parsed = validateStudioVirtualDecorationSave(body);
     if (!parsed.ok) throw new ConflictException(parsed.error);
     if (parsed.value.districtKey !== districtKey) {
       throw new ConflictException("요청 경로와 본문의 장소가 다릅니다.");
+    }
+    if (parsed.value.scopeKey !== scope) {
+      throw new ConflictException("요청 경로와 본문의 범위가 다릅니다.");
     }
 
     const { expectedRevision, placements, ...rest } = parsed.value;
@@ -98,6 +122,7 @@ export class StudioVirtualSpaceDecorationService {
         .insert(studioVirtualSpaceDecorationLayouts)
         .values({
           userId: owner,
+          scopeKey: scope,
           districtKey,
           presetKey: rest.presetKey,
           presentationMode: rest.presentationMode,
@@ -112,7 +137,7 @@ export class StudioVirtualSpaceDecorationService {
       if (inserted.length < 1) {
         throw new ConflictException("다른 기기가 먼저 저장했습니다.");
       }
-      return { ...rest, districtKey, placements, revision: 1 };
+      return { ...rest, scopeKey: scope, districtKey, placements, revision: 1 };
     }
 
     const updated = await db
@@ -129,21 +154,21 @@ export class StudioVirtualSpaceDecorationService {
       .where(
         and(
           eq(studioVirtualSpaceDecorationLayouts.userId, owner),
-          eq(studioVirtualSpaceDecorationLayouts.districtKey, districtKey),
+          eq(studioVirtualSpaceDecorationLayouts.scopeKey, scope),
           eq(studioVirtualSpaceDecorationLayouts.revision, expectedRevision),
         ),
       )
       .returning({ revision: studioVirtualSpaceDecorationLayouts.revision });
 
     if (updated.length < 1) {
-      const current = await this.getState(owner, districtKey);
+      const current = await this.getState(owner, scope, districtKey);
       throw new ConflictException({
         message: "다른 기기가 먼저 저장했습니다.",
         current,
       });
     }
 
-    return { ...rest, districtKey, placements, revision: nextRevision };
+    return { ...rest, scopeKey: scope, districtKey, placements, revision: nextRevision };
   }
 
   /** 승인된 배치 개수만 세는 집계. 운영 지표에서 쓰인다. */

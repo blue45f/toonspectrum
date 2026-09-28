@@ -257,6 +257,11 @@
       "import": "./src/studio-virtual-space-placement-contract.ts",
       "default": "./src/studio-virtual-space-placement-contract.ts"
     },
+    "./studio-virtual-custom-furniture-contract": {
+      "types": "./src/studio-virtual-custom-furniture-contract.ts",
+      "import": "./src/studio-virtual-custom-furniture-contract.ts",
+      "default": "./src/studio-virtual-custom-furniture-contract.ts"
+    },
     "./taxonomy": {
       "types": "./src/taxonomy.ts",
       "import": "./src/taxonomy.ts",

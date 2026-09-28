@@ -7,6 +7,10 @@ interface ImportMetaEnv {
   // Studio live ink: auto(default) selects the low-latency Canvas2D overlay before an operation.
   // `webgpu` is an explicit measured rollout; device/pipeline failure ends as unavailable.
   readonly VITE_STUDIO_LIVE_INK_BACKEND?: "auto" | "webgpu" | "canvas2d";
+  // Virtual space furniture placement: `1`/`true`/`on` lets the space read and write placements
+  // through the Core API. Missing or off keeps the browser-local path exactly as it behaves now,
+  // so a server outage or a rollback can never cost a user their room.
+  readonly VITE_STUDIO_SPACE_SYNC?: string;
   // Percentage of locally bucketed, WebGPU-capable browsers admitted when the backend is `auto`.
   // Missing/invalid values are 0; explicit backend controls remain the pre-operation override.
   readonly VITE_STUDIO_LIVE_INK_ROLLOUT_PERCENT?: string;
