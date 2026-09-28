@@ -854,7 +854,9 @@ async function clearRecoveryNoticeIfPresent(page: Page, timeoutMs: number): Prom
   await confirmation.getByRole("button", { name: "이전 그림 영구 삭제", exact: true }).click({ timeout: remaining() });
   await confirmation.waitFor({ state: "hidden", timeout: remaining() });
   await recovery.waitFor({ state: "hidden", timeout: remaining() });
-  return true;
+  // 저장된 복구 사본만 삭제한다. 현재 activePage.id와 내용은 유지되므로 문서 초기화가 아니다.
+  // true는 새 문서의 안내를 다시 닫아야 하는 경우에만 반환하는 readiness 계약이다.
+  return false;
 }
 
 async function clearStudioVerifierOriginStorage(page: Page, studioUrl: string): Promise<void> {
