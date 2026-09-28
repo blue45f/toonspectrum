@@ -28,7 +28,7 @@
 }
 @media(prefers-reduced-motion:reduce){.workspace-task-shell *{scroll-behavior:auto!important}}
 
-.workspace-focused-shell{min-height:100dvh;background:var(--color-canvas);color:var(--color-fg)}
+.workspace-focused-shell{display:grid;grid-template-rows:auto minmax(0,1fr);height:100dvh;min-height:100dvh;background:var(--color-canvas);color:var(--color-fg)}
 .workspace-focused-topbar{position:sticky;top:0;z-index:50;display:flex;min-height:57px;align-items:center;gap:10px;border-bottom:1px solid var(--color-line);padding:6px 16px;background:color-mix(in oklch,var(--color-canvas) 94%,transparent);backdrop-filter:blur(18px)}
 .workspace-focused-topbar .workspace-brand{width:auto;min-width:0}
 .workspace-focused-topbar .workspace-brand strong{display:block;font-size:16px;line-height:1.2}
@@ -40,7 +40,7 @@
 .workspace-focused-utilities{margin-left:auto;display:flex;flex:none;align-items:center;gap:4px}
 .workspace-focused-search{display:grid;width:44px;height:44px;place-items:center;border-radius:10px;color:var(--color-fg-2)}
 .workspace-focused-search:hover{background:var(--color-raised);color:var(--color-fg)}
-.workspace-focused-main.workspace-task-content{height:calc(100dvh - 57px);min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0}
+.workspace-focused-main.workspace-task-content{height:auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0}
 .workspace-focused-shell .workspace-task-route-content{min-height:100%}
 .workspace-focused-shell :is(a,button,input,select,textarea):focus-visible{outline:2px solid var(--color-accent);outline-offset:2px}
 @media(max-width:600px){
