@@ -569,6 +569,9 @@
   .studio-vspace-entry-avatars{display:flex;grid-template-columns:none;gap:.55rem;margin-top:1rem;overflow-x:auto;padding:.15rem .05rem .45rem;scroll-snap-type:x mandatory;scrollbar-width:none}.studio-vspace-entry-avatars::-webkit-scrollbar{display:none}.studio-vspace-entry-avatars legend{position:absolute}.studio-vspace-entry-avatar{flex:0 0 min(42vw,9.4rem);min-height:9.6rem;scroll-snap-align:center}.studio-vspace-entry-avatar-preview,.studio-vspace-entry-avatar-preview img{min-height:5.8rem;height:5.8rem}.studio-vspace-entry-avatar>span:last-of-type{display:none}
   .studio-vspace-entry-advanced{margin-top:.65rem}.studio-vspace-entry-actions{position:sticky;bottom:calc(.4rem + env(safe-area-inset-bottom));z-index:20;grid-template-columns:.75fr 1.25fr;margin:1rem -.2rem 0;padding:.45rem;border:1px solid rgb(255 255 255/.1);border-radius:1rem;background:rgb(18 23 34/.94);box-shadow:0 14px 40px rgb(0 0 0/.45);backdrop-filter:blur(18px)}.studio-vspace-entry-actions>a,.studio-vspace-entry-actions>button{min-height:3.25rem}.studio-vspace-entry-note{display:none}
   body:has(.studio-vspace-entry) [data-site-ost="mounted"]{display:none!important}
+  /* 고정 서비스 알림 위로 복귀·입장 동선을 스크롤하고 키보드 초점을 드러낸다. */
+  .studio-vspace-entry{padding-bottom:calc(.7rem + var(--service-status-overlay-clearance,0px))}
+  .studio-vspace-entry-actions>a,.studio-vspace-entry-actions>button{scroll-margin-bottom:var(--service-status-overlay-clearance,0px)}
 }
 @media(prefers-reduced-motion:reduce){.studio-vspace-entry-avatar{transition:none}.studio-vspace-entry-avatar:hover{transform:none}}
 .studio-vspace-entry[data-entry-variant="character-onboarding"] .studio-vspace-entry-container{padding-block:1rem}
