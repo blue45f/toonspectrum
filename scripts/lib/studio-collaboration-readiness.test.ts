@@ -59,6 +59,18 @@ describe("협업 검증기 시작 안내 readiness", () => {
     expect(state.welcome).toBe(false);
   });
 
+  it("초기 2초 동안 조작이 막혀도 동일 deadline 안에서 실제 닫기 완료를 확인한다", async () => {
+    const { page, state, click } = createPage();
+    state.welcome = true; state.blocked = true; state.dock = true; state.phase = "synced";
+    const result = waitForStudioCollaborationDocumentLane(page, readyPhases, 5_000);
+    await vi.advanceTimersByTimeAsync(2_100);
+    state.blocked = false;
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(result).resolves.toBe("synced");
+    expect(click).toHaveBeenCalledTimes(3);
+    expect(state.welcome).toBe(false);
+  });
+
   it("synced여도 계속 숨겨진 dock은 통과시키지 않는다", async () => {
     const { page, state } = createPage();
     state.phase = "synced";

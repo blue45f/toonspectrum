@@ -8,6 +8,11 @@ on:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
       - "scripts/verify-studio-drawing-sync-ui.mts"
+      - "scripts/verify-studio-service-recovery.mts"
+      - "scripts/lib/studio-collaboration-readiness*"
+      - "apps/web/tools/browser-harnesses/service-capability-recovery.*"
+      - "apps/web/src/platform/service-capability-state*"
+      - "apps/web/src/app/service-state/**"
       - "scripts/studio-canvas-preview-budget.test.ts"
       - "scripts/generate-studio-canvas-previews.py"
       - "apps/web/public/brand/studio-canvas-previews/**"
@@ -31,6 +36,11 @@ on:
       - ".github/workflows/studio-collaboration-sync.yml"
       - "scripts/verify-studio-collaboration-sync.mts"
       - "scripts/verify-studio-drawing-sync-ui.mts"
+      - "scripts/verify-studio-service-recovery.mts"
+      - "scripts/lib/studio-collaboration-readiness*"
+      - "apps/web/tools/browser-harnesses/service-capability-recovery.*"
+      - "apps/web/src/platform/service-capability-state*"
+      - "apps/web/src/app/service-state/**"
       - "scripts/studio-canvas-preview-budget.test.ts"
       - "scripts/generate-studio-canvas-previews.py"
       - "apps/web/public/brand/studio-canvas-previews/**"
@@ -88,6 +98,10 @@ jobs:
           apps/web/src/domains/creator/StudioDraftOperationSyncAssistant.test.tsx
           apps/web/src/domains/creator/canvas/StudioCinematicCanvasWelcome.test.tsx
           scripts/studio-canvas-preview-budget.test.ts
+          scripts/lib/studio-collaboration-readiness.test.ts
+          apps/web/src/platform/service-capability-state.test.ts
+          apps/web/src/platform/service-capability-state-lifecycle.test.ts
+          apps/web/src/app/service-state/ServiceDegradedBanner.test.tsx
       - name: Lint focused collaboration changes
         run: >-
           pnpm exec eslint
@@ -103,6 +117,10 @@ jobs:
           apps/web/src/domains/creator/StudioDraftOperationSyncAssistant.test.tsx
           apps/web/src/domains/creator/canvas/StudioCinematicCanvasWelcome.test.tsx
           scripts/studio-canvas-preview-budget.test.ts
+          scripts/lib/studio-collaboration-readiness.test.ts
+          apps/web/src/platform/service-capability-state.test.ts
+          apps/web/src/platform/service-capability-state-lifecycle.test.ts
+          apps/web/src/app/service-state/ServiceDegradedBanner.test.tsx
           apps/web/src/domains/creator/studio-router/StudioDocumentLayout.tsx
           scripts/lib/studio-collaboration-preview-session.ts
           scripts/lib/studio-composited-canvas-fingerprint.ts
@@ -167,6 +185,10 @@ jobs:
         env:
           TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonstudio-verification/studio-collaboration-sync/drawing-ui
         run: pnpm exec tsx scripts/verify-studio-drawing-sync-ui.mts
+      - name: Verify service status recovery without database migrations
+        env:
+          TOONSPECTRUM_VERIFY_DIR: ${{ runner.temp }}/toonstudio-verification/studio-collaboration-sync/service-recovery
+        run: pnpm exec tsx scripts/verify-studio-service-recovery.mts
       - name: Upload collaboration evidence
         if: always()
         uses: actions/upload-artifact@v4 # NOSONAR S7637 trusted first-party action

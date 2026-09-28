@@ -75,3 +75,44 @@ pnpm harness:verify
 인증된 다중 기기 운영 서버, 장시간 절전·복귀, Safari/iPad의 필압·팜 리젝션, 실제 네트워크 장애·DB 장애 주입은 이번 로컬 검증에 포함하지 않았다. 전체 드로잉 기능의 무결함이나 모든 기기의 성능 향상을 보증하지 않는다.
 
 이 작업은 PR 제출 범위다. 병합과 배포는 저장소 담당자의 CI·리뷰 확인 후 별도 승인한다. DB·환경변수 변경은 없다. 문제 발생 시 담당자가 본 변경 커밋을 되돌리고 동일 검증을 재실행한다. 기존 미승인 outbox와 원본 이미지를 삭제하는 롤백 절차는 사용하지 않는다.
+
+
+## 2026-09-28 후속: 온라인 경고와 추가 검증
+
+사용자의 후속 요청에 따라 PR #2173의 모든 변경을 main 병합 대상으로 유지한다. 마이그레이션과 운영 배포는 실행하지 않는다.
+
+### 운영 관찰과 수정 범위
+
+2026-09-28 13:05–13:07 UTC에 운영 `/api/health`, `/api/health/capabilities`, `/api/auth/session`은 HTTP 200이었다. 새 Chromium으로 운영 `/studio/canvas`를 열고 새로고침했을 때 상태는 두 번 모두 `available`, 경고 배너 없음, 실패한 HTTP 요청과 pageerror는 없었다. 이 관찰만으로 사용자가 앞서 경험한 장애의 원인을 단정하지 않는다.
+
+별도 회귀 테스트에서는 기존 서비스 상태 런타임의 9개 실패를 확인했다. 오래된 장애 캐시 재사용, 다른 탭의 과거 보고에 의한 상태 역행, 복구 시각 누락, 재시도 예정 시각 미준수, 온라인 복귀 지연, 추가 응답 필드 거절, 최신 장애를 지연 응답이 덮는 경합, 중복 구독 해제, 불안정한 SSR 스냅샷이다.
+
+수정은 [서비스 상태 런타임](../../apps/web/src/platform/service-capability-state.ts)과 [안내 배너](../../apps/web/src/app/service-state/ServiceDegradedBanner.tsx)에 있다. 캐시는 2분 이내 확인된 보고만 재사용하며, 과거 탭 보고는 최신 상태를 덮지 못한다. 복귀 시 즉시 확인하고, 서버 재시도 기한에 별도 타이머로 재확인한다. 필수 응답 필드는 검증하면서 미래의 추가 필드는 허용한다. 단일 HTTP 오류와 서버가 확인한 기능 장애의 문구를 구분하며, 실제 확인된 기능 장애 표시는 유지한다.
+
+### 협업 CI 초기 진입 실패
+
+GitHub run `36425709132`는 문서 준비 helper에 도달하기 전 중복 `dismissOverlays`의 2초 클릭에서 실패했다. 이미 존재하는 `waitForStudioCollaborationDocumentLane`가 시작 안내의 실제 클릭·숨김·보이는 dock·허용 phase를 하나의 30초 deadline 안에서 검사한다. 중복 조기 클릭만 제거해 해당 helper로 책임을 모았다. 문서 픽셀 일치·양방향 전달·동시 획·undo/redo 검사는 그대로 유지한다. 클릭이 계속 막히면 기존 deadline에서 실패하며, 늦게 조작 가능해지는 경우를 회귀 테스트로 추가했다.
+
+### 추가 실행 결과
+
+| 범위 | 결과 |
+| --- | --- |
+| 서비스 상태·배너·협업 진입 회귀 | 5개 파일 / 46개 테스트 통과 |
+| Chromium·Firefox·WebKit 상태 복구 | 실제 HTTP 503 주입, 기능별 안내, 온라인 복귀, 과거 탭 캐시, 390px 레이아웃, WCAG A/AA 통과 |
+| 인증·서버 CRDT·게이트웨이 경계 | 3개 파일 / 255개 테스트 통과; 격리된 테스트 저장소와 서버 경계 사용 |
+| 네이티브 OPFS·Web Locks 탭 승계 | 기존 leader 쓰기 보존, follower 쓰기 차단, leader 종료 후 승계·추가 획 보존 통과 |
+| GC 활성화 힙 측정 | 300획 / 24개 히스토리, 약 12,238 bytes/entry; 8개 구조 공유 테스트 통과 |
+| 복귀 시간 시뮬레이션 | 20분 뒤 focus 복귀 및 중복 focus의 단일 요청 확인 |
+
+HTTP 장애 주입은 격리 localhost에서 실행했다. 운영 데이터를 변경하지 않았다. 인증·권한·저장소 실패의 테스트 통과를 실제 운영 계정의 다중 기기 저장 승인으로 표현하지 않는다. WebKit 자동화는 물리 iPad의 Safari와 Apple Pencil 하드웨어 검증을 대체하지 않는다. 장시간 실제 절전과 물리 펜·팜 리젝션, 인증된 운영 다중 기기 작업은 여전히 별도 환경이 필요하다.
+
+추가 재실행 명령:
+
+```sh
+STUDIO_VERIFY_BROWSERS=chromium,firefox,webkit pnpm exec tsx scripts/verify-studio-service-recovery.mts
+pnpm exec vitest run apps/web/src/domains/creator/live/studio-crdt-page-bridge-structural-sharing.test.ts --pool=forks --execArgv=--expose-gc --maxWorkers=1
+TOONSPECTRUM_TWO_TAB_PORT=53741 pnpm exec tsx scripts/verify-studio-autosave-two-tab-leader.mts
+STUDIO_VERIFY_BROWSER=webkit pnpm exec tsx scripts/verify-studio-collaboration-sync.mts
+```
+
+마지막 명령은 전체 편집기의 WebKit 문서 협업 검증이며 위 상태 복구 harness와 별개다. 전체 편집기 브라우저 실행 결과와 원격 CI 결과는 PR의 후속 검증 기록에서 확인한다.

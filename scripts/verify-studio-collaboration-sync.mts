@@ -19,7 +19,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { chromium, type BrowserContext, type Page } from "playwright";
+import { chromium, firefox, webkit, type BrowserContext, type Page } from "playwright";
 
 import {
   STUDIO_LIVE_CLIENT_INSTANCE_STORAGE_PREFIX,
@@ -140,11 +140,8 @@ async function dismissOverlays(page: Page): Promise<void> {
     await betaNotice.getByRole("button").first().click({ timeout: 2_000 }).catch(() => undefined);
     await betaNotice.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => undefined);
   }
-  const cinematicWelcome = page.locator('[data-studio-cinematic-canvas-welcome="true"]');
-  if (await cinematicWelcome.isVisible().catch(() => false)) {
-    await cinematicWelcome.getByRole("button", { name: "시작 안내 닫기", exact: true }).click({ timeout: 2_000 });
-    await cinematicWelcome.waitFor({ state: "hidden", timeout: 5_000 });
-  }
+  // 시작 안내 닫기는 문서 readiness helper가 단일 deadline 안에서 실제 클릭·숨김까지 검증한다.
+  // 초기 엔진 로드 중의 중복 2초 클릭이 그 검증에 도달하기 전에 실패하지 않도록 한다.
   const explicitDismiss = page.locator('[data-studio-quickstart-dismiss="true"]');
   if (await explicitDismiss.isVisible().catch(() => false)) {
     await explicitDismiss.click({ timeout: 2_000 }).catch(() => undefined);
@@ -491,9 +488,12 @@ const server: ChildProcess | null = EXISTING_ORIGIN
       { stdio: "ignore" },
     );
 
-const browser = await chromium.launch({
+const browserName = process.env.STUDIO_VERIFY_BROWSER ?? "chromium";
+assert.ok(browserName === "chromium" || browserName === "firefox" || browserName === "webkit",
+  "검증 브라우저는 chromium, firefox, webkit 중 하나여야 합니다.");
+const browser = await ({ chromium, firefox, webkit })[browserName].launch({
   headless: true,
-  args: ["--no-sandbox", "--disable-dev-shm-usage"],
+  args: browserName === "chromium" ? ["--no-sandbox", "--disable-dev-shm-usage"] : [],
 });
 const diagnostics: PageDiagnostics[] = [];
 const report: Record<string, unknown> = {
@@ -501,6 +501,7 @@ const report: Record<string, unknown> = {
     "A storage-cloned duplicate tab receives a distinct live identity, survives simultaneous two-tab drawing plus undo/redo propagation, and a late third tab restores the converged document frontier.",
   origin,
   browser: browser.version(),
+  browserName,
   status: "FAIL",
 };
 
