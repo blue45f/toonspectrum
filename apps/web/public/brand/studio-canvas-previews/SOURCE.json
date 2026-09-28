@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "purpose": "기존 배경 원본의 드로잉 시작 안내용 축소 미리보기. 원본과 원본 SOURCE.json의 출처를 유지합니다.",
+  "maxEdge": 384,
+  "quality": 80,
+  "images": [
+    {
+      "id": "romance",
+      "source": "apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/romance/gpt25-bg-romance-cherry-path-vertical-depth/background.png",
+      "output": "romance.webp",
+      "sourceSha256": "bfe7e27cc4c35643ae9d0deaf04a317cf1f6831fcd3190a520f5f42d8ceec975"
+    },
+    {
+      "id": "sf",
+      "source": "apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/sf/gpt25-bg-sf-cyber-alley-vertical-depth/background.png",
+      "output": "sf.webp",
+      "sourceSha256": "3ed82eb947473c5c882a6a038d6cee65d5a81e1bd7dff45ec8ed07c4a9be7e9e"
+    },
+    {
+      "id": "action",
+      "source": "apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/action/gpt25-bg-action-ruined-city-vertical-depth/background.png",
+      "output": "action.webp",
+      "sourceSha256": "9bafc0aad76726aa32f25fdb85a6af5bede5b277a1823f652955f018441fd9e3"
+    },
+    {
+      "id": "fantasy",
+      "source": "apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/fantasy/gpt25-bg-fantasy-dragon-cliff-vertical-depth/background.png",
+      "output": "fantasy.webp",
+      "sourceSha256": "324a046259ffe39a7af784fb641e22c5ed67589be49868c7a93365c954afa4a6"
+    },
+    {
+      "id": "daily",
+      "source": "apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/daily/gpt25-bg-daily-bedroom-night-vertical-depth/background.png",
+      "output": "daily.webp",
+      "sourceSha256": "5d8ad23c9c078bc24e46defc2ec89ead6c6b00ac56fcffb95cf6bcc9d24a4b41"
+    },
+    {
+      "id": "horror",
+      "source": "apps/web/public/assets/studio/generated-backgrounds/gpt25-v1/horror/gpt25-bg-horror-fog-cabin-vertical-depth/background.png",
+      "output": "horror.webp",
+      "sourceSha256": "d6a7417a52fe49997a8717a44ff4ff970e986aa5292fb94321223e35d03d6dbd"
+    }
+  ]
+}

@@ -9,10 +9,11 @@ import {
   type StudioLiveCollaborationContextValue,
 } from "./live/studio-live-collaboration-context";
 import { INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT } from "./live/studio-live-sync-safety";
-import { StudioDraftOperationSyncAssistant } from "./StudioDraftOperationSyncAssistant";
+import { StudioDraftOperationSyncAssistant, type StudioDraftOperationSyncAssistantProps } from "./StudioDraftOperationSyncAssistant";
 
 function renderAssistant(
   liveOverrides: Partial<StudioLiveCollaborationContextValue> = {},
+  props: Partial<StudioDraftOperationSyncAssistantProps> = {},
 ) {
   const onOpenVersions = vi.fn();
   const onExportBackup = vi.fn(() => Promise.resolve());
@@ -48,6 +49,7 @@ function renderAssistant(
         saving={false}
         onOpenVersions={onOpenVersions}
         onExportBackup={onExportBackup}
+        {...props}
       />
     </StudioLiveCollaborationContext.Provider>,
   );
@@ -154,5 +156,66 @@ describe("StudioDraftOperationSyncAssistant", () => {
 
     expect(screen.queryByRole("dialog", { name: "기기·서버 동기화" })).toBeNull();
     expect(document.activeElement).toBe(trigger);
+  });
+});
+
+
+describe("동기화 패널 조작 안전성", () => {
+  const retrying = {
+    sync: {
+      ...INITIAL_STUDIO_LIVE_SYNC_SNAPSHOT,
+      phase: "retrying" as const,
+      pendingCount: 1,
+      persistenceDurability: "durable" as const,
+      operationSyncReady: true,
+      editsDurablyProtected: true,
+      mode: "server" as const,
+    },
+  };
+
+  it("패널을 열면 키보드 초점을 캔버스에서 상세 영역으로 옮긴다", () => {
+    renderAssistant(retrying);
+    fireEvent.click(screen.getByRole("button", { name: /동기화 상태:/ }));
+    expect(document.activeElement).toBe(screen.getByRole("dialog"));
+  });
+
+  it("백업 생성 중 중복 클릭을 막고 완료 후 다시 실행할 수 있다", async () => {
+    let finish: () => void = () => undefined;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    const onExportBackup = vi.fn(() => pending);
+    renderAssistant(retrying, { onExportBackup });
+    fireEvent.click(screen.getByRole("button", { name: /동기화 상태:/ }));
+    const backup = screen.getByRole("button", { name: "프로젝트 백업" });
+    fireEvent.click(backup);
+    fireEvent.click(backup);
+    expect(onExportBackup).toHaveBeenCalledTimes(1);
+    expect(backup.getAttribute("aria-busy")).toBe("true");
+    expect(backup.textContent).toContain("백업 파일 만드는 중");
+    finish();
+    await waitFor(() => expect(backup.getAttribute("aria-busy")).toBe("false"));
+    fireEvent.click(backup);
+    await waitFor(() => expect(onExportBackup).toHaveBeenCalledTimes(2));
+  });
+
+  it("백업 오류를 숨기지 않고 재시도 가능한 상태로 돌아간다", async () => {
+    const onExportBackup = vi.fn()
+      .mockRejectedValueOnce(new Error("백업 저장 공간이 부족합니다."))
+      .mockResolvedValueOnce(undefined);
+    renderAssistant(retrying, { onExportBackup });
+    fireEvent.click(screen.getByRole("button", { name: /동기화 상태:/ }));
+    fireEvent.click(screen.getByRole("button", { name: "프로젝트 백업" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("저장 공간"));
+    fireEvent.click(screen.getByRole("button", { name: "프로젝트 백업" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(onExportBackup).toHaveBeenCalledTimes(2);
+  });
+
+  it("로컬 탭의 복구 저장 담당을 서버 승인과 분리해 안내한다", () => {
+    renderAssistant({ ...retrying, mode: "local", sync: { ...retrying.sync, mode: "local" } }, {
+      localRole: "follower", mobileImmersive: true,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /동기화 상태:/ }));
+    expect(screen.getByText("먼저 연 다른 탭이 이 기기의 복구 저장을 담당합니다.")).toBeTruthy();
+    expect(screen.getByText("이 기기 탭 연결")).toBeTruthy();
   });
 });

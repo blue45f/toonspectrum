@@ -78,3 +78,19 @@ describe("StudioCinematicCanvasWelcome", () => {
     })).toBeNull();
   });
 });
+
+
+it("시작 안내 안에서 Escape로 캔버스 편집에 돌아간다", () => {
+  render(<StudioCinematicCanvasWelcome pageKey="keyboard" visible />);
+  fireEvent.keyDown(screen.getByRole("button", { name: "시작 안내 닫기" }), { key: "Escape" });
+  expect(screen.queryByRole("region", { name: "빈 캔버스 시작 방법" })).toBeNull();
+});
+
+it("장면 미리보기에서 원본 PNG를 내려받지 않는다", () => {
+  const { container } = render(<StudioCinematicCanvasWelcome pageKey="preview" visible />);
+  const backgrounds = Array.from(container.querySelectorAll<HTMLElement>("[style]"))
+    .map((element) => element.style.backgroundImage).filter(Boolean);
+  expect(backgrounds).toHaveLength(9);
+  expect(backgrounds.every((url) => url.includes("/brand/studio-canvas-previews/") && url.includes(".webp"))).toBe(true);
+  expect(backgrounds.some((url) => url.includes("background.png"))).toBe(false);
+});
