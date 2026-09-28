@@ -44,7 +44,7 @@ export function MarketCompareToggle({
       title={label}
       className={compact
         ? cn(
-            "flex size-7 items-center justify-center rounded-full bg-card/80 text-fg-3 shadow-sm backdrop-blur-sm transition-[color,transform] hover:scale-110 hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-40",
+            "flex size-11 items-center justify-center rounded-full bg-card/80 text-fg-3 shadow-sm backdrop-blur-sm transition-[color,transform] hover:scale-110 hover:text-accent motion-reduce:transform-none motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/70 disabled:cursor-not-allowed disabled:opacity-40",
             selected && "bg-accent/15 text-accent",
             className,
           )

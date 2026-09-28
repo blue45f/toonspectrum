@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { useBilingual } from "@/shared/lib/i18n-bilingual-copy";
+import "../studio-3d-ui/studio-3d-illustrated-chrome.css";
 import { safeCharacterOnboardingDestination } from "./studio-character-onboarding-destination";
 import { StudioVirtualSpaceEntryLobby } from "../virtual-space/StudioVirtualSpaceEntryLobby";
 import {
@@ -30,7 +31,7 @@ export function StudioCharacterOnboardingPage() {
   const [artStyle, setArtStyle] = useState<StudioVirtualArtStyleKey>(() => readStudioVirtualArtStyle());
   const [nickname, setNickname] = useState(initialPreference.nickname || bt("크리에이터", "Creator"));
 
-  return <StudioVirtualSpaceEntryLobby
+  return <div className="studio-character-onboarding"><StudioVirtualSpaceEntryLobby
     avatarIndex={avatarIndex}
     artStyle={artStyle}
     nickname={nickname}
@@ -49,7 +50,7 @@ export function StudioCharacterOnboardingPage() {
       void writeStudioVirtualArtStyle(artStyle);
       navigate(destination, { replace: true });
     }}
-  />;
+  /></div>;
 }
 
 export default StudioCharacterOnboardingPage;

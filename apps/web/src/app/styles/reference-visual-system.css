@@ -1,309 +1,470 @@
+/* 별빛 테마의 창작 도구 표면. 다른 팔레트와 문서/캔버스의 배치 권위는 유지한다. */
 :root[data-design-theme="starlight"] {
-  --reference-violet: #8b6cff;
-  --reference-violet-2: #b18cff;
-  --reference-cyan: #35d9ff;
-  --reference-pink: #ff5db1;
-  --reference-bg: #070918;
-  --reference-panel: #0d1022;
-  --reference-card: #14182e;
-  --reference-line: rgba(171, 182, 255, .18);
-  --reference-line-strong: rgba(190, 198, 255, .36);
-  --reference-chrome: rgba(7, 9, 24, .92);
-  --reference-focus: #6be5ff;
+  --reference-violet: #b39bff;
+  --reference-violet-2: #cdbaff;
+  --reference-cyan: #6edaff;
+  --reference-pink: #ffaad2;
+  --reference-bg: var(--unified-canvas);
+  --reference-panel: var(--unified-panel);
+  --reference-card: var(--unified-card);
+  --reference-line: var(--unified-line);
+  --reference-line-strong: var(--unified-line-strong);
+  --reference-chrome: rgb(8 12 23 / 96%);
+  --reference-focus: #83e6ff;
+  --reference-radius: 8px;
+  --reference-surface: linear-gradient(155deg, rgb(28 35 55 / 36%), transparent 55%), var(--reference-panel);
+  --reference-shadow: 0 8px 24px rgb(0 0 0 / 18%), inset 0 1px rgb(212 220 255 / 4%);
 }
+
 :root[data-design-theme="starlight"] body {
-  background:
-    radial-gradient(circle at 8% 0%, rgba(139, 108, 255, .12), transparent 32rem),
-    radial-gradient(circle at 92% 4%, rgba(53, 217, 255, .08), transparent 30rem),
-    var(--reference-bg);
+  background: var(--reference-bg);
 }
+
+/* 헤더는 하나의 도구 행으로 읽히고 모든 실제 동작은 기존 DOM에 남는다. */
 :root[data-design-theme="starlight"] .site-header {
-  border-bottom-color: rgba(171, 182, 255, .18);
-  background: rgba(7, 9, 24, .86);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, .22);
-  backdrop-filter: blur(24px) saturate(1.25);
+  border-bottom-color: var(--reference-line);
+  background: var(--reference-chrome);
+  box-shadow: 0 4px 18px rgb(0 0 0 / 18%);
+  backdrop-filter: blur(18px);
 }
 :root[data-design-theme="starlight"] .site-header[data-scrolled] {
-  border-bottom-color: rgba(177, 188, 255, .34);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, .32);
+  border-bottom-color: var(--reference-line-strong);
 }
 :root[data-design-theme="starlight"] .site-header__inner {
   max-width: var(--site-content-max, 82.5rem);
-  min-height: 72px;
+  min-height: 56px;
+  gap: 12px;
+}
+:root[data-design-theme="starlight"] .site-header__brand-mark {
+  border-color: var(--reference-line);
+  border-radius: 8px;
+  background: var(--reference-card);
+  box-shadow: inset 0 1px rgb(255 255 255 / 6%);
+}
+:root[data-design-theme="starlight"] .site-header__primary-link {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--color-fg-2);
+}
+:root[data-design-theme="starlight"] .site-header__primary-link:hover {
+  border-color: var(--reference-line);
+  background: var(--reference-card);
+  color: var(--color-fg);
+}
+:root[data-design-theme="starlight"] .site-header__primary-link[aria-current="page"] {
+  border-color: color-mix(in srgb, var(--reference-violet) 45%, var(--reference-line));
+  color: var(--color-fg);
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 -2px var(--reference-violet);
+}
+:root[data-design-theme="starlight"] .site-header__utilities > :is(button, a):not(.site-header__create) {
+  border-color: var(--reference-line);
+  border-radius: 7px;
+  background: var(--reference-panel);
+}
+:root[data-design-theme="starlight"] .site-header__utilities > :is(button, a):not(.site-header__create):hover {
+  border-color: var(--reference-line-strong);
+  background: var(--reference-card);
 }
 
-/* 공개 문서와 작업 셸은 같은 표면을 사용하고, 각 도구의 배치는 유지한다. */
+/* 라우트 분류는 색과 소개 헤더에만 쓰며 편집 결과 위에 이미지를 놓지 않는다. */
+:root[data-design-theme="starlight"] .route-stage[data-site-domain] {
+  --site-domain-accent: var(--reference-violet);
+  --site-domain-art: none;
+  --route-accent: var(--site-domain-accent);
+  background: var(--reference-bg);
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-tone="cyan"] {
+  --site-domain-accent: var(--reference-cyan);
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-tone="rose"] {
+  --site-domain-accent: var(--reference-pink);
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-tone="neutral"] {
+  --site-domain-accent: var(--color-fg-2);
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-artwork="hero"][data-site-art-placement="chrome"] {
+  --site-domain-art: url('/brand/illustrated-20260928/hero.webp');
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-artwork="canvas-noir"][data-site-art-placement="chrome"] {
+  --site-domain-art: url('/brand/illustrated-20260928/canvas-noir.webp');
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-artwork="luna"][data-site-art-placement="chrome"] {
+  --site-domain-art: url('/brand/illustrated-20260928/luna.webp');
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-artwork="character-pink"][data-site-art-placement="chrome"] {
+  --site-domain-art: url('/brand/illustrated-20260928/character-pink.webp');
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-artwork="character-blue"][data-site-art-placement="chrome"] {
+  --site-domain-art: url('/brand/illustrated-20260928/character-blue.webp');
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-artwork="background-city"][data-site-art-placement="chrome"] {
+  --site-domain-art: url('/brand/illustrated-20260928/background-city.webp');
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-artwork="project-romance"][data-site-art-placement="chrome"] {
+  --site-domain-art: url('/brand/illustrated-20260928/project-romance.webp');
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-artwork="project-crimson"][data-site-art-placement="chrome"] {
+  --site-domain-art: url('/brand/illustrated-20260928/project-crimson.webp');
+}
+
+/* 공개 페이지는 소개를 줄이고 실제 목록과 조작을 같은 화면에서 볼 수 있게 한다. */
+:root[data-design-theme="starlight"] [data-site-experience] {
+  --site-heading-space: clamp(1rem, 2vw, 1.5rem);
+  --site-heading-size: clamp(1.5rem, 2.5vw, 2.25rem);
+  --site-section-title-size: clamp(1.125rem, 1.6vw, 1.4rem);
+  background: var(--reference-bg);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-theme-scene {
+  opacity: .1;
+  filter: none;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-theme-mosaic {
+  opacity: .08;
+}
+:root[data-design-theme="starlight"] [data-site-experience] :is(.site-theme-art--orbit, .site-theme-art--constellation) {
+  opacity: .14;
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(
+  [data-page-container] > header,
+  .workspace-task-purpose
+) {
+  border-block-end: 1px solid var(--reference-line);
+  background-image: linear-gradient(90deg, var(--reference-bg) 15%, rgb(7 10 20 / 96%) 55%, rgb(7 10 20 / 82%)), var(--site-domain-art);
+  background-size: cover, min(42%, 28rem) auto;
+  background-position: center, right center;
+  background-repeat: no-repeat;
+  padding-block: 1rem;
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(
+  [data-page-container] > header h1,
+  [data-section-title],
+  .workspace-task-breadcrumb [aria-current="page"]
+) {
+  color: var(--color-fg);
+  letter-spacing: -.025em;
+  text-wrap: balance;
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] [data-section-heading] {
+  padding-block-end: .625rem;
+  border-block-end: 1px solid var(--reference-line);
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] [data-section-action] {
+  color: var(--site-domain-accent);
+}
+
+/* 카드 선택자는 명시한 표면에만 적용한다. 캔버스·가상목록·드래그 노드의 크기는 건드리지 않는다. */
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(
+  [data-slot="card"], [data-surface="card"], [data-surface="panel"],
+  section.bg-panel, article.bg-panel, aside.bg-panel,
+  section.bg-card, article.bg-card, aside.bg-card,
+  section.border-line, article.border-line, aside.border-line,
+  .learn-card, .learn-side-card, .learn-term-card, .learn-dashboard-card,
+  .learn-path-card, .learn-library-card, .academy-resource-card, .academy-assignment-card,
+  .market-collection-card, .market-material-preview, .site-next-steps__card,
+  .public-site-next__card, .public-story-route, .site-atelier-chapter
+) {
+  border-color: var(--reference-line);
+  border-radius: var(--reference-radius);
+  background: var(--reference-surface);
+  box-shadow: var(--reference-shadow);
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(
+  .learn-card, .learn-path-card, .learn-library-card, .academy-resource-card,
+  .market-collection-card, .site-next-steps__card, .public-site-next__card, .public-story-route
+):hover {
+  border-color: color-mix(in srgb, var(--site-domain-accent) 52%, var(--reference-line));
+  box-shadow: 0 8px 24px rgb(0 0 0 / 24%), inset 0 1px rgb(212 220 255 / 7%);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-atelier-chapter__heading {
+  color: var(--color-fg);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__card {
+  grid-template-rows: 112px auto;
+  gap: 12px;
+  padding: 0 14px 16px;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__visual {
+  height: 112px;
+  margin-inline: -14px;
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__icon {
+  border-color: var(--reference-line);
+  border-radius: 7px;
+  background: var(--reference-card);
+  color: var(--reference-cyan);
+}
+:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__arrow {
+  color: var(--reference-violet);
+}
+
+/* 공통 입력과 탭은 상태를 색과 경계선 둘 다로 표시한다. */
+:root[data-design-theme="starlight"] [data-slot="button"] {
+  border-radius: 6px;
+}
+:root[data-design-theme="starlight"] [data-slot="button"][data-variant="outline"] {
+  border-color: var(--reference-line-strong);
+}
+:root[data-design-theme="starlight"] [data-slot="badge"] {
+  border-radius: 4px;
+}
+:root[data-design-theme="starlight"] :is([data-slot="input"], [data-slot="select-trigger"]) {
+  border-color: var(--reference-line-strong);
+  border-radius: 6px;
+  background-color: var(--reference-panel);
+  color: var(--color-fg);
+  caret-color: var(--reference-cyan);
+}
+:root[data-design-theme="starlight"] [data-slot="input"][aria-invalid="true"],
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(input, textarea, select)[aria-invalid="true"] {
+  border-color: var(--color-bad);
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(
+  input:where(:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"])), textarea, select
+) {
+  border-color: var(--reference-line-strong);
+  border-radius: 6px;
+  background-color: var(--reference-panel);
+  color: var(--color-fg);
+  caret-color: var(--reference-cyan);
+}
+:root[data-design-theme="starlight"] :is([data-slot="tabs-list"], [data-slot="select-content"]) {
+  border-color: var(--reference-line);
+  border-radius: 7px;
+  background: var(--reference-panel);
+}
+:root[data-design-theme="starlight"] [data-slot="tabs-trigger"] {
+  border-radius: 5px;
+  color: var(--color-fg-2);
+}
+:root[data-design-theme="starlight"] [data-slot="tabs-trigger"][aria-selected="true"] {
+  color: var(--color-fg);
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 -2px var(--reference-cyan);
+}
+:root[data-design-theme="starlight"] [data-slot="select-item"][data-state="checked"] {
+  color: var(--reference-cyan);
+  background: var(--color-accent-soft);
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(.fb-tabs, .learn-filters, .learn-library-filters) {
+  border-color: var(--reference-line);
+  background: var(--reference-panel);
+  border-radius: 7px;
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] [role="tab"][aria-selected="true"] {
+  color: var(--color-fg);
+  background-color: var(--color-accent-soft);
+  box-shadow: inset 0 -2px var(--site-domain-accent);
+}
+
+/* 포탈은 RouteStage 밖에 있으므로 문서 테마를 통해 색만 연결한다. 위치와 z-index는 소비자 소유다. */
+:root[data-design-theme="starlight"] :is(
+  [data-slot="dialog-content"], [data-slot="sheet-content"], [data-slot="select-content"],
+  [data-auth-modal="true"], [role="dialog"].border-line,
+  [role="menu"].border-line, [role="listbox"].border-line
+) {
+  border-color: var(--reference-line-strong);
+  border-radius: var(--reference-radius);
+  color: var(--color-fg);
+  background: var(--reference-surface);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 48%), inset 0 1px rgb(212 220 255 / 8%);
+}
+:root[data-design-theme="starlight"] :is([data-slot="dialog-title"], [data-slot="sheet-title"]) {
+  font-weight: 700;
+  letter-spacing: -.02em;
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(table, [data-slot="table"]) {
+  border-color: var(--reference-line);
+  background-color: var(--reference-panel);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(table, [data-slot="table"]) th {
+  border-color: var(--reference-line);
+  color: var(--color-fg-2);
+  background-color: var(--reference-card);
+  font-weight: 650;
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(table, [data-slot="table"]) td {
+  border-color: var(--reference-line);
+}
+:root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is(table, [data-slot="table"]) tr[aria-selected="true"] {
+  background: var(--color-accent-soft);
+  box-shadow: inset 2px 0 var(--site-domain-accent);
+}
+:root[data-design-theme="starlight"] :is([data-slot="empty-state"], [data-slot="loading-state"]) {
+  border-color: var(--reference-line);
+  border-radius: var(--reference-radius);
+  background-color: var(--reference-panel);
+}
+:root[data-design-theme="starlight"] [data-slot="empty-state"] {
+  padding: clamp(1rem, 3vw, 2rem);
+}
+:root[data-design-theme="starlight"] [data-slot="error-state"] {
+  border-color: color-mix(in srgb, var(--color-bad) 65%, var(--reference-line));
+  border-radius: var(--reference-radius);
+  background: color-mix(in srgb, var(--color-bad) 8%, var(--reference-panel));
+  padding: clamp(1rem, 3vw, 2rem);
+}
+:root[data-design-theme="starlight"] :is([data-slot="skeleton"], .route-stage[data-site-art-placement="chrome"] .skeleton) {
+  border-radius: 5px;
+  background-color: var(--reference-card);
+}
+
+/* 셸의 스크롤·높이·그리드·편집기 경계는 그대로 두고 작업 패널 표면을 정돈한다. */
 :root[data-design-theme="starlight"] :is(.workspace-topbar, .workspace-focused-topbar) {
   border-color: var(--reference-line) !important;
   background: var(--reference-chrome) !important;
-  box-shadow: 0 12px 36px rgb(0 0 0 / 24%), inset 0 -1px rgb(255 255 255 / 3%);
+  box-shadow: inset 0 -1px rgb(212 220 255 / 4%);
 }
 :root[data-design-theme="starlight"] .workspace-sidebar {
   border-color: var(--reference-line);
-  background: linear-gradient(180deg, var(--reference-panel), var(--reference-bg));
-  box-shadow: 12px 0 36px rgb(0 0 0 / 16%);
+  background: var(--reference-panel);
+  box-shadow: none;
 }
 :root[data-design-theme="starlight"] :is(.workspace-statusbar, .campus-toolbar) {
   border-color: var(--reference-line);
-  background: var(--reference-chrome);
+  background: var(--reference-panel);
 }
 :root[data-design-theme="starlight"] :is(.workspace-search-trigger, .workspace-focused-search) {
-  border-color: var(--reference-line) !important;
+  border-color: var(--reference-line-strong) !important;
   background: var(--reference-card) !important;
 }
 :root[data-design-theme="starlight"] :is(.workspace-search-trigger, .workspace-focused-search):hover {
-  border-color: var(--reference-line-strong) !important;
-  background: color-mix(in srgb, var(--reference-violet) 12%, var(--reference-card)) !important;
+  border-color: var(--reference-violet) !important;
+}
+:root[data-design-theme="starlight"] .workspace-sidebar .workspace-nav a {
+  border-radius: 8px;
 }
 :root[data-design-theme="starlight"] .workspace-sidebar .workspace-nav a[aria-current="page"] {
   border-color: var(--reference-line-strong);
   color: var(--color-fg);
-  background: linear-gradient(135deg, rgb(139 108 255 / 18%), rgb(53 217 255 / 6%));
-  box-shadow: inset 3px 0 var(--reference-violet), 0 12px 28px rgb(0 0 0 / 16%);
+  background: var(--color-accent-soft);
+  box-shadow: inset 2px 0 var(--reference-cyan);
+}
+:root[data-design-theme="starlight"] .workspace-task-breadcrumb {
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+:root[data-design-theme="starlight"] .workspace-task-breadcrumb span {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 :root[data-design-theme="starlight"] [data-site-chrome="footer"] {
   border-color: var(--reference-line);
-  background: linear-gradient(180deg, var(--reference-panel), var(--reference-bg));
+  background: var(--reference-panel);
 }
 :root[data-design-theme="starlight"] [data-site-chrome="footer"] > div {
   max-width: var(--site-content-max, 82.5rem);
-  padding-inline: max(var(--site-page-gutter, clamp(1rem, 3vw, 2.5rem)), env(safe-area-inset-left)) max(var(--site-page-gutter, clamp(1rem, 3vw, 2.5rem)), env(safe-area-inset-right));
+  padding-inline: max(var(--site-page-gutter, 1rem), env(safe-area-inset-left)) max(var(--site-page-gutter, 1rem), env(safe-area-inset-right));
+}
+:root[data-design-theme="starlight"] .route-purpose-scene {
+  border-color: var(--reference-line);
+  border-radius: var(--reference-radius);
+  background: var(--reference-surface);
+  box-shadow: var(--reference-shadow);
+}
+:root[data-design-theme="starlight"] .route-purpose-scene__copy {
+  padding: clamp(1rem, 2vw, 1.5rem);
+}
+:root[data-design-theme="starlight"] .route-purpose-scene__media {
+  border-radius: 6px;
+  transform: none;
+}
+:root[data-design-theme="starlight"] .route-purpose-scene :is(h1, h2, h3) {
+  color: var(--color-fg);
+}
+:root[data-design-theme="starlight"] .route-purpose-scene__eyebrow {
+  color: var(--reference-cyan);
 }
 :root[data-design-theme="starlight"] :is(
-  .site-header,
-  [data-site-chrome="footer"],
-  .workspace-topbar,
-  .workspace-focused-topbar,
-  .workspace-sidebar
-) :is(a, button, input, summary):focus-visible {
+  .site-header, [data-site-chrome="footer"], .workspace-topbar, .workspace-focused-topbar,
+  .workspace-sidebar, .route-stage[data-site-art-placement="chrome"]
+) :is(a, button, input, select, textarea, summary):focus-visible,
+:root[data-design-theme="starlight"] :is(
+  [data-slot="input"], [data-slot="select-trigger"], [data-slot="tabs-trigger"], [data-slot="button"]
+):focus-visible {
   outline: 2px solid var(--reference-focus);
   outline-offset: 3px;
 }
-:root[data-design-theme="starlight"] .site-header__brand-mark {
-  border-color: rgba(190, 198, 255, .25);
-  background: linear-gradient(145deg, rgba(139, 108, 255, .26), rgba(53, 217, 255, .10));
-  box-shadow: 0 10px 28px rgba(111, 84, 255, .18);
-}
-:root[data-design-theme="starlight"] .site-header__primary-link {
-  border: 1px solid transparent;
-  border-radius: 12px;
-  color: var(--color-fg-2);
-}
-:root[data-design-theme="starlight"] .site-header__primary-link:hover {
-  border-color: rgba(171, 182, 255, .18);
-  background: rgba(139, 108, 255, .09);
-  color: var(--color-fg);
-}
-:root[data-design-theme="starlight"] .site-header__primary-link[aria-current="page"] {
-  color: #fff;
-  background: linear-gradient(135deg, rgba(139, 108, 255, .18), rgba(53, 217, 255, .06));
-  box-shadow: inset 0 -2px var(--reference-violet);
-}
-:root[data-design-theme="starlight"] .site-header__utilities > :is(button, a):not(.site-header__create) {
-  border-color: rgba(171, 182, 255, .18);
-  background: rgba(255, 255, 255, .025);
-}
-:root[data-design-theme="starlight"] .site-header__utilities > :is(button, a):not(.site-header__create):hover {
-  border-color: rgba(177, 188, 255, .34);
-  background: rgba(139, 108, 255, .11);
-}
-:root[data-design-theme="starlight"] [data-site-experience] {
-  position: relative;
-  isolation: isolate;
-  background:
-    radial-gradient(circle at 78% 0%, rgba(139, 108, 255, .10), transparent 34rem),
-    linear-gradient(180deg, rgba(8, 10, 25, .96), rgba(7, 9, 22, .99));
-}
-:root[data-design-theme="starlight"] [data-site-experience]::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(145, 158, 255, .025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(145, 158, 255, .025) 1px, transparent 1px);
-  background-size: 42px 42px;
-  mask-image: linear-gradient(to bottom, #000, transparent 82%);
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-theme-scene {
-  opacity: .16;
-  filter: saturate(1.18) contrast(1.06);
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-theme-mosaic {
-  opacity: .42;
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-atelier-chapter {
-  border-color: var(--reference-line);
-  background: linear-gradient(145deg, rgba(20, 24, 46, .94), rgba(10, 13, 29, .94));
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .24), inset 0 1px rgba(255, 255, 255, .04);
-  border-radius: 24px;
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-atelier-chapter__heading {
-  color: #fff;
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-atelier-chapter__heading p {
-  color: var(--color-fg-2);
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__card,
-:root[data-design-theme="starlight"] [data-site-experience] .public-story-route,
-:root[data-design-theme="starlight"] [data-site-experience] .market-collection-card {
-  border-color: var(--reference-line);
-  background: linear-gradient(145deg, rgba(21, 25, 47, .96), rgba(11, 14, 31, .96));
-  box-shadow: 0 18px 46px rgba(0, 0, 0, .20), inset 0 1px rgba(255, 255, 255, .035);
-  border-radius: 18px;
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__card:hover,
-:root[data-design-theme="starlight"] [data-site-experience] .public-story-route:hover,
-:root[data-design-theme="starlight"] [data-site-experience] .market-collection-card:hover {
-  border-color: rgba(139, 108, 255, .48);
-  box-shadow: 0 22px 52px rgba(0, 0, 0, .28), 0 0 0 1px rgba(139, 108, 255, .10);
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__icon {
-  border-color: rgba(171, 182, 255, .20);
-  background: linear-gradient(145deg, rgba(139, 108, 255, .22), rgba(53, 217, 255, .07));
-  color: #fff;
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-next-steps__arrow {
-  color: var(--reference-violet-2);
-}
-:root[data-design-theme="starlight"] [data-site-experience] .public-story-hero {
-  border-color: rgba(171, 182, 255, .20);
-  background: linear-gradient(135deg, rgba(12, 15, 33, .86), rgba(20, 17, 43, .92));
-  box-shadow: 0 30px 90px rgba(0, 0, 0, .36);
-  border-radius: 28px;
-  overflow: hidden;
-}
-:root[data-design-theme="starlight"] [data-site-experience] .public-story-hero::after {
-  background: linear-gradient(180deg, transparent 34%, rgba(5, 7, 18, .88));
-}
-:root[data-design-theme="starlight"] [data-site-experience] .public-story-hero__study-mark span {
-  border-color: rgba(190, 198, 255, .22);
-  background: rgba(7, 9, 23, .68);
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-theme-art--constellation {
-  opacity: .72;
-}
-:root[data-design-theme="starlight"] [data-site-experience] .site-theme-art--orbit {
-  opacity: .42;
-}
-:root[data-design-theme="starlight"] :is(
-  .public-site-atelier,
-  .site-directory,
-  .support-center,
-  .learning-hub,
-  .fortune-observatory,
-  .market-atelier,
-  .creator-resources
-) {
-  color: var(--color-fg);
-}
-:root[data-design-theme="starlight"] :is(
-  .public-site-atelier,
-  .site-directory,
-  .support-center,
-  .learning-hub,
-  .market-atelier,
-  .creator-resources
-) :is(
-  article,
-  section[data-surface],
-  [data-surface="card"],
-  .card,
-  .panel
-) {
-  border-color: var(--reference-line);
-  background: linear-gradient(145deg, rgba(20, 24, 46, .92), rgba(10, 13, 29, .94));
-  box-shadow: inset 0 1px rgba(255, 255, 255, .03);
-}
-:root[data-design-theme="starlight"] :is(
-  .public-site-atelier,
-  .site-directory,
-  .support-center,
-  .learning-hub,
-  .market-atelier,
-  .creator-resources
-) :is(button, [role="button"], a[data-primary="true"]) {
-  border-radius: 12px;
-}
-:root[data-design-theme="starlight"] :is(
-  .public-site-atelier,
-  .site-directory,
-  .support-center,
-  .learning-hub,
-  .market-atelier,
-  .creator-resources
-) :is(button, [role="button"], a[data-primary="true"]):hover {
-  box-shadow: 0 10px 28px rgba(0, 0, 0, .22);
-}
-:root[data-design-theme="starlight"] .route-purpose-scene {
-  border-color: rgba(171, 182, 255, .18);
-  background: linear-gradient(145deg, rgba(15, 18, 37, .94), rgba(8, 11, 25, .96));
-  box-shadow: 0 26px 72px rgba(0, 0, 0, .28);
-}
-:root[data-design-theme="starlight"] .route-purpose-scene :is(h1, h2, h3) {
-  color: #fff;
-  text-shadow: 0 8px 28px rgba(139, 108, 255, .14);
-}
-:root[data-design-theme="starlight"] .route-purpose-scene :is(.eyebrow, [data-eyebrow]) {
-  color: var(--reference-cyan);
-}
-:root[data-design-theme="starlight"] .route-purpose-scene :is(button, a) {
-  border-radius: 12px;
-}
+
 @media (max-width: 767px) {
   :root[data-design-theme="starlight"] .site-header__inner {
-    min-height: 64px;
-    gap: 8px;
+    min-height: 60px;
+    gap: 6px;
   }
   :root[data-design-theme="starlight"] .site-header__brand-copy .site-header__tagline {
     display: none;
   }
-  :root[data-design-theme="starlight"] [data-site-experience] .public-story-hero {
-    border-radius: 20px;
+  :root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is([data-page-container] > header, .workspace-task-purpose) {
+    background-size: cover, 60% auto;
+  }
+  :root[data-design-theme="starlight"] [data-slot="dialog-content"][data-dialog-layout="sheet"] {
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+    padding-block-end: max(1.25rem, env(safe-area-inset-bottom));
+  }
+}
+@media (max-width: 767px), (pointer: coarse) {
+  :root[data-design-theme="starlight"] :is([data-slot="select-trigger"], [data-slot="select-item"], [data-slot="tabs-trigger"]) {
+    min-block-size: 44px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  :root[data-design-theme="starlight"] [data-site-experience] *,
-  :root[data-design-theme="starlight"] .route-purpose-scene * {
-    transition-duration: .01ms !important;
-    animation-duration: .01ms !important;
+  :root[data-design-theme="starlight"] :is([data-slot="skeleton"], [data-slot="tabs-trigger"], .site-next-steps__card, .route-purpose-scene) {
+    animation: none;
+    transition: none;
+  }
+}
+@media (prefers-contrast: more) {
+  :root[data-design-theme="starlight"] {
+    --reference-line: #8193af;
+    --reference-line-strong: #b8c7dd;
+    --reference-surface: var(--reference-panel);
+    --reference-shadow: none;
+  }
+  :root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is([data-page-container] > header, .workspace-task-purpose) {
+    background-image: none;
   }
 }
 @media (forced-colors: active) {
-  :root[data-design-theme="starlight"] [data-site-experience]::before {
-    display: none;
+  :root[data-design-theme="starlight"] {
+    --reference-bg: Canvas;
+    --reference-panel: Canvas;
+    --reference-card: Canvas;
+    --reference-line: CanvasText;
+    --reference-line-strong: CanvasText;
+    --reference-chrome: Canvas;
+    --reference-violet: Highlight;
+    --reference-cyan: Highlight;
+    --reference-pink: Highlight;
+    --reference-focus: Highlight;
+    --reference-surface: Canvas;
+    --reference-shadow: none;
+  }
+  :root[data-design-theme="starlight"] .route-stage[data-site-art-placement="chrome"] :is([data-page-container] > header, .workspace-task-purpose) {
+    background-image: none;
   }
   :root[data-design-theme="starlight"] :is(
-    .site-header,
-    [data-site-chrome="footer"],
-    .workspace-topbar,
-    .workspace-focused-topbar,
-    .workspace-sidebar,
-    .workspace-statusbar,
-    .campus-toolbar,
-    .workspace-search-trigger,
-    .workspace-focused-search
+    .site-header, .workspace-topbar, .workspace-focused-topbar, .workspace-sidebar,
+    .workspace-search-trigger, .workspace-focused-search,
+    [data-slot="dialog-content"], [data-slot="sheet-content"], [data-slot="select-content"],
+    [data-slot="input"], [data-slot="select-trigger"], [data-slot="tabs-list"],
+    [data-slot="empty-state"], [data-slot="error-state"], [data-slot="loading-state"]
   ) {
     border-color: CanvasText !important;
     background: Canvas !important;
-    color: CanvasText !important;
+    color: CanvasText;
     box-shadow: none;
     backdrop-filter: none;
   }
-  :root[data-design-theme="starlight"] .workspace-sidebar .workspace-nav a[aria-current="page"] {
-    border-color: Highlight !important;
-    background: Highlight !important;
-    color: HighlightText !important;
-    box-shadow: none;
-  }
   :root[data-design-theme="starlight"] :is(
-    .site-header,
-    [data-site-chrome="footer"],
-    .workspace-topbar,
-    .workspace-focused-topbar,
-    .workspace-sidebar
-  ) :is(a, button, input, summary):focus-visible {
-    outline: 3px solid Highlight !important;
+    .workspace-sidebar .workspace-nav a[aria-current="page"],
+    [data-slot="tabs-trigger"][aria-selected="true"],
+    [data-slot="select-item"][data-state="checked"]
+  ) {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
   }
 }

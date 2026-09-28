@@ -27,7 +27,7 @@ import {
 import { workspaceNavigationActiveId } from "./workspace/workspace-navigation-model";
 import { ToonStudioMark } from "./toonstudio-mark";
 import { ToonStudioWordmark } from "./toonstudio-brand";
-import { PublicSiteJourney } from "./public-site-journey";
+import { PublicSiteAppearanceToggle, PublicSiteJourney } from "./public-site-journey";
 import {
   isDiscoverPurposeRoute,
   isPublicCreativeRoute,
@@ -217,6 +217,7 @@ export function SiteHeader() {
   const hideBottomTabs = isImmersiveMobileRoute(pathname);
   const navigationContext = siteNavigationContextForPath(pathname);
   const isPublicPage = isPublicCreativeRoute(pathname);
+  const isHomePage = canonicalSitePath(pathname) === "/";
   const headerRef = useRef<HTMLElement>(null);
   useSiteHeaderHeight(headerRef);
   const primaryNavigation = primarySiteNavigationForPath(pathname);
@@ -278,6 +279,7 @@ export function SiteHeader() {
         data-site-chrome="header"
         data-site-product={navigationContext}
         data-public-site={isPublicPage || undefined}
+        data-site-home={isHomePage || undefined}
         data-scrolled={scrolled || undefined}
         className="site-header"
       >
@@ -291,7 +293,7 @@ export function SiteHeader() {
             className="site-header__brand group"
           >
             <span className="site-header__brand-mark">
-              <ToonStudioMark className="size-9 rounded-[0.8rem]" />
+              <ToonStudioMark className="size-7 rounded-md" />
             </span>
             <span className="site-header__brand-copy">
               <span className="flex items-center gap-1.5">
@@ -299,7 +301,7 @@ export function SiteHeader() {
                   <ToonStudioWordmark />
                 </span>
                 <span
-                  className="hidden rounded-md border border-accent/35 bg-accent-soft px-1.5 py-0.5 font-display text-[0.65rem] font-bold uppercase leading-none tracking-[0.12em] text-accent min-[480px]:inline"
+                  className="site-header__beta hidden rounded border border-accent/35 bg-accent-soft px-1 py-0.5 font-display text-[0.6rem] font-bold uppercase leading-none tracking-[0.08em] text-accent min-[480px]:inline"
                   title={t("app.brandBeta")}
                 >
                   {translateCurrentStaticSourceText(
@@ -353,20 +355,20 @@ export function SiteHeader() {
               type="button"
               onClick={openSearch}
               aria-label={t("nav.searchOpen")}
-              className="group flex size-11 items-center justify-center rounded-[0.9rem] border border-line bg-card/80 text-fg-3 shadow-sm outline-none transition-[border-color,background-color,color,box-shadow] duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 focus-visible:border-accent/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:w-48 sm:justify-between sm:px-3 lg:w-40 xl:w-52"
+              className="site-header__search group flex size-11 shrink-0 items-center justify-center rounded-md border border-line bg-card/80 text-fg-3 outline-none transition-[border-color,background-color,color,box-shadow] duration-150 hover:border-line-strong hover:bg-card hover:text-fg-2 focus-visible:border-accent/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:justify-between sm:px-3"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <Search
                   size={16}
                   className="shrink-0 transition-colors group-hover:text-accent"
                 />
-                <span className="hidden truncate text-sm sm:inline">
+                <span className="site-header__search-label truncate text-sm">
                   {t("nav.search")}
                 </span>
               </span>
               <kbd
                 aria-hidden="true"
-                className="hidden items-center gap-0.5 rounded-md border border-line bg-panel px-1.5 py-0.5 font-display text-[0.68rem] text-fg-3 sm:flex lg:hidden xl:flex"
+                className="site-header__search-shortcut items-center gap-0.5 rounded border border-line bg-panel px-1 py-0.5 font-display text-[0.62rem] text-fg-3"
               >
                 ⌘K
               </kbd>
@@ -378,7 +380,7 @@ export function SiteHeader() {
               aria-current={isPurposeActive(create.href) ? "page" : undefined}
               title={siteNavigationText(create.description, locale)}
               className={cx(
-                "site-header__create group relative hidden h-11 min-w-11 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-[0.9rem] border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm outline-none transition-all duration-200 ease-out-expo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none sm:flex",
+                "site-header__create group relative hidden h-11 min-w-11 shrink-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-md border px-3 text-sm font-bold [text-wrap:nowrap] [word-break:keep-all] shadow-sm outline-none transition-all duration-200 ease-out-expo focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent motion-reduce:transition-none sm:flex",
                 isPurposeActive(create.href)
                   ? "border-accent bg-accent text-on-accent"
                   : "border-line-strong bg-fg text-canvas hover:-translate-y-0.5 hover:border-fg"
@@ -396,6 +398,8 @@ export function SiteHeader() {
                 {keepInlineText(siteNavigationText(create.label, locale))}
               </span>
             </Link>
+
+            {isHomePage && <PublicSiteAppearanceToggle locale={locale} className="site-header__appearance" />}
 
             <Suspense fallback={null}>
               <EngagementHeaderNotifications />
@@ -415,7 +419,7 @@ export function SiteHeader() {
               aria-haspopup="dialog"
               aria-expanded={menuOpen}
               aria-controls={menuId}
-              className="grid size-11 place-items-center rounded-[0.9rem] border border-line bg-card/80 text-fg-2 shadow-sm outline-none transition-[border-color,background-color,color,transform] hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:border-accent/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.97] min-[1180px]:hidden"
+              className="grid size-11 shrink-0 place-items-center rounded-md border border-line bg-card/80 text-fg-2 outline-none transition-[border-color,background-color,color,transform] hover:border-line-strong hover:bg-raised hover:text-fg focus-visible:border-accent/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.97] min-[1180px]:hidden"
             >
               {menuOpen ? (
                 <X size={18} aria-hidden="true" />
@@ -425,7 +429,7 @@ export function SiteHeader() {
             </button>
           </div>
         </div>
-        {isPublicPage && (
+        {isPublicPage && !isHomePage && (
           <PublicSiteJourney pathname={pathname} locale={locale} />
         )}
       </header>

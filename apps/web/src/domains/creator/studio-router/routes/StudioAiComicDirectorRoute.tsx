@@ -1,7 +1,7 @@
+import "../../studio-shell/creator-workflow-surfaces.css";
 import {
   BookOpenCheck,
   ChevronRight,
-  Clapperboard,
   Cloud,
   CloudOff,
   Layers3,
@@ -342,12 +342,13 @@ export function StudioAiComicDirectorRoute({
   return (
     <div
       className="min-h-[calc(100dvh-4rem)] bg-canvas px-3 py-4 text-fg sm:px-5 lg:px-8"
+      data-creator-workflow="ai-director"
       data-studio-ai-comic-director-route="true"
     >
       <div className="mx-auto max-w-[90rem]">
-        <header className="flex flex-wrap items-center gap-3 border-b border-line pb-4">
+        <header className="creator-workflow-topbar flex flex-wrap items-center gap-3 border-b border-line pb-4">
           <span className="grid size-11 place-items-center rounded-xl bg-accent text-on-accent">
-            <Clapperboard size={20} aria-hidden />
+            <img className="creator-workflow-director-avatar" src="/brand/illustrated-20260928/luna.webp" alt="" aria-hidden="true" width={44} height={44} decoding="async" />
           </span>
           <div className="min-w-0">
             <p className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-accent">

@@ -40,6 +40,30 @@ describe("route stage semantic and recovery guarantees", () => {
     expect(stage?.getAttribute("data-route-product")).toBe("studio");
     expect(stage?.getAttribute("data-route-purpose")).toBe("create");
     expect(stage?.getAttribute("data-route-maturity")).toBe("stable");
+    expect(stage?.getAttribute("data-site-domain")).toBe("assets");
+    expect(stage?.getAttribute("data-site-artwork")).toBe("character-blue");
+    expect(stage?.getAttribute("data-site-tone")).toBe("cyan");
+    expect(stage?.getAttribute("data-site-art-placement")).toBe("chrome");
+  });
+
+  it("편집기의 기존 수명주기 키를 유지하며 배경 아트 적용을 차단한다", () => {
+    const { rerender } = render(
+      <RouteStage pathname="/studio/work/work-1/canvas" search="?panel=layers" accessibleTitle="원고">
+        <canvas data-route-ready="" />
+      </RouteStage>,
+    );
+    const stage = document.querySelector("[data-route-stage-key]");
+    const canvas = document.querySelector("canvas");
+    const key = stage?.getAttribute("data-route-stage-key");
+    expect(stage?.getAttribute("data-site-domain")).toBe("editor");
+    expect(stage?.getAttribute("data-site-art-placement")).toBe("none");
+    rerender(
+      <RouteStage pathname="/studio/work/work-1/canvas" search="?panel=history" accessibleTitle="원고">
+        <canvas data-route-ready="" />
+      </RouteStage>,
+    );
+    expect(document.querySelector("[data-route-stage-key]")?.getAttribute("data-route-stage-key")).toBe(key);
+    expect(document.querySelector("canvas")).toBe(canvas);
   });
 
   it("publishes pending and ready route state for browser health checks", async () => {

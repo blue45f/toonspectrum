@@ -4,8 +4,17 @@ import { RESOURCE_BUTTON, RESOURCE_PAGES } from "./navigation";
 import { ResearchSceneStudy } from "./ResearchSceneStudy";
 
 import "./resource-atelier.css";
+import "./resource-illustrated.css";
 
 import type { ReactNode } from "react";
+
+const INTRO_ART: Record<string, string> = {
+  "/story-lab": "canvas-noir",
+  "/now": "project-crimson",
+  "/research/assets": "character-pink",
+  "/research/books": "project-romance",
+  "/research/3d-assets": "background-city",
+};
 
 export function ResourceLayout({
   title,
@@ -20,26 +29,27 @@ export function ResourceLayout({
 }) {
   const { pathname } = useLocation();
   const isDesk = pathname === "/research" || pathname === "/research/";
-  const isPlanning = pathname === "/story-lab" || pathname === "/publishing" || pathname.startsWith("/learn");
-  return <section className={`resource-atelier mx-auto space-y-8 px-4 py-8 text-fg sm:px-6 sm:py-12 ${width === "wide" ? "max-w-[90rem]" : "max-w-6xl"}`}>
-    <header className={`resource-masthead ${isDesk ? "resource-masthead--desk" : "resource-masthead--detail"}`}>
+  const introArt = INTRO_ART[pathname.replace(/\/$/u, "")];
+  const isCurrent = (path: string) => pathname === path || pathname.startsWith(`${path}/`);
+  return <section className={`resource-atelier resource-illustrated mx-auto space-y-8 px-4 py-8 text-fg sm:px-6 sm:py-12 ${width === "wide" ? "max-w-[90rem]" : "max-w-6xl"}`}>
+    <header className={`resource-masthead ${isDesk ? "resource-masthead--desk" : "resource-masthead--detail"} ${introArt ? "resource-masthead--illustrated" : ""}`}>
       <div className="resource-masthead-copy">
         <Link to="/research" className="inline-flex min-h-11 items-center text-xs font-semibold tracking-[.12em] text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">TOONSTUDIO / 리서치 데스크</Link>
         <h1 className="font-bold">{title}</h1>
         <p className="mt-5 max-w-3xl text-base leading-8 text-fg-2">{intro}</p>
         <p className="resource-context">복식·소품·배경을 관찰하고, 다음 웹툰 컷의 근거로</p>
       </div>
-      {isDesk ? <ResearchSceneStudy /> : <img className="resource-masthead-image" src={isPlanning ? "/brand/atelier-process.webp" : "/brand/atelier-materials.webp"} alt={isPlanning ? "스케치부터 채색으로 이어지는 제작 과정 콘셉트 아트" : "드로잉 재료와 소품을 모은 작업대 콘셉트 아트"} width={640} height={480} />}
+      {isDesk ? <ResearchSceneStudy /> : introArt ? <img className="resource-masthead-image" src={`/brand/illustrated-20260928/${introArt}.webp`} alt="" aria-hidden="true" width={320} height={240} /> : null}
     </header>
     <nav aria-label="창작 리서치 메뉴" className="resource-menu resource-menu--desktop">
-      {RESOURCE_PAGES.slice(1).map((page) => <Link key={page.path} to={page.path} aria-current={pathname === page.path ? "page" : undefined}
-        className={`${RESOURCE_BUTTON} ${pathname === page.path ? "bg-accent-soft text-accent" : "bg-panel"}`}>{page.title}</Link>)}
+      {RESOURCE_PAGES.slice(1).map((page) => <Link key={page.path} to={page.path} aria-current={isCurrent(page.path) ? "page" : undefined}
+        className={`${RESOURCE_BUTTON} ${isCurrent(page.path) ? "bg-accent-soft text-accent" : "bg-panel"}`}>{page.title}</Link>)}
     </nav>
     <details className="resource-menu-mobile">
       <summary>리서치·학습 전체 메뉴 <span aria-hidden="true">⌄</span></summary>
       <nav aria-label="모바일 창작 리서치 메뉴">
-        {RESOURCE_PAGES.slice(1).map((page) => <Link key={page.path} to={page.path} aria-current={pathname === page.path ? "page" : undefined}
-          className={pathname === page.path ? "bg-accent-soft text-accent" : "bg-panel text-fg-2"}>{page.title}</Link>)}
+        {RESOURCE_PAGES.slice(1).map((page) => <Link key={page.path} to={page.path} aria-current={isCurrent(page.path) ? "page" : undefined}
+          className={isCurrent(page.path) ? "bg-accent-soft text-accent" : "bg-panel text-fg-2"}>{page.title}</Link>)}
       </nav>
     </details>
     {children}

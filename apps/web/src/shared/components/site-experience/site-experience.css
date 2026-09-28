@@ -56,7 +56,7 @@
   --ce-violet: #635087; --ce-mint: #316969; --ce-sky: #395f86;
   background: radial-gradient(ellipse 58rem 42rem at 96% 5%, #7750a044, transparent), radial-gradient(ellipse 44rem 38rem at 0 11%, #bd6b4433, transparent), radial-gradient(ellipse 50rem 38rem at 85% 45%, #308e8d33, transparent), radial-gradient(ellipse 50rem 34rem at 5% 77%, #7750a033, transparent), var(--cf-paper);
 }
-[data-site-experience="vivid"] .creator-flagship .cf-hero h1 em { color: #ffc09b; background: linear-gradient(100deg, #ffba83, #ffb6bf 53%, #cbb8ff); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+[data-site-experience="vivid"] .creator-flagship .cf-hero h1 em { color: var(--color-accent); -webkit-text-fill-color: currentColor; }
 [data-site-experience="vivid"] .creator-flagship .cf-kicker { color: #d5c4e9; }
 [data-site-experience="vivid"] .creator-flagship .cf-signal { box-shadow: 0 0 0 5px #ed886d22, 0 0 22px #ed886d88; }
 [data-site-experience="vivid"] .creator-flagship .cf-art-study { border: 1px solid #a982be66; border-radius: 24px; box-shadow: 0 24px 100px -50px #a276ccaa, 0 0 0 8px #b995dc09; }

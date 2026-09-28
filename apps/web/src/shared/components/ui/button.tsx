@@ -19,5 +19,5 @@ export function Button({
   ref?: React.Ref<HTMLButtonElement>;
 }) {
   const Comp = asChild ? Slot : "button";
-  return <Comp className={buttonClass({ variant, size, className })} {...props} />;
+  return <Comp data-slot="button" data-variant={variant} data-size={size} className={buttonClass({ variant, size, className })} {...props} />;
 }

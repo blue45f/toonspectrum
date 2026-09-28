@@ -1,3 +1,4 @@
+import "../studio-shell/creator-workflow-surfaces.css";
 import { productionChecklistState } from "./studio-production-checklist";
 import { StudioWorkSessionEntry } from "../work-session/StudioWorkSessionEntry";
 import {
@@ -206,7 +207,7 @@ function Card({
   readonly action?: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-line bg-card p-4 shadow-sm">
+    <section className="creator-workflow-panel rounded-2xl border border-line bg-card p-4 shadow-sm">
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-bold text-fg">{title}</h2>
@@ -746,12 +747,13 @@ function StudioProductionHubWorkspace({
   return (
     <div
       className="min-h-dvh bg-bg text-fg"
+      data-creator-workflow="studio-production"
       data-studio-production-command-center
       data-scope-key={scope.key}
       data-workspace-mode={mode}
       data-collaboration-level={collaborationLevel}
     >
-      <header className="sticky top-0 z-40 border-b border-line bg-bg/92 backdrop-blur-xl">
+      <header className="creator-workflow-topbar sticky top-0 z-40 border-b border-line bg-bg/92 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1920px] flex-wrap items-center gap-3 px-3 py-2 sm:px-5">
           <button
             type="button"

@@ -37,6 +37,22 @@ beforeEach(() => {
 afterEach(() => { cleanup?.(); cleanup = undefined; vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("theme runtime", () => {
+  it.each([false, true])("첫 방문은 OS dark=%s와 무관하게 기존 dark 기본값을 사용한다", async (systemDark) => {
+    dark = systemDark;
+    document.documentElement.removeAttribute("data-design-theme");
+    const { useTheme, installAppearanceSync } = await import("./theme");
+    cleanup = installAppearanceSync();
+    expect(useTheme.getState()).toMatchObject({ preference: "dark", studioPreference: "inherit", resolvedTheme: "dark" });
+    expect(document.documentElement.dataset.designTheme).toBe("dark");
+  });
+  it("이미 선택한 starlight는 복원하고 Studio에서도 그대로 상속한다", async () => {
+    localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ state: { preference: "starlight", studioPreference: "inherit" }, version: 0 }));
+    const { useTheme, setAppearanceScope } = await import("./theme");
+    expect(useTheme.getState().resolvedTheme).toBe("starlight");
+    setAppearanceScope("studio");
+    expect(document.documentElement.dataset.designTheme).toBe("starlight");
+    expect(useTheme.getState().preference).toBe("starlight");
+  });
   it("restores legacy theme and persists the compatible envelope", async () => {
     localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify({ state: { theme: "light" }, version: 0 }));
     const { useTheme } = await import("./theme");
@@ -98,15 +114,15 @@ describe("theme runtime", () => {
     expect(document.documentElement.dataset.themeSource).toBe("inherit");
     expect(document.documentElement.dataset.themeScope).toBe("studio");
   });
-  it("syncs cross-tab updates and clears without write-back loops", async () => {
+  it.each([null, THEME_STORAGE_KEY])("다른 탭에서 %s를 지우면 재저장 루프 없이 dark로 복구한다", async (key) => {
     const { useTheme, installAppearanceSync } = await import("./theme");
     cleanup = installAppearanceSync();
     const spy = vi.spyOn(Storage.prototype, "setItem");
     window.dispatchEvent(new StorageEvent("storage", { key: THEME_STORAGE_KEY, newValue: JSON.stringify({ state: { preference: "sepia" } }) }));
     expect(useTheme.getState().resolvedTheme).toBe("sepia");
     expect(spy).not.toHaveBeenCalled();
-    window.dispatchEvent(new StorageEvent("storage", { key: null, newValue: null }));
-    expect(useTheme.getState().resolvedTheme).toBe("starlight");
+    window.dispatchEvent(new StorageEvent("storage", { key, newValue: null }));
+    expect(useTheme.getState().resolvedTheme).toBe("dark");
     expect(spy).not.toHaveBeenCalled();
   });
   it("ignores unrelated/session-storage events", async () => {

@@ -9,6 +9,7 @@ import { SiteConnectionNotice } from "./SiteConnectionNotice";
 import { EXPERIENCE_MODE_KEY } from "./site-experience-model";
 import { PublicSiteJourney } from "../public-site-journey";
 import { RouteScrollRestoration } from "@/app/RouteScrollRestoration";
+import { useTheme } from "@/shared/lib/theme";
 
 vi.mock("@/shared/lib/i18n", () => ({ useI18n: (selector: (state: { lang: string }) => unknown) => selector({ lang: "ko" }) }));
 vi.mock("@/domains/creator/studio-workspace-route", () => ({
@@ -16,12 +17,14 @@ vi.mock("@/domains/creator/studio-workspace-route", () => ({
   shouldPreserveStudioRouteLifecycle: () => true,
 }));
 
+const originalTheme = useTheme.getState().resolvedTheme;
 beforeEach(() => {
+  useTheme.setState({ resolvedTheme: "dark" });
   localStorage.clear();
   if (!HTMLElement.prototype.scrollTo) Object.defineProperty(HTMLElement.prototype, "scrollTo", { value: () => undefined, configurable: true, writable: true });
   vi.spyOn(HTMLElement.prototype, "scrollTo").mockImplementation(() => undefined);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); useTheme.setState({ resolvedTheme: originalTheme }); });
 
 function frame(path = "/calendar") {
   return render(<MemoryRouter initialEntries={[path]}><SiteExperienceFrame enabled>

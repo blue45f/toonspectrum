@@ -20,15 +20,15 @@ import {
 } from "./studio-project-library-management-model";
 import type { StudioProjectLibraryManagementController } from "./useStudioProjectLibraryManagementController";
 
-const HERO_ART = "/brand/toonstudio-visual-identity/creator-lobby-hero.webp";
-const AI_DIRECTOR_ART = "/brand/toonstudio-visual-identity/ai-creative-director.webp";
+const HERO_ART = "/brand/illustrated-20260928/canvas-noir.webp";
+const AI_DIRECTOR_ART = "/brand/illustrated-20260928/luna.webp";
 const ICON_ROOT = "/brand/toonstudio-premium-icons";
 
 const FALLBACK_PROJECT_ART = [
   HERO_ART,
-  "/brand/atelier-world-640.webp",
-  "/brand/atelier-process-640.webp",
-  "/brand/atelier-materials-640.webp",
+  "/brand/illustrated-20260928/background-city.webp",
+  "/brand/illustrated-20260928/project-crimson.webp",
+  "/brand/illustrated-20260928/character-pink.webp",
 ] as const;
 
 const bi = <TKo, TEn>(ko: TKo, en: TEn): TKo =>
@@ -52,7 +52,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "세로 웹툰",
     metaEn: "Vertical webtoon",
     tone: "violet",
-    art: "canvas.webp",
+    art: "canvas-noir.webp",
   },
   {
     href: "/story-lab",
@@ -61,7 +61,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "대본·콘티",
     metaEn: "Script & storyboard",
     tone: "blue",
-    art: "story.webp",
+    art: "character-blue.webp",
   },
   {
     href: "/studio/assets/characters/new",
@@ -70,7 +70,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "포즈·표정",
     metaEn: "Pose & expression",
     tone: "pink",
-    art: "character.webp",
+    art: "character-pink.webp",
   },
   {
     href: "/studio/bg3d",
@@ -79,7 +79,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "2D·3D 장면",
     metaEn: "2D & 3D scene",
     tone: "cyan",
-    art: "background.webp",
+    art: "background-city.webp",
   },
   {
     href: "/studio/new?kind=illustration&template=illustration-blank",
@@ -88,7 +88,7 @@ const LOBBY_ACTIONS: readonly LobbyAction[] = [
     metaKo: "바로 그리기",
     metaEn: "Start drawing",
     tone: "amber",
-    art: "canvas.webp",
+    art: "canvas-noir.webp",
   },
 ] as const;
 
@@ -107,7 +107,7 @@ const STARTER_CARDS = [
     titleEn: "Character illustration",
     metaKo: "포스터 · 표지 · 키비주얼",
     metaEn: "Poster · Cover · Key visual",
-    visual: "/brand/atelier-materials-640.webp",
+    visual: "/brand/illustrated-20260928/character-pink.webp",
   },
   {
     href: "/studio/new?kind=four-cut&template=four-cut-classic",
@@ -115,7 +115,7 @@ const STARTER_CARDS = [
     titleEn: "Four-panel story",
     metaKo: "빠른 콘티 · 대사 연출",
     metaEn: "Fast storyboard · Dialogue",
-    visual: "/brand/atelier-process-640.webp",
+    visual: "/brand/illustrated-20260928/project-crimson.webp",
   },
 ] as const;
 
@@ -223,7 +223,7 @@ export function StudioCreatorLobby({
           {LOBBY_ACTIONS.map(({ href, labelKo, labelEn, metaKo, metaEn, tone, art }) => (
             <Link key={href} href={href} data-tone={tone} className="studio-creator-quick-action">
               <span className="studio-creator-quick-action__icon" aria-hidden="true">
-                <img src={`${ICON_ROOT}/${art}`} alt="" decoding="async" />
+                <img src={`/brand/illustrated-20260928/${art}`} alt="" decoding="async" />
               </span>
               <span className="studio-creator-quick-action__copy">
                 <strong>{bi(labelKo, labelEn)}</strong>
@@ -274,7 +274,7 @@ export function StudioCreatorLobby({
                     <img src={visual} alt="" loading="lazy" decoding="async" />
                     <span className="studio-project-cover__veil" aria-hidden="true" />
                     <span className="studio-project-cover__kind">
-{studioProjectLibraryTypeLabel(project)}
+                      {!project.thumbnailUrl ? `${bi("기본 표지", "Default cover")} · ` : ""}{studioProjectLibraryTypeLabel(project)}
                     </span>
                     <span className="studio-project-cover__copy">
                       <strong>{`${project.title}${bi(" · 최근", " · Recent")}`}</strong>

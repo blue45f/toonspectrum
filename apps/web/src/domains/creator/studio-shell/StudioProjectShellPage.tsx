@@ -47,6 +47,7 @@ import {
 import { resolveStudioProjectViewDestination } from "../studio-project-view-destinations";
 import { StudioProjectDiagnosticsBridge } from "./StudioProjectDiagnosticsBridge";
 import { StudioProjectReadinessPanel } from "./StudioProjectReadinessPanel";
+import "./studio-illustrated-project-surfaces.css";
 
 
 export type StudioProjectSection = StudioProjectSectionId;
@@ -307,6 +308,7 @@ export function StudioProjectShellPage({ section }: { readonly section: StudioPr
     <Container
       size="wide"
       className="py-4 sm:py-6 lg:py-8"
+      data-studio-illustrated-surface="project"
       data-studio-project-shell="simple"
     >
       <CampusObjectSource objects={[

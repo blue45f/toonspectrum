@@ -11,12 +11,13 @@ import { useStudioProjectLibraryManagementController } from "./useStudioProjectL
 
 import "./studio-visual-identity.css";
 import "./studio-visual-identity-v2.css";
+import "./studio-illustrated-project-surfaces.css";
 
 export function StudioProjectLibraryManagementPage() {
   const controller = useStudioProjectLibraryManagementController();
   const bt = useBilingual("StudioProjectLibraryManagementPage");
   return (
-    <div data-route-ready="studio-project-library" className="studio-visual-identity-page min-h-[calc(100vh-4rem)] min-w-0 bg-bg">
+    <div data-studio-illustrated-surface="library" data-route-ready="studio-project-library" className="studio-visual-identity-page min-h-[calc(100vh-4rem)] min-w-0 bg-bg">
       <Container size="wide" className="min-w-0 py-7 sm:py-11">
         {controller.view === "active" ? <StudioCreatorLobby controller={controller} /> : null}
         <StudioProjectLibraryManagementHeader controller={controller} />
