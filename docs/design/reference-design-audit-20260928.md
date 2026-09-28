@@ -146,6 +146,21 @@ GNB·작업 공간·푸터·드로잉 앱바는 공통 ToonStudio 워드마크�
 - 새 격리 PG17에서 전체 bootstrap의 동일 오류를 재현한 뒤 새 DB에서 성공을 확인했다. **19 adopted·76 applied**, 두 번째 적용 **0 applied·96 checksum-verified skips**, ledger **97행 모두 applied**, 기본키 정본 일치와 **20개 Studio trigger**를 직접 확인했다. 같은 DB의 CI 통합 **5파일 187테스트**도 통과했고 로컬 DB 서버를 정상 종료했다. 로그는 `/tmp/toonstudio-reference-pk-*.log`, 실행 명령·대상은 `toonstudio-reference-pk-bootstrap-{red,green}.json`에 보존한다. 운영 DB 변경은 없다.
 - 브랜드 분리와 PK 보완을 포함한 소스의 `pnpm harness:verify`는 **exit 0**(`/tmp/toonstudio-reference-release-harness.log`)이며 웹 재빌드는 **exit 0, 1분 56초**, CSP·라이선스 통과(`/tmp/toonstudio-reference-brand-leaf-build.log`)다. 빌드 시작 시 HEAD는 `7fc763243`에 확정된 웹 수정이 적용된 상태였고, 동일 웹 소스는 `421639a30`에 커밋했다. 뒤의 `b3ddc0594`는 API 기본키·회귀만 변경한다. 이전 PR HEAD의 통과 결과를 갱신된 HEAD의 CI 성공으로 사용하지 않는다.
 
+### 탐색·오류 복구 후속 회귀
+
+- 갱신된 PR의 foundation 실패 7건은 가구 선택기를 실제로 마운트하는 두 테스트에 목록 응답 fixture가 없던 문제였다. 기준 main의 동일 상대 URL 오류도 확인했다. 두 fixture를 정상 빈 목록으로 고정하고 실제 제품의 네트워크 거절도 국소적으로 처리했다. 기존 목록을 유지하고 한·영 안내와 사용자가 누르는 목록 재시도를 제공하며, 패널 종료·이전 요청 취소 뒤 응답은 적용하지 않는다. 업로드 자동 재시도나 전역 오류 억제는 없다.
+- 위 문제는 수정 전 기존 두 파일의 assertion 8개가 통과해도 **unhandled 7개로 exit 1**, 새 오류 복구 테스트는 **2개 실패·unhandled 2개**로 재현됐다. 수정 후 관련 **4파일 21테스트, unhandled 0개**를 통과했다. 이어 실제 core foundation 명령도 **37개 dependency-free 검사 및 411파일 7,595테스트 PASS / exit 0**다. 로그는 /tmp/toonstudio-reference-foundation-final.log다.
+- 검색 탭 테스트는 선택 상태 변경과 requestAnimationFrame의 실제 초점 이동 사이에 Tab을 보내던 경쟁이었다. 실제 작품 탭 초점까지 기다리자 원격과 같은 실패가 재현됐다. 빈 작품 범위의 마지막 탭에서는 모달 처음으로 순환하는 것이 맞으므로, 중간 Tab의 기본 동작 보존과 양 끝 순환을 각각 검증했다. 검색 제품 소스는 바꾸지 않았고 **2파일 22테스트**를 통과했다.
+- 모바일 드로잉에서 오류 안내가 지우개 설정 버튼의 클릭을 가로채는 문제를 실제 production 화면에서 재현했다. 열린 draw 시트의 stacking context 아래로 오류 안내를 배치했다. 경고 문구·표시·포인터 동작을 보존하고 시트를 닫으면 원래 계층으로 돌아온다. 수정 후 개발 화면의 정상 지우개 클릭·선택 상태·중심 hit와 경고 펼치기, 관련 **6개 회귀**를 통과했다. 최종 production에서도 1440/390px 시작 안내 정상 닫기, 390px 지우개 선택·중심 hit, 시트 종료 후 경고 z-index 0→40 복원과 정상 펼치기를 확인했다. 결과는 .qa/reference-design-20260928/overlay-live-production-final-results.json이다.
+- 소개 페이지의 구형 앵커가 늦은 글꼴·헤더 재배치 뒤 가려지는 원격 tablet 관측을 복구했다. 제목이 초점을 유지하는 동안에만 위치를 보정하고, 사용자의 wheel·touch·pointer·keyboard 조작 또는 다른 컨트롤 초점 이후에는 화면을 되당기지 않는다. 페이지 종료 시 예약 프레임과 관측을 해제한다. 기존 탐색 및 새 늦은 재배치·사용자 의도 회귀를 포함한 **3파일 57테스트**를 통과했다.
+
+- 복구 기록 삭제 어댑터가 저장소 삭제를 현재 문서 초기화로 보고해 이미 닫은 시작 안내를 다시 기다리던 문제를 고쳤다. 동일 production에서 실제 삭제 버튼·확인 버튼을 눌러 문서 ID·내용 유지, 복구 저장소 삭제, 캔버스 표시를 확인했다. 기존 어댑터는 같은 20초 전체 제한에서 실패했고 수정 후 통과했다. 실제 새 문서의 안내 닫기를 요구하는 readiness 계약은 유지했다. 관련 **4파일 44테스트**를 통과했다.
+- 최종 산출물에서 원래 브러시 명령의 desktop/perfect-marker 단일 시나리오도 자체 preview를 사용해 **exit 0, 1/1**, select→paint→undo→redo 및 UI 카탈로그 대조, 오류 0을 확인했다. 전체 도구·long·shapes·내구성 검증으로 합산하지 않는다. 외부 preview 5195를 지정한 선행 실행의 API 502로 인한 exit 1도 원로그에 보존한다.
+- 웹 런타임 소스 a27ba81f0을 포함한 통합 production build는 **2분 4초 / exit 0**, CSP·라이선스 통과다. 전체 타입·변경 lint·경계 검사인 하네스도 **exit 0**이며 번들 gate는 기존 기준 그대로 **app 17개 / BG3D 90개 / 회귀 0**이다. 로그는 /tmp/toonstudio-reference-ci-recovery-{build,harness,bundle}.log다. 후속 검증 스크립트·문서 변경은 이 웹 산출물과 구분한다.
+
+- 공개 홈을 개인 workspace로 찾던 검사와 모바일에서 의도적으로 접힌 보조 여정 바를 요구하던 검사는 기준 main에서도 이미 현재 UI와 달랐다. 공개 홈의 실제 5개 시작·8개 모듈·검색 복귀, 개인 /home의 원래 계약, 모바일 하단 5개 목적지·전체 메뉴의 동등한 이동을 모두 검사한다. 새 닫힌 details의 lazy 이미지는 실제 가시성으로 구분하고, 직접 펼친 후 이미지 로딩과 접기·초점 복귀를 별도 검증한다. 정책 페이지는 공통 공개 셸을 유지하되 홍보 패널이 없음을 검사한다.
+- 최종 production a27ba81f0에서 공개 경로 **42/42 PASS**, 실제 상호작용·오류 주입 **22/22 PASS**, 원래 소개 앵커 검사 **4/4 PASS**다. 앵커는 desktop/tablet/mobile/English small mobile에서 구형 주소·지연 이미지·뒤로/앞으로·동일 fragment 재진입·44px 동작을 확인했다. .qa/reference-design-20260928/ci-triage-7fc/의 final-production 원장에 기록한다. 수정 전 CI 실패와 개발 서버 지연 로그는 보존하며 이 조건들을 기존 672와 중복 합산하지 않는다.
+
 ### 초기 검증 기록
 
 다음은 후속 수정 전의 초기 근거다. 위에 기록한 소스별 결과를 대체하거나 테스트 총수에 더하지 않는다.
