@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   AuthEmailConfigurationError,
+  authEmailAvailability,
+  isAuthEmailDeliveryConfigured,
   resolveAuthEmailConfig,
   sendAuthEmail,
 } from "./auth-email";
@@ -46,5 +48,23 @@ describe("authentication email delivery", () => {
       },
       fetchImpl: fetchImpl as typeof fetch,
     })).resolves.toEqual({ providerMessageId: "email_123" });
+  });
+});
+
+describe("이메일 가입 준비 상태", () => {
+  it.each([
+    [{}, "disabled"],
+    [{ AUTH_EMAIL_PROVIDER: "disabled", RESEND_API_KEY: "fixture-key", AUTH_EMAIL_FROM: "Sender <from@example.test>" }, "disabled"],
+    [{ AUTH_EMAIL_PROVIDER: "resend" }, "missing-key"],
+    [{ RESEND_API_KEY: "fixture-key" }, "missing-sender"],
+    [{ AUTH_EMAIL_PROVIDER: "unknown" }, "invalid-configuration"],
+    [{ RESEND_API_KEY: "fixture-key", AUTH_EMAIL_FROM: "Sender <from@example.test>", WEB_APP_BASE_URL: "not-a-url" }, "invalid-configuration"],
+    [{ RESEND_API_KEY: "fixture-key", AUTH_EMAIL_FROM: "Sender <from@example.test>", WEB_APP_BASE_URL: "https://www.toonstudio.cloud" }, "configured"],
+  ])("설정 값 대신 유한한 상태만 반환한다: %j", (environment, reason) => {
+    const result = authEmailAvailability(environment);
+    expect(result).toEqual({ available: reason === "configured", reason });
+    expect(JSON.stringify(result)).not.toContain("fixture-key");
+    expect(JSON.stringify(result)).not.toContain("from@example.test");
+    expect(result.available).toBe(isAuthEmailDeliveryConfigured(environment));
   });
 });

@@ -167,3 +167,25 @@ describe("실제 가입 응답 형태의 복구 동선", () => {
     expect(screen.queryByText("가입 확인 메일을 확인해 주세요.")).toBeNull();
   });
 });
+
+describe("이메일 가입의 사전 준비 상태", () => {
+  beforeEach(() => { fetchMock.mockReset(); vi.stubGlobal("fetch", fetchMock); });
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  it("준비되지 않은 가입·메일 요청만 중단하고 상태 재조회로 회복한다", async () => {
+    fetchMock.mockResolvedValueOnce(response({ ...kakao, email: { available: false, reason: "missing-key" } }))
+      .mockResolvedValueOnce(response({ ...kakao, email: { available: true, reason: "configured" } }));
+    render(<AuthModal initialMode="signup" onClose={vi.fn()} />);
+    await screen.findByText(/이메일 신규 가입·인증 메일 발송이 아직 준비되지 않았습니다/u);
+    expect((screen.getByRole("button", { name: "가입하고 시작" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("tab", { name: "로그인" }));
+    expect((screen.getByRole("button", { name: "로그인" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "인증 메일 다시 보내기" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "카카오로 계속하기" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "이메일 서비스 다시 확인" }));
+    await settle();
+    expect(screen.queryByText(/이메일 신규 가입·인증 메일 발송이 아직 준비되지 않았습니다/u)).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "회원가입" }));
+    expect((screen.getByRole("button", { name: "가입하고 시작" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});

@@ -198,3 +198,25 @@ test("공개 카탈로그가 비어 있어도 실제 기본 소재까지 이동�
   await expect(page.getByRole("heading", { name: "바로 꺼내 쓰는 무료 제작 소재" })).toBeVisible();
   await expect(page.locator('[data-essentials-id]').first()).toBeVisible();
 });
+
+test("이메일 가입 설정이 없으면 제출 전에 안내하고 기존 로그인은 유지한다", async ({ page }) => {
+  await mockMarket(page);
+  let signupRequests = 0;
+  await page.route("**/api/auth/session", (route) => route.fulfill({ status: 200, json: { authenticated: false, user: null } }));
+  await page.route("**/api/auth/providers", (route) => route.fulfill({ status: 200, json: { email: { available: false, reason: "missing-key" } } }));
+  await page.route("**/api/auth/signup", (route) => { signupRequests += 1; return route.fulfill({ status: 503, json: {} }); });
+  await page.goto("/market/library", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "회원가입", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText(/이메일 신규 가입·인증 메일 발송이 아직 준비되지 않았습니다/u)).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "가입하고 시작", exact: true })).toBeDisabled();
+  await dialog.getByRole("tab", { name: "로그인", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "로그인", exact: true })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "인증 메일 다시 보내기", exact: true })).toBeDisabled();
+  expect(signupRequests).toBe(0);
+  await page.route("**/api/auth/providers", (route) => route.fulfill({ status: 200, json: { email: { available: true, reason: "configured" } } }));
+  await dialog.getByRole("button", { name: "이메일 서비스 다시 확인" }).click();
+  await dialog.getByRole("tab", { name: "회원가입", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "가입하고 시작", exact: true })).toBeEnabled();
+  await expect(page).toHaveURL(/\/market\/library$/u);
+});
