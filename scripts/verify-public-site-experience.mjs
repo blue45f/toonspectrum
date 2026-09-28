@@ -3,6 +3,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 
 import { chromium, expect } from "@playwright/test";
 import { assertStudioWorkspaceHome } from "./lib/studio-workspace-browser-contract.mjs";
+import { assertPublicCreatorHome } from "./lib/public-home-browser-contract.mjs";
+import { assertPublicMobileNavigation } from "./lib/public-navigation-browser-contract.mjs";
 import { installBetaEventDismissal } from "./lib/public-page-event-gate.mjs";
 
 const origin = process.env.PUBLIC_WEBTOON_ORIGIN || "http://127.0.0.1:5281";
@@ -49,6 +51,11 @@ try {
     });
     await check(`active mobile journey stays visible ${width}`, async () => {
       await page.goto(`${origin}/community`, { waitUntil: 'domcontentloaded' });
+      if (width < 768) {
+        await assertPublicMobileNavigation(page, '/community');
+        await page.screenshot({ path: `${output}/community-${width}.png`, animations: 'disabled', timeout: 20000 });
+        return;
+      }
       const active = page.locator('.public-site-journey [aria-current="step"]');
       await expect(active).toHaveCount(1);
       await expect(active).toHaveAttribute('href', '/showcase');
@@ -80,14 +87,16 @@ try {
       for (const route of ['/settings', '/library', '/privacy', '/terms']) {
         await page.goto(`${origin}${route}`, { waitUntil: 'domcontentloaded' });
         await expect(page.locator('#main-content')).toBeVisible();
-        await expect(page.locator('[data-public-experience="atelier"]')).toHaveCount(0);
-        await expect(page.locator('.public-site-next')).toHaveCount(0);
+        // 정책 문서는 공개 GNB·푸터를 공유하지만 홍보/다음 작업 패널은 주입하지 않는다.
+        await expect(page.locator('[data-public-experience="atelier"]')).toHaveCount(['/privacy', '/terms'].includes(route) ? 1 : 0);
+        await expect(page.locator('.public-site-next, .public-site-demo, .site-atelier-chapter')).toHaveCount(0);
+        await expect(page.locator('main h1')).toHaveCount(1);
       }
     });
     await check(`home color treatment and footer availability ${width}`, async () => {
       await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
-      await assertStudioWorkspaceHome(page);
-      const background = await page.locator('.workspace-statusbar .workspace-primary, .workspace-live-status .workspace-live-actions > a').evaluate((element) => getComputedStyle(element).backgroundColor);
+      await assertPublicCreatorHome(page);
+      const background = await page.locator('.rd-search').evaluate((element) => getComputedStyle(element).backgroundColor);
       assert(background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent', 'The primary action must retain its theme surface');
       await expect(page.locator('footer')).toBeAttached({ timeout: 5000 });
       await page.screenshot({ path: `${output}/home-${width}.png`, animations: 'disabled', timeout: 20000 });
@@ -96,6 +105,31 @@ try {
       await page.goto(`${origin}/research`, { waitUntil: 'domcontentloaded' });
       await expect(page.locator('main h1')).toHaveCount(1);
       await page.screenshot({ path: `${output}/research-${width}.png`, animations: 'disabled', timeout: 20000 });
+    });
+    await check(`personal workspace remains distinct from the public home ${width}`, async () => {
+      await page.goto(`${origin}/home`, { waitUntil: 'domcontentloaded' });
+      await assertStudioWorkspaceHome(page);
+    });
+    await check(`optional studio preview reveals real artwork ${width}`, async () => {
+      await page.goto(`${origin}/about`, { waitUntil: 'domcontentloaded' });
+      const demo = page.locator('details.public-site-demo');
+      await expect(demo).not.toHaveAttribute('open');
+      const summary = demo.locator('summary');
+      await summary.scrollIntoViewIfNeeded();
+      await summary.focus();
+      await summary.press('Enter');
+      await expect(demo).toHaveAttribute('open');
+      await expect.poll(() => demo.locator('img').count()).toBeGreaterThan(0);
+      for (const image of await demo.locator('img').all()) {
+        await image.scrollIntoViewIfNeeded();
+        await expect(image).toBeVisible();
+        await expect.poll(() => image.evaluate((element) => element.complete && element.naturalWidth > 0),
+          { timeout: 15000, message: 'Expanded preview artwork must load' }).toBe(true);
+      }
+      await summary.focus();
+      await summary.press('Enter');
+      await expect(demo).not.toHaveAttribute('open');
+      await expect(summary).toBeFocused();
     });
     await context.close();
   }

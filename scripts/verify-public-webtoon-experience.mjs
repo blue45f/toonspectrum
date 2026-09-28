@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 
 import { chromium, expect } from "@playwright/test";
-import { assertStudioWorkspaceHome } from "./lib/studio-workspace-browser-contract.mjs";
+import { assertPublicCreatorHome } from "./lib/public-home-browser-contract.mjs";
 import { assertPublicSiteNavigation } from "./lib/public-navigation-browser-contract.mjs";
 import { installBetaEventDismissal } from "./lib/public-page-event-gate.mjs";
 
@@ -27,12 +27,12 @@ try {
         await page.goto(`${origin}${route}`, { waitUntil: "domcontentloaded" });
         await expect(page.locator("main h1")).toHaveCount(1, { timeout: 30000 });
         await expect(page.locator("main h1")).toBeVisible();
-        if (route === "/") await assertStudioWorkspaceHome(page);
+        if (route === "/") await assertPublicCreatorHome(page);
         else await assertPublicSiteNavigation(page, route);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, `${name}: horizontal overflow`);
         await expect.poll(() => page.locator('main img[src*="/brand/atelier-"]').evaluateAll((images) => images.filter((image) => {
           const box = image.getBoundingClientRect();
-          const visible = box.width > 0 && box.height > 0 && box.top < innerHeight && box.bottom > 0 && box.left < innerWidth && box.right > 0;
+          const visible = image.checkVisibility() && box.width > 0 && box.height > 0 && box.top < innerHeight && box.bottom > 0 && box.left < innerWidth && box.right > 0;
           return visible && (!image.complete || image.naturalWidth === 0);
         }).map((image) => image.getAttribute("src"))), { timeout: 15000, message: `${name}: visible branded artwork must load` }).toEqual([]);
         const drawingLinks = await page.locator("a[href]").evaluateAll((links) => links.map((link) => link.getAttribute("href")).filter((href) => /^\/(?:studio|make)(?:[/?]|$)/u.test(href)));

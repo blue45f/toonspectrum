@@ -10,6 +10,33 @@ const TASK_ROUTES = Object.freeze({
 });
 const DESTINATIONS = ["/home", "/studio", "/team", "/hub"];
 
+/** 좁은 화면은 중복 여정 대신 실제 다섯 목적지와 전체 메뉴를 제공한다. */
+export async function assertPublicMobileNavigation(page, route) {
+  const quick = page.getByRole("navigation", { name: "빠른 이동", exact: true });
+  await expect(quick).toBeVisible();
+  const links = quick.locator("a");
+  await expect(links).toHaveCount(5);
+  assert.deepEqual(await links.evaluateAll((items) => items.map((item) => new URL(item.href).pathname)),
+    ["/", "/studio", "/discover", "/community", "/sitemap"]);
+  for (const link of await links.all()) {
+    await expect(link).toBeVisible();
+    await expect.poll(async () => (await link.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+  if (route === "/community") await expect(quick.locator('a[href="/community"]')).toHaveAttribute("aria-current", "page");
+  const trigger = page.getByRole("button", { name: "전체 메뉴", exact: true });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "전체 메뉴", exact: true });
+  await expect(dialog).toBeVisible();
+  assert(await dialog.evaluate((element) => element.contains(document.activeElement)), "The full menu must receive focus");
+  for (const href of ["/discover", "/learn", "/market", "/studio/new", "/showcase"]) {
+    await expect(dialog.locator(`a[href="${href}"]`).first()).toBeVisible();
+  }
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  assert.equal(new URL(page.url()).pathname, route, "Menu inspection must preserve the current page");
+}
+
 /** Validate the actual DOM snapshot, not a generic replacement container's presence. */
 export function assertPublicTaskNavigationSnapshot(snapshot, route, origin) {
   const expected = TASK_ROUTES[route];
@@ -34,6 +61,11 @@ export async function assertPublicSiteNavigation(page, route) {
   const task = page.locator('[data-workspace-surface="task"]');
   await expect(journey.or(task)).toHaveCount(1);
   if (await task.count() === 0) {
+    if (page.viewportSize().width < 768) {
+      await expect(journey).toBeHidden();
+      await assertPublicMobileNavigation(page, route);
+      return "public-mobile-navigation";
+    }
     await expect(journey).toBeVisible();
     return "public-journey";
   }
