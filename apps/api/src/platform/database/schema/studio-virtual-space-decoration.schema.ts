@@ -15,6 +15,10 @@ import { STUDIO_VIRTUAL_MAX_PLACEMENTS } from "@toonstudio/contracts/studio-virt
 
 import { users } from "./auth.schema";
 
+// CHECK DDL은 bind parameter를 받지 않으므로 컴파일 시 확정된 정수만 리터럴로 넣는다.
+// 요청이나 환경변수에서 받은 값을 이 SQL 조각에 전달해서는 안 된다.
+const STUDIO_VIRTUAL_MAX_PLACEMENTS_SQL = sql.raw(String(STUDIO_VIRTUAL_MAX_PLACEMENTS));
+
 /**
  * 사용자별 가상 스튜디오 가구 배치의 서버 정본. 한 행은 (userId, scopeKey) 하나다.
  * scopeKey는 (projectId, worldScope, authoringMode)에서 온다. 같은 district라도
@@ -59,7 +63,7 @@ export const studioVirtualSpaceDecorationLayouts = pgTable(
     ),
     check(
       "studio_virtual_space_decoration_layout_placements_capped",
-      sql`jsonb_array_length(${table.placements}) <= ${STUDIO_VIRTUAL_MAX_PLACEMENTS}`,
+      sql`jsonb_array_length(${table.placements}) <= ${STUDIO_VIRTUAL_MAX_PLACEMENTS_SQL}`,
     ),
     check(
       "studio_virtual_space_decoration_layout_world_positive",
