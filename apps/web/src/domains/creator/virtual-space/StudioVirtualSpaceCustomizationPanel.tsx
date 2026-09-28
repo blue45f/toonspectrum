@@ -63,6 +63,7 @@ const DECOR_LABELS = {
   sign: ["안내판", "Sign"], parasol: ["파라솔", "Parasol"], pet: ["고양이", "Cat"],
   "drawing-desk": ["드로잉 데스크", "Drawing desk"], bookshelf: ["책장", "Bookshelf"],
   "review-board": ["원고 리뷰 보드", "Review board"], sofa: ["소파", "Sofa"],
+  custom: ["내 가구", "My furniture"],
 } as const;
 
 export function StudioVirtualSpaceCustomizationPanel({

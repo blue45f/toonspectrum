@@ -14,6 +14,7 @@ const LABELS: Readonly<Record<StudioVirtualDecorType, readonly [string, string]>
   banner: ["배너", "Banner"], "market-stall": ["마켓 부스", "Market stall"], fountain: ["분수", "Fountain"],
   portal: ["포털", "Portal"], rug: ["러그", "Rug"], sign: ["안내판", "Sign"], parasol: ["파라솔", "Parasol"], pet: ["고양이", "Cat"],
   "drawing-desk": ["드로잉 데스크", "Drawing desk"], bookshelf: ["책장", "Bookshelf"], "review-board": ["원고 리뷰 보드", "Review board"], sofa: ["소파", "Sofa"],
+  custom: ["내 가구", "My furniture"],
 };
 
 export function StudioVirtualSpaceDecorationEditor({ world, decorations, selfPoint, onChange, artStyle = DEFAULT_STUDIO_VIRTUAL_ART_STYLE }: {

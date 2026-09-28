@@ -6,6 +6,7 @@ import {
   STUDIO_VIRTUAL_DECOR_FRAME,
   type StudioVirtualCharacterCustomization,
   type StudioVirtualDecorationState,
+  type StudioVirtualDecorPlacement,
   type StudioVirtualDecorType,
 } from "./studio-virtual-space-customization";
 import { studioVirtualDecorCollider } from "./studio-virtual-space-decoration-layout";
@@ -20,6 +21,14 @@ export interface StudioDecorationTextureKeys {
   readonly cat?: string;
   readonly illustratedFurniture?: boolean;
   readonly artStyle?: StudioVirtualArtStyleKey;
+  /**
+   * assetId → 이미 로드된 커스텀 가구 텍스처 키.
+   *
+   * 아틀라스 키에 섞지 않는다. furniture/landmark 키는 테마별 아틀라스 전체를 가리켜야
+   * 하고, 그 계약이 깨지면 이전 테마의 사각형이 남는다. 커스텀 가구는 호출자가
+   * 별도로 등록한 키를 쓴다.
+   */
+  readonly customFurniture?: Readonly<Record<string, string>>;
 }
 
 interface ActorCosmeticVisual {
@@ -45,17 +54,28 @@ export class StudioVirtualDecorationRuntime {
     private readonly keys: StudioDecorationTextureKeys,
   ) {}
 
-  private textureFor(type: StudioVirtualDecorType) {
+  /**
+   * 커스텀 가구는 아틀라스 프레임이 없다. 로드된 텍스처가 없으면 null 을 돌려
+   * 스프라이트를 만들지 않는다. 아틀라스 번호로 대신 그리면 엉뚱한 가구가 서게 된다.
+   */
+  private textureFor(placement: Pick<StudioVirtualDecorPlacement, "type" | "assetId">) {
+    const type = placement.type;
+    if (type === "custom") {
+      const assetId = placement.assetId;
+      const key = assetId ? this.keys.customFurniture?.[assetId] : undefined;
+      if (!key || !this.scene.textures.exists(key)) return null;
+      return { frame: 0, texture: key, cat: false, furniture: false, custom: true };
+    }
     const cat = type === "pet" && this.keys.cat && this.scene.textures.exists(this.keys.cat) ? this.keys.cat : null;
     const requestedFrame = STUDIO_VIRTUAL_DECOR_FRAME[type];
     const furniture = this.keys.furniture && this.scene.textures.exists(this.keys.furniture)
       && (this.keys.illustratedFurniture || requestedFrame >= 12) ? this.keys.furniture : null;
     const frame = cat ? 0 : furniture || requestedFrame < 12 ? requestedFrame
       : requestedFrame === 15 ? 2 : requestedFrame === 12 ? 5 : 9;
-    return { frame, texture: cat ?? furniture ?? this.keys.decor, cat: Boolean(cat), furniture: Boolean(furniture && !cat) };
+    return { frame, texture: cat ?? furniture ?? this.keys.decor, cat: Boolean(cat), furniture: Boolean(furniture && !cat), custom: false };
   }
 
-  private geometryFor(visual: ReturnType<StudioVirtualDecorationRuntime["textureFor"]>, size: number) {
+  private geometryFor(visual: NonNullable<ReturnType<StudioVirtualDecorationRuntime["textureFor"]>>, size: number) {
     return visual.furniture && this.keys.artStyle
       ? studioExperienceFrameGeometry("furniture", this.keys.artStyle, visual.frame, size, size, .5, .9)
       : { width: size, height: size, originX: .5, originY: .9 };
@@ -64,8 +84,11 @@ export class StudioVirtualDecorationRuntime {
   /** 늦게 도착한 선택 아트만 교체한다. 배치·각도·크기·물리 body는 다시 만들지 않는다. */
   refreshTextures(): void {
     for (const sprite of this.decorationSprites.values()) {
-      const visual = this.textureFor(sprite.getData("decorType") as StudioVirtualDecorType);
-      if (sprite.texture.key === visual.texture) continue;
+      const visual = this.textureFor({
+        type: sprite.getData("decorType") as StudioVirtualDecorType,
+        assetId: sprite.getData("decorAssetId") as string | undefined,
+      });
+      if (!visual || sprite.texture.key === visual.texture) continue;
       const geometry = this.geometryFor(visual, Number(sprite.getData("decorNominalSize")));
       sprite.setTexture(visual.texture, visual.frame).setDisplaySize(geometry.width, geometry.height)
         .setOrigin(geometry.originX, geometry.originY).setData("catExpressionAtlas", visual.cat);
@@ -81,7 +104,9 @@ export class StudioVirtualDecorationRuntime {
     const catIds = new Set(state.placements.filter((item) => item.type === "pet").map((item) => item.id));
     for (const id of this.catExpressions.keys()) if (!catIds.has(id)) this.catExpressions.delete(id);
     for (const placement of state.placements) {
-      const visual = this.textureFor(placement.type);
+      const visual = this.textureFor(placement);
+      // 아직 로드되지 않은 커스텀 가구는 화면에 올리지 않는다.
+      if (!visual) continue;
       const geometry = this.geometryFor(visual, 82 * placement.scale);
       const sprite = this.scene.add.sprite(placement.x, placement.y, visual.texture, visual.frame)
         .setDisplaySize(geometry.width, geometry.height)
@@ -89,6 +114,7 @@ export class StudioVirtualDecorationRuntime {
         .setOrigin(geometry.originX, geometry.originY)
         .setDepth(Math.round(placement.y) + 948)
         .setData("decorType", placement.type)
+        .setData("decorAssetId", placement.assetId ?? "")
         .setData("decorNominalSize", 82 * placement.scale)
         .setData("catExpressionAtlas", visual.cat);
       sprite.setData("baseScaleX", sprite.scaleX).setData("baseScaleY", sprite.scaleY);

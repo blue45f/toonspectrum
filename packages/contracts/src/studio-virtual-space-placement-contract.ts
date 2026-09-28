@@ -12,6 +12,8 @@ export const STUDIO_VIRTUAL_DECOR_TYPES = [
   "tree", "flower-bed", "bench", "lamp", "banner", "market-stall",
   "fountain", "portal", "rug", "sign", "parasol", "pet",
   "drawing-desk", "bookshelf", "review-board", "sofa",
+  // 사용자가 직접 올린 가구. 아틀라스 프레임이 없고 assetId 로 별도 텍스처를 가리킨다.
+  "custom",
 ] as const;
 
 export type StudioVirtualDecorType = (typeof STUDIO_VIRTUAL_DECOR_TYPES)[number];
@@ -57,6 +59,8 @@ export const STUDIO_VIRTUAL_SCOPE_KEY_MAX = 240;
 export interface StudioVirtualPlacementDto {
   readonly id: string;
   readonly type: StudioVirtualDecorType;
+  /** type 이 "custom" 일 때만 필요하다. 아틀라스가 아니라 이 값으로 텍스처를 고른다. */
+  readonly assetId?: string;
   readonly x: number;
   readonly y: number;
   readonly rotation: StudioVirtualRotation;
@@ -97,6 +101,7 @@ export type StudioVirtualDecorationRejectReason =
   | "preset"
   | "mode"
   | "placement"
+  | "asset"
   | "too_many"
   | "revision";
 
@@ -142,6 +147,14 @@ export function parseStudioVirtualPlacement(value: unknown): StudioVirtualPlacem
   if (typeof body.id !== "string" || !ID_PATTERN.test(body.id)) return "malformed";
   if (!isOneOf(STUDIO_VIRTUAL_DECOR_TYPES, body.type)) return "malformed";
   if (!isOneOfNumber(STUDIO_VIRTUAL_ROTATIONS, body.rotation)) return "malformed";
+
+  const isCustom = body.type === "custom";
+  if (isCustom) {
+    if (typeof body.assetId !== "string" || !ID_PATTERN.test(body.assetId)) return "malformed";
+  } else if (body.assetId !== undefined) {
+    // 아틀라스 가구에 assetId 를 붙이면 렌더 경로가 어느 쪽인지 몰라 조용히 어긋난다.
+    return "malformed";
+  }
   if (!finite(body.x) || !finite(body.y)) return "malformed";
   if (!finite(body.scale)) return "malformed";
   if (body.scale < STUDIO_VIRTUAL_SCALE_MIN || body.scale > STUDIO_VIRTUAL_SCALE_MAX) return "malformed";
@@ -149,6 +162,7 @@ export function parseStudioVirtualPlacement(value: unknown): StudioVirtualPlacem
   return {
     id: body.id,
     type: body.type,
+    ...(isCustom ? { assetId: body.assetId as string } : {}),
     x: body.x,
     y: body.y,
     rotation: body.rotation,
@@ -198,6 +212,10 @@ export function validateStudioVirtualDecorationSave(input: unknown): StudioVirtu
 
   const placements: StudioVirtualPlacementDto[] = [];
   const seen = new Set<string>();
+  // 배치가 참조할 수 있는 assetId 목록. 없으면 빈 목록이므로 custom 배치는 전부 거절된다.
+  const seenAssets = new Set<string>(
+    (Array.isArray(body.assetIds) ? body.assetIds : []).filter((value): value is string => typeof value === "string"),
+  );
   for (const candidate of body.placements) {
     const parsed = parseStudioVirtualPlacement(candidate);
     if (typeof parsed === "string") {
@@ -206,6 +224,11 @@ export function validateStudioVirtualDecorationSave(input: unknown): StudioVirtu
     // 같은 id가 두 번 오면 렌더 순서가 입력 순서에 의존하게 되어 저장 결과가 흔들린다.
     if (seen.has(parsed.id)) {
       return { ok: false, error: "같은 가구가 두 번 포함되어 있습니다.", reason: "placement" };
+    }
+    if (parsed.type === "custom" && parsed.assetId) {
+      if (!seenAssets.has(parsed.assetId)) {
+        return { ok: false, error: "사용자가 올리지 않은 가구는 배치할 수 없어요.", reason: "asset" };
+      }
     }
     seen.add(parsed.id);
     placements.push(parsed);
