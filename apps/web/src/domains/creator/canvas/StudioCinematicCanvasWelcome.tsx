@@ -1,5 +1,5 @@
 import { ArrowRight, Layers3, Sparkles, X } from "lucide-react";
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 
 import {
   requestStudioCreationMode,
@@ -8,7 +8,7 @@ import {
 import "./studio-cinematic-collaboration-guard.css";
 
 const ICON_ROOT = "/brand/toonstudio-premium-icons";
-const SCENE_ROOT = "/assets/studio/generated-backgrounds/gpt25-v1";
+const SCENE_ROOT = "/brand/studio-canvas-previews";
 
 interface CanvasStartAction {
   readonly mode: StudioCreationMode;
@@ -39,37 +39,37 @@ const CANVAS_SCENE_PRESETS: readonly CanvasScenePreset[] = [
     id: "romance",
     label: "로맨스",
     description: "벚꽃길의 첫 만남",
-    art: `${SCENE_ROOT}/romance/gpt25-bg-romance-cherry-path-vertical-depth/background.png`,
+    art: `${SCENE_ROOT}/romance.webp`,
   },
   {
     id: "sf",
     label: "SF",
     description: "네온 도시의 추격",
-    art: `${SCENE_ROOT}/sf/gpt25-bg-sf-cyber-alley-vertical-depth/background.png`,
+    art: `${SCENE_ROOT}/sf.webp`,
   },
   {
     id: "action",
     label: "액션",
     description: "폐허 도시의 전투",
-    art: `${SCENE_ROOT}/action/gpt25-bg-action-ruined-city-vertical-depth/background.png`,
+    art: `${SCENE_ROOT}/action.webp`,
   },
   {
     id: "fantasy",
     label: "판타지",
     description: "용의 절벽과 구름",
-    art: `${SCENE_ROOT}/fantasy/gpt25-bg-fantasy-dragon-cliff-vertical-depth/background.png`,
+    art: `${SCENE_ROOT}/fantasy.webp`,
   },
   {
     id: "daily",
     label: "일상",
     description: "밤의 작업실",
-    art: `${SCENE_ROOT}/daily/gpt25-bg-daily-bedroom-night-vertical-depth/background.png`,
+    art: `${SCENE_ROOT}/daily.webp`,
   },
   {
     id: "horror",
     label: "호러",
     description: "안개 낀 오두막",
-    art: `${SCENE_ROOT}/horror/gpt25-bg-horror-fog-cabin-vertical-depth/background.png`,
+    art: `${SCENE_ROOT}/horror.webp`,
   },
 ] as const;
 
@@ -86,6 +86,13 @@ export function StudioCinematicCanvasWelcome({
 
   if (!visible || dismissedPageKey === pageKey) return null;
 
+  const dismissWithEscape = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setDismissedPageKey(pageKey);
+  };
+
   const launch = (mode: StudioCreationMode) => {
     setDismissedPageKey(pageKey);
     requestStudioCreationMode(mode);
@@ -99,8 +106,11 @@ export function StudioCinematicCanvasWelcome({
     >
       <button
         type="button"
+        onKeyDown={dismissWithEscape}
         className="studio-cinematic-canvas-welcome__close"
         aria-label="시작 안내 닫기"
+        aria-keyshortcuts="Escape"
+        title="시작 안내 닫기 (Esc)"
         onClick={() => setDismissedPageKey(pageKey)}
       >
         <X size={17} aria-hidden="true" />
@@ -137,12 +147,13 @@ export function StudioCinematicCanvasWelcome({
             <button
               key={action.mode}
               type="button"
+              onKeyDown={dismissWithEscape}
               data-canvas-start-mode={action.mode}
               data-accent={action.accent}
               onClick={() => launch(action.mode)}
             >
               <span className="studio-cinematic-canvas-welcome__action-art" aria-hidden="true">
-                <img src={`${ICON_ROOT}/${action.art}`} alt="" />
+                <img src={`${ICON_ROOT}/${action.art}`} alt="" decoding="async" />
               </span>
               <span>
                 <strong>{action.label}</strong>
@@ -164,6 +175,7 @@ export function StudioCinematicCanvasWelcome({
             <button
               key={preset.id}
               type="button"
+              onKeyDown={dismissWithEscape}
               data-canvas-scene-preset={preset.id}
               aria-label={`${preset.label} 장면으로 배경 시작`}
               onClick={() => launch("background")}
@@ -182,6 +194,7 @@ export function StudioCinematicCanvasWelcome({
         </div>
         <button
           type="button"
+          onKeyDown={dismissWithEscape}
           className="studio-cinematic-canvas-welcome__blank"
           onClick={() => setDismissedPageKey(pageKey)}
         >

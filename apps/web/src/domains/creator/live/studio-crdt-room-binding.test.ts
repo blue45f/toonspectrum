@@ -2047,3 +2047,171 @@ describe("StudioCrdtRoomBinding", () => {
     server.destroy();
   });
 });
+
+
+describe("드로잉 동기화 연결 세대 경계", () => {
+  function deferred() {
+    let release = () => undefined as void;
+    const promise = new Promise<void>((resolve) => { release = resolve; });
+    return { promise, release };
+  }
+
+  function transportState(fake: FakeRoom, state: "ready" | "disconnected") {
+    fake.ready = state === "ready";
+    for (const listener of fake.roomListeners) {
+      listener({ type: "transport-status", status: { state, message: state, recoverable: true } });
+    }
+  }
+
+  it("피어 전송 중 서버 연결로 전환되어도 늦은 피어 영수증으로 보관함을 지우지 않는다", async () => {
+    vi.useFakeTimers();
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    fake.crdtFanout = "mesh";
+    const outbox = new DurableMemoryOutbox();
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({
+      document: client, room: room(fake), outbox, outboxScope: "artist",
+      recoveryVault: new MemoryRecoveryVault(), onStatus: (status) => statuses.push(status),
+    });
+    try {
+      await binding.start();
+      const delivery = deferred();
+      fake.publishBarrier = delivery.promise;
+      add(client, "peer-in-flight", 20);
+      await vi.advanceTimersByTimeAsync(60);
+      expect(fake.publications).toHaveLength(1);
+      transportState(fake, "disconnected");
+      fake.crdtFanout = "authoritative";
+      transportState(fake, "ready");
+      await vi.advanceTimersByTimeAsync(0);
+      fake.publishBarrier = null;
+      delivery.release();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(outbox.requests.size).toBe(1);
+      expect(statuses.at(-1)?.lastAckAt).toBeNull();
+      await vi.advanceTimersByTimeAsync(600);
+      expect(fake.publications).toHaveLength(2);
+      expect(fake.publications[1]?.updateId).toBe(fake.publications[0]?.updateId);
+      expect(outbox.requests.size).toBe(0);
+      expect(statuses.at(-1)?.lastAckAt).not.toBeNull();
+    } finally { binding.close(); client.destroy(); server.destroy(); }
+  });
+
+  it("이전 연결의 스냅샷이 재연결 뒤 도착해도 현재 서버 원고로 적용하지 않는다", async () => {
+    vi.useFakeTimers();
+    const previous = new StudioCrdtDocument();
+    const current = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(previous);
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    try {
+      await binding.start();
+      add(previous, "stale-snapshot", 10);
+      const responseReady = deferred();
+      const responseRelease = deferred();
+      const original = fake.requestCrdtSync.bind(fake);
+      vi.spyOn(fake, "requestCrdtSync").mockImplementationOnce(async (request) => {
+        const response = await original(request);
+        responseReady.release();
+        await responseRelease.promise;
+        return response;
+      });
+      const syncing = binding.syncNow();
+      const rejected = expect(syncing).rejects.toThrow(/연결/);
+      await responseReady.promise;
+      transportState(fake, "disconnected");
+      fake.server = current;
+      transportState(fake, "ready");
+      responseRelease.release();
+      await rejected;
+      await vi.advanceTimersByTimeAsync(600);
+      expect(client.getStrokes().map((stroke) => stroke.id)).not.toContain("stale-snapshot");
+      expect(fake.syncRequests).toBeGreaterThanOrEqual(3);
+    } finally { binding.close(); client.destroy(); previous.destroy(); current.destroy(); }
+  });
+
+  it("원고를 닫은 뒤 도착한 서버 응답으로 저장 경계를 성공시키지 않는다", async () => {
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    try {
+      await binding.start();
+      const response = deferred();
+      fake.nextSyncBarrier = response.promise;
+      const saving = binding.flushAndWaitForAuthoritativeAck();
+      const rejected = expect(saving).rejects.toThrow(/닫힌|종료/);
+      binding.close();
+      response.release();
+      await rejected;
+    } finally { binding.close(); client.destroy(); server.destroy(); }
+  });
+
+  it("이전 스냅샷 요청 중 발견한 서버 순번 누락을 즉시 다시 맞춘다", async () => {
+    vi.useFakeTimers();
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    const binding = new StudioCrdtRoomBinding({ document: client, room: room(fake) });
+    try {
+      await binding.start();
+      const responseReady = deferred();
+      const responseRelease = deferred();
+      const original = fake.requestCrdtSync.bind(fake);
+      vi.spyOn(fake, "requestCrdtSync").mockImplementationOnce(async (request) => {
+        const response = await original(request);
+        responseReady.release();
+        await responseRelease.promise;
+        return response;
+      });
+      const syncing = binding.syncNow();
+      await responseReady.promise;
+      add(server, "missed-first", 10);
+      const vector = server.encodeStateVector();
+      add(server, "received-second", 20);
+      fake.serverSequence = 2;
+      fake.emitRemote({
+        protocolVersion: STUDIO_CRDT_PROTOCOL_VERSION, workId: fake.workId,
+        updateId: "00000000-0000-4000-8000-000000000002",
+        serverSequence: "2",
+        update: encodeStudioCrdtUpdate(server.encodeStateAsUpdate(vector)),
+      });
+      responseRelease.release();
+      await syncing;
+      await vi.advanceTimersByTimeAsync(600);
+      expect(fake.syncRequests).toBeGreaterThanOrEqual(3);
+      expect(client.getStrokes().map((stroke) => stroke.id).sort()).toEqual([
+        "missed-first", "received-second",
+      ]);
+    } finally { binding.close(); client.destroy(); server.destroy(); }
+  });
+
+  it("닫힌 원고의 늦은 승인으로 새 세션이 복구할 보관함을 삭제하지 않는다", async () => {
+    vi.useFakeTimers();
+    const server = new StudioCrdtDocument();
+    const client = new StudioCrdtDocument();
+    const fake = new FakeRoom(server);
+    const outbox = new DurableMemoryOutbox();
+    const statuses: StudioCrdtBindingStatus[] = [];
+    const binding = new StudioCrdtRoomBinding({
+      document: client, room: room(fake), outbox, outboxScope: "artist",
+      recoveryVault: new MemoryRecoveryVault(), onStatus: (status) => statuses.push(status),
+    });
+    try {
+      await binding.start();
+      const delivery = deferred();
+      fake.publishBarrier = delivery.promise;
+      add(client, "closed-tail", 20);
+      await vi.advanceTimersByTimeAsync(60);
+      expect(outbox.requests.size).toBe(1);
+      binding.close();
+      delivery.release();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(outbox.requests.size).toBe(1);
+      expect(statuses.at(-1)?.state).toBe("idle");
+      expect(statuses.at(-1)?.lastAckAt).toBeNull();
+    } finally { binding.close(); client.destroy(); server.destroy(); }
+  });
+});
