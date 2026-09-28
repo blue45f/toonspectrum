@@ -1,6 +1,8 @@
 import { apiFetch } from "@/platform/api";
 import { EyeOff, MessageCircle, Send, AlertTriangle, ShieldCheck, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { insertReplyNode } from "./fan-cafe-tree-utils";
 
 import type { ReviewReply } from "@/shared/lib/types";
 
@@ -14,6 +16,11 @@ const MAX_REPLY_DEPTH = 4;
 const MAX_REPLY_LENGTH = 700;
 
 export function ReviewReplies({ reviewId }: { reviewId: string }) {
+  const userId = useApp((state) => state.userId);
+  return <ReviewRepliesContent key={`${reviewId}:${userId ?? "guest"}`} reviewId={reviewId} />;
+}
+
+function ReviewRepliesContent({ reviewId }: { reviewId: string }) {
   const userId = useApp((s) => s.userId);
   const sessionToken = useApp((s) => s.sessionToken);
   const [open, setOpen] = useState(false);
@@ -24,6 +31,16 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
   const [openComposerFor, setOpenComposerFor] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({ [ROOT_REPLY]: "" });
   const [spoilerDrafts, setSpoilerDrafts] = useState<Record<string, boolean>>({ [ROOT_REPLY]: false });
+
+  const pendingRef = useRef(new Set<string>());
+  const loadControllerRef = useRef<AbortController | null>(null);
+  const activeRef = useRef(true);
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    activeRef.current = true;
+    return () => { activeRef.current = false; loadControllerRef.current?.abort(); };
+  }, []);
 
   function setDraft(id: string, value: string) {
     const next = value.slice(0, MAX_REPLY_LENGTH);
@@ -38,80 +55,74 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
     setOpenComposerFor((current) => (current === parentId ? null : parentId));
   }
 
-  function insertReply(
-    nodes: ReviewReply[],
-    parentId: string | null,
-    reply: ReviewReply
-  ): ReviewReply[] {
-    if (!parentId) return [...nodes, reply];
-    const next = nodes.map((node) => {
-      if (node.id === parentId) {
-        return { ...node, children: [...(node.children ?? []), reply] };
-      }
-      if (!node.children || node.children.length === 0) return node;
-      return { ...node, children: insertReply(node.children, parentId, reply) };
-    });
-    return next;
-  }
-
-  async function load() {
+  async function load(force = false) {
     setOpen(true);
-    if (loaded || loading) return;
+    if ((!force && loaded) || loading || pendingRef.current.size) return;
+    const controller = new AbortController();
+    loadControllerRef.current?.abort();
+    loadControllerRef.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const res = await apiFetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, { cache: "no-store" });
+      const res = await apiFetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, { cache: "no-store", signal: controller.signal });
       const data = await safeParseJson<unknown>(res);
+      if (controller.signal.aborted || !activeRef.current) return;
       if (!res.ok) {
         setError(resolveApiError(data, `답글 목록을 불러오지 못했습니다. (${res.status})`));
+        return;
+      }
+      if (!Array.isArray(data)) {
+        setError("답글 목록 응답이 유효하지 않습니다. 다시 불러와 주세요.");
         return;
       }
       setReplies(ensureArray<ReviewReply>(data));
       setLoaded(true);
     } catch {
-      setError("답글을 불러오지 못했습니다.");
+      if (!controller.signal.aborted && activeRef.current) setError("답글을 불러오지 못했습니다.");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted && activeRef.current) setLoading(false);
     }
   }
 
   async function submit(parentId: string | null = null) {
-    const draft = (drafts[parentId ?? ROOT_REPLY] ?? "").trim();
-    if (!draft || !userId) return;
-    const spoiler = spoilerDrafts[parentId ?? ROOT_REPLY] ?? false;
-
-    const body = {
-      text: draft,
-      spoiler,
-      ...(parentId ? { parentId } : {}),
-    };
-
+    const key = parentId ?? ROOT_REPLY;
+    const submittedValue = drafts[key] ?? "";
+    const draft = submittedValue.trim();
+    if (!draft || !userId || pendingRef.current.has(key)) return;
+    const spoiler = spoilerDrafts[key] ?? false;
+    pendingRef.current.add(key);
+    loadControllerRef.current?.abort();
+    setLoading(false);
+    setPending((current) => ({ ...current, [key]: true }));
     setError(null);
-    const res = await apiFetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, withCsrfProtection({
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        "Content-Type": "application/json",
-        ...(sessionToken ? { "x-user-id": sessionToken } : {}),
-      },
-      body: JSON.stringify(body),
-    }));
-
-    const data = await safeParseJson<unknown>(res);
-    if (!res.ok) {
-      setError(resolveApiError(data, `답글을 저장하지 못했습니다. (${res.status})`));
-      return;
+    setNotice("");
+    try {
+      const res = await apiFetch(`/api/reviews/${encodeURIComponent(reviewId)}/replies`, withCsrfProtection({
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json", ...(sessionToken ? { "x-user-id": sessionToken } : {}) },
+        body: JSON.stringify({ text: draft, spoiler, ...(parentId ? { parentId } : {}) }),
+      }));
+      const data = await safeParseJson<unknown>(res);
+      if (!activeRef.current) return;
+      if (!res.ok) {
+        setError(resolveApiError(data, `답글을 저장하지 못했습니다. (${res.status}) 입력 내용은 유지됩니다.`));
+        return;
+      }
+      if (!data || typeof data !== "object" || !("id" in data) || typeof data.id !== "string" || !("author" in data) || !data.author) {
+        setError("답글 응답 형식이 유효하지 않습니다.");
+        return;
+      }
+      setReplies((current) => insertReplyNode(current, parentId, data as ReviewReply));
+      setDrafts((current) => current[key] === submittedValue ? { ...current, [key]: "" } : current);
+      setLoaded(true);
+      setNotice("답글을 등록했습니다.");
+    } catch {
+      if (activeRef.current) setError("답글을 저장하지 못했습니다. 연결 상태를 확인한 뒤 다시 등록해 주세요. 입력 내용은 유지됩니다.");
+    } finally {
+      pendingRef.current.delete(key);
+      if (activeRef.current) setPending((current) => ({ ...current, [key]: false }));
     }
-    if (!data || typeof data !== "object" || !("id" in data)) {
-      setError("답글 응답 형식이 유효하지 않습니다.");
-      return;
-    }
-
-    setReplies((current) => insertReply(current, parentId, data as ReviewReply));
-    setDraft(parentId ?? ROOT_REPLY, "");
-    setSpoilerDraft(parentId ?? ROOT_REPLY, false);
-    setLoaded(true);
-    setOpenComposerFor(null);
   }
 
   // 소프트 삭제 마스킹/제거 — 서버(deleteReviewReply)와 동일하게 하위 답글이 있으면 자리 표시만 남긴다.
@@ -134,9 +145,15 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
   }
 
   async function deleteReply(replyId: string) {
-    if (!userId) return;
+    const key = `delete:${replyId}`;
+    if (!userId || pendingRef.current.has(key)) return;
     if (!globalThis.confirm("이 답글을 삭제할까요?")) return;
+    pendingRef.current.add(key);
+    loadControllerRef.current?.abort();
+    setLoading(false);
+    setPending((current) => ({ ...current, [key]: true }));
     setError(null);
+    setNotice("");
     try {
       const res = await apiFetch(
         `/api/reviews/${encodeURIComponent(reviewId)}/replies/${encodeURIComponent(replyId)}`,
@@ -147,6 +164,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
         })
       );
       const data = await safeParseJson<unknown>(res);
+      if (!activeRef.current) return;
       if (!res.ok) {
         setError(resolveApiError(data, "답글을 삭제하지 못했습니다."));
         return;
@@ -157,18 +175,24 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
         return;
       }
       setReplies((current) => (result.soft ? maskNode(current, replyId) : removeNode(current, replyId)));
+      setNotice("답글을 삭제했습니다.");
     } catch {
-      setError("답글을 삭제하지 못했습니다.");
+      if (activeRef.current) setError("답글을 삭제하지 못했습니다.");
+    } finally {
+      pendingRef.current.delete(key);
+      if (activeRef.current) setPending((current) => ({ ...current, [key]: false }));
     }
   }
 
   const count = countReplies(replies);
 
   return (
-    <div className="border-t border-line pt-3">
+    <div className="min-w-0 border-t border-line pt-3">
+      <p role="status" className="text-xs text-fg-3">{notice}</p>
       <button
         type="button"
-        onClick={() => (open ? setOpen(false) : load())}
+        aria-expanded={open}
+        onClick={() => (open ? setOpen(false) : void load())}
         className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium text-fg-3 transition-colors hover:bg-raised hover:text-fg-2"
       >
         <MessageCircle size={14} />
@@ -177,13 +201,17 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
 
       {open && (
         <div className="mt-3 flex flex-col gap-3">
-          {loading && <div className="skeleton h-10 w-full" />}
+          <button type="button" onClick={() => void load(true)} disabled={loading || Object.values(pending).some(Boolean)}
+            className="min-h-11 self-start rounded-lg border border-line px-3 text-xs text-fg-2 disabled:opacity-50">
+            {loading ? "답글 불러오는 중" : "답글 새로고침"}
+          </button>
+          {loading && <div role="status" aria-label="답글 불러오는 중" className="skeleton h-10 w-full" />}
           {error && (
-            <p className="rounded-lg border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] px-3 py-2 text-xs text-bad">
+            <p role="alert" className="rounded-lg border border-bad/40 bg-[oklch(0.66_0.2_25/0.12)] px-3 py-2 text-xs text-bad">
               {error}
             </p>
           )}
-          {replies.length === 0 && !loading ? (
+          {replies.length === 0 && loaded && !loading ? (
             <p className="rounded-lg border border-dashed border-line bg-canvas/40 px-3 py-3 text-xs text-fg-3">
               첫 답글을 남겨 대화를 이어가세요.
             </p>
@@ -199,6 +227,7 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
               onChangeDraft={setDraft}
               spoilerByReplyId={spoilerDrafts}
               onChangeSpoilerDraft={setSpoilerDraft}
+              pending={pending}
               depth={0}
             />
           )}
@@ -230,12 +259,12 @@ export function ReviewReplies({ reviewId }: { reviewId: string }) {
                   <span className="text-[0.7rem] text-fg-3">{(drafts[ROOT_REPLY] ?? "").length}/{MAX_REPLY_LENGTH}</span>
                   <button
                     type="button"
-                    onClick={() => submit(null)}
-                    disabled={!(drafts[ROOT_REPLY]?.trim() ?? "").length}
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
+                    onClick={() => void submit(null)}
+                    disabled={!(drafts[ROOT_REPLY]?.trim() ?? "").length || Boolean(pending[ROOT_REPLY])}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
                   >
                     <Send size={13} />
-                    등록
+                    {pending[ROOT_REPLY] ? "등록 중..." : "등록"}
                   </button>
                 </div>
               </>
@@ -260,6 +289,7 @@ function ReplyThread({
   onChangeDraft,
   spoilerByReplyId,
   onChangeSpoilerDraft,
+  pending,
   depth,
 }: {
   items: ReviewReply[];
@@ -272,6 +302,7 @@ function ReplyThread({
   onChangeDraft: (id: string, value: string) => void;
   spoilerByReplyId: Record<string, boolean>;
   onChangeSpoilerDraft: (id: string, value: boolean) => void;
+  pending: Record<string, boolean>;
   depth: number;
 }) {
   if (items.length === 0) return null;
@@ -293,6 +324,7 @@ function ReplyThread({
               onChangeDraft={onChangeDraft}
               spoilerByReplyId={spoilerByReplyId}
               onChangeSpoilerDraft={onChangeSpoilerDraft}
+              pending={pending}
             />
           ))}
         </div>
@@ -312,6 +344,7 @@ function ReviewReplyItem({
   onChangeDraft,
   spoilerByReplyId,
   onChangeSpoilerDraft,
+  pending,
 }: {
   reply: ReviewReply;
   userId: string | null;
@@ -325,6 +358,7 @@ function ReviewReplyItem({
   onChangeDraft: (id: string, value: string) => void;
   spoilerByReplyId: Record<string, boolean>;
   onChangeSpoilerDraft: (id: string, value: boolean) => void;
+  pending: Record<string, boolean>;
 }) {
   const [revealed, setRevealed] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -353,6 +387,7 @@ function ReviewReplyItem({
           <button
             type="button"
             onClick={() => void onDelete(reply.id)}
+            disabled={Boolean(pending[`delete:${reply.id}`])}
             aria-label="내 답글 삭제"
             title="삭제"
             className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[0.68rem] text-fg-3 transition-colors hover:bg-raised hover:text-bad"
@@ -366,7 +401,7 @@ function ReviewReplyItem({
         <p className="text-sm italic leading-relaxed text-fg-3">삭제된 답글입니다.</p>
       ) : (
         <div className="relative">
-          <p className={cn("text-sm leading-relaxed text-fg-2", hidden && "select-none blur-[5px]")}>{reply.text}</p>
+          <p className={cn("whitespace-pre-wrap [overflow-wrap:anywhere] text-sm leading-relaxed text-fg-2", hidden && "select-none blur-[5px]")}>{reply.text}</p>
           {hidden && (
             <button
               type="button"
@@ -436,12 +471,12 @@ function ReviewReplyItem({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onSubmit(reply.id)}
-                  disabled={!draft.trim()}
+                  onClick={() => void onSubmit(reply.id)}
+                  disabled={!draft.trim() || Boolean(pending[reply.id])}
                   className="inline-flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Send size={12} />
-                  저장
+                  {pending[reply.id] ? "저장 중..." : "저장"}
                 </button>
               </div>
             </div>
@@ -466,6 +501,7 @@ function ReviewReplyItem({
             onChangeDraft={onChangeDraft}
             spoilerByReplyId={spoilerByReplyId}
             onChangeSpoilerDraft={onChangeSpoilerDraft}
+              pending={pending}
             depth={depth + 1}
           />
         </div>
